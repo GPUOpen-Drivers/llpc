@@ -100,8 +100,8 @@ static cl::opt<bool> DisableFetchShader("disable-fetch-shader", cl::desc("Disabl
 static cl::opt<bool> DisableColorExportShader("disable-color-export-shader", cl::desc("Disable color export shaders"),
                                               cl::init(false));
 
-// -subgroup-size: sub-group size exposed via Vulkan API.
-static cl::opt<int> SubgroupSize("subgroup-size", cl::desc("Sub-group size exposed via Vulkan API"), cl::init(64));
+// -subgroup-size: subgroup size exposed via Vulkan API.
+static cl::opt<int> SubgroupSize("subgroup-size", cl::desc("Subgroup size exposed via Vulkan API"), cl::init(64));
 
 // -enable-shadow-desc: enable shadow descriptor table
 static cl::opt<bool> EnableShadowDescriptorTable("enable-shadow-desc", cl::desc("Enable shadow descriptor table"));

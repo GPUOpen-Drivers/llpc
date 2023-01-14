@@ -939,7 +939,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   // }
   //
 
-  // Export count when the entire sub-group is fully culled
+  // Export count when the entire subgroup is fully culled
   const bool waNggCullingNoEmptySubgroups =
       m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx10.waNggCullingNoEmptySubgroups;
   const unsigned fullyCulledExportCount = waNggCullingNoEmptySubgroups ? 1 : 0;
@@ -1360,7 +1360,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
         readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInWave, LdsRegionVertCountInWaves);
 
     // The last dword following dwords for all waves (each wave has one dword) stores vertex count of the
-    // entire sub-group
+    // entire subgroup
     vertCountInSubgroup = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {},
                                                     {vertCountInWaves, m_builder.getInt32(waveCountInSubgroup)});
 
@@ -1443,8 +1443,8 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     primCountInSubgroup = m_builder.CreateSelect(fullyCulled, m_builder.getInt32(fullyCulledExportCount),
                                                  m_nggInputs.primCountInSubgroup);
 
-    // NOTE: Here, we have to promote revised primitive count in sub-group to SGPR since it is treated
-    // as an uniform value later. This is similar to the provided primitive count in sub-group that is
+    // NOTE: Here, we have to promote revised primitive count in subgroup to SGPR since it is treated
+    // as an uniform value later. This is similar to the provided primitive count in subgroup that is
     // a system value.
     primCountInSubgroup = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primCountInSubgroup);
 
@@ -1452,9 +1452,9 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
         m_builder.CreateSelect(fullyCulled, m_builder.getInt32(fullyCulledExportCount),
                                disableCompact ? m_nggInputs.vertCountInSubgroup : vertCountInSubgroup);
 
-    // NOTE: Here, we have to promote revised vertex count in sub-group to SGPR since it is treated as
+    // NOTE: Here, we have to promote revised vertex count in subgroup to SGPR since it is treated as
     // an uniform value later, similar to what we have done for the revised primitive count in
-    // sub-group.
+    // subgroup.
     vertCountInSubgroup = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertCountInSubgroup);
 
     m_builder.CreateBr(checkAllocReqBlock);
@@ -1489,13 +1489,13 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     fullyCulledPhi->addIncoming(m_builder.getFalse(), runtimePassthroughBlock);
     fullyCulled = fullyCulledPhi;
 
-    // Update primitive count in sub-group
+    // Update primitive count in subgroup
     auto primCountInSubgroupPhi = m_builder.CreatePHI(m_builder.getInt32Ty(), 2);
     primCountInSubgroupPhi->addIncoming(primCountInSubgroup, endCompactVertBlock);
     primCountInSubgroupPhi->addIncoming(m_nggInputs.primCountInSubgroup, runtimePassthroughBlock);
     m_nggInputs.primCountInSubgroup = primCountInSubgroupPhi; // Record primitive count in subgroup
 
-    // Update vertex count in sub-group
+    // Update vertex count in subgroup
     auto vertCountInSubgroupPhi = m_builder.CreatePHI(m_builder.getInt32Ty(), 2);
     vertCountInSubgroupPhi->addIncoming(vertCountInSubgroup, endCompactVertBlock);
     vertCountInSubgroupPhi->addIncoming(m_nggInputs.vertCountInSubgroup, runtimePassthroughBlock);
@@ -2063,7 +2063,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
                                    (SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword) * rasterStream);
 
       // The last dword following dwords for all waves (each wave has one dword) stores GS output vertex count of the
-      // entire sub-group
+      // entire subgroup
       auto vertCountInSubgroup = m_builder.CreateIntrinsic(
           Intrinsic::amdgcn_readlane, {}, {outVertCountInWaves, m_builder.getInt32(waveCountInSubgroup)});
 
@@ -2075,7 +2075,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
       m_builder.CreateCondBr(m_builder.CreateAnd(drawFlag, vertCompacted), compactOutVertIdBlock,
                              endCompactOutVertIdBlock);
 
-      m_nggInputs.vertCountInSubgroup = vertCountInSubgroup; // Update GS output vertex count in sub-group
+      m_nggInputs.vertCountInSubgroup = vertCountInSubgroup; // Update GS output vertex count in subgroup
       m_nggInputs.vertCompacted = vertCompacted;             // Record vertex compaction flag
     }
   }
@@ -2514,10 +2514,10 @@ void NggPrimShader::doPrimitiveExportWithGs(Value *vertexId) {
 }
 
 // =====================================================================================================================
-// Early exit NGG primitive shader when we detect that the entire sub-group is fully culled, doing dummy
+// Early exit NGG primitive shader when we detect that the entire subgroup is fully culled, doing dummy
 // primitive/vertex export if necessary.
 //
-// @param fullyCulledExportCount : Primitive/vertex count for dummy export when the entire sub-group is fully culled
+// @param fullyCulledExportCount : Primitive/vertex count for dummy export when the entire subgroup is fully culled
 void NggPrimShader::doEarlyExit(unsigned fullyCulledExportCount) {
   if (fullyCulledExportCount > 0) {
     assert(fullyCulledExportCount == 1); // Currently, if workarounded, this is set to 1
@@ -2658,7 +2658,7 @@ void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
 
   std::vector<Value *> args;
 
-  // Setup attribute ring base and vertex thread ID in sub-group as two additional arguments to export vertex attributes
+  // Setup attribute ring base and vertex thread ID in subgroup as two additional arguments to export vertex attributes
   // through memory
   if (m_gfxIp.major >= 11 && !m_hasGs) { // For GS, vertex attribute exports are in copy shader
     const auto attribCount = m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStageTessEval : ShaderStageVertex)
@@ -2929,7 +2929,7 @@ Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Valu
 
   std::vector<Value *> args;
 
-  // Setup attribute ring base and vertex thread ID in sub-group as two additional arguments to export vertex attributes
+  // Setup attribute ring base and vertex thread ID in subgroup as two additional arguments to export vertex attributes
   // through memory
   if (m_gfxIp.major >= 11 && deferredVertexExport) {
     const auto attribCount = m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStageTessEval : ShaderStageVertex)
@@ -3225,9 +3225,9 @@ void NggPrimShader::runGs(Module *module, Argument *sysValueStart) {
 
   Value *gsVsOffset = UndefValue::get(m_builder.getInt32Ty()); // NOTE: For NGG, GS-VS offset is unused
 
-  // NOTE: This argument is expected to be GS wave ID, not wave ID in sub-group, for normal ES-GS merged shader.
+  // NOTE: This argument is expected to be GS wave ID, not wave ID in subgroup, for normal ES-GS merged shader.
   // However, in NGG mode, GS wave ID, sent to GS_EMIT and GS_CUT messages, is no longer required because of NGG
-  // handling of such messages. Instead, wave ID in sub-group is required as the substitute.
+  // handling of such messages. Instead, wave ID in subgroup is required as the substitute.
   auto waveId = m_nggInputs.waveIdInSubgroup;
 
   arg += NumSpecialSgprInputs;
@@ -3470,7 +3470,7 @@ void NggPrimShader::runCopyShader(Module *module, Argument *sysValueStart) {
   std::vector<Value *> args;
 
   if (m_gfxIp.major >= 11) {
-    // Setup attribute ring base and vertex thread ID in sub-group as two additional arguments to export vertex
+    // Setup attribute ring base and vertex thread ID in subgroup as two additional arguments to export vertex
     // attributes through memory
     const auto attribCount = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.expCount;
     if (attribCount > 0) {
@@ -3500,7 +3500,7 @@ void NggPrimShader::runCopyShader(Module *module, Argument *sysValueStart) {
     }
   }
 
-  // Vertex ID in sub-group
+  // Vertex ID in subgroup
   args.push_back(vertexId);
 
   CallInst *copyShaderCall = m_builder.CreateCall(copyShaderEntry, args);
@@ -3603,7 +3603,7 @@ Function *NggPrimShader::mutateCopyShader(Module *module) {
 // @param location : Location of the output
 // @param compIdx : Index used for vector element indexing
 // @param streamId : ID of output vertex stream
-// @param threadIdInSubgroup : Thread ID in sub-group
+// @param threadIdInSubgroup : Thread ID in subgroup
 // @param emitVerts : Counter of GS emitted vertices for this stream
 void NggPrimShader::exportGsOutput(Value *output, unsigned location, unsigned compIdx, unsigned streamId,
                                    Value *threadIdInSubgroup, Value *emitVerts) {
@@ -3918,7 +3918,7 @@ Function *NggPrimShader::createGsCutHandler(Module *module) {
 // Reads per-thread data from the specified NGG region in LDS.
 //
 // @param readDataTy : Data read from LDS
-// @param threadId : Thread ID in sub-group to calculate LDS offset
+// @param threadId : Thread ID in subgroup to calculate LDS offset
 // @param region : NGG LDS region
 // @param offsetInRegion : Offset within this NGG LDS region (in bytes), the default is 0 (from the region beginning)
 // @param useDs128 : Whether to use 128-bit LDS read, 16-byte alignment is guaranteed by caller
@@ -3943,7 +3943,7 @@ Value *NggPrimShader::readPerThreadDataFromLds(Type *readDataTy, Value *threadId
 // Writes the per-thread data to the specified NGG region in LDS.
 //
 // @param writeData : Data written to LDS
-// @param threadId : Thread ID in sub-group to calculate LDS offset
+// @param threadId : Thread ID in subgroup to calculate LDS offset
 // @param region : NGG LDS region
 // @param offsetInRegion : Offset within this NGG LDS region (in bytes), the default is 0 (from the region beginning)
 // @param useDs128 : Whether to use 128-bit LDS write, 16-byte alignment is guaranteed by caller
@@ -3969,7 +3969,7 @@ void NggPrimShader::writePerThreadDataToLds(Value *writeData, Value *threadId, N
 // Reads vertex cull info from LDS (the region of vertex cull info).
 //
 // @param readDataTy : Data read from LDS
-// @param vertexItemOffset : Per-vertex item offset (in bytes) in sub-group of the entire vertex cull info
+// @param vertexItemOffset : Per-vertex item offset (in bytes) in subgroup of the entire vertex cull info
 // @param dataOffset : Data offset (in bytes) within an item of vertex cull info
 Value *NggPrimShader::readVertexCullInfoFromLds(Type *readDataTy, Value *vertexItemOffset, unsigned dataOffset) {
   // Only applied to culling mode of non-GS NGG
@@ -3985,7 +3985,7 @@ Value *NggPrimShader::readVertexCullInfoFromLds(Type *readDataTy, Value *vertexI
 // Writes vertex cull info to LDS (the region of vertex cull info).
 //
 // @param writeData : Data written to LDS
-// @param vertexItemOffset : Per-vertex item offset (in bytes) in sub-group of the entire vertex cull info
+// @param vertexItemOffset : Per-vertex item offset (in bytes) in subgroup of the entire vertex cull info
 // @param dataOffset : Data offset (in bytes) within an item of vertex cull info
 void NggPrimShader::writeVertexCullInfoToLds(Value *writeData, Value *vertexItemOffset, unsigned dataOffset) {
   // Only applied to culling mode of non-GS NGG
@@ -5713,7 +5713,7 @@ Value *NggPrimShader::doSubgroupBallot(Value *value) {
 
 // =====================================================================================================================
 // Processes vertex attribute export calls in the target function. We mutate the argument list of the target function
-// by adding two additional arguments (one is attribute ring base and the other is vertex thread ID in sub-group).
+// by adding two additional arguments (one is attribute ring base and the other is vertex thread ID in subgroup).
 // Also, we expand all export calls by replacing it with real instructions that do vertex attribute exporting through
 // memory.
 //
@@ -5736,7 +5736,7 @@ void NggPrimShader::processVertexAttribExport(Function *&targetFunc) {
   auto newTargetFunc = addFunctionArgs(targetFunc, nullptr,
                                        {
                                            m_builder.getInt32Ty(), // Attribute ring base (SGPR)
-                                           m_builder.getInt32Ty()  // Vertex thread ID in sub-group (VGPR)
+                                           m_builder.getInt32Ty()  // Vertex thread ID in subgroup (VGPR)
                                        },
                                        {"attribRingBase", "vertexIndex"}, 0x1);
 
@@ -6502,7 +6502,7 @@ void NggPrimShader::processGsXfbOutputExport(Module *module, Argument *sysValueS
                                      (SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword) * i);
 
         // The last dword following dwords for all waves (each wave has one dword) stores GS output primitive count of
-        // the entire sub-group
+        // the entire subgroup
         primCountInSubgroup[i] = m_builder.CreateIntrinsic(
             Intrinsic::amdgcn_readlane, {}, {outPrimCountInWaves, m_builder.getInt32(waveCountInSubgroup)});
 
@@ -7174,7 +7174,7 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
   // If we don't clone the entry-point, we are going to run the whole ES and handle vertex attribute through memory
   // here.
   if (dontClone) {
-    // Setup attribute ring base and vertex thread ID in sub-group as two additional arguments to export vertex
+    // Setup attribute ring base and vertex thread ID in subgroup as two additional arguments to export vertex
     // attributes through memory
     if (m_gfxIp.major >= 11 && !m_hasGs) { // For GS, vertex attribute exports are in copy shader
       const auto attribCount =
@@ -7268,7 +7268,7 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
 // Reads transform feedback output from LDS
 //
 // @param readDataTy : Data read from LDS
-// @param vertexId: Vertex thread ID in sub-group
+// @param vertexId: Vertex thread ID in subgroup
 // @param outputIndex : Index of this transform feedback output
 Value *NggPrimShader::readXfbOutputFromLds(llvm::Type *readDataTy, llvm::Value *vertexId, unsigned outputIndex) {
   assert(m_enableSwXfb); // SW-emulated stream-out must be enabled
@@ -7296,7 +7296,7 @@ Value *NggPrimShader::readXfbOutputFromLds(llvm::Type *readDataTy, llvm::Value *
 // Writes transform feedback output from LDS
 //
 // @param writeData : Data written to LDS
-// @param vertexId: Vertex thread ID in sub-group
+// @param vertexId: Vertex thread ID in subgroup
 // @param outputIndex : Index of this transform feedback output
 void NggPrimShader::writeXfbOutputToLds(Value *writeData, Value *vertexId, unsigned outputIndex) {
   assert(m_enableSwXfb); // SW-emulated stream-out must be enabled
@@ -7324,7 +7324,7 @@ void NggPrimShader::writeXfbOutputToLds(Value *writeData, Value *vertexId, unsig
 // =====================================================================================================================
 // Fetches the position data for the specified vertex ID.
 //
-// @param vertexId : Vertex thread ID in sub-group.
+// @param vertexId : Vertex thread ID in subgroup.
 Value *NggPrimShader::fetchVertexPositionData(Value *vertexId) {
   if (!m_hasGs) {
     // ES-only
@@ -7345,7 +7345,7 @@ Value *NggPrimShader::fetchVertexPositionData(Value *vertexId) {
 // =====================================================================================================================
 // Fetches the aggregated sign mask of cull distances for the specified vertex ID.
 //
-// @param vertexId : Vertex thread ID in sub-group.
+// @param vertexId : Vertex thread ID in subgroup.
 Value *NggPrimShader::fetchCullDistanceSignMask(Value *vertexId) {
   assert(m_nggControl->enableCullDistanceCulling);
 
@@ -7387,7 +7387,7 @@ Value *NggPrimShader::fetchCullDistanceSignMask(Value *vertexId) {
 // Calculates the starting LDS offset (in bytes) of vertex item data in GS-VS ring.
 //
 // @param streamId : ID of output vertex stream.
-// @param vertexId : Vertex thread ID in sub-group.
+// @param vertexId : Vertex thread ID in subgroup.
 Value *NggPrimShader::calcVertexItemOffset(unsigned streamId, Value *vertexId) {
   assert(m_hasGs); // GS must be present
 

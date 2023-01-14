@@ -624,15 +624,15 @@ enum class WaveBreakSize : unsigned {
   _32x32 = 0x3, ///< Outside a 32x32 pixel region
 };
 
-/// Enumerates various sizing options of sub-group size for NGG primitive shader.
+/// Enumerates various sizing options of subgroup size for NGG primitive shader.
 enum class NggSubgroupSizingType : unsigned {
-  Auto,             ///< Sub-group size is allocated as optimally determined
-  MaximumSize,      ///< Sub-group size is allocated to the maximum allowable size by the hardware
-  HalfSize,         ///< Sub-group size is allocated as to allow half of the maximum allowable size
+  Auto,             ///< Subgroup size is allocated as optimally determined
+  MaximumSize,      ///< Subgroup size is allocated to the maximum allowable size by the hardware
+  HalfSize,         ///< Subgroup size is allocated as to allow half of the maximum allowable size
                     ///  by the hardware
-  OptimizeForVerts, ///< Sub-group size is optimized for vertex thread utilization
-  OptimizeForPrims, ///< Sub-group size is optimized for primitive thread utilization
-  Explicit,         ///< Sub-group size is allocated based on explicitly-specified vertsPerSubgroup and
+  OptimizeForVerts, ///< Subgroup size is optimized for vertex thread utilization
+  OptimizeForPrims, ///< Subgroup size is optimized for primitive thread utilization
+  Explicit,         ///< Subgroup size is allocated based on explicitly-specified vertsPerSubgroup and
                     ///  primsPerSubgroup
 };
 
@@ -664,12 +664,12 @@ struct NggState {
                              ///  Only valid if the NGG backface culler is enabled.
                              ///  A value of 0 will disable the threshold.
 
-  NggSubgroupSizingType subgroupSizing; ///< NGG sub-group sizing type
+  NggSubgroupSizingType subgroupSizing; ///< NGG subgroup sizing type
 
   unsigned primsPerSubgroup; ///< Preferred number of GS primitives to pack into a primitive shader
-                             ///  sub-group
+                             ///  subgroup
 
-  unsigned vertsPerSubgroup; ///< Preferred number of vertices consumed by a primitive shader sub-group
+  unsigned vertsPerSubgroup; ///< Preferred number of vertices consumed by a primitive shader subgroup
 };
 
 /// ShaderHash represents a 128-bit client-specified hash key which uniquely identifies a shader program.

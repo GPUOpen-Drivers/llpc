@@ -2124,7 +2124,7 @@ std::ostream &operator<<(std::ostream &out, ResourceMappingNodeType type) {
 // Translates enum "NggSubgroupSizingType" to string and output to ostream.
 //
 // @param [out] out : Output stream
-// @param subgroupSizing : NGG sub-group sizing type
+// @param subgroupSizing : NGG subgroup sizing type
 std::ostream &operator<<(std::ostream &out, NggSubgroupSizingType subgroupSizing) {
   const char *string = nullptr;
   switch (subgroupSizing) {

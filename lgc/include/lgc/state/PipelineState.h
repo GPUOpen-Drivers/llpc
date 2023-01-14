@@ -90,12 +90,12 @@ struct NggControl {
                              // Only valid if the NGG backface culler is enabled.
                              // A value of 0 will disable the threshold.
 
-  NggSubgroupSizing subgroupSizing; // NGG sub-group sizing type
+  NggSubgroupSizing subgroupSizing; // NGG subgroup sizing type
 
   unsigned primsPerSubgroup; // Preferred number of GS primitives to pack into a primitive shader
-                             // sub-group
+                             // subgroup
 
-  unsigned vertsPerSubgroup; // Preferred number of vertices consumed by a primitive shader sub-group
+  unsigned vertsPerSubgroup; // Preferred number of vertices consumed by a primitive shader subgroup
 
   bool passthroughMode;                          // Whether NGG passthrough mode is enabled
   Util::Abi::PrimShaderCbLayout primShaderTable; // Primitive shader table (only some registers are used)

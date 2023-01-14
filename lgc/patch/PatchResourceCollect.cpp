@@ -562,7 +562,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
     if (useAdjacency)
       esMinVertsPerSubgroup = inVertsPerPrim;
 
-    // For normal primitives, the VGT only checks if they are past the ES verts per sub-group after allocating a full
+    // For normal primitives, the VGT only checks if they are past the ES verts per subgroup after allocating a full
     // GS primitive and if they are, kick off a new sub group. But if those additional ES vertices are unique
     // (e.g. not reused) we need to make sure there is enough LDS space to account for those ES verts beyond
     // ES_VERTS_PER_SUBGRP.
@@ -909,7 +909,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
         rayQueryLdsStackSize = MaxRayQueryLdsStackEntries * MaxRayQueryThreadsPerGroup;
 #endif
 
-      // Use the client-specified amount of LDS space per sub-group. If they specified zero, they want us to
+      // Use the client-specified amount of LDS space per subgroup. If they specified zero, they want us to
       // choose a reasonable default. The final amount must be 128-dword aligned.
       // TODO: Accept DefaultLdsSizePerSubgroup from panel setting
       unsigned maxLdsSize = Gfx9::DefaultLdsSizePerSubgroup;
@@ -919,9 +919,9 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
 
       // If total LDS usage is too big, refactor partitions based on ratio of ES-GS item sizes.
       if (gsOnChipLdsSize > maxLdsSize) {
-        // Our target GS primitives per sub-group was too large
+        // Our target GS primitives per subgroup was too large
 
-        // Calculate the maximum number of GS primitives per sub-group that will fit into LDS, capped
+        // Calculate the maximum number of GS primitives per subgroup that will fit into LDS, capped
         // by the maximum that the hardware can support.
         unsigned availableLdsSize = maxLdsSize - esGsExtraLdsDwords;
         gsPrimsPerSubgroup =
@@ -1067,8 +1067,8 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
 
   LLPC_OUTS("===============================================================================\n");
   LLPC_OUTS("// LLPC geometry calculation factor results\n\n");
-  LLPC_OUTS("ES vertices per sub-group: " << gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup << "\n");
-  LLPC_OUTS("GS primitives per sub-group: " << gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup << "\n");
+  LLPC_OUTS("ES vertices per subgroup: " << gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup << "\n");
+  LLPC_OUTS("GS primitives per subgroup: " << gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup << "\n");
   LLPC_OUTS("\n");
   LLPC_OUTS("ES-GS LDS size (in dwords): " << gsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize << "\n");
   LLPC_OUTS("On-chip GS LDS size (in dwords): " << gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize << "\n");
