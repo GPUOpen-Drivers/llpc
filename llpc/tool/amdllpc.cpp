@@ -198,28 +198,28 @@ cl::opt<bool> NggEnableCullDistanceCulling("ngg-enable-cull-distance-culling",
 cl::opt<unsigned> NggBackfaceExponent("ngg-backface-exponent", cl::desc("Control backface culling algorithm (NGG)"),
                                       cl::value_desc("exp"), cl::init(0));
 
-// -ngg-subgroup-sizing: NGG sub-group sizing type (NGG)
+// -ngg-subgroup-sizing: NGG subgroup sizing type (NGG)
 cl::opt<unsigned> NggSubgroupSizing(
     "ngg-subgroup-sizing",
-    cl::desc("NGG sub-group sizing type (NGG):\n"
-             "0: Sub-group size is allocated as optimally determined\n"
-             "1: Sub-group size is allocated to the maximum allowable size\n"
-             "2: Sub-group size is allocated as to allow half of the maximum allowable size\n"
-             "3: Sub-group size is optimized for vertex thread utilization\n"
-             "4: Sub-group size is optimized for primitive thread utilization\n"
-             "5: Sub-group size is allocated based on explicitly-specified vertsPerSubgroup and primsPerSubgroup"),
+    cl::desc("NGG subgroup sizing type (NGG):\n"
+             "0: Subgroup size is allocated as optimally determined\n"
+             "1: Subgroup size is allocated to the maximum allowable size\n"
+             "2: Subgroup size is allocated as to allow half of the maximum allowable size\n"
+             "3: Subgroup size is optimized for vertex thread utilization\n"
+             "4: Subgroup size is optimized for primitive thread utilization\n"
+             "5: Subgroup size is allocated based on explicitly-specified vertsPerSubgroup and primsPerSubgroup"),
     cl::value_desc("sizing"), cl::init(static_cast<unsigned>(NggSubgroupSizingType::Auto)));
 
-// -ngg-prims-per-subgroup: preferred numberof GS primitives to pack into a primitive shader sub-group (NGG)
+// -ngg-prims-per-subgroup: preferred numberof GS primitives to pack into a primitive shader subgroup (NGG)
 cl::opt<unsigned>
     NggPrimsPerSubgroup("ngg-prims-per-subgroup",
-                        cl::desc("Preferred numberof GS primitives to pack into a primitive shader sub-group (NGG)"),
+                        cl::desc("Preferred numberof GS primitives to pack into a primitive shader subgroup (NGG)"),
                         cl::value_desc("prims"), cl::init(256));
 
-// -ngg-verts-per-subgroup: preferred number of vertices consumed by a primitive shader sub-group (NGG)
+// -ngg-verts-per-subgroup: preferred number of vertices consumed by a primitive shader subgroup (NGG)
 cl::opt<unsigned>
     NggVertsPerSubgroup("ngg-verts-per-subgroup",
-                        cl::desc("Preferred number of vertices consumed by a primitive shader sub-group (NGG)"),
+                        cl::desc("Preferred number of vertices consumed by a primitive shader subgroup (NGG)"),
                         cl::value_desc("verts"), cl::init(256));
 
 cl::opt<bool> RobustBufferAccess("robust-buffer-access", cl::desc("Validate if the index is out of bounds"),

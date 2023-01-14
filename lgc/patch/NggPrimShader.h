@@ -299,22 +299,22 @@ private:
 
   // NGG factors used for calculation (different modes use different factors)
   struct {
-    llvm::Value *vertCountInSubgroup; // Number of vertices in sub-group
-    llvm::Value *primCountInSubgroup; // Number of primitives in sub-group
+    llvm::Value *vertCountInSubgroup; // Number of vertices in subgroup
+    llvm::Value *primCountInSubgroup; // Number of primitives in subgroup
     llvm::Value *vertCountInWave;     // Number of vertices in wave
     llvm::Value *primCountInWave;     // Number of primitives in wave
 
     llvm::Value *threadIdInWave;     // Thread ID in wave
-    llvm::Value *threadIdInSubgroup; // Thread ID in sub-group
+    llvm::Value *threadIdInSubgroup; // Thread ID in subgroup
 
-    llvm::Value *waveIdInSubgroup; // Wave ID in sub-group
+    llvm::Value *waveIdInSubgroup; // Wave ID in subgroup
     llvm::Value *orderedWaveId;    // Ordered wave ID
 
     llvm::Value *primitiveId;   // Primitive ID (for VS)
     llvm::Value *vertCompacted; // Whether vertex compaction is performed (for culling mode)
 
     // System values (SGPRs)
-    llvm::Value *attribRingBase;          // Attribute ring base for this sub-group
+    llvm::Value *attribRingBase;          // Attribute ring base for this subgroup
     llvm::Value *primShaderTableAddrLow;  // Primitive shader table address low
     llvm::Value *primShaderTableAddrHigh; // Primitive shader table address high
 

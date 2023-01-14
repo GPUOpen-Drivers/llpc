@@ -66,15 +66,15 @@ enum NggFlag : unsigned {
   NggFlagEnableCullDistanceCulling = 0x0400, // Enable culling when "cull distance" exports are present
 };
 
-// Enumerates various sizing options of sub-group size for NGG primitive shader.
+// Enumerates various sizing options of subgroup size for NGG primitive shader.
 enum class NggSubgroupSizing : unsigned {
-  Auto,             ///< Sub-group size is allocated as optimally determined
-  MaximumSize,      ///< Sub-group size is allocated to the maximum allowable size by the hardware
-  HalfSize,         ///< Sub-group size is allocated as to allow half of the maximum allowable size
+  Auto,             ///< Subgroup size is allocated as optimally determined
+  MaximumSize,      ///< Subgroup size is allocated to the maximum allowable size by the hardware
+  HalfSize,         ///< Subgroup size is allocated as to allow half of the maximum allowable size
                     ///  by the hardware
-  OptimizeForVerts, ///< Sub-group size is optimized for vertex thread utilization
-  OptimizeForPrims, ///< Sub-group size is optimized for primitive thread utilization
-  Explicit,         ///< Sub-group size is allocated based on explicitly-specified vertsPerSubgroup and
+  OptimizeForVerts, ///< Subgroup size is optimized for vertex thread utilization
+  OptimizeForPrims, ///< Subgroup size is optimized for primitive thread utilization
+  Explicit,         ///< Subgroup size is allocated based on explicitly-specified vertsPerSubgroup and
                     ///  primsPerSubgroup
 };
 

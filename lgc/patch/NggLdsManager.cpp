@@ -64,7 +64,7 @@ const unsigned NggLdsManager::LdsRegionSizes[LdsRegionCount] = {
     InvalidValue,                                             // LdsRegionVertCullInfo
     // 1 dword per XFB buffer: dword written, 1 dword: primitives to write
     SizeOfDword * MaxTransformFeedbackBuffers + SizeOfDword,  // LdsRegionXfbStatInfo
-    // 1 dword per wave (8 potential waves) + 1 dword for the entire sub-group
+    // 1 dword per wave (8 potential waves) + 1 dword for the entire subgroup
     SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword, // LdsRegionVertCountInWaves
     // 1 dword (uint32) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionVertThreadIdMap
@@ -77,13 +77,13 @@ const unsigned NggLdsManager::LdsRegionSizes[LdsRegionCount] = {
     // 1 dword (uint32) per thread, 4 GS streams
     (SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup) * MaxGsStreams,
                                                               // LdsRegionOutPrimData
-    // 1 dword per wave (8 potential waves) + 1 dword for the entire sub-group, 4 GS streams
+    // 1 dword per wave (8 potential waves) + 1 dword for the entire subgroup, 4 GS streams
     (SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword) * MaxGsStreams,
                                                               // LdsRegionOutPrimCountInWaves
     // 1 dword (uint32) per thread, 4 GS streams
     (SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup) * MaxGsStreams,
                                                               // LdsRegionOutPrimThreadIdMap
-    // 1 dword per wave (8 potential waves) + 1 dword for the entire sub-group, 4 GS streams
+    // 1 dword per wave (8 potential waves) + 1 dword for the entire subgroup, 4 GS streams
     (SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword) * MaxGsStreams,
                                                               // LdsRegionOutVertCountInWaves
     // 1 dword (uint32) per thread
