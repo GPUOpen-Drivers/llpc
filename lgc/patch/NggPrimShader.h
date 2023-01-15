@@ -198,7 +198,7 @@ private:
   void doPrimitiveExportWithoutGs(llvm::Value *cullFlag = nullptr);
   void doPrimitiveExportWithGs(llvm::Value *vertxIndex);
 
-  void doEarlyExit(unsigned fullyCulledExportCount);
+  void earlyExitWithDummyExport();
 
   void runEs(llvm::Module *module, llvm::Argument *sysValueStart);
   llvm::Value *runEsPartial(llvm::Module *module, llvm::Argument *sysValueStart, llvm::Value *position = nullptr);

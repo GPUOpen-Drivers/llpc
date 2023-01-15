@@ -936,7 +936,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   // Export count when the entire subgroup is fully culled
   const bool waNggCullingNoEmptySubgroups =
       m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx10.waNggCullingNoEmptySubgroups;
-  const unsigned fullyCulledExportCount = waNggCullingNoEmptySubgroups ? 1 : 0;
+  const unsigned dummyExportCount = waNggCullingNoEmptySubgroups ? 1 : 0;
 
   const unsigned esGsRingItemSize =
       m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
@@ -1424,8 +1424,8 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
 
     fullyCulled = m_builder.CreateICmpEQ(vertCountInSubgroup, m_builder.getInt32(0));
 
-    primCountInSubgroup = m_builder.CreateSelect(fullyCulled, m_builder.getInt32(fullyCulledExportCount),
-                                                 m_nggInputs.primCountInSubgroup);
+    primCountInSubgroup =
+        m_builder.CreateSelect(fullyCulled, m_builder.getInt32(dummyExportCount), m_nggInputs.primCountInSubgroup);
 
     // NOTE: Here, we have to promote revised primitive count in subgroup to SGPR since it is treated
     // as an uniform value later. This is similar to the provided primitive count in subgroup that is
@@ -1433,7 +1433,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     primCountInSubgroup = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primCountInSubgroup);
 
     vertCountInSubgroup =
-        m_builder.CreateSelect(fullyCulled, m_builder.getInt32(fullyCulledExportCount),
+        m_builder.CreateSelect(fullyCulled, m_builder.getInt32(dummyExportCount),
                                m_nggControl->compactVertex ? vertCountInSubgroup : m_nggInputs.vertCountInSubgroup);
 
     // NOTE: Here, we have to promote revised vertex count in subgroup to SGPR since it is treated as
@@ -1518,7 +1518,10 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     {
       m_builder.SetInsertPoint(earlyExitBlock);
 
-      doEarlyExit(fullyCulledExportCount);
+      if (dummyExportCount > 0)
+        earlyExitWithDummyExport();
+      else
+        m_builder.CreateRetVoid();
     }
 
     // Construct ".noEarlyExit" block
@@ -2569,96 +2572,89 @@ void NggPrimShader::doPrimitiveExportWithGs(Value *vertexIndex) {
 // =====================================================================================================================
 // Early exit NGG primitive shader when we detect that the entire subgroup is fully culled, doing dummy
 // primitive/vertex export if necessary.
-//
-// @param fullyCulledExportCount : Primitive/vertex count for dummy export when the entire subgroup is fully culled
-void NggPrimShader::doEarlyExit(unsigned fullyCulledExportCount) {
-  if (fullyCulledExportCount > 0) {
-    assert(fullyCulledExportCount == 1); // Currently, if workarounded, this is set to 1
+void NggPrimShader::earlyExitWithDummyExport() {
+  auto earlyExitBlock = m_builder.GetInsertBlock();
 
-    auto earlyExitBlock = m_builder.GetInsertBlock();
+  auto dummyExportBlock = createBlock(earlyExitBlock->getParent(), ".dummyExport");
+  dummyExportBlock->moveAfter(earlyExitBlock);
 
-    auto dummyExpBlock = createBlock(earlyExitBlock->getParent(), ".dummyExp");
-    dummyExpBlock->moveAfter(earlyExitBlock);
+  auto endDummyExportBlock = createBlock(earlyExitBlock->getParent(), ".endDummyExport");
+  endDummyExportBlock->moveAfter(dummyExportBlock);
 
-    auto endDummyExpBlock = createBlock(earlyExitBlock->getParent(), ".endDummyExp");
-    endDummyExpBlock->moveAfter(dummyExpBlock);
+  // Construct ".earlyExit" block
+  {
+    auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(0));
+    m_builder.CreateCondBr(firstThreadInSubgroup, dummyExportBlock, endDummyExportBlock);
+  }
 
-    // Construct ".earlyExit" block
-    {
-      auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(0));
-      m_builder.CreateCondBr(firstThreadInSubgroup, dummyExpBlock, endDummyExpBlock);
+  // Construct ".dummyExport" block
+  {
+    m_builder.SetInsertPoint(dummyExportBlock);
+
+    auto undef = UndefValue::get(m_builder.getInt32Ty());
+
+    m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getInt32Ty(),
+                              {
+                                  m_builder.getInt32(EXP_TARGET_PRIM), // tgt
+                                  m_builder.getInt32(0x1),             // en
+                                  // src0 ~ src3
+                                  m_builder.getInt32(0), undef, undef, undef,
+                                  m_builder.getTrue(), // done
+                                  m_builder.getFalse() // vm
+                              });
+
+    // Determine how many dummy position exports we need
+    unsigned posExpCount = 1;
+    if (m_hasGs) {
+      const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
+
+      bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
+      miscExport |= builtInUsage.primitiveShadingRate;
+      if (miscExport)
+        ++posExpCount;
+
+      posExpCount += (builtInUsage.clipDistance + builtInUsage.cullDistance) / 4;
+    } else if (m_hasTes) {
+      const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.tes;
+
+      bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
+      if (miscExport)
+        ++posExpCount;
+
+      posExpCount += (builtInUsage.clipDistance + builtInUsage.cullDistance) / 4;
+    } else {
+      const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.vs;
+
+      bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
+      miscExport |= builtInUsage.primitiveShadingRate;
+      if (miscExport)
+        ++posExpCount;
+
+      posExpCount += (builtInUsage.clipDistance + builtInUsage.cullDistance) / 4;
     }
 
-    // Construct ".dummyExp" block
-    {
-      m_builder.SetInsertPoint(dummyExpBlock);
+    undef = UndefValue::get(m_builder.getFloatTy());
 
-      auto undef = UndefValue::get(m_builder.getInt32Ty());
-
-      m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getInt32Ty(),
+    for (unsigned i = 0; i < posExpCount; ++i) {
+      m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getFloatTy(),
                                 {
-                                    m_builder.getInt32(EXP_TARGET_PRIM), // tgt
-                                    m_builder.getInt32(0x1),             // en
+                                    m_builder.getInt32(EXP_TARGET_POS_0 + i), // tgt
+                                    m_builder.getInt32(0x0),                  // en
                                     // src0 ~ src3
-                                    m_builder.getInt32(0), undef, undef, undef,
-                                    m_builder.getTrue(), // done
-                                    m_builder.getFalse() // vm
+                                    undef, undef, undef, undef,
+                                    m_builder.getInt1(i == posExpCount - 1), // done
+                                    m_builder.getFalse()                     // vm
                                 });
-
-      // Determine how many dummy position exports we need
-      unsigned posExpCount = 1;
-      if (m_hasGs) {
-        const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
-
-        bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
-        miscExport |= builtInUsage.primitiveShadingRate;
-        if (miscExport)
-          ++posExpCount;
-
-        posExpCount += (builtInUsage.clipDistance + builtInUsage.cullDistance) / 4;
-      } else if (m_hasTes) {
-        const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.tes;
-
-        bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
-        if (miscExport)
-          ++posExpCount;
-
-        posExpCount += (builtInUsage.clipDistance + builtInUsage.cullDistance) / 4;
-      } else {
-        const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.vs;
-
-        bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
-        miscExport |= builtInUsage.primitiveShadingRate;
-        if (miscExport)
-          ++posExpCount;
-
-        posExpCount += (builtInUsage.clipDistance + builtInUsage.cullDistance) / 4;
-      }
-
-      undef = UndefValue::get(m_builder.getFloatTy());
-
-      for (unsigned i = 0; i < posExpCount; ++i) {
-        m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getFloatTy(),
-                                  {
-                                      m_builder.getInt32(EXP_TARGET_POS_0 + i), // tgt
-                                      m_builder.getInt32(0x0),                  // en
-                                      // src0 ~ src3
-                                      undef, undef, undef, undef,
-                                      m_builder.getInt1(i == posExpCount - 1), // done
-                                      m_builder.getFalse()                     // vm
-                                  });
-      }
-
-      m_builder.CreateBr(endDummyExpBlock);
     }
 
-    // Construct ".endDummyExp" block
-    {
-      m_builder.SetInsertPoint(endDummyExpBlock);
-      m_builder.CreateRetVoid();
-    }
-  } else
+    m_builder.CreateBr(endDummyExportBlock);
+  }
+
+  // Construct ".endDummyExport" block
+  {
+    m_builder.SetInsertPoint(endDummyExportBlock);
     m_builder.CreateRetVoid();
+  }
 }
 
 // =====================================================================================================================
