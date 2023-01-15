@@ -725,7 +725,7 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
     {
       m_builder.SetInsertPoint(allocReqBlock);
 
-      doParamCacheAllocRequest();
+      sendGsAllocReqMessage();
       m_builder.CreateBr(endAllocReqBlock);
     }
 
@@ -1495,7 +1495,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(allocReqBlock);
 
-    doParamCacheAllocRequest();
+    sendGsAllocReqMessage();
     m_builder.CreateBr(endAllocReqBlock);
   }
 
@@ -2096,7 +2096,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(allocReqBlock);
 
-    doParamCacheAllocRequest();
+    sendGsAllocReqMessage();
     m_builder.CreateBr(endAllocReqBlock);
   }
 
@@ -2371,8 +2371,8 @@ Value *NggPrimShader::doCulling(Module *module, Value *vertexIndex0, Value *vert
 }
 
 // =====================================================================================================================
-// Requests that parameter cache space be allocated (send the message GS_ALLOC_REQ).
-void NggPrimShader::doParamCacheAllocRequest() {
+// Send the message GS_ALLOC_REQ to SPI indicating how many primitives and vertices in this NGG subgroup.
+void NggPrimShader::sendGsAllocReqMessage() {
   // M0[10:0] = vertCntInSubgroup, M0[22:12] = primCntInSubgroup
   Value *m0 = m_builder.CreateShl(m_nggInputs.primCountInSubgroup, 12);
   m0 = m_builder.CreateOr(m0, m_nggInputs.vertCountInSubgroup);
