@@ -179,7 +179,7 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
 
     for (unsigned region = LdsRegionGsBeginRange; region <= LdsRegionGsEndRange; ++region) {
       // NOTE: For vertex compactionless mode, this region is unnecessary
-      if (region == LdsRegionOutVertThreadIdMap && nggControl->compactMode == NggCompactDisable)
+      if (region == LdsRegionOutVertThreadIdMap && !nggControl->compactVertex)
         continue;
 
       if (m_pipelineState->enableSwXfb()) {
@@ -262,7 +262,7 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
           continue;
 
         // NOTE: For vertex compactionless mode, this region is unnecessary
-        if (region == LdsRegionVertThreadIdMap && nggControl->compactMode == NggCompactDisable)
+        if (region == LdsRegionVertThreadIdMap && !nggControl->compactVertex)
           continue;
 
         unsigned ldsRegionSize = LdsRegionSizes[region];
@@ -371,7 +371,7 @@ unsigned NggLdsManager::calcEsExtraLdsSize(PipelineState *pipelineState) {
   }
 
   return LdsRegionSizes[LdsRegionVertPosData] + LdsRegionSizes[LdsRegionVertCountInWaves] +
-         (nggControl->compactMode == NggCompactDisable ? 0 : LdsRegionSizes[LdsRegionVertThreadIdMap]);
+         (nggControl->compactVertex ? LdsRegionSizes[LdsRegionVertThreadIdMap] : 0);
 }
 
 // =====================================================================================================================
@@ -397,7 +397,7 @@ unsigned NggLdsManager::calcGsExtraLdsSize(PipelineState *pipelineState) {
   }
 
   return LdsRegionSizes[LdsRegionOutPrimData] + LdsRegionSizes[LdsRegionOutVertCountInWaves] +
-         (nggControl->compactMode == NggCompactDisable ? 0 : LdsRegionSizes[LdsRegionOutVertThreadIdMap]);
+         (nggControl->compactVertex ? LdsRegionSizes[LdsRegionOutVertThreadIdMap] : 0);
 }
 
 // =====================================================================================================================
