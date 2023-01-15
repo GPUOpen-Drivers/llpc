@@ -287,6 +287,8 @@ private:
 
   llvm::BasicBlock *createBlock(llvm::Function *parent, const llvm::Twine &blockName = "");
   llvm::Value *createUBfe(llvm::Value *value, unsigned offset, unsigned count);
+  llvm::PHINode *createPhi(llvm::ArrayRef<std::pair<llvm::Value *, llvm::BasicBlock *>> incomings,
+                           const llvm::Twine &name = "");
   void createFenceAndBarrier();
 
   static const unsigned NullPrim = (1u << 31); // Null primitive data (invalid)

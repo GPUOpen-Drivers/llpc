@@ -709,13 +709,8 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
     {
       m_builder.SetInsertPoint(endReadPrimIdBlock);
 
-      auto primitiveIdPhi = m_builder.CreatePHI(m_builder.getInt32Ty(), 2);
-
-      primitiveIdPhi->addIncoming(primitiveId, readPrimIdBlock);
-      primitiveIdPhi->addIncoming(m_builder.getInt32(0), endWritePrimIdBlock);
-
-      // Record primitive ID
-      m_nggInputs.primitiveId = primitiveIdPhi;
+      m_nggInputs.primitiveId = createPhi(
+          {{primitiveId, readPrimIdBlock}, {m_builder.getInt32(0), endWritePrimIdBlock}}, "distributedPrimitiveId");
 
       createFenceAndBarrier();
 
@@ -1113,12 +1108,8 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     {
       m_builder.SetInsertPoint(endReadPrimIdBlock);
 
-      auto primitiveIdPhi = m_builder.CreatePHI(m_builder.getInt32Ty(), 2);
-      primitiveIdPhi->addIncoming(primitiveId, readPrimIdBlock);
-      primitiveIdPhi->addIncoming(m_builder.getInt32(0), endWritePrimIdBlock);
-
-      // Record primitive ID
-      m_nggInputs.primitiveId = primitiveIdPhi;
+      m_nggInputs.primitiveId = createPhi(
+          {{primitiveId, readPrimIdBlock}, {m_builder.getInt32(0), endWritePrimIdBlock}}, "distributedPrimitiveId");
 
       createFenceAndBarrier();
 
@@ -1150,11 +1141,10 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(endFetchVertCullDataBlock);
 
-    PHINode *positionPhi = m_builder.CreatePHI(FixedVectorType::get(m_builder.getFloatTy(), 4), 2, "position");
-    positionPhi->addIncoming(position, fetchVertCullDataBlock);
-    positionPhi->addIncoming(UndefValue::get(FixedVectorType::get(m_builder.getFloatTy(), 4)),
-                             distributePrimitiveId ? endReadPrimIdBlock : entryBlock);
-    position = positionPhi; // Update vertex position data
+    position =
+        createPhi({{position, fetchVertCullDataBlock},
+                   {PoisonValue::get(position->getType()), distributePrimitiveId ? endReadPrimIdBlock : entryBlock}},
+                  "position"); // Update vertex position data
 
     // NOTE: If the Z channel of vertex position data is constant, we can go into runtime passthrough mode. Otherwise,
     // we will further check if this is a small subgroup and enable runtime passthrough mode accordingly.
@@ -1292,11 +1282,9 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(endCullingBlock);
 
-    auto cullFlagPhi = m_builder.CreatePHI(m_builder.getInt1Ty(), 3);
-    cullFlagPhi->addIncoming(m_builder.getTrue(), cullingBlock);
-    cullFlagPhi->addIncoming(m_builder.getFalse(), writeVertDrawFlagBlock);
-    cullFlagPhi->addIncoming(m_builder.getTrue(), endWriteVertCullDataBlock);
-    cullFlag = cullFlagPhi;
+    cullFlag = createPhi({{m_builder.getTrue(), cullingBlock},
+                          {m_builder.getFalse(), writeVertDrawFlagBlock},
+                          {m_builder.getTrue(), endWriteVertCullDataBlock}});
 
     createFenceAndBarrier();
 
@@ -1321,12 +1309,9 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(endCheckVertDrawFlagBlock);
 
-    auto drawFlagPhi = m_builder.CreatePHI(m_builder.getInt1Ty(), 2);
-    drawFlagPhi->addIncoming(drawFlag, checkVertDrawFlagBlock);
-    drawFlagPhi->addIncoming(m_builder.getFalse(), endCullingBlock);
-    drawFlag = drawFlagPhi; // Update vertex draw flag
-
-    drawMask = doSubgroupBallot(drawFlagPhi);
+    drawFlag = createPhi(
+        {{drawFlag, checkVertDrawFlagBlock}, {m_builder.getFalse(), endCullingBlock}}); // Update vertex draw flag
+    drawMask = doSubgroupBallot(drawFlag);
 
     vertCountInWave = m_builder.CreateIntrinsic(Intrinsic::ctpop, m_builder.getInt64Ty(), drawMask);
     vertCountInWave = m_builder.CreateTrunc(vertCountInWave, m_builder.getInt32Ty());
@@ -1475,50 +1460,39 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
 
     if (m_nggControl->compactVertex) {
       // Update vertex compaction flag
-      auto vertCompactedPhi = m_builder.CreatePHI(m_builder.getInt1Ty(), 2, "vertCompacted");
-      vertCompactedPhi->addIncoming(vertCompacted, endCompactVertBlock);
-      vertCompactedPhi->addIncoming(m_builder.getFalse(), runtimePassthroughBlock);
-      m_nggInputs.vertCompacted = vertCompactedPhi; // Record vertex compaction flag
+      m_nggInputs.vertCompacted = createPhi(
+          {{vertCompacted, endCompactVertBlock}, {m_builder.getFalse(), runtimePassthroughBlock}}, "vertCompacted");
     } else {
       assert(!m_nggInputs.vertCompacted); // Must be null
     }
 
     // Update cull flag
-    auto cullFlagPhi = m_builder.CreatePHI(m_builder.getInt1Ty(), 2, "cullFlag");
-    cullFlagPhi->addIncoming(cullFlag, endCompactVertBlock);
-    cullFlagPhi->addIncoming(m_builder.getFalse(), runtimePassthroughBlock);
-    cullFlag = cullFlagPhi;
+    cullFlag =
+        createPhi({{cullFlag, endCompactVertBlock}, {m_builder.getFalse(), runtimePassthroughBlock}}, "cullFlag");
 
     // Update fully-culled flag
-    auto fullyCulledPhi = m_builder.CreatePHI(m_builder.getInt1Ty(), 2, "fullyCulled");
-    fullyCulledPhi->addIncoming(fullyCulled, endCompactVertBlock);
-    fullyCulledPhi->addIncoming(m_builder.getFalse(), runtimePassthroughBlock);
-    fullyCulled = fullyCulledPhi;
+    fullyCulled =
+        createPhi({{fullyCulled, endCompactVertBlock}, {m_builder.getFalse(), runtimePassthroughBlock}}, "fullyCulled");
 
     // Update primitive count in subgroup
-    auto primCountInSubgroupPhi = m_builder.CreatePHI(m_builder.getInt32Ty(), 2);
-    primCountInSubgroupPhi->addIncoming(primCountInSubgroup, endCompactVertBlock);
-    primCountInSubgroupPhi->addIncoming(m_nggInputs.primCountInSubgroup, runtimePassthroughBlock);
-    m_nggInputs.primCountInSubgroup = primCountInSubgroupPhi; // Record primitive count in subgroup
+    m_nggInputs.primCountInSubgroup = createPhi(
+        {{primCountInSubgroup, endCompactVertBlock}, {m_nggInputs.primCountInSubgroup, runtimePassthroughBlock}},
+        "primCountInSubgroup");
 
     // Update vertex count in subgroup
-    auto vertCountInSubgroupPhi = m_builder.CreatePHI(m_builder.getInt32Ty(), 2);
-    vertCountInSubgroupPhi->addIncoming(vertCountInSubgroup, endCompactVertBlock);
-    vertCountInSubgroupPhi->addIncoming(m_nggInputs.vertCountInSubgroup, runtimePassthroughBlock);
-    m_nggInputs.vertCountInSubgroup = vertCountInSubgroupPhi; // Record vertex count in subgroup
+    m_nggInputs.vertCountInSubgroup = createPhi(
+        {{vertCountInSubgroup, endCompactVertBlock}, {m_nggInputs.vertCountInSubgroup, runtimePassthroughBlock}},
+        "vertCountInSubgroup");
 
     if (!m_nggControl->compactVertex) {
       // Update draw flag
-      auto drawFlagPhi = m_builder.CreatePHI(m_builder.getInt1Ty(), 2);
-      drawFlagPhi->addIncoming(drawFlag, endCompactVertBlock);
-      drawFlagPhi->addIncoming(m_builder.getTrue(), runtimePassthroughBlock);
-      drawFlag = drawFlagPhi;
+      drawFlag =
+          createPhi({{drawFlag, endCompactVertBlock}, {m_builder.getTrue(), runtimePassthroughBlock}}, "drawFlag");
 
       // Update vertex count in wave
-      auto vertCountInWavePhi = m_builder.CreatePHI(m_builder.getInt32Ty(), 2);
-      vertCountInWavePhi->addIncoming(vertCountInWave, endCompactVertBlock);
-      vertCountInWavePhi->addIncoming(m_nggInputs.vertCountInWave, runtimePassthroughBlock);
-      vertCountInWave = vertCountInWavePhi;
+      vertCountInWave =
+          createPhi({{vertCountInWave, endCompactVertBlock}, {m_nggInputs.vertCountInWave, runtimePassthroughBlock}},
+                    "vertCountInWave");
     }
 
     auto firstWaveInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.waveIdInSubgroup, m_builder.getInt32(0));
@@ -2023,13 +1997,11 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(endCheckOutVertDrawFlagBlock);
 
-    auto drawFlagPhi = m_builder.CreatePHI(m_builder.getInt1Ty(), 2);
-    drawFlagPhi->addIncoming(drawFlag, checkOutVertDrawFlagBlock);
     // NOTE: The predecessors are different if culling mode is enabled.
-    drawFlagPhi->addIncoming(m_builder.getFalse(), cullingMode ? endCullingBlock : endInitOutVertCountBlock);
-    drawFlag = drawFlagPhi; // Update draw flag
-
-    drawMask = doSubgroupBallot(drawFlagPhi);
+    drawFlag = createPhi({{drawFlag, checkOutVertDrawFlagBlock},
+                          {m_builder.getFalse(), cullingMode ? endCullingBlock : endInitOutVertCountBlock}},
+                         "drawFlag");
+    drawMask = doSubgroupBallot(drawFlag);
 
     outVertCountInWave = m_builder.CreateIntrinsic(Intrinsic::ctpop, m_builder.getInt64Ty(), drawMask);
     outVertCountInWave = m_builder.CreateTrunc(outVertCountInWave, m_builder.getInt32Ty());
@@ -2117,10 +2089,8 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
     {
       m_builder.SetInsertPoint(endCompactOutVertIdBlock);
 
-      auto compactVertexIdPhi = m_builder.CreatePHI(m_builder.getInt32Ty(), 2);
-      compactVertexIdPhi->addIncoming(compactVertexId, compactOutVertIdBlock);
-      compactVertexIdPhi->addIncoming(m_nggInputs.threadIdInSubgroup, endAccumOutVertCountBlock);
-      compactVertexId = compactVertexIdPhi;
+      compactVertexId = createPhi(
+          {{compactVertexId, compactOutVertIdBlock}, {m_nggInputs.threadIdInSubgroup, endAccumOutVertCountBlock}});
 
       auto firstWaveInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.waveIdInSubgroup, m_builder.getInt32(0));
       m_builder.CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
@@ -2488,21 +2458,9 @@ void NggPrimShader::doPrimitiveExportWithoutGs(Value *cullFlag) {
       {
         m_builder.SetInsertPoint(endCompactVertIdBlock);
 
-        auto vertexId0Phi = m_builder.CreatePHI(m_builder.getInt32Ty(), 2);
-        vertexId0Phi->addIncoming(compactVertexId0, compactVertIdBlock);
-        vertexId0Phi->addIncoming(vertexId0, expPrimBlock);
-
-        auto vertexId1Phi = m_builder.CreatePHI(m_builder.getInt32Ty(), 2);
-        vertexId1Phi->addIncoming(compactVertexId1, compactVertIdBlock);
-        vertexId1Phi->addIncoming(vertexId1, expPrimBlock);
-
-        auto vertexId2Phi = m_builder.CreatePHI(m_builder.getInt32Ty(), 2);
-        vertexId2Phi->addIncoming(compactVertexId2, compactVertIdBlock);
-        vertexId2Phi->addIncoming(vertexId2, expPrimBlock);
-
-        vertexId0 = vertexId0Phi;
-        vertexId1 = vertexId1Phi;
-        vertexId2 = vertexId2Phi;
+        vertexId0 = createPhi({{compactVertexId0, compactVertIdBlock}, {vertexId0, expPrimBlock}});
+        vertexId1 = createPhi({{compactVertexId1, compactVertIdBlock}, {vertexId1, expPrimBlock}});
+        vertexId2 = createPhi({{compactVertexId2, compactVertIdBlock}, {vertexId2, expPrimBlock}});
       }
     }
 
@@ -2969,59 +2927,29 @@ Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Valu
     {
       m_builder.SetInsertPoint(endUncompactVertBlock);
 
-      auto positionPhi = m_builder.CreatePHI(FixedVectorType::get(m_builder.getFloatTy(), 4), 2);
-      positionPhi->addIncoming(newPosition, uncompactVertBlock);
-      positionPhi->addIncoming(position, expVertBlock);
-      position = positionPhi;
+      position = createPhi({{newPosition, uncompactVertBlock}, {position, expVertBlock}});
 
       if (m_hasTes) {
-        if (newTessCoordX) {
-          auto tessCoordXPhi = m_builder.CreatePHI(m_builder.getFloatTy(), 2);
-          tessCoordXPhi->addIncoming(newTessCoordX, uncompactVertBlock);
-          tessCoordXPhi->addIncoming(tessCoordX, expVertBlock);
-          tessCoordX = tessCoordXPhi;
-        }
+        if (newTessCoordX)
+          tessCoordX = createPhi({{newTessCoordX, uncompactVertBlock}, {tessCoordX, expVertBlock}});
 
-        if (newTessCoordY) {
-          auto tessCoordYPhi = m_builder.CreatePHI(m_builder.getFloatTy(), 2);
-          tessCoordYPhi->addIncoming(newTessCoordY, uncompactVertBlock);
-          tessCoordYPhi->addIncoming(tessCoordY, expVertBlock);
-          tessCoordY = tessCoordYPhi;
-        }
+        if (newTessCoordY)
+          tessCoordX = createPhi({{newTessCoordY, uncompactVertBlock}, {tessCoordY, expVertBlock}});
 
         assert(newRelPatchId);
-        auto relPatchPhi = m_builder.CreatePHI(m_builder.getInt32Ty(), 2);
-        relPatchPhi->addIncoming(newRelPatchId, uncompactVertBlock);
-        relPatchPhi->addIncoming(relPatchId, expVertBlock);
-        relPatchId = relPatchPhi;
+        relPatchId = createPhi({{newRelPatchId, uncompactVertBlock}, {relPatchId, expVertBlock}});
 
-        if (newPatchId) {
-          auto patchIdPhi = m_builder.CreatePHI(m_builder.getInt32Ty(), 2);
-          patchIdPhi->addIncoming(newPatchId, uncompactVertBlock);
-          patchIdPhi->addIncoming(patchId, expVertBlock);
-          patchId = patchIdPhi;
-        }
+        if (newPatchId)
+          patchId = createPhi({{newPatchId, uncompactVertBlock}, {patchId, expVertBlock}});
       } else {
-        if (newVertexId) {
-          auto vertexIdPhi = m_builder.CreatePHI(m_builder.getInt32Ty(), 2);
-          vertexIdPhi->addIncoming(newVertexId, uncompactVertBlock);
-          vertexIdPhi->addIncoming(vertexId, expVertBlock);
-          vertexId = vertexIdPhi;
-        }
+        if (newVertexId)
+          vertexId = createPhi({{newVertexId, uncompactVertBlock}, {vertexId, expVertBlock}});
 
-        if (newVsPrimitiveId) {
-          auto vsPrimitiveIdPhi = m_builder.CreatePHI(m_builder.getInt32Ty(), 2);
-          vsPrimitiveIdPhi->addIncoming(newVsPrimitiveId, uncompactVertBlock);
-          vsPrimitiveIdPhi->addIncoming(vsPrimitiveId, expVertBlock);
-          vsPrimitiveId = vsPrimitiveIdPhi;
-        }
+        if (newVsPrimitiveId)
+          vsPrimitiveId = createPhi({{newVsPrimitiveId, uncompactVertBlock}, {vsPrimitiveId, expVertBlock}});
 
-        if (newInstanceId) {
-          auto instanceIdPhi = m_builder.CreatePHI(m_builder.getInt32Ty(), 2);
-          instanceIdPhi->addIncoming(newInstanceId, uncompactVertBlock);
-          instanceIdPhi->addIncoming(instanceId, expVertBlock);
-          instanceId = instanceIdPhi;
-        }
+        if (newInstanceId)
+          instanceId = createPhi({{newInstanceId, uncompactVertBlock}, {instanceId, expVertBlock}});
       }
     }
   }
@@ -3556,10 +3484,7 @@ void NggPrimShader::runCopyShader(Module *module, Argument *sysValueStart) {
     {
       m_builder.SetInsertPoint(endUncompactOutVertIdBlock);
 
-      auto vertexIdPhi = m_builder.CreatePHI(m_builder.getInt32Ty(), 2);
-      vertexIdPhi->addIncoming(uncompactVertexId, uncompactOutVertIdBlock);
-      vertexIdPhi->addIncoming(vertexId, expVertBlock);
-      vertexId = vertexIdPhi;
+      vertexId = createPhi({{uncompactVertexId, uncompactOutVertIdBlock}, {vertexId, expVertBlock}});
     }
   }
 
@@ -4485,10 +4410,8 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
   {
     m_builder.SetInsertPoint(backfaceExitBlock);
 
-    auto cullFlagPhi = m_builder.CreatePHI(m_builder.getInt1Ty(), 3);
-    cullFlagPhi->addIncoming(cullFlag, backfaceEntryBlock);
-    cullFlagPhi->addIncoming(cullFlag1, backfaceCullBlock);
-    cullFlagPhi->addIncoming(cullFlag2, backfaceExponentBlock);
+    auto cullFlagPhi =
+        createPhi({{cullFlag, backfaceEntryBlock}, {cullFlag1, backfaceCullBlock}, {cullFlag2, backfaceExponentBlock}});
 
     // polyMode = (POLY_MODE, PA_SU_SC_MODE_CNTL[4:3], 0 = DISABLE, 1 = DUAL)
     auto polyMode = createUBfe(paSuScModeCntl, 3, 2);
@@ -4751,9 +4674,7 @@ Function *NggPrimShader::createFrustumCuller(Module *module) {
   {
     m_builder.SetInsertPoint(frustumExitBlock);
 
-    auto cullFlagPhi = m_builder.CreatePHI(m_builder.getInt1Ty(), 2);
-    cullFlagPhi->addIncoming(cullFlag, frustumEntryBlock);
-    cullFlagPhi->addIncoming(newCullFlag, frustumCullBlock);
+    auto cullFlagPhi = createPhi({{cullFlag, frustumEntryBlock}, {newCullFlag, frustumCullBlock}});
 
     m_builder.CreateRet(cullFlagPhi);
   }
@@ -4974,9 +4895,7 @@ Function *NggPrimShader::createBoxFilterCuller(Module *module) {
   {
     m_builder.SetInsertPoint(boxFilterExitBlock);
 
-    auto cullFlagPhi = m_builder.CreatePHI(m_builder.getInt1Ty(), 2);
-    cullFlagPhi->addIncoming(cullFlag, boxFilterEntryBlock);
-    cullFlagPhi->addIncoming(newCullFlag, boxFilterCullBlock);
+    auto cullFlagPhi = createPhi({{cullFlag, boxFilterEntryBlock}, {newCullFlag, boxFilterCullBlock}});
 
     m_builder.CreateRet(cullFlagPhi);
   }
@@ -5335,9 +5254,7 @@ Function *NggPrimShader::createSphereCuller(Module *module) {
   {
     m_builder.SetInsertPoint(sphereExitBlock);
 
-    auto cullFlagPhi = m_builder.CreatePHI(m_builder.getInt1Ty(), 2);
-    cullFlagPhi->addIncoming(cullFlag, sphereEntryBlock);
-    cullFlagPhi->addIncoming(newCullFlag, sphereCullBlock);
+    auto cullFlagPhi = createPhi({{cullFlag, sphereEntryBlock}, {newCullFlag, sphereCullBlock}});
 
     m_builder.CreateRet(cullFlagPhi);
   }
@@ -5613,9 +5530,7 @@ Function *NggPrimShader::createSmallPrimFilterCuller(Module *module) {
   {
     m_builder.SetInsertPoint(smallPrimFilterExitBlock);
 
-    auto cullFlagPhi = m_builder.CreatePHI(m_builder.getInt1Ty(), 2);
-    cullFlagPhi->addIncoming(cullFlag, smallPrimFilterEntryBlock);
-    cullFlagPhi->addIncoming(newCullFlag, smallPrimFilterCullBlock);
+    auto cullFlagPhi = createPhi({{cullFlag, smallPrimFilterEntryBlock}, {newCullFlag, smallPrimFilterCullBlock}});
 
     m_builder.CreateRet(cullFlagPhi);
   }
@@ -5692,9 +5607,7 @@ Function *NggPrimShader::createCullDistanceCuller(Module *module) {
   {
     m_builder.SetInsertPoint(cullDistanceExitBlock);
 
-    auto cullFlagPhi = m_builder.CreatePHI(m_builder.getInt1Ty(), 2);
-    cullFlagPhi->addIncoming(cullFlag, cullDistanceEntryBlock);
-    cullFlagPhi->addIncoming(cullFlag1, cullDistanceCullBlock);
+    auto cullFlagPhi = createPhi({{cullFlag, cullDistanceEntryBlock}, {cullFlag1, cullDistanceCullBlock}});
 
     m_builder.CreateRet(cullFlagPhi);
   }
@@ -6194,10 +6107,8 @@ void NggPrimShader::processSwXfb(Module *module, Argument *sysValueStart) {
   {
     m_builder.SetInsertPoint(endReadXfbStatInfoBlock);
 
-    auto xfbStatInfoPhi = m_builder.CreatePHI(m_builder.getInt32Ty(), 2);
-    xfbStatInfoPhi->addIncoming(xfbStatInfo, readXfbStatInfoBlock);
-    xfbStatInfoPhi->addIncoming(UndefValue::get(m_builder.getInt32Ty()), endPrepareXfbExportBlock);
-    xfbStatInfo = xfbStatInfoPhi;
+    xfbStatInfo = createPhi(
+        {{xfbStatInfo, readXfbStatInfoBlock}, {PoisonValue::get(xfbStatInfo->getType()), endPrepareXfbExportBlock}});
 
     for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
       if (bufferActive[i]) {
@@ -6535,10 +6446,8 @@ void NggPrimShader::processSwXfbWithGs(Module *module, Argument *sysValueStart) 
     // Update draw flags
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
       if (streamActive[i]) {
-        auto drawFlagPhi = m_builder.CreatePHI(m_builder.getInt1Ty(), 2);
-        drawFlagPhi->addIncoming(drawFlag[i], checkOutPrimDrawFlagBlock);
-        drawFlagPhi->addIncoming(m_builder.getFalse(), endInitOutPrimCountBlock);
-        drawFlag[i] = drawFlagPhi;
+        drawFlag[i] =
+            createPhi({{drawFlag[i], checkOutPrimDrawFlagBlock}, {m_builder.getFalse(), endInitOutPrimCountBlock}});
       }
     }
 
@@ -7450,6 +7359,26 @@ Value *NggPrimShader::createUBfe(Value *value, unsigned offset, unsigned count) 
     return m_builder.CreateAnd(value, (1U << count) - 1); // Just need mask
 
   return m_builder.CreateAnd(m_builder.CreateLShr(value, offset), (1U << count) - 1);
+}
+
+// =====================================================================================================================
+// Create a PHI node with the specified incomings.
+//
+// @param incomings : A set of incomings to create this PHI node
+// @param name : Name of this PHI node
+// @returns : The created PHI node
+PHINode *NggPrimShader::createPhi(ArrayRef<std::pair<Value *, BasicBlock *>> incomings, const Twine &name) {
+  assert(incomings.size() >= 2); // Must at least have two incomings
+
+  auto phiType = incomings[0].first->getType();
+  auto phi = m_builder.CreatePHI(phiType, incomings.size(), name);
+
+  for (auto &incoming : incomings) {
+    assert(incoming.first->getType() == phiType);
+    phi->addIncoming(incoming.first, incoming.second);
+  }
+
+  return phi;
 }
 
 // =====================================================================================================================
