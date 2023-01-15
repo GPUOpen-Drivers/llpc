@@ -1303,7 +1303,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
 
     drawFlag = createPhi(
         {{drawFlag, checkVertDrawFlagBlock}, {m_builder.getFalse(), endCullingBlock}}); // Update vertex draw flag
-    drawMask = doSubgroupBallot(drawFlag);
+    drawMask = ballot(drawFlag);
 
     vertCountInWave = m_builder.CreateIntrinsic(Intrinsic::ctpop, m_builder.getInt64Ty(), drawMask);
     vertCountInWave = m_builder.CreateTrunc(vertCountInWave, m_builder.getInt32Ty());
@@ -1996,7 +1996,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
     drawFlag = createPhi({{drawFlag, checkOutVertDrawFlagBlock},
                           {m_builder.getFalse(), cullingMode ? endCullingBlock : endInitOutVertCountBlock}},
                          "drawFlag");
-    drawMask = doSubgroupBallot(drawFlag);
+    drawMask = ballot(drawFlag);
 
     outVertCountInWave = m_builder.CreateIntrinsic(Intrinsic::ctpop, m_builder.getInt64Ty(), drawMask);
     outVertCountInWave = m_builder.CreateTrunc(outVertCountInWave, m_builder.getInt32Ty());
@@ -5672,10 +5672,10 @@ Function *NggPrimShader::createFetchCullingRegister(Module *module) {
 }
 
 // =====================================================================================================================
-// Output a subgroup ballot (always return i64 mask)
+// Output a wave-base ballot (always return i64 mask)
 //
 // @param value : The value to do the ballot on.
-Value *NggPrimShader::doSubgroupBallot(Value *value) {
+Value *NggPrimShader::ballot(Value *value) {
   assert(value->getType()->isIntegerTy(1)); // Should be i1
 
   const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
@@ -5688,7 +5688,7 @@ Value *NggPrimShader::doSubgroupBallot(Value *value) {
   value = m_builder.CreateCall(inlineAsm, value);
 
   static const unsigned PredicateNE = 33; // 33 = predicate NE
-  Value *ballot = m_builder.CreateIntrinsic(Intrinsic::amdgcn_icmp,
+  Value *result = m_builder.CreateIntrinsic(Intrinsic::amdgcn_icmp,
                                             {
                                                 m_builder.getIntNTy(waveSize), // Return type
                                                 m_builder.getInt32Ty()         // Argument type
@@ -5696,9 +5696,9 @@ Value *NggPrimShader::doSubgroupBallot(Value *value) {
                                             {value, m_builder.getInt32(0), m_builder.getInt32(PredicateNE)});
 
   if (waveSize == 32)
-    ballot = m_builder.CreateZExt(ballot, m_builder.getInt64Ty());
+    result = m_builder.CreateZExt(result, m_builder.getInt64Ty());
 
-  return ballot;
+  return result;
 }
 
 // =====================================================================================================================
@@ -6446,7 +6446,7 @@ void NggPrimShader::processSwXfbWithGs(Module *module, Argument *sysValueStart) 
 
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
       if (streamActive[i]) {
-        drawMask[i] = doSubgroupBallot(drawFlag[i]);
+        drawMask[i] = ballot(drawFlag[i]);
 
         outPrimCountInWave[i] = m_builder.CreateIntrinsic(Intrinsic::ctpop, m_builder.getInt64Ty(), drawMask[i]);
         outPrimCountInWave[i] = m_builder.CreateTrunc(outPrimCountInWave[i], m_builder.getInt32Ty());
