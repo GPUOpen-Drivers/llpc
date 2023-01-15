@@ -263,7 +263,7 @@ private:
 
   llvm::Function *createFetchCullingRegister(llvm::Module *module);
 
-  llvm::Value *doSubgroupBallot(llvm::Value *value);
+  llvm::Value *ballot(llvm::Value *value);
 
   llvm::Value *fetchVertexPositionData(llvm::Value *vertxIndex);
   llvm::Value *fetchCullDistanceSignMask(llvm::Value *vertxIndex);
