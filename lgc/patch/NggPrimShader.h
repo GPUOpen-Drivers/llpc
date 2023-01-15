@@ -194,7 +194,7 @@ private:
 
   llvm::Value *doCulling(llvm::Module *module, llvm::Value *vertxIndex0, llvm::Value *vertxIndex1,
                          llvm::Value *vertxIndex2);
-  void doParamCacheAllocRequest();
+  void sendGsAllocReqMessage();
   void doPrimitiveExportWithoutGs(llvm::Value *cullFlag = nullptr);
   void doPrimitiveExportWithGs(llvm::Value *vertxIndex);
 
