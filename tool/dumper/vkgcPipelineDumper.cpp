@@ -876,7 +876,9 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "nggState.enableGsUse = " << pipelineInfo->nggState.enableGsUse << "\n";
   dumpFile << "nggState.forceCullingMode = " << pipelineInfo->nggState.forceCullingMode << "\n";
   dumpFile << "nggState.compactMode = " << pipelineInfo->nggState.compactMode << "\n";
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 59
   dumpFile << "nggState.enableVertexReuse = " << pipelineInfo->nggState.enableVertexReuse << "\n";
+#endif
   dumpFile << "nggState.enableBackfaceCulling = " << pipelineInfo->nggState.enableBackfaceCulling << "\n";
   dumpFile << "nggState.enableFrustumCulling = " << pipelineInfo->nggState.enableFrustumCulling << "\n";
   dumpFile << "nggState.enableBoxFilterCulling = " << pipelineInfo->nggState.enableBoxFilterCulling << "\n";
@@ -1419,10 +1421,9 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   hasher->Update(pipeline->dynamicVertexStride);
   hasher->Update(pipeline->enableUberFetchShader);
 
-  bool passthroughMode = !nggState->enableVertexReuse && !nggState->enableBackfaceCulling &&
-                         !nggState->enableFrustumCulling && !nggState->enableBoxFilterCulling &&
-                         !nggState->enableSphereCulling && !nggState->enableSmallPrimFilter &&
-                         !nggState->enableCullDistanceCulling;
+  bool passthroughMode = !nggState->enableBackfaceCulling && !nggState->enableFrustumCulling &&
+                         !nggState->enableBoxFilterCulling && !nggState->enableSphereCulling &&
+                         !nggState->enableSmallPrimFilter && !nggState->enableCullDistanceCulling;
 
   bool updateHashFromRs = (!isCacheHash);
   updateHashFromRs |= (enableNgg && !passthroughMode);
@@ -1438,7 +1439,9 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
       hasher->Update(nggState->enableGsUse);
       hasher->Update(nggState->forceCullingMode);
       hasher->Update(nggState->compactMode);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 59
       hasher->Update(nggState->enableVertexReuse);
+#endif
       hasher->Update(nggState->enableBackfaceCulling);
       hasher->Update(nggState->enableFrustumCulling);
       hasher->Update(nggState->enableBoxFilterCulling);

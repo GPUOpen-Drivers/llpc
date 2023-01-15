@@ -44,10 +44,10 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 57
+#define LLPC_INTERFACE_MAJOR_VERSION 59
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 2
+#define LLPC_INTERFACE_MINOR_VERSION 0
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     59.0 | Remove the option enableVertexReuse from NggState                                                     |
 //  |     57.2 | Move all internal resource binding id to enum InternalBinding.                                        |
 //  |     57.1 | Add forceNonUniformResourceIndexStageMask to PipelineOptions                                          |
 //  |     57.0 | Merge aggressiveInvariantLoads and disableInvariantLoads to an enumerated option                      |
@@ -649,7 +650,9 @@ struct NggState {
   bool forceCullingMode;      ///< Force NGG to run in culling mode
   NggCompactMode compactMode; ///< Compaction mode after culling operations
 
-  bool enableVertexReuse;         ///< Enable optimization to cull duplicate vertices
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 59
+  bool enableVertexReuse; ///< Enable optimization to cull duplicate vertices
+#endif
   bool enableBackfaceCulling;     ///< Enable culling of primitives that don't meet facing criteria
   bool enableFrustumCulling;      ///< Enable discarding of primitives outside of view frustum
   bool enableBoxFilterCulling;    ///< Enable simpler frustum culler that is less accurate
