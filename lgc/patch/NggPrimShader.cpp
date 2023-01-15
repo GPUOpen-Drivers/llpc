@@ -879,7 +879,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   //     Process XFB output export
   //
   //   if (threadIdInWave < vertCountInWave)
-  //     Run ES-partial to fetch vertex cull data
+  //     Run part ES to fetch vertex cull data
   //
   //   if (!runtimePassthrough) {
   //     if (threadIdInSubgroup < vertCountInSubgroup)
@@ -928,7 +928,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   //     if (vertex compactionless && empty wave)
   //       Do dummy vertex export
   //     else
-  //       Run ES-partial to do deferred vertex export
+  //       Run part ES to do deferred vertex export
   //   }
   // }
   //
@@ -1122,8 +1122,8 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     // Split ES to two parts: fetch cull data before NGG culling; do deferred vertex export after NGG culling
     splitEs(entryPoint->getParent());
 
-    // Run ES-partial to fetch cull data
-    auto cullData = runEsPartial(entryPoint->getParent(), entryPoint->arg_begin());
+    // Run part ES to fetch cull data
+    auto cullData = runPartEs(entryPoint->getParent(), entryPoint->arg_begin());
     position = m_nggControl->enableCullDistanceCulling ? m_builder.CreateExtractValue(cullData, 0) : cullData;
 
     m_builder.CreateBr(endFetchVertCullDataBlock);
@@ -1592,8 +1592,8 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(expVertBlock);
 
-    // Run ES-partial to do deferred vertex export
-    runEsPartial(entryPoint->getParent(), entryPoint->arg_begin(), position);
+    // Run part ES to do deferred vertex export
+    runPartEs(entryPoint->getParent(), entryPoint->arg_begin(), position);
 
     m_builder.CreateBr(endExpVertBlock);
   }
@@ -2805,22 +2805,22 @@ void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
 }
 
 // =====================================================================================================================
-// Runs ES-partial. Before doing this, ES must have been already split to two parts: one is to fetch cull data for
+// Runs part ES. Before doing this, ES must have been already split to two parts: one is to fetch cull data for
 // NGG culling; the other is to do deferred vertex export.
 //
 // @param module : LLVM module
 // @param sysValueStart : Start of system value
-// @param position : Vertex position data (if provided, the ES-partial is to do deferred vertex export)
-Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Value *position) {
+// @param position : Vertex position data (if provided, the part ES is to do deferred vertex export)
+Value *NggPrimShader::runPartEs(Module *module, Argument *sysValueStart, Value *position) {
   assert(m_hasGs == false);                       // GS must not be present
   assert(m_nggControl->passthroughMode == false); // NGG culling is enabled
 
   const bool deferredVertexExport = position != nullptr;
-  Function *esPartialEntry =
+  Function *partEs =
       module->getFunction(deferredVertexExport ? lgcName::NggEsDeferredVertexExport : lgcName::NggEsCullDataFetch);
-  assert(esPartialEntry);
+  assert(partEs);
 
-  // Call ES-partial entry
+  // Call part ES
   Argument *arg = sysValueStart;
 
   Value *offChipLdsBase = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase));
@@ -2968,22 +2968,22 @@ Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Valu
 
   unsigned userDataIdx = 0;
 
-  auto esPartialArgBegin = esPartialEntry->arg_begin();
-  const unsigned esPartialArgCount = esPartialEntry->arg_size();
-  (void(esPartialArgCount)); // Unused
+  auto partEsArgBegin = partEs->arg_begin();
+  const unsigned partEsArgCount = partEs->arg_size();
+  (void(partEsArgCount)); // Unused
 
   // Set up user data SGPRs
   while (userDataIdx < userDataCount) {
-    assert(args.size() < esPartialArgCount);
+    assert(args.size() < partEsArgCount);
 
-    auto esPartialArg = (esPartialArgBegin + args.size());
-    assert(esPartialArg->hasAttribute(Attribute::InReg));
+    auto partEsArg = (partEsArgBegin + args.size());
+    assert(partEsArg->hasAttribute(Attribute::InReg));
 
-    auto esPartialArgTy = esPartialArg->getType();
-    if (esPartialArgTy->isVectorTy()) {
-      assert(cast<VectorType>(esPartialArgTy)->getElementType()->isIntegerTy());
+    auto partEsArgTy = partEsArg->getType();
+    if (partEsArgTy->isVectorTy()) {
+      assert(cast<VectorType>(partEsArgTy)->getElementType()->isIntegerTy());
 
-      const unsigned userDataSize = cast<FixedVectorType>(esPartialArgTy)->getNumElements();
+      const unsigned userDataSize = cast<FixedVectorType>(partEsArgTy)->getNumElements();
 
       std::vector<int> shuffleMask;
       for (unsigned i = 0; i < userDataSize; ++i)
@@ -2994,7 +2994,7 @@ Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Valu
       auto esUserData = m_builder.CreateShuffleVector(userData, userData, shuffleMask);
       args.push_back(esUserData);
     } else {
-      assert(esPartialArgTy->isIntegerTy());
+      assert(partEsArgTy->isIntegerTy());
 
       auto esUserData = m_builder.CreateExtractElement(userData, userDataIdx);
       args.push_back(esUserData);
@@ -3022,11 +3022,11 @@ Value *NggPrimShader::runEsPartial(Module *module, Argument *sysValueStart, Valu
     args.push_back(instanceId);
   }
 
-  assert(args.size() == esPartialArgCount); // Must have visit all arguments of ES-partial entry point
+  assert(args.size() == partEsArgCount); // Must have visit all arguments of the part ES
 
-  CallInst *esPartialCall = m_builder.CreateCall(esPartialEntry, args);
-  esPartialCall->setCallingConv(CallingConv::AMDGPU_ES);
-  return esPartialCall;
+  CallInst *partEsCall = m_builder.CreateCall(partEs, args);
+  partEsCall->setCallingConv(CallingConv::AMDGPU_ES);
+  return partEsCall;
 }
 
 // =====================================================================================================================
@@ -3085,7 +3085,7 @@ void NggPrimShader::splitEs(Module *module) {
   }
 
   //
-  // Create ES-partial to fetch cull data for NGG culling
+  // Create the part ES to fetch cull data for NGG culling
   //
   const auto positionTy = FixedVectorType::get(m_builder.getFloatTy(), 4);
   const auto cullDistanceTy = ArrayType::get(m_builder.getFloatTy(), cullDistanceCount);
@@ -3184,7 +3184,7 @@ void NggPrimShader::splitEs(Module *module) {
   m_builder.CreateRet(cullData);
 
   //
-  // Create ES-partial to do deferred vertex export after NGG culling
+  // Create the part ES to do deferred vertex export after NGG culling
   //
 
   // NOTE: Here, we just mutate original ES to do deferred vertex export. We add vertex position data as an additional

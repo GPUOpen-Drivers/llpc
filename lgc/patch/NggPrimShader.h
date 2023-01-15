@@ -201,7 +201,7 @@ private:
   void earlyExitWithDummyExport();
 
   void runEs(llvm::Module *module, llvm::Argument *sysValueStart);
-  llvm::Value *runEsPartial(llvm::Module *module, llvm::Argument *sysValueStart, llvm::Value *position = nullptr);
+  llvm::Value *runPartEs(llvm::Module *module, llvm::Argument *sysValueStart, llvm::Value *position = nullptr);
 
   void splitEs(llvm::Module *module);
 
