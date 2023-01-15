@@ -502,7 +502,11 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
     nggState.enableNgg = EnableNgg;
     nggState.enableGsUse = NggEnableGsUse;
     nggState.forceCullingMode = NggForceCullingMode;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 60
     nggState.compactMode = NggCompactVertex ? NggCompactVertices : NggCompactDisable;
+#else
+    nggState.compactVertex = NggCompactVertex;
+#endif
     nggState.enableBackfaceCulling = NggEnableBackfaceCulling;
     nggState.enableFrustumCulling = NggEnableFrustumCulling;
     nggState.enableBoxFilterCulling = NggEnableBoxFilterCulling;

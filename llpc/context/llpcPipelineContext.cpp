@@ -348,7 +348,11 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
       else {
         options.nggFlags = (nggState.enableGsUse ? NggFlagEnableGsUse : 0) |
                            (nggState.forceCullingMode ? NggFlagForceCullingMode : 0) |
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 60
                            (nggState.compactMode == NggCompactVertices ? NggFlagCompactVertex : 0) |
+#else
+                           (nggState.compactVertex ? NggFlagCompactVertex : 0) |
+#endif
                            (nggState.enableBackfaceCulling ? NggFlagEnableBackfaceCulling : 0) |
                            (nggState.enableFrustumCulling ? NggFlagEnableFrustumCulling : 0) |
                            (nggState.enableBoxFilterCulling ? NggFlagEnableBoxFilterCulling : 0) |

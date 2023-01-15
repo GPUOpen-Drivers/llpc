@@ -44,7 +44,7 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 59
+#define LLPC_INTERFACE_MAJOR_VERSION 60
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     60.0 | Simplify the enum NggCompactMode to a boolean flag                                                    |
 //  |     59.0 | Remove the option enableVertexReuse from NggState                                                     |
 //  |     57.2 | Move all internal resource binding id to enum InternalBinding.                                        |
 //  |     57.1 | Add forceNonUniformResourceIndexStageMask to PipelineOptions                                          |
@@ -637,19 +638,24 @@ enum class NggSubgroupSizingType : unsigned {
                     ///  primsPerSubgroup
 };
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 60
 /// Enumerates compaction modes after culling operations for NGG primitive shader.
 enum NggCompactMode : unsigned {
   NggCompactDisable,  ///< Compaction is disabled
   NggCompactVertices, ///< Compaction is based on vertices
 };
+#endif
 
 /// Represents NGG tuning options
 struct NggState {
-  bool enableNgg;             ///< Enable NGG mode, use an implicit primitive shader
-  bool enableGsUse;           ///< Enable NGG use on geometry shader
-  bool forceCullingMode;      ///< Force NGG to run in culling mode
+  bool enableNgg;        ///< Enable NGG mode, use an implicit primitive shader
+  bool enableGsUse;      ///< Enable NGG use on geometry shader
+  bool forceCullingMode; ///< Force NGG to run in culling mode
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 60
   NggCompactMode compactMode; ///< Compaction mode after culling operations
-
+#else
+  bool compactVertex; ///< Enable NGG vertex compaction after culling
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 59
   bool enableVertexReuse; ///< Enable optimization to cull duplicate vertices
 #endif
