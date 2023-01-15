@@ -198,9 +198,8 @@ void PatchResourceCollect::setNggControl(Module *module) {
   nggControl.enableGsUse =
       (options.nggFlags & NggFlagEnableGsUse) ||
       (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11); // Always enable NGG on GS for GFX11+
-  nggControl.compactMode = (options.nggFlags & NggFlagCompactDisable) ? NggCompactDisable : NggCompactVertices;
+  nggControl.compactVertex = (options.nggFlags & NggFlagCompactVertex);
 
-  nggControl.enableVertexReuse = (options.nggFlags & NggFlagEnableVertexReuse);
   nggControl.enableBackfaceCulling = (options.nggFlags & NggFlagEnableBackfaceCulling);
   nggControl.enableFrustumCulling = (options.nggFlags & NggFlagEnableFrustumCulling);
   nggControl.enableBoxFilterCulling = (options.nggFlags & NggFlagEnableBoxFilterCulling);
@@ -217,10 +216,9 @@ void PatchResourceCollect::setNggControl(Module *module) {
     if (options.nggFlags & NggFlagForceCullingMode)
       nggControl.passthroughMode = false;
     else {
-      nggControl.passthroughMode = !nggControl.enableVertexReuse && !nggControl.enableBackfaceCulling &&
-                                   !nggControl.enableFrustumCulling && !nggControl.enableBoxFilterCulling &&
-                                   !nggControl.enableSphereCulling && !nggControl.enableSmallPrimFilter &&
-                                   !nggControl.enableCullDistanceCulling;
+      nggControl.passthroughMode = !nggControl.enableBackfaceCulling && !nggControl.enableFrustumCulling &&
+                                   !nggControl.enableBoxFilterCulling && !nggControl.enableSphereCulling &&
+                                   !nggControl.enableSmallPrimFilter && !nggControl.enableCullDistanceCulling;
     }
 
     // NOTE: Further check if we have to turn on pass-through mode forcibly.
@@ -234,18 +232,7 @@ void PatchResourceCollect::setNggControl(Module *module) {
     LLPC_OUTS("EnableNgg                    = " << nggControl.enableNgg << "\n");
     LLPC_OUTS("EnableGsUse                  = " << nggControl.enableGsUse << "\n");
     LLPC_OUTS("PassthroughMode              = " << nggControl.passthroughMode << "\n");
-    LLPC_OUTS("CompactMode                  = ");
-    switch (nggControl.compactMode) {
-    case NggCompactDisable:
-      LLPC_OUTS("Disable\n");
-      break;
-    case NggCompactVertices:
-      LLPC_OUTS("Vertices\n");
-      break;
-    default:
-      break;
-    }
-    LLPC_OUTS("EnableVertexReuse            = " << nggControl.enableVertexReuse << "\n");
+    LLPC_OUTS("CompactVertex                = " << nggControl.compactVertex << "\n");
     LLPC_OUTS("EnableBackfaceCulling        = " << nggControl.enableBackfaceCulling << "\n");
     LLPC_OUTS("EnableFrustumCulling         = " << nggControl.enableFrustumCulling << "\n");
     LLPC_OUTS("EnableBoxFilterCulling       = " << nggControl.enableBoxFilterCulling << "\n");

@@ -255,7 +255,7 @@ unsigned NggPrimShader::calcVertexCullInfoSizeAndOffsets(PipelineState *pipeline
   vertCullInfoOffsets.drawFlag = cullInfoOffset;
   cullInfoOffset += sizeof(VertexCullInfo::drawFlag);
 
-  if (nggControl->compactMode != NggCompactDisable) {
+  if (nggControl->compactVertex) {
     cullInfoSize += sizeof(VertexCullInfo::compactThreadId);
     vertCullInfoOffsets.compactThreadId = cullInfoOffset;
     cullInfoOffset += sizeof(VertexCullInfo::compactThreadId);
@@ -950,8 +950,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   // NOTE: Make sure vertex position data is 16-byte alignment because we will use 128-bit LDS read/write for it.
   assert(m_ldsManager->getLdsRegionStart(LdsRegionVertPosData) % SizeOfVec4 == 0);
 
-  const bool disableCompact = m_nggControl->compactMode == NggCompactDisable;
-  if (disableCompact)
+  if (!m_nggControl->compactVertex)
     assert(m_gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
 
   // Define basic blocks
@@ -996,7 +995,8 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   auto accumVertCountBlock = createBlock(entryPoint, ".accumVertCount");
   auto endAccumVertCountBlock = createBlock(entryPoint, ".endAccumVertCount");
 
-  auto compactVertBlock = disableCompact ? nullptr : createBlock(entryPoint, ".compactVert"); // Conditionally created
+  auto compactVertBlock =
+      m_nggControl->compactVertex ? createBlock(entryPoint, ".compactVert") : nullptr; // Conditionally created
   auto endCompactVertBlock = createBlock(entryPoint, ".endCompactVert");
 
   auto checkAllocReqBlock = createBlock(entryPoint, ".checkAllocReq");
@@ -1019,7 +1019,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   BasicBlock *checkEmptyWaveBlock = nullptr;
   BasicBlock *emptyWaveExpBlock = nullptr;
   BasicBlock *noEmptyWaveExpBlock = nullptr;
-  if (disableCompact) {
+  if (!m_nggControl->compactVertex) {
     checkEmptyWaveBlock = createBlock(entryPoint, ".checkEmptyWave");
     emptyWaveExpBlock = createBlock(entryPoint, ".emptyWaveExp");
     noEmptyWaveExpBlock = createBlock(entryPoint, ".noEmptyWaveExp");
@@ -1364,7 +1364,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     vertCountInSubgroup = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {},
                                                     {vertCountInWaves, m_builder.getInt32(waveCountInSubgroup)});
 
-    if (disableCompact) {
+    if (!m_nggControl->compactVertex) {
       m_builder.CreateBr(endCompactVertBlock);
     } else {
       // Get vertex count for all waves prior to this wave
@@ -1376,7 +1376,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     }
   }
 
-  if (!disableCompact) {
+  if (m_nggControl->compactVertex) {
     // Construct ".compactVert" block
     {
       m_builder.SetInsertPoint(compactVertBlock);
@@ -1450,7 +1450,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
 
     vertCountInSubgroup =
         m_builder.CreateSelect(fullyCulled, m_builder.getInt32(fullyCulledExportCount),
-                               disableCompact ? m_nggInputs.vertCountInSubgroup : vertCountInSubgroup);
+                               m_nggControl->compactVertex ? vertCountInSubgroup : m_nggInputs.vertCountInSubgroup);
 
     // NOTE: Here, we have to promote revised vertex count in subgroup to SGPR since it is treated as
     // an uniform value later, similar to what we have done for the revised primitive count in
@@ -1467,7 +1467,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     // NOTE: Here, we make several phi nodes to update some values that are different in runtime passthrough path
     // and no runtime passthrough path (normal culling path).
 
-    if (!disableCompact) {
+    if (m_nggControl->compactVertex) {
       // Update vertex compaction flag
       auto vertCompactedPhi = m_builder.CreatePHI(m_builder.getInt1Ty(), 2, "vertCompacted");
       vertCompactedPhi->addIncoming(vertCompacted, endCompactVertBlock);
@@ -1501,7 +1501,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     vertCountInSubgroupPhi->addIncoming(m_nggInputs.vertCountInSubgroup, runtimePassthroughBlock);
     m_nggInputs.vertCountInSubgroup = vertCountInSubgroupPhi; // Record vertex count in subgroup
 
-    if (disableCompact) {
+    if (!m_nggControl->compactVertex) {
       // Update draw flag
       auto drawFlagPhi = m_builder.CreatePHI(m_builder.getInt1Ty(), 2);
       drawFlagPhi->addIncoming(drawFlag, endCompactVertBlock);
@@ -1572,13 +1572,13 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     m_builder.SetInsertPoint(endExpPrimBlock);
 
     auto vertValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
-    if (disableCompact)
-      m_builder.CreateCondBr(vertValid, checkEmptyWaveBlock, endExpVertBlock);
-    else
+    if (m_nggControl->compactVertex)
       m_builder.CreateCondBr(vertValid, expVertBlock, endExpVertBlock);
+    else
+      m_builder.CreateCondBr(vertValid, checkEmptyWaveBlock, endExpVertBlock);
   }
 
-  if (disableCompact) {
+  if (!m_nggControl->compactVertex) {
     // Construct ".checkEmptyWave" block
     {
       m_builder.SetInsertPoint(checkEmptyWaveBlock);
@@ -1641,8 +1641,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
   const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
   assert(waveSize == 32 || waveSize == 64);
 
-  const bool disableCompact = m_nggControl->compactMode == NggCompactDisable;
-  if (disableCompact)
+  if (!m_nggControl->compactVertex)
     assert(m_gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
 
   const unsigned waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
@@ -1772,7 +1771,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
   // NOTE: Those basic blocks are conditionally created according to the disablement of vertex compactionless mode.
   BasicBlock *compactOutVertIdBlock = nullptr;
   BasicBlock *endCompactOutVertIdBlock = nullptr;
-  if (!disableCompact) {
+  if (m_nggControl->compactVertex) {
     compactOutVertIdBlock = createBlock(entryPoint, ".compactOutVertId");
     endCompactOutVertIdBlock = createBlock(entryPoint, ".endCompactOutVertId");
   }
@@ -1787,7 +1786,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
   BasicBlock *checkEmptyWaveBlock = nullptr;
   BasicBlock *emptyWaveExpBlock = nullptr;
   BasicBlock *noEmptyWaveExpBlock = nullptr;
-  if (disableCompact) {
+  if (!m_nggControl->compactVertex) {
     checkEmptyWaveBlock = createBlock(entryPoint, ".checkEmptyWave");
     emptyWaveExpBlock = createBlock(entryPoint, ".emptyWaveExp");
     noEmptyWaveExpBlock = createBlock(entryPoint, ".noEmptyWaveExp");
@@ -2054,7 +2053,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
 
     createFenceAndBarrier();
 
-    if (disableCompact) {
+    if (!m_nggControl->compactVertex) {
       auto firstWaveInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.waveIdInSubgroup, m_builder.getInt32(0));
       m_builder.CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
     } else {
@@ -2081,7 +2080,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
   }
 
   Value *compactVertexId = nullptr;
-  if (!disableCompact) {
+  if (m_nggControl->compactVertex) {
     // Construct ".compactOutVertId" block
     {
       m_builder.SetInsertPoint(compactOutVertIdBlock);
@@ -2129,7 +2128,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
     m_builder.SetInsertPoint(endAllocReqBlock);
 
     // NOTE: This barrier is not necessary if we disable vertex compaction.
-    if (!disableCompact)
+    if (m_nggControl->compactVertex)
       createFenceAndBarrier();
 
     auto primValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
@@ -2140,7 +2139,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(expPrimBlock);
 
-    doPrimitiveExportWithGs(disableCompact ? m_nggInputs.threadIdInSubgroup : compactVertexId);
+    doPrimitiveExportWithGs(m_nggControl->compactVertex ? compactVertexId : m_nggInputs.threadIdInSubgroup);
     m_builder.CreateBr(endExpPrimBlock);
   }
 
@@ -2149,13 +2148,13 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
     m_builder.SetInsertPoint(endExpPrimBlock);
 
     auto vertValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
-    if (disableCompact)
-      m_builder.CreateCondBr(vertValid, checkEmptyWaveBlock, endExpVertBlock);
-    else
+    if (m_nggControl->compactVertex)
       m_builder.CreateCondBr(vertValid, expVertBlock, endExpVertBlock);
+    else
+      m_builder.CreateCondBr(vertValid, checkEmptyWaveBlock, endExpVertBlock);
   }
 
-  if (disableCompact) {
+  if (!m_nggControl->compactVertex) {
     // Construct ".checkEmptyWave" block
     {
       m_builder.SetInsertPoint(checkEmptyWaveBlock);

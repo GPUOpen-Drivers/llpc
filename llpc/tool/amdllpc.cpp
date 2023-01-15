@@ -153,16 +153,9 @@ cl::opt<bool> NggEnableGsUse("ngg-enable-gs-use", cl::desc("Enable NGG use on ge
 cl::opt<bool> NggForceCullingMode("ngg-force-culling-mode", cl::desc("Force NGG to run in culling mode"),
                                   cl::init(false));
 
-// -ngg-compact-mode: NGG compaction mode (NGG)
-cl::opt<unsigned> NggCompactionMode("ngg-compaction-mode",
-                                    cl::desc("Compaction mode after culling operations (NGG):\n"
-                                             "0: Compaction is disabled\n"
-                                             "1: Compaction is based on vertices"),
-                                    cl::value_desc("mode"), cl::init(static_cast<unsigned>(NggCompactVertices)));
-
-// -ngg-enable-vertex-reuse: enable optimization to cull duplicate vertices (NGG)
-cl::opt<bool> NggEnableVertexReuse("ngg-enable-vertex-reuse",
-                                   cl::desc("Enable optimization to cull duplicate vertices (NGG)"),cl::init(false));
+// -ngg-compact-vertex: enable NGG vertex compaction after culling
+cl::opt<bool> NggCompactVertex("ngg-compact-vertex", cl::desc("Enable NGG vertex compaction after culling"),
+                               cl::init(true));
 
 // -ngg-enable-backface-culling: enable culling of primitives that don't meet facing criteria (NGG)
 cl::opt<bool> NggEnableBackfaceCulling("ngg-enable-backface-culling",
@@ -385,7 +378,7 @@ static Result init(int argc, char *argv[], ICompiler *&compiler) {
     // For GFX10.3+, we always prefer to enable NGG. Backface culling and small primitive filter are enabled as
     // well. Also, the compaction mode is set to compactionless.
     EnableNgg.setValue(true);
-    NggCompactionMode.setValue(static_cast<unsigned>(NggCompactDisable));
+    NggCompactVertex.setValue(false);
     NggEnableBackfaceCulling.setValue(true);
     NggEnableSmallPrimFilter.setValue(true);
   }
@@ -509,8 +502,7 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
     nggState.enableNgg = EnableNgg;
     nggState.enableGsUse = NggEnableGsUse;
     nggState.forceCullingMode = NggForceCullingMode;
-    nggState.compactMode = static_cast<NggCompactMode>(NggCompactionMode.getValue());
-    nggState.enableVertexReuse = NggEnableVertexReuse;
+    nggState.compactMode = NggCompactVertex ? NggCompactVertices : NggCompactDisable;
     nggState.enableBackfaceCulling = NggEnableBackfaceCulling;
     nggState.enableFrustumCulling = NggEnableFrustumCulling;
     nggState.enableBoxFilterCulling = NggEnableBoxFilterCulling;
