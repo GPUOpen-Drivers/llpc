@@ -85,8 +85,8 @@ public:
 private:
   Compiler *m_compiler;
   Context *m_context;
-  llvm::Optional<CacheAccessor> m_nonFragmentCacheAccessor;
-  llvm::Optional<CacheAccessor> m_fragmentCacheAccessor;
+  std::optional<CacheAccessor> m_nonFragmentCacheAccessor;
+  std::optional<CacheAccessor> m_fragmentCacheAccessor;
 
   // New ICache
   Vkgc::EntryHandle m_nonFragmentEntry;

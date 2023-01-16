@@ -167,13 +167,7 @@ DIType *SPIRVToLLVMDbgTran::transTypePointer(const SPIRVExtInst *DebugInst) {
   DIType *PointeeTy = nullptr;
   if (BM->getEntry(Ops[BaseTypeIdx])->getOpCode() != OpTypeVoid)
     PointeeTy = transDebugInst<DIType>(BM->get<SPIRVExtInst>(Ops[BaseTypeIdx]));
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 444152
-  // Old version of the code
-  Optional<unsigned> AS;
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
   std::optional<unsigned> AS;
-#endif
   if (Ops[StorageClassIdx] != ~0U) {
     auto SC = static_cast<SPIRVStorageClassKind>(Ops[StorageClassIdx]);
     AS = SPIRSPIRVAddrSpaceMap::rmap(SC);

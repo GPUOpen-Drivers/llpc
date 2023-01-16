@@ -717,7 +717,7 @@ Result Compiler::buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *p
   cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, false);
   pipelineHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false, false);
 
-  Optional<CacheAccessor> cacheAccessor;
+  std::optional<CacheAccessor> cacheAccessor;
   if (cl::CacheFullPipelines) {
     cacheAccessor.emplace(pipelineInfo, cacheHash, getInternalCaches());
   }
@@ -1718,7 +1718,7 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
   if (result == Result::Success)
     dumpCompilerOptions(pipelineDumpFile);
 
-  Optional<CacheAccessor> cacheAccessor;
+  std::optional<CacheAccessor> cacheAccessor;
   if (cl::CacheFullPipelines) {
     cacheAccessor.emplace(pipelineInfo, cacheHash, getInternalCaches());
   }
@@ -1869,7 +1869,7 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
   if (result == Result::Success)
     dumpCompilerOptions(pipelineDumpFile);
 
-  Optional<CacheAccessor> cacheAccessor;
+  std::optional<CacheAccessor> cacheAccessor;
   if (cl::CacheFullPipelines) {
     cacheAccessor.emplace(pipelineInfo, cacheHash, getInternalCaches());
   }

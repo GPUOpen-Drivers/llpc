@@ -1491,7 +1491,7 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
                                                            IRBuilder<> &builder,
                                                            SmallVectorImpl<UserDataArg> &unspilledArgs) {
 
-  Optional<UserDataArg> spillTableArg;
+  std::optional<UserDataArg> spillTableArg;
 
   auto userDataUsage = getUserDataUsage(m_shaderStage);
   if (!userDataUsage->spillTable.users.empty() || userDataUsage->pushConstSpill ||
