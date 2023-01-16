@@ -103,7 +103,7 @@ struct CompileInfo {
   bool robustBufferAccess;        // Whether to enable robust buffer access
   bool scratchAccessBoundsChecks; // Whether to enable scratch access bounds checks
   VfxPipelineType pipelineType;   // Pipeline type
-  llvm::Optional<llvm::CodeGenOpt::Level> optimizationLevel; // The optimization level to pass the compiler
+  std::optional<llvm::CodeGenOpt::Level> optimizationLevel; // The optimization level to pass the compiler
 #if VKI_RAY_TRACING
   bool internalRtShaders; // Whether to enable intrinsics for internal RT shaders
 #endif
