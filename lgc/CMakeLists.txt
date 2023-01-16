@@ -54,7 +54,6 @@ add_llvm_library(LLVMlgc LINK_COMPONENTS
 target_link_libraries(LLVMlgc PUBLIC llvm_dialects)
 
 ### Cached Project Options #############################################################################################
-option(LLPC_BUILD_NAVI12 "LLPC support for NAVI12?" OFF)
 option(LLPC_ENABLE_WERROR "Build LLPC with more errors" OFF)
 
 ### Compiler Options ###################################################################################################
@@ -82,6 +81,7 @@ if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
 endif()
 target_compile_definitions(LLVMlgc PRIVATE
         LITTLEENDIAN_CPU
+        CHIP_HDR_NAVI12
         CHIP_HDR_NAVI14
         CHIP_HDR_NAVI21
         CHIP_HDR_NAVI22
@@ -91,13 +91,6 @@ target_compile_definitions(LLVMlgc PRIVATE
         )
 
 target_compile_definitions(LLVMlgc PRIVATE CHIP_HDR_RENOIR)
-
-  if(LLPC_BUILD_NAVI12)
-    target_compile_definitions(LLVMlgc PRIVATE
-        LLPC_BUILD_NAVI12
-        CHIP_HDR_NAVI12
-    )
-  endif()
 
 if(WIN32)
     target_compile_definitions(LLVMlgc PRIVATE
