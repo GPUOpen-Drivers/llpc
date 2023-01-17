@@ -592,46 +592,71 @@ void PalMetadata::finalizeUserDataLimit() {
 //                          for part-pipeline or shader compilation.
 void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
   assert(m_pipelineState->isGraphics());
+  if (m_pipelineState->useRegisterFieldFormat()) {
+    auto graphicsRegNode = m_registers[Util::Abi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
 
-  // Set PA_CL_CLIP_CNTL from pipeline state settings.
-  // DX_CLIP_SPACE_DEF, ZCLIP_NEAR_DISABLE and ZCLIP_FAR_DISABLE are now set internally by PAL (as of
-  // version 629), and are no longer part of the PAL ELF ABI.
-  const unsigned usrClipPlaneMask = m_pipelineState->getRasterizerState().usrClipPlaneMask;
-  const bool rasterizerDiscardEnable = m_pipelineState->getRasterizerState().rasterizerDiscardEnable;
-  PA_CL_CLIP_CNTL paClClipCntl = {};
-  paClClipCntl.bits.UCP_ENA_0 = (usrClipPlaneMask >> 0) & 0x1;
-  paClClipCntl.bits.UCP_ENA_1 = (usrClipPlaneMask >> 1) & 0x1;
-  paClClipCntl.bits.UCP_ENA_2 = (usrClipPlaneMask >> 2) & 0x1;
-  paClClipCntl.bits.UCP_ENA_3 = (usrClipPlaneMask >> 3) & 0x1;
-  paClClipCntl.bits.UCP_ENA_4 = (usrClipPlaneMask >> 4) & 0x1;
-  paClClipCntl.bits.UCP_ENA_5 = (usrClipPlaneMask >> 5) & 0x1;
-  paClClipCntl.bits.DX_LINEAR_ATTR_CLIP_ENA = true;
-  paClClipCntl.bits.DX_RASTERIZATION_KILL = rasterizerDiscardEnable;
-  setRegister(mmPA_CL_CLIP_CNTL, paClClipCntl.u32All);
-
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 &&
-      m_pipelineState->getColorExportState().alphaToCoverageEnable) {
-    DB_SHADER_CONTROL dbShaderControl = {};
-    dbShaderControl.u32All = getRegister(mmDB_SHADER_CONTROL);
-    dbShaderControl.bitfields.ALPHA_TO_MASK_DISABLE = dbShaderControl.bitfields.MASK_EXPORT_ENABLE;
-    setRegister(mmDB_SHADER_CONTROL, dbShaderControl.u32All);
-  }
-
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10) {
-    WaveBreak waveBreakSize = m_pipelineState->getShaderOptions(ShaderStageFragment).waveBreakSize;
-    PA_SC_SHADER_CONTROL paScShaderControl = {};
-    paScShaderControl.gfx10.WAVE_BREAK_REGION_SIZE = static_cast<unsigned>(waveBreakSize);
-    setRegister(mmPA_SC_SHADER_CONTROL, paScShaderControl.u32All);
-  }
-
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion{9, 0, 0}) {
-    PA_SC_AA_CONFIG paScAaConfig = {};
-    if (m_pipelineState->getRasterizerState().innerCoverage) {
-      paScAaConfig.bitfields.COVERAGE_TO_SHADER_SELECT = INPUT_INNER_COVERAGE;
-    } else {
-      paScAaConfig.bitfields.COVERAGE_TO_SHADER_SELECT = INPUT_COVERAGE;
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 &&
+        m_pipelineState->getColorExportState().alphaToCoverageEnable) {
+      graphicsRegNode[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] =
+          graphicsRegNode[Util::Abi::DbShaderControlMetadataKey::MaskExportEnable];
     }
-    setRegister(mmPA_SC_AA_CONFIG, paScAaConfig.u32All);
+
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10) {
+      WaveBreak waveBreakSize = m_pipelineState->getShaderOptions(ShaderStageFragment).waveBreakSize;
+      auto paScShaderControl = graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::PaScShaderControl].getMap(true);
+      paScShaderControl[Util::Abi::PaScShaderControlMetadataKey::WaveBreakRegionSize] =
+          static_cast<unsigned>(waveBreakSize);
+    }
+
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion{9, 0, 0}) {
+      if (m_pipelineState->getRasterizerState().innerCoverage)
+        graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::AaCoverageToShaderSelect] =
+            serializeEnum(Util::Abi::CoverageToShaderSel(INPUT_INNER_COVERAGE));
+      else
+        graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::AaCoverageToShaderSelect] =
+            serializeEnum(Util::Abi::CoverageToShaderSel(INPUT_COVERAGE));
+    }
+  } else {
+    // Set PA_CL_CLIP_CNTL from pipeline state settings.
+    // DX_CLIP_SPACE_DEF, ZCLIP_NEAR_DISABLE and ZCLIP_FAR_DISABLE are now set internally by PAL (as of
+    // version 629), and are no longer part of the PAL ELF ABI.
+    const unsigned usrClipPlaneMask = m_pipelineState->getRasterizerState().usrClipPlaneMask;
+    const bool rasterizerDiscardEnable = m_pipelineState->getRasterizerState().rasterizerDiscardEnable;
+    PA_CL_CLIP_CNTL paClClipCntl = {};
+    paClClipCntl.bits.UCP_ENA_0 = (usrClipPlaneMask >> 0) & 0x1;
+    paClClipCntl.bits.UCP_ENA_1 = (usrClipPlaneMask >> 1) & 0x1;
+    paClClipCntl.bits.UCP_ENA_2 = (usrClipPlaneMask >> 2) & 0x1;
+    paClClipCntl.bits.UCP_ENA_3 = (usrClipPlaneMask >> 3) & 0x1;
+    paClClipCntl.bits.UCP_ENA_4 = (usrClipPlaneMask >> 4) & 0x1;
+    paClClipCntl.bits.UCP_ENA_5 = (usrClipPlaneMask >> 5) & 0x1;
+    paClClipCntl.bits.DX_LINEAR_ATTR_CLIP_ENA = true;
+    paClClipCntl.bits.DX_RASTERIZATION_KILL = rasterizerDiscardEnable;
+    setRegister(mmPA_CL_CLIP_CNTL, paClClipCntl.u32All);
+
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 &&
+        m_pipelineState->getColorExportState().alphaToCoverageEnable) {
+      DB_SHADER_CONTROL dbShaderControl = {};
+      dbShaderControl.u32All = getRegister(mmDB_SHADER_CONTROL);
+      dbShaderControl.bitfields.ALPHA_TO_MASK_DISABLE = dbShaderControl.bitfields.MASK_EXPORT_ENABLE;
+      setRegister(mmDB_SHADER_CONTROL, dbShaderControl.u32All);
+    }
+
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10) {
+      WaveBreak waveBreakSize = m_pipelineState->getShaderOptions(ShaderStageFragment).waveBreakSize;
+      PA_SC_SHADER_CONTROL paScShaderControl = {};
+      paScShaderControl.gfx10.WAVE_BREAK_REGION_SIZE = static_cast<unsigned>(waveBreakSize);
+      setRegister(mmPA_SC_SHADER_CONTROL, paScShaderControl.u32All);
+    }
+
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion{9, 0, 0}) {
+      PA_SC_AA_CONFIG paScAaConfig = {};
+      if (m_pipelineState->getRasterizerState().innerCoverage) {
+        paScAaConfig.bitfields.COVERAGE_TO_SHADER_SELECT = INPUT_INNER_COVERAGE;
+      } else {
+        paScAaConfig.bitfields.COVERAGE_TO_SHADER_SELECT = INPUT_COVERAGE;
+      }
+      setRegister(mmPA_SC_AA_CONFIG, paScAaConfig.u32All);
+    }
   }
 }
 
@@ -948,7 +973,29 @@ void PalMetadata::updateSpiShaderColFormat(ArrayRef<ColorExportInfo> exps, bool 
       spiShaderColFormat = SPI_SHADER_32_R;
     }
   }
-  setRegister(mmSPI_SHADER_COL_FORMAT, spiShaderColFormat);
+
+  if (m_pipelineState->useRegisterFieldFormat()) {
+    auto spiShaderColFormatNode = m_registers[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
+                                      .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::SpiShaderColFormat]
+                                      .getMap(true);
+    spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_0ExportFormat] = spiShaderColFormat & 0xF;
+    spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_1ExportFormat] =
+        (spiShaderColFormat >> 4) & 0xF;
+    spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_2ExportFormat] =
+        (spiShaderColFormat >> 8) & 0xF;
+    spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_3ExportFormat] =
+        (spiShaderColFormat >> 12) & 0xF;
+    spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_4ExportFormat] =
+        (spiShaderColFormat >> 16) & 0xF;
+    spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_5ExportFormat] =
+        (spiShaderColFormat >> 20) & 0xF;
+    spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_6ExportFormat] =
+        (spiShaderColFormat >> 24) & 0xF;
+    spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_7ExportFormat] =
+        (spiShaderColFormat >> 28) & 0xF;
+  } else {
+    setRegister(mmSPI_SHADER_COL_FORMAT, spiShaderColFormat);
+  }
 }
 
 // =====================================================================================================================
@@ -1275,5 +1322,69 @@ bool PalMetadata::isWave32(unsigned callingConv) {
   default:
     llvm_unreachable("Unexpected calling convention.");
     return false;
+  }
+}
+
+// =====================================================================================================================
+// Serialize Util::Abi::CoverageToShaderSel to a string.
+//
+// @param value : The input enum of Util::Abi::CoverageToShaderSel
+llvm::StringRef PalMetadata::serializeEnum(Util::Abi::CoverageToShaderSel value) {
+  switch (value) {
+  case Util::Abi::CoverageToShaderSel::InputCoverage:
+    return "InputCoverage";
+  case Util::Abi::CoverageToShaderSel::InputInnerCoverage:
+    return "InputInnerCoverage";
+  case Util::Abi::CoverageToShaderSel::InputDepthCoverage:
+    return "InputDepthCoverage";
+  case Util::Abi::CoverageToShaderSel::Raw:
+    return "Raw";
+  default:
+    llvm_unreachable("Unexpected Util::Abi::CoverageToShaderSel enum");
+    return "";
+  }
+}
+
+// =====================================================================================================================
+// Serialize Util::Abi::PointSpriteSelect to a string.
+//
+// @param value : The input enum of Util::Abi::PointSpriteSelect
+llvm::StringRef PalMetadata::serializeEnum(Util::Abi::PointSpriteSelect value) {
+  switch (value) {
+  case Util::Abi::PointSpriteSelect::Zero:
+    return "Zero";
+  case Util::Abi::PointSpriteSelect::One:
+    return "One";
+  case Util::Abi::PointSpriteSelect::S:
+    return "S";
+  case Util::Abi::PointSpriteSelect::T:
+    return "T";
+  case Util::Abi::PointSpriteSelect::None:
+    return "None";
+  default:
+    llvm_unreachable("Unexpected Util::Abi::PointSpriteSelect");
+    return "";
+  }
+}
+
+// =====================================================================================================================
+// Serialize Util::Abi::GsOutPrimType to a string.
+//
+// @param value : The input enum of Util::Abi::GsOutPrimType
+llvm::StringRef PalMetadata::serializeEnum(Util::Abi::GsOutPrimType value) {
+  switch (value) {
+  case Util::Abi::GsOutPrimType::PointList:
+    return "PointList";
+  case Util::Abi::GsOutPrimType::LineStrip:
+    return "LineStrip";
+  case Util::Abi::GsOutPrimType::TriStrip:
+    return "TriStrip";
+  case Util::Abi::GsOutPrimType::Rect2d:
+    return "Rect2d";
+  case Util::Abi::GsOutPrimType::RectList:
+    return "RectList";
+  default:
+    llvm_unreachable("Unexpected Util::Abi::GsOutPrimType");
+    return "";
   }
 }

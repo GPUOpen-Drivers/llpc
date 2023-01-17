@@ -1008,8 +1008,9 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
       unsigned numEntries = isSystemUserData ? 1 : dwordSize;
       assert((!isUnlinkedDescriptorSetValue(userDataArg.userDataValue) || dwordSize == 1) &&
              "Expecting descriptor set values to be one dword.  The linker cannot handle anything else.");
-      m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx, userDataArg.userDataValue,
-                                                          numEntries);
+      if (!m_pipelineState->useRegisterFieldFormat())
+        m_pipelineState->getPalMetadata()->setUserDataEntry(m_shaderStage, userDataIdx, userDataArg.userDataValue,
+                                                            numEntries);
       if (isSystemUserData) {
         unsigned index = userDataArg.userDataValue - static_cast<unsigned>(UserDataMapping::GlobalTable);
         auto &specialUserData = getUserDataUsage(m_shaderStage)->specialUserData;
@@ -1046,6 +1047,28 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
 
   // Push the fixed system (not user data) register args.
   inRegMask |= shaderInputs->getShaderArgTys(m_pipelineState, m_shaderStage, argTys, argNames, argOffset);
+
+  if (m_pipelineState->useRegisterFieldFormat()) {
+    unsigned numUserDataSgprs = 16;
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 && m_shaderStage != ShaderStageCompute &&
+        m_shaderStage != ShaderStageTask)
+      numUserDataSgprs = 32;
+    std::vector<unsigned> userDataMap(numUserDataSgprs, static_cast<unsigned>(UserDataMapping::Invalid));
+    userDataIdx = 0;
+    for (const auto &userDataArg : unspilledArgs) {
+      unsigned dwordSize = userDataArg.argDwordSize;
+      if (userDataArg.userDataValue != static_cast<unsigned>(UserDataMapping::Invalid)) {
+        bool isSystemUserData = isSystemUserDataValue(userDataArg.userDataValue);
+        unsigned numEntries = isSystemUserData ? 1 : dwordSize;
+        unsigned userDataValue = userDataArg.userDataValue;
+        unsigned idx = userDataIdx;
+        while (numEntries--)
+          userDataMap[idx++] = userDataValue++;
+      }
+      userDataIdx += dwordSize;
+    }
+    m_pipelineState->setUserDataMap(m_shaderStage, userDataMap);
+  }
 
   return inRegMask;
 }

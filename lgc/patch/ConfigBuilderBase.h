@@ -63,6 +63,9 @@ public:
   ~ConfigBuilderBase();
 
   void writePalMetadata();
+  llvm::msgpack::MapDocNode &getGraphicsRegNode() { return m_graphicsRegistersNode; }
+  // Get the MsgPack map node for the specified HW shader in the ".hardware_stages" map
+  llvm::msgpack::MapDocNode getHwShaderNode(Util::Abi::HardwareStage hwStage);
 
 protected:
   void addApiHwShaderMapping(ShaderStage apiStage, unsigned hwStages);
@@ -114,8 +117,6 @@ protected:
 private:
   // Get the MsgPack map node for the specified API shader in the ".shaders" map
   llvm::msgpack::MapDocNode getApiShaderNode(unsigned apiStage);
-  // Get the MsgPack map node for the specified HW shader in the ".hardware_stages" map
-  llvm::msgpack::MapDocNode getHwShaderNode(Util::Abi::HardwareStage hwStage);
 
   llvm::msgpack::Document *m_document;      // The MsgPack document
   llvm::msgpack::MapDocNode m_pipelineNode; // MsgPack map node for amdpal.pipelines[0]
@@ -125,6 +126,9 @@ private:
   llvm::msgpack::MapDocNode m_hwShaderNodes[unsigned(Util::Abi::HardwareStage::Count)];
   // MsgPack map node for each HW shader's node in
   //  ".hardware_stages"
+  llvm::msgpack::MapDocNode m_graphicsRegistersNode;
+  // MsgPack map node for graphics registers metadata
+  // ".graphics_registers"
 
   llvm::SmallVector<PalMetadataNoteEntry, 128> m_config; // Register/metadata configuration
 };
