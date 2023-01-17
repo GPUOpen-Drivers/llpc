@@ -435,27 +435,27 @@ void ConfigBuilder::buildPipelineNggVsFsRegConfig() {
   GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
   assert(gfxIp.major >= 10);
 
-  const auto nggControl = m_pipelineState->getNggControl();
-  assert(nggControl->enableNgg);
-
   PipelineNggVsFsRegConfig config(gfxIp);
 
-  addApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderGs);
   addApiHwShaderMapping(ShaderStageFragment, Util::Abi::HwShaderPs);
 
-  setPipelineType(Util::Abi::PipelineType::Ngg);
-
-  SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, MAX_PRIMGRP_IN_WAVE, 2);
-
-  SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_EN, true);
-  SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, nggControl->passthroughMode);
-  if (gfxIp.major >= 11) {
-    SET_REG_GFX10_4_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_NO_MSG,
-                               nggControl->passthroughMode && !m_pipelineState->enableSwXfb());
-    SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, NGG_WAVE_ID_EN, m_pipelineState->enableSwXfb());
-  }
-
   if (m_pipelineState->hasShaderStage(ShaderStageVertex)) {
+    const auto nggControl = m_pipelineState->getNggControl();
+    assert(nggControl->enableNgg);
+
+    addApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderGs);
+    setPipelineType(Util::Abi::PipelineType::Ngg);
+
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, MAX_PRIMGRP_IN_WAVE, 2);
+
+    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_EN, true);
+    SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, nggControl->passthroughMode);
+    if (gfxIp.major >= 11) {
+      SET_REG_GFX10_4_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_NO_MSG,
+                                 nggControl->passthroughMode && !m_pipelineState->enableSwXfb());
+      SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, NGG_WAVE_ID_EN, m_pipelineState->enableSwXfb());
+    }
+
     buildPrimShaderRegConfig<PipelineNggVsFsRegConfig>(ShaderStageVertex, ShaderStageInvalid, &config);
 
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
@@ -472,24 +472,24 @@ void ConfigBuilder::buildPipelineNggVsFsRegConfig() {
     if (m_pipelineState->getTargetInfo().getGpuProperty().supportShaderPowerProfiling) {
       SET_REG_FIELD(&config.primShaderRegs, SPI_SHADER_PGM_CHKSUM_GS, CHECKSUM, checksum);
     }
+
+    regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
+
+    // When non-patch primitives are used without tessellation enabled, PRIMGROUP_SIZE must be at least 4,
+    // and must be even if there are more than 2 shader engines on the GPU.
+    unsigned primGroupSize = 128;
+    unsigned numShaderEngines = m_pipelineState->getTargetInfo().getGpuProperty().numShaderEngines;
+    if (numShaderEngines > 2)
+      primGroupSize = alignTo(primGroupSize, 2);
+
+    iaMultiVgtParam.bits.PRIMGROUP_SIZE = primGroupSize - 1;
+
+    SET_REG(&config, IA_MULTI_VGT_PARAM_PIPED, iaMultiVgtParam.u32All);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
     buildPsRegConfig<PipelineNggVsFsRegConfig>(ShaderStageFragment, &config);
   }
-
-  regIA_MULTI_VGT_PARAM iaMultiVgtParam = {};
-
-  // When non-patch primitives are used without tessellation enabled, PRIMGROUP_SIZE must be at least 4, and must be
-  // even if there are more than 2 shader engines on the GPU.
-  unsigned primGroupSize = 128;
-  unsigned numShaderEngines = m_pipelineState->getTargetInfo().getGpuProperty().numShaderEngines;
-  if (numShaderEngines > 2)
-    primGroupSize = alignTo(primGroupSize, 2);
-
-  iaMultiVgtParam.bits.PRIMGROUP_SIZE = primGroupSize - 1;
-
-  SET_REG(&config, IA_MULTI_VGT_PARAM_PIPED, iaMultiVgtParam.u32All);
 
   appendConfig(config);
 }
