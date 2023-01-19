@@ -353,23 +353,28 @@ FunctionType *NggPrimShader::generatePrimShaderEntryPointType(Module *module, ui
   argTys.push_back(FixedVectorType::get(m_builder.getInt32Ty(), userDataCount));
   *inRegMask |= (1ull << NumSpecialSgprInputs);
 
-  // Other system values (VGPRs)
-  argTys.push_back(m_builder.getInt32Ty()); // ES to GS offsets (vertex 0 and 1)
-  argTys.push_back(m_builder.getInt32Ty()); // ES to GS offsets (vertex 2 and 3)
-  argTys.push_back(m_builder.getInt32Ty()); // Primitive ID (GS)
-  argTys.push_back(m_builder.getInt32Ty()); // Invocation ID
-  argTys.push_back(m_builder.getInt32Ty()); // ES to GS offsets (vertex 4 and 5)
+  if (m_gfxIp.major <= 11) {
+    // GS VGPRs
+    argTys.push_back(m_builder.getInt32Ty()); // ES to GS offsets (vertex 0 and 1)
+    argTys.push_back(m_builder.getInt32Ty()); // ES to GS offsets (vertex 2 and 3)
+    argTys.push_back(m_builder.getInt32Ty()); // Primitive ID (primitive based)
+    argTys.push_back(m_builder.getInt32Ty()); // Invocation ID
+    argTys.push_back(m_builder.getInt32Ty()); // ES to GS offsets (vertex 4 and 5)
 
-  if (m_hasTes) {
-    argTys.push_back(m_builder.getFloatTy()); // X of TessCoord (U)
-    argTys.push_back(m_builder.getFloatTy()); // Y of TessCoord (V)
-    argTys.push_back(m_builder.getInt32Ty()); // Relative patch ID
-    argTys.push_back(m_builder.getInt32Ty()); // Patch ID
+    // ES VGPRs
+    if (m_hasTes) {
+      argTys.push_back(m_builder.getFloatTy()); // X of TessCoord (U)
+      argTys.push_back(m_builder.getFloatTy()); // Y of TessCoord (V)
+      argTys.push_back(m_builder.getInt32Ty()); // Relative patch ID
+      argTys.push_back(m_builder.getInt32Ty()); // Patch ID
+    } else {
+      argTys.push_back(m_builder.getInt32Ty()); // Vertex ID
+      argTys.push_back(m_builder.getInt32Ty()); // Unused
+      argTys.push_back(m_builder.getInt32Ty()); // Unused
+      argTys.push_back(m_builder.getInt32Ty()); // Instance ID
+    }
   } else {
-    argTys.push_back(m_builder.getInt32Ty()); // Vertex ID
-    argTys.push_back(m_builder.getInt32Ty()); // Relative vertex ID (auto index)
-    argTys.push_back(m_builder.getInt32Ty()); // Primitive ID (VS)
-    argTys.push_back(m_builder.getInt32Ty()); // Instance ID
+    llvm_unreachable("Not implemented!");
   }
 
   // If the ES is the API VS, and it is a fetchless VS, then we need to add args for the vertex fetches.
@@ -398,6 +403,7 @@ Function *NggPrimShader::generatePrimShaderEntryPoint(Module *module) {
   uint64_t inRegMask = 0;
   auto entryPointTy = generatePrimShaderEntryPointType(module, &inRegMask);
 
+  // Generate entry-point of primitive shader
   Function *entryPoint = Function::Create(entryPointTy, GlobalValue::ExternalLinkage, lgcName::NggPrimShaderEntryPoint);
   entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
 
@@ -406,50 +412,43 @@ Function *NggPrimShader::generatePrimShaderEntryPoint(Module *module) {
   entryPoint->addFnAttr("amdgpu-flat-work-group-size",
                         "128,128"); // Force s_barrier to be present (ignore optimization)
 
+  SmallVector<Argument *, 32> args;
   for (auto &arg : entryPoint->args()) {
     auto argIdx = arg.getArgNo();
     if (inRegMask & (1ull << argIdx))
       arg.addAttr(Attribute::InReg);
+    args.push_back(&arg);
   }
 
-  auto arg = entryPoint->arg_begin();
-  arg += NumSpecialSgprInputs;
-
-  Value *userData = arg++;
-
-  Value *esGsOffsets01 = arg;
-  Value *esGsOffsets23 = (arg + 1);
-  Value *gsPrimitiveId = (arg + 2);
-  Value *invocationId = (arg + 3);
-  Value *esGsOffsets45 = (arg + 4);
-
-  Value *tessCoordX = (arg + 5);
-  Value *tessCoordY = (arg + 6);
-  Value *relPatchId = (arg + 7);
-  Value *patchId = (arg + 8);
-
-  Value *vertexId = (arg + 5);
-  Value *relVertexId = (arg + 6);
-  Value *instanceId = (arg + 8);
-
+  // Assign names to part of primitive shader arguments
+  Value *userData = args[NumSpecialSgprInputs];
   userData->setName("userData");
-  esGsOffsets01->setName("esGsOffsets01");
-  esGsOffsets23->setName("esGsOffsets23");
-  gsPrimitiveId->setName("gsPrimitiveId");
-  invocationId->setName("invocationId");
-  esGsOffsets45->setName("esGsOffsets45");
 
-  if (m_hasTes) {
-    tessCoordX->setName("tessCoordX");
-    tessCoordY->setName("tessCoordY");
-    relPatchId->setName("relPatchId");
-    patchId->setName("patchId");
+  ArrayRef<Argument *> vgprArgs(args.begin() + NumSpecialSgprInputs + 1, args.end());
+  if (m_gfxIp.major <= 11) {
+    // GS VGPRs
+    vgprArgs[0]->setName("esGsOffsets01");
+    vgprArgs[1]->setName("esGsOffsets23");
+    vgprArgs[2]->setName("primitiveId");
+    vgprArgs[3]->setName("invocationId");
+    vgprArgs[4]->setName("esGsOffsets45");
+
+    // ES VGPRs
+    if (m_hasTes) {
+      vgprArgs[5]->setName("tessCoordX");
+      vgprArgs[6]->setName("tessCoordY");
+      vgprArgs[7]->setName("relPatchId");
+      vgprArgs[8]->setName("patchId");
+    } else {
+      vgprArgs[5]->setName("vertexId");
+      // VGPR6 and VGPR7 are unused
+      vgprArgs[8]->setName("instanceId");
+    }
   } else {
-    vertexId->setName("vertexId");
-    relVertexId->setName("relVertexId");
-    instanceId->setName("instanceId");
+    llvm_unreachable("Not implemented!");
   }
 
+  // Build primitive shader body
   if (m_hasGs) {
     // API GS is present
     buildPrimShaderWithGs(entryPoint);
@@ -518,32 +517,42 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
   assert(m_nggControl->passthroughMode); // Make sure NGG passthrough mode is enabled
   assert(!m_hasGs);                      // Make sure API GS is not present
 
-  auto arg = entryPoint->arg_begin();
+  SmallVector<Argument *, 32> args;
+  for (auto &arg : entryPoint->args())
+    args.push_back(&arg);
 
-  Value *mergedGroupInfo = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedGroupInfo));
+  // System SGPRs
+  Value *mergedGroupInfo = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedGroupInfo)];
   mergedGroupInfo->setName("mergedGroupInfo");
 
-  Value *mergedWaveInfo = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedWaveInfo));
+  Value *mergedWaveInfo = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedWaveInfo)];
   mergedWaveInfo->setName("mergedWaveInfo");
 
   Value *attribRingBase = nullptr;
   if (m_gfxIp.major >= 11) {
-    attribRingBase = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::AttribRingBase));
+    attribRingBase = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::AttribRingBase)];
     attribRingBase->setName("attribRingBase");
   }
 
-  Value *userData = arg + NumSpecialSgprInputs;
-  arg += (NumSpecialSgprInputs + 1);
+  // System user data
+  Value *userData = args[NumSpecialSgprInputs];
 
-  Value *esGsOffsets01 = arg;
-  Value *gsPrimitiveId = (arg + 2);
+  // System VGPRs
+  ArrayRef<Argument *> vgprArgs(args.begin() + NumSpecialSgprInputs + 1, args.end());
+
+  Value *primData = vgprArgs[0];
+  Value *primitiveId = nullptr;
+  if (m_gfxIp.major <= 11)
+    primitiveId = vgprArgs[2];
+  else
+    llvm_unreachable("Not implemented!");
 
   //
   // NOTE: If primitive ID is used in VS, we have to insert several basic blocks to distribute the value across
   // LDS because the primitive ID is provided as per-primitive instead of per-vertex. The algorithm is something
   // like this:
   //
-  // if (distributePrimitiveId) {
+  //   if (distributePrimitiveId) {
   //     if (threadIdInWave < primCountInWave)
   //       Distribute primitive ID to provoking vertex (vertex0)
   //     Barrier
@@ -564,7 +573,7 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
   //
   //   if (distributePrimitiveId) {
   //     if (threadIdInWave < primCountInWave)
-  //       Distribute primitive ID to provoking vertex (vertex0)
+  //       Distribute primitive ID to provoking vertex (vertex0 or vertex2)
   //     Barrier
   //
   //     if (threadIdInWave < vertCountInWave)
@@ -640,7 +649,7 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
     }
 
     // Record primitive connectivity data
-    m_nggInputs.primData = esGsOffsets01;
+    m_nggInputs.primData = primData;
 
     if (distributePrimitiveId) {
       auto primValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.primCountInWave);
@@ -675,7 +684,7 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
         vertexIndex = createUBfe(m_nggInputs.primData, 0, 9);
       else
         vertexIndex = createUBfe(m_nggInputs.primData, 20, 9);
-      writePerThreadDataToLds(gsPrimitiveId, vertexIndex, LdsRegionDistribPrimId);
+      writePerThreadDataToLds(primitiveId, vertexIndex, LdsRegionDistribPrimId);
 
       BranchInst::Create(endWritePrimIdBlock, writePrimIdBlock);
     }
@@ -777,7 +786,8 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
     {
       m_builder.SetInsertPoint(expVertBlock);
 
-      runEs(entryPoint->getParent(), entryPoint->arg_begin());
+      auto esEntryPoint = entryPoint->getParent()->getFunction(lgcName::NggEsEntryPoint);
+      runEs(esEntryPoint, args);
 
       m_builder.CreateBr(endExpVertBlock);
     }
@@ -804,41 +814,59 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
 
   const unsigned waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
 
-  auto arg = entryPoint->arg_begin();
+  SmallVector<Argument *, 32> args;
+  for (auto &arg : entryPoint->args())
+    args.push_back(&arg);
 
-  Value *mergedGroupInfo = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedGroupInfo));
+  // System SGPRs
+  Value *mergedGroupInfo = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedGroupInfo)];
   mergedGroupInfo->setName("mergedGroupInfo");
 
-  Value *mergedWaveInfo = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedWaveInfo));
+  Value *mergedWaveInfo = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedWaveInfo)];
   mergedWaveInfo->setName("mergedWaveInfo");
 
   Value *attribRingBase = nullptr;
   if (m_gfxIp.major >= 11) {
-    attribRingBase = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::AttribRingBase));
+    attribRingBase = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::AttribRingBase)];
     attribRingBase->setName("attribRingBase");
   }
 
   // GS shader address is reused as primitive shader table address for NGG culling
-  Value *primShaderTableAddrLow = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::GsShaderAddrLow));
+  Value *primShaderTableAddrLow = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::GsShaderAddrLow)];
   primShaderTableAddrLow->setName("primShaderTableAddrLow");
 
-  Value *primShaderTableAddrHigh = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::GsShaderAddrHigh));
+  Value *primShaderTableAddrHigh = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::GsShaderAddrHigh)];
   primShaderTableAddrHigh->setName("primShaderTableAddrHigh");
 
-  Value *userData = arg + NumSpecialSgprInputs;
-  arg += (NumSpecialSgprInputs + 1);
+  // System user data
+  Value *userData = args[NumSpecialSgprInputs];
 
-  Value *esGsOffsets01 = arg;
-  Value *esGsOffsets23 = (arg + 1);
-  Value *gsPrimitiveId = (arg + 2);
+  // System VGPRs
+  ArrayRef<Argument *> vgprArgs(args.begin() + NumSpecialSgprInputs + 1, args.end());
 
-  Value *tessCoordX = (arg + 5);
-  Value *tessCoordY = (arg + 6);
-  Value *relPatchId = (arg + 7);
-  Value *patchId = (arg + 8);
+  Value *primitiveId = nullptr;
 
-  Value *vertexId = (arg + 5);
-  Value *instanceId = (arg + 8);
+  Value *tessCoordX = nullptr;
+  Value *tessCoordY = nullptr;
+  Value *relPatchId = nullptr;
+  Value *patchId = nullptr;
+
+  Value *vertexId = nullptr;
+  Value *instanceId = nullptr;
+
+  if (m_gfxIp.major <= 11) {
+    primitiveId = vgprArgs[2];
+
+    tessCoordX = vgprArgs[5];
+    tessCoordY = vgprArgs[6];
+    relPatchId = vgprArgs[7];
+    patchId = vgprArgs[8];
+
+    vertexId = vgprArgs[5];
+    instanceId = vgprArgs[8];
+  } else {
+    llvm_unreachable("Not implemented!");
+  }
 
   const auto resUsage = m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStageTessEval : ShaderStageVertex);
 
@@ -1040,10 +1068,14 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     m_nggInputs.primShaderTableAddrLow = primShaderTableAddrLow;
     m_nggInputs.primShaderTableAddrHigh = primShaderTableAddrHigh;
 
-    // Record ES-GS vertex offsets info
-    m_nggInputs.esGsOffset0 = createUBfe(esGsOffsets01, 0, 16);
-    m_nggInputs.esGsOffset1 = createUBfe(esGsOffsets01, 16, 16);
-    m_nggInputs.esGsOffset2 = createUBfe(esGsOffsets23, 0, 16);
+    // Record vertex indices
+    if (m_gfxIp.major <= 11) {
+      m_nggInputs.vertexIndex0 = createUBfe(vgprArgs[0], 0, 16);
+      m_nggInputs.vertexIndex1 = createUBfe(vgprArgs[0], 16, 16);
+      m_nggInputs.vertexIndex2 = createUBfe(vgprArgs[1], 0, 16);
+    } else {
+      llvm_unreachable("Not implemented!");
+    }
 
     vertexItemOffset =
         m_builder.CreateMul(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(esGsRingItemSize * SizeOfDword));
@@ -1067,10 +1099,10 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
 
       Value *vertexIndex = nullptr;
       if (m_pipelineState->getRasterizerState().provokingVertexMode == ProvokingVertexFirst)
-        vertexIndex = m_nggInputs.esGsOffset0;
+        vertexIndex = m_nggInputs.vertexIndex0;
       else
-        vertexIndex = m_nggInputs.esGsOffset2;
-      writePerThreadDataToLds(gsPrimitiveId, vertexIndex, LdsRegionDistribPrimId);
+        vertexIndex = m_nggInputs.vertexIndex2;
+      writePerThreadDataToLds(primitiveId, vertexIndex, LdsRegionDistribPrimId);
 
       m_builder.CreateBr(endWritePrimIdBlock);
     }
@@ -1120,10 +1152,12 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     m_builder.SetInsertPoint(fetchVertCullDataBlock);
 
     // Split ES to two parts: fetch cull data before NGG culling; do deferred vertex export after NGG culling
-    splitEs(entryPoint->getParent());
+    auto esEntryPoint = entryPoint->getParent()->getFunction(lgcName::NggEsEntryPoint);
+    splitEs(esEntryPoint);
 
     // Run part ES to fetch cull data
-    auto cullData = runPartEs(entryPoint->getParent(), entryPoint->arg_begin());
+    auto partEs = entryPoint->getParent()->getFunction(lgcName::NggEsCullDataFetch);
+    auto cullData = runPartEs(partEs, args);
     position = m_nggControl->enableCullDistanceCulling ? m_builder.CreateExtractValue(cullData, 0) : cullData;
 
     m_builder.CreateBr(endFetchVertCullDataBlock);
@@ -1244,11 +1278,8 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(cullingBlock);
 
-    auto vertexIndex0 = m_nggInputs.esGsOffset0;
-    auto vertexIndex1 = m_nggInputs.esGsOffset1;
-    auto vertexIndex2 = m_nggInputs.esGsOffset2;
-
-    cullFlag = doCulling(entryPoint->getParent(), vertexIndex0, vertexIndex1, vertexIndex2);
+    cullFlag = doCulling(entryPoint->getParent(), m_nggInputs.vertexIndex0, m_nggInputs.vertexIndex1,
+                         m_nggInputs.vertexIndex2);
     m_builder.CreateCondBr(cullFlag, endCullingBlock, writeVertDrawFlagBlock);
   }
 
@@ -1257,11 +1288,11 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     m_builder.SetInsertPoint(writeVertDrawFlagBlock);
 
     auto vertexItemOffset0 =
-        m_builder.CreateMul(m_nggInputs.esGsOffset0, m_builder.getInt32(esGsRingItemSize * SizeOfDword));
+        m_builder.CreateMul(m_nggInputs.vertexIndex0, m_builder.getInt32(esGsRingItemSize * SizeOfDword));
     auto vertexItemOffset1 =
-        m_builder.CreateMul(m_nggInputs.esGsOffset1, m_builder.getInt32(esGsRingItemSize * SizeOfDword));
+        m_builder.CreateMul(m_nggInputs.vertexIndex1, m_builder.getInt32(esGsRingItemSize * SizeOfDword));
     auto vertexItemOffset2 =
-        m_builder.CreateMul(m_nggInputs.esGsOffset2, m_builder.getInt32(esGsRingItemSize * SizeOfDword));
+        m_builder.CreateMul(m_nggInputs.vertexIndex2, m_builder.getInt32(esGsRingItemSize * SizeOfDword));
 
     writeVertexCullInfoToLds(m_builder.getInt32(1), vertexItemOffset0, m_vertCullInfoOffsets.drawFlag);
     writeVertexCullInfoToLds(m_builder.getInt32(1), vertexItemOffset1, m_vertCullInfoOffsets.drawFlag);
@@ -1593,7 +1624,8 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     m_builder.SetInsertPoint(expVertBlock);
 
     // Run part ES to do deferred vertex export
-    runPartEs(entryPoint->getParent(), entryPoint->arg_begin(), position);
+    auto partEs = entryPoint->getParent()->getFunction(lgcName::NggEsDeferredVertexExport);
+    runPartEs(partEs, args, position);
 
     m_builder.CreateBr(endExpVertBlock);
   }
@@ -1625,33 +1657,30 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
   const auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs;
   const auto rasterStream = inOutUsage.rasterStream;
 
-  auto arg = entryPoint->arg_begin();
+  SmallVector<Argument *, 32> args;
+  for (auto &arg : entryPoint->args())
+    args.push_back(&arg);
 
-  Value *mergedGroupInfo = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedGroupInfo));
+  Value *mergedGroupInfo = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedGroupInfo)];
   mergedGroupInfo->setName("mergedGroupInfo");
 
-  Value *mergedWaveInfo = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedWaveInfo));
+  Value *mergedWaveInfo = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedWaveInfo)];
   mergedWaveInfo->setName("mergedWaveInfo");
 
   Value *attribRingBase = nullptr;
   if (m_gfxIp.major >= 11) {
-    attribRingBase = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::AttribRingBase));
+    attribRingBase = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::AttribRingBase)];
     attribRingBase->setName("attribRingBase");
   }
 
   // GS shader address is reused as primitive shader table address for NGG culling
-  Value *primShaderTableAddrLow = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::GsShaderAddrLow));
+  Value *primShaderTableAddrLow = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::GsShaderAddrLow)];
   primShaderTableAddrLow->setName("primShaderTableAddrLow");
 
-  Value *primShaderTableAddrHigh = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::GsShaderAddrHigh));
+  Value *primShaderTableAddrHigh = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::GsShaderAddrHigh)];
   primShaderTableAddrHigh->setName("primShaderTableAddrHigh");
 
-  Value *userData = arg + NumSpecialSgprInputs;
-  arg += (NumSpecialSgprInputs + 1);
-
-  Value *esGsOffsets01 = arg;
-  Value *esGsOffsets23 = (arg + 1);
-  Value *esGsOffsets45 = (arg + 4);
+  Value *userData = args[NumSpecialSgprInputs];
 
   //
   // The processing is something like this:
@@ -1789,14 +1818,6 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
     m_nggInputs.primShaderTableAddrLow = primShaderTableAddrLow;
     m_nggInputs.primShaderTableAddrHigh = primShaderTableAddrHigh;
 
-    // Record ES-GS vertex offsets info
-    m_nggInputs.esGsOffset0 = createUBfe(esGsOffsets01, 0, 16);
-    m_nggInputs.esGsOffset1 = createUBfe(esGsOffsets01, 16, 16);
-    m_nggInputs.esGsOffset2 = createUBfe(esGsOffsets23, 0, 16);
-    m_nggInputs.esGsOffset3 = createUBfe(esGsOffsets23, 16, 16);
-    m_nggInputs.esGsOffset4 = createUBfe(esGsOffsets45, 0, 16);
-    m_nggInputs.esGsOffset5 = createUBfe(esGsOffsets45, 16, 16);
-
     auto vertValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.vertCountInWave);
     m_builder.CreateCondBr(vertValid, beginEsBlock, endEsBlock);
   }
@@ -1805,7 +1826,8 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(beginEsBlock);
 
-    runEs(entryPoint->getParent(), entryPoint->arg_begin());
+    auto esEntryPoint = entryPoint->getParent()->getFunction(lgcName::NggEsEntryPoint);
+    runEs(esEntryPoint, args);
 
     m_builder.CreateBr(endEsBlock);
   }
@@ -1853,7 +1875,8 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(beginGsBlock);
 
-    runGs(entryPoint->getParent(), entryPoint->arg_begin());
+    auto gsEntryPoint = entryPoint->getParent()->getFunction(lgcName::NggGsEntryPoint);
+    runGs(gsEntryPoint, args);
 
     m_builder.CreateBr(endGsBlock);
   }
@@ -2173,7 +2196,8 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(expVertBlock);
 
-    runCopyShader(entryPoint->getParent(), entryPoint->arg_begin());
+    auto copyShader = entryPoint->getParent()->getFunction(lgcName::NggCopyShaderEntryPoint);
+    runCopyShader(copyShader, args);
     m_builder.CreateBr(endExpVertBlock);
   }
 
@@ -2401,9 +2425,9 @@ void NggPrimShader::doPrimitiveExportWithoutGs(Value *cullFlag) {
     primData = m_nggInputs.primData;
   } else {
     // Culling mode (primitive data has to be constructed)
-    Value *vertexIndex0 = m_nggInputs.esGsOffset0;
-    Value *vertexIndex1 = m_nggInputs.esGsOffset1;
-    Value *vertexIndex2 = m_nggInputs.esGsOffset2;
+    Value *vertexIndex0 = m_nggInputs.vertexIndex0;
+    Value *vertexIndex1 = m_nggInputs.vertexIndex1;
+    Value *vertexIndex2 = m_nggInputs.vertexIndex2;
 
     //
     // The processing is something like this:
@@ -2436,11 +2460,11 @@ void NggPrimShader::doPrimitiveExportWithoutGs(Value *cullFlag) {
             m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
 
         auto vertexItemOffset0 =
-            m_builder.CreateMul(m_nggInputs.esGsOffset0, m_builder.getInt32(esGsRingItemSize * SizeOfDword));
+            m_builder.CreateMul(m_nggInputs.vertexIndex0, m_builder.getInt32(esGsRingItemSize * SizeOfDword));
         auto vertexItemOffset1 =
-            m_builder.CreateMul(m_nggInputs.esGsOffset1, m_builder.getInt32(esGsRingItemSize * SizeOfDword));
+            m_builder.CreateMul(m_nggInputs.vertexIndex1, m_builder.getInt32(esGsRingItemSize * SizeOfDword));
         auto vertexItemOffset2 =
-            m_builder.CreateMul(m_nggInputs.esGsOffset2, m_builder.getInt32(esGsRingItemSize * SizeOfDword));
+            m_builder.CreateMul(m_nggInputs.vertexIndex2, m_builder.getInt32(esGsRingItemSize * SizeOfDword));
 
         compactedVertexIndex0 = readVertexCullInfoFromLds(m_builder.getInt32Ty(), vertexItemOffset0,
                                                           m_vertCullInfoOffsets.compactedVertexIndex);
@@ -2660,22 +2684,16 @@ void NggPrimShader::earlyExitWithDummyExport() {
 // =====================================================================================================================
 // Runs ES.
 //
-// @param module : LLVM module
-// @param sysValueStart : Start of system value
-void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
+// @param esEntryPoint : Entry-point of ES
+// @param args : Arguments of primitive shader entry-point
+void NggPrimShader::runEs(Function *esEntryPoint, ArrayRef<Argument *> args) {
   if (!m_hasTes && !m_hasVs) {
     // No TES or VS, don't have to run
     return;
   }
 
-  auto esEntry = module->getFunction(lgcName::NggEsEntryPoint);
-  assert(esEntry);
-
   if (m_gfxIp.major >= 11 && !m_hasGs) // For GS, vertex attribute exports are in copy shader
-    processVertexAttribExport(esEntry);
-
-  // Call ES entry
-  Argument *arg = sysValueStart;
+    processVertexAttribExport(esEntryPoint);
 
   Value *esGsOffset = nullptr;
   if (m_hasGs) {
@@ -2685,27 +2703,37 @@ void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
     esGsOffset = m_builder.CreateMul(m_nggInputs.waveIdInSubgroup, m_builder.getInt32(esGsBytesPerWave));
   }
 
-  Value *offChipLdsBase = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase));
+  Value *offChipLdsBase = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase)];
   offChipLdsBase->setName("offChipLdsBase");
 
-  Value *isOffChip = UndefValue::get(m_builder.getInt32Ty()); // NOTE: This flag is unused.
+  Value *userData = args[NumSpecialSgprInputs];
 
-  arg += NumSpecialSgprInputs;
+  ArrayRef<Argument *> vgprArgs(args.begin() + NumSpecialSgprInputs + 1, args.end());
 
-  Value *userData = arg++;
+  Value *tessCoordX = nullptr;
+  Value *tessCoordY = nullptr;
+  Value *relPatchId = nullptr;
+  Value *patchId = nullptr;
 
-  Value *tessCoordX = (arg + 5);
-  Value *tessCoordY = (arg + 6);
-  Value *relPatchId = (arg + 7);
-  Value *patchId = (arg + 8);
-
-  Value *vertexId = (arg + 5);
-  Value *relVertexId = (arg + 6);
+  Value *vertexId = nullptr;
+  Value *relVertexId = PoisonValue::get(m_builder.getInt32Ty()); // Unused
   // NOTE: VS primitive ID for NGG is specially obtained from primitive ID distribution.
   Value *vsPrimitiveId = m_distributedPrimitiveId ? m_distributedPrimitiveId : PoisonValue::get(m_builder.getInt32Ty());
-  Value *instanceId = (arg + 8);
+  Value *instanceId = nullptr;
 
-  std::vector<Value *> args;
+  if (m_gfxIp.major <= 11) {
+    tessCoordX = vgprArgs[5];
+    tessCoordY = vgprArgs[6];
+    relPatchId = vgprArgs[7];
+    patchId = vgprArgs[8];
+
+    vertexId = vgprArgs[5];
+    instanceId = vgprArgs[8];
+  } else {
+    llvm_unreachable("Not implemented!");
+  }
+
+  SmallVector<Value *, 32> esArgs;
 
   // Setup attribute ring base and vertex thread ID in subgroup as two additional arguments to export vertex attributes
   // through memory
@@ -2713,8 +2741,8 @@ void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
     const auto attribCount = m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStageTessEval : ShaderStageVertex)
                                  ->inOutUsage.expCount;
     if (attribCount > 0) {
-      args.push_back(m_nggInputs.attribRingBase);
-      args.push_back(m_nggInputs.threadIdInSubgroup);
+      esArgs.push_back(m_nggInputs.attribRingBase);
+      esArgs.push_back(m_nggInputs.threadIdInSubgroup);
     }
   }
 
@@ -2723,15 +2751,15 @@ void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
 
   unsigned userDataIdx = 0;
 
-  auto esArgBegin = esEntry->arg_begin();
-  const unsigned esArgCount = esEntry->arg_size();
+  auto esArgBegin = esEntryPoint->arg_begin();
+  const unsigned esArgCount = esEntryPoint->arg_size();
   (void(esArgCount)); // Unused
 
   // Set up user data SGPRs
   while (userDataIdx < userDataCount) {
-    assert(args.size() < esArgCount);
+    assert(esArgs.size() < esArgCount);
 
-    auto esArg = (esArgBegin + args.size());
+    auto esArg = (esArgBegin + esArgs.size());
     assert(esArg->hasAttribute(Attribute::InReg));
 
     auto esArgTy = esArg->getType();
@@ -2747,12 +2775,12 @@ void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
       userDataIdx += userDataSize;
 
       auto esUserData = m_builder.CreateShuffleVector(userData, userData, shuffleMask);
-      args.push_back(esUserData);
+      esArgs.push_back(esUserData);
     } else {
       assert(esArgTy->isIntegerTy());
 
       auto esUserData = m_builder.CreateExtractElement(userData, userDataIdx);
-      args.push_back(esUserData);
+      esArgs.push_back(esUserData);
       ++userDataIdx;
     }
   }
@@ -2760,47 +2788,48 @@ void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
   if (m_hasTes) {
     // Set up system value SGPRs
     if (m_pipelineState->isTessOffChip()) {
-      args.push_back(m_hasGs ? offChipLdsBase : isOffChip);
-      args.push_back(m_hasGs ? isOffChip : offChipLdsBase);
+      Value *isOffChip = PoisonValue::get(m_builder.getInt32Ty()); // Unused
+      esArgs.push_back(m_hasGs ? offChipLdsBase : isOffChip);
+      esArgs.push_back(m_hasGs ? isOffChip : offChipLdsBase);
     }
 
     if (m_hasGs)
-      args.push_back(esGsOffset);
+      esArgs.push_back(esGsOffset);
 
     // Set up system value VGPRs
-    args.push_back(tessCoordX);
-    args.push_back(tessCoordY);
-    args.push_back(relPatchId);
-    args.push_back(patchId);
+    esArgs.push_back(tessCoordX);
+    esArgs.push_back(tessCoordY);
+    esArgs.push_back(relPatchId);
+    esArgs.push_back(patchId);
   } else {
     // Set up system value SGPRs
     if (m_hasGs)
-      args.push_back(esGsOffset);
+      esArgs.push_back(esGsOffset);
 
     // Set up system value VGPRs
-    args.push_back(vertexId);
-    args.push_back(relVertexId);
-    args.push_back(vsPrimitiveId);
-    args.push_back(instanceId);
+    esArgs.push_back(vertexId);
+    esArgs.push_back(relVertexId);
+    esArgs.push_back(vsPrimitiveId);
+    esArgs.push_back(instanceId);
 
     // When tessellation is not enabled, the ES is actually a fetchless VS. Then, we need to add arguments for the
     // vertex fetches. Also set the name of each vertex fetch primitive shader argument while we're here.
     unsigned vertexFetchCount = m_pipelineState->getPalMetadata()->getVertexFetchCount();
-    if (vertexFetchCount != 0) {
-      // The last vertexFetchCount arguments of the primitive shader and ES are the vertex fetches
-      Function *primShader = m_builder.GetInsertBlock()->getParent();
-      unsigned primArgCount = primShader->arg_size();
-      for (unsigned i = 0; i != vertexFetchCount; ++i) {
-        Argument *vertexFetch = primShader->getArg(primArgCount - vertexFetchCount + i);
-        vertexFetch->setName(esEntry->getArg(esArgCount - vertexFetchCount + i)->getName()); // Copy argument name
-        args.push_back(vertexFetch);
+    if (vertexFetchCount > 0) {
+      ArrayRef<Argument *> vertexFetches = vgprArgs.drop_front(m_gfxIp.major <= 11 ? 9 : 7);
+      assert(vertexFetches.size() == vertexFetchCount);
+
+      for (unsigned i = 0; i < vertexFetchCount; ++i) {
+        vertexFetches[i]->setName(
+            esEntryPoint->getArg(esArgCount - vertexFetchCount + i)->getName()); // Copy argument name
+        esArgs.push_back(vertexFetches[i]);
       }
     }
   }
 
-  assert(args.size() == esArgCount); // Must have visit all arguments of ES entry point
+  assert(esArgs.size() == esArgCount); // Must have visit all arguments of ES entry point
 
-  CallInst *esCall = m_builder.CreateCall(esEntry, args);
+  CallInst *esCall = m_builder.CreateCall(esEntryPoint, esArgs);
   esCall->setCallingConv(CallingConv::AMDGPU_ES);
 }
 
@@ -2808,40 +2837,44 @@ void NggPrimShader::runEs(Module *module, Argument *sysValueStart) {
 // Runs part ES. Before doing this, ES must have been already split to two parts: one is to fetch cull data for
 // NGG culling; the other is to do deferred vertex export.
 //
-// @param module : LLVM module
-// @param sysValueStart : Start of system value
+// @param partEs : Entry-point of part ES
+// @param args : Arguments of primitive shader entry-point
 // @param position : Vertex position data (if provided, the part ES is to do deferred vertex export)
-Value *NggPrimShader::runPartEs(Module *module, Argument *sysValueStart, Value *position) {
+Value *NggPrimShader::runPartEs(Function *partEs, ArrayRef<Argument *> args, Value *position) {
   assert(m_hasGs == false);                       // GS must not be present
   assert(m_nggControl->passthroughMode == false); // NGG culling is enabled
 
   const bool deferredVertexExport = position != nullptr;
-  Function *partEs =
-      module->getFunction(deferredVertexExport ? lgcName::NggEsDeferredVertexExport : lgcName::NggEsCullDataFetch);
-  assert(partEs);
 
-  // Call part ES
-  Argument *arg = sysValueStart;
-
-  Value *offChipLdsBase = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase));
+  Value *offChipLdsBase = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase)];
   offChipLdsBase->setName("offChipLdsBase");
 
-  Value *isOffChip = UndefValue::get(m_builder.getInt32Ty()); // NOTE: This flag is unused.
+  Value *userData = args[NumSpecialSgprInputs];
 
-  arg += NumSpecialSgprInputs;
+  ArrayRef<Argument *> vgprArgs(args.begin() + NumSpecialSgprInputs + 1, args.end());
 
-  Value *userData = arg++;
+  Value *tessCoordX = nullptr;
+  Value *tessCoordY = nullptr;
+  Value *relPatchId = nullptr;
+  Value *patchId = nullptr;
 
-  Value *tessCoordX = (arg + 5);
-  Value *tessCoordY = (arg + 6);
-  Value *relPatchId = (arg + 7);
-  Value *patchId = (arg + 8);
-
-  Value *vertexId = (arg + 5);
-  Value *relVertexId = (arg + 6);
+  Value *vertexId = nullptr;
+  Value *relVertexId = PoisonValue::get(m_builder.getInt32Ty()); // Unused
   // NOTE: VS primitive ID for NGG is specially obtained from primitive ID distribution.
   Value *vsPrimitiveId = m_distributedPrimitiveId ? m_distributedPrimitiveId : PoisonValue::get(m_builder.getInt32Ty());
-  Value *instanceId = (arg + 8);
+  Value *instanceId = nullptr;
+
+  if (m_gfxIp.major <= 11) {
+    tessCoordX = vgprArgs[5];
+    tessCoordY = vgprArgs[6];
+    relPatchId = vgprArgs[7];
+    patchId = vgprArgs[8];
+
+    vertexId = vgprArgs[5];
+    instanceId = vgprArgs[8];
+  } else {
+    llvm_unreachable("Not implemented!");
+  }
 
   if (deferredVertexExport && m_compactVertex) {
     auto expVertBlock = m_builder.GetInsertBlock();
@@ -2947,7 +2980,7 @@ Value *NggPrimShader::runPartEs(Module *module, Argument *sysValueStart, Value *
     }
   }
 
-  std::vector<Value *> args;
+  SmallVector<Value *, 32> partEsArgs;
 
   // Setup attribute ring base and vertex thread ID in subgroup as two additional arguments to export vertex attributes
   // through memory
@@ -2955,13 +2988,13 @@ Value *NggPrimShader::runPartEs(Module *module, Argument *sysValueStart, Value *
     const auto attribCount = m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStageTessEval : ShaderStageVertex)
                                  ->inOutUsage.expCount;
     if (attribCount > 0) {
-      args.push_back(m_nggInputs.attribRingBase);
-      args.push_back(m_nggInputs.threadIdInSubgroup);
+      partEsArgs.push_back(m_nggInputs.attribRingBase);
+      partEsArgs.push_back(m_nggInputs.threadIdInSubgroup);
     }
   }
 
   if (deferredVertexExport)
-    args.push_back(position); // Setup vertex position data as the additional argument
+    partEsArgs.push_back(position); // Setup vertex position data as the additional argument
 
   auto intfData = m_pipelineState->getShaderInterfaceData(m_hasTes ? ShaderStageTessEval : ShaderStageVertex);
   const unsigned userDataCount = intfData->userDataCount;
@@ -2974,9 +3007,9 @@ Value *NggPrimShader::runPartEs(Module *module, Argument *sysValueStart, Value *
 
   // Set up user data SGPRs
   while (userDataIdx < userDataCount) {
-    assert(args.size() < partEsArgCount);
+    assert(partEsArgs.size() < partEsArgCount);
 
-    auto partEsArg = (partEsArgBegin + args.size());
+    auto partEsArg = (partEsArgBegin + partEsArgs.size());
     assert(partEsArg->hasAttribute(Attribute::InReg));
 
     auto partEsArgTy = partEsArg->getType();
@@ -2992,12 +3025,12 @@ Value *NggPrimShader::runPartEs(Module *module, Argument *sysValueStart, Value *
       userDataIdx += userDataSize;
 
       auto esUserData = m_builder.CreateShuffleVector(userData, userData, shuffleMask);
-      args.push_back(esUserData);
+      partEsArgs.push_back(esUserData);
     } else {
       assert(partEsArgTy->isIntegerTy());
 
       auto esUserData = m_builder.CreateExtractElement(userData, userDataIdx);
-      args.push_back(esUserData);
+      partEsArgs.push_back(esUserData);
       ++userDataIdx;
     }
   }
@@ -3005,26 +3038,27 @@ Value *NggPrimShader::runPartEs(Module *module, Argument *sysValueStart, Value *
   if (m_hasTes) {
     // Set up system value SGPRs
     if (m_pipelineState->isTessOffChip()) {
-      args.push_back(isOffChip);
-      args.push_back(offChipLdsBase);
+      Value *isOffChip = PoisonValue::get(m_builder.getInt32Ty()); // Unused
+      partEsArgs.push_back(isOffChip);
+      partEsArgs.push_back(offChipLdsBase);
     }
 
     // Set up system value VGPRs
-    args.push_back(tessCoordX);
-    args.push_back(tessCoordY);
-    args.push_back(relPatchId);
-    args.push_back(patchId);
+    partEsArgs.push_back(tessCoordX);
+    partEsArgs.push_back(tessCoordY);
+    partEsArgs.push_back(relPatchId);
+    partEsArgs.push_back(patchId);
   } else {
     // Set up system value VGPRs
-    args.push_back(vertexId);
-    args.push_back(relVertexId);
-    args.push_back(vsPrimitiveId);
-    args.push_back(instanceId);
+    partEsArgs.push_back(vertexId);
+    partEsArgs.push_back(relVertexId);
+    partEsArgs.push_back(vsPrimitiveId);
+    partEsArgs.push_back(instanceId);
   }
 
-  assert(args.size() == partEsArgCount); // Must have visit all arguments of the part ES
+  assert(partEsArgs.size() == partEsArgCount); // Must have visit all arguments of the part ES
 
-  CallInst *partEsCall = m_builder.CreateCall(partEs, args);
+  CallInst *partEsCall = m_builder.CreateCall(partEs, partEsArgs);
   partEsCall->setCallingConv(CallingConv::AMDGPU_ES);
   return partEsCall;
 }
@@ -3033,19 +3067,17 @@ Value *NggPrimShader::runPartEs(Module *module, Argument *sysValueStart, Value *
 // Split ES to two parts. One is to fetch cull data for NGG culling, such as position and cull distance (if cull
 // distance culling is enabled). The other is to do deferred vertex export like original ES.
 //
-// @param module : LLVM module
-// @param fetchData : Whether the mutation is to fetch data
-void NggPrimShader::splitEs(Module *module) {
+// NOTE: After this splitting, original ES is removed and couldn't be used any more.
+//
+// @param esEntryPoint : Entry-point of ES
+void NggPrimShader::splitEs(Function *esEntryPoint) {
   assert(m_hasGs == false); // GS must not be present
-
-  const auto esEntryPoint = module->getFunction(lgcName::NggEsEntryPoint);
-  assert(esEntryPoint);
 
   //
   // Collect all export calls for further analysis
   //
   SmallVector<Function *, 8> expFuncs;
-  for (auto &func : module->functions()) {
+  for (auto &func : esEntryPoint->getParent()->functions()) {
     if (func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_exp)
       expFuncs.push_back(&func);
     else if (m_gfxIp.major >= 11) {
@@ -3096,7 +3128,8 @@ void NggPrimShader::splitEs(Module *module) {
 
   // Clone ES
   auto esCullDataFetchFuncTy = FunctionType::get(cullDataTy, esEntryPoint->getFunctionType()->params(), false);
-  auto esCullDataFetchFunc = Function::Create(esCullDataFetchFuncTy, esEntryPoint->getLinkage(), "", module);
+  auto esCullDataFetchFunc =
+      Function::Create(esCullDataFetchFuncTy, esEntryPoint->getLinkage(), "", esEntryPoint->getParent());
 
   ValueToValueMapTy valueMap;
 
@@ -3219,7 +3252,7 @@ void NggPrimShader::splitEs(Module *module) {
   if (m_gfxIp.major >= 11)
     processVertexAttribExport(esDeferredVertexExportFunc);
 
-  // Original ES is no longer needed
+  // Remove original ES since it is no longer needed
   assert(esEntryPoint->use_empty());
   esEntryPoint->eraseFromParent();
 
@@ -3233,50 +3266,66 @@ void NggPrimShader::splitEs(Module *module) {
 // =====================================================================================================================
 // Runs GS.
 //
-// @param module : LLVM module
-// @param sysValueStart : Start of system value
-void NggPrimShader::runGs(Module *module, Argument *sysValueStart) {
+// @param gsEntryPoint : Entry-point of GS
+// @param args : Arguments of primitive shader entry-point
+void NggPrimShader::runGs(Function *gsEntryPoint, ArrayRef<Argument *> args) {
   assert(m_hasGs); // GS must be present
 
-  Function *gsEntry = mutateGs(module);
+  gsEntryPoint = mutateGs(gsEntryPoint);
 
-  // Call GS entry
-  Argument *arg = sysValueStart;
-
-  Value *gsVsOffset = UndefValue::get(m_builder.getInt32Ty()); // NOTE: For NGG, GS-VS offset is unused
+  Value *gsVsOffset = PoisonValue::get(m_builder.getInt32Ty()); // Unused
 
   // NOTE: This argument is expected to be GS wave ID, not wave ID in subgroup, for normal ES-GS merged shader.
   // However, in NGG mode, GS wave ID, sent to GS_EMIT and GS_CUT messages, is no longer required because of NGG
   // handling of such messages. Instead, wave ID in subgroup is required as the substitute.
   auto waveId = m_nggInputs.waveIdInSubgroup;
 
-  arg += NumSpecialSgprInputs;
+  Value *userData = args[NumSpecialSgprInputs];
 
-  Value *userData = arg++;
+  ArrayRef<Argument *> vgprArgs(args.begin() + NumSpecialSgprInputs + 1, args.end());
 
-  Value *gsPrimitiveId = (arg + 2);
-  Value *invocationId = (arg + 3);
+  Value *esGsOffset0 = nullptr;
+  Value *esGsOffset1 = nullptr;
+  Value *esGsOffset2 = nullptr;
+  Value *esGsOffset3 = nullptr;
+  Value *esGsOffset4 = nullptr;
+  Value *esGsOffset5 = nullptr;
 
-  // NOTE: For NGG, GS invocation ID is stored in lowest 8 bits ([7:0]) and other higher bits are used for other
-  // purposes according to GE-SPI interface.
-  invocationId = m_builder.CreateAnd(invocationId, m_builder.getInt32(0xFF));
+  Value *primitiveId = nullptr;
+  Value *invocationId = nullptr;
 
-  std::vector<Value *> args;
+  if (m_gfxIp.major <= 11) {
+    esGsOffset0 = createUBfe(vgprArgs[0], 0, 16);
+    esGsOffset1 = createUBfe(vgprArgs[0], 16, 16);
+    esGsOffset2 = createUBfe(vgprArgs[1], 0, 16);
+    esGsOffset3 = createUBfe(vgprArgs[1], 16, 16);
+    esGsOffset4 = createUBfe(vgprArgs[4], 0, 16);
+    esGsOffset5 = createUBfe(vgprArgs[4], 16, 16);
+
+    primitiveId = vgprArgs[2];
+    // NOTE: For NGG, GS invocation ID is stored in lowest 8 bits ([7:0]) and other higher bits are used for other
+    // purposes according to GE-SPI interface.
+    invocationId = m_builder.CreateAnd(vgprArgs[3], m_builder.getInt32(0xFF));
+  } else {
+    llvm_unreachable("Not implemented!");
+  }
+
+  SmallVector<Value *, 32> gsArgs;
 
   auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry);
   const unsigned userDataCount = intfData->userDataCount;
 
   unsigned userDataIdx = 0;
 
-  auto gsArgBegin = gsEntry->arg_begin();
-  const unsigned gsArgCount = gsEntry->arg_size();
+  auto gsArgBegin = gsEntryPoint->arg_begin();
+  const unsigned gsArgCount = gsEntryPoint->arg_size();
   (void(gsArgCount)); // unused
 
   // Set up user data SGPRs
   while (userDataIdx < userDataCount) {
-    assert(args.size() < gsArgCount);
+    assert(gsArgs.size() < gsArgCount);
 
-    auto gsArg = (gsArgBegin + args.size());
+    auto gsArg = (gsArgBegin + gsArgs.size());
     assert(gsArg->hasAttribute(Attribute::InReg));
 
     auto gsArgTy = gsArg->getType();
@@ -3292,49 +3341,46 @@ void NggPrimShader::runGs(Module *module, Argument *sysValueStart) {
       userDataIdx += userDataSize;
 
       auto gsUserData = m_builder.CreateShuffleVector(userData, userData, shuffleMask);
-      args.push_back(gsUserData);
+      gsArgs.push_back(gsUserData);
     } else {
       assert(gsArgTy->isIntegerTy());
 
       auto gsUserData = m_builder.CreateExtractElement(userData, userDataIdx);
-      args.push_back(gsUserData);
+      gsArgs.push_back(gsUserData);
       ++userDataIdx;
     }
   }
 
   // Set up system value SGPRs
-  args.push_back(gsVsOffset);
-  args.push_back(waveId);
+  gsArgs.push_back(gsVsOffset);
+  gsArgs.push_back(waveId);
 
   // Set up system value VGPRs
-  args.push_back(m_nggInputs.esGsOffset0);
-  args.push_back(m_nggInputs.esGsOffset1);
-  args.push_back(gsPrimitiveId);
-  args.push_back(m_nggInputs.esGsOffset2);
-  args.push_back(m_nggInputs.esGsOffset3);
-  args.push_back(m_nggInputs.esGsOffset4);
-  args.push_back(m_nggInputs.esGsOffset5);
-  args.push_back(invocationId);
+  gsArgs.push_back(esGsOffset0);
+  gsArgs.push_back(esGsOffset1);
+  gsArgs.push_back(primitiveId);
+  gsArgs.push_back(esGsOffset2);
+  gsArgs.push_back(esGsOffset3);
+  gsArgs.push_back(esGsOffset4);
+  gsArgs.push_back(esGsOffset5);
+  gsArgs.push_back(invocationId);
 
-  assert(args.size() == gsArgCount); // Must have visit all arguments of ES entry point
+  assert(gsArgs.size() == gsArgCount); // Must have visit all arguments of ES entry point
 
-  CallInst *gsCall = m_builder.CreateCall(gsEntry, args);
+  CallInst *gsCall = m_builder.CreateCall(gsEntryPoint, gsArgs);
   gsCall->setCallingConv(CallingConv::AMDGPU_GS);
 }
 
 // =====================================================================================================================
 // Mutates GS to handle exporting GS outputs to GS-VS ring, and the messages GS_EMIT/GS_CUT.
 //
-// @param module : LLVM module
-Function *NggPrimShader::mutateGs(Module *module) {
+// @param gsEntryPoint : Entry-point of GS
+Function *NggPrimShader::mutateGs(Function *gsEntryPoint) {
   assert(m_hasGs); // GS must be present
-
-  auto gsEntryPoint = module->getFunction(lgcName::NggGsEntryPoint);
-  assert(gsEntryPoint);
 
   IRBuilder<>::InsertPointGuard guard(m_builder);
 
-  std::vector<Instruction *> removeCalls;
+  SmallVector<Instruction *, 32> removedCalls;
 
   m_builder.SetInsertPointPastAllocas(gsEntryPoint);
 
@@ -3372,7 +3418,7 @@ Function *NggPrimShader::mutateGs(Module *module) {
   threadIdInSubgroup = m_builder.CreateAdd(threadIdInSubgroup, threadIdInWave);
 
   // Handle GS message and GS output export
-  for (auto &func : module->functions()) {
+  for (auto &func : gsEntryPoint->getParent()->functions()) {
     if (func.getName().startswith(lgcName::NggGsOutputExport)) {
       // Export GS outputs to GS-VS ring
       for (auto user : func.users()) {
@@ -3389,7 +3435,7 @@ Function *NggPrimShader::mutateGs(Module *module) {
         auto emitVerts = m_builder.CreateLoad(m_builder.getInt32Ty(), emitVertsPtrs[streamId]);
         exportGsOutput(output, location, compIdx, streamId, threadIdInSubgroup, emitVerts);
 
-        removeCalls.push_back(call);
+        removedCalls.push_back(call);
       }
     } else if (func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_s_sendmsg) {
       // Handle GS message
@@ -3406,13 +3452,14 @@ Function *NggPrimShader::mutateGs(Module *module) {
           // Handle GS_EMIT, MSG[9:8] = STREAM_ID
           unsigned streamId = (message & GsEmitCutStreamIdMask) >> GsEmitCutStreamIdShift;
           assert(streamId < MaxGsStreams);
-          processGsEmit(module, streamId, threadIdInSubgroup, emitVertsPtrs[streamId], outVertsPtrs[streamId]);
+          processGsEmit(gsEntryPoint->getParent(), streamId, threadIdInSubgroup, emitVertsPtrs[streamId],
+                        outVertsPtrs[streamId]);
         } else if (message == GsCutStreaM0 || message == GsCutStreaM1 || message == GsCutStreaM2 ||
                    message == GsCutStreaM3) {
           // Handle GS_CUT, MSG[9:8] = STREAM_ID
           unsigned streamId = (message & GsEmitCutStreamIdMask) >> GsEmitCutStreamIdShift;
           assert(streamId < MaxGsStreams);
-          processGsCut(module, streamId, outVertsPtrs[streamId]);
+          processGsCut(gsEntryPoint->getParent(), streamId, outVertsPtrs[streamId]);
         } else if (message == GsDone) {
           // Handle GS_DONE, do nothing (just remove this call)
         } else {
@@ -3420,13 +3467,13 @@ Function *NggPrimShader::mutateGs(Module *module) {
           llvm_unreachable("Unexpected GS message!");
         }
 
-        removeCalls.push_back(call);
+        removedCalls.push_back(call);
       }
     }
   }
 
   // Clear removed calls
-  for (auto call : removeCalls) {
+  for (auto call : removedCalls) {
     call->dropAllReferences();
     call->eraseFromParent();
   }
@@ -3437,9 +3484,9 @@ Function *NggPrimShader::mutateGs(Module *module) {
 // =====================================================================================================================
 // Runs copy shader.
 //
-// @param module : LLVM module
-// @param sysValueStart : Start of system value
-void NggPrimShader::runCopyShader(Module *module, Argument *sysValueStart) {
+// @param copyShader : Entry-point of copy shader
+// @param args : Arguments of primitive shader entry-point
+void NggPrimShader::runCopyShader(Function *copyShader, ArrayRef<Argument *> args) {
   assert(m_hasGs); // GS must be present
 
   //
@@ -3481,61 +3528,58 @@ void NggPrimShader::runCopyShader(Module *module, Argument *sysValueStart) {
     }
   }
 
-  auto copyShaderEntry = mutateCopyShader(module);
+  copyShader = mutateCopyShader(copyShader);
 
   // Run copy shader
-  std::vector<Value *> args;
+  SmallVector<Value *, 32> copyShaderArgs;
 
   if (m_gfxIp.major >= 11) {
     // Setup attribute ring base and vertex thread ID in subgroup as two additional arguments to export vertex
     // attributes through memory
     const auto attribCount = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.expCount;
     if (attribCount > 0) {
-      args.push_back(m_nggInputs.attribRingBase);
-      args.push_back(m_nggInputs.threadIdInSubgroup);
+      copyShaderArgs.push_back(m_nggInputs.attribRingBase);
+      copyShaderArgs.push_back(m_nggInputs.threadIdInSubgroup);
     }
 
     // Global table
-    auto userData = sysValueStart + NumSpecialSgprInputs;
+    auto userData = args[NumSpecialSgprInputs];
     assert(userData->getType()->isVectorTy());
     auto globalTable = m_builder.CreateExtractElement(userData, static_cast<uint64_t>(0)); // The first user data SGPRs
-    args.push_back(globalTable);
+    copyShaderArgs.push_back(globalTable);
   }
 
   // Relative vertex index in subgroup
-  args.push_back(vertexIndex);
+  copyShaderArgs.push_back(vertexIndex);
 
-  CallInst *copyShaderCall = m_builder.CreateCall(copyShaderEntry, args);
+  CallInst *copyShaderCall = m_builder.CreateCall(copyShader, copyShaderArgs);
   copyShaderCall->setCallingConv(CallingConv::AMDGPU_VS);
 }
 
 // =====================================================================================================================
 // Mutates copy shader to handle the importing GS outputs from GS-VS ring.
 //
-// @param module : LLVM module
-Function *NggPrimShader::mutateCopyShader(Module *module) {
-  auto copyShaderEntryPoint = module->getFunction(lgcName::NggCopyShaderEntryPoint);
-  assert(copyShaderEntryPoint);
-
+// @param copyShader : Entry-point of copy shader
+Function *NggPrimShader::mutateCopyShader(Function *copyShader) {
   if (m_gfxIp.major >= 11)
-    processVertexAttribExport(copyShaderEntryPoint);
+    processVertexAttribExport(copyShader);
 
   IRBuilder<>::InsertPointGuard guard(m_builder);
 
   // Relative vertex index is always the last argument
-  auto vertexIndex = getFunctionArgument(copyShaderEntryPoint, copyShaderEntryPoint->arg_size() - 1);
+  auto vertexIndex = getFunctionArgument(copyShader, copyShader->arg_size() - 1);
   const unsigned rasterStream =
       m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.rasterStream;
 
-  std::vector<Instruction *> removeCalls;
+  std::vector<Instruction *> removedCalls;
 
-  for (auto &func : module->functions()) {
+  for (auto &func : copyShader->getParent()->functions()) {
     if (func.getName().startswith(lgcName::NggGsOutputImport)) {
       // Import GS outputs from GS-VS ring
       for (auto user : func.users()) {
         CallInst *const call = cast<CallInst>(user);
 
-        if (call->getFunction() != copyShaderEntryPoint)
+        if (call->getFunction() != copyShader)
           continue; // Not belong to copy shader
 
         m_builder.SetInsertPoint(call);
@@ -3552,18 +3596,18 @@ Function *NggPrimShader::mutateCopyShader(Module *module) {
           call->replaceAllUsesWith(output);
         }
 
-        removeCalls.push_back(call);
+        removedCalls.push_back(call);
       }
     }
   }
 
   // Clear removed calls
-  for (auto call : removeCalls) {
+  for (auto call : removedCalls) {
     call->dropAllReferences();
     call->eraseFromParent();
   }
 
-  return copyShaderEntryPoint;
+  return copyShader;
 }
 
 // =====================================================================================================================
@@ -6137,9 +6181,9 @@ void NggPrimShader::processSwXfb(Module *module, Argument *sysValueStart) {
     } else {
       // Must be triangle
       assert(vertsPerPrim == 3);
-      vertexIndices[0] = m_nggInputs.esGsOffset0;
-      vertexIndices[1] = m_nggInputs.esGsOffset1;
-      vertexIndices[2] = m_nggInputs.esGsOffset2;
+      vertexIndices[0] = m_nggInputs.vertexIndex0;
+      vertexIndices[1] = m_nggInputs.vertexIndex1;
+      vertexIndices[2] = m_nggInputs.vertexIndex2;
     }
 
     for (unsigned i = 0; i < vertsPerPrim; ++i) {

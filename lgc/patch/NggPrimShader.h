@@ -200,18 +200,16 @@ private:
 
   void earlyExitWithDummyExport();
 
-  void runEs(llvm::Module *module, llvm::Argument *sysValueStart);
-  llvm::Value *runPartEs(llvm::Module *module, llvm::Argument *sysValueStart, llvm::Value *position = nullptr);
+  void runEs(llvm::Function *esEntryPoint, llvm::ArrayRef<llvm::Argument *> args);
+  llvm::Value *runPartEs(llvm::Function *partEs, llvm::ArrayRef<llvm::Argument *> args,
+                         llvm::Value *position = nullptr);
+  void splitEs(llvm::Function *esEntryPoint);
 
-  void splitEs(llvm::Module *module);
+  void runGs(llvm::Function *gsEntryPoint, llvm::ArrayRef<llvm::Argument *> args);
+  llvm::Function *mutateGs(llvm::Function *gsEntryPoint);
 
-  void runGs(llvm::Module *module, llvm::Argument *sysValueStart);
-
-  llvm::Function *mutateGs(llvm::Module *module);
-
-  void runCopyShader(llvm::Module *module, llvm::Argument *sysValueStart);
-
-  llvm::Function *mutateCopyShader(llvm::Module *module);
+  void runCopyShader(llvm::Function *copyShader, llvm::ArrayRef<llvm::Argument *> args);
+  llvm::Function *mutateCopyShader(llvm::Function *copyShader);
 
   void exportGsOutput(llvm::Value *output, unsigned location, unsigned compIdx, unsigned streamId,
                       llvm::Value *threadIdInSubgroup, llvm::Value *emitVerts);
@@ -303,31 +301,28 @@ private:
 
   // NGG inputs (from system values or derived from them)
   struct {
+    // SGPRs
     llvm::Value *vertCountInSubgroup; // Number of vertices in subgroup
     llvm::Value *primCountInSubgroup; // Number of primitives in subgroup
     llvm::Value *vertCountInWave;     // Number of vertices in wave
     llvm::Value *primCountInWave;     // Number of primitives in wave
 
-    llvm::Value *threadIdInWave;     // Thread ID in wave
-    llvm::Value *threadIdInSubgroup; // Thread ID in subgroup
-
     llvm::Value *waveIdInSubgroup; // Wave ID in subgroup
     llvm::Value *orderedWaveId;    // Ordered wave ID
 
-    // System values (SGPRs)
     llvm::Value *attribRingBase;          // Attribute ring base for this subgroup
     llvm::Value *primShaderTableAddrLow;  // Primitive shader table address low
     llvm::Value *primShaderTableAddrHigh; // Primitive shader table address high
 
-    // System values (VGPRs)
-    llvm::Value *primData; // Primitive connectivity data (only for non-GS NGG pass-through mode)
+    // VGPRs
+    llvm::Value *threadIdInWave;     // Thread ID in wave
+    llvm::Value *threadIdInSubgroup; // Thread ID in subgroup
 
-    llvm::Value *esGsOffset0; // ES-GS offset of vertex0
-    llvm::Value *esGsOffset1; // ES-GS offset of vertex1
-    llvm::Value *esGsOffset2; // ES-GS offset of vertex2
-    llvm::Value *esGsOffset3; // ES-GS offset of vertex3
-    llvm::Value *esGsOffset4; // ES-GS offset of vertex4
-    llvm::Value *esGsOffset5; // ES-GS offset of vertex5
+    llvm::Value *primData; // Primitive connectivity data (provided by HW)
+
+    llvm::Value *vertexIndex0; // Relative index of vertex0 in NGG subgroup
+    llvm::Value *vertexIndex1; // Relative index of vertex1 in NGG subgroup
+    llvm::Value *vertexIndex2; // Relative index of vertex2 in NGG subgroup
 
   } m_nggInputs = {};
 
