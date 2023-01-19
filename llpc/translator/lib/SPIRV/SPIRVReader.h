@@ -182,6 +182,9 @@ public:
   void addStoreInstRecursively(SPIRVType *const, Value *const, Type *, Value *const, bool, bool, bool);
   Constant *buildConstStoreRecursively(SPIRVType *const, Type *const, Type *const, Constant *const);
 
+  std::pair<Value *, Align> createGepIntoRowMajorMatrix(Type *matrixType, Value *matrixPtr, Align matrixAlign,
+                                                        Value *row, Value *col);
+
   // Post-process translated LLVM module to undo row major matrices.
   bool postProcessRowMajorMatrix();
 
