@@ -58,9 +58,7 @@ public:
   void visitAtomicRMWInst(llvm::AtomicRMWInst &atomicRmwInst);
   void visitBitCastInst(llvm::BitCastInst &bitCastInst);
   void visitCallInst(llvm::CallInst &callInst);
-  void visitExtractElementInst(llvm::ExtractElementInst &extractElementInst);
   void visitGetElementPtrInst(llvm::GetElementPtrInst &getElemPtrInst);
-  void visitInsertElementInst(llvm::InsertElementInst &insertElementInst);
   void visitLoadInst(llvm::LoadInst &loadInst);
   void visitMemCpyInst(llvm::MemCpyInst &memCpyInst);
   void visitMemMoveInst(llvm::MemMoveInst &memMoveInst);
