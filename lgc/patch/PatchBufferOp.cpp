@@ -533,32 +533,6 @@ void PatchBufferOp::visitCallInst(CallInst &callInst) {
 }
 
 // =====================================================================================================================
-// Visits "extractelement" instruction.
-//
-// @param extractElementInst : The instruction
-void PatchBufferOp::visitExtractElementInst(ExtractElementInst &extractElementInst) {
-  PointerType *const pointerType = dyn_cast<PointerType>(extractElementInst.getType());
-
-  // If the extract element is not extracting a pointer, bail.
-  if (!pointerType)
-    return;
-
-  // If the type we are GEPing into is not a fat pointer, bail.
-  if (pointerType->getAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
-    return;
-
-  m_builder->SetInsertPoint(&extractElementInst);
-
-  Replacement pointer = getRemappedValue(extractElementInst.getVectorOperand());
-  Value *const index = extractElementInst.getIndexOperand();
-
-  Value *const pointerElem = m_builder->CreateExtractElement(pointer.second, index);
-  copyMetadata(pointerElem, &extractElementInst);
-
-  m_replacementMap[&extractElementInst] = std::make_pair(pointer.first, pointerElem);
-}
-
-// =====================================================================================================================
 // Visits "getelementptr" instruction.
 //
 // @param getElemPtrInst : The instruction
@@ -586,46 +560,6 @@ void PatchBufferOp::visitGetElementPtrInst(GetElementPtrInst &getElemPtrInst) {
   copyMetadata(newGetElemPtr, &getElemPtrInst);
 
   m_replacementMap[&getElemPtrInst] = std::make_pair(pointer.first, newGetElemPtr);
-}
-
-// =====================================================================================================================
-// Visits "insertelement" instruction.
-//
-// @param insertElementInst : The instruction
-void PatchBufferOp::visitInsertElementInst(InsertElementInst &insertElementInst) {
-  Type *const type = insertElementInst.getType();
-
-  // If the type is not a vector, bail.
-  if (!type->isVectorTy())
-    return;
-
-  PointerType *const pointerType = dyn_cast<PointerType>(cast<VectorType>(type)->getElementType());
-
-  // If the extract element is not extracting from a vector of pointers, bail.
-  if (!pointerType)
-    return;
-
-  // If the type we are GEPing into is not a fat pointer, bail.
-  if (pointerType->getAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
-    return;
-
-  m_builder->SetInsertPoint(&insertElementInst);
-
-  Replacement pointer = getRemappedValue(insertElementInst.getOperand(1));
-  Value *const index = pointer.second;
-
-  Value *indexVector = nullptr;
-
-  if (isa<UndefValue>(insertElementInst.getOperand(0)))
-    indexVector =
-        UndefValue::get(FixedVectorType::get(index->getType(), cast<FixedVectorType>(type)->getNumElements()));
-  else
-    indexVector = getRemappedValue(insertElementInst.getOperand(0)).second;
-
-  indexVector = m_builder->CreateInsertElement(indexVector, index, insertElementInst.getOperand(2));
-  copyMetadata(indexVector, &insertElementInst);
-
-  m_replacementMap[&insertElementInst] = std::make_pair(pointer.first, indexVector);
 }
 
 // =====================================================================================================================
