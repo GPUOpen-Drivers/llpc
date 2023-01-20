@@ -30,8 +30,8 @@
  */
 #include "llpcSpirvLowerAccessChain.h"
 #include "SPIRVInternal.h"
+#include "lgc/Builder.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/IR/Operator.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <stack>
@@ -63,10 +63,69 @@ bool SpirvLowerAccessChain::runImpl(Module &module) {
 
   SpirvLower::init(&module);
 
-  // Invoke handling of "getelementptr" instruction
+  // Invoke handling of "getelementptr", "load" and "store" instructions
   visit(m_module);
 
   return true;
+}
+
+// =====================================================================================================================
+// Checks if pointer operand of getelementptr is a global value and if types are the same.
+// If types are different (which may happen for opaque pointers) then this function is adding the missing zero-index
+// elements to the gep instruction.
+//
+// One of the examples may be a type in which we have a multiple nested structures.
+// { { [4 x float] } }
+//
+// @param gep : Getelementptr instruction.
+void SpirvLowerAccessChain::tryToAddMissingIndicesBetweenGVandGEP(GEPOperator *gep) {
+
+  // We are interested only in address spaces which are used while doing global value lowering for store and load.
+  const unsigned addrSpace = gep->getType()->getPointerAddressSpace();
+  if (addrSpace != SPIRAS_Input && addrSpace != SPIRAS_Output && addrSpace != SPIRAS_TaskPayload)
+    return;
+
+  GlobalValue *gv = dyn_cast<GlobalValue>(gep->getPointerOperand());
+  if (!gv)
+    return;
+
+  // No missing indices, types are the same.
+  if (gep->getSourceElementType() == gv->getValueType())
+    return;
+
+  SmallVector<Value *, 8> idxs;
+  idxs.push_back(m_builder->getInt32(0));
+  appendZeroIndexToMatchTypes(idxs, gep->getSourceElementType(), gv->getValueType());
+
+  for (unsigned i = 2; i != gep->getNumOperands(); ++i)
+    idxs.push_back(gep->getOperand(i));
+
+  Value *newGep = m_builder->CreateGEP(gv->getValueType(), gv, idxs);
+  gep->replaceAllUsesWith(newGep);
+  if (Instruction *inst = dyn_cast<Instruction>(gep))
+    inst->eraseFromParent();
+}
+
+// =====================================================================================================================
+// Visits "load" instruction
+//
+// @param loadInst : "Load" instruction
+void SpirvLowerAccessChain::visitLoadInst(LoadInst &loadInst) {
+  if (GEPOperator *gep = dyn_cast<GEPOperator>(loadInst.getPointerOperand())) {
+    m_builder->SetInsertPoint(&loadInst);
+    tryToAddMissingIndicesBetweenGVandGEP(gep);
+  }
+}
+
+// =====================================================================================================================
+// Visits "store" instruction
+//
+// @param storeInst : "Store" instruction
+void SpirvLowerAccessChain::visitStoreInst(StoreInst &storeInst) {
+  if (GEPOperator *gep = dyn_cast<GEPOperator>(storeInst.getPointerOperand())) {
+    m_builder->SetInsertPoint(&storeInst);
+    tryToAddMissingIndicesBetweenGVandGEP(gep);
+  }
 }
 
 // =====================================================================================================================
@@ -78,8 +137,13 @@ void SpirvLowerAccessChain::visitGetElementPtrInst(GetElementPtrInst &getElemPtr
   // Because the metadata is always decorated on top-level pointer value (actually a global variable).
   const unsigned addrSpace = getElemPtrInst.getType()->getPointerAddressSpace();
   if (addrSpace == SPIRAS_Private || addrSpace == SPIRAS_Input || addrSpace == SPIRAS_Output ||
-      addrSpace == SPIRAS_TaskPayload)
-    tryToCoalesceChain(&getElemPtrInst, addrSpace);
+      addrSpace == SPIRAS_TaskPayload) {
+    GetElementPtrInst *gep = tryToCoalesceChain(&getElemPtrInst, addrSpace);
+    if (GEPOperator *gepOp = dyn_cast<GEPOperator>(gep)) {
+      m_builder->SetInsertPoint(gep);
+      tryToAddMissingIndicesBetweenGVandGEP(gepOp);
+    }
+  }
 }
 
 // =====================================================================================================================
