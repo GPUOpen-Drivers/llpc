@@ -1,0 +1,71 @@
+; RUN: amdllpc -v -gfxip=11.0 %s | FileCheck %s
+
+; CHECK-LABEL: {{^}}===== AMDLLPC SUCCESS =====
+
+; SPIR-V
+; Version: 1.4
+; Generator: Khronos Glslang Reference Front End; 10
+; Bound: 114
+; Schema: 0
+               OpCapability Int64
+               OpCapability Int64Atomics
+               OpCapability MeshShadingEXT
+               OpExtension "SPV_EXT_mesh_shader"
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint TaskEXT %4 "main" %50 %60
+               OpExecutionMode %4 LocalSize 32 1 1
+               OpDecorate %_arr_long_uint_16_0 ArrayStride 8
+               OpDecorate %_arr_long_uint_32_0 ArrayStride 8
+               OpDecorate %_arr_long_uint_32_1 ArrayStride 8
+               OpDecorate %_arr_long_uint_32_2 ArrayStride 8
+               OpDecorate %_arr_int_uint_32_0 ArrayStride 4
+               OpMemberDecorate %_struct_57 0 Offset 0
+               OpMemberDecorate %_struct_57 1 Offset 128
+               OpMemberDecorate %_struct_57 2 Offset 384
+               OpMemberDecorate %_struct_57 3 Offset 640
+               OpMemberDecorate %_struct_57 4 Offset 896
+               OpMemberDecorate %_struct_57 5 Offset 1024
+               OpMemberDecorate %_struct_58 0 Offset 0
+               OpDecorate %_struct_58 Block
+               OpDecorate %60 DescriptorSet 1
+               OpDecorate %60 Binding 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+       %uint = OpTypeInt 32 0
+     %uint_0 = OpConstant %uint 0
+     %uint_1 = OpConstant %uint 1
+     %uint_2 = OpConstant %uint 2
+       %long = OpTypeInt 64 1
+    %uint_16 = OpConstant %uint 16
+%_arr_long_uint_16 = OpTypeArray %long %uint_16
+    %uint_32 = OpConstant %uint 32
+%_arr_long_uint_32 = OpTypeArray %long %uint_32
+        %int = OpTypeInt 32 1
+%_arr_int_uint_32 = OpTypeArray %int %uint_32
+ %_struct_47 = OpTypeStruct %_arr_long_uint_16 %_arr_long_uint_32 %_arr_long_uint_32 %_arr_long_uint_32 %_arr_int_uint_32 %int
+ %_struct_48 = OpTypeStruct %_struct_47
+%_ptr_TaskPayloadWorkgroupEXT__struct_48 = OpTypePointer TaskPayloadWorkgroupEXT %_struct_48
+         %50 = OpVariable %_ptr_TaskPayloadWorkgroupEXT__struct_48 TaskPayloadWorkgroupEXT
+      %int_0 = OpConstant %int 0
+%_arr_long_uint_16_0 = OpTypeArray %long %uint_16
+%_arr_long_uint_32_0 = OpTypeArray %long %uint_32
+%_arr_long_uint_32_1 = OpTypeArray %long %uint_32
+%_arr_long_uint_32_2 = OpTypeArray %long %uint_32
+%_arr_int_uint_32_0 = OpTypeArray %int %uint_32
+ %_struct_57 = OpTypeStruct %_arr_long_uint_16_0 %_arr_long_uint_32_0 %_arr_long_uint_32_1 %_arr_long_uint_32_2 %_arr_int_uint_32_0 %int
+ %_struct_58 = OpTypeStruct %_struct_57
+%_ptr_StorageBuffer__struct_58 = OpTypePointer StorageBuffer %_struct_58
+         %60 = OpVariable %_ptr_StorageBuffer__struct_58 StorageBuffer
+%_ptr_StorageBuffer__struct_57 = OpTypePointer StorageBuffer %_struct_57
+%_ptr_TaskPayloadWorkgroupEXT__struct_47 = OpTypePointer TaskPayloadWorkgroupEXT %_struct_47
+          %4 = OpFunction %void None %3
+          %5 = OpLabel
+         %62 = OpAccessChain %_ptr_StorageBuffer__struct_57 %60 %int_0
+         %63 = OpLoad %_struct_57 %62
+         %65 = OpAccessChain %_ptr_TaskPayloadWorkgroupEXT__struct_47 %50 %int_0
+         %66 = OpCopyLogical %_struct_47 %63
+               OpStore %65 %66
+               OpReturn
+               OpFunctionEnd
+

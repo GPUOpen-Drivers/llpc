@@ -32,6 +32,7 @@
 
 #include "llpcSpirvLower.h"
 #include "llvm/IR/InstVisitor.h"
+#include "llvm/IR/Operator.h"
 #include "llvm/IR/PassManager.h"
 
 namespace Llpc {
@@ -44,6 +45,8 @@ class SpirvLowerAccessChain : public SpirvLower,
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
   virtual void visitGetElementPtrInst(llvm::GetElementPtrInst &getElemPtrInst);
+  virtual void visitLoadInst(llvm::LoadInst &loadInst);
+  virtual void visitStoreInst(llvm::StoreInst &storeInst);
 
   bool runImpl(llvm::Module &module);
 
@@ -53,6 +56,8 @@ private:
   llvm::GetElementPtrInst *tryToCoalesceChain(llvm::GetElementPtrInst *getElemPtr, unsigned addrSpace);
   void appendZeroIndexToMatchTypes(llvm::SmallVectorImpl<llvm::Value *> &indexOperands, llvm::Type *typeToMatch,
                                    llvm::Type *baseType);
+
+  void tryToAddMissingIndicesBetweenGVandGEP(llvm::GEPOperator *gep);
 };
 
 } // namespace Llpc
