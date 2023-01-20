@@ -698,34 +698,14 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
           // The inputLocInfoMap of {TCS, GS, FS} maps original InOutLocationInfo to tightly compact InOutLocationInfo
           const bool isTcs = m_shaderStage == ShaderStageTessControl;
           const uint32_t elemIdxArgIdx = (isInterpolantInputImport || isTcs) ? 2 : 1;
-          bool hasDynIndex = false;
-          if (isTcs) {
-            hasDynIndex = !isa<ConstantInt>(callInst.getOperand(1)) || !isa<ConstantInt>(callInst.getOperand(2));
-            if (!hasDynIndex) {
-              // TCS input calls at the same location may have dynamic indexing or not
-              // Try the key as combination of location and component at first
-              origLocInfo.setComponent(cast<ConstantInt>(callInst.getOperand(elemIdxArgIdx))->getZExtValue());
-              locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
-              if (locInfoMapIt == resUsage->inOutUsage.inputLocInfoMap.end()) {
-                // Try the key as the plain location
-                origLocInfo.setComponent(0);
-                hasDynIndex = true;
-              }
-            }
-          } else {
-            origLocInfo.setComponent(cast<ConstantInt>(callInst.getOperand(elemIdxArgIdx))->getZExtValue());
-            if (m_shaderStage == ShaderStageFragment && isInterpolantInputImport) {
-              const unsigned interpMode = cast<ConstantInt>(callInst.getOperand(3))->getZExtValue();
-              origLocInfo.setFlat(interpMode == InOutInfo::InterpModeFlat);
-              origLocInfo.setCustom(interpMode == InOutInfo::InterpModeCustom);
-            }
-          }
+          // All packing of the VS-TCS interface is disabled if dynamic indexing is detected
+          assert(!isTcs || (isa<ConstantInt>(callInst.getOperand(1)) && isa<ConstantInt>(callInst.getOperand(2))));
+          origLocInfo.setComponent(cast<ConstantInt>(callInst.getOperand(elemIdxArgIdx))->getZExtValue());
           locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
           assert(locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end());
 
           loc = locInfoMapIt->second.getLocation();
-          if (!hasDynIndex)
-            elemIdx = builder.getInt32(locInfoMapIt->second.getComponent());
+          elemIdx = builder.getInt32(locInfoMapIt->second.getComponent());
           highHalf = locInfoMapIt->second.isHighHalf();
         } else {
           assert(locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end());
@@ -1001,21 +981,10 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
                  m_shaderStage == ShaderStageTessEval);
           origLocInfo.setComponent(cast<ConstantInt>(callInst.getOperand(1))->getZExtValue());
           locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
-          bool relateDynIndex = false;
-          const bool checkDynIndex =
-              (m_shaderStage == ShaderStageVertex && m_pipelineState->hasShaderStage(ShaderStageTessControl));
-          if (checkDynIndex && locInfoMapIt == resUsage->inOutUsage.outputLocInfoMap.end()) {
-            // The location in TCS may be used with dynamic indexing, try location as the key for a search
-            origLocInfo.setComponent(0);
-            locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
-            relateDynIndex = true;
-          }
 
           if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
             loc = locInfoMapIt->second.getLocation();
-            // Dynamic indexing related locations just use the location for mapping
-            if (!relateDynIndex)
-              elemIdx = locInfoMapIt->second.getComponent();
+            elemIdx = locInfoMapIt->second.getComponent();
             exist = true;
           } else {
             exist = false;

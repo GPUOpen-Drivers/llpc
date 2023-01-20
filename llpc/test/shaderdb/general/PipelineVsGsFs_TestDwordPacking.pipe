@@ -9,12 +9,12 @@
 ; SHADERTEST: (FS) Input:  loc = 1, comp = 1 =>  Mapped = 0, 1
 ; SHADERTEST: (FS) Input:  loc = 1, comp = 2 =>  Mapped = 0, 2
 ; SHADERTEST: (FS) Input:  loc = 1, comp = 3 =>  Mapped = 0, 3
-; SHADERTEST: (FS) Input:  loc = 4, comp = 0 =>  Mapped = 1, 0
-; SHADERTEST: (FS) Input:  loc = 4, comp = 1 =>  Mapped = 1, 1
 ; SHADERTEST: (FS) Input:  loc = 2, comp = 0 =>  Mapped = 2, 0
 ; SHADERTEST: (FS) Input:  loc = 2, comp = 1 =>  Mapped = 2, 1
 ; SHADERTEST: (FS) Input:  loc = 2, comp = 2 =>  Mapped = 2, 2
 ; SHADERTEST: (FS) Input:  loc = 2, comp = 3 =>  Mapped = 2, 3
+; SHADERTEST: (FS) Input:  loc = 4, comp = 0 =>  Mapped = 1, 0
+; SHADERTEST: (FS) Input:  loc = 4, comp = 1 =>  Mapped = 1, 1
 ; SHADERTEST-LABEL: LLPC location count results (after builtin-to-generic mapping)
 ; SHADERTEST: (FS) Input:  loc count = 3
 ; SHADERTEST: (FS) Output: loc count = 2
@@ -29,11 +29,11 @@
 ; SHADERTEST: (GS) Output: stream = 0,  loc = 2, comp = 3  =>  Mapped = 2, 3
 ; SHADERTEST: (GS) Output: stream = 0,  loc = 4, comp = 0  =>  Mapped = 1, 0
 ; SHADERTEST: (GS) Output: stream = 0,  loc = 4, comp = 1  =>  Mapped = 1, 1
-; SHADERTEST: (GS) Output: stream = 0,  loc = 5, comp = 0  =>  Mapped = 1, 2
-; SHADERTEST: (GS) Output: stream = 0,  loc = 5, comp = 1  =>  Mapped = 1, 3
+; SHADERTEST: (GS) Output: stream = 0,  loc = 5, comp = 0  =>  Mapped = 3, 0
+; SHADERTEST: (GS) Output: stream = 0,  loc = 5, comp = 1  =>  Mapped = 3, 1
 ; SHADERTEST-LABEL: LLPC location count results (after input/output matching)
 ; SHADERTEST: (GS) Input:  loc count = 2
-; SHADERTEST: (GS) Output: loc count = 3
+; SHADERTEST: (GS) Output: loc count = 4
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 
