@@ -195,8 +195,9 @@ private:
   llvm::Value *doCulling(llvm::Module *module, llvm::Value *vertxIndex0, llvm::Value *vertxIndex1,
                          llvm::Value *vertxIndex2);
   void sendGsAllocReqMessage();
-  void doPrimitiveExportWithoutGs(llvm::Value *cullFlag = nullptr);
-  void doPrimitiveExportWithGs(llvm::Value *vertxIndex);
+  void exportPassthroughPrimitive();
+  void exportPrimitive(llvm::Value *primitiveCulled);
+  void exportPrimitiveWithGs(llvm::Value *startingVertexIndex);
 
   void earlyExitWithDummyExport();
 

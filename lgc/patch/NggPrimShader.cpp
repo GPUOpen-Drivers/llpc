@@ -674,11 +674,12 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
     {
       m_builder.SetInsertPoint(writePrimIdBlock);
 
-      // Primitive data layout
-      //   [31]    = null primitive flag
-      //   [28:20] = vertexIndex2
-      //   [18:10] = vertexIndex1
-      //   [8:0]   = vertexIndex0
+      // Primitive connectivity data have such layout:
+      //
+      //   +----------------+---------------+---------------+---------------+
+      //   | Null Primitive | Vertex Index2 | Vertex Index2 | Vertex Index2 |
+      //   | [31]           | [28:20]       | [18:10]       | [8:0]         |
+      //   +----------------+---------------+---------------+---------------+
 
       // Distribute primitive ID
       Value *vertexIndex = nullptr;
@@ -753,7 +754,7 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(expPrimBlock);
 
-    doPrimitiveExportWithoutGs();
+    exportPassthroughPrimitive();
     m_builder.CreateBr(endExpPrimBlock);
   }
 
@@ -1277,13 +1278,13 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   }
 
   // Construct ".culling" block
-  Value *cullFlag = nullptr;
+  Value *primitiveCulled = nullptr;
   {
     m_builder.SetInsertPoint(cullingBlock);
 
-    cullFlag = doCulling(entryPoint->getParent(), m_nggInputs.vertexIndex0, m_nggInputs.vertexIndex1,
-                         m_nggInputs.vertexIndex2);
-    m_builder.CreateCondBr(cullFlag, endCullingBlock, writeVertDrawFlagBlock);
+    primitiveCulled = doCulling(entryPoint->getParent(), m_nggInputs.vertexIndex0, m_nggInputs.vertexIndex1,
+                                m_nggInputs.vertexIndex2);
+    m_builder.CreateCondBr(primitiveCulled, endCullingBlock, writeVertDrawFlagBlock);
   }
 
   // Construct ".writeVertDrawFlag" block
@@ -1308,9 +1309,9 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(endCullingBlock);
 
-    cullFlag = createPhi({{m_builder.getTrue(), cullingBlock},
-                          {m_builder.getFalse(), writeVertDrawFlagBlock},
-                          {m_builder.getTrue(), endWriteVertCullDataBlock}});
+    primitiveCulled = createPhi({{m_builder.getTrue(), cullingBlock},
+                                 {m_builder.getFalse(), writeVertDrawFlagBlock},
+                                 {m_builder.getTrue(), endWriteVertCullDataBlock}});
 
     createFenceAndBarrier();
 
@@ -1492,9 +1493,9 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
       assert(!m_compactVertex); // Must be null
     }
 
-    // Update cull flag
-    cullFlag =
-        createPhi({{cullFlag, endCompactVertBlock}, {m_builder.getFalse(), runtimePassthroughBlock}}, "cullFlag");
+    // Update primitive culled flag
+    primitiveCulled = createPhi(
+        {{primitiveCulled, endCompactVertBlock}, {m_builder.getFalse(), runtimePassthroughBlock}}, "cullFlag");
 
     // Update fully-culled flag
     fullyCulled =
@@ -1571,7 +1572,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(expPrimBlock);
 
-    doPrimitiveExportWithoutGs(cullFlag);
+    exportPrimitive(primitiveCulled);
 
     m_builder.CreateBr(endExpPrimBlock);
   }
@@ -2147,7 +2148,8 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(expPrimBlock);
 
-    doPrimitiveExportWithGs(m_nggControl->compactVertex ? compactedVertexIndex : m_nggInputs.threadIdInSubgroup);
+    auto startingVertexIndex = m_nggControl->compactVertex ? compactedVertexIndex : m_nggInputs.threadIdInSubgroup;
+    exportPrimitiveWithGs(startingVertexIndex);
     m_builder.CreateBr(endExpPrimBlock);
   }
 
@@ -2413,97 +2415,115 @@ void NggPrimShader::sendGsAllocReqMessage() {
 }
 
 // =====================================================================================================================
-// Does primitive export in NGG primitive shader (GS is not present).
+// Export primitive in passthrough mode.
+void NggPrimShader::exportPassthroughPrimitive() {
+  assert(m_nggControl->passthroughMode); // Make sure NGG passthrough mode is enabled
+  assert(!m_hasGs);                      // Make sure API GS is not present
+
+  auto undef = PoisonValue::get(m_builder.getInt32Ty());
+  m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getInt32Ty(),
+                            {
+                                m_builder.getInt32(EXP_TARGET_PRIM), // tgt
+                                m_builder.getInt32(0x1),             // en
+                                // src0 ~ src3
+                                m_nggInputs.primData, undef, undef, undef,
+                                m_builder.getTrue(),  // done, must be set
+                                m_builder.getFalse(), // vm
+                            });
+}
+
+// =====================================================================================================================
+// Export primitive in culling mode without API GS.
 //
-// @param cullFlag : Cull flag indicating whether this primitive has been culled (could be null)
-void NggPrimShader::doPrimitiveExportWithoutGs(Value *cullFlag) {
-  Value *primData = nullptr;
+// @param primitiveCulled : Whether the primitive is culled
+void NggPrimShader::exportPrimitive(Value *primitiveCulled) {
+  assert(!m_nggControl->passthroughMode); // Make sure NGG passthrough mode is not enabled
+  assert(!m_hasGs);                       // Make sure API GS is not present
 
-  // Primitive data layout [31:0]
-  //   [31]    = null primitive flag
-  //   [28:20] = vertexIndex2
-  //   [18:10] = vertexIndex1
-  //   [8:0]   = vertexIndex0
+  //
+  // The processing is something like this:
+  //
+  //   vertexIndices = Relative vertex indices
+  //   if (compactVertex)
+  //     vertexIndices = Read compacted relative vertex indices from LDS
+  //   Export primitive
+  //
+  Value *vertexIndex0 = m_nggInputs.vertexIndex0;
+  Value *vertexIndex1 = m_nggInputs.vertexIndex1;
+  Value *vertexIndex2 = m_nggInputs.vertexIndex2;
 
-  if (m_nggControl->passthroughMode) {
-    // Pass-through mode (primitive data has been constructed)
-    primData = m_nggInputs.primData;
-  } else {
-    // Culling mode (primitive data has to be constructed)
-    Value *vertexIndex0 = m_nggInputs.vertexIndex0;
-    Value *vertexIndex1 = m_nggInputs.vertexIndex1;
-    Value *vertexIndex2 = m_nggInputs.vertexIndex2;
+  auto exportPrimitiveBlock = m_builder.GetInsertBlock();
 
-    //
-    // The processing is something like this:
-    //
-    //   vertexIndices = Relative vertex indices
-    //   if (compactVertex)
-    //     vertexIndices = Read compacted relative vertex indices from LDS
-    //   Export primitive
-    //
+  if (m_compactVertex) {
+    auto compactVertexIndexBlock = createBlock(exportPrimitiveBlock->getParent(), ".compactVertexIndex");
+    compactVertexIndexBlock->moveAfter(exportPrimitiveBlock);
 
-    auto expPrimBlock = m_builder.GetInsertBlock();
+    auto endCompactVertexIndexBlock = createBlock(exportPrimitiveBlock->getParent(), ".endCompactVertexIndex");
+    endCompactVertexIndexBlock->moveAfter(compactVertexIndexBlock);
 
-    if (m_compactVertex) {
-      auto compactVertIdBlock = createBlock(expPrimBlock->getParent(), ".compactVertId");
-      compactVertIdBlock->moveAfter(expPrimBlock);
+    m_builder.CreateCondBr(m_compactVertex, compactVertexIndexBlock, endCompactVertexIndexBlock);
 
-      auto endCompactVertIdBlock = createBlock(expPrimBlock->getParent(), ".endCompactVertId");
-      endCompactVertIdBlock->moveAfter(compactVertIdBlock);
+    // Construct ".compactVertexIndex" block
+    Value *compactedVertexIndex0 = nullptr;
+    Value *compactedVertexIndex1 = nullptr;
+    Value *compactedVertexIndex2 = nullptr;
+    {
+      m_builder.SetInsertPoint(compactVertexIndexBlock);
 
-      m_builder.CreateCondBr(m_compactVertex, compactVertIdBlock, endCompactVertIdBlock);
+      const unsigned esGsRingItemSize =
+          m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
 
-      // Construct ".compactVertId" block
-      Value *compactedVertexIndex0 = nullptr;
-      Value *compactedVertexIndex1 = nullptr;
-      Value *compactedVertexIndex2 = nullptr;
-      {
-        m_builder.SetInsertPoint(compactVertIdBlock);
+      auto vertexItemOffset0 =
+          m_builder.CreateMul(m_nggInputs.vertexIndex0, m_builder.getInt32(esGsRingItemSize * SizeOfDword));
+      auto vertexItemOffset1 =
+          m_builder.CreateMul(m_nggInputs.vertexIndex1, m_builder.getInt32(esGsRingItemSize * SizeOfDword));
+      auto vertexItemOffset2 =
+          m_builder.CreateMul(m_nggInputs.vertexIndex2, m_builder.getInt32(esGsRingItemSize * SizeOfDword));
 
-        const unsigned esGsRingItemSize =
-            m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
+      compactedVertexIndex0 = readVertexCullInfoFromLds(m_builder.getInt32Ty(), vertexItemOffset0,
+                                                        m_vertCullInfoOffsets.compactedVertexIndex);
+      compactedVertexIndex1 = readVertexCullInfoFromLds(m_builder.getInt32Ty(), vertexItemOffset1,
+                                                        m_vertCullInfoOffsets.compactedVertexIndex);
+      compactedVertexIndex2 = readVertexCullInfoFromLds(m_builder.getInt32Ty(), vertexItemOffset2,
+                                                        m_vertCullInfoOffsets.compactedVertexIndex);
 
-        auto vertexItemOffset0 =
-            m_builder.CreateMul(m_nggInputs.vertexIndex0, m_builder.getInt32(esGsRingItemSize * SizeOfDword));
-        auto vertexItemOffset1 =
-            m_builder.CreateMul(m_nggInputs.vertexIndex1, m_builder.getInt32(esGsRingItemSize * SizeOfDword));
-        auto vertexItemOffset2 =
-            m_builder.CreateMul(m_nggInputs.vertexIndex2, m_builder.getInt32(esGsRingItemSize * SizeOfDword));
-
-        compactedVertexIndex0 = readVertexCullInfoFromLds(m_builder.getInt32Ty(), vertexItemOffset0,
-                                                          m_vertCullInfoOffsets.compactedVertexIndex);
-        compactedVertexIndex1 = readVertexCullInfoFromLds(m_builder.getInt32Ty(), vertexItemOffset1,
-                                                          m_vertCullInfoOffsets.compactedVertexIndex);
-        compactedVertexIndex2 = readVertexCullInfoFromLds(m_builder.getInt32Ty(), vertexItemOffset2,
-                                                          m_vertCullInfoOffsets.compactedVertexIndex);
-
-        m_builder.CreateBr(endCompactVertIdBlock);
-      }
-
-      // Construct ".endCompactVertId" block
-      {
-        m_builder.SetInsertPoint(endCompactVertIdBlock);
-
-        vertexIndex0 = createPhi({{compactedVertexIndex0, compactVertIdBlock}, {vertexIndex0, expPrimBlock}});
-        vertexIndex1 = createPhi({{compactedVertexIndex1, compactVertIdBlock}, {vertexIndex1, expPrimBlock}});
-        vertexIndex2 = createPhi({{compactedVertexIndex2, compactVertIdBlock}, {vertexIndex2, expPrimBlock}});
-      }
+      m_builder.CreateBr(endCompactVertexIndexBlock);
     }
 
+    // Construct ".endCompactVertexIndex" block
+    {
+      m_builder.SetInsertPoint(endCompactVertexIndexBlock);
+
+      vertexIndex0 =
+          createPhi({{compactedVertexIndex0, compactVertexIndexBlock}, {vertexIndex0, exportPrimitiveBlock}});
+      vertexIndex1 =
+          createPhi({{compactedVertexIndex1, compactVertexIndexBlock}, {vertexIndex1, exportPrimitiveBlock}});
+      vertexIndex2 =
+          createPhi({{compactedVertexIndex2, compactVertexIndexBlock}, {vertexIndex2, exportPrimitiveBlock}});
+    }
+  }
+
+  // Primitive connectivity data have such layout:
+  //
+  //   +----------------+---------------+---------------+---------------+
+  //   | Null Primitive | Vertex Index2 | Vertex Index2 | Vertex Index2 |
+  //   | [31]           | [28:20]       | [18:10]       | [8:0]         |
+  //   +----------------+---------------+---------------+---------------+
+  Value *primData = nullptr;
+  if (m_gfxIp.major <= 11) {
     primData = m_builder.CreateShl(vertexIndex2, 10);
     primData = m_builder.CreateOr(primData, vertexIndex1);
 
     primData = m_builder.CreateShl(primData, 10);
     primData = m_builder.CreateOr(primData, vertexIndex0);
-
-    // Check cull flag to determine whether this primitive is culled if the cull flag is specified.
-    if (cullFlag)
-      primData = m_builder.CreateSelect(cullFlag, m_builder.getInt32(NullPrim), primData);
+  } else {
+    llvm_unreachable("Not implemented!");
   }
 
-  auto undef = UndefValue::get(m_builder.getInt32Ty());
+  if (primitiveCulled)
+    primData = m_builder.CreateSelect(primitiveCulled, m_builder.getInt32(NullPrim), primData);
 
+  auto undef = PoisonValue::get(m_builder.getInt32Ty());
   m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getInt32Ty(),
                             {
                                 m_builder.getInt32(EXP_TARGET_PRIM), // tgt
@@ -2516,12 +2536,12 @@ void NggPrimShader::doPrimitiveExportWithoutGs(Value *cullFlag) {
 }
 
 // =====================================================================================================================
-// Does primitive export in NGG primitive shader (GS is present).
+// Export primitive when API GS is present.
 //
-// @param vertexIndex : The relative index of starting vertex (Indices of vertices forming a GS primitive must be
-//                      consecutive)
-void NggPrimShader::doPrimitiveExportWithGs(Value *vertexIndex) {
-  assert(m_hasGs);
+// @param startingVertexIndex : The relative index of starting vertex (Indices of vertices forming a GS primitive must
+//                              be consecutive)
+void NggPrimShader::exportPrimitiveWithGs(Value *startingVertexIndex) {
+  assert(m_hasGs); // Make sure API GS is present
 
   //
   // The processing is something like this:
@@ -2538,44 +2558,55 @@ void NggPrimShader::doPrimitiveExportWithGs(Value *vertexIndex) {
   //                          : <vertexIndex0, vertexIndex1, vertexIndex2>
   //     }
   //   }
-  //   Export primitive data
-  //
-  //
-  // Primitive data layout [31:0]
-  //   [31]    = null primitive flag
-  //   [28:20] = vertexIndex2
-  //   [18:10] = vertexIndex1
-  //   [8:0]   = vertexIndex0
+  //   Export primitive
   //
   const auto rasterStream = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.rasterStream;
   Value *primData =
       readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup, LdsRegionOutPrimData,
                                SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
-
   auto primValid = m_builder.CreateICmpNE(primData, m_builder.getInt32(NullPrim));
 
+  // Primitive connectivity data have such layout:
+  //
+  //   +----------------+---------------+---------------+---------------+
+  //   | Null Primitive | Vertex Index2 | Vertex Index2 | Vertex Index2 |
+  //   | [31]           | [28:20]       | [18:10]       | [8:0]         |
+  //   +----------------+---------------+---------------+---------------+
+  Value *newPrimData = nullptr;
   const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
 
-  Value *newPrimData = nullptr;
   switch (geometryMode.outputPrimitive) {
   case OutputPrimitives::Points:
-    newPrimData = vertexIndex;
+    newPrimData = startingVertexIndex;
     break;
   case OutputPrimitives::LineStrip: {
-    Value *vertexIndex0 = vertexIndex;
-    Value *vertexIndex1 = m_builder.CreateAdd(vertexIndex, m_builder.getInt32(1));
-    newPrimData = m_builder.CreateOr(m_builder.CreateShl(vertexIndex1, 10), vertexIndex0);
+    Value *vertexIndex0 = startingVertexIndex;
+    Value *vertexIndex1 = m_builder.CreateAdd(startingVertexIndex, m_builder.getInt32(1));
+    if (m_gfxIp.major <= 11)
+      newPrimData = m_builder.CreateOr(m_builder.CreateShl(vertexIndex1, 10), vertexIndex0);
+    else
+      llvm_unreachable("Not implemented!");
     break;
   }
   case OutputPrimitives::TriangleStrip: {
     Value *winding = m_builder.CreateICmpNE(primData, m_builder.getInt32(0));
-    Value *vertexIndex0 = vertexIndex;
-    Value *vertexIndex1 = m_builder.CreateAdd(vertexIndex, m_builder.getInt32(1));
-    Value *vertexIndex2 = m_builder.CreateAdd(vertexIndex, m_builder.getInt32(2));
-    auto newPrimDataNoWinding = m_builder.CreateOr(
-        m_builder.CreateShl(m_builder.CreateOr(m_builder.CreateShl(vertexIndex2, 10), vertexIndex1), 10), vertexIndex0);
-    auto newPrimDataWinding = m_builder.CreateOr(
-        m_builder.CreateShl(m_builder.CreateOr(m_builder.CreateShl(vertexIndex1, 10), vertexIndex2), 10), vertexIndex0);
+    Value *vertexIndex0 = startingVertexIndex;
+    Value *vertexIndex1 = m_builder.CreateAdd(startingVertexIndex, m_builder.getInt32(1));
+    Value *vertexIndex2 = m_builder.CreateAdd(startingVertexIndex, m_builder.getInt32(2));
+
+    Value *newPrimDataNoWinding = nullptr;
+    Value *newPrimDataWinding = nullptr;
+    if (m_gfxIp.major <= 11) {
+      newPrimDataNoWinding = m_builder.CreateOr(
+          m_builder.CreateShl(m_builder.CreateOr(m_builder.CreateShl(vertexIndex2, 10), vertexIndex1), 10),
+          vertexIndex0);
+      newPrimDataWinding = m_builder.CreateOr(
+          m_builder.CreateShl(m_builder.CreateOr(m_builder.CreateShl(vertexIndex1, 10), vertexIndex2), 10),
+          vertexIndex0);
+    } else {
+      llvm_unreachable("Not implemented!");
+    }
+
     newPrimData = m_builder.CreateSelect(winding, newPrimDataWinding, newPrimDataNoWinding);
     break;
   }
@@ -2586,8 +2617,7 @@ void NggPrimShader::doPrimitiveExportWithGs(Value *vertexIndex) {
 
   primData = m_builder.CreateSelect(primValid, newPrimData, primData);
 
-  auto undef = UndefValue::get(m_builder.getInt32Ty());
-
+  auto undef = PoisonValue::get(m_builder.getInt32Ty());
   m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getInt32Ty(),
                             {
                                 m_builder.getInt32(EXP_TARGET_PRIM), // tgt
@@ -2939,7 +2969,7 @@ Value *NggPrimShader::runPartEs(Function *partEs, ArrayRef<Argument *> args, Val
               readVertexCullInfoFromLds(m_builder.getInt32Ty(), vertexItemOffset, m_vertCullInfoOffsets.vertexId);
         }
 
-        // NOTE: Relative vertex ID is not used when VS is merged to GS.
+        // NOTE: Relative vertex index provided by HW is not used when VS is merged to GS.
 
         if (resUsage->builtInUsage.vs.primitiveId) {
           newVsPrimitiveId =
@@ -3163,7 +3193,7 @@ void NggPrimShader::splitEs(Function *esEntryPoint) {
   IRBuilder<>::InsertPointGuard guard(m_builder);
   m_builder.SetInsertPoint(retBlock);
 
-  SmallVector<CallInst *, 8> removeCalls;
+  SmallVector<CallInst *, 8> removedCalls;
 
   // Fetch position and cull distances
   Value *position = UndefValue::get(positionTy);
@@ -3204,7 +3234,7 @@ void NggPrimShader::splitEs(Function *esEntryPoint) {
         }
       }
 
-      removeCalls.push_back(call); // Remove export
+      removedCalls.push_back(call); // Remove export
     }
   }
 
@@ -3262,7 +3292,7 @@ void NggPrimShader::splitEs(Function *esEntryPoint) {
   esEntryPoint->eraseFromParent();
 
   // Remove calls
-  for (auto call : removeCalls) {
+  for (auto call : removedCalls) {
     call->dropAllReferences();
     call->eraseFromParent();
   }
@@ -3826,7 +3856,7 @@ Function *NggPrimShader::createGsEmitHandler(Module *module) {
   //
   //   if (outVerts >= outVertsPerPrim) {
   //     winding = triangleStrip ? ((outVerts - outVertsPerPrim) & 0x1) : 0
-  //     N (starting vertex ID) = threadIdInSubgroup * outputVertices + emitVerts - outVertsPerPrim
+  //     N (starting vertex index) = threadIdInSubgroup * outputVertices + emitVerts - outVertsPerPrim
   //     primData[N] = winding
   //   }
   //
@@ -7110,7 +7140,7 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
     auto globalTable = m_builder.CreateExtractElement(userData, static_cast<uint64_t>(0));
     return m_builder.CreateCall(xfbFetcher,
                                 {globalTable,                      // Global table
-                                 m_nggInputs.threadIdInSubgroup}); // Vertex ID in sub-rgoup
+                                 m_nggInputs.threadIdInSubgroup}); // Relative vertex index in subgroup
   }
 
   Value *offChipLdsBase = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase)];
