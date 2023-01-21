@@ -267,11 +267,11 @@ private:
   llvm::Value *fetchCullDistanceSignMask(llvm::Value *vertxIndex);
   llvm::Value *calcVertexItemOffset(unsigned streamId, llvm::Value *vertxIndex);
 
-  void processVertexAttribExport(llvm::Function *&targetFunc);
+  void processVertexAttribExport(llvm::Function *&target);
 
-  void processSwXfb(llvm::Module *module, llvm::Argument *sysValueStart);
-  void processSwXfbWithGs(llvm::Module *module, llvm::Argument *sysValueStart);
-  llvm::Value *fetchXfbOutput(llvm::Module *module, llvm::Argument *sysValueStart,
+  void processSwXfb(llvm::Function *target, llvm::ArrayRef<llvm::Argument *> args);
+  void processSwXfbWithGs(llvm::Function *target, llvm::ArrayRef<llvm::Argument *> args);
+  llvm::Value *fetchXfbOutput(llvm::Function *target, llvm::ArrayRef<llvm::Argument *> args,
                               llvm::SmallVector<XfbOutputExport, 32> &xfbOutputExports);
 
   llvm::Value *readXfbOutputFromLds(llvm::Type *readDataTy, llvm::Value *vertxIndex, unsigned outputIndex);

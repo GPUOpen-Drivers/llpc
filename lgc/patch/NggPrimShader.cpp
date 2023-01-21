@@ -634,6 +634,8 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
     endExpVertBlock = createBlock(entryPoint, ".endExpVert");
   }
 
+  auto esEntryPoint = entryPoint->getParent()->getFunction(lgcName::NggEsEntryPoint);
+
   // Construct ".entry" block
   {
     m_builder.SetInsertPoint(entryBlock);
@@ -773,7 +775,7 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
     //  }
     //
     if (m_pipelineState->enableSwXfb()) {
-      processSwXfb(entryPoint->getParent(), entryPoint->arg_begin());
+      processSwXfb(esEntryPoint, args);
       m_builder.CreateRetVoid();
     } else {
       auto vertValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
@@ -786,7 +788,6 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
     {
       m_builder.SetInsertPoint(expVertBlock);
 
-      auto esEntryPoint = entryPoint->getParent()->getFunction(lgcName::NggEsEntryPoint);
       runEs(esEntryPoint, args);
 
       m_builder.CreateBr(endExpVertBlock);
@@ -1050,6 +1051,8 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   auto expVertBlock = createBlock(entryPoint, ".expVert");
   auto endExpVertBlock = createBlock(entryPoint, ".endExpVert");
 
+  auto esEntryPoint = entryPoint->getParent()->getFunction(lgcName::NggEsEntryPoint);
+
   // Construct ".entry" block
   Value *vertexItemOffset = nullptr;
   {
@@ -1085,7 +1088,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
       m_builder.CreateCondBr(primValid, writePrimIdBlock, endWritePrimIdBlock);
     } else {
       if (m_pipelineState->enableSwXfb())
-        processSwXfb(entryPoint->getParent(), entryPoint->arg_begin());
+        processSwXfb(esEntryPoint, args);
 
       auto vertValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.vertCountInWave);
       m_builder.CreateCondBr(vertValid, fetchVertCullDataBlock, endFetchVertCullDataBlock);
@@ -1138,7 +1141,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
       createFenceAndBarrier();
 
       if (m_pipelineState->enableSwXfb())
-        processSwXfb(entryPoint->getParent(), entryPoint->arg_begin());
+        processSwXfb(esEntryPoint, args);
 
       auto vertValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.vertCountInWave);
       m_builder.CreateCondBr(vertValid, fetchVertCullDataBlock, endFetchVertCullDataBlock);
@@ -1152,8 +1155,8 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     m_builder.SetInsertPoint(fetchVertCullDataBlock);
 
     // Split ES to two parts: fetch cull data before NGG culling; do deferred vertex export after NGG culling
-    auto esEntryPoint = entryPoint->getParent()->getFunction(lgcName::NggEsEntryPoint);
     splitEs(esEntryPoint);
+    esEntryPoint = nullptr; // After splitting, original ES is removed
 
     // Run part ES to fetch cull data
     auto partEs = entryPoint->getParent()->getFunction(lgcName::NggEsCullDataFetch);
@@ -1800,6 +1803,9 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
   auto expVertBlock = createBlock(entryPoint, ".expVert");
   auto endExpVertBlock = createBlock(entryPoint, ".endExpVert");
 
+  auto gsEntryPoint = entryPoint->getParent()->getFunction(lgcName::NggGsEntryPoint);
+  auto copyShader = entryPoint->getParent()->getFunction(lgcName::NggCopyShaderEntryPoint);
+
   // Construct ".entry" block
   {
     m_builder.SetInsertPoint(entryBlock);
@@ -1875,7 +1881,6 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(beginGsBlock);
 
-    auto gsEntryPoint = entryPoint->getParent()->getFunction(lgcName::NggGsEntryPoint);
     runGs(gsEntryPoint, args);
 
     m_builder.CreateBr(endGsBlock);
@@ -1886,7 +1891,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
     m_builder.SetInsertPoint(endGsBlock);
 
     if (m_pipelineState->enableSwXfb())
-      processSwXfbWithGs(entryPoint->getParent(), entryPoint->arg_begin());
+      processSwXfbWithGs(copyShader, args);
 
     auto waveValid =
         m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(waveCountInSubgroup + 1));
@@ -2196,8 +2201,8 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(expVertBlock);
 
-    auto copyShader = entryPoint->getParent()->getFunction(lgcName::NggCopyShaderEntryPoint);
     runCopyShader(copyShader, args);
+
     m_builder.CreateBr(endExpVertBlock);
   }
 
@@ -5751,8 +5756,8 @@ Value *NggPrimShader::ballot(Value *value) {
 // Also, we expand all export calls by replacing it with real instructions that do vertex attribute exporting through
 // memory.
 //
-// @param [in/out] target : Targeted function that has vertex attribute calls to process
-void NggPrimShader::processVertexAttribExport(Function *&targetFunc) {
+// @param [in/out] target : Target function to process vertex attribute export
+void NggPrimShader::processVertexAttribExport(Function *&target) {
   assert(m_gfxIp.major >= 11); // For GFX11+
 
   const unsigned attribCount =
@@ -5767,18 +5772,18 @@ void NggPrimShader::processVertexAttribExport(Function *&targetFunc) {
   //
   // Mutate the argument list by adding two additional arguments
   //
-  auto newTargetFunc = addFunctionArgs(targetFunc, nullptr,
-                                       {
-                                           m_builder.getInt32Ty(), // Attribute ring base (SGPR)
-                                           m_builder.getInt32Ty()  // Vertex thread ID in subgroup (VGPR)
-                                       },
-                                       {"attribRingBase", "vertexIndex"}, 0x1);
+  auto newTarget = addFunctionArgs(target, nullptr,
+                                   {
+                                       m_builder.getInt32Ty(), // Attribute ring base (SGPR)
+                                       m_builder.getInt32Ty()  // Relative vertex index in subgroup (VGPR)
+                                   },
+                                   {"attribRingBase", "vertexIndex"}, 0x1);
 
   // Original function is no longer needed
-  assert(targetFunc->use_empty());
-  targetFunc->eraseFromParent();
+  assert(target->use_empty());
+  target->eraseFromParent();
 
-  targetFunc = newTargetFunc;
+  target = newTarget;
 
   //
   // Expand vertex attribute export calls by replacing them with real instructions
@@ -5788,18 +5793,18 @@ void NggPrimShader::processVertexAttribExport(Function *&targetFunc) {
   Value *attribRingBufDesc = nullptr;
 
   // Always the first two arguments, added by us
-  auto attribRingBase = targetFunc->getArg(0);
-  auto vertexIndex = targetFunc->getArg(1);
+  auto attribRingBase = target->getArg(0);
+  auto vertexIndex = target->getArg(1);
 
-  SmallVector<CallInst *, 8> removeCalls;
+  SmallVector<CallInst *, 8> removedCalls;
 
-  for (auto &func : targetFunc->getParent()->functions()) {
+  for (auto &func : target->getParent()->functions()) {
     if (func.getName().startswith(lgcName::NggAttribExport)) {
       for (auto user : func.users()) {
         CallInst *const call = dyn_cast<CallInst>(user);
         assert(call);
 
-        if (call->getParent()->getParent() != targetFunc)
+        if (call->getParent()->getParent() != target)
           continue; // Export call doesn't belong to targeted function, skip
 
         // NOTE: We always set the insert point before the terminator of the basic block to which this call belongs.
@@ -5843,7 +5848,7 @@ void NggPrimShader::processVertexAttribExport(Function *&targetFunc) {
                                   {attribValue, attribRingBufDesc, vertexIndex, m_builder.getInt32(0), ringOffset,
                                    m_builder.getInt32(coherent.u32All)});
 
-        removeCalls.push_back(call);
+        removedCalls.push_back(call);
       }
 
       break; // Vertex attribute export calls are handled, could exit the loop
@@ -5857,13 +5862,13 @@ void NggPrimShader::processVertexAttribExport(Function *&targetFunc) {
     SmallVector<CallInst *, 4> exportCalls;
 
     // Colllect export calls of vertex position data
-    for (auto &func : targetFunc->getParent()->functions()) {
+    for (auto &func : target->getParent()->functions()) {
       if (func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_exp) {
         for (auto user : func.users()) {
           CallInst *const call = dyn_cast<CallInst>(user);
           assert(call);
 
-          if (call->getParent()->getParent() != targetFunc)
+          if (call->getParent()->getParent() != target)
             continue; // Export call doesn't belong to targeted function, skip
 
           exportCalls.push_back(call);
@@ -5896,7 +5901,7 @@ void NggPrimShader::processVertexAttribExport(Function *&targetFunc) {
   }
 
   // Remove calls
-  for (auto call : removeCalls) {
+  for (auto call : removedCalls) {
     call->dropAllReferences();
     call->eraseFromParent();
   }
@@ -5905,11 +5910,11 @@ void NggPrimShader::processVertexAttribExport(Function *&targetFunc) {
 // =====================================================================================================================
 // Processes SW emulated transform feedback when API GS is not present.
 //
-// @param module : LLVM module.
-// @param sysValueStart : Start of system value
-void NggPrimShader::processSwXfb(Module *module, Argument *sysValueStart) {
+// @param target : Target function to process SW emulated transform feedback
+// @param args : Arguments of primitive shader entry-point
+void NggPrimShader::processSwXfb(Function *target, ArrayRef<Argument *> args) {
   assert(m_pipelineState->enableSwXfb());
-  assert(!m_hasGs); // GS is not present
+  assert(!m_hasGs); // API GS is not present
 
   const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
 
@@ -5987,7 +5992,7 @@ void NggPrimShader::processSwXfb(Module *module, Argument *sysValueStart) {
   {
     m_builder.SetInsertPoint(fetchXfbOutputBlock);
 
-    auto xfbOutputs = fetchXfbOutput(module, sysValueStart, xfbOutputExports);
+    auto xfbOutputs = fetchXfbOutput(target, args, xfbOutputExports);
 
     for (unsigned i = 0; i < xfbOutputExports.size(); ++i) {
       assert(xfbOutputs->getType()->isArrayTy()); // Must be arrayed
@@ -6276,9 +6281,9 @@ void NggPrimShader::processSwXfb(Module *module, Argument *sysValueStart) {
 // =====================================================================================================================
 // Process SW emulated transform feedback when API GS is present.
 //
-// @param module : LLVM module.
-// @param sysValueStart : Start of system value
-void NggPrimShader::processSwXfbWithGs(Module *module, Argument *sysValueStart) {
+// @param target : Target function to process SW emulated transform feedback
+// @param args : Arguments of primitive shader entry-point
+void NggPrimShader::processSwXfbWithGs(Function *target, ArrayRef<Argument *> args) {
   assert(m_pipelineState->enableSwXfb());
   assert(m_hasGs); // GS is present
 
@@ -6590,7 +6595,7 @@ void NggPrimShader::processSwXfbWithGs(Module *module, Argument *sysValueStart) 
       if (i == lastActiveStream) {
         // Start to fetch transform feedback outputs after we finish compacting primitive thread IDs of the last vertex
         // stream.
-        fetchXfbOutput(module, sysValueStart, xfbOutputExports);
+        fetchXfbOutput(target, args, xfbOutputExports);
 
         auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(0));
         m_builder.CreateCondBr(firstThreadInSubgroup, prepareXfbExportBlock, endPrepareXfbExportBlock);
@@ -6900,13 +6905,13 @@ void NggPrimShader::processSwXfbWithGs(Module *module, Argument *sysValueStart) 
 }
 
 // =====================================================================================================================
-// Fetches transform feedback outputs by creating a fetch function cloned from ES/copy shader entry-point or just
-// mutating existing ES and running it after that. Meanwhile, we collect the transform feedback export info.
+// Fetches transform feedback outputs by creating a fetcher cloned from the target function or just mutating
+// the target function and running it after that. Meanwhile, we collect the transform feedback export info.
 //
-// @param module : LLVM module.
-// @param sysValueStart : Start of system value
+// @param target : Target function to process SW emulated transform feedback
+// @param args : Arguments of primitive shader entry-point
 // @param [out] xfbOutputExports : Export info of transform feedback outputs
-Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
+Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args,
                                      SmallVector<XfbOutputExport, 32> &xfbOutputExports) {
   assert(m_pipelineState->enableSwXfb());
 
@@ -6920,17 +6925,15 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
     return nullptr;
 
   //
-  // Clone ES/copy shader entry-point or just mutate existing ES entry-point to fetch transform feedback outputs
+  // Clone the target function or just mutate the target function to fetch transform feedback outputs
   //
-  auto entryPoint = module->getFunction(m_hasGs ? lgcName::NggCopyShaderEntryPoint : lgcName::NggEsEntryPoint);
-  assert(entryPoint);
 
-  // We don't clone the entry-point if we are in passthrough mode without GS
+  // We don't clone the target function if we are in passthrough mode without GS
   bool dontClone = !m_hasGs && m_nggControl->passthroughMode;
 
   // Collect all export calls for further analysis
   SmallVector<Function *, 8> expFuncs;
-  for (auto &func : module->functions()) {
+  for (auto &func : target->getParent()->functions()) {
     if (dontClone) {
       if (func.getName().startswith(lgcName::NggXfbOutputExport))
         expFuncs.push_back(&func);
@@ -6941,7 +6944,7 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
     }
   }
 
-  // Clone or mutate entry-point
+  // Clone or mutate the target function
   xfbOutputExports.resize(xfbOutputCount);
 
   // NOTE: For non-GS transform feedback, the return type is represented as an array of transform feedback outputs; for
@@ -6951,32 +6954,32 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
   Type *xfbOutputsTy = ArrayType::get(FixedVectorType::get(m_builder.getInt32Ty(), 4), xfbOutputCount);
   Type *xfbReturnTy = m_hasGs ? m_builder.getVoidTy() : xfbOutputsTy;
 
-  Function *xfbOutputFetchFunc = entryPoint;
+  Function *xfbFetcher = target;
   if (dontClone) {
-    processVertexAttribExport(entryPoint);
-    xfbOutputFetchFunc = addFunctionArgs(entryPoint, xfbReturnTy, {}, {}, 0);
+    processVertexAttribExport(target);
+    xfbFetcher = addFunctionArgs(target, xfbReturnTy, {}, {}, 0);
 
-    // Original function is no longer needed
-    assert(entryPoint->use_empty());
-    entryPoint->eraseFromParent();
+    // Original target function is no longer needed
+    assert(target->use_empty());
+    target->eraseFromParent();
   } else {
-    auto xfbOutputFetchFuncTy = FunctionType::get(xfbReturnTy, entryPoint->getFunctionType()->params(), false);
-    xfbOutputFetchFunc = Function::Create(xfbOutputFetchFuncTy, entryPoint->getLinkage(), "", module);
+    auto xfbFetcherTy = FunctionType::get(xfbReturnTy, target->getFunctionType()->params(), false);
+    xfbFetcher = Function::Create(xfbFetcherTy, target->getLinkage(), "", target->getParent());
 
     ValueToValueMapTy valueMap;
 
-    Argument *newArg = xfbOutputFetchFunc->arg_begin();
-    for (Argument &arg : entryPoint->args())
+    Argument *newArg = xfbFetcher->arg_begin();
+    for (Argument &arg : target->args())
       valueMap[&arg] = newArg++;
 
     SmallVector<ReturnInst *, 8> retInsts;
-    CloneFunctionInto(xfbOutputFetchFunc, entryPoint, valueMap, CloneFunctionChangeType::LocalChangesOnly, retInsts);
-    xfbOutputFetchFunc->setName(m_hasGs ? lgcName::NggGsXfbOutputFetch : lgcName::NggEsXfbOutputFetch);
+    CloneFunctionInto(xfbFetcher, target, valueMap, CloneFunctionChangeType::LocalChangesOnly, retInsts);
+    xfbFetcher->setName(m_hasGs ? lgcName::NggGsXfbOutputFetch : lgcName::NggEsXfbOutputFetch);
   }
 
   // Find the return block
   BasicBlock *retBlock = nullptr;
-  for (BasicBlock &block : *xfbOutputFetchFunc) {
+  for (BasicBlock &block : *xfbFetcher) {
     auto retInst = dyn_cast<ReturnInst>(block.getTerminator());
     if (retInst) {
       retInst->dropAllReferences();
@@ -6992,7 +6995,7 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
   m_builder.SetInsertPoint(retBlock);
 
   // Visit all export calls, removing those unnecessary and mutating the return type
-  SmallVector<CallInst *, 8> removeCalls;
+  SmallVector<CallInst *, 8> removedCalls;
 
   Value *xfbOutputs = UndefValue::get(xfbOutputsTy);
   unsigned outputIndex = 0;
@@ -7003,15 +7006,15 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
       assert(call);
 
       if (!dontClone) {
-        // Remove transform feedback output export calls from original ES/copy shader. No need of doing this if we
-        // don't clone the entry-point.
-        if (call->getFunction() == entryPoint && func->getName().startswith(lgcName::NggXfbOutputExport)) {
-          removeCalls.push_back(call);
+        // Remove transform feedback output export calls from the target function. No need of doing this if we
+        // just mutate it without cloning.
+        if (call->getFunction() == target && func->getName().startswith(lgcName::NggXfbOutputExport)) {
+          removedCalls.push_back(call);
           continue;
         }
       }
 
-      if (call->getFunction() != xfbOutputFetchFunc)
+      if (call->getFunction() != xfbFetcher)
         continue;
 
       assert(call->getParent() == retBlock); // Must in return block
@@ -7081,7 +7084,7 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
         ++outputIndex;
       }
 
-      removeCalls.push_back(call); // Remove export
+      removedCalls.push_back(call); // Remove export
     }
   }
 
@@ -7089,7 +7092,7 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
   m_builder.CreateRet(xfbOutputs);
 
   // Remove calls
-  for (auto call : removeCalls) {
+  for (auto call : removedCalls) {
     call->dropAllReferences();
     call->eraseFromParent();
   }
@@ -7097,55 +7100,63 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
   m_builder.restoreIP(savedInsertPos);
 
   //
-  // Run transform feedback output fetch function
+  // Run transform feedback fetch function
   //
   if (m_hasGs) {
     // Copy shader has fixed argument layout
-    Value *userData = sysValueStart + NumSpecialSgprInputs;
+    Value *userData = args[NumSpecialSgprInputs];
     assert(userData->getType()->isVectorTy());
 
     auto globalTable = m_builder.CreateExtractElement(userData, static_cast<uint64_t>(0));
-    return m_builder.CreateCall(xfbOutputFetchFunc,
+    return m_builder.CreateCall(xfbFetcher,
                                 {globalTable,                      // Global table
                                  m_nggInputs.threadIdInSubgroup}); // Vertex ID in sub-rgoup
   }
 
-  Argument *arg = sysValueStart;
-
-  Value *offChipLdsBase = (arg + ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase));
+  Value *offChipLdsBase = args[ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase)];
   offChipLdsBase->setName("offChipLdsBase");
 
-  Value *isOffChip = UndefValue::get(m_builder.getInt32Ty()); // NOTE: This flag is unused.
+  Value *userData = args[NumSpecialSgprInputs];
 
-  arg += NumSpecialSgprInputs;
+  ArrayRef<Argument *> vgprArgs(args.begin() + NumSpecialSgprInputs + 1, args.end());
 
-  Value *userData = arg++;
+  Value *tessCoordX = nullptr;
+  Value *tessCoordY = nullptr;
+  Value *relPatchId = nullptr;
+  Value *patchId = nullptr;
 
-  Value *tessCoordX = (arg + 5);
-  Value *tessCoordY = (arg + 6);
-  Value *relPatchId = (arg + 7);
-  Value *patchId = (arg + 8);
-
-  Value *vertexId = (arg + 5);
-  Value *relVertexId = (arg + 6);
+  Value *vertexId = nullptr;
+  Value *relVertexId = PoisonValue::get(m_builder.getInt32Ty());
   // NOTE: VS primitive ID for NGG is specially obtained from primitive ID distribution.
   Value *vsPrimitiveId = m_distributedPrimitiveId ? m_distributedPrimitiveId : PoisonValue::get(m_builder.getInt32Ty());
-  Value *instanceId = (arg + 8);
+  Value *instanceId = nullptr;
 
-  std::vector<Value *> args;
+  if (m_gfxIp.major <= 11) {
+    tessCoordX = vgprArgs[5];
+    tessCoordY = vgprArgs[6];
+    relPatchId = vgprArgs[7];
+    patchId = vgprArgs[8];
 
-  // If we don't clone the entry-point, we are going to run the whole ES and handle vertex attribute through memory
+    vertexId = vgprArgs[5];
+    instanceId = vgprArgs[8];
+  } else {
+    llvm_unreachable("Not implemented!");
+  }
+
+  std::vector<Value *> xfbFetcherArgs;
+
+  // If we don't clone the target function, we are going to run it and handle vertex attribute through memory
   // here.
   if (dontClone) {
-    // Setup attribute ring base and vertex thread ID in subgroup as two additional arguments to export vertex
+    // Setup attribute ring base and relative vertx index in subgroup as two additional arguments to export vertex
     // attributes through memory
     if (m_gfxIp.major >= 11 && !m_hasGs) { // For GS, vertex attribute exports are in copy shader
       const auto attribCount =
           m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStageTessEval : ShaderStageVertex)
               ->inOutUsage.expCount;
       if (attribCount > 0) {
-        args.push_back(m_nggInputs.attribRingBase);
-        args.push_back(m_nggInputs.threadIdInSubgroup);
+        xfbFetcherArgs.push_back(m_nggInputs.attribRingBase);
+        xfbFetcherArgs.push_back(m_nggInputs.threadIdInSubgroup);
       }
     }
   }
@@ -7155,32 +7166,32 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
 
   unsigned userDataIdx = 0;
 
-  auto argBegin = xfbOutputFetchFunc->arg_begin();
-  const unsigned argCount = xfbOutputFetchFunc->arg_size();
-  (void(argCount)); // Unused
+  auto xfbFetcherArgBegin = xfbFetcher->arg_begin();
+  const unsigned xfbFetcherArgCount = xfbFetcher->arg_size();
+  (void(xfbFetcherArgCount)); // Unused
 
   // Set up user data SGPRs
   while (userDataIdx < userDataCount) {
-    assert(args.size() < argCount);
+    assert(xfbFetcherArgs.size() < xfbFetcherArgCount);
 
-    auto arg = (argBegin + args.size());
-    assert(arg->hasAttribute(Attribute::InReg));
+    auto xfbFetcherArg = (xfbFetcherArgBegin + xfbFetcherArgs.size());
+    assert(xfbFetcherArg->hasAttribute(Attribute::InReg));
 
-    auto argTy = arg->getType();
-    if (argTy->isVectorTy()) {
-      assert(cast<VectorType>(argTy)->getElementType()->isIntegerTy());
+    auto xfbFetcherArgTy = xfbFetcherArg->getType();
+    if (xfbFetcherArgTy->isVectorTy()) {
+      assert(cast<VectorType>(xfbFetcherArgTy)->getElementType()->isIntegerTy());
 
-      const unsigned userDataSize = cast<FixedVectorType>(argTy)->getNumElements();
+      const unsigned userDataSize = cast<FixedVectorType>(xfbFetcherArgTy)->getNumElements();
 
       std::vector<int> shuffleMask;
       for (unsigned i = 0; i < userDataSize; ++i)
         shuffleMask.push_back(userDataIdx + i);
 
-      args.push_back(m_builder.CreateShuffleVector(userData, userData, shuffleMask));
+      xfbFetcherArgs.push_back(m_builder.CreateShuffleVector(userData, userData, shuffleMask));
       userDataIdx += userDataSize;
     } else {
-      assert(argTy->isIntegerTy());
-      args.push_back(m_builder.CreateExtractElement(userData, userDataIdx));
+      assert(xfbFetcherArgTy->isIntegerTy());
+      xfbFetcherArgs.push_back(m_builder.CreateExtractElement(userData, userDataIdx));
       ++userDataIdx;
     }
   }
@@ -7188,43 +7199,44 @@ Value *NggPrimShader::fetchXfbOutput(Module *module, Argument *sysValueStart,
   if (m_hasTes) {
     // Set up system value SGPRs
     if (m_pipelineState->isTessOffChip()) {
-      args.push_back(isOffChip);
-      args.push_back(offChipLdsBase);
+      Value *isOffChip = PoisonValue::get(m_builder.getInt32Ty()); // Unused
+      xfbFetcherArgs.push_back(isOffChip);
+      xfbFetcherArgs.push_back(offChipLdsBase);
     }
 
     // Set up system value VGPRs
-    args.push_back(tessCoordX);
-    args.push_back(tessCoordY);
-    args.push_back(relPatchId);
-    args.push_back(patchId);
+    xfbFetcherArgs.push_back(tessCoordX);
+    xfbFetcherArgs.push_back(tessCoordY);
+    xfbFetcherArgs.push_back(relPatchId);
+    xfbFetcherArgs.push_back(patchId);
   } else {
     // Set up system value VGPRs
-    args.push_back(vertexId);
-    args.push_back(relVertexId);
-    args.push_back(vsPrimitiveId);
-    args.push_back(instanceId);
+    xfbFetcherArgs.push_back(vertexId);
+    xfbFetcherArgs.push_back(relVertexId);
+    xfbFetcherArgs.push_back(vsPrimitiveId);
+    xfbFetcherArgs.push_back(instanceId);
 
     if (m_nggControl->passthroughMode) {
-      // When tessellation is not enabled, the ES is actually a fetchless VS. Then, we need to add arguments for the
-      // vertex fetches. Also set the name of each vertex fetch primitive shader argument while we're here.
+      // When tessellation is not enabled, the transform feedback fetch function is actually a fetchless VS. Then, we
+      // need to add arguments for the vertex fetches. Also set the name of each vertex fetch primitive shader argument
+      // while we're here.
       unsigned vertexFetchCount = m_pipelineState->getPalMetadata()->getVertexFetchCount();
-      if (vertexFetchCount != 0) {
-        // The last vertexFetchCount arguments of the primitive shader and ES are the vertex fetches
-        Function *primShader = m_builder.GetInsertBlock()->getParent();
-        unsigned primArgCount = primShader->arg_size();
-        for (unsigned i = 0; i != vertexFetchCount; ++i) {
-          Argument *vertexFetch = primShader->getArg(primArgCount - vertexFetchCount + i);
-          vertexFetch->setName(
-              xfbOutputFetchFunc->getArg(argCount - vertexFetchCount + i)->getName()); // Copy argument name
-          args.push_back(vertexFetch);
+      if (vertexFetchCount > 0) {
+        ArrayRef<Argument *> vertexFetches = vgprArgs.drop_front(m_gfxIp.major <= 11 ? 9 : 7);
+        assert(vertexFetches.size() == vertexFetchCount);
+
+        for (unsigned i = 0; i < vertexFetchCount; ++i) {
+          vertexFetches[i]->setName(
+              xfbFetcher->getArg(xfbFetcherArgCount - vertexFetchCount + i)->getName()); // Copy argument name
+          xfbFetcherArgs.push_back(vertexFetches[i]);
         }
       }
     }
   }
 
-  assert(args.size() == argCount); // Must have visit all arguments
+  assert(xfbFetcherArgs.size() == xfbFetcherArgCount); // Must have visit all arguments
 
-  return m_builder.CreateCall(xfbOutputFetchFunc, args);
+  return m_builder.CreateCall(xfbFetcher, xfbFetcherArgs);
 }
 
 // =====================================================================================================================
