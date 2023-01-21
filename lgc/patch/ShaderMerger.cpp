@@ -281,7 +281,7 @@ FunctionType *ShaderMerger::generateLsHsEntryPointType(uint64_t *inRegMask) cons
   argTys.push_back(Type::getInt32Ty(*m_context)); // Vertex ID
   if (m_gfxIp.major <= 11) {
     argTys.push_back(Type::getInt32Ty(*m_context)); // Relative vertex ID (auto index)
-    argTys.push_back(Type::getInt32Ty(*m_context)); // Step rate
+    argTys.push_back(Type::getInt32Ty(*m_context)); // Unused
   }
   argTys.push_back(Type::getInt32Ty(*m_context)); // Instance ID
 
@@ -404,13 +404,16 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
 
   // LS VGPRs
   Value *vertexId = vgprArgs[2];
-  Value *relVertexId = PoisonValue::get(builder.getInt32Ty());
-  Value *stepRate = PoisonValue::get(builder.getInt32Ty());
+  Value *relVertexId = nullptr;
+  Value *stepRate = PoisonValue::get(builder.getInt32Ty()); // Unused
+  Value *instanceId = nullptr;
+
   if (m_gfxIp.major <= 11) {
     relVertexId = vgprArgs[3];
-    stepRate = vgprArgs[4];
+    instanceId = vgprArgs[5];
+  } else {
+    llvm_unreachable("Not implemented!");
   }
-  Value *instanceId = m_gfxIp.major <= 11 ? vgprArgs[5] : vgprArgs[3];
 
   // Vertex fetch VGPRs
   ArrayRef<Argument *> vertexFetches = vgprArgs.drop_front(m_gfxIp.major <= 11 ? 6 : 4);

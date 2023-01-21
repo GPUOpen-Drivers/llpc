@@ -952,6 +952,8 @@ void ConfigBuilder::buildLsHsRegConfig(ShaderStage shaderStage1, ShaderStage sha
       lsVgprCompCnt = 3; // Enable all LS VGPRs (LS VGPR2 - VGPR5)
     else
       lsVgprCompCnt = 1; // Must enable relative vertex ID (LS VGPR2 and VGPR3)
+  } else {
+    llvm_unreachable("Not implemented!");
   }
   SET_REG_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC1_HS, LS_VGPR_COMP_CNT, lsVgprCompCnt);
 
