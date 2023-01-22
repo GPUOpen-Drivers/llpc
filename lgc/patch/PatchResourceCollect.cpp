@@ -32,7 +32,6 @@
 #include "Gfx6Chip.h"
 #include "Gfx9Chip.h"
 #include "MeshTaskShader.h"
-#include "NggLdsManager.h"
 #include "NggPrimShader.h"
 #include "lgc/Builder.h"
 #include "lgc/state/IntrinsDefs.h"
@@ -628,15 +627,15 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
       const unsigned gsVsRingItemSize =
           hasGs ? std::max(1u, 4 * gsResUsage->inOutUsage.outputMapLocCount * geometryMode.outputVertices) : 0;
 
-      const unsigned esExtraLdsSize = NggLdsManager::calcEsExtraLdsSize(m_pipelineState) / 4; // In dwords
-      const unsigned gsExtraLdsSize = NggLdsManager::calcGsExtraLdsSize(m_pipelineState) / 4; // In dwords
+      const auto &ldsGeneralUsage = NggPrimShader::layoutPrimShaderLds(m_pipelineState);
+      const bool needsLds = ldsGeneralUsage.needsLds;
+      const unsigned esExtraLdsSize = ldsGeneralUsage.esExtraLdsSize / sizeof(unsigned); // In dwords
+      const unsigned gsExtraLdsSize = ldsGeneralUsage.gsExtraLdsSize / sizeof(unsigned); // In dwords
 
       // NOTE: Primitive amplification factor must be at least 1. And for NGG GS mode, we force number of output
       // primitives to be equal to that of output vertices regardless of the output primitive type by emitting
       // invalid primitives. This is to simplify the algorithmic design of NGG GS and improve its efficiency.
       unsigned primAmpFactor = std::max(1u, geometryMode.outputVertices);
-
-      const bool needsLds = NggLdsManager::needsLds(m_pipelineState);
 
       unsigned esVertsPerSubgroup = 0;
       unsigned gsPrimsPerSubgroup = 0;

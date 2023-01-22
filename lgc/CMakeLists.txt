@@ -188,7 +188,6 @@ target_sources(LLVMlgc PRIVATE
     patch/Gfx9Chip.cpp
     patch/Gfx9ConfigBuilder.cpp
     patch/MeshTaskShader.cpp
-    patch/NggLdsManager.cpp
     patch/NggPrimShader.cpp
     patch/Patch.cpp
     patch/PatchBufferOp.cpp
