@@ -30,7 +30,6 @@
  */
 #pragma once
 
-#include "NggLdsManager.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/IR/Module.h"
@@ -38,7 +37,6 @@
 namespace lgc {
 
 struct NggControl;
-class NggLdsManager;
 class PipelineState;
 
 // Represents constant buffer offsets (in bytes) of viewport controls in primitive shader table.
@@ -160,14 +158,41 @@ struct XfbOutputExport {
   } locInfo;           // Output location info in GS-VS ring (just for GS)
 };
 
+// Enumerates the LDS regions used by primitive shader
+enum class PrimShaderLdsRegion : unsigned {
+  DistributedPrimitiveId, // Distributed primitive ID
+  XfbOutput,              // Transform feedback outputs
+  VertexPosition,         // Vertex position
+  VertexCullInfo,         // Vertex cull info
+  XfbStats,               // Transform feedback statistics
+  VertexCounts,           // Vertex counts in waves and in NGG subgroup
+  VertexIndexMap,         // Vertex index map (compacted -> uncompacted)
+  EsGsRing,               // ES-GS ring
+  PrimitiveData,          // Primitive connectivity data
+  PrimitiveCounts,        // Primitive counts in waves and in NGG subgroup
+  PrimitiveIndexMap,      // Primitive index map (compacted -> uncompacted)
+  GsVsRing,               // GS-VS ring
+};
+
+// Represents LDS usage info of primitive shader
+struct PrimShaderLdsUsageInfo {
+  bool needsLds;           // Whether primitive shader needs LDS for operations
+  unsigned esExtraLdsSize; // ES extra LDS size in bytes
+  unsigned gsExtraLdsSize; // GS extra LDS size in bytes
+};
+
+// Map: LDS region -> <region Offset, region Size>
+typedef std::unordered_map<PrimShaderLdsRegion, std::pair<unsigned, unsigned>> PrimShaderLdsLayout;
+
 // =====================================================================================================================
 // Represents the manager of NGG primitive shader.
 class NggPrimShader {
 public:
   NggPrimShader(PipelineState *pipelineState);
-  ~NggPrimShader();
 
   static unsigned calcEsGsRingItemSize(PipelineState *pipelineState);
+  static PrimShaderLdsUsageInfo layoutPrimShaderLds(PipelineState *pipelineState,
+                                                    PrimShaderLdsLayout *ldsLayout = nullptr);
 
   llvm::Function *generate(llvm::Function *esEntryPoint, llvm::Function *gsEntryPoint,
                            llvm::Function *copyShaderEntryPoint);
@@ -225,9 +250,9 @@ private:
   llvm::Function *createGsEmitHandler(llvm::Module *module);
   llvm::Function *createGsCutHandler(llvm::Module *module);
 
-  llvm::Value *readPerThreadDataFromLds(llvm::Type *readDataTy, llvm::Value *threadId, NggLdsRegionType region,
+  llvm::Value *readPerThreadDataFromLds(llvm::Type *readDataTy, llvm::Value *threadId, PrimShaderLdsRegion region,
                                         unsigned offsetInRegion = 0, bool useDs128 = false);
-  void writePerThreadDataToLds(llvm::Value *writeData, llvm::Value *threadId, NggLdsRegionType region,
+  void writePerThreadDataToLds(llvm::Value *writeData, llvm::Value *threadId, PrimShaderLdsRegion region,
                                unsigned offsetInRegion = 0, bool useDs128 = false);
 
   llvm::Value *readVertexCullInfoFromLds(llvm::Type *readDataTy, llvm::Value *vertexItemOffset, unsigned dataOffset);
@@ -291,14 +316,21 @@ private:
                            const llvm::Twine &name = "");
   void createFenceAndBarrier();
 
+  unsigned getLdsRegionStart(PrimShaderLdsRegion region) {
+    assert(m_ldsLayout.count(region) > 0);
+    return m_ldsLayout[region].first;
+  }
+
+  llvm::Value *readValueFromLds(llvm::Type *readTy, llvm::Value *ldsOffset, bool useDs128 = false);
+  void writeValueToLds(llvm::Value *writeValue, llvm::Value *ldsOffset, bool useDs128 = false);
+  void atomicAdd(llvm::Value *valueToAdd, llvm::Value *ldsOffset);
+
   static const unsigned NullPrim = (1u << 31); // Null primitive data (invalid)
 
   PipelineState *m_pipelineState = nullptr; // Pipeline state
   GfxIpVersion m_gfxIp;                     // Graphics IP version info
 
   const NggControl *m_nggControl = nullptr; // NGG control settings
-
-  NggLdsManager *m_ldsManager = nullptr; // NGG LDS manager
 
   // NGG inputs (from system values or derived from them)
   struct {
@@ -348,6 +380,9 @@ private:
   VertexCullInfoOffsets m_vertCullInfoOffsets;   // A collection of offsets within an item of vertex cull info
 
   llvm::IRBuilder<> m_builder; // LLVM IR builder
+
+  llvm::GlobalValue *m_lds = nullptr; // Global variable to model primitive shader LDS
+  PrimShaderLdsLayout m_ldsLayout;    // Primitive shader LDS layout
 };
 
 } // namespace lgc
