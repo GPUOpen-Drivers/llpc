@@ -67,7 +67,7 @@ protected:
   bool supportDppRowXmask() const;
 
   // Get whether the context we are building in support the bpermute operation.
-  bool supportBPermute() const;
+  bool supportWaveWideBPermute() const;
 
   // Get whether the context we are building in supports permute lane DPP operations.
   bool supportPermLaneDpp() const;

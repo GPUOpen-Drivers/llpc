@@ -316,7 +316,7 @@ Value *SubgroupBuilder::CreateSubgroupBallotFindMsb(Value *const value, const Tw
 // @param index : The index to shuffle from.
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupShuffle(Value *const value, Value *const index, const Twine &instName) {
-  if (supportBPermute()) {
+  if (supportWaveWideBPermute()) {
     auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
                       ArrayRef<Value *> passthroughArgs) -> Value * {
       return builder.CreateIntrinsic(Intrinsic::amdgcn_ds_bpermute, {}, {passthroughArgs[0], mappedArgs[0]});
@@ -325,6 +325,27 @@ Value *SubgroupBuilder::CreateSubgroupShuffle(Value *const value, Value *const i
     // The ds_bpermute intrinsic requires the index be multiplied by 4.
     return CreateMapToInt32(mapFunc, value, CreateMul(index, getInt32(4)));
   }
+
+  if (supportPermLane64Dpp()) {
+    auto permuteFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
+                          ArrayRef<Value *> passthroughArgs) -> Value * {
+      return builder.CreateIntrinsic(Intrinsic::amdgcn_permlane64, {}, {mappedArgs[0]});
+    };
+
+    auto swapped = CreateMapToInt32(permuteFunc, value, {});
+
+    auto bPermFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
+                        ArrayRef<Value *> passthroughArgs) -> Value * {
+      return builder.CreateIntrinsic(Intrinsic::amdgcn_ds_bpermute, {}, {passthroughArgs[0], mappedArgs[0]});
+    };
+
+    auto bPermValuesLo = CreateMapToInt32(bPermFunc, value, CreateMul(index, getInt32(4)));
+    auto bPermValuesHi = CreateMapToInt32(bPermFunc, swapped, CreateMul(index, getInt32(4)));
+
+    auto const indexLessThan32 = CreateICmpULT(index, getInt32(32));
+    return CreateSelect(indexLessThan32, bPermValuesLo, bPermValuesHi);
+  }
+
   auto mapFunc = [this](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
                         ArrayRef<Value *> passthroughArgs) -> Value * {
     Value *const readlane =
