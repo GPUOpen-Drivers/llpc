@@ -155,6 +155,7 @@ def main():
                       help='The name of the tool used to generate the test case (defaults to "amdllpc")')
   parser.add_argument('--tool-binary',
                       help='The tool binary used to generate the test case')
+  parser.add_argument('--function', help='Only update functions whose name matches the given regex')
   parser.add_argument('-p', '--preserve-names', action='store_true',
                       help='Do not scrub IR names')
   parser.add_argument('--function-signature', action='store_true',
@@ -290,8 +291,20 @@ def main():
                                prefix_list, output_lines, global_vars_seen_dict,
                                args.preserve_names, True)
 
+    # Filter out functions
+    func_order = builder.func_order()
+    if ti.args.function:
+      filter_re = re.compile(ti.args.function)
+      new_func_order = {}
+      for prefix, func_names in func_order.items():
+        new_func_order[prefix] = [
+          func_name for func_name in func_names
+          if filter_re.search(func_name)
+        ]
+      func_order = new_func_order
+
     # Now generate all the checks.
-    common.add_checks_at_end(output_lines, prefix_list, builder.func_order(),
+    common.add_checks_at_end(output_lines, prefix_list, func_order,
                              ti.comment_prefix, lambda my_output_lines, prefixes, func:
                              add_checks(my_output_lines, ti.comment_prefix,
                                         prefixes, func_dict, func,
