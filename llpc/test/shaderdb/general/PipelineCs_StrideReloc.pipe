@@ -1,13 +1,11 @@
 // This test case checks that stride relocation is generated correctly for array of textures.
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
-  // Test that correct relocated offsets are in the linked texture fetching code.
+  // Test that correct stride is in the linked texture fetching code.
 ; SHADERTEST-LABEL: 0000000000000000 <_amdgpu_cs_main>:
-  // Matching the texture index
-; SHADERTEST-DAG: v_readfirstlane_b32 s[[TEXINDEX:[0-9]+]], v{{[0-9]+}} //{{.*}}
-  // Check that correct stride value is multiplied onto the index
-; SHADERTEST-DAG: s_add_i32 s[[TEXINDEX2:[0-9]+]], s[[TEXINDEX]], s{{[0-9]+}}
-; SHADERTEST-DAG: s_mul_i32 s{{[0-9]+}}, s[[TEXINDEX2]], 48 //{{.*}}
+; SHADERTEST-NOT: s_mul
+; SHADERTEST: s_mul_i32 s{{[0-9]+}}, s{{[0-9]+}}, 48 //{{.*}}
+; SHADERTEST-NOT: s_mul
 ; END_SHADERTEST
 
 ; BEGIN_SHADERTEST
