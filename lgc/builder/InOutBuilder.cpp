@@ -974,31 +974,29 @@ Value *InOutBuilder::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo i
 // @returns : gl_Barycoord
 Value *InOutBuilder::normalizeBaryCoord(Value *iJCoord) {
   auto baryType = FixedVectorType::get(getFloatTy(), 3);
-  Value *barycoord = UndefValue::get(baryType);
   auto one = ConstantFP::get(getFloatTy(), 1.0);
   auto zero = ConstantFP::get(getFloatTy(), 0.0);
 
-  auto iCoord = CreateExtractElement(iJCoord, uint64_t(0));
-  auto jCoord = CreateExtractElement(iJCoord, 1);
-  auto kCoord = CreateFSub(ConstantFP::get(getFloatTy(), 1.0), iCoord);
-  kCoord = CreateFSub(kCoord, jCoord);
+  Value *hwCoord[3] = {};
+  hwCoord[0] = CreateExtractElement(iJCoord, uint64_t(0));
+  hwCoord[1] = CreateExtractElement(iJCoord, 1);
+  hwCoord[2] = CreateFSub(CreateFSub(one, hwCoord[0]), hwCoord[1]);
 
   auto primType = m_pipelineState->getPrimitiveType();
   auto provokingVertexMode = m_pipelineState->getRasterizerState().provokingVertexMode;
+  Value *normalized[3] = {zero, zero, zero};
   switch (primType) {
   case PrimitiveType::Point: {
-    // Points
-    barycoord = ConstantVector::get({one, zero, zero});
+    normalized[0] = one;
     break;
   }
   case PrimitiveType::LineList:
   case PrimitiveType::LineStrip: {
     // Lines
     // The weight of vertex0 is (1 - i - j), the weight of vertex1 is (i + j).
-    auto yCoord = CreateFAdd(iCoord, jCoord);
-    barycoord = CreateInsertElement(barycoord, kCoord, uint64_t(0));
-    barycoord = CreateInsertElement(barycoord, yCoord, 1);
-    barycoord = CreateInsertElement(barycoord, zero, 2);
+    auto yCoord = CreateFAdd(hwCoord[0], hwCoord[1]);
+    normalized[0] = hwCoord[2];
+    normalized[1] = yCoord;
     break;
   }
   case PrimitiveType::TriangleList: {
@@ -1006,15 +1004,13 @@ Value *InOutBuilder::normalizeBaryCoord(Value *iJCoord) {
     // V0 ==> Attr_indx2
     // V1 ==> Attr_indx0
     // V2 ==> Attr_indx1
-    barycoord = CreateInsertElement(barycoord, iCoord, 2);
-    barycoord = CreateInsertElement(barycoord, jCoord, uint64_t(0));
-    barycoord = CreateInsertElement(barycoord, kCoord, 1);
+    normalized[0] = hwCoord[1];
+    normalized[1] = hwCoord[2];
+    normalized[2] = hwCoord[0];
     break;
   }
   default: {
     unsigned oddOffset = 0, evenOffset = 0;
-    Value *odd = UndefValue::get(baryType);
-    Value *even = UndefValue::get(baryType);
     switch (primType) {
     case PrimitiveType::TriangleFan: {
       oddOffset = provokingVertexMode == ProvokingVertexLast ? 0 : 2;
@@ -1037,21 +1033,22 @@ Value *InOutBuilder::normalizeBaryCoord(Value *iJCoord) {
       break;
     }
     }
-    odd = CreateInsertElement(odd, iCoord, oddOffset % 3);
-    odd = CreateInsertElement(odd, jCoord, (1 + oddOffset) % 3);
-    odd = CreateInsertElement(odd, kCoord, (2 + oddOffset) % 3);
-
-    even = CreateInsertElement(even, iCoord, evenOffset % 3);
-    even = CreateInsertElement(even, jCoord, (1 + evenOffset) % 3);
-    even = CreateInsertElement(even, kCoord, (2 + evenOffset) % 3);
 
     // Select between them.
     Value *primitiveId = readBuiltIn(false, BuiltInPrimitiveId, {}, nullptr, nullptr, "");
     Value *parity = CreateTrunc(primitiveId, Type::getInt1Ty(getContext()));
-    barycoord = CreateSelect(parity, odd, even);
+    for (unsigned i = 0; i < 3; ++i) {
+      Value *odd = hwCoord[(i - oddOffset + 3) % 3];
+      Value *even = hwCoord[(i - evenOffset + 3) % 3];
+      normalized[i] = CreateSelect(parity, odd, even);
+    }
     break;
   }
   }
+
+  Value *barycoord = PoisonValue::get(baryType);
+  for (unsigned i = 0; i < 3; ++i)
+    barycoord = CreateInsertElement(barycoord, normalized[i], i);
   return barycoord;
 }
 
