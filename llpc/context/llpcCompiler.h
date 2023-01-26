@@ -193,8 +193,9 @@ private:
                                           const GraphicsPipelineBuildInfo *pipelineInfo);
   bool canUseRelocatableComputeShaderElf(const ComputePipelineBuildInfo *pipelineInfo);
 #if VKI_RAY_TRACING
-  Result buildRayTracingPipelineInternal(Context *context, llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo,
-                                         bool unlinked, std::vector<ElfPackage> &pipelineElfs,
+  Result buildRayTracingPipelineInternal(RayTracingContext &rtContext,
+                                         llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo, bool unlinked,
+                                         std::vector<ElfPackage> &pipelineElfs,
                                          std::vector<Vkgc::RayTracingShaderProperty> &shaderProps,
                                          IHelperThreadProvider *helperThreadProvider);
   void addRayTracingIndirectPipelineMetadata(ElfPackage *pipelineElf);
