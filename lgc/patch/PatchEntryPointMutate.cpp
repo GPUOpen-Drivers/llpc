@@ -358,7 +358,7 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
           // index.
           const ResourceNode *node;
           node = m_pipelineState->findResourceNode(searchType, set, binding).first;
-          if(!node) {
+          if (!node) {
             // Handle mutable descriptors
             node = m_pipelineState->findResourceNode(ResourceNodeType::Unknown, set, binding).first;
           }
