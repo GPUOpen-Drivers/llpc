@@ -2274,22 +2274,39 @@ void NggPrimShader::initWaveThreadInfo(Value *mergedGroupInfo, Value *mergedWave
 void NggPrimShader::loadStreamOutBufferInfo(Value *userData) {
   assert(m_gfxIp.major >= 11 && m_pipelineState->enableSwXfb()); // Must be GFX11+ and enable SW emulated stream-out
 
-  // Get stream-out table pointer and stream-out control buffer pointer
-  unsigned indexOfStreamOutTablePtr = InvalidValue;
-  unsigned indexOfStreamOutControlBufPtr = InvalidValue;
-  if (m_hasGs) {
-    const auto &entryArgIdx = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
-    indexOfStreamOutTablePtr = entryArgIdx.streamOutData.tablePtr;
-    indexOfStreamOutControlBufPtr = entryArgIdx.streamOutData.controlBufPtr;
-  } else if (m_hasTes) {
-    const auto &entryArgIdx = m_pipelineState->getShaderInterfaceData(ShaderStageTessEval)->entryArgIdxs.tes;
-    indexOfStreamOutTablePtr = entryArgIdx.streamOutData.tablePtr;
-    indexOfStreamOutControlBufPtr = entryArgIdx.streamOutData.controlBufPtr;
-  } else {
-    const auto &entryArgIdx = m_pipelineState->getShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
-    indexOfStreamOutTablePtr = entryArgIdx.streamOutData.tablePtr;
-    indexOfStreamOutControlBufPtr = entryArgIdx.streamOutData.controlBufPtr;
-  }
+  // Helper to convert argument index to user data index
+  auto getUserDataIndex = [&](Function *func, unsigned argIndex) {
+    // Traverse all arguments prior to the argument specified by argIndex. All of them should be user data.
+    unsigned userDataIndex = 0;
+    for (unsigned i = 0; i < argIndex; ++i) {
+      auto argTy = func->getArg(i)->getType();
+      if (argTy->isVectorTy()) {
+        assert(cast<FixedVectorType>(argTy)->getElementType()->isIntegerTy());
+        userDataIndex += cast<FixedVectorType>(argTy)->getNumElements();
+      } else {
+        assert(argTy->isIntegerTy());
+        ++userDataIndex;
+      }
+    }
+    return userDataIndex;
+  };
+
+  // Get stream-out table pointer value and stream-out control buffer pointer value
+  const auto gsOrEsEntryPoint = m_builder.GetInsertBlock()->getModule()->getFunction(
+      m_hasGs ? lgcName::NggGsEntryPoint : lgcName::NggEsEntryPoint);
+  StreamOutData streamOutData = {};
+  if (m_hasGs)
+    streamOutData = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs.streamOutData;
+  else if (m_hasTes)
+    streamOutData = m_pipelineState->getShaderInterfaceData(ShaderStageTessEval)->entryArgIdxs.tes.streamOutData;
+  else
+    streamOutData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs.streamOutData;
+
+  assert(userData->getType()->isVectorTy());
+  auto streamOutTablePtrValue =
+      m_builder.CreateExtractElement(userData, getUserDataIndex(gsOrEsEntryPoint, streamOutData.tablePtr));
+  auto streamOutControlBufPtrValue =
+      m_builder.CreateExtractElement(userData, getUserDataIndex(gsOrEsEntryPoint, streamOutData.controlBufPtr));
 
   // Helper to make a pointer from its integer address value and the type
   auto makePointer = [&](Value *ptrValue, Type *ptrTy) {
@@ -2307,19 +2324,15 @@ void NggPrimShader::loadStreamOutBufferInfo(Value *userData) {
   auto streamOutTableTy = ArrayType::get(streamOutBufDescTy, MaxTransformFeedbackBuffers);
   auto streamOutTablePtrTy = PointerType::get(streamOutTableTy, ADDR_SPACE_CONST);
 
-  assert(userData->getType()->isVectorTy());
-  auto streamOutTablePtr =
-      makePointer(m_builder.CreateExtractElement(userData, indexOfStreamOutTablePtr), streamOutTablePtrTy);
+  auto streamOutTablePtr = makePointer(streamOutTablePtrValue, streamOutTablePtrTy);
 
   // NOTE: The stream-out control buffer has the following memory layout:
   //   OFFSET[X]: OFFSET0, OFFSET1, ..., OFFSETN
   //   FILLED_SIZE[X]: FILLED_SIZE0, FILLED_SIZE1, ..., FILLED_SIZEN
-  auto streamOutControlBufTy =
-      ArrayType::get(FixedVectorType::get(m_builder.getInt32Ty(), MaxTransformFeedbackBuffers), 2);
+  auto streamOutControlBufTy = ArrayType::get(ArrayType::get(m_builder.getInt32Ty(), MaxTransformFeedbackBuffers), 2);
   auto streamOutControlBufPtrTy = PointerType::get(streamOutControlBufTy, ADDR_SPACE_CONST);
 
-  auto streamOutControlBufPtr =
-      makePointer(m_builder.CreateExtractElement(userData, indexOfStreamOutControlBufPtr), streamOutControlBufPtrTy);
+  auto streamOutControlBufPtr = makePointer(streamOutControlBufPtrValue, streamOutControlBufPtrTy);
 
   const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
   for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
