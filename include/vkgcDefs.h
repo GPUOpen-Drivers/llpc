@@ -368,6 +368,8 @@ struct ResourceMappingNode {
 
   unsigned sizeInDwords;   ///< Size of this node in dword
   unsigned offsetInDwords; ///< Offset of this node (from the beginning of the resource mapping table) in dword
+  unsigned strideInDwords; ///< Stride of elements in a descriptor array (used for mutable descriptors)
+                           ///  a stride of zero will use the type of the node to determine the stride
 
   union {
     /// Info for generic descriptor nodes (DescriptorResource, DescriptorSampler, DescriptorCombinedTexture,

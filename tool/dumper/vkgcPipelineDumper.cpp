@@ -497,6 +497,7 @@ void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userData
   dumpFile << prefix << ".type = " << userDataNode->type << "\n";
   dumpFile << prefix << ".offsetInDwords = " << userDataNode->offsetInDwords << "\n";
   dumpFile << prefix << ".sizeInDwords = " << userDataNode->sizeInDwords << "\n";
+  dumpFile << prefix << ".strideInDwords = " << userDataNode->strideInDwords << "\n";
 
   switch (userDataNode->type) {
   case ResourceMappingNodeType::DescriptorResource:
@@ -532,6 +533,10 @@ void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userData
     break;
   }
   case ResourceMappingNodeType::StreamOutTableVaPtr: {
+    break;
+  }
+  case ResourceMappingNodeType::Unknown: {
+    // Mutable descriptors
     break;
   }
   default: {
@@ -1714,6 +1719,7 @@ void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode 
   hasher->Update(userDataNode->type);
   hasher->Update(userDataNode->sizeInDwords);
   hasher->Update(userDataNode->offsetInDwords);
+  hasher->Update(userDataNode->strideInDwords);
   switch (userDataNode->type) {
   case ResourceMappingNodeType::DescriptorResource:
   case ResourceMappingNodeType::DescriptorSampler:
