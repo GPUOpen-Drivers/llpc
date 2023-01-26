@@ -87,31 +87,53 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
       abstractType = ResourceNodeType::DescriptorBufferCompact;
 
     std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding);
+    if (!node) {
+      // If we can't find the node, assume mutable descriptor and search for any node.
+      std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding);
+      if(!node) {
+        // We did not find the resource node. Return an undef value.
+        return UndefValue::get(getBufferDescTy(pointeeTy));
+      }
+    }
     assert(node && "missing resource node");
 
     if (node == topNode && isa<Constant>(descIndex) && node->concreteType != ResourceNodeType::InlineBuffer) {
-      // Handle a descriptor in the root table (a "dynamic descriptor") specially, as long as it is not variably
-      // indexed and is not an InlineBuffer. This lgc.root.descriptor call is by default lowered in
-      // PatchEntryPointMutate into a load from the spill table, but it might be able to "unspill" it to
-      // directly use shader entry SGPRs.
-      // TODO: Handle root InlineBuffer specially in a similar way to PushConst. The default handling is
-      // suboptimal as it always loads from the spill table.
-      Type *descTy = getDescTy(node->concreteType);
-      std::string callName = lgcName::RootDescriptor;
-      addTypeMangling(descTy, {}, callName);
-      unsigned dwordSize = descTy->getPrimitiveSizeInBits() / 32;
-      unsigned dwordOffset = cast<ConstantInt>(descIndex)->getZExtValue() * dwordSize;
-      if (dwordOffset + dwordSize > node->sizeInDwords) {
-        // Index out of range
-        desc = UndefValue::get(descTy);
-      } else {
+      if (return64Address) {
+        assert(node->concreteType == ResourceNodeType::DescriptorBufferCompact);
+        return CreateBitCast(desc, getInt64Ty());
+      }
+      // If the node is a mutable descriptor create call
+      if (node->concreteType == ResourceNodeType::Unknown) {
+        Type *descTy = getInt8Ty()->getPointerTo(ADDR_SPACE_BUFFER_FAT_POINTER);
+        std::string callName = lgcName::RootDescriptor;
+        addTypeMangling(descTy, {}, callName);
+        unsigned dwordSize = 2;
+        unsigned dwordOffset = cast<ConstantInt>(descIndex)->getZExtValue() * dwordSize;
         dwordOffset += node->offsetInDwords;
         dwordOffset += (binding - node->binding) * node->stride;
         desc = CreateNamedCall(callName, descTy, getInt32(dwordOffset), Attribute::ReadNone);
       }
-      if (return64Address) {
-        assert(node->concreteType == ResourceNodeType::DescriptorBufferCompact);
-        return CreateBitCast(desc, getInt64Ty());
+      else
+      {
+        // Handle a descriptor in the root table (a "dynamic descriptor") specially, as long as it is not variably
+        // indexed and is not an InlineBuffer. This lgc.root.descriptor call is by default lowered in
+        // PatchEntryPointMutate into a load from the spill table, but it might be able to "unspill" it to
+        // directly use shader entry SGPRs.
+        // TODO: Handle root InlineBuffer specially in a similar way to PushConst. The default handling is
+        // suboptimal as it always loads from the spill table.
+        Type *descTy = getDescTy(node->concreteType);
+        std::string callName = lgcName::RootDescriptor;
+        addTypeMangling(descTy, {}, callName);
+        unsigned dwordSize = descTy->getPrimitiveSizeInBits() / 32;
+        unsigned dwordOffset = cast<ConstantInt>(descIndex)->getZExtValue() * dwordSize;
+        if (dwordOffset + dwordSize > node->sizeInDwords) {
+          // Index out of range
+          desc = UndefValue::get(descTy);
+        } else {
+          dwordOffset += node->offsetInDwords;
+          dwordOffset += (binding - node->binding) * node->stride;
+          desc = CreateNamedCall(callName, descTy, getInt32(dwordOffset), Attribute::ReadNone);
+        }
       }
     } else if (node->concreteType == ResourceNodeType::InlineBuffer) {
       // Handle an inline buffer specially. Get a pointer to it, then expand to a descriptor.
@@ -124,6 +146,17 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
     if (node) {
       ResourceNodeType resType = node->concreteType;
       ResourceNodeType abstractType = node->abstractType;
+
+      // Handle mutable descriptors
+      if(resType == ResourceNodeType::Unknown)
+      {
+        resType = ResourceNodeType::DescriptorBuffer;
+      }
+      if(abstractType == ResourceNodeType::Unknown)
+      {
+        abstractType = ResourceNodeType::DescriptorBuffer;
+      }
+
       Value *descPtr = getDescPtr(resType, abstractType, descSet, binding, topNode, node);
       // Index it.
       if (descIndex != getInt32(0)) {
@@ -210,10 +243,20 @@ Value *DescBuilder::CreateGetDescStride(ResourceNodeType concreteType, ResourceN
   if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
     std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding);
     if (!node && m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding).second) {
-      // NOTE: Resource node may be DescriptorTexelBuffer, but it is defined as OpTypeSampledImage in SPIRV,
-      // In this case, a caller may search for the DescriptorSampler and not find it. We return nullptr and
-      // expect the caller to handle it.
-      return UndefValue::get(getInt32Ty());
+      if (!node) {
+      // If we can't find the node, assume mutable descriptor and search for any node.
+      std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding);
+      if (!node) {
+        // We did not find the resource node. Return an undef value.
+        return UndefValue::get(getInt32Ty());
+      }
+      if (!node && m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding).second) {
+        // NOTE: Resource node may be DescriptorTexelBuffer, but it is defined as OpTypeSampledImage in SPIRV,
+        // In this case, a caller may search for the DescriptorSampler and not find it. We return nullptr and
+        // expect the caller to handle it.
+        return UndefValue::get(getInt32Ty());
+      }
+      assert(node && "missing resource node");
     }
     assert(node && "missing resource node");
   }
@@ -239,10 +282,20 @@ Value *DescBuilder::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNode
   if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
     std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding);
     if (!node && m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding).second) {
-      // NOTE: Resource node may be DescriptorTexelBuffer, but it is defined as OpTypeSampledImage in SPIRV,
-      // In this case, a caller may search for the DescriptorSampler and not find it. We return nullptr and
-      // expect the caller to handle it.
-      return UndefValue::get(getDescPtrTy(concreteType));
+      if (!node) {
+      // If we can't find the node, assume mutable descriptor and search for any node.
+      std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding);
+      if (!node) {
+        // We did not find the resource node. Return an undef value.
+        return UndefValue::get(getDescPtrTy(concreteType));
+      }
+      if (!node && m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding).second) {
+        // NOTE: Resource node may be DescriptorTexelBuffer, but it is defined as OpTypeSampledImage in SPIRV,
+        // In this case, a caller may search for the DescriptorSampler and not find it. We return nullptr and
+        // expect the caller to handle it.
+        return UndefValue::get(getDescPtrTy(concreteType));
+      }
+      assert(node && "missing resource node");
     }
     assert(node && "missing resource node");
   }

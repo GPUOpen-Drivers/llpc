@@ -358,6 +358,10 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
           // index.
           const ResourceNode *node;
           node = m_pipelineState->findResourceNode(searchType, set, binding).first;
+          if(!node) {
+            // Handle mutable descriptors
+            node = m_pipelineState->findResourceNode(ResourceNodeType::Unknown, set, binding).first;
+          }
           assert(node && "Could not find resource node");
           uint32_t descTableIndex = node - &m_pipelineState->getUserDataNodes().front();
           descriptorTable.resize(std::max(descriptorTable.size(), size_t(descTableIndex + 1)));
