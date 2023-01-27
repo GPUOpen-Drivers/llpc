@@ -17,10 +17,7 @@ jobs:
         image-template: ["amdvlkadmin/amdvlk_%s%s:nightly"]
         branch:         [dev]
         config:         [Release]
-        feature-set:    ["+gcc", "+gcc+assertions",
-                         "+clang",
-                         "+clang+shadercache+ubsan+asan",
-                         "+clang+shadercache+ubsan+asan+assertions",
+        feature-set:    [
                          "+clang+shadercache+tsan"]
         generator:      [Ninja]
     steps:
