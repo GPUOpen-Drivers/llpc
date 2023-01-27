@@ -2326,56 +2326,40 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
   std::vector<Module *> modules(shaderInfo.size());
   mainContext->setBuilder(builderContext->createBuilder(&*pipeline));
 
-  // Create empty modules and set target machine in each.
+  // Read SPIR-V into LLVM modules and perform some initial lowering.
   for (unsigned shaderIndex = 0; shaderIndex < shaderInfo.size() && result == Result::Success; ++shaderIndex) {
     const PipelineShaderInfo *shaderInfoEntry = shaderInfo[shaderIndex];
-    auto moduleName = std::string("_") + getShaderStageAbbreviation(shaderInfoEntry->entryStage) + "_" +
+    auto entryStage = shaderInfoEntry->entryStage;
+    auto moduleName = std::string("_") + getShaderStageAbbreviation(entryStage) + "_" +
                       std::to_string(getModuleIdByIndex(shaderIndex));
     moduleName[1] = std::tolower(moduleName[1]);
     modules[shaderIndex] = new Module(moduleName, *mainContext);
     mainContext->setModuleTargetMachine(modules[shaderIndex]);
 
-    if (!shaderInfoEntry->pModuleData)
-      continue;
-
     std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(builderContext));
     lowerPassMgr->setPassIndex(&passIndex);
     SpirvLower::registerPasses(*lowerPassMgr);
 
-    // SPIR-V translation, then dump the result.
-    lowerPassMgr->addPass(SpirvLowerTranslator(shaderInfoEntry->entryStage, shaderInfoEntry));
-
-    // Run the passes.
-    bool success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
-    if (!success) {
-      LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
-      result = Result::ErrorInvalidShader;
-    }
-  }
-
-  for (unsigned shaderIndex = 0; shaderIndex < shaderInfo.size() && result == Result::Success; ++shaderIndex) {
-    ShaderStage entryStage = shaderInfo[shaderIndex]->entryStage;
-
-    std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(builderContext));
-    lowerPassMgr->setPassIndex(&passIndex);
-    SpirvLower::registerPasses(*lowerPassMgr);
-
-    // Start timer for translate.
     timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, true);
 
-    // OpTerminateRay/OpIgnoreIntersection of anyhit shader and OpReportIntersection of intersection shader could
-    // terminate ray during inbetween of shader execution. So functions in these shaders need to be inlined.
-    if (entryStage == ShaderStageRayTracingAnyHit || entryStage == ShaderStageRayTracingIntersect) {
-      // Lower SPIR-V CFG merges before inlining
-      lowerPassMgr->addPass(SpirvLowerCfgMerges());
-      lowerPassMgr->addPass(AlwaysInlinerPass());
+    if (shaderInfoEntry->pModuleData) {
+      lowerPassMgr->addPass(SpirvLowerTranslator(shaderInfoEntry->entryStage, shaderInfoEntry));
+
+      // OpTerminateRay/OpIgnoreIntersection of anyhit shader and OpReportIntersection of intersection shader could
+      // terminate ray during inbetween of shader execution. So functions in these shaders need to be inlined.
+      if (entryStage == ShaderStageRayTracingAnyHit || entryStage == ShaderStageRayTracingIntersect) {
+        // Lower SPIR-V CFG merges before inlining
+        lowerPassMgr->addPass(SpirvLowerCfgMerges());
+        lowerPassMgr->addPass(AlwaysInlinerPass());
+      }
     }
+
+    // Run this pass unconditionally since it is used to generate the compute shader entry function in an
+    // otherwise empty module.
     lowerPassMgr->addPass(SpirvLowerRayTracing(false));
 
-    // Stop timer for translate.
     timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, false);
 
-    // Run the passes.
     bool success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
     if (!success) {
       LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
