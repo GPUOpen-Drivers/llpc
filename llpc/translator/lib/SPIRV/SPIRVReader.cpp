@@ -2916,7 +2916,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
   // Run over the indices and map the SPIR-V level indices to LLVM indices, which may be different because the LLVM
   // types may contain manual padding fields to model the power of Vulkan's layout options.
   // Additionally, break up the GEP sequence to handle some special cases like row major matrices.
-  for (Value *index : makeArrayRef(srcIndices).drop_front()) {
+  for (Value *index : ArrayRef(srcIndices).drop_front()) {
     switch (spvAccessType->getOpCode()) {
     case OpTypeStruct: {
       ConstantInt *constIndex = cast<ConstantInt>(index);

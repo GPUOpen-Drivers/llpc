@@ -2684,8 +2684,8 @@ void SpirvLowerGlobal::interpolateInputElement(unsigned interpLoc, Value *auxInt
     auto interpPtr = new AllocaInst(inputTy, m_module->getDataLayout().getAllocaAddrSpace(), Twine(),
                                     &*(m_entryPoint->begin()->getFirstInsertionPt()));
     // Load all possibly accessed values
-    auto loadValue = loadDynamicIndexedMembers(inputTy, SPIRAS_Input, makeArrayRef(indexOperands).drop_front(),
-                                               inputMeta, nullptr, interpLoc, auxInterpValue, false);
+    auto loadValue = loadDynamicIndexedMembers(inputTy, SPIRAS_Input, ArrayRef(indexOperands).drop_front(), inputMeta,
+                                               nullptr, interpLoc, auxInterpValue, false);
 
     m_builder->CreateStore(loadValue, interpPtr);
 
