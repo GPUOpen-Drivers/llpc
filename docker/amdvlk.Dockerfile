@@ -75,7 +75,7 @@ COPY docker/update-llpc.sh /vulkandriver/
 WORKDIR /vulkandriver/builds/ci-build
 RUN EXTRA_COMPILER_FLAGS=() \
     && EXTRA_LINKER_FLAGS=() \
-    && EXTRA_FLAGS=("-DXGL_BUILD_CACHE_CREATOR=ON") \
+    && EXTRA_FLAGS=("-DXGL_BUILD_CACHE_CREATOR=OFF") \
     && SANITIZERS=() \
     && if echo "$FEATURES" | grep -q "+gcc" ; then \
          EXTRA_FLAGS+=("-DCMAKE_C_COMPILER=gcc"); \
