@@ -117,7 +117,7 @@ struct VertexCullInfo {
   };
 };
 
-// Represents a collection of LDS offsets (in bytes) within an item of vertex cull info.
+// Represents a collection of LDS offsets (in dwords) within an item of vertex cull info.
 struct VertexCullInfoOffsets {
   //
   // Vertex transform feedback outputs
@@ -177,8 +177,8 @@ enum class PrimShaderLdsRegion : unsigned {
 // Represents LDS usage info of primitive shader
 struct PrimShaderLdsUsageInfo {
   bool needsLds;           // Whether primitive shader needs LDS for operations
-  unsigned esExtraLdsSize; // ES extra LDS size in bytes
-  unsigned gsExtraLdsSize; // GS extra LDS size in bytes
+  unsigned esExtraLdsSize; // ES extra LDS size in dwords
+  unsigned gsExtraLdsSize; // GS extra LDS size in dwords
 };
 
 // Map: LDS region -> <region Offset, region Size>

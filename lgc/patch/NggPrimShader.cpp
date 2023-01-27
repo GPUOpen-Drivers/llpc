@@ -125,12 +125,14 @@ NggPrimShader::NggPrimShader(PipelineState *pipelineState)
 unsigned NggPrimShader::calcEsGsRingItemSize(PipelineState *pipelineState) {
   assert(pipelineState->getNggControl()->enableNgg); // Must enable NGG
 
+  // API GS is present
   if (pipelineState->hasShaderStage(ShaderStageGeometry)) {
     auto resUsage = pipelineState->getShaderResourceUsage(ShaderStageGeometry);
     // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
     return (4 * std::max(1u, resUsage->inOutUsage.inputMapLocCount)) | 1;
   }
 
+  // Passthrough mode is enabled (API GS is not present)
   if (pipelineState->getNggControl()->passthroughMode) {
     unsigned esGsRingItemSize = 1;
 
@@ -147,13 +149,10 @@ unsigned NggPrimShader::calcEsGsRingItemSize(PipelineState *pipelineState) {
     return esGsRingItemSize | 1;
   }
 
+  // Culling mode is enabled (API GS is not present)
   VertexCullInfoOffsets vertCullInfoOffsets = {}; // Dummy offsets (don't care)
-  // For non-GS NGG, in the culling mode, the ES-GS ring item is vertex cull info.
+  // In the culling mode, the ES-GS ring item is vertex cull info.
   unsigned esGsRingItemSize = calcVertexCullInfoSizeAndOffsets(pipelineState, vertCullInfoOffsets);
-
-  // Change it back to dword size
-  assert(esGsRingItemSize % sizeof(unsigned) == 0);
-  esGsRingItemSize /= sizeof(unsigned);
 
   // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
   return esGsRingItemSize | 1;
@@ -170,8 +169,8 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
 
   const auto &calcFactor = pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
 
-  unsigned ldsOffset = 0; // In bytes
-  unsigned ldsRegionSize = 0; // In bytes
+  unsigned ldsOffset = 0;     // In dwords
+  unsigned ldsRegionSize = 0; // In dwords
 
   auto printLdsRegionInfo = [=](const char *regionName, unsigned regionOffset, unsigned regionSize) {
     LLPC_OUTS(format("%-40s : offset = 0x%04" PRIX32 ", size = 0x%04" PRIX32, regionName, regionOffset, regionSize));
@@ -182,7 +181,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
 
   if (ldsLayout) {
     LLPC_OUTS("===============================================================================\n");
-    LLPC_OUTS("// LLPC primitive shader LDS region info (in bytes) and general usage info\n\n");
+    LLPC_OUTS("// LLPC primitive shader LDS region info (in dwords) and general usage info\n\n");
   }
 
   //
@@ -206,7 +205,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
     if (ldsLayout) {
       // NOTE: We round ES-GS LDS size to 4-dword alignment. This is for later LDS read/write operations of mutilple
       // dwords (such as DS128).
-      ldsRegionSize = alignTo(calcFactor.esGsLdsSize, 4U) * sizeof(unsigned);
+      ldsRegionSize = alignTo(calcFactor.esGsLdsSize, 4U);
 
       printLdsRegionInfo("ES-GS Ring", ldsOffset, ldsRegionSize);
       (*ldsLayout)[PrimShaderLdsRegion::EsGsRing] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -214,8 +213,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
     }
 
     // Primitive data
-    ldsRegionSize = (sizeof(unsigned) * Gfx9::NggMaxThreadsPerSubgroup) *
-                    MaxGsStreams; // 1 dword per primitive thread, 4 GS streams
+    ldsRegionSize = Gfx9::NggMaxThreadsPerSubgroup * MaxGsStreams; // 1 dword per primitive thread, 4 GS streams
     if (ldsLayout) {
       printLdsRegionInfo("Primitive Connectivity Data", ldsOffset, ldsRegionSize);
       (*ldsLayout)[PrimShaderLdsRegion::PrimitiveData] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -225,8 +223,8 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
 
     // Primitive counts
     if (pipelineState->enableSwXfb()) {
-      ldsRegionSize = (sizeof(unsigned) * (Gfx9::NggMaxWavesPerSubgroup + 1)) *
-                      MaxGsStreams; // 1 dword per wave and 1 dword per subgroup, 4 GS streams
+      ldsRegionSize =
+          (Gfx9::NggMaxWavesPerSubgroup + 1) * MaxGsStreams; // 1 dword per wave and 1 dword per subgroup, 4 GS streams
       if (ldsLayout) {
         printLdsRegionInfo("Primitive Counts", ldsOffset, ldsRegionSize);
         (*ldsLayout)[PrimShaderLdsRegion::PrimitiveCounts] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -237,8 +235,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
 
     // Primitive index map (compacted -> uncompacted)
     if (pipelineState->enableSwXfb()) {
-      ldsRegionSize = (sizeof(unsigned) * Gfx9::NggMaxThreadsPerSubgroup) *
-                      MaxGsStreams; // 1 dword per primitive thread, 4 GS streams
+      ldsRegionSize = Gfx9::NggMaxThreadsPerSubgroup * MaxGsStreams; // 1 dword per primitive thread, 4 GS streams
       if (ldsLayout) {
         printLdsRegionInfo("Primitive Index Map (To Uncompacted)", ldsOffset, ldsRegionSize);
         (*ldsLayout)[PrimShaderLdsRegion::PrimitiveIndexMap] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -256,8 +253,8 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
                            (*ldsLayout)[PrimShaderLdsRegion::VertexCounts].second);
       }
     } else {
-      ldsRegionSize = (sizeof(unsigned) * (Gfx9::NggMaxWavesPerSubgroup + 1)) *
-                      MaxGsStreams; // 1 dword per wave and 1 dword per subgroup, 4 GS streams
+      ldsRegionSize =
+          (Gfx9::NggMaxWavesPerSubgroup + 1) * MaxGsStreams; // 1 dword per wave and 1 dword per subgroup, 4 GS streams
       if (ldsLayout) {
         printLdsRegionInfo("Vertex Counts", ldsOffset, ldsRegionSize);
         (*ldsLayout)[PrimShaderLdsRegion::VertexCounts] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -272,12 +269,12 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
         if (ldsLayout) {
           // NOTE: If SW emulated stream-out is enabled, this region is overlapped with PrimitiveIndexMap
           (*ldsLayout)[PrimShaderLdsRegion::VertexIndexMap] = (*ldsLayout)[PrimShaderLdsRegion::PrimitiveIndexMap];
-          printLdsRegionInfo("Vertex Index Map (To Uncompacted)", (*ldsLayout)[PrimShaderLdsRegion::VertexIndexMap].first,
+          printLdsRegionInfo("Vertex Index Map (To Uncompacted)",
+                             (*ldsLayout)[PrimShaderLdsRegion::VertexIndexMap].first,
                              (*ldsLayout)[PrimShaderLdsRegion::VertexIndexMap].second);
         }
       } else {
-        ldsRegionSize = (sizeof(unsigned) * Gfx9::NggMaxThreadsPerSubgroup) *
-                        MaxGsStreams; // 1 dword per vertex thread, 4 GS streams
+        ldsRegionSize = Gfx9::NggMaxThreadsPerSubgroup * MaxGsStreams; // 1 dword per vertex thread, 4 GS streams
         if (ldsLayout) {
           printLdsRegionInfo("Vertex Index Map (To Uncompacted)", ldsOffset, ldsRegionSize);
           (*ldsLayout)[PrimShaderLdsRegion::VertexIndexMap] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -290,9 +287,8 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
     // XFB statistics
     if (pipelineState->enableSwXfb()) {
       ldsRegionSize =
-          sizeof(unsigned) * MaxTransformFeedbackBuffers +
-          sizeof(unsigned) *
-              MaxGsStreams; // 1 dword per XFB buffer : dword written, 1 dword per GS stream : primitives to write
+          MaxTransformFeedbackBuffers +
+          MaxGsStreams; // 1 dword per XFB buffer : dword written, 1 dword per GS stream : primitives to write
       if (ldsLayout) {
         printLdsRegionInfo("XFB Statistics", ldsOffset, ldsRegionSize);
         (*ldsLayout)[PrimShaderLdsRegion::XfbStats] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -304,8 +300,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
     // GS-VS ring
     if (ldsLayout) {
       const unsigned esGsRingLdsSize = (*ldsLayout)[PrimShaderLdsRegion::EsGsRing].second;
-      ldsRegionSize = calcFactor.gsOnChipLdsSize * sizeof(unsigned) - esGsRingLdsSize -
-                      ldsUsageInfo.gsExtraLdsSize;
+      ldsRegionSize = calcFactor.gsOnChipLdsSize - esGsRingLdsSize - ldsUsageInfo.gsExtraLdsSize;
 
       printLdsRegionInfo("GS-VS Ring", ldsOffset, ldsRegionSize);
       (*ldsLayout)[PrimShaderLdsRegion::GsVsRing] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -316,8 +311,8 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
       printLdsRegionInfo("Total LDS", 0, ldsOffset);
       LLPC_OUTS("\n");
       LLPC_OUTS("Needs LDS = " << (ldsUsageInfo.needsLds ? "true" : "false") << "\n");
-      LLPC_OUTS("ES Extra LDS Size (In Bytes) = " << format("0x%04" PRIX32, ldsUsageInfo.esExtraLdsSize) << "\n");
-      LLPC_OUTS("GS Extra LDS Size (In Bytes) = " << format("0x%04" PRIX32, ldsUsageInfo.gsExtraLdsSize) << "\n");
+      LLPC_OUTS("ES Extra LDS Size (in Dwords) = " << format("0x%04" PRIX32, ldsUsageInfo.esExtraLdsSize) << "\n");
+      LLPC_OUTS("GS Extra LDS Size (in Dwords) = " << format("0x%04" PRIX32, ldsUsageInfo.gsExtraLdsSize) << "\n");
       LLPC_OUTS("\n");
     }
 
@@ -348,7 +343,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
     // Distributed primitive ID
     if (distributePrimitiveId) {
       if (ldsLayout) {
-        ldsRegionSize = sizeof(unsigned) * calcFactor.esVertsPerSubgroup; // 1 dword per vertex thread
+        ldsRegionSize = calcFactor.esVertsPerSubgroup; // 1 dword per vertex thread
 
         printLdsRegionInfo("Distributed Primitive ID", ldsOffset, ldsRegionSize);
         (*ldsLayout)[PrimShaderLdsRegion::DistributedPrimitiveId] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -361,7 +356,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
     // XFB outputs
     if (pipelineState->enableSwXfb()) {
       if (ldsLayout) {
-        ldsRegionSize = sizeof(unsigned) * calcFactor.esVertsPerSubgroup *
+        ldsRegionSize = calcFactor.esVertsPerSubgroup *
                         calcFactor.esGsRingItemSize; // Transform feedback outputs are stored as a ES-GS ring item
 
         printLdsRegionInfo("XFB Outputs", ldsOffset, ldsRegionSize);
@@ -372,8 +367,8 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
 
     // XFB statistics
     if (pipelineState->enableSwXfb()) {
-      ldsRegionSize = sizeof(unsigned) * MaxTransformFeedbackBuffers +
-                      sizeof(unsigned); // 1 dword per XFB buffer: dword written, 1 dword: primitives to write
+      ldsRegionSize =
+          MaxTransformFeedbackBuffers + 1; // 1 dword per XFB buffer: dword written, 1 dword: primitives to write
       if (ldsLayout) {
         printLdsRegionInfo("XFB Statistics", ldsOffset, ldsRegionSize);
         (*ldsLayout)[PrimShaderLdsRegion::XfbStats] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -386,8 +381,8 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
       printLdsRegionInfo("Total LDS", 0, ldsOffset);
       LLPC_OUTS("\n");
       LLPC_OUTS("Needs LDS = " << (ldsUsageInfo.needsLds ? "true" : "false") << "\n");
-      LLPC_OUTS("ES Extra LDS Size (In Bytes) = " << format("0x%04" PRIX32, ldsUsageInfo.esExtraLdsSize) << "\n");
-      LLPC_OUTS("GS Extra LDS Size (In Bytes) = " << format("0x%04" PRIX32, ldsUsageInfo.gsExtraLdsSize) << "\n");
+      LLPC_OUTS("ES Extra LDS Size (in Dwords) = " << format("0x%04" PRIX32, ldsUsageInfo.esExtraLdsSize) << "\n");
+      LLPC_OUTS("GS Extra LDS Size (in Dwords) = " << format("0x%04" PRIX32, ldsUsageInfo.gsExtraLdsSize) << "\n");
       LLPC_OUTS("\n");
     }
 
@@ -413,7 +408,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
   // Distributed primitive ID
   if (distributePrimitiveId) {
     if (ldsLayout) {
-      ldsRegionSize = sizeof(unsigned) * calcFactor.esVertsPerSubgroup; // 1 dword per vertex thread
+      ldsRegionSize = calcFactor.esVertsPerSubgroup; // 1 dword per vertex thread
 
       printLdsRegionInfo("Distributed Primitive ID", ldsOffset, ldsRegionSize);
       (*ldsLayout)[PrimShaderLdsRegion::DistributedPrimitiveId] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -424,7 +419,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
   ldsOffset = 0; // DistributedPrimitiveId is always the first region and is overlapped with VertexPosition
 
   // Vertex position
-  ldsRegionSize = SizeOfVec4 * Gfx9::NggMaxThreadsPerSubgroup; // 4 dwords per vertex thread
+  ldsRegionSize = 4 * Gfx9::NggMaxThreadsPerSubgroup; // 4 dwords per vertex thread
   if (ldsLayout) {
     printLdsRegionInfo("Vertex Position", ldsOffset, ldsRegionSize);
     (*ldsLayout)[PrimShaderLdsRegion::VertexPosition] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -434,8 +429,8 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
 
   // Vertex cull info
   if (ldsLayout) {
-    ldsRegionSize = sizeof(unsigned) * calcFactor.esGsRingItemSize *
-                    calcFactor.esVertsPerSubgroup; // Vertex cull info is stored as a ES-GS ring item
+    ldsRegionSize =
+        calcFactor.esGsRingItemSize * calcFactor.esVertsPerSubgroup; // Vertex cull info is stored as a ES-GS ring item
 
     printLdsRegionInfo("Vertex Cull Info", ldsOffset, ldsRegionSize);
     (*ldsLayout)[PrimShaderLdsRegion::VertexCullInfo] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -444,17 +439,18 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
 
   // XFB statistics
   if (pipelineState->enableSwXfb()) {
-    ldsRegionSize = sizeof(unsigned) * MaxTransformFeedbackBuffers +
-                    sizeof(unsigned); // 1 dword per XFB buffer: dword written, 1 dword: primitives to write
+    ldsRegionSize =
+        MaxTransformFeedbackBuffers + 1; // 1 dword per XFB buffer: dword written, 1 dword: primitives to write
     if (ldsLayout) {
       printLdsRegionInfo("XFB Statistics", ldsOffset, ldsRegionSize);
       (*ldsLayout)[PrimShaderLdsRegion::XfbStats] = std::make_pair(ldsOffset, ldsRegionSize);
       ldsOffset += ldsRegionSize;
     }
+    ldsUsageInfo.esExtraLdsSize += ldsRegionSize;
   }
 
   // Vertex counts
-  ldsRegionSize = sizeof(unsigned) * (Gfx9::NggMaxWavesPerSubgroup + 1);
+  ldsRegionSize = Gfx9::NggMaxWavesPerSubgroup + 1; // 1 dword per wave and 1 dword per subgroup
   if (ldsLayout) {
     printLdsRegionInfo("Vertex Counts", ldsOffset, ldsRegionSize);
     (*ldsLayout)[PrimShaderLdsRegion::VertexCounts] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -464,7 +460,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
 
   // Vertex index map
   if (pipelineState->getNggControl()->compactVertex) {
-    ldsRegionSize = sizeof(unsigned) * Gfx9::NggMaxThreadsPerSubgroup; // 1 dword per wave and 1 dword per subgroup
+    ldsRegionSize = Gfx9::NggMaxThreadsPerSubgroup; // 1 dword per wave and 1 dword per subgroup
     if (ldsLayout) {
       printLdsRegionInfo("Vertex Index Map (To Uncompacted)", ldsOffset, ldsRegionSize);
       (*ldsLayout)[PrimShaderLdsRegion::VertexIndexMap] = std::make_pair(ldsOffset, ldsRegionSize);
@@ -477,8 +473,8 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
     printLdsRegionInfo("Total LDS", 0, ldsOffset);
     LLPC_OUTS("\n");
     LLPC_OUTS("Needs LDS = " << (ldsUsageInfo.needsLds ? "true" : "false") << "\n");
-    LLPC_OUTS("ES Extra LDS Size (In Bytes) = " << format("0x%04" PRIX32, ldsUsageInfo.esExtraLdsSize) << "\n");
-    LLPC_OUTS("GS Extra LDS Size (In Bytes) = " << format("0x%04" PRIX32, ldsUsageInfo.gsExtraLdsSize) << "\n");
+    LLPC_OUTS("ES Extra LDS Size (in Dwords) = " << format("0x%04" PRIX32, ldsUsageInfo.esExtraLdsSize) << "\n");
+    LLPC_OUTS("GS Extra LDS Size (in Dwords) = " << format("0x%04" PRIX32, ldsUsageInfo.gsExtraLdsSize) << "\n");
     LLPC_OUTS("\n");
   }
 
@@ -527,11 +523,12 @@ Function *NggPrimShader::generate(Function *esEntryPoint, Function *gsEntryPoint
 }
 
 // =====================================================================================================================
-// Calculates and returns the byte size of vertex cull info. Meanwhile, builds the collection of LDS offsets within an
+// Calculates and returns the dword size of vertex cull info. Meanwhile, builds the collection of LDS offsets within an
 // item of vertex cull info region.
 //
 // @param pipelineState : Pipeline state
 // @param [out] vertCullInfoOffsets : The collection of LDS offsets to build
+// @returns : Dword size of vertex cull info
 unsigned NggPrimShader::calcVertexCullInfoSizeAndOffsets(PipelineState *pipelineState,
                                                          VertexCullInfoOffsets &vertCullInfoOffsets) {
   auto nggControl = pipelineState->getNggControl();
@@ -546,6 +543,7 @@ unsigned NggPrimShader::calcVertexCullInfoSizeAndOffsets(PipelineState *pipeline
 
   unsigned cullInfoSize = 0;
   unsigned cullInfoOffset = 0;
+  unsigned itemSize = 0;
 
   if (pipelineState->enableSwXfb()) {
     const bool hasTes = pipelineState->hasShaderStage(ShaderStageTessEval);
@@ -553,66 +551,77 @@ unsigned NggPrimShader::calcVertexCullInfoSizeAndOffsets(PipelineState *pipeline
 
     // NOTE: Each transform feedback output is <4 x dword>.
     const unsigned xfbOutputCount = resUsage->inOutUsage.xfbOutputExpCount;
-    cullInfoSize += sizeof(VertexCullInfo::xfbOutputs) * xfbOutputCount;
+    itemSize = sizeof(VertexCullInfo::xfbOutputs) * xfbOutputCount / sizeof(unsigned);
+    cullInfoSize += itemSize;
     vertCullInfoOffsets.xfbOutputs = cullInfoOffset;
-    cullInfoOffset += sizeof(VertexCullInfo::xfbOutputs) * xfbOutputCount;
+    cullInfoOffset += itemSize;
   }
 
   if (nggControl->enableCullDistanceCulling) {
-    cullInfoSize += sizeof(VertexCullInfo::cullDistanceSignMask);
+    itemSize = sizeof(VertexCullInfo::cullDistanceSignMask) / sizeof(unsigned);
+    cullInfoSize += itemSize;
     vertCullInfoOffsets.cullDistanceSignMask = cullInfoOffset;
-    cullInfoOffset += sizeof(VertexCullInfo::cullDistanceSignMask);
+    cullInfoOffset += itemSize;
   }
 
-  cullInfoSize += sizeof(VertexCullInfo::drawFlag);
+  itemSize = sizeof(VertexCullInfo::drawFlag) / sizeof(unsigned);
+  cullInfoSize += itemSize;
   vertCullInfoOffsets.drawFlag = cullInfoOffset;
-  cullInfoOffset += sizeof(VertexCullInfo::drawFlag);
+  cullInfoOffset += itemSize;
 
   if (nggControl->compactVertex) {
-    cullInfoSize += sizeof(VertexCullInfo::compactedVertexIndex);
+    itemSize = sizeof(VertexCullInfo::compactedVertexIndex) / sizeof(unsigned);
+    cullInfoSize += itemSize;
     vertCullInfoOffsets.compactedVertexIndex = cullInfoOffset;
-    cullInfoOffset += sizeof(VertexCullInfo::compactedVertexIndex);
+    cullInfoOffset += itemSize;
 
     const bool hasTes = pipelineState->hasShaderStage(ShaderStageTessEval);
     if (hasTes) {
       auto builtInUsage = pipelineState->getShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes;
       if (builtInUsage.tessCoord) {
-        cullInfoSize += sizeof(VertexCullInfo::tes.tessCoordX);
+        itemSize = sizeof(VertexCullInfo::tes.tessCoordX) / sizeof(unsigned);
+        cullInfoSize += itemSize;
         vertCullInfoOffsets.tessCoordX = cullInfoOffset;
-        cullInfoOffset += sizeof(VertexCullInfo::tes.tessCoordX);
+        cullInfoOffset += itemSize;
 
-        cullInfoSize += sizeof(VertexCullInfo::tes.tessCoordY);
+        itemSize = sizeof(VertexCullInfo::tes.tessCoordY) / sizeof(unsigned);
+        cullInfoSize += itemSize;
         vertCullInfoOffsets.tessCoordY = cullInfoOffset;
-        cullInfoOffset += sizeof(VertexCullInfo::tes.tessCoordY);
+        cullInfoOffset += itemSize;
       }
 
-      cullInfoSize += sizeof(VertexCullInfo::tes.relPatchId);
+      itemSize = sizeof(VertexCullInfo::tes.relPatchId) / sizeof(unsigned);
+      cullInfoSize += itemSize;
       vertCullInfoOffsets.relPatchId = cullInfoOffset;
-      cullInfoOffset += sizeof(VertexCullInfo::tes.relPatchId);
+      cullInfoOffset += itemSize;
 
       if (builtInUsage.primitiveId) {
-        cullInfoSize += sizeof(VertexCullInfo::tes.patchId);
+        itemSize = sizeof(VertexCullInfo::tes.patchId) / sizeof(unsigned);
+        cullInfoSize += itemSize;
         vertCullInfoOffsets.patchId = cullInfoOffset;
-        cullInfoOffset += sizeof(VertexCullInfo::tes.patchId);
+        cullInfoOffset += itemSize;
       }
     } else {
       auto builtInUsage = pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
       if (builtInUsage.vertexIndex) {
-        cullInfoSize += sizeof(VertexCullInfo::vs.vertexId);
+        itemSize = sizeof(VertexCullInfo::vs.vertexId) / sizeof(unsigned);
+        cullInfoSize += itemSize;
         vertCullInfoOffsets.vertexId = cullInfoOffset;
-        cullInfoOffset += sizeof(VertexCullInfo::vs.vertexId);
+        cullInfoOffset += itemSize;
       }
 
       if (builtInUsage.instanceIndex) {
-        cullInfoSize += sizeof(VertexCullInfo::vs.instanceId);
+        itemSize = sizeof(VertexCullInfo::vs.instanceId) / sizeof(unsigned);
+        cullInfoSize += itemSize;
         vertCullInfoOffsets.instanceId = cullInfoOffset;
-        cullInfoOffset += sizeof(VertexCullInfo::vs.instanceId);
+        cullInfoOffset += itemSize;
       }
 
       if (builtInUsage.primitiveId) {
-        cullInfoSize += sizeof(VertexCullInfo::vs.primitiveId);
+        itemSize = sizeof(VertexCullInfo::vs.primitiveId) / sizeof(unsigned);
+        cullInfoSize += itemSize;
         vertCullInfoOffsets.primitiveId = cullInfoOffset;
-        cullInfoOffset += sizeof(VertexCullInfo::vs.primitiveId);
+        cullInfoOffset += itemSize;
       }
     }
   }
@@ -1402,8 +1411,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
       llvm_unreachable("Not implemented!");
     }
 
-    vertexItemOffset =
-        m_builder.CreateMul(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(esGsRingItemSize * sizeof(unsigned)));
+    vertexItemOffset = m_builder.CreateMul(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(esGsRingItemSize));
 
     if (distributePrimitiveId) {
       auto primValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.primCountInWave);
@@ -1612,12 +1620,9 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(writeVertDrawFlagBlock);
 
-    auto vertexItemOffset0 =
-        m_builder.CreateMul(m_nggInputs.vertexIndex0, m_builder.getInt32(esGsRingItemSize * sizeof(unsigned)));
-    auto vertexItemOffset1 =
-        m_builder.CreateMul(m_nggInputs.vertexIndex1, m_builder.getInt32(esGsRingItemSize * sizeof(unsigned)));
-    auto vertexItemOffset2 =
-        m_builder.CreateMul(m_nggInputs.vertexIndex2, m_builder.getInt32(esGsRingItemSize * sizeof(unsigned)));
+    auto vertexItemOffset0 = m_builder.CreateMul(m_nggInputs.vertexIndex0, m_builder.getInt32(esGsRingItemSize));
+    auto vertexItemOffset1 = m_builder.CreateMul(m_nggInputs.vertexIndex1, m_builder.getInt32(esGsRingItemSize));
+    auto vertexItemOffset2 = m_builder.CreateMul(m_nggInputs.vertexIndex2, m_builder.getInt32(esGsRingItemSize));
 
     writeVertexCullInfoToLds(m_builder.getInt32(1), vertexItemOffset0, m_vertCullInfoOffsets.drawFlag);
     writeVertexCullInfoToLds(m_builder.getInt32(1), vertexItemOffset1, m_vertCullInfoOffsets.drawFlag);
@@ -1676,7 +1681,6 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
 
     auto ldsOffset = m_builder.CreateAdd(m_nggInputs.waveIdInSubgroup, m_nggInputs.threadIdInWave);
     ldsOffset = m_builder.CreateAdd(ldsOffset, m_builder.getInt32(1));
-    ldsOffset = m_builder.CreateShl(ldsOffset, 2);
 
     unsigned regionStart = getLdsRegionStart(PrimShaderLdsRegion::VertexCounts);
 
@@ -2179,14 +2183,12 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
         bool streamActive = streamXfbBuffers[i] != 0;
         if (streamActive) { // Initialize primitive connectivity data if the stream is active
           writePerThreadDataToLds(m_builder.getInt32(NullPrim), m_nggInputs.threadIdInSubgroup,
-                                  PrimShaderLdsRegion::PrimitiveData,
-                                  sizeof(unsigned) * Gfx9::NggMaxThreadsPerSubgroup * i);
+                                  PrimShaderLdsRegion::PrimitiveData, Gfx9::NggMaxThreadsPerSubgroup * i);
         }
       }
     } else {
       writePerThreadDataToLds(m_builder.getInt32(NullPrim), m_nggInputs.threadIdInSubgroup,
-                              PrimShaderLdsRegion::PrimitiveData,
-                              sizeof(unsigned) * Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
+                              PrimShaderLdsRegion::PrimitiveData, Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
     }
 
     m_builder.CreateBr(endInitOutPrimDataBlock);
@@ -2228,7 +2230,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
     m_builder.SetInsertPoint(initOutVertCountBlock);
 
     writePerThreadDataToLds(m_builder.getInt32(0), m_nggInputs.threadIdInSubgroup, PrimShaderLdsRegion::VertexCounts,
-                            (sizeof(unsigned) * Gfx9::NggMaxWavesPerSubgroup + sizeof(unsigned)) * rasterStream);
+                            (Gfx9::NggMaxWavesPerSubgroup + 1) * rasterStream);
 
     m_builder.CreateBr(endInitOutVertCountBlock);
   }
@@ -2242,9 +2244,9 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
 
     if (cullingMode) {
       // Do culling
-      primData = readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
-                                          PrimShaderLdsRegion::PrimitiveData,
-                                          sizeof(unsigned) * Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
+      primData =
+          readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
+                                   PrimShaderLdsRegion::PrimitiveData, Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
       auto doCull = m_builder.CreateICmpNE(primData, m_builder.getInt32(NullPrim));
       auto outPrimValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
       doCull = m_builder.CreateAnd(doCull, outPrimValid);
@@ -2285,8 +2287,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
       m_builder.SetInsertPoint(nullifyOutPrimDataBlock);
 
       writePerThreadDataToLds(m_builder.getInt32(NullPrim), m_nggInputs.threadIdInSubgroup,
-                              PrimShaderLdsRegion::PrimitiveData,
-                              sizeof(unsigned) * Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
+                              PrimShaderLdsRegion::PrimitiveData, Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
 
       m_builder.CreateBr(endCullingBlock);
     }
@@ -2310,9 +2311,9 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
     const unsigned outVertsPerPrim = m_pipelineState->getVerticesPerPrimitive();
 
     // drawFlag = primData[N] != NullPrim
-    auto primData0 = readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
-                                              PrimShaderLdsRegion::PrimitiveData,
-                                              sizeof(unsigned) * Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
+    auto primData0 =
+        readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
+                                 PrimShaderLdsRegion::PrimitiveData, Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
     auto drawFlag0 = m_builder.CreateICmpNE(primData0, m_builder.getInt32(NullPrim));
     drawFlag = drawFlag0;
 
@@ -2320,7 +2321,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
       // drawFlag |= N >= 1 ? (primData[N-1] != NullPrim) : false
       auto primData1 = readPerThreadDataFromLds(
           m_builder.getInt32Ty(), m_builder.CreateSub(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(1)),
-          PrimShaderLdsRegion::PrimitiveData, sizeof(unsigned) * Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
+          PrimShaderLdsRegion::PrimitiveData, Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
       auto drawFlag1 =
           m_builder.CreateSelect(m_builder.CreateICmpUGE(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(1)),
                                  m_builder.CreateICmpNE(primData1, m_builder.getInt32(NullPrim)), m_builder.getFalse());
@@ -2331,7 +2332,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
       // drawFlag |= N >= 2 ? (primData[N-2] != NullPrim) : false
       auto primData2 = readPerThreadDataFromLds(
           m_builder.getInt32Ty(), m_builder.CreateSub(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(2)),
-          PrimShaderLdsRegion::PrimitiveData, sizeof(unsigned) * Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
+          PrimShaderLdsRegion::PrimitiveData, Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
       auto drawFlag2 =
           m_builder.CreateSelect(m_builder.CreateICmpUGE(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(2)),
                                  m_builder.CreateICmpNE(primData2, m_builder.getInt32(NullPrim)), m_builder.getFalse());
@@ -2368,13 +2369,11 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
 
     auto ldsOffset = m_builder.CreateAdd(m_nggInputs.waveIdInSubgroup, m_nggInputs.threadIdInWave);
     ldsOffset = m_builder.CreateAdd(ldsOffset, m_builder.getInt32(1));
-    ldsOffset = m_builder.CreateShl(ldsOffset, 2);
 
     unsigned regionStart = getLdsRegionStart(PrimShaderLdsRegion::VertexCounts);
 
     ldsOffset = m_builder.CreateAdd(
-        ldsOffset, m_builder.getInt32(regionStart +
-                           (sizeof(unsigned) * Gfx9::NggMaxWavesPerSubgroup + sizeof(unsigned)) * rasterStream));
+        ldsOffset, m_builder.getInt32(regionStart + (Gfx9::NggMaxWavesPerSubgroup + 1) * rasterStream));
     atomicAdd(outVertCountInWave, ldsOffset);
 
     m_builder.CreateBr(endAccumOutVertCountBlock);
@@ -2391,9 +2390,9 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
       auto firstWaveInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.waveIdInSubgroup, m_builder.getInt32(0));
       m_builder.CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
     } else {
-      auto outVertCountInWaves = readPerThreadDataFromLds(
-          m_builder.getInt32Ty(), m_nggInputs.threadIdInWave, PrimShaderLdsRegion::VertexCounts,
-          (sizeof(unsigned) * Gfx9::NggMaxWavesPerSubgroup + sizeof(unsigned)) * rasterStream);
+      auto outVertCountInWaves = readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInWave,
+                                                          PrimShaderLdsRegion::VertexCounts,
+                                                          (Gfx9::NggMaxWavesPerSubgroup + 1) * rasterStream);
 
       // The last dword following dwords for all waves (each wave has one dword) stores GS output vertex count of the
       // entire subgroup
@@ -2813,12 +2812,9 @@ void NggPrimShader::exportPrimitive(Value *primitiveCulled) {
       const unsigned esGsRingItemSize =
           m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
 
-      auto vertexItemOffset0 =
-          m_builder.CreateMul(m_nggInputs.vertexIndex0, m_builder.getInt32(esGsRingItemSize * sizeof(unsigned)));
-      auto vertexItemOffset1 =
-          m_builder.CreateMul(m_nggInputs.vertexIndex1, m_builder.getInt32(esGsRingItemSize * sizeof(unsigned)));
-      auto vertexItemOffset2 =
-          m_builder.CreateMul(m_nggInputs.vertexIndex2, m_builder.getInt32(esGsRingItemSize * sizeof(unsigned)));
+      auto vertexItemOffset0 = m_builder.CreateMul(m_nggInputs.vertexIndex0, m_builder.getInt32(esGsRingItemSize));
+      auto vertexItemOffset1 = m_builder.CreateMul(m_nggInputs.vertexIndex1, m_builder.getInt32(esGsRingItemSize));
+      auto vertexItemOffset2 = m_builder.CreateMul(m_nggInputs.vertexIndex2, m_builder.getInt32(esGsRingItemSize));
 
       compactedVertexIndex0 = readVertexCullInfoFromLds(m_builder.getInt32Ty(), vertexItemOffset0,
                                                         m_vertCullInfoOffsets.compactedVertexIndex);
@@ -2901,9 +2897,9 @@ void NggPrimShader::exportPrimitiveWithGs(Value *startingVertexIndex) {
   //   Export primitive
   //
   const auto rasterStream = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.rasterStream;
-  Value *primData = readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
-                                             PrimShaderLdsRegion::PrimitiveData,
-                                             sizeof(unsigned) * Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
+  Value *primData =
+      readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
+                               PrimShaderLdsRegion::PrimitiveData, Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
   auto primValid = m_builder.CreateICmpNE(primData, m_builder.getInt32(NullPrim));
 
   // Primitive connectivity data have such layout:
@@ -3279,8 +3275,7 @@ Value *NggPrimShader::runPartEs(Function *partEs, ArrayRef<Argument *> args, Val
 
       auto uncompactedVertexIndex = readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
                                                              PrimShaderLdsRegion::VertexIndexMap);
-      auto vertexItemOffset =
-          m_builder.CreateMul(uncompactedVertexIndex, m_builder.getInt32(esGsRingItemSize * sizeof(unsigned)));
+      auto vertexItemOffset = m_builder.CreateMul(uncompactedVertexIndex, m_builder.getInt32(esGsRingItemSize));
 
       newPosition = readPerThreadDataFromLds(FixedVectorType::get(m_builder.getFloatTy(), 4), uncompactedVertexIndex,
                                              PrimShaderLdsRegion::VertexPosition, true);
@@ -4078,10 +4073,10 @@ void NggPrimShader::exportGsOutput(Value *output, unsigned location, unsigned co
   auto vertexIndex = m_builder.CreateMul(threadIdInSubgroup, m_builder.getInt32(geometryMode.outputVertices));
   vertexIndex = m_builder.CreateAdd(vertexIndex, emitVerts);
 
-  // ldsOffset = vertexOffset + (location * 4 + compIdx) * 4 (in bytes)
+  // ldsOffset = vertexOffset + location * 4 + compIdx (in dwords)
   auto vertexOffset = calcVertexItemOffset(streamId, vertexIndex);
   const unsigned attribOffset = (location * 4) + compIdx;
-  auto ldsOffset = m_builder.CreateAdd(vertexOffset, m_builder.getInt32(attribOffset * 4));
+  auto ldsOffset = m_builder.CreateAdd(vertexOffset, m_builder.getInt32(attribOffset));
 
   writeValueToLds(output, ldsOffset);
 }
@@ -4092,7 +4087,7 @@ void NggPrimShader::exportGsOutput(Value *output, unsigned location, unsigned co
 // @param outputTy : Type of the output
 // @param location : Location of the output
 // @param streamId : ID of output vertex stream
-// @param vertexOffset : Start offset of vertex item in GS-VS ring (in bytes)
+// @param vertexOffset : Start offset of vertex item in GS-VS ring (in dwords)
 Value *NggPrimShader::importGsOutput(Type *outputTy, unsigned location, unsigned streamId, Value *vertexOffset) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
   if (!m_pipelineState->enableSwXfb() && resUsage->inOutUsage.gs.rasterStream != streamId) {
@@ -4112,9 +4107,9 @@ Value *NggPrimShader::importGsOutput(Type *outputTy, unsigned location, unsigned
     outputTy = FixedVectorType::get(outputElemTy, elemCount);
   }
 
-  // ldsOffset = vertexOffset + location * 4 * 4 (in bytes)
+  // ldsOffset = vertexOffset + location * 4 (in dwords)
   const unsigned attribOffset = location * 4;
-  auto ldsOffset = m_builder.CreateAdd(vertexOffset, m_builder.getInt32(attribOffset * 4));
+  auto ldsOffset = m_builder.CreateAdd(vertexOffset, m_builder.getInt32(attribOffset));
 
   auto output = readValueFromLds(outputTy, ldsOffset);
 
@@ -4274,12 +4269,10 @@ Function *NggPrimShader::createGsEmitHandler(Module *module) {
 
     // Write primitive data (just winding)
     const unsigned regionStart = getLdsRegionStart(PrimShaderLdsRegion::PrimitiveData);
-    // ldsOffset = regionStart + vertexIndex * sizeof(DWORD) + sizeof(DWORD) * NggMaxThreadsPerSubgroup * streamId
-    auto ldsOffset = m_builder.CreateAdd(m_builder.getInt32(regionStart),
-                                         m_builder.CreateMul(vertexIndex, m_builder.getInt32(sizeof(unsigned))));
-    ldsOffset = m_builder.CreateAdd(
-        ldsOffset,
-        m_builder.CreateMul(m_builder.getInt32(sizeof(unsigned) * Gfx9::NggMaxThreadsPerSubgroup), streamId));
+    // ldsOffset = regionStart + vertexIndex + NggMaxThreadsPerSubgroup * streamId
+    auto ldsOffset = m_builder.CreateAdd(m_builder.getInt32(regionStart), vertexIndex);
+    ldsOffset = m_builder.CreateAdd(ldsOffset,
+                                    m_builder.CreateMul(m_builder.getInt32(Gfx9::NggMaxThreadsPerSubgroup), streamId));
     writeValueToLds(winding, ldsOffset);
 
     m_builder.CreateBr(endEmitPrimBlock);
@@ -4342,18 +4335,20 @@ Function *NggPrimShader::createGsCutHandler(Module *module) {
 // @param readDataTy : Data read from LDS
 // @param threadId : Thread ID in subgroup to calculate LDS offset
 // @param region : Primitive shader LDS region
-// @param offsetInRegion : Offset within this LDS region (in bytes), the default is 0 (from the region beginning)
+// @param offsetInRegion : Offset within this LDS region (in dwords), the default is 0 (from the region beginning)
 // @param useDs128 : Whether to use 128-bit LDS read, 16-byte alignment is guaranteed by caller
 Value *NggPrimShader::readPerThreadDataFromLds(Type *readDataTy, Value *threadId, PrimShaderLdsRegion region,
                                                unsigned offsetInRegion, bool useDs128) {
-  assert(region != PrimShaderLdsRegion::VertexCullInfo); // Vertex cull info region is an aggregate-typed one, not applicable
-  auto sizeInBytes = readDataTy->getPrimitiveSizeInBits() / 8;
+  assert(region !=
+         PrimShaderLdsRegion::VertexCullInfo); // Vertex cull info region is an aggregate-typed one, not applicable
+  assert(readDataTy->getPrimitiveSizeInBits() % 32 == 0); // Must be dwords
+  auto sizeInDwords = readDataTy->getPrimitiveSizeInBits() / 32;
 
   const auto regionStart = getLdsRegionStart(region);
 
   Value *ldsOffset = nullptr;
-  if (sizeInBytes > 1)
-    ldsOffset = m_builder.CreateMul(threadId, m_builder.getInt32(sizeInBytes));
+  if (sizeInDwords > 1)
+    ldsOffset = m_builder.CreateMul(threadId, m_builder.getInt32(sizeInDwords));
   else
     ldsOffset = threadId;
   ldsOffset = m_builder.CreateAdd(ldsOffset, m_builder.getInt32(regionStart + offsetInRegion));
@@ -4367,19 +4362,21 @@ Value *NggPrimShader::readPerThreadDataFromLds(Type *readDataTy, Value *threadId
 // @param writeData : Data written to LDS
 // @param threadId : Thread ID in subgroup to calculate LDS offset
 // @param region : Primitive shader LDS region
-// @param offsetInRegion : Offset within this LDS region (in bytes), the default is 0 (from the region beginning)
+// @param offsetInRegion : Offset within this LDS region (in dwords), the default is 0 (from the region beginning)
 // @param useDs128 : Whether to use 128-bit LDS write, 16-byte alignment is guaranteed by caller
 void NggPrimShader::writePerThreadDataToLds(Value *writeData, Value *threadId, PrimShaderLdsRegion region,
                                             unsigned offsetInRegion, bool useDs128) {
-  assert(region != PrimShaderLdsRegion::VertexCullInfo); // Vertex cull info region is an aggregate-typed one, not applicable
+  assert(region !=
+         PrimShaderLdsRegion::VertexCullInfo); // Vertex cull info region is an aggregate-typed one, not applicable
   auto writeDataTy = writeData->getType();
-  auto sizeInBytes = writeDataTy->getPrimitiveSizeInBits() / 8;
+  assert(writeDataTy->getPrimitiveSizeInBits() % 32 == 0); // Must be dwords
+  auto sizeInDwords = writeDataTy->getPrimitiveSizeInBits() / 32;
 
   const auto regionStart = getLdsRegionStart(region);
 
   Value *ldsOffset = nullptr;
-  if (sizeInBytes > 1)
-    ldsOffset = m_builder.CreateMul(threadId, m_builder.getInt32(sizeInBytes));
+  if (sizeInDwords > 1)
+    ldsOffset = m_builder.CreateMul(threadId, m_builder.getInt32(sizeInDwords));
   else
     ldsOffset = threadId;
   ldsOffset = m_builder.CreateAdd(ldsOffset, m_builder.getInt32(regionStart + offsetInRegion));
@@ -4391,8 +4388,8 @@ void NggPrimShader::writePerThreadDataToLds(Value *writeData, Value *threadId, P
 // Reads vertex cull info from LDS (the region of vertex cull info).
 //
 // @param readDataTy : Data read from LDS
-// @param vertexItemOffset : Per-vertex item offset (in bytes) in subgroup of the entire vertex cull info
-// @param dataOffset : Data offset (in bytes) within an item of vertex cull info
+// @param vertexItemOffset : Per-vertex item offset (in dwords) in subgroup of the entire vertex cull info
+// @param dataOffset : Data offset (in dwords) within an item of vertex cull info
 Value *NggPrimShader::readVertexCullInfoFromLds(Type *readDataTy, Value *vertexItemOffset, unsigned dataOffset) {
   // Only applied to culling mode of non-GS NGG
   assert(!m_hasGs && !m_nggControl->passthroughMode);
@@ -4407,8 +4404,8 @@ Value *NggPrimShader::readVertexCullInfoFromLds(Type *readDataTy, Value *vertexI
 // Writes vertex cull info to LDS (the region of vertex cull info).
 //
 // @param writeData : Data written to LDS
-// @param vertexItemOffset : Per-vertex item offset (in bytes) in subgroup of the entire vertex cull info
-// @param dataOffset : Data offset (in bytes) within an item of vertex cull info
+// @param vertexItemOffset : Per-vertex item offset (in dwords) in subgroup of the entire vertex cull info
+// @param dataOffset : Data offset (in dwords) within an item of vertex cull info
 void NggPrimShader::writeVertexCullInfoToLds(Value *writeData, Value *vertexItemOffset, unsigned dataOffset) {
   // Only applied to culling mode of non-GS NGG
   assert(!m_hasGs && !m_nggControl->passthroughMode);
@@ -6473,12 +6470,12 @@ void NggPrimShader::processSwXfb(Function *target, ArrayRef<Argument *> args) {
 
     // Store transform feedback statistics info to LDS and GDS
     const unsigned regionStart = getLdsRegionStart(PrimShaderLdsRegion::XfbStats);
-    writeValueToLds(numPrimsToWrite, m_builder.getInt32(regionStart + MaxTransformFeedbackBuffers * sizeof(unsigned)));
+    writeValueToLds(numPrimsToWrite, m_builder.getInt32(regionStart + MaxTransformFeedbackBuffers));
     for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
       if (!bufferActive[i])
         continue;
 
-      writeValueToLds(dwordsWritten[i], m_builder.getInt32(regionStart + i * sizeof(unsigned)));
+      writeValueToLds(dwordsWritten[i], m_builder.getInt32(regionStart + i));
     }
 
     m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, m_nggInputs.primCountInSubgroup->getType(),
@@ -6815,8 +6812,7 @@ void NggPrimShader::processSwXfbWithGs(Function *target, ArrayRef<Argument *> ar
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
       if (streamActive[i]) {
         writePerThreadDataToLds(m_builder.getInt32(0), m_nggInputs.threadIdInSubgroup,
-                                PrimShaderLdsRegion::PrimitiveCounts,
-                                (sizeof(unsigned) * Gfx9::NggMaxWavesPerSubgroup + sizeof(unsigned)) * i);
+                                PrimShaderLdsRegion::PrimitiveCounts, (Gfx9::NggMaxWavesPerSubgroup + 1) * i);
       }
     }
 
@@ -6841,9 +6837,9 @@ void NggPrimShader::processSwXfbWithGs(Function *target, ArrayRef<Argument *> ar
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
       if (streamActive[i]) {
         // drawFlag = primData[N] != NullPrim
-        auto primData = readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
-                                                 PrimShaderLdsRegion::PrimitiveData,
-                                                 sizeof(unsigned) * Gfx9::NggMaxThreadsPerSubgroup * i);
+        auto primData =
+            readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
+                                     PrimShaderLdsRegion::PrimitiveData, Gfx9::NggMaxThreadsPerSubgroup * i);
         drawFlag[i] = m_builder.CreateICmpNE(primData, m_builder.getInt32(NullPrim));
       }
     }
@@ -6887,15 +6883,12 @@ void NggPrimShader::processSwXfbWithGs(Function *target, ArrayRef<Argument *> ar
 
     auto ldsOffset = m_builder.CreateAdd(m_nggInputs.waveIdInSubgroup, m_nggInputs.threadIdInWave);
     ldsOffset = m_builder.CreateAdd(ldsOffset, m_builder.getInt32(1));
-    ldsOffset = m_builder.CreateShl(ldsOffset, 2);
 
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
       if (streamActive[i]) {
-        atomicAdd(outPrimCountInWave[i],
-                  m_builder.CreateAdd(
-                      ldsOffset,
-                      m_builder.getInt32(regionStart +
-                                         (sizeof(unsigned) * Gfx9::NggMaxWavesPerSubgroup + sizeof(unsigned)) * i)));
+        atomicAdd(
+            outPrimCountInWave[i],
+            m_builder.CreateAdd(ldsOffset, m_builder.getInt32(regionStart + (Gfx9::NggMaxWavesPerSubgroup + 1) * i)));
       }
     }
 
@@ -6912,9 +6905,9 @@ void NggPrimShader::processSwXfbWithGs(Function *target, ArrayRef<Argument *> ar
 
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
       if (streamActive[i]) {
-        auto outPrimCountInWaves = readPerThreadDataFromLds(
-            m_builder.getInt32Ty(), m_nggInputs.threadIdInWave, PrimShaderLdsRegion::PrimitiveCounts,
-            (sizeof(unsigned) * Gfx9::NggMaxWavesPerSubgroup + sizeof(unsigned)) * i);
+        auto outPrimCountInWaves =
+            readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInWave,
+                                     PrimShaderLdsRegion::PrimitiveCounts, (Gfx9::NggMaxWavesPerSubgroup + 1) * i);
 
         // The last dword following dwords for all waves (each wave has one dword) stores GS output primitive count of
         // the entire subgroup
@@ -6954,8 +6947,8 @@ void NggPrimShader::processSwXfbWithGs(Function *target, ArrayRef<Argument *> ar
       }
 
       compactPrimitiveId = m_builder.CreateAdd(primCountInPrevWaves[i], compactPrimitiveId);
-      writePerThreadDataToLds(m_nggInputs.threadIdInSubgroup, compactPrimitiveId, PrimShaderLdsRegion::PrimitiveIndexMap,
-                              sizeof(unsigned) * Gfx9::NggMaxThreadsPerSubgroup * i);
+      writePerThreadDataToLds(m_nggInputs.threadIdInSubgroup, compactPrimitiveId,
+                              PrimShaderLdsRegion::PrimitiveIndexMap, Gfx9::NggMaxThreadsPerSubgroup * i);
 
       m_builder.CreateBr(endCompactOutPrimIdBlock[i]);
     }
@@ -7081,15 +7074,14 @@ void NggPrimShader::processSwXfbWithGs(Function *target, ArrayRef<Argument *> ar
       if (!bufferActive[i])
         continue;
 
-      writeValueToLds(dwordsWritten[i], m_builder.getInt32(regionStart + i * sizeof(unsigned)));
+      writeValueToLds(dwordsWritten[i], m_builder.getInt32(regionStart + i));
     }
 
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
       if (!streamActive[i])
         continue;
 
-      writeValueToLds(numPrimsToWrite[i],
-          m_builder.getInt32(regionStart + MaxTransformFeedbackBuffers * sizeof(unsigned) + i * sizeof(unsigned)));
+      writeValueToLds(numPrimsToWrite[i], m_builder.getInt32(regionStart + MaxTransformFeedbackBuffers + i));
 
       m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, primCountInSubgroup[i]->getType(),
                                 {primCountInSubgroup[i],                                          // value to add
@@ -7146,9 +7138,9 @@ void NggPrimShader::processSwXfbWithGs(Function *target, ArrayRef<Argument *> ar
 
       Value *vertexIndices[3] = {};
 
-      Value *uncompactedPrimitiveId = readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
-                                                               PrimShaderLdsRegion::PrimitiveIndexMap,
-                                                               sizeof(unsigned) * Gfx9::NggMaxThreadsPerSubgroup * i);
+      Value *uncompactedPrimitiveId =
+          readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
+                                   PrimShaderLdsRegion::PrimitiveIndexMap, Gfx9::NggMaxThreadsPerSubgroup * i);
       Value *vertexIndex = uncompactedPrimitiveId;
 
       const unsigned outVertsPerPrim = m_pipelineState->getVerticesPerPrimitive();
@@ -7161,7 +7153,7 @@ void NggPrimShader::processSwXfbWithGs(Function *target, ArrayRef<Argument *> ar
 
         Value *primData =
             readPerThreadDataFromLds(m_builder.getInt32Ty(), uncompactedPrimitiveId, PrimShaderLdsRegion::PrimitiveData,
-                                     sizeof(unsigned) * Gfx9::NggMaxThreadsPerSubgroup * i);
+                                     Gfx9::NggMaxThreadsPerSubgroup * i);
         Value *winding = m_builder.CreateICmpNE(primData, m_builder.getInt32(0));
         Value *vertexIndex1 = m_builder.CreateSelect(winding, vertexIndices[2], vertexIndices[1]);
         Value *vertexIndex2 = m_builder.CreateSelect(winding, vertexIndices[1], vertexIndices[2]);
@@ -7617,25 +7609,26 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
 // @param readDataTy : Data read from LDS
 // @param vertexIndex: Relative vertex index in NGG subgroup
 // @param outputIndex : Index of this transform feedback output
-Value *NggPrimShader::readXfbOutputFromLds(llvm::Type *readDataTy, llvm::Value *vertexIndex, unsigned outputIndex) {
+Value *NggPrimShader::readXfbOutputFromLds(Type *readDataTy, Value *vertexIndex, unsigned outputIndex) {
   assert(m_pipelineState->enableSwXfb()); // SW-emulated stream-out must be enabled
   assert(!m_hasGs);
 
   const unsigned esGsRingItemSize =
       m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
-  auto vertexItemOffset = m_builder.CreateMul(vertexIndex, m_builder.getInt32(esGsRingItemSize * sizeof(unsigned)));
+  auto vertexItemOffset = m_builder.CreateMul(vertexIndex, m_builder.getInt32(esGsRingItemSize));
 
   if (m_nggControl->passthroughMode) {
     const auto regionStart = getLdsRegionStart(PrimShaderLdsRegion::XfbOutput);
     Value *ldsOffset =
-        m_builder.CreateAdd(vertexItemOffset, m_builder.getInt32(regionStart + SizeOfVec4 * outputIndex));
+        m_builder.CreateAdd(vertexItemOffset, m_builder.getInt32(regionStart + 4 * outputIndex)); // <4 x dword>
     return readValueFromLds(readDataTy, ldsOffset);
   }
 
   // NOTE: For NGG culling mode, transform feedback outputs are part of vertex cull info.
   const auto regionStart = getLdsRegionStart(PrimShaderLdsRegion::VertexCullInfo);
-  Value *ldsOffset = m_builder.CreateAdd(
-      vertexItemOffset, m_builder.getInt32(regionStart + m_vertCullInfoOffsets.xfbOutputs + SizeOfVec4 * outputIndex));
+  Value *ldsOffset =
+      m_builder.CreateAdd(vertexItemOffset, m_builder.getInt32(regionStart + m_vertCullInfoOffsets.xfbOutputs +
+                                                               4 * outputIndex)); // <4 x dword>
   return readValueFromLds(readDataTy, ldsOffset);
 }
 
@@ -7651,20 +7644,21 @@ void NggPrimShader::writeXfbOutputToLds(Value *writeData, Value *vertexIndex, un
 
   const unsigned esGsRingItemSize =
       m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
-  auto vertexItemOffset = m_builder.CreateMul(vertexIndex, m_builder.getInt32(esGsRingItemSize * sizeof(unsigned)));
+  auto vertexItemOffset = m_builder.CreateMul(vertexIndex, m_builder.getInt32(esGsRingItemSize));
 
   if (m_nggControl->passthroughMode) {
     const auto regionStart = getLdsRegionStart(PrimShaderLdsRegion::XfbOutput);
     Value *ldsOffset =
-        m_builder.CreateAdd(vertexItemOffset, m_builder.getInt32(regionStart + SizeOfVec4 * outputIndex));
+        m_builder.CreateAdd(vertexItemOffset, m_builder.getInt32(regionStart + 4 * outputIndex)); // <4 x dword>
     writeValueToLds(writeData, ldsOffset);
     return;
   }
 
   // NOTE: For NGG culling mode, transform feedback outputs are part of vertex cull info.
   const auto regionStart = getLdsRegionStart(PrimShaderLdsRegion::VertexCullInfo);
-  Value *ldsOffset = m_builder.CreateAdd(
-      vertexItemOffset, m_builder.getInt32(regionStart + m_vertCullInfoOffsets.xfbOutputs + SizeOfVec4 * outputIndex));
+  Value *ldsOffset =
+      m_builder.CreateAdd(vertexItemOffset, m_builder.getInt32(regionStart + m_vertCullInfoOffsets.xfbOutputs +
+                                                               4 * outputIndex)); // <4 x dword>
   writeValueToLds(writeData, ldsOffset);
 }
 
@@ -7700,7 +7694,7 @@ Value *NggPrimShader::fetchCullDistanceSignMask(Value *vertexIndex) {
     // ES-only
     const unsigned esGsRingItemSize =
         m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
-    auto vertexItemOffset = m_builder.CreateMul(vertexIndex, m_builder.getInt32(esGsRingItemSize * sizeof(unsigned)));
+    auto vertexItemOffset = m_builder.CreateMul(vertexIndex, m_builder.getInt32(esGsRingItemSize));
     return readVertexCullInfoFromLds(m_builder.getInt32Ty(), vertexItemOffset,
                                      m_vertCullInfoOffsets.cullDistanceSignMask);
   }
@@ -7731,7 +7725,7 @@ Value *NggPrimShader::fetchCullDistanceSignMask(Value *vertexIndex) {
 }
 
 // =====================================================================================================================
-// Calculates the starting LDS offset (in bytes) of vertex item data in GS-VS ring.
+// Calculates the starting LDS offset (in dwords) of vertex item data in GS-VS ring.
 //
 // @param streamId : ID of output vertex stream.
 // @param vertexIndex : Relative vertex index in NGG subgroup.
@@ -7740,11 +7734,10 @@ Value *NggPrimShader::calcVertexItemOffset(unsigned streamId, Value *vertexIndex
 
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage;
 
-  // vertexOffset = gsVsRingStart + (streamBases[stream] + vertexIndex * vertexItemSize) * 4 (in bytes)
+  // vertexOffset = gsVsRingStart + streamBases[stream] + vertexIndex * vertexItemSize (in dwords)
   const unsigned vertexItemSize = 4 * inOutUsage.gs.outLocCount[streamId];
   auto vertexOffset = m_builder.CreateMul(vertexIndex, m_builder.getInt32(vertexItemSize));
   vertexOffset = m_builder.CreateAdd(vertexOffset, m_builder.getInt32(m_gsStreamBases[streamId]));
-  vertexOffset = m_builder.CreateShl(vertexOffset, 2);
 
   const unsigned gsVsRingStart = getLdsRegionStart(PrimShaderLdsRegion::GsVsRing);
   vertexOffset = m_builder.CreateAdd(vertexOffset, m_builder.getInt32(gsVsRingStart));
@@ -7815,7 +7808,7 @@ void NggPrimShader::createFenceAndBarrier() {
 // Read value from LDS.
 //
 // @param readTy : Type of value read from LDS
-// @param ldsOffset : Start offset to do LDS read operations
+// @param ldsOffset : Start offset to do LDS read operations (in dwords)
 // @param useDs128 : Whether to use 128-bit LDS load, 16-byte alignment is guaranteed by caller
 // @returns : Value read from LDS
 Value *NggPrimShader::readValueFromLds(Type *readTy, Value *ldsOffset, bool useDs128) {
@@ -7827,12 +7820,8 @@ Value *NggPrimShader::readValueFromLds(Type *readTy, Value *ldsOffset, bool useD
     alignment = 16;
   }
 
-  // NOTE: LDS variable is defined as a pointer to [n x i32]. We cast it to a pointer to [n x i8] first.
   assert(m_lds);
-  auto lds = ConstantExpr::getBitCast(
-      m_lds, PointerType::get(m_builder.getInt8Ty(), m_lds->getType()->getPointerAddressSpace()));
-
-  Value *readPtr = m_builder.CreateGEP(m_builder.getInt8Ty(), lds, ldsOffset);
+  Value *readPtr = m_builder.CreateGEP(m_builder.getInt32Ty(), m_lds, ldsOffset);
   readPtr = m_builder.CreateBitCast(readPtr, PointerType::get(readTy, ADDR_SPACE_LOCAL));
 
   return m_builder.CreateAlignedLoad(readTy, readPtr, Align(alignment));
@@ -7842,7 +7831,7 @@ Value *NggPrimShader::readValueFromLds(Type *readTy, Value *ldsOffset, bool useD
 // Write value to LDS.
 //
 // @param writeValue : Value written to LDS
-// @param ldsOffset : Start offset to do LDS write operations
+// @param ldsOffset : Start offset to do LDS write operations (in dwords)
 // @param useDs128 : Whether to use 128-bit LDS store, 16-byte alignment is guaranteed by caller
 void NggPrimShader::writeValueToLds(Value *writeValue, Value *ldsOffset, bool useDs128) {
   auto writeTy = writeValue->getType();
@@ -7854,12 +7843,8 @@ void NggPrimShader::writeValueToLds(Value *writeValue, Value *ldsOffset, bool us
     alignment = 16;
   }
 
-  // NOTE: LDS variable is defined as a pointer to [n x i32]. We cast it to a pointer to [n x i8] first.
   assert(m_lds != nullptr);
-  auto lds = ConstantExpr::getBitCast(
-      m_lds, PointerType::get(m_builder.getInt8Ty(), m_lds->getType()->getPointerAddressSpace()));
-
-  Value *writePtr = m_builder.CreateGEP(m_builder.getInt8Ty(), lds, ldsOffset);
+  Value *writePtr = m_builder.CreateGEP(m_builder.getInt32Ty(), m_lds, ldsOffset);
   writePtr = m_builder.CreateBitCast(writePtr, PointerType::get(writeTy, ADDR_SPACE_LOCAL));
 
   m_builder.CreateAlignedStore(writeValue, writePtr, Align(alignment));
@@ -7869,13 +7854,9 @@ void NggPrimShader::writeValueToLds(Value *writeValue, Value *ldsOffset, bool us
 // Do atomic add operation with the value stored in LDS.
 //
 // @param valueToAdd : Value to do atomic add
-// @param ldsOffset : Start offset to do LDS atomic operations
+// @param ldsOffset : Start offset to do LDS atomic operations (in dwords)
 void NggPrimShader::atomicAdd(Value *ValueToAdd, Value *ldsOffset) {
   assert(ValueToAdd->getType()->isIntegerTy(32));
-
-  // NOTE: LDS variable is defined as a pointer to [n x i32]. The LDS offset here has to be casted to dword offset
-  // from byte offset.
-  ldsOffset = m_builder.CreateLShr(ldsOffset, 2);
 
   Value *atomicPtr = m_builder.CreateGEP(m_lds->getValueType(), m_lds, {m_builder.getInt32(0), ldsOffset});
 
