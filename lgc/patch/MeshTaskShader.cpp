@@ -1584,9 +1584,9 @@ Function *MeshTaskShader::mutateMeshShaderEntryPoint(Function *entryPoint) {
 
   ArrayRef<std::string> specialSgprInputNames;
   if (m_gfxIp.major == 10)
-    specialSgprInputNames = makeArrayRef(SpecialSgprInputNamesGfx10);
+    specialSgprInputNames = ArrayRef(SpecialSgprInputNamesGfx10);
   else if (m_gfxIp.major == 11)
-    specialSgprInputNames = makeArrayRef(SpecialSgprInputNamesGfx11);
+    specialSgprInputNames = ArrayRef(SpecialSgprInputNamesGfx11);
   assert(specialSgprInputNames.size() == NumSpecialSgprInputs);
 
   // Add special SGPR inputs, prior to existing user data SGPRs
