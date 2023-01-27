@@ -629,8 +629,8 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
 
       const auto &ldsGeneralUsage = NggPrimShader::layoutPrimShaderLds(m_pipelineState);
       const bool needsLds = ldsGeneralUsage.needsLds;
-      const unsigned esExtraLdsSize = ldsGeneralUsage.esExtraLdsSize / sizeof(unsigned); // In dwords
-      const unsigned gsExtraLdsSize = ldsGeneralUsage.gsExtraLdsSize / sizeof(unsigned); // In dwords
+      const unsigned esExtraLdsSize = ldsGeneralUsage.esExtraLdsSize; // In dwords
+      const unsigned gsExtraLdsSize = ldsGeneralUsage.gsExtraLdsSize; // In dwords
 
       // NOTE: Primitive amplification factor must be at least 1. And for NGG GS mode, we force number of output
       // primitives to be equal to that of output vertices regardless of the output primitive type by emitting

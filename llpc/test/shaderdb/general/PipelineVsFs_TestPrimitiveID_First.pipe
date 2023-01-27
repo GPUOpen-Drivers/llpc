@@ -7,9 +7,8 @@
 ; SHADERTEST: define dllexport amdgpu_gs void @_amdgpu_gs_main({{.*}}, i32 %esGsOffsets01, i32 %esGsOffsets23, i32 %primitiveId,
 ; Extract bits 0 to 8 from %esGsOffsets01. These bit encode the thread ID in sub-group which will be used to
 ; calculate the address at which to store the provoking vertex.
-; SHADERTEST: [[offset1:%[0-9]*]] = shl i32 %esGsOffsets01, 2
-; SHADERTEST: [[offset2:%[0-9]*]] = and i32 [[offset1]], 2044
-; SHADERTEST: [[Addr1:%[0-9]*]] = getelementptr i8, ptr addrspace(3) @[[LDS]], i32 [[offset2]]
+; SHADERTEST: [[offset:%[0-9]*]] = and i32 %esGsOffsets01, 511
+; SHADERTEST: [[Addr1:%[0-9]*]] = getelementptr i32, ptr addrspace(3) @[[LDS]], i32 [[offset]]
 ; SHADERTEST: store i32 %primitiveId, ptr addrspace(3) [[Addr1]], align 4
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
