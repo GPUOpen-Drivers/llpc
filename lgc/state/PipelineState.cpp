@@ -54,6 +54,10 @@ static cl::opt<bool> EnableTessOffChip("enable-tess-offchip", cl::desc("Enable t
 static cl::opt<bool> EnableRowExport("enable-row-export", cl::desc("Enable row export for mesh shader"),
                                      cl::init(false));
 
+// -use-register-field-format: use register field format in pipeline ELF
+static cl::opt<bool> UseRegisterFieldFormat("use-register-field-format",
+                                            cl::desc("Use register field format in pipeline ELF"), cl::init(false));
+
 // Names for named metadata nodes when storing and reading back pipeline state
 static const char UnlinkedMetadataName[] = "lgc.unlinked";
 static const char PreRasterHasGsMetadataName[] = "lgc.prerast.has.gs";
@@ -219,7 +223,8 @@ static CompSetting computeCompSetting(BufDataFormat dfmt) {
 // @param builderContext : LGC builder context
 // @param emitLgc : Whether the option -emit-lgc is on
 PipelineState::PipelineState(LgcContext *builderContext, bool emitLgc)
-    : Pipeline(builderContext), m_emitLgc(emitLgc), m_meshRowExport(EnableRowExport) {
+    : Pipeline(builderContext), m_emitLgc(emitLgc), m_meshRowExport(EnableRowExport),
+      m_registerFieldFormat(UseRegisterFieldFormat) {
 }
 
 // =====================================================================================================================
@@ -1360,6 +1365,14 @@ bool PipelineState::enableMeshRowExport() const {
     return false; // Row export is not supported by HW
 
   return m_meshRowExport;
+}
+
+// =====================================================================================================================
+// Checks if register field value format is used or not
+bool PipelineState::useRegisterFieldFormat() const {
+  if (getTargetInfo().getGfxIpVersion().major < 11)
+    return false; // Register field format is not supported pre-GFX11 by now
+  return m_registerFieldFormat;
 }
 
 // =====================================================================================================================

@@ -188,6 +188,7 @@ target_sources(LLVMlgc PRIVATE
     patch/VertexFetch.cpp
     patch/PatchImageOpCollect.cpp
     patch/PatchWaveSizeAdjust.cpp
+    patch/RegisterMetadataBuilder.cpp
 )
 
 # lgc/state

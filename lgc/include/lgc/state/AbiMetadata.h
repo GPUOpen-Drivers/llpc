@@ -66,13 +66,13 @@ enum PipelineType : unsigned {
 
 // Hardware shader stage
 enum class HardwareStage : unsigned {
-  Ls = 0, ///< Hardware LS stage
-  Hs,     ///< Hardware hS stage
-  Es,     ///< Hardware ES stage
-  Gs,     ///< Hardware GS stage
-  Vs,     ///< Hardware VS stage
-  Ps,     ///< Hardware PS stage
-  Cs,     ///< Hardware CS stage
+  Ls = 0, // Hardware LS stage
+  Hs,     // Hardware hS stage
+  Es,     // Hardware ES stage
+  Gs,     // Hardware GS stage
+  Vs,     // Hardware VS stage
+  Ps,     // Hardware PS stage
+  Cs,     // Hardware CS stage
   Count,
   Invalid = ~0U
 };
@@ -86,6 +86,35 @@ enum HardwareStageFlagBits : unsigned {
   HwShaderVs = (1 << static_cast<unsigned>(HardwareStage::Vs)),
   HwShaderPs = (1 << static_cast<unsigned>(HardwareStage::Ps)),
   HwShaderCs = (1 << static_cast<unsigned>(HardwareStage::Cs)),
+};
+
+// Point sprite override selection.
+enum class PointSpriteSelect : unsigned {
+  Zero, // Select 0.0f.
+  One,  // Select 1.0f.
+  S,    // Select S component value.
+  T,    // Select T component value.
+  None, // Keep interpolated result.
+};
+
+// Geometry Shader output primitive type.
+enum class GsOutPrimType : unsigned {
+  PointList = 0, // A list of individual vertices that make up points.
+  LineStrip,     // Each additional vertex after the first two makes a new line.
+  TriStrip,      // Each additional vertex after the first three makes a new triangle.
+  Rect2d,        // Each rect is the bounding box of an arbitrary 2D triangle.
+  RectList,      // Each rect is three 2D axis-aligned rectangle vertices.
+  Last,
+};
+
+// Specifies how to populate the sample mask provided to pixel shaders.
+enum class CoverageToShaderSel : unsigned {
+  InputCoverage = 0,  // In over rasterization mode, replicate the overrast result to all detail samples of
+                      ///  the pixel. In standard rasterization mode, leave the sample mask untouched.
+  InputInnerCoverage, // In under rasterization mode, replicate the underrast result to all detail samples
+                      ///  of the pixel. If under rasterization is disabled output raw mask.
+  InputDepthCoverage, // The InputCoverage mask bitwise ANDed with the result of Early Depth/Stencil testing.
+  Raw,                // Output the scan converter's internal mask, unchanged.
 };
 
 namespace PalCodeObjectMetadataKey {
@@ -115,6 +144,8 @@ static constexpr char StreamOutVertexStrides[] = ".streamout_vertex_strides";
 static constexpr char Api[] = ".api";
 static constexpr char ApiCreateInfo[] = ".api_create_info";
 static constexpr char PsSampleMask[] = ".ps_sample_mask";
+static constexpr char GraphicsRegisters[] = ".graphics_registers";
+static constexpr char ComputeRegisters[] = ".compute_registers";
 }; // namespace PipelineMetadataKey
 
 namespace HardwareStageMetadataKey {
@@ -134,12 +165,341 @@ static constexpr char WritesUavs[] = ".writes_uavs";
 static constexpr char WritesDepth[] = ".writes_depth";
 static constexpr char UsesAppendConsume[] = ".uses_append_consume";
 static constexpr char MaxPrimsPerWave[] = ".max_prims_per_wave";
+static constexpr char ChecksumValue[] = ".checksum_value";
+static constexpr char FloatMode[] = ".float_mode";
+static constexpr char DebugMode[] = ".debug_mode";
+static constexpr char TrapPresent[] = ".trap_present";
+static constexpr char UserSgprs[] = ".user_sgprs";
+static constexpr char MemOrdered[] = ".mem_ordered";
+static constexpr char WgpMode[] = ".wgp_mode";
+static constexpr char OffchipLdsEn[] = ".offchip_lds_en";
+static constexpr char UserDataRegMap[] = ".user_data_reg_map";
+static constexpr char ImageOp[] = ".image_op";
 }; // namespace HardwareStageMetadataKey
 
 namespace ShaderMetadataKey {
 static constexpr char ApiShaderHash[] = ".api_shader_hash";
 static constexpr char HardwareMapping[] = ".hardware_mapping";
 }; // namespace ShaderMetadataKey
+
+namespace GraphicsRegisterMetadataKey {
+static constexpr char NggCullingDataReg[] = ".ngg_culling_data_reg";
+static constexpr char LsVgprCompCnt[] = ".ls_vgpr_comp_cnt";
+static constexpr char HsTgSizeEn[] = ".hs_tg_size_en";
+static constexpr char EsVgprCompCnt[] = ".es_vgpr_comp_cnt";
+static constexpr char GsVgprCompCnt[] = ".gs_vgpr_comp_cnt";
+static constexpr char VsVgprCompCnt[] = ".vs_vgpr_comp_cnt";
+static constexpr char VsSoEn[] = ".vs_so_en";
+static constexpr char VsSoBase0En[] = ".vs_so_base0_en";
+static constexpr char VsSoBase1En[] = ".vs_so_base1_en";
+static constexpr char VsSoBase2En[] = ".vs_so_base2_en";
+static constexpr char VsSoBase3En[] = ".vs_so_base3_en";
+static constexpr char VsStreamoutEn[] = ".vs_streamout_en";
+static constexpr char VsPcBaseEn[] = ".vs_pc_base_en";
+static constexpr char PsLoadProvokingVtx[] = ".ps_load_provoking_vtx";
+static constexpr char PsWaveCntEn[] = ".ps_wave_cnt_en";
+static constexpr char PsExtraLdsSize[] = ".ps_extra_lds_size";
+static constexpr char PaClClipCntl[] = ".pa_cl_clip_cntl";
+static constexpr char PaClVteCntl[] = ".pa_cl_vte_cntl";
+static constexpr char PaSuVtxCntl[] = ".pa_su_vtx_cntl";
+static constexpr char PaScModeCntl1[] = ".pa_sc_mode_cntl_1";
+static constexpr char PsIterSample[] = ".ps_iter_sample";
+static constexpr char VgtShaderStagesEn[] = ".vgt_shader_stages_en";
+static constexpr char VgtReuseOff[] = ".vgt_reuse_off";
+static constexpr char VgtGsMode[] = ".vgt_gs_mode";
+static constexpr char VgtTfParam[] = ".vgt_tf_param";
+static constexpr char VgtLsHsConfig[] = ".vgt_ls_hs_config";
+static constexpr char IaMultiVgtParam[] = ".ia_multi_vgt_param";
+static constexpr char IaMultiVgtParamPiped[] = ".ia_multi_vgt_param_piped";
+static constexpr char SpiInterpControl[] = ".spi_interp_control";
+static constexpr char SpiPsInputCntl[] = ".spi_ps_input_cntl";
+static constexpr char VgtHosMinTessLevel[] = ".vgt_hos_min_tess_level";
+static constexpr char VgtHosMaxTessLevel[] = ".vgt_hos_max_tess_level";
+static constexpr char SpiShaderGsMeshletDim[] = ".spi_shader_gs_meshlet_dim";
+static constexpr char SpiShaderGsMeshletExpAlloc[] = ".spi_shader_gs_meshlet_exp_alloc";
+static constexpr char ImageOp[] = ".image_op";
+static constexpr char VgtGsMaxVertOut[] = ".vgt_gs_max_vert_out";
+static constexpr char VgtGsInstanceCnt[] = ".vgt_gs_instance_cnt";
+static constexpr char VgtEsgsRingItemsize[] = ".vgt_esgs_ring_itemsize";
+static constexpr char VgtDrawPrimPayloadEn[] = ".vgt_draw_prim_payload_en";
+static constexpr char VgtGsOutPrimType[] = ".vgt_gs_out_prim_type";
+static constexpr char VgtGsVertItemsize[] = ".vgt_gs_vert_itemsize";
+static constexpr char VgtGsvsRingOffset[] = ".vgt_gsvs_ring_offset";
+static constexpr char VgtGsvsRingItemsize[] = ".vgt_gsvs_ring_itemsize";
+static constexpr char VgtEsPerGs[] = ".vgt_es_per_gs";
+static constexpr char VgtGsPerEs[] = ".vgt_gs_per_es";
+static constexpr char VgtGsPerVs[] = ".vgt_gs_per_vs";
+static constexpr char MaxVertsPerSubgroup[] = ".max_verts_per_subgroup";
+static constexpr char MaxPrimsPerSubgroup[] = ".max_prims_per_subgroup";
+static constexpr char SpiShaderIdxFormat[] = ".spi_shader_idx_format";
+static constexpr char GeNggSubgrpCntl[] = ".ge_ngg_subgrp_cntl";
+static constexpr char VgtGsOnchipCntl[] = ".vgt_gs_onchip_cntl";
+static constexpr char PaClVsOutCntl[] = ".pa_cl_vs_out_cntl";
+static constexpr char SpiShaderPosFormat[] = ".spi_shader_pos_format";
+static constexpr char SpiVsOutConfig[] = ".spi_vs_out_config";
+static constexpr char VgtPrimitiveIdEn[] = ".vgt_primitive_id_en";
+static constexpr char NggDisableProvokReuse[] = ".ngg_disable_provok_reuse";
+static constexpr char VgtStrmoutConfig[] = ".vgt_strmout_config";
+static constexpr char VgtStrmoutBufferConfig[] = ".vgt_strmout_buffer_config";
+static constexpr char VgtStrmoutVtxStride0[] = ".vgt_strmout_vtx_stride_0";
+static constexpr char VgtStrmoutVtxStride1[] = ".vgt_strmout_vtx_stride_1";
+static constexpr char VgtStrmoutVtxStride2[] = ".vgt_strmout_vtx_stride_2";
+static constexpr char VgtStrmoutVtxStride3[] = ".vgt_strmout_vtx_stride_3";
+static constexpr char CbShaderMask[] = ".cb_shader_mask";
+static constexpr char DbShaderControl[] = ".db_shader_control";
+static constexpr char SpiPsInControl[] = ".spi_ps_in_control";
+static constexpr char AaCoverageToShaderSelect[] = ".aa_coverage_to_shader_select";
+static constexpr char PaScShaderControl[] = ".pa_sc_shader_control";
+static constexpr char SpiBarycCntl[] = ".spi_baryc_cntl";
+static constexpr char SpiPsInputEna[] = ".spi_ps_input_ena";
+static constexpr char SpiPsInputAddr[] = ".spi_ps_input_addr";
+static constexpr char SpiShaderColFormat[] = ".spi_shader_col_format";
+static constexpr char SpiShaderZFormat[] = ".spi_shader_z_format";
+}; // namespace GraphicsRegisterMetadataKey
+
+namespace PaClClipCntlMetadataKey {
+static constexpr char UserClipPlane0Ena[] = ".user_clip_plane0_ena";
+static constexpr char UserClipPlane1Ena[] = ".user_clip_plane1_ena";
+static constexpr char UserClipPlane2Ena[] = ".user_clip_plane2_ena";
+static constexpr char UserClipPlane3Ena[] = ".user_clip_plane3_ena";
+static constexpr char UserClipPlane4Ena[] = ".user_clip_plane4_ena";
+static constexpr char UserClipPlane5Ena[] = ".user_clip_plane5_ena";
+static constexpr char DxLinearAttrClipEna[] = ".dx_linear_attr_clip_ena";
+static constexpr char RasterizationKill[] = ".rasterization_kill";
+static constexpr char VteVportProvokeDisable[] = ".vte_vport_provoke_disable";
+}; // namespace PaClClipCntlMetadataKey
+
+namespace PaSuVtxCntlMetadataKey {
+static constexpr char PixCenter[] = ".pix_center";
+static constexpr char RoundMode[] = ".round_mode";
+static constexpr char QuantMode[] = ".quant_mode";
+}; // namespace PaSuVtxCntlMetadataKey
+
+namespace PaClVteCntlMetadataKey {
+static constexpr char XScaleEna[] = ".x_scale_ena";
+static constexpr char XOffsetEna[] = ".x_offset_ena";
+static constexpr char YScaleEna[] = ".y_scale_ena";
+static constexpr char YOffsetEna[] = ".y_offset_ena";
+static constexpr char ZScaleEna[] = ".z_scale_ena";
+static constexpr char ZOffsetEna[] = ".z_offset_ena";
+static constexpr char VtxW0Fmt[] = ".vtx_w0_fmt";
+}; // namespace PaClVteCntlMetadataKey
+
+namespace PaScModeCntl1MetadataKey {
+static constexpr char PsIterSample[] = ".per_iter_sample";
+}; // namespace PaScModeCntl1MetadataKey
+
+namespace VgtShaderStagesEnMetadataKey {
+static constexpr char LsStageEn[] = ".ls_stage_en";
+static constexpr char HsStageEn[] = ".hs_stage_en";
+static constexpr char EsStageEn[] = ".es_stage_en";
+static constexpr char GsStageEn[] = ".gs_stage_en";
+static constexpr char VsStageEn[] = ".vs_stage_en";
+static constexpr char DynamicHs[] = ".dynamic_hs";
+static constexpr char MaxPrimgroupInWave[] = ".max_primgroup_in_wave";
+static constexpr char PrimgenEn[] = ".primgen_en";
+static constexpr char OrderedIdMode[] = ".ordered_id_mode";
+static constexpr char NggWaveIdEn[] = ".ngg_wave_id_en";
+static constexpr char GsFastLaunch[] = ".gs_fast_launch";
+static constexpr char PrimgenPassthruEn[] = ".primgen_passthru_en";
+static constexpr char GsW32En[] = ".gs_w32_en";
+static constexpr char VsW32En[] = ".vs_w32_en";
+static constexpr char HsW32En[] = ".hs_w32_en";
+static constexpr char PrimgenPassthruNoMsg[] = ".primgen_passthru_no_msg";
+}; // namespace VgtShaderStagesEnMetadataKey
+
+namespace IaMultiVgtParamMetadataKey {
+static constexpr char PrimgroupSize[] = ".primgroup_size";
+static constexpr char SwitchOnEoi[] = ".switch_on_eoi";
+static constexpr char PartialEsWaveOn[] = ".partial_es_wave_on";
+}; // namespace IaMultiVgtParamMetadataKey
+
+namespace IaMultiVgtParamPipedMetadataKey {
+static constexpr char PrimgroupSize[] = ".primgroup_size";
+static constexpr char SwitchOnEoi[] = ".switch_on_eoi";
+static constexpr char PartialEsWaveOn[] = ".partial_es_wave_on";
+}; // namespace IaMultiVgtParamPipedMetadataKey
+
+namespace VgtGsModeMetadataKey {
+static constexpr char Mode[] = ".mode";
+static constexpr char Onchip[] = ".onchip";
+static constexpr char EsWriteOptimize[] = ".es_write_optimize";
+static constexpr char GsWriteOptimize[] = ".gs_write_optimize";
+static constexpr char CutMode[] = ".cut_mode";
+}; // namespace VgtGsModeMetadataKey
+
+namespace SpiBarycCntlMetadataKey {
+static constexpr char PosFloatLocation[] = ".pos_float_location";
+static constexpr char FrontFaceAllBits[] = ".front_face_all_bits";
+static constexpr char PosFloatUlc[] = ".pos_float_ulc";
+}; // namespace SpiBarycCntlMetadataKey
+
+namespace DbShaderControlMetadataKey {
+static constexpr char ZExportEnable[] = ".z_export_enable";
+static constexpr char StencilTestValExportEnable[] = ".stencil_test_val_export_enable";
+static constexpr char ZOrder[] = ".z_order";
+static constexpr char KillEnable[] = ".kill_enable";
+static constexpr char MaskExportEnable[] = ".mask_export_enable";
+static constexpr char ExecOnHierFail[] = ".exec_on_hier_fail";
+static constexpr char ExecOnNoop[] = ".exec_on_noop";
+static constexpr char AlphaToMaskDisable[] = ".alpha_to_mask_disable";
+static constexpr char DepthBeforeShader[] = ".depth_before_shader";
+static constexpr char ConservativeZExport[] = ".conservative_z_export";
+static constexpr char PreShaderDepthCoverageEnable[] = ".pre_shader_depth_coverage_enable";
+}; // namespace DbShaderControlMetadataKey
+
+namespace SpiInterpControlMetadataKey {
+static constexpr char PointSpriteEna[] = ".point_sprite_ena";
+static constexpr char PointSpriteOverrideX[] = ".point_sprite_override_x";
+static constexpr char PointSpriteOverrideY[] = ".point_sprite_override_y";
+static constexpr char PointSpriteOverrideZ[] = ".point_sprite_override_z";
+static constexpr char PointSpriteOverrideW[] = ".point_sprite_override_w";
+}; // namespace SpiInterpControlMetadataKey
+
+namespace SpiPsInputCntlMetadataKey {
+static constexpr char Offset[] = ".offset";
+static constexpr char FlatShade[] = ".flat_shade";
+static constexpr char PtSpriteTex[] = ".pt_sprite_tex";
+static constexpr char Fp16InterpMode[] = ".fp16_interp_mode";
+static constexpr char Attr0Valid[] = ".attr0_valid";
+static constexpr char Attr1Valid[] = ".attr1_valid";
+static constexpr char PrimAttr[] = ".prim_attr";
+}; // namespace SpiPsInputCntlMetadataKey
+
+namespace SpiPsInControlMetadataKey {
+static constexpr char NumInterps[] = ".num_interps";
+static constexpr char NumPrimInterp[] = ".num_prim_interp";
+static constexpr char PsW32En[] = ".ps_w32_en";
+}; // namespace SpiPsInControlMetadataKey
+
+namespace VgtGsOnchipCntlMetadataKey {
+static constexpr char EsVertsPerSubgroup[] = ".es_verts_per_subgroup";
+static constexpr char GsPrimsPerSubgroup[] = ".gs_prims_per_subgroup";
+static constexpr char GsInstPrimsPerSubgrp[] = ".gs_inst_prims_per_subgrp";
+}; // namespace VgtGsOnchipCntlMetadataKey
+
+namespace VgtGsInstanceCntMetadataKey {
+static constexpr char Enable[] = ".enable";
+static constexpr char Count[] = ".count";
+static constexpr char EnMaxVertOutPerGsInstance[] = ".en_max_vert_out_per_gs_instance";
+}; // namespace VgtGsInstanceCntMetadataKey
+
+namespace VgtGsOutPrimTypeMetadataKey {
+static constexpr char OutprimType[] = ".outprim_type";
+static constexpr char OutprimType_1[] = ".outprim_type_1";
+static constexpr char OutprimType_2[] = ".outprim_type_2";
+static constexpr char OutprimType_3[] = ".outprim_type_3";
+static constexpr char UniqueTypePerStream[] = ".unique_type_per_stream";
+}; // namespace VgtGsOutPrimTypeMetadataKey
+
+namespace SpiVsOutConfigMetadataKey {
+static constexpr char NoPcExport[] = ".no_pc_export";
+static constexpr char VsExportCount[] = ".vs_export_count";
+static constexpr char PrimExportCount[] = ".prim_export_count";
+}; // namespace SpiVsOutConfigMetadataKey
+
+namespace PaClVsOutCntlMetadataKey {
+static constexpr char ClipDistEna_0[] = ".clip_dist_ena_0";
+static constexpr char ClipDistEna_1[] = ".clip_dist_ena_1";
+static constexpr char ClipDistEna_2[] = ".clip_dist_ena_2";
+static constexpr char ClipDistEna_3[] = ".clip_dist_ena_3";
+static constexpr char ClipDistEna_4[] = ".clip_dist_ena_4";
+static constexpr char ClipDistEna_5[] = ".clip_dist_ena_5";
+static constexpr char ClipDistEna_6[] = ".clip_dist_ena_6";
+static constexpr char ClipDistEna_7[] = ".clip_dist_ena_7";
+static constexpr char CullDistEna_0[] = ".cull_dist_ena_0";
+static constexpr char CullDistEna_1[] = ".cull_dist_ena_1";
+static constexpr char CullDistEna_2[] = ".cull_dist_ena_2";
+static constexpr char CullDistEna_3[] = ".cull_dist_ena_3";
+static constexpr char CullDistEna_4[] = ".cull_dist_ena_4";
+static constexpr char CullDistEna_5[] = ".cull_dist_ena_5";
+static constexpr char CullDistEna_6[] = ".cull_dist_ena_6";
+static constexpr char CullDistEna_7[] = ".cull_dist_ena_7";
+static constexpr char UseVtxPointSize[] = ".use_vtx_point_size";
+static constexpr char UseVtxEdgeFlag[] = ".use_vtx_edge_flag";
+static constexpr char UseVtxRenderTargetIndx[] = ".use_vtx_render_target_indx";
+static constexpr char UseVtxViewportIndx[] = ".use_vtx_viewport_indx";
+static constexpr char UseVtxKillFlag[] = ".use_vtx_kill_flag";
+static constexpr char VsOutMiscVecEna[] = ".vs_out_misc_vec_ena";
+static constexpr char VsOutCcDist0VecEna[] = ".vs_out_cc_dist0_vec_ena";
+static constexpr char VsOutCcDist1VecEna[] = ".vs_out_cc_dist1_vec_ena";
+static constexpr char VsOutMiscSideBusEna[] = ".vs_out_misc_side_bus_ena";
+static constexpr char UseVtxLineWidth[] = ".use_vtx_line_width";
+static constexpr char UseVtxVrsRate[] = ".use_vtx_vrs_rate";
+static constexpr char BypassVtxRateCombiner[] = ".bypass_vtx_rate_combiner";
+static constexpr char BypassPrimRateCombiner[] = ".bypass_prim_rate_combiner";
+static constexpr char UseVtxGsCutFlag[] = ".use_vtx_gs_cut_flag";
+#if PAL_BUILD_GFX11
+static constexpr char UseVtxFsrSelect[] = ".use_vtx_fsr_select";
+#endif
+}; // namespace PaClVsOutCntlMetadataKey
+
+namespace GeNggSubgrpCntlMetadataKey {
+static constexpr char PrimAmpFactor[] = ".prim_amp_factor";
+static constexpr char ThreadsPerSubgroup[] = ".threads_per_subgroup";
+}; // namespace GeNggSubgrpCntlMetadataKey
+
+namespace SpiShaderColFormatMetadataKey {
+static constexpr char Col_0ExportFormat[] = ".col_0_export_format";
+static constexpr char Col_1ExportFormat[] = ".col_1_export_format";
+static constexpr char Col_2ExportFormat[] = ".col_2_export_format";
+static constexpr char Col_3ExportFormat[] = ".col_3_export_format";
+static constexpr char Col_4ExportFormat[] = ".col_4_export_format";
+static constexpr char Col_5ExportFormat[] = ".col_5_export_format";
+static constexpr char Col_6ExportFormat[] = ".col_6_export_format";
+static constexpr char Col_7ExportFormat[] = ".col_7_export_format";
+}; // namespace SpiShaderColFormatMetadataKey
+
+namespace PaScShaderControlMetadataKey {
+static constexpr char LoadCollisionWaveid[] = ".load_collision_waveid";
+static constexpr char LoadIntrawaveCollision[] = ".load_intrawave_collision";
+static constexpr char WaveBreakRegionSize[] = ".wave_break_region_size";
+}; // namespace PaScShaderControlMetadataKey
+
+namespace VgtLsHsConfigMetadataKey {
+static constexpr char NumPatches[] = ".num_patches";
+static constexpr char HsNumInputCp[] = ".hs_num_input_cp";
+static constexpr char HsNumOutputCp[] = ".hs_num_output_cp";
+}; // namespace VgtLsHsConfigMetadataKey
+
+namespace VgtTfParamMetadataKey {
+static constexpr char Type[] = ".type";
+static constexpr char Partitioning[] = ".partitioning";
+static constexpr char Topology[] = ".topology";
+static constexpr char DisableDonuts[] = ".disable_donuts";
+static constexpr char NumDsWavesPerSimd[] = ".num_ds_waves_per_simd";
+static constexpr char DistributionMode[] = ".distribution_mode";
+}; // namespace VgtTfParamMetadataKey
+
+namespace VgtStrmoutConfigMetadataKey {
+static constexpr char Streamout_0En[] = ".streamout_0_en";
+static constexpr char Streamout_1En[] = ".streamout_1_en";
+static constexpr char Streamout_2En[] = ".streamout_2_en";
+static constexpr char Streamout_3En[] = ".streamout_3_en";
+static constexpr char RastStream[] = ".rast_stream";
+static constexpr char PrimsNeededCntEn[] = ".prims_needed_cnt_en";
+static constexpr char RastStreamMask[] = ".rast_stream_mask";
+static constexpr char UseRastStreamMask[] = ".use_rast_stream_mask";
+}; // namespace VgtStrmoutConfigMetadataKey
+
+namespace VgtStrmoutBufferConfigMetadataKey {
+static constexpr char Stream_0BufferEn[] = ".stream_0_buffer_en";
+static constexpr char Stream_1BufferEn[] = ".stream_1_buffer_en";
+static constexpr char Stream_2BufferEn[] = ".stream_2_buffer_en";
+static constexpr char Stream_3BufferEn[] = ".stream_3_buffer_en";
+}; // namespace VgtStrmoutBufferConfigMetadataKey
+
+namespace SpiShaderGsMeshletDimMetadataKey {
+static constexpr char NumThreadX[] = ".num_thread_x";
+static constexpr char NumThreadY[] = ".num_thread_y";
+static constexpr char NumThreadZ[] = ".num_thread_z";
+static constexpr char ThreadgroupSize[] = ".threadgroup_size";
+}; // namespace SpiShaderGsMeshletDimMetadataKey
+
+namespace SpiShaderGsMeshletExpAllocMetadataKey {
+static constexpr char MaxExpVerts[] = ".max_exp_verts";
+static constexpr char MaxExpPrims[] = ".max_exp_prims";
+}; // namespace SpiShaderGsMeshletExpAllocMetadataKey
 
 } // namespace Abi
 

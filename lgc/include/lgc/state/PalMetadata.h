@@ -205,6 +205,15 @@ public:
   // Get shader stage mask (only called for a link-only pipeline whose shader stage mask has not been set yet).
   unsigned getShaderStageMask();
 
+  // Serialize Util::Abi::CoverageToShaderSel to a string
+  llvm::StringRef serializeEnum(Util::Abi::CoverageToShaderSel value);
+
+  // Serialize Util::Abi::PointSpriteSelect to a string
+  llvm::StringRef serializeEnum(Util::Abi::PointSpriteSelect value);
+
+  // Serialize Util::Abi::GsOutPrimType to a string
+  llvm::StringRef serializeEnum(Util::Abi::GsOutPrimType value);
+
 private:
   // Initialize the PalMetadata object after reading in already-existing PAL metadata if any
   void initialize();
