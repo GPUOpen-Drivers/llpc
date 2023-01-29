@@ -1399,8 +1399,8 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
         loadStreamOutBufferInfo(userData);
     }
 
-    m_nggInputs.primShaderTableAddrLow = primShaderTableAddrLow;
-    m_nggInputs.primShaderTableAddrHigh = primShaderTableAddrHigh;
+    // Record primitive shader table address info
+    m_nggInputs.primShaderTableAddr = std::make_pair(primShaderTableAddrLow, primShaderTableAddrHigh);
 
     // Record vertex indices
     if (m_gfxIp.major <= 11) {
@@ -2148,8 +2148,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
     }
 
     // Record primitive shader table address info
-    m_nggInputs.primShaderTableAddrLow = primShaderTableAddrLow;
-    m_nggInputs.primShaderTableAddrHigh = primShaderTableAddrHigh;
+    m_nggInputs.primShaderTableAddr = std::make_pair(primShaderTableAddrLow, primShaderTableAddrHigh);
 
     auto vertValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.vertCountInWave);
     m_builder.CreateCondBr(vertValid, beginEsBlock, endEsBlock);
@@ -4615,7 +4614,7 @@ Value *NggPrimShader::fetchCullingControlRegister(Module *module, unsigned regOf
 
   return m_builder.CreateCall(
       fetchCullingRegister,
-      {m_nggInputs.primShaderTableAddrLow, m_nggInputs.primShaderTableAddrHigh, m_builder.getInt32(regOffset)});
+      {m_nggInputs.primShaderTableAddr.first, m_nggInputs.primShaderTableAddr.second, m_builder.getInt32(regOffset)});
 }
 
 // =====================================================================================================================

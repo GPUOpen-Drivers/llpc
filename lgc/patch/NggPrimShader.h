@@ -343,9 +343,8 @@ private:
     llvm::Value *waveIdInSubgroup; // Wave ID in subgroup
     llvm::Value *orderedWaveId;    // Ordered wave ID
 
-    llvm::Value *attribRingBase;          // Attribute ring base for this subgroup
-    llvm::Value *primShaderTableAddrLow;  // Primitive shader table address low
-    llvm::Value *primShaderTableAddrHigh; // Primitive shader table address high
+    llvm::Value *attribRingBase;                                 // Attribute ring base for this subgroup
+    std::pair<llvm::Value *, llvm::Value *> primShaderTableAddr; // Primitive shader table address <low, high>
 
     // VGPRs
     llvm::Value *threadIdInWave;     // Thread ID in wave
