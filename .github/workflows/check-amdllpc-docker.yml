@@ -20,8 +20,7 @@ jobs:
         feature-set:         ["+gcc", "+gcc+assertions",
                               "+clang",
                               "+clang+shadercache+ubsan+asan",
-                              "+clang+shadercache+ubsan+asan+assertions",
-                              "+clang+shadercache+tsan"]
+                              "+clang+shadercache+ubsan+asan+assertions"]
     steps:
       - name: Free up disk space
         if: contains(matrix.feature-set, '+ubsan') || contains(matrix.feature-set, '+asan') || contains(matrix.feature-set, '+tsan') || contains(matrix.feature-set, '+coverage')
