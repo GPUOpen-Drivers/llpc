@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2022 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -2323,7 +2323,6 @@ void SpirvLowerGlobal::lowerBufferBlock() {
             // pointers are removing zero-index GEPs and BitCast with pointer to pointer cast.
             m_builder->SetInsertPoint(replaceInstsInfo.loadStoreInst);
             unsigned bufferFlags = global.isConstant() ? 0 : lgc::Builder::BufferFlagWritten;
-
             Value *const bufferDesc = m_builder->CreateLoadBufferDesc(descSet, binding, m_builder->getInt32(0),
                                                                       bufferFlags, m_builder->getInt8Ty());
 

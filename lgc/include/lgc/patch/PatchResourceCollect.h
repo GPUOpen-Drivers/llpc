@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2022 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -175,8 +175,8 @@ private:
     return isCompatible;
   }
 
-  std::set<LocationSpan> m_locationSpans;    // Tracks spans of contiguous components in the generic input space
-  InOutLocationInfoMap m_locationInfoMap;    // The map between original location and new location
+  std::set<LocationSpan> m_locationSpans; // Tracks spans of contiguous components in the generic input space
+  InOutLocationInfoMap m_locationInfoMap; // The map between original location and new location
 };
 
 } // namespace lgc

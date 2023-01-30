@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2022 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -268,6 +268,7 @@ constexpr unsigned mmPA_SC_AA_CONFIG = 0xA2F8;
 
 // GS register numbers in PAL metadata
 constexpr unsigned mmVGT_GS_OUT_PRIM_TYPE = 0xA29B;
+constexpr unsigned mmVGT_GS_OUT_PRIM_TYPE_GFX11 = 0xC266;
 
 // Register bitfield layout.
 

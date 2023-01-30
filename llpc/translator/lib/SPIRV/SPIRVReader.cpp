@@ -2954,7 +2954,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
       }
     }
 
-    base = getBuilder()->CreateGEP(basePointeeType, base, gepIndices, "", spvAccessChain->isInBounds());
+    if (spvAccessChain->isInBounds())
+      base = getBuilder()->CreateInBoundsGEP(basePointeeType, base, gepIndices);
+    else
+      base = getBuilder()->CreateGEP(basePointeeType, base, gepIndices);
 
     gepIndices.clear();
     gepIndices.push_back(getBuilder()->getInt32(0));
