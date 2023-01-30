@@ -24,6 +24,7 @@
  **********************************************************************************************************************/
 
 #include "lgc/LgcContext.h"
+#include "lgc/LgcDialect.h"
 #include "llvm/IR/LLVMContext.h"
 #include "gmock/gmock.h"
 
@@ -32,8 +33,10 @@ using namespace llvm;
 using namespace llvm::CodeGenOpt;
 
 TEST(LgcInterfaceTests, DefaultOptLevel) {
-  LLVMContext context;
   LgcContext::initialize();
+  LLVMContext context;
+  auto dialectContext = llvm_dialects::DialectContext::make<LgcDialect>(context);
+
   unsigned palAbiVersion = 0xFFFFFFFF;
   StringRef gpuName = "gfx802";
 

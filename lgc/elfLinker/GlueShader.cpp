@@ -44,8 +44,6 @@ using namespace llvm;
 //
 // @param [in/out] outStream : Stream to write ELF to
 void GlueShader::compile(raw_pwrite_stream &outStream) {
-  auto dialectGuard = llvm_dialects::withDialects(m_lgcContext->getDialectContext());
-
   // Generate the glue shader IR module.
   std::unique_ptr<Module> module(generate());
 
