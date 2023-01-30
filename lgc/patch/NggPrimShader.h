@@ -194,8 +194,7 @@ public:
   static PrimShaderLdsUsageInfo layoutPrimShaderLds(PipelineState *pipelineState,
                                                     PrimShaderLdsLayout *ldsLayout = nullptr);
 
-  llvm::Function *generate(llvm::Function *esEntryPoint, llvm::Function *gsEntryPoint,
-                           llvm::Function *copyShaderEntryPoint);
+  llvm::Function *generate(llvm::Function *esMain, llvm::Function *gsMain, llvm::Function *copyShader);
 
 private:
   NggPrimShader() = delete;
@@ -226,16 +225,15 @@ private:
 
   void earlyExitWithDummyExport();
 
-  void runEs(llvm::Function *esEntryPoint, llvm::ArrayRef<llvm::Argument *> args);
-  llvm::Value *runPartEs(llvm::Function *partEs, llvm::ArrayRef<llvm::Argument *> args,
-                         llvm::Value *position = nullptr);
-  void splitEs(llvm::Function *esEntryPoint);
+  void runEs(llvm::ArrayRef<llvm::Argument *> args);
+  llvm::Value *runPartEs(llvm::ArrayRef<llvm::Argument *> args, llvm::Value *position = nullptr);
+  void splitEs();
 
-  void runGs(llvm::Function *gsEntryPoint, llvm::ArrayRef<llvm::Argument *> args);
-  llvm::Function *mutateGs(llvm::Function *gsEntryPoint);
+  void runGs(llvm::ArrayRef<llvm::Argument *> args);
+  void mutateGs();
 
-  void runCopyShader(llvm::Function *copyShader, llvm::ArrayRef<llvm::Argument *> args);
-  llvm::Function *mutateCopyShader(llvm::Function *copyShader);
+  void runCopyShader(llvm::ArrayRef<llvm::Argument *> args);
+  void mutateCopyShader();
 
   void exportGsOutput(llvm::Value *output, unsigned location, unsigned compIdx, unsigned streamId,
                       llvm::Value *threadIdInSubgroup, llvm::Value *emitVerts);
@@ -295,8 +293,8 @@ private:
 
   void processVertexAttribExport(llvm::Function *&target);
 
-  void processSwXfb(llvm::Function *target, llvm::ArrayRef<llvm::Argument *> args);
-  void processSwXfbWithGs(llvm::Function *target, llvm::ArrayRef<llvm::Argument *> args);
+  void processSwXfb(llvm::ArrayRef<llvm::Argument *> args);
+  void processSwXfbWithGs(llvm::ArrayRef<llvm::Argument *> args);
   llvm::Value *fetchXfbOutput(llvm::Function *target, llvm::ArrayRef<llvm::Argument *> args,
                               llvm::SmallVector<XfbOutputExport, 32> &xfbOutputExports);
 
@@ -355,8 +353,33 @@ private:
     llvm::Value *vertexIndex0; // Relative index of vertex0 in NGG subgroup
     llvm::Value *vertexIndex1; // Relative index of vertex1 in NGG subgroup
     llvm::Value *vertexIndex2; // Relative index of vertex2 in NGG subgroup
-
   } m_nggInputs = {};
+
+  // ES handlers
+  struct {
+    llvm::Function *main;            // ES main function
+    llvm::Function *cullDataFetcher; // Part ES to fetch cull data (position and cull distance)
+    llvm::Function *vertexExporter;  // Part ES to do deferred vertex exporting
+  } m_esHandlers = {};
+
+  // GS handlers
+  struct {
+    llvm::Function *main;       // GS main function
+    llvm::Function *copyShader; // Copy shader
+    llvm::Function *emit;       // GS emit handler
+    llvm::Function *cut;        // GS cut handler
+  } m_gsHandlers = {};
+
+  // Cullers
+  struct {
+    llvm::Function *backface;        // Backface culller
+    llvm::Function *frustum;         // Frustum culler
+    llvm::Function *boxFilter;       // Box filter culler
+    llvm::Function *sphere;          // Sphere culler
+    llvm::Function *smallPrimFilter; // Small primitive filter
+    llvm::Function *cullDistance;    // Cull distance culler
+    llvm::Function *regFetcher;      // Culling register fetcher
+  } m_cullers = {};
 
   llvm::Value *m_distributedPrimitiveId = nullptr; // Distributed primitive ID (from geomeotry based to vertex based)
 

@@ -112,30 +112,11 @@ const static char ImmutableConvertingSamplerGlobal[] = "lgc.immutable.converting
 const static char EsGsEntryPoint[] = "lgc.shader.ESGS.main";
 const static char LsHsEntryPoint[] = "lgc.shader.LSHS.main";
 
-const static char NggEsEntryPoint[] = "lgc.ngg.ES.main";
-const static char NggEsCullDataFetch[] = "lgc.ngg.ES.cull.data.fetch";
-const static char NggEsDeferredVertexExport[] = "lgc.ngg.ES.deferred.vertex.export";
-const static char NggEsXfbOutputFetch[] = "lgc.ngg.ES.xfb.output.fetch";
 const static char NggAttribExport[] = "lgc.ngg.attrib.export";
 const static char NggXfbOutputExport[] = "lgc.ngg.xfb.output.export.";
-
-const static char NggGsEntryPoint[] = "lgc.ngg.GS.main";
 const static char NggGsOutputExport[] = "lgc.ngg.GS.output.export.";
 const static char NggGsOutputImport[] = "lgc.ngg.GS.output.import.";
-const static char NggGsEmit[] = "lgc.ngg.GS.emit";
-const static char NggGsCut[] = "lgc.ngg.GS.cut";
-const static char NggGsXfbOutputFetch[] = "lgc.ngg.GS.xfb.output.fetch";
-
-const static char NggCopyShaderEntryPoint[] = "lgc.ngg.COPY.main";
 const static char NggPrimShaderEntryPoint[] = "lgc.shader.PRIM.main";
-
-const static char NggCullingFetchReg[] = "lgc.ngg.culling.fetchreg";
-const static char NggCullingBackface[] = "lgc.ngg.culling.backface";
-const static char NggCullingFrustum[] = "lgc.ngg.culling.frustum";
-const static char NggCullingBoxFilter[] = "lgc.ngg.culling.boxfilter";
-const static char NggCullingSphere[] = "lgc.ngg.culling.sphere";
-const static char NggCullingSmallPrimFilter[] = "lgc.ngg.culling.smallprimfilter";
-const static char NggCullingCullDistance[] = "lgc.ngg.culling.culldistance";
 
 const static char EntryPointPrefix[] = "lgc.shader.";
 const static char CopyShaderEntryPoint[] = "lgc.shader.COPY.main";
