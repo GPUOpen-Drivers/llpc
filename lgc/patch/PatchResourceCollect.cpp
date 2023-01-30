@@ -357,8 +357,8 @@ bool PatchResourceCollect::canUseNggCulling(Module *module) {
   }
 
   // Check resource usage, disable culling if there are resource write operations (including atomic operations) in
-  // non-GS NGG cases. This is because such write operations have side effect in execution sequences. But in GS NGG
-  // cases, we can still enable culling. Culling is performed after GS execution.
+  // NGG cases when API GS is not present. This is because such write operations have side effect in execution
+  // sequences. But when GS is present, we can still enable culling. Culling is performed after GS execution.
   if (!hasGs) {
     const auto resUsage = m_pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
     if (resUsage->resourceWrite)
@@ -632,9 +632,9 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
       const unsigned esExtraLdsSize = ldsGeneralUsage.esExtraLdsSize; // In dwords
       const unsigned gsExtraLdsSize = ldsGeneralUsage.gsExtraLdsSize; // In dwords
 
-      // NOTE: Primitive amplification factor must be at least 1. And for NGG GS mode, we force number of output
+      // NOTE: Primitive amplification factor must be at least 1. And for NGG with API GS, we force number of output
       // primitives to be equal to that of output vertices regardless of the output primitive type by emitting
-      // invalid primitives. This is to simplify the algorithmic design of NGG GS and improve its efficiency.
+      // invalid primitives. This is to simplify the algorithmic design and improve its efficiency.
       unsigned primAmpFactor = std::max(1u, geometryMode.outputVertices);
 
       unsigned esVertsPerSubgroup = 0;

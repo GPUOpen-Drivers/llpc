@@ -90,7 +90,7 @@ NggPrimShader::NggPrimShader(PipelineState *pipelineState)
 
   assert(m_pipelineState->isGraphics());
 
-  // NOTE: For NGG GS mode, we change data layout of output vertices. They are grouped by vertex streams now.
+  // NOTE: For NGG with API GS, we change data layout of output vertices. They are grouped by vertex streams now.
   // Vertices belonging to different vertex streams are in different regions of GS-VS ring. Here, we calculate
   // the base offset of each vertex streams and record them. See NggPrimShader::exportGsOutput for detail.
   if (m_hasGs) {
@@ -482,7 +482,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
 }
 
 // =====================================================================================================================
-// Generates NGG primitive shader entry-point.
+// Generates the entry-point of primitive shader.
 //
 // @param esEntryPoint : Entry-point of hardware export shader (ES) (could be null)
 // @param gsEntryPoint : Entry-point of hardware geometry shader (GS) (could be null)
@@ -536,7 +536,7 @@ unsigned NggPrimShader::calcVertexCullInfoSizeAndOffsets(PipelineState *pipeline
 
   vertCullInfoOffsets = {};
 
-  // Only for non-GS NGG with culling mode enabled
+  // Only for NGG culling mode without API GS
   const bool hasGs = pipelineState->hasShaderStage(ShaderStageGeometry);
   if (hasGs || nggControl->passthroughMode)
     return 0;
@@ -630,7 +630,7 @@ unsigned NggPrimShader::calcVertexCullInfoSizeAndOffsets(PipelineState *pipeline
 }
 
 // =====================================================================================================================
-// Generates the type for the new entry-point of NGG primitive shader.
+// Generates the entry-point type of primitive shader.
 //
 // @param module : IR module (for getting ES function if needed to get vertex fetch types)
 // @param [out] inRegMask : "Inreg" bit mask for the arguments
@@ -709,7 +709,7 @@ FunctionType *NggPrimShader::generatePrimShaderEntryPointType(Module *module, ui
     if (vertexFetchCount != 0) {
       // TODO: This will not work with non-GS culling.
       if (!m_hasGs && !m_nggControl->passthroughMode)
-        m_pipelineState->setError("Fetchless VS with non-GS NGG culling not supported");
+        m_pipelineState->setError("Fetchless VS in NGG culling mode (without API GS) not supported");
       // The final vertexFetchCount args of the ES (API VS) are the vertex fetches.
       Function *esEntry = module->getFunction(lgcName::NggEsEntryPoint);
       unsigned esArgSize = esEntry->arg_size();
@@ -722,7 +722,7 @@ FunctionType *NggPrimShader::generatePrimShaderEntryPointType(Module *module, ui
 }
 
 // =====================================================================================================================
-// Generates the new entry-point for NGG primitive shader.
+// Generates the entry-point for primitive shader.
 //
 // @param module : LLVM module
 Function *NggPrimShader::generatePrimShaderEntryPoint(Module *module) {
@@ -794,7 +794,7 @@ Function *NggPrimShader::generatePrimShaderEntryPoint(Module *module) {
 }
 
 // =====================================================================================================================
-// Builds layout lookup table of NGG primitive shader constant buffer, setting up a collection of buffer offsets
+// Builds layout lookup table of primitive shader constant buffer, setting up a collection of buffer offsets
 // according to the definition of this constant buffer in ABI.
 void NggPrimShader::buildPrimShaderCbLayoutLookupTable() {
   m_cbLayoutTable = {}; // Initialized to all-zeros
@@ -2694,7 +2694,7 @@ void NggPrimShader::loadStreamOutBufferInfo(Value *userData) {
 }
 
 // =====================================================================================================================
-// Does various culling for NGG primitive shader.
+// Does various culling for primitive shader.
 //
 // @param module : LLVM module
 // @param vertexIndex0: Relative index of vertex0 (forming this primitive)
@@ -2964,7 +2964,7 @@ void NggPrimShader::exportPrimitiveWithGs(Value *startingVertexIndex) {
 }
 
 // =====================================================================================================================
-// Early exit NGG primitive shader when we detect that the entire subgroup is fully culled, doing dummy
+// Early exit primitive shader when we detect that the entire subgroup is fully culled, doing dummy
 // primitive/vertex export if necessary.
 void NggPrimShader::earlyExitWithDummyExport() {
   auto earlyExitBlock = m_builder.GetInsertBlock();
@@ -4390,7 +4390,7 @@ void NggPrimShader::writePerThreadDataToLds(Value *writeData, Value *threadId, P
 // @param vertexItemOffset : Per-vertex item offset (in dwords) in subgroup of the entire vertex cull info
 // @param dataOffset : Data offset (in dwords) within an item of vertex cull info
 Value *NggPrimShader::readVertexCullInfoFromLds(Type *readDataTy, Value *vertexItemOffset, unsigned dataOffset) {
-  // Only applied to culling mode of non-GS NGG
+  // Only applied to NGG culling mode without API GS
   assert(!m_hasGs && !m_nggControl->passthroughMode);
   assert(dataOffset != InvalidValue);
 
@@ -4406,7 +4406,7 @@ Value *NggPrimShader::readVertexCullInfoFromLds(Type *readDataTy, Value *vertexI
 // @param vertexItemOffset : Per-vertex item offset (in dwords) in subgroup of the entire vertex cull info
 // @param dataOffset : Data offset (in dwords) within an item of vertex cull info
 void NggPrimShader::writeVertexCullInfoToLds(Value *writeData, Value *vertexItemOffset, unsigned dataOffset) {
-  // Only applied to culling mode of non-GS NGG
+  // Only applied to NGG culling mode without API GS
   assert(!m_hasGs && !m_nggControl->passthroughMode);
   assert(dataOffset != InvalidValue);
 
