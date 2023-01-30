@@ -1,7 +1,7 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2017-2022 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
  #  of this software and associated documentation files (the "Software"), to deal
@@ -59,12 +59,6 @@ endif()
 #if VKI_BUILD_GFX11
 if(LLPC_BUILD_GFX11)
     target_compile_definitions(vkgc_headers INTERFACE VKI_BUILD_GFX11)
-endif()
-#endif
-
-#if VKI_BUILD_NAVI31
-if(LLPC_BUILD_NAVI31)
-    target_compile_definitions(vkgc_headers INTERFACE LLPC_BUILD_NAVI31)
 endif()
 #endif
 
