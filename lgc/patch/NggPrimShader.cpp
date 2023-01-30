@@ -635,7 +635,7 @@ unsigned NggPrimShader::calcVertexCullInfoSizeAndOffsets(PipelineState *pipeline
 // @param module : IR module (for getting ES function if needed to get vertex fetch types)
 // @param [out] inRegMask : "Inreg" bit mask for the arguments
 FunctionType *NggPrimShader::generatePrimShaderEntryPointType(Module *module, uint64_t *inRegMask) {
-  std::vector<Type *> argTys;
+  SmallVector<Type *, 32> argTys;
 
   // First 8 system values (SGPRs)
   for (unsigned i = 0; i < NumSpecialSgprInputs; ++i) {
@@ -3138,7 +3138,7 @@ void NggPrimShader::runEs(Function *esEntryPoint, ArrayRef<Argument *> args) {
 
       const unsigned userDataSize = cast<FixedVectorType>(esArgTy)->getNumElements();
 
-      std::vector<int> shuffleMask;
+      SmallVector<int, 8> shuffleMask;
       for (unsigned i = 0; i < userDataSize; ++i)
         shuffleMask.push_back(userDataIdx + i);
 
@@ -3387,7 +3387,7 @@ Value *NggPrimShader::runPartEs(Function *partEs, ArrayRef<Argument *> args, Val
 
       const unsigned userDataSize = cast<FixedVectorType>(partEsArgTy)->getNumElements();
 
-      std::vector<int> shuffleMask;
+      SmallVector<int, 8> shuffleMask;
       for (unsigned i = 0; i < userDataSize; ++i)
         shuffleMask.push_back(userDataIdx + i);
 
@@ -3703,7 +3703,7 @@ void NggPrimShader::runGs(Function *gsEntryPoint, ArrayRef<Argument *> args) {
 
       const unsigned userDataSize = cast<FixedVectorType>(gsArgTy)->getNumElements();
 
-      std::vector<int> shuffleMask;
+      SmallVector<int, 8> shuffleMask;
       for (unsigned i = 0; i < userDataSize; ++i)
         shuffleMask.push_back(userDataIdx + i);
 
@@ -3940,7 +3940,7 @@ Function *NggPrimShader::mutateCopyShader(Function *copyShader) {
   const unsigned rasterStream =
       m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.rasterStream;
 
-  std::vector<Instruction *> removedCalls;
+  SmallVector<Instruction *, 32> removedCalls;
 
   for (auto &func : copyShader->getParent()->functions()) {
     if (func.getName().startswith(lgcName::NggGsOutputImport)) {
@@ -7506,7 +7506,7 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
     llvm_unreachable("Not implemented!");
   }
 
-  std::vector<Value *> xfbFetcherArgs;
+  SmallVector<Value *, 32> xfbFetcherArgs;
 
   // If we don't clone the target function, we are going to run it and handle vertex attribute through memory
   // here.
@@ -7546,7 +7546,7 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
 
       const unsigned userDataSize = cast<FixedVectorType>(xfbFetcherArgTy)->getNumElements();
 
-      std::vector<int> shuffleMask;
+      SmallVector<int, 8> shuffleMask;
       for (unsigned i = 0; i < userDataSize; ++i)
         shuffleMask.push_back(userDataIdx + i);
 
