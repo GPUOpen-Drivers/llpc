@@ -31,6 +31,7 @@
 
 #include "lgc/ElfLinker.h"
 #include "lgc/LgcContext.h"
+#include "lgc/LgcDialect.h"
 #include "lgc/PassManager.h"
 #include "lgc/Pipeline.h"
 #include "lgc/patch/Patch.h"
@@ -182,8 +183,10 @@ static bool runPassPipeline(Pipeline &pipeline, Module &module, raw_pwrite_strea
 // @param argv : Command-line arguments
 int main(int argc, char **argv) {
   const char *progName = sys::path::filename(argv[0]).data();
-  LLVMContext context;
   LgcContext::initialize();
+
+  LLVMContext context;
+  auto dialectContext = llvm_dialects::DialectContext::make<LgcDialect>(context);
 
   // Set our category on options that we want to show in -help, and hide other options.
   auto opts = cl::getRegisteredOptions();
@@ -252,8 +255,6 @@ int main(int argc, char **argv) {
     errs() << progName << ": GPU type '" << gpuName << "' not recognized\n";
     return 1;
   }
-
-  auto dialectGuard = llvm_dialects::withDialects(lgcContext->getDialectContext());
 
   if (VerboseOutput)
     lgcContext->setLlpcOuts(&outs());
