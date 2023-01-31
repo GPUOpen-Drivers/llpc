@@ -1570,13 +1570,13 @@ Function *MeshTaskShader::mutateMeshShaderEntryPoint(Function *entryPoint) {
   assert(getShaderStage(entryPoint) == ShaderStageMesh); // Must be mesh shader
 
   // GFX10 special SGPR input names
-  static const SmallVector<std::string, NumSpecialSgprInputs> SpecialSgprInputNamesGfx10 = {
+  static const std::array<std::string, NumSpecialSgprInputs> SpecialSgprInputNamesGfx10 = {
       "gsUserDataAddrLow", "gsUserDataAddrHigh",  "mergedGroupInfo", "mergedWaveInfo",
       "offChipLdsBase",    "sharedScratchOffset", "gsShaderAddrLow", "gsShaderAddrHigh",
   };
 
   // GFX10 special SGPR input names
-  static const SmallVector<std::string, NumSpecialSgprInputs> SpecialSgprInputNamesGfx11 = {
+  static const std::array<std::string, NumSpecialSgprInputs> SpecialSgprInputNamesGfx11 = {
       "gsProgramAddrLow", "gsProgramAddrHigh", "mergedGroupInfo",
       "mergedWaveInfo",   "workgroupIdYX",     "workgroupIdZAndAttribRingBase",
       "flatScratchLow",   "flatScratchHigh",
