@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -72,9 +72,7 @@ LLPC_FUNCTION_PASS("lgc-patch-buffer-op", PatchBufferOp)
 LLPC_MODULE_PASS("lgc-patch-workarounds", PatchWorkarounds)
 LLPC_FUNCTION_PASS("lgc-patch-load-scalarizer", PatchLoadScalarizer)
 LLPC_MODULE_PASS("lgc-patch-null-frag-shader", PatchNullFragShader)
-#if LLPC_BUILD_GFX11
 LLPC_MODULE_PASS("lgc-patch-image-op-collect", PatchImageOpCollect)
-#endif
 LLPC_MODULE_PASS("lgc-vertex-fetch", LowerVertexFetch)
 
 #undef LLPC_PASS

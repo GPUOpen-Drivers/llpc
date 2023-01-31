@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2022 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2023 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -423,7 +423,12 @@ void PalMetadata::fixUpRegisters() {
     if (!hasTs && !hasGs && !hasMesh) {
       // Here we use register field to determine if NGG is enabled, because enabling NGG depends on other conditions.
       // see PatchResourceCollect::canUseNgg.
-      if (m_registers.find(m_document->getNode(mmVGT_GS_OUT_PRIM_TYPE)) != m_registers.end()) {
+      unsigned vgtGsOutPrimType = mmVGT_GS_OUT_PRIM_TYPE;
+      if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
+        // NOTE: Register VGT_GS_OUT_PRIM_TYPE is a special one that has different HW offset on GFX11+.
+        vgtGsOutPrimType = mmVGT_GS_OUT_PRIM_TYPE_GFX11;
+      }
+      if (m_registers.find(m_document->getNode(vgtGsOutPrimType)) != m_registers.end()) {
         const auto primType = m_pipelineState->getInputAssemblyState().primitiveType;
         unsigned gsOutputPrimitiveType = 0;
         switch (primType) {
@@ -445,7 +450,7 @@ void PalMetadata::fixUpRegisters() {
           llvm_unreachable("Should never be called!");
           break;
         }
-        m_registers[mmVGT_GS_OUT_PRIM_TYPE] = gsOutputPrimitiveType;
+        m_registers[vgtGsOutPrimType] = gsOutputPrimitiveType;
       }
     }
   }

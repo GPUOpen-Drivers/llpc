@@ -325,6 +325,5 @@ def main():
     with open(ti.path, 'wb') as f:
       f.writelines(['{}\n'.format(l).encode('utf-8') for l in output_lines])
 
-
 if __name__ == '__main__':
   main()

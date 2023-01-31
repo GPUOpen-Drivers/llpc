@@ -562,6 +562,7 @@ inline bool isValid(spv::Capability V) {
   case CapabilityFragmentShadingRateKHR:
   case CapabilityInt64ImageEXT:
   case CapabilityMeshShadingEXT:
+  case CapabilityFragmentBarycentricKHR:
 #if SPV_VERSION >= 0x10500
   case CapabilityShaderNonUniform:
   case CapabilityRuntimeDescriptorArray:

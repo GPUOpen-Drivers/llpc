@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2022 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2023 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -439,6 +439,27 @@ static void setGfx1034Info(TargetInfo *targetInfo) {
   targetInfo->getGpuProperty().numShaderEngines = 1;
 }
 
+// gfx1035
+//
+// @param [in/out] targetInfo : Target info
+static void setGfx1035Info(TargetInfo *targetInfo) {
+  setGfx10Info(targetInfo);
+  setGfx103Info(targetInfo);
+
+  targetInfo->getGpuProperty().numShaderEngines = 1;
+  targetInfo->getGpuWorkarounds().gfx10.waClearWriteCompressBit = 1;
+}
+
+// gfx1036
+//
+// @param [in/out] targetInfo : Target info
+static void setGfx1036Info(TargetInfo *targetInfo) {
+  setGfx10Info(targetInfo);
+  setGfx103Info(targetInfo);
+
+  targetInfo->getGpuProperty().numShaderEngines = 1;
+}
+
 // gfx11
 //
 // @param [in/out] targetInfo : Target info
@@ -506,6 +527,8 @@ bool TargetInfo::setTargetInfo(StringRef gpuName) {
       {"gfx1031", &setGfx1031Info}, // gfx1031, navi22
       {"gfx1032", &setGfx1032Info}, // gfx1032, navi23
       {"gfx1034", &setGfx1034Info}, // gfx1034, navi24
+      {"gfx1035", &setGfx1035Info}, // gfx1035, rembrandt
+      {"gfx1036", &setGfx1036Info}, // gfx1036, raphael | mendocino
       {"gfx1100", &setGfx1100Info}, // gfx1100, navi31
   };
 
