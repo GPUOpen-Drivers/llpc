@@ -556,9 +556,9 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
   if (vertexFetches.empty())
     return false;
 
-  // Some formats are not supported before gfx9.
-  GfxIpVersion gfxIp = pipelineState->getLgcContext()->getTargetInfo().getGfxIpVersion();
-  if (pipelineState->getOptions().enableUberFetchShader && gfxIp.major > 9) {
+  if (pipelineState->getOptions().enableUberFetchShader) {
+    // NOTE: The 10_10_10_2 formats are not supported by the uber fetch shader on gfx9 and older.
+    // We rely on the driver to fallback to not using the uber fetch shader when those formats are used.
     std::unique_ptr<lgc::Builder> desBuilder(Builder::createBuilderImpl(pipelineState->getLgcContext(), pipelineState));
     static_cast<BuilderImplBase *>(&*desBuilder)->setShaderStage(ShaderStageVertex);
     desBuilder->SetInsertPoint(&(*vertexFetches[0]->getFunction()->front().getFirstInsertionPt()));
