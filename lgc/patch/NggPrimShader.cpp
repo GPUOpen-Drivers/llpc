@@ -2179,7 +2179,8 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
     if (m_pipelineState->enableSwXfb()) {
       const auto &streamXfbBuffers = m_pipelineState->getStreamXfbBuffers();
       for (unsigned i = 0; i < MaxGsStreams; ++i) {
-        bool streamActive = streamXfbBuffers[i] != 0;
+        // Treat the vertex stream as active if it is associated with XFB buffers or is the rasterization stream.
+        bool streamActive = streamXfbBuffers[i] != 0 || i == rasterStream;
         if (streamActive) { // Initialize primitive connectivity data if the stream is active
           writePerThreadDataToLds(m_builder.getInt32(NullPrim), m_nggInputs.threadIdInSubgroup,
                                   PrimShaderLdsRegion::PrimitiveData, Gfx9::NggMaxThreadsPerSubgroup * i);
@@ -6679,8 +6680,12 @@ void NggPrimShader::processSwXfbWithGs(Function *target, ArrayRef<Argument *> ar
   unsigned firstActiveStream = InvalidValue;
   unsigned lastActiveStream = InvalidValue;
 
+  const unsigned rasterStream =
+      m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.rasterStream;
+
   for (unsigned i = 0; i < MaxGsStreams; ++i) {
-    streamActive[i] = streamXfbBuffers[i] != 0;
+    // Treat the vertex stream as active if it is associated with XFB buffers or is the rasterization stream.
+    streamActive[i] = streamXfbBuffers[i] != 0 || i == rasterStream;
     if (!streamActive[i])
       continue; // Stream is inactive
 
