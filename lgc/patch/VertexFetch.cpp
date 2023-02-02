@@ -992,7 +992,13 @@ Value *VertexFetchImpl::fetchVertex(CallInst *callInst, llvm::Value *descPtr, Bu
 
   // PerInstance
   auto vbIndexInstance = ShaderInputs::getInput(ShaderInput::InstanceId, builder, *m_lgcContext);
-  vbIndexInstance = builder.CreateUDiv(vbIndexInstance, inputRate);
+
+  // NOTE: When inputRate = 0, avoid adding new blocks and use two select instead.
+  auto isZero = builder.CreateICmpEQ(inputRate, zero);
+  auto divisor = builder.CreateSelect(isZero, builder.getInt32(1), inputRate);
+  vbIndexInstance = builder.CreateUDiv(vbIndexInstance, divisor);
+  vbIndexInstance = builder.CreateSelect(isZero, zero, vbIndexInstance);
+
   vbIndexInstance =
       builder.CreateAdd(vbIndexInstance, ShaderInputs::getSpecialUserData(UserDataMapping::BaseInstance, builder));
 
