@@ -253,17 +253,18 @@ void RegisterMetadataBuilder::buildEsGsRegisters() {
   vgtGsOnChipCntl[Util::Abi::VgtGsOnchipCntlMetadataKey::GsInstPrimsPerSubgrp] = gsInstPrimsInSubgrp;
 
   // VGT_GS_VERT_ITEMSIZE and VGT_GSVS_RING_OFFSET
+  auto itemSizeArrayNode =
+      getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtGsVertItemsize].getArray(true);
+  auto ringOffsetArrayNode =
+      getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtGsvsRingOffset].getArray(true);
   const unsigned itemCount = 4;
-  unsigned gsVertItemSizes[itemCount] = {};
-  unsigned gsVsRingOffsets[itemCount] = {};
   unsigned gsVsRingOffset = 0;
   for (unsigned i = 0; i < itemCount; ++i) {
-    gsVertItemSizes[i] = sizeof(unsigned) * gsInOutUsage.gs.outLocCount[i];
-    gsVsRingOffset += gsVertItemSizes[i] * maxVertOut;
-    gsVsRingOffsets[i] = gsVsRingOffset;
+    unsigned itemSize = sizeof(unsigned) * gsInOutUsage.gs.outLocCount[i];
+    gsVsRingOffset += itemSize * maxVertOut;
+    itemSizeArrayNode[i] = itemSize;
+    ringOffsetArrayNode[i] = gsVsRingOffset;
   }
-  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtGsVertItemsize] = gsVertItemSizes;
-  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtGsvsRingOffset] = gsVsRingOffsets;
 
   // VGT_GS_INSTANCE_CNT
   if (geometryMode.invocations > 1 || gsBuiltInUsage.invocationId) {
@@ -284,14 +285,14 @@ void RegisterMetadataBuilder::buildEsGsRegisters() {
   auto vgtGsOutPrimType = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtGsOutPrimType].getMap(true);
   vgtGsOutPrimType[Util::Abi::VgtGsOutPrimTypeMetadataKey::OutprimType] = gsOutputPrimitiveType;
   // Set multi-stream output primitive type
-  if (gsVertItemSizes[1] > 0 || gsVertItemSizes[2] > 0 || gsVertItemSizes[3] > 0) {
+  if (itemSizeArrayNode[1].getInt() > 0 || itemSizeArrayNode[2].getInt() > 0 || itemSizeArrayNode[3].getInt() > 0) {
     const static auto GsOutPrimInvalid = 3u;
     vgtGsOutPrimType[Util::Abi::VgtGsOutPrimTypeMetadataKey::OutprimType_1] =
-        gsVertItemSizes[1] > 0 ? gsOutputPrimitiveType : GsOutPrimInvalid;
+        itemSizeArrayNode[1].getInt() > 0 ? gsOutputPrimitiveType : GsOutPrimInvalid;
     vgtGsOutPrimType[Util::Abi::VgtGsOutPrimTypeMetadataKey::OutprimType_2] =
-        gsVertItemSizes[2] > 0 ? gsOutputPrimitiveType : GsOutPrimInvalid;
+        itemSizeArrayNode[2].getInt() > 0 ? gsOutputPrimitiveType : GsOutPrimInvalid;
     vgtGsOutPrimType[Util::Abi::VgtGsOutPrimTypeMetadataKey::OutprimType_3] =
-        gsVertItemSizes[3] > 0 ? gsOutputPrimitiveType : GsOutPrimInvalid;
+        itemSizeArrayNode[3].getInt() > 0 ? gsOutputPrimitiveType : GsOutPrimInvalid;
   }
 
   // VGT_GSVS_RING_ITEMSIZE
@@ -501,8 +502,10 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
   } else {
     maxVertsPerSubgroup = std::min(gsInstPrimsInSubgrp * maxVertOut, NggMaxThreadsPerSubgroup);
     // VGT_GS_VERT_ITEMSIZE
-    unsigned gsVertItemSizes[4] = {4 * gsInOutUsage.outputMapLocCount, 0, 0, 0};
-    getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtGsVertItemsize] = gsVertItemSizes;
+    auto itemSizeArrayNode =
+        getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtGsVertItemsize].getArray(true);
+    itemSizeArrayNode[0] = 4 * gsInOutUsage.outputMapLocCount;
+    itemSizeArrayNode[1] = itemSizeArrayNode[2] = itemSizeArrayNode[3] = 0;
 
     // VGT_GS_INSTANCE_CNT
     if (geometryMode.invocations > 1 || gsBuiltInUsage.invocationId) {
@@ -910,7 +913,9 @@ void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareS
   if (m_gfxIp.major >= 10) {
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::MemOrdered] = true;
     if (hwStageId == Util::Abi::HardwareStage::Hs || hwStageId == Util::Abi::HardwareStage::Gs) {
-      bool wgpMode = m_pipelineState->getShaderWgpMode(apiStage1) || m_pipelineState->getShaderWgpMode(apiStage2);
+      bool wgpMode = m_pipelineState->getShaderWgpMode(apiStage1);
+      if (apiStage2 != ShaderStageInvalid)
+        wgpMode = wgpMode || m_pipelineState->getShaderWgpMode(apiStage2);
       hwShaderNode[Util::Abi::HardwareStageMetadataKey::WgpMode] = wgpMode;
     }
   }
