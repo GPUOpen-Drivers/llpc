@@ -15,11 +15,10 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -enable-opaque-pointers=false -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} float @interpolateAtCentroid.f32.{{p64|p64f32}}({{float addrspace\(64\)\*|ptr addrspace\(64\)}} @{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x float> @interpolateAtCentroid.v4f32.{{p64|p64v4f32}}({{<4 x float> addrspace\(64\)\*|ptr addrspace\(64\)}} @{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} float @interpolateAtCentroid.f32.p64(ptr addrspace(64) @{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call {{.*}} <4 x float> @interpolateAtCentroid.v4f32.p64(ptr addrspace(64) @{{.*}})
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: %{{[A-Za-z0-9]*}} = call <2 x float> @lgc.input.import.builtin.InterpPerspCentroid.v2f32.i32(i32 268435458)
 ; SHADERTEST: %{{[A-Za-z0-9]*}} = call <2 x float> @lgc.input.import.builtin.InterpPerspCentroid.v2f32.i32(i32 268435458)

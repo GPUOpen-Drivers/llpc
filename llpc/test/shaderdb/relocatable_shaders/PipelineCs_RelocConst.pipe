@@ -7,7 +7,6 @@
 ; END_SHADERTEST
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-opaque-pointers=false -enable-relocatable-shader-elf -v %gfxip %s | FileCheck -check-prefix=SHADERTEST1 %s
 ; RUN: amdllpc -enable-opaque-pointers=true -enable-relocatable-shader-elf -v %gfxip %s | FileCheck -check-prefix=SHADERTEST1 %s
 ; SHADERTEST1-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST1-DAG: ![[METADATANODE:[0-9]+]] = !{!"doff_0_0_b"}
