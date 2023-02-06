@@ -1526,18 +1526,23 @@ void MeshTaskShader::emitTaskMeshs(Value *groupCountX, Value *groupCountY, Value
     Value *drawDataRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskDrawDataRingBufDesc();
     Value *drawDataRingEntryOffset = getDrawDataRingEntryOffset(entryPoint);
 
-    // Draw data (<4 x i32>) = <groupCountX, groupCountY, groupCountZ, readyBit>
-    Value *drawData = UndefValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 4));
-    drawData = m_builder->CreateInsertElement(drawData, groupCountX, static_cast<uint64_t>(0));
-    drawData = m_builder->CreateInsertElement(drawData, groupCountY, 1);
-    drawData = m_builder->CreateInsertElement(drawData, groupCountZ, 2);
-
-    Value *readyBit = getDrawDataReadyBit(entryPoint);
-    drawData = m_builder->CreateInsertElement(drawData, m_builder->CreateZExt(readyBit, m_builder->getInt32Ty()), 3);
+    // Draw data = <groupCountX, groupCountY, groupCountZ, readyBit>
+    Value *groupCount = UndefValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 3));
+    groupCount = m_builder->CreateInsertElement(groupCount, groupCountX, static_cast<uint64_t>(0));
+    groupCount = m_builder->CreateInsertElement(groupCount, groupCountY, 1);
+    groupCount = m_builder->CreateInsertElement(groupCount, groupCountZ, 2);
 
     m_builder->CreateIntrinsic(
-        Intrinsic::amdgcn_raw_buffer_store, drawData->getType(),
-        {drawData, drawDataRingBufDesc, m_builder->getInt32(0), drawDataRingEntryOffset, m_builder->getInt32(0)});
+        Intrinsic::amdgcn_raw_buffer_store, groupCount->getType(),
+        {groupCount, drawDataRingBufDesc, m_builder->getInt32(0), drawDataRingEntryOffset, m_builder->getInt32(0)});
+
+    // NOTE: Only the lowest 8 bits are for us to write.
+    Value *readyBit = getDrawDataReadyBit(entryPoint);
+    readyBit = m_builder->CreateZExt(readyBit, m_builder->getInt8Ty());
+
+    m_builder->CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_store, readyBit->getType(),
+                               {readyBit, drawDataRingBufDesc, m_builder->getInt32(3 * sizeof(unsigned)),
+                                drawDataRingEntryOffset, m_builder->getInt32(0)});
   }
 
   // Construct ".endEmitTaskMeshs" block

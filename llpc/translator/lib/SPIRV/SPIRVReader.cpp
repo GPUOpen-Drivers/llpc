@@ -7580,12 +7580,14 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
 
     } else if (as == SPIRAS_Uniform || as == SPIRAS_TaskPayload) {
       // Translate decorations of blocks
-      // Remove array dimensions, it is useless for block metadata building
-      SPIRVType *blockTy = nullptr;
-
-      blockTy = bv->getType()->getPointerElementType();
-      while (blockTy->isTypeArray())
-        blockTy = blockTy->getArrayElementType();
+      SPIRVType *blockTy = bv->getType()->getPointerElementType();
+      // If not task payload, try to remove block array dimensions. Note that task
+      // payload doesn't have such dimensions.
+      if (as != SPIRAS_TaskPayload) {
+        // Remove array dimensions, it is useless for block metadata building
+        while (blockTy->isTypeArray())
+          blockTy = blockTy->getArrayElementType();
+      }
       bool isStructTy = blockTy->isTypeStruct();
 #if VKI_RAY_TRACING
       isStructTy = isStructTy || blockTy->isTypeAccelerationStructureKHR();

@@ -1386,6 +1386,10 @@ bool PipelineState::enableSwXfb() {
   if (getTargetInfo().getGfxIpVersion().major < 11)
     return false;
 
+  // Mesh pipeline doesn't support stream-out
+  if (hasShaderStage(ShaderStageTask) || hasShaderStage(ShaderStageMesh))
+    return false;
+
   auto lastVertexStage = getLastVertexProcessingStage();
   lastVertexStage = lastVertexStage == ShaderStageCopyShader ? ShaderStageGeometry : lastVertexStage;
 

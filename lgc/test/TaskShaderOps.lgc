@@ -46,13 +46,13 @@
 ; CHECK-NEXT: [[wrapMask:%[0-9]*]] = add nuw nsw i32 [[numEntries]], 268435455
 ; CHECK-NEXT: [[wrappedEntryIndex:%[0-9]*]] = and i32 [[entryIndex]], [[wrapMask]]
 ; CHECK-NEXT: [[entryOffset:%[0-9]*]] = shl i32 [[wrappedEntryIndex]], 4
+; CHECK-NEXT: call void @llvm.amdgcn.raw.buffer.store.v3i32(<3 x i32> <i32 3, i32 1, i32 1>, <4 x i32> [[drawDataRingDesc]], i32 0, i32 [[entryOffset]], i32 0)
 ; CHECK: [[ringSize:%[0-9]*]] = extractelement <4 x i32> [[drawDataRingDesc]], i64 2
 ; CHECK-NEXT: [[numEntries:%[0-9]*]] = lshr i32 [[ringSize]], 4
 ; CHECK-NEXT: [[checkReadyBit:%[0-9]*]] = and i32 [[entryIndex]], [[numEntries]]
 ; CHECK-NEXT: [[readyBit:%[0-9]*]] = icmp ne i32 [[checkReadyBit]], 0
-; CHECK-NEXT: [[readyBit32:%[0-9]*]] = zext i1 [[readyBit]] to i32
-; CHECK-NEXT: [[drawData:%[0-9]*]] = insertelement <4 x i32> <i32 3, i32 1, i32 1, i32 poison>, i32 [[readyBit32]], i64 3
-; CHECK: call void @llvm.amdgcn.raw.buffer.store.v4i32(<4 x i32> [[drawData]], <4 x i32> [[drawDataRingDesc]], i32 0, i32 [[entryOffset]], i32 0)
+; CHECK-NEXT: [[readyBit8:%[0-9]*]] = zext i1 [[readyBit]] to i8
+; CHECK-NEXT: call void @llvm.amdgcn.raw.buffer.store.i8(i8 [[readyBit8]], <4 x i32> [[drawDataRingDesc]], i32 12, i32 [[entryOffset]], i32 0)
 ; CHECK-NEXT: br label %.endEmitMeshs
 ;
 ; CHECK: .endEmitMeshs:
