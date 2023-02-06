@@ -1648,16 +1648,14 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
     spiPsInputCntl.bits.FLAT_SHADE = interpInfoElem.flat && !interpInfoElem.isPerPrimitive;
     spiPsInputCntl.bits.OFFSET = interpInfoElem.loc;
     if (gfxIp.major >= 11 && interpInfoElem.isPerPrimitive) {
-      const auto preStage = m_pipelineState->getPrevShaderStage(ShaderStageFragment);
-      if (preStage == ShaderStageMesh) {
-        // NOTE: HW allocates and manages attribute ring based on the register fields: VS_EXPORT_COUNT and
-        // PRIM_EXPORT_COUNT. When VS_EXPORT_COUNT = 0, HW assumes there is still a vertex attribute exported even
-        // though this is not what we want. Hence, we should reserve param0 as a dummy vertex attribute and all
-        // primitive attributes are moved after it.
-        bool hasNoVertexAttrib = m_pipelineState->getShaderResourceUsage(ShaderStageMesh)->inOutUsage.expCount == 0;
-        if (hasNoVertexAttrib)
-          ++spiPsInputCntl.bits.OFFSET;
-      }
+      // NOTE: HW allocates and manages attribute ring based on the register fields: VS_EXPORT_COUNT and
+      // PRIM_EXPORT_COUNT. When VS_EXPORT_COUNT = 0, HW assumes there is still a vertex attribute exported even
+      // though this is not what we want. Hence, we should reserve param0 as a dummy vertex attribute and all
+      // primitive attributes are moved after it.
+      const bool hasNoVertexAttrib = resUsage->inOutUsage.inputMapLocCount == 0; // No vertex attribute
+      if (hasNoVertexAttrib)
+        ++spiPsInputCntl.bits.OFFSET;
+
       spiPsInputCntl.gfx11.PRIM_ATTR = true;
     }
 
