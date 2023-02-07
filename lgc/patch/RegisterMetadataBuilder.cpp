@@ -618,10 +618,11 @@ void RegisterMetadataBuilder::buildHwVsRegisters() {
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VsSoBase3En] = xfbStrides[3] > 0;
 
   // VGT_STRMOUT_VTX_STRIDE_*
-  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtStrmoutVtxStride0] = xfbStrides[0] / sizeof(unsigned);
-  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtStrmoutVtxStride1] = xfbStrides[1] / sizeof(unsigned);
-  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtStrmoutVtxStride2] = xfbStrides[2] / sizeof(unsigned);
-  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtStrmoutVtxStride3] = xfbStrides[3] / sizeof(unsigned);
+  const unsigned sizeInByte = static_cast<unsigned>(sizeof(unsigned));
+  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtStrmoutVtxStride0] = xfbStrides[0] / sizeInByte;
+  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtStrmoutVtxStride1] = xfbStrides[1] / sizeInByte;
+  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtStrmoutVtxStride2] = xfbStrides[2] / sizeInByte;
+  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtStrmoutVtxStride3] = xfbStrides[3] / sizeInByte;
 
   // VGT_STRMOUT_BUFFER_CONFIG
   auto vgtStrmoutBufferConfig =
