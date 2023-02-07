@@ -539,7 +539,6 @@ private:
   SectionIndirectCalleeSavedRegs m_indirectCalleeSavedRegs;
 };
 
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
 // =====================================================================================================================
 // Represents the sub section GpurtFuncTable state
 class SectionGpurtFuncTable : public Section {
@@ -570,7 +569,6 @@ private:
   SubState m_state;
   std::string m_pFunc[Vkgc::RT_ENTRY_FUNC_COUNT];
 };
-#endif
 
 // =====================================================================================================================
 // Represents the sub section RtState state
@@ -585,9 +583,7 @@ public:
     for (unsigned i = 0; i < m_bvhResDesc.size(); ++i)
       state.bvhResDesc.descriptorData[i] = m_bvhResDesc[i];
     m_exportConfig.getSubState(state.exportConfig);
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
     m_gpurtFuncTable.getSubState(state.gpurtFuncTable);
-#endif
   }
 
   SubState &getSubStateRef() { return m_state; }
@@ -628,9 +624,7 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, maxRayLength, MemberTypeFloat, false);
 #endif
       INIT_MEMBER_NAME_TO_ADDR(SectionRtState, m_exportConfig, MemberTypeRayTracingShaderExportConfig, true);
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
       INIT_MEMBER_NAME_TO_ADDR(SectionRtState, m_gpurtFuncTable, MemberTypeGpurtFuncTable, true);
-#endif
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -638,9 +632,7 @@ private:
 
   SubState m_state;
   SectionRayTracingShaderExportConfig m_exportConfig;
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
   SectionGpurtFuncTable m_gpurtFuncTable;
-#endif
   unsigned m_bvhResDescSize;
   std::vector<unsigned> m_bvhResDesc;
 };
