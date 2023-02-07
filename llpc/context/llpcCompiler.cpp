@@ -1977,15 +1977,18 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
     traceRayModuleData.binType = BinaryType::Spirv;
     traceRayModuleData.usage.keepUnusedFunctions = true;
 
-    // Using the raytracing pipeline first shader to initialize trace ray pipeline shader info
-    PipelineShaderInfo traceRayShaderInfo = pipelineInfo->pShaders[0];
-    traceRayShaderInfo.entryStage = ShaderStageCompute;
-    traceRayShaderInfo.pModuleData = &traceRayModuleData;
-    traceRayShaderInfo.pEntryTarget = Vkgc::getEntryPointNameFromSpirvBinary(&pipelineInfo->shaderTraceRay);
+    PipelineShaderInfo traceRayShaderInfo = {};
+    if (pipelineInfo->shaderCount > 0) {
+      // Using the raytracing pipeline first shader to initialize trace ray pipeline shader info
+      traceRayShaderInfo = pipelineInfo->pShaders[0];
+      traceRayShaderInfo.entryStage = ShaderStageCompute;
+      traceRayShaderInfo.pModuleData = &traceRayModuleData;
+      traceRayShaderInfo.pEntryTarget = Vkgc::getEntryPointNameFromSpirvBinary(&pipelineInfo->shaderTraceRay);
 
-    bool hwIntersectRay = pipelineInfo->rtState.bvhResDesc.dataSizeInDwords > 0;
-    // Disable fast math Contract when there is no hardware intersectRay
-    traceRayShaderInfo.options.noContract = !hwIntersectRay;
+      bool hwIntersectRay = pipelineInfo->rtState.bvhResDesc.dataSizeInDwords > 0;
+      // Disable fast math Contract when there is no hardware intersectRay
+      traceRayShaderInfo.options.noContract = !hwIntersectRay;
+    }
 
     RayTracingContext rayTracingContext(m_gfxIp, pipelineInfo, &traceRayShaderInfo, &pipelineHash, &cacheHash,
                                         pipelineInfo->indirectStageMask);
@@ -1993,12 +1996,12 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
     // Raytracing modules: pipeline shader count + entryModule
     unsigned modulesCount = pipelineInfo->shaderCount + 1;
 
-    // Set pipeline has trace ray module by default
-    pipelineOut->hasTraceRay = true;
+    // Set pipeline has trace ray module by default, as long as the pipeline contains any shader.
+    pipelineOut->hasTraceRay = (pipelineInfo->shaderCount > 0);
     unsigned i = 0;
 
     if (pipelineInfo->rtState.pipelineFlags & VK_PIPELINE_CREATE_LIBRARY_BIT_KHR) {
-      // Library  pipeline usually does not have trace ray module
+      // Library pipeline usually does not have trace ray module
       pipelineOut->hasTraceRay = false;
       for (i = 0; i < pipelineInfo->shaderCount; ++i) {
         const auto &shaderInfo = pipelineInfo->pShaders[i];
