@@ -103,7 +103,6 @@ cl::opt<unsigned> PalAbiVersion("pal-abi-version", cl::init(0xFFFFFFFF), cl::cat
 // -v: enable verbose output
 cl::opt<bool> VerboseOutput("v", cl::cat(LgcCategory), cl::desc("Enable verbose output"), cl::init(false));
 
-cl::opt<bool> OpaquePointers("enable-opaque-pointers", cl::desc("Enable opaque-pointers in LGC"), cl::init(true));
 } // anonymous namespace
 
 // =====================================================================================================================
@@ -219,10 +218,6 @@ int main(int argc, char **argv) {
                                    "tool, and the resulting IR is output as assembly or bitcode. Passes from both\n"
                                    " LLVM and LGC can be used.\n";
   cl::ParseCommandLineOptions(argc, argv, commandDesc);
-
-  // Temporarily disable opaque pointers (llvm is making opaque the default).
-  // TODO: Remove this once work complete on transition to opaque pointers.
-  context.setOpaquePointers(OpaquePointers);
 
   // Find the -mcpu option and get its value.
   auto mcpu = opts.find("mcpu");

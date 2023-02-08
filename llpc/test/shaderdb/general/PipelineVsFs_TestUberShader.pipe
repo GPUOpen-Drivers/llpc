@@ -1,7 +1,7 @@
 // Test uber shader
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-opaque-pointers=true -v -gfxip=10.3 %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v -gfxip=10.3 %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; Load input descriptor
 

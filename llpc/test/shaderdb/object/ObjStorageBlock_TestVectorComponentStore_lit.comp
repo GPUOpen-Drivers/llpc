@@ -12,7 +12,7 @@ void main()
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v -enable-opaque-pointers=true %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: %{{[0-9]*}} = call ptr addrspace(7) {{.*}} @lgc.create.load.buffer.desc.{{[0-9a-z.]*}}(i32 0, i32 0, i32 0,

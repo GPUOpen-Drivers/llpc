@@ -1,7 +1,7 @@
 // Check the resource layout option '--resource-layout-scheme'
 
 // BEGIN_SHADERTEST
-// RUN: amdllpc -enable-opaque-pointers=true -v %gfxip --resource-layout-scheme=indirect %s | FileCheck -check-prefix=SHADERTEST %s
+// RUN: amdllpc -v %gfxip --resource-layout-scheme=indirect %s | FileCheck -check-prefix=SHADERTEST %s
 
 // SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
 // SHADERTEST: call ptr addrspace(4) @lgc.descriptor.table.addr(i32 6, i32 6, i32 1, i32 1, i32 -1)

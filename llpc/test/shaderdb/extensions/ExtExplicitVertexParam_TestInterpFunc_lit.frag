@@ -16,7 +16,7 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: call {{.*}} <2 x float> @InterpolateAtVertexAMD.v2f32.p64.i32
 ; SHADERTEST: call {{.*}} <2 x i32> @InterpolateAtVertexAMD.v2i32.p64.i32

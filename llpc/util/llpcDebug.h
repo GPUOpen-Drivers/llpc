@@ -66,6 +66,4 @@ void redirectLogOutput(bool restoreToDefault, unsigned optionCount, const char *
 // Enable/disable the output for debugging.
 void enableDebugOutput(bool restore);
 
-bool GetOpaquePointersFlag();
-
 } // namespace Llpc

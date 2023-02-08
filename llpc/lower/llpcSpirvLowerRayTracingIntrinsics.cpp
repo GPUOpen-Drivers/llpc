@@ -169,8 +169,6 @@ void SpirvLowerRayTracingIntrinsics::createConvertF32toF16(Function *func, unsig
   auto argIt = func->arg_begin();
 
   Type *convertInputType = FixedVectorType::get(m_builder->getFloatTy(), 3);
-  // TODO: Remove this when LLPC will switch fully to opaque pointers.
-  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(argIt->getType(), convertInputType));
   Value *inVec = m_builder->CreateLoad(convertInputType, argIt);
   // TODO: Backend currently does not support rounding mode correctly. LGC is also treating all rounding mode other than
   // RTE as RTZ. We need RTN and RTP here. LGC needs a change after backend confirm the support of rounding mode.
