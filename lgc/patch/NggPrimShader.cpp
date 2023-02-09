@@ -866,13 +866,13 @@ void NggPrimShader::buildPrimShaderCbLayoutLookupTable() {
 // =====================================================================================================================
 // Build the body of passthrough primitive shader.
 //
-// @param entryPoint : Entry-point of primitive shader to build
-void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
+// @param primShader : Entry-point of primitive shader to build
+void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
   assert(m_nggControl->passthroughMode); // Make sure NGG passthrough mode is enabled
   assert(!m_hasGs);                      // Make sure API GS is not present
 
   SmallVector<Argument *, 32> args;
-  for (auto &arg : entryPoint->args())
+  for (auto &arg : primShader->args())
     args.push_back(&arg);
 
   // System SGPRs
@@ -902,47 +902,29 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
     llvm_unreachable("Not implemented!");
 
   //
-  // NOTE: If primitive ID is used in VS, we have to insert several basic blocks to distribute the value across
-  // LDS because the primitive ID is provided as per-primitive instead of per-vertex. The algorithm is something
-  // like this:
-  //
-  //   if (distributePrimitiveId) {
-  //     if (threadIdInWave < primCountInWave)
-  //       Distribute primitive ID to provoking vertex (vertex0)
-  //     Barrier
-  //
-  //     if (threadIdInWave < vertCountInWave)
-  //       Get primitive ID
-  //     Barrier
-  //   }
-  //
-  const bool distributePrimitiveId =
-      !m_hasTes && m_pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs.primitiveId;
-
-  //
   // For pass-through mode, the processing is something like this:
   //
   // NGG_PASSTHROUGH() {
   //   Initialize thread/wave info
   //
-  //   if (distributePrimitiveId) {
-  //     if (threadIdInWave < primCountInWave)
+  //   if (Distribute primitive ID) {
+  //     if (threadIdInSubgroup < primCountInSubgroup)
   //       Distribute primitive ID to provoking vertex (vertex0 or vertex2)
   //     Barrier
   //
-  //     if (threadIdInWave < vertCountInWave)
+  //     if (threadIdInSubgroup < vertCountInSubgroup)
   //       Get primitive ID
+  //     Barrier
   //   }
-  //   Barrier
   //
   //   if (waveId == 0)
-  //     GS allocation request (GS_ALLOC_REQ)
+  //     Send GS_ALLOC_REQ message
   //
   //   if (threadIdInSubgroup < primCountInSubgroup)
-  //     Do primitive connectivity data export
+  //     Export primitive
   //
-  //   if (enableSwXfb)
-  //     Process XFB output export (Run ES)
+  //   if (Enable SW XFB)
+  //     Process SW XFB (Run ES)
   //   else {
   //     if (threadIdInSubgroup < vertCountInSubgroup)
   //       Run ES
@@ -951,42 +933,16 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
   //
 
   // Define basic blocks
-  auto entryBlock = createBlock(entryPoint, ".entry");
+  auto entryBlock = createBlock(primShader, ".entry");
 
-  // NOTE: Those basic blocks are conditionally created on the basis of actual use of primitive ID.
-  BasicBlock *writePrimIdBlock = nullptr;
-  BasicBlock *endWritePrimIdBlock = nullptr;
-  BasicBlock *readPrimIdBlock = nullptr;
-  BasicBlock *endReadPrimIdBlock = nullptr;
+  auto sendGsAllocReqBlock = createBlock(primShader, ".sendGsAllocReq");
+  auto endSendGsAllocReqBlock = createBlock(primShader, ".endSendGsAllocReq");
 
-  if (distributePrimitiveId) {
-    writePrimIdBlock = createBlock(entryPoint, ".writePrimId");
-    endWritePrimIdBlock = createBlock(entryPoint, ".endWritePrimId");
+  auto exportPrimitiveBlock = createBlock(primShader, ".exportPrimitive");
+  auto endExportPrimitiveBlock = createBlock(primShader, ".endExportPrimitive");
 
-    readPrimIdBlock = createBlock(entryPoint, ".readPrimId");
-    endReadPrimIdBlock = createBlock(entryPoint, ".endReadPrimId");
-  }
-
-  // NOTE: For GFX11+, we use NO_MSG mode for NGG pass-through mode if SW-emulated stream-out is not requested. The
-  // message GS_ALLOC_REQ is no longer necessary.
-  bool passthroughNoMsg = m_gfxIp.major >= 11 && !m_pipelineState->enableSwXfb();
-
-  BasicBlock *allocReqBlock = nullptr;
-  BasicBlock *endAllocReqBlock = nullptr;
-  if (!passthroughNoMsg) {
-    allocReqBlock = createBlock(entryPoint, ".allocReq");
-    endAllocReqBlock = createBlock(entryPoint, ".endAllocReq");
-  }
-
-  auto expPrimBlock = createBlock(entryPoint, ".expPrim");
-  auto endExpPrimBlock = createBlock(entryPoint, ".endExpPrim");
-
-  BasicBlock *expVertBlock = nullptr;
-  BasicBlock *endExpVertBlock = nullptr;
-  if (!m_pipelineState->enableSwXfb()) {
-    expVertBlock = createBlock(entryPoint, ".expVert");
-    endExpVertBlock = createBlock(entryPoint, ".endExpVert");
-  }
+  auto exportVertexBlock = createBlock(primShader, ".exportVertex");
+  auto endExportVertexBlock = createBlock(primShader, ".endExportVertex");
 
   // Construct ".entry" block
   {
@@ -1005,114 +961,71 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
     // Record primitive connectivity data
     m_nggInputs.primData = primData;
 
-    if (distributePrimitiveId) {
-      auto primValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.primCountInWave);
-      m_builder.CreateCondBr(primValid, writePrimIdBlock, endWritePrimIdBlock);
+    // Primitive connectivity data have such layout:
+    //
+    //   +----------------+---------------+---------------+---------------+
+    //   | Null Primitive | Vertex Index2 | Vertex Index1 | Vertex Index0 |
+    //   | [31]           | [28:20]       | [18:10]       | [8:0]         |
+    //   +----------------+---------------+---------------+---------------+
+
+    // Record relative vertex indices
+    if (m_gfxIp.major <= 11) {
+      m_nggInputs.vertexIndex0 = createUBfe(primData, 0, 9);
+      m_nggInputs.vertexIndex1 = createUBfe(primData, 10, 9);
+      m_nggInputs.vertexIndex2 = createUBfe(primData, 20, 9);
     } else {
-      m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-
-      if (!passthroughNoMsg) {
-        auto firstWaveInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.waveIdInSubgroup, m_builder.getInt32(0));
-        m_builder.CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
-      } else {
-        auto primValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
-        m_builder.CreateCondBr(primValid, expPrimBlock, endExpPrimBlock);
-      }
+      llvm_unreachable("Not implemented!");
     }
+
+    distributePrimitiveId(primitiveId);
+
+    auto firstWaveInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.waveIdInSubgroup, m_builder.getInt32(0));
+    m_builder.CreateCondBr(firstWaveInSubgroup, sendGsAllocReqBlock, endSendGsAllocReqBlock);
   }
 
-  if (distributePrimitiveId) {
-    // Construct ".writePrimId" block
-    {
-      m_builder.SetInsertPoint(writePrimIdBlock);
-
-      // Primitive connectivity data have such layout:
-      //
-      //   +----------------+---------------+---------------+---------------+
-      //   | Null Primitive | Vertex Index2 | Vertex Index2 | Vertex Index2 |
-      //   | [31]           | [28:20]       | [18:10]       | [8:0]         |
-      //   +----------------+---------------+---------------+---------------+
-
-      // Distribute primitive ID
-      Value *vertexIndex = nullptr;
-      if (m_pipelineState->getRasterizerState().provokingVertexMode == ProvokingVertexFirst)
-        vertexIndex = createUBfe(m_nggInputs.primData, 0, 9);
-      else
-        vertexIndex = createUBfe(m_nggInputs.primData, 20, 9);
-      writePerThreadDataToLds(primitiveId, vertexIndex, PrimShaderLdsRegion::DistributedPrimitiveId);
-
-      BranchInst::Create(endWritePrimIdBlock, writePrimIdBlock);
-    }
-
-    // Construct ".endWritePrimId" block
-    {
-      m_builder.SetInsertPoint(endWritePrimIdBlock);
-
-      createFenceAndBarrier();
-
-      auto vertValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.vertCountInWave);
-      m_builder.CreateCondBr(vertValid, readPrimIdBlock, endReadPrimIdBlock);
-    }
-
-    // Construct ".readPrimId" block
-    Value *primitiveId = nullptr;
-    {
-      m_builder.SetInsertPoint(readPrimIdBlock);
-
-      primitiveId = readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
-                                             PrimShaderLdsRegion::DistributedPrimitiveId);
-
-      m_builder.CreateBr(endReadPrimIdBlock);
-    }
-
-    // Construct ".endReadPrimId" block
-    {
-      m_builder.SetInsertPoint(endReadPrimIdBlock);
-
-      m_distributedPrimitiveId = createPhi(
-          {{primitiveId, readPrimIdBlock}, {m_builder.getInt32(0), endWritePrimIdBlock}}, "distributedPrimitiveId");
-
-      createFenceAndBarrier();
-
-      if (!passthroughNoMsg) {
-        auto firstWaveInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.waveIdInSubgroup, m_builder.getInt32(0));
-        m_builder.CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
-      } else {
-        auto primValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
-        m_builder.CreateCondBr(primValid, expPrimBlock, endExpPrimBlock);
-      }
-    }
-  }
-
-  if (!passthroughNoMsg) {
-    // Construct ".allocReq" block
-    {
-      m_builder.SetInsertPoint(allocReqBlock);
-
-      sendGsAllocReqMessage();
-      m_builder.CreateBr(endAllocReqBlock);
-    }
-
-    // Construct ".endAllocReq" block
-    {
-      m_builder.SetInsertPoint(endAllocReqBlock);
-
-      auto primValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
-      m_builder.CreateCondBr(primValid, expPrimBlock, endExpPrimBlock);
-    }
-  }
-
-  // Construct ".expPrim" block
+  // Construct ".sendGsAllocReq" block
   {
-    m_builder.SetInsertPoint(expPrimBlock);
+    m_builder.SetInsertPoint(sendGsAllocReqBlock);
+
+    // NOTE: For GFX11+, we use NO_MSG mode for NGG pass-through mode if SW-emulated stream-out is not requested. The
+    // message GS_ALLOC_REQ is no longer necessary.
+    const bool passthroughNoMsg = m_gfxIp.major >= 11 && !m_pipelineState->enableSwXfb();
+    if (!passthroughNoMsg)
+      sendGsAllocReqMessage();
+
+    m_builder.CreateBr(endSendGsAllocReqBlock);
+  }
+
+  // Construct ".endSendGsAllocReq" block
+  {
+    m_builder.SetInsertPoint(endSendGsAllocReqBlock);
+
+    auto validPrimitive = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
+    m_builder.CreateCondBr(validPrimitive, exportPrimitiveBlock, endExportPrimitiveBlock);
+  }
+
+  // Construct ".exportPrimitive" block
+  {
+    m_builder.SetInsertPoint(exportPrimitiveBlock);
 
     exportPassthroughPrimitive();
-    m_builder.CreateBr(endExpPrimBlock);
+    m_builder.CreateBr(endExportPrimitiveBlock);
   }
 
-  // Construct ".endExpPrim" block
+  // Construct ".endExportPrimitive" block
   {
-    m_builder.SetInsertPoint(endExpPrimBlock);
+    m_builder.SetInsertPoint(endExportPrimitiveBlock);
+
+    if (m_pipelineState->enableSwXfb())
+      processSwXfb(args);
+
+    auto validVertex = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
+    m_builder.CreateCondBr(validVertex, exportVertexBlock, endExportVertexBlock);
+  }
+
+  // Construct ".exportVertex" block
+  {
+    m_builder.SetInsertPoint(exportVertexBlock);
 
     // NOTE: For NGG passthrough mode, if SW-emulated stream-out is enabled, running ES is included in processing
     // transform feedback output exporting. There won't be separated ES running (ES is not split any more). This is
@@ -1126,32 +1039,17 @@ void NggPrimShader::buildPassthroughPrimShader(Function *entryPoint) {
     //     xfbExport = value
     //     vertexExport = value
     //  }
-    //
-    if (m_pipelineState->enableSwXfb()) {
-      processSwXfb(args);
-      m_builder.CreateRetVoid();
-    } else {
-      auto vertValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
-      m_builder.CreateCondBr(vertValid, expVertBlock, endExpVertBlock);
-    }
-  }
-
-  if (!m_pipelineState->enableSwXfb()) {
-    // Construct ".expVert" block
-    {
-      m_builder.SetInsertPoint(expVertBlock);
-
+    if (!m_pipelineState->enableSwXfb())
       runEs(args);
 
-      m_builder.CreateBr(endExpVertBlock);
-    }
+    m_builder.CreateBr(endExportVertexBlock);
+  }
 
-    // Construct ".endExpVert" block
-    {
-      m_builder.SetInsertPoint(endExpVertBlock);
+  // Construct ".endExportVertex" block
+  {
+    m_builder.SetInsertPoint(endExportVertexBlock);
 
-      m_builder.CreateRetVoid();
-    }
+    m_builder.CreateRetVoid();
   }
 }
 
@@ -2707,6 +2605,94 @@ void NggPrimShader::loadStreamOutBufferInfo(Value *userData) {
 }
 
 // =====================================================================================================================
+// Distribute primitive ID from primitive-based to vertex-based.
+//
+// @param primitiveId : Primitive ID to distribute (primitive-based, provided by GE)
+void NggPrimShader::distributePrimitiveId(Value *primitiveId) {
+  // NOTE: If primitive ID is used in VS-FS pipeline, we have to distribute the value across LDS because the primitive
+  // ID is provided as primitive-based instead of vertex-based.
+  if (m_hasGs || m_hasTes)
+    return; // Not VS-PS pipeline
+
+  if (!m_pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs.primitiveId)
+    return; // Primitive ID not used in VS
+
+  //
+  // The processing is something like this:
+  //
+  //   if (threadIdInSubgroup < primCountInSubgroup)
+  //     Distribute primitive ID to provoking vertex (vertex0 or vertex2)
+  //   Barrier
+  //
+  //   if (threadIdInSubgroup < vertCountInSubgroup)
+  //     Read back distributed primitive ID
+  //   Barrier
+  //
+  auto insertBlock = m_builder.GetInsertBlock();
+  auto primShader = insertBlock->getParent();
+
+  auto distribPrimitiveIdBlock = createBlock(primShader, ".distribPrimitiveId");
+  distribPrimitiveIdBlock->moveAfter(insertBlock);
+  auto endDistribPrimitiveIdBlock = createBlock(primShader, ".endDistribPrimitiveId");
+  endDistribPrimitiveIdBlock->moveAfter(distribPrimitiveIdBlock);
+
+  auto readPrimitiveIdBlock = createBlock(primShader, ".readPrimitiveId");
+  readPrimitiveIdBlock->moveAfter(endDistribPrimitiveIdBlock);
+  auto endReadPrimitiveIdBlock = createBlock(primShader, ".endReadPrimitiveId");
+  endReadPrimitiveIdBlock->moveAfter(readPrimitiveIdBlock);
+
+  // Continue to construct insert block
+  {
+    auto validPrimitive = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
+    m_builder.CreateCondBr(validPrimitive, distribPrimitiveIdBlock, endDistribPrimitiveIdBlock);
+  }
+
+  // Construct ".distribPrimitiveId" block
+  {
+    m_builder.SetInsertPoint(distribPrimitiveIdBlock);
+
+    Value *provokingVertexIndex = m_pipelineState->getRasterizerState().provokingVertexMode == ProvokingVertexFirst
+                                      ? m_nggInputs.vertexIndex0
+                                      : m_nggInputs.vertexIndex2;
+    writePerThreadDataToLds(primitiveId, provokingVertexIndex, PrimShaderLdsRegion::DistributedPrimitiveId);
+
+    m_builder.CreateBr(endDistribPrimitiveIdBlock);
+  }
+
+  // Construct ".endDistribPrimitiveId" block
+  {
+    m_builder.SetInsertPoint(endDistribPrimitiveIdBlock);
+
+    createFenceAndBarrier();
+
+    auto validVertex = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
+    m_builder.CreateCondBr(validVertex, readPrimitiveIdBlock, endReadPrimitiveIdBlock);
+  }
+
+  // Construct ".readPrimitiveId" block
+  Value *distributedPrimitiveId = nullptr;
+  {
+    m_builder.SetInsertPoint(readPrimitiveIdBlock);
+
+    distributedPrimitiveId = readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
+                                                      PrimShaderLdsRegion::DistributedPrimitiveId);
+
+    m_builder.CreateBr(endReadPrimitiveIdBlock);
+  }
+
+  // Construct ".endReadPrimitiveId" block
+  {
+    m_builder.SetInsertPoint(endReadPrimitiveIdBlock);
+
+    m_distributedPrimitiveId = createPhi({{distributedPrimitiveId, readPrimitiveIdBlock},
+                                          {PoisonValue::get(m_builder.getInt32Ty()), endReadPrimitiveIdBlock}},
+                                         "distributedPrimitiveId");
+
+    createFenceAndBarrier();
+  }
+}
+
+// =====================================================================================================================
 // Does various culling for primitive shader.
 //
 // @param module : LLVM module
@@ -2854,7 +2840,7 @@ void NggPrimShader::exportPrimitive(Value *primitiveCulled) {
   // Primitive connectivity data have such layout:
   //
   //   +----------------+---------------+---------------+---------------+
-  //   | Null Primitive | Vertex Index2 | Vertex Index2 | Vertex Index2 |
+  //   | Null Primitive | Vertex Index2 | Vertex Index1 | Vertex Index0 |
   //   | [31]           | [28:20]       | [18:10]       | [8:0]         |
   //   +----------------+---------------+---------------+---------------+
   Value *primData = nullptr;
@@ -2917,7 +2903,7 @@ void NggPrimShader::exportPrimitiveWithGs(Value *startingVertexIndex) {
   // Primitive connectivity data have such layout:
   //
   //   +----------------+---------------+---------------+---------------+
-  //   | Null Primitive | Vertex Index2 | Vertex Index2 | Vertex Index2 |
+  //   | Null Primitive | Vertex Index2 | Vertex Index1 | Vertex Index0 |
   //   | [31]           | [28:20]       | [18:10]       | [8:0]         |
   //   +----------------+---------------+---------------+---------------+
   Value *newPrimData = nullptr;
