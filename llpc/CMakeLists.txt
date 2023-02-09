@@ -26,10 +26,10 @@
 project(LLPC C CXX)
 
 ### Create LLPC Library ################################################################################################
-add_library(llpc STATIC "")
+add_library(llpcinternal STATIC "")
 
 if(ICD_BUILD_LLPC)
-  add_dependencies(llpc LLVMlgc)
+    add_dependencies(llpcinternal LLVMlgc)
 endif()
 
 ### Cached Project Options #############################################################################################
@@ -89,7 +89,7 @@ if(ICD_BUILD_LLPC)
 
     if (LLVM_LINK_LLVM_DYLIB)
         # Link dynamically against libLLVM-${version}.so
-        target_link_libraries(llpc PUBLIC LLVM)
+        target_link_libraries(llpcinternal PUBLIC LLVM)
     else()
         # Link statically against the required component libraries
         llvm_map_components_to_libnames(llvm_libs
@@ -125,7 +125,7 @@ if(ICD_BUILD_LLPC)
                 target_compile_options(${lib} PRIVATE "-fno-aligned-new")
             endforeach()
         endif()
-        target_link_libraries(llpc PUBLIC ${llvm_libs})
+        target_link_libraries(llpcinternal PUBLIC ${llvm_libs})
     endif()
 
     # Always link statically against libLLVMlgc
@@ -135,12 +135,12 @@ if(ICD_BUILD_LLPC)
             target_compile_options(${lib} PRIVATE "-fno-aligned-new")
         endforeach()
     endif()
-    target_link_libraries(llpc PUBLIC ${extra_llvm_libs})
+    target_link_libraries(llpcinternal PUBLIC ${extra_llvm_libs})
 endif()
 
 ### Compiler Options ###################################################################################################
 include(../cmake/CompilerFlags.cmake)
-set_compiler_options(llpc ${LLPC_ENABLE_WERROR})
+set_compiler_options(llpcinternal ${LLPC_ENABLE_WERROR})
 
 ### Defines/Includes/Sources ###########################################################################################
 if(ICD_BUILD_LLPC)
@@ -158,31 +158,31 @@ if(ICD_BUILD_LLPC)
     )
     message(STATUS "LLVM link options:" ${LLVM_LINK_FLAGS})
 endif()
-target_compile_definitions(llpc PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
-target_compile_definitions(llpc PRIVATE _SPIRV_LLVM_API)
-target_compile_definitions(llpc PRIVATE PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL_CLIENT_INTERFACE_MAJOR_VERSION})
+target_compile_definitions(llpcinternal PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
+target_compile_definitions(llpcinternal PRIVATE _SPIRV_LLVM_API)
+target_compile_definitions(llpcinternal PRIVATE PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL_CLIENT_INTERFACE_MAJOR_VERSION})
 if(ICD_BUILD_LLPC)
-    target_compile_definitions(llpc PRIVATE ICD_BUILD_LLPC)
+    target_compile_definitions(llpcinternal PRIVATE ICD_BUILD_LLPC)
 endif()
 
 if(ICD_BUILD_LLPC)
     if(XGL_LLVM_UPSTREAM)
-        target_compile_definitions(llpc PRIVATE XGL_LLVM_UPSTREAM)
+        target_compile_definitions(llpcinternal PRIVATE XGL_LLVM_UPSTREAM)
     endif()
 endif()
 
 if(WIN32)
-    target_compile_definitions(llpc PRIVATE
+    target_compile_definitions(llpcinternal PRIVATE
         NOMINMAX    # windows.h defines min/max which conflicts with the use of std::min / max
         UNICODE     # CMAKE-TODO: What is this used for?
         _UNICODE
     )
 endif()
 
-target_include_directories(llpc
+target_include_directories(llpcinternal
     PUBLIC
         include
-    PRIVATE
+        ../include
         context
         lower
         translator/include
@@ -197,17 +197,17 @@ target_include_directories(llpc
 
 #if VKI_RAY_TRACING
 if(VKI_RAY_TRACING)
-  target_include_directories(llpc PRIVATE ${XGL_GPURT_PATH})
+  target_include_directories(llpcinternal PRIVATE ${XGL_GPURT_PATH})
 endif()
 #endif
 
 if(WIN32)
-    target_compile_definitions(llpc PRIVATE VK_USE_PLATFORM_WIN32_KHR)
+    target_compile_definitions(llpcinternal PRIVATE VK_USE_PLATFORM_WIN32_KHR)
 endif()
 
 if(ICD_BUILD_LLPC)
 # llpc/context
-    target_sources(llpc PRIVATE
+    target_sources(llpcinternal PRIVATE
         context/llpcCompiler.cpp
         context/llpcContext.cpp
         context/llpcComputeContext.cpp
@@ -218,14 +218,14 @@ if(ICD_BUILD_LLPC)
     )
 #if VKI_RAY_TRACING
 if(VKI_RAY_TRACING)
-    target_sources(llpc PRIVATE
+    target_sources(llpcinternal PRIVATE
          context/llpcRayTracingContext.cpp
          )
 endif()
 #endif
 
 # llpc/lower
-    target_sources(llpc PRIVATE
+    target_sources(llpcinternal PRIVATE
         lower/llpcSpirvLower.cpp
         lower/llpcSpirvLowerAccessChain.cpp
         lower/llpcSpirvLowerCfgMerges.cpp
@@ -241,7 +241,7 @@ endif()
 
 #if VKI_RAY_TRACING
 if(VKI_RAY_TRACING)
-    target_sources(llpc PRIVATE
+    target_sources(llpcinternal PRIVATE
         lower/llpcSpirvLowerRayQuery.cpp
         lower/llpcSpirvLowerRayQueryPostInline.cpp
         lower/llpcSpirvLowerRayTracing.cpp
@@ -252,13 +252,13 @@ endif()
 #endif
 
 # llpc/translator
-    target_sources(llpc PRIVATE
+    target_sources(llpcinternal PRIVATE
         translator/lib/SPIRV/SPIRVReader.cpp
         translator/lib/SPIRV/SPIRVToLLVMDbgTran.cpp
         translator/lib/SPIRV/SPIRVUtil.cpp
     )
 
-    target_sources(llpc PRIVATE
+    target_sources(llpcinternal PRIVATE
         translator/lib/SPIRV/libSPIRV/SPIRVBasicBlock.cpp
         translator/lib/SPIRV/libSPIRV/SPIRVDebug.cpp
         translator/lib/SPIRV/libSPIRV/SPIRVDecorate.cpp
@@ -272,7 +272,7 @@ endif()
     )
 
 # llpc/util
-    target_sources(llpc PRIVATE
+    target_sources(llpcinternal PRIVATE
         util/llpcCacheAccessor.cpp
         util/llpcDebug.cpp
         util/llpcElfWriter.cpp
@@ -283,7 +283,7 @@ endif()
         util/llpcUtil.cpp
     )
 else()
-    target_sources(llpc PRIVATE
+    target_sources(llpcinternal PRIVATE
         util/llpcUtil.cpp
     )
 endif()
@@ -308,18 +308,45 @@ endif()
 # Maybe add XGL_LLVM_PATH?
 # How are these built? Can they be built through CMake?
 
-target_link_libraries(llpc PRIVATE dumper)
-target_link_libraries(llpc PRIVATE cwpack)
-target_link_libraries(llpc PRIVATE metrohash)
-target_link_libraries(llpc PRIVATE vkgc_headers)
-target_link_libraries(llpc PUBLIC
+target_link_libraries(llpcinternal PUBLIC dumper)
+target_link_libraries(llpcinternal PUBLIC cwpack)
+target_link_libraries(llpcinternal PUBLIC metrohash)
+target_link_libraries(llpcinternal PUBLIC vkgc_headers)
+target_link_libraries(llpcinternal PUBLIC
     khronos_vulkan_interface
     khronos_spirv_interface
 )
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
-target_link_libraries(llpc PRIVATE Threads::Threads)
+target_link_libraries(llpcinternal PRIVATE Threads::Threads)
+
+### Create LLPC Library ################################################################################################
+add_library(llpc STATIC "")
+
+add_dependencies(llpc llpcinternal)
+
+target_include_directories(llpc
+  PUBLIC
+    include
+)
+
+set_compiler_options(llpc ${LLPC_ENABLE_WERROR})
+
+# This one source file is here just to stop getting cmake and ar errors about having no source files.
+target_sources(llpc PRIVATE
+    context/llpcStub.cpp
+)
+
+target_link_libraries(llpc
+  PUBLIC
+    ${llvm_libs}
+    ${extra_llvm_libs}
+    khronos_vulkan_interface
+    khronos_spirv_interface
+  PRIVATE
+    llpcinternal
+)
 
 if(LLPC_BUILD_TOOLS)
 ### VFX library for Standalone Compiler ###################################################################################
