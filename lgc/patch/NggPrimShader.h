@@ -215,6 +215,7 @@ private:
 
   void initWaveThreadInfo(llvm::Value *mergedGroupInfo, llvm::Value *mergedWaveInfo);
   void loadStreamOutBufferInfo(llvm::Value *userData);
+  void distributePrimitiveId(llvm::Value *primitiveId);
 
   llvm::Value *doCulling(llvm::Module *module, llvm::Value *vertxIndex0, llvm::Value *vertxIndex1,
                          llvm::Value *vertxIndex2);
