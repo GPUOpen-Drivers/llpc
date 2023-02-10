@@ -1,4 +1,4 @@
-; RUN: lgc -mcpu=gfx1030 -o - -passes=lgc-vertex-fetch -enable-opaque-pointers %s | FileCheck --check-prefixes=CHECK %s
+; RUN: lgc -mcpu=gfx1030 -o - -passes=lgc-vertex-fetch %s | FileCheck --check-prefixes=CHECK %s
 
 ; CHECK-LABEL: define dllexport spir_func void @lgc.shader.VS.main()
 ; Get the descriptor of Uber Fetch Shader buffer

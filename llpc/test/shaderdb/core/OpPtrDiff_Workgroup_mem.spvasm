@@ -1,6 +1,6 @@
 ; BEGIN_SHADERTEST
 ; REQUIRES: do-not-run-me
-; RUN: amdllpc -v -enable-opaque-pointers=true %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: call i64 (...) @lgc.create.buffer.ptrdiff.i64(i32 0, ptr addrspace(3) @lds, ptr addrspace(3) {{%[0-9]+}})
 ; SHADERTEST: call i64 (...) @lgc.create.buffer.ptrdiff.i64(i64 0, ptr addrspace(3) @lds.1, ptr addrspace(3) {{%[0-9]+}})

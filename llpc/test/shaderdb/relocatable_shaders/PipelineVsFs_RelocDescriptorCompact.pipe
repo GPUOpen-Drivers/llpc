@@ -3,7 +3,7 @@
 // 2. If set is not -1, it may be descriptorBufferCompact or descriptorBuffer if there is no pipeline layout
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-relocatable-shader-elf -enable-opaque-pointers=true -v -gfxip=10.3 %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-relocatable-shader-elf -v -gfxip=10.3 %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^}}// LLPC pipeline patching results
 ; set = -1, binding = 5, this is a internal buffer
 ; SHADERTEST:call i32 @llvm.amdgcn.reloc.constant(metadata ![[OFFSET_4294967295_5:[0-9]+]])

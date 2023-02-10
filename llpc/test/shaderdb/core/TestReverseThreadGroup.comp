@@ -13,7 +13,7 @@ void main()
 }
 
 // BEGIN_REVERSETEST
-// RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s --reverse-thread-group=1 | FileCheck -check-prefix=REVERSETEST %s
+// RUN: amdllpc -v %gfxip %s --reverse-thread-group=1 | FileCheck -check-prefix=REVERSETEST %s
 // REVERSETEST-LABEL: {{^// LLPC}} pipeline before-patching results
 // There should be a call to get the gl_NumWorkGroups
 // REVERSETEST: %{{[0-9]+}} = call ptr addrspace(4) @lgc.special.user.data.Workgroup(i32 268435462)
@@ -24,7 +24,7 @@ void main()
 // REVERSETEST: AMDLLPC SUCCESS
 // END_REVERSETEST
 // BEGIN_NOTREVERSETEST
-// RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s --reverse-thread-group=0 | FileCheck -check-prefix=NOTREVERSETEST %s
+// RUN: amdllpc -v %gfxip %s --reverse-thread-group=0 | FileCheck -check-prefix=NOTREVERSETEST %s
 // NOTREVERSETEST-LABEL: {{^// LLPC}} pipeline before-patching results
 // There should not be a call to get the gl_NumWorkGroups
 // NOTREVERSETEST-NOT: %{{[0-9]+}} = call ptr addrspace(4) @lgc.special.user.data.Workgroup(i32 268435462)
