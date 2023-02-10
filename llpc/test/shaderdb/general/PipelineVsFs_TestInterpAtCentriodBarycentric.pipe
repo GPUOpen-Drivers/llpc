@@ -1,7 +1,7 @@
 // gl_BaryCoordNoPerspEXT requires different interpolant mode. This tests interpolateAtCentroid(gl_BaryCoordNoPerspEXT)
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: @[[BaryCoord:[^ ]*]] = external addrspace(64) global <3 x float>

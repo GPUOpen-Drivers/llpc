@@ -1,7 +1,7 @@
 ; Check the resource layout mode. In "Indirect" mode, "PushConst" resource is not in root node.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: [[Desc:%[0-9]*]] = call ptr addrspace(4) (...) @lgc.create.load.push.constants.ptr.p4()
 ; SHADERTEST: [[Value:%[0-9]*]] = load <4 x float>, ptr addrspace(4) [[Desc]], align 16

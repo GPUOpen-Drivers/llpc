@@ -27,7 +27,7 @@ void main()
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: alloca <4 x float>,{{.*}} addrspace(5)
 ; SHADERTEST: alloca { [3 x <3 x float>], [3 x <3 x float>], i32, <2 x i32> },{{.*}} addrspace(5)

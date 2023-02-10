@@ -41,7 +41,7 @@ void main()
 }
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -enable-opaque-pointers=true -enable-load-scalarizer=false -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-load-scalarizer=false -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST-COUNT-4: getelementptr {{.*}}[4 x { i8, <2 x i8>, <3 x i8>, <4 x i8> }], ptr addrspace(3) @{{.*}}, i32 0, i32 {{%?[0-9]+}}, i32 {{[0-3]}}
