@@ -397,7 +397,6 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
 
   // Replayer implementations of DescBuilder methods
   case BuilderRecorder::Opcode::LoadBufferDesc: {
-    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(call->getType(), m_builder->getInt8Ty()));
     return m_builder->CreateLoadBufferDesc(cast<ConstantInt>(args[0])->getZExtValue(), // descSet
                                            cast<ConstantInt>(args[1])->getZExtValue(), // binding
                                            args[2],                                    // descIndex

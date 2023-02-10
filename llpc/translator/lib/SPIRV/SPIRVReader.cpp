@@ -1262,8 +1262,6 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
       // Get return type of the function by transposing matrix type.
       Type *const destType = getTransposedType(func.getArg(1)->getType());
 
-      // TODO: Remove this when LLPC will switch fully to opaque pointers.
-      assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(call->getType(), destType));
       assert(destType->isArrayTy());
 
       const unsigned colCount = destType->getArrayNumElements();
@@ -1577,9 +1575,6 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
                                            bool isVolatile, bool isCoherent, bool isNonTemporal) {
   assert(loadPointer->getType()->isPointerTy());
 
-  // TODO: Remove this when LLPC will switch fully to opaque pointers.
-  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(loadPointer->getType(), loadType));
-
   if (isTypeWithPadRowMajorMatrix(loadType)) {
     auto loadPair = createLaunderRowMajorMatrix(loadType, loadPointer);
     loadType = loadPair.first;
@@ -1724,15 +1719,10 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
                                           Value *storeValue, bool isVolatile, bool isCoherent, bool isNonTemporal) {
   assert(storePointer->getType()->isPointerTy());
 
-  // TODO: Remove this when LLPC will switch fully to opaque pointers.
-  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(storePointer->getType(), storeType));
-
   if (isTypeWithPadRowMajorMatrix(storeType)) {
     auto storePair = createLaunderRowMajorMatrix(storeType, storePointer);
     storePointer = storePair.second;
     storeType = storePair.first;
-    // TODO: Remove this when LLPC will switch fully to opaque pointers.
-    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(storePointer->getType(), storeType));
   }
 
   const Align alignment = m_m->getDataLayout().getABITypeAlign(storeType);
@@ -1814,9 +1804,6 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
 
     Type *storeType = nullptr;
 
-    // TODO: Remove this when LLPC will switch fully to opaque pointers.
-    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(storePointer->getType(), alignmentType));
-
     // If the store was a bool or vector of bool, need to zext the storing value.
     if (spvType->isTypeBool() || (spvType->isTypeVector() && spvType->getVectorComponentType()->isTypeBool())) {
       storeValue = getBuilder()->CreateZExtOrBitCast(storeValue, alignmentType);
@@ -1856,9 +1843,6 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
 Constant *SPIRVToLLVM::buildConstStoreRecursively(SPIRVType *const spvType, Type *const storePointerType,
                                                   Type *const storeType, Constant *constStoreValue) {
   assert(storePointerType->isPointerTy());
-
-  // TODO: Remove this when LLPC will switch fully to opaque pointers.
-  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(storePointerType, storeType));
 
   const unsigned addrSpace = storePointerType->getPointerAddressSpace();
 
@@ -2832,8 +2816,6 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpArrayLength>(SPIRVValue *
       lookupRemappedTypeElements(spvStruct->getType()->getPointerElementType(), memberIndex);
 
   StructType *const structType = cast<StructType>(getPointeeType(spvStruct));
-  // TODO: Remove this when LLPC will switch fully to opaque pointers.
-  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(structure->getType(), structType));
   const StructLayout *const structLayout = m_m->getDataLayout().getStructLayout(structType);
   const unsigned offset = static_cast<unsigned>(structLayout->getElementOffset(remappedMemberIndex));
   Value *const offsetVal = getBuilder()->getInt32(offset);
@@ -2886,8 +2868,6 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
   const bool isBufferBlockPointer = isStorageClassExplicitlyLaidOut(m_bm, storageClass);
 
   Type *basePointeeType = getPointeeType(spvAccessChain->getBase());
-  // TODO: Remove this when LLPC will switch fully to opaque pointers.
-  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(base->getType(), basePointeeType));
 
   SmallVector<Value *, 8> gepIndices;
 
@@ -4187,8 +4167,6 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
 
   Type *const varType = transType(spvVar->getType()->getPointerElementType(), 0, true, true,
                                   isStorageClassExplicitlyLaidOut(m_bm, spvVar->getType()->getPointerStorageClass()));
-  // TODO: Remove this when LLPC will switch fully to opaque pointers.
-  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(ptrType, varType));
 
   SPIRVValue *const spvInitializer = spvVar->getInitializer();
 
@@ -8612,8 +8590,6 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
     // Frexp: Store the exponent and return the mantissa.
     Type *pointeeType = getPointeeType(extInst->getValues(bArgs)[1]);
     exp = getBuilder()->CreateSExtOrTrunc(exp, pointeeType);
-    // TODO: Remove this when LLPC will switch fully to opaque pointers.
-    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(args[1]->getType(), pointeeType));
     // Vectors are represented as arrays in memory, so we need to cast the pointer of array to pointer of vector before
     // storing.
     if (exp->getType()->isVectorTy()) {
