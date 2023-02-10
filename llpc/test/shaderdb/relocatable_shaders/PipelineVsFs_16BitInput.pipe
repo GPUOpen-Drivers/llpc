@@ -15,7 +15,7 @@
 ; corresponds to the vertex shader.
 ; SHADERTEST-LABEL: // LGC glue shader results
 ; SHADERTEST: define amdgpu_vs {{.*}}
-; SHADERTEST: [[ld:%[0-9]+]] = call half @llvm.amdgcn.struct.tbuffer.load.f16({{.*}}) #1
+; SHADERTEST: [[ld:%[0-9]+]] = call half @llvm.amdgcn.struct.tbuffer.load.f16({{.*}}
 ; SHADERTEST: [[cast:%[0-9]+]] = bitcast half [[ld]] to i16
 ; SHADERTEST: [[zext:%[0-9]+]] = zext i16 [[cast]] to i32
 ; SHADERTEST: [[result:%[0-9]+]] = bitcast i32 [[zext]] to float
