@@ -132,6 +132,7 @@ Function *ColorExportShader::createColorExportFunc() {
   // Create the function. Mark SGPR inputs as "inreg".
   Function *func = Function::Create(funcTy, GlobalValue::ExternalLinkage, getGlueShaderName(), module);
   func->setCallingConv(CallingConv::AMDGPU_PS);
+  setShaderStage(func, ShaderStageFragment);
 
   BasicBlock *block = BasicBlock::Create(func->getContext(), "", func);
   BuilderBase builder(block);
