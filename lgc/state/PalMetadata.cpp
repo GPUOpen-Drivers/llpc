@@ -498,10 +498,15 @@ void PalMetadata::fixUpRegisters() {
         size_t descSet = node.innerTable[0].set;
         descSetNodes.resize(std::max(descSetNodes.size(), descSet + 1));
         descSetNodes[descSet] = &node;
-      } else if (node.concreteType == ResourceNodeType::DescriptorBuffer) {
+      } else if ((node.concreteType == ResourceNodeType::DescriptorBuffer) ||
+                 (node.concreteType == ResourceNodeType::DescriptorConstBuffer) ||
+                 (node.concreteType == ResourceNodeType::DescriptorBufferCompact) ||
+                 (node.concreteType == ResourceNodeType::DescriptorConstBufferCompact)) {
         size_t descSet = node.set;
-        descSetNodes.resize(std::max(descSetNodes.size(), descSet + 1));
-        descSetNodes[descSet] = &node;
+        if (descSet != InvalidValue) {
+          descSetNodes.resize(std::max(descSetNodes.size(), descSet + 1));
+          descSetNodes[descSet] = &node;
+        }
       } else if (node.concreteType == ResourceNodeType::PushConst) {
         pushConstNode = &node;
       }
