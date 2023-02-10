@@ -91,10 +91,7 @@ void getTypeName(Type *ty, raw_ostream &nameStream) {
   for (;;) {
     if (auto pointerTy = dyn_cast<PointerType>(ty)) {
       nameStream << "p" << pointerTy->getAddressSpace();
-      if (pointerTy->isOpaque())
-        return;
-      ty = pointerTy->getPointerElementType();
-      continue;
+      return;
     }
     if (auto arrayTy = dyn_cast<ArrayType>(ty)) {
       nameStream << "a" << arrayTy->getNumElements();
