@@ -18,7 +18,7 @@ define spir_func void @func() local_unnamed_addr #0 !lgc.shaderstage !5 {
 }
 
 ; Function Attrs: nounwind readonly
-declare i8 addrspace(7)* @lgc.create.load.buffer.desc.p7i8(...) local_unnamed_addr #1
+declare ptr addrspace(7) @lgc.create.load.buffer.desc.p7(...) local_unnamed_addr #1
 
 attributes #0 = { nounwind }
 attributes #1 = { nounwind readonly }
