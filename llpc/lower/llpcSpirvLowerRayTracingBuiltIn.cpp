@@ -168,8 +168,6 @@ Value *SpirvLowerRayTracingBuiltIn::processBuiltIn(GlobalVariable *global, Instr
   auto meta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
   unsigned startOperand = 0;
   Type *globalTy = global->getValueType();
-  // TODO: Remove this when LLPC will switch fully to opaque pointers.
-  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(global->getType(), globalTy));
   if (globalTy->isArrayTy()) {
     assert(meta->getNumOperands() == 4);
     startOperand += 2;
