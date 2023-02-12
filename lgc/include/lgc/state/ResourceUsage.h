@@ -173,6 +173,12 @@ struct ResourceUsage {
   struct {
     // Per-stage built-in usage
     union {
+      // Task shader
+      struct {
+        // Statement
+        unsigned meshLinearDispatch : 1; // Mesh linear dispatch from task shader when group count Y/Z are both ones
+      } task;
+
       // Vertex shader
       struct {
         // Input

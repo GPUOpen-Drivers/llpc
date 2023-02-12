@@ -217,6 +217,7 @@ static constexpr char VgtHosMinTessLevel[] = ".vgt_hos_min_tess_level";
 static constexpr char VgtHosMaxTessLevel[] = ".vgt_hos_max_tess_level";
 static constexpr char SpiShaderGsMeshletDim[] = ".spi_shader_gs_meshlet_dim";
 static constexpr char SpiShaderGsMeshletExpAlloc[] = ".spi_shader_gs_meshlet_exp_alloc";
+static constexpr char MeshLinearDispatchFromTask[] = ".mesh_linear_dispatch_from_task";
 static constexpr char ImageOp[] = ".image_op";
 static constexpr char VgtGsMaxVertOut[] = ".vgt_gs_max_vert_out";
 static constexpr char VgtGsInstanceCnt[] = ".vgt_gs_instance_cnt";

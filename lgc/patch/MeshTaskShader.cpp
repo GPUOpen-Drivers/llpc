@@ -1457,6 +1457,14 @@ void MeshTaskShader::emitTaskMeshs(Value *groupCountX, Value *groupCountY, Value
   auto entryPoint = m_builder->GetInsertBlock()->getParent();
   assert(getShaderStage(entryPoint) == ShaderStageTask); // Must be task shader
 
+  // Mark the flag of mesh linear dispatch from task when the group count Y and Z are both ones
+  if (isa<ConstantInt>(groupCountY) && isa<ConstantInt>(groupCountZ)) {
+    const unsigned constGroupCountY = cast<ConstantInt>(groupCountY)->getZExtValue();
+    const unsigned constGroupCountZ = cast<ConstantInt>(groupCountZ)->getZExtValue();
+    m_pipelineState->getShaderResourceUsage(ShaderStageTask)->builtInUsage.task.meshLinearDispatch =
+        constGroupCountY == 1 && constGroupCountZ == 1;
+  }
+
   auto emitMeshsCall = m_builder->GetInsertPoint();
 
   auto checkEmitMeshsBlock = m_builder->GetInsertBlock();
