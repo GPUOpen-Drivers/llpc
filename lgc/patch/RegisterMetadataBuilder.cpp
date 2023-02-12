@@ -477,6 +477,15 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
     // VGT_DRAW_PAYLOAD_CNTL
     getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtDrawPrimPayloadEn] = hasPrimitivePayload;
 
+    // Pipeline metadata: mesh_linear_dispatch_from_task
+    bool meshLinearDispatchFromTask = false;
+    if (m_hasTask) {
+      meshLinearDispatchFromTask =
+          m_pipelineState->getShaderResourceUsage(ShaderStageTask)->builtInUsage.task.meshLinearDispatch;
+    }
+    getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::MeshLinearDispatchFromTask] =
+        meshLinearDispatchFromTask;
+
     if (m_gfxIp.major >= 11) {
       // SPI_SHADER_GS_MESHLET_DIM
       auto spiShaderGsMeshletDim =
