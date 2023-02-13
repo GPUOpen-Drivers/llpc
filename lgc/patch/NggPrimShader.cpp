@@ -927,7 +927,7 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
   //     Process SW XFB (Run ES)
   //   else {
   //     if (threadIdInSubgroup < vertCountInSubgroup)
-  //       Run ES
+  //       Run ES (export vertex)
   //   }
   // }
   //
@@ -977,6 +977,7 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
       llvm_unreachable("Not implemented!");
     }
 
+    // Distribute primitive ID if needed
     distributePrimitiveId(primitiveId);
 
     auto firstWaveInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.waveIdInSubgroup, m_builder.getInt32(0));
@@ -1056,8 +1057,8 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
 // =====================================================================================================================
 // Build the body of primitive shader when API GS is not present.
 //
-// @param entryPoint : Entry-point of primitive shader to build
-void NggPrimShader::buildPrimShader(Function *entryPoint) {
+// @param primShader : Entry-point of primitive shader to build
+void NggPrimShader::buildPrimShader(Function *primShader) {
   assert(!m_nggControl->passthroughMode); // Make sure NGG passthrough mode is not enabled
   assert(!m_hasGs);                       // Make sure API GS is not present
 
@@ -1067,7 +1068,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   const unsigned waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
 
   SmallVector<Argument *, 32> args;
-  for (auto &arg : entryPoint->args())
+  for (auto &arg : primShader->args())
     args.push_back(&arg);
 
   // System SGPRs
@@ -1120,48 +1121,29 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     llvm_unreachable("Not implemented!");
   }
 
-  const auto resUsage = m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStageTessEval : ShaderStageVertex);
-
-  //
-  // NOTE: If primitive ID is used in VS, we have to insert several basic blocks to distribute the value across
-  // LDS because the primitive ID is provided as per-primitive instead of per-vertex. The algorithm is something
-  // like this:
-  //
-  // if (distributePrimitiveId) {
-  //     if (threadIdInWave < primCountInWave)
-  //       Distribute primitive ID to provoking vertex (vertex0)
-  //     Barrier
-  //
-  //     if (threadIdInWave < vertCountInWave)
-  //       Get primitive ID
-  //     Barrier
-  //   }
-  //
-  const bool distributePrimitiveId = !m_hasTes && resUsage->builtInUsage.vs.primitiveId;
-
   //
   // The processing is something like this:
   //
   // NGG() {
   //   Initialize thread/wave info
   //
-  //   if (distributePrimitiveId) {
-  //     if (threadIdInWave < primCountInWave)
-  //       Distribute primitive ID to provoking vertex (vertex0)
+  //   if (Distribute primitive ID) {
+  //     if (threadIdInSubgroup < primCountInSubgroup)
+  //       Distribute primitive ID to provoking vertex (vertex0 or vertex2)
   //     Barrier
   //
-  //     if (threadIdInWave < vertCountInWave)
+  //     if (threadIdInSubgroup < vertCountInSubgroup)
   //       Get primitive ID
   //     Barrier
   //   }
   //
-  //   if (enableSwXfb)
-  //     Process XFB output export
+  //   if (Enable SW XFB)
+  //     Process SW XFB
   //
   //   if (threadIdInWave < vertCountInWave)
   //     Run part ES to fetch vertex cull data
   //
-  //   if (!runtimePassthrough) {
+  //   if (Not runtime passthrough) {
   //     if (threadIdInSubgroup < vertCountInSubgroup)
   //       Initialize vertex draw flag
   //     if (threadIdInSubgroup < waveCount + 1)
@@ -1172,7 +1154,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   //     Barrier
   //
   //     if (threadIdInSubgroup < primCountInSubgroup) {
-  //       Do culling (run culling algorithms)
+  //       Cull primitive (run culling algorithms)
   //       if (primitive not culled)
   //         Write draw flags of forming vertices
   //     }
@@ -1185,28 +1167,28 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   //       Accumulate per-wave and per-subgroup count of output vertices
   //     Barrier
   //
-  //     if (vertex compacted && vertex drawn) {
-  //       Compact vertex thread ID (map: compacted -> uncompacted)
+  //     if (Need compact vertex && vertex drawn) {
+  //       Compact vertex (compacted -> uncompacted)
   //       Write vertex compaction info
   //     }
   //     Update vertCountInSubgroup and primCountInSubgroup
   //   }
   //
   //   if (waveId == 0)
-  //     GS allocation request (GS_ALLOC_REQ)
+  //     Send GS_ALLOC_REQ message
   //   Barrier
   //
   //   if (fullyCulled) {
-  //     Do dummy export
+  //     Dummy export
   //     return (early exit)
   //   }
   //
   //   if (threadIdInSubgroup < primCountInSubgroup)
-  //     Do primitive connectivity data export
+  //     Export primitive
   //
   //   if (threadIdInSubgroup < vertCountInSubgroup) {
-  //     if (vertex compactionless && empty wave)
-  //       Do dummy vertex export
+  //     if (Needn't compact vertex && empty wave)
+  //       Dummy vertex export
   //     else
   //       Run part ES to do deferred vertex export
   //   }
@@ -1221,86 +1203,58 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
   const unsigned esGsRingItemSize =
       m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
 
-  // NOTE: Make sure vertex position data is 16-byte alignment because we will use 128-bit LDS read/write for it.
-  assert(getLdsRegionStart(PrimShaderLdsRegion::VertexPosition) % SizeOfVec4 == 0);
+  // NOTE: Make sure vertex position data is 4-dword alignment because we will use 128-bit LDS read/write for it.
+  assert(getLdsRegionStart(PrimShaderLdsRegion::VertexPosition) % 4U == 0);
 
   if (!m_nggControl->compactVertex)
     assert(m_gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
 
   // Define basic blocks
-  auto entryBlock = createBlock(entryPoint, ".entry");
+  auto entryBlock = createBlock(primShader, ".entry");
 
-  // NOTE: Those basic blocks are conditionally created on the basis of actual use of primitive ID.
-  BasicBlock *writePrimIdBlock = nullptr;
-  BasicBlock *endWritePrimIdBlock = nullptr;
-  BasicBlock *readPrimIdBlock = nullptr;
-  BasicBlock *endReadPrimIdBlock = nullptr;
+  auto checkFetchVertexCullDataBlock = createBlock(primShader, ".checkFetchVertexCullData");
+  auto fetchVertexCullDataBlock = createBlock(primShader, ".fetchVertexCullData");
+  auto endFetchVertexCullDataBlock = createBlock(primShader, ".endFetchVertexCullData");
 
-  if (distributePrimitiveId) {
-    writePrimIdBlock = createBlock(entryPoint, ".writePrimId");
-    endWritePrimIdBlock = createBlock(entryPoint, ".endWritePrimId");
+  auto checkInitVertexDrawFlagBlock = createBlock(primShader, ".checkInitVertexDrawFlag");
+  auto initVertexDrawFlagBlock = createBlock(primShader, ".initVertexDrawFlag");
+  auto endInitVertexDrawFlagBlock = createBlock(primShader, ".endInitVertexDrawFlag");
 
-    readPrimIdBlock = createBlock(entryPoint, ".readPrimId");
-    endReadPrimIdBlock = createBlock(entryPoint, ".endReadPrimId");
-  }
+  auto initVertexCountsBlock = createBlock(primShader, ".initVertexCounts");
+  auto endInitVertexCountsBlock = createBlock(primShader, ".endInitVertexCounts");
 
-  auto fetchVertCullDataBlock = createBlock(entryPoint, ".fetchVertCullData");
-  auto endFetchVertCullDataBlock = createBlock(entryPoint, ".endFetchVertCullData");
+  auto writeVertexCullDataBlock = createBlock(primShader, ".writeVertexCullData");
+  auto endWriteVertexCullDataBlock = createBlock(primShader, ".endWriteVertexCullData");
 
-  auto runtimePassthroughBlock = createBlock(entryPoint, ".runtimePassthrough");
-  auto noRuntimePassthroughBlock = createBlock(entryPoint, ".noRuntimePassthrough");
+  auto cullPrimitiveBlock = createBlock(primShader, ".cullPrimitive");
+  auto writeVertexDrawFlagBlock = createBlock(primShader, ".writeVertexDrawFlag");
+  auto endCullPrimitiveBlock = createBlock(primShader, ".endCullPrimitive");
 
-  auto initVertDrawFlagBlock = createBlock(entryPoint, ".initVertDrawFlag");
-  auto endInitVertDrawFlagBlock = createBlock(entryPoint, ".endInitVertDrawFlag");
+  auto checkVertexDrawFlagBlock = createBlock(primShader, ".checkVertexDrawFlag");
+  auto endCheckVertexDrawFlagBlock = createBlock(primShader, ".endCheckVertexDrawFlag");
 
-  auto initVertCountBlock = createBlock(entryPoint, ".initVertCount");
-  auto endInitVertCountBlock = createBlock(entryPoint, ".endInitVertCount");
+  auto accumVertexCountsBlock = createBlock(primShader, ".accumVertexCounts");
+  auto endAccumVertexCountsBlock = createBlock(primShader, ".endAccumVertexCounts");
 
-  auto writeVertCullDataBlock = createBlock(entryPoint, ".writeVertCullData");
-  auto endWriteVertCullDataBlock = createBlock(entryPoint, ".endWriteVertCullData");
+  auto compactVertexBlock = createBlock(primShader, ".compactVertex");
+  auto endCompactVertexBlock = createBlock(primShader, ".endCompactVertex");
 
-  auto cullingBlock = createBlock(entryPoint, ".culling");
-  auto writeVertDrawFlagBlock = createBlock(entryPoint, ".writeVertDrawFlag");
-  auto endCullingBlock = createBlock(entryPoint, ".endCulling");
+  auto checkSendGsAllocReqBlock = createBlock(primShader, ".checkSendGsAllocReq");
+  auto sendGsAllocReqBlock = createBlock(primShader, ".sendGsAllocReq");
+  auto endSendGsAllocReqBlock = createBlock(primShader, ".endSendGsAllocReq");
 
-  auto checkVertDrawFlagBlock = createBlock(entryPoint, ".checkVertDrawFlag");
-  auto endCheckVertDrawFlagBlock = createBlock(entryPoint, ".endCheckVertDrawFlag");
+  auto earlyExitBlock = createBlock(primShader, ".earlyExit");
+  auto checkExportPrimitiveBlock = createBlock(primShader, ".checkExportPrimitive");
 
-  auto accumVertCountBlock = createBlock(entryPoint, ".accumVertCount");
-  auto endAccumVertCountBlock = createBlock(entryPoint, ".endAccumVertCount");
+  auto exportPrimitiveBlock = createBlock(primShader, ".exportPrimitive");
+  auto endExportPrimitiveBlock = createBlock(primShader, ".endExportPrimitive");
 
-  auto compactVertBlock =
-      m_nggControl->compactVertex ? createBlock(entryPoint, ".compactVert") : nullptr; // Conditionally created
-  auto endCompactVertBlock = createBlock(entryPoint, ".endCompactVert");
+  auto checkEmptyWaveBlock = createBlock(primShader, ".checkEmptyWave");
+  auto dummyVertexExportBlock = createBlock(primShader, ".dummyVertexExport");
 
-  auto checkAllocReqBlock = createBlock(entryPoint, ".checkAllocReq");
-  auto allocReqBlock = createBlock(entryPoint, ".allocReq");
-  auto endAllocReqBlock = createBlock(entryPoint, ".endAllocReq");
-
-  // NOTE: Those basic blocks are conditionally created according to the enablement of a workaround flag that handles
-  // empty subgroup.
-  BasicBlock *earlyExitBlock = nullptr;
-  BasicBlock *noEarlyExitBlock = nullptr;
-  if (waNggCullingNoEmptySubgroups) {
-    earlyExitBlock = createBlock(entryPoint, ".earlyExit");
-    noEarlyExitBlock = createBlock(entryPoint, ".noEarlyExit");
-  }
-
-  auto expPrimBlock = createBlock(entryPoint, ".expPrim");
-  auto endExpPrimBlock = createBlock(entryPoint, ".endExpPrim");
-
-  // NOTE: Those basic blocks are conditionally created according to the enablement of vertex compactionless mode.
-  BasicBlock *checkEmptyWaveBlock = nullptr;
-  BasicBlock *emptyWaveExpBlock = nullptr;
-  BasicBlock *noEmptyWaveExpBlock = nullptr;
-  if (!m_nggControl->compactVertex) {
-    checkEmptyWaveBlock = createBlock(entryPoint, ".checkEmptyWave");
-    emptyWaveExpBlock = createBlock(entryPoint, ".emptyWaveExp");
-    noEmptyWaveExpBlock = createBlock(entryPoint, ".noEmptyWaveExp");
-  }
-
-  auto expVertBlock = createBlock(entryPoint, ".expVert");
-  auto endExpVertBlock = createBlock(entryPoint, ".endExpVert");
+  auto checkExportVertexBlock = createBlock(primShader, ".checkExportVertex");
+  auto exportVertexBlock = createBlock(primShader, ".exportVertex");
+  auto endExportVertexBlock = createBlock(primShader, ".endExportVertex");
 
   // Construct ".entry" block
   Value *vertexItemOffset = nullptr;
@@ -1331,76 +1285,29 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
 
     vertexItemOffset = m_builder.CreateMul(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(esGsRingItemSize));
 
-    if (distributePrimitiveId) {
-      auto primValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.primCountInWave);
-      m_builder.CreateCondBr(primValid, writePrimIdBlock, endWritePrimIdBlock);
-    } else {
-      if (m_pipelineState->enableSwXfb())
-        processSwXfb(args);
+    // Distribute primitive ID if needed
+    distributePrimitiveId(primitiveId);
 
-      auto vertValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.vertCountInWave);
-      m_builder.CreateCondBr(vertValid, fetchVertCullDataBlock, endFetchVertCullDataBlock);
-    }
+    // Process SW XFB
+    if (m_pipelineState->enableSwXfb())
+      processSwXfb(args);
+
+    m_builder.CreateBr(checkFetchVertexCullDataBlock);
   }
 
-  if (distributePrimitiveId) {
-    // Construct ".writePrimId" block
-    {
-      m_builder.SetInsertPoint(writePrimIdBlock);
+  // Construct ".checkFetchVertexCullData" block
+  {
+    m_builder.SetInsertPoint(checkFetchVertexCullDataBlock);
 
-      Value *vertexIndex = nullptr;
-      if (m_pipelineState->getRasterizerState().provokingVertexMode == ProvokingVertexFirst)
-        vertexIndex = m_nggInputs.vertexIndex0;
-      else
-        vertexIndex = m_nggInputs.vertexIndex2;
-      writePerThreadDataToLds(primitiveId, vertexIndex, PrimShaderLdsRegion::DistributedPrimitiveId);
-
-      m_builder.CreateBr(endWritePrimIdBlock);
-    }
-
-    // Construct ".endWritePrimId" block
-    {
-      m_builder.SetInsertPoint(endWritePrimIdBlock);
-
-      createFenceAndBarrier();
-
-      auto vertValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.vertCountInWave);
-      m_builder.CreateCondBr(vertValid, readPrimIdBlock, endReadPrimIdBlock);
-    }
-
-    // Construct ".readPrimId" block
-    Value *primitiveId = nullptr;
-    {
-      m_builder.SetInsertPoint(readPrimIdBlock);
-
-      primitiveId = readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
-                                             PrimShaderLdsRegion::DistributedPrimitiveId);
-
-      m_builder.CreateBr(endReadPrimIdBlock);
-    }
-
-    // Construct ".endReadPrimId" block
-    {
-      m_builder.SetInsertPoint(endReadPrimIdBlock);
-
-      m_distributedPrimitiveId = createPhi(
-          {{primitiveId, readPrimIdBlock}, {m_builder.getInt32(0), endWritePrimIdBlock}}, "distributedPrimitiveId");
-
-      createFenceAndBarrier();
-
-      if (m_pipelineState->enableSwXfb())
-        processSwXfb(args);
-
-      auto vertValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.vertCountInWave);
-      m_builder.CreateCondBr(vertValid, fetchVertCullDataBlock, endFetchVertCullDataBlock);
-    }
+    auto validVertex = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.vertCountInWave);
+    m_builder.CreateCondBr(validVertex, fetchVertexCullDataBlock, endFetchVertexCullDataBlock);
   }
 
-  // Construct ".fetchVertCullData" block
+  // Construct ".fetchVertexCullData" block
   Value *cullData = nullptr;
   Value *position = nullptr;
   {
-    m_builder.SetInsertPoint(fetchVertCullDataBlock);
+    m_builder.SetInsertPoint(fetchVertexCullDataBlock);
 
     // Split ES to two parts: fetch cull data before NGG culling; do deferred vertex export after NGG culling
     splitEs();
@@ -1409,83 +1316,71 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     auto cullData = runPartEs(args);
     position = m_nggControl->enableCullDistanceCulling ? m_builder.CreateExtractValue(cullData, 0) : cullData;
 
-    m_builder.CreateBr(endFetchVertCullDataBlock);
+    m_builder.CreateBr(endFetchVertexCullDataBlock);
   }
 
-  // Construct ".endFetchVertCullData" block
+  // Construct ".endFetchVertexCullData" block
   {
-    m_builder.SetInsertPoint(endFetchVertCullDataBlock);
+    m_builder.SetInsertPoint(endFetchVertexCullDataBlock);
 
-    position =
-        createPhi({{position, fetchVertCullDataBlock},
-                   {PoisonValue::get(position->getType()), distributePrimitiveId ? endReadPrimIdBlock : entryBlock}},
-                  "position"); // Update vertex position data
+    position = createPhi(
+        {{position, fetchVertexCullDataBlock}, {PoisonValue::get(position->getType()), checkFetchVertexCullDataBlock}},
+        "position"); // Update vertex position data
 
     // NOTE: If the Z channel of vertex position data is constant, we can go into runtime passthrough mode. Otherwise,
     // we will further check if this is a small subgroup and enable runtime passthrough mode accordingly.
     auto runtimePassthrough = m_constPositionZ ? m_builder.getTrue()
                                                : m_builder.CreateICmpULT(m_nggInputs.vertCountInSubgroup,
                                                                          m_builder.getInt32(NggSmallSubgroupThreshold));
-    m_builder.CreateCondBr(runtimePassthrough, runtimePassthroughBlock, noRuntimePassthroughBlock);
+    m_builder.CreateCondBr(runtimePassthrough, checkSendGsAllocReqBlock, checkInitVertexDrawFlagBlock);
   }
 
-  // Construct ".runtimePassthrough" block
+  // Construct ".checkInitVertexDrawFlag" block
   {
-    m_builder.SetInsertPoint(runtimePassthroughBlock);
+    m_builder.SetInsertPoint(checkInitVertexDrawFlagBlock);
 
-    if (!distributePrimitiveId) {
-      m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-    }
-
-    m_builder.CreateBr(checkAllocReqBlock);
+    auto validVertex = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
+    m_builder.CreateCondBr(validVertex, initVertexDrawFlagBlock, endInitVertexDrawFlagBlock);
   }
 
-  // Construct ".noRuntimePassthrough" block
+  // Construct ".initVertexDrawFlag" block
   {
-    m_builder.SetInsertPoint(noRuntimePassthroughBlock);
-
-    auto vertValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
-    m_builder.CreateCondBr(vertValid, initVertDrawFlagBlock, endInitVertDrawFlagBlock);
-  }
-
-  // Construct ".initVertDrawFlag" block
-  {
-    m_builder.SetInsertPoint(initVertDrawFlagBlock);
+    m_builder.SetInsertPoint(initVertexDrawFlagBlock);
 
     writeVertexCullInfoToLds(m_builder.getInt32(0), vertexItemOffset, m_vertCullInfoOffsets.drawFlag);
 
-    m_builder.CreateBr(endInitVertDrawFlagBlock);
+    m_builder.CreateBr(endInitVertexDrawFlagBlock);
   }
 
-  // Construct ".endInitVertDrawFlag" block
+  // Construct ".endInitVertexDrawFlag" block
   {
-    m_builder.SetInsertPoint(endInitVertDrawFlagBlock);
+    m_builder.SetInsertPoint(endInitVertexDrawFlagBlock);
 
-    auto waveValid =
+    auto validWave =
         m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(waveCountInSubgroup + 1));
-    m_builder.CreateCondBr(waveValid, initVertCountBlock, endInitVertCountBlock);
+    m_builder.CreateCondBr(validWave, initVertexCountsBlock, endInitVertexCountsBlock);
   }
 
-  // Construct ".initVertCount" block
+  // Construct ".initVertexCounts" block
   {
-    m_builder.SetInsertPoint(initVertCountBlock);
+    m_builder.SetInsertPoint(initVertexCountsBlock);
 
     writePerThreadDataToLds(m_builder.getInt32(0), m_nggInputs.threadIdInSubgroup, PrimShaderLdsRegion::VertexCounts);
 
-    m_builder.CreateBr(endInitVertCountBlock);
+    m_builder.CreateBr(endInitVertexCountsBlock);
   }
 
-  // Construct ".endInitVertCount" block
+  // Construct ".endInitVertexCounts" block
   {
-    m_builder.SetInsertPoint(endInitVertCountBlock);
+    m_builder.SetInsertPoint(endInitVertexCountsBlock);
 
-    auto vertValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.vertCountInWave);
-    m_builder.CreateCondBr(vertValid, writeVertCullDataBlock, endWriteVertCullDataBlock);
+    auto validVertex = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, m_nggInputs.vertCountInWave);
+    m_builder.CreateCondBr(validVertex, writeVertexCullDataBlock, endWriteVertexCullDataBlock);
   }
 
   // Construct ".writeVertexCullData" block
   {
-    m_builder.SetInsertPoint(writeVertCullDataBlock);
+    m_builder.SetInsertPoint(writeVertexCullDataBlock);
 
     // Write vertex position data
     writePerThreadDataToLds(position, m_nggInputs.threadIdInSubgroup, PrimShaderLdsRegion::VertexPosition, 0, true);
@@ -1509,32 +1404,32 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
       writeVertexCullInfoToLds(signMask, vertexItemOffset, m_vertCullInfoOffsets.cullDistanceSignMask);
     }
 
-    m_builder.CreateBr(endWriteVertCullDataBlock);
+    m_builder.CreateBr(endWriteVertexCullDataBlock);
   }
 
-  // Construct ".endWriteVertCullData" block
+  // Construct ".endWriteVertexCullData" block
   {
-    m_builder.SetInsertPoint(endWriteVertCullDataBlock);
+    m_builder.SetInsertPoint(endWriteVertexCullDataBlock);
 
     createFenceAndBarrier();
 
-    auto primValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
-    m_builder.CreateCondBr(primValid, cullingBlock, endCullingBlock);
+    auto validPrimitive = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
+    m_builder.CreateCondBr(validPrimitive, cullPrimitiveBlock, endCullPrimitiveBlock);
   }
 
-  // Construct ".culling" block
+  // Construct ".cullPrimitive" block
   Value *primitiveCulled = nullptr;
   {
-    m_builder.SetInsertPoint(cullingBlock);
+    m_builder.SetInsertPoint(cullPrimitiveBlock);
 
-    primitiveCulled = doCulling(entryPoint->getParent(), m_nggInputs.vertexIndex0, m_nggInputs.vertexIndex1,
+    primitiveCulled = doCulling(primShader->getParent(), m_nggInputs.vertexIndex0, m_nggInputs.vertexIndex1,
                                 m_nggInputs.vertexIndex2);
-    m_builder.CreateCondBr(primitiveCulled, endCullingBlock, writeVertDrawFlagBlock);
+    m_builder.CreateCondBr(primitiveCulled, endCullPrimitiveBlock, writeVertexDrawFlagBlock);
   }
 
-  // Construct ".writeVertDrawFlag" block
+  // Construct ".writeVertexDrawFlag" block
   {
-    m_builder.SetInsertPoint(writeVertDrawFlagBlock);
+    m_builder.SetInsertPoint(writeVertexDrawFlagBlock);
 
     auto vertexItemOffset0 = m_builder.CreateMul(m_nggInputs.vertexIndex0, m_builder.getInt32(esGsRingItemSize));
     auto vertexItemOffset1 = m_builder.CreateMul(m_nggInputs.vertexIndex1, m_builder.getInt32(esGsRingItemSize));
@@ -1544,56 +1439,55 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     writeVertexCullInfoToLds(m_builder.getInt32(1), vertexItemOffset1, m_vertCullInfoOffsets.drawFlag);
     writeVertexCullInfoToLds(m_builder.getInt32(1), vertexItemOffset2, m_vertCullInfoOffsets.drawFlag);
 
-    m_builder.CreateBr(endCullingBlock);
+    m_builder.CreateBr(endCullPrimitiveBlock);
   }
 
-  // Construct ".endCulling" block
+  // Construct ".endCullPrimitive" block
   {
-    m_builder.SetInsertPoint(endCullingBlock);
+    m_builder.SetInsertPoint(endCullPrimitiveBlock);
 
-    primitiveCulled = createPhi({{m_builder.getTrue(), cullingBlock},
-                                 {m_builder.getFalse(), writeVertDrawFlagBlock},
-                                 {m_builder.getTrue(), endWriteVertCullDataBlock}});
+    primitiveCulled = createPhi({{m_builder.getTrue(), cullPrimitiveBlock},
+                                 {m_builder.getFalse(), writeVertexDrawFlagBlock},
+                                 {m_builder.getTrue(), endWriteVertexCullDataBlock}});
 
     createFenceAndBarrier();
 
-    auto vertValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
-    m_builder.CreateCondBr(vertValid, checkVertDrawFlagBlock, endCheckVertDrawFlagBlock);
+    auto validVertex = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
+    m_builder.CreateCondBr(validVertex, checkVertexDrawFlagBlock, endCheckVertexDrawFlagBlock);
   }
 
-  // Construct ".checkVertDrawFlag"
+  // Construct ".checkVertexDrawFlag"
   Value *drawFlag = nullptr;
   {
-    m_builder.SetInsertPoint(checkVertDrawFlagBlock);
+    m_builder.SetInsertPoint(checkVertexDrawFlagBlock);
 
     drawFlag = readVertexCullInfoFromLds(m_builder.getInt32Ty(), vertexItemOffset, m_vertCullInfoOffsets.drawFlag);
     drawFlag = m_builder.CreateICmpNE(drawFlag, m_builder.getInt32(0));
 
-    m_builder.CreateBr(endCheckVertDrawFlagBlock);
+    m_builder.CreateBr(endCheckVertexDrawFlagBlock);
   }
 
-  // Construct ".endCheckVertDrawFlag"
+  // Construct ".endCheckVertexDrawFlag"
   Value *drawMask = nullptr;
   Value *vertCountInWave = nullptr;
   {
-    m_builder.SetInsertPoint(endCheckVertDrawFlagBlock);
+    m_builder.SetInsertPoint(endCheckVertexDrawFlagBlock);
 
-    drawFlag = createPhi(
-        {{drawFlag, checkVertDrawFlagBlock}, {m_builder.getFalse(), endCullingBlock}}); // Update vertex draw flag
+    drawFlag = createPhi({{drawFlag, checkVertexDrawFlagBlock},
+                          {m_builder.getFalse(), endCullPrimitiveBlock}}); // Update vertex draw flag
     drawMask = ballot(drawFlag);
 
     vertCountInWave = m_builder.CreateIntrinsic(Intrinsic::ctpop, m_builder.getInt64Ty(), drawMask);
     vertCountInWave = m_builder.CreateTrunc(vertCountInWave, m_builder.getInt32Ty());
 
     auto threadIdUpbound = m_builder.CreateSub(m_builder.getInt32(waveCountInSubgroup), m_nggInputs.waveIdInSubgroup);
-    auto threadValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, threadIdUpbound);
-
-    m_builder.CreateCondBr(threadValid, accumVertCountBlock, endAccumVertCountBlock);
+    auto validThread = m_builder.CreateICmpULT(m_nggInputs.threadIdInWave, threadIdUpbound);
+    m_builder.CreateCondBr(validThread, accumVertexCountsBlock, endAccumVertexCountsBlock);
   }
 
-  // Construct ".accumVertCount" block
+  // Construct ".accumVertexCounts" block
   {
-    m_builder.SetInsertPoint(accumVertCountBlock);
+    m_builder.SetInsertPoint(accumVertexCountsBlock);
 
     auto ldsOffset = m_builder.CreateAdd(m_nggInputs.waveIdInSubgroup, m_nggInputs.threadIdInWave);
     ldsOffset = m_builder.CreateAdd(ldsOffset, m_builder.getInt32(1));
@@ -1603,15 +1497,15 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     ldsOffset = m_builder.CreateAdd(ldsOffset, m_builder.getInt32(regionStart));
     atomicAdd(vertCountInWave, ldsOffset);
 
-    m_builder.CreateBr(endAccumVertCountBlock);
+    m_builder.CreateBr(endAccumVertexCountsBlock);
   }
 
-  // Construct ".endAccumVertCount" block
+  // Construct ".endAccumVertexCounts" block
   Value *vertCountInPrevWaves = nullptr;
   Value *vertCountInSubgroup = nullptr;
   Value *hasCulledVertices = nullptr;
   {
-    m_builder.SetInsertPoint(endAccumVertCountBlock);
+    m_builder.SetInsertPoint(endAccumVertexCountsBlock);
 
     createFenceAndBarrier();
 
@@ -1623,22 +1517,23 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     vertCountInSubgroup = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {},
                                                     {vertCountInWaves, m_builder.getInt32(waveCountInSubgroup)});
 
-    if (!m_nggControl->compactVertex) {
-      m_builder.CreateBr(endCompactVertBlock);
-    } else {
+    if (m_nggControl->compactVertex) {
       // Get vertex count for all waves prior to this wave
       vertCountInPrevWaves =
           m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {vertCountInWaves, m_nggInputs.waveIdInSubgroup});
 
       hasCulledVertices = m_builder.CreateICmpULT(vertCountInSubgroup, m_nggInputs.vertCountInSubgroup);
-      m_builder.CreateCondBr(m_builder.CreateAnd(drawFlag, hasCulledVertices), compactVertBlock, endCompactVertBlock);
+      m_builder.CreateCondBr(m_builder.CreateAnd(drawFlag, hasCulledVertices), compactVertexBlock,
+                             endCompactVertexBlock);
+    } else {
+      m_builder.CreateBr(endCompactVertexBlock);
     }
   }
 
   if (m_nggControl->compactVertex) {
-    // Construct ".compactVert" block
+    // Construct ".compactVertex" block
     {
-      m_builder.SetInsertPoint(compactVertBlock);
+      m_builder.SetInsertPoint(compactVertexBlock);
 
       auto drawMaskVec = m_builder.CreateBitCast(drawMask, FixedVectorType::get(m_builder.getInt32Ty(), 2));
 
@@ -1660,6 +1555,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
       // Write compacted vertex index
       writeVertexCullInfoToLds(compactedVertexIndex, vertexItemOffset, m_vertCullInfoOffsets.compactedVertexIndex);
 
+      const auto resUsage = m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStageTessEval : ShaderStageVertex);
       if (m_hasTes) {
         // Write X/Y of tessCoord (U/V)
         if (resUsage->builtInUsage.tes.tessCoord) {
@@ -1689,15 +1585,21 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
         }
       }
 
-      m_builder.CreateBr(endCompactVertBlock);
+      m_builder.CreateBr(endCompactVertexBlock);
+    }
+  } else {
+    // Mark ".compactVertex" block as unused
+    {
+      m_builder.SetInsertPoint(compactVertexBlock);
+      m_builder.CreateUnreachable();
     }
   }
 
-  // Construct ".endCompactVert" block
+  // Construct ".endCompactVertex" block
   Value *fullyCulled = nullptr;
   Value *primCountInSubgroup = nullptr;
   {
-    m_builder.SetInsertPoint(endCompactVertBlock);
+    m_builder.SetInsertPoint(endCompactVertexBlock);
 
     fullyCulled = m_builder.CreateICmpEQ(vertCountInSubgroup, m_builder.getInt32(0));
 
@@ -1718,76 +1620,74 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     // subgroup.
     vertCountInSubgroup = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertCountInSubgroup);
 
-    m_builder.CreateBr(checkAllocReqBlock);
+    m_builder.CreateBr(checkSendGsAllocReqBlock);
   }
 
-  // Construct ".checkAllocReq" block
+  // Construct ".checkSendGsAllocReq" block
   {
-    m_builder.SetInsertPoint(checkAllocReqBlock);
+    m_builder.SetInsertPoint(checkSendGsAllocReqBlock);
 
     // NOTE: Here, we make several phi nodes to update some values that are different in runtime passthrough path
     // and no runtime passthrough path (normal culling path).
-
     if (m_nggControl->compactVertex) {
-      m_compactVertex = createPhi(
-          {{hasCulledVertices, endCompactVertBlock}, {m_builder.getFalse(), runtimePassthroughBlock}}, "compactVertex");
+      m_compactVertex =
+          createPhi({{hasCulledVertices, endCompactVertexBlock}, {m_builder.getFalse(), endFetchVertexCullDataBlock}},
+                    "compactVertex");
     } else {
       assert(!m_compactVertex); // Must be null
     }
 
     // Update primitive culled flag
     primitiveCulled = createPhi(
-        {{primitiveCulled, endCompactVertBlock}, {m_builder.getFalse(), runtimePassthroughBlock}}, "cullFlag");
+        {{primitiveCulled, endCompactVertexBlock}, {m_builder.getFalse(), endFetchVertexCullDataBlock}}, "cullFlag");
 
     // Update fully-culled flag
-    fullyCulled =
-        createPhi({{fullyCulled, endCompactVertBlock}, {m_builder.getFalse(), runtimePassthroughBlock}}, "fullyCulled");
+    fullyCulled = createPhi({{fullyCulled, endCompactVertexBlock}, {m_builder.getFalse(), endFetchVertexCullDataBlock}},
+                            "fullyCulled");
 
     // Update primitive count in subgroup
     m_nggInputs.primCountInSubgroup = createPhi(
-        {{primCountInSubgroup, endCompactVertBlock}, {m_nggInputs.primCountInSubgroup, runtimePassthroughBlock}},
+        {{primCountInSubgroup, endCompactVertexBlock}, {m_nggInputs.primCountInSubgroup, endFetchVertexCullDataBlock}},
         "primCountInSubgroup");
 
     // Update vertex count in subgroup
     m_nggInputs.vertCountInSubgroup = createPhi(
-        {{vertCountInSubgroup, endCompactVertBlock}, {m_nggInputs.vertCountInSubgroup, runtimePassthroughBlock}},
+        {{vertCountInSubgroup, endCompactVertexBlock}, {m_nggInputs.vertCountInSubgroup, endFetchVertexCullDataBlock}},
         "vertCountInSubgroup");
 
     if (!m_nggControl->compactVertex) {
       // Update draw flag
-      drawFlag =
-          createPhi({{drawFlag, endCompactVertBlock}, {m_builder.getTrue(), runtimePassthroughBlock}}, "drawFlag");
+      drawFlag = createPhi({{drawFlag, endCompactVertexBlock}, {m_builder.getTrue(), endFetchVertexCullDataBlock}},
+                           "drawFlag");
 
       // Update vertex count in wave
-      vertCountInWave =
-          createPhi({{vertCountInWave, endCompactVertBlock}, {m_nggInputs.vertCountInWave, runtimePassthroughBlock}},
-                    "vertCountInWave");
+      vertCountInWave = createPhi(
+          {{vertCountInWave, endCompactVertexBlock}, {m_nggInputs.vertCountInWave, endFetchVertexCullDataBlock}},
+          "vertCountInWave");
     }
 
     auto firstWaveInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.waveIdInSubgroup, m_builder.getInt32(0));
-    m_builder.CreateCondBr(firstWaveInSubgroup, allocReqBlock, endAllocReqBlock);
+    m_builder.CreateCondBr(firstWaveInSubgroup, sendGsAllocReqBlock, endSendGsAllocReqBlock);
   }
 
-  // Construct ".allocReq" block
+  // Construct ".sendGsAllocReq" block
   {
-    m_builder.SetInsertPoint(allocReqBlock);
+    m_builder.SetInsertPoint(sendGsAllocReqBlock);
 
     sendGsAllocReqMessage();
-    m_builder.CreateBr(endAllocReqBlock);
+    m_builder.CreateBr(endSendGsAllocReqBlock);
   }
 
-  // Construct ".endAllocReq" block
+  // Construct ".endSendGsAllocReq" block
   {
-    m_builder.SetInsertPoint(endAllocReqBlock);
+    m_builder.SetInsertPoint(endSendGsAllocReqBlock);
 
     createFenceAndBarrier();
 
     if (waNggCullingNoEmptySubgroups)
-      m_builder.CreateCondBr(fullyCulled, earlyExitBlock, noEarlyExitBlock);
-    else {
-      auto primValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
-      m_builder.CreateCondBr(primValid, expPrimBlock, endExpPrimBlock);
-    }
+      m_builder.CreateCondBr(fullyCulled, earlyExitBlock, checkExportPrimitiveBlock);
+    else
+      m_builder.CreateBr(checkExportPrimitiveBlock);
   }
 
   if (waNggCullingNoEmptySubgroups) {
@@ -1800,48 +1700,67 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
       else
         m_builder.CreateRetVoid();
     }
-
-    // Construct ".noEarlyExit" block
+  } else {
+    // Mark ".earlyExit" block as unused
     {
-      m_builder.SetInsertPoint(noEarlyExitBlock);
-
-      auto primValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
-      m_builder.CreateCondBr(primValid, expPrimBlock, endExpPrimBlock);
+      m_builder.SetInsertPoint(earlyExitBlock);
+      m_builder.CreateUnreachable();
     }
   }
 
-  // Construct ".expPrim" block
+  // Construct ".checkExportPrimitive" block
   {
-    m_builder.SetInsertPoint(expPrimBlock);
+    m_builder.SetInsertPoint(checkExportPrimitiveBlock);
+
+    auto validPrimitive = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
+    m_builder.CreateCondBr(validPrimitive, exportPrimitiveBlock, endExportPrimitiveBlock);
+  }
+
+  // Construct ".exportPrimitive" block
+  {
+    m_builder.SetInsertPoint(exportPrimitiveBlock);
 
     exportPrimitive(primitiveCulled);
 
-    m_builder.CreateBr(endExpPrimBlock);
+    m_builder.CreateBr(endExportPrimitiveBlock);
   }
 
-  // Construct ".endExpPrim" block
+  // Construct ".endExportPrimitive" block
   {
-    m_builder.SetInsertPoint(endExpPrimBlock);
+    m_builder.SetInsertPoint(endExportPrimitiveBlock);
 
-    auto vertValid = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
-    if (m_nggControl->compactVertex)
-      m_builder.CreateCondBr(vertValid, expVertBlock, endExpVertBlock);
-    else
-      m_builder.CreateCondBr(vertValid, checkEmptyWaveBlock, endExpVertBlock);
+    if (m_nggControl->compactVertex) {
+      m_builder.CreateBr(checkExportVertexBlock);
+    } else {
+      auto validVertex = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
+      m_builder.CreateCondBr(validVertex, checkEmptyWaveBlock, endExportVertexBlock);
+    }
   }
 
-  if (!m_nggControl->compactVertex) {
+  if (m_nggControl->compactVertex) {
+    // Mark ".checkEmptyWave" block as unused
+    {
+      m_builder.SetInsertPoint(checkEmptyWaveBlock);
+      m_builder.CreateUnreachable();
+    }
+
+    // Mark ".dummyVertexExport" block as unused
+    {
+      m_builder.SetInsertPoint(dummyVertexExportBlock);
+      m_builder.CreateUnreachable();
+    }
+  } else {
     // Construct ".checkEmptyWave" block
     {
       m_builder.SetInsertPoint(checkEmptyWaveBlock);
 
       auto emptyWave = m_builder.CreateICmpEQ(vertCountInWave, m_builder.getInt32(0));
-      m_builder.CreateCondBr(emptyWave, emptyWaveExpBlock, noEmptyWaveExpBlock);
+      m_builder.CreateCondBr(emptyWave, dummyVertexExportBlock, checkExportVertexBlock);
     }
 
-    // Construct ".emptyWaveExp" block
+    // Construct ".dummyVertexExport" block
     {
-      m_builder.SetInsertPoint(emptyWaveExpBlock);
+      m_builder.SetInsertPoint(dummyVertexExportBlock);
 
       auto undef = UndefValue::get(m_builder.getFloatTy());
       m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getFloatTy(),
@@ -1856,28 +1775,31 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
 
       m_builder.CreateRetVoid();
     }
-
-    // Construct ".noEmptyWaveExp" block
-    {
-      m_builder.SetInsertPoint(noEmptyWaveExpBlock);
-
-      m_builder.CreateCondBr(drawFlag, expVertBlock, endExpVertBlock);
-    }
   }
 
-  // Construct ".expVert" block
+  // Construct ".checkExportVertexBlock" block
   {
-    m_builder.SetInsertPoint(expVertBlock);
+    m_builder.SetInsertPoint(checkExportVertexBlock);
+
+    auto validVertex = m_nggControl->compactVertex
+                           ? m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup)
+                           : drawFlag;
+    m_builder.CreateCondBr(validVertex, exportVertexBlock, endExportVertexBlock);
+  }
+
+  // Construct ".exportVertex" block
+  {
+    m_builder.SetInsertPoint(exportVertexBlock);
 
     // Run part ES to do deferred vertex export
     runPartEs(args, position);
 
-    m_builder.CreateBr(endExpVertBlock);
+    m_builder.CreateBr(endExportVertexBlock);
   }
 
-  // Construct ".endExpVert" block
+  // Construct ".endExportVertex" block
   {
-    m_builder.SetInsertPoint(endExpVertBlock);
+    m_builder.SetInsertPoint(endExportVertexBlock);
 
     m_builder.CreateRetVoid();
   }
