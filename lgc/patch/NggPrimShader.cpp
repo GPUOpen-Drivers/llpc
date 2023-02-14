@@ -6128,10 +6128,8 @@ Value *NggPrimShader::ballot(Value *value) {
 void NggPrimShader::processVertexAttribExport(Function *&target) {
   assert(m_gfxIp.major >= 11); // For GFX11+
 
-  const unsigned attribCount =
-      m_pipelineState
-          ->getShaderResourceUsage(m_hasGs ? ShaderStageGeometry : (m_hasTes ? ShaderStageTessEval : ShaderStageVertex))
-          ->inOutUsage.expCount;
+  ShaderStage shaderStage = m_hasGs ? ShaderStageGeometry : (m_hasTes ? ShaderStageTessEval : ShaderStageVertex);
+  const unsigned attribCount = m_pipelineState->getShaderResourceUsage(shaderStage)->inOutUsage.expCount;
   if (attribCount == 0)
     return; // No vertex attribute exports
 
@@ -6156,13 +6154,18 @@ void NggPrimShader::processVertexAttribExport(Function *&target) {
   //
   // Expand vertex attribute export calls by replacing them with real instructions
   //
-  // Modify the field STRIDE of attribute ring buffer descriptor if we have more than one vertex attribute to export
-  bool modifyAttribRingBufDesc = attribCount > 1;
   Value *attribRingBufDesc = nullptr;
 
   // Always the first two arguments, added by us
   auto attribRingBase = target->getArg(0);
   auto vertexIndex = target->getArg(1);
+
+  m_builder.SetInsertPointPastAllocas(target);
+
+  // ringOffset = attribRingBase * 32 * 16
+  //            = attribRingBase * 512
+  static const unsigned AttribGranularity = 32 * SizeOfVec4; // 32 * 16 bytes
+  auto ringOffset = m_builder.CreateMul(attribRingBase, m_builder.getInt32(AttribGranularity));
 
   SmallVector<CallInst *, 8> removedCalls;
 
@@ -6180,40 +6183,39 @@ void NggPrimShader::processVertexAttribExport(Function *&target) {
         // by subsequent ring buffer store instructions that do vertex attribute exporting.
         m_builder.SetInsertPoint(call->getParent()->getTerminator());
 
-        if (!attribRingBufDesc)
+        if (!attribRingBufDesc) {
           attribRingBufDesc = call->getArgOperand(0); // Initialize it if necessary
+
+          // Fixup the STRIDE field if necessary, STRIDE = WORD1[30:16].
+          //
+          // STRIDE is initialized to 16 by the driver, which is the right value for attribCount == 1.
+          // We override the value if there are more attributes.
+          if (attribCount > 1) {
+            auto descWord1 = m_builder.CreateExtractElement(attribRingBufDesc, 1);
+            auto stride = m_builder.getInt32(attribCount * SizeOfVec4);
+            if ((attribCount & 1) == 0) {
+              // Clear the bit that was set in STRIDE by the driver.
+              descWord1 = m_builder.CreateAnd(descWord1, ~0x3FFF0000);
+            }
+            descWord1 = m_builder.CreateOr(descWord1, m_builder.CreateShl(stride, 16)); // Set new STRIDE
+            attribRingBufDesc = m_builder.CreateInsertElement(attribRingBufDesc, descWord1, 1);
+          }
+        }
+
         const unsigned location = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
         auto attribValue = call->getArgOperand(2);
-
-        // Modify the field STRIDE of attribute ring buffer descriptor
-        if (modifyAttribRingBufDesc) {
-          // STRIDE = WORD1[30:16], STRIDE is multiplied by attribute count
-          auto descWord1 = m_builder.CreateExtractElement(attribRingBufDesc, 1);
-          auto stride = createUBfe(descWord1, 16, 14);
-          stride = m_builder.CreateMul(stride, m_builder.getInt32(attribCount));
-
-          descWord1 = m_builder.CreateAnd(descWord1, ~0x3FFF0000);                    // Clear STRIDE
-          descWord1 = m_builder.CreateOr(descWord1, m_builder.CreateShl(stride, 16)); // Set new STRIDE
-          attribRingBufDesc = m_builder.CreateInsertElement(attribRingBufDesc, descWord1, 1);
-
-          modifyAttribRingBufDesc = false; // Clear the flag once finished
-        }
 
         // Export vertex attributes
         assert(attribValue->getType() == FixedVectorType::get(m_builder.getFloatTy(), 4)); // Must be <4 xfloat>
 
-        // ringOffset = attribRingBase * 32 * 16 + 32 * location * 16
-        //            = attribRingBase * 512 + location * 512
-        static const unsigned AttribGranularity = 32 * SizeOfVec4; // 32 * 16 bytes
-        auto ringOffset = m_builder.CreateMul(attribRingBase, m_builder.getInt32(AttribGranularity));
-        ringOffset = m_builder.CreateAdd(ringOffset, m_builder.getInt32(AttribGranularity * location));
+        auto locationOffset = m_builder.getInt32(location * SizeOfVec4);
 
         CoherentFlag coherent = {};
         coherent.bits.glc = true;
         coherent.bits.slc = true;
 
         m_builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_store, attribValue->getType(),
-                                  {attribValue, attribRingBufDesc, vertexIndex, m_builder.getInt32(0), ringOffset,
+                                  {attribValue, attribRingBufDesc, vertexIndex, locationOffset, ringOffset,
                                    m_builder.getInt32(coherent.u32All)});
 
         removedCalls.push_back(call);
