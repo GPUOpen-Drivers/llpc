@@ -2210,12 +2210,14 @@ Value *SpirvLowerGlobal::atomicOpWithValueInTaskPayload(Instruction *atomicInstT
 void SpirvLowerGlobal::lowerBufferBlock() {
   SmallVector<GlobalVariable *, 8> globalsToRemove;
 
-  // Represent the users of the global variables, expect a bitCast, a load, a store, a GEP or a select used by GEPs
+  // With opaque pointers actually any instruction can be the user of the global variable since, zero-index GEPs
+  // are removed. However we need to handle non-zero-index GEPs and selects differently.
   struct ReplaceInstsInfo {
     // TODO: Remove this when LLPC will switch fully to opaque pointers.
     // remove bitCastInst.
     BitCastInst *bitCastInst;                         // The user is a bitCast
-    Instruction *loadStoreInst;                       // The user is a load or a store.
+    Instruction *otherInst;                           // This can be any instruction which is using global, since
+                                                      // opaque pointers are removing zero-index GEP.
     SelectInst *selectInst;                           // The user is a select
     SmallVector<GetElementPtrInst *> getElemPtrInsts; // The user is a GEP. If the user is a select, we store its users.
   };
@@ -2282,11 +2284,8 @@ void SpirvLowerGlobal::lowerBufferBlock() {
               // We need to modify the bitcast if we did not find a GEP.
               assert(bitCast->getOperand(0) == &global);
               replaceInstsInfo.bitCastInst = bitCast;
-            } else if (isa<LoadInst>(inst) || isa<StoreInst>(inst)) {
-              replaceInstsInfo.loadStoreInst = inst;
-            } else {
+            } else if (auto *selectInst = dyn_cast<SelectInst>(inst)) {
               // The users of the select must be a GEP.
-              SelectInst *selectInst = cast<SelectInst>(inst);
               assert(selectInst->getTrueValue() == &global || selectInst->getFalseValue() == &global);
               replaceInstsInfo.selectInst = selectInst;
               for (User *selectUser : selectInst->users()) {
@@ -2296,6 +2295,8 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                     replaceInstsInfo.getElemPtrInsts.push_back(getElemPtr);
                 }
               }
+            } else {
+              replaceInstsInfo.otherInst = inst;
             }
             instructionsToReplace.push_back(replaceInstsInfo);
           }
@@ -2318,10 +2319,10 @@ void SpirvLowerGlobal::lowerBufferBlock() {
               m_builder->CreateInvariantStart(bufferDesc);
 
             replaceInstsInfo.bitCastInst->replaceUsesOfWith(&global, m_builder->CreateBitCast(bufferDesc, blockType));
-          } else if (replaceInstsInfo.loadStoreInst) {
-            // All load or store recorded here are for GEPs that indexed by 0, 0 into the arrayed resource. Opaque
+          } else if (replaceInstsInfo.otherInst) {
+            // All instructions here are for GEPs that indexed by 0, 0 into the arrayed resource. Opaque
             // pointers are removing zero-index GEPs and BitCast with pointer to pointer cast.
-            m_builder->SetInsertPoint(replaceInstsInfo.loadStoreInst);
+            m_builder->SetInsertPoint(replaceInstsInfo.otherInst);
             unsigned bufferFlags = global.isConstant() ? 0 : lgc::Builder::BufferFlagWritten;
             Value *const bufferDesc = m_builder->CreateLoadBufferDesc(descSet, binding, m_builder->getInt32(0),
                                                                       bufferFlags, m_builder->getInt8Ty());
@@ -2330,7 +2331,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
             if (global.isConstant())
               m_builder->CreateInvariantStart(bufferDesc);
 
-            replaceInstsInfo.loadStoreInst->replaceUsesOfWith(&global, bufferDesc);
+            replaceInstsInfo.otherInst->replaceUsesOfWith(&global, bufferDesc);
           } else {
             assert(!replaceInstsInfo.getElemPtrInsts.empty());
 
