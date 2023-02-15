@@ -2373,7 +2373,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
       lowerPassMgr->addPass(SpirvLowerCfgMerges());
       lowerPassMgr->addPass(AlwaysInlinerPass());
     }
-    lowerPassMgr->addPass(SpirvLowerRayTracing(false));
+    lowerPassMgr->addPass(SpirvLowerRayTracing());
 
     // Stop timer for translate.
     timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, false);

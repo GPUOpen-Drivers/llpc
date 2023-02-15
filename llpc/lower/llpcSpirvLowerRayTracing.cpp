@@ -106,13 +106,7 @@ unsigned getTraceRayParamPayloadIdx(void) {
 }
 
 // =====================================================================================================================
-SpirvLowerRayTracing::SpirvLowerRayTracing() : SpirvLowerRayTracing(false) {
-}
-
-// =====================================================================================================================
-SpirvLowerRayTracing::SpirvLowerRayTracing(bool rayQueryLibrary)
-    : SpirvLowerRayQuery(rayQueryLibrary), m_funcRetFlag(nullptr), m_worldToObjMatrix(nullptr),
-      m_globalPayload(nullptr), m_globalCallableData(nullptr) {
+SpirvLowerRayTracing::SpirvLowerRayTracing() : SpirvLowerRayQuery(false) {
 }
 
 // =====================================================================================================================
