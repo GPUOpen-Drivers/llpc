@@ -7056,51 +7056,78 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
       auto bv = m_bm->getVariable(i);
       if (bv->getStorageClass() == StorageClassOutput) {
         SPIRVWord xfbBuffer = InvalidValue;
-        if (bv->hasDecorate(DecorationXfbBuffer, 0, &xfbBuffer)) {
-          const unsigned indexOfBuffer = 2 * xfbBuffer;
-          xfbState[indexOfBuffer] = 0;
-          SPIRVWord streamId = InvalidValue;
-          if (bv->hasDecorate(DecorationStream, 0, &streamId))
-            xfbState[indexOfBuffer] = streamId;
+        // NOTE: XFbBuffer may be decorated on the pointer element
+        SPIRVType *pointerElemTy = bv->getType()->getPointerElementType();
+        SPIRVEntry *entries[2] = {bv, pointerElemTy};
+        unsigned memberCount = 0;
+        if (pointerElemTy->isTypeStruct())
+          memberCount = pointerElemTy->getStructMemberCount();
+        for (unsigned id = 0; id < 2; ++id) {
+          auto entry = entries[id];
+          if (entry->hasDecorate(DecorationXfbBuffer, 0, &xfbBuffer)) {
+            const unsigned indexOfBuffer = 2 * xfbBuffer;
+            xfbState[indexOfBuffer] = 0;
+            SPIRVWord streamId = InvalidValue;
+            if (entry->hasDecorate(DecorationStream, 0, &streamId))
+              xfbState[indexOfBuffer] = streamId;
 
-          SPIRVWord xfbStride = InvalidValue;
-          if (bv->hasDecorate(DecorationXfbStride, 0, &xfbStride)) {
-            const unsigned indexOfStride = indexOfBuffer + 1;
-            xfbState[indexOfStride] = xfbStride;
-          }
+            SPIRVWord xfbStride = InvalidValue;
+            if (entry->hasDecorate(DecorationXfbStride, 0, &xfbStride)) {
+              const unsigned indexOfStride = indexOfBuffer + 1;
+              xfbState[indexOfStride] = xfbStride;
+            }
+          } else if (id == 1) {
+            for (unsigned i = 0; i < memberCount; ++i) {
+              if (entry->hasMemberDecorate(i, DecorationXfbBuffer, 0, &xfbBuffer)) {
+                const unsigned indexOfBuffer = 2 * xfbBuffer;
+                xfbState[indexOfBuffer] = 0;
+                SPIRVWord streamId = InvalidValue;
+                if (entry->hasMemberDecorate(i, DecorationStream, 0, &streamId))
+                  xfbState[indexOfBuffer] = streamId;
 
-          // Update indexOfBuffer for block array, the N array-elements are captured by N consecutive buffers.
-          SPIRVType *bt = bv->getType()->getPointerElementType();
-          if (bt->isTypeArray()) {
-            assert(m_valueMap.find(bv) != m_valueMap.end());
-            auto output = cast<GlobalVariable>(m_valueMap[bv]);
-            MDNode *metaNode = output->getMetadata(gSPIRVMD::InOut);
-            assert(metaNode);
-            auto elemMeta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
-            // Find the innermost array-element
-            auto elemTy = bt;
-            uint64_t elemCount = 0;
-            ShaderInOutMetadata outMetadata = {};
-            do {
-              assert(elemMeta->getNumOperands() == 4);
-              outMetadata.U64All[0] = cast<ConstantInt>(elemMeta->getOperand(2))->getZExtValue();
-              outMetadata.U64All[1] = cast<ConstantInt>(elemMeta->getOperand(3))->getZExtValue();
-              elemCount = elemTy->getArrayLength();
-
-              elemTy = elemTy->getArrayElementType();
-              elemMeta = cast<Constant>(elemMeta->getOperand(1));
-            } while (elemTy->isTypeArray());
-
-            if (outMetadata.IsBlockArray) {
-              // The even index (0,2,4,6) of !lgc.xfb.state metadata corresponds the buffer index (0~3).
-              const unsigned bufferIdx = outMetadata.XfbBuffer;
-              const int streamId = xfbState[2 * bufferIdx];
-              const unsigned stride = xfbState[2 * bufferIdx + 1];
-              for (unsigned idx = 0; idx < elemCount; ++idx) {
-                const unsigned indexOfBuffer = 2 * (bufferIdx + idx);
-                xfbState[indexOfBuffer] = streamId;
-                xfbState[indexOfBuffer + 1] = stride;
+                SPIRVWord xfbStride = InvalidValue;
+                if (entry->hasMemberDecorate(i, DecorationXfbStride, 0, &xfbStride)) {
+                  const unsigned indexOfStride = indexOfBuffer + 1;
+                  xfbState[indexOfStride] = xfbStride;
+                }
               }
+            }
+          }
+        }
+        if (xfbBuffer == InvalidValue)
+          continue;
+
+        // Update indexOfBuffer for block array, the N array-elements are captured by N consecutive buffers.
+        SPIRVType *bt = bv->getType()->getPointerElementType();
+        if (bt->isTypeArray()) {
+          assert(m_valueMap.find(bv) != m_valueMap.end());
+          auto output = cast<GlobalVariable>(m_valueMap[bv]);
+          MDNode *metaNode = output->getMetadata(gSPIRVMD::InOut);
+          assert(metaNode);
+          auto elemMeta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+          // Find the innermost array-element
+          auto elemTy = bt;
+          uint64_t elemCount = 0;
+          ShaderInOutMetadata outMetadata = {};
+          do {
+            assert(elemMeta->getNumOperands() == 4);
+            outMetadata.U64All[0] = cast<ConstantInt>(elemMeta->getOperand(2))->getZExtValue();
+            outMetadata.U64All[1] = cast<ConstantInt>(elemMeta->getOperand(3))->getZExtValue();
+            elemCount = elemTy->getArrayLength();
+
+            elemTy = elemTy->getArrayElementType();
+            elemMeta = cast<Constant>(elemMeta->getOperand(1));
+          } while (elemTy->isTypeArray());
+
+          if (outMetadata.IsBlockArray) {
+            // The even index (0,2,4,6) of !lgc.xfb.state metadata corresponds the buffer index (0~3).
+            const unsigned bufferIdx = outMetadata.XfbBuffer;
+            const int streamId = xfbState[2 * bufferIdx];
+            const unsigned stride = xfbState[2 * bufferIdx + 1];
+            for (unsigned idx = 0; idx < elemCount; ++idx) {
+              const unsigned indexOfBuffer = 2 * (bufferIdx + idx);
+              xfbState[indexOfBuffer] = streamId;
+              xfbState[indexOfBuffer + 1] = stride;
             }
           }
         }
@@ -8011,21 +8038,13 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
     // Enable transform feedback buffer if transform feedback offset is declared, and then
     // find the minimum member transform feedback offset as starting block transform feedback offset
     for (auto memberIdx = 0; memberIdx < numMembers; ++memberIdx) {
-      if (bt->hasMemberDecorate(memberIdx, DecorationXfbBuffer, 0, &xfbBuffer))
-        inOutDec.XfbBuffer = xfbBuffer;
-
-      if (bt->hasMemberDecorate(memberIdx, DecorationXfbStride, 0, &xfbStride))
-        inOutDec.XfbStride = xfbStride;
-
       if (bt->hasMemberDecorate(memberIdx, DecorationOffset, 0, &xfbOffset)) {
-        // NOTE: Transform feedback is triggered only if "xfb_offset" is specified. And in such case, "xfb_stride"
-        // must be specified as well.
-        if (inOutDec.XfbStride > 0)
-          inOutDec.IsXfb = true;
         if (xfbOffset < blockXfbOffset)
           blockXfbOffset = xfbOffset;
       }
     }
+    if (blockXfbOffset == SPIRVID_INVALID)
+      blockXfbOffset = 0;
 
     for (auto memberIdx = 0; memberIdx < numMembers; ++memberIdx) {
       auto memberDec = inOutDec;
@@ -8072,6 +8091,12 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
         memberDec.Interp.Mode = InterpModeFlat;
       }
 
+      if (bt->hasMemberDecorate(memberIdx, DecorationXfbBuffer, 0, &xfbBuffer))
+        memberDec.XfbBuffer = xfbBuffer;
+
+      if (bt->hasMemberDecorate(memberIdx, DecorationXfbStride, 0, &xfbStride))
+        memberDec.XfbStride = xfbStride;
+
       auto memberTy = bt->getStructMemberType(memberIdx);
       bool alignTo64Bit = checkContains64BitType(memberTy);
       if (bt->hasMemberDecorate(memberIdx, DecorationOffset, 0, &xfbOffset)) {
@@ -8079,6 +8104,10 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
         // Then use DecorationOffset as starting XfbExtraOffset
         memberDec.XfbExtraOffset = xfbOffset - blockXfbOffset;
         memberDec.XfbOffset = blockXfbOffset;
+        // NOTE: Transform feedback is triggered only if "xfb_offset" is specified. And in such case, "xfb_stride"
+        // must be specified as well.
+        if (memberDec.XfbStride > 0)
+          memberDec.IsXfb = true;
       } else {
         if (alignTo64Bit)
           // Align next XfbExtraOffset to 64-bit (8 bytes)
