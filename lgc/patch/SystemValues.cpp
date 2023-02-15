@@ -426,47 +426,6 @@ Value *ShaderSystemValues::getStreamOutBufDesc(unsigned xfbBuffer) {
 }
 
 // =====================================================================================================================
-// Get stream-out buffer offset
-//
-// @param xfbBuffer : Transform feedback buffer ID
-Value *ShaderSystemValues::getStreamOutBufOffset(unsigned xfbBuffer) {
-  assert(m_pipelineState->enableSwXfb());
-  assert(xfbBuffer < MaxTransformFeedbackBuffers);
-  if (m_streamOutBufOffsets.size() <= xfbBuffer)
-    m_streamOutBufOffsets.resize(xfbBuffer + 1);
-
-  if (!m_streamOutBufOffsets[xfbBuffer]) {
-    auto streamOutControlBufPair = getStreamOutControlBufPtr();
-    auto streamOutControlBufPtr = streamOutControlBufPair.second;
-    auto insertPos = streamOutControlBufPtr->getNextNode();
-
-    Value *idxs[] = {ConstantInt::get(Type::getInt64Ty(*m_context), 0),
-                     ConstantInt::get(Type::getInt64Ty(*m_context), 0), // 0: OFFSET[X], 1: FILLED_SIZE[X]
-                     ConstantInt::get(Type::getInt64Ty(*m_context), xfbBuffer)};
-
-    auto streamOutControlBufType = streamOutControlBufPair.first;
-    // TODO: Remove this when LLPC will switch fully to opaque pointers.
-    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(streamOutControlBufPtr->getType(), streamOutControlBufType));
-    auto streamOutBufOffsetPtr =
-        GetElementPtrInst::Create(streamOutControlBufType, streamOutControlBufPtr, idxs, "", insertPos);
-    streamOutBufOffsetPtr->setMetadata(MetaNameUniform, MDNode::get(streamOutBufOffsetPtr->getContext(), {}));
-    auto streamOutBufOffsetTy = GetElementPtrInst::getIndexedType(streamOutControlBufType, idxs);
-    // TODO: Remove this when LLPC will switch fully to opaque pointers.
-    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(streamOutBufOffsetPtr->getType(), streamOutBufOffsetTy));
-
-    auto streamOutBufOffset = new LoadInst(streamOutBufOffsetTy, streamOutBufOffsetPtr, "", false, Align(4), insertPos);
-    // NOTE: PAL decided not to invalidate the SQC and L1 for every stream-out update, mainly because that will hurt
-    // overall performance worse than just forcing this one buffer to be read via L2. Since PAL would not have wider
-    // context, PAL believed that they would have to perform that invalidation on every Set/Load unconditionally.
-    // Thus, we force the load of stream-out control buffer to be volatile to let LLVM backend add GLC and DLC flags.
-    streamOutBufOffset->setVolatile(true);
-
-    m_streamOutBufOffsets[xfbBuffer] = streamOutBufOffset;
-  }
-  return m_streamOutBufOffsets[xfbBuffer];
-}
-
-// =====================================================================================================================
 // Get stream-out buffer table pointer
 std::pair<Type *, Instruction *> ShaderSystemValues::getStreamOutTablePtr() {
   assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
@@ -476,7 +435,7 @@ std::pair<Type *, Instruction *> ShaderSystemValues::getStreamOutTablePtr() {
       ArrayType::get(FixedVectorType::get(Type::getInt32Ty(*m_context), 4), MaxTransformFeedbackBuffers);
   if (!m_streamOutTablePtr) {
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
-    unsigned entryArgIdx = 0;
+    unsigned entryArgIdx = InvalidValue;
 
     // Get the SGPR number of the stream-out table pointer.
     switch (m_shaderStage) {
@@ -493,7 +452,7 @@ std::pair<Type *, Instruction *> ShaderSystemValues::getStreamOutTablePtr() {
       llvm_unreachable("Should never be called!");
       break;
     }
-    assert(entryArgIdx != 0);
+    assert(entryArgIdx != InvalidValue);
 
     // Get the 64-bit extended node value.
     auto streamOutTablePtrLow = getFunctionArgument(m_entryPoint, entryArgIdx, "streamOutTable");
@@ -501,48 +460,6 @@ std::pair<Type *, Instruction *> ShaderSystemValues::getStreamOutTablePtr() {
     m_streamOutTablePtr = makePointer(streamOutTablePtrLow, streamOutTablePtrTy, InvalidValue);
   }
   return std::make_pair(streamOutTableTy, m_streamOutTablePtr);
-}
-
-// =====================================================================================================================
-// Get stream-out control buffer pointer
-std::pair<Type *, Instruction *> ShaderSystemValues::getStreamOutControlBufPtr() {
-  assert(m_pipelineState->enableSwXfb());
-  assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
-         m_shaderStage == ShaderStageCopyShader);
-
-  Type *streamOutControlBufTy =
-      ArrayType::get(FixedVectorType::get(Type::getInt32Ty(*m_context), MaxTransformFeedbackBuffers), 2);
-
-  if (!m_streamOutControlBufPtr) {
-    auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
-    unsigned entryArgIdx = 0;
-
-    // Get the SGPR number of the stream-out control buffer pointer.
-    switch (m_shaderStage) {
-    case ShaderStageVertex:
-      entryArgIdx = intfData->entryArgIdxs.vs.streamOutData.controlBufPtr;
-      break;
-    case ShaderStageTessEval:
-      entryArgIdx = intfData->entryArgIdxs.tes.streamOutData.controlBufPtr;
-      break;
-    case ShaderStageCopyShader:
-      entryArgIdx = intfData->userDataUsage.gs.copyShaderStreamOutControlBuf;
-      break;
-    default:
-      llvm_unreachable("Should never be called!");
-      break;
-    }
-    assert(entryArgIdx != 0);
-
-    // Get the 64-bit extended node value.
-    auto streamOutControlBufPtrLow = getFunctionArgument(m_entryPoint, entryArgIdx, "streamOutControlBuf");
-    // NOTE: The stream-out control buffer has the following memory layout:
-    //   OFFSET[X]: OFFSET0, OFFSET1, ..., OFFSETN
-    //   FILLED_SIZE[X]: FILLED_SIZE0, FILLED_SIZE1, ..., FILLED_SIZEN
-    auto streamOutControlBufPtrTy = PointerType::get(streamOutControlBufTy, ADDR_SPACE_CONST);
-    m_streamOutControlBufPtr = makePointer(streamOutControlBufPtrLow, streamOutControlBufPtrTy, InvalidValue);
-  }
-  return std::make_pair(streamOutControlBufTy, m_streamOutControlBufPtr);
 }
 
 // =====================================================================================================================

@@ -140,17 +140,15 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
     // GFX11+:
     //   void copyShader(
     //     i32 inreg globalTable,
-    //     i32 inreg streamOutTable,
-    //     i32 inreg streamOutControlBuf,
     //     i32 vertexId)
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 10) {
       argTys = {int32Ty};
       argInReg = {false};
       argNames = {"vertexId"};
     } else {
-      argTys = {int32Ty, int32Ty, int32Ty, int32Ty};
-      argInReg = {true, true, true, false};
-      argNames = {"globalTable", "streamOutTable", "streamOutControlBuf", "vertexId"};
+      argTys = {int32Ty, int32Ty};
+      argInReg = {true, false};
+      argNames = {"globalTable", "vertexId"};
     }
   }
 
@@ -195,11 +193,9 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
       intfData->userDataUsage.gs.copyShaderEsGsLdsSize = 2;
       intfData->userDataUsage.gs.copyShaderStreamOutTable = 3;
     } else {
-      // If NGG, esGsLdsSize is not used
+      // If NGG, both esGsLdsSize and streamOutTable are not used
       intfData->userDataUsage.gs.copyShaderEsGsLdsSize = InvalidValue;
-      intfData->userDataUsage.gs.copyShaderStreamOutTable = 1;
-      if (m_pipelineState->enableSwXfb())
-        intfData->userDataUsage.gs.copyShaderStreamOutControlBuf = 2;
+      intfData->userDataUsage.gs.copyShaderStreamOutTable = InvalidValue;
     }
   }
 

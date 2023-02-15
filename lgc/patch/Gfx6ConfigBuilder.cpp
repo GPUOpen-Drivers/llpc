@@ -994,20 +994,16 @@ void ConfigBuilder::buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *confi
   const auto &computeMode = m_pipelineState->getShaderModes()->getComputeShaderMode();
   unsigned workgroupSizes[3] = {};
 
-  switch (static_cast<WorkgroupLayout>(builtInUsage.workgroupLayout)) {
-  case WorkgroupLayout::Unknown:
-  case WorkgroupLayout::Linear:
-    workgroupSizes[0] = computeMode.workgroupSizeX;
-    workgroupSizes[1] = computeMode.workgroupSizeY;
-    workgroupSizes[2] = computeMode.workgroupSizeZ;
-    break;
-  case WorkgroupLayout::Quads:
-  case WorkgroupLayout::SexagintiQuads:
+  if (builtInUsage.foldWorkgroupXY) {
     workgroupSizes[0] = computeMode.workgroupSizeX * computeMode.workgroupSizeY;
     workgroupSizes[1] = computeMode.workgroupSizeZ;
     workgroupSizes[2] = 1;
-    break;
+  } else {
+    workgroupSizes[0] = computeMode.workgroupSizeX;
+    workgroupSizes[1] = computeMode.workgroupSizeY;
+    workgroupSizes[2] = computeMode.workgroupSizeZ;
   }
+
   unsigned floatMode = setupFloatingPointMode(shaderStage);
   SET_REG_FIELD(config, COMPUTE_PGM_RSRC1, FLOAT_MODE, floatMode);
   SET_REG_FIELD(config, COMPUTE_PGM_RSRC1, DX10_CLAMP, true); // Follow PAL setting

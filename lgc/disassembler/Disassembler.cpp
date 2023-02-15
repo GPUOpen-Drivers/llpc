@@ -171,7 +171,10 @@ void ObjDisassembler::run() {
 
   // Figure out the target triple from the object file, and get features.
   Triple triple = m_objFile->makeTriple();
-  SubtargetFeatures features = m_objFile->getFeatures();
+  Expected<SubtargetFeatures> expectedFeatures = m_objFile->getFeatures();
+  if (!expectedFeatures)
+    report_fatal_error(expectedFeatures.takeError());
+  SubtargetFeatures features = *expectedFeatures;
 
   // Get the target specific parser.
   std::string error;

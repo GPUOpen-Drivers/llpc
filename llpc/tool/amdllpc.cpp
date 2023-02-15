@@ -153,16 +153,9 @@ cl::opt<bool> NggEnableGsUse("ngg-enable-gs-use", cl::desc("Enable NGG use on ge
 cl::opt<bool> NggForceCullingMode("ngg-force-culling-mode", cl::desc("Force NGG to run in culling mode"),
                                   cl::init(false));
 
-// -ngg-compact-mode: NGG compaction mode (NGG)
-cl::opt<unsigned> NggCompactionMode("ngg-compaction-mode",
-                                    cl::desc("Compaction mode after culling operations (NGG):\n"
-                                             "0: Compaction is disabled\n"
-                                             "1: Compaction is based on vertices"),
-                                    cl::value_desc("mode"), cl::init(static_cast<unsigned>(NggCompactVertices)));
-
-// -ngg-enable-vertex-reuse: enable optimization to cull duplicate vertices (NGG)
-cl::opt<bool> NggEnableVertexReuse("ngg-enable-vertex-reuse",
-                                   cl::desc("Enable optimization to cull duplicate vertices (NGG)"),cl::init(false));
+// -ngg-compact-vertex: enable NGG vertex compaction after culling
+cl::opt<bool> NggCompactVertex("ngg-compact-vertex", cl::desc("Enable NGG vertex compaction after culling"),
+                               cl::init(true));
 
 // -ngg-enable-backface-culling: enable culling of primitives that don't meet facing criteria (NGG)
 cl::opt<bool> NggEnableBackfaceCulling("ngg-enable-backface-culling",
@@ -198,28 +191,28 @@ cl::opt<bool> NggEnableCullDistanceCulling("ngg-enable-cull-distance-culling",
 cl::opt<unsigned> NggBackfaceExponent("ngg-backface-exponent", cl::desc("Control backface culling algorithm (NGG)"),
                                       cl::value_desc("exp"), cl::init(0));
 
-// -ngg-subgroup-sizing: NGG sub-group sizing type (NGG)
+// -ngg-subgroup-sizing: NGG subgroup sizing type (NGG)
 cl::opt<unsigned> NggSubgroupSizing(
     "ngg-subgroup-sizing",
-    cl::desc("NGG sub-group sizing type (NGG):\n"
-             "0: Sub-group size is allocated as optimally determined\n"
-             "1: Sub-group size is allocated to the maximum allowable size\n"
-             "2: Sub-group size is allocated as to allow half of the maximum allowable size\n"
-             "3: Sub-group size is optimized for vertex thread utilization\n"
-             "4: Sub-group size is optimized for primitive thread utilization\n"
-             "5: Sub-group size is allocated based on explicitly-specified vertsPerSubgroup and primsPerSubgroup"),
+    cl::desc("NGG subgroup sizing type (NGG):\n"
+             "0: Subgroup size is allocated as optimally determined\n"
+             "1: Subgroup size is allocated to the maximum allowable size\n"
+             "2: Subgroup size is allocated as to allow half of the maximum allowable size\n"
+             "3: Subgroup size is optimized for vertex thread utilization\n"
+             "4: Subgroup size is optimized for primitive thread utilization\n"
+             "5: Subgroup size is allocated based on explicitly-specified vertsPerSubgroup and primsPerSubgroup"),
     cl::value_desc("sizing"), cl::init(static_cast<unsigned>(NggSubgroupSizingType::Auto)));
 
-// -ngg-prims-per-subgroup: preferred numberof GS primitives to pack into a primitive shader sub-group (NGG)
+// -ngg-prims-per-subgroup: preferred numberof GS primitives to pack into a primitive shader subgroup (NGG)
 cl::opt<unsigned>
     NggPrimsPerSubgroup("ngg-prims-per-subgroup",
-                        cl::desc("Preferred numberof GS primitives to pack into a primitive shader sub-group (NGG)"),
+                        cl::desc("Preferred numberof GS primitives to pack into a primitive shader subgroup (NGG)"),
                         cl::value_desc("prims"), cl::init(256));
 
-// -ngg-verts-per-subgroup: preferred number of vertices consumed by a primitive shader sub-group (NGG)
+// -ngg-verts-per-subgroup: preferred number of vertices consumed by a primitive shader subgroup (NGG)
 cl::opt<unsigned>
     NggVertsPerSubgroup("ngg-verts-per-subgroup",
-                        cl::desc("Preferred number of vertices consumed by a primitive shader sub-group (NGG)"),
+                        cl::desc("Preferred number of vertices consumed by a primitive shader subgroup (NGG)"),
                         cl::value_desc("verts"), cl::init(256));
 
 cl::opt<bool> RobustBufferAccess("robust-buffer-access", cl::desc("Validate if the index is out of bounds"),
@@ -385,7 +378,7 @@ static Result init(int argc, char *argv[], ICompiler *&compiler) {
     // For GFX10.3+, we always prefer to enable NGG. Backface culling and small primitive filter are enabled as
     // well. Also, the compaction mode is set to compactionless.
     EnableNgg.setValue(true);
-    NggCompactionMode.setValue(static_cast<unsigned>(NggCompactDisable));
+    NggCompactVertex.setValue(false);
     NggEnableBackfaceCulling.setValue(true);
     NggEnableSmallPrimFilter.setValue(true);
   }
@@ -509,8 +502,11 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
     nggState.enableNgg = EnableNgg;
     nggState.enableGsUse = NggEnableGsUse;
     nggState.forceCullingMode = NggForceCullingMode;
-    nggState.compactMode = static_cast<NggCompactMode>(NggCompactionMode.getValue());
-    nggState.enableVertexReuse = NggEnableVertexReuse;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 60
+    nggState.compactMode = NggCompactVertex ? NggCompactVertices : NggCompactDisable;
+#else
+    nggState.compactVertex = NggCompactVertex;
+#endif
     nggState.enableBackfaceCulling = NggEnableBackfaceCulling;
     nggState.enableFrustumCulling = NggEnableFrustumCulling;
     nggState.enableBoxFilterCulling = NggEnableBoxFilterCulling;
@@ -577,7 +573,7 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
   //
   // Build pipeline
   //
-  Optional<PipelineDumpOptions> dumpOptions;
+  std::optional<PipelineDumpOptions> dumpOptions;
   if (cl::EnablePipelineDump) {
     dumpOptions.emplace();
     dumpOptions->pDumpDir = cl::PipelineDumpDir.c_str();

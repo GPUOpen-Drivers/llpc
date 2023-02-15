@@ -34,8 +34,8 @@
 #include "llpcCompilationUtils.h"
 #include "llpcError.h"
 #include "vkgcDefs.h"
-#include "llvm/ADT/Optional.h"
 #include <memory>
+#include <optional>
 
 namespace Llpc {
 namespace StandaloneCompiler {
@@ -44,7 +44,7 @@ class PipelineBuilder;
 
 // Factory function that returns a `PipelineBuilder` appropriate for the given pipeline type (e.g., graphics, compute).
 std::unique_ptr<PipelineBuilder> createPipelineBuilder(ICompiler &compiler, CompileInfo &compileInfo,
-                                                       llvm::Optional<Vkgc::PipelineDumpOptions> dumpOptions,
+                                                       std::optional<Vkgc::PipelineDumpOptions> dumpOptions,
                                                        bool printPipelineInfo);
 
 // Base class for pipeline compilation. Dumps compiled pipelines when requested.
@@ -58,7 +58,7 @@ public:
   // @param [in/out] compileInfo : Compilation info of LLPC standalone tool. This will be modified by `build()`.
   // @param dumpOptions : Pipeline dump options. Pipeline dumps are disabled when `std::nullopt` is passed.
   // @param printPipelineInfo : Whether to print pipeline info (hash, filenames) before compilation.
-  PipelineBuilder(ICompiler &compiler, CompileInfo &compileInfo, llvm::Optional<Vkgc::PipelineDumpOptions> dumpOptions,
+  PipelineBuilder(ICompiler &compiler, CompileInfo &compileInfo, std::optional<Vkgc::PipelineDumpOptions> dumpOptions,
                   bool printPipelineInfo)
       : m_compiler(compiler), m_compileInfo(compileInfo), m_dumpOptions(std::move(dumpOptions)),
         m_printPipelineInfo(printPipelineInfo) {}
@@ -96,7 +96,7 @@ public:
   // Returns the pipeline dump options.
   //
   // @returns : `PipelineDumpOptions` or `std::nullopt` if pipeline dumps were not requested.
-  llvm::Optional<Vkgc::PipelineDumpOptions> &getDumpOptions() { return m_dumpOptions; }
+  std::optional<Vkgc::PipelineDumpOptions> &getDumpOptions() { return m_dumpOptions; }
 
   // Returns true iff pipeline dumps are requested.
   //
@@ -120,7 +120,7 @@ public:
 private:
   ICompiler &m_compiler;
   CompileInfo &m_compileInfo;
-  llvm::Optional<Vkgc::PipelineDumpOptions> m_dumpOptions = {};
+  std::optional<Vkgc::PipelineDumpOptions> m_dumpOptions = {};
   bool m_printPipelineInfo = false;
 };
 

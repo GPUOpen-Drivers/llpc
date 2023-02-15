@@ -293,7 +293,7 @@ void ConfigBuilderBase::setEsGsLdsSize(unsigned value) {
 }
 
 // =====================================================================================================================
-// Set NGG sub-group size
+// Set NGG subgroup size
 //
 // @param value : Value to set
 void ConfigBuilderBase::setNggSubgroupSize(unsigned value) {

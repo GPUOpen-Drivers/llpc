@@ -86,7 +86,7 @@ namespace StandaloneCompiler {
 // @param printPipelineInfo : Whether to print pipeline info (hash, filenames) before compilation.
 // @returns : Concrete `PipelineBuilder` object for this pipeline type.
 std::unique_ptr<PipelineBuilder> createPipelineBuilder(ICompiler &compiler, CompileInfo &compileInfo,
-                                                       llvm::Optional<Vkgc::PipelineDumpOptions> dumpOptions,
+                                                       std::optional<Vkgc::PipelineDumpOptions> dumpOptions,
                                                        bool printPipelineInfo) {
   const unsigned stageMask = compileInfo.stageMask;
 

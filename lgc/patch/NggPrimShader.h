@@ -103,7 +103,7 @@ struct VertexCullInfo {
   //
   // Vertex compaction info (vertex compaction only, must in the end of this structure)
   //
-  unsigned compactThreadId;
+  unsigned compactedVertexIndex;
   union {
     struct {
       unsigned vertexId;
@@ -136,7 +136,7 @@ struct VertexCullInfoOffsets {
   //
   // Vertex compaction info
   //
-  unsigned compactThreadId;
+  unsigned compactedVertexIndex;
   // VS
   unsigned vertexId;
   unsigned instanceId;
@@ -190,16 +190,18 @@ private:
   void buildPrimShaderWithGs(llvm::Function *entryPoint);
 
   void initWaveThreadInfo(llvm::Value *mergedGroupInfo, llvm::Value *mergedWaveInfo);
+  void loadStreamOutBufferInfo(llvm::Value *userData);
 
-  llvm::Value *doCulling(llvm::Module *module, llvm::Value *vertexId0, llvm::Value *vertexId1, llvm::Value *vertexId2);
-  void doParamCacheAllocRequest();
+  llvm::Value *doCulling(llvm::Module *module, llvm::Value *vertxIndex0, llvm::Value *vertxIndex1,
+                         llvm::Value *vertxIndex2);
+  void sendGsAllocReqMessage();
   void doPrimitiveExportWithoutGs(llvm::Value *cullFlag = nullptr);
-  void doPrimitiveExportWithGs(llvm::Value *vertexId);
+  void doPrimitiveExportWithGs(llvm::Value *vertxIndex);
 
-  void doEarlyExit(unsigned fullyCulledExportCount);
+  void earlyExitWithDummyExport();
 
   void runEs(llvm::Module *module, llvm::Argument *sysValueStart);
-  llvm::Value *runEsPartial(llvm::Module *module, llvm::Argument *sysValueStart, llvm::Value *position = nullptr);
+  llvm::Value *runPartEs(llvm::Module *module, llvm::Argument *sysValueStart, llvm::Value *position = nullptr);
 
   void splitEs(llvm::Module *module);
 
@@ -261,21 +263,21 @@ private:
 
   llvm::Function *createFetchCullingRegister(llvm::Module *module);
 
-  llvm::Value *doSubgroupBallot(llvm::Value *value);
+  llvm::Value *ballot(llvm::Value *value);
 
-  llvm::Value *fetchVertexPositionData(llvm::Value *vertexId);
-  llvm::Value *fetchCullDistanceSignMask(llvm::Value *vertexId);
-  llvm::Value *calcVertexItemOffset(unsigned streamId, llvm::Value *vertexId);
+  llvm::Value *fetchVertexPositionData(llvm::Value *vertxIndex);
+  llvm::Value *fetchCullDistanceSignMask(llvm::Value *vertxIndex);
+  llvm::Value *calcVertexItemOffset(unsigned streamId, llvm::Value *vertxIndex);
 
   void processVertexAttribExport(llvm::Function *&targetFunc);
 
-  void processXfbOutputExport(llvm::Module *module, llvm::Argument *sysValueStart);
-  void processGsXfbOutputExport(llvm::Module *module, llvm::Argument *sysValueStart);
+  void processSwXfb(llvm::Module *module, llvm::Argument *sysValueStart);
+  void processSwXfbWithGs(llvm::Module *module, llvm::Argument *sysValueStart);
   llvm::Value *fetchXfbOutput(llvm::Module *module, llvm::Argument *sysValueStart,
                               llvm::SmallVector<XfbOutputExport, 32> &xfbOutputExports);
 
-  llvm::Value *readXfbOutputFromLds(llvm::Type *readDataTy, llvm::Value *vertexId, unsigned outputIndex);
-  void writeXfbOutputToLds(llvm::Value *writeData, llvm::Value *vertexId, unsigned outputIndex);
+  llvm::Value *readXfbOutputFromLds(llvm::Type *readDataTy, llvm::Value *vertxIndex, unsigned outputIndex);
+  void writeXfbOutputToLds(llvm::Value *writeData, llvm::Value *vertxIndex, unsigned outputIndex);
 
   // Checks if NGG culling operations are enabled
   bool enableCulling() const {
@@ -286,6 +288,8 @@ private:
 
   llvm::BasicBlock *createBlock(llvm::Function *parent, const llvm::Twine &blockName = "");
   llvm::Value *createUBfe(llvm::Value *value, unsigned offset, unsigned count);
+  llvm::PHINode *createPhi(llvm::ArrayRef<std::pair<llvm::Value *, llvm::BasicBlock *>> incomings,
+                           const llvm::Twine &name = "");
   void createFenceAndBarrier();
 
   static const unsigned NullPrim = (1u << 31); // Null primitive data (invalid)
@@ -297,24 +301,21 @@ private:
 
   NggLdsManager *m_ldsManager = nullptr; // NGG LDS manager
 
-  // NGG factors used for calculation (different modes use different factors)
+  // NGG inputs (from system values or derived from them)
   struct {
-    llvm::Value *vertCountInSubgroup; // Number of vertices in sub-group
-    llvm::Value *primCountInSubgroup; // Number of primitives in sub-group
+    llvm::Value *vertCountInSubgroup; // Number of vertices in subgroup
+    llvm::Value *primCountInSubgroup; // Number of primitives in subgroup
     llvm::Value *vertCountInWave;     // Number of vertices in wave
     llvm::Value *primCountInWave;     // Number of primitives in wave
 
     llvm::Value *threadIdInWave;     // Thread ID in wave
-    llvm::Value *threadIdInSubgroup; // Thread ID in sub-group
+    llvm::Value *threadIdInSubgroup; // Thread ID in subgroup
 
-    llvm::Value *waveIdInSubgroup; // Wave ID in sub-group
+    llvm::Value *waveIdInSubgroup; // Wave ID in subgroup
     llvm::Value *orderedWaveId;    // Ordered wave ID
 
-    llvm::Value *primitiveId;   // Primitive ID (for VS)
-    llvm::Value *vertCompacted; // Whether vertex compaction is performed (for culling mode)
-
     // System values (SGPRs)
-    llvm::Value *attribRingBase;          // Attribute ring base for this sub-group
+    llvm::Value *attribRingBase;          // Attribute ring base for this subgroup
     llvm::Value *primShaderTableAddrLow;  // Primitive shader table address low
     llvm::Value *primShaderTableAddrHigh; // Primitive shader table address high
 
@@ -330,11 +331,17 @@ private:
 
   } m_nggInputs = {};
 
+  llvm::Value *m_distributedPrimitiveId = nullptr; // Distributed primitive ID (from geomeotry based to vertex based)
+
+  llvm::Value *m_compactVertex = nullptr; // Flag indicating whether to perform vertex compaction (if
+                                          // null, we are in vertex compactionless mode)
+
   bool m_hasVs = false;  // Whether the pipeline has vertex shader
   bool m_hasTes = false; // Whether the pipeline has tessellation evaluation shader
   bool m_hasGs = false;  // Whether the pipeline has geometry shader
 
-  bool m_enableSwXfb = false; // Whether SW-emulated stream-out is enabled (GFX11+)
+  llvm::Value *m_streamOutBufDescs[MaxTransformFeedbackBuffers];   // Stream-out buffer descriptors
+  llvm::Value *m_streamOutBufOffsets[MaxTransformFeedbackBuffers]; // Stream-out buffer offsets
 
   bool m_constPositionZ = false; // Whether the Z channel of vertex position data is constant
 

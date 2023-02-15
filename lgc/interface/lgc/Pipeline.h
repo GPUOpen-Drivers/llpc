@@ -56,25 +56,24 @@ enum NggFlag : unsigned {
   NggFlagDisable = 0x0001,                   // Disable NGG
   NggFlagEnableGsUse = 0x0002,               // Enable NGG when pipeline has GS
   NggFlagForceCullingMode = 0x0004,          // Force NGG to run in culling mode
-  NggFlagCompactDisable = 0x0008,            // Vertex compaction is disabled
-  NggFlagEnableVertexReuse = 0x0010,         // Enable optimization to cull duplicate vertices
-  NggFlagEnableBackfaceCulling = 0x0020,     // Enable culling of primitives that don't meet facing criteria
-  NggFlagEnableFrustumCulling = 0x0040,      // Enable discarding of primitives outside of view frustum
-  NggFlagEnableBoxFilterCulling = 0x0080,    // Enable simpler frustum culler that is less accurate
-  NggFlagEnableSphereCulling = 0x0100,       // Enable frustum culling based on a sphere
-  NggFlagEnableSmallPrimFilter = 0x0200,     // Enable trivial sub-sample primitive culling
-  NggFlagEnableCullDistanceCulling = 0x0400, // Enable culling when "cull distance" exports are present
+  NggFlagCompactVertex = 0x0008,             // Enable Vertex compaction
+  NggFlagEnableBackfaceCulling = 0x0010,     // Enable culling of primitives that don't meet facing criteria
+  NggFlagEnableFrustumCulling = 0x0020,      // Enable discarding of primitives outside of view frustum
+  NggFlagEnableBoxFilterCulling = 0x0040,    // Enable simpler frustum culler that is less accurate
+  NggFlagEnableSphereCulling = 0x0080,       // Enable frustum culling based on a sphere
+  NggFlagEnableSmallPrimFilter = 0x0100,     // Enable trivial sub-sample primitive culling
+  NggFlagEnableCullDistanceCulling = 0x0200, // Enable culling when "cull distance" exports are present
 };
 
-// Enumerates various sizing options of sub-group size for NGG primitive shader.
+// Enumerates various sizing options of subgroup size for NGG primitive shader.
 enum class NggSubgroupSizing : unsigned {
-  Auto,             ///< Sub-group size is allocated as optimally determined
-  MaximumSize,      ///< Sub-group size is allocated to the maximum allowable size by the hardware
-  HalfSize,         ///< Sub-group size is allocated as to allow half of the maximum allowable size
+  Auto,             ///< Subgroup size is allocated as optimally determined
+  MaximumSize,      ///< Subgroup size is allocated to the maximum allowable size by the hardware
+  HalfSize,         ///< Subgroup size is allocated as to allow half of the maximum allowable size
                     ///  by the hardware
-  OptimizeForVerts, ///< Sub-group size is optimized for vertex thread utilization
-  OptimizeForPrims, ///< Sub-group size is optimized for primitive thread utilization
-  Explicit,         ///< Sub-group size is allocated based on explicitly-specified vertsPerSubgroup and
+  OptimizeForVerts, ///< Subgroup size is optimized for vertex thread utilization
+  OptimizeForPrims, ///< Subgroup size is optimized for primitive thread utilization
+  Explicit,         ///< Subgroup size is allocated based on explicitly-specified vertsPerSubgroup and
                     ///  primsPerSubgroup
 };
 
@@ -619,14 +618,21 @@ struct FragmentShaderMode {
   ConservativeDepth conservativeStencilBack;
 };
 
+// Kind of derivativeMode:
+// None: Return 0 for derivatives calculation of compute shader
+// Linear: Calculating derivatives in linear mode(4*1)
+// Quads: Calculating derivatives in Quads mode(2*2)
+enum class DerivativeMode : unsigned { None, Linear, Quads };
+
 // Struct to pass to SetComputeShaderMode.
 // The front-end should zero-initialize it with "= {}" in case future changes add new fields.
 // All fields are unsigned, even those that could be bool, because the way the state is written to and read
 // from IR metadata relies on that.
 struct ComputeShaderMode {
-  unsigned workgroupSizeX; // X dimension of workgroup size. 0 is taken to be 1
-  unsigned workgroupSizeY; // Y dimension of workgroup size. 0 is taken to be 1
-  unsigned workgroupSizeZ; // Z dimension of workgroup size. 0 is taken to be 1
+  unsigned workgroupSizeX;    // X dimension of workgroup size. 0 is taken to be 1
+  unsigned workgroupSizeY;    // Y dimension of workgroup size. 0 is taken to be 1
+  unsigned workgroupSizeZ;    // Z dimension of workgroup size. 0 is taken to be 1
+  DerivativeMode derivatives; // derivativeMode for computeShader
 };
 
 // Enum passed to Pipeline::irLink to give information on whether this is a whole or part pipeline.

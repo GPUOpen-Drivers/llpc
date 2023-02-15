@@ -71,11 +71,10 @@ enum NggCompactMode : unsigned {
 
 // Represents NGG tuning options
 struct NggControl {
-  bool enableNgg;             // Enable NGG mode, use an implicit primitive shader
-  bool enableGsUse;           // Enable NGG use on geometry shader
-  NggCompactMode compactMode; // Compaction mode after culling operations
+  bool enableNgg;     // Enable NGG mode, use an implicit primitive shader
+  bool enableGsUse;   // Enable NGG use on geometry shader
+  bool compactVertex; // Enable vertex compaction after culling operations
 
-  bool enableVertexReuse;         // Enable optimization to cull duplicate vertices
   bool enableBackfaceCulling;     // Enable culling of primitives that don't meet facing criteria
   bool enableFrustumCulling;      // Enable discarding of primitives outside of view frustum
   bool enableBoxFilterCulling;    // Enable simpler frustum culler that is less accurate
@@ -90,12 +89,12 @@ struct NggControl {
                              // Only valid if the NGG backface culler is enabled.
                              // A value of 0 will disable the threshold.
 
-  NggSubgroupSizing subgroupSizing; // NGG sub-group sizing type
+  NggSubgroupSizing subgroupSizing; // NGG subgroup sizing type
 
   unsigned primsPerSubgroup; // Preferred number of GS primitives to pack into a primitive shader
-                             // sub-group
+                             // subgroup
 
-  unsigned vertsPerSubgroup; // Preferred number of vertices consumed by a primitive shader sub-group
+  unsigned vertsPerSubgroup; // Preferred number of vertices consumed by a primitive shader subgroup
 
   bool passthroughMode;                          // Whether NGG passthrough mode is enabled
   Util::Abi::PrimShaderCbLayout primShaderTable; // Primitive shader table (only some registers are used)

@@ -69,6 +69,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
 
 #define DEBUG_TYPE "lgc-patch-entry-point-mutate"
 
@@ -363,7 +364,10 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
           descriptorTable[descTableIndex].users.push_back(call);
         }
       }
-    } else if (func.getName().startswith(lgcName::OutputExportXfb) && !func.use_empty()) {
+    } else if ((func.getName().startswith(lgcName::OutputExportXfb) && !func.use_empty()) ||
+               m_pipelineState->enableSwXfb()) {
+      // NOTE: For GFX11+, SW emulated stream-out will always use stream-out buffer descriptors and stream-out buffer
+      // offsets to calculate numbers of written primitives/dwords and update the counters.  auto lastVertexStage =
       auto lastVertexStage = m_pipelineState->getLastVertexProcessingStage();
       lastVertexStage = lastVertexStage == ShaderStageCopyShader ? ShaderStageGeometry : lastVertexStage;
       getUserDataUsage(lastVertexStage)->usesStreamOutTable = true;
@@ -1491,7 +1495,7 @@ void PatchEntryPointMutate::determineUnspilledUserDataArgs(ArrayRef<UserDataArg>
                                                            IRBuilder<> &builder,
                                                            SmallVectorImpl<UserDataArg> &unspilledArgs) {
 
-  Optional<UserDataArg> spillTableArg;
+  std::optional<UserDataArg> spillTableArg;
 
   auto userDataUsage = getUserDataUsage(m_shaderStage);
   if (!userDataUsage->spillTable.users.empty() || userDataUsage->pushConstSpill ||

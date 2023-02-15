@@ -44,7 +44,7 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 58
+#define LLPC_INTERFACE_MAJOR_VERSION 60
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -82,6 +82,8 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     60.0 | Simplify the enum NggCompactMode to a boolean flag                                                    |
+//  |     59.0 | Remove the option enableVertexReuse from NggState                                                     |
 //  |     57.2 | Move all internal resource binding id to enum InternalBinding.                                        |
 //  |     57.1 | Add forceNonUniformResourceIndexStageMask to PipelineOptions                                          |
 //  |     57.0 | Merge aggressiveInvariantLoads and disableInvariantLoads to an enumerated option                      |
@@ -624,32 +626,39 @@ enum class WaveBreakSize : unsigned {
   _32x32 = 0x3, ///< Outside a 32x32 pixel region
 };
 
-/// Enumerates various sizing options of sub-group size for NGG primitive shader.
+/// Enumerates various sizing options of subgroup size for NGG primitive shader.
 enum class NggSubgroupSizingType : unsigned {
-  Auto,             ///< Sub-group size is allocated as optimally determined
-  MaximumSize,      ///< Sub-group size is allocated to the maximum allowable size by the hardware
-  HalfSize,         ///< Sub-group size is allocated as to allow half of the maximum allowable size
+  Auto,             ///< Subgroup size is allocated as optimally determined
+  MaximumSize,      ///< Subgroup size is allocated to the maximum allowable size by the hardware
+  HalfSize,         ///< Subgroup size is allocated as to allow half of the maximum allowable size
                     ///  by the hardware
-  OptimizeForVerts, ///< Sub-group size is optimized for vertex thread utilization
-  OptimizeForPrims, ///< Sub-group size is optimized for primitive thread utilization
-  Explicit,         ///< Sub-group size is allocated based on explicitly-specified vertsPerSubgroup and
+  OptimizeForVerts, ///< Subgroup size is optimized for vertex thread utilization
+  OptimizeForPrims, ///< Subgroup size is optimized for primitive thread utilization
+  Explicit,         ///< Subgroup size is allocated based on explicitly-specified vertsPerSubgroup and
                     ///  primsPerSubgroup
 };
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 60
 /// Enumerates compaction modes after culling operations for NGG primitive shader.
 enum NggCompactMode : unsigned {
   NggCompactDisable,  ///< Compaction is disabled
   NggCompactVertices, ///< Compaction is based on vertices
 };
+#endif
 
 /// Represents NGG tuning options
 struct NggState {
-  bool enableNgg;             ///< Enable NGG mode, use an implicit primitive shader
-  bool enableGsUse;           ///< Enable NGG use on geometry shader
-  bool forceCullingMode;      ///< Force NGG to run in culling mode
+  bool enableNgg;        ///< Enable NGG mode, use an implicit primitive shader
+  bool enableGsUse;      ///< Enable NGG use on geometry shader
+  bool forceCullingMode; ///< Force NGG to run in culling mode
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 60
   NggCompactMode compactMode; ///< Compaction mode after culling operations
-
-  bool enableVertexReuse;         ///< Enable optimization to cull duplicate vertices
+#else
+  bool compactVertex; ///< Enable NGG vertex compaction after culling
+#endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 59
+  bool enableVertexReuse; ///< Enable optimization to cull duplicate vertices
+#endif
   bool enableBackfaceCulling;     ///< Enable culling of primitives that don't meet facing criteria
   bool enableFrustumCulling;      ///< Enable discarding of primitives outside of view frustum
   bool enableBoxFilterCulling;    ///< Enable simpler frustum culler that is less accurate
@@ -664,12 +673,12 @@ struct NggState {
                              ///  Only valid if the NGG backface culler is enabled.
                              ///  A value of 0 will disable the threshold.
 
-  NggSubgroupSizingType subgroupSizing; ///< NGG sub-group sizing type
+  NggSubgroupSizingType subgroupSizing; ///< NGG subgroup sizing type
 
   unsigned primsPerSubgroup; ///< Preferred number of GS primitives to pack into a primitive shader
-                             ///  sub-group
+                             ///  subgroup
 
-  unsigned vertsPerSubgroup; ///< Preferred number of vertices consumed by a primitive shader sub-group
+  unsigned vertsPerSubgroup; ///< Preferred number of vertices consumed by a primitive shader subgroup
 };
 
 /// ShaderHash represents a 128-bit client-specified hash key which uniquely identifies a shader program.

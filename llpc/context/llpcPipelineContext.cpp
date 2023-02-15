@@ -100,8 +100,8 @@ static cl::opt<bool> DisableFetchShader("disable-fetch-shader", cl::desc("Disabl
 static cl::opt<bool> DisableColorExportShader("disable-color-export-shader", cl::desc("Disable color export shaders"),
                                               cl::init(false));
 
-// -subgroup-size: sub-group size exposed via Vulkan API.
-static cl::opt<int> SubgroupSize("subgroup-size", cl::desc("Sub-group size exposed via Vulkan API"), cl::init(64));
+// -subgroup-size: subgroup size exposed via Vulkan API.
+static cl::opt<int> SubgroupSize("subgroup-size", cl::desc("Subgroup size exposed via Vulkan API"), cl::init(64));
 
 // -enable-shadow-desc: enable shadow descriptor table
 static cl::opt<bool> EnableShadowDescriptorTable("enable-shadow-desc", cl::desc("Enable shadow descriptor table"));
@@ -348,8 +348,11 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
       else {
         options.nggFlags = (nggState.enableGsUse ? NggFlagEnableGsUse : 0) |
                            (nggState.forceCullingMode ? NggFlagForceCullingMode : 0) |
-                           (nggState.compactMode == NggCompactDisable ? NggFlagCompactDisable : 0) |
-                           (nggState.enableVertexReuse ? NggFlagEnableVertexReuse : 0) |
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 60
+                           (nggState.compactMode == NggCompactVertices ? NggFlagCompactVertex : 0) |
+#else
+                           (nggState.compactVertex ? NggFlagCompactVertex : 0) |
+#endif
                            (nggState.enableBackfaceCulling ? NggFlagEnableBackfaceCulling : 0) |
                            (nggState.enableFrustumCulling ? NggFlagEnableFrustumCulling : 0) |
                            (nggState.enableBoxFilterCulling ? NggFlagEnableBoxFilterCulling : 0) |

@@ -64,7 +64,7 @@ const unsigned NggLdsManager::LdsRegionSizes[LdsRegionCount] = {
     InvalidValue,                                             // LdsRegionVertCullInfo
     // 1 dword per XFB buffer: dword written, 1 dword: primitives to write
     SizeOfDword * MaxTransformFeedbackBuffers + SizeOfDword,  // LdsRegionXfbStatInfo
-    // 1 dword per wave (8 potential waves) + 1 dword for the entire sub-group
+    // 1 dword per wave (8 potential waves) + 1 dword for the entire subgroup
     SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword, // LdsRegionVertCountInWaves
     // 1 dword (uint32) per thread
     SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup,             // LdsRegionVertThreadIdMap
@@ -77,13 +77,13 @@ const unsigned NggLdsManager::LdsRegionSizes[LdsRegionCount] = {
     // 1 dword (uint32) per thread, 4 GS streams
     (SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup) * MaxGsStreams,
                                                               // LdsRegionOutPrimData
-    // 1 dword per wave (8 potential waves) + 1 dword for the entire sub-group, 4 GS streams
+    // 1 dword per wave (8 potential waves) + 1 dword for the entire subgroup, 4 GS streams
     (SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword) * MaxGsStreams,
                                                               // LdsRegionOutPrimCountInWaves
     // 1 dword (uint32) per thread, 4 GS streams
     (SizeOfDword * Gfx9::NggMaxThreadsPerSubgroup) * MaxGsStreams,
                                                               // LdsRegionOutPrimThreadIdMap
-    // 1 dword per wave (8 potential waves) + 1 dword for the entire sub-group, 4 GS streams
+    // 1 dword per wave (8 potential waves) + 1 dword for the entire subgroup, 4 GS streams
     (SizeOfDword * Gfx9::NggMaxWavesPerSubgroup + SizeOfDword) * MaxGsStreams,
                                                               // LdsRegionOutVertCountInWaves
     // 1 dword (uint32) per thread
@@ -179,7 +179,7 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
 
     for (unsigned region = LdsRegionGsBeginRange; region <= LdsRegionGsEndRange; ++region) {
       // NOTE: For vertex compactionless mode, this region is unnecessary
-      if (region == LdsRegionOutVertThreadIdMap && nggControl->compactMode == NggCompactDisable)
+      if (region == LdsRegionOutVertThreadIdMap && !nggControl->compactVertex)
         continue;
 
       if (m_pipelineState->enableSwXfb()) {
@@ -262,7 +262,7 @@ NggLdsManager::NggLdsManager(Module *module, PipelineState *pipelineState, IRBui
           continue;
 
         // NOTE: For vertex compactionless mode, this region is unnecessary
-        if (region == LdsRegionVertThreadIdMap && nggControl->compactMode == NggCompactDisable)
+        if (region == LdsRegionVertThreadIdMap && !nggControl->compactVertex)
           continue;
 
         unsigned ldsRegionSize = LdsRegionSizes[region];
@@ -371,7 +371,7 @@ unsigned NggLdsManager::calcEsExtraLdsSize(PipelineState *pipelineState) {
   }
 
   return LdsRegionSizes[LdsRegionVertPosData] + LdsRegionSizes[LdsRegionVertCountInWaves] +
-         (nggControl->compactMode == NggCompactDisable ? 0 : LdsRegionSizes[LdsRegionVertThreadIdMap]);
+         (nggControl->compactVertex ? LdsRegionSizes[LdsRegionVertThreadIdMap] : 0);
 }
 
 // =====================================================================================================================
@@ -397,7 +397,7 @@ unsigned NggLdsManager::calcGsExtraLdsSize(PipelineState *pipelineState) {
   }
 
   return LdsRegionSizes[LdsRegionOutPrimData] + LdsRegionSizes[LdsRegionOutVertCountInWaves] +
-         (nggControl->compactMode == NggCompactDisable ? 0 : LdsRegionSizes[LdsRegionOutVertThreadIdMap]);
+         (nggControl->compactVertex ? LdsRegionSizes[LdsRegionOutVertThreadIdMap] : 0);
 }
 
 // =====================================================================================================================

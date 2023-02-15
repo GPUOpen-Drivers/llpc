@@ -50,8 +50,8 @@ static const BuiltInKind BuiltInSamplePatternIdx = static_cast<BuiltInKind>(0x10
 static const BuiltInKind BuiltInGsWaveId = static_cast<BuiltInKind>(0x1000000A);
 
 // Internal builts-ins for compute input when thread id is swizzled
-static const BuiltInKind BuiltInHwLocalInvocationId = static_cast<BuiltInKind>(0x1000000B);
-static const BuiltInKind BuiltInHwLocalInvocationIndex = static_cast<BuiltInKind>(0x1000000C);
+static const BuiltInKind BuiltInUnswizzledLocalInvocationId = static_cast<BuiltInKind>(0x1000000B);
+static const BuiltInKind BuiltInUnswizzledLocalInvocationIndex = static_cast<BuiltInKind>(0x1000000C);
 
 // Names used for calls added to IR to represent various actions internally.
 namespace lgcName {
@@ -70,7 +70,6 @@ const static char OutputExportXfb[] = "lgc.output.export.xfb.";
 const static char TfBufferStore[] = "lgc.tfbuffer.store.";
 const static char StreamOutBufferStore[] = "lgc.streamoutbuffer.store";
 const static char ReconfigureLocalInvocationId[] = "lgc.reconfigure.local.invocation.id";
-const static char SwizzleLocalInvocationId[] = "lgc.swizzle.local.invocation.id";
 const static char SwizzleWorkgroupId[] = "lgc.swizzle.workgroup.id";
 
 const static char MeshTaskCallPrefix[] = "lgc.mesh.task.";
