@@ -35,6 +35,7 @@
 #include "llpcError.h"
 #include "vkgcDefs.h"
 #include <memory>
+#include <optional>
 
 namespace Llpc {
 namespace StandaloneCompiler {

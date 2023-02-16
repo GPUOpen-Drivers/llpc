@@ -149,7 +149,8 @@ PRIVATE
 
 #if VKI_RAY_TRACING
 if(VKI_RAY_TRACING)
-  target_compile_definitions(LLVMlgc PRIVATE VKI_RAY_TRACING=1)
+  # Public as it is used in the LGC interface.
+  target_compile_definitions(LLVMlgc PUBLIC VKI_RAY_TRACING=1)
 endif()
 #endif
 

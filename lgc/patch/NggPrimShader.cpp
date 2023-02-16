@@ -7497,8 +7497,7 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
 
   SmallVector<Value *, 32> xfbFetcherArgs;
 
-  // If we don't clone the target function, we are going to run it and handle vertex attribute through memory
-  // here.
+  // If we don't clone the target function, we are going to run it and handle vertex attribute through memory here.
   if (dontClone) {
     // Setup attribute ring base and relative vertx index in subgroup as two additional arguments to export vertex
     // attributes through memory
