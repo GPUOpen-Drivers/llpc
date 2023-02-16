@@ -41,12 +41,15 @@
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/VersionTuple.h"
 
 #define DEBUG_TYPE "lgc-pal-metadata"
 
 using namespace lgc;
 using namespace llvm;
+
+extern cl::opt<bool> UseRegisterFieldFormat;
 
 namespace {
 
@@ -154,8 +157,13 @@ void PalMetadata::initialize() {
 void PalMetadata::record(Module *module) {
   // Add the metadata version number.
   auto versionNode = m_document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Version].getArray(true);
-  versionNode[0] = Util::Abi::PipelineMetadataMajorVersion;
-  versionNode[1] = Util::Abi::PipelineMetadataMinorVersion;
+  if (UseRegisterFieldFormat) {
+    versionNode[0] = Util::Abi::PipelineMetadataMajorVersionNew;
+    versionNode[1] = Util::Abi::PipelineMetadataMinorVersionNew;
+  } else {
+    versionNode[0] = Util::Abi::PipelineMetadataMajorVersion;
+    versionNode[1] = Util::Abi::PipelineMetadataMinorVersion;
+  }
 
   // Write the MsgPack document into an IR metadata node.
   // The IR named metadata node contains an MDTuple containing an MDString containing the msgpack data.

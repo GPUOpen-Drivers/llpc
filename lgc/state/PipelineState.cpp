@@ -54,9 +54,8 @@ static cl::opt<bool> EnableTessOffChip("enable-tess-offchip", cl::desc("Enable t
 static cl::opt<bool> EnableRowExport("enable-row-export", cl::desc("Enable row export for mesh shader"),
                                      cl::init(false));
 
-// -use-register-field-format: use register field format in pipeline ELF
-static cl::opt<bool> UseRegisterFieldFormat("use-register-field-format",
-                                            cl::desc("Use register field format in pipeline ELF"), cl::init(false));
+cl::opt<bool> UseRegisterFieldFormat("use-register-field-format", cl::desc("Use register field format in pipeline ELF"),
+                                     cl::init(false));
 
 // Names for named metadata nodes when storing and reading back pipeline state
 static const char UnlinkedMetadataName[] = "lgc.unlinked";

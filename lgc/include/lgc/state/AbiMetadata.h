@@ -43,7 +43,11 @@ namespace Util {
 namespace Abi {
 
 constexpr unsigned PipelineMetadataMajorVersion = 2; // Pipeline Metadata Major Version
-constexpr unsigned PipelineMetadataMinorVersion = 3; // Pipeline Metadata Minor Version
+constexpr unsigned PipelineMetadataMinorVersion = 6; // Pipeline Metadata Minor Version
+
+// TODO: Remove and update the version to [3,0] after switching to new register metadata layout
+constexpr unsigned PipelineMetadataMajorVersionNew = 3; // Pipeline Metadata Major Version
+constexpr unsigned PipelineMetadataMinorVersionNew = 0; // Pipeline Metadata Minor Version
 
 constexpr unsigned PipelineMetadataBase = 0x10000000; // Pipeline Metadata base value to be OR'd with the
                                                       //  PipelineMetadataEntry value when saving to ELF.
