@@ -603,7 +603,7 @@ void PalMetadata::finalizeUserDataLimit() {
 void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
   assert(m_pipelineState->isGraphics());
   if (m_pipelineState->useRegisterFieldFormat()) {
-    auto graphicsRegNode = m_registers[Util::Abi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
+    auto graphicsRegNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
 
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 &&
         m_pipelineState->getColorExportState().alphaToCoverageEnable) {
@@ -985,7 +985,7 @@ void PalMetadata::updateSpiShaderColFormat(ArrayRef<ColorExportInfo> exps, bool 
   }
 
   if (m_pipelineState->useRegisterFieldFormat()) {
-    auto spiShaderColFormatNode = m_registers[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
+    auto spiShaderColFormatNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
                                       .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::SpiShaderColFormat]
                                       .getMap(true);
     spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_0ExportFormat] = spiShaderColFormat & 0xF;
