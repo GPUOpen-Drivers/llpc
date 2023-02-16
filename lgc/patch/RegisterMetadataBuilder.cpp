@@ -162,8 +162,8 @@ void RegisterMetadataBuilder::buildLsHsRegisters() {
   // Minimum and maximum tessellation factors supported by the hardware.
   constexpr float minTessFactor = 1.0f;
   constexpr float maxTessFactor = 64.0f;
-  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtHosMinTessLevel] = FloatToBits(minTessFactor);
-  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtHosMaxTessLevel] = FloatToBits(maxTessFactor);
+  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtHosMinTessLevel] = bit_cast<uint32_t>(minTessFactor);
+  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtHosMaxTessLevel] = bit_cast<uint32_t>(maxTessFactor);
 
   // VGT_LS_HS_CONFIG
   const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;

@@ -548,8 +548,8 @@ template <typename T> void ConfigBuilder::buildHsRegConfig(ShaderStage shaderSta
   // Minimum and maximum tessellation factors supported by the hardware.
   constexpr float minTessFactor = 1.0f;
   constexpr float maxTessFactor = 64.0f;
-  SET_REG(&config->hsRegs, VGT_HOS_MIN_TESS_LEVEL, FloatToBits(minTessFactor));
-  SET_REG(&config->hsRegs, VGT_HOS_MAX_TESS_LEVEL, FloatToBits(maxTessFactor));
+  SET_REG(&config->hsRegs, VGT_HOS_MIN_TESS_LEVEL, bit_cast<uint32_t>(minTessFactor));
+  SET_REG(&config->hsRegs, VGT_HOS_MAX_TESS_LEVEL, bit_cast<uint32_t>(maxTessFactor));
 
   // Set VGT_LS_HS_CONFIG
   SET_REG_FIELD(&config->hsRegs, VGT_LS_HS_CONFIG, NUM_PATCHES, calcFactor.patchCountPerThreadGroup);
