@@ -327,6 +327,12 @@ void PipelineState::record(Module *module) {
   recordGraphicsState(module);
   if (m_palMetadata)
     m_palMetadata->record(module);
+
+  if (UseRegisterFieldFormat) {
+    const bool isFieldSupported =
+        getTargetInfo().getGfxIpVersion().major >= 11 && (m_pipelineLink == PipelineLink::WholePipeline);
+    UseRegisterFieldFormat.setValue(isFieldSupported);
+  }
 }
 
 // =====================================================================================================================
@@ -1365,14 +1371,6 @@ bool PipelineState::enableMeshRowExport() const {
     return false; // Row export is not supported by HW
 
   return m_meshRowExport;
-}
-
-// =====================================================================================================================
-// Checks if register field value format is used or not
-bool PipelineState::useRegisterFieldFormat() const {
-  if (getTargetInfo().getGfxIpVersion().major < 11)
-    return false; // Register field format is not supported pre-GFX11 by now
-  return m_registerFieldFormat;
 }
 
 // =====================================================================================================================
