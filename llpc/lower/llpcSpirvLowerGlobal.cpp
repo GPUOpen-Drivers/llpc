@@ -28,6 +28,9 @@
  * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerGlobal.
  ***********************************************************************************************************************
  */
+
+// This is only test.
+
 #include "llpcSpirvLowerGlobal.h"
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
