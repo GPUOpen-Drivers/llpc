@@ -120,7 +120,7 @@ private:
 
   bool needSecondVertexFetch(const VertexInputDescription *inputDesc) const;
 
-  Function *generateFetchFunction(bool is64bitFetch, Module *module);
+  Function *generateFetchFunction(unsigned bitWidth, Module *module);
 
   LgcContext *m_lgcContext = nullptr;   // LGC context
   LLVMContext *m_context = nullptr;     // LLVM context
@@ -129,6 +129,7 @@ private:
   Value *m_instanceIndex = nullptr;     // Instance index
   Function *m_fetchVertex64 = nullptr;  // 64-bit fetch vertex function
   Function *m_fetchVertex32 = nullptr;  // 32-bit fetch vertex function
+  Function *m_fetchVertex16 = nullptr;  // 16-bit fetch vertex function
 
   static const VertexCompFormatInfo m_vertexCompFormatInfo[]; // Info table of vertex component format
   static const unsigned char m_vertexFormatMapGfx10[][8];     // Info table of vertex format mapping for GFX10
@@ -668,18 +669,24 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
 // =====================================================================================================================
 // Generate vertex fetch function.
 //
-// @param is64bitFetch : Whether is 64 bit fetch
+// @param bitWidth : bit width of vertex
 // @param [in/out] module : Module
 // @returns : Generated function
-Function *VertexFetchImpl::generateFetchFunction(bool is64bitFetch, Module *module) {
+Function *VertexFetchImpl::generateFetchFunction(unsigned bitWidth, Module *module) {
   BuilderBase builder(*m_context);
   // Helper to create basic block
   auto createBlock = [&](Twine blockName, Function *parent) {
     return BasicBlock::Create(*m_context, blockName, parent);
   };
 
+  // 8-bit vertex fetches use the 16-bit path as well.
+  bool is16bitFetch = bitWidth <= 16;
+  bool is64bitFetch = bitWidth == 64;
+
   auto fetch64Type = FixedVectorType::get(Type::getInt32Ty(*m_context), 2);
-  auto fetchType = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
+  auto fetch32Type = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
+  auto fetch16Type = FixedVectorType::get(Type::getInt16Ty(*m_context), 4);
+  auto fetchType = is16bitFetch ? fetch16Type : fetch32Type;
 
   auto createFunction = [&] {
     // Function args
@@ -696,8 +703,10 @@ Function *VertexFetchImpl::generateFetchFunction(bool is64bitFetch, Module *modu
     };
     // Return type
     Type *retTy = FixedVectorType::get(builder.getInt32Ty(), is64bitFetch ? 8 : 4);
+    if (is16bitFetch)
+      retTy = FixedVectorType::get(builder.getInt16Ty(), 4);
 
-    StringRef funcName = is64bitFetch ? "FetchVertex64" : "FetchVertex32";
+    StringRef funcName = is64bitFetch ? "FetchVertex64" : (is16bitFetch ? "FetchVertex16" : "FetchVertex32");
     FunctionType *const funcTy = FunctionType::get(retTy, argTypes, false);
     Function *func = Function::Create(funcTy, GlobalValue::InternalLinkage, funcName, module);
     func->setCallingConv(CallingConv::C);
@@ -756,6 +765,7 @@ Function *VertexFetchImpl::generateFetchFunction(bool is64bitFetch, Module *modu
     // .wholeVertex
     {
       builder.SetInsertPoint(wholeVertex);
+
       Value *vertex = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetchType, args, {});
       if (is64bitFetch) {
         // If it is 64-bit, we need the second fetch
@@ -779,6 +789,8 @@ Function *VertexFetchImpl::generateFetchFunction(bool is64bitFetch, Module *modu
     // reset
     args[2] = vertexOffset;
 
+    auto compType = is16bitFetch ? builder.getInt16Ty() : builder.getInt32Ty();
+
     // X channel
     // .comp0Block
     {
@@ -791,7 +803,7 @@ Function *VertexFetchImpl::generateFetchFunction(bool is64bitFetch, Module *modu
         lastVert = builder.CreateInsertElement(lastVert, elem, 1);
         comp0 = lastVert;
       } else {
-        comp0 = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, builder.getInt32Ty(), args, {});
+        comp0 = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, compType, args, {});
         lastVert = builder.CreateInsertElement(lastVert, comp0, uint64_t(0));
         comp0 = lastVert;
       }
@@ -813,8 +825,7 @@ Function *VertexFetchImpl::generateFetchFunction(bool is64bitFetch, Module *modu
         lastVert = builder.CreateInsertElement(lastVert, elem, 3);
         comp1 = lastVert;
       } else {
-        comp1 = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, Type::getInt32Ty(*m_context), args,
-                                        {});
+        comp1 = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, compType, args, {});
         lastVert = builder.CreateInsertElement(lastVert, comp1, 1);
         comp1 = lastVert;
       }
@@ -834,8 +845,7 @@ Function *VertexFetchImpl::generateFetchFunction(bool is64bitFetch, Module *modu
         lastVert = builder.CreateInsertElement(lastVert, elem, 5);
         comp2 = lastVert;
       } else {
-        comp2 = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, Type::getInt32Ty(*m_context), args,
-                                        {});
+        comp2 = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, compType, args, {});
         lastVert = builder.CreateInsertElement(lastVert, comp2, 2);
         comp2 = lastVert;
       }
@@ -855,8 +865,7 @@ Function *VertexFetchImpl::generateFetchFunction(bool is64bitFetch, Module *modu
         lastVert = builder.CreateInsertElement(lastVert, elem, 7);
         comp3 = lastVert;
       } else {
-        comp3 = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, Type::getInt32Ty(*m_context), args,
-                                        {});
+        comp3 = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, compType, args, {});
         lastVert = builder.CreateInsertElement(lastVert, comp3, 3);
         comp3 = lastVert;
       }
@@ -891,6 +900,12 @@ Function *VertexFetchImpl::generateFetchFunction(bool is64bitFetch, Module *modu
     if (!m_fetchVertex64)
       m_fetchVertex64 = createFunction();
     return m_fetchVertex64;
+  }
+
+  if (is16bitFetch) {
+    if (!m_fetchVertex16)
+      m_fetchVertex16 = createFunction();
+    return m_fetchVertex16;
   }
 
   if (!m_fetchVertex32)
@@ -1011,55 +1026,16 @@ Value *VertexFetchImpl::fetchVertex(CallInst *callInst, llvm::Value *descPtr, Bu
   const unsigned bitWidth = basicTy->getScalarSizeInBits();
   assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
 
-  bool is64Fetch = bitWidth == 64;
-  auto func = generateFetchFunction(is64Fetch, callInst->getFunction()->getParent());
+  auto func = generateFetchFunction(bitWidth, callInst->getFunction()->getParent());
   Value *lastVert =
       builder.CreateCall(func, {vbDesc, vbIndex, byteOffset, componentSize, isPacked, isBgr, yMask, zMask, wMask});
 
-  // Get default fetch values
-  Constant *defaults = nullptr;
-
-  if (basicTy->isIntegerTy()) {
-    if (bitWidth == 8)
-      defaults = m_fetchDefaults.int8;
-    else if (bitWidth == 16)
-      defaults = m_fetchDefaults.int16;
-    else if (bitWidth == 32)
-      defaults = m_fetchDefaults.int32;
-    else {
-      assert(bitWidth == 64);
-      defaults = m_fetchDefaults.int64;
-    }
-  } else if (basicTy->isFloatingPointTy()) {
-    if (bitWidth == 16)
-      defaults = m_fetchDefaults.float16;
-    else if (bitWidth == 32)
-      defaults = m_fetchDefaults.float32;
-    else {
-      assert(bitWidth == 64);
-      defaults = m_fetchDefaults.double64;
-    }
-  } else
-    llvm_unreachable("Should never be called!");
-
-  const unsigned defaultCompCount = cast<FixedVectorType>(defaults->getType())->getNumElements();
-  std::vector<Value *> defaultValues(defaultCompCount);
-
-  for (unsigned i = 0; i < defaultValues.size(); ++i) {
-    defaultValues[i] = builder.CreateExtractElement(defaults, ConstantInt::get(Type::getInt32Ty(*m_context), i));
-  }
-
   // Get vertex fetch values
-  const unsigned fetchCompCount =
-      lastVert->getType()->isVectorTy() ? cast<FixedVectorType>(lastVert->getType())->getNumElements() : 1;
+  const unsigned fetchCompCount = cast<FixedVectorType>(lastVert->getType())->getNumElements();
   std::vector<Value *> fetchValues(fetchCompCount);
 
-  if (fetchCompCount == 1)
-    fetchValues[0] = lastVert;
-  else {
-    for (unsigned i = 0; i < fetchCompCount; ++i) {
-      fetchValues[i] = builder.CreateExtractElement(lastVert, ConstantInt::get(Type::getInt32Ty(*m_context), i));
-    }
+  for (unsigned i = 0; i < fetchCompCount; ++i) {
+    fetchValues[i] = builder.CreateExtractElement(lastVert, ConstantInt::get(Type::getInt32Ty(*m_context), i));
   }
 
   // Construct vertex fetch results
@@ -1075,19 +1051,18 @@ Value *VertexFetchImpl::fetchVertex(CallInst *callInst, llvm::Value *descPtr, Bu
   for (unsigned i = 0; i < vertexCompCount; i++) {
     if (compIdx + i < fetchCompCount)
       vertexValues[i] = fetchValues[compIdx + i];
-    else if (compIdx + i < defaultCompCount)
-      vertexValues[i] = defaultValues[compIdx + i];
     else {
       llvm_unreachable("Should never be called!");
       vertexValues[i] = UndefValue::get(Type::getInt32Ty(*m_context));
     }
   }
-  Value *vertex = nullptr;
 
+  Value *vertex = nullptr;
   if (vertexCompCount == 1)
     vertex = vertexValues[0];
   else {
-    Type *vertexTy = FixedVectorType::get(Type::getInt32Ty(*m_context), vertexCompCount);
+    auto compType = bitWidth <= 16 ? Type::getInt16Ty(*m_context) : Type::getInt32Ty(*m_context);
+    Type *vertexTy = FixedVectorType::get(compType, vertexCompCount);
     vertex = UndefValue::get(vertexTy);
 
     for (unsigned i = 0; i < vertexCompCount; ++i)
@@ -1095,24 +1070,14 @@ Value *VertexFetchImpl::fetchVertex(CallInst *callInst, llvm::Value *descPtr, Bu
   }
 
   const bool is8bitFetch = (inputType->getScalarSizeInBits() == 8);
-  const bool is16bitFetch = (inputType->getScalarSizeInBits() == 16);
 
   if (is8bitFetch) {
-    // NOTE: The vertex fetch results are represented as <n x i32> now. For 8-bit vertex fetch, we have to
-    // convert them to <n x i8> and the 24 high bits is truncated.
+    // NOTE: The vertex fetch results are represented as <n x i16> now. For 8-bit vertex fetch, we have to
+    // convert them to <n x i8> and the 8 high bits is truncated.
     assert(inputTy->isIntOrIntVectorTy()); // Must be integer type
 
     Type *vertexTy = vertex->getType();
     Type *truncTy = Type::getInt8Ty(*m_context);
-    truncTy = vertexTy->isVectorTy()
-                  ? cast<Type>(FixedVectorType::get(truncTy, cast<FixedVectorType>(vertexTy)->getNumElements()))
-                  : truncTy;
-    vertex = builder.CreateTrunc(vertex, truncTy);
-  } else if (is16bitFetch) {
-    // NOTE: The vertex fetch results are represented as <n x i32> now. For 16-bit vertex fetch, we have to
-    // convert them to <n x i16> and the 16 high bits is truncated.
-    Type *vertexTy = vertex->getType();
-    Type *truncTy = Type::getInt16Ty(*m_context);
     truncTy = vertexTy->isVectorTy()
                   ? cast<Type>(FixedVectorType::get(truncTy, cast<FixedVectorType>(vertexTy)->getNumElements()))
                   : truncTy;
