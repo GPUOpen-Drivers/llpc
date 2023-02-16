@@ -327,6 +327,7 @@ Value *SubgroupBuilder::CreateSubgroupShuffle(Value *const value, Value *const i
   }
 
   if (supportPermLane64Dpp()) {
+    assert(getShaderWaveSize() == 64);
     auto permuteFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
                           ArrayRef<Value *> passthroughArgs) -> Value * {
       return builder.CreateIntrinsic(Intrinsic::amdgcn_permlane64, {}, {mappedArgs[0]});
