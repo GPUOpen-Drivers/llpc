@@ -47,6 +47,7 @@
 #include "SPIRVValue.h"
 #include "llpcCompiler.h"
 #include "llpcContext.h"
+#include "llpcDialect.h"
 #include "llpcPipelineContext.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/Pipeline.h"
@@ -4820,26 +4821,26 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
       return mapValue(bv, ExtractElementInst::Create(transValue(ce->getComposite(), f, bb),
                                                      ConstantInt::get(*m_context, APInt(32, ce->getIndices()[0])),
                                                      bv->getName(), bb));
-    } else {
-      auto cv = transValue(ce->getComposite(), f, bb);
-      auto indexedTy = ExtractValueInst::getIndexedType(cv->getType(), ce->getIndices());
-      if (!indexedTy) {
-        // NOTE: "OpCompositeExtract" could extract a scalar component from a
-        // vector or a vector in an aggregate. But in LLVM, "extractvalue" is
-        // unable to do such thing. We have to replace it with "extractelement"
-        // + "extractelement" to achieve this purpose.
-        assert(ce->getType()->isTypeScalar());
-        std::vector<SPIRVWord> idxs = ce->getIndices();
-        auto lastIdx = idxs.back();
-        idxs.pop_back();
-
-        Value *v = ExtractValueInst::Create(cv, idxs, "", bb);
-        assert(v->getType()->isVectorTy());
-        return mapValue(
-            bv, ExtractElementInst::Create(v, ConstantInt::get(*m_context, APInt(32, lastIdx)), bv->getName(), bb));
-      }
-      return mapValue(bv, ExtractValueInst::Create(cv, ce->getIndices(), bv->getName(), bb));
     }
+
+    auto cv = transValue(ce->getComposite(), f, bb);
+    auto indexedTy = ExtractValueInst::getIndexedType(cv->getType(), ce->getIndices());
+    if (!indexedTy) {
+      // NOTE: "OpCompositeExtract" could extract a scalar component from a
+      // vector or a vector in an aggregate. But in LLVM, "extractvalue" is
+      // unable to do such thing. We have to replace it with "extractelement"
+      // + "extractelement" to achieve this purpose.
+      assert(ce->getType()->isTypeScalar());
+      std::vector<SPIRVWord> idxs = ce->getIndices();
+      auto lastIdx = idxs.back();
+      idxs.pop_back();
+
+      Value *v = ExtractValueInst::Create(cv, idxs, "", bb);
+      assert(v->getType()->isVectorTy());
+      return mapValue(
+          bv, ExtractElementInst::Create(v, ConstantInt::get(*m_context, APInt(32, lastIdx)), bv->getName(), bb));
+    }
+    return mapValue(bv, ExtractValueInst::Create(cv, ce->getIndices(), bv->getName(), bb));
   }
 
   case OpVectorExtractDynamic: {
@@ -4856,6 +4857,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
                               transValue(ci->getComposite(), f, bb), transValue(ci->getObject(), f, bb),
                               ConstantInt::get(*m_context, APInt(32, ci->getIndices()[0])), bv->getName(), bb));
     }
+
     auto cv = transValue(ci->getComposite(), f, bb);
     auto indexedTy = ExtractValueInst::getIndexedType(cv->getType(), ci->getIndices());
     if (!indexedTy) {
