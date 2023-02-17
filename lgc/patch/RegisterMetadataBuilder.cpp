@@ -61,6 +61,7 @@ void RegisterMetadataBuilder::buildPalMetadata() {
 
     DenseMap<unsigned, unsigned> apiHwShaderMap;
     if (m_hasTask || m_hasMesh) {
+      assert(m_pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3}));
       apiHwShaderMap[ShaderStageMesh] = Util::Abi::HwShaderGs;
       pipelineType = Util::Abi::PipelineType::Mesh;
       if (m_hasTask) {
@@ -144,13 +145,20 @@ void RegisterMetadataBuilder::buildPalMetadata() {
       buildPsRegisters();
       buildShaderExecutionRegisters(Util::Abi::HardwareStage::Ps, ShaderStageFragment, ShaderStageInvalid);
     }
+    if (hwStageMask & Util::Abi::HwShaderCs) {
+      buildCsRegisters(ShaderStageTask);
+      buildShaderExecutionRegisters(Util::Abi::HardwareStage::Cs, ShaderStageTask, ShaderStageInvalid);
+    }
 
     buildPaSpecificRegisters();
     setVgtShaderStagesEn(hwStageMask);
     setIaMultVgtParam();
     setPipelineType(pipelineType);
   } else {
-    buildCsRegisters();
+    addApiHwShaderMapping(ShaderStageCompute, Util::Abi::HwShaderCs);
+    setPipelineType(Util::Abi::PipelineType::Cs);
+    buildCsRegisters(ShaderStageCompute);
+    buildShaderExecutionRegisters(Util::Abi::HardwareStage::Cs, ShaderStageCompute, ShaderStageInvalid);
   }
 }
 
@@ -856,8 +864,45 @@ void RegisterMetadataBuilder::buildPsRegisters() {
 
 // =====================================================================================================================
 // Builds register configuration for compute/task shader.
-void RegisterMetadataBuilder::buildCsRegisters() {
-  // TODO: Implement once PAL completes the new format for CS
+void RegisterMetadataBuilder::buildCsRegisters(ShaderStage shaderStage) {
+  assert(shaderStage == ShaderStageCompute || shaderStage == ShaderStageTask);
+
+  getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidXEn] = true;
+  getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidYEn] = true;
+  getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidZEn] = true;
+  getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgSizeEn] = true;
+
+  const auto resUsage = m_pipelineState->getShaderResourceUsage(shaderStage);
+  const auto &computeMode = m_pipelineState->getShaderModes()->getComputeShaderMode();
+
+  unsigned workgroupSizes[3] = {};
+  if (shaderStage == ShaderStageCompute) {
+    const auto &builtInUsage = resUsage->builtInUsage.cs;
+    if (builtInUsage.foldWorkgroupXY) {
+      workgroupSizes[0] = computeMode.workgroupSizeX * computeMode.workgroupSizeY;
+      workgroupSizes[1] = computeMode.workgroupSizeZ;
+      workgroupSizes[2] = 1;
+    } else {
+      workgroupSizes[0] = computeMode.workgroupSizeX;
+      workgroupSizes[1] = computeMode.workgroupSizeY;
+      workgroupSizes[2] = computeMode.workgroupSizeZ;
+    }
+  } else {
+    assert(shaderStage == ShaderStageTask);
+    workgroupSizes[0] = computeMode.workgroupSizeX;
+    workgroupSizes[1] = computeMode.workgroupSizeY;
+    workgroupSizes[2] = computeMode.workgroupSizeZ;
+  }
+
+  // 0 = X, 1 = XY, 2 = XYZ
+  unsigned tidigCompCnt = 0;
+  if (workgroupSizes[2] > 1)
+    tidigCompCnt = 2;
+  else if (workgroupSizes[1] > 1)
+    tidigCompCnt = 1;
+  getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TidigCompCnt] = tidigCompCnt;
+
+  setThreadgroupDimensions(workgroupSizes);
 }
 
 // =====================================================================================================================
@@ -872,7 +917,7 @@ void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareS
   auto hwShaderNode = getHwShaderNode(hwStageId);
   ShaderStage apiStage = apiStage2 != ShaderStageInvalid ? apiStage2 : apiStage1;
 
-  if (m_isNggMode || m_gfxIp.major == 10) {
+  if (m_isNggMode || m_gfxIp.major >= 10) {
     unsigned waveFrontSize = m_pipelineState->getShaderWaveSize(apiStage);
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::WavefrontSize] = waveFrontSize;
   }
@@ -930,7 +975,7 @@ void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareS
     }
   }
 
-  if (apiStage1 == ShaderStageTessEval || m_pipelineState->isTessOffChip())
+  if (apiStage1 == ShaderStageTessEval && m_pipelineState->isTessOffChip())
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::OffchipLdsEn] = true;
 
   hwShaderNode[Util::Abi::HardwareStageMetadataKey::SgprLimit] = sgprLimits;
