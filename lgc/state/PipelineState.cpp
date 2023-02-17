@@ -797,7 +797,8 @@ const ResourceNode *PipelineState::findPushConstantResourceNode() const {
 // @param nodeType : Resource node type
 // @param candidateType : Resource node candidate type
 static bool isNodeTypeCompatible(ResourceNodeType nodeType, ResourceNodeType candidateType) {
-  if (nodeType == ResourceNodeType::Unknown || candidateType == nodeType)
+  if (nodeType == ResourceNodeType::Unknown || candidateType == nodeType ||
+    candidateType == ResourceNodeType::DescriptorMutable)
     return true;
 
   if ((nodeType == ResourceNodeType::DescriptorConstBuffer || nodeType == DescriptorAnyBuffer) &&
@@ -1559,6 +1560,7 @@ const char *PipelineState::getResourceNodeTypeName(ResourceNodeType type) {
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, InlineBuffer)
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorConstBuffer)
     CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorConstBufferCompact)
+    CASE_CLASSENUM_TO_STRING(ResourceNodeType, DescriptorMutable)
     break;
   default:
     llvm_unreachable("Should never be called!");

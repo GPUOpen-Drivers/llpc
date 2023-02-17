@@ -497,7 +497,6 @@ void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userData
   dumpFile << prefix << ".type = " << userDataNode->type << "\n";
   dumpFile << prefix << ".offsetInDwords = " << userDataNode->offsetInDwords << "\n";
   dumpFile << prefix << ".sizeInDwords = " << userDataNode->sizeInDwords << "\n";
-  dumpFile << prefix << ".strideInDwords = " << userDataNode->strideInDwords << "\n";
 
   switch (userDataNode->type) {
   case ResourceMappingNodeType::DescriptorResource:
@@ -514,10 +513,12 @@ void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userData
   case ResourceMappingNodeType::DescriptorConstBufferCompact:
   case ResourceMappingNodeType::DescriptorImage:
   case ResourceMappingNodeType::DescriptorConstTexelBuffer: {
+  case ResourceMappingNodeType::DescriptorMutable:
     char setHexvalue[64] = {};
     snprintf(setHexvalue, 64, "0x%08" PRIX32, userDataNode->srdRange.set);
     dumpFile << prefix << ".set = " << setHexvalue << "\n";
     dumpFile << prefix << ".binding = " << userDataNode->srdRange.binding << "\n";
+    dumpFile << prefix << ".strideInDwords = " << userDataNode->srdRange.strideInDwords << "\n";
     break;
   }
   case ResourceMappingNodeType::DescriptorTableVaPtr: {
@@ -533,10 +534,6 @@ void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userData
     break;
   }
   case ResourceMappingNodeType::StreamOutTableVaPtr: {
-    break;
-  }
-  case ResourceMappingNodeType::Unknown: {
-    // Mutable descriptors
     break;
   }
   default: {
@@ -1719,7 +1716,6 @@ void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode 
   hasher->Update(userDataNode->type);
   hasher->Update(userDataNode->sizeInDwords);
   hasher->Update(userDataNode->offsetInDwords);
-  hasher->Update(userDataNode->strideInDwords);
   switch (userDataNode->type) {
   case ResourceMappingNodeType::DescriptorResource:
   case ResourceMappingNodeType::DescriptorSampler:
@@ -1732,7 +1728,8 @@ void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode 
   case ResourceMappingNodeType::DescriptorConstBuffer:
   case ResourceMappingNodeType::DescriptorConstBufferCompact:
   case ResourceMappingNodeType::DescriptorImage:
-  case ResourceMappingNodeType::DescriptorConstTexelBuffer: {
+  case ResourceMappingNodeType::DescriptorConstTexelBuffer:
+  case ResourceMappingNodeType::DescriptorMutable: {
     hasher->Update(userDataNode->srdRange);
     break;
   }

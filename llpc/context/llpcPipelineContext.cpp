@@ -711,6 +711,8 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
         destNode.concreteType = ResourceNodeType::DescriptorBufferCompact;
       else if (node.type == Vkgc::ResourceMappingNodeType::DescriptorConstBuffer)
         destNode.concreteType = ResourceNodeType::DescriptorBuffer;
+      else if (node.type == Vkgc::ResourceMappingNodeType::DescriptorMutable)
+        destNode.concreteType = ResourceNodeType::DescriptorMutable;
       else
         destNode.concreteType = static_cast<ResourceNodeType>(node.type);
 
@@ -719,43 +721,48 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
       destNode.abstractType = destNode.concreteType;
       destNode.immutableValue = nullptr;
       destNode.immutableSize = 0;
-      switch (node.type) {
-      case ResourceMappingNodeType::DescriptorImage:
-      case ResourceMappingNodeType::DescriptorResource:
-      case ResourceMappingNodeType::DescriptorFmask:
-        destNode.stride = DescriptorSizeResource / sizeof(uint32_t);
-        break;
-      case ResourceMappingNodeType::DescriptorSampler:
-        destNode.stride = DescriptorSizeSampler / sizeof(uint32_t);
-        break;
-      case ResourceMappingNodeType::DescriptorCombinedTexture:
-        destNode.stride = (DescriptorSizeResource + DescriptorSizeSampler) / sizeof(uint32_t);
-        break;
-      case ResourceMappingNodeType::InlineBuffer:
-      case ResourceMappingNodeType::DescriptorYCbCrSampler:
-        // Current node.sizeInDwords = resourceDescSizeInDwords * M * N (M means plane count, N means array count)
-        // TODO: Desired destNode.stride = resourceDescSizeInDwords * M
-        //
-        // Temporary set stride to be node.sizeInDwords, for that the stride varies from different plane
-        // counts, and we don't know the real plane count currently.
-        // Thus, set stride to sizeInDwords, and just divide array count when it is available in handling immutable
-        // sampler descriptor (For YCbCrSampler, immutable sampler is always accessible)
-        destNode.stride = node.sizeInDwords;
-        break;
-      case ResourceMappingNodeType::DescriptorBufferCompact:
-      case ResourceMappingNodeType::DescriptorConstBufferCompact:
-        destNode.stride = 2;
-        break;
-      default:
-        if (node.strideInDwords > 0) {
-          // Normally we know the stride of items in a descriptor array. However in specific circumstances
-          // the type is not known by llpc. This is the case with mutable descriptors where we need the
-          // stride to be explicitly specified.
-          destNode.stride = node.strideInDwords;
-        } else {
-          destNode.stride = DescriptorSizeBuffer / sizeof(uint32_t);
+
+
+      // Normally we know the stride of items in a desriptor array. However in specific circumstances
+      // the type is not known by llpc. This is the case with mutable descriptors where we need the
+      // stride to be explicitly specified.
+      if(node.srdRange.strideInDwords > 0)
+      {
+        destNode.stride = node.srdRange.strideInDwords;
+      }
+      else
+      {
+        switch (node.type) {
+        case ResourceMappingNodeType::DescriptorImage:
+        case ResourceMappingNodeType::DescriptorResource:
+        case ResourceMappingNodeType::DescriptorFmask:
+          destNode.stride = DescriptorSizeResource / sizeof(uint32_t);
+          break;
+        case ResourceMappingNodeType::DescriptorSampler:
+          destNode.stride = DescriptorSizeSampler / sizeof(uint32_t);
+          break;
+        case ResourceMappingNodeType::DescriptorCombinedTexture:
+          destNode.stride = (DescriptorSizeResource + DescriptorSizeSampler) / sizeof(uint32_t);
+          break;
+        case ResourceMappingNodeType::InlineBuffer:
+        case ResourceMappingNodeType::DescriptorYCbCrSampler:
+          // Current node.sizeInDwords = resourceDescSizeInDwords * M * N (M means plane count, N means array count)
+          // TODO: Desired destNode.stride = resourceDescSizeInDwords * M
+          //
+          // Temporary set stride to be node.sizeInDwords, for that the stride varies from different plane
+          // counts, and we don't know the real plane count currently.
+          // Thus, set stride to sizeInDwords, and just divide array count when it is available in handling immutable
+          // sampler descriptor (For YCbCrSampler, immutable sampler is always accessible)
+          destNode.stride = node.sizeInDwords;
+          break;
+        case ResourceMappingNodeType::DescriptorBufferCompact:
+        case ResourceMappingNodeType::DescriptorConstBufferCompact:
+          destNode.stride = 2;
+          break;
+        default:
+            destNode.stride = DescriptorSizeBuffer / sizeof(uint32_t);
+          break;
         }
-        break;
       }
 
       // Only check for an immutable value if the resource is or contains a sampler. This specifically excludes
