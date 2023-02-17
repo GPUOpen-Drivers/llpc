@@ -340,11 +340,14 @@ Value *SubgroupBuilder::CreateSubgroupShuffle(Value *const value, Value *const i
       return builder.CreateIntrinsic(Intrinsic::amdgcn_ds_bpermute, {}, {passthroughArgs[0], mappedArgs[0]});
     };
 
-    auto bPermValuesLo = CreateMapToInt32(bPermFunc, value, CreateMul(index, getInt32(4)));
-    auto bPermValuesHi = CreateMapToInt32(bPermFunc, swapped, CreateMul(index, getInt32(4)));
+    auto bPermSameHalf = CreateMapToInt32(bPermFunc, value, CreateMul(index, getInt32(4)));
+    auto bPermOtherHalf = CreateMapToInt32(bPermFunc, swapped, CreateMul(index, getInt32(4)));
 
-    auto const indexLessThan32 = CreateICmpULT(index, getInt32(32));
-    return CreateSelect(indexLessThan32, bPermValuesLo, bPermValuesHi);
+    auto const threadId = CreateSubgroupMbcnt(getInt64(UINT64_MAX), "");
+    auto const sameOrOtherHalf = CreateAnd(CreateXor(index, threadId), getInt32(32));
+    auto const indexInSameHalf = CreateICmpEQ(sameOrOtherHalf, getInt32(0));
+
+    return CreateSelect(indexInSameHalf, bPermSameHalf, bPermOtherHalf);
   }
 
   auto mapFunc = [this](BuilderBase &builder, ArrayRef<Value *> mappedArgs,

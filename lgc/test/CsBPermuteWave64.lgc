@@ -21,9 +21,14 @@ declare float @lgc.create.subgroup.shuffle.f32(...)
 ; CHECK-NEXT:    s_waitcnt_vscnt null, 0x0
 ; CHECK-NEXT:    v_lshlrev_b32_e32 v2, 2, v1
 ; CHECK-NEXT:    v_permlane64_b32 v3, v0
-; CHECK-NEXT:    v_cmp_gt_u32_e32 vcc, 32, v1
 ; CHECK-NEXT:    ds_bpermute_b32 v0, v2, v0
 ; CHECK-NEXT:    ds_bpermute_b32 v2, v2, v3
+; CHECK-NEXT:    v_mbcnt_lo_u32_b32 v3, -1, 0
+; CHECK-NEXT:    s_delay_alu instid0(VALU_DEP_1) | instskip(NEXT) | instid1(VALU_DEP_1)
+; CHECK-NEXT:    v_xor_b32_e32 v1, v3, v1
+; CHECK-NEXT:    v_and_b32_e32 v1, 32, v1
+; CHECK-NEXT:    s_delay_alu instid0(VALU_DEP_1)
+; CHECK-NEXT:    v_cmp_eq_u32_e32 vcc, 0, v1
 ; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
 ; CHECK-NEXT:    v_cndmask_b32_e32 v0, v2, v0, vcc
 ; CHECK-NEXT:    s_setpc_b64 s[30:31]
