@@ -351,6 +351,7 @@ enum class ResourceMappingNodeType : unsigned {
   DescriptorImage,              ///< Generic descriptor: storageImage, including image, input attachment
   DescriptorConstTexelBuffer,   ///< Generic descriptor: constTexelBuffer, including uniform texel buffer
   InlineBuffer,                 ///< Push constant with binding
+  DescriptorMutable,            ///< Mutable descriptor type
   Count,                        ///< Count of resource mapping node types.
 };
 
@@ -368,15 +369,15 @@ struct ResourceMappingNode {
 
   unsigned sizeInDwords;   ///< Size of this node in dword
   unsigned offsetInDwords; ///< Offset of this node (from the beginning of the resource mapping table) in dword
-  unsigned strideInDwords; ///< Stride of elements in a descriptor array (used for mutable descriptors)
-                           ///  a stride of zero will use the type of the node to determine the stride
 
   union {
     /// Info for generic descriptor nodes (DescriptorResource, DescriptorSampler, DescriptorCombinedTexture,
     /// DescriptorTexelBuffer, DescriptorBuffer and DescriptorBufferCompact)
     struct {
-      unsigned set;     ///< Descriptor set
-      unsigned binding; ///< Descriptor binding
+      unsigned set;            ///< Descriptor set
+      unsigned binding;        ///< Descriptor binding
+      unsigned strideInDwords; ///< Stride of elements in a descriptor array (used for mutable descriptors)
+                               ///  a stride of zero will use the type of the node to determine the stride
       unsigned reserv0;
       unsigned reserv1;
       unsigned reserv2;

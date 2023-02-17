@@ -89,7 +89,7 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
     std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding);
     if (!node) {
       // If we can't find the node, assume mutable descriptor and search for any node.
-      std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding);
+      std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::DescriptorMutable, descSet, binding);
       if (!node) {
         // We did not find the resource node. Return an undef value.
         return UndefValue::get(getBufferDescTy(pointeeTy));
@@ -98,12 +98,8 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
     assert(node && "missing resource node");
 
     if (node == topNode && isa<Constant>(descIndex) && node->concreteType != ResourceNodeType::InlineBuffer) {
-      if (return64Address) {
-        assert(node->concreteType == ResourceNodeType::DescriptorBufferCompact);
-        return CreateBitCast(desc, getInt64Ty());
-      }
       // If the node is a mutable descriptor create call
-      if (node->concreteType == ResourceNodeType::Unknown) {
+      if (node->concreteType == ResourceNodeType::DescriptorMutable) {
         Type *descTy = getInt8Ty()->getPointerTo(ADDR_SPACE_BUFFER_FAT_POINTER);
         std::string callName = lgcName::RootDescriptor;
         addTypeMangling(descTy, {}, callName);
@@ -132,6 +128,10 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
           dwordOffset += (binding - node->binding) * node->stride;
           desc = CreateNamedCall(callName, descTy, getInt32(dwordOffset), Attribute::ReadNone);
         }
+        if (return64Address) {
+          assert(node->concreteType == ResourceNodeType::DescriptorBufferCompact);
+          return CreateBitCast(desc, getInt64Ty());
+        }
       }
     } else if (node->concreteType == ResourceNodeType::InlineBuffer) {
       // Handle an inline buffer specially. Get a pointer to it, then expand to a descriptor.
@@ -141,18 +141,16 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
   }
 
   if (!desc) {
-    if (node) {
+    if (node || (node && node->concreteType == ResourceNodeType::DescriptorMutable)) {
       ResourceNodeType resType = node->concreteType;
       ResourceNodeType abstractType = node->abstractType;
-
       // Handle mutable descriptors
-      if (resType == ResourceNodeType::Unknown) {
+      if (resType == ResourceNodeType::DescriptorMutable) {
         resType = ResourceNodeType::DescriptorBuffer;
       }
-      if (abstractType == ResourceNodeType::Unknown) {
+      if (abstractType == ResourceNodeType::DescriptorMutable) {
         abstractType = ResourceNodeType::DescriptorBuffer;
       }
-
       Value *descPtr = getDescPtr(resType, abstractType, descSet, binding, topNode, node);
       // Index it.
       if (descIndex != getInt32(0)) {
@@ -238,22 +236,17 @@ Value *DescBuilder::CreateGetDescStride(ResourceNodeType concreteType, ResourceN
   const ResourceNode *node = nullptr;
   if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
     std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding);
-    if (!node && m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding).second) {
-      if (!node) {
-        // If we can't find the node, assume mutable descriptor and search for any node.
-        std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding);
-        if (!node) {
-          // We did not find the resource node. Return an undef value.
-          return UndefValue::get(getInt32Ty());
-        }
-        if (!node && m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding).second) {
-          // NOTE: Resource node may be DescriptorTexelBuffer, but it is defined as OpTypeSampledImage in SPIRV,
-          // In this case, a caller may search for the DescriptorSampler and not find it. We return nullptr and
-          // expect the caller to handle it.
-          return UndefValue::get(getInt32Ty());
-        }
-        assert(node && "missing resource node");
+    if (!node) {
+      // If we can't find the node, assume mutable descriptor and search for any node.
+      std::tie(topNode, node) =
+        m_pipelineState->findResourceNode(ResourceNodeType::DescriptorMutable, descSet, binding);
+      if (!node && m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding).second) {
+        // NOTE: Resource node may be DescriptorTexelBuffer, but it is defined as OpTypeSampledImage in SPIRV,
+        // In this case, a caller may search for the DescriptorSampler and not find it. We return nullptr and
+        // expect the caller to handle it.
+        return UndefValue::get(getInt32Ty());
       }
+      assert(node && "missing resource node");
     }
     assert(node && "missing resource node");
   }
@@ -278,24 +271,18 @@ Value *DescBuilder::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNode
   const ResourceNode *node = nullptr;
   if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
     std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding);
-    if (!node && m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding).second) {
-      if (!node) {
-        // If we can't find the node, assume mutable descriptor and search for any node.
-        std::tie(topNode, node) = m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding);
-        if (!node) {
-          // We did not find the resource node. Return an undef value.
-          return UndefValue::get(getDescPtrTy(concreteType));
-        }
-        if (!node && m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding).second) {
-          // NOTE: Resource node may be DescriptorTexelBuffer, but it is defined as OpTypeSampledImage in SPIRV,
-          // In this case, a caller may search for the DescriptorSampler and not find it. We return nullptr and
-          // expect the caller to handle it.
-          return UndefValue::get(getDescPtrTy(concreteType));
-        }
-        assert(node && "missing resource node");
+    if (!node) {
+      // If we can't find the node, assume mutable descriptor and search for any node.
+      std::tie(topNode, node) =
+        m_pipelineState->findResourceNode(ResourceNodeType::DescriptorMutable, descSet, binding);
+      if (!node && m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding).second) {
+        // NOTE: Resource node may be DescriptorTexelBuffer, but it is defined as OpTypeSampledImage in SPIRV,
+        // In this case, a caller may search for the DescriptorSampler and not find it. We return nullptr and
+        // expect the caller to handle it.
+        return UndefValue::get(getDescPtrTy(concreteType));
       }
+      assert(node && "missing resource node");
     }
-    assert(node && "missing resource node");
   }
 
   Value *descPtr = nullptr;

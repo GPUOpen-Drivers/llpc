@@ -60,6 +60,7 @@ public:
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorImage)
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorConstTexelBuffer)
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, InlineBuffer)
+    ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorMutable)
     ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, Auto)
     ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, MaximumSize)
     ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, HalfSize)

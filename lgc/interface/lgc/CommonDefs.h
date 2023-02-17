@@ -91,6 +91,7 @@ enum class ResourceNodeType : unsigned {
   InlineBuffer,                 ///< Inline buffer, with descriptor set and binding
   DescriptorConstBuffer,        ///< Generic descriptor: constant buffer
   DescriptorConstBufferCompact, ///< Compact buffer descriptor, only contains the buffer address
+  DescriptorMutable,            ///< Mutable descriptor type
   Count,                        ///< Count of resource mapping node types.
 };
 
