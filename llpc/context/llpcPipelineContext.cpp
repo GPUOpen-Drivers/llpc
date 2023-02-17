@@ -999,6 +999,12 @@ void PipelineContext::setColorExportState(Pipeline *pipeline, Util::MetroHash64 
     }
   }
 
+  if (state.alphaToCoverageEnable && formats.empty()) {
+    // NOTE: We must export alpha channel for alpha to coverage, if there is no color export,
+    // we force a dummy color export.
+    formats.push_back({BufDataFormat32, BufNumFormatFloat});
+  }
+
   pipeline->setColorExportState(formats, state);
 }
 
