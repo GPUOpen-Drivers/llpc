@@ -120,5 +120,5 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:       .llpc_version: {{.*}}
 ; CHECK-NEXT: amdpal.version:
 ; CHECK-NEXT:   - 0x2
-; CHECK-NEXT:   - 0x3
+; CHECK-NEXT:   - 0x6
 ; CHECK-NEXT: ...

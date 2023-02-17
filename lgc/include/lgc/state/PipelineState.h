@@ -302,7 +302,7 @@ public:
   bool enableMeshRowExport() const;
 
   // Checks if register field value format is used or not
-  bool useRegisterFieldFormat() const;
+  bool useRegisterFieldFormat() const { return m_registerFieldFormat; }
 
   // Checks if SW-emulated stream-out should be enabled
   bool enableSwXfb();

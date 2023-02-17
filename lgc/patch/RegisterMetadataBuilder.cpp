@@ -99,7 +99,7 @@ void RegisterMetadataBuilder::buildPalMetadata() {
     for (const auto &entry : apiHwShaderMap) {
       const auto apiStage = static_cast<ShaderStage>(entry.first);
       hwStageMask |= entry.second;
-      addApiHwShaderMapping(apiStage, hwStageMask);
+      addApiHwShaderMapping(apiStage, entry.second);
     }
 
     if (hwStageMask & Util::Abi::HwShaderHs) {
