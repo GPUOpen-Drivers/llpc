@@ -386,7 +386,7 @@ static bool hasPrimitiveIdx(const Constant &metaVal) {
 // @param loadInst : Load instruction
 void SpirvLowerGlobal::handleLoadInstGEP(GlobalVariable *inOut, ArrayRef<Value *> indexOperands, LoadInst &loadInst) {
 
-  assert(indexOperands.empty() || cast<ConstantInt>(indexOperands.front())->isZero() && "Non-zero GEP first index\n");
+  assert((indexOperands.empty() || cast<ConstantInt>(indexOperands.front())->isZero()) && "Non-zero GEP first index\n");
   if (!indexOperands.empty())
     indexOperands = indexOperands.drop_front();
 
@@ -476,7 +476,7 @@ void SpirvLowerGlobal::handleLoadInst() {
 // @param storeInst : Store instruction
 void SpirvLowerGlobal::handleStoreInstGEP(GlobalVariable *output, ArrayRef<Value *> indexOperands,
                                           StoreInst &storeInst) {
-  assert(indexOperands.empty() || cast<ConstantInt>(indexOperands.front())->isZero() && "Non-zero GEP first index\n");
+  assert((indexOperands.empty() || cast<ConstantInt>(indexOperands.front())->isZero()) && "Non-zero GEP first index\n");
   // drop first element
   if (!indexOperands.empty())
     indexOperands = indexOperands.drop_front();
@@ -2650,7 +2650,7 @@ void SpirvLowerGlobal::cleanupReturnBlock() {
 // @param gv : Global Variable instruction
 void SpirvLowerGlobal::interpolateInputElement(unsigned interpLoc, Value *auxInterpValue, CallInst &callInst,
                                                GlobalVariable *gv, ArrayRef<Value *> indexOperands) {
-  assert(indexOperands.empty() || cast<ConstantInt>(indexOperands.front())->isZero() && "Non-zero GEP first index\n");
+  assert((indexOperands.empty() || cast<ConstantInt>(indexOperands.front())->isZero()) && "Non-zero GEP first index\n");
 
   m_builder->SetInsertPoint(&callInst);
 
