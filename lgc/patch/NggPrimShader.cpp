@@ -1422,7 +1422,7 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
   {
     m_builder.SetInsertPoint(cullPrimitiveBlock);
 
-    primitiveCulled = doCulling(m_nggInputs.vertexIndex0, m_nggInputs.vertexIndex1, m_nggInputs.vertexIndex2);
+    primitiveCulled = cullPrimitive(m_nggInputs.vertexIndex0, m_nggInputs.vertexIndex1, m_nggInputs.vertexIndex2);
     m_builder.CreateCondBr(primitiveCulled, endCullPrimitiveBlock, writeVertexDrawFlagBlock);
   }
 
@@ -2090,7 +2090,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
           m_builder.CreateAdd(m_nggInputs.threadIdInSubgroup,
                               m_builder.CreateSelect(winding, m_builder.getInt32(1), m_builder.getInt32(2)));
 
-      auto primitiveCulled = doCulling(vertexIndex0, vertexIndex1, vertexIndex2);
+      auto primitiveCulled = cullPrimitive(vertexIndex0, vertexIndex1, vertexIndex2);
       m_builder.CreateCondBr(primitiveCulled, nullifyPrimitiveDataBlock, endCullPrimitiveBlock);
     }
 
@@ -2625,12 +2625,12 @@ void NggPrimShader::distributePrimitiveId(Value *primitiveId) {
 }
 
 // =====================================================================================================================
-// Does various culling for primitive shader.
+// Try to cull primitive by running various cullers.
 //
 // @param vertexIndex0: Relative index of vertex0 (forming this primitive)
 // @param vertexIndex1: Relative index of vertex1 (forming this primitive)
 // @param vertexIndex2: Relative index of vertex2 (forming this primitive)
-Value *NggPrimShader::doCulling(Value *vertexIndex0, Value *vertexIndex1, Value *vertexIndex2) {
+Value *NggPrimShader::cullPrimitive(Value *vertexIndex0, Value *vertexIndex1, Value *vertexIndex2) {
   // Skip following culling if it is not requested
   if (!enableCulling())
     return m_builder.getFalse();
@@ -2641,32 +2641,32 @@ Value *NggPrimShader::doCulling(Value *vertexIndex0, Value *vertexIndex1, Value 
   Value *vertex1 = fetchVertexPositionData(vertexIndex1);
   Value *vertex2 = fetchVertexPositionData(vertexIndex2);
 
-  // Handle backface culling
+  // Run backface culler
   if (m_nggControl->enableBackfaceCulling)
-    primitiveCulled = doBackfaceCulling(primitiveCulled, vertex0, vertex1, vertex2);
+    primitiveCulled = runBackfaceCuller(primitiveCulled, vertex0, vertex1, vertex2);
 
-  // Handle frustum culling
+  // Run frustum culler
   if (m_nggControl->enableFrustumCulling)
-    primitiveCulled = doFrustumCulling(primitiveCulled, vertex0, vertex1, vertex2);
+    primitiveCulled = runFrustumCuller(primitiveCulled, vertex0, vertex1, vertex2);
 
-  // Handle box filter culling
+  // Run box filter culler
   if (m_nggControl->enableBoxFilterCulling)
-    primitiveCulled = doBoxFilterCulling(primitiveCulled, vertex0, vertex1, vertex2);
+    primitiveCulled = runBoxFilterCuller(primitiveCulled, vertex0, vertex1, vertex2);
 
-  // Handle sphere culling
+  // Run sphere culler
   if (m_nggControl->enableSphereCulling)
-    primitiveCulled = doSphereCulling(primitiveCulled, vertex0, vertex1, vertex2);
+    primitiveCulled = runSphereCuller(primitiveCulled, vertex0, vertex1, vertex2);
 
-  // Handle small primitive filter culling
+  // Run small primitive filter culler
   if (m_nggControl->enableSmallPrimFilter)
-    primitiveCulled = doSmallPrimFilterCulling(primitiveCulled, vertex0, vertex1, vertex2);
+    primitiveCulled = runSmallPrimFilterCuller(primitiveCulled, vertex0, vertex1, vertex2);
 
-  // Handle cull distance culling
+  // Run cull distance culler
   if (m_nggControl->enableCullDistanceCulling) {
     Value *signMask0 = fetchCullDistanceSignMask(vertexIndex0);
     Value *signMask1 = fetchCullDistanceSignMask(vertexIndex1);
     Value *signMask2 = fetchCullDistanceSignMask(vertexIndex2);
-    primitiveCulled = doCullDistanceCulling(primitiveCulled, signMask0, signMask1, signMask2);
+    primitiveCulled = runCullDistanceCuller(primitiveCulled, signMask0, signMask1, signMask2);
   }
 
   return primitiveCulled;
@@ -4333,13 +4333,13 @@ void NggPrimShader::writeVertexCullInfoToLds(Value *writeData, Value *vertexItem
 }
 
 // =====================================================================================================================
-// Backface culler.
+// Run backface culler.
 //
 // @param primitiveAlreadyCulled : Whether this primitive has been already culled before running the culler
 // @param vertex0 : Position data of vertex0
 // @param vertex1 : Position data of vertex1
 // @param vertex2 : Position data of vertex2
-Value *NggPrimShader::doBackfaceCulling(Value *primitiveAlreadyCulled, Value *vertex0, Value *vertex1, Value *vertex2) {
+Value *NggPrimShader::runBackfaceCuller(Value *primitiveAlreadyCulled, Value *vertex0, Value *vertex1, Value *vertex2) {
   assert(m_nggControl->enableBackfaceCulling);
 
   if (!m_cullers.backface)
@@ -4354,20 +4354,20 @@ Value *NggPrimShader::doBackfaceCulling(Value *primitiveAlreadyCulled, Value *ve
   // Get register PA_CL_VPORT_YSCALE
   auto paClVportYscale = fetchCullingControlRegister(m_cbLayoutTable.vportControls[0].paClVportYscale);
 
-  // Do backface culling
+  // Run backface culler
   return m_builder.CreateCall(m_cullers.backface, {primitiveAlreadyCulled, vertex0, vertex1, vertex2,
                                                    m_builder.getInt32(m_nggControl->backfaceExponent), paSuScModeCntl,
                                                    paClVportXscale, paClVportYscale});
 }
 
 // =====================================================================================================================
-// Frustum culler.
+// Run frustum culler.
 //
 // @param primitiveAlreadyCulled : Whether this primitive has been already culled before running the culler
 // @param vertex0 : Position data of vertex0
 // @param vertex1 : Position data of vertex1
 // @param vertex2 : Position data of vertex2
-Value *NggPrimShader::doFrustumCulling(Value *primitiveAlreadyCulled, Value *vertex0, Value *vertex1, Value *vertex2) {
+Value *NggPrimShader::runFrustumCuller(Value *primitiveAlreadyCulled, Value *vertex0, Value *vertex1, Value *vertex2) {
   assert(m_nggControl->enableFrustumCulling);
 
   if (!m_cullers.frustum)
@@ -4382,19 +4382,19 @@ Value *NggPrimShader::doFrustumCulling(Value *primitiveAlreadyCulled, Value *ver
   // Get register PA_CL_GB_VERT_DISC_ADJ
   auto paClGbVertDiscAdj = fetchCullingControlRegister(m_cbLayoutTable.paClGbVertDiscAdj);
 
-  // Do frustum culling
+  // Run frustum culler
   return m_builder.CreateCall(m_cullers.frustum, {primitiveAlreadyCulled, vertex0, vertex1, vertex2, paClClipCntl,
                                                   paClGbHorzDiscAdj, paClGbVertDiscAdj});
 }
 
 // =====================================================================================================================
-// Box filter culler.
+// Run box filter culler.
 //
 // @param primitiveAlreadyCulled : Whether this primitive has been already culled before running the culler
 // @param vertex0 : Position data of vertex0
 // @param vertex1 : Position data of vertex1
 // @param vertex2 : Position data of vertex2
-Value *NggPrimShader::doBoxFilterCulling(Value *primitiveAlreadyCulled, Value *vertex0, Value *vertex1,
+Value *NggPrimShader::runBoxFilterCuller(Value *primitiveAlreadyCulled, Value *vertex0, Value *vertex1,
                                          Value *vertex2) {
   assert(m_nggControl->enableBoxFilterCulling);
 
@@ -4413,19 +4413,19 @@ Value *NggPrimShader::doBoxFilterCulling(Value *primitiveAlreadyCulled, Value *v
   // Get register PA_CL_GB_VERT_DISC_ADJ
   auto paClGbVertDiscAdj = fetchCullingControlRegister(m_cbLayoutTable.paClGbVertDiscAdj);
 
-  // Do box filter culling
+  // Run box filter culler
   return m_builder.CreateCall(m_cullers.boxFilter, {primitiveAlreadyCulled, vertex0, vertex1, vertex2, paClVteCntl,
                                                     paClClipCntl, paClGbHorzDiscAdj, paClGbVertDiscAdj});
 }
 
 // =====================================================================================================================
-// Sphere culler.
+// Run sphere culler.
 //
 // @param primitiveAlreadyCulled : Whether this primitive has been already culled before running the culler
 // @param vertex0 : Position data of vertex0
 // @param vertex1 : Position data of vertex1
 // @param vertex2 : Position data of vertex2
-Value *NggPrimShader::doSphereCulling(Value *primitiveAlreadyCulled, Value *vertex0, Value *vertex1, Value *vertex2) {
+Value *NggPrimShader::runSphereCuller(Value *primitiveAlreadyCulled, Value *vertex0, Value *vertex1, Value *vertex2) {
   assert(m_nggControl->enableSphereCulling);
 
   if (!m_cullers.sphere)
@@ -4443,19 +4443,19 @@ Value *NggPrimShader::doSphereCulling(Value *primitiveAlreadyCulled, Value *vert
   // Get register PA_CL_GB_VERT_DISC_ADJ
   auto paClGbVertDiscAdj = fetchCullingControlRegister(m_cbLayoutTable.paClGbVertDiscAdj);
 
-  // Do small primitive filter culling
+  // Run small primitive filter culler
   return m_builder.CreateCall(m_cullers.sphere, {primitiveAlreadyCulled, vertex0, vertex1, vertex2, paClVteCntl,
                                                  paClClipCntl, paClGbHorzDiscAdj, paClGbVertDiscAdj});
 }
 
 // =====================================================================================================================
-// Small primitive filter culler.
+// Run small primitive filter culler.
 //
 // @param primitiveAlreadyCulled : Whether this primitive has been already culled before running the culler
 // @param vertex0 : Position data of vertex0
 // @param vertex1 : Position data of vertex1
 // @param vertex2 : Position data of vertex2
-Value *NggPrimShader::doSmallPrimFilterCulling(Value *primitiveAlreadyCulled, Value *vertex0, Value *vertex1,
+Value *NggPrimShader::runSmallPrimFilterCuller(Value *primitiveAlreadyCulled, Value *vertex0, Value *vertex1,
                                                Value *vertex2) {
   assert(m_nggControl->enableSmallPrimFilter);
 
@@ -4481,27 +4481,27 @@ Value *NggPrimShader::doSmallPrimFilterCulling(Value *primitiveAlreadyCulled, Va
   auto conservativeRaster = fetchCullingControlRegister(m_cbLayoutTable.enableConservativeRasterization);
   conservativeRaster = m_builder.CreateICmpEQ(conservativeRaster, m_builder.getInt32(1));
 
-  // Do small primitive filter culling
+  // Run small primitive filter culler
   return m_builder.CreateCall(m_cullers.smallPrimFilter,
                               {primitiveAlreadyCulled, vertex0, vertex1, vertex2, paClVteCntl, paClVportXscale,
                                paClVportXoffset, paClVportYscale, paClVportYoffset, conservativeRaster});
 }
 
 // =====================================================================================================================
-// Cull distance culler.
+// Run cull distance culler.
 //
 // @param primitiveAlreadyCulled : Whether this primitive has been already culled before running the culler
 // @param signMask0 : Sign mask of cull distance of vertex0
 // @param signMask1 : Sign mask of cull distance of vertex1
 // @param signMask2 : Sign mask of cull distance of vertex2
-Value *NggPrimShader::doCullDistanceCulling(Value *primitiveAlreadyCulled, Value *signMask0, Value *signMask1,
+Value *NggPrimShader::runCullDistanceCuller(Value *primitiveAlreadyCulled, Value *signMask0, Value *signMask1,
                                             Value *signMask2) {
   assert(m_nggControl->enableCullDistanceCulling);
 
   if (!m_cullers.cullDistance)
     m_cullers.cullDistance = createCullDistanceCuller();
 
-  // Do cull distance culling
+  // Run cull distance culler
   return m_builder.CreateCall(m_cullers.cullDistance, {primitiveAlreadyCulled, signMask0, signMask1, signMask2});
 }
 
