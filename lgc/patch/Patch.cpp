@@ -204,7 +204,14 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   } else {
     FunctionPassManager fpm;
     fpm.addPass(PatchBufferOp());
-    fpm.addPass(InstCombinePass(2));
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 452298
+    // Old version of the code
+    unsigned instCombineOpt = 2;
+#else
+    // New version of the code (also handles unknown version, which we treat as latest)
+    auto instCombineOpt = InstCombineOptions().setMaxIterations(2);
+#endif
+    fpm.addPass(InstCombinePass(instCombineOpt));
     passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
   }
 
@@ -331,7 +338,14 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level o
 
   passMgr.addPass(ForceFunctionAttrsPass());
   FunctionPassManager fpm;
-  fpm.addPass(InstCombinePass(1));
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 452298
+  // Old version of the code
+  unsigned instCombineOpt = 1;
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  auto instCombineOpt = InstCombineOptions().setMaxIterations(1);
+#endif
+  fpm.addPass(InstCombinePass(instCombineOpt));
   fpm.addPass(SimplifyCFGPass());
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 444780
   // Old version of the code
@@ -345,7 +359,7 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level o
   fpm.addPass(CorrelatedValuePropagationPass());
   fpm.addPass(SimplifyCFGPass());
   fpm.addPass(AggressiveInstCombinePass());
-  fpm.addPass(InstCombinePass(1));
+  fpm.addPass(InstCombinePass(instCombineOpt));
   fpm.addPass(PatchPeepholeOpt());
   fpm.addPass(SimplifyCFGPass());
   fpm.addPass(ReassociatePass());
@@ -354,7 +368,7 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level o
   lpm.addPass(LICMPass(LICMOptions()));
   fpm.addPass(createFunctionToLoopPassAdaptor(std::move(lpm), true));
   fpm.addPass(SimplifyCFGPass());
-  fpm.addPass(InstCombinePass(1));
+  fpm.addPass(InstCombinePass(instCombineOpt));
   LoopPassManager lpm2;
   lpm2.addPass(IndVarSimplifyPass());
   lpm2.addPass(LoopIdiomRecognizePass());
@@ -367,7 +381,7 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level o
   fpm.addPass(InstSimplifyPass());
   fpm.addPass(NewGVNPass());
   fpm.addPass(BDCEPass());
-  fpm.addPass(InstCombinePass(1));
+  fpm.addPass(InstCombinePass(instCombineOpt));
   fpm.addPass(CorrelatedValuePropagationPass());
   fpm.addPass(ADCEPass());
   fpm.addPass(createFunctionToLoopPassAdaptor(LoopRotatePass()));
@@ -380,7 +394,7 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level o
   fpm.addPass(LoopUnrollPass(LoopUnrollOptions(optLevel)));
   // uses DivergenceAnalysis
   fpm.addPass(PatchReadFirstLane());
-  fpm.addPass(InstCombinePass(1));
+  fpm.addPass(InstCombinePass(instCombineOpt));
   passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
   passMgr.addPass(ConstantMergePass());
   FunctionPassManager fpm2;
