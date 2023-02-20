@@ -1637,8 +1637,9 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
     }
 
     // Update primitive culled flag
-    primitiveCulled = createPhi(
-        {{primitiveCulled, endCompactVertexBlock}, {m_builder.getFalse(), endFetchVertexCullDataBlock}}, "cullFlag");
+    primitiveCulled =
+        createPhi({{primitiveCulled, endCompactVertexBlock}, {m_builder.getFalse(), endFetchVertexCullDataBlock}},
+                  "primitiveCulled");
 
     // Update fully-culled flag
     fullyCulled = createPhi({{fullyCulled, endCompactVertexBlock}, {m_builder.getFalse(), endFetchVertexCullDataBlock}},
@@ -2634,7 +2635,7 @@ Value *NggPrimShader::doCulling(Value *vertexIndex0, Value *vertexIndex1, Value 
   if (!enableCulling())
     return m_builder.getFalse();
 
-  Value *cullFlag = m_builder.getFalse();
+  Value *primitiveCulled = m_builder.getFalse();
 
   Value *vertex0 = fetchVertexPositionData(vertexIndex0);
   Value *vertex1 = fetchVertexPositionData(vertexIndex1);
@@ -2642,33 +2643,33 @@ Value *NggPrimShader::doCulling(Value *vertexIndex0, Value *vertexIndex1, Value 
 
   // Handle backface culling
   if (m_nggControl->enableBackfaceCulling)
-    cullFlag = doBackfaceCulling(cullFlag, vertex0, vertex1, vertex2);
+    primitiveCulled = doBackfaceCulling(primitiveCulled, vertex0, vertex1, vertex2);
 
   // Handle frustum culling
   if (m_nggControl->enableFrustumCulling)
-    cullFlag = doFrustumCulling(cullFlag, vertex0, vertex1, vertex2);
+    primitiveCulled = doFrustumCulling(primitiveCulled, vertex0, vertex1, vertex2);
 
   // Handle box filter culling
   if (m_nggControl->enableBoxFilterCulling)
-    cullFlag = doBoxFilterCulling(cullFlag, vertex0, vertex1, vertex2);
+    primitiveCulled = doBoxFilterCulling(primitiveCulled, vertex0, vertex1, vertex2);
 
   // Handle sphere culling
   if (m_nggControl->enableSphereCulling)
-    cullFlag = doSphereCulling(cullFlag, vertex0, vertex1, vertex2);
+    primitiveCulled = doSphereCulling(primitiveCulled, vertex0, vertex1, vertex2);
 
   // Handle small primitive filter culling
   if (m_nggControl->enableSmallPrimFilter)
-    cullFlag = doSmallPrimFilterCulling(cullFlag, vertex0, vertex1, vertex2);
+    primitiveCulled = doSmallPrimFilterCulling(primitiveCulled, vertex0, vertex1, vertex2);
 
   // Handle cull distance culling
   if (m_nggControl->enableCullDistanceCulling) {
     Value *signMask0 = fetchCullDistanceSignMask(vertexIndex0);
     Value *signMask1 = fetchCullDistanceSignMask(vertexIndex1);
     Value *signMask2 = fetchCullDistanceSignMask(vertexIndex2);
-    cullFlag = doCullDistanceCulling(cullFlag, signMask0, signMask1, signMask2);
+    primitiveCulled = doCullDistanceCulling(primitiveCulled, signMask0, signMask1, signMask2);
   }
 
-  return cullFlag;
+  return primitiveCulled;
 }
 
 // =====================================================================================================================
@@ -4334,11 +4335,11 @@ void NggPrimShader::writeVertexCullInfoToLds(Value *writeData, Value *vertexItem
 // =====================================================================================================================
 // Backface culler.
 //
-// @param cullFlag : Cull flag before doing this culling
+// @param primitiveAlreadyCulled : Whether this primitive has been already culled before running the culler
 // @param vertex0 : Position data of vertex0
 // @param vertex1 : Position data of vertex1
 // @param vertex2 : Position data of vertex2
-Value *NggPrimShader::doBackfaceCulling(Value *cullFlag, Value *vertex0, Value *vertex1, Value *vertex2) {
+Value *NggPrimShader::doBackfaceCulling(Value *primitiveAlreadyCulled, Value *vertex0, Value *vertex1, Value *vertex2) {
   assert(m_nggControl->enableBackfaceCulling);
 
   if (!m_cullers.backface)
@@ -4354,19 +4355,19 @@ Value *NggPrimShader::doBackfaceCulling(Value *cullFlag, Value *vertex0, Value *
   auto paClVportYscale = fetchCullingControlRegister(m_cbLayoutTable.vportControls[0].paClVportYscale);
 
   // Do backface culling
-  return m_builder.CreateCall(m_cullers.backface,
-                              {cullFlag, vertex0, vertex1, vertex2, m_builder.getInt32(m_nggControl->backfaceExponent),
-                               paSuScModeCntl, paClVportXscale, paClVportYscale});
+  return m_builder.CreateCall(m_cullers.backface, {primitiveAlreadyCulled, vertex0, vertex1, vertex2,
+                                                   m_builder.getInt32(m_nggControl->backfaceExponent), paSuScModeCntl,
+                                                   paClVportXscale, paClVportYscale});
 }
 
 // =====================================================================================================================
 // Frustum culler.
 //
-// @param cullFlag : Cull flag before doing this culling
+// @param primitiveAlreadyCulled : Whether this primitive has been already culled before running the culler
 // @param vertex0 : Position data of vertex0
 // @param vertex1 : Position data of vertex1
 // @param vertex2 : Position data of vertex2
-Value *NggPrimShader::doFrustumCulling(Value *cullFlag, Value *vertex0, Value *vertex1, Value *vertex2) {
+Value *NggPrimShader::doFrustumCulling(Value *primitiveAlreadyCulled, Value *vertex0, Value *vertex1, Value *vertex2) {
   assert(m_nggControl->enableFrustumCulling);
 
   if (!m_cullers.frustum)
@@ -4382,18 +4383,19 @@ Value *NggPrimShader::doFrustumCulling(Value *cullFlag, Value *vertex0, Value *v
   auto paClGbVertDiscAdj = fetchCullingControlRegister(m_cbLayoutTable.paClGbVertDiscAdj);
 
   // Do frustum culling
-  return m_builder.CreateCall(
-      m_cullers.frustum, {cullFlag, vertex0, vertex1, vertex2, paClClipCntl, paClGbHorzDiscAdj, paClGbVertDiscAdj});
+  return m_builder.CreateCall(m_cullers.frustum, {primitiveAlreadyCulled, vertex0, vertex1, vertex2, paClClipCntl,
+                                                  paClGbHorzDiscAdj, paClGbVertDiscAdj});
 }
 
 // =====================================================================================================================
 // Box filter culler.
 //
-// @param cullFlag : Cull flag before doing this culling
+// @param primitiveAlreadyCulled : Whether this primitive has been already culled before running the culler
 // @param vertex0 : Position data of vertex0
 // @param vertex1 : Position data of vertex1
 // @param vertex2 : Position data of vertex2
-Value *NggPrimShader::doBoxFilterCulling(Value *cullFlag, Value *vertex0, Value *vertex1, Value *vertex2) {
+Value *NggPrimShader::doBoxFilterCulling(Value *primitiveAlreadyCulled, Value *vertex0, Value *vertex1,
+                                         Value *vertex2) {
   assert(m_nggControl->enableBoxFilterCulling);
 
   if (!m_cullers.boxFilter)
@@ -4412,18 +4414,18 @@ Value *NggPrimShader::doBoxFilterCulling(Value *cullFlag, Value *vertex0, Value 
   auto paClGbVertDiscAdj = fetchCullingControlRegister(m_cbLayoutTable.paClGbVertDiscAdj);
 
   // Do box filter culling
-  return m_builder.CreateCall(m_cullers.boxFilter, {cullFlag, vertex0, vertex1, vertex2, paClVteCntl, paClClipCntl,
-                                                    paClGbHorzDiscAdj, paClGbVertDiscAdj});
+  return m_builder.CreateCall(m_cullers.boxFilter, {primitiveAlreadyCulled, vertex0, vertex1, vertex2, paClVteCntl,
+                                                    paClClipCntl, paClGbHorzDiscAdj, paClGbVertDiscAdj});
 }
 
 // =====================================================================================================================
 // Sphere culler.
 //
-// @param cullFlag : Cull flag before doing this culling
+// @param primitiveAlreadyCulled : Whether this primitive has been already culled before running the culler
 // @param vertex0 : Position data of vertex0
 // @param vertex1 : Position data of vertex1
 // @param vertex2 : Position data of vertex2
-Value *NggPrimShader::doSphereCulling(Value *cullFlag, Value *vertex0, Value *vertex1, Value *vertex2) {
+Value *NggPrimShader::doSphereCulling(Value *primitiveAlreadyCulled, Value *vertex0, Value *vertex1, Value *vertex2) {
   assert(m_nggControl->enableSphereCulling);
 
   if (!m_cullers.sphere)
@@ -4442,18 +4444,19 @@ Value *NggPrimShader::doSphereCulling(Value *cullFlag, Value *vertex0, Value *ve
   auto paClGbVertDiscAdj = fetchCullingControlRegister(m_cbLayoutTable.paClGbVertDiscAdj);
 
   // Do small primitive filter culling
-  return m_builder.CreateCall(m_cullers.sphere, {cullFlag, vertex0, vertex1, vertex2, paClVteCntl, paClClipCntl,
-                                                 paClGbHorzDiscAdj, paClGbVertDiscAdj});
+  return m_builder.CreateCall(m_cullers.sphere, {primitiveAlreadyCulled, vertex0, vertex1, vertex2, paClVteCntl,
+                                                 paClClipCntl, paClGbHorzDiscAdj, paClGbVertDiscAdj});
 }
 
 // =====================================================================================================================
 // Small primitive filter culler.
 //
-// @param cullFlag : Cull flag before doing this culling
+// @param primitiveAlreadyCulled : Whether this primitive has been already culled before running the culler
 // @param vertex0 : Position data of vertex0
 // @param vertex1 : Position data of vertex1
 // @param vertex2 : Position data of vertex2
-Value *NggPrimShader::doSmallPrimFilterCulling(Value *cullFlag, Value *vertex0, Value *vertex1, Value *vertex2) {
+Value *NggPrimShader::doSmallPrimFilterCulling(Value *primitiveAlreadyCulled, Value *vertex0, Value *vertex1,
+                                               Value *vertex2) {
   assert(m_nggControl->enableSmallPrimFilter);
 
   if (!m_cullers.smallPrimFilter)
@@ -4480,25 +4483,26 @@ Value *NggPrimShader::doSmallPrimFilterCulling(Value *cullFlag, Value *vertex0, 
 
   // Do small primitive filter culling
   return m_builder.CreateCall(m_cullers.smallPrimFilter,
-                              {cullFlag, vertex0, vertex1, vertex2, paClVteCntl, paClVportXscale, paClVportXoffset,
-                               paClVportYscale, paClVportYoffset, conservativeRaster});
+                              {primitiveAlreadyCulled, vertex0, vertex1, vertex2, paClVteCntl, paClVportXscale,
+                               paClVportXoffset, paClVportYscale, paClVportYoffset, conservativeRaster});
 }
 
 // =====================================================================================================================
 // Cull distance culler.
 //
-// @param cullFlag : Cull flag before doing this culling
+// @param primitiveAlreadyCulled : Whether this primitive has been already culled before running the culler
 // @param signMask0 : Sign mask of cull distance of vertex0
 // @param signMask1 : Sign mask of cull distance of vertex1
 // @param signMask2 : Sign mask of cull distance of vertex2
-Value *NggPrimShader::doCullDistanceCulling(Value *cullFlag, Value *signMask0, Value *signMask1, Value *signMask2) {
+Value *NggPrimShader::doCullDistanceCulling(Value *primitiveAlreadyCulled, Value *signMask0, Value *signMask1,
+                                            Value *signMask2) {
   assert(m_nggControl->enableCullDistanceCulling);
 
   if (!m_cullers.cullDistance)
     m_cullers.cullDistance = createCullDistanceCuller();
 
   // Do cull distance culling
-  return m_builder.CreateCall(m_cullers.cullDistance, {cullFlag, signMask0, signMask1, signMask2});
+  return m_builder.CreateCall(m_cullers.cullDistance, {primitiveAlreadyCulled, signMask0, signMask1, signMask2});
 }
 
 // =====================================================================================================================
@@ -4519,7 +4523,7 @@ Value *NggPrimShader::fetchCullingControlRegister(unsigned regOffset) {
 Function *NggPrimShader::createBackfaceCuller() {
   auto funcTy = FunctionType::get(m_builder.getInt1Ty(),
                                   {
-                                      m_builder.getInt1Ty(),                           // %cullFlag
+                                      m_builder.getInt1Ty(),                           // %primitiveAlreadyCulled
                                       FixedVectorType::get(m_builder.getFloatTy(), 4), // %vertex0
                                       FixedVectorType::get(m_builder.getFloatTy(), 4), // %vertex1
                                       FixedVectorType::get(m_builder.getFloatTy(), 4), // %vertex2
@@ -4537,8 +4541,8 @@ Function *NggPrimShader::createBackfaceCuller() {
   func->addFnAttr(Attribute::AlwaysInline);
 
   auto argIt = func->arg_begin();
-  Value *cullFlag = argIt++;
-  cullFlag->setName("cullFlag");
+  Value *primitiveAlreadyCulled = argIt++;
+  primitiveAlreadyCulled->setName("primitiveAlreadyCulled");
 
   Value *vertex0 = argIt++;
   vertex0->setName("vertex0");
@@ -4571,12 +4575,12 @@ Function *NggPrimShader::createBackfaceCuller() {
   // Construct ".backfaceEntry" block
   {
     m_builder.SetInsertPoint(backfaceEntryBlock);
-    // If cull flag has already been TRUE, early return
-    m_builder.CreateCondBr(cullFlag, backfaceExitBlock, backfaceCullBlock);
+    // If the primitive has already been culled, early exit
+    m_builder.CreateCondBr(primitiveAlreadyCulled, backfaceExitBlock, backfaceCullBlock);
   }
 
   // Construct ".backfaceCull" block
-  Value *cullFlag1 = nullptr;
+  Value *primitiveCulled1 = nullptr;
   Value *w0 = nullptr;
   Value *w1 = nullptr;
   Value *w2 = nullptr;
@@ -4593,7 +4597,7 @@ Function *NggPrimShader::createBackfaceCuller() {
     //   backFace = !frontFace
     //
     //   if ((frontFace && cullFront) || (backFace && cullBack))
-    //     cullFlag = true
+    //     primitiveCulled = true
     //
 
     //          | x0 y0 w0 |
@@ -4670,22 +4674,22 @@ Function *NggPrimShader::createBackfaceCuller() {
     // cullBack = cullBack ? backFace : false
     cullBack = m_builder.CreateSelect(cullBack, backFace, m_builder.getFalse());
 
-    // cullFlag = cullFront || cullBack
-    cullFlag1 = m_builder.CreateOr(cullFront, cullBack);
+    // primitiveCulled = cullFront || cullBack
+    primitiveCulled1 = m_builder.CreateOr(cullFront, cullBack);
 
     auto nonZeroBackfaceExp = m_builder.CreateICmpNE(backfaceExponent, m_builder.getInt32(0));
     m_builder.CreateCondBr(nonZeroBackfaceExp, backfaceExponentBlock, backfaceExitBlock);
   }
 
   // Construct ".backfaceExponent" block
-  Value *cullFlag2 = nullptr;
+  Value *primitiveCulled2 = nullptr;
   {
     m_builder.SetInsertPoint(backfaceExponentBlock);
 
     //
     // Ignore area calculations that are less enough
     //   if (|area| < (10 ^ (-backfaceExponent)) / |w0 * w1 * w2| )
-    //     cullFlag = false
+    //     primitiveCulled = false
     //
 
     // |w0 * w1 * w2|
@@ -4704,9 +4708,9 @@ Function *NggPrimShader::createBackfaceCuller() {
     // |area|
     auto absArea = m_builder.CreateIntrinsic(Intrinsic::fabs, m_builder.getFloatTy(), area);
 
-    // cullFlag = cullFlag && (abs(area) >= threshold)
-    cullFlag2 = m_builder.CreateFCmpOGE(absArea, threshold);
-    cullFlag2 = m_builder.CreateAnd(cullFlag1, cullFlag2);
+    // primitiveCulled = primitiveCulled && (abs(area) >= threshold)
+    primitiveCulled2 = m_builder.CreateFCmpOGE(absArea, threshold);
+    primitiveCulled2 = m_builder.CreateAnd(primitiveCulled1, primitiveCulled2);
 
     m_builder.CreateBr(backfaceExitBlock);
   }
@@ -4715,8 +4719,9 @@ Function *NggPrimShader::createBackfaceCuller() {
   {
     m_builder.SetInsertPoint(backfaceExitBlock);
 
-    auto cullFlagPhi =
-        createPhi({{cullFlag, backfaceEntryBlock}, {cullFlag1, backfaceCullBlock}, {cullFlag2, backfaceExponentBlock}});
+    Value *primitiveCulled = createPhi({{primitiveAlreadyCulled, backfaceEntryBlock},
+                                        {primitiveCulled1, backfaceCullBlock},
+                                        {primitiveCulled2, backfaceExponentBlock}});
 
     // polyMode = (POLY_MODE, PA_SU_SC_MODE_CNTL[4:3], 0 = DISABLE, 1 = DUAL)
     auto polyMode = createUBfe(paSuScModeCntl, 3, 2);
@@ -4725,10 +4730,10 @@ Function *NggPrimShader::createBackfaceCuller() {
     auto wireFrameMode = m_builder.CreateICmpEQ(polyMode, m_builder.getInt32(1));
 
     // Disable backface culler if POLY_MODE is set to 1 (wireframe)
-    // cullFlag = (polyMode == 1) ? false : cullFlag
-    cullFlag = m_builder.CreateSelect(wireFrameMode, m_builder.getFalse(), cullFlagPhi);
+    // primitiveCulled = (polyMode == 1) ? false : primitiveCulled
+    primitiveCulled = m_builder.CreateSelect(wireFrameMode, m_builder.getFalse(), primitiveCulled);
 
-    m_builder.CreateRet(cullFlag);
+    m_builder.CreateRet(primitiveCulled);
   }
 
   return func;
@@ -4739,7 +4744,7 @@ Function *NggPrimShader::createBackfaceCuller() {
 Function *NggPrimShader::createFrustumCuller() {
   auto funcTy = FunctionType::get(m_builder.getInt1Ty(),
                                   {
-                                      m_builder.getInt1Ty(),                           // %cullFlag
+                                      m_builder.getInt1Ty(),                           // %primitiveAlreadyCulled
                                       FixedVectorType::get(m_builder.getFloatTy(), 4), // %vertex0
                                       FixedVectorType::get(m_builder.getFloatTy(), 4), // %vertex1
                                       FixedVectorType::get(m_builder.getFloatTy(), 4), // %vertex2
@@ -4756,8 +4761,8 @@ Function *NggPrimShader::createFrustumCuller() {
   func->addFnAttr(Attribute::AlwaysInline);
 
   auto argIt = func->arg_begin();
-  Value *cullFlag = argIt++;
-  cullFlag->setName("cullFlag");
+  Value *primitiveAlreadyCulled = argIt++;
+  primitiveAlreadyCulled->setName("primitiveAlreadyCulled");
 
   Value *vertex0 = argIt++;
   vertex0->setName("vertex0");
@@ -4786,12 +4791,12 @@ Function *NggPrimShader::createFrustumCuller() {
   // Construct ".frustumEntry" block
   {
     m_builder.SetInsertPoint(frustumEntryBlock);
-    // If cull flag has already been TRUE, early return
-    m_builder.CreateCondBr(cullFlag, frustumExitBlock, frustumCullBlock);
+    // If the primitive has already been culled, early exit
+    m_builder.CreateCondBr(primitiveAlreadyCulled, frustumExitBlock, frustumCullBlock);
   }
 
   // Construct ".frustumCull" block
-  Value *newCullFlag = nullptr;
+  Value *primitiveCulled = nullptr;
   {
     m_builder.SetInsertPoint(frustumCullBlock);
 
@@ -4799,10 +4804,10 @@ Function *NggPrimShader::createFrustumCuller() {
     // Frustum culling algorithm is described as follow:
     //
     //   if (x[i] > xDiscAdj * w[i] && y[i] > yDiscAdj * w[i] && z[i] > zFar * w[i])
-    //     cullFlag = true
+    //     primitiveCulled = true
     //
     //   if (x[i] < -xDiscAdj * w[i] && y[i] < -yDiscAdj * w[i] && z[i] < zNear * w[i])
-    //     cullFlag &= true
+    //     primitiveCulled &= true
     //
     //   i = [0..2]
     //
@@ -4968,8 +4973,8 @@ Function *NggPrimShader::createFrustumCuller() {
     auto clip = m_builder.CreateAnd(clipMask0, clipMask1);
     clip = m_builder.CreateAnd(clip, clipMask2);
 
-    // cullFlag = (clip != 0)
-    newCullFlag = m_builder.CreateICmpNE(clip, m_builder.getInt32(0));
+    // primitiveCulled = (clip != 0)
+    primitiveCulled = m_builder.CreateICmpNE(clip, m_builder.getInt32(0));
 
     m_builder.CreateBr(frustumExitBlock);
   }
@@ -4978,9 +4983,9 @@ Function *NggPrimShader::createFrustumCuller() {
   {
     m_builder.SetInsertPoint(frustumExitBlock);
 
-    auto cullFlagPhi = createPhi({{cullFlag, frustumEntryBlock}, {newCullFlag, frustumCullBlock}});
+    primitiveCulled = createPhi({{primitiveAlreadyCulled, frustumEntryBlock}, {primitiveCulled, frustumCullBlock}});
 
-    m_builder.CreateRet(cullFlagPhi);
+    m_builder.CreateRet(primitiveCulled);
   }
 
   return func;
@@ -4991,7 +4996,7 @@ Function *NggPrimShader::createFrustumCuller() {
 Function *NggPrimShader::createBoxFilterCuller() {
   auto funcTy = FunctionType::get(m_builder.getInt1Ty(),
                                   {
-                                      m_builder.getInt1Ty(),                           // %cullFlag
+                                      m_builder.getInt1Ty(),                           // %primitiveAlreadyCulled
                                       FixedVectorType::get(m_builder.getFloatTy(), 4), // %vertex0
                                       FixedVectorType::get(m_builder.getFloatTy(), 4), // %vertex1
                                       FixedVectorType::get(m_builder.getFloatTy(), 4), // %vertex2
@@ -5009,8 +5014,8 @@ Function *NggPrimShader::createBoxFilterCuller() {
   func->addFnAttr(Attribute::AlwaysInline);
 
   auto argIt = func->arg_begin();
-  Value *cullFlag = argIt++;
-  cullFlag->setName("cullFlag");
+  Value *primitiveAlreadyCulled = argIt++;
+  primitiveAlreadyCulled->setName("primitiveAlreadyCulled");
 
   Value *vertex0 = argIt++;
   vertex0->setName("vertex0");
@@ -5042,12 +5047,12 @@ Function *NggPrimShader::createBoxFilterCuller() {
   // Construct ".boxfilterEntry" block
   {
     m_builder.SetInsertPoint(boxFilterEntryBlock);
-    // If cull flag has already been TRUE, early return
-    m_builder.CreateCondBr(cullFlag, boxFilterExitBlock, boxFilterCullBlock);
+    // If the primitive has already been culled, early exit
+    m_builder.CreateCondBr(primitiveAlreadyCulled, boxFilterExitBlock, boxFilterCullBlock);
   }
 
   // Construct ".boxfilterCull" block
-  Value *newCullFlag = nullptr;
+  Value *primitiveCulled = nullptr;
   {
     m_builder.SetInsertPoint(boxFilterCullBlock);
 
@@ -5057,7 +5062,7 @@ Function *NggPrimShader::createBoxFilterCuller() {
     //   if (min(x0/w0, x1/w1, x2/w2) > xDiscAdj || max(x0/w0, x1/w1, x2/w2) < -xDiscAdj ||
     //       min(y0/w0, y1/w1, y2/w2) > yDiscAdj || max(y0/w0, y1/w1, y2/w2) < -yDiscAdj ||
     //       min(z0/w0, z1/w1, z2/w2) > zFar     || min(z0/w0, z1/w1, z2/w2) < zNear)
-    //     cullFlag = true
+    //     primitiveCulled = true
     //
 
     // vtxXyFmt = (VTX_XY_FMT, PA_CL_VTE_CNTL[8], 0 = 1/W0, 1 = none)
@@ -5188,8 +5193,8 @@ Function *NggPrimShader::createBoxFilterCuller() {
     auto cullX = m_builder.CreateOr(minXGtXDiscAdj, maxXLtNegXDiscAdj);
     auto cullY = m_builder.CreateOr(minYGtYDiscAdj, maxYLtNegYDiscAdj);
     auto cullZ = m_builder.CreateOr(minZGtZFar, maxZLtZNear);
-    newCullFlag = m_builder.CreateOr(cullX, cullY);
-    newCullFlag = m_builder.CreateOr(newCullFlag, cullZ);
+    primitiveCulled = m_builder.CreateOr(cullX, cullY);
+    primitiveCulled = m_builder.CreateOr(primitiveCulled, cullZ);
 
     m_builder.CreateBr(boxFilterExitBlock);
   }
@@ -5198,9 +5203,9 @@ Function *NggPrimShader::createBoxFilterCuller() {
   {
     m_builder.SetInsertPoint(boxFilterExitBlock);
 
-    auto cullFlagPhi = createPhi({{cullFlag, boxFilterEntryBlock}, {newCullFlag, boxFilterCullBlock}});
+    primitiveCulled = createPhi({{primitiveAlreadyCulled, boxFilterEntryBlock}, {primitiveCulled, boxFilterCullBlock}});
 
-    m_builder.CreateRet(cullFlagPhi);
+    m_builder.CreateRet(primitiveCulled);
   }
 
   return func;
@@ -5211,7 +5216,7 @@ Function *NggPrimShader::createBoxFilterCuller() {
 Function *NggPrimShader::createSphereCuller() {
   auto funcTy = FunctionType::get(m_builder.getInt1Ty(),
                                   {
-                                      m_builder.getInt1Ty(),                           // %cullFlag
+                                      m_builder.getInt1Ty(),                           // %primitiveAlreadyCulled
                                       FixedVectorType::get(m_builder.getFloatTy(), 4), // %vertex0
                                       FixedVectorType::get(m_builder.getFloatTy(), 4), // %vertex1
                                       FixedVectorType::get(m_builder.getFloatTy(), 4), // %vertex2
@@ -5229,8 +5234,8 @@ Function *NggPrimShader::createSphereCuller() {
   func->addFnAttr(Attribute::AlwaysInline);
 
   auto argIt = func->arg_begin();
-  Value *cullFlag = argIt++;
-  cullFlag->setName("cullFlag");
+  Value *primitiveAlreadyCulled = argIt++;
+  primitiveAlreadyCulled->setName("primitiveAlreadyCulled");
 
   Value *vertex0 = argIt++;
   vertex0->setName("vertex0");
@@ -5262,12 +5267,12 @@ Function *NggPrimShader::createSphereCuller() {
   // Construct ".sphereEntry" block
   {
     m_builder.SetInsertPoint(sphereEntryBlock);
-    // If cull flag has already been TRUE, early return
-    m_builder.CreateCondBr(cullFlag, sphereExitBlock, sphereCullBlock);
+    // If the primitive has already been culled, early exit
+    m_builder.CreateCondBr(primitiveAlreadyCulled, sphereExitBlock, sphereCullBlock);
   }
 
   // Construct ".sphereCull" block
-  Value *newCullFlag = nullptr;
+  Value *primitiveCulled = nullptr;
   {
     m_builder.SetInsertPoint(sphereCullBlock);
 
@@ -5546,8 +5551,8 @@ Function *NggPrimShader::createSphereCuller() {
     // == = Step 7 == = : Determine the cull flag
     //
 
-    // cullFlag = (r ^ 2 > 3.0)
-    newCullFlag = m_builder.CreateFCmpOGT(squareR, ConstantFP::get(m_builder.getHalfTy(), 3.0));
+    // primitiveCulled = (r ^ 2 > 3.0)
+    primitiveCulled = m_builder.CreateFCmpOGT(squareR, ConstantFP::get(m_builder.getHalfTy(), 3.0));
 
     m_builder.CreateBr(sphereExitBlock);
   }
@@ -5556,9 +5561,9 @@ Function *NggPrimShader::createSphereCuller() {
   {
     m_builder.SetInsertPoint(sphereExitBlock);
 
-    auto cullFlagPhi = createPhi({{cullFlag, sphereEntryBlock}, {newCullFlag, sphereCullBlock}});
+    primitiveCulled = createPhi({{primitiveAlreadyCulled, sphereEntryBlock}, {primitiveCulled, sphereCullBlock}});
 
-    m_builder.CreateRet(cullFlagPhi);
+    m_builder.CreateRet(primitiveCulled);
   }
 
   return func;
@@ -5569,7 +5574,7 @@ Function *NggPrimShader::createSphereCuller() {
 Function *NggPrimShader::createSmallPrimFilterCuller() {
   auto funcTy = FunctionType::get(m_builder.getInt1Ty(),
                                   {
-                                      m_builder.getInt1Ty(),                           // %cullFlag
+                                      m_builder.getInt1Ty(),                           // %primitiveAlreadyCulled
                                       FixedVectorType::get(m_builder.getFloatTy(), 4), // %vertex0
                                       FixedVectorType::get(m_builder.getFloatTy(), 4), // %vertex1
                                       FixedVectorType::get(m_builder.getFloatTy(), 4), // %vertex2
@@ -5589,8 +5594,8 @@ Function *NggPrimShader::createSmallPrimFilterCuller() {
   func->addFnAttr(Attribute::AlwaysInline);
 
   auto argIt = func->arg_begin();
-  Value *cullFlag = argIt++;
-  cullFlag->setName("cullFlag");
+  Value *primitiveAlreadyCulled = argIt++;
+  primitiveAlreadyCulled->setName("primitiveAlreadyCulled");
 
   Value *vertex0 = argIt++;
   vertex0->setName("vertex0");
@@ -5629,13 +5634,13 @@ Function *NggPrimShader::createSmallPrimFilterCuller() {
   {
     m_builder.SetInsertPoint(smallPrimFilterEntryBlock);
 
-    // If cull flag has already been TRUE or if conservative rasterization, early return
-    m_builder.CreateCondBr(m_builder.CreateOr(cullFlag, conservativeRaster), smallPrimFilterExitBlock,
+    // If the primitive has already been culled or if conservative rasterization, early exit
+    m_builder.CreateCondBr(m_builder.CreateOr(primitiveAlreadyCulled, conservativeRaster), smallPrimFilterExitBlock,
                            smallPrimFilterCullBlock);
   }
 
   // Construct ".smallprimfilterCull" block
-  Value *newCullFlag = nullptr;
+  Value *primitiveCulled = nullptr;
   {
     m_builder.SetInsertPoint(smallPrimFilterCullBlock);
 
@@ -5647,12 +5652,12 @@ Function *NggPrimShader::createSmallPrimFilterCuller() {
     //         roundEven(max(screen(x0/w0), screen(x1/w1), screen(x2/w2))) ||
     //         roundEven(min(screen(y0/w0), screen(y1/w1), screen(y2/w2)) ==
     //         roundEven(max(screen(y0/w0), screen(y1/w1), screen(y2/w2))))
-    //       cullFlag = true
+    //       primitiveCulled = true
     //
     //     allowCull = (w0 < 0 && w1 < 0 && w2 < 0) || (w0 > 0 && w1 > 0 && w2 > 0))
-    //     cullFlag = allowCull && cullFlag
+    //     primitiveCulled = allowCull && primitiveCulled
     //   } else
-    //     cullFlag = false
+    //     primitiveCulled = false
     //
 
     // vtxXyFmt = (VTX_XY_FMT, PA_CL_VTE_CNTL[8], 0 = 1/W0, 1 = none)
@@ -5803,8 +5808,8 @@ Function *NggPrimShader::createSmallPrimFilterCuller() {
     // minY == maxY
     auto minYEqMaxY = m_builder.CreateFCmpOEQ(minY, maxY);
 
-    // Get cull flag
-    newCullFlag = m_builder.CreateOr(minXEqMaxX, minYEqMaxY);
+    // Get primitive culled flag
+    primitiveCulled = m_builder.CreateOr(minXEqMaxX, minYEqMaxY);
 
     // Check if W allows culling
     auto w0AsInt = m_builder.CreateBitCast(w0, m_builder.getInt32Ty());
@@ -5822,7 +5827,7 @@ Function *NggPrimShader::createSmallPrimFilterCuller() {
     isAllWPos = m_builder.CreateICmpSGT(isAllWPos, m_builder.getInt32(0));
 
     auto allowCull = m_builder.CreateOr(isAllWNeg, isAllWPos);
-    newCullFlag = m_builder.CreateAnd(allowCull, newCullFlag);
+    primitiveCulled = m_builder.CreateAnd(allowCull, primitiveCulled);
 
     m_builder.CreateBr(smallPrimFilterExitBlock);
   }
@@ -5831,9 +5836,10 @@ Function *NggPrimShader::createSmallPrimFilterCuller() {
   {
     m_builder.SetInsertPoint(smallPrimFilterExitBlock);
 
-    auto cullFlagPhi = createPhi({{cullFlag, smallPrimFilterEntryBlock}, {newCullFlag, smallPrimFilterCullBlock}});
+    primitiveCulled =
+        createPhi({{primitiveAlreadyCulled, smallPrimFilterEntryBlock}, {primitiveCulled, smallPrimFilterCullBlock}});
 
-    m_builder.CreateRet(cullFlagPhi);
+    m_builder.CreateRet(primitiveCulled);
   }
 
   return func;
@@ -5844,7 +5850,7 @@ Function *NggPrimShader::createSmallPrimFilterCuller() {
 Function *NggPrimShader::createCullDistanceCuller() {
   auto funcTy = FunctionType::get(m_builder.getInt1Ty(),
                                   {
-                                      m_builder.getInt1Ty(),  // %cullFlag
+                                      m_builder.getInt1Ty(),  // %primitiveAlreadyCulled
                                       m_builder.getInt32Ty(), // %signMask0
                                       m_builder.getInt32Ty(), // %signMask1
                                       m_builder.getInt32Ty()  // %signMask2
@@ -5858,8 +5864,8 @@ Function *NggPrimShader::createCullDistanceCuller() {
   func->addFnAttr(Attribute::AlwaysInline);
 
   auto argIt = func->arg_begin();
-  Value *cullFlag = argIt++;
-  cullFlag->setName("cullFlag");
+  Value *primitiveAlreadyCulled = argIt++;
+  primitiveAlreadyCulled->setName("primitiveAlreadyCulled");
 
   Value *signMask0 = argIt++;
   signMask0->setName("signMask0");
@@ -5879,12 +5885,12 @@ Function *NggPrimShader::createCullDistanceCuller() {
   // Construct ".culldistanceEntry" block
   {
     m_builder.SetInsertPoint(cullDistanceEntryBlock);
-    // If cull flag has already been TRUE, early return
-    m_builder.CreateCondBr(cullFlag, cullDistanceExitBlock, cullDistanceCullBlock);
+    // If the primitive has already been culled, early exit
+    m_builder.CreateCondBr(primitiveAlreadyCulled, cullDistanceExitBlock, cullDistanceCullBlock);
   }
 
   // Construct ".culldistanceCull" block
-  Value *cullFlag1 = nullptr;
+  Value *primitiveCulled = nullptr;
   {
     m_builder.SetInsertPoint(cullDistanceCullBlock);
 
@@ -5893,12 +5899,12 @@ Function *NggPrimShader::createCullDistanceCuller() {
     //
     //   vertexSignMask[7:0] = [sign(ClipDistance[0])..sign(ClipDistance[7])]
     //   primSignMask = vertexSignMask0 & vertexSignMask1 & vertexSignMask2
-    //   cullFlag = (primSignMask != 0)
+    //   primitiveCulled = (primSignMask != 0)
     //
     auto signMask = m_builder.CreateAnd(signMask0, signMask1);
     signMask = m_builder.CreateAnd(signMask, signMask2);
 
-    cullFlag1 = m_builder.CreateICmpNE(signMask, m_builder.getInt32(0));
+    primitiveCulled = m_builder.CreateICmpNE(signMask, m_builder.getInt32(0));
 
     m_builder.CreateBr(cullDistanceExitBlock);
   }
@@ -5907,9 +5913,10 @@ Function *NggPrimShader::createCullDistanceCuller() {
   {
     m_builder.SetInsertPoint(cullDistanceExitBlock);
 
-    auto cullFlagPhi = createPhi({{cullFlag, cullDistanceEntryBlock}, {cullFlag1, cullDistanceCullBlock}});
+    primitiveCulled =
+        createPhi({{primitiveAlreadyCulled, cullDistanceEntryBlock}, {primitiveCulled, cullDistanceCullBlock}});
 
-    m_builder.CreateRet(cullFlagPhi);
+    m_builder.CreateRet(primitiveCulled);
   }
 
   return func;

@@ -255,17 +255,18 @@ private:
   llvm::Value *readVertexCullInfoFromLds(llvm::Type *readDataTy, llvm::Value *vertexItemOffset, unsigned dataOffset);
   void writeVertexCullInfoToLds(llvm::Value *writeData, llvm::Value *vertexItemOffset, unsigned dataOffset);
 
-  llvm::Value *doBackfaceCulling(llvm::Value *cullFlag, llvm::Value *vertex0, llvm::Value *vertex1,
+  llvm::Value *doBackfaceCulling(llvm::Value *primitiveAlreadyCulled, llvm::Value *vertex0, llvm::Value *vertex1,
                                  llvm::Value *vertex2);
-  llvm::Value *doFrustumCulling(llvm::Value *cullFlag, llvm::Value *vertex0, llvm::Value *vertex1,
+  llvm::Value *doFrustumCulling(llvm::Value *primitiveAlreadyCulled, llvm::Value *vertex0, llvm::Value *vertex1,
                                 llvm::Value *vertex2);
-  llvm::Value *doBoxFilterCulling(llvm::Value *cullFlag, llvm::Value *vertex0, llvm::Value *vertex1,
+  llvm::Value *doBoxFilterCulling(llvm::Value *primitiveAlreadyCulled, llvm::Value *vertex0, llvm::Value *vertex1,
                                   llvm::Value *vertex2);
-  llvm::Value *doSphereCulling(llvm::Value *cullFlag, llvm::Value *vertex0, llvm::Value *vertex1, llvm::Value *vertex2);
-  llvm::Value *doSmallPrimFilterCulling(llvm::Value *cullFlag, llvm::Value *vertex0, llvm::Value *vertex1,
+  llvm::Value *doSphereCulling(llvm::Value *primitiveAlreadyCulled, llvm::Value *vertex0, llvm::Value *vertex1,
+                               llvm::Value *vertex2);
+  llvm::Value *doSmallPrimFilterCulling(llvm::Value *primitiveAlreadyCulled, llvm::Value *vertex0, llvm::Value *vertex1,
                                         llvm::Value *vertex2);
-  llvm::Value *doCullDistanceCulling(llvm::Value *cullFlag, llvm::Value *signMask0, llvm::Value *signMask1,
-                                     llvm::Value *signMask2);
+  llvm::Value *doCullDistanceCulling(llvm::Value *primitiveAlreadyCulled, llvm::Value *signMask0,
+                                     llvm::Value *signMask1, llvm::Value *signMask2);
   llvm::Value *fetchCullingControlRegister(unsigned regOffset);
 
   llvm::Function *createBackfaceCuller();
