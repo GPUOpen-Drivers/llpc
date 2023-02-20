@@ -144,7 +144,10 @@ set_compiler_options(llpc ${LLPC_ENABLE_WERROR})
 
 ### Defines/Includes/Sources ###########################################################################################
 if(ICD_BUILD_LLPC)
-    set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${XGL_LLVM_BUILD_PATH}/${CMAKE_CFG_INTDIR}/lib/cmake/llvm")
+    list(APPEND CMAKE_MODULE_PATH
+        "${XGL_LLVM_BUILD_PATH}/lib/cmake/llvm"
+        "${XGL_LLVM_BUILD_PATH}/${CMAKE_CFG_INTDIR}/lib/cmake/llvm" # Workaround for VS generator with older LLVM.
+    )
     include(LLVMConfig)
     message(STATUS "LLVM executables: " ${LLVM_TOOLS_BINARY_DIR})
     message(STATUS "LLVM libraries: " ${LLVM_BUILD_LIBRARY_DIR})
@@ -298,8 +301,6 @@ if(UNIX)
 elseif(WIN32)
     set(BUILD_OS win)
 endif()
-
-set(LLVM_BIN_DIR "${XGL_LLVM_BUILD_PATH}/${CMAKE_CFG_INTDIR}/bin")
 
 endif()
 ### Link Libraries #####################################################################################################
