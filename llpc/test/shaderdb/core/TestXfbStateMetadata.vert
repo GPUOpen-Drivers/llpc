@@ -23,7 +23,7 @@ void main()
 // CHECK-NEXT:    [[TMP0:%.*]] = call float (...) @lgc.create.read.generic.input.f32(i32 1, i32 0, i32 0, i32 0, i32 0, i32 undef)
 // CHECK-NEXT:    [[TMP1:%.*]] = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 0, i32 0, i32 0, i32 0, i32 0, i32 undef)
 // CHECK-NEXT:    call void (...) @lgc.create.write.builtin.output(<4 x float> [[TMP1]], i32 0, i32 0, i32 undef, i32 undef)
-// CHECK-NEXT:    call void (...) @lgc.create.write.xfb.output(float [[TMP0]], i1 true, i32 1, i32 0, i32 4, i32 0, i32 0)
+// CHECK-NEXT:    call void (...) @lgc.create.write.xfb.output(float [[TMP0]], i1 true, i32 1, i32 0, i32 0, i32 4, i32 0, i32 0)
 // CHECK-NEXT:    call void (...) @lgc.create.write.builtin.output(float [[TMP0]], i32 1, i32 0, i32 undef, i32 undef)
 // CHECK-NEXT:    ret void
 //

@@ -714,15 +714,16 @@ Value *InOutBuilder::adjustIj(Value *value, Value *offset) {
 // of those correspondences is actually used when writing to XFB for each affected vertex.
 //
 // @param valueToWrite : Value to write
-// @param isBuiltIn : True for built-in, false for user output (ignored if not GS)
-// @param location : Location (row) or built-in kind of output (ignored if not GS)
+// @param isBuiltIn : True for built-in, false for user output
+// @param location : Location (row) or built-in kind of output
+// @param component : Component offset of inputs and outputs (ignored if built-in)
 // @param xfbBuffer : XFB buffer ID
 // @param xfbStride : XFB stride
 // @param xfbOffset : XFB byte offset
 // @param outputInfo : Extra output info (GS stream ID)
 Instruction *InOutBuilder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuiltIn, unsigned location,
-                                                unsigned xfbBuffer, unsigned xfbStride, Value *xfbOffset,
-                                                InOutInfo outputInfo) {
+                                                unsigned component, unsigned xfbBuffer, unsigned xfbStride,
+                                                Value *xfbOffset, InOutInfo outputInfo) {
   // xfbStride must be a non-zero value
   assert(xfbStride > 0);
   // Can currently only cope with constant xfbOffset.
@@ -771,7 +772,7 @@ Instruction *InOutBuilder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuil
       InOutLocationInfo outLocInfo;
       outLocInfo.setLocation(location);
       outLocInfo.setStreamId(streamId);
-      outLocInfo.setComponent(i);
+      outLocInfo.setComponent(component + i);
       outLocInfo.setBuiltIn(isBuiltIn);
       if (i >= 4) {
         outLocInfo.setLocation(location + 1);

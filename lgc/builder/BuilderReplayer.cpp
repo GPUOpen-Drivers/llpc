@@ -605,13 +605,14 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   }
 
   case BuilderRecorder::Opcode::WriteXfbOutput: {
-    InOutInfo outputInfo(cast<ConstantInt>(args[6])->getZExtValue());
+    InOutInfo outputInfo(cast<ConstantInt>(args[7])->getZExtValue());
     return m_builder->CreateWriteXfbOutput(args[0],                                    // Value to write
                                            cast<ConstantInt>(args[1])->getZExtValue(), // IsBuiltIn
                                            cast<ConstantInt>(args[2])->getZExtValue(), // Location/builtIn
-                                           cast<ConstantInt>(args[3])->getZExtValue(), // XFB buffer ID
-                                           cast<ConstantInt>(args[4])->getZExtValue(), // XFB stride
-                                           args[5],                                    // XFB byte offset
+                                           cast<ConstantInt>(args[3])->getZExtValue(), // Component
+                                           cast<ConstantInt>(args[4])->getZExtValue(), // XFB buffer ID
+                                           cast<ConstantInt>(args[5])->getZExtValue(), // XFB stride
+                                           args[6],                                    // XFB byte offset
                                            outputInfo);
   }
 

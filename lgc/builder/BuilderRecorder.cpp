@@ -1507,18 +1507,19 @@ Instruction *BuilderRecorder::CreateWriteGenericOutput(Value *valueToWrite, unsi
 // Create a write to an XFB (transform feedback / streamout) buffer.
 //
 // @param valueToWrite : Value to write
-// @param isBuiltIn : True for built-in, false for user output (ignored if not GS)
-// @param location : Location (row) or built-in kind of output (ignored if not GS)
+// @param isBuiltIn : True for built-in, false for user output
+// @param location : Location (row) or built-in kind of output
+// @param component : Component offset of inputs and outputs (ignored if built-in)
 // @param xfbBuffer : XFB buffer ID
 // @param xfbStride : XFB stride
 // @param xfbOffset : XFB byte offset
 // @param outputInfo : Extra output info (GS stream ID)
 Instruction *BuilderRecorder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuiltIn, unsigned location,
-                                                   unsigned xfbBuffer, unsigned xfbStride, Value *xfbOffset,
-                                                   InOutInfo outputInfo) {
+                                                   unsigned component, unsigned xfbBuffer, unsigned xfbStride,
+                                                   Value *xfbOffset, InOutInfo outputInfo) {
   return record(Opcode::WriteXfbOutput, nullptr,
-                {valueToWrite, getInt1(isBuiltIn), getInt32(location), getInt32(xfbBuffer), getInt32(xfbStride),
-                 xfbOffset, getInt32(outputInfo.getData())},
+                {valueToWrite, getInt1(isBuiltIn), getInt32(location), getInt32(component), getInt32(xfbBuffer),
+                 getInt32(xfbStride), xfbOffset, getInt32(outputInfo.getData())},
                 "");
 }
 
