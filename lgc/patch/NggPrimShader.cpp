@@ -1422,8 +1422,7 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
   {
     m_builder.SetInsertPoint(cullPrimitiveBlock);
 
-    primitiveCulled = doCulling(primShader->getParent(), m_nggInputs.vertexIndex0, m_nggInputs.vertexIndex1,
-                                m_nggInputs.vertexIndex2);
+    primitiveCulled = doCulling(m_nggInputs.vertexIndex0, m_nggInputs.vertexIndex1, m_nggInputs.vertexIndex2);
     m_builder.CreateCondBr(primitiveCulled, endCullPrimitiveBlock, writeVertexDrawFlagBlock);
   }
 
@@ -2090,7 +2089,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
           m_builder.CreateAdd(m_nggInputs.threadIdInSubgroup,
                               m_builder.CreateSelect(winding, m_builder.getInt32(1), m_builder.getInt32(2)));
 
-      auto primitiveCulled = doCulling(primShader->getParent(), vertexIndex0, vertexIndex1, vertexIndex2);
+      auto primitiveCulled = doCulling(vertexIndex0, vertexIndex1, vertexIndex2);
       m_builder.CreateCondBr(primitiveCulled, nullifyPrimitiveDataBlock, endCullPrimitiveBlock);
     }
 
@@ -2627,11 +2626,10 @@ void NggPrimShader::distributePrimitiveId(Value *primitiveId) {
 // =====================================================================================================================
 // Does various culling for primitive shader.
 //
-// @param module : LLVM module
 // @param vertexIndex0: Relative index of vertex0 (forming this primitive)
 // @param vertexIndex1: Relative index of vertex1 (forming this primitive)
 // @param vertexIndex2: Relative index of vertex2 (forming this primitive)
-Value *NggPrimShader::doCulling(Module *module, Value *vertexIndex0, Value *vertexIndex1, Value *vertexIndex2) {
+Value *NggPrimShader::doCulling(Value *vertexIndex0, Value *vertexIndex1, Value *vertexIndex2) {
   // Skip following culling if it is not requested
   if (!enableCulling())
     return m_builder.getFalse();
@@ -2644,30 +2642,30 @@ Value *NggPrimShader::doCulling(Module *module, Value *vertexIndex0, Value *vert
 
   // Handle backface culling
   if (m_nggControl->enableBackfaceCulling)
-    cullFlag = doBackfaceCulling(module, cullFlag, vertex0, vertex1, vertex2);
+    cullFlag = doBackfaceCulling(cullFlag, vertex0, vertex1, vertex2);
 
   // Handle frustum culling
   if (m_nggControl->enableFrustumCulling)
-    cullFlag = doFrustumCulling(module, cullFlag, vertex0, vertex1, vertex2);
+    cullFlag = doFrustumCulling(cullFlag, vertex0, vertex1, vertex2);
 
   // Handle box filter culling
   if (m_nggControl->enableBoxFilterCulling)
-    cullFlag = doBoxFilterCulling(module, cullFlag, vertex0, vertex1, vertex2);
+    cullFlag = doBoxFilterCulling(cullFlag, vertex0, vertex1, vertex2);
 
   // Handle sphere culling
   if (m_nggControl->enableSphereCulling)
-    cullFlag = doSphereCulling(module, cullFlag, vertex0, vertex1, vertex2);
+    cullFlag = doSphereCulling(cullFlag, vertex0, vertex1, vertex2);
 
   // Handle small primitive filter culling
   if (m_nggControl->enableSmallPrimFilter)
-    cullFlag = doSmallPrimFilterCulling(module, cullFlag, vertex0, vertex1, vertex2);
+    cullFlag = doSmallPrimFilterCulling(cullFlag, vertex0, vertex1, vertex2);
 
   // Handle cull distance culling
   if (m_nggControl->enableCullDistanceCulling) {
     Value *signMask0 = fetchCullDistanceSignMask(vertexIndex0);
     Value *signMask1 = fetchCullDistanceSignMask(vertexIndex1);
     Value *signMask2 = fetchCullDistanceSignMask(vertexIndex2);
-    cullFlag = doCullDistanceCulling(module, cullFlag, signMask0, signMask1, signMask2);
+    cullFlag = doCullDistanceCulling(cullFlag, signMask0, signMask1, signMask2);
   }
 
   return cullFlag;
@@ -3753,14 +3751,13 @@ void NggPrimShader::mutateGs() {
           // Handle GS_EMIT, MSG[9:8] = STREAM_ID
           unsigned streamId = (message & GsEmitCutStreamIdMask) >> GsEmitCutStreamIdShift;
           assert(streamId < MaxGsStreams);
-          processGsEmit(m_gsHandlers.main->getParent(), streamId, threadIdInSubgroup, emitVertsPtrs[streamId],
-                        outVertsPtrs[streamId]);
+          processGsEmit(streamId, threadIdInSubgroup, emitVertsPtrs[streamId], outVertsPtrs[streamId]);
         } else if (message == GsCutStreaM0 || message == GsCutStreaM1 || message == GsCutStreaM2 ||
                    message == GsCutStreaM3) {
           // Handle GS_CUT, MSG[9:8] = STREAM_ID
           unsigned streamId = (message & GsEmitCutStreamIdMask) >> GsEmitCutStreamIdShift;
           assert(streamId < MaxGsStreams);
-          processGsCut(m_gsHandlers.main->getParent(), streamId, outVertsPtrs[streamId]);
+          processGsCut(streamId, outVertsPtrs[streamId]);
         } else if (message == GsDone) {
           // Handle GS_DONE, do nothing (just remove this call)
         } else {
@@ -4058,12 +4055,11 @@ Value *NggPrimShader::importGsOutput(Type *outputTy, unsigned location, unsigned
 // =====================================================================================================================
 // Processes the message GS_EMIT.
 //
-// @param module : LLVM module
 // @param streamId : ID of output vertex stream
 // @param threadIdInSubgroup : Thread ID in subgroup
 // @param [in/out] emitVertsPtr : Pointer to the counter of GS emitted vertices for this stream
 // @param [in/out] outVertsPtr : Pointer to the counter of GS output vertices of current primitive for this stream
-void NggPrimShader::processGsEmit(Module *module, unsigned streamId, Value *threadIdInSubgroup, Value *emitVertsPtr,
+void NggPrimShader::processGsEmit(unsigned streamId, Value *threadIdInSubgroup, Value *emitVertsPtr,
                                   Value *outVertsPtr) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
   if (!m_pipelineState->enableSwXfb() && resUsage->inOutUsage.gs.rasterStream != streamId) {
@@ -4073,7 +4069,7 @@ void NggPrimShader::processGsEmit(Module *module, unsigned streamId, Value *thre
   }
 
   if (!m_gsHandlers.emit)
-    m_gsHandlers.emit = createGsEmitHandler(module);
+    m_gsHandlers.emit = createGsEmitHandler();
 
   m_builder.CreateCall(m_gsHandlers.emit,
                        {threadIdInSubgroup, m_builder.getInt32(streamId), emitVertsPtr, outVertsPtr});
@@ -4082,10 +4078,9 @@ void NggPrimShader::processGsEmit(Module *module, unsigned streamId, Value *thre
 // =====================================================================================================================
 // Processes the message GS_CUT.
 //
-// @param module : LLVM module
 // @param streamId : ID of output vertex stream
 // @param [in/out] outVertsPtr : Pointer to the counter of GS output vertices of current primitive for this stream
-void NggPrimShader::processGsCut(Module *module, unsigned streamId, Value *outVertsPtr) {
+void NggPrimShader::processGsCut(unsigned streamId, Value *outVertsPtr) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
   if (!m_pipelineState->enableSwXfb() && resUsage->inOutUsage.gs.rasterStream != streamId) {
     // NOTE: If SW-emulated stream-out is not enabled, only handle GS_CUT message that belongs to the rasterization
@@ -4094,16 +4089,14 @@ void NggPrimShader::processGsCut(Module *module, unsigned streamId, Value *outVe
   }
 
   if (!m_gsHandlers.cut)
-    m_gsHandlers.cut = createGsCutHandler(module);
+    m_gsHandlers.cut = createGsCutHandler();
 
   m_builder.CreateCall(m_gsHandlers.cut, outVertsPtr);
 }
 
 // =====================================================================================================================
 // Creates the function that processes GS_EMIT.
-//
-// @param module : LLVM module
-Function *NggPrimShader::createGsEmitHandler(Module *module) {
+Function *NggPrimShader::createGsEmitHandler() {
   assert(m_hasGs);
 
   //
@@ -4118,7 +4111,7 @@ Function *NggPrimShader::createGsEmitHandler(Module *module) {
   //     primData[N] = winding
   //   }
   //
-  const auto addrSpace = module->getDataLayout().getAllocaAddrSpace();
+  const auto addrSpace = m_builder.GetInsertBlock()->getModule()->getDataLayout().getAllocaAddrSpace();
   auto funcTy = FunctionType::get(m_builder.getVoidTy(),
                                   {
                                       m_builder.getInt32Ty(),                              // %threadIdInSubgroup
@@ -4127,7 +4120,8 @@ Function *NggPrimShader::createGsEmitHandler(Module *module) {
                                       PointerType::get(m_builder.getInt32Ty(), addrSpace), // %outVertsPtr
                                   },
                                   false);
-  auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, NggGsEmit, module);
+  auto func =
+      Function::Create(funcTy, GlobalValue::InternalLinkage, NggGsEmit, m_builder.GetInsertBlock()->getModule());
 
   func->setCallingConv(CallingConv::C);
   func->addFnAttr(Attribute::AlwaysInline);
@@ -4215,9 +4209,7 @@ Function *NggPrimShader::createGsEmitHandler(Module *module) {
 
 // =====================================================================================================================
 // Creates the function that processes GS_CUT.
-//
-// @param module : LLVM module
-Function *NggPrimShader::createGsCutHandler(Module *module) {
+Function *NggPrimShader::createGsCutHandler() {
   assert(m_hasGs);
 
   //
@@ -4225,11 +4217,11 @@ Function *NggPrimShader::createGsCutHandler(Module *module) {
   //
   //   outVerts = 0
   //
-  const auto addrSpace = module->getDataLayout().getAllocaAddrSpace();
+  const auto addrSpace = m_builder.GetInsertBlock()->getModule()->getDataLayout().getAllocaAddrSpace();
   auto funcTy =
       FunctionType::get(m_builder.getVoidTy(), PointerType::get(m_builder.getInt32Ty(), addrSpace), // %outVertsPtr
                         false);
-  auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, NggGsCut, module);
+  auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, NggGsCut, m_builder.GetInsertBlock()->getModule());
 
   func->setCallingConv(CallingConv::C);
   func->addFnAttr(Attribute::AlwaysInline);
@@ -4342,26 +4334,24 @@ void NggPrimShader::writeVertexCullInfoToLds(Value *writeData, Value *vertexItem
 // =====================================================================================================================
 // Backface culler.
 //
-// @param module : LLVM module
 // @param cullFlag : Cull flag before doing this culling
 // @param vertex0 : Position data of vertex0
 // @param vertex1 : Position data of vertex1
 // @param vertex2 : Position data of vertex2
-Value *NggPrimShader::doBackfaceCulling(Module *module, Value *cullFlag, Value *vertex0, Value *vertex1,
-                                        Value *vertex2) {
+Value *NggPrimShader::doBackfaceCulling(Value *cullFlag, Value *vertex0, Value *vertex1, Value *vertex2) {
   assert(m_nggControl->enableBackfaceCulling);
 
   if (!m_cullers.backface)
-    m_cullers.backface = createBackfaceCuller(module);
+    m_cullers.backface = createBackfaceCuller();
 
   // Get register PA_SU_SC_MODE_CNTL
-  Value *paSuScModeCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paSuScModeCntl);
+  Value *paSuScModeCntl = fetchCullingControlRegister(m_cbLayoutTable.paSuScModeCntl);
 
   // Get register PA_CL_VPORT_XSCALE
-  auto paClVportXscale = fetchCullingControlRegister(module, m_cbLayoutTable.vportControls[0].paClVportXscale);
+  auto paClVportXscale = fetchCullingControlRegister(m_cbLayoutTable.vportControls[0].paClVportXscale);
 
   // Get register PA_CL_VPORT_YSCALE
-  auto paClVportYscale = fetchCullingControlRegister(module, m_cbLayoutTable.vportControls[0].paClVportYscale);
+  auto paClVportYscale = fetchCullingControlRegister(m_cbLayoutTable.vportControls[0].paClVportYscale);
 
   // Do backface culling
   return m_builder.CreateCall(m_cullers.backface,
@@ -4372,26 +4362,24 @@ Value *NggPrimShader::doBackfaceCulling(Module *module, Value *cullFlag, Value *
 // =====================================================================================================================
 // Frustum culler.
 //
-// @param module : LLVM module
 // @param cullFlag : Cull flag before doing this culling
 // @param vertex0 : Position data of vertex0
 // @param vertex1 : Position data of vertex1
 // @param vertex2 : Position data of vertex2
-Value *NggPrimShader::doFrustumCulling(Module *module, Value *cullFlag, Value *vertex0, Value *vertex1,
-                                       Value *vertex2) {
+Value *NggPrimShader::doFrustumCulling(Value *cullFlag, Value *vertex0, Value *vertex1, Value *vertex2) {
   assert(m_nggControl->enableFrustumCulling);
 
   if (!m_cullers.frustum)
-    m_cullers.frustum = createFrustumCuller(module);
+    m_cullers.frustum = createFrustumCuller();
 
   // Get register PA_CL_CLIP_CNTL
-  Value *paClClipCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paClClipCntl);
+  Value *paClClipCntl = fetchCullingControlRegister(m_cbLayoutTable.paClClipCntl);
 
   // Get register PA_CL_GB_HORZ_DISC_ADJ
-  auto paClGbHorzDiscAdj = fetchCullingControlRegister(module, m_cbLayoutTable.paClGbHorzDiscAdj);
+  auto paClGbHorzDiscAdj = fetchCullingControlRegister(m_cbLayoutTable.paClGbHorzDiscAdj);
 
   // Get register PA_CL_GB_VERT_DISC_ADJ
-  auto paClGbVertDiscAdj = fetchCullingControlRegister(module, m_cbLayoutTable.paClGbVertDiscAdj);
+  auto paClGbVertDiscAdj = fetchCullingControlRegister(m_cbLayoutTable.paClGbVertDiscAdj);
 
   // Do frustum culling
   return m_builder.CreateCall(
@@ -4401,29 +4389,27 @@ Value *NggPrimShader::doFrustumCulling(Module *module, Value *cullFlag, Value *v
 // =====================================================================================================================
 // Box filter culler.
 //
-// @param module : LLVM module
 // @param cullFlag : Cull flag before doing this culling
 // @param vertex0 : Position data of vertex0
 // @param vertex1 : Position data of vertex1
 // @param vertex2 : Position data of vertex2
-Value *NggPrimShader::doBoxFilterCulling(Module *module, Value *cullFlag, Value *vertex0, Value *vertex1,
-                                         Value *vertex2) {
+Value *NggPrimShader::doBoxFilterCulling(Value *cullFlag, Value *vertex0, Value *vertex1, Value *vertex2) {
   assert(m_nggControl->enableBoxFilterCulling);
 
   if (!m_cullers.boxFilter)
-    m_cullers.boxFilter = createBoxFilterCuller(module);
+    m_cullers.boxFilter = createBoxFilterCuller();
 
   // Get register PA_CL_VTE_CNTL
-  Value *paClVteCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paClVteCntl);
+  Value *paClVteCntl = fetchCullingControlRegister(m_cbLayoutTable.paClVteCntl);
 
   // Get register PA_CL_CLIP_CNTL
-  Value *paClClipCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paClClipCntl);
+  Value *paClClipCntl = fetchCullingControlRegister(m_cbLayoutTable.paClClipCntl);
 
   // Get register PA_CL_GB_HORZ_DISC_ADJ
-  auto paClGbHorzDiscAdj = fetchCullingControlRegister(module, m_cbLayoutTable.paClGbHorzDiscAdj);
+  auto paClGbHorzDiscAdj = fetchCullingControlRegister(m_cbLayoutTable.paClGbHorzDiscAdj);
 
   // Get register PA_CL_GB_VERT_DISC_ADJ
-  auto paClGbVertDiscAdj = fetchCullingControlRegister(module, m_cbLayoutTable.paClGbVertDiscAdj);
+  auto paClGbVertDiscAdj = fetchCullingControlRegister(m_cbLayoutTable.paClGbVertDiscAdj);
 
   // Do box filter culling
   return m_builder.CreateCall(m_cullers.boxFilter, {cullFlag, vertex0, vertex1, vertex2, paClVteCntl, paClClipCntl,
@@ -4433,28 +4419,27 @@ Value *NggPrimShader::doBoxFilterCulling(Module *module, Value *cullFlag, Value 
 // =====================================================================================================================
 // Sphere culler.
 //
-// @param module : LLVM module
 // @param cullFlag : Cull flag before doing this culling
 // @param vertex0 : Position data of vertex0
 // @param vertex1 : Position data of vertex1
 // @param vertex2 : Position data of vertex2
-Value *NggPrimShader::doSphereCulling(Module *module, Value *cullFlag, Value *vertex0, Value *vertex1, Value *vertex2) {
+Value *NggPrimShader::doSphereCulling(Value *cullFlag, Value *vertex0, Value *vertex1, Value *vertex2) {
   assert(m_nggControl->enableSphereCulling);
 
   if (!m_cullers.sphere)
-    m_cullers.sphere = createSphereCuller(module);
+    m_cullers.sphere = createSphereCuller();
 
   // Get register PA_CL_VTE_CNTL
-  Value *paClVteCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paClVteCntl);
+  Value *paClVteCntl = fetchCullingControlRegister(m_cbLayoutTable.paClVteCntl);
 
   // Get register PA_CL_CLIP_CNTL
-  Value *paClClipCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paClClipCntl);
+  Value *paClClipCntl = fetchCullingControlRegister(m_cbLayoutTable.paClClipCntl);
 
   // Get register PA_CL_GB_HORZ_DISC_ADJ
-  auto paClGbHorzDiscAdj = fetchCullingControlRegister(module, m_cbLayoutTable.paClGbHorzDiscAdj);
+  auto paClGbHorzDiscAdj = fetchCullingControlRegister(m_cbLayoutTable.paClGbHorzDiscAdj);
 
   // Get register PA_CL_GB_VERT_DISC_ADJ
-  auto paClGbVertDiscAdj = fetchCullingControlRegister(module, m_cbLayoutTable.paClGbVertDiscAdj);
+  auto paClGbVertDiscAdj = fetchCullingControlRegister(m_cbLayoutTable.paClGbVertDiscAdj);
 
   // Do small primitive filter culling
   return m_builder.CreateCall(m_cullers.sphere, {cullFlag, vertex0, vertex1, vertex2, paClVteCntl, paClClipCntl,
@@ -4464,35 +4449,33 @@ Value *NggPrimShader::doSphereCulling(Module *module, Value *cullFlag, Value *ve
 // =====================================================================================================================
 // Small primitive filter culler.
 //
-// @param module : LLVM module
 // @param cullFlag : Cull flag before doing this culling
 // @param vertex0 : Position data of vertex0
 // @param vertex1 : Position data of vertex1
 // @param vertex2 : Position data of vertex2
-Value *NggPrimShader::doSmallPrimFilterCulling(Module *module, Value *cullFlag, Value *vertex0, Value *vertex1,
-                                               Value *vertex2) {
+Value *NggPrimShader::doSmallPrimFilterCulling(Value *cullFlag, Value *vertex0, Value *vertex1, Value *vertex2) {
   assert(m_nggControl->enableSmallPrimFilter);
 
   if (!m_cullers.smallPrimFilter)
-    m_cullers.smallPrimFilter = createSmallPrimFilterCuller(module);
+    m_cullers.smallPrimFilter = createSmallPrimFilterCuller();
 
   // Get register PA_CL_VTE_CNTL
-  Value *paClVteCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paClVteCntl);
+  Value *paClVteCntl = fetchCullingControlRegister(m_cbLayoutTable.paClVteCntl);
 
   // Get register PA_CL_VPORT_XSCALE
-  auto paClVportXscale = fetchCullingControlRegister(module, m_cbLayoutTable.vportControls[0].paClVportXscale);
+  auto paClVportXscale = fetchCullingControlRegister(m_cbLayoutTable.vportControls[0].paClVportXscale);
 
   // Get register PA_CL_VPORT_XOFFSET
-  auto paClVportXoffset = fetchCullingControlRegister(module, m_cbLayoutTable.vportControls[0].paClVportXoffset);
+  auto paClVportXoffset = fetchCullingControlRegister(m_cbLayoutTable.vportControls[0].paClVportXoffset);
 
   // Get register PA_CL_VPORT_YSCALE
-  auto paClVportYscale = fetchCullingControlRegister(module, m_cbLayoutTable.vportControls[0].paClVportYscale);
+  auto paClVportYscale = fetchCullingControlRegister(m_cbLayoutTable.vportControls[0].paClVportYscale);
 
   // Get register PA_CL_VPORT_YOFFSET
-  auto paClVportYoffset = fetchCullingControlRegister(module, m_cbLayoutTable.vportControls[0].paClVportYoffset);
+  auto paClVportYoffset = fetchCullingControlRegister(m_cbLayoutTable.vportControls[0].paClVportYoffset);
 
   // Get run-time flag enableConservativeRasterization
-  auto conservativeRaster = fetchCullingControlRegister(module, m_cbLayoutTable.enableConservativeRasterization);
+  auto conservativeRaster = fetchCullingControlRegister(m_cbLayoutTable.enableConservativeRasterization);
   conservativeRaster = m_builder.CreateICmpEQ(conservativeRaster, m_builder.getInt32(1));
 
   // Do small primitive filter culling
@@ -4504,17 +4487,15 @@ Value *NggPrimShader::doSmallPrimFilterCulling(Module *module, Value *cullFlag, 
 // =====================================================================================================================
 // Cull distance culler.
 //
-// @param module : LLVM module
 // @param cullFlag : Cull flag before doing this culling
 // @param signMask0 : Sign mask of cull distance of vertex0
 // @param signMask1 : Sign mask of cull distance of vertex1
 // @param signMask2 : Sign mask of cull distance of vertex2
-Value *NggPrimShader::doCullDistanceCulling(Module *module, Value *cullFlag, Value *signMask0, Value *signMask1,
-                                            Value *signMask2) {
+Value *NggPrimShader::doCullDistanceCulling(Value *cullFlag, Value *signMask0, Value *signMask1, Value *signMask2) {
   assert(m_nggControl->enableCullDistanceCulling);
 
   if (!m_cullers.cullDistance)
-    m_cullers.cullDistance = createCullDistanceCuller(module);
+    m_cullers.cullDistance = createCullDistanceCuller();
 
   // Do cull distance culling
   return m_builder.CreateCall(m_cullers.cullDistance, {cullFlag, signMask0, signMask1, signMask2});
@@ -4523,11 +4504,10 @@ Value *NggPrimShader::doCullDistanceCulling(Module *module, Value *cullFlag, Val
 // =====================================================================================================================
 // Fetches culling-control register from primitive shader table.
 //
-// @param module : LLVM module
 // @param regOffset : Register offset in the primitive shader table (in bytes)
-Value *NggPrimShader::fetchCullingControlRegister(Module *module, unsigned regOffset) {
+Value *NggPrimShader::fetchCullingControlRegister(unsigned regOffset) {
   if (!m_cullers.regFetcher)
-    m_cullers.regFetcher = createFetchCullingRegister(module);
+    m_cullers.regFetcher = createFetchCullingRegister();
 
   return m_builder.CreateCall(
       m_cullers.regFetcher,
@@ -4536,9 +4516,7 @@ Value *NggPrimShader::fetchCullingControlRegister(Module *module, unsigned regOf
 
 // =====================================================================================================================
 // Creates the function that does backface culling.
-//
-// @param module : LLVM module
-Function *NggPrimShader::createBackfaceCuller(Module *module) {
+Function *NggPrimShader::createBackfaceCuller() {
   auto funcTy = FunctionType::get(m_builder.getInt1Ty(),
                                   {
                                       m_builder.getInt1Ty(),                           // %cullFlag
@@ -4551,7 +4529,8 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
                                       m_builder.getInt32Ty()                           // %paClVportYscale
                                   },
                                   false);
-  auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, NggCullerBackface, module);
+  auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, NggCullerBackface,
+                               m_builder.GetInsertBlock()->getModule());
 
   func->setCallingConv(CallingConv::C);
   func->setDoesNotAccessMemory();
@@ -4757,9 +4736,7 @@ Function *NggPrimShader::createBackfaceCuller(Module *module) {
 
 // =====================================================================================================================
 // Creates the function that does frustum culling.
-//
-// @param module : LLVM module
-Function *NggPrimShader::createFrustumCuller(Module *module) {
+Function *NggPrimShader::createFrustumCuller() {
   auto funcTy = FunctionType::get(m_builder.getInt1Ty(),
                                   {
                                       m_builder.getInt1Ty(),                           // %cullFlag
@@ -4771,7 +4748,8 @@ Function *NggPrimShader::createFrustumCuller(Module *module) {
                                       m_builder.getInt32Ty()                           // %paClGbVertDiscAdj
                                   },
                                   false);
-  auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, NggCullerFrustum, module);
+  auto func =
+      Function::Create(funcTy, GlobalValue::InternalLinkage, NggCullerFrustum, m_builder.GetInsertBlock()->getModule());
 
   func->setCallingConv(CallingConv::C);
   func->setDoesNotAccessMemory();
@@ -5010,9 +4988,7 @@ Function *NggPrimShader::createFrustumCuller(Module *module) {
 
 // =====================================================================================================================
 // Creates the function that does box filter culling.
-//
-// @param module : LLVM module
-Function *NggPrimShader::createBoxFilterCuller(Module *module) {
+Function *NggPrimShader::createBoxFilterCuller() {
   auto funcTy = FunctionType::get(m_builder.getInt1Ty(),
                                   {
                                       m_builder.getInt1Ty(),                           // %cullFlag
@@ -5025,7 +5001,8 @@ Function *NggPrimShader::createBoxFilterCuller(Module *module) {
                                       m_builder.getInt32Ty()                           // %paClGbVertDiscAdj
                                   },
                                   false);
-  auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, NggCullerBoxFilter, module);
+  auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, NggCullerBoxFilter,
+                               m_builder.GetInsertBlock()->getModule());
 
   func->setCallingConv(CallingConv::C);
   func->setDoesNotAccessMemory();
@@ -5231,9 +5208,7 @@ Function *NggPrimShader::createBoxFilterCuller(Module *module) {
 
 // =====================================================================================================================
 // Creates the function that does sphere culling.
-//
-// @param module : LLVM module
-Function *NggPrimShader::createSphereCuller(Module *module) {
+Function *NggPrimShader::createSphereCuller() {
   auto funcTy = FunctionType::get(m_builder.getInt1Ty(),
                                   {
                                       m_builder.getInt1Ty(),                           // %cullFlag
@@ -5246,7 +5221,8 @@ Function *NggPrimShader::createSphereCuller(Module *module) {
                                       m_builder.getInt32Ty()                           // %paClGbVertDiscAdj
                                   },
                                   false);
-  auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, NggCullerSphere, module);
+  auto func =
+      Function::Create(funcTy, GlobalValue::InternalLinkage, NggCullerSphere, m_builder.GetInsertBlock()->getModule());
 
   func->setCallingConv(CallingConv::C);
   func->setDoesNotAccessMemory();
@@ -5590,9 +5566,7 @@ Function *NggPrimShader::createSphereCuller(Module *module) {
 
 // =====================================================================================================================
 // Creates the function that does small primitive filter culling.
-//
-// @param module : LLVM module
-Function *NggPrimShader::createSmallPrimFilterCuller(Module *module) {
+Function *NggPrimShader::createSmallPrimFilterCuller() {
   auto funcTy = FunctionType::get(m_builder.getInt1Ty(),
                                   {
                                       m_builder.getInt1Ty(),                           // %cullFlag
@@ -5607,7 +5581,8 @@ Function *NggPrimShader::createSmallPrimFilterCuller(Module *module) {
                                       m_builder.getInt1Ty()                            // %conservativeRaster
                                   },
                                   false);
-  auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, NggCullerSmallPrimFilter, module);
+  auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, NggCullerSmallPrimFilter,
+                               m_builder.GetInsertBlock()->getModule());
 
   func->setCallingConv(CallingConv::C);
   func->setDoesNotAccessMemory();
@@ -5866,9 +5841,7 @@ Function *NggPrimShader::createSmallPrimFilterCuller(Module *module) {
 
 // =====================================================================================================================
 // Creates the function that does frustum culling.
-//
-// @param module : LLVM module
-Function *NggPrimShader::createCullDistanceCuller(Module *module) {
+Function *NggPrimShader::createCullDistanceCuller() {
   auto funcTy = FunctionType::get(m_builder.getInt1Ty(),
                                   {
                                       m_builder.getInt1Ty(),  // %cullFlag
@@ -5877,7 +5850,8 @@ Function *NggPrimShader::createCullDistanceCuller(Module *module) {
                                       m_builder.getInt32Ty()  // %signMask2
                                   },
                                   false);
-  auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, NggCullerCullDistance, module);
+  auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, NggCullerCullDistance,
+                               m_builder.GetInsertBlock()->getModule());
 
   func->setCallingConv(CallingConv::C);
   func->setDoesNotAccessMemory();
@@ -5943,9 +5917,7 @@ Function *NggPrimShader::createCullDistanceCuller(Module *module) {
 
 // =====================================================================================================================
 // Creates the function that fetches culling control registers.
-//
-// @param module : LLVM module
-Function *NggPrimShader::createFetchCullingRegister(Module *module) {
+Function *NggPrimShader::createFetchCullingRegister() {
   auto funcTy = FunctionType::get(m_builder.getInt32Ty(),
                                   {
                                       m_builder.getInt32Ty(), // %primShaderTableAddrLow
@@ -5953,7 +5925,8 @@ Function *NggPrimShader::createFetchCullingRegister(Module *module) {
                                       m_builder.getInt32Ty()  // %regOffset
                                   },
                                   false);
-  auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, NggCullerRegFetcher, module);
+  auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, NggCullerRegFetcher,
+                               m_builder.GetInsertBlock()->getModule());
 
   func->setCallingConv(CallingConv::C);
   func->setOnlyReadsMemory();

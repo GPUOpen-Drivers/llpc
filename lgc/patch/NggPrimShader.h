@@ -217,8 +217,7 @@ private:
   void loadStreamOutBufferInfo(llvm::Value *userData);
   void distributePrimitiveId(llvm::Value *primitiveId);
 
-  llvm::Value *doCulling(llvm::Module *module, llvm::Value *vertxIndex0, llvm::Value *vertxIndex1,
-                         llvm::Value *vertxIndex2);
+  llvm::Value *doCulling(llvm::Value *vertxIndex0, llvm::Value *vertxIndex1, llvm::Value *vertxIndex2);
   void sendGsAllocReqMessage();
   void exportPassthroughPrimitive();
   void exportPrimitive(llvm::Value *primitiveCulled);
@@ -241,13 +240,12 @@ private:
 
   llvm::Value *importGsOutput(llvm::Type *outputTy, unsigned location, unsigned streamId, llvm::Value *vertexOffset);
 
-  void processGsEmit(llvm::Module *module, unsigned streamId, llvm::Value *threadIdInSubgroup,
-                     llvm::Value *emitVertsPtr, llvm::Value *outVertsPtr);
+  void processGsEmit(unsigned streamId, llvm::Value *threadIdInSubgroup, llvm::Value *emitVertsPtr,
+                     llvm::Value *outVertsPtr);
+  void processGsCut(unsigned streamId, llvm::Value *outVertsPtr);
 
-  void processGsCut(llvm::Module *module, unsigned streamId, llvm::Value *outVertsPtr);
-
-  llvm::Function *createGsEmitHandler(llvm::Module *module);
-  llvm::Function *createGsCutHandler(llvm::Module *module);
+  llvm::Function *createGsEmitHandler();
+  llvm::Function *createGsCutHandler();
 
   llvm::Value *readPerThreadDataFromLds(llvm::Type *readDataTy, llvm::Value *threadId, PrimShaderLdsRegion region,
                                         unsigned offsetInRegion = 0, bool useDs128 = false);
@@ -257,34 +255,26 @@ private:
   llvm::Value *readVertexCullInfoFromLds(llvm::Type *readDataTy, llvm::Value *vertexItemOffset, unsigned dataOffset);
   void writeVertexCullInfoToLds(llvm::Value *writeData, llvm::Value *vertexItemOffset, unsigned dataOffset);
 
-  llvm::Value *doBackfaceCulling(llvm::Module *module, llvm::Value *cullFlag, llvm::Value *vertex0,
-                                 llvm::Value *vertex1, llvm::Value *vertex2);
-
-  llvm::Value *doFrustumCulling(llvm::Module *module, llvm::Value *cullFlag, llvm::Value *vertex0, llvm::Value *vertex1,
+  llvm::Value *doBackfaceCulling(llvm::Value *cullFlag, llvm::Value *vertex0, llvm::Value *vertex1,
+                                 llvm::Value *vertex2);
+  llvm::Value *doFrustumCulling(llvm::Value *cullFlag, llvm::Value *vertex0, llvm::Value *vertex1,
                                 llvm::Value *vertex2);
+  llvm::Value *doBoxFilterCulling(llvm::Value *cullFlag, llvm::Value *vertex0, llvm::Value *vertex1,
+                                  llvm::Value *vertex2);
+  llvm::Value *doSphereCulling(llvm::Value *cullFlag, llvm::Value *vertex0, llvm::Value *vertex1, llvm::Value *vertex2);
+  llvm::Value *doSmallPrimFilterCulling(llvm::Value *cullFlag, llvm::Value *vertex0, llvm::Value *vertex1,
+                                        llvm::Value *vertex2);
+  llvm::Value *doCullDistanceCulling(llvm::Value *cullFlag, llvm::Value *signMask0, llvm::Value *signMask1,
+                                     llvm::Value *signMask2);
+  llvm::Value *fetchCullingControlRegister(unsigned regOffset);
 
-  llvm::Value *doBoxFilterCulling(llvm::Module *module, llvm::Value *cullFlag, llvm::Value *vertex0,
-                                  llvm::Value *vertex1, llvm::Value *vertex2);
-
-  llvm::Value *doSphereCulling(llvm::Module *module, llvm::Value *cullFlag, llvm::Value *vertex0, llvm::Value *vertex1,
-                               llvm::Value *vertex2);
-
-  llvm::Value *doSmallPrimFilterCulling(llvm::Module *module, llvm::Value *cullFlag, llvm::Value *vertex0,
-                                        llvm::Value *vertex1, llvm::Value *vertex2);
-
-  llvm::Value *doCullDistanceCulling(llvm::Module *module, llvm::Value *cullFlag, llvm::Value *signMask0,
-                                     llvm::Value *signMask1, llvm::Value *signMask2);
-
-  llvm::Value *fetchCullingControlRegister(llvm::Module *module, unsigned regOffset);
-
-  llvm::Function *createBackfaceCuller(llvm::Module *module);
-  llvm::Function *createFrustumCuller(llvm::Module *module);
-  llvm::Function *createBoxFilterCuller(llvm::Module *module);
-  llvm::Function *createSphereCuller(llvm::Module *module);
-  llvm::Function *createSmallPrimFilterCuller(llvm::Module *module);
-  llvm::Function *createCullDistanceCuller(llvm::Module *module);
-
-  llvm::Function *createFetchCullingRegister(llvm::Module *module);
+  llvm::Function *createBackfaceCuller();
+  llvm::Function *createFrustumCuller();
+  llvm::Function *createBoxFilterCuller();
+  llvm::Function *createSphereCuller();
+  llvm::Function *createSmallPrimFilterCuller();
+  llvm::Function *createCullDistanceCuller();
+  llvm::Function *createFetchCullingRegister();
 
   llvm::Value *ballot(llvm::Value *value);
 
