@@ -241,7 +241,6 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
       auto shaderSection = reinterpret_cast<SectionShader *>(m_sections[SectionTypeShader][i]);
       auto shaderInfoSection = reinterpret_cast<SectionShaderInfo *>(m_sections[SectionTypeShaderInfo][i]);
       VFX_ASSERT(shaderSection->getShaderStage() == shaderInfoSection->getShaderStage());
-      auto stage = shaderSection->getShaderStage();
 
       shaderSections[m_sections[SectionTypeShader][i]->getLineNum()] =
           std::pair<SectionShader *, SectionShaderInfo *>(shaderSection, shaderInfoSection);
@@ -518,6 +517,7 @@ void PipelineDocument::DeduplicateResourceMappingData(Vkgc::ResourceMappingData 
     auto iter = staticMap.find(key);
     if (iter == staticMap.end()) {
       auto result = staticMap.insert({key, descriptorRangeValue});
+      (void)result;
       VFX_ASSERT(result.second);
     } else {
       iter->second.visibility |= descriptorRangeValue.visibility;
