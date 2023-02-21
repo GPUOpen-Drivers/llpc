@@ -130,7 +130,7 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
   }
 
   if (!desc) {
-    if (node || node->concreteType == ResourceNodeType::DescriptorMutable) {
+    if (node) {
       ResourceNodeType resType = node->concreteType;
       ResourceNodeType abstractType = node->abstractType;
       // Handle mutable descriptors
