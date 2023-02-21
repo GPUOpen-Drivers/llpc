@@ -4482,7 +4482,7 @@ Value *NggPrimShader::doBoxFilterCulling(Module *module, Value *cullFlag, Value 
     m_cullers.boxFilter = createBoxFilterCuller(module);
 
   // Get register PA_CL_VTE_CNTL
-  Value *paClVteCntl = m_builder.getInt32(m_nggControl->primShaderTable.pipelineStateCb.paClVteCntl);
+  Value *paClVteCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paClVteCntl);
 
   // Get register PA_CL_CLIP_CNTL
   Value *paClClipCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paClClipCntl);
@@ -4513,7 +4513,7 @@ Value *NggPrimShader::doSphereCulling(Module *module, Value *cullFlag, Value *ve
     m_cullers.sphere = createSphereCuller(module);
 
   // Get register PA_CL_VTE_CNTL
-  Value *paClVteCntl = m_builder.getInt32(m_nggControl->primShaderTable.pipelineStateCb.paClVteCntl);
+  Value *paClVteCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paClVteCntl);
 
   // Get register PA_CL_CLIP_CNTL
   Value *paClClipCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paClClipCntl);
@@ -4545,7 +4545,7 @@ Value *NggPrimShader::doSmallPrimFilterCulling(Module *module, Value *cullFlag, 
     m_cullers.smallPrimFilter = createSmallPrimFilterCuller(module);
 
   // Get register PA_CL_VTE_CNTL
-  Value *paClVteCntl = m_builder.getInt32(m_nggControl->primShaderTable.pipelineStateCb.paClVteCntl);
+  Value *paClVteCntl = fetchCullingControlRegister(module, m_cbLayoutTable.paClVteCntl);
 
   // Get register PA_CL_VPORT_XSCALE
   auto paClVportXscale = fetchCullingControlRegister(module, m_cbLayoutTable.vportControls[0].paClVportXscale);

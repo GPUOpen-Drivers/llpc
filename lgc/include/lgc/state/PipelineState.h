@@ -96,8 +96,7 @@ struct NggControl {
 
   unsigned vertsPerSubgroup; // Preferred number of vertices consumed by a primitive shader subgroup
 
-  bool passthroughMode;                          // Whether NGG passthrough mode is enabled
-  Util::Abi::PrimShaderCbLayout primShaderTable; // Primitive shader table (only some registers are used)
+  bool passthroughMode; // Whether NGG passthrough mode is enabled
 };
 
 // Represents transform feedback state metadata
