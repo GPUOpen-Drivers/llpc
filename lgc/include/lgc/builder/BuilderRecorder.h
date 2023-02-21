@@ -186,6 +186,7 @@ public:
     EmitMeshTasks,
     SetMeshOutputs,
     GetWaveSize,
+    DebugBreak,
 
     // Subgroup
     GetSubgroupSize,
@@ -508,6 +509,8 @@ public:
   // Create a workgroup control barrier.
   llvm::Instruction *CreateBarrier() override final;
 
+  // Create debug break (system halt)
+  llvm::Instruction *CreateDebugBreak(const llvm::Twine &instName = "") override final;
   llvm::Instruction *CreateKill(const llvm::Twine &instName = "") override final;
   llvm::Instruction *CreateReadClock(bool realtime, const llvm::Twine &instName = "") override final;
   llvm::Instruction *CreateDemoteToHelperInvocation(const llvm::Twine &instName) override final;

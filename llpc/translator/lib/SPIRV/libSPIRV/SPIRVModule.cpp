@@ -616,12 +616,13 @@ bool SPIRVModuleImpl::isNonSemanticInfoInstSet(llvm::StringRef setName) const {
 bool SPIRVModuleImpl::importBuiltinSetWithId(const std::string &BuiltinSetName, SPIRVId BuiltinSetId) {
   SPIRVExtInstSetKind BuiltinSet = SPIRVEIS_Count;
 
-  if (isNonSemanticInfoInstSet(BuiltinSetName))
-    BuiltinSet = SPIRVEIS_NonSemanticInfo;
+  if (SPIRVBuiltinSetNameMap::rfind(BuiltinSetName, &BuiltinSet))
+    IdBuiltinMap[BuiltinSetId] = BuiltinSet;
+  else if (isNonSemanticInfoInstSet(BuiltinSetName))
+    IdBuiltinMap[BuiltinSetId] = SPIRVEIS_NonSemanticInfo;
   else
-    SPIRVCKRT(SPIRVBuiltinSetNameMap::rfind(BuiltinSetName, &BuiltinSet), InvalidBuiltinSetName,
-              "Actual is " + BuiltinSetName);
-  IdBuiltinMap[BuiltinSetId] = BuiltinSet;
+    SPIRVCKRT(false, InvalidBuiltinSetName, "Actual is " + BuiltinSetName);
+
   return true;
 }
 

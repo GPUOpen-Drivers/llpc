@@ -41,7 +41,7 @@
 
 #include "GLSL.std.450.h"
 #include "khronos/spirv.hpp"
-
+#include "khronos/spirv/NonSemanticDebugBreak.h"
 namespace spv {
 #include "GLSL.ext.AMD.h"
 

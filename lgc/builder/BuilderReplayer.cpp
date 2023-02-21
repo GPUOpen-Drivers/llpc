@@ -715,6 +715,9 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   case BuilderRecorder::Opcode::IsHelperInvocation: {
     return m_builder->CreateIsHelperInvocation();
   }
+  case BuilderRecorder::Opcode::DebugBreak: {
+    return m_builder->CreateDebugBreak();
+  }
   case BuilderRecorder::Opcode::EmitMeshTasks: {
     return m_builder->CreateEmitMeshTasks(args[0], args[1], args[2]);
   }
