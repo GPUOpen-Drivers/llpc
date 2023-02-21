@@ -788,7 +788,7 @@ const ResourceNode *PipelineState::findPushConstantResourceNode() const {
 // @param candidateType : Resource node candidate type
 static bool isNodeTypeCompatible(ResourceNodeType nodeType, ResourceNodeType candidateType) {
   if (nodeType == ResourceNodeType::Unknown || candidateType == nodeType ||
-    candidateType == ResourceNodeType::DescriptorMutable)
+      candidateType == ResourceNodeType::DescriptorMutable)
     return true;
 
   if ((nodeType == ResourceNodeType::DescriptorConstBuffer || nodeType == DescriptorAnyBuffer) &&

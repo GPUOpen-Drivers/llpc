@@ -722,16 +722,12 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
       destNode.immutableValue = nullptr;
       destNode.immutableSize = 0;
 
-
-      // Normally we know the stride of items in a desriptor array. However in specific circumstances
+      // Normally we know the stride of items in a descriptor array. However in specific circumstances
       // the type is not known by llpc. This is the case with mutable descriptors where we need the
       // stride to be explicitly specified.
-      if(node.srdRange.strideInDwords > 0)
-      {
+      if (node.srdRange.strideInDwords > 0) {
         destNode.stride = node.srdRange.strideInDwords;
-      }
-      else
-      {
+      } else {
         switch (node.type) {
         case ResourceMappingNodeType::DescriptorImage:
         case ResourceMappingNodeType::DescriptorResource:
@@ -760,7 +756,7 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
           destNode.stride = 2;
           break;
         default:
-            destNode.stride = DescriptorSizeBuffer / sizeof(uint32_t);
+          destNode.stride = DescriptorSizeBuffer / sizeof(uint32_t);
           break;
         }
       }
