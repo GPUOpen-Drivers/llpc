@@ -1303,19 +1303,8 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStage stage) {
         waveSize = waveSizeOption;
 
       // Note: the conditions below override the tuning option.
-      // If subgroup size is used in any shader in the pipeline, use the specified subgroup size as wave size.
-      if (m_shaderModes.getAnyUseSubgroupSize()) {
-        // If allowVaryWaveSize is enabled, subgroupSize is default as zero, initialized as waveSize
-        subgroupSize = getShaderOptions(checkingStage).subgroupSize;
-        subgroupSize = (subgroupSize == 0) ? waveSize : subgroupSize;
-
-        m_subgroupSize[checkingStage] = subgroupSize;
-
-        if ((subgroupSize < waveSize) || getOptions().fullSubgroups)
-          waveSize = subgroupSize;
-      } else if (checkingStage == ShaderStageMesh || checkingStage == ShaderStageTask ||
-                 checkingStage == ShaderStageCompute) {
-        // If workgroup size is not larger than 32, use wave size 32.
+      // If workgroup size is not larger than 32, use wave size 32.
+      if (checkingStage == ShaderStageMesh || checkingStage == ShaderStageTask || checkingStage == ShaderStageCompute) {
         unsigned workGroupSize;
         if (checkingStage == ShaderStageMesh) {
           auto &mode = m_shaderModes.getMeshShaderMode();
@@ -1330,7 +1319,26 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStage stage) {
           waveSize = 32;
       }
 
+      // If subgroup size is used in any shader in the pipeline, use the specified subgroup size.
+      if (m_shaderModes.getAnyUseSubgroupSize()) {
+        // If allowVaryWaveSize is enabled, subgroupSize is default as zero, initialized as waveSize
+        subgroupSize = getShaderOptions(checkingStage).subgroupSize;
+        // The driver only sets waveSize if a size is requested by an app. We may want to change that in the driver to
+        // set subgroupSize instead.
+        if (subgroupSize == 0)
+          subgroupSize = getShaderOptions(checkingStage).waveSize;
+        if (subgroupSize == 0)
+          subgroupSize = waveSize;
+
+        if ((subgroupSize < waveSize) || getOptions().fullSubgroups)
+          waveSize = subgroupSize;
+      } else {
+        // The subgroup size cannot be observed, use the wave size.
+        subgroupSize = waveSize;
+      }
+
       assert(waveSize == 32 || waveSize == 64);
+      assert(waveSize <= subgroupSize);
     }
     m_waveSize[checkingStage] = waveSize;
     m_subgroupSize[checkingStage] = subgroupSize;
