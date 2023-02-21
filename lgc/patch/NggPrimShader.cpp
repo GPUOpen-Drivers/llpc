@@ -1843,7 +1843,7 @@ void NggPrimShader::buildPrimShader(Function *entryPoint) {
     {
       m_builder.SetInsertPoint(emptyWaveExpBlock);
 
-      auto undef = UndefValue::get(m_builder.getFloatTy());
+      auto undef = PoisonValue::get(m_builder.getFloatTy());
       m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getFloatTy(),
                                 {
                                     m_builder.getInt32(EXP_TARGET_POS_0), // tgt
@@ -2414,7 +2414,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *entryPoint) {
     {
       m_builder.SetInsertPoint(emptyWaveExpBlock);
 
-      auto undef = UndefValue::get(m_builder.getFloatTy());
+      auto undef = PoisonValue::get(m_builder.getFloatTy());
       m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getFloatTy(),
                                 {
                                     m_builder.getInt32(EXP_TARGET_POS_0), // tgt
@@ -2984,7 +2984,7 @@ void NggPrimShader::earlyExitWithDummyExport() {
   {
     m_builder.SetInsertPoint(dummyExportBlock);
 
-    auto undef = UndefValue::get(m_builder.getInt32Ty());
+    auto undef = PoisonValue::get(m_builder.getInt32Ty());
 
     m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getInt32Ty(),
                               {
@@ -3026,7 +3026,7 @@ void NggPrimShader::earlyExitWithDummyExport() {
       posExpCount += (builtInUsage.clipDistance + builtInUsage.cullDistance) / 4;
     }
 
-    undef = UndefValue::get(m_builder.getFloatTy());
+    undef = PoisonValue::get(m_builder.getFloatTy());
 
     for (unsigned i = 0; i < posExpCount; ++i) {
       m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getFloatTy(),
@@ -4085,7 +4085,7 @@ Value *NggPrimShader::importGsOutput(Type *outputTy, unsigned location, unsigned
   if (!m_pipelineState->enableSwXfb() && resUsage->inOutUsage.gs.rasterStream != streamId) {
     // NOTE: If SW-emulated stream-out is not enabled, only import those outputs that belong to the rasterization
     // stream.
-    return UndefValue::get(outputTy);
+    return PoisonValue::get(outputTy);
   }
 
   // NOTE: We only handle LDS vector/scalar reading, so change [n x Ty] to <n x Ty> for array.
@@ -7415,7 +7415,7 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
                 m_builder.CreateInsertElement(UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 4)),
                                               outputValue, static_cast<uint64_t>(0));
           } else if (numElements < 4) {
-            outputValue = m_builder.CreateShuffleVector(outputValue, UndefValue::get(outputValue->getType()),
+            outputValue = m_builder.CreateShuffleVector(outputValue, PoisonValue::get(outputValue->getType()),
                                                         ArrayRef<int>({0U, 1U, 2U, 3U}));
           }
         }
