@@ -92,7 +92,7 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
       std::tie(topNode, node) =
           m_pipelineState->findResourceNode(ResourceNodeType::DescriptorMutable, descSet, binding);
       if (!node) {
-        // We did not find the resource node. Return an undef value.
+        // We did not find the resource node. Return an poison value.
         return PoisonValue::get(getBufferDescTy(pointeeTy));
       }
     }
