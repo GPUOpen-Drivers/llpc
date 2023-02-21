@@ -46,3 +46,4 @@ target_compile_definitions(vfx PRIVATE VFX_SUPPORT_VK_PIPELINE SH_EXPORTING)
 target_include_directories(vfx PUBLIC ${PROJECT_SOURCE_DIR})
 
 target_link_libraries(vfx PRIVATE spvgen_static vkgc_headers khronos_vulkan_interface khronos_spirv_interface)
+set_compiler_options(vfx ${VFX_ENABLE_WERROR})
