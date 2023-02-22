@@ -3036,44 +3036,10 @@ void NggPrimShader::runEs(ArrayRef<Argument *> args) {
     }
   }
 
-  auto intfData = m_pipelineState->getShaderInterfaceData(m_hasTes ? ShaderStageTessEval : ShaderStageVertex);
-  const unsigned userDataCount = intfData->userDataCount;
-
-  unsigned userDataIdx = 0;
-
-  auto esArgBegin = m_esHandlers.main->arg_begin();
-  const unsigned esArgCount = m_esHandlers.main->arg_size();
-  (void(esArgCount)); // Unused
-
   // Set up user data SGPRs
-  while (userDataIdx < userDataCount) {
-    assert(esArgs.size() < esArgCount);
-
-    auto esArg = (esArgBegin + esArgs.size());
-    assert(esArg->hasAttribute(Attribute::InReg));
-
-    auto esArgTy = esArg->getType();
-    if (esArgTy->isVectorTy()) {
-      assert(cast<VectorType>(esArgTy)->getElementType()->isIntegerTy());
-
-      const unsigned userDataSize = cast<FixedVectorType>(esArgTy)->getNumElements();
-
-      SmallVector<int, 8> shuffleMask;
-      for (unsigned i = 0; i < userDataSize; ++i)
-        shuffleMask.push_back(userDataIdx + i);
-
-      userDataIdx += userDataSize;
-
-      auto esUserData = m_builder.CreateShuffleVector(userData, userData, shuffleMask);
-      esArgs.push_back(esUserData);
-    } else {
-      assert(esArgTy->isIntegerTy());
-
-      auto esUserData = m_builder.CreateExtractElement(userData, userDataIdx);
-      esArgs.push_back(esUserData);
-      ++userDataIdx;
-    }
-  }
+  const unsigned userDataCount =
+      m_pipelineState->getShaderInterfaceData(m_hasTes ? ShaderStageTessEval : ShaderStageVertex)->userDataCount;
+  appendUserData(esArgs, m_esHandlers.main, userData, userDataCount);
 
   if (m_hasTes) {
     // Set up system value SGPRs
@@ -3110,14 +3076,14 @@ void NggPrimShader::runEs(ArrayRef<Argument *> args) {
       assert(vertexFetches.size() == vertexFetchCount);
 
       for (unsigned i = 0; i < vertexFetchCount; ++i) {
-        vertexFetches[i]->setName(
-            m_esHandlers.main->getArg(esArgCount - vertexFetchCount + i)->getName()); // Copy argument name
+        vertexFetches[i]->setName(m_esHandlers.main->getArg(m_esHandlers.main->arg_size() - vertexFetchCount + i)
+                                      ->getName()); // Copy argument name
         esArgs.push_back(vertexFetches[i]);
       }
     }
   }
 
-  assert(esArgs.size() == esArgCount); // Must have visit all arguments of ES entry point
+  assert(esArgs.size() == m_esHandlers.main->arg_size()); // Must have visit all arguments of ES entry point
 
   CallInst *esCall = m_builder.CreateCall(m_esHandlers.main, esArgs);
   esCall->setCallingConv(CallingConv::AMDGPU_ES);
@@ -3286,44 +3252,10 @@ Value *NggPrimShader::runPartEs(ArrayRef<Argument *> args, Value *position) {
   if (deferredVertexExport)
     partEsArgs.push_back(position); // Setup vertex position data as the additional argument
 
-  auto intfData = m_pipelineState->getShaderInterfaceData(m_hasTes ? ShaderStageTessEval : ShaderStageVertex);
-  const unsigned userDataCount = intfData->userDataCount;
-
-  unsigned userDataIdx = 0;
-
-  auto partEsArgBegin = partEs->arg_begin();
-  const unsigned partEsArgCount = partEs->arg_size();
-  (void(partEsArgCount)); // Unused
-
   // Set up user data SGPRs
-  while (userDataIdx < userDataCount) {
-    assert(partEsArgs.size() < partEsArgCount);
-
-    auto partEsArg = (partEsArgBegin + partEsArgs.size());
-    assert(partEsArg->hasAttribute(Attribute::InReg));
-
-    auto partEsArgTy = partEsArg->getType();
-    if (partEsArgTy->isVectorTy()) {
-      assert(cast<VectorType>(partEsArgTy)->getElementType()->isIntegerTy());
-
-      const unsigned userDataSize = cast<FixedVectorType>(partEsArgTy)->getNumElements();
-
-      SmallVector<int, 8> shuffleMask;
-      for (unsigned i = 0; i < userDataSize; ++i)
-        shuffleMask.push_back(userDataIdx + i);
-
-      userDataIdx += userDataSize;
-
-      auto esUserData = m_builder.CreateShuffleVector(userData, userData, shuffleMask);
-      partEsArgs.push_back(esUserData);
-    } else {
-      assert(partEsArgTy->isIntegerTy());
-
-      auto esUserData = m_builder.CreateExtractElement(userData, userDataIdx);
-      partEsArgs.push_back(esUserData);
-      ++userDataIdx;
-    }
-  }
+  const unsigned userDataCount =
+      m_pipelineState->getShaderInterfaceData(m_hasTes ? ShaderStageTessEval : ShaderStageVertex)->userDataCount;
+  appendUserData(partEsArgs, partEs, userData, userDataCount);
 
   if (m_hasTes) {
     // Set up system value SGPRs
@@ -3346,7 +3278,7 @@ Value *NggPrimShader::runPartEs(ArrayRef<Argument *> args, Value *position) {
     partEsArgs.push_back(instanceId);
   }
 
-  assert(partEsArgs.size() == partEsArgCount); // Must have visit all arguments of the part ES
+  assert(partEsArgs.size() == partEs->arg_size()); // Must have visit all arguments of the part ES
 
   CallInst *partEsCall = m_builder.CreateCall(partEs, partEsArgs);
   partEsCall->setCallingConv(CallingConv::AMDGPU_ES);
@@ -3605,44 +3537,9 @@ void NggPrimShader::runGs(ArrayRef<Argument *> args) {
 
   SmallVector<Value *, 32> gsArgs;
 
-  auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry);
-  const unsigned userDataCount = intfData->userDataCount;
-
-  unsigned userDataIdx = 0;
-
-  auto gsArgBegin = m_gsHandlers.main->arg_begin();
-  const unsigned gsArgCount = m_gsHandlers.main->arg_size();
-  (void(gsArgCount)); // unused
-
   // Set up user data SGPRs
-  while (userDataIdx < userDataCount) {
-    assert(gsArgs.size() < gsArgCount);
-
-    auto gsArg = (gsArgBegin + gsArgs.size());
-    assert(gsArg->hasAttribute(Attribute::InReg));
-
-    auto gsArgTy = gsArg->getType();
-    if (gsArgTy->isVectorTy()) {
-      assert(cast<VectorType>(gsArgTy)->getElementType()->isIntegerTy());
-
-      const unsigned userDataSize = cast<FixedVectorType>(gsArgTy)->getNumElements();
-
-      SmallVector<int, 8> shuffleMask;
-      for (unsigned i = 0; i < userDataSize; ++i)
-        shuffleMask.push_back(userDataIdx + i);
-
-      userDataIdx += userDataSize;
-
-      auto gsUserData = m_builder.CreateShuffleVector(userData, userData, shuffleMask);
-      gsArgs.push_back(gsUserData);
-    } else {
-      assert(gsArgTy->isIntegerTy());
-
-      auto gsUserData = m_builder.CreateExtractElement(userData, userDataIdx);
-      gsArgs.push_back(gsUserData);
-      ++userDataIdx;
-    }
-  }
+  const unsigned userDataCount = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry)->userDataCount;
+  appendUserData(gsArgs, m_gsHandlers.main, userData, userDataCount);
 
   // Set up system value SGPRs
   gsArgs.push_back(gsVsOffset);
@@ -3658,7 +3555,7 @@ void NggPrimShader::runGs(ArrayRef<Argument *> args) {
   gsArgs.push_back(esGsOffset5);
   gsArgs.push_back(invocationId);
 
-  assert(gsArgs.size() == gsArgCount); // Must have visit all arguments of ES entry point
+  assert(gsArgs.size() == m_gsHandlers.main->arg_size()); // Must have visit all arguments of ES entry point
 
   CallInst *gsCall = m_builder.CreateCall(m_gsHandlers.main, gsArgs);
   gsCall->setCallingConv(CallingConv::AMDGPU_GS);
@@ -3890,6 +3787,53 @@ void NggPrimShader::mutateCopyShader() {
   for (auto call : removedCalls) {
     call->dropAllReferences();
     call->eraseFromParent();
+  }
+}
+
+// =====================================================================================================================
+// Append user data arguments to the argument list for the target caller. Those arguments will be consumed by the
+// target callee later.
+//
+// @param [in/out] args : The arguments that will be appended to
+// @param target : The function we are preparing to call later
+// @param userData : The <N x i32> vector of user data values
+// @param userDataCount : The number of elements of user data that should be processed
+void NggPrimShader::appendUserData(SmallVectorImpl<Value *> &args, Function *target, Value *userData,
+                                   unsigned userDataCount) {
+  unsigned userDataIdx = 0;
+
+  auto argBegin = target->arg_begin();
+  const unsigned argCount = target->arg_size();
+  (void(argCount)); // Unused
+
+  // Set up user data SGPRs
+  while (userDataIdx < userDataCount) {
+    assert(args.size() < argCount);
+
+    auto arg = (argBegin + args.size());
+    assert(arg->hasAttribute(Attribute::InReg));
+
+    auto argTy = arg->getType();
+    if (argTy->isVectorTy()) {
+      assert(cast<VectorType>(argTy)->getElementType()->isIntegerTy());
+
+      const unsigned userDataSize = cast<FixedVectorType>(argTy)->getNumElements();
+
+      std::vector<int> shuffleMask;
+      for (unsigned i = 0; i < userDataSize; ++i)
+        shuffleMask.push_back(userDataIdx + i);
+
+      userDataIdx += userDataSize;
+
+      auto newUserData = m_builder.CreateShuffleVector(userData, userData, shuffleMask);
+      args.push_back(newUserData);
+    } else {
+      assert(argTy->isIntegerTy());
+
+      auto newUserData = m_builder.CreateExtractElement(userData, userDataIdx);
+      args.push_back(newUserData);
+      ++userDataIdx;
+    }
   }
 }
 
@@ -7417,40 +7361,10 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
     }
   }
 
-  auto intfData = m_pipelineState->getShaderInterfaceData(m_hasTes ? ShaderStageTessEval : ShaderStageVertex);
-  const unsigned userDataCount = intfData->userDataCount;
-
-  unsigned userDataIdx = 0;
-
-  auto xfbFetcherArgBegin = xfbFetcher->arg_begin();
-  const unsigned xfbFetcherArgCount = xfbFetcher->arg_size();
-  (void(xfbFetcherArgCount)); // Unused
-
   // Set up user data SGPRs
-  while (userDataIdx < userDataCount) {
-    assert(xfbFetcherArgs.size() < xfbFetcherArgCount);
-
-    auto xfbFetcherArg = (xfbFetcherArgBegin + xfbFetcherArgs.size());
-    assert(xfbFetcherArg->hasAttribute(Attribute::InReg));
-
-    auto xfbFetcherArgTy = xfbFetcherArg->getType();
-    if (xfbFetcherArgTy->isVectorTy()) {
-      assert(cast<VectorType>(xfbFetcherArgTy)->getElementType()->isIntegerTy());
-
-      const unsigned userDataSize = cast<FixedVectorType>(xfbFetcherArgTy)->getNumElements();
-
-      SmallVector<int, 8> shuffleMask;
-      for (unsigned i = 0; i < userDataSize; ++i)
-        shuffleMask.push_back(userDataIdx + i);
-
-      xfbFetcherArgs.push_back(m_builder.CreateShuffleVector(userData, userData, shuffleMask));
-      userDataIdx += userDataSize;
-    } else {
-      assert(xfbFetcherArgTy->isIntegerTy());
-      xfbFetcherArgs.push_back(m_builder.CreateExtractElement(userData, userDataIdx));
-      ++userDataIdx;
-    }
-  }
+  const unsigned userDataCount =
+      m_pipelineState->getShaderInterfaceData(m_hasTes ? ShaderStageTessEval : ShaderStageVertex)->userDataCount;
+  appendUserData(xfbFetcherArgs, xfbFetcher, userData, userDataCount);
 
   if (m_hasTes) {
     // Set up system value SGPRs
@@ -7483,14 +7397,14 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
 
         for (unsigned i = 0; i < vertexFetchCount; ++i) {
           vertexFetches[i]->setName(
-              xfbFetcher->getArg(xfbFetcherArgCount - vertexFetchCount + i)->getName()); // Copy argument name
+              xfbFetcher->getArg(xfbFetcher->arg_size() - vertexFetchCount + i)->getName()); // Copy argument name
           xfbFetcherArgs.push_back(vertexFetches[i]);
         }
       }
     }
   }
 
-  assert(xfbFetcherArgs.size() == xfbFetcherArgCount); // Must have visit all arguments
+  assert(xfbFetcherArgs.size() == xfbFetcher->arg_size()); // Must have visit all arguments
 
   return m_builder.CreateCall(xfbFetcher, xfbFetcherArgs);
 }
