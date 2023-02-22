@@ -30,9 +30,9 @@ def LgcDialect : Dialect {
   let cppNamespace = "lgc";
 }
 
-def BufferPointer : PointerType<7>;
+def BufferPointer : TgConstant<(PointerType 7)>, Type;
 
-def V4I32 : FixedVectorType<4, I32>;
+def V4I32 : TgConstant<(FixedVectorType I32, 4)>, Type;
 
 class LgcOp<string mnemonic_, list<Trait> traits_ = []>
     : Op<LgcDialect, mnemonic_, traits_ # [NoUnwind]>;
@@ -53,7 +53,7 @@ class LgcOp<string mnemonic_, list<Trait> traits_ = []>
 
 def BufferLengthOp : LgcOp<"buffer.length", [Memory<[]>, WillReturn]> {
   // TODO: Change to BufferPointer after we switch to opaque pointers.
-  let arguments = (ins AnyPointerType:$pointer, I32:$offset);
+  let arguments = (ins PointerType:$pointer, I32:$offset);
   let results = (outs I32:$result);
 
   let summary = "return the size of a buffer";
@@ -70,10 +70,8 @@ def BufferLengthOp : LgcOp<"buffer.length", [Memory<[]>, WillReturn]> {
 
 def BufferPtrDiffOp : LgcOp<"buffer.ptr.diff", [Memory<[]>, WillReturn]> {
   // TODO: Change to BufferPointer after we switch to opaque pointers.
-  let arguments = (ins AnyPointerType:$lhs, AnyPointerType:$rhs);
+  let arguments = (ins PointerType:$lhs, (eq $lhs):$rhs);
   let results = (outs I64:$result);
-
-  let verifier = [(SameTypes $lhs, $rhs)];
 
   let summary = "return the difference between buffer pointers in bytes";
   let description = [{
