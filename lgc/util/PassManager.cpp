@@ -109,6 +109,7 @@ public:
   void run(Module &module) override;
   void setPassIndex(unsigned *passIndex) override { m_passIndex = passIndex; }
   PassInstrumentationCallbacks &getInstrumentationCallbacks() override { return m_instrumentationCallbacks; }
+  bool stopped() const override { return m_stopped; }
 
 private:
   void registerCallbacks();
@@ -122,6 +123,8 @@ private:
   StandardInstrumentations m_instrumentationStandard;      // LLVM's Standard instrumentations
   unsigned *m_passIndex = nullptr;                         // Pass Index.
   bool initialized = false;                                // Whether the pass manager is initialized or not
+  std::string m_stopAfter;
+  bool m_stopped = false;
 };
 
 } // namespace
@@ -188,6 +191,12 @@ PassManagerImpl::PassManagerImpl(LgcContext *lgcContext)
   if (!cl::DumpCfgAfter.empty())
     report_fatal_error("The --dump-cfg-after option is not supported with the new pass manager.");
 
+  auto &options = cl::getRegisteredOptions();
+
+  auto it = options.find("stop-after");
+  assert(it != options.end());
+  m_stopAfter = static_cast<cl::opt<std::string> *>(it->second)->getValue();
+
   // Setup custom instrumentation callbacks and register LLVM's default module
   // analyses to the analysis manager.
   registerCallbacks();
@@ -242,19 +251,28 @@ void PassManagerImpl::registerCallbacks() {
   m_instrumentationCallbacks.registerBeforeSkippedPassCallback(beforePass);
   m_instrumentationCallbacks.registerBeforeNonSkippedPassCallback(beforePass);
 
-  m_instrumentationCallbacks.registerShouldRunOptionalPassCallback([this](StringRef passName, Any ir) { // NOLINT
+  m_instrumentationCallbacks.registerShouldRunOptionalPassCallback([this](StringRef className, Any ir) { // NOLINT
+    if (m_stopped)
+      return false;
+
     // Skip the jump threading pass as it interacts really badly with the structurizer.
-    if (passName == JumpThreadingPass::name())
+    if (className == JumpThreadingPass::name())
       return false;
     // Check if the user disabled that specific pass index.
-    if (passName != PrintModulePass::name() && m_passIndex) {
+    if (className != PrintModulePass::name() && m_passIndex) {
       unsigned passIndex = *m_passIndex;
       for (auto disableIndex : cl::DisablePassIndices) {
         if (disableIndex == passIndex) {
-          LLPC_OUTS("Pass[" << passIndex << "] = " << passName << " (disabled)\n");
+          LLPC_OUTS("Pass[" << passIndex << "] = " << className << " (disabled)\n");
           return false;
         }
       }
+    }
+
+    StringRef passName = m_instrumentationCallbacks.getPassNameForClassName(className);
+    if (!m_stopAfter.empty() && passName == m_stopAfter) {
+      // This particular pass still gets to run, but we skip everything afterwards.
+      m_stopped = true;
     }
     return true;
   });

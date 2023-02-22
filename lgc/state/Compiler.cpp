@@ -220,15 +220,18 @@ bool PipelineState::generate(std::unique_ptr<Module> pipelineModule, raw_pwrite_
     // Add pass to clear pipeline state from IR
     passMgr->addPass(PipelineStateClearer());
 
-    // Code generation.
-    std::unique_ptr<LegacyPassManager> codegenPassMgr(LegacyPassManager::Create());
-    unsigned passIndex = 2000;
-    codegenPassMgr->setPassIndex(&passIndex);
-    getLgcContext()->addTargetPasses(*codegenPassMgr, codeGenTimer, outStream);
     // Run the pipeline passes until codegen.
     passMgr->run(*pipelineModule);
-    // Run the codegen passes
-    codegenPassMgr->run(*pipelineModule);
+    if (passMgr->stopped()) {
+      outStream << *pipelineModule;
+    } else {
+      // Code generation.
+      std::unique_ptr<LegacyPassManager> codegenPassMgr(LegacyPassManager::Create());
+      unsigned passIndex = 2000;
+      codegenPassMgr->setPassIndex(&passIndex);
+      getLgcContext()->addTargetPasses(*codegenPassMgr, codeGenTimer, outStream);
+      codegenPassMgr->run(*pipelineModule);
+    }
   }
 
   // See if there was a recoverable error.
