@@ -513,6 +513,7 @@ Function *NggPrimShader::generate(Function *esMain, Function *gsMain, Function *
   // ES and GS could not be null at the same time
   assert((!esMain && !gsMain) == false);
 
+  // Assign names to ES, GS and copy shader main functions
   Module *module = nullptr;
   if (esMain) {
     module = esMain->getParent();
@@ -544,7 +545,70 @@ Function *NggPrimShader::generate(Function *esMain, Function *gsMain, Function *
     m_gsHandlers.copyShader = copyShader;
   }
 
-  return generatePrimShaderEntryPoint(module);
+  // Create primitive shader entry-point
+  uint64_t inRegMask = 0;
+  auto primShaderTy = getPrimShaderType(inRegMask);
+
+  Function *primShader = Function::Create(primShaderTy, GlobalValue::ExternalLinkage, lgcName::NggPrimShaderEntryPoint);
+  primShader->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
+  primShader->addFnAttr("amdgpu-flat-work-group-size",
+                        "128,128"); // Force s_barrier to be present (ignore optimization)
+
+  module->getFunctionList().push_front(primShader);
+
+  SmallVector<Argument *, 32> args;
+  for (auto &arg : primShader->args()) {
+    auto argIdx = arg.getArgNo();
+    if (inRegMask & (1ull << argIdx))
+      arg.addAttr(Attribute::InReg);
+    args.push_back(&arg);
+  }
+
+  // Assign names to part of primitive shader arguments
+  Value *userData = args[NumSpecialSgprInputs];
+  userData->setName("userData");
+
+  ArrayRef<Argument *> vgprArgs(args.begin() + NumSpecialSgprInputs + 1, args.end());
+  if (m_gfxIp.major <= 11) {
+    // GS VGPRs
+    vgprArgs[0]->setName("esGsOffsets01");
+    vgprArgs[1]->setName("esGsOffsets23");
+    vgprArgs[2]->setName("primitiveId");
+    vgprArgs[3]->setName("invocationId");
+    vgprArgs[4]->setName("esGsOffsets45");
+
+    // ES VGPRs
+    if (m_hasTes) {
+      vgprArgs[5]->setName("tessCoordX");
+      vgprArgs[6]->setName("tessCoordY");
+      vgprArgs[7]->setName("relPatchId");
+      vgprArgs[8]->setName("patchId");
+    } else {
+      vgprArgs[5]->setName("vertexId");
+      // VGPR6 and VGPR7 are unused
+      vgprArgs[8]->setName("instanceId");
+    }
+  } else {
+    llvm_unreachable("Not implemented!");
+  }
+
+  // Setup LDS layout
+  m_lds = Patch::getLdsVariable(m_pipelineState, module);
+  layoutPrimShaderLds(m_pipelineState, &m_ldsLayout);
+
+  // Build primitive shader body
+  if (m_hasGs) {
+    // API GS is present
+    buildPrimShaderWithGs(primShader);
+  } else if (m_nggControl->passthroughMode) {
+    // NGG passthrough mode is enabled
+    buildPassthroughPrimShader(primShader);
+  } else {
+    // NGG passthrough mode is disabled
+    buildPrimShader(primShader);
+  }
+
+  return primShader;
 }
 
 // =====================================================================================================================
@@ -655,17 +719,16 @@ unsigned NggPrimShader::calcVertexCullInfoSizeAndOffsets(PipelineState *pipeline
 }
 
 // =====================================================================================================================
-// Generates the entry-point type of primitive shader.
+// Get primitive shader entry-point type.
 //
-// @param module : IR module (for getting ES function if needed to get vertex fetch types)
 // @param [out] inRegMask : "Inreg" bit mask for the arguments
-FunctionType *NggPrimShader::generatePrimShaderEntryPointType(Module *module, uint64_t *inRegMask) {
+FunctionType *NggPrimShader::getPrimShaderType(uint64_t &inRegMask) {
   SmallVector<Type *, 32> argTys;
 
   // First 8 system values (SGPRs)
   for (unsigned i = 0; i < NumSpecialSgprInputs; ++i) {
     argTys.push_back(m_builder.getInt32Ty());
-    *inRegMask |= (1ull << i);
+    inRegMask |= (1ull << i);
   }
 
   // User data (SGPRs)
@@ -702,7 +765,7 @@ FunctionType *NggPrimShader::generatePrimShaderEntryPointType(Module *module, ui
 
   assert(userDataCount > 0);
   argTys.push_back(FixedVectorType::get(m_builder.getInt32Ty(), userDataCount));
-  *inRegMask |= (1ull << NumSpecialSgprInputs);
+  inRegMask |= (1ull << NumSpecialSgprInputs);
 
   if (m_gfxIp.major <= 11) {
     // GS VGPRs
@@ -743,78 +806,6 @@ FunctionType *NggPrimShader::generatePrimShaderEntryPointType(Module *module, ui
   }
 
   return FunctionType::get(m_builder.getVoidTy(), argTys, false);
-}
-
-// =====================================================================================================================
-// Generates the entry-point for primitive shader.
-//
-// @param module : LLVM module
-Function *NggPrimShader::generatePrimShaderEntryPoint(Module *module) {
-  uint64_t inRegMask = 0;
-  auto entryPointTy = generatePrimShaderEntryPointType(module, &inRegMask);
-
-  // Generate entry-point of primitive shader
-  Function *entryPoint = Function::Create(entryPointTy, GlobalValue::ExternalLinkage, lgcName::NggPrimShaderEntryPoint);
-  entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
-
-  module->getFunctionList().push_front(entryPoint);
-
-  entryPoint->addFnAttr("amdgpu-flat-work-group-size",
-                        "128,128"); // Force s_barrier to be present (ignore optimization)
-
-  SmallVector<Argument *, 32> args;
-  for (auto &arg : entryPoint->args()) {
-    auto argIdx = arg.getArgNo();
-    if (inRegMask & (1ull << argIdx))
-      arg.addAttr(Attribute::InReg);
-    args.push_back(&arg);
-  }
-
-  // Assign names to part of primitive shader arguments
-  Value *userData = args[NumSpecialSgprInputs];
-  userData->setName("userData");
-
-  ArrayRef<Argument *> vgprArgs(args.begin() + NumSpecialSgprInputs + 1, args.end());
-  if (m_gfxIp.major <= 11) {
-    // GS VGPRs
-    vgprArgs[0]->setName("esGsOffsets01");
-    vgprArgs[1]->setName("esGsOffsets23");
-    vgprArgs[2]->setName("primitiveId");
-    vgprArgs[3]->setName("invocationId");
-    vgprArgs[4]->setName("esGsOffsets45");
-
-    // ES VGPRs
-    if (m_hasTes) {
-      vgprArgs[5]->setName("tessCoordX");
-      vgprArgs[6]->setName("tessCoordY");
-      vgprArgs[7]->setName("relPatchId");
-      vgprArgs[8]->setName("patchId");
-    } else {
-      vgprArgs[5]->setName("vertexId");
-      // VGPR6 and VGPR7 are unused
-      vgprArgs[8]->setName("instanceId");
-    }
-  } else {
-    llvm_unreachable("Not implemented!");
-  }
-
-  // Setup LDS layout
-  m_lds = Patch::getLdsVariable(m_pipelineState, module);
-  layoutPrimShaderLds(m_pipelineState, &m_ldsLayout);
-
-  // Build primitive shader body
-  if (m_hasGs) {
-    // API GS is present
-    buildPrimShaderWithGs(entryPoint);
-  } else if (m_nggControl->passthroughMode) {
-    // NGG passthrough mode is enabled
-    buildPassthroughPrimShader(entryPoint);
-  } else {
-    // NGG passthrough mode is disabled
-    buildPrimShader(entryPoint);
-  }
-
-  return entryPoint;
 }
 
 // =====================================================================================================================
