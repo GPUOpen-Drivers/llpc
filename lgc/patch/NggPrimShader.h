@@ -235,6 +235,9 @@ private:
   void runCopyShader(llvm::ArrayRef<llvm::Argument *> args);
   void mutateCopyShader();
 
+  void appendUserData(llvm::SmallVectorImpl<llvm::Value *> &args, llvm::Function *target, llvm::Value *userData,
+                      unsigned userDataCount);
+
   void exportGsOutput(llvm::Value *output, unsigned location, unsigned compIdx, unsigned streamId,
                       llvm::Value *threadIdInSubgroup, llvm::Value *emitVerts);
 
