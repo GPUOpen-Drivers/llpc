@@ -3867,7 +3867,7 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsi
     Value *args[] = {ConstantInt::get(Type::getInt32Ty(*m_context), xfbBuffer),
                      ConstantInt::get(Type::getInt32Ty(*m_context), xfbOffset),
                      ConstantInt::get(Type::getInt32Ty(*m_context), streamId), storeValue};
-    std::string callName = lgcName::NggXfbOutputExport + getTypeName(storeValue->getType());
+    std::string callName = lgcName::NggXfbExport + getTypeName(storeValue->getType());
     emitCall(callName, Type::getVoidTy(*m_context), args, {}, insertPos);
     return;
   }

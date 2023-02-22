@@ -161,8 +161,8 @@ unsigned NggPrimShader::calcEsGsRingItemSize(PipelineState *pipelineState) {
       auto resUsage = pipelineState->getShaderResourceUsage(hasTes ? ShaderStageTessEval : ShaderStageVertex);
 
       // NOTE: For GFX11+, transform feedback outputs (each output is <4 x dword>) are stored as a ES-GS ring item.
-      assert(resUsage->inOutUsage.xfbOutputExpCount > 0);
-      esGsRingItemSize = resUsage->inOutUsage.xfbOutputExpCount * 4;
+      assert(resUsage->inOutUsage.xfbExpCount > 0);
+      esGsRingItemSize = resUsage->inOutUsage.xfbExpCount * 4;
     }
 
     // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
@@ -639,7 +639,7 @@ unsigned NggPrimShader::calcVertexCullInfoSizeAndOffsets(PipelineState *pipeline
     auto resUsage = pipelineState->getShaderResourceUsage(hasTes ? ShaderStageTessEval : ShaderStageVertex);
 
     // NOTE: Each transform feedback output is <4 x dword>.
-    const unsigned xfbOutputCount = resUsage->inOutUsage.xfbOutputExpCount;
+    const unsigned xfbOutputCount = resUsage->inOutUsage.xfbExpCount;
     itemSize = sizeof(VertexCullInfo::xfbOutputs) * xfbOutputCount / sizeof(unsigned);
     cullInfoSize += itemSize;
     vertCullInfoOffsets.xfbOutputs = cullInfoOffset;
@@ -1020,7 +1020,7 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
     m_builder.SetInsertPoint(exportVertexBlock);
 
     // NOTE: For NGG passthrough mode, if SW-emulated stream-out is enabled, running ES is included in processing
-    // transform feedback output exporting. There won't be separated ES running (ES is not split any more). This is
+    // transform feedback exporting. There won't be separated ES running (ES is not split any more). This is
     // because we could encounter special cases in which there are memory atomics producing output values both for
     // transform feedback exporting and for vertex exporting like following codes. The atomics shouldn't be separated
     // and be run multiple times.
@@ -3301,7 +3301,7 @@ void NggPrimShader::splitEs() {
     if (func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_exp)
       expFuncs.push_back(&func);
     else if (m_gfxIp.major >= 11) {
-      if (func.getName().startswith(lgcName::NggAttribExport) || func.getName().startswith(lgcName::NggXfbOutputExport))
+      if (func.getName().startswith(lgcName::NggAttribExport) || func.getName().startswith(lgcName::NggXfbExport))
         expFuncs.push_back(&func);
     }
   }
@@ -6179,7 +6179,7 @@ void NggPrimShader::processSwXfb(ArrayRef<Argument *> args) {
   BasicBlock *endExportXfbOutputBlock = createBlock(xfbEntryBlock->getParent(), ".endExportXfbOutput");
   endExportXfbOutputBlock->moveAfter(exportXfbOutputBlock);
 
-  // Insert branching in current block to process transform feedback output export
+  // Insert branching in current block to process transform feedback export
   {
     auto validVertex = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
     m_builder.CreateCondBr(validVertex, fetchXfbOutputBlock, endFetchXfbOutputBlock);
@@ -6631,7 +6631,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
     }
   }
 
-  // Insert branching in current block to process transform feedback output export
+  // Insert branching in current block to process transform feedback export
   {
     auto validWave =
         m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(waveCountInSubgroup + 1));
@@ -7117,7 +7117,7 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
   const unsigned xfbOutputCount =
       m_pipelineState
           ->getShaderResourceUsage(m_hasGs ? ShaderStageGeometry : (m_hasTes ? ShaderStageTessEval : ShaderStageVertex))
-          ->inOutUsage.xfbOutputExpCount;
+          ->inOutUsage.xfbExpCount;
 
   // Skip following handling if transform feedback output is empty
   if (xfbOutputCount == 0)
@@ -7134,11 +7134,11 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
   SmallVector<Function *, 8> expFuncs;
   for (auto &func : target->getParent()->functions()) {
     if (dontClone) {
-      if (func.getName().startswith(lgcName::NggXfbOutputExport))
+      if (func.getName().startswith(lgcName::NggXfbExport))
         expFuncs.push_back(&func);
     } else {
       if ((func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_exp) ||
-          func.getName().startswith(lgcName::NggAttribExport) || func.getName().startswith(lgcName::NggXfbOutputExport))
+          func.getName().startswith(lgcName::NggAttribExport) || func.getName().startswith(lgcName::NggXfbExport))
         expFuncs.push_back(&func);
     }
   }
@@ -7205,9 +7205,9 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
       assert(call);
 
       if (!dontClone) {
-        // Remove transform feedback output export calls from the target function. No need of doing this if we
+        // Remove transform feedback export calls from the target function. No need of doing this if we
         // just mutate it without cloning.
-        if (call->getFunction() == target && func->getName().startswith(lgcName::NggXfbOutputExport)) {
+        if (call->getFunction() == target && func->getName().startswith(lgcName::NggXfbExport)) {
           removedCalls.push_back(call);
           continue;
         }
@@ -7218,7 +7218,7 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
 
       assert(call->getParent() == retBlock); // Must in return block
 
-      if (func->getName().startswith(lgcName::NggXfbOutputExport)) {
+      if (func->getName().startswith(lgcName::NggXfbExport)) {
         // Lower transform feedback export calls
         auto xfbBuffer = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
         auto xfbOffset = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
@@ -7287,7 +7287,7 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
     }
   }
 
-  assert(outputIndex == xfbOutputCount); // Visit all transform feedback output export calls
+  assert(outputIndex == xfbOutputCount); // Visit all transform feedback export calls
   m_builder.CreateRet(xfbOutputs);
 
   // Remove calls
