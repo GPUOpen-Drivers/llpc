@@ -37,23 +37,21 @@ def V4I32 : TgConstant<(FixedVectorType I32, 4)>, Type;
 class LgcOp<string mnemonic_, list<Trait> traits_ = []>
     : Op<LgcDialect, mnemonic_, traits_ # [NoUnwind]>;
 
-// TODO: Enable this once we have made the switch to opaque pointers.
-//def BufferDescToPtrOp : LgcOp<"buffer.desc.to.ptr", [ReadNone, WillReturn]> {
-//  let arguments = (ins V4I32:$desc);
-//  let results = (outs BufferPointer:$result);
-//
-//  let summary = "convert a buffer descriptor into a buffer pointer";
-//  let description = [{
-//    Given a buffer descriptor for a storage buffer, returns a fat buffer pointer to the start of the buffer.
-//
-//    The descriptor must be a null descriptor or a valid descriptor for a storage buffer aka raw buffer, i.e. a buffer
-//    for which the indexing feature of BUFFER_LOAD_* instructions is never used.
-//  }];
-//}
+def BufferDescToPtrOp : LgcOp<"buffer.desc.to.ptr", [Memory<[]>, WillReturn]> {
+  let arguments = (ins V4I32:$desc);
+  let results = (outs BufferPointer:$result);
+
+  let summary = "convert a buffer descriptor into a buffer pointer";
+  let description = [{
+    Given a buffer descriptor for a storage buffer, returns a fat buffer pointer to the start of the buffer.
+
+    The descriptor must be a null descriptor or a valid descriptor for a storage buffer aka raw buffer, i.e. a buffer
+    for which the indexing feature of BUFFER_LOAD_* instructions is never used.
+  }];
+}
 
 def BufferLengthOp : LgcOp<"buffer.length", [Memory<[]>, WillReturn]> {
-  // TODO: Change to BufferPointer after we switch to opaque pointers.
-  let arguments = (ins PointerType:$pointer, I32:$offset);
+  let arguments = (ins BufferPointer:$pointer, I32:$offset);
   let results = (outs I32:$result);
 
   let summary = "return the size of a buffer";
@@ -69,8 +67,7 @@ def BufferLengthOp : LgcOp<"buffer.length", [Memory<[]>, WillReturn]> {
 }
 
 def BufferPtrDiffOp : LgcOp<"buffer.ptr.diff", [Memory<[]>, WillReturn]> {
-  // TODO: Change to BufferPointer after we switch to opaque pointers.
-  let arguments = (ins PointerType:$lhs, (eq $lhs):$rhs);
+  let arguments = (ins BufferPointer:$lhs, BufferPointer:$rhs);
   let results = (outs I64:$result);
 
   let summary = "return the difference between buffer pointers in bytes";

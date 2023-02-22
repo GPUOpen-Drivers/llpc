@@ -35,6 +35,7 @@
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
+#include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/Analysis/DivergenceAnalysis.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
@@ -451,71 +452,68 @@ void PatchBufferOp::visitBitCastInst(BitCastInst &bitCastInst) {
 //
 // @param callInst : The instruction
 void PatchBufferOp::visitCallInst(CallInst &callInst) {
-  Function *const calledFunc = callInst.getCalledFunction();
+  static auto visitor =
+      llvm_dialects::VisitorBuilder<PatchBufferOp>()
+          .add<BufferDescToPtrOp>([](PatchBufferOp &self, BufferDescToPtrOp &descToPtr) {
+            Constant *const nullPointer = ConstantPointerNull::get(self.m_offsetType);
+            self.m_replacementMap[&descToPtr] = std::make_pair(descToPtr.getDesc(), nullPointer);
 
-  // If the call does not have a called function, bail.
-  if (!calledFunc)
-    return;
+            // Check for any invariant starts that use the pointer.
+            if (self.removeUsersForInvariantStarts(&descToPtr))
+              self.m_invariantSet.insert(descToPtr.getDesc());
 
-  const StringRef callName(calledFunc->getName());
+            // If the incoming index to the fat pointer launder was divergent, remember it.
+            if (self.m_isDivergent(*descToPtr.getDesc()))
+              self.m_divergenceSet.insert(descToPtr.getDesc());
+          })
+          .add<BufferLengthOp>([](PatchBufferOp &self, BufferLengthOp &bufferLength) {
+            Replacement pointer = self.getRemappedValue(bufferLength.getPointer());
+
+            // Extract element 2 which is the NUM_RECORDS field from the buffer descriptor.
+            Value *const bufferDesc = pointer.first;
+            Value *numRecords = self.m_builder->CreateExtractElement(bufferDesc, 2);
+            Value *offset = bufferLength.getOffset();
+
+            // If null descriptors are allowed, we must guarantee a 0 result for a null buffer descriptor.
+            //
+            // What we implement here is in fact more robust: ensure that the subtraction of the offset is clamped to 0.
+            // The backend should be able to achieve this with a single additional ALU instruction (e.g. s_max_u32).
+            if (self.m_pipelineState->getOptions().allowNullDescriptor) {
+              Value *const underflow = self.m_builder->CreateICmpUGT(offset, numRecords);
+              numRecords = self.m_builder->CreateSelect(underflow, offset, numRecords);
+            }
+
+            numRecords = self.m_builder->CreateSub(numRecords, offset);
+
+            // Record the call instruction so we remember to delete it later.
+            self.m_replacementMap[&bufferLength] = std::make_pair(nullptr, nullptr);
+
+            bufferLength.replaceAllUsesWith(numRecords);
+          })
+          .add<BufferPtrDiffOp>([](PatchBufferOp &self, BufferPtrDiffOp &ptrDiff) {
+            Value *const lhs = ptrDiff.getLhs();
+            Value *const rhs = ptrDiff.getRhs();
+
+            Value *const lhsPtrToInt =
+                self.m_builder->CreatePtrToInt(self.getRemappedValue(lhs).second, self.m_builder->getInt32Ty());
+            Value *const rhsPtrToInt =
+                self.m_builder->CreatePtrToInt(self.getRemappedValue(rhs).second, self.m_builder->getInt32Ty());
+
+            self.copyMetadata(lhsPtrToInt, lhs);
+            self.copyMetadata(rhsPtrToInt, rhs);
+
+            Value *difference = self.m_builder->CreateSub(lhsPtrToInt, rhsPtrToInt);
+            difference = self.m_builder->CreateSExt(difference, self.m_builder->getInt64Ty());
+
+            // Record the call instruction so we remember to delete it later.
+            self.m_replacementMap[&ptrDiff] = std::make_pair(nullptr, nullptr);
+
+            ptrDiff.replaceAllUsesWith(difference);
+          })
+          .build();
 
   m_builder->SetInsertPoint(&callInst);
-
-  if (callName.equals(lgcName::LateLaunderFatPointer)) {
-    Constant *const nullPointer = ConstantPointerNull::get(m_offsetType);
-    m_replacementMap[&callInst] = std::make_pair(callInst.getArgOperand(0), nullPointer);
-
-    // Check for any invariant starts that use the pointer.
-    if (removeUsersForInvariantStarts(&callInst))
-      m_invariantSet.insert(callInst.getArgOperand(0));
-
-    // If the incoming index to the fat pointer launder was divergent, remember it.
-    if (m_isDivergent(*callInst.getArgOperand(0)))
-      m_divergenceSet.insert(callInst.getArgOperand(0));
-  } else if (auto *bufferLength = dyn_cast<BufferLengthOp>(&callInst)) {
-    Replacement pointer = getRemappedValue(bufferLength->getPointer());
-
-    // Extract element 2 which is the NUM_RECORDS field from the buffer descriptor.
-    Value *const bufferDesc = pointer.first;
-    Value *numRecords = m_builder->CreateExtractElement(bufferDesc, 2);
-    Value *offset = bufferLength->getOffset();
-
-    // If null descriptors are allowed, we must guarantee a 0 result for a null buffer descriptor.
-    //
-    // What we implement here is in fact more robust: ensure that the subtraction of the offset is clamped to 0.
-    // The backend should be able to achieve this with a single additional ALU instruction (e.g. s_max_u32).
-    if (m_pipelineState->getOptions().allowNullDescriptor) {
-      Value *const underflow = m_builder->CreateICmpUGT(offset, numRecords);
-      numRecords = m_builder->CreateSelect(underflow, offset, numRecords);
-    }
-
-    numRecords = m_builder->CreateSub(numRecords, offset);
-
-    // Record the call instruction so we remember to delete it later.
-    m_replacementMap[bufferLength] = std::make_pair(nullptr, nullptr);
-
-    bufferLength->replaceAllUsesWith(numRecords);
-  } else if (auto *ptrDiff = dyn_cast<BufferPtrDiffOp>(&callInst)) {
-    Value *const lhs = ptrDiff->getLhs();
-    Value *const rhs = ptrDiff->getRhs();
-
-    assert(lhs->getType()->isPointerTy() && lhs->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_FAT_POINTER &&
-           rhs->getType()->isPointerTy() && rhs->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_FAT_POINTER &&
-           "Argument to BufferPtrDiff is not a buffer fat pointer");
-
-    Value *const lhsPtrToInt = m_builder->CreatePtrToInt(getRemappedValue(lhs).second, m_builder->getInt64Ty());
-    Value *const rhsPtrToInt = m_builder->CreatePtrToInt(getRemappedValue(rhs).second, m_builder->getInt64Ty());
-
-    copyMetadata(lhsPtrToInt, lhs);
-    copyMetadata(rhsPtrToInt, rhs);
-
-    Value *const difference = m_builder->CreateSub(lhsPtrToInt, rhsPtrToInt);
-
-    // Record the call instruction so we remember to delete it later.
-    m_replacementMap[ptrDiff] = std::make_pair(nullptr, nullptr);
-
-    ptrDiff->replaceAllUsesWith(difference);
-  }
+  visitor.visit(*this, callInst);
 }
 
 // =====================================================================================================================

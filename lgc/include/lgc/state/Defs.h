@@ -102,8 +102,6 @@ const static char SpecialUserData[] = "lgc.special.user.data.";
 // Get shader input. Arg is ShaderInput enum value.
 const static char ShaderInput[] = "lgc.shader.input.";
 
-const static char LateLaunderFatPointer[] = "lgc.late.launder.fat.pointer";
-
 // Names of global variables
 const static char ImmutableSamplerGlobal[] = "lgc.immutable.sampler";
 const static char ImmutableConvertingSamplerGlobal[] = "lgc.immutable.converting.sampler";
