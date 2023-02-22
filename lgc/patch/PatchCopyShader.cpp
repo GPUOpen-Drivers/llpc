@@ -571,9 +571,9 @@ Value *PatchCopyShader::loadValueFromGsVsRing(Type *loadTy, unsigned location, u
   assert(elemTy->isIntegerTy(32) || elemTy->isFloatTy()); // Must be 32-bit type
 
   if (m_pipelineState->getNggControl()->enableNgg) {
-    // NOTE: For NGG, importing GS output from GS-VS ring is represented by a call and the call is replaced with
+    // NOTE: For NGG, reading GS output from GS-VS ring is represented by a call and the call is replaced with
     // real instructions when when NGG primitive shader is generated.
-    std::string callName(lgcName::NggGsOutputImport);
+    std::string callName(lgcName::NggReadGsOutput);
     callName += getTypeName(loadTy);
     return builder.CreateNamedCall(callName, loadTy, {builder.getInt32(location), builder.getInt32(streamId)},
                                    {Attribute::Speculatable, Attribute::ReadOnly, Attribute::WillReturn});
