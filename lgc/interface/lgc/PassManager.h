@@ -63,6 +63,7 @@ public:
   virtual void registerPass(llvm::StringRef passName, llvm::StringRef className) = 0;
   virtual void run(llvm::Module &module) = 0;
   virtual void setPassIndex(unsigned *passIndex) = 0;
+  virtual bool stopped() const = 0;
 
   virtual llvm::PassInstrumentationCallbacks &getInstrumentationCallbacks() = 0;
 
