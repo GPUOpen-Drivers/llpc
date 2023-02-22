@@ -690,11 +690,11 @@ void PatchCopyShader::exportXfbOutput(Value *outputValue, const XfbOutInfo &xfbO
     }
   }
 
-  // Collect transform feedback output export calls, used in SW-emulated stream-out.
+  // Collect transform feedback export calls, used in SW-emulated stream-out.
   if (m_pipelineState->enableSwXfb()) {
     auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader)->inOutUsage;
-    // A transform feedback output export call is expected to be <4 x dword> at most
-    inOutUsage.xfbOutputExpCount += outputValue->getType()->getPrimitiveSizeInBits() > 128 ? 2 : 1;
+    // A transform feedback export call is expected to be <4 x dword> at most
+    inOutUsage.xfbExpCount += outputValue->getType()->getPrimitiveSizeInBits() > 128 ? 2 : 1;
   }
 
   Value *args[] = {builder.getInt32(xfbOutInfo.xfbBuffer), builder.getInt32(xfbOutInfo.xfbOffset),
@@ -725,11 +725,11 @@ void PatchCopyShader::exportBuiltInOutput(Value *outputValue, BuiltInKind builtI
     auto &locInfoXfbOutInfoMap = resUsage->inOutUsage.locInfoXfbOutInfoMap;
     const auto &locInfoXfbOutInfoMapIt = locInfoXfbOutInfoMap.find(outLocInfo);
     if (locInfoXfbOutInfoMapIt != locInfoXfbOutInfoMap.end()) {
-      // Collect transform feedback output export calls, used in SW-emulated stream-out.
+      // Collect transform feedback export calls, used in SW-emulated stream-out.
       if (m_pipelineState->enableSwXfb()) {
         auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader)->inOutUsage;
-        // A transform feedback output export call is expected to be <4 x dword> at most
-        inOutUsage.xfbOutputExpCount += outputValue->getType()->getPrimitiveSizeInBits() > 128 ? 2 : 1;
+        // A transform feedback export call is expected to be <4 x dword> at most
+        inOutUsage.xfbExpCount += outputValue->getType()->getPrimitiveSizeInBits() > 128 ? 2 : 1;
       }
 
       const auto &xfbOutInfo = locInfoXfbOutInfoMapIt->second;
