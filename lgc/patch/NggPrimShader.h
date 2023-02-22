@@ -204,8 +204,7 @@ private:
   static unsigned calcVertexCullInfoSizeAndOffsets(PipelineState *pipelineState,
                                                    VertexCullInfoOffsets &vertCullInfoOffsets);
 
-  llvm::FunctionType *generatePrimShaderEntryPointType(llvm::Module *module, uint64_t *inRegMask);
-  llvm::Function *generatePrimShaderEntryPoint(llvm::Module *module);
+  llvm::FunctionType *getPrimShaderType(uint64_t &inRegMask);
 
   void buildPrimShaderCbLayoutLookupTable();
 
