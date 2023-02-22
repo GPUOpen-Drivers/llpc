@@ -437,6 +437,9 @@ struct GfxIpVersion {
   bool operator>=(const GfxIpVersion &rhs) const {
     return std::tie(major, minor, stepping) >= std::tie(rhs.major, rhs.minor, rhs.stepping);
   }
+  bool isGfx(unsigned rhsMajor, unsigned rhsMinor) const {
+    return std::tie(major, minor) == std::tie(rhsMajor, rhsMinor);
+  }
 };
 
 /// Represents shader binary data.
