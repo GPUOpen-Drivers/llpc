@@ -114,8 +114,8 @@ const static char LsHsEntryPoint[] = "lgc.shader.LSHS.main";
 
 const static char NggAttribExport[] = "lgc.ngg.attrib.export";
 const static char NggXfbOutputExport[] = "lgc.ngg.xfb.output.export.";
-const static char NggGsOutputExport[] = "lgc.ngg.GS.output.export.";
-const static char NggGsOutputImport[] = "lgc.ngg.GS.output.import.";
+const static char NggWriteGsOutput[] = "lgc.ngg.write.GS.output.";
+const static char NggReadGsOutput[] = "lgc.ngg.read.GS.output.";
 const static char NggPrimShaderEntryPoint[] = "lgc.shader.PRIM.main";
 
 const static char EntryPointPrefix[] = "lgc.shader.";

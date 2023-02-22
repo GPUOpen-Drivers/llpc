@@ -237,12 +237,11 @@ private:
   void appendUserData(llvm::SmallVectorImpl<llvm::Value *> &args, llvm::Function *target, llvm::Value *userData,
                       unsigned userDataCount);
 
-  void exportGsOutput(llvm::Value *output, unsigned location, unsigned compIdx, unsigned streamId,
-                      llvm::Value *threadIdInSubgroup, llvm::Value *emitVerts);
+  void writeGsOutput(llvm::Value *output, unsigned location, unsigned compIdx, unsigned streamId,
+                     llvm::Value *primitiveIndex, llvm::Value *emitVerts);
+  llvm::Value *readGsOutput(llvm::Type *outputTy, unsigned location, unsigned streamId, llvm::Value *vertexOffset);
 
-  llvm::Value *importGsOutput(llvm::Type *outputTy, unsigned location, unsigned streamId, llvm::Value *vertexOffset);
-
-  void processGsEmit(unsigned streamId, llvm::Value *threadIdInSubgroup, llvm::Value *emitVertsPtr,
+  void processGsEmit(unsigned streamId, llvm::Value *primitiveIndex, llvm::Value *emitVertsPtr,
                      llvm::Value *outVertsPtr);
   void processGsCut(unsigned streamId, llvm::Value *outVertsPtr);
 
