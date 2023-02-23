@@ -1308,7 +1308,7 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
 
           auto xfbOffset = m_builder->getInt32(outputMeta.XfbOffset + outputMeta.XfbExtraOffset + byteSize * idx);
           m_builder->CreateWriteXfbOutput(elem,
-                                          /*isBuiltIn=*/true, builtInId, outputMeta.XfbBuffer, outputMeta.XfbStride,
+                                          /*isBuiltIn=*/true, builtInId, 0, outputMeta.XfbBuffer, outputMeta.XfbStride,
                                           xfbOffset, outputInfo);
 
           if (!static_cast<bool>(EnableXfb)) {
@@ -1323,7 +1323,8 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
           LLPC_OUTS(*outputValue->getType() << " (builtin = " << builtInName.substr(strlen("BuiltIn")) << "), "
                                             << "xfbBuffer = " << outputMeta.XfbBuffer << ", "
                                             << "xfbStride = " << outputMeta.XfbStride << ", "
-                                            << "xfbOffset = " << cast<ConstantInt>(xfbOffset)->getZExtValue() << "\n");
+                                            << "xfbOffset = " << cast<ConstantInt>(xfbOffset)->getZExtValue() << ", "
+                                            << "streamId = " << outputMeta.StreamId << "\n");
         }
       }
     } else {
@@ -1398,7 +1399,7 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
         assert(xfbOffsetAdjust == 0 && xfbBufferAdjust == 0); // Unused for built-ins
         auto xfbOffset = m_builder->getInt32(outputMeta.XfbOffset + outputMeta.XfbExtraOffset);
         m_builder->CreateWriteXfbOutput(outputValue,
-                                        /*isBuiltIn=*/true, builtInId, outputMeta.XfbBuffer, outputMeta.XfbStride,
+                                        /*isBuiltIn=*/true, builtInId, 0, outputMeta.XfbBuffer, outputMeta.XfbStride,
                                         xfbOffset, outputInfo);
 
         if (!static_cast<bool>(EnableXfb)) {
@@ -1412,7 +1413,8 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
         LLPC_OUTS(*outputValue->getType() << " (builtin = " << builtInName.substr(strlen("BuiltIn")) << "), "
                                           << "xfbBuffer = " << outputMeta.XfbBuffer << ", "
                                           << "xfbStride = " << outputMeta.XfbStride << ", "
-                                          << "xfbOffset = " << cast<ConstantInt>(xfbOffset)->getZExtValue() << "\n");
+                                          << "xfbOffset = " << cast<ConstantInt>(xfbOffset)->getZExtValue() << ", "
+                                          << "streamID = " << outputMeta.StreamId << "\n");
       }
 
       if (builtInId == lgc::BuiltInCullPrimitive && outputTy->isIntegerTy(32)) {
@@ -1443,8 +1445,8 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
       Value *xfbOffset = m_builder->getInt32(outputMeta.XfbOffset + outputMeta.XfbExtraOffset + xfbOffsetAdjust);
       m_builder->CreateWriteXfbOutput(outputValue,
                                       /*isBuiltIn=*/false, location + cast<ConstantInt>(locOffset)->getZExtValue(),
-                                      outputMeta.XfbBuffer + xfbBufferAdjust, outputMeta.XfbStride, xfbOffset,
-                                      outputInfo);
+                                      outputMeta.Component, outputMeta.XfbBuffer + xfbBufferAdjust,
+                                      outputMeta.XfbStride, xfbOffset, outputInfo);
 
       if (!static_cast<bool>(EnableXfb)) {
         LLPC_OUTS("\n===============================================================================\n");
@@ -1454,10 +1456,11 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
       }
 
       LLPC_OUTS(*outputValue->getType() << " (loc = " << location + cast<ConstantInt>(locOffset)->getZExtValue()
-                                        << "), "
+                                        << ", comp = " << outputMeta.Component << "), "
                                         << "xfbBuffer = " << outputMeta.XfbBuffer + xfbBufferAdjust << ", "
                                         << "xfbStride = " << outputMeta.XfbStride << ", "
-                                        << "xfbOffset = " << cast<ConstantInt>(xfbOffset)->getZExtValue() << "\n");
+                                        << "xfbOffset = " << cast<ConstantInt>(xfbOffset)->getZExtValue() << ", "
+                                        << "streamID = " << outputMeta.StreamId << "\n");
     }
 
     m_builder->CreateWriteGenericOutput(outputValue, location, locOffset, elemIdx, maxLocOffset, outputInfo,

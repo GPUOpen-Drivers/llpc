@@ -404,7 +404,7 @@ void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
     // Export XFB output
     if (m_pipelineState->canPackOutput(ShaderStageGeometry)) {
       // With packing locations, we should collect the XFB output value at an original location
-      DenseMap<unsigned, SmallVector<Value *, 4>> origLocElemsMap;
+      DenseMap<unsigned, std::pair<unsigned, SmallVector<Value *, 4>>> origLocCompElemsMap;
       for (const auto &locInfoXfbInfoPair : locInfoXfbOutInfoMap) {
         const InOutLocationInfo &origLocInfo = locInfoXfbInfoPair.first;
         if (origLocInfo.getStreamId() != streamId || origLocInfo.isBuiltIn())
@@ -418,12 +418,13 @@ void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
                           ? builder.CreateExtractElement(packedOutValue, newLocInfo.getComponent())
                           : packedOutValue;
 
-        auto &elements = origLocElemsMap[origLocInfo.getLocation()];
+        auto &elements = origLocCompElemsMap[origLocInfo.getLocation()].second;
         elements.push_back(elem);
+        origLocCompElemsMap[origLocInfo.getLocation()].first = origLocInfo.getComponent();
       }
       // Construct original XFB output value and export it
-      for (const auto &locElemsPair : origLocElemsMap) {
-        auto &elements = locElemsPair.second;
+      for (const auto &entry : origLocCompElemsMap) {
+        auto &elements = entry.second.second;
         const unsigned elemCount = elements.size();
         Value *xfbOutValue = nullptr;
         if (elemCount > 1) {
@@ -436,7 +437,8 @@ void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
 
         // Get the XFB out info at the original location info
         InOutLocationInfo origLocInfo;
-        origLocInfo.setLocation(locElemsPair.first);
+        origLocInfo.setLocation(entry.first);
+        origLocInfo.setComponent(entry.second.first);
         origLocInfo.setStreamId(streamId);
         assert(locInfoXfbOutInfoMap.count(origLocInfo) > 0);
         auto &xfbInfo = locInfoXfbOutInfoMap[origLocInfo];

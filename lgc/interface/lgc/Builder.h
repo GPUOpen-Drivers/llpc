@@ -1198,15 +1198,16 @@ public:
   // of those correspondences is actually used when writing to XFB for each affected vertex.
   //
   // @param valueToWrite : Value to write
-  // @param isBuiltIn : True for built-in, false for user output (ignored if not GS)
-  // @param location : Location (row) or built-in kind of output (ignored if not GS)
+  // @param isBuiltIn : True for built-in, false for user output
+  // @param location : Location (row) or built-in kind of output
+  // @param component : Component offset of inputs and outputs (ignored if built-in)
   // @param xfbBuffer : XFB buffer ID
   // @param xfbStride : XFB stride
   // @param xfbOffset : XFB byte offset
   // @param outputInfo : Extra output info (GS stream ID)
   virtual llvm::Instruction *CreateWriteXfbOutput(llvm::Value *valueToWrite, bool isBuiltIn, unsigned location,
-                                                  unsigned xfbBuffer, unsigned xfbStride, llvm::Value *xfbOffset,
-                                                  InOutInfo outputInfo) = 0;
+                                                  unsigned component, unsigned xfbBuffer, unsigned xfbStride,
+                                                  llvm::Value *xfbOffset, InOutInfo outputInfo) = 0;
 
   // Get the type of a built-in -- static edition of the method below, so you can use it without a Builder object.
   //
