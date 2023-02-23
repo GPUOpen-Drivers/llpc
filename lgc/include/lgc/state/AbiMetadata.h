@@ -186,6 +186,14 @@ static constexpr char ApiShaderHash[] = ".api_shader_hash";
 static constexpr char HardwareMapping[] = ".hardware_mapping";
 }; // namespace ShaderMetadataKey
 
+namespace ComputeRegisterMetadataKey {
+static constexpr char TgidXEn[] = ".tgid_x_en";
+static constexpr char TgidYEn[] = ".tgid_y_en";
+static constexpr char TgidZEn[] = ".tgid_z_en";
+static constexpr char TgSizeEn[] = ".tg_size_en";
+static constexpr char TidigCompCnt[] = ".tidig_comp_cnt";
+}; // namespace ComputeRegisterMetadataKey
+
 namespace GraphicsRegisterMetadataKey {
 static constexpr char NggCullingDataReg[] = ".ngg_culling_data_reg";
 static constexpr char LsVgprCompCnt[] = ".ls_vgpr_comp_cnt";
