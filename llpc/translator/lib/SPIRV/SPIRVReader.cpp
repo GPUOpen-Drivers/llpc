@@ -2434,10 +2434,25 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
     }
   }
 
+  Value *const loadPointer =
+      transValue(spvLoad->getSrc(), getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
+
   bool isVolatile = spvLoad->SPIRVMemoryAccess::isVolatile(true);
   const Vkgc::ExtendedRobustness &extendedRobustness = getPipelineOptions()->extendedRobustness;
   if (extendedRobustness.nullDescriptor || extendedRobustness.robustBufferAccess)
     isVolatile |= spvLoad->getSrc()->isVolatile();
+
+  // Translate a volatile load of BuiltInHelperInvocation to a call to IsHelperInvocation.
+  if ((isVolatile || spvLoad->getSrc()->isVolatile()) &&
+      spvLoad->getSrc()->getType()->getPointerStorageClass() == StorageClassInput) {
+    if (GlobalVariable *gv = dyn_cast<GlobalVariable>(loadPointer)) {
+      SPIRVBuiltinVariableKind kind;
+      if (isSPIRVBuiltinVariable(gv, &kind)) {
+        if (kind == spv::BuiltInHelperInvocation)
+          return getBuilder()->CreateIsHelperInvocation();
+      }
+    }
+  }
 
   // We don't require volatile on address spaces that become non-pointers.
   switch (spvLoad->getSrc()->getType()->getPointerStorageClass()) {
@@ -2469,9 +2484,6 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
     isCoherent = true;
 
   const bool isNonTemporal = spvLoad->SPIRVMemoryAccess::isNonTemporal(true);
-
-  Value *const loadPointer =
-      transValue(spvLoad->getSrc(), getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
 
   SPIRVType *const spvLoadType = spvLoad->getSrc()->getType();
 
