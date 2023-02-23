@@ -2264,7 +2264,6 @@ Function *SpirvLowerRayTracing::getOrCreateRemapCapturedVaToReplayVaFunc() {
     Type *int8Ty = m_builder->getInt8Ty();
     Type *int32Ty = m_builder->getInt32Ty();
     Type *int64Ty = m_builder->getInt64Ty();
-    Type *int64PtrTy = m_builder->getBufferDescTy(int64Ty);
 
     // Takes a shader ID (uint64_t) and returns a remapped one (uint64_t)
     auto funcTy = FunctionType::get(int64Ty, {int64Ty}, false);
@@ -2294,8 +2293,7 @@ Function *SpirvLowerRayTracing::getOrCreateRemapCapturedVaToReplayVaFunc() {
                                                       Vkgc::RtCaptureReplayInternalBufferBinding, zero, 0, int8Ty);
 
     auto numEntriesPtr = m_builder->CreateInBoundsGEP(int8Ty, bufferDesc, zero);
-    auto numEntries = m_builder->CreateTrunc(
-        m_builder->CreateLoad(int64Ty, m_builder->CreateBitCast(numEntriesPtr, int64PtrTy)), int32Ty);
+    auto numEntries = m_builder->CreateTrunc(m_builder->CreateLoad(int64Ty, numEntriesPtr), int32Ty);
     m_builder->CreateStore(one, loopIteratorPtr);
     m_builder->CreateBr(loopConditionBlock);
 
@@ -2311,7 +2309,7 @@ Function *SpirvLowerRayTracing::getOrCreateRemapCapturedVaToReplayVaFunc() {
 
     auto entryOffset = m_builder->CreateMul(loopIteratorVal, entryStride);
     auto capturedGpuVaPtr = m_builder->CreateInBoundsGEP(int8Ty, bufferDesc, entryOffset);
-    auto capturedGpuVa = m_builder->CreateLoad(int64Ty, m_builder->CreateBitCast(capturedGpuVaPtr, int64PtrTy));
+    auto capturedGpuVa = m_builder->CreateLoad(int64Ty, capturedGpuVaPtr);
     auto match = m_builder->CreateICmpEQ(shaderId, capturedGpuVa);
     m_builder->CreateCondBr(match, vaMatchBlock, vaMismatchBlock);
 
@@ -2321,7 +2319,7 @@ Function *SpirvLowerRayTracing::getOrCreateRemapCapturedVaToReplayVaFunc() {
     auto replayGpuVaOffset = m_builder->CreateAdd(
         entryOffset, m_builder->getInt32(offsetof(Vkgc::RayTracingCaptureReplayVaMappingEntry, replayGpuVa)));
     auto replayGpuVaPtr = m_builder->CreateInBoundsGEP(int8Ty, bufferDesc, replayGpuVaOffset);
-    auto replayGpuVa = m_builder->CreateLoad(int64Ty, m_builder->CreateBitCast(replayGpuVaPtr, int64PtrTy));
+    auto replayGpuVa = m_builder->CreateLoad(int64Ty, replayGpuVaPtr);
     m_builder->CreateRet(replayGpuVa);
 
     // VA mismatch block

@@ -706,7 +706,7 @@ public:
   };
 
   // Get the type of pointer returned by CreateLoadBufferDesc.
-  llvm::PointerType *getBufferDescTy(llvm::Type *pointeeTy);
+  llvm::PointerType *getBufferDescTy();
 
   // Create a load of a buffer descriptor.
   //

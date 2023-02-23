@@ -176,10 +176,8 @@ Type *Builder::getTransposedMatrixTy(Type *const matrixType) const {
 
 // =====================================================================================================================
 // Get the type of pointer returned by CreateLoadBufferDesc.
-//
-// @param pointeeTy : Type that the returned pointer should point to.
-PointerType *Builder::getBufferDescTy(Type *pointeeTy) {
-  return PointerType::get(pointeeTy, ADDR_SPACE_BUFFER_FAT_POINTER);
+PointerType *Builder::getBufferDescTy() {
+  return PointerType::get(getContext(), ADDR_SPACE_BUFFER_FAT_POINTER);
 }
 
 // =====================================================================================================================
