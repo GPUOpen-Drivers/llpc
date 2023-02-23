@@ -563,9 +563,8 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
     std::unique_ptr<lgc::Builder> desBuilder(Builder::createBuilderImpl(pipelineState->getLgcContext(), pipelineState));
     static_cast<BuilderImplBase *>(&*desBuilder)->setShaderStage(ShaderStageVertex);
     desBuilder->SetInsertPoint(&(*vertexFetches[0]->getFunction()->front().getFirstInsertionPt()));
-    auto desc =
-        desBuilder->CreateLoadBufferDesc(InternalDescriptorSetId, FetchShaderInternalBufferBinding,
-                                         desBuilder->getInt32(0), Builder::BufferFlagAddress, desBuilder->getInt8Ty());
+    auto desc = desBuilder->CreateLoadBufferDesc(InternalDescriptorSetId, FetchShaderInternalBufferBinding,
+                                                 desBuilder->getInt32(0), Builder::BufferFlagAddress);
 
     // The size of each input descriptor is sizeof(UberFetchShaderAttribInfo). vector4
     auto uberFetchAttrType = FixedVectorType::get(builder.getInt32Ty(), 4);

@@ -2290,7 +2290,7 @@ Function *SpirvLowerRayTracing::getOrCreateRemapCapturedVaToReplayVaFunc() {
     auto loopIteratorPtr = m_builder->CreateAlloca(int32Ty, SPIRAS_Private);
 
     auto bufferDesc = m_builder->CreateLoadBufferDesc(Vkgc::InternalDescriptorSetId,
-                                                      Vkgc::RtCaptureReplayInternalBufferBinding, zero, 0, int8Ty);
+                                                      Vkgc::RtCaptureReplayInternalBufferBinding, zero, 0);
 
     auto numEntriesPtr = m_builder->CreateInBoundsGEP(int8Ty, bufferDesc, zero);
     auto numEntries = m_builder->CreateTrunc(m_builder->CreateLoad(int64Ty, numEntriesPtr), int32Ty);

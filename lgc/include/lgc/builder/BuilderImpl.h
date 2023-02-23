@@ -292,7 +292,7 @@ public:
 
   // Create a load of a buffer descriptor.
   llvm::Value *CreateLoadBufferDesc(unsigned descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
-                                    llvm::Type *pointeeTy, const llvm::Twine &instName) override final;
+                                    const llvm::Twine &instName) override final;
 
   // Create a get of the stride (in bytes) of a descriptor.
   llvm::Value *CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
