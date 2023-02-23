@@ -206,6 +206,8 @@ StringRef BuilderRecorder::getCallName(Opcode opcode) {
     return "barrier";
   case Opcode::Kill:
     return "kill";
+  case Opcode::DebugBreak:
+    return "debug.break";
   case Opcode::ReadClock:
     return "read.clock";
   case Opcode::Derivative:
@@ -520,6 +522,14 @@ Value *BuilderRecorder::CreateMatrixInverse(Value *const matrix, const Twine &in
 // @param instName : Name to give final instruction
 Instruction *BuilderRecorder::CreateReadClock(bool realtime, const Twine &instName) {
   return record(Opcode::ReadClock, getInt64Ty(), getInt1(realtime), instName);
+}
+
+// =====================================================================================================================
+// Create a "debug break halt"
+//
+// @param instName : Name to give final instruction
+Instruction *BuilderRecorder::CreateDebugBreak(const Twine &instName) {
+  return record(Opcode::DebugBreak, getVoidTy(), {}, instName);
 }
 
 // =====================================================================================================================
@@ -2202,6 +2212,7 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::SetMeshOutputs:
     case Opcode::Kill:
     case Opcode::ReadClock:
+    case Opcode::DebugBreak:
     case Opcode::WriteBuiltInOutput:
     case Opcode::WriteGenericOutput:
 #if VKI_RAY_TRACING

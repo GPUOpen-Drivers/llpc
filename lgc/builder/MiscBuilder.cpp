@@ -96,6 +96,14 @@ Instruction *MiscBuilder::CreateKill(const Twine &instName) {
 }
 
 // =====================================================================================================================
+// Create a "system halt"
+//
+// @param instName : Name to give instruction(s)
+Instruction *MiscBuilder::CreateDebugBreak(const Twine &instName) {
+  return CreateIntrinsic(Intrinsic::amdgcn_s_sethalt, {}, getInt32(1), nullptr, instName);
+}
+
+// =====================================================================================================================
 // Create a demote to helper invocation operation. Only allowed in a fragment shader.
 //
 // @param instName : Name to give instruction(s)

@@ -1406,6 +1406,11 @@ public:
   // @param instName : Name to give instruction(s)
   virtual llvm::Instruction *CreateKill(const llvm::Twine &instName = "") = 0;
 
+  // Create a "debug break".
+  //
+  // @param instName : Name to give instruction(s)
+  virtual llvm::Instruction *CreateDebugBreak(const llvm::Twine &instName = "") = 0;
+
   // Create a "readclock".
   //
   // @param realtime : Whether to read real-time clock counter

@@ -673,6 +673,9 @@ public:
   // Create a "kill". Only allowed in a fragment shader.
   llvm::Instruction *CreateKill(const llvm::Twine &instName) override final;
 
+  // Create a "debug break".
+  llvm::Instruction *CreateDebugBreak(const llvm::Twine &instName) override final;
+
   // Create a "readclock".
   llvm::Instruction *CreateReadClock(bool realtime, const llvm::Twine &instName) override final;
 

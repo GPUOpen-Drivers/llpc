@@ -4055,6 +4055,11 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpExtInst>(SPIRVValue *cons
   case SPIRVEIS_ShaderTrinaryMinMaxAMD:
     return transTrinaryMinMaxExtInst(spvExtInst, block);
 
+  case SPIRVEIS_NonSemanticDebugBreak:
+    // Only one instruction for this extended instruction set
+    assert(spvExtInst->getExtOp() == NonSemanticDebugBreakDebugBreak);
+    return getBuilder()->CreateDebugBreak();
+
   case SPIRVEIS_Debug:
     return m_dbgTran.transDebugIntrinsic(spvExtInst, block);
 
