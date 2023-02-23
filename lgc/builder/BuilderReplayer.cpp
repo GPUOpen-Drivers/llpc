@@ -397,11 +397,10 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
 
   // Replayer implementations of DescBuilder methods
   case BuilderRecorder::Opcode::LoadBufferDesc: {
-    return m_builder->CreateLoadBufferDesc(cast<ConstantInt>(args[0])->getZExtValue(), // descSet
-                                           cast<ConstantInt>(args[1])->getZExtValue(), // binding
-                                           args[2],                                    // descIndex
-                                           cast<ConstantInt>(args[3])->getZExtValue(), // flags
-                                           m_builder->getInt8Ty());                    // pointeeTy
+    return m_builder->CreateLoadBufferDesc(cast<ConstantInt>(args[0])->getZExtValue(),  // descSet
+                                           cast<ConstantInt>(args[1])->getZExtValue(),  // binding
+                                           args[2],                                     // descIndex
+                                           cast<ConstantInt>(args[3])->getZExtValue()); // flags
   }
 
   case BuilderRecorder::Opcode::GetDescStride:

@@ -351,9 +351,8 @@ void SpirvLowerRayTracingBuiltIn::setShaderTableVariables(GlobalValue *global, S
 Value *SpirvLowerRayTracingBuiltIn::getDispatchRaysInfoDesc(Instruction *insertPos) {
   if (!m_dispatchRaysInfoDesc) {
     m_builder->SetInsertPoint(insertPos);
-    m_dispatchRaysInfoDesc =
-        m_builder->CreateLoadBufferDesc(TraceRayDescriptorSet, RayTracingResourceIndexDispatchRaysInfo,
-                                        m_builder->getInt32(0), 0, m_builder->getInt8Ty());
+    m_dispatchRaysInfoDesc = m_builder->CreateLoadBufferDesc(
+        TraceRayDescriptorSet, RayTracingResourceIndexDispatchRaysInfo, m_builder->getInt32(0), 0);
   }
   return m_dispatchRaysInfoDesc;
 }

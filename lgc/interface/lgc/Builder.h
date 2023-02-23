@@ -717,10 +717,9 @@ public:
   // @param binding : Descriptor binding
   // @param descIndex : Descriptor index
   // @param flags : BufferFlag* bit settings
-  // @param pointeeTy : Type that the returned pointer should point to.
   // @param instName : Name to give instruction(s)
   virtual llvm::Value *CreateLoadBufferDesc(unsigned descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
-                                            llvm::Type *pointeeTy, const llvm::Twine &instName = "") = 0;
+                                            const llvm::Twine &instName = "") = 0;
 
   // Get the type of a descriptor
   //

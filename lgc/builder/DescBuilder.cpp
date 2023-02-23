@@ -53,10 +53,9 @@ using namespace llvm;
 // @param binding : Descriptor binding
 // @param descIndex : Descriptor index
 // @param flags : BufferFlag* bit settings
-// @param pointeeTy : Type that the returned pointer should point to.
 // @param instName : Name to give instruction(s)
 Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Value *descIndex, unsigned flags,
-                                         Type *const pointeeTy, const Twine &instName) {
+                                         const Twine &instName) {
   Value *desc = nullptr;
   bool return64Address = false;
   descIndex = scalarizeIfUniform(descIndex, flags & BufferFlagNonUniform);

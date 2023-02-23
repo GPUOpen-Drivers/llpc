@@ -1085,10 +1085,9 @@ Value *BuilderRecorder::CreateFindSMsb(Value *value, const Twine &instName) {
 // @param binding : Descriptor binding
 // @param descIndex : Descriptor index
 // @param flags : BufferFlag* bit settings
-// @param pointeeTy : Type that the returned pointer should point to
 // @param instName : Name to give instruction(s)
 Value *BuilderRecorder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Value *descIndex, unsigned flags,
-                                             Type *pointeeTy, const Twine &instName) {
+                                             const Twine &instName) {
   return record(Opcode::LoadBufferDesc, getBufferDescTy(),
                 {
                     getInt32(descSet),
