@@ -83,6 +83,7 @@ bool PatchBufferOp::runImpl(Function &function, PipelineState *pipelineState,
   m_pipelineState = pipelineState;
   m_isDivergent = std::move(isDivergent);
   m_context = &function.getContext();
+  m_offsetType = PointerType::get(*m_context, ADDR_SPACE_CONST_32BIT);
 
   IRBuilder<> builder(*m_context);
   m_builder = &builder;
@@ -442,15 +443,7 @@ void PatchBufferOp::visitBitCastInst(BitCastInst &bitCastInst) {
   if (destType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
     return;
 
-  m_builder->SetInsertPoint(&bitCastInst);
-
-  Replacement pointer = getRemappedValue(bitCastInst.getOperand(0));
-
-  Value *const newBitCast = m_builder->CreateBitCast(pointer.second, getRemappedType(bitCastInst.getDestTy()));
-
-  copyMetadata(newBitCast, &bitCastInst);
-
-  m_replacementMap[&bitCastInst] = std::make_pair(pointer.first, newBitCast);
+  m_replacementMap[&bitCastInst] = getRemappedValue(bitCastInst.getOperand(0));
 }
 
 // =====================================================================================================================
@@ -469,7 +462,7 @@ void PatchBufferOp::visitCallInst(CallInst &callInst) {
   m_builder->SetInsertPoint(&callInst);
 
   if (callName.equals(lgcName::LateLaunderFatPointer)) {
-    Constant *const nullPointer = ConstantPointerNull::get(getRemappedType(callInst.getType()));
+    Constant *const nullPointer = ConstantPointerNull::get(m_offsetType);
     m_replacementMap[&callInst] = std::make_pair(callInst.getArgOperand(0), nullPointer);
 
     // Check for any invariant starts that use the pointer.
@@ -589,7 +582,7 @@ void PatchBufferOp::visitLoadInst(LoadInst &loadInst) {
     newLoad->setSyncScopeID(loadInst.getSyncScopeID());
     copyMetadata(newLoad, &loadInst);
 
-    Constant *const nullPointer = ConstantPointerNull::get(getRemappedType(loadType));
+    Constant *const nullPointer = ConstantPointerNull::get(m_offsetType);
 
     m_replacementMap[&loadInst] = std::make_pair(newLoad, nullPointer);
 
@@ -774,7 +767,7 @@ void PatchBufferOp::visitPHINode(PHINode &phiNode) {
       m_divergenceSet.insert(bufferDesc);
   }
 
-  PHINode *const newPhiNode = m_builder->CreatePHI(getRemappedType(phiNode.getType()), incomings.size());
+  PHINode *const newPhiNode = m_builder->CreatePHI(m_offsetType, incomings.size());
   copyMetadata(newPhiNode, &phiNode);
 
   m_replacementMap[&phiNode] = std::make_pair(bufferDesc, newPhiNode);
@@ -1202,7 +1195,7 @@ PatchBufferOp::Replacement PatchBufferOp::getRemappedValueOrNull(Value *value) c
   }
 
   // Otherwise the value is a constant. Assume it is a null pointer and remap its type.
-  Constant *nullPointer = ConstantPointerNull::get(getRemappedType(value->getType()));
+  Constant *nullPointer = ConstantPointerNull::get(m_offsetType);
   return std::make_pair(nullptr, nullPointer);
 }
 
@@ -1258,16 +1251,6 @@ void PatchBufferOp::copyMetadata(Value *const dest, const Value *const src) cons
 
   for (auto metaNode : allMetaNodes)
     destInst->setMetadata(metaNode.first, metaNode.second);
-}
-
-// =====================================================================================================================
-// Get the remapped type for a fat pointer that is usable in indexing. We use the 32-bit wide constant address space for
-// this, as it means when we convert the GEP to an integer, the GEP can be converted losslessly to a 32-bit integer,
-// which just happens to be what the MUBUF instructions expect.
-//
-// @param type : The type to remap.
-PointerType *PatchBufferOp::getRemappedType(Type *const type) const {
-  return PointerType::getWithSamePointeeType(cast<PointerType>(type), ADDR_SPACE_CONST_32BIT);
 }
 
 // =====================================================================================================================
