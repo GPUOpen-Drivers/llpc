@@ -29,7 +29,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST-DAG: call i32 @lgc.input.import.builtin.ViewIndex{{.*}}
-; SHADERTEST-DAG: call i1 @lgc.input.import.builtin.HelperInvocation{{.*}}
+; SHADERTEST-DAG: call i1 (...) @lgc.create.is.helper.invocation.i1{{.*}}
 ; SHADERTEST-DAG: call i32 @lgc.input.import.builtin.ViewportIndex{{.*}}
 ; SHADERTEST-DAG: call i32 @lgc.input.import.builtin.Layer{{.*}}
 ; SHADERTEST-DAG: call i32 @lgc.input.import.builtin.SampleId{{.*}}

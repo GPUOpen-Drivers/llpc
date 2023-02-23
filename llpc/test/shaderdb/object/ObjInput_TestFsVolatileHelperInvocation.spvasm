@@ -1,0 +1,67 @@
+; Test that a load from BuiltIn HelperInvocation without volatile decoration,
+; but with load marked as Volatile, is correctly lowered to an is.helper.invocation.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST-COUNT-1: call i1 (...) @lgc.create.is.helper.invocation{{.*}}
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+; SPIR-V
+; Version: 1.6
+; Generator: Khronos Glslang Reference Front End; 11
+; Bound: 29
+; Schema: 0
+               OpCapability Shader
+          %2 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %gl_HelperInvocation %f4
+               OpExecutionMode %main OriginUpperLeft
+          %1 = OpString "ObjInput_TestFsNonVolatileHelperInvocation.glsl"
+               OpName %main "main"
+               OpName %f "f"
+               OpName %gl_HelperInvocation "gl_HelperInvocation"
+               OpName %f4 "f4"
+               OpModuleProcessed "client vulkan100"
+               OpModuleProcessed "target-env spirv1.6"
+               OpModuleProcessed "target-env vulkan1.1"
+               OpModuleProcessed "entry-point main"
+               OpDecorate %gl_HelperInvocation BuiltIn HelperInvocation
+               OpDecorate %f4 Location 0
+       %void = OpTypeVoid
+          %4 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+%_ptr_Function_v4float = OpTypePointer Function %v4float
+    %float_0 = OpConstant %float 0
+         %12 = OpConstantComposite %v4float %float_0 %float_0 %float_0 %float_0
+       %bool = OpTypeBool
+%_ptr_Input_bool = OpTypePointer Input %bool
+%gl_HelperInvocation = OpVariable %_ptr_Input_bool Input
+    %float_1 = OpConstant %float 1
+       %uint = OpTypeInt 32 0
+     %uint_0 = OpConstant %uint 0
+%_ptr_Function_float = OpTypePointer Function %float
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+         %f4 = OpVariable %_ptr_Output_v4float Output
+               OpLine %1 5 11
+       %main = OpFunction %void None %4
+          %6 = OpLabel
+          %f = OpVariable %_ptr_Function_v4float Function
+               OpLine %1 7 0
+               OpStore %f %12
+               OpLine %1 9 0
+         %16 = OpLoad %bool %gl_HelperInvocation Volatile
+         %18 = OpSelect %float %16 %float_1 %float_0
+         %22 = OpAccessChain %_ptr_Function_float %f %uint_0
+         %23 = OpLoad %float %22
+         %24 = OpFAdd %float %23 %18
+         %25 = OpAccessChain %_ptr_Function_float %f %uint_0
+               OpStore %25 %24
+               OpLine %1 11 0
+         %28 = OpLoad %v4float %f
+               OpStore %f4 %28
+               OpReturn
+               OpFunctionEnd
