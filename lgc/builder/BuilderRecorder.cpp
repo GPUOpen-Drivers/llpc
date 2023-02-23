@@ -1089,7 +1089,7 @@ Value *BuilderRecorder::CreateFindSMsb(Value *value, const Twine &instName) {
 // @param instName : Name to give instruction(s)
 Value *BuilderRecorder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Value *descIndex, unsigned flags,
                                              Type *pointeeTy, const Twine &instName) {
-  return record(Opcode::LoadBufferDesc, getBufferDescTy(pointeeTy),
+  return record(Opcode::LoadBufferDesc, getBufferDescTy(),
                 {
                     getInt32(descSet),
                     getInt32(binding),

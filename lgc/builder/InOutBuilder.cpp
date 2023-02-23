@@ -1177,8 +1177,7 @@ Value *InOutBuilder::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
       auto bufferDesc = CreateLoadBufferDesc(options.reverseThreadGroupBufferDescSet,
                                              options.reverseThreadGroupBufferBinding, getInt32(0), 0, getInt8Ty());
       auto controlBitPtr = CreateInBoundsGEP(getInt8Ty(), bufferDesc, getInt32(0));
-      auto controlBit = CreateTrunc(
-          CreateLoad(getInt32Ty(), CreateBitCast(controlBitPtr, getBufferDescTy(getInt32Ty()))), getInt1Ty());
+      auto controlBit = CreateTrunc(CreateLoad(getInt32Ty(), controlBitPtr), getInt1Ty());
 
       workgroupId = CreateSelect(controlBit, reversedWorkgroupId, workgroupId);
     }

@@ -189,7 +189,7 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
   // Convert to fat pointer.
   desc = CreateNamedCall(lgcName::LateLaunderFatPointer, getInt8Ty()->getPointerTo(ADDR_SPACE_BUFFER_FAT_POINTER), desc,
                          Attribute::ReadNone);
-  return CreateBitCast(desc, getBufferDescTy(pointeeTy));
+  return desc;
 }
 
 // =====================================================================================================================
