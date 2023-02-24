@@ -64,6 +64,7 @@ public:
 
   void writePalMetadata();
   llvm::msgpack::MapDocNode &getGraphicsRegNode() { return m_graphicsRegistersNode; }
+  llvm::msgpack::MapDocNode &getComputeRegNode() { return m_computeRegistersNode; }
   // Get the MsgPack map node for the specified HW shader in the ".hardware_stages" map
   llvm::msgpack::MapDocNode getHwShaderNode(Util::Abi::HardwareStage hwStage);
 
@@ -129,6 +130,9 @@ private:
   llvm::msgpack::MapDocNode m_graphicsRegistersNode;
   // MsgPack map node for graphics registers metadata
   // ".graphics_registers"
+  llvm::msgpack::MapDocNode m_computeRegistersNode;
+  // MsgPack map node for graphics registers metadata
+  // ".compute_registers"
 
   llvm::SmallVector<PalMetadataNoteEntry, 128> m_config; // Register/metadata configuration
 };

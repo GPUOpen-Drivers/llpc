@@ -1,6 +1,6 @@
 ; Test that PHI with incoming value that may read from memory should not be optimized.
 
-; RUN: lgc -mcpu=gfx1010 -print-after=lgc-patch-peephole-opt -enable-opaque-pointers=true -o - - <%s 2>&1 | FileCheck --check-prefixes=CHECK %s
+; RUN: lgc -mcpu=gfx1010 -print-after=lgc-patch-peephole-opt -o - - <%s 2>&1 | FileCheck --check-prefixes=CHECK %s
 
 ; CHECK: [[LOAD:%[0-9a-z]*]] = load i32, ptr addrspace(3) @lds, align 16
 ; CHECK: [[PHI:%[0-9a-z]*]] = phi i32 [ [[LOAD]], %.entry ], [ [[INC:%[0-9a-z]*]], %.block2 ]
@@ -15,11 +15,11 @@ target triple = "amdgcn--amdpal"
 ; Function Attrs: nounwind
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
 .entry:
-  %load0 = load i32, i32 addrspace(3)* @lds, align 16
+  %load0 = load i32, ptr addrspace(3) @lds, align 16
   br label %.block0
 
 .block0:                                          ; preds = %.entry
-  store i32 0, i32 addrspace(3)* @lds, align 16
+  store i32 0, ptr addrspace(3) @lds, align 16
   br label %.block1
 
 .block1:                                          ; preds = %.block3, %.block0
@@ -29,11 +29,11 @@ define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc
 
 .block2:                                          ; preds = %.block1
   %i2 = add i32 %i, 1
-  store i32 %i2, i32 addrspace(3)* @lds, align 16
+  store i32 %i2, ptr addrspace(3) @lds, align 16
   br label %.block3
 
 .block3:                                          ; preds = %.block2
-  %load1 = load i32, i32 addrspace(3)* @lds, align 16
+  %load1 = load i32, ptr addrspace(3) @lds, align 16
   br label %.block1
 
 .exit:                                            ; preds = %.block1

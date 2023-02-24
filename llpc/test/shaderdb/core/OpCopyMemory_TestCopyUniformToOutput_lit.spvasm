@@ -1,5 +1,5 @@
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIRV-to-LLVM translation results
 ; SHADERTEST: %{{[0-9]+}} = load <4 x float>,
 ; SHADERTEST: store <4 x float> %{{[0-9]+}}, ptr addrspace({{[0-9]+}}) @{{.*}}

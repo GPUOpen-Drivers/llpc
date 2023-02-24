@@ -1341,16 +1341,15 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
   } else if (mangledName.startswith(lgcName::OutputExportXfb)) {
     auto outputValue = callInst.getArgOperand(callInst.arg_size() - 1);
     if (isa<UndefValue>(outputValue)) {
-      // NOTE: If an output value is undefined, we can safely drop it and remove the transform feedback output export
-      // call.
+      // NOTE: If an output value is undefined, we can safely drop it and remove the transform feedback export call.
       m_deadCalls.push_back(&callInst);
     } else if (m_pipelineState->enableSwXfb()) {
-      // Collect transform feedback output export calls, used in SW-emulated stream-out. For GS, the collecting will
+      // Collect transform feedback export calls, used in SW-emulated stream-out. For GS, the collecting will
       // be done when we generate copy shader since GS is primitive-based.
       if (m_shaderStage != ShaderStageGeometry) {
         auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
-        // A transform feedback output export call is expected to be <4 x dword> at most
-        inOutUsage.xfbOutputExpCount += outputValue->getType()->getPrimitiveSizeInBits() > 128 ? 2 : 1;
+        // A transform feedback export call is expected to be <4 x dword> at most
+        inOutUsage.xfbExpCount += outputValue->getType()->getPrimitiveSizeInBits() > 128 ? 2 : 1;
       }
     }
   }

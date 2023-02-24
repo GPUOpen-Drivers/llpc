@@ -3501,25 +3501,25 @@ void PatchInOutImportExport::patchXfbOutputExport(Value *output, unsigned xfbBuf
   assert(bitWidth == 16 || bitWidth == 32);
 
   if (m_pipelineState->enableSwXfb() && m_shaderStage == ShaderStageCopyShader) {
-    // NOTE: For NGG, importing GS output from GS-VS ring is represented by a call and the call is replaced with
+    // NOTE: For NGG, reading GS output from GS-VS ring is represented by a call and the call is replaced with
     // real instructions when when NGG primitive shader is generated.
     if (compCount > 4) {
-      CallInst *importCall = cast<CallInst>(output);
-      assert(importCall != nullptr);
-      unsigned location = cast<ConstantInt>(importCall->getArgOperand(0))->getZExtValue();
+      CallInst *readCall = cast<CallInst>(output);
+      assert(readCall != nullptr);
+      unsigned location = cast<ConstantInt>(readCall->getArgOperand(0))->getZExtValue();
 
       // vecX -> vec4 + vec(X - 4)
       assert(compCount <= 8);
       Type *loadTy = FixedVectorType::get(Type::getFloatTy(*m_context), 4);
       Value *args[] = {ConstantInt::get(Type::getInt32Ty(*m_context), location),
                        ConstantInt::get(Type::getInt32Ty(*m_context), streamId)};
-      output = emitCall(lgcName::NggGsOutputImport + getTypeName(loadTy), loadTy, args,
+      output = emitCall(lgcName::NggReadGsOutput + getTypeName(loadTy), loadTy, args,
                         {Attribute::Speculatable, Attribute::ReadOnly, Attribute::WillReturn}, insertPos);
       storeValueToStreamOutBuffer(output, xfbBuffer, xfbOffset, xfbStride, streamId, nullptr, insertPos);
 
       loadTy = FixedVectorType::get(Type::getFloatTy(*m_context), (compCount - 4));
       args[0] = ConstantInt::get(Type::getInt32Ty(*m_context), location + 1);
-      output = emitCall(lgcName::NggGsOutputImport + getTypeName(loadTy), loadTy, args,
+      output = emitCall(lgcName::NggReadGsOutput + getTypeName(loadTy), loadTy, args,
                         {Attribute::Speculatable, Attribute::ReadOnly, Attribute::WillReturn}, insertPos);
       storeValueToStreamOutBuffer(output, xfbBuffer, xfbOffset + 4 * bitWidth / 8, xfbStride, streamId, nullptr,
                                   insertPos);
@@ -3867,7 +3867,7 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsi
     Value *args[] = {ConstantInt::get(Type::getInt32Ty(*m_context), xfbBuffer),
                      ConstantInt::get(Type::getInt32Ty(*m_context), xfbOffset),
                      ConstantInt::get(Type::getInt32Ty(*m_context), streamId), storeValue};
-    std::string callName = lgcName::NggXfbOutputExport + getTypeName(storeValue->getType());
+    std::string callName = lgcName::NggXfbExport + getTypeName(storeValue->getType());
     emitCall(callName, Type::getVoidTy(*m_context), args, {}, insertPos);
     return;
   }
@@ -4167,12 +4167,12 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
   assert((elemTy->isFloatingPointTy() || elemTy->isIntegerTy()) && (bitWidth == 8 || bitWidth == 16 || bitWidth == 32));
 
   if (m_pipelineState->getNggControl()->enableNgg) {
-    // NOTE: For NGG, exporting GS output to GS-VS ring is represented by a call and the call is replaced with
+    // NOTE: For NGG, writing GS output to GS-VS ring is represented by a call and the call is replaced with
     // real instructions when when NGG primitive shader is generated.
     Value *args[] = {ConstantInt::get(Type::getInt32Ty(*m_context), location),
                      ConstantInt::get(Type::getInt32Ty(*m_context), compIdx),
                      ConstantInt::get(Type::getInt32Ty(*m_context), streamId), storeValue};
-    std::string callName = lgcName::NggGsOutputExport + getTypeName(storeTy);
+    std::string callName = lgcName::NggWriteGsOutput + getTypeName(storeTy);
     emitCall(callName, Type::getVoidTy(*m_context), args, {}, insertPos);
     return;
   }

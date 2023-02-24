@@ -1457,6 +1457,14 @@ void MeshTaskShader::emitTaskMeshs(Value *groupCountX, Value *groupCountY, Value
   auto entryPoint = m_builder->GetInsertBlock()->getParent();
   assert(getShaderStage(entryPoint) == ShaderStageTask); // Must be task shader
 
+  // Mark the flag of mesh linear dispatch from task when the group count Y and Z are both ones
+  if (isa<ConstantInt>(groupCountY) && isa<ConstantInt>(groupCountZ)) {
+    const unsigned constGroupCountY = cast<ConstantInt>(groupCountY)->getZExtValue();
+    const unsigned constGroupCountZ = cast<ConstantInt>(groupCountZ)->getZExtValue();
+    m_pipelineState->getShaderResourceUsage(ShaderStageTask)->builtInUsage.task.meshLinearDispatch =
+        constGroupCountY == 1 && constGroupCountZ == 1;
+  }
+
   auto emitMeshsCall = m_builder->GetInsertPoint();
 
   auto checkEmitMeshsBlock = m_builder->GetInsertBlock();
@@ -2477,15 +2485,14 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
           // primitive attributes are moved after it.
           ++exportIndex;
         }
-        auto ringOffset =
-            m_builder->CreateAdd(m_attribRingBaseOffset, m_builder->getInt32(AttribGranularity * exportIndex));
+        auto locationOffset = m_builder->getInt32(exportIndex * SizeOfVec4);
 
         CoherentFlag coherent = {};
         coherent.bits.glc = true;
 
         m_builder->CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_store, valueToStore->getType(),
                                    {valueToStore, m_attribRingBufDesc, m_waveThreadInfo.threadIdInSubgroup,
-                                    m_builder->getInt32(0), ringOffset, m_builder->getInt32(coherent.u32All)});
+                                    locationOffset, m_attribRingBaseOffset, m_builder->getInt32(coherent.u32All)});
       }
     } else {
       m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, valueTy,
@@ -2551,12 +2558,14 @@ void MeshTaskShader::prepareAttribRingAccess() {
 
   // Modify the field STRIDE of attribute ring buffer descriptor
   if (attribCount >= 2) {
-    // STRIDE = WORD1[30:16], STRIDE is multiplied by attribute count
+    // STRIDE = WORD1[30:16], STRIDE is initialized to 16 by the driver, which is the right value for attribCount == 1.
+    // We override the value if there are more attributes.
     auto descWord1 = m_builder->CreateExtractElement(m_attribRingBufDesc, 1);
-    auto stride = m_builder->CreateAnd(m_builder->CreateLShr(descWord1, 16), 0x3FFF);
-    stride = m_builder->CreateMul(stride, m_builder->getInt32(attribCount));
-
-    descWord1 = m_builder->CreateAnd(descWord1, ~0x3FFF0000);                     // Clear STRIDE
+    auto stride = m_builder->getInt32(attribCount * SizeOfVec4);
+    if ((attribCount & 1) == 0) {
+      // Clear the bit that was set in STRIDE by the driver.
+      descWord1 = m_builder->CreateAnd(descWord1, ~0x3FFF0000);
+    }
     descWord1 = m_builder->CreateOr(descWord1, m_builder->CreateShl(stride, 16)); // Set new STRIDE
     m_attribRingBufDesc = m_builder->CreateInsertElement(m_attribRingBufDesc, descWord1, 1);
   }

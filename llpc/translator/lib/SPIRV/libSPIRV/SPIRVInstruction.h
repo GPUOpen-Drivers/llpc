@@ -1526,7 +1526,7 @@ public:
     assert((ExtSetKind == SPIRVEIS_GLSL || ExtSetKind == SPIRVEIS_ShaderBallotAMD ||
             ExtSetKind == SPIRVEIS_ShaderExplicitVertexParameterAMD || ExtSetKind == SPIRVEIS_GcnShaderAMD ||
             ExtSetKind == SPIRVEIS_ShaderTrinaryMinMaxAMD || ExtSetKind == SPIRVEIS_NonSemanticInfo ||
-            ExtSetKind == SPIRVEIS_Debug) &&
+            ExtSetKind == SPIRVEIS_NonSemanticDebugBreak || ExtSetKind == SPIRVEIS_Debug) &&
            "not supported");
   }
   void decode(std::istream &I) override {
@@ -1549,6 +1549,7 @@ public:
       getDecoder(I) >> ExtOpShaderTrinaryMinMaxAMD;
       break;
     case SPIRVEIS_NonSemanticInfo:
+    case SPIRVEIS_NonSemanticDebugBreak:
       getDecoder(I) >> ExtOpNonSemanticInfo;
       break;
     case SPIRVEIS_Debug:

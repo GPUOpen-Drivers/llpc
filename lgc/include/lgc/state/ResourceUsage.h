@@ -173,6 +173,12 @@ struct ResourceUsage {
   struct {
     // Per-stage built-in usage
     union {
+      // Task shader
+      struct {
+        // Statement
+        unsigned meshLinearDispatch : 1; // Mesh linear dispatch from task shader when group count Y/Z are both ones
+      } task;
+
       // Vertex shader
       struct {
         // Input
@@ -358,9 +364,9 @@ struct ResourceUsage {
     // Map from output location info to the transform feedback info
     std::map<InOutLocationInfo, XfbOutInfo> locInfoXfbOutInfoMap;
 
-    // Count of transform feedback output export call (each call is to export <4 x dword> at most), used in SW emulated
+    // Count of transform feedback export call (each call is to export <4 x dword> at most), used in SW emulated
     // stream-out for GFX11+
-    unsigned xfbOutputExpCount = 0;
+    unsigned xfbExpCount = 0;
 
     // Count of mapped location for inputs/outputs (including those special locations to which the built-ins
     // are mapped)

@@ -1,6 +1,6 @@
 ; Define a compute library that can be called from a compute shader.
 
-; RUN: lgc -mcpu=gfx1010 -print-after=lgc-patch-entry-point-mutate -print-after=lgc-patch-prepare-pipeline-abi -enable-opaque-pointers=true -o /dev/null 2>&1 - <%s | FileCheck --check-prefixes=CHECK %s
+; RUN: lgc -mcpu=gfx1010 -print-after=lgc-patch-entry-point-mutate -print-after=lgc-patch-prepare-pipeline-abi -o /dev/null 2>&1 - <%s | FileCheck --check-prefixes=CHECK %s
 ; CHECK: IR Dump After Patch LLVM for entry-point mutation
 ; CHECK: define amdgpu_gfx void @func(i32 inreg %globalTable, i32 inreg %perShaderTable, ptr addrspace(4) inreg %numWorkgroupsPtr, i32 inreg %0, i32 inreg %1, i32 inreg %2, i32 inreg %3, i32 inreg %4, i32 inreg %5, i32 inreg %6, i32 inreg %7, i32 inreg %8, i32 inreg %9, i32 inreg %10, i32 inreg %spillTable, <3 x i32> inreg %WorkgroupId, i32 inreg %MultiDispatchInfo, <3 x i32> %LocalInvocationId) #0 !lgc.shaderstage !5 {
 ; CHECK: !5 = !{i32 6}
@@ -18,7 +18,7 @@ define spir_func void @func() local_unnamed_addr #0 !lgc.shaderstage !5 {
 }
 
 ; Function Attrs: nounwind readonly
-declare i8 addrspace(7)* @lgc.create.load.buffer.desc.p7i8(...) local_unnamed_addr #1
+declare ptr addrspace(7) @lgc.create.load.buffer.desc.p7(...) local_unnamed_addr #1
 
 attributes #0 = { nounwind }
 attributes #1 = { nounwind readonly }

@@ -1,6 +1,6 @@
 ; BEGIN_SHADERTEST
 ; REQUIRES: do-not-run-me
-; RUN: amdllpc -enable-load-scalarizer=false -v -enable-opaque-pointers=true %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-load-scalarizer=false -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results

@@ -38,6 +38,7 @@ LINK_COMPONENTS
     Object
     Support
     Target
+    TargetParser
 )
 
 ### Compiler Options ###################################################################################################

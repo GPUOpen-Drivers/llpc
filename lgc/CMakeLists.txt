@@ -38,6 +38,7 @@ add_llvm_library(LLVMlgc LINK_COMPONENTS
     CodeGen
     Core
     InstCombine
+    IRPrinter
     ipo
     Linker
     MC
@@ -47,6 +48,7 @@ add_llvm_library(LLVMlgc LINK_COMPONENTS
     SelectionDAG
     Support
     Target
+    TargetParser
     TransformUtils
     Vectorize
 )
@@ -147,7 +149,8 @@ PRIVATE
 
 #if VKI_RAY_TRACING
 if(VKI_RAY_TRACING)
-  target_compile_definitions(LLVMlgc PRIVATE VKI_RAY_TRACING=1)
+  # Public as it is used in the LGC interface.
+  target_compile_definitions(LLVMlgc PUBLIC VKI_RAY_TRACING=1)
 endif()
 #endif
 

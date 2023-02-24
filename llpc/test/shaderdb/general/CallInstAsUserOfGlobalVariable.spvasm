@@ -1,0 +1,116 @@
+; This test checks if lowerGlobal is handling properly case with removed zero-index GEPs.
+
+; @_ug_input23 = external addrspace(7) global [2 x <{ [4294967295 x float] }>], !spirv.Resource !2, !spirv.Block !1
+; %2 = call i32 (...) @lgc.buffer.length(ptr addrspace(7) @_ug_input23, i32 0)
+
+
+
+; RUN: amdllpc -v -gfxip=11.0 %s | FileCheck %s
+
+; CHECK-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; CHECK: @_ug_input23 = external addrspace(7) global [2 x <{ [4294967295 x float] }>], !spirv.Resource !2, !spirv.Block !1
+; CHECK: call i32 (...) @lgc.buffer.length(ptr addrspace(7) @_ug_input23, i32 0)
+
+; CHECK-LABEL: {{^// LLPC}}  SPIR-V lowering results
+; CHECK: %[[global:[0-9]+]] = call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i32 2, i32 1, i32 0, i32 2)
+; CHECK: call i32 (...) @lgc.buffer.length(ptr addrspace(7) %[[global]], i32 0)
+
+; CHECK-LABEL: {{^}}===== AMDLLPC SUCCESS =====
+
+; SPIR-V
+; Version: 1.0
+; Generator: Google ANGLE Shader Compiler; 1
+; Bound: 48
+; Schema: 0
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main"
+               OpExecutionMode %main LocalSize 1 1 1
+               OpSource GLSL 450
+               OpName %_uInput0 "_uInput0"
+               OpMemberName %_uInput0 0 "_ug_input0"
+               OpName %_ ""
+               OpName %_uInput23 "_uInput23"
+               OpMemberName %_uInput23 0 "_udata"
+               OpName %_ug_input23 "_ug_input23"
+               OpName %_uOutput "_uOutput"
+               OpMemberName %_uOutput 0 "_ug_length2"
+               OpMemberName %_uOutput 1 "_ug_length"
+               OpName %__0 ""
+               OpName %ANGLEUniformBlock "ANGLEUniformBlock"
+               OpMemberName %ANGLEUniformBlock 0 "acbBufferOffsets"
+               OpName %ANGLEUniforms "ANGLEUniforms"
+               OpName %main "main"
+               OpDecorate %_runtimearr_uint ArrayStride 4
+               OpMemberDecorate %_uInput0 0 Offset 0
+               OpMemberDecorate %_uInput0 0 NonWritable
+               OpDecorate %_uInput0 BufferBlock
+               OpDecorate %_ DescriptorSet 2
+               OpDecorate %_ Binding 0
+               OpDecorate %_runtimearr_float ArrayStride 4
+               OpMemberDecorate %_uInput23 0 Offset 0
+               OpMemberDecorate %_uInput23 0 NonWritable
+               OpDecorate %_uInput23 BufferBlock
+               OpDecorate %_ug_input23 DescriptorSet 2
+               OpDecorate %_ug_input23 Binding 1
+               OpDecorate %_runtimearr_int ArrayStride 4
+               OpMemberDecorate %_uOutput 0 Offset 0
+               OpMemberDecorate %_uOutput 1 Offset 4
+               OpDecorate %_uOutput BufferBlock
+               OpDecorate %__0 DescriptorSet 2
+               OpDecorate %__0 Binding 2
+               OpMemberDecorate %ANGLEUniformBlock 0 Offset 0
+               OpDecorate %ANGLEUniformBlock Block
+       %uint = OpTypeInt 32 0
+%_runtimearr_uint = OpTypeRuntimeArray %uint
+   %_uInput0 = OpTypeStruct %_runtimearr_uint
+      %float = OpTypeFloat 32
+%_runtimearr_float = OpTypeRuntimeArray %float
+  %_uInput23 = OpTypeStruct %_runtimearr_float
+     %uint_2 = OpConstant %uint 2
+%_arr__uInput23_uint_2 = OpTypeArray %_uInput23 %uint_2
+        %int = OpTypeInt 32 1
+%_runtimearr_int = OpTypeRuntimeArray %int
+   %_uOutput = OpTypeStruct %int %_runtimearr_int
+     %v4uint = OpTypeVector %uint 4
+%ANGLEUniformBlock = OpTypeStruct %v4uint
+       %void = OpTypeVoid
+      %int_0 = OpConstant %int 0
+     %uint_1 = OpConstant %uint 1
+      %int_1 = OpConstant %int 1
+     %uint_0 = OpConstant %uint 0
+      %int_2 = OpConstant %int 2
+%_ptr_Uniform__uInput0 = OpTypePointer Uniform %_uInput0
+%_ptr_Uniform__arr__uInput23_uint_2 = OpTypePointer Uniform %_arr__uInput23_uint_2
+%_ptr_Uniform__uOutput = OpTypePointer Uniform %_uOutput
+%_ptr_PushConstant_ANGLEUniformBlock = OpTypePointer PushConstant %ANGLEUniformBlock
+%_ptr_Uniform_int = OpTypePointer Uniform %int
+%_ptr_Uniform__uInput23 = OpTypePointer Uniform %_uInput23
+         %24 = OpTypeFunction %void
+          %_ = OpVariable %_ptr_Uniform__uInput0 Uniform
+%_ug_input23 = OpVariable %_ptr_Uniform__arr__uInput23_uint_2 Uniform
+        %__0 = OpVariable %_ptr_Uniform__uOutput Uniform
+%ANGLEUniforms = OpVariable %_ptr_PushConstant_ANGLEUniformBlock PushConstant
+       %main = OpFunction %void None %24
+         %26 = OpLabel
+         %28 = OpArrayLength %uint %_ 0
+         %29 = OpBitcast %int %28
+         %32 = OpAccessChain %_ptr_Uniform_int %__0 %uint_1 %int_0
+               OpStore %32 %29
+         %36 = OpAccessChain %_ptr_Uniform__uInput23 %_ug_input23 %uint_0
+         %37 = OpArrayLength %uint %36 0
+         %38 = OpBitcast %int %37
+         %39 = OpAccessChain %_ptr_Uniform_int %__0 %uint_1 %int_1
+               OpStore %39 %38
+         %41 = OpAccessChain %_ptr_Uniform__uInput23 %_ug_input23 %uint_1
+         %42 = OpArrayLength %uint %41 0
+         %43 = OpBitcast %int %42
+         %44 = OpAccessChain %_ptr_Uniform_int %__0 %uint_1 %int_2
+               OpStore %44 %43
+         %45 = OpArrayLength %uint %__0 1
+         %46 = OpBitcast %int %45
+         %47 = OpAccessChain %_ptr_Uniform_int %__0 %uint_0
+               OpStore %47 %46
+               OpReturn
+               OpFunctionEnd

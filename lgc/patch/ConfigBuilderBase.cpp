@@ -67,9 +67,11 @@ ConfigBuilderBase::ConfigBuilderBase(Module *module, PipelineState *pipelineStat
       m_document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines].getArray(true)[0].getMap(true);
 
   if (m_pipelineState->useRegisterFieldFormat()) {
-    m_graphicsRegistersNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::Registers]
-                                  .getMap(true)[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
-                                  .getMap(true);
+    if (m_pipelineState->isGraphics())
+      m_graphicsRegistersNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
+
+    if (m_pipelineState->hasShaderStage(ShaderStageCompute) || m_pipelineState->hasShaderStage(ShaderStageTask))
+      m_computeRegistersNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::ComputeRegisters].getMap(true);
   }
 
   setApiName(pipelineState->getClient());

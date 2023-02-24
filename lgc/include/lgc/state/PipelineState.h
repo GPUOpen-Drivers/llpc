@@ -96,8 +96,7 @@ struct NggControl {
 
   unsigned vertsPerSubgroup; // Preferred number of vertices consumed by a primitive shader subgroup
 
-  bool passthroughMode;                          // Whether NGG passthrough mode is enabled
-  Util::Abi::PrimShaderCbLayout primShaderTable; // Primitive shader table (only some registers are used)
+  bool passthroughMode; // Whether NGG passthrough mode is enabled
 };
 
 // Represents transform feedback state metadata
@@ -302,7 +301,7 @@ public:
   bool enableMeshRowExport() const;
 
   // Checks if register field value format is used or not
-  bool useRegisterFieldFormat() const;
+  bool useRegisterFieldFormat() const { return m_registerFieldFormat; }
 
   // Checks if SW-emulated stream-out should be enabled
   bool enableSwXfb();

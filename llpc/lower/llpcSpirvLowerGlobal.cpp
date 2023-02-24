@@ -386,7 +386,7 @@ static bool hasPrimitiveIdx(const Constant &metaVal) {
 // @param loadInst : Load instruction
 void SpirvLowerGlobal::handleLoadInstGEP(GlobalVariable *inOut, ArrayRef<Value *> indexOperands, LoadInst &loadInst) {
 
-  assert(indexOperands.empty() || cast<ConstantInt>(indexOperands.front())->isZero() && "Non-zero GEP first index\n");
+  assert((indexOperands.empty() || cast<ConstantInt>(indexOperands.front())->isZero()) && "Non-zero GEP first index\n");
   if (!indexOperands.empty())
     indexOperands = indexOperands.drop_front();
 
@@ -476,7 +476,7 @@ void SpirvLowerGlobal::handleLoadInst() {
 // @param storeInst : Store instruction
 void SpirvLowerGlobal::handleStoreInstGEP(GlobalVariable *output, ArrayRef<Value *> indexOperands,
                                           StoreInst &storeInst) {
-  assert(indexOperands.empty() || cast<ConstantInt>(indexOperands.front())->isZero() && "Non-zero GEP first index\n");
+  assert((indexOperands.empty() || cast<ConstantInt>(indexOperands.front())->isZero()) && "Non-zero GEP first index\n");
   // drop first element
   if (!indexOperands.empty())
     indexOperands = indexOperands.drop_front();
@@ -1308,7 +1308,7 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
 
           auto xfbOffset = m_builder->getInt32(outputMeta.XfbOffset + outputMeta.XfbExtraOffset + byteSize * idx);
           m_builder->CreateWriteXfbOutput(elem,
-                                          /*isBuiltIn=*/true, builtInId, outputMeta.XfbBuffer, outputMeta.XfbStride,
+                                          /*isBuiltIn=*/true, builtInId, 0, outputMeta.XfbBuffer, outputMeta.XfbStride,
                                           xfbOffset, outputInfo);
 
           if (!static_cast<bool>(EnableXfb)) {
@@ -1323,7 +1323,8 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
           LLPC_OUTS(*outputValue->getType() << " (builtin = " << builtInName.substr(strlen("BuiltIn")) << "), "
                                             << "xfbBuffer = " << outputMeta.XfbBuffer << ", "
                                             << "xfbStride = " << outputMeta.XfbStride << ", "
-                                            << "xfbOffset = " << cast<ConstantInt>(xfbOffset)->getZExtValue() << "\n");
+                                            << "xfbOffset = " << cast<ConstantInt>(xfbOffset)->getZExtValue() << ", "
+                                            << "streamId = " << outputMeta.StreamId << "\n");
         }
       }
     } else {
@@ -1398,7 +1399,7 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
         assert(xfbOffsetAdjust == 0 && xfbBufferAdjust == 0); // Unused for built-ins
         auto xfbOffset = m_builder->getInt32(outputMeta.XfbOffset + outputMeta.XfbExtraOffset);
         m_builder->CreateWriteXfbOutput(outputValue,
-                                        /*isBuiltIn=*/true, builtInId, outputMeta.XfbBuffer, outputMeta.XfbStride,
+                                        /*isBuiltIn=*/true, builtInId, 0, outputMeta.XfbBuffer, outputMeta.XfbStride,
                                         xfbOffset, outputInfo);
 
         if (!static_cast<bool>(EnableXfb)) {
@@ -1412,7 +1413,8 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
         LLPC_OUTS(*outputValue->getType() << " (builtin = " << builtInName.substr(strlen("BuiltIn")) << "), "
                                           << "xfbBuffer = " << outputMeta.XfbBuffer << ", "
                                           << "xfbStride = " << outputMeta.XfbStride << ", "
-                                          << "xfbOffset = " << cast<ConstantInt>(xfbOffset)->getZExtValue() << "\n");
+                                          << "xfbOffset = " << cast<ConstantInt>(xfbOffset)->getZExtValue() << ", "
+                                          << "streamID = " << outputMeta.StreamId << "\n");
       }
 
       if (builtInId == lgc::BuiltInCullPrimitive && outputTy->isIntegerTy(32)) {
@@ -1443,8 +1445,8 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
       Value *xfbOffset = m_builder->getInt32(outputMeta.XfbOffset + outputMeta.XfbExtraOffset + xfbOffsetAdjust);
       m_builder->CreateWriteXfbOutput(outputValue,
                                       /*isBuiltIn=*/false, location + cast<ConstantInt>(locOffset)->getZExtValue(),
-                                      outputMeta.XfbBuffer + xfbBufferAdjust, outputMeta.XfbStride, xfbOffset,
-                                      outputInfo);
+                                      outputMeta.Component, outputMeta.XfbBuffer + xfbBufferAdjust,
+                                      outputMeta.XfbStride, xfbOffset, outputInfo);
 
       if (!static_cast<bool>(EnableXfb)) {
         LLPC_OUTS("\n===============================================================================\n");
@@ -1454,10 +1456,11 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
       }
 
       LLPC_OUTS(*outputValue->getType() << " (loc = " << location + cast<ConstantInt>(locOffset)->getZExtValue()
-                                        << "), "
+                                        << ", comp = " << outputMeta.Component << "), "
                                         << "xfbBuffer = " << outputMeta.XfbBuffer + xfbBufferAdjust << ", "
                                         << "xfbStride = " << outputMeta.XfbStride << ", "
-                                        << "xfbOffset = " << cast<ConstantInt>(xfbOffset)->getZExtValue() << "\n");
+                                        << "xfbOffset = " << cast<ConstantInt>(xfbOffset)->getZExtValue() << ", "
+                                        << "streamID = " << outputMeta.StreamId << "\n");
     }
 
     m_builder->CreateWriteGenericOutput(outputValue, location, locOffset, elemIdx, maxLocOffset, outputInfo,
@@ -2210,12 +2213,14 @@ Value *SpirvLowerGlobal::atomicOpWithValueInTaskPayload(Instruction *atomicInstT
 void SpirvLowerGlobal::lowerBufferBlock() {
   SmallVector<GlobalVariable *, 8> globalsToRemove;
 
-  // Represent the users of the global variables, expect a bitCast, a load, a store, a GEP or a select used by GEPs
+  // With opaque pointers actually any instruction can be the user of the global variable since, zero-index GEPs
+  // are removed. However we need to handle non-zero-index GEPs and selects differently.
   struct ReplaceInstsInfo {
     // TODO: Remove this when LLPC will switch fully to opaque pointers.
     // remove bitCastInst.
     BitCastInst *bitCastInst;                         // The user is a bitCast
-    Instruction *loadStoreInst;                       // The user is a load or a store.
+    Instruction *otherInst;                           // This can be any instruction which is using global, since
+                                                      // opaque pointers are removing zero-index GEP.
     SelectInst *selectInst;                           // The user is a select
     SmallVector<GetElementPtrInst *> getElemPtrInsts; // The user is a GEP. If the user is a select, we store its users.
   };
@@ -2282,11 +2287,8 @@ void SpirvLowerGlobal::lowerBufferBlock() {
               // We need to modify the bitcast if we did not find a GEP.
               assert(bitCast->getOperand(0) == &global);
               replaceInstsInfo.bitCastInst = bitCast;
-            } else if (isa<LoadInst>(inst) || isa<StoreInst>(inst)) {
-              replaceInstsInfo.loadStoreInst = inst;
-            } else {
+            } else if (auto *selectInst = dyn_cast<SelectInst>(inst)) {
               // The users of the select must be a GEP.
-              SelectInst *selectInst = cast<SelectInst>(inst);
               assert(selectInst->getTrueValue() == &global || selectInst->getFalseValue() == &global);
               replaceInstsInfo.selectInst = selectInst;
               for (User *selectUser : selectInst->users()) {
@@ -2296,6 +2298,8 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                     replaceInstsInfo.getElemPtrInsts.push_back(getElemPtr);
                 }
               }
+            } else {
+              replaceInstsInfo.otherInst = inst;
             }
             instructionsToReplace.push_back(replaceInstsInfo);
           }
@@ -2318,10 +2322,10 @@ void SpirvLowerGlobal::lowerBufferBlock() {
               m_builder->CreateInvariantStart(bufferDesc);
 
             replaceInstsInfo.bitCastInst->replaceUsesOfWith(&global, m_builder->CreateBitCast(bufferDesc, blockType));
-          } else if (replaceInstsInfo.loadStoreInst) {
-            // All load or store recorded here are for GEPs that indexed by 0, 0 into the arrayed resource. Opaque
+          } else if (replaceInstsInfo.otherInst) {
+            // All instructions here are for GEPs that indexed by 0, 0 into the arrayed resource. Opaque
             // pointers are removing zero-index GEPs and BitCast with pointer to pointer cast.
-            m_builder->SetInsertPoint(replaceInstsInfo.loadStoreInst);
+            m_builder->SetInsertPoint(replaceInstsInfo.otherInst);
             unsigned bufferFlags = global.isConstant() ? 0 : lgc::Builder::BufferFlagWritten;
             Value *const bufferDesc = m_builder->CreateLoadBufferDesc(descSet, binding, m_builder->getInt32(0),
                                                                       bufferFlags, m_builder->getInt8Ty());
@@ -2330,7 +2334,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
             if (global.isConstant())
               m_builder->CreateInvariantStart(bufferDesc);
 
-            replaceInstsInfo.loadStoreInst->replaceUsesOfWith(&global, bufferDesc);
+            replaceInstsInfo.otherInst->replaceUsesOfWith(&global, bufferDesc);
           } else {
             assert(!replaceInstsInfo.getElemPtrInsts.empty());
 
@@ -2649,7 +2653,7 @@ void SpirvLowerGlobal::cleanupReturnBlock() {
 // @param gv : Global Variable instruction
 void SpirvLowerGlobal::interpolateInputElement(unsigned interpLoc, Value *auxInterpValue, CallInst &callInst,
                                                GlobalVariable *gv, ArrayRef<Value *> indexOperands) {
-  assert(indexOperands.empty() || cast<ConstantInt>(indexOperands.front())->isZero() && "Non-zero GEP first index\n");
+  assert((indexOperands.empty() || cast<ConstantInt>(indexOperands.front())->isZero()) && "Non-zero GEP first index\n");
 
   m_builder->SetInsertPoint(&callInst);
 

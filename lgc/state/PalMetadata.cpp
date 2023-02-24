@@ -41,12 +41,15 @@
 #include "llvm/IR/CallingConv.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/VersionTuple.h"
 
 #define DEBUG_TYPE "lgc-pal-metadata"
 
 using namespace lgc;
 using namespace llvm;
+
+extern cl::opt<bool> UseRegisterFieldFormat;
 
 namespace {
 
@@ -154,8 +157,13 @@ void PalMetadata::initialize() {
 void PalMetadata::record(Module *module) {
   // Add the metadata version number.
   auto versionNode = m_document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Version].getArray(true);
-  versionNode[0] = Util::Abi::PipelineMetadataMajorVersion;
-  versionNode[1] = Util::Abi::PipelineMetadataMinorVersion;
+  if (UseRegisterFieldFormat) {
+    versionNode[0] = Util::Abi::PipelineMetadataMajorVersionNew;
+    versionNode[1] = Util::Abi::PipelineMetadataMinorVersionNew;
+  } else {
+    versionNode[0] = Util::Abi::PipelineMetadataMajorVersion;
+    versionNode[1] = Util::Abi::PipelineMetadataMinorVersion;
+  }
 
   // Write the MsgPack document into an IR metadata node.
   // The IR named metadata node contains an MDTuple containing an MDString containing the msgpack data.
@@ -498,10 +506,15 @@ void PalMetadata::fixUpRegisters() {
         size_t descSet = node.innerTable[0].set;
         descSetNodes.resize(std::max(descSetNodes.size(), descSet + 1));
         descSetNodes[descSet] = &node;
-      } else if (node.concreteType == ResourceNodeType::DescriptorBuffer) {
+      } else if ((node.concreteType == ResourceNodeType::DescriptorBuffer) ||
+                 (node.concreteType == ResourceNodeType::DescriptorConstBuffer) ||
+                 (node.concreteType == ResourceNodeType::DescriptorBufferCompact) ||
+                 (node.concreteType == ResourceNodeType::DescriptorConstBufferCompact)) {
         size_t descSet = node.set;
-        descSetNodes.resize(std::max(descSetNodes.size(), descSet + 1));
-        descSetNodes[descSet] = &node;
+        if (descSet != InvalidValue) {
+          descSetNodes.resize(std::max(descSetNodes.size(), descSet + 1));
+          descSetNodes[descSet] = &node;
+        }
       } else if (node.concreteType == ResourceNodeType::PushConst) {
         pushConstNode = &node;
       }
@@ -598,7 +611,7 @@ void PalMetadata::finalizeUserDataLimit() {
 void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
   assert(m_pipelineState->isGraphics());
   if (m_pipelineState->useRegisterFieldFormat()) {
-    auto graphicsRegNode = m_registers[Util::Abi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
+    auto graphicsRegNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
 
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 &&
         m_pipelineState->getColorExportState().alphaToCoverageEnable) {
@@ -980,7 +993,7 @@ void PalMetadata::updateSpiShaderColFormat(ArrayRef<ColorExportInfo> exps, bool 
   }
 
   if (m_pipelineState->useRegisterFieldFormat()) {
-    auto spiShaderColFormatNode = m_registers[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
+    auto spiShaderColFormatNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
                                       .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::SpiShaderColFormat]
                                       .getMap(true);
     spiShaderColFormatNode[Util::Abi::SpiShaderColFormatMetadataKey::Col_0ExportFormat] = spiShaderColFormat & 0xF;

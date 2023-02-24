@@ -1049,15 +1049,19 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
   inRegMask |= shaderInputs->getShaderArgTys(m_pipelineState, m_shaderStage, argTys, argNames, argOffset);
 
   if (m_pipelineState->useRegisterFieldFormat()) {
+    constexpr unsigned NumUserSgprs = 32;
     unsigned numUserDataSgprs = 16;
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 && m_shaderStage != ShaderStageCompute &&
         m_shaderStage != ShaderStageTask)
       numUserDataSgprs = 32;
-    std::vector<unsigned> userDataMap(numUserDataSgprs, static_cast<unsigned>(UserDataMapping::Invalid));
+
+    constexpr unsigned InvalidMapVal = static_cast<unsigned>(UserDataMapping::Invalid);
+    SmallVector<unsigned, NumUserSgprs> userDataMap;
+    userDataMap.resize(NumUserSgprs, InvalidMapVal);
     userDataIdx = 0;
     for (const auto &userDataArg : unspilledArgs) {
       unsigned dwordSize = userDataArg.argDwordSize;
-      if (userDataArg.userDataValue != static_cast<unsigned>(UserDataMapping::Invalid)) {
+      if (userDataArg.userDataValue != InvalidMapVal) {
         bool isSystemUserData = isSystemUserDataValue(userDataArg.userDataValue);
         unsigned numEntries = isSystemUserData ? 1 : dwordSize;
         unsigned userDataValue = userDataArg.userDataValue;

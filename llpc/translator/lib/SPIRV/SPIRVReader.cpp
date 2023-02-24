@@ -47,6 +47,7 @@
 #include "SPIRVValue.h"
 #include "llpcCompiler.h"
 #include "llpcContext.h"
+#include "llpcDialect.h"
 #include "llpcPipelineContext.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/Pipeline.h"
@@ -1262,8 +1263,6 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
       // Get return type of the function by transposing matrix type.
       Type *const destType = getTransposedType(func.getArg(1)->getType());
 
-      // TODO: Remove this when LLPC will switch fully to opaque pointers.
-      assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(call->getType(), destType));
       assert(destType->isArrayTy());
 
       const unsigned colCount = destType->getArrayNumElements();
@@ -1577,9 +1576,6 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
                                            bool isVolatile, bool isCoherent, bool isNonTemporal) {
   assert(loadPointer->getType()->isPointerTy());
 
-  // TODO: Remove this when LLPC will switch fully to opaque pointers.
-  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(loadPointer->getType(), loadType));
-
   if (isTypeWithPadRowMajorMatrix(loadType)) {
     auto loadPair = createLaunderRowMajorMatrix(loadType, loadPointer);
     loadType = loadPair.first;
@@ -1724,15 +1720,10 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
                                           Value *storeValue, bool isVolatile, bool isCoherent, bool isNonTemporal) {
   assert(storePointer->getType()->isPointerTy());
 
-  // TODO: Remove this when LLPC will switch fully to opaque pointers.
-  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(storePointer->getType(), storeType));
-
   if (isTypeWithPadRowMajorMatrix(storeType)) {
     auto storePair = createLaunderRowMajorMatrix(storeType, storePointer);
     storePointer = storePair.second;
     storeType = storePair.first;
-    // TODO: Remove this when LLPC will switch fully to opaque pointers.
-    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(storePointer->getType(), storeType));
   }
 
   const Align alignment = m_m->getDataLayout().getABITypeAlign(storeType);
@@ -1814,9 +1805,6 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
 
     Type *storeType = nullptr;
 
-    // TODO: Remove this when LLPC will switch fully to opaque pointers.
-    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(storePointer->getType(), alignmentType));
-
     // If the store was a bool or vector of bool, need to zext the storing value.
     if (spvType->isTypeBool() || (spvType->isTypeVector() && spvType->getVectorComponentType()->isTypeBool())) {
       storeValue = getBuilder()->CreateZExtOrBitCast(storeValue, alignmentType);
@@ -1856,9 +1844,6 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
 Constant *SPIRVToLLVM::buildConstStoreRecursively(SPIRVType *const spvType, Type *const storePointerType,
                                                   Type *const storeType, Constant *constStoreValue) {
   assert(storePointerType->isPointerTy());
-
-  // TODO: Remove this when LLPC will switch fully to opaque pointers.
-  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(storePointerType, storeType));
 
   const unsigned addrSpace = storePointerType->getPointerAddressSpace();
 
@@ -2832,8 +2817,6 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpArrayLength>(SPIRVValue *
       lookupRemappedTypeElements(spvStruct->getType()->getPointerElementType(), memberIndex);
 
   StructType *const structType = cast<StructType>(getPointeeType(spvStruct));
-  // TODO: Remove this when LLPC will switch fully to opaque pointers.
-  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(structure->getType(), structType));
   const StructLayout *const structLayout = m_m->getDataLayout().getStructLayout(structType);
   const unsigned offset = static_cast<unsigned>(structLayout->getElementOffset(remappedMemberIndex));
   Value *const offsetVal = getBuilder()->getInt32(offset);
@@ -2886,8 +2869,6 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
   const bool isBufferBlockPointer = isStorageClassExplicitlyLaidOut(m_bm, storageClass);
 
   Type *basePointeeType = getPointeeType(spvAccessChain->getBase());
-  // TODO: Remove this when LLPC will switch fully to opaque pointers.
-  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(base->getType(), basePointeeType));
 
   SmallVector<Value *, 8> gepIndices;
 
@@ -4074,6 +4055,11 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpExtInst>(SPIRVValue *cons
   case SPIRVEIS_ShaderTrinaryMinMaxAMD:
     return transTrinaryMinMaxExtInst(spvExtInst, block);
 
+  case SPIRVEIS_NonSemanticDebugBreak:
+    // Only one instruction for this extended instruction set
+    assert(spvExtInst->getExtOp() == NonSemanticDebugBreakDebugBreak);
+    return getBuilder()->CreateDebugBreak();
+
   case SPIRVEIS_Debug:
     return m_dbgTran.transDebugIntrinsic(spvExtInst, block);
 
@@ -4187,8 +4173,6 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
 
   Type *const varType = transType(spvVar->getType()->getPointerElementType(), 0, true, true,
                                   isStorageClassExplicitlyLaidOut(m_bm, spvVar->getType()->getPointerStorageClass()));
-  // TODO: Remove this when LLPC will switch fully to opaque pointers.
-  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(ptrType, varType));
 
   SPIRVValue *const spvInitializer = spvVar->getInitializer();
 
@@ -4842,26 +4826,26 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
       return mapValue(bv, ExtractElementInst::Create(transValue(ce->getComposite(), f, bb),
                                                      ConstantInt::get(*m_context, APInt(32, ce->getIndices()[0])),
                                                      bv->getName(), bb));
-    } else {
-      auto cv = transValue(ce->getComposite(), f, bb);
-      auto indexedTy = ExtractValueInst::getIndexedType(cv->getType(), ce->getIndices());
-      if (!indexedTy) {
-        // NOTE: "OpCompositeExtract" could extract a scalar component from a
-        // vector or a vector in an aggregate. But in LLVM, "extractvalue" is
-        // unable to do such thing. We have to replace it with "extractelement"
-        // + "extractelement" to achieve this purpose.
-        assert(ce->getType()->isTypeScalar());
-        std::vector<SPIRVWord> idxs = ce->getIndices();
-        auto lastIdx = idxs.back();
-        idxs.pop_back();
-
-        Value *v = ExtractValueInst::Create(cv, idxs, "", bb);
-        assert(v->getType()->isVectorTy());
-        return mapValue(
-            bv, ExtractElementInst::Create(v, ConstantInt::get(*m_context, APInt(32, lastIdx)), bv->getName(), bb));
-      }
-      return mapValue(bv, ExtractValueInst::Create(cv, ce->getIndices(), bv->getName(), bb));
     }
+
+    auto cv = transValue(ce->getComposite(), f, bb);
+    auto indexedTy = ExtractValueInst::getIndexedType(cv->getType(), ce->getIndices());
+    if (!indexedTy) {
+      // NOTE: "OpCompositeExtract" could extract a scalar component from a
+      // vector or a vector in an aggregate. But in LLVM, "extractvalue" is
+      // unable to do such thing. We have to replace it with "extractelement"
+      // + "extractelement" to achieve this purpose.
+      assert(ce->getType()->isTypeScalar());
+      std::vector<SPIRVWord> idxs = ce->getIndices();
+      auto lastIdx = idxs.back();
+      idxs.pop_back();
+
+      Value *v = ExtractValueInst::Create(cv, idxs, "", bb);
+      assert(v->getType()->isVectorTy());
+      return mapValue(
+          bv, ExtractElementInst::Create(v, ConstantInt::get(*m_context, APInt(32, lastIdx)), bv->getName(), bb));
+    }
+    return mapValue(bv, ExtractValueInst::Create(cv, ce->getIndices(), bv->getName(), bb));
   }
 
   case OpVectorExtractDynamic: {
@@ -4878,6 +4862,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
                               transValue(ci->getComposite(), f, bb), transValue(ci->getObject(), f, bb),
                               ConstantInt::get(*m_context, APInt(32, ci->getIndices()[0])), bv->getName(), bb));
     }
+
     auto cv = transValue(ci->getComposite(), f, bb);
     auto indexedTy = ExtractValueInst::getIndexedType(cv->getType(), ci->getIndices());
     if (!indexedTy) {
@@ -5642,10 +5627,7 @@ static void printTypeName(Type *ty, raw_ostream &nameStream) {
   for (;;) {
     if (auto pointerTy = dyn_cast<PointerType>(ty)) {
       nameStream << "p" << pointerTy->getAddressSpace();
-      if (pointerTy->isOpaque())
-        return;
-      ty = pointerTy->getPointerElementType();
-      continue;
+      return;
     }
     if (auto arrayTy = dyn_cast<ArrayType>(ty)) {
       nameStream << "a" << arrayTy->getNumElements();
@@ -7081,51 +7063,78 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
       auto bv = m_bm->getVariable(i);
       if (bv->getStorageClass() == StorageClassOutput) {
         SPIRVWord xfbBuffer = InvalidValue;
-        if (bv->hasDecorate(DecorationXfbBuffer, 0, &xfbBuffer)) {
-          const unsigned indexOfBuffer = 2 * xfbBuffer;
-          xfbState[indexOfBuffer] = 0;
-          SPIRVWord streamId = InvalidValue;
-          if (bv->hasDecorate(DecorationStream, 0, &streamId))
-            xfbState[indexOfBuffer] = streamId;
+        // NOTE: XFbBuffer may be decorated on the pointer element
+        SPIRVType *pointerElemTy = bv->getType()->getPointerElementType();
+        SPIRVEntry *entries[2] = {bv, pointerElemTy};
+        unsigned memberCount = 0;
+        if (pointerElemTy->isTypeStruct())
+          memberCount = pointerElemTy->getStructMemberCount();
+        for (unsigned id = 0; id < 2; ++id) {
+          auto entry = entries[id];
+          if (entry->hasDecorate(DecorationXfbBuffer, 0, &xfbBuffer)) {
+            const unsigned indexOfBuffer = 2 * xfbBuffer;
+            xfbState[indexOfBuffer] = 0;
+            SPIRVWord streamId = InvalidValue;
+            if (entry->hasDecorate(DecorationStream, 0, &streamId))
+              xfbState[indexOfBuffer] = streamId;
 
-          SPIRVWord xfbStride = InvalidValue;
-          if (bv->hasDecorate(DecorationXfbStride, 0, &xfbStride)) {
-            const unsigned indexOfStride = indexOfBuffer + 1;
-            xfbState[indexOfStride] = xfbStride;
-          }
+            SPIRVWord xfbStride = InvalidValue;
+            if (entry->hasDecorate(DecorationXfbStride, 0, &xfbStride)) {
+              const unsigned indexOfStride = indexOfBuffer + 1;
+              xfbState[indexOfStride] = xfbStride;
+            }
+          } else if (id == 1) {
+            for (unsigned i = 0; i < memberCount; ++i) {
+              if (entry->hasMemberDecorate(i, DecorationXfbBuffer, 0, &xfbBuffer)) {
+                const unsigned indexOfBuffer = 2 * xfbBuffer;
+                xfbState[indexOfBuffer] = 0;
+                SPIRVWord streamId = InvalidValue;
+                if (entry->hasMemberDecorate(i, DecorationStream, 0, &streamId))
+                  xfbState[indexOfBuffer] = streamId;
 
-          // Update indexOfBuffer for block array, the N array-elements are captured by N consecutive buffers.
-          SPIRVType *bt = bv->getType()->getPointerElementType();
-          if (bt->isTypeArray()) {
-            assert(m_valueMap.find(bv) != m_valueMap.end());
-            auto output = cast<GlobalVariable>(m_valueMap[bv]);
-            MDNode *metaNode = output->getMetadata(gSPIRVMD::InOut);
-            assert(metaNode);
-            auto elemMeta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
-            // Find the innermost array-element
-            auto elemTy = bt;
-            uint64_t elemCount = 0;
-            ShaderInOutMetadata outMetadata = {};
-            do {
-              assert(elemMeta->getNumOperands() == 4);
-              outMetadata.U64All[0] = cast<ConstantInt>(elemMeta->getOperand(2))->getZExtValue();
-              outMetadata.U64All[1] = cast<ConstantInt>(elemMeta->getOperand(3))->getZExtValue();
-              elemCount = elemTy->getArrayLength();
-
-              elemTy = elemTy->getArrayElementType();
-              elemMeta = cast<Constant>(elemMeta->getOperand(1));
-            } while (elemTy->isTypeArray());
-
-            if (outMetadata.IsBlockArray) {
-              // The even index (0,2,4,6) of !lgc.xfb.state metadata corresponds the buffer index (0~3).
-              const unsigned bufferIdx = outMetadata.XfbBuffer;
-              const int streamId = xfbState[2 * bufferIdx];
-              const unsigned stride = xfbState[2 * bufferIdx + 1];
-              for (unsigned idx = 0; idx < elemCount; ++idx) {
-                const unsigned indexOfBuffer = 2 * (bufferIdx + idx);
-                xfbState[indexOfBuffer] = streamId;
-                xfbState[indexOfBuffer + 1] = stride;
+                SPIRVWord xfbStride = InvalidValue;
+                if (entry->hasMemberDecorate(i, DecorationXfbStride, 0, &xfbStride)) {
+                  const unsigned indexOfStride = indexOfBuffer + 1;
+                  xfbState[indexOfStride] = xfbStride;
+                }
               }
+            }
+          }
+        }
+        if (xfbBuffer == InvalidValue)
+          continue;
+
+        // Update indexOfBuffer for block array, the N array-elements are captured by N consecutive buffers.
+        SPIRVType *bt = bv->getType()->getPointerElementType();
+        if (bt->isTypeArray()) {
+          assert(m_valueMap.find(bv) != m_valueMap.end());
+          auto output = cast<GlobalVariable>(m_valueMap[bv]);
+          MDNode *metaNode = output->getMetadata(gSPIRVMD::InOut);
+          assert(metaNode);
+          auto elemMeta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+          // Find the innermost array-element
+          auto elemTy = bt;
+          uint64_t elemCount = 0;
+          ShaderInOutMetadata outMetadata = {};
+          do {
+            assert(elemMeta->getNumOperands() == 4);
+            outMetadata.U64All[0] = cast<ConstantInt>(elemMeta->getOperand(2))->getZExtValue();
+            outMetadata.U64All[1] = cast<ConstantInt>(elemMeta->getOperand(3))->getZExtValue();
+            elemCount = elemTy->getArrayLength();
+
+            elemTy = elemTy->getArrayElementType();
+            elemMeta = cast<Constant>(elemMeta->getOperand(1));
+          } while (elemTy->isTypeArray());
+
+          if (outMetadata.IsBlockArray) {
+            // The even index (0,2,4,6) of !lgc.xfb.state metadata corresponds the buffer index (0~3).
+            const unsigned bufferIdx = outMetadata.XfbBuffer;
+            const int streamId = xfbState[2 * bufferIdx];
+            const unsigned stride = xfbState[2 * bufferIdx + 1];
+            for (unsigned idx = 0; idx < elemCount; ++idx) {
+              const unsigned indexOfBuffer = 2 * (bufferIdx + idx);
+              xfbState[indexOfBuffer] = streamId;
+              xfbState[indexOfBuffer + 1] = stride;
             }
           }
         }
@@ -8036,21 +8045,13 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
     // Enable transform feedback buffer if transform feedback offset is declared, and then
     // find the minimum member transform feedback offset as starting block transform feedback offset
     for (auto memberIdx = 0; memberIdx < numMembers; ++memberIdx) {
-      if (bt->hasMemberDecorate(memberIdx, DecorationXfbBuffer, 0, &xfbBuffer))
-        inOutDec.XfbBuffer = xfbBuffer;
-
-      if (bt->hasMemberDecorate(memberIdx, DecorationXfbStride, 0, &xfbStride))
-        inOutDec.XfbStride = xfbStride;
-
       if (bt->hasMemberDecorate(memberIdx, DecorationOffset, 0, &xfbOffset)) {
-        // NOTE: Transform feedback is triggered only if "xfb_offset" is specified. And in such case, "xfb_stride"
-        // must be specified as well.
-        if (inOutDec.XfbStride > 0)
-          inOutDec.IsXfb = true;
         if (xfbOffset < blockXfbOffset)
           blockXfbOffset = xfbOffset;
       }
     }
+    if (blockXfbOffset == SPIRVID_INVALID)
+      blockXfbOffset = 0;
 
     for (auto memberIdx = 0; memberIdx < numMembers; ++memberIdx) {
       auto memberDec = inOutDec;
@@ -8097,6 +8098,12 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
         memberDec.Interp.Mode = InterpModeFlat;
       }
 
+      if (bt->hasMemberDecorate(memberIdx, DecorationXfbBuffer, 0, &xfbBuffer))
+        memberDec.XfbBuffer = xfbBuffer;
+
+      if (bt->hasMemberDecorate(memberIdx, DecorationXfbStride, 0, &xfbStride))
+        memberDec.XfbStride = xfbStride;
+
       auto memberTy = bt->getStructMemberType(memberIdx);
       bool alignTo64Bit = checkContains64BitType(memberTy);
       if (bt->hasMemberDecorate(memberIdx, DecorationOffset, 0, &xfbOffset)) {
@@ -8104,6 +8111,10 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
         // Then use DecorationOffset as starting XfbExtraOffset
         memberDec.XfbExtraOffset = xfbOffset - blockXfbOffset;
         memberDec.XfbOffset = blockXfbOffset;
+        // NOTE: Transform feedback is triggered only if "xfb_offset" is specified. And in such case, "xfb_stride"
+        // must be specified as well.
+        if (memberDec.XfbStride > 0)
+          memberDec.IsXfb = true;
       } else {
         if (alignTo64Bit)
           // Align next XfbExtraOffset to 64-bit (8 bytes)
@@ -8612,8 +8623,6 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
     // Frexp: Store the exponent and return the mantissa.
     Type *pointeeType = getPointeeType(extInst->getValues(bArgs)[1]);
     exp = getBuilder()->CreateSExtOrTrunc(exp, pointeeType);
-    // TODO: Remove this when LLPC will switch fully to opaque pointers.
-    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(args[1]->getType(), pointeeType));
     // Vectors are represented as arrays in memory, so we need to cast the pointer of array to pointer of vector before
     // storing.
     if (exp->getType()->isVectorTy()) {

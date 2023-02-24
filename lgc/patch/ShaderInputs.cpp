@@ -333,46 +333,53 @@ void ShaderInputs::fixupUses(Module &module, PipelineState *pipelineState) {
     ShaderInputsUsage *inputsUsage = getShaderInputsUsage(stage);
     for (unsigned kind = 0; kind != static_cast<unsigned>(ShaderInput::Count); ++kind) {
       ShaderInputUsage *inputUsage = inputsUsage->inputs[kind].get();
-      if (inputUsage && inputUsage->entryArgIdx != 0) {
-        Argument *arg = getFunctionArgument(&func, inputUsage->entryArgIdx);
-        arg->setName(getInputName(static_cast<ShaderInput>(kind)));
-        for (Instruction *&call : inputUsage->users) {
-          if (call && call->getFunction() == &func) {
-            call->replaceAllUsesWith(arg);
-            call->eraseFromParent();
-            call = nullptr;
-          }
-        }
+      if (!inputUsage)
+        continue;
+      Value *value = nullptr;
+      {
+        if (inputUsage->entryArgIdx != 0)
+          value = getFunctionArgument(&func, inputUsage->entryArgIdx);
+        else
+          continue;
+      }
 
-        // The new ShaderInputs scheme means that InOutBuilder or PatchResourceCollect no longer needs to set
-        // the builtInUsage field for an input that is generated using ShaderInputs::getInput() and/or
-        // ShaderInputs::getSpecialUserData() (before PatchEntryPointMutate), and we can remove that
-        // builtInUsage field.
-        //
-        // However, in some cases, the builtInUsage field is used in NggPrimShader and/or Gfx*ConfigBuilder
-        // (both run later on) to tell that the input is in use. For those cases, we must keep the builtInUsage
-        // field, and set it here.
-        // Add code here as built-ins are moved from PatchInOutImportExport to InOutBuilder.
-        auto &builtInUsage = pipelineState->getShaderResourceUsage(stage)->builtInUsage;
-        switch (stage) {
-        case ShaderStageVertex:
-          switch (static_cast<ShaderInput>(kind)) {
-          case ShaderInput::VertexId:
-            // Tell NggPrimShader to copy VertexId through LDS.
-            builtInUsage.vs.vertexIndex = true;
-            break;
-          case ShaderInput::InstanceId:
-            // Tell NggPrimShader to copy InstanceId through LDS, and tell Gfx*ConfigBuilder to set
-            // SPI_SHADER_PGM_RSRC1_VS.VGPR_COMP_CNT to enable it.
-            builtInUsage.vs.instanceIndex = true;
-            break;
-          default:
-            break;
-          }
+      value->setName(getInputName(static_cast<ShaderInput>(kind)));
+      for (Instruction *&call : inputUsage->users) {
+        if (call && call->getFunction() == &func) {
+          call->replaceAllUsesWith(value);
+          call->eraseFromParent();
+          call = nullptr;
+        }
+      }
+
+      // The new ShaderInputs scheme means that InOutBuilder or PatchResourceCollect no longer needs to set
+      // the builtInUsage field for an input that is generated using ShaderInputs::getInput() and/or
+      // ShaderInputs::getSpecialUserData() (before PatchEntryPointMutate), and we can remove that
+      // builtInUsage field.
+      //
+      // However, in some cases, the builtInUsage field is used in NggPrimShader and/or Gfx*ConfigBuilder
+      // (both run later on) to tell that the input is in use. For those cases, we must keep the builtInUsage
+      // field, and set it here.
+      // Add code here as built-ins are moved from PatchInOutImportExport to InOutBuilder.
+      auto &builtInUsage = pipelineState->getShaderResourceUsage(stage)->builtInUsage;
+      switch (stage) {
+      case ShaderStageVertex:
+        switch (static_cast<ShaderInput>(kind)) {
+        case ShaderInput::VertexId:
+          // Tell NggPrimShader to copy VertexId through LDS.
+          builtInUsage.vs.vertexIndex = true;
+          break;
+        case ShaderInput::InstanceId:
+          // Tell NggPrimShader to copy InstanceId through LDS, and tell Gfx*ConfigBuilder to set
+          // SPI_SHADER_PGM_RSRC1_VS.VGPR_COMP_CNT to enable it.
+          builtInUsage.vs.instanceIndex = true;
           break;
         default:
           break;
         }
+        break;
+      default:
+        break;
       }
     }
   }

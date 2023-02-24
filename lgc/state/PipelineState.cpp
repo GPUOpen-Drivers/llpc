@@ -54,9 +54,8 @@ static cl::opt<bool> EnableTessOffChip("enable-tess-offchip", cl::desc("Enable t
 static cl::opt<bool> EnableRowExport("enable-row-export", cl::desc("Enable row export for mesh shader"),
                                      cl::init(false));
 
-// -use-register-field-format: use register field format in pipeline ELF
-static cl::opt<bool> UseRegisterFieldFormat("use-register-field-format",
-                                            cl::desc("Use register field format in pipeline ELF"), cl::init(false));
+cl::opt<bool> UseRegisterFieldFormat("use-register-field-format", cl::desc("Use register field format in pipeline ELF"),
+                                     cl::init(false));
 
 // Names for named metadata nodes when storing and reading back pipeline state
 static const char UnlinkedMetadataName[] = "lgc.unlinked";
@@ -327,6 +326,12 @@ void PipelineState::record(Module *module) {
   recordGraphicsState(module);
   if (m_palMetadata)
     m_palMetadata->record(module);
+
+  if (UseRegisterFieldFormat) {
+    const bool isFieldSupported =
+        getTargetInfo().getGfxIpVersion().major >= 11 && (m_pipelineLink == PipelineLink::WholePipeline);
+    UseRegisterFieldFormat.setValue(isFieldSupported);
+  }
 }
 
 // =====================================================================================================================
@@ -1298,19 +1303,8 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStage stage) {
         waveSize = waveSizeOption;
 
       // Note: the conditions below override the tuning option.
-      // If subgroup size is used in any shader in the pipeline, use the specified subgroup size as wave size.
-      if (m_shaderModes.getAnyUseSubgroupSize()) {
-        // If allowVaryWaveSize is enabled, subgroupSize is default as zero, initialized as waveSize
-        subgroupSize = getShaderOptions(checkingStage).subgroupSize;
-        subgroupSize = (subgroupSize == 0) ? waveSize : subgroupSize;
-
-        m_subgroupSize[checkingStage] = subgroupSize;
-
-        if ((subgroupSize < waveSize) || getOptions().fullSubgroups)
-          waveSize = subgroupSize;
-      } else if (checkingStage == ShaderStageMesh || checkingStage == ShaderStageTask ||
-                 checkingStage == ShaderStageCompute) {
-        // If workgroup size is not larger than 32, use wave size 32.
+      // If workgroup size is not larger than 32, use wave size 32.
+      if (checkingStage == ShaderStageMesh || checkingStage == ShaderStageTask || checkingStage == ShaderStageCompute) {
         unsigned workGroupSize;
         if (checkingStage == ShaderStageMesh) {
           auto &mode = m_shaderModes.getMeshShaderMode();
@@ -1325,7 +1319,26 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStage stage) {
           waveSize = 32;
       }
 
+      // If subgroup size is used in any shader in the pipeline, use the specified subgroup size.
+      if (m_shaderModes.getAnyUseSubgroupSize()) {
+        // If allowVaryWaveSize is enabled, subgroupSize is default as zero, initialized as waveSize
+        subgroupSize = getShaderOptions(checkingStage).subgroupSize;
+        // The driver only sets waveSize if a size is requested by an app. We may want to change that in the driver to
+        // set subgroupSize instead.
+        if (subgroupSize == 0)
+          subgroupSize = getShaderOptions(checkingStage).waveSize;
+        if (subgroupSize == 0)
+          subgroupSize = waveSize;
+
+        if ((subgroupSize < waveSize) || getOptions().fullSubgroups)
+          waveSize = subgroupSize;
+      } else {
+        // The subgroup size cannot be observed, use the wave size.
+        subgroupSize = waveSize;
+      }
+
       assert(waveSize == 32 || waveSize == 64);
+      assert(waveSize <= subgroupSize);
     }
     m_waveSize[checkingStage] = waveSize;
     m_subgroupSize[checkingStage] = subgroupSize;
@@ -1365,14 +1378,6 @@ bool PipelineState::enableMeshRowExport() const {
     return false; // Row export is not supported by HW
 
   return m_meshRowExport;
-}
-
-// =====================================================================================================================
-// Checks if register field value format is used or not
-bool PipelineState::useRegisterFieldFormat() const {
-  if (getTargetInfo().getGfxIpVersion().major < 11)
-    return false; // Register field format is not supported pre-GFX11 by now
-  return m_registerFieldFormat;
 }
 
 // =====================================================================================================================

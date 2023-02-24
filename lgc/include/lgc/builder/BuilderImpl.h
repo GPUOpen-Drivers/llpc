@@ -509,8 +509,8 @@ public:
 
   // Create a write to an XFB (transform feedback / streamout) buffer.
   llvm::Instruction *CreateWriteXfbOutput(llvm::Value *valueToWrite, bool isBuiltIn, unsigned location,
-                                          unsigned xfbBuffer, unsigned xfbStride, llvm::Value *xfbOffset,
-                                          InOutInfo outputInfo) override final;
+                                          unsigned component, unsigned xfbBuffer, unsigned xfbStride,
+                                          llvm::Value *xfbOffset, InOutInfo outputInfo) override final;
 
   // Create a read of barycoord input value.
   llvm::Value *CreateReadBaryCoord(BuiltInKind builtIn, InOutInfo inputInfo, llvm::Value *auxInterpValue,
@@ -672,6 +672,9 @@ public:
 
   // Create a "kill". Only allowed in a fragment shader.
   llvm::Instruction *CreateKill(const llvm::Twine &instName) override final;
+
+  // Create a "debug break".
+  llvm::Instruction *CreateDebugBreak(const llvm::Twine &instName) override final;
 
   // Create a "readclock".
   llvm::Instruction *CreateReadClock(bool realtime, const llvm::Twine &instName) override final;

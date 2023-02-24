@@ -13,7 +13,7 @@ void main()
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
 ; SHADERTEST:  [[V0:%.*]] = call {{.*}} @lgc.create.load.push.constants.ptr
 ; SHADERTEST:  load <4 x float>, ptr addrspace(4) [[V0]], align 16

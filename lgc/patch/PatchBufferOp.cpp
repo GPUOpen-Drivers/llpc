@@ -543,7 +543,6 @@ void PatchBufferOp::visitGetElementPtrInst(GetElementPtrInst &getElemPtrInst) {
   Value *newGetElemPtr = nullptr;
   auto getElemPtrPtr = pointer.second;
   auto getElemPtrEltTy = getElemPtrInst.getSourceElementType();
-  assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(getElemPtrPtr->getType()->getScalarType(), getElemPtrEltTy));
 
   if (getElemPtrInst.isInBounds())
     newGetElemPtr = m_builder->CreateInBoundsGEP(getElemPtrEltTy, getElemPtrPtr, indices);
@@ -985,7 +984,6 @@ void PatchBufferOp::postVisitMemCpyInst(MemCpyInst &memCpyInst) {
         makeLoop(ConstantInt::get(lengthType, 0), length, ConstantInt::get(lengthType, stride), &memCpyInst);
 
     // Get the current index into our source pointer.
-    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(src->getType()->getScalarType(), m_builder->getInt8Ty()));
     Value *const srcPtr = m_builder->CreateGEP(m_builder->getInt8Ty(), src, index);
     copyMetadata(srcPtr, &memCpyInst);
 
@@ -997,7 +995,6 @@ void PatchBufferOp::postVisitMemCpyInst(MemCpyInst &memCpyInst) {
     copyMetadata(srcLoad, &memCpyInst);
 
     // Get the current index into our destination pointer.
-    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(dest->getType()->getScalarType(), m_builder->getInt8Ty()));
     Value *const destPtr = m_builder->CreateGEP(m_builder->getInt8Ty(), dest, index);
     copyMetadata(destPtr, &memCpyInst);
 
@@ -1134,7 +1131,6 @@ void PatchBufferOp::postVisitMemSetInst(MemSetInst &memSetInst) {
         makeLoop(ConstantInt::get(lengthType, 0), length, ConstantInt::get(lengthType, stride), &memSetInst);
 
     // Get the current index into our destination pointer.
-    assert(IS_OPAQUE_OR_POINTEE_TYPE_MATCHES(dest->getType()->getScalarType(), m_builder->getInt8Ty()));
     Value *const destPtr = m_builder->CreateGEP(m_builder->getInt8Ty(), dest, index);
     copyMetadata(destPtr, &memSetInst);
 

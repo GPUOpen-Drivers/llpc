@@ -1,7 +1,7 @@
 // Shadow table is disabled, F-mask doesn't need to load descriptor, append the provided sample number to coordinates.
 
 // BEGIN_SHADERTEST
-// RUN: amdllpc -enable-opaque-pointers=true -v %gfxip --enable-shadow-desc=false %s | FileCheck -check-prefix=SHADERTEST %s
+// RUN: amdllpc -v %gfxip --enable-shadow-desc=false %s | FileCheck -check-prefix=SHADERTEST %s
 // SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 // SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i32 0, i32 0
 // SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 5, i32 5, i32 0, i32 0

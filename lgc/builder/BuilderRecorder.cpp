@@ -206,6 +206,8 @@ StringRef BuilderRecorder::getCallName(Opcode opcode) {
     return "barrier";
   case Opcode::Kill:
     return "kill";
+  case Opcode::DebugBreak:
+    return "debug.break";
   case Opcode::ReadClock:
     return "read.clock";
   case Opcode::Derivative:
@@ -520,6 +522,14 @@ Value *BuilderRecorder::CreateMatrixInverse(Value *const matrix, const Twine &in
 // @param instName : Name to give final instruction
 Instruction *BuilderRecorder::CreateReadClock(bool realtime, const Twine &instName) {
   return record(Opcode::ReadClock, getInt64Ty(), getInt1(realtime), instName);
+}
+
+// =====================================================================================================================
+// Create a "debug break halt"
+//
+// @param instName : Name to give final instruction
+Instruction *BuilderRecorder::CreateDebugBreak(const Twine &instName) {
+  return record(Opcode::DebugBreak, getVoidTy(), {}, instName);
 }
 
 // =====================================================================================================================
@@ -1507,18 +1517,19 @@ Instruction *BuilderRecorder::CreateWriteGenericOutput(Value *valueToWrite, unsi
 // Create a write to an XFB (transform feedback / streamout) buffer.
 //
 // @param valueToWrite : Value to write
-// @param isBuiltIn : True for built-in, false for user output (ignored if not GS)
-// @param location : Location (row) or built-in kind of output (ignored if not GS)
+// @param isBuiltIn : True for built-in, false for user output
+// @param location : Location (row) or built-in kind of output
+// @param component : Component offset of inputs and outputs (ignored if built-in)
 // @param xfbBuffer : XFB buffer ID
 // @param xfbStride : XFB stride
 // @param xfbOffset : XFB byte offset
 // @param outputInfo : Extra output info (GS stream ID)
 Instruction *BuilderRecorder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuiltIn, unsigned location,
-                                                   unsigned xfbBuffer, unsigned xfbStride, Value *xfbOffset,
-                                                   InOutInfo outputInfo) {
+                                                   unsigned component, unsigned xfbBuffer, unsigned xfbStride,
+                                                   Value *xfbOffset, InOutInfo outputInfo) {
   return record(Opcode::WriteXfbOutput, nullptr,
-                {valueToWrite, getInt1(isBuiltIn), getInt32(location), getInt32(xfbBuffer), getInt32(xfbStride),
-                 xfbOffset, getInt32(outputInfo.getData())},
+                {valueToWrite, getInt1(isBuiltIn), getInt32(location), getInt32(component), getInt32(xfbBuffer),
+                 getInt32(xfbStride), xfbOffset, getInt32(outputInfo.getData())},
                 "");
 }
 
@@ -2201,6 +2212,7 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     case Opcode::SetMeshOutputs:
     case Opcode::Kill:
     case Opcode::ReadClock:
+    case Opcode::DebugBreak:
     case Opcode::WriteBuiltInOutput:
     case Opcode::WriteGenericOutput:
 #if VKI_RAY_TRACING

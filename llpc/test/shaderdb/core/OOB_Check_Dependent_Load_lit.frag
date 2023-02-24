@@ -4,7 +4,7 @@
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -enable-opaque-pointers=true -v %gfxip %s -enable-scratch-bounds-checks | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s -enable-scratch-bounds-checks | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: .[[entry:[a-z0-9]+]]:
 ; SHADERTEST: %[[arr:[a-z0-9]+]] = alloca [5 x i32], align 4, addrspace(5)

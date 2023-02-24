@@ -43,7 +43,11 @@ namespace Util {
 namespace Abi {
 
 constexpr unsigned PipelineMetadataMajorVersion = 2; // Pipeline Metadata Major Version
-constexpr unsigned PipelineMetadataMinorVersion = 3; // Pipeline Metadata Minor Version
+constexpr unsigned PipelineMetadataMinorVersion = 6; // Pipeline Metadata Minor Version
+
+// TODO: Remove and update the version to [3,0] after switching to new register metadata layout
+constexpr unsigned PipelineMetadataMajorVersionNew = 3; // Pipeline Metadata Major Version
+constexpr unsigned PipelineMetadataMinorVersionNew = 0; // Pipeline Metadata Minor Version
 
 constexpr unsigned PipelineMetadataBase = 0x10000000; // Pipeline Metadata base value to be OR'd with the
                                                       //  PipelineMetadataEntry value when saving to ELF.
@@ -182,6 +186,14 @@ static constexpr char ApiShaderHash[] = ".api_shader_hash";
 static constexpr char HardwareMapping[] = ".hardware_mapping";
 }; // namespace ShaderMetadataKey
 
+namespace ComputeRegisterMetadataKey {
+static constexpr char TgidXEn[] = ".tgid_x_en";
+static constexpr char TgidYEn[] = ".tgid_y_en";
+static constexpr char TgidZEn[] = ".tgid_z_en";
+static constexpr char TgSizeEn[] = ".tg_size_en";
+static constexpr char TidigCompCnt[] = ".tidig_comp_cnt";
+}; // namespace ComputeRegisterMetadataKey
+
 namespace GraphicsRegisterMetadataKey {
 static constexpr char NggCullingDataReg[] = ".ngg_culling_data_reg";
 static constexpr char LsVgprCompCnt[] = ".ls_vgpr_comp_cnt";
@@ -217,6 +229,7 @@ static constexpr char VgtHosMinTessLevel[] = ".vgt_hos_min_tess_level";
 static constexpr char VgtHosMaxTessLevel[] = ".vgt_hos_max_tess_level";
 static constexpr char SpiShaderGsMeshletDim[] = ".spi_shader_gs_meshlet_dim";
 static constexpr char SpiShaderGsMeshletExpAlloc[] = ".spi_shader_gs_meshlet_exp_alloc";
+static constexpr char MeshLinearDispatchFromTask[] = ".mesh_linear_dispatch_from_task";
 static constexpr char ImageOp[] = ".image_op";
 static constexpr char VgtGsMaxVertOut[] = ".vgt_gs_max_vert_out";
 static constexpr char VgtGsInstanceCnt[] = ".vgt_gs_instance_cnt";

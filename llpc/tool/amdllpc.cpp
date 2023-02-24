@@ -374,13 +374,17 @@ static Result init(int argc, char *argv[], ICompiler *&compiler) {
   }
 
   // Change defaults of NGG options according to GFX IP
-  if (ParsedGfxIp >= GfxIpVersion{10, 3}) {
-    // For GFX10.3+, we always prefer to enable NGG. Backface culling and small primitive filter are enabled as
-    // well. Also, the compaction mode is set to compactionless.
+  if (ParsedGfxIp.isGfx(10, 3)) {
+    // For GFX10.3, we always prefer to enable NGG. Backface culling and small primitive filter are enabled as
+    // well. Also, we disable vertex compaction.
     EnableNgg.setValue(true);
     NggCompactVertex.setValue(false);
     NggEnableBackfaceCulling.setValue(true);
     NggEnableSmallPrimFilter.setValue(true);
+  } else if (ParsedGfxIp.major >= 11) {
+    // For GFX11+, NGG must be enabled because the legacy pipeline mode is removed. Still, we disable vertex compaction.
+    EnableNgg.setValue(true);
+    NggCompactVertex.setValue(false);
   }
 
   // Provide a default for -shader-cache-file-dir, as long as the environment variables below are

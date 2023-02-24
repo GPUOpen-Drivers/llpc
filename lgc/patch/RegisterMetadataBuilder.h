@@ -51,7 +51,7 @@ private:
   void buildPrimShaderRegisters();
   void buildHwVsRegisters();
   void buildPsRegisters();
-  void buildCsRegisters();
+  void buildCsRegisters(ShaderStage shaderStage);
 
   void buildShaderExecutionRegisters(Util::Abi::HardwareStage hwStageId, ShaderStage apiStage1, ShaderStage apiStage2);
   void buildPaSpecificRegisters();
