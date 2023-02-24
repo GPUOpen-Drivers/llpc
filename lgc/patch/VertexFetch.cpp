@@ -172,6 +172,9 @@ const VertexCompFormatInfo VertexFetchImpl::m_vertexCompFormatInfo[] = {
     {8, 2, 4, BUF_DATA_FORMAT_16},         // BUF_DATA_FORMAT_16_16_16_16
     {12, 4, 3, BUF_DATA_FORMAT_32},        // BUF_DATA_FORMAT_32_32_32
     {16, 4, 4, BUF_DATA_FORMAT_32},        // BUF_DATA_FORMAT_32_32_32_32
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormatReserved
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat8_8_8_8_Bgra
+    {3, 1, 3, BUF_DATA_FORMAT_8},          // BufDataFormat8_8_8
 };
 
 // clang-format off
@@ -1481,6 +1484,9 @@ VertexFormatInfo VertexFetchImpl::getVertexFormatInfo(const VertexInputDescripti
     info.numChannels = 4;
     info.dfmt = BufDataFormat32_32_32_32;
     break;
+  case BufDataFormat8_8_8:
+    info.dfmt = BufDataFormat8_8_8;
+    info.numChannels = 3;
   default:
     break;
   }
@@ -1580,7 +1586,7 @@ void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bo
        // NOTE: For the vertex data format 8_8, 8_8_8_8, 16_16, and 16_16_16_16, tbuffer_load has a HW defect when
        // vertex buffer is unaligned. Therefore, we have to split the vertex fetch to component-based ones
        dfmt != BufDataFormat8_8 && dfmt != BufDataFormat8_8_8_8 && dfmt != BufDataFormat16_16 &&
-       dfmt != BufDataFormat16_16_16_16) ||
+       dfmt != BufDataFormat16_16_16_16 && dfmt != BufDataFormat8_8_8) ||
       formatInfo->compDfmt == dfmt) {
     // NOTE: If the vertex attribute offset is greater than vertex attribute stride, we have to adjust both vertex
     // buffer index and vertex attribute offset accordingly. Otherwise, vertex fetch might behave unexpectedly.
