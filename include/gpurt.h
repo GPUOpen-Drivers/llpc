@@ -31,6 +31,7 @@
 
 #pragma once
 
+#include "gpurt/gpurtLib.h"
 #define MAKE_GPURT_VERSION(MAJOR, MINOR) ((MAJOR << 16) | MINOR)
 
 namespace GpuRt {
