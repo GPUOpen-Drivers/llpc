@@ -158,7 +158,7 @@ private:
 
   PipelineSystemValues m_pipelineSysValues; // Cache of ShaderSystemValues objects, one per shader stage
 
-  std::unique_ptr<llvm::IRBuilder<>> m_builder; // LLVM IR builder
+  llvm::IRBuilder<> m_builder; // LLVM IR builder
 
   // The wave/thread info used for control shader branching
   struct {

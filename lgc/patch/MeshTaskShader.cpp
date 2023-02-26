@@ -51,8 +51,7 @@ namespace lgc {
 // @param getPostDomTree : Function to get the post dominator tree of the given function
 MeshTaskShader::MeshTaskShader(PipelineState *pipelineState,
                                PatchPreparePipelineAbi::FunctionAnalysisHandlers *analysisHandlers)
-    : m_pipelineState(pipelineState), m_analysisHandlers(analysisHandlers),
-      m_builder(std::make_unique<IRBuilder<>>(pipelineState->getContext())),
+    : m_pipelineState(pipelineState), m_analysisHandlers(analysisHandlers), m_builder(pipelineState->getContext()),
       m_gfxIp(pipelineState->getTargetInfo().getGfxIpVersion()) {
   assert(pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3})); // Must be GFX10.3+
   m_pipelineSysValues.initialize(m_pipelineState);
@@ -350,7 +349,7 @@ void MeshTaskShader::processTaskShader(Function *entryPoint) {
   //   }
   // }
   //
-  m_builder->SetInsertPointPastAllocas(entryPoint);
+  m_builder.SetInsertPointPastAllocas(entryPoint);
   initWaveThreadInfo(entryPoint);
 
   SmallVector<CallInst *, 8> removedCalls;
@@ -367,7 +366,7 @@ void MeshTaskShader::processTaskShader(Function *entryPoint) {
         if (call->getFunction() != entryPoint)
           continue; // Not belong to task shader
 
-        m_builder->SetInsertPoint(call);
+        m_builder.SetInsertPoint(call);
 
         if (func.getName().startswith(lgcName::MeshTaskReadTaskPayload)) {
           // Read task payload
@@ -599,44 +598,44 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
 
   // Construct ".entry" block
   {
-    m_builder->SetInsertPoint(entryBlock);
+    m_builder.SetInsertPoint(entryBlock);
 
     initWaveThreadInfo(entryPoint);
 
     if (m_needBarrierFlag) {
-      m_barrierToggle = m_builder->CreateAlloca(m_builder->getInt1Ty(), nullptr, "barrierToggle");
-      m_builder->CreateStore(m_builder->getFalse(), m_barrierToggle);
+      m_barrierToggle = m_builder.CreateAlloca(m_builder.getInt1Ty(), nullptr, "barrierToggle");
+      m_builder.CreateStore(m_builder.getFalse(), m_barrierToggle);
     }
 
-    m_builder->CreateBr(initPrimitiveIndicesHeaderBlock);
+    m_builder.CreateBr(initPrimitiveIndicesHeaderBlock);
   }
 
   // Construct ".initPrimitiveIndicesHeader" block
   PHINode *loopIndexPhi = nullptr;
   {
-    m_builder->SetInsertPoint(initPrimitiveIndicesHeaderBlock);
+    m_builder.SetInsertPoint(initPrimitiveIndicesHeaderBlock);
 
     if (m_pipelineState->enableMeshRowExport()) {
-      loopIndexPhi = m_builder->CreatePHI(m_builder->getInt32Ty(), 2);
-      loopIndexPhi->addIncoming(m_builder->getInt32(0), entryBlock); // loopIndex = 0
+      loopIndexPhi = m_builder.CreatePHI(m_builder.getInt32Ty(), 2);
+      loopIndexPhi->addIncoming(m_builder.getInt32(0), entryBlock); // loopIndex = 0
 
       // primitiveIndex = threadIdInSubgroup + loopIndex * waveSize
       m_waveThreadInfo.primOrVertexIndex =
-          m_builder->CreateAdd(m_waveThreadInfo.threadIdInSubgroup,
-                               m_builder->CreateMul(loopIndexPhi, m_builder->getInt32(waveSize)), "primitiveIndex");
+          m_builder.CreateAdd(m_waveThreadInfo.threadIdInSubgroup,
+                              m_builder.CreateMul(loopIndexPhi, m_builder.getInt32(waveSize)), "primitiveIndex");
     }
 
     if (m_gfxIp.major >= 11)
       prepareAttribRingAccess();
 
     auto validPrimitive =
-        m_builder->CreateICmpULT(m_waveThreadInfo.primOrVertexIndex, m_builder->getInt32(meshMode.outputPrimitives));
-    m_builder->CreateCondBr(validPrimitive, initPrimitiveIndicesBodyBlock, endInitPrimitiveIndicesBlock);
+        m_builder.CreateICmpULT(m_waveThreadInfo.primOrVertexIndex, m_builder.getInt32(meshMode.outputPrimitives));
+    m_builder.CreateCondBr(validPrimitive, initPrimitiveIndicesBodyBlock, endInitPrimitiveIndicesBlock);
   }
 
   // Construct ".initPrimitiveIndicesBody" block
   {
-    m_builder->SetInsertPoint(initPrimitiveIndicesBodyBlock);
+    m_builder.SetInsertPoint(initPrimitiveIndicesBodyBlock);
 
     if (m_pipelineState->enableMeshRowExport()) {
       //
@@ -652,76 +651,76 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
       //     primitiveIndex += loopIndex * waveSize
       //   }
       //
-      auto loopIndex = m_builder->CreateAdd(loopIndexPhi, m_builder->getInt32(numWaves)); // loopIndex += numWaves
+      auto loopIndex = m_builder.CreateAdd(loopIndexPhi, m_builder.getInt32(numWaves)); // loopIndex += numWaves
       loopIndexPhi->addIncoming(loopIndex, initPrimitiveIndicesBodyBlock);
     }
 
-    auto ldsStart = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveIndices));
-    auto ldsOffset = m_builder->CreateAdd(ldsStart, m_waveThreadInfo.primOrVertexIndex);
+    auto ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveIndices));
+    auto ldsOffset = m_builder.CreateAdd(ldsStart, m_waveThreadInfo.primOrVertexIndex);
 
-    writeValueToLds(m_builder->getInt32(0), ldsOffset);
-    m_builder->CreateBr(m_pipelineState->enableMeshRowExport() ? initPrimitiveIndicesHeaderBlock
-                                                               : endInitPrimitiveIndicesBlock);
+    writeValueToLds(m_builder.getInt32(0), ldsOffset);
+    m_builder.CreateBr(m_pipelineState->enableMeshRowExport() ? initPrimitiveIndicesHeaderBlock
+                                                              : endInitPrimitiveIndicesBlock);
   }
 
   // Construct ".endInitPrimitiveIndices" block
   Value *firstThreadInSubgroup = nullptr;
   {
-    m_builder->SetInsertPoint(endInitPrimitiveIndicesBlock);
+    m_builder.SetInsertPoint(endInitPrimitiveIndicesBlock);
 
-    firstThreadInSubgroup = m_builder->CreateICmpEQ(m_waveThreadInfo.threadIdInSubgroup, m_builder->getInt32(0));
-    m_builder->CreateCondBr(firstThreadInSubgroup, writeSpecialValueBlock, endWriteSpecialValueBlock);
+    firstThreadInSubgroup = m_builder.CreateICmpEQ(m_waveThreadInfo.threadIdInSubgroup, m_builder.getInt32(0));
+    m_builder.CreateCondBr(firstThreadInSubgroup, writeSpecialValueBlock, endWriteSpecialValueBlock);
   }
 
   // Construct ".writeSpecialValue" block
   {
-    m_builder->SetInsertPoint(writeSpecialValueBlock);
+    m_builder.SetInsertPoint(writeSpecialValueBlock);
 
     // NOTE: We write invalid value (~0) to vertex count as the sentinel. If API mesh shader executes
     // SetMeshOutputs, the value will be changed to a valid one. Otherwise, we know SetMeshOutputs is not be
     // executed and we must make a dummy sendmsg (GS_ALLOC_REQ) with zero vertex/primitive count.
-    auto ldsOffset = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexCount));
-    writeValueToLds(m_builder->getInt32(InvalidValue), ldsOffset);
+    auto ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexCount));
+    writeValueToLds(m_builder.getInt32(InvalidValue), ldsOffset);
 
     // Write barrier completion flag to LDS if it is required. Otherwise, skip it.
     if (m_needBarrierFlag) {
-      auto ldsOffset = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::BarrierCompletion));
-      writeValueToLds(m_builder->getInt32(0), ldsOffset);
+      auto ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::BarrierCompletion));
+      writeValueToLds(m_builder.getInt32(0), ldsOffset);
     }
 
     // Write flat workgroup ID to LDS if it is required. Otherwise, skip it.
     if (useFlatWorkgroupId(m_pipelineState)) {
-      auto ldsOffset = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::FlatWorkgroupId));
+      auto ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::FlatWorkgroupId));
       auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
       auto flatWorkgroupId = getFunctionArgument(entryPoint, entryArgIdxs.flatWorkgroupId);
       writeValueToLds(flatWorkgroupId, ldsOffset);
     }
 
-    m_builder->CreateBr(endWriteSpecialValueBlock);
+    m_builder.CreateBr(endWriteSpecialValueBlock);
   }
 
   // Construct ".endWriteSpecialValue" block
   {
-    m_builder->SetInsertPoint(endWriteSpecialValueBlock);
+    m_builder.SetInsertPoint(endWriteSpecialValueBlock);
 
     SyncScope::ID syncScope = entryPoint->getParent()->getContext().getOrInsertSyncScopeID("workgroup");
-    m_builder->CreateFence(AtomicOrdering::Release, syncScope);
-    m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-    m_builder->CreateFence(AtomicOrdering::Acquire, syncScope);
+    m_builder.CreateFence(AtomicOrdering::Release, syncScope);
+    m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+    m_builder.CreateFence(AtomicOrdering::Acquire, syncScope);
 
-    auto validMeshWave = m_builder->CreateICmpULT(m_waveThreadInfo.waveIdInSubgroup, m_builder->getInt32(numMeshWaves));
+    auto validMeshWave = m_builder.CreateICmpULT(m_waveThreadInfo.waveIdInSubgroup, m_builder.getInt32(numMeshWaves));
     // There could be no extra waves
-    validMeshWave = m_builder->CreateOr(validMeshWave, m_builder->getInt1(numMeshWaves == numWaves));
-    m_builder->CreateCondBr(validMeshWave, beginMeshWaveBlock, beginExtraWaveBlock);
+    validMeshWave = m_builder.CreateOr(validMeshWave, m_builder.getInt1(numMeshWaves == numWaves));
+    m_builder.CreateCondBr(validMeshWave, beginMeshWaveBlock, beginExtraWaveBlock);
   }
 
   // Construct ".beginMeshWave" block
   {
-    m_builder->SetInsertPoint(beginMeshWaveBlock);
+    m_builder.SetInsertPoint(beginMeshWaveBlock);
 
     auto validMeshThread =
-        m_builder->CreateICmpULT(m_waveThreadInfo.threadIdInSubgroup, m_builder->getInt32(numMeshThreads));
-    m_builder->CreateCondBr(validMeshThread, apiMeshEntryBlock, endMeshWaveBlock);
+        m_builder.CreateICmpULT(m_waveThreadInfo.threadIdInSubgroup, m_builder.getInt32(numMeshThreads));
+    m_builder.CreateCondBr(validMeshThread, apiMeshEntryBlock, endMeshWaveBlock);
   }
 
   // Lower mesh shader main body
@@ -729,7 +728,7 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
 
   // Construct ".endMeshWave" block
   {
-    m_builder->SetInsertPoint(endMeshWaveBlock);
+    m_builder.SetInsertPoint(endMeshWaveBlock);
 
     // NOTE: Here, we remove original return instruction from API mesh shader and continue to construct this block
     // with other instructions.
@@ -737,17 +736,17 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
 
     if (m_needBarrierFlag) {
       SyncScope::ID syncScope = entryPoint->getParent()->getContext().getOrInsertSyncScopeID("workgroup");
-      m_builder->CreateFence(AtomicOrdering::Release, syncScope);
-      m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-      m_builder->CreateFence(AtomicOrdering::Acquire, syncScope);
+      m_builder.CreateFence(AtomicOrdering::Release, syncScope);
+      m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+      m_builder.CreateFence(AtomicOrdering::Acquire, syncScope);
     }
 
-    m_builder->CreateBr(checkMeshOutputCountBlock);
+    m_builder.CreateBr(checkMeshOutputCountBlock);
   }
 
   // Construct ".beginExtraWave" block
   {
-    m_builder->SetInsertPoint(beginExtraWaveBlock);
+    m_builder.SetInsertPoint(beginExtraWaveBlock);
 
     if (m_needBarrierFlag) {
       //
@@ -758,34 +757,34 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
       //
 
       // barrierToggle = !barrierToggle
-      Value *barrierToggle = m_builder->CreateLoad(m_builder->getInt1Ty(), m_barrierToggle);
-      barrierToggle = m_builder->CreateNot(barrierToggle);
-      m_builder->CreateStore(barrierToggle, m_barrierToggle);
+      Value *barrierToggle = m_builder.CreateLoad(m_builder.getInt1Ty(), m_barrierToggle);
+      barrierToggle = m_builder.CreateNot(barrierToggle);
+      m_builder.CreateStore(barrierToggle, m_barrierToggle);
 
-      m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+      m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 
-      auto ldsOffset = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::BarrierCompletion));
-      auto barrierFlag = readValueFromLds(m_builder->getInt32Ty(), ldsOffset);
+      auto ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::BarrierCompletion));
+      auto barrierFlag = readValueFromLds(m_builder.getInt32Ty(), ldsOffset);
 
       // barriersNotCompleted = barrierFlag == 0
-      auto barriersNotCompleted = m_builder->CreateICmpEQ(barrierFlag, m_builder->getInt32(0));
+      auto barriersNotCompleted = m_builder.CreateICmpEQ(barrierFlag, m_builder.getInt32(0));
       // barriersToggle = barrierFlag & 0x1
-      auto barriersToggle = m_builder->CreateAnd(barrierFlag, 0x1);
-      barriersToggle = m_builder->CreateTrunc(barriersToggle, m_builder->getInt1Ty());
+      auto barriersToggle = m_builder.CreateAnd(barrierFlag, 0x1);
+      barriersToggle = m_builder.CreateTrunc(barriersToggle, m_builder.getInt1Ty());
 
       // toggleEqual = barriersToggle == barrierToggle
-      auto toggleEqual = m_builder->CreateICmpEQ(barriersToggle, barrierToggle);
+      auto toggleEqual = m_builder.CreateICmpEQ(barriersToggle, barrierToggle);
 
-      auto continueToAddBarriers = m_builder->CreateOr(barriersNotCompleted, toggleEqual);
-      m_builder->CreateCondBr(continueToAddBarriers, beginExtraWaveBlock, checkMeshOutputCountBlock);
+      auto continueToAddBarriers = m_builder.CreateOr(barriersNotCompleted, toggleEqual);
+      m_builder.CreateCondBr(continueToAddBarriers, beginExtraWaveBlock, checkMeshOutputCountBlock);
     } else {
       const unsigned numBarriers = m_barriers.size();
       // NOTEL: Here, we don't need barrier completion flag, but we still find API barriers. To match number of API
       // barriers, we add additional barriers in extra waves. The number is known.
       for (unsigned i = 0; i < numBarriers; ++i) {
-        m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+        m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
       }
-      m_builder->CreateBr(checkMeshOutputCountBlock);
+      m_builder.CreateBr(checkMeshOutputCountBlock);
     }
   }
 
@@ -793,85 +792,83 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   Value *vertexCount = nullptr;
   Value *primitiveCount = nullptr;
   {
-    m_builder->SetInsertPoint(checkMeshOutputCountBlock);
+    m_builder.SetInsertPoint(checkMeshOutputCountBlock);
 
     SyncScope::ID syncScope = entryPoint->getParent()->getContext().getOrInsertSyncScopeID("workgroup");
-    m_builder->CreateFence(AtomicOrdering::Release, syncScope);
-    m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-    m_builder->CreateFence(AtomicOrdering::Acquire, syncScope);
+    m_builder.CreateFence(AtomicOrdering::Release, syncScope);
+    m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+    m_builder.CreateFence(AtomicOrdering::Acquire, syncScope);
 
-    Value *ldsOffset = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexCount));
-    vertexCount = readValueFromLds(m_builder->getInt32Ty(), ldsOffset);
-    vertexCount = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertexCount); // Promoted to SGPR
+    Value *ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexCount));
+    vertexCount = readValueFromLds(m_builder.getInt32Ty(), ldsOffset);
+    vertexCount = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertexCount); // Promoted to SGPR
     vertexCount->setName("vertexCount");
 
-    ldsOffset = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveCount));
-    primitiveCount = readValueFromLds(m_builder->getInt32Ty(), ldsOffset);
-    primitiveCount =
-        m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primitiveCount); // Promoted to SGPR
+    ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveCount));
+    primitiveCount = readValueFromLds(m_builder.getInt32Ty(), ldsOffset);
+    primitiveCount = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primitiveCount); // Promoted to SGPR
     primitiveCount->setName("primitiveCount");
 
-    auto dummyAllocReq = m_builder->CreateICmpEQ(vertexCount, m_builder->getInt32(InvalidValue));
-    m_builder->CreateCondBr(dummyAllocReq, checkDummyAllocReqBlock, checkExportPrimitiveBlock);
+    auto dummyAllocReq = m_builder.CreateICmpEQ(vertexCount, m_builder.getInt32(InvalidValue));
+    m_builder.CreateCondBr(dummyAllocReq, checkDummyAllocReqBlock, checkExportPrimitiveBlock);
   }
 
   // Construct ".checkDummyAllocReq" block
   {
-    m_builder->SetInsertPoint(checkDummyAllocReqBlock);
+    m_builder.SetInsertPoint(checkDummyAllocReqBlock);
 
-    m_builder->CreateCondBr(firstThreadInSubgroup, dummyAllocReqBlock, endDummyAllocReqBlock);
+    m_builder.CreateCondBr(firstThreadInSubgroup, dummyAllocReqBlock, endDummyAllocReqBlock);
   }
 
   // Construct ".dummyAllocReq" block
   {
-    m_builder->SetInsertPoint(dummyAllocReqBlock);
+    m_builder.SetInsertPoint(dummyAllocReqBlock);
 
-    m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {},
-                               {m_builder->getInt32(GsAllocReq), m_builder->getInt32(0)});
-    m_builder->CreateBr(endDummyAllocReqBlock);
+    m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, {m_builder.getInt32(GsAllocReq), m_builder.getInt32(0)});
+    m_builder.CreateBr(endDummyAllocReqBlock);
   }
 
   // Construct ".endDummyAllocReq" block
   {
-    m_builder->SetInsertPoint(endDummyAllocReqBlock);
+    m_builder.SetInsertPoint(endDummyAllocReqBlock);
 
-    m_builder->CreateRetVoid();
+    m_builder.CreateRetVoid();
   }
 
   // Construct ".checkExportPrimitive" block
   {
-    m_builder->SetInsertPoint(checkExportPrimitiveBlock);
+    m_builder.SetInsertPoint(checkExportPrimitiveBlock);
 
-    m_builder->CreateBr(exportPrimitiveHeaderBlock);
+    m_builder.CreateBr(exportPrimitiveHeaderBlock);
   }
 
   // Construct ".exportPrimitiveHeader" block
   {
-    m_builder->SetInsertPoint(exportPrimitiveHeaderBlock);
+    m_builder.SetInsertPoint(exportPrimitiveHeaderBlock);
 
     if (m_pipelineState->enableMeshRowExport()) {
-      loopIndexPhi = m_builder->CreatePHI(m_builder->getInt32Ty(), 2);
-      loopIndexPhi->addIncoming(m_builder->getInt32(0), checkExportPrimitiveBlock); // loopIndex = 0
+      loopIndexPhi = m_builder.CreatePHI(m_builder.getInt32Ty(), 2);
+      loopIndexPhi->addIncoming(m_builder.getInt32(0), checkExportPrimitiveBlock); // loopIndex = 0
 
       // primitiveIndex = threadIdInSubgroup + loopIndex * waveSize
       m_waveThreadInfo.primOrVertexIndex =
-          m_builder->CreateAdd(m_waveThreadInfo.threadIdInSubgroup,
-                               m_builder->CreateMul(loopIndexPhi, m_builder->getInt32(waveSize)), "primitiveIndex");
+          m_builder.CreateAdd(m_waveThreadInfo.threadIdInSubgroup,
+                              m_builder.CreateMul(loopIndexPhi, m_builder.getInt32(waveSize)), "primitiveIndex");
 
       if (m_gfxIp.major >= 11) {
         // rowInSubgroup = waveIdInSubgroup + loopIndex
         m_waveThreadInfo.rowInSubgroup =
-            m_builder->CreateAdd(m_waveThreadInfo.waveIdInSubgroup, loopIndexPhi, "rowInSubgroup");
+            m_builder.CreateAdd(m_waveThreadInfo.waveIdInSubgroup, loopIndexPhi, "rowInSubgroup");
       }
     }
 
-    auto validPrimitive = m_builder->CreateICmpULT(m_waveThreadInfo.primOrVertexIndex, primitiveCount);
-    m_builder->CreateCondBr(validPrimitive, exportPrimitiveBodyBlock, endExportPrimitiveBlock);
+    auto validPrimitive = m_builder.CreateICmpULT(m_waveThreadInfo.primOrVertexIndex, primitiveCount);
+    m_builder.CreateCondBr(validPrimitive, exportPrimitiveBodyBlock, endExportPrimitiveBlock);
   }
 
   // Construct ".exportPrimitiveBody" block
   {
-    m_builder->SetInsertPoint(exportPrimitiveBodyBlock);
+    m_builder.SetInsertPoint(exportPrimitiveBodyBlock);
 
     if (m_pipelineState->enableMeshRowExport()) {
       //
@@ -890,48 +887,48 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
       //     rowInSubgroup += loopIndex
       //   }
       //
-      auto loopIndex = m_builder->CreateAdd(loopIndexPhi, m_builder->getInt32(numWaves)); // loopIndex += numWaves
+      auto loopIndex = m_builder.CreateAdd(loopIndexPhi, m_builder.getInt32(numWaves)); // loopIndex += numWaves
       loopIndexPhi->addIncoming(loopIndex, exportPrimitiveBodyBlock);
     }
 
     exportPrimitive();
-    m_builder->CreateBr(m_pipelineState->enableMeshRowExport() ? exportPrimitiveHeaderBlock : endExportPrimitiveBlock);
+    m_builder.CreateBr(m_pipelineState->enableMeshRowExport() ? exportPrimitiveHeaderBlock : endExportPrimitiveBlock);
   }
 
   // Construct ".endExportPrimitive" block
   {
-    m_builder->SetInsertPoint(endExportPrimitiveBlock);
+    m_builder.SetInsertPoint(endExportPrimitiveBlock);
 
-    m_builder->CreateBr(exportVertexHeaderBlock);
+    m_builder.CreateBr(exportVertexHeaderBlock);
   }
 
   // Construct ".exportVertexHeader" block
   {
-    m_builder->SetInsertPoint(exportVertexHeaderBlock);
+    m_builder.SetInsertPoint(exportVertexHeaderBlock);
 
     if (m_pipelineState->enableMeshRowExport()) {
-      loopIndexPhi = m_builder->CreatePHI(m_builder->getInt32Ty(), 2);
-      loopIndexPhi->addIncoming(m_builder->getInt32(0), endExportPrimitiveBlock); // loopIndex = 0
+      loopIndexPhi = m_builder.CreatePHI(m_builder.getInt32Ty(), 2);
+      loopIndexPhi->addIncoming(m_builder.getInt32(0), endExportPrimitiveBlock); // loopIndex = 0
 
       // vertexIndex = threadIdInSubgroup + loopIndex * waveSize
       m_waveThreadInfo.primOrVertexIndex =
-          m_builder->CreateAdd(m_waveThreadInfo.threadIdInSubgroup,
-                               m_builder->CreateMul(loopIndexPhi, m_builder->getInt32(waveSize)), "vertexIndex");
+          m_builder.CreateAdd(m_waveThreadInfo.threadIdInSubgroup,
+                              m_builder.CreateMul(loopIndexPhi, m_builder.getInt32(waveSize)), "vertexIndex");
 
       if (m_gfxIp.major >= 11) {
         // rowInSubgroup = waveIdInSubgroup + loopIndex
         m_waveThreadInfo.rowInSubgroup =
-            m_builder->CreateAdd(m_waveThreadInfo.waveIdInSubgroup, loopIndexPhi, "rowInSubgroup");
+            m_builder.CreateAdd(m_waveThreadInfo.waveIdInSubgroup, loopIndexPhi, "rowInSubgroup");
       }
     }
 
-    auto validVertex = m_builder->CreateICmpULT(m_waveThreadInfo.primOrVertexIndex, vertexCount);
-    m_builder->CreateCondBr(validVertex, exportVertexBodyBlock, endExportVertexBlock);
+    auto validVertex = m_builder.CreateICmpULT(m_waveThreadInfo.primOrVertexIndex, vertexCount);
+    m_builder.CreateCondBr(validVertex, exportVertexBodyBlock, endExportVertexBlock);
   }
 
   // Construct "exportVertexBody" block
   {
-    m_builder->SetInsertPoint(exportVertexBodyBlock);
+    m_builder.SetInsertPoint(exportVertexBodyBlock);
 
     if (m_pipelineState->enableMeshRowExport()) {
       //
@@ -950,35 +947,35 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
       //     rowInSubgroup += loopIndex
       //   }
       //
-      auto loopIndex = m_builder->CreateAdd(loopIndexPhi, m_builder->getInt32(numWaves)); // loopIndex += numWaves
+      auto loopIndex = m_builder.CreateAdd(loopIndexPhi, m_builder.getInt32(numWaves)); // loopIndex += numWaves
       loopIndexPhi->addIncoming(loopIndex, exportVertexBodyBlock);
     }
 
     exportVertex();
-    m_builder->CreateBr(m_pipelineState->enableMeshRowExport() ? exportVertexHeaderBlock : endExportVertexBlock);
+    m_builder.CreateBr(m_pipelineState->enableMeshRowExport() ? exportVertexHeaderBlock : endExportVertexBlock);
   }
 
   // Construct ".endExportVertex" block
   {
-    m_builder->SetInsertPoint(endExportVertexBlock);
+    m_builder.SetInsertPoint(endExportVertexBlock);
 
-    auto firstThreadInSubgroup = m_builder->CreateICmpEQ(m_waveThreadInfo.threadIdInSubgroup, m_builder->getInt32(0));
-    m_builder->CreateCondBr(firstThreadInSubgroup, collectMeshStatsBlock, exitBlock);
+    auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_waveThreadInfo.threadIdInSubgroup, m_builder.getInt32(0));
+    m_builder.CreateCondBr(firstThreadInSubgroup, collectMeshStatsBlock, exitBlock);
   }
 
   // Construct ".collectMeshStats" block
   {
-    m_builder->SetInsertPoint(collectMeshStatsBlock);
+    m_builder.SetInsertPoint(collectMeshStatsBlock);
 
     collectMeshStatsInfo(entryPoint, primitiveCount);
-    m_builder->CreateBr(exitBlock);
+    m_builder.CreateBr(exitBlock);
   }
 
   // Construct ".exit" block
   {
-    m_builder->SetInsertPoint(exitBlock);
+    m_builder.SetInsertPoint(exitBlock);
 
-    m_builder->CreateRetVoid();
+    m_builder.CreateRetVoid();
   }
 }
 
@@ -989,7 +986,7 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
 // @param byteOffset : Byte offset within the payload entry
 // @returns : Value read from task payload
 Value *MeshTaskShader::readTaskPayload(Type *readTy, Value *byteOffset) {
-  auto entryPoint = m_builder->GetInsertBlock()->getParent();
+  auto entryPoint = m_builder.GetInsertBlock()->getParent();
 
   auto payloadRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskPayloadRingBufDesc();
   auto payloadRingEntryOffset = getPayloadRingEntryOffset(entryPoint);
@@ -1008,43 +1005,43 @@ Value *MeshTaskShader::readTaskPayload(Type *readTy, Value *byteOffset) {
     // 64vec2 -> vec4
     // 64vec3 -> vec4 + vec2
     // 64vec4 -> vec4 + vec4
-    Type *readTy1 = FixedVectorType::get(m_builder->getInt32Ty(), std::min(2 * numElements, 4u));
+    Type *readTy1 = FixedVectorType::get(m_builder.getInt32Ty(), std::min(2 * numElements, 4u));
     Value *readValue1 = readTaskPayload(readTy1, byteOffset);
 
     Value *readValue = nullptr;
     if (numElements > 2) {
-      Type *readTy2 = FixedVectorType::get(m_builder->getInt32Ty(), 2 * numElements - 4);
-      byteOffset = m_builder->CreateAdd(byteOffset, m_builder->getInt32(4 * sizeof(unsigned)));
+      Type *readTy2 = FixedVectorType::get(m_builder.getInt32Ty(), 2 * numElements - 4);
+      byteOffset = m_builder.CreateAdd(byteOffset, m_builder.getInt32(4 * sizeof(unsigned)));
       Value *readValue2 = readTaskPayload(readTy2, byteOffset);
 
       if (numElements == 3) {
-        readValue2 = m_builder->CreateShuffleVector(readValue2, PoisonValue::get(readValue2->getType()),
-                                                    ArrayRef<int>{0, 1, 2, 3});
+        readValue2 = m_builder.CreateShuffleVector(readValue2, PoisonValue::get(readValue2->getType()),
+                                                   ArrayRef<int>{0, 1, 2, 3});
       }
-      readValue = m_builder->CreateShuffleVector(readValue1, readValue2,
-                                                 ArrayRef<int>{0, 1, 2, 3, 4, 5, 6, 7}.slice(0, numElements * 2));
+      readValue = m_builder.CreateShuffleVector(readValue1, readValue2,
+                                                ArrayRef<int>{0, 1, 2, 3, 4, 5, 6, 7}.slice(0, numElements * 2));
     } else {
       readValue = readValue1;
     }
 
-    return m_builder->CreateBitCast(readValue, readTy);
+    return m_builder.CreateBitCast(readValue, readTy);
   } else if (bitWidth == 8 || bitWidth == 16) {
     if (numElements > 1) {
       // Scalarize
       Value *readValue = UndefValue::get(readTy);
       for (unsigned i = 0; i < numElements; ++i) {
         auto elemByteOffset =
-            i > 0 ? m_builder->CreateAdd(byteOffset, m_builder->getInt32(i * bitWidth / 8)) : byteOffset;
+            i > 0 ? m_builder.CreateAdd(byteOffset, m_builder.getInt32(i * bitWidth / 8)) : byteOffset;
         auto elem = readTaskPayload(readTy->getScalarType(), elemByteOffset);
-        readValue = m_builder->CreateInsertElement(readValue, elem, i);
+        readValue = m_builder.CreateInsertElement(readValue, elem, i);
       }
       return readValue;
     }
   }
 
-  return m_builder->CreateIntrinsic(
+  return m_builder.CreateIntrinsic(
       Intrinsic::amdgcn_raw_buffer_load, readTy,
-      {payloadRingBufDesc, byteOffset, payloadRingEntryOffset, m_builder->getInt32(coherent.u32All)});
+      {payloadRingBufDesc, byteOffset, payloadRingEntryOffset, m_builder.getInt32(coherent.u32All)});
 }
 
 // =====================================================================================================================
@@ -1053,7 +1050,7 @@ Value *MeshTaskShader::readTaskPayload(Type *readTy, Value *byteOffset) {
 // @param writeValue : Value to write
 // @param byteOffset : Byte offset within the payload entry
 void MeshTaskShader::writeTaskPayload(Value *writeValue, Value *byteOffset) {
-  auto entryPoint = m_builder->GetInsertBlock()->getParent();
+  auto entryPoint = m_builder.GetInsertBlock()->getParent();
   assert(getShaderStage(entryPoint) == ShaderStageTask);
 
   auto payloadRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskPayloadRingBufDesc();
@@ -1070,8 +1067,8 @@ void MeshTaskShader::writeTaskPayload(Value *writeValue, Value *byteOffset) {
   // NOTE: There are some special types that LLVM backend couldn't support. We have to lower them here.
   if (bitWidth == 64) {
     // Cast to <n x i32>
-    auto castTy = FixedVectorType::get(m_builder->getInt32Ty(), 2 * numElements);
-    writeValue = m_builder->CreateBitCast(writeValue, castTy);
+    auto castTy = FixedVectorType::get(m_builder.getInt32Ty(), 2 * numElements);
+    writeValue = m_builder.CreateBitCast(writeValue, castTy);
 
     // 64scalar -> vec2
     // 64vec2 -> vec4
@@ -1079,15 +1076,15 @@ void MeshTaskShader::writeTaskPayload(Value *writeValue, Value *byteOffset) {
     // 64vec4 -> vec4 + vec4
     auto writeValue1 = writeValue;
     if (numElements > 2) {
-      writeValue1 = m_builder->CreateShuffleVector(writeValue, PoisonValue::get(writeValue->getType()),
-                                                   ArrayRef<int>({0, 1, 2, 3}));
+      writeValue1 = m_builder.CreateShuffleVector(writeValue, PoisonValue::get(writeValue->getType()),
+                                                  ArrayRef<int>({0, 1, 2, 3}));
     }
     writeTaskPayload(writeValue1, byteOffset);
 
     if (numElements > 2) {
-      auto writeValue2 = m_builder->CreateShuffleVector(writeValue, PoisonValue::get(writeValue->getType()),
-                                                        ArrayRef<int>({4, 5, 6, 7}).slice(0, 2 * numElements - 4));
-      byteOffset = m_builder->CreateAdd(byteOffset, m_builder->getInt32(4 * sizeof(unsigned)));
+      auto writeValue2 = m_builder.CreateShuffleVector(writeValue, PoisonValue::get(writeValue->getType()),
+                                                       ArrayRef<int>({4, 5, 6, 7}).slice(0, 2 * numElements - 4));
+      byteOffset = m_builder.CreateAdd(byteOffset, m_builder.getInt32(4 * sizeof(unsigned)));
       writeTaskPayload(writeValue2, byteOffset);
     }
 
@@ -1096,18 +1093,18 @@ void MeshTaskShader::writeTaskPayload(Value *writeValue, Value *byteOffset) {
     if (numElements > 1) {
       // Scalarize
       for (unsigned i = 0; i < numElements; ++i) {
-        auto elem = m_builder->CreateExtractElement(writeValue, i);
+        auto elem = m_builder.CreateExtractElement(writeValue, i);
         auto elemByteOffset =
-            i > 0 ? m_builder->CreateAdd(byteOffset, m_builder->getInt32(i * bitWidth / 8)) : byteOffset;
+            i > 0 ? m_builder.CreateAdd(byteOffset, m_builder.getInt32(i * bitWidth / 8)) : byteOffset;
         writeTaskPayload(elem, elemByteOffset);
       }
       return;
     }
   }
 
-  m_builder->CreateIntrinsic(
+  m_builder.CreateIntrinsic(
       Intrinsic::amdgcn_raw_buffer_store, writeValue->getType(),
-      {writeValue, payloadRingBufDesc, byteOffset, payloadRingEntryOffset, m_builder->getInt32(coherent.u32All)});
+      {writeValue, payloadRingBufDesc, byteOffset, payloadRingEntryOffset, m_builder.getInt32(coherent.u32All)});
 }
 
 // =====================================================================================================================
@@ -1120,7 +1117,7 @@ void MeshTaskShader::writeTaskPayload(Value *writeValue, Value *byteOffset) {
 // @returns : Original value read from the task payload
 Value *MeshTaskShader::taskPayloadAtomic(unsigned atomicOp, AtomicOrdering ordering, Value *inputValue,
                                          Value *byteOffset) {
-  auto entryPoint = m_builder->GetInsertBlock()->getParent();
+  auto entryPoint = m_builder.GetInsertBlock()->getParent();
   assert(getShaderStage(entryPoint) == ShaderStageTask);
 
   assert(inputValue->getType()->isIntegerTy() || inputValue->getType()->isFloatingPointTy());
@@ -1133,7 +1130,7 @@ Value *MeshTaskShader::taskPayloadAtomic(unsigned atomicOp, AtomicOrdering order
   // NOTE: buffer.atomic.swap.f64 is not supported in LLVM backend, so we convert double to int64.
   bool doubleToInt64 = atomicOp == AtomicRMWInst::Xchg && inputValue->getType()->isDoubleTy();
   if (doubleToInt64)
-    inputValue = m_builder->CreateBitCast(inputValue, m_builder->getInt64Ty());
+    inputValue = m_builder.CreateBitCast(inputValue, m_builder.getInt64Ty());
 
   Intrinsic::ID intrinsic = Intrinsic::not_intrinsic;
   switch (atomicOp) {
@@ -1183,18 +1180,18 @@ Value *MeshTaskShader::taskPayloadAtomic(unsigned atomicOp, AtomicOrdering order
 
   if (ordering == AtomicOrdering::Release || ordering == AtomicOrdering::AcquireRelease ||
       ordering == AtomicOrdering::SequentiallyConsistent)
-    m_builder->CreateFence(AtomicOrdering::Release, syncScope);
+    m_builder.CreateFence(AtomicOrdering::Release, syncScope);
 
-  Value *atomicCall = m_builder->CreateIntrinsic(
+  Value *atomicCall = m_builder.CreateIntrinsic(
       intrinsic, inputValue->getType(),
-      {inputValue, payloadRingBufDesc, byteOffset, payloadRingEntryOffset, m_builder->getInt32(0)});
+      {inputValue, payloadRingBufDesc, byteOffset, payloadRingEntryOffset, m_builder.getInt32(0)});
 
   if (doubleToInt64)
-    atomicCall = m_builder->CreateBitCast(atomicCall, m_builder->getDoubleTy());
+    atomicCall = m_builder.CreateBitCast(atomicCall, m_builder.getDoubleTy());
 
   if (ordering == AtomicOrdering::Release || ordering == AtomicOrdering::AcquireRelease ||
       ordering == AtomicOrdering::SequentiallyConsistent)
-    m_builder->CreateFence(AtomicOrdering::Acquire, syncScope);
+    m_builder.CreateFence(AtomicOrdering::Acquire, syncScope);
 
   return atomicCall;
 }
@@ -1209,7 +1206,7 @@ Value *MeshTaskShader::taskPayloadAtomic(unsigned atomicOp, AtomicOrdering order
 // @returns : Original value read from the task payload
 Value *MeshTaskShader::taskPayloadAtomicCompareSwap(AtomicOrdering ordering, Value *inputValue, Value *comparatorValue,
                                                     Value *byteOffset) {
-  auto entryPoint = m_builder->GetInsertBlock()->getParent();
+  auto entryPoint = m_builder.GetInsertBlock()->getParent();
   assert(getShaderStage(entryPoint) == ShaderStageTask);
 
   assert(inputValue->getType()->isIntegerTy() || inputValue->getType()->isFloatingPointTy());
@@ -1223,39 +1220,39 @@ Value *MeshTaskShader::taskPayloadAtomicCompareSwap(AtomicOrdering ordering, Val
     // NOTE: HW doesn't have buffer_atomic_cmpswap_x2 instruction, we resort to global_atomic_cmpswap_x2.
 
     // 48-bit GPU address of from the buffer descriptor: dword1[15:0] + dword0
-    auto baseAddressLow = m_builder->CreateExtractElement(payloadRingBufDesc, static_cast<uint64_t>(0));
-    auto baseAddressHigh = m_builder->CreateExtractElement(payloadRingBufDesc, 1);
-    baseAddressHigh = m_builder->CreateAnd(baseAddressHigh, 0xFFFF);
+    auto baseAddressLow = m_builder.CreateExtractElement(payloadRingBufDesc, static_cast<uint64_t>(0));
+    auto baseAddressHigh = m_builder.CreateExtractElement(payloadRingBufDesc, 1);
+    baseAddressHigh = m_builder.CreateAnd(baseAddressHigh, 0xFFFF);
 
-    Value *baseAddress = UndefValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 2));
-    baseAddress = m_builder->CreateInsertElement(baseAddress, baseAddressLow, static_cast<uint64_t>(0));
-    baseAddress = m_builder->CreateInsertElement(baseAddress, baseAddressHigh, 1);
-    baseAddress = m_builder->CreateBitCast(baseAddress, m_builder->getInt64Ty());
+    Value *baseAddress = UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
+    baseAddress = m_builder.CreateInsertElement(baseAddress, baseAddressLow, static_cast<uint64_t>(0));
+    baseAddress = m_builder.CreateInsertElement(baseAddress, baseAddressHigh, 1);
+    baseAddress = m_builder.CreateBitCast(baseAddress, m_builder.getInt64Ty());
 
-    Value *payloadRingBufPtr = m_builder->CreateIntToPtr(baseAddress, m_builder->getInt8PtrTy(ADDR_SPACE_GLOBAL));
-    Value *entryOffset = m_builder->CreateAdd(payloadRingEntryOffset, byteOffset);
-    Value *payloadRingBufEntryPtr = m_builder->CreateGEP(m_builder->getInt8Ty(), payloadRingBufPtr, entryOffset);
+    Value *payloadRingBufPtr = m_builder.CreateIntToPtr(baseAddress, m_builder.getInt8PtrTy(ADDR_SPACE_GLOBAL));
+    Value *entryOffset = m_builder.CreateAdd(payloadRingEntryOffset, byteOffset);
+    Value *payloadRingBufEntryPtr = m_builder.CreateGEP(m_builder.getInt8Ty(), payloadRingBufPtr, entryOffset);
     payloadRingBufEntryPtr =
-        m_builder->CreateBitCast(payloadRingBufEntryPtr, PointerType::get(m_builder->getInt64Ty(), ADDR_SPACE_GLOBAL));
+        m_builder.CreateBitCast(payloadRingBufEntryPtr, PointerType::get(m_builder.getInt64Ty(), ADDR_SPACE_GLOBAL));
 
-    auto atomicInst = m_builder->CreateAtomicCmpXchg(payloadRingBufEntryPtr, comparatorValue, inputValue, MaybeAlign(),
-                                                     ordering, AtomicOrdering::Monotonic, syncScope);
+    auto atomicInst = m_builder.CreateAtomicCmpXchg(payloadRingBufEntryPtr, comparatorValue, inputValue, MaybeAlign(),
+                                                    ordering, AtomicOrdering::Monotonic, syncScope);
     // NOTE: In cmpxchg instruction in LLVM returns a structure-typed result {<value>, i1}, we don't care about the
     // second member.
-    return m_builder->CreateExtractValue(atomicInst, 0);
+    return m_builder.CreateExtractValue(atomicInst, 0);
   }
 
   if (ordering == AtomicOrdering::Release || ordering == AtomicOrdering::AcquireRelease ||
       ordering == AtomicOrdering::SequentiallyConsistent)
-    m_builder->CreateFence(AtomicOrdering::Release, syncScope);
+    m_builder.CreateFence(AtomicOrdering::Release, syncScope);
 
-  Value *atomicCall = m_builder->CreateIntrinsic(
+  Value *atomicCall = m_builder.CreateIntrinsic(
       Intrinsic::amdgcn_raw_buffer_atomic_cmpswap, inputValue->getType(),
-      {inputValue, comparatorValue, payloadRingBufDesc, byteOffset, payloadRingEntryOffset, m_builder->getInt32(0)});
+      {inputValue, comparatorValue, payloadRingBufDesc, byteOffset, payloadRingEntryOffset, m_builder.getInt32(0)});
 
   if (ordering == AtomicOrdering::Release || ordering == AtomicOrdering::AcquireRelease ||
       ordering == AtomicOrdering::SequentiallyConsistent)
-    m_builder->CreateFence(AtomicOrdering::Acquire, syncScope);
+    m_builder.CreateFence(AtomicOrdering::Acquire, syncScope);
 
   return atomicCall;
 }
@@ -1273,47 +1270,47 @@ void MeshTaskShader::initWaveThreadInfo(Function *entryPoint) {
 
     // waveId = dispatchInfo[24:20]
     m_waveThreadInfo.waveIdInSubgroup =
-        m_builder->CreateAnd(m_builder->CreateLShr(getFunctionArgument(entryPoint, entryArgIdxs.multiDispatchInfo), 20),
-                             0x1F, "waveIdInSubgroup");
+        m_builder.CreateAnd(m_builder.CreateLShr(getFunctionArgument(entryPoint, entryArgIdxs.multiDispatchInfo), 20),
+                            0x1F, "waveIdInSubgroup");
 
     const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageTask);
 
     m_waveThreadInfo.threadIdInWave =
-        m_builder->CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {m_builder->getInt32(-1), m_builder->getInt32(0)});
+        m_builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {m_builder.getInt32(-1), m_builder.getInt32(0)});
     if (waveSize == 64) {
-      m_waveThreadInfo.threadIdInWave = m_builder->CreateIntrinsic(
-          Intrinsic::amdgcn_mbcnt_hi, {}, {m_builder->getInt32(-1), m_waveThreadInfo.threadIdInWave});
+      m_waveThreadInfo.threadIdInWave = m_builder.CreateIntrinsic(
+          Intrinsic::amdgcn_mbcnt_hi, {}, {m_builder.getInt32(-1), m_waveThreadInfo.threadIdInWave});
     }
     m_waveThreadInfo.threadIdInWave->setName("threadIdInWave");
 
     m_waveThreadInfo.threadIdInSubgroup =
-        m_builder->CreateAdd(m_builder->CreateMul(m_waveThreadInfo.waveIdInSubgroup, m_builder->getInt32(waveSize)),
-                             m_waveThreadInfo.threadIdInWave, "threadIdInSubgroup");
+        m_builder.CreateAdd(m_builder.CreateMul(m_waveThreadInfo.waveIdInSubgroup, m_builder.getInt32(waveSize)),
+                            m_waveThreadInfo.threadIdInWave, "threadIdInSubgroup");
   } else {
     // Mesh shader
     assert(getShaderStage(entryPoint) == ShaderStageMesh);
 
-    m_builder->CreateIntrinsic(Intrinsic::amdgcn_init_exec, {}, m_builder->getInt64(-1));
+    m_builder.CreateIntrinsic(Intrinsic::amdgcn_init_exec, {}, m_builder.getInt64(-1));
 
     // waveId = mergedWaveInfo[27:24]
     Value *mergedWaveInfo =
         getFunctionArgument(entryPoint, ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::MergedWaveInfo));
     m_waveThreadInfo.waveIdInSubgroup =
-        m_builder->CreateAnd(m_builder->CreateLShr(mergedWaveInfo, 24), 0xF, "waveIdInSubgroup");
+        m_builder.CreateAnd(m_builder.CreateLShr(mergedWaveInfo, 24), 0xF, "waveIdInSubgroup");
 
     const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageMesh);
 
     m_waveThreadInfo.threadIdInWave =
-        m_builder->CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {m_builder->getInt32(-1), m_builder->getInt32(0)});
+        m_builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {m_builder.getInt32(-1), m_builder.getInt32(0)});
     if (waveSize == 64) {
-      m_waveThreadInfo.threadIdInWave = m_builder->CreateIntrinsic(
-          Intrinsic::amdgcn_mbcnt_hi, {}, {m_builder->getInt32(-1), m_waveThreadInfo.threadIdInWave});
+      m_waveThreadInfo.threadIdInWave = m_builder.CreateIntrinsic(
+          Intrinsic::amdgcn_mbcnt_hi, {}, {m_builder.getInt32(-1), m_waveThreadInfo.threadIdInWave});
     }
     m_waveThreadInfo.threadIdInWave->setName("threadIdInWave");
 
     m_waveThreadInfo.threadIdInSubgroup =
-        m_builder->CreateAdd(m_builder->CreateMul(m_waveThreadInfo.waveIdInSubgroup, m_builder->getInt32(waveSize)),
-                             m_waveThreadInfo.threadIdInWave, "threadIdInSubgroup");
+        m_builder.CreateAdd(m_builder.CreateMul(m_waveThreadInfo.waveIdInSubgroup, m_builder.getInt32(waveSize)),
+                            m_waveThreadInfo.threadIdInWave, "threadIdInSubgroup");
 
     m_waveThreadInfo.primOrVertexIndex =
         m_waveThreadInfo.threadIdInSubgroup; // Primitive or vertex index is initialized to thread ID in subgroup
@@ -1324,14 +1321,14 @@ void MeshTaskShader::initWaveThreadInfo(Function *entryPoint) {
           getFunctionArgument(entryPoint, ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::OffChipLdsBase));
       // workgroupIdY = workgroupIdXY[31:16]
       m_waveThreadInfo.workgroupIdY =
-          m_builder->CreateAnd(m_builder->CreateLShr(workgroupIdYX, 16), 0xFFFF, "workgroupIdY");
+          m_builder.CreateAnd(m_builder.CreateLShr(workgroupIdYX, 16), 0xFFFF, "workgroupIdY");
       // workgroupIdX = workgroupIdXY[15:0]
-      m_waveThreadInfo.workgroupIdX = m_builder->CreateAnd(workgroupIdYX, 0xFFFF, "workgroupIdX");
+      m_waveThreadInfo.workgroupIdX = m_builder.CreateAnd(workgroupIdYX, 0xFFFF, "workgroupIdX");
       // workgroupIdZ = attribRingBaseAndWorkgroupIdZ[31:16]
       Value *workgroupIdZAndAttribRingBase =
           getFunctionArgument(entryPoint, ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::AttribRingBase));
       m_waveThreadInfo.workgroupIdZ =
-          m_builder->CreateAnd(m_builder->CreateLShr(workgroupIdZAndAttribRingBase, 16), 0xFFFF, "workgroupIdZ");
+          m_builder.CreateAnd(m_builder.CreateLShr(workgroupIdZAndAttribRingBase, 16), 0xFFFF, "workgroupIdZ");
 
       m_waveThreadInfo.rowInSubgroup =
           m_waveThreadInfo.waveIdInSubgroup; // Row number is initialized to wave ID in subgroup
@@ -1349,8 +1346,8 @@ Value *MeshTaskShader::getShaderRingEntryIndex(Function *entryPoint) {
     if (getShaderStage(entryPoint) == ShaderStageTask) {
       // NOTE: The calculation of shader ring entry index should be done at the beginning of the entry block. And the
       // value could be reused in subsequent operations.
-      IRBuilder<>::InsertPointGuard guard(*m_builder);
-      m_builder->SetInsertPointPastAllocas(entryPoint);
+      IRBuilder<>::InsertPointGuard guard(m_builder);
+      m_builder.SetInsertPointPastAllocas(entryPoint);
 
       auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageTask)->entryArgIdxs.task;
 
@@ -1360,16 +1357,16 @@ Value *MeshTaskShader::getShaderRingEntryIndex(Function *entryPoint) {
       // flatWorkgroupId = workgroupId.z * dispatchDims.x * dispatchDims.y +
       //                   workgroupId.y * dispatchDims.x + workgroupId.x
       //                 = (workgroupId.z * dispatchDims.y + workgroupId.y) * dispatchDims.x + workgroupId.x
-      auto flatWorkgroupId = m_builder->CreateMul(m_builder->CreateExtractElement(workgroupId, 2),
-                                                  m_builder->CreateExtractElement(dispatchDims, 1));
-      flatWorkgroupId = m_builder->CreateAdd(flatWorkgroupId, m_builder->CreateExtractElement(workgroupId, 1));
-      flatWorkgroupId = m_builder->CreateMul(flatWorkgroupId,
-                                             m_builder->CreateExtractElement(dispatchDims, static_cast<uint64_t>(0)));
+      auto flatWorkgroupId = m_builder.CreateMul(m_builder.CreateExtractElement(workgroupId, 2),
+                                                 m_builder.CreateExtractElement(dispatchDims, 1));
+      flatWorkgroupId = m_builder.CreateAdd(flatWorkgroupId, m_builder.CreateExtractElement(workgroupId, 1));
       flatWorkgroupId =
-          m_builder->CreateAdd(flatWorkgroupId, m_builder->CreateExtractElement(workgroupId, static_cast<uint64_t>(0)));
+          m_builder.CreateMul(flatWorkgroupId, m_builder.CreateExtractElement(dispatchDims, static_cast<uint64_t>(0)));
+      flatWorkgroupId =
+          m_builder.CreateAdd(flatWorkgroupId, m_builder.CreateExtractElement(workgroupId, static_cast<uint64_t>(0)));
 
       auto baseRingEntryIndex = getFunctionArgument(entryPoint, entryArgIdxs.baseRingEntryIndex);
-      m_shaderRingEntryIndex = m_builder->CreateAdd(baseRingEntryIndex, flatWorkgroupId);
+      m_shaderRingEntryIndex = m_builder.CreateAdd(baseRingEntryIndex, flatWorkgroupId);
     } else {
       assert(getShaderStage(entryPoint) == ShaderStageMesh);
 
@@ -1393,16 +1390,16 @@ Value *MeshTaskShader::getPayloadRingEntryOffset(Function *entryPoint) {
 
     // NOTE: Make sure below calculation follows payload ring descriptor getter and is prior to any task payload
     // access operations.
-    IRBuilder<>::InsertPointGuard guard(*m_builder);
-    m_builder->SetInsertPoint(cast<Instruction>(payloadRingBufDesc)->getNextNode());
+    IRBuilder<>::InsertPointGuard guard(m_builder);
+    m_builder.SetInsertPoint(cast<Instruction>(payloadRingBufDesc)->getNextNode());
 
     // NUM_RECORDS = SQ_BUF_RSRC_WORD2[31:0]
-    Value *numPayloadRingEntries = m_builder->CreateUDiv(m_builder->CreateExtractElement(payloadRingBufDesc, 2),
-                                                         m_builder->getInt32(PayloadRingEntrySize));
+    Value *numPayloadRingEntries = m_builder.CreateUDiv(m_builder.CreateExtractElement(payloadRingBufDesc, 2),
+                                                        m_builder.getInt32(PayloadRingEntrySize));
     // wrappedRingEntryIndex = ringEntryIndex % numRingEntries = ringEntryIndex & (numRingEntries - 1)
     Value *wrappedRingEntryIndex =
-        m_builder->CreateAnd(ringEntryIndex, m_builder->CreateSub(numPayloadRingEntries, m_builder->getInt32(1)));
-    m_payloadRingEntryOffset = m_builder->CreateMul(wrappedRingEntryIndex, m_builder->getInt32(PayloadRingEntrySize));
+        m_builder.CreateAnd(ringEntryIndex, m_builder.CreateSub(numPayloadRingEntries, m_builder.getInt32(1)));
+    m_payloadRingEntryOffset = m_builder.CreateMul(wrappedRingEntryIndex, m_builder.getInt32(PayloadRingEntrySize));
   }
 
   return m_payloadRingEntryOffset;
@@ -1420,12 +1417,12 @@ Value *MeshTaskShader::getDrawDataRingEntryOffset(Function *entryPoint) {
   Value *drawDataRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskDrawDataRingBufDesc();
 
   // NUM_RECORDS = SQ_BUF_RSRC_WORD2[31:0]
-  Value *numDrawDataRingEntries = m_builder->CreateUDiv(m_builder->CreateExtractElement(drawDataRingBufDesc, 2),
-                                                        m_builder->getInt32(DrawDataRingEntrySize));
+  Value *numDrawDataRingEntries = m_builder.CreateUDiv(m_builder.CreateExtractElement(drawDataRingBufDesc, 2),
+                                                       m_builder.getInt32(DrawDataRingEntrySize));
   // wrappedRingEntryIndex = ringEntryIndex % numRingEntries = ringEntryIndex & (numRingEntries - 1)
   Value *wrappedRingEntryIndex =
-      m_builder->CreateAnd(ringEntryIndex, m_builder->CreateSub(numDrawDataRingEntries, m_builder->getInt32(1)));
-  return m_builder->CreateMul(wrappedRingEntryIndex, m_builder->getInt32(DrawDataRingEntrySize));
+      m_builder.CreateAnd(ringEntryIndex, m_builder.CreateSub(numDrawDataRingEntries, m_builder.getInt32(1)));
+  return m_builder.CreateMul(wrappedRingEntryIndex, m_builder.getInt32(DrawDataRingEntrySize));
 }
 
 // =====================================================================================================================
@@ -1440,10 +1437,10 @@ Value *MeshTaskShader::getDrawDataReadyBit(Function *entryPoint) {
   Value *drawDataRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskDrawDataRingBufDesc();
 
   // NUM_RECORDS = SQ_BUF_RSRC_WORD2[31:0]
-  Value *numDrawDataRingEntries = m_builder->CreateUDiv(m_builder->CreateExtractElement(drawDataRingBufDesc, 2),
-                                                        m_builder->getInt32(DrawDataRingEntrySize));
+  Value *numDrawDataRingEntries = m_builder.CreateUDiv(m_builder.CreateExtractElement(drawDataRingBufDesc, 2),
+                                                       m_builder.getInt32(DrawDataRingEntrySize));
   // readyBit = ringEntryIndex & numRingEnties != 0
-  return m_builder->CreateICmpNE(m_builder->CreateAnd(ringEntryIndex, numDrawDataRingEntries), m_builder->getInt32(0));
+  return m_builder.CreateICmpNE(m_builder.CreateAnd(ringEntryIndex, numDrawDataRingEntries), m_builder.getInt32(0));
 }
 
 // =====================================================================================================================
@@ -1454,7 +1451,7 @@ Value *MeshTaskShader::getDrawDataReadyBit(Function *entryPoint) {
 // @param groupCountX : Number of local workgroups in Y dimension for the launch of child mesh tasks
 // @param groupCountX : Number of local workgroups in Z dimension for the launch of child mesh tasks
 void MeshTaskShader::emitTaskMeshs(Value *groupCountX, Value *groupCountY, Value *groupCountZ) {
-  auto entryPoint = m_builder->GetInsertBlock()->getParent();
+  auto entryPoint = m_builder.GetInsertBlock()->getParent();
   assert(getShaderStage(entryPoint) == ShaderStageTask); // Must be task shader
 
   // Mark the flag of mesh linear dispatch from task when the group count Y and Z are both ones
@@ -1465,30 +1462,30 @@ void MeshTaskShader::emitTaskMeshs(Value *groupCountX, Value *groupCountY, Value
         constGroupCountY == 1 && constGroupCountZ == 1;
   }
 
-  auto emitMeshsCall = m_builder->GetInsertPoint();
+  auto emitMeshsCall = m_builder.GetInsertPoint();
 
-  auto checkEmitMeshsBlock = m_builder->GetInsertBlock();
+  auto checkEmitMeshsBlock = m_builder.GetInsertBlock();
   auto emitMeshsBlock = checkEmitMeshsBlock->splitBasicBlock(emitMeshsCall, ".emitMeshs");
   auto endEmitMeshsBlock = emitMeshsBlock->splitBasicBlock(emitMeshsCall, ".endEmitMeshs");
 
   // Modify ".checkEmitMeshs" block
   {
-    m_builder->SetInsertPoint(checkEmitMeshsBlock->getTerminator());
+    m_builder.SetInsertPoint(checkEmitMeshsBlock->getTerminator());
 
     if (m_accessTaskPayload) {
       // Make sure the task payload read/write access is completed
-      m_builder->CreateFence(AtomicOrdering::Release, SyncScope::System);
-      m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+      m_builder.CreateFence(AtomicOrdering::Release, SyncScope::System);
+      m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
     }
 
-    auto firstThreadInSubgroup = m_builder->CreateICmpEQ(m_waveThreadInfo.threadIdInSubgroup, m_builder->getInt32(0));
-    m_builder->CreateCondBr(firstThreadInSubgroup, emitMeshsBlock, endEmitMeshsBlock);
+    auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_waveThreadInfo.threadIdInSubgroup, m_builder.getInt32(0));
+    m_builder.CreateCondBr(firstThreadInSubgroup, emitMeshsBlock, endEmitMeshsBlock);
     checkEmitMeshsBlock->getTerminator()->eraseFromParent(); // Remove old terminator
   }
 
   // Construct ".emitTaskMeshs" block
   {
-    m_builder->SetInsertPoint(emitMeshsBlock->getTerminator());
+    m_builder.SetInsertPoint(emitMeshsBlock->getTerminator());
 
     //
     // Collect task statistics info
@@ -1500,24 +1497,23 @@ void MeshTaskShader::emitTaskMeshs(Value *groupCountX, Value *groupCountY, Value
           computeMode.workgroupSizeX * computeMode.workgroupSizeY * computeMode.workgroupSizeZ;
 
       Value *meshPipeStatsBufPtr = m_pipelineSysValues.get(entryPoint)->getMeshPipeStatsBufPtr();
-      Value *meshPipeStatsBufEntryPtr =
-          m_builder->CreateGEP(m_builder->getInt8Ty(), meshPipeStatsBufPtr,
-                               m_builder->getInt32(offsetof(MeshPipeStatsEntry, numTaskThreads)));
-      meshPipeStatsBufEntryPtr = m_builder->CreateBitCast(meshPipeStatsBufEntryPtr,
-                                                          PointerType::get(m_builder->getInt64Ty(), ADDR_SPACE_GLOBAL));
+      Value *meshPipeStatsBufEntryPtr = m_builder.CreateGEP(
+          m_builder.getInt8Ty(), meshPipeStatsBufPtr, m_builder.getInt32(offsetof(MeshPipeStatsEntry, numTaskThreads)));
+      meshPipeStatsBufEntryPtr = m_builder.CreateBitCast(meshPipeStatsBufEntryPtr,
+                                                         PointerType::get(m_builder.getInt64Ty(), ADDR_SPACE_GLOBAL));
 
       // NOTE: LLVM backend will try to apply atomics optimization. But here, we only have one active thread to execute
       // the global_atomic_add instruction. Thus, the optimization is completely unnecessary. To avoid this, we try to
       // move the added value to VGPR to mark it as "divergent".
-      Value *valueToAdd = UndefValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 2));
-      valueToAdd = m_builder->CreateInsertElement(valueToAdd, convertToDivergent(m_builder->getInt32(numTaskThreads)),
-                                                  static_cast<uint64_t>(0));
+      Value *valueToAdd = UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
+      valueToAdd = m_builder.CreateInsertElement(valueToAdd, convertToDivergent(m_builder.getInt32(numTaskThreads)),
+                                                 static_cast<uint64_t>(0));
       valueToAdd =
-          m_builder->CreateInsertElement(valueToAdd, convertToDivergent(m_builder->getInt32(numTaskThreads >> 32)), 1);
-      valueToAdd = m_builder->CreateBitCast(valueToAdd, m_builder->getInt64Ty());
+          m_builder.CreateInsertElement(valueToAdd, convertToDivergent(m_builder.getInt32(numTaskThreads >> 32)), 1);
+      valueToAdd = m_builder.CreateBitCast(valueToAdd, m_builder.getInt64Ty());
 
-      m_builder->CreateAtomicRMW(AtomicRMWInst::Add, meshPipeStatsBufEntryPtr, valueToAdd, MaybeAlign(),
-                                 AtomicOrdering::Monotonic, SyncScope::System);
+      m_builder.CreateAtomicRMW(AtomicRMWInst::Add, meshPipeStatsBufEntryPtr, valueToAdd, MaybeAlign(),
+                                AtomicOrdering::Monotonic, SyncScope::System);
     }
 
     //
@@ -1527,35 +1523,35 @@ void MeshTaskShader::emitTaskMeshs(Value *groupCountX, Value *groupCountY, Value
     // Set X dimension to 0 if any of X, Y, Z dimension is 0:
     //   groupCountX = min(groupCountY, groupCountZ) == 0 ? 0 : groupCountX
     auto minGroupCountYZ =
-        m_builder->CreateIntrinsic(Intrinsic::umin, groupCountY->getType(), {groupCountY, groupCountZ});
-    groupCountX = m_builder->CreateSelect(m_builder->CreateICmpEQ(minGroupCountYZ, m_builder->getInt32(0)),
-                                          m_builder->getInt32(0), groupCountX);
+        m_builder.CreateIntrinsic(Intrinsic::umin, groupCountY->getType(), {groupCountY, groupCountZ});
+    groupCountX = m_builder.CreateSelect(m_builder.CreateICmpEQ(minGroupCountYZ, m_builder.getInt32(0)),
+                                         m_builder.getInt32(0), groupCountX);
 
     Value *drawDataRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskDrawDataRingBufDesc();
     Value *drawDataRingEntryOffset = getDrawDataRingEntryOffset(entryPoint);
 
     // Draw data = <groupCountX, groupCountY, groupCountZ, readyBit>
-    Value *groupCount = UndefValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 3));
-    groupCount = m_builder->CreateInsertElement(groupCount, groupCountX, static_cast<uint64_t>(0));
-    groupCount = m_builder->CreateInsertElement(groupCount, groupCountY, 1);
-    groupCount = m_builder->CreateInsertElement(groupCount, groupCountZ, 2);
+    Value *groupCount = UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 3));
+    groupCount = m_builder.CreateInsertElement(groupCount, groupCountX, static_cast<uint64_t>(0));
+    groupCount = m_builder.CreateInsertElement(groupCount, groupCountY, 1);
+    groupCount = m_builder.CreateInsertElement(groupCount, groupCountZ, 2);
 
-    m_builder->CreateIntrinsic(
+    m_builder.CreateIntrinsic(
         Intrinsic::amdgcn_raw_buffer_store, groupCount->getType(),
-        {groupCount, drawDataRingBufDesc, m_builder->getInt32(0), drawDataRingEntryOffset, m_builder->getInt32(0)});
+        {groupCount, drawDataRingBufDesc, m_builder.getInt32(0), drawDataRingEntryOffset, m_builder.getInt32(0)});
 
     // NOTE: Only the lowest 8 bits are for us to write.
     Value *readyBit = getDrawDataReadyBit(entryPoint);
-    readyBit = m_builder->CreateZExt(readyBit, m_builder->getInt8Ty());
+    readyBit = m_builder.CreateZExt(readyBit, m_builder.getInt8Ty());
 
-    m_builder->CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_store, readyBit->getType(),
-                               {readyBit, drawDataRingBufDesc, m_builder->getInt32(3 * sizeof(unsigned)),
-                                drawDataRingEntryOffset, m_builder->getInt32(0)});
+    m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_store, readyBit->getType(),
+                              {readyBit, drawDataRingBufDesc, m_builder.getInt32(3 * sizeof(unsigned)),
+                               drawDataRingEntryOffset, m_builder.getInt32(0)});
   }
 
   // Construct ".endEmitTaskMeshs" block
   {
-    m_builder->SetInsertPoint(endEmitMeshsBlock->getTerminator());
+    m_builder.SetInsertPoint(endEmitMeshsBlock->getTerminator());
 
     // Currently, nothing to do
   }
@@ -1567,10 +1563,10 @@ void MeshTaskShader::emitTaskMeshs(Value *groupCountX, Value *groupCountY, Value
 // @param value : Input i32 value
 // @returns : A new i32 value that is considered to be divergent
 Value *MeshTaskShader::convertToDivergent(Value *value) {
-  assert(value->getType() == m_builder->getInt32Ty()); // Must be i32 typed
-  auto inlineAsmTy = FunctionType::get(m_builder->getInt32Ty(), m_builder->getInt32Ty(), false);
+  assert(value->getType() == m_builder.getInt32Ty()); // Must be i32 typed
+  auto inlineAsmTy = FunctionType::get(m_builder.getInt32Ty(), m_builder.getInt32Ty(), false);
   auto inlineAsm = InlineAsm::get(inlineAsmTy, "v_mov_b32 $0, $1", "=v,0", true);
-  return m_builder->CreateCall(inlineAsm, value);
+  return m_builder.CreateCall(inlineAsm, value);
 }
 
 // =====================================================================================================================
@@ -1603,7 +1599,7 @@ Function *MeshTaskShader::mutateMeshShaderEntryPoint(Function *entryPoint) {
   assert(specialSgprInputNames.size() == NumSpecialSgprInputs);
 
   // Add special SGPR inputs, prior to existing user data SGPRs
-  auto int32Ty = m_builder->getInt32Ty();
+  auto int32Ty = m_builder.getInt32Ty();
   auto newEntryPoint =
       addFunctionArgs(entryPoint, nullptr, {int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty},
                       specialSgprInputNames, (1u << NumSpecialSgprInputs) - 1);
@@ -1623,8 +1619,8 @@ Function *MeshTaskShader::mutateMeshShaderEntryPoint(Function *entryPoint) {
   // emulate flat workgroup ID since HW GS is configurated to have one vertex and one primitive in one input thread.
   // The "vertexId" VGPR5 will be incremented by 1 for each subgroup.
   if (useFlatWorkgroupId(m_pipelineState)) {
-    static const SmallVector<std::string, 6> VgprInputNames = {"esGsOffset01", "esGsOffset23", "gsPrimitiveId",
-                                                               "gsInstanceId", "esGsOffset45", "flatWorkgroupId"};
+    static const std::array<std::string, 6> VgprInputNames = {"esGsOffset01", "esGsOffset23", "gsPrimitiveId",
+                                                              "gsInstanceId", "esGsOffset45", "flatWorkgroupId"};
 
     entryPoint = newEntryPoint;
     newEntryPoint = addFunctionArgs(entryPoint, nullptr, {int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty},
@@ -1654,20 +1650,20 @@ void MeshTaskShader::lowerMeshShaderBody(BasicBlock *apiMeshEntryBlock, BasicBlo
   if (m_needBarrierFlag) {
     // Flip barrier toggle when we encounter a API barrier
     for (auto barrier : m_barriers) {
-      m_builder->SetInsertPoint(barrier);
+      m_builder.SetInsertPoint(barrier);
       // barrierToggle = !barrierToggle
-      Value *barrierToggle = m_builder->CreateLoad(m_builder->getInt1Ty(), m_barrierToggle);
-      barrierToggle = m_builder->CreateNot(barrierToggle);
-      m_builder->CreateStore(barrierToggle, m_barrierToggle);
+      Value *barrierToggle = m_builder.CreateLoad(m_builder.getInt1Ty(), m_barrierToggle);
+      barrierToggle = m_builder.CreateNot(barrierToggle);
+      m_builder.CreateStore(barrierToggle, m_barrierToggle);
     }
 
     // Store barrier completion flag according to barrier toggle
-    m_builder->SetInsertPoint(apiMeshExitBlock->getTerminator());
+    m_builder.SetInsertPoint(apiMeshExitBlock->getTerminator());
     // barrierFlag = barrierToggle ? 0b11 : 0b10
-    Value *barrierToggle = m_builder->CreateLoad(m_builder->getInt1Ty(), m_barrierToggle);
-    Value *barrierFlag = m_builder->CreateSelect(barrierToggle, m_builder->getInt32(3), m_builder->getInt32(2));
+    Value *barrierToggle = m_builder.CreateLoad(m_builder.getInt1Ty(), m_barrierToggle);
+    Value *barrierFlag = m_builder.CreateSelect(barrierToggle, m_builder.getInt32(3), m_builder.getInt32(2));
 
-    auto ldsOffset = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::BarrierCompletion));
+    auto ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::BarrierCompletion));
     writeValueToLds(barrierFlag, ldsOffset);
   }
 
@@ -1684,7 +1680,7 @@ void MeshTaskShader::lowerMeshShaderBody(BasicBlock *apiMeshEntryBlock, BasicBlo
         if (call->getFunction() != entryPoint)
           continue; // Not belong to mesh shader
 
-        m_builder->SetInsertPoint(call);
+        m_builder.SetInsertPoint(call);
 
         if (func.getName().startswith(lgcName::MeshTaskSetMeshOutputs)) {
           // Set mesh outputs
@@ -1713,7 +1709,7 @@ void MeshTaskShader::lowerMeshShaderBody(BasicBlock *apiMeshEntryBlock, BasicBlo
           unsigned builtIn = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
 
           // NOTE: Mesh shader input lowering is supposed to happen at the beginning of API mesh shader.
-          m_builder->SetInsertPoint(&*apiMeshEntryBlock->getFirstInsertionPt());
+          m_builder.SetInsertPoint(&*apiMeshEntryBlock->getFirstInsertionPt());
 
           auto meshInput = getMeshInput(static_cast<BuiltInKind>(builtIn));
           assert(meshInput->getType() == call->getType());
@@ -1763,59 +1759,59 @@ void MeshTaskShader::lowerMeshShaderBody(BasicBlock *apiMeshEntryBlock, BasicBlo
 // @param vertexCount : Actual output size of the vertices
 // @param primitiveCount : Actual output size of the primitives
 void MeshTaskShader::setMeshOutputs(Value *vertexCount, Value *primitiveCount) {
-  auto setMeshOutputsCall = m_builder->GetInsertPoint();
+  auto setMeshOutputsCall = m_builder.GetInsertPoint();
 
-  auto checkSetMeshOutputsBlock = m_builder->GetInsertBlock();
+  auto checkSetMeshOutputsBlock = m_builder.GetInsertBlock();
   auto setMeshOutputsBlock = checkSetMeshOutputsBlock->splitBasicBlock(setMeshOutputsCall, ".setMeshOutputs");
   auto endSetMeshOutputsBlock = setMeshOutputsBlock->splitBasicBlock(setMeshOutputsCall, ".endSetMeshOutputs");
 
   // Modify ".checkSetMeshOutputs" block
   {
-    m_builder->SetInsertPoint(checkSetMeshOutputsBlock->getTerminator());
+    m_builder.SetInsertPoint(checkSetMeshOutputsBlock->getTerminator());
 
-    auto firstThreadInSubgroup = m_builder->CreateICmpEQ(m_waveThreadInfo.threadIdInSubgroup, m_builder->getInt32(0));
-    m_builder->CreateCondBr(firstThreadInSubgroup, setMeshOutputsBlock, endSetMeshOutputsBlock);
+    auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_waveThreadInfo.threadIdInSubgroup, m_builder.getInt32(0));
+    m_builder.CreateCondBr(firstThreadInSubgroup, setMeshOutputsBlock, endSetMeshOutputsBlock);
     checkSetMeshOutputsBlock->getTerminator()->eraseFromParent(); // Remove old terminator
   }
 
   // Construct ".setMeshOutputs" block
   {
-    m_builder->SetInsertPoint(setMeshOutputsBlock->getTerminator());
+    m_builder.SetInsertPoint(setMeshOutputsBlock->getTerminator());
 
     // Promote vertex/primitive count to SGPRs
-    vertexCount = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertexCount);
-    primitiveCount = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primitiveCount);
+    vertexCount = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertexCount);
+    primitiveCount = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primitiveCount);
 
     // Check if vertex count or primitive count is zero. If so, set both to zero in order to disable vertex/primitive
     // exporting.
-    auto zeroVertexCount = m_builder->CreateICmpEQ(vertexCount, m_builder->getInt32(0));
-    auto zeroPrimitiveCount = m_builder->CreateICmpEQ(primitiveCount, m_builder->getInt32(0));
-    auto hasZeroCount = m_builder->CreateOr(zeroVertexCount, zeroPrimitiveCount);
-    vertexCount = m_builder->CreateSelect(hasZeroCount, m_builder->getInt32(0), vertexCount);
-    primitiveCount = m_builder->CreateSelect(hasZeroCount, m_builder->getInt32(0), primitiveCount);
+    auto zeroVertexCount = m_builder.CreateICmpEQ(vertexCount, m_builder.getInt32(0));
+    auto zeroPrimitiveCount = m_builder.CreateICmpEQ(primitiveCount, m_builder.getInt32(0));
+    auto hasZeroCount = m_builder.CreateOr(zeroVertexCount, zeroPrimitiveCount);
+    vertexCount = m_builder.CreateSelect(hasZeroCount, m_builder.getInt32(0), vertexCount);
+    primitiveCount = m_builder.CreateSelect(hasZeroCount, m_builder.getInt32(0), primitiveCount);
 
     // NOTE: Here, we promote vertex/primitive count to SGPRs once again because M0 implicitly used in s_sendmsg is
     // SGPR. LLVM backend has issues of handling this because it doesn't use s_cselect to translate LLVM IR select
     // instruction (which keeps the destination operand still in SGPR) and it doesn't use readfirstlane to promote
     // VGPR to SGPR for M0.
-    vertexCount = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertexCount);
-    primitiveCount = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primitiveCount);
+    vertexCount = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertexCount);
+    primitiveCount = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primitiveCount);
 
     // M0[10:0] = vertexCount, M0[22:12] = primitiveCount
-    Value *m0 = m_builder->CreateShl(primitiveCount, 12);
-    m0 = m_builder->CreateOr(m0, vertexCount);
-    m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, {m_builder->getInt32(GsAllocReq), m0});
+    Value *m0 = m_builder.CreateShl(primitiveCount, 12);
+    m0 = m_builder.CreateOr(m0, vertexCount);
+    m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, {m_builder.getInt32(GsAllocReq), m0});
 
-    Value *ldsOffset = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexCount));
+    Value *ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexCount));
     writeValueToLds(vertexCount, ldsOffset);
 
-    ldsOffset = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveCount));
+    ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveCount));
     writeValueToLds(primitiveCount, ldsOffset);
   }
 
   // Construct ".endSetMeshOutputs" block
   {
-    m_builder->SetInsertPoint(endSetMeshOutputsBlock->getTerminator());
+    m_builder.SetInsertPoint(endSetMeshOutputsBlock->getTerminator());
 
     // Currently, nothing to do
   }
@@ -1838,34 +1834,34 @@ void MeshTaskShader::setPrimitiveIndices(Value *primitiveIndex, Value *primitive
   Value *primitiveData = nullptr;
 
   if (meshMode.outputPrimitive == OutputPrimitives::Points) {
-    assert(primitiveIndices->getType() == m_builder->getInt32Ty()); // i32
+    assert(primitiveIndices->getType() == m_builder.getInt32Ty()); // i32
     primitiveData = primitiveIndices;
   } else if (meshMode.outputPrimitive == OutputPrimitives::Lines) {
-    assert(primitiveIndices->getType() == FixedVectorType::get(m_builder->getInt32Ty(), 2)); // v2i32
-    Value *vertex0 = m_builder->CreateExtractElement(primitiveIndices, static_cast<uint64_t>(0));
-    Value *vertex1 = m_builder->CreateExtractElement(primitiveIndices, 1);
+    assert(primitiveIndices->getType() == FixedVectorType::get(m_builder.getInt32Ty(), 2)); // v2i32
+    Value *vertex0 = m_builder.CreateExtractElement(primitiveIndices, static_cast<uint64_t>(0));
+    Value *vertex1 = m_builder.CreateExtractElement(primitiveIndices, 1);
 
-    primitiveData = m_builder->CreateShl(vertex1, 10);
-    primitiveData = m_builder->CreateOr(primitiveData, vertex0);
+    primitiveData = m_builder.CreateShl(vertex1, 10);
+    primitiveData = m_builder.CreateOr(primitiveData, vertex0);
   } else {
     assert(meshMode.outputPrimitive == OutputPrimitives::Triangles);
-    Value *vertex0 = m_builder->CreateExtractElement(primitiveIndices, static_cast<uint64_t>(0));
-    Value *vertex1 = m_builder->CreateExtractElement(primitiveIndices, 1);
-    Value *vertex2 = m_builder->CreateExtractElement(primitiveIndices, 2);
+    Value *vertex0 = m_builder.CreateExtractElement(primitiveIndices, static_cast<uint64_t>(0));
+    Value *vertex1 = m_builder.CreateExtractElement(primitiveIndices, 1);
+    Value *vertex2 = m_builder.CreateExtractElement(primitiveIndices, 2);
 
-    primitiveData = m_builder->CreateShl(vertex2, 10);
-    primitiveData = m_builder->CreateOr(primitiveData, vertex1);
-    primitiveData = m_builder->CreateShl(primitiveData, 10);
-    primitiveData = m_builder->CreateOr(primitiveData, vertex0);
+    primitiveData = m_builder.CreateShl(vertex2, 10);
+    primitiveData = m_builder.CreateOr(primitiveData, vertex1);
+    primitiveData = m_builder.CreateShl(primitiveData, 10);
+    primitiveData = m_builder.CreateOr(primitiveData, vertex0);
   }
 
-  Value *ldsStart = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveIndices));
-  Value *ldsOffset = m_builder->CreateAdd(ldsStart, primitiveIndex);
+  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveIndices));
+  Value *ldsOffset = m_builder.CreateAdd(ldsStart, primitiveIndex);
 
   // NOTE: We first clear old primitive connectivity data and use atomic OR operation to set new data. This is because
   // the null primitive flag might be set via built-in CullPrimitive.
   static const unsigned ClearMask = (1u << 31);
-  atomicOpWithLds(AtomicRMWInst::And, m_builder->getInt32(ClearMask), ldsOffset);
+  atomicOpWithLds(AtomicRMWInst::And, m_builder.getInt32(ClearMask), ldsOffset);
   atomicOpWithLds(AtomicRMWInst::Or, primitiveData, ldsOffset);
 }
 
@@ -1885,15 +1881,15 @@ void MeshTaskShader::setPrimitiveCulled(Value *primitiveIndex, Value *isCulled) 
   assert(isCulled->getType()->isIntegerTy(1));
 
   static const unsigned NullPrimitive = (1u << 31);
-  auto nullPrimitive = m_builder->CreateSelect(isCulled, m_builder->getInt32(NullPrimitive), m_builder->getInt32(0));
+  auto nullPrimitive = m_builder.CreateSelect(isCulled, m_builder.getInt32(NullPrimitive), m_builder.getInt32(0));
 
-  Value *ldsStart = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveIndices));
-  Value *ldsOffset = m_builder->CreateAdd(ldsStart, primitiveIndex);
+  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveIndices));
+  Value *ldsOffset = m_builder.CreateAdd(ldsStart, primitiveIndex);
 
   // NOTE: We first clear null primitive flag and use atomic OR operation to set new flag. This is because the
   // primitive connectivity data might be set via built-in PrimitiveXXXIndices.
   static const unsigned ClearMask = ~(1u << 31);
-  atomicOpWithLds(AtomicRMWInst::And, m_builder->getInt32(ClearMask), ldsOffset);
+  atomicOpWithLds(AtomicRMWInst::And, m_builder.getInt32(ClearMask), ldsOffset);
   atomicOpWithLds(AtomicRMWInst::Or, nullPrimitive, ldsOffset);
 }
 
@@ -1903,7 +1899,7 @@ void MeshTaskShader::setPrimitiveCulled(Value *primitiveIndex, Value *isCulled) 
 // @param builtIn : Input built-in ID of mesh shader
 // @returns : Value of the specified input built-in
 Value *MeshTaskShader::getMeshInput(BuiltInKind builtIn) {
-  auto entryPoint = m_builder->GetInsertBlock()->getParent();
+  auto entryPoint = m_builder.GetInsertBlock()->getParent();
   assert(getShaderStage(entryPoint) == ShaderStageMesh);
 
   switch (builtIn) {
@@ -1917,7 +1913,7 @@ Value *MeshTaskShader::getMeshInput(BuiltInKind builtIn) {
       auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
       return getFunctionArgument(entryPoint, entryArgIdxs.viewIndex);
     }
-    return m_builder->getInt32(0);
+    return m_builder.getInt32(0);
   }
 
   case BuiltInNumWorkgroups:
@@ -1940,7 +1936,7 @@ Value *MeshTaskShader::getMeshInput(BuiltInKind builtIn) {
     auto localInvocationIndex = getMeshLocalInvocationIndex();
     unsigned subgroupSize = m_pipelineState->getShaderSubgroupSize(ShaderStageMesh);
     assert(subgroupSize > 0 && subgroupSize % 32 == 0);
-    return m_builder->CreateLShr(localInvocationIndex, m_builder->getInt32(Log2_32(subgroupSize)));
+    return m_builder.CreateLShr(localInvocationIndex, m_builder.getInt32(Log2_32(subgroupSize)));
   }
 
   case BuiltInNumSubgroups: {
@@ -1950,7 +1946,7 @@ Value *MeshTaskShader::getMeshInput(BuiltInKind builtIn) {
     unsigned subgroupSize = m_pipelineState->getShaderSubgroupSize(ShaderStageMesh);
     assert(subgroupSize > 0 && subgroupSize % 32 == 0);
     const unsigned numSubgroups = alignTo(numMeshThreads, subgroupSize) / subgroupSize;
-    return m_builder->getInt32(numSubgroups);
+    return m_builder.getInt32(numSubgroups);
   }
 
   default:
@@ -1969,10 +1965,10 @@ void MeshTaskShader::writeVertexOutput(Value *outputOffset, Value *vertexIndex, 
   const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh);
   const unsigned vertexStride = 4 * resUsage->inOutUsage.outputMapLocCount; // Corresponds to vec4 output
 
-  Value *ldsStart = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexOutput));
-  Value *ldsOffset = m_builder->CreateMul(vertexIndex, m_builder->getInt32(vertexStride));
-  ldsOffset = m_builder->CreateAdd(ldsOffset, outputOffset);
-  ldsOffset = m_builder->CreateAdd(ldsStart, ldsOffset);
+  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexOutput));
+  Value *ldsOffset = m_builder.CreateMul(vertexIndex, m_builder.getInt32(vertexStride));
+  ldsOffset = m_builder.CreateAdd(ldsOffset, outputOffset);
+  ldsOffset = m_builder.CreateAdd(ldsStart, ldsOffset);
 
   writeValueToLds(outputValue, ldsOffset);
 }
@@ -1987,10 +1983,10 @@ void MeshTaskShader::writePrimitiveOutput(Value *outputOffset, Value *primitiveI
   const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh);
   const unsigned primitiveStride = 4 * resUsage->inOutUsage.perPrimitiveOutputMapLocCount; // Corresponds to vec4 output
 
-  Value *ldsStart = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveOutput));
-  Value *ldsOffset = m_builder->CreateMul(primitiveIndex, m_builder->getInt32(primitiveStride));
-  ldsOffset = m_builder->CreateAdd(ldsOffset, outputOffset);
-  ldsOffset = m_builder->CreateAdd(ldsStart, ldsOffset);
+  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveOutput));
+  Value *ldsOffset = m_builder.CreateMul(primitiveIndex, m_builder.getInt32(primitiveStride));
+  ldsOffset = m_builder.CreateAdd(ldsOffset, outputOffset);
+  ldsOffset = m_builder.CreateAdd(ldsStart, ldsOffset);
 
   writeValueToLds(outputValue, ldsOffset);
 }
@@ -2001,11 +1997,11 @@ void MeshTaskShader::exportPrimitive() {
   const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh)->builtInUsage.mesh;
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh)->inOutUsage;
 
-  Value *ldsStart = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveIndices));
-  Value *ldsOffset = m_builder->CreateAdd(ldsStart, m_waveThreadInfo.primOrVertexIndex);
+  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveIndices));
+  Value *ldsOffset = m_builder.CreateAdd(ldsStart, m_waveThreadInfo.primOrVertexIndex);
 
   // The first dword is primitive connectivity data
-  auto primitiveIndices = readValueFromLds(m_builder->getInt32Ty(), ldsOffset);
+  auto primitiveIndices = readValueFromLds(m_builder.getInt32Ty(), ldsOffset);
 
   // The second dword is primitive payload, which has the following bit layout specified by HW:
   //
@@ -2026,9 +2022,9 @@ void MeshTaskShader::exportPrimitive() {
     primitiveId = readMeshBuiltInFromLds(BuiltInPrimitiveId);
     if (m_gfxIp.major < 11) {
       // [16:0] = Pipeline primitive ID
-      auto primitiveIdMaskAndShift = m_builder->CreateAnd(primitiveId, 0x1FFFF);
+      auto primitiveIdMaskAndShift = m_builder.CreateAnd(primitiveId, 0x1FFFF);
       if (primitivePayload)
-        primitivePayload = m_builder->CreateOr(primitivePayload, primitiveIdMaskAndShift);
+        primitivePayload = m_builder.CreateOr(primitivePayload, primitiveIdMaskAndShift);
       else
         primitivePayload = primitiveIdMaskAndShift;
     }
@@ -2041,7 +2037,7 @@ void MeshTaskShader::exportPrimitive() {
   Value *viewIndex = nullptr;
   const bool enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
   if (enableMultiView) {
-    auto entryPoint = m_builder->GetInsertBlock()->getParent();
+    auto entryPoint = m_builder.GetInsertBlock()->getParent();
     const auto entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
     viewIndex = getFunctionArgument(entryPoint, entryArgIdxs.viewIndex);
   }
@@ -2051,13 +2047,13 @@ void MeshTaskShader::exportPrimitive() {
     // When multi-view is enabled, the input view index is treated as the output layer.
     Value *layerMaskAndShift = nullptr;
     if (m_gfxIp.major < 11) {
-      layerMaskAndShift = m_builder->CreateAnd(enableMultiView ? viewIndex : layer, 0x7);
-      layerMaskAndShift = m_builder->CreateShl(layerMaskAndShift, 17);
+      layerMaskAndShift = m_builder.CreateAnd(enableMultiView ? viewIndex : layer, 0x7);
+      layerMaskAndShift = m_builder.CreateShl(layerMaskAndShift, 17);
     } else {
-      layerMaskAndShift = m_builder->CreateAnd(enableMultiView ? viewIndex : layer, 0x1FFF);
+      layerMaskAndShift = m_builder.CreateAnd(enableMultiView ? viewIndex : layer, 0x1FFF);
     }
     if (primitivePayload)
-      primitivePayload = m_builder->CreateOr(primitivePayload, layerMaskAndShift);
+      primitivePayload = m_builder.CreateOr(primitivePayload, layerMaskAndShift);
     else
       primitivePayload = layerMaskAndShift;
   }
@@ -2066,10 +2062,10 @@ void MeshTaskShader::exportPrimitive() {
   if (builtInUsage.viewportIndex) {
     // [23:20] = Viewport index
     viewportIndex = readMeshBuiltInFromLds(BuiltInViewportIndex);
-    auto viewportIndexMaskAndShift = m_builder->CreateAnd(viewportIndex, 0xF);
-    viewportIndexMaskAndShift = m_builder->CreateShl(viewportIndexMaskAndShift, 20);
+    auto viewportIndexMaskAndShift = m_builder.CreateAnd(viewportIndex, 0xF);
+    viewportIndexMaskAndShift = m_builder.CreateShl(viewportIndexMaskAndShift, 20);
     if (primitivePayload)
-      primitivePayload = m_builder->CreateOr(primitivePayload, viewportIndexMaskAndShift);
+      primitivePayload = m_builder.CreateOr(primitivePayload, viewportIndexMaskAndShift);
     else
       primitivePayload = viewportIndexMaskAndShift;
   }
@@ -2079,11 +2075,11 @@ void MeshTaskShader::exportPrimitive() {
     auto primitiveShadingRate = readMeshBuiltInFromLds(BuiltInPrimitiveShadingRate);
     auto hwShadingRateMaskAndShift = convertToHwShadingRate(primitiveShadingRate);
 
-    hwShadingRateMaskAndShift = m_builder->CreateAnd(hwShadingRateMaskAndShift, 0xF);
-    hwShadingRateMaskAndShift = m_builder->CreateShl(hwShadingRateMaskAndShift, 28);
+    hwShadingRateMaskAndShift = m_builder.CreateAnd(hwShadingRateMaskAndShift, 0xF);
+    hwShadingRateMaskAndShift = m_builder.CreateShl(hwShadingRateMaskAndShift, 28);
 
     if (primitivePayload)
-      primitivePayload = m_builder->CreateOr(primitivePayload, hwShadingRateMaskAndShift);
+      primitivePayload = m_builder.CreateOr(primitivePayload, hwShadingRateMaskAndShift);
     else
       primitivePayload = hwShadingRateMaskAndShift;
   }
@@ -2100,18 +2096,18 @@ void MeshTaskShader::exportPrimitive() {
   }
 
   // Export primitive attributes (from generic outputs)
-  ldsStart = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveOutput));
+  ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveOutput));
   auto primitiveStride = 4 * inOutUsage.perPrimitiveOutputMapLocCount;
-  auto ldsOffsetBase = m_builder->CreateMul(m_waveThreadInfo.primOrVertexIndex, m_builder->getInt32(primitiveStride));
-  ldsOffsetBase = m_builder->CreateAdd(ldsStart, ldsOffsetBase);
+  auto ldsOffsetBase = m_builder.CreateMul(m_waveThreadInfo.primOrVertexIndex, m_builder.getInt32(primitiveStride));
+  ldsOffsetBase = m_builder.CreateAdd(ldsStart, ldsOffsetBase);
 
   for (unsigned loc = 0; loc < inOutUsage.mesh.perPrimitiveGenericOutputMapLocCount; ++loc) {
-    auto ldsOffset = m_builder->CreateAdd(ldsOffsetBase, m_builder->getInt32(4 * loc));
-    auto exportValue = readValueFromLds(FixedVectorType::get(m_builder->getFloatTy(), 4), ldsOffset);
+    auto ldsOffset = m_builder.CreateAdd(ldsOffsetBase, m_builder.getInt32(4 * loc));
+    auto exportValue = readValueFromLds(FixedVectorType::get(m_builder.getFloatTy(), 4), ldsOffset);
 
     std::array<Value *, 4> exportValues;
     for (unsigned j = 0; j < 4; ++j)
-      exportValues[j] = m_builder->CreateExtractElement(exportValue, j);
+      exportValues[j] = m_builder.CreateExtractElement(exportValue, j);
 
     primAttrExports.push_back({startLoc + loc, exportValues});
     ++inOutUsage.primExpCount;
@@ -2137,7 +2133,7 @@ void MeshTaskShader::exportPrimitive() {
       if (fsBuiltInUsage.layer) {
         // NOTE: In such case, mesh shader doesn't export layer while fragment shader expects to read it. We
         // export 0 to fragment shader, which is required by the spec.
-        layer = m_builder->getInt32(0);
+        layer = m_builder.getInt32(0);
         exportLayer = true;
       }
     }
@@ -2162,7 +2158,7 @@ void MeshTaskShader::exportPrimitive() {
       if (fsBuiltInUsage.viewportIndex) {
         // NOTE: In such case, mesh shader doesn't export viewport index while fragment shader expects to read it. We
         // export 0 to fragment shader, which is required by spec.
-        viewportIndex = m_builder->getInt32(0);
+        viewportIndex = m_builder.getInt32(0);
         exportViewportIndex = true;
       }
     }
@@ -2191,10 +2187,9 @@ void MeshTaskShader::exportVertex() {
 
   if (builtInUsage.position) {
     auto position = readMeshBuiltInFromLds(BuiltInPosition);
-    std::array<Value *, 4> positions = {m_builder->CreateExtractElement(position, static_cast<uint64_t>(0)),
-                                        m_builder->CreateExtractElement(position, 1),
-                                        m_builder->CreateExtractElement(position, 2),
-                                        m_builder->CreateExtractElement(position, 3)};
+    std::array<Value *, 4> positions = {
+        m_builder.CreateExtractElement(position, static_cast<uint64_t>(0)), m_builder.CreateExtractElement(position, 1),
+        m_builder.CreateExtractElement(position, 2), m_builder.CreateExtractElement(position, 3)};
 
     posExports.push_back({0, positions});
   }
@@ -2208,14 +2203,14 @@ void MeshTaskShader::exportVertex() {
   if (builtInUsage.clipDistance > 0) {
     auto clipDistance = readMeshBuiltInFromLds(BuiltInClipDistance);
     for (unsigned i = 0; i < builtInUsage.clipDistance; ++i)
-      clipDistances.push_back(m_builder->CreateExtractElement(clipDistance, i));
+      clipDistances.push_back(m_builder.CreateExtractElement(clipDistance, i));
   }
 
   SmallVector<Value *, 8> cullDistances;
   if (builtInUsage.cullDistance > 0) {
     auto cullDistance = readMeshBuiltInFromLds(BuiltInCullDistance);
     for (unsigned i = 0; i < builtInUsage.cullDistance; ++i)
-      cullDistances.push_back(m_builder->CreateExtractElement(cullDistance, i));
+      cullDistances.push_back(m_builder.CreateExtractElement(cullDistance, i));
   }
 
   SmallVector<Value *, 8> clipCullDistances;
@@ -2230,7 +2225,7 @@ void MeshTaskShader::exportVertex() {
       clipCullDistances.push_back(cullDistance);
 
     // Do array padding
-    auto undef = PoisonValue::get(m_builder->getFloatTy());
+    auto undef = PoisonValue::get(m_builder.getFloatTy());
     if (clipCullDistances.size() <= 4) {
       while (clipCullDistances.size() < 4) // <4 x float>
         clipCullDistances.push_back(undef);
@@ -2260,19 +2255,19 @@ void MeshTaskShader::exportVertex() {
   SmallVector<ExportInfo, 32> vertAttrExports;
 
   // Export vertex attributes (from generic outputs)
-  Value *ldsStart = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexOutput));
+  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexOutput));
   auto vertexStride = 4 * inOutUsage.outputMapLocCount;
-  auto ldsOffsetBase = m_builder->CreateMul(m_waveThreadInfo.primOrVertexIndex, m_builder->getInt32(vertexStride));
-  ldsOffsetBase = m_builder->CreateAdd(ldsStart, ldsOffsetBase);
+  auto ldsOffsetBase = m_builder.CreateMul(m_waveThreadInfo.primOrVertexIndex, m_builder.getInt32(vertexStride));
+  ldsOffsetBase = m_builder.CreateAdd(ldsStart, ldsOffsetBase);
 
   for (unsigned i = 0; i < inOutUsage.mesh.genericOutputMapLocCount; ++i) {
-    auto ldsOffset = m_builder->CreateAdd(ldsOffsetBase, m_builder->getInt32(4 * i));
-    auto exportValue = readValueFromLds(FixedVectorType::get(m_builder->getFloatTy(), 4), ldsOffset);
+    auto ldsOffset = m_builder.CreateAdd(ldsOffsetBase, m_builder.getInt32(4 * i));
+    auto exportValue = readValueFromLds(FixedVectorType::get(m_builder.getFloatTy(), 4), ldsOffset);
 
-    std::array<Value *, 4> exportValues = {m_builder->CreateExtractElement(exportValue, static_cast<uint64_t>(0)),
-                                           m_builder->CreateExtractElement(exportValue, 1),
-                                           m_builder->CreateExtractElement(exportValue, 2),
-                                           m_builder->CreateExtractElement(exportValue, 3)};
+    std::array<Value *, 4> exportValues = {m_builder.CreateExtractElement(exportValue, static_cast<uint64_t>(0)),
+                                           m_builder.CreateExtractElement(exportValue, 1),
+                                           m_builder.CreateExtractElement(exportValue, 2),
+                                           m_builder.CreateExtractElement(exportValue, 3)};
 
     vertAttrExports.push_back({i, exportValues});
     ++inOutUsage.expCount;
@@ -2292,7 +2287,7 @@ void MeshTaskShader::exportVertex() {
         const unsigned clipDistanceCount = std::min(fsBuiltInUsage.clipDistance, builtInUsage.clipDistance);
         const unsigned cullDistanceCount = std::min(fsBuiltInUsage.cullDistance, builtInUsage.cullDistance);
 
-        auto undef = PoisonValue::get(m_builder->getFloatTy());
+        auto undef = PoisonValue::get(m_builder.getFloatTy());
 
         clipCullDistances.clear();
         for (unsigned i = 0; i < clipDistanceCount; ++i)
@@ -2342,7 +2337,7 @@ void MeshTaskShader::exportVertex() {
   if (waAtmPrecedesPos) {
     // Before the first export call of vertex position data, add s_wait_vscnt 0 to make sure the completion of all
     // attributes being written to the attribute ring buffer
-    m_builder->CreateFence(AtomicOrdering::Release, SyncScope::System);
+    m_builder.CreateFence(AtomicOrdering::Release, SyncScope::System);
 
     doExport(ExportKind::Pos, posExports);
   }
@@ -2366,23 +2361,23 @@ void MeshTaskShader::collectMeshStatsInfo(Function *entryPoint, Value *numMeshPr
   // Record numMeshThreads
   //
   {
-    Value *meshPipeStatsBufEntryPtr = m_builder->CreateGEP(
-        m_builder->getInt8Ty(), meshPipeStatsBufPtr, m_builder->getInt32(offsetof(MeshPipeStatsEntry, numMeshThreads)));
-    meshPipeStatsBufEntryPtr = m_builder->CreateBitCast(meshPipeStatsBufEntryPtr,
-                                                        PointerType::get(m_builder->getInt64Ty(), ADDR_SPACE_GLOBAL));
+    Value *meshPipeStatsBufEntryPtr = m_builder.CreateGEP(
+        m_builder.getInt8Ty(), meshPipeStatsBufPtr, m_builder.getInt32(offsetof(MeshPipeStatsEntry, numMeshThreads)));
+    meshPipeStatsBufEntryPtr =
+        m_builder.CreateBitCast(meshPipeStatsBufEntryPtr, PointerType::get(m_builder.getInt64Ty(), ADDR_SPACE_GLOBAL));
 
     // NOTE: LLVM backend will try to apply atomics optimization. But here, we only have one active thread to execute
     // the global_atomic_add instruction. Thus, the optimization is completely unnecessary. To avoid this, we try to
     // move the added value to VGPR to mark it as "divergent".
-    Value *valueToAdd = UndefValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 2));
-    valueToAdd = m_builder->CreateInsertElement(valueToAdd, convertToDivergent(m_builder->getInt32(numMeshThreads)),
-                                                static_cast<uint64_t>(0));
+    Value *valueToAdd = UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
+    valueToAdd = m_builder.CreateInsertElement(valueToAdd, convertToDivergent(m_builder.getInt32(numMeshThreads)),
+                                               static_cast<uint64_t>(0));
     valueToAdd =
-        m_builder->CreateInsertElement(valueToAdd, convertToDivergent(m_builder->getInt32(numMeshThreads >> 32)), 1);
-    valueToAdd = m_builder->CreateBitCast(valueToAdd, m_builder->getInt64Ty());
+        m_builder.CreateInsertElement(valueToAdd, convertToDivergent(m_builder.getInt32(numMeshThreads >> 32)), 1);
+    valueToAdd = m_builder.CreateBitCast(valueToAdd, m_builder.getInt64Ty());
 
-    m_builder->CreateAtomicRMW(AtomicRMWInst::Add, meshPipeStatsBufEntryPtr, valueToAdd, MaybeAlign(),
-                               AtomicOrdering::Monotonic, SyncScope::System);
+    m_builder.CreateAtomicRMW(AtomicRMWInst::Add, meshPipeStatsBufEntryPtr, valueToAdd, MaybeAlign(),
+                              AtomicOrdering::Monotonic, SyncScope::System);
   }
 
   //
@@ -2390,24 +2385,24 @@ void MeshTaskShader::collectMeshStatsInfo(Function *entryPoint, Value *numMeshPr
   //
   {
     Value *meshPipeStatsBufEntryPtr =
-        m_builder->CreateGEP(m_builder->getInt8Ty(), meshPipeStatsBufPtr,
-                             m_builder->getInt32(offsetof(MeshPipeStatsEntry, numMeshPrimitives)));
-    meshPipeStatsBufEntryPtr = m_builder->CreateBitCast(meshPipeStatsBufEntryPtr,
-                                                        PointerType::get(m_builder->getInt64Ty(), ADDR_SPACE_GLOBAL));
+        m_builder.CreateGEP(m_builder.getInt8Ty(), meshPipeStatsBufPtr,
+                            m_builder.getInt32(offsetof(MeshPipeStatsEntry, numMeshPrimitives)));
+    meshPipeStatsBufEntryPtr =
+        m_builder.CreateBitCast(meshPipeStatsBufEntryPtr, PointerType::get(m_builder.getInt64Ty(), ADDR_SPACE_GLOBAL));
 
-    assert(numMeshPrimitives->getType() == m_builder->getInt32Ty());
+    assert(numMeshPrimitives->getType() == m_builder.getInt32Ty());
 
     // NOTE: LLVM backend will try to apply atomics optimization. But here, we only have one active thread to execute
     // the global_atomic_add instruction. Thus, the optimization is completely unnecessary. To avoid this, we try to
     // move the added value to VGPR to mark it as "divergent".
-    Value *valueToAdd = UndefValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 2));
+    Value *valueToAdd = UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
     valueToAdd =
-        m_builder->CreateInsertElement(valueToAdd, convertToDivergent(numMeshPrimitives), static_cast<uint64_t>(0));
-    valueToAdd = m_builder->CreateInsertElement(valueToAdd, convertToDivergent(m_builder->getInt32(0)), 1);
-    valueToAdd = m_builder->CreateBitCast(valueToAdd, m_builder->getInt64Ty());
+        m_builder.CreateInsertElement(valueToAdd, convertToDivergent(numMeshPrimitives), static_cast<uint64_t>(0));
+    valueToAdd = m_builder.CreateInsertElement(valueToAdd, convertToDivergent(m_builder.getInt32(0)), 1);
+    valueToAdd = m_builder.CreateBitCast(valueToAdd, m_builder.getInt64Ty());
 
-    m_builder->CreateAtomicRMW(AtomicRMWInst::Add, meshPipeStatsBufEntryPtr, valueToAdd, MaybeAlign(),
-                               AtomicOrdering::Monotonic, SyncScope::System);
+    m_builder.CreateAtomicRMW(AtomicRMWInst::Add, meshPipeStatsBufEntryPtr, valueToAdd, MaybeAlign(),
+                              AtomicOrdering::Monotonic, SyncScope::System);
   }
 }
 
@@ -2455,24 +2450,24 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
 
     if (m_gfxIp.major >= 11) {
       if (kind == ExportKind::Pos || kind == ExportKind::Prim) {
-        m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp_row, valueTy,
-                                   {
-                                       m_builder->getInt32(target + exports[i].index), // tgt
-                                       m_builder->getInt32(validMask),                 // en
-                                       values[0],                                      // src0
-                                       values[1] ? values[1] : undef,                  // src1
-                                       values[2] ? values[2] : undef,                  // src2
-                                       values[3] ? values[3] : undef,                  // src3
-                                       m_builder->getInt1(exportDone),                 // done
-                                       m_waveThreadInfo.rowInSubgroup,                 // row number
-                                   });
+        m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp_row, valueTy,
+                                  {
+                                      m_builder.getInt32(target + exports[i].index), // tgt
+                                      m_builder.getInt32(validMask),                 // en
+                                      values[0],                                     // src0
+                                      values[1] ? values[1] : undef,                 // src1
+                                      values[2] ? values[2] : undef,                 // src2
+                                      values[3] ? values[3] : undef,                 // src3
+                                      m_builder.getInt1(exportDone),                 // done
+                                      m_waveThreadInfo.rowInSubgroup,                // row number
+                                  });
       } else {
         assert(kind == ExportKind::VertAttr || kind == ExportKind::PrimAttr);
 
         Value *valueToStore = UndefValue::get(FixedVectorType::get(valueTy, 4));
         for (unsigned j = 0; j < 4; ++j) {
           if (values[j])
-            valueToStore = m_builder->CreateInsertElement(valueToStore, values[j], j);
+            valueToStore = m_builder.CreateInsertElement(valueToStore, values[j], j);
         }
 
         // ringOffset = attribRingBaseOffset + 32 * exportIndex * 16
@@ -2485,27 +2480,27 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
           // primitive attributes are moved after it.
           ++exportIndex;
         }
-        auto locationOffset = m_builder->getInt32(exportIndex * SizeOfVec4);
+        auto locationOffset = m_builder.getInt32(exportIndex * SizeOfVec4);
 
         CoherentFlag coherent = {};
         coherent.bits.glc = true;
 
-        m_builder->CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_store, valueToStore->getType(),
-                                   {valueToStore, m_attribRingBufDesc, m_waveThreadInfo.threadIdInSubgroup,
-                                    locationOffset, m_attribRingBaseOffset, m_builder->getInt32(coherent.u32All)});
+        m_builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_store, valueToStore->getType(),
+                                  {valueToStore, m_attribRingBufDesc, m_waveThreadInfo.threadIdInSubgroup,
+                                   locationOffset, m_attribRingBaseOffset, m_builder.getInt32(coherent.u32All)});
       }
     } else {
-      m_builder->CreateIntrinsic(Intrinsic::amdgcn_exp, valueTy,
-                                 {
-                                     m_builder->getInt32(target + exports[i].index), // tgt
-                                     m_builder->getInt32(validMask),                 // en
-                                     values[0],                                      // src0
-                                     values[1] ? values[1] : undef,                  // src1
-                                     values[2] ? values[2] : undef,                  // src2
-                                     values[3] ? values[3] : undef,                  // src3
-                                     m_builder->getInt1(exportDone),                 // done
-                                     m_builder->getFalse(),                          // vm
-                                 });
+      m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, valueTy,
+                                {
+                                    m_builder.getInt32(target + exports[i].index), // tgt
+                                    m_builder.getInt32(validMask),                 // en
+                                    values[0],                                     // src0
+                                    values[1] ? values[1] : undef,                 // src1
+                                    values[2] ? values[2] : undef,                 // src2
+                                    values[3] ? values[3] : undef,                 // src3
+                                    m_builder.getInt1(exportDone),                 // done
+                                    m_builder.getFalse(),                          // vm
+                                });
     }
   }
 }
@@ -2547,12 +2542,12 @@ void MeshTaskShader::prepareAttribRingAccess() {
   }
 
   // attribRingBase[14:0]
-  auto entryPoint = m_builder->GetInsertBlock()->getParent();
+  auto entryPoint = m_builder.GetInsertBlock()->getParent();
   Value *attribRingBase =
       getFunctionArgument(entryPoint, ShaderMerger::getSpecialSgprInputIndex(m_gfxIp, EsGs::AttribRingBase));
-  attribRingBase = m_builder->CreateAnd(attribRingBase, 0x7FFF);
+  attribRingBase = m_builder.CreateAnd(attribRingBase, 0x7FFF);
   m_attribRingBaseOffset =
-      m_builder->CreateMul(attribRingBase, m_builder->getInt32(AttribGranularity), "attribRingBaseOffset");
+      m_builder.CreateMul(attribRingBase, m_builder.getInt32(AttribGranularity), "attribRingBaseOffset");
 
   m_attribRingBufDesc = m_pipelineSysValues.get(entryPoint)->getAttribRingBufDesc();
 
@@ -2560,14 +2555,14 @@ void MeshTaskShader::prepareAttribRingAccess() {
   if (attribCount >= 2) {
     // STRIDE = WORD1[30:16], STRIDE is initialized to 16 by the driver, which is the right value for attribCount == 1.
     // We override the value if there are more attributes.
-    auto descWord1 = m_builder->CreateExtractElement(m_attribRingBufDesc, 1);
-    auto stride = m_builder->getInt32(attribCount * SizeOfVec4);
+    auto descWord1 = m_builder.CreateExtractElement(m_attribRingBufDesc, 1);
+    auto stride = m_builder.getInt32(attribCount * SizeOfVec4);
     if ((attribCount & 1) == 0) {
       // Clear the bit that was set in STRIDE by the driver.
-      descWord1 = m_builder->CreateAnd(descWord1, ~0x3FFF0000);
+      descWord1 = m_builder.CreateAnd(descWord1, ~0x3FFF0000);
     }
-    descWord1 = m_builder->CreateOr(descWord1, m_builder->CreateShl(stride, 16)); // Set new STRIDE
-    m_attribRingBufDesc = m_builder->CreateInsertElement(m_attribRingBufDesc, descWord1, 1);
+    descWord1 = m_builder.CreateOr(descWord1, m_builder.CreateShl(stride, 16)); // Set new STRIDE
+    m_attribRingBufDesc = m_builder.CreateInsertElement(m_attribRingBufDesc, descWord1, 1);
   }
 }
 
@@ -2576,13 +2571,13 @@ void MeshTaskShader::prepareAttribRingAccess() {
 //
 // @returns : Value of flat workgroup ID
 Value *MeshTaskShader::getMeshFlatWorkgroupId() {
-  assert(getShaderStage(m_builder->GetInsertBlock()->getParent()) == ShaderStageMesh); // Must be mesh shader
+  assert(getShaderStage(m_builder.GetInsertBlock()->getParent()) == ShaderStageMesh); // Must be mesh shader
 
   if (!m_meshFlatWorkgroupId) {
-    auto ldsOffset = m_builder->getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::FlatWorkgroupId));
-    auto flatWorkgroupId = readValueFromLds(m_builder->getInt32Ty(), ldsOffset);
+    auto ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::FlatWorkgroupId));
+    auto flatWorkgroupId = readValueFromLds(m_builder.getInt32Ty(), ldsOffset);
     flatWorkgroupId =
-        m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, flatWorkgroupId); // Promoted to SGPR
+        m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, flatWorkgroupId); // Promoted to SGPR
     flatWorkgroupId->setName("flatWorkgroupId");
 
     m_meshFlatWorkgroupId = flatWorkgroupId;
@@ -2596,7 +2591,7 @@ Value *MeshTaskShader::getMeshFlatWorkgroupId() {
 //
 // @returns : Value of the built-in numWorkgroups
 Value *MeshTaskShader::getMeshNumWorkgroups() {
-  auto entryPoint = m_builder->GetInsertBlock()->getParent();
+  auto entryPoint = m_builder.GetInsertBlock()->getParent();
   assert(getShaderStage(entryPoint) == ShaderStageMesh); // Must be mesh shader
 
   auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
@@ -2608,16 +2603,15 @@ Value *MeshTaskShader::getMeshNumWorkgroups() {
 //
 // @returns : Value of the built-in WorkgroupId
 Value *MeshTaskShader::getMeshWorkgroupId() {
-  auto entryPoint = m_builder->GetInsertBlock()->getParent();
+  auto entryPoint = m_builder.GetInsertBlock()->getParent();
   assert(getShaderStage(entryPoint) == ShaderStageMesh); // Must be mesh shader
 
   if (!m_meshWorkgroupId) {
     if (m_gfxIp.major >= 11) {
-      Value *workgroupId = UndefValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 3));
-      workgroupId =
-          m_builder->CreateInsertElement(workgroupId, m_waveThreadInfo.workgroupIdX, static_cast<uint64_t>(0));
-      workgroupId = m_builder->CreateInsertElement(workgroupId, m_waveThreadInfo.workgroupIdY, 1);
-      workgroupId = m_builder->CreateInsertElement(workgroupId, m_waveThreadInfo.workgroupIdZ, 2);
+      Value *workgroupId = UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 3));
+      workgroupId = m_builder.CreateInsertElement(workgroupId, m_waveThreadInfo.workgroupIdX, static_cast<uint64_t>(0));
+      workgroupId = m_builder.CreateInsertElement(workgroupId, m_waveThreadInfo.workgroupIdY, 1);
+      workgroupId = m_builder.CreateInsertElement(workgroupId, m_waveThreadInfo.workgroupIdZ, 2);
 
       m_meshWorkgroupId = workgroupId;
     } else {
@@ -2633,26 +2627,26 @@ Value *MeshTaskShader::getMeshWorkgroupId() {
       auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
 
       auto dispatchDims = getFunctionArgument(entryPoint, entryArgIdxs.dispatchDims);
-      auto dispatchDimX = m_builder->CreateExtractElement(dispatchDims, static_cast<uint64_t>(0));
-      auto dispatchDimY = m_builder->CreateExtractElement(dispatchDims, 1);
-      auto dispatchDimXMulY = m_builder->CreateMul(dispatchDimX, dispatchDimY);
+      auto dispatchDimX = m_builder.CreateExtractElement(dispatchDims, static_cast<uint64_t>(0));
+      auto dispatchDimY = m_builder.CreateExtractElement(dispatchDims, 1);
+      auto dispatchDimXMulY = m_builder.CreateMul(dispatchDimX, dispatchDimY);
 
-      auto workgroupIdZ = m_builder->CreateUDiv(flatWorkgroupId, dispatchDimXMulY);
-      workgroupIdZ = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, workgroupIdZ); // Promoted to SGPR
+      auto workgroupIdZ = m_builder.CreateUDiv(flatWorkgroupId, dispatchDimXMulY);
+      workgroupIdZ = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, workgroupIdZ); // Promoted to SGPR
 
-      auto diff = m_builder->CreateMul(dispatchDimXMulY, workgroupIdZ);
-      diff = m_builder->CreateSub(flatWorkgroupId, diff);
-      auto workgroupIdY = m_builder->CreateUDiv(diff, dispatchDimX);
-      workgroupIdY = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, workgroupIdY); // Promoted to SGPR
+      auto diff = m_builder.CreateMul(dispatchDimXMulY, workgroupIdZ);
+      diff = m_builder.CreateSub(flatWorkgroupId, diff);
+      auto workgroupIdY = m_builder.CreateUDiv(diff, dispatchDimX);
+      workgroupIdY = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, workgroupIdY); // Promoted to SGPR
 
-      auto workgroupIdX = m_builder->CreateMul(dispatchDimX, workgroupIdY);
-      workgroupIdX = m_builder->CreateSub(diff, workgroupIdX);
-      workgroupIdX = m_builder->CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, workgroupIdX); // Promoted to SGPR
+      auto workgroupIdX = m_builder.CreateMul(dispatchDimX, workgroupIdY);
+      workgroupIdX = m_builder.CreateSub(diff, workgroupIdX);
+      workgroupIdX = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, workgroupIdX); // Promoted to SGPR
 
-      Value *workgroupId = UndefValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 3));
-      workgroupId = m_builder->CreateInsertElement(workgroupId, workgroupIdX, static_cast<uint64_t>(0));
-      workgroupId = m_builder->CreateInsertElement(workgroupId, workgroupIdY, 1);
-      workgroupId = m_builder->CreateInsertElement(workgroupId, workgroupIdZ, 2);
+      Value *workgroupId = UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 3));
+      workgroupId = m_builder.CreateInsertElement(workgroupId, workgroupIdX, static_cast<uint64_t>(0));
+      workgroupId = m_builder.CreateInsertElement(workgroupId, workgroupIdY, 1);
+      workgroupId = m_builder.CreateInsertElement(workgroupId, workgroupIdZ, 2);
 
       m_meshWorkgroupId = workgroupId;
     }
@@ -2667,7 +2661,7 @@ Value *MeshTaskShader::getMeshWorkgroupId() {
 //
 // @returns : Value of the built-in LocalInvocationId
 Value *MeshTaskShader::getMeshLocalInvocationId() {
-  assert(getShaderStage(m_builder->GetInsertBlock()->getParent()) == ShaderStageMesh); // Must be mesh shader
+  assert(getShaderStage(m_builder.GetInsertBlock()->getParent()) == ShaderStageMesh); // Must be mesh shader
 
   if (!m_meshLocalInvocationId) {
     // localInvocationIndex = localInvocationId.z * workgroupSize.x * workgroupSize.y +
@@ -2681,22 +2675,22 @@ Value *MeshTaskShader::getMeshLocalInvocationId() {
     const auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
     auto localInvocationIndex = getMeshLocalInvocationIndex();
 
-    auto workgroupSizeX = m_builder->getInt32(meshMode.workgroupSizeX);
-    auto workgroupSizeXMulY = m_builder->getInt32(meshMode.workgroupSizeX * meshMode.workgroupSizeY);
+    auto workgroupSizeX = m_builder.getInt32(meshMode.workgroupSizeX);
+    auto workgroupSizeXMulY = m_builder.getInt32(meshMode.workgroupSizeX * meshMode.workgroupSizeY);
 
-    auto localInvocationIdZ = m_builder->CreateUDiv(localInvocationIndex, workgroupSizeXMulY);
+    auto localInvocationIdZ = m_builder.CreateUDiv(localInvocationIndex, workgroupSizeXMulY);
 
-    auto diff = m_builder->CreateMul(workgroupSizeXMulY, localInvocationIdZ);
-    diff = m_builder->CreateSub(localInvocationIndex, diff);
-    auto localInvocationIdY = m_builder->CreateUDiv(diff, workgroupSizeX);
+    auto diff = m_builder.CreateMul(workgroupSizeXMulY, localInvocationIdZ);
+    diff = m_builder.CreateSub(localInvocationIndex, diff);
+    auto localInvocationIdY = m_builder.CreateUDiv(diff, workgroupSizeX);
 
-    auto localInvocationIdX = m_builder->CreateMul(workgroupSizeX, localInvocationIdY);
-    localInvocationIdX = m_builder->CreateSub(diff, localInvocationIdX);
+    auto localInvocationIdX = m_builder.CreateMul(workgroupSizeX, localInvocationIdY);
+    localInvocationIdX = m_builder.CreateSub(diff, localInvocationIdX);
 
-    Value *localInvocationId = UndefValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 3));
-    localInvocationId = m_builder->CreateInsertElement(localInvocationId, localInvocationIdX, static_cast<uint64_t>(0));
-    localInvocationId = m_builder->CreateInsertElement(localInvocationId, localInvocationIdY, 1);
-    localInvocationId = m_builder->CreateInsertElement(localInvocationId, localInvocationIdZ, 2);
+    Value *localInvocationId = UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 3));
+    localInvocationId = m_builder.CreateInsertElement(localInvocationId, localInvocationIdX, static_cast<uint64_t>(0));
+    localInvocationId = m_builder.CreateInsertElement(localInvocationId, localInvocationIdY, 1);
+    localInvocationId = m_builder.CreateInsertElement(localInvocationId, localInvocationIdZ, 2);
 
     m_meshLocalInvocationId = localInvocationId;
     m_meshLocalInvocationId->setName("localInvocationId");
@@ -2710,7 +2704,7 @@ Value *MeshTaskShader::getMeshLocalInvocationId() {
 //
 // @returns : Value of the built-in LocalInvocationIndex
 Value *MeshTaskShader::getMeshLocalInvocationIndex() {
-  assert(getShaderStage(m_builder->GetInsertBlock()->getParent()) == ShaderStageMesh); // Must be mesh shader
+  assert(getShaderStage(m_builder.GetInsertBlock()->getParent()) == ShaderStageMesh); // Must be mesh shader
   return m_waveThreadInfo.threadIdInSubgroup;
 }
 
@@ -2719,19 +2713,19 @@ Value *MeshTaskShader::getMeshLocalInvocationIndex() {
 //
 // @returns : Value of the built-in GlobalInvocationId
 Value *MeshTaskShader::getMeshGlobalInvocationId() {
-  assert(getShaderStage(m_builder->GetInsertBlock()->getParent()) == ShaderStageMesh); // Must be mesh shader
+  assert(getShaderStage(m_builder.GetInsertBlock()->getParent()) == ShaderStageMesh); // Must be mesh shader
 
   if (!m_meshGlobalInvocationId) {
     // globalInvocationId = workgroupId * workgroupSize + localInvocationId
     auto workgourpId = getMeshWorkgroupId();
     const auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
     auto workgroupSize =
-        ConstantVector::get({m_builder->getInt32(meshMode.workgroupSizeX), m_builder->getInt32(meshMode.workgroupSizeY),
-                             m_builder->getInt32(meshMode.workgroupSizeZ)});
+        ConstantVector::get({m_builder.getInt32(meshMode.workgroupSizeX), m_builder.getInt32(meshMode.workgroupSizeY),
+                             m_builder.getInt32(meshMode.workgroupSizeZ)});
     auto localInvocationId = getMeshLocalInvocationId();
 
-    auto globalInvocationId = m_builder->CreateMul(workgourpId, workgroupSize);
-    globalInvocationId = m_builder->CreateAdd(globalInvocationId, localInvocationId);
+    auto globalInvocationId = m_builder.CreateMul(workgourpId, workgroupSize);
+    globalInvocationId = m_builder.CreateAdd(globalInvocationId, localInvocationId);
 
     m_meshGlobalInvocationId = globalInvocationId;
     m_meshGlobalInvocationId->setName("globalInvocationId");
@@ -2745,7 +2739,7 @@ Value *MeshTaskShader::getMeshGlobalInvocationId() {
 //
 // @returns : Value of global invocation index
 Value *MeshTaskShader::getGlobalInvocationIndex() {
-  assert(getShaderStage(m_builder->GetInsertBlock()->getParent()) == ShaderStageMesh); // Must be mesh shader
+  assert(getShaderStage(m_builder.GetInsertBlock()->getParent()) == ShaderStageMesh); // Must be mesh shader
 
   if (!m_meshGlobalInvocationIndex) {
     // globalInvocationIndex = flatWorkgroupId * numMeshThreads + threadIdInSubgroup
@@ -2754,8 +2748,8 @@ Value *MeshTaskShader::getGlobalInvocationIndex() {
     auto flatWorkgroupId = getMeshFlatWorkgroupId();
 
     Value *localInvocationIndex = getMeshLocalInvocationIndex();
-    Value *globalInvocationIndex = m_builder->CreateMul(flatWorkgroupId, m_builder->getInt32(numMeshThreads));
-    globalInvocationIndex = m_builder->CreateAdd(globalInvocationIndex, localInvocationIndex);
+    Value *globalInvocationIndex = m_builder.CreateMul(flatWorkgroupId, m_builder.getInt32(numMeshThreads));
+    globalInvocationIndex = m_builder.CreateAdd(globalInvocationIndex, localInvocationIndex);
 
     m_meshGlobalInvocationIndex = globalInvocationIndex;
     m_meshGlobalInvocationIndex->setName("globalInvocationIndex");
@@ -2793,35 +2787,35 @@ Value *MeshTaskShader::readMeshBuiltInFromLds(BuiltInKind builtIn) {
   switch (builtIn) {
   case BuiltInPosition:
     assert(builtInUsage.position);
-    readTy = FixedVectorType::get(m_builder->getFloatTy(), 4);
+    readTy = FixedVectorType::get(m_builder.getFloatTy(), 4);
     break;
   case BuiltInPointSize:
     assert(builtInUsage.pointSize);
-    readTy = m_builder->getFloatTy();
+    readTy = m_builder.getFloatTy();
     break;
   case BuiltInClipDistance:
     assert(builtInUsage.clipDistance > 0);
-    readTy = FixedVectorType::get(m_builder->getFloatTy(), builtInUsage.clipDistance);
+    readTy = FixedVectorType::get(m_builder.getFloatTy(), builtInUsage.clipDistance);
     break;
   case BuiltInCullDistance:
     assert(builtInUsage.cullDistance > 0);
-    readTy = FixedVectorType::get(m_builder->getFloatTy(), builtInUsage.cullDistance);
+    readTy = FixedVectorType::get(m_builder.getFloatTy(), builtInUsage.cullDistance);
     break;
   case BuiltInPrimitiveId:
     assert(builtInUsage.primitiveId);
-    readTy = m_builder->getInt32Ty();
+    readTy = m_builder.getInt32Ty();
     break;
   case BuiltInViewportIndex:
     assert(builtInUsage.viewportIndex);
-    readTy = m_builder->getInt32Ty();
+    readTy = m_builder.getInt32Ty();
     break;
   case BuiltInLayer:
     assert(builtInUsage.layer);
-    readTy = m_builder->getInt32Ty();
+    readTy = m_builder.getInt32Ty();
     break;
   case BuiltInPrimitiveShadingRate:
     assert(builtInUsage.primitiveShadingRate);
-    readTy = m_builder->getInt32Ty();
+    readTy = m_builder.getInt32Ty();
     break;
   default:
     llvm_unreachable("Unexpected mesh shader built-in!");
@@ -2831,16 +2825,16 @@ Value *MeshTaskShader::readMeshBuiltInFromLds(BuiltInKind builtIn) {
   Value *ldsOffset = nullptr;
   if (region == MeshLdsRegion::VertexOutput) {
     auto vertexStride = 4 * inOutUsage.outputMapLocCount;
-    ldsOffset = m_builder->CreateMul(m_waveThreadInfo.primOrVertexIndex, m_builder->getInt32(vertexStride));
+    ldsOffset = m_builder.CreateMul(m_waveThreadInfo.primOrVertexIndex, m_builder.getInt32(vertexStride));
   } else {
     assert(region == MeshLdsRegion::PrimitiveOutput);
     auto primitiveStride = 4 * inOutUsage.perPrimitiveOutputMapLocCount;
-    ldsOffset = m_builder->CreateMul(m_waveThreadInfo.primOrVertexIndex, m_builder->getInt32(primitiveStride));
+    ldsOffset = m_builder.CreateMul(m_waveThreadInfo.primOrVertexIndex, m_builder.getInt32(primitiveStride));
   }
-  ldsOffset = m_builder->CreateAdd(ldsOffset, m_builder->getInt32(4 * location));
+  ldsOffset = m_builder.CreateAdd(ldsOffset, m_builder.getInt32(4 * location));
 
-  Value *ldsStart = m_builder->getInt32(getMeshShaderLdsRegionStart(region));
-  ldsOffset = m_builder->CreateAdd(ldsStart, ldsOffset);
+  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(region));
+  ldsOffset = m_builder.CreateAdd(ldsStart, ldsOffset);
 
   return readValueFromLds(readTy, ldsOffset);
 }
@@ -2889,17 +2883,17 @@ Value *MeshTaskShader::convertToHwShadingRate(Value *primitiveShadingRate) {
 
     // hwShadingRate = primitiveShadingRate & (Horizontal2Pixels | Horizontal4Pixels |
     //                                         Vertical2Pixels | Vertical4Pixels)
-    auto hwShadingRate = m_builder->CreateAnd(
-        primitiveShadingRate, m_builder->getInt32(ShadingRateHorizontal2Pixels | ShadingRateHorizontal4Pixels |
-                                                  ShadingRateVertical2Pixels | ShadingRateVertical4Pixels));
+    auto hwShadingRate = m_builder.CreateAnd(
+        primitiveShadingRate, m_builder.getInt32(ShadingRateHorizontal2Pixels | ShadingRateHorizontal4Pixels |
+                                                 ShadingRateVertical2Pixels | ShadingRateVertical4Pixels));
 
     // hwShadingRate = hwShadingRate == 1x4 ? 1x2 : hwShadingRate
-    Value *isRate1x4 = m_builder->CreateICmpEQ(hwShadingRate, m_builder->getInt32(ShadingRateVertical4Pixels));
-    hwShadingRate = m_builder->CreateSelect(isRate1x4, m_builder->getInt32(HwShadingRate1x2), hwShadingRate);
+    Value *isRate1x4 = m_builder.CreateICmpEQ(hwShadingRate, m_builder.getInt32(ShadingRateVertical4Pixels));
+    hwShadingRate = m_builder.CreateSelect(isRate1x4, m_builder.getInt32(HwShadingRate1x2), hwShadingRate);
 
     // hwShadingRate = hwShadingRate == 4x1 ? 2x1 : hwShadingRate
-    Value *isRate4x1 = m_builder->CreateICmpEQ(hwShadingRate, m_builder->getInt32(ShadingRateHorizontal4Pixels));
-    hwShadingRate = m_builder->CreateSelect(isRate4x1, m_builder->getInt32(HwShadingRate2x1), hwShadingRate);
+    Value *isRate4x1 = m_builder.CreateICmpEQ(hwShadingRate, m_builder.getInt32(ShadingRateHorizontal4Pixels));
+    hwShadingRate = m_builder.CreateSelect(isRate4x1, m_builder.getInt32(HwShadingRate2x1), hwShadingRate);
 
     return hwShadingRate;
   }
@@ -2914,20 +2908,20 @@ Value *MeshTaskShader::convertToHwShadingRate(Value *primitiveShadingRate) {
   //   VRS rate Y: MaskNone -> 0b00, Vertical2Pixels | Vertical4Pixels -> 0b01
   //
   // hwXRate = (primitiveShadingRate & (Horizontal2Pixels | Horizontal4Pixels)) ? 0x1 : 0x0
-  Value *xRate2Pixels = m_builder->CreateAnd(
-      primitiveShadingRate, m_builder->getInt32(ShadingRateHorizontal2Pixels | ShadingRateHorizontal4Pixels));
-  xRate2Pixels = m_builder->CreateICmpNE(xRate2Pixels, m_builder->getInt32(0));
-  Value *hwXRate = m_builder->CreateSelect(xRate2Pixels, m_builder->getInt32(1), m_builder->getInt32(0));
+  Value *xRate2Pixels = m_builder.CreateAnd(
+      primitiveShadingRate, m_builder.getInt32(ShadingRateHorizontal2Pixels | ShadingRateHorizontal4Pixels));
+  xRate2Pixels = m_builder.CreateICmpNE(xRate2Pixels, m_builder.getInt32(0));
+  Value *hwXRate = m_builder.CreateSelect(xRate2Pixels, m_builder.getInt32(1), m_builder.getInt32(0));
 
   // hwYRate = (primitiveShadingRate & (Vertical2Pixels | Vertical4Pixels)) ? 0x1 : 0x0
-  Value *yRate2Pixels = m_builder->CreateAnd(
-      primitiveShadingRate, m_builder->getInt32(ShadingRateVertical2Pixels | ShadingRateVertical4Pixels));
-  yRate2Pixels = m_builder->CreateICmpNE(yRate2Pixels, m_builder->getInt32(0));
-  Value *hwYRate = m_builder->CreateSelect(yRate2Pixels, m_builder->getInt32(1), m_builder->getInt32(0));
+  Value *yRate2Pixels = m_builder.CreateAnd(
+      primitiveShadingRate, m_builder.getInt32(ShadingRateVertical2Pixels | ShadingRateVertical4Pixels));
+  yRate2Pixels = m_builder.CreateICmpNE(yRate2Pixels, m_builder.getInt32(0));
+  Value *hwYRate = m_builder.CreateSelect(yRate2Pixels, m_builder.getInt32(1), m_builder.getInt32(0));
 
   // hwShadingRate = (hwYRate << 2) | hwXRate
-  auto hwShadingRate = m_builder->CreateShl(hwYRate, 2);
-  hwShadingRate = m_builder->CreateOr(hwShadingRate, hwXRate);
+  auto hwShadingRate = m_builder.CreateShl(hwYRate, 2);
+  hwShadingRate = m_builder.CreateOr(hwShadingRate, hwXRate);
 
   return hwShadingRate;
 }
@@ -3051,35 +3045,35 @@ Value *MeshTaskShader::readValueFromLds(Type *readTy, Value *ldsOffset) {
   assert(m_lds);
   assert(readTy->isIntOrIntVectorTy() || readTy->isFPOrFPVectorTy());
 
-  Value *readPtr = m_builder->CreateGEP(m_lds->getValueType(), m_lds, {m_builder->getInt32(0), ldsOffset});
+  Value *readPtr = m_builder.CreateGEP(m_lds->getValueType(), m_lds, {m_builder.getInt32(0), ldsOffset});
 
   const unsigned bitWidth = readTy->getScalarSizeInBits();
   if (bitWidth == 8 || bitWidth == 16) {
     // For 8-bit and 16-bit data type, we read them as 32-bit types from LDS. They are not packed tightly in LDS.
     unsigned numElems = readTy->isVectorTy() ? cast<FixedVectorType>(readTy)->getNumElements() : 1;
 
-    Type *newReadTy = m_builder->getInt32Ty();
+    Type *newReadTy = m_builder.getInt32Ty();
     if (readTy->isVectorTy())
-      newReadTy = FixedVectorType::get(m_builder->getInt32Ty(), numElems);
+      newReadTy = FixedVectorType::get(m_builder.getInt32Ty(), numElems);
 
     readPtr =
-        m_builder->CreateBitCast(readPtr, PointerType::get(newReadTy, readPtr->getType()->getPointerAddressSpace()));
-    Value *readValue = m_builder->CreateAlignedLoad(newReadTy, readPtr, Align(4));
+        m_builder.CreateBitCast(readPtr, PointerType::get(newReadTy, readPtr->getType()->getPointerAddressSpace()));
+    Value *readValue = m_builder.CreateAlignedLoad(newReadTy, readPtr, Align(4));
 
-    Type *truncTy = m_builder->getIntNTy(bitWidth);
+    Type *truncTy = m_builder.getIntNTy(bitWidth);
     if (readTy->isVectorTy())
-      truncTy = FixedVectorType::get(m_builder->getIntNTy(bitWidth), numElems);
+      truncTy = FixedVectorType::get(m_builder.getIntNTy(bitWidth), numElems);
 
-    readValue = m_builder->CreateTrunc(readValue, truncTy);
+    readValue = m_builder.CreateTrunc(readValue, truncTy);
 
     if (readTy->isFPOrFPVectorTy())
-      readValue = m_builder->CreateBitCast(readValue, readTy);
+      readValue = m_builder.CreateBitCast(readValue, readTy);
 
     return readValue;
   }
 
-  readPtr = m_builder->CreateBitCast(readPtr, PointerType::get(readTy, readPtr->getType()->getPointerAddressSpace()));
-  return m_builder->CreateAlignedLoad(readTy, readPtr, Align(4));
+  readPtr = m_builder.CreateBitCast(readPtr, PointerType::get(readTy, readPtr->getType()->getPointerAddressSpace()));
+  return m_builder.CreateAlignedLoad(readTy, readPtr, Align(4));
 }
 
 // =====================================================================================================================
@@ -3093,7 +3087,7 @@ void MeshTaskShader::writeValueToLds(Value *writeValue, Value *ldsOffset) {
   auto writeTy = writeValue->getType();
   assert(writeTy->isIntOrIntVectorTy() || writeTy->isFPOrFPVectorTy());
 
-  Value *writePtr = m_builder->CreateGEP(m_lds->getValueType(), m_lds, {m_builder->getInt32(0), ldsOffset});
+  Value *writePtr = m_builder.CreateGEP(m_lds->getValueType(), m_lds, {m_builder.getInt32(0), ldsOffset});
 
   const unsigned bitWidth = writeTy->getScalarSizeInBits();
   if (bitWidth == 8 || bitWidth == 16) {
@@ -3101,28 +3095,28 @@ void MeshTaskShader::writeValueToLds(Value *writeValue, Value *ldsOffset) {
     unsigned numElems = writeTy->isVectorTy() ? cast<FixedVectorType>(writeTy)->getNumElements() : 1;
 
     if (writeTy->isFPOrFPVectorTy()) {
-      Type *castTy = m_builder->getIntNTy(bitWidth);
+      Type *castTy = m_builder.getIntNTy(bitWidth);
       if (writeTy->isVectorTy())
-        castTy = FixedVectorType::get(m_builder->getIntNTy(bitWidth), numElems);
+        castTy = FixedVectorType::get(m_builder.getIntNTy(bitWidth), numElems);
 
-      writeValue = m_builder->CreateBitCast(writeValue, castTy);
+      writeValue = m_builder.CreateBitCast(writeValue, castTy);
     }
 
-    Type *extTy = m_builder->getInt32Ty();
+    Type *extTy = m_builder.getInt32Ty();
     if (writeTy->isVectorTy())
-      extTy = FixedVectorType::get(m_builder->getInt32Ty(), numElems);
+      extTy = FixedVectorType::get(m_builder.getInt32Ty(), numElems);
 
-    writeValue = m_builder->CreateZExt(writeValue, extTy);
+    writeValue = m_builder.CreateZExt(writeValue, extTy);
 
-    writePtr = m_builder->CreateBitCast(
+    writePtr = m_builder.CreateBitCast(
         writePtr, PointerType::get(writeValue->getType(), writePtr->getType()->getPointerAddressSpace()));
-    m_builder->CreateAlignedStore(writeValue, writePtr, Align(4));
+    m_builder.CreateAlignedStore(writeValue, writePtr, Align(4));
     return;
   }
 
-  writePtr = m_builder->CreateBitCast(
+  writePtr = m_builder.CreateBitCast(
       writePtr, PointerType::get(writeValue->getType(), writePtr->getType()->getPointerAddressSpace()));
-  m_builder->CreateAlignedStore(writeValue, writePtr, Align(4));
+  m_builder.CreateAlignedStore(writeValue, writePtr, Align(4));
 }
 
 // =====================================================================================================================
@@ -3135,9 +3129,9 @@ void MeshTaskShader::atomicOpWithLds(AtomicRMWInst::BinOp atomicOp, Value *atomi
   assert(atomicValue->getType()->isIntegerTy(32));
 
   // NOTE: Here, we just use LDS atomics to do ALU operations on LDS. No synchronization between threads is needed.
-  Value *atomicPtr = m_builder->CreateGEP(m_lds->getValueType(), m_lds, {m_builder->getInt32(0), ldsOffset});
-  m_builder->CreateAtomicRMW(atomicOp, atomicPtr, atomicValue, MaybeAlign(), AtomicOrdering::Monotonic,
-                             SyncScope::SingleThread);
+  Value *atomicPtr = m_builder.CreateGEP(m_lds->getValueType(), m_lds, {m_builder.getInt32(0), ldsOffset});
+  m_builder.CreateAtomicRMW(atomicOp, atomicPtr, atomicValue, MaybeAlign(), AtomicOrdering::Monotonic,
+                            SyncScope::SingleThread);
 }
 
 } // namespace lgc
