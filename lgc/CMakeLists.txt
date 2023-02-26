@@ -243,6 +243,8 @@ target_sources(LLVMlgc PRIVATE
     util/GfxRegHandlerBase.cpp
     util/GfxRegHandler.cpp
     util/Internal.cpp
+    util/MbStandardInstrumentations.cpp
+    util/ModuleBunch.cpp
     util/PassManager.cpp
     util/StartStopTimer.cpp
     util/TypeLowering.cpp
