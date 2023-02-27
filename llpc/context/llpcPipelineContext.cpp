@@ -196,7 +196,7 @@ const char *PipelineContext::getGpuNameAbbreviation(GfxIpVersion gfxIp) {
 // Gets the hash code of input shader with specified shader stage.
 //
 // @param stage : Shader stage
-ShaderHash PipelineContext::getShaderHashCode(ShaderStage stage) const {
+ShaderHash PipelineContext::getShaderHashCode(unsigned stage) const {
   auto shaderInfo = getPipelineShaderInfo(stage);
   assert(shaderInfo);
 
@@ -234,7 +234,9 @@ const char *PipelineContext::getRayTracingFunctionName(unsigned funcType) {
 // @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
 // @param unlinked : Do not provide some state to LGC, so offsets are generated as relocs, and a fetch shader
 //                   is needed
-void PipelineContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *hasher, bool unlinked) const {
+// @param shaderNdx : Used instead of shaderStage, set to nullptr if override not needed.
+void PipelineContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *hasher, bool unlinked,
+                                       const unsigned *shaderNdx) const {
   // Give the shader stage mask to the middle-end. We need to translate the Vkgc::ShaderStage bit numbers
   // to lgc::ShaderStage bit numbers. We only process native shader stages, ignoring the CopyShader stage.
   unsigned stageMask = getShaderStageMask();
@@ -255,7 +257,7 @@ void PipelineContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
   }
 
   // Give the pipeline options to the middle-end, and/or hash them.
-  setOptionsInPipeline(pipeline, hasher);
+  setOptionsInPipeline(pipeline, hasher, shaderNdx);
 
   if (isGraphics()) {
     if ((stageMask & ~shaderStageToMask(ShaderStageFragment)) && (!unlinked || DisableFetchShader)) {
@@ -290,7 +292,8 @@ void PipelineContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
 //
 // @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing
 // @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
-void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64 *hasher) const {
+void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64 *hasher,
+                                           const unsigned *shaderNdx) const {
   Options options = {};
   options.hash[0] = getPipelineHashCode();
   options.hash[1] = get64BitCacheHashCode();
@@ -417,12 +420,14 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
   for (ShaderStage stage : make_filter_range(allStages, isNativeStage)) {
     ShaderOptions shaderOptions = {};
 
-    ShaderHash hash = getShaderHashCode(stage);
+    const unsigned shaderStageNdx = (shaderNdx == nullptr) ? stage : *shaderNdx;
+
+    ShaderHash hash = getShaderHashCode(shaderStageNdx);
     // 128-bit hash
     shaderOptions.hash[0] = hash.lower;
     shaderOptions.hash[1] = hash.upper;
 
-    const PipelineShaderInfo *shaderInfo = getPipelineShaderInfo(stage);
+    const PipelineShaderInfo *shaderInfo = getPipelineShaderInfo(shaderStageNdx);
     shaderOptions.trapPresent = shaderInfo->options.trapPresent;
     shaderOptions.debugMode = shaderInfo->options.debugMode;
     shaderOptions.allowReZ = shaderInfo->options.allowReZ;

@@ -62,7 +62,7 @@ ComputeContext::ComputeContext(GfxIpVersion gfxIp, const ComputePipelineBuildInf
 // Gets pipeline shader info of the specified shader stage
 //
 // @param shaderStage : Shader stage
-const PipelineShaderInfo *ComputeContext::getPipelineShaderInfo(ShaderStage shaderStage) const {
+const PipelineShaderInfo *ComputeContext::getPipelineShaderInfo(unsigned shaderStage) const {
   assert(shaderStage == ShaderStageCompute);
   return &m_pipelineInfo->cs;
 }

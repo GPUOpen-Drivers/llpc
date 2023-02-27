@@ -47,7 +47,7 @@ public:
   virtual bool isGraphics() const override { return true; }
 
   // Gets pipeline shader info of the specified shader stage
-  virtual const PipelineShaderInfo *getPipelineShaderInfo(ShaderStage shaderStage) const override;
+  virtual const PipelineShaderInfo *getPipelineShaderInfo(unsigned shaderStage) const override;
 
   // Gets pipeline build info
   virtual const void *getPipelineBuildInfo() const override { return m_pipelineInfo; }

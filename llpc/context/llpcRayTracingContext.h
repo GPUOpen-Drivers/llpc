@@ -49,7 +49,7 @@ public:
                     MetroHash::Hash *cacheHash, unsigned indirectStageMask);
   virtual ~RayTracingContext() {}
 
-  virtual const PipelineShaderInfo *getPipelineShaderInfo(ShaderStage shaderStage) const override;
+  virtual const PipelineShaderInfo *getPipelineShaderInfo(unsigned shaderStage) const override;
 
   // Gets pipeline build info
   virtual const void *getPipelineBuildInfo() const override { return m_pipelineInfo; }

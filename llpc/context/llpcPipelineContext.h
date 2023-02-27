@@ -111,7 +111,7 @@ public:
   virtual bool isGraphics() const { return false; }
 
   // Gets pipeline shader info of the specified shader stage
-  virtual const PipelineShaderInfo *getPipelineShaderInfo(ShaderStage shaderStage) const = 0;
+  virtual const PipelineShaderInfo *getPipelineShaderInfo(unsigned shaderStage) const = 0;
 
   // Gets pipeline build info
   virtual const void *getPipelineBuildInfo() const = 0;
@@ -195,10 +195,11 @@ public:
   // Sets the cache hash for the pipeline.  This is the hash that is used to do cache lookups.
   void setHashForCacheLookUp(MetroHash::Hash hash) { m_cacheHash = hash; }
 
-  ShaderHash getShaderHashCode(ShaderStage stage) const;
+  ShaderHash getShaderHashCode(unsigned stage) const;
 
   // Set pipeline state in lgc::Pipeline object for middle-end, and (optionally) hash the state.
-  void setPipelineState(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, bool unlinked) const;
+  void setPipelineState(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, bool unlinked,
+                        const unsigned *shaderNdx) const;
 
   // Get ShaderFpMode struct for the given shader stage
   ShaderFpMode &getShaderFpMode(ShaderStage stage) { return m_shaderFpModes[stage]; }
@@ -247,7 +248,7 @@ private:
   typedef std::map<std::pair<unsigned, unsigned>, const StaticDescriptorValue *> ImmutableNodesMap;
 
   // Give the pipeline options to the middle-end, and/or hash them.
-  void setOptionsInPipeline(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher) const;
+  void setOptionsInPipeline(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, const unsigned *shaderNdx) const;
 
   // Give the user data nodes and descriptor range values to the middle-end, and/or hash them.
   void setUserDataInPipeline(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, unsigned stageMask) const;

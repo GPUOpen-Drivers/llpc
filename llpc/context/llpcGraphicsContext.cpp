@@ -93,7 +93,7 @@ GraphicsContext::~GraphicsContext() {
 // Gets pipeline shader info of the specified shader stage
 //
 // @param shaderStage : Shader stage
-const PipelineShaderInfo *GraphicsContext::getPipelineShaderInfo(ShaderStage shaderStage) const {
+const PipelineShaderInfo *GraphicsContext::getPipelineShaderInfo(unsigned shaderStage) const {
   if (shaderStage == ShaderStageCopyShader) {
     // Treat copy shader as part of geometry shader
     shaderStage = ShaderStageGeometry;

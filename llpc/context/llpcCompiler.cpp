@@ -1071,7 +1071,8 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
   LgcContext *builderContext = context->getLgcContext();
   std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
   context->getPipelineContext()->setPipelineState(&*pipeline, /*hasher=*/nullptr,
-                                                  pipelineLink == PipelineLink::Unlinked);
+                                                  pipelineLink == PipelineLink::Unlinked,
+                                                  /*shaderNdx=*/nullptr);
   context->setBuilder(builderContext->createBuilder(&*pipeline));
 
   std::unique_ptr<Module> pipelineModule;
@@ -1516,7 +1517,8 @@ Result Compiler::buildGraphicsPipelineWithPartPipelines(Context *context,
 
   // Give selected pipeline state to the linker's pipeline object, required to complete the ELF link.
   // We pass unlinked=true as we do not need to pass user data layout into the ELF link.
-  context->getPipelineContext()->setPipelineState(&*elfLinkerPipeline, /*hasher=*/nullptr, /*unlinked=*/true);
+  context->getPipelineContext()->setPipelineState(&*elfLinkerPipeline, /*hasher=*/nullptr, /*unlinked=*/true,
+                                                  /*shaderNdx=*/nullptr);
 
   bool textualOutput = false;
   // For each of the two part pipelines (fragment first, then pre-rasterization)...
@@ -1545,7 +1547,8 @@ Result Compiler::buildGraphicsPipelineWithPartPipelines(Context *context,
     }
     // Add applicable pipeline state to the hash. (This uses getShaderStageMask() to decide which parts of the
     // state are applicable.)
-    context->getPipelineContext()->setPipelineState(/*pipeline=*/nullptr, /*hasher=*/&hasher, /*unlinked=*/false);
+    context->getPipelineContext()->setPipelineState(/*pipeline=*/nullptr, /*hasher=*/&hasher, /*unlinked=*/false,
+                                                    /*shaderNdx=*/nullptr);
 
     // If we are doing the pre-rasterization part pipeline, the linker's pipeline object contains the FS input mapping
     // state. We need to include that state in the hash.
@@ -2234,7 +2237,7 @@ void helperThreadBuildRayTracingPipelineElf(IHelperThreadProvider *helperThreadP
 
   LgcContext *builderContext = context->getLgcContext();
   std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
-  helperThreadPayload->rayTracingContext->setPipelineState(&*pipeline, /*hasher=*/nullptr, false);
+  helperThreadPayload->rayTracingContext->setPipelineState(&*pipeline, /*hasher=*/nullptr, false, /*shaderNdx=*/nullptr);
   context->setBuilder(builderContext->createBuilder(&*pipeline));
 
   TimerProfiler timerProfiler(context->getPipelineHashCode(), "LLPC", TimerProfiler::PipelineTimerEnableMask);
@@ -2324,7 +2327,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
   // Step 1: Set up middle-end objects.
   LgcContext *builderContext = mainContext->getLgcContext();
   std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
-  rtContext.setPipelineState(&*pipeline, /*hasher=*/nullptr, unlinked);
+  rtContext.setPipelineState(&*pipeline, /*hasher=*/nullptr, unlinked, /*shaderNdx=*/nullptr);
 
   std::vector<Module *> modules(shaderInfo.size());
   mainContext->setBuilder(builderContext->createBuilder(&*pipeline));
@@ -2923,7 +2926,8 @@ bool Compiler::linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipe
   // Set up middle-end objects, including setting up pipeline state.
   LgcContext *builderContext = context->getLgcContext();
   std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
-  context->getPipelineContext()->setPipelineState(&*pipeline, /*hasher=*/nullptr, /*unlinked=*/false);
+  context->getPipelineContext()->setPipelineState(&*pipeline, /*hasher=*/nullptr, /*unlinked=*/false,
+                                                  /*shaderNdx=*/nullptr);
 
   // Create linker, passing ELFs to it.
   SmallVector<MemoryBufferRef, 3> elfs;
