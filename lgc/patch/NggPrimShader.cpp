@@ -971,6 +971,14 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
     // Distribute primitive ID if needed
     distributePrimitiveId(primitiveId);
 
+    // Apply workaround to fix HW VMID reset bug (add an additional s_barrier before sending GS_ALLOC_REQ message)
+    if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx10.waNggPassthroughMessageHazard) {
+      // If we distribute primitive ID, there must be at least a s_barrier inserted. Thus, following codes are not
+      // needed.
+      if (!m_distributedPrimitiveId)
+        m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+    }
+
     auto firstWaveInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.waveIdInSubgroup, m_builder.getInt32(0));
     m_builder.CreateCondBr(firstWaveInSubgroup, sendGsAllocReqBlock, endSendGsAllocReqBlock);
   }
