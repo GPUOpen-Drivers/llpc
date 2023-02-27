@@ -93,8 +93,8 @@ public:
 #if VKI_RAY_TRACING
   bool isRayTracing() const { return m_pipelineContext->isRayTracing(); }
 #endif
-  const PipelineShaderInfo *getPipelineShaderInfo(ShaderStage shaderStage) const {
-    return m_pipelineContext->getPipelineShaderInfo(shaderStage);
+  const PipelineShaderInfo *getPipelineShaderInfo(ShaderStage shaderId) const {
+    return m_pipelineContext->getPipelineShaderInfo(shaderId);
   }
 
   const ResourceMappingData *getResourceMapping() const { return m_pipelineContext->getResourceMapping(); }
@@ -115,8 +115,8 @@ public:
 
   uint64_t get64BitCacheHashCode() const { return m_pipelineContext->get64BitCacheHashCode(); }
 
-  ShaderHash getShaderHashCode(ShaderStage shaderStage) const {
-    return m_pipelineContext->getShaderHashCode(shaderStage);
+  ShaderHash getShaderHashCode(const PipelineShaderInfo &shaderInfo) const {
+    return m_pipelineContext->getShaderHashCode(shaderInfo);
   }
 
   // Sets triple and data layout in specified module from the context's target machine.

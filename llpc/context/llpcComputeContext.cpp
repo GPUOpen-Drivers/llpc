@@ -62,8 +62,8 @@ ComputeContext::ComputeContext(GfxIpVersion gfxIp, const ComputePipelineBuildInf
 // Gets pipeline shader info of the specified shader stage
 //
 // @param shaderStage : Shader stage
-const PipelineShaderInfo *ComputeContext::getPipelineShaderInfo(ShaderStage shaderStage) const {
-  assert(shaderStage == ShaderStageCompute);
+const PipelineShaderInfo *ComputeContext::getPipelineShaderInfo(unsigned shaderId) const {
+  assert(shaderId == ShaderStageCompute);
   return &m_pipelineInfo->cs;
 }
 
@@ -74,6 +74,34 @@ const PipelineShaderInfo *ComputeContext::getPipelineShaderInfo(ShaderStage shad
 unsigned ComputeContext::getSubgroupSizeUsage() const {
   const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(m_pipelineInfo->cs.pModuleData);
   return moduleData->usage.useSubgroupSize ? ShaderStageComputeBit : 0;
+}
+
+// =====================================================================================================================
+// Set pipeline state in Pipeline object for middle-end and/or calculate the hash for the state to be added.
+// Doing both these things in the same code ensures that we hash and use the same pipeline state in all situations.
+// For graphics, we use the shader stage mask to decide which parts of graphics state to use, omitting
+// pre-rasterization state if there are no pre-rasterization shaders, and omitting fragment state if there is
+// no FS.
+//
+// @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing pipeline state
+// @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
+// @param unlinked : Do not provide some state to LGC, so offsets are generated as relocs, and a fetch shader
+//                   is needed
+void ComputeContext::setPipelineState(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, bool unlinked) const {
+  PipelineContext::setPipelineState(pipeline, hasher, unlinked);
+  const unsigned stageMask = getShaderStageMask();
+
+  if (pipeline) {
+    // Give the shader options (including the hash) to the middle-end.
+    const auto allStages = maskToShaderStages(stageMask);
+    for (ShaderStage stage : make_filter_range(allStages, isNativeStage)) {
+      const PipelineShaderInfo *shaderInfo = getPipelineShaderInfo(stage);
+
+      assert(shaderInfo);
+
+      pipeline->setShaderOptions(getLgcShaderStage(static_cast<ShaderStage>(stage)), computeShaderOptions(*shaderInfo));
+    }
+  }
 }
 
 // =====================================================================================================================

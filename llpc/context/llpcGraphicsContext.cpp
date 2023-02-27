@@ -38,8 +38,16 @@
 
 using namespace llvm;
 using namespace SPIRV;
+using namespace lgc;
 
 namespace Llpc {
+
+// -disable-fetch-shader: disable the fetch shader when doing unlinked shaders.
+static cl::opt<bool> DisableFetchShader("disable-fetch-shader", cl::desc("Disable fetch shaders"), cl::init(false));
+
+// -disable-color-export-shader: disable the color export shader when doing unlinked shaders.
+static cl::opt<bool> DisableColorExportShader("disable-color-export-shader", cl::desc("Disable color export shaders"),
+                                              cl::init(false));
 
 // =====================================================================================================================
 //
@@ -93,16 +101,16 @@ GraphicsContext::~GraphicsContext() {
 // Gets pipeline shader info of the specified shader stage
 //
 // @param shaderStage : Shader stage
-const PipelineShaderInfo *GraphicsContext::getPipelineShaderInfo(ShaderStage shaderStage) const {
-  if (shaderStage == ShaderStageCopyShader) {
+const PipelineShaderInfo *GraphicsContext::getPipelineShaderInfo(unsigned shaderId) const {
+  if (shaderId == ShaderStageCopyShader) {
     // Treat copy shader as part of geometry shader
-    shaderStage = ShaderStageGeometry;
+    shaderId = ShaderStageGeometry;
   }
 
-  assert(shaderStage < ShaderStageGfxCount);
+  assert(shaderId < ShaderStageGfxCount);
 
   const PipelineShaderInfo *shaderInfo = nullptr;
-  switch (shaderStage) {
+  switch (shaderId) {
   case Llpc::ShaderStageTask:
     shaderInfo = &m_pipelineInfo->task;
     break;
@@ -158,6 +166,105 @@ unsigned GraphicsContext::getSubgroupSizeUsage() const {
       bitmask |= (1 << shaderInfoIdx);
   }
   return bitmask;
+}
+
+// =====================================================================================================================
+// Set pipeline state in Pipeline object for middle-end and/or calculate the hash for the state to be added.
+// Doing both these things in the same code ensures that we hash and use the same pipeline state in all situations.
+// For graphics, we use the shader stage mask to decide which parts of graphics state to use, omitting
+// pre-rasterization state if there are no pre-rasterization shaders, and omitting fragment state if there is
+// no FS.
+//
+// @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing pipeline state
+// @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
+// @param unlinked : Do not provide some state to LGC, so offsets are generated as relocs, and a fetch shader
+//                   is needed
+void GraphicsContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *hasher, bool unlinked) const {
+  PipelineContext::setPipelineState(pipeline, hasher, unlinked);
+  const unsigned stageMask = getShaderStageMask();
+
+  if (pipeline) {
+    // Give the shader options (including the hash) to the middle-end.
+    const auto allStages = maskToShaderStages(stageMask);
+    for (ShaderStage stage : make_filter_range(allStages, isNativeStage)) {
+      const PipelineShaderInfo *shaderInfo = getPipelineShaderInfo(stage);
+
+      assert(shaderInfo);
+
+      pipeline->setShaderOptions(getLgcShaderStage(static_cast<ShaderStage>(stage)), computeShaderOptions(*shaderInfo));
+    }
+  }
+
+  if ((stageMask & ~shaderStageToMask(ShaderStageFragment)) && (!unlinked || DisableFetchShader)) {
+    // Set vertex input descriptions to the middle-end.
+    setVertexInputDescriptions(pipeline, hasher);
+  }
+
+  if (isShaderStageInMask(ShaderStageFragment, stageMask) && (!unlinked || DisableColorExportShader)) {
+    // Give the color export state to the middle-end.
+    setColorExportState(pipeline, hasher);
+  }
+
+  // Give the graphics pipeline state to the middle-end.
+  setGraphicsStateInPipeline(pipeline, hasher, stageMask);
+}
+
+// =====================================================================================================================
+// Give the pipeline options to the middle-end, and/or hash them.
+Options GraphicsContext::computePipelineOptions() const {
+  Options options = PipelineContext::computePipelineOptions();
+
+  options.enableUberFetchShader =
+      reinterpret_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->enableUberFetchShader;
+  if (getGfxIpVersion().major >= 10) {
+    // Only set NGG options for a GFX10+ graphics pipeline.
+    auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo());
+    const auto &nggState = pipelineInfo->nggState;
+#if VKI_BUILD_GFX11
+    if (!nggState.enableNgg && getGfxIpVersion().major < 11) // GFX11+ must enable NGG
+#else
+    if (!nggState.enableNgg)
+#endif
+      options.nggFlags |= NggFlagDisable;
+    else {
+      options.nggFlags = (nggState.enableGsUse ? NggFlagEnableGsUse : 0) |
+                         (nggState.forceCullingMode ? NggFlagForceCullingMode : 0) |
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 60
+                         (nggState.compactMode == NggCompactVertices ? NggFlagCompactVertex : 0) |
+#else
+                         (nggState.compactVertex ? NggFlagCompactVertex : 0) |
+#endif
+                         (nggState.enableBackfaceCulling ? NggFlagEnableBackfaceCulling : 0) |
+                         (nggState.enableFrustumCulling ? NggFlagEnableFrustumCulling : 0) |
+                         (nggState.enableBoxFilterCulling ? NggFlagEnableBoxFilterCulling : 0) |
+                         (nggState.enableSphereCulling ? NggFlagEnableSphereCulling : 0) |
+                         (nggState.enableSmallPrimFilter ? NggFlagEnableSmallPrimFilter : 0) |
+                         (nggState.enableCullDistanceCulling ? NggFlagEnableCullDistanceCulling : 0);
+      options.nggBackfaceExponent = nggState.backfaceExponent;
+
+      // Use a static cast from Vkgc NggSubgroupSizingType to LGC NggSubgroupSizing, and static assert that
+      // that is valid.
+      static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::Auto) == NggSubgroupSizing::Auto, "Mismatch");
+      static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::MaximumSize) ==
+                        NggSubgroupSizing::MaximumSize,
+                    "Mismatch");
+      static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::HalfSize) == NggSubgroupSizing::HalfSize,
+                    "Mismatch");
+      static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::OptimizeForVerts) ==
+                        NggSubgroupSizing::OptimizeForVerts,
+                    "Mismatch");
+      static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::OptimizeForPrims) ==
+                        NggSubgroupSizing::OptimizeForPrims,
+                    "Mismatch");
+      static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::Explicit) == NggSubgroupSizing::Explicit,
+                    "Mismatch");
+      options.nggSubgroupSizing = static_cast<NggSubgroupSizing>(nggState.subgroupSizing);
+
+      options.nggVertsPerSubgroup = nggState.vertsPerSubgroup;
+      options.nggPrimsPerSubgroup = nggState.primsPerSubgroup;
+    }
+  }
+  return options;
 }
 
 // =====================================================================================================================

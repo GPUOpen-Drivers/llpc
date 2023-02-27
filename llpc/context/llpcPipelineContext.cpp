@@ -93,13 +93,6 @@ static cl::opt<bool> EnableSiScheduler("enable-si-scheduler", cl::desc("Enable t
 // for -disable-licm-threshold=1 which remains for backwards compatibility)
 static cl::opt<bool> DisableLicm("disable-licm", cl::desc("Disable LLVM LICM pass"), cl::init(false));
 
-// -disable-fetch-shader: disable the fetch shader when doing unlinked shaders.
-static cl::opt<bool> DisableFetchShader("disable-fetch-shader", cl::desc("Disable fetch shaders"), cl::init(false));
-
-// -disable-color-export-shader: disable the color export shader when doing unlinked shaders.
-static cl::opt<bool> DisableColorExportShader("disable-color-export-shader", cl::desc("Disable color export shaders"),
-                                              cl::init(false));
-
 // -subgroup-size: subgroup size exposed via Vulkan API.
 static cl::opt<int> SubgroupSize("subgroup-size", cl::desc("Subgroup size exposed via Vulkan API"), cl::init(64));
 
@@ -196,14 +189,12 @@ const char *PipelineContext::getGpuNameAbbreviation(GfxIpVersion gfxIp) {
 // Gets the hash code of input shader with specified shader stage.
 //
 // @param stage : Shader stage
-ShaderHash PipelineContext::getShaderHashCode(ShaderStage stage) const {
-  auto shaderInfo = getPipelineShaderInfo(stage);
-  assert(shaderInfo);
+ShaderHash PipelineContext::getShaderHashCode(const PipelineShaderInfo &shaderInfo) const {
 
-  if (shaderInfo->options.clientHash.upper != 0 && shaderInfo->options.clientHash.lower != 0)
-    return shaderInfo->options.clientHash;
+  if (shaderInfo.options.clientHash.upper != 0 && shaderInfo.options.clientHash.lower != 0)
+    return shaderInfo.options.clientHash;
   ShaderHash hash = {};
-  const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
+  const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo.pModuleData);
 
   if (moduleData) {
     hash.lower = MetroHash::compact64(reinterpret_cast<const MetroHash::Hash *>(&moduleData->hash));
@@ -235,13 +226,6 @@ const char *PipelineContext::getRayTracingFunctionName(unsigned funcType) {
 // @param unlinked : Do not provide some state to LGC, so offsets are generated as relocs, and a fetch shader
 //                   is needed
 void PipelineContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *hasher, bool unlinked) const {
-  // Give the shader stage mask to the middle-end. We need to translate the Vkgc::ShaderStage bit numbers
-  // to lgc::ShaderStage bit numbers. We only process native shader stages, ignoring the CopyShader stage.
-  unsigned stageMask = getShaderStageMask();
-#if VKI_RAY_TRACING
-  if (hasRayTracingShaderStage(stageMask))
-    stageMask = ShaderStageComputeBit;
-#endif
   if (pipeline) {
     pipeline->set128BitCacheHash(get128BitCacheHashCode(),
                                  VersionTuple(LLPC_INTERFACE_MAJOR_VERSION, LLPC_INTERFACE_MINOR_VERSION));
@@ -250,38 +234,24 @@ void PipelineContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
       pipeline->setPreRasterHasGs(true);
   }
   if (!unlinked) {
+    // Give the shader stage mask to the middle-end. We need to translate the Vkgc::ShaderStage bit numbers
+    // to lgc::ShaderStage bit numbers. We only process native shader stages, ignoring the CopyShader stage.
+    unsigned stageMask = getShaderStageMask();
+#if VKI_RAY_TRACING
+    if (hasRayTracingShaderStage(stageMask))
+      stageMask = ShaderStageComputeBit;
+#endif
     // Give the user data nodes to the middle-end, and/or hash them.
     setUserDataInPipeline(pipeline, hasher, stageMask);
   }
 
   // Give the pipeline options to the middle-end, and/or hash them.
-  setOptionsInPipeline(pipeline, hasher);
+  Options options = computePipelineOptions();
 
-  if (isGraphics()) {
-    if ((stageMask & ~shaderStageToMask(ShaderStageFragment)) && (!unlinked || DisableFetchShader)) {
-      // Set vertex input descriptions to the middle-end.
-      setVertexInputDescriptions(pipeline, hasher);
-    }
-
-    if (isShaderStageInMask(ShaderStageFragment, stageMask) && (!unlinked || DisableColorExportShader)) {
-      // Give the color export state to the middle-end.
-      setColorExportState(pipeline, hasher);
-    }
-
-    // Give the graphics pipeline state to the middle-end.
-    setGraphicsStateInPipeline(pipeline, hasher, stageMask);
-  } else {
-#if VKI_RAY_TRACING
-    if (!hasRayTracingShaderStage(stageMask))
-#endif
-    {
-      unsigned deviceIndex = static_cast<const ComputePipelineBuildInfo *>(getPipelineBuildInfo())->deviceIndex;
-      if (pipeline)
-        pipeline->setDeviceIndex(deviceIndex);
-      if (hasher)
-        hasher->Update(deviceIndex);
-    }
-  }
+  if (pipeline)
+    pipeline->setOptions(options);
+  if (hasher)
+    hasher->Update(options);
 
   if (pipeline)
     pipeline->setClientMetadata(getClientMetadata());
@@ -293,7 +263,7 @@ void PipelineContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
 //
 // @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing
 // @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
-void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64 *hasher) const {
+Options PipelineContext::computePipelineOptions() const {
   Options options = {};
   options.hash[0] = getPipelineHashCode();
   options.hash[1] = get64BitCacheHashCode();
@@ -335,60 +305,6 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
       options.shadowDescriptorTable = ShadowDescTablePtrHigh;
   }
 
-  if (isGraphics()) {
-    options.enableUberFetchShader =
-        reinterpret_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->enableUberFetchShader;
-    if (getGfxIpVersion().major >= 10) {
-      // Only set NGG options for a GFX10+ graphics pipeline.
-      auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo());
-      const auto &nggState = pipelineInfo->nggState;
-#if VKI_BUILD_GFX11
-      if (!nggState.enableNgg && getGfxIpVersion().major < 11) // GFX11+ must enable NGG
-#else
-      if (!nggState.enableNgg)
-#endif
-        options.nggFlags |= NggFlagDisable;
-      else {
-        options.nggFlags = (nggState.enableGsUse ? NggFlagEnableGsUse : 0) |
-                           (nggState.forceCullingMode ? NggFlagForceCullingMode : 0) |
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 60
-                           (nggState.compactMode == NggCompactVertices ? NggFlagCompactVertex : 0) |
-#else
-                           (nggState.compactVertex ? NggFlagCompactVertex : 0) |
-#endif
-                           (nggState.enableBackfaceCulling ? NggFlagEnableBackfaceCulling : 0) |
-                           (nggState.enableFrustumCulling ? NggFlagEnableFrustumCulling : 0) |
-                           (nggState.enableBoxFilterCulling ? NggFlagEnableBoxFilterCulling : 0) |
-                           (nggState.enableSphereCulling ? NggFlagEnableSphereCulling : 0) |
-                           (nggState.enableSmallPrimFilter ? NggFlagEnableSmallPrimFilter : 0) |
-                           (nggState.enableCullDistanceCulling ? NggFlagEnableCullDistanceCulling : 0);
-        options.nggBackfaceExponent = nggState.backfaceExponent;
-
-        // Use a static cast from Vkgc NggSubgroupSizingType to LGC NggSubgroupSizing, and static assert that
-        // that is valid.
-        static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::Auto) == NggSubgroupSizing::Auto,
-                      "Mismatch");
-        static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::MaximumSize) ==
-                          NggSubgroupSizing::MaximumSize,
-                      "Mismatch");
-        static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::HalfSize) == NggSubgroupSizing::HalfSize,
-                      "Mismatch");
-        static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::OptimizeForVerts) ==
-                          NggSubgroupSizing::OptimizeForVerts,
-                      "Mismatch");
-        static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::OptimizeForPrims) ==
-                          NggSubgroupSizing::OptimizeForPrims,
-                      "Mismatch");
-        static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::Explicit) == NggSubgroupSizing::Explicit,
-                      "Mismatch");
-        options.nggSubgroupSizing = static_cast<NggSubgroupSizing>(nggState.subgroupSizing);
-
-        options.nggVertsPerSubgroup = nggState.vertsPerSubgroup;
-        options.nggPrimsPerSubgroup = nggState.primsPerSubgroup;
-      }
-    }
-  }
-
   options.allowNullDescriptor = getPipelineOptions()->extendedRobustness.nullDescriptor;
   options.disableImageResourceCheck = getPipelineOptions()->disableImageResourceCheck;
 #if VKI_BUILD_GFX11
@@ -401,173 +317,9 @@ void PipelineContext::setOptionsInPipeline(Pipeline *pipeline, Util::MetroHash64
   // Driver report full subgroup lanes for compute shader, here we just set fullSubgroups as default options
   options.fullSubgroups = true;
 #if VKI_RAY_TRACING
-  // NOTE: raytracing waveSize and subgroupSize can be different.
-  if (isRayTracing()) {
-    options.fullSubgroups = false;
-  }
+  options.internalRtShaders = getPipelineOptions()->internalRtShaders;
 #endif
-  if (pipeline)
-    pipeline->setOptions(options);
-  if (hasher)
-    hasher->Update(options);
-
-  if (!pipeline)
-    return; // Not hashing shader options.
-
-  // Give the shader options (including the hash) to the middle-end.
-  const unsigned stageMask = getShaderStageMask();
-  const auto allStages = maskToShaderStages(stageMask);
-  for (ShaderStage stage : make_filter_range(allStages, isNativeStage)) {
-    ShaderOptions shaderOptions = {};
-
-    ShaderHash hash = getShaderHashCode(stage);
-    // 128-bit hash
-    shaderOptions.hash[0] = hash.lower;
-    shaderOptions.hash[1] = hash.upper;
-
-    const PipelineShaderInfo *shaderInfo = getPipelineShaderInfo(stage);
-    shaderOptions.trapPresent = shaderInfo->options.trapPresent;
-    shaderOptions.debugMode = shaderInfo->options.debugMode;
-    shaderOptions.allowReZ = shaderInfo->options.allowReZ;
-    shaderOptions.forceLateZ = shaderInfo->options.forceLateZ;
-
-    shaderOptions.vgprLimit = shaderInfo->options.vgprLimit;
-
-    if (shaderOptions.vgprLimit == UINT_MAX)
-      shaderOptions.vgprLimit = 0;
-
-    if (VgprLimit != 0) {
-      if (VgprLimit < shaderOptions.vgprLimit || shaderOptions.vgprLimit == 0) {
-        shaderOptions.vgprLimit = VgprLimit;
-      }
-    }
-
-    if (ScalarizeWaterfallDescriptorLoads.getNumOccurrences() > 0) {
-      shaderOptions.scalarizeWaterfallLoads = ScalarizeWaterfallDescriptorLoads;
-    } else {
-      shaderOptions.scalarizeWaterfallLoads = shaderInfo->options.scalarizeWaterfallLoads;
-      // Enable waterfall load scalarization when vgpr limit is set.
-      if (shaderOptions.vgprLimit != 0 && shaderOptions.vgprLimit != UINT_MAX)
-        shaderOptions.scalarizeWaterfallLoads = true;
-    }
-
-    shaderOptions.sgprLimit = shaderInfo->options.sgprLimit;
-
-    if (shaderOptions.sgprLimit == UINT_MAX)
-      shaderOptions.sgprLimit = 0;
-
-    if (SgprLimit != 0) {
-      if (SgprLimit < shaderOptions.sgprLimit || shaderOptions.sgprLimit == 0) {
-        shaderOptions.sgprLimit = SgprLimit;
-      }
-    }
-
-    if (shaderInfo->options.maxThreadGroupsPerComputeUnit != 0)
-      shaderOptions.maxThreadGroupsPerComputeUnit = shaderInfo->options.maxThreadGroupsPerComputeUnit;
-    else
-      shaderOptions.maxThreadGroupsPerComputeUnit = WavesPerEu;
-
-    shaderOptions.waveSize = shaderInfo->options.waveSize;
-    shaderOptions.wgpMode = shaderInfo->options.wgpMode;
-
-    // If subgroupSize is specified, we should use the specified value.
-    if (shaderInfo->options.subgroupSize != 0)
-      shaderOptions.subgroupSize = shaderInfo->options.subgroupSize;
-    else if (!shaderInfo->options.allowVaryWaveSize) {
-      // allowVaryWaveSize is disabled, so use -subgroup-size (default 64) to override the wave
-      // size for a shader that uses gl_SubgroupSize.
-      shaderOptions.subgroupSize = SubgroupSize;
-    }
-#if VKI_RAY_TRACING
-    // NOTE: WaveSize of raytracing usually be 32
-    if (hasRayQuery() || isRayTracing()) {
-      shaderOptions.waveSize = getRayTracingWaveSize();
-    }
-#endif
-#if VKI_RAY_TRACING
-    options.internalRtShaders = getPipelineOptions()->internalRtShaders;
-#endif
-
-    // Use a static cast from Vkgc WaveBreakSize to LGC WaveBreak, and static assert that
-    // that is valid.
-    static_assert(static_cast<WaveBreak>(WaveBreakSize::None) == WaveBreak::None, "Mismatch");
-    static_assert(static_cast<WaveBreak>(WaveBreakSize::_8x8) == WaveBreak::_8x8, "Mismatch");
-    static_assert(static_cast<WaveBreak>(WaveBreakSize::_16x16) == WaveBreak::_16x16, "Mismatch");
-    static_assert(static_cast<WaveBreak>(WaveBreakSize::_32x32) == WaveBreak::_32x32, "Mismatch");
-    shaderOptions.waveBreakSize = static_cast<WaveBreak>(shaderInfo->options.waveBreakSize);
-
-    shaderOptions.loadScalarizerThreshold = 0;
-    if (EnableScalarLoad)
-      shaderOptions.loadScalarizerThreshold = ScalarThreshold;
-
-    if (shaderInfo->options.enableLoadScalarizer) {
-      if (shaderInfo->options.scalarThreshold != 0)
-        shaderOptions.loadScalarizerThreshold = shaderInfo->options.scalarThreshold;
-      else
-        shaderOptions.loadScalarizerThreshold = MaxScalarThreshold;
-    }
-
-    shaderOptions.useSiScheduler = EnableSiScheduler || shaderInfo->options.useSiScheduler;
-    shaderOptions.disableCodeSinking = shaderInfo->options.disableCodeSinking;
-    shaderOptions.favorLatencyHiding = shaderInfo->options.favorLatencyHiding;
-    shaderOptions.updateDescInElf = shaderInfo->options.updateDescInElf;
-    shaderOptions.unrollThreshold = shaderInfo->options.unrollThreshold;
-    // A non-zero command line -force-loop-unroll-count value overrides the shaderInfo option value.
-    shaderOptions.forceLoopUnrollCount =
-        ForceLoopUnrollCount ? ForceLoopUnrollCount : shaderInfo->options.forceLoopUnrollCount;
-
-    static_assert(static_cast<lgc::DenormalMode>(Vkgc::DenormalMode::Auto) == lgc::DenormalMode::Auto, "Mismatch");
-    static_assert(static_cast<lgc::DenormalMode>(Vkgc::DenormalMode::FlushToZero) == lgc::DenormalMode::FlushToZero,
-                  "Mismatch");
-    static_assert(static_cast<lgc::DenormalMode>(Vkgc::DenormalMode::Preserve) == lgc::DenormalMode::Preserve,
-                  "Mismatch");
-    shaderOptions.fp32DenormalMode = static_cast<lgc::DenormalMode>(shaderInfo->options.fp32DenormalMode);
-    shaderOptions.adjustDepthImportVrs = shaderInfo->options.adjustDepthImportVrs;
-    // disableLicmThreshold is set to the first of:
-    // - a non-zero value from the corresponding shaderInfo option
-    // - a value of 1 if DisableLicm or the disableLicm shaderInfo option is true
-    // - the value of DisableLicmThreshold
-    // Default is 0, which does not disable LICM
-    if (shaderInfo->options.disableLicmThreshold > 0)
-      shaderOptions.disableLicmThreshold = shaderInfo->options.disableLicmThreshold;
-    else if (DisableLicm || shaderInfo->options.disableLicm)
-      shaderOptions.disableLicmThreshold = 1;
-    else
-      shaderOptions.disableLicmThreshold = DisableLicmThreshold;
-    if (shaderInfo->options.unrollHintThreshold > 0)
-      shaderOptions.unrollHintThreshold = shaderInfo->options.unrollHintThreshold;
-    else
-      shaderOptions.unrollHintThreshold = UnrollHintThreshold;
-    if (shaderInfo->options.dontUnrollHintThreshold > 0)
-      shaderOptions.dontUnrollHintThreshold = shaderInfo->options.dontUnrollHintThreshold;
-    else
-      shaderOptions.dontUnrollHintThreshold = DontUnrollHintThreshold;
-    if (shaderInfo->options.ldsSpillLimitDwords > 0)
-      shaderOptions.ldsSpillLimitDwords = shaderInfo->options.ldsSpillLimitDwords;
-    else
-      shaderOptions.ldsSpillLimitDwords = LdsSpillLimitDwords;
-
-    shaderOptions.overrideShaderThreadGroupSizeX = shaderInfo->options.overrideShaderThreadGroupSizeX;
-    shaderOptions.overrideShaderThreadGroupSizeY = shaderInfo->options.overrideShaderThreadGroupSizeY;
-    shaderOptions.overrideShaderThreadGroupSizeZ = shaderInfo->options.overrideShaderThreadGroupSizeZ;
-
-    shaderOptions.nsaThreshold = shaderInfo->options.nsaThreshold;
-
-    static_assert(static_cast<InvariantLoadsOption>(InvariantLoads::Auto) == InvariantLoadsOption::Auto, "Mismatch");
-    static_assert(static_cast<InvariantLoadsOption>(InvariantLoads::EnableOptimization) ==
-                      InvariantLoadsOption::EnableOptimization,
-                  "Mismatch");
-    static_assert(static_cast<InvariantLoadsOption>(InvariantLoads::DisableOptimization) ==
-                      InvariantLoadsOption::DisableOptimization,
-                  "Mismatch");
-    static_assert(static_cast<InvariantLoadsOption>(InvariantLoads::ClearInvariants) ==
-                      InvariantLoadsOption::ClearInvariants,
-                  "Mismatch");
-    shaderOptions.aggressiveInvariantLoads =
-        static_cast<InvariantLoadsOption>(shaderInfo->options.aggressiveInvariantLoads);
-
-    pipeline->setShaderOptions(getLgcShaderStage(static_cast<ShaderStage>(stage)), shaderOptions);
-  }
+  return options;
 }
 
 // =====================================================================================================================
@@ -985,6 +737,156 @@ void PipelineContext::setVertexInputDescriptions(Pipeline *pipeline, Util::Metro
 
   // Give the vertex input descriptions to the middle-end Pipeline object.
   pipeline->setVertexInputDescriptions(descriptions);
+}
+
+// =====================================================================================================================
+// Gets ShaderOptions of the specified shader stage.
+// @param shaderInfo : Shader stage
+ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &shaderInfo) const {
+  ShaderOptions shaderOptions = {};
+  ShaderHash hash = getShaderHashCode(shaderInfo);
+  // 128-bit hash
+  shaderOptions.hash[0] = hash.lower;
+  shaderOptions.hash[1] = hash.upper;
+
+  shaderOptions.trapPresent = shaderInfo.options.trapPresent;
+  shaderOptions.debugMode = shaderInfo.options.debugMode;
+  shaderOptions.allowReZ = shaderInfo.options.allowReZ;
+  shaderOptions.forceLateZ = shaderInfo.options.forceLateZ;
+
+  shaderOptions.vgprLimit = shaderInfo.options.vgprLimit;
+
+  if (shaderOptions.vgprLimit == UINT_MAX)
+    shaderOptions.vgprLimit = 0;
+
+  if (VgprLimit != 0) {
+    if (VgprLimit < shaderOptions.vgprLimit || shaderOptions.vgprLimit == 0) {
+      shaderOptions.vgprLimit = VgprLimit;
+    }
+  }
+
+  if (ScalarizeWaterfallDescriptorLoads.getNumOccurrences() > 0) {
+    shaderOptions.scalarizeWaterfallLoads = ScalarizeWaterfallDescriptorLoads;
+  } else {
+    shaderOptions.scalarizeWaterfallLoads = shaderInfo.options.scalarizeWaterfallLoads;
+    // Enable waterfall load scalarization when vgpr limit is set.
+    if (shaderOptions.vgprLimit != 0 && shaderOptions.vgprLimit != UINT_MAX)
+      shaderOptions.scalarizeWaterfallLoads = true;
+  }
+
+  shaderOptions.sgprLimit = shaderInfo.options.sgprLimit;
+
+  if (shaderOptions.sgprLimit == UINT_MAX)
+    shaderOptions.sgprLimit = 0;
+
+  if (SgprLimit != 0) {
+    if (SgprLimit < shaderOptions.sgprLimit || shaderOptions.sgprLimit == 0) {
+      shaderOptions.sgprLimit = SgprLimit;
+    }
+  }
+
+  if (shaderInfo.options.maxThreadGroupsPerComputeUnit != 0)
+    shaderOptions.maxThreadGroupsPerComputeUnit = shaderInfo.options.maxThreadGroupsPerComputeUnit;
+  else
+    shaderOptions.maxThreadGroupsPerComputeUnit = WavesPerEu;
+
+  shaderOptions.waveSize = shaderInfo.options.waveSize;
+  shaderOptions.wgpMode = shaderInfo.options.wgpMode;
+
+  // If subgroupSize is specified, we should use the specified value.
+  if (shaderInfo.options.subgroupSize != 0)
+    shaderOptions.subgroupSize = shaderInfo.options.subgroupSize;
+  else if (!shaderInfo.options.allowVaryWaveSize) {
+    // allowVaryWaveSize is disabled, so use -subgroup-size (default 64) to override the wave
+    // size for a shader that uses gl_SubgroupSize.
+    shaderOptions.subgroupSize = SubgroupSize;
+  }
+#if VKI_RAY_TRACING
+  // NOTE: WaveSize of raytracing usually be 32
+  if (hasRayQuery() || isRayTracing()) {
+    shaderOptions.waveSize = getRayTracingWaveSize();
+  }
+#endif
+
+  // Use a static cast from Vkgc WaveBreakSize to LGC WaveBreak, and static assert that
+  // that is valid.
+  static_assert(static_cast<WaveBreak>(WaveBreakSize::None) == WaveBreak::None, "Mismatch");
+  static_assert(static_cast<WaveBreak>(WaveBreakSize::_8x8) == WaveBreak::_8x8, "Mismatch");
+  static_assert(static_cast<WaveBreak>(WaveBreakSize::_16x16) == WaveBreak::_16x16, "Mismatch");
+  static_assert(static_cast<WaveBreak>(WaveBreakSize::_32x32) == WaveBreak::_32x32, "Mismatch");
+  shaderOptions.waveBreakSize = static_cast<WaveBreak>(shaderInfo.options.waveBreakSize);
+
+  shaderOptions.loadScalarizerThreshold = 0;
+  if (EnableScalarLoad)
+    shaderOptions.loadScalarizerThreshold = ScalarThreshold;
+
+  if (shaderInfo.options.enableLoadScalarizer) {
+    if (shaderInfo.options.scalarThreshold != 0)
+      shaderOptions.loadScalarizerThreshold = shaderInfo.options.scalarThreshold;
+    else
+      shaderOptions.loadScalarizerThreshold = MaxScalarThreshold;
+  }
+
+  shaderOptions.useSiScheduler = EnableSiScheduler || shaderInfo.options.useSiScheduler;
+  shaderOptions.disableCodeSinking = shaderInfo.options.disableCodeSinking;
+  shaderOptions.favorLatencyHiding = shaderInfo.options.favorLatencyHiding;
+  shaderOptions.updateDescInElf = shaderInfo.options.updateDescInElf;
+  shaderOptions.unrollThreshold = shaderInfo.options.unrollThreshold;
+  // A non-zero command line -force-loop-unroll-count value overrides the shaderInfo option value.
+  shaderOptions.forceLoopUnrollCount =
+      ForceLoopUnrollCount ? ForceLoopUnrollCount : shaderInfo.options.forceLoopUnrollCount;
+
+  static_assert(static_cast<lgc::DenormalMode>(Vkgc::DenormalMode::Auto) == lgc::DenormalMode::Auto, "Mismatch");
+  static_assert(static_cast<lgc::DenormalMode>(Vkgc::DenormalMode::FlushToZero) == lgc::DenormalMode::FlushToZero,
+                "Mismatch");
+  static_assert(static_cast<lgc::DenormalMode>(Vkgc::DenormalMode::Preserve) == lgc::DenormalMode::Preserve,
+                "Mismatch");
+  shaderOptions.fp32DenormalMode = static_cast<lgc::DenormalMode>(shaderInfo.options.fp32DenormalMode);
+  shaderOptions.adjustDepthImportVrs = shaderInfo.options.adjustDepthImportVrs;
+  // disableLicmThreshold is set to the first of:
+  // - a non-zero value from the corresponding shaderInfo option
+  // - a value of 1 if DisableLicm or the disableLicm shaderInfo option is true
+  // - the value of DisableLicmThreshold
+  // Default is 0, which does not disable LICM
+  if (shaderInfo.options.disableLicmThreshold > 0)
+    shaderOptions.disableLicmThreshold = shaderInfo.options.disableLicmThreshold;
+  else if (DisableLicm || shaderInfo.options.disableLicm)
+    shaderOptions.disableLicmThreshold = 1;
+  else
+    shaderOptions.disableLicmThreshold = DisableLicmThreshold;
+  if (shaderInfo.options.unrollHintThreshold > 0)
+    shaderOptions.unrollHintThreshold = shaderInfo.options.unrollHintThreshold;
+  else
+    shaderOptions.unrollHintThreshold = UnrollHintThreshold;
+  if (shaderInfo.options.dontUnrollHintThreshold > 0)
+    shaderOptions.dontUnrollHintThreshold = shaderInfo.options.dontUnrollHintThreshold;
+  else
+    shaderOptions.dontUnrollHintThreshold = DontUnrollHintThreshold;
+  if (shaderInfo.options.ldsSpillLimitDwords > 0)
+    shaderOptions.ldsSpillLimitDwords = shaderInfo.options.ldsSpillLimitDwords;
+  else
+    shaderOptions.ldsSpillLimitDwords = LdsSpillLimitDwords;
+
+  shaderOptions.overrideShaderThreadGroupSizeX = shaderInfo.options.overrideShaderThreadGroupSizeX;
+  shaderOptions.overrideShaderThreadGroupSizeY = shaderInfo.options.overrideShaderThreadGroupSizeY;
+  shaderOptions.overrideShaderThreadGroupSizeZ = shaderInfo.options.overrideShaderThreadGroupSizeZ;
+
+  shaderOptions.nsaThreshold = shaderInfo.options.nsaThreshold;
+
+  static_assert(static_cast<InvariantLoadsOption>(InvariantLoads::Auto) == InvariantLoadsOption::Auto, "Mismatch");
+  static_assert(static_cast<InvariantLoadsOption>(InvariantLoads::EnableOptimization) ==
+                    InvariantLoadsOption::EnableOptimization,
+                "Mismatch");
+  static_assert(static_cast<InvariantLoadsOption>(InvariantLoads::DisableOptimization) ==
+                    InvariantLoadsOption::DisableOptimization,
+                "Mismatch");
+  static_assert(static_cast<InvariantLoadsOption>(InvariantLoads::ClearInvariants) ==
+                    InvariantLoadsOption::ClearInvariants,
+                "Mismatch");
+  shaderOptions.aggressiveInvariantLoads =
+      static_cast<InvariantLoadsOption>(shaderInfo.options.aggressiveInvariantLoads);
+
+  return shaderOptions;
 }
 
 // =====================================================================================================================
