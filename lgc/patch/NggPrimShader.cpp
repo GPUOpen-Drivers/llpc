@@ -1109,13 +1109,15 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
   if (m_gfxIp.major <= 11) {
     primitiveId = vgprArgs[2];
 
-    tessCoordX = vgprArgs[5];
-    tessCoordY = vgprArgs[6];
-    relPatchId = vgprArgs[7];
-    patchId = vgprArgs[8];
-
-    vertexId = vgprArgs[5];
-    instanceId = vgprArgs[8];
+    if (m_hasTes) {
+      tessCoordX = vgprArgs[5];
+      tessCoordY = vgprArgs[6];
+      relPatchId = vgprArgs[7];
+      patchId = vgprArgs[8];
+    } else {
+      vertexId = vgprArgs[5];
+      instanceId = vgprArgs[8];
+    }
   } else {
     llvm_unreachable("Not implemented!");
   }
@@ -3020,13 +3022,15 @@ void NggPrimShader::runEs(ArrayRef<Argument *> args) {
   Value *instanceId = nullptr;
 
   if (m_gfxIp.major <= 11) {
-    tessCoordX = vgprArgs[5];
-    tessCoordY = vgprArgs[6];
-    relPatchId = vgprArgs[7];
-    patchId = vgprArgs[8];
-
-    vertexId = vgprArgs[5];
-    instanceId = vgprArgs[8];
+    if (m_hasTes) {
+      tessCoordX = vgprArgs[5];
+      tessCoordY = vgprArgs[6];
+      relPatchId = vgprArgs[7];
+      patchId = vgprArgs[8];
+    } else {
+      vertexId = vgprArgs[5];
+      instanceId = vgprArgs[8];
+    }
   } else {
     llvm_unreachable("Not implemented!");
   }
@@ -3128,13 +3132,15 @@ Value *NggPrimShader::runPartEs(ArrayRef<Argument *> args, Value *position) {
   Value *instanceId = nullptr;
 
   if (m_gfxIp.major <= 11) {
-    tessCoordX = vgprArgs[5];
-    tessCoordY = vgprArgs[6];
-    relPatchId = vgprArgs[7];
-    patchId = vgprArgs[8];
-
-    vertexId = vgprArgs[5];
-    instanceId = vgprArgs[8];
+    if (m_hasTes) {
+      tessCoordX = vgprArgs[5];
+      tessCoordY = vgprArgs[6];
+      relPatchId = vgprArgs[7];
+      patchId = vgprArgs[8];
+    } else {
+      vertexId = vgprArgs[5];
+      instanceId = vgprArgs[8];
+    }
   } else {
     llvm_unreachable("Not implemented!");
   }
@@ -7339,13 +7345,15 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
   Value *instanceId = nullptr;
 
   if (m_gfxIp.major <= 11) {
-    tessCoordX = vgprArgs[5];
-    tessCoordY = vgprArgs[6];
-    relPatchId = vgprArgs[7];
-    patchId = vgprArgs[8];
-
-    vertexId = vgprArgs[5];
-    instanceId = vgprArgs[8];
+    if (m_hasTes) {
+      tessCoordX = vgprArgs[5];
+      tessCoordY = vgprArgs[6];
+      relPatchId = vgprArgs[7];
+      patchId = vgprArgs[8];
+    } else {
+      vertexId = vgprArgs[5];
+      instanceId = vgprArgs[8];
+    }
   } else {
     llvm_unreachable("Not implemented!");
   }
