@@ -896,7 +896,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         break;
       }
       case ShaderStageGeometry: {
-        patchGsBuiltInOutputExport(output, builtInId, resUsage->inOutUsage.gs.rasterStream, &callInst);
+        patchGsBuiltInOutputExport(output, builtInId, resUsage->inOutUsage.gs.rasterStream, builder);
         break;
       }
       case ShaderStageMesh: {
@@ -1068,7 +1068,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
             assert(builtInOutLocMap.find(BuiltInViewIndex) != builtInOutLocMap.end());
             unsigned loc = builtInOutLocMap.find(BuiltInViewIndex)->second;
 
-            storeValueToGsVsRing(viewIndex, loc, 0, rasterStream, &callInst);
+            storeValueToGsVsRing(viewIndex, loc, 0, rasterStream, builder);
           }
         }
 
@@ -1076,10 +1076,9 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         auto emitCounterPair = m_pipelineSysValues.get(m_entryPoint)->getEmitCounterPtr();
         auto emitCounterTy = emitCounterPair.first;
         auto emitCounterPtr = emitCounterPair.second[emitStream];
-        Value *emitCounter = new LoadInst(emitCounterTy, emitCounterPtr, "", &callInst);
-        emitCounter =
-            BinaryOperator::CreateAdd(emitCounter, ConstantInt::get(Type::getInt32Ty(*m_context), 1), "", &callInst);
-        new StoreInst(emitCounter, emitCounterPtr, &callInst);
+        Value *emitCounter = builder.CreateLoad(emitCounterTy, emitCounterPtr);
+        emitCounter = builder.CreateAdd(emitCounter, builder.getInt32(1));
+        builder.CreateStore(emitCounter, emitCounterPtr);
       }
     }
   }
@@ -2032,7 +2031,7 @@ void PatchInOutImportExport::patchGsGenericOutputExport(Value *output, unsigned 
 
   assert(compIdx <= 4);
 
-  storeValueToGsVsRing(output, location, compIdx, streamId, &*builder.GetInsertPoint());
+  storeValueToGsVsRing(output, location, compIdx, streamId, builder);
 }
 
 // =====================================================================================================================
@@ -3194,9 +3193,9 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned
 // @param output : Output value
 // @param builtInId : ID of the built-in variable
 // @param streamId : ID of output vertex stream
-// @param insertPos : Where to insert the patch instruction
+// @param builder : the builder to use
 void PatchInOutImportExport::patchGsBuiltInOutputExport(Value *output, unsigned builtInId, unsigned streamId,
-                                                        Instruction *insertPos) {
+                                                        BuilderBase &builder) {
   const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
   const auto &builtInUsage = resUsage->builtInUsage.gs;
   const auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
@@ -3235,7 +3234,7 @@ void PatchInOutImportExport::patchGsBuiltInOutputExport(Value *output, unsigned 
   }
 
   (void(builtInUsage)); // unused
-  storeValueToGsVsRing(output, loc, 0, streamId, insertPos);
+  storeValueToGsVsRing(output, loc, 0, streamId, builder);
 }
 
 // =====================================================================================================================
@@ -4132,9 +4131,9 @@ Value *PatchInOutImportExport::loadValueFromEsGsRing(Type *loadTy, unsigned loca
 // @param location : Output location
 // @param compIdx : Output component index
 // @param streamId : Output stream ID
-// @param insertPos : Where to insert the store instruction
+// @param builder : the builder to use
 void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned location, unsigned compIdx,
-                                                  unsigned streamId, Instruction *insertPos) {
+                                                  unsigned streamId, BuilderBase &builder) {
   auto storeTy = storeValue->getType();
 
   Type *elemTy = storeTy;
@@ -4153,7 +4152,7 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
                      ConstantInt::get(Type::getInt32Ty(*m_context), compIdx),
                      ConstantInt::get(Type::getInt32Ty(*m_context), streamId), storeValue};
     std::string callName = lgcName::NggWriteGsOutput + getTypeName(storeTy);
-    emitCall(callName, Type::getVoidTy(*m_context), args, {}, insertPos);
+    builder.CreateNamedCall(callName, Type::getVoidTy(*m_context), args, {});
     return;
   }
 
@@ -4164,13 +4163,12 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
     for (unsigned i = 0; i < elemCount; ++i) {
       Value *storeElem = nullptr;
       if (storeTy->isArrayTy())
-        storeElem = ExtractValueInst::Create(storeValue, {i}, "", insertPos);
+        storeElem = builder.CreateExtractValue(storeValue, {i});
       else {
-        storeElem =
-            ExtractElementInst::Create(storeValue, ConstantInt::get(Type::getInt32Ty(*m_context), i), "", insertPos);
+        storeElem = builder.CreateExtractElement(storeValue, i);
       }
 
-      storeValueToGsVsRing(storeElem, location + (compIdx + i) / 4, (compIdx + i) % 4, streamId, insertPos);
+      storeValueToGsVsRing(storeElem, location + (compIdx + i) / 4, (compIdx + i) % 4, streamId, builder);
     }
   } else {
     if (bitWidth == 8 || bitWidth == 16) {
@@ -4179,14 +4177,14 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
       // export calls based on number of dwords.
       if (storeTy->isFloatingPointTy()) {
         assert(bitWidth == 16);
-        storeValue = new BitCastInst(storeValue, Type::getInt16Ty(*m_context), "", insertPos);
+        storeValue = builder.CreateBitCast(storeValue, builder.getInt16Ty());
       }
 
-      storeValue = new ZExtInst(storeValue, Type::getInt32Ty(*m_context), "", insertPos);
+      storeValue = builder.CreateZExt(storeValue, builder.getInt32Ty());
     } else {
       assert(bitWidth == 32);
       if (storeTy->isFloatingPointTy())
-        storeValue = new BitCastInst(storeValue, Type::getInt32Ty(*m_context), "", insertPos);
+        storeValue = builder.CreateBitCast(storeValue, builder.getInt32Ty());
     }
 
     const auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(m_shaderStage)->entryArgIdxs;
@@ -4195,51 +4193,41 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
     auto emitCounterPair = m_pipelineSysValues.get(m_entryPoint)->getEmitCounterPtr();
     auto emitCounterTy = emitCounterPair.first;
     auto emitCounterPtr = emitCounterPair.second[streamId];
-    auto emitCounter = new LoadInst(emitCounterTy, emitCounterPtr, "", insertPos);
+    auto emitCounter = builder.CreateLoad(emitCounterTy, emitCounterPtr);
 
-    auto ringOffset = calcGsVsRingOffsetForOutput(location, compIdx, streamId, emitCounter, gsVsOffset, insertPos);
+    auto ringOffset = calcGsVsRingOffsetForOutput(location, compIdx, streamId, emitCounter, gsVsOffset, builder);
 
     if (m_pipelineState->isGsOnChip()) {
-      Value *idxs[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0), ringOffset};
+      Value *idxs[] = {builder.getInt32(0), ringOffset};
       auto ldsType = m_lds->getValueType();
-      Value *storePtr = GetElementPtrInst::Create(ldsType, m_lds, idxs, "", insertPos);
-      new StoreInst(storeValue, storePtr, false, m_lds->getAlign().value(), insertPos);
+      Value *storePtr = builder.CreateGEP(ldsType, m_lds, idxs);
+      builder.CreateAlignedStore(storeValue, storePtr, m_lds->getAlign().value());
     } else {
       // NOTE: Here we use tbuffer_store instruction instead of buffer_store because we have to do explicit
       // control of soffset. This is required by swizzle enabled mode when address range checking should be
       // complied with.
+      unsigned format;
       if (m_gfxIp.major <= 9) {
         CombineFormat combineFormat = {};
         combineFormat.bits.dfmt = BUF_DATA_FORMAT_32;
         combineFormat.bits.nfmt = BUF_NUM_FORMAT_UINT;
-        CoherentFlag coherent = {};
-        coherent.bits.glc = true;
-        coherent.bits.slc = true;
-        coherent.bits.swz = true;
-        Value *args[] = {
-            storeValue,                                                          // vdata
-            m_pipelineSysValues.get(m_entryPoint)->getGsVsRingBufDesc(streamId), // rsrc
-            ringOffset,                                                          // voffset
-            gsVsOffset,                                                          // soffset
-            ConstantInt::get(Type::getInt32Ty(*m_context), combineFormat.u32All),
-            ConstantInt::get(Type::getInt32Ty(*m_context), coherent.u32All) // glc, slc, swz
-        };
-        emitCall("llvm.amdgcn.raw.tbuffer.store.i32", Type::getVoidTy(*m_context), args, {}, insertPos);
+        format = combineFormat.u32All;
       } else {
-        CoherentFlag coherent = {};
-        coherent.bits.glc = true;
-        coherent.bits.slc = true;
-        coherent.bits.swz = true;
-        Value *args[] = {
-            storeValue,                                                          // vdata
-            m_pipelineSysValues.get(m_entryPoint)->getGsVsRingBufDesc(streamId), // rsrc
-            ringOffset,                                                          // voffset
-            gsVsOffset,                                                          // soffset
-            ConstantInt::get(Type::getInt32Ty(*m_context), BUF_FORMAT_32_UINT),  // format
-            ConstantInt::get(Type::getInt32Ty(*m_context), coherent.u32All)      // glc, slc, swz
-        };
-        emitCall("llvm.amdgcn.raw.tbuffer.store.i32", Type::getVoidTy(*m_context), args, {}, insertPos);
+        format = BUF_FORMAT_32_UINT;
       }
+      CoherentFlag coherent = {};
+      coherent.bits.glc = true;
+      coherent.bits.slc = true;
+      coherent.bits.swz = true;
+      Value *args[] = {
+          storeValue,                                                          // vdata
+          m_pipelineSysValues.get(m_entryPoint)->getGsVsRingBufDesc(streamId), // rsrc
+          ringOffset,                                                          // voffset
+          gsVsOffset,                                                          // soffset
+          builder.getInt32(format),
+          builder.getInt32(coherent.u32All) // glc, slc, swz
+      };
+      builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_raw_tbuffer_store, args);
     }
   }
 }
@@ -4319,10 +4307,9 @@ Value *PatchInOutImportExport::calcEsGsRingOffsetForInput(unsigned location, uns
 // @param streamId : Output stream ID
 // @param vertexIdx : Vertex index
 // @param gsVsOffset : ES-GS ring offset in bytes
-// @param insertPos : Where to insert the instruction
+// @param builder : the builder to use
 Value *PatchInOutImportExport::calcGsVsRingOffsetForOutput(unsigned location, unsigned compIdx, unsigned streamId,
-                                                           Value *vertexIdx, Value *gsVsOffset,
-                                                           Instruction *insertPos) {
+                                                           Value *vertexIdx, Value *gsVsOffset, BuilderBase &builder) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
 
   Value *ringOffset = nullptr;
@@ -4341,40 +4328,29 @@ Value *PatchInOutImportExport::calcGsVsRingOffsetForOutput(unsigned location, un
     //              threadId * gsVsRingItemSize +
     //              (vertexIdx * vertexSizePerStream) + location * 4 + compIdx + streamBase (in dwords)
 
-    auto esGsLdsSize = ConstantInt::get(Type::getInt32Ty(*m_context), resUsage->inOutUsage.gs.calcFactor.esGsLdsSize);
+    auto esGsLdsSize = builder.getInt32(resUsage->inOutUsage.gs.calcFactor.esGsLdsSize);
 
-    gsVsOffset = BinaryOperator::CreateExact(Instruction::LShr, gsVsOffset,
-                                             ConstantInt::get(Type::getInt32Ty(*m_context), 2), "", insertPos);
+    gsVsOffset = builder.CreateLShr(gsVsOffset, 2, "", /*isExact=*/true);
 
-    auto ringItemOffset = BinaryOperator::CreateMul(
-        m_threadId, ConstantInt::get(Type::getInt32Ty(*m_context), resUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize),
-        "", insertPos);
+    auto ringItemOffset =
+        builder.CreateMul(m_threadId, builder.getInt32(resUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize));
 
     // VertexSize is stream output vertexSize x 4 (in dwords)
     unsigned vertexSize = resUsage->inOutUsage.gs.outLocCount[streamId] * 4;
-    auto vertexItemOffset =
-        BinaryOperator::CreateMul(vertexIdx, ConstantInt::get(Type::getInt32Ty(*m_context), vertexSize), "", insertPos);
-
-    ringOffset = BinaryOperator::CreateAdd(esGsLdsSize, gsVsOffset, "", insertPos);
-
-    ringOffset = BinaryOperator::CreateAdd(ringOffset, ringItemOffset, "", insertPos);
-
-    ringOffset = BinaryOperator::CreateAdd(ringOffset, vertexItemOffset, "", insertPos);
+    auto vertexItemOffset = builder.CreateMul(vertexIdx, builder.getInt32(vertexSize));
+    ringOffset = builder.CreateAdd(esGsLdsSize, gsVsOffset);
+    ringOffset = builder.CreateAdd(ringOffset, ringItemOffset);
+    ringOffset = builder.CreateAdd(ringOffset, vertexItemOffset);
 
     unsigned attribOffset = (location * 4) + compIdx + streamBases[streamId];
-    ringOffset = BinaryOperator::CreateAdd(ringOffset, ConstantInt::get(Type::getInt32Ty(*m_context), attribOffset), "",
-                                           insertPos);
+    ringOffset = builder.CreateAdd(ringOffset, builder.getInt32(attribOffset));
   } else {
     // ringOffset = ((location * 4 + compIdx) * maxVertices + vertexIdx) * 4 (in bytes);
 
     unsigned outputVertices = m_pipelineState->getShaderModes()->getGeometryShaderMode().outputVertices;
 
-    ringOffset = BinaryOperator::CreateAdd(
-        ConstantInt::get(Type::getInt32Ty(*m_context), (location * 4 + compIdx) * outputVertices), vertexIdx, "",
-        insertPos);
-
-    ringOffset =
-        BinaryOperator::CreateMul(ringOffset, ConstantInt::get(Type::getInt32Ty(*m_context), 4), "", insertPos);
+    ringOffset = builder.CreateAdd(vertexIdx, builder.getInt32((location * 4 + compIdx) * outputVertices));
+    ringOffset = builder.CreateMul(ringOffset, builder.getInt32(4));
   }
 
   return ringOffset;
