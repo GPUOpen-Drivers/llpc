@@ -166,11 +166,13 @@ private:
     llvm::Value *threadIdInWave;
     llvm::Value *threadIdInSubgroup;
     llvm::Value *primOrVertexIndex;
-    // Following info is for GFX11+
+    llvm::Value *rowInSubgroup;
     llvm::Value *workgroupIdX;
     llvm::Value *workgroupIdY;
     llvm::Value *workgroupIdZ;
-    llvm::Value *rowInSubgroup;
+    llvm::Value *localInvocationIdX;
+    llvm::Value *localInvocationIdY;
+    llvm::Value *localInvocationIdZ;
   } m_waveThreadInfo = {};
 
   bool m_accessTaskPayload = false;                // Whether task shader has payload access operations
