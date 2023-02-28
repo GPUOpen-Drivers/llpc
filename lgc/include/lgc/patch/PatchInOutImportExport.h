@@ -122,8 +122,7 @@ private:
   void patchTcsBuiltInOutputExport(llvm::Value *output, unsigned builtInId, llvm::Value *elemIdx,
                                    llvm::Value *vertexIdx, llvm::Instruction *insertPos);
   void patchTesBuiltInOutputExport(llvm::Value *output, unsigned builtInId, llvm::Instruction *insertPos);
-  void patchGsBuiltInOutputExport(llvm::Value *output, unsigned builtInId, unsigned streamId,
-                                  llvm::Instruction *insertPos);
+  void patchGsBuiltInOutputExport(llvm::Value *output, unsigned builtInId, unsigned streamId, BuilderBase &builder);
   void patchMeshBuiltInOutputExport(llvm::Value *output, unsigned builtInId, llvm::Value *elemIdx,
                                     llvm::Value *vertexOrPrimitiveIdx, bool isPerPrimitive,
                                     llvm::Instruction *insertPos);
@@ -154,7 +153,7 @@ private:
                                      llvm::Instruction *insertPos);
 
   void storeValueToGsVsRing(llvm::Value *storeValue, unsigned location, unsigned compIdx, unsigned streamId,
-                            llvm::Instruction *insertPos);
+                            BuilderBase &builder);
 
   llvm::Value *calcEsGsRingOffsetForOutput(unsigned location, unsigned compIdx, llvm::Value *esGsOffset,
                                            llvm::Instruction *insertPos);
@@ -163,8 +162,7 @@ private:
                                           llvm::Instruction *insertPos);
 
   llvm::Value *calcGsVsRingOffsetForOutput(unsigned location, unsigned compIdx, unsigned streamId,
-                                           llvm::Value *vertexIdx, llvm::Value *gsVsOffset,
-                                           llvm::Instruction *insertPos);
+                                           llvm::Value *vertexIdx, llvm::Value *gsVsOffset, BuilderBase &builder);
 
   llvm::Value *readValueFromLds(bool offChip, llvm::Type *readTy, llvm::Value *ldsOffset, BuilderBase &builder);
   void writeValueToLds(bool offChip, llvm::Value *writeValue, llvm::Value *ldsOffset, BuilderBase &builder);
