@@ -1770,28 +1770,20 @@ template <typename T> void ConfigBuilder::buildMeshRegConfig(ShaderStage shaderS
   SET_REG_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, MAX_PRIMGRP_IN_WAVE, 2);
 
   SET_REG_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, PRIMGEN_EN, true);
-  SET_REG_GFX10_PLUS_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, false);
 
   const unsigned waveSize = m_pipelineState->getShaderWaveSize(shaderStage);
   if (waveSize == 32)
     SET_REG_GFX10_PLUS_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
 
-  SET_REG_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
+  if (m_gfxIp.major <= 11)
+    SET_REG_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
   SET_REG_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
-  if (gfxIp.major >= 11) {
-    static constexpr unsigned NEW_FAST_LAUNCH = 0x2;
-    SET_REG_GFX09_1X_PLUS_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, GS_FAST_LAUNCH, NEW_FAST_LAUNCH);
-  } else {
-    static constexpr unsigned LEGACY_FAST_LAUNCH = 0x1;
-    SET_REG_GFX09_1X_PLUS_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, GS_FAST_LAUNCH, LEGACY_FAST_LAUNCH);
-  }
+  const unsigned gsFastLaunch = m_gfxIp.major == 11 ? 0x2 : 0x1; // GFX11 sets GS fast launch mode to 0x2
+  SET_REG_GFX09_1X_PLUS_FIELD(&config->meshRegs, VGT_SHADER_STAGES_EN, GS_FAST_LAUNCH, gsFastLaunch);
 
   //
   // Build ES-GS specific configuration
   //
-  unsigned gsVgprCompCnt = 0;
-  SET_REG_FIELD(&config->meshRegs, SPI_SHADER_PGM_RSRC1_GS, GS_VGPR_COMP_CNT, gsVgprCompCnt);
-
   unsigned floatMode = setupFloatingPointMode(shaderStage);
   SET_REG_FIELD(&config->meshRegs, SPI_SHADER_PGM_RSRC1_GS, FLOAT_MODE, floatMode);
   SET_REG_FIELD(&config->meshRegs, SPI_SHADER_PGM_RSRC1_GS, DX10_CLAMP, true); // Follow PAL setting
@@ -1810,9 +1802,6 @@ template <typename T> void ConfigBuilder::buildMeshRegConfig(ShaderStage shaderS
 
   const bool userSgprMsb = (userDataCount > 31);
   SET_REG_GFX10_PLUS_FIELD(&config->meshRegs, SPI_SHADER_PGM_RSRC2_GS, USER_SGPR_MSB, userSgprMsb);
-
-  unsigned esVgprCompCnt = 0;
-  SET_REG_FIELD(&config->meshRegs, SPI_SHADER_PGM_RSRC2_GS, ES_VGPR_COMP_CNT, esVgprCompCnt);
 
   const unsigned ldsSizeDwordGranularityShift =
       m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
