@@ -449,7 +449,9 @@ void ConfigBuilder::buildPipelineNggVsFsRegConfig() {
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, MAX_PRIMGRP_IN_WAVE, 2);
 
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_EN, true);
-    SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, nggControl->passthroughMode);
+    if (m_gfxIp.major <= 11) {
+      SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, nggControl->passthroughMode);
+    }
     if (gfxIp.major >= 11) {
       SET_REG_GFX10_4_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_NO_MSG,
                                  nggControl->passthroughMode && !m_pipelineState->enableSwXfb());
@@ -458,8 +460,10 @@ void ConfigBuilder::buildPipelineNggVsFsRegConfig() {
 
     buildPrimShaderRegConfig<PipelineNggVsFsRegConfig>(ShaderStageVertex, ShaderStageInvalid, &config);
 
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
+    if (m_gfxIp.major <= 11) {
+      SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
+      SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
+    }
 
     auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageVertex);
     if (waveFrontSize == 32) {
@@ -515,7 +519,9 @@ void ConfigBuilder::buildPipelineNggVsTsFsRegConfig() {
   SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, MAX_PRIMGRP_IN_WAVE, 2);
 
   SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_EN, true);
-  SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, nggControl->passthroughMode);
+  if (m_gfxIp.major <= 11) {
+    SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, nggControl->passthroughMode);
+  }
   if (gfxIp.major >= 11) {
     SET_REG_GFX10_4_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_NO_MSG,
                                nggControl->passthroughMode && !m_pipelineState->enableSwXfb());
@@ -536,8 +542,9 @@ void ConfigBuilder::buildPipelineNggVsTsFsRegConfig() {
       SET_REG_FIELD(&config.lsHsRegs, SPI_SHADER_PGM_CHKSUM_HS, CHECKSUM, checksum);
     }
 
+    if (m_gfxIp.major <= 11)
+      SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
 
     auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
     if (waveFrontSize == 32) {
@@ -549,8 +556,11 @@ void ConfigBuilder::buildPipelineNggVsTsFsRegConfig() {
   if (m_pipelineState->hasShaderStage(ShaderStageTessEval)) {
     buildPrimShaderRegConfig<PipelineNggVsTsFsRegConfig>(ShaderStageTessEval, ShaderStageInvalid, &config);
 
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_DS);
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
+    if (m_gfxIp.major <= 11) {
+      SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_DS);
+      SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
+    }
+
     auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageTessEval);
     if (waveFrontSize == 32) {
       SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
@@ -600,10 +610,12 @@ void ConfigBuilder::buildPipelineNggVsGsFsRegConfig() {
   SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, MAX_PRIMGRP_IN_WAVE, 2);
 
   SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_EN, true);
-  // NOTE: When GS is present, NGG pass-through mode is always turned off regardless of the pass-through flag of
-  // NGG control settings. In such case, the pass-through flag means whether there is culling (different from
-  // hardware pass-through).
-  SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, false);
+  if (m_gfxIp.major <= 11) {
+    // NOTE: When GS is present, NGG pass-through mode is always turned off regardless of the pass-through flag of
+    // NGG control settings. In such case, the pass-through flag means whether there is culling (different from
+    // hardware pass-through).
+    SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, false);
+  }
   if (gfxIp.major >= 11)
     SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, NGG_WAVE_ID_EN, m_pipelineState->enableSwXfb());
 
@@ -621,9 +633,11 @@ void ConfigBuilder::buildPipelineNggVsGsFsRegConfig() {
       SET_REG_FIELD(&config.primShaderRegs, SPI_SHADER_PGM_CHKSUM_GS, CHECKSUM, checksum);
     }
 
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
+    if (m_gfxIp.major <= 11) {
+      SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
+      SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
+    }
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
 
     auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
     if (waveFrontSize == 32) {
@@ -668,10 +682,12 @@ void ConfigBuilder::buildPipelineNggVsTsGsFsRegConfig() {
   SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, MAX_PRIMGRP_IN_WAVE, 2);
 
   SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_EN, true);
-  // NOTE: When GS is present, NGG pass-through mode is always turned off regardless of the pass-through flag of
-  // NGG control settings. In such case, the pass-through flag means whether there is culling (different from
-  // hardware pass-through).
-  SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, false);
+  if (m_gfxIp.major <= 11) {
+    // NOTE: When GS is present, NGG pass-through mode is always turned off regardless of the pass-through flag of
+    // NGG control settings. In such case, the pass-through flag means whether there is culling (different from
+    // hardware pass-through).
+    SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, false);
+  }
   if (gfxIp.major >= 11)
     SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, NGG_WAVE_ID_EN, m_pipelineState->enableSwXfb());
 
@@ -689,8 +705,9 @@ void ConfigBuilder::buildPipelineNggVsTsGsFsRegConfig() {
       SET_REG_FIELD(&config.lsHsRegs, SPI_SHADER_PGM_CHKSUM_HS, CHECKSUM, checksum);
     }
 
+    if (m_gfxIp.major <= 11)
+      SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
 
     auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
     if (waveFrontSize == 32) {
@@ -713,9 +730,11 @@ void ConfigBuilder::buildPipelineNggVsTsGsFsRegConfig() {
       SET_REG_FIELD(&config.primShaderRegs, SPI_SHADER_PGM_CHKSUM_GS, CHECKSUM, checksum);
     }
 
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_DS);
+    if (m_gfxIp.major <= 11) {
+      SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_DS);
+      SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
+    }
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
-    SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
 
     auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
     if (waveFrontSize == 32) {
@@ -1062,11 +1081,11 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
 
   unsigned gsVgprCompCnt = 0;
   if (calcFactor.inputVertices > 4 || gsBuiltInUsage.invocationId)
-    gsVgprCompCnt = 3;
+    gsVgprCompCnt = 3; // Enable vtx4/vtx5 offset (GS VGPR3) or GS instance ID (GS VGPR4)
   else if (gsBuiltInUsage.primitiveIdIn)
-    gsVgprCompCnt = 2;
+    gsVgprCompCnt = 2; // Enable primitive ID (GS VGPR2)
   else if (calcFactor.inputVertices > 2)
-    gsVgprCompCnt = 1;
+    gsVgprCompCnt = 1; // Enable vtx2/vtx3 offset (GS VGPR1)
 
   SET_REG_FIELD(&config->esGsRegs, SPI_SHADER_PGM_RSRC1_GS, GS_VGPR_COMP_CNT, gsVgprCompCnt);
 
@@ -1100,21 +1119,17 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
 
   unsigned esVgprCompCnt = 0;
   if (hasTs) {
-    // NOTE: when primitive ID is used, set vgtCompCnt to 3 directly because primitive ID is the last VGPR.
     if (tesBuiltInUsage.primitiveId)
-      esVgprCompCnt = 3;
+      esVgprCompCnt = 3; // Enable patch ID (ES VGPR8)
     else
-      esVgprCompCnt = 2;
-
-    if (m_pipelineState->isTessOffChip()) {
-      SET_REG_FIELD(&config->esGsRegs, SPI_SHADER_PGM_RSRC2_GS, OC_LDS_EN, true);
-    }
+      esVgprCompCnt = 2; // Must enable relative patch ID (ES VGPR7)
   } else {
     if (vsBuiltInUsage.instanceIndex)
-      esVgprCompCnt = 3; // Enable instance ID
+      esVgprCompCnt = 3; // Enable instance ID (ES VGPR8)
   }
-
   SET_REG_FIELD(&config->esGsRegs, SPI_SHADER_PGM_RSRC2_GS, ES_VGPR_COMP_CNT, esVgprCompCnt);
+
+  SET_REG_FIELD(&config->esGsRegs, SPI_SHADER_PGM_RSRC2_GS, OC_LDS_EN, hasTs);
 
   const unsigned ldsSizeDwordGranularityShift =
       m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
@@ -1270,19 +1285,24 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   // Build ES-GS specific configuration
   //
   unsigned gsVgprCompCnt = 0;
-  if (hasGs) {
-    if (calcFactor.inputVertices > 4 || gsBuiltInUsage.invocationId)
-      gsVgprCompCnt = 3;
-    else if (gsBuiltInUsage.primitiveIdIn)
-      gsVgprCompCnt = 2;
-    else if (calcFactor.inputVertices > 2)
+  if (m_gfxIp.major <= 11) {
+    if (hasGs) {
+      if (calcFactor.inputVertices > 4 || gsBuiltInUsage.invocationId)
+        gsVgprCompCnt = 3; // Enable vtx4/vtx5 offset (GS VGPR3) or GS instance ID (GS VGPR4)
+      else if (gsBuiltInUsage.primitiveIdIn)
+        gsVgprCompCnt = 2; // Enable primitive ID (GS VGPR2)
+      else if (calcFactor.inputVertices > 2)
+        gsVgprCompCnt = 1; // Enable vtx2/vtx3 offset (GS VGPR1)
+    } else {
+      // NOTE: When GS is absent, only those VGPRs are required: vtx0/vtx1 offset, vtx2/vtx3 offset,
+      // primitive ID (only for VS).
       gsVgprCompCnt = 1;
+      if (!hasTs && vsBuiltInUsage.primitiveId)
+        gsVgprCompCnt = 2; // Enable primitive ID (GS VGPR2)
+    }
   } else {
-    // NOTE: When GS is absent, only those VGPRs are required: vtx0/vtx1 offset, vtx2/vtx3 offset,
-    // primitive ID (only for VS).
-    gsVgprCompCnt = hasTs ? 1 : (vsBuiltInUsage.primitiveId ? 2 : 1);
+    llvm_unreachable("Not implemented!");
   }
-
   SET_REG_FIELD(&config->primShaderRegs, SPI_SHADER_PGM_RSRC1_GS, GS_VGPR_COMP_CNT, gsVgprCompCnt);
 
   unsigned floatMode = setupFloatingPointMode(shaderStage2 != ShaderStageInvalid ? shaderStage2 : shaderStage1);
@@ -1312,22 +1332,22 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   SET_REG_GFX10_PLUS_FIELD(&config->primShaderRegs, SPI_SHADER_PGM_RSRC2_GS, USER_SGPR_MSB, userSgprMsb);
 
   unsigned esVgprCompCnt = 0;
-  if (hasTs) {
-    // NOTE: when primitive ID is used, set vgtCompCnt to 3 directly because primitive ID is the last VGPR.
-    if (tesBuiltInUsage.primitiveId)
-      esVgprCompCnt = 3;
-    else
-      esVgprCompCnt = 2;
-
-    if (m_pipelineState->isTessOffChip()) {
-      SET_REG_FIELD(&config->primShaderRegs, SPI_SHADER_PGM_RSRC2_GS, OC_LDS_EN, true);
+  if (gfxIp.major <= 11) {
+    if (hasTs) {
+      if (tesBuiltInUsage.primitiveId)
+        esVgprCompCnt = 3; // Enable patch ID (ES VGPR8)
+      else
+        esVgprCompCnt = 2; // Must enable relative patch ID (ES VGPR7)
+    } else {
+      if (vsBuiltInUsage.instanceIndex)
+        esVgprCompCnt = 3; // Enable instance ID (ES VGPR8)
     }
   } else {
-    if (vsBuiltInUsage.instanceIndex)
-      esVgprCompCnt = 3; // Enable instance ID
+    llvm_unreachable("Not implemented!");
   }
-
   SET_REG_FIELD(&config->primShaderRegs, SPI_SHADER_PGM_RSRC2_GS, ES_VGPR_COMP_CNT, esVgprCompCnt);
+
+  SET_REG_FIELD(&config->primShaderRegs, SPI_SHADER_PGM_RSRC2_GS, OC_LDS_EN, hasTs);
 
   const unsigned ldsSizeDwordGranularityShift =
       m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
@@ -1434,10 +1454,12 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
 
   // TODO: Multiple output streams are not supported.
   SET_REG_FIELD(&config->primShaderRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE, gsOutputPrimitiveType);
-  SET_REG_FIELD(&config->primShaderRegs, VGT_GSVS_RING_ITEMSIZE, ITEMSIZE, calcFactor.gsVsRingItemSize);
-  // NOTE: When GS is absent, always set ES-GS ring item size to 1. Thus, we can easily get vertex ID in subgroup
-  // without any additional calculations.
-  SET_REG_FIELD(&config->primShaderRegs, VGT_ESGS_RING_ITEMSIZE, ITEMSIZE, hasGs ? calcFactor.esGsRingItemSize : 1);
+  if (gfxIp.major <= 11) {
+    SET_REG_FIELD(&config->primShaderRegs, VGT_GSVS_RING_ITEMSIZE, ITEMSIZE, calcFactor.gsVsRingItemSize);
+    // NOTE: When GS is absent, always set ES-GS ring item size to 1. Thus, we can easily get vertex ID in subgroup
+    // without any additional calculations.
+    SET_REG_FIELD(&config->primShaderRegs, VGT_ESGS_RING_ITEMSIZE, ITEMSIZE, hasGs ? calcFactor.esGsRingItemSize : 1);
+  }
 
   const unsigned maxVertsPerSubgroup = std::min(gsInstPrimsInSubgrp * maxVertOut, NggMaxThreadsPerSubgroup);
   SET_REG_FIELD(&config->primShaderRegs, GE_MAX_OUTPUT_PER_SUBGROUP, MAX_VERTS_PER_SUBGROUP, maxVertsPerSubgroup);
