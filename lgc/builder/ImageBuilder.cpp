@@ -1424,8 +1424,18 @@ Value *ImageBuilder::CreateImageQuerySize(unsigned dim, unsigned flags, Value *i
   height = CreateSelect(CreateICmpEQ(height, getInt32(0)), getInt32(1), height);
 
   if (dim == Dim3D) {
-    depth = CreateLShr(depth, curLevel);
-    depth = CreateSelect(CreateICmpEQ(depth, getInt32(0)), getInt32(1), depth);
+    Value *mipDepth = CreateLShr(depth, curLevel);
+    mipDepth = CreateSelect(CreateICmpEQ(mipDepth, getInt32(0)), getInt32(1), mipDepth);
+
+    if (getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 10) {
+      Value *arrayPitch = proxySqRsrcRegHelper.getReg(SqRsrcRegs::ArrayPitch);
+      Value *baseArray = proxySqRsrcRegHelper.getReg(SqRsrcRegs::BaseArray);
+      Value *sliceDepth = CreateSub(depth, baseArray);
+      Value *isSlice = CreateTrunc(arrayPitch, getInt1Ty());
+      depth = CreateSelect(isSlice, sliceDepth, mipDepth);
+    } else {
+      depth = mipDepth;
+    }
   } else {
     if (getPipelineState()->getTargetInfo().getGfxIpVersion().major < 9) {
       Value *baseArray = proxySqRsrcRegHelper.getReg(SqRsrcRegs::BaseArray);

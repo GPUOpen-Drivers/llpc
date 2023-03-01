@@ -184,6 +184,7 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx6[static_cast<unsigned>(SqRsrcRegs:
     {5, 13, 13}, // LastArray
     {},          // WidthLo
     {},          // WidthHi
+    {},          // ArrayPitch
 };
 
 // =====================================================================================================================
@@ -206,6 +207,7 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx9[static_cast<unsigned>(SqRsrcRegs:
     {},          // LastArray
     {},          // WidthLo
     {},          // WidthHi
+    {},          // ArrayPitch
 };
 
 // =====================================================================================================================
@@ -228,6 +230,7 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx10[static_cast<unsigned>(SqRsrcRegs
     {},          // LastArray
     {1, 30, 2},  // WidthLo
     {2, 0, 12},  // WidthHi
+    {5, 0, 4},   // ArrayPitch
 };
 
 // =====================================================================================================================
@@ -250,6 +253,7 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx11[static_cast<unsigned>(SqRsrcRegs
     {},          // LastArray
     {1, 30, 2},  // WidthLo
     {2, 0, 12},  // WidthHi
+    {5, 0, 4},   // ArrayPitch
 };
 
 // =====================================================================================================================
@@ -298,6 +302,7 @@ Value *SqImgRsrcRegHandler::getReg(SqRsrcRegs regId) {
   case SqRsrcRegs::BaseLevel:
   case SqRsrcRegs::LastLevel:
   case SqRsrcRegs::BaseArray:
+  case SqRsrcRegs::ArrayPitch:
     return getRegCommon(static_cast<unsigned>(regId));
   case SqRsrcRegs::Depth:
   case SqRsrcRegs::Height:

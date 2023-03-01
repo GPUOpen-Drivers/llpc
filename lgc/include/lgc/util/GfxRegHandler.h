@@ -153,6 +153,7 @@ enum class SqRsrcRegs {
   // The following are introduced in gfx10.
   WidthLo,
   WidthHi,
+  ArrayPitch,
 
   Count,
 };
