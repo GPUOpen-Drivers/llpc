@@ -111,6 +111,21 @@ void main()
 ; SHADERTEST: call {{.*}} @lgc.create.image.query.size.v3i32(i32 7, i32 512, {{.*}}, i32 0)
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
+; SHADERTEST: call float @llvm.amdgcn.image.getresinfo.1d.f32.i32(i32 1, i32 0,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call <2 x float> @llvm.amdgcn.image.getresinfo.2d.v2f32.i32(i32 3, i32 0,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call <3 x float> @llvm.amdgcn.image.getresinfo.3d.v3f32.i32(i32 7, i32 0,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call <2 x float> @llvm.amdgcn.image.getresinfo.cube.v2f32.i32(i32 3, i32 0,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call float @llvm.amdgcn.image.getresinfo.1d.f32.i32(i32 1, i32 0,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call <2 x float> @llvm.amdgcn.image.getresinfo.2d.v2f32.i32(i32 3, i32 0,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call <2 x float> @llvm.amdgcn.image.getresinfo.cube.v2f32.i32(i32 3, i32 0,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call <{{3|4}} x float> @llvm.amdgcn.image.getresinfo.cube.v{{3|4}}f32.i32(i32 {{7|15}}, i32 0,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call <{{3|4}} x float> @llvm.amdgcn.image.getresinfo.cube.v{{3|4}}f32.i32(i32 {{7|15}}, i32 0,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call <2 x float> @llvm.amdgcn.image.getresinfo.2d.v2f32.i32(i32 3, i32 0,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call <2 x float> @llvm.amdgcn.image.getresinfo.2d.v2f32.i32(i32 3, i32 0,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call <2 x float> @llvm.amdgcn.image.getresinfo.1darray.v2f32.i32(i32 3, i32 0,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call <3 x float> @llvm.amdgcn.image.getresinfo.2darray.v3f32.i32(i32 7, i32 0,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call <2 x float> @llvm.amdgcn.image.getresinfo.2dmsaa.v2f32.i32(i32 3, i32 0,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call <3 x float> @llvm.amdgcn.image.getresinfo.2darraymsaa.v3f32.i32(i32 7, i32 0,{{.*}}, i32 0, i32 0)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

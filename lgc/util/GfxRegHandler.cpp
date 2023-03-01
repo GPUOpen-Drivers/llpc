@@ -178,10 +178,6 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx6[static_cast<unsigned>(SqRsrcRegs:
     {4, 0, 13},  // Depth
     {4, 13, 14}, // Pitch
     {},          // BcSwizzle
-    {3, 12, 4},  // BaseLevel
-    {3, 16, 4},  // LastLevel
-    {5, 0, 13},  // BaseArray
-    {5, 13, 13}, // LastArray
     {},          // WidthLo
     {},          // WidthHi
 };
@@ -200,10 +196,6 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx9[static_cast<unsigned>(SqRsrcRegs:
     {4, 0, 13},  // Depth
     {4, 13, 12}, // Pitch
     {4, 29, 3},  // BcSwizzle
-    {3, 12, 4},  // BaseLevel
-    {3, 16, 4},  // LastLevel
-    {5, 0, 13},  // BaseArray
-    {},          // LastArray
     {},          // WidthLo
     {},          // WidthHi
 };
@@ -222,10 +214,6 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx10[static_cast<unsigned>(SqRsrcRegs
     {4, 0, 13},  // Depth
     {},          // Pitch
     {3, 25, 3},  // BcSwizzle
-    {3, 12, 4},  // BaseLevel
-    {3, 16, 4},  // LastLevel
-    {4, 16, 13}, // BaseArray
-    {},          // LastArray
     {1, 30, 2},  // WidthLo
     {2, 0, 12},  // WidthHi
 };
@@ -244,10 +232,6 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx11[static_cast<unsigned>(SqRsrcRegs
     {4, 0, 13},  // Depth
     {},          // Pitch
     {3, 25, 3},  // BcSwizzle
-    {3, 12, 4},  // BaseLevel
-    {3, 16, 4},  // LastLevel
-    {4, 16, 13}, // BaseArray
-    {},          // LastArray
     {1, 30, 2},  // WidthLo
     {2, 0, 12},  // WidthHi
 };
@@ -294,12 +278,9 @@ Value *SqImgRsrcRegHandler::getReg(SqRsrcRegs regId) {
   case SqRsrcRegs::Format:
   case SqRsrcRegs::DstSelXYZW:
   case SqRsrcRegs::SwizzleMode:
-  case SqRsrcRegs::BcSwizzle:
-  case SqRsrcRegs::BaseLevel:
-  case SqRsrcRegs::LastLevel:
-  case SqRsrcRegs::BaseArray:
-    return getRegCommon(static_cast<unsigned>(regId));
   case SqRsrcRegs::Depth:
+  case SqRsrcRegs::BcSwizzle:
+    return getRegCommon(static_cast<unsigned>(regId));
   case SqRsrcRegs::Height:
   case SqRsrcRegs::Pitch:
     return m_builder->CreateAdd(getRegCommon(static_cast<unsigned>(regId)), m_one);
@@ -314,16 +295,6 @@ Value *SqImgRsrcRegHandler::getReg(SqRsrcRegs regId) {
     case 11:
       return m_builder->CreateAdd(
           getRegCombine(static_cast<unsigned>(SqRsrcRegs::WidthLo), static_cast<unsigned>(SqRsrcRegs::WidthHi)), m_one);
-    default:
-      llvm_unreachable("GFX IP is not supported!");
-      break;
-    }
-  case SqRsrcRegs::LastArray:
-    switch (m_gfxIpVersion->major) {
-    case 6:
-    case 7:
-    case 8:
-      return getRegCommon(static_cast<unsigned>(regId));
     default:
       llvm_unreachable("GFX IP is not supported!");
       break;

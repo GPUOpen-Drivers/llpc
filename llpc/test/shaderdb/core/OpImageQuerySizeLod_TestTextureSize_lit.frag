@@ -31,6 +31,9 @@ void main()
 ; SHADERTEST: call {{.*}} @lgc.create.image.query.size.v3i32(i32 2, i32 512, {{.*}}, i32 5)
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
+; SHADERTEST: call <2 x float> @llvm.amdgcn.image.getresinfo.2d.v2f32.i32(i32 3, i32 3,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call <2 x float> @llvm.amdgcn.image.getresinfo.2d.v2f32.i32(i32 3, i32 4,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call <3 x float> @llvm.amdgcn.image.getresinfo.3d.v3f32.i32(i32 7, i32 5,{{.*}}, i32 0, i32 0)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

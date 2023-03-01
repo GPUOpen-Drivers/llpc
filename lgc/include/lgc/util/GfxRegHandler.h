@@ -145,10 +145,6 @@ enum class SqRsrcRegs {
   Depth,
   Pitch,
   BcSwizzle,
-  BaseLevel,
-  LastLevel,
-  BaseArray,
-  LastArray, // only gfx6, gfx7 and gfx8
 
   // The following are introduced in gfx10.
   WidthLo,

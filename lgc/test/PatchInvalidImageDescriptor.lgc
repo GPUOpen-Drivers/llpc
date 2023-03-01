@@ -31,16 +31,12 @@
 ; GFX900: %.lod = call <2 x float> @llvm.amdgcn.image.getlod.2d.v2f32.f32(i32 3, float 0.000000e+00, float 0.000000e+00, <8 x i32> %{{[0-9]+}}, <4 x i32> %{{[0-9]+}}, i1 false, i32 0, i32 0)
 ; GFX1010: %.lod = call <2 x float> @llvm.amdgcn.image.getlod.2d.v2f32.f32(i32 3, float 0.000000e+00, float 0.000000e+00, <8 x i32> %{{[0-9]+}}, <4 x i32> %{{[0-9]+}}, i1 false, i32 0, i32 0)
 
-; CHECK: [[WFDESC:%[0-9]+]] = call <8 x i32> @llvm.amdgcn.waterfall.readfirstlane
-; GFX900: [[WFDESC1:%[0-9]+]] = call <8 x i32> @llvm.amdgcn.waterfall.last.use.v8i32(i32 %{{[0-9]+}}, <8 x i32> [[WFDESC]])
-; GFX900: call void @llvm.amdgcn.image.store.2d.v4f32.i32(<4 x float> zeroinitializer, i32 15, i32 0, i32 0, <8 x i32> [[WFDESC1]], i32 0, i32 0)
-; GFX1010: extractelement <8 x i32> [[WFDESC]], i64 3
-; GFX1010-NEXT: icmp sge i32
-; GFX1010-NEXT: and i32
-; GFX1010-NEXT: select i1
-; GFX1010-NEXT: [[PATCHED_DESC1:%[.a-zA-Z0-9]+]] = insertelement <8 x i32> [[WFDESC]]
-; GFX1010: [[WFDESC1:%[0-9]+]] = call <8 x i32> @llvm.amdgcn.waterfall.last.use.v8i32(i32 %{{[0-9]+}}, <8 x i32> [[PATCHED_DESC1]])
-; GFX1010: call void @llvm.amdgcn.image.store.1d.v4f32.i32(<4 x float> zeroinitializer, i32 15, i32 0, <8 x i32> [[WFDESC1]], i32 0, i32 0)
+; GFX900: call <4 x float> @llvm.amdgcn.image.getresinfo.2d.v4f32.i32(i32 15, i32 0, <8 x i32> %.desc, i32 0, i32 0)
+; GFX1010: call <4 x float> @llvm.amdgcn.image.getresinfo.2d.v4f32.i32(i32 15, i32 0, <8 x i32> [[PATCHED_DESC0]], i32 0, i32 0)
+
+; GFX900: call float @llvm.amdgcn.image.getresinfo.2d.f32.i32(i32 8, i32 undef, <8 x i32> %.desc, i32 0, i32 0)
+; GFX1010: call float @llvm.amdgcn.image.getresinfo.2d.f32.i32(i32 8, i32 undef, <8 x i32> [[PATCHED_DESC0]], i32 0, i32 0)
+
 ; ModuleID = 'lgcPipeline'
 source_filename = "lgcPipeline"
 target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5-ni:7"

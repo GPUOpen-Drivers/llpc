@@ -1318,28 +1318,12 @@ Value *ImageBuilder::CreateImageAtomicCommon(unsigned atomicOp, unsigned dim, un
 // @param instName : Name to give instruction(s)
 Value *ImageBuilder::CreateImageQueryLevels(unsigned dim, unsigned flags, Value *imageDesc, const Twine &instName) {
   dim = dim == DimCubeArray ? DimCube : dim;
-
-  Value *numMipLevel = nullptr;
-  if (dim == Dim2DMsaa || dim == Dim2DArrayMsaa)
-    numMipLevel = getInt32(1);
-  else {
-    GfxIpVersion gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion();
-    SqImgRsrcRegHandler proxySqRsrcRegHelper(this, imageDesc, &gfxIp);
-    Value *lastLevel = proxySqRsrcRegHelper.getReg(SqRsrcRegs::LastLevel);
-    Value *baseLevel = proxySqRsrcRegHelper.getReg(SqRsrcRegs::BaseLevel);
-    numMipLevel = CreateSub(lastLevel, baseLevel);
-    numMipLevel = CreateAdd(numMipLevel, getInt32(1));
-  }
-
-  // Set to 0 if allowNullDescriptor is on and image descriptor is a null descriptor
-  if (m_pipelineState->getOptions().allowNullDescriptor) {
-    // Check dword3 against 0 for a null descriptor
-    Value *descWord3 = CreateExtractElement(imageDesc, 3);
-    Value *isNullDesc = CreateICmpEQ(descWord3, getInt32(0));
-    numMipLevel = CreateSelect(isNullDesc, getInt32(0), numMipLevel);
-  }
-
-  return numMipLevel;
+  Value *zero = getInt32(0);
+  Instruction *resInfo = CreateIntrinsic(ImageGetResInfoIntrinsicTable[dim], {getFloatTy(), getInt32Ty()},
+                                         {getInt32(8), UndefValue::get(getInt32Ty()), imageDesc, zero, zero});
+  if (flags & ImageFlagNonUniformImage)
+    resInfo = createWaterfallLoop(resInfo, 2);
+  return CreateBitCast(resInfo, getInt32Ty(), instName);
 }
 
 // =====================================================================================================================
@@ -1403,72 +1387,30 @@ Value *ImageBuilder::CreateImageQuerySize(unsigned dim, unsigned flags, Value *i
 
   // Proper image.
   unsigned modifiedDim = dim == DimCubeArray ? DimCube : change1DTo2DIfNeeded(dim);
-  Value *resInfo = nullptr;
-
-  GfxIpVersion gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion();
-  SqImgRsrcRegHandler proxySqRsrcRegHelper(this, imageDesc, &gfxIp);
-  Value *width = proxySqRsrcRegHelper.getReg(SqRsrcRegs::Width);
-  Value *height = proxySqRsrcRegHelper.getReg(SqRsrcRegs::Height);
-  Value *depth = proxySqRsrcRegHelper.getReg(SqRsrcRegs::Depth);
-  Value *baseLevel = proxySqRsrcRegHelper.getReg(SqRsrcRegs::BaseLevel);
-
-  if (dim == Dim2DMsaa || dim == Dim2DArrayMsaa)
-    baseLevel = getInt32(0);
-
-  Value *curLevel = CreateAdd(baseLevel, lod);
-
-  // Size of the level
-  width = CreateLShr(width, curLevel);
-  width = CreateSelect(CreateICmpEQ(width, getInt32(0)), getInt32(1), width);
-  height = CreateLShr(height, curLevel);
-  height = CreateSelect(CreateICmpEQ(height, getInt32(0)), getInt32(1), height);
-
-  if (dim == Dim3D) {
-    depth = CreateLShr(depth, curLevel);
-    depth = CreateSelect(CreateICmpEQ(depth, getInt32(0)), getInt32(1), depth);
-  } else {
-    if (getPipelineState()->getTargetInfo().getGfxIpVersion().major < 9) {
-      Value *baseArray = proxySqRsrcRegHelper.getReg(SqRsrcRegs::BaseArray);
-      Value *lastArray = proxySqRsrcRegHelper.getReg(SqRsrcRegs::LastArray);
-      depth = CreateSub(lastArray, baseArray);
-      depth = CreateAdd(depth, getInt32(1));
-    }
-  }
-
-  // Set to 0 if allowNullDescriptor is on and image descriptor is a null descriptor
-  if (m_pipelineState->getOptions().allowNullDescriptor) {
-    // Check dword3 against 0 for a null descriptor
-    Value *descWord3 = CreateExtractElement(imageDesc, 3);
-    Value *isNullDesc = CreateICmpEQ(descWord3, getInt32(0));
-    width = CreateSelect(isNullDesc, getInt32(0), width);
-    height = CreateSelect(isNullDesc, getInt32(0), height);
-    depth = CreateSelect(isNullDesc, getInt32(0), depth);
-  }
-
-  resInfo = CreateInsertElement(UndefValue::get(FixedVectorType::get(getInt32Ty(), 4)), width, uint64_t(0));
-  if (dim == Dim1DArray)
-    resInfo = CreateInsertElement(resInfo, depth, 1);
-  else
-    resInfo = CreateInsertElement(resInfo, height, 1);
-
-  resInfo = CreateInsertElement(resInfo, depth, 2);
+  Value *zero = getInt32(0);
+  Instruction *resInfo =
+      CreateIntrinsic(ImageGetResInfoIntrinsicTable[modifiedDim], {FixedVectorType::get(getFloatTy(), 4), getInt32Ty()},
+                      {getInt32(15), lod, imageDesc, zero, zero});
+  if (flags & ImageFlagNonUniformImage)
+    resInfo = createWaterfallLoop(resInfo, 2);
+  Value *intResInfo = CreateBitCast(resInfo, FixedVectorType::get(getInt32Ty(), 4));
 
   unsigned sizeComponentCount = getImageQuerySizeComponentCount(dim);
 
   if (sizeComponentCount == 1)
-    return CreateExtractElement(resInfo, uint64_t(0), instName);
+    return CreateExtractElement(intResInfo, uint64_t(0), instName);
 
   if (dim == DimCubeArray) {
-    Value *slices = CreateExtractElement(resInfo, 2);
+    Value *slices = CreateExtractElement(intResInfo, 2);
     slices = CreateSDiv(slices, getInt32(6));
-    resInfo = CreateInsertElement(resInfo, slices, 2);
+    intResInfo = CreateInsertElement(intResInfo, slices, 2);
   }
 
   if (dim == Dim1DArray && modifiedDim == Dim2DArray) {
     // For a 1D array on gfx9+ that we treated as a 2D array, we want components 0 and 2.
-    return CreateShuffleVector(resInfo, resInfo, ArrayRef<int>{0, 2}, instName);
+    return CreateShuffleVector(intResInfo, intResInfo, ArrayRef<int>{0, 2}, instName);
   }
-  return CreateShuffleVector(resInfo, resInfo, ArrayRef<int>({0, 1, 2}).slice(0, sizeComponentCount), instName);
+  return CreateShuffleVector(intResInfo, intResInfo, ArrayRef<int>({0, 1, 2}).slice(0, sizeComponentCount), instName);
 }
 
 // =====================================================================================================================
