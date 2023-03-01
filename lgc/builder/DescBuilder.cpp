@@ -93,7 +93,7 @@ Value *DescBuilder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
           m_pipelineState->findResourceNode(ResourceNodeType::DescriptorMutable, descSet, binding);
       if (!node) {
         // We did not find the resource node. Return an poison value.
-        return PoisonValue::get(getBufferDescTy(pointeeTy));
+        return PoisonValue::get(getBufferDescTy());
       }
     }
     assert(node && "missing resource node");
