@@ -5954,6 +5954,62 @@ void SPIRVToLLVM::getImageDesc(SPIRVValue *bImageInst, ExtractedImageInfo *info)
 }
 
 // =============================================================================
+// Get number of channels based on the image format.
+// Returns 0 if number of channels is unknown.
+//
+// @param descriptor: The image descriptor to derive the channel count from.
+unsigned SPIRVToLLVM::getImageNumChannels(const SPIRVTypeImageDescriptor *descriptor) {
+  switch (descriptor->Format) {
+  case ImageFormat::ImageFormatR64i:
+  case ImageFormat::ImageFormatR64ui:
+  case ImageFormat::ImageFormatR32f:
+  case ImageFormat::ImageFormatR32i:
+  case ImageFormat::ImageFormatR32ui:
+  case ImageFormat::ImageFormatR16:
+  case ImageFormat::ImageFormatR16Snorm:
+  case ImageFormat::ImageFormatR16f:
+  case ImageFormat::ImageFormatR16i:
+  case ImageFormat::ImageFormatR16ui:
+  case ImageFormat::ImageFormatR8:
+  case ImageFormat::ImageFormatR8Snorm:
+  case ImageFormat::ImageFormatR8i:
+  case ImageFormat::ImageFormatR8ui:
+    return 1;
+  case ImageFormat::ImageFormatRg8:
+  case ImageFormat::ImageFormatRg8Snorm:
+  case ImageFormat::ImageFormatRg8i:
+  case ImageFormat::ImageFormatRg8ui:
+  case ImageFormat::ImageFormatRg32f:
+  case ImageFormat::ImageFormatRg32i:
+  case ImageFormat::ImageFormatRg16:
+  case ImageFormat::ImageFormatRg16Snorm:
+  case ImageFormat::ImageFormatRg16f:
+  case ImageFormat::ImageFormatRg16i:
+  case ImageFormat::ImageFormatRg16ui:
+    return 2;
+  case ImageFormat::ImageFormatR11fG11fB10f:
+    return 3;
+  case ImageFormat::ImageFormatRgba32f:
+  case ImageFormat::ImageFormatRgba32i:
+  case ImageFormat::ImageFormatRgba32ui:
+  case ImageFormat::ImageFormatRgba16:
+  case ImageFormat::ImageFormatRgba16Snorm:
+  case ImageFormat::ImageFormatRgba16f:
+  case ImageFormat::ImageFormatRgba16i:
+  case ImageFormat::ImageFormatRgba16ui:
+  case ImageFormat::ImageFormatRgba8Snorm:
+  case ImageFormat::ImageFormatRgba8:
+  case ImageFormat::ImageFormatRgba8i:
+  case ImageFormat::ImageFormatRgba8ui:
+  case ImageFormat::ImageFormatRgb10A2:
+  case ImageFormat::ImageFormatRgb10a2ui:
+    return 4;
+  }
+
+  return 0;
+}
+
+// =============================================================================
 // Set up address operand array for image sample/gather/fetch/read/write
 // builder call.
 //
@@ -6693,6 +6749,24 @@ Value *SPIRVToLLVM::transSPIRVImageWriteFromInst(SPIRVInstruction *bi, BasicBloc
   unsigned opndIdx = 1;
   addr[lgc::Builder::ImageAddressIdxCoordinate] = transValue(bii->getOpValue(opndIdx++), bb->getParent(), bb);
   Value *texel = transValue(bii->getOpValue(opndIdx++), bb->getParent(), bb);
+
+  // Create smaller texel vector, if num texel components > num channels. This
+  // ensures that no unused channels are being stored.
+  if (auto texelVecType = dyn_cast<FixedVectorType>(texel->getType())) {
+    unsigned numChannels = getImageNumChannels(imageInfo.desc);
+    if (numChannels > 0 && numChannels < texelVecType->getNumElements()) {
+      if (numChannels == 1) {
+        texel = getBuilder()->CreateExtractElement(texel, getBuilder()->getInt32(0));
+      } else {
+        SmallVector<int, 3> channels;
+        for (int channel = 0; channel < numChannels; ++channel) {
+          channels.push_back(channel);
+        }
+
+        texel = getBuilder()->CreateShuffleVector(texel, ArrayRef<int>(channels));
+      }
+    }
+  }
 
   Value *sampleNum = nullptr;
   setupImageAddressOperands(bii, opndIdx, /*HasProj=*/false, addr, &imageInfo, &sampleNum);

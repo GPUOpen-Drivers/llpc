@@ -612,7 +612,7 @@ Value *ImageBuilder::CreateImageLoadWithFmask(Type *resultTy, unsigned dim, unsi
 // =====================================================================================================================
 // Create an image store.
 //
-// @param texel : Texel value to store; v4i16, v4i32, v4i64, v4f16 or v4f32
+// @param texel : Texel value to store
 // @param dim : Image dimension
 // @param flags : ImageFlag* flags
 // @param imageDesc : Image descriptor

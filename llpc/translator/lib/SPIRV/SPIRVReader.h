@@ -135,6 +135,10 @@ public:
   // type.
   void getImageDesc(SPIRVValue *bImageInst, ExtractedImageInfo *info);
 
+  // Get number of channels based on the image format.
+  // Returns 0 if number of channels is unknown.
+  unsigned getImageNumChannels(const SPIRVTypeImageDescriptor *descriptor);
+
   // Set up address operand array for image sample/gather builder call.
   void setupImageAddressOperands(SPIRVInstruction *bi, unsigned maskIdx, bool hasProj, MutableArrayRef<Value *> addr,
                                  ExtractedImageInfo *imageInfo, Value **sampleNum);
