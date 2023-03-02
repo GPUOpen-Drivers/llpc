@@ -238,8 +238,7 @@ Value *FetchShader::getVpgrArgument(unsigned vgpr, BuilderBase &builder) const {
   Value *mergeWaveInfo = function->getArg(LsHsSysValueMergedWaveInfo);
   Value *eight = builder.getInt32(8);
   std::array<Value *, 3> args = {mergeWaveInfo, eight, eight};
-  std::array<Attribute::AttrKind, 1> attribs = {Attribute::ReadNone};
-  Value *hsVertexCount = builder.CreateNamedCall("llvm.amdgcn.ubfe.i32", int32Type, args, attribs, "HsVertCount");
+  Value *hsVertexCount = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, int32Type, args, nullptr, "HsVertCount");
   Value *isNullHs = builder.CreateICmp(CmpInst::ICMP_EQ, hsVertexCount, builder.getInt32(0), "IsNullHs");
 
   Value *valueForNonNullHs = function->getArg(m_vsEntryRegInfo.sgprCount + vgpr);

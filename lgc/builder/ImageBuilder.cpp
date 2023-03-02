@@ -1563,12 +1563,7 @@ Value *ImageBuilder::CreateImageBvhIntersectRay(Value *nodePtr, Value *extent, V
   args.push_back(invDirection);
   args.push_back(imageDesc);
 
-  // NOTE: llvm.amdgcn.image.bvh.intersect.ray* intrinsics are define in amd-vulkan-npi
-  // Use hardcode to avoid compile-error when using non-npi llvm
-  std::string callName = "llvm.amdgcn.image.bvh.intersect.ray";
-  addTypeMangling(nullptr, {nodePtr, direction}, callName);
-
-  return CreateNamedCall(callName, FixedVectorType::get(getInt32Ty(), 4), args, {});
+  return CreateIntrinsic(Intrinsic::amdgcn_image_bvh_intersect_ray, FixedVectorType::get(getInt32Ty(), 4), args);
 }
 
 #endif

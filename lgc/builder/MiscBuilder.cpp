@@ -161,7 +161,8 @@ Instruction *MiscBuilder::CreateReadClock(bool realtime, const Twine &instName) 
   CallInst *readClock = nullptr;
   if (realtime) {
     if (getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 11)
-      readClock = CreateNamedCall("llvm.amdgcn.s.sendmsg.rtn", getInt64Ty(), getInt32(GetRealTime), {}, instName);
+      readClock =
+          CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg_rtn, getInt64Ty(), getInt32(GetRealTime), nullptr, instName);
     else
       readClock = CreateIntrinsic(Intrinsic::amdgcn_s_memrealtime, {}, {}, nullptr, instName);
   } else

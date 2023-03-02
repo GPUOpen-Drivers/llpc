@@ -1265,17 +1265,9 @@ Value *SubgroupBuilder::createDppUpdate(Value *const origValue, Value *const upd
 Value *SubgroupBuilder::createPermLane16(Value *const origValue, Value *const updateValue, unsigned selectBitsLow,
                                          unsigned selectBitsHigh, bool fetchInactive, bool boundCtrl) {
   auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
-    Module *const module = builder.GetInsertBlock()->getModule();
-
-    Type *const int1Ty = builder.getInt1Ty();
-    Type *const int32Ty = builder.getInt32Ty();
-
-    FunctionCallee function = module->getOrInsertFunction("llvm.amdgcn.permlane16", int32Ty, int32Ty, int32Ty, int32Ty,
-                                                          int32Ty, int1Ty, int1Ty);
-
-    // TODO: Once GFX10 intrinsic amdgcn_permlane16 has been upstreamed, used CreateIntrinsic here.
-    return builder.CreateCall(function, {mappedArgs[0], mappedArgs[1], passthroughArgs[0], passthroughArgs[1],
-                                         passthroughArgs[2], passthroughArgs[3]});
+    return builder.CreateIntrinsic(
+        Intrinsic::amdgcn_permlane16, {},
+        {mappedArgs[0], mappedArgs[1], passthroughArgs[0], passthroughArgs[1], passthroughArgs[2], passthroughArgs[3]});
   };
 
   return CreateMapToInt32(
@@ -1299,17 +1291,9 @@ Value *SubgroupBuilder::createPermLane16(Value *const origValue, Value *const up
 Value *SubgroupBuilder::createPermLaneX16(Value *const origValue, Value *const updateValue, unsigned selectBitsLow,
                                           unsigned selectBitsHigh, bool fetchInactive, bool boundCtrl) {
   auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
-    Module *const module = builder.GetInsertBlock()->getModule();
-
-    Type *const int1Ty = builder.getInt1Ty();
-    Type *const int32Ty = builder.getInt32Ty();
-
-    FunctionCallee function = module->getOrInsertFunction("llvm.amdgcn.permlanex16", int32Ty, int32Ty, int32Ty, int32Ty,
-                                                          int32Ty, int1Ty, int1Ty);
-
-    // TODO: Once GFX10 intrinsic amdgcn_permlanex16 has been upstreamed, used CreateIntrinsic here.
-    return builder.CreateCall(function, {mappedArgs[0], mappedArgs[1], passthroughArgs[0], passthroughArgs[1],
-                                         passthroughArgs[2], passthroughArgs[3]});
+    return builder.CreateIntrinsic(
+        Intrinsic::amdgcn_permlanex16, {},
+        {mappedArgs[0], mappedArgs[1], passthroughArgs[0], passthroughArgs[1], passthroughArgs[2], passthroughArgs[3]});
   };
 
   return CreateMapToInt32(
