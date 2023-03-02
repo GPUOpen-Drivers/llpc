@@ -1498,6 +1498,7 @@ VertexFormatInfo VertexFetchImpl::getVertexFormatInfo(const VertexInputDescripti
   case BufDataFormat8_8_8:
     info.dfmt = BufDataFormat8_8_8;
     info.numChannels = 3;
+    break;
   default:
     break;
   }
