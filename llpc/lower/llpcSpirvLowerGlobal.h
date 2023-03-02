@@ -118,6 +118,8 @@ private:
   void interpolateInputElement(unsigned interpLoc, llvm::Value *interpInfo, llvm::CallInst &callInst,
                                GlobalVariable *gv, ArrayRef<Value *> indexOperands);
 
+  llvm::FunctionAnalysisManager *m_functionAnalysisManager = nullptr;
+
   std::unordered_map<llvm::Value *, llvm::Value *> m_globalVarProxyMap; // Proxy map for lowering global variables
   std::unordered_map<llvm::Value *, llvm::Value *> m_inputProxyMap;     // Proxy map for lowering inputs
 
