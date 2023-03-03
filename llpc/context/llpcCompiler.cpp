@@ -2237,7 +2237,8 @@ void helperThreadBuildRayTracingPipelineElf(IHelperThreadProvider *helperThreadP
 
   LgcContext *builderContext = context->getLgcContext();
   std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
-  helperThreadPayload->rayTracingContext->setPipelineState(&*pipeline, /*hasher=*/nullptr, false, /*shaderNdx=*/nullptr);
+  helperThreadPayload->rayTracingContext->setPipelineState(&*pipeline, /*hasher=*/nullptr, false,
+                                                           /*shaderNdx=*/nullptr);
   context->setBuilder(builderContext->createBuilder(&*pipeline));
 
   TimerProfiler timerProfiler(context->getPipelineHashCode(), "LLPC", TimerProfiler::PipelineTimerEnableMask);
