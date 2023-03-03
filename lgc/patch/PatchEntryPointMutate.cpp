@@ -1054,11 +1054,6 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
 
   if (m_pipelineState->useRegisterFieldFormat()) {
     constexpr unsigned NumUserSgprs = 32;
-    unsigned numUserDataSgprs = 16;
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 && m_shaderStage != ShaderStageCompute &&
-        m_shaderStage != ShaderStageTask)
-      numUserDataSgprs = 32;
-
     constexpr unsigned InvalidMapVal = static_cast<unsigned>(UserDataMapping::Invalid);
     SmallVector<unsigned, NumUserSgprs> userDataMap;
     userDataMap.resize(NumUserSgprs, InvalidMapVal);
