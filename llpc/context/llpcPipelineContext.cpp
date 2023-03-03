@@ -711,8 +711,10 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
         destNode.concreteType = ResourceNodeType::DescriptorBufferCompact;
       else if (node.type == Vkgc::ResourceMappingNodeType::DescriptorConstBuffer)
         destNode.concreteType = ResourceNodeType::DescriptorBuffer;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
       else if (node.type == Vkgc::ResourceMappingNodeType::DescriptorMutable)
         destNode.concreteType = ResourceNodeType::DescriptorMutable;
+#endif
       else
         destNode.concreteType = static_cast<ResourceNodeType>(node.type);
 
@@ -722,12 +724,14 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
       destNode.immutableValue = nullptr;
       destNode.immutableSize = 0;
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
       // Normally we know the stride of items in a descriptor array. However in specific circumstances
       // the type is not known by llpc. This is the case with mutable descriptors where we need the
       // stride to be explicitly specified.
       if (node.srdRange.strideInDwords > 0) {
         destNode.stride = node.srdRange.strideInDwords;
       } else {
+#endif
         switch (node.type) {
         case ResourceMappingNodeType::DescriptorImage:
         case ResourceMappingNodeType::DescriptorResource:
@@ -759,7 +763,9 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
           destNode.stride = DescriptorSizeBuffer / sizeof(uint32_t);
           break;
         }
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
       }
+#endif
 
       // Only check for an immutable value if the resource is or contains a sampler. This specifically excludes
       // YCbCrSampler; that was handled in the SPIR-V reader.

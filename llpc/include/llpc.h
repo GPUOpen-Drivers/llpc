@@ -44,7 +44,7 @@ using Vkgc::FsOutInfo;
 using Vkgc::GfxIpVersion;
 using Vkgc::GraphicsPipelineBuildInfo;
 using Vkgc::MaxColorTargets;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION > 60
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 60
 using Vkgc::NggCompactDisable;
 #endif
 using Vkgc::NggSubgroupSizingType;

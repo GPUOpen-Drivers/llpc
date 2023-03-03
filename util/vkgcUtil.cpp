@@ -157,7 +157,9 @@ const char *getResourceMappingNodeTypeName(ResourceMappingNodeType type) {
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorBufferCompact)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, StreamOutTableVaPtr)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, InlineBuffer)
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorMutable)
+#endif
     break;
   default:
     llvm_unreachable("Should never be called!");

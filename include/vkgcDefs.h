@@ -44,7 +44,7 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 60
+#define LLPC_INTERFACE_MAJOR_VERSION 61
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     61.0 | Add DescriptorMutable type and ResourceMappingNode::strideInDwords to support mutable descriptors     |
 //  |     60.0 | Simplify the enum NggCompactMode to a boolean flag                                                    |
 //  |     59.0 | Remove the option enableVertexReuse from NggState                                                     |
 //  |     57.2 | Move all internal resource binding id to enum InternalBinding.                                        |
@@ -351,7 +352,9 @@ enum class ResourceMappingNodeType : unsigned {
   DescriptorImage,              ///< Generic descriptor: storageImage, including image, input attachment
   DescriptorConstTexelBuffer,   ///< Generic descriptor: constTexelBuffer, including uniform texel buffer
   InlineBuffer,                 ///< Push constant with binding
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
   DescriptorMutable,            ///< Mutable descriptor type
+#endif
   Count,                        ///< Count of resource mapping node types.
 };
 
@@ -376,8 +379,10 @@ struct ResourceMappingNode {
     struct {
       unsigned set;            ///< Descriptor set
       unsigned binding;        ///< Descriptor binding
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
       unsigned strideInDwords; ///< Stride of elements in a descriptor array (used for mutable descriptors)
                                ///  a stride of zero will use the type of the node to determine the stride
+#endif
       unsigned reserv0;
       unsigned reserv1;
       unsigned reserv2;
