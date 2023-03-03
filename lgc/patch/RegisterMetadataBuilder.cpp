@@ -78,6 +78,8 @@ void RegisterMetadataBuilder::buildPalMetadata() {
         apiHwShaderMap[ShaderStageTessControl] = Util::Abi::HwShaderHs;
       }
       auto lastVertexProcessingStage = m_pipelineState->getLastVertexProcessingStage();
+      if (lastVertexProcessingStage == ShaderStageCopyShader)
+        lastVertexProcessingStage = ShaderStageGeometry;
       if (m_isNggMode) {
         apiHwShaderMap[lastVertexProcessingStage] = Util::Abi::HwShaderGs;
         pipelineType = hasTs ? Util::Abi::PipelineType::NggTess : Util::Abi::PipelineType::Ngg;
@@ -290,16 +292,19 @@ void RegisterMetadataBuilder::buildEsGsRegisters() {
   else if (geometryMode.outputPrimitive == OutputPrimitives::LineStrip)
     gsOutputPrimitiveType = LINESTRIP;
   auto vgtGsOutPrimType = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtGsOutPrimType].getMap(true);
-  vgtGsOutPrimType[Util::Abi::VgtGsOutPrimTypeMetadataKey::OutprimType] = gsOutputPrimitiveType;
+  StringRef primTyStr =
+      m_pipelineState->getPalMetadata()->serializeEnum(Util::Abi::GsOutPrimType(gsOutputPrimitiveType));
+  vgtGsOutPrimType[Util::Abi::VgtGsOutPrimTypeMetadataKey::OutprimType] = primTyStr;
+
   // Set multi-stream output primitive type
   if (itemSizeArrayNode[1].getInt() > 0 || itemSizeArrayNode[2].getInt() > 0 || itemSizeArrayNode[3].getInt() > 0) {
-    const static auto GsOutPrimInvalid = 3u;
+    StringRef invalidTyStr = m_pipelineState->getPalMetadata()->serializeEnum(Util::Abi::GsOutPrimType::Last);
     vgtGsOutPrimType[Util::Abi::VgtGsOutPrimTypeMetadataKey::OutprimType_1] =
-        itemSizeArrayNode[1].getInt() > 0 ? gsOutputPrimitiveType : GsOutPrimInvalid;
+        itemSizeArrayNode[1].getInt() > 0 ? primTyStr : invalidTyStr;
     vgtGsOutPrimType[Util::Abi::VgtGsOutPrimTypeMetadataKey::OutprimType_2] =
-        itemSizeArrayNode[2].getInt() > 0 ? gsOutputPrimitiveType : GsOutPrimInvalid;
+        itemSizeArrayNode[2].getInt() > 0 ? primTyStr : invalidTyStr;
     vgtGsOutPrimType[Util::Abi::VgtGsOutPrimTypeMetadataKey::OutprimType_3] =
-        itemSizeArrayNode[3].getInt() > 0 ? gsOutputPrimitiveType : GsOutPrimInvalid;
+        itemSizeArrayNode[3].getInt() > 0 ? primTyStr : invalidTyStr;
   }
 
   // VGT_GSVS_RING_ITEMSIZE
@@ -475,7 +480,8 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
     }
   }
   auto vgtGsOutPrimType = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtGsOutPrimType].getMap(true);
-  vgtGsOutPrimType[Util::Abi::VgtGsOutPrimTypeMetadataKey::OutprimType] = gsOutputPrimitiveType;
+  vgtGsOutPrimType[Util::Abi::VgtGsOutPrimTypeMetadataKey::OutprimType] =
+      m_pipelineState->getPalMetadata()->serializeEnum(Util::Abi::GsOutPrimType(gsOutputPrimitiveType));
 
   assert(calcFactor.primAmpFactor >= 1);
   unsigned maxVertsPerSubgroup = NggMaxThreadsPerSubgroup;
@@ -528,10 +534,8 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
   } else {
     maxVertsPerSubgroup = std::min(gsInstPrimsInSubgrp * maxVertOut, NggMaxThreadsPerSubgroup);
     // VGT_GS_VERT_ITEMSIZE
-    auto itemSizeArrayNode =
-        getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtGsVertItemsize].getArray(true);
-    itemSizeArrayNode[0] = 4 * gsInOutUsage.outputMapLocCount;
-    itemSizeArrayNode[1] = itemSizeArrayNode[2] = itemSizeArrayNode[3] = 0;
+    getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtGsVertItemsize] =
+        4 * gsInOutUsage.outputMapLocCount;
 
     // VGT_GS_INSTANCE_CNT
     if (geometryMode.invocations > 1 || gsBuiltInUsage.invocationId) {
@@ -698,7 +702,7 @@ void RegisterMetadataBuilder::buildPsRegisters() {
   }
 
   // PA_SC_MODE_CNTL_1
-  getGraphicsRegNode()[Util::Abi::PaScModeCntl1MetadataKey::PsIterSample] =
+  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::PsIterSample] =
       m_pipelineState->getShaderResourceUsage(shaderStage)->builtInUsage.fs.runAtSampleRate > 0;
 
   // DB_SHADER_CONTROL
@@ -871,6 +875,12 @@ void RegisterMetadataBuilder::buildPsRegisters() {
   } else {
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::UsesUavs] = resUsage->resourceWrite;
   }
+
+  // CB_SHADER_MASK
+  unsigned cbShaderMask = resUsage->inOutUsage.fs.cbShaderMask;
+  cbShaderMask = resUsage->inOutUsage.fs.isNullFs ? 0 : cbShaderMask;
+  auto cbShaderMaskNode = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::CbShaderMask].getMap(true);
+  cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output0Enable] = cbShaderMask;
 }
 
 // =====================================================================================================================

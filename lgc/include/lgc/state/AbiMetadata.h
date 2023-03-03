@@ -298,10 +298,6 @@ static constexpr char ZOffsetEna[] = ".z_offset_ena";
 static constexpr char VtxW0Fmt[] = ".vtx_w0_fmt";
 }; // namespace PaClVteCntlMetadataKey
 
-namespace PaScModeCntl1MetadataKey {
-static constexpr char PsIterSample[] = ".per_iter_sample";
-}; // namespace PaScModeCntl1MetadataKey
-
 namespace VgtShaderStagesEnMetadataKey {
 static constexpr char LsStageEn[] = ".ls_stage_en";
 static constexpr char HsStageEn[] = ".hs_stage_en";
@@ -513,6 +509,17 @@ namespace SpiShaderGsMeshletExpAllocMetadataKey {
 static constexpr char MaxExpVerts[] = ".max_exp_verts";
 static constexpr char MaxExpPrims[] = ".max_exp_prims";
 }; // namespace SpiShaderGsMeshletExpAllocMetadataKey
+
+namespace CbShaderMaskMetadataKey {
+static constexpr char Output0Enable[] = ".output0_enable";
+static constexpr char Output1Enable[] = ".output1_enable";
+static constexpr char Output2Enable[] = ".output2_enable";
+static constexpr char Output3Enable[] = ".output3_enable";
+static constexpr char Output4Enable[] = ".output4_enable";
+static constexpr char Output5Enable[] = ".output5_enable";
+static constexpr char Output6Enable[] = ".output6_enable";
+static constexpr char Output7Enable[] = ".output7_enable";
+}; // namespace CbShaderMaskMetadataKey
 
 } // namespace Abi
 

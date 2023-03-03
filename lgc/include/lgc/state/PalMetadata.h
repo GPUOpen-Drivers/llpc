@@ -214,6 +214,9 @@ public:
   // Serialize Util::Abi::GsOutPrimType to a string
   llvm::StringRef serializeEnum(Util::Abi::GsOutPrimType value);
 
+  // Get the MapDocNode of .amdpal.pipelines
+  llvm::msgpack::MapDocNode &getPipelineNode() { return m_pipelineNode; }
+
 private:
   // Initialize the PalMetadata object after reading in already-existing PAL metadata if any
   void initialize();
