@@ -512,13 +512,18 @@ void PipelineDumper::dumpResourceMappingNode(const ResourceMappingNode *userData
   case ResourceMappingNodeType::DescriptorConstBuffer:
   case ResourceMappingNodeType::DescriptorConstBufferCompact:
   case ResourceMappingNodeType::DescriptorImage:
-  case ResourceMappingNodeType::DescriptorConstTexelBuffer: {
+  case ResourceMappingNodeType::DescriptorConstTexelBuffer:
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
   case ResourceMappingNodeType::DescriptorMutable:
+#endif
+  {
     char setHexvalue[64] = {};
     snprintf(setHexvalue, 64, "0x%08" PRIX32, userDataNode->srdRange.set);
     dumpFile << prefix << ".set = " << setHexvalue << "\n";
     dumpFile << prefix << ".binding = " << userDataNode->srdRange.binding << "\n";
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
     dumpFile << prefix << ".strideInDwords = " << userDataNode->srdRange.strideInDwords << "\n";
+#endif
     break;
   }
   case ResourceMappingNodeType::DescriptorTableVaPtr: {
@@ -1729,7 +1734,10 @@ void PipelineDumper::updateHashForResourceMappingNode(const ResourceMappingNode 
   case ResourceMappingNodeType::DescriptorConstBufferCompact:
   case ResourceMappingNodeType::DescriptorImage:
   case ResourceMappingNodeType::DescriptorConstTexelBuffer:
-  case ResourceMappingNodeType::DescriptorMutable: {
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
+  case ResourceMappingNodeType::DescriptorMutable:
+#endif
+  {
     hasher->Update(userDataNode->srdRange);
     break;
   }
