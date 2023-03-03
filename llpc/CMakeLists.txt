@@ -65,13 +65,7 @@ if(ICD_BUILD_LLPC)
     set(LLVM_INCLUDE_TOOLS ON CACHE BOOL Force)
     set(LLVM_INCLUDE_UTILS ON CACHE BOOL Force)
     set(LLVM_ENABLE_TERMINFO OFF CACHE BOOL Force)
-    if (NOT WIN32)
-        # Build optimized version of llvm-tblgen even in debug builds, for faster build times.
-        #
-        # Don't turn this on on Windows, because the required "cross compile" setup doesn't work in the internal CMake
-        # setup on Windows.
-        set(LLVM_OPTIMIZED_TABLEGEN ON CACHE BOOL Force)
-    endif()
+    set(LLVM_OPTIMIZED_TABLEGEN ON CACHE BOOL Force)
 
     # This will greatly speed up debug builds because we won't be listing all the symbols with llvm-nm.
     set(LLVM_BUILD_LLVM_C_DYLIB OFF CACHE BOOL Force)
