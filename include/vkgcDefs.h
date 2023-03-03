@@ -353,9 +353,9 @@ enum class ResourceMappingNodeType : unsigned {
   DescriptorConstTexelBuffer,   ///< Generic descriptor: constTexelBuffer, including uniform texel buffer
   InlineBuffer,                 ///< Push constant with binding
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
-  DescriptorMutable,            ///< Mutable descriptor type
+  DescriptorMutable, ///< Mutable descriptor type
 #endif
-  Count,                        ///< Count of resource mapping node types.
+  Count, ///< Count of resource mapping node types.
 };
 
 /// Enumerates part-pipeline stages of compilation.
@@ -377,8 +377,8 @@ struct ResourceMappingNode {
     /// Info for generic descriptor nodes (DescriptorResource, DescriptorSampler, DescriptorCombinedTexture,
     /// DescriptorTexelBuffer, DescriptorBuffer and DescriptorBufferCompact)
     struct {
-      unsigned set;            ///< Descriptor set
-      unsigned binding;        ///< Descriptor binding
+      unsigned set;     ///< Descriptor set
+      unsigned binding; ///< Descriptor binding
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
       unsigned strideInDwords; ///< Stride of elements in a descriptor array (used for mutable descriptors)
                                ///  a stride of zero will use the type of the node to determine the stride
