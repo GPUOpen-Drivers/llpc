@@ -328,20 +328,29 @@ Value *SubgroupBuilder::CreateSubgroupShuffle(Value *const value, Value *const i
 
   if (supportPermLane64Dpp()) {
     assert(getShaderWaveSize() == 64);
+
+    // Start the WWM section by setting the inactive lanes.
+    Value *const poisonValue = PoisonValue::get(value->getType());
+    Value *const poisonIndex = PoisonValue::get(index->getType());
+    Value *const scaledIndex = CreateMul(index, getInt32(4));
+    Value *wwmValue = BuilderBase::get(*this).CreateSetInactive(value, poisonValue);
+    Value *wwmIndex = BuilderBase::get(*this).CreateSetInactive(scaledIndex, poisonIndex);
+
     auto permuteFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
                           ArrayRef<Value *> passthroughArgs) -> Value * {
       return builder.CreateIntrinsic(Intrinsic::amdgcn_permlane64, {}, {mappedArgs[0]});
     };
 
-    auto swapped = CreateMapToInt32(permuteFunc, value, {});
+    auto swapped = CreateMapToInt32(permuteFunc, wwmValue, {});
 
     auto bPermFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
                         ArrayRef<Value *> passthroughArgs) -> Value * {
       return builder.CreateIntrinsic(Intrinsic::amdgcn_ds_bpermute, {}, {passthroughArgs[0], mappedArgs[0]});
     };
 
-    auto bPermSameHalf = CreateMapToInt32(bPermFunc, value, CreateMul(index, getInt32(4)));
-    auto bPermOtherHalf = CreateMapToInt32(bPermFunc, swapped, CreateMul(index, getInt32(4)));
+    auto bPermSameHalf = CreateMapToInt32(bPermFunc, wwmValue, wwmIndex);
+    auto bPermOtherHalf = CreateMapToInt32(bPermFunc, swapped, wwmIndex);
+    bPermOtherHalf = createWwm(bPermOtherHalf);
 
     auto const threadId = CreateSubgroupMbcnt(getInt64(UINT64_MAX), "");
     auto const sameOrOtherHalf = CreateAnd(CreateXor(index, threadId), getInt32(32));
