@@ -857,11 +857,34 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
     bool hasDepthExport = builtInUsage.sampleMask || builtInUsage.fragStencilRef || builtInUsage.fragDepth;
     builder.addAttribute("amdgpu-depth-export", hasDepthExport ? "1" : "0");
 
-    // mmSPI_SHADER_COL_FORMAT is used for fully compiled shaders
-    unsigned colFormat = m_pipelineState->getPalMetadata()->getRegister(mmSPI_SHADER_COL_FORMAT);
-    // getColorExportCount() is used for partially compiled shaders
-    unsigned colorExportCount = m_pipelineState->getPalMetadata()->getColorExportCount();
-    bool hasColorExport = (colFormat != EXP_FORMAT_ZERO) || (colorExportCount > (hasDepthExport ? 1 : 0));
+    bool hasColorExport = false;
+    // SpiShaderColFormat / mmSPI_SHADER_COL_FORMAT is used for fully compiled shaders
+    unsigned colFormat = EXP_FORMAT_ZERO;
+    if (m_pipelineState->useRegisterFieldFormat()) {
+      auto &colFormatNode = m_pipelineState->getPalMetadata()
+                                ->getPipelineNode()
+                                .getMap(true)[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
+                                .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::SpiShaderColFormat]
+                                .getMap(true);
+      for (auto iter = colFormatNode.begin(); iter != colFormatNode.end(); ++iter) {
+        if (iter->second.getUInt() != EXP_FORMAT_ZERO) {
+          colFormat = iter->second.getUInt();
+          break;
+        }
+      }
+    } else {
+      colFormat = m_pipelineState->getPalMetadata()->getRegister(mmSPI_SHADER_COL_FORMAT);
+    }
+    if (colFormat != EXP_FORMAT_ZERO)
+      hasColorExport = true;
+
+    if (!hasColorExport) {
+      // getColorExportCount() is used for partially compiled shaders
+      const unsigned colorExportCount = m_pipelineState->getPalMetadata()->getColorExportCount();
+      if (colorExportCount > static_cast<unsigned>(hasDepthExport))
+        hasColorExport = true;
+    }
+
     builder.addAttribute("amdgpu-color-export", hasColorExport ? "1" : "0");
   }
 
