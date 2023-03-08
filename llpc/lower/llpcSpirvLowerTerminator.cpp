@@ -117,25 +117,30 @@ void SpirvLowerTerminator::visitCallInst(CallInst &callInst) {
   if (isa<ReturnInst>(*instIter))
     return;
 
-  // If terminator branches to block containing a PHI node which references
-  // this block then instructions following kill may be part of a return
-  // value sequence. In which case we cannot safely modify the instructions.
-  auto blockTerm = parentBlock->getTerminator();
-  if (!blockTerm)
-    return;
-  if (BranchInst *branch = dyn_cast<BranchInst>(blockTerm)) {
-    assert(branch->isUnconditional());
-    BasicBlock *targetBlock = branch->getSuccessor(0);
-    for (PHINode &phiNode : targetBlock->phis()) {
-      for (BasicBlock *incomingBlock : phiNode.blocks()) {
-        if (incomingBlock == parentBlock)
-          return;
+  // We must update any phis that point to this block as stale values confuse later passes
+  for (auto succBlock : successors(parentBlock)) {
+    for (auto &phiNode : succBlock->phis()) {
+      phiNode.removeIncomingValue(parentBlock, false);
+      if (phiNode.getNumOperands() == 0) {
+        // PHI began empty which means this successor block is now unreachable.
+        // Update all references to the PHI with poison and mark it for removal.
+        // We can do this because all references to this PHI are now also unreachable,
+        // or are PHI nodes which will be cleaned when the CFG is simplified.
+        auto poisonValue = PoisonValue::get(phiNode.getType());
+        phiNode.replaceAllUsesWith(poisonValue);
+        m_removalStack.emplace_back(&phiNode);
       }
     }
   }
 
-  // Add return
-  ReturnInst::Create(*m_context, nullptr, &*instIter);
+  // Add return (of poison)
+  auto returnType = parentBlock->getParent()->getReturnType();
+  if (returnType && !returnType->isVoidTy()) {
+    auto returnValue = PoisonValue::get(returnType);
+    ReturnInst::Create(*m_context, returnValue, &*instIter);
+  } else {
+    ReturnInst::Create(*m_context, nullptr, &*instIter);
+  }
 
   // Mark all other instructions for removal
   while (instIter != parentBlock->end()) {
