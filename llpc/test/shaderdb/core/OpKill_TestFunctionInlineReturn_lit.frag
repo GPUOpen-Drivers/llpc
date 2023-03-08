@@ -4,18 +4,28 @@
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
-; Test that after SPIR-V lowering all operations after second kill
-; have been replaced with a branch to the return block; however,
-; the operations after first kill should not be touched as these
-; are part of return .
+; Test that after SPIR-V lowering there are only two kills and
+; both branch directly to the return block.
+
+; Check that the selection of constants is correctly preserved
+; in the inlined function call. Selection relies on SimplifyCFG
+; correctly lowering a PHI, in a manner that can fail if
+; PHIs are not updated correctly.
 
 ; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
 ; SHADERTEST: call void{{.*}} @lgc.create.kill
-; SHADERTEST-NEXT: br label %"{{.*}}.exit"
-; SHADERTEST: call void{{.*}} @lgc.create.kill
 ; SHADERTEST-NEXT: br label %[[LABEL:[0-9]*]]
+
+; SHADERTEST: "myfunc1(i1;.exit":
+; SHADERTEST: select i1 %{{.*}}, float 3.000000e+00, float 5.000000e+00
+
+; SHADERTEST: call void{{.*}} @lgc.create.kill
+; SHADERTEST-NEXT: br label %[[LABEL]]
+
 ; SHADERTEST-NOT: call void{{.*}} @lgc.create.kill
+
 ; SHADERTEST: [[LABEL]]:
+; SHADERTEST-NOT: call void{{.*}} @lgc.create.kill
 ; SHADERTEST: call void{{.*}} @lgc.create.write.generic.output
 
 ; SHADERTEST: AMDLLPC SUCCESS

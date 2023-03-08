@@ -1,0 +1,90 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+
+; Test that branch after a kill is correctly replaced with a return.
+
+; SHADERTEST-LABEL: {{^// LLPC.*}} SPIR-V lowering results
+; SHADERTEST: call {{.*}} @lgc.create.kill
+; SHADERTEST-NEXT: call {{.*}} @lgc.create.write.generic.output
+; SHADERTEST-NEXT: ret void
+
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+; SPIR-V
+; Version: 1.5
+; Generator: Khronos Glslang Reference Front End; 10
+; Bound: 33
+; Schema: 0
+               OpCapability Shader
+          %2 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %o_color %v_color %v_coords
+               OpExecutionMode %main OriginUpperLeft
+          %1 = OpString "OpKill_TestFunctionBranch_lit.frag"
+               OpSource GLSL 450 %1 ""
+               OpName %main "main"
+               OpName %myfunc_ "myfunc("
+               OpName %o_color "o_color"
+               OpName %v_color "v_color"
+               OpName %v_coords "v_coords"
+               OpModuleProcessed "client vulkan100"
+               OpModuleProcessed "target-env spirv1.5"
+               OpModuleProcessed "target-env vulkan1.1"
+               OpModuleProcessed "entry-point main"
+               OpModuleProcessed "use-storage-buffer"
+               OpDecorate %o_color RelaxedPrecision
+               OpDecorate %o_color Location 0
+               OpDecorate %v_color RelaxedPrecision
+               OpDecorate %v_color Location 0
+               OpDecorate %16 RelaxedPrecision
+               OpDecorate %v_coords RelaxedPrecision
+               OpDecorate %v_coords Location 1
+               OpDecorate %22 RelaxedPrecision
+               OpDecorate %25 RelaxedPrecision
+               OpDecorate %26 RelaxedPrecision
+       %void = OpTypeVoid
+          %4 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+    %o_color = OpVariable %_ptr_Output_v4float Output
+%_ptr_Input_v4float = OpTypePointer Input %v4float
+    %v_color = OpVariable %_ptr_Input_v4float Input
+   %v_coords = OpVariable %_ptr_Input_v4float Input
+       %uint = OpTypeInt 32 0
+     %uint_0 = OpConstant %uint 0
+%_ptr_Input_float = OpTypePointer Input %float
+     %uint_1 = OpConstant %uint 1
+    %float_0 = OpConstant %float 0
+    %float_1 = OpConstant %float 1
+  %v4float_1 = OpConstantComposite %v4float %float_1 %float_1 %float_1 %float_1
+       %bool = OpTypeBool
+       %main = OpFunction %void None %4
+          %6 = OpLabel
+               OpLine %1 14 0
+         %16 = OpLoad %v4float %v_color
+               OpStore %o_color %16
+               OpLine %1 15 0
+         %21 = OpAccessChain %_ptr_Input_float %v_coords %uint_0
+         %22 = OpLoad %float %21
+         %24 = OpAccessChain %_ptr_Input_float %v_coords %uint_1
+         %25 = OpLoad %float %24
+         %26 = OpFAdd %float %22 %25
+         %32 = OpFunctionCall %void %myfunc_
+         %29 = OpFOrdGreaterThan %bool %26 %float_0
+               OpSelectionMerge %31 None
+               OpBranchConditional %29 %30 %31
+         %30 = OpLabel
+               OpLine %1 16 0
+         %17 = OpFAdd %v4float %16 %v4float_1
+               OpStore %o_color %17
+               OpBranch %31
+         %31 = OpLabel
+               OpReturn
+               OpFunctionEnd
+    %myfunc_ = OpFunction %void None %4
+          %8 = OpLabel
+               OpLine %1 9 0
+               OpKill
+               OpFunctionEnd
