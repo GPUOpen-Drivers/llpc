@@ -38,17 +38,13 @@ namespace lgc {
 
 // =====================================================================================================================
 // Pass to replay Builder calls recorded by BuilderRecorder
-class BuilderReplayer final : public BuilderRecorderMetadataKinds, public llvm::PassInfoMixin<BuilderReplayer> {
+class BuilderReplayer final : public llvm::PassInfoMixin<BuilderReplayer> {
 public:
-  BuilderReplayer(Pipeline *pipeline);
-
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
   bool runImpl(llvm::Module &module, PipelineState *pipelineState);
 
   static llvm::StringRef name() { return "Replay LLPC builder calls"; }
-
-  static bool parsePass(llvm::StringRef params, llvm::ModulePassManager &passMgr);
 
 private:
   void replayCall(unsigned opcode, llvm::CallInst *call);
@@ -60,6 +56,8 @@ private:
   std::map<llvm::Function *, ShaderStage> m_shaderStageMap; // Map function -> shader stage
   llvm::Function *m_enclosingFunc = nullptr;                // Last function written with current
                                                             //  shader stage
+
+  BuilderRecorderMetadataKinds m_mdKindIdCache;
 };
 
 } // namespace lgc

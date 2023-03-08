@@ -42,27 +42,6 @@ using namespace lgc;
 using namespace llvm;
 
 // =====================================================================================================================
-// Constructor
-//
-// @param pipeline : Pipeline object
-BuilderReplayer::BuilderReplayer(Pipeline *pipeline)
-    : BuilderRecorderMetadataKinds(static_cast<LLVMContext &>(pipeline->getContext())) {
-}
-
-// =====================================================================================================================
-// Parser callback for adding this pass from a textually described pass pipeline.
-//
-// @param params : Parameters to the pass (in angle brackets)
-// @param passMgr : The pass manager to which the pass should be added
-bool BuilderReplayer::parsePass(llvm::StringRef params, llvm::ModulePassManager &passMgr) {
-  if (!params.empty())
-    return false;
-
-  passMgr.addPass(BuilderReplayer(nullptr));
-  return true;
-}
-
-// =====================================================================================================================
 // Run the BuilderReplayer pass on a module
 //
 // @param [in/out] module : LLVM module to be run on
@@ -100,7 +79,7 @@ bool BuilderReplayer::runImpl(Module &module, PipelineState *pipelineState) {
     // (in the case that there is no metadata because we are running the lgc command-line tool on the
     // output from "amdllpc -emit-lgc") from the name with string searching.
     unsigned opcode = 0;
-    if (const MDNode *funcMeta = func.getMetadata(opcodeMetaKindId)) {
+    if (const MDNode *funcMeta = func.getMetadata(m_mdKindIdCache.getOpcodeMetaKindId(m_builder->getContext()))) {
       const ConstantAsMetadata *metaConst = cast<ConstantAsMetadata>(funcMeta->getOperand(0));
       opcode = cast<ConstantInt>(metaConst->getValue())->getZExtValue();
       assert(func.getName().startswith(BuilderCallPrefix));
