@@ -122,7 +122,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
     LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
 
   // We're using BuilderRecorder; replay the Builder calls now
-  passMgr.addPass(BuilderReplayer(pipelineState));
+  passMgr.addPass(BuilderReplayer());
 
   if (raw_ostream *outs = getLgcOuts()) {
     passMgr.addPass(PrintModulePass(*outs,
@@ -282,6 +282,7 @@ void Patch::registerPasses(PassBuilder &passBuilder) {
       return false;
     return true;
   };
+  (void)checkNameWithParams;
 
 #define HANDLE_PASS_WITH_PARSER(NAME, CLASS)                                                                           \
   if (innerPipeline.empty() && checkNameWithParams(name, NAME, params))                                                \
@@ -290,6 +291,7 @@ void Patch::registerPasses(PassBuilder &passBuilder) {
   passBuilder.registerPipelineParsingCallback(
       [=](StringRef name, ModulePassManager &passMgr, ArrayRef<PassBuilder::PipelineElement> innerPipeline) {
         StringRef params;
+        (void)params;
 #define LLPC_PASS(NAME, CLASS) /* */
 #define LLPC_MODULE_PASS HANDLE_PASS
 #define LLPC_MODULE_PASS_WITH_PARSER HANDLE_PASS_WITH_PARSER

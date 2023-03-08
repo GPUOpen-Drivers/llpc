@@ -49,17 +49,23 @@ static const char BuilderCallOpcodeMetadataName[] = "lgc.create.opcode";
 // A class that caches the metadata kind IDs used by BuilderRecorder and BuilderReplayer.
 class BuilderRecorderMetadataKinds {
 public:
-  BuilderRecorderMetadataKinds() {}
-  BuilderRecorderMetadataKinds(llvm::LLVMContext &context);
+  unsigned getOpcodeMetaKindId(llvm::LLVMContext &context) {
+    if (!m_opcodeMetaKindId)
+      init(context);
+    return m_opcodeMetaKindId;
+  }
 
-  unsigned opcodeMetaKindId; // Cached metadata kinds for opcode
+private:
+  void init(llvm::LLVMContext &context);
+
+  unsigned m_opcodeMetaKindId = 0; // Cached metadata kinds for opcode
 };
 
 // =====================================================================================================================
 // Builder recorder, to record all Builder calls as intrinsics
 // Each call to a Builder method causes the insertion of a call to lgc.call.*, so the Builder calls can be replayed
 // later on.
-class BuilderRecorder final : public Builder, BuilderRecorderMetadataKinds {
+class BuilderRecorder final : public Builder {
   friend LgcContext;
 
 public:
@@ -602,6 +608,8 @@ private:
   PipelineState *m_pipelineState;             // PipelineState; nullptr for shader compile
   std::unique_ptr<ShaderModes> m_shaderModes; // ShaderModes for a shader compile
   bool m_omitOpcodes;                         // Omit opcodes on lgc.create.* function declarations
+
+  BuilderRecorderMetadataKinds m_mdKindIdCache;
 };
 
 } // namespace lgc

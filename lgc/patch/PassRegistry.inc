@@ -49,10 +49,9 @@
 #define LLPC_MODULE_ANALYSIS(name, class)
 #endif
 
-LLPC_MODULE_PASS_WITH_PARSER("lgc-builder-replayer", BuilderReplayer)
-
 LLPC_MODULE_ANALYSIS("lgc-pipeline-state", PipelineStateWrapper)
 
+LLPC_MODULE_PASS("lgc-builder-replayer", BuilderReplayer)
 LLPC_MODULE_PASS("lgc-patch-resource-collect", PatchResourceCollect)
 LLPC_MODULE_PASS("lgc-patch-initialize-workgroup-memory", PatchInitializeWorkgroupMemory)
 LLPC_MODULE_PASS("lgc-patch-image-derivatives", PatchImageDerivatives)

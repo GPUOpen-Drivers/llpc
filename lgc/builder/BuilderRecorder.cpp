@@ -327,11 +327,12 @@ StringRef BuilderRecorder::getCallName(Opcode opcode) {
 }
 
 // =====================================================================================================================
-// BuilderRecordedMetadataKinds constructor : get the metadata kind IDs
+// Initialize the metadata kind cache.
 //
 // @param context : LLVM context
-BuilderRecorderMetadataKinds::BuilderRecorderMetadataKinds(LLVMContext &context) {
-  opcodeMetaKindId = context.getMDKindID(BuilderCallOpcodeMetadataName);
+void BuilderRecorderMetadataKinds::init(LLVMContext &context) {
+  m_opcodeMetaKindId = context.getMDKindID(BuilderCallOpcodeMetadataName);
+  assert(m_opcodeMetaKindId != 0); // shouldn't happen because LLVM assigns 0 internally
 }
 
 // =====================================================================================================================
@@ -339,8 +340,8 @@ BuilderRecorderMetadataKinds::BuilderRecorderMetadataKinds(LLVMContext &context)
 // @param builderContext : Builder context
 // @param pipeline : PipelineState, or nullptr for shader compile
 BuilderRecorder::BuilderRecorder(LgcContext *builderContext, Pipeline *pipeline, bool omitOpcodes)
-    : Builder(builderContext), BuilderRecorderMetadataKinds(builderContext->getContext()),
-      m_pipelineState(reinterpret_cast<PipelineState *>(pipeline)), m_omitOpcodes(omitOpcodes) {
+    : Builder(builderContext), m_pipelineState(reinterpret_cast<PipelineState *>(pipeline)),
+      m_omitOpcodes(omitOpcodes) {
 }
 
 // =====================================================================================================================
@@ -2061,7 +2062,7 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     // on the more stable lgc.create.* name rather than the less stable opcode.
     if (!m_omitOpcodes) {
       MDNode *const funcMeta = MDNode::get(getContext(), ConstantAsMetadata::get(getInt32(opcode)));
-      func->setMetadata(opcodeMetaKindId, funcMeta);
+      func->setMetadata(m_mdKindIdCache.getOpcodeMetaKindId(getContext()), funcMeta);
     }
 
     // Add attributes.
