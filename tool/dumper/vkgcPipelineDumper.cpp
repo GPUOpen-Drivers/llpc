@@ -190,6 +190,22 @@ uint64_t VKAPI_CALL IPipelineDumper::GetShaderHash(const void *moduleData) {
 }
 
 // =====================================================================================================================
+// Calculates graphics shader binary hash code.
+//
+// @param pipelineInfo : Info to build this partial graphics pipeline
+// @param stage : The shader stage for which the code is calculated
+uint64_t VKAPI_CALL IPipelineDumper::GetGraphicsShaderBinaryHash(const GraphicsPipelineBuildInfo *pipelineInfo,
+                                                                 ShaderStage stage) {
+  UnlinkedShaderStage unlinkedStage;
+  if (stage < ShaderStageFragment)
+    unlinkedStage = UnlinkedStageVertexProcess;
+  else
+    unlinkedStage = UnlinkedStageFragment;
+  auto hash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false, false, unlinkedStage);
+  return MetroHash::compact64(&hash);
+}
+
+// =====================================================================================================================
 // Calculates graphics pipeline hash code.
 //
 // @param pipelineInfo : Info to build this graphics pipeline
