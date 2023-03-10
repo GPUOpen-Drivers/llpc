@@ -3,7 +3,7 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL:  _amdgpu_vs_main:
-; SHADERTEST: s_lshl_b32 [[offset:s[0-9]*]], dstride_3_14@abs32@lo, 2
+; SHADERTEST: s_mul_i32 [[offset:s[0-9]*]], dstride_3_14@abs32@lo, 3
 ; SHADERTEST: s_ashr_i32 [[sign:s[0-9]*]], [[offset]], 31
 ; SHADERTEST: s_add_u32 s[[base1:[0-9]*]], {{s[0-9]*}}, [[offset]]
 ; SHADERTEST: s_addc_u32 s[[base2:[0-9]*]], {{s[0-9]*}}, [[sign]]
@@ -14,7 +14,7 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST1 %s
 ; SHADERTEST1-LABEL: 0000000000000100 <_amdgpu_ps_main>:
-; SHADERTEST1: s_lshl_b32 [[offset:s[0-9]*]], 32, 2
+; SHADERTEST1: s_mul_i32 [[offset:s[0-9]*]], 32, 3
 ; SHADERTEST1: s_ashr_i32 [[sign:s[0-9]*]], [[offset]], 31
 ; SHADERTEST1: s_add_u32 s[[base1:[0-9]*]], {{s[0-9]*}}, [[offset]]
 ; SHADERTEST1: s_addc_u32 s[[base2:[0-9]*]], {{s[0-9]*}}, [[sign]]
@@ -84,7 +84,7 @@ entryPoint = main
                OpLoopMerge %1030 %1002 None
                OpBranchConditional %1001 %1002 %1030
        %1002 = OpLabel
-       %1005 = OpAccessChain %_ptr_UniformConstant_38 %177 %int_4
+       %1005 = OpAccessChain %_ptr_UniformConstant_38 %177 %int_3
        %1006 = OpLoad %38 %1005
        %1008 = OpSampledImage %117 %1006 %1285
        %1012 = OpImageSampleImplicitLod %v4float %1008 %101

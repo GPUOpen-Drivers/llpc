@@ -26,6 +26,7 @@
                OpDecorate %11 Block
                OpDecorate %26 DescriptorSet 0
                OpDecorate %26 Binding 0
+               OpDecorate %22 Location 0
           %2 = OpTypeVoid
           %3 = OpTypeFunction %2
           %7 = OpTypeFloat 64
