@@ -30,7 +30,6 @@ set_target_properties(LlpcUnitTests PROPERTIES FOLDER "LLPC Tests")
 # To execute all LLPC unit tests, run:
 #   cmake --build . --target check-amdllpc-units
 
-list(APPEND CMAKE_MODULE_PATH "${XGL_LLVM_BUILD_PATH}/${CMAKE_CFG_INTDIR}/lib/cmake/llvm")
 include(LLVMConfig)
 
 # Required to use LIT on Windows.
