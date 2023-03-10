@@ -1,0 +1,85 @@
+; RUN: amdllpc -v -gfxip 11.0 %s | FileCheck --check-prefixes=CHECK
+; XFAIL: *
+
+; CHECK: AMDLLPC SUCCESS
+
+; In pseudo-GLSL, this shader does:
+;
+;    layout(set = 0, binding = 0) buffer {
+;      uint x[];
+;    } buffer0;
+;
+;    void main() {
+;      uint addrspace(StorageBuffer) *array[64];
+;      array[0] = &buffer0.x[0];
+;      array[1] = &buffer0.x[1];
+;      buffer0[0] = *array[gl_SubgroupLocalInvocationId];
+;    }
+;
+; It passes SPIR-V validation and is indeed valid to the best of my knowledge,
+; but crashes in PatchBufferOp at the time of writing because it's trying to
+; load/store addrspace(7) pointers.
+
+; SPIR-V
+; Version: 1.6
+; Generator: Google ANGLE Shader Compiler; 1
+; Bound: 48
+; Schema: 0
+
+OpCapability Shader
+OpCapability GroupNonUniform
+OpCapability VariablePointers
+OpMemoryModel Logical GLSL450
+OpEntryPoint GLCompute %main "main" %buffer0 %laneid_var
+OpExecutionMode %main LocalSize 1 1 1
+
+OpDecorate %buffer0 DescriptorSet 0
+OpDecorate %buffer0 Binding 0
+OpDecorate %_runtimearr_uint ArrayStride 4
+OpDecorate %laneid_var BuiltIn SubgroupLocalInvocationId
+
+%void = OpTypeVoid
+
+%uint = OpTypeInt 32 0
+%uint_0 = OpConstant %uint 0
+%uint_1 = OpConstant %uint 1
+%uint_2 = OpConstant %uint 2
+%uint_64 = OpConstant %uint 64
+
+%_runtimearr_uint = OpTypeRuntimeArray %uint
+%block_struct = OpTypeStruct %_runtimearr_uint
+
+%_ptr_StorageBuffer__block = OpTypePointer StorageBuffer %block_struct
+%buffer0 = OpVariable %_ptr_StorageBuffer__block StorageBuffer
+
+%_ptr_StorageBuffer__uint = OpTypePointer StorageBuffer %uint
+%_array_of_ptr = OpTypeArray %_ptr_StorageBuffer__uint %uint_64
+%_ptr_Function__array_of_ptr = OpTypePointer Function %_array_of_ptr
+%_ptr_Function__ptr = OpTypePointer Function %_ptr_StorageBuffer__uint
+
+%_ptr_Input_uint = OpTypePointer Input %uint
+%laneid_var = OpVariable %_ptr_Input_uint Input
+
+%_typeof_main = OpTypeFunction %void
+%main = OpFunction %void None %_typeof_main
+%entry = OpLabel
+
+%array = OpVariable %_ptr_Function__array_of_ptr Function
+
+%array0 = OpAccessChain %_ptr_Function__ptr %array %uint_0
+%array1 = OpAccessChain %_ptr_Function__ptr %array %uint_1
+
+%ptr0 = OpAccessChain %_ptr_StorageBuffer__uint %buffer0 %uint_0 %uint_0
+%ptr1 = OpAccessChain %_ptr_StorageBuffer__uint %buffer0 %uint_0 %uint_1
+OpStore %array0 %ptr0
+OpStore %array1 %ptr1
+
+%laneid = OpLoad %uint %laneid_var
+
+%array_varptr = OpAccessChain %_ptr_Function__ptr %array %laneid
+%ptr = OpLoad %_ptr_StorageBuffer__uint %array_varptr
+%data = OpLoad %uint %ptr
+OpStore %ptr0 %data
+
+OpReturn
+OpFunctionEnd
