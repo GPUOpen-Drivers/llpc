@@ -31,12 +31,12 @@
 
 #pragma once
 
-#include "gpurt/gpurtLib.h"
 #define MAKE_GPURT_VERSION(MAJOR, MINOR) ((MAJOR << 16) | MINOR)
 
 namespace GpuRt {
 
 #pragma pack(push, 4)
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
 struct DispatchRaysInfoData {
   uint64_t rayGenerationTable; ///< Shader record table for raygeneration shaders
   unsigned rayDispatchWidth;   ///< Width of the ray dispatch
@@ -68,6 +68,29 @@ struct DispatchRaysInfoData {
   } profile;
 
   uint64_t traceRayGpuVa; ///< Internal TraceRays indirect function GPU VA
+};
+#endif
+struct DispatchRaysConstantData {
+  unsigned rayGenerationTableAddressLo; ///< Ray generation table base address low 32-bits
+  unsigned rayGenerationTableAddressHi; ///< Ray generation table base address high 32-bits
+  unsigned rayDispatchWidth;            ///< Width of the ray dispatch
+  unsigned rayDispatchHeight;           ///< Height of the ray dispatch
+  unsigned rayDispatchDepth;            ///< Depth of the ray dispatch
+  unsigned missTableBaseAddressLo;      ///< Miss shader table base address low 32-bits
+  unsigned missTableBaseAddressHi;      ///< Miss shader table base address high 32-bits
+  unsigned missTableStrideInBytes;      ///< Miss shader table record byte stride
+  unsigned reserved0;                   ///< Reserved padding
+  unsigned hitGroupTableBaseAddressLo;  ///< Hit group table base address low 32-bits
+  unsigned hitGroupTableBaseAddressHi;  ///< Hit group table base address high 32-bits
+  unsigned hitGroupTableStrideInBytes;  ///< Hit group table record byte stride
+  unsigned reserved1;                   ///< Reserved padding
+  unsigned callableTableBaseAddressLo;  ///< Callable shader table base address low 32-bits
+  unsigned callableTableBaseAddressHi;  ///< Callable shader table base address high 32-bits
+  unsigned callableTableStrideInBytes;  ///< Callable shader table byte stride
+  unsigned profileRayFlags;             ///< Ray flags for profiling
+  unsigned profileMaxIterations;        ///< Maximum traversal iterations for profiling
+  unsigned traceRayGpuVaLo;             ///< Traversal shader (shader table) base address low 32-bits
+  unsigned traceRayGpuVaHi;             ///< Traversal shader (shader table) base address high 32-bits
 };
 #pragma pack(pop)
 

@@ -695,7 +695,7 @@ void SpirvLowerRayTracing::createSetTraceParams(Function *func) {
   BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
   m_builder->SetInsertPoint(entryBlock);
 
-#if GPURT_INTERFACE_VERSION >= MAKE_GPURT_VERSION(12, 0)
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 12
   assert(func->arg_size() == 9);
 #else
   assert(func->arg_size() == 8);
@@ -707,7 +707,7 @@ void SpirvLowerRayTracing::createSetTraceParams(Function *func) {
   rayFlags = m_builder->CreateLoad(m_traceParamsTys[TraceParam::RayFlags], rayFlags);
   m_builder->CreateStore(rayFlags, m_traceParams[TraceParam::RayFlags]);
 
-#if GPURT_INTERFACE_VERSION >= MAKE_GPURT_VERSION(12, 0)
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 12
   Value *instanceInclusionMask = argIt++;
   instanceInclusionMask =
       m_builder->CreateLoad(m_traceParamsTys[TraceParam::InstanceInclusionMask], instanceInclusionMask);

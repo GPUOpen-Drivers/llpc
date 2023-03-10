@@ -121,9 +121,7 @@ enum MemberType : unsigned {
   MemberTypeRtState,                      // VFX member type: SectionRtState
   MemberTypeRayTracingShaderExportConfig, // VFX member type: SectionRayTracingShaderExportConfig
   MemberTypeIndirectCalleeSavedRegs,      // VFX member type: SectionIndirectCalleeSavedRegs
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
-  MemberTypeGpurtFuncTable, // VFX member type: SectionGpurtFuncTable
-#endif
+  MemberTypeGpurtFuncTable,               // VFX member type: SectionGpurtFuncTable
 #endif
   MemberTypeExtendedRobustness,      // VFX member type: SectionExtendedRobustness
   MemberTypeGlAttribLocation,        // GL vertex attribute location
