@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     61.1 | Add IPipelineDumper::GetGraphicsShaderBinaryHash                                                      |
 //  |     61.0 | Add DescriptorMutable type and ResourceMappingNode::strideInDwords to support mutable descriptors     |
 //  |     60.0 | Simplify the enum NggCompactMode to a boolean flag                                                    |
 //  |     59.0 | Remove the option enableVertexReuse from NggState                                                     |
@@ -1354,6 +1355,15 @@ public:
   ///
   /// @returns : Hash code associated this shader module.
   static uint64_t VKAPI_CALL GetShaderHash(const void *pModuleData);
+
+  /// Calculates graphics shader binary hash code.
+  ///
+  /// @param [in]  pPipelineInfo  Info to build this partial graphics pipeline
+  /// @param [in]  stage          The shader stage for which the code is calculated
+  ///
+  /// @returns : Hash code associated to this shader binary compilation
+  static uint64_t VKAPI_CALL GetGraphicsShaderBinaryHash(const GraphicsPipelineBuildInfo *pPipelineInfo,
+                                                         ShaderStage stage);
 
   /// Calculates graphics pipeline hash code.
   ///
