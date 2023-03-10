@@ -436,6 +436,24 @@ CallInst *Builder::CreateIntrinsic(Intrinsic::ID id, ArrayRef<Type *> types, Arr
   return result;
 }
 
+// =====================================================================================================================
+// Create a call to the specified intrinsic with the specified return type and operands, mangled based on the operand
+// types. This is an override of the same method in IRBuilder<>; the difference is that this one sets fast math
+// flags from the Builder if none are specified by fmfSource.
+//
+// @param retTy : Return type
+// @param id : Intrinsic ID
+// @param args : Input values
+// @param fmfSource : Instruction to copy fast math flags from; nullptr to get from Builder
+// @param name : Name to give instruction
+CallInst *Builder::CreateIntrinsic(Type *retTy, Intrinsic::ID id, ArrayRef<Value *> args, Instruction *fmfSource,
+                                   const Twine &name) {
+  CallInst *result = IRBuilder<>::CreateIntrinsic(retTy, id, args, fmfSource, name);
+  if (!fmfSource && isa<FPMathOperator>(result))
+    result->setFastMathFlags(getFastMathFlags());
+  return result;
+}
+
 #if VKI_RAY_TRACING
 // =====================================================================================================================
 // Create a ray intersect result with specified node in BVH buffer.

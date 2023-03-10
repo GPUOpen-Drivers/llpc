@@ -1573,7 +1573,7 @@ Value *ImageBuilder::CreateImageBvhIntersectRay(Value *nodePtr, Value *extent, V
   args.push_back(invDirection);
   args.push_back(imageDesc);
 
-  return CreateIntrinsic(Intrinsic::amdgcn_image_bvh_intersect_ray, FixedVectorType::get(getInt32Ty(), 4), args);
+  return CreateIntrinsic(FixedVectorType::get(getInt32Ty(), 4), Intrinsic::amdgcn_image_bvh_intersect_ray, args);
 }
 
 #endif

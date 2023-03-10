@@ -262,6 +262,15 @@ public:
                                   llvm::ArrayRef<llvm::Value *> args, llvm::Instruction *fmfSource = nullptr,
                                   const llvm::Twine &name = "");
 
+  //
+  // @param retTy : Return type
+  // @param id : Intrinsic ID
+  // @param args : Input values
+  // @param fmfSource : Instruction to copy fast math flags from; nullptr to get from Builder
+  // @param name : Name to give instruction
+  llvm::CallInst *CreateIntrinsic(llvm::Type *retTy, llvm::Intrinsic::ID id, llvm::ArrayRef<llvm::Value *> args,
+                                  llvm::Instruction *fmfSource = nullptr, const llvm::Twine &name = "");
+
   // -----------------------------------------------------------------------------------------------------------------
   // Arithmetic operations
 
