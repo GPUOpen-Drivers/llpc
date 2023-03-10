@@ -245,6 +245,7 @@ target_sources(LLVMlgc PRIVATE
     util/Internal.cpp
     util/PassManager.cpp
     util/StartStopTimer.cpp
+    util/TypeLowering.cpp
 )
 
 add_subdirectory(disassembler)
