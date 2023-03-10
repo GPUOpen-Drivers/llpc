@@ -36,6 +36,7 @@
 namespace lgc {
 
 class BuilderBase;
+class InputImportGenericOp;
 
 // =====================================================================================================================
 // Public interface to vertex fetch manager.
@@ -51,7 +52,7 @@ public:
                                    unsigned compIdx, BuilderBase &builder) = 0;
 
   // Generate code to fetch a vertex value for uber shader
-  virtual llvm::Value *fetchVertex(llvm::CallInst *vertexFetches, llvm::Value *inputDesc, BuilderBase &builder) = 0;
+  virtual llvm::Value *fetchVertex(InputImportGenericOp *vertexFetch, llvm::Value *inputDesc, BuilderBase &builder) = 0;
 };
 
 // =====================================================================================================================
