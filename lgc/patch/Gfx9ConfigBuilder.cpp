@@ -94,10 +94,9 @@ void ConfigBuilder::buildPalMetadata() {
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (VS-FS) or FS-only shader compilation
 void ConfigBuilder::buildPipelineVsFsRegConfig() {
-  GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-  assert(gfxIp.major <= 10); // Must be GFX10 or below
+  assert(m_gfxIp.major <= 10); // Must be GFX10 or below
 
-  PipelineVsFsRegConfig config(gfxIp);
+  PipelineVsFsRegConfig config(m_gfxIp);
 
   addApiHwShaderMapping(ShaderStageFragment, Util::Abi::HwShaderPs);
 
@@ -114,7 +113,7 @@ void ConfigBuilder::buildPipelineVsFsRegConfig() {
       SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, VS_W32_EN, true);
     }
 
-    if (gfxIp.major == 10)
+    if (m_gfxIp.major == 10)
       setWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
 
     unsigned checksum = setShaderHash(ShaderStageVertex);
@@ -135,7 +134,7 @@ void ConfigBuilder::buildPipelineVsFsRegConfig() {
 
     iaMultiVgtParam.bits.PRIMGROUP_SIZE = primGroupSize - 1;
 
-    if (gfxIp.major == 10) {
+    if (m_gfxIp.major == 10) {
       SET_REG(&config, IA_MULTI_VGT_PARAM_PIPED, iaMultiVgtParam.u32All);
     } else {
       SET_REG(&config, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
@@ -152,10 +151,9 @@ void ConfigBuilder::buildPipelineVsFsRegConfig() {
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (VS-TS-FS).
 void ConfigBuilder::buildPipelineVsTsFsRegConfig() {
-  GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-  assert(gfxIp.major <= 10);
+  assert(m_gfxIp.major <= 10); // Must be GFX10 or below
 
-  PipelineVsTsFsRegConfig config(gfxIp);
+  PipelineVsTsFsRegConfig config(m_gfxIp);
 
   addApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderHs);
   addApiHwShaderMapping(ShaderStageTessControl, Util::Abi::HwShaderHs);
@@ -191,7 +189,7 @@ void ConfigBuilder::buildPipelineVsTsFsRegConfig() {
       SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, HS_W32_EN, true);
     }
 
-    if (gfxIp.major == 10)
+    if (m_gfxIp.major == 10)
       setWaveFrontSize(Util::Abi::HardwareStage::Hs, waveFrontSize);
   }
 
@@ -204,7 +202,7 @@ void ConfigBuilder::buildPipelineVsTsFsRegConfig() {
     if (waveFrontSize == 32) {
       SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, VS_W32_EN, true);
     }
-    if (gfxIp.major == 10)
+    if (m_gfxIp.major == 10)
       setWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
 
     unsigned checksum = setShaderHash(ShaderStageTessEval);
@@ -229,7 +227,7 @@ void ConfigBuilder::buildPipelineVsTsFsRegConfig() {
     iaMultiVgtParam.bits.SWITCH_ON_EOI = true;
   }
 
-  if (gfxIp.major == 10) {
+  if (m_gfxIp.major == 10) {
     SET_REG(&config, IA_MULTI_VGT_PARAM_PIPED, iaMultiVgtParam.u32All);
 
     SET_REG_FIELD(&config, VGT_GS_ONCHIP_CNTL, ES_VERTS_PER_SUBGRP, EsVertsOffchipGsOrTess);
@@ -244,12 +242,10 @@ void ConfigBuilder::buildPipelineVsTsFsRegConfig() {
 
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (VS-GS-FS).
-void ConfigBuilder::buildPipelineVsGsFsRegConfig() // [out] Size of register configuration
-{
-  GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-  assert(gfxIp.major <= 10);
+void ConfigBuilder::buildPipelineVsGsFsRegConfig() {
+  assert(m_gfxIp.major <= 10); // Must be GFX10 or below
 
-  PipelineVsGsFsRegConfig config(gfxIp);
+  PipelineVsGsFsRegConfig config(m_gfxIp);
 
   addApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderGs);
   addApiHwShaderMapping(ShaderStageGeometry, Util::Abi::HwShaderGs | Util::Abi::HwShaderVs);
@@ -280,7 +276,7 @@ void ConfigBuilder::buildPipelineVsGsFsRegConfig() // [out] Size of register con
     if (waveFrontSize == 32) {
       SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
     }
-    if (gfxIp.major == 10)
+    if (m_gfxIp.major == 10)
       setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
   }
 
@@ -297,7 +293,7 @@ void ConfigBuilder::buildPipelineVsGsFsRegConfig() // [out] Size of register con
     if (waveFrontSize == 32) {
       SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, VS_W32_EN, true);
     }
-    if (gfxIp.major == 10)
+    if (m_gfxIp.major == 10)
       setWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
   }
 
@@ -307,7 +303,7 @@ void ConfigBuilder::buildPipelineVsGsFsRegConfig() // [out] Size of register con
   const unsigned primGroupSize = 128;
   iaMultiVgtParam.bits.PRIMGROUP_SIZE = primGroupSize - 1;
 
-  if (gfxIp.major == 10) {
+  if (m_gfxIp.major == 10) {
     SET_REG(&config, IA_MULTI_VGT_PARAM_PIPED, iaMultiVgtParam.u32All);
   } else {
     SET_REG(&config, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
@@ -319,10 +315,9 @@ void ConfigBuilder::buildPipelineVsGsFsRegConfig() // [out] Size of register con
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (VS-TS-GS-FS).
 void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
-  GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-  assert(gfxIp.major <= 10);
+  assert(m_gfxIp.major <= 10); // Must be GFX10 or below
 
-  PipelineVsTsGsFsRegConfig config(gfxIp);
+  PipelineVsTsGsFsRegConfig config(m_gfxIp);
 
   addApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderHs);
   addApiHwShaderMapping(ShaderStageTessControl, Util::Abi::HwShaderHs);
@@ -354,7 +349,7 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
     if (waveFrontSize == 32) {
       SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, HS_W32_EN, true);
     }
-    if (gfxIp.major == 10)
+    if (m_gfxIp.major == 10)
       setWaveFrontSize(Util::Abi::HardwareStage::Hs, waveFrontSize);
 
     //  In GEN_TWO the only supported mode is fully distributed tessellation. The programming model is expected
@@ -384,7 +379,7 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
       SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
     }
 
-    if (gfxIp.major == 10)
+    if (m_gfxIp.major == 10)
       setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
   }
 
@@ -401,7 +396,7 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
     if (waveFrontSize == 32) {
       SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, VS_W32_EN, true);
     }
-    if (gfxIp.major == 10)
+    if (m_gfxIp.major == 10)
       setWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
   }
 
@@ -417,7 +412,7 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
   if (tcsBuiltInUsage.primitiveId || tesBuiltInUsage.primitiveId || gsBuiltInUsage.primitiveIdIn)
     iaMultiVgtParam.bits.SWITCH_ON_EOI = true;
 
-  if (gfxIp.major == 10) {
+  if (m_gfxIp.major == 10) {
     SET_REG(&config, IA_MULTI_VGT_PARAM_PIPED, iaMultiVgtParam.u32All);
   } else {
     SET_REG(&config, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
@@ -432,10 +427,9 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (NGG, VS-FS) or FS-only shader compilation
 void ConfigBuilder::buildPipelineNggVsFsRegConfig() {
-  GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-  assert(gfxIp.major >= 10);
+  assert(m_gfxIp.major >= 10); // Must be GFX10 or above
 
-  PipelineNggVsFsRegConfig config(gfxIp);
+  PipelineNggVsFsRegConfig config(m_gfxIp);
 
   addApiHwShaderMapping(ShaderStageFragment, Util::Abi::HwShaderPs);
 
@@ -452,7 +446,7 @@ void ConfigBuilder::buildPipelineNggVsFsRegConfig() {
     if (m_gfxIp.major <= 11) {
       SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, nggControl->passthroughMode);
     }
-    if (gfxIp.major >= 11) {
+    if (m_gfxIp.major >= 11) {
       SET_REG_GFX10_4_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_NO_MSG,
                                  nggControl->passthroughMode && !m_pipelineState->enableSwXfb());
       SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, NGG_WAVE_ID_EN, m_pipelineState->enableSwXfb());
@@ -501,13 +495,12 @@ void ConfigBuilder::buildPipelineNggVsFsRegConfig() {
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (NGG, VS-TS-FS).
 void ConfigBuilder::buildPipelineNggVsTsFsRegConfig() {
-  GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-  assert(gfxIp.major >= 10);
+  assert(m_gfxIp.major >= 10); // Must be GFX10 or above
 
   const auto nggControl = m_pipelineState->getNggControl();
   assert(nggControl->enableNgg);
 
-  PipelineNggVsTsFsRegConfig config(gfxIp);
+  PipelineNggVsTsFsRegConfig config(m_gfxIp);
 
   addApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderHs);
   addApiHwShaderMapping(ShaderStageTessControl, Util::Abi::HwShaderHs);
@@ -522,7 +515,7 @@ void ConfigBuilder::buildPipelineNggVsTsFsRegConfig() {
   if (m_gfxIp.major <= 11) {
     SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, nggControl->passthroughMode);
   }
-  if (gfxIp.major >= 11) {
+  if (m_gfxIp.major >= 11) {
     SET_REG_GFX10_4_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_NO_MSG,
                                nggControl->passthroughMode && !m_pipelineState->enableSwXfb());
     SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, NGG_WAVE_ID_EN, m_pipelineState->enableSwXfb());
@@ -594,12 +587,11 @@ void ConfigBuilder::buildPipelineNggVsTsFsRegConfig() {
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (NGG, VS-GS-FS).
 void ConfigBuilder::buildPipelineNggVsGsFsRegConfig() {
-  GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-  assert(gfxIp.major >= 10);
+  assert(m_gfxIp.major >= 10); // Must be GFX10 or above
 
   assert(m_pipelineState->getNggControl()->enableNgg);
 
-  PipelineNggVsGsFsRegConfig config(gfxIp);
+  PipelineNggVsGsFsRegConfig config(m_gfxIp);
 
   addApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderGs);
   addApiHwShaderMapping(ShaderStageGeometry, Util::Abi::HwShaderGs);
@@ -616,7 +608,7 @@ void ConfigBuilder::buildPipelineNggVsGsFsRegConfig() {
     // hardware pass-through).
     SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, false);
   }
-  if (gfxIp.major >= 11)
+  if (m_gfxIp.major >= 11)
     SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, NGG_WAVE_ID_EN, m_pipelineState->enableSwXfb());
 
   if (m_pipelineState->hasShaderStage(ShaderStageVertex) || m_pipelineState->hasShaderStage(ShaderStageGeometry)) {
@@ -664,12 +656,11 @@ void ConfigBuilder::buildPipelineNggVsGsFsRegConfig() {
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (NGG, VS-TS-GS-FS).
 void ConfigBuilder::buildPipelineNggVsTsGsFsRegConfig() {
-  GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-  assert(gfxIp.major >= 10);
+  assert(m_gfxIp.major >= 10); // Must be GFX10 or above
 
   assert(m_pipelineState->getNggControl()->enableNgg);
 
-  PipelineNggVsTsGsFsRegConfig config(gfxIp);
+  PipelineNggVsTsGsFsRegConfig config(m_gfxIp);
 
   addApiHwShaderMapping(ShaderStageVertex, Util::Abi::HwShaderHs);
   addApiHwShaderMapping(ShaderStageTessControl, Util::Abi::HwShaderHs);
@@ -688,7 +679,7 @@ void ConfigBuilder::buildPipelineNggVsTsGsFsRegConfig() {
     // hardware pass-through).
     SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, PRIMGEN_PASSTHRU_EN, false);
   }
-  if (gfxIp.major >= 11)
+  if (m_gfxIp.major >= 11)
     SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, NGG_WAVE_ID_EN, m_pipelineState->enableSwXfb());
 
   if (m_pipelineState->hasShaderStage(ShaderStageVertex) || m_pipelineState->hasShaderStage(ShaderStageTessControl)) {
@@ -767,10 +758,9 @@ void ConfigBuilder::buildPipelineNggVsTsGsFsRegConfig() {
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (Mesh-FS).
 void ConfigBuilder::buildPipelineMeshFsConfig() {
-  GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-  assert(gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
+  assert(m_gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
 
-  PipelineMeshFsRegConfig config(gfxIp);
+  PipelineMeshFsRegConfig config(m_gfxIp);
 
   addApiHwShaderMapping(ShaderStageMesh, Util::Abi::HwShaderGs);
   addApiHwShaderMapping(ShaderStageFragment, Util::Abi::HwShaderPs);
@@ -795,10 +785,9 @@ void ConfigBuilder::buildPipelineMeshFsConfig() {
 // =====================================================================================================================
 // Builds register configuration for graphics pipeline (Task-Mesh-FS).
 void ConfigBuilder::buildPipelineTaskMeshFsConfig() {
-  GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-  assert(gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
+  assert(m_gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
 
-  PipelineTaskMeshFsRegConfig config(gfxIp);
+  PipelineTaskMeshFsRegConfig config(m_gfxIp);
 
   addApiHwShaderMapping(ShaderStageTask, Util::Abi::HwShaderCs);
   addApiHwShaderMapping(ShaderStageMesh, Util::Abi::HwShaderGs);
@@ -827,11 +816,9 @@ void ConfigBuilder::buildPipelineTaskMeshFsConfig() {
 // =====================================================================================================================
 // Builds register configuration for compute pipeline.
 void ConfigBuilder::buildPipelineCsRegConfig() {
-  GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-
   assert(m_pipelineState->hasShaderStage(ShaderStageCompute));
 
-  CsRegConfig config(gfxIp);
+  CsRegConfig config(m_gfxIp);
 
   addApiHwShaderMapping(ShaderStageCompute, Util::Abi::HwShaderCs);
 
@@ -851,8 +838,7 @@ template <typename T> void ConfigBuilder::buildVsRegConfig(ShaderStage shaderSta
   assert(shaderStage == ShaderStageVertex || shaderStage == ShaderStageTessEval ||
          shaderStage == ShaderStageCopyShader);
 
-  GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-  assert(gfxIp.major <= 10);
+  assert(m_gfxIp.major <= 10); // Must be GFX10 or below
 
   const auto intfData = m_pipelineState->getShaderInterfaceData(shaderStage);
 
@@ -887,7 +873,7 @@ template <typename T> void ConfigBuilder::buildVsRegConfig(ShaderStage shaderSta
     SET_REG_FIELD(&config->vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, intfData->userDataCount);
     const bool userSgprMsb = (intfData->userDataCount > 31);
 
-    if (gfxIp.major == 10) {
+    if (m_gfxIp.major == 10) {
       SET_REG_GFX10_FIELD(&config->vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR_MSB, userSgprMsb);
     } else {
       SET_REG_GFX9_FIELD(&config->vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR_MSB, userSgprMsb);
@@ -918,7 +904,7 @@ template <typename T> void ConfigBuilder::buildVsRegConfig(ShaderStage shaderSta
     streamBufferConfig |= (streamXfbBuffers[i] << (i * 4));
   SET_REG(&config->vsRegs, VGT_STRMOUT_BUFFER_CONFIG, streamBufferConfig);
 
-  if (gfxIp.major == 10) {
+  if (m_gfxIp.major == 10) {
     SET_REG_GFX10_FIELD(&config->vsRegs, SPI_SHADER_PGM_RSRC1_VS, MEM_ORDERED, true);
   }
 
@@ -955,8 +941,6 @@ void ConfigBuilder::buildLsHsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   assert(shaderStage1 == ShaderStageVertex || shaderStage1 == ShaderStageInvalid);
   assert(shaderStage2 == ShaderStageTessControl || shaderStage2 == ShaderStageInvalid);
 
-  GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-
   const auto tcsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl);
   const auto vsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
   const auto &vsBuiltInUsage = vsResUsage->builtInUsage.vs;
@@ -984,7 +968,7 @@ void ConfigBuilder::buildLsHsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   SET_REG_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC1_HS, DEBUG_MODE, tcsShaderOptions.debugMode);
 
   const bool userSgprMsb = (userDataCount > 31);
-  if (gfxIp.major >= 10) {
+  if (m_gfxIp.major >= 10) {
     bool wgpMode = (m_pipelineState->getShaderWgpMode(ShaderStageVertex) ||
                     m_pipelineState->getShaderWgpMode(ShaderStageTessControl));
 
@@ -1014,13 +998,13 @@ void ConfigBuilder::buildLsHsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   ldsSizeInDwords = alignTo(ldsSizeInDwords, ldsSizeDwordGranularity);
 
   const unsigned ldsSize = ldsSizeInDwords >> ldsSizeDwordGranularityShift;
-  if (gfxIp.major == 9) {
+  if (m_gfxIp.major == 9) {
     SET_REG_GFX9_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, LDS_SIZE, ldsSize);
   } else {
     SET_REG_GFX10_PLUS_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, LDS_SIZE, ldsSize);
   }
 
-  if (gfxIp.major >= 11) {
+  if (m_gfxIp.major >= 11) {
     // Pixel wait sync+
     const bool useImageOp = vsResUsage->useImageOp || tcsResUsage->useImageOp;
     SET_REG_GFX11_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC4_HS, IMAGE_OP, useImageOp);
@@ -1061,8 +1045,7 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
          shaderStage1 == ShaderStageInvalid);
   assert(shaderStage2 == ShaderStageGeometry || shaderStage2 == ShaderStageInvalid);
 
-  GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-  assert(gfxIp.major <= 10);
+  assert(m_gfxIp.major <= 10); // Must be GFX10 or below
 
   const bool hasTs =
       m_pipelineState->hasShaderStage(ShaderStageTessControl) || m_pipelineState->hasShaderStage(ShaderStageTessEval);
@@ -1103,7 +1086,7 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   SET_REG_FIELD(&config->esGsRegs, SPI_SHADER_PGM_RSRC1_GS, DEBUG_MODE, gsShaderOptions.debugMode);
 
   const bool userSgprMsb = (userDataCount > 31);
-  if (gfxIp.major == 10) {
+  if (m_gfxIp.major == 10) {
     bool wgpMode = m_pipelineState->getShaderWgpMode(hasTs ? ShaderStageTessEval : ShaderStageVertex) ||
                    m_pipelineState->getShaderWgpMode(ShaderStageGeometry);
 
@@ -1237,7 +1220,7 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
 
   const unsigned maxPrimsPerSubgroup = std::min(gsInstPrimsInSubgrp * maxVertOut, MaxGsThreadsPerSubgroup);
 
-  if (gfxIp.major == 9) {
+  if (m_gfxIp.major == 9) {
     SET_REG_FIELD(&config->esGsRegs, VGT_GS_MAX_PRIMS_PER_SUBGROUP, MAX_PRIMS_PER_SUBGROUP, maxPrimsPerSubgroup);
   } else {
     SET_REG_FIELD(&config->esGsRegs, GE_MAX_OUTPUT_PER_SUBGROUP, MAX_VERTS_PER_SUBGROUP, maxPrimsPerSubgroup);
@@ -1259,8 +1242,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
          shaderStage1 == ShaderStageInvalid);
   assert(shaderStage2 == ShaderStageGeometry || shaderStage2 == ShaderStageInvalid);
 
-  const auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-  assert(gfxIp.major >= 10);
+  assert(m_gfxIp.major >= 10); // Must be GFX10 or above
 
   const auto nggControl = m_pipelineState->getNggControl();
   assert(nggControl->enableNgg);
@@ -1332,7 +1314,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   SET_REG_GFX10_PLUS_FIELD(&config->primShaderRegs, SPI_SHADER_PGM_RSRC2_GS, USER_SGPR_MSB, userSgprMsb);
 
   unsigned esVgprCompCnt = 0;
-  if (gfxIp.major <= 11) {
+  if (m_gfxIp.major <= 11) {
     if (hasTs) {
       if (tesBuiltInUsage.primitiveId)
         esVgprCompCnt = 3; // Enable patch ID (ES VGPR8)
@@ -1364,7 +1346,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   setLdsSizeByteSize(Util::Abi::HardwareStage::Gs, ldsSizeInDwords * 4);
   setEsGsLdsSize(calcFactor.esGsLdsSize * 4);
 
-  if (gfxIp.major >= 11) {
+  if (m_gfxIp.major >= 11) {
     // Pixel wait sync+
     bool useImageOp = hasGs ? gsResUsage->useImageOp : false;
     if (hasTs)
@@ -1397,7 +1379,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   if (geometryMode.invocations > 1 || gsBuiltInUsage.invocationId) {
     SET_REG_FIELD(&config->primShaderRegs, VGT_GS_INSTANCE_CNT, ENABLE, true);
     SET_REG_FIELD(&config->primShaderRegs, VGT_GS_INSTANCE_CNT, CNT, geometryMode.invocations);
-    if (gfxIp >= GfxIpVersion{10, 1}) {
+    if (m_gfxIp >= GfxIpVersion{10, 1}) {
       SET_REG_GFX10_PLUS_FIELD(&config->primShaderRegs, VGT_GS_INSTANCE_CNT, EN_MAX_VERT_OUT_PER_GS_INSTANCE,
                                calcFactor.enableMaxVertOut);
     }
@@ -1454,7 +1436,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
 
   // TODO: Multiple output streams are not supported.
   SET_REG_FIELD(&config->primShaderRegs, VGT_GS_OUT_PRIM_TYPE, OUTPRIM_TYPE, gsOutputPrimitiveType);
-  if (gfxIp.major <= 11) {
+  if (m_gfxIp.major <= 11) {
     SET_REG_FIELD(&config->primShaderRegs, VGT_GSVS_RING_ITEMSIZE, ITEMSIZE, calcFactor.gsVsRingItemSize);
     // NOTE: When GS is absent, always set ES-GS ring item size to 1. Thus, we can easily get vertex ID in subgroup
     // without any additional calculations.
@@ -1541,9 +1523,8 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
   SET_REG_FIELD(&config->psRegs, SPI_SHADER_PGM_RSRC2_PS, USER_SGPR, intfData->userDataCount);
 
   const bool userSgprMsb = (intfData->userDataCount > 31);
-  GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
-  if (gfxIp.major >= 10) {
+  if (m_gfxIp.major >= 10) {
     SET_REG_GFX10_PLUS_FIELD(&config->psRegs, SPI_SHADER_PGM_RSRC1_PS, MEM_ORDERED, true);
     SET_REG_MOST_FIELD(&config->psRegs, PA_STEREO_CNTL, STEREO_MODE, STATE_STEREO_X);
     SET_REG_GFX10_PLUS_FIELD(&config->psRegs, SPI_SHADER_PGM_RSRC2_PS, USER_SGPR_MSB, userSgprMsb);
@@ -1551,7 +1532,7 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
     SET_REG_GFX9_FIELD(&config->psRegs, SPI_SHADER_PGM_RSRC2_PS, USER_SGPR_MSB, userSgprMsb);
   }
 
-  if (gfxIp.major >= 11) {
+  if (m_gfxIp.major >= 11) {
     // Pixel wait sync+
     SET_REG_GFX11_FIELD(&config->psRegs, SPI_SHADER_PGM_RSRC4_PS, IMAGE_OP, resUsage->useImageOp);
   }
@@ -1610,7 +1591,7 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
   SET_REG_FIELD(&config->psRegs, DB_SHADER_CONTROL, EXEC_ON_HIER_FAIL, execOnHeirFail);
   SET_REG_FIELD(&config->psRegs, DB_SHADER_CONTROL, CONSERVATIVE_Z_EXPORT, conservativeZExport);
 
-  if (gfxIp.major >= 10) {
+  if (m_gfxIp.major >= 10) {
     SET_REG_GFX10_PLUS_FIELD(&config->psRegs, DB_SHADER_CONTROL, PRE_SHADER_DEPTH_COVERAGE_ENABLE,
                              fragmentMode.postDepthCoverage);
   }
@@ -1633,7 +1614,7 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
     SET_REG_GFX10_PLUS_FIELD(&config->psRegs, SPI_PS_IN_CONTROL, PS_W32_EN, true);
   }
 
-  if (gfxIp.major >= 10)
+  if (m_gfxIp.major >= 10)
     setWaveFrontSize(Util::Abi::HardwareStage::Ps, waveFrontSize);
 
   unsigned pointCoordLoc = InvalidValue;
@@ -1669,7 +1650,7 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
     // NOTE: Flat shading flag is only set for per-vertex parameter.
     spiPsInputCntl.bits.FLAT_SHADE = interpInfoElem.flat && !interpInfoElem.isPerPrimitive;
     spiPsInputCntl.bits.OFFSET = interpInfoElem.loc;
-    if (gfxIp.major >= 11 && interpInfoElem.isPerPrimitive) {
+    if (m_gfxIp.major >= 11 && interpInfoElem.isPerPrimitive) {
       // NOTE: HW allocates and manages attribute ring based on the register fields: VS_EXPORT_COUNT and
       // PRIM_EXPORT_COUNT. When VS_EXPORT_COUNT = 0, HW assumes there is still a vertex attribute exported even
       // though this is not what we want. Hence, we should reserve param0 as a dummy vertex attribute and all
@@ -1707,13 +1688,13 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
   }
 
   unsigned numInterp = resUsage->inOutUsage.fs.interpInfo.size() - numPrimInterp;
-  if (gfxIp.major >= 11) {
+  if (m_gfxIp.major >= 11) {
     // NOTE: For GFX11+, vertex attributes and primitive attributes are counted together. The field
     // SPI_PS_INPUT_CNTL.PRIM_ATTR is used to differentiate them.
     numInterp = resUsage->inOutUsage.fs.interpInfo.size();
   }
   SET_REG_FIELD(&config->psRegs, SPI_PS_IN_CONTROL, NUM_INTERP, numInterp);
-  if (gfxIp.isGfx(10, 3))
+  if (m_gfxIp.isGfx(10, 3))
     SET_REG_GFX10_3_PLUS_EXCLUSIVE_FIELD(&config->psRegs, SPI_PS_IN_CONTROL, NUM_PRIM_INTERP, numPrimInterp);
 
   if (pointCoordLoc != InvalidValue) {
@@ -1756,8 +1737,7 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
 template <typename T> void ConfigBuilder::buildMeshRegConfig(ShaderStage shaderStage, T *config) {
   assert(shaderStage == ShaderStageMesh);
 
-  const auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-  assert(gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
+  assert(m_gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
 
   const auto resUsage = m_pipelineState->getShaderResourceUsage(shaderStage);
   const auto intfData = m_pipelineState->getShaderInterfaceData(shaderStage);
@@ -1814,7 +1794,7 @@ template <typename T> void ConfigBuilder::buildMeshRegConfig(ShaderStage shaderS
   SET_REG_FIELD(&config->meshRegs, SPI_SHADER_PGM_RSRC2_GS, LDS_SIZE, ldsSize);
   setLdsSizeByteSize(Util::Abi::HardwareStage::Gs, ldsSizeInDwords * 4);
 
-  if (gfxIp.major >= 11) {
+  if (m_gfxIp.major >= 11) {
     // Pixel wait sync+
     SET_REG_GFX11_FIELD(&config->meshRegs, SPI_SHADER_PGM_RSRC4_GS, IMAGE_OP, resUsage->useImageOp);
   }
@@ -1870,13 +1850,13 @@ template <typename T> void ConfigBuilder::buildMeshRegConfig(ShaderStage shaderS
   const bool enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
   bool hasPrimitivePayload =
       builtInUsage.layer || builtInUsage.viewportIndex || builtInUsage.primitiveShadingRate || enableMultiView;
-  if (gfxIp.major < 11)
+  if (m_gfxIp.major < 11)
     hasPrimitivePayload |= builtInUsage.primitiveId;
   SET_REG_FIELD(&config->meshRegs, SPI_SHADER_IDX_FORMAT, IDX0_EXPORT_FORMAT,
                 hasPrimitivePayload ? SPI_SHADER_2COMP : SPI_SHADER_1COMP);
   SET_REG_GFX10_PLUS_FIELD(&config->meshRegs, VGT_DRAW_PAYLOAD_CNTL, EN_PRIM_PAYLOAD, hasPrimitivePayload);
 
-  if (gfxIp.major >= 11) {
+  if (m_gfxIp.major >= 11) {
     SET_REG_FIELD(&config->meshRegs, SPI_SHADER_GS_MESHLET_DIM, MESHLET_NUM_THREAD_X, meshMode.workgroupSizeX - 1);
     SET_REG_FIELD(&config->meshRegs, SPI_SHADER_GS_MESHLET_DIM, MESHLET_NUM_THREAD_Y, meshMode.workgroupSizeY - 1);
     SET_REG_FIELD(&config->meshRegs, SPI_SHADER_GS_MESHLET_DIM, MESHLET_NUM_THREAD_Z, meshMode.workgroupSizeZ - 1);
@@ -1948,9 +1928,7 @@ void ConfigBuilder::buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *confi
   SET_REG_FIELD(config, COMPUTE_PGM_RSRC1, DX10_CLAMP, true); // Follow PAL setting
   SET_REG_FIELD(config, COMPUTE_PGM_RSRC1, DEBUG_MODE, shaderOptions.debugMode);
 
-  GfxIpVersion gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-
-  if (gfxIp.major >= 10) {
+  if (m_gfxIp.major >= 10) {
     bool wgpMode = m_pipelineState->getShaderWgpMode(shaderStage);
 
     SET_REG_GFX10_PLUS_FIELD(config, COMPUTE_PGM_RSRC1, MEM_ORDERED, true);
@@ -1976,7 +1954,7 @@ void ConfigBuilder::buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *confi
     tidigCompCnt = 1;
   SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TIDIG_COMP_CNT, tidigCompCnt);
 
-  if (gfxIp.major >= 11) {
+  if (m_gfxIp.major >= 11) {
     // Pixel wait sync+
     SET_REG_GFX11_FIELD(config, COMPUTE_PGM_RSRC3, IMAGE_OP, resUsage->useImageOp);
   }
@@ -2057,9 +2035,6 @@ void ConfigBuilder::setupVgtTfParam(LsHsRegConfig *config) {
 //
 // @param [out] config : Register configuration
 template <typename T> void ConfigBuilder::setupPaSpecificRegisters(T *config) {
-  const auto &gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
-  (void(gfxIp)); // Unused
-
   const bool hasTs =
       m_pipelineState->hasShaderStage(ShaderStageTessControl) || m_pipelineState->hasShaderStage(ShaderStageTessEval);
   const bool hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
@@ -2103,7 +2078,7 @@ template <typename T> void ConfigBuilder::setupPaSpecificRegisters(T *config) {
 
   if (meshPipeline) {
     // Mesh pipeline
-    assert(gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
+    assert(m_gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
 
     const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh);
     const auto &builtInUsage = resUsage->builtInUsage.mesh;
@@ -2191,7 +2166,7 @@ template <typename T> void ConfigBuilder::setupPaSpecificRegisters(T *config) {
       SET_REG_FIELD(config, SPI_VS_OUT_CONFIG, VS_EXPORT_COUNT, expCount - 1);
 
     if (primExpCount > 0) {
-      assert(gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
+      assert(m_gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
       SET_REG_GFX10_3_PLUS_EXCLUSIVE_FIELD(config, SPI_VS_OUT_CONFIG, PRIM_EXPORT_COUNT, primExpCount);
     }
   }
@@ -2226,7 +2201,7 @@ template <typename T> void ConfigBuilder::setupPaSpecificRegisters(T *config) {
 
     if (meshPipeline) {
       if (useShadingRate) {
-        assert(gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
+        assert(m_gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
         SET_REG_GFX10_3_PLUS_FIELD(config, PA_CL_VS_OUT_CNTL, BYPASS_VTX_RATE_COMBINER, true);
       }
     } else {
@@ -2236,7 +2211,7 @@ template <typename T> void ConfigBuilder::setupPaSpecificRegisters(T *config) {
       SET_REG_FIELD(config, PA_CL_VS_OUT_CNTL, USE_VTX_VIEWPORT_INDX, useViewportIndex);
 
       if (useShadingRate) {
-        assert(gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
+        assert(m_gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
         SET_REG_GFX10_3_PLUS_FIELD(config, PA_CL_VS_OUT_CNTL, USE_VTX_VRS_RATE, true);
         SET_REG_GFX10_3_PLUS_FIELD(config, PA_CL_VS_OUT_CNTL, BYPASS_PRIM_RATE_COMBINER, true);
       }
@@ -2262,7 +2237,7 @@ template <typename T> void ConfigBuilder::setupPaSpecificRegisters(T *config) {
     SET_REG(config, PA_CL_VS_OUT_CNTL, paClVsOutCntl);
 
     // On 10.3+ all auxiliary position exports are optimized, not just the misc exports.
-    if (gfxIp >= GfxIpVersion{10, 3})
+    if (m_gfxIp >= GfxIpVersion{10, 3})
       SET_REG_FIELD(config, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_SIDE_BUS_ENA, true);
   }
 
