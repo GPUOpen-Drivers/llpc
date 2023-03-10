@@ -847,9 +847,8 @@ void RegisterMetadataBuilder::buildPsRegisters() {
   spiPsInControl[Util::Abi::SpiPsInControlMetadataKey::NumInterps] = numInterp;
   if (m_gfxIp.isGfx(10, 3))
     spiPsInControl[Util::Abi::SpiPsInControlMetadataKey::NumPrimInterp] = numPrimInterp;
-  auto waveFrontSize = m_pipelineState->getShaderWaveSize(shaderStage);
-  if (waveFrontSize == 32)
-    spiPsInControl[Util::Abi::SpiPsInControlMetadataKey::PsW32En] = true;
+  const auto waveSize = m_pipelineState->getShaderWaveSize(shaderStage);
+  spiPsInControl[Util::Abi::SpiPsInControlMetadataKey::PsW32En] = (waveSize == 32);
 
   // SPI_INTERP_CONTROL_0
   if (pointCoordLoc != InvalidValue) {
@@ -929,18 +928,18 @@ void RegisterMetadataBuilder::buildCsRegisters(ShaderStage shaderStage) {
 // =====================================================================================================================
 // Build registers fields related to shader execution.
 //
-// @param hwStageId: The hardware shader stage
+// @param hwStage: The hardware shader stage
 // @param apiStage1: The first api shader stage
 // @param apiStage2: The second api shader stage
-void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareStage hwStageId, ShaderStage apiStage1,
+void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareStage hwStage, ShaderStage apiStage1,
                                                             ShaderStage apiStage2) {
   // Set hardware stage metadata
-  auto hwShaderNode = getHwShaderNode(hwStageId);
+  auto hwShaderNode = getHwShaderNode(hwStage);
   ShaderStage apiStage = apiStage2 != ShaderStageInvalid ? apiStage2 : apiStage1;
 
   if (m_isNggMode || m_gfxIp.major >= 10) {
-    unsigned waveFrontSize = m_pipelineState->getShaderWaveSize(apiStage);
-    hwShaderNode[Util::Abi::HardwareStageMetadataKey::WavefrontSize] = waveFrontSize;
+    const unsigned waveSize = m_pipelineState->getShaderWaveSize(apiStage);
+    hwShaderNode[Util::Abi::HardwareStageMetadataKey::WavefrontSize] = waveSize;
   }
 
   if (m_pipelineState->getTargetInfo().getGpuProperty().supportShaderPowerProfiling) {
@@ -988,7 +987,7 @@ void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareS
 
   if (m_gfxIp.major >= 10) {
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::MemOrdered] = true;
-    if (hwStageId == Util::Abi::HardwareStage::Hs || hwStageId == Util::Abi::HardwareStage::Gs) {
+    if (hwStage == Util::Abi::HardwareStage::Hs || hwStage == Util::Abi::HardwareStage::Gs) {
       bool wgpMode = m_pipelineState->getShaderWgpMode(apiStage1);
       if (apiStage2 != ShaderStageInvalid)
         wgpMode = wgpMode || m_pipelineState->getShaderWgpMode(apiStage2);
@@ -999,7 +998,7 @@ void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareS
   hwShaderNode[Util::Abi::HardwareStageMetadataKey::SgprLimit] = sgprLimits;
   hwShaderNode[Util::Abi::HardwareStageMetadataKey::VgprLimit] = vgprLimits;
 
-  if (m_gfxIp.major >= 11 && hwStageId != Util::Abi::HardwareStage::Vs) {
+  if (m_gfxIp.major >= 11 && hwStage != Util::Abi::HardwareStage::Vs) {
     bool useImageOp = m_pipelineState->getShaderResourceUsage(apiStage1)->useImageOp;
     if (apiStage2 != ShaderStageInvalid)
       useImageOp |= m_pipelineState->getShaderResourceUsage(apiStage2)->useImageOp;
@@ -1314,9 +1313,8 @@ void RegisterMetadataBuilder::setVgtShaderStagesEn(unsigned hwStageMask) {
       apiStage = ShaderStageTessEval;
       vsStageEn = VS_STAGE_DS;
     }
-    auto waveFrontSize = m_pipelineState->getShaderWaveSize(apiStage);
-    if (waveFrontSize == 32)
-      vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::VsW32En] = true;
+    const auto waveSize = m_pipelineState->getShaderWaveSize(apiStage);
+    vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::VsW32En] = (waveSize == 32);
 
     vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::VsStageEn] = vsStageEn;
   }
@@ -1330,9 +1328,8 @@ void RegisterMetadataBuilder::setVgtShaderStagesEn(unsigned hwStageMask) {
       apiStage = ShaderStageTessEval;
       esStageEn = ES_STAGE_DS;
     }
-    auto waveFrontSize = m_pipelineState->getShaderWaveSize(apiStage);
-    if (waveFrontSize == 32)
-      vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::GsW32En] = true;
+    const auto waveSize = m_pipelineState->getShaderWaveSize(apiStage);
+    vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::GsW32En] = (waveSize == 32);
 
     if (m_gfxIp.major <= 11) {
       vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::EsStageEn] = esStageEn;
@@ -1341,9 +1338,9 @@ void RegisterMetadataBuilder::setVgtShaderStagesEn(unsigned hwStageMask) {
     }
   }
   if (hwStageMask & Util::Abi::HwShaderHs) {
-    auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
-    if (waveFrontSize == 32)
-      vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::HsW32En] = true;
+    const auto waveSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
+    vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::HsW32En] = (waveSize == 32);
+
     if (m_gfxIp.major <= 11)
       vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::LsStageEn] = LS_STAGE_ON;
     vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::HsStageEn] = HS_STAGE_ON;

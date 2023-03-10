@@ -53,7 +53,7 @@ private:
   void buildPsRegisters();
   void buildCsRegisters(ShaderStage shaderStage);
 
-  void buildShaderExecutionRegisters(Util::Abi::HardwareStage hwStageId, ShaderStage apiStage1, ShaderStage apiStage2);
+  void buildShaderExecutionRegisters(Util::Abi::HardwareStage hwStage, ShaderStage apiStage1, ShaderStage apiStage2);
   void buildPaSpecificRegisters();
   void setVgtShaderStagesEn(unsigned hwStageMask);
   void setIaMultVgtParam();

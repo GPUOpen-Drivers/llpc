@@ -108,13 +108,11 @@ void ConfigBuilder::buildPipelineVsFsRegConfig() {
     buildVsRegConfig<PipelineVsFsRegConfig>(ShaderStageVertex, &config);
 
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
-    auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageVertex);
-    if (waveFrontSize == 32) {
-      SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, VS_W32_EN, true);
-    }
+    const auto waveSize = m_pipelineState->getShaderWaveSize(ShaderStageVertex);
+    SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, VS_W32_EN, (waveSize == 32));
 
     if (m_gfxIp.major == 10)
-      setWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
+      setWaveFrontSize(Util::Abi::HardwareStage::Vs, waveSize);
 
     unsigned checksum = setShaderHash(ShaderStageVertex);
     SET_REG(&config, VGT_GS_ONCHIP_CNTL, 0);
@@ -184,13 +182,11 @@ void ConfigBuilder::buildPipelineVsTsFsRegConfig() {
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
 
-    auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
-    if (waveFrontSize == 32) {
-      SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, HS_W32_EN, true);
-    }
+    const auto waveSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
+    SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, HS_W32_EN, (waveSize == 32));
 
     if (m_gfxIp.major == 10)
-      setWaveFrontSize(Util::Abi::HardwareStage::Hs, waveFrontSize);
+      setWaveFrontSize(Util::Abi::HardwareStage::Hs, waveSize);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageTessEval)) {
@@ -198,12 +194,11 @@ void ConfigBuilder::buildPipelineVsTsFsRegConfig() {
 
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_DS);
 
-    auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageTessEval);
-    if (waveFrontSize == 32) {
-      SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, VS_W32_EN, true);
-    }
+    const auto waveSize = m_pipelineState->getShaderWaveSize(ShaderStageTessEval);
+    SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, VS_W32_EN, (waveSize == 32));
+
     if (m_gfxIp.major == 10)
-      setWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
+      setWaveFrontSize(Util::Abi::HardwareStage::Vs, waveSize);
 
     unsigned checksum = setShaderHash(ShaderStageTessEval);
 
@@ -272,12 +267,11 @@ void ConfigBuilder::buildPipelineVsGsFsRegConfig() {
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_REAL);
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
 
-    auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
-    if (waveFrontSize == 32) {
-      SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
-    }
+    const auto waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
+    SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, (waveSize == 32));
+
     if (m_gfxIp.major == 10)
-      setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
+      setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveSize);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
@@ -289,12 +283,11 @@ void ConfigBuilder::buildPipelineVsGsFsRegConfig() {
 
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_COPY_SHADER);
 
-    auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageCopyShader);
-    if (waveFrontSize == 32) {
-      SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, VS_W32_EN, true);
-    }
+    const auto waveSize = m_pipelineState->getShaderWaveSize(ShaderStageCopyShader);
+    SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, VS_W32_EN, (waveSize == 32));
+
     if (m_gfxIp.major == 10)
-      setWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
+      setWaveFrontSize(Util::Abi::HardwareStage::Vs, waveSize);
   }
 
   // Set up IA_MULTI_VGT_PARAM
@@ -345,12 +338,11 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
 
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
-    auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
-    if (waveFrontSize == 32) {
-      SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, HS_W32_EN, true);
-    }
+    const auto waveSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
+    SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, HS_W32_EN, (waveSize == 32));
+
     if (m_gfxIp.major == 10)
-      setWaveFrontSize(Util::Abi::HardwareStage::Hs, waveFrontSize);
+      setWaveFrontSize(Util::Abi::HardwareStage::Hs, waveSize);
 
     //  In GEN_TWO the only supported mode is fully distributed tessellation. The programming model is expected
     //  to set VGT_SHADER_STAGES_EN.DYNAMIC_HS=1 and VGT_TF_PARAM.NUM_DS_WAVES_PER_SIMD=0
@@ -374,13 +366,11 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, ES_EN, ES_STAGE_DS);
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
 
-    auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
-    if (waveFrontSize == 32) {
-      SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
-    }
+    const auto waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
+    SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, (waveSize == 32));
 
     if (m_gfxIp.major == 10)
-      setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
+      setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveSize);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
@@ -392,12 +382,11 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
 
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_COPY_SHADER);
 
-    auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageCopyShader);
-    if (waveFrontSize == 32) {
-      SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, VS_W32_EN, true);
-    }
+    const auto waveSize = m_pipelineState->getShaderWaveSize(ShaderStageCopyShader);
+    SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, VS_W32_EN, (waveSize == 32));
+
     if (m_gfxIp.major == 10)
-      setWaveFrontSize(Util::Abi::HardwareStage::Vs, waveFrontSize);
+      setWaveFrontSize(Util::Abi::HardwareStage::Vs, waveSize);
   }
 
   // Set up IA_MULTI_VGT_PARAM
@@ -459,11 +448,10 @@ void ConfigBuilder::buildPipelineNggVsFsRegConfig() {
       SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
     }
 
-    auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageVertex);
-    if (waveFrontSize == 32) {
-      SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
-    }
-    setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
+    const auto waveSize = m_pipelineState->getShaderWaveSize(ShaderStageVertex);
+    SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, (waveSize == 32));
+
+    setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveSize);
 
     unsigned checksum = setShaderHash(ShaderStageVertex);
 
@@ -539,11 +527,10 @@ void ConfigBuilder::buildPipelineNggVsTsFsRegConfig() {
       SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
 
-    auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
-    if (waveFrontSize == 32) {
-      SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, HS_W32_EN, true);
-    }
-    setWaveFrontSize(Util::Abi::HardwareStage::Hs, waveFrontSize);
+    const auto waveSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
+    SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, HS_W32_EN, (waveSize == 32));
+
+    setWaveFrontSize(Util::Abi::HardwareStage::Hs, waveSize);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageTessEval)) {
@@ -554,11 +541,10 @@ void ConfigBuilder::buildPipelineNggVsTsFsRegConfig() {
       SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, VS_EN, VS_STAGE_REAL);
     }
 
-    auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageTessEval);
-    if (waveFrontSize == 32) {
-      SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
-    }
-    setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
+    const auto waveSize = m_pipelineState->getShaderWaveSize(ShaderStageTessEval);
+    SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, (waveSize == 32));
+
+    setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveSize);
 
     unsigned checksum = setShaderHash(ShaderStageTessEval);
 
@@ -631,11 +617,10 @@ void ConfigBuilder::buildPipelineNggVsGsFsRegConfig() {
     }
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
 
-    auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
-    if (waveFrontSize == 32) {
-      SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
-    }
-    setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
+    const auto waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
+    SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, (waveSize == 32));
+
+    setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveSize);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
@@ -700,11 +685,10 @@ void ConfigBuilder::buildPipelineNggVsTsGsFsRegConfig() {
       SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, LS_EN, LS_STAGE_ON);
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, HS_EN, HS_STAGE_ON);
 
-    auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
-    if (waveFrontSize == 32) {
-      SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, HS_W32_EN, true);
-    }
-    setWaveFrontSize(Util::Abi::HardwareStage::Hs, waveFrontSize);
+    const auto waveSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
+    SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, HS_W32_EN, (waveSize == 32));
+
+    setWaveFrontSize(Util::Abi::HardwareStage::Hs, waveSize);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageTessEval) || m_pipelineState->hasShaderStage(ShaderStageGeometry)) {
@@ -727,11 +711,10 @@ void ConfigBuilder::buildPipelineNggVsTsGsFsRegConfig() {
     }
     SET_REG_FIELD(&config, VGT_SHADER_STAGES_EN, GS_EN, GS_STAGE_ON);
 
-    auto waveFrontSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
-    if (waveFrontSize == 32) {
-      SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, true);
-    }
-    setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveFrontSize);
+    const auto waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
+    SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, (waveSize == 32));
+
+    setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveSize);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
@@ -1609,13 +1592,11 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
   cbShaderMask = resUsage->inOutUsage.fs.isNullFs ? 0 : cbShaderMask;
   SET_REG(&config->psRegs, CB_SHADER_MASK, cbShaderMask);
 
-  auto waveFrontSize = m_pipelineState->getShaderWaveSize(shaderStage);
-  if (waveFrontSize == 32) {
-    SET_REG_GFX10_PLUS_FIELD(&config->psRegs, SPI_PS_IN_CONTROL, PS_W32_EN, true);
-  }
+  const auto waveSize = m_pipelineState->getShaderWaveSize(shaderStage);
+  SET_REG_GFX10_PLUS_FIELD(&config->psRegs, SPI_PS_IN_CONTROL, PS_W32_EN, (waveSize == 32));
 
   if (m_gfxIp.major >= 10)
-    setWaveFrontSize(Util::Abi::HardwareStage::Ps, waveFrontSize);
+    setWaveFrontSize(Util::Abi::HardwareStage::Ps, waveSize);
 
   unsigned pointCoordLoc = InvalidValue;
 
