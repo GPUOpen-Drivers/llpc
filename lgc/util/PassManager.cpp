@@ -44,7 +44,6 @@
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Transforms/Scalar/JumpThreading.h"
 
 namespace llvm {
 namespace cl {
@@ -92,11 +91,10 @@ public:
   void stop() override;
 
 private:
-  bool m_stopped = false;               // Whether we have already stopped adding new passes.
-  AnalysisID m_dumpCfgAfter = nullptr;  // -dump-cfg-after pass id
-  AnalysisID m_printModule = nullptr;   // Pass id of dump pass "Print Module IR"
-  AnalysisID m_jumpThreading = nullptr; // Pass id of opt pass "Jump Threading"
-  unsigned *m_passIndex = nullptr;      // Pass Index
+  bool m_stopped = false;              // Whether we have already stopped adding new passes.
+  AnalysisID m_dumpCfgAfter = nullptr; // -dump-cfg-after pass id
+  AnalysisID m_printModule = nullptr;  // Pass id of dump pass "Print Module IR"
+  unsigned *m_passIndex = nullptr;     // Pass Index
 };
 
 // =====================================================================================================================
@@ -174,7 +172,6 @@ LegacyPassManagerImpl::LegacyPassManagerImpl() : LegacyPassManager() {
   if (!cl::DumpCfgAfter.empty())
     m_dumpCfgAfter = getPassIdFromName(cl::DumpCfgAfter);
 
-  m_jumpThreading = getPassIdFromName("jump-threading");
   m_printModule = getPassIdFromName("print-module");
 }
 
@@ -255,9 +252,6 @@ void PassManagerImpl::registerCallbacks() {
     if (m_stopped)
       return false;
 
-    // Skip the jump threading pass as it interacts really badly with the structurizer.
-    if (className == JumpThreadingPass::name())
-      return false;
     // Check if the user disabled that specific pass index.
     if (className != PrintModulePass::name() && m_passIndex) {
       unsigned passIndex = *m_passIndex;
@@ -288,10 +282,6 @@ void LegacyPassManagerImpl::add(Pass *pass) {
     return;
 
   AnalysisID passId = pass->getPassID();
-
-  // Skip the jump threading pass as it interacts really badly with the structurizer.
-  if (passId == m_jumpThreading)
-    return;
 
   if (passId != m_printModule && m_passIndex) {
     unsigned passIndex = (*m_passIndex)++;
