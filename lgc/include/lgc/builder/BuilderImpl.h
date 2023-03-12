@@ -514,6 +514,9 @@ public:
                                                   llvm::Value *comparatorValue, llvm::Value *byteOffset,
                                                   const llvm::Twine &instName = "");
 
+  // Create debug printf operation, and write to the output debug buffer
+  llvm::Value *CreateDebugPrintf(llvm::ArrayRef<llvm::Value *> vars, const llvm::Twine &instName);
+
 private:
   // Read (a part of) a generic (user) input/output value.
   llvm::Value *readGenericInputOutput(bool isOutput, llvm::Type *resultTy, unsigned location,

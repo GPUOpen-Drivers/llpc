@@ -118,6 +118,8 @@ public:
   Instruction *transBuiltinFromInst(const std::string &funcName, SPIRVInstruction *bi, BasicBlock *bb);
   Instruction *transSPIRVBuiltinFromInst(SPIRVInstruction *bi, BasicBlock *bb);
   Instruction *transBarrierFence(SPIRVInstruction *bi, BasicBlock *bb);
+  Value *transString(const SPIRVString *spvValue);
+  Value *transDebugPrintf(SPIRVInstruction *bi, const ArrayRef<SPIRVValue *> spvValues, Function *func, BasicBlock *bb);
 
   // Struct used to pass information in and out of getImageDesc.
   struct ExtractedImageInfo {
@@ -220,6 +222,7 @@ private:
   typedef DenseMap<GlobalVariable *, SPIRVBuiltinVariableKind> BuiltinVarMap;
   typedef DenseMap<SPIRVType *, SmallVector<unsigned, 8>> RemappedTypeElementsMap;
   typedef DenseMap<SPIRVValue *, Type *> SPIRVAccessChainValueToLLVMRetTypeMap;
+  typedef DenseMap<const SPIRVEntry *, Value *> SPIRVToLLVMEntryMap;
 
   // A SPIRV value may be translated to a load instruction of a placeholder
   // global variable. This map records load instruction of these placeholders
@@ -243,6 +246,7 @@ private:
   SPIRVToLLVMTypeMap m_typeMap;
   SPIRVToLLVMFullTypeMap m_fullTypeMap;
   SPIRVToLLVMValueMap m_valueMap;
+  SPIRVToLLVMEntryMap m_entryMap;
   SPIRVToLLVMFunctionMap m_funcMap;
   SPIRVBlockToLLVMStructMap m_blockMap;
   SPIRVToLLVMPlaceholderMap m_placeholderMap;
@@ -258,6 +262,8 @@ private:
   DenseMap<std::pair<SPIRVType *, unsigned>, Type *> m_overlappingStructTypeWorkaroundMap;
   DenseMap<std::pair<BasicBlock *, BasicBlock *>, unsigned> m_blockPredecessorToCount;
   const Vkgc::ShaderModuleUsage *m_moduleUsage;
+  GlobalVariable *m_debugOutputBuffer;
+
   const Vkgc::PipelineShaderOptions *m_shaderOptions;
   unsigned m_spirvOpMetaKindId;
   unsigned m_execModule;
@@ -336,6 +342,8 @@ private:
   // which must be a load instruction of a global variable whose name starts
   // with kPlaceholderPrefix.
   Value *mapValue(SPIRVValue *bv, Value *v);
+  // Keep track of the spirvEntry
+  Value *mapEntry(const SPIRVEntry *be, Value *v);
 
   // Used to keep track of the number of incoming edges to a block from each
   // of the predecessor.

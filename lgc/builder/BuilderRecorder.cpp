@@ -66,6 +66,8 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
   switch (opcode) {
   case BuilderOpcode::Nop:
     return "nop";
+  case BuilderOpcode::DebugPrintf:
+    return "debug.printf";
   case BuilderOpcode::DotProduct:
     return "dot.product";
   case BuilderOpcode::IntegerDotProduct:
@@ -1849,6 +1851,14 @@ Value *Builder::createFMix(Value *x, Value *y, Value *a, const Twine &instName) 
 }
 
 // =====================================================================================================================
+// Create debug printf operation, and write to the output debug buffer
+// @vars: Printf variable parameters
+// @instName : Instance Name
+Value *BuilderRecorder::CreateDebugPrintf(llvm::ArrayRef<llvm::Value *> vars, const llvm::Twine &instName) {
+  return record(Opcode::DebugPrintf, getInt64Ty(), vars, instName);
+}
+
+// =====================================================================================================================
 // Create a subgroup shuffle.
 //
 // @param value : The value to shuffle
@@ -2065,6 +2075,7 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::CrossProduct:
     case BuilderOpcode::CubeFaceCoord:
     case BuilderOpcode::CubeFaceIndex:
+    case BuilderOpcode::DebugPrintf:
     case BuilderOpcode::Derivative:
     case BuilderOpcode::DotProduct:
     case BuilderOpcode::IntegerDotProduct:

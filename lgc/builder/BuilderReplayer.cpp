@@ -726,6 +726,13 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   case BuilderOpcode::DotProduct: {
     return m_builder->CreateDotProduct(args[0], args[1]);
   }
+  case BuilderOpcode::DebugPrintf: {
+    SmallVector<Value *> vars;
+    for (const auto &arg : args) {
+      vars.push_back(arg);
+    }
+    return m_builder->CreateDebugPrintf(vars);
+  }
   case BuilderOpcode::IntegerDotProduct: {
     Value *vector1 = args[0];
     Value *vector2 = args[1];

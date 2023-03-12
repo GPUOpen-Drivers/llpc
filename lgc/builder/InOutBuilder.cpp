@@ -1449,6 +1449,24 @@ Value *BuilderImpl::CreateTaskPayloadAtomicCompareSwap(AtomicOrdering ordering, 
 }
 
 // =====================================================================================================================
+// Create debug printf operation, and write to the output debug buffer
+// @args: Printf variable parameters
+// @instName : Instance Name
+llvm::Value *lgc::InOutBuilder::CreateDebugPrintf(llvm::ArrayRef<llvm::Value *> args, const llvm::Twine &instName) {
+  Module *module = GetInsertPoint()->getModule();
+  SmallVector<Type *, 8> argTys;
+  argTys.reserve(args.size());
+  for (auto arg : args)
+    argTys.push_back(arg->getType());
+
+  auto funcTy = FunctionType::get(getInt64Ty(), argTys, false);
+  auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, lgcName::LowerDebugPrintf, module);
+  func->setCallingConv(CallingConv::C);
+  func->addFnAttr(Attribute::NoUnwind);
+  return CreateCall(func, args, instName);
+}
+
+// =====================================================================================================================
 // Get the type of a built-in. This overrides the one in Builder to additionally recognize the internal built-ins.
 //
 // @param builtIn : Built-in kind

@@ -88,6 +88,7 @@ public:
   std::set<std::string> &getExtension() override { return SPIRVExt; }
   SPIRVFunction *getFunction(unsigned I) const override { return FuncVec[I]; }
   SPIRVVariable *getVariable(unsigned I) const override { return VariableVec[I]; }
+  const std::vector<SPIRVString *> &getStringVec() const override { return StringVec; }
   SPIRVValue *getConstant(unsigned I) const override { return ConstVec[I]; }
   SPIRVValue *getValue(SPIRVId TheId) const override;
   std::vector<SPIRVValue *> getValues(const std::vector<SPIRVId> &) const override;
@@ -193,6 +194,8 @@ public:
   // Type creation functions
   template <class T> T *addType(T *Ty);
   SPIRVTypeArray *addArrayType(SPIRVType *, SPIRVConstant *) override;
+  SPIRVTypeRuntimeArray *addRuntimeArray(SPIRVType *) override;
+  SPIRVTypeStruct *addStructType(const std::vector<SPIRVType *> &vecTypes) override;
   SPIRVTypeBool *addBoolType() override;
   SPIRVTypeFloat *addFloatType(unsigned BitWidth) override;
   SPIRVTypeFunction *addFunctionType(SPIRVType *, const std::vector<SPIRVType *> &) override;
@@ -663,6 +666,14 @@ SPIRVTypeVoid *SPIRVModuleImpl::addVoidType() {
 
 SPIRVTypeArray *SPIRVModuleImpl::addArrayType(SPIRVType *ElementType, SPIRVConstant *Length) {
   return addType(new SPIRVTypeArray(this, getId(), ElementType, Length));
+}
+
+SPIRVTypeRuntimeArray *SPIRVModuleImpl::addRuntimeArray(SPIRVType *elementType) {
+  return addType(new SPIRVTypeRuntimeArray(this, getId(), elementType));
+}
+
+SPIRVTypeStruct *SPIRVModuleImpl::addStructType(const std::vector<SPIRVType *> &vecTypes) {
+  return addType(new SPIRVTypeStruct(this, getId(), vecTypes, ""));
 }
 
 SPIRVTypeBool *SPIRVModuleImpl::addBoolType() {
