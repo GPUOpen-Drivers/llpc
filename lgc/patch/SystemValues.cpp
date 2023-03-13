@@ -329,7 +329,7 @@ std::pair<Type *, ArrayRef<Value *>> ShaderSystemValues::getEmitCounterPtr() {
       m_emitCounterPtrs.push_back(emitCounterPtr);
     }
   }
-  return std::make_pair(emitCounterTy, m_emitCounterPtrs);
+  return std::make_pair(emitCounterTy, ArrayRef<Value *>(m_emitCounterPtrs));
 }
 
 // =====================================================================================================================
