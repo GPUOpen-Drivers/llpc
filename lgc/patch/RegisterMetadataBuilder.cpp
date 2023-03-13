@@ -186,6 +186,26 @@ void RegisterMetadataBuilder::buildLsHsRegisters() {
 
   // VGT_TF_PARAM
   setVgtTfParam();
+
+  // LS_VGPR_COMP_CNT in SPI_SHADER_PGM_RSRC1_HS
+  const auto &vsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
+  unsigned lsVgprCompCnt = 0;
+  if (m_gfxIp.major <= 11) {
+    if (vsBuiltInUsage.instanceIndex)
+      lsVgprCompCnt = 3; // Enable all LS VGPRs (LS VGPR2 - VGPR5)
+    else
+      lsVgprCompCnt = 1; // Must enable relative vertex ID (LS VGPR2 and VGPR3)
+  }
+  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::LsVgprCompCnt] = lsVgprCompCnt;
+
+  // Set LDS_SIZE of SPI_SHADER_PGM_RSRC2_HS
+  assert(m_pipelineState->isTessOffChip()); // Must be off-chip on GFX9+
+  unsigned ldsSizeInDwords = calcFactor.tessOnChipLdsSize;
+#if VKI_RAY_TRACING
+  ldsSizeInDwords += calcFactor.rayQueryLdsStackSize;
+#endif
+  auto hwShaderNode = getHwShaderNode(Util::Abi::HardwareStage::Hs);
+  hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = calcLdsSize(ldsSizeInDwords);
 }
 
 // =====================================================================================================================
@@ -320,18 +340,13 @@ void RegisterMetadataBuilder::buildEsGsRegisters() {
   else
     getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::MaxVertsPerSubgroup] = maxPrimsPerSubgroup;
 
-  const unsigned ldsSizeDwordGranularityShift =
-      m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
-  const unsigned ldsSizeDwordGranularity = 1u << ldsSizeDwordGranularityShift;
-
+  // Set LDS_SIZE of SPI_SHADER_PGM_RSRC2_GS
   unsigned ldsSizeInDwords = calcFactor.gsOnChipLdsSize;
 #if VKI_RAY_TRACING
   ldsSizeInDwords += calcFactor.rayQueryLdsStackSize;
 #endif
-  ldsSizeInDwords = alignTo(ldsSizeInDwords, ldsSizeDwordGranularity);
-
   auto hwShaderNode = getHwShaderNode(Util::Abi::HardwareStage::Gs);
-  hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = ldsSizeInDwords * 4;
+  hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = calcLdsSize(ldsSizeInDwords);
   setEsGsLdsSize(calcFactor.esGsLdsSize * 4);
 }
 
@@ -599,18 +614,13 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
     setStreamOutVertexStrides(xfbStridesInDwords); // Set SW stream-out vertex strides
   }
 
-  const unsigned ldsSizeDwordGranularityShift =
-      m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
-  const unsigned ldsSizeDwordGranularity = 1u << ldsSizeDwordGranularityShift;
-
+  // Set LDS_SIZE of SPI_SHADER_PGM_RSRC2_GS
   unsigned ldsSizeInDwords = calcFactor.gsOnChipLdsSize;
 #if VKI_RAY_TRACING
   ldsSizeInDwords += calcFactor.rayQueryLdsStackSize;
 #endif
-  ldsSizeInDwords = alignTo(ldsSizeInDwords, ldsSizeDwordGranularity);
-
   auto hwShaderNode = getHwShaderNode(Util::Abi::HardwareStage::Gs);
-  hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = ldsSizeInDwords * 4;
+  hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = calcLdsSize(ldsSizeInDwords);
   if (!m_hasMesh)
     setEsGsLdsSize(calcFactor.esGsLdsSize * 4);
 }
@@ -807,7 +817,7 @@ void RegisterMetadataBuilder::buildPsRegisters() {
         if (hasNoVertexAttrib)
           ++spiPsInputCntlInfo.offset;
       }
-      spiPsInputCntElem[Util::Abi::SpiPsInputCntlMetadataKey::PrimAttr] = true;
+      spiPsInputCntlInfo.primAttr = true;
     }
 
     if (interpInfoElem.custom) {
@@ -833,7 +843,10 @@ void RegisterMetadataBuilder::buildPsRegisters() {
     spiPsInputCntElem[Util::Abi::SpiPsInputCntlMetadataKey::PtSpriteTex] = spiPsInputCntlInfo.ptSpriteTex;
     spiPsInputCntElem[Util::Abi::SpiPsInputCntlMetadataKey::Attr0Valid] = spiPsInputCntlInfo.attr0Valid;
     spiPsInputCntElem[Util::Abi::SpiPsInputCntlMetadataKey::Attr1Valid] = spiPsInputCntlInfo.attr1Valid;
+    spiPsInputCntElem[Util::Abi::SpiPsInputCntlMetadataKey::PrimAttr] = spiPsInputCntlInfo.primAttr;
   }
+  // Set .num_interpolants in amdpal.pipelines
+  getPipelineNode()[Util::Abi::PipelineMetadataKey::NumInterpolants] = interpInfo->size();
 
   // SPI_PS_IN_CONTROL
   unsigned numInterp = resUsage->inOutUsage.fs.interpInfo.size() - numPrimInterp;
@@ -1454,6 +1467,18 @@ void RegisterMetadataBuilder::setVgtTfParam() {
   vgtTfParam[Util::Abi::VgtTfParamMetadataKey::Topology] = topology;
   if (m_pipelineState->isTessOffChip())
     vgtTfParam[Util::Abi::VgtTfParamMetadataKey::DistributionMode] = TRAPEZOIDS;
+}
+
+// =====================================================================================================================
+// Calculate the LDS size in bytes.
+//
+// @param onChipLdsSize : The value of onChip LDS size
+unsigned RegisterMetadataBuilder::calcLdsSize(unsigned ldsSizeInDwords) {
+  const unsigned ldsSizeDwordGranularityShift =
+      m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
+  const unsigned ldsSizeDwordGranularity = 1u << ldsSizeDwordGranularityShift;
+  ldsSizeInDwords = alignTo(ldsSizeInDwords, ldsSizeDwordGranularity);
+  return (ldsSizeInDwords * 4);
 }
 
 } // namespace Gfx9
