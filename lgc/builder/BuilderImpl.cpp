@@ -246,11 +246,11 @@ bool BuilderImplBase::supportDppRowXmask() const {
 
 // =====================================================================================================================
 // Get whether the context we are building in support the bpermute operation.
-bool BuilderImplBase::supportBPermute() const {
+bool BuilderImplBase::supportWaveWideBPermute() const {
   auto gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion().major;
   auto supportBPermute = gfxIp == 8 || gfxIp == 9;
   auto waveSize = getPipelineState()->getShaderWaveSize(getShaderStage(GetInsertBlock()->getParent()));
-  supportBPermute = supportBPermute || (gfxIp == 10 && waveSize == 32);
+  supportBPermute = supportBPermute || (gfxIp >= 10 && waveSize == 32);
   return supportBPermute;
 }
 

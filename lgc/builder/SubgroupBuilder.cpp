@@ -316,7 +316,7 @@ Value *SubgroupBuilder::CreateSubgroupBallotFindMsb(Value *const value, const Tw
 // @param index : The index to shuffle from.
 // @param instName : Name to give final instruction.
 Value *SubgroupBuilder::CreateSubgroupShuffle(Value *const value, Value *const index, const Twine &instName) {
-  if (supportBPermute()) {
+  if (supportWaveWideBPermute()) {
     auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
                       ArrayRef<Value *> passthroughArgs) -> Value * {
       return builder.CreateIntrinsic(Intrinsic::amdgcn_ds_bpermute, {}, {passthroughArgs[0], mappedArgs[0]});
@@ -325,6 +325,40 @@ Value *SubgroupBuilder::CreateSubgroupShuffle(Value *const value, Value *const i
     // The ds_bpermute intrinsic requires the index be multiplied by 4.
     return CreateMapToInt32(mapFunc, value, CreateMul(index, getInt32(4)));
   }
+
+  if (supportPermLane64Dpp()) {
+    assert(getShaderWaveSize() == 64);
+
+    // Start the WWM section by setting the inactive lanes.
+    Value *const poisonValue = PoisonValue::get(value->getType());
+    Value *const poisonIndex = PoisonValue::get(index->getType());
+    Value *const scaledIndex = CreateMul(index, getInt32(4));
+    Value *wwmValue = BuilderBase::get(*this).CreateSetInactive(value, poisonValue);
+    Value *wwmIndex = BuilderBase::get(*this).CreateSetInactive(scaledIndex, poisonIndex);
+
+    auto permuteFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
+                          ArrayRef<Value *> passthroughArgs) -> Value * {
+      return builder.CreateIntrinsic(Intrinsic::amdgcn_permlane64, {}, {mappedArgs[0]});
+    };
+
+    auto swapped = CreateMapToInt32(permuteFunc, wwmValue, {});
+
+    auto bPermFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
+                        ArrayRef<Value *> passthroughArgs) -> Value * {
+      return builder.CreateIntrinsic(Intrinsic::amdgcn_ds_bpermute, {}, {passthroughArgs[0], mappedArgs[0]});
+    };
+
+    auto bPermSameHalf = CreateMapToInt32(bPermFunc, wwmValue, wwmIndex);
+    auto bPermOtherHalf = CreateMapToInt32(bPermFunc, swapped, wwmIndex);
+    bPermOtherHalf = createWwm(bPermOtherHalf);
+
+    auto const threadId = CreateSubgroupMbcnt(getInt64(UINT64_MAX), "");
+    auto const sameOrOtherHalf = CreateAnd(CreateXor(index, threadId), getInt32(32));
+    auto const indexInSameHalf = CreateICmpEQ(sameOrOtherHalf, getInt32(0));
+
+    return CreateSelect(indexInSameHalf, bPermSameHalf, bPermOtherHalf);
+  }
+
   auto mapFunc = [this](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
                         ArrayRef<Value *> passthroughArgs) -> Value * {
     Value *const readlane =
