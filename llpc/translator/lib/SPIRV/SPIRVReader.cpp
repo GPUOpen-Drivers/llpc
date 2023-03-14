@@ -7524,6 +7524,7 @@ bool SPIRVToLLVM::transMetadata() {
           }
 #endif
         }
+
       } else
         llvm_unreachable("Invalid execution model");
 

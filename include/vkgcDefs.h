@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 61
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 0
+#define LLPC_INTERFACE_MINOR_VERSION 1
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -545,6 +545,7 @@ struct PipelineOptions {
   bool reserved15;
 #endif
   unsigned forceNonUniformResourceIndexStageMask; ///< Mask of the stage to force using non-uniform resource index.
+  bool reserved16;
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.

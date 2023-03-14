@@ -971,16 +971,6 @@ void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareS
     // NOTE: For copy shader, usually we use fixed number of user data registers.
     // But in some cases, we may change user data registers, we use variable to keep user sgpr count here
     userDataCount = lgc::CopyShaderUserSgprCount;
-#if VKI_BUILD_SHADER_DBG
-    if (m_pipelineState->getOptions().shaderTraceMask != 0) {
-      std::vector<unsigned> userDataMap(32, static_cast<unsigned>(UserDataMapping::Invalid));
-      userDataMap[userDataCount] = UserDataMapping::ShaderDbgAddr;
-      m_pipelineState->setUserDataMap(m_shaderStage, userDataMap);
-
-      // 2 SGPRs holding the GPU VA address of the buffer for shader debugging
-      userDataCount += 2;
-    }
-#endif
     sgprLimits = m_pipelineState->getTargetInfo().getGpuProperty().maxSgprsAvailable;
     vgprLimits = m_pipelineState->getTargetInfo().getGpuProperty().maxVgprsAvailable;
   } else {
@@ -1309,7 +1299,6 @@ void RegisterMetadataBuilder::setVgtShaderStagesEn(unsigned hwStageMask) {
       vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::GsFastLaunch] = gsFastLaunch;
     }
   } else if (m_hasTcs || m_hasTes) {
-    //# NOTE: From:  //gfxip/gfx10/doc/blocks/ge/Combined_Geometry_Engine_MAS.docx
     //  In GEN_TWO the only supported mode is fully distributed tessellation. The programming model is expected
     //  to set VGT_SHADER_STAGES_EN.DYNAMIC_HS=1 and VGT_TF_PARAM.NUM_DS_WAVES_PER_SIMD=0
     vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::DynamicHs] = true;

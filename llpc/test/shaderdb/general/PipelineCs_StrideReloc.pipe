@@ -4,6 +4,7 @@
 ; REQUIRES: do-not-run-me
   // Test that correct stride is in the linked texture fetching code.
 ; SHADERTEST-LABEL: 0000000000000000 <_amdgpu_cs_main>:
+  // Matching the texture index
 ; SHADERTEST-NOT: s_mul
 ; SHADERTEST: s_mul_i32 s{{[0-9]+}}, s{{[0-9]+}}, 48 //{{.*}}
 ; SHADERTEST-NOT: s_mul
