@@ -66,6 +66,6 @@
          %65 = OpAccessChain %_ptr_TaskPayloadWorkgroupEXT__struct_47 %50 %int_0
          %66 = OpCopyLogical %_struct_47 %63
                OpStore %65 %66
-               OpReturn
+               OpEmitMeshTasksEXT %uint_1 %uint_1 %uint_1 %50
                OpFunctionEnd
 
