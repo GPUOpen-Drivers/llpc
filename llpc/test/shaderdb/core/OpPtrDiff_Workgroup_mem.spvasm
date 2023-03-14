@@ -1,25 +1,24 @@
 ; BEGIN_SHADERTEST
-; REQUIRES: do-not-run-me
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: call i64 (...) @lgc.create.buffer.ptrdiff.i64(i32 0, ptr addrspace(3) @lds, ptr addrspace(3) {{%[0-9]+}})
-; SHADERTEST: call i64 (...) @lgc.create.buffer.ptrdiff.i64(i64 0, ptr addrspace(3) @lds.1, ptr addrspace(3) {{%[0-9]+}})
+; SHADERTEST-LABEL: define dllexport spir_func void @main
 
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-
-; SHADERTEST: [[a:%[0-9]+]] = getelementptr [32 x i32], ptr addrspace(3) @lds, i32 0, i32 {{%[0-9]+}}
-; SHADERTEST: [[b:%[0-9]+]] = ptrtoint ptr addrspace(3)* [[a]] to i64
+; SHADERTEST: [[a:%[0-9]+]] = getelementptr i32, ptr addrspace(3) @lds, i32 {{%[0-9]+}}
+; SHADERTEST: [[b:%[0-9]+]] = ptrtoint ptr addrspace(3) [[a]] to i64
 ; SHADERTEST: [[c:%[0-9]+]] = sub i64 ptrtoint (ptr addrspace(3) @lds to i64), [[b]]
 ; SHADERTEST: [[d1:%[0-9]+]] = sdiv exact i64 [[c]], ptrtoint (ptr getelementptr (i32, ptr null, i32 1) to i64)
+; SHADERTEST: [[e1:%[0-9]+]] = trunc i64 [[d1]] to i32
 
-; SHADERTEST: [[a:%[0-9]+]] = getelementptr [32 x i64], ptr addrspace(3) @lds.1, i32 0, i32 {{%[0-9]+}}
+; SHADERTEST: [[a:%[0-9]+]] = getelementptr i64, ptr addrspace(3) @lds.1, i32 {{%[0-9]+}}
 ; SHADERTEST: [[b:%[0-9]+]] = ptrtoint ptr addrspace(3) [[a]] to i64
 ; SHADERTEST: [[c:%[0-9]+]] = sub i64 ptrtoint (ptr addrspace(3) @lds.1 to i64), [[b]]
 ; SHADERTEST: [[d:%[0-9]+]] = sdiv exact i64 [[c]], ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64)
 ; SHADERTEST: [[e:%[0-9]+]] = trunc i64 [[d]] to i32
 
-; SHADERTEST: [[e1:%[0-9a-zA-Z.]+]] = bitcast i64 [[d1]] to <2 x i32>
-; SHADERTEST: {{%[0-9]+}} = insertelement <2 x i32> [[e1]], i32 [[e]], i64 1
+; SHADERTEST: [[i:%[0-9a-zA-Z.]+]] = insertelement <2 x i32> undef, i32 [[e1]], i32 0
+; SHADERTEST: {{%[0-9]+}} = insertelement <2 x i32> [[i]], i32 [[e]], i32 1
+
+; SHADERTEST-LABEL: }
 
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
