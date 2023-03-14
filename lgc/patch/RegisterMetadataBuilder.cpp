@@ -112,7 +112,7 @@ void RegisterMetadataBuilder::buildPalMetadata() {
       buildShaderExecutionRegisters(Util::Abi::HardwareStage::Hs, apiStage1, apiStage2);
     }
     if (hwStageMask & Util::Abi::HwShaderGs) {
-      if (m_isNggMode)
+      if (m_isNggMode || m_hasMesh)
         buildPrimShaderRegisters();
       else
         buildEsGsRegisters();
@@ -411,7 +411,9 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
   getHwShaderNode(Util::Abi::HardwareStage::Gs)[Util::Abi::HardwareStageMetadataKey::OffchipLdsEn] = hasTs;
 
   // VGT_GS_MAX_VERT_OUT
-  unsigned maxVertOut = std::max(1u, static_cast<unsigned>(geometryMode.outputVertices));
+  const unsigned outputVertices = m_hasMesh ? m_pipelineState->getShaderModes()->getMeshShaderMode().outputVertices
+                                            : m_pipelineState->getShaderModes()->getGeometryShaderMode().outputVertices;
+  const unsigned maxVertOut = std::max(1u, outputVertices);
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtGsMaxVertOut] = maxVertOut;
 
   // VGT_GS_MODE
@@ -536,7 +538,7 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
       const unsigned threadGroupSize = m_pipelineState->enableMeshRowExport()
                                            ? meshMode.workgroupSizeX * meshMode.workgroupSizeY * meshMode.workgroupSizeZ
                                            : calcFactor.primAmpFactor;
-      spiShaderGsMeshletDim[Util::Abi::SpiShaderGsMeshletDimMetadataKey::ThreadgroupSize] = threadGroupSize;
+      spiShaderGsMeshletDim[Util::Abi::SpiShaderGsMeshletDimMetadataKey::ThreadgroupSize] = threadGroupSize - 1;
 
       // SPI_SHADER_GS_MESHLET_EXP_ALLOC
       auto spiShaderGsMeshletExpAlloc =
@@ -1279,9 +1281,6 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
 //
 // @param hwStageMask : Mask of the hardware shader stage
 void RegisterMetadataBuilder::setVgtShaderStagesEn(unsigned hwStageMask) {
-  if (m_hasTask)
-    return;
-
   auto vgtShaderStagesEn = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtShaderStagesEn].getMap(true);
   vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::MaxPrimgroupInWave] = 2;
 
@@ -1289,22 +1288,22 @@ void RegisterMetadataBuilder::setVgtShaderStagesEn(unsigned hwStageMask) {
 
   if (m_isNggMode || m_hasMesh) {
     vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::PrimgenEn] = true;
-    if (m_gfxIp.major <= 11) {
-      // NOTE: When GS is present, NGG pass-through mode is always turned off regardless of the pass-through flag of
-      // NGG control settings. In such case, the pass-through flag means whether there is culling (different from
-      // hardware pass-through).
-      vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::PrimgenPassthruEn] =
-          m_hasGs ? false : nggControl->passthroughMode;
-    }
+    if (!m_hasMesh) {
+      if (m_gfxIp.major <= 11) {
+        // NOTE: When GS is present, NGG pass-through mode is always turned off regardless of the pass-through flag of
+        // NGG control settings. In such case, the pass-through flag means whether there is culling (different from
+        // hardware pass-through).
+        vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::PrimgenPassthruEn] =
+            m_hasGs ? false : nggControl->passthroughMode;
+      }
 
-    if (m_gfxIp.major >= 11) {
-      vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::NggWaveIdEn] = m_pipelineState->enableSwXfb();
-      if (!m_hasGs)
-        vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::PrimgenPassthruNoMsg] =
-            nggControl->passthroughMode && !m_pipelineState->enableSwXfb();
-    }
-
-    if (m_hasMesh) {
+      if (m_gfxIp.major >= 11) {
+        vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::NggWaveIdEn] = m_pipelineState->enableSwXfb();
+        if (!m_hasGs)
+          vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::PrimgenPassthruNoMsg] =
+              nggControl->passthroughMode && !m_pipelineState->enableSwXfb();
+      }
+    } else {
       const unsigned gsFastLaunch = m_gfxIp.major == 11 ? 0x2 : 0x1; // GFX11 defines the new fast launch mode to 0x2
       vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::GsFastLaunch] = gsFastLaunch;
     }
