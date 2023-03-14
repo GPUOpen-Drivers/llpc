@@ -155,6 +155,7 @@ struct Options {
   bool reserved15;
 #endif
   bool enableUberFetchShader; // Enable UberShader
+  bool reserved16;
 };
 
 /// Represent a pipeline option which can be automatic as well as explicitly set.

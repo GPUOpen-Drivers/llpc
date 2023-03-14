@@ -98,7 +98,14 @@ std::pair<lgc::PassManager &, LegacyPassManager &> PassManagerCache::getPassMana
 
   // Add a few optimizations.
   FunctionPassManager fpm;
-  fpm.addPass(InstCombinePass(5));
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 452298
+  // Old version of the code
+  unsigned instCombineOpt = 5;
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  auto instCombineOpt = InstCombineOptions().setMaxIterations(5);
+#endif
+  fpm.addPass(InstCombinePass(instCombineOpt));
   fpm.addPass(InstSimplifyPass());
   fpm.addPass(EarlyCSEPass(true));
   passManagers.first->addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));

@@ -31,6 +31,7 @@
                OpMemberDecorate %10 0 Offset 0
                OpDecorate %10 Block
                OpDecorate %12 Binding 1
+               OpDecorate %9 Location 0
           %2 = OpTypeVoid
           %3 = OpTypeFunction %2
           %6 = OpTypeFloat 32

@@ -40,6 +40,7 @@
                OpDecorate %14 Block
                OpDecorate %16 DescriptorSet 0
                OpDecorate %16 Binding 0
+               OpDecorate %58 Location 0
           %2 = OpTypeVoid
           %3 = OpTypeFunction %2
           %6 = OpTypeBool
