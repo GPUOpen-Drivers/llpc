@@ -1446,7 +1446,7 @@ unsigned Compiler::ConvertColorBufferFormatToExportFormat(const ColorTarget *tar
   state.alphaToCoverageEnable = enableAlphaToCoverage;
   pipeline->setColorExportState(format, state);
 
-  Type *outputTy = FixedVectorType::get(Type::getFloatTy(*context), countPopulation(target->channelWriteMask));
+  Type *outputTy = FixedVectorType::get(Type::getFloatTy(*context), llvm::popcount(target->channelWriteMask));
   unsigned exportFormat = pipeline->computeExportFormat(outputTy, 0);
 
   pipeline.reset(nullptr);
