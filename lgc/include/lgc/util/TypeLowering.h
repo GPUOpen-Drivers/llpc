@@ -97,8 +97,11 @@ using ConstantTypeLoweringFn = llvm::SmallVector<llvm::Constant *>(TypeLowering 
 ///       .build();
 ///   visitor.visit(payload, module);
 ///
-///   // Fixup phi nodes and erase all instructions that "have been replaced" (by calling replaceInstruction for them).
-///   payload.lowering.finish();
+///   // Fixup phi nodes.
+///   payload.lowering.finishPhis();
+///
+///   // Erase all instructions that "have been replaced" (by calling replaceInstruction for them).
+///   payload.lowering.finishCleanup();
 /// @endcode
 class TypeLowering {
 public:
