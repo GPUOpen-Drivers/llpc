@@ -131,7 +131,6 @@ private:
   llvm::Value *getMeshLocalInvocationId();
   llvm::Value *getMeshLocalInvocationIndex();
   llvm::Value *getMeshGlobalInvocationId();
-  llvm::Value *getGlobalInvocationIndex();
 
   llvm::Value *readMeshBuiltInFromLds(BuiltInKind builtIn);
   llvm::Value *convertToHwShadingRate(llvm::Value *primitiveShadingRate);
@@ -168,12 +167,6 @@ private:
     llvm::Value *threadIdInSubgroup;
     llvm::Value *primOrVertexIndex;
     llvm::Value *rowInSubgroup;
-    llvm::Value *workgroupIdX;
-    llvm::Value *workgroupIdY;
-    llvm::Value *workgroupIdZ;
-    llvm::Value *localInvocationIdX;
-    llvm::Value *localInvocationIdY;
-    llvm::Value *localInvocationIdZ;
   } m_waveThreadInfo = {};
 
   bool m_accessTaskPayload = false;                // Whether task shader has payload access operations
@@ -183,12 +176,6 @@ private:
   bool m_hasNoVertexAttrib = false;              // Whether mesh shader has vertex attribute export or not
   llvm::Value *m_attribRingBufDesc = nullptr;    // Attribute ring buffer descriptor
   llvm::Value *m_attribRingBaseOffset = nullptr; // Subgroup's attribute ring base offset (in bytes)
-
-  llvm::Value *m_meshFlatWorkgroupId = nullptr;       // Flat workgroupId of mesh shader
-  llvm::Value *m_meshWorkgroupId = nullptr;           // Built-in WorkgroupId of mesh shader
-  llvm::Value *m_meshLocalInvocationId = nullptr;     // Built-in LocalInvocationId of mesh shader
-  llvm::Value *m_meshGlobalInvocationId = nullptr;    // Built-in GlobalInvocationId of mesh shader
-  llvm::Value *m_meshGlobalInvocationIndex = nullptr; // Global invocation index of mesh shader
 
   llvm::Value *m_barrierToggle = nullptr;            // Toggle used by calculation of barrier completion flag
   bool m_needBarrierFlag = false;                    // Whether barrier completion flag is needed
