@@ -703,10 +703,7 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(endWriteSpecialValueBlock);
 
-    SyncScope::ID syncScope = entryPoint->getParent()->getContext().getOrInsertSyncScopeID("workgroup");
-    m_builder.CreateFence(AtomicOrdering::Release, syncScope);
-    m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-    m_builder.CreateFence(AtomicOrdering::Acquire, syncScope);
+    createFenceAndBarrier();
 
     auto validMeshWave = m_builder.CreateICmpULT(m_waveThreadInfo.waveIdInSubgroup, m_builder.getInt32(numMeshWaves));
     // There could be no extra waves
@@ -734,12 +731,8 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
     // with other instructions.
     endMeshWaveBlock->getTerminator()->eraseFromParent();
 
-    if (m_needBarrierFlag) {
-      SyncScope::ID syncScope = entryPoint->getParent()->getContext().getOrInsertSyncScopeID("workgroup");
-      m_builder.CreateFence(AtomicOrdering::Release, syncScope);
-      m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-      m_builder.CreateFence(AtomicOrdering::Acquire, syncScope);
-    }
+    if (m_needBarrierFlag)
+      createFenceAndBarrier();
 
     m_builder.CreateBr(checkMeshOutputCountBlock);
   }
@@ -794,10 +787,7 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(checkMeshOutputCountBlock);
 
-    SyncScope::ID syncScope = entryPoint->getParent()->getContext().getOrInsertSyncScopeID("workgroup");
-    m_builder.CreateFence(AtomicOrdering::Release, syncScope);
-    m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-    m_builder.CreateFence(AtomicOrdering::Acquire, syncScope);
+    createFenceAndBarrier();
 
     Value *ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexCount));
     vertexCount = readValueFromLds(m_builder.getInt32Ty(), ldsOffset);
@@ -3174,6 +3164,15 @@ void MeshTaskShader::atomicOpWithLds(AtomicRMWInst::BinOp atomicOp, Value *atomi
   Value *atomicPtr = m_builder.CreateGEP(m_lds->getValueType(), m_lds, {m_builder.getInt32(0), ldsOffset});
   m_builder.CreateAtomicRMW(atomicOp, atomicPtr, atomicValue, MaybeAlign(), AtomicOrdering::Monotonic,
                             SyncScope::SingleThread);
+}
+
+// =====================================================================================================================
+// Create LDS fence and barrier to guarantee the synchronization of LDS operations.
+void MeshTaskShader::createFenceAndBarrier() {
+  SyncScope::ID syncScope = m_builder.getContext().getOrInsertSyncScopeID("workgroup");
+  m_builder.CreateFence(AtomicOrdering::Release, syncScope);
+  m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+  m_builder.CreateFence(AtomicOrdering::Acquire, syncScope);
 }
 
 } // namespace lgc
