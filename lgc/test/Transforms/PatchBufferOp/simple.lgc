@@ -14,19 +14,10 @@ define amdgpu_gfx float @simple(<4 x i32> inreg %desc) !lgc.shaderstage !0 {
 
 define amdgpu_gfx float @uniform_select(<4 x i32> inreg %desc0, <4 x i32> inreg %desc1, i1 inreg %sel) !lgc.shaderstage !0 {
 ; CHECK-LABEL: @uniform_select(
-; CHECK-NEXT:    [[TMP1:%.*]] = select i1 [[SEL:%.*]], <4 x i32> [[DESC0:%.*]], <4 x i32> [[DESC1:%.*]]
-; CHECK-NEXT:    [[TMP2:%.*]] = select i1 [[SEL]], ptr addrspace(6) null, ptr addrspace(6) null
-; CHECK-NEXT:    [[TMP3:%.*]] = ptrtoint ptr addrspace(6) [[TMP2]] to i32
-; CHECK-NEXT:    [[TMP4:%.*]] = shufflevector <4 x i32> [[TMP1]], <4 x i32> undef, <2 x i32> <i32 0, i32 1>
-; CHECK-NEXT:    [[TMP5:%.*]] = and <2 x i32> [[TMP4]], <i32 -1, i32 65535>
-; CHECK-NEXT:    [[TMP6:%.*]] = bitcast <2 x i32> [[TMP5]] to i64
-; CHECK-NEXT:    [[TMP7:%.*]] = inttoptr i64 [[TMP6]] to ptr addrspace(1)
-; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <4 x i32> [[TMP1]], i64 2
-; CHECK-NEXT:    [[TMP9:%.*]] = icmp ult i32 [[TMP3]], [[TMP8]]
-; CHECK-NEXT:    [[TMP10:%.*]] = select i1 [[TMP9]], i32 [[TMP3]], i32 0
-; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr addrspace(1) [[TMP7]], i32 [[TMP10]]
-; CHECK-NEXT:    [[TMP12:%.*]] = load float, ptr addrspace(1) [[TMP11]], align 4
-; CHECK-NEXT:    ret float [[TMP12]]
+; CHECK-NEXT:    [[PTR_0:%.*]] = select i1 [[SEL:%.*]], <4 x i32> [[DESC0:%.*]], <4 x i32> [[DESC1:%.*]]
+; CHECK-NEXT:    [[TMP1:%.*]] = call i32 @llvm.amdgcn.raw.buffer.load.i32(<4 x i32> [[PTR_0]], i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP2:%.*]] = bitcast i32 [[TMP1]] to float
+; CHECK-NEXT:    ret float [[TMP2]]
 ;
   %ptr0 = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc0)
   %ptr1 = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc1)
@@ -37,19 +28,17 @@ define amdgpu_gfx float @uniform_select(<4 x i32> inreg %desc0, <4 x i32> inreg 
 
 define amdgpu_gfx float @divergent_select(<4 x i32> inreg %desc0, <4 x i32> inreg %desc1, i1 %sel) !lgc.shaderstage !0 {
 ; CHECK-LABEL: @divergent_select(
-; CHECK-NEXT:    [[TMP1:%.*]] = select i1 [[SEL:%.*]], <4 x i32> [[DESC0:%.*]], <4 x i32> [[DESC1:%.*]]
-; CHECK-NEXT:    [[TMP2:%.*]] = select i1 [[SEL]], ptr addrspace(6) null, ptr addrspace(6) null
-; CHECK-NEXT:    [[TMP3:%.*]] = ptrtoint ptr addrspace(6) [[TMP2]] to i32
-; CHECK-NEXT:    [[TMP4:%.*]] = shufflevector <4 x i32> [[TMP1]], <4 x i32> undef, <2 x i32> <i32 0, i32 1>
-; CHECK-NEXT:    [[TMP5:%.*]] = and <2 x i32> [[TMP4]], <i32 -1, i32 65535>
-; CHECK-NEXT:    [[TMP6:%.*]] = bitcast <2 x i32> [[TMP5]] to i64
-; CHECK-NEXT:    [[TMP7:%.*]] = inttoptr i64 [[TMP6]] to ptr addrspace(1)
-; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <4 x i32> [[TMP1]], i64 2
-; CHECK-NEXT:    [[TMP9:%.*]] = icmp ult i32 [[TMP3]], [[TMP8]]
-; CHECK-NEXT:    [[TMP10:%.*]] = select i1 [[TMP9]], i32 [[TMP3]], i32 0
-; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr addrspace(1) [[TMP7]], i32 [[TMP10]]
-; CHECK-NEXT:    [[TMP12:%.*]] = load float, ptr addrspace(1) [[TMP11]], align 4
-; CHECK-NEXT:    ret float [[TMP12]]
+; CHECK-NEXT:    [[PTR_0:%.*]] = select i1 [[SEL:%.*]], <4 x i32> [[DESC0:%.*]], <4 x i32> [[DESC1:%.*]]
+; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <4 x i32> [[PTR_0]], <4 x i32> undef, <2 x i32> <i32 0, i32 1>
+; CHECK-NEXT:    [[TMP2:%.*]] = and <2 x i32> [[TMP1]], <i32 -1, i32 65535>
+; CHECK-NEXT:    [[TMP3:%.*]] = bitcast <2 x i32> [[TMP2]] to i64
+; CHECK-NEXT:    [[TMP4:%.*]] = inttoptr i64 [[TMP3]] to ptr addrspace(1)
+; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x i32> [[PTR_0]], i64 2
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp ult i32 0, [[TMP5]]
+; CHECK-NEXT:    [[TMP7:%.*]] = select i1 [[TMP6]], i32 0, i32 0
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr addrspace(1) [[TMP4]], i32 [[TMP7]]
+; CHECK-NEXT:    [[TMP9:%.*]] = load float, ptr addrspace(1) [[TMP8]], align 4
+; CHECK-NEXT:    ret float [[TMP9]]
 ;
   %ptr0 = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc0)
   %ptr1 = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc1)
@@ -60,19 +49,17 @@ define amdgpu_gfx float @divergent_select(<4 x i32> inreg %desc0, <4 x i32> inre
 
 define amdgpu_gfx float @divergent_select1(<4 x i32> %desc0, <4 x i32> inreg %desc1, i1 inreg %sel) !lgc.shaderstage !0 {
 ; CHECK-LABEL: @divergent_select1(
-; CHECK-NEXT:    [[TMP1:%.*]] = select i1 [[SEL:%.*]], <4 x i32> [[DESC0:%.*]], <4 x i32> [[DESC1:%.*]]
-; CHECK-NEXT:    [[TMP2:%.*]] = select i1 [[SEL]], ptr addrspace(6) null, ptr addrspace(6) null
-; CHECK-NEXT:    [[TMP3:%.*]] = ptrtoint ptr addrspace(6) [[TMP2]] to i32
-; CHECK-NEXT:    [[TMP4:%.*]] = shufflevector <4 x i32> [[TMP1]], <4 x i32> undef, <2 x i32> <i32 0, i32 1>
-; CHECK-NEXT:    [[TMP5:%.*]] = and <2 x i32> [[TMP4]], <i32 -1, i32 65535>
-; CHECK-NEXT:    [[TMP6:%.*]] = bitcast <2 x i32> [[TMP5]] to i64
-; CHECK-NEXT:    [[TMP7:%.*]] = inttoptr i64 [[TMP6]] to ptr addrspace(1)
-; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <4 x i32> [[TMP1]], i64 2
-; CHECK-NEXT:    [[TMP9:%.*]] = icmp ult i32 [[TMP3]], [[TMP8]]
-; CHECK-NEXT:    [[TMP10:%.*]] = select i1 [[TMP9]], i32 [[TMP3]], i32 0
-; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr addrspace(1) [[TMP7]], i32 [[TMP10]]
-; CHECK-NEXT:    [[TMP12:%.*]] = load float, ptr addrspace(1) [[TMP11]], align 4
-; CHECK-NEXT:    ret float [[TMP12]]
+; CHECK-NEXT:    [[PTR_0:%.*]] = select i1 [[SEL:%.*]], <4 x i32> [[DESC0:%.*]], <4 x i32> [[DESC1:%.*]]
+; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <4 x i32> [[PTR_0]], <4 x i32> undef, <2 x i32> <i32 0, i32 1>
+; CHECK-NEXT:    [[TMP2:%.*]] = and <2 x i32> [[TMP1]], <i32 -1, i32 65535>
+; CHECK-NEXT:    [[TMP3:%.*]] = bitcast <2 x i32> [[TMP2]] to i64
+; CHECK-NEXT:    [[TMP4:%.*]] = inttoptr i64 [[TMP3]] to ptr addrspace(1)
+; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x i32> [[PTR_0]], i64 2
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp ult i32 0, [[TMP5]]
+; CHECK-NEXT:    [[TMP7:%.*]] = select i1 [[TMP6]], i32 0, i32 0
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr addrspace(1) [[TMP4]], i32 [[TMP7]]
+; CHECK-NEXT:    [[TMP9:%.*]] = load float, ptr addrspace(1) [[TMP8]], align 4
+; CHECK-NEXT:    ret float [[TMP9]]
 ;
   %ptr0 = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc0)
   %ptr1 = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc1)
@@ -83,19 +70,17 @@ define amdgpu_gfx float @divergent_select1(<4 x i32> %desc0, <4 x i32> inreg %de
 
 define amdgpu_gfx float @divergent_select2(<4 x i32> inreg %desc0, <4 x i32> %desc1, i1 inreg %sel) !lgc.shaderstage !0 {
 ; CHECK-LABEL: @divergent_select2(
-; CHECK-NEXT:    [[TMP1:%.*]] = select i1 [[SEL:%.*]], <4 x i32> [[DESC0:%.*]], <4 x i32> [[DESC1:%.*]]
-; CHECK-NEXT:    [[TMP2:%.*]] = select i1 [[SEL]], ptr addrspace(6) null, ptr addrspace(6) null
-; CHECK-NEXT:    [[TMP3:%.*]] = ptrtoint ptr addrspace(6) [[TMP2]] to i32
-; CHECK-NEXT:    [[TMP4:%.*]] = shufflevector <4 x i32> [[TMP1]], <4 x i32> undef, <2 x i32> <i32 0, i32 1>
-; CHECK-NEXT:    [[TMP5:%.*]] = and <2 x i32> [[TMP4]], <i32 -1, i32 65535>
-; CHECK-NEXT:    [[TMP6:%.*]] = bitcast <2 x i32> [[TMP5]] to i64
-; CHECK-NEXT:    [[TMP7:%.*]] = inttoptr i64 [[TMP6]] to ptr addrspace(1)
-; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <4 x i32> [[TMP1]], i64 2
-; CHECK-NEXT:    [[TMP9:%.*]] = icmp ult i32 [[TMP3]], [[TMP8]]
-; CHECK-NEXT:    [[TMP10:%.*]] = select i1 [[TMP9]], i32 [[TMP3]], i32 0
-; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr addrspace(1) [[TMP7]], i32 [[TMP10]]
-; CHECK-NEXT:    [[TMP12:%.*]] = load float, ptr addrspace(1) [[TMP11]], align 4
-; CHECK-NEXT:    ret float [[TMP12]]
+; CHECK-NEXT:    [[PTR_0:%.*]] = select i1 [[SEL:%.*]], <4 x i32> [[DESC0:%.*]], <4 x i32> [[DESC1:%.*]]
+; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <4 x i32> [[PTR_0]], <4 x i32> undef, <2 x i32> <i32 0, i32 1>
+; CHECK-NEXT:    [[TMP2:%.*]] = and <2 x i32> [[TMP1]], <i32 -1, i32 65535>
+; CHECK-NEXT:    [[TMP3:%.*]] = bitcast <2 x i32> [[TMP2]] to i64
+; CHECK-NEXT:    [[TMP4:%.*]] = inttoptr i64 [[TMP3]] to ptr addrspace(1)
+; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x i32> [[PTR_0]], i64 2
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp ult i32 0, [[TMP5]]
+; CHECK-NEXT:    [[TMP7:%.*]] = select i1 [[TMP6]], i32 0, i32 0
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr addrspace(1) [[TMP4]], i32 [[TMP7]]
+; CHECK-NEXT:    [[TMP9:%.*]] = load float, ptr addrspace(1) [[TMP8]], align 4
+; CHECK-NEXT:    ret float [[TMP9]]
 ;
   %ptr0 = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc0)
   %ptr1 = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc1)
@@ -109,20 +94,11 @@ define amdgpu_gfx void @divergent_phi_uniform_desc(<4 x i32> inreg %desc0, i32 %
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    br label [[LOOP:%.*]]
 ; CHECK:       loop:
-; CHECK-NEXT:    [[TMP0:%.*]] = phi <4 x i32> [ [[DESC0:%.*]], [[ENTRY:%.*]] ], [ [[TMP0]], [[LOOP]] ]
-; CHECK-NEXT:    [[TMP1:%.*]] = phi ptr addrspace(6) [ null, [[ENTRY]] ], [ [[TMP11:%.*]], [[LOOP]] ]
+; CHECK-NEXT:    [[PTR_PHI_1:%.*]] = phi ptr addrspace(6) [ null, [[ENTRY:%.*]] ], [ [[TMP1:%.*]], [[LOOP]] ]
 ; CHECK-NEXT:    [[CTR:%.*]] = phi i32 [ 0, [[ENTRY]] ], [ [[CTR_NEXT:%.*]], [[LOOP]] ]
-; CHECK-NEXT:    [[TMP2:%.*]] = ptrtoint ptr addrspace(6) [[TMP1]] to i32
-; CHECK-NEXT:    [[TMP3:%.*]] = shufflevector <4 x i32> [[TMP0]], <4 x i32> undef, <2 x i32> <i32 0, i32 1>
-; CHECK-NEXT:    [[TMP4:%.*]] = and <2 x i32> [[TMP3]], <i32 -1, i32 65535>
-; CHECK-NEXT:    [[TMP5:%.*]] = bitcast <2 x i32> [[TMP4]] to i64
-; CHECK-NEXT:    [[TMP6:%.*]] = inttoptr i64 [[TMP5]] to ptr addrspace(1)
-; CHECK-NEXT:    [[TMP7:%.*]] = extractelement <4 x i32> [[TMP0]], i64 2
-; CHECK-NEXT:    [[TMP8:%.*]] = icmp ult i32 [[TMP2]], [[TMP7]]
-; CHECK-NEXT:    [[TMP9:%.*]] = select i1 [[TMP8]], i32 [[TMP2]], i32 0
-; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr i8, ptr addrspace(1) [[TMP6]], i32 [[TMP9]]
-; CHECK-NEXT:    store i32 0, ptr addrspace(1) [[TMP10]], align 4
-; CHECK-NEXT:    [[TMP11]] = getelementptr i32, ptr addrspace(6) [[TMP1]], i32 [[STRIDE:%.*]]
+; CHECK-NEXT:    [[TMP0:%.*]] = ptrtoint ptr addrspace(6) [[PTR_PHI_1]] to i32
+; CHECK-NEXT:    call void @llvm.amdgcn.raw.buffer.store.i32(i32 0, <4 x i32> [[DESC0:%.*]], i32 [[TMP0]], i32 0, i32 0)
+; CHECK-NEXT:    [[TMP1]] = getelementptr i32, ptr addrspace(6) [[PTR_PHI_1]], i32 [[STRIDE:%.*]]
 ; CHECK-NEXT:    [[CTR_NEXT]] = add i32 [[CTR]], 1
 ; CHECK-NEXT:    [[CC:%.*]] = icmp ne i32 [[CTR_NEXT]], 1024
 ; CHECK-NEXT:    br i1 [[CC]], label [[LOOP]], label [[END:%.*]]
@@ -154,19 +130,17 @@ define amdgpu_gfx float @divergent_input0_phi(<4 x i32> %desc0, <4 x i32> inreg 
 ; CHECK:       b:
 ; CHECK-NEXT:    br label [[TAIL]]
 ; CHECK:       tail:
-; CHECK-NEXT:    [[TMP1:%.*]] = phi <4 x i32> [ [[DESC0:%.*]], [[A]] ], [ [[DESC1:%.*]], [[B]] ]
-; CHECK-NEXT:    [[TMP2:%.*]] = phi ptr addrspace(6) [ null, [[A]] ], [ null, [[B]] ]
-; CHECK-NEXT:    [[TMP3:%.*]] = ptrtoint ptr addrspace(6) [[TMP2]] to i32
-; CHECK-NEXT:    [[TMP4:%.*]] = shufflevector <4 x i32> [[TMP1]], <4 x i32> undef, <2 x i32> <i32 0, i32 1>
-; CHECK-NEXT:    [[TMP5:%.*]] = and <2 x i32> [[TMP4]], <i32 -1, i32 65535>
-; CHECK-NEXT:    [[TMP6:%.*]] = bitcast <2 x i32> [[TMP5]] to i64
-; CHECK-NEXT:    [[TMP7:%.*]] = inttoptr i64 [[TMP6]] to ptr addrspace(1)
-; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <4 x i32> [[TMP1]], i64 2
-; CHECK-NEXT:    [[TMP9:%.*]] = icmp ult i32 [[TMP3]], [[TMP8]]
-; CHECK-NEXT:    [[TMP10:%.*]] = select i1 [[TMP9]], i32 [[TMP3]], i32 0
-; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr addrspace(1) [[TMP7]], i32 [[TMP10]]
-; CHECK-NEXT:    [[TMP12:%.*]] = load float, ptr addrspace(1) [[TMP11]], align 4
-; CHECK-NEXT:    ret float [[TMP12]]
+; CHECK-NEXT:    [[PTR_0:%.*]] = phi <4 x i32> [ [[DESC0:%.*]], [[A]] ], [ [[DESC1:%.*]], [[B]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <4 x i32> [[PTR_0]], <4 x i32> undef, <2 x i32> <i32 0, i32 1>
+; CHECK-NEXT:    [[TMP2:%.*]] = and <2 x i32> [[TMP1]], <i32 -1, i32 65535>
+; CHECK-NEXT:    [[TMP3:%.*]] = bitcast <2 x i32> [[TMP2]] to i64
+; CHECK-NEXT:    [[TMP4:%.*]] = inttoptr i64 [[TMP3]] to ptr addrspace(1)
+; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x i32> [[PTR_0]], i64 2
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp ult i32 0, [[TMP5]]
+; CHECK-NEXT:    [[TMP7:%.*]] = select i1 [[TMP6]], i32 0, i32 0
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr addrspace(1) [[TMP4]], i32 [[TMP7]]
+; CHECK-NEXT:    [[TMP9:%.*]] = load float, ptr addrspace(1) [[TMP8]], align 4
+; CHECK-NEXT:    ret float [[TMP9]]
 ;
   br i1 %sel, label %a, label %b
 
@@ -192,19 +166,17 @@ define amdgpu_gfx float @divergent_input1_phi(<4 x i32> inreg %desc0, <4 x i32> 
 ; CHECK:       b:
 ; CHECK-NEXT:    br label [[TAIL]]
 ; CHECK:       tail:
-; CHECK-NEXT:    [[TMP1:%.*]] = phi <4 x i32> [ [[DESC0:%.*]], [[A]] ], [ [[DESC1:%.*]], [[B]] ]
-; CHECK-NEXT:    [[TMP2:%.*]] = phi ptr addrspace(6) [ null, [[A]] ], [ null, [[B]] ]
-; CHECK-NEXT:    [[TMP3:%.*]] = ptrtoint ptr addrspace(6) [[TMP2]] to i32
-; CHECK-NEXT:    [[TMP4:%.*]] = shufflevector <4 x i32> [[TMP1]], <4 x i32> undef, <2 x i32> <i32 0, i32 1>
-; CHECK-NEXT:    [[TMP5:%.*]] = and <2 x i32> [[TMP4]], <i32 -1, i32 65535>
-; CHECK-NEXT:    [[TMP6:%.*]] = bitcast <2 x i32> [[TMP5]] to i64
-; CHECK-NEXT:    [[TMP7:%.*]] = inttoptr i64 [[TMP6]] to ptr addrspace(1)
-; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <4 x i32> [[TMP1]], i64 2
-; CHECK-NEXT:    [[TMP9:%.*]] = icmp ult i32 [[TMP3]], [[TMP8]]
-; CHECK-NEXT:    [[TMP10:%.*]] = select i1 [[TMP9]], i32 [[TMP3]], i32 0
-; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr addrspace(1) [[TMP7]], i32 [[TMP10]]
-; CHECK-NEXT:    [[TMP12:%.*]] = load float, ptr addrspace(1) [[TMP11]], align 4
-; CHECK-NEXT:    ret float [[TMP12]]
+; CHECK-NEXT:    [[PTR_0:%.*]] = phi <4 x i32> [ [[DESC0:%.*]], [[A]] ], [ [[DESC1:%.*]], [[B]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <4 x i32> [[PTR_0]], <4 x i32> undef, <2 x i32> <i32 0, i32 1>
+; CHECK-NEXT:    [[TMP2:%.*]] = and <2 x i32> [[TMP1]], <i32 -1, i32 65535>
+; CHECK-NEXT:    [[TMP3:%.*]] = bitcast <2 x i32> [[TMP2]] to i64
+; CHECK-NEXT:    [[TMP4:%.*]] = inttoptr i64 [[TMP3]] to ptr addrspace(1)
+; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x i32> [[PTR_0]], i64 2
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp ult i32 0, [[TMP5]]
+; CHECK-NEXT:    [[TMP7:%.*]] = select i1 [[TMP6]], i32 0, i32 0
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr addrspace(1) [[TMP4]], i32 [[TMP7]]
+; CHECK-NEXT:    [[TMP9:%.*]] = load float, ptr addrspace(1) [[TMP8]], align 4
+; CHECK-NEXT:    ret float [[TMP9]]
 ;
   br i1 %sel, label %a, label %b
 
@@ -230,19 +202,17 @@ define amdgpu_gfx float @divergent_sync_phi(<4 x i32> inreg %desc0, <4 x i32> in
 ; CHECK:       b:
 ; CHECK-NEXT:    br label [[TAIL]]
 ; CHECK:       tail:
-; CHECK-NEXT:    [[TMP1:%.*]] = phi <4 x i32> [ [[DESC0:%.*]], [[A]] ], [ [[DESC1:%.*]], [[B]] ]
-; CHECK-NEXT:    [[TMP2:%.*]] = phi ptr addrspace(6) [ null, [[A]] ], [ null, [[B]] ]
-; CHECK-NEXT:    [[TMP3:%.*]] = ptrtoint ptr addrspace(6) [[TMP2]] to i32
-; CHECK-NEXT:    [[TMP4:%.*]] = shufflevector <4 x i32> [[TMP1]], <4 x i32> undef, <2 x i32> <i32 0, i32 1>
-; CHECK-NEXT:    [[TMP5:%.*]] = and <2 x i32> [[TMP4]], <i32 -1, i32 65535>
-; CHECK-NEXT:    [[TMP6:%.*]] = bitcast <2 x i32> [[TMP5]] to i64
-; CHECK-NEXT:    [[TMP7:%.*]] = inttoptr i64 [[TMP6]] to ptr addrspace(1)
-; CHECK-NEXT:    [[TMP8:%.*]] = extractelement <4 x i32> [[TMP1]], i64 2
-; CHECK-NEXT:    [[TMP9:%.*]] = icmp ult i32 [[TMP3]], [[TMP8]]
-; CHECK-NEXT:    [[TMP10:%.*]] = select i1 [[TMP9]], i32 [[TMP3]], i32 0
-; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr i8, ptr addrspace(1) [[TMP7]], i32 [[TMP10]]
-; CHECK-NEXT:    [[TMP12:%.*]] = load float, ptr addrspace(1) [[TMP11]], align 4
-; CHECK-NEXT:    ret float [[TMP12]]
+; CHECK-NEXT:    [[PTR_0:%.*]] = phi <4 x i32> [ [[DESC0:%.*]], [[A]] ], [ [[DESC1:%.*]], [[B]] ]
+; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <4 x i32> [[PTR_0]], <4 x i32> undef, <2 x i32> <i32 0, i32 1>
+; CHECK-NEXT:    [[TMP2:%.*]] = and <2 x i32> [[TMP1]], <i32 -1, i32 65535>
+; CHECK-NEXT:    [[TMP3:%.*]] = bitcast <2 x i32> [[TMP2]] to i64
+; CHECK-NEXT:    [[TMP4:%.*]] = inttoptr i64 [[TMP3]] to ptr addrspace(1)
+; CHECK-NEXT:    [[TMP5:%.*]] = extractelement <4 x i32> [[PTR_0]], i64 2
+; CHECK-NEXT:    [[TMP6:%.*]] = icmp ult i32 0, [[TMP5]]
+; CHECK-NEXT:    [[TMP7:%.*]] = select i1 [[TMP6]], i32 0, i32 0
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr addrspace(1) [[TMP4]], i32 [[TMP7]]
+; CHECK-NEXT:    [[TMP9:%.*]] = load float, ptr addrspace(1) [[TMP8]], align 4
+; CHECK-NEXT:    ret float [[TMP9]]
 ;
   br i1 %sel, label %a, label %b
 

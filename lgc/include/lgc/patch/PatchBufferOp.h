@@ -31,14 +31,99 @@
 #pragma once
 
 #include "lgc/patch/Patch.h"
+#include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/PassManager.h"
 
+namespace llvm {
+class DivergenceInfo;
+}
+
 namespace lgc {
 
+class BufferDescToPtrOp;
+class BufferLengthOp;
+class BufferPtrDiffOp;
 class PipelineState;
+class TypeLowering;
+
+// =====================================================================================================================
+// Helper class for lowering buffer operations integrated with a flow based on llvm_dialects::Visitor and TypeLowering.
+class BufferOpLowering {
+  // Hide operator bool to safe-guard against accidents.
+  struct optional_bool : private std::optional<bool> {
+    optional_bool &operator=(const optional_bool &rhs) = default;
+    optional_bool &operator=(bool rhs) {
+      std::optional<bool>::operator=(rhs);
+      return *this;
+    }
+    using std::optional<bool>::has_value;
+    using std::optional<bool>::value;
+    using std::optional<bool>::value_or;
+  };
+
+  struct DescriptorInfo {
+    optional_bool invariant;
+    optional_bool divergent;
+  };
+
+public:
+  BufferOpLowering(TypeLowering &typeLowering, PipelineState &pipelineState, llvm::DivergenceInfo &divergenceInfo);
+
+  static void registerVisitors(llvm_dialects::VisitorBuilder<BufferOpLowering> &builder);
+
+  void finish();
+
+private:
+  void visitAtomicCmpXchgInst(llvm::AtomicCmpXchgInst &atomicCmpXchgInst);
+  void visitAtomicRMWInst(llvm::AtomicRMWInst &atomicRmwInst);
+  void visitBitCastInst(llvm::BitCastInst &bitCastInst);
+  void visitBufferDescToPtr(BufferDescToPtrOp &descToPtr);
+  void visitBufferLength(BufferLengthOp &length);
+  void visitBufferPtrDiff(BufferPtrDiffOp &ptrDiff);
+  void visitGetElementPtrInst(llvm::GetElementPtrInst &getElemPtrInst);
+  void visitLoadInst(llvm::LoadInst &loadInst);
+  void visitMemCpyInst(llvm::MemCpyInst &memCpyInst);
+  void visitMemMoveInst(llvm::MemMoveInst &memMoveInst);
+  void visitMemSetInst(llvm::MemSetInst &memSetInst);
+  void visitPhiInst(llvm::PHINode &phi);
+  void visitStoreInst(llvm::StoreInst &storeInst);
+  void visitICmpInst(llvm::ICmpInst &icmpInst);
+
+  void postVisitLoadInst(llvm::LoadInst &loadInst);
+  void postVisitStoreInst(llvm::StoreInst &storeInst);
+  void postVisitMemCpyInst(llvm::MemCpyInst &memCpyInst);
+  void postVisitMemSetInst(llvm::MemSetInst &memSetInst);
+
+  DescriptorInfo getDescriptorInfo(llvm::Value *desc);
+  void copyMetadata(llvm::Value *const dest, const llvm::Value *const src) const;
+  llvm::Value *getBaseAddressFromBufferDesc(llvm::Value *const bufferDesc);
+  bool removeUsersForInvariantStarts(llvm::Value *const value);
+  llvm::Value *replaceLoadStore(llvm::Instruction &inst);
+  llvm::Instruction *makeLoop(llvm::Value *const loopStart, llvm::Value *const loopEnd, llvm::Value *const loopStride,
+                              llvm::Instruction *const insertPos);
+
+  TypeLowering &m_typeLowering;
+  llvm::IRBuilder<> m_builder;
+
+  PipelineState &m_pipelineState;
+  llvm::DivergenceInfo &m_divergenceInfo;
+
+  // The proxy pointer type used to accumulate offsets.
+  llvm::PointerType *m_offsetType = nullptr;
+
+  // Map of buffer descriptor infos (for tracking invariance and divergence).
+  llvm::DenseMap<llvm::Value *, DescriptorInfo> m_descriptors;
+
+  llvm::SmallVector<llvm::PHINode *> m_divergentPhis;
+
+  // Instructions to handle during finish().
+  llvm::SmallVector<llvm::Instruction *> m_postVisitInsts;
+
+  static constexpr unsigned MinMemOpLoopBytes = 256;
+};
 
 // =====================================================================================================================
 // Represents the pass of LLVM patching operations for buffer operations
@@ -46,57 +131,7 @@ class PatchBufferOp : public llvm::InstVisitor<PatchBufferOp>, public llvm::Pass
 public:
   llvm::PreservedAnalyses run(llvm::Function &function, llvm::FunctionAnalysisManager &analysisManager);
 
-  // NOTE: Once the switch to the new pass manager is completed, the isDivergent argument can be removed and the
-  // divergent analysis can be put back as class attribute.
-  bool runImpl(llvm::Function &function, PipelineState *pipelineState,
-               std::function<bool(const llvm::Value &)> isDivergent);
-
   static llvm::StringRef name() { return "Patch LLVM for buffer operations"; }
-
-  // Visitors
-  void visitAtomicCmpXchgInst(llvm::AtomicCmpXchgInst &atomicCmpXchgInst);
-  void visitAtomicRMWInst(llvm::AtomicRMWInst &atomicRmwInst);
-  void visitBitCastInst(llvm::BitCastInst &bitCastInst);
-  void visitCallInst(llvm::CallInst &callInst);
-  void visitGetElementPtrInst(llvm::GetElementPtrInst &getElemPtrInst);
-  void visitLoadInst(llvm::LoadInst &loadInst);
-  void visitMemCpyInst(llvm::MemCpyInst &memCpyInst);
-  void visitMemMoveInst(llvm::MemMoveInst &memMoveInst);
-  void visitMemSetInst(llvm::MemSetInst &memSetInst);
-  void visitPHINode(llvm::PHINode &phiNode);
-  void visitSelectInst(llvm::SelectInst &selectInst);
-  void visitStoreInst(llvm::StoreInst &storeInst);
-  void visitICmpInst(llvm::ICmpInst &icmpInst);
-
-private:
-  using Replacement = std::pair<llvm::Value *, llvm::Value *>;
-  Replacement getRemappedValueOrNull(llvm::Value *value) const;
-  Replacement getRemappedValue(llvm::Value *value) const;
-  llvm::Value *getBaseAddressFromBufferDesc(llvm::Value *const bufferDesc) const;
-  void copyMetadata(llvm::Value *const dest, const llvm::Value *const src) const;
-  bool removeUsersForInvariantStarts(llvm::Value *const value);
-  llvm::Value *replaceLoadStore(llvm::Instruction &loadInst);
-  llvm::Instruction *makeLoop(llvm::Value *const loopStart, llvm::Value *const loopEnd, llvm::Value *const loopStride,
-                              llvm::Instruction *const insertPos);
-  void postVisitMemCpyInst(llvm::MemCpyInst &memCpyInst);
-  void postVisitMemSetInst(llvm::MemSetInst &memSetInst);
-  void fixIncompletePhis();
-
-  using PhiIncoming = std::pair<llvm::PHINode *, llvm::BasicBlock *>;
-  llvm::DenseMap<llvm::Instruction *, Replacement> m_replacementMap; // The replacement map.
-  llvm::DenseMap<PhiIncoming, llvm::Value *> m_incompletePhis;       // The incomplete phi map.
-  llvm::DenseSet<llvm::Value *> m_invariantSet;                      // The invariant set.
-  llvm::DenseSet<llvm::Value *> m_divergenceSet;                     // The divergence set.
-  llvm::SmallVector<llvm::Instruction *, 16> m_postVisitInsts;       // The post process instruction set.
-  llvm::IRBuilder<> *m_builder;                                      // The IRBuilder.
-  llvm::LLVMContext *m_context;                                      // The LLVM context.
-  llvm::FixedVectorType *m_descType;                                 // The <4 x i32> type used for buffer descriptors.
-  llvm::PointerType *m_offsetType; // The proxy pointer type used to accumulate offsets.
-  PipelineState *m_pipelineState;  // The pipeline state
-
-  std::function<bool(const llvm::Value &)> m_isDivergent;
-
-  static constexpr unsigned MinMemOpLoopBytes = 256;
 };
 
 } // namespace lgc
