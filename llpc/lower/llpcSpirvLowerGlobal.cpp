@@ -1794,12 +1794,7 @@ static Instruction *findNearestCommonDominator(Instruction *instA, Use &useB, Do
   if (!instA)
     return instB;
 
-  BasicBlock *blockA = instA->getParent();
-  if (blockA == blockB)
-    return instA->comesBefore(instB) ? instA : instB;
-
-  BasicBlock *block = domTree.findNearestCommonDominator(blockA, blockB);
-  return block == blockA ? instA : (block == blockB ? instB : block->getTerminator());
+  return domTree.findNearestCommonDominator(instA, instB);
 }
 
 // =====================================================================================================================
@@ -2529,6 +2524,9 @@ void SpirvLowerGlobal::lowerBufferBlock() {
           insertPoint = findNearestCommonDominator(insertPoint, use, domTree);
         }
 
+        if (!insertPoint)
+          continue;
+
         m_builder->SetInsertPoint(insertPoint);
         unsigned bufferFlags = global.isConstant() ? 0 : lgc::Builder::BufferFlagWritten;
         Value *const bufferDesc =
@@ -2643,6 +2641,9 @@ void SpirvLowerGlobal::lowerPushConsts() {
         usesToReplace.push_back(inst);
         insertPoint = findNearestCommonDominator(insertPoint, use, domTree);
       }
+
+      if (!insertPoint)
+        continue;
 
       m_builder->SetInsertPoint(insertPoint);
 
