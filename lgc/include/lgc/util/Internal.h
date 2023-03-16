@@ -59,9 +59,6 @@ static const unsigned InvalidValue = ~0u;
 // Size of vec4
 static const unsigned SizeOfVec4 = sizeof(float) * 4;
 
-//
-static constexpr char PrintfStrings[] = "PrintfStrings";
-
 // Initialize helper passes
 //
 // @param passRegistry : Pass registry

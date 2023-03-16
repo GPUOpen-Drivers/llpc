@@ -1,9 +1,27 @@
 /*
-************************************************************************************************************************
-*
-*  Copyright (C) 2017-2021 Advanced Micro Devices, Inc. All rights reserved.
-*
-***********************************************************************************************************************/
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ *  Permission is hereby granted, free of charge, to any person obtaining a copy
+ *  of this software and associated documentation files (the "Software"), to deal
+ *  in the Software without restriction, including without limitation the rights
+ *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ *  copies of the Software, and to permit persons to whom the Software is
+ *  furnished to do so, subject to the following conditions:
+ *
+ *  The above copyright notice and this permission notice shall be included in all
+ *  copies or substantial portions of the Software.
+ *
+ *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ *  SOFTWARE.
+ *
+ **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
  * @file  LowerDebugPrintf.cpp
@@ -19,7 +37,7 @@
 #include "llvm/InitializePasses.h"
 #include "llvm/Support/Debug.h"
 
-#define DEBUG_TYPE "lgc-patch-image-op-collect"
+#define DEBUG_TYPE "lower-debug-printf"
 
 using namespace llvm;
 using namespace lgc;
@@ -37,7 +55,7 @@ PreservedAnalyses LowerDebugPrintf::run(Module &module, ModuleAnalysisManager &a
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
   Patch::init(&module);
   m_pipelineState = pipelineState;
-  SmallVector<CallInst *, 16> callees;
+  SmallVector<CallInst *> callees;
   BuilderBase builder(*m_context);
   for (auto &func : module) {
     auto name = func.getName();
@@ -55,12 +73,11 @@ PreservedAnalyses LowerDebugPrintf::run(Module &module, ModuleAnalysisManager &a
   }
 
   for (auto callInst : callees) {
-    callInst->dropAllReferences();
     callInst->eraseFromParent();
   }
   setupElfsPrintfStrings();
 
-  return PreservedAnalyses::all();
+  return PreservedAnalyses::none();
 }
 
 // =====================================================================================================================
@@ -73,9 +90,9 @@ llvm::Value *LowerDebugPrintf::createDebugPrintf(Value *debugPrintfBuffer, Value
                                                  iterator_range<User::op_iterator> vars, BuilderBase &builder) {
 
   // Printf output variables in DWORDs
-  SmallVector<Value *, 4> printArgs;
+  SmallVector<Value *> printArgs;
   // Records printf output variables are 64bit or not
-  SmallVector<bool, 4> bit64Vector;
+  SmallVector<bool> bit64Vector;
   for (const auto &var : vars) {
     getDwordValues(var, printArgs, bit64Vector);
   }
@@ -108,7 +125,7 @@ llvm::Value *LowerDebugPrintf::createDebugPrintf(Value *debugPrintfBuffer, Value
   Value *maxOffset = builder.getInt64(1 << 31);
   entryOffset = builder.CreateBinaryIntrinsic(Intrinsic::umin, entryOffset, maxOffset);
 
-  // Buffer Header is {BufferOffset_Loword, BufferOffset_Hiword, rerv0, rerv1};
+  // Buffer Header is {BufferOffset_Loword, BufferOffset_Hiword, reserved0, reserved1};
   Type *bufferHeaderType = ArrayType::get(builder.getInt32Ty(), 4);
   Type *runtimeArrayType = ArrayType::get(builder.getInt32Ty(), ~0U);
   Type *bufferType = StructType::get(*m_context, {bufferHeaderType, runtimeArrayType});
@@ -116,7 +133,7 @@ llvm::Value *LowerDebugPrintf::createDebugPrintf(Value *debugPrintfBuffer, Value
 
   bufferPtr = builder.CreateBitCast(debugPrintfBuffer, bufferPtrType);
 
-  SmallVector<Value *, 4> outputVals = {builder.getInt32(loEntryheader), builder.getInt32(hiEntryheader)};
+  SmallVector<Value *> outputVals = {builder.getInt32(loEntryheader), builder.getInt32(hiEntryheader)};
 
   // Prepare the dword sequence of printf output variables
   for (auto printArg : printArgs)
@@ -138,8 +155,8 @@ llvm::Value *LowerDebugPrintf::createDebugPrintf(Value *debugPrintfBuffer, Value
 // @val: input value
 // @output : generated converted val
 // @output64Bits : bits vector, one bit for one printf output variable
-void LowerDebugPrintf::getDwordValues(llvm::Value *val, llvm::SmallVector<Value *, 4> &output,
-                                      llvm::SmallVector<bool, 4> &output64Bits) {
+void LowerDebugPrintf::getDwordValues(llvm::Value *val, llvm::SmallVector<Value *> &output,
+                                      llvm::SmallVector<bool> &output64Bits) {
   auto vTy = val->getType();
   BuilderBase builder(*m_context);
   auto int32Ty = builder.getInt32Ty();
@@ -226,7 +243,7 @@ void LowerDebugPrintf::setupElfsPrintfStrings() {
     arrayElems[".argument_count"] = argsCount;
     // Convert bit array to the 64bits array
     unsigned bit64ArgsCount = (argsCount + 63) / 64;
-    SmallVector<uint64_t, 2> bitInDword64s(bit64ArgsCount, 0);
+    SmallVector<uint64_t> bitInDword64s(bit64ArgsCount, 0);
     for (unsigned j = 0; j < argsCount; ++j) {
       bitInDword64s[j / 64] |= (bitVector[j] << (j % 64));
     }

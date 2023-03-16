@@ -24,8 +24,8 @@ namespace lgc {
 // Pass to lower debug.printf calls
 class LowerDebugPrintf : public Patch, public llvm::PassInfoMixin<LowerDebugPrintf> {
   struct ElfInfo {
-    llvm::StringRef formatString;        // Printf format string
-    llvm::SmallVector<bool, 4> bit64Pos; // 64bit position records output variable 32bit/64bit condition.
+    llvm::StringRef formatString;     // Printf format string
+    llvm::SmallVector<bool> bit64Pos; // 64bit position records output variable 32bit/64bit condition.
   };
 
 public:
@@ -35,8 +35,8 @@ public:
 private:
   llvm::Value *createDebugPrintf(llvm::Value *debugPrintfBuffer, llvm::Value *formatStr,
                                  llvm::iterator_range<llvm::User::op_iterator> vars, lgc::BuilderBase &builder);
-  void getDwordValues(llvm::Value *val, llvm::SmallVector<llvm::Value *, 4> &output,
-                      llvm::SmallVector<bool, 4> &output64Bits);
+  void getDwordValues(llvm::Value *val, llvm::SmallVector<llvm::Value *> &output,
+                      llvm::SmallVector<bool> &output64Bits);
   void setupElfsPrintfStrings();
   llvm::DenseMap<uint64_t, ElfInfo> m_elfInfos;
   PipelineState *m_pipelineState = nullptr;
