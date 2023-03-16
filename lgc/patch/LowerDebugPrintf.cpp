@@ -75,24 +75,27 @@ PreservedAnalyses LowerDebugPrintf::run(Module &module, ModuleAnalysisManager &a
   for (auto callInst : callees) {
     callInst->eraseFromParent();
   }
-  setupElfsPrintfStrings();
 
-  return PreservedAnalyses::none();
+  if (m_elfInfos.size() == 0)
+    return PreservedAnalyses::none();
+
+  setupElfsPrintfStrings();
+  return PreservedAnalyses::all();
 }
 
 // =====================================================================================================================
 // Create debug printf operation, and write to the output debug buffer
 // @debugPrintfBuffer : Output buffer for debug print data
 // @formatStr : Printf format string
-// @vars: Printf variable parameters
-// @builder: BuilderBase to build instruction
+// @vars : Printf variable parameters
+// @builder : BuilderBase to build instruction
 llvm::Value *LowerDebugPrintf::createDebugPrintf(Value *debugPrintfBuffer, Value *formatStr,
                                                  iterator_range<User::op_iterator> vars, BuilderBase &builder) {
 
   // Printf output variables in DWORDs
   SmallVector<Value *> printArgs;
   // Records printf output variables are 64bit or not
-  SmallVector<bool> bit64Vector;
+  SmallBitVector bit64Vector;
   for (const auto &var : vars) {
     getDwordValues(var, printArgs, bit64Vector);
   }
@@ -134,7 +137,7 @@ llvm::Value *LowerDebugPrintf::createDebugPrintf(Value *debugPrintfBuffer, Value
   bufferPtr = builder.CreateBitCast(debugPrintfBuffer, bufferPtrType);
 
   SmallVector<Value *> outputVals = {builder.getInt32(loEntryheader), builder.getInt32(hiEntryheader)};
-
+  outputVals.reserve(printArgs.size() + 2);
   // Prepare the dword sequence of printf output variables
   for (auto printArg : printArgs)
     outputVals.push_back(printArg);
@@ -152,11 +155,11 @@ llvm::Value *LowerDebugPrintf::createDebugPrintf(Value *debugPrintfBuffer, Value
 
 // =====================================================================================================================
 // Convert value to the DWords, also append to output vector
-// @val: input value
+// @val : input value
 // @output : generated converted val
 // @output64Bits : bits vector, one bit for one printf output variable
 void LowerDebugPrintf::getDwordValues(llvm::Value *val, llvm::SmallVector<Value *> &output,
-                                      llvm::SmallVector<bool> &output64Bits) {
+                                      llvm::SmallBitVector &output64Bits) {
   auto vTy = val->getType();
   BuilderBase builder(*m_context);
   auto int32Ty = builder.getInt32Ty();
@@ -225,8 +228,6 @@ void LowerDebugPrintf::getDwordValues(llvm::Value *val, llvm::SmallVector<Value 
 }
 
 void LowerDebugPrintf::setupElfsPrintfStrings() {
-  if (m_elfInfos.size() == 0)
-    return;
 
   msgpack::Document *document = m_pipelineState->getPalMetadata()->getDocument();
   auto printfStrings =

@@ -4097,9 +4097,9 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpExtInst>(SPIRVValue *cons
 // Handle extended instruction Nonsemantics.debugPrintf
 //
 // @param bi : A SPIR-V debugPrintf instruction
-// @param spvValues: Instruction spirv parameters
-// @param func: Which function to generate code
-// @param bb: Which basicblock to generate code
+// @param spvValues : Instruction spirv parameters
+// @param func : Which function to generate code
+// @param bb : Which basicblock to generate code
 Value *SPIRVToLLVM::transDebugPrintf(SPIRVInstruction *bi, const ArrayRef<SPIRVValue *> spvValues, Function *func,
                                      BasicBlock *bb) {
   if (!getBuilder()->findResourceNode(ResourceNodeType::DescriptorBuffer, Vkgc::InternalDescriptorSetId,
@@ -4486,7 +4486,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpDot>(SPIRVValue *const sp
 
 // =====================================================================================================================
 // Translate OpString
-// @param spvValues: Instruction spirv parameters
+// @param spvValues : Instruction spirv parameters
 Value *SPIRVToLLVM::transString(const SPIRVString *spvValue) {
   auto &debugStr = spvValue->getStr();
   auto globalTy = ArrayType::get(Type::getInt8Ty(*m_context), debugStr.size());

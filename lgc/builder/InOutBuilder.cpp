@@ -1450,7 +1450,7 @@ Value *BuilderImpl::CreateTaskPayloadAtomicCompareSwap(AtomicOrdering ordering, 
 
 // =====================================================================================================================
 // Create debug printf operation, and write to the output debug buffer
-// @args: Printf variable parameters
+// @args : Printf variable parameters
 // @instName : Instance Name
 llvm::Value *lgc::InOutBuilder::CreateDebugPrintf(llvm::ArrayRef<llvm::Value *> args, const llvm::Twine &instName) {
   Module *module = GetInsertPoint()->getModule();

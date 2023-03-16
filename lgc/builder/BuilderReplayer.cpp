@@ -728,6 +728,7 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   }
   case BuilderOpcode::DebugPrintf: {
     SmallVector<Value *> vars;
+    vars.reserve(args.size());
     for (const auto &arg : args) {
       vars.push_back(arg);
     }

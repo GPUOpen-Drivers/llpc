@@ -506,6 +506,7 @@ public:
   SPIRVTypeStruct(SPIRVModule *M, SPIRVId TheId, const std::vector<SPIRVType *> &TheMemberTypes,
                   const std::string &TheName)
       : SPIRVType(M, 2 + TheMemberTypes.size(), OpTypeStruct, TheId), Literal(false) {
+    MemberTypeIdVec.reserve(TheMemberTypes.size());
     for (auto &T : TheMemberTypes)
       MemberTypeIdVec.push_back(T->getId());
     assert(MemberTypeIdVec.size() == TheMemberTypes.size());
