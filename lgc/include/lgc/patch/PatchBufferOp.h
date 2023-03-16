@@ -77,7 +77,6 @@ private:
   void copyMetadata(llvm::Value *const dest, const llvm::Value *const src) const;
   bool removeUsersForInvariantStarts(llvm::Value *const value);
   llvm::Value *replaceLoadStore(llvm::Instruction &loadInst);
-  llvm::Value *replaceICmp(llvm::ICmpInst *const iCmpInst);
   llvm::Instruction *makeLoop(llvm::Value *const loopStart, llvm::Value *const loopEnd, llvm::Value *const loopStride,
                               llvm::Instruction *const insertPos);
   void postVisitMemCpyInst(llvm::MemCpyInst &memCpyInst);
