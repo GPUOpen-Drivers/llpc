@@ -547,53 +547,15 @@ void PatchBufferOp::visitGetElementPtrInst(GetElementPtrInst &getElemPtrInst) {
 void PatchBufferOp::visitLoadInst(LoadInst &loadInst) {
   const unsigned addrSpace = loadInst.getPointerAddressSpace();
 
-  if (addrSpace == ADDR_SPACE_CONST) {
-    m_builder->SetInsertPoint(&loadInst);
+  if (addrSpace != ADDR_SPACE_BUFFER_FAT_POINTER)
+    return;
 
-    Type *const loadType = loadInst.getType();
+  Value *const newLoad = replaceLoadStore(loadInst);
 
-    // If the load is not a pointer type, bail.
-    if (!loadType->isPointerTy())
-      return;
+  // Record the load instruction so we remember to delete it later.
+  m_replacementMap[&loadInst] = std::make_pair(nullptr, nullptr);
 
-    // If the address space of the loaded pointer is not a buffer fat pointer, bail.
-    if (loadType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
-      return;
-
-    assert(loadInst.isVolatile() == false);
-    assert(loadInst.getOrdering() == AtomicOrdering::NotAtomic);
-
-    Type *const castType = m_descType->getPointerTo(ADDR_SPACE_CONST);
-
-    Value *const pointer = loadInst.getPointerOperand();
-
-    Value *const loadPointer = m_builder->CreateBitCast(pointer, castType);
-
-    LoadInst *const newLoad =
-        m_builder->CreateAlignedLoad(m_builder->getInt32Ty(), loadPointer, loadInst.getAlign(), loadInst.isVolatile());
-    newLoad->setOrdering(loadInst.getOrdering());
-    newLoad->setSyncScopeID(loadInst.getSyncScopeID());
-    copyMetadata(newLoad, &loadInst);
-
-    Constant *const nullPointer = ConstantPointerNull::get(m_offsetType);
-
-    m_replacementMap[&loadInst] = std::make_pair(newLoad, nullPointer);
-
-    // If we removed an invariant load, remember that our new load is invariant.
-    if (removeUsersForInvariantStarts(&loadInst))
-      m_invariantSet.insert(newLoad);
-
-    // If the original load was divergent, it means we are using descriptor indexing and need to remember it.
-    if (m_isDivergent(loadInst))
-      m_divergenceSet.insert(newLoad);
-  } else if (addrSpace == ADDR_SPACE_BUFFER_FAT_POINTER) {
-    Value *const newLoad = replaceLoadStore(loadInst);
-
-    // Record the load instruction so we remember to delete it later.
-    m_replacementMap[&loadInst] = std::make_pair(nullptr, nullptr);
-
-    loadInst.replaceAllUsesWith(newLoad);
-  }
+  loadInst.replaceAllUsesWith(newLoad);
 }
 
 // =====================================================================================================================
