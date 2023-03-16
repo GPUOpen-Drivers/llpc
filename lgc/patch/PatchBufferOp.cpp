@@ -905,34 +905,6 @@ void PatchBufferOp::visitICmpInst(ICmpInst &icmpInst) {
 }
 
 // =====================================================================================================================
-// Visits "ptrtoint" instruction.
-//
-// @param ptrToIntInst : The "ptrtoint" instruction
-void PatchBufferOp::visitPtrToIntInst(PtrToIntInst &ptrToIntInst) {
-  Type *const type = ptrToIntInst.getOperand(0)->getType();
-
-  // If the type is not a pointer type, bail.
-  if (!type->isPointerTy())
-    return;
-
-  // If the pointer is not a fat pointer, bail.
-  if (type->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
-    return;
-
-  m_builder->SetInsertPoint(&ptrToIntInst);
-
-  Replacement pointer = getRemappedValue(ptrToIntInst.getOperand(0));
-
-  Value *const newPtrToInt = m_builder->CreatePtrToInt(pointer.second, ptrToIntInst.getDestTy());
-
-  copyMetadata(newPtrToInt, &ptrToIntInst);
-
-  m_replacementMap[&ptrToIntInst] = std::make_pair(pointer.first, newPtrToInt);
-
-  ptrToIntInst.replaceAllUsesWith(newPtrToInt);
-}
-
-// =====================================================================================================================
 // Post-process visits "memcpy" instruction.
 //
 // @param memCpyInst : The memcpy instruction

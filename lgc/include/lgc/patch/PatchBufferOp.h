@@ -67,7 +67,6 @@ public:
   void visitSelectInst(llvm::SelectInst &selectInst);
   void visitStoreInst(llvm::StoreInst &storeInst);
   void visitICmpInst(llvm::ICmpInst &icmpInst);
-  void visitPtrToIntInst(llvm::PtrToIntInst &ptrToIntInst);
 
 private:
   using Replacement = std::pair<llvm::Value *, llvm::Value *>;
