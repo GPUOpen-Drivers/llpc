@@ -54,7 +54,8 @@ public:
 private:
   llvm::Value *createDebugPrintf(llvm::Value *debugPrintfBuffer, llvm::Value *formatStr,
                                  llvm::iterator_range<llvm::User::op_iterator> vars, lgc::BuilderBase &builder);
-  void getDwordValues(llvm::Value *val, llvm::SmallVector<llvm::Value *> &output, llvm::SmallBitVector &output64Bits);
+  void getDwordValues(llvm::Value *val, llvm::SmallVectorImpl<llvm::Value *> &output,
+                      llvm::SmallBitVector &output64Bits);
   void setupElfsPrintfStrings();
   llvm::DenseMap<uint64_t, ElfInfo> m_elfInfos;
   PipelineState *m_pipelineState = nullptr;

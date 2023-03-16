@@ -158,7 +158,7 @@ llvm::Value *LowerDebugPrintf::createDebugPrintf(Value *debugPrintfBuffer, Value
 // @val : input value
 // @output : generated converted val
 // @output64Bits : bits vector, one bit for one printf output variable
-void LowerDebugPrintf::getDwordValues(llvm::Value *val, llvm::SmallVector<Value *> &output,
+void LowerDebugPrintf::getDwordValues(llvm::Value *val, llvm::SmallVectorImpl<llvm::Value *> &output,
                                       llvm::SmallBitVector &output64Bits) {
   auto vTy = val->getType();
   BuilderBase builder(*m_context);
