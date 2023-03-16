@@ -867,7 +867,34 @@ void PatchBufferOp::visitICmpInst(ICmpInst &icmpInst) {
   if (type->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
     return;
 
-  Value *const newICmp = replaceICmp(&icmpInst);
+  m_builder->SetInsertPoint(&icmpInst);
+
+  SmallVector<Value *, 2> bufferDescs;
+  SmallVector<Value *, 2> indices;
+  for (int i = 0; i < 2; ++i) {
+    Replacement operand = getRemappedValue(icmpInst.getOperand(i));
+    bufferDescs.push_back(operand.first);
+    indices.push_back(m_builder->CreatePtrToInt(operand.second, m_builder->getInt32Ty()));
+  }
+
+  assert(bufferDescs[0]->getType() == m_descType);
+
+  assert(icmpInst.getPredicate() == ICmpInst::ICMP_EQ || icmpInst.getPredicate() == ICmpInst::ICMP_NE);
+
+  Value *const bufferDescEqual = m_builder->CreateICmpEQ(bufferDescs[0], bufferDescs[1]);
+
+  Value *bufferDescICmp = m_builder->CreateExtractElement(bufferDescEqual, static_cast<uint64_t>(0));
+  for (unsigned i = 1; i < 4; ++i) {
+    Value *bufferDescElemEqual = m_builder->CreateExtractElement(bufferDescEqual, i);
+    bufferDescICmp = m_builder->CreateAnd(bufferDescICmp, bufferDescElemEqual);
+  }
+
+  Value *indexICmp = m_builder->CreateICmpEQ(indices[0], indices[1]);
+
+  Value *newICmp = m_builder->CreateAnd(bufferDescICmp, indexICmp);
+
+  if (icmpInst.getPredicate() == ICmpInst::ICMP_NE)
+    newICmp = m_builder->CreateNot(newICmp);
 
   copyMetadata(newICmp, &icmpInst);
 
@@ -1557,43 +1584,6 @@ Value *PatchBufferOp::replaceLoadStore(Instruction &inst) {
   }
 
   return newInst;
-}
-
-// =====================================================================================================================
-// Replace fat pointers icmp with the instruction required to do the icmp.
-//
-// @param iCmpInst : The "icmp" instruction to replace.
-Value *PatchBufferOp::replaceICmp(ICmpInst *const iCmpInst) {
-  m_builder->SetInsertPoint(iCmpInst);
-
-  SmallVector<Value *, 2> bufferDescs;
-  SmallVector<Value *, 2> indices;
-  for (int i = 0; i < 2; ++i) {
-    Replacement operand = getRemappedValue(iCmpInst->getOperand(i));
-    bufferDescs.push_back(operand.first);
-    indices.push_back(m_builder->CreatePtrToInt(operand.second, m_builder->getInt32Ty()));
-  }
-
-  assert(bufferDescs[0]->getType() == m_descType);
-
-  assert(iCmpInst->getPredicate() == ICmpInst::ICMP_EQ || iCmpInst->getPredicate() == ICmpInst::ICMP_NE);
-
-  Value *const bufferDescEqual = m_builder->CreateICmpEQ(bufferDescs[0], bufferDescs[1]);
-
-  Value *bufferDescICmp = m_builder->CreateExtractElement(bufferDescEqual, static_cast<uint64_t>(0));
-  for (unsigned i = 1; i < 4; ++i) {
-    Value *bufferDescElemEqual = m_builder->CreateExtractElement(bufferDescEqual, i);
-    bufferDescICmp = m_builder->CreateAnd(bufferDescICmp, bufferDescElemEqual);
-  }
-
-  Value *indexICmp = m_builder->CreateICmpEQ(indices[0], indices[1]);
-
-  Value *newICmp = m_builder->CreateAnd(bufferDescICmp, indexICmp);
-
-  if (iCmpInst->getPredicate() == ICmpInst::ICMP_NE)
-    newICmp = m_builder->CreateNot(newICmp);
-
-  return newICmp;
 }
 
 // =====================================================================================================================
