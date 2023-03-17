@@ -5793,7 +5793,7 @@ void PatchInOutImportExport::recordVertexAttribExport(unsigned location, ArrayRe
 
   for (unsigned i = 0; i < 4; ++i) {
     assert(attribValues[i]);
-    if (isa<UndefValue>(attribValues[i]))
+    if (isa<UndefValue>(attribValues[i]) || isa<PoisonValue>(attribValues[i]))
       continue; // Here, we only record new attribute values that are valid (not undefined ones)
 
     // NOTE: The existing values must have been initialized to undefined ones already. Overlapping is disallowed (see
@@ -5832,7 +5832,7 @@ void PatchInOutImportExport::exportVertexAttribs(Instruction *insertPos) {
       unsigned channelMask = 0;
       for (unsigned i = 0; i < 4; ++i) {
         assert(attribExport.second[i]);
-        if (!isa<UndefValue>(attribExport.second[i]))
+        if (!isa<UndefValue>(attribExport.second[i]) && !isa<PoisonValue>(attribExport.second[i]))
           channelMask |= (1u << i); // Update channel mask if the value is valid (not undef)
       }
 
