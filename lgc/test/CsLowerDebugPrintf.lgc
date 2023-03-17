@@ -80,7 +80,7 @@ attributes #2 = { nounwind willreturn memory(none) }
 ; CHECK-NEXT:    [[TMP9:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP8]], align 16
 ; CHECK-NEXT:    [[TMP10:%.*]] = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> [[TMP9]])
 ; CHECK-NEXT:    [[TMP11:%.*]] = atomicrmw add ptr addrspace(7) [[TMP10]], i64 3 syncscope("singlethread") monotonic, align 8
-; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.umin.i64(i64 [[TMP11]], i64 -2147483648)
+; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.umin.i64(i64 [[TMP11]], i64 2147483648)
 ; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr { [4 x i32], [4294967295 x i32] }, ptr addrspace(7) [[TMP10]], i32 0, i32 1, i64 [[TMP12]]
 ; CHECK-NEXT:    store i32 -1902706685, ptr addrspace(7) [[TMP13]], align 4
 ; CHECK-NEXT:    [[TMP14:%.*]] = add i64 [[TMP12]], 1

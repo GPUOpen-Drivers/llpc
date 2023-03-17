@@ -125,7 +125,7 @@ llvm::Value *LowerDebugPrintf::createDebugPrintf(Value *debugPrintfBuffer, Value
   // offset = offset < maxOffset ? offset : maxOffset;
   Value *entryOffset = builder.CreateAtomicRMW(AtomicRMWInst::Add, bufferPtr, builder.getInt64(entrySize), MaybeAlign(),
                                                AtomicOrdering::Monotonic, SyncScope::SingleThread);
-  Value *maxOffset = builder.getInt64(1 << 31);
+  Value *maxOffset = builder.getInt64(1U << 31);
   entryOffset = builder.CreateBinaryIntrinsic(Intrinsic::umin, entryOffset, maxOffset);
 
   // Buffer Header is {BufferOffset_Loword, BufferOffset_Hiword, reserved0, reserved1};
