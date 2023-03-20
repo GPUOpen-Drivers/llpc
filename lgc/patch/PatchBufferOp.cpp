@@ -810,9 +810,6 @@ void PatchBufferOp::visitSelectInst(SelectInst &selectInst) {
   if (bufferDesc1 == bufferDesc2) {
     // If the buffer descriptors are the same, then no select needed.
     bufferDesc = bufferDesc1;
-  } else if (!bufferDesc1 || !bufferDesc2) {
-    // Select the non-nullptr buffer descriptor
-    bufferDesc = bufferDesc1 ? bufferDesc1 : bufferDesc2;
   } else {
     // Otherwise we need to insert a select between the buffer descriptors.
     bufferDesc = m_builder->CreateSelect(selectInst.getCondition(), bufferDesc1, bufferDesc2);
@@ -1187,8 +1184,9 @@ PatchBufferOp::Replacement PatchBufferOp::getRemappedValueOrNull(Value *value) c
   }
 
   // Otherwise the value is a constant. Assume it is a null pointer and remap its type.
-  Constant *nullPointer = ConstantPointerNull::get(m_offsetType);
-  return std::make_pair(nullptr, nullPointer);
+  Constant *nullDesc = ConstantAggregateZero::get(m_descType);
+  Constant *nullIndex = ConstantPointerNull::get(m_offsetType);
+  return std::make_pair(nullDesc, nullIndex);
 }
 
 // =====================================================================================================================
@@ -1580,17 +1578,12 @@ Value *PatchBufferOp::replaceICmp(ICmpInst *const iCmpInst) {
 
   assert(iCmpInst->getPredicate() == ICmpInst::ICMP_EQ || iCmpInst->getPredicate() == ICmpInst::ICMP_NE);
 
-  Value *bufferDescICmp = m_builder->getFalse();
-  if (!bufferDescs[0] && !bufferDescs[1])
-    bufferDescICmp = m_builder->getTrue();
-  else if (bufferDescs[0] && bufferDescs[1]) {
-    Value *const bufferDescEqual = m_builder->CreateICmpEQ(bufferDescs[0], bufferDescs[1]);
+  Value *const bufferDescEqual = m_builder->CreateICmpEQ(bufferDescs[0], bufferDescs[1]);
 
-    bufferDescICmp = m_builder->CreateExtractElement(bufferDescEqual, static_cast<uint64_t>(0));
-    for (unsigned i = 1; i < 4; ++i) {
-      Value *bufferDescElemEqual = m_builder->CreateExtractElement(bufferDescEqual, i);
-      bufferDescICmp = m_builder->CreateAnd(bufferDescICmp, bufferDescElemEqual);
-    }
+  Value *bufferDescICmp = m_builder->CreateExtractElement(bufferDescEqual, static_cast<uint64_t>(0));
+  for (unsigned i = 1; i < 4; ++i) {
+    Value *bufferDescElemEqual = m_builder->CreateExtractElement(bufferDescEqual, i);
+    bufferDescICmp = m_builder->CreateAnd(bufferDescICmp, bufferDescElemEqual);
   }
 
   Value *indexICmp = m_builder->CreateICmpEQ(indices[0], indices[1]);
