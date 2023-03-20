@@ -89,8 +89,8 @@ PreservedAnalyses LowerDebugPrintf::run(Module &module, ModuleAnalysisManager &a
 // @formatStr : Printf format string
 // @vars : Printf variable parameters
 // @builder : BuilderBase to build instruction
-llvm::Value *LowerDebugPrintf::createDebugPrintf(Value *debugPrintfBuffer, Value *formatStr,
-                                                 iterator_range<User::op_iterator> vars, BuilderBase &builder) {
+Value *LowerDebugPrintf::createDebugPrintf(Value *debugPrintfBuffer, Value *formatStr,
+                                           iterator_range<User::op_iterator> vars, BuilderBase &builder) {
 
   // Printf output variables in DWORDs
   SmallVector<Value *> printArgs;
@@ -158,8 +158,7 @@ llvm::Value *LowerDebugPrintf::createDebugPrintf(Value *debugPrintfBuffer, Value
 // @val : input value
 // @output : generated converted val
 // @output64Bits : bits vector, one bit for one printf output variable
-void LowerDebugPrintf::getDwordValues(llvm::Value *val, llvm::SmallVectorImpl<llvm::Value *> &output,
-                                      llvm::SmallBitVector &output64Bits) {
+void LowerDebugPrintf::getDwordValues(Value *val, SmallVectorImpl<Value *> &output, SmallBitVector &output64Bits) {
   auto vTy = val->getType();
   BuilderBase builder(*m_context);
   auto int32Ty = builder.getInt32Ty();

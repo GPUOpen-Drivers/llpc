@@ -1854,7 +1854,7 @@ Value *Builder::createFMix(Value *x, Value *y, Value *a, const Twine &instName) 
 // Create debug printf operation, and write to the output debug buffer
 // @vars: Printf variable parameters
 // @instName : Instance Name
-Value *BuilderRecorder::CreateDebugPrintf(llvm::ArrayRef<llvm::Value *> vars, const llvm::Twine &instName) {
+Value *BuilderRecorder::CreateDebugPrintf(ArrayRef<Value *> vars, const Twine &instName) {
   return record(Opcode::DebugPrintf, getInt64Ty(), vars, instName);
 }
 
