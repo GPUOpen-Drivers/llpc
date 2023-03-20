@@ -116,14 +116,8 @@ bool PatchBufferOp::runImpl(Function &function, PipelineState *pipelineState,
   const bool changed = (!m_replacementMap.empty());
 
   for (auto &replaceMap : m_replacementMap) {
-    Instruction *const inst = dyn_cast<Instruction>(replaceMap.first);
-
-    if (!inst)
-      continue;
-
-    if (!isa<StoreInst>(inst))
-      inst->replaceAllUsesWith(UndefValue::get(inst->getType()));
-
+    Instruction *const inst = replaceMap.first;
+    inst->replaceAllUsesWith(UndefValue::get(inst->getType()));
     inst->eraseFromParent();
   }
 
@@ -1673,12 +1667,14 @@ void PatchBufferOp::fixIncompletePhis() {
     assert(isa<UndefValue>(phiNode->getIncomingValueForBlock(incomingBlock)));
     assert(phiNode->getType()->isVectorTy() || phiNode->getType()->isPointerTy());
 
-    if (phiNode->getType()->isVectorTy())
+    Replacement pointer = getRemappedValue(incoming);
+    if (phiNode->getType()->isVectorTy()) {
       // It is a buffer descriptor
-      phiNode->setIncomingValueForBlock(incomingBlock, m_replacementMap[incoming].first);
-    else
+      phiNode->setIncomingValueForBlock(incomingBlock, pointer.first);
+    } else {
       // It is an index
-      phiNode->setIncomingValueForBlock(incomingBlock, m_replacementMap[incoming].second);
+      phiNode->setIncomingValueForBlock(incomingBlock, pointer.second);
+    }
   }
 }
 
