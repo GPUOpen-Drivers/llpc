@@ -92,6 +92,7 @@ private:
   llvm::SmallVector<llvm::Instruction *, 16> m_postVisitInsts;       // The post process instruction set.
   llvm::IRBuilder<> *m_builder;                                      // The IRBuilder.
   llvm::LLVMContext *m_context;                                      // The LLVM context.
+  llvm::FixedVectorType *m_descType;                                 // The <4 x i32> type used for buffer descriptors.
   llvm::PointerType *m_offsetType; // The proxy pointer type used to accumulate offsets.
   PipelineState *m_pipelineState;  // The pipeline state
 

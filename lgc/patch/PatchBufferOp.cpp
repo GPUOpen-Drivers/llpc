@@ -84,6 +84,7 @@ bool PatchBufferOp::runImpl(Function &function, PipelineState *pipelineState,
   m_pipelineState = pipelineState;
   m_isDivergent = std::move(isDivergent);
   m_context = &function.getContext();
+  m_descType = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
   m_offsetType = PointerType::get(*m_context, ADDR_SPACE_CONST_32BIT);
 
   IRBuilder<> builder(*m_context);
@@ -562,7 +563,7 @@ void PatchBufferOp::visitLoadInst(LoadInst &loadInst) {
     assert(loadInst.isVolatile() == false);
     assert(loadInst.getOrdering() == AtomicOrdering::NotAtomic);
 
-    Type *const castType = FixedVectorType::get(Type::getInt32Ty(*m_context), 4)->getPointerTo(ADDR_SPACE_CONST);
+    Type *const castType = m_descType->getPointerTo(ADDR_SPACE_CONST);
 
     Value *const pointer = loadInst.getPointerOperand();
 
@@ -720,8 +721,7 @@ void PatchBufferOp::visitPHINode(PHINode &phiNode) {
 
   // If the buffer descriptor was null, it means the PHI is changing the buffer descriptor, and we need a new PHI.
   if (!bufferDesc) {
-    PHINode *const newPhiNode =
-        m_builder->CreatePHI(FixedVectorType::get(Type::getInt32Ty(*m_context), 4), incomings.size());
+    PHINode *const newPhiNode = m_builder->CreatePHI(m_descType, incomings.size());
     copyMetadata(newPhiNode, &phiNode);
 
     bool isInvariant = true;
@@ -1208,9 +1208,7 @@ PatchBufferOp::Replacement PatchBufferOp::getRemappedValue(Value *value) const {
 Value *PatchBufferOp::getBaseAddressFromBufferDesc(Value *const bufferDesc) const {
   Type *const descType = bufferDesc->getType();
 
-  assert(descType->isVectorTy());
-  assert(cast<FixedVectorType>(descType)->getNumElements() == 4);
-  assert(cast<VectorType>(descType)->getElementType()->isIntegerTy(32));
+  assert(descType == m_descType);
 
   // Get the base address of our buffer by extracting the two components with the 48-bit address, and masking.
   Value *baseAddr = m_builder->CreateShuffleVector(bufferDesc, UndefValue::get(descType), ArrayRef<int>{0, 1});
@@ -1578,12 +1576,8 @@ Value *PatchBufferOp::replaceICmp(ICmpInst *const iCmpInst) {
     indices.push_back(m_builder->CreatePtrToInt(operand.second, m_builder->getInt32Ty()));
   }
 
-  Type *const bufferDescTy = bufferDescs[0]->getType();
+  assert(bufferDescs[0]->getType() == m_descType);
 
-  assert(bufferDescTy->isVectorTy());
-  assert(cast<FixedVectorType>(bufferDescTy)->getNumElements() == 4);
-  assert(cast<VectorType>(bufferDescTy)->getElementType()->isIntegerTy(32));
-  (void(bufferDescTy)); // unused
   assert(iCmpInst->getPredicate() == ICmpInst::ICMP_EQ || iCmpInst->getPredicate() == ICmpInst::ICMP_NE);
 
   Value *bufferDescICmp = m_builder->getFalse();
