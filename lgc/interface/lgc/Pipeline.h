@@ -446,7 +446,8 @@ struct ColorExportState {
 // Struct to pass to SetInputAssemblyState.
 struct InputAssemblyState {
   PrimitiveType primitiveType; // Primitive type
-  unsigned patchControlPoints; // Number of control points for PrimitiveType::Patch
+  unsigned patchControlPoints; // Number of control points for PrimitiveType::Patch. Can be provided here, or as
+                               //  TessellationMode::inputVertices.
   unsigned disableVertexReuse; // Disable reusing vertex shader output for indexed draws
   unsigned switchWinding;      // Whether to reverse vertex ordering for tessellation
   unsigned enableMultiView;    // Whether to enable multi-view support
@@ -564,6 +565,8 @@ struct TessellationMode {
   PrimitiveMode primitiveMode; // Tessellation primitive mode
   unsigned pointMode;          // Whether point mode is specified
   unsigned outputVertices;     // Number of produced vertices in the output patch
+  unsigned inputVertices;      // Number of input vertices in the input patch. Can be provided either here as part
+                               //  of TessellationMode, or in InputAssemblyState::patchControlPoints in pipeline state.
 };
 
 // Kind of GS input primitives.

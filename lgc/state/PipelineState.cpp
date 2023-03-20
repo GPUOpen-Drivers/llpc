@@ -1261,6 +1261,16 @@ void PipelineState::readGraphicsState(Module *module) {
 }
 
 // =====================================================================================================================
+// Get number of patch control points. The front-end can supply this either as
+// InputAssemblyState::patchControlPoints or as TessellationMode::outputVertices.
+unsigned PipelineState::getNumPatchControlPoints() const {
+  unsigned numPatchControlPoints = getInputAssemblyState().patchControlPoints;
+  if (numPatchControlPoints == 0)
+    numPatchControlPoints = getShaderModes()->getTessellationMode().inputVertices;
+  return numPatchControlPoints;
+}
+
+// =====================================================================================================================
 // Determine whether to use off-chip tessellation mode
 bool PipelineState::isTessOffChip() {
   // For GFX9+, always enable tessellation off-chip mode

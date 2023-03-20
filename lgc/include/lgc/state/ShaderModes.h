@@ -55,34 +55,34 @@ public:
   static CommonShaderMode getCommonShaderMode(llvm::Module &module, ShaderStage stage);
 
   // Get the common shader modes for the given shader stage
-  const CommonShaderMode &getCommonShaderMode(ShaderStage stage);
+  const CommonShaderMode &getCommonShaderMode(ShaderStage stage) const;
 
   // Check if any shader stage has useSubgroupSize set
-  bool getAnyUseSubgroupSize();
+  bool getAnyUseSubgroupSize() const;
 
   // Set the tessellation mode for the given shader stage (TCS or TES).
   static void setTessellationMode(llvm::Module &module, ShaderStage stage, const TessellationMode &inMode);
 
   // Get the tessellation state.
-  const TessellationMode &getTessellationMode();
+  const TessellationMode &getTessellationMode() const;
 
   // Set the geometry shader mode
   static void setGeometryShaderMode(llvm::Module &module, const GeometryShaderMode &inMode);
 
   // Get the geometry shader mode
-  const GeometryShaderMode &getGeometryShaderMode();
+  const GeometryShaderMode &getGeometryShaderMode() const;
 
   // Set the mesh shader mode
   static void setMeshShaderMode(llvm::Module &module, const MeshShaderMode &inMode);
 
   // Get the mesh shader mode
-  const MeshShaderMode &getMeshShaderMode();
+  const MeshShaderMode &getMeshShaderMode() const;
 
   // Set the fragment shader mode
   static void setFragmentShaderMode(llvm::Module &module, const FragmentShaderMode &inMode);
 
   // Get the fragment shader mode
-  const FragmentShaderMode &getFragmentShaderMode();
+  const FragmentShaderMode &getFragmentShaderMode() const;
 
   // Set the compute shader mode (workgroup size)
   static void setComputeShaderMode(llvm::Module &module, const ComputeShaderMode &inMode);
@@ -91,7 +91,7 @@ public:
   static ComputeShaderMode getComputeShaderMode(llvm::Module &module);
 
   // Get the compute shader mode (workgroup size)
-  const ComputeShaderMode &getComputeShaderMode();
+  const ComputeShaderMode &getComputeShaderMode() const;
 
   // Set subgroup size usage.
   static void setSubgroupSizeUsage(llvm::Module &module, ShaderStage stage, bool usage);

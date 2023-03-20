@@ -192,6 +192,7 @@ public:
   void setShaderStageMask(unsigned mask) { m_stageMask = mask; }
 
   // Get the embedded ShaderModes object
+  const ShaderModes *getShaderModes() const { return &m_shaderModes; }
   ShaderModes *getShaderModes() { return &m_shaderModes; }
 
   // Accessors for context information
@@ -257,6 +258,7 @@ public:
   // Accessors for pipeline state
   unsigned getDeviceIndex() const { return m_deviceIndex; }
   const InputAssemblyState &getInputAssemblyState() const { return m_inputAssemblyState; }
+  unsigned getNumPatchControlPoints() const;
   const RasterizerState &getRasterizerState() const { return m_rasterizerState; }
   const DepthStencilState &getDepthStencilState() const { return m_depthStencilState; }
 

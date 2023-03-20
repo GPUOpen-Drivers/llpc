@@ -328,7 +328,7 @@ void PatchInOutImportExport::processShader() {
       const unsigned outLocCount =
           hasTcs ? std::max(tcsInOutUsage.outputMapLocCount, 1u) : std::max(tesInOutUsage.inputMapLocCount, 1u);
 
-      const unsigned inVertexCount = m_pipelineState->getInputAssemblyState().patchControlPoints;
+      const unsigned inVertexCount = m_pipelineState->getNumPatchControlPoints();
       const unsigned outVertexCount =
           hasTcs ? m_pipelineState->getShaderModes()->getTessellationMode().outputVertices : MaxTessPatchVertices;
 
