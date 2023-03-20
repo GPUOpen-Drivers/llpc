@@ -139,8 +139,8 @@ TEST_F(ShaderCacheTest, InsertsShaders) {
   SmallVector<char> cacheEntry(64);
   constexpr size_t numShaders = 128;
   SmallVector<MetroHash::Hash, 0> hashes(numShaders);
-  for (auto &hashAndIndex : enumerate(hashes))
-    hashAndIndex.value() = hashFromDWords(static_cast<unsigned>(hashAndIndex.index()), 2, 3, 4);
+  for (auto [idx, hash] : enumerate(hashes))
+    hash = hashFromDWords(static_cast<unsigned>(idx), 2, 3, 4);
 
   for (auto &hash : hashes) {
     CacheEntryHandle handle = nullptr;
@@ -183,8 +183,8 @@ TEST_F(ShaderCacheTest, InsertsShadersMultithreaded) {
   constexpr unsigned maxWaitTimeMilliseconds = 4;
 
   SmallVector<MetroHash::Hash, 0> hashes(numShaders);
-  for (auto &hashAndIndex : enumerate(hashes))
-    hashAndIndex.value() = hashFromDWords(static_cast<unsigned>(hashAndIndex.index()), 2, 3, 4);
+  for (auto [idx, hash] : enumerate(hashes))
+    hash = hashFromDWords(static_cast<unsigned>(idx), 2, 3, 4);
 
   // Initialize the generator with a deterministic seed.
   std::mt19937 generator(std::random_device{}());
