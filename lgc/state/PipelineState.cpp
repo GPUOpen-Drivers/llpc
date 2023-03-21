@@ -295,6 +295,14 @@ void PipelineState::setOtherPartPipeline(Pipeline &otherPartPipeline, Module *li
 }
 
 // =====================================================================================================================
+// Copy client-defined metadata blob to be stored inside ELF.
+//
+// @param clientMetadata : StringRef representing the client metadata blob
+void PipelineState::setClientMetadata(StringRef clientMetadata) {
+  getPalMetadata()->setClientMetadata(clientMetadata);
+}
+
+// =====================================================================================================================
 // Clear the pipeline state IR metadata.
 // This does not clear PalMetadata, because we want that to persist into the back-end.
 //

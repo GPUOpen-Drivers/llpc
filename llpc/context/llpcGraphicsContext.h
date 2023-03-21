@@ -73,6 +73,9 @@ public:
   // Gets subgroup size usage
   virtual unsigned getSubgroupSizeUsage() const override;
 
+  // Gets client-defined metadata
+  virtual llvm::StringRef getClientMetadata() const override;
+
 #if VKI_RAY_TRACING
   virtual bool hasRayQuery() const override { return (m_pipelineInfo->shaderLibrary.codeSize > 0); }
 #endif

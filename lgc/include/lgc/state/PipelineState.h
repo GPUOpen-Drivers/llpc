@@ -182,6 +182,9 @@ public:
   // compile of the non-FS part of the pipeline, to inherit required information from the FS part-pipeline.
   void setOtherPartPipeline(Pipeline &otherPartPipeline, llvm::Module *linkedModule = nullptr) override final;
 
+  // Set the client-defined metadata to be stored inside the ELF
+  void setClientMetadata(llvm::StringRef clientMetadata) override final;
+
   // -----------------------------------------------------------------------------------------------------------------
   // Other methods
 

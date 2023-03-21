@@ -193,6 +193,9 @@ public:
   // In part-pipeline compilation, copy any metadata needed from the "other" pipeline's PAL metadata into ours.
   void setOtherPartPipeline(PalMetadata &other);
 
+  // Copy client-defined metadata blob to be stored inside ELF
+  void setClientMetadata(llvm::StringRef clientMetadata);
+
   // Erase the PAL metadata for FS input mappings. Used when finalizing the PAL metadata in the link.
   void eraseFragmentInputInfo();
 

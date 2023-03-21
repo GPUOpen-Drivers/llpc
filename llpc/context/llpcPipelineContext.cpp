@@ -282,6 +282,9 @@ void PipelineContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
         hasher->Update(deviceIndex);
     }
   }
+
+  if (pipeline)
+    pipeline->setClientMetadata(getClientMetadata());
 }
 
 // =====================================================================================================================

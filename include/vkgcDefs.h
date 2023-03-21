@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 61
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 1
+#define LLPC_INTERFACE_MINOR_VERSION 2
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     61.2 | Add pClientMetadata and clientMetadataSize to all PipelineBuildInfos                                  |
 //  |     61.1 | Add IPipelineDumper::GetGraphicsShaderBinaryHash                                                      |
 //  |     61.0 | Add DescriptorMutable type and ResourceMappingNode::strideInDwords to support mutable descriptors     |
 //  |     60.0 | Simplify the enum NggCompactMode to a boolean flag                                                    |
@@ -1202,6 +1203,8 @@ struct GraphicsPipelineBuildInfo {
   BinaryData shaderLibrary; ///< SPIR-V library binary data
   RtState rtState;          ///< Ray tracing state
 #endif
+  const void *pClientMetadata; ///< Pointer to (optional) client-defined data to be stored inside the ELF
+  size_t clientMetadataSize;   ///< Size (in bytes) of the client-defined data
 };
 
 /// Represents info to build a compute pipeline.
@@ -1223,6 +1226,8 @@ struct ComputePipelineBuildInfo {
   BinaryData shaderLibrary; ///< SPIR-V library binary data
   RtState rtState;          ///< Ray tracing state
 #endif
+  const void *pClientMetadata; ///< Pointer to (optional) client-defined data to be stored inside the ELF
+  size_t clientMetadataSize;   ///< Size (in bytes) of the client-defined data
 };
 
 #if VKI_RAY_TRACING
@@ -1250,6 +1255,9 @@ struct RayTracingPipelineBuildInfo {
   bool hasPipelineLibrary;                                   ///< Whether include pipeline library
   unsigned pipelineLibStageMask;                             ///< Pipeline library stage mask
   bool isReplay;                                             ///< Pipeline is created for replaying
+  const void *pClientMetadata;                               ///< Pointer to (optional) client-defined data to be
+                                                             ///  stored inside the ELF
+  size_t clientMetadataSize;                                 ///< Size (in bytes) of the client-defined data
 };
 
 /// Ray tracing max shader name length

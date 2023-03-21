@@ -222,4 +222,10 @@ unsigned RayTracingContext::getSubgroupSizeUsage() const {
   return 0;
 }
 
+// =====================================================================================================================
+// Gets client-defined metadata
+StringRef RayTracingContext::getClientMetadata() const {
+  return StringRef(static_cast<const char *>(m_pipelineInfo->pClientMetadata), m_pipelineInfo->clientMetadataSize);
+}
+
 } // namespace Llpc
