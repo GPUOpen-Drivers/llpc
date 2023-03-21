@@ -85,15 +85,16 @@ private:
   void fixIncompletePhis();
 
   using PhiIncoming = std::pair<llvm::PHINode *, llvm::BasicBlock *>;
-  llvm::DenseMap<llvm::Value *, Replacement> m_replacementMap; // The replacement map.
-  llvm::DenseMap<PhiIncoming, llvm::Value *> m_incompletePhis; // The incomplete phi map.
-  llvm::DenseSet<llvm::Value *> m_invariantSet;                // The invariant set.
-  llvm::DenseSet<llvm::Value *> m_divergenceSet;               // The divergence set.
-  llvm::SmallVector<llvm::Instruction *, 16> m_postVisitInsts; // The post process instruction set.
-  llvm::IRBuilder<> *m_builder;                                // The IRBuilder.
-  llvm::LLVMContext *m_context;                                // The LLVM context.
-  llvm::PointerType *m_offsetType;                             // The proxy pointer type used to accumulate offsets.
-  PipelineState *m_pipelineState;                              // The pipeline state
+  llvm::DenseMap<llvm::Instruction *, Replacement> m_replacementMap; // The replacement map.
+  llvm::DenseMap<PhiIncoming, llvm::Value *> m_incompletePhis;       // The incomplete phi map.
+  llvm::DenseSet<llvm::Value *> m_invariantSet;                      // The invariant set.
+  llvm::DenseSet<llvm::Value *> m_divergenceSet;                     // The divergence set.
+  llvm::SmallVector<llvm::Instruction *, 16> m_postVisitInsts;       // The post process instruction set.
+  llvm::IRBuilder<> *m_builder;                                      // The IRBuilder.
+  llvm::LLVMContext *m_context;                                      // The LLVM context.
+  llvm::FixedVectorType *m_descType;                                 // The <4 x i32> type used for buffer descriptors.
+  llvm::PointerType *m_offsetType; // The proxy pointer type used to accumulate offsets.
+  PipelineState *m_pipelineState;  // The pipeline state
 
   std::function<bool(const llvm::Value &)> m_isDivergent;
 
