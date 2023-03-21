@@ -7757,35 +7757,6 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       blockMDs.push_back(ConstantAsMetadata::get(blockMd));
       auto blockMdNode = MDNode::get(*m_context, blockMDs);
       gv->addMetadata(gSPIRVMD::Block, *blockMdNode);
-
-    } else if (as == SPIRAS_Constant) {
-      // Translate decorations of uniform constants (images or samplers)
-
-      SPIRVType *opaqueTy = bv->getType()->getPointerElementType();
-      while (opaqueTy->isTypeArray())
-        opaqueTy = opaqueTy->getArrayElementType();
-      assert(opaqueTy->isTypeImage() || opaqueTy->isTypeSampledImage() || opaqueTy->isTypeSampler());
-
-      // Get values of descriptor binding and set based on corresponding
-      // decorations
-      unsigned descSet = SPIRVID_INVALID;
-      SPIRVWord binding = SPIRVID_INVALID;
-      bool hasBinding = bv->hasDecorate(DecorationBinding, 0, &binding);
-      bool hasDescSet = bv->hasDecorate(DecorationDescriptorSet, 0, &descSet);
-      // TODO: Currently, set default binding and descriptor to 0. Will be
-      // changed later.
-      if (!hasBinding)
-        binding = 0;
-      if (!hasDescSet)
-        descSet = 0;
-
-      // Setup resource metadata
-      auto int32Ty = Type::getInt32Ty(*m_context);
-      std::vector<Metadata *> mDs;
-      mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, descSet)));
-      mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, binding)));
-      auto mdNode = MDNode::get(*m_context, mDs);
-      gv->addMetadata(gSPIRVMD::Resource, *mdNode);
     } else if (as == SPIRAS_Local) {
       if (m_bm->hasCapability(CapabilityWorkgroupMemoryExplicitLayoutKHR)) {
         std::vector<Metadata *> mDs;
@@ -7794,6 +7765,9 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
         auto mdNode = MDNode::get(*m_context, mDs);
         gv->addMetadata(gSPIRVMD::Lds, *mdNode);
       }
+    } else {
+      // image/sampler/sampledimage are lowered without GlobalVariable, so we should not arrive here anymore.
+      assert(as != SPIRAS_Constant && "We don't have decoration on constant globalvariable now.\n");
     }
   } else {
     bool isNonUniform = bv->hasDecorate(DecorationNonUniformEXT);
