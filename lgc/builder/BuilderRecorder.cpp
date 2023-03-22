@@ -336,36 +336,6 @@ void BuilderRecorderMetadataKinds::init(LLVMContext &context) {
 }
 
 // =====================================================================================================================
-//
-// @param builderContext : Builder context
-// @param pipeline : PipelineState, or nullptr for shader compile
-BuilderRecorder::BuilderRecorder(LgcContext *builderContext, Pipeline *pipeline, bool omitOpcodes)
-    : Builder(builderContext), m_pipelineState(reinterpret_cast<PipelineState *>(pipeline)),
-      m_omitOpcodes(omitOpcodes) {
-}
-
-// =====================================================================================================================
-// Record shader modes into IR metadata if this is a shader compile (no PipelineState).
-// For a pipeline compile with BuilderRecorder, they get recorded by PipelineState.
-//
-// @param [in/out] module : Module to record into
-void BuilderRecorder::recordShaderModes(Module *module) {
-  if (!m_pipelineState && m_shaderModes)
-    m_shaderModes->record(module);
-}
-
-// =====================================================================================================================
-// Get the ShaderModes object. If this is a pipeline compile, we get the ShaderModes object from the PipelineState.
-// If it is a shader compile, we create our own ShaderModes object.
-ShaderModes *BuilderRecorder::getShaderModes() {
-  if (m_pipelineState)
-    return m_pipelineState->getShaderModes();
-  if (!m_shaderModes)
-    m_shaderModes = std::make_unique<ShaderModes>();
-  return &*m_shaderModes;
-}
-
-// =====================================================================================================================
 // Create scalar from dot product of vector
 //
 // @param vector1 : The vector 1
@@ -2060,7 +2030,7 @@ Instruction *BuilderRecorder::record(BuilderRecorder::Opcode opcode, Type *resul
     // Add opcode metadata to the function, so that BuilderReplayer does not need to do a string comparison.
     // We do not add that metadata if doing -emit-lgc, so that a test constructed with -emit-lgc will rely
     // on the more stable lgc.create.* name rather than the less stable opcode.
-    if (!m_omitOpcodes) {
+    if (!LgcContext::getEmitLgc()) {
       MDNode *const funcMeta = MDNode::get(getContext(), ConstantAsMetadata::get(getInt32(opcode)));
       func->setMetadata(m_mdKindIdCache.getOpcodeMetaKindId(getContext()), funcMeta);
     }

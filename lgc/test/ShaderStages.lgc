@@ -236,7 +236,7 @@ declare <4 x float> @lgc.create.read.generic.input.v4f32(...) local_unnamed_addr
 attributes #0 = { nounwind }
 attributes #1 = { nounwind readonly }
 
-!llpc.tessellation.mode = !{!0}
+!llpc.tcs.mode = !{!0}
 !lgc.options = !{!1}
 !lgc.options.TCS = !{!2}
 !lgc.options.TES = !{!3}
@@ -294,7 +294,7 @@ declare <4 x float> @lgc.create.read.generic.input.v4f32(...) local_unnamed_addr
 attributes #0 = { nounwind }
 attributes #1 = { nounwind readonly }
 
-!llpc.tessellation.mode = !{!0}
+!llpc.tcs.mode = !{!0}
 !lgc.options = !{!1}
 !lgc.options.TCS = !{!2}
 !lgc.options.TES = !{!3}
@@ -359,7 +359,7 @@ declare <4 x float> @lgc.create.read.generic.input.v4f32(...) local_unnamed_addr
 attributes #0 = { nounwind }
 attributes #1 = { nounwind readonly }
 
-!llpc.tessellation.mode = !{!0}
+!llpc.tes.mode = !{!0}
 !lgc.options = !{!1}
 !lgc.options.TCS = !{!2}
 !lgc.options.TES = !{!3}
@@ -499,7 +499,7 @@ declare void @llvm.amdgcn.s.sendmsg(i32 immarg, i32) #0
 attributes #0 = { nounwind }
 attributes #1 = { nounwind readonly }
 
-!llpc.tessellation.mode = !{!0}
+!llpc.tcs.mode = !{!0}
 !llpc.geometry.mode = !{!0}
 !lgc.options = !{!1}
 !lgc.options.TCS = !{!2}

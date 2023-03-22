@@ -137,64 +137,11 @@ public:
   // Static methods to create a BuilderImpl or BuilderRecorder. These are not used as part of the LGC
   // interface; use LgcContext::createBuilder instead.
   static Builder *createBuilderImpl(LgcContext *context, Pipeline *pipeline);
-  static Builder *createBuilderRecorder(LgcContext *context, Pipeline *pipeline, bool omitOpcodes);
+  static Builder *createBuilderRecorder(LgcContext *context, Pipeline *pipeline);
 
   // Get the type elementTy, turned into a vector of the same vector width as maybeVecTy if the latter
   // is a vector type.
   static llvm::Type *getConditionallyVectorizedTy(llvm::Type *elementTy, llvm::Type *maybeVecTy);
-
-  // Get the LgcContext
-  LgcContext *getLgcContext() const { return m_builderContext; }
-
-  // -----------------------------------------------------------------------------------------------------------------
-  // Methods to set shader modes (FP modes, tessellation modes, fragment modes, workgroup size) for the current
-  // shader that come from the input language. The structs passed to the methods are declared in Pipeline.h.
-  // For a particular shader stage, these methods must be called before any Builder::Create* calls that
-  // generate IR.
-
-  // Set the common shader mode for the given shader stage, containing hardware FP round and denorm modes.
-  // The client should always zero-initialize the struct before setting it up, in case future versions
-  // add more fields. A local struct variable can be zero-initialized with " = {}".
-  void setCommonShaderMode(ShaderStage shaderStage, const CommonShaderMode &commonShaderMode);
-
-  // Get the common shader mode for the given shader stage.
-  const CommonShaderMode &getCommonShaderMode(ShaderStage shaderStage);
-
-  // Set the tessellation mode. This can be called in multiple shaders, and the values are merged
-  // together -- a zero value in one call is overridden by a non-zero value in another call. LLPC needs
-  // that because SPIR-V allows some of these execution mode items to appear in either the TCS or TES.
-  // The client should always zero-initialize the struct before setting it up, in case future versions
-  // add more fields. A local struct variable can be zero-initialized with " = {}".
-  void setTessellationMode(const TessellationMode &tessellationMode);
-
-  // Set the geometry shader state.
-  // The client should always zero-initialize the struct before setting it up, in case future versions
-  // add more fields. A local struct variable can be zero-initialized with " = {}".
-  void setGeometryShaderMode(const GeometryShaderMode &geometryShaderMode);
-
-  // Set the mesh shader state.
-  // The client should always zero-initialize the struct before setting it up, in case future versions
-  // add more fields. A local struct variable can be zero-initialized with " = {}".
-  void setMeshShaderMode(const MeshShaderMode &meshShaderMode);
-
-  // Set the fragment shader mode.
-  // The client should always zero-initialize the struct before setting it up, in case future versions
-  // add more fields. A local struct variable can be zero-initialized with " = {}".
-  void setFragmentShaderMode(const FragmentShaderMode &fragmentShaderMode);
-
-  // Set the compute shader modes.
-  // The client should always zero-initialize the struct before setting it up, in case future versions
-  // add more fields. A local struct variable can be zero-initialized with " = {}".
-  void setComputeShaderMode(const ComputeShaderMode &computeShaderMode);
-
-  // Set subgroup size usage
-  void setSubgroupSizeUsage(ShaderStage stage, bool usage);
-
-  // Get the compute shader mode (workgroup size)
-  const ComputeShaderMode &getComputeShaderMode();
-
-  // Record shader modes into IR metadata if this is a shader compile (no PipelineState).
-  virtual void recordShaderModes(llvm::Module *module) {}
 
   // -----------------------------------------------------------------------------------------------------------------
   // Base class operations
@@ -1696,11 +1643,7 @@ public:
   virtual llvm::Value *CreateSubgroupMbcnt(llvm::Value *const mask, const llvm::Twine &instName = "") = 0;
 
 protected:
-  Builder(LgcContext *builderContext);
-
-  // Get the ShaderModes object. For a pipeline compilation, it comes from the PipelineState. For a shader
-  // compilation, there is no PipelineState, so BuilderRecorder creates its own ShaderModes.
-  virtual ShaderModes *getShaderModes() = 0;
+  Builder(llvm::LLVMContext &context) : BuilderCommon(context) {}
 
   // Get a constant of FP or vector of FP type from the given APFloat, converting APFloat semantics where necessary
   llvm::Constant *getFpConstant(llvm::Type *ty, llvm::APFloat value);
@@ -1713,8 +1656,6 @@ private:
   Builder() = delete;
   Builder(const Builder &) = delete;
   Builder &operator=(const Builder &) = delete;
-
-  LgcContext *m_builderContext; // Builder context
 };
 
 } // namespace lgc

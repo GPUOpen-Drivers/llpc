@@ -155,6 +155,10 @@ public:
   virtual void collectCallableDataSize(llvm::Type *type, const llvm::DataLayout &dataLayout) {}
   virtual void collectAttributeDataSize(llvm::Type *type, const llvm::DataLayout &dataLayout) {}
   virtual void collectBuiltIn(unsigned builtIn) {}
+
+  // Set workgroup size for compute pipeline so that rayQuery lowering can see it.
+  virtual void setWorkgroupSize(unsigned workgroupSize) {}
+  virtual unsigned getWorkgroupSize() const { return 0; }
 #endif
 
   static const char *getGpuNameAbbreviation(GfxIpVersion gfxIp);

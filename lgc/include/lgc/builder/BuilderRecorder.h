@@ -238,13 +238,10 @@ public:
   static Opcode getOpcodeFromName(llvm::StringRef name);
 
   // Constructors
-  BuilderRecorder(LgcContext *builderContext, Pipeline *pipeline, bool omitOpcodes);
+  BuilderRecorder(llvm::LLVMContext &context) : Builder(context) {}
   BuilderRecorder() = delete;
   BuilderRecorder(const BuilderRecorder &) = delete;
   BuilderRecorder &operator=(const BuilderRecorder &) = delete;
-
-  // Record shader modes into IR metadata if this is a shader compile (no PipelineState).
-  void recordShaderModes(llvm::Module *module) override final;
 
   // -----------------------------------------------------------------------------------------------------------------
   // Base class operations
@@ -596,18 +593,10 @@ public:
                                              llvm::Value *const index, const llvm::Twine &instName) override final;
   llvm::Value *CreateSubgroupMbcnt(llvm::Value *const mask, const llvm::Twine &instName) override final;
 
-protected:
-  // Get the ShaderModes object.
-  ShaderModes *getShaderModes() override final;
-
 private:
   // Record one Builder call
   llvm::Instruction *record(Opcode opcode, llvm::Type *returnTy, llvm::ArrayRef<llvm::Value *> args,
                             const llvm::Twine &instName);
-
-  PipelineState *m_pipelineState;             // PipelineState; nullptr for shader compile
-  std::unique_ptr<ShaderModes> m_shaderModes; // ShaderModes for a shader compile
-  bool m_omitOpcodes;                         // Omit opcodes on lgc.create.* function declarations
 
   BuilderRecorderMetadataKinds m_mdKindIdCache;
 };

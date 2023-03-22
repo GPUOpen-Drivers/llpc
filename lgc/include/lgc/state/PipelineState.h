@@ -466,6 +466,31 @@ public:
     return readArrayOfInt32MetaNode(namedMetaNode->getOperand(0), value);
   }
 
+  // Set a named metadata node to point to its previous array of i32 values, with a new array of i32 ORed in.
+  // The array is trimmed to remove trailing zero values. If the whole array would be 0, then this function
+  // removes the named metadata node (if it existed).
+  //
+  // @param [in/out] module : IR module to record into
+  // @param value : Value to write as array of i32
+  // @param metaName : Name for named metadata node
+  template <typename T>
+  static void orNamedMetadataToArrayOfInt32(llvm::Module *module, const T &value, llvm::StringRef metaName) {
+    llvm::ArrayRef<unsigned> values(reinterpret_cast<const unsigned *>(&value), sizeof(value) / sizeof(unsigned));
+    unsigned oredValues[sizeof(value) / sizeof(unsigned)] = {};
+    auto namedMetaNode = module->getOrInsertNamedMetadata(metaName);
+    if (namedMetaNode->getNumOperands() >= 1)
+      readArrayOfInt32MetaNode(namedMetaNode->getOperand(0), oredValues);
+    for (unsigned idx = 0; idx != sizeof(value) / sizeof(unsigned); ++idx)
+      oredValues[idx] |= values[idx];
+    llvm::MDNode *arrayMetaNode = getArrayOfInt32MetaNode(module->getContext(), oredValues, false);
+    if (!arrayMetaNode) {
+      module->eraseNamedMetadata(namedMetaNode);
+      return;
+    }
+    namedMetaNode->clearOperands();
+    namedMetaNode->addOperand(arrayMetaNode);
+  }
+
 private:
   // Read shaderStageMask from IR
   void readShaderStageMask(llvm::Module *module);

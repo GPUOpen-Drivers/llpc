@@ -42,7 +42,7 @@ define dllexport spir_func void @lgc.shader.TES.VkMain() local_unnamed_addr #0 !
 attributes #0 = { nounwind }
 attributes #1 = { nounwind readonly willreturn }
 
-!llpc.tessellation.mode = !{!0}
+!llpc.tcs.mode = !{!0}
 !lgc.client = !{!1}
 !lgc.unlinked = !{!2}
 !lgc.options = !{!3}

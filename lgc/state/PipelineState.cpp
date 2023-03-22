@@ -217,6 +217,99 @@ static CompSetting computeCompSetting(BufDataFormat dfmt) {
 } // namespace
 
 // =====================================================================================================================
+// Set the common shader mode for the given shader stage, containing hardware FP round and denorm modes.
+// This records the mode into IR metadata in the given module.
+//
+// @param module : Module to record in
+// @param shaderStage : Shader stage to set modes for
+// @param commonShaderMode : FP round and denorm modes
+void Pipeline::setCommonShaderMode(Module &module, ShaderStage shaderStage, const CommonShaderMode &commonShaderMode) {
+  ShaderModes::setCommonShaderMode(module, shaderStage, commonShaderMode);
+}
+
+// =====================================================================================================================
+// Get the common shader mode for the given shader stage.
+// This reads the mode from IR metadata in the given module.
+//
+// @param module : Module to read from
+// @param shaderStage : Shader stage to get modes for
+CommonShaderMode Pipeline::getCommonShaderMode(Module &module, ShaderStage shaderStage) {
+  return ShaderModes::getCommonShaderMode(module, shaderStage);
+}
+
+// =====================================================================================================================
+// Set the tessellation mode
+// This records the mode into IR metadata in the given module.
+// Both TCS and TES can set tessellation mode, and the two get merged together by the middle end.
+//
+// @param module : Module to record in
+// @param shaderStage : Shader stage to set modes for (TCS or TES)
+// @param tessellationMode : Tessellation mode
+void Pipeline::setTessellationMode(Module &module, ShaderStage shaderStage, const TessellationMode &tessellationMode) {
+  ShaderModes::setTessellationMode(module, shaderStage, tessellationMode);
+}
+
+// =====================================================================================================================
+// Set the geometry shader mode
+// This records the mode into IR metadata in the given module.
+//
+// @param module : Module to record in
+// @param geometryShaderMode : Geometry shader mode
+void Pipeline::setGeometryShaderMode(Module &module, const GeometryShaderMode &geometryShaderMode) {
+  ShaderModes::setGeometryShaderMode(module, geometryShaderMode);
+}
+
+// =====================================================================================================================
+// Set the mesh shader mode
+// This records the mode into IR metadata in the given module.
+//
+// @param module : Module to record in
+// @param meshShaderMode : Mesh shader mode
+void Pipeline::setMeshShaderMode(Module &module, const MeshShaderMode &meshShaderMode) {
+  ShaderModes::setMeshShaderMode(module, meshShaderMode);
+}
+
+// =====================================================================================================================
+// Set the fragment shader mode
+// This records the mode into IR metadata in the given module.
+//
+// @param module : Module to record in
+// @param fragmentShaderMode : Fragment shader mode
+void Pipeline::setFragmentShaderMode(Module &module, const FragmentShaderMode &fragmentShaderMode) {
+  ShaderModes::setFragmentShaderMode(module, fragmentShaderMode);
+}
+
+// =====================================================================================================================
+// Set the compute shader mode (workgroup size)
+// This records the mode into IR metadata in the given module.
+//
+// @param module : Module to record in
+// @param computeShaderMode : Compute shader mode
+void Pipeline::setComputeShaderMode(Module &module, const ComputeShaderMode &computeShaderMode) {
+  ShaderModes::setComputeShaderMode(module, computeShaderMode);
+}
+
+// =====================================================================================================================
+// Set subgroup size usage.
+// This records the mode into IR metadata in the given module.
+//
+// @param module : Module to record in
+// @param stage : Shader stage
+// @param usage : Subgroup size usage
+void Pipeline::setSubgroupSizeUsage(Module &module, ShaderStage stage, bool usage) {
+  ShaderModes::setSubgroupSizeUsage(module, stage, usage);
+}
+
+// =====================================================================================================================
+// Get the compute shader mode (workgroup size)
+// This reads the mode from IR metadata in the given module.
+//
+// @param module : Module to read from
+ComputeShaderMode Pipeline::getComputeShaderMode(Module &module) {
+  return ShaderModes::getComputeShaderMode(module);
+}
+
+// =====================================================================================================================
 // Constructor
 //
 // @param builderContext : LGC builder context
@@ -317,7 +410,6 @@ void PipelineState::clear(Module *module) {
 //
 // @param [in/out] module : Module to record the IR metadata in
 void PipelineState::record(Module *module) {
-  getShaderModes()->record(module);
   recordOptions(module);
   recordUserDataNodes(module);
   recordDeviceIndex(module);
