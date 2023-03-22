@@ -4191,10 +4191,35 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
   Constant *initializer = nullptr;
 
   // If the type has an initializer, re-create the SPIR-V initializer in LLVM.
-  if (spvInitializer)
+  if (spvInitializer) {
     initializer = transInitializer(spvInitializer, varType);
-  else if (storageClass == SPIRVStorageClassKind::StorageClassWorkgroup)
+  } else if (storageClass == SPIRVStorageClassKind::StorageClassWorkgroup) {
     initializer = UndefValue::get(varType);
+  } else if (m_shaderOptions->workaroundInitializeOutputsToZero &&
+             storageClass == SPIRVStorageClassKind::StorageClassOutput) {
+    bool isBuiltIn = false;
+    if (spvVarType->hasDecorate(DecorationBuiltIn)) {
+      isBuiltIn = true;
+    } else if (spvVarType->isTypeStruct()) {
+      for (unsigned memberId = 0; memberId < spvVarType->getStructMemberCount(); ++memberId) {
+        if (spvVarType->hasMemberDecorate(memberId, DecorationBuiltIn)) {
+          isBuiltIn = true;
+          break;
+        }
+      }
+    }
+    if (!isBuiltIn) {
+      // Initializize user-defined output variable to zero
+      if (varType->isAggregateType() || varType->isVectorTy())
+        initializer = ConstantAggregateZero::get(varType);
+      else if (varType->isIntegerTy())
+        initializer = ConstantInt::get(varType, uint64_t(0));
+      else if (varType->isFloatTy())
+        initializer = ConstantFP::getZero(varType);
+      else
+        llvm_unreachable("should never be called");
+    }
+  }
 
   bool readOnly = false;
 
