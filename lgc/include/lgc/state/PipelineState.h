@@ -401,6 +401,7 @@ public:
   template <typename T>
   static llvm::MDNode *getArrayOfInt32MetaNode(llvm::LLVMContext &context, const T &value, bool atLeastOneValue) {
     llvm::IRBuilder<> builder(context);
+    static_assert(sizeof(value) % sizeof(unsigned) == 0, "Bad value type");
     llvm::ArrayRef<unsigned> values(reinterpret_cast<const unsigned *>(&value), sizeof(value) / sizeof(unsigned));
 
     while (!values.empty() && values.back() == 0) {
@@ -426,6 +427,7 @@ public:
   // @param metaName : Name for named metadata node
   template <typename T>
   static void setNamedMetadataToArrayOfInt32(llvm::Module *module, const T &value, llvm::StringRef metaName) {
+    static_assert(sizeof(value) % sizeof(unsigned) == 0, "Bad value type");
     llvm::MDNode *arrayMetaNode = getArrayOfInt32MetaNode(module->getContext(), value, false);
     if (!arrayMetaNode) {
       if (auto namedMetaNode = module->getNamedMetadata(metaName))
@@ -444,6 +446,7 @@ public:
   // @param metaNode : Metadata node to read from
   // @param [out] value : Value to write into (caller must zero initialize)
   template <typename T> static unsigned readArrayOfInt32MetaNode(llvm::MDNode *metaNode, T &value) {
+    static_assert(sizeof(value) % sizeof(unsigned) == 0, "Bad value type");
     llvm::MutableArrayRef<unsigned> values(reinterpret_cast<unsigned *>(&value), sizeof(value) / sizeof(unsigned));
     unsigned count = std::min(metaNode->getNumOperands(), unsigned(values.size()));
     for (unsigned index = 0; index < count; ++index)
@@ -475,6 +478,7 @@ public:
   // @param metaName : Name for named metadata node
   template <typename T>
   static void orNamedMetadataToArrayOfInt32(llvm::Module *module, const T &value, llvm::StringRef metaName) {
+    static_assert(sizeof(value) % sizeof(unsigned) == 0, "Bad value type");
     llvm::ArrayRef<unsigned> values(reinterpret_cast<const unsigned *>(&value), sizeof(value) / sizeof(unsigned));
     unsigned oredValues[sizeof(value) / sizeof(unsigned)] = {};
     auto namedMetaNode = module->getOrInsertNamedMetadata(metaName);
