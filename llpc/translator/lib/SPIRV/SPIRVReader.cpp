@@ -4210,14 +4210,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
     }
     if (!isBuiltIn) {
       // Initializize user-defined output variable to zero
-      if (varType->isAggregateType() || varType->isVectorTy())
-        initializer = ConstantAggregateZero::get(varType);
-      else if (varType->isIntegerTy())
-        initializer = ConstantInt::get(varType, uint64_t(0));
-      else if (varType->isFloatTy())
-        initializer = ConstantFP::getZero(varType);
-      else
-        llvm_unreachable("should never be called");
+      initializer = Constant::getNullValue(varType);
     }
   }
 
