@@ -226,12 +226,15 @@ void ShaderModes::readModesFromPipeline(Module *module) {
   TessellationMode tesMode = {};
   PipelineState::readNamedMetadataArrayOfInt32(module, TcsModeMetadataName, tcsMode);
   PipelineState::readNamedMetadataArrayOfInt32(module, TesModeMetadataName, tesMode);
-  m_tessellationMode.vertexSpacing = tcsMode.vertexSpacing != VertexSpacing::Unknown ? tcsMode.vertexSpacing
-    : tesMode.vertexSpacing != VertexSpacing::Unknown ? tesMode.vertexSpacing : VertexSpacing::Equal;
-  m_tessellationMode.vertexOrder = tcsMode.vertexOrder != VertexOrder::Unknown ? tcsMode.vertexOrder
-    : tesMode.vertexOrder != VertexOrder::Unknown ? tesMode.vertexOrder : VertexOrder::Ccw;
-  m_tessellationMode.primitiveMode = tcsMode.primitiveMode != PrimitiveMode::Unknown ? tcsMode.primitiveMode
-    : tesMode.primitiveMode != PrimitiveMode::Unknown ? tesMode.primitiveMode : PrimitiveMode::Triangles;
+  m_tessellationMode.vertexSpacing = tcsMode.vertexSpacing != VertexSpacing::Unknown   ? tcsMode.vertexSpacing
+                                     : tesMode.vertexSpacing != VertexSpacing::Unknown ? tesMode.vertexSpacing
+                                                                                       : VertexSpacing::Equal;
+  m_tessellationMode.vertexOrder = tcsMode.vertexOrder != VertexOrder::Unknown   ? tcsMode.vertexOrder
+                                   : tesMode.vertexOrder != VertexOrder::Unknown ? tesMode.vertexOrder
+                                                                                 : VertexOrder::Ccw;
+  m_tessellationMode.primitiveMode = tcsMode.primitiveMode != PrimitiveMode::Unknown   ? tcsMode.primitiveMode
+                                     : tesMode.primitiveMode != PrimitiveMode::Unknown ? tesMode.primitiveMode
+                                                                                       : PrimitiveMode::Triangles;
   m_tessellationMode.pointMode = tcsMode.pointMode | tesMode.pointMode;
   m_tessellationMode.outputVertices = tcsMode.outputVertices != 0 ? tcsMode.outputVertices : tesMode.outputVertices;
 }

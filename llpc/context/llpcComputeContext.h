@@ -77,7 +77,7 @@ private:
 
   const ComputePipelineBuildInfo *m_pipelineInfo; // Info to build a compute pipeline
 #if VKI_RAY_TRACING
-  unsigned m_workgroupSize = 0;                   // Workgroup size for rayQuery lowering
+  unsigned m_workgroupSize = 0; // Workgroup size for rayQuery lowering
 #endif
 };
 
