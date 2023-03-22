@@ -848,7 +848,7 @@ void RegisterMetadataBuilder::buildPsRegisters() {
     spiPsInputCntElem[Util::Abi::SpiPsInputCntlMetadataKey::PrimAttr] = spiPsInputCntlInfo.primAttr;
   }
   // Set .num_interpolants in amdpal.pipelines
-  getPipelineNode()[Util::Abi::PipelineMetadataKey::NumInterpolants] = interpInfo->size();
+  getPipelineNode()[Util::Abi::PipelineMetadataKey::NumInterpolants] = unsigned(interpInfo->size());
 
   // SPI_PS_IN_CONTROL
   unsigned numInterp = resUsage->inOutUsage.fs.interpInfo.size() - numPrimInterp;
