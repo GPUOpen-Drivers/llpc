@@ -86,7 +86,7 @@ bool SpirvLowerRayTracingBuiltIn::runImpl(Module &module) {
   mode.workgroupSizeX = rtState->threadGroupSizeX;
   mode.workgroupSizeY = rtState->threadGroupSizeY;
   mode.workgroupSizeZ = rtState->threadGroupSizeZ;
-  m_context->getBuilder()->setComputeShaderMode(mode);
+  lgc::Pipeline::setComputeShaderMode(module, mode);
 
   for (auto funcIt = module.begin(), funcEnd = module.end(); funcIt != funcEnd;) {
     Function *func = &*funcIt++;

@@ -7013,7 +7013,7 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
   if (pipelineContext->isGraphics() && subgroupSizeUsage) {
     for (lgc::ShaderStage stage : lgc::enumRange<lgc::ShaderStage>()) {
       if (subgroupSizeUsage & (1 << stage)) {
-        getBuilder()->setSubgroupSizeUsage(stage, true);
+        Pipeline::setSubgroupSizeUsage(*m_m, stage, true);
       }
     }
   }
@@ -7046,7 +7046,7 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
     break;
   }
 
-  getBuilder()->setCommonShaderMode(shaderStage, shaderMode);
+  Pipeline::setCommonShaderMode(*m_m, shaderStage, shaderMode);
 
   m_enableGatherLodNz =
       m_bm->hasCapability(CapabilityImageGatherBiasLodAMD) && entryExecModel == ExecutionModelFragment;
@@ -7323,7 +7323,9 @@ bool SPIRVToLLVM::transMetadata() {
         if (auto em = bf->getExecutionMode(ExecutionModeOutputVertices))
           tessellationMode.outputVertices = em->getLiterals()[0];
 
-        getBuilder()->setTessellationMode(tessellationMode);
+        lgc::ShaderStage shaderStage =
+            execModel == ExecutionModelTessellationControl ? lgc::ShaderStageTessControl : lgc::ShaderStageTessEval;
+        Pipeline::setTessellationMode(*m_m, shaderStage, tessellationMode);
 
       } else if (execModel == ExecutionModelGeometry) {
         GeometryShaderMode geometryMode = {};
@@ -7353,7 +7355,7 @@ bool SPIRVToLLVM::transMetadata() {
         if (auto em = bf->getExecutionMode(ExecutionModeOutputVertices))
           geometryMode.outputVertices = em->getLiterals()[0];
 
-        getBuilder()->setGeometryShaderMode(geometryMode);
+        Pipeline::setGeometryShaderMode(*m_m, geometryMode);
 
       } else if (execModel == ExecutionModelMeshEXT) {
         MeshShaderMode meshMode = {};
@@ -7414,7 +7416,7 @@ bool SPIRVToLLVM::transMetadata() {
           }
         }
 
-        getBuilder()->setMeshShaderMode(meshMode);
+        Pipeline::setMeshShaderMode(*m_m, meshMode);
       } else if (execModel == ExecutionModelFragment) {
         FragmentShaderMode fragmentMode = {};
 
@@ -7451,7 +7453,7 @@ bool SPIRVToLLVM::transMetadata() {
             fragmentMode.earlyFragmentTests = true;
         }
 
-        getBuilder()->setFragmentShaderMode(fragmentMode);
+        Pipeline::setFragmentShaderMode(*m_m, fragmentMode);
 
       } else if (execModel == ExecutionModelGLCompute || execModel == ExecutionModelTaskEXT) {
         unsigned workgroupSizeX = 0;
@@ -7491,7 +7493,7 @@ bool SPIRVToLLVM::transMetadata() {
             }
           }
         }
-        // clang-format off
+
         ComputeShaderMode computeMode = {};
         unsigned overrideShaderGroupSizeX = m_shaderOptions->overrideShaderThreadGroupSizeX;
         unsigned overrideShaderGroupSizeY = m_shaderOptions->overrideShaderThreadGroupSizeY;
@@ -7504,26 +7506,29 @@ bool SPIRVToLLVM::transMetadata() {
           computeMode.workgroupSizeX = overrideShaderGroupSizeX;
           computeMode.workgroupSizeY = overrideShaderGroupSizeY;
           computeMode.workgroupSizeZ = overrideShaderGroupSizeZ;
-          getBuilder()->setComputeShaderMode(computeMode);
         } else if (overrideThreadGroupSizeX != 0 || overrideThreadGroupSizeY != 0 || overrideThreadGroupSizeZ != 0) {
           computeMode.workgroupSizeX = overrideThreadGroupSizeX;
           computeMode.workgroupSizeY = overrideThreadGroupSizeY;
           computeMode.workgroupSizeZ = overrideThreadGroupSizeZ;
-          getBuilder()->setComputeShaderMode(computeMode);
-        }else{
 #if VKI_RAY_TRACING
-        // Ray Query library Shader can not overwrite the compute mode settings
-          if (!m_moduleUsage->rayQueryLibrary) {
+        } else if (m_moduleUsage->rayQueryLibrary) {
+          // Ray Query library Shader can not overwrite the compute mode settings
 #endif
+        } else {
           computeMode.workgroupSizeX = workgroupSizeX;
           computeMode.workgroupSizeY = workgroupSizeY;
           computeMode.workgroupSizeZ = workgroupSizeZ;
-          getBuilder()->setComputeShaderMode(computeMode);
-            // clang-format on
-#if VKI_RAY_TRACING
-          }
-#endif
         }
+        Pipeline::setComputeShaderMode(*m_m, computeMode);
+#if VKI_RAY_TRACING
+        // We also need to set the overall workgroup size on the PipelineContext so that the LowerRayQuery
+        // pass running on the rayQuery library module (a different module to this compute shader) can see it.
+        unsigned workgroupSize = workgroupSizeX == 0 ? 1 : workgroupSizeX;
+        workgroupSize *= workgroupSizeY == 0 ? 1 : workgroupSizeY;
+        workgroupSize *= workgroupSizeZ == 0 ? 1 : workgroupSizeZ;
+        Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
+        llpcContext->getPipelineContext()->setWorkgroupSize(workgroupSize);
+#endif
 
       } else
         llvm_unreachable("Invalid execution model");

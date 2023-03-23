@@ -88,6 +88,10 @@ public:
   static LgcContext *create(llvm::LLVMContext &context, llvm::StringRef gpuName, unsigned int palAbiVersion,
                             llvm::CodeGenOpt::Level optLevel);
 
+  // Get the value of the -emit-lgc option. BuilderRecorder uses this to decide whether to omit the opcode
+  // metadata when recording a Builder call.
+  static bool getEmitLgc();
+
   ~LgcContext();
 
   // Given major.minor.steppings - generate the gpuName string

@@ -252,6 +252,13 @@ LgcContext *LgcContext::create(LLVMContext &context, StringRef gpuName, unsigned
 }
 
 // =====================================================================================================================
+// Get the value of the -emit-lgc option. BuilderRecorder uses this to decide whether to omit the opcode
+// metadata when recording a Builder call.
+bool LgcContext::getEmitLgc() {
+  return EmitLgc;
+}
+
+// =====================================================================================================================
 //
 // @param context : LLVM context to give each Builder
 // @param palAbiVersion : PAL pipeline ABI version to compile for
@@ -278,7 +285,7 @@ Pipeline *LgcContext::createPipeline() {
 //
 // @param pipeline : Pipeline object for pipeline compile, nullptr for shader compile
 Builder *LgcContext::createBuilder(Pipeline *pipeline) {
-  return Builder::createBuilderRecorder(this, pipeline, EmitLgc);
+  return Builder::createBuilderRecorder(this, pipeline);
 }
 
 // =====================================================================================================================

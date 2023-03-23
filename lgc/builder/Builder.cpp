@@ -62,87 +62,8 @@ Builder *Builder::createBuilderImpl(LgcContext *context, Pipeline *pipeline) {
 //
 // @param context : LGC context
 // @param pipeline : Pipeline object, can be nullptr
-// @param omitOpcodes : Don't add opcode metadata to lgc.create.* function declarations
-Builder *Builder::createBuilderRecorder(LgcContext *context, Pipeline *pipeline, bool omitOpcodes) {
-  return new BuilderRecorder(context, pipeline, omitOpcodes);
-}
-
-// =====================================================================================================================
-//
-// @param builderContext : Builder context
-Builder::Builder(LgcContext *builderContext)
-    : BuilderCommon(builderContext->getContext()), m_builderContext(builderContext) {
-}
-
-// =====================================================================================================================
-// Set the common shader mode for the given shader stage, containing hardware FP round and denorm modes.
-//
-// @param shaderStage : Shader stage to set modes for
-// @param commonShaderMode : FP round and denorm modes
-void Builder::setCommonShaderMode(ShaderStage shaderStage, const CommonShaderMode &commonShaderMode) {
-  getShaderModes()->setCommonShaderMode(shaderStage, commonShaderMode);
-}
-
-// =====================================================================================================================
-// Get the common shader mode for the given shader stage.
-// @param shaderStage : Shader stage to get modes for
-const CommonShaderMode &Builder::getCommonShaderMode(ShaderStage shaderStage) {
-  return getShaderModes()->getCommonShaderMode(shaderStage);
-}
-
-// =====================================================================================================================
-// Set the tessellation mode
-//
-// @param tessellationMode : Tessellation mode
-void Builder::setTessellationMode(const TessellationMode &tessellationMode) {
-  getShaderModes()->setTessellationMode(tessellationMode);
-}
-
-// =====================================================================================================================
-// Set the geometry shader mode
-//
-// @param geometryShaderMode : Geometry shader mode
-void Builder::setGeometryShaderMode(const GeometryShaderMode &geometryShaderMode) {
-  getShaderModes()->setGeometryShaderMode(geometryShaderMode);
-}
-
-// =====================================================================================================================
-// Set the mesh shader mode
-//
-// @param meshShaderMode : Mesh shader mode
-void Builder::setMeshShaderMode(const MeshShaderMode &meshShaderMode) {
-  getShaderModes()->setMeshShaderMode(meshShaderMode);
-}
-
-// =====================================================================================================================
-// Set the fragment shader mode
-//
-// @param fragmentShaderMode : Fragment shader mode
-void Builder::setFragmentShaderMode(const FragmentShaderMode &fragmentShaderMode) {
-  getShaderModes()->setFragmentShaderMode(fragmentShaderMode);
-}
-
-// =====================================================================================================================
-// Set the compute shader mode (workgroup size)
-//
-// @param computeShaderMode : Compute shader mode
-void Builder::setComputeShaderMode(const ComputeShaderMode &computeShaderMode) {
-  getShaderModes()->setComputeShaderMode(computeShaderMode);
-}
-
-// =====================================================================================================================
-// Set subgroup size usage
-//
-// @param stage : Shader stage
-// @param usage : Subgroup size usage
-void Builder::setSubgroupSizeUsage(ShaderStage stage, bool usage) {
-  getShaderModes()->setSubgroupSizeUsage(stage, usage);
-}
-
-// =====================================================================================================================
-// Get the compute shader mode (workgroup size)
-const ComputeShaderMode &Builder::getComputeShaderMode() {
-  return getShaderModes()->getComputeShaderMode();
+Builder *Builder::createBuilderRecorder(LgcContext *context, Pipeline *pipeline) {
+  return new BuilderRecorder(context->getContext());
 }
 
 // =====================================================================================================================

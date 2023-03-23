@@ -40,7 +40,7 @@ namespace lgc {
 // Builder implementation base class
 class BuilderImplBase : public Builder {
 public:
-  BuilderImplBase(LgcContext *builderContext) : Builder(builderContext) {}
+  BuilderImplBase(LgcContext *builderContext);
 
   // Create scalar from dot product of vector
   llvm::Value *CreateDotProduct(llvm::Value *const vector1, llvm::Value *const vector2,
@@ -53,9 +53,12 @@ public:
   // Set the current shader stage, clamp shader stage to the ShaderStageCompute
   void setShaderStage(ShaderStage stage) { m_shaderStage = stage > ShaderStageCompute ? ShaderStageCompute : stage; }
 
+  // Get the LgcContext
+  LgcContext *getLgcContext() const { return m_builderContext; }
+
 protected:
   // Get the ShaderModes object.
-  ShaderModes *getShaderModes() override final;
+  ShaderModes *getShaderModes();
 
   // Get the PipelineState object.
   PipelineState *getPipelineState() const { return m_pipelineState; }
@@ -122,6 +125,8 @@ private:
   BuilderImplBase() = delete;
   BuilderImplBase(const BuilderImplBase &) = delete;
   BuilderImplBase &operator=(const BuilderImplBase &) = delete;
+
+  LgcContext *m_builderContext; // Builder context
 };
 
 // =====================================================================================================================

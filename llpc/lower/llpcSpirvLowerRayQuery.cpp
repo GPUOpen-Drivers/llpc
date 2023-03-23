@@ -1443,8 +1443,7 @@ unsigned SpirvLowerRayQuery::getWorkgroupSize() const {
   } else if (m_context->isGraphics()) {
     workgroupSize = m_context->getPipelineContext()->getRayTracingWaveSize();
   } else {
-    const lgc::ComputeShaderMode &computeMode = m_builder->getComputeShaderMode();
-    workgroupSize = computeMode.workgroupSizeX * computeMode.workgroupSizeY * computeMode.workgroupSizeZ;
+    workgroupSize = m_context->getPipelineContext()->getWorkgroupSize();
   }
   assert(workgroupSize != 0);
 #if VKI_BUILD_GFX11

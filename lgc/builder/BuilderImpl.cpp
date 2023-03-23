@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/builder/BuilderImpl.h"
+#include "lgc/LgcContext.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
@@ -37,6 +38,7 @@ using namespace lgc;
 using namespace llvm;
 
 // =====================================================================================================================
+// BuilderImpl constructor
 //
 // @param builderContext : LgcContext
 // @param pipeline : PipelineState (as public superclass Pipeline)
@@ -45,6 +47,14 @@ BuilderImpl::BuilderImpl(LgcContext *builderContext, Pipeline *pipeline)
       ImageBuilder(builderContext), InOutBuilder(builderContext), MatrixBuilder(builderContext),
       MiscBuilder(builderContext), SubgroupBuilder(builderContext) {
   m_pipelineState = reinterpret_cast<PipelineState *>(pipeline);
+}
+
+// =====================================================================================================================
+// BuilderImplBase constructor
+//
+// @param builderContext : LgcContext
+BuilderImplBase::BuilderImplBase(LgcContext *builderContext)
+    : Builder(builderContext->getContext()), m_builderContext(builderContext) {
 }
 
 // =====================================================================================================================

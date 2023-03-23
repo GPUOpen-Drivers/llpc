@@ -123,10 +123,6 @@ void SpirvLowerTranslator::translateSpirvToLlvm(const PipelineShaderInfo *shader
                        false);
   }
 
-  // Ensure the shader modes are recorded in IR metadata in the case that this is a shader compile
-  // rather than a pipeline compile.
-  m_context->getBuilder()->recordShaderModes(module);
-
   ShaderModuleHelper::cleanOptimizedSpirv(&optimizedSpirvBin);
 
   // NOTE: Our shader entrypoint is marked in the SPIR-V reader as dllexport. Here we tell LGC that it is the

@@ -660,6 +660,53 @@ public:
   llvm::LLVMContext &getContext() const;
 
   // -----------------------------------------------------------------------------------------------------------------
+  // Methods to set shader modes (FP modes, tessellation modes, fragment modes, workgroup size) for the current
+  // shader that come from the input language.
+
+  // Set the common shader mode for the given shader stage, containing hardware FP round and denorm modes.
+  // The client should always zero-initialize the struct before setting it up, in case future versions
+  // add more fields. A local struct variable can be zero-initialized with " = {}".
+  static void setCommonShaderMode(llvm::Module &module, ShaderStage shaderStage,
+                                  const CommonShaderMode &commonShaderMode);
+
+  // Get the common shader mode for the given shader stage.
+  static CommonShaderMode getCommonShaderMode(llvm::Module &module, ShaderStage shaderStage);
+
+  // Set the tessellation mode. This can be called in multiple shaders, and the values are merged
+  // together -- a zero value in one call is overridden by a non-zero value in another call. LLPC needs
+  // that because SPIR-V allows some of these execution mode items to appear in either the TCS or TES.
+  // The client should always zero-initialize the struct before setting it up, in case future versions
+  // add more fields. A local struct variable can be zero-initialized with " = {}".
+  static void setTessellationMode(llvm::Module &module, ShaderStage shaderStage,
+                                  const TessellationMode &tessellationMode);
+
+  // Set the geometry shader state.
+  // The client should always zero-initialize the struct before setting it up, in case future versions
+  // add more fields. A local struct variable can be zero-initialized with " = {}".
+  static void setGeometryShaderMode(llvm::Module &module, const GeometryShaderMode &geometryShaderMode);
+
+  // Set the mesh shader state.
+  // The client should always zero-initialize the struct before setting it up, in case future versions
+  // add more fields. A local struct variable can be zero-initialized with " = {}".
+  static void setMeshShaderMode(llvm::Module &module, const MeshShaderMode &meshShaderMode);
+
+  // Set the fragment shader mode.
+  // The client should always zero-initialize the struct before setting it up, in case future versions
+  // add more fields. A local struct variable can be zero-initialized with " = {}".
+  static void setFragmentShaderMode(llvm::Module &module, const FragmentShaderMode &fragmentShaderMode);
+
+  // Set the compute shader modes.
+  // The client should always zero-initialize the struct before setting it up, in case future versions
+  // add more fields. A local struct variable can be zero-initialized with " = {}".
+  static void setComputeShaderMode(llvm::Module &module, const ComputeShaderMode &computeShaderMode);
+
+  // Set subgroup size usage.
+  static void setSubgroupSizeUsage(llvm::Module &module, ShaderStage stage, bool usage);
+
+  // Get the compute shader mode (workgroup size)
+  static ComputeShaderMode getComputeShaderMode(llvm::Module &module);
+
+  // -----------------------------------------------------------------------------------------------------------------
   // State setting methods
 
   // Set whether pre-rasterization part has a geometry shader
