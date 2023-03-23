@@ -143,6 +143,9 @@ public:
 #endif
   virtual unsigned getSubgroupSizeUsage() const = 0;
 
+  // Gets client-defined metadata
+  virtual llvm::StringRef getClientMetadata() const = 0;
+
 #if VKI_RAY_TRACING
   // Checks whether the pipeline is ray tracing
   virtual bool isRayTracing() const { return false; }

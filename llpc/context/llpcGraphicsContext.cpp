@@ -160,4 +160,10 @@ unsigned GraphicsContext::getSubgroupSizeUsage() const {
   return bitmask;
 }
 
+// =====================================================================================================================
+// Gets client-defined metadata
+StringRef GraphicsContext::getClientMetadata() const {
+  return StringRef(static_cast<const char *>(m_pipelineInfo->pClientMetadata), m_pipelineInfo->clientMetadataSize);
+}
+
 } // namespace Llpc

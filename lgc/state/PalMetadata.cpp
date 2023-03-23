@@ -1063,6 +1063,15 @@ void PalMetadata::setOtherPartPipeline(PalMetadata &other) {
 }
 
 // =====================================================================================================================
+// Store client-defined metadata blob in a buffer node.
+//
+// @param clientMetadata : StringRef representing the client metadata blob
+void PalMetadata::setClientMetadata(StringRef clientMetadata) {
+  if (!clientMetadata.empty())
+    m_pipelineNode[Util::Abi::PipelineMetadataKey::ApiCreateInfo] = MemoryBufferRef(clientMetadata, "");
+}
+
+// =====================================================================================================================
 // Check whether we have FS input mappings, and thus whether we're doing part-pipeline compilation of the
 // pre-FS part of the pipeline.
 bool PalMetadata::haveFsInputMappings() {

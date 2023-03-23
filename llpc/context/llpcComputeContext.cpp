@@ -76,4 +76,10 @@ unsigned ComputeContext::getSubgroupSizeUsage() const {
   return moduleData->usage.useSubgroupSize ? ShaderStageComputeBit : 0;
 }
 
+// =====================================================================================================================
+// Gets client-defined metadata
+StringRef ComputeContext::getClientMetadata() const {
+  return StringRef(static_cast<const char *>(m_pipelineInfo->pClientMetadata), m_pipelineInfo->clientMetadataSize);
+}
+
 } // namespace Llpc

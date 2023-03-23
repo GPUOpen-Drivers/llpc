@@ -774,6 +774,9 @@ public:
   //                 do an irLink() at all.
   virtual void setOtherPartPipeline(Pipeline &otherPartPipeline, llvm::Module *linkedModule = nullptr) = 0;
 
+  // Set the client-defined metadata to be stored inside the ELF
+  virtual void setClientMetadata(llvm::StringRef clientMetadata) = 0;
+
   // -----------------------------------------------------------------------------------------------------------------
   // IR link and generate pipeline/library methods
 

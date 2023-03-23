@@ -69,6 +69,9 @@ public:
   // Gets subgroup size usage
   virtual unsigned getSubgroupSizeUsage() const override;
 
+  // Gets client-defined metadata
+  virtual llvm::StringRef getClientMetadata() const override;
+
   // Checks whether the pipeline is ray tracing
   virtual bool isRayTracing() const override { return true; }
 
