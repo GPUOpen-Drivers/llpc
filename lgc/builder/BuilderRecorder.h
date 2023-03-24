@@ -206,9 +206,8 @@ enum BuilderOpcode : unsigned {
 };
 
 // =====================================================================================================================
-// Builder recorder, to record all Builder calls as intrinsics
-// Each call to a Builder method causes the insertion of a call to lgc.call.*, so the Builder calls can be replayed
-// later on.
+// Builder recorder/replay utility class containing just a couple of static methods used both in BuilderRecorder.cpp
+// and in BuilderReplayer.cpp.
 class BuilderRecorder {
 public:
   // Given an opcode, get the call name (without the "lgc.create." prefix)

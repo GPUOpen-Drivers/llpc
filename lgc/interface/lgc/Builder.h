@@ -1073,9 +1073,6 @@ public:
                                       llvm::Value *elemIdx, unsigned locationCount, InOutInfo inputInfo,
                                       llvm::Value *vertexIndex, const llvm::Twine &instName = "");
 
-  // -----------------------------------------------------------------------------------------------------------------
-  // Shader input/output methods
-
   // Create a read of (part of) a perVertex input value, passed from the previous shader stage.
   // The result type is as specified by resultTy, a scalar or vector type with no more than four elements.
   // A "location" can contain up to a 4-vector of 16- or 32-bit components, or up to a 2-vector of

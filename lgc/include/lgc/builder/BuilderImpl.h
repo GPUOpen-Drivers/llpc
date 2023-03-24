@@ -128,7 +128,7 @@ private:
 
   LgcContext *m_builderContext; // Builder context
 
-  // ---------------------------------------------------------------------------------------------------------------------
+  // -------------------------------------------------------------------------------------------------------------------
   // Arithmetic operations
 public:
   // Create calculation of 2D texture coordinates that would be used for accessing the selected cube map face for
@@ -275,7 +275,7 @@ private:
   // Ensure result is canonicalized if the shader's FP mode is flush denorms.
   llvm::Value *canonicalize(llvm::Value *value);
 
-  // ---------------------------------------------------------------------------------------------------------------------
+  // -------------------------------------------------------------------------------------------------------------------
   // Descriptor operations
 public:
   // Create a load of a buffer descriptor.
@@ -313,7 +313,7 @@ private:
   // Build buffer compact descriptor
   llvm::Value *buildBufferCompactDesc(llvm::Value *desc);
 
-  // ---------------------------------------------------------------------------------------------------------------------
+  // -------------------------------------------------------------------------------------------------------------------
   // Image operations
 
   friend class YCbCrConverter;
@@ -454,7 +454,7 @@ private:
 
   static const unsigned AtomicOpCompareSwap = 1;
 
-  // ---------------------------------------------------------------------------------------------------------------------
+  // -------------------------------------------------------------------------------------------------------------------
   // Input/output operations
 public:
   // Create a read of (part of) a user input value.
@@ -570,7 +570,7 @@ private:
   bool isBuiltInOutput(BuiltInKind builtIn);
 #endif // NDEBUG
 
-  // ---------------------------------------------------------------------------------------------------------------------
+  // -------------------------------------------------------------------------------------------------------------------
   // Matrix operations
 public:
   // Create a matrix transpose.
@@ -610,7 +610,7 @@ private:
   void getSubmatrix(llvm::ArrayRef<llvm::Value *> matrix, llvm::MutableArrayRef<llvm::Value *> submatrix,
                     unsigned order, unsigned rowToDelete, unsigned columnToDelete);
 
-  // ---------------------------------------------------------------------------------------------------------------------
+  // -------------------------------------------------------------------------------------------------------------------
   // Misc. operations
 public:
   // In the GS, emit the current values of outputs (as written by CreateWriteBuiltIn and CreateWriteOutput) to
@@ -651,7 +651,7 @@ public:
   llvm::Instruction *CreateSetMeshOutputs(llvm::Value *vertexCount, llvm::Value *primitiveCount,
                                           const llvm::Twine &instName = "");
 
-  // ---------------------------------------------------------------------------------------------------------------------
+  // -------------------------------------------------------------------------------------------------------------------
   // Builder implementation subclass for subgroup operations
 public:
   // Create a get wave size query.
