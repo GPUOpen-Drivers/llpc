@@ -228,7 +228,7 @@ void SPIRVEntry::takeDecorates(SPIRVEntry *E) {
   Decorates = std::move(E->Decorates);
 }
 
-void SPIRVEntry::setLine(const std::shared_ptr<const SPIRVLine> &L) {
+void SPIRVEntry::setLine(const SPIRVLine *L) {
   Line = L;
 }
 
@@ -443,14 +443,12 @@ _SPIRV_IMP_DECODE3(SPIRVMemberName, Target, MemberNumber, Str)
 
 void SPIRVLine::decode(std::istream &I) {
   getDecoder(I) >> FileName >> Line >> Column;
-  std::shared_ptr<const SPIRVLine> L(this);
-  Module->setCurrentLine(L);
+  Module->setCurrentLine(this);
 }
 
 void SPIRVLine::validate() const {
   assert(OpCode == OpLine);
   assert(WordCount == 4);
-  assert(get<SPIRVEntry>(FileName)->getOpCode() == OpString);
   assert(Line != SPIRVWORD_MAX);
   assert(Column != SPIRVWORD_MAX);
   assert(!hasId());

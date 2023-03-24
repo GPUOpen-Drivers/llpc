@@ -193,6 +193,7 @@ public:
 
   // Post-process translated LLVM module to undo row major matrices.
   bool postProcessRowMajorMatrix();
+  Value *getTranslatedValue(SPIRVValue *bv);
 
 private:
   class SPIRVTypeContext {
@@ -365,8 +366,6 @@ private:
     m_funcMap[bf] = f;
     return f;
   }
-
-  Value *getTranslatedValue(SPIRVValue *bv);
 
   SPIRVErrorLog &getErrorLog() { return m_bm->getErrorLog(); }
 

@@ -46,7 +46,15 @@ enum Instruction {
   MacroUndef                    = 33,
   ImportedEntity                = 34,
   Source                        = 35,
-  InstCount                     = 36
+  InstCount                     = 36,
+  FunctionDefinition            = 101,
+  SourceContinued               = 102,
+  Line                          = 103,
+  NoLine                        = 104,
+  BuildIdentifier               = 105,
+  StoragePath                   = 106,
+  EntryPoint                    = 107,
+  TypeMatrix                    = 108,
 };
 
 enum Flag {
@@ -138,7 +146,8 @@ enum {
   NameIdx      = 0,
   SizeIdx      = 1,
   EncodingIdx  = 2,
-  OperandCount = 3
+  FlagsIdx     = 3,
+  OperandCount = 4
 };
 }
 
@@ -335,7 +344,7 @@ enum {
   SourceIdx       = 2,
   LineIdx         = 3,
   ColumnIdx       = 4,
-  ParentIdx       = 5,
+  ScopeIdx        = 5,
   LinkageNameIdx  = 6,
   FlagsIdx        = 7,
   ScopeLineIdx    = 8,
