@@ -40,7 +40,7 @@ using namespace llvm;
 //
 // @param matrix : Matrix to transpose.
 // @param instName : Name to give final instruction
-Value *MatrixBuilder::CreateTransposeMatrix(Value *const matrix, const Twine &instName) {
+Value *BuilderImpl::CreateTransposeMatrix(Value *const matrix, const Twine &instName) {
   assert(matrix);
 
   Type *const matrixType = matrix->getType();
@@ -89,7 +89,7 @@ Value *MatrixBuilder::CreateTransposeMatrix(Value *const matrix, const Twine &in
 // @param matrix : The column major matrix, n x <n x float>
 // @param scalar : The float scalar
 // @param instName : Name to give instruction(s)
-Value *MatrixBuilder::CreateMatrixTimesScalar(Value *const matrix, Value *const scalar, const Twine &instName) {
+Value *BuilderImpl::CreateMatrixTimesScalar(Value *const matrix, Value *const scalar, const Twine &instName) {
   Type *const matrixTy = matrix->getType();
   Type *const columnTy = matrixTy->getArrayElementType();
   const unsigned rowCount = cast<FixedVectorType>(columnTy)->getNumElements();
@@ -113,7 +113,7 @@ Value *MatrixBuilder::CreateMatrixTimesScalar(Value *const matrix, Value *const 
 // @param vector : The float vector
 // @param matrix : The column major matrix, n x <n x float>
 // @param instName : Name to give instruction(s)
-Value *MatrixBuilder::CreateVectorTimesMatrix(Value *const vector, Value *const matrix, const Twine &instName) {
+Value *BuilderImpl::CreateVectorTimesMatrix(Value *const vector, Value *const matrix, const Twine &instName) {
   Type *const matrixTy = matrix->getType();
   Type *const compTy = cast<VectorType>(cast<ArrayType>(matrixTy)->getElementType())->getElementType();
   const unsigned columnCount = matrixTy->getArrayNumElements();
@@ -135,7 +135,7 @@ Value *MatrixBuilder::CreateVectorTimesMatrix(Value *const vector, Value *const 
 // @param matrix : The column major matrix, n x <n x float>
 // @param vector : The vector
 // @param instName : Name to give instruction(s)
-Value *MatrixBuilder::CreateMatrixTimesVector(Value *const matrix, Value *const vector, const Twine &instName) {
+Value *BuilderImpl::CreateMatrixTimesVector(Value *const matrix, Value *const vector, const Twine &instName) {
   Type *const columnTy = matrix->getType()->getArrayElementType();
   const unsigned rowCount = cast<FixedVectorType>(columnTy)->getNumElements();
   Value *result = nullptr;
@@ -160,7 +160,7 @@ Value *MatrixBuilder::CreateMatrixTimesVector(Value *const matrix, Value *const 
 // @param matrix1 : The float matrix 1
 // @param matrix2 : The float matrix 2
 // @param instName : Name to give instruction(s)
-Value *MatrixBuilder::CreateMatrixTimesMatrix(Value *const matrix1, Value *const matrix2, const Twine &instName) {
+Value *BuilderImpl::CreateMatrixTimesMatrix(Value *const matrix1, Value *const matrix2, const Twine &instName) {
   Type *const mat1ColumnType = matrix1->getType()->getArrayElementType();
   const unsigned mat2ColCount = matrix2->getType()->getArrayNumElements();
   Type *const resultTy = ArrayType::get(mat1ColumnType, mat2ColCount);
@@ -181,7 +181,7 @@ Value *MatrixBuilder::CreateMatrixTimesMatrix(Value *const matrix1, Value *const
 // @param vector1 : The float vector 1
 // @param vector2 : The float vector 2
 // @param instName : Name to give instruction(s)
-Value *MatrixBuilder::CreateOuterProduct(Value *const vector1, Value *const vector2, const Twine &instName) {
+Value *BuilderImpl::CreateOuterProduct(Value *const vector1, Value *const vector2, const Twine &instName) {
   const unsigned rowCount = cast<FixedVectorType>(vector1->getType())->getNumElements();
   const unsigned colCount = cast<FixedVectorType>(vector2->getType())->getNumElements();
   Type *const resultTy = ArrayType::get(vector1->getType(), colCount);
@@ -202,7 +202,7 @@ Value *MatrixBuilder::CreateOuterProduct(Value *const vector1, Value *const vect
 //
 // @param matrix : Matrix
 // @param instName : Name to give instruction(s)
-Value *MatrixBuilder::CreateDeterminant(Value *const matrix, const Twine &instName) {
+Value *BuilderImpl::CreateDeterminant(Value *const matrix, const Twine &instName) {
   unsigned order = matrix->getType()->getArrayNumElements();
   assert(cast<FixedVectorType>(cast<ArrayType>(matrix->getType())->getElementType())->getNumElements() == order);
   assert(order >= 2);
@@ -225,7 +225,7 @@ Value *MatrixBuilder::CreateDeterminant(Value *const matrix, const Twine &instNa
 //
 // @param elements : Elements of matrix (order*order of them)
 // @param order : Order of matrix
-Value *MatrixBuilder::determinant(ArrayRef<Value *> elements, unsigned order) {
+Value *BuilderImpl::determinant(ArrayRef<Value *> elements, unsigned order) {
   if (order == 1)
     return elements[0];
 
@@ -267,8 +267,8 @@ Value *MatrixBuilder::determinant(ArrayRef<Value *> elements, unsigned order) {
 // @param order : Order of input matrix
 // @param rowToDelete : Row index to delete
 // @param columnToDelete : Column index to delete
-void MatrixBuilder::getSubmatrix(ArrayRef<Value *> matrix, MutableArrayRef<Value *> submatrix, unsigned order,
-                                 unsigned rowToDelete, unsigned columnToDelete) {
+void BuilderImpl::getSubmatrix(ArrayRef<Value *> matrix, MutableArrayRef<Value *> submatrix, unsigned order,
+                               unsigned rowToDelete, unsigned columnToDelete) {
   unsigned inElementIdx = 0, outElementIdx = 0;
   for (unsigned columnIdx = 0; columnIdx != order; ++columnIdx) {
     for (unsigned rowIdx = 0; rowIdx != order; ++rowIdx) {
@@ -285,7 +285,7 @@ void MatrixBuilder::getSubmatrix(ArrayRef<Value *> matrix, MutableArrayRef<Value
 //
 // @param matrix : Matrix
 // @param instName : Name to give instruction(s)
-Value *MatrixBuilder::CreateMatrixInverse(Value *const matrix, const Twine &instName) {
+Value *BuilderImpl::CreateMatrixInverse(Value *const matrix, const Twine &instName) {
   unsigned order = matrix->getType()->getArrayNumElements();
   assert(cast<FixedVectorType>(cast<ArrayType>(matrix->getType())->getElementType())->getNumElements() == order);
   assert(order >= 2);

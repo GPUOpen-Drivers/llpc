@@ -43,7 +43,7 @@ using namespace llvm;
 // Get shader wave size.
 //
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateGetWaveSize(const Twine &instName) {
+Value *BuilderImpl::CreateGetWaveSize(const Twine &instName) {
   return getInt32(getShaderWaveSize());
 }
 
@@ -51,7 +51,7 @@ Value *SubgroupBuilder::CreateGetWaveSize(const Twine &instName) {
 // Create a subgroup get subgroup size.
 //
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateGetSubgroupSize(const Twine &instName) {
+Value *BuilderImpl::CreateGetSubgroupSize(const Twine &instName) {
   return getInt32(getShaderSubgroupSize());
 }
 
@@ -59,7 +59,7 @@ Value *SubgroupBuilder::CreateGetSubgroupSize(const Twine &instName) {
 // Get the shader subgroup size for the current shader stage.
 //
 // @returns : Subgroup size of current shader stage
-unsigned SubgroupBuilder::getShaderSubgroupSize() {
+unsigned BuilderImpl::getShaderSubgroupSize() {
   return getPipelineState()->getShaderSubgroupSize(getShaderStage(GetInsertBlock()->getParent()));
 }
 
@@ -67,7 +67,7 @@ unsigned SubgroupBuilder::getShaderSubgroupSize() {
 // Get the shader wave size for the current shader stage.
 //
 // @returns : Wave size of current shader stage
-unsigned SubgroupBuilder::getShaderWaveSize() {
+unsigned BuilderImpl::getShaderWaveSize() {
   return getPipelineState()->getShaderWaveSize(getShaderStage(GetInsertBlock()->getParent()));
 }
 
@@ -75,7 +75,7 @@ unsigned SubgroupBuilder::getShaderWaveSize() {
 // Create a subgroup elect call.
 //
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupElect(const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupElect(const Twine &instName) {
   return CreateICmpEQ(CreateSubgroupMbcnt(createGroupBallot(getTrue()), ""), getInt32(0));
 }
 
@@ -84,7 +84,7 @@ Value *SubgroupBuilder::CreateSubgroupElect(const Twine &instName) {
 //
 // @param value : The value to compare across the subgroup. Must be an integer type.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupAll(Value *const value, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupAll(Value *const value, const Twine &instName) {
   Value *result = CreateICmpEQ(createGroupBallot(value), createGroupBallot(getTrue()));
   result = CreateSelect(CreateUnaryIntrinsic(Intrinsic::is_constant, value), value, result);
 
@@ -102,7 +102,7 @@ Value *SubgroupBuilder::CreateSubgroupAll(Value *const value, const Twine &instN
 //
 // @param value : The value to compare across the subgroup. Must be an integer type.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupAny(Value *const value, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupAny(Value *const value, const Twine &instName) {
   Value *result = CreateICmpNE(createGroupBallot(value), getInt64(0));
   result = CreateSelect(CreateUnaryIntrinsic(Intrinsic::is_constant, value), value, result);
 
@@ -120,7 +120,7 @@ Value *SubgroupBuilder::CreateSubgroupAny(Value *const value, const Twine &instN
 //
 // @param value : The value to compare across the subgroup. Must be an integer type.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupAllEqual(Value *const value, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupAllEqual(Value *const value, const Twine &instName) {
   Type *const type = value->getType();
 
   Value *compare = CreateSubgroupBroadcastFirst(value, instName);
@@ -149,7 +149,7 @@ Value *SubgroupBuilder::CreateSubgroupAllEqual(Value *const value, const Twine &
 // @param value : The value to read from the chosen lane to all active lanes.
 // @param index : The index to broadcast from. Must be an i32.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupBroadcast(Value *const value, Value *const index, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupBroadcast(Value *const value, Value *const index, const Twine &instName) {
   auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
     return builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {mappedArgs[0], passthroughArgs[0]});
   };
@@ -163,8 +163,7 @@ Value *SubgroupBuilder::CreateSubgroupBroadcast(Value *const value, Value *const
 // @param value : The value to read from the chosen lane to all active lanes.
 // @param index : The index to broadcast from. Must be an i32.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupBroadcastWaterfall(Value *const value, Value *const index,
-                                                         const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupBroadcastWaterfall(Value *const value, Value *const index, const Twine &instName) {
   auto mapFunc = [this](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
                         ArrayRef<Value *> passthroughArgs) -> Value * {
     Value *const readlane =
@@ -179,7 +178,7 @@ Value *SubgroupBuilder::CreateSubgroupBroadcastWaterfall(Value *const value, Val
 //
 // @param value : The value to read from the first active lane into all other active lanes.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupBroadcastFirst(Value *const value, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupBroadcastFirst(Value *const value, const Twine &instName) {
   auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
     return builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, mappedArgs[0]);
   };
@@ -192,7 +191,7 @@ Value *SubgroupBuilder::CreateSubgroupBroadcastFirst(Value *const value, const T
 //
 // @param value : The value to ballot across the subgroup. Must be an integer type.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupBallot(Value *const value, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupBallot(Value *const value, const Twine &instName) {
   // Check the type is definitely an integer.
   assert(value->getType()->isIntegerTy());
 
@@ -210,7 +209,7 @@ Value *SubgroupBuilder::CreateSubgroupBallot(Value *const value, const Twine &in
 //
 // @param value : The value to inverseballot across the subgroup. Must be a <4 x i32> type.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupInverseBallot(Value *const value, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupInverseBallot(Value *const value, const Twine &instName) {
   return CreateSubgroupBallotBitExtract(value, CreateSubgroupMbcnt(getInt64(UINT64_MAX), ""), instName);
 }
 
@@ -220,7 +219,7 @@ Value *SubgroupBuilder::CreateSubgroupInverseBallot(Value *const value, const Tw
 // @param value : The ballot value to bit extract. Must be an <4 x i32> type.
 // @param index : The bit index to extract. Must be an i32 type.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupBallotBitExtract(Value *const value, Value *const index, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupBallotBitExtract(Value *const value, Value *const index, const Twine &instName) {
   if (getShaderSubgroupSize() <= 32) {
     Value *const indexMask = CreateShl(getInt32(1), index);
     Value *const valueAsInt32 = CreateExtractElement(value, getInt32(0));
@@ -240,7 +239,7 @@ Value *SubgroupBuilder::CreateSubgroupBallotBitExtract(Value *const value, Value
 //
 // @param value : The ballot value to bit count. Must be an <4 x i32> type.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupBallotBitCount(Value *const value, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupBallotBitCount(Value *const value, const Twine &instName) {
   if (getShaderSubgroupSize() <= 32)
     return CreateUnaryIntrinsic(Intrinsic::ctpop, CreateExtractElement(value, getInt32(0)));
   Value *result = CreateShuffleVector(value, UndefValue::get(value->getType()), ArrayRef<int>{0, 1});
@@ -254,7 +253,7 @@ Value *SubgroupBuilder::CreateSubgroupBallotBitCount(Value *const value, const T
 //
 // @param value : The ballot value to inclusively bit count. Must be an <4 x i32> type.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupBallotInclusiveBitCount(Value *const value, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupBallotInclusiveBitCount(Value *const value, const Twine &instName) {
   Value *const exclusiveBitCount = CreateSubgroupBallotExclusiveBitCount(value, instName);
   Value *const inverseBallot = CreateSubgroupInverseBallot(value, instName);
   Value *const inclusiveBitCount = CreateAdd(exclusiveBitCount, getInt32(1));
@@ -266,7 +265,7 @@ Value *SubgroupBuilder::CreateSubgroupBallotInclusiveBitCount(Value *const value
 //
 // @param value : The ballot value to exclusively bit count. Must be an <4 x i32> type.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupBallotExclusiveBitCount(Value *const value, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupBallotExclusiveBitCount(Value *const value, const Twine &instName) {
   if (getShaderSubgroupSize() <= 32)
     // Directly invoke the required mbcnt_lo intrinsic since CreateSubgroupMbcnt expects a 64-bit mask
     return CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {CreateExtractElement(value, getInt32(0)), getInt32(0)});
@@ -280,7 +279,7 @@ Value *SubgroupBuilder::CreateSubgroupBallotExclusiveBitCount(Value *const value
 //
 // @param value : The ballot value to find the least significant bit of. Must be an <4 x i32> type.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupBallotFindLsb(Value *const value, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupBallotFindLsb(Value *const value, const Twine &instName) {
   if (getShaderSubgroupSize() <= 32) {
     Value *const result = CreateExtractElement(value, getInt32(0));
     return CreateIntrinsic(Intrinsic::cttz, getInt32Ty(), {result, getTrue()});
@@ -296,7 +295,7 @@ Value *SubgroupBuilder::CreateSubgroupBallotFindLsb(Value *const value, const Tw
 //
 // @param value : The ballot value to find the most significant bit of. Must be an <4 x i32> type.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupBallotFindMsb(Value *const value, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupBallotFindMsb(Value *const value, const Twine &instName) {
   if (getShaderSubgroupSize() <= 32) {
     Value *result = CreateExtractElement(value, getInt32(0));
     result = CreateIntrinsic(Intrinsic::ctlz, getInt32Ty(), {result, getTrue()});
@@ -315,7 +314,7 @@ Value *SubgroupBuilder::CreateSubgroupBallotFindMsb(Value *const value, const Tw
 // @param value : The value to shuffle.
 // @param index : The index to shuffle from.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupShuffle(Value *const value, Value *const index, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupShuffle(Value *const value, Value *const index, const Twine &instName) {
   if (supportWaveWideBPermute()) {
     auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
                       ArrayRef<Value *> passthroughArgs) -> Value * {
@@ -375,7 +374,7 @@ Value *SubgroupBuilder::CreateSubgroupShuffle(Value *const value, Value *const i
 // @param value : The value to shuffle.
 // @param mask : The mask to shuffle with.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupShuffleXor(Value *const value, Value *const mask, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupShuffleXor(Value *const value, Value *const mask, const Twine &instName) {
   bool canOptimize = false;
   unsigned maskValue = ~0;
   DppCtrl dppCtrl = DppCtrl::DppQuadPerm0000;
@@ -478,7 +477,7 @@ Value *SubgroupBuilder::CreateSubgroupShuffleXor(Value *const value, Value *cons
 // @param value : The value to shuffle.
 // @param delta : The delta to shuffle from.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupShuffleUp(Value *const value, Value *const delta, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupShuffleUp(Value *const value, Value *const delta, const Twine &instName) {
   Value *index = CreateSubgroupMbcnt(getInt64(UINT64_MAX), "");
   index = CreateSub(index, delta);
   return CreateSubgroupShuffle(value, index, instName);
@@ -490,7 +489,7 @@ Value *SubgroupBuilder::CreateSubgroupShuffleUp(Value *const value, Value *const
 // @param value : The value to shuffle.
 // @param delta : The delta to shuffle from.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupShuffleDown(Value *const value, Value *const delta, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupShuffleDown(Value *const value, Value *const delta, const Twine &instName) {
   Value *index = CreateSubgroupMbcnt(getInt64(UINT64_MAX), "");
   index = CreateAdd(index, delta);
   return CreateSubgroupShuffle(value, index, instName);
@@ -503,8 +502,8 @@ Value *SubgroupBuilder::CreateSubgroupShuffleDown(Value *const value, Value *con
 // @param value : An LLVM value.
 // @param inClusterSize : The expected cluster size.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupClusteredReduction(GroupArithOp groupArithOp, Value *const value,
-                                                         Value *const inClusterSize, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupClusteredReduction(GroupArithOp groupArithOp, Value *const value,
+                                                     Value *const inClusterSize, const Twine &instName) {
   auto waveSize = getInt32(getShaderWaveSize());
   Value *clusterSize = CreateSelect(CreateICmpUGT(inClusterSize, waveSize), waveSize, inClusterSize);
   if (supportDpp()) {
@@ -659,8 +658,8 @@ Value *SubgroupBuilder::CreateSubgroupClusteredReduction(GroupArithOp groupArith
 // @param value : An LLVM value.
 // @param inClusterSize : The expected cluster size.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupClusteredInclusive(GroupArithOp groupArithOp, Value *const value,
-                                                         Value *const inClusterSize, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupClusteredInclusive(GroupArithOp groupArithOp, Value *const value,
+                                                     Value *const inClusterSize, const Twine &instName) {
   auto waveSize = getInt32(getShaderWaveSize());
   Value *clusterSize = CreateSelect(CreateICmpUGT(inClusterSize, waveSize), waveSize, inClusterSize);
   if (supportDpp()) {
@@ -807,8 +806,8 @@ Value *SubgroupBuilder::CreateSubgroupClusteredInclusive(GroupArithOp groupArith
 // @param value : An LLVM value.
 // @param inClusterSize : The expected cluster size.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, Value *const value,
-                                                         Value *const inClusterSize, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, Value *const value,
+                                                     Value *const inClusterSize, const Twine &instName) {
   auto waveSize = getInt32(getShaderWaveSize());
   Value *clusterSize = CreateSelect(CreateICmpUGT(inClusterSize, waveSize), waveSize, inClusterSize);
   if (supportDpp()) {
@@ -996,7 +995,7 @@ Value *SubgroupBuilder::CreateSubgroupClusteredExclusive(GroupArithOp groupArith
 // @param value : The value to broadcast across the quad.
 // @param index : The index in the quad to broadcast the value from.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupQuadBroadcast(Value *const value, Value *const index, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupQuadBroadcast(Value *const value, Value *const index, const Twine &instName) {
   Value *result = UndefValue::get(value->getType());
 
   const unsigned indexBits = index->getType()->getPrimitiveSizeInBits();
@@ -1035,7 +1034,7 @@ Value *SubgroupBuilder::CreateSubgroupQuadBroadcast(Value *const value, Value *c
 //
 // @param value : The value to swap.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupQuadSwapHorizontal(Value *const value, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupQuadSwapHorizontal(Value *const value, const Twine &instName) {
   if (supportDpp())
     return createWqm(createDppMov(value, DppCtrl::DppQuadPerm1032, 0xF, 0xF, true));
 
@@ -1047,7 +1046,7 @@ Value *SubgroupBuilder::CreateSubgroupQuadSwapHorizontal(Value *const value, con
 //
 // @param value : The value to swap.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupQuadSwapVertical(Value *const value, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupQuadSwapVertical(Value *const value, const Twine &instName) {
   if (supportDpp())
     return createWqm(createDppMov(value, DppCtrl::DppQuadPerm2301, 0xF, 0xF, true));
 
@@ -1059,7 +1058,7 @@ Value *SubgroupBuilder::CreateSubgroupQuadSwapVertical(Value *const value, const
 //
 // @param value : The value to swap.
 // @param instName : Name to give final instruction.
-Value *SubgroupBuilder::CreateSubgroupQuadSwapDiagonal(Value *const value, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupQuadSwapDiagonal(Value *const value, const Twine &instName) {
   if (supportDpp())
     return createWqm(createDppMov(value, DppCtrl::DppQuadPerm3210, 0xF, 0xF, true));
 
@@ -1072,7 +1071,7 @@ Value *SubgroupBuilder::CreateSubgroupQuadSwapDiagonal(Value *const value, const
 // @param value : The value to swizzle.
 // @param offset : The value to specify the swizzle offsets.
 // @param instName : Name to give instruction(s)
-Value *SubgroupBuilder::CreateSubgroupSwizzleQuad(Value *const value, Value *const offset, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupSwizzleQuad(Value *const value, Value *const offset, const Twine &instName) {
   Constant *const constOffset = cast<Constant>(offset);
   uint8_t lane0 = static_cast<uint8_t>(cast<ConstantInt>(constOffset->getAggregateElement(0u))->getZExtValue());
   uint8_t lane1 = static_cast<uint8_t>(cast<ConstantInt>(constOffset->getAggregateElement(1u))->getZExtValue());
@@ -1088,7 +1087,7 @@ Value *SubgroupBuilder::CreateSubgroupSwizzleQuad(Value *const value, Value *con
 // @param value : The value to swizzle.
 // @param mask : The value to specify the swizzle masks.
 // @param instName : Name to give instruction(s)
-Value *SubgroupBuilder::CreateSubgroupSwizzleMask(Value *const value, Value *const mask, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupSwizzleMask(Value *const value, Value *const mask, const Twine &instName) {
   Constant *const constMask = cast<Constant>(mask);
   uint8_t andMask = static_cast<uint8_t>(cast<ConstantInt>(constMask->getAggregateElement(0u))->getZExtValue());
   uint8_t orMask = static_cast<uint8_t>(cast<ConstantInt>(constMask->getAggregateElement(1u))->getZExtValue());
@@ -1106,8 +1105,8 @@ Value *SubgroupBuilder::CreateSubgroupSwizzleMask(Value *const value, Value *con
 // @param writeValue : The value to return for one invocation.
 // @param invocationIndex : The index of the invocation that gets the write value.
 // @param instName : Name to give instruction(s)
-Value *SubgroupBuilder::CreateSubgroupWriteInvocation(Value *const inputValue, Value *const writeValue,
-                                                      Value *const invocationIndex, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupWriteInvocation(Value *const inputValue, Value *const writeValue,
+                                                  Value *const invocationIndex, const Twine &instName) {
   auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
     return builder.CreateIntrinsic(Intrinsic::amdgcn_writelane, {},
                                    {
@@ -1125,7 +1124,7 @@ Value *SubgroupBuilder::CreateSubgroupWriteInvocation(Value *const inputValue, V
 //
 // @param mask : The mask to mbcnt with.
 // @param instName : Name to give instruction(s)
-Value *SubgroupBuilder::CreateSubgroupMbcnt(Value *const mask, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupMbcnt(Value *const mask, const Twine &instName) {
   // Check that the type is definitely an i64.
   assert(mask->getType()->isIntegerTy(64));
 
@@ -1144,7 +1143,7 @@ Value *SubgroupBuilder::CreateSubgroupMbcnt(Value *const mask, const Twine &inst
 //
 // @param groupArithOp : The group arithmetic operation to get the identity for.
 // @param type : The type of the identity.
-Value *SubgroupBuilder::createGroupArithmeticIdentity(GroupArithOp groupArithOp, Type *const type) {
+Value *BuilderImpl::createGroupArithmeticIdentity(GroupArithOp groupArithOp, Type *const type) {
   switch (groupArithOp) {
   case GroupArithOp::IAdd:
     return ConstantInt::get(type, 0);
@@ -1206,7 +1205,7 @@ Value *SubgroupBuilder::createGroupArithmeticIdentity(GroupArithOp groupArithOp,
 // @param groupArithOp : The group arithmetic operation to use for the reduction.
 // @param x : The x value to perform the arithmetic on.
 // @param y : The y value to perform the arithmetic on.
-Value *SubgroupBuilder::createGroupArithmeticOperation(GroupArithOp groupArithOp, Value *const x, Value *const y) {
+Value *BuilderImpl::createGroupArithmeticOperation(GroupArithOp groupArithOp, Value *const x, Value *const y) {
   switch (groupArithOp) {
   case GroupArithOp::IAdd:
     return CreateAdd(x, y);
@@ -1248,8 +1247,8 @@ Value *SubgroupBuilder::createGroupArithmeticOperation(GroupArithOp groupArithOp
 // @param rowMask : The row mask.
 // @param bankMask : The bank mask.
 // @param boundCtrl : Whether bound_ctrl is used or not.
-Value *SubgroupBuilder::createDppMov(Value *const value, DppCtrl dppCtrl, unsigned rowMask, unsigned bankMask,
-                                     bool boundCtrl) {
+Value *BuilderImpl::createDppMov(Value *const value, DppCtrl dppCtrl, unsigned rowMask, unsigned bankMask,
+                                 bool boundCtrl) {
   auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
     return builder.CreateIntrinsic(
         Intrinsic::amdgcn_mov_dpp, builder.getInt32Ty(),
@@ -1270,8 +1269,8 @@ Value *SubgroupBuilder::createDppMov(Value *const value, DppCtrl dppCtrl, unsign
 // @param rowMask : The row mask.
 // @param bankMask : The bank mask.
 // @param boundCtrl : Whether bound_ctrl is used or not.
-Value *SubgroupBuilder::createDppUpdate(Value *const origValue, Value *const updateValue, DppCtrl dppCtrl,
-                                        unsigned rowMask, unsigned bankMask, bool boundCtrl) {
+Value *BuilderImpl::createDppUpdate(Value *const origValue, Value *const updateValue, DppCtrl dppCtrl, unsigned rowMask,
+                                    unsigned bankMask, bool boundCtrl) {
   auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
     return builder.CreateIntrinsic(
         Intrinsic::amdgcn_update_dpp, builder.getInt32Ty(),
@@ -1296,8 +1295,8 @@ Value *SubgroupBuilder::createDppUpdate(Value *const origValue, Value *const upd
 // @param selectBitsHigh : Select bits high.
 // @param fetchInactive : FI mode, whether to fetch inactive lane.
 // @param boundCtrl : Whether bound_ctrl is used or not.
-Value *SubgroupBuilder::createPermLane16(Value *const origValue, Value *const updateValue, unsigned selectBitsLow,
-                                         unsigned selectBitsHigh, bool fetchInactive, bool boundCtrl) {
+Value *BuilderImpl::createPermLane16(Value *const origValue, Value *const updateValue, unsigned selectBitsLow,
+                                     unsigned selectBitsHigh, bool fetchInactive, bool boundCtrl) {
   auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
     return builder.CreateIntrinsic(
         Intrinsic::amdgcn_permlane16, {},
@@ -1322,8 +1321,8 @@ Value *SubgroupBuilder::createPermLane16(Value *const origValue, Value *const up
 // @param selectBitsHigh : Select bits high.
 // @param fetchInactive : FI mode, whether to fetch inactive lane.
 // @param boundCtrl : Whether bound_ctrl is used or not.
-Value *SubgroupBuilder::createPermLaneX16(Value *const origValue, Value *const updateValue, unsigned selectBitsLow,
-                                          unsigned selectBitsHigh, bool fetchInactive, bool boundCtrl) {
+Value *BuilderImpl::createPermLaneX16(Value *const origValue, Value *const updateValue, unsigned selectBitsLow,
+                                      unsigned selectBitsHigh, bool fetchInactive, bool boundCtrl) {
   auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
     return builder.CreateIntrinsic(
         Intrinsic::amdgcn_permlanex16, {},
@@ -1343,7 +1342,7 @@ Value *SubgroupBuilder::createPermLaneX16(Value *const origValue, Value *const u
 // Create a call to permute lane 64.
 //
 // @param updateValue : The value to update with.
-Value *SubgroupBuilder::createPermLane64(Value *const updateValue) {
+Value *BuilderImpl::createPermLane64(Value *const updateValue) {
   auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
     return builder.CreateIntrinsic(Intrinsic::amdgcn_permlane64, {}, {mappedArgs[0]});
   };
@@ -1356,7 +1355,7 @@ Value *SubgroupBuilder::createPermLane64(Value *const updateValue) {
 //
 // @param value : The value to swizzle.
 // @param dsPattern : The pattern to swizzle with.
-Value *SubgroupBuilder::createDsSwizzle(Value *const value, uint16_t dsPattern) {
+Value *BuilderImpl::createDsSwizzle(Value *const value, uint16_t dsPattern) {
   auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
     return builder.CreateIntrinsic(Intrinsic::amdgcn_ds_swizzle, {}, {mappedArgs[0], passthroughArgs[0]});
   };
@@ -1368,7 +1367,7 @@ Value *SubgroupBuilder::createDsSwizzle(Value *const value, uint16_t dsPattern) 
 // Create a call to WWM (whole wave mode).
 //
 // @param value : The value to pass to the WWM call.
-Value *SubgroupBuilder::createWwm(Value *const value) {
+Value *BuilderImpl::createWwm(Value *const value) {
   auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *>) -> Value * {
     return builder.CreateUnaryIntrinsic(Intrinsic::amdgcn_wwm, mappedArgs[0]);
   };
@@ -1381,7 +1380,7 @@ Value *SubgroupBuilder::createWwm(Value *const value) {
 // Only in fragment shader stage.
 //
 // @param value : The value to pass to the soft WQM call.
-Value *SubgroupBuilder::createWqm(Value *const value) {
+Value *BuilderImpl::createWqm(Value *const value) {
   auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *>) -> Value * {
     return builder.CreateUnaryIntrinsic(Intrinsic::amdgcn_wqm, mappedArgs[0]);
   };
@@ -1398,7 +1397,7 @@ Value *SubgroupBuilder::createWqm(Value *const value) {
 // @param xorMask : The xor mask (bits 10..14).
 // @param orMask : The or mask (bits 5..9).
 // @param andMask : The and mask (bits 0..4).
-uint16_t SubgroupBuilder::getDsSwizzleBitMode(uint8_t xorMask, uint8_t orMask, uint8_t andMask) {
+uint16_t BuilderImpl::getDsSwizzleBitMode(uint8_t xorMask, uint8_t orMask, uint8_t andMask) {
   return (static_cast<uint16_t>(xorMask & 0x1F) << 10) | (static_cast<uint16_t>(orMask & 0x1F) << 5) | (andMask & 0x1F);
 }
 
@@ -1409,13 +1408,13 @@ uint16_t SubgroupBuilder::getDsSwizzleBitMode(uint8_t xorMask, uint8_t orMask, u
 // @param lane1 : The 1st lane.
 // @param lane2 : The 2nd lane.
 // @param lane3 : The 3rd lane.
-uint16_t SubgroupBuilder::getDsSwizzleQuadMode(uint8_t lane0, uint8_t lane1, uint8_t lane2, uint8_t lane3) {
+uint16_t BuilderImpl::getDsSwizzleQuadMode(uint8_t lane0, uint8_t lane1, uint8_t lane2, uint8_t lane3) {
   return 0x8000 | static_cast<uint16_t>((lane3 << 6) | ((lane2 & 0x3) << 4) | ((lane1 & 0x3) << 2) | ((lane0 & 0x3)));
 }
 
 // =====================================================================================================================
 // Create a thread mask for the current thread, an integer with a single bit representing the ID of the thread set to 1.
-Value *SubgroupBuilder::createThreadMask() {
+Value *BuilderImpl::createThreadMask() {
   Value *threadId = CreateSubgroupMbcnt(getInt64(UINT64_MAX), "");
 
   Value *threadMask = nullptr;
@@ -1435,8 +1434,8 @@ Value *SubgroupBuilder::createThreadMask() {
 // @param andMask : The mask to and with the thread mask.
 // @param value1 : The first value to select.
 // @param value2 : The second value to select.
-Value *SubgroupBuilder::createThreadMaskedSelect(Value *const threadMask, uint64_t andMask, Value *const value1,
-                                                 Value *const value2) {
+Value *BuilderImpl::createThreadMaskedSelect(Value *const threadMask, uint64_t andMask, Value *const value1,
+                                             Value *const value2) {
   Value *const andMaskVal = getIntN(getShaderSubgroupSize(), andMask);
   Value *const zero = getIntN(getShaderSubgroupSize(), 0);
   return CreateSelect(CreateICmpNE(CreateAnd(threadMask, andMaskVal), zero), value1, value2);
@@ -1446,7 +1445,7 @@ Value *SubgroupBuilder::createThreadMaskedSelect(Value *const threadMask, uint64
 // Do group ballot, turning a per-lane boolean value (in a VGPR) into a subgroup-wide shared SGPR.
 //
 // @param value : The value to contribute to the SGPR, must be an boolean type.
-Value *SubgroupBuilder::createGroupBallot(Value *const value) {
+Value *BuilderImpl::createGroupBallot(Value *const value) {
   // Check the type is definitely an boolean.
   assert(value->getType()->isIntegerTy(1));
 

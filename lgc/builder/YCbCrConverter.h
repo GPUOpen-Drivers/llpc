@@ -222,7 +222,7 @@ struct YCbCrWrappedSampleInfo : XYChromaSampleInfo {
 // Represents LLPC sampler YCbCr conversion helper class
 class YCbCrConverter {
 public:
-  YCbCrConverter(ImageBuilder *builder, const SamplerYCbCrConversionMetaData &ycbcrMetaData,
+  YCbCrConverter(BuilderImpl *builder, const SamplerYCbCrConversionMetaData &ycbcrMetaData,
                  YCbCrSampleInfo *ycbcrSampleInfo, GfxIpVersion *gfxIp);
 
   // Make sure default constructor deleted - const ref can't be initialized
@@ -294,7 +294,7 @@ private:
                             unsigned *channelBits, llvm::Value *imageOp);
 
   // Builder context
-  ImageBuilder *m_builder;
+  BuilderImpl *m_builder;
 
   // Sampler YCbCr conversion meta data
   const SamplerYCbCrConversionMetaData &m_metaData;

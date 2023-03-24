@@ -305,11 +305,11 @@ Value *YCbCrConverter::createImageSampleInternal(SmallVectorImpl<Value *> &coord
 // =====================================================================================================================
 // YCbCrConverter
 //
-// @param builder : ImageBuilder instance
+// @param builder : BuilderImpl instance
 // @param ycbcrMetaData : YCbCr conversion metadata
 // @param ycbcrSampleInfo : YCbCr sample information
 // @param gfxIp : The GfxIp Version
-YCbCrConverter::YCbCrConverter(ImageBuilder *builder, const SamplerYCbCrConversionMetaData &ycbcrMetaData,
+YCbCrConverter::YCbCrConverter(BuilderImpl *builder, const SamplerYCbCrConversionMetaData &ycbcrMetaData,
                                YCbCrSampleInfo *ycbcrSampleInfo, GfxIpVersion *gfxIp)
     : m_builder(builder), m_metaData(ycbcrMetaData), m_gfxIp(gfxIp) {
   m_imgDescsChroma.resize(3);
@@ -374,34 +374,34 @@ void YCbCrConverter::genImgDescChroma() {
     case 7:
     case 8:
     case 9: {
-      isGbGrFmt = m_builder->CreateICmpEQ(
-          imgDataFmt, m_builder->getInt32(ImageBuilder::ImgDataFormat::IMG_DATA_FORMAT_BG_RG__CORE));
+      isGbGrFmt = m_builder->CreateICmpEQ(imgDataFmt,
+                                          m_builder->getInt32(BuilderImpl::ImgDataFormat::IMG_DATA_FORMAT_BG_RG__CORE));
 
-      isBgRgFmt = m_builder->CreateICmpEQ(
-          imgDataFmt, m_builder->getInt32(ImageBuilder::ImgDataFormat::IMG_DATA_FORMAT_GB_GR__CORE));
+      isBgRgFmt = m_builder->CreateICmpEQ(imgDataFmt,
+                                          m_builder->getInt32(BuilderImpl::ImgDataFormat::IMG_DATA_FORMAT_GB_GR__CORE));
 
       proxySqRsrcRegHelper.setReg(SqRsrcRegs::Format,
-                                  m_builder->getInt32(ImageBuilder::ImgDataFormat::IMG_DATA_FORMAT_8_8_8_8));
+                                  m_builder->getInt32(BuilderImpl::ImgDataFormat::IMG_DATA_FORMAT_8_8_8_8));
       break;
     }
     case 10: {
       isGbGrFmt = m_builder->CreateICmpEQ(
-          imgDataFmt, m_builder->getInt32(ImageBuilder::ImgFmtGfx10::IMG_FMT_BG_RG_UNORM__GFX10CORE));
+          imgDataFmt, m_builder->getInt32(BuilderImpl::ImgFmtGfx10::IMG_FMT_BG_RG_UNORM__GFX10CORE));
       isBgRgFmt = m_builder->CreateICmpEQ(
-          imgDataFmt, m_builder->getInt32(ImageBuilder::ImgFmtGfx10::IMG_FMT_GB_GR_UNORM__GFX10CORE));
+          imgDataFmt, m_builder->getInt32(BuilderImpl::ImgFmtGfx10::IMG_FMT_GB_GR_UNORM__GFX10CORE));
 
       proxySqRsrcRegHelper.setReg(SqRsrcRegs::Format,
-                                  m_builder->getInt32(ImageBuilder::ImgFmtGfx10::IMG_FMT_8_8_8_8_UNORM__GFX10CORE));
+                                  m_builder->getInt32(BuilderImpl::ImgFmtGfx10::IMG_FMT_8_8_8_8_UNORM__GFX10CORE));
       break;
     }
     case 11: {
       isGbGrFmt = m_builder->CreateICmpEQ(
-          imgDataFmt, m_builder->getInt32(ImageBuilder::ImgFmtGfx11::IMG_FMT_BG_RG_UNORM__GFX104PLUS));
+          imgDataFmt, m_builder->getInt32(BuilderImpl::ImgFmtGfx11::IMG_FMT_BG_RG_UNORM__GFX104PLUS));
       isBgRgFmt = m_builder->CreateICmpEQ(
-          imgDataFmt, m_builder->getInt32(ImageBuilder::ImgFmtGfx11::IMG_FMT_GB_GR_UNORM__GFX104PLUS));
+          imgDataFmt, m_builder->getInt32(BuilderImpl::ImgFmtGfx11::IMG_FMT_GB_GR_UNORM__GFX104PLUS));
 
       proxySqRsrcRegHelper.setReg(SqRsrcRegs::Format,
-                                  m_builder->getInt32(ImageBuilder::ImgFmtGfx11::IMG_FMT_8_8_8_8_UNORM__GFX104PLUS));
+                                  m_builder->getInt32(BuilderImpl::ImgFmtGfx11::IMG_FMT_8_8_8_8_UNORM__GFX104PLUS));
       break;
     }
     default:

@@ -281,11 +281,12 @@ Pipeline *LgcContext::createPipeline() {
 }
 
 // =====================================================================================================================
-// Create a Builder object.
+// Create a Builder object. This is now unnecessary, as you can just create a local variable Builder or "new" it
+// yourself.
 //
-// @param pipeline : Pipeline object for pipeline compile, nullptr for shader compile
+// @param pipeline : Ignored
 Builder *LgcContext::createBuilder(Pipeline *pipeline) {
-  return Builder::createBuilderRecorder(this, pipeline);
+  return new Builder(getContext());
 }
 
 // =====================================================================================================================
