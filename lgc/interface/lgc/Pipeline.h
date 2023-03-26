@@ -864,6 +864,10 @@ public:
   virtual bool generate(std::unique_ptr<llvm::Module> pipelineModule, llvm::raw_pwrite_stream &outStream,
                         CheckShaderCacheFunc checkShaderCacheFunc, llvm::ArrayRef<llvm::Timer *> timers) = 0;
 
+  // Version of generate() that does not take ownership of the Module.
+  virtual bool generate(llvm::Module *pipelineModule, llvm::raw_pwrite_stream &outStream,
+                        CheckShaderCacheFunc checkShaderCacheFunc, llvm::ArrayRef<llvm::Timer *> timers) = 0;
+
   // Create an ELF linker object for linking unlinked shader or part-pipeline ELFs into a pipeline ELF using
   // the pipeline state. This needs to be deleted after use.
   virtual ElfLinker *createElfLinker(llvm::ArrayRef<llvm::MemoryBufferRef> elfs) = 0;
