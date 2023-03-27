@@ -43,6 +43,12 @@ userDataNode[0].next[0].offsetInDwords = 4
 userDataNode[0].next[0].sizeInDwords = 8
 userDataNode[0].next[0].set = 0
 userDataNode[0].next[0].binding = 0
+userDataNode[1].visibility = 2
+userDataNode[1].type = IndirectUserDataVaPtr
+userDataNode[1].offsetInDwords = 12
+userDataNode[1].sizeInDwords = 1
+userDataNode[1].indirectUserDataCount = 4
+
 
 [FsGlsl]
 #version 450 core
@@ -75,6 +81,11 @@ userDataNode[0].next[0].offsetInDwords = 4
 userDataNode[0].next[0].sizeInDwords = 8
 userDataNode[0].next[0].set = 0
 userDataNode[0].next[0].binding = 0
+userDataNode[1].visibility = 2
+userDataNode[1].type = IndirectUserDataVaPtr
+userDataNode[1].offsetInDwords = 12
+userDataNode[1].sizeInDwords = 1
+userDataNode[1].indirectUserDataCount = 4
 options.shadowDescriptorTableUsage = Enable
 options.shadowDescriptorTablePtrHigh = 0xFFFF
 

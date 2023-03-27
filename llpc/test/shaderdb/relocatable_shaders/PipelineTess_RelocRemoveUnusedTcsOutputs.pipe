@@ -79,3 +79,5 @@ colorBuffer[0].format = VK_FORMAT_R8G8B8A8_SRGB
 colorBuffer[0].channelWriteMask = 15
 colorBuffer[0].blendEnable = 0
 colorBuffer[0].blendSrcAlphaToColor = 0
+topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST
+patchControlPoints = 3
