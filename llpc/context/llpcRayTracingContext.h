@@ -49,7 +49,7 @@ public:
                     MetroHash::Hash *cacheHash, unsigned indirectStageMask);
   virtual ~RayTracingContext() {}
 
-  virtual const PipelineShaderInfo *getPipelineShaderInfo(ShaderStage shaderStage) const override;
+  virtual const PipelineShaderInfo *getPipelineShaderInfo(unsigned shaderId) const override;
 
   // Gets pipeline build info
   virtual const void *getPipelineBuildInfo() const override { return m_pipelineInfo; }
@@ -68,6 +68,9 @@ public:
 
   // Gets subgroup size usage
   virtual unsigned getSubgroupSizeUsage() const override;
+
+  // Set pipeline state in lgc::Pipeline object for middle-end, and (optionally) hash the state.
+  void setPipelineState(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, bool unlinked) const override;
 
   // Gets client-defined metadata
   virtual llvm::StringRef getClientMetadata() const override;
@@ -109,6 +112,10 @@ public:
   bool hasPipelineLibrary() { return m_pipelineInfo->hasPipelineLibrary; }
   unsigned hasLibraryStage(unsigned stageMask) { return m_pipelineInfo->pipelineLibStageMask & stageMask; }
   bool isReplay() { return m_pipelineInfo->isReplay; }
+
+protected:
+  // Give the pipeline options to the middle-end, and/or hash them.
+  virtual lgc::Options computePipelineOptions() const override;
 
 private:
   RayTracingContext() = delete;

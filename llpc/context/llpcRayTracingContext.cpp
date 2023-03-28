@@ -58,7 +58,7 @@ RayTracingContext::RayTracingContext(GfxIpVersion gfxIP, const RayTracingPipelin
 // Gets pipeline shader info of the specified shader stage
 //
 // @param shaderStage : Shader stage
-const PipelineShaderInfo *RayTracingContext::getPipelineShaderInfo(ShaderStage shaderStage) const {
+const PipelineShaderInfo *RayTracingContext::getPipelineShaderInfo(unsigned shaderId) const {
   return m_traceRayShaderInfo;
 }
 
@@ -220,6 +220,49 @@ unsigned RayTracingContext::getSubgroupSizeUsage() const {
     return unsigned(-1);
   }
   return 0;
+}
+
+// =====================================================================================================================
+// Set pipeline state in Pipeline object for middle-end and/or calculate the hash for the state to be added.
+// Doing both these things in the same code ensures that we hash and use the same pipeline state in all situations.
+// For graphics, we use the shader stage mask to decide which parts of graphics state to use, omitting
+// pre-rasterization state if there are no pre-rasterization shaders, and omitting fragment state if there is
+// no FS.
+//
+// @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing pipeline state
+// @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
+// @param unlinked : Do not provide some state to LGC, so offsets are generated as relocs, and a fetch shader
+//                   is needed
+void RayTracingContext::setPipelineState(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, bool unlinked) const {
+  PipelineContext::setPipelineState(pipeline, hasher, unlinked);
+  const unsigned stageMask = getShaderStageMask();
+
+  if (pipeline) {
+    // Give the shader options (including the hash) to the middle-end.
+    const auto allStages = maskToShaderStages(stageMask);
+    assert(m_traceRayShaderInfo);
+    lgc::ShaderOptions options = computeShaderOptions(*m_traceRayShaderInfo);
+    for (ShaderStage stage : make_filter_range(allStages, isNativeStage)) {
+      pipeline->setShaderOptions(getLgcShaderStage(static_cast<ShaderStage>(stage)), options);
+    }
+  }
+
+  if (!hasRayTracingShaderStage(stageMask)) {
+    unsigned deviceIndex = static_cast<const ComputePipelineBuildInfo *>(getPipelineBuildInfo())->deviceIndex;
+    if (pipeline)
+      pipeline->setDeviceIndex(deviceIndex);
+    if (hasher)
+      hasher->Update(deviceIndex);
+  }
+}
+
+// =====================================================================================================================
+// Give the pipeline options to the middle-end, and/or hash them.
+lgc::Options RayTracingContext::computePipelineOptions() const {
+  lgc::Options options = PipelineContext::computePipelineOptions();
+  // NOTE: raytracing waveSize and subgroupSize can be different.
+  options.fullSubgroups = false;
+  return options;
 }
 
 // =====================================================================================================================

@@ -47,7 +47,7 @@ public:
   virtual bool isGraphics() const override { return true; }
 
   // Gets pipeline shader info of the specified shader stage
-  virtual const PipelineShaderInfo *getPipelineShaderInfo(ShaderStage shaderStage) const override;
+  virtual const PipelineShaderInfo *getPipelineShaderInfo(unsigned shaderId) const override;
 
   // Gets pipeline build info
   virtual const void *getPipelineBuildInfo() const override { return m_pipelineInfo; }
@@ -73,12 +73,28 @@ public:
   // Gets subgroup size usage
   virtual unsigned getSubgroupSizeUsage() const override;
 
+  // Set pipeline state in lgc::Pipeline object for middle-end, and (optionally) hash the state.
+  virtual void setPipelineState(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, bool unlinked) const override;
+
   // Gets client-defined metadata
   virtual llvm::StringRef getClientMetadata() const override;
 
 #if VKI_RAY_TRACING
   virtual bool hasRayQuery() const override { return (m_pipelineInfo->shaderLibrary.codeSize > 0); }
 #endif
+
+protected:
+  // Give the pipeline options to the middle-end, and/or hash them.
+  virtual lgc::Options computePipelineOptions() const override;
+
+  // Give the color export state to the middle-end, and/or hash it.
+  void setColorExportState(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher) const;
+
+  // Set vertex input descriptions in middle-end Pipeline, and/or hash them.
+  void setVertexInputDescriptions(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher) const;
+
+  // Give the graphics pipeline state to the middle-end, and/or hash it.
+  void setGraphicsStateInPipeline(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, unsigned stageMask) const;
 
 private:
   GraphicsContext() = delete;

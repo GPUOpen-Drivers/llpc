@@ -111,7 +111,7 @@ public:
   virtual bool isGraphics() const { return false; }
 
   // Gets pipeline shader info of the specified shader stage
-  virtual const PipelineShaderInfo *getPipelineShaderInfo(ShaderStage shaderStage) const = 0;
+  virtual const PipelineShaderInfo *getPipelineShaderInfo(unsigned shaderId) const = 0;
 
   // Gets pipeline build info
   virtual const void *getPipelineBuildInfo() const = 0;
@@ -142,6 +142,9 @@ public:
   // NOTE: For raytracing, returns (-1) if the pipeline uses features relevant to subgroup size.
 #endif
   virtual unsigned getSubgroupSizeUsage() const = 0;
+
+  // Set pipeline state in lgc::Pipeline object for middle-end, and (optionally) hash the state.
+  virtual void setPipelineState(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, bool unlinked) const;
 
   // Gets client-defined metadata
   virtual llvm::StringRef getClientMetadata() const = 0;
@@ -202,10 +205,7 @@ public:
   // Sets the cache hash for the pipeline.  This is the hash that is used to do cache lookups.
   void setHashForCacheLookUp(MetroHash::Hash hash) { m_cacheHash = hash; }
 
-  ShaderHash getShaderHashCode(ShaderStage stage) const;
-
-  // Set pipeline state in lgc::Pipeline object for middle-end, and (optionally) hash the state.
-  void setPipelineState(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, bool unlinked) const;
+  ShaderHash getShaderHashCode(const PipelineShaderInfo &shaderInfo) const;
 
   // Get ShaderFpMode struct for the given shader stage
   ShaderFpMode &getShaderFpMode(ShaderStage stage) { return m_shaderFpModes[stage]; }
@@ -226,6 +226,9 @@ public:
   // Gets pipeline layout api hash
   const uint64_t getPipelineLayoutApiHash() const { return m_pipelineLayoutApiHash; }
 
+  // Gets ShaderOptions of the specified shader stage.
+  lgc::ShaderOptions computeShaderOptions(const PipelineShaderInfo &shaderInfo) const;
+
 protected:
   // Gets dummy vertex input create info
   virtual VkPipelineVertexInputStateCreateInfo *getDummyVertexInputInfo() { return nullptr; }
@@ -235,6 +238,9 @@ protected:
 
   // Gets dummy vertex attribute info
   virtual std::vector<VkVertexInputAttributeDescription> *getDummyVertexAttributes() { return nullptr; }
+
+  // Give the pipeline options to the middle-end, and/or hash them.
+  virtual lgc::Options computePipelineOptions() const;
 
   GfxIpVersion m_gfxIp;                  // Graphics IP version info
   MetroHash::Hash m_pipelineHash;        // Pipeline hash code
@@ -261,15 +267,6 @@ private:
   void setUserDataNodesTable(lgc::Pipeline *pipeline, llvm::ArrayRef<ResourceMappingNode> nodes,
                              const ImmutableNodesMap &immutableNodesMap, bool isRoot, lgc::ResourceNode *destTable,
                              lgc::ResourceNode *&destInnerTable) const;
-
-  // Give the graphics pipeline state to the middle-end, and/or hash it.
-  void setGraphicsStateInPipeline(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, unsigned stageMask) const;
-
-  // Set vertex input descriptions in middle-end Pipeline, and/or hash them.
-  void setVertexInputDescriptions(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher) const;
-
-  // Give the color export state to the middle-end, and/or hash it.
-  void setColorExportState(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher) const;
 
   ShaderFpMode m_shaderFpModes[ShaderStageCountInternal] = {};
   bool m_unlinked = false; // Whether we are building an "unlinked" shader ELF

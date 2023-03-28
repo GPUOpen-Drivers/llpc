@@ -31,6 +31,7 @@
 #include "llpcGraphicsContext.h"
 #include "SPIRVInternal.h"
 #include "llpcCompiler.h"
+#include "vkgcPipelineDumper.h"
 #include "lgc/Builder.h"
 #include "llvm/Support/Format.h"
 
@@ -38,8 +39,17 @@
 
 using namespace llvm;
 using namespace SPIRV;
+using namespace lgc;
+using namespace Vkgc;
 
 namespace Llpc {
+
+// -disable-fetch-shader: disable the fetch shader when doing unlinked shaders.
+static cl::opt<bool> DisableFetchShader("disable-fetch-shader", cl::desc("Disable fetch shaders"), cl::init(false));
+
+// -disable-color-export-shader: disable the color export shader when doing unlinked shaders.
+static cl::opt<bool> DisableColorExportShader("disable-color-export-shader", cl::desc("Disable color export shaders"),
+                                              cl::init(false));
 
 // =====================================================================================================================
 //
@@ -93,16 +103,16 @@ GraphicsContext::~GraphicsContext() {
 // Gets pipeline shader info of the specified shader stage
 //
 // @param shaderStage : Shader stage
-const PipelineShaderInfo *GraphicsContext::getPipelineShaderInfo(ShaderStage shaderStage) const {
-  if (shaderStage == ShaderStageCopyShader) {
+const PipelineShaderInfo *GraphicsContext::getPipelineShaderInfo(unsigned shaderId) const {
+  if (shaderId == ShaderStageCopyShader) {
     // Treat copy shader as part of geometry shader
-    shaderStage = ShaderStageGeometry;
+    shaderId = ShaderStageGeometry;
   }
 
-  assert(shaderStage < ShaderStageGfxCount);
+  assert(shaderId < ShaderStageGfxCount);
 
   const PipelineShaderInfo *shaderInfo = nullptr;
-  switch (shaderStage) {
+  switch (shaderId) {
   case Llpc::ShaderStageTask:
     shaderInfo = &m_pipelineInfo->task;
     break;
@@ -158,6 +168,329 @@ unsigned GraphicsContext::getSubgroupSizeUsage() const {
       bitmask |= (1 << shaderInfoIdx);
   }
   return bitmask;
+}
+
+// =====================================================================================================================
+// Set pipeline state in Pipeline object for middle-end and/or calculate the hash for the state to be added.
+// Doing both these things in the same code ensures that we hash and use the same pipeline state in all situations.
+// For graphics, we use the shader stage mask to decide which parts of graphics state to use, omitting
+// pre-rasterization state if there are no pre-rasterization shaders, and omitting fragment state if there is
+// no FS.
+//
+// @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing pipeline state
+// @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
+// @param unlinked : Do not provide some state to LGC, so offsets are generated as relocs, and a fetch shader
+//                   is needed
+void GraphicsContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *hasher, bool unlinked) const {
+  PipelineContext::setPipelineState(pipeline, hasher, unlinked);
+  const unsigned stageMask = getShaderStageMask();
+
+  if (pipeline) {
+    // Give the shader options (including the hash) to the middle-end.
+    const auto allStages = maskToShaderStages(stageMask);
+    for (ShaderStage stage : make_filter_range(allStages, isNativeStage)) {
+      const PipelineShaderInfo *shaderInfo = getPipelineShaderInfo(stage);
+
+      assert(shaderInfo);
+
+      pipeline->setShaderOptions(getLgcShaderStage(static_cast<ShaderStage>(stage)), computeShaderOptions(*shaderInfo));
+    }
+  }
+
+  if ((stageMask & ~shaderStageToMask(ShaderStageFragment)) && (!unlinked || DisableFetchShader)) {
+    // Set vertex input descriptions to the middle-end.
+    setVertexInputDescriptions(pipeline, hasher);
+  }
+
+  if (isShaderStageInMask(ShaderStageFragment, stageMask) && (!unlinked || DisableColorExportShader)) {
+    // Give the color export state to the middle-end.
+    setColorExportState(pipeline, hasher);
+  }
+
+  // Give the graphics pipeline state to the middle-end.
+  setGraphicsStateInPipeline(pipeline, hasher, stageMask);
+}
+
+// =====================================================================================================================
+// Give the pipeline options to the middle-end, and/or hash them.
+Options GraphicsContext::computePipelineOptions() const {
+  Options options = PipelineContext::computePipelineOptions();
+
+  options.enableUberFetchShader =
+      reinterpret_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->enableUberFetchShader;
+  if (getGfxIpVersion().major >= 10) {
+    // Only set NGG options for a GFX10+ graphics pipeline.
+    auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo());
+    const auto &nggState = pipelineInfo->nggState;
+#if VKI_BUILD_GFX11
+    if (!nggState.enableNgg && getGfxIpVersion().major < 11) // GFX11+ must enable NGG
+#else
+    if (!nggState.enableNgg)
+#endif
+      options.nggFlags |= NggFlagDisable;
+    else {
+      options.nggFlags = (nggState.enableGsUse ? NggFlagEnableGsUse : 0) |
+                         (nggState.forceCullingMode ? NggFlagForceCullingMode : 0) |
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 60
+                         (nggState.compactMode == NggCompactVertices ? NggFlagCompactVertex : 0) |
+#else
+                         (nggState.compactVertex ? NggFlagCompactVertex : 0) |
+#endif
+                         (nggState.enableBackfaceCulling ? NggFlagEnableBackfaceCulling : 0) |
+                         (nggState.enableFrustumCulling ? NggFlagEnableFrustumCulling : 0) |
+                         (nggState.enableBoxFilterCulling ? NggFlagEnableBoxFilterCulling : 0) |
+                         (nggState.enableSphereCulling ? NggFlagEnableSphereCulling : 0) |
+                         (nggState.enableSmallPrimFilter ? NggFlagEnableSmallPrimFilter : 0) |
+                         (nggState.enableCullDistanceCulling ? NggFlagEnableCullDistanceCulling : 0);
+      options.nggBackfaceExponent = nggState.backfaceExponent;
+
+      // Use a static cast from Vkgc NggSubgroupSizingType to LGC NggSubgroupSizing, and static assert that
+      // that is valid.
+      static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::Auto) == NggSubgroupSizing::Auto, "Mismatch");
+      static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::MaximumSize) ==
+                        NggSubgroupSizing::MaximumSize,
+                    "Mismatch");
+      static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::HalfSize) == NggSubgroupSizing::HalfSize,
+                    "Mismatch");
+      static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::OptimizeForVerts) ==
+                        NggSubgroupSizing::OptimizeForVerts,
+                    "Mismatch");
+      static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::OptimizeForPrims) ==
+                        NggSubgroupSizing::OptimizeForPrims,
+                    "Mismatch");
+      static_assert(static_cast<NggSubgroupSizing>(NggSubgroupSizingType::Explicit) == NggSubgroupSizing::Explicit,
+                    "Mismatch");
+      options.nggSubgroupSizing = static_cast<NggSubgroupSizing>(nggState.subgroupSizing);
+
+      options.nggVertsPerSubgroup = nggState.vertsPerSubgroup;
+      options.nggPrimsPerSubgroup = nggState.primsPerSubgroup;
+    }
+  }
+  return options;
+}
+
+// =====================================================================================================================
+// Set color export state in middle-end Pipeline object, and/or hash it.
+//
+// @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing
+// @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
+void GraphicsContext::setColorExportState(Pipeline *pipeline, Util::MetroHash64 *hasher) const {
+  const auto &cbState = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->cbState;
+  if (hasher)
+    hasher->Update(cbState);
+  if (!pipeline)
+    return; // Only hashing.
+
+  ColorExportState state = {};
+  SmallVector<ColorExportFormat, MaxColorTargets> formats;
+
+  state.alphaToCoverageEnable = cbState.alphaToCoverageEnable;
+  state.dualSourceBlendEnable = cbState.dualSourceBlendEnable;
+
+  for (unsigned targetIndex = 0; targetIndex < MaxColorTargets; ++targetIndex) {
+    if (cbState.target[targetIndex].format != VK_FORMAT_UNDEFINED) {
+      auto dfmt = BufDataFormatInvalid;
+      auto nfmt = BufNumFormatUnorm;
+      std::tie(dfmt, nfmt) = mapVkFormat(cbState.target[targetIndex].format, true);
+      formats.resize(targetIndex + 1);
+      formats[targetIndex].dfmt = dfmt;
+      formats[targetIndex].nfmt = nfmt;
+      formats[targetIndex].blendEnable = cbState.target[targetIndex].blendEnable;
+      formats[targetIndex].blendSrcAlphaToColor = cbState.target[targetIndex].blendSrcAlphaToColor;
+    }
+  }
+
+  if (state.alphaToCoverageEnable && formats.empty()) {
+    // NOTE: We must export alpha channel for alpha to coverage, if there is no color export,
+    // we force a dummy color export.
+    formats.push_back({BufDataFormat32, BufNumFormatFloat});
+  }
+
+  pipeline->setColorExportState(formats, state);
+}
+
+// =====================================================================================================================
+// Set vertex input descriptions in middle-end Pipeline object, or hash them.
+//
+// @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing
+// @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
+void GraphicsContext::setVertexInputDescriptions(Pipeline *pipeline, Util::MetroHash64 *hasher) const {
+  auto vertexInput = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->pVertexInput;
+  if (!vertexInput)
+    return;
+
+  if (hasher) {
+    PipelineDumper::updateHashForVertexInputState(
+        vertexInput, static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->dynamicVertexStride,
+        hasher);
+  }
+  if (!pipeline)
+    return; // Only hashing.
+
+  // Gather the bindings.
+  SmallVector<VertexInputDescription, 8> bindings;
+  for (unsigned i = 0; i < vertexInput->vertexBindingDescriptionCount; ++i) {
+    auto binding = &vertexInput->pVertexBindingDescriptions[i];
+    unsigned idx = binding->binding;
+    if (idx >= bindings.size())
+      bindings.resize(idx + 1);
+    bindings[idx].binding = binding->binding;
+    bindings[idx].stride = binding->stride;
+    switch (binding->inputRate) {
+    case VK_VERTEX_INPUT_RATE_VERTEX:
+      bindings[idx].inputRate = VertexInputRateVertex;
+      break;
+    case VK_VERTEX_INPUT_RATE_INSTANCE:
+      bindings[idx].inputRate = VertexInputRateInstance;
+      break;
+    default:
+      llvm_unreachable("Should never be called!");
+    }
+  }
+
+  // Check for divisors.
+  auto vertexDivisor = findVkStructInChain<VkPipelineVertexInputDivisorStateCreateInfoEXT>(
+      VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO_EXT, vertexInput->pNext);
+  if (vertexDivisor) {
+    for (unsigned i = 0; i < vertexDivisor->vertexBindingDivisorCount; ++i) {
+      auto divisor = &vertexDivisor->pVertexBindingDivisors[i];
+      if (divisor->binding <= bindings.size())
+        bindings[divisor->binding].inputRate = divisor->divisor;
+    }
+  }
+
+  // Gather the vertex inputs.
+  SmallVector<VertexInputDescription, 8> descriptions;
+  for (unsigned i = 0; i < vertexInput->vertexAttributeDescriptionCount; ++i) {
+    auto attrib = &vertexInput->pVertexAttributeDescriptions[i];
+    if (attrib->binding >= bindings.size())
+      continue;
+    auto binding = &bindings[attrib->binding];
+    if (binding->binding != attrib->binding)
+      continue;
+
+    auto dfmt = BufDataFormatInvalid;
+    auto nfmt = BufNumFormatUnorm;
+    std::tie(dfmt, nfmt) = mapVkFormat(attrib->format, /*isColorExport=*/false);
+
+    if (dfmt != BufDataFormatInvalid) {
+      descriptions.push_back({
+          attrib->location,
+          attrib->binding,
+          attrib->offset,
+          (static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->dynamicVertexStride
+               ? 0
+               : binding->stride),
+          dfmt,
+          nfmt,
+          binding->inputRate,
+      });
+    }
+  }
+
+  // Give the vertex input descriptions to the middle-end Pipeline object.
+  pipeline->setVertexInputDescriptions(descriptions);
+}
+
+// =====================================================================================================================
+// Give the graphics pipeline state to the middle-end, and/or hash it. If stageMask has no pre-rasterization shader
+// stages, do not consider pre-rasterization pipeline state. If stageMask has no FS, do not consider FS state.
+//
+// @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing
+// @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
+// @param stageMask : Bitmap of shader stages
+void GraphicsContext::setGraphicsStateInPipeline(Pipeline *pipeline, Util::MetroHash64 *hasher,
+                                                 unsigned stageMask) const {
+  const auto &inputIaState = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->iaState;
+  if (pipeline)
+    pipeline->setDeviceIndex(inputIaState.deviceIndex);
+  if (hasher)
+    hasher->Update(inputIaState.deviceIndex);
+  const auto &inputRsState = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->rsState;
+
+  InputAssemblyState inputAssemblyState = {};
+  inputAssemblyState.enableMultiView = inputIaState.enableMultiView;
+  RasterizerState rasterizerState = {};
+
+  if (stageMask & ~shaderStageToMask(ShaderStageFragment)) {
+    // Pre-rasterization shader stages are present.
+    switch (inputIaState.topology) {
+    case VK_PRIMITIVE_TOPOLOGY_POINT_LIST:
+      inputAssemblyState.primitiveType = PrimitiveType::Point;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_LINE_LIST:
+    case VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY:
+      inputAssemblyState.primitiveType = PrimitiveType::LineList;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP:
+    case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY:
+      inputAssemblyState.primitiveType = PrimitiveType::LineStrip;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST:
+      inputAssemblyState.primitiveType = PrimitiveType::TriangleList;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP:
+      inputAssemblyState.primitiveType = PrimitiveType::TriangleStrip;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN:
+      inputAssemblyState.primitiveType = PrimitiveType::TriangleFan;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY:
+      inputAssemblyState.primitiveType = PrimitiveType::TriangleListAdjacency;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY:
+      inputAssemblyState.primitiveType = PrimitiveType::TriangleStripAdjacency;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_PATCH_LIST:
+      inputAssemblyState.primitiveType = PrimitiveType::Patch;
+      break;
+    default:
+      llvm_unreachable("");
+    }
+
+    inputAssemblyState.patchControlPoints = inputIaState.patchControlPoints;
+    inputAssemblyState.disableVertexReuse = inputIaState.disableVertexReuse;
+    inputAssemblyState.switchWinding = inputIaState.switchWinding;
+
+    rasterizerState.rasterizerDiscardEnable = inputRsState.rasterizerDiscardEnable;
+    rasterizerState.usrClipPlaneMask = inputRsState.usrClipPlaneMask;
+    rasterizerState.provokingVertexMode = static_cast<ProvokingVertexMode>(inputRsState.provokingVertexMode);
+  }
+
+  if (isShaderStageInMask(ShaderStageFragment, stageMask)) {
+    rasterizerState.innerCoverage = inputRsState.innerCoverage;
+    rasterizerState.perSampleShading = inputRsState.perSampleShading;
+    rasterizerState.numSamples = inputRsState.numSamples;
+    rasterizerState.samplePatternIdx = inputRsState.samplePatternIdx;
+  }
+
+  if (pipeline)
+    pipeline->setGraphicsState(inputAssemblyState, rasterizerState);
+  if (hasher) {
+    hasher->Update(inputAssemblyState);
+    hasher->Update(rasterizerState);
+  }
+
+  if (isShaderStageInMask(ShaderStageFragment, stageMask)) {
+    // Fragment shader is present.
+    const VkPipelineDepthStencilStateCreateInfo &inputDsState =
+        static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->dsState;
+    DepthStencilState depthStencilState = {};
+    if (inputDsState.depthTestEnable) {
+      depthStencilState.depthTestEnable = inputDsState.depthTestEnable;
+      depthStencilState.depthCompareOp = inputDsState.depthCompareOp;
+    }
+    if (inputDsState.stencilTestEnable) {
+      depthStencilState.stencilTestEnable = inputDsState.stencilTestEnable;
+      depthStencilState.stencilCompareOpFront = inputDsState.front.compareOp;
+      depthStencilState.stencilCompareOpBack = inputDsState.back.compareOp;
+    }
+
+    if (pipeline)
+      pipeline->setDepthStencilState(depthStencilState);
+    if (hasher)
+      hasher->Update(depthStencilState);
+  }
 }
 
 // =====================================================================================================================
