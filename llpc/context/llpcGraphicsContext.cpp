@@ -40,6 +40,7 @@
 using namespace llvm;
 using namespace SPIRV;
 using namespace lgc;
+using namespace Vkgc;
 
 namespace Llpc {
 
