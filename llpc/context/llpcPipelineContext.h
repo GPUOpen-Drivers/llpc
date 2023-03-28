@@ -251,15 +251,6 @@ protected:
   const Vkgc::RtState *m_rtState; // Ray tracing state
 #endif
 
-  // Give the color export state to the middle-end, and/or hash it.
-  void setColorExportState(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher) const;
-
-  // Set vertex input descriptions in middle-end Pipeline, and/or hash them.
-  void setVertexInputDescriptions(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher) const;
-
-  // Give the graphics pipeline state to the middle-end, and/or hash it.
-  void setGraphicsStateInPipeline(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, unsigned stageMask) const;
-
 private:
   PipelineContext() = delete;
   PipelineContext(const PipelineContext &) = delete;

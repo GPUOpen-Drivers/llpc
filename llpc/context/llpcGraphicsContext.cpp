@@ -268,6 +268,230 @@ Options GraphicsContext::computePipelineOptions() const {
 }
 
 // =====================================================================================================================
+// Set color export state in middle-end Pipeline object, and/or hash it.
+//
+// @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing
+// @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
+void GraphicsContext::setColorExportState(Pipeline *pipeline, Util::MetroHash64 *hasher) const {
+  const auto &cbState = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->cbState;
+  if (hasher)
+    hasher->Update(cbState);
+  if (!pipeline)
+    return; // Only hashing.
+
+  ColorExportState state = {};
+  SmallVector<ColorExportFormat, MaxColorTargets> formats;
+
+  state.alphaToCoverageEnable = cbState.alphaToCoverageEnable;
+  state.dualSourceBlendEnable = cbState.dualSourceBlendEnable;
+
+  for (unsigned targetIndex = 0; targetIndex < MaxColorTargets; ++targetIndex) {
+    if (cbState.target[targetIndex].format != VK_FORMAT_UNDEFINED) {
+      auto dfmt = BufDataFormatInvalid;
+      auto nfmt = BufNumFormatUnorm;
+      std::tie(dfmt, nfmt) = mapVkFormat(cbState.target[targetIndex].format, true);
+      formats.resize(targetIndex + 1);
+      formats[targetIndex].dfmt = dfmt;
+      formats[targetIndex].nfmt = nfmt;
+      formats[targetIndex].blendEnable = cbState.target[targetIndex].blendEnable;
+      formats[targetIndex].blendSrcAlphaToColor = cbState.target[targetIndex].blendSrcAlphaToColor;
+    }
+  }
+
+  if (state.alphaToCoverageEnable && formats.empty()) {
+    // NOTE: We must export alpha channel for alpha to coverage, if there is no color export,
+    // we force a dummy color export.
+    formats.push_back({BufDataFormat32, BufNumFormatFloat});
+  }
+
+  pipeline->setColorExportState(formats, state);
+}
+
+// =====================================================================================================================
+// Set vertex input descriptions in middle-end Pipeline object, or hash them.
+//
+// @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing
+// @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
+void GraphicsContext::setVertexInputDescriptions(Pipeline *pipeline, Util::MetroHash64 *hasher) const {
+  auto vertexInput = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->pVertexInput;
+  if (!vertexInput)
+    return;
+
+  if (hasher) {
+    PipelineDumper::updateHashForVertexInputState(
+        vertexInput, static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->dynamicVertexStride,
+        hasher);
+  }
+  if (!pipeline)
+    return; // Only hashing.
+
+  // Gather the bindings.
+  SmallVector<VertexInputDescription, 8> bindings;
+  for (unsigned i = 0; i < vertexInput->vertexBindingDescriptionCount; ++i) {
+    auto binding = &vertexInput->pVertexBindingDescriptions[i];
+    unsigned idx = binding->binding;
+    if (idx >= bindings.size())
+      bindings.resize(idx + 1);
+    bindings[idx].binding = binding->binding;
+    bindings[idx].stride = binding->stride;
+    switch (binding->inputRate) {
+    case VK_VERTEX_INPUT_RATE_VERTEX:
+      bindings[idx].inputRate = VertexInputRateVertex;
+      break;
+    case VK_VERTEX_INPUT_RATE_INSTANCE:
+      bindings[idx].inputRate = VertexInputRateInstance;
+      break;
+    default:
+      llvm_unreachable("Should never be called!");
+    }
+  }
+
+  // Check for divisors.
+  auto vertexDivisor = findVkStructInChain<VkPipelineVertexInputDivisorStateCreateInfoEXT>(
+      VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO_EXT, vertexInput->pNext);
+  if (vertexDivisor) {
+    for (unsigned i = 0; i < vertexDivisor->vertexBindingDivisorCount; ++i) {
+      auto divisor = &vertexDivisor->pVertexBindingDivisors[i];
+      if (divisor->binding <= bindings.size())
+        bindings[divisor->binding].inputRate = divisor->divisor;
+    }
+  }
+
+  // Gather the vertex inputs.
+  SmallVector<VertexInputDescription, 8> descriptions;
+  for (unsigned i = 0; i < vertexInput->vertexAttributeDescriptionCount; ++i) {
+    auto attrib = &vertexInput->pVertexAttributeDescriptions[i];
+    if (attrib->binding >= bindings.size())
+      continue;
+    auto binding = &bindings[attrib->binding];
+    if (binding->binding != attrib->binding)
+      continue;
+
+    auto dfmt = BufDataFormatInvalid;
+    auto nfmt = BufNumFormatUnorm;
+    std::tie(dfmt, nfmt) = mapVkFormat(attrib->format, /*isColorExport=*/false);
+
+    if (dfmt != BufDataFormatInvalid) {
+      descriptions.push_back({
+          attrib->location,
+          attrib->binding,
+          attrib->offset,
+          (static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->dynamicVertexStride
+               ? 0
+               : binding->stride),
+          dfmt,
+          nfmt,
+          binding->inputRate,
+      });
+    }
+  }
+
+  // Give the vertex input descriptions to the middle-end Pipeline object.
+  pipeline->setVertexInputDescriptions(descriptions);
+}
+
+// =====================================================================================================================
+// Give the graphics pipeline state to the middle-end, and/or hash it. If stageMask has no pre-rasterization shader
+// stages, do not consider pre-rasterization pipeline state. If stageMask has no FS, do not consider FS state.
+//
+// @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing
+// @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
+// @param stageMask : Bitmap of shader stages
+void GraphicsContext::setGraphicsStateInPipeline(Pipeline *pipeline, Util::MetroHash64 *hasher,
+                                                 unsigned stageMask) const {
+  const auto &inputIaState = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->iaState;
+  if (pipeline)
+    pipeline->setDeviceIndex(inputIaState.deviceIndex);
+  if (hasher)
+    hasher->Update(inputIaState.deviceIndex);
+  const auto &inputRsState = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->rsState;
+
+  InputAssemblyState inputAssemblyState = {};
+  inputAssemblyState.enableMultiView = inputIaState.enableMultiView;
+  RasterizerState rasterizerState = {};
+
+  if (stageMask & ~shaderStageToMask(ShaderStageFragment)) {
+    // Pre-rasterization shader stages are present.
+    switch (inputIaState.topology) {
+    case VK_PRIMITIVE_TOPOLOGY_POINT_LIST:
+      inputAssemblyState.primitiveType = PrimitiveType::Point;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_LINE_LIST:
+    case VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY:
+      inputAssemblyState.primitiveType = PrimitiveType::LineList;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP:
+    case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY:
+      inputAssemblyState.primitiveType = PrimitiveType::LineStrip;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST:
+      inputAssemblyState.primitiveType = PrimitiveType::TriangleList;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP:
+      inputAssemblyState.primitiveType = PrimitiveType::TriangleStrip;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN:
+      inputAssemblyState.primitiveType = PrimitiveType::TriangleFan;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY:
+      inputAssemblyState.primitiveType = PrimitiveType::TriangleListAdjacency;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY:
+      inputAssemblyState.primitiveType = PrimitiveType::TriangleStripAdjacency;
+      break;
+    case VK_PRIMITIVE_TOPOLOGY_PATCH_LIST:
+      inputAssemblyState.primitiveType = PrimitiveType::Patch;
+      break;
+    default:
+      llvm_unreachable("");
+    }
+
+    inputAssemblyState.patchControlPoints = inputIaState.patchControlPoints;
+    inputAssemblyState.disableVertexReuse = inputIaState.disableVertexReuse;
+    inputAssemblyState.switchWinding = inputIaState.switchWinding;
+
+    rasterizerState.rasterizerDiscardEnable = inputRsState.rasterizerDiscardEnable;
+    rasterizerState.usrClipPlaneMask = inputRsState.usrClipPlaneMask;
+    rasterizerState.provokingVertexMode = static_cast<ProvokingVertexMode>(inputRsState.provokingVertexMode);
+  }
+
+  if (isShaderStageInMask(ShaderStageFragment, stageMask)) {
+    rasterizerState.innerCoverage = inputRsState.innerCoverage;
+    rasterizerState.perSampleShading = inputRsState.perSampleShading;
+    rasterizerState.numSamples = inputRsState.numSamples;
+    rasterizerState.samplePatternIdx = inputRsState.samplePatternIdx;
+  }
+
+  if (pipeline)
+    pipeline->setGraphicsState(inputAssemblyState, rasterizerState);
+  if (hasher) {
+    hasher->Update(inputAssemblyState);
+    hasher->Update(rasterizerState);
+  }
+
+  if (isShaderStageInMask(ShaderStageFragment, stageMask)) {
+    // Fragment shader is present.
+    const VkPipelineDepthStencilStateCreateInfo &inputDsState =
+        static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->dsState;
+    DepthStencilState depthStencilState = {};
+    if (inputDsState.depthTestEnable) {
+      depthStencilState.depthTestEnable = inputDsState.depthTestEnable;
+      depthStencilState.depthCompareOp = inputDsState.depthCompareOp;
+    }
+    if (inputDsState.stencilTestEnable) {
+      depthStencilState.stencilTestEnable = inputDsState.stencilTestEnable;
+      depthStencilState.stencilCompareOpFront = inputDsState.front.compareOp;
+      depthStencilState.stencilCompareOpBack = inputDsState.back.compareOp;
+    }
+
+    if (pipeline)
+      pipeline->setDepthStencilState(depthStencilState);
+    if (hasher)
+      hasher->Update(depthStencilState);
+  }
+}
+
+// =====================================================================================================================
 // Gets client-defined metadata
 StringRef GraphicsContext::getClientMetadata() const {
   return StringRef(static_cast<const char *>(m_pipelineInfo->pClientMetadata), m_pipelineInfo->clientMetadataSize);

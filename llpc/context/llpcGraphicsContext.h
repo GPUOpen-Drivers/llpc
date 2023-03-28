@@ -87,6 +87,15 @@ protected:
   // Give the pipeline options to the middle-end, and/or hash them.
   virtual lgc::Options computePipelineOptions() const override;
 
+  // Give the color export state to the middle-end, and/or hash it.
+  void setColorExportState(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher) const;
+
+  // Set vertex input descriptions in middle-end Pipeline, and/or hash them.
+  void setVertexInputDescriptions(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher) const;
+
+  // Give the graphics pipeline state to the middle-end, and/or hash it.
+  void setGraphicsStateInPipeline(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, unsigned stageMask) const;
+
 private:
   GraphicsContext() = delete;
   GraphicsContext(const GraphicsContext &) = delete;
