@@ -31,6 +31,7 @@
 #include "llpcGraphicsContext.h"
 #include "SPIRVInternal.h"
 #include "llpcCompiler.h"
+#include "vkgcPipelineDumper.h"
 #include "lgc/Builder.h"
 #include "llvm/Support/Format.h"
 
