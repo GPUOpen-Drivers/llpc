@@ -62,9 +62,12 @@ PreservedAnalyses LowerDebugPrintf::run(Module &module, ModuleAnalysisManager &a
     if (name.startswith(lgcName::LowerDebugPrintf)) {
       for (auto user : func.users()) {
         if (CallInst *callInst = dyn_cast<CallInst>(user)) {
-          builder.SetInsertPoint(callInst);
-          auto resultVal = createDebugPrintf(callInst->getArgOperand(0), callInst->getArgOperand(1),
-                                             make_range(callInst->arg_begin() + 2, callInst->arg_end()), builder);
+          Value *resultVal = builder.getInt64(0);
+          if (!isa<PoisonValue>(callInst->getArgOperand(0))) {
+            builder.SetInsertPoint(callInst);
+            resultVal = createDebugPrintf(callInst->getArgOperand(0), callInst->getArgOperand(1),
+                                          make_range(callInst->arg_begin() + 2, callInst->arg_end()), builder);
+          }
           callInst->replaceAllUsesWith(resultVal);
           callees.push_back(callInst);
         }
@@ -93,6 +96,7 @@ Value *LowerDebugPrintf::createDebugPrintf(Value *debugPrintfBuffer, Value *form
                                            iterator_range<User::op_iterator> vars, BuilderBase &builder) {
 
   // Printf output variables in DWORDs
+
   SmallVector<Value *> printArgs;
   // Records printf output variables are 64bit or not
   SmallBitVector bit64Vector;

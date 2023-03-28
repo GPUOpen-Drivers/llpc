@@ -515,7 +515,7 @@ public:
                                                   const llvm::Twine &instName = "");
 
   // Create debug printf operation, and write to the output debug buffer
-  llvm::Value *CreateDebugPrintf(llvm::ArrayRef<llvm::Value *> vars, const llvm::Twine &instName) override final;
+  llvm::Value *CreateDebugPrintf(llvm::ArrayRef<llvm::Value *> vars, const llvm::Twine &instName = "");
 
 private:
   // Read (a part of) a generic (user) input/output value.

@@ -1452,7 +1452,7 @@ Value *BuilderImpl::CreateTaskPayloadAtomicCompareSwap(AtomicOrdering ordering, 
 // Create debug printf operation, and write to the output debug buffer
 // @args : Printf variable parameters
 // @instName : Instance Name
-Value *InOutBuilder::CreateDebugPrintf(ArrayRef<Value *> args, const Twine &instName) {
+Value *BuilderImpl::CreateDebugPrintf(ArrayRef<Value *> args, const Twine &instName) {
   Module *module = GetInsertPoint()->getModule();
   SmallVector<Type *> argTys;
   argTys.reserve(args.size());

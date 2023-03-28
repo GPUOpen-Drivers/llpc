@@ -1395,7 +1395,7 @@ public:
   // Create debug printf operation, and write to the output debug buffer
   // @vars: Printf variable parameters
   // @instName : Instance Name
-  virtual llvm::Value *CreateDebugPrintf(llvm::ArrayRef<llvm::Value *> vars, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateDebugPrintf(llvm::ArrayRef<llvm::Value *> vars, const llvm::Twine &instName = "");
   // -----------------------------------------------------------------------------------------------------------------
   // Subgroup operations
 

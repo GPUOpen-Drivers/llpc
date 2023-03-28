@@ -4102,12 +4102,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpExtInst>(SPIRVValue *cons
 // @param bb : Which basicblock to generate code
 Value *SPIRVToLLVM::transDebugPrintf(SPIRVInstruction *bi, const ArrayRef<SPIRVValue *> spvValues, Function *func,
                                      BasicBlock *bb) {
-  if (!getBuilder()->findResourceNode(ResourceNodeType::DescriptorBuffer, Vkgc::InternalDescriptorSetId,
-                                      Vkgc::PrintfBufferBindingId)) {
-    return getBuilder()->getInt64(0);
-  }
   if (!m_debugOutputBuffer) {
-
     auto spvArrType = m_bm->addRuntimeArray(m_bm->addIntegerType(32));
     auto spvStructType = m_bm->addStructType({spvArrType});
     Type *bufType = transType(spvStructType);
