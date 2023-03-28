@@ -59,6 +59,7 @@ public:
   SPIRVDecorateGeneric(Op OC);
 
   SPIRVWord getLiteral(size_t) const;
+  SPIRVEntry *getEntry(size_t) const;
   const char *getLiteralString() const {
     assert(!Literals.empty());
     return reinterpret_cast<const char *>(Literals.data());
@@ -91,6 +92,7 @@ public:
 protected:
   Decoration Dec;
   std::vector<SPIRVWord> Literals;
+  std::vector<SPIRVId> Ids;
   SPIRVDecorationGroup *Owner; // Owning decorate group
 };
 
@@ -124,6 +126,19 @@ public:
   void validate() const override {
     SPIRVDecorateGeneric::validate();
     assert(WordCount == Literals.size() + FixedWC);
+  }
+};
+
+class SPIRVDecorateId : public SPIRVDecorate {
+public:
+  static const Op OC = OpDecorateId;
+  static const SPIRVWord FixedWC = 3;
+
+  _SPIRV_DCL_DECODE
+  void setWordCount(SPIRVWord) override;
+  void validate() const override {
+    SPIRVDecorateGeneric::validate();
+    assert(WordCount == Ids.size() + FixedWC);
   }
 };
 
