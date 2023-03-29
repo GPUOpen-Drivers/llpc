@@ -129,7 +129,7 @@ void SPIRVToLLVMDbgTran::transDbgInfo() {
     if (it->second == nullptr) {
       auto lv = SPIRVReader->getTranslatedValue(it->first);
       SPIRVInstruction *sinst = static_cast<SPIRVInstruction *>(it->first);
-      Instruction *inst = dyn_cast<Instruction>(lv);
+      Instruction *inst = cast<Instruction>(lv);
       inst->setDebugLoc(transDebugScope(sinst, inst));
     }
   }

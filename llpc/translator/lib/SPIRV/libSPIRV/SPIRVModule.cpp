@@ -170,7 +170,6 @@ public:
   SPIRVString *getString(const std::string &Str) override;
   SPIRVMemberName *addMemberName(SPIRVTypeStruct *ST, SPIRVWord MemberNumber, const std::string &Name) override;
   void addUnknownStructField(SPIRVTypeStruct *Struct, unsigned I, SPIRVId ID) override;
-  void addLine(SPIRVEntry *E, SPIRVId FileNameId, SPIRVWord Line, SPIRVWord Column) override;
   const SPIRVLine *getCurrentLine() const override;
   void setCurrentLine(const SPIRVLine *Line) override;
   void addCapability(SPIRVCapabilityKind) override;
@@ -357,13 +356,6 @@ const SPIRVLine *SPIRVModuleImpl::getCurrentLine() const {
 
 void SPIRVModuleImpl::setCurrentLine(const SPIRVLine *Line) {
   CurrentLine = Line;
-}
-
-void SPIRVModuleImpl::addLine(SPIRVEntry *E, SPIRVId FileNameId, SPIRVWord Line, SPIRVWord Column) {
-  if (!(CurrentLine && CurrentLine->equals(FileNameId, Line, Column)))
-    CurrentLine = new SPIRVLine(this, FileNameId, Line, Column);
-  assert(E && "invalid entry");
-  E->setLine(CurrentLine);
 }
 
 // Creates decoration group and group decorates from decorates shared by
