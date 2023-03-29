@@ -901,10 +901,20 @@ void RegisterMetadataBuilder::buildPsRegisters() {
 // Builds register configuration for compute/task shader.
 void RegisterMetadataBuilder::buildCsRegisters(ShaderStage shaderStage) {
   assert(shaderStage == ShaderStageCompute || shaderStage == ShaderStageTask);
+  auto entryPoint = m_pipelineShaders->getEntryPoint(shaderStage);
+  if (shaderStage == ShaderStageCompute) {
+    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidXEn] =
+        !entryPoint->hasFnAttribute("amdgpu-no-workgroup-id-x");
+    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidYEn] =
+        !entryPoint->hasFnAttribute("amdgpu-no-workgroup-id-y");
+    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidZEn] =
+        !entryPoint->hasFnAttribute("amdgpu-no-workgroup-id-z");
 
-  getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidXEn] = true;
-  getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidYEn] = true;
-  getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidZEn] = true;
+  } else {
+    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidXEn] = true;
+    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidYEn] = true;
+    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidZEn] = true;
+  }
   getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgSizeEn] = true;
 
   const auto resUsage = m_pipelineState->getShaderResourceUsage(shaderStage);

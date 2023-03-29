@@ -474,7 +474,7 @@ void PatchPreparePipelineAbi::addAbiMetadata(Module &module) {
     configBuilder.buildPalMetadata();
   } else {
     if (m_pipelineState->useRegisterFieldFormat()) {
-      Gfx9::RegisterMetadataBuilder regMetadataBuilder(&module, m_pipelineState);
+      Gfx9::RegisterMetadataBuilder regMetadataBuilder(&module, m_pipelineState, m_pipelineShaders);
       regMetadataBuilder.buildPalMetadata();
     } else {
       Gfx9::ConfigBuilder configBuilder(&module, m_pipelineState);
