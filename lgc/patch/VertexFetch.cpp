@@ -562,24 +562,23 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
     return false;
 
   std::unique_ptr<VertexFetch> vertexFetch(VertexFetch::create(pipelineState->getLgcContext()));
-  BuilderBase builder(module.getContext());
+  BuilderImpl builder(pipelineState);
 
   if (pipelineState->getOptions().enableUberFetchShader) {
     // NOTE: The 10_10_10_2 formats are not supported by the uber fetch shader on gfx9 and older.
     // We rely on the driver to fallback to not using the uber fetch shader when those formats are used.
-    std::unique_ptr<lgc::Builder> desBuilder(Builder::createBuilderImpl(pipelineState->getLgcContext(), pipelineState));
-    static_cast<BuilderImplBase *>(&*desBuilder)->setShaderStage(ShaderStageVertex);
-    desBuilder->SetInsertPoint(&(*vertexFetches[0]->getFunction()->front().getFirstInsertionPt()));
-    auto desc = desBuilder->CreateLoadBufferDesc(InternalDescriptorSetId, FetchShaderInternalBufferBinding,
-                                                 desBuilder->getInt32(0), Builder::BufferFlagAddress);
+    builder.setShaderStage(ShaderStageVertex);
+    builder.SetInsertPoint(&(*vertexFetches[0]->getFunction()->front().getFirstInsertionPt()));
+    auto desc = builder.CreateLoadBufferDesc(InternalDescriptorSetId, FetchShaderInternalBufferBinding,
+                                             builder.getInt32(0), Builder::BufferFlagAddress);
 
     // The size of each input descriptor is sizeof(UberFetchShaderAttribInfo). vector4
     auto uberFetchAttrType = FixedVectorType::get(builder.getInt32Ty(), 4);
-    auto descPtr = desBuilder->CreateIntToPtr(desc, PointerType::get(uberFetchAttrType, ADDR_SPACE_CONST));
+    auto descPtr = builder.CreateIntToPtr(desc, PointerType::get(uberFetchAttrType, ADDR_SPACE_CONST));
 
     for (InputImportGenericOp *inst : vertexFetches) {
       builder.SetInsertPoint(inst);
-      Value *vertex = vertexFetch->fetchVertex(inst, descPtr, builder);
+      Value *vertex = vertexFetch->fetchVertex(inst, descPtr, BuilderBase::get(builder));
       // Replace and erase this instruction.
       inst->replaceAllUsesWith(vertex);
       inst->eraseFromParent();
@@ -608,7 +607,8 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
       } else {
         // Fetch the vertex.
         builder.SetInsertPoint(fetch);
-        vertex = vertexFetch->fetchVertex(fetch->getType(), description, location, component, builder);
+        vertex =
+            vertexFetch->fetchVertex(fetch->getType(), description, location, component, BuilderBase::get(builder));
       }
 
       // Replace and erase this call.

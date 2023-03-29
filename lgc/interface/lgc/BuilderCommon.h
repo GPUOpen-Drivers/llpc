@@ -35,6 +35,8 @@
 
 namespace lgc {
 
+enum class ResourceNodeType : unsigned;
+
 // =====================================================================================================================
 // BuilderCommon extends llvm_dialects::Builder, which extends llvm::IRBuilder<>, and provides a few utility methods
 // used in both the LLPC front-end and in LGC (the LLPC middle-end).
@@ -45,6 +47,22 @@ public:
   BuilderCommon(llvm::LLVMContext &context) : llvm_dialects::Builder(context) {}
   BuilderCommon(llvm::BasicBlock *block) : llvm_dialects::Builder(block) {}
   BuilderCommon(llvm::Instruction *inst) : llvm_dialects::Builder(inst) {}
+
+  // Get the type of a descriptor
+  //
+  // @param descType : Descriptor type, one of the ResourceNodeType values
+  llvm::VectorType *getDescTy(ResourceNodeType descType);
+
+  // Get the type of pointer to descriptor.
+  //
+  // @param descType : Descriptor type, one of the ResourceNodeType values
+  llvm::Type *getDescPtrTy(ResourceNodeType descType);
+
+  // Get the type of pointer returned by CreateLoadBufferDesc.
+  llvm::PointerType *getBufferDescTy();
+
+  // Get a constant of FP or vector of FP type from the given APFloat, converting APFloat semantics where necessary
+  llvm::Constant *getFpConstant(llvm::Type *ty, llvm::APFloat value);
 
   // Return the i64 difference between two pointers, dividing out the size of the pointed-to objects.
   // For buffer fat pointers, delays the translation to patch phase.

@@ -28,9 +28,9 @@
  * @brief LLPC source file: implementation of lgc::Builder
  ***********************************************************************************************************************
  */
+#include "BuilderRecorder.h"
 #include "lgc/LgcContext.h"
 #include "lgc/builder/BuilderImpl.h"
-#include "lgc/builder/BuilderRecorder.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/ShaderModes.h"
 #include "lgc/state/TargetInfo.h"
@@ -49,55 +49,8 @@ const unsigned DescriptorSizeBufferCompact = 2 * sizeof(unsigned);
 } // anonymous namespace
 
 // =====================================================================================================================
-// Static method to create a BuilderImpl
-//
-// @param context : LGC context
-// @param pipeline : Pipeline object
-Builder *Builder::createBuilderImpl(LgcContext *context, Pipeline *pipeline) {
-  return new BuilderImpl(context, pipeline);
-}
-
-// =====================================================================================================================
-// Static method to create a BuilderRecorder
-//
-// @param context : LGC context
-// @param pipeline : Pipeline object, can be nullptr
-Builder *Builder::createBuilderRecorder(LgcContext *context, Pipeline *pipeline) {
-  return new BuilderRecorder(context->getContext());
-}
-
-// =====================================================================================================================
-// Get the type elementTy, turned into a vector of the same vector width as maybeVecTy if the latter
-// is a vector type.
-//
-// @param elementTy : Element type
-// @param maybeVecTy : Possible vector type to get number of elements from
-Type *Builder::getConditionallyVectorizedTy(Type *elementTy, Type *maybeVecTy) {
-  if (auto vecTy = dyn_cast<FixedVectorType>(maybeVecTy))
-    return FixedVectorType::get(elementTy, vecTy->getNumElements());
-  return elementTy;
-}
-
-// =====================================================================================================================
-// Gets new matrix type after doing matrix transposing.
-//
-// @param matrixType : The matrix type to get the transposed type from.
-Type *Builder::getTransposedMatrixTy(Type *const matrixType) const {
-  assert(matrixType->isArrayTy());
-
-  Type *const columnVectorType = matrixType->getArrayElementType();
-  assert(columnVectorType->isVectorTy());
-
-  const unsigned columnCount = matrixType->getArrayNumElements();
-  const unsigned rowCount = cast<FixedVectorType>(columnVectorType)->getNumElements();
-
-  return ArrayType::get(FixedVectorType::get(cast<VectorType>(columnVectorType)->getElementType(), columnCount),
-                        rowCount);
-}
-
-// =====================================================================================================================
 // Get the type of pointer returned by CreateLoadBufferDesc.
-PointerType *Builder::getBufferDescTy() {
+PointerType *BuilderCommon::getBufferDescTy() {
   return PointerType::get(getContext(), ADDR_SPACE_BUFFER_FAT_POINTER);
 }
 
@@ -105,7 +58,7 @@ PointerType *Builder::getBufferDescTy() {
 // Get the type of a descriptor
 //
 // @param descType : Descriptor type, one of the ResourceNodeType values
-VectorType *Builder::getDescTy(ResourceNodeType descType) {
+VectorType *BuilderCommon::getDescTy(ResourceNodeType descType) {
   unsigned byteSize = 0;
   switch (descType) {
   case ResourceNodeType::DescriptorBuffer:
@@ -135,7 +88,7 @@ VectorType *Builder::getDescTy(ResourceNodeType descType) {
 // Get the type of pointer to descriptor.
 //
 // @param descType : Descriptor type, one of the ResourceNodeType values
-Type *Builder::getDescPtrTy(ResourceNodeType descType) {
+Type *BuilderCommon::getDescPtrTy(ResourceNodeType descType) {
   return getDescTy(descType)->getPointerTo(ADDR_SPACE_CONST);
 }
 
@@ -152,7 +105,7 @@ unsigned Builder::getAddrSpaceConst() {
 // @param builtIn : Built-in kind
 // @param inOutInfo : Extra input/output info (shader-defined array size)
 // @param context : LLVMContext
-Type *Builder::getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo, LLVMContext &context) {
+Type *BuilderDefs::getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo, LLVMContext &context) {
   enum TypeCode : unsigned {
     a2f32,
     a4f32,
@@ -235,7 +188,7 @@ Type *Builder::getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo, LLVMContex
 //
 // @param ty : FP scalar or vector type
 // @param value : APFloat value
-Constant *Builder::getFpConstant(Type *ty, APFloat value) {
+Constant *BuilderCommon::getFpConstant(Type *ty, APFloat value) {
   const fltSemantics *semantics = &APFloat::IEEEdouble();
   Type *scalarTy = ty->getScalarType();
   if (scalarTy->isHalfTy())
@@ -374,23 +327,3 @@ CallInst *Builder::CreateIntrinsic(Type *retTy, Intrinsic::ID id, ArrayRef<Value
     result->setFastMathFlags(getFastMathFlags());
   return result;
 }
-
-#if VKI_RAY_TRACING
-// =====================================================================================================================
-// Create a ray intersect result with specified node in BVH buffer.
-// nodePtr is the combination of BVH node offset type.
-//
-// @param nodePtr : BVH node pointer
-// @param extent : The valid range on which intersections can occur
-// @param origin : Intersect ray origin
-// @param direction : Intersect ray direction
-// @param invDirection : The inverse of direction
-// @param imageDesc : Image descriptor
-// @param instName : Name to give instruction(s)
-Value *Builder::CreateImageBvhIntersectRay(Value *nodePtr, Value *extent, Value *origin, Value *direction,
-                                           Value *invDirection, Value *imageDesc, const Twine &instName) {
-  return static_cast<BuilderRecorder *>(this)->CreateImageBvhIntersectRay(nodePtr, extent, origin, direction,
-                                                                          invDirection, imageDesc, instName);
-}
-
-#endif
