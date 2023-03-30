@@ -5827,35 +5827,65 @@ void PatchInOutImportExport::exportVertexAttribs(Instruction *insertPos) {
   BuilderBase builder(*m_context);
   builder.SetInsertPoint(insertPos);
 
+  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment);
+  auto &interpInfo = resUsage->inOutUsage.fs.interpInfo;
   for (auto &attribExport : m_attribExports) {
-    if (m_gfxIp.major <= 10) {
-      unsigned channelMask = 0;
-      for (unsigned i = 0; i < 4; ++i) {
-        assert(attribExport.second[i]);
-        if (!isa<UndefValue>(attribExport.second[i]))
-          channelMask |= (1u << i); // Update channel mask if the value is valid (not undef)
-      }
+    unsigned channelMask = 0;
+    unsigned zeroMask = {0}; // The mask of channels with zero value.
+    for (unsigned i = 0; i < 4; ++i) {
+      assert(attribExport.second[i]);
+      if (!isa<UndefValue>(attribExport.second[i])) {
+        const unsigned offset = 1u << i;
+        channelMask |= offset; // Update channel mask if the value is valid (not undef)
 
-      builder.CreateIntrinsic(Intrinsic::amdgcn_exp, builder.getFloatTy(),
-                              {builder.getInt32(EXP_TARGET_PARAM_0 + attribExport.first), // tgt
-                               builder.getInt32(channelMask),                             // en
-                               attribExport.second[0],                                    // src0
-                               attribExport.second[1],                                    // src1
-                               attribExport.second[2],                                    // src2
-                               attribExport.second[3],                                    // src3
-                               builder.getFalse(),                                        // done
-                               builder.getFalse()});                                      // src0
+        // Check if the valid value is zero and set the mask
+        if (auto channelValue = dyn_cast<ConstantFP>(attribExport.second[i])) {
+          if (channelValue->isZero())
+            zeroMask |= offset;
+        } else if (auto extract = dyn_cast<ExtractElementInst>(attribExport.second[i])) {
+          if (isa<ConstantAggregateZero>(extract->getVectorOperand()))
+            zeroMask |= offset;
+        }
+      }
+    }
+
+    // The requirement of using DEFAULT_VAl as an optimizaiton
+    // 1. All valid value are zero or the mask is 0
+    // 2. The attribute is not in flat shade mode.
+    bool canOptimize = false;
+    if (channelMask == zeroMask) {
+      auto iter = std::find_if(interpInfo.begin(), interpInfo.end(),
+                               [&](FsInterpInfo info) { return info.loc == attribExport.first; });
+      if (iter != interpInfo.end())
+        canOptimize = !iter->flat;
+    }
+
+    if (canOptimize) {
+      // All valid value are 0.0, skip the export and set the flag for using default val
+      interpInfo[attribExport.first].isDefaultVal = true;
     } else {
-      Value *attribValue = UndefValue::get(FixedVectorType::get(builder.getFloatTy(), 4)); // Always be <4 x float>
-      for (unsigned i = 0; i < 4; ++i)
-        attribValue = builder.CreateInsertElement(attribValue, attribExport.second[i], i);
-      // NOTE: For GFX11+, vertex attributes are exported through memory. This call will be expanded when NGG primitive
-      // shader is generated. The arguments are: buffer descriptor of attribute ring, attribute location, and attribute
-      // export value.
-      emitCall(lgcName::NggAttribExport, builder.getVoidTy(),
-               {m_pipelineSysValues.get(m_entryPoint)->getAttribRingBufDesc(), builder.getInt32(attribExport.first),
-                attribValue},
-               {}, insertPos);
+      if (m_gfxIp.major <= 10) {
+        builder.CreateIntrinsic(Intrinsic::amdgcn_exp, builder.getFloatTy(),
+                                {builder.getInt32(EXP_TARGET_PARAM_0 + attribExport.first), // tgt
+                                 builder.getInt32(channelMask),                             // en
+                                 attribExport.second[0],                                    // src0
+                                 attribExport.second[1],                                    // src1
+                                 attribExport.second[2],                                    // src2
+                                 attribExport.second[3],                                    // src3
+                                 builder.getFalse(),                                        // done
+                                 builder.getFalse()});                                      // src0
+      } else {
+        Value *attribValue = UndefValue::get(FixedVectorType::get(builder.getFloatTy(), 4)); // Always be <4 x float>
+        for (unsigned i = 0; i < 4; ++i)
+          attribValue = builder.CreateInsertElement(attribValue, attribExport.second[i], i);
+        // NOTE: For GFX11+, vertex attributes are exported through memory. This call will be expanded when NGG
+        // primitive shader is generated. The arguments are: buffer descriptor of attribute ring, attribute location,
+        // and attribute export value.
+        emitCall(lgcName::NggAttribExport, builder.getVoidTy(),
+                 {m_pipelineSysValues.get(m_entryPoint)->getAttribRingBufDesc(), builder.getInt32(attribExport.first),
+                  attribValue},
+                 {}, insertPos);
+      }
     }
   }
 }
