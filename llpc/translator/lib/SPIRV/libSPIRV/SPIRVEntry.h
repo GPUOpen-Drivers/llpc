@@ -210,6 +210,7 @@ public:
   virtual SPIRVCapVec getRequiredCapability() const { return SPIRVCapVec(); }
   const std::string &getName() const { return Name; }
   bool hasDecorate(Decoration Kind, size_t Index = 0, SPIRVWord *Result = 0) const;
+  SPIRVEntry *getDecorateId(Decoration Kind, size_t Index) const;
   const char *getDecorateString(Decoration kind) const;
   bool hasMemberDecorate(SPIRVWord MemberIndex, Decoration Kind, size_t Index = 0, SPIRVWord *Result = 0) const;
   std::set<SPIRVWord> getDecorate(Decoration Kind, size_t Index = 0) const;
@@ -670,7 +671,6 @@ template <spv::Op OC> bool isa(SPIRVEntry *E) {
 // This is also an indication of how much work is left.
 #define _SPIRV_OP(x, ...) typedef SPIRVEntryOpCodeOnly<Op##x> SPIRV##x;
 _SPIRV_OP(SizeOf)
-_SPIRV_OP(DecorateId)
 // NOTE: These 4 OpCodes are reserved by SPIR-V spec, they are invalid unless
 // some extensions expose them.
 _SPIRV_OP(ImageSparseSampleProjImplicitLod)

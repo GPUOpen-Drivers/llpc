@@ -276,6 +276,15 @@ bool SPIRVEntry::hasDecorate(Decoration Kind, size_t Index, SPIRVWord *Result) c
   return true;
 }
 
+// Check if an entry has Kind of decorationId
+SPIRVEntry *SPIRVEntry::getDecorateId(Decoration Kind, size_t Index) const {
+  DecorateMapType::const_iterator Loc = Decorates.find(Kind);
+  if (Loc == Decorates.end())
+    return nullptr;
+
+  return Loc->second->getEntry(Index);
+}
+
 const char *SPIRVEntry::getDecorateString(Decoration kind) const {
   DecorateMapType::const_iterator loc = Decorates.find(kind);
   if (loc == Decorates.end())

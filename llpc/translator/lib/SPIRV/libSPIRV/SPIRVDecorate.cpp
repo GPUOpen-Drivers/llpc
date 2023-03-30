@@ -70,6 +70,11 @@ SPIRVWord SPIRVDecorateGeneric::getLiteral(size_t I) const {
   return Literals[I];
 }
 
+SPIRVEntry *SPIRVDecorateGeneric::getEntry(size_t I) const {
+  assert(I <= Ids.size() && "Out of bounds");
+  return Module->getEntry(Ids[I]);
+}
+
 size_t SPIRVDecorateGeneric::getLiteralCount() const {
   return Literals.size();
 }
@@ -145,6 +150,18 @@ void SPIRVGroupMemberDecorate::decorateTargets() {
       }
     }
   }
+}
+
+void SPIRVDecorateId::setWordCount(SPIRVWord Count) {
+  WordCount = Count;
+  Ids.resize(WordCount - FixedWC);
+}
+
+void SPIRVDecorateId::decode(std::istream &I) {
+  SPIRVDecoder Decoder = getDecoder(I);
+  Decoder >> Target >> Dec;
+  Decoder >> Ids;
+  getOrCreateTarget()->addDecorate(this);
 }
 
 bool SPIRVDecorateGeneric::Comparator::operator()(const SPIRVDecorateGeneric *A, const SPIRVDecorateGeneric *B) const {
