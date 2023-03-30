@@ -65,8 +65,8 @@ public:
 
   SPIRVToLLVMDbgTran(SPIRVModule *TBM, Module *TM, SPIRVToLLVM *Reader);
   void createCompilationUnit();
-  void recordsDbgInfo(SPIRVValue *SV, Value *V);
-  void transDbgInfo();
+  void recordsValue(SPIRVValue *SV, Value *V);
+  void applyDelayedDbgInfo();
   template <typename T = MDNode> T *transDebugInst(const SPIRVExtInst *DebugInst) {
     assert((DebugInst->getExtSetKind() == SPIRVEIS_Debug ||
             DebugInst->getExtSetKind() == SPIRVEIS_NonSemanticShaderDebugInfo100) &&
@@ -154,7 +154,7 @@ private:
   std::unordered_map<std::string, DIFile *> FileMap;
   std::unordered_map<SPIRVId, DISubprogram *> FuncMap;
   std::unordered_map<const SPIRVExtInst *, MDNode *> DebugInstCache;
-  std::unordered_map<SPIRVInstruction *, DILocation *> ValueMap;
+  std::unordered_map<Instruction *, SPIRVInstruction *> RecordedInstructions;
   struct SplitFileName {
     SplitFileName(const std::string &FileName);
     std::string BaseName;

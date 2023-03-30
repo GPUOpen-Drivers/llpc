@@ -109,29 +109,31 @@ unsigned SPIRVToLLVMDbgTran::getConstant(const SPIRVId id) {
   return BM->get<SPIRVConstant>(id)->getZExtIntValue();
 }
 
-void SPIRVToLLVMDbgTran::recordsDbgInfo(SPIRVValue *SV, Value *V) {
+// =====================================================================================================================
+// Record spirv/llvm variables for later debug info processing
+void SPIRVToLLVMDbgTran::recordsValue(SPIRVValue *SV, Value *V) {
   if (!Enable || !SV->hasLine())
     return;
   // A constant sampler does not have a corresponding SPIRVInstruction.
   if (SV->getOpCode() == OpConstantSampler)
     return;
 
-  if (dyn_cast<Instruction>(V) != nullptr) {
+  if (Instruction *I = dyn_cast<Instruction>(V)) {
     SPIRVInstruction *SI = static_cast<SPIRVInstruction *>(SV);
-    if (ValueMap.find(SI) == ValueMap.end()) {
-      ValueMap[SI] = nullptr;
+    if (RecordedInstructions.find(I) == RecordedInstructions.end()) {
+      RecordedInstructions[I] = SI;
     }
   }
 }
 
-void SPIRVToLLVMDbgTran::transDbgInfo() {
-  for (auto it = ValueMap.begin(); it != ValueMap.end(); ++it) {
-    if (it->second == nullptr) {
-      auto lv = SPIRVReader->getTranslatedValue(it->first);
-      SPIRVInstruction *sinst = static_cast<SPIRVInstruction *>(it->first);
-      Instruction *inst = cast<Instruction>(lv);
-      inst->setDebugLoc(transDebugScope(sinst, inst));
-    }
+// =====================================================================================================================
+// Apply dbg infos to previous translated spirv variables/instructions
+// spirv variables are defined before the debug function info available.
+// so the actual llvm debug info settings are delayed.
+void SPIRVToLLVMDbgTran::applyDelayedDbgInfo() {
+  for (auto it = RecordedInstructions.begin(); it != RecordedInstructions.end(); ++it) {
+    Instruction *inst = it->first;
+    inst->setDebugLoc(transDebugScope(it->second, inst));
   }
 }
 

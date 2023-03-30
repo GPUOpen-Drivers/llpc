@@ -989,6 +989,7 @@ Value *SPIRVToLLVM::transValue(SPIRVValue *bv, Function *f, BasicBlock *bb, bool
     assert(0 && "trans decoration fail");
     return nullptr;
   }
+  m_dbgTran.recordsValue(bv, v);
 
   return v;
 }
@@ -5689,7 +5690,7 @@ Function *SPIRVToLLVM::transFunction(SPIRVFunction *bf) {
       transValue(bInst, f, bb, false);
     }
   }
-  m_dbgTran.transDbgInfo();
+  m_dbgTran.applyDelayedDbgInfo();
 
   // Update phi nodes -- add missing incoming arcs.
   // This is necessary because LLVM's CFG is a multigraph, while SPIR-V's
@@ -7350,7 +7351,6 @@ bool SPIRVToLLVM::transAddressingModel() {
 bool SPIRVToLLVM::transDecoration(SPIRVValue *bv, Value *v) {
   if (!transShaderDecoration(bv, v))
     return false;
-  m_dbgTran.recordsDbgInfo(bv, v);
   return true;
 }
 
