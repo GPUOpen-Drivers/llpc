@@ -822,8 +822,8 @@ Value *BuilderImpl::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, 
       Value *const threadMask = createThreadMask();
 
       // Shift right within each row:
-      // ‭0b0110,0101,0100,0011,0010,0001,0000,1111‬ = 0x‭‭6543210F‬
-      // ‭0b1110,1101,1100,1011,1010,1001,1000,0111‬ = 0xEDCBA987
+      // 0b0110,0101,0100,0011,0010,0001,0000,1111 = 0x6543210F
+      // 0b1110,1101,1100,1011,1010,1001,1000,0111 = 0xEDCBA987
       shiftRight = createPermLane16(setInactive, setInactive, 0x6543210F, 0xEDCBA987, true, false);
 
       // Only needed for wave size 64.
