@@ -79,11 +79,11 @@ PreservedAnalyses LowerDebugPrintf::run(Module &module, ModuleAnalysisManager &a
     callInst->eraseFromParent();
   }
 
-  if (m_elfInfos.size() == 0)
-    return PreservedAnalyses::none();
+  if (m_elfInfos.empty())
+    return PreservedAnalyses::all();
 
   setupElfsPrintfStrings();
-  return PreservedAnalyses::all();
+  return PreservedAnalyses::allInSet<CFGAnalyses>();
 }
 
 // =====================================================================================================================
