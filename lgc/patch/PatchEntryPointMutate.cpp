@@ -1396,8 +1396,9 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
   // We do have user data layout.
   // Add entries from the root user data layout (not vertex buffer or streamout, and not unused ones).
 
-  for (unsigned userDataNodeIdx = 0; userDataNodeIdx != m_pipelineState->getUserDataNodes().size(); ++userDataNodeIdx) {
-    const ResourceNode &node = m_pipelineState->getUserDataNodes()[userDataNodeIdx];
+  llvm::ArrayRef<ResourceNode> userDataNodes = m_pipelineState->getUserDataNodes();
+  for (unsigned userDataNodeIdx = 0; userDataNodeIdx != userDataNodes.size(); ++userDataNodeIdx) {
+    const ResourceNode &node = userDataNodes[userDataNodeIdx];
     switch (node.concreteType) {
 
     case ResourceNodeType::IndirectUserDataVaPtr:

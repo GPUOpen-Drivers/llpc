@@ -312,7 +312,7 @@ static void findAllMatchFiles(const std::string &inFile, std::vector<std::string
 // @param [out] expandedFilenames : Returned expanded input filenames.
 // @returns : Result::Success on success, Result::ErrorInvalidValue when expansion fails.
 Result expandInputFilenames(ArrayRef<std::string> inputSpecs, std::vector<std::string> &expandedFilenames) {
-  unsigned i = 0;
+  [[maybe_unused]] unsigned i = 0;
   for (const auto &inFile : inputSpecs) {
     // Handle any optional entry point after the filename.
     // inputSpecs can be of the form <filename>,<entrypoint> and <filename>
