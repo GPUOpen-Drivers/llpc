@@ -500,7 +500,7 @@ private:
 
 // Inline may allow the compiler to conveniently optimize at compile time
 inline const size_t SectionIndirectCalleeSavedRegs::ExportConfigOffset =
-  reinterpret_cast<size_t>(&reinterpret_cast<SectionIndirectCalleeSavedRegs*>(0)->m_state);
+    reinterpret_cast<size_t>(&reinterpret_cast<SectionIndirectCalleeSavedRegs *>(0)->m_state);
 
 // =====================================================================================================================
 // Represents the sub section RayTracingShaderExportConfig state
