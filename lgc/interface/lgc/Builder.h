@@ -47,6 +47,7 @@ struct MeshShaderMode;
 class Pipeline;
 class ShaderModes;
 struct TessellationMode;
+struct ResourceNode;
 
 // =====================================================================================================================
 // Class that represents extra information on an input or output.
@@ -1391,6 +1392,10 @@ public:
   llvm::Instruction *CreateSetMeshOutputs(llvm::Value *vertexCount, llvm::Value *primitiveCount, // NOLINT
                                           const llvm::Twine &instName = "");
 
+  // Create debug printf operation, and write to the output debug buffer
+  // @vars: Printf variable parameters
+  // @instName : Instance Name
+  llvm::Value *CreateDebugPrintf(llvm::ArrayRef<llvm::Value *> vars, const llvm::Twine &instName = "");
   // -----------------------------------------------------------------------------------------------------------------
   // Subgroup operations
 

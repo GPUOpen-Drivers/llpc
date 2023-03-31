@@ -190,6 +190,7 @@ target_sources(LLVMlgc PRIVATE
     patch/Gfx6ConfigBuilder.cpp
     patch/Gfx9Chip.cpp
     patch/Gfx9ConfigBuilder.cpp
+    patch/LowerDebugPrintf.cpp
     patch/MeshTaskShader.cpp
     patch/NggPrimShader.cpp
     patch/Patch.cpp

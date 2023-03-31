@@ -159,7 +159,7 @@ SPIRVToLLVM::SPIRVToLLVM(Module *llvmModule, SPIRVModule *theSpirvModule, const 
                          const Vkgc::ShaderModuleUsage *moduleUsage, const Vkgc::PipelineShaderOptions *shaderOptions)
     : m_m(llvmModule), m_builder(builder), m_bm(theSpirvModule), m_entryTarget(nullptr),
       m_specConstMap(theSpecConstMap), m_convertingSamplers(convertingSamplers), m_dbgTran(m_bm, m_m, this),
-      m_moduleUsage(reinterpret_cast<const Vkgc::ShaderModuleUsage *>(moduleUsage)),
+      m_moduleUsage(reinterpret_cast<const Vkgc::ShaderModuleUsage *>(moduleUsage)), m_debugOutputBuffer(nullptr),
       m_shaderOptions(reinterpret_cast<const Vkgc::PipelineShaderOptions *>(shaderOptions)) {
   assert(m_m);
   m_context = &m_m->getContext();
@@ -201,6 +201,15 @@ Value *SPIRVToLLVM::mapValue(SPIRVValue *bv, Value *v) {
   }
   m_valueMap[bv] = v;
   return v;
+}
+
+Value *SPIRVToLLVM::mapEntry(const SPIRVEntry *be, Value *v) {
+  if (m_entryMap.find(be) == m_entryMap.end()) {
+    assert(v != nullptr);
+    m_entryMap[be] = v;
+    return v;
+  } else
+    return m_entryMap[be];
 }
 
 unsigned SPIRVToLLVM::getBlockPredecessorCounts(BasicBlock *block, BasicBlock *predecessor) {
@@ -4018,9 +4027,6 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpExtInst>(SPIRVValue *cons
   SPIRVExtInst *const spvExtInst = static_cast<SPIRVExtInst *>(spvValue);
 
   // Just ignore this set of extended instructions
-  if (m_bm->getBuiltinSet(spvExtInst->getExtSetId()) == SPIRVEIS_NonSemanticInfo)
-    return nullptr;
-
   std::vector<SPIRVValue *> spvArgValues = spvExtInst->getArgumentValues();
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
@@ -4074,7 +4080,13 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpExtInst>(SPIRVValue *cons
 
   case SPIRVEIS_Debug:
     return m_dbgTran.transDebugIntrinsic(spvExtInst, block);
-
+  case SPIRVEIS_NonSemanticDebugPrintf:
+    switch (spvExtInst->getExtOp()) {
+    case NonSemanticDebugPrintfDebugPrintf:
+      return transDebugPrintf(spvExtInst, spvArgValues, func, block);
+    default:
+      return nullptr;
+    }
   default:
     llvm_unreachable("Should never be called!");
     return nullptr;
@@ -4082,6 +4094,43 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpExtInst>(SPIRVValue *cons
 }
 
 // =====================================================================================================================
+// Handle extended instruction Nonsemantics.debugPrintf
+//
+// @param bi : A SPIR-V debugPrintf instruction
+// @param spvValues : Instruction spirv parameters
+// @param func : Which function to generate code
+// @param bb : Which basicblock to generate code
+Value *SPIRVToLLVM::transDebugPrintf(SPIRVInstruction *bi, const ArrayRef<SPIRVValue *> spvValues, Function *func,
+                                     BasicBlock *bb) {
+  if (!m_debugOutputBuffer) {
+    auto spvArrType = m_bm->addRuntimeArray(m_bm->addIntegerType(32));
+    auto spvStructType = m_bm->addStructType({spvArrType});
+    Type *bufType = transType(spvStructType);
+
+    m_debugOutputBuffer =
+        new GlobalVariable(*m_m, bufType, false, GlobalValue::ExternalLinkage, nullptr, "debugOutputBuffer", nullptr,
+                           GlobalVariable::NotThreadLocal, SPIRAS_Uniform);
+
+    // Setup (desc,binding) resource metadata
+    auto intType = getBuilder()->getInt32Ty();
+    SmallVector<Metadata *, 4> resourceMetas = {
+        ConstantAsMetadata::get(ConstantInt::get(intType, Vkgc::InternalDescriptorSetId)),
+        ConstantAsMetadata::get(ConstantInt::get(intType, Vkgc::PrintfBufferBindingId)),
+        ConstantAsMetadata::get(ConstantInt::get(intType, 0))};
+
+    auto resMdNode = MDNode::get(*m_context, resourceMetas);
+    m_debugOutputBuffer->addMetadata(gSPIRVMD::Resource, *resMdNode);
+  }
+
+  auto spvValueItr = spvValues.begin();
+  Value *formatStr = mapEntry(*spvValueItr++, nullptr);
+  SmallVector<Value *> args = {m_debugOutputBuffer, formatStr};
+  for (; spvValueItr != spvValues.end(); ++spvValueItr) {
+    args.push_back(transValue(*spvValueItr, func, bb));
+  }
+  return getBuilder()->CreateDebugPrintf(args);
+}
+
 // Translate an initializer. This has special handling for the case where the type to initialize to does not match the
 // type of the initializer, which is common when dealing with interface objects.
 //
@@ -4446,6 +4495,18 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpDot>(SPIRVValue *const sp
   Value *const vector1 = transValue(spvOperands[0], func, block);
   Value *const vector2 = transValue(spvOperands[1], func, block);
   return getBuilder()->CreateDotProduct(vector1, vector2);
+}
+
+// =====================================================================================================================
+// Translate OpString
+// @param spvValues : Instruction spirv parameters
+Value *SPIRVToLLVM::transString(const SPIRVString *spvValue) {
+  auto &debugStr = spvValue->getStr();
+  auto globalTy = ArrayType::get(Type::getInt8Ty(*m_context), debugStr.size());
+  auto initializer = ConstantDataArray::getString(*m_context, debugStr, false);
+  auto global = new GlobalVariable(*m_m, globalTy, true, GlobalValue::InternalLinkage, initializer, "str", nullptr,
+                                   GlobalValue::NotThreadLocal, SPIRAS_Constant);
+  return mapEntry(spvValue, global);
 }
 
 /// For instructions, this function assumes they are created in order
@@ -7116,6 +7177,10 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
       bv = createValueFromSpecConstantOp(bi, m_fpControlFlags.RoundingModeRTE);
       bi->mapToConstant(bv);
     }
+  }
+
+  for (auto spirvString : m_bm->getStringVec()) {
+    transString(spirvString);
   }
 
   for (unsigned i = 0, e = m_bm->getNumVariables(); i != e; ++i) {

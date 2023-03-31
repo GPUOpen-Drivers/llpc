@@ -124,9 +124,12 @@ enum class CoverageToShaderSel : unsigned {
 namespace PalCodeObjectMetadataKey {
 static constexpr char Version[] = "amdpal.version";
 static constexpr char Pipelines[] = "amdpal.pipelines";
+static constexpr char PrintfStrings[] = "amdpal.format_strings";
 }; // namespace PalCodeObjectMetadataKey
 
 namespace PipelineMetadataKey {
+static constexpr char Index[] = ".index";
+static constexpr char String[] = ".string";
 static constexpr char Name[] = ".name";
 static constexpr char Type[] = ".type";
 static constexpr char InternalPipelineHash[] = ".internal_pipeline_hash";

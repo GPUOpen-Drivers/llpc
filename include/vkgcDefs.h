@@ -325,6 +325,7 @@ enum InternalBinding : unsigned {
 #endif
   TaskPayloadBinding = 4,               ///< Binding ID of payload buffer in task shader
   FetchShaderInternalBufferBinding = 5, ///< Binding ID of uber-fetch shader internal buffer
+  PrintfBufferBindingId = 6,            ///< Binding ID of internal buffer for debug printf
   ReverseThreadGroupControlBinding = 7, ///< Binding ID of internal buffer for reverseThreadGroup
 #if VKI_RAY_TRACING
   RtCaptureReplayInternalBufferBinding = 8, ///< Binding ID of ray-tracing capture replay internal buffer

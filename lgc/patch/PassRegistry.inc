@@ -73,6 +73,7 @@ LLPC_FUNCTION_PASS("lgc-patch-load-scalarizer", PatchLoadScalarizer)
 LLPC_MODULE_PASS("lgc-patch-null-frag-shader", PatchNullFragShader)
 LLPC_MODULE_PASS("lgc-patch-image-op-collect", PatchImageOpCollect)
 LLPC_MODULE_PASS("lgc-vertex-fetch", LowerVertexFetch)
+LLPC_MODULE_PASS("lgc-lower-debug-printf", LowerDebugPrintf)
 
 #undef LLPC_PASS
 #undef LLPC_LOOP_PASS
