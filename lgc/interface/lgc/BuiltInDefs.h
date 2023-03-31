@@ -109,5 +109,7 @@ BUILTIN(CullPrimitive, 5299, N, M, i1)                   // Whether primitive sh
 BUILTIN(PrimitivePointIndices, 5294, N, M, ai32)         // Array of indices of the vertices making up the points
 BUILTIN(PrimitiveLineIndices, 5295, N, M, av2i32)        // Array of indices of the vertices making up the lines
 BUILTIN(PrimitiveTriangleIndices, 5296, N, M, av3i32)    // Array of indices of the vertices making up the triangles
+BUILTIN(VertexId, 5, N, V, i32)                          // Index of current vertex
+BUILTIN(InstanceId, 6, N, V, i32)                        // Index of current primitive
 
 // Reserved LGC internal built-ins
