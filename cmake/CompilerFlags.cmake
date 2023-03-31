@@ -19,7 +19,6 @@ function(set_compiler_options PROJECT_NAME ENABLE_WERROR)
             -Wall
             -Wno-delete-incomplete
             -Wno-delete-non-virtual-dtor
-            -Wno-invalid-offsetof
             -Wno-missing-braces
             -Wno-missing-field-initializers
             -Wno-parentheses
@@ -42,7 +41,6 @@ function(set_compiler_options PROJECT_NAME ENABLE_WERROR)
             -fno-aligned-new
             -Wno-ignored-qualifiers
             -Wno-missing-field-initializers
-            -Wno-invalid-offsetof           # offsetof within non-standard-layout type 'x' is undefined
         >)
 
         if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
