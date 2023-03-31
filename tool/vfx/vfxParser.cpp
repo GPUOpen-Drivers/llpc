@@ -1365,8 +1365,9 @@ bool Document::macroSubstituteLine(char *line, unsigned lineNum, const MacroDefi
         break;
       }
 
-      sprintf(namePos, "%s%s", value, lineRest);
-      lineRest = namePos + nameLen + valueLen;
+      memmove(namePos + valueLen, lineRest, restLen);
+      memcpy(namePos, value, valueLen);
+      lineRest = namePos + valueLen;
       MacroDefinition macros2;
       macros2[iter->first] = iter->second;
       result =
