@@ -51,6 +51,7 @@ namespace RtName {
 const char *LdsUsage = "LdsUsage";
 const char *PrevRayQueryObj = "PrevRayQueryObj";
 const char *RayQueryObjGen = "RayQueryObjGen";
+const char *StaticId = "StaticId";
 static const char *LibraryEntryFuncName = "libraryEntry";
 static const char *LdsStack = "LdsStack";
 extern const char *LoadDwordAtAddr;
@@ -69,6 +70,7 @@ static const char *GetTriangleCompressionMode = "AmdTraceRayGetTriangleCompressi
 static const char *SetHitTokenData = "AmdTraceRaySetHitTokenData";
 static const char *GetBoxSortHeuristicMode = "AmdTraceRayGetBoxSortHeuristicMode";
 static const char *SampleGpuTimer = "AmdTraceRaySampleGpuTimer";
+static const char *GetStaticRayId = "AmdTraceRayGetStaticRayId";
 #if VKI_BUILD_GFX11
 static const char *LdsStackInit = "AmdTraceRayLdsStackInit";
 static const char *LdsStackStore = "AmdTraceRayLdsStackStore";
@@ -302,7 +304,7 @@ SpirvLowerRayQuery::SpirvLowerRayQuery() : SpirvLowerRayQuery(false) {
 // =====================================================================================================================
 SpirvLowerRayQuery::SpirvLowerRayQuery(bool rayQueryLibrary)
     : m_rayQueryLibrary(rayQueryLibrary), m_spirvOpMetaKindId(0), m_ldsStack(nullptr), m_prevRayQueryObj(nullptr),
-      m_rayQueryObjGen(nullptr) {
+      m_rayQueryObjGen(nullptr), m_nextTraceRayId(0) {
 }
 
 // =====================================================================================================================
@@ -324,6 +326,7 @@ bool SpirvLowerRayQuery::runImpl(Module &module) {
   SpirvLower::init(&module);
   createGlobalRayQueryObj();
   createGlobalLdsUsage();
+  createGlobalTraceRayStaticId();
   if (m_rayQueryLibrary) {
     createGlobalStack();
     for (auto funcIt = module.begin(), funcEnd = module.end(); funcIt != funcEnd;) {
@@ -427,6 +430,12 @@ void SpirvLowerRayQuery::processLibraryFunction(Function *&func) {
     m_builder->SetInsertPoint(entryBlock);
     m_builder->CreateRet(m_builder->getInt32(rtState->boxSortHeuristicMode));
     func->setName(RtName::GetBoxSortHeuristicMode);
+  } else if (mangledName.startswith(RtName::GetStaticRayId)) {
+    eraseFunctionBlocks(func);
+    BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
+    m_builder->SetInsertPoint(entryBlock);
+    m_builder->CreateRet(m_builder->CreateLoad(m_builder->getInt32Ty(), m_traceRayStaticId));
+    func->setName(RtName::GetStaticRayId);
   }
 #if VKI_BUILD_GFX11
   else if (mangledName.startswith(RtName::LdsStackInit)) {
@@ -550,6 +559,10 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryInitializeKHR>
   m_builder->CreateStore(rayDesc, traceRaysArgs[6]);
   // 7, Dispatch Id
   m_builder->CreateStore(getDispatchId(), traceRaysArgs[7]);
+
+  if (m_context->getPipelineContext()->getRayTracingState()->enableRayTracingCounters)
+    generateTraceRayStaticId();
+
   const char *rayQueryInitialize =
       m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_TRACE_RAY_INLINE);
   m_builder->CreateNamedCall(rayQueryInitialize, m_builder->getVoidTy(), traceRaysArgs,
@@ -1336,6 +1349,16 @@ void SpirvLowerRayQuery::createGlobalLdsUsage() {
 }
 
 // =====================================================================================================================
+// Create global variable for static ID
+void SpirvLowerRayQuery::createGlobalTraceRayStaticId() {
+  m_traceRayStaticId =
+      new GlobalVariable(*m_module, Type::getInt32Ty(m_module->getContext()), true, GlobalValue::ExternalLinkage,
+                         nullptr, RtName::StaticId, nullptr, GlobalValue::NotThreadLocal, SPIRAS_Private);
+
+  m_traceRayStaticId->setAlignment(MaybeAlign(4));
+}
+
+// =====================================================================================================================
 // Create global variable for the prevRayQueryObj
 void SpirvLowerRayQuery::createGlobalRayQueryObj() {
   m_prevRayQueryObj =
@@ -1551,6 +1574,20 @@ void SpirvLowerRayQuery::initGlobalVariable() {
   m_builder->CreateStore(m_builder->getInt32(InvalidValue), m_prevRayQueryObj);
   m_builder->CreateStore(m_builder->getInt32(0), m_rayQueryObjGen);
   m_builder->CreateStore(m_builder->getInt32(1), m_ldsUsage);
+}
+
+// =====================================================================================================================
+// Generate a static ID for current Trace Ray call
+//
+void SpirvLowerRayQuery::generateTraceRayStaticId() {
+  Util::MetroHash64 hasher;
+  hasher.Update(m_nextTraceRayId++);
+  hasher.Update(m_module->getName());
+
+  MetroHash::Hash hash = {};
+  hasher.Finalize(hash.bytes);
+
+  m_builder->CreateStore(m_builder->getInt32(MetroHash::compact32(&hash)), m_traceRayStaticId);
 }
 
 // =====================================================================================================================
