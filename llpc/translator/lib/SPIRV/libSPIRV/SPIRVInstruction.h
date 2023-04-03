@@ -1468,6 +1468,7 @@ public:
   }
   SPIRVFunctionCallGeneric() : SPIRVInstruction(OC) {}
   const std::vector<SPIRVWord> &getArguments() const { return Args; }
+  std::vector<SPIRVWord> &getArguments() { return Args; }
   std::vector<SPIRVValue *> getArgumentValues() { return getValues(Args); }
   std::vector<SPIRVType *> getArgumentValueTypes() const {
     std::vector<SPIRVType *> ArgTypes;
@@ -1527,7 +1528,7 @@ public:
             ExtSetKind == SPIRVEIS_ShaderExplicitVertexParameterAMD || ExtSetKind == SPIRVEIS_GcnShaderAMD ||
             ExtSetKind == SPIRVEIS_ShaderTrinaryMinMaxAMD || ExtSetKind == SPIRVEIS_NonSemanticInfo ||
             ExtSetKind == SPIRVEIS_NonSemanticDebugBreak || ExtSetKind == SPIRVEIS_NonSemanticDebugPrintf ||
-            ExtSetKind == SPIRVEIS_Debug) &&
+            ExtSetKind == SPIRVEIS_Debug || ExtSetKind == SPIRVEIS_NonSemanticShaderDebugInfo100) &&
            "not supported");
   }
   void decode(std::istream &I) override {
@@ -1555,6 +1556,7 @@ public:
       getDecoder(I) >> ExtOpNonSemanticInfo;
       break;
     case SPIRVEIS_Debug:
+    case SPIRVEIS_NonSemanticShaderDebugInfo100:
       getDecoder(I) >> ExtOpDebug;
       break;
     default:
@@ -1562,6 +1564,21 @@ public:
       getDecoder(I) >> ExtOp;
     }
     getDecoder(I) >> Args;
+
+    if (ExtSetKind == SPIRVEIS_NonSemanticShaderDebugInfo100) {
+      // DebugLine is recorded to set current debug location with following spirv instruction
+      if (ExtOpDebug == NonSemanticShaderDebugInfo100DebugLine) {
+        unsigned dbgLn = Module->get<SPIRVConstant>(Args[1])->getZExtIntValue();
+        unsigned dbgCol = Module->get<SPIRVConstant>(Args[3])->getZExtIntValue();
+        SPIRVLine *line = Module->add(new SPIRVLine(Module, Args[0], dbgLn, dbgCol));
+        Module->setCurrentLine(line);
+      }
+      // NonSemanticShaderDebugInfo100DebugFunction has one less argument than
+      // OpenCL.DebugInfo.100 DebugFunction
+      else if (ExtOpDebug == NonSemanticShaderDebugInfo100DebugFunction) {
+        Args.push_back(0);
+      }
+    }
   }
   void validate() const override {
     SPIRVFunctionCallGeneric::validate();

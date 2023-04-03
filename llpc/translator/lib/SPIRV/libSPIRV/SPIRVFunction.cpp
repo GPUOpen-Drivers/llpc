@@ -116,9 +116,11 @@ void SPIRVFunction::decodeBB(SPIRVDecoder &Decoder) {
 
     SPIRVInstruction *Inst = static_cast<SPIRVInstruction *>(Decoder.getEntry());
     if ((Inst != nullptr) && Inst->getOpCode() != OpUndef) {
-      if (Inst->isExtInst(SPIRVEIS_Debug, SPIRVDebug::Scope)) {
+      if (Inst->isExtInst(SPIRVEIS_Debug, SPIRVDebug::Scope) ||
+          Inst->isExtInst(SPIRVEIS_NonSemanticShaderDebugInfo100, SPIRVDebug::Scope)) {
         DebugScope = Inst;
-      } else if (Inst->isExtInst(SPIRVEIS_Debug, SPIRVDebug::NoScope)) {
+      } else if (Inst->isExtInst(SPIRVEIS_Debug, SPIRVDebug::NoScope) ||
+                 Inst->isExtInst(SPIRVEIS_NonSemanticShaderDebugInfo100, SPIRVDebug::NoScope)) {
         DebugScope = nullptr;
       } else {
         Inst->setDebugScope(DebugScope);

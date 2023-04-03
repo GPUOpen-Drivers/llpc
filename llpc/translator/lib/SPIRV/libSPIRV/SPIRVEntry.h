@@ -203,7 +203,7 @@ public:
     assert(hasId());
     return Id;
   }
-  std::shared_ptr<const SPIRVLine> getLine() const { return Line; }
+  const SPIRVLine *getLine() const { return Line; }
   SPIRVLinkageTypeKind getLinkageType() const;
   Op getOpCode() const { return OpCode; }
   SPIRVModule *getModule() const { return Module; }
@@ -247,7 +247,7 @@ public:
   void eraseMemberDecorate(SPIRVWord MemberNumber, Decoration Kind);
   void setHasNoId() { Attrib |= SPIRVEA_NOID; }
   void setId(SPIRVId TheId) { Id = TheId; }
-  void setLine(const std::shared_ptr<const SPIRVLine> &L);
+  void setLine(const SPIRVLine *L);
   void setLinkageType(SPIRVLinkageTypeKind);
   void setModule(SPIRVModule *TheModule);
   void setName(const std::string &TheName);
@@ -321,7 +321,7 @@ protected:
 
   DecorateMapType Decorates;
   MemberDecorateMapType MemberDecorates;
-  std::shared_ptr<const SPIRVLine> Line;
+  const SPIRVLine *Line;
 };
 
 class SPIRVEntryNoIdGeneric : public SPIRVEntry {

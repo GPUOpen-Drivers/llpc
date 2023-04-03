@@ -62,7 +62,8 @@ class SPIRVModuleImpl : public SPIRVModule {
 public:
   SPIRVModuleImpl()
       : SPIRVModule(), NextId(1), SPIRVVersion(SPIRV_1_0), GeneratorId(SPIRVGEN_KhronosLLVMSPIRVTranslator),
-        GeneratorVer(0), InstSchema(SPIRVISCH_Default), SrcLang(SourceLanguageGLSL), SrcLangVer(102000) {
+        GeneratorVer(0), InstSchema(SPIRVISCH_Default), SrcLang(SourceLanguageGLSL), SrcLangVer(102000),
+        CurrentLine(nullptr) {
     AddrModel = sizeof(size_t) == 32 ? AddressingModelPhysical32 : AddressingModelPhysical64;
     setMemoryModel(MemoryModelGLSL450);
   }
@@ -74,7 +75,7 @@ public:
   SPIRVId getId(SPIRVId Id = SPIRVID_INVALID, unsigned Increment = 1);
   SPIRVEntry *getEntry(SPIRVId Id) const override;
   // If there's at least one OpLine in the module the CurrentLine is non-empty.
-  bool hasDebugInfo() const override { return CurrentLine.get() || !StringVec.empty() || !DebugInstVec.empty(); }
+  bool hasDebugInfo() const override { return CurrentLine != nullptr || !StringVec.empty() || !DebugInstVec.empty(); }
 
   // Error handling functions
   SPIRVErrorLog &getErrorLog() override { return ErrLog; }
@@ -169,9 +170,8 @@ public:
   SPIRVString *getString(const std::string &Str) override;
   SPIRVMemberName *addMemberName(SPIRVTypeStruct *ST, SPIRVWord MemberNumber, const std::string &Name) override;
   void addUnknownStructField(SPIRVTypeStruct *Struct, unsigned I, SPIRVId ID) override;
-  void addLine(SPIRVEntry *E, SPIRVId FileNameId, SPIRVWord Line, SPIRVWord Column) override;
-  const std::shared_ptr<const SPIRVLine> &getCurrentLine() const override;
-  void setCurrentLine(const std::shared_ptr<const SPIRVLine> &Line) override;
+  const SPIRVLine *getCurrentLine() const override;
+  void setCurrentLine(const SPIRVLine *Line) override;
   void addCapability(SPIRVCapabilityKind) override;
   void addCapabilityInternal(SPIRVCapabilityKind) override;
   const SPIRVDecorateGeneric *addDecorate(const SPIRVDecorateGeneric *) override;
@@ -323,7 +323,7 @@ private:
   SPIRVIdSet NamedId;
   SPIRVStringVec StringVec;
   SPIRVMemberNameVec MemberNameVec;
-  std::shared_ptr<const SPIRVLine> CurrentLine;
+  const SPIRVLine *CurrentLine;
   SPIRVDecorateSet DecorateSet;
   SPIRVDecGroupVec DecGroupVec;
   SPIRVGroupDecVec GroupDecVec;
@@ -339,38 +339,23 @@ private:
 };
 
 SPIRVModuleImpl::~SPIRVModuleImpl() {
-
   for (auto I : IdEntryMap)
     delete I.second;
 
   for (auto I : EntryNoId) {
-    if (I->getOpCode() == OpLine)
-      // NOTE: For the entry corresponding to "OpLine", we do not have to
-      // destroy it explicitly. The entry is managed by shared pointer
-      // mechanism. What we have to do is to release the owned "OpLine"
-      // entry (often itself, a cyclic reference).
-      I->setLine(nullptr);
-    else
-      delete I;
+    delete I;
   }
 
   for (auto C : CapMap)
     delete C.second;
 }
 
-const std::shared_ptr<const SPIRVLine> &SPIRVModuleImpl::getCurrentLine() const {
+const SPIRVLine *SPIRVModuleImpl::getCurrentLine() const {
   return CurrentLine;
 }
 
-void SPIRVModuleImpl::setCurrentLine(const std::shared_ptr<const SPIRVLine> &Line) {
+void SPIRVModuleImpl::setCurrentLine(const SPIRVLine *Line) {
   CurrentLine = Line;
-}
-
-void SPIRVModuleImpl::addLine(SPIRVEntry *E, SPIRVId FileNameId, SPIRVWord Line, SPIRVWord Column) {
-  if (!(CurrentLine && CurrentLine->equals(FileNameId, Line, Column)))
-    CurrentLine.reset(new SPIRVLine(this, FileNameId, Line, Column));
-  assert(E && "invalid entry");
-  E->setLine(CurrentLine);
 }
 
 // Creates decoration group and group decorates from decorates shared by
@@ -475,9 +460,9 @@ void SPIRVModuleImpl::layoutEntry(SPIRVEntry *E) {
   } break;
   case OpExtInst: {
     SPIRVExtInst *EI = static_cast<SPIRVExtInst *>(E);
-    if (EI->getExtSetKind() == SPIRVEIS_Debug && EI->getExtOp() != SPIRVDebug::Declare &&
-        EI->getExtOp() != SPIRVDebug::Value && EI->getExtOp() != SPIRVDebug::Scope &&
-        EI->getExtOp() != SPIRVDebug::NoScope) {
+    if ((EI->getExtSetKind() == SPIRVEIS_Debug || EI->getExtSetKind() == SPIRVEIS_NonSemanticShaderDebugInfo100) &&
+        EI->getExtOp() != SPIRVDebug::Declare && EI->getExtOp() != SPIRVDebug::Value &&
+        EI->getExtOp() != SPIRVDebug::Scope && EI->getExtOp() != SPIRVDebug::NoScope) {
       DebugInstVec.push_back(EI);
     }
     break;

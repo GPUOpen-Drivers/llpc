@@ -65,9 +65,12 @@ public:
 
   SPIRVToLLVMDbgTran(SPIRVModule *TBM, Module *TM, SPIRVToLLVM *Reader);
   void createCompilationUnit();
-  void transDbgInfo(SPIRVValue *SV, Value *V);
+  void recordsValue(SPIRVValue *SV, Value *V);
+  void applyDelayedDbgInfo();
   template <typename T = MDNode> T *transDebugInst(const SPIRVExtInst *DebugInst) {
-    assert(DebugInst->getExtSetKind() == SPIRVEIS_Debug && "Unexpected extended instruction set");
+    assert((DebugInst->getExtSetKind() == SPIRVEIS_Debug ||
+            DebugInst->getExtSetKind() == SPIRVEIS_NonSemanticShaderDebugInfo100) &&
+           "Unexpected extended instruction set");
     auto It = DebugInstCache.find(DebugInst);
     if (It != DebugInstCache.end())
       return static_cast<T *>(It->second);
@@ -140,6 +143,8 @@ private:
 
   MDNode *transExpression(const SPIRVExtInst *DebugInst);
 
+  DIFile *transSource(const SPIRVExtInst *DebugInst);
+
   SPIRVModule *BM;
   Module *M;
   DIBuilder Builder;
@@ -149,7 +154,7 @@ private:
   std::unordered_map<std::string, DIFile *> FileMap;
   std::unordered_map<SPIRVId, DISubprogram *> FuncMap;
   std::unordered_map<const SPIRVExtInst *, MDNode *> DebugInstCache;
-
+  std::unordered_map<Instruction *, SPIRVInstruction *> RecordedInstructions;
   struct SplitFileName {
     SplitFileName(const std::string &FileName);
     std::string BaseName;
@@ -168,6 +173,7 @@ private:
     return nullptr;
   }
   const std::string &getString(const SPIRVId Id);
+  unsigned getConstant(const SPIRVId Id);
 };
 } // namespace SPIRV
 

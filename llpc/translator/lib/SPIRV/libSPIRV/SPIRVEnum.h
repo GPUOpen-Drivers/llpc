@@ -83,6 +83,7 @@ enum SPIRVExtInstSetKind {
   SPIRVEIS_NonSemanticInfo,
   SPIRVEIS_NonSemanticDebugBreak,
   SPIRVEIS_NonSemanticDebugPrintf,
+  SPIRVEIS_NonSemanticShaderDebugInfo100,
   SPIRVEIS_Debug,
   SPIRVEIS_Count,
 };
@@ -118,7 +119,9 @@ template <> inline void SPIRVMap<SPIRVExtInstSetKind, std::string>::init() {
   add(SPIRVEIS_NonSemanticDebugBreak, "NonSemantic.DebugBreak");
   add(SPIRVEIS_NonSemanticDebugPrintf, "NonSemantic.DebugPrintf");
   add(SPIRVEIS_Debug, "OpenCL.DebugInfo.100");
+  add(SPIRVEIS_NonSemanticShaderDebugInfo100, "NonSemantic.Shader.DebugInfo.100");
 }
+
 typedef SPIRVMap<SPIRVExtInstSetKind, std::string> SPIRVBuiltinSetNameMap;
 
 template <typename K> SPIRVCapVec getCapability(K Key) {

@@ -43,6 +43,7 @@
 #include "khronos/spirv.hpp"
 #include "khronos/spirv/NonSemanticDebugBreak.h"
 #include "khronos/spirv/NonSemanticDebugPrintf.h"
+#include "khronos/spirv/NonSemanticShaderDebugInfo100.h"
 namespace spv {
 #include "GLSL.ext.AMD.h"
 
