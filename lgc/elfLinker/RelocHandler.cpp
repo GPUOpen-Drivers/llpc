@@ -216,7 +216,7 @@ bool RelocHandler::getValue(StringRef name, uint64_t &value) {
     return true;
   }
   if (name == reloc::ShadowDescriptorTableEnabled) {
-    value = m_pipelineState->getOptions().shadowDescriptorTable != ShadowDescriptorTableDisable;
+    value = m_pipelineState->getOptions().enableFmask;
     return true;
   }
 

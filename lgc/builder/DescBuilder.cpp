@@ -425,9 +425,9 @@ Value *BuilderImpl::getDescPtr(ResourceNodeType concreteType, ResourceNodeType a
     // - value for high 32 bits of the pointer; HighAddrPc to use PC
     if (node || topNode || concreteType != ResourceNodeType::DescriptorFmask) {
       unsigned shadowDescriptorTable = m_pipelineState->getOptions().shadowDescriptorTable;
-      bool shadow =
-          concreteType == ResourceNodeType::DescriptorFmask && shadowDescriptorTable != ShadowDescriptorTableDisable;
-      Value *highHalf = getInt32(shadow ? shadowDescriptorTable : HighAddrPc);
+      bool enableFmask =
+          concreteType == ResourceNodeType::DescriptorFmask && m_pipelineState->getOptions().enableFmask;
+      Value *highHalf = getInt32(enableFmask ? shadowDescriptorTable : HighAddrPc);
       return CreateNamedCall(lgcName::DescriptorTableAddr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
                              {getInt32(unsigned(concreteType)), getInt32(unsigned(abstractType)), getInt32(descSet),
                               getInt32(binding), highHalf},
@@ -518,6 +518,9 @@ Value *BuilderImpl::getDescPtr(ResourceNodeType concreteType, ResourceNodeType a
     if (concreteType == ResourceNodeType::DescriptorSampler &&
         node->concreteType == ResourceNodeType::DescriptorCombinedTexture)
       offsetInBytes += DescriptorSizeResource;
+    else if (concreteType == ResourceNodeType::DescriptorFmask &&
+             node->concreteType == ResourceNodeType::DescriptorCombinedTexture)
+      offsetInBytes += DescriptorSizeResource + DescriptorSizeSampler;
     offset = getInt32(offsetInBytes);
   }
 

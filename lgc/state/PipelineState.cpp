@@ -1003,8 +1003,7 @@ PipelineState::findResourceNode(ResourceNodeType nodeType, unsigned descSet, uns
       return {&node, &node};
   }
 
-  if (nodeType == ResourceNodeType::DescriptorFmask &&
-      getOptions().shadowDescriptorTable != ShadowDescriptorTableDisable) {
+  if (nodeType == ResourceNodeType::DescriptorFmask && getOptions().enableFmask) {
 #if defined(__GNUC__) && !defined(__clang__)
     // FIXME Newer gcc versions optimize out this if statement. The reason is either undefined behavior in lgc or a bug
     // in gcc. The following inline assembly prevents the gcc optimization.
