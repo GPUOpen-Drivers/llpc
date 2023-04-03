@@ -133,8 +133,8 @@ struct Options {
   bool fullSubgroups;                  // Use full subgroup lanes
   unsigned nggVertsPerSubgroup;        // How to determine NGG verts per subgroup
   unsigned nggPrimsPerSubgroup;        // How to determine NGG prims per subgroup
-  unsigned shadowDescriptorTable;      // High dword of shadow descriptor table address, or
-                                       //   ShadowDescriptorTableDisable to disable shadow descriptor tables
+  unsigned highAddrOfFmask;            // High dword of Fmask address
+  bool enableFmask;                    // Whether to use Fmasks when loading from MSAA images
   unsigned allowNullDescriptor;        // Allow and give defined behavior for null descriptor
   unsigned disableImageResourceCheck;  // Don't do image resource type check
   unsigned reserved0f;                 // Reserved for future functionality

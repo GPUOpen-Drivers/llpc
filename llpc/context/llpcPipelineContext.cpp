@@ -287,22 +287,28 @@ Options PipelineContext::computePipelineOptions() const {
   switch (getPipelineOptions()->shadowDescriptorTableUsage) {
   case Vkgc::ShadowDescriptorTableUsage::Auto:
     // Use default of 2 for standalone amdllpc.
-    options.shadowDescriptorTable = ShadowDescTablePtrHigh;
+    options.highAddrOfFmask = ShadowDescTablePtrHigh;
+    options.enableFmask = true;
     break;
   case Vkgc::ShadowDescriptorTableUsage::Enable:
-    options.shadowDescriptorTable = getPipelineOptions()->shadowDescriptorTablePtrHigh;
+    options.highAddrOfFmask = getPipelineOptions()->shadowDescriptorTablePtrHigh;
+    options.enableFmask = true;
     break;
   case Vkgc::ShadowDescriptorTableUsage::Disable:
-    options.shadowDescriptorTable = ShadowDescriptorTableDisable;
+    options.highAddrOfFmask = ShadowDescriptorTableDisable;
+    options.enableFmask = false;
     break;
   }
 
   // Shadow descriptor command line options override pipeline options.
   if (EnableShadowDescriptorTable.getNumOccurrences() > 0) {
-    if (!EnableShadowDescriptorTable)
-      options.shadowDescriptorTable = ShadowDescriptorTableDisable;
-    else
-      options.shadowDescriptorTable = ShadowDescTablePtrHigh;
+    if (!EnableShadowDescriptorTable) {
+      options.highAddrOfFmask = ShadowDescriptorTableDisable;
+      options.enableFmask = false;
+    } else {
+      options.highAddrOfFmask = ShadowDescTablePtrHigh;
+      options.enableFmask = true;
+    }
   }
 
   options.allowNullDescriptor = getPipelineOptions()->extendedRobustness.nullDescriptor;

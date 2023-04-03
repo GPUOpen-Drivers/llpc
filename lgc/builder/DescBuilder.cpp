@@ -424,10 +424,10 @@ Value *BuilderImpl::getDescPtr(ResourceNodeType concreteType, ResourceNodeType a
     // - descriptor binding number
     // - value for high 32 bits of the pointer; HighAddrPc to use PC
     if (node || topNode || concreteType != ResourceNodeType::DescriptorFmask) {
-      unsigned shadowDescriptorTable = m_pipelineState->getOptions().shadowDescriptorTable;
-      bool shadow =
-          concreteType == ResourceNodeType::DescriptorFmask && shadowDescriptorTable != ShadowDescriptorTableDisable;
-      Value *highHalf = getInt32(shadow ? shadowDescriptorTable : HighAddrPc);
+      unsigned highAddrOfFmask = m_pipelineState->getOptions().highAddrOfFmask;
+      bool isFmask = concreteType == ResourceNodeType::DescriptorFmask;
+      assert(!(isFmask && highAddrOfFmask == ShadowDescriptorTableDisable) && "not implemented");
+      Value *highHalf = getInt32(isFmask ? highAddrOfFmask : HighAddrPc);
       return CreateNamedCall(lgcName::DescriptorTableAddr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
                              {getInt32(unsigned(concreteType)), getInt32(unsigned(abstractType)), getInt32(descSet),
                               getInt32(binding), highHalf},
