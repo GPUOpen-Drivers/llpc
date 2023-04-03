@@ -583,7 +583,7 @@ Value *BuilderImpl::CreateImageLoadWithFmask(Type *resultTy, unsigned dim, unsig
   }
 
   // When the shadow table is disabled, we don't need to load F-mask descriptor
-  if (m_pipelineState->getOptions().shadowDescriptorTable != ShadowDescriptorTableDisable) {
+  if (m_pipelineState->getOptions().enableFmask) {
     Value *fmaskTexel = CreateImageLoad(FixedVectorType::get(getInt32Ty(), 4), fmaskDim, flags, fmaskDesc, coord,
                                         nullptr, instName + ".fmaskload");
 
