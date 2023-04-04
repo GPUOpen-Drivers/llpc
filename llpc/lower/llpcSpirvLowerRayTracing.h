@@ -53,6 +53,7 @@ enum : unsigned {
   DuplicateAnyHit,       // Indication of calling behavior on any hit shader,
   GeometryIndex,         // Geometry Index
   HitAttributes,         // Hit attributes
+  ParentRayId,           // Ray ID of the parent TraceRay call
   Count                  // Count of the trace attributes
 };
 }

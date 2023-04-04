@@ -127,7 +127,9 @@ protected:
   void createGlobalStack();
   void createGlobalLdsUsage();
   void createGlobalRayQueryObj();
+  void createGlobalTraceRayStaticId();
   void initGlobalVariable();
+  void generateTraceRayStaticId();
   llvm::Value *createTransformMatrix(unsigned builtInId, llvm::Value *accelStruct, llvm::Value *instanceId,
                                      llvm::Instruction *insertPos);
   llvm::Value *getThreadIdInGroup() const;
@@ -136,6 +138,7 @@ protected:
   llvm::Value *createLoadInstanceIndex(llvm::Value *instNodeAddr);
   llvm::Value *createLoadInstanceId(llvm::Value *instNodeAddr);
   llvm::Value *createLoadMatrixFromAddr(llvm::Value *matrixAddr);
+  llvm::GlobalVariable *m_traceRayStaticId; // Static trace ray call site identifier
 
   bool m_rayQueryLibrary;       // Whether the module is ray query library
   unsigned m_spirvOpMetaKindId; // Metadata kind ID for "spirv.op"
@@ -163,6 +166,7 @@ private:
   llvm::GlobalVariable *m_stackArray;      // Stack array to hold stack value
   llvm::GlobalVariable *m_prevRayQueryObj; // Previous ray query Object
   llvm::GlobalVariable *m_rayQueryObjGen;  // Ray query Object Id generator
+  unsigned m_nextTraceRayId;               // Next trace ray ID to be used for ray history
 };
 
 } // namespace Llpc
