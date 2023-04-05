@@ -646,6 +646,7 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.nsaThreshold = " << shaderInfo->options.nsaThreshold << "\n";
   dumpFile << "options.aggressiveInvariantLoads = " << shaderInfo->options.aggressiveInvariantLoads << "\n";
   dumpFile << "options.workaroundInitializeOutputsToZero = " << shaderInfo->options.workaroundInitializeOutputsToZero << "\n";
+  dumpFile << "options.workaroundStorageImageFormats = " << shaderInfo->options.workaroundStorageImageFormats << "\n";
   dumpFile << "\n";
   // clang-format on
 }
@@ -1670,6 +1671,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.nsaThreshold);
       hasher->Update(options.aggressiveInvariantLoads);
       hasher->Update(options.workaroundInitializeOutputsToZero);
+      hasher->Update(options.workaroundStorageImageFormats);
     }
   }
 }

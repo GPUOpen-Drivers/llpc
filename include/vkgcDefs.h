@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     61.4 | Add workaroundStorageImageFormats to PipelineShaderOptions                                            |
 //  |     61.3 | Add workaroundInitializeOutputsToZero to PipelineShaderOptions                                        |
 //  |     61.2 | Add pClientMetadata and clientMetadataSize to all PipelineBuildInfos                                  |
 //  |     61.1 | Add IPipelineDumper::GetGraphicsShaderBinaryHash                                                      |
@@ -844,6 +845,10 @@ struct PipelineShaderOptions {
 
   /// Initialize outputs to zero if it is true
   bool workaroundInitializeOutputsToZero;
+
+  /// Disable an optimization that relies on trusting shaders to specify the correct image format to reduce the number
+  /// of written channels.
+  bool workaroundStorageImageFormats;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor
