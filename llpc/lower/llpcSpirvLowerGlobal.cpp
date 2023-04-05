@@ -36,7 +36,6 @@
 #include "lgc/Builder.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/IR/Constant.h"
-#include "llvm/IR/Dominators.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/Debug.h"
@@ -190,7 +189,6 @@ SpirvLowerGlobal::SpirvLowerGlobal() : m_retBlock(nullptr), m_lowerInputInPlace(
 // @param [in/out] module : LLVM module to be run on (empty on entry)
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses SpirvLowerGlobal::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  m_functionAnalysisManager = &analysisManager.getResult<FunctionAnalysisManagerModuleProxy>(module).getManager();
   runImpl(module);
   return PreservedAnalyses::none();
 }
@@ -1778,26 +1776,6 @@ void SpirvLowerGlobal::storeOutputMember(Type *outputTy, Type *storeTy, Value *s
 }
 
 // =====================================================================================================================
-// Find a new insertion point that dominates the current insertion point \p instA and a specified instruction use
-// \p useB.
-static Instruction *findNearestCommonDominator(Instruction *instA, Use &useB, DominatorTree &domTree) {
-  auto *instB = cast<Instruction>(useB.getUser());
-  BasicBlock *blockB = instB->getParent();
-  if (auto *phiB = dyn_cast<PHINode>(instB)) {
-    // Normal instructions cannot be inserted before a PHI node, so put them at the end of the corresponding predecessor
-    // block instead.
-    blockB = phiB->getIncomingBlock(useB.getOperandNo());
-    instB = blockB->getTerminator();
-  }
-
-  // Allow instA to be nullptr for ease of use.
-  if (!instA)
-    return instB;
-
-  return domTree.findNearestCommonDominator(instA, instB);
-}
-
-// =====================================================================================================================
 // Loads indexed value from task payload.
 //
 // @param indexedTy : Current indexed type in processing when we traverse the index operands
@@ -2477,14 +2455,20 @@ void SpirvLowerGlobal::lowerBufferBlock() {
           }
         }
       } else {
-        DominatorTree &domTree = m_functionAnalysisManager->getResult<DominatorTreeAnalysis>(*func);
+        m_builder->SetInsertPointPastAllocas(func);
+        unsigned bufferFlags = global.isConstant() ? 0 : lgc::Builder::BufferFlagWritten;
+        Value *const bufferDesc =
+            m_builder->CreateLoadBufferDesc(descSet, binding, m_builder->getInt32(0), bufferFlags);
+
+        // If the global variable is a constant, the data it points to is invariant.
+        if (global.isConstant())
+          m_builder->CreateInvariantStart(bufferDesc);
+
+        Value *const bitCast = m_builder->CreateBitCast(bufferDesc, global.getType());
 
         SmallVector<Instruction *, 8> usesToReplace;
-        Instruction *insertPoint = nullptr;
 
-        for (Use &use : global.uses()) {
-          User *const user = use.getUser();
-
+        for (User *const user : global.users()) {
           // Skip over non-instructions that we've already made useless.
           if (!isa<Instruction>(user))
             continue;
@@ -2496,22 +2480,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
             continue;
 
           usesToReplace.push_back(inst);
-          insertPoint = findNearestCommonDominator(insertPoint, use, domTree);
         }
-
-        if (!insertPoint)
-          continue;
-
-        m_builder->SetInsertPoint(insertPoint);
-        unsigned bufferFlags = global.isConstant() ? 0 : lgc::Builder::BufferFlagWritten;
-        Value *const bufferDesc =
-            m_builder->CreateLoadBufferDesc(descSet, binding, m_builder->getInt32(0), bufferFlags);
-
-        // If the global variable is a constant, the data it points to is invariant.
-        if (global.isConstant())
-          m_builder->CreateInvariantStart(bufferDesc);
-
-        Value *const bitCast = m_builder->CreateBitCast(bufferDesc, global.getType());
 
         for (Instruction *const use : usesToReplace)
           use->replaceUsesOfWith(&global, bitCast);
@@ -2595,14 +2564,21 @@ void SpirvLowerGlobal::lowerPushConsts() {
     }
 
     for (Function *const func : funcsUsedIn) {
-      DominatorTree &domTree = m_functionAnalysisManager->getResult<DominatorTreeAnalysis>(*func);
+      m_builder->SetInsertPointPastAllocas(func);
+
+      MDNode *metaNode = global.getMetadata(gSPIRVMD::PushConst);
+      auto pushConstSize = mdconst::dyn_extract<ConstantInt>(metaNode->getOperand(0))->getZExtValue();
+      Type *const pushConstantsType = ArrayType::get(m_builder->getInt8Ty(), pushConstSize);
+      Value *pushConstants =
+          m_builder->CreateLoadPushConstantsPtr(pushConstantsType->getPointerTo(m_builder->getAddrSpaceConst()));
+
+      auto addrSpace = pushConstants->getType()->getPointerAddressSpace();
+      Type *const castType = global.getValueType()->getPointerTo(addrSpace);
+      pushConstants = m_builder->CreateBitCast(pushConstants, castType);
 
       SmallVector<Instruction *, 8> usesToReplace;
-      Instruction *insertPoint = nullptr;
 
-      for (Use &use : global.uses()) {
-        User *const user = use.getUser();
-
+      for (User *const user : global.users()) {
         // Skip over non-instructions that we've already made useless.
         if (!isa<Instruction>(user))
           continue;
@@ -2614,23 +2590,7 @@ void SpirvLowerGlobal::lowerPushConsts() {
           continue;
 
         usesToReplace.push_back(inst);
-        insertPoint = findNearestCommonDominator(insertPoint, use, domTree);
       }
-
-      if (!insertPoint)
-        continue;
-
-      m_builder->SetInsertPoint(insertPoint);
-
-      MDNode *metaNode = global.getMetadata(gSPIRVMD::PushConst);
-      auto pushConstSize = mdconst::dyn_extract<ConstantInt>(metaNode->getOperand(0))->getZExtValue();
-      Type *const pushConstantsType = ArrayType::get(m_builder->getInt8Ty(), pushConstSize);
-      Value *pushConstants =
-          m_builder->CreateLoadPushConstantsPtr(pushConstantsType->getPointerTo(m_builder->getAddrSpaceConst()));
-
-      auto addrSpace = pushConstants->getType()->getPointerAddressSpace();
-      Type *const castType = global.getValueType()->getPointerTo(addrSpace);
-      pushConstants = m_builder->CreateBitCast(pushConstants, castType);
 
       for (Instruction *const inst : usesToReplace)
         inst->replaceUsesOfWith(&global, pushConstants);
