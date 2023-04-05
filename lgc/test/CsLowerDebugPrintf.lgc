@@ -23,7 +23,10 @@ define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !spi
   %8 = getelementptr i8, ptr addrspace(4) %7, i32 0
   %9 = load <4 x i32>, ptr addrspace(4) %8, align 16
   %10 = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %9)
-  %" " = call i64 @lgc.debug.printf(ptr addrspace(7) %10, ptr addrspace(4) @str.1, i32 %__llpc_input_proxy_gl_GlobalInvocationID.0.vec.extract)
+  %11 = insertelement <2 x i32> poison, i32 0, i64 0
+  %12 = insertelement <2 x i32> %11, i32 0, i64 1
+  %13 = bitcast <2 x i32> %12 to i64
+  %" " = call i64 @lgc.debug.printf(ptr addrspace(7) %10, ptr addrspace(4) @str.1, i32 %__llpc_input_proxy_gl_GlobalInvocationID.0.vec.extract, i64 %13)
   ret void
 }
 
@@ -79,16 +82,28 @@ attributes #2 = { nounwind willreturn memory(none) }
 ; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP7]], i32 0
 ; CHECK-NEXT:    [[TMP9:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP8]], align 16
 ; CHECK-NEXT:    [[TMP10:%.*]] = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> [[TMP9]])
-; CHECK-NEXT:    [[TMP11:%.*]] = atomicrmw add ptr addrspace(7) [[TMP10]], i64 3 syncscope("singlethread") monotonic, align 8
-; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.umin.i64(i64 [[TMP11]], i64 2147483648)
-; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr { [4 x i32], [4294967295 x i32] }, ptr addrspace(7) [[TMP10]], i32 0, i32 1, i64 [[TMP12]]
-; CHECK-NEXT:    store i32 -1902706685, ptr addrspace(7) [[TMP13]], align 4
-; CHECK-NEXT:    [[TMP14:%.*]] = add i64 [[TMP12]], 1
-; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr { [4 x i32], [4294967295 x i32] }, ptr addrspace(7) [[TMP10]], i32 0, i32 1, i64 [[TMP14]]
-; CHECK-NEXT:    store i32 -455574279, ptr addrspace(7) [[TMP15]], align 4
-; CHECK-NEXT:    [[TMP16:%.*]] = add i64 [[TMP14]], 1
-; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr { [4 x i32], [4294967295 x i32] }, ptr addrspace(7) [[TMP10]], i32 0, i32 1, i64 [[TMP16]]
-; CHECK-NEXT:    store i32 [[__LLPC_INPUT_PROXY_GL_GLOBALINVOCATIONID_0_VEC_EXTRACT]], ptr addrspace(7) [[TMP17]], align 4
-; CHECK-NEXT:    [[TMP18:%.*]] = add i64 [[TMP16]], 1
+; CHECK-NEXT:    [[TMP11:%.*]] = insertelement <2 x i32> poison, i32 0, i64 0
+; CHECK-NEXT:    [[TMP12:%.*]] = insertelement <2 x i32> [[TMP11]], i32 0, i64 1
+; CHECK-NEXT:    [[TMP13:%.*]] = bitcast <2 x i32> [[TMP12]] to i64
+; CHECK-NEXT:    [[TMP14:%.*]] = trunc i64 [[TMP13]] to i32
+; CHECK-NEXT:    [[TMP15:%.*]] = lshr i64 [[TMP13]], 32
+; CHECK-NEXT:    [[TMP16:%.*]] = trunc i64 [[TMP15]] to i32
+; CHECK-NEXT:    [[TMP17:%.*]] = atomicrmw add ptr addrspace(7) [[TMP10]], i64 5 syncscope("singlethread") monotonic, align 8
+; CHECK-NEXT:    [[TMP18:%.*]] = call i64 @llvm.umin.i64(i64 [[TMP17]], i64 2147483648)
+; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr { [4 x i32], [4294967295 x i32] }, ptr addrspace(7) [[TMP10]], i32 0, i32 1, i64 [[TMP18]]
+; CHECK-NEXT:    store i32 -1902706683, ptr addrspace(7) [[TMP19]], align 4
+; CHECK-NEXT:    [[TMP20:%.*]] = add i64 [[TMP18]], 1
+; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr { [4 x i32], [4294967295 x i32] }, ptr addrspace(7) [[TMP10]], i32 0, i32 1, i64 [[TMP20]]
+; CHECK-NEXT:    store i32 -455574279, ptr addrspace(7) [[TMP21]], align 4
+; CHECK-NEXT:    [[TMP22:%.*]] = add i64 [[TMP20]], 1
+; CHECK-NEXT:    [[TMP23:%.*]] = getelementptr { [4 x i32], [4294967295 x i32] }, ptr addrspace(7) [[TMP10]], i32 0, i32 1, i64 [[TMP22]]
+; CHECK-NEXT:    store i32 [[__LLPC_INPUT_PROXY_GL_GLOBALINVOCATIONID_0_VEC_EXTRACT]], ptr addrspace(7) [[TMP23]], align 4
+; CHECK-NEXT:    [[TMP24:%.*]] = add i64 [[TMP22]], 1
+; CHECK-NEXT:    [[TMP25:%.*]] = getelementptr { [4 x i32], [4294967295 x i32] }, ptr addrspace(7) [[TMP10]], i32 0, i32 1, i64 [[TMP24]]
+; CHECK-NEXT:    store i32 [[TMP14]], ptr addrspace(7) [[TMP25]], align 4
+; CHECK-NEXT:    [[TMP26:%.*]] = add i64 [[TMP24]], 1
+; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr { [4 x i32], [4294967295 x i32] }, ptr addrspace(7) [[TMP10]], i32 0, i32 1, i64 [[TMP26]]
+; CHECK-NEXT:    store i32 [[TMP16]], ptr addrspace(7) [[TMP27]], align 4
+; CHECK-NEXT:    [[TMP28:%.*]] = add i64 [[TMP26]], 1
 ; CHECK-NEXT:    ret void
 ;
