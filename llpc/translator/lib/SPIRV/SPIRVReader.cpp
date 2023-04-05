@@ -115,6 +115,13 @@ cl::opt<Vkgc::DenormalMode> Fp32DenormalModeOpt(
                clEnumValN(Vkgc::DenormalMode::FlushToZero, "ftz", "Denormal input/output flushed to zero"),
                clEnumValN(Vkgc::DenormalMode::Preserve, "preserve", "Denormal input/output preserved")));
 
+cl::opt<bool> SpirvOverrideWorkaroundStorageImageFormats(
+    "spirv-override-workaround-storage-image-formats",
+    cl::desc("Override the workaroundStorageImageFormats setting. When set to true, the Image Format operand of "
+             "OpTypeImage is ignored and always treated as if it were Unknown. The default is to take the setting from "
+             "the pipeline shader options (which itself defaults to false)"),
+    cl::init(false));
+
 // Prefix for placeholder global variable name.
 const char *KPlaceholderPrefix = "placeholder.";
 
@@ -165,6 +172,10 @@ SPIRVToLLVM::SPIRVToLLVM(Module *llvmModule, SPIRVModule *theSpirvModule, const 
   m_context = &m_m->getContext();
   m_spirvOpMetaKindId = m_context->getMDKindID(MetaNameSpirvOp);
   m_scratchBoundsChecksEnabled = scratchBoundsChecksEnabled();
+
+  m_workaroundStorageImageFormats = shaderOptions->workaroundStorageImageFormats;
+  if (SpirvOverrideWorkaroundStorageImageFormats.getNumOccurrences() > 0)
+    m_workaroundStorageImageFormats = SpirvOverrideWorkaroundStorageImageFormats.getValue();
 }
 
 void SPIRVToLLVM::recordRemappedTypeElements(SPIRVType *bt, unsigned from, unsigned to) {
@@ -6835,7 +6846,9 @@ Value *SPIRVToLLVM::transSPIRVImageWriteFromInst(SPIRVInstruction *bi, BasicBloc
   // Create smaller texel vector, if num texel components > num channels. This
   // ensures that no unused channels are being stored.
   if (auto texelVecType = dyn_cast<FixedVectorType>(texel->getType())) {
-    unsigned numChannels = getImageNumChannels(imageInfo.desc);
+    unsigned numChannels = 0;
+    if (!m_workaroundStorageImageFormats)
+      numChannels = getImageNumChannels(imageInfo.desc);
     if (numChannels > 0 && numChannels < texelVecType->getNumElements()) {
       if (numChannels == 1) {
         texel = getBuilder()->CreateExtractElement(texel, getBuilder()->getInt32(0));

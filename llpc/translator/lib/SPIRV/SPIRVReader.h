@@ -266,6 +266,7 @@ private:
   GlobalVariable *m_debugOutputBuffer;
 
   const Vkgc::PipelineShaderOptions *m_shaderOptions;
+  bool m_workaroundStorageImageFormats;
   unsigned m_spirvOpMetaKindId;
   unsigned m_execModule;
   bool m_scratchBoundsChecksEnabled;
