@@ -101,7 +101,7 @@ Value *LowerDebugPrintf::createDebugPrintf(Value *debugPrintfBuffer, Value *form
   // Records printf output variables are 64bit or not
   SmallBitVector bit64Vector;
   for (const auto &var : vars) {
-    getDwordValues(var, printArgs, bit64Vector);
+    getDwordValues(var, printArgs, bit64Vector, builder);
   }
 
   GlobalVariable *globalStr = cast<GlobalVariable>(formatStr);
@@ -162,9 +162,11 @@ Value *LowerDebugPrintf::createDebugPrintf(Value *debugPrintfBuffer, Value *form
 // @val : input value
 // @output : generated converted val
 // @output64Bits : bits vector, one bit for one printf output variable
-void LowerDebugPrintf::getDwordValues(Value *val, SmallVectorImpl<Value *> &output, SmallBitVector &output64Bits) {
+// @builder: builder to generate llvm
+void LowerDebugPrintf::getDwordValues(Value *val, SmallVectorImpl<Value *> &output, SmallBitVector &output64Bits,
+                                      BuilderBase &builder) {
   auto vTy = val->getType();
-  BuilderBase builder(*m_context);
+
   auto int32Ty = builder.getInt32Ty();
   auto int64Ty = builder.getInt64Ty();
 
@@ -172,13 +174,13 @@ void LowerDebugPrintf::getDwordValues(Value *val, SmallVectorImpl<Value *> &outp
   case Type::FixedVectorTyID: {
     for (uint64_t i = 0; i < cast<FixedVectorType>(vTy)->getNumElements(); ++i) {
       Value *element = builder.CreateExtractElement(val, i);
-      return getDwordValues(element, output, output64Bits);
+      return getDwordValues(element, output, output64Bits, builder);
     }
     break;
   }
   case Type::HalfTyID: {
     val = builder.CreateFPExt(val, builder.getFloatTy());
-    return getDwordValues(val, output, output64Bits);
+    return getDwordValues(val, output, output64Bits, builder);
   }
   case Type::FloatTyID: {
     val = builder.CreateBitCast(val, int32Ty);
@@ -188,7 +190,7 @@ void LowerDebugPrintf::getDwordValues(Value *val, SmallVectorImpl<Value *> &outp
   }
   case Type::DoubleTyID: {
     val = builder.CreateBitCast(val, int64Ty);
-    return getDwordValues(val, output, output64Bits);
+    return getDwordValues(val, output, output64Bits, builder);
   }
 
   case Type::IntegerTyID: {
