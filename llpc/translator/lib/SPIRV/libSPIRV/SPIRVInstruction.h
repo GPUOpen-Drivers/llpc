@@ -1596,7 +1596,7 @@ protected:
     GcnShaderAMDExtOpKind ExtOpGcnShaderAMD;
     ShaderTrinaryMinMaxAMDExtOpKind ExtOpShaderTrinaryMinMaxAMD;
     NonSemanticInfoExtOpKind ExtOpNonSemanticInfo;
-    SPIRVDebugExtOpKind ExtOpDebug;
+    NonSemanticShaderDebugInfo100Instructions ExtOpDebug;
   };
   SPIRVExtInstSetKind ExtSetKind;
 };
