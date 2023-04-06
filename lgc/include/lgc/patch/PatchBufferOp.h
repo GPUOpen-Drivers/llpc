@@ -106,7 +106,7 @@ private:
   llvm::IRBuilder<> m_builder;
 
   PipelineState &m_pipelineState;
-  UniformityInfo &m_uniformityInfo;
+  llvm::UniformityInfo &m_uniformityInfo;
 
   // The proxy pointer type used to accumulate offsets.
   llvm::PointerType *m_offsetType = nullptr;
