@@ -6,7 +6,6 @@
 ;
 ; OVERRIDDEN-LABEL: --robust-buffer-access = 1 (default: 0)
 ; OVERRIDDEN-NOT:   --scalar-block-layout = {{.*}}
-; OVERRIDDEN-LABEL: --use-gpu-divergence-analysis = 1 (default: 0)
 
 ; 2. Check that all options gets printed with `--print-all-options`.
 ; RUN: amdllpc %gfxip %s --robust-buffer-access --print-all-options \
@@ -14,7 +13,6 @@
 ;
 ; ALL-LABEL: --robust-buffer-access = 1 (default: 0)
 ; ALL-LABEL: --scalar-block-layout = {{.*}}
-; ALL-LABEL: --use-gpu-divergence-analysis = 1 (default: 0)
 
 
                OpCapability Shader

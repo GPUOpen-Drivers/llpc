@@ -38,7 +38,6 @@
 #include "lgc/util/TypeLowering.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/PostOrderIterator.h"
-#include "llvm/Analysis/DivergenceAnalysis.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
@@ -55,7 +54,7 @@ using namespace lgc;
 namespace {
 
 struct PatchBufferOpImpl {
-  PatchBufferOpImpl(LLVMContext &context, PipelineState &pipelineState, DivergenceInfo &divergenceInfo);
+  PatchBufferOpImpl(LLVMContext &context, PipelineState &pipelineState, UniformityInfo &uniformityInfo);
 
   bool run(Function &function);
 
@@ -78,9 +77,9 @@ PreservedAnalyses PatchBufferOp::run(Function &function, FunctionAnalysisManager
   const auto &moduleAnalysisManager = analysisManager.getResult<ModuleAnalysisManagerFunctionProxy>(function);
   PipelineState *pipelineState =
       moduleAnalysisManager.getCachedResult<PipelineStateWrapper>(*function.getParent())->getPipelineState();
-  DivergenceInfo &divergenceInfo = analysisManager.getResult<DivergenceAnalysis>(function);
+  UniformityInfo &uniformityInfo = analysisManager.getResult<UniformityInfoAnalysis>(function);
 
-  PatchBufferOpImpl impl(function.getContext(), *pipelineState, divergenceInfo);
+  PatchBufferOpImpl impl(function.getContext(), *pipelineState, uniformityInfo);
   if (!impl.run(function))
     return PreservedAnalyses::none();
   return PreservedAnalyses::all();
@@ -88,8 +87,8 @@ PreservedAnalyses PatchBufferOp::run(Function &function, FunctionAnalysisManager
 
 // =====================================================================================================================
 // Construct the per-run temporaries of the PatchBufferOp pass.
-PatchBufferOpImpl::PatchBufferOpImpl(LLVMContext &context, PipelineState &pipelineState, DivergenceInfo &divergenceInfo)
-    : m_typeLowering(context), m_bufferOpLowering(m_typeLowering, pipelineState, divergenceInfo) {
+PatchBufferOpImpl::PatchBufferOpImpl(LLVMContext &context, PipelineState &pipelineState, UniformityInfo &uniformityInfo)
+    : m_typeLowering(context), m_bufferOpLowering(m_typeLowering, pipelineState, uniformityInfo) {
 }
 
 // =====================================================================================================================
@@ -135,11 +134,11 @@ static SmallVector<Type *> convertBufferPointer(TypeLowering &typeLowering, Type
 //
 // @param typeLowering : the TypeLowering object to be used
 // @param pipelineState : the PipelineState object
-// @param divergenceInfo : the divergence analysis result
+// @param uniformityInfo : the uniformity analysis result
 BufferOpLowering::BufferOpLowering(TypeLowering &typeLowering, PipelineState &pipelineState,
-                                   DivergenceInfo &divergenceInfo)
+                                   UniformityInfo &uniformityInfo)
     : m_typeLowering(typeLowering), m_builder(typeLowering.getContext()), m_pipelineState(pipelineState),
-      m_divergenceInfo(divergenceInfo) {
+      m_uniformityInfo(uniformityInfo) {
   m_typeLowering.addRule(&convertBufferPointer);
 
   m_offsetType = m_builder.getPtrTy(ADDR_SPACE_CONST_32BIT);
@@ -174,8 +173,6 @@ void BufferOpLowering::registerVisitors(llvm_dialects::VisitorBuilder<BufferOpLo
 void BufferOpLowering::finish() {
   // If PHI nodes on descriptors weren't optimized away, assume that divergence in the original phi was due to sync
   // divergence, and the new phi should be divergent as well.
-  //
-  // TODO: DivergenceAnalysis should really be updatable/preservable (but switch to new uniform analysis first)
   for (PHINode *originalPhi : m_divergentPhis) {
     auto values = m_typeLowering.getValue(originalPhi);
     if (auto *newPhi = dyn_cast<PHINode>(values[0])) {
@@ -227,7 +224,7 @@ BufferOpLowering::DescriptorInfo BufferOpLowering::getDescriptorInfo(Value *desc
             searchWorklist.push_back(incoming);
         } else if (auto *select = dyn_cast<SelectInst>(current)) {
           assert(select->getOperandUse(0).get() == select->getCondition());
-          if (m_divergenceInfo.isDivergentUse(select->getOperandUse(0)))
+          if (m_uniformityInfo.isDivergentUse(select->getOperandUse(0)))
             di.divergent = true;
 
           if (!di.invariant.has_value() || !di.divergent.has_value()) {
@@ -622,7 +619,7 @@ void BufferOpLowering::visitBufferDescToPtr(BufferDescToPtrOp &descToPtr) {
 
   auto &di = m_descriptors[descToPtr.getDesc()];
   di.invariant = removeUsersForInvariantStarts(&descToPtr);
-  di.divergent = m_divergenceInfo.isDivergent(*descToPtr.getDesc());
+  di.divergent = m_uniformityInfo.isDivergent(*descToPtr.getDesc());
 }
 
 // =====================================================================================================================
@@ -828,7 +825,7 @@ void BufferOpLowering::visitPhiInst(llvm::PHINode &phi) {
   if (!phi.getType()->isPointerTy() || phi.getType()->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
     return;
 
-  if (m_divergenceInfo.isDivergent(phi))
+  if (m_uniformityInfo.isDivergent(phi))
     m_divergentPhis.push_back(&phi);
 }
 

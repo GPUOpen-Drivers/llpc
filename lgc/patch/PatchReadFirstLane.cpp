@@ -31,7 +31,7 @@
 #include "lgc/patch/PatchReadFirstLane.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/state/PipelineState.h"
-#include "llvm/Analysis/DivergenceAnalysis.h"
+#include "llvm/Analysis/UniformityAnalysis.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/InstVisitor.h"
@@ -89,8 +89,8 @@ PatchReadFirstLane::PatchReadFirstLane() : m_targetTransformInfo(nullptr) {
 PreservedAnalyses PatchReadFirstLane::run(Function &function, FunctionAnalysisManager &analysisManager) {
   TargetTransformInfo &targetTransformInfo = analysisManager.getResult<TargetIRAnalysis>(function);
 
-  DivergenceInfo &divergenceInfo = analysisManager.getResult<DivergenceAnalysis>(function);
-  auto isDivergentUse = [&](const Use &use) { return divergenceInfo.isDivergentUse(use); };
+  UniformityInfo &uniformityInfo = analysisManager.getResult<UniformityInfoAnalysis>(function);
+  auto isDivergentUse = [&](const Use &use) { return uniformityInfo.isDivergentUse(use); };
   if (runImpl(function, isDivergentUse, &targetTransformInfo))
     return PreservedAnalyses::none();
   return PreservedAnalyses::all();
