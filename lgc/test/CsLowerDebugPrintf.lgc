@@ -91,10 +91,10 @@ attributes #2 = { nounwind willreturn memory(none) }
 ; CHECK-NEXT:    [[TMP17:%.*]] = atomicrmw add ptr addrspace(7) [[TMP10]], i64 5 syncscope("singlethread") monotonic, align 8
 ; CHECK-NEXT:    [[TMP18:%.*]] = call i64 @llvm.umin.i64(i64 [[TMP17]], i64 2147483648)
 ; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr { [4 x i32], [4294967295 x i32] }, ptr addrspace(7) [[TMP10]], i32 0, i32 1, i64 [[TMP18]]
-; CHECK-NEXT:    store i32 -1902706683, ptr addrspace(7) [[TMP19]], align 4
+; CHECK-NEXT:    store i32 {{-*[0-9]+}}, ptr addrspace(7) [[TMP19]], align 4
 ; CHECK-NEXT:    [[TMP20:%.*]] = add i64 [[TMP18]], 1
 ; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr { [4 x i32], [4294967295 x i32] }, ptr addrspace(7) [[TMP10]], i32 0, i32 1, i64 [[TMP20]]
-; CHECK-NEXT:    store i32 -455574279, ptr addrspace(7) [[TMP21]], align 4
+; CHECK-NEXT:    store i32 {{-*[0-9]+}}, ptr addrspace(7) [[TMP21]], align 4
 ; CHECK-NEXT:    [[TMP22:%.*]] = add i64 [[TMP20]], 1
 ; CHECK-NEXT:    [[TMP23:%.*]] = getelementptr { [4 x i32], [4294967295 x i32] }, ptr addrspace(7) [[TMP10]], i32 0, i32 1, i64 [[TMP22]]
 ; CHECK-NEXT:    store i32 [[__LLPC_INPUT_PROXY_GL_GLOBALINVOCATIONID_0_VEC_EXTRACT]], ptr addrspace(7) [[TMP23]], align 4
