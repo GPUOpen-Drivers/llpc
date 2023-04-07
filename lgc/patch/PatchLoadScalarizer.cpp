@@ -150,8 +150,8 @@ void PatchLoadScalarizer::visitLoadInst(LoadInst &loadInst) {
       // Calculate the alignment of component i
       Align compAlignment = commonAlignment(loadInst.getAlign(), i * compSize);
 
-      loadComps[i] =
-          m_builder->CreateAlignedLoad(compTy, loadCompPtr, compAlignment, loadInst.getName() + ".ii" + Twine(i));
+      loadComps[i] = m_builder->CreateAlignedLoad(compTy, loadCompPtr, compAlignment, loadInst.isVolatile(),
+                                                  loadInst.getName() + ".ii" + Twine(i));
 
       for (auto metaNode : allMetaNodes)
         dyn_cast<Instruction>(loadComps[i])->setMetadata(metaNode.first, metaNode.second);
