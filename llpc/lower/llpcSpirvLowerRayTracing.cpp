@@ -78,6 +78,7 @@ static const char *SetTriangleIntersectionAttributes = "AmdTraceRaySetTriangleIn
 static const char *RemapCapturedVaToReplayVa = "AmdTraceRayRemapCapturedVaToReplayVa";
 static const char *GetParentId = "AmdTraceRayGetParentId";
 static const char *SetParentId = "AmdTraceRaySetParentId";
+static const char *DispatchRayIndex = "AmdTraceRayDispatchRaysIndex";
 } // namespace RtName
 
 namespace Llpc {
@@ -682,6 +683,11 @@ void SpirvLowerRayTracing::processLibraryFunction(Function *func) {
     BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
     m_builder->SetInsertPoint(entryBlock);
     m_builder->CreateRet(m_builder->CreateLoad(m_builder->getInt32Ty(), m_traceParams[TraceParam::ParentRayId]));
+  } else if (mangledName.startswith(RtName::DispatchRayIndex)) {
+    eraseFunctionBlocks(func);
+    BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
+    m_builder->SetInsertPoint(entryBlock);
+    m_builder->CreateRet(m_builder->CreateReadBuiltInInput(lgc::BuiltInGlobalInvocationId, {}, nullptr, nullptr, ""));
   }
 }
 

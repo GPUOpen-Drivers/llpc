@@ -70,7 +70,7 @@ static const char *GetTriangleCompressionMode = "AmdTraceRayGetTriangleCompressi
 static const char *SetHitTokenData = "AmdTraceRaySetHitTokenData";
 static const char *GetBoxSortHeuristicMode = "AmdTraceRayGetBoxSortHeuristicMode";
 static const char *SampleGpuTimer = "AmdTraceRaySampleGpuTimer";
-static const char *GetStaticRayId = "AmdTraceRayGetStaticRayId";
+static const char *GetStaticId = "AmdTraceRayGetStaticId";
 #if VKI_BUILD_GFX11
 static const char *LdsStackInit = "AmdTraceRayLdsStackInit";
 static const char *LdsStackStore = "AmdTraceRayLdsStackStore";
@@ -430,12 +430,12 @@ void SpirvLowerRayQuery::processLibraryFunction(Function *&func) {
     m_builder->SetInsertPoint(entryBlock);
     m_builder->CreateRet(m_builder->getInt32(rtState->boxSortHeuristicMode));
     func->setName(RtName::GetBoxSortHeuristicMode);
-  } else if (mangledName.startswith(RtName::GetStaticRayId)) {
+  } else if (mangledName.startswith(RtName::GetStaticId)) {
     eraseFunctionBlocks(func);
     BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
     m_builder->SetInsertPoint(entryBlock);
     m_builder->CreateRet(m_builder->CreateLoad(m_builder->getInt32Ty(), m_traceRayStaticId));
-    func->setName(RtName::GetStaticRayId);
+    func->setName(RtName::GetStaticId);
   }
 #if VKI_BUILD_GFX11
   else if (mangledName.startswith(RtName::LdsStackInit)) {
