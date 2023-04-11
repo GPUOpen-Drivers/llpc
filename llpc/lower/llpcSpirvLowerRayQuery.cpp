@@ -57,7 +57,11 @@ static const char *LdsStack = "LdsStack";
 extern const char *LoadDwordAtAddr;
 extern const char *LoadDwordAtAddrx2;
 extern const char *LoadDwordAtAddrx4;
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 33
 static const char *IntersectBvh = "AmdExtD3DShaderIntrinsics_IntersectBvhNode";
+#else
+static const char *IntersectBvh = "AmdExtD3DShaderIntrinsics_IntersectInternal";
+#endif
 extern const char *ConvertF32toF16NegInf;
 extern const char *ConvertF32toF16PosInf;
 static const char *GetStackSize = "AmdTraceRayGetStackSize";
@@ -1499,8 +1503,13 @@ void SpirvLowerRayQuery::createIntersectBvh(Function *func) {
   m_builder->SetInsertPoint(entryBlock);
   func->setName(RtName::IntersectBvh);
 
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 33
   // Ray tracing utility function: AmdExtD3DShaderIntrinsics_IntersectBvhNode
   // uint4 AmdExtD3DShaderIntrinsics_IntersectBvhNode(
+#else
+  // Ray tracing utility function: AmdExtD3DShaderIntrinsics_IntersectInternal
+  // uint4 AmdExtD3DShaderIntrinsics_IntersectInternal(
+#endif
   //     in uint2  address,
   //     in float  ray_extent,
   //     in float3 ray_origin,
