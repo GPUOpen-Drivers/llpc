@@ -33,13 +33,10 @@
 #include "lgc/patch/Patch.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/Analysis/UniformityAnalysis.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/PassManager.h"
-
-namespace llvm {
-class DivergenceInfo;
-}
 
 namespace lgc {
 
@@ -70,7 +67,7 @@ class BufferOpLowering {
   };
 
 public:
-  BufferOpLowering(TypeLowering &typeLowering, PipelineState &pipelineState, llvm::DivergenceInfo &divergenceInfo);
+  BufferOpLowering(TypeLowering &typeLowering, PipelineState &pipelineState, llvm::UniformityInfo &uniformityInfo);
 
   static void registerVisitors(llvm_dialects::VisitorBuilder<BufferOpLowering> &builder);
 
@@ -109,7 +106,7 @@ private:
   llvm::IRBuilder<> m_builder;
 
   PipelineState &m_pipelineState;
-  llvm::DivergenceInfo &m_divergenceInfo;
+  llvm::UniformityInfo &m_uniformityInfo;
 
   // The proxy pointer type used to accumulate offsets.
   llvm::PointerType *m_offsetType = nullptr;
