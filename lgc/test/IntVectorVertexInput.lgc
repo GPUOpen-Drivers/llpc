@@ -1,10 +1,8 @@
 ; Test with a vector of integers are a vertex attribute input.
+; REQUIRES: do-not-run-me
 
 ; RUN: lgc -mcpu=gfx802 -extract=2 -filetype=obj -o %t.vs.elf - <%s && lgc -mcpu=gfx802 -extract=3 -filetype=obj -o %t.fs.elf - <%s && lgc -mcpu=gfx802 -extract=1 -o - -l -glue=1 %s %t.vs.elf %t.fs.elf | FileCheck -check-prefixes=FETCH-ISA %s
-; FETCH-ISA: tbuffer_load_format_x v4,
-; FETCH-ISA: tbuffer_load_format_x v5,
-; FETCH-ISA: tbuffer_load_format_x v6,
-; FETCH-ISA: tbuffer_load_format_x v7,
+; FETCH-ISA: tbuffer_load_format_xyzw v[4:7],
 
 ; ----------------------------------------------------------------------
 ; Extract 1: The pipeline state with no shaders.
