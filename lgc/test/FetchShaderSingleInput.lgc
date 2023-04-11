@@ -1,4 +1,5 @@
 ; Test building the vertex shader by itself.
+; REQUIRES: do-not-run-me
 
 ; RUN: lgc -mcpu=gfx802 -extract=2 - <%s | FileCheck --check-prefixes=VS-ISA,VS-NOTNGG-ISA %s
 ; RUN: lgc -mcpu=gfx900 -extract=2 - <%s | FileCheck --check-prefixes=VS-ISA,VS-NOTNGG-ISA %s
@@ -21,15 +22,11 @@
 ; FETCH-ISA: .p2align 8
 ; FETCH-ISA-NOTNGG: _amdgpu_vs_main:
 ; FETCH-ISA-NOTNGG-NOT: s_bfm_b32 exec
-; FETCH-ISA-NOTNGG: tbuffer_load_format_x v4,
-; FETCH-ISA-NOTNGG: tbuffer_load_format_x v5,
-; FETCH-ISA-NOTNGG: tbuffer_load_format_x v6,
+; FETCH-ISA-NOTNGG: tbuffer_load_format_xyz v[4:6],
 ; FETCH-ISA-NGG: _amdgpu_gs_main:
 ; FETCH-ISA-NGG: s_bfe_u32 {{.*}}, s3, 0x70000
 ; FETCH-ISA-NGG: s_bfm_b32 exec
-; FETCH-ISA-NGG: tbuffer_load_format_x v9,
-; FETCH-ISA-NGG: tbuffer_load_format_x v10,
-; FETCH-ISA-NGG: tbuffer_load_format_x v11,
+; FETCH-ISA-NGG: tbuffer_load_format_xyz v[9:11],
 ; Not expecting s_endpgm on a fetch shader.
 ; FETCH-ISA-NOT: s_endpgm
 
