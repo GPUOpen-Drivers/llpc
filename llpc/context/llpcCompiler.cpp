@@ -1220,6 +1220,10 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
         result = Result::ErrorInvalidShader;
       }
 
+      // If this is TCS, set inputVertices from patchControlPoints in the pipeline state.
+      if (entryStage == ShaderStageTessControl)
+        context->getPipelineContext()->setTcsInputVertices(modules[shaderIndex]);
+
       // Add the shader module to the list for the pipeline.
       modulesToLink.push_back(modules[shaderIndex]);
     }

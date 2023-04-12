@@ -109,6 +109,16 @@ void ShaderModes::setTessellationMode(Module &module, ShaderStage stage, const T
 }
 
 // =====================================================================================================================
+// Get the tessellation mode for the given shader stage (TCS or TES): static edition that reads directly from IR.
+TessellationMode ShaderModes::getTessellationMode(Module &module, ShaderStage stage) {
+  assert(stage == ShaderStageTessControl || stage == ShaderStageTessEval);
+  TessellationMode mode = {};
+  PipelineState::readNamedMetadataArrayOfInt32(
+      &module, stage == ShaderStageTessControl ? TcsModeMetadataName : TesModeMetadataName, mode);
+  return mode;
+}
+
+// =====================================================================================================================
 // Get the tessellation state.
 const TessellationMode &ShaderModes::getTessellationMode() const {
   return m_tessellationMode;

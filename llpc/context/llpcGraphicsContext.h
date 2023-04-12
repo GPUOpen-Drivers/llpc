@@ -76,6 +76,9 @@ public:
   // Set pipeline state in lgc::Pipeline object for middle-end, and (optionally) hash the state.
   virtual void setPipelineState(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, bool unlinked) const override;
 
+  // For TCS, set inputVertices from patchControlPoints in the pipeline state.
+  virtual void setTcsInputVertices(llvm::Module *tcsModule) override;
+
   // Gets client-defined metadata
   virtual llvm::StringRef getClientMetadata() const override;
 

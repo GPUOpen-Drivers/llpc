@@ -63,6 +63,9 @@ public:
   // Set the tessellation mode for the given shader stage (TCS or TES).
   static void setTessellationMode(llvm::Module &module, ShaderStage stage, const TessellationMode &inMode);
 
+  // Get the tessellation mode for the given shader stage (TCS or TES): static edition that reads directly from IR.
+  static TessellationMode getTessellationMode(llvm::Module &module, ShaderStage shaderStage);
+
   // Get the tessellation state.
   const TessellationMode &getTessellationMode() const;
 

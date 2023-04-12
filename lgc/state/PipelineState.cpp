@@ -250,6 +250,13 @@ void Pipeline::setTessellationMode(Module &module, ShaderStage shaderStage, cons
 }
 
 // =====================================================================================================================
+// Get the tessellation mode for the given shader stage.
+// This reads the mode from IR metadata in the given module.
+TessellationMode Pipeline::getTessellationMode(Module &module, ShaderStage shaderStage) {
+  return ShaderModes::getTessellationMode(module, shaderStage);
+}
+
+// =====================================================================================================================
 // Set the geometry shader mode
 // This records the mode into IR metadata in the given module.
 //
@@ -1261,13 +1268,9 @@ void PipelineState::readGraphicsState(Module *module) {
 }
 
 // =====================================================================================================================
-// Get number of patch control points. The front-end can supply this either as
-// InputAssemblyState::patchControlPoints or as TessellationMode::outputVertices.
+// Get number of patch control points. The front-end supplies this as TessellationMode::inputVertices.
 unsigned PipelineState::getNumPatchControlPoints() const {
-  unsigned numPatchControlPoints = getInputAssemblyState().patchControlPoints;
-  if (numPatchControlPoints == 0)
-    numPatchControlPoints = getShaderModes()->getTessellationMode().inputVertices;
-  return numPatchControlPoints;
+  return getShaderModes()->getTessellationMode().inputVertices;
 }
 
 // =====================================================================================================================
