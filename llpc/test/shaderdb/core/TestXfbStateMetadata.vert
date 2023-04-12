@@ -18,7 +18,7 @@ void main()
     gl_PointSize = pointSize;
 }
 // CHECK-LABEL: define {{[^@]+}}@lgc.shader.VS.main
-// CHECK-SAME: () local_unnamed_addr #[[ATTR0:[0-9]+]] !spirv.ExecutionModel !6 !lgc.xfb.state !7 !lgc.shaderstage !1 {
+// CHECK-SAME: () local_unnamed_addr #[[ATTR0:[0-9]+]] !spirv.ExecutionModel [[META6:![0-9]+]] !lgc.xfb.state [[META7:![0-9]+]] !lgc.shaderstage [[META1:![0-9]+]] {
 // CHECK-NEXT:  .entry:
 // CHECK-NEXT:    [[TMP0:%.*]] = call float (...) @lgc.create.read.generic.input.f32(i32 1, i32 0, i32 0, i32 0, i32 0, i32 undef)
 // CHECK-NEXT:    [[TMP1:%.*]] = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 0, i32 0, i32 0, i32 0, i32 0, i32 undef)
@@ -31,9 +31,7 @@ void main()
 // CHECK: attributes #[[ATTR0]] = { nounwind }
 // CHECK: attributes #[[ATTR1:[0-9]+]] = { nounwind willreturn memory(read) }
 //.
-// CHECK: [[META0:![0-9]+]] = !{!"Vulkan"}
-// CHECK: [[META1:![0-9]+]] = !{i32 1}
-// CHECK: [[META4:![0-9]+]] = !{i32 0, i32 3}
-// CHECK: [[META6:![0-9]+]] = !{i32 0}
-// CHECK: [[META7:![0-9]+]] = !{i32 0, i32 4, i32 -1, i32 0, i32 -1, i32 0, i32 -1, i32 0}
+// CHECK: [[META1]] = !{i32 1}
+// CHECK: [[META6]] = !{i32 0}
+// CHECK: [[META7]] = !{i32 0, i32 4, i32 -1, i32 0, i32 -1, i32 0, i32 -1, i32 0}
 //.
