@@ -455,7 +455,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
 
     gsResUsage->inOutUsage.gs.calcFactor.inputVertices = inVertsPerPrim;
   } else if (hasTs) {
-    inVertsPerPrim = m_pipelineState->getInputAssemblyState().patchControlPoints;
+    inVertsPerPrim = m_pipelineState->getNumPatchControlPoints();
   } else {
     const auto primType = m_pipelineState->getInputAssemblyState().primitiveType;
     switch (primType) {

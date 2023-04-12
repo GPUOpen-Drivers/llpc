@@ -2124,7 +2124,7 @@ Value *PatchInOutImportExport::patchTcsBuiltInInputImport(Type *inputTy, unsigne
     break;
   }
   case BuiltInPatchVertices: {
-    input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getInputAssemblyState().patchControlPoints);
+    input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getNumPatchControlPoints());
     break;
   }
   case BuiltInPrimitiveId: {
@@ -4585,7 +4585,8 @@ Value *PatchInOutImportExport::calcLdsOffsetForTcsInput(Type *inputTy, unsigned 
   }
 
   // dwordOffset = (relativeId * inVertexCount + vertexId) * inVertexStride + attribOffset
-  auto inVertexCount = m_pipelineState->getInputAssemblyState().patchControlPoints;
+  auto inVertexCount = m_pipelineState->getNumPatchControlPoints();
+
   auto inVertexCountVal = builder.getInt32(inVertexCount);
   auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
 
