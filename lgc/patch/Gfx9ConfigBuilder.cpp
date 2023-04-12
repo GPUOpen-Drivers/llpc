@@ -1608,7 +1608,7 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
 
   // NOTE: PAL expects at least one mmSPI_PS_INPUT_CNTL_0 register set, so we always patch it at least one if none
   // were identified in the shader.
-  const std::vector<FsInterpInfo> dummyInterpInfo{{0, false, false, false, false, false, false, false}};
+  const std::vector<FsInterpInfo> dummyInterpInfo{{0, false, false, false, false, false, false}};
   const auto &fsInterpInfo = resUsage->inOutUsage.fs.interpInfo;
   const auto *interpInfo = fsInterpInfo.size() == 0 ? &dummyInterpInfo : &fsInterpInfo;
 
@@ -1661,8 +1661,6 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
       // NOTE: Set the offset value to force hardware to select input defaults (no VS match).
       spiPsInputCntl.bits.OFFSET = UseDefaultVal;
     }
-    if (interpInfoElem.isDefaultVal)
-      spiPsInputCntl.bits.OFFSET = UseDefaultVal; // VS doesn't write the outputs
 
     // NOTE: Set SPI_PS_INPUT_CNTL_* here, but the register can still be changed later,
     // when it becomes known that gl_ViewportIndex is not used and fields OFFSET and FLAT_SHADE

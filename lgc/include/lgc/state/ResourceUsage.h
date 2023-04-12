@@ -86,11 +86,10 @@ struct FsInterpInfo {
   bool attr0Valid;     // Whether the location has a valid low half
   bool attr1Valid;     // Wheterh the location has a valid high half
   bool isPerPrimitive; // Whether it is per-primitive
-  bool isDefaultVal;   // Whether it is default value
 };
 
 // Invalid interpolation info
-static const FsInterpInfo InvalidFsInterpInfo = {InvalidValue, false, false, false, false, false, false, false};
+static const FsInterpInfo InvalidFsInterpInfo = {InvalidValue, false, false, false, false, false, false};
 
 // Represents the location information on an input or output
 class InOutLocationInfo {

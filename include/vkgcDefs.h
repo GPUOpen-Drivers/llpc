@@ -83,7 +83,6 @@
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
 //  |     61.4 | Add workaroundStorageImageFormats to PipelineShaderOptions                                            |
-//  |     61.3 | Add workaroundInitializeOutputsToZero to PipelineShaderOptions                                        |
 //  |     61.2 | Add pClientMetadata and clientMetadataSize to all PipelineBuildInfos                                  |
 //  |     61.1 | Add IPipelineDumper::GetGraphicsShaderBinaryHash                                                      |
 //  |     61.0 | Add DescriptorMutable type and ResourceMappingNode::strideInDwords to support mutable descriptors     |
@@ -842,9 +841,6 @@ struct PipelineShaderOptions {
 
   /// Aggressively mark shader loads as invariant (where it is safe to do so).
   InvariantLoads aggressiveInvariantLoads;
-
-  /// Initialize outputs to zero if it is true
-  bool workaroundInitializeOutputsToZero;
 
   /// Disable an optimization that relies on trusting shaders to specify the correct image format to reduce the number
   /// of written channels.
