@@ -788,7 +788,7 @@ void RegisterMetadataBuilder::buildPsRegisters() {
 
   msgpack::ArrayDocNode spiPsInputCnt =
       getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::SpiPsInputCntl].getArray(true);
-  const std::vector<FsInterpInfo> dummyInterpInfo{{0, false, false, false, false, false, false, false}};
+  const std::vector<FsInterpInfo> dummyInterpInfo{{0, false, false, false, false, false, false}};
   const auto &fsInterpInfo = resUsage->inOutUsage.fs.interpInfo;
   const auto *interpInfo = fsInterpInfo.size() == 0 ? &dummyInterpInfo : &fsInterpInfo;
 
@@ -838,8 +838,6 @@ void RegisterMetadataBuilder::buildPsRegisters() {
       // NOTE: Set the offset value to force hardware to select input defaults (no VS match).
       spiPsInputCntlInfo.offset = UseDefaultVal;
     }
-    if (interpInfoElem.isDefaultVal)
-      spiPsInputCntlInfo.offset = UseDefaultVal; // VS doesn't write the outputs
 
     spiPsInputCntElem[Util::Abi::SpiPsInputCntlMetadataKey::FlatShade] = spiPsInputCntlInfo.flatShade;
     spiPsInputCntElem[Util::Abi::SpiPsInputCntlMetadataKey::Offset] = spiPsInputCntlInfo.offset;
