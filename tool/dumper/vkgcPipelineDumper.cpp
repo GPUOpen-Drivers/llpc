@@ -607,7 +607,6 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   }
 
   // Output pipeline shader options
-  // clang-format off
   dumpFile << "options.trapPresent = " << shaderInfo->options.trapPresent << "\n";
   dumpFile << "options.debugMode = " << shaderInfo->options.debugMode << "\n";
   dumpFile << "options.enablePerformanceData = " << shaderInfo->options.enablePerformanceData << "\n";
@@ -645,10 +644,8 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.overrideShaderThreadGroupSizeZ = " << shaderInfo->options.overrideShaderThreadGroupSizeZ << "\n";
   dumpFile << "options.nsaThreshold = " << shaderInfo->options.nsaThreshold << "\n";
   dumpFile << "options.aggressiveInvariantLoads = " << shaderInfo->options.aggressiveInvariantLoads << "\n";
-  dumpFile << "options.workaroundInitializeOutputsToZero = " << shaderInfo->options.workaroundInitializeOutputsToZero << "\n";
   dumpFile << "options.workaroundStorageImageFormats = " << shaderInfo->options.workaroundStorageImageFormats << "\n";
   dumpFile << "\n";
-  // clang-format on
 }
 
 // =====================================================================================================================
@@ -1670,7 +1667,6 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.overrideShaderThreadGroupSizeZ);
       hasher->Update(options.nsaThreshold);
       hasher->Update(options.aggressiveInvariantLoads);
-      hasher->Update(options.workaroundInitializeOutputsToZero);
       hasher->Update(options.workaroundStorageImageFormats);
     }
   }
