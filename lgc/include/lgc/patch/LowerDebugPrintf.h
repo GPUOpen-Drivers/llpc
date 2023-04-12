@@ -59,8 +59,6 @@ private:
   void setupElfsPrintfStrings();
   llvm::DenseMap<uint64_t, ElfInfo> m_elfInfos;
   PipelineState *m_pipelineState = nullptr;
-  PipelineShadersResult *m_pipelineShaders = nullptr;
-  GfxIpVersion m_gfxIp;
 };
 
 } // namespace lgc
