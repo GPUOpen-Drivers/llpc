@@ -174,7 +174,7 @@ void BufferOpLowering::finish() {
   // If PHI nodes on descriptors weren't optimized away, assume that divergence in the original phi was due to sync
   // divergence, and the new phi should be divergent as well.
   //
-  // TODO: DivergenceAnalysis should really be updatable/preservable (but switch to new uniform analysis first)
+  // TODO: UniformityAnalysis should really be updatable/preservable
 
   for (PHINode *originalPhi : m_divergentPhis) {
     auto values = m_typeLowering.getValue(originalPhi);
