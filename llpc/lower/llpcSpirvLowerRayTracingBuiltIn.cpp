@@ -189,7 +189,11 @@ Value *SpirvLowerRayTracingBuiltIn::processBuiltIn(GlobalVariable *global, Instr
   }
   case BuiltInLaunchSizeKHR: {
     Value *const bufferDesc = getDispatchRaysInfoDesc(insertPos);
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
     auto offset = offsetof(GpuRt::DispatchRaysInfoData, rayDispatchWidth);
+#else
+    auto offset = offsetof(GpuRt::DispatchRaysConstantData, rayDispatchWidth);
+#endif
     Value *offsetOfRayDispatchWidth = m_builder->getInt32(offset);
     Value *rayDispatchWidthPtr =
         m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, offsetOfRayDispatchWidth, "");
@@ -283,43 +287,86 @@ void SpirvLowerRayTracingBuiltIn::setShaderTableVariables(GlobalValue *global, S
 
   switch (tableKind) {
   case ShaderTable::RayGenTableAddr: {
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
     auto offset = offsetof(GpuRt::DispatchRaysInfoData, rayGenerationTable);
+#else
+    auto offset = offsetof(GpuRt::DispatchRaysConstantData, rayGenerationTableAddressLo);
+    static_assert(
+        offsetof(GpuRt::DispatchRaysConstantData, rayGenerationTableAddressHi) ==
+            offsetof(GpuRt::DispatchRaysConstantData, rayGenerationTableAddressLo) + 4,
+        "GpuRt::DispatchRaysConstantData: rayGenerationTableAddressLo and rayGenerationTableAddressHi mismatch!");
+#endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
     value = m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
     break;
   }
   case ShaderTable::MissTableAddr: {
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
     auto offset = offsetof(GpuRt::DispatchRaysInfoData, missTable.baseAddress);
+#else
+    auto offset = offsetof(GpuRt::DispatchRaysConstantData, missTableBaseAddressLo);
+    static_assert(offsetof(GpuRt::DispatchRaysConstantData, missTableBaseAddressHi) ==
+                      offsetof(GpuRt::DispatchRaysConstantData, missTableBaseAddressLo) + 4,
+                  "GpuRt::DispatchRaysConstantData: missTableBaseAddressLo and missTableBaseAddressHi mismatch!");
+#endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
     value = m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
     break;
   }
   case ShaderTable::HitGroupTableAddr: {
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
     auto offset = offsetof(GpuRt::DispatchRaysInfoData, hitGroupTable.baseAddress);
+#else
+    auto offset = offsetof(GpuRt::DispatchRaysConstantData, hitGroupTableBaseAddressLo);
+    static_assert(
+        offsetof(GpuRt::DispatchRaysConstantData, hitGroupTableBaseAddressHi) ==
+            offsetof(GpuRt::DispatchRaysConstantData, hitGroupTableBaseAddressLo) + 4,
+        "GpuRt::DispatchRaysConstantData: hitGroupTableBaseAddressLo and hitGroupTableBaseAddressHi mismatch!");
+#endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
     value = m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
     break;
   }
   case ShaderTable::CallableTableAddr: {
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
     auto offset = offsetof(GpuRt::DispatchRaysInfoData, callableTable.baseAddress);
+#else
+    auto offset = offsetof(GpuRt::DispatchRaysConstantData, callableTableBaseAddressLo);
+    static_assert(
+        offsetof(GpuRt::DispatchRaysConstantData, callableTableBaseAddressHi) ==
+            offsetof(GpuRt::DispatchRaysConstantData, callableTableBaseAddressLo) + 4,
+        "GpuRt::DispatchRaysConstantData: callableTableBaseAddressLo and callableTableBaseAddressHi mismatch!");
+#endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
     value = m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
     break;
   }
   case ShaderTable::MissTableStride: {
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
     auto offset = offsetof(GpuRt::DispatchRaysInfoData, missTable.strideInBytes);
+#else
+    auto offset = offsetof(GpuRt::DispatchRaysConstantData, missTableStrideInBytes);
+#endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
     value = m_builder->CreateLoad(m_builder->getInt32Ty(), valuePtr);
     break;
   }
   case ShaderTable::HitGroupTableStride: {
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
     auto offset = offsetof(GpuRt::DispatchRaysInfoData, hitGroupTable.strideInBytes);
+#else
+    auto offset = offsetof(GpuRt::DispatchRaysConstantData, hitGroupTableStrideInBytes);
+#endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
     value = m_builder->CreateLoad(m_builder->getInt32Ty(), valuePtr);
     break;
   }
   case ShaderTable::CallableTableStride: {
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
     auto offset = offsetof(GpuRt::DispatchRaysInfoData, callableTable.strideInBytes);
+#else
+    auto offset = offsetof(GpuRt::DispatchRaysConstantData, callableTableStrideInBytes);
+#endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
     value = m_builder->CreateLoad(m_builder->getInt32Ty(), valuePtr);
     break;
@@ -329,7 +376,14 @@ void SpirvLowerRayTracingBuiltIn::setShaderTableVariables(GlobalValue *global, S
     break;
   }
   case ShaderTable::TraceRayGpuVirtAddr: {
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
     auto offset = offsetof(GpuRt::DispatchRaysInfoData, traceRayGpuVa);
+#else
+    auto offset = offsetof(GpuRt::DispatchRaysConstantData, traceRayGpuVaLo);
+    static_assert(offsetof(GpuRt::DispatchRaysConstantData, traceRayGpuVaHi) ==
+                      offsetof(GpuRt::DispatchRaysConstantData, traceRayGpuVaLo) + 4,
+                  "GpuRt::DispatchRaysConstantData: traceRayGpuVaLo and traceRayGpuVaHi mismatch!");
+#endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
     value = m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
     break;
