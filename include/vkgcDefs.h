@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 61
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 2
+#define LLPC_INTERFACE_MINOR_VERSION 5
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     61.5 | Add RtIpVersion (including its checkers) to represent ray tracing IP                                  |
 //  |     61.4 | Add workaroundStorageImageFormats to PipelineShaderOptions                                            |
 //  |     61.2 | Add pClientMetadata and clientMetadataSize to all PipelineBuildInfos                                  |
 //  |     61.1 | Add IPipelineDumper::GetGraphicsShaderBinaryHash                                                      |
@@ -452,6 +453,16 @@ struct GfxIpVersion {
   bool isGfx(unsigned rhsMajor, unsigned rhsMinor) const {
     return std::tie(major, minor) == std::tie(rhsMajor, rhsMinor);
   }
+};
+
+/// Represents RT (ray tracing) IP version
+struct RtIpVersion {
+  unsigned major; ///< Major version
+  unsigned minor; ///< Minor version
+
+  // RT IP checkers
+  bool operator==(const RtIpVersion &rhs) const { return std::tie(major, minor) == std::tie(rhs.major, rhs.minor); }
+  bool operator>=(const RtIpVersion &rhs) const { return std::tie(major, minor) >= std::tie(rhs.major, rhs.minor); }
 };
 
 /// Represents shader binary data.
@@ -1131,6 +1142,7 @@ struct RtState {
   float maxRayLength; ///< Raytracing rayDesc.tMax override
 #endif
   GpurtFuncTable gpurtFuncTable; ///< GPURT function table
+  RtIpVersion rtIpVersion;       ///< RT IP version
 };
 #endif
 
