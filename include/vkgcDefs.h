@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     61.6 | Add workaroundInitializeOutputsToZero to PipelineShaderOptions                                        |
 //  |     61.5 | Add RtIpVersion (including its checkers) to represent ray tracing IP                                  |
 //  |     61.4 | Add workaroundStorageImageFormats to PipelineShaderOptions                                            |
 //  |     61.2 | Add pClientMetadata and clientMetadataSize to all PipelineBuildInfos                                  |
@@ -856,6 +857,9 @@ struct PipelineShaderOptions {
   /// Disable an optimization that relies on trusting shaders to specify the correct image format to reduce the number
   /// of written channels.
   bool workaroundStorageImageFormats;
+
+  /// Initialize outputs to zero if it is true
+  bool workaroundInitializeOutputsToZero;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor
