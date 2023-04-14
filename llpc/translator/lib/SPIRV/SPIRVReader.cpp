@@ -4100,6 +4100,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpExtInst>(SPIRVValue *cons
     default:
       return nullptr;
     }
+  case SPIRVEIS_NonSemanticInfo:
+    return nullptr;
   default:
     llvm_unreachable("Should never be called!");
     return nullptr;
