@@ -1297,9 +1297,10 @@ Value *BuilderImpl::createDppUpdate(Value *const origValue, Value *const updateV
 // @param boundCtrl : Whether bound_ctrl is used or not.
 Value *BuilderImpl::createPermLane16(Value *const origValue, Value *const updateValue, unsigned selectBitsLow,
                                      unsigned selectBitsHigh, bool fetchInactive, bool boundCtrl) {
-  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+  auto mapFunc = [this](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
+                        ArrayRef<Value *> passthroughArgs) -> Value * {
     return builder.CreateIntrinsic(
-        Intrinsic::amdgcn_permlane16, {},
+        getInt32Ty(), Intrinsic::amdgcn_permlane16,
         {mappedArgs[0], mappedArgs[1], passthroughArgs[0], passthroughArgs[1], passthroughArgs[2], passthroughArgs[3]});
   };
 
@@ -1323,9 +1324,10 @@ Value *BuilderImpl::createPermLane16(Value *const origValue, Value *const update
 // @param boundCtrl : Whether bound_ctrl is used or not.
 Value *BuilderImpl::createPermLaneX16(Value *const origValue, Value *const updateValue, unsigned selectBitsLow,
                                       unsigned selectBitsHigh, bool fetchInactive, bool boundCtrl) {
-  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+  auto mapFunc = [this](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
+                        ArrayRef<Value *> passthroughArgs) -> Value * {
     return builder.CreateIntrinsic(
-        Intrinsic::amdgcn_permlanex16, {},
+        getInt32Ty(), Intrinsic::amdgcn_permlanex16,
         {mappedArgs[0], mappedArgs[1], passthroughArgs[0], passthroughArgs[1], passthroughArgs[2], passthroughArgs[3]});
   };
 
