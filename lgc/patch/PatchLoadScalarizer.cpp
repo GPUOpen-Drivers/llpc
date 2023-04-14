@@ -128,11 +128,6 @@ void PatchLoadScalarizer::visitLoadInst(LoadInst &loadInst) {
       return;
 
     Type *compTy = cast<VectorType>(loadTy)->getElementType();
-    unsigned elemSize = loadInst.getModule()->getDataLayout().getTypeAllocSizeInBits(compTy);
-    // For 16bit or 8bit vector elements, the pass would not do the vector load scalarize
-    if (elemSize < 32)
-      return;
-
     uint64_t compSize = loadInst.getModule()->getDataLayout().getTypeStoreSize(compTy);
 
     Value *loadValue = UndefValue::get(loadTy);
