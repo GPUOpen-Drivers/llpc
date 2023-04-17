@@ -68,8 +68,6 @@ Context::Context(GfxIpVersion gfxIp) : LLVMContext(), m_gfxIp(gfxIp) {
   m_dialectContext = llvm_dialects::DialectContext::make<LgcDialect>(*this);
 
   reset();
-  // TODO: Remove this once work complete on transition to opaque pointers.
-  setOpaquePointers(true);
 }
 
 // =====================================================================================================================
