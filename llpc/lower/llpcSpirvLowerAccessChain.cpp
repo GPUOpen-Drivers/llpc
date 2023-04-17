@@ -240,9 +240,6 @@ GetElementPtrInst *SpirvLowerAccessChain::tryToCoalesceChain(GetElementPtrInst *
         removedInsts.push(inst);
     } while (!chainedInsts.empty());
 
-    // TODO: Remove this when LLPC will switch fully to opaque pointers.
-    assert(cast<PointerType>(basePtr->getType())->isOpaqueOrPointeeTypeMatches(coalescedType));
-
     // Create the coalesced "getelementptr" instruction (do combining)
     coalescedGetElemPtr = GetElementPtrInst::Create(coalescedType, basePtr, idxs, "", getElemPtr);
     getElemPtr->replaceAllUsesWith(coalescedGetElemPtr);
