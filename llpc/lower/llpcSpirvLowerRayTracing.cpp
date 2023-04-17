@@ -136,11 +136,6 @@ template <> void SpirvLowerRayTracing::createRayTracingFunc<OpTraceRayKHR>(Funct
     auto payloadArg = func->getArg(TraceRayParam::Payload);
     auto payloadTypeArg = func->arg_end() - 1;
     unsigned payloadArgSize = alignTo(m_module->getDataLayout().getTypeAllocSize(payloadTypeArg->getType()), 4);
-    // TODO: Remove this when LLPC will switch fully to opaque pointers.
-    assert(payloadArg->getType()->isOpaquePointerTy() ||
-           (payloadArgSize == (alignTo(m_module->getDataLayout().getTypeAllocSize(
-                                           payloadArg->getType()->getNonOpaquePointerElementType()),
-                                       4))));
     const Align align = Align(4);
     // type conversion
     m_builder->CreateMemCpy(payload, align, payloadArg, align, payloadArgSize);
@@ -222,11 +217,6 @@ template <> void SpirvLowerRayTracing::createRayTracingFunc<OpExecuteCallableKHR
   Value *callableData = func->arg_end() - 2;
   Value *callableTypeArg = func->arg_end() - 1;
   unsigned callableDataSize = alignTo(m_module->getDataLayout().getTypeAllocSize(callableTypeArg->getType()), 4);
-  // TODO: Remove this when LLPC will switch fully to opaque pointers.
-  assert(callableData->getType()->isOpaquePointerTy() ||
-         (callableDataSize == (alignTo(m_module->getDataLayout().getTypeAllocSize(
-                                           callableData->getType()->getNonOpaquePointerElementType()),
-                                       4))));
   const Align align = Align(4);
   m_builder->CreateMemCpy(inputResult, align, callableData, align, callableDataSize);
   SmallVector<Value *, 8> args;
