@@ -219,9 +219,6 @@ int main(int argc, char **argv) {
                                    " LLVM and LGC can be used.\n";
   cl::ParseCommandLineOptions(argc, argv, commandDesc);
 
-  // TODO: Remove this once work complete on transition to opaque pointers.
-  context.setOpaquePointers(true);
-
   // Find the -mcpu option and get its value.
   auto mcpu = opts.find("mcpu");
   assert(mcpu != opts.end());
