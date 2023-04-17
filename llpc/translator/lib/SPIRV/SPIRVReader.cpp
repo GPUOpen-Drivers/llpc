@@ -1180,19 +1180,6 @@ Value *SPIRVToLLVM::transCmpInst(SPIRVValue *bv, BasicBlock *bb, Function *f) {
   SPIRVCompare *bc = static_cast<SPIRVCompare *>(bv);
   assert(bb && "Invalid BB");
   auto op = bc->getOpCode();
-  if (op == OpPtrEqual || op == OpPtrNotEqual) {
-    // NOTE: The two compared operands have the same SPIR-V type, but the IR types are different.
-    // for example: struct {
-    //                mat4 mat1;  // rowMajor
-    //                mat4 mat2;  // colMajor
-    //              };
-    auto lValue = transValue(bc->getOperand(0), f, bb);
-    auto rValue = transValue(bc->getOperand(1), f, bb);
-    // TODO: Remove this when LLPC will switch fully to opaque pointers.
-    // For opaque pointers this condition will be always FALSE.
-    if (lValue->getType() != rValue->getType())
-      return getBuilder()->CreateCmp(CmpMap::rmap(op), getBuilder()->getInt32(0), getBuilder()->getInt32(1));
-  }
 
   if (isLogicalOpCode(op))
     op = IntBoolOpMap::rmap(op);
