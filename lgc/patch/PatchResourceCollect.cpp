@@ -2916,9 +2916,9 @@ void PatchResourceCollect::updateOutputLocInfoMapWithUnpack() {
 }
 
 // =====================================================================================================================
-// Returns true if the locations for the Gs output can be compressed.
+// Returns true if the locations for the GS output can be compressed.
 bool PatchResourceCollect::canChangeOutputLocationsForGs() {
-  // The Gs outputs can only be changed if LGC has access to the fragment shader's inputs.
+  // The GS outputs can only be changed if LGC has access to the fragment shader's inputs.
   if (!m_pipelineState->isUnlinked())
     return true;
   if (m_pipelineState->getPalMetadata()->haveFsInputMappings())

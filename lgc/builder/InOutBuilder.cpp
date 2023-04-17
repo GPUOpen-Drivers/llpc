@@ -687,14 +687,13 @@ Value *BuilderImpl::adjustIj(Value *value, Value *offset) {
 // @param valueToWrite : Value to write
 // @param isBuiltIn : True for built-in, false for user output
 // @param location : Location (row) or built-in kind of output
-// @param component : Component offset of inputs and outputs (ignored if built-in)
 // @param xfbBuffer : XFB buffer ID
 // @param xfbStride : XFB stride
 // @param xfbOffset : XFB byte offset
 // @param outputInfo : Extra output info (GS stream ID)
 Instruction *BuilderImpl::CreateWriteXfbOutput(Value *valueToWrite, bool isBuiltIn, unsigned location,
-                                               unsigned component, unsigned xfbBuffer, unsigned xfbStride,
-                                               Value *xfbOffset, InOutInfo outputInfo) {
+                                               unsigned xfbBuffer, unsigned xfbStride, Value *xfbOffset,
+                                               InOutInfo outputInfo) {
   // xfbStride must be a non-zero value
   assert(xfbStride > 0);
   // Can currently only cope with constant xfbOffset.
@@ -736,20 +735,22 @@ Instruction *BuilderImpl::CreateWriteXfbOutput(Value *valueToWrite, bool isBuilt
       scalarizeBy = vectorTy->getNumElements();
       elementTy = vectorTy->getElementType();
     }
-    if (elementTy->getPrimitiveSizeInBits() == 64)
+    unsigned bitWidth = elementTy->getPrimitiveSizeInBits();
+    if (bitWidth == 64) {
+      // Scalarized as dword
+      bitWidth = 32;
       scalarizeBy *= 2;
+    }
+    assert(scalarizeBy <= 8); // At most <8 x dword>
     unsigned xfbOffset = xfbOutInfo.xfbOffset;
     for (unsigned i = 0; i < scalarizeBy; ++i) {
       InOutLocationInfo outLocInfo;
-      outLocInfo.setLocation(location);
+      outLocInfo.setLocation(location + i / 4);
+      outLocInfo.setComponent(outputInfo.getComponent() + i % 4);
       outLocInfo.setStreamId(streamId);
-      outLocInfo.setComponent(component + i);
       outLocInfo.setBuiltIn(isBuiltIn);
-      if (i >= 4) {
-        outLocInfo.setLocation(location + 1);
-        outLocInfo.setComponent(i - 4);
+      if (i >= 4)
         xfbOutInfo.xfbOffset = xfbOffset + 16;
-      }
       resUsage->inOutUsage.locInfoXfbOutInfoMap[outLocInfo] = xfbOutInfo;
     }
   } else {

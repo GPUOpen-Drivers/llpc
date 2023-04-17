@@ -1502,17 +1502,15 @@ Instruction *Builder::CreateWriteGenericOutput(Value *valueToWrite, unsigned loc
 // @param valueToWrite : Value to write
 // @param isBuiltIn : True for built-in, false for user output
 // @param location : Location (row) or built-in kind of output
-// @param component : Component offset of inputs and outputs (ignored if built-in)
 // @param xfbBuffer : XFB buffer ID
 // @param xfbStride : XFB stride
 // @param xfbOffset : XFB byte offset
 // @param outputInfo : Extra output info (GS stream ID)
-Instruction *Builder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuiltIn, unsigned location, unsigned component,
-                                           unsigned xfbBuffer, unsigned xfbStride, Value *xfbOffset,
-                                           InOutInfo outputInfo) {
+Instruction *Builder::CreateWriteXfbOutput(Value *valueToWrite, bool isBuiltIn, unsigned location, unsigned xfbBuffer,
+                                           unsigned xfbStride, Value *xfbOffset, InOutInfo outputInfo) {
   return record(BuilderOpcode::WriteXfbOutput, nullptr,
-                {valueToWrite, getInt1(isBuiltIn), getInt32(location), getInt32(component), getInt32(xfbBuffer),
-                 getInt32(xfbStride), xfbOffset, getInt32(outputInfo.getData())},
+                {valueToWrite, getInt1(isBuiltIn), getInt32(location), getInt32(xfbBuffer), getInt32(xfbStride),
+                 xfbOffset, getInt32(outputInfo.getData())},
                 "");
 }
 

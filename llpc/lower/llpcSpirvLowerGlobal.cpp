@@ -1308,7 +1308,7 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
 
           auto xfbOffset = m_builder->getInt32(outputMeta.XfbOffset + outputMeta.XfbExtraOffset + byteSize * idx);
           m_builder->CreateWriteXfbOutput(elem,
-                                          /*isBuiltIn=*/true, builtInId, 0, outputMeta.XfbBuffer, outputMeta.XfbStride,
+                                          /*isBuiltIn=*/true, builtInId, outputMeta.XfbBuffer, outputMeta.XfbStride,
                                           xfbOffset, outputInfo);
 
           if (!static_cast<bool>(EnableXfb)) {
@@ -1390,6 +1390,7 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
       outputInfo.setStreamId(emitStreamId);
     outputInfo.setIsSigned(outputMeta.Signedness);
     outputInfo.setPerPrimitive(outputMeta.PerPrimitive);
+    outputInfo.setComponent(outputMeta.Component);
 
     if (outputMeta.IsBuiltIn) {
       auto builtInId = static_cast<lgc::BuiltInKind>(outputMeta.Value);
@@ -1399,7 +1400,7 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
         assert(xfbOffsetAdjust == 0 && xfbBufferAdjust == 0); // Unused for built-ins
         auto xfbOffset = m_builder->getInt32(outputMeta.XfbOffset + outputMeta.XfbExtraOffset);
         m_builder->CreateWriteXfbOutput(outputValue,
-                                        /*isBuiltIn=*/true, builtInId, 0, outputMeta.XfbBuffer, outputMeta.XfbStride,
+                                        /*isBuiltIn=*/true, builtInId, outputMeta.XfbBuffer, outputMeta.XfbStride,
                                         xfbOffset, outputInfo);
 
         if (!static_cast<bool>(EnableXfb)) {
@@ -1445,8 +1446,8 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
       Value *xfbOffset = m_builder->getInt32(outputMeta.XfbOffset + outputMeta.XfbExtraOffset + xfbOffsetAdjust);
       m_builder->CreateWriteXfbOutput(outputValue,
                                       /*isBuiltIn=*/false, location + cast<ConstantInt>(locOffset)->getZExtValue(),
-                                      outputMeta.Component, outputMeta.XfbBuffer + xfbBufferAdjust,
-                                      outputMeta.XfbStride, xfbOffset, outputInfo);
+                                      outputMeta.XfbBuffer + xfbBufferAdjust, outputMeta.XfbStride, xfbOffset,
+                                      outputInfo);
 
       if (!static_cast<bool>(EnableXfb)) {
         LLPC_OUTS("\n===============================================================================\n");

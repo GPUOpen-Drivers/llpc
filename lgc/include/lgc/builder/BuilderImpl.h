@@ -479,8 +479,8 @@ public:
 
   // Create a write to an XFB (transform feedback / streamout) buffer.
   llvm::Instruction *CreateWriteXfbOutput(llvm::Value *valueToWrite, bool isBuiltIn, unsigned location,
-                                          unsigned component, unsigned xfbBuffer, unsigned xfbStride,
-                                          llvm::Value *xfbOffset, InOutInfo outputInfo);
+                                          unsigned xfbBuffer, unsigned xfbStride, llvm::Value *xfbOffset,
+                                          InOutInfo outputInfo);
 
   // Create a read of barycoord input value.
   llvm::Value *CreateReadBaryCoord(BuiltInKind builtIn, InOutInfo inputInfo, llvm::Value *auxInterpValue,
