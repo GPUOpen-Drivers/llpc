@@ -147,7 +147,7 @@ public:
   virtual void setPipelineState(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, bool unlinked) const;
 
   // For TCS, set inputVertices from patchControlPoints in the pipeline state.
-  virtual void setTcsInputVertices(llvm::Module *tcsModule) {}
+  virtual void setTcsInputVertices(llvm::Module *tcsModule) { llvm_unreachable(""); }
 
   // Gets client-defined metadata
   virtual llvm::StringRef getClientMetadata() const = 0;
