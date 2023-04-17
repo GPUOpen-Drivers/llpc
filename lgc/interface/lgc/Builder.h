@@ -104,6 +104,12 @@ public:
   bool isPerPrimitive() const { return m_data.bits.perPrimitive; }
   void setPerPrimitive(bool perPrimitive = true) { m_data.bits.perPrimitive = perPrimitive; }
 
+  unsigned getComponent() const { return m_data.bits.component; }
+  void setComponent(unsigned component) {
+    assert(component < 4); // Valid component offsets are 0~3
+    m_data.bits.component = component;
+  }
+
 private:
   union {
     struct {
@@ -118,6 +124,7 @@ private:
                                  //    a read or write of ClipDistance or CullDistance that is of the
                                  //    whole array or of an element with a variable index.
       unsigned perPrimitive : 1; // Mesh shader output: whether it is a per-primitive output
+      unsigned component : 2;    // Component offset, specifying which components within a location is consumed
     } bits;
     unsigned u32All;
   } m_data;
@@ -1153,14 +1160,13 @@ public:
   // @param valueToWrite : Value to write
   // @param isBuiltIn : True for built-in, false for user output
   // @param location : Location (row) or built-in kind of output
-  // @param component : Component offset of inputs and outputs (ignored if built-in)
   // @param xfbBuffer : XFB buffer ID
   // @param xfbStride : XFB stride
   // @param xfbOffset : XFB byte offset
   // @param outputInfo : Extra output info (GS stream ID)
   llvm::Instruction *CreateWriteXfbOutput(llvm::Value *valueToWrite, bool isBuiltIn, unsigned location,
-                                          unsigned component, unsigned xfbBuffer, unsigned xfbStride,
-                                          llvm::Value *xfbOffset, InOutInfo outputInfo);
+                                          unsigned xfbBuffer, unsigned xfbStride, llvm::Value *xfbOffset,
+                                          InOutInfo outputInfo);
 
   // Create a read of barycoord input value.
   // The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),

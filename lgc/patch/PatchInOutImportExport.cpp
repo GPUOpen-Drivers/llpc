@@ -957,8 +957,11 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         loc = value;
       } else {
         if (m_pipelineState->canPackOutput(m_shaderStage)) {
+          // Generic output exports of FS should have been handled by the LowerFragColorExport pass
           assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageGeometry ||
                  m_shaderStage == ShaderStageTessEval);
+
+          // Check component offset and search the location info map once again
           origLocInfo.setComponent(cast<ConstantInt>(callInst.getOperand(1))->getZExtValue());
           locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
 
