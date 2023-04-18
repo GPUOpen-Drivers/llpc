@@ -380,6 +380,9 @@ Expected<BinaryData> getSpirvBinaryFromFile(StringRef spvBinFile) {
 // @param fileName : Name of the file that should be written or "-" for stdout
 // @returns : `ErrorSuccess` on success, `ResultError` on failure
 Error writeFile(BinaryData pipelineBin, StringRef fileName) {
+  if (pipelineBin.codeSize == 0)
+    return Error::success();
+
   FILE *outFile = stdout;
   if (fileName != "-")
     outFile = fopen(fileName.str().c_str(), "wb");
