@@ -982,8 +982,10 @@ Value *MeshTaskShader::readTaskPayload(Type *readTy, Value *byteOffset) {
   auto payloadRingEntryOffset = getPayloadRingEntryOffset(entryPoint);
 
   CoherentFlag coherent = {};
-  coherent.bits.glc = true;
-  coherent.bits.dlc = true;
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
+    coherent.bits.glc = true;
+    coherent.bits.dlc = true;
+  }
 
   const unsigned bitWidth = readTy->getScalarSizeInBits();
   const unsigned numElements = readTy->isVectorTy() ? cast<FixedVectorType>(readTy)->getNumElements() : 1;
@@ -1047,7 +1049,9 @@ void MeshTaskShader::writeTaskPayload(Value *writeValue, Value *byteOffset) {
   auto payloadRingEntryOffset = getPayloadRingEntryOffset(entryPoint);
 
   CoherentFlag coherent = {};
-  coherent.bits.glc = true;
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
+    coherent.bits.glc = true;
+  }
 
   const auto writeTy = writeValue->getType();
   const unsigned bitWidth = writeTy->getScalarSizeInBits();
@@ -2483,7 +2487,9 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
         auto locationOffset = m_builder.getInt32(exportIndex * SizeOfVec4);
 
         CoherentFlag coherent = {};
-        coherent.bits.glc = true;
+        if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
+          coherent.bits.glc = true;
+        }
 
         m_builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_store, valueToStore->getType(),
                                   {valueToStore, m_attribRingBufDesc, m_waveThreadInfo.threadIdInSubgroup,

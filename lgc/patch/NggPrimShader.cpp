@@ -6054,9 +6054,10 @@ void NggPrimShader::processVertexAttribExport(Function *&target) {
         auto locationOffset = m_builder.getInt32(location * SizeOfVec4);
 
         CoherentFlag coherent = {};
-        coherent.bits.glc = true;
-        coherent.bits.slc = true;
-
+        if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
+          coherent.bits.glc = true;
+          coherent.bits.slc = true;
+        }
         m_builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_store, attribValue->getType(),
                                   {attribValue, attribRingBufDesc, vertexIndex, locationOffset, ringOffset,
                                    m_builder.getInt32(coherent.u32All)});
@@ -6441,8 +6442,10 @@ void NggPrimShader::processSwXfb(ArrayRef<Argument *> args) {
         }
 
         CoherentFlag coherent = {};
-        coherent.bits.glc = true;
-        coherent.bits.slc = true;
+        if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
+          coherent.bits.glc = true;
+          coherent.bits.slc = true;
+        }
 
         // vertexOffset = (threadIdInSubgroup * vertsPerPrim + vertexIndex) * xfbStride
         Value *vertexOffset =
@@ -7051,8 +7054,10 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
           }
 
           CoherentFlag coherent = {};
-          coherent.bits.glc = true;
-          coherent.bits.slc = true;
+          if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
+            coherent.bits.glc = true;
+            coherent.bits.slc = true;
+          }
 
           // vertexOffset = (threadIdInSubgroup * outVertsPerPrim + vertexIndex) * xfbStride
           Value *vertexOffset = m_builder.CreateAdd(

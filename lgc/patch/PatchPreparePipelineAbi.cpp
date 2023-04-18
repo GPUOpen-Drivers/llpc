@@ -227,7 +227,8 @@ void PatchPreparePipelineAbi::writeTessFactors(PipelineState *pipelineState, Val
   Value *tfBufferOffset = builder.CreateMul(relPatchId, builder.getInt32(calcFactor.tessFactorStride * sizeof(float)));
 
   CoherentFlag coherent = {};
-  coherent.bits.glc = true;
+  if (pipelineState->getTargetInfo().getGfxIpVersion().major <= 11)
+    coherent.bits.glc = true;
 
   const auto numOuterTfs = cast<FixedVectorType>(outerTf->getType())->getNumElements();
   const auto numInnerTfs = innerTf ? cast<FixedVectorType>(innerTf->getType())->getNumElements()

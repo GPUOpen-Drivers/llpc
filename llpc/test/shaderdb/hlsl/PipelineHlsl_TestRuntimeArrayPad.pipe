@@ -59,7 +59,7 @@ options.dontUnrollHintThreshold = 0
                OpCapability Tessellation
           %1 = OpExtInstImport "GLSL.std.450"
                OpMemoryModel Logical GLSL450
-               OpEntryPoint TessellationControl %4 "main" %gl_InvocationID %gl_TessLevelOuter %48
+               OpEntryPoint TessellationControl %4 "main" %gl_InvocationID %gl_TessLevelOuter
                OpExecutionMode %4 OutputVertices 1
                OpExecutionMode %4 Isolines
                OpExecutionMode %4 SpacingFractionalOdd
@@ -171,7 +171,7 @@ options.dontUnrollHintThreshold = 0
                OpCapability Tessellation
           %1 = OpExtInstImport "GLSL.std.450"
                OpMemoryModel Logical GLSL450
-               OpEntryPoint TessellationEvaluation %4 "main" %21 %gl_TessCoord
+               OpEntryPoint TessellationEvaluation %4 "main" %gl_TessCoord
                OpDecorate %_runtimearr_float ArrayStride 4
                OpMemberDecorate %_struct_17 0 Offset 0
                OpMemberDecorate %_struct_17 1 Offset 4

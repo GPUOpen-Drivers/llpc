@@ -591,8 +591,10 @@ Value *PatchCopyShader::loadValueFromGsVsRing(Type *loadTy, unsigned location, u
   assert(m_gsVsRingBufDesc);
 
   CoherentFlag coherent = {};
-  coherent.bits.glc = true;
-  coherent.bits.slc = true;
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
+    coherent.bits.glc = true;
+    coherent.bits.slc = true;
+  }
 
   Value *loadValue = UndefValue::get(loadTy);
 

@@ -11,9 +11,6 @@
 ; SHADERTEST: define dllexport spir_func void @lgc.shader.CS.main()
 
 ; Get a pointer to the spill table
-; SHADERTEST: [[spill_table0:%[0-9]*]] = call ptr addrspace(4) @lgc.spill.table() #2
-
-; Get a pointer to the spill table
 ; SHADERTEST: [[spill_table1:%[0-9]*]] = call ptr addrspace(4) @lgc.spill.table() #2
 
 ; Get a pointer to the second inline buffer in the spill table.  Offset 40 comes from the user data nodes.
@@ -34,6 +31,9 @@
 
 ; Get the "fat pointer" for the buffer
 ; SHADERTEST: call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> [[desc1_3]])
+
+; Get a pointer to the spill table
+; SHADERTEST: [[spill_table0:%[0-9]*]] = call ptr addrspace(4) @lgc.spill.table() #2
 
 ; SHADERTEST: ret void
 ; SHADERTEST-LABEL: {{^//}} LLPC pipeline patching results

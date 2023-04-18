@@ -1633,6 +1633,7 @@ Value *Builder::CreateImageBvhIntersectRay(Value *nodePtr, Value *extent, Value 
                 {nodePtr, extent, origin, direction, invDirection, imageDesc}, instName);
 }
 #endif
+
 // =====================================================================================================================
 // Create a read from (part of) a task payload.
 // The result type is as specified by resultTy, a scalar or vector type with no more than four elements.

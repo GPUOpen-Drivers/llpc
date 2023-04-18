@@ -313,7 +313,7 @@ void BufferOpLowering::visitAtomicCmpXchgInst(AtomicCmpXchgInst &atomicCmpXchgIn
 
   Type *const storeType = atomicCmpXchgInst.getNewValOperand()->getType();
 
-  const bool isSlc = atomicCmpXchgInst.getMetadata(LLVMContext::MD_nontemporal);
+  const bool isNonTemporal = atomicCmpXchgInst.getMetadata(LLVMContext::MD_nontemporal);
 
   Value *const bufferDesc = values[0];
   Value *const baseIndex = m_builder.CreatePtrToInt(values[1], m_builder.getInt32Ty());
@@ -363,10 +363,14 @@ void BufferOpLowering::visitAtomicCmpXchgInst(AtomicCmpXchgInst &atomicCmpXchgIn
     }
     }
 
+    CoherentFlag coherent = {};
+    if (m_pipelineState.getTargetInfo().getGfxIpVersion().major <= 11)
+      coherent.bits.slc = isNonTemporal ? 1 : 0;
+
     Value *const atomicCall = m_builder.CreateIntrinsic(
         Intrinsic::amdgcn_raw_buffer_atomic_cmpswap, atomicCmpXchgInst.getNewValOperand()->getType(),
         {atomicCmpXchgInst.getNewValOperand(), atomicCmpXchgInst.getCompareOperand(), bufferDesc, baseIndex,
-         m_builder.getInt32(0), m_builder.getInt32(isSlc ? 1 : 0)});
+         m_builder.getInt32(0), m_builder.getInt32(coherent.u32All)});
 
     switch (atomicCmpXchgInst.getSuccessOrdering()) {
     case AtomicOrdering::Acquire:
@@ -415,7 +419,7 @@ void BufferOpLowering::visitAtomicRMWInst(AtomicRMWInst &atomicRmwInst) {
 
     Type *const storeType = atomicRmwInst.getValOperand()->getType();
 
-    const bool isSlc = atomicRmwInst.getMetadata(LLVMContext::MD_nontemporal);
+    const bool isNonTemporal = atomicRmwInst.getMetadata(LLVMContext::MD_nontemporal);
 
     Value *const bufferDesc = values[0];
     Value *const baseIndex = m_builder.CreatePtrToInt(values[1], m_builder.getInt32Ty());
@@ -505,9 +509,14 @@ void BufferOpLowering::visitAtomicRMWInst(AtomicRMWInst &atomicRmwInst) {
         break;
       }
 
-      Value *const atomicCall = m_builder.CreateIntrinsic(
-          intrinsic, storeType,
-          {atomicRmwInst.getValOperand(), bufferDesc, baseIndex, m_builder.getInt32(0), m_builder.getInt32(isSlc * 2)});
+      CoherentFlag coherent = {};
+      if (m_pipelineState.getTargetInfo().getGfxIpVersion().major <= 11) {
+        coherent.bits.slc = isNonTemporal ? 1 : 0;
+      }
+
+      Value *const atomicCall = m_builder.CreateIntrinsic(intrinsic, storeType,
+                                                          {atomicRmwInst.getValOperand(), bufferDesc, baseIndex,
+                                                           m_builder.getInt32(0), m_builder.getInt32(coherent.u32All)});
       copyMetadata(atomicCall, &atomicRmwInst);
 
       switch (atomicRmwInst.getOrdering()) {
@@ -1246,7 +1255,7 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
         getDescriptorInfo(bufferDesc).invariant.value() || loadInst->getMetadata(LLVMContext::MD_invariant_load);
   }
 
-  const bool isSlc = inst.getMetadata(LLVMContext::MD_nontemporal);
+  const bool isNonTemporal = inst.getMetadata(LLVMContext::MD_nontemporal);
   const bool isGlc = ordering != AtomicOrdering::NotAtomic;
   const bool isDlc = isGlc; // For buffer load on GFX10+, we set DLC = GLC
 
@@ -1381,12 +1390,15 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
     Value *part = nullptr;
 
     CoherentFlag coherent = {};
-    coherent.bits.glc = isGlc;
-    if (!isInvariant)
-      coherent.bits.slc = isSlc;
+    if (m_pipelineState.getTargetInfo().getGfxIpVersion().major <= 11) {
+      coherent.bits.glc = isGlc;
+      if (!isInvariant)
+        coherent.bits.slc = isNonTemporal;
+    }
 
     if (isLoad) {
-      if (m_pipelineState.getTargetInfo().getGfxIpVersion().major >= 10) {
+      if (m_pipelineState.getTargetInfo().getGfxIpVersion().major >= 10 &&
+          m_pipelineState.getTargetInfo().getGfxIpVersion().major <= 11) {
         // TODO For stores?
         coherent.bits.dlc = isDlc;
       }
