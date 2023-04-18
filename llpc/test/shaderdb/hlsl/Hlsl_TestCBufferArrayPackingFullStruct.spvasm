@@ -10,7 +10,7 @@
                OpExecutionMode %PSMain OriginUpperLeft
                OpDecorate %_arr_float_uint_2 ArrayStride 16
                OpMemberDecorate %type_cb 0 Offset 0
-               OpMemberDecorate %type_cb 1 Offset 20
+               OpMemberDecorate %type_cb 1 Offset 32
                OpDecorate %type_cb Block
                OpDecorate %out_var_SV_TARGET Location 0
                OpDecorate %cb DescriptorSet 0

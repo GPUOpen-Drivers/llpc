@@ -90,3 +90,4 @@ check_str = out.decode("utf-8")
 if check_str.find("Invalid gfxip: gfx1100") == -1:
     config.available_features.add('gfx11')
 #endif
+

@@ -415,12 +415,9 @@ struct StaticDescriptorValue {
   ResourceMappingNodeType type; ///< Type of this resource mapping node (currently, only sampler is supported)
   unsigned set;                 ///< ID of descriptor set
   unsigned binding;             ///< ID of descriptor binding
-  unsigned reserv0;
-  unsigned reserv1;
-  unsigned reserv2;
-  unsigned arraySize;     ///< Element count for arrayed binding
-  const unsigned *pValue; ///< Static SRDs
-  unsigned visibility;    ///< Mask composed of ShaderStageBit values
+  unsigned arraySize;           ///< Element count for arrayed binding
+  const unsigned *pValue;       ///< Static SRDs
+  unsigned visibility;          ///< Mask composed of ShaderStageBit values
 };
 
 /// Represents the resource mapping data provided during pipeline creation
@@ -463,6 +460,9 @@ struct RtIpVersion {
   // RT IP checkers
   bool operator==(const RtIpVersion &rhs) const { return std::tie(major, minor) == std::tie(rhs.major, rhs.minor); }
   bool operator>=(const RtIpVersion &rhs) const { return std::tie(major, minor) >= std::tie(rhs.major, rhs.minor); }
+  bool isRtIp(unsigned rhsMajor, unsigned rhsMinor) const {
+    return std::tie(major, minor) == std::tie(rhsMajor, rhsMinor);
+  }
 };
 
 /// Represents shader binary data.

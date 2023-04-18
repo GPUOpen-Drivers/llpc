@@ -2,9 +2,9 @@
 ; RUN: amdllpc -v %gfxip %s --validate-spirv=false | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> %{{[0-9]*}}, i32 4, i32 0)
-; SHADERTEST: call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> %{{[0-9]*}}, i32 16, i32 0)
-; SHADERTEST: call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> %{{[0-9]*}}, i32 28, i32 0)
-; SHADERTEST: call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> %{{[0-9]*}}, i32 40, i32 0)
+; SHADERTEST: call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> %{{[0-9]*}}, i32 20, i32 0)
+; SHADERTEST: call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> %{{[0-9]*}}, i32 36, i32 0)
+; SHADERTEST: call i32 @llvm.amdgcn.s.buffer.load.i32(<4 x i32> %{{[0-9]*}}, i32 52, i32 0)
 ; SHADERTEST : AMDLLPC SUCCESS
 ; END_SHADERTEST
 
@@ -13,7 +13,7 @@
                OpEntryPoint Fragment %PSMain "main" %out_var_SV_TARGET
                OpExecutionMode %PSMain OriginUpperLeft
                OpMemberDecorate %type_cb 0 RowMajor
-               OpMemberDecorate %type_cb 0 MatrixStride 12
+               OpMemberDecorate %type_cb 0 MatrixStride 16
                OpMemberDecorate %type_cb 0 Offset 0
                OpMemberDecorate %type_cb 1 Offset 64
                OpDecorate %type_cb Block

@@ -39,3 +39,4 @@ config.test_exec_root = os.path.join(config.llvm_obj_root, 'test')
 llvm_config.with_environment('PATH', config.llvm_tools_dir, append_path=True)
 
 llvm_config.use_default_substitutions()
+

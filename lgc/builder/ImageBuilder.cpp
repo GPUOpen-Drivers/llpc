@@ -481,11 +481,14 @@ Value *BuilderImpl::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags
 
     // glc/dlc bits
     CoherentFlag coherent = {};
-    if (flags & (ImageFlagCoherent | ImageFlagVolatile)) {
-      coherent.bits.glc = true;
-      if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10)
-        coherent.bits.dlc = true;
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
+      if (flags & (ImageFlagCoherent | ImageFlagVolatile)) {
+        coherent.bits.glc = true;
+        if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10)
+          coherent.bits.dlc = true;
+      }
     }
+
     args.push_back(getInt32(coherent.u32All));
 
     // Get the intrinsic ID from the load intrinsic ID table and call it.
@@ -670,9 +673,12 @@ Value *BuilderImpl::CreateImageStore(Value *texel, unsigned dim, unsigned flags,
 
     // glc bit
     CoherentFlag coherent = {};
-    if (flags & (ImageFlagCoherent | ImageFlagVolatile)) {
-      coherent.bits.glc = true;
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
+      if (flags & (ImageFlagCoherent | ImageFlagVolatile)) {
+        coherent.bits.glc = true;
+      }
     }
+
     args.push_back(getInt32(coherent.u32All));
 
     // Get the intrinsic ID from the store intrinsic ID table and call it.
@@ -1151,11 +1157,14 @@ Value *BuilderImpl::CreateImageSampleGather(Type *resultTy, unsigned dim, unsign
 
   // glc/dlc bits
   CoherentFlag coherent = {};
-  if (flags & (ImageFlagCoherent | ImageFlagVolatile)) {
-    coherent.bits.glc = true;
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10)
-      coherent.bits.dlc = true;
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
+    if (flags & (ImageFlagCoherent | ImageFlagVolatile)) {
+      coherent.bits.glc = true;
+      if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10)
+        coherent.bits.dlc = true;
+    }
   }
+
   args.push_back(getInt32(coherent.u32All));
 
   // Search the intrinsic ID table.

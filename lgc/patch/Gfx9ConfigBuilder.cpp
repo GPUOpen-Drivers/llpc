@@ -1308,6 +1308,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
         esVgprCompCnt = 3; // Enable instance ID (ES VGPR8)
     }
   } else {
+
     llvm_unreachable("Not implemented!");
   }
   SET_REG_FIELD(&config->primShaderRegs, SPI_SHADER_PGM_RSRC2_GS, ES_VGPR_COMP_CNT, esVgprCompCnt);
