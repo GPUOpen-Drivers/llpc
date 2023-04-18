@@ -542,46 +542,65 @@ Instruction *BuilderImpl::createWaterfallLoop(Instruction *nonUniformInst, Array
 
   // Find first index instruction and check if index instructions are identical.
   Instruction *firstIndexInst = nullptr;
-  bool identicalIndexes = true;
-  for (Value *nonUniformVal : nonUniformIndices) {
-    Instruction *nuInst = dyn_cast<Instruction>(nonUniformVal);
-    if (!nuInst || (firstIndexInst && !instructionsEqual(nuInst, firstIndexInst))) {
-      identicalIndexes = false;
-      break;
+  if (scalarizeDescriptorLoads) {
+    // FIXME: these do not actually need to be identical if we introduce multiple waterfall
+    // begin and readlane intrinsics for these.
+    bool identicalIndexes = true;
+    for (Value *nonUniformVal : nonUniformIndices) {
+      Instruction *nuInst = dyn_cast<Instruction>(nonUniformVal);
+      // Note: parent check here guards use of comesBefore below
+      if (!nuInst || (firstIndexInst && !instructionsEqual(nuInst, firstIndexInst)) ||
+          (firstIndexInst && nuInst->getParent() != firstIndexInst->getParent())) {
+        identicalIndexes = false;
+        break;
+      }
+      if (!firstIndexInst || nuInst->comesBefore(firstIndexInst))
+        firstIndexInst = nuInst;
     }
-    if (!firstIndexInst || nuInst->comesBefore(firstIndexInst))
-      firstIndexInst = nuInst;
+
+    // Ensure we do not create a waterfall across blocks.
+    // FIXME: we could use dominator check to allow scalarizing descriptor loads on multi-block spans;
+    // however, this also requires backend support for multi-block waterfalls to be implemented.
+    if (!identicalIndexes || !firstIndexInst ||
+        (firstIndexInst && firstIndexInst->getParent() != nonUniformInst->getParent()))
+      scalarizeDescriptorLoads = false;
   }
 
   // Save Builder's insert point
   IRBuilder<>::InsertPointGuard guard(*this);
 
   Value *waterfallBegin;
-  if (scalarizeDescriptorLoads && firstIndexInst && identicalIndexes) {
+  if (scalarizeDescriptorLoads) {
     // Attempt to scalarize descriptor loads.
+    assert(firstIndexInst);
+    CallInst *firstCallInst = dyn_cast<CallInst>(firstIndexInst);
+    if (firstCallInst && firstCallInst->getIntrinsicID() == Intrinsic::amdgcn_waterfall_readfirstlane) {
+      // Descriptor loads are already inside a waterfall.
+      waterfallBegin = firstCallInst->getArgOperand(0);
+    } else {
+      // Begin waterfall loop just after shared index is computed.
+      // This places all dependent instructions within the waterfall loop, including descriptor loads.
+      auto descTy = firstIndexInst->getType();
+      SetInsertPoint(firstIndexInst->getNextNonDebugInstruction(false));
+      waterfallBegin = ConstantInt::get(getInt32Ty(), 0);
+      waterfallBegin = CreateIntrinsic(Intrinsic::amdgcn_waterfall_begin, descTy, {waterfallBegin, firstIndexInst},
+                                       nullptr, instName);
 
-    // Begin waterfall loop just after shared index is computed.
-    // This places all dependent instructions within the waterfall loop, including descriptor loads.
-    auto nonUniformVal = cast<Value>(firstIndexInst);
-    SetInsertPoint(firstIndexInst->getNextNonDebugInstruction(false));
-    waterfallBegin = ConstantInt::get(getInt32Ty(), 0);
-    waterfallBegin = CreateIntrinsic(Intrinsic::amdgcn_waterfall_begin, nonUniformVal->getType(),
-                                     {waterfallBegin, nonUniformVal}, nullptr, instName);
+      // Scalarize shared index.
+      Value *desc = CreateIntrinsic(Intrinsic::amdgcn_waterfall_readfirstlane, {descTy, descTy},
+                                    {waterfallBegin, firstIndexInst}, nullptr, instName);
 
-    // Scalarize shared index.
-    auto descTy = nonUniformVal->getType();
-    Value *desc = CreateIntrinsic(Intrinsic::amdgcn_waterfall_readfirstlane, {descTy, descTy},
-                                  {waterfallBegin, nonUniformVal}, nullptr, instName);
-
-    // Replace all references to shared index within the waterfall loop with scalarized index.
-    // (Note: this includes the non-uniform instruction itself.)
-    // Loads using scalarized index will become scalar loads.
-    for (Value *otherNonUniformVal : nonUniformIndices) {
-      otherNonUniformVal->replaceUsesWithIf(desc, [desc, waterfallBegin, nonUniformInst](Use &U) {
-        Instruction *userInst = cast<Instruction>(U.getUser());
-        return U.getUser() != waterfallBegin && U.getUser() != desc &&
-               (userInst->comesBefore(nonUniformInst) || userInst == nonUniformInst);
-      });
+      // Replace all references to shared index within the waterfall loop with scalarized index.
+      // (Note: this includes the non-uniform instruction itself.)
+      // Loads using scalarized index will become scalar loads.
+      for (Value *otherNonUniformVal : nonUniformIndices) {
+        otherNonUniformVal->replaceUsesWithIf(desc, [desc, waterfallBegin, nonUniformInst](Use &U) {
+          Instruction *userInst = cast<Instruction>(U.getUser());
+          return U.getUser() != waterfallBegin && U.getUser() != desc &&
+                 userInst->getParent() == nonUniformInst->getParent() &&
+                 (userInst == nonUniformInst || userInst->comesBefore(nonUniformInst));
+        });
+      }
     }
   } else {
     // Insert new code just before nonUniformInst.
