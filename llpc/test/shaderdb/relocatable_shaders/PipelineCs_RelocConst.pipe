@@ -3,7 +3,7 @@
 ; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --arch=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: 0000000000000000 <_amdgpu_cs_main>:
 ; SHADERTEST: s_mov_b32 s[[RELOREG:[0-9]+]], 16 {{.*}}
-; SHADERTEST: s_load_dwordx2 s[{{.*}}:{{.*}}], s[{{.*}}:{{.*}}], s[[RELOREG]] //{{.*}}
+; SHADERTEST: s_load_dwordx2 s[{{.*}}:{{.*}}], s[{{.*}}:{{.*}}], s[[RELOREG]] {{(offset:0x0 )?}}//{{.*}}
 ; END_SHADERTEST
 
 ; BEGIN_SHADERTEST
