@@ -179,8 +179,7 @@ void RegisterMetadataBuilder::buildLsHsRegisters() {
   const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
   auto vgtLsHsConfig = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtLsHsConfig].getMap(true);
   vgtLsHsConfig[Util::Abi::VgtLsHsConfigMetadataKey::NumPatches] = calcFactor.patchCountPerThreadGroup;
-  vgtLsHsConfig[Util::Abi::VgtLsHsConfigMetadataKey::HsNumInputCp] =
-      m_pipelineState->getInputAssemblyState().patchControlPoints;
+  vgtLsHsConfig[Util::Abi::VgtLsHsConfigMetadataKey::HsNumInputCp] = m_pipelineState->getNumPatchControlPoints();
   vgtLsHsConfig[Util::Abi::VgtLsHsConfigMetadataKey::HsNumOutputCp] =
       m_pipelineState->getShaderModes()->getTessellationMode().outputVertices;
 

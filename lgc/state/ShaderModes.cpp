@@ -80,13 +80,13 @@ CommonShaderMode ShaderModes::getCommonShaderMode(Module &module, ShaderStage st
 // Get the common shader mode (FP mode) for the given shader stage
 //
 // @param stage : Shader stage
-const CommonShaderMode &ShaderModes::getCommonShaderMode(ShaderStage stage) {
+const CommonShaderMode &ShaderModes::getCommonShaderMode(ShaderStage stage) const {
   return ArrayRef<CommonShaderMode>(m_commonShaderModes)[stage];
 }
 
 // =====================================================================================================================
 // Check if any shader stage has useSubgroupSize set
-bool ShaderModes::getAnyUseSubgroupSize() {
+bool ShaderModes::getAnyUseSubgroupSize() const {
   for (const auto &commonShaderMode : m_commonShaderModes) {
     if (commonShaderMode.useSubgroupSize)
       return true;
@@ -109,8 +109,18 @@ void ShaderModes::setTessellationMode(Module &module, ShaderStage stage, const T
 }
 
 // =====================================================================================================================
+// Get the tessellation mode for the given shader stage (TCS or TES): static edition that reads directly from IR.
+TessellationMode ShaderModes::getTessellationMode(Module &module, ShaderStage stage) {
+  assert(stage == ShaderStageTessControl || stage == ShaderStageTessEval);
+  TessellationMode mode = {};
+  PipelineState::readNamedMetadataArrayOfInt32(
+      &module, stage == ShaderStageTessControl ? TcsModeMetadataName : TesModeMetadataName, mode);
+  return mode;
+}
+
+// =====================================================================================================================
 // Get the tessellation state.
-const TessellationMode &ShaderModes::getTessellationMode() {
+const TessellationMode &ShaderModes::getTessellationMode() const {
   return m_tessellationMode;
 }
 
@@ -125,7 +135,7 @@ void ShaderModes::setGeometryShaderMode(Module &module, const GeometryShaderMode
 
 // =====================================================================================================================
 // Get the geometry shader mode
-const GeometryShaderMode &ShaderModes::getGeometryShaderMode() {
+const GeometryShaderMode &ShaderModes::getGeometryShaderMode() const {
   return m_geometryShaderMode;
 }
 
@@ -140,7 +150,7 @@ void ShaderModes::setMeshShaderMode(Module &module, const MeshShaderMode &inMode
 
 // =====================================================================================================================
 // Get the mesh shader mode
-const MeshShaderMode &ShaderModes::getMeshShaderMode() {
+const MeshShaderMode &ShaderModes::getMeshShaderMode() const {
   return m_meshShaderMode;
 }
 
@@ -155,7 +165,7 @@ void ShaderModes::setFragmentShaderMode(Module &module, const FragmentShaderMode
 
 // =====================================================================================================================
 // Get the fragment shader mode
-const FragmentShaderMode &ShaderModes::getFragmentShaderMode() {
+const FragmentShaderMode &ShaderModes::getFragmentShaderMode() const {
   return m_fragmentShaderMode;
 }
 
@@ -185,7 +195,7 @@ ComputeShaderMode ShaderModes::getComputeShaderMode(Module &module) {
 
 // =====================================================================================================================
 // Get the compute shader mode (workgroup size)
-const ComputeShaderMode &ShaderModes::getComputeShaderMode() {
+const ComputeShaderMode &ShaderModes::getComputeShaderMode() const {
   return m_computeShaderMode;
 }
 
@@ -237,4 +247,5 @@ void ShaderModes::readModesFromPipeline(Module *module) {
                                                                                        : PrimitiveMode::Triangles;
   m_tessellationMode.pointMode = tcsMode.pointMode | tesMode.pointMode;
   m_tessellationMode.outputVertices = tcsMode.outputVertices != 0 ? tcsMode.outputVertices : tesMode.outputVertices;
+  m_tessellationMode.inputVertices = tcsMode.inputVertices != 0 ? tcsMode.inputVertices : tesMode.inputVertices;
 }

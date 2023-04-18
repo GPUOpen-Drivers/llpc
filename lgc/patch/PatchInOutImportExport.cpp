@@ -328,7 +328,7 @@ void PatchInOutImportExport::processShader() {
       const unsigned outLocCount =
           hasTcs ? std::max(tcsInOutUsage.outputMapLocCount, 1u) : std::max(tesInOutUsage.inputMapLocCount, 1u);
 
-      const unsigned inVertexCount = m_pipelineState->getInputAssemblyState().patchControlPoints;
+      const unsigned inVertexCount = m_pipelineState->getNumPatchControlPoints();
       const unsigned outVertexCount =
           hasTcs ? m_pipelineState->getShaderModes()->getTessellationMode().outputVertices : MaxTessPatchVertices;
 
@@ -2124,7 +2124,7 @@ Value *PatchInOutImportExport::patchTcsBuiltInInputImport(Type *inputTy, unsigne
     break;
   }
   case BuiltInPatchVertices: {
-    input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getInputAssemblyState().patchControlPoints);
+    input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getNumPatchControlPoints());
     break;
   }
   case BuiltInPrimitiveId: {
@@ -4592,7 +4592,8 @@ Value *PatchInOutImportExport::calcLdsOffsetForTcsInput(Type *inputTy, unsigned 
   }
 
   // dwordOffset = (relativeId * inVertexCount + vertexId) * inVertexStride + attribOffset
-  auto inVertexCount = m_pipelineState->getInputAssemblyState().patchControlPoints;
+  auto inVertexCount = m_pipelineState->getNumPatchControlPoints();
+
   auto inVertexCountVal = builder.getInt32(inVertexCount);
   auto relativeId = m_pipelineSysValues.get(m_entryPoint)->getRelativeId();
 

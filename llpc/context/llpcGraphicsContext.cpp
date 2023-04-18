@@ -212,6 +212,17 @@ void GraphicsContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
 }
 
 // =====================================================================================================================
+// For TCS, set inputVertices from patchControlPoints in the pipeline state.
+void GraphicsContext::setTcsInputVertices(Module *tcsModule) {
+  const auto &inputIaState = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->iaState;
+  if (inputIaState.patchControlPoints == 0)
+    return;
+  TessellationMode tessellationMode = lgc::Pipeline::getTessellationMode(*tcsModule, lgc::ShaderStageTessControl);
+  tessellationMode.inputVertices = inputIaState.patchControlPoints;
+  lgc::Pipeline::setTessellationMode(*tcsModule, lgc::ShaderStageTessControl, tessellationMode);
+}
+
+// =====================================================================================================================
 // Give the pipeline options to the middle-end, and/or hash them.
 Options GraphicsContext::computePipelineOptions() const {
   Options options = PipelineContext::computePipelineOptions();
@@ -448,9 +459,14 @@ void GraphicsContext::setGraphicsStateInPipeline(Pipeline *pipeline, Util::Metro
       llvm_unreachable("");
     }
 
-    inputAssemblyState.patchControlPoints = inputIaState.patchControlPoints;
     inputAssemblyState.disableVertexReuse = inputIaState.disableVertexReuse;
     inputAssemblyState.switchWinding = inputIaState.switchWinding;
+
+    if (hasher) {
+      // We need to hash patchControlPoints here, even though it is used separately in setTcsInputVertices as
+      // LGC needs it in the TCS shader mode.
+      hasher->Update(inputIaState.patchControlPoints);
+    }
 
     rasterizerState.rasterizerDiscardEnable = inputRsState.rasterizerDiscardEnable;
     rasterizerState.usrClipPlaneMask = inputRsState.usrClipPlaneMask;

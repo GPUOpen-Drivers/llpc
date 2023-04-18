@@ -553,8 +553,7 @@ template <typename T> void ConfigBuilder::buildHsRegConfig(ShaderStage shaderSta
 
   // Set VGT_LS_HS_CONFIG
   SET_REG_FIELD(&config->hsRegs, VGT_LS_HS_CONFIG, NUM_PATCHES, calcFactor.patchCountPerThreadGroup);
-  SET_REG_FIELD(&config->hsRegs, VGT_LS_HS_CONFIG, HS_NUM_INPUT_CP,
-                m_pipelineState->getInputAssemblyState().patchControlPoints);
+  SET_REG_FIELD(&config->hsRegs, VGT_LS_HS_CONFIG, HS_NUM_INPUT_CP, m_pipelineState->getNumPatchControlPoints());
 
   auto hsNumOutputCp = tessMode.outputVertices;
   SET_REG_FIELD(&config->hsRegs, VGT_LS_HS_CONFIG, HS_NUM_OUTPUT_CP, hsNumOutputCp);

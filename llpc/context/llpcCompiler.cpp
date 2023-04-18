@@ -1161,6 +1161,10 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
         LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
         result = Result::ErrorInvalidShader;
       }
+
+      // If this is TCS, set inputVertices from patchControlPoints in the pipeline state.
+      if (entryStage == ShaderStageTessControl)
+        context->getPipelineContext()->setTcsInputVertices(modules[shaderIndex]);
     }
 #if VKI_RAY_TRACING
     std::vector<const PipelineShaderInfo *> newShaderInfos;

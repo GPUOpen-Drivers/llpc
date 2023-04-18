@@ -1003,8 +1003,7 @@ void ConfigBuilder::buildLsHsRegConfig(ShaderStage shaderStage1, ShaderStage sha
 
   // Set VGT_LS_HS_CONFIG
   SET_REG_FIELD(&config->lsHsRegs, VGT_LS_HS_CONFIG, NUM_PATCHES, calcFactor.patchCountPerThreadGroup);
-  SET_REG_FIELD(&config->lsHsRegs, VGT_LS_HS_CONFIG, HS_NUM_INPUT_CP,
-                m_pipelineState->getInputAssemblyState().patchControlPoints);
+  SET_REG_FIELD(&config->lsHsRegs, VGT_LS_HS_CONFIG, HS_NUM_INPUT_CP, m_pipelineState->getNumPatchControlPoints());
 
   auto hsNumOutputCp = m_pipelineState->getShaderModes()->getTessellationMode().outputVertices;
   SET_REG_FIELD(&config->lsHsRegs, VGT_LS_HS_CONFIG, HS_NUM_OUTPUT_CP, hsNumOutputCp);
