@@ -9,9 +9,9 @@
   // Matching the relocation entry for the sampler descriptor
 ; SHADERTEST-DAG: s_mov_b32 s[[RELOREG_SAMPLER:[0-9]+]], 48 //{{.*}}
   // Loading the resource descriptor
-; SHADERTEST-DAG: s_load_dwordx8 s[[RESOURCE_REG:\[[0-9]+:[0-9]+\]]], s[{{.*}}:{{.*}}], s[[RELOREG_RESOURCE]] //{{.*}}
+; SHADERTEST-DAG: s_load_dwordx8 s[[RESOURCE_REG:\[[0-9]+:[0-9]+\]]], s[{{.*}}:{{.*}}], s[[RELOREG_RESOURCE]] {{(offset:0x0 )?}}//{{.*}}
   // Loading the sampler descriptor
-; SHADERTEST-DAG: s_load_dwordx4 s[[SAMPLER_REG:\[[0-9]+:[0-9]+\]]], s[{{.*}}:{{.*}}], s[[RELOREG_SAMPLER]] //{{.*}}
+; SHADERTEST-DAG: s_load_dwordx4 s[[SAMPLER_REG:\[[0-9]+:[0-9]+\]]], s[{{.*}}:{{.*}}], s[[RELOREG_SAMPLER]] {{(offset:0x0 )?}}//{{.*}}
   // Sampling the texture
 ; SHADERTEST: image_sample_lz v[0:3], v0, s[[RESOURCE_REG]], s[[SAMPLER_REG]] {{.*}}
 ; END_SHADERTEST
