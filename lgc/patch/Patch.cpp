@@ -395,7 +395,7 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level o
                                   .needCanonicalLoops(true)
                                   .sinkCommonInsts(true)));
   fpm.addPass(LoopUnrollPass(LoopUnrollOptions(optLevel)));
-  // uses UniformityAnalysis
+  // uses DivergenceAnalysis
   fpm.addPass(PatchReadFirstLane());
   fpm.addPass(InstCombinePass(instCombineOpt));
   passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));

@@ -38,6 +38,7 @@
 #include "lgc/util/TypeLowering.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/PostOrderIterator.h"
+#include "llvm/Analysis/DivergenceAnalysis.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
@@ -54,7 +55,7 @@ using namespace lgc;
 namespace {
 
 struct PatchBufferOpImpl {
-  PatchBufferOpImpl(LLVMContext &context, PipelineState &pipelineState, UniformityInfo &uniformityInfo);
+  PatchBufferOpImpl(LLVMContext &context, PipelineState &pipelineState, DivergenceInfo &divergenceInfo);
 
   bool run(Function &function);
 
@@ -77,9 +78,9 @@ PreservedAnalyses PatchBufferOp::run(Function &function, FunctionAnalysisManager
   const auto &moduleAnalysisManager = analysisManager.getResult<ModuleAnalysisManagerFunctionProxy>(function);
   PipelineState *pipelineState =
       moduleAnalysisManager.getCachedResult<PipelineStateWrapper>(*function.getParent())->getPipelineState();
-  UniformityInfo &uniformityInfo = analysisManager.getResult<UniformityInfoAnalysis>(function);
+  DivergenceInfo &divergenceInfo = analysisManager.getResult<DivergenceAnalysis>(function);
 
-  PatchBufferOpImpl impl(function.getContext(), *pipelineState, uniformityInfo);
+  PatchBufferOpImpl impl(function.getContext(), *pipelineState, divergenceInfo);
   if (!impl.run(function))
     return PreservedAnalyses::none();
   return PreservedAnalyses::all();
@@ -87,8 +88,8 @@ PreservedAnalyses PatchBufferOp::run(Function &function, FunctionAnalysisManager
 
 // =====================================================================================================================
 // Construct the per-run temporaries of the PatchBufferOp pass.
-PatchBufferOpImpl::PatchBufferOpImpl(LLVMContext &context, PipelineState &pipelineState, UniformityInfo &uniformityInfo)
-    : m_typeLowering(context), m_bufferOpLowering(m_typeLowering, pipelineState, uniformityInfo) {
+PatchBufferOpImpl::PatchBufferOpImpl(LLVMContext &context, PipelineState &pipelineState, DivergenceInfo &divergenceInfo)
+    : m_typeLowering(context), m_bufferOpLowering(m_typeLowering, pipelineState, divergenceInfo) {
 }
 
 // =====================================================================================================================
@@ -134,11 +135,11 @@ static SmallVector<Type *> convertBufferPointer(TypeLowering &typeLowering, Type
 //
 // @param typeLowering : the TypeLowering object to be used
 // @param pipelineState : the PipelineState object
-// @param uniformityInfo : the uniformity analysis result
+// @param divergenceInfo : the divergence analysis result
 BufferOpLowering::BufferOpLowering(TypeLowering &typeLowering, PipelineState &pipelineState,
-                                   UniformityInfo &uniformityInfo)
+                                   DivergenceInfo &divergenceInfo)
     : m_typeLowering(typeLowering), m_builder(typeLowering.getContext()), m_pipelineState(pipelineState),
-      m_uniformityInfo(uniformityInfo) {
+      m_divergenceInfo(divergenceInfo) {
   m_typeLowering.addRule(&convertBufferPointer);
 
   m_offsetType = m_builder.getPtrTy(ADDR_SPACE_CONST_32BIT);
@@ -227,7 +228,7 @@ BufferOpLowering::DescriptorInfo BufferOpLowering::getDescriptorInfo(Value *desc
             searchWorklist.push_back(incoming);
         } else if (auto *select = dyn_cast<SelectInst>(current)) {
           assert(select->getOperandUse(0).get() == select->getCondition());
-          if (m_uniformityInfo.isDivergentUse(select->getOperandUse(0)))
+          if (m_divergenceInfo.isDivergentUse(select->getOperandUse(0)))
             di.divergent = true;
 
           if (!di.invariant.has_value() || !di.divergent.has_value()) {
@@ -622,7 +623,7 @@ void BufferOpLowering::visitBufferDescToPtr(BufferDescToPtrOp &descToPtr) {
 
   auto &di = m_descriptors[descToPtr.getDesc()];
   di.invariant = removeUsersForInvariantStarts(&descToPtr);
-  di.divergent = m_uniformityInfo.isDivergent(descToPtr.getDesc());
+  di.divergent = m_divergenceInfo.isDivergent(*descToPtr.getDesc());
 }
 
 // =====================================================================================================================
@@ -828,7 +829,7 @@ void BufferOpLowering::visitPhiInst(llvm::PHINode &phi) {
   if (!phi.getType()->isPointerTy() || phi.getType()->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
     return;
 
-  if (m_uniformityInfo.isDivergent(&phi))
+  if (m_divergenceInfo.isDivergent(phi))
     m_divergentPhis.push_back(&phi);
 }
 

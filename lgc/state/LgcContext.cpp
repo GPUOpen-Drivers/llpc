@@ -149,6 +149,7 @@ void LgcContext::initialize() {
   setOptionDefault("simplifycfg-sink-common", "0");
   setOptionDefault("amdgpu-vgpr-index-mode", "1"); // force VGPR indexing on GFX8
   setOptionDefault("amdgpu-atomic-optimizations", "1");
+  setOptionDefault("use-gpu-divergence-analysis", "1");
   setOptionDefault("structurizecfg-skip-uniform-regions", "1");
   setOptionDefault("spec-exec-max-speculation-cost", "10");
 #if !defined(LLVM_HAVE_BRANCH_AMD_GFX)
