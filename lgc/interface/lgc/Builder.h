@@ -37,11 +37,12 @@
 
 namespace lgc {
 
-class LgcContext;
+enum BuilderOpcode : unsigned;
 struct CommonShaderMode;
 struct ComputeShaderMode;
 struct FragmentShaderMode;
 struct GeometryShaderMode;
+class LgcContext;
 struct MeshShaderMode;
 class Pipeline;
 class ShaderModes;
@@ -122,39 +123,10 @@ private:
 };
 
 // =====================================================================================================================
-// Builder is the part of the LLPC middle-end interface used by the front-end to build IR. It is a subclass
-// of IRBuilder<>, so the front-end can use its methods to create IR instructions at the set insertion
-// point. In addition it has its own Create* methods to create graphics-specific IR constructs.
-//
-class Builder : public BuilderCommon {
+// BuilderDefs contains enums etc used in the Builder interface.
+class BuilderDefs : public BuilderCommon {
 public:
-  // The group arithmetic operations the builder can consume.
-  // NOTE : We rely on casting this implicitly to an integer, so we cannot use an enum class.
-  enum GroupArithOp { IAdd = 0, FAdd, IMul, FMul, SMin, UMin, FMin, SMax, UMax, FMax, And, Or, Xor };
-
-  virtual ~Builder() {}
-
-  // Static methods to create a BuilderImpl or BuilderRecorder. These are not used as part of the LGC
-  // interface; use LgcContext::createBuilder instead.
-  static Builder *createBuilderImpl(LgcContext *context, Pipeline *pipeline);
-  static Builder *createBuilderRecorder(LgcContext *context, Pipeline *pipeline);
-
-  // Get the type elementTy, turned into a vector of the same vector width as maybeVecTy if the latter
-  // is a vector type.
-  static llvm::Type *getConditionallyVectorizedTy(llvm::Type *elementTy, llvm::Type *maybeVecTy);
-
-  // -----------------------------------------------------------------------------------------------------------------
-  // Base class operations
-
-  // Create scalar from dot product of scalar or vector FP type. (The dot product of two scalars is their product.)
-  // The two vectors must be the same floating point scalar/vector type.
-  // Returns a value whose type is the element type of the vectors.
-  //
-  // @param vector1 : The float vector 1
-  // @param vector2 : The float vector 2
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateDotProduct(llvm::Value *const vector1, llvm::Value *const vector2,
-                                        const llvm::Twine &instName = "") = 0;
+  BuilderDefs(llvm::LLVMContext &context) : BuilderCommon(context) {}
 
   // Bit settings for integer dot product
   enum : unsigned {
@@ -162,491 +134,9 @@ public:
     SecondVectorSigned,    // The components of the second vector are signed
   };
 
-  // Create code to calculate the dot product of two integer vectors, with optional accumulator, using hardware support
-  // where available. The factor inputs are always <N x iM> of the same type, N can be arbitrary and M must be 4, 8, 16,
-  // 32, or 64 Use a value of 0 for no accumulation and the value type is consistent with the result type. The result is
-  // saturated if there is an accumulator. Only the final addition to the accumulator needs to be saturated.
-  // Intermediate overflows of the dot product can lead to an undefined result.
-  //
-  // @param vector1 : The integer Vector 1
-  // @param vector2 : The integer Vector 2
-  // @param accumulator : The accumulator to the scalar of dot product
-  // @param flags : The first bit marks whether Vector 1 is signed and the second bit marks whether Vector 2 is signed
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateIntegerDotProduct(llvm::Value *vector1, llvm::Value *vector2, llvm::Value *accumulator,
-                                               unsigned flags, const llvm::Twine &instName = "") = 0;
-
-  // Create a call to the specified intrinsic with one operand, mangled on its type.
-  // This is an override of the same method in IRBuilder<>; the difference is that this one sets fast math
-  // flags from the Builder if none are specified by fmfSource.
-  //
-  // @param id : Intrinsic ID
-  // @param value : Input value
-  // @param fmfSource : Instruction to copy fast math flags from; nullptr to get from Builder
-  // @param instName : Name to give instruction
-  llvm::CallInst *CreateUnaryIntrinsic(llvm::Intrinsic::ID id, llvm::Value *value,
-                                       llvm::Instruction *fmfSource = nullptr, const llvm::Twine &instName = "");
-
-  // Create a call to the specified intrinsic with two operands of the same type, mangled on that type.
-  // This is an override of the same method in IRBuilder<>; the difference is that this one sets fast math
-  // flags from the Builder if none are specified by fmfSource.
-  //
-  // @param id : Intrinsic ID
-  // @param value1 : Input value 1
-  // @param value2 : Input value 2
-  // @param fmfSource : Instruction to copy fast math flags from; nullptr to get from Builder
-  // @param name : Name to give instruction
-  llvm::CallInst *CreateBinaryIntrinsic(llvm::Intrinsic::ID id, llvm::Value *value1, llvm::Value *value2,
-                                        llvm::Instruction *fmfSource = nullptr, const llvm::Twine &name = "");
-
-  //
-  // @param id : Intrinsic ID
-  // @param types : Types
-  // @param args : Input values
-  // @param fmfSource : Instruction to copy fast math flags from; nullptr to get from Builder
-  // @param name : Name to give instruction
-  llvm::CallInst *CreateIntrinsic(llvm::Intrinsic::ID id, llvm::ArrayRef<llvm::Type *> types,
-                                  llvm::ArrayRef<llvm::Value *> args, llvm::Instruction *fmfSource = nullptr,
-                                  const llvm::Twine &name = "");
-
-  //
-  // @param retTy : Return type
-  // @param id : Intrinsic ID
-  // @param args : Input values
-  // @param fmfSource : Instruction to copy fast math flags from; nullptr to get from Builder
-  // @param name : Name to give instruction
-  llvm::CallInst *CreateIntrinsic(llvm::Type *retTy, llvm::Intrinsic::ID id, llvm::ArrayRef<llvm::Value *> args,
-                                  llvm::Instruction *fmfSource = nullptr, const llvm::Twine &name = "");
-
-  // -----------------------------------------------------------------------------------------------------------------
-  // Arithmetic operations
-
-  // Methods to get useful FP constants. Using these (rather than just using for example
-  // ConstantFP::get(.., 180 / M_PI)) ensures that we always get the same value, independent of the
-  // host platform and its compiler.
-
-  // Get a constant of FP or vector of FP type for the value PI/180, for converting radians to degrees.
-  llvm::Constant *getPiOver180(llvm::Type *ty);
-
-  // Get a constant of FP or vector of FP type for the value 180/PI, for converting degrees to radians.
-  llvm::Constant *get180OverPi(llvm::Type *ty);
-
-  // Get a constant of FP or vector of FP type for the value 1/(2^n - 1)
-  llvm::Constant *getOneOverPower2MinusOne(llvm::Type *ty, unsigned n);
-
-  // Create calculation of 2D texture coordinates that would be used for accessing the selected cube map face for
-  // the given cube map texture coordinates. Returns <2 x float>.
-  //
-  // @param coord : Input coordinate <3 x float>
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateCubeFaceCoord(llvm::Value *coord, const llvm::Twine &instName = "") = 0;
-
-  // Create calculation of the index of the cube map face that would be accessed by a texture lookup function for
-  // the given cube map texture coordinates. Returns a single float with value:
-  //  0.0 = the cube map face facing the positive X direction
-  //  1.0 = the cube map face facing the negative X direction
-  //  2.0 = the cube map face facing the positive Y direction
-  //  3.0 = the cube map face facing the negative Y direction
-  //  4.0 = the cube map face facing the positive Z direction
-  //  5.0 = the cube map face facing the negative Z direction
-  //
-  // @param coord : Input coordinate <3 x float>
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateCubeFaceIndex(llvm::Value *coord, const llvm::Twine &instName = "") = 0;
-
-  // Create scalar or vector FP truncate operation with the given rounding mode.
-  // Currently the rounding mode is only implemented for float/double -> half conversion.
-  //
-  // @param value : Input value
-  // @param destTy : Type to convert to
-  // @param roundingMode : Rounding mode
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateFpTruncWithRounding(llvm::Value *value, llvm::Type *destTy,
-                                                 llvm::RoundingMode roundingMode, const llvm::Twine &instName = "") = 0;
-
-  // Create quantize operation: truncates float (or vector) value to a value that is representable by a half.
-  //
-  // @param value : Input value (float or float vector)
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateQuantizeToFp16(llvm::Value *value, const llvm::Twine &instName = "") = 0;
-
-  // Create signed integer modulo operation, where the sign of the result (if not zero) is the same as
-  // the sign of the divisor. The result is undefined if divisor is zero.
-  //
-  // @param dividend : Dividend value
-  // @param divisor : Divisor value
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSMod(llvm::Value *dividend, llvm::Value *divisor, const llvm::Twine &instName = "") = 0;
-
-  // Create FP modulo operation, where the sign of the result (if not zero) is the same as
-  // the sign of the divisor. The result is undefined if divisor is zero.
-  //
-  // @param dividend : Dividend value
-  // @param divisor : Divisor value
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateFMod(llvm::Value *dividend, llvm::Value *divisor, const llvm::Twine &instName = "") = 0;
-
-  // Create scalar/vector float/half fused multiply-and-add, to compute a * b + c
-  //
-  // @param a : One value to multiply
-  // @param b : The other value to multiply
-  // @param c : The value to add to the product of A and B
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateFma(llvm::Value *a, llvm::Value *b, llvm::Value *c, const llvm::Twine &instName = "") = 0;
-
-  // Create a "tan" operation for a scalar or vector float or half.
-  //
-  // @param x : Input value X
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateTan(llvm::Value *x, const llvm::Twine &instName = "") = 0;
-
-  // Create an "asin" operation for a scalar or vector float or half.
-  //
-  // @param x : Input value X
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateASin(llvm::Value *x, const llvm::Twine &instName = "") = 0;
-
-  // Create an "acos" operation for a scalar or vector float or half.
-  //
-  // @param x : Input value X
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateACos(llvm::Value *x, const llvm::Twine &instName = "") = 0;
-
-  // Create an "atan" operation for a scalar or vector float or half.
-  //
-  // @param yOverX : Input value Y/X
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateATan(llvm::Value *yOverX, const llvm::Twine &instName = "") = 0;
-
-  // Create an "atan2" operation for a scalar or vector float or half.
-  // Returns atan(Y/X) but in the correct quadrant for the input value signs.
-  //
-  // @param y : Input value Y
-  // @param x : Input value X
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateATan2(llvm::Value *y, llvm::Value *x, const llvm::Twine &instName = "") = 0;
-
-  // Create a "sinh" operation for a scalar or vector float or half.
-  //
-  // @param x : Input value X
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSinh(llvm::Value *x, const llvm::Twine &instName = "") = 0;
-
-  // Create a "cosh" operation for a scalar or vector float or half.
-  //
-  // @param x : Input value X
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateCosh(llvm::Value *x, const llvm::Twine &instName = "") = 0;
-
-  // Create a "tanh" operation for a scalar or vector float or half.
-  //
-  // @param x : Input value X
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateTanh(llvm::Value *x, const llvm::Twine &instName = "") = 0;
-
-  // Create an "asinh" operation for a scalar or vector float or half.
-  //
-  // @param x : Input value X
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateASinh(llvm::Value *x, const llvm::Twine &instName = "") = 0;
-
-  // Create an "acosh" operation for a scalar or vector float or half.
-  //
-  // @param x : Input value X
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateACosh(llvm::Value *x, const llvm::Twine &instName = "") = 0;
-
-  // Create an "atanh" operation for a scalar or vector float or half.
-  //
-  // @param x : Input value X
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateATanh(llvm::Value *x, const llvm::Twine &instName = "") = 0;
-
-  // Create a "power" operation for a scalar or vector float or half, calculating X ^ Y
-  //
-  // @param x : Input value X
-  // @param y : Input value Y
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreatePower(llvm::Value *x, llvm::Value *y, const llvm::Twine &instName = "") = 0;
-
-  // Create an "exp" operation for a scalar or vector float or half.
-  //
-  // @param x : Input value X
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateExp(llvm::Value *x, const llvm::Twine &instName = "") = 0;
-
-  // Create a "log" operation for a scalar or vector float or half.
-  //
-  // @param x : Input value X
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateLog(llvm::Value *x, const llvm::Twine &instName = "") = 0;
-
-  // Create a square root operation for a scalar or vector FP type
-  //
-  // @param x : Input value X
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSqrt(llvm::Value *x, const llvm::Twine &instName = "") = 0;
-
-  // Create an inverse square root operation for a scalar or vector FP type
-  //
-  // @param x : Input value X
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateInverseSqrt(llvm::Value *x, const llvm::Twine &instName = "") = 0;
-
-  // Create "signed integer abs" operation for a scalar or vector integer value.
-  //
-  // @param x : Input value X
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSAbs(llvm::Value *x, const llvm::Twine &instName = "") = 0;
-
-  // Create "fsign" operation for a scalar or vector floating-point type, returning -1.0, 0.0 or +1.0 if the input
-  // value is negative, zero or positive.
-  //
-  // @param inValue : Input value X
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateFSign(llvm::Value *inValue, const llvm::Twine &instName = "") = 0;
-
-  // Create "ssign" operation for a scalar or vector integer type, returning -1, 0 or +1 if the input
-  // value is negative, zero or positive.
-  //
-  // @param x : Input value
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSSign(llvm::Value *x, const llvm::Twine &instName = "") = 0;
-
-  // Create "fract" operation for a scalar or vector floating-point type, returning x - floor(x).
-  //
-  // @param x : Input value
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateFract(llvm::Value *x, const llvm::Twine &instName = "") = 0;
-
-  // Create "smoothStep" operation. Result is 0.0 if x <= edge0 and 1.0 if x >= edge1 and performs smooth Hermite
-  // interpolation between 0 and 1 when edge0 < x < edge1. This is equivalent to:
-  // t * t * (3 - 2 * t), where t = clamp ((x - edge0) / (edge1 - edge0), 0, 1)
-  // Result is undefined if edge0 >= edge1.
-  //
-  // @param edge0 : Edge0 value
-  // @param edge1 : Edge1 value
-  // @param x : X (input) value
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSmoothStep(llvm::Value *edge0, llvm::Value *edge1, llvm::Value *x,
-                                        const llvm::Twine &instName = "") = 0;
-
-  // Create "ldexp" operation: given an FP mantissa and int exponent, build an FP value
-  //
-  // @param x : Mantissa
-  // @param exp : Exponent
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateLdexp(llvm::Value *x, llvm::Value *exp, const llvm::Twine &instName = "") = 0;
-
-  // Create "extract significand" operation: given an FP scalar or vector value, return the significand in the range
-  // [0.5,1.0), of the same type as the input. If the input is 0, the result is 0. If the input is infinite or NaN,
-  // the result is undefined.
-  //
-  // @param value : Input value
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateExtractSignificand(llvm::Value *value, const llvm::Twine &instName = "") = 0;
-
-  // Create "extract exponent" operation: given an FP scalar or vector value, return the exponent as a signed integer.
-  // If the input is (vector of) half, the result type is (vector of) i16, otherwise it is (vector of) i32.
-  // If the input is 0, the result is 0. If the input is infinite or NaN, the result is undefined.
-  //
-  // @param value : Input value
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateExtractExponent(llvm::Value *value, const llvm::Twine &instName = "") = 0;
-
-  // Create vector cross product operation. Inputs must be <3 x FP>
-  //
-  // @param x : Input value X
-  // @param y : Input value Y
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateCrossProduct(llvm::Value *x, llvm::Value *y, const llvm::Twine &instName = "") = 0;
-
-  // Create FP scalar/vector normalize operation: returns a scalar/vector with the same direction and magnitude 1.
-  //
-  // @param x : Input value
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateNormalizeVector(llvm::Value *x, const llvm::Twine &instName = "") = 0;
-
-  // Create "face forward" operation: given three FP scalars/vectors {N, I, Nref}, if the dot product of
-  // Nref and I is negative, the result is N, otherwise it is -N
-  //
-  // @param n : Input value "N"
-  // @param i : Input value "I"
-  // @param nref : Input value "Nref"
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateFaceForward(llvm::Value *n, llvm::Value *i, llvm::Value *nref,
-                                         const llvm::Twine &instName = "") = 0;
-
-  // Create "reflect" operation. For the incident vector I and normalized surface orientation N, the result is
-  // the reflection direction:
-  // I - 2 * dot(N, I) * N
-  //
-  // @param i : Input value "I"
-  // @param n : Input value "N"
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateReflect(llvm::Value *i, llvm::Value *n, const llvm::Twine &instName = "") = 0;
-
-  // Create "refract" operation. For the normalized incident vector I, normalized surface orientation N and ratio
-  // of indices of refraction eta, the result is the refraction vector:
-  // k = 1.0 - eta * eta * (1.0 - dot(N,I) * dot(N,I))
-  // If k < 0.0 the result is 0.0.
-  // Otherwise, the result is eta * I - (eta * dot(N,I) + sqrt(k)) * N
-  //
-  // @param i : Input value "I"
-  // @param n : Input value "N"
-  // @param eta : Input value "eta"
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateRefract(llvm::Value *i, llvm::Value *n, llvm::Value *eta,
-                                     const llvm::Twine &instName = "") = 0;
-
-  // Create "fclamp" operation, returning min(max(x, minVal), maxVal). Result is undefined if minVal > maxVal.
-  // This honors the fast math flags; clear "nnan" in fast math flags in order to obtain the "NaN avoiding
-  // semantics" for the min and max where, if one input is NaN, it returns the other one.
-  // It also honors the shader's FP mode being "flush denorm".
-  //
-  // @param x : Value to clamp
-  // @param minVal : Minimum of clamp range
-  // @param maxVal : Maximum of clamp range
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateFClamp(llvm::Value *x, llvm::Value *minVal, llvm::Value *maxVal,
-                                    const llvm::Twine &instName = "") = 0;
-
-  // Create "fmin" operation, returning the minimum of two scalar or vector FP values.
-  // This honors the fast math flags; do not set "nnan" if you want the "return the non-NaN input" behavior.
-  // It also honors the shader's FP mode being "flush denorm".
-  //
-  // @param value1 : First value
-  // @param value2 : Second value
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateFMin(llvm::Value *value1, llvm::Value *value2, const llvm::Twine &instName = "") = 0;
-
-  // Create "fmax" operation, returning the maximum of two scalar or vector float or half values.
-  // This honors the fast math flags; do not set "nnan" if you want the "return the non-NaN input" behavior.
-  // It also honors the shader's FP mode being "flush denorm".
-  //
-  // @param value1 : First value
-  // @param value2 : Second value
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateFMax(llvm::Value *value1, llvm::Value *value2, const llvm::Twine &instName = "") = 0;
-
-  // Create "fmin3" operation, returning the minimum of three scalar or vector float or half values.
-  // This honors the fast math flags; do not set "nnan" if you want the "return the non-NaN input" behavior.
-  // It also honors the shader's FP mode being "flush denorm".
-  //
-  // @param value1 : First value
-  // @param value2 : Second value
-  // @param value3 : Third value
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateFMin3(llvm::Value *value1, llvm::Value *value2, llvm::Value *value3,
-                                   const llvm::Twine &instName = "") = 0;
-
-  // Create "fmax3" operation, returning the maximum of three scalar or vector float or half values.
-  // This honors the fast math flags; do not set "nnan" if you want the "return the non-NaN input" behavior.
-  // It also honors the shader's FP mode being "flush denorm".
-  //
-  // @param value1 : First value
-  // @param value2 : Second value
-  // @param value3 : Third value
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateFMax3(llvm::Value *value1, llvm::Value *value2, llvm::Value *value3,
-                                   const llvm::Twine &instName = "") = 0;
-
-  // Create "fmid3" operation, returning the middle one of three scalar or vector float or half values.
-  // This honors the fast math flags; do not set "nnan" if you want the "return the non-NaN input" behavior.
-  // It also honors the shader's FP mode being "flush denorm".
-  //
-  // @param value1 : First value
-  // @param value2 : Second value
-  // @param value3 : Third value
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateFMid3(llvm::Value *value1, llvm::Value *value2, llvm::Value *value3,
-                                   const llvm::Twine &instName = "") = 0;
-
-  // Create "isInf" operation: return true if the supplied FP (or vector) value is infinity
-  //
-  // @param x : Input value
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateIsInf(llvm::Value *x, const llvm::Twine &instName = "") = 0;
-
-  // Create "isNaN" operation: return true if the supplied FP (or vector) value is NaN
-  //
-  // @param x : Input value
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateIsNaN(llvm::Value *x, const llvm::Twine &instName = "") = 0;
-
-  // Create an "insert bitfield" operation for a (vector of) integer type.
-  // Returns a value where the "count" bits starting at bit "offset" come from the least significant "count"
-  // bits in "insert", and remaining bits come from "base". The result is undefined if "count"+"offset" is
-  // more than the number of bits (per vector element) in "base" and "insert".
-  // If "base" and "insert" are vectors, "offset" and "count" can be either scalar or vector of the same
-  // width. The scalar type of "offset" and "count" must be integer, but can be different to that of "base"
-  // and "insert" (and different to each other too).
-  //
-  // @param base : Base value
-  // @param insert : Value to insert (same type as base)
-  // @param offset : Bit number of least-significant end of bitfield
-  // @param count : Count of bits in bitfield
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateInsertBitField(llvm::Value *base, llvm::Value *insert, llvm::Value *offset,
-                                            llvm::Value *count, const llvm::Twine &instName = "") = 0;
-
-  // Create an "extract bitfield " operation for a (vector of) i32.
-  // Returns a value where the least significant "count" bits come from the "count" bits starting at bit
-  // "offset" in "base", and that is zero- or sign-extended (depending on "isSigned") to the rest of the value.
-  // If "base" and "insert" are vectors, "offset" and "count" can be either scalar or vector of the same
-  // width. The scalar type of "offset" and "count" must be integer, but can be different to that of "base"
-  // (and different to each other too).
-  //
-  // @param base : Base value
-  // @param offset : Bit number of least-significant end of bitfield
-  // @param count : Count of bits in bitfield
-  // @param isSigned : True for a signed int bitfield extract, false for unsigned
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateExtractBitField(llvm::Value *base, llvm::Value *offset, llvm::Value *count, bool isSigned,
-                                             const llvm::Twine &instName = "") = 0;
-
-  // Create "find MSB" operation for a (vector of) signed i32. For a positive number, the result is the bit number of
-  // the most significant 1-bit. For a negative number, the result is the bit number of the most significant 0-bit.
-  // For a value of 0 or -1, the result is -1.
-  //
-  // Note that unsigned "find MSB" is not provided as a Builder method, because it is easily synthesized from
-  // the standard LLVM intrinsic llvm.ctlz. Similarly "find LSB" is not provided because it is easily synthesized
-  // from the standard LLVM intrinsic llvm.cttz.
-  //
-  // @param value : Input value
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateFindSMsb(llvm::Value *value, const llvm::Twine &instName = "") = 0;
-
-  // Create "fmix" operation, returning ( 1 - A ) * X + A * Y. Result would be FP scalar or vector value.
-  // Returns scalar, if and only if "pX", "pY" and "pA" are all scalars.
-  // Returns vector, if "pX" and "pY" are vector but "pA" is a scalar, under such condition, "pA" will be splatted.
-  // Returns vector, if "pX", "pY" and "pA" are all vectors.
-  //
-  // Note that when doing vector calculation, it means add/sub are element-wise between vectors, and the product will
-  // be Hadamard product.
-  //
-  // @param x : Left Value
-  // @param y : Right Value
-  // @param a : Wight Value
-  virtual llvm::Value *createFMix(llvm::Value *x, llvm::Value *y, llvm::Value *a, const llvm::Twine &instName = "") = 0;
-
-  // -----------------------------------------------------------------------------------------------------------------
-  // Descriptor operations
-  //
-  // The API here has two classes of descriptor, with different ways of handling the two classes:
-  //
-  // 1. A buffer descriptor is loaded in one step given its descriptor set, binding and index.
-  //    It is done this way because the implementation needs to be able to handle normal buffer
-  //    descriptors, compact buffer descriptors and inline buffers, without the input language (SPIR-V)
-  //    telling us which one it is.
-  //
-  // 2. An image/sampler/texelbuffer/F-mask descriptor has a three-step API:
-  //    a. Get a pointer to the descriptor or array of descriptors given the descriptor set and binding.
-  //    b. Zero or more calls to add on an array index.
-  //    c. Load the descriptor from its pointer.
-  //    SPIR-V allows a pointer to an image/sampler to be passed as a function arg (and maybe in other
-  //    ways). This API is formulated to allow the front-end to implement that. Step (c) can be
-  //    performed without needing to see the resource node used in (a).
+  // The group arithmetic operations the builder can consume.
+  // NOTE : We rely on casting this implicitly to an integer, so we cannot use an enum class.
+  enum GroupArithOp { IAdd = 0, FAdd, IMul, FMul, SMin, UMin, FMin, SMax, UMax, FMax, And, Or, Xor };
 
   // Bit settings for flags argument in CreateLoadBufferDesc.
   enum {
@@ -661,68 +151,21 @@ public:
     BufferFlagAddress = 64         // Flag to return an i64 address of the descriptor
   };
 
-  // Get the type of pointer returned by CreateLoadBufferDesc.
-  llvm::PointerType *getBufferDescTy();
-
-  // Create a load of a buffer descriptor.
+  // Get the type of a built-in -- static edition of the method below, so you can use it without a BuilderDefs object.
   //
-  // If descSet = -1, this is an internal user data, which is a plain 64-bit pointer, flags must be 'BufferFlagAddress'
-  // i64 address is returned.
+  // @param builtIn : Built-in kind, one of the BuiltIn* constants
+  // @param inOutInfo : Extra input/output info (shader-defined array length)
+  // @param context : LLVMContext
+  static llvm::Type *getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo, llvm::LLVMContext &context);
+
+  // Get the type of a built-in. Where the built-in has a shader-defined array length (ClipDistance,
+  // CullDistance, SampleMask), inOutInfo.GetArraySize() is used as the array size.
   //
-  // @param descSet : Descriptor set
-  // @param binding : Descriptor binding
-  // @param descIndex : Descriptor index
-  // @param flags : BufferFlag* bit settings
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateLoadBufferDesc(unsigned descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
-                                            const llvm::Twine &instName = "") = 0;
-
-  // Get the type of a descriptor
-  //
-  // @param descType : Descriptor type, one of the ResourceNodeType values
-  llvm::VectorType *getDescTy(ResourceNodeType descType);
-
-  // Get the type of pointer to descriptor.
-  //
-  // @param descType : Descriptor type, one of the ResourceNodeType values
-  llvm::Type *getDescPtrTy(ResourceNodeType descType);
-
-  // Get address space of constant memory.
-  unsigned getAddrSpaceConst();
-
-  // Create a get of the stride (in bytes) of a descriptor. Returns an i32 value.
-  //
-  // @param concreteType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
-  //                   DescriptorTexelBuffer, DescriptorFmask.
-  // @param abstractType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
-  //                   DescriptorTexelBuffer, DescriptorFmask.
-  // @param descSet : Descriptor set
-  // @param binding : Descriptor binding
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeType abstractType,
-                                           unsigned descSet, unsigned binding, const llvm::Twine &instName = "") = 0;
-
-  // Create a pointer to a descriptor. Returns a value of the type returned by GetSamplerDescPtrTy, GetImageDescPtrTy,
-  // GetTexelBufferDescPtrTy or GetFmaskDescPtrTy, depending on descType.
-  //
-  // @param concreteType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
-  //                   DescriptorTexelBuffer, DescriptorFmask.
-  // @param abstractType : Descriptor type to find user resource nodes;
-  // @param descSet : Descriptor set
-  // @param binding : Descriptor binding
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
-                                        unsigned binding, const llvm::Twine &instName = "") = 0;
-
-  // Create a load of the push constants pointer.
-  // This returns a pointer to the ResourceNodeType::PushConst resource in the top-level user data table.
-  //
-  // @param returnTy : Return type of the load
-  // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateLoadPushConstantsPtr(llvm::Type *returnTy, const llvm::Twine &instName = "") = 0;
-
-  // -----------------------------------------------------------------------------------------------------------------
-  // Image operations
+  // @param builtIn : Built-in kind, one of the BuiltIn* constants
+  // @param inOutInfo : Extra input/output info (shader-defined array length)
+  llvm::Type *getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo) {
+    return getBuiltInTy(builtIn, inOutInfo, getContext());
+  }
 
   // Possible values for dimension argument for image methods.
   enum {
@@ -855,6 +298,562 @@ public:
     ImageAtomicFMax = 12, // Atomic operation: fmax
     ImageAtomicFAdd = 13  // Atomic operation: fadd
   };
+};
+
+// =====================================================================================================================
+// Builder is the part of the LLPC middle-end interface used by the front-end to build IR. It is a subclass
+// of IRBuilder<>, so the front-end can use its methods to create IR instructions at the set insertion
+// point. In addition it has its own Create* methods to create graphics-specific IR constructs.
+//
+class Builder : public BuilderDefs {
+public:
+  Builder(llvm::LLVMContext &context) : BuilderDefs(context) {}
+
+  // -----------------------------------------------------------------------------------------------------------------
+  // Base class operations
+
+  // Create scalar from dot product of scalar or vector FP type. (The dot product of two scalars is their product.)
+  // The two vectors must be the same floating point scalar/vector type.
+  // Returns a value whose type is the element type of the vectors.
+  //
+  // @param vector1 : The float vector 1
+  // @param vector2 : The float vector 2
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateDotProduct(llvm::Value *const vector1, llvm::Value *const vector2,
+                                const llvm::Twine &instName = "");
+
+  // Create code to calculate the dot product of two integer vectors, with optional accumulator, using hardware support
+  // where available. The factor inputs are always <N x iM> of the same type, N can be arbitrary and M must be 4, 8, 16,
+  // 32, or 64 Use a value of 0 for no accumulation and the value type is consistent with the result type. The result is
+  // saturated if there is an accumulator. Only the final addition to the accumulator needs to be saturated.
+  // Intermediate overflows of the dot product can lead to an undefined result.
+  //
+  // @param vector1 : The integer Vector 1
+  // @param vector2 : The integer Vector 2
+  // @param accumulator : The accumulator to the scalar of dot product
+  // @param flags : The first bit marks whether Vector 1 is signed and the second bit marks whether Vector 2 is signed
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateIntegerDotProduct(llvm::Value *vector1, llvm::Value *vector2, llvm::Value *accumulator,
+                                       unsigned flags, const llvm::Twine &instName = "");
+
+  // Create a call to the specified intrinsic with one operand, mangled on its type.
+  // This is an override of the same method in IRBuilder<>; the difference is that this one sets fast math
+  // flags from the Builder if none are specified by fmfSource.
+  //
+  // @param id : Intrinsic ID
+  // @param value : Input value
+  // @param fmfSource : Instruction to copy fast math flags from; nullptr to get from Builder
+  // @param instName : Name to give instruction
+  llvm::CallInst *CreateUnaryIntrinsic(llvm::Intrinsic::ID id, llvm::Value *value,
+                                       llvm::Instruction *fmfSource = nullptr, const llvm::Twine &instName = "");
+
+  // Create a call to the specified intrinsic with two operands of the same type, mangled on that type.
+  // This is an override of the same method in IRBuilder<>; the difference is that this one sets fast math
+  // flags from the Builder if none are specified by fmfSource.
+  //
+  // @param id : Intrinsic ID
+  // @param value1 : Input value 1
+  // @param value2 : Input value 2
+  // @param fmfSource : Instruction to copy fast math flags from; nullptr to get from Builder
+  // @param name : Name to give instruction
+  llvm::CallInst *CreateBinaryIntrinsic(llvm::Intrinsic::ID id, llvm::Value *value1, llvm::Value *value2,
+                                        llvm::Instruction *fmfSource = nullptr, const llvm::Twine &name = "");
+
+  //
+  // @param id : Intrinsic ID
+  // @param types : Types
+  // @param args : Input values
+  // @param fmfSource : Instruction to copy fast math flags from; nullptr to get from Builder
+  // @param name : Name to give instruction
+  llvm::CallInst *CreateIntrinsic(llvm::Intrinsic::ID id, llvm::ArrayRef<llvm::Type *> types,
+                                  llvm::ArrayRef<llvm::Value *> args, llvm::Instruction *fmfSource = nullptr,
+                                  const llvm::Twine &name = "");
+
+  //
+  // @param retTy : Return type
+  // @param id : Intrinsic ID
+  // @param args : Input values
+  // @param fmfSource : Instruction to copy fast math flags from; nullptr to get from Builder
+  // @param name : Name to give instruction
+  llvm::CallInst *CreateIntrinsic(llvm::Type *retTy, llvm::Intrinsic::ID id, llvm::ArrayRef<llvm::Value *> args,
+                                  llvm::Instruction *fmfSource = nullptr, const llvm::Twine &name = "");
+
+  // -----------------------------------------------------------------------------------------------------------------
+  // Arithmetic operations
+
+  // Methods to get useful FP constants. Using these (rather than just using for example
+  // ConstantFP::get(.., 180 / M_PI)) ensures that we always get the same value, independent of the
+  // host platform and its compiler.
+
+  // Get a constant of FP or vector of FP type for the value PI/180, for converting radians to degrees.
+  llvm::Constant *getPiOver180(llvm::Type *ty);
+
+  // Get a constant of FP or vector of FP type for the value 180/PI, for converting degrees to radians.
+  llvm::Constant *get180OverPi(llvm::Type *ty);
+
+  // Get a constant of FP or vector of FP type for the value 1/(2^n - 1)
+  llvm::Constant *getOneOverPower2MinusOne(llvm::Type *ty, unsigned n);
+
+  // Create calculation of 2D texture coordinates that would be used for accessing the selected cube map face for
+  // the given cube map texture coordinates. Returns <2 x float>.
+  //
+  // @param coord : Input coordinate <3 x float>
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateCubeFaceCoord(llvm::Value *coord, const llvm::Twine &instName = "");
+
+  // Create calculation of the index of the cube map face that would be accessed by a texture lookup function for
+  // the given cube map texture coordinates. Returns a single float with value:
+  //  0.0 = the cube map face facing the positive X direction
+  //  1.0 = the cube map face facing the negative X direction
+  //  2.0 = the cube map face facing the positive Y direction
+  //  3.0 = the cube map face facing the negative Y direction
+  //  4.0 = the cube map face facing the positive Z direction
+  //  5.0 = the cube map face facing the negative Z direction
+  //
+  // @param coord : Input coordinate <3 x float>
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateCubeFaceIndex(llvm::Value *coord, const llvm::Twine &instName = "");
+
+  // Create scalar or vector FP truncate operation with the given rounding mode.
+  // Currently the rounding mode is only implemented for float/double -> half conversion.
+  //
+  // @param value : Input value
+  // @param destTy : Type to convert to
+  // @param roundingMode : Rounding mode
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateFpTruncWithRounding(llvm::Value *value, llvm::Type *destTy, llvm::RoundingMode roundingMode,
+                                         const llvm::Twine &instName = "");
+
+  // Create quantize operation: truncates float (or vector) value to a value that is representable by a half.
+  //
+  // @param value : Input value (float or float vector)
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateQuantizeToFp16(llvm::Value *value, const llvm::Twine &instName = "");
+
+  // Create signed integer modulo operation, where the sign of the result (if not zero) is the same as
+  // the sign of the divisor. The result is undefined if divisor is zero.
+  //
+  // @param dividend : Dividend value
+  // @param divisor : Divisor value
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateSMod(llvm::Value *dividend, llvm::Value *divisor, const llvm::Twine &instName = "");
+
+  // Create FP modulo operation, where the sign of the result (if not zero) is the same as
+  // the sign of the divisor. The result is undefined if divisor is zero.
+  //
+  // @param dividend : Dividend value
+  // @param divisor : Divisor value
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateFMod(llvm::Value *dividend, llvm::Value *divisor, const llvm::Twine &instName = "");
+
+  // Create scalar/vector float/half fused multiply-and-add, to compute a * b + c
+  //
+  // @param a : One value to multiply
+  // @param b : The other value to multiply
+  // @param c : The value to add to the product of A and B
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateFma(llvm::Value *a, llvm::Value *b, llvm::Value *c, const llvm::Twine &instName = "");
+
+  // Create a "tan" operation for a scalar or vector float or half.
+  //
+  // @param x : Input value X
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateTan(llvm::Value *x, const llvm::Twine &instName = "");
+
+  // Create an "asin" operation for a scalar or vector float or half.
+  //
+  // @param x : Input value X
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateASin(llvm::Value *x, const llvm::Twine &instName = "");
+
+  // Create an "acos" operation for a scalar or vector float or half.
+  //
+  // @param x : Input value X
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateACos(llvm::Value *x, const llvm::Twine &instName = "");
+
+  // Create an "atan" operation for a scalar or vector float or half.
+  //
+  // @param yOverX : Input value Y/X
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateATan(llvm::Value *yOverX, const llvm::Twine &instName = "");
+
+  // Create an "atan2" operation for a scalar or vector float or half.
+  // Returns atan(Y/X) but in the correct quadrant for the input value signs.
+  //
+  // @param y : Input value Y
+  // @param x : Input value X
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateATan2(llvm::Value *y, llvm::Value *x, const llvm::Twine &instName = "");
+
+  // Create a "sinh" operation for a scalar or vector float or half.
+  //
+  // @param x : Input value X
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateSinh(llvm::Value *x, const llvm::Twine &instName = "");
+
+  // Create a "cosh" operation for a scalar or vector float or half.
+  //
+  // @param x : Input value X
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateCosh(llvm::Value *x, const llvm::Twine &instName = "");
+
+  // Create a "tanh" operation for a scalar or vector float or half.
+  //
+  // @param x : Input value X
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateTanh(llvm::Value *x, const llvm::Twine &instName = "");
+
+  // Create an "asinh" operation for a scalar or vector float or half.
+  //
+  // @param x : Input value X
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateASinh(llvm::Value *x, const llvm::Twine &instName = "");
+
+  // Create an "acosh" operation for a scalar or vector float or half.
+  //
+  // @param x : Input value X
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateACosh(llvm::Value *x, const llvm::Twine &instName = "");
+
+  // Create an "atanh" operation for a scalar or vector float or half.
+  //
+  // @param x : Input value X
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateATanh(llvm::Value *x, const llvm::Twine &instName = "");
+
+  // Create a "power" operation for a scalar or vector float or half, calculating X ^ Y
+  //
+  // @param x : Input value X
+  // @param y : Input value Y
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreatePower(llvm::Value *x, llvm::Value *y, const llvm::Twine &instName = "");
+
+  // Create an "exp" operation for a scalar or vector float or half.
+  //
+  // @param x : Input value X
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateExp(llvm::Value *x, const llvm::Twine &instName = "");
+
+  // Create a "log" operation for a scalar or vector float or half.
+  //
+  // @param x : Input value X
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateLog(llvm::Value *x, const llvm::Twine &instName = "");
+
+  // Create a square root operation for a scalar or vector FP type
+  //
+  // @param x : Input value X
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateSqrt(llvm::Value *x, const llvm::Twine &instName = "");
+
+  // Create an inverse square root operation for a scalar or vector FP type
+  //
+  // @param x : Input value X
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateInverseSqrt(llvm::Value *x, const llvm::Twine &instName = "");
+
+  // Create "signed integer abs" operation for a scalar or vector integer value.
+  //
+  // @param x : Input value X
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateSAbs(llvm::Value *x, const llvm::Twine &instName = "");
+
+  // Create "fsign" operation for a scalar or vector floating-point type, returning -1.0, 0.0 or +1.0 if the input
+  // value is negative, zero or positive.
+  //
+  // @param inValue : Input value X
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateFSign(llvm::Value *inValue, const llvm::Twine &instName = "");
+
+  // Create "ssign" operation for a scalar or vector integer type, returning -1, 0 or +1 if the input
+  // value is negative, zero or positive.
+  //
+  // @param x : Input value
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateSSign(llvm::Value *x, const llvm::Twine &instName = "");
+
+  // Create "fract" operation for a scalar or vector floating-point type, returning x - floor(x).
+  //
+  // @param x : Input value
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateFract(llvm::Value *x, const llvm::Twine &instName = "");
+
+  // Create "smoothStep" operation. Result is 0.0 if x <= edge0 and 1.0 if x >= edge1 and performs smooth Hermite
+  // interpolation between 0 and 1 when edge0 < x < edge1. This is equivalent to:
+  // t * t * (3 - 2 * t), where t = clamp ((x - edge0) / (edge1 - edge0), 0, 1)
+  // Result is undefined if edge0 >= edge1.
+  //
+  // @param edge0 : Edge0 value
+  // @param edge1 : Edge1 value
+  // @param x : X (input) value
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateSmoothStep(llvm::Value *edge0, llvm::Value *edge1, llvm::Value *x,
+                                const llvm::Twine &instName = "");
+
+  // Create "ldexp" operation: given an FP mantissa and int exponent, build an FP value
+  //
+  // @param x : Mantissa
+  // @param exp : Exponent
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateLdexp(llvm::Value *x, llvm::Value *exp, const llvm::Twine &instName = "");
+
+  // Create "extract significand" operation: given an FP scalar or vector value, return the significand in the range
+  // [0.5,1.0), of the same type as the input. If the input is 0, the result is 0. If the input is infinite or NaN,
+  // the result is undefined.
+  //
+  // @param value : Input value
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateExtractSignificand(llvm::Value *value, const llvm::Twine &instName = "");
+
+  // Create "extract exponent" operation: given an FP scalar or vector value, return the exponent as a signed integer.
+  // If the input is (vector of) half, the result type is (vector of) i16, otherwise it is (vector of) i32.
+  // If the input is 0, the result is 0. If the input is infinite or NaN, the result is undefined.
+  //
+  // @param value : Input value
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateExtractExponent(llvm::Value *value, const llvm::Twine &instName = "");
+
+  // Create vector cross product operation. Inputs must be <3 x FP>
+  //
+  // @param x : Input value X
+  // @param y : Input value Y
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateCrossProduct(llvm::Value *x, llvm::Value *y, const llvm::Twine &instName = "");
+
+  // Create FP scalar/vector normalize operation: returns a scalar/vector with the same direction and magnitude 1.
+  //
+  // @param x : Input value
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateNormalizeVector(llvm::Value *x, const llvm::Twine &instName = "");
+
+  // Create "face forward" operation: given three FP scalars/vectors {N, I, Nref}, if the dot product of
+  // Nref and I is negative, the result is N, otherwise it is -N
+  //
+  // @param n : Input value "N"
+  // @param i : Input value "I"
+  // @param nref : Input value "Nref"
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateFaceForward(llvm::Value *n, llvm::Value *i, llvm::Value *nref, const llvm::Twine &instName = "");
+
+  // Create "reflect" operation. For the incident vector I and normalized surface orientation N, the result is
+  // the reflection direction:
+  // I - 2 * dot(N, I) * N
+  //
+  // @param i : Input value "I"
+  // @param n : Input value "N"
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateReflect(llvm::Value *i, llvm::Value *n, const llvm::Twine &instName = "");
+
+  // Create "refract" operation. For the normalized incident vector I, normalized surface orientation N and ratio
+  // of indices of refraction eta, the result is the refraction vector:
+  // k = 1.0 - eta * eta * (1.0 - dot(N,I) * dot(N,I))
+  // If k < 0.0 the result is 0.0.
+  // Otherwise, the result is eta * I - (eta * dot(N,I) + sqrt(k)) * N
+  //
+  // @param i : Input value "I"
+  // @param n : Input value "N"
+  // @param eta : Input value "eta"
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateRefract(llvm::Value *i, llvm::Value *n, llvm::Value *eta, const llvm::Twine &instName = "");
+
+  // Create "fclamp" operation, returning min(max(x, minVal), maxVal). Result is undefined if minVal > maxVal.
+  // This honors the fast math flags; clear "nnan" in fast math flags in order to obtain the "NaN avoiding
+  // semantics" for the min and max where, if one input is NaN, it returns the other one.
+  // It also honors the shader's FP mode being "flush denorm".
+  //
+  // @param x : Value to clamp
+  // @param minVal : Minimum of clamp range
+  // @param maxVal : Maximum of clamp range
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateFClamp(llvm::Value *x, llvm::Value *minVal, llvm::Value *maxVal, const llvm::Twine &instName = "");
+
+  // Create "fmin" operation, returning the minimum of two scalar or vector FP values.
+  // This honors the fast math flags; do not set "nnan" if you want the "return the non-NaN input" behavior.
+  // It also honors the shader's FP mode being "flush denorm".
+  //
+  // @param value1 : First value
+  // @param value2 : Second value
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateFMin(llvm::Value *value1, llvm::Value *value2, const llvm::Twine &instName = "");
+
+  // Create "fmax" operation, returning the maximum of two scalar or vector float or half values.
+  // This honors the fast math flags; do not set "nnan" if you want the "return the non-NaN input" behavior.
+  // It also honors the shader's FP mode being "flush denorm".
+  //
+  // @param value1 : First value
+  // @param value2 : Second value
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateFMax(llvm::Value *value1, llvm::Value *value2, const llvm::Twine &instName = "");
+
+  // Create "fmin3" operation, returning the minimum of three scalar or vector float or half values.
+  // This honors the fast math flags; do not set "nnan" if you want the "return the non-NaN input" behavior.
+  // It also honors the shader's FP mode being "flush denorm".
+  //
+  // @param value1 : First value
+  // @param value2 : Second value
+  // @param value3 : Third value
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateFMin3(llvm::Value *value1, llvm::Value *value2, llvm::Value *value3,
+                           const llvm::Twine &instName = "");
+
+  // Create "fmax3" operation, returning the maximum of three scalar or vector float or half values.
+  // This honors the fast math flags; do not set "nnan" if you want the "return the non-NaN input" behavior.
+  // It also honors the shader's FP mode being "flush denorm".
+  //
+  // @param value1 : First value
+  // @param value2 : Second value
+  // @param value3 : Third value
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateFMax3(llvm::Value *value1, llvm::Value *value2, llvm::Value *value3,
+                           const llvm::Twine &instName = "");
+
+  // Create "fmid3" operation, returning the middle one of three scalar or vector float or half values.
+  // This honors the fast math flags; do not set "nnan" if you want the "return the non-NaN input" behavior.
+  // It also honors the shader's FP mode being "flush denorm".
+  //
+  // @param value1 : First value
+  // @param value2 : Second value
+  // @param value3 : Third value
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateFMid3(llvm::Value *value1, llvm::Value *value2, llvm::Value *value3,
+                           const llvm::Twine &instName = "");
+
+  // Create "isInf" operation: return true if the supplied FP (or vector) value is infinity
+  //
+  // @param x : Input value
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateIsInf(llvm::Value *x, const llvm::Twine &instName = "");
+
+  // Create "isNaN" operation: return true if the supplied FP (or vector) value is NaN
+  //
+  // @param x : Input value
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateIsNaN(llvm::Value *x, const llvm::Twine &instName = "");
+
+  // Create an "insert bitfield" operation for a (vector of) integer type.
+  // Returns a value where the "count" bits starting at bit "offset" come from the least significant "count"
+  // bits in "insert", and remaining bits come from "base". The result is undefined if "count"+"offset" is
+  // more than the number of bits (per vector element) in "base" and "insert".
+  // If "base" and "insert" are vectors, "offset" and "count" can be either scalar or vector of the same
+  // width. The scalar type of "offset" and "count" must be integer, but can be different to that of "base"
+  // and "insert" (and different to each other too).
+  //
+  // @param base : Base value
+  // @param insert : Value to insert (same type as base)
+  // @param offset : Bit number of least-significant end of bitfield
+  // @param count : Count of bits in bitfield
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateInsertBitField(llvm::Value *base, llvm::Value *insert, llvm::Value *offset, llvm::Value *count,
+                                    const llvm::Twine &instName = "");
+
+  // Create an "extract bitfield " operation for a (vector of) i32.
+  // Returns a value where the least significant "count" bits come from the "count" bits starting at bit
+  // "offset" in "base", and that is zero- or sign-extended (depending on "isSigned") to the rest of the value.
+  // If "base" and "insert" are vectors, "offset" and "count" can be either scalar or vector of the same
+  // width. The scalar type of "offset" and "count" must be integer, but can be different to that of "base"
+  // (and different to each other too).
+  //
+  // @param base : Base value
+  // @param offset : Bit number of least-significant end of bitfield
+  // @param count : Count of bits in bitfield
+  // @param isSigned : True for a signed int bitfield extract, false for unsigned
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateExtractBitField(llvm::Value *base, llvm::Value *offset, llvm::Value *count, bool isSigned,
+                                     const llvm::Twine &instName = "");
+
+  // Create "find MSB" operation for a (vector of) signed i32. For a positive number, the result is the bit number of
+  // the most significant 1-bit. For a negative number, the result is the bit number of the most significant 0-bit.
+  // For a value of 0 or -1, the result is -1.
+  //
+  // Note that unsigned "find MSB" is not provided as a Builder method, because it is easily synthesized from
+  // the standard LLVM intrinsic llvm.ctlz. Similarly "find LSB" is not provided because it is easily synthesized
+  // from the standard LLVM intrinsic llvm.cttz.
+  //
+  // @param value : Input value
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateFindSMsb(llvm::Value *value, const llvm::Twine &instName = "");
+
+  // Create "fmix" operation, returning ( 1 - A ) * X + A * Y. Result would be FP scalar or vector value.
+  // Returns scalar, if and only if "pX", "pY" and "pA" are all scalars.
+  // Returns vector, if "pX" and "pY" are vector but "pA" is a scalar, under such condition, "pA" will be splatted.
+  // Returns vector, if "pX", "pY" and "pA" are all vectors.
+  //
+  // Note that when doing vector calculation, it means add/sub are element-wise between vectors, and the product will
+  // be Hadamard product.
+  //
+  // @param x : Left Value
+  // @param y : Right Value
+  // @param a : Wight Value
+  llvm::Value *createFMix(llvm::Value *x, llvm::Value *y, llvm::Value *a, const llvm::Twine &instName = "");
+
+  // -----------------------------------------------------------------------------------------------------------------
+  // Descriptor operations
+  //
+  // The API here has two classes of descriptor, with different ways of handling the two classes:
+  //
+  // 1. A buffer descriptor is loaded in one step given its descriptor set, binding and index.
+  //    It is done this way because the implementation needs to be able to handle normal buffer
+  //    descriptors, compact buffer descriptors and inline buffers, without the input language (SPIR-V)
+  //    telling us which one it is.
+  //
+  // 2. An image/sampler/texelbuffer/F-mask descriptor has a three-step API:
+  //    a. Get a pointer to the descriptor or array of descriptors given the descriptor set and binding.
+  //    b. Zero or more calls to add on an array index.
+  //    c. Load the descriptor from its pointer.
+  //    SPIR-V allows a pointer to an image/sampler to be passed as a function arg (and maybe in other
+  //    ways). This API is formulated to allow the front-end to implement that. Step (c) can be
+  //    performed without needing to see the resource node used in (a).
+
+  // Create a load of a buffer descriptor.
+  //
+  // If descSet = -1, this is an internal user data, which is a plain 64-bit pointer, flags must be 'BufferFlagAddress'
+  // i64 address is returned.
+  //
+  // @param descSet : Descriptor set
+  // @param binding : Descriptor binding
+  // @param descIndex : Descriptor index
+  // @param flags : BufferFlag* bit settings
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateLoadBufferDesc(unsigned descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
+                                    const llvm::Twine &instName = "");
+
+  // Get address space of constant memory.
+  unsigned getAddrSpaceConst();
+
+  // Create a get of the stride (in bytes) of a descriptor. Returns an i32 value.
+  //
+  // @param concreteType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
+  //                   DescriptorTexelBuffer, DescriptorFmask.
+  // @param abstractType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
+  //                   DescriptorTexelBuffer, DescriptorFmask.
+  // @param descSet : Descriptor set
+  // @param binding : Descriptor binding
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
+                                   unsigned binding, const llvm::Twine &instName = "");
+
+  // Create a pointer to a descriptor. Returns a value of the type returned by GetSamplerDescPtrTy, GetImageDescPtrTy,
+  // GetTexelBufferDescPtrTy or GetFmaskDescPtrTy, depending on descType.
+  //
+  // @param concreteType : Descriptor type, one of ResourceNodeType::DescriptorSampler, DescriptorResource,
+  //                   DescriptorTexelBuffer, DescriptorFmask.
+  // @param abstractType : Descriptor type to find user resource nodes;
+  // @param descSet : Descriptor set
+  // @param binding : Descriptor binding
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
+                                unsigned binding, const llvm::Twine &instName = "");
+
+  // Create a load of the push constants pointer.
+  // This returns a pointer to the ResourceNodeType::PushConst resource in the top-level user data table.
+  //
+  // @param returnTy : Return type of the load
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateLoadPushConstantsPtr(llvm::Type *returnTy, const llvm::Twine &instName = "");
+
+  // -----------------------------------------------------------------------------------------------------------------
+  // Image operations
 
   // Create an image load.
   //
@@ -865,8 +864,8 @@ public:
   // @param coord : Coordinates: scalar or vector i32, exactly right width
   // @param mipLevel : Mipmap level if doing load_mip, otherwise nullptr
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateImageLoad(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
-                                       llvm::Value *coord, llvm::Value *mipLevel, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateImageLoad(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
+                               llvm::Value *coord, llvm::Value *mipLevel, const llvm::Twine &instName = "");
 
   // Create an image load with fmask. Dim must be 2DMsaa or 2DArrayMsaa. If the F-mask descriptor has a valid
   // format field, then it reads "fmask_texel_R", the R component of the texel read from the given coordinates
@@ -883,9 +882,9 @@ public:
   // @param coord : Coordinates: scalar or vector i32, exactly right width for given dimension excluding sample
   // @param sampleNum : Sample number, i32
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateImageLoadWithFmask(llvm::Type *resultTy, unsigned dim, unsigned flags,
-                                                llvm::Value *imageDesc, llvm::Value *fmaskDesc, llvm::Value *coord,
-                                                llvm::Value *sampleNum, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateImageLoadWithFmask(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
+                                        llvm::Value *fmaskDesc, llvm::Value *coord, llvm::Value *sampleNum,
+                                        const llvm::Twine &instName = "");
 
   // Create an image store.
   //
@@ -896,9 +895,8 @@ public:
   // @param coord : Coordinates: scalar or vector i32, exactly right width
   // @param mipLevel : Mipmap level if doing store_mip, otherwise nullptr
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateImageStore(llvm::Value *texel, unsigned dim, unsigned flags, llvm::Value *imageDesc,
-                                        llvm::Value *coord, llvm::Value *mipLevel,
-                                        const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateImageStore(llvm::Value *texel, unsigned dim, unsigned flags, llvm::Value *imageDesc,
+                                llvm::Value *coord, llvm::Value *mipLevel, const llvm::Twine &instName = "");
 
   // Create an image sample.
   // The return type is specified by resultTy as follows:
@@ -916,9 +914,9 @@ public:
   // @param samplerDesc : Sampler descriptor
   // @param address : Address and other arguments
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateImageSample(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
-                                         llvm::Value *samplerDesc, llvm::ArrayRef<llvm::Value *> address,
-                                         const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateImageSample(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
+                                 llvm::Value *samplerDesc, llvm::ArrayRef<llvm::Value *> address,
+                                 const llvm::Twine &instName = "");
 
   // Create an image sample with a converting sampler.
   // The caller supplies all arguments to the image sample op in "address", in the order specified
@@ -931,10 +929,9 @@ public:
   // @param convertingSamplerDesc : Converting sampler descriptor (constant v10i32)
   // @param address : Address and other arguments
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateImageSampleConvert(llvm::Type *resultTy, unsigned dim, unsigned flags,
-                                                llvm::Value *imageDescArray, llvm::Value *convertingSamplerDesc,
-                                                llvm::ArrayRef<llvm::Value *> address,
-                                                const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateImageSampleConvert(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDescArray,
+                                        llvm::Value *convertingSamplerDesc, llvm::ArrayRef<llvm::Value *> address,
+                                        const llvm::Twine &instName = "");
 
   // Create an image gather.
   // The return type is specified by resultTy as follows:
@@ -950,9 +947,9 @@ public:
   // @param samplerDesc : Sampler descriptor
   // @param address : Address and other arguments
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateImageGather(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
-                                         llvm::Value *samplerDesc, llvm::ArrayRef<llvm::Value *> address,
-                                         const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateImageGather(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *imageDesc,
+                                 llvm::Value *samplerDesc, llvm::ArrayRef<llvm::Value *> address,
+                                 const llvm::Twine &instName = "");
 
   // Create an image atomic operation other than compare-and-swap. An add of +1 or -1, or a sub
   // of -1 or +1, is generated as inc or dec. Result type is the same as the input value type.
@@ -968,9 +965,9 @@ public:
   // @param coord : Coordinates: scalar or vector i32, exactly right width
   // @param inputValue : Input value: i32
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateImageAtomic(unsigned atomicOp, unsigned dim, unsigned flags, llvm::AtomicOrdering ordering,
-                                         llvm::Value *imageDesc, llvm::Value *coord, llvm::Value *inputValue,
-                                         const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateImageAtomic(unsigned atomicOp, unsigned dim, unsigned flags, llvm::AtomicOrdering ordering,
+                                 llvm::Value *imageDesc, llvm::Value *coord, llvm::Value *inputValue,
+                                 const llvm::Twine &instName = "");
 
   // Create an image atomic compare-and-swap.
   // Normally imageDesc is an image descriptor, as returned by CreateLoadImageDesc, and this method
@@ -985,9 +982,9 @@ public:
   // @param inputValue : Input value: i32
   // @param comparatorValue : Value to compare against: i32
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateImageAtomicCompareSwap(unsigned dim, unsigned flags, llvm::AtomicOrdering ordering,
-                                                    llvm::Value *imageDesc, llvm::Value *coord, llvm::Value *inputValue,
-                                                    llvm::Value *comparatorValue, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateImageAtomicCompareSwap(unsigned dim, unsigned flags, llvm::AtomicOrdering ordering,
+                                            llvm::Value *imageDesc, llvm::Value *coord, llvm::Value *inputValue,
+                                            llvm::Value *comparatorValue, const llvm::Twine &instName = "");
 
   // Create a query of the number of mipmap levels in an image. Returns an i32 value.
   //
@@ -995,8 +992,8 @@ public:
   // @param flags : ImageFlag* flags
   // @param imageDesc : Image descriptor or texel buffer descriptor
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateImageQueryLevels(unsigned dim, unsigned flags, llvm::Value *imageDesc,
-                                              const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateImageQueryLevels(unsigned dim, unsigned flags, llvm::Value *imageDesc,
+                                      const llvm::Twine &instName = "");
 
   // Create a query of the number of samples in an image. Returns an i32 value.
   //
@@ -1004,8 +1001,8 @@ public:
   // @param flags : ImageFlag* flags
   // @param imageDesc : Image descriptor or texel buffer descriptor
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateImageQuerySamples(unsigned dim, unsigned flags, llvm::Value *imageDesc,
-                                               const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateImageQuerySamples(unsigned dim, unsigned flags, llvm::Value *imageDesc,
+                                       const llvm::Twine &instName = "");
 
   // Create a query of size of an image at the specified LOD.
   // Returns an i32 scalar or vector of the width given by GetImageQuerySizeComponentCount.
@@ -1015,8 +1012,8 @@ public:
   // @param imageDesc : Image descriptor or texel buffer descriptor
   // @param lod : LOD
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateImageQuerySize(unsigned dim, unsigned flags, llvm::Value *imageDesc, llvm::Value *lod,
-                                            const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateImageQuerySize(unsigned dim, unsigned flags, llvm::Value *imageDesc, llvm::Value *lod,
+                                    const llvm::Twine &instName = "");
 
   // Create a get of the LOD that would be used for an image sample with the given coordinates
   // and implicit LOD. Returns a v2f32 containing the layer number and the implicit level of
@@ -1028,8 +1025,8 @@ public:
   // @param samplerDesc : Sampler descriptor
   // @param coord : Coordinates: scalar or vector f32, exactly right width without array layer
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateImageGetLod(unsigned dim, unsigned flags, llvm::Value *imageDesc, llvm::Value *samplerDesc,
-                                         llvm::Value *coord, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateImageGetLod(unsigned dim, unsigned flags, llvm::Value *imageDesc, llvm::Value *samplerDesc,
+                                 llvm::Value *coord, const llvm::Twine &instName = "");
 
 #if VKI_RAY_TRACING
   // Create a ray intersect result with specified node in BVH buffer.
@@ -1042,9 +1039,9 @@ public:
   // @param invDirection : The inverse of direction
   // @param imageDesc : Image descriptor
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateImageBvhIntersectRay(llvm::Value *nodePtr, llvm::Value *extent, llvm::Value *origin,
-                                                  llvm::Value *direction, llvm::Value *invDirection,
-                                                  llvm::Value *imageDesc, const llvm::Twine &instName = "");
+  llvm::Value *CreateImageBvhIntersectRay(llvm::Value *nodePtr, llvm::Value *extent, llvm::Value *origin,
+                                          llvm::Value *direction, llvm::Value *invDirection, llvm::Value *imageDesc,
+                                          const llvm::Twine &instName = "");
 
 #endif
 
@@ -1068,12 +1065,9 @@ public:
   // @param vertexIndex : For TCS/TES/GS per-vertex input: vertex index; for FS custom interpolated input: auxiliary
   // interpolation value; else nullptr
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateReadGenericInput(llvm::Type *resultTy, unsigned location, llvm::Value *locationOffset,
-                                              llvm::Value *elemIdx, unsigned locationCount, InOutInfo inputInfo,
-                                              llvm::Value *vertexIndex, const llvm::Twine &instName = "") = 0;
-
-  // -----------------------------------------------------------------------------------------------------------------
-  // Shader input/output methods
+  llvm::Value *CreateReadGenericInput(llvm::Type *resultTy, unsigned location, llvm::Value *locationOffset,
+                                      llvm::Value *elemIdx, unsigned locationCount, InOutInfo inputInfo,
+                                      llvm::Value *vertexIndex, const llvm::Twine &instName = "");
 
   // Create a read of (part of) a perVertex input value, passed from the previous shader stage.
   // The result type is as specified by resultTy, a scalar or vector type with no more than four elements.
@@ -1093,9 +1087,9 @@ public:
   // @param instName : Name to give instruction(s)
   //
   // @returns Value of input
-  virtual llvm::Value *CreateReadPerVertexInput(llvm::Type *resultTy, unsigned location, llvm::Value *locationOffset,
-                                                llvm::Value *elemIdx, unsigned locationCount, InOutInfo inputInfo,
-                                                llvm::Value *vertexIndex, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateReadPerVertexInput(llvm::Type *resultTy, unsigned location, llvm::Value *locationOffset,
+                                        llvm::Value *elemIdx, unsigned locationCount, InOutInfo inputInfo,
+                                        llvm::Value *vertexIndex, const llvm::Twine &instName = "");
 
   // Create a read of (part of) a generic (user) output value, returning the value last written in this shader stage.
   // The result type is as specified by resultTy, a scalar or vector type with no more than four elements.
@@ -1113,9 +1107,9 @@ public:
   // @param outputInfo : Extra output info (GS stream ID)
   // @param vertexIndex : For TCS per-vertex output: vertex index; else nullptr
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateReadGenericOutput(llvm::Type *resultTy, unsigned location, llvm::Value *locationOffset,
-                                               llvm::Value *elemIdx, unsigned locationCount, InOutInfo outputInfo,
-                                               llvm::Value *vertexIndex, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateReadGenericOutput(llvm::Type *resultTy, unsigned location, llvm::Value *locationOffset,
+                                       llvm::Value *elemIdx, unsigned locationCount, InOutInfo outputInfo,
+                                       llvm::Value *vertexIndex, const llvm::Twine &instName = "");
 
   // Create a write of (part of) a generic (user) output value, setting the value to pass to the next shader stage.
   // The value to write must be a scalar or vector type with no more than four elements.
@@ -1132,10 +1126,9 @@ public:
   // @param outputInfo : Extra output info (GS stream ID, FS integer signedness)
   // @param vertexOrPrimitiveIndex : For TCS/mesh shader per-vertex output: vertex index; for mesh shader per-primitive
   //                                 output: primitive index; else nullptr
-  virtual llvm::Instruction *CreateWriteGenericOutput(llvm::Value *valueToWrite, unsigned location,
-                                                      llvm::Value *locationOffset, llvm::Value *elemIdx,
-                                                      unsigned locationCount, InOutInfo outputInfo,
-                                                      llvm::Value *vertexOrPrimitiveIndex) = 0;
+  llvm::Instruction *CreateWriteGenericOutput(llvm::Value *valueToWrite, unsigned location, llvm::Value *locationOffset,
+                                              llvm::Value *elemIdx, unsigned locationCount, InOutInfo outputInfo,
+                                              llvm::Value *vertexOrPrimitiveIndex);
 
   // Create a write to an XFB (transform feedback / streamout) buffer.
   // The value to write must be a scalar or vector type with no more than four elements.
@@ -1160,25 +1153,9 @@ public:
   // @param xfbStride : XFB stride
   // @param xfbOffset : XFB byte offset
   // @param outputInfo : Extra output info (GS stream ID)
-  virtual llvm::Instruction *CreateWriteXfbOutput(llvm::Value *valueToWrite, bool isBuiltIn, unsigned location,
-                                                  unsigned component, unsigned xfbBuffer, unsigned xfbStride,
-                                                  llvm::Value *xfbOffset, InOutInfo outputInfo) = 0;
-
-  // Get the type of a built-in -- static edition of the method below, so you can use it without a Builder object.
-  //
-  // @param builtIn : Built-in kind, one of the BuiltIn* constants
-  // @param inOutInfo : Extra input/output info (shader-defined array length)
-  // @param context : LLVMContext
-  static llvm::Type *getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo, llvm::LLVMContext &context);
-
-  // Get the type of a built-in. Where the built-in has a shader-defined array length (ClipDistance,
-  // CullDistance, SampleMask), inOutInfo.GetArraySize() is used as the array size.
-  //
-  // @param builtIn : Built-in kind, one of the BuiltIn* constants
-  // @param inOutInfo : Extra input/output info (shader-defined array length)
-  llvm::Type *getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo) {
-    return getBuiltInTy(builtIn, inOutInfo, getContext());
-  }
+  llvm::Instruction *CreateWriteXfbOutput(llvm::Value *valueToWrite, bool isBuiltIn, unsigned location,
+                                          unsigned component, unsigned xfbBuffer, unsigned xfbStride,
+                                          llvm::Value *xfbOffset, InOutInfo outputInfo);
 
   // Create a read of barycoord input value.
   // The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),
@@ -1187,8 +1164,8 @@ public:
   // @param inputInfo : Extra input info
   // @param auxInterpValue : Auxiliary value of interpolation
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateReadBaryCoord(BuiltInKind builtIn, InOutInfo inputInfo, llvm::Value *auxInterpValue,
-                                           const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateReadBaryCoord(BuiltInKind builtIn, InOutInfo inputInfo, llvm::Value *auxInterpValue,
+                                   const llvm::Twine &instName = "");
 
   // Create a read of (part of) a built-in input value.
   // The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),
@@ -1200,8 +1177,8 @@ public:
   // @param vertexIndex : For TCS/TES/GS per-vertex input: vertex index, else nullptr
   // @param index : Array or vector index to access part of an input, else nullptr
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateReadBuiltInInput(BuiltInKind builtIn, InOutInfo inputInfo, llvm::Value *vertexIndex,
-                                              llvm::Value *index, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateReadBuiltInInput(BuiltInKind builtIn, InOutInfo inputInfo, llvm::Value *vertexIndex,
+                                      llvm::Value *index, const llvm::Twine &instName = "");
 
   // Create a read of (part of) a built-in output value.
   // The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),
@@ -1214,8 +1191,8 @@ public:
   // @param vertexIndex : For TCS per-vertex output: vertex index, else nullptr
   // @param index : Array or vector index to access part of an input, else nullptr
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateReadBuiltInOutput(BuiltInKind builtIn, InOutInfo outputInfo, llvm::Value *vertexIndex,
-                                               llvm::Value *index, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateReadBuiltInOutput(BuiltInKind builtIn, InOutInfo outputInfo, llvm::Value *vertexIndex,
+                                       llvm::Value *index, const llvm::Twine &instName = "");
 
   // Create a write of (part of) a built-in output value.
   // The type of the value to write must be the fixed type of the specified built-in (see BuiltInDefs.h),
@@ -1227,9 +1204,8 @@ public:
   // @param vertexOrPrimitiveIndex : For TCS/mesh shader per-vertex output: vertex index; for mesh shader per-primitive
   //                                 output: primitive index; else nullptr
   // @param index : For TCS: array or vector index to access part of an output, else nullptr
-  virtual llvm::Instruction *CreateWriteBuiltInOutput(llvm::Value *valueToWrite, BuiltInKind builtIn,
-                                                      InOutInfo outputInfo, llvm::Value *vertexOrPrimitiveIndex,
-                                                      llvm::Value *index) = 0;
+  llvm::Instruction *CreateWriteBuiltInOutput(llvm::Value *valueToWrite, BuiltInKind builtIn, InOutInfo outputInfo,
+                                              llvm::Value *vertexOrPrimitiveIndex, llvm::Value *index);
 
   // Create a read of (part of) a task payload.
   // The result type is as specified by resultTy, a scalar or vector type with no more than four elements.
@@ -1238,8 +1214,8 @@ public:
   // @param byteOffset : Byte offset within the payload structure
   // @param instName : Name to give instruction(s)
   // @returns : Value read from the task payload
-  virtual llvm::Value *CreateReadTaskPayload(llvm::Type *resultTy, llvm::Value *byteOffset, // NOLINT
-                                             const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateReadTaskPayload(llvm::Type *resultTy, llvm::Value *byteOffset, // NOLINT
+                                     const llvm::Twine &instName = "");
 
   // Create a write of (part of) a task payload.
   //
@@ -1248,8 +1224,8 @@ public:
   // @param instName : Name to give instruction(s)
   // @returns Instruction to write value to task payload
   // @returns : Original value read from the task payload
-  virtual llvm::Instruction *CreateWriteTaskPayload(llvm::Value *valueToWrite, llvm::Value *byteOffset, // NOLINT
-                                                    const llvm::Twine &instName = "") = 0;
+  llvm::Instruction *CreateWriteTaskPayload(llvm::Value *valueToWrite, llvm::Value *byteOffset, // NOLINT
+                                            const llvm::Twine &instName = "");
 
   // Create a task payload atomic operation other than compare-and-swap. An add of +1 or -1, or a sub
   // of -1 or +1, is generated as inc or dec. Result type is the same as the input value type.
@@ -1260,9 +1236,9 @@ public:
   // @param byteOffset : Byte offset within the payload structure
   // @param instName : Name to give instruction(s)
   // @returns : Original value read from the task payload
-  virtual llvm::Value *CreateTaskPayloadAtomic(unsigned atomicOp, llvm::AtomicOrdering ordering, // NOLINT
-                                               llvm::Value *inputValue, llvm::Value *byteOffset,
-                                               const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateTaskPayloadAtomic(unsigned atomicOp, llvm::AtomicOrdering ordering, // NOLINT
+                                       llvm::Value *inputValue, llvm::Value *byteOffset,
+                                       const llvm::Twine &instName = "");
 
   // Create a task payload atomic compare-and-swap.
   //
@@ -1272,10 +1248,9 @@ public:
   // @param byteOffset : Byte offset within the payload structure
   // @param instName : Name to give instruction(s)
   // @returns : Original value read from the task payload
-  virtual llvm::Value *CreateTaskPayloadAtomicCompareSwap(llvm::AtomicOrdering ordering, // NOLINT
-                                                          llvm::Value *inputValue, llvm::Value *comparatorValue,
-                                                          llvm::Value *byteOffset,
-                                                          const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateTaskPayloadAtomicCompareSwap(llvm::AtomicOrdering ordering, // NOLINT
+                                                  llvm::Value *inputValue, llvm::Value *comparatorValue,
+                                                  llvm::Value *byteOffset, const llvm::Twine &instName = "");
 
   // -----------------------------------------------------------------------------------------------------------------
   // Matrix operations
@@ -1284,60 +1259,60 @@ public:
   //
   // @param matrix : The matrix to transpose
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateTransposeMatrix(llvm::Value *const matrix, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateTransposeMatrix(llvm::Value *const matrix, const llvm::Twine &instName = "");
 
   // Create matrix multiplication: matrix times scalar, resulting in matrix
   //
   // @param matrix : The column major matrix, [n x <n x float>]
   // @param scalar : The float scalar
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateMatrixTimesScalar(llvm::Value *const matrix, llvm::Value *const scalar,
-                                               const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateMatrixTimesScalar(llvm::Value *const matrix, llvm::Value *const scalar,
+                                       const llvm::Twine &instName = "");
 
   // Create matrix multiplication: vector times matrix, resulting in vector
   //
   // @param vector : The float vector
   // @param matrix : The column major matrix, n x <n x float>
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateVectorTimesMatrix(llvm::Value *const vector, llvm::Value *const matrix,
-                                               const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateVectorTimesMatrix(llvm::Value *const vector, llvm::Value *const matrix,
+                                       const llvm::Twine &instName = "");
 
   // Create matrix multiplication: matrix times vector, resulting in vector
   //
   // @param matrix : The column major matrix, n x <n x float>
   // @param vector : The float vector
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateMatrixTimesVector(llvm::Value *const matrix, llvm::Value *const vector,
-                                               const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateMatrixTimesVector(llvm::Value *const matrix, llvm::Value *const vector,
+                                       const llvm::Twine &instName = "");
 
   // Create matrix multiplication:  matrix times matrix, resulting in matrix
   //
   // @param matrix1 : The float matrix 1
   // @param matrix2 : The float matrix 2
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateMatrixTimesMatrix(llvm::Value *const matrix1, llvm::Value *const matrix2,
-                                               const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateMatrixTimesMatrix(llvm::Value *const matrix1, llvm::Value *const matrix2,
+                                       const llvm::Twine &instName = "");
 
   // Create vector outer product operation, resulting in matrix
   //
   // @param vector1 : The float vector 1
   // @param vector2 : The float vector 2
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateOuterProduct(llvm::Value *const vector1, llvm::Value *const vector2,
-                                          const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateOuterProduct(llvm::Value *const vector1, llvm::Value *const vector2,
+                                  const llvm::Twine &instName = "");
 
   // Create matrix determinant operation. Matrix must be square
   //
   // @param matrix : Matrix
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateDeterminant(llvm::Value *const matrix, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateDeterminant(llvm::Value *const matrix, const llvm::Twine &instName = "");
 
   // Create matrix inverse operation. Matrix must be square. Result is undefined if the matrix
   // is singular or poorly conditioned (nearly singular).
   //
   // @param matrix : Matrix
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateMatrixInverse(llvm::Value *const matrix, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateMatrixInverse(llvm::Value *const matrix, const llvm::Twine &instName = "");
 
   // -----------------------------------------------------------------------------------------------------------------
   // Miscellaneous operations
@@ -1346,31 +1321,31 @@ public:
   // the current output primitive in the specified output-primitive stream.
   //
   // @param streamId : Stream number, 0 if only one stream is present
-  virtual llvm::Instruction *CreateEmitVertex(unsigned streamId) = 0;
+  llvm::Instruction *CreateEmitVertex(unsigned streamId);
 
   // In the GS, finish the current primitive and start a new one in the specified output-primitive stream.
   //
   // @param streamId : Stream number, 0 if only one stream is present
-  virtual llvm::Instruction *CreateEndPrimitive(unsigned streamId) = 0;
+  llvm::Instruction *CreateEndPrimitive(unsigned streamId);
 
   // Create a workgroup control barrier.
-  virtual llvm::Instruction *CreateBarrier() = 0;
+  llvm::Instruction *CreateBarrier();
 
   // Create a "kill". Only allowed in a fragment shader.
   //
   // @param instName : Name to give instruction(s)
-  virtual llvm::Instruction *CreateKill(const llvm::Twine &instName = "") = 0;
+  llvm::Instruction *CreateKill(const llvm::Twine &instName = "");
 
   // Create a "debug break".
   //
   // @param instName : Name to give instruction(s)
-  virtual llvm::Instruction *CreateDebugBreak(const llvm::Twine &instName = "") = 0;
+  llvm::Instruction *CreateDebugBreak(const llvm::Twine &instName = "");
 
   // Create a "readclock".
   //
   // @param realtime : Whether to read real-time clock counter
   // @param instName : Name to give instruction(s)
-  virtual llvm::Instruction *CreateReadClock(bool realtime, const llvm::Twine &instName = "") = 0;
+  llvm::Instruction *CreateReadClock(bool realtime, const llvm::Twine &instName = "");
 
   // Create derivative calculation on float or vector of float or half
   //
@@ -1379,18 +1354,17 @@ public:
   // @param isFine : True for "fine" calculation, where the value in the current fragment is used. False for "coarse"
   // calculation, where it might use fewer locations to calculate.
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateDerivative(llvm::Value *value, bool isDirectionY, bool isFine,
-                                        const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateDerivative(llvm::Value *value, bool isDirectionY, bool isFine, const llvm::Twine &instName = "");
 
   // Create a demote to helper invocation operation. Only allowed in a fragment shader.
   //
   // @param instName : Name to give instruction(s)
-  virtual llvm::Instruction *CreateDemoteToHelperInvocation(const llvm::Twine &instName = "") = 0;
+  llvm::Instruction *CreateDemoteToHelperInvocation(const llvm::Twine &instName = "");
 
   // Create a helper invocation query. Only allowed in a fragment shader.
   //
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateIsHelperInvocation(const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateIsHelperInvocation(const llvm::Twine &instName = "");
 
   // In the task shader, emit the current values of all per-task output variables to the current task output by
   // specifying the group count XYZ of the launched child mesh tasks.
@@ -1400,8 +1374,8 @@ public:
   // @param groupCountZ : Z dimension of the launched child mesh tasks
   // @param instName : Name to give final instruction
   // @returns Instruction to emit mesh tasks
-  virtual llvm::Instruction *CreateEmitMeshTasks(llvm::Value *groupCountX, llvm::Value *groupCountY, // NOLINT
-                                                 llvm::Value *groupCountZ, const llvm::Twine &instName = "") = 0;
+  llvm::Instruction *CreateEmitMeshTasks(llvm::Value *groupCountX, llvm::Value *groupCountY, // NOLINT
+                                         llvm::Value *groupCountZ, const llvm::Twine &instName = "");
 
   // In the mesh shader, set the actual output size of the primitives and vertices that the mesh shader workgroup will
   // emit upon completion.
@@ -1410,8 +1384,8 @@ public:
   // @param primitiveCount : Actual output size of the primitives
   // @param instName : Name to give final instruction
   // @returns Instruction to set the actual size of mesh outputs
-  virtual llvm::Instruction *CreateSetMeshOutputs(llvm::Value *vertexCount, llvm::Value *primitiveCount, // NOLINT
-                                                  const llvm::Twine &instName = "") = 0;
+  llvm::Instruction *CreateSetMeshOutputs(llvm::Value *vertexCount, llvm::Value *primitiveCount, // NOLINT
+                                          const llvm::Twine &instName = "");
 
   // -----------------------------------------------------------------------------------------------------------------
   // Subgroup operations
@@ -1419,141 +1393,139 @@ public:
   // Create a get wave size query.
   //
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateGetWaveSize(const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateGetWaveSize(const llvm::Twine &instName = "");
 
   // Create a get subgroup size query.
   //
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateGetSubgroupSize(const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateGetSubgroupSize(const llvm::Twine &instName = "");
 
   // Create a subgroup elect.
   //
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupElect(const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupElect(const llvm::Twine &instName = "");
 
   // Create a subgroup all.
   //
   // @param value : The value to compare
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupAll(llvm::Value *const value, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupAll(llvm::Value *const value, const llvm::Twine &instName = "");
 
   // Create a subgroup any
   //
   // @param value : The value to compare
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupAny(llvm::Value *const value, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupAny(llvm::Value *const value, const llvm::Twine &instName = "");
 
   // Create a subgroup all equal.
   //
   // @param value : The value to compare
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupAllEqual(llvm::Value *const value, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupAllEqual(llvm::Value *const value, const llvm::Twine &instName = "");
 
   // Create a subgroup broadcast.
   //
   // @param value : The value to broadcast
   // @param index : The index to broadcast from
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupBroadcast(llvm::Value *const value, llvm::Value *const index,
-                                               const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupBroadcast(llvm::Value *const value, llvm::Value *const index,
+                                       const llvm::Twine &instName = "");
 
   // Create a subgroup broadcast that can potentially have a non-uniform index
   //
   // @param value : The value to broadcast
   // @param index : The index to broadcast from
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupBroadcastWaterfall(llvm::Value *const value, llvm::Value *const index,
-                                                        const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupBroadcastWaterfall(llvm::Value *const value, llvm::Value *const index,
+                                                const llvm::Twine &instName = "");
 
   // Create a subgroup broadcast first.
   //
   // @param value : The value to broadcast
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupBroadcastFirst(llvm::Value *const value, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupBroadcastFirst(llvm::Value *const value, const llvm::Twine &instName = "");
 
   // Create a subgroup ballot.
   //
   // @param value : The value to contribute
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupBallot(llvm::Value *const value, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupBallot(llvm::Value *const value, const llvm::Twine &instName = "");
 
   // Create a subgroup inverse ballot.
   //
   // @param value : The ballot value
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupInverseBallot(llvm::Value *const value, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupInverseBallot(llvm::Value *const value, const llvm::Twine &instName = "");
 
   // Create a subgroup ballot bit extract.
   //
   // @param value : The ballot value
   // @param index : The index to extract from the ballot
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupBallotBitExtract(llvm::Value *const value, llvm::Value *const index,
-                                                      const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupBallotBitExtract(llvm::Value *const value, llvm::Value *const index,
+                                              const llvm::Twine &instName = "");
 
   // Create a subgroup ballot bit count.
   //
   // @param value : The ballot value
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupBallotBitCount(llvm::Value *const value, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupBallotBitCount(llvm::Value *const value, const llvm::Twine &instName = "");
 
   // Create a subgroup ballot inclusive bit count.
   //
   // @param value : The ballot value
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupBallotInclusiveBitCount(llvm::Value *const value,
-                                                             const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupBallotInclusiveBitCount(llvm::Value *const value, const llvm::Twine &instName = "");
 
   // Create a subgroup ballot exclusive bit count.
   //
   // @param value : The ballot value
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupBallotExclusiveBitCount(llvm::Value *const value,
-                                                             const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupBallotExclusiveBitCount(llvm::Value *const value, const llvm::Twine &instName = "");
 
   // Create a subgroup ballot find least significant bit.
   //
   // @param value : The ballot value
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupBallotFindLsb(llvm::Value *const value, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupBallotFindLsb(llvm::Value *const value, const llvm::Twine &instName = "");
 
   // Create a subgroup ballot find most significant bit.
   //
   // @param value : The ballot value
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupBallotFindMsb(llvm::Value *const value, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupBallotFindMsb(llvm::Value *const value, const llvm::Twine &instName = "");
 
   // Create a subgroup shuffle.
   //
   // @param value : The value to shuffle
   // @param index : The index to shuffle from
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupShuffle(llvm::Value *const value, llvm::Value *const index,
-                                             const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupShuffle(llvm::Value *const value, llvm::Value *const index,
+                                     const llvm::Twine &instName = "");
 
   // Create a subgroup shuffle xor.
   //
   // @param value : The value to shuffle
   // @param mask : The mask to shuffle with
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupShuffleXor(llvm::Value *const value, llvm::Value *const mask,
-                                                const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupShuffleXor(llvm::Value *const value, llvm::Value *const mask,
+                                        const llvm::Twine &instName = "");
 
   // Create a subgroup shuffle up.
   //
   // @param value : The value to shuffle
   // @param delta : The delta to shuffle up to
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupShuffleUp(llvm::Value *const value, llvm::Value *const delta,
-                                               const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupShuffleUp(llvm::Value *const value, llvm::Value *const delta,
+                                       const llvm::Twine &instName = "");
 
   // Create a subgroup shuffle down.
   //
   // @param value : The value to shuffle
   // @param delta : The delta to shuffle down to
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupShuffleDown(llvm::Value *const value, llvm::Value *const delta,
-                                                 const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupShuffleDown(llvm::Value *const value, llvm::Value *const delta,
+                                         const llvm::Twine &instName = "");
 
   // Create a subgroup clustered reduction.
   //
@@ -1561,9 +1533,8 @@ public:
   // @param value : The value to perform on
   // @param clusterSize : The cluster size
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupClusteredReduction(GroupArithOp groupArithOp, llvm::Value *const value,
-                                                        llvm::Value *const clusterSize,
-                                                        const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupClusteredReduction(GroupArithOp groupArithOp, llvm::Value *const value,
+                                                llvm::Value *const clusterSize, const llvm::Twine &instName = "");
 
   // Create a subgroup clustered inclusive scan.
   //
@@ -1571,9 +1542,8 @@ public:
   // @param value : The value to perform on
   // @param clusterSize : The cluster size
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupClusteredInclusive(GroupArithOp groupArithOp, llvm::Value *const value,
-                                                        llvm::Value *const clusterSize,
-                                                        const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupClusteredInclusive(GroupArithOp groupArithOp, llvm::Value *const value,
+                                                llvm::Value *const clusterSize, const llvm::Twine &instName = "");
 
   // Create a subgroup clustered exclusive scan.
   //
@@ -1581,51 +1551,50 @@ public:
   // @param value : The value to perform on
   // @param clusterSize : The cluster size
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, llvm::Value *const value,
-                                                        llvm::Value *const clusterSize,
-                                                        const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, llvm::Value *const value,
+                                                llvm::Value *const clusterSize, const llvm::Twine &instName = "");
 
   // Create a subgroup quad broadcast.
   //
   // @param value : The value to broadcast
   // @param index : The index within the quad to broadcast from
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupQuadBroadcast(llvm::Value *const value, llvm::Value *const index,
-                                                   const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupQuadBroadcast(llvm::Value *const value, llvm::Value *const index,
+                                           const llvm::Twine &instName = "");
 
   // Create a subgroup quad swap horizontal.
   //
   // @param value : The value to swap
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupQuadSwapHorizontal(llvm::Value *const value, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupQuadSwapHorizontal(llvm::Value *const value, const llvm::Twine &instName = "");
 
   // Create a subgroup quad swap vertical.
   //
   // @param value : The value to swap
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupQuadSwapVertical(llvm::Value *const value, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupQuadSwapVertical(llvm::Value *const value, const llvm::Twine &instName = "");
 
   // Create a subgroup quad swap diagonal.
   //
   // @param value : The value to swap
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupQuadSwapDiagonal(llvm::Value *const value, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupQuadSwapDiagonal(llvm::Value *const value, const llvm::Twine &instName = "");
 
   // Create a subgroup swizzle quad.
   //
   // @param value : The value to swizzle.
   // @param offset : The value to specify the swizzle offsets.
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupSwizzleQuad(llvm::Value *const value, llvm::Value *const offset,
-                                                 const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupSwizzleQuad(llvm::Value *const value, llvm::Value *const offset,
+                                         const llvm::Twine &instName = "");
 
   // Create a subgroup swizzle masked.
   //
   // @param value : The value to swizzle.
   // @param mask : The value to specify the swizzle masks.
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupSwizzleMask(llvm::Value *const value, llvm::Value *const mask,
-                                                 const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupSwizzleMask(llvm::Value *const value, llvm::Value *const mask,
+                                         const llvm::Twine &instName = "");
 
   // Create a subgroup write invocation.
   //
@@ -1633,29 +1602,25 @@ public:
   // @param writeValue : The value to return for one invocation.
   // @param index : The index of the invocation that gets the write value.
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupWriteInvocation(llvm::Value *const inputValue, llvm::Value *const writeValue,
-                                                     llvm::Value *const index, const llvm::Twine &instName = "") = 0;
+  llvm::Value *CreateSubgroupWriteInvocation(llvm::Value *const inputValue, llvm::Value *const writeValue,
+                                             llvm::Value *const index, const llvm::Twine &instName = "");
 
   // Create a subgroup mbcnt.
   //
   // @param mask : The mask to mbcnt with.
   // @param instName : Name to give instruction(s)
-  virtual llvm::Value *CreateSubgroupMbcnt(llvm::Value *const mask, const llvm::Twine &instName = "") = 0;
-
-protected:
-  Builder(llvm::LLVMContext &context) : BuilderCommon(context) {}
-
-  // Get a constant of FP or vector of FP type from the given APFloat, converting APFloat semantics where necessary
-  llvm::Constant *getFpConstant(llvm::Type *ty, llvm::APFloat value);
-
-  //
-  // @param matrixType : The matrix type to transpose
-  llvm::Type *getTransposedMatrixTy(llvm::Type *const matrixType) const;
+  llvm::Value *CreateSubgroupMbcnt(llvm::Value *const mask, const llvm::Twine &instName = "");
 
 private:
   Builder() = delete;
   Builder(const Builder &) = delete;
   Builder &operator=(const Builder &) = delete;
+
+  // Record one Builder call
+  llvm::Instruction *record(BuilderOpcode opcode, llvm::Type *returnTy, llvm::ArrayRef<llvm::Value *> args,
+                            const llvm::Twine &instName);
+
+  unsigned m_opcodeMetaKindId = 0; // Cached metadata kind for opcode
 };
 
 } // namespace lgc

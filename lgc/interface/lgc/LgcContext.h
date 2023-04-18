@@ -115,9 +115,10 @@ public:
   // Create a Pipeline object for a pipeline compile
   Pipeline *createPipeline();
 
-  // Create a Builder object
+  // Create a Builder object. This is now unnecessary, as you can just create a local variable Builder or "new" it
+  // yourself.
   //
-  // @param pipeline : Pipeline object for pipeline compile, nullptr for shader compile
+  // @param pipeline : Ignored
   Builder *createBuilder(Pipeline *pipeline);
 
   // Prepare a pass manager. This manually adds a target-aware TLI pass, so middle-end optimizations do not

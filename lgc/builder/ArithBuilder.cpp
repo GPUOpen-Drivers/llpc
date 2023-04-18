@@ -45,7 +45,7 @@ using namespace llvm;
 //
 // @param coord : Input coordinate <3 x float>
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateCubeFaceCoord(Value *coord, const Twine &instName) {
+Value *BuilderImpl::CreateCubeFaceCoord(Value *coord, const Twine &instName) {
   Value *coordX = CreateExtractElement(coord, uint64_t(0));
   Value *coordY = CreateExtractElement(coord, 1);
   Value *coordZ = CreateExtractElement(coord, 2);
@@ -74,7 +74,7 @@ Value *ArithBuilder::CreateCubeFaceCoord(Value *coord, const Twine &instName) {
 //
 // @param coord : Input coordinate <3 x float>
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateCubeFaceIndex(Value *coord, const Twine &instName) {
+Value *BuilderImpl::CreateCubeFaceIndex(Value *coord, const Twine &instName) {
   Value *coordX = CreateExtractElement(coord, uint64_t(0));
   Value *coordY = CreateExtractElement(coord, 1);
   Value *coordZ = CreateExtractElement(coord, 2);
@@ -89,10 +89,10 @@ Value *ArithBuilder::CreateCubeFaceIndex(Value *coord, const Twine &instName) {
 // @param destTy : Type to convert to
 // @param roundingMode : Rounding mode
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateFpTruncWithRounding(Value *value, Type *destTy, RoundingMode roundingMode,
-                                               const Twine &instName) {
+Value *BuilderImpl::CreateFpTruncWithRounding(Value *value, Type *destTy, RoundingMode roundingMode,
+                                              const Twine &instName) {
   if (value->getType()->getScalarType()->isDoubleTy())
-    value = CreateFPTrunc(value, getConditionallyVectorizedTy(getFloatTy(), destTy));
+    value = CreateFPTrunc(value, BuilderBase::getConditionallyVectorizedTy(getFloatTy(), destTy));
 
   if (value->getType() == destTy)
     return value;
@@ -126,7 +126,7 @@ Value *ArithBuilder::CreateFpTruncWithRounding(Value *value, Type *destTy, Round
 
   // float32: sign = [31], exponent = [30:23], mantissa = [22:0]
   // float16: sign = [15], exponent = [14:10], mantissa = [9:0]
-  Value *bits32 = CreateBitCast(value, getConditionallyVectorizedTy(getInt32Ty(), value->getType()));
+  Value *bits32 = CreateBitCast(value, BuilderBase::getConditionallyVectorizedTy(getInt32Ty(), value->getType()));
 
   // sign16 = (bits32 >> 16) & 0x8000
   Value *sign16 = CreateAnd(CreateLShr(bits32, ConstantInt::get(bits32->getType(), 16)),
@@ -190,7 +190,8 @@ Value *ArithBuilder::CreateFpTruncWithRounding(Value *value, Type *destTy, Round
   combined16 = CreateSelect(isNan, nan16, combined16);
 
   // Return as (vector of) half.
-  return CreateBitCast(CreateTrunc(combined16, getConditionallyVectorizedTy(getInt16Ty(), destTy)), destTy, instName);
+  return CreateBitCast(CreateTrunc(combined16, BuilderBase::getConditionallyVectorizedTy(getInt16Ty(), destTy)), destTy,
+                       instName);
 }
 
 // =====================================================================================================================
@@ -198,14 +199,14 @@ Value *ArithBuilder::CreateFpTruncWithRounding(Value *value, Type *destTy, Round
 //
 // @param value : Input value (float or float vector)
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateQuantizeToFp16(Value *value, const Twine &instName) {
+Value *BuilderImpl::CreateQuantizeToFp16(Value *value, const Twine &instName) {
   assert(value->getType()->getScalarType()->isFloatTy());
 
   Constant *zero = Constant::getNullValue(value->getType());
   // 2^-15 (normalized float16 minimum)
   Constant *minNormalizedHalf = ConstantFP::get(value->getType(), 1.0 / 32768.0);
 
-  Value *trunc = CreateFPTrunc(value, getConditionallyVectorizedTy(getHalfTy(), value->getType()));
+  Value *trunc = CreateFPTrunc(value, BuilderBase::getConditionallyVectorizedTy(getHalfTy(), value->getType()));
   Value *ext = CreateFPExt(trunc, value->getType());
   Value *abs = CreateIntrinsic(Intrinsic::fabs, ext->getType(), ext);
   Value *isLessThanMin = CreateFCmpOLT(abs, minNormalizedHalf);
@@ -225,7 +226,7 @@ Value *ArithBuilder::CreateQuantizeToFp16(Value *value, const Twine &instName) {
 // @param dividend : Dividend value
 // @param divisor : Divisor value
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateSMod(Value *dividend, Value *divisor, const Twine &instName) {
+Value *BuilderImpl::CreateSMod(Value *dividend, Value *divisor, const Twine &instName) {
   Value *srem = CreateSRem(dividend, divisor);
   Value *divisorPlusSrem = CreateAdd(divisor, srem);
   Value *isDifferentSign = CreateICmpSLT(CreateXor(dividend, divisor), Constant::getNullValue(dividend->getType()));
@@ -241,7 +242,7 @@ Value *ArithBuilder::CreateSMod(Value *dividend, Value *divisor, const Twine &in
 // @param dividend : Dividend value
 // @param divisor : Divisor value
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateFMod(Value *dividend, Value *divisor, const Twine &instName) {
+Value *BuilderImpl::CreateFMod(Value *dividend, Value *divisor, const Twine &instName) {
   Value *quotient = CreateFMul(CreateFDiv(ConstantFP::get(divisor->getType(), 1.0), divisor), dividend);
   Value *floor = CreateUnaryIntrinsic(Intrinsic::floor, quotient);
   return CreateFSub(dividend, CreateFMul(divisor, floor), instName);
@@ -254,7 +255,7 @@ Value *ArithBuilder::CreateFMod(Value *dividend, Value *divisor, const Twine &in
 // @param b : The other value to multiply
 // @param c : The value to add to the product of A and B
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateFma(Value *a, Value *b, Value *c, const Twine &instName) {
+Value *BuilderImpl::CreateFma(Value *a, Value *b, Value *c, const Twine &instName) {
   if (getPipelineState()->getTargetInfo().getGfxIpVersion().major <= 8) {
     // Pre-GFX9 version: Use fmuladd.
     return CreateIntrinsic(Intrinsic::fmuladd, a->getType(), {a, b, c}, nullptr, instName);
@@ -269,7 +270,7 @@ Value *ArithBuilder::CreateFma(Value *a, Value *b, Value *c, const Twine &instNa
 //
 // @param x : Input value X
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateTan(Value *x, const Twine &instName) {
+Value *BuilderImpl::CreateTan(Value *x, const Twine &instName) {
   Constant *one = ConstantFP::get(x->getType(), 1.0);
   Value *sin = CreateUnaryIntrinsic(Intrinsic::sin, x);
   Value *cos = CreateUnaryIntrinsic(Intrinsic::cos, x);
@@ -281,12 +282,12 @@ Value *ArithBuilder::CreateTan(Value *x, const Twine &instName) {
 //
 // @param x : Input value X
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateASin(Value *x, const Twine &instName) {
+Value *BuilderImpl::CreateASin(Value *x, const Twine &instName) {
   // Extend half to float.
   Type *origTy = x->getType();
   Type *extTy = origTy;
   if (extTy->getScalarType()->isHalfTy()) {
-    extTy = getConditionallyVectorizedTy(getFloatTy(), extTy);
+    extTy = BuilderBase::getConditionallyVectorizedTy(getFloatTy(), extTy);
     x = CreateFPExt(x, extTy);
   }
 
@@ -307,12 +308,12 @@ Value *ArithBuilder::CreateASin(Value *x, const Twine &instName) {
 //
 // @param x : Input value X
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateACos(Value *x, const Twine &instName) {
+Value *BuilderImpl::CreateACos(Value *x, const Twine &instName) {
   // Extend half to float.
   Type *origTy = x->getType();
   Type *extTy = origTy;
   if (extTy->getScalarType()->isHalfTy()) {
-    extTy = getConditionallyVectorizedTy(getFloatTy(), extTy);
+    extTy = BuilderBase::getConditionallyVectorizedTy(getFloatTy(), extTy);
     x = CreateFPExt(x, extTy);
   }
 
@@ -335,7 +336,7 @@ Value *ArithBuilder::CreateACos(Value *x, const Twine &instName) {
 // @param x : Input value X
 // @param coefP0 : p0 coefficient
 // @param coefP1 : p1 coefficient
-Value *ArithBuilder::aSinACosCommon(Value *x, Constant *coefP0, Constant *coefP1) {
+Value *BuilderImpl::aSinACosCommon(Value *x, Constant *coefP0, Constant *coefP1) {
   // asin(x) = sgn(x) * (PI/2 - sqrt(1 - |x|) * (PI/2 + |x| * (PI/4 - 1 + |x| * (p0 + |x| * p1))))
   // acos(x) = PI/2 - the same, but with slightly different coefficients
   Value *absInValue = CreateUnaryIntrinsic(Intrinsic::fabs, x);
@@ -358,7 +359,7 @@ Value *ArithBuilder::aSinACosCommon(Value *x, Constant *coefP0, Constant *coefP1
 //
 // @param yOverX : Input value Y/X
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateATan(Value *yOverX, const Twine &instName) {
+Value *BuilderImpl::CreateATan(Value *yOverX, const Twine &instName) {
   // atan(x) = x - x^3 / 3 + x^5 / 5 - x^7 / 7 + x^9 / 9 - x^11 / 11, |x| <= 1.0
   // x = min(1.0, x) / max(1.0, x), make |x| <= 1.0
   Constant *zero = Constant::getNullValue(yOverX->getType());
@@ -415,7 +416,7 @@ Value *ArithBuilder::CreateATan(Value *yOverX, const Twine &instName) {
 // @param y : Input value Y
 // @param x : Input value X
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateATan2(Value *y, Value *x, const Twine &instName) {
+Value *BuilderImpl::CreateATan2(Value *y, Value *x, const Twine &instName) {
   // yox = (|x| == |y|) ? ((x == y) ? 1.0 : -1.0) : y/x
   //
   // p0 = sgn(y) * PI/2
@@ -461,7 +462,7 @@ Value *ArithBuilder::CreateATan2(Value *y, Value *x, const Twine &instName) {
 //
 // @param x : Input value X
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateSinh(Value *x, const Twine &instName) {
+Value *BuilderImpl::CreateSinh(Value *x, const Twine &instName) {
   // (e^x - e^(-x)) / 2.0
   // e^x = 2^(x * 1.442695)
   // 1/log(2) = 1.442695
@@ -481,7 +482,7 @@ Value *ArithBuilder::CreateSinh(Value *x, const Twine &instName) {
 //
 // @param x : Input value X
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateCosh(Value *x, const Twine &instName) {
+Value *BuilderImpl::CreateCosh(Value *x, const Twine &instName) {
   // (e^x + e^(-x)) / 2.0
   // e^x = 2^(x * 1.442695)
   // 1/log(2) = 1.442695
@@ -499,7 +500,7 @@ Value *ArithBuilder::CreateCosh(Value *x, const Twine &instName) {
 //
 // @param x : Input value X
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateTanh(Value *x, const Twine &instName) {
+Value *BuilderImpl::CreateTanh(Value *x, const Twine &instName) {
   // sinh(x) / cosh(x)
   // (e^x - e^(-x))/(e^x + e^(-x))
   // 1/log(2) = 1.442695
@@ -520,7 +521,7 @@ Value *ArithBuilder::CreateTanh(Value *x, const Twine &instName) {
 //
 // @param x : Input value X
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateASinh(Value *x, const Twine &instName) {
+Value *BuilderImpl::CreateASinh(Value *x, const Twine &instName) {
   // ln(x + sqrt(x*x + 1))
   //             / ln(x + sqrt(x^2 + 1))      when x >= 0
   //  asinh(x) =
@@ -544,7 +545,7 @@ Value *ArithBuilder::CreateASinh(Value *x, const Twine &instName) {
 //
 // @param x : Input value X
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateACosh(Value *x, const Twine &instName) {
+Value *BuilderImpl::CreateACosh(Value *x, const Twine &instName) {
   // ln(x + sqrt(x*x - 1))
   // x should >= 1, undefined < 1
   Constant *one = ConstantFP::get(x->getType(), 1.0);
@@ -561,7 +562,7 @@ Value *ArithBuilder::CreateACosh(Value *x, const Twine &instName) {
 //
 // @param x : Input value X
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateATanh(Value *x, const Twine &instName) {
+Value *BuilderImpl::CreateATanh(Value *x, const Twine &instName) {
   // ln((x + 1)/( 1 - x)) * 0.5f;
   // |x| <1, undefined |x| >= 1
   Constant *one = ConstantFP::get(x->getType(), 1.0);
@@ -578,7 +579,7 @@ Value *ArithBuilder::CreateATanh(Value *x, const Twine &instName) {
 // @param x : Input value X
 // @param y : Input value Y
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreatePower(Value *x, Value *y, const Twine &instName) {
+Value *BuilderImpl::CreatePower(Value *x, Value *y, const Twine &instName) {
   if (x == ConstantFP::get(x->getType(), 2.0))
     return CreateUnaryIntrinsic(Intrinsic::exp2, y, nullptr, instName);
 
@@ -596,7 +597,7 @@ Value *ArithBuilder::CreatePower(Value *x, Value *y, const Twine &instName) {
 //
 // @param x : Input value X
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateExp(Value *x, const Twine &instName) {
+Value *BuilderImpl::CreateExp(Value *x, const Twine &instName) {
   return CreateUnaryIntrinsic(Intrinsic::exp2, CreateFMul(x, getRecipLog2(x->getType())), nullptr, instName);
 }
 
@@ -605,7 +606,7 @@ Value *ArithBuilder::CreateExp(Value *x, const Twine &instName) {
 //
 // @param x : Input value X
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateLog(Value *x, const Twine &instName) {
+Value *BuilderImpl::CreateLog(Value *x, const Twine &instName) {
   Value *log = CreateUnaryIntrinsic(Intrinsic::log2, x);
   return CreateFMul(log, getLog2(x->getType()), instName);
 }
@@ -615,7 +616,7 @@ Value *ArithBuilder::CreateLog(Value *x, const Twine &instName) {
 //
 // @param x : Input value X
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateSqrt(Value *x, const Twine &instName) {
+Value *BuilderImpl::CreateSqrt(Value *x, const Twine &instName) {
   if (x->getType()->getScalarType()->isDoubleTy()) {
     // NOTE: For double type, the SQRT and RSQ instructions don't have required precision, we apply Goldschmidt's
     // algorithm to improve the result:
@@ -643,7 +644,7 @@ Value *ArithBuilder::CreateSqrt(Value *x, const Twine &instName) {
     // x < 2^-768
     auto scaling = CreateFCmpOLT(x, getFpConstant(x->getType(), llvm::APFloat(llvm::APFloat::IEEEdouble(),
                                                                               llvm::APInt(64, 0x1000000000000000))));
-    auto expTy = getConditionallyVectorizedTy(getInt32Ty(), x->getType());
+    auto expTy = BuilderBase::getConditionallyVectorizedTy(getInt32Ty(), x->getType());
     auto scaleUp = CreateSelect(scaling, ConstantInt::get(expTy, 256), ConstantInt::get(expTy, 0));
     auto scaleDown = CreateSelect(scaling, ConstantInt::get(expTy, -128, true), ConstantInt::get(expTy, 0));
     auto half = ConstantFP::get(x->getType(), 0.5);
@@ -679,7 +680,7 @@ Value *ArithBuilder::CreateSqrt(Value *x, const Twine &instName) {
 //
 // @param x : Input value X
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateInverseSqrt(Value *x, const Twine &instName) {
+Value *BuilderImpl::CreateInverseSqrt(Value *x, const Twine &instName) {
   if (x->getType()->getScalarType()->isDoubleTy()) {
     // NOTE: For double type, the SQRT and RSQ instructions don't have required precision, we apply Goldschmidt's
     // algorithm to improve the result:
@@ -707,7 +708,7 @@ Value *ArithBuilder::CreateInverseSqrt(Value *x, const Twine &instName) {
     // x < 2^-768
     auto scaling = CreateFCmpOLT(x, getFpConstant(x->getType(), llvm::APFloat(llvm::APFloat::IEEEdouble(),
                                                                               llvm::APInt(64, 0x1000000000000000))));
-    auto expTy = getConditionallyVectorizedTy(getInt32Ty(), x->getType());
+    auto expTy = BuilderBase::getConditionallyVectorizedTy(getInt32Ty(), x->getType());
     auto scaleUp = CreateSelect(scaling, ConstantInt::get(expTy, 256), ConstantInt::get(expTy, 0));
     auto scaleDown = CreateSelect(scaling, ConstantInt::get(expTy, 128), ConstantInt::get(expTy, 0));
     auto half = ConstantFP::get(x->getType(), 0.5);
@@ -748,7 +749,7 @@ Value *ArithBuilder::CreateInverseSqrt(Value *x, const Twine &instName) {
 //
 // @param x : Input value X
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateSAbs(Value *x, const Twine &instName) {
+Value *BuilderImpl::CreateSAbs(Value *x, const Twine &instName) {
   Value *negX = CreateNeg(x);
   Value *isPositive = CreateICmpSGT(x, negX);
   return CreateSelect(isPositive, x, negX, instName);
@@ -760,7 +761,7 @@ Value *ArithBuilder::CreateSAbs(Value *x, const Twine &instName) {
 //
 // @param x : Input value
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateFSign(Value *x, const Twine &instName) {
+Value *BuilderImpl::CreateFSign(Value *x, const Twine &instName) {
   Value *isPositive = CreateFCmpOGT(x, Constant::getNullValue(x->getType()));
   Value *partialResult = CreateSelect(isPositive, ConstantFP::get(x->getType(), 1.0), x);
   Value *isNonNegative = CreateFCmpOGE(partialResult, Constant::getNullValue(x->getType()));
@@ -773,7 +774,7 @@ Value *ArithBuilder::CreateFSign(Value *x, const Twine &instName) {
 //
 // @param x : Input value
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateSSign(Value *x, const Twine &instName) {
+Value *BuilderImpl::CreateSSign(Value *x, const Twine &instName) {
   Value *isPositive = CreateICmpSGT(x, Constant::getNullValue(x->getType()));
   Value *partialResult = CreateSelect(isPositive, ConstantInt::get(x->getType(), 1, true), x);
   Value *isNonNegative = CreateICmpSGE(partialResult, Constant::getNullValue(x->getType()));
@@ -785,7 +786,7 @@ Value *ArithBuilder::CreateSSign(Value *x, const Twine &instName) {
 //
 // @param x : Input value
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateFract(Value *x, const Twine &instName) {
+Value *BuilderImpl::CreateFract(Value *x, const Twine &instName) {
   // We need to scalarize this ourselves.
   Value *result = scalarize(x, [this](Value *x) { return CreateIntrinsic(Intrinsic::amdgcn_fract, x->getType(), x); });
   result->setName(instName);
@@ -802,7 +803,7 @@ Value *ArithBuilder::CreateFract(Value *x, const Twine &instName) {
 // @param edge1 : Edge1 value
 // @param x : X (input) value
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateSmoothStep(Value *edge0, Value *edge1, Value *x, const Twine &instName) {
+Value *BuilderImpl::CreateSmoothStep(Value *edge0, Value *edge1, Value *x, const Twine &instName) {
   if (edge0->getType()->getScalarType()->isHalfTy()) {
     // Enabling fast math flags for half type here causes test problems.
     // TODO: Investigate this further.
@@ -823,12 +824,12 @@ Value *ArithBuilder::CreateSmoothStep(Value *edge0, Value *edge1, Value *x, cons
 // @param x : Mantissa
 // @param exp : Exponent
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateLdexp(Value *x, Value *exp, const Twine &instName) {
+Value *BuilderImpl::CreateLdexp(Value *x, Value *exp, const Twine &instName) {
   // Ensure exponent is i32.
   if (exp->getType()->getScalarType()->isIntegerTy(16))
-    exp = CreateSExt(exp, getConditionallyVectorizedTy(getInt32Ty(), exp->getType()));
+    exp = CreateSExt(exp, BuilderBase::getConditionallyVectorizedTy(getInt32Ty(), exp->getType()));
   else if (exp->getType()->getScalarType()->isIntegerTy(64))
-    exp = CreateTrunc(exp, getConditionallyVectorizedTy(getInt32Ty(), exp->getType()));
+    exp = CreateTrunc(exp, BuilderBase::getConditionallyVectorizedTy(getInt32Ty(), exp->getType()));
 
   // We need to scalarize this ourselves.
   Value *result = scalarize(x, exp, [this](Value *x, Value *exp) {
@@ -854,7 +855,7 @@ Value *ArithBuilder::CreateLdexp(Value *x, Value *exp, const Twine &instName) {
 //
 // @param value : Input value
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateExtractSignificand(Value *value, const Twine &instName) {
+Value *BuilderImpl::CreateExtractSignificand(Value *value, const Twine &instName) {
   // We need to scalarize this ourselves.
   Value *mant = scalarize(
       value, [this](Value *value) { return CreateIntrinsic(Intrinsic::amdgcn_frexp_mant, value->getType(), value); });
@@ -869,7 +870,7 @@ Value *ArithBuilder::CreateExtractSignificand(Value *value, const Twine &instNam
 //
 // @param value : Input value
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateExtractExponent(Value *value, const Twine &instName) {
+Value *BuilderImpl::CreateExtractExponent(Value *value, const Twine &instName) {
   // We need to scalarize this ourselves.
   Type *expTy = value->getType()->getScalarType()->isHalfTy() ? getInt16Ty() : getInt32Ty();
   Value *exp = scalarize(value, [this, expTy](Value *value) {
@@ -885,7 +886,7 @@ Value *ArithBuilder::CreateExtractExponent(Value *value, const Twine &instName) 
 // @param x : Input value X
 // @param y : Input value Y
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateCrossProduct(Value *x, Value *y, const Twine &instName) {
+Value *BuilderImpl::CreateCrossProduct(Value *x, Value *y, const Twine &instName) {
   assert(x->getType() == y->getType() && cast<FixedVectorType>(x->getType())->getNumElements() == 3);
 
   Value *left = UndefValue::get(x->getType());
@@ -904,7 +905,7 @@ Value *ArithBuilder::CreateCrossProduct(Value *x, Value *y, const Twine &instNam
 //
 // @param x : Input value
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateNormalizeVector(Value *x, const Twine &instName) {
+Value *BuilderImpl::CreateNormalizeVector(Value *x, const Twine &instName) {
   if (!isa<VectorType>(x->getType())) {
     // For a scalar, just return -1.0 or +1.0.
     Value *isPositive = CreateFCmpOGT(x, Constant::getNullValue(x->getType()));
@@ -934,7 +935,7 @@ Value *ArithBuilder::CreateNormalizeVector(Value *x, const Twine &instName) {
 // @param i : Input value "I"
 // @param nref : Input value "Nref"
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateFaceForward(Value *n, Value *i, Value *nref, const Twine &instName) {
+Value *BuilderImpl::CreateFaceForward(Value *n, Value *i, Value *nref, const Twine &instName) {
   Value *dot = CreateDotProduct(i, nref);
   Value *isDotNegative = CreateFCmpOLT(dot, Constant::getNullValue(dot->getType()));
   Value *negN = CreateFSub(Constant::getNullValue(n->getType()), n);
@@ -949,7 +950,7 @@ Value *ArithBuilder::CreateFaceForward(Value *n, Value *i, Value *nref, const Tw
 // @param i : Input value "I"
 // @param n : Input value "N"
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateReflect(Value *i, Value *n, const Twine &instName) {
+Value *BuilderImpl::CreateReflect(Value *i, Value *n, const Twine &instName) {
   Value *dot = CreateDotProduct(n, i);
   dot = CreateFMul(dot, ConstantFP::get(dot->getType(), 2.0));
   if (auto vecTy = dyn_cast<FixedVectorType>(n->getType()))
@@ -968,7 +969,7 @@ Value *ArithBuilder::CreateReflect(Value *i, Value *n, const Twine &instName) {
 // @param n : Input value "N"
 // @param eta : Input value "eta"
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateRefract(Value *i, Value *n, Value *eta, const Twine &instName) {
+Value *BuilderImpl::CreateRefract(Value *i, Value *n, Value *eta, const Twine &instName) {
   Constant *one = ConstantFP::get(eta->getType(), 1.0);
   Value *dot = CreateDotProduct(i, n);
   Value *dotSqr = CreateFMul(dot, dot);
@@ -1001,7 +1002,7 @@ Value *ArithBuilder::CreateRefract(Value *i, Value *n, Value *eta, const Twine &
 // @param minVal : Minimum of clamp range
 // @param maxVal : Maximum of clamp range
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateFClamp(Value *x, Value *minVal, Value *maxVal, const Twine &instName) {
+Value *BuilderImpl::CreateFClamp(Value *x, Value *minVal, Value *maxVal, const Twine &instName) {
   // For float, and for half on GFX9+, we can use the fmed3 instruction.
   // But we can only do this if we do not need NaN preservation.
   Value *result = nullptr;
@@ -1038,7 +1039,7 @@ Value *ArithBuilder::CreateFClamp(Value *x, Value *minVal, Value *maxVal, const 
 // @param value1 : First value
 // @param value2 : Second value
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateFMin(Value *value1, Value *value2, const Twine &instName) {
+Value *BuilderImpl::CreateFMin(Value *value1, Value *value2, const Twine &instName) {
   CallInst *min = CreateMinNum(value1, value2);
   min->setFastMathFlags(getFastMathFlags());
   Value *result = min;
@@ -1060,7 +1061,7 @@ Value *ArithBuilder::CreateFMin(Value *value1, Value *value2, const Twine &instN
 // @param value1 : First value
 // @param value2 : Second value
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateFMax(Value *value1, Value *value2, const Twine &instName) {
+Value *BuilderImpl::CreateFMax(Value *value1, Value *value2, const Twine &instName) {
   CallInst *max = CreateMaxNum(value1, value2);
   max->setFastMathFlags(getFastMathFlags());
   Value *result = max;
@@ -1083,7 +1084,7 @@ Value *ArithBuilder::CreateFMax(Value *value1, Value *value2, const Twine &instN
 // @param value2 : Second value
 // @param value3 : Third value
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateFMin3(Value *value1, Value *value2, Value *value3, const Twine &instName) {
+Value *BuilderImpl::CreateFMin3(Value *value1, Value *value2, Value *value3, const Twine &instName) {
   CallInst *min1 = CreateMinNum(value1, value2);
   min1->setFastMathFlags(getFastMathFlags());
   CallInst *min2 = CreateMinNum(min1, value3);
@@ -1108,7 +1109,7 @@ Value *ArithBuilder::CreateFMin3(Value *value1, Value *value2, Value *value3, co
 // @param value2 : Second value
 // @param value3 : Third value
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateFMax3(Value *value1, Value *value2, Value *value3, const Twine &instName) {
+Value *BuilderImpl::CreateFMax3(Value *value1, Value *value2, Value *value3, const Twine &instName) {
   CallInst *max1 = CreateMaxNum(value1, value2);
   max1->setFastMathFlags(getFastMathFlags());
   CallInst *max2 = CreateMaxNum(max1, value3);
@@ -1133,7 +1134,7 @@ Value *ArithBuilder::CreateFMax3(Value *value1, Value *value2, Value *value3, co
 // @param value2 : Second value
 // @param value3 : Third value
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateFMid3(Value *value1, Value *value2, Value *value3, const Twine &instName) {
+Value *BuilderImpl::CreateFMid3(Value *value1, Value *value2, Value *value3, const Twine &instName) {
   // For float, and for half on GFX9+, we can use the fmed3 instruction.
   // But we can only do this if we do not need NaN preservation.
   Value *result = nullptr;
@@ -1172,7 +1173,7 @@ Value *ArithBuilder::CreateFMid3(Value *value1, Value *value2, Value *value3, co
 //
 // @param numerator : Numerator
 // @param denominator : Denominator
-Value *ArithBuilder::fDivFast(Value *numerator, Value *denominator) {
+Value *BuilderImpl::fDivFast(Value *numerator, Value *denominator) {
   if (!numerator->getType()->getScalarType()->isFloatTy())
     return CreateFMul(numerator, CreateFDiv(ConstantFP::get(denominator->getType(), 1.0), denominator));
 
@@ -1187,7 +1188,7 @@ Value *ArithBuilder::fDivFast(Value *numerator, Value *denominator) {
 //
 // @param x : Input value X
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateIsInf(Value *x, const Twine &instName) {
+Value *BuilderImpl::CreateIsInf(Value *x, const Twine &instName) {
   return createCallAmdgcnClass(x, CmpClass::NegativeInfinity | CmpClass::PositiveInfinity, instName);
 }
 
@@ -1196,7 +1197,7 @@ Value *ArithBuilder::CreateIsInf(Value *x, const Twine &instName) {
 //
 // @param x : Input value X
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateIsNaN(Value *x, const Twine &instName) {
+Value *BuilderImpl::CreateIsNaN(Value *x, const Twine &instName) {
   // 0x001: signaling NaN, 0x002: quiet NaN
   return createCallAmdgcnClass(x, CmpClass::SignalingNaN | CmpClass::QuietNaN, instName);
 }
@@ -1208,7 +1209,7 @@ Value *ArithBuilder::CreateIsNaN(Value *x, const Twine &instName) {
 // @param value : Input value
 // @param flags : Flags for what class(es) to check for
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::createCallAmdgcnClass(Value *value, unsigned flags, const Twine &instName) {
+Value *BuilderImpl::createCallAmdgcnClass(Value *value, unsigned flags, const Twine &instName) {
   Value *result = scalarize(value, [this, flags](Value *value) {
     return CreateIntrinsic(Intrinsic::amdgcn_class, value->getType(), {value, getInt32(flags)});
   });
@@ -1230,8 +1231,8 @@ Value *ArithBuilder::createCallAmdgcnClass(Value *value, unsigned flags, const T
 // @param offset : Bit number of least-significant end of bitfield
 // @param count : Count of bits in bitfield
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateInsertBitField(Value *base, Value *insert, Value *offset, Value *count,
-                                          const Twine &instName) {
+Value *BuilderImpl::CreateInsertBitField(Value *base, Value *insert, Value *offset, Value *count,
+                                         const Twine &instName) {
   // Make offset and count vectors of the right integer type if necessary.
   if (auto vecTy = dyn_cast<FixedVectorType>(base->getType())) {
     if (!isa<VectorType>(offset->getType()))
@@ -1263,8 +1264,8 @@ Value *ArithBuilder::CreateInsertBitField(Value *base, Value *insert, Value *off
 // @param count : Count of bits in bitfield
 // @param isSigned : True for a signed int bitfield extract, false for unsigned
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateExtractBitField(Value *base, Value *offset, Value *count, bool isSigned,
-                                           const Twine &instName) {
+Value *BuilderImpl::CreateExtractBitField(Value *base, Value *offset, Value *count, bool isSigned,
+                                          const Twine &instName) {
   // Make offset and count vectors of the right integer type if necessary.
   if (auto vecTy = dyn_cast<FixedVectorType>(base->getType())) {
     if (!isa<VectorType>(offset->getType()))
@@ -1308,7 +1309,7 @@ Value *ArithBuilder::CreateExtractBitField(Value *base, Value *offset, Value *co
 //
 // @param value : Input value
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::CreateFindSMsb(Value *value, const Twine &instName) {
+Value *BuilderImpl::CreateFindSMsb(Value *value, const Twine &instName) {
   assert(value->getType()->getScalarType()->isIntegerTy(32));
 
   Constant *negOne = ConstantInt::get(value->getType(), -1);
@@ -1333,7 +1334,7 @@ Value *ArithBuilder::CreateFindSMsb(Value *value, const Twine &instName) {
 // @param y : right Value
 // @param a : wight Value
 // @param instName : Name to give instruction(s)
-Value *ArithBuilder::createFMix(Value *x, Value *y, Value *a, const Twine &instName) {
+Value *BuilderImpl::createFMix(Value *x, Value *y, Value *a, const Twine &instName) {
   Value *ySubX = CreateFSub(y, x);
   if (auto vectorResultTy = dyn_cast<FixedVectorType>(ySubX->getType())) {
     // x, y => vector, but a => scalar
@@ -1355,7 +1356,7 @@ Value *ArithBuilder::createFMix(Value *x, Value *y, Value *a, const Twine &instN
 // instruction that does not honor the hardware's FP mode, such as fmin/fmax/fmed on GFX8 and earlier.
 //
 // @param value : Value to canonicalize
-Value *ArithBuilder::canonicalize(Value *value) {
+Value *BuilderImpl::canonicalize(Value *value) {
   const auto &shaderMode = getShaderModes()->getCommonShaderMode(m_shaderStage);
   auto destTy = value->getType();
   FpDenormMode denormMode = destTy->getScalarType()->isHalfTy()     ? shaderMode.fp16DenormMode

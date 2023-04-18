@@ -379,7 +379,7 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
         gsVgprCompCnt = 2; // Enable primitive ID (GS VGPR2)
       else if (calcFactor.inputVertices > 2)
         gsVgprCompCnt = 1; // Enable vtx2/vtx3 offset (GS VGPR1)
-    } else if (!m_hasMesh) {
+    } else if (m_hasVs) {
       // NOTE: When GS is absent, only those VGPRs are required: vtx0/vtx1 offset, vtx2/vtx3 offset,
       // primitive ID (only for VS).
       gsVgprCompCnt = 1;
@@ -399,7 +399,7 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
         esVgprCompCnt = 3; // Enable patch ID (ES VGPR8)
       else
         esVgprCompCnt = 2; // Must enable relative patch ID (ES VGPR7)
-    } else if (!m_hasMesh) {
+    } else if (m_hasVs) {
       if (vsBuiltInUsage.instanceIndex)
         esVgprCompCnt = 3; // Enable instance ID (ES VGPR8)
     }
@@ -901,10 +901,20 @@ void RegisterMetadataBuilder::buildPsRegisters() {
 // Builds register configuration for compute/task shader.
 void RegisterMetadataBuilder::buildCsRegisters(ShaderStage shaderStage) {
   assert(shaderStage == ShaderStageCompute || shaderStage == ShaderStageTask);
+  auto entryPoint = m_pipelineShaders->getEntryPoint(shaderStage);
+  if (shaderStage == ShaderStageCompute) {
+    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidXEn] =
+        !entryPoint->hasFnAttribute("amdgpu-no-workgroup-id-x");
+    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidYEn] =
+        !entryPoint->hasFnAttribute("amdgpu-no-workgroup-id-y");
+    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidZEn] =
+        !entryPoint->hasFnAttribute("amdgpu-no-workgroup-id-z");
 
-  getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidXEn] = true;
-  getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidYEn] = true;
-  getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidZEn] = true;
+  } else {
+    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidXEn] = true;
+    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidYEn] = true;
+    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidZEn] = true;
+  }
   getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgSizeEn] = true;
 
   const auto resUsage = m_pipelineState->getShaderResourceUsage(shaderStage);
@@ -1319,6 +1329,7 @@ void RegisterMetadataBuilder::setVgtShaderStagesEn(unsigned hwStageMask) {
 
     vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::VsStageEn] = vsStageEn;
   }
+
   if (hwStageMask & Util::Abi::HwShaderGs) {
     unsigned esStageEn = ES_STAGE_REAL;
     ShaderStage apiStage = ShaderStageVertex;
@@ -1338,6 +1349,7 @@ void RegisterMetadataBuilder::setVgtShaderStagesEn(unsigned hwStageMask) {
         vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::VsStageEn] = VS_STAGE_REAL;
     }
   }
+
   if (hwStageMask & Util::Abi::HwShaderHs) {
     const auto waveSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
     vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::HsW32En] = (waveSize == 32);

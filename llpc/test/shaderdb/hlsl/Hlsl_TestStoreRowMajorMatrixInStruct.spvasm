@@ -10,7 +10,7 @@
                OpEntryPoint Fragment %PSMain "main"
                OpExecutionMode %PSMain OriginUpperLeft
                OpMemberDecorate %type_cb 0 RowMajor
-               OpMemberDecorate %type_cb 0 MatrixStride 12
+               OpMemberDecorate %type_cb 0 MatrixStride 16
                OpMemberDecorate %type_cb 0 Offset 0
                OpMemberDecorate %type_cb 1 Offset 64
                OpDecorate %type_cb BufferBlock

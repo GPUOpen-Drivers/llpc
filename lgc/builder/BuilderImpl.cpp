@@ -40,27 +40,28 @@ using namespace llvm;
 // =====================================================================================================================
 // BuilderImpl constructor
 //
-// @param builderContext : LgcContext
 // @param pipeline : PipelineState (as public superclass Pipeline)
-BuilderImpl::BuilderImpl(LgcContext *builderContext, Pipeline *pipeline)
-    : BuilderImplBase(builderContext), ArithBuilder(builderContext), DescBuilder(builderContext),
-      ImageBuilder(builderContext), InOutBuilder(builderContext), MatrixBuilder(builderContext),
-      MiscBuilder(builderContext), SubgroupBuilder(builderContext) {
-  m_pipelineState = reinterpret_cast<PipelineState *>(pipeline);
-}
-
-// =====================================================================================================================
-// BuilderImplBase constructor
-//
-// @param builderContext : LgcContext
-BuilderImplBase::BuilderImplBase(LgcContext *builderContext)
-    : Builder(builderContext->getContext()), m_builderContext(builderContext) {
+BuilderImpl::BuilderImpl(Pipeline *pipeline)
+    : BuilderDefs(pipeline->getContext()), m_pipelineState(static_cast<PipelineState *>(pipeline)),
+      m_builderContext(pipeline->getLgcContext()) {
 }
 
 // =====================================================================================================================
 // Get the ShaderModes object.
-ShaderModes *BuilderImplBase::getShaderModes() {
+ShaderModes *BuilderImpl::getShaderModes() {
   return m_pipelineState->getShaderModes();
+}
+
+// =====================================================================================================================
+// Get the type elementTy, turned into a vector of the same vector width as maybeVecTy if the latter
+// is a vector type.
+//
+// @param elementTy : Element type
+// @param maybeVecTy : Possible vector type to get number of elements from
+Type *BuilderBase::getConditionallyVectorizedTy(Type *elementTy, Type *maybeVecTy) {
+  if (auto vecTy = dyn_cast<FixedVectorType>(maybeVecTy))
+    return FixedVectorType::get(elementTy, vecTy->getNumElements());
+  return elementTy;
 }
 
 // =====================================================================================================================
@@ -69,7 +70,7 @@ ShaderModes *BuilderImplBase::getShaderModes() {
 // @param vector1 : The float vector 1
 // @param vector2 : The float vector 2
 // @param instName : Name to give instruction(s)
-Value *BuilderImplBase::CreateDotProduct(Value *const vector1, Value *const vector2, const Twine &instName) {
+Value *BuilderImpl::CreateDotProduct(Value *const vector1, Value *const vector2, const Twine &instName) {
   Value *product = CreateFMul(vector1, vector2);
   if (!isa<VectorType>(product->getType()))
     return product;
@@ -96,8 +97,8 @@ Value *BuilderImplBase::CreateDotProduct(Value *const vector1, Value *const vect
 // @param accumulator : The accumulator to the scalar of dot product
 // @param flags : The first bit marks whether Vector 1 is signed and the second bit marks whether Vector 2 is signed
 // @param instName : Name to give instruction(s)
-Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, Value *accumulator, unsigned flags,
-                                                const Twine &instName) {
+Value *BuilderImpl::CreateIntegerDotProduct(Value *vector1, Value *vector2, Value *accumulator, unsigned flags,
+                                            const Twine &instName) {
   if (flags == SecondVectorSigned) {
     std::swap(vector1, vector2);
     flags = FirstVectorSigned;
@@ -244,19 +245,19 @@ Value *BuilderImplBase::CreateIntegerDotProduct(Value *vector1, Value *vector2, 
 
 // =====================================================================================================================
 // Get whether the context we are building in supports DPP operations.
-bool BuilderImplBase::supportDpp() const {
+bool BuilderImpl::supportDpp() const {
   return getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 8;
 }
 
 // =====================================================================================================================
 // Get whether the context we are building in supports DPP ROW_XMASK operations.
-bool BuilderImplBase::supportDppRowXmask() const {
+bool BuilderImpl::supportDppRowXmask() const {
   return getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 10;
 }
 
 // =====================================================================================================================
 // Get whether the context we are building in support the bpermute operation.
-bool BuilderImplBase::supportWaveWideBPermute() const {
+bool BuilderImpl::supportWaveWideBPermute() const {
   auto gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion().major;
   auto supportBPermute = gfxIp == 8 || gfxIp == 9;
   auto waveSize = getPipelineState()->getShaderWaveSize(getShaderStage(GetInsertBlock()->getParent()));
@@ -266,13 +267,13 @@ bool BuilderImplBase::supportWaveWideBPermute() const {
 
 // =====================================================================================================================
 // Get whether the context we are building in supports permute lane DPP operations.
-bool BuilderImplBase::supportPermLaneDpp() const {
+bool BuilderImpl::supportPermLaneDpp() const {
   return getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 10;
 }
 
 // =====================================================================================================================
 // Get whether the context we are building in supports permute lane 64 DPP operations.
-bool BuilderImplBase::supportPermLane64Dpp() const {
+bool BuilderImpl::supportPermLane64Dpp() const {
   auto gfxip = getPipelineState()->getTargetInfo().getGfxIpVersion().major;
   auto waveSize = getPipelineState()->getShaderWaveSize(getShaderStage(GetInsertBlock()->getParent()));
   return gfxip >= 11 && waveSize == 64;
@@ -289,7 +290,7 @@ bool BuilderImplBase::supportPermLane64Dpp() const {
 // @param condition : The "if" condition
 // @param wantElse : Whether to generate an "else" block
 // @param instName : Base of name for new basic blocks
-BranchInst *BuilderImplBase::createIf(Value *condition, bool wantElse, const Twine &instName) {
+BranchInst *BuilderImpl::createIf(Value *condition, bool wantElse, const Twine &instName) {
   // Create "if" block and move instructions in current block to it.
   BasicBlock *endIfBlock = GetInsertBlock();
   BasicBlock *ifBlock = BasicBlock::Create(getContext(), "", endIfBlock->getParent(), endIfBlock);
@@ -510,8 +511,8 @@ static bool instructionsEqual(Instruction *lhs, Instruction *rhs) {
 // @param nonUniformInst : The instruction to put in a waterfall loop
 // @param operandIdxs : The operand index/indices for non-uniform inputs that need to be uniform
 // @param instName : Name to give instruction(s)
-Instruction *BuilderImplBase::createWaterfallLoop(Instruction *nonUniformInst, ArrayRef<unsigned> operandIdxs,
-                                                  bool scalarizeDescriptorLoads, const Twine &instName) {
+Instruction *BuilderImpl::createWaterfallLoop(Instruction *nonUniformInst, ArrayRef<unsigned> operandIdxs,
+                                              bool scalarizeDescriptorLoads, const Twine &instName) {
 #if !defined(LLVM_HAVE_BRANCH_AMD_GFX)
 #warning[!amd-gfx] Waterfall feature disabled
   errs() << "Generating invalid waterfall loop code\n";
@@ -652,7 +653,7 @@ Instruction *BuilderImplBase::createWaterfallLoop(Instruction *nonUniformInst, A
 //
 // @param value : Input value
 // @param callback : Callback function
-Value *BuilderImplBase::scalarize(Value *value, const std::function<Value *(Value *)> &callback) {
+Value *BuilderImpl::scalarize(Value *value, const std::function<Value *(Value *)> &callback) {
   if (auto vecTy = dyn_cast<FixedVectorType>(value->getType())) {
     Value *result0 = callback(CreateExtractElement(value, uint64_t(0)));
     Value *result = UndefValue::get(FixedVectorType::get(result0->getType(), vecTy->getNumElements()));
@@ -671,7 +672,7 @@ Value *BuilderImplBase::scalarize(Value *value, const std::function<Value *(Valu
 //
 // @param value : Input value
 // @param callback : Callback function
-Value *BuilderImplBase::scalarizeInPairs(Value *value, const std::function<Value *(Value *)> &callback) {
+Value *BuilderImpl::scalarizeInPairs(Value *value, const std::function<Value *(Value *)> &callback) {
   if (auto vecTy = dyn_cast<FixedVectorType>(value->getType())) {
     Value *inComps = CreateShuffleVector(value, value, ArrayRef<int>{0, 1});
     Value *resultComps = callback(inComps);
@@ -706,8 +707,7 @@ Value *BuilderImplBase::scalarizeInPairs(Value *value, const std::function<Value
 // @param value0 : Input value 0
 // @param value1 : Input value 1
 // @param callback : Callback function
-Value *BuilderImplBase::scalarize(Value *value0, Value *value1,
-                                  const std::function<Value *(Value *, Value *)> &callback) {
+Value *BuilderImpl::scalarize(Value *value0, Value *value1, const std::function<Value *(Value *, Value *)> &callback) {
   if (auto vecTy = dyn_cast<FixedVectorType>(value0->getType())) {
     Value *result0 = callback(CreateExtractElement(value0, uint64_t(0)), CreateExtractElement(value1, uint64_t(0)));
     Value *result = UndefValue::get(FixedVectorType::get(result0->getType(), vecTy->getNumElements()));
@@ -729,8 +729,8 @@ Value *BuilderImplBase::scalarize(Value *value0, Value *value1,
 // @param value1 : Input value 1
 // @param value2 : Input value 2
 // @param callback : Callback function
-Value *BuilderImplBase::scalarize(Value *value0, Value *value1, Value *value2,
-                                  const std::function<Value *(Value *, Value *, Value *)> &callback) {
+Value *BuilderImpl::scalarize(Value *value0, Value *value1, Value *value2,
+                              const std::function<Value *(Value *, Value *, Value *)> &callback) {
   if (auto vecTy = dyn_cast<FixedVectorType>(value0->getType())) {
     Value *result0 = callback(CreateExtractElement(value0, uint64_t(0)), CreateExtractElement(value1, uint64_t(0)),
                               CreateExtractElement(value2, uint64_t(0)));
@@ -751,7 +751,7 @@ Value *BuilderImplBase::scalarize(Value *value0, Value *value1, Value *value2,
 // =====================================================================================================================
 // Create code to get the lane number within the wave. This depends on whether the shader is wave32 or wave64,
 // and thus on the shader stage it is used from.
-Value *BuilderImplBase::CreateGetLaneNumber() {
+Value *BuilderImpl::CreateGetLaneNumber() {
   Value *result = CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {getInt32(-1), getInt32(0)});
   if (getPipelineState()->getShaderWaveSize(m_shaderStage) == 64)
     result = CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {getInt32(-1), result});

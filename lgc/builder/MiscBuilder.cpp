@@ -43,7 +43,7 @@ using namespace llvm;
 // the current output primitive in the specified output-primitive stream number.
 //
 // @param streamId : Stream number, 0 if only one stream is present
-Instruction *MiscBuilder::CreateEmitVertex(unsigned streamId) {
+Instruction *BuilderImpl::CreateEmitVertex(unsigned streamId) {
   assert(m_shaderStage == ShaderStageGeometry);
 
   // Get GsWaveId
@@ -61,7 +61,7 @@ Instruction *MiscBuilder::CreateEmitVertex(unsigned streamId) {
 // In the GS, finish the current primitive and start a new one in the specified output-primitive stream.
 //
 // @param streamId : Stream number, 0 if only one stream is present
-Instruction *MiscBuilder::CreateEndPrimitive(unsigned streamId) {
+Instruction *BuilderImpl::CreateEndPrimitive(unsigned streamId) {
   assert(m_shaderStage == ShaderStageGeometry);
 
   // Get GsWaveId
@@ -77,7 +77,7 @@ Instruction *MiscBuilder::CreateEndPrimitive(unsigned streamId) {
 
 // =====================================================================================================================
 // Create a workgroup control barrier.
-Instruction *MiscBuilder::CreateBarrier() {
+Instruction *BuilderImpl::CreateBarrier() {
   return CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 }
 
@@ -85,7 +85,7 @@ Instruction *MiscBuilder::CreateBarrier() {
 // Create a "kill". Only allowed in a fragment shader.
 //
 // @param instName : Name to give instruction(s)
-Instruction *MiscBuilder::CreateKill(const Twine &instName) {
+Instruction *BuilderImpl::CreateKill(const Twine &instName) {
   // This tells the config builder to set KILL_ENABLE in DB_SHADER_CONTROL.
   // Doing it here is suboptimal, as it does not allow for subsequent middle-end optimizations removing the
   // section of code containing the kill.
@@ -99,7 +99,7 @@ Instruction *MiscBuilder::CreateKill(const Twine &instName) {
 // Create a "system halt"
 //
 // @param instName : Name to give instruction(s)
-Instruction *MiscBuilder::CreateDebugBreak(const Twine &instName) {
+Instruction *BuilderImpl::CreateDebugBreak(const Twine &instName) {
   return CreateIntrinsic(Intrinsic::amdgcn_s_sethalt, {}, getInt32(1), nullptr, instName);
 }
 
@@ -107,7 +107,7 @@ Instruction *MiscBuilder::CreateDebugBreak(const Twine &instName) {
 // Create a demote to helper invocation operation. Only allowed in a fragment shader.
 //
 // @param instName : Name to give instruction(s)
-Instruction *MiscBuilder::CreateDemoteToHelperInvocation(const Twine &instName) {
+Instruction *BuilderImpl::CreateDemoteToHelperInvocation(const Twine &instName) {
   // Treat a demote as a kill for the purposes of disabling middle-end optimizations.
   auto resUsage = getPipelineState()->getShaderResourceUsage(ShaderStageFragment);
   resUsage->builtInUsage.fs.discard = true;
@@ -119,7 +119,7 @@ Instruction *MiscBuilder::CreateDemoteToHelperInvocation(const Twine &instName) 
 // Create a helper invocation query. Only allowed in a fragment shader.
 //
 // @param instName : Name to give instruction(s)
-Value *MiscBuilder::CreateIsHelperInvocation(const Twine &instName) {
+Value *BuilderImpl::CreateIsHelperInvocation(const Twine &instName) {
   auto isLive = CreateIntrinsic(Intrinsic::amdgcn_live_mask, {}, {}, nullptr, instName);
   return CreateNot(isLive);
 }
@@ -133,7 +133,7 @@ Value *MiscBuilder::CreateIsHelperInvocation(const Twine &instName) {
 // @param groupCountZ : Z dimension of the launched child mesh tasks
 // @param instName : Name to give final instruction
 // @returns Instruction to emit mesh tasks
-Instruction *MiscBuilder::CreateEmitMeshTasks(Value *groupCountX, Value *groupCountY, Value *groupCountZ,
+Instruction *BuilderImpl::CreateEmitMeshTasks(Value *groupCountX, Value *groupCountY, Value *groupCountZ,
                                               const Twine &instName) {
   assert(m_shaderStage == ShaderStageTask); // Only valid for task shader
   return CreateNamedCall(lgcName::MeshTaskEmitMeshTasks, getVoidTy(), {groupCountX, groupCountY, groupCountZ}, {});
@@ -147,7 +147,7 @@ Instruction *MiscBuilder::CreateEmitMeshTasks(Value *groupCountX, Value *groupCo
 // @param primitiveCount : Actual output size of the primitives
 // @param instName : Name to give final instruction
 // @returns Instruction to set the actual size of mesh outputs
-Instruction *MiscBuilder::CreateSetMeshOutputs(Value *vertexCount, Value *primitiveCount, const Twine &instName) {
+Instruction *BuilderImpl::CreateSetMeshOutputs(Value *vertexCount, Value *primitiveCount, const Twine &instName) {
   assert(m_shaderStage == ShaderStageMesh); // Only valid for mesh shader
   return CreateNamedCall(lgcName::MeshTaskSetMeshOutputs, getVoidTy(), {vertexCount, primitiveCount}, {});
 }
@@ -157,7 +157,7 @@ Instruction *MiscBuilder::CreateSetMeshOutputs(Value *vertexCount, Value *primit
 //
 // @param realtime : Whether to read real-time clock counter
 // @param instName : Name to give instruction(s)
-Instruction *MiscBuilder::CreateReadClock(bool realtime, const Twine &instName) {
+Instruction *BuilderImpl::CreateReadClock(bool realtime, const Twine &instName) {
   CallInst *readClock = nullptr;
   if (realtime) {
     if (getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 11)
@@ -185,7 +185,7 @@ Instruction *MiscBuilder::CreateReadClock(bool realtime, const Twine &instName) 
 // @param isFine : True for "fine" calculation, where the value in the current fragment is used. False for "coarse"
 // calculation, where it might use fewer locations to calculate.
 // @param instName : Name to give instruction(s)
-Value *MiscBuilder::CreateDerivative(Value *value, bool isDirectionY, bool isFine, const Twine &instName) {
+Value *BuilderImpl::CreateDerivative(Value *value, bool isDirectionY, bool isFine, const Twine &instName) {
   unsigned tableIdx = isDirectionY * 2 + isFine;
   Value *result = nullptr;
   if (supportDpp()) {

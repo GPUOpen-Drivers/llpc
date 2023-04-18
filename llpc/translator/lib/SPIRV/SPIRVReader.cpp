@@ -2591,6 +2591,7 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
   // generating the code to get the descriptor pointer(s).
   SPIRVWord binding = 0;
   unsigned descriptorSet = 0;
+
   spvImagePtr->hasDecorate(DecorationBinding, 0, &binding);
   spvImagePtr->hasDecorate(DecorationDescriptorSet, 0, &descriptorSet);
 
@@ -2611,14 +2612,13 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
     auto desc = &static_cast<SPIRVTypeImage *>(spvImageTy)->getDescriptor();
     auto resType =
         desc->Dim == DimBuffer ? ResourceNodeType::DescriptorTexelBuffer : ResourceNodeType::DescriptorResource;
-    auto searchType = resType;
-    imageDescPtr = getDescPointerAndStride(resType, descriptorSet, binding, searchType);
+
+    imageDescPtr = getDescPointerAndStride(resType, descriptorSet, binding, resType);
 
     if (desc->MS) {
       // A multisampled image pointer is a struct containing an image desc pointer and an fmask desc pointer.
-      auto searchType = ResourceNodeType::DescriptorFmask;
-      Value *fmaskDescPtr =
-          getDescPointerAndStride(ResourceNodeType::DescriptorFmask, descriptorSet, binding, searchType);
+      Value *fmaskDescPtr = getDescPointerAndStride(ResourceNodeType::DescriptorFmask, descriptorSet, binding,
+                                                    ResourceNodeType::DescriptorFmask);
       imageDescPtr = getBuilder()->CreateInsertValue(
           UndefValue::get(StructType::get(*m_context, {imageDescPtr->getType(), fmaskDescPtr->getType()})),
           imageDescPtr, 0);
@@ -2628,8 +2628,8 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
 
   if (spvTy->getOpCode() != OpTypeImage) {
     // Sampler or sampledimage -- need to get the sampler {pointer,stride,convertingSamplerIdx}
-    auto searchType = ResourceNodeType::DescriptorSampler;
-    samplerDescPtr = getDescPointerAndStride(ResourceNodeType::DescriptorSampler, descriptorSet, binding, searchType);
+    samplerDescPtr = getDescPointerAndStride(ResourceNodeType::DescriptorSampler, descriptorSet, binding,
+                                             ResourceNodeType::DescriptorSampler);
 
     if (spvTy->getOpCode() == OpTypeSampler)
       return samplerDescPtr;
@@ -7495,6 +7495,7 @@ bool SPIRVToLLVM::transMetadata() {
         }
 
         ComputeShaderMode computeMode = {};
+
         unsigned overrideShaderGroupSizeX = m_shaderOptions->overrideShaderThreadGroupSizeX;
         unsigned overrideShaderGroupSizeY = m_shaderOptions->overrideShaderThreadGroupSizeY;
         unsigned overrideShaderGroupSizeZ = m_shaderOptions->overrideShaderThreadGroupSizeZ;

@@ -3694,8 +3694,11 @@ void PatchInOutImportExport::createStreamOutBufferStoreFunction(Value *storeValu
   //              (writeIndex + threadId) * bufferStride[bufferId] +
   //              xfbOffset
   CoherentFlag coherent = {};
-  coherent.bits.glc = true;
-  coherent.bits.slc = true;
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
+    coherent.bits.glc = true;
+    coherent.bits.slc = true;
+  }
+
   Value *args[] = {
       storedValue,                                                    // value
       streamOutBufDesc,                                               // desc
@@ -4215,10 +4218,13 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
       } else {
         format = BUF_FORMAT_32_UINT;
       }
+
       CoherentFlag coherent = {};
-      coherent.bits.glc = true;
-      coherent.bits.slc = true;
-      coherent.bits.swz = true;
+      if (m_gfxIp.major <= 11) {
+        coherent.bits.glc = true;
+        coherent.bits.slc = true;
+        coherent.bits.swz = true;
+      }
       Value *args[] = {
           storeValue,                                                          // vdata
           m_pipelineSysValues.get(m_entryPoint)->getGsVsRingBufDesc(streamId), // rsrc
@@ -4492,7 +4498,8 @@ void PatchInOutImportExport::writeValueToLds(bool offChip, Value *writeValue, Va
     auto offChipLdsDesc = m_pipelineSysValues.get(m_entryPoint)->getOffChipLdsDesc();
 
     CoherentFlag coherent = {};
-    coherent.bits.glc = true;
+    if (m_gfxIp.major <= 11)
+      coherent.bits.glc = true;
 
     for (unsigned i = 0, combineCount = 0; i < numChannels; i += combineCount) {
       combineCount =

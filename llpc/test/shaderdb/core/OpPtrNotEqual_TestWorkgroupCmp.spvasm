@@ -21,6 +21,8 @@
                OpDecorate %3 DescriptorSet 0
                OpDecorate %3 Binding 0
                OpDecorate %_struct_8 Block
+               OpMemberDecorate %_struct_8 0 Offset 0
+               OpMemberDecorate %_struct_8 1 Offset 16
                OpMemberDecorate %_struct_8 0 BuiltIn LocalInvocationId
                OpMemberDecorate %_struct_8 1 BuiltIn GlobalInvocationId
        %void = OpTypeVoid

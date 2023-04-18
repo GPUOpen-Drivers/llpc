@@ -46,6 +46,10 @@ public:
   BuilderBase(llvm::BasicBlock *block) : BuilderCommon(block) {}
   BuilderBase(llvm::Instruction *inst) : BuilderCommon(inst) {}
 
+  // Get the type elementTy, turned into a vector of the same vector width as maybeVecTy if the latter
+  // is a vector type.
+  static llvm::Type *getConditionallyVectorizedTy(llvm::Type *elementTy, llvm::Type *maybeVecTy);
+
   // Static method to use a BuilderCommon as a BuilderBase, relying on the fact that BuilderBase does not have
   // any additional state. This is needed when code in one of the builder implementation classes, such as
   // InOutBuilder, wants to use an LGC-internal method here in BuilderBase.
