@@ -2370,9 +2370,10 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     // Start timer for translate.
     timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, true);
 
-    // OpTerminateRay/OpIgnoreIntersection of anyhit shader and OpReportIntersection of intersection shader could
-    // terminate ray during inbetween of shader execution. So functions in these shaders need to be inlined.
-    if (entryStage == ShaderStageRayTracingAnyHit || entryStage == ShaderStageRayTracingIntersect) {
+    // Any ray tracing shader may access shader record buffer in non-entry function, we will replace all Global SRB to a
+    // combination of instructions at the beginning of entry function in SpirvLowerRayTracing pass, so we need to inline
+    // all functions so that SRB is accessible throughout the shader.
+    if (entryStage != ShaderStageCompute) {
       // Lower SPIR-V CFG merges before inlining
       lowerPassMgr->addPass(SpirvLowerCfgMerges());
       lowerPassMgr->addPass(AlwaysInlinerPass());
