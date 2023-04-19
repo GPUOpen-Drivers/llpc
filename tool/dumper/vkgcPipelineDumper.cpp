@@ -839,6 +839,7 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
 
   dumpFile << "options.forceNonUniformResourceIndexStageMask = " << options->forceNonUniformResourceIndexStageMask
            << "\n";
+  dumpFile << "options.disableFMA = " << options->disableFMA << "\n";
 }
 
 // =====================================================================================================================
@@ -1589,6 +1590,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->internalRtShaders);
 #endif
   hasher->Update(options->forceNonUniformResourceIndexStageMask);
+  hasher->Update(options->disableFMA);
 }
 
 // =====================================================================================================================
