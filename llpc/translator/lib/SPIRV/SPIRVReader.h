@@ -230,10 +230,6 @@ private:
   // which are supposed to be replaced by the real values later.
   typedef std::map<SPIRVValue *, LoadInst *> SPIRVToLLVMPlaceholderMap;
 
-  // TODO: Workaround to handle opaque pointers for OpTypeForwardPointer.
-  // This will be removed after opaque pointer transition is complete.
-  typedef DenseMap<SPIRVType *, Type *> SPIRVOpForwardPointerWorkaround;
-
   Module *m_m;
   BuiltinVarMap m_builtinGvMap;
   LLVMContext *m_context;
@@ -270,10 +266,6 @@ private:
   unsigned m_spirvOpMetaKindId;
   unsigned m_execModule;
   bool m_scratchBoundsChecksEnabled;
-
-  // TODO: Workaround to handle opaque pointers for OpTypeForwardPointer.
-  // This will be removed after opaque pointer transition is complete.
-  SPIRVOpForwardPointerWorkaround m_forwardPointerWorkaroundMap;
 
   enum class LlvmMemOpType : uint8_t { IS_LOAD, IS_STORE };
   struct ScratchBoundsCheckData {
