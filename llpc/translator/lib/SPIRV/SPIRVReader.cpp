@@ -372,18 +372,6 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeForwardPointer>(SPIRVType *const sp
 
   pointeeType->setBody(structType->elements(), structType->isPacked());
 
-  // TODO: Workaround for opaque pointers.
-  // Because of the way of creating type for OpTypeForwardPointer (creating new structure and filling
-  // it with elements) we are not able to repeat this later and get the same address of created structure.
-  // This function creates type which looks more or less like: %"type 0x7670800" = type <{ i32 }>
-  // Using transType we are able to create type which will be: <{ i32 }>
-  // Later this is causing asserts while creating GEP instructions. After transition is completed, GEP will remove
-  // validation and this map can be removed.
-  // TODO: Remove this when LLPC will switch fully to opaque pointers.
-  auto loc = m_forwardPointerWorkaroundMap.find(spvType->getPointerElementType());
-  if (loc == m_forwardPointerWorkaroundMap.end())
-    m_forwardPointerWorkaroundMap[spvType->getPointerElementType()] = pointeeType;
-
   return type;
 }
 
@@ -727,12 +715,6 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeVector>(SPIRVType *const spvType, c
 //
 // @param v : SPIRV Value
 Type *SPIRVToLLVM::getPointeeType(SPIRVValue *v) {
-  // TODO: Workaround for forward pointers and opaque pointers.
-  // TODO: Remove this when LLPC will switch fully to opaque pointers.
-  auto loc = m_forwardPointerWorkaroundMap.find(v->getType()->getPointerElementType());
-  if (loc != m_forwardPointerWorkaroundMap.end())
-    return loc->second;
-
   auto opCode = v->getOpCode();
   if (isAccessChainOpCode(opCode)) {
     // If the Base of the AccessChain is a structure then additional padding may be added (depending on the structure
