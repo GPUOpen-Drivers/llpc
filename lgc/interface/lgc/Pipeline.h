@@ -156,6 +156,7 @@ struct Options {
 #endif
   bool enableUberFetchShader; // Enable UberShader
   bool reserved16;
+  bool disableFMA; // Disable to use FMA intrinsic and use FMUL + FADD instead.
 };
 
 /// Represent a pipeline option which can be automatic as well as explicitly set.

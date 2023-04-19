@@ -133,6 +133,11 @@ static cl::opt<bool> ScalarizeWaterfallDescriptorLoads("scalarize-waterfall-desc
                                                        cl::desc("Try to scalarize non-uniform descriptor loads"),
                                                        cl::init(false));
 
+// -disable-fma: disable fma intrinsic
+static cl::opt<bool> DisableFMA("disable-fma",
+                                cl::desc("Disable FMA intrinsic and use 'FMUL + FADD' instead"),
+                                cl::init(false));
+
 namespace Llpc {
 
 // =====================================================================================================================
@@ -325,6 +330,8 @@ Options PipelineContext::computePipelineOptions() const {
 #if VKI_RAY_TRACING
   options.internalRtShaders = getPipelineOptions()->internalRtShaders;
 #endif
+
+  options.disableFMA = getPipelineOptions()->disableFMA | DisableFMA;
   return options;
 }
 

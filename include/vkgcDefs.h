@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 61
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 5
+#define LLPC_INTERFACE_MINOR_VERSION 7
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     61.7 | Add disableFMA to PipelineOptions                                                                     |  
 //  |     61.6 | Add workaroundInitializeOutputsToZero to PipelineShaderOptions                                        |
 //  |     61.5 | Add RtIpVersion (including its checkers) to represent ray tracing IP                                  |
 //  |     61.4 | Add workaroundStorageImageFormats to PipelineShaderOptions                                            |
@@ -562,6 +563,7 @@ struct PipelineOptions {
 #endif
   unsigned forceNonUniformResourceIndexStageMask; ///< Mask of the stage to force using non-uniform resource index.
   bool reserved16;
+  bool disableFMA; ///< Disable to use FMA intrinsic and use FMUL + FADD instead.
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.
