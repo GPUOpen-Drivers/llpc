@@ -1,0 +1,91 @@
+// Disable FMA
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc --gfxip=10.3.0 -v %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: call reassoc nnan nsz arcp contract afn float (...) @lgc.create.fma.f32
+; SHADERTEST-LABEL: _amdgpu_vs_main:
+; SHADERTEST-NOT: fma
+; SHADERTEST: s_endpgm
+; END_SHADERTEST
+
+[Version]
+version = 46
+
+[VsGlsl]
+#version 450
+
+layout(binding = 0, std140) uniform _37_39
+{
+    float _m0;
+    float _m1;
+} _39;
+
+void main()
+{
+    gl_Position = vec4(fma(_39._m0, _39._m0, _39._m1),0, 0, 1.0);
+}
+
+[VsInfo]
+entryPoint = main
+
+
+[FsGlsl]
+#version 450
+layout(early_fragment_tests) in;
+
+layout(location = 0, component = 0) out vec4 _9;
+
+void main()
+{
+    _9 = vec4(0.0,1.0,0.0,1.0);
+}
+
+[FsInfo]
+entryPoint = main
+
+[ResourceMapping]
+userDataNode[0].visibility = 1
+userDataNode[0].type = StreamOutTableVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[1].visibility = 17
+userDataNode[1].type = DescriptorBuffer
+userDataNode[1].offsetInDwords = 1
+userDataNode[1].sizeInDwords = 4
+userDataNode[1].set = 0
+userDataNode[1].binding = 0
+userDataNode[2].visibility = 17
+userDataNode[2].type = DescriptorBuffer
+userDataNode[2].offsetInDwords = 5
+userDataNode[2].sizeInDwords = 4
+userDataNode[2].set = 1
+userDataNode[2].binding = 0
+userDataNode[3].visibility = 17
+userDataNode[3].type = DescriptorBuffer
+userDataNode[3].offsetInDwords = 9
+userDataNode[3].sizeInDwords = 4
+userDataNode[3].set = 1
+userDataNode[3].binding = 1
+userDataNode[4].visibility = 1
+userDataNode[4].type = IndirectUserDataVaPtr
+userDataNode[4].offsetInDwords = 13
+userDataNode[4].sizeInDwords = 1
+userDataNode[4].indirectUserDataCount = 4
+
+[GraphicsPipelineState]
+colorBuffer[0].format = VK_FORMAT_B8G8R8A8_UNORM
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 0
+options.disableFMA = 1
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 2
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R8G8_SNORM
+attribute[0].offset = 0
+dynamicVertexStride = 0

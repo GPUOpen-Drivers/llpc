@@ -378,6 +378,7 @@ private:
       INIT_MEMBER_NAME_TO_ADDR(SectionPipelineOption, m_extendedRobustness, MemberTypeExtendedRobustness, true);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, forceNonUniformResourceIndexStageMask, MemberTypeInt,
                                      false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, disableFMA, MemberTypeBool, false);
       // One internal member
 #if VKI_RAY_TRACING
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, internalRtShaders, MemberTypeBool, false);
