@@ -51,7 +51,7 @@ void main()
 ; SHADERTEST: %[[EXP_OF_SCALE_RSQ_X:[^ ,]*]] = call i32 @llvm.amdgcn.frexp.exp.i32.f64(double %[[SCALE_RSQ_X]])
 ; SHADERTEST: %[[TOO_SMALL_SCALE_RSQ_X:[^ ,]*]] = icmp slt i32 %[[EXP_OF_SCALE_RSQ_X]], -1021
 ; SHADERTEST: %[[NEW_SCALE_RSQ_X:[^ ,]*]] = select reassoc nnan nsz arcp contract i1 %[[TOO_SMALL_SCALE_RSQ_X]], double 0.000000e+00, double %[[SCALE_RSQ_X]]
-; SHADERTEST: %[[SPECIAL_X:[^ ,]*]] = call i1 @llvm.amdgcn.class.f64(double %[[NEW_SCALE_X]], i32 608)
+; SHADERTEST: %[[SPECIAL_X:[^ ,]*]] = call i1 @llvm.is.fpclass.f64(double %[[NEW_SCALE_X]], i32 608)
 ; SHADERTEST: %[[FINAL_RSQ_X:[^ ,]*]] = select reassoc nnan nsz arcp contract i1 %[[SPECIAL_X]], double %[[Y]], double %[[NEW_SCALE_RSQ_X]]
 
 ; SHADERTEST: AMDLLPC SUCCESS
