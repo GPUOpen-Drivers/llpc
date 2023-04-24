@@ -1027,11 +1027,6 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
           patchMeshGenericOutputExport(output, loc, locOffset, elemIdx, vertexOrPrimitiveIdx, isPerPrimitive, builder);
           break;
         }
-        case ShaderStageFragment: {
-          assert(callInst.arg_size() == 3);
-          llvm_unreachable("Fragment shader export should have been handled by the LowerFragColorExport pass");
-          break;
-        }
         case ShaderStageCopyShader: {
           patchCopyShaderGenericOutputExport(output, loc, &callInst);
           break;
