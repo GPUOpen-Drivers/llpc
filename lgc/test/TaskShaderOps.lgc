@@ -12,14 +12,14 @@
 ;
 ; CHECK-LABEL: _amdgpu_cs_main
 ; CHECK: .entry:
-; CHECK-DAG: [[groupIdZ:%[0-9]*]] = extractelement <3 x i32> %WorkgroupId, i64 2
-; CHECK-DAG: [[dimY:%[0-9]*]] = extractelement <3 x i32> %meshTaskDispatchDims, i64 1
-; CHECK-NEXT: [[tempResult0:%[0-9]*]] = mul i32 [[groupIdZ]], [[dimY]]
+; CHECK: [[groupIdX:%[0-9]*]] = extractelement <3 x i32> %WorkgroupId, i64 0
 ; CHECK-NEXT: [[groupIdY:%[0-9]*]] = extractelement <3 x i32> %WorkgroupId, i64 1
+; CHECK-NEXT: [[groupIdZ:%[0-9]*]] = extractelement <3 x i32> %WorkgroupId, i64 2
+; CHECK-NEXT: [[dimY:%[0-9]*]] = extractelement <3 x i32> %meshTaskDispatchDims, i64 1
+; CHECK-NEXT: [[tempResult0:%[0-9]*]] = mul i32 [[groupIdZ]], [[dimY]]
 ; CHECK-NEXT: [[tempResult1:%[0-9]*]] = add i32 [[tempResult0]], [[groupIdY]]
 ; CHECK-NEXT: [[dimX:%[0-9]*]] = extractelement <3 x i32> %meshTaskDispatchDims, i64 0
 ; CHECK-NEXT: [[tempResult2:%[0-9]*]] = mul i32 [[tempResult1]], [[dimX]]
-; CHECK-NEXT: [[groupIdX:%[0-9]*]] = extractelement <3 x i32> %WorkgroupId, i64 0
 ; CHECK-NEXT: [[flattenId:%[0-9]*]] = add i32 [[tempResult2]], [[groupIdX]]
 ; CHECK-NEXT: [[entryIndex:%[0-9]*]] = add i32 [[flattenId]], %meshTaskRingIndex
 ; CHECK: [[payloadRingDescPtr:%[0-9]*]] = getelementptr <4 x i32>, ptr addrspace(4) %{{[0-9]*}}, i64 13
