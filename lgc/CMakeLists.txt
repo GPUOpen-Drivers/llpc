@@ -68,7 +68,7 @@ set_compiler_options(LLVMlgc ${LLPC_ENABLE_WERROR})
 
 ### TableGen for LGC dialect ###########################################################################################
 
-set(LGC_TABLEGEN_EXE llvm-dialects-tblgen)
+set(LGC_TABLEGEN_EXE ${LLVM_TOOLS_BINARY_DIR}/llvm-dialects-tblgen)
 set(LGC_TABLEGEN_TARGET llvm-dialects-tblgen)
 set(LLVM_TARGET_DEFINITIONS interface/lgc/LgcDialect.td)
 
