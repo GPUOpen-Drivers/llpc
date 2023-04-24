@@ -344,8 +344,12 @@ MeshRegConfig::MeshRegConfig(GfxIpVersion gfxIp) {
   INIT_REG_GFX10_PLUS(gfxIp.major, GE_NGG_SUBGRP_CNTL);
   INIT_REG_GFX10_PLUS(gfxIp.major, SPI_SHADER_IDX_FORMAT);
 
-  INIT_REG_GFX11(gfxIp.major, SPI_SHADER_GS_MESHLET_DIM);
-  INIT_REG_GFX11(gfxIp.major, SPI_SHADER_GS_MESHLET_EXP_ALLOC);
+  if (gfxIp.major <= 11) {
+    INIT_REG_GFX11(gfxIp.major, SPI_SHADER_GS_MESHLET_DIM);
+    INIT_REG_GFX11(gfxIp.major, SPI_SHADER_GS_MESHLET_EXP_ALLOC);
+  } else {
+    llvm_unreachable("Not implemented!");
+  }
 }
 
 // =====================================================================================================================

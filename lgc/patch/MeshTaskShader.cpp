@@ -1329,19 +1329,25 @@ Value *MeshTaskShader::getShaderRingEntryIndex(Function *entryPoint) {
 
       auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageTask)->entryArgIdxs.task;
 
-      auto workgroupId = getFunctionArgument(entryPoint, entryArgIdxs.workgroupId);
+      Value *workgroupIds[3] = {};
+      if (m_gfxIp.major <= 11) {
+        auto workgroupId = getFunctionArgument(entryPoint, entryArgIdxs.workgroupId);
+        workgroupIds[0] = m_builder.CreateExtractElement(workgroupId, static_cast<uint64_t>(0));
+        workgroupIds[1] = m_builder.CreateExtractElement(workgroupId, 1);
+        workgroupIds[2] = m_builder.CreateExtractElement(workgroupId, 2);
+      } else {
+        llvm_unreachable("Not implemented!");
+      }
       auto dispatchDims = getFunctionArgument(entryPoint, entryArgIdxs.dispatchDims);
 
       // flatWorkgroupId = workgroupId.z * dispatchDims.x * dispatchDims.y +
       //                   workgroupId.y * dispatchDims.x + workgroupId.x
       //                 = (workgroupId.z * dispatchDims.y + workgroupId.y) * dispatchDims.x + workgroupId.x
-      auto flatWorkgroupId = m_builder.CreateMul(m_builder.CreateExtractElement(workgroupId, 2),
-                                                 m_builder.CreateExtractElement(dispatchDims, 1));
-      flatWorkgroupId = m_builder.CreateAdd(flatWorkgroupId, m_builder.CreateExtractElement(workgroupId, 1));
+      auto flatWorkgroupId = m_builder.CreateMul(workgroupIds[2], m_builder.CreateExtractElement(dispatchDims, 1));
+      flatWorkgroupId = m_builder.CreateAdd(flatWorkgroupId, workgroupIds[1]);
       flatWorkgroupId =
           m_builder.CreateMul(flatWorkgroupId, m_builder.CreateExtractElement(dispatchDims, static_cast<uint64_t>(0)));
-      flatWorkgroupId =
-          m_builder.CreateAdd(flatWorkgroupId, m_builder.CreateExtractElement(workgroupId, static_cast<uint64_t>(0)));
+      flatWorkgroupId = m_builder.CreateAdd(flatWorkgroupId, workgroupIds[0]);
 
       auto baseRingEntryIndex = getFunctionArgument(entryPoint, entryArgIdxs.baseRingEntryIndex);
       m_shaderRingEntryIndex = m_builder.CreateAdd(baseRingEntryIndex, flatWorkgroupId);
@@ -1562,7 +1568,7 @@ Function *MeshTaskShader::mutateMeshShaderEntryPoint(Function *entryPoint) {
       "offChipLdsBase",    "sharedScratchOffset", "gsShaderAddrLow", "gsShaderAddrHigh",
   };
 
-  // GFX10 special SGPR input names
+  // GFX11+ special SGPR input names
   static const std::array<std::string, NumSpecialSgprInputs> SpecialSgprInputNamesGfx11 = {
       "gsProgramAddrLow", "gsProgramAddrHigh", "mergedGroupInfo",
       "mergedWaveInfo",   "workgroupIdYX",     "workgroupIdZAndAttribRingBase",
@@ -1572,7 +1578,7 @@ Function *MeshTaskShader::mutateMeshShaderEntryPoint(Function *entryPoint) {
   ArrayRef<std::string> specialSgprInputNames;
   if (m_gfxIp.major == 10)
     specialSgprInputNames = ArrayRef<std::string>(SpecialSgprInputNamesGfx10);
-  else if (m_gfxIp.major == 11)
+  else
     specialSgprInputNames = ArrayRef<std::string>(SpecialSgprInputNamesGfx11);
   assert(specialSgprInputNames.size() == NumSpecialSgprInputs);
 
