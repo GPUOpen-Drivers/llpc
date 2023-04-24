@@ -38,6 +38,12 @@
 #include "lgc/util/TypeLowering.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/PostOrderIterator.h"
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
+// Old version of the code
+#include "llvm/Analysis/DivergenceAnalysis.h"
+#else
+// New version of the code (also handles unknown version, which we treat as latest)
+#endif
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
@@ -54,7 +60,13 @@ using namespace lgc;
 namespace {
 
 struct PatchBufferOpImpl {
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
+  // Old version of the code
+  PatchBufferOpImpl(LLVMContext &context, PipelineState &pipelineState, DivergenceInfo &divergenceInfo);
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
   PatchBufferOpImpl(LLVMContext &context, PipelineState &pipelineState, UniformityInfo &uniformityInfo);
+#endif
 
   bool run(Function &function);
 
@@ -77,7 +89,13 @@ PreservedAnalyses PatchBufferOp::run(Function &function, FunctionAnalysisManager
   const auto &moduleAnalysisManager = analysisManager.getResult<ModuleAnalysisManagerFunctionProxy>(function);
   PipelineState *pipelineState =
       moduleAnalysisManager.getCachedResult<PipelineStateWrapper>(*function.getParent())->getPipelineState();
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
+  // Old version of the code
+  DivergenceInfo &uniformityInfo = analysisManager.getResult<DivergenceAnalysis>(function);
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
   UniformityInfo &uniformityInfo = analysisManager.getResult<UniformityInfoAnalysis>(function);
+#endif
 
   PatchBufferOpImpl impl(function.getContext(), *pipelineState, uniformityInfo);
   if (!impl.run(function))
@@ -87,9 +105,17 @@ PreservedAnalyses PatchBufferOp::run(Function &function, FunctionAnalysisManager
 
 // =====================================================================================================================
 // Construct the per-run temporaries of the PatchBufferOp pass.
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
+// Old version of the code
+PatchBufferOpImpl::PatchBufferOpImpl(LLVMContext &context, PipelineState &pipelineState, DivergenceInfo &divergenceInfo)
+    : m_typeLowering(context), m_bufferOpLowering(m_typeLowering, pipelineState, divergenceInfo) {
+}
+#else
+// New version of the code (also handles unknown version, which we treat as latest)
 PatchBufferOpImpl::PatchBufferOpImpl(LLVMContext &context, PipelineState &pipelineState, UniformityInfo &uniformityInfo)
     : m_typeLowering(context), m_bufferOpLowering(m_typeLowering, pipelineState, uniformityInfo) {
 }
+#endif
 
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM function.
@@ -135,8 +161,15 @@ static SmallVector<Type *> convertBufferPointer(TypeLowering &typeLowering, Type
 // @param typeLowering : the TypeLowering object to be used
 // @param pipelineState : the PipelineState object
 // @param uniformityInfo : the uniformity analysis result
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
+// Old version of the code
+BufferOpLowering::BufferOpLowering(TypeLowering &typeLowering, PipelineState &pipelineState,
+                                   DivergenceInfo &uniformityInfo)
+#else
+// New version of the code (also handles unknown version, which we treat as latest)
 BufferOpLowering::BufferOpLowering(TypeLowering &typeLowering, PipelineState &pipelineState,
                                    UniformityInfo &uniformityInfo)
+#endif
     : m_typeLowering(typeLowering), m_builder(typeLowering.getContext()), m_pipelineState(pipelineState),
       m_uniformityInfo(uniformityInfo) {
   m_typeLowering.addRule(&convertBufferPointer);
@@ -631,7 +664,13 @@ void BufferOpLowering::visitBufferDescToPtr(BufferDescToPtrOp &descToPtr) {
 
   auto &di = m_descriptors[descToPtr.getDesc()];
   di.invariant = removeUsersForInvariantStarts(&descToPtr);
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
+  // Old version of the code
+  di.divergent = m_uniformityInfo.isDivergent(*descToPtr.getDesc());
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
   di.divergent = m_uniformityInfo.isDivergent(descToPtr.getDesc());
+#endif
 }
 
 // =====================================================================================================================
@@ -837,7 +876,13 @@ void BufferOpLowering::visitPhiInst(llvm::PHINode &phi) {
   if (!phi.getType()->isPointerTy() || phi.getType()->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
     return;
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
+  // Old version of the code
+  if (m_uniformityInfo.isDivergent(phi))
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
   if (m_uniformityInfo.isDivergent(&phi))
+#endif
     m_divergentPhis.push_back(&phi);
 }
 

@@ -38,6 +38,15 @@
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/PassManager.h"
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
+// Old version of the code
+namespace llvm {
+class DivergenceInfo;
+}
+#else
+// New version of the code (also handles unknown version, which we treat as latest)
+#endif
+
 namespace lgc {
 
 class BufferDescToPtrOp;
@@ -67,7 +76,13 @@ class BufferOpLowering {
   };
 
 public:
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
+  // Old version of the code
+  BufferOpLowering(TypeLowering &typeLowering, PipelineState &pipelineState, llvm::DivergenceInfo &divergenceInfo);
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
   BufferOpLowering(TypeLowering &typeLowering, PipelineState &pipelineState, llvm::UniformityInfo &uniformityInfo);
+#endif
 
   static void registerVisitors(llvm_dialects::VisitorBuilder<BufferOpLowering> &builder);
 
@@ -106,7 +121,13 @@ private:
   llvm::IRBuilder<> m_builder;
 
   PipelineState &m_pipelineState;
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
+  // Old version of the code
+  llvm::DivergenceInfo &m_uniformityInfo;
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
   llvm::UniformityInfo &m_uniformityInfo;
+#endif
 
   // The proxy pointer type used to accumulate offsets.
   llvm::PointerType *m_offsetType = nullptr;

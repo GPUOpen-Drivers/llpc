@@ -32,7 +32,13 @@
 #include "lgc/patch/Patch.h"
 #include "lgc/state/PipelineState.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
+// Old version of the code
+#include "llvm/Analysis/DivergenceAnalysis.h"
+#else
+// New version of the code (also handles unknown version, which we treat as latest)
 #include "llvm/Analysis/UniformityAnalysis.h"
+#endif
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/Instructions.h"
@@ -89,7 +95,13 @@ PatchReadFirstLane::PatchReadFirstLane() : m_targetTransformInfo(nullptr) {
 PreservedAnalyses PatchReadFirstLane::run(Function &function, FunctionAnalysisManager &analysisManager) {
   TargetTransformInfo &targetTransformInfo = analysisManager.getResult<TargetIRAnalysis>(function);
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
+  // Old version of the code
+  DivergenceInfo &uniformityInfo = analysisManager.getResult<DivergenceAnalysis>(function);
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
   UniformityInfo &uniformityInfo = analysisManager.getResult<UniformityInfoAnalysis>(function);
+#endif
   auto isDivergentUse = [&](const Use &use) { return uniformityInfo.isDivergentUse(use); };
   if (runImpl(function, isDivergentUse, &targetTransformInfo))
     return PreservedAnalyses::none();
