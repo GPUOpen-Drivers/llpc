@@ -674,7 +674,7 @@ Value *BuilderImpl::CreateSqrt(Value *x, const Twine &instName) {
 
     // If x is +INF, +0, or -0, use its original value
     return CreateSelect(
-        createCallIsFPClass(x, CmpClass::PositiveInfinity | CmpClass::PositiveZero | CmpClass::NegativeZero), x, g,
+        createIsFPClass(x, CmpClass::PositiveInfinity | CmpClass::PositiveZero | CmpClass::NegativeZero), x, g,
         instName);
   }
 
@@ -741,7 +741,7 @@ Value *BuilderImpl::CreateInverseSqrt(Value *x, const Twine &instName) {
 
     // If x is +INF, +0, or -0, use the initial value of reciprocal square root
     return CreateSelect(
-        createCallIsFPClass(x, CmpClass::PositiveInfinity | CmpClass::PositiveZero | CmpClass::NegativeZero), y, h,
+        createIsFPClass(x, CmpClass::PositiveInfinity | CmpClass::PositiveZero | CmpClass::NegativeZero), y, h,
         instName);
   }
 
@@ -1195,7 +1195,7 @@ Value *BuilderImpl::fDivFast(Value *numerator, Value *denominator) {
 // @param x : Input value X
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateIsInf(Value *x, const Twine &instName) {
-  return createCallIsFPClass(x, CmpClass::NegativeInfinity | CmpClass::PositiveInfinity, instName);
+  return createIsFPClass(x, CmpClass::NegativeInfinity | CmpClass::PositiveInfinity, instName);
 }
 
 // =====================================================================================================================
@@ -1205,7 +1205,7 @@ Value *BuilderImpl::CreateIsInf(Value *x, const Twine &instName) {
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateIsNaN(Value *x, const Twine &instName) {
   // 0x001: signaling NaN, 0x002: quiet NaN
-  return createCallIsFPClass(x, CmpClass::SignalingNaN | CmpClass::QuietNaN, instName);
+  return createIsFPClass(x, CmpClass::SignalingNaN | CmpClass::QuietNaN, instName);
 }
 
 // =====================================================================================================================
@@ -1215,7 +1215,7 @@ Value *BuilderImpl::CreateIsNaN(Value *x, const Twine &instName) {
 // @param value : Input value
 // @param flags : Flags for what class(es) to check for
 // @param instName : Name to give instruction(s)
-Value *BuilderImpl::createCallIsFPClass(Value *value, unsigned flags, const Twine &instName) {
+Value *BuilderImpl::createIsFPClass(Value *value, unsigned flags, const Twine &instName) {
   return CreateIntrinsic(Intrinsic::is_fpclass, value->getType(), {value, getInt32(flags)}, nullptr, instName);
 }
 
