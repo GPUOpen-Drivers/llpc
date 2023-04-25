@@ -33,6 +33,7 @@
  */
 #pragma once
 
+#include "Defs.h"
 #include <stdint.h>
 
 namespace lgc {
@@ -129,6 +130,11 @@ struct PrimShaderCbLayout {
   PrimShaderVportCb viewportStateCb;
   PrimShaderScissorCb scissorStateCb;
   PrimShaderRenderCb renderStateCb;
+};
+
+/// Constant buffer used by SW stream-out processing (GFX11+).
+struct StreamOutControlCb {
+  unsigned bufOffsets[MaxTransformFeedbackBuffers];
 };
 
 } // namespace Abi
