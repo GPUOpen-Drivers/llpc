@@ -98,6 +98,12 @@ unsigned Builder::getAddrSpaceConst() {
   return ADDR_SPACE_CONST;
 }
 
+// ====================================================================================================================
+// Get address space of local (thread-global) memory.
+unsigned Builder::getAddrSpaceLocal() {
+  return ADDR_SPACE_LOCAL;
+}
+
 // =====================================================================================================================
 // Get the type of a built-in. Where the built-in has a shader-defined array size (ClipDistance,
 // CullDistance, SampleMask), inOutInfo.GetArraySize() is used as the array size.

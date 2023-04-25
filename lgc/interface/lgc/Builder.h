@@ -827,7 +827,10 @@ public:
                                     const llvm::Twine &instName = "");
 
   // Get address space of constant memory.
-  unsigned getAddrSpaceConst();
+  static unsigned getAddrSpaceConst();
+
+  // Get address space of local (thread-global) memory.
+  static unsigned getAddrSpaceLocal();
 
   // Create a get of the stride (in bytes) of a descriptor. Returns an i32 value.
   //
