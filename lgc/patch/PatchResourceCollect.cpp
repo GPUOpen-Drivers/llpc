@@ -2865,25 +2865,44 @@ void PatchResourceCollect::updateOutputLocInfoMapWithUnpack() {
 
   // Update the value of outputLocInfoMap
   if (!outputLocInfoMap.empty()) {
-    unsigned nextMapLoc = 0;
+    unsigned nextMapLoc[MaxGsStreams] = {};
+    DenseMap<unsigned, unsigned> alreadyMappedLocs[MaxGsStreams]; // Map from original location to new location
+
     for (auto &locInfoPair : outputLocInfoMap) {
+      const auto &locationInfo = locInfoPair.first;
       auto &newLocationInfo = locInfoPair.second;
+
       if (!newLocationInfo.isInvalid())
-        continue;
+        continue; // Skip any location that is mapped
+
       newLocationInfo.setData(0);
-      if (m_shaderStage == ShaderStageGeometry) {
-        const unsigned streamId = locInfoPair.first.getStreamId();
-        if (canChangeOutputLocationsForGs()) {
-          newLocationInfo.setLocation(inOutUsage.gs.outLocCount[streamId]++);
-        } else {
-          newLocationInfo.setLocation(locInfoPair.first.getLocation());
-          inOutUsage.gs.outLocCount[streamId] =
-              std::max(inOutUsage.gs.outLocCount[streamId], newLocationInfo.getLocation() + 1);
-        }
-        newLocationInfo.setStreamId(streamId);
+      newLocationInfo.setComponent(locationInfo.getComponent());
+      const unsigned streamId = m_shaderStage == ShaderStageGeometry ? locationInfo.getStreamId() : 0;
+      newLocationInfo.setStreamId(streamId);
+
+      const unsigned locToBeMapped = locationInfo.getLocation();
+      unsigned mappedLoc = InvalidValue;
+      const bool keepLocation = m_shaderStage == ShaderStageGeometry && !canChangeOutputLocationsForGs();
+      if (keepLocation) {
+        // Keep location unchanged
+        mappedLoc = locToBeMapped;
       } else {
-        newLocationInfo.setLocation(nextMapLoc++);
+        // Map to new location
+        if (alreadyMappedLocs[streamId].count(locToBeMapped) > 0) {
+          mappedLoc = alreadyMappedLocs[streamId][locToBeMapped];
+        } else {
+          mappedLoc = nextMapLoc[streamId]++;
+          // NOTE: Record the map because we are handling multiple pairs of <location, component>. Some pairs have the
+          // same location while the components are different.
+          alreadyMappedLocs[streamId][locToBeMapped] = mappedLoc;
+        }
       }
+
+      assert(mappedLoc != InvalidValue);
+      newLocationInfo.setLocation(mappedLoc);
+
+      if (m_shaderStage == ShaderStageGeometry)
+        inOutUsage.gs.outLocCount[streamId] = std::max(inOutUsage.gs.outLocCount[streamId], mappedLoc + 1);
     }
   }
 
