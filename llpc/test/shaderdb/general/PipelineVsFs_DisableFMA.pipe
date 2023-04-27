@@ -3,10 +3,8 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc --gfxip=10.3.0 -v %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: call reassoc nnan nsz arcp contract afn float (...) @lgc.create.fma.f32
-; SHADERTEST-LABEL: _amdgpu_vs_main:
-; SHADERTEST-NOT: fma
-; SHADERTEST: s_endpgm
+; SHADERTEST-NOT: @lgc.create.fma
+; SHADERTEST: ret void
 ; END_SHADERTEST
 
 [Version]
@@ -28,6 +26,7 @@ void main()
 
 [VsInfo]
 entryPoint = main
+options.disableFMA = 1
 
 
 [FsGlsl]
@@ -76,9 +75,6 @@ userDataNode[4].indirectUserDataCount = 4
 [GraphicsPipelineState]
 colorBuffer[0].format = VK_FORMAT_B8G8R8A8_UNORM
 colorBuffer[0].channelWriteMask = 15
-colorBuffer[0].blendEnable = 0
-colorBuffer[0].blendSrcAlphaToColor = 0
-options.disableFMA = 1
 
 [VertexInputState]
 binding[0].binding = 0

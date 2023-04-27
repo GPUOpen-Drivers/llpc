@@ -169,6 +169,7 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, aggressiveInvariantLoads, MemberTypeEnum, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, workaroundStorageImageFormats, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, workaroundInitializeOutputsToZero, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableFMA, MemberTypeBool, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -378,7 +379,6 @@ private:
       INIT_MEMBER_NAME_TO_ADDR(SectionPipelineOption, m_extendedRobustness, MemberTypeExtendedRobustness, true);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, forceNonUniformResourceIndexStageMask, MemberTypeInt,
                                      false);
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, disableFMA, MemberTypeBool, false);
       // One internal member
 #if VKI_RAY_TRACING
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, internalRtShaders, MemberTypeBool, false);

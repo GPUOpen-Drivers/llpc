@@ -82,7 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
-//  |     61.7 | Add disableFMA to PipelineOptions                                                                     |
+//  |     61.7 | Add disableFMA to PipelineShaderOptions                                                               |
 //  |     61.6 | Add workaroundInitializeOutputsToZero to PipelineShaderOptions                                        |
 //  |     61.5 | Add RtIpVersion (including its checkers) to represent ray tracing IP                                  |
 //  |     61.4 | Add workaroundStorageImageFormats to PipelineShaderOptions                                            |
@@ -563,7 +563,6 @@ struct PipelineOptions {
 #endif
   unsigned forceNonUniformResourceIndexStageMask; ///< Mask of the stage to force using non-uniform resource index.
   bool reserved16;
-  bool disableFMA; ///< Disable to use FMA intrinsic and use FMUL + FADD instead.
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.
@@ -862,6 +861,9 @@ struct PipelineShaderOptions {
 
   /// Initialize outputs to zero if it is true
   bool workaroundInitializeOutputsToZero;
+
+  /// Application workaround: Treat GLSL.ext fma instruction as OpFMul + OpFAdd
+  bool disableFMA;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor

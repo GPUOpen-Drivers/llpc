@@ -256,12 +256,6 @@ Value *BuilderImpl::CreateFMod(Value *dividend, Value *divisor, const Twine &ins
 // @param c : The value to add to the product of A and B
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateFma(Value *a, Value *b, Value *c, const Twine &instName) {
-  if (getPipelineState()->getOptions().disableFMA) {
-    // Using FMUL + FADD
-    FMF.setAllowContract(false);
-    return CreateFAdd(CreateFMul(a, b), c, instName);
-  }
-
   if (getPipelineState()->getTargetInfo().getGfxIpVersion().major <= 8) {
     // Pre-GFX9 version: Use fmuladd.
     return CreateIntrinsic(Intrinsic::fmuladd, a->getType(), {a, b, c}, nullptr, instName);
