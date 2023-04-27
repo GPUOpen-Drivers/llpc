@@ -122,6 +122,9 @@ cl::opt<bool> SpirvOverrideWorkaroundStorageImageFormats(
              "the pipeline shader options (which itself defaults to false)"),
     cl::init(false));
 
+cl::opt<bool> DisableFMA("disable-fma", cl::desc("Disable FMA intrinsic and use 'FMUL + FADD' instead"),
+                         cl::init(false));
+
 // Prefix for placeholder global variable name.
 const char *KPlaceholderPrefix = "placeholder.";
 
@@ -8741,6 +8744,11 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
 
   case GLSLstd450Fma:
     // Fused multiply and add
+    if (m_shaderOptions->disableFMA || DisableFMA) {
+      IRBuilderBase::FastMathFlagGuard FMFGuard(*getBuilder());
+      getBuilder()->getFastMathFlags().setAllowContract(false);
+      return getBuilder()->CreateFAdd(getBuilder()->CreateFMul(args[0], args[1]), args[2]);
+    }
     return getBuilder()->CreateFma(args[0], args[1], args[2]);
 
   case GLSLstd450Frexp:

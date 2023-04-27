@@ -647,6 +647,7 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.aggressiveInvariantLoads = " << shaderInfo->options.aggressiveInvariantLoads << "\n";
   dumpFile << "options.workaroundStorageImageFormats = " << shaderInfo->options.workaroundStorageImageFormats << "\n";
   dumpFile << "options.workaroundInitializeOutputsToZero = " << shaderInfo->options.workaroundInitializeOutputsToZero << "\n";
+  dumpFile << "options.disableFMA = " << shaderInfo->options.disableFMA << "\n";
   dumpFile << "\n";
   // clang-format on
 }
@@ -839,7 +840,6 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
 
   dumpFile << "options.forceNonUniformResourceIndexStageMask = " << options->forceNonUniformResourceIndexStageMask
            << "\n";
-  dumpFile << "options.disableFMA = " << options->disableFMA << "\n";
 }
 
 // =====================================================================================================================
@@ -1590,7 +1590,6 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->internalRtShaders);
 #endif
   hasher->Update(options->forceNonUniformResourceIndexStageMask);
-  hasher->Update(options->disableFMA);
 }
 
 // =====================================================================================================================
@@ -1673,6 +1672,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.nsaThreshold);
       hasher->Update(options.aggressiveInvariantLoads);
       hasher->Update(options.workaroundStorageImageFormats);
+      hasher->Update(options.disableFMA);
     }
   }
 }
