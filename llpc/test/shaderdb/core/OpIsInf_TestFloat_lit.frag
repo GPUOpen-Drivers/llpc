@@ -18,7 +18,7 @@ void main()
 ; SHADERTEST: = call i1 (...) @lgc.create.isinf.i1(float
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call i1 @llvm.amdgcn.class.f32(float %{{[0-9]*}}, i32 516)
+; SHADERTEST: call i1 @llvm.is.fpclass.f32(float %{{[0-9]*}}, i32 516)
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

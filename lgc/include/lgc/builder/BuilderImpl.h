@@ -229,9 +229,8 @@ private:
   // Generate FP division, using fast fdiv for float to bypass optimization.
   llvm::Value *fDivFast(llvm::Value *numerator, llvm::Value *denominator);
 
-  // Helper method to create call to llvm.amdgcn.class, scalarizing if necessary. This is not exposed outside of
-  // ArithBuilder.
-  llvm::Value *createCallAmdgcnClass(llvm::Value *value, unsigned flags, const llvm::Twine &instName = "");
+  // Helper method to create call to llvm.is.fpclass. This is not exposed outside of ArithBuilder.
+  llvm::Value *createIsFPClass(llvm::Value *value, unsigned flags, const llvm::Twine &instName = "");
 
   // Methods to get various FP constants as scalar or vector. Any needed directly by a client should be moved
   // to Builder.h. Using these (rather than just using for example
