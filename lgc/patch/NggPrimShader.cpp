@@ -3774,15 +3774,16 @@ void NggPrimShader::mutateCopyShader() {
 
         m_builder.SetInsertPoint(call);
 
-        assert(call->arg_size() == 2);
+        assert(call->arg_size() == 3);
         const unsigned location = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
-        const unsigned streamId = cast<ConstantInt>(call->getOperand(1))->getZExtValue();
+        const unsigned component = cast<ConstantInt>(call->getOperand(1))->getZExtValue();
+        const unsigned streamId = cast<ConstantInt>(call->getOperand(2))->getZExtValue();
         assert(streamId < MaxGsStreams);
 
         // Only lower the GS output import calls if they belong to the rasterization stream.
         if (streamId == rasterStream) {
           auto vertexOffset = calcVertexItemOffset(streamId, vertexIndex);
-          auto output = readGsOutput(call->getType(), location, streamId, vertexOffset);
+          auto output = readGsOutput(call->getType(), location, component, streamId, vertexOffset);
           call->replaceAllUsesWith(output);
         }
 
@@ -3882,11 +3883,11 @@ void NggPrimShader::appendUserData(SmallVectorImpl<Value *> &args, Function *tar
 //
 // @param output : Output value
 // @param location : Location of the output
-// @param compIdx : Index used for vector element indexing
+// @param component : Component index used for vector element addressing
 // @param streamId : ID of output vertex stream
 // @param primitiveIndex : Relative primitive index in subgroup
 // @param emitVerts : Counter of GS emitted vertices for this stream
-void NggPrimShader::writeGsOutput(Value *output, unsigned location, unsigned compIdx, unsigned streamId,
+void NggPrimShader::writeGsOutput(Value *output, unsigned location, unsigned component, unsigned streamId,
                                   Value *primitiveIndex, Value *emitVerts) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
   if (!m_pipelineState->enableSwXfb() && resUsage->inOutUsage.gs.rasterStream != streamId) {
@@ -3938,9 +3939,9 @@ void NggPrimShader::writeGsOutput(Value *output, unsigned location, unsigned com
   auto vertexIndex = m_builder.CreateMul(primitiveIndex, m_builder.getInt32(geometryMode.outputVertices));
   vertexIndex = m_builder.CreateAdd(vertexIndex, emitVerts);
 
-  // ldsOffset = vertexOffset + location * 4 + compIdx (in dwords)
+  // ldsOffset = vertexOffset + location * 4 + component (in dwords)
   auto vertexOffset = calcVertexItemOffset(streamId, vertexIndex);
-  const unsigned attribOffset = (location * 4) + compIdx;
+  const unsigned attribOffset = (location * 4) + component;
   auto ldsOffset = m_builder.CreateAdd(vertexOffset, m_builder.getInt32(attribOffset));
 
   writeValueToLds(output, ldsOffset);
@@ -3951,9 +3952,11 @@ void NggPrimShader::writeGsOutput(Value *output, unsigned location, unsigned com
 //
 // @param outputTy : Type of the output
 // @param location : Location of the output
+// @param component : Component index used for vector element addressing
 // @param streamId : ID of output vertex stream
 // @param vertexOffset : Start offset of vertex item in GS-VS ring (in dwords)
-Value *NggPrimShader::readGsOutput(Type *outputTy, unsigned location, unsigned streamId, Value *vertexOffset) {
+Value *NggPrimShader::readGsOutput(Type *outputTy, unsigned location, unsigned component, unsigned streamId,
+                                   Value *vertexOffset) {
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
   if (!m_pipelineState->enableSwXfb() && resUsage->inOutUsage.gs.rasterStream != streamId) {
     // NOTE: If SW-emulated stream-out is not enabled, only import those outputs that belong to the rasterization
@@ -3972,8 +3975,8 @@ Value *NggPrimShader::readGsOutput(Type *outputTy, unsigned location, unsigned s
     outputTy = FixedVectorType::get(outputElemTy, elemCount);
   }
 
-  // ldsOffset = vertexOffset + location * 4 (in dwords)
-  const unsigned attribOffset = location * 4;
+  // ldsOffset = vertexOffset + location * 4 + component (in dwords)
+  const unsigned attribOffset = location * 4 + component;
   auto ldsOffset = m_builder.CreateAdd(vertexOffset, m_builder.getInt32(attribOffset));
 
   auto output = readValueFromLds(outputTy, ldsOffset);
@@ -7028,7 +7031,8 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
               readGsOutput(xfbOutputExport.numElements > 1
                                ? FixedVectorType::get(m_builder.getFloatTy(), xfbOutputExport.numElements)
                                : m_builder.getFloatTy(),
-                           xfbOutputExport.locInfo.loc, i, calcVertexItemOffset(i, vertexIndices[j]));
+                           xfbOutputExport.locInfo.location, xfbOutputExport.locInfo.component, i,
+                           calcVertexItemOffset(i, vertexIndices[j]));
 
           if (xfbOutputExport.is16bit) {
             // NOTE: For 16-bit transform feedbakc outputs, they are stored as 32-bit without tightly packed in LDS.
@@ -7255,15 +7259,17 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
 
         // Those values are just for GS
         auto streamId = InvalidValue;
-        unsigned loc = InvalidValue;
+        unsigned location = InvalidValue;
+        unsigned component = InvalidValue;
 
         if (m_hasGs) {
           // NOTE: For GS, the output value must be loaded by GS read output call. This is generated by copy shader.
           CallInst *readCall = dyn_cast<CallInst>(outputValue);
           assert(readCall && readCall->getCalledFunction()->getName().startswith(lgcName::NggReadGsOutput));
           streamId = cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
-          assert(streamId == cast<ConstantInt>(readCall->getArgOperand(1))->getZExtValue()); // Stream ID must match
-          loc = cast<ConstantInt>(readCall->getArgOperand(0))->getZExtValue();
+          assert(streamId == cast<ConstantInt>(readCall->getArgOperand(2))->getZExtValue()); // Stream ID must match
+          location = cast<ConstantInt>(readCall->getArgOperand(0))->getZExtValue();
+          component = cast<ConstantInt>(readCall->getArgOperand(1))->getZExtValue();
         } else {
           // If the output value is floating point, cast it to integer type
           if (outputValue->getType()->isFPOrFPVectorTy()) {
@@ -7303,7 +7309,8 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
         xfbOutputExports[outputIndex].is16bit = is16bit;
         // Those values are just for GS
         xfbOutputExports[outputIndex].locInfo.streamId = streamId;
-        xfbOutputExports[outputIndex].locInfo.loc = loc;
+        xfbOutputExports[outputIndex].locInfo.location = location;
+        xfbOutputExports[outputIndex].locInfo.component = component;
 
         ++outputIndex;
       }
@@ -7511,7 +7518,7 @@ Value *NggPrimShader::fetchVertexPositionData(Value *vertexIndex) {
   const unsigned rasterStream = inOutUsage.gs.rasterStream;
   auto vertexOffset = calcVertexItemOffset(rasterStream, vertexIndex);
 
-  return readGsOutput(FixedVectorType::get(m_builder.getFloatTy(), 4), loc, rasterStream, vertexOffset);
+  return readGsOutput(FixedVectorType::get(m_builder.getFloatTy(), 4), loc, 0, rasterStream, vertexOffset);
 }
 
 // =====================================================================================================================
@@ -7538,8 +7545,8 @@ Value *NggPrimShader::fetchCullDistanceSignMask(Value *vertexIndex) {
   auto vertexOffset = calcVertexItemOffset(rasterStream, vertexIndex);
 
   auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
-  auto cullDistances =
-      readGsOutput(ArrayType::get(m_builder.getFloatTy(), builtInUsage.cullDistance), loc, rasterStream, vertexOffset);
+  auto cullDistances = readGsOutput(ArrayType::get(m_builder.getFloatTy(), builtInUsage.cullDistance), loc, 0,
+                                    rasterStream, vertexOffset);
 
   // Calculate the sign mask for all cull distances
   Value *signMask = m_builder.getInt32(0);

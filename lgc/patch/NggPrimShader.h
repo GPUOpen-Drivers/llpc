@@ -153,9 +153,10 @@ struct XfbOutputExport {
   unsigned numElements; // Number of output elements, valid range is [1,4]
   bool is16bit;         // Whether the output is 16-bit
   struct {
-    unsigned streamId; // Output stream ID
-    unsigned loc;      // Output location
-  } locInfo;           // Output location info in GS-VS ring (just for GS)
+    unsigned streamId;  // Output stream ID
+    unsigned location;  // Output location
+    unsigned component; // Output component within a location
+  } locInfo;            // Output location info in GS-VS ring (just for GS)
 };
 
 // Enumerates the LDS regions used by primitive shader
@@ -244,9 +245,10 @@ private:
   void appendUserData(llvm::SmallVectorImpl<llvm::Value *> &args, llvm::Function *target, llvm::Value *userData,
                       unsigned userDataCount);
 
-  void writeGsOutput(llvm::Value *output, unsigned location, unsigned compIdx, unsigned streamId,
+  void writeGsOutput(llvm::Value *output, unsigned location, unsigned component, unsigned streamId,
                      llvm::Value *primitiveIndex, llvm::Value *emitVerts);
-  llvm::Value *readGsOutput(llvm::Type *outputTy, unsigned location, unsigned streamId, llvm::Value *vertexOffset);
+  llvm::Value *readGsOutput(llvm::Type *outputTy, unsigned location, unsigned component, unsigned streamId,
+                            llvm::Value *vertexOffset);
 
   void processGsEmit(unsigned streamId, llvm::Value *primitiveIndex, llvm::Value *emitVertsPtr,
                      llvm::Value *outVertsPtr);

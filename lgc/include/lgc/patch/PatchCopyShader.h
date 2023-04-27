@@ -53,7 +53,8 @@ private:
 
   llvm::Value *calcGsVsRingOffsetForInput(unsigned location, unsigned compIdx, unsigned streamId, BuilderBase &builder);
 
-  llvm::Value *loadValueFromGsVsRing(llvm::Type *loadTy, unsigned location, unsigned streamId, BuilderBase &builder);
+  llvm::Value *loadValueFromGsVsRing(llvm::Type *loadTy, unsigned location, unsigned component, unsigned streamId,
+                                     BuilderBase &builder);
 
   llvm::Value *loadGsVsRingBufferDescriptor(BuilderBase &builder);
 
