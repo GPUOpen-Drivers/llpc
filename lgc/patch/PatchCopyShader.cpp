@@ -396,7 +396,7 @@ void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
     const unsigned dwordSize = byteSize / 4;
     Value *outputValue = loadValueFromGsVsRing(dwordSize > 1 ? FixedVectorType::get(builder.getFloatTy(), dwordSize)
                                                              : builder.getFloatTy(),
-                                               newLoc, streamId, builder);
+                                               newLoc, 0, streamId, builder);
     newLocValueMap[newLoc] = outputValue;
   }
 
@@ -513,7 +513,7 @@ void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
     assert(resUsage->inOutUsage.builtInOutputLocMap.find(builtInId) != resUsage->inOutUsage.builtInOutputLocMap.end());
 
     unsigned loc = resUsage->inOutUsage.builtInOutputLocMap[builtInId];
-    Value *outputValue = loadValueFromGsVsRing(builtInTy, loc, streamId, builder);
+    Value *outputValue = loadValueFromGsVsRing(builtInTy, loc, 0, streamId, builder);
     exportBuiltInOutput(outputValue, builtInId, streamId, builder);
   }
 }
@@ -554,9 +554,10 @@ Value *PatchCopyShader::calcGsVsRingOffsetForInput(unsigned location, unsigned c
 //
 // @param loadTy : Type of the load value
 // @param location : Output location
+// @param component : Output component
 // @param streamId : Output stream ID
 // @param builder : BuilderBase to use for instruction constructing
-Value *PatchCopyShader::loadValueFromGsVsRing(Type *loadTy, unsigned location, unsigned streamId,
+Value *PatchCopyShader::loadValueFromGsVsRing(Type *loadTy, unsigned location, unsigned component, unsigned streamId,
                                               BuilderBase &builder) {
   unsigned elemCount = 1;
   Type *elemTy = loadTy;
@@ -570,19 +571,29 @@ Value *PatchCopyShader::loadValueFromGsVsRing(Type *loadTy, unsigned location, u
   }
   assert(elemTy->isIntegerTy(32) || elemTy->isFloatTy()); // Must be 32-bit type
 
+  // NOTE: From Vulkan spec: If the 'Component' decoration is used on an 'OpVariable' that has a 'OpTypeVector' type
+  // with a 'Component Type' with a 'Width' that is equal to 64, the sum of two times its 'Component Count' and the
+  // 'Component' decoration value must be less than or equal to 4. Also, the 'Component' decorations must not be used
+  // for a 64-bit vector type with more than two components.
+  if (elemCount > 4)
+    assert(component == 0);
+  else
+    assert(elemCount + component <= 4);
+
   if (m_pipelineState->getNggControl()->enableNgg) {
     // NOTE: For NGG, reading GS output from GS-VS ring is represented by a call and the call is replaced with
     // real instructions when when NGG primitive shader is generated.
     std::string callName(lgcName::NggReadGsOutput);
     callName += getTypeName(loadTy);
-    return builder.CreateNamedCall(callName, loadTy, {builder.getInt32(location), builder.getInt32(streamId)},
-                                   {Attribute::Speculatable, Attribute::ReadOnly, Attribute::WillReturn});
+    return builder.CreateNamedCall(
+        callName, loadTy, {builder.getInt32(location), builder.getInt32(component), builder.getInt32(streamId)},
+        {Attribute::Speculatable, Attribute::ReadOnly, Attribute::WillReturn});
   }
 
   if (m_pipelineState->isGsOnChip()) {
     assert(m_lds);
 
-    Value *ringOffset = calcGsVsRingOffsetForInput(location, 0, streamId, builder);
+    Value *ringOffset = calcGsVsRingOffsetForInput(location, component, streamId, builder);
     Value *loadPtr = builder.CreateGEP(m_lds->getValueType(), m_lds, {builder.getInt32(0), ringOffset});
     loadPtr = builder.CreateBitCast(loadPtr, PointerType::get(loadTy, m_lds->getType()->getPointerAddressSpace()));
 
@@ -599,7 +610,7 @@ Value *PatchCopyShader::loadValueFromGsVsRing(Type *loadTy, unsigned location, u
   Value *loadValue = UndefValue::get(loadTy);
 
   for (unsigned i = 0; i < elemCount; ++i) {
-    Value *ringOffset = calcGsVsRingOffsetForInput(location + i / 4, i % 4, streamId, builder);
+    Value *ringOffset = calcGsVsRingOffsetForInput(location + i / 4, component + i % 4, streamId, builder);
     auto loadElem = builder.CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_load, elemTy,
                                             {
                                                 m_gsVsRingBufDesc, ringOffset,
