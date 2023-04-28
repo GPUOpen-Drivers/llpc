@@ -234,17 +234,15 @@ void PipelineContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
     if (getPreRasterHasGs())
       pipeline->setPreRasterHasGs(true);
   }
-  if (!unlinked) {
-    // Give the shader stage mask to the middle-end. We need to translate the Vkgc::ShaderStage bit numbers
-    // to lgc::ShaderStage bit numbers. We only process native shader stages, ignoring the CopyShader stage.
-    unsigned stageMask = getShaderStageMask();
+  // Give the shader stage mask to the middle-end. We need to translate the Vkgc::ShaderStage bit numbers
+  // to lgc::ShaderStage bit numbers. We only process native shader stages, ignoring the CopyShader stage.
+  unsigned stageMask = getShaderStageMask();
 #if VKI_RAY_TRACING
-    if (hasRayTracingShaderStage(stageMask))
-      stageMask = ShaderStageComputeBit;
+  if (hasRayTracingShaderStage(stageMask))
+    stageMask = ShaderStageComputeBit;
 #endif
-    // Give the user data nodes to the middle-end, and/or hash them.
-    setUserDataInPipeline(pipeline, hasher, stageMask);
-  }
+  // Give the user data nodes to the middle-end, and/or hash them.
+  setUserDataInPipeline(pipeline, hasher, stageMask);
 
   // Give the pipeline options to the middle-end, and/or hash them.
   Options options = computePipelineOptions();
