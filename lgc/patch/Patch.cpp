@@ -377,7 +377,15 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level o
   fpm.addPass(createFunctionToLoopPassAdaptor(std::move(lpm2), true));
   fpm.addPass(LoopUnrollPass(
       LoopUnrollOptions(optLevel).setPeeling(true).setRuntime(false).setUpperBound(false).setPartial(false)));
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 464212
+  // Old version of the code
   fpm.addPass(ScalarizerPass());
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  ScalarizerPassOptions scalarizerOptions;
+  scalarizerOptions.ScalarizeMinBits = 32;
+  fpm.addPass(ScalarizerPass(scalarizerOptions));
+#endif
   fpm.addPass(PatchLoadScalarizer());
   fpm.addPass(InstSimplifyPass());
   fpm.addPass(NewGVNPass());
