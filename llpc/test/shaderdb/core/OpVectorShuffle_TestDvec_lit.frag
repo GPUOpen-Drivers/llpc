@@ -31,8 +31,8 @@ void main()
 ; SHADERTEST: %{{.*}} = shufflevector <3 x double> %{{.*}}, <3 x double> %{{.*}}, <2 x i32> <i32 1, i32 0>
 ; SHADERTEST: %{{.*}} = shufflevector <3 x double> %{{.*}}, <3 x double> %{{.*}}, <2 x i32> <i32 2, i32 2>
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{.*}} = shufflevector <3 x double> %{{.*}}, <3 x double> {{undef|poison}}, <4 x i32> <i32 undef, i32 undef, i32 2, i32 undef>
-; SHADERTEST: %{{.*}} = shufflevector <3 x double> %{{.*}}, <3 x double> {{undef|poison}}, <4 x i32> <i32 0, i32 1, i32 undef, i32 undef>
+; SHADERTEST: %{{.*}} = shufflevector <3 x double> %{{.*}}, <3 x double> {{undef|poison}}, <4 x i32> <i32 {{undef|poison}}, i32 {{undef|poison}}, i32 2, i32 {{undef|poison}}>
+; SHADERTEST: %{{.*}} = shufflevector <3 x double> %{{.*}}, <3 x double> {{undef|poison}}, <4 x i32> <i32 0, i32 1, i32 {{undef|poison}}, i32 {{undef|poison}}>
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
