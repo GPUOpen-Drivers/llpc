@@ -64,6 +64,21 @@ static const unsigned GsEmitCutStreamIdMask = 0x300; // Mask of STREAM_ID of the
 
 static const unsigned GetRealTime = 0x83; // [7] = 1, [6:0] = 3
 
+// Count of user SGPRs used in copy shader
+static const unsigned CopyShaderUserSgprCount = 4;
+
+// User SGPR index for the stream info in copy shader
+static const unsigned CopyShaderUserSgprIdxStreamInfo = 4;
+
+// User SGPR index for the stream-out write index in copy shader
+static const unsigned CopyShaderUserSgprIdxWriteIndex = 5;
+
+// User SGPR index for the stream offsets in copy shader
+static const unsigned CopyShaderUserSgprIdxStreamOffset = 6;
+
+// Start offset of currently-processed vertex in GS-VS ring buffer
+static const unsigned CopyShaderUserSgprIdxVertexOffset = 10;
+
 // Enumerates address spaces valid for AMD GPU (similar to LLVM header AMDGPU.h)
 enum AddrSpace {
   ADDR_SPACE_FLAT = 0,               // Flat memory
@@ -683,20 +698,5 @@ union CombineFormat {
 
   unsigned u32All;
 };
-
-// Count of user SGPRs used in copy shader
-static const unsigned CopyShaderUserSgprCount = 4;
-
-// User SGPR index for the stream info in copy shader
-static const unsigned CopyShaderUserSgprIdxStreamInfo = 4;
-
-// User SGPR index for the stream-out write index in copy shader
-static const unsigned CopyShaderUserSgprIdxWriteIndex = 5;
-
-// User SGPR index for the stream offsets in copy shader
-static const unsigned CopyShaderUserSgprIdxStreamOffset = 6;
-
-// Start offset of currently-processed vertex in GS-VS ring buffer
-static const unsigned CopyShaderUserSgprIdxVertexOffset = 10;
 
 } // namespace lgc
