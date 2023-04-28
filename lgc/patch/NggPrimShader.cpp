@@ -2094,16 +2094,30 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
       assert(m_pipelineState->getShaderModes()->getGeometryShaderMode().outputPrimitive ==
              OutputPrimitives::TriangleStrip);
 
-      // NOTE: primData[N] corresponds to the forming vertices <N, N+1, N+2> or <N, N+2, N+1>.
+      // NOTE: primData[N] corresponds to the forming vertex
+      // The vertice indices in the first triangle <N, N+1, N+2>
+      // If provoking vertex is the first one, the vertice indices in the second triangle is <N, N+2, N+1>, otherwise it
+      // is <N+1, N, N+2>.
+      unsigned windingIndices[3] = {};
+      if (m_pipelineState->getRasterizerState().provokingVertexMode == ProvokingVertexFirst) {
+        windingIndices[0] = 0;
+        windingIndices[1] = 2;
+        windingIndices[2] = 1;
+      } else {
+        windingIndices[0] = 1;
+        windingIndices[1] = 0;
+        windingIndices[2] = 2;
+      }
       Value *winding = m_builder.CreateICmpNE(primData, m_builder.getInt32(0));
-
-      auto vertexIndex0 = m_nggInputs.threadIdInSubgroup;
-      auto vertexIndex1 =
-          m_builder.CreateAdd(m_nggInputs.threadIdInSubgroup,
-                              m_builder.CreateSelect(winding, m_builder.getInt32(2), m_builder.getInt32(1)));
-      auto vertexIndex2 =
-          m_builder.CreateAdd(m_nggInputs.threadIdInSubgroup,
-                              m_builder.CreateSelect(winding, m_builder.getInt32(1), m_builder.getInt32(2)));
+      auto vertexIndex0 = m_builder.CreateAdd(
+          m_nggInputs.threadIdInSubgroup,
+          m_builder.CreateSelect(winding, m_builder.getInt32(windingIndices[0]), m_builder.getInt32(0)));
+      auto vertexIndex1 = m_builder.CreateAdd(
+          m_nggInputs.threadIdInSubgroup,
+          m_builder.CreateSelect(winding, m_builder.getInt32(windingIndices[1]), m_builder.getInt32(1)));
+      auto vertexIndex2 = m_builder.CreateAdd(
+          m_nggInputs.threadIdInSubgroup,
+          m_builder.CreateSelect(winding, m_builder.getInt32(windingIndices[2]), m_builder.getInt32(2)));
 
       auto primitiveCulled = cullPrimitive(vertexIndex0, vertexIndex1, vertexIndex2);
       m_builder.CreateCondBr(primitiveCulled, nullifyPrimitiveDataBlock, endCullPrimitiveBlock);
@@ -2814,8 +2828,14 @@ void NggPrimShader::exportPrimitiveWithGs(Value *startingVertexIndex) {
   //       primData = <vertexIndex0, vertexIndex1>
   //     } else if (triangle_strip) {
   //       winding = primData != 0
-  //       primData = winding ? <vertexIndex0, vertexIndex2, vertexIndex1>
-  //                          : <vertexIndex0, vertexIndex1, vertexIndex2>
+  //       if (winding == 0)
+  //         primData = <vertexIndex0, vertexIndex1, vertexIndex2>
+  //       else {
+  //         if (provokingVertexMode == ProvokingVerexFirst)
+  //           primData = <vertexIndex0, vertexIndex2, vertexIndex1>
+  //         else
+  //           primData = <vertexIndex1, vertexIndex0, vertexIndex2>
+  //       }
   //     }
   //   }
   //   Export primitive
@@ -2849,25 +2869,38 @@ void NggPrimShader::exportPrimitiveWithGs(Value *startingVertexIndex) {
     break;
   }
   case OutputPrimitives::TriangleStrip: {
+    // NOTE: primData[N] corresponds to the forming vertex
+    // The vertice indices in the first triangle <N, N+1, N+2>
+    // If provoking vertex is the first one, the vertice indices in the second triangle is <N, N+2, N+1>, otherwise it
+    // is <N+1, N, N+2>.
+    unsigned windingIndices[3] = {};
+    if (m_pipelineState->getRasterizerState().provokingVertexMode == ProvokingVertexFirst) {
+      windingIndices[0] = 0;
+      windingIndices[1] = 2;
+      windingIndices[2] = 1;
+    } else {
+      windingIndices[0] = 1;
+      windingIndices[1] = 0;
+      windingIndices[2] = 2;
+    }
     Value *winding = m_builder.CreateICmpNE(primData, m_builder.getInt32(0));
-    Value *vertexIndex0 = startingVertexIndex;
-    Value *vertexIndex1 = m_builder.CreateAdd(startingVertexIndex, m_builder.getInt32(1));
-    Value *vertexIndex2 = m_builder.CreateAdd(startingVertexIndex, m_builder.getInt32(2));
+    auto vertexIndex0 =
+        m_builder.CreateAdd(startingVertexIndex, m_builder.CreateSelect(winding, m_builder.getInt32(windingIndices[0]),
+                                                                        m_builder.getInt32(0)));
+    auto vertexIndex1 =
+        m_builder.CreateAdd(startingVertexIndex, m_builder.CreateSelect(winding, m_builder.getInt32(windingIndices[1]),
+                                                                        m_builder.getInt32(1)));
+    auto vertexIndex2 =
+        m_builder.CreateAdd(startingVertexIndex, m_builder.CreateSelect(winding, m_builder.getInt32(windingIndices[2]),
+                                                                        m_builder.getInt32(2)));
 
-    Value *newPrimDataNoWinding = nullptr;
-    Value *newPrimDataWinding = nullptr;
     if (m_gfxIp.major <= 11) {
-      newPrimDataNoWinding = m_builder.CreateOr(
+      newPrimData = m_builder.CreateOr(
           m_builder.CreateShl(m_builder.CreateOr(m_builder.CreateShl(vertexIndex2, 10), vertexIndex1), 10),
-          vertexIndex0);
-      newPrimDataWinding = m_builder.CreateOr(
-          m_builder.CreateShl(m_builder.CreateOr(m_builder.CreateShl(vertexIndex1, 10), vertexIndex2), 10),
           vertexIndex0);
     } else {
       llvm_unreachable("Not implemented!");
     }
-
-    newPrimData = m_builder.CreateSelect(winding, newPrimDataWinding, newPrimDataNoWinding);
     break;
   }
   default:
@@ -7014,11 +7047,27 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
         Value *primData =
             readPerThreadDataFromLds(m_builder.getInt32Ty(), uncompactedPrimitiveIndex,
                                      PrimShaderLdsRegion::PrimitiveData, Gfx9::NggMaxThreadsPerSubgroup * i);
+        // NOTE: primData[N] corresponds to the forming vertex
+        // The vertice indices in the first triangle <N, N+1, N+2>
+        // If provoking vertex is the first one, the vertice indices in the second triangle is <N, N+2, N+1>, otherwise
+        // it is <N+1, N, N+2>.
+        unsigned windingIndices[3] = {};
+        if (m_pipelineState->getRasterizerState().provokingVertexMode == ProvokingVertexFirst) {
+          windingIndices[0] = 0;
+          windingIndices[1] = 2;
+          windingIndices[2] = 1;
+        } else {
+          windingIndices[0] = 1;
+          windingIndices[1] = 0;
+          windingIndices[2] = 2;
+        }
         Value *winding = m_builder.CreateICmpNE(primData, m_builder.getInt32(0));
-        Value *vertexIndex1 = m_builder.CreateSelect(winding, vertexIndices[2], vertexIndices[1]);
-        Value *vertexIndex2 = m_builder.CreateSelect(winding, vertexIndices[1], vertexIndices[2]);
-        vertexIndices[1] = vertexIndex1;
-        vertexIndices[2] = vertexIndex2;
+        vertexIndices[0] = m_builder.CreateAdd(
+            vertexIndex, m_builder.CreateSelect(winding, m_builder.getInt32(windingIndices[0]), m_builder.getInt32(0)));
+        vertexIndices[1] = m_builder.CreateAdd(
+            vertexIndex, m_builder.CreateSelect(winding, m_builder.getInt32(windingIndices[1]), m_builder.getInt32(1)));
+        vertexIndices[2] = m_builder.CreateAdd(
+            vertexIndex, m_builder.CreateSelect(winding, m_builder.getInt32(windingIndices[2]), m_builder.getInt32(2)));
       }
 
       for (unsigned j = 0; j < outVertsPerPrim; ++j) {
