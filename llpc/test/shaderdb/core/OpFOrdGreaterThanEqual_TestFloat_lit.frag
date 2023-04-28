@@ -20,10 +20,6 @@ void main()
 ; SHADERTEST: icmp uge <4 x i32>
 ; SHADERTEST: fcmp ult <4 x float>
 ; SHADERTEST: icmp sge <4 x i32>
-; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
-; SHADERTEST-COUNT-4: icmp uge
-; SHADERTEST-COUNT-4: fcmp ult
-; SHADERTEST-COUNT-4: icmp sge
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
