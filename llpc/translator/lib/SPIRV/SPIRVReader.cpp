@@ -109,6 +109,10 @@ cl::opt<bool> SPIRVConvertNonUniformBroadcastToShuffle(
     "spirv-convert-non-uniform-broadcast-to-shuffle", cl::init(false),
     cl::desc("Convert OpGroupNonUniformBroadcast instructions to OpGroupNonUniformShuffle instructions."));
 
+cl::opt<bool>
+    SPIRVInstNamer("spirv-instnamer", cl::init(false),
+                   cl::desc("Choose IR value names corresponding to SPIR-V IDs if no other name is available"));
+
 cl::opt<Vkgc::DenormalMode> Fp32DenormalModeOpt(
     "fp32-denormal-mode", cl::init(Vkgc::DenormalMode::Auto), cl::desc("Override denormal mode for FP32"),
     cl::values(clEnumValN(Vkgc::DenormalMode::Auto, "auto", "No override (default behaviour)"),
@@ -889,16 +893,16 @@ bool SPIRVToLLVM::isSPIRVCmpInstTransToLLVMInst(SPIRVInstruction *bi) const {
 void SPIRVToLLVM::setName(llvm::Value *v, SPIRVValue *bv) {
   const auto &name = bv->getName();
 
-  if (name.empty())
-    return;
-
   if (v->hasName())
     return;
 
   if (v->getType()->isVoidTy())
     return;
 
-  v->setName(name);
+  if (!name.empty())
+    v->setName(name);
+  else if (SPIRVInstNamer && isa<Instruction>(v) && bv->hasId())
+    v->setName(Twine("spv") + Twine(bv->getId()));
 }
 
 void SPIRVToLLVM::setLLVMLoopMetadata(SPIRVLoopMerge *lm, BranchInst *bi) {
@@ -4628,8 +4632,12 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
   case OpFunction:
     return mapValue(bv, transFunction(static_cast<SPIRVFunction *>(bv)));
 
-  case OpLabel:
-    return mapValue(bv, BasicBlock::Create(*m_context, bv->getName(), f));
+  case OpLabel: {
+    std::string name = bv->getName();
+    if (name.empty() && SPIRVInstNamer)
+      name = (Twine("spv") + Twine(bv->getId())).str();
+    return mapValue(bv, BasicBlock::Create(*m_context, name, f));
+  }
 
   case (OpVariable):
     if (bb) {
