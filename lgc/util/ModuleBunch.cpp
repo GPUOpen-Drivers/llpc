@@ -62,13 +62,28 @@ bool ModuleBunch::isNormalized() const {
   return true;
 }
 
+/// Print the ModuleBunch to an output stream. The extra args are passed as-is
+/// to Module::print for each module.
+void ModuleBunch::print(raw_ostream &OS, AssemblyAnnotationWriter *AAW, bool ShouldPreserveUseListOrder,
+                        bool IsForDebug) const {
+  for (const Module &M : *this)
+    M.print(OS, AAW, ShouldPreserveUseListOrder, IsForDebug);
+}
+
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+/// Dump ModuleBunch to dbgs().
+LLVM_DUMP_METHOD
+void ModuleBunch::dump() const {
+  print(dbgs(), nullptr, false, /*IsForDebug=*/true);
+}
+#endif // !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+
 // Copied from IRPrintingPasses.cpp and edited.
 PreservedAnalyses PrintModuleBunchPass::run(ModuleBunch &MB, ModuleBunchAnalysisManager &AM) {
   if (llvm::isFunctionInPrintList("*")) {
     if (!Banner.empty())
       OS << Banner << "\n";
-    for (const Module &M : MB)
-      M.print(OS, nullptr, ShouldPreserveUseListOrder);
+    MB.print(OS, nullptr, ShouldPreserveUseListOrder);
   } else {
     bool BannerPrinted = false;
     for (const Module &M : MB) {
@@ -175,7 +190,8 @@ PreservedAnalyses ModuleBunchToModulePassAdaptor::run(ModuleBunch &Bunch, Module
   // so we can at least test users adding identical copies of the module pass manager.
   SmallPtrSet<LLVMContext *, 16> DoneContexts;
   for (unsigned StartIdx = 0; StartIdx != Bunch.size(); ++StartIdx) {
-    LLVMContext *Context = &Bunch.begin()[StartIdx].getContext();
+    Module &module = Bunch.begin()[StartIdx];
+    LLVMContext *Context = &module.getContext();
     if (!DoneContexts.insert(Context).second)
       continue;
 

@@ -40,65 +40,13 @@ using ModuleBunchAnalysisManager = AnalysisManager<ModuleBunch>;
 using ModuleAnalysisManagerModuleBunchProxy = InnerAnalysisManagerProxy<ModuleAnalysisManager, ModuleBunch>;
 using ModuleBunchAnalysisManagerModuleProxy = OuterAnalysisManagerProxy<ModuleBunchAnalysisManager, Module>;
 
-/// A pointer encapsulated as random access iterator, so that it can be subclassed to handle dereferences differently.
-template <typename T> class PointerAsIterator : public std::iterator<std::random_access_iterator_tag, T> {
-public:
-  using value_type = T;
-  using difference_type = size_t;
-  PointerAsIterator(value_type *ptr) : ptr(ptr) {}
-
-  const value_type &operator*() const { return *ptr; }
-  const value_type *operator->() const { return ptr; }
-  PointerAsIterator &operator+=(size_t offset) {
-    ptr += offset;
-    return *this;
-  }
-  PointerAsIterator operator+(size_t offset) const { return PointerAsIterator(ptr + offset); }
-  friend PointerAsIterator operator+(size_t offset, const PointerAsIterator &it) {
-    return PointerAsIterator(it.ptr + offset);
-  }
-  PointerAsIterator &operator++() {
-    ++ptr;
-    return *this;
-  }
-  PointerAsIterator &operator-=(size_t offset) {
-    ptr -= offset;
-    return *this;
-  }
-  PointerAsIterator operator-(size_t offset) const { return PointerAsIterator(ptr - offset); }
-  size_t operator-(const PointerAsIterator &rhs) const { return ptr - rhs.ptr; }
-  PointerAsIterator &operator--() {
-    --ptr;
-    return *this;
-  }
-  value_type &operator[](size_t idx) { return *(*this + idx); }
-  bool operator==(const PointerAsIterator &rhs) const { return ptr == rhs.ptr; }
-  bool operator!=(const PointerAsIterator &rhs) const { return ptr != rhs.ptr; }
-  bool operator<(const PointerAsIterator &rhs) const { return ptr < rhs.ptr; }
-  bool operator>(const PointerAsIterator &rhs) const { return ptr > rhs.ptr; }
-  bool operator<=(const PointerAsIterator &rhs) const { return ptr <= rhs.ptr; }
-  bool operator>=(const PointerAsIterator &rhs) const { return ptr >= rhs.ptr; }
-
-private:
-  value_type *ptr = nullptr;
-};
-
 /// ModuleBunch is a pseudo-IR construct for a bunch of modules that we want to run passes on.
 class ModuleBunch {
 public:
   // Iterator for accessing the Modules in the ModuleBunch, without being able to free or replace
   // any Module. The iterator does a "double dereference" from pointer-to-unique-ptr-to-Module
   // down to Module &.
-  class iterator : public PointerAsIterator<const std::unique_ptr<Module>> {
-  public:
-    using Parent = PointerAsIterator<const std::unique_ptr<Module>>;
-    using value_type = Module;
-    iterator(const std::unique_ptr<Module> *ptr) : Parent(ptr) {}
-    // Override methods that access the iterator's contents.
-    value_type &operator*() const { return **static_cast<Parent>(*this); }
-    const value_type *operator->() const { return &**static_cast<Parent>(*this); }
-    value_type &operator[](size_t idx) const { return *static_cast<Parent>(*this)[idx]; }
-  };
+  using iterator = llvm::pointee_iterator<ArrayRef<std::unique_ptr<Module>>::iterator>;
 
   // Access the Modules in the ModuleBunch, without erasing/removing/replacing them.
   iterator begin() const { return iterator(Modules.begin()); }
@@ -124,9 +72,23 @@ public:
   // Check that Modules list has been renormalized since caller removed/freed modules.
   bool isNormalized() const;
 
+  // Print the ModuleBunch to an output stream. The extra args are passed as-is
+  // to Module::print for each module.
+  void print(raw_ostream &OS, AssemblyAnnotationWriter *AAW, bool ShouldPreserveUseListOrder = false,
+             bool IsForDebug = false) const;
+
+  // Dump the module to stderr (for debugging).
+  void dump() const;
+
 private:
   SmallVector<std::unique_ptr<Module>> Modules;
 };
+
+/// A raw_ostream inserter for ModuleBunch
+inline raw_ostream &operator<<(raw_ostream &O, const ModuleBunch &MB) {
+  MB.print(O, nullptr);
+  return O;
+}
 
 extern template class PassManager<ModuleBunch>;
 extern template class AnalysisManager<ModuleBunch>;
