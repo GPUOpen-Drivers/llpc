@@ -1,5 +1,4 @@
 ; Test that a fetch shader for 1 input is handled correctly.
-; REQUIRES: do-not-run-me
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -use-relocatable-shader-elf -auto-layout-desc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
