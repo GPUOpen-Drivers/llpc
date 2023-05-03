@@ -102,7 +102,7 @@ private:
 // This is the implementation subclass of the PassManager class declared in PassManager.h
 class PassManagerImpl final : public lgc::PassManager {
 public:
-  PassManagerImpl(LgcContext *lgcContext);
+  PassManagerImpl(TargetMachine *targetMachine, LLVMContext &context);
   void registerPass(StringRef passName, StringRef className) override;
   void run(Module &module) override;
   void setPassIndex(unsigned *passIndex) override { m_passIndex = passIndex; }
@@ -161,10 +161,9 @@ lgc::LegacyPassManager *lgc::LegacyPassManager::Create() {
 // =====================================================================================================================
 // Create a PassManagerImpl
 //
-// @param targetMachine : Optional target machine argument. Must be provided if the AMDLLPC target specific alias
-// analysis pass needs to be registered.
+// @param lgcContext : LgcContext to get TargetMachine and LLVMContext from
 lgc::PassManager *lgc::PassManager::Create(LgcContext *lgcContext) {
-  return new PassManagerImpl(lgcContext);
+  return new PassManagerImpl(lgcContext->getTargetMachine(), lgcContext->getContext());
 }
 
 // =====================================================================================================================
@@ -176,12 +175,12 @@ LegacyPassManagerImpl::LegacyPassManagerImpl() : LegacyPassManager() {
 }
 
 // =====================================================================================================================
-PassManagerImpl::PassManagerImpl(LgcContext *lgcContext)
-    : PassManager(), m_targetMachine(lgcContext->getTargetMachine()),
+PassManagerImpl::PassManagerImpl(TargetMachine *targetMachine, LLVMContext &context)
+    : PassManager(), m_targetMachine(targetMachine),
       m_instrumentationStandard(
 #if !LLVM_MAIN_REVISION || LLVM_MAIN_REVISION >= 442861
           // New version of the code (also handles unknown version, which we treat as latest)
-          lgcContext->getContext(),
+          context,
 #endif
           cl::DebugPassManager, cl::DebugPassManager || cl::VerifyIr,
           /*PrintPassOpts=*/{true, false, true}) {

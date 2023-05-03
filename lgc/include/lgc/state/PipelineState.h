@@ -159,6 +159,8 @@ public:
   // Generate pipeline module
   bool generate(std::unique_ptr<llvm::Module> pipelineModule, llvm::raw_pwrite_stream &outStream,
                 CheckShaderCacheFunc checkShaderCacheFunc, llvm::ArrayRef<llvm::Timer *> timers) override final;
+  bool generate(llvm::Module *pipelineModule, llvm::raw_pwrite_stream &outStream,
+                CheckShaderCacheFunc checkShaderCacheFunc, llvm::ArrayRef<llvm::Timer *> timers) override final;
 
   // Create an ELF linker object for linking unlinked shader/part-pipeline ELFs into a pipeline ELF using the
   // pipeline state

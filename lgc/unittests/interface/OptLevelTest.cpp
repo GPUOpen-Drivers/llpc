@@ -26,6 +26,7 @@
 #include "lgc/LgcContext.h"
 #include "lgc/LgcDialect.h"
 #include "llvm/IR/LLVMContext.h"
+#include "llvm/Target/TargetMachine.h"
 #include "gmock/gmock.h"
 
 using namespace lgc;
@@ -41,7 +42,8 @@ TEST(LgcInterfaceTests, DefaultOptLevel) {
   StringRef gpuName = "gfx802";
 
   for (auto optLevel : {Level::None, Level::Less, Level::Default, Level::Aggressive}) {
-    std::unique_ptr<LgcContext> lgcContext(LgcContext::create(context, gpuName, palAbiVersion, optLevel));
+    std::unique_ptr<TargetMachine> targetMachine = LgcContext::createTargetMachine(gpuName, optLevel);
+    std::unique_ptr<LgcContext> lgcContext(LgcContext::create(&*targetMachine, context, palAbiVersion));
     EXPECT_EQ(lgcContext->getOptimizationLevel(), optLevel);
   }
 }

@@ -84,7 +84,8 @@ public:
   // Get (create if necessary) LgcContext
   lgc::LgcContext *getLgcContext();
 
-  llvm::CodeGenOpt::Level getOptimizationLevel() const;
+  llvm::CodeGenOpt::Level getOptimizationLevel();
+  llvm::CodeGenOpt::Level getLastOptimizationLevel() const;
 
   std::unique_ptr<llvm::Module> loadLibrary(const BinaryData *lib);
 
@@ -127,13 +128,14 @@ private:
   Context(const Context &) = delete;
   Context &operator=(const Context &) = delete;
 
-  GfxIpVersion m_gfxIp;                              // Graphics IP version info
-  PipelineContext *m_pipelineContext;                // Pipeline-specific context
-  bool m_isInUse = false;                            // Whether this context is in use
-  lgc::Builder *m_builder = nullptr;                 // LLPC builder object
-  std::unique_ptr<lgc::LgcContext> m_builderContext; // Builder context
+  GfxIpVersion m_gfxIp;                                 // Graphics IP version info
+  PipelineContext *m_pipelineContext;                   // Pipeline-specific context
+  bool m_isInUse = false;                               // Whether this context is in use
+  lgc::Builder *m_builder = nullptr;                    // LLPC builder object
+  std::unique_ptr<llvm::TargetMachine> m_targetMachine; // Target machine for LGC context
+  std::unique_ptr<lgc::LgcContext> m_builderContext;    // LGC context
 
-  std::unique_ptr<llvm::TargetMachine> m_targetMachine; // Target machine
+  std::optional<llvm::CodeGenOpt::Level> m_lastOptLevel{}; // What getOptimizationLevel() last returned
   std::unique_ptr<llvm_dialects::DialectContext> m_dialectContext;
 
   unsigned m_useCount = 0; // Number of times this context is used.
