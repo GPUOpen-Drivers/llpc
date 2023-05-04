@@ -611,9 +611,9 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
 void SpirvLowerRayTracing::processLibraryFunction(Function *func) {
   assert(m_shaderStage == ShaderStageCompute);
   auto mangledName = func->getName();
-  const char *traceRayFuncName = m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_TRACE_RAY);
+  StringRef traceRayFuncName = m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_TRACE_RAY);
 
-  if (mangledName.startswith(traceRayFuncName)) {
+  if (!traceRayFuncName.empty() && mangledName.startswith(traceRayFuncName)) {
     func->setLinkage(GlobalValue::ExternalLinkage);
   } else if (mangledName.startswith(RtName::GetFlattenedGroupThreadId)) {
     eraseFunctionBlocks(func);

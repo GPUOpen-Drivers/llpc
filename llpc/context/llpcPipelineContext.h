@@ -184,7 +184,7 @@ public:
 #if VKI_RAY_TRACING
   unsigned getRayTracingWaveSize() const;
 
-  const char *getRayTracingFunctionName(unsigned funcType);
+  llvm::StringRef getRayTracingFunctionName(unsigned funcType);
 
   // Gets ray tracing state info
   const Vkgc::RtState *getRayTracingState() { return m_rtState; }
