@@ -76,6 +76,7 @@ Value *BuilderCommon::CreatePtrDiff(Type *ty, Value *lhs, Value *rhs, const Twin
 // @param instName : Name to give instruction
 CallInst *BuilderCommon::CreateNamedCall(StringRef funcName, Type *retTy, ArrayRef<Value *> args,
                                          ArrayRef<Attribute::AttrKind> attribs, const Twine &instName) {
+  assert(!funcName.empty());
   Module *module = GetInsertBlock()->getParent()->getParent();
   Function *func = dyn_cast_or_null<Function>(module->getFunction(funcName));
   if (!func) {
