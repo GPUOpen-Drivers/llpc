@@ -357,18 +357,18 @@ bool SpirvLowerRayQuery::runImpl(Module &module) {
 void SpirvLowerRayQuery::processLibraryFunction(Function *&func) {
   const auto *rtState = m_context->getPipelineContext()->getRayTracingState();
   auto mangledName = func->getName();
-  const char *rayQueryInitialize =
+  const StringRef rayQueryInitialize =
       m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_TRACE_RAY_INLINE);
-  const char *rayQueryProceed =
+  const StringRef rayQueryProceed =
       m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_RAY_QUERY_PROCEED);
   if (mangledName.startswith(RtName::LibraryEntryFuncName)) {
     func->dropAllReferences();
     func->eraseFromParent();
     func = nullptr;
-  } else if (mangledName.startswith(rayQueryInitialize)) {
+  } else if (!rayQueryInitialize.empty() && mangledName.startswith(rayQueryInitialize)) {
     func->setName(rayQueryInitialize);
     func->setLinkage(GlobalValue::ExternalLinkage);
-  } else if (mangledName.startswith(rayQueryProceed)) {
+  } else if (!rayQueryProceed.empty() && mangledName.startswith(rayQueryProceed)) {
     func->setName(rayQueryProceed);
     func->setLinkage(GlobalValue::ExternalLinkage);
   } else if (mangledName.startswith(RtName::LoadDwordAtAddrx4)) {
@@ -567,7 +567,7 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryInitializeKHR>
   if (m_context->getPipelineContext()->getRayTracingState()->enableRayTracingCounters)
     generateTraceRayStaticId();
 
-  const char *rayQueryInitialize =
+  StringRef rayQueryInitialize =
       m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_TRACE_RAY_INLINE);
   m_builder->CreateNamedCall(rayQueryInitialize, m_builder->getVoidTy(), traceRaysArgs,
                              {Attribute::NoUnwind, Attribute::AlwaysInline});

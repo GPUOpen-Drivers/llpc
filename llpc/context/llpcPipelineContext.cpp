@@ -206,8 +206,10 @@ ShaderHash PipelineContext::getShaderHashCode(const PipelineShaderInfo &shaderIn
 // =====================================================================================================================
 // Return ray tracing/ray query entry function names
 //
+// This may return null, e.g. when compiling from an older pipeline dump
+//
 // @param funcType : function type
-const char *PipelineContext::getRayTracingFunctionName(unsigned funcType) {
+StringRef PipelineContext::getRayTracingFunctionName(unsigned funcType) {
   assert(funcType < Vkgc::RT_ENTRY_FUNC_COUNT);
   return getRayTracingState()->gpurtFuncTable.pFunc[funcType];
 }
