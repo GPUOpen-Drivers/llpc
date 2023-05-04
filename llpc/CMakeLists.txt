@@ -195,12 +195,6 @@ target_include_directories(llpcinternal
         ${LLVM_INCLUDE_DIRS}
 )
 
-#if VKI_RAY_TRACING
-if(VKI_RAY_TRACING)
-  target_include_directories(llpcinternal PRIVATE ${XGL_GPURT_PATH})
-endif()
-#endif
-
 if(WIN32)
     target_compile_definitions(llpcinternal PRIVATE VK_USE_PLATFORM_WIN32_KHR)
 endif()

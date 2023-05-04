@@ -24,8 +24,9 @@
  **********************************************************************************************************************/
 /**
 ***********************************************************************************************************************
-* @file  gpurt.h
-* @brief Main header for the GPU raytracing shared code component
+* @file  gpurt-compiler.h
+* @brief Main header for the GPU raytracing shared code component, cut down to essentials and renamed to reduce the
+* risk of mixing up files.
 ***********************************************************************************************************************
 */
 

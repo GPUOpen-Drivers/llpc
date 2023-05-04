@@ -31,7 +31,7 @@
 
 #include "llpcSpirvLowerRayTracingBuiltIn.h"
 #include "SPIRVInternal.h"
-#include "gpurt.h"
+#include "gpurt-compiler.h"
 #include "llpcContext.h"
 #include "llpcRayTracingContext.h"
 #include "llpcSpirvLowerRayTracing.h"
