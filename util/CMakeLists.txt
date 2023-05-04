@@ -23,6 +23,8 @@
  #
  #######################################################################################################################
 
+add_subdirectory(gpurtshim)
+
 add_library(vkgc_util
     vkgcExtension.cpp
     vkgcCapability.h

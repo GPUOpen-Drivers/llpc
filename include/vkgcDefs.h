@@ -30,6 +30,7 @@
  */
 #pragma once
 
+#include "vkgcBase.h"
 #include "vulkan.h"
 #include <cassert>
 #include <tuple>
@@ -437,38 +438,6 @@ struct ResourceMappingData {
 
   const StaticDescriptorValue *pStaticDescriptorValues; ///< An array of static descriptors
   unsigned staticDescriptorValueCount;                  ///< Count of static descriptors
-};
-
-/// Represents graphics IP version info. See https://llvm.org/docs/AMDGPUUsage.html#processors for more
-/// details.
-struct GfxIpVersion {
-  unsigned major;    ///< Major version
-  unsigned minor;    ///< Minor version
-  unsigned stepping; ///< Stepping info
-
-  // GFX IP checkers
-  bool operator==(const GfxIpVersion &rhs) const {
-    return std::tie(major, minor, stepping) == std::tie(rhs.major, rhs.minor, rhs.stepping);
-  }
-  bool operator>=(const GfxIpVersion &rhs) const {
-    return std::tie(major, minor, stepping) >= std::tie(rhs.major, rhs.minor, rhs.stepping);
-  }
-  bool isGfx(unsigned rhsMajor, unsigned rhsMinor) const {
-    return std::tie(major, minor) == std::tie(rhsMajor, rhsMinor);
-  }
-};
-
-/// Represents RT IP version
-struct RtIpVersion {
-  unsigned major; ///< Major version
-  unsigned minor; ///< Minor version
-
-  // RT IP checkers
-  bool operator==(const RtIpVersion &rhs) const { return std::tie(major, minor) == std::tie(rhs.major, rhs.minor); }
-  bool operator>=(const RtIpVersion &rhs) const { return std::tie(major, minor) >= std::tie(rhs.major, rhs.minor); }
-  bool isRtIp(unsigned rhsMajor, unsigned rhsMinor) const {
-    return std::tie(major, minor) == std::tie(rhsMajor, rhsMinor);
-  }
 };
 
 /// Represents shader binary data.
@@ -1007,24 +976,6 @@ enum RayTracingRayFlag : uint32_t {
 };
 
 // =====================================================================================================================
-// Raytracing entry function indices
-enum RAYTRACING_ENTRY_FUNC : unsigned {
-  RT_ENTRY_TRACE_RAY,
-  RT_ENTRY_TRACE_RAY_INLINE,
-  RT_ENTRY_TRACE_RAY_HIT_TOKEN,
-  RT_ENTRY_RAY_QUERY_PROCEED,
-  RT_ENTRY_INSTANCE_INDEX,
-  RT_ENTRY_INSTANCE_ID,
-  RT_ENTRY_OBJECT_TO_WORLD_TRANSFORM,
-  RT_ENTRY_WORLD_TO_OBJECT_TRANSFORM,
-  RT_ENTRY_RESERVE1,
-  RT_ENTRY_RESERVE2,
-  RT_ENTRY_FETCH_HIT_TRIANGLE_FROM_NODE_POINTER,
-  RT_ENTRY_FETCH_HIT_TRIANGLE_FROM_RAY_QUERY,
-  RT_ENTRY_FUNC_COUNT,
-};
-
-// =====================================================================================================================
 // raytracing system value usage flags
 union RayTracingSystemValueUsage {
   struct {
@@ -1081,11 +1032,6 @@ struct RayTracingShaderExportConfig {
   bool readsDispatchRaysIndex;        // Shader reads dispatchRaysIndex
   bool enableDynamicLaunch;           // Enable dynamic launch
   bool emitRaytracingShaderDataToken; // Emitting Raytracing ShaderData SQTT Token
-};
-
-/// Represents GPURT function table
-struct GpurtFuncTable {
-  char pFunc[RT_ENTRY_FUNC_COUNT][256]; ///< Function names
 };
 
 /// Enumerates the method of mapping from ray tracing launch ID to native thread ID

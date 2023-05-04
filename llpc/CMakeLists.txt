@@ -311,6 +311,10 @@ target_link_libraries(llpcinternal PUBLIC
     khronos_spirv_interface
 )
 
+if(VKI_RAY_TRACING AND NOT LLPC_IS_STANDALONE)
+    target_link_libraries(llpcinternal PRIVATE vkgc_gpurtshim)
+endif()
+
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 target_link_libraries(llpcinternal PRIVATE Threads::Threads)

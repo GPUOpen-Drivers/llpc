@@ -64,6 +64,10 @@ endif()
 
 #if VKI_RAY_TRACING
 if(VKI_RAY_TRACING)
+    if(NOT LLPC_IS_STANDALONE)
+        target_compile_definitions(vkgc_headers INTERFACE HAVE_GPURT_SHIM)
+    endif()
+
     target_compile_definitions(vkgc_headers INTERFACE VKI_RAY_TRACING)
     target_compile_definitions(vkgc_headers INTERFACE GPURT_CLIENT_INTERFACE_MAJOR_VERSION=${GPURT_CLIENT_INTERFACE_MAJOR_VERSION})
 endif()
@@ -124,11 +128,11 @@ if(EXISTS ${XGL_SPVGEN_PATH})
     add_subdirectory(${XGL_SPVGEN_PATH} ${XGL_SPVGEN_BUILD_PATH} EXCLUDE_FROM_ALL)
 endif()
 
+endif(LLPC_BUILD_TOOLS)
+
 if(ICD_BUILD_LLPC)
     # Generate Strings for LLPC standalone tool
     add_subdirectory(util ${PROJECT_BINARY_DIR}/util)
-endif()
-
 endif()
 
 ### VKGC build LLPC ################################################################
