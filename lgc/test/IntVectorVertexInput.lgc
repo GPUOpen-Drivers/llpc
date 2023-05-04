@@ -1,5 +1,4 @@
 ; Test with a vector of integers are a vertex attribute input.
-; REQUIRES: do-not-run-me
 
 ; RUN: lgc -mcpu=gfx802 -extract=2 -filetype=obj -o %t.vs.elf - <%s && lgc -mcpu=gfx802 -extract=3 -filetype=obj -o %t.fs.elf - <%s && lgc -mcpu=gfx802 -extract=1 -o - -l -glue=1 %s %t.vs.elf %t.fs.elf | FileCheck -check-prefixes=FETCH-ISA %s
 ; FETCH-ISA: tbuffer_load_format_xyzw v[4:7],

@@ -1,5 +1,4 @@
 ; Test building the vertex shader by itself.
-; REQUIRES: do-not-run-me
 
 ; RUN: lgc -mcpu=gfx802 -extract=2 - <%s | FileCheck --check-prefixes=VS-ISA,VS-NOTNGG-ISA %s
 ; RUN: lgc -mcpu=gfx900 -extract=2 - <%s | FileCheck --check-prefixes=VS-ISA,VS-NOTNGG-ISA %s
