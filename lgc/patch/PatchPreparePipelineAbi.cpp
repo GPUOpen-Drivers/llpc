@@ -414,8 +414,7 @@ void PatchPreparePipelineAbi::mergeShader(Module &module) {
         // If NGG is enabled, ES-GS merged shader should be present even if GS is absent
         auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageVertex);
         if (esEntryPoint) {
-          if (esEntryPoint)
-            lgc::setShaderStage(esEntryPoint, ShaderStageVertex);
+          lgc::setShaderStage(esEntryPoint, ShaderStageVertex);
           auto primShaderEntryPoint = shaderMerger.buildPrimShader(esEntryPoint, nullptr, nullptr);
           primShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
           lgc::setShaderStage(primShaderEntryPoint, ShaderStageVertex);
