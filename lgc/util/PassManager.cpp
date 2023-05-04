@@ -189,8 +189,7 @@ lgc::LegacyPassManager *lgc::LegacyPassManager::Create() {
 //
 // @param lgcContext : LgcContext to get TargetMachine and LLVMContext from
 std::unique_ptr<lgc::PassManager> lgc::PassManager::Create(LgcContext *lgcContext) {
-  return std::unique_ptr<lgc::PassManager>(
-      new PassManagerImpl(lgcContext->getTargetMachine(), lgcContext->getContext()));
+  return std::make_unique<PassManagerImpl>(lgcContext->getTargetMachine(), lgcContext->getContext());
 }
 
 // =====================================================================================================================
@@ -198,7 +197,7 @@ std::unique_ptr<lgc::PassManager> lgc::PassManager::Create(LgcContext *lgcContex
 //
 // @param targetMachine : TargetMachine to use
 std::unique_ptr<lgc::MbPassManager> lgc::MbPassManager::Create(TargetMachine *targetMachine) {
-  return std::unique_ptr<MbPassManager>(new MbPassManagerImpl(targetMachine));
+  return std::make_unique<MbPassManagerImpl>(targetMachine);
 }
 
 // =====================================================================================================================
