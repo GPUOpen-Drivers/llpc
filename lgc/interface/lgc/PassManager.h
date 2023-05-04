@@ -30,6 +30,7 @@
  */
 #pragma once
 
+#include "lgc/ModuleBunch.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/PassManager.h"
 
@@ -53,13 +54,13 @@ public:
 };
 
 // =====================================================================================================================
-// Public interface of LLPC middle-end's PassManager override
+// Public interface of LLPC middle-end's PassManager override -- Module pass manager edition
 class PassManager : public llvm::ModulePassManager {
 public:
   // Create an LGC PassManager using the TargetMachine and LLVMContext from the given lgcContext.
-  static PassManager *Create(LgcContext *lgcContext);
+  static std::unique_ptr<PassManager> Create(LgcContext *lgcContext);
 
-  virtual ~PassManager() {}
+  virtual ~PassManager() = default;
   template <typename PassBuilderT> bool registerFunctionAnalysis(PassBuilderT &&PassBuilder) {
     return m_functionAnalysisManager.registerPass(std::forward<PassBuilderT>(PassBuilder));
   }
@@ -77,6 +78,36 @@ public:
 protected:
   llvm::FunctionAnalysisManager m_functionAnalysisManager;
   llvm::ModuleAnalysisManager m_moduleAnalysisManager;
+};
+
+// =====================================================================================================================
+// Public interface of LLPC middle-end's PassManager override -- ModuleBunch pass manager edition
+class MbPassManager : public llvm::PassManager<llvm::ModuleBunch> {
+public:
+  // Create an LGC PassManager using the given TargetMachine.
+  static std::unique_ptr<MbPassManager> Create(llvm::TargetMachine *targetMachine);
+
+  virtual ~MbPassManager() = default;
+  template <typename PassBuilderT> bool registerFunctionAnalysis(PassBuilderT &&PassBuilder) {
+    return m_functionAnalysisManager.registerPass(std::forward<PassBuilderT>(PassBuilder));
+  }
+  template <typename PassBuilderT> bool registerModuleAnalysis(PassBuilderT &&passBuilder) {
+    return m_moduleAnalysisManager.registerPass(std::forward<PassBuilderT>(passBuilder));
+  }
+  template <typename PassBuilderT> bool registerModuleBunchAnalysis(PassBuilderT &&passBuilder) {
+    return m_moduleBunchAnalysisManager.registerPass(std::forward<PassBuilderT>(passBuilder));
+  }
+  // Register a pass to identify it with a short name in the pass manager
+  virtual void registerPass(llvm::StringRef passName, llvm::StringRef className) = 0;
+  virtual void run(llvm::ModuleBunch &moduleBunch) = 0;
+  virtual bool stopped() const = 0;
+
+  virtual llvm::PassInstrumentationCallbacks &getInstrumentationCallbacks() = 0;
+
+protected:
+  llvm::FunctionAnalysisManager m_functionAnalysisManager;
+  llvm::ModuleAnalysisManager m_moduleAnalysisManager;
+  llvm::ModuleBunchAnalysisManager m_moduleBunchAnalysisManager;
 };
 
 } // namespace lgc
