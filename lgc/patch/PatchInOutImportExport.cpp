@@ -956,15 +956,18 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         exist = true;
         loc = value;
       } else {
+        // Generic output exports of FS should have been handled by the LowerFragColorExport pass
+        assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageGeometry ||
+               m_shaderStage == ShaderStageTessEval);
+
+        // Check component offset and search the location info map once again
+        unsigned component = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
+        if (output->getType()->getScalarSizeInBits() == 64)
+          component *= 2; // Component in location info is dword-based
+        origLocInfo.setComponent(component);
+        locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
+
         if (m_pipelineState->canPackOutput(m_shaderStage)) {
-          // Generic output exports of FS should have been handled by the LowerFragColorExport pass
-          assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageGeometry ||
-                 m_shaderStage == ShaderStageTessEval);
-
-          // Check component offset and search the location info map once again
-          origLocInfo.setComponent(cast<ConstantInt>(callInst.getOperand(1))->getZExtValue());
-          locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
-
           if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
             loc = locInfoMapIt->second.getLocation();
             elemIdx = locInfoMapIt->second.getComponent();

@@ -507,12 +507,14 @@ bool LowerFragColorExport::runImpl(Module &module, PipelineShadersResult &pipeli
 // @param [in/out] expFragColors : An array with the current color export information for each hw color target.
 void LowerFragColorExport::updateFragColors(CallInst *callInst, ColorExportValueInfo expFragColors[],
                                             BuilderBase &builder) {
-  unsigned location = cast<ConstantInt>(callInst->getOperand(0))->getZExtValue();
-  const unsigned compIdx = cast<ConstantInt>(callInst->getOperand(1))->getZExtValue();
+  const unsigned location = cast<ConstantInt>(callInst->getOperand(0))->getZExtValue();
+  const unsigned component = cast<ConstantInt>(callInst->getOperand(1))->getZExtValue();
   Value *output = callInst->getOperand(2);
+  assert(output->getType()->getScalarSizeInBits() <= 32); // 64-bit output is not allowed
 
   InOutLocationInfo origLocInfo;
   origLocInfo.setLocation(location);
+  origLocInfo.setComponent(component);
   auto locInfoMapIt = m_resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
   if (locInfoMapIt == m_resUsage->inOutUsage.outputLocInfoMap.end())
     return;
@@ -541,11 +543,11 @@ void LowerFragColorExport::updateFragColors(CallInst *callInst, ColorExportValue
   assert(hwColorTarget < MaxColorTargets);
   auto &expFragColor = expFragColors[hwColorTarget];
 
-  while (compIdx + compCount > expFragColor.value.size())
+  while (component + compCount > expFragColor.value.size())
     expFragColor.value.push_back(UndefValue::get(compTy));
 
   for (unsigned i = 0; i < compCount; ++i)
-    expFragColor.value[compIdx + i] = outputComps[i];
+    expFragColor.value[component + i] = outputComps[i];
 
   expFragColor.location = location;
   BasicType outputType = m_resUsage->inOutUsage.fs.outputTypes[location];
