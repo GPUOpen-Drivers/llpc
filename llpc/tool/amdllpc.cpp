@@ -479,11 +479,9 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
     compileInfo->optimizationLevel = LlpcOptLevel;
   }
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
   // We want the default optimization level to be "Default" which is not 0.
   compileInfo->gfxPipelineInfo.options.optimizationLevel = CodeGenOpt::Level::Default;
   compileInfo->compPipelineInfo.options.optimizationLevel = CodeGenOpt::Level::Default;
-#endif
   compileInfo->gfxPipelineInfo.options.resourceLayoutScheme = LayoutScheme;
   compileInfo->compPipelineInfo.options.forceCsThreadIdSwizzling = ForceCsThreadIdSwizzling;
   compileInfo->compPipelineInfo.options.overrideThreadGroupSizeX = OverrideThreadGroupSizeX;
@@ -506,11 +504,7 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
     nggState.enableNgg = EnableNgg;
     nggState.enableGsUse = NggEnableGsUse;
     nggState.forceCullingMode = NggForceCullingMode;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 60
-    nggState.compactMode = NggCompactVertex ? NggCompactVertices : NggCompactDisable;
-#else
     nggState.compactVertex = NggCompactVertex;
-#endif
     nggState.enableBackfaceCulling = NggEnableBackfaceCulling;
     nggState.enableFrustumCulling = NggEnableFrustumCulling;
     nggState.enableBoxFilterCulling = NggEnableBoxFilterCulling;

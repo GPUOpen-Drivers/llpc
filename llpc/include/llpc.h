@@ -44,9 +44,6 @@ using Vkgc::FsOutInfo;
 using Vkgc::GfxIpVersion;
 using Vkgc::GraphicsPipelineBuildInfo;
 using Vkgc::MaxColorTargets;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 60
-using Vkgc::NggCompactDisable;
-#endif
 using Vkgc::NggSubgroupSizingType;
 using Vkgc::OutputAllocFunc;
 using Vkgc::PipelineOptions;
@@ -114,14 +111,6 @@ static const char VkIcdName[] = "amdvlk";
 /// Represents per shader module options.
 struct ShaderModuleOptions {
   PipelineOptions pipelineOptions; ///< Pipeline options related with this shader module
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 50
-  bool enableOpt; ///< Enable translate & lower phase in build shader module
-#endif
-#if VKI_RAY_TRACING
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 55
-  bool isInternalRtShader; ///< Whether this shader is an internal raytracing shader
-#endif
-#endif
 };
 
 /// Represents info to build a shader module.

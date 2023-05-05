@@ -276,7 +276,6 @@ TEST(PipelineDumperTest, TestOptimizeTessFactorOptionCompute) {
 }
 #endif
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
 // =====================================================================================================================
 // Test the optimization level option.  The default value for the optimization level in the pipeline build info is 0.
 // All tess will be compared with that.
@@ -344,8 +343,6 @@ TEST(PipelineDumperTest, TestOverrideThreadGroupSizeValue2Compute) {
   HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &) { return false; };
   runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
 }
-
-#endif
 
 // =====================================================================================================================
 // Test the threadGroupSwizzleMode option.

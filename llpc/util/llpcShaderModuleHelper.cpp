@@ -405,12 +405,7 @@ Result ShaderModuleHelper::getModuleData(const ShaderModuleBuildInfo *shaderInfo
     moduleData.usage = ShaderModuleHelper::getShaderModuleUsageInfo(&shaderBinary);
     moduleData.binCode = getShaderCode(shaderInfo, codeBuffer);
 #if VKI_RAY_TRACING
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 55
-    moduleData.usage.isInternalRtShader =
-        shaderInfo->options.isInternalRtShader || shaderInfo->options.pipelineOptions.internalRtShaders;
-#else
     moduleData.usage.isInternalRtShader = shaderInfo->options.pipelineOptions.internalRtShaders;
-#endif
 #endif
     // Calculate SPIR-V cache hash
     Hash cacheHash = {};
@@ -439,12 +434,7 @@ BinaryData ShaderModuleHelper::getShaderCode(const ShaderModuleBuildInfo *shader
   const BinaryData &shaderBinary = shaderInfo->shaderBin;
   bool trimDebugInfo = cl::TrimDebugInfo;
 #if VKI_RAY_TRACING
-  trimDebugInfo = trimDebugInfo &&
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 55
-                  !(shaderInfo->options.pipelineOptions.internalRtShaders || shaderInfo->options.isInternalRtShader);
-#else
-                  !(shaderInfo->options.pipelineOptions.internalRtShaders);
-#endif
+  trimDebugInfo = trimDebugInfo && !(shaderInfo->options.pipelineOptions.internalRtShaders);
 #endif
   if (trimDebugInfo) {
     code.codeSize = trimSpirvDebugInfo(&shaderBinary, codeBuffer);
@@ -464,12 +454,7 @@ unsigned ShaderModuleHelper::getCodeSize(const ShaderModuleBuildInfo *shaderInfo
   const BinaryData &shaderBinary = shaderInfo->shaderBin;
   bool trimDebugInfo = cl::TrimDebugInfo;
 #if VKI_RAY_TRACING
-  trimDebugInfo = trimDebugInfo &&
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 55
-                  !(shaderInfo->options.pipelineOptions.internalRtShaders || shaderInfo->options.isInternalRtShader);
-#else
-                  !(shaderInfo->options.pipelineOptions.internalRtShaders);
-#endif
+  trimDebugInfo = trimDebugInfo && !(shaderInfo->options.pipelineOptions.internalRtShaders);
 #endif
   if (!trimDebugInfo)
     return shaderBinary.codeSize;
