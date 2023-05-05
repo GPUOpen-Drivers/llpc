@@ -45,10 +45,8 @@ public:
     initVkSections();
     memset(&m_pipelineState, 0, sizeof(m_pipelineState));
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
     m_pipelineState.gfxPipelineInfo.options.optimizationLevel = 2;
     m_pipelineState.compPipelineInfo.options.optimizationLevel = 2;
-#endif
 
     memset(&m_vertexInputState, 0, sizeof(m_vertexInputState));
   };

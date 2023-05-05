@@ -70,11 +70,6 @@ public:
     ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, OptimizeForPrims)
     ADD_CLASS_ENUM_MAP(NggSubgroupSizingType, Explicit)
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 60
-    ADD_ENUM_MAP(NggCompactMode, NggCompactDisable)
-    ADD_ENUM_MAP(NggCompactMode, NggCompactVertices)
-#endif
-
     ADD_CLASS_ENUM_MAP(WaveBreakSize, None)
     ADD_CLASS_ENUM_MAP(WaveBreakSize, _8x8)
     ADD_CLASS_ENUM_MAP(WaveBreakSize, _16x16)
