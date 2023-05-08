@@ -42,7 +42,7 @@ using namespace llvm;
 // Constructor. This is where we store all the information needed to generate the export shader; other methods
 // do not need to look at PipelineState.
 ColorExportShader::ColorExportShader(PipelineState *pipelineState, ArrayRef<ColorExportInfo> exports)
-    : GlueShader(pipelineState->getLgcContext()), m_pipelineState(pipelineState) {
+    : GlueShader(pipelineState) {
   m_exports.append(exports.begin(), exports.end());
 
   memset(m_exportFormat, 0, sizeof(m_exportFormat));

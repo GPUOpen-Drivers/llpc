@@ -40,7 +40,7 @@ namespace lgc {
 // The class to generate the null fragment shader when linking.
 class NullFragmentShader : public GlueShader {
 public:
-  NullFragmentShader(PipelineState *pipelineState) : GlueShader(pipelineState->getLgcContext()) {}
+  NullFragmentShader(PipelineState *pipelineState) : GlueShader(pipelineState) {}
 
   // Get the string for this glue shader. This is some encoding or hash of the inputs to the create*Shader function
   // that the front-end client can use as a cache key to avoid compiling the same glue shader more than once.
