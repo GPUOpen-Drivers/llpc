@@ -3489,6 +3489,7 @@ void PatchInOutImportExport::patchXfbOutputExport(Value *output, unsigned xfbBuf
       assert(compCount <= 8);
       Type *loadTy = FixedVectorType::get(Type::getFloatTy(*m_context), 4);
       Value *args[] = {ConstantInt::get(Type::getInt32Ty(*m_context), location),
+                       ConstantInt::get(Type::getInt32Ty(*m_context), 0),
                        ConstantInt::get(Type::getInt32Ty(*m_context), streamId)};
       output = emitCall(lgcName::NggReadGsOutput + getTypeName(loadTy), loadTy, args,
                         {Attribute::Speculatable, Attribute::ReadOnly, Attribute::WillReturn}, insertPos);
