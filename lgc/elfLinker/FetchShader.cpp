@@ -51,7 +51,7 @@ constexpr uint32_t LsHsSysValueMergedWaveInfo = 3;
 // @param vsEntryRegInfo : The information about the contents of the parameters to the vertex shader.
 FetchShader::FetchShader(PipelineState *pipelineState, ArrayRef<VertexFetchInfo> fetches,
                          const VsEntryRegInfo &vsEntryRegInfo)
-    : GlueShader(pipelineState->getLgcContext()), m_vsEntryRegInfo(vsEntryRegInfo) {
+    : GlueShader(pipelineState->getLgcContext(), pipelineState), m_vsEntryRegInfo(vsEntryRegInfo) {
   m_fetches.append(fetches.begin(), fetches.end());
   for (const auto &fetch : m_fetches)
     m_fetchDescriptions.push_back(pipelineState->findVertexInputDescription(fetch.location));

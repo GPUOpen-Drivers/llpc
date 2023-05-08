@@ -89,7 +89,8 @@ public:
   virtual void updatePalMetadata(PalMetadata &palMetadata) = 0;
 
 protected:
-  GlueShader(LgcContext *lgcContext) : m_lgcContext(lgcContext) {}
+  GlueShader(LgcContext *lgcContext, PipelineState* pipelineState)
+      : m_lgcContext(lgcContext), m_pipelineState(pipelineState) {}
 
   // Compile the glue shader
   void compile(llvm::raw_pwrite_stream &outStream);
@@ -100,6 +101,8 @@ protected:
   llvm::LLVMContext &getContext() const { return m_lgcContext->getContext(); }
 
   LgcContext *m_lgcContext;
+
+  PipelineState *m_pipelineState;
 
 private:
   llvm::SmallString<0> m_elfBlob;
