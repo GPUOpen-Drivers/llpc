@@ -762,7 +762,7 @@ Instruction *BuilderImpl::CreateWriteXfbOutput(Value *valueToWrite, bool isBuilt
 
     if (valueToWrite->getType()->getPrimitiveSizeInBits() > 128) {
       outLocInfo.setLocation(location + 1);
-      xfbOutInfo.xfbOffset += 32;
+      xfbOutInfo.xfbOffset += 16; // <4 x dword>
       resUsage->inOutUsage.locInfoXfbOutInfoMap[outLocInfo] = xfbOutInfo;
     }
   }
