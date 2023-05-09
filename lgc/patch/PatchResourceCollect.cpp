@@ -1308,20 +1308,40 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
       m_deadCalls.push_back(&callInst);
 
       if (m_pipelineState->getNextShaderStage(m_shaderStage) != ShaderStageInvalid) {
+        // Also, we remove the output location info from the map if it exists
+        const unsigned location = cast<ConstantInt>(callInst.getArgOperand(0))->getZExtValue();
+        unsigned component = cast<ConstantInt>(callInst.getArgOperand(1))->getZExtValue();
+        if (outputValue->getType()->getScalarSizeInBits() == 64)
+          component *= 2; // Component in location info is dword-based
+
         InOutLocationInfo outLocInfo;
-        outLocInfo.setLocation(cast<ConstantInt>(callInst.getArgOperand(0))->getZExtValue());
-        outLocInfo.setComponent(cast<ConstantInt>(callInst.getArgOperand(1))->getZExtValue());
+        outLocInfo.setLocation(location);
+        outLocInfo.setComponent(component);
         if (m_shaderStage == ShaderStageGeometry)
           outLocInfo.setStreamId(cast<ConstantInt>(callInst.getArgOperand(2))->getZExtValue());
-        // Also, we remove the output location info from the map if it exists
+
         auto &outLocInfoMap = m_resUsage->inOutUsage.outputLocInfoMap;
-        if (outLocInfoMap.count(outLocInfo) > 0)
+        if (outLocInfoMap.count(outLocInfo) > 0) {
           outLocInfoMap.erase(outLocInfo);
+          if (outputValue->getType()->getPrimitiveSizeInBits() > 128) {
+            // NOTE: For any data that is larger than <4 x dword>, there are two consecutive locations occupied.
+            outLocInfo.setLocation(location + 1);
+            outLocInfoMap.erase(outLocInfo);
+          }
+        }
+
         // For GS, we remove transform feedback location info as well if it exists
         if (m_shaderStage == ShaderStageGeometry) {
+          outLocInfo.setLocation(location);
           auto &locInfoXfbOutInfoMap = m_resUsage->inOutUsage.locInfoXfbOutInfoMap;
-          if (locInfoXfbOutInfoMap.count(outLocInfo) > 0)
+          if (locInfoXfbOutInfoMap.count(outLocInfo) > 0) {
             locInfoXfbOutInfoMap.erase(outLocInfo);
+            if (outputValue->getType()->getPrimitiveSizeInBits() > 128) {
+              // NOTE: For any data that is larger than <4 x dword>, there are two consecutive locations occupied.
+              outLocInfo.setLocation(location + 1);
+              locInfoXfbOutInfoMap.erase(outLocInfo);
+            }
+          }
         }
       }
     } else {
