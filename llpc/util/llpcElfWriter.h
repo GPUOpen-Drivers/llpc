@@ -131,6 +131,8 @@ private:
 
   static void mergeMapItem(llvm::msgpack::MapDocNode &destMap, llvm::msgpack::MapDocNode &srcMap, unsigned key);
 
+  static void mergeMapItem(llvm::msgpack::MapDocNode &destMap, llvm::msgpack::MapDocNode &srcMap, llvm::StringRef key);
+
   LLPC_NODISCARD size_t getRequiredBufferSizeBytes();
 
   void calcSectionHeaderOffset();
