@@ -322,8 +322,10 @@ ComputeShaderMode Pipeline::getComputeShaderMode(Module &module) {
 // @param builderContext : LGC builder context
 // @param emitLgc : Whether the option -emit-lgc is on
 PipelineState::PipelineState(LgcContext *builderContext, bool emitLgc)
-    : Pipeline(builderContext), m_emitLgc(emitLgc), m_meshRowExport(EnableRowExport),
-      m_registerFieldFormat(UseRegisterFieldFormat) {
+    : Pipeline(builderContext), m_emitLgc(emitLgc), m_meshRowExport(EnableRowExport) {
+  const bool canUseFieldFormat = getTargetInfo().getGfxIpVersion().major >= 11 && UseRegisterFieldFormat;
+  UseRegisterFieldFormat.setValue(canUseFieldFormat);
+  m_registerFieldFormat = UseRegisterFieldFormat;
 }
 
 // =====================================================================================================================
@@ -434,11 +436,8 @@ void PipelineState::record(Module *module) {
   if (m_palMetadata)
     m_palMetadata->record(module);
 
-  if (UseRegisterFieldFormat) {
-    const bool isFieldSupported =
-        getTargetInfo().getGfxIpVersion().major >= 11 && (m_pipelineLink == PipelineLink::WholePipeline);
-    UseRegisterFieldFormat.setValue(isFieldSupported);
-  }
+  if (UseRegisterFieldFormat)
+    UseRegisterFieldFormat.setValue(getTargetInfo().getGfxIpVersion().major >= 11);
 }
 
 // =====================================================================================================================
