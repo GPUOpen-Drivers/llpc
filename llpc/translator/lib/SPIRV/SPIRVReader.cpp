@@ -288,13 +288,12 @@ Type *SPIRVToLLVM::transFPType(SPIRVType *t) {
 // @param matrixStride : The matrix stride (can be 0).
 // @param isColumnMajor : Whether the matrix is column major.
 // @param isParentPointer : If the parent is a pointer type.
-// @param isExplicitlyLaidOut : If the type is one which is explicitly laid out.
+// @param layout : The layout mode will be used for the type translation.
 template <>
 Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeArray>(SPIRVType *const spvType, const unsigned matrixStride,
                                                          const bool isColumnMajor, const bool isParentPointer,
-                                                         const bool isExplicitlyLaidOut) {
-  Type *elementType =
-      transType(spvType->getArrayElementType(), matrixStride, isColumnMajor, isParentPointer, isExplicitlyLaidOut);
+                                                         LayoutMode layout) {
+  Type *elementType = transType(spvType->getArrayElementType(), matrixStride, isColumnMajor, isParentPointer, layout);
 
   SPIRVWord arrayStride = 0;
   const bool hasArrayStride = spvType->hasDecorate(DecorationArrayStride, 0, &arrayStride);
@@ -304,7 +303,7 @@ Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeArray>(SPIRVType *const spvTyp
 
   bool paddedArray = false;
 
-  if (isExplicitlyLaidOut && hasArrayStride) {
+  if (layout == LayoutMode::Explicit && hasArrayStride) {
     assert(arrayStride >= storeSize);
 
     const unsigned padding = static_cast<unsigned>(arrayStride - storeSize);
@@ -331,11 +330,11 @@ Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeArray>(SPIRVType *const spvTyp
 // @param matrixStride : The matrix stride (can be 0).
 // @param isColumnMajor : Whether the matrix is column major.
 // @param isParentPointer : If the parent is a pointer type.
-// @param isExplicitlyLaidOut : If the type is one which is explicitly laid out.
+// @param layout : The layout mode will be used for the type translation.
 template <>
 Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeBool>(SPIRVType *const spvType, const unsigned matrixStride,
                                                    const bool isColumnMajor, const bool isParentPointer,
-                                                   const bool isExplicitlyLaidOut) {
+                                                   LayoutMode layout) {
   if (isParentPointer)
     return getBuilder()->getInt32Ty();
   return getBuilder()->getInt1Ty();
@@ -348,11 +347,11 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeBool>(SPIRVType *const spvType, con
 // @param matrixStride : The matrix stride (can be 0).
 // @param isColumnMajor : Whether the matrix is column major.
 // @param isParentPointer : If the parent is a pointer type.
-// @param isExplicitlyLaidOut : If the type is one which is explicitly laid out.
+// @param layout : The layout mode will be used for the type translation.
 template <>
 Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeForwardPointer>(SPIRVType *const spvType, const unsigned matrixStride,
                                                              const bool isColumnMajor, const bool isParentPointer,
-                                                             const bool isExplicitlyLaidOut) {
+                                                             LayoutMode layout) {
   SPIRVTypeForwardPointer *const spvForwardPointerType = static_cast<SPIRVTypeForwardPointer *>(spvType);
   const SPIRVStorageClassKind storageClass = spvForwardPointerType->getPointerStorageClass();
 
@@ -372,10 +371,11 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeForwardPointer>(SPIRVType *const sp
                                     storageClass == StorageClassShaderRecordBufferKHR ||
 #endif
                                     storageClass == StorageClassPhysicalStorageBufferEXT;
+  LayoutMode structLayout = isBufferBlockPointer ? LayoutMode::Explicit : LayoutMode::Native;
 
   // Finally we translate the struct we are pointing to create it.
-  StructType *const structType = cast<StructType>(
-      transType(spvType->getPointerElementType(), matrixStride, isColumnMajor, true, isBufferBlockPointer));
+  StructType *const structType =
+      cast<StructType>(transType(spvType->getPointerElementType(), matrixStride, isColumnMajor, true, structLayout));
 
   pointeeType->setBody(structType->elements(), structType->isPacked());
 
@@ -390,25 +390,24 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeForwardPointer>(SPIRVType *const sp
 // @param matrixStride : The matrix stride (can be 0).
 // @param isColumnMajor : Whether the matrix is column major.
 // @param isParentPointer : If the parent is a pointer type.
-// @param isExplicitlyLaidOut : If the type is one which is explicitly laid out.
+// @param layout : The layout mode will be used for the type translation.
 template <>
 Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(SPIRVType *const spvType, unsigned matrixStride,
                                                      const bool isColumnMajor, const bool isParentPointer,
-                                                     const bool isExplicitlyLaidOut) {
+                                                     LayoutMode layout) {
   Type *columnType = nullptr;
 
   unsigned columnCount = spvType->getMatrixColumnCount();
 
   // If the matrix is not explicitly laid out or is column major, just translate the column type.
   if (!isParentPointer || isColumnMajor) {
-    columnType =
-        transType(spvType->getMatrixColumnType(), matrixStride, isColumnMajor, isParentPointer, isExplicitlyLaidOut);
+    columnType = transType(spvType->getMatrixColumnType(), matrixStride, isColumnMajor, isParentPointer, layout);
   } else {
     // We need to transpose the matrix type to represent its layout in memory.
     SPIRVType *const spvColumnType = spvType->getMatrixColumnType();
 
-    Type *const elementType = transType(spvColumnType->getVectorComponentType(), matrixStride, isColumnMajor,
-                                        isParentPointer, isExplicitlyLaidOut);
+    Type *const elementType =
+        transType(spvColumnType->getVectorComponentType(), matrixStride, isColumnMajor, isParentPointer, layout);
 
     columnType = ArrayType::get(elementType, columnCount);
     columnCount = spvColumnType->getVectorComponentCount();
@@ -422,8 +421,9 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(SPIRVType *const spvType, u
   }
 
   const bool isPaddedMatrix = matrixStride > 0;
+  const bool usePadding = (layout == LayoutMode::Explicit) && isPaddedMatrix;
 
-  if (isExplicitlyLaidOut && isPaddedMatrix) {
+  if (usePadding) {
     SmallVector<Type *, 2> memberTypes;
 
     memberTypes.push_back(columnType);
@@ -442,7 +442,7 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(SPIRVType *const spvType, u
   }
 
   Type *const matrixType = ArrayType::get(columnType, columnCount);
-  return isExplicitlyLaidOut && isPaddedMatrix ? recordTypeWithPad(matrixType, !isColumnMajor) : matrixType;
+  return usePadding ? recordTypeWithPad(matrixType, !isColumnMajor) : matrixType;
 }
 
 // =====================================================================================================================
@@ -453,11 +453,11 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(SPIRVType *const spvType, u
 // @param matrixStride : The matrix stride (can be 0).
 // @param isColumnMajor : Whether the matrix is column major.
 // @param isParentPointer : If the parent is a pointer type.
-// @param isExplicitlyLaidOut : If the type is one which is explicitly laid out.
+// @param layout : The layout mode will be used for the type translation.
 template <>
 Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(SPIRVType *const spvType, const unsigned matrixStride,
                                                       const bool isColumnMajor, const bool isParentPointer,
-                                                      const bool isExplicitlyLaidOut) {
+                                                      LayoutMode layout) {
   SPIRVStorageClassKind storageClass = spvType->getPointerStorageClass();
 
   // Handle image etc types first, if in UniformConstant memory.
@@ -520,8 +520,10 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(SPIRVType *const spvType, 
 #endif
   }
 
-  Type *const pointeeType = transType(spvType->getPointerElementType(), matrixStride, isColumnMajor, true,
-                                      isStorageClassExplicitlyLaidOut(m_bm, storageClass));
+  LayoutMode pointeeLayout =
+      isStorageClassExplicitlyLaidOut(m_bm, storageClass) ? LayoutMode::Explicit : LayoutMode::Native;
+  Type *const pointeeType =
+      transType(spvType->getPointerElementType(), matrixStride, isColumnMajor, true, pointeeLayout);
 
   return PointerType::get(pointeeType, SPIRSPIRVAddrSpaceMap::rmap(storageClass));
 }
@@ -535,13 +537,12 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(SPIRVType *const spvType, 
 // @param matrixStride : The matrix stride (can be 0).
 // @param isColumnMajor : Whether the matrix is column major.
 // @param isParentPointer : If the parent is a pointer type.
-// @param isExplicitlyLaidOut : If the type is one which is explicitly laid out.
+// @param layout : The layout mode will be used for the type translation.
 template <>
 Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeRuntimeArray>(SPIRVType *const spvType, const unsigned matrixStride,
                                                            const bool isColumnMajor, const bool isParentPointer,
-                                                           const bool isExplicitlyLaidOut) {
-  Type *elementType =
-      transType(spvType->getArrayElementType(), matrixStride, isColumnMajor, isParentPointer, isExplicitlyLaidOut);
+                                                           LayoutMode layout) {
+  Type *elementType = transType(spvType->getArrayElementType(), matrixStride, isColumnMajor, isParentPointer, layout);
 
   SPIRVWord arrayStride = 0;
   const bool hasArrayStride = spvType->hasDecorate(DecorationArrayStride, 0, &arrayStride);
@@ -552,7 +553,7 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeRuntimeArray>(SPIRVType *const spvT
   // NOTE: Padding isn't allowed for a case that the array element is a structure with array-type member in HLSL.
   bool paddedArray = arrayStride > storeSize;
 
-  if (isExplicitlyLaidOut && hasArrayStride && paddedArray) {
+  if (layout == LayoutMode::Explicit && hasArrayStride && paddedArray) {
     const unsigned padding = static_cast<unsigned>(arrayStride - storeSize);
 
     // Record that the array was remapped, even though we don't record a useful mapping for arrays.
@@ -574,15 +575,15 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeRuntimeArray>(SPIRVType *const spvT
 // @param matrixStride : The matrix stride (can be 0).
 // @param isColumnMajor : Whether the matrix is column major.
 // @param isParentPointer : If the parent is a pointer type.
-// @param isExplicitlyLaidOut : If the type is one which is explicitly laid out.
+// @param layout : The layout mode will be used for the type translation.
 template <>
 Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(SPIRVType *const spvType, const unsigned matrixStride,
                                                           const bool isColumnMajor, const bool isParentPointer,
-                                                          const bool isExplicitlyLaidOut) {
+                                                          LayoutMode layout) {
   SPIRVTypeStruct *const spvStructType = static_cast<SPIRVTypeStruct *>(spvType);
 
   bool isPacked = false;
-
+  bool isExplicitlyLaidOut = layout == LayoutMode::Explicit;
   bool hasMemberOffset = false;
 
   using StructMember = std::tuple<SPIRVWord, SPIRVWord>;
@@ -673,8 +674,7 @@ Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(SPIRVType *const spvTy
     if (isExplicitlyLaidOut && memberMatrixStride > 0)
       assert(memberIsColumnMajor ^ spvStructType->hasMemberDecorate(index, DecorationRowMajor));
 
-    Type *const memberType =
-        transType(spvMemberType, memberMatrixStride, memberIsColumnMajor, isParentPointer, isExplicitlyLaidOut);
+    Type *const memberType = transType(spvMemberType, memberMatrixStride, memberIsColumnMajor, isParentPointer, layout);
 
     lastValidByte = offset + getTypeStoreSize(memberType);
 
@@ -703,16 +703,16 @@ Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(SPIRVType *const spvTy
 // @param matrixStride : The matrix stride (can be 0).
 // @param isColumnMajor : Whether the matrix is column major.
 // @param isParentPointer : If the parent is a pointer type.
-// @param isExplicitlyLaidOut : If the type is one which is explicitly laid out.
+// @param layout : The layout mode will be used for the type translation.
 template <>
 Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeVector>(SPIRVType *const spvType, const unsigned matrixStride,
                                                      const bool isColumnMajor, const bool isParentPointer,
-                                                     const bool isExplicitlyLaidOut) {
+                                                     LayoutMode layout) {
   Type *const compType =
-      transType(spvType->getVectorComponentType(), matrixStride, isColumnMajor, isParentPointer, isExplicitlyLaidOut);
+      transType(spvType->getVectorComponentType(), matrixStride, isColumnMajor, isParentPointer, layout);
 
   // If the vector is in a pointer, we need to use an array to represent it because of LLVMs data layout rules.
-  if (isExplicitlyLaidOut)
+  if (layout == LayoutMode::Explicit)
     return ArrayType::get(compType, spvType->getVectorComponentCount());
   return FixedVectorType::get(compType, spvType->getVectorComponentCount());
 }
@@ -745,25 +745,27 @@ Type *SPIRVToLLVM::getPointeeType(SPIRVValue *v) {
     if (pointeeType)
       return pointeeType;
   }
+  LayoutMode layout = isStorageClassExplicitlyLaidOut(m_bm, v->getType()->getPointerStorageClass())
+                          ? LayoutMode::Explicit
+                          : LayoutMode::Native;
 
-  return transType(v->getType()->getPointerElementType(), 0, true, true,
-                   isStorageClassExplicitlyLaidOut(m_bm, v->getType()->getPointerStorageClass()));
+  return transType(v->getType()->getPointerElementType(), 0, true, true, layout);
 }
 
 Type *SPIRVToLLVM::transType(SPIRVType *t, unsigned matrixStride, bool columnMajor, bool parentIsPointer,
-                             bool explicitlyLaidOut) {
-  SPIRVTypeContext ctx(t, matrixStride, columnMajor, parentIsPointer, explicitlyLaidOut);
+                             LayoutMode layout) {
+  SPIRVTypeContext ctx(t, matrixStride, columnMajor, parentIsPointer, layout);
   auto it = m_fullTypeMap.find(ctx.asTuple());
   if (it != m_fullTypeMap.end())
     return it->second;
 
-  auto res = transTypeImpl(t, matrixStride, columnMajor, parentIsPointer, explicitlyLaidOut);
+  auto res = transTypeImpl(t, matrixStride, columnMajor, parentIsPointer, layout);
   m_fullTypeMap[ctx.asTuple()] = res;
   return res;
 }
 
 Type *SPIRVToLLVM::transTypeImpl(SPIRVType *t, unsigned matrixStride, bool columnMajor, bool parentIsPointer,
-                                 bool explicitlyLaidOut) {
+                                 LayoutMode layout) {
   // If the type is not a sub-part of a pointer or it is a forward pointer, we can look in the map.
   if (!parentIsPointer || t->isTypeForwardPointer()) {
     auto loc = m_typeMap.find(t);
@@ -831,37 +833,35 @@ Type *SPIRVToLLVM::transTypeImpl(SPIRVType *t, unsigned matrixStride, bool colum
 #endif
 
   case OpTypeArray: {
-    Type *newTy = transTypeWithOpcode<OpTypeArray>(t, matrixStride, columnMajor, parentIsPointer, explicitlyLaidOut);
+    Type *newTy = transTypeWithOpcode<OpTypeArray>(t, matrixStride, columnMajor, parentIsPointer, layout);
     return parentIsPointer ? newTy : mapType(t, newTy);
   }
   case OpTypeBool: {
-    Type *newTy = transTypeWithOpcode<OpTypeBool>(t, matrixStride, columnMajor, parentIsPointer, explicitlyLaidOut);
+    Type *newTy = transTypeWithOpcode<OpTypeBool>(t, matrixStride, columnMajor, parentIsPointer, layout);
     return parentIsPointer ? newTy : mapType(t, newTy);
   }
   case OpTypeForwardPointer: {
-    Type *newTy =
-        transTypeWithOpcode<OpTypeForwardPointer>(t, matrixStride, columnMajor, parentIsPointer, explicitlyLaidOut);
+    Type *newTy = transTypeWithOpcode<OpTypeForwardPointer>(t, matrixStride, columnMajor, parentIsPointer, layout);
     return parentIsPointer ? newTy : mapType(t, newTy);
   }
   case OpTypeMatrix: {
-    Type *newTy = transTypeWithOpcode<OpTypeMatrix>(t, matrixStride, columnMajor, parentIsPointer, explicitlyLaidOut);
+    Type *newTy = transTypeWithOpcode<OpTypeMatrix>(t, matrixStride, columnMajor, parentIsPointer, layout);
     return parentIsPointer ? newTy : mapType(t, newTy);
   }
   case OpTypePointer: {
-    Type *newTy = transTypeWithOpcode<OpTypePointer>(t, matrixStride, columnMajor, parentIsPointer, explicitlyLaidOut);
+    Type *newTy = transTypeWithOpcode<OpTypePointer>(t, matrixStride, columnMajor, parentIsPointer, layout);
     return parentIsPointer ? newTy : mapType(t, newTy);
   }
   case OpTypeRuntimeArray: {
-    Type *newTy =
-        transTypeWithOpcode<OpTypeRuntimeArray>(t, matrixStride, columnMajor, parentIsPointer, explicitlyLaidOut);
+    Type *newTy = transTypeWithOpcode<OpTypeRuntimeArray>(t, matrixStride, columnMajor, parentIsPointer, layout);
     return parentIsPointer ? newTy : mapType(t, newTy);
   }
   case OpTypeStruct: {
-    Type *newTy = transTypeWithOpcode<OpTypeStruct>(t, matrixStride, columnMajor, parentIsPointer, explicitlyLaidOut);
+    Type *newTy = transTypeWithOpcode<OpTypeStruct>(t, matrixStride, columnMajor, parentIsPointer, layout);
     return parentIsPointer ? newTy : mapType(t, newTy);
   }
   case OpTypeVector: {
-    Type *newTy = transTypeWithOpcode<OpTypeVector>(t, matrixStride, columnMajor, parentIsPointer, explicitlyLaidOut);
+    Type *newTy = transTypeWithOpcode<OpTypeVector>(t, matrixStride, columnMajor, parentIsPointer, layout);
     return parentIsPointer ? newTy : mapType(t, newTy);
   }
 
@@ -1676,7 +1676,7 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
 
   // Vectors are represented as arrays in memory, so we need to cast the array to a vector before loading.
   if (spvType->isTypeVector()) {
-    Type *const vectorType = transType(spvType, 0, false, true, false);
+    Type *const vectorType = transType(spvType, 0, false, true, LayoutMode::Native);
     Type *const castType = vectorType->getPointerTo(loadPointer->getType()->getPointerAddressSpace());
     loadPointer = getBuilder()->CreateBitCast(loadPointer, castType);
     loadType = vectorType;
@@ -2379,9 +2379,11 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(SPIRVValue *c
                                         getBuilder()->GetInsertBlock());
 
   SPIRVType *const spvLoadType = spvCopyMemory->getSource()->getType();
+  LayoutMode loadLayout = isStorageClassExplicitlyLaidOut(m_bm, spvLoadType->getPointerStorageClass())
+                              ? LayoutMode::Explicit
+                              : LayoutMode::Native;
 
-  Type *const loadType = transType(spvLoadType->getPointerElementType(), 0, true, true,
-                                   isStorageClassExplicitlyLaidOut(m_bm, spvLoadType->getPointerStorageClass()));
+  Type *const loadType = transType(spvLoadType->getPointerElementType(), 0, true, true, loadLayout);
 
   Value *const load = addLoadInstRecursively(spvLoadType->getPointerElementType(), loadPointer, loadType, isSrcVolatile,
                                              isCoherent, isNonTemporal);
@@ -2390,8 +2392,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(SPIRVValue *c
                                          getBuilder()->GetInsertBlock());
 
   SPIRVType *const spvStoreType = spvCopyMemory->getTarget()->getType();
-  Type *const storeType = transType(spvStoreType->getPointerElementType(), 0, true, true,
-                                    isStorageClassExplicitlyLaidOut(m_bm, spvStoreType->getPointerStorageClass()));
+  LayoutMode storeLayout = isStorageClassExplicitlyLaidOut(m_bm, spvStoreType->getPointerStorageClass())
+                               ? LayoutMode::Explicit
+                               : LayoutMode::Native;
+  Type *const storeType = transType(spvStoreType->getPointerElementType(), 0, true, true, storeLayout);
   isNonTemporal = spvCopyMemory->SPIRVMemoryAccess::isNonTemporal(false);
 
   addStoreInstRecursively(spvStoreType->getPointerElementType(), storePointer, storeType, load, isDestVolatile,
@@ -2506,7 +2510,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
 // @param spvImageLoadPtr : The image/sampler/sampledimage pointer
 Value *SPIRVToLLVM::transLoadImage(SPIRVValue *spvImageLoadPtr) {
   SPIRVType *spvElementTy = spvImageLoadPtr->getType()->getPointerElementType();
-  Type *elementTy = transType(spvElementTy, 0, false, false, false);
+  Type *elementTy = transType(spvElementTy, 0, false, false, LayoutMode::Native);
   Value *base = transImagePointer(spvImageLoadPtr);
   return loadImageSampler(elementTy, base);
 }
@@ -3022,7 +3026,7 @@ Value *SPIRVToLLVM::transOpAccessChainForImage(SPIRVAccessChainBase *spvAccessCh
     spvElementType = spvElementType->getArrayElementType();
   }
 
-  Type *elementTy = transType(spvElementType, 0, false, false, false);
+  Type *elementTy = transType(spvElementType, 0, false, false, LayoutMode::Native);
   return indexDescPtr(elementTy, base, index);
 }
 
@@ -4222,9 +4226,11 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
 
   Type *const ptrType = transType(spvVar->getType());
   unsigned addrSpace = ptrType->getPointerAddressSpace();
+  LayoutMode layout = isStorageClassExplicitlyLaidOut(m_bm, spvVar->getType()->getPointerStorageClass())
+                          ? LayoutMode::Explicit
+                          : LayoutMode::Native;
 
-  Type *const varType = transType(spvVar->getType()->getPointerElementType(), 0, true, true,
-                                  isStorageClassExplicitlyLaidOut(m_bm, spvVar->getType()->getPointerStorageClass()));
+  Type *const varType = transType(spvVar->getType()->getPointerElementType(), 0, true, true, layout);
 
   SPIRVValue *const spvInitializer = spvVar->getInitializer();
 
@@ -8414,7 +8420,7 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
 
       const unsigned remappedIdx = isRemappedTypeElements(bt) ? lookupRemappedTypeElements(bt, memberIdx) : memberIdx;
       const DataLayout &dl = m_m->getDataLayout();
-      Type *const ty = transType(bt, 0, false, true, true);
+      Type *const ty = transType(bt, 0, false, true, LayoutMode::Explicit);
       assert(ty->isStructTy());
       const StructLayout *const sl = dl.getStructLayout(static_cast<StructType *>(ty));
 
