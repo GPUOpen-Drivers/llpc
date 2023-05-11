@@ -1,0 +1,29 @@
+// The test checks whether image/sampler descriptor loads are marked with invariant.load metadata.
+
+// BEGIN_SHADERTEST
+/*
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+
+; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST: [[SMP_DESC:%[0-9]*]] = load <4 x i32>, ptr addrspace(4) %{{[0-9]*}}, align 16, !invariant.load
+; SHADERTEST: [[IMG_DESC:%[0-9]*]] = load <8 x i32>, ptr addrspace(4) %{{[0-9]*}}, align 32, !invariant.load
+; SHADERTEST: lgc.create.image.sample.v4f32(i32 1, i32 512, <8 x i32> [[IMG_DESC]], <4 x i32> [[SMP_DESC]], i32 33, <2 x float> zeroinitializer, float 0.000000e+00) 
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
+*/
+// END_SHADERTEST
+
+#version 450
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+layout(binding = 1, std430) buffer B
+{
+    vec4 res;
+};
+
+layout(set = 1, binding = 0) uniform sampler2D s;
+
+void main()
+{
+    res = texture(s, vec2(0.0, 0.0));
+}

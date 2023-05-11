@@ -2556,7 +2556,9 @@ Value *SPIRVToLLVM::loadImageSampler(Type *elementTy, Value *base) {
     // load one descriptor; if there are any converting samplers, we load all three, and rely on later optimizations
     // to remove the unused ones (and thus stop us reading off the end of the descriptor table).
     elementTy = arrayTy->getElementType();
-    Value *oneVal = getBuilder()->CreateLoad(elementTy, ptr);
+    auto *oneVal = getBuilder()->CreateLoad(elementTy, ptr);
+    oneVal->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, {}));
+
     Value *result = getBuilder()->CreateInsertValue(UndefValue::get(arrayTy), oneVal, 0);
     // Pointer to image is represented as a struct containing {pointer, stride, planeStride, isResource}.
     if (!m_convertingSamplers.empty() && base->getType()->getStructNumElements() >= 4) {
@@ -2569,6 +2571,7 @@ Value *SPIRVToLLVM::loadImageSampler(Type *elementTy, Value *base) {
         ptr = getBuilder()->CreateGEP(getBuilder()->getInt8Ty(), ptr, planeStride);
         ptr = getBuilder()->CreateBitCast(ptr, ptrTy);
         oneVal = getBuilder()->CreateLoad(elementTy, ptr);
+        oneVal->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, {}));
         result = getBuilder()->CreateInsertValue(result, oneVal, planeIdx);
       }
     }
@@ -2576,7 +2579,9 @@ Value *SPIRVToLLVM::loadImageSampler(Type *elementTy, Value *base) {
   }
 
   // Other cases: Just load the element from the pointer.
-  return getBuilder()->CreateLoad(elementTy, ptr);
+  auto load = getBuilder()->CreateLoad(elementTy, ptr);
+  load->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, {}));
+  return load;
 }
 
 // =====================================================================================================================
