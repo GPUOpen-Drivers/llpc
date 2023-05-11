@@ -3613,8 +3613,9 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpConvertUToAccelerationStr
 
   // Cast to the return type pointer
   loadValue = m_builder->CreateBitCast(loadValue, accelStructPtrTy);
-  loadValue = m_builder->CreateLoad(accelStructTy, loadValue);
-  return mapValue(spvValue, loadValue);
+  auto load = m_builder->CreateLoad(accelStructTy, loadValue);
+  load->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, {}));
+  return mapValue(spvValue, load);
 }
 
 // =====================================================================================================================
