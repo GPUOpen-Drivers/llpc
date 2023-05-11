@@ -2431,8 +2431,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
                                             {ancillary, builder.getInt32(8), builder.getInt32(4)});
 
     Value *sampleMaskIn = sampleCoverage;
-    if (m_pipelineState->getRasterizerState().perSampleShading || builtInUsage.runAtSampleRate)
-    {
+    if (m_pipelineState->getRasterizerState().perSampleShading || builtInUsage.runAtSampleRate) {
       // gl_SampleMaskIn[0] = (SampleCoverage & (1 << gl_SampleID))
       sampleMaskIn = builder.CreateShl(builder.getInt32(1), sampleId);
       sampleMaskIn = builder.CreateAnd(sampleCoverage, sampleMaskIn);
