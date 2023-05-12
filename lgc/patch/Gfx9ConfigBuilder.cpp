@@ -2213,8 +2213,8 @@ template <typename T> void ConfigBuilder::setupPaSpecificRegisters(T *config) {
 
     // Set fields CLIP_DIST_ENA_0 ~ CLIP_DIST_ENA_7 and CULL_DIST_ENA_0 ~ CULL_DIST_ENA_7
     unsigned paClVsOutCntl = GET_REG(config, PA_CL_VS_OUT_CNTL);
-    paClVsOutCntl |= clipDistanceMask;
-    paClVsOutCntl |= (cullDistanceMask << 8);
+    unsigned finalMask = clipDistanceMask | cullDistanceMask;
+    paClVsOutCntl |= clipDistanceMask | (finalMask << 8);
     SET_REG(config, PA_CL_VS_OUT_CNTL, paClVsOutCntl);
 
     // On 10.3+ all auxiliary position exports are optimized, not just the misc exports.
