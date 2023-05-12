@@ -42,6 +42,8 @@ public:
                  MetroHash::Hash *cacheHash);
   virtual ~ComputeContext() {}
 
+  virtual PipelineType getPipelineType() const override { return PipelineType::Compute; }
+
   // Gets pipeline shader info of the specified shader stage
   virtual const PipelineShaderInfo *getPipelineShaderInfo(unsigned shaderId) const override;
 

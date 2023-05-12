@@ -821,7 +821,7 @@ void SpirvLowerGlobal::lowerInput() {
 void SpirvLowerGlobal::lowerOutput() {
 #if VKI_RAY_TRACING
   // Note: indirect raytracing does not have output to lower and must return payload value
-  if (m_context->isRayTracing())
+  if (m_context->getPipelineType() == PipelineType::RayTracing)
     return;
 #endif
 

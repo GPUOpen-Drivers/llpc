@@ -7113,10 +7113,11 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
   unsigned subgroupSizeUsage = pipelineContext->getSubgroupSizeUsage();
 #if VKI_RAY_TRACING
   // NOTE: setCommonShaderMode() supports the graphics and compute stage, does not support raytracing stage
-  shaderMode.useSubgroupSize = pipelineContext->isRayTracing() ? subgroupSizeUsage : shaderMode.useSubgroupSize;
+  shaderMode.useSubgroupSize =
+      pipelineContext->getPipelineType() == PipelineType::RayTracing ? subgroupSizeUsage : shaderMode.useSubgroupSize;
 #endif
 
-  if (pipelineContext->isGraphics() && subgroupSizeUsage) {
+  if (pipelineContext->getPipelineType() == PipelineType::Graphics && subgroupSizeUsage) {
     for (lgc::ShaderStage stage : lgc::enumRange<lgc::ShaderStage>()) {
       if (subgroupSizeUsage & (1 << stage)) {
         Pipeline::setSubgroupSizeUsage(*m_m, stage, true);

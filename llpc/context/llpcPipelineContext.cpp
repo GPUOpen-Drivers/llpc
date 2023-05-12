@@ -624,7 +624,7 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
   }
 #if VKI_RAY_TRACING
   // NOTE: WaveSize of raytracing usually be 32
-  if (hasRayQuery() || isRayTracing()) {
+  if (hasRayQuery() || getPipelineType() == PipelineType::RayTracing) {
     shaderOptions.waveSize = getRayTracingWaveSize();
   }
 #endif
@@ -714,7 +714,7 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
 // =====================================================================================================================
 // Get wave size used for raytracing
 unsigned PipelineContext::getRayTracingWaveSize() const {
-  if ((m_gfxIp.major >= 10) && !isGraphics())
+  if ((m_gfxIp.major >= 10) && getPipelineType() != PipelineType::Graphics)
     return 32;
   return 64;
 }

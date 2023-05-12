@@ -49,6 +49,8 @@ public:
                     MetroHash::Hash *cacheHash, unsigned indirectStageMask);
   virtual ~RayTracingContext() {}
 
+  virtual PipelineType getPipelineType() const override { return PipelineType::RayTracing; }
+
   virtual const PipelineShaderInfo *getPipelineShaderInfo(unsigned shaderId) const override;
 
   // Gets pipeline build info
@@ -74,9 +76,6 @@ public:
 
   // Gets client-defined metadata
   virtual llvm::StringRef getClientMetadata() const override;
-
-  // Checks whether the pipeline is ray tracing
-  virtual bool isRayTracing() const override { return true; }
 
   // Set the raytracing shader stages inline/indirect status
   virtual void setIndirectStage(ShaderStage stage) override { m_indirectStageMask |= shaderStageToMask(stage); }

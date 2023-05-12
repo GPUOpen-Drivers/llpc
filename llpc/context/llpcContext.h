@@ -90,10 +90,7 @@ public:
   std::unique_ptr<llvm::Module> loadLibrary(const BinaryData *lib);
 
   // Wrappers of interfaces of pipeline context
-  bool isGraphics() const { return m_pipelineContext->isGraphics(); }
-#if VKI_RAY_TRACING
-  bool isRayTracing() const { return m_pipelineContext->isRayTracing(); }
-#endif
+  PipelineType getPipelineType() const { return m_pipelineContext->getPipelineType(); }
   const PipelineShaderInfo *getPipelineShaderInfo(ShaderStage shaderId) const {
     return m_pipelineContext->getPipelineShaderInfo(shaderId);
   }
