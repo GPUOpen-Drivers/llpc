@@ -82,10 +82,6 @@ public:
   // Gets client-defined metadata
   virtual llvm::StringRef getClientMetadata() const override;
 
-#if VKI_RAY_TRACING
-  virtual bool hasRayQuery() const override { return (m_pipelineInfo->shaderLibrary.codeSize > 0); }
-#endif
-
 protected:
   // Give the pipeline options to the middle-end, and/or hash them.
   virtual lgc::Options computePipelineOptions() const override;

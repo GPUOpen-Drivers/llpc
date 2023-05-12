@@ -1415,7 +1415,17 @@ Result Compiler::buildGraphicsPipelineInternal(GraphicsContext *graphicsContext,
     bool buildPartPipeline = (cl::EnablePartPipeline && isShaderStageInMask(ShaderStageFragment, stageMask) &&
                               (stageMask & ~shaderStageToMask(ShaderStageFragment)));
 #if VKI_RAY_TRACING
-    buildPartPipeline &= !graphicsContext->hasRayQuery();
+    if (buildPartPipeline) {
+      for (const auto *oneShaderInfo : shaderInfo) {
+        if (!oneShaderInfo)
+          continue;
+        auto *moduleData = reinterpret_cast<const ShaderModuleData *>(oneShaderInfo->pModuleData);
+        if (moduleData && moduleData->usage.enableRayQuery) {
+          buildPartPipeline = false;
+          break;
+        }
+      }
+    }
 #endif
     if (buildPartPipeline)
       result = buildGraphicsPipelineWithPartPipelines(context, shaderInfo, pipelineElf, stageCacheAccesses);
