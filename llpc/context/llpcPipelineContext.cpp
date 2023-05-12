@@ -624,9 +624,16 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
   }
 #if VKI_RAY_TRACING
   // NOTE: WaveSize of raytracing usually be 32
-  if (hasRayQuery() || getPipelineType() == PipelineType::RayTracing) {
-    shaderOptions.waveSize = getRayTracingWaveSize();
+  bool useRayTracingWaveSize = false;
+  if (getPipelineType() == PipelineType::RayTracing) {
+    useRayTracingWaveSize = true;
+  } else {
+    const auto *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo.pModuleData);
+    if (moduleData->usage.enableRayQuery)
+      useRayTracingWaveSize = true;
   }
+  if (useRayTracingWaveSize)
+    shaderOptions.waveSize = getRayTracingWaveSize();
 #endif
 
   // Use a static cast from Vkgc WaveBreakSize to LGC WaveBreak, and static assert that

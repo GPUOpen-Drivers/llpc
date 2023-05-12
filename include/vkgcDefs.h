@@ -598,7 +598,7 @@ struct ShaderModuleUsage {
   bool useSpecConstant;        ///< Whether specialization constant is used
   bool keepUnusedFunctions;    ///< Whether to keep unused function
 #if VKI_RAY_TRACING
-  bool enableRayQuery;     ///< Whether to enable "RayQueryProvisionalKHR" capability
+  bool enableRayQuery;     ///< Whether the "RayQueryKHR" capability is used
   bool rayQueryLibrary;    ///< Whether the shaderModule is rayQueryLibrary
   bool isInternalRtShader; ///< Whether the shaderModule is a ray tracing internal shader
   bool hasTraceRay;        ///< Whether the shaderModule has OpTraceRayKHR;
