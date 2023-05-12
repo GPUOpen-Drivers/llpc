@@ -1464,10 +1464,10 @@ Value *SpirvLowerRayQuery::createTransformMatrix(unsigned builtInId, Value *acce
 // Get raytracing workgroup size for LDS stack size calculation
 unsigned SpirvLowerRayQuery::getWorkgroupSize() const {
   unsigned workgroupSize = 0;
-  if (m_context->isRayTracing()) {
+  if (m_context->getPipelineType() == PipelineType::RayTracing) {
     const auto *rtState = m_context->getPipelineContext()->getRayTracingState();
     workgroupSize = rtState->threadGroupSizeX * rtState->threadGroupSizeY * rtState->threadGroupSizeZ;
-  } else if (m_context->isGraphics()) {
+  } else if (m_context->getPipelineType() == PipelineType::Graphics) {
     workgroupSize = m_context->getPipelineContext()->getRayTracingWaveSize();
   } else {
     workgroupSize = m_context->getPipelineContext()->getWorkgroupSize();
@@ -1485,7 +1485,8 @@ unsigned SpirvLowerRayQuery::getWorkgroupSize() const {
 // =====================================================================================================================
 // Get flat thread id in work group/wave
 Value *SpirvLowerRayQuery::getThreadIdInGroup() const {
-  unsigned builtIn = m_context->isGraphics() ? BuiltInSubgroupLocalInvocationId : BuiltInLocalInvocationIndex;
+  unsigned builtIn = m_context->getPipelineType() == PipelineType::Graphics ? BuiltInSubgroupLocalInvocationId
+                                                                            : BuiltInLocalInvocationIndex;
   lgc::InOutInfo inputInfo = {};
   return m_builder->CreateReadBuiltInInput(static_cast<lgc::BuiltInKind>(builtIn), inputInfo, nullptr, nullptr, "");
 }

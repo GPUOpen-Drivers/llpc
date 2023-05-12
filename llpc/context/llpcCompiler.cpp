@@ -810,7 +810,7 @@ Result Compiler::buildUnlinkedShaderInternal(Context *context, ArrayRef<const Pi
 
   // Check the cache for the relocatable shader for this stage.
   MetroHash::Hash cacheHash = {};
-  if (context->isGraphics()) {
+  if (context->getPipelineType() == PipelineType::Graphics) {
     auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
     cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, true, stage);
   } else {
@@ -1184,7 +1184,8 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
   // Only enable per stage cache for full graphics pipeline (traditional pipeline or mesh pipeline)
   bool checkPerStageCache =
-      cl::EnablePerStageCache && !cl::EnablePartPipeline && context->isGraphics() && !buildingRelocatableElf &&
+      cl::EnablePerStageCache && !cl::EnablePartPipeline && context->getPipelineType() == PipelineType::Graphics &&
+      !buildingRelocatableElf &&
       (context->getShaderStageMask() & (ShaderStageVertexBit | ShaderStageMeshBit | ShaderStageFragmentBit));
 
   if (!checkPerStageCache)

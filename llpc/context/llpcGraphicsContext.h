@@ -44,7 +44,7 @@ public:
                   MetroHash::Hash *cacheHash);
   virtual ~GraphicsContext();
 
-  virtual bool isGraphics() const override { return true; }
+  virtual PipelineType getPipelineType() const override { return PipelineType::Graphics; }
 
   // Gets pipeline shader info of the specified shader stage
   virtual const PipelineShaderInfo *getPipelineShaderInfo(unsigned shaderId) const override;
