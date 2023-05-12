@@ -459,6 +459,8 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(SPIRVType *const spvType, 
                                                       const bool isColumnMajor, const bool isParentPointer,
                                                       LayoutMode layout) {
   SPIRVStorageClassKind storageClass = spvType->getPointerStorageClass();
+  LayoutMode pointeeLayout =
+      isStorageClassExplicitlyLaidOut(m_bm, storageClass) ? LayoutMode::Explicit : LayoutMode::Native;
 
   // Handle image etc types first, if in UniformConstant memory.
   if (storageClass == StorageClassUniformConstant) {
@@ -515,13 +517,11 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(SPIRVType *const spvType, 
     }
 #if VKI_RAY_TRACING
     else if (spvElementType->isTypeAccelerationStructureKHR()) {
-      storageClass = StorageClassUniform;
+      pointeeLayout = LayoutMode::Explicit;
     }
 #endif
   }
 
-  LayoutMode pointeeLayout =
-      isStorageClassExplicitlyLaidOut(m_bm, storageClass) ? LayoutMode::Explicit : LayoutMode::Native;
   Type *const pointeeType =
       transType(spvType->getPointerElementType(), matrixStride, isColumnMajor, true, pointeeLayout);
 
@@ -4291,12 +4291,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
 #if VKI_RAY_TRACING
     if (spvVarType->isTypeAccelerationStructureKHR()) {
       readOnly = true;
-      addrSpace = SPIRAS_Uniform;
     }
 
     if (spvVarType->isTypeArray() && spvVarType->getArrayElementType()->isTypeAccelerationStructureKHR()) {
       readOnly = true;
-      addrSpace = SPIRAS_Uniform;
     }
 #endif
     break;

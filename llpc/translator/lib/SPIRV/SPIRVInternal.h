@@ -185,7 +185,7 @@ template <> inline void SPIRVMap<SPIRAddressSpace, std::string>::init() {
 template <> inline void SPIRVMap<SPIRAddressSpace, SPIRVStorageClassKind>::init() {
   add(SPIRAS_Private, StorageClassFunction);
   add(SPIRAS_Global, StorageClassCrossWorkgroup);
-  add(SPIRAS_Constant, StorageClassUniformConstant);
+  add(SPIRAS_Uniform, StorageClassUniformConstant);
   add(SPIRAS_Local, StorageClassWorkgroup);
   add(SPIRAS_Generic, StorageClassGeneric);
   add(SPIRAS_Input, StorageClassInput);
