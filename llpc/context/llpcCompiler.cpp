@@ -1040,7 +1040,6 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
 #if VKI_RAY_TRACING
     unsigned rayQueryLibraryIndex = InvalidValue;
-    bool isInternalRtShader = false;
 #endif
     for (unsigned shaderIndex = 0; shaderIndex < shaderInfo.size() && result == Result::Success; ++shaderIndex) {
       const PipelineShaderInfo *shaderInfoEntry = shaderInfo[shaderIndex];
@@ -1073,11 +1072,6 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
         lowerPassMgr->addPass(SpirvLowerRayQuery(moduleData->usage.rayQueryLibrary));
         rayQueryLibraryIndex = shaderIndex;
       }
-
-      isInternalRtShader = moduleData->usage.isInternalRtShader;
-
-      if (isInternalRtShader)
-        assert(entryStage == ShaderStageCompute);
 #endif
 
       // Stop timer for translate.
@@ -1137,6 +1131,10 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(context->getLgcContext()));
       lowerPassMgr->setPassIndex(&passIndex);
       SpirvLower::registerPasses(*lowerPassMgr);
+
+      const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfoEntry->pModuleData);
+      bool isInternalRtShader = moduleData->usage.isInternalRtShader;
+      assert(!isInternalRtShader || entryStage == ShaderStageCompute);
 
       SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower)
 #if VKI_RAY_TRACING
