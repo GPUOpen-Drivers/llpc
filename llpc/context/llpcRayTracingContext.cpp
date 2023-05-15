@@ -44,14 +44,17 @@ namespace Llpc {
 // @param pipelineHash : Pipeline hash code
 // @param cacheHash : Cache hash code
 RayTracingContext::RayTracingContext(GfxIpVersion gfxIP, const RayTracingPipelineBuildInfo *pipelineInfo,
-                                     const PipelineShaderInfo *traceRayShaderInfo, MetroHash::Hash *pipelineHash,
+                                     const PipelineShaderInfo *representativeShaderInfo, MetroHash::Hash *pipelineHash,
                                      MetroHash::Hash *cacheHash, unsigned indirectStageMask)
     : PipelineContext(gfxIP, pipelineHash, cacheHash, &pipelineInfo->rtState), m_pipelineInfo(pipelineInfo),
-      m_traceRayShaderInfo(traceRayShaderInfo), m_linked(false), m_indirectStageMask(indirectStageMask),
-      m_entryName(""), m_payloadMaxSize(pipelineInfo->payloadSizeMaxInLib), m_callableDataMaxSize(0),
+      m_representativeShaderInfo(), m_linked(false), m_indirectStageMask(indirectStageMask), m_entryName(""),
+      m_payloadMaxSize(pipelineInfo->payloadSizeMaxInLib), m_callableDataMaxSize(0),
       m_attributeDataMaxSize(pipelineInfo->attributeSizeMaxInLib) {
   m_resourceMapping = pipelineInfo->resourceMapping;
   m_pipelineLayoutApiHash = pipelineInfo->pipelineLayoutApiHash;
+
+  if (representativeShaderInfo)
+    m_representativeShaderInfo.options = representativeShaderInfo->options;
 }
 
 // =====================================================================================================================
@@ -232,8 +235,7 @@ void RayTracingContext::setPipelineState(lgc::Pipeline *pipeline, Util::MetroHas
   if (pipeline) {
     // Give the shader options (including the hash) to the middle-end.
     const auto allStages = maskToShaderStages(stageMask);
-    assert(m_traceRayShaderInfo);
-    lgc::ShaderOptions options = computeShaderOptions(*m_traceRayShaderInfo);
+    lgc::ShaderOptions options = computeShaderOptions(m_representativeShaderInfo);
     for (ShaderStage stage : make_filter_range(allStages, isNativeStage)) {
       pipeline->setShaderOptions(getLgcShaderStage(static_cast<ShaderStage>(stage)), options);
     }
