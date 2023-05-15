@@ -45,7 +45,7 @@ namespace Llpc {
 class RayTracingContext : public PipelineContext {
 public:
   RayTracingContext(GfxIpVersion gfxIp, const RayTracingPipelineBuildInfo *pipelineInfo,
-                    const PipelineShaderInfo *traceRayShaderInfo, MetroHash::Hash *pipelineHash,
+                    const PipelineShaderInfo *representativeShaderInfo, MetroHash::Hash *pipelineHash,
                     MetroHash::Hash *cacheHash, unsigned indirectStageMask);
   virtual ~RayTracingContext() {}
 
@@ -120,8 +120,12 @@ private:
   RayTracingContext &operator=(const RayTracingContext &) = delete;
   bool isRayTracingBuiltIn(unsigned builtIn);
 
-  const RayTracingPipelineBuildInfo *m_pipelineInfo;  // Info to build a ray tracing pipeline
-  const PipelineShaderInfo *m_traceRayShaderInfo;     // Trace Ray shaderInfo
+  /// Info to build a ray tracing pipeline
+  const RayTracingPipelineBuildInfo *m_pipelineInfo;
+
+  /// Shader info that is representative of the pipeline as a whole. It does not actually contain module data.
+  PipelineShaderInfo m_representativeShaderInfo;
+
   bool m_linked;                                      // Whether the context is linked or not
   unsigned m_indirectStageMask;                       // Which stages enable indirect call for ray tracing
   std::string m_entryName;                            // Entry function of the raytracing module
