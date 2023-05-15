@@ -600,7 +600,7 @@ struct ShaderModuleUsage {
 #if VKI_RAY_TRACING
   bool enableRayQuery;     ///< Whether the "RayQueryKHR" capability is used
   bool rayQueryLibrary;    ///< Whether the shaderModule is rayQueryLibrary
-  bool isInternalRtShader; ///< Whether the shaderModule is a ray tracing internal shader
+  bool isInternalRtShader; ///< Whether the shaderModule is a GPURT internal shader (e.g. BVH build)
   bool hasTraceRay;        ///< Whether the shaderModule has OpTraceRayKHR;
 #endif
   bool useIsNan;     ///< Whether IsNan is used
