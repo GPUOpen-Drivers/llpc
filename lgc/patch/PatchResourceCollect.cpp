@@ -1330,17 +1330,15 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
           }
         }
 
-        // For GS, we remove transform feedback location info as well if it exists
-        if (m_shaderStage == ShaderStageGeometry) {
-          outLocInfo.setLocation(location);
-          auto &locInfoXfbOutInfoMap = m_resUsage->inOutUsage.locInfoXfbOutInfoMap;
-          if (locInfoXfbOutInfoMap.count(outLocInfo) > 0) {
+        // Remove transform feedback location info as well if it exists
+        outLocInfo.setLocation(location);
+        auto &locInfoXfbOutInfoMap = m_resUsage->inOutUsage.locInfoXfbOutInfoMap;
+        if (locInfoXfbOutInfoMap.count(outLocInfo) > 0) {
+          locInfoXfbOutInfoMap.erase(outLocInfo);
+          if (outputValue->getType()->getPrimitiveSizeInBits() > 128) {
+            // NOTE: For any data that is larger than <4 x dword>, there are two consecutive locations occupied.
+            outLocInfo.setLocation(location + 1);
             locInfoXfbOutInfoMap.erase(outLocInfo);
-            if (outputValue->getType()->getPrimitiveSizeInBits() > 128) {
-              // NOTE: For any data that is larger than <4 x dword>, there are two consecutive locations occupied.
-              outLocInfo.setLocation(location + 1);
-              locInfoXfbOutInfoMap.erase(outLocInfo);
-            }
           }
         }
       }
