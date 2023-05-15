@@ -1218,7 +1218,8 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
     bool cullDistEna[MaxDistCount] = {};
     for (unsigned i = 0; i < MaxDistCount; ++i) {
       clipDistEna[i] = (clipDistanceMask >> i) & 0x1;
-      cullDistEna[i] = (cullDistanceMask >> i) & 0x1;
+       // Note : Merge clip and cull mask to make the point can be clipped
+      cullDistEna[i] = ((clipDistanceMask | cullDistanceMask) >> i) & 0x1;
     }
     paClVsOutCntl[Util::Abi::PaClVsOutCntlMetadataKey::ClipDistEna_0] = clipDistEna[0];
     paClVsOutCntl[Util::Abi::PaClVsOutCntlMetadataKey::ClipDistEna_1] = clipDistEna[1];

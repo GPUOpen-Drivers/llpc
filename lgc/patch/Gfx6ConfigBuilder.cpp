@@ -492,6 +492,8 @@ template <typename T> void ConfigBuilder::buildVsRegConfig(ShaderStage shaderSta
 
     // Set fields CLIP_DIST_ENA_0 ~ CLIP_DIST_ENA_7 and CULL_DIST_ENA_0 ~ CULL_DIST_ENA_7
     unsigned paClVsOutCntl = GET_REG(&config->vsRegs, PA_CL_VS_OUT_CNTL);
+
+    // Note : Merge clip and cull mask to make the point can be clipped
     unsigned finalMask = clipDistanceMask | cullDistanceMask;
     paClVsOutCntl |= clipDistanceMask | (finalMask << 8);
     SET_REG(&config->vsRegs, PA_CL_VS_OUT_CNTL, paClVsOutCntl);
