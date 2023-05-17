@@ -135,7 +135,7 @@ private:
                             llvm::Instruction *insertPos);
 
   void storeValueToStreamOutBuffer(llvm::Value *storeValue, unsigned xfbBuffer, unsigned xfbOffset, unsigned xfbStride,
-                                   unsigned streamId, llvm::Value *streamOutBufDesc, llvm::Instruction *insertPos);
+                                   unsigned streamId, llvm::Instruction *insertPos);
 
   void createStreamOutBufferStoreFunction(llvm::Value *storeValue, unsigned xfbStrde, std::string &funcName);
 

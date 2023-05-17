@@ -193,7 +193,8 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
       intfData->userDataUsage.gs.copyShaderEsGsLdsSize = 2;
       intfData->userDataUsage.gs.copyShaderStreamOutTable = 3;
     } else {
-      // If NGG, both esGsLdsSize and streamOutTable are not used
+      // If NGG (SW stream-out), both esGsLdsSize and streamOutTable are not used
+      assert(m_pipelineState->enableSwXfb());
       intfData->userDataUsage.gs.copyShaderEsGsLdsSize = InvalidValue;
       intfData->userDataUsage.gs.copyShaderStreamOutTable = InvalidValue;
     }
