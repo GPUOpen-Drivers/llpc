@@ -107,6 +107,7 @@ enum class ThreadGroupSwizzleMode : unsigned {
 static const unsigned ShadowDescriptorTableDisable = ~0U;
 
 static const char XfbStateMetadataName[] = "lgc.xfb.state";
+static const char SampleShadingMetaName[] = "lgc.sample.shading";
 
 // Middle-end per-pipeline options to pass to SetOptions.
 // The front-end should zero-initialize it with "= {}" in case future changes add new fields.

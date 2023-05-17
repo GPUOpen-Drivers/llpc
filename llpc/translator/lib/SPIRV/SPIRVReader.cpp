@@ -7712,6 +7712,19 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       if (bv->hasDecorate(DecorationBuiltIn, 0, &builtIn)) {
         inOutDec.IsBuiltIn = true;
         inOutDec.Value.BuiltIn = builtIn;
+
+        // NOTE: According to the vulkan spec, sample shading is enabled if the fragment shader's entry point
+        // interface includes input variables decorated with a BuiltIn of SampleId or SamplePosition built-ins.
+        // If gl_sampleId or gl_samplePosition is declared but not used in a fragment shader, it will be removed
+        // in lower stage, in those cases, we need to add metadata and use it later.
+        if ((m_execModule == ExecutionModelFragment) &&
+            (builtIn == spv::BuiltInSampleId || builtIn == spv::BuiltInSamplePosition)) {
+          auto nameMeta = m_m->getNamedMetadata(lgc::SampleShadingMetaName);
+          if (!nameMeta) {
+            nameMeta = m_m->getOrInsertNamedMetadata(lgc::SampleShadingMetaName);
+            nameMeta->addOperand(MDNode::get(*m_context, MDString::get(*m_context, lgc::SampleShadingMetaName)));
+          }
+        }
 #if VKI_RAY_TRACING
         Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
         llpcContext->getPipelineContext()->collectBuiltIn(builtIn);
