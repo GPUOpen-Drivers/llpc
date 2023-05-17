@@ -56,14 +56,6 @@ RayTracingContext::RayTracingContext(GfxIpVersion gfxIP, const RayTracingPipelin
 
 // =====================================================================================================================
 // Gets pipeline shader info of the specified shader stage
-//
-// @param shaderStage : Shader stage
-const PipelineShaderInfo *RayTracingContext::getPipelineShaderInfo(unsigned shaderId) const {
-  return m_traceRayShaderInfo;
-}
-
-// =====================================================================================================================
-// Gets pipeline shader info of the specified shader stage
 unsigned RayTracingContext::getShaderStageMask() const {
   if (m_linked)
     return ShaderStageComputeBit;

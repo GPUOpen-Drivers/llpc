@@ -117,9 +117,6 @@ public:
   // Returns the pipeline type
   virtual PipelineType getPipelineType() const = 0;
 
-  // Gets pipeline shader info of the specified shader stage
-  virtual const PipelineShaderInfo *getPipelineShaderInfo(unsigned shaderId) const = 0;
-
   // Gets pipeline build info
   virtual const void *getPipelineBuildInfo() const = 0;
 
