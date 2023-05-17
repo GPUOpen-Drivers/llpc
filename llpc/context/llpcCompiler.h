@@ -171,7 +171,7 @@ public:
   void releaseContext(Context *context) const;
 
 #if VKI_RAY_TRACING
-  Result buildRayTracingPipelineElf(Context *context, llvm::Module *module, ElfPackage &pipelineElf,
+  Result buildRayTracingPipelineElf(Context *context, std::unique_ptr<llvm::Module> module, ElfPackage &pipelineElf,
                                     std::vector<Vkgc::RayTracingShaderProperty> &shaderProps,
                                     std::vector<bool> &moduleCallsTraceRay, unsigned moduleIndex,
                                     std::unique_ptr<lgc::Pipeline> &pipeline, TimerProfiler &timerProfiler);
