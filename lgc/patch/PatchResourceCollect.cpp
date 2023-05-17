@@ -1134,9 +1134,9 @@ void PatchResourceCollect::processShader() {
   }
 
   if (m_shaderStage == ShaderStageFragment) {
-    if (m_resUsage->builtInUsage.fs.fragCoord || m_resUsage->builtInUsage.fs.pointCoord ||
-        m_resUsage->builtInUsage.fs.sampleMaskIn) {
-      if (m_pipelineState->getRasterizerState().perSampleShading)
+    if (m_pipelineState->getRasterizerState().perSampleShading) {
+      if (m_resUsage->builtInUsage.fs.fragCoord || m_resUsage->builtInUsage.fs.pointCoord ||
+          m_resUsage->builtInUsage.fs.sampleMaskIn || m_resUsage->resourceWrite)
         m_resUsage->builtInUsage.fs.runAtSampleRate = true;
     }
 

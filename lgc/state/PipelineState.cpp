@@ -1262,6 +1262,10 @@ void PipelineState::recordGraphicsState(Module *module) {
 void PipelineState::readGraphicsState(Module *module) {
   readNamedMetadataArrayOfInt32(module, IaStateMetadataName, m_inputAssemblyState);
   readNamedMetadataArrayOfInt32(module, RsStateMetadataName, m_rasterizerState);
+
+  auto nameMeta = module->getNamedMetadata(SampleShadingMetaName);
+  if (nameMeta)
+    m_rasterizerState.perSampleShading |= 1;
 }
 
 // =====================================================================================================================
