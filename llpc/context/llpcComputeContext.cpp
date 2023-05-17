@@ -59,15 +59,6 @@ ComputeContext::ComputeContext(GfxIpVersion gfxIp, const ComputePipelineBuildInf
 }
 
 // =====================================================================================================================
-// Gets pipeline shader info of the specified shader stage
-//
-// @param shaderStage : Shader stage
-const PipelineShaderInfo *ComputeContext::getPipelineShaderInfo(unsigned shaderId) const {
-  assert(shaderId == ShaderStageCompute);
-  return &m_pipelineInfo->cs;
-}
-
-// =====================================================================================================================
 // Gets subgroup size usage
 //
 // @returns : Bitmask per stage, in the same order as defined in `Vkgc::ShaderStage`.
@@ -79,9 +70,6 @@ unsigned ComputeContext::getSubgroupSizeUsage() const {
 // =====================================================================================================================
 // Set pipeline state in Pipeline object for middle-end and/or calculate the hash for the state to be added.
 // Doing both these things in the same code ensures that we hash and use the same pipeline state in all situations.
-// For graphics, we use the shader stage mask to decide which parts of graphics state to use, omitting
-// pre-rasterization state if there are no pre-rasterization shaders, and omitting fragment state if there is
-// no FS.
 //
 // @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing pipeline state
 // @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
@@ -89,19 +77,9 @@ unsigned ComputeContext::getSubgroupSizeUsage() const {
 //                   is needed
 void ComputeContext::setPipelineState(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, bool unlinked) const {
   PipelineContext::setPipelineState(pipeline, hasher, unlinked);
-  const unsigned stageMask = getShaderStageMask();
 
-  if (pipeline) {
-    // Give the shader options (including the hash) to the middle-end.
-    const auto allStages = maskToShaderStages(stageMask);
-    for (ShaderStage stage : make_filter_range(allStages, isNativeStage)) {
-      const PipelineShaderInfo *shaderInfo = getPipelineShaderInfo(stage);
-
-      assert(shaderInfo);
-
-      pipeline->setShaderOptions(getLgcShaderStage(static_cast<ShaderStage>(stage)), computeShaderOptions(*shaderInfo));
-    }
-  }
+  if (pipeline)
+    pipeline->setShaderOptions(lgc::ShaderStageCompute, computeShaderOptions(m_pipelineInfo->cs));
 }
 
 // =====================================================================================================================

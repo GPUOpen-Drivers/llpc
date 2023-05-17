@@ -47,7 +47,7 @@ public:
   virtual PipelineType getPipelineType() const override { return PipelineType::Graphics; }
 
   // Gets pipeline shader info of the specified shader stage
-  virtual const PipelineShaderInfo *getPipelineShaderInfo(unsigned shaderId) const override;
+  const PipelineShaderInfo *getPipelineShaderInfo(unsigned shaderId) const;
 
   // Gets pipeline build info
   virtual const void *getPipelineBuildInfo() const override { return m_pipelineInfo; }

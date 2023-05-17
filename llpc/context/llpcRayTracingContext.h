@@ -51,8 +51,6 @@ public:
 
   virtual PipelineType getPipelineType() const override { return PipelineType::RayTracing; }
 
-  virtual const PipelineShaderInfo *getPipelineShaderInfo(unsigned shaderId) const override;
-
   // Gets pipeline build info
   virtual const void *getPipelineBuildInfo() const override { return m_pipelineInfo; }
 

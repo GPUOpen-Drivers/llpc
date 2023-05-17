@@ -2776,17 +2776,19 @@ void Compiler::releaseContext(Context *context) const {
 // @param [out] nonFragmentHash : Hash code of all non-fragment shader
 void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayRef<ArrayRef<uint8_t>> stageHashes,
                                     MetroHash::Hash *fragmentHash, MetroHash::Hash *nonFragmentHash) {
+  assert(context->getPipelineType() == PipelineType::Graphics);
   MetroHash64 fragmentHasher;
   MetroHash64 nonFragmentHasher;
+  auto pipelineContext = static_cast<const GraphicsContext *>(context->getPipelineContext());
   auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
-  auto pipelineOptions = context->getPipelineContext()->getPipelineOptions();
+  auto pipelineOptions = pipelineContext->getPipelineOptions();
 
   // Build hash per shader stage
   for (ShaderStage stage : gfxShaderStages()) {
     if ((stageMask & getLgcShaderStageMask(stage)) == 0)
       continue;
 
-    auto shaderInfo = context->getPipelineShaderInfo(stage);
+    auto shaderInfo = pipelineContext->getPipelineShaderInfo(stage);
     MetroHash64 hasher;
 
     // Update common shader info

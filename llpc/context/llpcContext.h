@@ -91,9 +91,6 @@ public:
 
   // Wrappers of interfaces of pipeline context
   PipelineType getPipelineType() const { return m_pipelineContext->getPipelineType(); }
-  const PipelineShaderInfo *getPipelineShaderInfo(ShaderStage shaderId) const {
-    return m_pipelineContext->getPipelineShaderInfo(shaderId);
-  }
 
   const ResourceMappingData *getResourceMapping() const { return m_pipelineContext->getResourceMapping(); }
 
