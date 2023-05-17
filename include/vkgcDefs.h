@@ -82,6 +82,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     61.8 | Add useShadingRate and useSampleInfoto ShaderModuleUsage                                              |
 //  |     61.7 | Add disableFMA to PipelineShaderOptions                                                               |
 //  |     61.6 | Add workaroundInitializeOutputsToZero to PipelineShaderOptions                                        |
 //  |     61.5 | Add RtIpVersion (including its checkers) to represent ray tracing IP                                  |
@@ -603,9 +604,11 @@ struct ShaderModuleUsage {
   bool isInternalRtShader; ///< Whether the shaderModule is a ray tracing internal shader
   bool hasTraceRay;        ///< Whether the shaderModule has OpTraceRayKHR;
 #endif
-  bool useIsNan;     ///< Whether IsNan is used
-  bool useInvariant; ///< Whether invariant variable is used
-  bool usePointSize; ///< Whether gl_PointSize is used in output
+  bool useIsNan;       ///< Whether IsNan is used
+  bool useInvariant;   ///< Whether invariant variable is used
+  bool usePointSize;   ///< Whether gl_PointSize is used in output
+  bool useShadingRate; ///< Whether shading rate is used
+  bool useSampleInfo;  ///< Whether gl_SamplePosition or InterpolateAtSample are used
 };
 
 /// Represents common part of shader module data
