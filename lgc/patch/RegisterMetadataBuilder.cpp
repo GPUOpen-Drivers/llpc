@@ -755,8 +755,9 @@ void RegisterMetadataBuilder::buildPsRegisters() {
   dbShaderControl[Util::Abi::DbShaderControlMetadataKey::KillEnable] = builtInUsage.discard;
   dbShaderControl[Util::Abi::DbShaderControlMetadataKey::ZExportEnable] = builtInUsage.fragDepth;
   dbShaderControl[Util::Abi::DbShaderControlMetadataKey::StencilTestValExportEnable] = builtInUsage.fragStencilRef;
-  dbShaderControl[Util::Abi::DbShaderControlMetadataKey::MaskExportEnable] = builtInUsage.sampleMask;
-  dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] = 1; // Set during pipeline finalization.
+  dbShaderControl[Util::Abi::DbShaderControlMetadataKey::MaskExportEnable] = builtInUsage.sampleMask == 1;
+  // Set during pipeline finalization.
+  dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] = true;
   dbShaderControl[Util::Abi::DbShaderControlMetadataKey::DepthBeforeShader] = fragmentMode.earlyFragmentTests;
   dbShaderControl[Util::Abi::DbShaderControlMetadataKey::ExecOnNoop] =
       fragmentMode.earlyFragmentTests && resUsage->resourceWrite;
@@ -1054,10 +1055,16 @@ void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareS
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::ImageOp] = useImageOp;
   }
 
+  // Fill ".user_data_reg_map" and update ".user_data_limit"
   auto userDataNode = hwShaderNode[Util::Abi::HardwareStageMetadataKey::UserDataRegMap].getArray(true);
   unsigned idx = 0;
-  for (auto value : m_pipelineState->getUserDataMap(apiStage))
+  unsigned userDataLimit = 1;
+  for (auto value : m_pipelineState->getUserDataMap(apiStage)) {
     userDataNode[idx++] = value;
+    if (value < InterfaceData::MaxSpillTableSize && (value + 1) > userDataLimit)
+      userDataLimit = value + 1;
+  }
+  m_pipelineState->getPalMetadata()->setUserDataLimit(userDataLimit);
 }
 
 // =====================================================================================================================
@@ -1238,7 +1245,7 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
       paClVsOutCntl[Util::Abi::PaClVsOutCntlMetadataKey::VsOutCcDist1VecEna] = true;
 
     unsigned clipDistanceMask = (1 << clipDistanceCount) - 1;
-    unsigned cullDistanceMask = (1 << cullDistanceCount) - 1;
+    unsigned cullDistanceMask = ((1 << cullDistanceCount) - 1) << clipDistanceCount;
 
     // Set fields CLIP_DIST_ENA_0 ~ CLIP_DIST_ENA_7 and CULL_DIST_ENA_0 ~ CULL_DIST_ENA_7
     static const unsigned MaxDistCount = 8;
