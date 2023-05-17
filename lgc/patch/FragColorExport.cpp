@@ -843,7 +843,6 @@ Value *FragColorExport::dualSourceSwizzle(BuilderBase &builder) {
         builder.getFalse(),                                 // done
         builder.getTrue()                                   // vm
     };
-
     return builder.CreateNamedCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {});
   } else {
     Value *result0[4], *result1[4];
