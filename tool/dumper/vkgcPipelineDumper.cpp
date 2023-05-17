@@ -1499,12 +1499,10 @@ void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo 
     hasher->Update(cbState->alphaToCoverageEnable);
     hasher->Update(cbState->dualSourceBlendEnable);
     for (unsigned i = 0; i < MaxColorTargets; ++i) {
-      if (cbState->target[i].format != VK_FORMAT_UNDEFINED) {
-        hasher->Update(cbState->target[i].channelWriteMask);
-        hasher->Update(cbState->target[i].blendEnable);
-        hasher->Update(cbState->target[i].blendSrcAlphaToColor);
-        hasher->Update(cbState->target[i].format);
-      }
+      hasher->Update(cbState->target[i].channelWriteMask);
+      hasher->Update(cbState->target[i].blendEnable);
+      hasher->Update(cbState->target[i].blendSrcAlphaToColor);
+      hasher->Update(cbState->target[i].format);
     }
   }
 }
