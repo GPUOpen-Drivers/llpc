@@ -140,6 +140,10 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
       shaderModuleUsage.hasTraceRay = true;
       break;
     }
+    case OpExecuteCallableNV:
+    case OpExecuteCallableKHR:
+      shaderModuleUsage.hasExecuteCallable = true;
+      break;
 #endif
     case OpIsNan: {
       shaderModuleUsage.useIsNan = true;
