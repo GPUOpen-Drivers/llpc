@@ -1550,7 +1550,6 @@ InterfaceData *PipelineState::getShaderInterfaceData(ShaderStage shaderStage) {
 // @param location : Location
 unsigned PipelineState::computeExportFormat(Type *outputTy, unsigned location) {
   const ColorExportFormat *colorExportFormat = &getColorExportFormat(location);
-  GfxIpVersion gfxIp = getTargetInfo().getGfxIpVersion();
   auto gpuWorkarounds = &getTargetInfo().getGpuWorkarounds();
   unsigned outputMask = outputTy->isVectorTy() ? (1 << cast<FixedVectorType>(outputTy)->getNumElements()) - 1 : 1;
   const auto cbState = &getColorExportState();
@@ -1582,14 +1581,12 @@ unsigned PipelineState::computeExportFormat(Type *outputTy, unsigned location) {
   // Start by assuming EXP_FORMAT_ZERO (no exports)
   ExportFormat expFmt = EXP_FORMAT_ZERO;
 
-  bool gfx8RbPlusEnable = false;
-  if (gfxIp.major == 8 && gfxIp.minor == 1)
-    gfx8RbPlusEnable = true;
+  bool supportRbPlus = getTargetInfo().getGpuProperty().supportsRbPlus;
 
   if (colorExportFormat->dfmt == BufDataFormatInvalid)
     expFmt = EXP_FORMAT_ZERO;
   else if (compSetting == CompSetting::OneCompRed && !alphaExport && !isSrgbFormat &&
-           (!gfx8RbPlusEnable || maxCompBitCount == 32)) {
+           (!supportRbPlus || maxCompBitCount == 32)) {
     // NOTE: When Rb+ is enabled, "R8 UNORM" and "R16 UNORM" shouldn't use "EXP_FORMAT_32_R", instead
     // "EXP_FORMAT_FP16_ABGR" and "EXP_FORMAT_UNORM16_ABGR" should be used for 2X exporting performance.
     expFmt = EXP_FORMAT_32_R;
