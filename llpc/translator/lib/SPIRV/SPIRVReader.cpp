@@ -49,6 +49,7 @@
 #include "llpcContext.h"
 #include "llpcDialect.h"
 #include "llpcPipelineContext.h"
+#include "llpcRayTracingContext.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/Pipeline.h"
 #include "llvm/ADT/DenseMap.h"
@@ -3589,15 +3590,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleDow
 //
 // @param spvValue : A SPIR-V value.
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpTraceRayKHR>(SPIRVValue *const spvValue) {
-  Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
-  if (m_execModule == ExecutionModelClosestHitKHR) {
-    llpcContext->getPipelineContext()->setIndirectStage(Vkgc::ShaderStageRayTracingClosestHit);
-    llpcContext->getPipelineContext()->setIndirectStage(Vkgc::ShaderStageCompute);
-    llpcContext->getPipelineContext()->setIndirectStage(Vkgc::ShaderStageRayTracingRayGen);
-  } else if (m_execModule == ExecutionModelMissKHR) {
-    llpcContext->getPipelineContext()->setIndirectStage(Vkgc::ShaderStageRayTracingMiss);
-    llpcContext->getPipelineContext()->setIndirectStage(Vkgc::ShaderStageCompute);
-    llpcContext->getPipelineContext()->setIndirectStage(Vkgc::ShaderStageRayTracingRayGen);
+  if (m_execModule != ExecutionModelRayGenerationKHR) {
+    Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
+    auto *pipelineContext = static_cast<Llpc::RayTracingContext *>(llpcContext->getPipelineContext());
+    pipelineContext->setIndirectPipeline();
   }
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   return mapValue(spvValue, transSPIRVBuiltinFromInst(static_cast<SPIRVInstruction *>(spvValue), block));
@@ -3608,9 +3604,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpTraceRayKHR>(SPIRVValue *
 //
 // @param spvValue : A SPIR-V value.
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpExecuteCallableKHR>(SPIRVValue *const spvValue) {
-  if (m_execModule == ExecutionModelCallableKHR) {
+  if (m_execModule != ExecutionModelRayGenerationKHR) {
     Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
-    llpcContext->getPipelineContext()->setIndirectStage(Vkgc::ShaderStageRayTracingCallable);
+    auto *pipelineContext = static_cast<Llpc::RayTracingContext *>(llpcContext->getPipelineContext());
+    pipelineContext->setIndirectPipeline();
   }
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   return mapValue(spvValue, transSPIRVBuiltinFromInst(static_cast<SPIRVInstruction *>(spvValue), block));
