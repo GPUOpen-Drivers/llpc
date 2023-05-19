@@ -1630,6 +1630,7 @@ Value *Builder::CreateImageBvhIntersectRay(Value *nodePtr, Value *extent, Value 
   return record(BuilderOpcode::ImageBvhIntersectRay, FixedVectorType::get(getInt32Ty(), 4),
                 {nodePtr, extent, origin, direction, invDirection, imageDesc}, instName);
 }
+
 #endif
 
 // =====================================================================================================================

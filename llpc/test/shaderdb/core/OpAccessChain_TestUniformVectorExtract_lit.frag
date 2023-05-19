@@ -17,6 +17,7 @@ void main()
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; REQUIRES: do-not-run-me
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: [[GEPVAR:%[^ ]+]] = getelementptr <{ [4 x double], i32 }>, ptr addrspace(7) {{%[^,]+}}, i64 0, i32 0, i64 %

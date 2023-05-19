@@ -79,6 +79,7 @@ static const char *GetStaticId = "AmdTraceRayGetStaticId";
 static const char *LdsStackInit = "AmdTraceRayLdsStackInit";
 static const char *LdsStackStore = "AmdTraceRayLdsStackStore";
 #endif
+static const char *FetchTrianglePositionFromRayQuery = "FetchTrianglePositionFromRayQuery";
 } // namespace RtName
 
 // Enum for the RayDesc
@@ -448,7 +449,10 @@ void SpirvLowerRayQuery::processLibraryFunction(Function *&func) {
     createLdsStackStore(func);
   }
 #endif
-  else {
+  else if (mangledName.startswith(RtName::FetchTrianglePositionFromRayQuery)) {
+    func->setName(RtName::FetchTrianglePositionFromRayQuery);
+    func->setLinkage(GlobalValue::ExternalLinkage);
+  } else {
     // Nothing to do
   }
 }
@@ -1196,6 +1200,36 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetIntersectio
 }
 
 // =====================================================================================================================
+// Process RayQuery OpRayQueryGetIntersectionTriangleVertexPositionsKHR
+//
+// @param func : The function to create
+template <>
+void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetIntersectionTriangleVertexPositionsKHR>(Function *func) {
+  func->addFnAttr(Attribute::AlwaysInline);
+  BasicBlock *entryBlock = BasicBlock::Create(*m_context, ".entry", func);
+  m_builder->SetInsertPoint(entryBlock);
+  Value *rayQuery = func->arg_begin();
+  Value *intersectVal = func->arg_begin() + 1;
+  Value *intersectPtr = m_builder->CreateAlloca(m_builder->getInt32Ty());
+  m_builder->CreateStore(intersectVal, intersectPtr);
+
+  // Call {vec3, vec3, vec3} FetchTrianglePositionFromRayQuery(rayquery* rayquery, int* intersect)
+  // return 3 triangle vertices
+  auto floatx3Ty = FixedVectorType::get(m_builder->getFloatTy(), 3);
+  auto triangleDataTy = StructType::get(*m_context, {floatx3Ty, floatx3Ty, floatx3Ty});
+  auto triangleData =
+      m_builder->CreateNamedCall(RtName::FetchTrianglePositionFromRayQuery, triangleDataTy, {rayQuery, intersectPtr},
+                                 {Attribute::NoUnwind, Attribute::AlwaysInline});
+
+  // Return type of OpRayQueryGetIntersectionTriangleVertexPositionsKHR is array of vec3 (vec3[3]).
+  auto retType = ArrayType::get(floatx3Ty, 3);
+  Value *ret = PoisonValue::get(retType);
+  for (unsigned i = 0; i < 3; i++)
+    ret = m_builder->CreateInsertValue(ret, m_builder->CreateExtractValue(triangleData, {i}), {i});
+  m_builder->CreateRet(ret);
+}
+
+// =====================================================================================================================
 // Process compute/graphics/raytracing shader RayQueryOp functions
 //
 // @param func : The function to create
@@ -1247,6 +1281,8 @@ void SpirvLowerRayQuery::processShaderFunction(Function *func, unsigned opcode) 
     return createRayQueryFunc<OpRayQueryGetIntersectionObjectToWorldKHR>(func);
   case OpRayQueryGetIntersectionWorldToObjectKHR:
     return createRayQueryFunc<OpRayQueryGetIntersectionWorldToObjectKHR>(func);
+  case OpRayQueryGetIntersectionTriangleVertexPositionsKHR:
+    return createRayQueryFunc<OpRayQueryGetIntersectionTriangleVertexPositionsKHR>(func);
   default:
     return;
   }

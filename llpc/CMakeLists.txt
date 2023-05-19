@@ -412,6 +412,7 @@ target_link_libraries(llpc_standalone_compiler PUBLIC
     spvgen_static
     vfx
     vkgc_headers
+    vkgc_util
     ${CMAKE_DL_LIBS}
 )
 

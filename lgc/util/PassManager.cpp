@@ -30,6 +30,7 @@
  */
 #include "lgc/PassManager.h"
 #include "lgc/LgcContext.h"
+#include "lgc/MbStandardInstrumentations.h"
 #include "lgc/util/Debug.h"
 #include "llvm/Analysis/CFGPrinter.h"
 #include "llvm/IR/PrintPasses.h"
@@ -42,7 +43,6 @@
 #include "llvm/IRPrinter/IRPrintingPasses.h"
 #endif
 #include "llvm/Passes/PassBuilder.h"
-#include "llvm/Passes/StandardInstrumentations.h"
 #include "llvm/Support/CommandLine.h"
 
 namespace llvm {
@@ -98,7 +98,7 @@ private:
 };
 
 // =====================================================================================================================
-// LLPC's PassManager override.
+// LLPC's PassManager override -- Module pass edition.
 // This is the implementation subclass of the PassManager class declared in PassManager.h
 class PassManagerImpl final : public lgc::PassManager {
 public:
@@ -120,9 +120,35 @@ private:
   PassInstrumentationCallbacks m_instrumentationCallbacks; // Instrumentation callbacks ran when running the passes.
   StandardInstrumentations m_instrumentationStandard;      // LLVM's Standard instrumentations
   unsigned *m_passIndex = nullptr;                         // Pass Index.
-  bool initialized = false;                                // Whether the pass manager is initialized or not
-  std::string m_stopAfter;
+  bool m_initialized = false;                              // Whether the pass manager is initialized or not
   bool m_stopped = false;
+  std::string m_stopAfter;
+};
+
+// =====================================================================================================================
+// LLPC's PassManager override -- ModuleBunch pass edition.
+// This is the implementation subclass of the MbPassManager class declared in PassManager.h
+class MbPassManagerImpl final : public lgc::MbPassManager {
+public:
+  MbPassManagerImpl(TargetMachine *targetMachine);
+  void registerPass(StringRef passName, StringRef className) override;
+  void run(ModuleBunch &moduleBunch) override;
+  PassInstrumentationCallbacks &getInstrumentationCallbacks() override { return m_instrumentationCallbacks; }
+  bool stopped() const override { return m_stopped; }
+
+private:
+  void registerCallbacks();
+  TargetMachine *m_targetMachine;
+
+  // -----------------------------------------------------------------------------------------------------------------
+
+  LoopAnalysisManager m_loopAnalysisManager;               // Loop analysis manager used when running the passes.
+  CGSCCAnalysisManager m_cgsccAnalysisManager;             // CGSCC analysis manager used when running the passes.
+  PassInstrumentationCallbacks m_instrumentationCallbacks; // Instrumentation callbacks ran when running the passes.
+  MbStandardInstrumentations m_instrumentationStandard;    // LLVM's Standard instrumentations
+  bool m_initialized = false;                              // Whether the pass manager is initialized or not
+  bool m_stopped = false;
+  std::string m_stopAfter;
 };
 
 } // namespace
@@ -162,8 +188,16 @@ lgc::LegacyPassManager *lgc::LegacyPassManager::Create() {
 // Create a PassManagerImpl
 //
 // @param lgcContext : LgcContext to get TargetMachine and LLVMContext from
-lgc::PassManager *lgc::PassManager::Create(LgcContext *lgcContext) {
-  return new PassManagerImpl(lgcContext->getTargetMachine(), lgcContext->getContext());
+std::unique_ptr<lgc::PassManager> lgc::PassManager::Create(LgcContext *lgcContext) {
+  return std::make_unique<PassManagerImpl>(lgcContext->getTargetMachine(), lgcContext->getContext());
+}
+
+// =====================================================================================================================
+// Create an MbPassManagerImpl
+//
+// @param targetMachine : TargetMachine to use
+std::unique_ptr<lgc::MbPassManager> lgc::MbPassManager::Create(TargetMachine *targetMachine) {
+  return std::make_unique<MbPassManagerImpl>(targetMachine);
 }
 
 // =====================================================================================================================
@@ -202,11 +236,42 @@ PassManagerImpl::PassManagerImpl(TargetMachine *targetMachine, LLVMContext &cont
 }
 
 // =====================================================================================================================
+MbPassManagerImpl::MbPassManagerImpl(TargetMachine *targetMachine)
+    : MbPassManager(), m_targetMachine(targetMachine),
+      m_instrumentationStandard(cl::DebugPassManager, cl::DebugPassManager || cl::VerifyIr,
+                                /*PrintPassOpts=*/{true, false, true}) {
+  if (!cl::DumpCfgAfter.empty())
+    report_fatal_error("The --dump-cfg-after option is not supported with the new pass manager.");
+
+  auto &options = cl::getRegisteredOptions();
+
+  auto it = options.find("stop-after");
+  assert(it != options.end());
+  m_stopAfter = static_cast<cl::opt<std::string> *>(it->second)->getValue();
+
+  // Setup custom instrumentation callbacks and register LLVM's default module
+  // analyses to the analysis manager.
+  registerCallbacks();
+
+  // Register standard instrumentation callbacks.
+  m_instrumentationStandard.registerCallbacks(m_instrumentationCallbacks);
+}
+
+// =====================================================================================================================
 // Register a pass to identify it with a short name in the pass manager
 //
 // @param passName : Dash-case short name to use for registration
 // @param className : Full pass name
 void PassManagerImpl::registerPass(StringRef passName, StringRef className) {
+  m_instrumentationCallbacks.addClassToPassName(className, passName);
+}
+
+// =====================================================================================================================
+// Register a pass to identify it with a short name in the pass manager
+//
+// @param passName : Dash-case short name to use for registration
+// @param className : Full pass name
+void MbPassManagerImpl::registerPass(StringRef passName, StringRef className) {
   m_instrumentationCallbacks.addClassToPassName(className, passName);
 }
 
@@ -217,7 +282,7 @@ void PassManagerImpl::registerPass(StringRef passName, StringRef className) {
 void PassManagerImpl::run(Module &module) {
   // We register LLVM's default analysis sets late to be sure our custom
   // analyses are added beforehand.
-  if (!initialized) {
+  if (!m_initialized) {
     PassBuilder passBuilder(m_targetMachine, PipelineTuningOptions(), {}, &m_instrumentationCallbacks);
     passBuilder.registerModuleAnalyses(m_moduleAnalysisManager);
     passBuilder.registerCGSCCAnalyses(m_cgsccAnalysisManager);
@@ -226,9 +291,36 @@ void PassManagerImpl::run(Module &module) {
     passBuilder.crossRegisterProxies(m_loopAnalysisManager, m_functionAnalysisManager, m_cgsccAnalysisManager,
                                      m_moduleAnalysisManager);
     m_loopAnalysisManager.registerPass([&] { return ModuleAnalysisManagerLoopProxy(m_moduleAnalysisManager); });
-    initialized = true;
+    m_initialized = true;
   }
   ModulePassManager::run(module, m_moduleAnalysisManager);
+}
+
+// =====================================================================================================================
+// Run all the added passes with the pass managers's ModuleBunch analysis manager
+//
+// @param moduleBunch : ModuleBunch to run the passes on
+void MbPassManagerImpl::run(ModuleBunch &moduleBunch) {
+  // We register LLVM's default analysis sets late to be sure our custom
+  // analyses are added beforehand.
+  if (!m_initialized) {
+    PassBuilder passBuilder(m_targetMachine, PipelineTuningOptions(), {}, &m_instrumentationCallbacks);
+    passBuilder.registerModuleAnalyses(m_moduleAnalysisManager);
+    passBuilder.registerCGSCCAnalyses(m_cgsccAnalysisManager);
+    passBuilder.registerFunctionAnalyses(m_functionAnalysisManager);
+    passBuilder.registerLoopAnalyses(m_loopAnalysisManager);
+    passBuilder.crossRegisterProxies(m_loopAnalysisManager, m_functionAnalysisManager, m_cgsccAnalysisManager,
+                                     m_moduleAnalysisManager);
+    m_moduleAnalysisManager.registerPass(
+        [&] { return ModuleBunchAnalysisManagerModuleProxy(m_moduleBunchAnalysisManager); });
+    m_moduleBunchAnalysisManager.registerPass(
+        [&] { return ModuleAnalysisManagerModuleBunchProxy(m_moduleAnalysisManager); });
+    m_loopAnalysisManager.registerPass([&] { return ModuleAnalysisManagerLoopProxy(m_moduleAnalysisManager); });
+    m_moduleBunchAnalysisManager.registerPass(
+        [&]() { return PassInstrumentationAnalysis(&m_instrumentationCallbacks); });
+    m_initialized = true;
+  }
+  ModuleBunchPassManager::run(moduleBunch, m_moduleBunchAnalysisManager);
 }
 
 // =====================================================================================================================
@@ -261,6 +353,23 @@ void PassManagerImpl::registerCallbacks() {
         }
       }
     }
+
+    StringRef passName = m_instrumentationCallbacks.getPassNameForClassName(className);
+    if (!m_stopAfter.empty() && passName == m_stopAfter) {
+      // This particular pass still gets to run, but we skip everything afterwards.
+      m_stopped = true;
+    }
+    return true;
+  });
+}
+
+// =====================================================================================================================
+// Register LLPC's custom callbacks
+//
+void MbPassManagerImpl::registerCallbacks() {
+  m_instrumentationCallbacks.registerShouldRunOptionalPassCallback([this](StringRef className, Any ir) { // NOLINT
+    if (m_stopped)
+      return false;
 
     StringRef passName = m_instrumentationCallbacks.getPassNameForClassName(className);
     if (!m_stopAfter.empty() && passName == m_stopAfter) {

@@ -328,6 +328,7 @@ _SPIRV_OP(TerminateRayKHR, 4449)
 _SPIRV_OP(IgnoreIntersectionNV, 5335)
 _SPIRV_OP(TerminateRayNV, 5336)
 _SPIRV_OP(TraceNV, 5337)
+_SPIRV_OP(RayQueryGetIntersectionTriangleVertexPositionsKHR, 5340)
 _SPIRV_OP(TypeAccelerationStructureKHR, 5341)
 _SPIRV_OP(ExecuteCallableKHR, 5344)
 #endif

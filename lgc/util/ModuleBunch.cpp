@@ -76,7 +76,7 @@ LLVM_DUMP_METHOD
 void ModuleBunch::dump() const {
   print(dbgs(), nullptr, false, /*IsForDebug=*/true);
 }
-#endif // !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+#endif
 
 // Copied from IRPrintingPasses.cpp and edited.
 PreservedAnalyses PrintModuleBunchPass::run(ModuleBunch &MB, ModuleBunchAnalysisManager &AM) {

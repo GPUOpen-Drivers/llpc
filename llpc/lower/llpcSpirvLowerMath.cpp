@@ -74,6 +74,8 @@ void SpirvLowerMath::init(Module &module) {
   m_fp64DenormFlush = commonShaderMode.fp64DenormMode == FpDenormMode::FlushOut ||
                       commonShaderMode.fp64DenormMode == FpDenormMode::FlushInOut;
   m_fp16RoundToZero = commonShaderMode.fp16RoundMode == FpRoundMode::Zero;
+  m_enableImplicitInvariantExports =
+      m_context->getPipelineContext()->getPipelineOptions()->enableImplicitInvariantExports;
 }
 
 // =====================================================================================================================
@@ -120,7 +122,7 @@ bool SpirvLowerMath::isOperandNoContract(Value *operand) {
 // =====================================================================================================================
 // Disable fast math for all values related with the specified value
 //
-// @param value : Value to disable fast math
+// @param value : Value to disable fast math for
 void SpirvLowerMath::disableFastMath(Value *value) {
   std::set<Instruction *> allValues;
   std::list<Instruction *> workSet;
@@ -392,7 +394,7 @@ void SpirvLowerMathFloatOp::visitCallInst(CallInst &callInst) {
       builtIn = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
       valueWritten = callInst.getOperand(0);
     }
-    if (builtIn == lgc::BuiltInPosition)
+    if (builtIn == lgc::BuiltInPosition && m_enableImplicitInvariantExports)
       disableFastMath(valueWritten);
   }
 }

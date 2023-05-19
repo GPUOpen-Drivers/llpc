@@ -101,13 +101,11 @@ LgcContext *Context::getLgcContext() {
 // @returns: the optimization level for the context.
 CodeGenOpt::Level Context::getOptimizationLevel() {
   uint32_t optLevel = CodeGenOpt::Level::Default;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
   optLevel = getPipelineContext()->getPipelineOptions()->optimizationLevel;
   if (optLevel > 3)
     optLevel = 3;
   else if (optLevel == 0) // Workaround for noopt bugs in the AMDGPU backend in LLVM.
     optLevel = 1;
-#endif
   m_lastOptLevel = CodeGenOpt::Level(optLevel);
   return *m_lastOptLevel;
 }

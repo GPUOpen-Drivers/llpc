@@ -41,7 +41,6 @@ namespace {
 
 constexpr GfxIpVersion GfxIp = {9, 0, 0};
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
 // cppcheck-suppress syntaxError
 TEST(LlpcContextTests, MatchPipelineOptLevel) {
   MetroHash::Hash cacheHash = {};
@@ -83,7 +82,6 @@ TEST(LlpcContextTests, MatchPipelineOptLevel) {
     }
   }
 }
-#endif
 
 } // namespace
 } // namespace Llpc

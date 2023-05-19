@@ -41,12 +41,14 @@
 #define vfxSnprintf(buf, len, ...) snprintf((buf), (len), __VA_ARGS__)
 #endif
 
+const static int ERROR_BUF_LEN = 4096;
+
 #define PARSE_ERROR(errorMsg, lineNum, ...)                                                                            \
   {                                                                                                                    \
-    char errorBuf[4096];                                                                                               \
-    int pos = vfxSnprintf(errorBuf, 4096, "Parse error at line %u: ", lineNum);                                        \
-    pos += vfxSnprintf(errorBuf + pos, 4096 - pos, __VA_ARGS__);                                                       \
-    pos += vfxSnprintf(errorBuf + pos, 4096 - pos, "\n");                                                              \
+    char errorBuf[ERROR_BUF_LEN];                                                                                      \
+    int pos = vfxSnprintf(errorBuf, ERROR_BUF_LEN, "Parse error at line %u: ", lineNum);                               \
+    pos += vfxSnprintf(errorBuf + pos, ERROR_BUF_LEN - pos, __VA_ARGS__);                                              \
+    pos += vfxSnprintf(errorBuf + pos, ERROR_BUF_LEN - pos, "\n");                                                     \
     errorMsg += errorBuf;                                                                                              \
     fputs(errorBuf, stderr);                                                                                           \
     exit(1);                                                                                                           \
@@ -54,10 +56,10 @@
 
 #define PARSE_WARNING(errorMsg, lineNum, ...)                                                                          \
   {                                                                                                                    \
-    char errorBuf[4096];                                                                                               \
-    int pos = vfxSnprintf(errorBuf, 4096, "Parse warning at line %u: ", lineNum);                                      \
-    pos += vfxSnprintf(errorBuf + pos, 4096 - pos, __VA_ARGS__);                                                       \
-    pos += vfxSnprintf(errorBuf + pos, 4096 - pos, "\n");                                                              \
-    VFX_ASSERT(pos < 4096);                                                                                            \
+    char errorBuf[ERROR_BUF_LEN];                                                                                      \
+    int pos = vfxSnprintf(errorBuf, ERROR_BUF_LEN, "Parse warning at line %u: ", lineNum);                             \
+    pos += vfxSnprintf(errorBuf + pos, ERROR_BUF_LEN - pos, __VA_ARGS__);                                              \
+    pos += vfxSnprintf(errorBuf + pos, ERROR_BUF_LEN - pos, "\n");                                                     \
+    VFX_ASSERT(pos < ERROR_BUF_LEN);                                                                                   \
     errorMsg += errorBuf;                                                                                              \
   }

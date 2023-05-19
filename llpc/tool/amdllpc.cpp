@@ -43,6 +43,8 @@
 #include "llpcThreading.h"
 #include "llpcUtil.h"
 #include "spvgen.h"
+#include "vkgcCapability.h"
+#include "vkgcExtension.h"
 #include "lgc/LgcContext.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/CodeGen/CommandFlags.h"
@@ -229,6 +231,11 @@ cl::opt<bool> EnableScratchAccessBoundsChecks("enable-scratch-bounds-checks",
                                               cl::desc("Insert scratch access bounds checks on loads and stores"),
                                               cl::init(false));
 
+// -enable-implicit-invariant-exports: allow implicit marking of position exports as invariant
+cl::opt<bool> EnableImplicitInvariantExports("enable-implicit-invariant-exports",
+                                              cl::desc("Enable implicit marking of position exports as invariant"),
+                                              cl::init(true));
+
 // -enable-forceCsThreadIdSwizzling: force cs thread id swizzling
 cl::opt<bool> ForceCsThreadIdSwizzling("force-compute-shader-thread-id-swizzling",
                                               cl::desc("force compute shader thread-id swizzling"),
@@ -335,6 +342,50 @@ extern opt<bool> BuildShaderCache;
 
 } // namespace cl
 } // namespace llvm
+
+namespace {
+class CapabilityPrinter {
+public:
+  void print() {
+    for (const auto &capability : ArrayRef(VkgcSupportedCapabilities))
+      outs() << capability << '\n';
+  }
+
+  void operator=(bool value) {
+    if (!value)
+      return;
+    print();
+    exit(0);
+  }
+};
+
+class ExtensionPrinter {
+public:
+  void print() {
+    for (uint32_t idx = 0; idx < ExtensionCount; ++idx) {
+      char pExtName[MaxExtensionStringSize] = {};
+      GetExtensionName(static_cast<Extension>(idx), pExtName, MaxExtensionStringSize);
+      outs() << pExtName << '\n';
+    }
+  }
+
+  void operator=(bool value) {
+    if (!value)
+      return;
+    print();
+    exit(0);
+  }
+};
+
+CapabilityPrinter CapPrinterInstance;
+ExtensionPrinter ExtPrinterInstance;
+
+cl::opt<CapabilityPrinter, true, cl::parser<bool>> CapPrinter{"cap", cl::desc("Display the supported Capabilities."),
+                                                              cl::location(CapPrinterInstance), cl::ValueDisallowed};
+
+cl::opt<ExtensionPrinter, true, cl::parser<bool>> ExtPrinter{"ext", cl::desc("Display the supported extensions."),
+                                                             cl::location(ExtPrinterInstance), cl::ValueDisallowed};
+} // namespace
 
 // =====================================================================================================================
 // Performs initialization work for LLPC standalone tool.
@@ -471,6 +522,7 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
   compileInfo->robustBufferAccess = RobustBufferAccess;
   compileInfo->scalarBlockLayout = ScalarBlockLayout;
   compileInfo->scratchAccessBoundsChecks = EnableScratchAccessBoundsChecks;
+  compileInfo->enableImplicitInvariantExports = EnableImplicitInvariantExports;
 #if VKI_RAY_TRACING
   compileInfo->bvhNodeStride = BvhNodeStride;
 #endif
@@ -479,11 +531,9 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
     compileInfo->optimizationLevel = LlpcOptLevel;
   }
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
   // We want the default optimization level to be "Default" which is not 0.
   compileInfo->gfxPipelineInfo.options.optimizationLevel = CodeGenOpt::Level::Default;
   compileInfo->compPipelineInfo.options.optimizationLevel = CodeGenOpt::Level::Default;
-#endif
   compileInfo->gfxPipelineInfo.options.resourceLayoutScheme = LayoutScheme;
   compileInfo->compPipelineInfo.options.forceCsThreadIdSwizzling = ForceCsThreadIdSwizzling;
   compileInfo->compPipelineInfo.options.overrideThreadGroupSizeX = OverrideThreadGroupSizeX;
@@ -506,11 +556,7 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
     nggState.enableNgg = EnableNgg;
     nggState.enableGsUse = NggEnableGsUse;
     nggState.forceCullingMode = NggForceCullingMode;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 60
-    nggState.compactMode = NggCompactVertex ? NggCompactVertices : NggCompactDisable;
-#else
     nggState.compactVertex = NggCompactVertex;
-#endif
     nggState.enableBackfaceCulling = NggEnableBackfaceCulling;
     nggState.enableFrustumCulling = NggEnableFrustumCulling;
     nggState.enableBoxFilterCulling = NggEnableBoxFilterCulling;

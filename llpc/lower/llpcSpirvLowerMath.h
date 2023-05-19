@@ -50,11 +50,13 @@ protected:
   bool isOperandNoContract(llvm::Value *operand);
   void disableFastMath(llvm::Value *value);
 
-  bool m_changed;         // Whether the module is changed
-  bool m_fp16DenormFlush; // Whether FP mode wants f16 denorms to be flushed to zero
-  bool m_fp32DenormFlush; // Whether FP mode wants f32 denorms to be flushed to zero
-  bool m_fp64DenormFlush; // Whether FP mode wants f64 denorms to be flushed to zero
-  bool m_fp16RoundToZero; // Whether FP mode wants f16 round-to-zero
+  bool m_changed;                        // Whether the module is changed
+  bool m_fp16DenormFlush;                // Whether FP mode wants f16 denorms to be flushed to zero
+  bool m_fp32DenormFlush;                // Whether FP mode wants f32 denorms to be flushed to zero
+  bool m_fp64DenormFlush;                // Whether FP mode wants f64 denorms to be flushed to zero
+  bool m_fp16RoundToZero;                // Whether FP mode wants f16 round-to-zero
+  bool m_enableImplicitInvariantExports; // Whether fast math should be disabled
+                                         // for gl_Position exports
 };
 
 // =====================================================================================================================

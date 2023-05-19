@@ -47,13 +47,13 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 61
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 7
+#define LLPC_INTERFACE_MINOR_VERSION 9
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
 #endif
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 49
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 60
 #error LLPC client version is too old
 #endif
 
@@ -82,9 +82,10 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     61.8 | Add enableImplicitInvariantExports to PipelineOptions                                                 |
 //  |     61.7 | Add disableFMA to PipelineOptions                                                                     |
 //  |     61.6 | Add workaroundInitializeOutputsToZero to PipelineShaderOptions                                        |
-//  |     61.5 | Add RtIpVersion (including its checkers) to represent ray tracing IP                                  |
+//  |     61.5 | Add RtIpVersion (including its checkers) to represent RT IP                                           |
 //  |     61.4 | Add workaroundStorageImageFormats to PipelineShaderOptions                                            |
 //  |     61.2 | Add pClientMetadata and clientMetadataSize to all PipelineBuildInfos                                  |
 //  |     61.1 | Add IPipelineDumper::GetGraphicsShaderBinaryHash                                                      |
@@ -454,7 +455,7 @@ struct GfxIpVersion {
   }
 };
 
-/// Represents RT (ray tracing) IP version
+/// Represents RT IP version
 struct RtIpVersion {
   unsigned major; ///< Major version
   unsigned minor; ///< Minor version
@@ -527,15 +528,13 @@ struct PipelineOptions {
                                    ///  descriptors.
   bool enableScratchAccessBoundsChecks; ///< If set, out of bounds guards will be inserted in the LLVM IR for OpLoads
                                         ///< and OpStores in private and function memory storage.
+  bool enableImplicitInvariantExports;  ///< If set, enable implicit marking of position exports as invariant.
   ShadowDescriptorTableUsage shadowDescriptorTableUsage; ///< Controls shadow descriptor table.
   unsigned shadowDescriptorTablePtrHigh;                 ///< Sets high part of VA ptr for shadow descriptor table.
   ExtendedRobustness extendedRobustness;                 ///< ExtendedRobustness is intended to correspond to the
                                                          ///  features of VK_EXT_robustness2.
 #if VKI_RAY_TRACING
   bool enableRayQuery; ///< If set, ray query is enabled
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 56
-  float rtMaxRayLength; ///< Overrides the rayTMax value
-#endif
 #endif
 #if VKI_BUILD_GFX11
   bool optimizeTessFactor; ///< If set, we can determine either send HT_TessFactor message or write to TF buffer
@@ -545,10 +544,8 @@ struct PipelineOptions {
 #endif
   bool enableInterpModePatch; ///< If set, per-sample interpolation for nonperspective and smooth input is enabled
   bool pageMigrationEnabled;  ///< If set, page migration is enabled
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 53
   uint32_t optimizationLevel; ///< The higher the number the more optimizations will be performed.  Valid values are
                               ///< between 0 and 3.
-#endif
   unsigned overrideThreadGroupSizeX;             ///< Override value for ThreadGroupSizeX
   unsigned overrideThreadGroupSizeY;             ///< Override value for ThreadGroupSizeY
   unsigned overrideThreadGroupSizeZ;             ///< Override value for ThreadGroupSizeZ
@@ -668,27 +665,12 @@ enum class NggSubgroupSizingType : unsigned {
                     ///  primsPerSubgroup
 };
 
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 60
-/// Enumerates compaction modes after culling operations for NGG primitive shader.
-enum NggCompactMode : unsigned {
-  NggCompactDisable,  ///< Compaction is disabled
-  NggCompactVertices, ///< Compaction is based on vertices
-};
-#endif
-
 /// Represents NGG tuning options
 struct NggState {
-  bool enableNgg;        ///< Enable NGG mode, use an implicit primitive shader
-  bool enableGsUse;      ///< Enable NGG use on geometry shader
-  bool forceCullingMode; ///< Force NGG to run in culling mode
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 60
-  NggCompactMode compactMode; ///< Compaction mode after culling operations
-#else
-  bool compactVertex; ///< Enable NGG vertex compaction after culling
-#endif
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 59
-  bool enableVertexReuse; ///< Enable optimization to cull duplicate vertices
-#endif
+  bool enableNgg;                 ///< Enable NGG mode, use an implicit primitive shader
+  bool enableGsUse;               ///< Enable NGG use on geometry shader
+  bool forceCullingMode;          ///< Force NGG to run in culling mode
+  bool compactVertex;             ///< Enable NGG vertex compaction after culling
   bool enableBackfaceCulling;     ///< Enable culling of primitives that don't meet facing criteria
   bool enableFrustumCulling;      ///< Enable discarding of primitives outside of view frustum
   bool enableBoxFilterCulling;    ///< Enable simpler frustum culler that is less accurate
@@ -1029,8 +1011,8 @@ enum RAYTRACING_ENTRY_FUNC : unsigned {
   RT_ENTRY_WORLD_TO_OBJECT_TRANSFORM,
   RT_ENTRY_RESERVE1,
   RT_ENTRY_RESERVE2,
-  RT_ENTRY_RESERVE3,
-  RT_ENTRY_RESERVE4,
+  RT_ENTRY_FETCH_HIT_TRIANGLE_FROM_NODE_POINTER,
+  RT_ENTRY_FETCH_HIT_TRIANGLE_FROM_RAY_QUERY,
   RT_ENTRY_FUNC_COUNT,
 };
 
@@ -1054,17 +1036,17 @@ union RayTracingSystemValueUsage {
 
     union {
       struct {
-        uint16_t hitKind : 1;            // Shader calls gl_HitKindEXT
-        uint16_t instanceIndex : 1;      // Shader calls gl_InstanceCustomIndexEXT
-        uint16_t instanceID : 1;         // Shader calls gl_InstanceID
-        uint16_t primitiveIndex : 1;     // Shader calls gl_PrimitiveID
-        uint16_t geometryIndex : 1;      // Shader calls gl_GeometryIndexEXT
-        uint16_t objectToWorld : 1;      // Shader calls gl_ObjectToWorldEXT
-        uint16_t objectRayOrigin : 1;    // Shader calls gl_ObjectRayOriginEXT
-        uint16_t objectRayDirection : 1; // Shader calls gl_ObjectRayDirectionEXT
-        uint16_t worldToObject : 1;      // Shader calls gl_WorldToObjectEXT
-        uint16_t reservedBit : 1;
-        uint16_t reserved : 6; // Reserved
+        uint16_t hitKind : 1;             // Shader calls gl_HitKindEXT
+        uint16_t instanceIndex : 1;       // Shader calls gl_InstanceCustomIndexEXT
+        uint16_t instanceID : 1;          // Shader calls gl_InstanceID
+        uint16_t primitiveIndex : 1;      // Shader calls gl_PrimitiveID
+        uint16_t geometryIndex : 1;       // Shader calls gl_GeometryIndexEXT
+        uint16_t objectToWorld : 1;       // Shader calls gl_ObjectToWorldEXT
+        uint16_t objectRayOrigin : 1;     // Shader calls gl_ObjectRayOriginEXT
+        uint16_t objectRayDirection : 1;  // Shader calls gl_ObjectRayDirectionEXT
+        uint16_t worldToObject : 1;       // Shader calls gl_WorldToObjectEXT
+        uint16_t hitTrianglePosition : 1; // Shader calls gl_HitTriangleVertexPositionsEXT
+        uint16_t reserved : 6;            // Reserved
       };
       uint16_t u16All;
     } primitive;
@@ -1074,10 +1056,6 @@ union RayTracingSystemValueUsage {
 
 /// Represents ray-tracing shader export configuration
 struct RayTracingShaderExportConfig {
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 56
-  float maxRayLength; // Raytracing rayDesc.tMax override
-#endif
-
   unsigned indirectCallingConvention; ///< Indirect calling convention
   struct {
     unsigned raygen;         ///< Ray generation shader saved register
@@ -1144,11 +1122,9 @@ struct RtState {
 #endif
   bool enableOptimalLdsStackSizeForIndirect; ///< Enable optimal LDS stack size for indirect shaders
   bool enableOptimalLdsStackSizeForUnified;  ///< Enable optimal LDS stack size for unified shaders
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 56
-  float maxRayLength; ///< Raytracing rayDesc.tMax override
-#endif
-  GpurtFuncTable gpurtFuncTable; ///< GPURT function table
-  RtIpVersion rtIpVersion;       ///< RT IP version
+  float maxRayLength;                        ///< Raytracing rayDesc.tMax override
+  GpurtFuncTable gpurtFuncTable;             ///< GPURT function table
+  RtIpVersion rtIpVersion;                   ///< RT IP version
 };
 #endif
 
