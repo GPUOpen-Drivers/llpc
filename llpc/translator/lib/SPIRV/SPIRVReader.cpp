@@ -2427,6 +2427,25 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
         (void(loadType)); // unused
         return ConstantVector::get({m_builder->getInt32(0), m_builder->getInt32(0)});
       }
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 34
+      else {
+        // From now on, AS header may start at a non-zero offset, GPURT now request base offset of the resource, and it
+        // will calculate the actual GPUVA, instead of compiler providing one loaded from offset 0.
+        unsigned binding = 0u;
+        unsigned descSet = 0u;
+        bool valid = spvLoad->getSrc()->hasDecorate(DecorationBinding, 0, &binding);
+        valid &= spvLoad->getSrc()->hasDecorate(DecorationDescriptorSet, 0, &descSet);
+        assert(valid);
+
+        auto descTy = ResourceNodeType::DescriptorBuffer;
+        auto descPtr = getBuilder()->CreateGetDescPtr(descTy, descTy, descSet, binding);
+        // Base address is the first 48-bit of descriptor.
+        Value *accelAddr = getBuilder()->CreateLoad(FixedVectorType::get(getBuilder()->getInt32Ty(), 2), descPtr);
+        accelAddr = getBuilder()->CreateInsertElement(
+            accelAddr, getBuilder()->CreateAnd(getBuilder()->CreateExtractElement(accelAddr, 1), 0xFFFF), 1);
+        return accelAddr;
+      }
+#endif
       break;
     }
 #endif
