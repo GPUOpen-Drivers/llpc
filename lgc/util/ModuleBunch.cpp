@@ -198,8 +198,10 @@ PreservedAnalyses ModuleBunchToModulePassAdaptor::run(ModuleBunch &Bunch, Module
     // Use the single Pass if it was set. Otherwise call PassMaker to create a Pass each time
     // round the outer per-LLVMContext loop.
     std::unique_ptr<PassConceptT> AllocatedPass;
-    PassConceptT *ThisPass = &*Pass;
-    if (!ThisPass) {
+    PassConceptT *ThisPass = nullptr;
+    if (Pass)
+      ThisPass = &*Pass;
+    else {
       AllocatedPass = PassMaker();
       ThisPass = &*AllocatedPass;
     }
