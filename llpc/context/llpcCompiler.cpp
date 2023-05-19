@@ -2501,7 +2501,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     }
   }
 
-  return Result::Success;
+  return hasError ? Result::ErrorInvalidShader : Result::Success;
 }
 
 // =====================================================================================================================
