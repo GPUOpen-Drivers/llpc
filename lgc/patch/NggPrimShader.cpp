@@ -253,8 +253,14 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
       ldsUsageInfo.gsExtraLdsSize += ldsRegionSize;
     }
 
+    // NOTE: If the output primitive from GS is point, we don't need primitive compaction because each vertex from
+    // GS_EMIT always forms a point primitive. No incomplete primitive will be generated because of GS_CUT and the
+    // primitive index is consecutive in a NGG subgroup.
+    const bool compactPrimitive =
+        pipelineState->getShaderModes()->getGeometryShaderMode().outputPrimitive != OutputPrimitives::Points;
+
     // Primitive index map (compacted -> uncompacted)
-    if (pipelineState->enableSwXfb()) {
+    if (pipelineState->enableSwXfb() && compactPrimitive) {
       ldsRegionSize = Gfx9::NggMaxThreadsPerSubgroup * MaxGsStreams; // 1 dword per primitive thread, 4 GS streams
       if (ldsLayout) {
         printLdsRegionInfo("Primitive Index Map (To Uncompacted)", ldsOffset, ldsRegionSize);
@@ -285,7 +291,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
 
     // Vertex index map (compacted -> uncompacted)
     if (pipelineState->getNggControl()->compactVertex) {
-      if (pipelineState->enableSwXfb()) {
+      if (pipelineState->enableSwXfb() && compactPrimitive) {
         if (ldsLayout) {
           // NOTE: If SW emulated stream-out is enabled, this region is overlapped with PrimitiveIndexMap
           (*ldsLayout)[PrimShaderLdsRegion::VertexIndexMap] = (*ldsLayout)[PrimShaderLdsRegion::PrimitiveIndexMap];
@@ -6643,19 +6649,29 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
   BasicBlock *compactPrimitiveIndexBlock[MaxGsStreams] = {};
   BasicBlock *endCompactPrimitiveIndexBlock[MaxGsStreams] = {};
   BasicBlock *insertPos = endAccumPrimitiveCountsBlock;
-  for (unsigned i = 0; i < MaxGsStreams; ++i) {
-    if (streamActive[i]) {
-      compactPrimitiveIndexBlock[i] =
-          createBlock(xfbEntryBlock->getParent(), ".compactPrimitiveIndexInStream" + std::to_string(i));
-      compactPrimitiveIndexBlock[i]->moveAfter(insertPos);
-      insertPos = compactPrimitiveIndexBlock[i];
 
-      endCompactPrimitiveIndexBlock[i] =
-          createBlock(xfbEntryBlock->getParent(), ".endCompactPrimitiveIndexInStream" + std::to_string(i));
-      endCompactPrimitiveIndexBlock[i]->moveAfter(insertPos);
-      insertPos = endCompactPrimitiveIndexBlock[i];
+  // NOTE: If the output primitive from GS is point, we don't need primitive compaction because each vertex from
+  // GS_EMIT always forms a point primitive. No incomplete primitive will be generated because of GS_CUT and the
+  // primitive index is consecutive in a NGG subgroup.
+  const bool compactPrimitive =
+      m_pipelineState->getShaderModes()->getGeometryShaderMode().outputPrimitive != OutputPrimitives::Points;
+  if (compactPrimitive) {
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (streamActive[i]) {
+        compactPrimitiveIndexBlock[i] =
+            createBlock(xfbEntryBlock->getParent(), ".compactPrimitiveIndexInStream" + std::to_string(i));
+        compactPrimitiveIndexBlock[i]->moveAfter(insertPos);
+        insertPos = compactPrimitiveIndexBlock[i];
+
+        endCompactPrimitiveIndexBlock[i] =
+            createBlock(xfbEntryBlock->getParent(), ".endCompactPrimitiveIndexInStream" + std::to_string(i));
+        endCompactPrimitiveIndexBlock[i]->moveAfter(insertPos);
+        insertPos = endCompactPrimitiveIndexBlock[i];
+      }
     }
   }
+
+  BasicBlock *fetchXfbOutputBlock = createBlock(xfbEntryBlock->getParent(), ".fetchXfbOutput");
 
   BasicBlock *prepareXfbExportBlock = createBlock(xfbEntryBlock->getParent(), ".prepareXfbExport");
   prepareXfbExportBlock->moveAfter(insertPos);
@@ -6801,61 +6817,73 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
           m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {primCountInWaves, m_nggInputs.waveIdInSubgroup});
     }
 
-    m_builder.CreateCondBr(drawFlag[firstActiveStream], compactPrimitiveIndexBlock[firstActiveStream],
-                           endCompactPrimitiveIndexBlock[firstActiveStream]);
+    if (compactPrimitive) {
+      m_builder.CreateCondBr(drawFlag[firstActiveStream], compactPrimitiveIndexBlock[firstActiveStream],
+                             endCompactPrimitiveIndexBlock[firstActiveStream]);
+    } else {
+      m_builder.CreateBr(fetchXfbOutputBlock);
+    }
   }
 
-  SmallVector<XfbOutputExport, 32> xfbOutputExports;
+  if (compactPrimitive) {
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (!streamActive[i])
+        continue;
 
-  for (unsigned i = 0; i < MaxGsStreams; ++i) {
-    if (!streamActive[i])
-      continue;
+      // Construct ".compactPrimitiveIndexInStream[N]" block
+      {
+        m_builder.SetInsertPoint(compactPrimitiveIndexBlock[i]);
 
-    // Construct ".compactPrimitiveIndexInStream[N]" block
-    {
-      m_builder.SetInsertPoint(compactPrimitiveIndexBlock[i]);
+        auto drawMaskVec = m_builder.CreateBitCast(drawMask[i], FixedVectorType::get(m_builder.getInt32Ty(), 2));
 
-      auto drawMaskVec = m_builder.CreateBitCast(drawMask[i], FixedVectorType::get(m_builder.getInt32Ty(), 2));
+        auto drawMaskLow = m_builder.CreateExtractElement(drawMaskVec, static_cast<uint64_t>(0));
+        Value *compactedPrimitiveIndex =
+            m_builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {drawMaskLow, m_builder.getInt32(0)});
 
-      auto drawMaskLow = m_builder.CreateExtractElement(drawMaskVec, static_cast<uint64_t>(0));
-      Value *compactedPrimitiveIndex =
-          m_builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {drawMaskLow, m_builder.getInt32(0)});
-
-      if (waveSize == 64) {
-        auto drawMaskHigh = m_builder.CreateExtractElement(drawMaskVec, 1);
-        compactedPrimitiveIndex =
-            m_builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {drawMaskHigh, compactedPrimitiveIndex});
-      }
-
-      compactedPrimitiveIndex = m_builder.CreateAdd(primCountInPrevWaves[i], compactedPrimitiveIndex);
-      writePerThreadDataToLds(m_nggInputs.threadIdInSubgroup, compactedPrimitiveIndex,
-                              PrimShaderLdsRegion::PrimitiveIndexMap, Gfx9::NggMaxThreadsPerSubgroup * i);
-
-      m_builder.CreateBr(endCompactPrimitiveIndexBlock[i]);
-    }
-
-    // Construct ".endCompactPrimitiveIndexInStream[N]" block
-    {
-      m_builder.SetInsertPoint(endCompactPrimitiveIndexBlock[i]);
-
-      if (i == lastActiveStream) {
-        // Start to fetch transform feedback outputs after we finish compacting primitive index of the last vertex
-        // stream.
-        fetchXfbOutput(m_gsHandlers.copyShader, args, xfbOutputExports);
-
-        auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(0));
-        m_builder.CreateCondBr(firstThreadInSubgroup, prepareXfbExportBlock, endPrepareXfbExportBlock);
-      } else {
-        unsigned nextActiveStream = i + 1;
-        while (!streamActive[nextActiveStream]) {
-          ++nextActiveStream;
+        if (waveSize == 64) {
+          auto drawMaskHigh = m_builder.CreateExtractElement(drawMaskVec, 1);
+          compactedPrimitiveIndex =
+              m_builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {drawMaskHigh, compactedPrimitiveIndex});
         }
 
-        assert(nextActiveStream <= lastActiveStream);
-        m_builder.CreateCondBr(drawFlag[nextActiveStream], compactPrimitiveIndexBlock[nextActiveStream],
-                               endCompactPrimitiveIndexBlock[nextActiveStream]);
+        compactedPrimitiveIndex = m_builder.CreateAdd(primCountInPrevWaves[i], compactedPrimitiveIndex);
+        writePerThreadDataToLds(m_nggInputs.threadIdInSubgroup, compactedPrimitiveIndex,
+                                PrimShaderLdsRegion::PrimitiveIndexMap, Gfx9::NggMaxThreadsPerSubgroup * i);
+
+        m_builder.CreateBr(endCompactPrimitiveIndexBlock[i]);
+      }
+
+      // Construct ".endCompactPrimitiveIndexInStream[N]" block
+      {
+        m_builder.SetInsertPoint(endCompactPrimitiveIndexBlock[i]);
+
+        if (i == lastActiveStream) {
+          // We can start to fetch transform feedback outputs after we finish compacting primitive index of the last
+          // vertex stream.
+          m_builder.CreateBr(fetchXfbOutputBlock);
+        } else {
+          unsigned nextActiveStream = i + 1;
+          while (!streamActive[nextActiveStream]) {
+            ++nextActiveStream;
+          }
+
+          assert(nextActiveStream <= lastActiveStream);
+          m_builder.CreateCondBr(drawFlag[nextActiveStream], compactPrimitiveIndexBlock[nextActiveStream],
+                                 endCompactPrimitiveIndexBlock[nextActiveStream]);
+        }
       }
     }
+  }
+
+  // Construct ".fetchXfbOutput"
+  SmallVector<XfbOutputExport, 32> xfbOutputExports;
+  {
+    m_builder.SetInsertPoint(fetchXfbOutputBlock);
+
+    fetchXfbOutput(m_gsHandlers.copyShader, args, xfbOutputExports);
+
+    auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(0));
+    m_builder.CreateCondBr(firstThreadInSubgroup, prepareXfbExportBlock, endPrepareXfbExportBlock);
   }
 
   // Construct ".prepareXfbExport" block
@@ -7032,8 +7060,10 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
       Value *vertexIndices[3] = {};
 
       Value *uncompactedPrimitiveIndex =
-          readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
-                                   PrimShaderLdsRegion::PrimitiveIndexMap, Gfx9::NggMaxThreadsPerSubgroup * i);
+          compactPrimitive
+              ? readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
+                                         PrimShaderLdsRegion::PrimitiveIndexMap, Gfx9::NggMaxThreadsPerSubgroup * i)
+              : m_nggInputs.threadIdInSubgroup;
       Value *vertexIndex = uncompactedPrimitiveIndex;
 
       const unsigned outVertsPerPrim = m_pipelineState->getVerticesPerPrimitive();
