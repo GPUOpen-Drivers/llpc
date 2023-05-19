@@ -1936,30 +1936,31 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
     // Raytracing modules: pipeline shader count + entryModule
     unsigned modulesCount = pipelineInfo->shaderCount + 1;
 
-    // Set pipeline has trace ray module by default, as long as the pipeline contains any shader.
-    pipelineOut->hasTraceRay = (pipelineInfo->shaderCount > 0);
-    unsigned i = 0;
-
-    if (pipelineInfo->rtState.pipelineFlags & VK_PIPELINE_CREATE_LIBRARY_BIT_KHR) {
-      // Library pipeline usually does not have trace ray module
-      pipelineOut->hasTraceRay = false;
-      for (i = 0; i < pipelineInfo->shaderCount; ++i) {
-        const auto &shaderInfo = pipelineInfo->pShaders[i];
-        // Check raygen spirv module have OpTraceRayKHR or not
-        if (shaderInfo.entryStage == ShaderStageRayTracingRayGen) {
-          const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo.pModuleData);
-          if (moduleData->usage.hasTraceRay) {
-            pipelineOut->hasTraceRay = true;
-            break;
-          }
-        }
+    bool needsGpurtShaderLibrary = false;
+    pipelineOut->hasTraceRay = false;
+    for (unsigned i = 0; i < pipelineInfo->shaderCount; ++i) {
+      const auto &shaderInfo = pipelineInfo->pShaders[i];
+      const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo.pModuleData);
+      if (moduleData->usage.hasTraceRay) {
+        needsGpurtShaderLibrary = true;
+        pipelineOut->hasTraceRay = true;
+        break;
       }
+      if (moduleData->usage.enableRayQuery)
+        needsGpurtShaderLibrary = true;
+    }
+
+    if (pipelineInfo->indirectStageMask == 0) {
+      // TODO: buildRayTracingPipelineInternal doesn't correctly handle the case of no indirect stage and not GPURT
+      //       shader library.
+      needsGpurtShaderLibrary = true;
     }
 
     // For traceray module, update the modules count
-    modulesCount = pipelineOut->hasTraceRay ? modulesCount + 1 : modulesCount;
+    modulesCount = needsGpurtShaderLibrary ? modulesCount + 1 : modulesCount;
 
     std::vector<const PipelineShaderInfo *> rayTracingShaderInfo(modulesCount);
+    unsigned i;
     for (i = 0; i < pipelineInfo->shaderCount; ++i) {
       rayTracingShaderInfo[i] = &pipelineInfo->pShaders[i];
     }
