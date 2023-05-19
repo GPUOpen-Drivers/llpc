@@ -165,8 +165,6 @@ public:
   virtual llvm::StringRef getClientMetadata() const = 0;
 
 #if VKI_RAY_TRACING
-  virtual void setIndirectStage(ShaderStage stage) {}
-
   virtual void collectPayloadSize(llvm::Type *type, const llvm::DataLayout &dataLayout) {}
   virtual void collectCallableDataSize(llvm::Type *type, const llvm::DataLayout &dataLayout) {}
   virtual void collectAttributeDataSize(llvm::Type *type, const llvm::DataLayout &dataLayout) {}

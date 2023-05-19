@@ -1957,7 +1957,8 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
     }
 
     // For traceray module, update the modules count
-    modulesCount = needsGpurtShaderLibrary ? modulesCount + 1 : modulesCount;
+    if (needsGpurtShaderLibrary)
+      ++modulesCount;
 
     std::vector<const PipelineShaderInfo *> rayTracingShaderInfo(modulesCount);
     unsigned i;
@@ -2253,8 +2254,6 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
   unsigned passIndex = 0;
   TimerProfiler timerProfiler(rtContext.getPipelineHashCode(), "LLPC", TimerProfiler::PipelineTimerEnableMask);
   auto pipelineInfo = reinterpret_cast<const RayTracingPipelineBuildInfo *>(rtContext.getPipelineBuildInfo());
-  auto inputShaderCount = pipelineInfo->shaderCount;
-  bool hasTraceRayModule = (shaderInfo.size() - inputShaderCount) > 1;
 
   bool hasError = false;
   Context *mainContext = acquireContext();
@@ -2266,7 +2265,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     releaseContext(mainContext);
   });
 
-  // Step 1: Set up middle-end objects.
+  // Step 1: Set up middle-end objects and read shaders.
   LgcContext *builderContext = mainContext->getLgcContext();
   std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
   rtContext.setPipelineState(&*pipeline, /*hasher=*/nullptr, unlinked);
@@ -2277,9 +2276,15 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
   // Create empty modules and set target machine in each.
   for (unsigned shaderIndex = 0; shaderIndex < shaderInfo.size(); ++shaderIndex) {
     const PipelineShaderInfo *shaderInfoEntry = shaderInfo[shaderIndex];
-    auto moduleName = std::string("_") + getShaderStageAbbreviation(shaderInfoEntry->entryStage) + "_" +
-                      std::to_string(getModuleIdByIndex(shaderIndex));
-    moduleName[1] = std::tolower(moduleName[1]);
+    std::string moduleName;
+    if (shaderInfoEntry->pModuleData) {
+      moduleName = (Twine("_") + getShaderStageAbbreviation(shaderInfoEntry->entryStage) + "_" +
+                    Twine(getModuleIdByIndex(shaderIndex)))
+                       .str();
+      moduleName[1] = std::tolower(moduleName[1]);
+    } else {
+      moduleName = "main";
+    }
     modules[shaderIndex] = std::make_unique<Module>(moduleName, *mainContext);
     mainContext->setModuleTargetMachine(modules[shaderIndex].get());
 
@@ -2337,116 +2342,60 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
   // Record which module calls TraceRay(), except the first one (For indirect mode, it is the entry function which will
   // never call TraceRay(). For inlined mode, we don't need to care).
   std::vector<bool> moduleCallsTraceRay;
+  std::unique_ptr<Module> gpurtShaderLibrary;
+  if ((shaderInfo.size() - pipelineInfo->shaderCount) > 1) {
+    gpurtShaderLibrary = std::move(modules.back());
+    modules.pop_back();
+    shaderInfo = shaderInfo.drop_back();
+  }
 
-  auto indirectStageMask = rtContext.getIndirectStageMask();
-  unsigned intersectMask = ShaderStageRayTracingIntersectBit | ShaderStageRayTracingAnyHitBit |
-                           ShaderStageRayTracingClosestHitBit | ShaderStageRayTracingMissBit;
+  // Can currently only support all-or-nothing indirect for various reasons, the most important one being that the
+  // Vulkan driver's shader group handle construction logic assume that if any shader identifier uses a VA mapping, then
+  // all of them do.
+  auto indirectStageMask = rtContext.getIndirectStageMask() & ShaderStageAllRayTracingBit;
 
-  if (indirectStageMask == 0) {
-    // Create an empty module then link each shader module into it.
-    std::unique_ptr<Module> rayTracingModule = std::make_unique<Module>("llpcLinkedRayTrace", *mainContext);
-    mainContext->setModuleTargetMachine(rayTracingModule.get());
-    Linker linker(*rayTracingModule);
+  assert(indirectStageMask == 0 || indirectStageMask == ShaderStageAllRayTracingBit);
 
-    for (unsigned shaderIndex = 0; shaderIndex < modules.size(); ++shaderIndex) {
-      if (modules[shaderIndex]) {
-        // NOTE: We use unique_ptr here. The shader module will be destroyed after it is
-        // linked into pipeline module.
-        if (linker.linkInModule(std::move(modules[shaderIndex])))
-          return Result::ErrorInvalidShader;
-      }
-    }
-    setShaderStageToModule(rayTracingModule.get(), ShaderStageCompute);
-    newModules.push_back(std::move(rayTracingModule));
-  } else if (!hasTraceRayModule) {
-    assert(shaderInfo.size() > inputShaderCount);
-    modules[inputShaderCount]->setModuleIdentifier("main");
-    newModules.push_back(std::move(modules[inputShaderCount]));
-    unsigned shaderIndex = 0;
-    for (shaderIndex = 0; shaderIndex < inputShaderCount; ++shaderIndex) {
-      newModules.push_back(std::move(modules[shaderIndex]));
-      moduleCallsTraceRay.push_back(false);
-    }
-  } else {
-    // Begin indirect modules processing
-    // First stage : link rayquery functions for ray tracing modules
-    unsigned shaderIndex = 0;
-    // Last module in the modules is trace ray module
-    Module &shaderLibraryModule = *modules[shaderInfo.size() - 1];
-    for (; shaderIndex < inputShaderCount; ++shaderIndex) {
-      const auto *shaderInfoEntry = shaderInfo[shaderIndex];
-      const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfoEntry->pModuleData);
-      if (moduleData->usage.enableRayQuery) {
-        Linker linker(*modules[shaderIndex]);
-        if (linker.linkInModule(CloneModule(shaderLibraryModule)))
-          return Result::ErrorInvalidShader;
-      }
-    }
+  std::optional<Linker> linker;
+  {
+    std::unique_ptr<Module> entry = std::move(modules.back());
+    modules.pop_back();
+    shaderInfo = shaderInfo.drop_back();
 
-    if (indirectStageMask & intersectMask) {
-      // currently only support ClosestHit, Miss, AnyHit, Intersect shader inline/indirect
-      auto traceRayModule = std::make_unique<Module>(modules[shaderInfo.size() - 1]->getName(), *mainContext);
-      auto raygenModule = std::make_unique<Module>("main", *mainContext);
-      mainContext->setModuleTargetMachine(traceRayModule.get());
-      mainContext->setModuleTargetMachine(raygenModule.get());
-      Linker traceRaylinker(*traceRayModule);
-      Linker raygenlinker(*raygenModule);
+    if (indirectStageMask == 0)
+      linker.emplace(*entry);
 
-      newModules.push_back(std::move(raygenModule));
+    setShaderStageToModule(entry.get(), ShaderStageCompute);
+    newModules.push_back(std::move(entry));
+  }
 
-      for (shaderIndex = 0; shaderIndex < inputShaderCount; ++shaderIndex) {
-        unsigned entryStageMask = shaderStageToMask(shaderInfo[shaderIndex]->entryStage);
-        const ShaderModuleData *moduleData =
-            reinterpret_cast<const ShaderModuleData *>(shaderInfo[shaderIndex]->pModuleData);
-        if (indirectStageMask & entryStageMask) {
-          newModules.push_back(std::move(modules[shaderIndex]));
-          moduleCallsTraceRay.push_back(moduleData->usage.hasTraceRay);
-        } else if (intersectMask & entryStageMask) {
-          // link library module
-          if (traceRaylinker.linkInModule(std::move(modules[shaderIndex])))
-            return Result::ErrorInvalidShader;
-        } else if (entryStageMask == ShaderStageRayTracingRayGenBit) {
-          if (raygenlinker.linkInModule(std::move(modules[shaderIndex])))
-            return Result::ErrorInvalidShader;
-        }
-      }
-      if (traceRaylinker.linkInModule(std::move(modules[shaderIndex + 1])))
+  for (unsigned shaderIndex = 0; shaderIndex < pipelineInfo->shaderCount; ++shaderIndex) {
+    const auto *shaderInfoEntry = shaderInfo[shaderIndex];
+    const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfoEntry->pModuleData);
+    auto shaderModule = std::move(modules[shaderIndex]);
+
+    if (linker) {
+      if (linker->linkInModule(std::move(shaderModule)))
         return Result::ErrorInvalidShader;
-
-      if (raygenlinker.linkInModule(std::move(modules[shaderIndex])))
-        return Result::ErrorInvalidShader;
-
-      if (!traceRayModule->empty()) {
-        newModules.push_back(std::move(traceRayModule));
-        moduleCallsTraceRay.push_back(false);
-      }
     } else {
-      auto raygenModule = std::make_unique<Module>("main", *mainContext);
-      mainContext->setModuleTargetMachine(raygenModule.get());
-      Linker raygenlinker(*raygenModule);
-
-      newModules.push_back(std::move(raygenModule));
-
-      for (shaderIndex = 0; shaderIndex < inputShaderCount; ++shaderIndex) {
-        unsigned entryStageMask = shaderStageToMask(shaderInfo[shaderIndex]->entryStage);
-        const ShaderModuleData *moduleData =
-            reinterpret_cast<const ShaderModuleData *>(shaderInfo[shaderIndex]->pModuleData);
-        if (indirectStageMask & entryStageMask) {
-          newModules.push_back(std::move(modules[shaderIndex]));
-          moduleCallsTraceRay.push_back(moduleData->usage.hasTraceRay);
-        } else {
-          if (raygenlinker.linkInModule(std::move(modules[shaderIndex])))
-            return Result::ErrorInvalidShader;
-        }
+      if (moduleData->usage.enableRayQuery) {
+        Linker linker(*shaderModule);
+        if (linker.linkInModule(CloneModule(*gpurtShaderLibrary)))
+          return Result::ErrorInvalidShader;
       }
 
-      // Link entry modules
-      if (raygenlinker.linkInModule(std::move(modules[shaderIndex++])))
-        return Result::ErrorInvalidShader;
+      newModules.push_back(std::move(shaderModule));
+      moduleCallsTraceRay.push_back(moduleData->usage.hasTraceRay);
+    }
+  }
 
-      // Link trace ray modules
-      if (raygenlinker.linkInModule(std::move(modules[shaderIndex])))
+  if (gpurtShaderLibrary) {
+    if (linker) {
+      if (linker->linkInModule(std::move(gpurtShaderLibrary)))
         return Result::ErrorInvalidShader;
+    } else {
+      newModules.push_back(std::move(gpurtShaderLibrary));
+      moduleCallsTraceRay.push_back(false);
     }
   }
 

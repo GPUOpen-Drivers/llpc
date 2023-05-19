@@ -219,6 +219,16 @@ unsigned RayTracingContext::getSubgroupSizeUsage() const {
 }
 
 // =====================================================================================================================
+// Set the raytracing pipeline as indirect shader
+void RayTracingContext::setIndirectPipeline() {
+  m_indirectStageMask |=
+      shaderStageToMask(Vkgc::ShaderStageRayTracingClosestHit) | shaderStageToMask(Vkgc::ShaderStageRayTracingAnyHit) |
+      shaderStageToMask(Vkgc::ShaderStageCompute) | shaderStageToMask(Vkgc::ShaderStageRayTracingRayGen) |
+      shaderStageToMask(Vkgc::ShaderStageRayTracingIntersect) | shaderStageToMask(Vkgc::ShaderStageRayTracingMiss) |
+      shaderStageToMask(Vkgc::ShaderStageRayTracingCallable);
+}
+
+// =====================================================================================================================
 // Set pipeline state in Pipeline object for middle-end and/or calculate the hash for the state to be added.
 // Doing both these things in the same code ensures that we hash and use the same pipeline state in all situations.
 // For graphics, we use the shader stage mask to decide which parts of graphics state to use, omitting
