@@ -1647,6 +1647,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.nsaThreshold);
       hasher->Update(options.aggressiveInvariantLoads);
       hasher->Update(options.workaroundStorageImageFormats);
+      hasher->Update(options.workaroundInitializeOutputsToZero);
       hasher->Update(options.disableFMA);
     }
   }
