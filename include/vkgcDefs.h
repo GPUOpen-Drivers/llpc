@@ -606,7 +606,8 @@ struct ShaderModuleUsage {
   bool enableRayQuery;     ///< Whether the "RayQueryKHR" capability is used
   bool rayQueryLibrary;    ///< Whether the shaderModule is rayQueryLibrary
   bool isInternalRtShader; ///< Whether the shaderModule is a GPURT internal shader (e.g. BVH build)
-  bool hasTraceRay;        ///< Whether the shaderModule has OpTraceRayKHR;
+  bool hasTraceRay;        ///< Whether the shaderModule has OpTraceRayKHR
+  bool hasExecuteCallable; ///< Whether the shaderModule has OpExecuteCallableKHR
 #endif
   bool useIsNan;       ///< Whether IsNan is used
   bool useInvariant;   ///< Whether invariant variable is used
