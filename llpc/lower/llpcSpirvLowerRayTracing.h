@@ -38,23 +38,24 @@ namespace Llpc {
 // Enum for the ray start parameter
 namespace TraceParam {
 enum : unsigned {
-  RayFlags,              // Ray flags
-  InstanceInclusionMask, // Instance inclusion mask
-  Origin,                // Ray origin
-  TMin,                  // T min
-  Dir,                   // World ray direction
-  TMax,                  // T max
-  TCurrent,              // Ray T current (begins as T max)
-  Kind,                  // Intersection hit kind
-  Status,                // Hit status
-  InstNodeAddrLo,        // Instance node address low part
-  InstNodeAddrHi,        // Instance node address high part
-  PrimitiveIndex,        // Primitive index
-  DuplicateAnyHit,       // Indication of calling behavior on any hit shader,
-  GeometryIndex,         // Geometry Index
-  HitAttributes,         // Hit attributes
-  ParentRayId,           // Ray ID of the parent TraceRay call
-  Count                  // Count of the trace attributes
+  RayFlags,                   // Ray flags
+  InstanceInclusionMask,      // Instance inclusion mask
+  Origin,                     // Ray origin
+  TMin,                       // T min
+  Dir,                        // World ray direction
+  TMax,                       // T max
+  TCurrent,                   // Ray T current (begins as T max)
+  Kind,                       // Intersection hit kind
+  Status,                     // Hit status
+  InstNodeAddrLo,             // Instance node address low part
+  InstNodeAddrHi,             // Instance node address high part
+  PrimitiveIndex,             // Primitive index
+  DuplicateAnyHit,            // Indication of calling behavior on any hit shader,
+  GeometryIndex,              // Geometry Index
+  HitAttributes,              // Hit attributes
+  ParentRayId,                // Ray ID of the parent TraceRay call
+  HitTriangleVertexPositions, // Hit triangle vertex positions
+  Count                       // Count of the trace attributes
 };
 }
 
@@ -175,6 +176,7 @@ private:
   void initInputResult(ShaderStage stage, llvm::Value *payload, llvm::Value *traceParams[], llvm::Value *result);
   void cloneDbgInfoSubgrogram(llvm::Function *func, llvm::Function *newfunc);
   llvm::Value *createLoadRayTracingMatrix(unsigned builtInId, llvm::Instruction *insertPos);
+  void createSetHitTriangleNodePointer(llvm::Function *func);
   llvm::Function *getOrCreateRemapCapturedVaToReplayVaFunc();
 
   llvm::GlobalVariable *m_traceParams[TraceParam::Count];              // Trace ray set parameters

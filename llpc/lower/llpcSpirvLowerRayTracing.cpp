@@ -75,6 +75,8 @@ static const char *CallTriangleAnyHitShader = "AmdTraceRayCallTriangleAnyHitShad
 static const char *CallIntersectionShader = "AmdTraceRayCallIntersectionShader";
 static const char *CallAnyHitShader = "AmdTraceRayCallAnyHitShader";
 static const char *SetTriangleIntersectionAttributes = "AmdTraceRaySetTriangleIntersectionAttributes";
+static const char *SetHitTriangleNodePointer = "AmdTraceRaySetHitTriangleNodePointer";
+static const char *FetchTrianglePositionFromNodePointer = "FetchTrianglePositionFromNodePointer";
 static const char *RemapCapturedVaToReplayVa = "AmdTraceRayRemapCapturedVaToReplayVa";
 static const char *GetParentId = "AmdTraceRayGetParentId";
 static const char *SetParentId = "AmdTraceRaySetParentId";
@@ -101,6 +103,7 @@ static unsigned TraceParamsTySize[] = {
     1, // 14, geometryIndex
     8, // 15, hit attribute
     1, // 16, parentId
+    9, // 16, HitTriangleVertexPositions
 };
 
 // ====================================================================================================================
@@ -678,6 +681,8 @@ void SpirvLowerRayTracing::processLibraryFunction(Function *func) {
     BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
     m_builder->SetInsertPoint(entryBlock);
     m_builder->CreateRet(m_builder->CreateReadBuiltInInput(lgc::BuiltInGlobalInvocationId, {}, nullptr, nullptr, ""));
+  } else if (mangledName.startswith(RtName::SetHitTriangleNodePointer)) {
+    createSetHitTriangleNodePointer(func);
   }
 }
 
@@ -1696,22 +1701,23 @@ void SpirvLowerRayTracing::createTraceRay() {
 void SpirvLowerRayTracing::initTraceParamsTy(unsigned attributeSize) {
   auto floatx3Ty = FixedVectorType::get(Type::getFloatTy(*m_context), 3);
   m_traceParamsTys = {
-      m_builder->getInt32Ty(),                                // 1, rayFlags
-      m_builder->getInt32Ty(),                                // 2, instanceInclusionMask
-      floatx3Ty,                                              // 3, origin
-      m_builder->getFloatTy(),                                // 4, tMin
-      floatx3Ty,                                              // 5, dir
-      m_builder->getFloatTy(),                                // 6, tMax
-      m_builder->getFloatTy(),                                // 7, tCurrent
-      m_builder->getInt32Ty(),                                // 8, kind
-      m_builder->getInt32Ty(),                                // 9, status
-      m_builder->getInt32Ty(),                                // 10, instNodeAddrLo
-      m_builder->getInt32Ty(),                                // 11, instNodeAddrHi
-      m_builder->getInt32Ty(),                                // 12, primitiveIndex
-      m_builder->getInt32Ty(),                                // 13, duplicateAnyHit
-      m_builder->getInt32Ty(),                                // 14, geometryIndex
-      ArrayType::get(m_builder->getFloatTy(), attributeSize), // 15, hit attribute
-      m_builder->getInt32Ty(),                                // 16, parentId
+      m_builder->getInt32Ty(),                                        // 1, rayFlags
+      m_builder->getInt32Ty(),                                        // 2, instanceInclusionMask
+      floatx3Ty,                                                      // 3, origin
+      m_builder->getFloatTy(),                                        // 4, tMin
+      floatx3Ty,                                                      // 5, dir
+      m_builder->getFloatTy(),                                        // 6, tMax
+      m_builder->getFloatTy(),                                        // 7, tCurrent
+      m_builder->getInt32Ty(),                                        // 8, kind
+      m_builder->getInt32Ty(),                                        // 9, status
+      m_builder->getInt32Ty(),                                        // 10, instNodeAddrLo
+      m_builder->getInt32Ty(),                                        // 11, instNodeAddrHi
+      m_builder->getInt32Ty(),                                        // 12, primitiveIndex
+      m_builder->getInt32Ty(),                                        // 13, duplicateAnyHit
+      m_builder->getInt32Ty(),                                        // 14, geometryIndex
+      ArrayType::get(m_builder->getFloatTy(), attributeSize),         // 15, hit attribute
+      m_builder->getInt32Ty(),                                        // 16, parentId
+      StructType::get(*m_context, {floatx3Ty, floatx3Ty, floatx3Ty}), // 16, HitTriangleVertexPositions
   };
   TraceParamsTySize[TraceParam::HitAttributes] = attributeSize;
   assert(sizeof(TraceParamsTySize) / sizeof(TraceParamsTySize[0]) == TraceParam::Count);
@@ -1805,6 +1811,10 @@ void SpirvLowerRayTracing::initShaderBuiltIns() {
     }
     case BuiltInCullMaskKHR: {
       m_builtInParams.insert(TraceParam::InstanceInclusionMask);
+      break;
+    }
+    case BuiltInHitTriangleVertexPositionsKHR: {
+      m_builtInParams.insert(TraceParam::HitTriangleVertexPositions);
       break;
     }
     default:
@@ -2288,6 +2298,25 @@ Value *SpirvLowerRayTracing::createLoadRayTracingMatrix(unsigned builtInId, Inst
   matrixAddr = m_builder->CreateAdd(matrixAddr, matrixOffset);
 
   return createLoadMatrixFromAddr(matrixAddr);
+}
+
+// =====================================================================================================================
+// Process AmdTraceRaySetHitTriangleNodePointer function
+//
+// @param func : The function to create
+void SpirvLowerRayTracing::createSetHitTriangleNodePointer(Function *func) {
+  eraseFunctionBlocks(func);
+  BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
+  m_builder->SetInsertPoint(entryBlock);
+  if (m_builtInParams.find(TraceParam::HitTriangleVertexPositions) != m_builtInParams.end()) {
+    Value *bvh = func->arg_begin();
+    Value *nodePtr = func->arg_begin() + 1;
+    auto triangleDataTy = m_traceParamsTys[TraceParam::HitTriangleVertexPositions];
+    auto triangleData = m_builder->CreateNamedCall(RtName::FetchTrianglePositionFromNodePointer, triangleDataTy,
+                                                   {bvh, nodePtr}, {Attribute::NoUnwind, Attribute::AlwaysInline});
+    m_builder->CreateStore(triangleData, m_traceParams[TraceParam::HitTriangleVertexPositions]);
+  }
+  m_builder->CreateRetVoid();
 }
 
 // =====================================================================================================================

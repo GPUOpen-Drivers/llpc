@@ -124,6 +124,11 @@ if(EXISTS ${XGL_SPVGEN_PATH})
     add_subdirectory(${XGL_SPVGEN_PATH} ${XGL_SPVGEN_BUILD_PATH} EXCLUDE_FROM_ALL)
 endif()
 
+if(ICD_BUILD_LLPC)
+    # Generate Strings for LLPC standalone tool
+    add_subdirectory(util ${PROJECT_BINARY_DIR}/util)
+endif()
+
 endif()
 
 ### VKGC build LLPC ################################################################

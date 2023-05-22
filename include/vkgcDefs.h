@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 61
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 7
+#define LLPC_INTERFACE_MINOR_VERSION 9
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -82,10 +82,11 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     62.0 | Add enableImplicitInvariantExports to PipelineOptions                                                 |
 //  |     61.8 | Add useShadingRate and useSampleInfoto ShaderModuleUsage                                              |
 //  |     61.7 | Add disableFMA to PipelineShaderOptions                                                               |
 //  |     61.6 | Add workaroundInitializeOutputsToZero to PipelineShaderOptions                                        |
-//  |     61.5 | Add RtIpVersion (including its checkers) to represent ray tracing IP                                  |
+//  |     61.5 | Add RtIpVersion (including its checkers) to represent RT IP                                           |
 //  |     61.4 | Add workaroundStorageImageFormats to PipelineShaderOptions                                            |
 //  |     61.2 | Add pClientMetadata and clientMetadataSize to all PipelineBuildInfos                                  |
 //  |     61.1 | Add IPipelineDumper::GetGraphicsShaderBinaryHash                                                      |
@@ -455,7 +456,7 @@ struct GfxIpVersion {
   }
 };
 
-/// Represents RT (ray tracing) IP version
+/// Represents RT IP version
 struct RtIpVersion {
   unsigned major; ///< Major version
   unsigned minor; ///< Minor version
@@ -528,6 +529,7 @@ struct PipelineOptions {
                                    ///  descriptors.
   bool enableScratchAccessBoundsChecks; ///< If set, out of bounds guards will be inserted in the LLVM IR for OpLoads
                                         ///< and OpStores in private and function memory storage.
+  bool enableImplicitInvariantExports;  ///< If set, enable implicit marking of position exports as invariant.
   ShadowDescriptorTableUsage shadowDescriptorTableUsage; ///< Controls shadow descriptor table.
   unsigned shadowDescriptorTablePtrHigh;                 ///< Sets high part of VA ptr for shadow descriptor table.
   ExtendedRobustness extendedRobustness;                 ///< ExtendedRobustness is intended to correspond to the
@@ -1014,8 +1016,8 @@ enum RAYTRACING_ENTRY_FUNC : unsigned {
   RT_ENTRY_WORLD_TO_OBJECT_TRANSFORM,
   RT_ENTRY_RESERVE1,
   RT_ENTRY_RESERVE2,
-  RT_ENTRY_RESERVE3,
-  RT_ENTRY_RESERVE4,
+  RT_ENTRY_FETCH_HIT_TRIANGLE_FROM_NODE_POINTER,
+  RT_ENTRY_FETCH_HIT_TRIANGLE_FROM_RAY_QUERY,
   RT_ENTRY_FUNC_COUNT,
 };
 
@@ -1039,17 +1041,17 @@ union RayTracingSystemValueUsage {
 
     union {
       struct {
-        uint16_t hitKind : 1;            // Shader calls gl_HitKindEXT
-        uint16_t instanceIndex : 1;      // Shader calls gl_InstanceCustomIndexEXT
-        uint16_t instanceID : 1;         // Shader calls gl_InstanceID
-        uint16_t primitiveIndex : 1;     // Shader calls gl_PrimitiveID
-        uint16_t geometryIndex : 1;      // Shader calls gl_GeometryIndexEXT
-        uint16_t objectToWorld : 1;      // Shader calls gl_ObjectToWorldEXT
-        uint16_t objectRayOrigin : 1;    // Shader calls gl_ObjectRayOriginEXT
-        uint16_t objectRayDirection : 1; // Shader calls gl_ObjectRayDirectionEXT
-        uint16_t worldToObject : 1;      // Shader calls gl_WorldToObjectEXT
-        uint16_t reservedBit : 1;
-        uint16_t reserved : 6; // Reserved
+        uint16_t hitKind : 1;             // Shader calls gl_HitKindEXT
+        uint16_t instanceIndex : 1;       // Shader calls gl_InstanceCustomIndexEXT
+        uint16_t instanceID : 1;          // Shader calls gl_InstanceID
+        uint16_t primitiveIndex : 1;      // Shader calls gl_PrimitiveID
+        uint16_t geometryIndex : 1;       // Shader calls gl_GeometryIndexEXT
+        uint16_t objectToWorld : 1;       // Shader calls gl_ObjectToWorldEXT
+        uint16_t objectRayOrigin : 1;     // Shader calls gl_ObjectRayOriginEXT
+        uint16_t objectRayDirection : 1;  // Shader calls gl_ObjectRayDirectionEXT
+        uint16_t worldToObject : 1;       // Shader calls gl_WorldToObjectEXT
+        uint16_t hitTrianglePosition : 1; // Shader calls gl_HitTriangleVertexPositionsEXT
+        uint16_t reserved : 6;            // Reserved
       };
       uint16_t u16All;
     } primitive;

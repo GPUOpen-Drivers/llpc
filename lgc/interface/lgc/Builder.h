@@ -1042,10 +1042,6 @@ public:
 #if VKI_RAY_TRACING
   // Create a ray intersect result with specified node in BVH buffer.
   // nodePtr is the combination of BVH node offset type.
-  //# TODO: This is not because making it virtual introduces weird runtime bugs if the
-  //# front-end and LGC are accidentally compiled with different VKI_IMAGE_BVH_INTERSECT_RAY settings,
-  //# making the vtables mismatch in a way that the linker cannot spot.
-  //# Once the feature is in released hardware, we can remove the #if and make the function virtual.
   //
   // @param nodePtr : BVH node pointer
   // @param extent : The valid range on which intersections can occur

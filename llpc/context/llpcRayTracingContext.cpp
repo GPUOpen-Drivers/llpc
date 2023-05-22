@@ -164,6 +164,7 @@ bool RayTracingContext::isRayTracingBuiltIn(unsigned builtIn) {
   case BuiltInObjectRayOriginKHR:
   case BuiltInObjectRayDirectionKHR:
   case BuiltInCullMaskKHR:
+  case BuiltInHitTriangleVertexPositionsKHR:
     return true;
   default:
     return false;

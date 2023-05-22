@@ -242,7 +242,7 @@ void PatchPreparePipelineAbi::writeTessFactors(PipelineState *pipelineState, Val
   if (pipelineState->getTargetInfo().getGfxIpVersion().major == 10) {
     bufferFormatX2 = BUF_FORMAT_32_32_FLOAT_GFX10;
     bufferFormatX4 = BUF_FORMAT_32_32_32_32_FLOAT_GFX10;
-  } else if (pipelineState->getTargetInfo().getGfxIpVersion().major == 11) {
+  } else if (pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
     bufferFormatX2 = BUF_FORMAT_32_32_FLOAT_GFX11;
     bufferFormatX4 = BUF_FORMAT_32_32_32_32_FLOAT_GFX11;
   }

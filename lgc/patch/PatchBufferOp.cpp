@@ -289,7 +289,6 @@ BufferOpLowering::DescriptorInfo BufferOpLowering::getDescriptorInfo(Value *desc
 
     current = searchWorklist.pop_back_val();
   }
-
   // Fixed-point iteration to propagate "variant" and "divergent" flags.
   while (!propagationWorklist.empty()) {
     current = propagationWorklist.pop_back_val();

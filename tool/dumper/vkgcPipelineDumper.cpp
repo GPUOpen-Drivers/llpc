@@ -828,6 +828,7 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.optimizationLevel = " << options->optimizationLevel << "\n";
   dumpFile << "options.threadGroupSwizzleMode = " << options->threadGroupSwizzleMode << "\n";
   dumpFile << "options.reverseThreadGroup = " << options->reverseThreadGroup << "\n";
+  dumpFile << "options.enableImplicitInvariantExports = " << options->enableImplicitInvariantExports << "\n";
 
 #if VKI_RAY_TRACING
   dumpFile << "options.internalRtShaders = " << options->internalRtShaders << "\n";
@@ -1534,6 +1535,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->enableRelocatableShaderElf);
   hasher->Update(options->disableImageResourceCheck);
   hasher->Update(options->enableScratchAccessBoundsChecks);
+  hasher->Update(options->enableImplicitInvariantExports);
   hasher->Update(options->resourceLayoutScheme);
 
   if (!isRelocatableShader) {

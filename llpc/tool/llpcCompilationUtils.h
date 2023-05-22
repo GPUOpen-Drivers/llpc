@@ -94,16 +94,17 @@ struct CompileInfo {
   RayTracingPipelineBuildOut rayTracingPipelineOut; // Output of building ray tracing pipeline
   unsigned bvhNodeStride;
 #endif
-  void *pipelineBuf;              // Allocation buffer of building pipeline
-  void *pipelineInfoFile;         // VFX-style file containing pipeline info
-  bool unlinked;                  // Whether to generate unlinked shader/part-pipeline ELF
-  bool relocatableShaderElf;      // Whether to enable relocatable shader compilation
-  bool scalarBlockLayout;         // Whether to enable scalar block layout
-  bool doAutoLayout;              // Whether to auto layout descriptors
-  bool autoLayoutDesc;            // Whether to automatically create descriptor layout based on resource usages
-  bool robustBufferAccess;        // Whether to enable robust buffer access
-  bool scratchAccessBoundsChecks; // Whether to enable scratch access bounds checks
-  VfxPipelineType pipelineType;   // Pipeline type
+  void *pipelineBuf;                   // Allocation buffer of building pipeline
+  void *pipelineInfoFile;              // VFX-style file containing pipeline info
+  bool unlinked;                       // Whether to generate unlinked shader/part-pipeline ELF
+  bool relocatableShaderElf;           // Whether to enable relocatable shader compilation
+  bool scalarBlockLayout;              // Whether to enable scalar block layout
+  bool doAutoLayout;                   // Whether to auto layout descriptors
+  bool autoLayoutDesc;                 // Whether to automatically create descriptor layout based on resource usages
+  bool robustBufferAccess;             // Whether to enable robust buffer access
+  bool scratchAccessBoundsChecks;      // Whether to enable scratch access bounds checks
+  bool enableImplicitInvariantExports; // Whether to enable implicit marking of position exports as invariant
+  VfxPipelineType pipelineType;        // Pipeline type
   std::optional<llvm::CodeGenOpt::Level> optimizationLevel; // The optimization level to pass the compiler
 #if VKI_RAY_TRACING
   bool internalRtShaders; // Whether to enable intrinsics for internal RT shaders
