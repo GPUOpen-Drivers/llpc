@@ -105,13 +105,7 @@ enum class PipelineType {
 // Represents pipeline-specific context for pipeline compilation, it is a part of LLPC context
 class PipelineContext {
 public:
-  PipelineContext(GfxIpVersion gfxIp, MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash
-#if VKI_RAY_TRACING
-                  ,
-                  const Vkgc::RtState *rtState
-
-#endif
-  );
+  PipelineContext(GfxIpVersion gfxIp, MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash);
   virtual ~PipelineContext();
 
   // Returns the pipeline type
@@ -192,7 +186,7 @@ public:
   llvm::StringRef getRayTracingFunctionName(unsigned funcType);
 
   // Gets ray tracing state info
-  const Vkgc::RtState *getRayTracingState() { return m_rtState; }
+  const Vkgc::RtState *getRayTracingState() { return &m_rtState; }
 #endif
 
   // Gets the finalized 128-bit cache hash code.
@@ -238,6 +232,9 @@ public:
   lgc::ShaderOptions computeShaderOptions(const PipelineShaderInfo &shaderInfo) const;
 
 protected:
+  // Set the raytracing state
+  void setRayTracingState(const Vkgc::RtState &rtState, const Vkgc::BinaryData *shaderLibrary = nullptr);
+
   // Gets dummy vertex input create info
   virtual VkPipelineVertexInputStateCreateInfo *getDummyVertexInputInfo() { return nullptr; }
 
@@ -255,9 +252,6 @@ protected:
   MetroHash::Hash m_cacheHash;           // Cache hash code
   ResourceMappingData m_resourceMapping; // Contains resource mapping nodes and static descriptor values
   uint64_t m_pipelineLayoutApiHash;      // Pipeline Layout Api Hash
-#if VKI_RAY_TRACING
-  const Vkgc::RtState *m_rtState; // Ray tracing state
-#endif
 
 private:
   PipelineContext() = delete;
@@ -278,6 +272,7 @@ private:
 
   ShaderFpMode m_shaderFpModes[ShaderStageCountInternal] = {};
   bool m_unlinked = false; // Whether we are building an "unlinked" shader ELF
+  Vkgc::RtState m_rtState = {};
 };
 
 } // namespace Llpc

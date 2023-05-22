@@ -328,6 +328,10 @@ cl::opt<bool> AssertToMsgBox("assert-to-msgbox", cl::desc("Pop message box when 
 cl::opt<bool> EnableInternalRtShaders("enable-internal-rt-shaders",
                                       cl::desc("Enable intrinsics for internal RT shaders"),
                                       cl::init(false));
+
+cl::opt<bool> GpuRtUseDumped("gpurt-use-dumped", cl::desc("Use the GPURT shader library that was dumped with the pipeline dump (may fail due to incompatibility)"));
+
+cl::opt<std::string> GpuRtLibrary("gpurt-library", cl::desc("Use the GPURT shader library from the given file"));
 #endif
 
 } // namespace
@@ -577,6 +581,54 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
   return Result::Success;
 }
 
+static Error fixupRtState(RtState &rtState, std::vector<char> &shaderLibraryStorage) {
+  if (rtState.gpurtOverride || rtState.rtIpOverride) {
+    // Trying to compile a .pipe file that was dumped from a driver with an explicit shader library override setting
+    // may have unexpected results. Complain loudly to make sure the user knows what they're doing.
+    if (!GpuRtUseDumped.getNumOccurrences() && GpuRtLibrary.empty()) {
+      return createResultError(Result::ErrorInvalidValue,
+                               "The .pipe file explicitly sets gpurtOverride and/or rtIpOverride to true. You must "
+                               "explicitly choose -gpurt-use-dumped=true/false.");
+    }
+
+    if (!GpuRtUseDumped) {
+      rtState.gpurtOverride = false;
+      rtState.rtIpOverride = false;
+    }
+  }
+
+  if (GpuRtUseDumped)
+    rtState.gpurtOverride = true;
+  else
+    rtState.gpurtShaderLibrary = {};
+
+  if (!GpuRtLibrary.empty()) {
+    if (GpuRtUseDumped)
+      return createResultError(Result::ErrorInvalidValue, "Cannot use both -gpurt-use-dumped and -gpurt-library");
+
+    FILE *gpurtFile = fopen(GpuRtLibrary.c_str(), "rb");
+    if (!gpurtFile)
+      return createResultError(Result::ErrorUnavailable, Twine("Failed to open input file: ") + GpuRtLibrary);
+    auto closeInput = make_scope_exit([gpurtFile] { fclose(gpurtFile); });
+
+    fseek(gpurtFile, 0, SEEK_END);
+    shaderLibraryStorage.resize(ftell(gpurtFile));
+    fseek(gpurtFile, 0, SEEK_SET);
+    size_t nread = fread(shaderLibraryStorage.data(), 1, shaderLibraryStorage.size(), gpurtFile);
+
+    if (nread != shaderLibraryStorage.size()) {
+      // cppcheck-suppress resourceLeak; gpurtFile is closed via the make_scope_exit.
+      return createResultError(Result::ErrorInvalidValue, Twine("Error reading: ") + GpuRtLibrary);
+    }
+
+    rtState.gpurtOverride = true;
+    rtState.gpurtShaderLibrary.pCode = shaderLibraryStorage.data();
+    rtState.gpurtShaderLibrary.codeSize = shaderLibraryStorage.size();
+  }
+
+  return Error::success();
+}
+
 // =====================================================================================================================
 // Process one pipeline. This can either be a single .pipe file or a set of shader stages.
 //
@@ -609,6 +661,23 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
       compileInfo.pipelineType = VfxPipelineTypeRayTracing;
 #endif
   }
+
+  RtState *rtState = nullptr;
+  switch (compileInfo.pipelineType) {
+  case VfxPipelineTypeGraphics:
+    rtState = &compileInfo.gfxPipelineInfo.rtState;
+    break;
+  case VfxPipelineTypeCompute:
+    rtState = &compileInfo.compPipelineInfo.rtState;
+    break;
+  case VfxPipelineTypeRayTracing:
+    rtState = &compileInfo.rayTracePipelineInfo.rtState;
+    break;
+  }
+
+  std::vector<char> gpurtShaderLibraryStorage;
+  if (Error err = fixupRtState(*rtState, gpurtShaderLibraryStorage))
+    return err;
 
   //
   // Build shader modules

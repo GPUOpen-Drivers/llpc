@@ -522,8 +522,10 @@ struct GraphicsPipelineState {
 
   ColorBuffer colorBuffer[Vkgc::MaxColorTargets]; // Color target state.
 #if VKI_RAY_TRACING
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   Vkgc::BinaryData shaderLibrary; // Shader library SPIR-V binary
-  Vkgc::RtState rtState;          // Ray tracing state
+#endif
+  Vkgc::RtState rtState; // Ray tracing state
 #endif
   bool dynamicVertexStride;   // Dynamic Vertex input Stride is enabled.
   bool enableUberFetchShader; // Use uber fetch shader
@@ -536,8 +538,10 @@ struct ComputePipelineState {
   unsigned deviceIndex;          // Device index for device group
   Vkgc::PipelineOptions options; // Pipeline options
 #if VKI_RAY_TRACING
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   Vkgc::BinaryData shaderLibrary; // Shader library SPIR-V binary
-  Vkgc::RtState rtState;          // Ray tracing state
+#endif
+  Vkgc::RtState rtState; // Ray tracing state
 #endif
 };
 
@@ -549,14 +553,19 @@ struct RayTracingPipelineState {
   Vkgc::PipelineOptions options;                       // Pipeline options
   unsigned shaderGroupCount;                           // Count of shader groups
   VkRayTracingShaderGroupCreateInfoKHR *pShaderGroups; // An array of shader groups
-  Vkgc::BinaryData shaderTraceRay;                     // Trace-ray SPIR-V binary
-  unsigned maxRecursionDepth;                          // Ray tracing max recursion depth
-  unsigned indirectStageMask;                          // Trace-ray indirect stage mask
-  Vkgc::RtState rtState;                               // Ray tracing state
-  unsigned payloadSizeMaxInLib;                        // Pipeline library maxPayloadSize
-  unsigned attributeSizeMaxInLib;                      // Pipeline library maxAttributeSize
-  bool hasPipelineLibrary;                             // Whether has pipeline library
-  unsigned pipelineLibStageMask;                       // Pipeline library stage mask
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
+  Vkgc::BinaryData shaderTraceRay; // Trace-ray SPIR-V binary
+#endif
+  unsigned maxRecursionDepth;     // Ray tracing max recursion depth
+  unsigned indirectStageMask;     // Trace-ray indirect stage mask
+  Vkgc::RtState rtState;          // Ray tracing state
+  unsigned payloadSizeMaxInLib;   // Pipeline library maxPayloadSize
+  unsigned attributeSizeMaxInLib; // Pipeline library maxAttributeSize
+  bool hasPipelineLibrary;        // Whether has pipeline library
+  unsigned pipelineLibStageMask;  // Pipeline library stage mask
+
+  /// Combination of GpuRt::ShaderLibraryFeatureFlag
+  unsigned gpurtFeatureFlags;
 };
 #endif
 

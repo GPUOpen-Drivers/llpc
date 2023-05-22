@@ -33,6 +33,7 @@
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
 #include "llpcUtil.h"
+#include "vkgcGpurtShim.h"
 #include "vkgcPipelineDumper.h"
 #include "lgc/Builder.h"
 #include "lgc/LgcContext.h"
@@ -139,18 +140,8 @@ namespace Llpc {
 // @param gfxIp : Graphics IP version info
 // @param pipelineHash : Pipeline hash code
 // @param cacheHash : Cache hash code
-PipelineContext::PipelineContext(GfxIpVersion gfxIp, MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash
-#if VKI_RAY_TRACING
-                                 ,
-                                 const Vkgc::RtState *rtState
-#endif
-                                 )
-    : m_gfxIp(gfxIp), m_pipelineHash(*pipelineHash), m_cacheHash(*cacheHash)
-#if VKI_RAY_TRACING
-      ,
-      m_rtState(rtState)
-#endif
-{
+PipelineContext::PipelineContext(GfxIpVersion gfxIp, MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash)
+    : m_gfxIp(gfxIp), m_pipelineHash(*pipelineHash), m_cacheHash(*cacheHash) {
 }
 
 // =====================================================================================================================
@@ -211,9 +202,40 @@ ShaderHash PipelineContext::getShaderHashCode(const PipelineShaderInfo &shaderIn
 // @param funcType : function type
 StringRef PipelineContext::getRayTracingFunctionName(unsigned funcType) {
   assert(funcType < Vkgc::RT_ENTRY_FUNC_COUNT);
-  return getRayTracingState()->gpurtFuncTable.pFunc[funcType];
+  return m_rtState.gpurtFuncTable.pFunc[funcType];
 }
 #endif
+
+// =====================================================================================================================
+// Set the raytracing state
+//
+// @param rtState : the raytracing state configured by the driver
+// @param shaderLibrary : [interface major version < 62 only] the GPURT shader library passed in by the driver via
+//                        the old interface
+void PipelineContext::setRayTracingState(const Vkgc::RtState &rtState, const Vkgc::BinaryData *shaderLibrary) {
+  m_rtState = rtState;
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 62
+  assert(!shaderLibrary);
+#else
+  assert(shaderLibrary);
+
+  m_rtState.gpurtOverride = true;
+  m_rtState.rtIpOverride = true;
+  m_rtState.gpurtShaderLibrary = *shaderLibrary;
+#endif
+
+#if HAVE_GPURT_SHIM
+  if (!m_rtState.rtIpOverride)
+    m_rtState.rtIpVersion = Vkgc::gpurt::getRtIpVersion(m_gfxIp);
+
+  if (m_rtState.rtIpVersion.major != 0 && !m_rtState.gpurtOverride) {
+    gpurt::getShaderLibrarySpirv(m_rtState.gpurtFeatureFlags, m_rtState.gpurtShaderLibrary.pCode,
+                                 m_rtState.gpurtShaderLibrary.codeSize);
+    gpurt::getFuncTable(m_rtState.rtIpVersion, m_rtState.gpurtFuncTable);
+  }
+#endif
+}
 
 // =====================================================================================================================
 // Set pipeline state in Pipeline object for middle-end and/or calculate the hash for the state to be added.

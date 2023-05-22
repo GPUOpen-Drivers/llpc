@@ -192,6 +192,7 @@ private:
   bool canUseRelocatableGraphicsShaderElf(const llvm::ArrayRef<const PipelineShaderInfo *> &shaderInfo,
                                           const GraphicsPipelineBuildInfo *pipelineInfo);
   bool canUseRelocatableComputeShaderElf(const ComputePipelineBuildInfo *pipelineInfo);
+  std::unique_ptr<llvm::Module> createGpurtShaderLibrary(Context *context);
 #if VKI_RAY_TRACING
   Result buildRayTracingPipelineInternal(RayTracingContext &rtContext,
                                          llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo, bool unlinked,

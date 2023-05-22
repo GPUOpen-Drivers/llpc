@@ -45,10 +45,10 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 61
+#define LLPC_INTERFACE_MAJOR_VERSION 62
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 14
+#define LLPC_INTERFACE_MINOR_VERSION 0
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -83,6 +83,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     62.0 | Default to the compiler getting the GPURT library directly, and move shader library info into RtState |
 //  |     61.14| Add rasterStream to rsState                                                                           |
 //  |     61.13| Add dualSourceBlendDynamic to cbState                                                                 |
 //  |     61.10| Add useShadingRate and useSampleInfoto ShaderModuleUsage                                              |
@@ -1077,8 +1078,22 @@ struct RtState {
   bool enableOptimalLdsStackSizeForIndirect; ///< Enable optimal LDS stack size for indirect shaders
   bool enableOptimalLdsStackSizeForUnified;  ///< Enable optimal LDS stack size for unified shaders
   float maxRayLength;                        ///< Raytracing rayDesc.tMax override
+  unsigned gpurtFeatureFlags;                ///< GPURT features flags to use for the pipeline compile
+  BinaryData gpurtShaderLibrary;             ///< GPURT shader library
   GpurtFuncTable gpurtFuncTable;             ///< GPURT function table
   RtIpVersion rtIpVersion;                   ///< RT IP version
+
+  /// If true, force the compiler to use gpurtShaderLibrary. Otherwise, it is up to the compiler whether it uses
+  /// gpurtShaderLibrary or obtains a library directly from GPURT.
+  ///
+  /// If LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62, the compiler always behaves as if this was true.
+  bool gpurtOverride;
+
+  /// If true, force the compile to use rtIpVersion. If false, the compiler may derive the default RTIP version from
+  /// the GFXIP version.
+  ///
+  /// If LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62, the compiler always behaves as if this was true.
+  bool rtIpOverride;
 };
 #endif
 
@@ -1155,8 +1170,10 @@ struct GraphicsPipelineBuildInfo {
   bool enableUberFetchShader; ///< Use uber fetch shader
   bool enableEarlyCompile;    ///< Whether enable early compile
 #if VKI_RAY_TRACING
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   BinaryData shaderLibrary; ///< SPIR-V library binary data
-  RtState rtState;          ///< Ray tracing state
+#endif
+  RtState rtState; ///< Ray tracing state
 #endif
   const void *pClientMetadata; ///< Pointer to (optional) client-defined data to be stored inside the ELF
   size_t clientMetadataSize;   ///< Size (in bytes) of the client-defined data
@@ -1178,8 +1195,10 @@ struct ComputePipelineBuildInfo {
   PipelineOptions options;             ///< Per pipeline tuning options
   bool unlinked;                       ///< True to build an "unlinked" half-pipeline ELF
 #if VKI_RAY_TRACING
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   BinaryData shaderLibrary; ///< SPIR-V library binary data
-  RtState rtState;          ///< Ray tracing state
+#endif
+  RtState rtState; ///< Ray tracing state
 #endif
   const void *pClientMetadata; ///< Pointer to (optional) client-defined data to be stored inside the ELF
   size_t clientMetadataSize;   ///< Size (in bytes) of the client-defined data
@@ -1200,7 +1219,9 @@ struct RayTracingPipelineBuildInfo {
   uint64_t pipelineLayoutApiHash;                            ///< Pipeline Layout Api Hash
   unsigned shaderGroupCount;                                 ///< Count of shader group
   const VkRayTracingShaderGroupCreateInfoKHR *pShaderGroups; ///< An array of shader group
-  BinaryData shaderTraceRay;                                 ///< Trace-ray SPIR-V binary data
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
+  BinaryData shaderTraceRay; ///< Trace-ray SPIR-V binary data
+#endif
   PipelineOptions options;                                   ///< Per pipeline tuning options
   unsigned maxRecursionDepth;                                ///< Ray tracing max recursion depth
   unsigned indirectStageMask;                                ///< Ray tracing indirect stage mask
