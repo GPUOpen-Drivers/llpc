@@ -252,11 +252,12 @@ private:
   static constexpr uint64_t MAX_SPILL_THRESHOLD = UINT_MAX;
 
   unsigned getUserDataCount(unsigned callingConv);
-  unsigned getCallingConventionForFirstHardwareShaderStage();
+  unsigned getCallingConventionForFirstHardwareShaderStage(std::string &hwStageName);
   unsigned getFirstUserDataReg(unsigned callingConv);
   unsigned getNumberOfSgprsBeforeUserData(unsigned conv);
   unsigned getOffsetOfUserDataReg(std::map<llvm::msgpack::DocNode, llvm::msgpack::DocNode>::iterator firstUserDataNode,
                                   UserDataMapping userDataMapping);
+  unsigned getOffsetOfUserDataReg(llvm::msgpack::ArrayDocNode &userDataReg, UserDataMapping userDataRegMapping);
   unsigned getNumberOfSgprsAfterUserData(unsigned callingConv);
   unsigned getVertexIdOffset(unsigned callingConv);
   unsigned getInstanceIdOffset(unsigned callingConv);

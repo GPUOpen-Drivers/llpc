@@ -147,7 +147,8 @@ void PalMetadata::initialize() {
   // Pre-find (or create) heavily used nodes.
   m_pipelineNode =
       m_document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines].getArray(true)[0].getMap(true);
-  m_registers = m_pipelineNode[".registers"].getMap(true);
+  if (!m_useRegisterFieldFormat)
+    m_registers = m_pipelineNode[".registers"].getMap(true);
   m_userDataLimit = &m_pipelineNode[Util::Abi::PipelineMetadataKey::UserDataLimit];
   if (m_userDataLimit->isEmpty())
     *m_userDataLimit = 0U;
@@ -200,8 +201,7 @@ void PalMetadata::mergeFromBlob(llvm::StringRef blob, bool isGlueCode) {
   // -1: failure
   // 0: success; *dest has been set up with the merged node. For an array, 0 means overwrite the existing array
   //    rather than appending.
-  bool success = m_document->readFromBlob(
-      blob, /*multi=*/false,
+  auto merger =
       [isGlueCode](msgpack::DocNode *destNode, msgpack::DocNode srcNode, msgpack::DocNode mapKey) {
         // Allow array and map merging.
         if (srcNode.isMap() && destNode->isMap())
@@ -295,7 +295,107 @@ void PalMetadata::mergeFromBlob(llvm::StringRef blob, bool isGlueCode) {
         // Default behavior for uint nodes: "or" the values together.
         *destNode = destNode->getUInt() | srcNode.getUInt();
         return 0;
-      });
+      };
+  auto mergerNew = [isGlueCode](msgpack::DocNode *destNode, msgpack::DocNode srcNode, msgpack::DocNode mapKey) {
+    // Allow array and map merging.
+    if (srcNode.isMap() && destNode->isMap())
+      return 0;
+    if (srcNode.isArray() && destNode->isArray())
+      return 0;
+    // Allow string merging as long as the two strings have the same value. If one string has a "_fetchless"
+    // suffix, take the other one. This is for the benefit of the linker linking a fetch shader with a
+    // fetchless VS.
+    if (destNode->isString() && srcNode.isString()) {
+      if (destNode->getString() == srcNode.getString())
+        return 0;
+      if (srcNode.getString().endswith("_fetchless"))
+        return 0;
+      if (destNode->getString().endswith("_fetchless")) {
+        *destNode = srcNode;
+        return 0;
+      }
+      if (srcNode.getString() == "color_export_shader")
+        return 0;
+      if (destNode->getString() == "color_export_shader") {
+        *destNode = srcNode;
+        return 0;
+      }
+    }
+    // Disallow merging if they are not in the same type
+    if (destNode->getKind() != srcNode.getKind())
+      return -1;
+    // Special cases of merging.
+    if (mapKey.isString()) {
+      // For .userdatalimit, register counts, and register limits, take the max value.
+      if (mapKey.getString() == Util::Abi::PipelineMetadataKey::UserDataLimit ||
+          mapKey.getString() == Util::Abi::HardwareStageMetadataKey::SgprCount ||
+          mapKey.getString() == Util::Abi::HardwareStageMetadataKey::SgprLimit ||
+          mapKey.getString() == Util::Abi::HardwareStageMetadataKey::VgprCount ||
+          mapKey.getString() == Util::Abi::HardwareStageMetadataKey::VgprLimit) {
+        *destNode = std::max(destNode->getUInt(), srcNode.getUInt());
+        return 0;
+      }
+      // For .spillthreshold, take the min value.
+      if (mapKey.getString() == Util::Abi::PipelineMetadataKey::SpillThreshold) {
+        *destNode = std::min(destNode->getUInt(), srcNode.getUInt());
+        return 0;
+      }
+      if (isGlueCode) {
+        // For .spi_ps_input_addr/ena, spi_ps_in_control, vgt_shader_stages_en, and float_mode, skip merging
+        if (mapKey.getString() == Util::Abi::SpiPsInputAddrMetadataKey::AncillaryEna ||
+            mapKey.getString() == Util::Abi::SpiPsInputAddrMetadataKey::FrontFaceEna ||
+            mapKey.getString() == Util::Abi::SpiPsInputAddrMetadataKey::LineStippleTexEna ||
+            mapKey.getString() == Util::Abi::SpiPsInputAddrMetadataKey::LinearCenterEna ||
+            mapKey.getString() == Util::Abi::SpiPsInputAddrMetadataKey::LinearCentroidEna ||
+            mapKey.getString() == Util::Abi::SpiPsInputAddrMetadataKey::LinearSampleEna ||
+            mapKey.getString() == Util::Abi::SpiPsInputAddrMetadataKey::PerspCenterEna ||
+            mapKey.getString() == Util::Abi::SpiPsInputAddrMetadataKey::PerspCentroidEna ||
+            mapKey.getString() == Util::Abi::SpiPsInputAddrMetadataKey::PerspPullModelEna ||
+            mapKey.getString() == Util::Abi::SpiPsInputAddrMetadataKey::PerspSampleEna ||
+            mapKey.getString() == Util::Abi::SpiPsInputAddrMetadataKey::PosFixedPtEna ||
+            mapKey.getString() == Util::Abi::SpiPsInputAddrMetadataKey::PosWFloatEna ||
+            mapKey.getString() == Util::Abi::SpiPsInputAddrMetadataKey::PosXFloatEna ||
+            mapKey.getString() == Util::Abi::SpiPsInputAddrMetadataKey::PosYFloatEna ||
+            mapKey.getString() == Util::Abi::SpiPsInputAddrMetadataKey::PosZFloatEna ||
+            mapKey.getString() == Util::Abi::SpiPsInputAddrMetadataKey::SampleCoverageEna ||
+            mapKey.getString() == Util::Abi::SpiPsInControlMetadataKey::NumInterps ||
+            mapKey.getString() == Util::Abi::SpiPsInControlMetadataKey::NumPrimInterp ||
+            mapKey.getString() == Util::Abi::SpiPsInControlMetadataKey::PsW32En ||
+            mapKey.getString() == Util::Abi::VgtShaderStagesEnMetadataKey::DynamicHs ||
+            mapKey.getString() == Util::Abi::VgtShaderStagesEnMetadataKey::EsStageEn ||
+            mapKey.getString() == Util::Abi::VgtShaderStagesEnMetadataKey::GsFastLaunch ||
+            mapKey.getString() == Util::Abi::VgtShaderStagesEnMetadataKey::GsStageEn ||
+            mapKey.getString() == Util::Abi::VgtShaderStagesEnMetadataKey::GsW32En ||
+            mapKey.getString() == Util::Abi::VgtShaderStagesEnMetadataKey::HsStageEn ||
+            mapKey.getString() == Util::Abi::VgtShaderStagesEnMetadataKey::HsW32En ||
+            mapKey.getString() == Util::Abi::VgtShaderStagesEnMetadataKey::LsStageEn ||
+            mapKey.getString() == Util::Abi::VgtShaderStagesEnMetadataKey::MaxPrimgroupInWave ||
+            mapKey.getString() == Util::Abi::VgtShaderStagesEnMetadataKey::NggWaveIdEn ||
+            mapKey.getString() == Util::Abi::VgtShaderStagesEnMetadataKey::PrimgenEn ||
+            mapKey.getString() == Util::Abi::VgtShaderStagesEnMetadataKey::PrimgenPassthruEn ||
+            mapKey.getString() == Util::Abi::VgtShaderStagesEnMetadataKey::PrimgenPassthruNoMsg ||
+            mapKey.getString() == Util::Abi::VgtShaderStagesEnMetadataKey::VsStageEn ||
+            mapKey.getString() == Util::Abi::VgtShaderStagesEnMetadataKey::VsW32En ||
+            mapKey.getString() == Util::Abi::HardwareStageMetadataKey::FloatMode)
+          return 0;
+      }
+      // Default behavior for uint/bool nodes: "or" the values together.
+      if (destNode->getKind() == msgpack::Type::UInt)
+        *destNode = destNode->getUInt() | srcNode.getUInt();
+      else if (destNode->getKind() == msgpack::Type::Boolean)
+        *destNode = destNode->getBool() | srcNode.getBool();
+      else
+        llvm_unreachable("unsupported type to be merged!");
+    }
+
+    return 0;
+  };
+  bool success = false;
+  if (m_useRegisterFieldFormat)
+    success = m_document->readFromBlob(blob, /*multi=*/false, mergerNew);
+  else
+    success = m_document->readFromBlob(blob, /*multi=*/false, merger);
+
   assert(success && "Bad PAL metadata format");
   ((void)success);
 }
@@ -307,6 +407,7 @@ void PalMetadata::mergeFromBlob(llvm::StringRef blob, bool isGlueCode) {
 //
 // @param stage : ShaderStage
 unsigned PalMetadata::getUserDataReg0(ShaderStage stage) {
+  assert(!m_useRegisterFieldFormat);
   if (m_userDataRegMapping[stage] != 0)
     return m_userDataRegMapping[stage];
 
@@ -391,6 +492,7 @@ unsigned PalMetadata::getUserDataReg0(ShaderStage stage) {
 // @param dwordCount : Number of user data entries to set
 void PalMetadata::setUserDataEntry(ShaderStage stage, unsigned userDataIndex, unsigned userDataValue,
                                    unsigned dwordCount) {
+  assert(!m_useRegisterFieldFormat);
   // Get the start register number of SPI user data registers for this shader stage.
   unsigned userDataReg = getUserDataReg0(stage);
 
@@ -538,9 +640,11 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
 
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 &&
         m_pipelineState->getColorExportState().alphaToCoverageEnable) {
-      auto dbShaderControl = graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl].getMap(true);
-      dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] =
-          dbShaderControl[Util::Abi::DbShaderControlMetadataKey::MaskExportEnable].getBool();
+      if (graphicsRegNode.find(Util::Abi::DbShaderControlMetadataKey::MaskExportEnable) != graphicsRegNode.end()) {
+        auto dbShaderControl = graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl].getMap(true);
+        dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] =
+            dbShaderControl[Util::Abi::DbShaderControlMetadataKey::MaskExportEnable].getBool();
+      }
     }
 
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10) {
@@ -625,15 +729,29 @@ void PalMetadata::finalizeInputControlRegisterSetting() {
   const bool usesViewportArrayIndex = usesViewportArrayIndexNode->getBool();
 
   if (!usesViewportArrayIndex) {
-    SPI_PS_INPUT_CNTL_0 spiPsInputCntl = {};
-    spiPsInputCntl.u32All = getRegister(mmSPI_PS_INPUT_CNTL_0 + viewportIndexLoc);
-    // Check if pointCoordLoc is not used
-    if (!spiPsInputCntl.bits.PT_SPRITE_TEX) {
-      // Use default value 0 for viewport array index if it is only used in FS (not set in other stages)
-      constexpr unsigned defaultVal = (1 << 5);
-      spiPsInputCntl.bits.OFFSET = defaultVal;
-      spiPsInputCntl.bits.FLAT_SHADE = false;
-      setRegister(mmSPI_PS_INPUT_CNTL_0 + viewportIndexLoc, spiPsInputCntl.u32All);
+    if (m_useRegisterFieldFormat) {
+      auto spiPsInputCntl = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
+                                .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::SpiPsInputCntl]
+                                .getArray(true);
+      // Check if pointCoordLoc is not used
+      auto spiPsInputCntlElem = spiPsInputCntl[viewportIndexLoc].getMap(true);
+      if (spiPsInputCntlElem[Util::Abi::SpiPsInputCntlMetadataKey::PtSpriteTex].getBool()) {
+        // Use default value 0 for viewport array index if it is only used in FS (not set in other stages)
+        constexpr unsigned defaultVal = (1 << 5);
+        spiPsInputCntlElem[Util::Abi::SpiPsInputCntlMetadataKey::Offset] = defaultVal;
+        spiPsInputCntlElem[Util::Abi::SpiPsInputCntlMetadataKey::FlatShade] = false;
+      }
+    } else {
+      SPI_PS_INPUT_CNTL_0 spiPsInputCntl = {};
+      spiPsInputCntl.u32All = getRegister(mmSPI_PS_INPUT_CNTL_0 + viewportIndexLoc);
+      // Check if pointCoordLoc is not used
+      if (!spiPsInputCntl.bits.PT_SPRITE_TEX) {
+        // Use default value 0 for viewport array index if it is only used in FS (not set in other stages)
+        constexpr unsigned defaultVal = (1 << 5);
+        spiPsInputCntl.bits.OFFSET = defaultVal;
+        spiPsInputCntl.bits.FLAT_SHADE = false;
+        setRegister(mmSPI_PS_INPUT_CNTL_0 + viewportIndexLoc, spiPsInputCntl.u32All);
+      }
     }
   }
 }
@@ -674,6 +792,7 @@ void PalMetadata::finalizePipeline(bool isWholePipeline) {
 //
 // @param regNum : Register number
 unsigned PalMetadata::getRegister(unsigned regNum) {
+  assert(!m_useRegisterFieldFormat);
   auto mapIt = m_registers.find(m_document->getNode(regNum));
   if (mapIt == m_registers.end()) {
     return 0;
@@ -689,6 +808,7 @@ unsigned PalMetadata::getRegister(unsigned regNum) {
 // @param regNum : Register number
 // @param value : Value to set
 void PalMetadata::setRegister(unsigned regNum, unsigned newValue) {
+  assert(!m_useRegisterFieldFormat);
   msgpack::DocNode &node = m_registers[regNum];
   node = newValue;
 }
@@ -824,23 +944,37 @@ void PalMetadata::eraseColorExportInfo() {
 // @param [out] regInfo : Where to store VS entry register info
 void PalMetadata::getVsEntryRegInfo(VsEntryRegInfo &regInfo) {
   regInfo = {};
-  regInfo.callingConv = getCallingConventionForFirstHardwareShaderStage();
-  unsigned userDataReg0 = getFirstUserDataReg(regInfo.callingConv);
-  auto userDataRegIt = m_registers.find(m_document->getNode(userDataReg0));
-  assert(userDataRegIt != m_registers.end());
-
+  std::string hwStageName;
+  regInfo.callingConv = getCallingConventionForFirstHardwareShaderStage(hwStageName);
   unsigned sgprsBeforeUserData = getNumberOfSgprsBeforeUserData(regInfo.callingConv);
   unsigned sgprsAfterUserData = getNumberOfSgprsAfterUserData(regInfo.callingConv);
 
-  regInfo.vertexBufferTable =
-      sgprsBeforeUserData + getOffsetOfUserDataReg(userDataRegIt, UserDataMapping::VertexBufferTable);
-  regInfo.baseVertex = sgprsBeforeUserData + getOffsetOfUserDataReg(userDataRegIt, UserDataMapping::BaseVertex);
-  regInfo.baseInstance = sgprsBeforeUserData + getOffsetOfUserDataReg(userDataRegIt, UserDataMapping::BaseInstance);
-  regInfo.sgprCount = sgprsBeforeUserData + getUserDataCount(regInfo.callingConv) + sgprsAfterUserData;
   regInfo.vertexId = getVertexIdOffset(regInfo.callingConv);
   regInfo.instanceId = getInstanceIdOffset(regInfo.callingConv);
   regInfo.vgprCount = getVgprCount(regInfo.callingConv);
   regInfo.wave32 = isWave32(regInfo.callingConv);
+
+  if (m_useRegisterFieldFormat) {
+    auto hardwareStages = m_pipelineNode[Util::Abi::PipelineMetadataKey::HardwareStages].getMap(true);
+    assert(hardwareStages.find(hwStageName) != hardwareStages.end());
+    auto hwStage = hardwareStages[hwStageName].getMap(true);
+    auto userDataRegMap = hwStage[Util::Abi::HardwareStageMetadataKey::UserDataRegMap].getArray(true);
+    regInfo.sgprCount =
+        sgprsBeforeUserData + hwStage[Util::Abi::HardwareStageMetadataKey::UserSgprs].getUInt() + sgprsAfterUserData;
+    regInfo.vertexBufferTable =
+        sgprsBeforeUserData + getOffsetOfUserDataReg(userDataRegMap, UserDataMapping::VertexBufferTable);
+    regInfo.baseVertex = sgprsBeforeUserData + getOffsetOfUserDataReg(userDataRegMap, UserDataMapping::BaseVertex);
+    regInfo.baseInstance = sgprsBeforeUserData + getOffsetOfUserDataReg(userDataRegMap, UserDataMapping::BaseInstance);
+  } else {
+    unsigned userDataReg0 = getFirstUserDataReg(regInfo.callingConv);
+    auto userDataRegIt = m_registers.find(m_document->getNode(userDataReg0));
+    assert(userDataRegIt != m_registers.end());
+    regInfo.sgprCount = sgprsBeforeUserData + getUserDataCount(regInfo.callingConv) + sgprsAfterUserData;
+    regInfo.vertexBufferTable =
+        sgprsBeforeUserData + getOffsetOfUserDataReg(userDataRegIt, UserDataMapping::VertexBufferTable);
+    regInfo.baseVertex = sgprsBeforeUserData + getOffsetOfUserDataReg(userDataRegIt, UserDataMapping::BaseVertex);
+    regInfo.baseInstance = sgprsBeforeUserData + getOffsetOfUserDataReg(userDataRegIt, UserDataMapping::BaseInstance);
+  }
 }
 
 // =====================================================================================================================
@@ -848,6 +982,7 @@ void PalMetadata::getVsEntryRegInfo(VsEntryRegInfo &regInfo) {
 //
 // @param callingConv : The calling convention of the shader we are interested in.
 unsigned PalMetadata::getUserDataCount(unsigned callingConv) {
+  assert(!m_useRegisterFieldFormat);
   // Should we just define mmSPI_SHADER_PGM_RSRC2_* for all shader types? The comment before the definition of
   // mmSPI_SHADER_PGM_RSRC2_VS in AbiMetadata.h says that do not want to.
   static const ArrayMap callingConvToRsrc2Map = {{CallingConv::AMDGPU_LS, mmSPI_SHADER_USER_DATA_LS_0 - 1},
@@ -1108,7 +1243,26 @@ unsigned PalMetadata::getFragmentShaderBuiltInLoc(unsigned builtin) {
 
 // =====================================================================================================================
 // Returns the calling convention of the first hardware shader stage that will be executed in the pipeline.
-unsigned PalMetadata::getCallingConventionForFirstHardwareShaderStage() {
+//
+// @param hwStageName : The hardware stage name that is filled in with the new register field format.
+unsigned PalMetadata::getCallingConventionForFirstHardwareShaderStage(std::string &hwStageName) {
+  if (m_useRegisterFieldFormat) {
+    auto hardwareStages = m_pipelineNode[Util::Abi::PipelineMetadataKey::HardwareStages].getMap(true);
+    hwStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Vs)];
+    if (hardwareStages.find(hwStageName) != hardwareStages.end())
+      return CallingConv::AMDGPU_VS;
+
+    hwStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Hs)];
+    if (hardwareStages.find(hwStageName) != hardwareStages.end())
+      return CallingConv::AMDGPU_HS;
+
+    hwStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Gs)];
+    if (hardwareStages.find(hwStageName) != hardwareStages.end())
+      return CallingConv::AMDGPU_GS;
+
+    hwStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Cs)];
+    return CallingConv::AMDGPU_CS;
+  }
   constexpr unsigned hwShaderStageCount = 6;
   static const std::pair<unsigned, unsigned> shaderTable[hwShaderStageCount] = {
       {mmSPI_SHADER_PGM_RSRC1_LS, CallingConv::AMDGPU_LS}, {mmSPI_SHADER_PGM_RSRC1_HS, CallingConv::AMDGPU_HS},
@@ -1128,6 +1282,7 @@ unsigned PalMetadata::getCallingConventionForFirstHardwareShaderStage() {
 //
 // @param callingConv : The calling convention
 unsigned PalMetadata::getFirstUserDataReg(unsigned callingConv) {
+  assert(!m_useRegisterFieldFormat);
   static const ArrayMap shaderTable = {
       {CallingConv::AMDGPU_LS, mmSPI_SHADER_USER_DATA_LS_0}, {CallingConv::AMDGPU_HS, mmSPI_SHADER_USER_DATA_HS_0},
       {CallingConv::AMDGPU_ES, mmSPI_SHADER_USER_DATA_ES_0}, {CallingConv::AMDGPU_GS, mmSPI_SHADER_USER_DATA_GS_0},
@@ -1169,6 +1324,7 @@ unsigned PalMetadata::getNumberOfSgprsBeforeUserData(unsigned callingConv) {
 //
 unsigned PalMetadata::getOffsetOfUserDataReg(std::map<msgpack::DocNode, msgpack::DocNode>::iterator firstUserDataNode,
                                              UserDataMapping userDataMapping) {
+  assert(!m_useRegisterFieldFormat);
   unsigned firstReg = firstUserDataNode->first.getUInt();
   unsigned lastReg = firstReg + m_pipelineState->getTargetInfo().getGpuProperty().maxUserDataCount;
   for (auto &userDataNode : make_range(firstUserDataNode, m_registers.end())) {
@@ -1177,6 +1333,19 @@ unsigned PalMetadata::getOffsetOfUserDataReg(std::map<msgpack::DocNode, msgpack:
       return UINT_MAX;
     if (static_cast<UserDataMapping>(userDataNode.second.getUInt()) == userDataMapping)
       return reg - firstReg;
+  }
+  return UINT_MAX;
+}
+
+// =====================================================================================================================
+// Returns the offset of the userDataMapping from firstUserDataNode.  Returns UINT_MAX if it cannot be found.
+//
+// @param userDataReg :
+// @param userDataMapping : The user data mapping that is being search for.
+unsigned PalMetadata::getOffsetOfUserDataReg(msgpack::ArrayDocNode &userDataReg, UserDataMapping userDataMapping) {
+  for (unsigned id = 0; id < userDataReg.size(); ++id) {
+    if (userDataReg[id].getUInt() == static_cast<unsigned>(userDataMapping))
+      return id;
   }
   return UINT_MAX;
 }
@@ -1261,6 +1430,22 @@ bool PalMetadata::isWave32(unsigned callingConv) {
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10)
     return false;
 
+  if (m_useRegisterFieldFormat) {
+    auto vgtShaderStagesEn = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
+                                 .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::VgtShaderStagesEn]
+                                 .getMap(true);
+    switch (callingConv) {
+    case CallingConv::AMDGPU_VS:
+      return vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::VsW32En].getBool();
+    case CallingConv::AMDGPU_HS: // GFX9+ LS+HS
+      return vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::HsW32En].getBool();
+    case CallingConv::AMDGPU_GS: // GFX9+ ES+GS
+      return vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::GsW32En].getBool();
+    default:
+      llvm_unreachable("Unexpected calling convention.");
+      return false;
+    }
+  }
   VGT_SHADER_STAGES_EN vgtShaderStagesEn;
   vgtShaderStagesEn.u32All = m_registers[m_document->getNode(mmVGT_SHADER_STAGES_EN)].getUInt();
   switch (callingConv) {
