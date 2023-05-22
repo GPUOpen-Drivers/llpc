@@ -492,8 +492,10 @@ template <typename T> void ConfigBuilder::buildVsRegConfig(ShaderStage shaderSta
 
     // Set fields CLIP_DIST_ENA_0 ~ CLIP_DIST_ENA_7 and CULL_DIST_ENA_0 ~ CULL_DIST_ENA_7
     unsigned paClVsOutCntl = GET_REG(&config->vsRegs, PA_CL_VS_OUT_CNTL);
-    paClVsOutCntl |= clipDistanceMask;
-    paClVsOutCntl |= (cullDistanceMask << 8);
+
+    // Note: Point primitives are only affected by the cull mask, so enable culling also based on clip distances
+    unsigned finalMask = clipDistanceMask | cullDistanceMask;
+    paClVsOutCntl |= clipDistanceMask | (finalMask << 8);
     SET_REG(&config->vsRegs, PA_CL_VS_OUT_CNTL, paClVsOutCntl);
   }
 
