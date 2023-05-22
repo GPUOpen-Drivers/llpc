@@ -59,14 +59,13 @@ static cl::opt<bool> DisableColorExportShader("disable-color-export-shader", cl:
 // @param cacheHash : Cache hash code
 GraphicsContext::GraphicsContext(GfxIpVersion gfxIp, const GraphicsPipelineBuildInfo *pipelineInfo,
                                  MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash)
-    : PipelineContext(gfxIp, pipelineHash, cacheHash
-#if VKI_RAY_TRACING
-                      ,
-                      &pipelineInfo->rtState
+    : PipelineContext(gfxIp, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo), m_stageMask(0),
+      m_preRasterHasGs(false), m_activeStageCount(0) {
+  const Vkgc::BinaryData *gpurtShaderLibrary = nullptr;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
+  gpurtShaderLibrary = &pipelineInfo->shaderLibrary;
 #endif
-                      ),
-      m_pipelineInfo(pipelineInfo), m_stageMask(0), m_preRasterHasGs(false), m_useDualSourceBlend(false),
-      m_activeStageCount(0) {
+  setRayTracingState(pipelineInfo->rtState, gpurtShaderLibrary);
 
   setUnlinked(pipelineInfo->unlinked);
   // clang-format off

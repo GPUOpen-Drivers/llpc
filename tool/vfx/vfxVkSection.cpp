@@ -104,5 +104,28 @@ void initVkSections() {
   static VkSectionParserInit init;
 }
 
+// =====================================================================================================================
+// Parse the RT IP version
+bool SectionRtState::parseRtIpVersion(RtIpVersion *rtIpVersion) {
+  if (m_rtIpVersion.empty())
+    return true;
+
+  const char *p = m_rtIpVersion.c_str();
+  if (!isdigit(*p))
+    return false;
+
+  char *np;
+  rtIpVersion->major = strtol(p, &np, 10);
+  if (p == np || *np != '.')
+    return false;
+
+  p = np + 1;
+  if (!isdigit(*p))
+    return false;
+
+  rtIpVersion->minor = strtol(p, &np, 10);
+  return *np == 0;
+}
+
 } // namespace Vfx
 #endif
