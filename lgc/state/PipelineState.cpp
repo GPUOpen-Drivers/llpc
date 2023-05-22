@@ -323,9 +323,7 @@ ComputeShaderMode Pipeline::getComputeShaderMode(Module &module) {
 // @param emitLgc : Whether the option -emit-lgc is on
 PipelineState::PipelineState(LgcContext *builderContext, bool emitLgc)
     : Pipeline(builderContext), m_emitLgc(emitLgc), m_meshRowExport(EnableRowExport) {
-  const bool canUseFieldFormat = getTargetInfo().getGfxIpVersion().major >= 11 && UseRegisterFieldFormat;
-  UseRegisterFieldFormat.setValue(canUseFieldFormat);
-  m_registerFieldFormat = UseRegisterFieldFormat;
+  m_registerFieldFormat = getTargetInfo().getGfxIpVersion().major >= 11 && UseRegisterFieldFormat;
 }
 
 // =====================================================================================================================
@@ -356,7 +354,7 @@ unsigned PipelineState::getPalAbiVersion() const {
 // Get PalMetadata object, creating an empty one if necessary
 PalMetadata *PipelineState::getPalMetadata() {
   if (!m_palMetadata)
-    m_palMetadata = new PalMetadata(this);
+    m_palMetadata = new PalMetadata(this, m_registerFieldFormat);
   return m_palMetadata;
 }
 
@@ -374,7 +372,7 @@ void PipelineState::clearPalMetadata() {
 // @param isGlueCode : True if the blob was generated for glue code.
 void PipelineState::mergePalMetadataFromBlob(StringRef blob, bool isGlueCode) {
   if (!m_palMetadata)
-    m_palMetadata = new PalMetadata(this, blob);
+    m_palMetadata = new PalMetadata(this, blob, m_registerFieldFormat);
   else
     m_palMetadata->mergeFromBlob(blob, isGlueCode);
 }
@@ -435,9 +433,6 @@ void PipelineState::record(Module *module) {
   recordGraphicsState(module);
   if (m_palMetadata)
     m_palMetadata->record(module);
-
-  if (UseRegisterFieldFormat)
-    UseRegisterFieldFormat.setValue(getTargetInfo().getGfxIpVersion().major >= 11);
 }
 
 // =====================================================================================================================
@@ -454,7 +449,7 @@ void PipelineState::readState(Module *module) {
   readColorExportState(module);
   readGraphicsState(module);
   if (!m_palMetadata)
-    m_palMetadata = new PalMetadata(this, module);
+    m_palMetadata = new PalMetadata(this, module, m_registerFieldFormat);
   setXfbStateMetadata(module);
 }
 

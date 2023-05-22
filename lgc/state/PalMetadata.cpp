@@ -49,8 +49,6 @@
 using namespace lgc;
 using namespace llvm;
 
-extern cl::opt<bool> UseRegisterFieldFormat;
-
 namespace {
 
 // Structure used to hold the key and the corresponding value in an ArrayMap below.
@@ -89,7 +87,11 @@ msgpack::ArrayDocNode buildArrayDocNode(msgpack::Document *document, Hash128 has
 
 // =====================================================================================================================
 // Construct empty object
-PalMetadata::PalMetadata(PipelineState *pipelineState) : m_pipelineState(pipelineState) {
+//
+// @param pipelineState : PipelineState
+// @param useRegisterFieldFormat: The control of new PAL metadata or not
+PalMetadata::PalMetadata(PipelineState *pipelineState, bool useRegisterFieldFormat)
+    : m_pipelineState(pipelineState), m_useRegisterFieldFormat(useRegisterFieldFormat) {
   m_document = new msgpack::Document;
   initialize();
 }
@@ -99,7 +101,9 @@ PalMetadata::PalMetadata(PipelineState *pipelineState) : m_pipelineState(pipelin
 //
 // @param pipelineState : PipelineState
 // @param blob : MsgPack PAL metadata
-PalMetadata::PalMetadata(PipelineState *pipelineState, StringRef blob) : m_pipelineState(pipelineState) {
+// @param useRegisterFieldFormat: The control of using new PAL metadata or not
+PalMetadata::PalMetadata(PipelineState *pipelineState, StringRef blob, bool useRegisterFieldFormat)
+    : m_pipelineState(pipelineState), m_useRegisterFieldFormat(useRegisterFieldFormat) {
   m_document = new msgpack::Document;
   bool success = m_document->readFromBlob(blob, /*multi=*/false);
   assert(success && "Bad PAL metadata format");
@@ -110,8 +114,11 @@ PalMetadata::PalMetadata(PipelineState *pipelineState, StringRef blob) : m_pipel
 // =====================================================================================================================
 // Constructor given pipeline IR module. This reads the already-existing PAL metadata if any.
 //
+// @param pipelineState : PipelineState
 // @param module : Pipeline IR module
-PalMetadata::PalMetadata(PipelineState *pipelineState, Module *module) : m_pipelineState(pipelineState) {
+// @param useRegisterFieldFormat: The control of using new PAL metadata or not
+PalMetadata::PalMetadata(PipelineState *pipelineState, Module *module, bool useRegisterFieldFormat)
+    : m_pipelineState(pipelineState), m_useRegisterFieldFormat(useRegisterFieldFormat) {
   m_document = new msgpack::Document;
   NamedMDNode *namedMd = module->getNamedMetadata(PalMetadataName);
   if (namedMd && namedMd->getNumOperands()) {
@@ -157,7 +164,7 @@ void PalMetadata::initialize() {
 void PalMetadata::record(Module *module) {
   // Add the metadata version number.
   auto versionNode = m_document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Version].getArray(true);
-  if (UseRegisterFieldFormat) {
+  if (m_useRegisterFieldFormat) {
     versionNode[0] = Util::Abi::PipelineMetadataMajorVersionNew;
     versionNode[1] = Util::Abi::PipelineMetadataMinorVersionNew;
   } else {
