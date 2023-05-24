@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 61
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 9
+#define LLPC_INTERFACE_MINOR_VERSION 10
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -82,8 +82,8 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
-//  |     62.0 | Add enableImplicitInvariantExports to PipelineOptions                                                 |
-//  |     61.8 | Add useShadingRate and useSampleInfoto ShaderModuleUsage                                              |
+//  |     61.10| Add useShadingRate and useSampleInfoto ShaderModuleUsage                                              |
+//  |     61.8 | Add enableImplicitInvariantExports to PipelineOptions                                                 |
 //  |     61.7 | Add disableFMA to PipelineShaderOptions                                                               |
 //  |     61.6 | Add workaroundInitializeOutputsToZero to PipelineShaderOptions                                        |
 //  |     61.5 | Add RtIpVersion (including its checkers) to represent RT IP                                           |
