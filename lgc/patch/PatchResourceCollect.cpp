@@ -3038,6 +3038,8 @@ void PatchResourceCollect::updateOutputLocInfoMapWithPack() {
     outputLocInfoMap = nextStageInputLocInfoMap;
   } else {
     // For {VS, TES, GS}-FS, the dead output is neither a XFB output or a corresponding FS' input.
+    assert(nextStage == ShaderStageFragment);
+
     // Collect XFB locations
     auto &xfbOutLocInfoMap = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.locInfoXfbOutInfoMap;
     std::set<unsigned> xfbOutputLocs[MaxGsStreams];
@@ -3049,17 +3051,18 @@ void PatchResourceCollect::updateOutputLocInfoMapWithPack() {
     // Store the output calls that have no corresponding input in FS
     std::vector<CallInst *> noMappedCalls;
     for (auto call : m_outputCalls) {
+      // NOTE: Don't set stream ID to the original output location info for GS. This is because the corresponding input
+      // location info of FS doesn't have stream ID. This will cause in-out mismatch.
       InOutLocationInfo origLocInfo;
       origLocInfo.setLocation(cast<ConstantInt>(call->getOperand(0))->getZExtValue());
       origLocInfo.setComponent(cast<ConstantInt>(call->getOperand(1))->getZExtValue());
-      unsigned streamId = 0;
-      if (m_shaderStage == ShaderStageGeometry) {
-        streamId = cast<ConstantInt>(call->getOperand(2))->getZExtValue();
-        origLocInfo.setStreamId(streamId);
-      }
+
       const unsigned origLocation = origLocInfo.getLocation();
       const bool hasNoMappedInput = (nextStageInputLocInfoMap.find(origLocInfo) == nextStageInputLocInfoMap.end());
       if (hasNoMappedInput) {
+        const unsigned streamId =
+            m_shaderStage == ShaderStageGeometry ? cast<ConstantInt>(call->getOperand(2))->getZExtValue() : 0;
+
         if (xfbOutputLocs[streamId].count(origLocation) == 0)
           m_deadCalls.push_back(call);
         else
@@ -3080,7 +3083,21 @@ void PatchResourceCollect::updateOutputLocInfoMapWithPack() {
     m_locationInfoMapManager->createMap(outLocInfos, m_shaderStage);
     const auto &calcOutLocInfoMap = m_locationInfoMapManager->getMap();
 
-    outputLocInfoMap = nextStageInputLocInfoMap;
+    if (m_shaderStage == ShaderStageGeometry) {
+      // NOTE: The output location info from next shader stage (FS) doesn't contain raster stream ID. We have to
+      // reconstruct it.
+      const auto rasterStream = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.gs.rasterStream;
+      for (auto &entry : nextStageInputLocInfoMap) {
+        InOutLocationInfo origLocInfo(entry.first);
+        origLocInfo.setStreamId(rasterStream);
+        InOutLocationInfo newLocInfo(entry.second);
+        newLocInfo.setStreamId(rasterStream);
+        outputLocInfoMap.insert({origLocInfo, newLocInfo});
+      }
+    } else {
+      outputLocInfoMap = nextStageInputLocInfoMap;
+    }
+
     unsigned newLocMax = 0;
     for (const auto &entry : outputLocInfoMap)
       newLocMax = std::max(newLocMax, entry.second.getLocation() + 1);
