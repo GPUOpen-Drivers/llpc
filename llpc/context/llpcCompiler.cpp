@@ -47,6 +47,7 @@
 #include "llpcSpirvLowerTranslator.h"
 #include "llpcSpirvLowerUtil.h"
 #include "llpcSpirvProcessGpuRtLibrary.h"
+#include "llpcThreading.h"
 #include "llpcTimerProfiler.h"
 #include "llpcUtil.h"
 #include "spirvExt.h"
@@ -84,6 +85,7 @@
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 #include <cassert>
+#include <condition_variable>
 #include <mutex>
 #include <set>
 #include <unordered_set>
@@ -180,6 +182,10 @@ opt<bool> FatalLlvmErrors("fatal-llvm-errors", cl::desc("Make all LLVM errors fa
 // -enable-part-pipeline: Use part pipeline compilation scheme (experimental)
 opt<bool> EnablePartPipeline("enable-part-pipeline", cl::desc("Enable part pipeline compilation scheme"), init(false));
 
+// -add-rt-helpers: Spawn additional helper threads to run RT pipeline compilations
+opt<int> AddRtHelpers("add-rt-helpers", cl::desc("Add this number of helper threads for each RT pipeline compile"),
+                      init(0));
+
 extern opt<bool> EnableOuts;
 
 extern opt<bool> EnableErrs;
@@ -220,8 +226,8 @@ struct HelperThreadBuildRayTracingPipelineElfPayload {
   std::vector<Result> &results;                       // Build result of each module
   RayTracingContext *rayTracingContext;               // The ray tracing context across the pipeline
   Compiler *compiler;                                 // The compiler instance
-  volatile bool helperThreadJoined;                   // Whether helper thread has joined
-  volatile bool mainThreadSwitchedContext;            // Whether main thread has finished switching context
+  std::atomic<bool> helperThreadJoined;               // Whether helper thread has joined
+  std::atomic<bool> mainThreadSwitchedContext;        // Whether main thread has finished switching context
 };
 
 sys::Mutex Compiler::m_helperThreadMutex;
@@ -2163,7 +2169,7 @@ void helperThreadBuildRayTracingPipelineElf(IHelperThreadProvider *helperThreadP
     // Compiler::buildRayTracingPipelineInternal for why we need this.
     std::unique_lock<sys::Mutex> lock(helperThreadPayload->compiler->getHelperThreadMutex());
     helperThreadPayload->compiler->getHelperThreadConditionVariable().wait(
-        lock, [helperThreadPayload]() { return helperThreadPayload->mainThreadSwitchedContext; });
+        lock, [helperThreadPayload]() { return helperThreadPayload->mainThreadSwitchedContext.load(); });
   }
 
   do {
@@ -2212,6 +2218,44 @@ void helperThreadBuildRayTracingPipelineElf(IHelperThreadProvider *helperThreadP
   context->setDiagnosticHandler(nullptr);
   helperThreadPayload->compiler->releaseContext(context);
 }
+
+// =====================================================================================================================
+// Limited implementation of Llpc::IHelperThreadProvider to support -add-rt-helpers.
+//
+// If no deferred work helper thread providers is available when additional threads are requested via -add-rt-helpers
+// then use an instances of this class to coordinate helper threads.
+class InternalHelperThreadProvider : public Llpc::IHelperThreadProvider {
+public:
+  virtual void SetTasks(ThreadFunction *pFunction, uint32_t numTasks, void *pPayload) override {
+    assert(!m_totalInstances && "InternalHelperThreadProvider is single use");
+    m_totalInstances = numTasks;
+  }
+
+  virtual bool GetNextTask(uint32_t *pTaskIndex) override {
+    assert(pTaskIndex != nullptr);
+    *pTaskIndex = m_nextInstance.fetch_add(1);
+    return (*pTaskIndex < m_totalInstances);
+  }
+
+  virtual void TaskCompleted() override {
+    uint32_t completedInstances = m_completedInstances.fetch_add(1) + 1;
+    if (completedInstances == m_totalInstances)
+      m_event.notify_all();
+  }
+
+  virtual void WaitForTasks() override {
+    std::unique_lock<std::mutex> lock(m_lock);
+    while (m_completedInstances < m_totalInstances)
+      m_event.wait(lock);
+  }
+
+private:
+  uint32_t m_totalInstances = 0;
+  std::atomic<uint32_t> m_nextInstance = 0;
+  std::atomic<uint32_t> m_completedInstances = 0;
+  std::condition_variable m_event;
+  std::mutex m_lock;
+};
 
 // =====================================================================================================================
 // Build raytracing pipeline internally
@@ -2369,6 +2413,10 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
   pipelineElfs.resize(newModules.size());
   shaderProps.resize(newModules.size() - 1);
 
+  InternalHelperThreadProvider ourHelperThreadProvider;
+  if (cl::AddRtHelpers && !helperThreadProvider)
+    helperThreadProvider = &ourHelperThreadProvider;
+
   if (helperThreadProvider) {
     std::vector<Result> results(newModules.size(), Result::Success);
     std::vector<Module *> modulePointers;
@@ -2379,7 +2427,15 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     helperThreadProvider->SetTasks(&helperThreadBuildRayTracingPipelineElf, newModules.size(),
                                    static_cast<void *>(&helperThreadPayload));
 
+    std::vector<std::thread> workers(cl::AddRtHelpers);
+    for (std::thread &worker : workers) {
+      worker = std::thread([&helperThreadProvider, &helperThreadPayload] {
+        helperThreadBuildRayTracingPipelineElf(helperThreadProvider, &helperThreadPayload);
+      });
+    }
+
     unsigned moduleIndex = 0;
+
     while (!helperThreadPayload.helperThreadJoined && helperThreadProvider->GetNextTask(&moduleIndex)) {
       // NOTE: When a helper thread joins, it will move modules from the original context into a new one. However,
       // main thread may be processing on the original context at the same time, results in out of sync situation.
@@ -2400,6 +2456,9 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
       helperThreadBuildRayTracingPipelineElf(helperThreadProvider, &helperThreadPayload);
     }
     helperThreadProvider->WaitForTasks();
+
+    for (std::thread &worker : workers)
+      worker.join();
 
     for (auto res : results) {
       if (res != Result::Success)
