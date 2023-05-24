@@ -92,7 +92,9 @@ Value *BuilderImpl::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
       std::tie(topNode, node) =
           m_pipelineState->findResourceNode(ResourceNodeType::DescriptorMutable, descSet, binding);
     }
-    assert(node && "missing resource node");
+
+    if (!node)
+      report_fatal_error("Resource node not found");
 
     if (node == topNode && isa<Constant>(descIndex) && node->concreteType != ResourceNodeType::InlineBuffer) {
       // Handle a descriptor in the root table (a "dynamic descriptor") specially, as long as it is not variably
