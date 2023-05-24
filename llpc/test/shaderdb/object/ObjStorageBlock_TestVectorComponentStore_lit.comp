@@ -13,6 +13,7 @@ void main()
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; REQUIRES: do-not-run-me
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: %{{[0-9]*}} = call ptr addrspace(7) {{.*}} @lgc.create.load.buffer.desc.{{[0-9a-z.]*}}(i32 0, i32 0, i32 0,

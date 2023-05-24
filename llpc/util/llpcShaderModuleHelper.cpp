@@ -82,6 +82,13 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
       capabilities.insert(capability);
       break;
     }
+    case OpExtInst: {
+      auto extInst = static_cast<GLSLstd450>(codePos[4]);
+      if (extInst == GLSLstd450InterpolateAtSample) {
+        shaderModuleUsage.useSampleInfo = true;
+      }
+      break;
+    }
     case OpExtension: {
       StringRef extName = reinterpret_cast<const char *>(&codePos[1]);
       if (extName == "SPV_AMD_shader_ballot") {
@@ -98,8 +105,23 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
       }
       if (decoration == DecorationBuiltIn) {
         auto builtIn = (opCode == OpDecorate) ? static_cast<BuiltIn>(codePos[3]) : static_cast<BuiltIn>(codePos[4]);
-        if (builtIn == BuiltInPointSize) {
+        switch (builtIn) {
+        case BuiltInPointSize: {
           shaderModuleUsage.usePointSize = true;
+          break;
+        }
+        case BuiltInPrimitiveShadingRateKHR:
+        case BuiltInShadingRateKHR: {
+          shaderModuleUsage.useShadingRate = true;
+          break;
+        }
+        case BuiltInSamplePosition: {
+          shaderModuleUsage.useSampleInfo = true;
+          break;
+        }
+        default: {
+          break;
+        }
         }
       }
       break;

@@ -61,9 +61,8 @@ SPIRVModule::~SPIRVModule() {
 class SPIRVModuleImpl : public SPIRVModule {
 public:
   SPIRVModuleImpl()
-      : SPIRVModule(), NextId(1), SPIRVVersion(SPIRV_1_0), GeneratorId(SPIRVGEN_KhronosLLVMSPIRVTranslator),
-        GeneratorVer(0), InstSchema(SPIRVISCH_Default), SrcLang(SourceLanguageGLSL), SrcLangVer(102000),
-        CurrentLine(nullptr) {
+      : SPIRVModule(), NextId(1), SPIRVVersion(SPIRV_1_0), GeneratorVer(0), InstSchema(SPIRVISCH_Default),
+        SrcLang(SourceLanguageGLSL), SrcLangVer(102000), CurrentLine(nullptr) {
     AddrModel = sizeof(size_t) == 32 ? AddressingModelPhysical32 : AddressingModelPhysical64;
     setMemoryModel(MemoryModelGLSL450);
   }

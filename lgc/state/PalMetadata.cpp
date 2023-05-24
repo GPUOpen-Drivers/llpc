@@ -49,8 +49,6 @@
 using namespace lgc;
 using namespace llvm;
 
-extern cl::opt<bool> UseRegisterFieldFormat;
-
 namespace {
 
 // Structure used to hold the key and the corresponding value in an ArrayMap below.
@@ -89,7 +87,11 @@ msgpack::ArrayDocNode buildArrayDocNode(msgpack::Document *document, Hash128 has
 
 // =====================================================================================================================
 // Construct empty object
-PalMetadata::PalMetadata(PipelineState *pipelineState) : m_pipelineState(pipelineState) {
+//
+// @param pipelineState : PipelineState
+// @param useRegisterFieldFormat: The control of new PAL metadata or not
+PalMetadata::PalMetadata(PipelineState *pipelineState, bool useRegisterFieldFormat)
+    : m_pipelineState(pipelineState), m_useRegisterFieldFormat(useRegisterFieldFormat) {
   m_document = new msgpack::Document;
   initialize();
 }
@@ -99,7 +101,9 @@ PalMetadata::PalMetadata(PipelineState *pipelineState) : m_pipelineState(pipelin
 //
 // @param pipelineState : PipelineState
 // @param blob : MsgPack PAL metadata
-PalMetadata::PalMetadata(PipelineState *pipelineState, StringRef blob) : m_pipelineState(pipelineState) {
+// @param useRegisterFieldFormat: The control of using new PAL metadata or not
+PalMetadata::PalMetadata(PipelineState *pipelineState, StringRef blob, bool useRegisterFieldFormat)
+    : m_pipelineState(pipelineState), m_useRegisterFieldFormat(useRegisterFieldFormat) {
   m_document = new msgpack::Document;
   bool success = m_document->readFromBlob(blob, /*multi=*/false);
   assert(success && "Bad PAL metadata format");
@@ -110,8 +114,11 @@ PalMetadata::PalMetadata(PipelineState *pipelineState, StringRef blob) : m_pipel
 // =====================================================================================================================
 // Constructor given pipeline IR module. This reads the already-existing PAL metadata if any.
 //
+// @param pipelineState : PipelineState
 // @param module : Pipeline IR module
-PalMetadata::PalMetadata(PipelineState *pipelineState, Module *module) : m_pipelineState(pipelineState) {
+// @param useRegisterFieldFormat: The control of using new PAL metadata or not
+PalMetadata::PalMetadata(PipelineState *pipelineState, Module *module, bool useRegisterFieldFormat)
+    : m_pipelineState(pipelineState), m_useRegisterFieldFormat(useRegisterFieldFormat) {
   m_document = new msgpack::Document;
   NamedMDNode *namedMd = module->getNamedMetadata(PalMetadataName);
   if (namedMd && namedMd->getNumOperands()) {
@@ -157,7 +164,7 @@ void PalMetadata::initialize() {
 void PalMetadata::record(Module *module) {
   // Add the metadata version number.
   auto versionNode = m_document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Version].getArray(true);
-  if (UseRegisterFieldFormat) {
+  if (m_useRegisterFieldFormat) {
     versionNode[0] = Util::Abi::PipelineMetadataMajorVersionNew;
     versionNode[1] = Util::Abi::PipelineMetadataMinorVersionNew;
   } else {
@@ -429,14 +436,7 @@ void PalMetadata::fixUpRegisters() {
     const bool hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
     const bool hasMesh = m_pipelineState->hasShaderStage(ShaderStageMesh);
     if (!hasTs && !hasGs && !hasMesh) {
-      // Here we use register field to determine if NGG is enabled, because enabling NGG depends on other conditions.
-      // see PatchResourceCollect::canUseNgg.
-      unsigned vgtGsOutPrimType = mmVGT_GS_OUT_PRIM_TYPE;
-      if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
-        // NOTE: Register VGT_GS_OUT_PRIM_TYPE is a special one that has different HW offset on GFX11+.
-        vgtGsOutPrimType = mmVGT_GS_OUT_PRIM_TYPE_GFX11;
-      }
-      if (m_registers.find(m_document->getNode(vgtGsOutPrimType)) != m_registers.end()) {
+      auto getPrimType = [&]() {
         const auto primType = m_pipelineState->getInputAssemblyState().primitiveType;
         unsigned gsOutputPrimitiveType = 0;
         switch (primType) {
@@ -458,110 +458,33 @@ void PalMetadata::fixUpRegisters() {
           llvm_unreachable("Should never be called!");
           break;
         }
-        m_registers[vgtGsOutPrimType] = gsOutputPrimitiveType;
+        return gsOutputPrimitiveType;
+      };
+      // Here we use register field to determine if NGG is enabled, because enabling NGG depends on other conditions.
+      // see PatchResourceCollect::canUseNgg.
+      if (m_pipelineState->useRegisterFieldFormat()) {
+        auto graphicsRegisters = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
+        if (graphicsRegisters.find(Util::Abi::GraphicsRegisterMetadataKey::VgtGsOutPrimType) !=
+            graphicsRegisters.end()) {
+          auto primType = getPrimType();
+          auto vgtGsOutPrimType =
+              graphicsRegisters[Util::Abi::GraphicsRegisterMetadataKey::VgtGsOutPrimType].getMap(true);
+          vgtGsOutPrimType[Util::Abi::VgtGsOutPrimTypeMetadataKey::OutprimType] =
+              serializeEnum(Util::Abi::GsOutPrimType(primType));
+        }
+      } else {
+        unsigned vgtGsOutPrimType = mmVGT_GS_OUT_PRIM_TYPE;
+        if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
+          // NOTE: Register VGT_GS_OUT_PRIM_TYPE is a special one that has different HW offset on GFX11+.
+          vgtGsOutPrimType = mmVGT_GS_OUT_PRIM_TYPE_GFX11;
+        }
+        if (m_registers.find(m_document->getNode(vgtGsOutPrimType)) != m_registers.end()) {
+          auto primType = getPrimType();
+          m_registers[vgtGsOutPrimType] = primType;
+        }
       }
     }
   }
-
-  static const std::pair<unsigned, unsigned> ComputeRegRanges[] = {{mmCOMPUTE_USER_DATA_0, 16}};
-  static const std::pair<unsigned, unsigned> Gfx8RegRanges[] = {
-      {mmSPI_SHADER_USER_DATA_PS_0, 16}, {mmSPI_SHADER_USER_DATA_VS_0, 16}, {mmSPI_SHADER_USER_DATA_GS_0, 16},
-      {mmSPI_SHADER_USER_DATA_ES_0, 16}, {mmSPI_SHADER_USER_DATA_HS_0, 16}, {mmSPI_SHADER_USER_DATA_LS_0, 16}};
-  static const std::pair<unsigned, unsigned> Gfx9RegRanges[] = {{mmSPI_SHADER_USER_DATA_PS_0, 32},
-                                                                {mmSPI_SHADER_USER_DATA_VS_0, 32},
-                                                                {mmSPI_SHADER_USER_DATA_ES_0, 32},
-                                                                {mmSPI_SHADER_USER_DATA_HS_0, 32}};
-  static const std::pair<unsigned, unsigned> Gfx10RegRanges[] = {{mmSPI_SHADER_USER_DATA_PS_0, 32},
-                                                                 {mmSPI_SHADER_USER_DATA_VS_0, 32},
-                                                                 {mmSPI_SHADER_USER_DATA_GS_0, 32},
-                                                                 {mmSPI_SHADER_USER_DATA_HS_0, 32}};
-
-  ArrayRef<std::pair<unsigned, unsigned>> regRanges = ComputeRegRanges;
-  if (m_pipelineState->isGraphics()) {
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 9)
-      regRanges = Gfx8RegRanges;
-    else if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 9)
-      regRanges = Gfx9RegRanges;
-    else
-      regRanges = Gfx10RegRanges;
-  }
-
-  // First find the descriptor sets and push const nodes.
-  bool isIndirect = m_pipelineState->getOptions().resourceLayoutScheme == ResourceLayoutScheme::Indirect;
-  SmallVector<const ResourceNode *, 4> descSetNodes;
-  const ResourceNode *pushConstNode = nullptr;
-  for (const auto &node : m_pipelineState->getUserDataNodes()) {
-    if (isIndirect) {
-      if (node.concreteType == ResourceNodeType::DescriptorTableVaPtr && !node.innerTable.empty()) {
-        if (node.innerTable[0].concreteType == ResourceNodeType::PushConst) {
-          descSetNodes.resize(std::max(descSetNodes.size(), size_t(1)));
-          descSetNodes[0] = &node;
-        } else {
-          descSetNodes.resize(std::max(descSetNodes.size(), size_t(node.innerTable[0].set + 2)));
-          descSetNodes[node.innerTable[0].set + 1] = &node;
-        }
-      }
-    } else {
-      if (node.concreteType == ResourceNodeType::DescriptorTableVaPtr && !node.innerTable.empty()) {
-        size_t descSet = node.innerTable[0].set;
-        descSetNodes.resize(std::max(descSetNodes.size(), descSet + 1));
-        descSetNodes[descSet] = &node;
-      } else if ((node.concreteType == ResourceNodeType::DescriptorBuffer) ||
-                 (node.concreteType == ResourceNodeType::DescriptorConstBuffer) ||
-                 (node.concreteType == ResourceNodeType::DescriptorBufferCompact) ||
-                 (node.concreteType == ResourceNodeType::DescriptorConstBufferCompact)) {
-        size_t descSet = node.set;
-        if (descSet != InvalidValue) {
-          descSetNodes.resize(std::max(descSetNodes.size(), descSet + 1));
-          descSetNodes[descSet] = &node;
-        }
-      } else if (node.concreteType == ResourceNodeType::PushConst) {
-        pushConstNode = &node;
-      }
-    }
-  }
-
-  // Scan the PAL metadata registers for user data.
-  unsigned userDataLimit = m_userDataLimit->getUInt();
-  for (const std::pair<unsigned, unsigned> &regRange : regRanges) {
-    unsigned reg = regRange.first;
-    unsigned regEnd = reg + regRange.second;
-    // Scan registers [reg,regEnd), the user data registers for one shader stage. If register 0 in that range is
-    // not set, then the shader stage is not in use, so don't bother to scan the others.
-    auto it = m_registers.find(m_document->getNode(reg));
-    if (it != m_registers.end()) {
-      for (;;) {
-        unsigned value = it->second.getUInt();
-        unsigned descSet = value - static_cast<unsigned>(UserDataMapping::DescriptorSet0);
-        if (descSet <= static_cast<unsigned>(UserDataMapping::DescriptorSetMax) -
-                           static_cast<unsigned>(UserDataMapping::DescriptorSet0)) {
-          // This entry is a descriptor set pointer. Replace it with the dword offset for that descriptor set.
-          if (descSet >= descSetNodes.size() || !descSetNodes[descSet])
-            report_fatal_error("Descriptor set " + Twine(descSet) + " not found");
-          value = descSetNodes[descSet]->offsetInDwords;
-          it->second = value;
-          unsigned extent = value + descSetNodes[descSet]->sizeInDwords;
-          userDataLimit = std::max(userDataLimit, extent);
-        } else {
-          unsigned pushConstOffset = value - static_cast<unsigned>(UserDataMapping::PushConst0);
-          if (pushConstOffset <= static_cast<unsigned>(UserDataMapping::DescriptorSetMax) -
-                                     static_cast<unsigned>(UserDataMapping::DescriptorSet0)) {
-            // This entry is a dword in the push constant.
-            if (!pushConstNode || pushConstNode->sizeInDwords <= pushConstOffset)
-              report_fatal_error("Push constant not found or not big enough");
-            value = pushConstNode->offsetInDwords + pushConstOffset;
-            it->second = value;
-            unsigned extent = pushConstNode->offsetInDwords + pushConstNode->sizeInDwords;
-            userDataLimit = std::max(userDataLimit, extent);
-          }
-        }
-        ++it;
-        if (it == m_registers.end() || it->first.getUInt() >= regEnd)
-          break;
-      }
-    }
-  }
-  *m_userDataLimit = userDataLimit;
 }
 
 // =====================================================================================================================
@@ -615,8 +538,9 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
 
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 &&
         m_pipelineState->getColorExportState().alphaToCoverageEnable) {
-      graphicsRegNode[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] =
-          graphicsRegNode[Util::Abi::DbShaderControlMetadataKey::MaskExportEnable];
+      auto dbShaderControl = graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl].getMap(true);
+      dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] =
+          dbShaderControl[Util::Abi::DbShaderControlMetadataKey::MaskExportEnable].getBool();
     }
 
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10) {
@@ -1414,4 +1338,13 @@ llvm::StringRef PalMetadata::serializeEnum(Util::Abi::GsOutPrimType value) {
     llvm_unreachable("Unexpected Util::Abi::GsOutPrimType");
     return "";
   }
+}
+
+// =====================================================================================================================
+// Set userDataLimit to the given value if it is bigger than m_userDataLimit
+//
+// @param value : The given value to update m_userDataLimit
+void PalMetadata::setUserDataLimit(unsigned value) {
+  if (value > m_userDataLimit->getUInt())
+    *m_userDataLimit = value;
 }

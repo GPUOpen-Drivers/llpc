@@ -48,3 +48,9 @@ add_lit_testsuite(check-amdllpc "Running the AMDLLPC regression tests"
   DEPENDS
     ${AMDLLPC_TEST_DEPS}
 )
+
+if(CMAKE_GENERATOR MATCHES "Visual Studio")
+    add_custom_command(TARGET check-amdllpc PRE_BUILD
+         COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${AMDLLPC_DIR}/$<CONFIG>/amdllpc.exe" "${AMDLLPC_DIR}/amdllpc.exe")
+
+endif()

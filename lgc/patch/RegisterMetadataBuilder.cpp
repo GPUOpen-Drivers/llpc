@@ -62,8 +62,10 @@ void RegisterMetadataBuilder::buildPalMetadata() {
     DenseMap<unsigned, unsigned> apiHwShaderMap;
     if (m_hasTask || m_hasMesh) {
       assert(m_pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3}));
-      apiHwShaderMap[ShaderStageMesh] = Util::Abi::HwShaderGs;
-      pipelineType = Util::Abi::PipelineType::Mesh;
+      if (m_hasMesh) {
+        apiHwShaderMap[ShaderStageMesh] = Util::Abi::HwShaderGs;
+        pipelineType = Util::Abi::PipelineType::Mesh;
+      }
       if (m_hasTask) {
         apiHwShaderMap[ShaderStageTask] = Util::Abi::HwShaderCs;
         pipelineType = Util::Abi::PipelineType::TaskMesh;
@@ -71,31 +73,36 @@ void RegisterMetadataBuilder::buildPalMetadata() {
     } else {
       if (m_hasGs) {
         auto preGsStage = m_pipelineState->getPrevShaderStage(ShaderStageGeometry);
-        apiHwShaderMap[preGsStage] = Util::Abi::HwShaderGs;
+        if (preGsStage != ShaderStageInvalid)
+          apiHwShaderMap[preGsStage] = Util::Abi::HwShaderGs;
       }
-      if (hasTs) {
-        apiHwShaderMap[ShaderStageVertex] = Util::Abi::HwShaderHs;
+      if (m_hasTcs) {
         apiHwShaderMap[ShaderStageTessControl] = Util::Abi::HwShaderHs;
+        if (m_hasVs)
+          apiHwShaderMap[ShaderStageVertex] = Util::Abi::HwShaderHs;
       }
       auto lastVertexProcessingStage = m_pipelineState->getLastVertexProcessingStage();
-      if (lastVertexProcessingStage == ShaderStageCopyShader)
-        lastVertexProcessingStage = ShaderStageGeometry;
-      if (m_isNggMode) {
-        apiHwShaderMap[lastVertexProcessingStage] = Util::Abi::HwShaderGs;
-        pipelineType = hasTs ? Util::Abi::PipelineType::NggTess : Util::Abi::PipelineType::Ngg;
-      } else {
-        apiHwShaderMap[lastVertexProcessingStage] = Util::Abi::HwShaderVs;
-        if (m_hasGs)
-          apiHwShaderMap[lastVertexProcessingStage] |= Util::Abi::HwShaderGs;
+      if (lastVertexProcessingStage != ShaderStageInvalid) {
+        if (lastVertexProcessingStage == ShaderStageCopyShader)
+          lastVertexProcessingStage = ShaderStageGeometry;
+        if (m_isNggMode) {
+          apiHwShaderMap[lastVertexProcessingStage] = Util::Abi::HwShaderGs;
+          pipelineType = hasTs ? Util::Abi::PipelineType::NggTess : Util::Abi::PipelineType::Ngg;
+        } else {
+          apiHwShaderMap[lastVertexProcessingStage] = Util::Abi::HwShaderVs;
+          if (m_hasGs)
+            apiHwShaderMap[lastVertexProcessingStage] |= Util::Abi::HwShaderGs;
 
-        pipelineType = Util::Abi::PipelineType::GsTess;
-        if (hasTs && !m_hasGs)
-          pipelineType = Util::Abi::PipelineType::Tess;
-        else if (!hasTs && m_hasGs)
-          pipelineType = Util::Abi::PipelineType::Gs;
+          pipelineType = Util::Abi::PipelineType::GsTess;
+          if (hasTs && !m_hasGs)
+            pipelineType = Util::Abi::PipelineType::Tess;
+          else if (!hasTs && m_hasGs)
+            pipelineType = Util::Abi::PipelineType::Gs;
+        }
       }
     }
-    apiHwShaderMap[ShaderStageFragment] = Util::Abi::HwShaderPs;
+    if (m_pipelineState->hasShaderStage(ShaderStageFragment))
+      apiHwShaderMap[ShaderStageFragment] = Util::Abi::HwShaderPs;
 
     // Set the mapping between api shader stage and hardware stage
     unsigned hwStageMask = 0;
@@ -152,10 +159,16 @@ void RegisterMetadataBuilder::buildPalMetadata() {
       buildShaderExecutionRegisters(Util::Abi::HardwareStage::Cs, ShaderStageTask, ShaderStageInvalid);
     }
 
-    buildPaSpecificRegisters();
-    setVgtShaderStagesEn(hwStageMask);
-    setIaMultVgtParam();
-    setPipelineType(pipelineType);
+    // Set other registers if it is not a single PS or CS
+    if (hwStageMask & (Util::Abi::HwShaderHs | Util::Abi::HwShaderGs | Util::Abi::HwShaderVs)) {
+      setVgtShaderStagesEn(hwStageMask);
+      setIaMultVgtParam();
+      setPipelineType(pipelineType);
+    }
+
+    if (hwStageMask & (Util::Abi::HwShaderGs | Util::Abi::HwShaderVs))
+      buildPaSpecificRegisters();
+
   } else {
     addApiHwShaderMapping(ShaderStageCompute, Util::Abi::HwShaderCs);
     setPipelineType(Util::Abi::PipelineType::Cs);
@@ -742,8 +755,9 @@ void RegisterMetadataBuilder::buildPsRegisters() {
   dbShaderControl[Util::Abi::DbShaderControlMetadataKey::KillEnable] = builtInUsage.discard;
   dbShaderControl[Util::Abi::DbShaderControlMetadataKey::ZExportEnable] = builtInUsage.fragDepth;
   dbShaderControl[Util::Abi::DbShaderControlMetadataKey::StencilTestValExportEnable] = builtInUsage.fragStencilRef;
-  dbShaderControl[Util::Abi::DbShaderControlMetadataKey::MaskExportEnable] = builtInUsage.sampleMask;
-  dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] = 1; // Set during pipeline finalization.
+  dbShaderControl[Util::Abi::DbShaderControlMetadataKey::MaskExportEnable] = builtInUsage.sampleMask == 1;
+  // Set during pipeline finalization.
+  dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] = true;
   dbShaderControl[Util::Abi::DbShaderControlMetadataKey::DepthBeforeShader] = fragmentMode.earlyFragmentTests;
   dbShaderControl[Util::Abi::DbShaderControlMetadataKey::ExecOnNoop] =
       fragmentMode.earlyFragmentTests && resUsage->resourceWrite;
@@ -907,14 +921,21 @@ void RegisterMetadataBuilder::buildPsRegisters() {
 // Builds register configuration for compute/task shader.
 void RegisterMetadataBuilder::buildCsRegisters(ShaderStage shaderStage) {
   assert(shaderStage == ShaderStageCompute || shaderStage == ShaderStageTask);
-  auto entryPoint = m_pipelineShaders->getEntryPoint(shaderStage);
   if (shaderStage == ShaderStageCompute) {
+    Function *attribFunc = nullptr;
+    for (Function &func : *m_module) {
+      // Only entrypoint and amd_gfx functions may have the function attribute for workgroup id.
+      if (isShaderEntryPoint(&func) || (func.getCallingConv() == CallingConv::AMDGPU_Gfx)) {
+        attribFunc = &func;
+        break;
+      }
+    }
     getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidXEn] =
-        !entryPoint->hasFnAttribute("amdgpu-no-workgroup-id-x");
+        !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-x");
     getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidYEn] =
-        !entryPoint->hasFnAttribute("amdgpu-no-workgroup-id-y");
+        !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-y");
     getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidZEn] =
-        !entryPoint->hasFnAttribute("amdgpu-no-workgroup-id-z");
+        !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-z");
 
   } else {
     getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidXEn] = true;
@@ -974,7 +995,9 @@ void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareS
   }
 
   if (m_pipelineState->getTargetInfo().getGpuProperty().supportShaderPowerProfiling) {
-    unsigned checksum = setShaderHash(apiStage1);
+    unsigned checksum = 0;
+    if (apiStage1 != ShaderStageInvalid)
+      checksum = setShaderHash(apiStage1);
     if (apiStage2 != ShaderStageInvalid)
       checksum ^= setShaderHash(apiStage2);
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::ChecksumValue] = checksum;
@@ -992,7 +1015,9 @@ void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareS
     sgprLimits = m_pipelineState->getTargetInfo().getGpuProperty().maxSgprsAvailable;
     vgprLimits = m_pipelineState->getTargetInfo().getGpuProperty().maxVgprsAvailable;
   } else {
-    userDataCount = m_pipelineState->getShaderInterfaceData(apiStage1)->userDataCount;
+    userDataCount = 0;
+    if (apiStage1 != ShaderStageInvalid)
+      userDataCount = m_pipelineState->getShaderInterfaceData(apiStage1)->userDataCount;
     if (apiStage2 != ShaderStageInvalid) {
       userDataCount = std::max(userDataCount, m_pipelineState->getShaderInterfaceData(apiStage2)->userDataCount);
     }
@@ -1009,7 +1034,9 @@ void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareS
   if (m_gfxIp.major >= 10) {
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::MemOrdered] = true;
     if (hwStage == Util::Abi::HardwareStage::Hs || hwStage == Util::Abi::HardwareStage::Gs) {
-      bool wgpMode = m_pipelineState->getShaderWgpMode(apiStage1);
+      bool wgpMode = false;
+      if (apiStage1 != ShaderStageInvalid)
+        wgpMode = m_pipelineState->getShaderWgpMode(apiStage1);
       if (apiStage2 != ShaderStageInvalid)
         wgpMode = wgpMode || m_pipelineState->getShaderWgpMode(apiStage2);
       hwShaderNode[Util::Abi::HardwareStageMetadataKey::WgpMode] = wgpMode;
@@ -1020,16 +1047,24 @@ void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareS
   hwShaderNode[Util::Abi::HardwareStageMetadataKey::VgprLimit] = vgprLimits;
 
   if (m_gfxIp.major >= 11 && hwStage != Util::Abi::HardwareStage::Vs) {
-    bool useImageOp = m_pipelineState->getShaderResourceUsage(apiStage1)->useImageOp;
+    bool useImageOp = false;
+    if (apiStage1 != ShaderStageInvalid)
+      useImageOp = m_pipelineState->getShaderResourceUsage(apiStage1)->useImageOp;
     if (apiStage2 != ShaderStageInvalid)
       useImageOp |= m_pipelineState->getShaderResourceUsage(apiStage2)->useImageOp;
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::ImageOp] = useImageOp;
   }
 
+  // Fill ".user_data_reg_map" and update ".user_data_limit"
   auto userDataNode = hwShaderNode[Util::Abi::HardwareStageMetadataKey::UserDataRegMap].getArray(true);
   unsigned idx = 0;
-  for (auto value : m_pipelineState->getUserDataMap(apiStage))
+  unsigned userDataLimit = 1;
+  for (auto value : m_pipelineState->getUserDataMap(apiStage)) {
     userDataNode[idx++] = value;
+    if (value < InterfaceData::MaxSpillTableSize && (value + 1) > userDataLimit)
+      userDataLimit = value + 1;
+  }
+  m_pipelineState->getPalMetadata()->setUserDataLimit(userDataLimit);
 }
 
 // =====================================================================================================================
@@ -1210,7 +1245,7 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
       paClVsOutCntl[Util::Abi::PaClVsOutCntlMetadataKey::VsOutCcDist1VecEna] = true;
 
     unsigned clipDistanceMask = (1 << clipDistanceCount) - 1;
-    unsigned cullDistanceMask = (1 << cullDistanceCount) - 1;
+    unsigned cullDistanceMask = ((1 << cullDistanceCount) - 1) << clipDistanceCount;
 
     // Set fields CLIP_DIST_ENA_0 ~ CLIP_DIST_ENA_7 and CULL_DIST_ENA_0 ~ CULL_DIST_ENA_7
     static const unsigned MaxDistCount = 8;
@@ -1218,7 +1253,8 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
     bool cullDistEna[MaxDistCount] = {};
     for (unsigned i = 0; i < MaxDistCount; ++i) {
       clipDistEna[i] = (clipDistanceMask >> i) & 0x1;
-      cullDistEna[i] = (cullDistanceMask >> i) & 0x1;
+      // Note: Point primitives are only affected by the cull mask, so enable culling also based on clip distances
+      cullDistEna[i] = ((clipDistanceMask | cullDistanceMask) >> i) & 0x1;
     }
     paClVsOutCntl[Util::Abi::PaClVsOutCntlMetadataKey::ClipDistEna_0] = clipDistEna[0];
     paClVsOutCntl[Util::Abi::PaClVsOutCntlMetadataKey::ClipDistEna_1] = clipDistEna[1];

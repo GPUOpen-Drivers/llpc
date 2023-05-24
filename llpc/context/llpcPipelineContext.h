@@ -94,6 +94,13 @@ struct ShaderFpMode {
   unsigned roundingModeRTZ : 4;          // Bitmask of roundingModeRTZ flags
 };
 
+// Pipeline type enumeration
+enum class PipelineType {
+  Graphics,
+  Compute,
+  RayTracing,
+};
+
 // =====================================================================================================================
 // Represents pipeline-specific context for pipeline compilation, it is a part of LLPC context
 class PipelineContext {
@@ -107,11 +114,8 @@ public:
   );
   virtual ~PipelineContext();
 
-  // Checks whether the pipeline is graphics or compute
-  virtual bool isGraphics() const { return false; }
-
-  // Gets pipeline shader info of the specified shader stage
-  virtual const PipelineShaderInfo *getPipelineShaderInfo(unsigned shaderId) const = 0;
+  // Returns the pipeline type
+  virtual PipelineType getPipelineType() const = 0;
 
   // Gets pipeline build info
   virtual const void *getPipelineBuildInfo() const = 0;
@@ -153,11 +157,6 @@ public:
   virtual llvm::StringRef getClientMetadata() const = 0;
 
 #if VKI_RAY_TRACING
-  // Checks whether the pipeline is ray tracing
-  virtual bool isRayTracing() const { return false; }
-
-  virtual bool hasRayQuery() const { return false; }
-
   virtual void setIndirectStage(ShaderStage stage) {}
 
   virtual void collectPayloadSize(llvm::Type *type, const llvm::DataLayout &dataLayout) {}

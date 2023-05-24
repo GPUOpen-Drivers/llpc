@@ -422,6 +422,7 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
       for (unsigned i = startLocation; i < location + locationCount; ++i) {
         InOutLocationInfo origLocationInfo;
         origLocationInfo.setLocation(i);
+        origLocationInfo.setComponent(inOutInfo.getComponent());
         auto &newLocationInfo = (*inOutLocInfoMap)[origLocationInfo];
         newLocationInfo.setData(InvalidValue);
       }
@@ -439,6 +440,7 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
     for (unsigned i = 0; i < locationCount; ++i) {
       InOutLocationInfo outLocationInfo;
       outLocationInfo.setLocation(location + i);
+      outLocationInfo.setComponent(inOutInfo.getComponent());
       outLocationInfo.setStreamId(inOutInfo.getStreamId());
       auto &newLocationInfo = (*inOutLocInfoMap)[outLocationInfo];
       newLocationInfo.setData(InvalidValue);
@@ -749,20 +751,20 @@ Instruction *BuilderImpl::CreateWriteXfbOutput(Value *valueToWrite, bool isBuilt
       outLocInfo.setComponent(outputInfo.getComponent() + i % 4);
       outLocInfo.setStreamId(streamId);
       outLocInfo.setBuiltIn(isBuiltIn);
-      if (i >= 4)
-        xfbOutInfo.xfbOffset = xfbOffset + 16;
+      xfbOutInfo.xfbOffset = xfbOffset + i * bitWidth / 8;
       resUsage->inOutUsage.locInfoXfbOutInfoMap[outLocInfo] = xfbOutInfo;
     }
   } else {
     InOutLocationInfo outLocInfo;
     outLocInfo.setLocation(location);
+    outLocInfo.setComponent(outputInfo.getComponent());
     outLocInfo.setBuiltIn(isBuiltIn);
     outLocInfo.setStreamId(streamId);
     resUsage->inOutUsage.locInfoXfbOutInfoMap[outLocInfo] = xfbOutInfo;
 
     if (valueToWrite->getType()->getPrimitiveSizeInBits() > 128) {
       outLocInfo.setLocation(location + 1);
-      xfbOutInfo.xfbOffset += 32;
+      xfbOutInfo.xfbOffset += 16; // <4 x dword>
       resUsage->inOutUsage.locInfoXfbOutInfoMap[outLocInfo] = xfbOutInfo;
     }
   }

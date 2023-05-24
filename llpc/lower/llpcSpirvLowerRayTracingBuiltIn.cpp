@@ -238,6 +238,10 @@ Value *SpirvLowerRayTracingBuiltIn::processBuiltIn(GlobalVariable *global, Instr
     input = m_traceParams[TraceParam::InstanceInclusionMask];
     break;
   }
+  case BuiltInHitTriangleVertexPositionsKHR: {
+    input = m_traceParams[TraceParam::HitTriangleVertexPositions];
+    break;
+  }
   case BuiltInObjectToWorldKHR:
   case BuiltInWorldToObjectKHR:
   case BuiltInObjectRayOriginKHR:

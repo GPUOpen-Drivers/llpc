@@ -51,7 +51,7 @@ void GlueShader::compile(raw_pwrite_stream &outStream) {
   m_pipelineState->record(&*module);
 
   // Add empty PAL metadata, to ensure that the back-end writes its PAL metadata in MsgPack format.
-  PalMetadata *palMetadata = new PalMetadata(nullptr);
+  PalMetadata *palMetadata = new PalMetadata(nullptr, m_pipelineState->useRegisterFieldFormat());
   palMetadata->record(&*module);
   delete palMetadata;
 

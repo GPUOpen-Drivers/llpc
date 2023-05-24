@@ -147,6 +147,7 @@ Expected<BinaryData> GraphicsPipelineBuilder::buildGraphicsPipeline() {
   pipelineInfo->options.enableRelocatableShaderElf = compileInfo.relocatableShaderElf;
   pipelineInfo->options.scalarBlockLayout = compileInfo.scalarBlockLayout;
   pipelineInfo->options.enableScratchAccessBoundsChecks = compileInfo.scratchAccessBoundsChecks;
+  pipelineInfo->options.enableImplicitInvariantExports = compileInfo.enableImplicitInvariantExports;
   if (compileInfo.optimizationLevel.has_value()) {
     pipelineInfo->options.optimizationLevel = compileInfo.optimizationLevel.value();
   }

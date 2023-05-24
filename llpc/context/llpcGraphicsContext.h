@@ -44,10 +44,10 @@ public:
                   MetroHash::Hash *cacheHash);
   virtual ~GraphicsContext();
 
-  virtual bool isGraphics() const override { return true; }
+  virtual PipelineType getPipelineType() const override { return PipelineType::Graphics; }
 
   // Gets pipeline shader info of the specified shader stage
-  virtual const PipelineShaderInfo *getPipelineShaderInfo(unsigned shaderId) const override;
+  const PipelineShaderInfo *getPipelineShaderInfo(unsigned shaderId) const;
 
   // Gets pipeline build info
   virtual const void *getPipelineBuildInfo() const override { return m_pipelineInfo; }
@@ -81,10 +81,6 @@ public:
 
   // Gets client-defined metadata
   virtual llvm::StringRef getClientMetadata() const override;
-
-#if VKI_RAY_TRACING
-  virtual bool hasRayQuery() const override { return (m_pipelineInfo->shaderLibrary.codeSize > 0); }
-#endif
 
 protected:
   // Give the pipeline options to the middle-end, and/or hash them.

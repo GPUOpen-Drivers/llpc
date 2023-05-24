@@ -322,8 +322,8 @@ ComputeShaderMode Pipeline::getComputeShaderMode(Module &module) {
 // @param builderContext : LGC builder context
 // @param emitLgc : Whether the option -emit-lgc is on
 PipelineState::PipelineState(LgcContext *builderContext, bool emitLgc)
-    : Pipeline(builderContext), m_emitLgc(emitLgc), m_meshRowExport(EnableRowExport),
-      m_registerFieldFormat(UseRegisterFieldFormat) {
+    : Pipeline(builderContext), m_emitLgc(emitLgc), m_meshRowExport(EnableRowExport) {
+  m_registerFieldFormat = getTargetInfo().getGfxIpVersion().major >= 11 && UseRegisterFieldFormat;
 }
 
 // =====================================================================================================================
@@ -354,7 +354,7 @@ unsigned PipelineState::getPalAbiVersion() const {
 // Get PalMetadata object, creating an empty one if necessary
 PalMetadata *PipelineState::getPalMetadata() {
   if (!m_palMetadata)
-    m_palMetadata = new PalMetadata(this);
+    m_palMetadata = new PalMetadata(this, m_registerFieldFormat);
   return m_palMetadata;
 }
 
@@ -372,7 +372,7 @@ void PipelineState::clearPalMetadata() {
 // @param isGlueCode : True if the blob was generated for glue code.
 void PipelineState::mergePalMetadataFromBlob(StringRef blob, bool isGlueCode) {
   if (!m_palMetadata)
-    m_palMetadata = new PalMetadata(this, blob);
+    m_palMetadata = new PalMetadata(this, blob, m_registerFieldFormat);
   else
     m_palMetadata->mergeFromBlob(blob, isGlueCode);
 }
@@ -433,12 +433,6 @@ void PipelineState::record(Module *module) {
   recordGraphicsState(module);
   if (m_palMetadata)
     m_palMetadata->record(module);
-
-  if (UseRegisterFieldFormat) {
-    const bool isFieldSupported =
-        getTargetInfo().getGfxIpVersion().major >= 11 && (m_pipelineLink == PipelineLink::WholePipeline);
-    UseRegisterFieldFormat.setValue(isFieldSupported);
-  }
 }
 
 // =====================================================================================================================
@@ -455,7 +449,7 @@ void PipelineState::readState(Module *module) {
   readColorExportState(module);
   readGraphicsState(module);
   if (!m_palMetadata)
-    m_palMetadata = new PalMetadata(this, module);
+    m_palMetadata = new PalMetadata(this, module, m_registerFieldFormat);
   setXfbStateMetadata(module);
 }
 
@@ -1263,6 +1257,10 @@ void PipelineState::recordGraphicsState(Module *module) {
 void PipelineState::readGraphicsState(Module *module) {
   readNamedMetadataArrayOfInt32(module, IaStateMetadataName, m_inputAssemblyState);
   readNamedMetadataArrayOfInt32(module, RsStateMetadataName, m_rasterizerState);
+
+  auto nameMeta = module->getNamedMetadata(SampleShadingMetaName);
+  if (nameMeta)
+    m_rasterizerState.perSampleShading |= 1;
 }
 
 // =====================================================================================================================
@@ -1556,7 +1554,6 @@ InterfaceData *PipelineState::getShaderInterfaceData(ShaderStage shaderStage) {
 // @param location : Location
 unsigned PipelineState::computeExportFormat(Type *outputTy, unsigned location) {
   const ColorExportFormat *colorExportFormat = &getColorExportFormat(location);
-  GfxIpVersion gfxIp = getTargetInfo().getGfxIpVersion();
   auto gpuWorkarounds = &getTargetInfo().getGpuWorkarounds();
   unsigned outputMask = outputTy->isVectorTy() ? (1 << cast<FixedVectorType>(outputTy)->getNumElements()) - 1 : 1;
   const auto cbState = &getColorExportState();
@@ -1588,14 +1585,12 @@ unsigned PipelineState::computeExportFormat(Type *outputTy, unsigned location) {
   // Start by assuming EXP_FORMAT_ZERO (no exports)
   ExportFormat expFmt = EXP_FORMAT_ZERO;
 
-  bool gfx8RbPlusEnable = false;
-  if (gfxIp.major == 8 && gfxIp.minor == 1)
-    gfx8RbPlusEnable = true;
+  bool supportRbPlus = getTargetInfo().getGpuProperty().supportsRbPlus;
 
   if (colorExportFormat->dfmt == BufDataFormatInvalid)
     expFmt = EXP_FORMAT_ZERO;
   else if (compSetting == CompSetting::OneCompRed && !alphaExport && !isSrgbFormat &&
-           (!gfx8RbPlusEnable || maxCompBitCount == 32)) {
+           (!supportRbPlus || maxCompBitCount == 32)) {
     // NOTE: When Rb+ is enabled, "R8 UNORM" and "R16 UNORM" shouldn't use "EXP_FORMAT_32_R", instead
     // "EXP_FORMAT_FP16_ABGR" and "EXP_FORMAT_UNORM16_ABGR" should be used for 2X exporting performance.
     expFmt = EXP_FORMAT_32_R;

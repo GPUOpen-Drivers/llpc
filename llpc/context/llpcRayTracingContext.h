@@ -45,11 +45,11 @@ namespace Llpc {
 class RayTracingContext : public PipelineContext {
 public:
   RayTracingContext(GfxIpVersion gfxIp, const RayTracingPipelineBuildInfo *pipelineInfo,
-                    const PipelineShaderInfo *traceRayShaderInfo, MetroHash::Hash *pipelineHash,
+                    const PipelineShaderInfo *representativeShaderInfo, MetroHash::Hash *pipelineHash,
                     MetroHash::Hash *cacheHash, unsigned indirectStageMask);
   virtual ~RayTracingContext() {}
 
-  virtual const PipelineShaderInfo *getPipelineShaderInfo(unsigned shaderId) const override;
+  virtual PipelineType getPipelineType() const override { return PipelineType::RayTracing; }
 
   // Gets pipeline build info
   virtual const void *getPipelineBuildInfo() const override { return m_pipelineInfo; }
@@ -74,9 +74,6 @@ public:
 
   // Gets client-defined metadata
   virtual llvm::StringRef getClientMetadata() const override;
-
-  // Checks whether the pipeline is ray tracing
-  virtual bool isRayTracing() const override { return true; }
 
   // Set the raytracing shader stages inline/indirect status
   virtual void setIndirectStage(ShaderStage stage) override { m_indirectStageMask |= shaderStageToMask(stage); }
@@ -123,8 +120,12 @@ private:
   RayTracingContext &operator=(const RayTracingContext &) = delete;
   bool isRayTracingBuiltIn(unsigned builtIn);
 
-  const RayTracingPipelineBuildInfo *m_pipelineInfo;  // Info to build a ray tracing pipeline
-  const PipelineShaderInfo *m_traceRayShaderInfo;     // Trace Ray shaderInfo
+  /// Info to build a ray tracing pipeline
+  const RayTracingPipelineBuildInfo *m_pipelineInfo;
+
+  /// Shader info that is representative of the pipeline as a whole. It does not actually contain module data.
+  PipelineShaderInfo m_representativeShaderInfo;
+
   bool m_linked;                                      // Whether the context is linked or not
   unsigned m_indirectStageMask;                       // Which stages enable indirect call for ray tracing
   std::string m_entryName;                            // Entry function of the raytracing module

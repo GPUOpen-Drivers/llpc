@@ -189,6 +189,29 @@ void ElfWriter<Elf>::mergeMapItem(msgpack::MapDocNode &destMap, msgpack::MapDocN
 }
 
 // =====================================================================================================================
+// Merges the map item pair from source map to destination map for llvm::msgpack::MapDocNode.
+//
+// @param [in/out] destMap : Destination map
+// @param srcMap : Source map
+// @param key : Key to check in source map
+template <class Elf>
+void ElfWriter<Elf>::mergeMapItem(msgpack::MapDocNode &destMap, msgpack::MapDocNode &srcMap, StringRef key) {
+  auto srcKeyNode = srcMap.getDocument()->getNode(key);
+  auto srcIt = srcMap.find(srcKeyNode);
+  if (srcIt != srcMap.end()) {
+    assert(srcIt->first.getString() == key);
+    destMap[destMap.getDocument()->getNode(key)] = srcIt->second;
+  } else {
+    auto destKeyNode = destMap.getDocument()->getNode(key);
+    auto destIt = destMap.find(destKeyNode);
+    if (destIt != destMap.end()) {
+      assert(destIt->first.getString() == key);
+      static_cast<MapDocNode &>(destMap).erase(destIt);
+    }
+  }
+}
+
+// =====================================================================================================================
 // Update descriptor offset to USER_DATA in metaNote, in place in the messagepack document.
 //
 // @param context : Context related to ElfNote
@@ -302,61 +325,87 @@ void ElfWriter<Elf>::mergeMetaNote(Context *pContext, const ElfNote *pNote1, con
   pipelineHash[0] = destDocument.getNode(pContext->getPipelineHashCode());
   pipelineHash[1] = destDocument.getNode(pContext->getPipelineHashCode());
 
+  // "amdpal.version >= [3 0]" adopts the new metadata format for ".graphics_registers" section
+  auto palVersion = destDocument.getRoot().getMap(true)[PalAbi::CodeObjectMetadataKey::Version].getArray(true);
+  if (palVersion[0].getUInt() < 3) {
+    // Old metadate format for ".registers" section
 #if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 723
-  // Update .ps_sample_mask
-  // NOTE: We need to erase the node if the cached ELF has it but we actually don't need it.
-  auto srcPsSampleMask = srcPipeline.getMap(true).find(StringRef(PalAbi::PipelineMetadataKey::PsSampleMask));
-  auto destPsSampleMask = destPipeline.getMap(true).find(StringRef(PalAbi::PipelineMetadataKey::PsSampleMask));
-  if (srcPsSampleMask != srcPipeline.getMap(true).end())
-    destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::PsSampleMask] = srcPsSampleMask->second;
-  else if (destPsSampleMask != destPipeline.getMap(true).end())
-    destPipeline.getMap(true).erase(destPsSampleMask);
+    // Update .ps_sample_mask
+    // NOTE: We need to erase the node if the cached ELF has it but we actually don't need it.
+    auto srcPsSampleMask = srcPipeline.getMap(true).find(StringRef(PalAbi::PipelineMetadataKey::PsSampleMask));
+    auto destPsSampleMask = destPipeline.getMap(true).find(StringRef(PalAbi::PipelineMetadataKey::PsSampleMask));
+    if (srcPsSampleMask != srcPipeline.getMap(true).end())
+      destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::PsSampleMask] = srcPsSampleMask->second;
+    else if (destPsSampleMask != destPipeline.getMap(true).end())
+      destPipeline.getMap(true).erase(destPsSampleMask);
 #endif
 
-  // List of fragment shader related registers.
-  static const unsigned PsRegNumbers[] = {
-      0x2C0A, // mmSPI_SHADER_PGM_RSRC1_PS
-      0x2C0B, // mmSPI_SHADER_PGM_RSRC2_PS
-      0xA1C4, // mmSPI_SHADER_Z_FORMAT
-      0xA1C5, // mmSPI_SHADER_COL_FORMAT
-      0xA1B8, // mmSPI_BARYC_CNTL
-      0xA1B6, // mmSPI_PS_IN_CONTROL
-      0xA1B3, // mmSPI_PS_INPUT_ENA
-      0xA1B4, // mmSPI_PS_INPUT_ADDR
-      0xA1B5, // mmSPI_INTERP_CONTROL_0
-      0xA293, // mmPA_SC_MODE_CNTL_1
-      0xA203, // mmDB_SHADER_CONTROL
-      0xA08F, // mmCB_SHADER_MASK
-      0xA2F8, // mmPA_SC_AA_CONFIG
-      // The following ones are GFX9+ only, but we don't need to handle them specially as those register
-      // numbers are not used at all on earlier chips.
-      0xA310, // mmPA_SC_SHADER_CONTROL
-      0xA210, // mmPA_STEREO_CNTL
-      0xC25F, // mmGE_STEREO_CNTL
-      0xC262, // mmGE_USER_VGPR_EN
-      0x2C06, // mmSPI_SHADER_PGM_CHKSUM_PS
-  };
+    // List of fragment shader related registers.
+    static const unsigned PsRegNumbers[] = {
+        0x2C0A, // mmSPI_SHADER_PGM_RSRC1_PS
+        0x2C0B, // mmSPI_SHADER_PGM_RSRC2_PS
+        0xA1C4, // mmSPI_SHADER_Z_FORMAT
+        0xA1C5, // mmSPI_SHADER_COL_FORMAT
+        0xA1B8, // mmSPI_BARYC_CNTL
+        0xA1B6, // mmSPI_PS_IN_CONTROL
+        0xA1B3, // mmSPI_PS_INPUT_ENA
+        0xA1B4, // mmSPI_PS_INPUT_ADDR
+        0xA1B5, // mmSPI_INTERP_CONTROL_0
+        0xA293, // mmPA_SC_MODE_CNTL_1
+        0xA203, // mmDB_SHADER_CONTROL
+        0xA08F, // mmCB_SHADER_MASK
+        0xA2F8, // mmPA_SC_AA_CONFIG
+        // The following ones are GFX9+ only, but we don't need to handle them specially as those register
+        // numbers are not used at all on earlier chips.
+        0xA310, // mmPA_SC_SHADER_CONTROL
+        0xA210, // mmPA_STEREO_CNTL
+        0xC25F, // mmGE_STEREO_CNTL
+        0xC262, // mmGE_USER_VGPR_EN
+        0x2C06, // mmSPI_SHADER_PGM_CHKSUM_PS
+    };
 
-  // Merge fragment shader related registers. For each of the registers listed above, plus the input
-  // control registers and the user data registers, copy the value from srcRegisters to destRegisters.
-  // Where the register is set in destRegisters but not srcRegisters, clear it.
-  auto destRegisters = destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::Registers].getMap(true);
-  auto srcRegisters = srcPipeline.getMap(true)[PalAbi::PipelineMetadataKey::Registers].getMap(true);
+    // Merge fragment shader related registers. For each of the registers listed above, plus the input
+    // control registers and the user data registers, copy the value from srcRegisters to destRegisters.
+    // Where the register is set in destRegisters but not srcRegisters, clear it.
+    auto destRegisters = destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::Registers].getMap(true);
+    auto srcRegisters = srcPipeline.getMap(true)[PalAbi::PipelineMetadataKey::Registers].getMap(true);
 
-  for (unsigned regNumber : ArrayRef<unsigned>(PsRegNumbers))
-    mergeMapItem(destRegisters, srcRegisters, regNumber);
+    for (unsigned regNumber : ArrayRef<unsigned>(PsRegNumbers))
+      mergeMapItem(destRegisters, srcRegisters, regNumber);
 
-  const unsigned mmSpiPsInputCntl0 = 0xa191;
-  const unsigned mmSpiPsInputCntl31 = 0xa1b0;
-  for (unsigned regNumber = mmSpiPsInputCntl0; regNumber != mmSpiPsInputCntl31 + 1; ++regNumber)
-    mergeMapItem(destRegisters, srcRegisters, regNumber);
+    const unsigned mmSpiPsInputCntl0 = 0xa191;
+    const unsigned mmSpiPsInputCntl31 = 0xa1b0;
+    for (unsigned regNumber = mmSpiPsInputCntl0; regNumber != mmSpiPsInputCntl31 + 1; ++regNumber)
+      mergeMapItem(destRegisters, srcRegisters, regNumber);
 
-  const unsigned mmSpiShaderUserDataPs0 = 0x2c0c;
-  unsigned psUserDataCount = pContext->getGfxIpVersion().major < 9 ? 16 : 32;
-  for (unsigned regNumber = mmSpiShaderUserDataPs0; regNumber != mmSpiShaderUserDataPs0 + psUserDataCount; ++regNumber)
-    mergeMapItem(destRegisters, srcRegisters, regNumber);
+    const unsigned mmSpiShaderUserDataPs0 = 0x2c0c;
+    unsigned psUserDataCount = pContext->getGfxIpVersion().major < 9 ? 16 : 32;
+    for (unsigned regNumber = mmSpiShaderUserDataPs0; regNumber != mmSpiShaderUserDataPs0 + psUserDataCount;
+         ++regNumber)
+      mergeMapItem(destRegisters, srcRegisters, regNumber);
 
-  updateRootDescriptorRegisters(pContext, destDocument);
+    updateRootDescriptorRegisters(pContext, destDocument);
+  } else {
+    // List of fragment shader related registers.
+    static const char *PsRegNames[] = {
+        PalAbi::GraphicsRegisterMetadataKey::SpiShaderZFormat,
+        PalAbi::GraphicsRegisterMetadataKey::SpiShaderColFormat,
+        PalAbi::GraphicsRegisterMetadataKey::SpiBarycCntl,
+        PalAbi::GraphicsRegisterMetadataKey::SpiPsInControl,
+        PalAbi::GraphicsRegisterMetadataKey::SpiPsInputEna,
+        PalAbi::GraphicsRegisterMetadataKey::SpiPsInputAddr,
+        PalAbi::GraphicsRegisterMetadataKey::SpiPsInputCntl,
+        PalAbi::GraphicsRegisterMetadataKey::SpiInterpControl,
+        PalAbi::GraphicsRegisterMetadataKey::PsIterSample,
+        PalAbi::GraphicsRegisterMetadataKey::DbShaderControl,
+        PalAbi::GraphicsRegisterMetadataKey::CbShaderMask,
+        PalAbi::GraphicsRegisterMetadataKey::AaCoverageToShaderSelect,
+    };
+    auto destRegisters = destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
+    auto srcRegisters = srcPipeline.getMap(true)[PalAbi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
+    for (const auto &regName : ArrayRef<const char *>(PsRegNames))
+      mergeMapItem(destRegisters, srcRegisters, regName);
+  }
 
   std::string destBlob;
   destDocument.writeToBlob(destBlob);

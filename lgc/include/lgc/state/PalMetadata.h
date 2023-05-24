@@ -102,9 +102,9 @@ struct FsInputMappings {
 class PalMetadata {
 public:
   // Constructors
-  PalMetadata(PipelineState *pipelineState);
-  PalMetadata(PipelineState *pipelineState, llvm::StringRef blob);
-  PalMetadata(PipelineState *pipelineState, llvm::Module *module);
+  PalMetadata(PipelineState *pipelineState, bool useRegisterFieldFormat);
+  PalMetadata(PipelineState *pipelineState, llvm::StringRef blob, bool useRegisterFieldFormat);
+  PalMetadata(PipelineState *pipelineState, llvm::Module *module, bool useRegisterFieldFormat);
   PalMetadata(const PalMetadata &) = delete;
   PalMetadata &operator=(const PalMetadata &) = delete;
 
@@ -220,6 +220,9 @@ public:
   // Get the MapDocNode of .amdpal.pipelines
   llvm::msgpack::MapDocNode &getPipelineNode() { return m_pipelineNode; }
 
+  // Set userDataLimit to the given value
+  void setUserDataLimit(unsigned value);
+
 private:
   // Initialize the PalMetadata object after reading in already-existing PAL metadata if any
   void initialize();
@@ -271,6 +274,7 @@ private:
   llvm::msgpack::DocNode *m_userDataLimit;    // Maximum so far number of user data dwords used
   llvm::msgpack::DocNode *m_spillThreshold;   // Minimum so far dword offset used in user data spill table
   llvm::SmallString<0> m_fsInputMappingsBlob; // Buffer for returning FS input mappings blob to LGC client
+  bool m_useRegisterFieldFormat;              // Whether to use new PAL metadata in ELF
 };
 
 } // namespace lgc

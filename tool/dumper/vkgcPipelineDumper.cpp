@@ -828,6 +828,7 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.optimizationLevel = " << options->optimizationLevel << "\n";
   dumpFile << "options.threadGroupSwizzleMode = " << options->threadGroupSwizzleMode << "\n";
   dumpFile << "options.reverseThreadGroup = " << options->reverseThreadGroup << "\n";
+  dumpFile << "options.enableImplicitInvariantExports = " << options->enableImplicitInvariantExports << "\n";
 
 #if VKI_RAY_TRACING
   dumpFile << "options.internalRtShaders = " << options->internalRtShaders << "\n";
@@ -1499,12 +1500,10 @@ void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo 
     hasher->Update(cbState->alphaToCoverageEnable);
     hasher->Update(cbState->dualSourceBlendEnable);
     for (unsigned i = 0; i < MaxColorTargets; ++i) {
-      if (cbState->target[i].format != VK_FORMAT_UNDEFINED) {
-        hasher->Update(cbState->target[i].channelWriteMask);
-        hasher->Update(cbState->target[i].blendEnable);
-        hasher->Update(cbState->target[i].blendSrcAlphaToColor);
-        hasher->Update(cbState->target[i].format);
-      }
+      hasher->Update(cbState->target[i].channelWriteMask);
+      hasher->Update(cbState->target[i].blendEnable);
+      hasher->Update(cbState->target[i].blendSrcAlphaToColor);
+      hasher->Update(cbState->target[i].format);
     }
   }
 }
@@ -1536,6 +1535,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->enableRelocatableShaderElf);
   hasher->Update(options->disableImageResourceCheck);
   hasher->Update(options->enableScratchAccessBoundsChecks);
+  hasher->Update(options->enableImplicitInvariantExports);
   hasher->Update(options->resourceLayoutScheme);
 
   if (!isRelocatableShader) {
@@ -1647,6 +1647,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.nsaThreshold);
       hasher->Update(options.aggressiveInvariantLoads);
       hasher->Update(options.workaroundStorageImageFormats);
+      hasher->Update(options.workaroundInitializeOutputsToZero);
       hasher->Update(options.disableFMA);
     }
   }

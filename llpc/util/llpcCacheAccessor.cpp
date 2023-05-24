@@ -53,7 +53,7 @@ namespace Llpc {
 // @param internalCaches : The internal caches to check.
 CacheAccessor::CacheAccessor(Context *context, MetroHash::Hash &cacheHash, CachePair internalCaches) {
   assert(context);
-  if (context->isGraphics()) {
+  if (context->getPipelineType() == PipelineType::Graphics) {
     const auto *pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
     initializeUsingBuildInfo(pipelineInfo, cacheHash, internalCaches);
   } else {

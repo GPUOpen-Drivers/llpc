@@ -976,6 +976,7 @@ inline bool isValid(spv::Op V) {
   case OpRayQueryGetWorldRayOriginKHR:
   case OpRayQueryGetIntersectionObjectToWorldKHR:
   case OpRayQueryGetIntersectionWorldToObjectKHR:
+  case OpRayQueryGetIntersectionTriangleVertexPositionsKHR:
 #endif
     return true;
   default:

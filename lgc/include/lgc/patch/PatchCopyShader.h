@@ -65,11 +65,13 @@ private:
   // Low part of global internal table pointer
   static const unsigned EntryArgIdxInternalTablePtrLow = 0;
 
-  PipelineState *m_pipelineState;                                             // Pipeline state
-  llvm::GlobalVariable *m_lds = nullptr;                                      // Global variable representing LDS
-  llvm::Value *m_gsVsRingBufDesc = nullptr;                                   // Descriptor for GS-VS ring
-  llvm::DenseMap<unsigned, unsigned> m_newLocByteSizesMapArray[MaxGsStreams]; // The byte sizes of the output value at
-                                                                              // the mapped location for each stream
+  PipelineState *m_pipelineState;           // Pipeline state
+  llvm::GlobalVariable *m_lds = nullptr;    // Global variable representing LDS
+  llvm::Value *m_gsVsRingBufDesc = nullptr; // Descriptor for GS-VS ring
+
+  llvm::DenseMap<unsigned, llvm::DenseMap<unsigned, unsigned>>
+      m_outputLocCompSizeMap[MaxGsStreams]; // The dword size of the output value at the new mapped <location,
+                                            // component> for each stream
 };
 
 } // namespace lgc
