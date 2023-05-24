@@ -220,6 +220,9 @@ public:
   // Get the MapDocNode of .amdpal.pipelines
   llvm::msgpack::MapDocNode &getPipelineNode() { return m_pipelineNode; }
 
+  // Set userDataLimit to the given value
+  void setUserDataLimit(unsigned value);
+
 private:
   // Initialize the PalMetadata object after reading in already-existing PAL metadata if any
   void initialize();

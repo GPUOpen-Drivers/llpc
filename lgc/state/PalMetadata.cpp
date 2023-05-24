@@ -436,14 +436,7 @@ void PalMetadata::fixUpRegisters() {
     const bool hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
     const bool hasMesh = m_pipelineState->hasShaderStage(ShaderStageMesh);
     if (!hasTs && !hasGs && !hasMesh) {
-      // Here we use register field to determine if NGG is enabled, because enabling NGG depends on other conditions.
-      // see PatchResourceCollect::canUseNgg.
-      unsigned vgtGsOutPrimType = mmVGT_GS_OUT_PRIM_TYPE;
-      if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
-        // NOTE: Register VGT_GS_OUT_PRIM_TYPE is a special one that has different HW offset on GFX11+.
-        vgtGsOutPrimType = mmVGT_GS_OUT_PRIM_TYPE_GFX11;
-      }
-      if (m_registers.find(m_document->getNode(vgtGsOutPrimType)) != m_registers.end()) {
+      auto getPrimType = [&]() {
         const auto primType = m_pipelineState->getInputAssemblyState().primitiveType;
         unsigned gsOutputPrimitiveType = 0;
         switch (primType) {
@@ -465,7 +458,30 @@ void PalMetadata::fixUpRegisters() {
           llvm_unreachable("Should never be called!");
           break;
         }
-        m_registers[vgtGsOutPrimType] = gsOutputPrimitiveType;
+        return gsOutputPrimitiveType;
+      };
+      // Here we use register field to determine if NGG is enabled, because enabling NGG depends on other conditions.
+      // see PatchResourceCollect::canUseNgg.
+      if (m_pipelineState->useRegisterFieldFormat()) {
+        auto graphicsRegisters = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
+        if (graphicsRegisters.find(Util::Abi::GraphicsRegisterMetadataKey::VgtGsOutPrimType) !=
+            graphicsRegisters.end()) {
+          auto primType = getPrimType();
+          auto vgtGsOutPrimType =
+              graphicsRegisters[Util::Abi::GraphicsRegisterMetadataKey::VgtGsOutPrimType].getMap(true);
+          vgtGsOutPrimType[Util::Abi::VgtGsOutPrimTypeMetadataKey::OutprimType] =
+              serializeEnum(Util::Abi::GsOutPrimType(primType));
+        }
+      } else {
+        unsigned vgtGsOutPrimType = mmVGT_GS_OUT_PRIM_TYPE;
+        if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
+          // NOTE: Register VGT_GS_OUT_PRIM_TYPE is a special one that has different HW offset on GFX11+.
+          vgtGsOutPrimType = mmVGT_GS_OUT_PRIM_TYPE_GFX11;
+        }
+        if (m_registers.find(m_document->getNode(vgtGsOutPrimType)) != m_registers.end()) {
+          auto primType = getPrimType();
+          m_registers[vgtGsOutPrimType] = primType;
+        }
       }
     }
   }
@@ -522,8 +538,9 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
 
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 &&
         m_pipelineState->getColorExportState().alphaToCoverageEnable) {
-      graphicsRegNode[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] =
-          graphicsRegNode[Util::Abi::DbShaderControlMetadataKey::MaskExportEnable];
+      auto dbShaderControl = graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl].getMap(true);
+      dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] =
+          dbShaderControl[Util::Abi::DbShaderControlMetadataKey::MaskExportEnable].getBool();
     }
 
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10) {
@@ -1321,4 +1338,13 @@ llvm::StringRef PalMetadata::serializeEnum(Util::Abi::GsOutPrimType value) {
     llvm_unreachable("Unexpected Util::Abi::GsOutPrimType");
     return "";
   }
+}
+
+// =====================================================================================================================
+// Set userDataLimit to the given value if it is bigger than m_userDataLimit
+//
+// @param value : The given value to update m_userDataLimit
+void PalMetadata::setUserDataLimit(unsigned value) {
+  if (value > m_userDataLimit->getUInt())
+    *m_userDataLimit = value;
 }
