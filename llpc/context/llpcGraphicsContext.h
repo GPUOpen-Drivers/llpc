@@ -58,6 +58,12 @@ public:
   // Sets the mask of active shader stages bound to this pipeline
   virtual void setShaderStageMask(unsigned mask) override { m_stageMask = mask; }
 
+  // Sets whether dual source blend is used in fragment shader
+  virtual void setUseDualSourceBlend(bool useDualSourceBlend) override { m_useDualSourceBlend = useDualSourceBlend; }
+
+  // Gets whether dual source blend is used in fragment shader
+  virtual bool getUseDualSourceBlend() const override { return m_useDualSourceBlend; }
+
   // Sets whether pre-rasterization part has a geometry shader
   virtual void setPreRasterHasGs(bool preRasterHasGs) override { m_preRasterHasGs = preRasterHasGs; }
 
@@ -104,6 +110,7 @@ private:
 
   unsigned m_stageMask;        // Mask of active shader stages bound to this graphics pipeline
   bool m_preRasterHasGs;       // Whether pre-rasterization part has a geometry shader
+  bool m_useDualSourceBlend;   // Whether dual source blend is used in fragment shader
   unsigned m_activeStageCount; // Count of active shader stages
 };
 
