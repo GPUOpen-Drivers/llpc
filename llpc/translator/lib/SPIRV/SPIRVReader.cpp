@@ -2755,6 +2755,14 @@ Value *SPIRVToLLVM::getDescPointerAndStride(ResourceNodeType resType, unsigned d
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpStore>(SPIRVValue *const spvValue) {
   SPIRVStore *const spvStore = static_cast<SPIRVStore *>(spvValue);
 
+  if (spvStore->getDst()->hasDecorate(DecorationNonWritable)) {
+    // Discard any writes to non-writable memory as these are not permitted.
+    // For debugging purposes assert that these are only duplicate stores of the initializer of an OpVariable.
+    assert(spvStore->getDst()->getOpCode() == OpVariable);
+    assert(static_cast<SPIRVVariable *>(spvStore->getDst())->getInitializer() == spvStore->getSrc());
+    return nullptr;
+  }
+
   bool isVolatile = spvStore->SPIRVMemoryAccess::isVolatile(false);
   const Vkgc::ExtendedRobustness &extendedRobustness = getPipelineOptions()->extendedRobustness;
   if (extendedRobustness.nullDescriptor || extendedRobustness.robustBufferAccess)
