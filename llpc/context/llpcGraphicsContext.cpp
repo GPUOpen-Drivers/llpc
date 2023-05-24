@@ -65,7 +65,11 @@ GraphicsContext::GraphicsContext(GfxIpVersion gfxIp, const GraphicsPipelineBuild
                       &pipelineInfo->rtState
 #endif
                       ),
-      m_pipelineInfo(pipelineInfo), m_stageMask(0), m_preRasterHasGs(false), m_activeStageCount(0) {
+      m_pipelineInfo(pipelineInfo),
+      m_stageMask(0),
+      m_preRasterHasGs(false),
+      m_useDualSourceBlend(false),
+      m_activeStageCount(0) {
 
   setUnlinked(pipelineInfo->unlinked);
   // clang-format off
@@ -292,7 +296,8 @@ void GraphicsContext::setColorExportState(Pipeline *pipeline, Util::MetroHash64 
   SmallVector<ColorExportFormat, MaxColorTargets> formats;
 
   state.alphaToCoverageEnable = cbState.alphaToCoverageEnable;
-  state.dualSourceBlendEnable = cbState.dualSourceBlendEnable;
+  state.dualSourceBlendEnable = cbState.dualSourceBlendEnable ||
+                                (cbState.dualSourceBlendDynamic && getUseDualSourceBlend());
 
   for (unsigned targetIndex = 0; targetIndex < MaxColorTargets; ++targetIndex) {
     if (cbState.target[targetIndex].format != VK_FORMAT_UNDEFINED) {

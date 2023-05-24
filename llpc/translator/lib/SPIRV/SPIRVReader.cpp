@@ -7794,6 +7794,20 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
         inOutDec.XfbOffset = xfbOffset;
       }
 
+      // If dual source blend is dynamically set, need to confirm whether the fragment shader actually uses
+      // dual-source blending by checking if there is an output at Location 0, Index 1
+      Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
+      if ((llpcContext->getPipelineType() == PipelineType::Graphics) &&
+          (m_execModule == spv::ExecutionModelFragment)) {
+        auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());
+        if (buildInfo->cbState.dualSourceBlendDynamic &&
+            (as == SPIRAS_Output) &&
+            (inOutDec.Value.Loc == 0) &&
+            (inOutDec.Index == 1)) {
+          llpcContext->getPipelineContext()->setUseDualSourceBlend(true);
+        }
+      }
+
       Type *mdTy = nullptr;
       SPIRVType *bt = bv->getType()->getPointerElementType();
       auto md = buildShaderInOutMetadata(bt, inOutDec, mdTy);

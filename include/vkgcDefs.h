@@ -1192,8 +1192,9 @@ struct GraphicsPipelineBuildInfo {
                                                   ///  are passed to the PS.
   } rsState;                                      ///< Rasterizer State
   struct {
-    bool alphaToCoverageEnable; ///< Enable alpha to coverage
-    bool dualSourceBlendEnable; ///< Blend state bound at draw time will use a dual source blend mode
+    bool alphaToCoverageEnable;  ///< Enable alpha to coverage
+    bool dualSourceBlendEnable;  ///< Blend state bound at draw time will use a dual source blend mode
+    bool dualSourceBlendDynamic; ///< Dual source blend mode is dynamically set
 
     ColorTarget target[MaxColorTargets]; ///< Per-MRT color target info
   } cbState;                             ///< Color target state
