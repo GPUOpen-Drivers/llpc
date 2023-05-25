@@ -512,6 +512,7 @@ struct GraphicsPipelineState {
   unsigned usrClipPlaneMask;                    // Mask to indicate the enabled user defined clip planes
   unsigned alphaToCoverageEnable;               // Enable alpha to coverage
   unsigned dualSourceBlendEnable;               // Blend state bound at draw time will use a dual source blend mode
+  unsigned dualSourceBlendDynamic;              // Dual source blend mode is dynamically set
   unsigned switchWinding;                       // reverse the TCS declared output primitive vertex order
   unsigned enableMultiView;                     // Whether to enable multi-view support
   Vkgc::PipelineOptions options;                // Pipeline options

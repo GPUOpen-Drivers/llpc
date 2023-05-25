@@ -7799,7 +7799,7 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
       if ((llpcContext->getPipelineType() == PipelineType::Graphics) && (m_execModule == spv::ExecutionModelFragment)) {
         auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());
-        if (buildInfo->dynamicDualSourceBlend && (as == SPIRAS_Output) && (inOutDec.Value.Loc == 0) &&
+        if (buildInfo->cbState.dualSourceBlendDynamic && (as == SPIRAS_Output) && (inOutDec.Value.Loc == 0) &&
             (inOutDec.Index == 1)) {
           llpcContext->getPipelineContext()->setUseDualSourceBlend(true);
         }
