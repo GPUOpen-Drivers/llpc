@@ -84,7 +84,7 @@
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
 //  |     61.11| Add dualSourceBlendDynamic to cbState                                                                 |
 //  |     61.10| Add useShadingRate and useSampleInfoto ShaderModuleUsage                                              |
-//  |     61.8 | Add useShadingRate and useSampleInfoto ShaderModuleUsage                                              |
+//  |     61.8 | Add enableImplicitInvariantExports to PipelineOptions                                                 |
 //  |     61.7 | Add disableFMA to PipelineShaderOptions                                                               |
 //  |     61.6 | Add workaroundInitializeOutputsToZero to PipelineShaderOptions                                        |
 //  |     61.5 | Add RtIpVersion (including its checkers) to represent RT IP                                           |
