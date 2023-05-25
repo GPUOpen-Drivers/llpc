@@ -886,6 +886,7 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "usrClipPlaneMask = " << static_cast<unsigned>(pipelineInfo->rsState.usrClipPlaneMask) << "\n";
   dumpFile << "alphaToCoverageEnable = " << pipelineInfo->cbState.alphaToCoverageEnable << "\n";
   dumpFile << "dualSourceBlendEnable = " << pipelineInfo->cbState.dualSourceBlendEnable << "\n";
+  dumpFile << "dualSourceBlendDynamic = " << pipelineInfo->cbState.dualSourceBlendDynamic << "\n";
 
   for (unsigned i = 0; i < MaxColorTargets; ++i) {
     if (pipelineInfo->cbState.target[i].format != VK_FORMAT_UNDEFINED) {
@@ -1499,6 +1500,7 @@ void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo 
     auto cbState = &pipeline->cbState;
     hasher->Update(cbState->alphaToCoverageEnable);
     hasher->Update(cbState->dualSourceBlendEnable);
+    hasher->Update(cbState->dualSourceBlendDynamic);
     for (unsigned i = 0; i < MaxColorTargets; ++i) {
       hasher->Update(cbState->target[i].channelWriteMask);
       hasher->Update(cbState->target[i].blendEnable);

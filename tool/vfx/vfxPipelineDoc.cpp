@@ -123,6 +123,7 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
 
     gfxPipelineInfo->cbState.alphaToCoverageEnable = graphicState.alphaToCoverageEnable != 0;
     gfxPipelineInfo->cbState.dualSourceBlendEnable = graphicState.dualSourceBlendEnable != 0;
+    gfxPipelineInfo->cbState.dualSourceBlendDynamic = graphicState.dualSourceBlendDynamic != 0;
     for (unsigned i = 0; i < MaxColorTargets; ++i) {
       gfxPipelineInfo->cbState.target[i].format = graphicState.colorBuffer[i].format;
       gfxPipelineInfo->cbState.target[i].channelWriteMask =

@@ -65,7 +65,8 @@ GraphicsContext::GraphicsContext(GfxIpVersion gfxIp, const GraphicsPipelineBuild
                       &pipelineInfo->rtState
 #endif
                       ),
-      m_pipelineInfo(pipelineInfo), m_stageMask(0), m_preRasterHasGs(false), m_activeStageCount(0) {
+      m_pipelineInfo(pipelineInfo), m_stageMask(0), m_preRasterHasGs(false), m_useDualSourceBlend(false),
+      m_activeStageCount(0) {
 
   setUnlinked(pipelineInfo->unlinked);
   // clang-format off
@@ -282,7 +283,9 @@ Options GraphicsContext::computePipelineOptions() const {
 // @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing
 // @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
 void GraphicsContext::setColorExportState(Pipeline *pipeline, Util::MetroHash64 *hasher) const {
-  const auto &cbState = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->cbState;
+  auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo());
+  const auto &cbState = pipelineInfo->cbState;
+
   if (hasher)
     hasher->Update(cbState);
   if (!pipeline)
@@ -292,7 +295,8 @@ void GraphicsContext::setColorExportState(Pipeline *pipeline, Util::MetroHash64 
   SmallVector<ColorExportFormat, MaxColorTargets> formats;
 
   state.alphaToCoverageEnable = cbState.alphaToCoverageEnable;
-  state.dualSourceBlendEnable = cbState.dualSourceBlendEnable;
+  state.dualSourceBlendEnable =
+      cbState.dualSourceBlendEnable || (pipelineInfo->cbState.dualSourceBlendDynamic && getUseDualSourceBlend());
 
   for (unsigned targetIndex = 0; targetIndex < MaxColorTargets; ++targetIndex) {
     if (cbState.target[targetIndex].format != VK_FORMAT_UNDEFINED) {
