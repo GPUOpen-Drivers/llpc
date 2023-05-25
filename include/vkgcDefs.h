@@ -82,9 +82,9 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
-//  |     61.11 | Add dualSourceBlendDynamic to cbState                                                                |
+//  |     61.11| Add dualSourceBlendDynamic to cbState                                                                 |
 //  |     61.10| Add useShadingRate and useSampleInfoto ShaderModuleUsage                                              |
-//  |     61.8 | Add enableImplicitInvariantExports to PipelineOptions                                                 |
+//  |     61.8 | Add useShadingRate and useSampleInfoto ShaderModuleUsage                                              |
 //  |     61.7 | Add disableFMA to PipelineShaderOptions                                                               |
 //  |     61.6 | Add workaroundInitializeOutputsToZero to PipelineShaderOptions                                        |
 //  |     61.5 | Add RtIpVersion (including its checkers) to represent RT IP                                           |
@@ -1200,12 +1200,12 @@ struct GraphicsPipelineBuildInfo {
     ColorTarget target[MaxColorTargets]; ///< Per-MRT color target info
   } cbState;                             ///< Color target state
 
-  NggState nggState;           ///< NGG state used for tuning and debugging
-  PipelineOptions options;     ///< Per pipeline tuning/debugging options
-  bool unlinked;               ///< True to build an "unlinked" half-pipeline ELF
-  bool dynamicVertexStride;    ///< Dynamic Vertex input Stride is enabled.
-  bool enableUberFetchShader;  ///< Use uber fetch shader
-  bool enableEarlyCompile;     ///< Whether enable early compile
+  NggState nggState;          ///< NGG state used for tuning and debugging
+  PipelineOptions options;    ///< Per pipeline tuning/debugging options
+  bool unlinked;              ///< True to build an "unlinked" half-pipeline ELF
+  bool dynamicVertexStride;   ///< Dynamic Vertex input Stride is enabled.
+  bool enableUberFetchShader; ///< Use uber fetch shader
+  bool enableEarlyCompile;    ///< Whether enable early compile
 #if VKI_RAY_TRACING
   BinaryData shaderLibrary; ///< SPIR-V library binary data
   RtState rtState;          ///< Ray tracing state
