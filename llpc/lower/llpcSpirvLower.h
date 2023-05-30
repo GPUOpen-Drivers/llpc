@@ -39,7 +39,6 @@ namespace llvm {
 class Constant;
 class GlobalVariable;
 class Timer;
-
 } // namespace llvm
 
 namespace lgc {

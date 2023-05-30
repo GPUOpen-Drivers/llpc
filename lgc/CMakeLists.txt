@@ -76,12 +76,16 @@ if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/interface/lgc)
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/interface/lgc")
 endif()
 tablegen(LGC interface/lgc/LgcDialect.h.inc -gen-dialect-decls --dialect lgc
-    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include)
+    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
+    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/interface/lgc
+    )
 if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/state)
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/state")
 endif()
 tablegen(LGC state/LgcDialect.cpp.inc -gen-dialect-defs --dialect lgc
-    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include)
+    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
+    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/interface/lgc
+    )
 add_public_tablegen_target(LgcDialectTableGen)
 
 add_dependencies(LLVMlgc LgcDialectTableGen)

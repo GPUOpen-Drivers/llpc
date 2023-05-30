@@ -47,6 +47,7 @@
 #include "llpcSpirvLowerCfgMerges.h"
 #if VKI_RAY_TRACING
 #include "llpcSpirvLowerRayTracing.h"
+#include "llpcSpirvProcessGpuRtLibrary.h"
 #endif
 #include "llpcSpirvLowerTranslator.h"
 #include "llpcSpirvLowerUtil.h"
@@ -1852,6 +1853,8 @@ std::unique_ptr<Module> Compiler::createGpurtShaderLibrary(Context *context) {
                                 "// LLPC SPIRV-to-LLVM translation results\n"));
   }
 
+  lowerPassMgr->addPass(SpirvProcessGpuRtLibrary());
+
   if (context->getPipelineType() == PipelineType::RayTracing)
     lowerPassMgr->addPass(SpirvLowerRayTracing());
   else
@@ -1942,8 +1945,17 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
 
     std::vector<const PipelineShaderInfo *> rayTracingShaderInfo;
     rayTracingShaderInfo.reserve(pipelineInfo->shaderCount + 1);
-    for (unsigned i = 0; i < pipelineInfo->shaderCount; ++i)
-      rayTracingShaderInfo.push_back(&pipelineInfo->pShaders[i]);
+    for (unsigned i = 0; i < pipelineInfo->shaderCount; ++i) {
+      auto shaderInfo = &pipelineInfo->pShaders[i];
+      rayTracingShaderInfo.push_back(shaderInfo);
+      const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
+      if (shaderInfo->entryStage == ShaderStageRayTracingAnyHit ||
+          shaderInfo->entryStage == ShaderStageRayTracingIntersect) {
+        if (moduleData->usage.enableRayQuery) {
+          rayTracingContext.setIndirectPipeline();
+        }
+      }
+    }
 
     // Add entry module
     PipelineShaderInfo raygenMainShaderInfo = pipelineInfo->pShaders[0];
@@ -2299,7 +2311,8 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
       // Lower SPIR-V CFG merges before inlining -- don't run in the (empty) entry point module
       lowerPassMgr->addPass(SpirvLowerCfgMerges());
       lowerPassMgr->addPass(AlwaysInlinerPass());
-    }
+    } else
+      lowerPassMgr->addPass(SpirvProcessGpuRtLibrary());
     lowerPassMgr->addPass(SpirvLowerRayTracing());
 
     // Stop timer for translate.

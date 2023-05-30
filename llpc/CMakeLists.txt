@@ -242,6 +242,8 @@ if(VKI_RAY_TRACING)
         lower/llpcSpirvLowerRayTracing.cpp
         lower/llpcSpirvLowerRayTracingBuiltIn.cpp
         lower/llpcSpirvLowerRayTracingIntrinsics.cpp
+        lower/llpcSpirvProcessGpuRtLibrary.cpp
+        lower/LowerGpuRt.cpp
     )
 endif()
 #endif

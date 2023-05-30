@@ -67,12 +67,6 @@ public:
   // Gets client-defined metadata
   virtual llvm::StringRef getClientMetadata() const override;
 
-#if VKI_RAY_TRACING
-  // Set workgroup size for compute pipeline so that rayQuery lowering can see it.
-  virtual void setWorkgroupSize(unsigned workgroupSize) override { m_workgroupSize = workgroupSize; }
-  virtual unsigned getWorkgroupSize() const override { return m_workgroupSize; }
-#endif
-
 private:
   ComputeContext() = delete;
   ComputeContext(const ComputeContext &) = delete;
