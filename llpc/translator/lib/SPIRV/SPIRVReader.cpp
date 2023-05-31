@@ -4122,6 +4122,13 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpExtInst>(SPIRVValue *cons
 // @param bb : Which basicblock to generate code
 Value *SPIRVToLLVM::transDebugPrintf(SPIRVInstruction *bi, const ArrayRef<SPIRVValue *> spvValues, Function *func,
                                      BasicBlock *bb) {
+  auto pipelineContext = (static_cast<Llpc::Context *>(m_context))->getPipelineContext();
+  auto resMapping = pipelineContext->getResourceMapping();
+  unsigned nodeIndex = 0;
+  if (findResourceNode(resMapping->pUserDataNodes, resMapping->userDataNodeCount, Vkgc::InternalDescriptorSetId,
+                       Vkgc::PrintfBufferBindingId, &nodeIndex) == nullptr)
+    return getBuilder()->getInt64(0);
+
   if (!m_debugOutputBuffer) {
     auto spvArrType = m_bm->addRuntimeArray(m_bm->addIntegerType(32));
     auto spvStructType = m_bm->addStructType({spvArrType});
