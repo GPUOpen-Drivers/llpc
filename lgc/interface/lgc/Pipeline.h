@@ -470,17 +470,17 @@ enum ProvokingVertexMode : unsigned {
 
 // Struct to pass to SetRasterizerState
 struct RasterizerState {
-  unsigned rasterizerDiscardEnable; // Kill all rasterized pixels. This is implicitly true if stream out
-                                    //  is enabled and no streams are rasterized
-  unsigned innerCoverage;           // Related to conservative rasterization.  Must be false if
-                                    //  conservative rasterization is disabled.
-  unsigned perSampleShading;        // Enable per sample shading
-  unsigned numSamples;              // Number of coverage samples used when rendering with this pipeline
-  unsigned samplePatternIdx;        // Index into the currently bound MSAA sample pattern table that
-                                    //  matches the sample pattern used by the rasterizer when rendering
-                                    //  with this pipeline.
-  unsigned usrClipPlaneMask;        // Mask to indicate the enabled user defined clip planes
-
+  unsigned rasterizerDiscardEnable;        // Kill all rasterized pixels. This is implicitly true if stream out
+                                           //  is enabled and no streams are rasterized
+  unsigned innerCoverage;                  // Related to conservative rasterization.  Must be false if
+                                           //  conservative rasterization is disabled.
+  unsigned perSampleShading;               // Enable per sample shading
+  unsigned numSamples;                     // Number of coverage samples used when rendering with this pipeline
+  unsigned samplePatternIdx;               // Index into the currently bound MSAA sample pattern table that
+                                           //  matches the sample pattern used by the rasterizer when rendering
+                                           //  with this pipeline.
+  unsigned usrClipPlaneMask;               // Mask to indicate the enabled user defined clip planes
+  unsigned rasterStream;                   // Which vertex stream to rasterize
   ProvokingVertexMode provokingVertexMode; // Specifies which vertex of a primitive is the _provoking vertex_,
                                            // this impacts which vertex's "flat" VS outputs are passed to the PS.
 };

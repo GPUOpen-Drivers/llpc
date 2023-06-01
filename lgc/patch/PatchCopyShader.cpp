@@ -434,7 +434,7 @@ void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
   }
 
   // Following non-XFB output exports are only for rasterization stream
-  if (resUsage->inOutUsage.gs.rasterStream != streamId)
+  if (m_pipelineState->getRasterizerState().rasterStream != streamId)
     return;
 
   // Reconstruct output value at the new mapped location
@@ -723,7 +723,7 @@ void PatchCopyShader::exportBuiltInOutput(Value *outputValue, BuiltInKind builtI
     }
   }
 
-  if (resUsage->inOutUsage.gs.rasterStream == streamId) {
+  if (m_pipelineState->getRasterizerState().rasterStream == streamId) {
     std::string callName = lgcName::OutputExportBuiltIn;
     callName += PipelineState::getBuiltInName(builtInId);
     Value *args[] = {builder.getInt32(builtInId), outputValue};

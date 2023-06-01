@@ -471,6 +471,7 @@ void GraphicsContext::setGraphicsStateInPipeline(Pipeline *pipeline, Util::Metro
     rasterizerState.rasterizerDiscardEnable = inputRsState.rasterizerDiscardEnable;
     rasterizerState.usrClipPlaneMask = inputRsState.usrClipPlaneMask;
     rasterizerState.provokingVertexMode = static_cast<ProvokingVertexMode>(inputRsState.provokingVertexMode);
+    rasterizerState.rasterStream = inputRsState.rasterStream;
   }
 
   if (isShaderStageInMask(ShaderStageFragment, stageMask)) {

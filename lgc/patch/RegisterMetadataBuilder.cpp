@@ -664,7 +664,8 @@ void RegisterMetadataBuilder::buildHwVsRegisters() {
   vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::Streamout_2En] = streamXfbBuffers[2] > 0;
   vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::Streamout_3En] = streamXfbBuffers[3] > 0;
   if (shaderStage == ShaderStageCopyShader)
-    vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::RastStream] = resUsage->inOutUsage.gs.rasterStream;
+    vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::RastStream] =
+        m_pipelineState->getRasterizerState().rasterStream;
 
   // Set some field of SPI_SHADER_PGM_RSRC2_VS
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VsSoEn] = enableXfb;

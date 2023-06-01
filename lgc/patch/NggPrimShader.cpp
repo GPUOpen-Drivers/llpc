@@ -1836,8 +1836,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
   const unsigned waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
   const bool cullingMode = !m_nggControl->passthroughMode;
 
-  const auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs;
-  const auto rasterStream = inOutUsage.rasterStream;
+  const auto rasterStream = m_pipelineState->getRasterizerState().rasterStream;
 
   SmallVector<Argument *, 32> args;
   for (auto &arg : primShader->args())
@@ -2840,7 +2839,7 @@ void NggPrimShader::exportPrimitiveWithGs(Value *startingVertexIndex) {
   //   }
   //   Export primitive
   //
-  const auto rasterStream = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.rasterStream;
+  const auto rasterStream = m_pipelineState->getRasterizerState().rasterStream;
   Value *primData =
       readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
                                PrimShaderLdsRegion::PrimitiveData, Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
@@ -3791,8 +3790,7 @@ void NggPrimShader::mutateCopyShader() {
 
   // Relative vertex index is always the last argument
   auto vertexIndex = getFunctionArgument(m_gsHandlers.copyShader, m_gsHandlers.copyShader->arg_size() - 1);
-  const unsigned rasterStream =
-      m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.rasterStream;
+  const unsigned rasterStream = m_pipelineState->getRasterizerState().rasterStream;
 
   SmallVector<Instruction *, 32> removedCalls;
 
@@ -3922,8 +3920,7 @@ void NggPrimShader::appendUserData(SmallVectorImpl<Value *> &args, Function *tar
 // @param emitVerts : Counter of GS emitted vertices for this stream
 void NggPrimShader::writeGsOutput(Value *output, unsigned location, unsigned component, unsigned streamId,
                                   Value *primitiveIndex, Value *emitVerts) {
-  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
-  if (!m_pipelineState->enableSwXfb() && resUsage->inOutUsage.gs.rasterStream != streamId) {
+  if (!m_pipelineState->enableSwXfb() && m_pipelineState->getRasterizerState().rasterStream != streamId) {
     // NOTE: If SW-emulated stream-out is not enabled, only import those outputs that belong to the rasterization
     // stream.
     return;
@@ -3990,8 +3987,7 @@ void NggPrimShader::writeGsOutput(Value *output, unsigned location, unsigned com
 // @param vertexOffset : Start offset of vertex item in GS-VS ring (in dwords)
 Value *NggPrimShader::readGsOutput(Type *outputTy, unsigned location, unsigned component, unsigned streamId,
                                    Value *vertexOffset) {
-  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
-  if (!m_pipelineState->enableSwXfb() && resUsage->inOutUsage.gs.rasterStream != streamId) {
+  if (!m_pipelineState->enableSwXfb() && m_pipelineState->getRasterizerState().rasterStream != streamId) {
     // NOTE: If SW-emulated stream-out is not enabled, only import those outputs that belong to the rasterization
     // stream.
     return PoisonValue::get(outputTy);
@@ -4040,8 +4036,7 @@ Value *NggPrimShader::readGsOutput(Type *outputTy, unsigned location, unsigned c
 // @param [in/out] emitVertsPtr : Pointer to the counter of GS emitted vertices for this stream
 // @param [in/out] outVertsPtr : Pointer to the counter of GS output vertices of current primitive for this stream
 void NggPrimShader::processGsEmit(unsigned streamId, Value *primitiveIndex, Value *emitVertsPtr, Value *outVertsPtr) {
-  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
-  if (!m_pipelineState->enableSwXfb() && resUsage->inOutUsage.gs.rasterStream != streamId) {
+  if (!m_pipelineState->enableSwXfb() && m_pipelineState->getRasterizerState().rasterStream != streamId) {
     // NOTE: If SW-emulated stream-out is not enabled, only handle GS_EMIT message that belongs to the rasterization
     // stream.
     return;
@@ -4059,8 +4054,7 @@ void NggPrimShader::processGsEmit(unsigned streamId, Value *primitiveIndex, Valu
 // @param streamId : ID of output vertex stream
 // @param [in/out] outVertsPtr : Pointer to the counter of GS output vertices of current primitive for this stream
 void NggPrimShader::processGsCut(unsigned streamId, Value *outVertsPtr) {
-  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
-  if (!m_pipelineState->enableSwXfb() && resUsage->inOutUsage.gs.rasterStream != streamId) {
+  if (!m_pipelineState->enableSwXfb() && m_pipelineState->getRasterizerState().rasterStream != streamId) {
     // NOTE: If SW-emulated stream-out is not enabled, only handle GS_CUT message that belongs to the rasterization
     // stream.
     return;
@@ -6556,8 +6550,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
   unsigned firstActiveStream = InvalidValue;
   unsigned lastActiveStream = InvalidValue;
 
-  const unsigned rasterStream =
-      m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.rasterStream;
+  const unsigned rasterStream = m_pipelineState->getRasterizerState().rasterStream;
 
   for (unsigned i = 0; i < MaxGsStreams; ++i) {
     // Treat the vertex stream as active if it is associated with XFB buffers or is the rasterization stream.
@@ -7564,7 +7557,7 @@ Value *NggPrimShader::fetchVertexPositionData(Value *vertexIndex) {
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage;
   assert(inOutUsage.builtInOutputLocMap.find(BuiltInPosition) != inOutUsage.builtInOutputLocMap.end());
   const unsigned loc = inOutUsage.builtInOutputLocMap[BuiltInPosition];
-  const unsigned rasterStream = inOutUsage.gs.rasterStream;
+  const unsigned rasterStream = m_pipelineState->getRasterizerState().rasterStream;
   auto vertexOffset = calcVertexItemOffset(rasterStream, vertexIndex);
 
   return readGsOutput(FixedVectorType::get(m_builder.getFloatTy(), 4), loc, 0, rasterStream, vertexOffset);
@@ -7590,7 +7583,7 @@ Value *NggPrimShader::fetchCullDistanceSignMask(Value *vertexIndex) {
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage;
   assert(inOutUsage.builtInOutputLocMap.find(BuiltInCullDistance) != inOutUsage.builtInOutputLocMap.end());
   const unsigned loc = inOutUsage.builtInOutputLocMap[BuiltInCullDistance];
-  const unsigned rasterStream = inOutUsage.gs.rasterStream;
+  const unsigned rasterStream = m_pipelineState->getRasterizerState().rasterStream;
   auto vertexOffset = calcVertexItemOffset(rasterStream, vertexIndex);
 
   auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
