@@ -166,5 +166,3 @@ def InputImportInterpolatedOp : LgcOp<"input.import.interpolated", [Memory<[]>, 
       this operation to map between HW and API.
   }];
 }
-
-include "GpurtDialect.td"

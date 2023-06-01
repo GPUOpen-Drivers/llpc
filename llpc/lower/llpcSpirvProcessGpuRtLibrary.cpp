@@ -14,8 +14,8 @@
 #include "llpcContext.h"
 #include "llpcSpirvLowerUtil.h"
 #include "lgc/Builder.h"
+#include "lgc/GpurtDialect.h"
 #include "lgc/LgcContext.h"
-#include "lgc/LgcDialect.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower-gpurt-library"
 using namespace lgc;
