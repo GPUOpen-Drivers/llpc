@@ -395,28 +395,38 @@ template <>
 Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(SPIRVType *const spvType, unsigned matrixStride,
                                                      const bool isColumnMajor, const bool isParentPointer,
                                                      LayoutMode layout) {
+  const auto spvColumnType = spvType->getMatrixColumnType();
+  const auto spvElementType = spvColumnType->getVectorComponentType();
+  const unsigned spvColumnCount = spvType->getMatrixColumnCount();
+  const unsigned spvRowCount = spvColumnType->getVectorComponentCount();
+
   Type *columnType = nullptr;
+  unsigned columnCount = 0;
 
-  unsigned columnCount = spvType->getMatrixColumnCount();
-
-  // If the matrix is not explicitly laid out or is column major, just translate the column type.
   if (!isParentPointer || isColumnMajor) {
-    columnType = transType(spvType->getMatrixColumnType(), matrixStride, isColumnMajor, isParentPointer, layout);
+    // If the matrix is not explicitly laid out or is column major, just translate the column type.
+    columnType = transType(spvColumnType, matrixStride, isColumnMajor, isParentPointer, layout);
+    columnCount = spvColumnCount;
   } else {
     // We need to transpose the matrix type to represent its layout in memory.
-    SPIRVType *const spvColumnType = spvType->getMatrixColumnType();
+    Type *const elementType = transType(spvElementType, matrixStride, isColumnMajor, isParentPointer, layout);
 
-    Type *const elementType =
-        transType(spvColumnType->getVectorComponentType(), matrixStride, isColumnMajor, isParentPointer, layout);
+    // NOTE: The new column after transposition is actually the original SPIR-V row vector and the column count is the
+    // original SPIR-V row vector count.
+    columnType = ArrayType::get(elementType, spvColumnCount);
+    columnCount = spvRowCount;
 
-    columnType = ArrayType::get(elementType, columnCount);
-    columnCount = spvColumnType->getVectorComponentCount();
-
-    // with a MatrixStride Decoration, and one of the RowMajor or ColMajor Decorations
+    // NOTE: This is a workaround. SPIR-V translated from HLSL might not have MatrixStride decoration. In such cases,
+    // we will calculate it for RowMajor matrix.
     if (!isColumnMajor && matrixStride == 0) {
-      // Targeted for std430 layout
-      assert(columnCount == 4);
-      matrixStride = columnCount * (elementType->getPrimitiveSizeInBits() / 8);
+      // Targeted for std430 layout with those rules:
+      //   - A three- or four-component vector, with components of size N, has a base alignment of 4N.
+      //   - A row-major matrix of C columns has a base alignment equal to the base alignment of a vector of C matrix
+      //     components.
+      //   - Any ArrayStride or MatrixStride decoration must be an integer multiple of the base alignment of the array
+      //     or matrix.
+      assert(spvColumnCount >= 2);
+      matrixStride = alignTo(spvColumnCount, 2) * (elementType->getPrimitiveSizeInBits() / 8);
     }
   }
 
