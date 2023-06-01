@@ -47,7 +47,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 61
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 10
+#define LLPC_INTERFACE_MINOR_VERSION 14
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -82,7 +82,8 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
-//  |     61.11| Add dualSourceBlendDynamic to cbState                                                                 |
+//  |     61.14| Add rasterStream to rsState                                                                           |
+//  |     61.13| Add dualSourceBlendDynamic to cbState                                                                 |
 //  |     61.10| Add useShadingRate and useSampleInfoto ShaderModuleUsage                                              |
 //  |     61.8 | Add enableImplicitInvariantExports to PipelineOptions                                                 |
 //  |     61.7 | Add disableFMA to PipelineShaderOptions                                                               |
@@ -1187,7 +1188,7 @@ struct GraphicsPipelineBuildInfo {
     unsigned samplePatternIdx;    ///< Index into the currently bound MSAA sample pattern table that
                                   ///  matches the sample pattern used by the rasterizer when rendering
                                   ///  with this pipeline.
-
+    unsigned rasterStream;        ///< Which vertex stream to rasterize
     VkProvokingVertexModeEXT provokingVertexMode; ///< Specifies which vertex of a primitive is the _provoking
                                                   ///  vertex_, this impacts which vertex's "flat" VS outputs
                                                   ///  are passed to the PS.

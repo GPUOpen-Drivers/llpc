@@ -2571,8 +2571,8 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
     const unsigned loc = builtInMap.second;
 
     if (m_shaderStage == ShaderStageGeometry) {
-      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output: stream = " << inOutUsage.gs.rasterStream
-                    << " , "
+      LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage)
+                    << ") Output: stream = " << m_pipelineState->getRasterizerState().rasterStream << " , "
                     << "builtin = " << PipelineState::getBuiltInName(builtInId) << "  =>  Mapped = " << loc << "\n");
     } else {
       LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output: builtin = "
@@ -2651,7 +2651,7 @@ void PatchResourceCollect::mapGsBuiltInOutput(unsigned builtInId, unsigned elemC
   assert(m_shaderStage == ShaderStageGeometry);
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
   auto &inOutUsage = resUsage->inOutUsage.gs;
-  unsigned streamId = inOutUsage.rasterStream;
+  unsigned streamId = m_pipelineState->getRasterizerState().rasterStream;
 
   resUsage->inOutUsage.builtInOutputLocMap[builtInId] = inOutUsage.outLocCount[streamId]++;
 
@@ -3086,7 +3086,7 @@ void PatchResourceCollect::updateOutputLocInfoMapWithPack() {
     if (m_shaderStage == ShaderStageGeometry) {
       // NOTE: The output location info from next shader stage (FS) doesn't contain raster stream ID. We have to
       // reconstruct it.
-      const auto rasterStream = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.gs.rasterStream;
+      const auto rasterStream = m_pipelineState->getRasterizerState().rasterStream;
       for (auto &entry : nextStageInputLocInfoMap) {
         InOutLocationInfo origLocInfo(entry.first);
         origLocInfo.setStreamId(rasterStream);

@@ -883,6 +883,7 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "numSamples = " << pipelineInfo->rsState.numSamples << "\n";
   dumpFile << "pixelShaderSamples = " << pipelineInfo->rsState.pixelShaderSamples << "\n";
   dumpFile << "samplePatternIdx = " << pipelineInfo->rsState.samplePatternIdx << "\n";
+  dumpFile << "rasterStream = " << pipelineInfo->rsState.rasterStream << "\n";
   dumpFile << "usrClipPlaneMask = " << static_cast<unsigned>(pipelineInfo->rsState.usrClipPlaneMask) << "\n";
   dumpFile << "alphaToCoverageEnable = " << pipelineInfo->cbState.alphaToCoverageEnable << "\n";
   dumpFile << "dualSourceBlendEnable = " << pipelineInfo->cbState.dualSourceBlendEnable << "\n";
@@ -1451,6 +1452,7 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   if (updateHashFromRs) {
     auto rsState = &pipeline->rsState;
     hasher->Update(rsState->usrClipPlaneMask);
+    hasher->Update(rsState->rasterStream);
   }
 
   if (isCacheHash) {
@@ -1496,6 +1498,7 @@ void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo 
     hasher->Update(rsState->innerCoverage);
     hasher->Update(rsState->numSamples);
     hasher->Update(rsState->samplePatternIdx);
+    hasher->Update(rsState->rasterStream);
 
     auto cbState = &pipeline->cbState;
     hasher->Update(cbState->alphaToCoverageEnable);

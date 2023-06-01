@@ -509,6 +509,7 @@ struct GraphicsPipelineState {
   unsigned numSamples;                          // Number of coverage samples used when rendering with this pipeline
   unsigned pixelShaderSamples;                  // Controls the pixel shader execution rate
   unsigned samplePatternIdx;                    // Index into the currently bound MSAA sample pattern table
+  unsigned rasterStream;                        // Which vertex stream to rasterize
   unsigned usrClipPlaneMask;                    // Mask to indicate the enabled user defined clip planes
   unsigned alphaToCoverageEnable;               // Enable alpha to coverage
   unsigned dualSourceBlendEnable;               // Blend state bound at draw time will use a dual source blend mode

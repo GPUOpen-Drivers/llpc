@@ -1892,9 +1892,6 @@ void BuilderImpl::markBuiltInOutputUsage(BuiltInKind builtIn, unsigned arraySize
     default:
       break;
     }
-    // Collect raster stream ID for the export of built-ins
-    if (streamId != InvalidValue)
-      getPipelineState()->getShaderResourceUsage(m_shaderStage)->inOutUsage.gs.rasterStream = streamId;
     break;
   }
 
