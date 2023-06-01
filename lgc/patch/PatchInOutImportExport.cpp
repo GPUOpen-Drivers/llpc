@@ -2562,8 +2562,8 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
 
       assert(inOutUsage.builtInInputLocMap.find(BuiltInCullDistance) != inOutUsage.builtInInputLocMap.end());
       loc = inOutUsage.builtInInputLocMap[BuiltInCullDistance];
-      locCount = builtInUsage.clipDistance + builtInUsage.cullDistance > 4 ? 2 : 1;
       startChannel = builtInUsage.clipDistance % 4;
+      locCount = startChannel + builtInUsage.cullDistance > 4 ? 2 : 1;
     }
 
     auto &interpInfo = inOutUsage.fs.interpInfo;
