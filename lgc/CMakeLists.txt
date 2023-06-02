@@ -274,3 +274,4 @@ if (LLPC_BUILD_TESTS)
 endif()
 
 target_link_libraries(LLVMlgc PUBLIC LLVMLgcRt)
+target_link_libraries(LLVMlgc PRIVATE LLVMContinuations)
