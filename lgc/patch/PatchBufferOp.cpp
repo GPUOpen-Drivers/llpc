@@ -197,6 +197,7 @@ void BufferOpLowering::registerVisitors(llvm_dialects::VisitorBuilder<BufferOpLo
   builder.add(&BufferOpLowering::visitPhiInst);
   builder.add(&BufferOpLowering::visitStoreInst);
   builder.add(&BufferOpLowering::visitICmpInst);
+  builder.addIntrinsic(Intrinsic::invariant_start, &BufferOpLowering::visitInvariantStart);
 }
 
 // =====================================================================================================================
@@ -662,7 +663,8 @@ void BufferOpLowering::visitBufferDescToPtr(BufferDescToPtrOp &descToPtr) {
   m_typeLowering.replaceInstruction(&descToPtr, {descToPtr.getDesc(), nullPointer});
 
   auto &di = m_descriptors[descToPtr.getDesc()];
-  di.invariant = removeUsersForInvariantStarts(&descToPtr);
+  di.invariant = hasUsersForInvariantStarts(&descToPtr);
+
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
   // Old version of the code
   di.divergent = m_uniformityInfo.isDivergent(*descToPtr.getDesc());
@@ -960,6 +962,22 @@ void BufferOpLowering::visitICmpInst(ICmpInst &icmpInst) {
 }
 
 // =====================================================================================================================
+// Visits invariant start intrinsic.
+//
+// @param intrinsic : The intrinsic
+void BufferOpLowering::visitInvariantStart(llvm::IntrinsicInst &intrinsic) {
+  Value *bufferDesc = intrinsic.getArgOperand(1);
+  if (bufferDesc->getType()->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
+    return;
+
+  auto &di = m_descriptors[bufferDesc];
+
+  di.invariant = true;
+
+  m_typeLowering.eraseInstruction(&intrinsic);
+}
+
+// =====================================================================================================================
 // Post-process visits "memcpy" instruction.
 //
 // @param memCpyInst : The memcpy instruction
@@ -1224,29 +1242,21 @@ void BufferOpLowering::copyMetadata(Value *const dest, const Value *const src) c
 // Remove any users that are invariant starts, returning if any were removed.
 //
 // @param value : The value to check the users of.
-bool BufferOpLowering::removeUsersForInvariantStarts(Value *const value) {
+bool BufferOpLowering::hasUsersForInvariantStarts(Value *const value) {
   bool modified = false;
 
   for (User *const user : value->users()) {
-    if (BitCastInst *const bitCast = dyn_cast<BitCastInst>(user)) {
-      // Remove any users of the bitcast too.
-      if (removeUsersForInvariantStarts(bitCast))
-        modified = true;
-    } else {
-      IntrinsicInst *const intrinsic = dyn_cast<IntrinsicInst>(user);
+    IntrinsicInst *const intrinsic = dyn_cast<IntrinsicInst>(user);
 
-      // If the user isn't an intrinsic, bail.
-      if (!intrinsic)
-        continue;
+    // If the user isn't an intrinsic, bail.
+    if (!intrinsic)
+      continue;
 
-      // If the intrinsic is not an invariant load, bail.
-      if (intrinsic->getIntrinsicID() != Intrinsic::invariant_start)
-        continue;
+    // If the intrinsic is not an invariant load, bail.
+    if (intrinsic->getIntrinsicID() != Intrinsic::invariant_start)
+      continue;
 
-      // Remember the intrinsic because we will want to delete it.
-      m_typeLowering.eraseInstruction(intrinsic);
-      modified = true;
-    }
+    modified = true;
   }
 
   return modified;
