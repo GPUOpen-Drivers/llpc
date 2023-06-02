@@ -179,6 +179,29 @@ inline bool isGraphicsPipeline(unsigned stageMask) {
          (stageMask & Vkgc::ShaderStageBit::ShaderStageComputeBit) == 0;
 }
 
+// =====================================================================================================================
+// Find userDataNode with specified set and binding. And return Node index.
+//
+// @param userDataNodes : Point to ResourceMappingNode array
+// @param nodeCount : User data node count
+// @param set : Find same set in node array
+// @param binding : Find same binding in node array
+// @param [out] index : Return node position in node array
+const ResourceMappingNode *findResourceNode(const ResourceMappingNode *userDataNodes, unsigned nodeCount, unsigned set,
+                                            unsigned binding, unsigned *index);
+
+// =====================================================================================================================
+// Find userDataNode with specified set and binding. And return Node index.
+//
+// @param userDataNodes : Point to ResourceMappingNode array
+// @param nodeCount : User data node count
+// @param set : Find same set in node array
+// @param binding : Find same binding in node array
+// @param [out] index : Return node position in node array
+// @returns : The Node index
+const ResourceMappingNode *findResourceNode(const ResourceMappingRootNode *userDataNodes, unsigned nodeCount,
+                                            unsigned set, unsigned binding, unsigned *index);
+
 #if VKI_RAY_TRACING
 // =====================================================================================================================
 // Returns true iff the compiled pipeline is a raytracing pipeline.
