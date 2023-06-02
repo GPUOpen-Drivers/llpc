@@ -103,6 +103,7 @@ private:
   void visitPhiInst(llvm::PHINode &phi);
   void visitStoreInst(llvm::StoreInst &storeInst);
   void visitICmpInst(llvm::ICmpInst &icmpInst);
+  void visitInvariantStart(llvm::IntrinsicInst &intrinsic);
 
   void postVisitLoadInst(llvm::LoadInst &loadInst);
   void postVisitStoreInst(llvm::StoreInst &storeInst);
@@ -112,7 +113,6 @@ private:
   DescriptorInfo getDescriptorInfo(llvm::Value *desc);
   void copyMetadata(llvm::Value *const dest, const llvm::Value *const src) const;
   llvm::Value *getBaseAddressFromBufferDesc(llvm::Value *const bufferDesc);
-  bool removeUsersForInvariantStarts(llvm::Value *const value);
   llvm::Value *replaceLoadStore(llvm::Instruction &inst);
   llvm::Instruction *makeLoop(llvm::Value *const loopStart, llvm::Value *const loopEnd, llvm::Value *const loopStride,
                               llvm::Instruction *const insertPos);
