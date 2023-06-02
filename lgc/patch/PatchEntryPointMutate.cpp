@@ -54,6 +54,7 @@
  */
 
 #include "lgc/patch/PatchEntryPointMutate.h"
+#include "LgcCpsDialect.h"
 #include "lgc/LgcContext.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/AbiUnlinked.h"
@@ -151,6 +152,8 @@ bool PatchEntryPointMutate::runImpl(Module &module, PipelineShadersResult &pipel
     for (unsigned shaderStage = 0; shaderStage < ShaderStageNativeStageCount; ++shaderStage) {
       m_entryPoint = pipelineShaders.getEntryPoint(static_cast<ShaderStage>(shaderStage));
       if (m_entryPoint) {
+        // ToDo: This should always be skipped since we don't implement CPS metadata yet.
+        assert(!lgc::cps::isCpsFunction(*m_entryPoint) && "CPS support not implemented yet");
 
         m_shaderStage = static_cast<ShaderStage>(shaderStage);
         processShader(&shaderInputs);
