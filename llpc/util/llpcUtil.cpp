@@ -251,17 +251,17 @@ const char *getPartPipelineStageName(Vkgc::PartPipelineStage type) {
 // =====================================================================================================================
 // Find userDataNode with specified set and binding. And return Node index.
 //
-// @param userDataNode : ResourceMappingNode pointer
+// @param userDataNodes : ResourceMappingNode pointer
 // @param nodeCount : User data node count
 // @param set : Find same set in node array
 // @param binding : Find same binding in node array
 // @param [out] index : Return node position in node array
-const ResourceMappingNode *findResourceNode(const ResourceMappingNode *userDataNode, unsigned nodeCount, unsigned set,
+const ResourceMappingNode *findResourceNode(const ResourceMappingNode *userDataNodes, unsigned nodeCount, unsigned set,
                                             unsigned binding, unsigned *index) {
   const ResourceMappingNode *resourceNode = nullptr;
 
   for (unsigned j = 0; j < nodeCount; ++j) {
-    const ResourceMappingNode *next = &userDataNode[j];
+    const ResourceMappingNode *next = &userDataNodes[j];
 
     if (set == next->srdRange.set && binding == next->srdRange.binding) {
       resourceNode = next;
@@ -276,17 +276,17 @@ const ResourceMappingNode *findResourceNode(const ResourceMappingNode *userDataN
 // =====================================================================================================================
 // Find userDataNode with specified set and binding. And return Node index.
 //
-// @param userDataNode : ResourceMappingRootNode pointer
+// @param userDataNodes : ResourceMappingRootNode pointer
 // @param nodeCount : User data node count
 // @param set : Find same set in node array
 // @param binding : Find same binding in node array
 // @param [out] index : Return node position in node array
 // @returns : The Node index
-const ResourceMappingNode *findResourceNode(const ResourceMappingRootNode *userDataNode, unsigned nodeCount,
+const ResourceMappingNode *findResourceNode(const ResourceMappingRootNode *userDataNodes, unsigned nodeCount,
                                             unsigned set, unsigned binding, unsigned *index) {
   const ResourceMappingNode *resourceNode = nullptr;
   for (unsigned j = 0; j < nodeCount; ++j) {
-    const ResourceMappingRootNode *next = &userDataNode[j];
+    const ResourceMappingRootNode *next = &userDataNodes[j];
     if (next->node.type == ResourceMappingNodeType::DescriptorTableVaPtr) {
       resourceNode = findResourceNode(next->node.tablePtr.pNext, next->node.tablePtr.nodeCount, set, binding, index);
       if (resourceNode) {
