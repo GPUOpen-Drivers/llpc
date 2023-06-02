@@ -4885,6 +4885,14 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
 
     auto trueSuccessor = cast<BasicBlock>(transValue(br->getTrueLabel(), f, bb));
     auto falseSuccessor = cast<BasicBlock>(transValue(br->getFalseLabel(), f, bb));
+
+    // OpBranchConditional can branch with OpUndef as condition. The selected jump target is undefined.
+    // In LLVM IR, BranchInst with undef value is fully UB.
+    // LLVM will mark the successors as unreachable, so later SimplifyCFG passes will cause
+    // unwanted removal of branches. By using a freeze instruction as condition, we make sure that LLVM
+    // will always operate on a fixed value.
+    c = new FreezeInst(c, "cond.freeze", bb);
+
     auto bc = BranchInst::Create(trueSuccessor, falseSuccessor, c, bb);
     auto lm = static_cast<SPIRVLoopMerge *>(br->getPrevious());
     if (lm && lm->getOpCode() == OpLoopMerge)
@@ -4976,6 +4984,14 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     auto select = transValue(bs->getSelect(), f, bb);
     auto defaultSuccessor = dyn_cast<BasicBlock>(transValue(bs->getDefault(), f, bb));
     recordBlockPredecessor(defaultSuccessor, bb);
+
+    // OpSwitch can branch with OpUndef as condition. The selected jump target is undefined.
+    // In LLVM IR, SwitchInst with undef value is fully UB.
+    // LLVM will mark the successors as unreachable, so later SimplifyCFG passes will cause
+    // unwanted removal of branches. By using a freeze instruction as condition, we make sure that LLVM
+    // will always operate on a fixed value.
+    select = new FreezeInst(select, "cond.freeze", bb);
+
     auto ls = SwitchInst::Create(select, defaultSuccessor, bs->getNumPairs(), bb);
     bs->foreachPair([&](SPIRVSwitch::LiteralTy literals, SPIRVBasicBlock *label) {
       assert(!literals.empty() && "Literals should not be empty");
