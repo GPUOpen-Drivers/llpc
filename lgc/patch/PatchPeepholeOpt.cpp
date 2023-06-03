@@ -29,9 +29,11 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/PatchPeepholeOpt.h"
+#include "lgc/Builder.h"
 #include "lgc/patch/Patch.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/PatternMatch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -40,6 +42,7 @@
 
 using namespace lgc;
 using namespace llvm;
+using namespace llvm::PatternMatch;
 
 namespace lgc {
 
@@ -63,9 +66,11 @@ PreservedAnalyses PatchPeepholeOpt::run(Function &function, FunctionAnalysisMana
 bool PatchPeepholeOpt::runImpl(Function &function) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Peephole-Opt\n");
 
+  m_changed = false;
+
   visit(function);
 
-  const bool changed = !m_instsToErase.empty();
+  const bool changed = m_changed || !m_instsToErase.empty();
 
   for (Instruction *const inst : m_instsToErase) {
     // Lastly delete any instructions we replaced.
@@ -141,6 +146,37 @@ void PatchPeepholeOpt::visitIntToPtr(IntToPtrInst &intToPtr) {
   // If the add instruction has no other users then mark to erase.
   if (binaryOperator->getNumUses() == 0)
     m_instsToErase.push_back(binaryOperator);
+}
+
+// =====================================================================================================================
+// Visit a call instruction.
+//
+// Peephole log2(const +/- x) -> log2(max(0.0, const +/- x)).
+// This addresses a potential precision underflow in applications intolerant to in-spec math reordering.
+//
+// @param callInst: The call instruction to visit.
+void PatchPeepholeOpt::visitCallInst(CallInst &callInst) {
+  if (callInst.getIntrinsicID() != Intrinsic::log2)
+    return;
+
+  Value *V = callInst.getOperand(0);
+
+  if (!(match(V, m_FSub(m_Constant(), m_Value())) || match(V, m_FSub(m_Value(), m_Constant())) ||
+        match(V, m_FAdd(m_Constant(), m_Value())) || match(V, m_FAdd(m_Value(), m_Constant()))))
+    return;
+
+  // Do not touch instructions marked as potentially having NaNs, as this would not be a legal transform.
+  Instruction *srcInst = cast<Instruction>(V);
+  if (!srcInst->hasNoNaNs())
+    return;
+
+  IRBuilder<> builder(callInst.getContext());
+  builder.setFastMathFlags(srcInst->getFastMathFlags());
+  builder.SetInsertPoint(&callInst);
+  Value *newSrc = builder.CreateMaxNum(ConstantFP::getZero(V->getType()), V);
+  callInst.setOperand(0, newSrc);
+
+  m_changed = true;
 }
 
 } // namespace lgc

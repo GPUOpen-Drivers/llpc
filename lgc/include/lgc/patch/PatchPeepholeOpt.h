@@ -43,6 +43,8 @@ namespace lgc {
 // - Change inttoptr ( add x, const ) -> gep ( inttoptr x, const ) to improve value tracking and load/store
 //   vectorization.
 //
+// - Change log2 ( const +/- x ) -> log2 ( max ( 0.0, const +/- x ) ) to avoid application underflow.
+//
 class PatchPeepholeOpt final : public llvm::InstVisitor<PatchPeepholeOpt>,
                                public llvm::PassInfoMixin<PatchPeepholeOpt> {
 public:
@@ -53,8 +55,10 @@ public:
   static llvm::StringRef name() { return "Patch LLVM for peephole optimizations"; }
 
   void visitIntToPtr(llvm::IntToPtrInst &intToPtr);
+  void visitCallInst(llvm::CallInst &callInst);
 
 private:
+  bool m_changed;
   llvm::SmallVector<llvm::Instruction *, 8> m_instsToErase;
 };
 
