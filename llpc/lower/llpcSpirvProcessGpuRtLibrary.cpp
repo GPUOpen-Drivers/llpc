@@ -22,22 +22,32 @@ using namespace lgc;
 using namespace llvm;
 
 namespace RtName {
-static const char *AmdLibraryNames[] = {
-    "AmdTraceRayGetStackSize",   "AmdTraceRayLdsRead",      "AmdTraceRayLdsWrite",      "AmdTraceRayGetStackBase",
-    "AmdTraceRayGetStackStride", "AmdTraceRayLdsStackInit", "AmdTraceRayLdsStackStore",
+static const char *AmdLibraryNames[] = {"AmdTraceRayGetStackSize",
+                                        "AmdTraceRayLdsRead",
+                                        "AmdTraceRayLdsWrite",
+                                        "AmdTraceRayGetStackBase",
+                                        "AmdTraceRayGetStackStride",
+                                        "AmdTraceRayLdsStackInit",
+                                        "AmdTraceRayLdsStackStore",
+                                        "AmdTraceRayGetBoxSortHeuristicMode",
+                                        "AmdTraceRayGetStaticFlags",
+                                        "AmdTraceRayGetTriangleCompressionMode"
 
 };
 } // namespace RtName
 
 namespace AmdLibraryFunc {
 enum : unsigned {
-  GetStackSize = 0, // Get stack size
-  LdsRead,          // Read from LDS
-  LdsWrite,         // Write to LDS
-  GetStackBase,     // Get stack base
-  GetStackStride,   // Get stack stride
-  LdsStackInit,     // Lds stack init
-  LdsStackStore,    // Lds stack store
+  GetStackSize = 0,           // Get stack size
+  LdsRead,                    // Read from LDS
+  LdsWrite,                   // Write to LDS
+  GetStackBase,               // Get stack base
+  GetStackStride,             // Get stack stride
+  LdsStackInit,               // Lds stack init
+  LdsStackStore,              // Lds stack store
+  GetBoxSortHeuristicMode,    // Get box sort heuristic mode
+  GetStaticFlags,             // Get static flags
+  GetTriangleCompressionMode, // Get triangle compression mode
   Count
 };
 } // namespace AmdLibraryFunc
@@ -64,11 +74,16 @@ PreservedAnalyses SpirvProcessGpuRtLibrary::run(Module &module, ModuleAnalysisMa
 // =====================================================================================================================
 // Initialize library function pointer table
 SpirvProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
-  LibraryFuncPtr amdLibraryFuncs[] = {
-      &SpirvProcessGpuRtLibrary::createGetStackSize,   &SpirvProcessGpuRtLibrary::createLdsRead,
-      &SpirvProcessGpuRtLibrary::createLdsWrite,       &SpirvProcessGpuRtLibrary::createGetStackBase,
-      &SpirvProcessGpuRtLibrary::createGetStackStride, &SpirvProcessGpuRtLibrary::createLdsStackInit,
-      &SpirvProcessGpuRtLibrary::createLdsStackStore,
+  LibraryFuncPtr amdLibraryFuncs[] = {&SpirvProcessGpuRtLibrary::createGetStackSize,
+                                      &SpirvProcessGpuRtLibrary::createLdsRead,
+                                      &SpirvProcessGpuRtLibrary::createLdsWrite,
+                                      &SpirvProcessGpuRtLibrary::createGetStackBase,
+                                      &SpirvProcessGpuRtLibrary::createGetStackStride,
+                                      &SpirvProcessGpuRtLibrary::createLdsStackInit,
+                                      &SpirvProcessGpuRtLibrary::createLdsStackStore,
+                                      &SpirvProcessGpuRtLibrary::createGetBoxSortHeuristicMode,
+                                      &SpirvProcessGpuRtLibrary::createGetStaticFlags,
+                                      &SpirvProcessGpuRtLibrary::createGetTriangleCompressionMode
 
   };
   for (unsigned i = 0; i < AmdLibraryFunc::Count; ++i) {
@@ -86,34 +101,32 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
   auto funcIt = funcTable.find(func->getName());
   if (funcIt != funcTable.end()) {
     auto funcPtr = funcIt->second;
+    m_builder->SetInsertPoint(clearBlock(func));
     (this->*funcPtr)(func);
   }
 }
 
 // =====================================================================================================================
-// Create to get stack size
+// Create function to get stack size
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createGetStackSize(llvm::Function *func) {
-  m_builder->SetInsertPoint(clearBlock(func));
   m_builder->CreateRet(m_builder->create<GpurtGetStackSizeOp>());
 }
 
 // =====================================================================================================================
-// Create to get stack base
+// Create function to get stack base
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createGetStackBase(llvm::Function *func) {
-  m_builder->SetInsertPoint(clearBlock(func));
   m_builder->CreateRet(m_builder->create<GpurtGetStackBaseOp>());
 }
 
 // =====================================================================================================================
-// Create to write LDS stack
+// Create function to write LDS stack
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createLdsWrite(llvm::Function *func) {
-  m_builder->SetInsertPoint(clearBlock(func));
   auto argIt = func->arg_begin();
   auto int32ty = m_builder->getInt32Ty();
   Value *stackOffset = m_builder->CreateLoad(int32ty, argIt++);
@@ -122,47 +135,66 @@ void SpirvProcessGpuRtLibrary::createLdsWrite(llvm::Function *func) {
 }
 
 // =====================================================================================================================
-// Create to read LDS stack
+// Create function to read LDS stack
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createLdsRead(llvm::Function *func) {
-  m_builder->SetInsertPoint(clearBlock(func));
   Value *stackIndex = func->arg_begin();
   stackIndex = m_builder->CreateLoad(m_builder->getInt32Ty(), stackIndex);
   m_builder->CreateRet(m_builder->create<GpurtStackReadOp>(stackIndex));
 }
 
 // =====================================================================================================================
-// Create to get stack stride
+// Create function to get stack stride
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createGetStackStride(llvm::Function *func) {
-
-  m_builder->SetInsertPoint(clearBlock(func));
   m_builder->CreateRet(m_builder->create<GpurtGetStackStrideOp>());
 }
 
 // =====================================================================================================================
-// Create to init stack LDS
+// Create function to init stack LDS
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createLdsStackInit(llvm::Function *func) {
-  m_builder->SetInsertPoint(clearBlock(func));
   m_builder->CreateRet(m_builder->create<GpurtLdsStackInitOp>());
 }
 
 // =====================================================================================================================
-// Create to store stack LDS
+// Create function to store stack LDS
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createLdsStackStore(llvm::Function *func) {
-  m_builder->SetInsertPoint(clearBlock(func));
   auto argIt = func->arg_begin();
   Value *stackAddr = argIt++;
   Value *lastVisited = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt++);
   auto int32x4Ty = FixedVectorType::get(m_builder->getInt32Ty(), 4);
   Value *data = m_builder->CreateLoad(int32x4Ty, argIt);
   m_builder->CreateRet(m_builder->create<GpurtLdsStackStoreOp>(stackAddr, lastVisited, data));
+}
+
+// =====================================================================================================================
+// Create function to get box sort heuristic mode
+//
+// @param func : The function to process
+void SpirvProcessGpuRtLibrary::createGetBoxSortHeuristicMode(llvm::Function *func) {
+  m_builder->CreateRet(m_builder->create<GpurtGetBoxSortHeuristicModeOp>());
+}
+
+// =====================================================================================================================
+// Create function to get static flags
+//
+// @param func : The function to process
+void SpirvProcessGpuRtLibrary::createGetStaticFlags(llvm::Function *func) {
+  m_builder->CreateRet(m_builder->create<GpurtGetStaticFlagsOp>());
+}
+
+// =====================================================================================================================
+// Create function to get triangle compression mode
+//
+// @param func : The function to process
+void SpirvProcessGpuRtLibrary::createGetTriangleCompressionMode(llvm::Function *func) {
+  m_builder->CreateRet(m_builder->create<GpurtGetTriangleCompressionModeOp>());
 }
 
 } // namespace Llpc

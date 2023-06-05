@@ -90,3 +90,21 @@ def GpurtLdsStackStoreOp : GpurtOp<"lds.stack.store", [Memory<[(write)]>, WillRe
   }];
 }
 
+def GpurtGetBoxSortHeuristicModeOp : GpurtOp<"get.box.sort.heuristic.mode", [Memory<[]>, WillReturn]> {
+  let arguments = (ins);
+  let results = (outs I32:$result);
+  let summary = "return the box sort heuristic mode";
+}
+
+def GpurtGetStaticFlagsOp : GpurtOp<"get.static.flags", [Memory<[]>, WillReturn]> {
+  let arguments = (ins);
+  let results = (outs I32:$result);
+  let summary = "return the rayQuery/traceRay static flags";
+}
+
+def GpurtGetTriangleCompressionModeOp : GpurtOp<"get.triangle.compression.mode", [Memory<[]>, WillReturn]> {
+  let arguments = (ins);
+  let results = (outs I32:$result);
+  let summary = "return the traceRay triangle compression mode";
+}
+

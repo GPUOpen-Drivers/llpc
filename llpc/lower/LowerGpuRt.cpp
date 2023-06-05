@@ -52,6 +52,9 @@ PreservedAnalyses LowerGpuRt::run(Module &module, ModuleAnalysisManager &analysi
                             .add(&LowerGpuRt::visitStackRead)
                             .add(&LowerGpuRt::visitLdsStackInit)
                             .add(&LowerGpuRt::visitLdsStackStore)
+                            .add(&LowerGpuRt::visitGetBoxSortHeuristicMode)
+                            .add(&LowerGpuRt::visitGetStaticFlags)
+                            .add(&LowerGpuRt::visitGetTriangleCompressionMode)
                             .build();
 
   visitor.visit(*this, *m_module);
@@ -261,4 +264,44 @@ void LowerGpuRt::visitLdsStackStore(GpurtLdsStackStoreOp &inst) {
   m_callsToLower.push_back(&inst);
   m_funcsToLower.insert(inst.getCalledFunction());
 }
+
+// =====================================================================================================================
+// Visit "GpurtGetBoxSortHeuristicModeOp" instruction
+//
+// @param inst : The dialect instruction to process
+void LowerGpuRt::visitGetBoxSortHeuristicMode(GpurtGetBoxSortHeuristicModeOp &inst) {
+  m_builder->SetInsertPoint(&inst);
+  auto rtState = m_context->getPipelineContext()->getRayTracingState();
+  Value *boxSortHeuristicMode = m_builder->getInt32(rtState->boxSortHeuristicMode);
+  inst.replaceAllUsesWith(boxSortHeuristicMode);
+  m_callsToLower.push_back(&inst);
+  m_funcsToLower.insert(inst.getCalledFunction());
+}
+
+// =====================================================================================================================
+// Visit "GpurtGetStaticFlagsOp" instruction
+//
+// @param inst : The dialect instruction to process
+void LowerGpuRt::visitGetStaticFlags(GpurtGetStaticFlagsOp &inst) {
+  m_builder->SetInsertPoint(&inst);
+  auto rtState = m_context->getPipelineContext()->getRayTracingState();
+  Value *staticPipelineFlags = m_builder->getInt32(rtState->staticPipelineFlags);
+  inst.replaceAllUsesWith(staticPipelineFlags);
+  m_callsToLower.push_back(&inst);
+  m_funcsToLower.insert(inst.getCalledFunction());
+}
+
+// =====================================================================================================================
+// Visit "GpurtGetTriangleCompressionModeOp" instruction
+//
+// @param inst : The dialect instruction to process
+void LowerGpuRt::visitGetTriangleCompressionMode(GpurtGetTriangleCompressionModeOp &inst) {
+  m_builder->SetInsertPoint(&inst);
+  auto rtState = m_context->getPipelineContext()->getRayTracingState();
+  Value *triCompressMode = m_builder->getInt32(rtState->triCompressMode);
+  inst.replaceAllUsesWith(triCompressMode);
+  m_callsToLower.push_back(&inst);
+  m_funcsToLower.insert(inst.getCalledFunction());
+}
+
 } // namespace Llpc
