@@ -36,7 +36,7 @@ class GpurtOp<string mnemonic_, list<Trait> traits_ = []>
 def PrivatePointer : TgConstant<(PointerType 5)>, Type;
 def V4I32 : TgConstant<(FixedVectorType I32, 4)>, Type;
 
-def GpurtGetStackSize : GpurtOp<"get.stack.size", [Memory<[]>, WillReturn]> {
+def GpurtGetStackSizeOp : GpurtOp<"get.stack.size", [Memory<[]>, WillReturn]> {
   let arguments = (ins);
   let results = (outs I32:$result);
   let summary = "return the gpurt stack size in dword";
@@ -45,7 +45,7 @@ def GpurtGetStackSize : GpurtOp<"get.stack.size", [Memory<[]>, WillReturn]> {
   }];
 }
 
-def GpurtStackRead : GpurtOp<"stack.read", [Memory<[(read)]>, WillReturn]> {
+def GpurtStackReadOp : GpurtOp<"stack.read", [Memory<[(read)]>, WillReturn]> {
   let arguments = (ins I32:$index);
   let results = (outs I32:$result);
   let summary = "read a dword from stack";
@@ -54,7 +54,7 @@ def GpurtStackRead : GpurtOp<"stack.read", [Memory<[(read)]>, WillReturn]> {
   }];
 }
 
-def GpurtStackWrite : GpurtOp<"stack.write", [Memory<[(write)]>, WillReturn]> {
+def GpurtStackWriteOp : GpurtOp<"stack.write", [Memory<[(write)]>, WillReturn]> {
   let arguments = (ins I32:$index, I32:$value);
   let results = (outs I32:$result);
   let summary = "write a dword to stack";
@@ -63,25 +63,25 @@ def GpurtStackWrite : GpurtOp<"stack.write", [Memory<[(write)]>, WillReturn]> {
   }];
 }
 
-def GpurtGetStackBase : GpurtOp<"get.stack.base", [Memory<[]>, WillReturn]> {
+def GpurtGetStackBaseOp : GpurtOp<"get.stack.base", [Memory<[]>, WillReturn]> {
   let arguments = (ins);
   let results = (outs I32:$result);
   let summary = "this returns the stack base position in dword";
 }
 
-def GpurtGetStackStride : GpurtOp<"get.stack.stride", [Memory<[]>, WillReturn]> {
+def GpurtGetStackStrideOp : GpurtOp<"get.stack.stride", [Memory<[]>, WillReturn]> {
   let arguments = (ins);
   let results = (outs I32:$result);
   let summary = "return the gpurt stack stride in dword";
 }
 
-def GpurtLdsStackInit : GpurtOp<"lds.stack.init", [Memory<[]>, WillReturn]> {
+def GpurtLdsStackInitOp : GpurtOp<"lds.stack.init", [Memory<[]>, WillReturn]> {
   let arguments = (ins);
   let results = (outs I32:$result);
   let summary = "return the initial stack dword position for use with lds.stack.store";
 }
 
-def GpurtLdsStackStore : GpurtOp<"lds.stack.store", [Memory<[(write)]>, WillReturn]> {
+def GpurtLdsStackStoreOp : GpurtOp<"lds.stack.store", [Memory<[(write)]>, WillReturn]> {
   let arguments = (ins PrivatePointer:$new_pos, I32:$old_pos, V4I32:$data);
   let results = (outs I32:$result);
   let summary = "perform a combined lds stack push and pop operation.";

@@ -96,7 +96,7 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createGetStackSize(llvm::Function *func) {
   m_builder->SetInsertPoint(clearBlock(func));
-  m_builder->CreateRet(m_builder->create<GpurtGetStackSize>());
+  m_builder->CreateRet(m_builder->create<GpurtGetStackSizeOp>());
 }
 
 // =====================================================================================================================
@@ -105,7 +105,7 @@ void SpirvProcessGpuRtLibrary::createGetStackSize(llvm::Function *func) {
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createGetStackBase(llvm::Function *func) {
   m_builder->SetInsertPoint(clearBlock(func));
-  m_builder->CreateRet(m_builder->create<GpurtGetStackBase>());
+  m_builder->CreateRet(m_builder->create<GpurtGetStackBaseOp>());
 }
 
 // =====================================================================================================================
@@ -118,7 +118,7 @@ void SpirvProcessGpuRtLibrary::createLdsWrite(llvm::Function *func) {
   auto int32ty = m_builder->getInt32Ty();
   Value *stackOffset = m_builder->CreateLoad(int32ty, argIt++);
   Value *stackData = m_builder->CreateLoad(int32ty, argIt);
-  m_builder->CreateRet(m_builder->create<GpurtStackWrite>(stackOffset, stackData));
+  m_builder->CreateRet(m_builder->create<GpurtStackWriteOp>(stackOffset, stackData));
 }
 
 // =====================================================================================================================
@@ -129,7 +129,7 @@ void SpirvProcessGpuRtLibrary::createLdsRead(llvm::Function *func) {
   m_builder->SetInsertPoint(clearBlock(func));
   Value *stackIndex = func->arg_begin();
   stackIndex = m_builder->CreateLoad(m_builder->getInt32Ty(), stackIndex);
-  m_builder->CreateRet(m_builder->create<GpurtStackRead>(stackIndex));
+  m_builder->CreateRet(m_builder->create<GpurtStackReadOp>(stackIndex));
 }
 
 // =====================================================================================================================
@@ -139,7 +139,7 @@ void SpirvProcessGpuRtLibrary::createLdsRead(llvm::Function *func) {
 void SpirvProcessGpuRtLibrary::createGetStackStride(llvm::Function *func) {
 
   m_builder->SetInsertPoint(clearBlock(func));
-  m_builder->CreateRet(m_builder->create<GpurtGetStackStride>());
+  m_builder->CreateRet(m_builder->create<GpurtGetStackStrideOp>());
 }
 
 // =====================================================================================================================
@@ -148,7 +148,7 @@ void SpirvProcessGpuRtLibrary::createGetStackStride(llvm::Function *func) {
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createLdsStackInit(llvm::Function *func) {
   m_builder->SetInsertPoint(clearBlock(func));
-  m_builder->CreateRet(m_builder->create<GpurtLdsStackInit>());
+  m_builder->CreateRet(m_builder->create<GpurtLdsStackInitOp>());
 }
 
 // =====================================================================================================================
@@ -162,7 +162,7 @@ void SpirvProcessGpuRtLibrary::createLdsStackStore(llvm::Function *func) {
   Value *lastVisited = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt++);
   auto int32x4Ty = FixedVectorType::get(m_builder->getInt32Ty(), 4);
   Value *data = m_builder->CreateLoad(int32x4Ty, argIt);
-  m_builder->CreateRet(m_builder->create<GpurtLdsStackStore>(stackAddr, lastVisited, data));
+  m_builder->CreateRet(m_builder->create<GpurtLdsStackStoreOp>(stackAddr, lastVisited, data));
 }
 
 } // namespace Llpc

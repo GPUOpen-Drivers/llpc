@@ -17,13 +17,13 @@
 #include "llvm/IR/PassManager.h"
 
 namespace lgc {
-class GpurtGetStackSize;
-class GpurtGetStackBase;
-class GpurtGetStackStride;
-class GpurtStackWrite;
-class GpurtStackRead;
-class GpurtLdsStackInit;
-class GpurtLdsStackStore;
+class GpurtGetStackSizeOp;
+class GpurtGetStackBaseOp;
+class GpurtGetStackStrideOp;
+class GpurtStackWriteOp;
+class GpurtStackReadOp;
+class GpurtLdsStackInitOp;
+class GpurtLdsStackStoreOp;
 } // namespace lgc
 
 namespace llvm {
@@ -42,13 +42,13 @@ private:
   uint32_t getWorkgroupSize() const;
   llvm::Value *getThreadIdInGroup() const;
   void createGlobalStack();
-  void getStackSize(lgc::GpurtGetStackSize &inst);
-  void getStackBase(lgc::GpurtGetStackBase &inst);
-  void getStackStride(lgc::GpurtGetStackStride &inst);
-  void stackWrite(lgc::GpurtStackWrite &inst);
-  void stackRead(lgc::GpurtStackRead &inst);
-  void ldsStackInit(lgc::GpurtLdsStackInit &inst);
-  void ldsStackStore(lgc::GpurtLdsStackStore &inst);
+  void visitGetStackSize(lgc::GpurtGetStackSizeOp &inst);
+  void visitGetStackBase(lgc::GpurtGetStackBaseOp &inst);
+  void visitGetStackStride(lgc::GpurtGetStackStrideOp &inst);
+  void visitStackWrite(lgc::GpurtStackWriteOp &inst);
+  void visitStackRead(lgc::GpurtStackReadOp &inst);
+  void visitLdsStackInit(lgc::GpurtLdsStackInitOp &inst);
+  void visitLdsStackStore(lgc::GpurtLdsStackStoreOp &inst);
   llvm::Value *m_stack;                                  // Stack array to hold stack value
   llvm::Type *m_stackTy;                                 // Stack type
   bool m_lowerStack;                                     // If it is lowerStack
