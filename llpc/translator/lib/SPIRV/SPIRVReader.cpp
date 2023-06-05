@@ -8455,12 +8455,8 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
     } else {
       blockDec.IsMatrix = true;
       stride = blockDec.MatrixStride;
-      if (stride == 0) {
-        if (deriveStride)
-          stride = bt->getDerivedMatrixStride();
-        else
-          llvm_unreachable("Missing matrix stride decoration");
-      }
+      if (stride == 0 && deriveStride)
+        stride = bt->getDerivedMatrixStride();
       elemTy = bt->getMatrixColumnType();
     }
 
