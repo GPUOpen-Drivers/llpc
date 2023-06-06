@@ -257,8 +257,9 @@ Value *BuilderImpl::CreateFMod(Value *dividend, Value *divisor, const Twine &ins
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateFma(Value *a, Value *b, Value *c, const Twine &instName) {
   if (getPipelineState()->getTargetInfo().getGfxIpVersion().major <= 8) {
-    // Pre-GFX9 version: Use fmuladd.
-    return CreateIntrinsic(Intrinsic::fmuladd, a->getType(), {a, b, c}, nullptr, instName);
+    // Pre-GFX9 version: Use fmul and fadd.
+    Value *fmul = CreateFMul(a, b);
+    return CreateFAdd(fmul, c, instName);
   }
 
   // GFX9+ version: Use fma.
@@ -1338,11 +1339,11 @@ Value *BuilderImpl::createFMix(Value *x, Value *y, Value *a, const Twine &instNa
       a = CreateVectorSplat(vectorResultTy->getNumElements(), a);
   }
 
-  FastMathFlags fastMathFlags = getFastMathFlags();
-  fastMathFlags.setNoNaNs();
-  fastMathFlags.setAllowContract();
-  CallInst *result = CreateIntrinsic(Intrinsic::fmuladd, x->getType(), {ySubX, a, x}, nullptr, instName);
-  result->setFastMathFlags(fastMathFlags);
+  IRBuilderBase::FastMathFlagGuard FMFGuard(*this);
+  getFastMathFlags().setNoNaNs();
+  getFastMathFlags().setAllowContract();
+  Value *fmul = CreateFMul(ySubX, a);
+  Value *result = CreateFAdd(fmul, x, instName);
 
   return result;
 }
