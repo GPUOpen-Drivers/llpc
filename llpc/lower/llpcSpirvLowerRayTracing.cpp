@@ -486,7 +486,6 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
 
   // Process traceRays module
   if (m_shaderStage == ShaderStageCompute) {
-    createGlobalStack();
     for (auto funcIt = module.begin(), funcEnd = module.end(); funcIt != funcEnd;) {
       Function *func = &*funcIt++;
       SpirvLowerRayQuery::processLibraryFunction(func);

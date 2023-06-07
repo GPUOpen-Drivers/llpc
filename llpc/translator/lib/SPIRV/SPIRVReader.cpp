@@ -7669,15 +7669,6 @@ bool SPIRVToLLVM::transMetadata() {
           computeMode.workgroupSizeZ = workgroupSizeZ;
         }
         Pipeline::setComputeShaderMode(*m_m, computeMode);
-#if VKI_RAY_TRACING
-        // We also need to set the overall workgroup size on the PipelineContext so that the LowerRayQuery
-        // pass running on the rayQuery library module (a different module to this compute shader) can see it.
-        unsigned workgroupSize = workgroupSizeX == 0 ? 1 : workgroupSizeX;
-        workgroupSize *= workgroupSizeY == 0 ? 1 : workgroupSizeY;
-        workgroupSize *= workgroupSizeZ == 0 ? 1 : workgroupSizeZ;
-        Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
-        llpcContext->getPipelineContext()->setWorkgroupSize(workgroupSize);
-#endif
 
       } else
         llvm_unreachable("Invalid execution model");

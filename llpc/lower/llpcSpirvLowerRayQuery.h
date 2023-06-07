@@ -116,6 +116,7 @@ public:
   SpirvLowerRayQuery(bool rayQueryLibrary);
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
   virtual bool runImpl(llvm::Module &module);
+  llvm::Value *getThreadIdInGroup() const;
 
   static llvm::StringRef name() { return "Lower SPIR-V RayQuery operations"; }
 
@@ -124,7 +125,6 @@ public:
 protected:
   void processLibraryFunction(llvm::Function *&func);
   void processShaderFunction(llvm::Function *func, unsigned opcode);
-  void createGlobalStack();
   void createGlobalLdsUsage();
   void createGlobalRayQueryObj();
   void createGlobalTraceRayStaticId();
@@ -132,7 +132,6 @@ protected:
   void generateTraceRayStaticId();
   llvm::Value *createTransformMatrix(unsigned builtInId, llvm::Value *accelStruct, llvm::Value *instanceId,
                                      llvm::Instruction *insertPos);
-  llvm::Value *getThreadIdInGroup() const;
   void eraseFunctionBlocks(llvm::Function *func);
   unsigned getFuncOpcode(llvm::Function *func);
   llvm::Value *createLoadInstanceIndex(llvm::Value *instNodeAddr);
@@ -146,22 +145,13 @@ private:
   template <spv::Op> void createRayQueryFunc(llvm::Function *func);
   void createRayQueryProceedFunc(llvm::Function *func);
   llvm::Value *createIntersectSystemValue(llvm::Function *func, unsigned raySystem);
-  void createWriteLdsStack(llvm::Function *func);
-  void createReadLdsStack(llvm::Function *func);
   void createIntersectMatrix(llvm::Function *func, unsigned builtInId);
   void createIntersectBvh(llvm::Function *func);
   void createSampleGpuTime(llvm::Function *func);
-#if VKI_BUILD_GFX11
-  void createLdsStackInit(llvm::Function *func);
-  void createLdsStackStore(llvm::Function *func);
-#endif
-  llvm::Value *getStackArrayIndex(llvm::Value *stackOffset);
-  uint32_t getWorkgroupSize() const;
   llvm::Value *createGetInstanceNodeAddr(llvm::Value *instNodePtr, llvm::Value *rayQuery);
   llvm::Value *getDispatchId();
   llvm::Value *createGetBvhSrd(llvm::Value *expansion, llvm::Value *boxSortMode);
   bool stageNotSupportLds(ShaderStage stage);
-  llvm::GlobalVariable *m_ldsStack;        // LDS to hold stack value
   llvm::GlobalVariable *m_ldsUsage;        // LDS usage
   llvm::GlobalVariable *m_stackArray;      // Stack array to hold stack value
   llvm::GlobalVariable *m_prevRayQueryObj; // Previous ray query Object

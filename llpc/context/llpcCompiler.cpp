@@ -47,6 +47,7 @@
 #include "llpcSpirvLowerCfgMerges.h"
 #if VKI_RAY_TRACING
 #include "llpcSpirvLowerRayTracing.h"
+#include "llpcSpirvProcessGpuRtLibrary.h"
 #endif
 #include "llpcSpirvLowerTranslator.h"
 #include "llpcSpirvLowerUtil.h"
@@ -2299,7 +2300,8 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
       // Lower SPIR-V CFG merges before inlining -- don't run in the (empty) entry point module
       lowerPassMgr->addPass(SpirvLowerCfgMerges());
       lowerPassMgr->addPass(AlwaysInlinerPass());
-    }
+    } else
+      lowerPassMgr->addPass(SpirvProcessGpuRtLibrary());
     lowerPassMgr->addPass(SpirvLowerRayTracing());
 
     // Stop timer for translate.
