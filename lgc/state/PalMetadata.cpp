@@ -383,7 +383,7 @@ void PalMetadata::mergeFromBlob(llvm::StringRef blob, bool isGlueCode) {
       if (destNode->getKind() == msgpack::Type::UInt)
         *destNode = destNode->getUInt() | srcNode.getUInt();
       else if (destNode->getKind() == msgpack::Type::Boolean)
-        *destNode = destNode->getBool() | srcNode.getBool();
+        *destNode = destNode->getBool() || srcNode.getBool();
       else
         llvm_unreachable("unsupported type to be merged!");
     }
