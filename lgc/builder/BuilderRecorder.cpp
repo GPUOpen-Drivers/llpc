@@ -166,6 +166,8 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "extract.bit.field";
   case BuilderOpcode::FindSMsb:
     return "find.smsb";
+  case BuilderOpcode::CountLeadingSignBits:
+    return "count.leading.sign.bits";
   case BuilderOpcode::FMix:
     return "fmix";
   case BuilderOpcode::LoadBufferDesc:
@@ -1061,6 +1063,15 @@ Value *Builder::CreateExtractBitField(Value *base, Value *offset, Value *count, 
 // @param instName : Name to give instruction(s)
 Value *Builder::CreateFindSMsb(Value *value, const Twine &instName) {
   return record(BuilderOpcode::FindSMsb, value->getType(), value, instName);
+}
+
+// =====================================================================================================================
+// Create "count leading sign bits" operation for a (vector of) signed int.
+//
+// @param value : Input value
+// @param instName : Name to give instruction(s)
+Value *Builder::CreateCountLeadingSignBits(Value *value, const Twine &instName) {
+  return record(BuilderOpcode::CountLeadingSignBits, value->getType(), value, instName);
 }
 
 // =====================================================================================================================
@@ -2093,6 +2104,7 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::FSign:
     case BuilderOpcode::FaceForward:
     case BuilderOpcode::FindSMsb:
+    case BuilderOpcode::CountLeadingSignBits:
     case BuilderOpcode::Fma:
     case BuilderOpcode::FpTruncWithRounding:
     case BuilderOpcode::Fract:

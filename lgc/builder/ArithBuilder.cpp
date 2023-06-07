@@ -356,6 +356,25 @@ Value *BuilderImpl::aSinACosCommon(Value *x, Constant *coefP0, Constant *coefP1)
 }
 
 // =====================================================================================================================
+// Common code for find smsb and count leading sign bits
+//
+// @param x : Input value X
+// @param isCountLeadingSignBits : if count leading sign bits
+Value *BuilderImpl::findSMsbOrCountLeadingSignBitsCommon(Value *value, bool isFindSMsb, const Twine &instName) {
+  assert(value->getType()->getScalarType()->isIntegerTy(32));
+
+  Constant *negOne = ConstantInt::get(value->getType(), -1);
+  Value *result =
+      scalarize(value, [this](Value *value) { return CreateUnaryIntrinsic(Intrinsic::amdgcn_sffbh, value); });
+  if (isFindSMsb)
+    result = CreateSub(ConstantInt::get(value->getType(), 31), result);
+  Value *isNegOne = CreateICmpEQ(value, negOne);
+  Value *isZero = CreateICmpEQ(value, Constant::getNullValue(value->getType()));
+  Value *isNegOneOrZero = CreateOr(isNegOne, isZero);
+  return CreateSelect(isNegOneOrZero, negOne, result, instName);
+}
+
+// =====================================================================================================================
 // Create an "atan" operation for a scalar or vector float or half.
 //
 // @param yOverX : Input value Y/X
@@ -1307,16 +1326,18 @@ Value *BuilderImpl::CreateExtractBitField(Value *base, Value *offset, Value *cou
 // @param value : Input value
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateFindSMsb(Value *value, const Twine &instName) {
-  assert(value->getType()->getScalarType()->isIntegerTy(32));
+  return findSMsbOrCountLeadingSignBitsCommon(value, true, instName);
+}
 
-  Constant *negOne = ConstantInt::get(value->getType(), -1);
-  Value *leadingZeroCount =
-      scalarize(value, [this](Value *value) { return CreateUnaryIntrinsic(Intrinsic::amdgcn_sffbh, value); });
-  Value *bitOnePos = CreateSub(ConstantInt::get(value->getType(), 31), leadingZeroCount);
-  Value *isNegOne = CreateICmpEQ(value, negOne);
-  Value *isZero = CreateICmpEQ(value, Constant::getNullValue(value->getType()));
-  Value *isNegOneOrZero = CreateOr(isNegOne, isZero);
-  return CreateSelect(isNegOneOrZero, negOne, bitOnePos, instName);
+// =====================================================================================================================
+// Create "count leading sign bits" operation for a (vector of) signed i32. For a positive number, the result is the count of
+// the most leading significant 1-bit. For a negative number, the result is the bit number of the most significant 0-bit.
+// For a value of 0 or -1, the result is -1.
+//
+// @param value : Input value
+// @param instName : Name to give instruction(s)
+Value *BuilderImpl::CreateCountLeadingSignBits(Value *value, const Twine &instName) {
+  return findSMsbOrCountLeadingSignBitsCommon(value, false, instName);
 }
 
 // =====================================================================================================================

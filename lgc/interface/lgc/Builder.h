@@ -782,6 +782,15 @@ public:
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateFindSMsb(llvm::Value *value, const llvm::Twine &instName = "");
 
+  // Create "count leading sign bits" operation for a (vector of) signed i32. For a positive number, the result is
+  // the count of the most leading significant 1-bit. For a negative number, the result is the bit number of the
+  // most significant 0-bit.
+  // For a value of 0 or -1, the result is -1.
+  //
+  // @param value : Input value
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateCountLeadingSignBits(llvm::Value *value, const llvm::Twine &instName = "");
+
   // Create "fmix" operation, returning ( 1 - A ) * X + A * Y. Result would be FP scalar or vector value.
   // Returns scalar, if and only if "pX", "pY" and "pA" are all scalars.
   // Returns vector, if "pX" and "pY" are vector but "pA" is a scalar, under such condition, "pA" will be splatted.
