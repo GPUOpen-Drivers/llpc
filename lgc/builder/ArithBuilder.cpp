@@ -356,25 +356,6 @@ Value *BuilderImpl::aSinACosCommon(Value *x, Constant *coefP0, Constant *coefP1)
 }
 
 // =====================================================================================================================
-// Common code for find smsb and count leading sign bits
-//
-// @param x : Input value X
-// @param isCountLeadingSignBits : if count leading sign bits
-Value *BuilderImpl::findSMsbOrCountLeadingSignBitsCommon(Value *value, bool isFindSMsb, const Twine &instName) {
-  assert(value->getType()->getScalarType()->isIntegerTy(32));
-
-  Constant *negOne = ConstantInt::get(value->getType(), -1);
-  Value *result =
-      scalarize(value, [this](Value *value) { return CreateUnaryIntrinsic(Intrinsic::amdgcn_sffbh, value); });
-  if (isFindSMsb)
-    result = CreateSub(ConstantInt::get(value->getType(), 31), result);
-  Value *isNegOne = CreateICmpEQ(value, negOne);
-  Value *isZero = CreateICmpEQ(value, Constant::getNullValue(value->getType()));
-  Value *isNegOneOrZero = CreateOr(isNegOne, isZero);
-  return CreateSelect(isNegOneOrZero, negOne, result, instName);
-}
-
-// =====================================================================================================================
 // Create an "atan" operation for a scalar or vector float or half.
 //
 // @param yOverX : Input value Y/X
@@ -1326,7 +1307,13 @@ Value *BuilderImpl::CreateExtractBitField(Value *base, Value *offset, Value *cou
 // @param value : Input value
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateFindSMsb(Value *value, const Twine &instName) {
-  return findSMsbOrCountLeadingSignBitsCommon(value, true, instName);
+  assert(value->getType()->getScalarType()->isIntegerTy(32));
+
+  Constant *negOne = ConstantInt::get(value->getType(), -1);
+  Value *leadingZeroCount = CreateCountLeadingSignBits(value);
+  Value *isNegOne = CreateICmpEQ(leadingZeroCount, negOne);
+  Value *bitOnePos = CreateSub(ConstantInt::get(value->getType(), 31), leadingZeroCount);
+  return CreateSelect(isNegOne, negOne, bitOnePos, instName);
 }
 
 // =====================================================================================================================
@@ -1337,7 +1324,12 @@ Value *BuilderImpl::CreateFindSMsb(Value *value, const Twine &instName) {
 // @param value : Input value
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateCountLeadingSignBits(Value *value, const Twine &instName) {
-  return findSMsbOrCountLeadingSignBitsCommon(value, false, instName);
+  assert(value->getType()->getScalarType()->isIntegerTy(32));
+
+  Value *result =
+      scalarize(value, [this](Value *value) { return CreateUnaryIntrinsic(Intrinsic::amdgcn_sffbh, value); });
+  result->setName(instName);
+  return result;
 }
 
 // =====================================================================================================================
