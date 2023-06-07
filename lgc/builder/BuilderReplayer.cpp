@@ -372,6 +372,10 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     return m_builder->CreateFindSMsb(args[0]);
   }
 
+  case BuilderOpcode::CountLeadingSignBits: {
+    return m_builder->CreateCountLeadingSignBits(args[0]);
+  }
+
   case BuilderOpcode::FMix: {
     return m_builder->createFMix(args[0], args[1], args[2]);
   }

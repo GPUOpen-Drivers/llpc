@@ -100,6 +100,7 @@ enum BuilderOpcode : unsigned {
   InsertBitField,
   ExtractBitField,
   FindSMsb,
+  CountLeadingSignBits,
   FMix,
 
   // Descriptor
