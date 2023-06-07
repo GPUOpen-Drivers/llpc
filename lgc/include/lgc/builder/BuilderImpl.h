@@ -229,10 +229,6 @@ private:
   // Common code for asin and acos
   llvm::Value *aSinACosCommon(llvm::Value *x, llvm::Constant *coefP0, llvm::Constant *coefP1);
 
-  // Common code for find smsb and count leading sign bits
-  llvm::Value *findSMsbOrCountLeadingSignBitsCommon(llvm::Value *value, bool isFindSMsb,
-                                                    const llvm::Twine &instName = "");
-
   // Generate FP division, using fast fdiv for float to bypass optimization.
   llvm::Value *fDivFast(llvm::Value *numerator, llvm::Value *denominator);
 
