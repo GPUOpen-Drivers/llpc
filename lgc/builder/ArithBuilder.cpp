@@ -1310,9 +1310,9 @@ Value *BuilderImpl::CreateFindSMsb(Value *value, const Twine &instName) {
   assert(value->getType()->getScalarType()->isIntegerTy(32));
 
   Constant *negOne = ConstantInt::get(value->getType(), -1);
-  Value *leadingZeroCount = CreateCountLeadingSignBits(value);
-  Value *isNegOne = CreateICmpEQ(leadingZeroCount, negOne);
-  Value *bitOnePos = CreateSub(ConstantInt::get(value->getType(), 31), leadingZeroCount);
+  Value *leadingSignBitsCount = CreateCountLeadingSignBits(value);
+  Value *isNegOne = CreateICmpEQ(leadingSignBitsCount, negOne);
+  Value *bitOnePos = CreateSub(ConstantInt::get(value->getType(), 31), leadingSignBitsCount);
   return CreateSelect(isNegOne, negOne, bitOnePos, instName);
 }
 
