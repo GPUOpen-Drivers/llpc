@@ -1317,9 +1317,9 @@ Value *BuilderImpl::CreateFindSMsb(Value *value, const Twine &instName) {
 }
 
 // =====================================================================================================================
-// Create "count leading sign bits" operation for a (vector of) signed i32. For a positive number, the result is the count of
-// the most leading significant 1-bit. For a negative number, the result is the bit number of the most significant 0-bit.
-// For a value of 0 or -1, the result is -1.
+// Create "count leading sign bits" operation for a (vector of) signed i32. For a positive number, the result is the
+// count of the most leading significant 1-bit. For a negative number, the result is the bit number of the most
+// significant 0-bit. For a value of 0 or -1, the result is -1.
 //
 // @param value : Input value
 // @param instName : Name to give instruction(s)
