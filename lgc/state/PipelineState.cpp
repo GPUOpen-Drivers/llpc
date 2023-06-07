@@ -760,7 +760,7 @@ void PipelineState::recordUserDataTable(ArrayRef<ResourceNode> nodes, NamedMDNod
     }
     default: {
       // Operand 4: set
-      operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.set)));
+      operands.push_back(ConstantAsMetadata::get(builder.getInt64(node.set)));
       // Operand 5: binding
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.binding)));
       // Operand 6: stride
@@ -956,7 +956,7 @@ static bool nodeTypeHasBinding(ResourceNodeType nodeType) {
 // @param nodeType : Resource node type being searched for
 // @param descSet : Descriptor set being searched for
 // @param binding : Descriptor binding being searched for
-bool PipelineState::matchResourceNode(const ResourceNode &node, ResourceNodeType nodeType, unsigned descSet,
+bool PipelineState::matchResourceNode(const ResourceNode &node, ResourceNodeType nodeType, uint64_t descSet,
                                       unsigned binding) const {
   if (node.set != descSet || !isNodeTypeCompatible(nodeType, node.abstractType))
     return false;
@@ -981,7 +981,7 @@ bool PipelineState::matchResourceNode(const ResourceNode &node, ResourceNodeType
 // @param descSet : ID of descriptor set
 // @param binding : ID of descriptor binding
 std::pair<const ResourceNode *, const ResourceNode *>
-PipelineState::findResourceNode(ResourceNodeType nodeType, unsigned descSet, unsigned binding) const {
+PipelineState::findResourceNode(ResourceNodeType nodeType, uint64_t descSet, unsigned binding) const {
   for (const ResourceNode &node : getUserDataNodes()) {
     if (!nodeTypeHasBinding(node.concreteType))
       continue;

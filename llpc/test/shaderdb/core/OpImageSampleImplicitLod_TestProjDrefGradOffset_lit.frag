@@ -14,11 +14,11 @@ void main()
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i32 0, i32 0)
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i64 0, i32 0)
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.f32(i32 1, i32 512, {{.*}}, {{.*}}, i32 793, {{.*}}, <2 x float> <float 0x3FB99999A0000000, float 0x3FC99999A0000000>, <2 x float> <float 0x3FD3333340000000, float 0x3FD99999A0000000>, <2 x i32> <i32 2, i32 3>, {{.*}})
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i32 0, i32 0)
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i64 0, i32 0)
 ; SHADERTEST: call {{.*}} @lgc.create.image.sample.f32(i32 1, i32 512, {{.*}}, {{.*}}, i32 793, {{.*}}, <2 x float> <float 0x3FB99999A0000000, float 0x3FC99999A0000000>, <2 x float> <float 0x3FD3333340000000, float 0x3FD99999A0000000>, <2 x i32> <i32 2, i32 3>, {{.*}})
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results

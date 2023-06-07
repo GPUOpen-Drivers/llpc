@@ -59,7 +59,6 @@ class PipelineState;
 namespace {
 
 // Map vkgc
-static constexpr unsigned InternalDescriptorSetId = static_cast<unsigned>(-1);
 static constexpr unsigned FetchShaderInternalBufferBinding = 5;
 
 // Represents vertex format info corresponding to vertex attribute format (VkFormat).

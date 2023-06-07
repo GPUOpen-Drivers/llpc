@@ -297,7 +297,7 @@ struct ResourceNode {
   union {
     // Info for generic descriptor nodes.
     struct {
-      unsigned set;                   // Descriptor set
+      uint64_t set;                   // Descriptor set
       unsigned binding;               // Binding
                                       // If pipeline option "useResourceBindingRange" is set, then this is the
                                       //  start of a range of bindings whose size is sizeInDwords/stride.

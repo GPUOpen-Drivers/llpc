@@ -23,7 +23,7 @@ void main()
 }
 // CHECK-LABEL: @lgc.shader.FS.main(
 // CHECK-NEXT:  .entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i32 0, i32 0, i32 0, i32 0)
+// CHECK-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i64 0, i32 0, i32 0, i32 0)
 // CHECK-NEXT:    [[TMP1:%.*]] = call ptr @llvm.invariant.start.p7(i64 -1, ptr addrspace(7) [[TMP0]])
 // CHECK-NEXT:    [[TMP2:%.*]] = load <2 x i32>, ptr addrspace(7) [[TMP0]], align 8
 // CHECK-NEXT:    [[TMP3:%.*]] = icmp ne <2 x i32> [[TMP2]], zeroinitializer

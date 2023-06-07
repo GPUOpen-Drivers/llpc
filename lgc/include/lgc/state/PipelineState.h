@@ -242,8 +242,8 @@ public:
   const ResourceNode *findPushConstantResourceNode() const;
 
   // Find the resource node for the given set,binding
-  std::pair<const ResourceNode *, const ResourceNode *> findResourceNode(ResourceNodeType nodeType, unsigned descSet,
-                                                                         unsigned binding) const;
+  std::pair<const ResourceNode *, const ResourceNode *>
+  findResourceNode(ResourceNodeType nodeType, uint64_t descSet, unsigned binding) const;
 
   // Find the single root resource node of the given type
   const ResourceNode *findSingleRootResourceNode(ResourceNodeType nodeType) const;
@@ -519,7 +519,7 @@ private:
   llvm::ArrayRef<llvm::MDString *> getResourceTypeNames();
   llvm::MDString *getResourceTypeName(ResourceNodeType type);
   ResourceNodeType getResourceTypeFromName(llvm::MDString *typeName);
-  bool matchResourceNode(const ResourceNode &node, ResourceNodeType nodeType, unsigned descSet, unsigned binding) const;
+  bool matchResourceNode(const ResourceNode &node, ResourceNodeType nodeType, uint64_t descSet, unsigned binding) const;
 
   // Device index handling
   void recordDeviceIndex(llvm::Module *module);
