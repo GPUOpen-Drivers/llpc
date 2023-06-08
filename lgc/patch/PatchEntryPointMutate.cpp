@@ -64,6 +64,7 @@
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/AddressExtender.h"
 #include "lgc/util/BuilderBase.h"
+#include "lgc/util/Debug.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Analysis/AliasAnalysis.h" // for MemoryEffects
 #include "llvm/Support/CommandLine.h"
@@ -894,6 +895,16 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
 
   unsigned vgprLimit = shaderOptions->vgprLimit;
   unsigned sgprLimit = shaderOptions->sgprLimit;
+
+  if (vgprLimit != 0 && entryPoint->getReturnType()->isSized()) {
+    const unsigned CalleeSaveRegsMax = 56; // FIXME: can we compute this?
+    const DataLayout &dataLayout = entryPoint->getParent()->getDataLayout();
+    const uint64_t returnSize = dataLayout.getTypeAllocSize(entryPoint->getReturnType()) / 4;
+    if ((vgprLimit - CalleeSaveRegsMax) < returnSize) {
+      LLPC_OUTS("Ignoring vgprLimit setting due to return size of " << returnSize << " dwords\n");
+      vgprLimit = 0;
+    }
+  }
 
   if (vgprLimit != 0) {
     builder.addAttribute("amdgpu-num-vgpr", std::to_string(vgprLimit));
