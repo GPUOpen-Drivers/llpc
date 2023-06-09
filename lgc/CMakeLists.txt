@@ -217,7 +217,6 @@ target_sources(LLVMlgc PRIVATE
     patch/SystemValues.cpp
     patch/VertexFetch.cpp
     patch/PatchImageOpCollect.cpp
-    patch/PatchWaveSizeAdjust.cpp
     patch/RegisterMetadataBuilder.cpp
 )
 
