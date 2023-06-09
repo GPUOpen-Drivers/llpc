@@ -129,6 +129,7 @@ bool PatchWaveSizeAdjust::is16BitArithmeticOp(Instruction *inst) {
     case Intrinsic::umax:
     case Intrinsic::smax:
     case Intrinsic::fma:
+    case Intrinsic::ldexp:
     case Intrinsic::amdgcn_fract:
     case Intrinsic::amdgcn_frexp_mant:
     case Intrinsic::amdgcn_frexp_exp:

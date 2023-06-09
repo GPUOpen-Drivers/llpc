@@ -28,7 +28,7 @@ void main()
 ; SHADERTEST: %[[SCALING:[^ ,]*]] = fcmp reassoc nnan nsz arcp contract olt double %[[X]], 0x1000000000000000
 ; SHADERTEST: %[[SCALE_UP:[^ ,]*]] = select i1 %[[SCALING]], i32 256, i32 0
 ; SHADERTEST: %[[SCALE_DOWN:[^ ,]*]] = select i1 %[[SCALING]], i32 128, i32 0
-; SHADERTEST: %[[SCALE_X:[^ ,]*]] = call reassoc nnan nsz arcp contract double @llvm.amdgcn.ldexp.f64(double %[[X]], i32 %[[SCALE_UP]])
+; SHADERTEST: %[[SCALE_X:[^ ,]*]] = call reassoc nnan nsz arcp contract double @llvm.ldexp.f64.i32(double %[[X]], i32 %[[SCALE_UP]])
 ; SHADERTEST: %[[EXP_OF_SCALE_X:[^ ,]*]] = call i32 @llvm.amdgcn.frexp.exp.i32.f64(double %[[SCALE_X]])
 ; SHADERTEST: %[[TOO_SMALL_SCALE_X:[^ ,]*]] = icmp slt i32 %[[EXP_OF_SCALE_X]], -1021
 ; SHADERTEST: %[[NEW_SCALE_X:[^ ,]*]] = select reassoc nnan nsz arcp contract i1 %[[TOO_SMALL_SCALE_X]], double 0.000000e+00, double %[[SCALE_X]]
@@ -47,7 +47,7 @@ void main()
 ; SHADERTEST: %[[R2:[^ ,]*]] = call reassoc nnan nsz arcp contract double @llvm.fma.f64(double %[[NEG_H2]], double %[[G2]], double 5.000000e-01)
 ; SHADERTEST: %[[H3:[^ ,]*]] = call reassoc nnan nsz arcp contract double @llvm.fma.f64(double %[[H2]], double %[[R2]], double %[[H2]])
 ; SHADERTEST: %[[RSQ_X:[^ ,]*]] = fmul reassoc nnan nsz arcp contract double 2.000000e+00, %[[H3]]
-; SHADERTEST: %[[SCALE_RSQ_X:[^ ,]*]] = call reassoc nnan nsz arcp contract double @llvm.amdgcn.ldexp.f64(double %[[RSQ_X]], i32 %[[SCALE_DOWN]])
+; SHADERTEST: %[[SCALE_RSQ_X:[^ ,]*]] = call reassoc nnan nsz arcp contract double @llvm.ldexp.f64.i32(double %[[RSQ_X]], i32 %[[SCALE_DOWN]])
 ; SHADERTEST: %[[EXP_OF_SCALE_RSQ_X:[^ ,]*]] = call i32 @llvm.amdgcn.frexp.exp.i32.f64(double %[[SCALE_RSQ_X]])
 ; SHADERTEST: %[[TOO_SMALL_SCALE_RSQ_X:[^ ,]*]] = icmp slt i32 %[[EXP_OF_SCALE_RSQ_X]], -1021
 ; SHADERTEST: %[[NEW_SCALE_RSQ_X:[^ ,]*]] = select reassoc nnan nsz arcp contract i1 %[[TOO_SMALL_SCALE_RSQ_X]], double 0.000000e+00, double %[[SCALE_RSQ_X]]
