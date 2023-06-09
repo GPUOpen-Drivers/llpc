@@ -1408,6 +1408,10 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStage stage) {
       if (getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3}) && stage == ShaderStageCompute)
         waveSize = 64;
 
+      // Prefer wave64 on GFX11+
+      if (getTargetInfo().getGfxIpVersion() >= GfxIpVersion({11}))
+        waveSize = 64;
+
       unsigned waveSizeOption = getShaderOptions(checkingStage).waveSize;
       if (waveSizeOption != 0)
         waveSize = waveSizeOption;
