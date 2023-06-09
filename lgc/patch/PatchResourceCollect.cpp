@@ -406,6 +406,31 @@ bool PatchResourceCollect::canUseNggCulling(Module *module) {
   if (isa<Constant>(posValue))
     return false;
 
+  // Heuristic detecting very simple calculated position for geometry that will
+  // never be culled, disable NGG culling if there is no position fetch.
+  auto hasPositionFetch = [posCall] {
+    std::list<Instruction *> workList;
+    workList.push_back(posCall);
+    std::unordered_set<Instruction *> visited;
+    while (!workList.empty()) {
+      Instruction *inst = workList.front();
+      workList.pop_front();
+      visited.insert(inst);
+      for (Value *op : inst->operands()) {
+        LoadInst *opLoad = dyn_cast<LoadInst>(op);
+        if (opLoad && opLoad->getPointerAddressSpace() != ADDR_SPACE_CONST)
+          return true;
+        Instruction *opInst = dyn_cast<Instruction>(op);
+        if (opInst && visited.find(opInst) == visited.end())
+          workList.push_back(opInst);
+      }
+    }
+    return false;
+  };
+  bool hasVertexFetch = m_pipelineState->getPalMetadata()->getVertexFetchCount() != 0;
+  if (!hasGs && !hasVertexFetch && !hasPositionFetch())
+    return false;
+
   // We can safely enable NGG culling here
   return true;
 }
