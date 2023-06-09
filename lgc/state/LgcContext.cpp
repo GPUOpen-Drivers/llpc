@@ -149,11 +149,17 @@ void LgcContext::initialize() {
   setOptionDefault("simplifycfg-sink-common", "0");
   setOptionDefault("amdgpu-vgpr-index-mode", "1"); // force VGPR indexing on GFX8
   setOptionDefault("amdgpu-atomic-optimizations", "1");
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 463788
+  // Old version of the code
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  setOptionDefault("amdgpu-atomic-optimizer-strategy", "DPP");
+#endif
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
   // Old version of the code
   setOptionDefault("use-gpu-divergence-analysis", "1");
 #else
-// New version of the code (also handles unknown version, which we treat as latest)
+  // New version of the code (also handles unknown version, which we treat as latest)
 #endif
   setOptionDefault("structurizecfg-skip-uniform-regions", "1");
   setOptionDefault("spec-exec-max-speculation-cost", "10");
