@@ -3111,7 +3111,7 @@ void NggPrimShader::runEs(ArrayRef<Argument *> args) {
     // vertex fetches. Also set the name of each vertex fetch primitive shader argument while we're here.
     unsigned vertexFetchCount = m_pipelineState->getPalMetadata()->getVertexFetchCount();
     if (vertexFetchCount > 0) {
-      ArrayRef<Argument *> vertexFetches = vgprArgs.drop_front(m_gfxIp.major <= 11 ? 9 : 7);
+      ArrayRef<Argument *> vertexFetches = vgprArgs.drop_front(m_gfxIp.major <= 11 ? 9 : 5);
       assert(vertexFetches.size() == vertexFetchCount);
 
       for (unsigned i = 0; i < vertexFetchCount; ++i) {
@@ -7473,7 +7473,7 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
       // while we're here.
       unsigned vertexFetchCount = m_pipelineState->getPalMetadata()->getVertexFetchCount();
       if (vertexFetchCount > 0) {
-        ArrayRef<Argument *> vertexFetches = vgprArgs.drop_front(m_gfxIp.major <= 11 ? 9 : 7);
+        ArrayRef<Argument *> vertexFetches = vgprArgs.drop_front(m_gfxIp.major <= 11 ? 9 : 5);
         assert(vertexFetches.size() == vertexFetchCount);
 
         for (unsigned i = 0; i < vertexFetchCount; ++i) {
