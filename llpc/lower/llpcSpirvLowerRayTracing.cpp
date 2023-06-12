@@ -56,7 +56,7 @@ extern const char *MetaNameSpirvOp;
 } // namespace SPIRV
 
 namespace RtName {
-const char *TraceRayKHR = "TraceRayKHR";
+const char *TraceRayKHR = "_cs_";
 const char *TraceRaySetTraceParams = "TraceRaySetTraceParams";
 const char *ShaderTable = "ShaderTable";
 static const char *HitAttribute = "HitAttribute";
@@ -1566,7 +1566,7 @@ void SpirvLowerRayTracing::createTraceRay() {
   bool indirect = rayTracingContext->getIndirectStageMask() & ShaderStageComputeBit;
 
   auto funcTy = getTraceRayFuncTy();
-  StringRef funcName = indirect ? m_module->getName() : RtName::TraceRayKHR;
+  StringRef funcName = RtName::TraceRayKHR;
   Function *func = Function::Create(funcTy, GlobalValue::ExternalLinkage, funcName, m_module);
   func->setCallingConv(CallingConv::SPIR_FUNC);
   if (!indirect)

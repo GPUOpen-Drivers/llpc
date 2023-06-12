@@ -101,4 +101,20 @@ BasicBlock *clearBlock(Function *func) {
   return &entryBlock;
 }
 
+// =====================================================================================================================
+// Clear non entry external functions
+// @param module : LLVM module to remove functions.
+// @param entryName : Entry Function Name
+void clearNonEntryFunctions(Module *module, StringRef entryName) {
+  for (auto funcIt = module->begin(), funcEnd = module->end(); funcIt != funcEnd;) {
+    Function *func = &*funcIt++;
+    if (func->getLinkage() == GlobalValue::ExternalLinkage && !func->empty()) {
+      if (!func->getName().startswith(entryName)) {
+        func->dropAllReferences();
+        func->eraseFromParent();
+      }
+    }
+  }
+}
+
 } // namespace Llpc

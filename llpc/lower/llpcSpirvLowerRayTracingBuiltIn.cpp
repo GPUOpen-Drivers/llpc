@@ -79,7 +79,6 @@ bool SpirvLowerRayTracingBuiltIn::runImpl(Module &module) {
   m_context = static_cast<Context *>(&m_module->getContext());
   m_builder = m_context->getBuilder();
   m_shaderStage = getShaderStageFromModule(m_module);
-  auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
   const auto *rtState = m_context->getPipelineContext()->getRayTracingState();
 
   lgc::ComputeShaderMode mode = {};
@@ -91,9 +90,7 @@ bool SpirvLowerRayTracingBuiltIn::runImpl(Module &module) {
   for (auto funcIt = module.begin(), funcEnd = module.end(); funcIt != funcEnd;) {
     Function *func = &*funcIt++;
     if (func->getLinkage() == GlobalValue::ExternalLinkage && !func->empty()) {
-      StringRef entryName =
-          rayTracingContext->getIndirectStageMask() == 0 ? rayTracingContext->getEntryName() : module.getName();
-      if (func->getName().startswith(entryName))
+      if (func->getName().startswith(module.getName()))
         m_entryPoint = func;
       else {
         func->dropAllReferences();
