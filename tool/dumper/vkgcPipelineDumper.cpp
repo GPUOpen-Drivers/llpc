@@ -57,9 +57,7 @@ namespace Vkgc {
 std::ostream &operator<<(std::ostream &out, VkVertexInputRate inputRate);
 std::ostream &operator<<(std::ostream &out, VkFormat format);
 std::ostream &operator<<(std::ostream &out, VkPrimitiveTopology topology);
-#if VKI_RAY_TRACING
 std::ostream &operator<<(std::ostream &out, VkRayTracingShaderGroupTypeKHR type);
-#endif
 std::ostream &operator<<(std::ostream &out, ResourceMappingNodeType type);
 std::ostream &operator<<(std::ostream &out, NggSubgroupSizingType subgroupSizing);
 std::ostream &operator<<(std::ostream &out, DenormalMode denormalMode);
@@ -125,10 +123,8 @@ void *VKAPI_CALL IPipelineDumper::BeginPipelineDump(const PipelineDumpOptions *d
   MetroHash::Hash hash = {};
   if (pipelineInfo.pComputeInfo)
     hash = PipelineDumper::generateHashForComputePipeline(pipelineInfo.pComputeInfo, false, false);
-#if VKI_RAY_TRACING
   else if (pipelineInfo.pRayTracingInfo)
     hash = PipelineDumper::generateHashForRayTracingPipeline(pipelineInfo.pRayTracingInfo, false);
-#endif
   else {
     assert(pipelineInfo.pGraphicsInfo);
     hash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo.pGraphicsInfo, false, false);
@@ -282,7 +278,6 @@ uint64_t VKAPI_CALL IPipelineDumper::GetPipelineHash(const ComputePipelineBuildI
   return MetroHash::compact64(&hash);
 }
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Calculates ray tracing pipeline hash code.
 //
@@ -330,7 +325,6 @@ void VKAPI_CALL IPipelineDumper::GetPipelineName(const RayTracingPipelineBuildIn
 void VKAPI_CALL IPipelineDumper::DumpRayTracingPipelineMetadata(void *dumpFile, BinaryData *pipelineMeta) {
   PipelineDumper::dumpRayTracingPipelineMetadata(reinterpret_cast<PipelineDumpFile *>(dumpFile), pipelineMeta);
 }
-#endif
 
 // =====================================================================================================================
 // Gets the file name of SPIR-V binary according the specified shader hash.
@@ -352,14 +346,10 @@ std::string PipelineDumper::getPipelineInfoFileName(PipelineBuildInfo pipelineIn
   char fileName[64] = {};
   if (pipelineInfo.pComputeInfo) {
     snprintf(fileName, 64, "PipelineCs_0x%016" PRIX64, hashCode64);
-  }
-#if VKI_RAY_TRACING
-  else if (pipelineInfo.pRayTracingInfo) {
+  } else if (pipelineInfo.pRayTracingInfo) {
     auto length = snprintf(fileName, 64, "PipelineRays_0x%016" PRIX64, hashCode64);
     (void(length)); // unused
-  }
-#endif
-  else {
+  } else {
     assert(pipelineInfo.pGraphicsInfo);
     const char *fileNamePrefix = nullptr;
     if (pipelineInfo.pGraphicsInfo->tes.pModuleData && pipelineInfo.pGraphicsInfo->gs.pModuleData)
@@ -481,10 +471,8 @@ PipelineDumpFile *PipelineDumper::BeginPipelineDump(const PipelineDumpOptions *d
       if (pipelineInfo.pGraphicsInfo)
         dumpGraphicsPipelineInfo(&dumpFile->dumpFile, dumpOptions->pDumpDir, pipelineInfo.pGraphicsInfo);
 
-#if VKI_RAY_TRACING
       if (pipelineInfo.pRayTracingInfo)
         dumpRayTracingPipelineInfo(&dumpFile->dumpFile, dumpOptions->pDumpDir, pipelineInfo.pRayTracingInfo);
-#endif
     }
   }
 
@@ -783,7 +771,6 @@ void PipelineDumper::dumpComputeStateInfo(const ComputePipelineBuildInfo *pipeli
   // Output pipeline states
   dumpFile << "deviceIndex = " << pipelineInfo->deviceIndex << "\n";
   dumpPipelineOptions(&pipelineInfo->options, dumpFile);
-#if VKI_RAY_TRACING
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   // Output shader library binary
   if (pipelineInfo->shaderLibrary.codeSize > 0) {
@@ -797,7 +784,6 @@ void PipelineDumper::dumpComputeStateInfo(const ComputePipelineBuildInfo *pipeli
   }
 #endif
   dumpRayTracingRtState(&pipelineInfo->rtState, dumpDir, dumpFile);
-#endif
 }
 
 // =====================================================================================================================
@@ -831,11 +817,7 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.threadGroupSwizzleMode = " << options->threadGroupSwizzleMode << "\n";
   dumpFile << "options.reverseThreadGroup = " << options->reverseThreadGroup << "\n";
   dumpFile << "options.enableImplicitInvariantExports = " << options->enableImplicitInvariantExports << "\n";
-
-#if VKI_RAY_TRACING
   dumpFile << "options.internalRtShaders = " << options->internalRtShaders << "\n";
-#endif
-
   dumpFile << "options.forceNonUniformResourceIndexStageMask = " << options->forceNonUniformResourceIndexStageMask
            << "\n";
 }
@@ -920,7 +902,6 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "enableUberFetchShader = " << pipelineInfo->enableUberFetchShader << "\n";
   dumpFile << "enableEarlyCompile = " << pipelineInfo->enableEarlyCompile << "\n";
   dumpPipelineOptions(&pipelineInfo->options, dumpFile);
-#if VKI_RAY_TRACING
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   // Output shader library binary
   if (pipelineInfo->shaderLibrary.codeSize > 0) {
@@ -934,7 +915,6 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   }
 #endif
   dumpRayTracingRtState(&pipelineInfo->rtState, dumpDir, dumpFile);
-#endif
   dumpFile << "\n\n";
 
   // Output vertex input state
@@ -1001,7 +981,6 @@ void PipelineDumper::dumpGraphicsPipelineInfo(std::ostream *dumpFile, const char
   dumpFile->flush();
 }
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Dumps ray tracing pipeline build info to file.
 //
@@ -1178,6 +1157,7 @@ void PipelineDumper::dumpRayTracingPipelineMetadata(PipelineDumpFile *dumpFile, 
     dumpFile->binaryFile.close();
   }
 }
+
 // =====================================================================================================================
 // Update hash code for the pipeline rtstate
 //
@@ -1252,8 +1232,6 @@ void PipelineDumper::updateHashForRtState(const RtState *rtState, MetroHash64 *h
   }
 }
 
-#endif
-
 // =====================================================================================================================
 // Builds hash code from graphics pipeline build info.  If stage is a specific stage of the graphics pipeline, then only
 // the portions of the pipeline build info that affect that stage will be included in the hash.  Otherwise, stage must
@@ -1313,9 +1291,7 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
   if (unlinkedShaderType != UnlinkedStageVertexProcess)
     updateHashForFragmentState(pipeline, &hasher, isRelocatableShader);
 
-#if VKI_RAY_TRACING
   updateHashForRtState(&pipeline->rtState, &hasher, isCacheHash);
-#endif
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
 
@@ -1341,9 +1317,7 @@ MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipe
 
   updateHashForPipelineOptions(&pipeline->options, &hasher, isCacheHash, isRelocatableShader, UnlinkedStageCompute);
 
-#if VKI_RAY_TRACING
   updateHashForRtState(&pipeline->rtState, &hasher, isCacheHash);
-#endif
   // Relocatable shaders force an unlinked compilation.
   hasher.Update(pipeline->unlinked || isRelocatableShader);
 
@@ -1353,7 +1327,6 @@ MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipe
   return hash;
 }
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Builds hash code from ray tracing pipeline build info.
 //
@@ -1407,7 +1380,6 @@ MetroHash::Hash PipelineDumper::generateHashForRayTracingPipeline(const RayTraci
 
   return hash;
 }
-#endif
 
 // =====================================================================================================================
 // Updates hash code context for vertex input state
@@ -1603,10 +1575,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->optimizationLevel);
   hasher->Update(options->threadGroupSwizzleMode);
   hasher->Update(options->reverseThreadGroup);
-
-#if VKI_RAY_TRACING
   hasher->Update(options->internalRtShaders);
-#endif
   hasher->Update(options->forceNonUniformResourceIndexStageMask);
 }
 
@@ -2299,7 +2268,6 @@ std::ostream &operator<<(std::ostream &out, VkPrimitiveTopology topology) {
   return out << string;
 }
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Translates enum "VkRayTracingShaderGroupTypeKHR" to string and output to ostream.
 //
@@ -2320,7 +2288,6 @@ std::ostream &operator<<(std::ostream &out, VkRayTracingShaderGroupTypeKHR type)
 
   return out << string;
 }
-#endif
 
 // =====================================================================================================================
 // Translates enum "VkFormat" to string and output to ostream.

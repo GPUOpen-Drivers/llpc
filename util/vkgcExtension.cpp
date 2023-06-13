@@ -94,11 +94,9 @@ const ExtensionNamePair ExtensionNameTable[ExtensionCount] = {
     DeclExtensionName(GOOGLE_DECORATE_STRING),
     DeclExtensionName(GOOGLE_HLSL_FUNCTIONALITY1),
     DeclExtensionName(GOOGLE_USER_TYPE),
-#if VKI_RAY_TRACING
     DeclExtensionName(KHR_RAY_TRACING_POSITION_FETCH),
     DeclExtensionName(KHR_RAY_TRACING),
     DeclExtensionName(KHR_RAY_QUERY),
-#endif
     DeclExtensionName(NV_SHADER_ATOMIC_FLOAT),
 };
 

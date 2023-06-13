@@ -253,7 +253,6 @@ TEST(PipelineDumperTest, TestShadowDescriptorTableUsageCompute) {
   HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &params) { return params.isRelocatableShader; };
   runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
 }
-#if VKI_BUILD_GFX11
 
 // =====================================================================================================================
 // Test the optimizeTessFactor option.
@@ -274,7 +273,6 @@ TEST(PipelineDumperTest, TestOptimizeTessFactorOptionCompute) {
   HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &params) { return true; };
   runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
 }
-#endif
 
 // =====================================================================================================================
 // Test the optimization level option.  The default value for the optimization level in the pipeline build info is 0.
@@ -370,7 +368,7 @@ TEST(PipelineDumperTest, TestReverseThreadGroupCompute) {
   HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &params) { return false; };
   runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
 }
-#if VKI_RAY_TRACING
+
 // =====================================================================================================================
 // Test the internalRtShaders option.
 
@@ -389,7 +387,6 @@ TEST(PipelineDumperTest, TestInternalRTShadersCompute) {
   HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &) { return false; };
   runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
 }
-#endif
 
 // =====================================================================================================================
 // Test the forceNonUniformResourceIndexStageMask option.

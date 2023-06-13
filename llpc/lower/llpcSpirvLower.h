@@ -39,7 +39,6 @@ namespace llvm {
 class Constant;
 class GlobalVariable;
 class Timer;
-
 } // namespace llvm
 
 namespace lgc {
@@ -60,12 +59,8 @@ public:
   explicit SpirvLower() {}
 
   // Add per-shader lowering passes to pass manager
-  static void addPasses(Context *context, ShaderStage stage, lgc::PassManager &passMgr, llvm::Timer *lowerTimer
-#if VKI_RAY_TRACING
-                        ,
-                        bool rayTracing, bool rayQuery, bool isInternalRtShader
-#endif
-  );
+  static void addPasses(Context *context, ShaderStage stage, lgc::PassManager &passMgr, llvm::Timer *lowerTimer,
+                        bool rayTracing, bool rayQuery, bool isInternalRtShader);
   // Register all the lowering passes into the given pass manager
   static void registerPasses(lgc::PassManager &passMgr);
 

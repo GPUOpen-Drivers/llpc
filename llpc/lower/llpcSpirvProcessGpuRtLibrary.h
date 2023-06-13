@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2023 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,43 +24,37 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLowerUtil.h
- * @brief LLPC header file: utilities for use by LLPC front-end
+ * @file  llpcSpirvProcessGpuRtLibrary.h
+ * @brief LLPC header file: contains declaration of Llpc::SpirvProcessGpuRtLibrary
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "llpc.h"
-
-namespace llvm {
-
-class Function;
-class Module;
-class BasicBlock;
-
-} // namespace llvm
-
+#include "llpcSpirvLower.h"
+#include "llvm/IR/PassManager.h"
 namespace Llpc {
+class SpirvProcessGpuRtLibrary : public SpirvLower, public llvm::PassInfoMixin<SpirvProcessGpuRtLibrary> {
+public:
+  SpirvProcessGpuRtLibrary();
+  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-// Well-known names in the front-end.
-namespace LlpcName {
-
-const static char GlobalProxyPrefix[] = "__llpc_global_proxy_";
-const static char InputProxyPrefix[] = "__llpc_input_proxy_";
-const static char OutputProxyPrefix[] = "__llpc_output_proxy_";
-
-} // namespace LlpcName
-
-// Gets the shader stage from the specified LLVM module.
-ShaderStage getShaderStageFromModule(llvm::Module *module);
-
-// Set the shader stage to the specified LLVM module.
-void setShaderStageToModule(llvm::Module *module, ShaderStage shaderStage);
-
-// Gets the entry point (valid for AMD GPU) of a LLVM module.
-llvm::Function *getEntryPoint(llvm::Module *module);
-
-// Clears the empty block
-llvm::BasicBlock *clearBlock(llvm::Function *func);
-
+private:
+  typedef void (SpirvProcessGpuRtLibrary::*LibraryFuncPtr)(llvm::Function *);
+  struct LibraryFunctionTable {
+    llvm::DenseMap<llvm::StringRef, LibraryFuncPtr> m_libFuncPtrs;
+    LibraryFunctionTable();
+    static const LibraryFunctionTable &get() {
+      static LibraryFunctionTable instance;
+      return instance;
+    }
+  };
+  void processLibraryFunction(llvm::Function *&func);
+  void createGetStackSize(llvm::Function *func);
+  void createGetStackBase(llvm::Function *func);
+  void createLdsWrite(llvm::Function *func);
+  void createLdsRead(llvm::Function *func);
+  void createGetStackStride(llvm::Function *func);
+  void createLdsStackInit(llvm::Function *func);
+  void createLdsStackStore(llvm::Function *func);
+};
 } // namespace Llpc

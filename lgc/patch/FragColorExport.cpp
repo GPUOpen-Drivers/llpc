@@ -182,9 +182,9 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
       }
     } else {
       if (outputTy->isIntOrIntVectorTy())
-        output = builder.CreateBitCast(output, outputTy->isVectorTy()
-                                                   ? builder.getFloatTy()
-                                                   : FixedVectorType::get(builder.getFloatTy(), compCount));
+        output =
+            builder.CreateBitCast(output, outputTy->isVectorTy() ? FixedVectorType::get(builder.getFloatTy(), compCount)
+                                                                 : builder.getFloatTy());
       extractElements(output, builder, comps);
 
       Attribute::AttrKind attribs[] = {Attribute::ReadNone};

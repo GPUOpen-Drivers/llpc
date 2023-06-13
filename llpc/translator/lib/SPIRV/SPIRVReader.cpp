@@ -93,13 +93,10 @@ using namespace llvm;
 using namespace SPIRV;
 using namespace Llpc;
 
-#if VKI_RAY_TRACING
 namespace Llpc {
 Type *getRayQueryInternalTy(lgc::Builder *builder);
 unsigned getTraceRayParamPayloadIdx(void);
 } // namespace Llpc
-
-#endif
 
 namespace SPIRV {
 
@@ -159,13 +156,96 @@ static void dumpLLVM(Module *m, const std::string &fName) {
   }
 }
 
+bool isAccelerationStructureType(SPIRVType *type) {
+  return type->isTypeAccelerationStructureKHR();
+}
+
+SPIRVWord getStd430TypeAlignment(SPIRVType *const spvType) {
+  switch (spvType->getOpCode()) {
+  case OpTypeInt:
+  case OpTypeBool:
+  case OpTypeFloat:
+    return spvType->getSizeInBytes();
+  case OpTypeVector: {
+    auto Components = spvType->getVectorComponentCount();
+    if (Components == 3)
+      Components = 4;
+    return Components * spvType->getVectorComponentType()->getSizeInBytes();
+  }
+  case OpTypeStruct: {
+    SPIRVWord maxAlign = 0;
+    SPIRVTypeStruct *const spvStructType = static_cast<SPIRVTypeStruct *>(spvType);
+    for (SPIRVWord i = 0, memberCount = spvStructType->getMemberCount(); i < memberCount; i++) {
+      SPIRVType *const memberTy = spvStructType->getMemberType(i);
+      auto memberAlign = getStd430TypeAlignment(memberTy);
+      if (memberAlign > maxAlign)
+        maxAlign = memberAlign;
+    }
+    return maxAlign;
+  }
+  case OpTypeArray: {
+    SPIRVTypeArray *const spvArrayType = static_cast<SPIRVTypeArray *>(spvType);
+    return getStd430TypeAlignment(spvArrayType->getArrayElementType());
+  }
+  case OpTypeMatrix: {
+    auto *columnTy = spvType->getMatrixColumnType();
+    return getStd430TypeAlignment(columnTy);
+  }
+  default:
+    llvm_unreachable("unexpected type");
+    break;
+  }
+  return 0;
+}
+
+// Return the aligned size, considering the padding between sub-members.
+SPIRVWord getStd430AlignedTypeSize(SPIRVType *const spvType) {
+  switch (spvType->getOpCode()) {
+  case OpTypeInt:
+  case OpTypeBool:
+  case OpTypeFloat:
+  case OpTypeVector:
+    return spvType->getSizeInBytes();
+  case OpTypeStruct: {
+    SPIRVTypeStruct *const spvStructType = static_cast<SPIRVTypeStruct *>(spvType);
+    SPIRVWord accumulatedOffset = 0;
+    for (SPIRVWord i = 0, memberCount = spvStructType->getMemberCount(); i < memberCount; i++) {
+      SPIRVType *const memberTy = spvStructType->getMemberType(i);
+      auto memberAlign = getStd430TypeAlignment(memberTy);
+      auto size = getStd430AlignedTypeSize(memberTy);
+      accumulatedOffset = roundUpToMultiple(accumulatedOffset, memberAlign);
+      accumulatedOffset += size;
+    }
+    return accumulatedOffset;
+  }
+  case OpTypeArray: {
+    SPIRVTypeArray *const spvArrayType = static_cast<SPIRVTypeArray *>(spvType);
+    SPIRVType *elemTy = spvArrayType->getArrayElementType();
+    SPIRVWord elemAlign = getStd430TypeAlignment(elemTy);
+    auto elemSize = getStd430AlignedTypeSize(elemTy);
+    // We need tail-padding if element size is not multiple of element alignment
+    SPIRVWord stride = elemSize;
+    if (elemSize % elemAlign != 0)
+      stride = roundUpToMultiple(elemSize, elemAlign);
+    return stride * spvArrayType->getLength()->getZExtIntValue();
+  }
+  case OpTypeMatrix: {
+    auto *columnTy = spvType->getMatrixColumnType();
+    SPIRVWord columnCount = spvType->getMatrixColumnCount();
+    return getStd430TypeAlignment(columnTy) * columnCount;
+  }
+  default:
+    llvm_unreachable("unexpected type");
+    break;
+  }
+  return 0;
+}
+
 static bool isStorageClassExplicitlyLaidOut(SPIRVModule *m_bm, SPIRVStorageClassKind storageClass) {
   return llvm::is_contained({StorageClassStorageBuffer, StorageClassUniform, StorageClassPushConstant,
                              StorageClassPhysicalStorageBufferEXT},
                             storageClass) ||
-#if VKI_RAY_TRACING
          storageClass == StorageClassShaderRecordBufferKHR ||
-#endif
          (storageClass == StorageClassWorkgroup && m_bm->hasCapability(CapabilityWorkgroupMemoryExplicitLayoutKHR));
 }
 
@@ -298,13 +378,18 @@ Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeArray>(SPIRVType *const spvTyp
 
   SPIRVWord arrayStride = 0;
   const bool hasArrayStride = spvType->hasDecorate(DecorationArrayStride, 0, &arrayStride);
-  assert(hasArrayStride ^ (arrayStride == 0));
+  assert((hasArrayStride ^ (arrayStride == 0)) || layout == LayoutMode::Std430);
 
   const uint64_t storeSize = getTypeStoreSize(elementType);
+  if (layout == LayoutMode::Std430) {
+    SPIRVWord elementAlign = getStd430TypeAlignment(spvType->getArrayElementType());
+    arrayStride = roundUpToMultiple((SPIRVWord)storeSize, elementAlign);
+  }
 
+  bool maybePadded = (layout == LayoutMode::Explicit && hasArrayStride) || layout == LayoutMode::Std430;
   bool paddedArray = false;
 
-  if (layout == LayoutMode::Explicit && hasArrayStride) {
+  if (maybePadded) {
     assert(arrayStride >= storeSize);
 
     const unsigned padding = static_cast<unsigned>(arrayStride - storeSize);
@@ -368,9 +453,7 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeForwardPointer>(SPIRVType *const sp
 
   const bool isBufferBlockPointer = storageClass == StorageClassStorageBuffer || storageClass == StorageClassUniform ||
                                     storageClass == StorageClassPushConstant ||
-#if VKI_RAY_TRACING
                                     storageClass == StorageClassShaderRecordBufferKHR ||
-#endif
                                     storageClass == StorageClassPhysicalStorageBufferEXT;
   LayoutMode structLayout = isBufferBlockPointer ? LayoutMode::Explicit : LayoutMode::Native;
 
@@ -431,8 +514,14 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(SPIRVType *const spvType, u
     }
   }
 
+  if (layout == LayoutMode::Std430) {
+    // For std430 layout, set matrix stride to the alignment of column vector to make every column vector properly
+    // aligned.
+    matrixStride = getStd430TypeAlignment(spvType->getMatrixColumnType());
+  }
+
   const bool isPaddedMatrix = matrixStride > 0;
-  const bool usePadding = (layout == LayoutMode::Explicit) && isPaddedMatrix;
+  const bool usePadding = (layout == LayoutMode::Explicit || layout == LayoutMode::Std430) && isPaddedMatrix;
 
   if (usePadding) {
     SmallVector<Type *, 2> memberTypes;
@@ -525,12 +614,10 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(SPIRVType *const spvType, 
       if (!imagePtrTy)
         return samplerPtrTy;
       return StructType::get(*m_context, {imagePtrTy, samplerPtrTy});
+    } else {
+      // Uniform constant variable outside of a block use std430 layout.
+      pointeeLayout = isAccelerationStructureType(spvElementType) ? LayoutMode::Explicit : LayoutMode::Std430;
     }
-#if VKI_RAY_TRACING
-    else if (spvElementType->isTypeAccelerationStructureKHR()) {
-      pointeeLayout = LayoutMode::Explicit;
-    }
-#endif
   }
 
   Type *const pointeeType =
@@ -600,10 +687,20 @@ Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(SPIRVType *const spvTy
   using StructMember = std::tuple<SPIRVWord, SPIRVWord>;
 
   SmallVector<StructMember, 8> structMembers;
-
+  // For uniform constants, we need to calculate the alignment of each member first. Based on the alignment,
+  // we get the offset.
+  SPIRVWord accumulatedOffset = 0;
   for (SPIRVWord i = 0, memberCount = spvStructType->getMemberCount(); i < memberCount; i++) {
     SPIRVWord offset = 0;
 
+    if (layout == LayoutMode::Std430) {
+      auto align = getStd430TypeAlignment(spvStructType->getMemberType(i));
+      auto size = getStd430AlignedTypeSize(spvStructType->getMemberType(i));
+      accumulatedOffset = roundUpToMultiple(accumulatedOffset, align);
+      structMembers.push_back(StructMember(i, accumulatedOffset));
+      accumulatedOffset += size;
+      continue;
+    }
     // If we have a member decorate, we need to handle the struct carefully. To do this we use a packed LLVM struct
     // type with manually added byte array pads. We record all the remappings of original index -> new index that
     // have occurred so that we can fixup GEPs and insert/extract's later.
@@ -631,14 +728,14 @@ Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(SPIRVType *const spvTy
 
   SPIRVWord lastIndex = 0;
   uint64_t lastValidByte = 0;
-
+  bool usePadding = (isExplicitlyLaidOut && hasMemberOffset) || layout == LayoutMode::Std430;
   SmallVector<Type *, 16> memberTypes;
 
   for (const StructMember &structMember : structMembers) {
     const SPIRVWord index = std::get<0>(structMember);
     const SPIRVWord offset = std::get<1>(structMember);
 
-    if (isExplicitlyLaidOut && hasMemberOffset) {
+    if (usePadding) {
       // HLSL-derived shaders contain some (entirely valid) strange mappings for arrays that cannot be represented
       // in LLVM. This manifests as an offset for a struct member that overlaps the previous data in the struct.
       // To workaround this, we need to change the previous member in the struct to a pad array that we'll sort
@@ -702,7 +799,7 @@ Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(SPIRVType *const spvTy
     structType->setBody(memberTypes, isPacked);
   }
 
-  return isExplicitlyLaidOut && hasMemberOffset ? recordTypeWithPad(structType) : structType;
+  return usePadding ? recordTypeWithPad(structType) : structType;
 }
 
 // =====================================================================================================================
@@ -722,8 +819,9 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeVector>(SPIRVType *const spvType, c
   Type *const compType =
       transType(spvType->getVectorComponentType(), matrixStride, isColumnMajor, isParentPointer, layout);
 
-  // If the vector is in a pointer, we need to use an array to represent it because of LLVMs data layout rules.
-  if (layout == LayoutMode::Explicit)
+  // If the vector needs explicit/std430 layout, we need to use an array to represent it because of LLVM's data layout
+  // rules.
+  if (layout == LayoutMode::Explicit || layout == LayoutMode::Std430)
     return ArrayType::get(compType, spvType->getVectorComponentCount());
   return FixedVectorType::get(compType, spvType->getVectorComponentCount());
 }
@@ -732,7 +830,8 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeVector>(SPIRVType *const spvType, c
 // Get pointee type from SPIRV Value.
 //
 // @param v : SPIRV Value
-Type *SPIRVToLLVM::getPointeeType(SPIRVValue *v) {
+// @param layout : The layout mode will be used for the type translation.
+Type *SPIRVToLLVM::getPointeeType(SPIRVValue *v, LayoutMode layout) {
   auto opCode = v->getOpCode();
   if (isAccessChainOpCode(opCode)) {
     // If the Base of the AccessChain is a structure then additional padding may be added (depending on the structure
@@ -756,9 +855,8 @@ Type *SPIRVToLLVM::getPointeeType(SPIRVValue *v) {
     if (pointeeType)
       return pointeeType;
   }
-  LayoutMode layout = isStorageClassExplicitlyLaidOut(m_bm, v->getType()->getPointerStorageClass())
-                          ? LayoutMode::Explicit
-                          : LayoutMode::Native;
+  if (isStorageClassExplicitlyLaidOut(m_bm, v->getType()->getPointerStorageClass()))
+    layout = LayoutMode::Explicit;
 
   return transType(v->getType()->getPointerElementType(), 0, true, true, layout);
 }
@@ -834,15 +932,12 @@ Type *SPIRVToLLVM::transTypeImpl(SPIRVType *t, unsigned matrixStride, bool colum
     }
     return mapType(t, ty);
   }
-#if VKI_RAY_TRACING
   case OpTypeAccelerationStructureKHR: {
     auto int32x2Ty = FixedVectorType::get(Type::getInt32Ty(*m_context), 2);
     return mapType(t, int32x2Ty);
   }
   case OpTypeRayQueryKHR:
     return mapType(t, getRayQueryInternalTy(m_builder));
-#endif
-
   case OpTypeArray: {
     Type *newTy = transTypeWithOpcode<OpTypeArray>(t, matrixStride, columnMajor, parentIsPointer, layout);
     return parentIsPointer ? newTy : mapType(t, newTy);
@@ -875,7 +970,6 @@ Type *SPIRVToLLVM::transTypeImpl(SPIRVType *t, unsigned matrixStride, bool colum
     Type *newTy = transTypeWithOpcode<OpTypeVector>(t, matrixStride, columnMajor, parentIsPointer, layout);
     return parentIsPointer ? newTy : mapType(t, newTy);
   }
-
   default: {
     llvm_unreachable("Not implemented");
   }
@@ -1591,13 +1685,8 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
   }
 
   Constant *const zero = getBuilder()->getInt32(0);
-  // clang-format off
-  if (loadType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage
-#if VKI_RAY_TRACING
-      && spvType->getOpCode() != OpTypeRayQueryKHR
-#endif
-  ) {
-    // clang-format on
+  if (loadType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage &&
+      spvType->getOpCode() != OpTypeRayQueryKHR) {
     // For structs we lookup the mapping of the elements and use it to reverse map the values.
     const bool needsPad = isRemappedTypeElements(spvType);
 
@@ -1660,7 +1749,6 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
 
       Value *elementLoadPointer = getBuilder()->CreateGEP(loadType, loadPointer, indices);
       Type *const elementLoadType = GetElementPtrInst::getIndexedType(loadType, indices);
-
       Value *const elementLoad = addLoadInstRecursively(spvElementType, elementLoadPointer, elementLoadType, isVolatile,
                                                         isCoherent, isNonTemporal);
       load = getBuilder()->CreateInsertValue(load, elementLoad, i);
@@ -1756,13 +1844,8 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
   }
 
   Value *const zero = getBuilder()->getInt32(0);
-  // clang-format off
-  if (storeType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage
-#if VKI_RAY_TRACING
-      && spvType->getOpCode() != OpTypeRayQueryKHR
-#endif
-  ) {
-    // clang-format on
+  if (storeType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage &&
+      spvType->getOpCode() != OpTypeRayQueryKHR) {
     // For structs we lookup the mapping of the elements and use it to map the values.
     const bool needsPad = isRemappedTypeElements(spvType);
 
@@ -2420,6 +2503,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(SPIRVValue *c
 // @param spvValue : A SPIR-V value.
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const spvValue) {
   SPIRVLoad *const spvLoad = static_cast<SPIRVLoad *>(spvValue);
+  LayoutMode layout = LayoutMode::Native;
 
   // Handle UniformConstant image/sampler/sampledimage load.
   if (static_cast<SPIRVTypePointer *>(spvLoad->getSrc()->getType())->getStorageClass() == StorageClassUniformConstant) {
@@ -2428,7 +2512,6 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
     case OpTypeSampler:
     case OpTypeSampledImage:
       return transLoadImage(spvLoad->getSrc());
-#if VKI_RAY_TRACING
     case OpTypeAccelerationStructureKHR: {
       auto pipelineContext = (static_cast<Llpc::Context *>(m_context))->getPipelineContext();
       if (pipelineContext->getRayTracingState()->forceInvalidAccelStruct) {
@@ -2459,8 +2542,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
 #endif
       break;
     }
-#endif
     default:
+      layout = LayoutMode::Std430;
       break;
     }
   }
@@ -2521,7 +2604,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
   Instruction *baseNode = getLastInsertedValue();
   BasicBlock *currentBlock = getBuilder()->GetInsertBlock();
 
-  Type *loadType = getPointeeType(spvLoad->getSrc());
+  Type *loadType = getPointeeType(spvLoad->getSrc(), layout);
 
   auto loadInst = addLoadInstRecursively(spvLoadType->getPointerElementType(), loadPointer, loadType, isVolatile,
                                          isCoherent, isNonTemporal);
@@ -2890,6 +2973,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpArrayLength>(SPIRVValue *
 // @param spvValue : A SPIR-V value.
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *const spvValue) {
   SPIRVAccessChainBase *const spvAccessChain = static_cast<SPIRVAccessChainBase *>(spvValue);
+  LayoutMode layout = LayoutMode::Native;
 
   // Special handling for UniformConstant if the ultimate element type is image/sampler/sampledimage.
   if (static_cast<SPIRVTypePointer *>(spvAccessChain->getBase()->getType())->getStorageClass() ==
@@ -2905,6 +2989,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
     case OpTypeSampledImage:
       return transOpAccessChainForImage(spvAccessChain);
     default:
+      layout = isAccelerationStructureType(spvUltimateElementType) ? LayoutMode::Explicit : LayoutMode::Std430;
       break;
     }
   }
@@ -2922,9 +3007,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
 
   SPIRVType *spvAccessType = spvAccessChain->getBase()->getType();
   const SPIRVStorageClassKind storageClass = spvAccessType->getPointerStorageClass();
-  const bool isBufferBlockPointer = isStorageClassExplicitlyLaidOut(m_bm, storageClass);
+  const bool typeMaybeRemapped =
+      isStorageClassExplicitlyLaidOut(m_bm, storageClass) || storageClass == StorageClassUniformConstant;
 
-  Type *basePointeeType = getPointeeType(spvAccessChain->getBase());
+  Type *basePointeeType = getPointeeType(spvAccessChain->getBase(), layout);
 
   SmallVector<Value *, 8> gepIndices;
 
@@ -2961,7 +3047,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
       const uint64_t origMemberIndex = constIndex->getZExtValue();
       Type *castType = nullptr;
 
-      if (isBufferBlockPointer) {
+      if (typeMaybeRemapped) {
         if (isRemappedTypeElements(spvAccessType)) {
           const uint64_t remappedMemberIndex = lookupRemappedTypeElements(spvAccessType, origMemberIndex);
           constIndex = getBuilder()->getInt32(remappedMemberIndex);
@@ -2990,7 +3076,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
     case OpTypeRuntimeArray: {
       gepIndices.push_back(index);
 
-      if (isBufferBlockPointer && isRemappedTypeElements(spvAccessType)) {
+      if (typeMaybeRemapped && isRemappedTypeElements(spvAccessType)) {
         // If we have padding in an array, we inserted a struct to add that
         // padding, and so we need an extra constant 0 index.
         gepIndices.push_back(getBuilder()->getInt32(0));
@@ -3004,7 +3090,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
       Type *const matrixType = GetElementPtrInst::getIndexedType(basePointeeType, gepIndices);
       assert(matrixType && matrixType->isArrayTy());
 
-      if (isBufferBlockPointer && isTypeWithPadRowMajorMatrix(matrixType)) {
+      if (typeMaybeRemapped && isTypeWithPadRowMajorMatrix(matrixType)) {
         // We have a row major matrix, we need to split the access chain here to handle it.
         flushGep();
 
@@ -3594,7 +3680,6 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleDow
   return getBuilder()->CreateSubgroupShuffleDown(value, delta);
 }
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Handle OpTraceRayKHR.
 //
@@ -3666,7 +3751,6 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpTerminateRayKHR>(SPIRVVal
   Value *ret = getBuilder()->CreateRetVoid();
   return mapValue(spvValue, ret);
 }
-#endif
 
 // =====================================================================================================================
 // Handle OpEmitMeshTasksEXT.
@@ -4256,6 +4340,9 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
   const SPIRVStorageClassKind storageClass = spvVar->getStorageClass();
   SPIRVType *const spvVarType = spvVar->getType()->getPointerElementType();
 
+  LayoutMode layout = isStorageClassExplicitlyLaidOut(m_bm, spvVar->getType()->getPointerStorageClass())
+                          ? LayoutMode::Explicit
+                          : LayoutMode::Native;
   if (storageClass == StorageClassUniformConstant) {
     SPIRVType *spvElementType = spvVarType;
     while (spvElementType->getOpCode() == OpTypeArray || spvElementType->getOpCode() == OpTypeRuntimeArray)
@@ -4267,15 +4354,14 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
       // Do nothing for image/sampler/sampledimage.
       return nullptr;
     default:
+      if (!isAccelerationStructureType(spvElementType))
+        layout = LayoutMode::Std430;
       break;
     }
   }
 
   Type *const ptrType = transType(spvVar->getType());
   unsigned addrSpace = ptrType->getPointerAddressSpace();
-  LayoutMode layout = isStorageClassExplicitlyLaidOut(m_bm, spvVar->getType()->getPointerStorageClass())
-                          ? LayoutMode::Explicit
-                          : LayoutMode::Native;
 
   Type *const varType = transType(spvVar->getType()->getPointerElementType(), 0, true, true, layout);
 
@@ -4329,7 +4415,6 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
     break;
   }
   case StorageClassUniformConstant: {
-#if VKI_RAY_TRACING
     if (spvVarType->isTypeAccelerationStructureKHR()) {
       readOnly = true;
     }
@@ -4337,7 +4422,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
     if (spvVarType->isTypeArray() && spvVarType->getArrayElementType()->isTypeAccelerationStructureKHR()) {
       readOnly = true;
     }
-#endif
+
     break;
   }
 
@@ -4388,7 +4473,6 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
   }
 
   string varName = spvVar->getName();
-#if VKI_RAY_TRACING
   if (storageClass == StorageClassCallableDataKHR || storageClass == StorageClassIncomingCallableDataKHR ||
       storageClass == StorageClassRayPayloadKHR || storageClass == StorageClassHitAttributeKHR ||
       storageClass == StorageClassIncomingRayPayloadKHR || storageClass == StorageClassShaderRecordBufferKHR) {
@@ -4408,7 +4492,6 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
     if (storageClass == StorageClassHitAttributeKHR)
       llpcContext->getPipelineContext()->collectAttributeDataSize(varType, m_m->getDataLayout());
   }
-#endif
 
   GlobalVariable *const globalVar =
       new GlobalVariable(*m_m, varType, readOnly, GlobalValue::ExternalLinkage, initializer, varName, nullptr,
@@ -4424,12 +4507,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
       globalVar->setName("lds");
   }
 
-#if VKI_RAY_TRACING
   if (storageClass == StorageClassCallableDataKHR || storageClass == StorageClassIncomingCallableDataKHR ||
       storageClass == StorageClassRayPayloadKHR || storageClass == StorageClassHitAttributeKHR ||
       storageClass == StorageClassIncomingRayPayloadKHR)
     globalVar->setAlignment(MaybeAlign(4));
-#endif
 
   SPIRVBuiltinVariableKind builtinKind;
   if (spvVar->isBuiltin(&builtinKind))
@@ -5616,7 +5697,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     return mapValue(bv, transValueWithOpcode<OpDemoteToHelperInvocationEXT>(bv));
   case OpIsHelperInvocationEXT:
     return mapValue(bv, transValueWithOpcode<OpIsHelperInvocationEXT>(bv));
-#if VKI_RAY_TRACING
   case OpTraceRayKHR:
     return transValueWithOpcode<OpTraceRayKHR>(bv);
   case OpExecuteCallableKHR:
@@ -5626,7 +5706,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
   case OpTerminateRayKHR:
   case OpIgnoreIntersectionKHR:
     return transValueWithOpcode<OpTerminateRayKHR>(bv);
-#endif
   case OpSDotKHR:
   case OpUDotKHR:
   case OpSUDotKHR:
@@ -5854,7 +5933,6 @@ Instruction *SPIRVToLLVM::transBuiltinFromInst(const std::string &funcName, SPIR
       i = PointerType::get(i, SPIRAS_Private);
   }
 
-#if VKI_RAY_TRACING
   // This is the last place where we know the base type of the payload data. Opaque pointers are
   // removing ability to get base type from pointer type.
   // Base type of payload data will be added as last argument to the function.
@@ -5879,7 +5957,6 @@ Instruction *SPIRVToLLVM::transBuiltinFromInst(const std::string &funcName, SPIR
     argTys.push_back(payloadBaseType);
     args.push_back(dummyValue);
   }
-#endif
 
   std::string mangledName(funcName);
   appendTypeMangling(retTy, args, mangledName);
@@ -7149,11 +7226,9 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
   // Shader modes contain also data for other modules (subgroup size usage), so query it in the pipeline context.
   auto pipelineContext = (static_cast<Llpc::Context *>(m_context))->getPipelineContext();
   unsigned subgroupSizeUsage = pipelineContext->getSubgroupSizeUsage();
-#if VKI_RAY_TRACING
   // NOTE: setCommonShaderMode() supports the graphics and compute stage, does not support raytracing stage
   shaderMode.useSubgroupSize =
       pipelineContext->getPipelineType() == PipelineType::RayTracing ? subgroupSizeUsage : shaderMode.useSubgroupSize;
-#endif
 
   if (pipelineContext->getPipelineType() == PipelineType::Graphics && subgroupSizeUsage) {
     for (lgc::ShaderStage stage : lgc::enumRange<lgc::ShaderStage>()) {
@@ -7659,25 +7734,14 @@ bool SPIRVToLLVM::transMetadata() {
           computeMode.workgroupSizeX = overrideThreadGroupSizeX;
           computeMode.workgroupSizeY = overrideThreadGroupSizeY;
           computeMode.workgroupSizeZ = overrideThreadGroupSizeZ;
-#if VKI_RAY_TRACING
         } else if (m_moduleUsage->rayQueryLibrary) {
           // Ray Query library Shader can not overwrite the compute mode settings
-#endif
         } else {
           computeMode.workgroupSizeX = workgroupSizeX;
           computeMode.workgroupSizeY = workgroupSizeY;
           computeMode.workgroupSizeZ = workgroupSizeZ;
         }
         Pipeline::setComputeShaderMode(*m_m, computeMode);
-#if VKI_RAY_TRACING
-        // We also need to set the overall workgroup size on the PipelineContext so that the LowerRayQuery
-        // pass running on the rayQuery library module (a different module to this compute shader) can see it.
-        unsigned workgroupSize = workgroupSizeX == 0 ? 1 : workgroupSizeX;
-        workgroupSize *= workgroupSizeY == 0 ? 1 : workgroupSizeY;
-        workgroupSize *= workgroupSizeZ == 0 ? 1 : workgroupSizeZ;
-        Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
-        llpcContext->getPipelineContext()->setWorkgroupSize(workgroupSize);
-#endif
 
       } else
         llvm_unreachable("Invalid execution model");
@@ -7763,10 +7827,9 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
             nameMeta->addOperand(MDNode::get(*m_context, MDString::get(*m_context, lgc::SampleShadingMetaName)));
           }
         }
-#if VKI_RAY_TRACING
+
         Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
         llpcContext->getPipelineContext()->collectBuiltIn(builtIn);
-#endif
       } else if (bv->getName() == "gl_in" || bv->getName() == "gl_out" || bv->getName() == "gl_MeshVerticesEXT") {
         inOutDec.IsBuiltIn = true;
         inOutDec.Value.BuiltIn = BuiltInPerVertex;
@@ -7863,12 +7926,6 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
         while (blockTy->isTypeArray())
           blockTy = blockTy->getArrayElementType();
       }
-      bool isStructTy = blockTy->isTypeStruct();
-#if VKI_RAY_TRACING
-      isStructTy = isStructTy || blockTy->isTypeAccelerationStructureKHR();
-#endif
-      assert(isStructTy || as == SPIRAS_TaskPayload); // Task payload is not necessarily a structure
-      (void)isStructTy;
 
       // Get values of descriptor binding and set based on corresponding
       // decorations
@@ -7885,29 +7942,79 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       if (!hasDescSet)
         descSet = 0;
 
-      // Setup resource metadata
-      auto int32Ty = Type::getInt32Ty(*m_context);
-      std::vector<Metadata *> resMDs;
-      resMDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, descSet)));
-      resMDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, binding)));
-      auto resMdNode = MDNode::get(*m_context, resMDs);
-      gv->addMetadata(gSPIRVMD::Resource, *resMdNode);
+      if (bv->getType()->getPointerStorageClass() != StorageClassUniformConstant ||
+          isAccelerationStructureType(blockTy)) {
+        assert(blockTy->isTypeStruct() || blockTy->isTypeAccelerationStructureKHR() ||
+               as == SPIRAS_TaskPayload); // Task payload is not necessarily a structure
+        // Setup resource metadata
+        auto int32Ty = Type::getInt32Ty(*m_context);
+        std::vector<Metadata *> resMDs;
+        resMDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, descSet)));
+        resMDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, binding)));
+        auto resMdNode = MDNode::get(*m_context, resMDs);
+        gv->addMetadata(gSPIRVMD::Resource, *resMdNode);
 
-      // Build block metadata
-      const bool isUniformBlock =
-          bv->getType()->getPointerStorageClass() != StorageClassStorageBuffer && blockTy->hasDecorate(DecorationBlock);
+        // Build block metadata
+        const bool isUniformBlock = bv->getType()->getPointerStorageClass() != StorageClassStorageBuffer &&
+                                    blockTy->hasDecorate(DecorationBlock);
 
-      ShaderBlockDecorate blockDec = {};
-      blockDec.NonWritable = isUniformBlock;
-      Type *blockMdTy = nullptr;
-      auto blockMd = buildShaderBlockMetadata(
-          blockTy, blockDec, blockMdTy, bv->getType()->getPointerStorageClass() == StorageClassTaskPayloadWorkgroupEXT);
+        ShaderBlockDecorate blockDec = {};
+        blockDec.NonWritable = isUniformBlock;
+        Type *blockMdTy = nullptr;
+        auto blockMd =
+            buildShaderBlockMetadata(blockTy, blockDec, blockMdTy,
+                                     bv->getType()->getPointerStorageClass() == StorageClassTaskPayloadWorkgroupEXT);
 
-      std::vector<Metadata *> blockMDs;
-      blockMDs.push_back(ConstantAsMetadata::get(blockMd));
-      auto blockMdNode = MDNode::get(*m_context, blockMDs);
-      gv->addMetadata(gSPIRVMD::Block, *blockMdNode);
+        std::vector<Metadata *> blockMDs;
+        blockMDs.push_back(ConstantAsMetadata::get(blockMd));
+        auto blockMdNode = MDNode::get(*m_context, blockMDs);
+        gv->addMetadata(gSPIRVMD::Block, *blockMdNode);
+      } else {
+        // Setup metadata for uniform constant.
+        auto int32Ty = Type::getInt32Ty(*m_context);
+        std::vector<Metadata *> mDs;
 
+        SPIRVWord loc = SPIRVID_INVALID;
+        bv->hasDecorate(DecorationLocation, 0, &loc);
+        assert(loc != SPIRVID_INVALID && "Default uniform constant should get location\n");
+
+        // Get the offset in default uniform constant buffer from location
+        Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
+        Vkgc::UniformConstantMap *accessedUniformMap = nullptr;
+        if (llpcContext->getPipelineType() == PipelineType::Graphics) {
+          auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());
+          // Find the uniform constant map to use.
+          for (unsigned s = 0; s < buildInfo->numUniformConstantMaps; s++) {
+            if (isShaderStageInMask(convertToShaderStage(m_execModule), buildInfo->ppUniformMaps[s]->visibility)) {
+              accessedUniformMap = buildInfo->ppUniformMaps[s];
+              break;
+            }
+          }
+        } else {
+          assert(llpcContext->getPipelineType() == PipelineType::Compute);
+          auto *buildInfo = static_cast<const Vkgc::ComputePipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());
+          accessedUniformMap = buildInfo->pUniformMap;
+        }
+
+        assert(accessedUniformMap != nullptr);
+        auto *uniforms = accessedUniformMap->pUniforms;
+        unsigned numUniform = accessedUniformMap->numUniformConstants;
+
+        auto locationFound =
+            std::find_if(uniforms, uniforms + numUniform,
+                         [&](const Vkgc::UniformConstantMapEntry &item) { return item.location == loc; });
+
+        unsigned offset = 0;
+        // Unused uniform constant variable does not appear in the map.
+        if (locationFound != uniforms + numUniform)
+          offset = locationFound->offset;
+
+        mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, Vkgc::InternalDescriptorSetId)));
+        mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, Vkgc::ConstantBuffer0Binding)));
+        mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, offset)));
+        auto mdNode = MDNode::get(*m_context, mDs);
+        gv->addMetadata(gSPIRVMD::UniformConstant, *mdNode);
+      }
     } else if (bv->getType()->isTypePointer() && bv->getType()->getPointerStorageClass() == StorageClassPushConstant) {
       // Translate decorations of push constants
 
@@ -8577,14 +8684,11 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
 
     mdTy = Type::getInt64Ty(*m_context);
     return ConstantInt::get(mdTy, blockMd.U64All);
-  }
-#if VKI_RAY_TRACING
-  else if (bt->isTypeAccelerationStructureKHR()) {
+  } else if (bt->isTypeAccelerationStructureKHR()) {
     ShaderBlockMetadata blockMd = {};
     mdTy = Type::getInt64Ty(*m_context);
     return ConstantInt::get(mdTy, blockMd.U64All);
   }
-#endif
 
   llvm_unreachable("Invalid type");
   return nullptr;

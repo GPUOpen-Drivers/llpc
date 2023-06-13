@@ -45,7 +45,7 @@ endif()
 if(ICD_BUILD_LLPC)
     # Set LLVM options and build LLVM
     # Add LGC as an LLVM external project, but only if its CMakeLists.txt exists.
-    set(LLVM_EXTERNAL_PROJECTS llvm-dialects lgc)
+        set(LLVM_EXTERNAL_PROJECTS llvm-dialects lgc)
     set(LLVM_EXTERNAL_LLVM_DIALECTS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../imported/llvm-dialects)
     set(LLVM_EXTERNAL_LGC_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../lgc)
 
@@ -208,15 +208,9 @@ if(ICD_BUILD_LLPC)
         context/llpcGraphicsContext.cpp
         context/llpcShaderCache.cpp
         context/llpcPipelineContext.cpp
+        context/llpcRayTracingContext.cpp
         context/llpcShaderCacheManager.cpp
     )
-#if VKI_RAY_TRACING
-if(VKI_RAY_TRACING)
-    target_sources(llpcinternal PRIVATE
-         context/llpcRayTracingContext.cpp
-         )
-endif()
-#endif
 
 # llpc/lower
     target_sources(llpcinternal PRIVATE
@@ -228,22 +222,17 @@ endif()
         lower/llpcSpirvLowerInstMetaRemove.cpp
         lower/llpcSpirvLowerMath.cpp
         lower/llpcSpirvLowerMemoryOp.cpp
-        lower/llpcSpirvLowerTerminator.cpp
-        lower/llpcSpirvLowerTranslator.cpp
-        lower/llpcSpirvLowerUtil.cpp
-    )
-
-#if VKI_RAY_TRACING
-if(VKI_RAY_TRACING)
-    target_sources(llpcinternal PRIVATE
         lower/llpcSpirvLowerRayQuery.cpp
         lower/llpcSpirvLowerRayQueryPostInline.cpp
         lower/llpcSpirvLowerRayTracing.cpp
         lower/llpcSpirvLowerRayTracingBuiltIn.cpp
         lower/llpcSpirvLowerRayTracingIntrinsics.cpp
+        lower/llpcSpirvLowerTerminator.cpp
+        lower/llpcSpirvLowerTranslator.cpp
+        lower/llpcSpirvLowerUtil.cpp
+        lower/llpcSpirvProcessGpuRtLibrary.cpp
+        lower/LowerGpuRt.cpp
     )
-endif()
-#endif
 
 # llpc/translator
     target_sources(llpcinternal PRIVATE
@@ -363,15 +352,8 @@ add_library(llpc_standalone_compiler
     tool/llpcGraphicsPipelineBuilder.cpp
     tool/llpcInputUtils.cpp
     tool/llpcPipelineBuilder.cpp
+    tool/llpcRayTracingPipelineBuilder.cpp
 )
-
-#if VKI_RAY_TRACING
-if(VKI_RAY_TRACING)
-    target_sources(llpc_standalone_compiler PRIVATE
-        tool/llpcRayTracingPipelineBuilder.cpp
-        )
-endif()
-#endif
 
 add_dependencies(llpc_standalone_compiler llpc)
 

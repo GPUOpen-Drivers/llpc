@@ -409,7 +409,6 @@ void PatchInOutImportExport::processShader() {
         calcFactor.tessOnChipLdsSize += 1 + calcFactor.specialTfValueSize;
       }
 
-#if VKI_RAY_TRACING
       // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
       // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
       // restriction by providing the capability of querying thread ID in group rather than in wave.
@@ -417,7 +416,6 @@ void PatchInOutImportExport::processShader() {
       const auto tcsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl);
       if (vsResUsage->useRayQueryLdsStack || tcsResUsage->useRayQueryLdsStack)
         calcFactor.rayQueryLdsStackSize = MaxRayQueryLdsStackEntries * MaxRayQueryThreadsPerGroup;
-#endif
 
       LLPC_OUTS("===============================================================================\n");
       LLPC_OUTS("// LLPC tessellation calculation factor results\n\n");
@@ -470,12 +468,10 @@ void PatchInOutImportExport::processShader() {
       }
       LLPC_OUTS(")\n\n");
       LLPC_OUTS("Tess on-chip LDS total size (in dwords): " << calcFactor.tessOnChipLdsSize << "\n");
-#if VKI_RAY_TRACING
       if (calcFactor.rayQueryLdsStackSize > 0) {
         LLPC_OUTS("Ray query LDS stack size (in dwords): " << calcFactor.rayQueryLdsStackSize
                                                            << " (start = " << calcFactor.tessOnChipLdsSize << ")\n");
       }
-#endif
       LLPC_OUTS("\n");
     }
   }
@@ -4740,7 +4736,6 @@ unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(unsigned inVertexC
   unsigned maxThreadCountPerThreadGroup =
       m_gfxIp.major >= 9 ? Gfx9::MaxHsThreadsPerSubgroup : Gfx6::MaxHsThreadsPerSubgroup;
 
-#if VKI_RAY_TRACING
   // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
   // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
   // restriction by providing the capability of querying thread ID in the group rather than in wave.
@@ -4751,7 +4746,6 @@ unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(unsigned inVertexC
     maxThreadCountPerThreadGroup = std::min(MaxRayQueryThreadsPerGroup, maxThreadCountPerThreadGroup);
     rayQueryLdsStackSize = MaxRayQueryLdsStackEntries * MaxRayQueryThreadsPerGroup;
   }
-#endif
 
   const unsigned maxThreadCountPerPatch = std::max(inVertexCount, outVertexCount);
   const unsigned patchCountLimitedByThread = maxThreadCountPerThreadGroup / maxThreadCountPerPatch;
@@ -4773,9 +4767,8 @@ unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(unsigned inVertexC
         Gfx9::MaxHsThreadsPerSubgroup / m_pipelineState->getMergedShaderWaveSize(ShaderStageTessControl);
     ldsSizePerThreadGroup -= 1 + maxNumHsWaves * 2;
   }
-#if VKI_RAY_TRACING
   ldsSizePerThreadGroup -= rayQueryLdsStackSize; // Exclude LDS space used as ray query stack
-#endif
+
   unsigned patchCountLimitedByLds = ldsSizePerThreadGroup / ldsSizePerPatch;
 
   unsigned patchCountPerThreadGroup = std::min(patchCountLimitedByThread, patchCountLimitedByLds);

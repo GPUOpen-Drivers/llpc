@@ -635,7 +635,6 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
                                                isa<UndefValue>(args[4]) ? nullptr : &*args[4]); // Index
   }
 
-#if VKI_RAY_TRACING
   case BuilderOpcode::ImageBvhIntersectRay: {
     Value *bvhNodePtr = args[0];
     Value *extent = args[1];
@@ -646,7 +645,6 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     return m_builder->CreateImageBvhIntersectRay(bvhNodePtr, extent, origin, direction, invDirection, imageDesc);
   }
 
-#endif
   case BuilderOpcode::ReadTaskPayload: {
     return m_builder->CreateReadTaskPayload(call->getType(), // Result type
                                             args[0]);        // Byte offset within the payload structure

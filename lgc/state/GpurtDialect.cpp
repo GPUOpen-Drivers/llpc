@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,43 +24,13 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLowerUtil.h
- * @brief LLPC header file: utilities for use by LLPC front-end
+ * @file  GpurtDialect.cpp
+ * @brief Implementation of the LGC dialect definition
  ***********************************************************************************************************************
  */
-#pragma once
 
-#include "llpc.h"
+#include "lgc/GpurtDialect.h"
 
-namespace llvm {
-
-class Function;
-class Module;
-class BasicBlock;
-
-} // namespace llvm
-
-namespace Llpc {
-
-// Well-known names in the front-end.
-namespace LlpcName {
-
-const static char GlobalProxyPrefix[] = "__llpc_global_proxy_";
-const static char InputProxyPrefix[] = "__llpc_input_proxy_";
-const static char OutputProxyPrefix[] = "__llpc_output_proxy_";
-
-} // namespace LlpcName
-
-// Gets the shader stage from the specified LLVM module.
-ShaderStage getShaderStageFromModule(llvm::Module *module);
-
-// Set the shader stage to the specified LLVM module.
-void setShaderStageToModule(llvm::Module *module, ShaderStage shaderStage);
-
-// Gets the entry point (valid for AMD GPU) of a LLVM module.
-llvm::Function *getEntryPoint(llvm::Module *module);
-
-// Clears the empty block
-llvm::BasicBlock *clearBlock(llvm::Function *func);
-
-} // namespace Llpc
+#define GET_INCLUDES
+#define GET_DIALECT_DEFS
+#include "state/GpurtDialect.cpp.inc"

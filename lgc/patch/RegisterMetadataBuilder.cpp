@@ -213,9 +213,8 @@ void RegisterMetadataBuilder::buildLsHsRegisters() {
   // Set LDS_SIZE of SPI_SHADER_PGM_RSRC2_HS
   assert(m_pipelineState->isTessOffChip()); // Must be off-chip on GFX9+
   unsigned ldsSizeInDwords = calcFactor.tessOnChipLdsSize;
-#if VKI_RAY_TRACING
   ldsSizeInDwords += calcFactor.rayQueryLdsStackSize;
-#endif
+
   auto hwShaderNode = getHwShaderNode(Util::Abi::HardwareStage::Hs);
   hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = calcLdsSize(ldsSizeInDwords);
 }
@@ -354,9 +353,8 @@ void RegisterMetadataBuilder::buildEsGsRegisters() {
 
   // Set LDS_SIZE of SPI_SHADER_PGM_RSRC2_GS
   unsigned ldsSizeInDwords = calcFactor.gsOnChipLdsSize;
-#if VKI_RAY_TRACING
   ldsSizeInDwords += calcFactor.rayQueryLdsStackSize;
-#endif
+
   auto hwShaderNode = getHwShaderNode(Util::Abi::HardwareStage::Gs);
   hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = calcLdsSize(ldsSizeInDwords);
   setEsGsLdsSize(calcFactor.esGsLdsSize * 4);
@@ -630,9 +628,8 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
 
   // Set LDS_SIZE of SPI_SHADER_PGM_RSRC2_GS
   unsigned ldsSizeInDwords = calcFactor.gsOnChipLdsSize;
-#if VKI_RAY_TRACING
   ldsSizeInDwords += calcFactor.rayQueryLdsStackSize;
-#endif
+
   auto hwShaderNode = getHwShaderNode(Util::Abi::HardwareStage::Gs);
   hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = calcLdsSize(ldsSizeInDwords);
   if (!m_hasMesh)
