@@ -5972,20 +5972,7 @@ Value *NggPrimShader::ballot(Value *value) {
   const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
   assert(waveSize == 32 || waveSize == 64);
 
-  value = m_builder.CreateSelect(value, m_builder.getInt32(1), m_builder.getInt32(0));
-
-  auto inlineAsmTy = FunctionType::get(m_builder.getInt32Ty(), m_builder.getInt32Ty(), false);
-  auto inlineAsm = InlineAsm::get(inlineAsmTy, "; %1", "=v,0", true);
-  value = m_builder.CreateCall(inlineAsm, value);
-
-  static const unsigned PredicateNE = 33; // 33 = predicate NE
-  Value *result = m_builder.CreateIntrinsic(Intrinsic::amdgcn_icmp,
-                                            {
-                                                m_builder.getIntNTy(waveSize), // Return type
-                                                m_builder.getInt32Ty()         // Argument type
-                                            },
-                                            {value, m_builder.getInt32(0), m_builder.getInt32(PredicateNE)});
-
+  Value *result = m_builder.CreateIntrinsic(Intrinsic::amdgcn_ballot, m_builder.getIntNTy(waveSize), value);
   if (waveSize == 32)
     result = m_builder.CreateZExt(result, m_builder.getInt64Ty());
 

@@ -1107,20 +1107,10 @@ void ShaderMerger::storeTessFactorsWithOpt(Value *threadIdInWave, IRBuilder<> &b
   auto ballot = [&](Value *value) {
     assert(value->getType()->isIntegerTy(1)); // Should be i1
 
-    value = builder.CreateSelect(value, builder.getInt32(1), builder.getInt32(0));
-    auto inlineAsmTy = FunctionType::get(builder.getInt32Ty(), builder.getInt32Ty(), false);
-    auto inlineAsm = InlineAsm::get(inlineAsmTy, "; %1", "=v,0", true);
-    value = builder.CreateCall(inlineAsm, value);
-
-    static const unsigned PredicateNE = 33; // 33 = predicate NE
-    Value *ballot = builder.CreateIntrinsic(Intrinsic::amdgcn_icmp,
-                                            {
-                                                builder.getIntNTy(waveSize), // Return type
-                                                builder.getInt32Ty()         // Argument type
-                                            },
-                                            {value, builder.getInt32(0), builder.getInt32(PredicateNE)});
+    Value *ballot = builder.CreateIntrinsic(Intrinsic::amdgcn_ballot, builder.getIntNTy(waveSize), value);
     if (waveSize == 32)
       ballot = builder.CreateZExt(ballot, builder.getInt64Ty());
+
     return ballot;
   };
 
