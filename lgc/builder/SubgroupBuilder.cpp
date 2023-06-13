@@ -1457,7 +1457,7 @@ Value *BuilderImpl::createGroupBallot(Value *const value) {
 
   // If we have a 32-bit subgroup size, we need to turn the 32-bit ballot result into a 64-bit result.
   if (waveSize <= 32)
-    result = CreateZExt(result, getInt64Ty(), "");
+    result = CreateZExt(result, getInt64Ty());
 
   return result;
 }
