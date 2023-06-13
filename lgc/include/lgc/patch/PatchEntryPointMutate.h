@@ -139,10 +139,18 @@ private:
 
   uint64_t pushFixedShaderArgTys(llvm::SmallVectorImpl<llvm::Type *> &argTys) const;
 
+  // Information about each cps exit (return or cps.jump) used for exit unification.
+  struct CpsExitInfo {
+    CpsExitInfo(llvm::BasicBlock *_pred, llvm::SmallVector<llvm::Value *> _vgpr) : pred(_pred), vgpr(_vgpr) {}
+    llvm::BasicBlock *pred;                // The predecessor that will branch to the unified exit.
+    llvm::SmallVector<llvm::Value *> vgpr; // The vgpr values from the exit.
+  };
+
   bool lowerCpsOps(llvm::Function *func);
   llvm::Function *lowerCpsFunction(llvm::Function *func, llvm::ArrayRef<llvm::Type *> userDataTys,
                                    llvm::ArrayRef<std::string> argNames);
-  void lowerCpsJump(llvm::Function *parent, cps::JumpOp *jumpOp, unsigned numUserdata);
+  void lowerCpsJump(llvm::Function *parent, cps::JumpOp *jumpOp, llvm::BasicBlock *tailBlock,
+                    llvm::SmallVectorImpl<CpsExitInfo> &exitInfos);
 
   // Get UserDataUsage struct for the merged shader stage that contains the given shader stage
   UserDataUsage *getUserDataUsage(ShaderStage stage);
