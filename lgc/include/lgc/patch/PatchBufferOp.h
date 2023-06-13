@@ -99,9 +99,6 @@ private:
   void visitBufferPtrDiff(BufferPtrDiffOp &ptrDiff);
   void visitGetElementPtrInst(llvm::GetElementPtrInst &getElemPtrInst);
   void visitLoadInst(llvm::LoadInst &loadInst);
-  void visitMemCpyInst(llvm::MemCpyInst &memCpyInst);
-  void visitMemMoveInst(llvm::MemMoveInst &memMoveInst);
-  void visitMemSetInst(llvm::MemSetInst &memSetInst);
   void visitPhiInst(llvm::PHINode &phi);
   void visitStoreInst(llvm::StoreInst &storeInst);
   void visitICmpInst(llvm::ICmpInst &icmpInst);
@@ -109,8 +106,6 @@ private:
 
   void postVisitLoadInst(llvm::LoadInst &loadInst);
   void postVisitStoreInst(llvm::StoreInst &storeInst);
-  void postVisitMemCpyInst(llvm::MemCpyInst &memCpyInst);
-  void postVisitMemSetInst(llvm::MemSetInst &memSetInst);
 
   DescriptorInfo getDescriptorInfo(llvm::Value *desc);
   void copyMetadata(llvm::Value *const dest, const llvm::Value *const src) const;
@@ -141,8 +136,6 @@ private:
 
   // Instructions to handle during finish().
   llvm::SmallVector<llvm::Instruction *> m_postVisitInsts;
-
-  static constexpr unsigned MinMemOpLoopBytes = 256;
 };
 
 // =====================================================================================================================
