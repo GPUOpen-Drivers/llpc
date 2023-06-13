@@ -3614,7 +3614,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpTraceRayKHR>(SPIRVValue *
 //
 // @param spvValue : A SPIR-V value.
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpExecuteCallableKHR>(SPIRVValue *const spvValue) {
-  if (m_execModule != ExecutionModelRayGenerationKHR) {
+  if (m_execModule == ExecutionModelCallableKHR) {
     Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
     auto *pipelineContext = static_cast<Llpc::RayTracingContext *>(llpcContext->getPipelineContext());
     pipelineContext->setIndirectPipeline();
