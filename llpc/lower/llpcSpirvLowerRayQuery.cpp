@@ -539,6 +539,27 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryInitializeKHR>
   Value *arg = argIt++;
   Value *sceneAddLow = m_builder->CreateExtractElement(arg, uint64_t(0));
   Value *sceneAddHigh = m_builder->CreateExtractElement(arg, 1);
+
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 34
+  {
+    // For GPURT major version < 34, GPURT expect base address of acceleration structure being passed, which is stored
+    // at offset 0 of the resource.
+    auto gpuLowAddr = m_builder->CreateZExt(sceneAddLow, m_builder->getInt64Ty());
+    auto gpuHighAddr = m_builder->CreateZExt(sceneAddHigh, m_builder->getInt64Ty());
+    gpuHighAddr = m_builder->CreateShl(gpuHighAddr, m_builder->getInt64(32));
+    auto gpuAddr = m_builder->CreateOr(gpuLowAddr, gpuHighAddr);
+
+    Type *gpuAddrAsPtrTy = PointerType::get(*m_context, SPIRAS_Global);
+    auto loadPtr = m_builder->CreateIntToPtr(gpuAddr, gpuAddrAsPtrTy);
+
+    auto loadTy = FixedVectorType::get(Type::getInt32Ty(*m_context), 2);
+    auto loadValue = m_builder->CreateLoad(loadTy, loadPtr);
+
+    sceneAddLow = m_builder->CreateExtractElement(loadValue, uint64_t(0));
+    sceneAddHigh = m_builder->CreateExtractElement(loadValue, 1);
+  }
+#endif
+
   m_builder->CreateStore(sceneAddLow, traceRaysArgs[1]);
   m_builder->CreateStore(sceneAddHigh, traceRaysArgs[2]);
   // 3, Const ray flags

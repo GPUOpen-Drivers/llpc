@@ -472,6 +472,7 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(SPIRVType *const spvType, 
   SPIRVStorageClassKind storageClass = spvType->getPointerStorageClass();
   LayoutMode pointeeLayout =
       isStorageClassExplicitlyLaidOut(m_bm, storageClass) ? LayoutMode::Explicit : LayoutMode::Native;
+  auto addrSpace = SPIRSPIRVAddrSpaceMap::rmap(storageClass);
 
   // Handle image etc types first, if in UniformConstant memory.
   if (storageClass == StorageClassUniformConstant) {
@@ -529,6 +530,11 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(SPIRVType *const spvType, 
 #if VKI_RAY_TRACING
     else if (spvElementType->isTypeAccelerationStructureKHR()) {
       pointeeLayout = LayoutMode::Explicit;
+      // From now on (GPURT major version >= 34), AS header may start at a non-zero offset, GPURT now request base
+      // offset of the resource, and it will calculate the actual GPUVA, instead of compiler providing one loaded from
+      // offset 0. Here we use SPIRAS_Constant because later in llpcSpirvLowerGlobal the AS will be lowered to
+      // get.desc.ptr which returns SPIRAS_Constant ptr.
+      addrSpace = SPIRAS_Constant;
     }
 #endif
   }
@@ -536,7 +542,7 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(SPIRVType *const spvType, 
   Type *const pointeeType =
       transType(spvType->getPointerElementType(), matrixStride, isColumnMajor, true, pointeeLayout);
 
-  return PointerType::get(pointeeType, SPIRSPIRVAddrSpaceMap::rmap(storageClass));
+  return PointerType::get(pointeeType, addrSpace);
 }
 
 // =====================================================================================================================
@@ -2438,25 +2444,6 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
         (void(loadType)); // unused
         return ConstantVector::get({m_builder->getInt32(0), m_builder->getInt32(0)});
       }
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 34
-      else {
-        // From now on, AS header may start at a non-zero offset, GPURT now request base offset of the resource, and it
-        // will calculate the actual GPUVA, instead of compiler providing one loaded from offset 0.
-        unsigned binding = 0u;
-        unsigned descSet = 0u;
-        bool valid = spvLoad->getSrc()->hasDecorate(DecorationBinding, 0, &binding);
-        valid &= spvLoad->getSrc()->hasDecorate(DecorationDescriptorSet, 0, &descSet);
-        assert(valid);
-
-        auto descTy = ResourceNodeType::DescriptorBuffer;
-        auto descPtr = getBuilder()->CreateGetDescPtr(descTy, descTy, descSet, binding);
-        // Base address is the first 48-bit of descriptor.
-        Value *accelAddr = getBuilder()->CreateLoad(FixedVectorType::get(getBuilder()->getInt32Ty(), 2), descPtr);
-        accelAddr = getBuilder()->CreateInsertElement(
-            accelAddr, getBuilder()->CreateAnd(getBuilder()->CreateExtractElement(accelAddr, 1), 0xFFFF), 1);
-        return accelAddr;
-      }
-#endif
       break;
     }
 #endif
@@ -2529,6 +2516,15 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
   // Record all load instructions inserted by addLoadInstRecursively.
   if (m_scratchBoundsChecksEnabled) {
     gatherScratchBoundsChecksMemOps(spvLoad, baseNode, currentBlock, LlvmMemOpType::IS_LOAD, currentBlock->getParent());
+  }
+
+  if (spvLoad->getType()->getOpCode() == OpTypeAccelerationStructureKHR) {
+    // From now on (GPURT major version >= 34), AS header may start at a non-zero offset, GPURT now request base offset
+    // of the resource, and it will calculate the actual GPUVA, instead of compiler providing one loaded from offset 0.
+    // We'll lower the AS global value later in llpcSpirvLowerGlobal, here we clamp the loaded GPUVA to first 48 bits.
+    assert(loadInst->getType()->isVectorTy());
+    loadInst = getBuilder()->CreateInsertElement(
+        loadInst, getBuilder()->CreateAnd(getBuilder()->CreateExtractElement(loadInst, 1), 0xFFFF), 1);
   }
 
   return loadInst;
@@ -7717,6 +7713,17 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
   // so we must explicitly check both the SPIR-V opcode and the LLVM type.
   if (gv && bv->getOpCode() == OpVariable) {
     auto as = gv->getType()->getAddressSpace();
+
+    auto spvTy = bv->getType()->getPointerElementType();
+    while (spvTy->getOpCode() == OpTypeArray || spvTy->getOpCode() == OpTypeRuntimeArray)
+      spvTy = spvTy->getArrayElementType();
+    if (spvTy->isTypeAccelerationStructureKHR()) {
+      // NOTE: For acceleration structure, we use SPIRAS_Constant address space, but to apply decoration correctly,
+      // we assume it is SPIRAS_Uniform here.
+      assert(as == SPIRAS_Constant);
+      as = SPIRAS_Uniform;
+    }
+
     if (as == SPIRAS_Input || as == SPIRAS_Output) {
       // Translate decorations of inputs and outputs
 
@@ -8581,6 +8588,7 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
 #if VKI_RAY_TRACING
   else if (bt->isTypeAccelerationStructureKHR()) {
     ShaderBlockMetadata blockMd = {};
+    blockMd.IsAccelerationStructure = true;
     mdTy = Type::getInt64Ty(*m_context);
     return ConstantInt::get(mdTy, blockMd.U64All);
   }

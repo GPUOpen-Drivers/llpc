@@ -2227,13 +2227,26 @@ void SpirvLowerGlobal::lowerBufferBlock() {
   SmallSet<GlobalVariable *, 4> skipGlobals;
 
   for (GlobalVariable &global : m_module->globals()) {
-    // Skip anything that is not a block.
-    if (global.getAddressSpace() != SPIRAS_Uniform)
+    // Skip anything that is not a block or default uniform or acceleration structure.
+    if ((global.getAddressSpace() != SPIRAS_Uniform && global.getAddressSpace() != SPIRAS_Constant))
       continue;
     if (skipGlobals.count(&global) > 0) {
       globalsToRemove.push_back(&global);
       continue;
     }
+
+    bool isAccelerationStructure = false;
+    MDNode *blockMetaNode = global.getMetadata(gSPIRVMD::Block);
+    if (blockMetaNode) {
+      ShaderBlockMetadata blockMeta = {};
+      auto blockMetaNodeVal = mdconst::dyn_extract<Constant>(blockMetaNode->getOperand(0));
+      if (auto meta = dyn_cast<ConstantInt>(blockMetaNodeVal))
+        blockMeta.U64All = meta->getZExtValue();
+      isAccelerationStructure = blockMeta.IsAccelerationStructure;
+    }
+
+    if (global.getAddressSpace() == SPIRAS_Constant && !isAccelerationStructure)
+      continue;
 
     MDNode *const resMetaNode = global.getMetadata(gSPIRVMD::Resource);
     assert(resMetaNode);
@@ -2302,8 +2315,12 @@ void SpirvLowerGlobal::lowerBufferBlock() {
             // pointers are removing zero-index GEPs and BitCast with pointer to pointer cast.
             m_builder->SetInsertPoint(replaceInstsInfo.otherInst);
             unsigned bufferFlags = global.isConstant() ? 0 : lgc::Builder::BufferFlagWritten;
+
+            auto descTy = lgc::ResourceNodeType::DescriptorBuffer;
             Value *const bufferDesc =
-                m_builder->CreateLoadBufferDesc(descSet, binding, m_builder->getInt32(0), bufferFlags);
+                isAccelerationStructure
+                    ? m_builder->CreateGetDescPtr(descTy, descTy, descSet, binding)
+                    : m_builder->CreateLoadBufferDesc(descSet, binding, m_builder->getInt32(0), bufferFlags);
 
             // If the global variable is a constant, the data it points to is invariant.
             if (global.isConstant())
@@ -2412,8 +2429,22 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                 skipGlobals.insert(globals[nextGlobalIdx]);
               }
               for (unsigned idx = 0; idx < descCount; ++idx) {
-                bufferDescs[idx] =
-                    m_builder->CreateLoadBufferDesc(descSets[idx], bindings[idx], blockIndex, bufferFlags);
+                if (isAccelerationStructure) {
+                  // For acceleration structure array, get the base descriptor pointer and use index + stride to access
+                  // the actual needed pointer.
+                  auto descTy = lgc::ResourceNodeType::DescriptorBuffer;
+                  auto descPtr = m_builder->CreateGetDescPtr(descTy, descTy, descSet, binding);
+                  auto stride = m_builder->CreateGetDescStride(descTy, descTy, descSet, binding);
+                  auto index = m_builder->CreateMul(blockIndex, stride);
+                  Value *castDescPtr = m_builder->CreateBitCast(
+                      descPtr,
+                      m_builder->getInt8Ty()->getPointerTo(cast<PointerType>(descPtr->getType())->getAddressSpace()));
+                  Value *indexedDescPtr = m_builder->CreateGEP(m_builder->getInt8Ty(), castDescPtr, index);
+                  bufferDescs[idx] = m_builder->CreateBitCast(indexedDescPtr, descPtr->getType());
+                } else {
+                  bufferDescs[idx] =
+                      m_builder->CreateLoadBufferDesc(descSets[idx], bindings[idx], blockIndex, bufferFlags);
+                }
                 // If the global variable is a constant, the data it points to is invariant.
                 if (global.isConstant())
                   m_builder->CreateInvariantStart(bufferDescs[idx]);
@@ -2458,8 +2489,12 @@ void SpirvLowerGlobal::lowerBufferBlock() {
       } else {
         m_builder->SetInsertPointPastAllocas(func);
         unsigned bufferFlags = global.isConstant() ? 0 : lgc::Builder::BufferFlagWritten;
+
+        auto descTy = lgc::ResourceNodeType::DescriptorBuffer;
         Value *const bufferDesc =
-            m_builder->CreateLoadBufferDesc(descSet, binding, m_builder->getInt32(0), bufferFlags);
+            isAccelerationStructure
+                ? m_builder->CreateGetDescPtr(descTy, descTy, descSet, binding)
+                : m_builder->CreateLoadBufferDesc(descSet, binding, m_builder->getInt32(0), bufferFlags);
 
         // If the global variable is a constant, the data it points to is invariant.
         if (global.isConstant())
