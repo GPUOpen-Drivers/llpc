@@ -53,7 +53,6 @@ const char *PrevRayQueryObj = "PrevRayQueryObj";
 const char *RayQueryObjGen = "RayQueryObjGen";
 const char *StaticId = "StaticId";
 static const char *LibraryEntryFuncName = "libraryEntry";
-static const char *LdsStack = "LdsStack";
 extern const char *LoadDwordAtAddr;
 extern const char *LoadDwordAtAddrx2;
 extern const char *LoadDwordAtAddrx4;
@@ -64,21 +63,12 @@ static const char *IntersectBvh = "AmdExtD3DShaderIntrinsics_IntersectInternal";
 #endif
 extern const char *ConvertF32toF16NegInf;
 extern const char *ConvertF32toF16PosInf;
-static const char *GetStackSize = "AmdTraceRayGetStackSize";
-static const char *LdsRead = "AmdTraceRayLdsRead";
-static const char *LdsWrite = "AmdTraceRayLdsWrite";
-static const char *GetStackBase = "AmdTraceRayGetStackBase";
-static const char *GetStackStride = "AmdTraceRayGetStackStride";
 static const char *GetStaticFlags = "AmdTraceRayGetStaticFlags";
 static const char *GetTriangleCompressionMode = "AmdTraceRayGetTriangleCompressionMode";
 static const char *SetHitTokenData = "AmdTraceRaySetHitTokenData";
 static const char *GetBoxSortHeuristicMode = "AmdTraceRayGetBoxSortHeuristicMode";
 static const char *SampleGpuTimer = "AmdTraceRaySampleGpuTimer";
 static const char *GetStaticId = "AmdTraceRayGetStaticId";
-#if VKI_BUILD_GFX11
-static const char *LdsStackInit = "AmdTraceRayLdsStackInit";
-static const char *LdsStackStore = "AmdTraceRayLdsStackStore";
-#endif
 static const char *FetchTrianglePositionFromRayQuery = "FetchTrianglePositionFromRayQuery";
 } // namespace RtName
 
@@ -308,8 +298,8 @@ SpirvLowerRayQuery::SpirvLowerRayQuery() : SpirvLowerRayQuery(false) {
 
 // =====================================================================================================================
 SpirvLowerRayQuery::SpirvLowerRayQuery(bool rayQueryLibrary)
-    : m_rayQueryLibrary(rayQueryLibrary), m_spirvOpMetaKindId(0), m_ldsStack(nullptr), m_prevRayQueryObj(nullptr),
-      m_rayQueryObjGen(nullptr), m_nextTraceRayId(0) {
+    : m_rayQueryLibrary(rayQueryLibrary), m_spirvOpMetaKindId(0), m_prevRayQueryObj(nullptr), m_rayQueryObjGen(nullptr),
+      m_nextTraceRayId(0) {
 }
 
 // =====================================================================================================================
@@ -333,7 +323,6 @@ bool SpirvLowerRayQuery::runImpl(Module &module) {
   createGlobalLdsUsage();
   createGlobalTraceRayStaticId();
   if (m_rayQueryLibrary) {
-    createGlobalStack();
     for (auto funcIt = module.begin(), funcEnd = module.end(); funcIt != funcEnd;) {
       Function *func = &*funcIt++;
       processLibraryFunction(func);
@@ -389,30 +378,6 @@ void SpirvLowerRayQuery::processLibraryFunction(Function *&func) {
     createConvertF32toF16(func, 2);
   } else if (mangledName.startswith(RtName::ConvertF32toF16PosInf)) {
     createConvertF32toF16(func, 3);
-  } else if (mangledName.startswith(RtName::GetStackSize)) {
-    eraseFunctionBlocks(func);
-    BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
-    m_builder->SetInsertPoint(entryBlock);
-    m_builder->CreateRet(m_builder->getInt32(MaxLdsStackEntries * getWorkgroupSize()));
-    func->setName(RtName::GetStackSize);
-  } else if (mangledName.startswith(RtName::LdsRead)) {
-    createReadLdsStack(func);
-    func->setName(RtName::LdsRead);
-  } else if (mangledName.startswith(RtName::LdsWrite)) {
-    createWriteLdsStack(func);
-    func->setName(RtName::LdsWrite);
-  } else if (mangledName.startswith(RtName::GetStackBase)) {
-    eraseFunctionBlocks(func);
-    BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
-    m_builder->SetInsertPoint(entryBlock);
-    m_builder->CreateRet(getThreadIdInGroup());
-    func->setName(RtName::GetStackBase);
-  } else if (mangledName.startswith(RtName::GetStackStride)) {
-    eraseFunctionBlocks(func);
-    BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
-    m_builder->SetInsertPoint(entryBlock);
-    m_builder->CreateRet(m_builder->getInt32(getWorkgroupSize()));
-    func->setName(RtName::GetStackStride);
   } else if (mangledName.startswith(RtName::GetStaticFlags)) {
     eraseFunctionBlocks(func);
     BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
@@ -441,15 +406,7 @@ void SpirvLowerRayQuery::processLibraryFunction(Function *&func) {
     m_builder->SetInsertPoint(entryBlock);
     m_builder->CreateRet(m_builder->CreateLoad(m_builder->getInt32Ty(), m_traceRayStaticId));
     func->setName(RtName::GetStaticId);
-  }
-#if VKI_BUILD_GFX11
-  else if (mangledName.startswith(RtName::LdsStackInit)) {
-    createLdsStackInit(func);
-  } else if (mangledName.startswith(RtName::LdsStackStore)) {
-    createLdsStackStore(func);
-  }
-#endif
-  else if (mangledName.startswith(RtName::FetchTrianglePositionFromRayQuery)) {
+  } else if (mangledName.startswith(RtName::FetchTrianglePositionFromRayQuery)) {
     func->setName(RtName::FetchTrianglePositionFromRayQuery);
     func->setLinkage(GlobalValue::ExternalLinkage);
   } else {
@@ -687,12 +644,9 @@ void SpirvLowerRayQuery::createRayQueryProceedFunc(Function *func) {
 
   m_builder->CreateStore(getDispatchId(), threadId);
 
-  Value *result;
-  {
-    result = m_builder->CreateNamedCall(
-        m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_RAY_QUERY_PROCEED),
-        func->getReturnType(), {rayQuery, constRayFlags, threadId}, {Attribute::NoUnwind, Attribute::AlwaysInline});
-  }
+  Value *result = m_builder->CreateNamedCall(
+      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_RAY_QUERY_PROCEED),
+      func->getReturnType(), {rayQuery, constRayFlags, threadId}, {Attribute::NoUnwind, Attribute::AlwaysInline});
 
   m_builder->CreateStore(m_builder->getInt32(1), m_ldsUsage);
   m_builder->CreateRet(result);
@@ -926,7 +880,6 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryTerminateKHR>(
   Value *rayQuery = func->arg_begin();
   auto rayQueryEltTy = getRayQueryInternalTy(m_builder);
 
-#if VKI_BUILD_GFX11
   if (m_context->getGfxIpVersion().major >= 11) {
     // Navi3x and beyond, use rayQuery.currentNodePtr == TERMINAL_NODE to determine Terminate()
 
@@ -936,9 +889,7 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryTerminateKHR>(
     Value *currNodeAddr = m_builder->CreateGEP(
         rayQueryEltTy, rayQuery, {m_builder->getInt32(0), m_builder->getInt32(RayQueryParams::CurrNodePtr)});
     m_builder->CreateStore(m_builder->getInt32(RayQueryTerminalNode), currNodeAddr);
-  } else
-#endif
-  {
+  } else {
     // Navi2x, use the following combination to determine Terminate()
     //  rayQuery.nodeIndex = 0xFFFFFFFF // invalid index
     //  rayQuery.numStackEntries = 0;
@@ -1289,96 +1240,6 @@ void SpirvLowerRayQuery::processShaderFunction(Function *func, unsigned opcode) 
 }
 
 // =====================================================================================================================
-// Return read value from LDS stack
-//
-// @param func : The function to create
-void SpirvLowerRayQuery::createReadLdsStack(Function *func) {
-  eraseFunctionBlocks(func);
-  BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
-  m_builder->SetInsertPoint(entryBlock);
-  auto argIt = func->arg_begin();
-  Value *stackOffset = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt);
-
-  auto stageMask = m_context->getPipelineContext()->getShaderStageMask();
-  bool isGraphics = stageMask < ShaderStageComputeBit;
-  bool hasAnyHitStage = stageMask & ShaderStageRayTracingAnyHitBit;
-  if (isGraphics || hasAnyHitStage) {
-    Value *ldsUsage = m_builder->CreateLoad(m_builder->getInt32Ty(), m_ldsUsage);
-    auto isLds = m_builder->CreateICmpEQ(ldsUsage, m_builder->getInt32(1));
-
-    BasicBlock *tempArrayBlock = BasicBlock::Create(*m_context, ".tempArray", func);
-    BasicBlock *ldsArrayBlock = BasicBlock::Create(*m_context, ".lds", func);
-    m_builder->CreateCondBr(isLds, ldsArrayBlock, tempArrayBlock);
-    m_builder->SetInsertPoint(tempArrayBlock);
-    auto stackArrayIdx = getStackArrayIndex(stackOffset);
-    Type *stackArrayEltTy = m_stackArray->getValueType();
-    auto stackArrayAddr = m_builder->CreateGEP(stackArrayEltTy, m_stackArray, {m_builder->getInt32(0), stackArrayIdx});
-    Value *stackArrayData = m_builder->CreateLoad(m_builder->getInt32Ty(), stackArrayAddr);
-    m_builder->CreateRet(stackArrayData);
-    m_builder->SetInsertPoint(ldsArrayBlock);
-  }
-  Type *ldsStackEltTy = m_ldsStack->getValueType();
-  Value *stackAddr = m_builder->CreateGEP(ldsStackEltTy, m_ldsStack, {m_builder->getInt32(0), stackOffset});
-  Value *stackData = m_builder->CreateLoad(m_builder->getInt32Ty(), stackAddr);
-  m_builder->CreateRet(stackData);
-}
-
-// =====================================================================================================================
-// Write value to LDS stack
-//
-// @param func : The function to create
-void SpirvLowerRayQuery::createWriteLdsStack(Function *func) {
-  eraseFunctionBlocks(func);
-  BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
-  m_builder->SetInsertPoint(entryBlock);
-
-  auto argIt = func->arg_begin();
-  Value *stackOffset = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt++);
-  Value *stackData = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt);
-
-  auto stageMask = m_context->getPipelineContext()->getShaderStageMask();
-  bool isGraphics = stageMask < ShaderStageComputeBit;
-  bool hasAnyHitStage = stageMask & ShaderStageRayTracingAnyHitBit;
-  if (isGraphics || hasAnyHitStage) {
-    Value *ldsUsage = m_builder->CreateLoad(m_builder->getInt32Ty(), m_ldsUsage);
-    auto isLds = m_builder->CreateICmpEQ(ldsUsage, m_builder->getInt32(1));
-
-    BasicBlock *tempArrayBlock = BasicBlock::Create(*m_context, ".tempArray", func);
-    BasicBlock *ldsArrayBlock = BasicBlock::Create(*m_context, ".lds", func);
-    m_builder->CreateCondBr(isLds, ldsArrayBlock, tempArrayBlock);
-    m_builder->SetInsertPoint(tempArrayBlock);
-    auto stackArrayIdx = getStackArrayIndex(stackOffset);
-    Type *stackArrayEltTy = m_stackArray->getValueType();
-    auto stackArrayAddr = m_builder->CreateGEP(stackArrayEltTy, m_stackArray, {m_builder->getInt32(0), stackArrayIdx});
-    m_builder->CreateStore(stackData, stackArrayAddr);
-    m_builder->CreateRet(m_builder->getInt32(0));
-    m_builder->SetInsertPoint(ldsArrayBlock);
-  }
-
-  Type *ldsStackEltTy = m_ldsStack->getValueType();
-  Value *stackAddr = m_builder->CreateGEP(ldsStackEltTy, m_ldsStack, {m_builder->getInt32(0), stackOffset});
-  m_builder->CreateStore(stackData, stackAddr);
-  m_builder->CreateRet(m_builder->getInt32(0));
-}
-
-// =====================================================================================================================
-// Create global variable for the LDS stack and stack array
-void SpirvLowerRayQuery::createGlobalStack() {
-  auto ldsStackSize = getWorkgroupSize() * MaxLdsStackEntries;
-
-  auto ldsStackTy = ArrayType::get(m_builder->getInt32Ty(), ldsStackSize);
-  m_ldsStack = new GlobalVariable(*m_module, ldsStackTy, false, GlobalValue::ExternalLinkage, nullptr, RtName::LdsStack,
-                                  nullptr, GlobalValue::NotThreadLocal, SPIRAS_Local);
-
-  m_ldsStack->setAlignment(MaybeAlign(4));
-
-  auto arrayStackTy = ArrayType::get(m_builder->getInt32Ty(), MaxLdsStackEntries);
-  m_stackArray = new GlobalVariable(*m_module, arrayStackTy, false, GlobalValue::ExternalLinkage, nullptr,
-                                    RtName::LdsStack, nullptr, GlobalValue::NotThreadLocal, SPIRAS_Private);
-  m_stackArray->setAlignment(MaybeAlign(4));
-}
-
-// =====================================================================================================================
 // Create global variable for the LDS stack
 void SpirvLowerRayQuery::createGlobalLdsUsage() {
   m_ldsUsage =
@@ -1497,37 +1358,6 @@ Value *SpirvLowerRayQuery::createTransformMatrix(unsigned builtInId, Value *acce
 }
 
 // =====================================================================================================================
-// Get raytracing workgroup size for LDS stack size calculation
-unsigned SpirvLowerRayQuery::getWorkgroupSize() const {
-  unsigned workgroupSize = 0;
-  if (m_context->getPipelineType() == PipelineType::RayTracing) {
-    const auto *rtState = m_context->getPipelineContext()->getRayTracingState();
-    workgroupSize = rtState->threadGroupSizeX * rtState->threadGroupSizeY * rtState->threadGroupSizeZ;
-  } else if (m_context->getPipelineType() == PipelineType::Graphics) {
-    workgroupSize = m_context->getPipelineContext()->getRayTracingWaveSize();
-  } else {
-    workgroupSize = m_context->getPipelineContext()->getWorkgroupSize();
-  }
-  assert(workgroupSize != 0);
-#if VKI_BUILD_GFX11
-  if (m_context->getPipelineContext()->getGfxIpVersion().major >= 11) {
-    // Round up to multiple of 32, as the ds_bvh_stack swizzle as 32 threads
-    workgroupSize = alignTo(workgroupSize, 32);
-  }
-#endif
-  return workgroupSize;
-}
-
-// =====================================================================================================================
-// Get flat thread id in work group/wave
-Value *SpirvLowerRayQuery::getThreadIdInGroup() const {
-  unsigned builtIn = m_context->getPipelineType() == PipelineType::Graphics ? BuiltInSubgroupLocalInvocationId
-                                                                            : BuiltInLocalInvocationIndex;
-  lgc::InOutInfo inputInfo = {};
-  return m_builder->CreateReadBuiltInInput(static_cast<lgc::BuiltInKind>(builtIn), inputInfo, nullptr, nullptr, "");
-}
-
-// =====================================================================================================================
 // Create function to return bvh node intersection result
 //
 // @param func : The function to create
@@ -1642,23 +1472,6 @@ void SpirvLowerRayQuery::generateTraceRayStaticId() {
 // @param stage : Shader stage
 bool SpirvLowerRayQuery::stageNotSupportLds(ShaderStage stage) {
   return stage == ShaderStageRayTracingAnyHit;
-}
-
-// =====================================================================================================================
-// Get stack array index from stackoffset
-
-// @param stackOffset : Stack offset
-Value *SpirvLowerRayQuery::getStackArrayIndex(Value *stackOffset) {
-  // offset = (rayQuery.stackPtr - AmdTraceRayGetStackBase()) % AmdTraceRayGetStackSize();
-  // index = offset / AmdTraceRayGetStackStride();
-
-  // From rayquery.hlsl : stackOffset = rayQuery.stackPtr % AmdTraceRayGetStackSize()
-  // so offset = (stackOffset - AmdTraceRayGetStackBase() + AmdTraceRayGetStackSize()) % AmdTraceRayGetStackSize()
-  Value *offset = m_builder->CreateSub(stackOffset, getThreadIdInGroup());
-  Value *stackSize = m_builder->getInt32(MaxLdsStackEntries * getWorkgroupSize());
-  offset = m_builder->CreateAdd(offset, stackSize);
-  offset = m_builder->CreateURem(offset, stackSize);
-  return m_builder->CreateUDiv(offset, m_builder->getInt32(getWorkgroupSize()));
 }
 
 // =====================================================================================================================
@@ -1796,84 +1609,14 @@ Value *SpirvLowerRayQuery::createLoadMatrixFromAddr(Value *matrixAddr) {
   return matrix;
 }
 
-#if VKI_BUILD_GFX11
 // =====================================================================================================================
-// Init LDS stack address
-//
-// @param func : The function to create
-void SpirvLowerRayQuery::createLdsStackInit(Function *func) {
-  eraseFunctionBlocks(func);
-  BasicBlock *block = BasicBlock::Create(*m_context, "", func);
-  m_builder->SetInsertPoint(block);
-
-  // The initial stack index is 0 currently.
-  // stackIndex = 0
-  // stackBase = AmdTraceRayGetStackBase()
-  // stackAddr = ((stackBase << 18u) | startIndex)
-  Type *ldsStackElemTy = m_ldsStack->getValueType();
-  Value *stackBasePerThread = getThreadIdInGroup();
-
-  // From Navi3x on, Hardware has decided that the stacks are only swizzled across every 32 threads,
-  // with stacks for every set of 32 threads stored after all the stack data for the previous 32 threads.
-  if (getWorkgroupSize() > 32) {
-    // localThreadId = (LinearLocalThreadID%32)
-    // localGroupId = (LinearLocalThreadID/32)
-    // stackSize = STACK_SIZE * 32 = m_stackEntries * 32
-    // groupOf32ThreadSize = (LinearLocalThreadID/32) * stackSize
-    // stackBasePerThread (in DW) = (LinearLocalThreadID%32)+(LinearLocalThreadID/32)*STACK_SIZE*32
-    //                            = localThreadId + groupOf32ThreadSize
-    Value *localThreadId = m_builder->CreateAnd(stackBasePerThread, m_builder->getInt32(31));
-    Value *localGroupId = m_builder->CreateLShr(stackBasePerThread, m_builder->getInt32(5));
-    Value *stackSize = m_builder->getInt32(MaxLdsStackEntries * 32);
-    Value *groupOf32ThreadSize = m_builder->CreateMul(localGroupId, stackSize);
-    stackBasePerThread = m_builder->CreateAdd(localThreadId, groupOf32ThreadSize);
-  }
-
-  Value *stackBaseAsInt = m_builder->CreatePtrToInt(
-      m_builder->CreateGEP(ldsStackElemTy, m_ldsStack, {m_builder->getInt32(0), stackBasePerThread}),
-      m_builder->getInt32Ty());
-
-  // stack_addr[31:18] = stack_base[15:2]
-  // stack_addr[17:0] = stack_index[17:0]
-  // The low 18 bits of stackAddr contain stackIndex which we always initialize to 0.
-  // Note that this relies on stackAddr being a multiple of 4, so that bits 17 and 16 are 0.
-  Value *stackAddr = m_builder->CreateShl(stackBaseAsInt, 16);
-
-  m_builder->CreateRet(stackAddr);
+// Get thread ID in group.
+Value *SpirvLowerRayQuery::getThreadIdInGroup() const {
+  // Todo: for graphics shader, subgroupId * waveSize + subgroupLocalInvocationId()
+  unsigned builtIn = m_context->getPipelineType() == PipelineType::Graphics ? BuiltInSubgroupLocalInvocationId
+                                                                            : BuiltInLocalInvocationIndex;
+  lgc::InOutInfo inputInfo = {};
+  return m_builder->CreateReadBuiltInInput(static_cast<lgc::BuiltInKind>(builtIn), inputInfo, nullptr, nullptr, "");
 }
-
-// =====================================================================================================================
-// Store to LDS stack
-//
-// @param func : The function to create
-void SpirvLowerRayQuery::createLdsStackStore(Function *func) {
-  eraseFunctionBlocks(func);
-  BasicBlock *block = BasicBlock::Create(*m_context, "", func);
-  m_builder->SetInsertPoint(block);
-
-  auto int32x4Ty = FixedVectorType::get(m_builder->getInt32Ty(), 4);
-
-  auto argIt = func->arg_begin();
-  Value *stackAddr = argIt++;
-  Value *stackAddrVal = m_builder->CreateLoad(m_builder->getInt32Ty(), stackAddr);
-  Value *lastVisited = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt++);
-  Value *data = m_builder->CreateLoad(int32x4Ty, argIt);
-  // OFFSET = {OFFSET1, OFFSET0}
-  // stack_size[1:0] = OFFSET1[5:4]
-  // Stack size is encoded in the offset argument as:
-  // 8 -> {0x00, 0x00}
-  // 16 -> {0x10, 0x00}
-  // 32 -> {0x20, 0x00}
-  // 64 -> {0x30, 0x00}
-  assert(MaxLdsStackEntries == 16);
-  Value *offset = m_builder->getInt32((Log2_32(MaxLdsStackEntries) - 3) << 12);
-
-  Value *result =
-      m_builder->CreateIntrinsic(Intrinsic::amdgcn_ds_bvh_stack_rtn, {}, {stackAddrVal, lastVisited, data, offset});
-
-  m_builder->CreateStore(m_builder->CreateExtractValue(result, 1), stackAddr);
-  m_builder->CreateRet(m_builder->CreateExtractValue(result, 0));
-}
-#endif
 
 } // namespace Llpc

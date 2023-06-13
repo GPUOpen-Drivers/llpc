@@ -3,7 +3,10 @@
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: %[[RESULT:[0-9]*]] = call i32 @llvm.amdgcn.raw.buffer.atomic.cmpswap.i32(i32 %{{[0-9]*}}, i32 %[[COMPARE:[0-9]*]]
 ; SHADERTEST: %[[IS_EQUAL:[0-9]*]] = icmp eq i32 %[[RESULT]], %[[COMPARE]]
-; SHADERTEST: br i1 %[[IS_EQUAL]]
+; SHADERTEST: %[[INS1:[0-9]*]] = insertvalue { i32, i1 } %{{[0-9]*}}, i1 %[[IS_EQUAL]], 1
+; SHADERTEST: %[[FR:.*]] = freeze { i32, i1 } %[[INS1]]
+; SHADERTEST: %[[RES:[0-9]*]] = extractvalue { i32, i1 } %[[FR]], 1
+; SHADERTEST: br i1 %[[RES]]
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

@@ -132,9 +132,7 @@ cl::opt<bool> ValidateSpirv("validate-spirv", cl::desc("Validate input SPIR-V bi
 cl::opt<bool> IgnoreColorAttachmentFormats("ignore-color-attachment-formats",
                                            cl::desc("Ignore color attachment formats"), cl::init(false));
 
-#if VKI_RAY_TRACING
 cl::opt<unsigned> BvhNodeStride("bvh-node-stride", cl::desc("Ray tracing BVH node stride"), cl::init(64u));
-#endif
 
 // -num-threads: number of CPU threads to use when compiling the inputs
 cl::opt<unsigned> NumThreads("num-threads",
@@ -323,12 +321,10 @@ cl::opt<ResourceLayoutScheme> LayoutScheme("resource-layout-scheme", cl::desc("T
 cl::opt<bool> AssertToMsgBox("assert-to-msgbox", cl::desc("Pop message box when assert is hit"));
 #endif
 
-#if VKI_RAY_TRACING
 // -enable-internal-rt-shaders: enable intrinsics for internal RT shaders
 cl::opt<bool> EnableInternalRtShaders("enable-internal-rt-shaders",
                                       cl::desc("Enable intrinsics for internal RT shaders"),
                                       cl::init(false));
-#endif
 
 } // namespace
 // clang-format on
@@ -523,9 +519,7 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
   compileInfo->scalarBlockLayout = ScalarBlockLayout;
   compileInfo->scratchAccessBoundsChecks = EnableScratchAccessBoundsChecks;
   compileInfo->enableImplicitInvariantExports = EnableImplicitInvariantExports;
-#if VKI_RAY_TRACING
   compileInfo->bvhNodeStride = BvhNodeStride;
-#endif
 
   if (LlpcOptLevel.getPosition() != 0) {
     compileInfo->optimizationLevel = LlpcOptLevel;
@@ -544,10 +538,8 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
 
   compileInfo->compPipelineInfo.options.forceNonUniformResourceIndexStageMask = ForceNonUniformResourceIndexStageMask;
   compileInfo->gfxPipelineInfo.options.forceNonUniformResourceIndexStageMask = ForceNonUniformResourceIndexStageMask;
-#if VKI_RAY_TRACING
   compileInfo->rayTracePipelineInfo.options.forceNonUniformResourceIndexStageMask =
       ForceNonUniformResourceIndexStageMask;
-#endif
 
   // Set NGG control settings
   if (ParsedGfxIp.major >= 10) {
@@ -570,9 +562,7 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
     nggState.vertsPerSubgroup = NggVertsPerSubgroup;
   }
 
-#if VKI_RAY_TRACING
   compileInfo->internalRtShaders = EnableInternalRtShaders;
-#endif
 
   return Result::Success;
 }
@@ -602,12 +592,12 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
   } else {
     if (Error err = processInputStages(compileInfo, inputSpecs, ValidateSpirv, NumThreads))
       return err;
+
     compileInfo.pipelineType =
         isComputePipeline(compileInfo.stageMask) ? VfxPipelineTypeCompute : VfxPipelineTypeGraphics;
-#if VKI_RAY_TRACING
+
     if (isRayTracingPipeline(compileInfo.stageMask))
       compileInfo.pipelineType = VfxPipelineTypeRayTracing;
-#endif
   }
 
   //

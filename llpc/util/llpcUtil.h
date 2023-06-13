@@ -58,10 +58,8 @@ static const unsigned DescSetMask = 0x000000FF;
 // Gets the name string of shader stage.
 const char *getShaderStageName(ShaderStage shaderStage);
 
-#if VKI_RAY_TRACING
 bool isRayTracingShaderStage(ShaderStage stage);
 bool hasRayTracingShaderStage(unsigned shageMask);
-#endif
 
 // Convert shader stage to the SPIR-V execution model
 spv::ExecutionModel convertToExecModel(ShaderStage shaderStage);
@@ -179,7 +177,6 @@ inline bool isGraphicsPipeline(unsigned stageMask) {
          (stageMask & Vkgc::ShaderStageBit::ShaderStageComputeBit) == 0;
 }
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Returns true iff the compiled pipeline is a raytracing pipeline.
 //
@@ -187,7 +184,7 @@ inline bool isGraphicsPipeline(unsigned stageMask) {
 inline bool isRayTracingPipeline(unsigned stageMask) {
   return hasRayTracingShaderStage(stageMask);
 }
-#endif
+
 } // namespace Llpc
 
 namespace llvm {

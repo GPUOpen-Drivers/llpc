@@ -315,6 +315,7 @@ private:
   llvm::PHINode *createPhi(llvm::ArrayRef<std::pair<llvm::Value *, llvm::BasicBlock *>> incomings,
                            const llvm::Twine &name = "");
   void createFenceAndBarrier();
+  void createBarrier();
 
   unsigned getLdsRegionStart(PrimShaderLdsRegion region) {
     assert(m_ldsLayout.count(region) > 0);

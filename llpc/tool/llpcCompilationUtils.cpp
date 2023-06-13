@@ -145,7 +145,6 @@ static ShaderStage sourceLangToShaderStage(SpvGenStage sourceLang) {
     return ShaderStage::ShaderStageFragment;
   case SpvGenStageCompute:
     return ShaderStage::ShaderStageCompute;
-#if VKI_RAY_TRACING
   case SpvGenStageRayTracingRayGen:
     return ShaderStage::ShaderStageRayTracingRayGen;
   case SpvGenStageRayTracingIntersect:
@@ -158,7 +157,6 @@ static ShaderStage sourceLangToShaderStage(SpvGenStage sourceLang) {
     return ShaderStage::ShaderStageRayTracingMiss;
   case SpvGenStageRayTracingCallable:
     return ShaderStage::ShaderStageRayTracingCallable;
-#endif
   default:
     llvm_unreachable("Unexpected shading language type!");
     return ShaderStage::ShaderStageInvalid;
@@ -385,9 +383,7 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
 
   compileInfo.compPipelineInfo = pipelineState->compPipelineInfo;
   compileInfo.gfxPipelineInfo = pipelineState->gfxPipelineInfo;
-#if VKI_RAY_TRACING
   compileInfo.rayTracePipelineInfo = pipelineState->rayPipelineInfo;
-#endif
   compileInfo.pipelineType = pipelineState->pipelineType;
 
   if (ignoreColorAttachmentFormats) {
@@ -417,21 +413,18 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
                          Twine(getShaderStageName(pipelineState->stages[stage].stage)) + " shader module");
     }
   }
-#if VKI_RAY_TRACING
+
   const BinaryData *shaderLibrary = nullptr;
   if (pipelineState->pipelineType == VfxPipelineTypeRayTracing)
     shaderLibrary = &pipelineState->rayPipelineInfo.shaderTraceRay;
   else if (pipelineState->pipelineType == VfxPipelineTypeCompute)
     shaderLibrary = &pipelineState->compPipelineInfo.shaderLibrary;
-#endif
-#if VKI_RAY_TRACING
   else {
     assert(pipelineState->pipelineType == VfxPipelineTypeGraphics);
     shaderLibrary = &pipelineState->gfxPipelineInfo.shaderLibrary;
   }
   if (shaderLibrary->codeSize > 0 && EnableOuts())
     disassembleSpirv(shaderLibrary->codeSize, shaderLibrary->pCode, "Ray tracing library");
-#endif
 
   const bool isGraphics = compileInfo.pipelineType == VfxPipelineTypeGraphics;
   assert(!(isGraphics && isComputePipeline(compileInfo.stageMask)) && "Bad stage mask");

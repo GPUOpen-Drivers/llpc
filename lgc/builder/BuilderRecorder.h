@@ -121,13 +121,8 @@ enum BuilderOpcode : unsigned {
   ImageQuerySamples,
   ImageQuerySize,
   ImageGetLod,
-#if VKI_RAY_TRACING
   ImageBvhIntersectRay,
   Reserved2,
-#else
-  Reserved2,
-  Reserved1,
-#endif
 
   // Input/output
   ReadGenericInput,

@@ -39,17 +39,14 @@
 #include "llpcError.h"
 #include "llpcFile.h"
 #include "llpcGraphicsContext.h"
-#if VKI_RAY_TRACING
 #include "llpcRayTracingContext.h"
-#endif
 #include "llpcShaderModuleHelper.h"
 #include "llpcSpirvLower.h"
 #include "llpcSpirvLowerCfgMerges.h"
-#if VKI_RAY_TRACING
 #include "llpcSpirvLowerRayTracing.h"
-#endif
 #include "llpcSpirvLowerTranslator.h"
 #include "llpcSpirvLowerUtil.h"
+#include "llpcSpirvProcessGpuRtLibrary.h"
 #include "llpcTimerProfiler.h"
 #include "llpcUtil.h"
 #include "spirvExt.h"
@@ -85,9 +82,7 @@
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
-#if VKI_RAY_TRACING
 #include "llvm/Transforms/Utils/Cloning.h"
-#endif
 #include <cassert>
 #include <mutex>
 #include <set>
@@ -97,11 +92,9 @@
 #include "spvgen.h"
 #endif
 
-#if VKI_RAY_TRACING
 namespace RtName {
 extern const char *TraceRayKHR;
 } // namespace RtName
-#endif
 
 #define DEBUG_TYPE "llpc-compiler"
 
@@ -218,7 +211,6 @@ static MetroHash::Hash SOptionHash = {};
 unsigned Compiler::m_instanceCount = 0;
 unsigned Compiler::m_outRedirectCount = 0;
 
-#if VKI_RAY_TRACING
 // Represents the payload used by helper thread to build ray tracing Elf
 struct HelperThreadBuildRayTracingPipelineElfPayload {
   ArrayRef<Module *> modules;                         // Modules to generate ELF packages
@@ -234,7 +226,6 @@ struct HelperThreadBuildRayTracingPipelineElfPayload {
 
 sys::Mutex Compiler::m_helperThreadMutex;
 std::condition_variable_any Compiler::m_helperThreadConditionVariable;
-#endif
 
 // =====================================================================================================================
 // Handler for LLVM fatal error.
@@ -926,12 +917,81 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
 }
 
 // =====================================================================================================================
+// Returns true if node is of a descriptor type that is unsupported by relocatable shader compilation.
+//
+// @param [in] node : User data node
+static bool isUnrelocatableResourceMappingRootNode(const ResourceMappingNode *node) {
+  switch (node->type) {
+  case ResourceMappingNodeType::DescriptorTableVaPtr: {
+    const ResourceMappingNode *startInnerNode = node->tablePtr.pNext;
+    const ResourceMappingNode *endInnerNode = startInnerNode + node->tablePtr.nodeCount;
+    for (const ResourceMappingNode *innerNode = startInnerNode; innerNode != endInnerNode; ++innerNode) {
+      if (innerNode->type == ResourceMappingNodeType::InlineBuffer) {
+        // The code to handle an inline buffer cannot be easily patched, so relocatable shaders
+        // assume there are no inline buffers.
+        return true;
+      }
+    }
+    break;
+  }
+  case ResourceMappingNodeType::DescriptorSampler:
+  case ResourceMappingNodeType::DescriptorCombinedTexture:
+  case ResourceMappingNodeType::DescriptorTexelBuffer:
+    // Generic descriptors in the top level are not handled by the linker.
+    return true;
+  case ResourceMappingNodeType::InlineBuffer:
+    // Loading from an inline buffer requires building a descriptor that is not handled by the linker.
+    return true;
+  default:
+    break;
+  }
+  return false;
+}
+
+// =====================================================================================================================
+// Returns true if resourceMapping contains a user data node entry with a descriptor type that is unsupported by
+// relocatable shader compilation.
+//
+// @param [in] resourceMapping : resource mapping data, containing user data nodes
+static bool hasUnrelocatableDescriptorNode(const ResourceMappingData *resourceMapping) {
+  auto descriptorRangeValues = ArrayRef<StaticDescriptorValue>(resourceMapping->pStaticDescriptorValues,
+                                                               resourceMapping->staticDescriptorValueCount);
+  for (const auto &range : descriptorRangeValues) {
+    if (range.type == ResourceMappingNodeType::DescriptorYCbCrSampler) {
+      return true;
+    }
+  }
+
+  for (unsigned i = 0; i < resourceMapping->userDataNodeCount; ++i) {
+    if (isUnrelocatableResourceMappingRootNode(&resourceMapping->pUserDataNodes[i].node))
+      return true;
+  }
+
+  // If there is no 1-to-1 mapping between descriptor sets and descriptor tables, then relocatable shaders will fail.
+  SmallSet<unsigned, 8> descriptorSetsSeen;
+  for (unsigned i = 0; i < resourceMapping->userDataNodeCount; ++i) {
+    const ResourceMappingNode *node = &resourceMapping->pUserDataNodes[i].node;
+    if (node->type != ResourceMappingNodeType::DescriptorTableVaPtr)
+      continue;
+    const ResourceMappingNode *innerNode = node->tablePtr.pNext;
+    if (innerNode && !descriptorSetsSeen.insert(innerNode->srdRange.set).second)
+      return true;
+  }
+
+  return false;
+}
+
+// =====================================================================================================================
 // Returns true if a graphics pipeline can be built out of the given shader infos.
 //
 // @param shaderInfos : Shader infos for the pipeline to be built
 // @param pipelineInfo : Pipeline info for the pipeline to be built
 bool Compiler::canUseRelocatableGraphicsShaderElf(const ArrayRef<const PipelineShaderInfo *> &shaderInfos,
                                                   const GraphicsPipelineBuildInfo *pipelineInfo) {
+  // Check user data nodes for unsupported Descriptor types.
+  if (hasUnrelocatableDescriptorNode(&pipelineInfo->resourceMapping))
+    return false;
+
   if (pipelineInfo->iaState.enableMultiView)
     return false;
 
@@ -961,6 +1021,10 @@ bool Compiler::canUseRelocatableComputeShaderElf(const ComputePipelineBuildInfo 
     if (moduleData && moduleData->binType != BinaryType::Spirv)
       return false;
   }
+
+  // Check UserDataNode for unsupported Descriptor types.
+  if (hasUnrelocatableDescriptorNode(&pipelineInfo->resourceMapping))
+    return false;
 
   if (cl::RelocatableShaderElfLimit != -1) {
     if (m_relocatablePipelineCompilations >= cl::RelocatableShaderElfLimit)
@@ -1038,9 +1102,8 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       context->setModuleTargetMachine(module);
     }
 
-#if VKI_RAY_TRACING
     unsigned rayQueryLibraryIndex = InvalidValue;
-#endif
+
     for (unsigned shaderIndex = 0; shaderIndex < shaderInfo.size() && result == Result::Success; ++shaderIndex) {
       const PipelineShaderInfo *shaderInfoEntry = shaderInfo[shaderIndex];
       ShaderStage entryStage = shaderInfoEntry ? shaderInfoEntry->entryStage : ShaderStageInvalid;
@@ -1066,13 +1129,15 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
                                     "// LLPC SPIRV-to-LLVM translation results\n"));
       }
 
-#if VKI_RAY_TRACING
       const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfoEntry->pModuleData);
       if (moduleData->usage.enableRayQuery) {
         lowerPassMgr->addPass(SpirvLowerRayQuery(moduleData->usage.rayQueryLibrary));
+      }
+
+      if (moduleData->usage.rayQueryLibrary) {
+        lowerPassMgr->addPass(SpirvProcessGpuRtLibrary());
         rayQueryLibraryIndex = shaderIndex;
       }
-#endif
 
       // Stop timer for translate.
       timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, false);
@@ -1087,7 +1152,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       if (entryStage == ShaderStageTessControl)
         context->getPipelineContext()->setTcsInputVertices(modules[shaderIndex]);
     }
-#if VKI_RAY_TRACING
+
     std::vector<const PipelineShaderInfo *> newShaderInfos;
     bool rayQuery = (rayQueryLibraryIndex != InvalidValue);
     if (rayQuery) {
@@ -1113,7 +1178,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       delete shaderLibraryModule;
       shaderInfo = newShaderInfos;
     }
-#endif
+
     SmallVector<Module *, ShaderStageGfxCount> modulesToLink;
     for (unsigned shaderIndex = 0; shaderIndex < shaderInfo.size() && result == Result::Success; ++shaderIndex) {
       // Per-shader SPIR-V lowering passes.
@@ -1136,12 +1201,8 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       bool isInternalRtShader = moduleData->usage.isInternalRtShader;
       assert(!isInternalRtShader || entryStage == ShaderStageCompute);
 
-      SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower)
-#if VKI_RAY_TRACING
-                                                                    ,
-                            false, rayQuery, isInternalRtShader
-#endif
-      );
+      SpirvLower::addPasses(context, entryStage, *lowerPassMgr, timerProfiler.getTimer(TimerLower), false, rayQuery,
+                            isInternalRtShader);
       // Run the passes.
       bool success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
       if (!success) {
@@ -1412,7 +1473,6 @@ Result Compiler::buildGraphicsPipelineInternal(GraphicsContext *graphicsContext,
     unsigned stageMask = context->getShaderStageMask();
     bool buildPartPipeline = (cl::EnablePartPipeline && isShaderStageInMask(ShaderStageFragment, stageMask) &&
                               (stageMask & ~shaderStageToMask(ShaderStageFragment)));
-#if VKI_RAY_TRACING
     if (buildPartPipeline) {
       for (const auto *oneShaderInfo : shaderInfo) {
         if (!oneShaderInfo)
@@ -1424,7 +1484,7 @@ Result Compiler::buildGraphicsPipelineInternal(GraphicsContext *graphicsContext,
         }
       }
     }
-#endif
+
     if (buildPartPipeline)
       result = buildGraphicsPipelineWithPartPipelines(context, shaderInfo, pipelineElf, stageCacheAccesses);
     else
@@ -1606,7 +1666,6 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
       break;
   }
 
-#if VKI_RAY_TRACING
   // Setup the rayquery Graphics PipelineShaderinfo
   PipelineShaderInfo rayQueryShaderInfo = {};
   ShaderModuleData rayQueryModuleData = {};
@@ -1628,7 +1687,6 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
     // Add the rayquery PipelineShaderinfo
     shaderInfo.push_back(&rayQueryShaderInfo);
   }
-#endif
 
   MetroHash::Hash cacheHash = {};
   MetroHash::Hash pipelineHash = {};
@@ -1734,7 +1792,6 @@ Result Compiler::buildComputePipelineInternal(ComputeContext *computeContext,
       &pipelineInfo->cs ///< Compute shader
   };
 
-#if VKI_RAY_TRACING
   PipelineShaderInfo rayQueryShaderInfo = pipelineInfo->cs;
   ShaderModuleData rayQueryModuleData = {};
   if (pipelineInfo->shaderLibrary.codeSize > 0) {
@@ -1755,7 +1812,7 @@ Result Compiler::buildComputePipelineInternal(ComputeContext *computeContext,
     // Add the rayquery PipelineShaderinfo
     shadersInfo.push_back(&rayQueryShaderInfo);
   }
-#endif
+
   Result result = Result::ErrorUnavailable;
   CacheAccessInfo stageCacheAccesses[ShaderStageCount] = {};
   if (buildingRelocatableElf) {
@@ -1857,7 +1914,6 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
   return result;
 }
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Build ray tracing pipeline from the specified info.
 //
@@ -1946,8 +2002,8 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
       for (i = 0; i < pipelineInfo->shaderCount; ++i) {
         const auto &shaderInfo = pipelineInfo->pShaders[i];
         // Check raygen spirv module have OpTraceRayKHR or not
+        const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo.pModuleData);
         if (shaderInfo.entryStage == ShaderStageRayTracingRayGen) {
-          const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo.pModuleData);
           if (moduleData->usage.hasTraceRay) {
             pipelineOut->hasTraceRay = true;
             break;
@@ -1961,7 +2017,15 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
 
     std::vector<const PipelineShaderInfo *> rayTracingShaderInfo(modulesCount);
     for (i = 0; i < pipelineInfo->shaderCount; ++i) {
-      rayTracingShaderInfo[i] = &pipelineInfo->pShaders[i];
+      auto &shaderInfo = rayTracingShaderInfo[i];
+      shaderInfo = &pipelineInfo->pShaders[i];
+      const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
+      if (shaderInfo->entryStage == ShaderStageRayTracingAnyHit ||
+          shaderInfo->entryStage == ShaderStageRayTracingIntersect) {
+        if (moduleData->usage.enableRayQuery) {
+          rayTracingContext.setIndirectPipeline();
+        }
+      }
     }
 
     // Add entry module
@@ -2317,7 +2381,8 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
       // Lower SPIR-V CFG merges before inlining
       lowerPassMgr->addPass(SpirvLowerCfgMerges());
       lowerPassMgr->addPass(AlwaysInlinerPass());
-    }
+    } else
+      lowerPassMgr->addPass(SpirvProcessGpuRtLibrary());
     lowerPassMgr->addPass(SpirvLowerRayTracing());
 
     // Stop timer for translate.
@@ -2571,7 +2636,6 @@ void Compiler::addRayTracingIndirectPipelineMetadata(ElfPackage *pipelineElf) {
   writer.setNote(&newMetaNote);
   writer.writeToBuffer(pipelineElf);
 }
-#endif
 
 // =====================================================================================================================
 // Builds hash code from compilation-options
@@ -2895,7 +2959,6 @@ lgc::ShaderStage getLgcShaderStage(Llpc::ShaderStage stage) {
     return lgc::ShaderStageFragment;
   case ShaderStageCopyShader:
     return lgc::ShaderStageCopyShader;
-#if VKI_RAY_TRACING
   case ShaderStageRayTracingRayGen:
   case ShaderStageRayTracingIntersect:
   case ShaderStageRayTracingAnyHit:
@@ -2903,7 +2966,6 @@ lgc::ShaderStage getLgcShaderStage(Llpc::ShaderStage stage) {
   case ShaderStageRayTracingMiss:
   case ShaderStageRayTracingCallable:
     return lgc::ShaderStageCompute;
-#endif
   default:
     llvm_unreachable("");
     return lgc::ShaderStageInvalid;

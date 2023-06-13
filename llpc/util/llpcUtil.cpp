@@ -54,24 +54,20 @@ const char *getShaderStageName(ShaderStage shaderStage) {
   if (shaderStage == ShaderStageCopyShader)
     name = "copy";
   else if (shaderStage < ShaderStageCount) {
-    static const char *ShaderStageNames[] = {
-      "task",
-      "vertex",
-      "tessellation control",
-      "tessellation evaluation",
-      "geometry",
-      "mesh",
-      "fragment",
-      "compute",
-#if VKI_RAY_TRACING
-      "raygen",
-      "intersect",
-      "anyhit",
-      "closesthit",
-      "miss",
-      "callable"
-#endif
-    };
+    static const char *ShaderStageNames[] = {"task",
+                                             "vertex",
+                                             "tessellation control",
+                                             "tessellation evaluation",
+                                             "geometry",
+                                             "mesh",
+                                             "fragment",
+                                             "compute",
+                                             "raygen",
+                                             "intersect",
+                                             "anyhit",
+                                             "closesthit",
+                                             "miss",
+                                             "callable"};
 
     name = ShaderStageNames[static_cast<unsigned>(shaderStage)];
   } else
@@ -104,7 +100,6 @@ ShaderStage convertToShaderStage(unsigned execModel) {
     return ShaderStageCompute;
   case spv::ExecutionModelCopyShader:
     return ShaderStageCopyShader;
-#if VKI_RAY_TRACING
   case spv::ExecutionModelRayGenerationKHR:
     return ShaderStageRayTracingRayGen;
   case spv::ExecutionModelIntersectionKHR:
@@ -117,7 +112,6 @@ ShaderStage convertToShaderStage(unsigned execModel) {
     return ShaderStageRayTracingMiss;
   case spv::ExecutionModelCallableKHR:
     return ShaderStageRayTracingCallable;
-#endif
   default:
     llvm_unreachable("Unknown execution model");
     return ShaderStageInvalid;
@@ -148,7 +142,6 @@ spv::ExecutionModel convertToExecModel(ShaderStage shaderStage) {
     return spv::ExecutionModelGLCompute;
   case ShaderStageCopyShader:
     return spv::ExecutionModelCopyShader;
-#if VKI_RAY_TRACING
   case ShaderStageRayTracingRayGen:
     return spv::ExecutionModelRayGenerationKHR;
   case ShaderStageRayTracingIntersect:
@@ -161,14 +154,12 @@ spv::ExecutionModel convertToExecModel(ShaderStage shaderStage) {
     return spv::ExecutionModelMissKHR;
   case ShaderStageRayTracingCallable:
     return spv::ExecutionModelCallableKHR;
-#endif
   default:
     llvm_unreachable("Unknown shader stage");
     return spv::ExecutionModelMax;
   }
 }
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Checks whether a specified shader stage is for ray tracing.
 //
@@ -184,7 +175,6 @@ bool isRayTracingShaderStage(ShaderStage stage) {
 bool hasRayTracingShaderStage(unsigned shageMask) {
   return (shageMask & ShaderStageAllRayTracingBit) != 0;
 }
-#endif
 
 // =====================================================================================================================
 // Returns true if shaderInfo has the information required to compile an unlinked shader of the given type.

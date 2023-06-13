@@ -1558,7 +1558,10 @@ unsigned PipelineState::computeExportFormat(Type *outputTy, unsigned location) {
   unsigned outputMask = outputTy->isVectorTy() ? (1 << cast<FixedVectorType>(outputTy)->getNumElements()) - 1 : 1;
   const auto cbState = &getColorExportState();
   // NOTE: Alpha-to-coverage only takes effect for outputs from color target 0.
-  const bool enableAlphaToCoverage = (cbState->alphaToCoverageEnable && location == 0);
+  // When dual source blend is enabled, location 1 is location 0 index 1 in shader source. we need generate same export
+  // format.
+  const bool enableAlphaToCoverage =
+      (cbState->alphaToCoverageEnable && ((location == 0) || ((location == 1) && cbState->dualSourceBlendEnable)));
 
   const bool blendEnabled = colorExportFormat->blendEnable;
 

@@ -30,6 +30,7 @@ def LgcDialect : Dialect {
   let cppNamespace = "lgc";
 }
 
+def PrivatePointer : TgConstant<(PointerType 5)>, Type;
 def BufferPointer : TgConstant<(PointerType 7)>, Type;
 
 def V4I32 : TgConstant<(FixedVectorType I32, 4)>, Type;
@@ -157,7 +158,7 @@ def InputImportInterpolatedOp : LgcOp<"input.import.interpolated", [Memory<[]>, 
     Only used in PS for per-vertex/interpolated inputs. Use `input.import.generic` for per-primitive inputs.
 
     `interpMode` is one of:
-    
+
     - InterpModeSmooth for interpolation using the `<2 x float>` barycentrics in `interpValue`
     - InterpModeFlat for flat shading; `interpValue` is ignored and is recommended to be `poison`
     - InterpModeCustom to retrieve the attribute of the vertex with the `i32` index `interpValue` (which must be 0, 1,

@@ -139,18 +139,9 @@ namespace Llpc {
 // @param gfxIp : Graphics IP version info
 // @param pipelineHash : Pipeline hash code
 // @param cacheHash : Cache hash code
-PipelineContext::PipelineContext(GfxIpVersion gfxIp, MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash
-#if VKI_RAY_TRACING
-                                 ,
-                                 const Vkgc::RtState *rtState
-#endif
-                                 )
-    : m_gfxIp(gfxIp), m_pipelineHash(*pipelineHash), m_cacheHash(*cacheHash)
-#if VKI_RAY_TRACING
-      ,
-      m_rtState(rtState)
-#endif
-{
+PipelineContext::PipelineContext(GfxIpVersion gfxIp, MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash,
+                                 const Vkgc::RtState *rtState)
+    : m_gfxIp(gfxIp), m_pipelineHash(*pipelineHash), m_cacheHash(*cacheHash), m_rtState(rtState) {
 }
 
 // =====================================================================================================================
@@ -202,7 +193,6 @@ ShaderHash PipelineContext::getShaderHashCode(const PipelineShaderInfo &shaderIn
   return hash;
 }
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Return ray tracing/ray query entry function names
 //
@@ -213,7 +203,6 @@ StringRef PipelineContext::getRayTracingFunctionName(unsigned funcType) {
   assert(funcType < Vkgc::RT_ENTRY_FUNC_COUNT);
   return getRayTracingState()->gpurtFuncTable.pFunc[funcType];
 }
-#endif
 
 // =====================================================================================================================
 // Set pipeline state in Pipeline object for middle-end and/or calculate the hash for the state to be added.
@@ -234,15 +223,16 @@ void PipelineContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
     if (getPreRasterHasGs())
       pipeline->setPreRasterHasGs(true);
   }
-  // Give the shader stage mask to the middle-end. We need to translate the Vkgc::ShaderStage bit numbers
-  // to lgc::ShaderStage bit numbers. We only process native shader stages, ignoring the CopyShader stage.
-  unsigned stageMask = getShaderStageMask();
-#if VKI_RAY_TRACING
-  if (hasRayTracingShaderStage(stageMask))
-    stageMask = ShaderStageComputeBit;
-#endif
-  // Give the user data nodes to the middle-end, and/or hash them.
-  setUserDataInPipeline(pipeline, hasher, stageMask);
+  if (!unlinked) {
+    // Give the shader stage mask to the middle-end. We need to translate the Vkgc::ShaderStage bit numbers
+    // to lgc::ShaderStage bit numbers. We only process native shader stages, ignoring the CopyShader stage.
+    unsigned stageMask = getShaderStageMask();
+    if (hasRayTracingShaderStage(stageMask))
+      stageMask = ShaderStageComputeBit;
+
+    // Give the user data nodes to the middle-end, and/or hash them.
+    setUserDataInPipeline(pipeline, hasher, stageMask);
+  }
 
   // Give the pipeline options to the middle-end, and/or hash them.
   Options options = computePipelineOptions();
@@ -312,18 +302,15 @@ Options PipelineContext::computePipelineOptions() const {
 
   options.allowNullDescriptor = getPipelineOptions()->extendedRobustness.nullDescriptor;
   options.disableImageResourceCheck = getPipelineOptions()->disableImageResourceCheck;
-#if VKI_BUILD_GFX11
   options.optimizeTessFactor = getPipelineOptions()->optimizeTessFactor;
-#endif
   options.enableInterpModePatch = getPipelineOptions()->enableInterpModePatch;
   options.pageMigrationEnabled = getPipelineOptions()->pageMigrationEnabled;
   options.resourceLayoutScheme = static_cast<lgc::ResourceLayoutScheme>(getPipelineOptions()->resourceLayoutScheme);
 
   // Driver report full subgroup lanes for compute shader, here we just set fullSubgroups as default options
   options.fullSubgroups = true;
-#if VKI_RAY_TRACING
   options.internalRtShaders = getPipelineOptions()->internalRtShaders;
-#endif
+
   return options;
 }
 
@@ -622,7 +609,7 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
     // size for a shader that uses gl_SubgroupSize.
     shaderOptions.subgroupSize = SubgroupSize;
   }
-#if VKI_RAY_TRACING
+
   // NOTE: WaveSize of raytracing usually be 32
   bool useRayTracingWaveSize = false;
   if (getPipelineType() == PipelineType::RayTracing) {
@@ -634,7 +621,6 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
   }
   if (useRayTracingWaveSize)
     shaderOptions.waveSize = getRayTracingWaveSize();
-#endif
 
   // Use a static cast from Vkgc WaveBreakSize to LGC WaveBreak, and static assert that
   // that is valid.
@@ -717,7 +703,6 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
   return shaderOptions;
 }
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Get wave size used for raytracing
 unsigned PipelineContext::getRayTracingWaveSize() const {
@@ -725,8 +710,6 @@ unsigned PipelineContext::getRayTracingWaveSize() const {
     return 32;
   return 64;
 }
-
-#endif
 
 // =====================================================================================================================
 // Map a VkFormat to a {BufDataFormat, BufNumFormat}. Returns BufDataFormatInvalid if the

@@ -136,7 +136,6 @@ enum class ShaderInput : unsigned {
 
   // Task/CS VGPRs
   LocalInvocationId, // LocalInvocationId (v3i32)
-
   Count
 };
 
