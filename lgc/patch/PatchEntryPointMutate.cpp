@@ -177,15 +177,15 @@ bool PatchEntryPointMutate::runImpl(Module &module, PipelineShadersResult &pipel
 constexpr unsigned continuationStackAlignment = 4;
 
 // =====================================================================================================================
-// Split the input into pieces of dword.
-static void splitIntoDwords(const DataLayout &layout, IRBuilder<> &builder, ArrayRef<Value *> input,
-                            SmallVector<Value *> &output) {
+// Split the input into pieces of i32.
+static void splitIntoI32(const DataLayout &layout, IRBuilder<> &builder, ArrayRef<Value *> input,
+                         SmallVector<Value *> &output) {
   for (auto *x : input) {
     Type *xType = x->getType();
     if (isa<StructType>(xType)) {
       StructType *structTy = cast<StructType>(xType);
       for (unsigned idx = 0; idx < structTy->getNumElements(); idx++)
-        splitIntoDwords(layout, builder, builder.CreateExtractValue(x, idx), output);
+        splitIntoI32(layout, builder, builder.CreateExtractValue(x, idx), output);
     } else if (isa<ArrayType>(xType)) {
       llvm_unreachable("Array type not supported yet.");
     } else if (auto *vecTy = dyn_cast<FixedVectorType>(xType)) {
@@ -197,7 +197,7 @@ static void splitIntoDwords(const DataLayout &layout, IRBuilder<> &builder, Arra
         llvm_unreachable("vector of type smaller than dword not supported yet.");
       } else {
         for (unsigned idx = 0; idx < (unsigned)vecTy->getNumElements(); idx++)
-          splitIntoDwords(layout, builder, builder.CreateExtractElement(x, idx), output);
+          splitIntoI32(layout, builder, builder.CreateExtractElement(x, idx), output);
       }
     } else {
       // pointer or primitive types
@@ -209,8 +209,10 @@ static void splitIntoDwords(const DataLayout &layout, IRBuilder<> &builder, Arra
       if (size > 32) {
         assert(size % 32 == 0);
         Value *vecDword = builder.CreateBitCast(x, FixedVectorType::get(builder.getInt32Ty(), size / 32));
-        splitIntoDwords(layout, builder, vecDword, output);
+        splitIntoI32(layout, builder, vecDword, output);
       } else {
+        if (!xType->isIntegerTy())
+          x = builder.CreateBitCast(x, builder.getInt32Ty());
         output.push_back(x);
       }
     }
@@ -247,7 +249,6 @@ static Value *mergeDwordsIntoVector(IRBuilder<> &builder, ArrayRef<Value *> inpu
 //
 // @param func : the function to be processed
 bool PatchEntryPointMutate::lowerCpsOps(Function *func) {
-  // TODO: Get all return instruction in cps functions as well.
   SmallVector<CallInst *> cpsOps;
   struct Payload {
     SmallVectorImpl<CallInst *> &calls;
@@ -265,6 +266,7 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func) {
   if (!isCpsFunc && cpsOps.empty())
     return false;
 
+  // Get the number of user-data arguments.
   unsigned numUserdata;
   if (!isCpsFunc) {
     SmallVector<Type *, 8> argTys;
@@ -275,9 +277,134 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func) {
     numUserdata = m_cpsShaderInputCache.getTypes().size();
   }
 
+  // Get all the return instructions.
+  SmallVector<ReturnInst *> retInstrs;
+  for (BasicBlock &block : *func)
+    if (ReturnInst *ret = dyn_cast<ReturnInst>(block.getTerminator()))
+      retInstrs.push_back(ret);
+
+  auto *tailBlock = BasicBlock::Create(func->getContext(), "tail.block", func);
+
+  SmallVector<CpsExitInfo> exitInfos;
+  IRBuilder<> builder(func->getContext());
+
+  // Lower cps jumps.
   for (auto *call : cpsOps)
     if (auto *jumpOp = dyn_cast<cps::JumpOp>(call))
-      lowerCpsJump(func, jumpOp, numUserdata);
+      lowerCpsJump(func, jumpOp, tailBlock, exitInfos);
+
+  // Lower returns.
+  for (auto *ret : retInstrs) {
+    auto *vspTy = PointerType::get(func->getContext(), ADDR_SPACE_PRIVATE);
+    exitInfos.push_back(CpsExitInfo(ret->getParent(), {builder.getInt32(0), PoisonValue::get(vspTy)}));
+    builder.SetInsertPoint(ret);
+    builder.CreateBr(tailBlock);
+    ret->eraseFromParent();
+  }
+
+  size_t vgprNum = 0;
+  for (const auto &exit : exitInfos)
+    vgprNum = std::max(exit.vgpr.size(), vgprNum);
+
+  SmallVector<Value *> newVgpr;
+  builder.SetInsertPoint(tailBlock);
+
+  if (exitInfos.size() == 1) {
+    newVgpr = exitInfos[0].vgpr;
+  } else {
+    for (size_t vgprIdx = 0; vgprIdx < vgprNum; vgprIdx++) {
+      // We always have the leading two fixed vgpr arguments: vcr, vsp. The other remaining payloads are i32 type.
+      Type *phiTy = vgprIdx < 2 ? exitInfos[0].vgpr[vgprIdx]->getType() : builder.getInt32Ty();
+      PHINode *phi = builder.CreatePHI(phiTy, exitInfos.size());
+      for (size_t exitIdx = 0; exitIdx < exitInfos.size(); exitIdx++) {
+        if (vgprIdx < exitInfos[exitIdx].vgpr.size())
+          phi->addIncoming(exitInfos[exitIdx].vgpr[vgprIdx], exitInfos[exitIdx].pred);
+        else
+          phi->addIncoming(PoisonValue::get(builder.getInt32Ty()), exitInfos[exitIdx].pred);
+      }
+      newVgpr.push_back(phi);
+    }
+  }
+  // Packing VGPR arguments.
+  Value *vgprArg = mergeIntoStruct(builder, newVgpr);
+
+  // Packing SGPR arguments (user data) into vector of i32s.
+  SmallVector<Value *> userData;
+  for (unsigned idx = 0; idx != numUserdata; ++idx)
+    userData.push_back(func->getArg(idx));
+
+  const DataLayout &layout = func->getParent()->getDataLayout();
+  SmallVector<Value *> userDataI32;
+  splitIntoI32(layout, builder, userData, userDataI32);
+  Value *userDataVec = mergeDwordsIntoVector(builder, userDataI32);
+  //    tail:
+  //      Merge vgpr values from different exits.
+  //      Check if we have pending cps call
+  //      If no cps call, jump to return block.
+  //    chain:
+  //      Jump to next cps function.
+  //    ret:
+  //      ret void
+  unsigned waveSize = m_pipelineState->getShaderWaveSize(m_shaderStage);
+  Type *waveMaskTy = builder.getIntNTy(waveSize);
+  auto *chainBlock = BasicBlock::Create(func->getContext(), "chain.block", func);
+  auto *retBlock = BasicBlock::Create(func->getContext(), "ret.block", func);
+  auto *vcr = builder.CreateExtractValue(vgprArg, 0);
+  auto *vcrTy = vcr->getType();
+
+  if (isCpsFunc) {
+    // FIXME: Switch to LLVM intrinsic
+    FunctionType *setInactiveChainTy = FunctionType::get(vcrTy, {vcrTy, vcrTy}, false);
+    auto setInactiveChain = Function::Create(setInactiveChainTy, GlobalValue::ExternalLinkage,
+                                             "llvm.amdgcn.setinactive.chain.arg", func->getParent());
+    vcr = builder.CreateCall(setInactiveChain, {vcr, func->getArg(numUserdata)});
+  }
+
+  // Find first lane having non-null vcr, and use as next jump target.
+  auto *vcrMask = builder.CreateICmpNE(vcr, builder.getInt32(0));
+  auto *pendingBallot = builder.CreateIntrinsic(Intrinsic::amdgcn_ballot, waveMaskTy, vcrMask);
+  Value *firstActive = builder.CreateIntrinsic(Intrinsic::cttz, waveMaskTy, {pendingBallot, builder.getTrue()});
+  if (!waveMaskTy->isIntegerTy(32))
+    firstActive = builder.CreateTrunc(firstActive, builder.getInt32Ty());
+  auto *targetVcr = builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_readlane, {vcr, firstActive});
+  // Calculate the lane mask that take this specific target.
+  auto *targetMask = builder.CreateICmpEQ(vcr, targetVcr);
+  auto *execMask = builder.CreateIntrinsic(Intrinsic::amdgcn_ballot, waveMaskTy, targetMask);
+
+  if (isCpsFunc) {
+    targetVcr = builder.CreateUnaryIntrinsic(Intrinsic::amdgcn_wwm, targetVcr);
+    execMask = builder.CreateUnaryIntrinsic(Intrinsic::amdgcn_wwm, execMask);
+  }
+
+  auto *isNullTarget = builder.CreateICmpEQ(targetVcr, builder.getInt32(0));
+  builder.CreateCondBr(isNullTarget, retBlock, chainBlock);
+
+  builder.SetInsertPoint(retBlock);
+  builder.CreateRetVoid();
+
+  builder.SetInsertPoint(chainBlock);
+  // Mask off metadata bits and setup jump target.
+  Value *addr32 = builder.CreateAnd(targetVcr, builder.getInt32(~0x3fu));
+  AddressExtender addressExtender(func);
+  Value *jumpTarget = addressExtender.extend(addr32, builder.getInt32(HighAddrPc), builder.getPtrTy(), builder);
+
+  Value *chainArgs[] = {jumpTarget, execMask, userDataVec, vgprArg, builder.getInt32(0)};
+
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 465197
+  // Old version of the code
+  Type *chainArgTys[] = {builder.getPtrTy(), builder.getIntNTy(waveSize), userDataVec->getType(), vgprArg->getType(),
+                         builder.getInt32Ty()};
+  FunctionType *chainFuncTy = FunctionType::get(builder.getVoidTy(), chainArgTys, true);
+  auto chainFunc =
+      Function::Create(chainFuncTy, GlobalValue::ExternalLinkage, "llvm.amdgcn.cs.chain", func->getParent());
+  builder.CreateCall(chainFunc, chainArgs);
+#else
+  // New version of the code (also handles unknown version, which we treat as
+  // latest)
+  Type *chainTys[] = {builder.getPtrTy(), builder.getIntNTy(waveSize), userDataVec->getType(), vgprArg->getType()};
+  builder.CreateIntrinsic(Intrinsic::amdgcn_cs_chain, chainTys, chainArgs);
+#endif
+  builder.CreateUnreachable();
 
   return true;
 }
@@ -369,13 +496,14 @@ Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type 
 }
 
 // =====================================================================================================================
-// Lower cps.jump into amdgcn.cs.chain
+// Lower cps.jump, fill cps exit information and branch to tailBlock.
 // This assume the arguments of the parent function are setup correctly.
 //
 // @param parent : the parent function of the cps.jump operation
 // @param jumpOp : the call instruction of cps.jump
-// @param numUserdata: the number of user data inputs to the parent function
-void PatchEntryPointMutate::lowerCpsJump(Function *parent, cps::JumpOp *jumpOp, unsigned numUserdata) {
+// @param [in/out] exitInfos : the vector of cps exit information to be filled
+void PatchEntryPointMutate::lowerCpsJump(Function *parent, cps::JumpOp *jumpOp, BasicBlock *tailBlock,
+                                         SmallVectorImpl<CpsExitInfo> &exitInfos) {
   IRBuilder<> builder(parent->getContext());
   const DataLayout &layout = parent->getParent()->getDataLayout();
   // Translate @lgc.cps.jump(CR %target, i32 %levels, T %state, ...) into:
@@ -404,41 +532,15 @@ void PatchEntryPointMutate::lowerCpsJump(Function *parent, cps::JumpOp *jumpOp, 
   SmallVector<Value *> vgprArgs;
   vgprArgs.push_back(vcr);
   vgprArgs.push_back(vsp);
-  splitIntoDwords(layout, builder, remainingArgs, vgprArgs);
+  splitIntoI32(layout, builder, remainingArgs, vgprArgs);
 
-  Value *vgprArg = mergeIntoStruct(builder, vgprArgs);
-
-  // Packing SGPR arguments(user data) into vector of dwords.
-  SmallVector<Value *> userData;
-  for (unsigned idx = 0; idx != numUserdata; ++idx)
-    userData.push_back(parent->getArg(idx));
-
-  SmallVector<Value *> userDataDwords;
-  splitIntoDwords(layout, builder, userData, userDataDwords);
-  Value *userDataVec = mergeDwordsIntoVector(builder, userDataDwords);
-
-  // Mask off metadata bits and setup jump target.
-  Value *addr32 = builder.CreateAnd(vcr, builder.getInt32(~0x3fu));
-  AddressExtender addressExtender(parent);
-  Value *jumpTarget = addressExtender.extend(addr32, builder.getInt32(HighAddrPc), builder.getPtrTy(), builder);
-
-  unsigned waveSize = m_pipelineState->getShaderWaveSize(m_shaderStage);
-  Value *execMask = builder.CreateIntrinsic(Intrinsic::amdgcn_ballot, builder.getIntNTy(waveSize), builder.getTrue());
-
-  Value *chainArgs[] = {jumpTarget, execMask, userDataVec, vgprArg, builder.getInt32(0)};
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 465197
-  // Old version of the code
-  Type *chainArgTys[] = {builder.getPtrTy(), builder.getIntNTy(waveSize), userDataVec->getType(), vgprArg->getType(),
-                         builder.getInt32Ty()};
-  FunctionType *funcTy = FunctionType::get(builder.getVoidTy(), chainArgTys, true);
-  auto func = Function::Create(funcTy, GlobalValue::ExternalLinkage, "llvm.amdgcn.cs.chain", parent->getParent());
-  builder.CreateCall(func, chainArgs);
-#else
-  // New version of the code (also handles unknown version, which we treat as
-  // latest)
-  Type *chainTys[] = {builder.getPtrTy(), builder.getIntNTy(waveSize), userDataVec->getType(), vgprArg->getType()};
-  builder.CreateIntrinsic(Intrinsic::amdgcn_cs_chain, chainTys, chainArgs);
-#endif
+  // Fill exit information.
+  exitInfos.push_back(CpsExitInfo(jumpOp->getParent(), std::move(vgprArgs)));
+  // Branch to tailBlock.
+  auto *oldTerm = jumpOp->getParent()->getTerminator();
+  assert(isa<UnreachableInst>(oldTerm));
+  oldTerm->eraseFromParent();
+  builder.CreateBr(tailBlock);
 
   jumpOp->eraseFromParent();
 }
