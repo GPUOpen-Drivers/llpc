@@ -1690,24 +1690,6 @@ StringRef PipelineState::getBuiltInName(BuiltInKind builtIn) {
     return #name;
 #include "lgc/BuiltInDefs.h"
 #undef BUILTIN
-
-  // Internal built-ins.
-  case BuiltInSamplePosOffset:
-    return "SamplePosOffset";
-  case BuiltInInterpLinearCenter:
-    return "InterpLinearCenter";
-  case BuiltInInterpPullMode:
-    return "InterpPullMode";
-  case BuiltInInterpPerspCenter:
-    return "InterpPerspCenter";
-  case BuiltInInterpPerspCentroid:
-    return "InterpPerspCentroid";
-  case BuiltInInterpLinearCentroid:
-    return "InterpLinearCentroid";
-  case BuiltInInterpPerspSample:
-    return "InterpPerspSample";
-  case BuiltInInterpLinearSample:
-    return "InterpLinearSample";
   default:
     llvm_unreachable("Should never be called!");
     return "unknown";

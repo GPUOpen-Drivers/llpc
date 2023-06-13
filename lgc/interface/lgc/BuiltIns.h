@@ -32,6 +32,9 @@
 #pragma once
 
 namespace lgc {
+// Max spirv builtIn value
+static constexpr unsigned BuiltInInternalBase = 0x10000000;
+
 // Define built-in kind enum.
 enum BuiltInKind : unsigned {
 #define BUILTIN(name, number, out, in, type) BuiltIn##name = number,

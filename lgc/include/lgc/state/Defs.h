@@ -34,25 +34,6 @@
 
 namespace lgc {
 
-// Internal built-ins for fragment input interpolation (I/J)
-static const BuiltInKind BuiltInInterpPerspSample = static_cast<BuiltInKind>(0x10000000);
-static const BuiltInKind BuiltInInterpPerspCenter = static_cast<BuiltInKind>(0x10000001);
-static const BuiltInKind BuiltInInterpPerspCentroid = static_cast<BuiltInKind>(0x10000002);
-static const BuiltInKind BuiltInInterpPullMode = static_cast<BuiltInKind>(0x10000003);
-static const BuiltInKind BuiltInInterpLinearSample = static_cast<BuiltInKind>(0x10000004);
-static const BuiltInKind BuiltInInterpLinearCenter = static_cast<BuiltInKind>(0x10000005);
-static const BuiltInKind BuiltInInterpLinearCentroid = static_cast<BuiltInKind>(0x10000006);
-
-// Internal built-ins for sample position emulation
-static const BuiltInKind BuiltInSamplePosOffset = static_cast<BuiltInKind>(0x10000007);
-static const BuiltInKind BuiltInNumSamples = static_cast<BuiltInKind>(0x10000008);
-static const BuiltInKind BuiltInSamplePatternIdx = static_cast<BuiltInKind>(0x10000009);
-static const BuiltInKind BuiltInGsWaveId = static_cast<BuiltInKind>(0x1000000A);
-
-// Internal builts-ins for compute input when thread id is swizzled
-static const BuiltInKind BuiltInUnswizzledLocalInvocationId = static_cast<BuiltInKind>(0x1000000B);
-static const BuiltInKind BuiltInUnswizzledLocalInvocationIndex = static_cast<BuiltInKind>(0x1000000C);
-
 // Names used for calls added to IR to represent various actions internally.
 namespace lgcName {
 const static char InternalCallPrefix[] = "lgc.";
