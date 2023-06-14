@@ -1168,7 +1168,7 @@ Value *BuilderImpl::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
     // On GFX11, it is a single VGPR and we need to extract the three components.
     if (getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 11) {
       static const unsigned mask = 0x3ff;
-      Value *unpackedLocalInvocationId = UndefValue::get(FixedVectorType::get(getInt32Ty(), 3));
+      Value *unpackedLocalInvocationId = PoisonValue::get(FixedVectorType::get(getInt32Ty(), 3));
 
       // X = PackedId[9:0]
       unpackedLocalInvocationId =

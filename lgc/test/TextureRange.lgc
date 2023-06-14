@@ -44,7 +44,7 @@ define dllexport spir_func void @lgc.shader.FS.PSMain() local_unnamed_addr #0 !s
   %3 = bitcast i8 addrspace(7)* %2 to <{ [4294967295 x float] }> addrspace(7)*
   %4 = call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i32 -1610612736, i32 3, i32 0, i32 0)
   %5 = call {}* @llvm.invariant.start.p7(i64 -1, ptr addrspace(7) %4)
-  %6 = call <2 x float> (...) @lgc.create.read.generic.input.v2f32(i32 0, i32 0, i32 0, i32 0, i32 16, i32 undef)
+  %6 = call <2 x float> (...) @lgc.create.read.generic.input.v2f32(i32 0, i32 0, i32 0, i32 0, i32 16, i32 poison)
   %7 = load i32, ptr addrspace(7) %4, align 4
   %8 = sext i32 %7 to i64
   %9 = getelementptr <{ [4294967295 x float] }>, ptr addrspace(7) %2, i64 0, i32 0, i64 %8
@@ -62,7 +62,7 @@ define dllexport spir_func void @lgc.shader.FS.PSMain() local_unnamed_addr #0 !s
   %.splatinsert = insertelement <4 x float> poison, float %13, i64 0
   %21 = shufflevector <4 x float> %.splatinsert, <4 x float> poison, <4 x i32> zeroinitializer
   %scale = fmul reassoc nnan nsz arcp contract afn <4 x float> %20, %21
-  call void (...) @lgc.create.write.generic.output(<4 x float> %scale, i32 0, i32 0, i32 0, i32 0, i32 0, i32 undef)
+  call void (...) @lgc.create.write.generic.output(<4 x float> %scale, i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison)
   ret void
 }
 

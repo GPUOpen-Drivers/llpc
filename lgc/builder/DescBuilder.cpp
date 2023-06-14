@@ -564,7 +564,7 @@ Value *BuilderImpl::buildBufferCompactDesc(Value *desc) {
 
   // Build normal buffer descriptor
   // Dword 0
-  Value *bufDesc = UndefValue::get(FixedVectorType::get(getInt32Ty(), 4));
+  Value *bufDesc = PoisonValue::get(FixedVectorType::get(getInt32Ty(), 4));
   bufDesc = CreateInsertElement(bufDesc, descElem0, uint64_t(0));
 
   // Dword 1

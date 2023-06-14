@@ -57,7 +57,7 @@ Value *BuilderImpl::CreateCubeFaceCoord(Value *coord, const Twine &instName) {
   Value *cubeTc = CreateIntrinsic(Intrinsic::amdgcn_cubetc, {}, {coordX, coordY, coordZ}, nullptr);
   Value *tcDivMa = CreateFMul(recipMa, cubeTc);
   Value *resultY = CreateFAdd(tcDivMa, ConstantFP::get(getFloatTy(), 0.5));
-  Value *result = CreateInsertElement(UndefValue::get(FixedVectorType::get(getFloatTy(), 2)), resultX, uint64_t(0));
+  Value *result = CreateInsertElement(PoisonValue::get(FixedVectorType::get(getFloatTy(), 2)), resultX, uint64_t(0));
   result = CreateInsertElement(result, resultY, 1, instName);
   return result;
 }
@@ -890,8 +890,8 @@ Value *BuilderImpl::CreateExtractExponent(Value *value, const Twine &instName) {
 Value *BuilderImpl::CreateCrossProduct(Value *x, Value *y, const Twine &instName) {
   assert(x->getType() == y->getType() && cast<FixedVectorType>(x->getType())->getNumElements() == 3);
 
-  Value *left = UndefValue::get(x->getType());
-  Value *right = UndefValue::get(x->getType());
+  Value *left = PoisonValue::get(x->getType());
+  Value *right = PoisonValue::get(x->getType());
   for (unsigned idx = 0; idx != 3; ++idx) {
     left = CreateInsertElement(
         left, CreateFMul(CreateExtractElement(x, (idx + 1) % 3), CreateExtractElement(y, (idx + 2) % 3)), idx);

@@ -658,7 +658,7 @@ Instruction *BuilderImpl::createWaterfallLoop(Instruction *nonUniformInst, Array
       resultValue = cast<Instruction>(CreateBitCast(resultValue, nonUniformInst->getType(), instName));
 
     // Replace all uses of nonUniformInst with the result of this code.
-    *useOfNonUniformInst = UndefValue::get(nonUniformInst->getType());
+    *useOfNonUniformInst = PoisonValue::get(nonUniformInst->getType());
     nonUniformInst->replaceAllUsesWith(resultValue);
     *useOfNonUniformInst = nonUniformInst;
   }
@@ -675,7 +675,7 @@ Instruction *BuilderImpl::createWaterfallLoop(Instruction *nonUniformInst, Array
 Value *BuilderImpl::scalarize(Value *value, const std::function<Value *(Value *)> &callback) {
   if (auto vecTy = dyn_cast<FixedVectorType>(value->getType())) {
     Value *result0 = callback(CreateExtractElement(value, uint64_t(0)));
-    Value *result = UndefValue::get(FixedVectorType::get(result0->getType(), vecTy->getNumElements()));
+    Value *result = PoisonValue::get(FixedVectorType::get(result0->getType(), vecTy->getNumElements()));
     result = CreateInsertElement(result, result0, uint64_t(0));
     for (unsigned idx = 1, end = vecTy->getNumElements(); idx != end; ++idx)
       result = CreateInsertElement(result, callback(CreateExtractElement(value, idx)), idx);
@@ -696,7 +696,7 @@ Value *BuilderImpl::scalarizeInPairs(Value *value, const std::function<Value *(V
     Value *inComps = CreateShuffleVector(value, value, ArrayRef<int>{0, 1});
     Value *resultComps = callback(inComps);
     Value *result =
-        UndefValue::get(FixedVectorType::get(resultComps->getType()->getScalarType(), vecTy->getNumElements()));
+        PoisonValue::get(FixedVectorType::get(resultComps->getType()->getScalarType(), vecTy->getNumElements()));
     result = CreateInsertElement(result, CreateExtractElement(resultComps, uint64_t(0)), uint64_t(0));
     if (vecTy->getNumElements() > 1)
       result = CreateInsertElement(result, CreateExtractElement(resultComps, 1), 1);
@@ -713,7 +713,7 @@ Value *BuilderImpl::scalarizeInPairs(Value *value, const std::function<Value *(V
   }
 
   // For the scalar case, we need to create a vec2.
-  Value *inComps = UndefValue::get(FixedVectorType::get(value->getType(), 2));
+  Value *inComps = PoisonValue::get(FixedVectorType::get(value->getType(), 2));
   inComps = CreateInsertElement(inComps, value, uint64_t(0));
   inComps = CreateInsertElement(inComps, Constant::getNullValue(value->getType()), 1);
   Value *result = callback(inComps);
@@ -729,7 +729,7 @@ Value *BuilderImpl::scalarizeInPairs(Value *value, const std::function<Value *(V
 Value *BuilderImpl::scalarize(Value *value0, Value *value1, const std::function<Value *(Value *, Value *)> &callback) {
   if (auto vecTy = dyn_cast<FixedVectorType>(value0->getType())) {
     Value *result0 = callback(CreateExtractElement(value0, uint64_t(0)), CreateExtractElement(value1, uint64_t(0)));
-    Value *result = UndefValue::get(FixedVectorType::get(result0->getType(), vecTy->getNumElements()));
+    Value *result = PoisonValue::get(FixedVectorType::get(result0->getType(), vecTy->getNumElements()));
     result = CreateInsertElement(result, result0, uint64_t(0));
     for (unsigned idx = 1, end = vecTy->getNumElements(); idx != end; ++idx) {
       result = CreateInsertElement(result,
@@ -753,7 +753,7 @@ Value *BuilderImpl::scalarize(Value *value0, Value *value1, Value *value2,
   if (auto vecTy = dyn_cast<FixedVectorType>(value0->getType())) {
     Value *result0 = callback(CreateExtractElement(value0, uint64_t(0)), CreateExtractElement(value1, uint64_t(0)),
                               CreateExtractElement(value2, uint64_t(0)));
-    Value *result = UndefValue::get(FixedVectorType::get(result0->getType(), vecTy->getNumElements()));
+    Value *result = PoisonValue::get(FixedVectorType::get(result0->getType(), vecTy->getNumElements()));
     result = CreateInsertElement(result, result0, uint64_t(0));
     for (unsigned idx = 1, end = vecTy->getNumElements(); idx != end; ++idx) {
       result = CreateInsertElement(result,

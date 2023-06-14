@@ -21,7 +21,7 @@
 ; SHADERTEST: [[buf1_vec:%[0-9]*]] = bitcast i64 [[buf1]] to <2 x i32>
 ; SHADERTEST: [[buf1_0:%[0-9]*]] = extractelement <2 x i32> [[buf1_vec]], i64 0
 ; SHADERTEST: [[buf1_1:%[0-9]*]] = extractelement <2 x i32> [[buf1_vec]], i64 1
-; SHADERTEST: [[desc1_0:%[0-9]*]] = insertelement <4 x i32> undef, i32 [[buf1_0]], i64 0
+; SHADERTEST: [[desc1_0:%[0-9]*]] = insertelement <4 x i32> poison, i32 [[buf1_0]], i64 0
 ; SHADERTEST: [[buf1_2:%[0-9]*]] = and i32 [[buf1_1]], 65535
 ; SHADERTEST: [[desc1_1:%[0-9]*]] = insertelement <4 x i32> [[desc1_0]], i32 [[buf1_2]], i64 1
 

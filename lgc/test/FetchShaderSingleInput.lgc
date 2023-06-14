@@ -74,7 +74,7 @@ define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !lgc
 .entry:
   %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i32 0)
   %1 = call {}* @llvm.invariant.start.p7i8(i64 -1, i8 addrspace(7)* %0)
-  %2 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 0, i32 0, i32 0, i32 0, i32 0, i32 undef)
+  %2 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison)
   %3 = bitcast i8 addrspace(7)* %0 to <4 x float> addrspace(7)*
   %4 = load <4 x float>, <4 x float> addrspace(7)* %3, align 16
   %5 = insertvalue [4 x <4 x float>] undef, <4 x float> %4, 0
@@ -92,7 +92,7 @@ define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !lgc
   %17 = insertvalue [4 x <4 x float>] %13, <4 x float> %16, 3
   %18 = insertelement <4 x float> %2, float 1.000000e+00, i32 3
   %19 = call <4 x float> (...) @lgc.create.matrix.times.vector.v4f32([4 x <4 x float>] %17, <4 x float> %18)
-  call void (...) @lgc.create.write.builtin.output(<4 x float> %19, i32 0, i32 0, i32 undef, i32 undef)
+  call void (...) @lgc.create.write.builtin.output(<4 x float> %19, i32 0, i32 0, i32 poison, i32 poison)
   ret void
 }
 
@@ -132,7 +132,7 @@ target triple = "amdgcn--amdpal"
 
 define dllexport spir_func void @lgc.shader.FS.main() local_unnamed_addr #0 !lgc.shaderstage !5 {
 .entry:
-  call void (...) @lgc.create.write.generic.output(<4 x float> <float 0.000000e+00, float 1.000000e+00, float 0.000000e+00, float 1.000000e+00>, i32 0, i32 0, i32 0, i32 0, i32 0, i32 undef)
+  call void (...) @lgc.create.write.generic.output(<4 x float> <float 0.000000e+00, float 1.000000e+00, float 0.000000e+00, float 1.000000e+00>, i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison)
   ret void
 }
 

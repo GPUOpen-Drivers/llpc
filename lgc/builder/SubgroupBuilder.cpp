@@ -228,7 +228,7 @@ Value *BuilderImpl::CreateSubgroupBallotBitExtract(Value *const value, Value *co
   }
   Value *indexMask = CreateZExtOrTrunc(index, getInt64Ty());
   indexMask = CreateShl(getInt64(1), indexMask);
-  Value *valueAsInt64 = CreateShuffleVector(value, UndefValue::get(value->getType()), ArrayRef<int>{0, 1});
+  Value *valueAsInt64 = CreateShuffleVector(value, PoisonValue::get(value->getType()), ArrayRef<int>{0, 1});
   valueAsInt64 = CreateBitCast(valueAsInt64, getInt64Ty());
   Value *const result = CreateAnd(indexMask, valueAsInt64);
   return CreateICmpNE(result, getInt64(0));
@@ -242,7 +242,7 @@ Value *BuilderImpl::CreateSubgroupBallotBitExtract(Value *const value, Value *co
 Value *BuilderImpl::CreateSubgroupBallotBitCount(Value *const value, const Twine &instName) {
   if (getShaderSubgroupSize() <= 32)
     return CreateUnaryIntrinsic(Intrinsic::ctpop, CreateExtractElement(value, getInt32(0)));
-  Value *result = CreateShuffleVector(value, UndefValue::get(value->getType()), ArrayRef<int>{0, 1});
+  Value *result = CreateShuffleVector(value, PoisonValue::get(value->getType()), ArrayRef<int>{0, 1});
   result = CreateBitCast(result, getInt64Ty());
   result = CreateUnaryIntrinsic(Intrinsic::ctpop, result);
   return CreateZExtOrTrunc(result, getInt32Ty());
@@ -269,7 +269,7 @@ Value *BuilderImpl::CreateSubgroupBallotExclusiveBitCount(Value *const value, co
   if (getShaderSubgroupSize() <= 32)
     // Directly invoke the required mbcnt_lo intrinsic since CreateSubgroupMbcnt expects a 64-bit mask
     return CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {CreateExtractElement(value, getInt32(0)), getInt32(0)});
-  Value *result = CreateShuffleVector(value, UndefValue::get(value->getType()), ArrayRef<int>{0, 1});
+  Value *result = CreateShuffleVector(value, PoisonValue::get(value->getType()), ArrayRef<int>{0, 1});
   result = CreateBitCast(result, getInt64Ty());
   return CreateSubgroupMbcnt(result, "");
 }
@@ -284,7 +284,7 @@ Value *BuilderImpl::CreateSubgroupBallotFindLsb(Value *const value, const Twine 
     Value *const result = CreateExtractElement(value, getInt32(0));
     return CreateIntrinsic(Intrinsic::cttz, getInt32Ty(), {result, getTrue()});
   }
-  Value *result = CreateShuffleVector(value, UndefValue::get(value->getType()), ArrayRef<int>{0, 1});
+  Value *result = CreateShuffleVector(value, PoisonValue::get(value->getType()), ArrayRef<int>{0, 1});
   result = CreateBitCast(result, getInt64Ty());
   result = CreateIntrinsic(Intrinsic::cttz, getInt64Ty(), {result, getTrue()});
   return CreateZExtOrTrunc(result, getInt32Ty());
@@ -301,7 +301,7 @@ Value *BuilderImpl::CreateSubgroupBallotFindMsb(Value *const value, const Twine 
     result = CreateIntrinsic(Intrinsic::ctlz, getInt32Ty(), {result, getTrue()});
     return CreateSub(getInt32(31), result);
   }
-  Value *result = CreateShuffleVector(value, UndefValue::get(value->getType()), ArrayRef<int>{0, 1});
+  Value *result = CreateShuffleVector(value, PoisonValue::get(value->getType()), ArrayRef<int>{0, 1});
   result = CreateBitCast(result, getInt64Ty());
   result = CreateIntrinsic(Intrinsic::ctlz, getInt64Ty(), {result, getTrue()});
   result = CreateZExtOrTrunc(result, getInt32Ty());
@@ -996,7 +996,7 @@ Value *BuilderImpl::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, 
 // @param index : The index in the quad to broadcast the value from.
 // @param instName : Name to give final instruction.
 Value *BuilderImpl::CreateSubgroupQuadBroadcast(Value *const value, Value *const index, const Twine &instName) {
-  Value *result = UndefValue::get(value->getType());
+  Value *result = PoisonValue::get(value->getType());
 
   const unsigned indexBits = index->getType()->getPrimitiveSizeInBits();
 

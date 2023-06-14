@@ -4,7 +4,7 @@
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
 .entry:
   %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i32 2)
-  %1 = call i32 (...) @lgc.create.read.builtin.input.i32(i32 4438, i32 0, i32 undef, i32 undef)
+  %1 = call i32 (...) @lgc.create.read.builtin.input.i32(i32 4438, i32 0, i32 poison, i32 poison)
   %2 = bitcast i8 addrspace(7)* %0 to i32 addrspace(7)*
   store i32 %1, i32 addrspace(7)* %2, align 4
   ret void
