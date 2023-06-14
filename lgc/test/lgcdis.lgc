@@ -19,11 +19,11 @@ target triple = "amdgcn--amdpal"
 
 define dllexport void @lgc.shader.VS.main() !lgc.shaderstage !24 {
 entry:
-  %TEXCOORD = call <2 x float> (...) @lgc.create.read.generic.input.v2f32(i32 1, i32 0, i32 0, i32 1, i32 16, i32 undef)
-  %POSITION = call <3 x float> (...) @lgc.create.read.generic.input.v3f32(i32 0, i32 0, i32 0, i32 1, i32 16, i32 undef)
+  %TEXCOORD = call <2 x float> (...) @lgc.create.read.generic.input.v2f32(i32 1, i32 0, i32 0, i32 1, i32 16, i32 poison)
+  %POSITION = call <3 x float> (...) @lgc.create.read.generic.input.v3f32(i32 0, i32 0, i32 0, i32 1, i32 16, i32 poison)
   %posext = shufflevector <3 x float> %POSITION, <3 x float> <float 1.0, float 1.0, float 1.0>, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
-  call void (...) @lgc.create.write.builtin.output(<4 x float> %posext, i32 0, i32 0, i32 undef, i32 undef)
-  call void (...) @lgc.create.write.generic.output(<2 x float> %TEXCOORD, i32 1, i32 0, i32 0, i32 1, i32 0, i32 undef)
+  call void (...) @lgc.create.write.builtin.output(<4 x float> %posext, i32 0, i32 0, i32 poison, i32 poison)
+  call void (...) @lgc.create.write.generic.output(<2 x float> %TEXCOORD, i32 1, i32 0, i32 0, i32 1, i32 0, i32 poison)
   ret void
 }
 
@@ -41,13 +41,13 @@ declare void @lgc.create.write.generic.output(...) #1
 
 define dllexport void @lgc.shader.FS.main() !lgc.shaderstage !25 {
 entry:
-  %TEXCOORD = call <2 x float> (...) @lgc.create.read.generic.input.v2f32(i32 1, i32 0, i32 0, i32 1, i32 16, i32 undef)
+  %TEXCOORD = call <2 x float> (...) @lgc.create.read.generic.input.v2f32(i32 1, i32 0, i32 0, i32 1, i32 16, i32 poison)
   %imageptr = call <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 0, i32 1)
   %image = load <8 x i32>, <8 x i32> addrspace(4)* %imageptr, align 32
   %samplerptr = call <4 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v4i32(i32 2, i32 2, i32 0, i32 2)
   %sampler = load <4 x i32>, <4 x i32> addrspace(4)* %samplerptr, align 16
   %sample = call <4 x float> (...) @lgc.create.image.sample.v4f32(i32 1, i32 0, <8 x i32> %image, <4 x i32> %sampler, i32 1, <2 x float> %TEXCOORD)
-  call void (...) @lgc.create.write.generic.output(<4 x float> %sample, i32 0, i32 0, i32 0, i32 1, i32 0, i32 undef)
+  call void (...) @lgc.create.write.generic.output(<4 x float> %sample, i32 0, i32 0, i32 0, i32 1, i32 0, i32 poison)
   ret void
 }
 

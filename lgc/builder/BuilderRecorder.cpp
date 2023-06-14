@@ -1415,7 +1415,7 @@ Value *Builder::CreateReadGenericInput(Type *resultTy, unsigned location, Value 
                     elemIdx,
                     getInt32(locationCount),
                     getInt32(inputInfo.getData()),
-                    vertexIndex ? vertexIndex : UndefValue::get(getInt32Ty()),
+                    vertexIndex ? vertexIndex : PoisonValue::get(getInt32Ty()),
                 },
                 instName);
 }
@@ -1470,7 +1470,7 @@ Value *Builder::CreateReadGenericOutput(Type *resultTy, unsigned location, Value
                     elemIdx,
                     getInt32(locationCount),
                     getInt32(outputInfo.getData()),
-                    vertexIndex ? vertexIndex : UndefValue::get(getInt32Ty()),
+                    vertexIndex ? vertexIndex : PoisonValue::get(getInt32Ty()),
                 },
                 instName);
 }
@@ -1502,7 +1502,7 @@ Instruction *Builder::CreateWriteGenericOutput(Value *valueToWrite, unsigned loc
                     elemIdx,
                     getInt32(locationCount),
                     getInt32(outputInfo.getData()),
-                    vertexOrPrimitiveIndex ? vertexOrPrimitiveIndex : UndefValue::get(getInt32Ty()),
+                    vertexOrPrimitiveIndex ? vertexOrPrimitiveIndex : PoisonValue::get(getInt32Ty()),
                 },
                 "");
 }
@@ -1568,8 +1568,8 @@ Value *Builder::CreateReadBuiltInInput(BuiltInKind builtIn, InOutInfo inputInfo,
                 {
                     getInt32(builtIn),
                     getInt32(inputInfo.getData()),
-                    vertexIndex ? vertexIndex : UndefValue::get(getInt32Ty()),
-                    index ? index : UndefValue::get(getInt32Ty()),
+                    vertexIndex ? vertexIndex : PoisonValue::get(getInt32Ty()),
+                    index ? index : PoisonValue::get(getInt32Ty()),
                 },
                 instName);
 }
@@ -1597,8 +1597,8 @@ Value *Builder::CreateReadBuiltInOutput(BuiltInKind builtIn, InOutInfo outputInf
                 {
                     getInt32(builtIn),
                     getInt32(outputInfo.getData()),
-                    vertexIndex ? vertexIndex : UndefValue::get(getInt32Ty()),
-                    index ? index : UndefValue::get(getInt32Ty()),
+                    vertexIndex ? vertexIndex : PoisonValue::get(getInt32Ty()),
+                    index ? index : PoisonValue::get(getInt32Ty()),
                 },
                 instName);
 }
@@ -1619,8 +1619,8 @@ Instruction *Builder::CreateWriteBuiltInOutput(Value *valueToWrite, BuiltInKind 
                     valueToWrite,
                     getInt32(builtIn),
                     getInt32(outputInfo.getData()),
-                    vertexOrPrimitiveIndex ? vertexOrPrimitiveIndex : UndefValue::get(getInt32Ty()),
-                    index ? index : UndefValue::get(getInt32Ty()),
+                    vertexOrPrimitiveIndex ? vertexOrPrimitiveIndex : PoisonValue::get(getInt32Ty()),
+                    index ? index : PoisonValue::get(getInt32Ty()),
                 },
                 "");
 }

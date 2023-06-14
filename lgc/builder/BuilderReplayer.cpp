@@ -546,46 +546,46 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   // Replayer implementations of InOutBuilder methods
   case BuilderOpcode::ReadGenericInput: {
     InOutInfo inputInfo(cast<ConstantInt>(args[4])->getZExtValue());
-    return m_builder->CreateReadGenericInput(call->getType(),                                 // Result type
-                                             cast<ConstantInt>(args[0])->getZExtValue(),      // Location
-                                             args[1],                                         // Location offset
-                                             isa<UndefValue>(args[2]) ? nullptr : &*args[2],  // Element index
-                                             cast<ConstantInt>(args[3])->getZExtValue(),      // Location count
-                                             inputInfo,                                       // Input info
-                                             isa<UndefValue>(args[5]) ? nullptr : &*args[5]); // Vertex index
+    return m_builder->CreateReadGenericInput(call->getType(),                                  // Result type
+                                             cast<ConstantInt>(args[0])->getZExtValue(),       // Location
+                                             args[1],                                          // Location offset
+                                             isa<PoisonValue>(args[2]) ? nullptr : &*args[2],  // Element index
+                                             cast<ConstantInt>(args[3])->getZExtValue(),       // Location count
+                                             inputInfo,                                        // Input info
+                                             isa<PoisonValue>(args[5]) ? nullptr : &*args[5]); // Vertex index
   }
 
   case BuilderOpcode::ReadPerVertexInput: {
     InOutInfo inputInfo(cast<ConstantInt>(args[4])->getZExtValue());
-    return m_builder->CreateReadPerVertexInput(call->getType(),                                // Result type
-                                               cast<ConstantInt>(args[0])->getZExtValue(),     // Location
-                                               args[1],                                        // Location offset
-                                               isa<UndefValue>(args[2]) ? nullptr : &*args[2], // Element index
-                                               cast<ConstantInt>(args[3])->getZExtValue(),     // Location count
-                                               inputInfo,                                      // Input info
-                                               args[5]);                                       // Vertex index
+    return m_builder->CreateReadPerVertexInput(call->getType(),                                 // Result type
+                                               cast<ConstantInt>(args[0])->getZExtValue(),      // Location
+                                               args[1],                                         // Location offset
+                                               isa<PoisonValue>(args[2]) ? nullptr : &*args[2], // Element index
+                                               cast<ConstantInt>(args[3])->getZExtValue(),      // Location count
+                                               inputInfo,                                       // Input info
+                                               args[5]);                                        // Vertex index
   }
 
   case BuilderOpcode::ReadGenericOutput: {
     InOutInfo outputInfo(cast<ConstantInt>(args[4])->getZExtValue());
-    return m_builder->CreateReadGenericOutput(call->getType(),                                 // Result type
-                                              cast<ConstantInt>(args[0])->getZExtValue(),      // Location
-                                              args[1],                                         // Location offset
-                                              isa<UndefValue>(args[2]) ? nullptr : &*args[2],  // Element index
-                                              cast<ConstantInt>(args[3])->getZExtValue(),      // Location count
-                                              outputInfo,                                      // Output info
-                                              isa<UndefValue>(args[5]) ? nullptr : &*args[5]); // Vertex index
+    return m_builder->CreateReadGenericOutput(call->getType(),                                  // Result type
+                                              cast<ConstantInt>(args[0])->getZExtValue(),       // Location
+                                              args[1],                                          // Location offset
+                                              isa<PoisonValue>(args[2]) ? nullptr : &*args[2],  // Element index
+                                              cast<ConstantInt>(args[3])->getZExtValue(),       // Location count
+                                              outputInfo,                                       // Output info
+                                              isa<PoisonValue>(args[5]) ? nullptr : &*args[5]); // Vertex index
   }
 
   case BuilderOpcode::WriteGenericOutput: {
     InOutInfo outputInfo(cast<ConstantInt>(args[5])->getZExtValue());
-    return m_builder->CreateWriteGenericOutput(args[0],                                         // Value to write
-                                               cast<ConstantInt>(args[1])->getZExtValue(),      // Location
-                                               args[2],                                         // Location offset
-                                               isa<UndefValue>(args[3]) ? nullptr : &*args[3],  // Element index
-                                               cast<ConstantInt>(args[4])->getZExtValue(),      // Location count
-                                               outputInfo,                                      // Output info
-                                               isa<UndefValue>(args[6]) ? nullptr : &*args[6]); // Vertex index
+    return m_builder->CreateWriteGenericOutput(args[0],                                          // Value to write
+                                               cast<ConstantInt>(args[1])->getZExtValue(),       // Location
+                                               args[2],                                          // Location offset
+                                               isa<PoisonValue>(args[3]) ? nullptr : &*args[3],  // Element index
+                                               cast<ConstantInt>(args[4])->getZExtValue(),       // Location count
+                                               outputInfo,                                       // Output info
+                                               isa<PoisonValue>(args[6]) ? nullptr : &*args[6]); // Vertex index
   }
 
   case BuilderOpcode::WriteXfbOutput: {
@@ -602,37 +602,37 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   case BuilderOpcode::ReadBaryCoord: {
     auto builtIn = static_cast<BuiltInKind>(cast<ConstantInt>(args[0])->getZExtValue());
     InOutInfo inputInfo(cast<ConstantInt>(args[1])->getZExtValue());
-    return m_builder->CreateReadBaryCoord(builtIn,                                         // BuiltIn
-                                          inputInfo,                                       // Input info
-                                          isa<UndefValue>(args[2]) ? nullptr : &*args[2]); // auxInterpValue
+    return m_builder->CreateReadBaryCoord(builtIn,                                          // BuiltIn
+                                          inputInfo,                                        // Input info
+                                          isa<PoisonValue>(args[2]) ? nullptr : &*args[2]); // auxInterpValue
   }
 
   case BuilderOpcode::ReadBuiltInInput: {
     auto builtIn = static_cast<BuiltInKind>(cast<ConstantInt>(args[0])->getZExtValue());
     InOutInfo inputInfo(cast<ConstantInt>(args[1])->getZExtValue());
-    return m_builder->CreateReadBuiltInInput(builtIn,                                         // BuiltIn
-                                             inputInfo,                                       // Input info
-                                             isa<UndefValue>(args[2]) ? nullptr : &*args[2],  // Vertex index
-                                             isa<UndefValue>(args[3]) ? nullptr : &*args[3]); // Index
+    return m_builder->CreateReadBuiltInInput(builtIn,                                          // BuiltIn
+                                             inputInfo,                                        // Input info
+                                             isa<PoisonValue>(args[2]) ? nullptr : &*args[2],  // Vertex index
+                                             isa<PoisonValue>(args[3]) ? nullptr : &*args[3]); // Index
   }
 
   case BuilderOpcode::ReadBuiltInOutput: {
     auto builtIn = static_cast<BuiltInKind>(cast<ConstantInt>(args[0])->getZExtValue());
     InOutInfo outputInfo(cast<ConstantInt>(args[1])->getZExtValue());
-    return m_builder->CreateReadBuiltInOutput(builtIn,                                         // BuiltIn
-                                              outputInfo,                                      // Output info
-                                              isa<UndefValue>(args[2]) ? nullptr : &*args[2],  // Vertex index
-                                              isa<UndefValue>(args[3]) ? nullptr : &*args[3]); // Index
+    return m_builder->CreateReadBuiltInOutput(builtIn,                                          // BuiltIn
+                                              outputInfo,                                       // Output info
+                                              isa<PoisonValue>(args[2]) ? nullptr : &*args[2],  // Vertex index
+                                              isa<PoisonValue>(args[3]) ? nullptr : &*args[3]); // Index
   }
 
   case BuilderOpcode::WriteBuiltInOutput: {
     auto builtIn = static_cast<BuiltInKind>(cast<ConstantInt>(args[1])->getZExtValue());
     InOutInfo outputInfo(cast<ConstantInt>(args[2])->getZExtValue());
-    return m_builder->CreateWriteBuiltInOutput(args[0],                                         // Val to write
-                                               builtIn,                                         // BuiltIn
-                                               outputInfo,                                      // Output info
-                                               isa<UndefValue>(args[3]) ? nullptr : &*args[3],  // Vertex index
-                                               isa<UndefValue>(args[4]) ? nullptr : &*args[4]); // Index
+    return m_builder->CreateWriteBuiltInOutput(args[0],                                          // Val to write
+                                               builtIn,                                          // BuiltIn
+                                               outputInfo,                                       // Output info
+                                               isa<PoisonValue>(args[3]) ? nullptr : &*args[3],  // Vertex index
+                                               isa<PoisonValue>(args[4]) ? nullptr : &*args[4]); // Index
   }
 
 #if VKI_RAY_TRACING

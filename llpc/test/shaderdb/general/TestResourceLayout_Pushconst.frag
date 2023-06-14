@@ -5,7 +5,7 @@
 // SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 // SHADERTEST: [[Desc:%[0-9]*]] = call ptr addrspace(4) (...) @lgc.create.load.push.constants.ptr.p4()
 // SHADERTEST: [[Value:%[0-9]*]] = load <4 x float>, ptr addrspace(4) [[Desc]], align 16
-// SHADERTEST: call void (...) @lgc.create.write.generic.output(<4 x float> [[Value]], i32 0, i32 0, i32 0, i32 0, i32 0, i32 undef)
+// SHADERTEST: call void (...) @lgc.create.write.generic.output(<4 x float> [[Value]], i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison)
 
 // SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
 // SHADERTEST: [[Desc:%[0-9]*]] = call ptr addrspace(4) @lgc.descriptor.table.addr(i32 9, i32 9, i32 -1, i32 0, i32 -1)
