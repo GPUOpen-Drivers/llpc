@@ -384,8 +384,7 @@ std::string PipelineDumper::getPipelineInfoFileName(PipelineBuildInfo pipelineIn
         fileNamePrefix = "PipelineLibMesh";
       else
         fileNamePrefix = "PipelineLibFs";
-    }
-    else if (pipelineInfo.pGraphicsInfo->tes.pModuleData && pipelineInfo.pGraphicsInfo->gs.pModuleData)
+    } else if (pipelineInfo.pGraphicsInfo->tes.pModuleData && pipelineInfo.pGraphicsInfo->gs.pModuleData)
       fileNamePrefix = "PipelineGsTess";
     else if (pipelineInfo.pGraphicsInfo->gs.pModuleData)
       fileNamePrefix = "PipelineGs";
