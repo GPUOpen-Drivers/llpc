@@ -219,6 +219,9 @@ public:
   // Create "find MSB" operation for a (vector of) signed int.
   llvm::Value *CreateFindSMsb(llvm::Value *value, const llvm::Twine &instName = "");
 
+  // Create "count leading sign bits" operation for a (vector of) signed int.
+  llvm::Value *CreateCountLeadingSignBits(llvm::Value *value, const llvm::Twine &instName = "");
+
   // Create "fmix" operation.
   llvm::Value *createFMix(llvm::Value *x, llvm::Value *y, llvm::Value *a, const llvm::Twine &instName = "");
 

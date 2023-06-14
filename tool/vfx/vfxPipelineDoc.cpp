@@ -119,10 +119,12 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     gfxPipelineInfo->rsState.numSamples = graphicState.numSamples;
     gfxPipelineInfo->rsState.pixelShaderSamples = graphicState.pixelShaderSamples;
     gfxPipelineInfo->rsState.samplePatternIdx = graphicState.samplePatternIdx;
+    gfxPipelineInfo->rsState.rasterStream = graphicState.rasterStream;
     gfxPipelineInfo->rsState.usrClipPlaneMask = static_cast<uint8_t>(graphicState.usrClipPlaneMask);
 
     gfxPipelineInfo->cbState.alphaToCoverageEnable = graphicState.alphaToCoverageEnable != 0;
     gfxPipelineInfo->cbState.dualSourceBlendEnable = graphicState.dualSourceBlendEnable != 0;
+    gfxPipelineInfo->cbState.dualSourceBlendDynamic = graphicState.dualSourceBlendDynamic != 0;
     for (unsigned i = 0; i < MaxColorTargets; ++i) {
       gfxPipelineInfo->cbState.target[i].format = graphicState.colorBuffer[i].format;
       gfxPipelineInfo->cbState.target[i].channelWriteMask =
@@ -137,7 +139,9 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     gfxPipelineInfo->enableUberFetchShader = graphicState.enableUberFetchShader;
     gfxPipelineInfo->enableEarlyCompile = graphicState.enableEarlyCompile;
 #if VKI_RAY_TRACING
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
     gfxPipelineInfo->shaderLibrary = graphicState.shaderLibrary;
+#endif
     gfxPipelineInfo->rtState = graphicState.rtState;
 #endif
   }
@@ -153,7 +157,9 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     computePipelineInfo->options = computeState.options;
     computePipelineInfo->cs.entryStage = Vkgc::ShaderStageCompute;
 #if VKI_RAY_TRACING
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
     computePipelineInfo->shaderLibrary = computeState.shaderLibrary;
+#endif
     computePipelineInfo->rtState = computeState.rtState;
 #endif
   }
@@ -170,7 +176,9 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     rayTracingPipelineInfo->options = rayTracingState.options;
     rayTracingPipelineInfo->shaderGroupCount = rayTracingState.shaderGroupCount;
     rayTracingPipelineInfo->pShaderGroups = rayTracingState.pShaderGroups;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
     rayTracingPipelineInfo->shaderTraceRay = rayTracingState.shaderTraceRay;
+#endif
     rayTracingPipelineInfo->maxRecursionDepth = rayTracingState.maxRecursionDepth;
     rayTracingPipelineInfo->indirectStageMask = rayTracingState.indirectStageMask;
     rayTracingPipelineInfo->rtState = rayTracingState.rtState;

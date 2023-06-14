@@ -45,7 +45,6 @@ ResourceUsage::ResourceUsage(ShaderStage shaderStage) {
   } else if (shaderStage == ShaderStageTessControl) {
     inOutUsage.tcs.calcFactor = {};
   } else if (shaderStage == ShaderStageGeometry) {
-    inOutUsage.gs.rasterStream = 0;
     inOutUsage.gs.calcFactor = {};
   } else if (shaderStage == ShaderStageFragment) {
     for (uint32_t i = 0; i < MaxColorTargets; ++i) {

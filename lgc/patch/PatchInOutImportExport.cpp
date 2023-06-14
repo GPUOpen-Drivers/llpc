@@ -896,7 +896,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         break;
       }
       case ShaderStageGeometry: {
-        patchGsBuiltInOutputExport(output, builtInId, resUsage->inOutUsage.gs.rasterStream, builder);
+        patchGsBuiltInOutputExport(output, builtInId, m_pipelineState->getRasterizerState().rasterStream, builder);
         break;
       }
       case ShaderStageMesh: {
@@ -1059,7 +1059,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         // enabled. Copy shader will read the value from GS-VS ring and export it to vertex position data.
         if (m_pipelineState->getInputAssemblyState().enableMultiView) {
           auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
-          auto rasterStream = resUsage->inOutUsage.gs.rasterStream;
+          auto rasterStream = m_pipelineState->getRasterizerState().rasterStream;
 
           if (emitStream == rasterStream) {
             auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
@@ -1147,15 +1147,13 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       //     return
       //   }
       //
-      auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
-
       bool updated = false;
       for (auto &block : *m_entryPoint) {
         // Search blocks to find the switch-case instruction
         auto switchInst = dyn_cast<SwitchInst>(block.getTerminator());
         if (switchInst) {
           for (auto &caseBranch : switchInst->cases()) {
-            if (caseBranch.getCaseValue()->getZExtValue() == resUsage->inOutUsage.gs.rasterStream) {
+            if (caseBranch.getCaseValue()->getZExtValue() == m_pipelineState->getRasterizerState().rasterStream) {
               // The insert position is updated to this case branch, before the terminator
               insertPos = caseBranch.getCaseSuccessor()->getTerminator();
               updated = true;
@@ -2562,8 +2560,8 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
 
       assert(inOutUsage.builtInInputLocMap.find(BuiltInCullDistance) != inOutUsage.builtInInputLocMap.end());
       loc = inOutUsage.builtInInputLocMap[BuiltInCullDistance];
-      locCount = builtInUsage.clipDistance + builtInUsage.cullDistance > 4 ? 2 : 1;
       startChannel = builtInUsage.clipDistance % 4;
+      locCount = startChannel + builtInUsage.cullDistance > 4 ? 2 : 1;
     }
 
     auto &interpInfo = inOutUsage.fs.interpInfo;

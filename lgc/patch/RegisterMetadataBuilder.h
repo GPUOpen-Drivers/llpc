@@ -42,7 +42,7 @@ namespace Gfx9 {
 class RegisterMetadataBuilder : public ConfigBuilderBase {
 public:
   RegisterMetadataBuilder(llvm::Module *module, PipelineState *PipelineState, PipelineShadersResult *pipelineShaders)
-      : ConfigBuilderBase(module, PipelineState), m_pipelineShaders(pipelineShaders) {}
+      : ConfigBuilderBase(module, PipelineState) {}
 
   void buildPalMetadata();
 
@@ -63,7 +63,6 @@ private:
   unsigned calcLdsSize(unsigned ldsSizeInDwords);
 
   bool m_isNggMode = false;
-  PipelineShadersResult *m_pipelineShaders; // API shaders in the pipeline
 };
 
 } // namespace Gfx9

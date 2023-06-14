@@ -524,6 +524,25 @@ static constexpr char Output6Enable[] = ".output6_enable";
 static constexpr char Output7Enable[] = ".output7_enable";
 }; // namespace CbShaderMaskMetadataKey
 
+namespace SpiPsInputAddrMetadataKey {
+static constexpr char PerspSampleEna[] = ".persp_sample_ena";
+static constexpr char PerspCenterEna[] = ".persp_center_ena";
+static constexpr char PerspCentroidEna[] = ".persp_centroid_ena";
+static constexpr char PerspPullModelEna[] = ".persp_pull_model_ena";
+static constexpr char LinearSampleEna[] = ".linear_sample_ena";
+static constexpr char LinearCenterEna[] = ".linear_center_ena";
+static constexpr char LinearCentroidEna[] = ".linear_centroid_ena";
+static constexpr char LineStippleTexEna[] = ".line_stipple_tex_ena";
+static constexpr char PosXFloatEna[] = ".pos_x_float_ena";
+static constexpr char PosYFloatEna[] = ".pos_y_float_ena";
+static constexpr char PosZFloatEna[] = ".pos_z_float_ena";
+static constexpr char PosWFloatEna[] = ".pos_w_float_ena";
+static constexpr char FrontFaceEna[] = ".front_face_ena";
+static constexpr char AncillaryEna[] = ".ancillary_ena";
+static constexpr char SampleCoverageEna[] = ".sample_coverage_ena";
+static constexpr char PosFixedPtEna[] = ".pos_fixed_pt_ena";
+}; // namespace SpiPsInputAddrMetadataKey
+
 } // namespace Abi
 
 } // namespace Util

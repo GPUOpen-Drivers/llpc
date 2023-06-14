@@ -59,13 +59,13 @@ static cl::opt<bool> DisableColorExportShader("disable-color-export-shader", cl:
 // @param cacheHash : Cache hash code
 GraphicsContext::GraphicsContext(GfxIpVersion gfxIp, const GraphicsPipelineBuildInfo *pipelineInfo,
                                  MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash)
-    : PipelineContext(gfxIp, pipelineHash, cacheHash
-#if VKI_RAY_TRACING
-                      ,
-                      &pipelineInfo->rtState
+    : PipelineContext(gfxIp, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo), m_stageMask(0),
+      m_preRasterHasGs(false), m_activeStageCount(0) {
+  const Vkgc::BinaryData *gpurtShaderLibrary = nullptr;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
+  gpurtShaderLibrary = &pipelineInfo->shaderLibrary;
 #endif
-                      ),
-      m_pipelineInfo(pipelineInfo), m_stageMask(0), m_preRasterHasGs(false), m_activeStageCount(0) {
+  setRayTracingState(pipelineInfo->rtState, gpurtShaderLibrary);
 
   setUnlinked(pipelineInfo->unlinked);
   // clang-format off
@@ -282,7 +282,9 @@ Options GraphicsContext::computePipelineOptions() const {
 // @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing
 // @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
 void GraphicsContext::setColorExportState(Pipeline *pipeline, Util::MetroHash64 *hasher) const {
-  const auto &cbState = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->cbState;
+  auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo());
+  const auto &cbState = pipelineInfo->cbState;
+
   if (hasher)
     hasher->Update(cbState);
   if (!pipeline)
@@ -292,7 +294,8 @@ void GraphicsContext::setColorExportState(Pipeline *pipeline, Util::MetroHash64 
   SmallVector<ColorExportFormat, MaxColorTargets> formats;
 
   state.alphaToCoverageEnable = cbState.alphaToCoverageEnable;
-  state.dualSourceBlendEnable = cbState.dualSourceBlendEnable;
+  state.dualSourceBlendEnable =
+      cbState.dualSourceBlendEnable || (pipelineInfo->cbState.dualSourceBlendDynamic && getUseDualSourceBlend());
 
   for (unsigned targetIndex = 0; targetIndex < MaxColorTargets; ++targetIndex) {
     if (cbState.target[targetIndex].format != VK_FORMAT_UNDEFINED) {
@@ -467,6 +470,7 @@ void GraphicsContext::setGraphicsStateInPipeline(Pipeline *pipeline, Util::Metro
     rasterizerState.rasterizerDiscardEnable = inputRsState.rasterizerDiscardEnable;
     rasterizerState.usrClipPlaneMask = inputRsState.usrClipPlaneMask;
     rasterizerState.provokingVertexMode = static_cast<ProvokingVertexMode>(inputRsState.provokingVertexMode);
+    rasterizerState.rasterStream = inputRsState.rasterStream;
   }
 
   if (isShaderStageInMask(ShaderStageFragment, stageMask)) {

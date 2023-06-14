@@ -105,13 +105,7 @@ enum class PipelineType {
 // Represents pipeline-specific context for pipeline compilation, it is a part of LLPC context
 class PipelineContext {
 public:
-  PipelineContext(GfxIpVersion gfxIp, MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash
-#if VKI_RAY_TRACING
-                  ,
-                  const Vkgc::RtState *rtState
-
-#endif
-  );
+  PipelineContext(GfxIpVersion gfxIp, MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash);
   virtual ~PipelineContext();
 
   // Returns the pipeline type
@@ -125,6 +119,14 @@ public:
 
   // Sets the mask of active shader stages bound to this pipeline
   virtual void setShaderStageMask(unsigned mask) = 0;
+
+  // Sets whether dual source blend is used in fragment shader
+  // NOTE: Only applicable in the part pipeline compilation mode.
+  virtual void setUseDualSourceBlend(bool useDualSourceBlend) { llvm_unreachable("Should never be called!"); }
+
+  // Gets whether dual source blend is used in fragment shader
+  // NOTE: Only applicable in the part pipeline compilation mode.
+  virtual bool getUseDualSourceBlend() const { return false; }
 
   // Sets whether pre-rasterization part has a geometry shader.
   // NOTE: Only applicable in the part pipeline compilation mode.
@@ -157,8 +159,6 @@ public:
   virtual llvm::StringRef getClientMetadata() const = 0;
 
 #if VKI_RAY_TRACING
-  virtual void setIndirectStage(ShaderStage stage) {}
-
   virtual void collectPayloadSize(llvm::Type *type, const llvm::DataLayout &dataLayout) {}
   virtual void collectCallableDataSize(llvm::Type *type, const llvm::DataLayout &dataLayout) {}
   virtual void collectAttributeDataSize(llvm::Type *type, const llvm::DataLayout &dataLayout) {}
@@ -186,7 +186,7 @@ public:
   llvm::StringRef getRayTracingFunctionName(unsigned funcType);
 
   // Gets ray tracing state info
-  const Vkgc::RtState *getRayTracingState() { return m_rtState; }
+  const Vkgc::RtState *getRayTracingState() { return &m_rtState; }
 #endif
 
   // Gets the finalized 128-bit cache hash code.
@@ -232,6 +232,9 @@ public:
   lgc::ShaderOptions computeShaderOptions(const PipelineShaderInfo &shaderInfo) const;
 
 protected:
+  // Set the raytracing state
+  void setRayTracingState(const Vkgc::RtState &rtState, const Vkgc::BinaryData *shaderLibrary = nullptr);
+
   // Gets dummy vertex input create info
   virtual VkPipelineVertexInputStateCreateInfo *getDummyVertexInputInfo() { return nullptr; }
 
@@ -249,9 +252,6 @@ protected:
   MetroHash::Hash m_cacheHash;           // Cache hash code
   ResourceMappingData m_resourceMapping; // Contains resource mapping nodes and static descriptor values
   uint64_t m_pipelineLayoutApiHash;      // Pipeline Layout Api Hash
-#if VKI_RAY_TRACING
-  const Vkgc::RtState *m_rtState; // Ray tracing state
-#endif
 
 private:
   PipelineContext() = delete;
@@ -272,6 +272,7 @@ private:
 
   ShaderFpMode m_shaderFpModes[ShaderStageCountInternal] = {};
   bool m_unlinked = false; // Whether we are building an "unlinked" shader ELF
+  Vkgc::RtState m_rtState = {};
 };
 
 } // namespace Llpc

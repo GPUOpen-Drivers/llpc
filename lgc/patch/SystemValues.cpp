@@ -53,7 +53,12 @@ void ShaderSystemValues::initialize(PipelineState *pipelineState, Function *entr
     m_pipelineState = pipelineState;
 
     assert(m_shaderStage != ShaderStageInvalid);
-    assert(m_pipelineState->getShaderInterfaceData(m_shaderStage)->entryArgIdxs.initialized);
+    if (m_shaderStage != ShaderStageCopyShader) {
+      // NOTE: For shader stages other than copy shader, make sure their entry-points are mutated with proper arguments.
+      // For copy shader, we don't need such check because entry-point mutation is not applied to copy shader. Copy
+      // shader is completely generated.
+      assert(m_pipelineState->getShaderInterfaceData(m_shaderStage)->entryArgIdxs.initialized);
+    }
   }
 }
 
@@ -305,7 +310,6 @@ Value *ShaderSystemValues::getGsVsRingBufDesc(unsigned streamId) {
       m_gsVsRingBufDescs[streamId] = desc;
     } else {
       // Copy shader, using GS-VS ring for input.
-      assert(streamId == 0);
       m_gsVsRingBufDescs[streamId] = loadDescFromDriverTable(SiDrvTableVsRingInOffs, builder);
     }
   }

@@ -162,7 +162,7 @@ void TypeLowering::registerVisitors(llvm_dialects::VisitorBuilder<TypeLowering> 
 // post-order, and phi nodes are fixed up at the end. Therefore, this method should be preferred over getValueOptional.
 //
 // @param value : the value
-ArrayRef<Value *> TypeLowering::getValue(Value *value) {
+SmallVector<Value *> TypeLowering::getValue(Value *value) {
   auto values = getValueOptional(value);
   assert(!values.empty());
   return values;
@@ -177,7 +177,7 @@ ArrayRef<Value *> TypeLowering::getValue(Value *value) {
 // Note that constant conversion is invoked on-the-fly as needed.
 //
 // @param value : the value
-ArrayRef<Value *> TypeLowering::getValueOptional(Value *value) {
+SmallVector<Value *> TypeLowering::getValueOptional(Value *value) {
   auto valueIt = m_valueMap.find(value);
   if (valueIt == m_valueMap.end()) {
     auto *constant = dyn_cast<Constant>(value);
@@ -208,15 +208,15 @@ ArrayRef<Value *> TypeLowering::getValueOptional(Value *value) {
     assert(valueIt != m_valueMap.end());
   }
 
-  if ((valueIt->second & 1) == 0)
-    return reinterpret_cast<Value *>(valueIt->second);
+  if ((valueIt->second & 1) == 0) {
+    return SmallVector<Value *>(ArrayRef(reinterpret_cast<Value *>(valueIt->second)));
+  }
 
   size_t begin = valueIt->second >> 1;
   auto typeIt = m_multiTypeConversions.find(value->getType());
   assert(typeIt != m_multiTypeConversions.end());
   size_t count = typeIt->second.size();
-
-  return {&m_convertedValueList[begin], count};
+  return SmallVector<Value *>(ArrayRef(&m_convertedValueList[begin], count));
 }
 
 // =====================================================================================================================

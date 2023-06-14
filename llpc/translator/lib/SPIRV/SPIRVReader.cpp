@@ -49,6 +49,7 @@
 #include "llpcContext.h"
 #include "llpcDialect.h"
 #include "llpcPipelineContext.h"
+#include "llpcRayTracingContext.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/Pipeline.h"
 #include "llvm/ADT/DenseMap.h"
@@ -395,28 +396,38 @@ template <>
 Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(SPIRVType *const spvType, unsigned matrixStride,
                                                      const bool isColumnMajor, const bool isParentPointer,
                                                      LayoutMode layout) {
+  const auto spvColumnType = spvType->getMatrixColumnType();
+  const auto spvElementType = spvColumnType->getVectorComponentType();
+  const unsigned spvColumnCount = spvType->getMatrixColumnCount();
+  const unsigned spvRowCount = spvColumnType->getVectorComponentCount();
+
   Type *columnType = nullptr;
+  unsigned columnCount = 0;
 
-  unsigned columnCount = spvType->getMatrixColumnCount();
-
-  // If the matrix is not explicitly laid out or is column major, just translate the column type.
   if (!isParentPointer || isColumnMajor) {
-    columnType = transType(spvType->getMatrixColumnType(), matrixStride, isColumnMajor, isParentPointer, layout);
+    // If the matrix is not explicitly laid out or is column major, just translate the column type.
+    columnType = transType(spvColumnType, matrixStride, isColumnMajor, isParentPointer, layout);
+    columnCount = spvColumnCount;
   } else {
     // We need to transpose the matrix type to represent its layout in memory.
-    SPIRVType *const spvColumnType = spvType->getMatrixColumnType();
+    Type *const elementType = transType(spvElementType, matrixStride, isColumnMajor, isParentPointer, layout);
 
-    Type *const elementType =
-        transType(spvColumnType->getVectorComponentType(), matrixStride, isColumnMajor, isParentPointer, layout);
+    // NOTE: The new column after transposition is actually the original SPIR-V row vector and the column count is the
+    // original SPIR-V row vector count.
+    columnType = ArrayType::get(elementType, spvColumnCount);
+    columnCount = spvRowCount;
 
-    columnType = ArrayType::get(elementType, columnCount);
-    columnCount = spvColumnType->getVectorComponentCount();
-
-    // with a MatrixStride Decoration, and one of the RowMajor or ColMajor Decorations
+    // NOTE: This is a workaround. SPIR-V translated from HLSL might not have MatrixStride decoration. In such cases,
+    // we will calculate it for RowMajor matrix.
     if (!isColumnMajor && matrixStride == 0) {
-      // Targeted for std430 layout
-      assert(columnCount == 4);
-      matrixStride = columnCount * (elementType->getPrimitiveSizeInBits() / 8);
+      // Targeted for std430 layout with those rules:
+      //   - A three- or four-component vector, with components of size N, has a base alignment of 4N.
+      //   - A row-major matrix of C columns has a base alignment equal to the base alignment of a vector of C matrix
+      //     components.
+      //   - Any ArrayStride or MatrixStride decoration must be an integer multiple of the base alignment of the array
+      //     or matrix.
+      assert(spvColumnCount >= 2);
+      matrixStride = alignTo(spvColumnCount, 2) * (elementType->getPrimitiveSizeInBits() / 8);
     }
   }
 
@@ -2755,6 +2766,14 @@ Value *SPIRVToLLVM::getDescPointerAndStride(ResourceNodeType resType, unsigned d
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpStore>(SPIRVValue *const spvValue) {
   SPIRVStore *const spvStore = static_cast<SPIRVStore *>(spvValue);
 
+  if (spvStore->getDst()->hasDecorate(DecorationNonWritable)) {
+    // Discard any writes to non-writable memory as these are not permitted.
+    // For debugging purposes assert that these are only duplicate stores of the initializer of an OpVariable.
+    assert(spvStore->getDst()->getOpCode() == OpVariable);
+    assert(static_cast<SPIRVVariable *>(spvStore->getDst())->getInitializer() == spvStore->getSrc());
+    return nullptr;
+  }
+
   bool isVolatile = spvStore->SPIRVMemoryAccess::isVolatile(false);
   const Vkgc::ExtendedRobustness &extendedRobustness = getPipelineOptions()->extendedRobustness;
   if (extendedRobustness.nullDescriptor || extendedRobustness.robustBufferAccess)
@@ -3581,15 +3600,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleDow
 //
 // @param spvValue : A SPIR-V value.
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpTraceRayKHR>(SPIRVValue *const spvValue) {
-  Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
-  if (m_execModule == ExecutionModelClosestHitKHR) {
-    llpcContext->getPipelineContext()->setIndirectStage(Vkgc::ShaderStageRayTracingClosestHit);
-    llpcContext->getPipelineContext()->setIndirectStage(Vkgc::ShaderStageCompute);
-    llpcContext->getPipelineContext()->setIndirectStage(Vkgc::ShaderStageRayTracingRayGen);
-  } else if (m_execModule == ExecutionModelMissKHR) {
-    llpcContext->getPipelineContext()->setIndirectStage(Vkgc::ShaderStageRayTracingMiss);
-    llpcContext->getPipelineContext()->setIndirectStage(Vkgc::ShaderStageCompute);
-    llpcContext->getPipelineContext()->setIndirectStage(Vkgc::ShaderStageRayTracingRayGen);
+  if (m_execModule != ExecutionModelRayGenerationKHR) {
+    Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
+    auto *pipelineContext = static_cast<Llpc::RayTracingContext *>(llpcContext->getPipelineContext());
+    pipelineContext->setIndirectPipeline();
   }
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   return mapValue(spvValue, transSPIRVBuiltinFromInst(static_cast<SPIRVInstruction *>(spvValue), block));
@@ -3602,7 +3616,8 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpTraceRayKHR>(SPIRVValue *
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpExecuteCallableKHR>(SPIRVValue *const spvValue) {
   if (m_execModule == ExecutionModelCallableKHR) {
     Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
-    llpcContext->getPipelineContext()->setIndirectStage(Vkgc::ShaderStageRayTracingCallable);
+    auto *pipelineContext = static_cast<Llpc::RayTracingContext *>(llpcContext->getPipelineContext());
+    pipelineContext->setIndirectPipeline();
   }
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   return mapValue(spvValue, transSPIRVBuiltinFromInst(static_cast<SPIRVInstruction *>(spvValue), block));
@@ -4122,6 +4137,13 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpExtInst>(SPIRVValue *cons
 // @param bb : Which basicblock to generate code
 Value *SPIRVToLLVM::transDebugPrintf(SPIRVInstruction *bi, const ArrayRef<SPIRVValue *> spvValues, Function *func,
                                      BasicBlock *bb) {
+  auto pipelineContext = (static_cast<Llpc::Context *>(m_context))->getPipelineContext();
+  auto resMapping = pipelineContext->getResourceMapping();
+  unsigned nodeIndex = 0;
+  if (findResourceNode(resMapping->pUserDataNodes, resMapping->userDataNodeCount, Vkgc::InternalDescriptorSetId,
+                       Vkgc::PrintfBufferBindingId, &nodeIndex) == nullptr)
+    return getBuilder()->getInt64(0);
+
   if (!m_debugOutputBuffer) {
     auto spvArrType = m_bm->addRuntimeArray(m_bm->addIntegerType(32));
     auto spvStructType = m_bm->addStructType({spvArrType});
@@ -4737,6 +4759,14 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
 
     auto trueSuccessor = cast<BasicBlock>(transValue(br->getTrueLabel(), f, bb));
     auto falseSuccessor = cast<BasicBlock>(transValue(br->getFalseLabel(), f, bb));
+
+    // OpBranchConditional can branch with OpUndef as condition. The selected jump target is undefined.
+    // In LLVM IR, BranchInst with undef value is fully UB.
+    // LLVM will mark the successors as unreachable, so later SimplifyCFG passes will cause
+    // unwanted removal of branches. By using a freeze instruction as condition, we make sure that LLVM
+    // will always operate on a fixed value.
+    c = new FreezeInst(c, "cond.freeze", bb);
+
     auto bc = BranchInst::Create(trueSuccessor, falseSuccessor, c, bb);
     auto lm = static_cast<SPIRVLoopMerge *>(br->getPrevious());
     if (lm && lm->getOpCode() == OpLoopMerge)
@@ -4828,6 +4858,14 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     auto select = transValue(bs->getSelect(), f, bb);
     auto defaultSuccessor = dyn_cast<BasicBlock>(transValue(bs->getDefault(), f, bb));
     recordBlockPredecessor(defaultSuccessor, bb);
+
+    // OpSwitch can branch with OpUndef as condition. The selected jump target is undefined.
+    // In LLVM IR, SwitchInst with undef value is fully UB.
+    // LLVM will mark the successors as unreachable, so later SimplifyCFG passes will cause
+    // unwanted removal of branches. By using a freeze instruction as condition, we make sure that LLVM
+    // will always operate on a fixed value.
+    select = new FreezeInst(select, "cond.freeze", bb);
+
     auto ls = SwitchInst::Create(select, defaultSuccessor, bs->getNumPairs(), bb);
     bs->foreachPair([&](SPIRVSwitch::LiteralTy literals, SPIRVBasicBlock *label) {
       assert(!literals.empty() && "Literals should not be empty");
@@ -7794,6 +7832,17 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
         inOutDec.XfbOffset = xfbOffset;
       }
 
+      // If dual source blend is dynamically set, need to confirm whether the fragment shader actually uses
+      // dual-source blending by checking if there is an output at Location 0, Index 1
+      Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
+      if ((llpcContext->getPipelineType() == PipelineType::Graphics) && (m_execModule == spv::ExecutionModelFragment)) {
+        auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());
+        if (buildInfo->cbState.dualSourceBlendDynamic && (as == SPIRAS_Output) && (inOutDec.Value.Loc == 0) &&
+            (inOutDec.Index == 1)) {
+          llpcContext->getPipelineContext()->setUseDualSourceBlend(true);
+        }
+      }
+
       Type *mdTy = nullptr;
       SPIRVType *bt = bv->getType()->getPointerElementType();
       auto md = buildShaderInOutMetadata(bt, inOutDec, mdTy);
@@ -8403,12 +8452,8 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
     } else {
       blockDec.IsMatrix = true;
       stride = blockDec.MatrixStride;
-      if (stride == 0) {
-        if (deriveStride)
-          stride = bt->getDerivedMatrixStride();
-        else
-          llvm_unreachable("Missing matrix stride decoration");
-      }
+      if (stride == 0 && deriveStride)
+        stride = bt->getDerivedMatrixStride();
       elemTy = bt->getMatrixColumnType();
     }
 

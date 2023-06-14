@@ -46,10 +46,16 @@ namespace Llpc {
 RayTracingContext::RayTracingContext(GfxIpVersion gfxIP, const RayTracingPipelineBuildInfo *pipelineInfo,
                                      const PipelineShaderInfo *representativeShaderInfo, MetroHash::Hash *pipelineHash,
                                      MetroHash::Hash *cacheHash, unsigned indirectStageMask)
-    : PipelineContext(gfxIP, pipelineHash, cacheHash, &pipelineInfo->rtState), m_pipelineInfo(pipelineInfo),
-      m_representativeShaderInfo(), m_linked(false), m_indirectStageMask(indirectStageMask), m_entryName(""),
+    : PipelineContext(gfxIP, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo), m_representativeShaderInfo(),
+      m_linked(false), m_indirectStageMask(indirectStageMask), m_entryName(""),
       m_payloadMaxSize(pipelineInfo->payloadSizeMaxInLib), m_callableDataMaxSize(0),
       m_attributeDataMaxSize(pipelineInfo->attributeSizeMaxInLib) {
+  const Vkgc::BinaryData *gpurtShaderLibrary = nullptr;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
+  gpurtShaderLibrary = &pipelineInfo->shaderTraceRay;
+#endif
+  setRayTracingState(pipelineInfo->rtState, gpurtShaderLibrary);
+
   m_resourceMapping = pipelineInfo->resourceMapping;
   m_pipelineLayoutApiHash = pipelineInfo->pipelineLayoutApiHash;
 
@@ -216,6 +222,16 @@ unsigned RayTracingContext::getSubgroupSizeUsage() const {
     return unsigned(-1);
   }
   return 0;
+}
+
+// =====================================================================================================================
+// Set the raytracing pipeline as indirect shader
+void RayTracingContext::setIndirectPipeline() {
+  m_indirectStageMask |=
+      shaderStageToMask(Vkgc::ShaderStageRayTracingClosestHit) | shaderStageToMask(Vkgc::ShaderStageRayTracingAnyHit) |
+      shaderStageToMask(Vkgc::ShaderStageCompute) | shaderStageToMask(Vkgc::ShaderStageRayTracingRayGen) |
+      shaderStageToMask(Vkgc::ShaderStageRayTracingIntersect) | shaderStageToMask(Vkgc::ShaderStageRayTracingMiss) |
+      shaderStageToMask(Vkgc::ShaderStageRayTracingCallable);
 }
 
 // =====================================================================================================================

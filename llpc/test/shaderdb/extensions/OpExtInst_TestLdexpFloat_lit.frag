@@ -26,8 +26,8 @@ void main()
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn float (...) @lgc.create.ldexp.f32(float %{{.*}}, i32
 ; SHADERTEST: = call reassoc nnan nsz arcp contract afn <3 x float> (...) @lgc.create.ldexp.v3f32(<3 x float> %{{.*}}, <3 x i32>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn float @llvm.amdgcn.ldexp.f32(float %{{.*}}, i32 %{{.*}})
-; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn float @llvm.amdgcn.ldexp.f32(float %{{.*}}, i32 %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn float @llvm.ldexp.f32.i32(float %{{.*}}, i32 %{{.*}})
+; SHADERTEST: %{{[0-9]*}} = call reassoc nnan nsz arcp contract afn float @llvm.ldexp.f32.i32(float %{{.*}}, i32 %{{.*}})
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

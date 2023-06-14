@@ -418,19 +418,19 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
     }
   }
 #if VKI_RAY_TRACING
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   const BinaryData *shaderLibrary = nullptr;
-  if (pipelineState->pipelineType == VfxPipelineTypeRayTracing)
+  if (pipelineState->pipelineType == VfxPipelineTypeRayTracing) {
     shaderLibrary = &pipelineState->rayPipelineInfo.shaderTraceRay;
-  else if (pipelineState->pipelineType == VfxPipelineTypeCompute)
+  } else if (pipelineState->pipelineType == VfxPipelineTypeCompute) {
     shaderLibrary = &pipelineState->compPipelineInfo.shaderLibrary;
-#endif
-#if VKI_RAY_TRACING
-  else {
+  } else {
     assert(pipelineState->pipelineType == VfxPipelineTypeGraphics);
     shaderLibrary = &pipelineState->gfxPipelineInfo.shaderLibrary;
   }
   if (shaderLibrary->codeSize > 0 && EnableOuts())
     disassembleSpirv(shaderLibrary->codeSize, shaderLibrary->pCode, "Ray tracing library");
+#endif
 #endif
 
   const bool isGraphics = compileInfo.pipelineType == VfxPipelineTypeGraphics;

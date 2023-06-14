@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2021-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2023 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,30 +24,24 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  PatchWaveSizeAdjust.h
- * @brief LLPC header file: contains declaration of class lgc::PatchWaveSizeAdjust.
+ * @file  vkgcGpurtShim.h
+ * @brief Contains declarations for the GPURT shim library
  ***********************************************************************************************************************
  */
+
 #pragma once
 
-#include "lgc/state/PipelineShaders.h"
-#include "lgc/state/PipelineState.h"
-#include "llvm/Pass.h"
+#include "vkgcBase.h"
+#include <cstddef>
 
-namespace lgc {
+namespace Vkgc {
+namespace gpurt {
 
-// =====================================================================================================================
-// Pass to adjust wave size per shader stage heuristically.
-class PatchWaveSizeAdjust final : public llvm::PassInfoMixin<PatchWaveSizeAdjust> {
-public:
-  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
+#ifdef HAVE_GPURT_SHIM
+void getShaderLibrarySpirv(unsigned featureFlags, const void *&code, size_t &size);
+void getFuncTable(Vkgc::RtIpVersion rtIpVersion, Vkgc::GpurtFuncTable &table);
+Vkgc::RtIpVersion getRtIpVersion(Vkgc::GfxIpVersion gfxIpVersion);
+#endif
 
-  bool runImpl(llvm::Module &module, PipelineState *pipelineState);
-
-  static llvm::StringRef name() { return "Patch LLVM for per-shader wave size adjustment"; }
-
-private:
-  bool is16BitArithmeticOp(llvm::Instruction *inst);
-};
-
-} // namespace lgc
+} // namespace gpurt
+} // namespace Vkgc

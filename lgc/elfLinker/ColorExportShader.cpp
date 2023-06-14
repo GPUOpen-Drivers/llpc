@@ -54,9 +54,16 @@ ColorExportShader::ColorExportShader(PipelineState *pipelineState, ArrayRef<Colo
   }
 
   PalMetadata *metadata = pipelineState->getPalMetadata();
-  DB_SHADER_CONTROL shaderControl = {};
-  shaderControl.u32All = metadata->getRegister(mmDB_SHADER_CONTROL);
-  m_killEnabled = shaderControl.bits.KILL_ENABLE;
+  if (pipelineState->useRegisterFieldFormat()) {
+    auto dbShaderControl = metadata->getPipelineNode()[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
+                               .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl]
+                               .getMap(true);
+    m_killEnabled = dbShaderControl[Util::Abi::DbShaderControlMetadataKey::KillEnable].getBool();
+  } else {
+    DB_SHADER_CONTROL shaderControl = {};
+    shaderControl.u32All = metadata->getRegister(mmDB_SHADER_CONTROL);
+    m_killEnabled = shaderControl.bits.KILL_ENABLE;
+  }
 }
 
 // =====================================================================================================================

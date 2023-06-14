@@ -76,7 +76,7 @@ public:
 #if VKI_RAY_TRACING
   static MetroHash::Hash generateHashForRayTracingPipeline(const RayTracingPipelineBuildInfo *pipeline,
                                                            bool isCacheHash);
-  static void dumpRayTracingRtState(const RtState *rtState, std::ostream &dumpFile);
+  static void dumpRayTracingRtState(const RtState *rtState, const char *dumpDir, std::ostream &dumpFile);
   static void dumpRayTracingPipelineMetadata(PipelineDumpFile *binaryFile, const BinaryData *pipelineBin);
 #endif
 
@@ -129,7 +129,7 @@ private:
 
   static void dumpRayTracingStateInfo(const RayTracingPipelineBuildInfo *pipelineInfo, const char *dumpDir,
                                       std::ostream &dumpFile);
-  static void updateHashForRtState(const RtState *rtState, MetroHash64 *hasher);
+  static void updateHashForRtState(const RtState *rtState, MetroHash64 *hasher, bool isCacheHash);
 #endif
 
   static void dumpVersionInfo(std::ostream &dumpFile);

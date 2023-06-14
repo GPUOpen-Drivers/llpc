@@ -52,7 +52,6 @@
 #include "lgc/patch/PatchReadFirstLane.h"
 #include "lgc/patch/PatchResourceCollect.h"
 #include "lgc/patch/PatchSetupTargetFeatures.h"
-#include "lgc/patch/PatchWaveSizeAdjust.h"
 #include "lgc/patch/PatchWorkarounds.h"
 #include "lgc/patch/VertexFetch.h"
 #include "lgc/state/PipelineState.h"
@@ -140,7 +139,6 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   passMgr.addPass(PatchCheckShaderCache(std::move(checkShaderCacheFunc)));
 
   // First part of lowering to "AMDGCN-style"
-  passMgr.addPass(PatchWaveSizeAdjust());
   passMgr.addPass(PatchWorkarounds());
   passMgr.addPass(PatchCopyShader());
   passMgr.addPass(LowerVertexFetch());

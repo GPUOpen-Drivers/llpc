@@ -437,9 +437,6 @@ struct ResourceUsage {
       //   <location, <component, byteSize>>
       std::unordered_map<unsigned, std::vector<unsigned>> genericOutByteSizes[MaxGsStreams];
 
-      // ID of the vertex stream sent to rasterizer
-      unsigned rasterStream = 0;
-
       struct {
         unsigned esGsRingItemSize;   // Size of each vertex written to the ES -> GS Ring, in dwords.
         unsigned gsVsRingItemSize;   // Size of each primitive written to the GS -> VS Ring, in dwords.

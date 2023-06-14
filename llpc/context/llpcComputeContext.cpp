@@ -46,13 +46,13 @@ namespace Llpc {
 // @param cacheHash : Cache hash code
 ComputeContext::ComputeContext(GfxIpVersion gfxIp, const ComputePipelineBuildInfo *pipelineInfo,
                                MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash)
-    : PipelineContext(gfxIp, pipelineHash, cacheHash
-#if VKI_RAY_TRACING
-                      ,
-                      &pipelineInfo->rtState
+    : PipelineContext(gfxIp, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo) {
+  const Vkgc::BinaryData *gpurtShaderLibrary = nullptr;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
+  gpurtShaderLibrary = &pipelineInfo->shaderLibrary;
 #endif
-                      ),
-      m_pipelineInfo(pipelineInfo) {
+  setRayTracingState(pipelineInfo->rtState, gpurtShaderLibrary);
+
   setUnlinked(pipelineInfo->unlinked);
   m_resourceMapping = pipelineInfo->resourceMapping;
   m_pipelineLayoutApiHash = pipelineInfo->pipelineLayoutApiHash;

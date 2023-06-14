@@ -134,8 +134,8 @@ public:
 
   static void registerVisitors(llvm_dialects::VisitorBuilder<TypeLowering> &builder);
 
-  llvm::ArrayRef<llvm::Value *> getValue(llvm::Value *value);
-  llvm::ArrayRef<llvm::Value *> getValueOptional(llvm::Value *value);
+  llvm::SmallVector<llvm::Value *> getValue(llvm::Value *value);
+  llvm::SmallVector<llvm::Value *> getValueOptional(llvm::Value *value);
   void replaceInstruction(llvm::Instruction *inst, llvm::ArrayRef<llvm::Value *> mapping);
   void eraseInstruction(llvm::Instruction *inst);
 

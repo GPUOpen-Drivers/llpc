@@ -257,8 +257,9 @@ Value *BuilderImpl::CreateFMod(Value *dividend, Value *divisor, const Twine &ins
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateFma(Value *a, Value *b, Value *c, const Twine &instName) {
   if (getPipelineState()->getTargetInfo().getGfxIpVersion().major <= 8) {
-    // Pre-GFX9 version: Use fmuladd.
-    return CreateIntrinsic(Intrinsic::fmuladd, a->getType(), {a, b, c}, nullptr, instName);
+    // Pre-GFX9 version: Use fmul and fadd.
+    Value *fmul = CreateFMul(a, b);
+    return CreateFAdd(fmul, c, instName);
   }
 
   // GFX9+ version: Use fma.
@@ -833,7 +834,7 @@ Value *BuilderImpl::CreateLdexp(Value *x, Value *exp, const Twine &instName) {
 
   // We need to scalarize this ourselves.
   Value *result = scalarize(x, exp, [this](Value *x, Value *exp) {
-    Value *ldexp = CreateIntrinsic(Intrinsic::amdgcn_ldexp, x->getType(), {x, exp});
+    Value *ldexp = CreateIntrinsic(x->getType(), Intrinsic::ldexp, {x, exp});
     if (x->getType()->getScalarType()->isDoubleTy()) {
       // NOTE: If LDEXP result is a denormal, we can flush it to zero. This is allowed. For double type, LDEXP
       // instruction does mantissa rounding instead of truncation, which is not expected by SPIR-V spec.
@@ -1309,13 +1310,26 @@ Value *BuilderImpl::CreateFindSMsb(Value *value, const Twine &instName) {
   assert(value->getType()->getScalarType()->isIntegerTy(32));
 
   Constant *negOne = ConstantInt::get(value->getType(), -1);
-  Value *leadingZeroCount =
+  Value *leadingSignBitsCount = CreateCountLeadingSignBits(value);
+  Value *isNegOne = CreateICmpEQ(leadingSignBitsCount, negOne);
+  Value *bitOnePos = CreateSub(ConstantInt::get(value->getType(), 31), leadingSignBitsCount);
+  return CreateSelect(isNegOne, negOne, bitOnePos, instName);
+}
+
+// =====================================================================================================================
+// Create "count leading sign bits" operation for a (vector of) signed i32. For a positive number, the result is the
+// count of the most leading significant 1-bit. For a negative number, the result is the bit number of the most
+// significant 0-bit. For a value of 0 or -1, the result is -1.
+//
+// @param value : Input value
+// @param instName : Name to give instruction(s)
+Value *BuilderImpl::CreateCountLeadingSignBits(Value *value, const Twine &instName) {
+  assert(value->getType()->getScalarType()->isIntegerTy(32));
+
+  Value *result =
       scalarize(value, [this](Value *value) { return CreateUnaryIntrinsic(Intrinsic::amdgcn_sffbh, value); });
-  Value *bitOnePos = CreateSub(ConstantInt::get(value->getType(), 31), leadingZeroCount);
-  Value *isNegOne = CreateICmpEQ(value, negOne);
-  Value *isZero = CreateICmpEQ(value, Constant::getNullValue(value->getType()));
-  Value *isNegOneOrZero = CreateOr(isNegOne, isZero);
-  return CreateSelect(isNegOneOrZero, negOne, bitOnePos, instName);
+  result->setName(instName);
+  return result;
 }
 
 // =====================================================================================================================
@@ -1338,11 +1352,11 @@ Value *BuilderImpl::createFMix(Value *x, Value *y, Value *a, const Twine &instNa
       a = CreateVectorSplat(vectorResultTy->getNumElements(), a);
   }
 
-  FastMathFlags fastMathFlags = getFastMathFlags();
-  fastMathFlags.setNoNaNs();
-  fastMathFlags.setAllowContract();
-  CallInst *result = CreateIntrinsic(Intrinsic::fmuladd, x->getType(), {ySubX, a, x}, nullptr, instName);
-  result->setFastMathFlags(fastMathFlags);
+  IRBuilderBase::FastMathFlagGuard FMFGuard(*this);
+  getFastMathFlags().setNoNaNs();
+  getFastMathFlags().setAllowContract();
+  Value *fmul = CreateFMul(ySubX, a);
+  Value *result = CreateFAdd(fmul, x, instName);
 
   return result;
 }

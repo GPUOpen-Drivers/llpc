@@ -30,6 +30,7 @@
  */
 #pragma once
 
+#include "vkgcBase.h"
 #include "vulkan.h"
 #include <cassert>
 #include <tuple>
@@ -44,10 +45,10 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 61
+#define LLPC_INTERFACE_MAJOR_VERSION 62
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 10
+#define LLPC_INTERFACE_MINOR_VERSION 0
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -82,6 +83,9 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     62.0 | Default to the compiler getting the GPURT library directly, and move shader library info into RtState |
+//  |     61.14| Add rasterStream to rsState                                                                           |
+//  |     61.13| Add dualSourceBlendDynamic to cbState                                                                 |
 //  |     61.10| Add useShadingRate and useSampleInfoto ShaderModuleUsage                                              |
 //  |     61.8 | Add enableImplicitInvariantExports to PipelineOptions                                                 |
 //  |     61.7 | Add disableFMA to PipelineShaderOptions                                                               |
@@ -437,38 +441,6 @@ struct ResourceMappingData {
   unsigned staticDescriptorValueCount;                  ///< Count of static descriptors
 };
 
-/// Represents graphics IP version info. See https://llvm.org/docs/AMDGPUUsage.html#processors for more
-/// details.
-struct GfxIpVersion {
-  unsigned major;    ///< Major version
-  unsigned minor;    ///< Minor version
-  unsigned stepping; ///< Stepping info
-
-  // GFX IP checkers
-  bool operator==(const GfxIpVersion &rhs) const {
-    return std::tie(major, minor, stepping) == std::tie(rhs.major, rhs.minor, rhs.stepping);
-  }
-  bool operator>=(const GfxIpVersion &rhs) const {
-    return std::tie(major, minor, stepping) >= std::tie(rhs.major, rhs.minor, rhs.stepping);
-  }
-  bool isGfx(unsigned rhsMajor, unsigned rhsMinor) const {
-    return std::tie(major, minor) == std::tie(rhsMajor, rhsMinor);
-  }
-};
-
-/// Represents RT IP version
-struct RtIpVersion {
-  unsigned major; ///< Major version
-  unsigned minor; ///< Minor version
-
-  // RT IP checkers
-  bool operator==(const RtIpVersion &rhs) const { return std::tie(major, minor) == std::tie(rhs.major, rhs.minor); }
-  bool operator>=(const RtIpVersion &rhs) const { return std::tie(major, minor) >= std::tie(rhs.major, rhs.minor); }
-  bool isRtIp(unsigned rhsMajor, unsigned rhsMinor) const {
-    return std::tie(major, minor) == std::tie(rhsMajor, rhsMinor);
-  }
-};
-
 /// Represents shader binary data.
 struct BinaryData {
   size_t codeSize;   ///< Size of shader binary data
@@ -604,7 +576,8 @@ struct ShaderModuleUsage {
   bool enableRayQuery;     ///< Whether the "RayQueryKHR" capability is used
   bool rayQueryLibrary;    ///< Whether the shaderModule is rayQueryLibrary
   bool isInternalRtShader; ///< Whether the shaderModule is a GPURT internal shader (e.g. BVH build)
-  bool hasTraceRay;        ///< Whether the shaderModule has OpTraceRayKHR;
+  bool hasTraceRay;        ///< Whether the shaderModule has OpTraceRayKHR
+  bool hasExecuteCallable; ///< Whether the shaderModule has OpExecuteCallableKHR
 #endif
   bool useIsNan;       ///< Whether IsNan is used
   bool useInvariant;   ///< Whether invariant variable is used
@@ -1004,24 +977,6 @@ enum RayTracingRayFlag : uint32_t {
 };
 
 // =====================================================================================================================
-// Raytracing entry function indices
-enum RAYTRACING_ENTRY_FUNC : unsigned {
-  RT_ENTRY_TRACE_RAY,
-  RT_ENTRY_TRACE_RAY_INLINE,
-  RT_ENTRY_TRACE_RAY_HIT_TOKEN,
-  RT_ENTRY_RAY_QUERY_PROCEED,
-  RT_ENTRY_INSTANCE_INDEX,
-  RT_ENTRY_INSTANCE_ID,
-  RT_ENTRY_OBJECT_TO_WORLD_TRANSFORM,
-  RT_ENTRY_WORLD_TO_OBJECT_TRANSFORM,
-  RT_ENTRY_RESERVE1,
-  RT_ENTRY_RESERVE2,
-  RT_ENTRY_FETCH_HIT_TRIANGLE_FROM_NODE_POINTER,
-  RT_ENTRY_FETCH_HIT_TRIANGLE_FROM_RAY_QUERY,
-  RT_ENTRY_FUNC_COUNT,
-};
-
-// =====================================================================================================================
 // raytracing system value usage flags
 union RayTracingSystemValueUsage {
   struct {
@@ -1080,11 +1035,6 @@ struct RayTracingShaderExportConfig {
   bool emitRaytracingShaderDataToken; // Emitting Raytracing ShaderData SQTT Token
 };
 
-/// Represents GPURT function table
-struct GpurtFuncTable {
-  char pFunc[RT_ENTRY_FUNC_COUNT][256]; ///< Function names
-};
-
 /// Enumerates the method of mapping from ray tracing launch ID to native thread ID
 enum DispatchDimSwizzleMode : unsigned {
   Native,             ///< Native mapping (width -> x, height -> y, depth -> z)
@@ -1128,8 +1078,22 @@ struct RtState {
   bool enableOptimalLdsStackSizeForIndirect; ///< Enable optimal LDS stack size for indirect shaders
   bool enableOptimalLdsStackSizeForUnified;  ///< Enable optimal LDS stack size for unified shaders
   float maxRayLength;                        ///< Raytracing rayDesc.tMax override
+  unsigned gpurtFeatureFlags;                ///< GPURT features flags to use for the pipeline compile
+  BinaryData gpurtShaderLibrary;             ///< GPURT shader library
   GpurtFuncTable gpurtFuncTable;             ///< GPURT function table
   RtIpVersion rtIpVersion;                   ///< RT IP version
+
+  /// If true, force the compiler to use gpurtShaderLibrary. Otherwise, it is up to the compiler whether it uses
+  /// gpurtShaderLibrary or obtains a library directly from GPURT.
+  ///
+  /// If LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62, the compiler always behaves as if this was true.
+  bool gpurtOverride;
+
+  /// If true, force the compile to use rtIpVersion. If false, the compiler may derive the default RTIP version from
+  /// the GFXIP version.
+  ///
+  /// If LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62, the compiler always behaves as if this was true.
+  bool rtIpOverride;
 };
 #endif
 
@@ -1186,14 +1150,15 @@ struct GraphicsPipelineBuildInfo {
     unsigned samplePatternIdx;    ///< Index into the currently bound MSAA sample pattern table that
                                   ///  matches the sample pattern used by the rasterizer when rendering
                                   ///  with this pipeline.
-
+    unsigned rasterStream;        ///< Which vertex stream to rasterize
     VkProvokingVertexModeEXT provokingVertexMode; ///< Specifies which vertex of a primitive is the _provoking
                                                   ///  vertex_, this impacts which vertex's "flat" VS outputs
                                                   ///  are passed to the PS.
   } rsState;                                      ///< Rasterizer State
   struct {
-    bool alphaToCoverageEnable; ///< Enable alpha to coverage
-    bool dualSourceBlendEnable; ///< Blend state bound at draw time will use a dual source blend mode
+    bool alphaToCoverageEnable;  ///< Enable alpha to coverage
+    bool dualSourceBlendEnable;  ///< Blend state bound at draw time will use a dual source blend mode
+    bool dualSourceBlendDynamic; ///< Dual source blend mode is dynamically set.
 
     ColorTarget target[MaxColorTargets]; ///< Per-MRT color target info
   } cbState;                             ///< Color target state
@@ -1205,8 +1170,10 @@ struct GraphicsPipelineBuildInfo {
   bool enableUberFetchShader; ///< Use uber fetch shader
   bool enableEarlyCompile;    ///< Whether enable early compile
 #if VKI_RAY_TRACING
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   BinaryData shaderLibrary; ///< SPIR-V library binary data
-  RtState rtState;          ///< Ray tracing state
+#endif
+  RtState rtState; ///< Ray tracing state
 #endif
   const void *pClientMetadata; ///< Pointer to (optional) client-defined data to be stored inside the ELF
   size_t clientMetadataSize;   ///< Size (in bytes) of the client-defined data
@@ -1228,8 +1195,10 @@ struct ComputePipelineBuildInfo {
   PipelineOptions options;             ///< Per pipeline tuning options
   bool unlinked;                       ///< True to build an "unlinked" half-pipeline ELF
 #if VKI_RAY_TRACING
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   BinaryData shaderLibrary; ///< SPIR-V library binary data
-  RtState rtState;          ///< Ray tracing state
+#endif
+  RtState rtState; ///< Ray tracing state
 #endif
   const void *pClientMetadata; ///< Pointer to (optional) client-defined data to be stored inside the ELF
   size_t clientMetadataSize;   ///< Size (in bytes) of the client-defined data
@@ -1250,7 +1219,9 @@ struct RayTracingPipelineBuildInfo {
   uint64_t pipelineLayoutApiHash;                            ///< Pipeline Layout Api Hash
   unsigned shaderGroupCount;                                 ///< Count of shader group
   const VkRayTracingShaderGroupCreateInfoKHR *pShaderGroups; ///< An array of shader group
-  BinaryData shaderTraceRay;                                 ///< Trace-ray SPIR-V binary data
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
+  BinaryData shaderTraceRay; ///< Trace-ray SPIR-V binary data
+#endif
   PipelineOptions options;                                   ///< Per pipeline tuning options
   unsigned maxRecursionDepth;                                ///< Ray tracing max recursion depth
   unsigned indirectStageMask;                                ///< Ray tracing indirect stage mask

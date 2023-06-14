@@ -217,7 +217,6 @@ target_sources(LLVMlgc PRIVATE
     patch/SystemValues.cpp
     patch/VertexFetch.cpp
     patch/PatchImageOpCollect.cpp
-    patch/PatchWaveSizeAdjust.cpp
     patch/RegisterMetadataBuilder.cpp
 )
 
@@ -257,3 +256,5 @@ add_subdirectory(test)
 if (LLPC_BUILD_TESTS)
   add_subdirectory(unittests)
 endif()
+
+target_link_libraries(LLVMlgc PUBLIC LLVMLgcRt)

@@ -664,7 +664,8 @@ void RegisterMetadataBuilder::buildHwVsRegisters() {
   vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::Streamout_2En] = streamXfbBuffers[2] > 0;
   vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::Streamout_3En] = streamXfbBuffers[3] > 0;
   if (shaderStage == ShaderStageCopyShader)
-    vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::RastStream] = resUsage->inOutUsage.gs.rasterStream;
+    vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::RastStream] =
+        m_pipelineState->getRasterizerState().rasterStream;
 
   // Set some field of SPI_SHADER_PGM_RSRC2_VS
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VsSoEn] = enableXfb;
@@ -752,7 +753,7 @@ void RegisterMetadataBuilder::buildPsRegisters() {
 
   auto dbShaderControl = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl].getMap(true);
   dbShaderControl[Util::Abi::DbShaderControlMetadataKey::ZOrder] = zOrder;
-  dbShaderControl[Util::Abi::DbShaderControlMetadataKey::KillEnable] = builtInUsage.discard;
+  dbShaderControl[Util::Abi::DbShaderControlMetadataKey::KillEnable] = builtInUsage.discard == 1;
   dbShaderControl[Util::Abi::DbShaderControlMetadataKey::ZExportEnable] = builtInUsage.fragDepth;
   dbShaderControl[Util::Abi::DbShaderControlMetadataKey::StencilTestValExportEnable] = builtInUsage.fragStencilRef;
   dbShaderControl[Util::Abi::DbShaderControlMetadataKey::MaskExportEnable] = builtInUsage.sampleMask == 1;

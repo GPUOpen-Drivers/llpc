@@ -784,6 +784,7 @@ void PipelineDumper::dumpComputeStateInfo(const ComputePipelineBuildInfo *pipeli
   dumpFile << "deviceIndex = " << pipelineInfo->deviceIndex << "\n";
   dumpPipelineOptions(&pipelineInfo->options, dumpFile);
 #if VKI_RAY_TRACING
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   // Output shader library binary
   if (pipelineInfo->shaderLibrary.codeSize > 0) {
     MetroHash::Hash hash = {};
@@ -793,8 +794,9 @@ void PipelineDumper::dumpComputeStateInfo(const ComputePipelineBuildInfo *pipeli
 
     std::string shaderLibraryName = getSpirvBinaryFileName(&hash);
     dumpFile << "shaderLibrary = " << shaderLibraryName << "\n";
-    dumpRayTracingRtState(&pipelineInfo->rtState, dumpFile);
   }
+#endif
+  dumpRayTracingRtState(&pipelineInfo->rtState, dumpDir, dumpFile);
 #endif
 }
 
@@ -883,9 +885,11 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "numSamples = " << pipelineInfo->rsState.numSamples << "\n";
   dumpFile << "pixelShaderSamples = " << pipelineInfo->rsState.pixelShaderSamples << "\n";
   dumpFile << "samplePatternIdx = " << pipelineInfo->rsState.samplePatternIdx << "\n";
+  dumpFile << "rasterStream = " << pipelineInfo->rsState.rasterStream << "\n";
   dumpFile << "usrClipPlaneMask = " << static_cast<unsigned>(pipelineInfo->rsState.usrClipPlaneMask) << "\n";
   dumpFile << "alphaToCoverageEnable = " << pipelineInfo->cbState.alphaToCoverageEnable << "\n";
   dumpFile << "dualSourceBlendEnable = " << pipelineInfo->cbState.dualSourceBlendEnable << "\n";
+  dumpFile << "dualSourceBlendDynamic = " << pipelineInfo->cbState.dualSourceBlendDynamic << "\n";
 
   for (unsigned i = 0; i < MaxColorTargets; ++i) {
     if (pipelineInfo->cbState.target[i].format != VK_FORMAT_UNDEFINED) {
@@ -917,6 +921,7 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "enableEarlyCompile = " << pipelineInfo->enableEarlyCompile << "\n";
   dumpPipelineOptions(&pipelineInfo->options, dumpFile);
 #if VKI_RAY_TRACING
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   // Output shader library binary
   if (pipelineInfo->shaderLibrary.codeSize > 0) {
     MetroHash::Hash hash = {};
@@ -926,8 +931,9 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
 
     std::string shaderLibraryName = getSpirvBinaryFileName(&hash);
     dumpFile << "shaderLibrary = " << shaderLibraryName << "\n";
-    dumpRayTracingRtState(&pipelineInfo->rtState, dumpFile);
   }
+#endif
+  dumpRayTracingRtState(&pipelineInfo->rtState, dumpDir, dumpFile);
 #endif
   dumpFile << "\n\n";
 
@@ -1045,6 +1051,7 @@ void PipelineDumper::dumpRayTracingStateInfo(const RayTracingPipelineBuildInfo *
              << "\n";
   }
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   // Output trace ray shader binary
   MetroHash::Hash hash = {};
   MetroHash64::Hash(reinterpret_cast<const uint8_t *>(pipelineInfo->shaderTraceRay.pCode),
@@ -1053,9 +1060,11 @@ void PipelineDumper::dumpRayTracingStateInfo(const RayTracingPipelineBuildInfo *
 
   std::string traceRayName = getSpirvBinaryFileName(&hash);
   dumpFile << "shaderTraceRay = " << traceRayName << "\n";
+#endif
+
   dumpFile << "maxRecursionDepth = " << pipelineInfo->maxRecursionDepth << "\n";
   dumpFile << "indirectStageMask = " << pipelineInfo->indirectStageMask << "\n";
-  dumpRayTracingRtState(&pipelineInfo->rtState, dumpFile);
+  dumpRayTracingRtState(&pipelineInfo->rtState, dumpDir, dumpFile);
   dumpFile << "payloadSizeMaxInLib = " << pipelineInfo->payloadSizeMaxInLib << "\n";
   dumpFile << "attributeSizeMaxInLib = " << pipelineInfo->attributeSizeMaxInLib << "\n";
   dumpFile << "hasPipelineLibrary = " << pipelineInfo->hasPipelineLibrary << "\n";
@@ -1066,8 +1075,9 @@ void PipelineDumper::dumpRayTracingStateInfo(const RayTracingPipelineBuildInfo *
 // Dumps ray tracing pipeline state info to file.
 //
 // @param rtState : Pipeline ray tracing state
+// @param dumpDir : Directory of pipeline dump
 // @param dumpFile : Pipeline dump file
-void PipelineDumper::dumpRayTracingRtState(const RtState *rtState, std::ostream &dumpStream) {
+void PipelineDumper::dumpRayTracingRtState(const RtState *rtState, const char *dumpDir, std::ostream &dumpStream) {
   dumpStream << "rtState.bvhResDescSize = " << rtState->bvhResDesc.dataSizeInDwords << "\n";
   for (unsigned i = 0; i < rtState->bvhResDesc.dataSizeInDwords; ++i)
     dumpStream << "rtState.bvhResDesc[" << i << "] = " << rtState->bvhResDesc.descriptorData[i] << "\n";
@@ -1125,10 +1135,25 @@ void PipelineDumper::dumpRayTracingRtState(const RtState *rtState, std::ostream 
   dumpStream << "rtState.enableOptimalLdsStackSizeForUnified = " << rtState->enableOptimalLdsStackSizeForUnified
              << "\n";
   dumpStream << "rtState.maxRayLength = " << rtState->maxRayLength << "\n";
+  dumpStream << "rtState.gpurtFeatureFlags = " << rtState->gpurtFeatureFlags << "\n";
+
+  if (rtState->gpurtShaderLibrary.codeSize > 0) {
+    // Output GPURT shader library binary
+    MetroHash::Hash hash = {};
+    MetroHash64::Hash(reinterpret_cast<const uint8_t *>(rtState->gpurtShaderLibrary.pCode),
+                      rtState->gpurtShaderLibrary.codeSize, hash.bytes);
+    DumpSpirvBinary(dumpDir, &rtState->gpurtShaderLibrary, &hash);
+
+    std::string libraryName = getSpirvBinaryFileName(&hash);
+    dumpStream << "rtState.gpurtShaderLibrary = " << libraryName << "\n";
+  }
 
   for (unsigned i = 0; i < RT_ENTRY_FUNC_COUNT; ++i) {
     dumpStream << "rtState.gpurtFuncTable.pFunc[" << i << "] = " << rtState->gpurtFuncTable.pFunc[i] << "\n";
   }
+  dumpStream << "rtState.rtIpVersion = " << rtState->rtIpVersion.major << "." << rtState->rtIpVersion.minor << "\n";
+  dumpStream << "rtState.gpurtOverride = " << rtState->gpurtOverride << "\n";
+  dumpStream << "rtState.rtIpOverride = " << rtState->rtIpOverride << "\n";
 }
 
 // =====================================================================================================================
@@ -1158,7 +1183,8 @@ void PipelineDumper::dumpRayTracingPipelineMetadata(PipelineDumpFile *dumpFile, 
 //
 // @param rtState : Pipeline rtstate
 // @param [in,out] hasher : Haher to generate hash code
-void PipelineDumper::updateHashForRtState(const RtState *rtState, MetroHash64 *hasher) {
+// @param isCacheHash : TRUE if hash is used by the shader cache
+void PipelineDumper::updateHashForRtState(const RtState *rtState, MetroHash64 *hasher, bool isCacheHash) {
   hasher->Update(rtState->nodeStrideShift);
   hasher->Update(rtState->staticPipelineFlags);
   hasher->Update(rtState->triCompressMode);
@@ -1200,15 +1226,29 @@ void PipelineDumper::updateHashForRtState(const RtState *rtState, MetroHash64 *h
   hasher->Update(rtState->enableOptimalLdsStackSizeForUnified);
   hasher->Update(rtState->maxRayLength);
 
-  for (unsigned i = 0; i < RT_ENTRY_FUNC_COUNT; ++i) {
-    size_t funcNameLen = 0;
-    if (rtState->gpurtFuncTable.pFunc[i]) {
-      funcNameLen = strlen(rtState->gpurtFuncTable.pFunc[i]);
-      hasher->Update(funcNameLen);
-      hasher->Update(reinterpret_cast<const uint8_t *>(rtState->gpurtFuncTable.pFunc[i]), funcNameLen);
-    } else {
-      hasher->Update(funcNameLen);
+  if (isCacheHash) {
+    hasher->Update(rtState->gpurtFeatureFlags);
+
+    hasher->Update(rtState->gpurtShaderLibrary.codeSize);
+    if (rtState->gpurtShaderLibrary.codeSize > 0) {
+      hasher->Update(static_cast<const uint8_t *>(rtState->gpurtShaderLibrary.pCode),
+                     rtState->gpurtShaderLibrary.codeSize);
     }
+
+    for (unsigned i = 0; i < RT_ENTRY_FUNC_COUNT; ++i) {
+      size_t funcNameLen = 0;
+      if (rtState->gpurtFuncTable.pFunc[i]) {
+        funcNameLen = strlen(rtState->gpurtFuncTable.pFunc[i]);
+        hasher->Update(funcNameLen);
+        hasher->Update(reinterpret_cast<const uint8_t *>(rtState->gpurtFuncTable.pFunc[i]), funcNameLen);
+      } else {
+        hasher->Update(funcNameLen);
+      }
+    }
+
+    hasher->Update(rtState->rtIpVersion);
+    hasher->Update(rtState->gpurtOverride);
+    hasher->Update(rtState->rtIpOverride);
   }
 }
 
@@ -1274,8 +1314,7 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
     updateHashForFragmentState(pipeline, &hasher, isRelocatableShader);
 
 #if VKI_RAY_TRACING
-  if (pipeline->shaderLibrary.codeSize > 0)
-    updateHashForRtState(&pipeline->rtState, &hasher);
+  updateHashForRtState(&pipeline->rtState, &hasher, isCacheHash);
 #endif
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
@@ -1303,8 +1342,7 @@ MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipe
   updateHashForPipelineOptions(&pipeline->options, &hasher, isCacheHash, isRelocatableShader, UnlinkedStageCompute);
 
 #if VKI_RAY_TRACING
-  if (pipeline->shaderLibrary.codeSize > 0)
-    updateHashForRtState(&pipeline->rtState, &hasher);
+  updateHashForRtState(&pipeline->rtState, &hasher, isCacheHash);
 #endif
   // Relocatable shaders force an unlinked compilation.
   hasher.Update(pipeline->unlinked || isRelocatableShader);
@@ -1350,17 +1388,19 @@ MetroHash::Hash PipelineDumper::generateHashForRayTracingPipeline(const RayTraci
 
   hasher.Update(pipeline->maxRecursionDepth);
   hasher.Update(pipeline->indirectStageMask);
-  updateHashForRtState(&pipeline->rtState, &hasher);
+  updateHashForRtState(&pipeline->rtState, &hasher, isCacheHash);
 
   hasher.Update(pipeline->payloadSizeMaxInLib);
   hasher.Update(pipeline->attributeSizeMaxInLib);
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   if (isCacheHash) {
     hasher.Update(pipeline->shaderTraceRay.codeSize);
     if (pipeline->shaderTraceRay.codeSize > 0) {
       hasher.Update(static_cast<const uint8_t *>(pipeline->shaderTraceRay.pCode), pipeline->shaderTraceRay.codeSize);
     }
   }
+#endif
 
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
@@ -1450,6 +1490,7 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   if (updateHashFromRs) {
     auto rsState = &pipeline->rsState;
     hasher->Update(rsState->usrClipPlaneMask);
+    hasher->Update(rsState->rasterStream);
   }
 
   if (isCacheHash) {
@@ -1495,10 +1536,12 @@ void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo 
     hasher->Update(rsState->innerCoverage);
     hasher->Update(rsState->numSamples);
     hasher->Update(rsState->samplePatternIdx);
+    hasher->Update(rsState->rasterStream);
 
     auto cbState = &pipeline->cbState;
     hasher->Update(cbState->alphaToCoverageEnable);
     hasher->Update(cbState->dualSourceBlendEnable);
+    hasher->Update(cbState->dualSourceBlendDynamic);
     for (unsigned i = 0; i < MaxColorTargets; ++i) {
       hasher->Update(cbState->target[i].channelWriteMask);
       hasher->Update(cbState->target[i].blendEnable);
