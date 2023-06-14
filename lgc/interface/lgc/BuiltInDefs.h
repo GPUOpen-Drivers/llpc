@@ -129,7 +129,6 @@ BUILTIN(NumSamples, BuiltInInternalBase + 8, N, P, i32)
 BUILTIN(SamplePatternIdx, BuiltInInternalBase + 9, N, P, i32)
 BUILTIN(GsWaveId, BuiltInInternalBase + 10, N, G, i32)
 
-// Internal builts-ins for compute input when thread id is swizzled
+// Internal built-ins for compute input when thread id is swizzled
 BUILTIN(UnswizzledLocalInvocationId, BuiltInInternalBase + 11, N, C, i32)
 BUILTIN(UnswizzledLocalInvocationIndex, BuiltInInternalBase + 12, N, C, i32)
-
