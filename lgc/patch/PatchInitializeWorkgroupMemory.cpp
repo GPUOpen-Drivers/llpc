@@ -156,7 +156,7 @@ void PatchInitializeWorkgroupMemory::initializeWithZero(GlobalVariable *lds, Bui
     assert(localInvocationId->getType() == builder.getInt32Ty());
 
     static constexpr unsigned LocalInvocationIdPackMask = 0x3FF;
-    Value *unpackedLocalInvocationId = UndefValue::get(FixedVectorType::get(builder.getInt32Ty(), 3));
+    Value *unpackedLocalInvocationId = PoisonValue::get(FixedVectorType::get(builder.getInt32Ty(), 3));
 
     // X = PackedId[9:0]
     unpackedLocalInvocationId = builder.CreateInsertElement(

@@ -63,7 +63,7 @@ PreservedAnalyses LowerDebugPrintf::run(Module &module, ModuleAnalysisManager &a
       for (auto user : func.users()) {
         if (CallInst *callInst = dyn_cast<CallInst>(user)) {
           Value *resultVal = builder.getInt64(0);
-          if (!isa<PoisonValue>(callInst->getArgOperand(0))) {
+          if (!isa<UndefValue>(callInst->getArgOperand(0)) && !isa<PoisonValue>(callInst->getArgOperand(0))) {
             builder.SetInsertPoint(callInst);
             resultVal = createDebugPrintf(callInst->getArgOperand(0), callInst->getArgOperand(1),
                                           make_range(callInst->arg_begin() + 2, callInst->arg_end()), builder);

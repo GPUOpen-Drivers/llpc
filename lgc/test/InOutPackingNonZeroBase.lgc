@@ -51,7 +51,7 @@ define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !spi
 ; IR-NEXT:    [[TMP7:%.*]] = bitcast i32 [[TMP4]] to float
 ; IR-NEXT:    call void @lgc.output.export.generic.i32.i32.f32(i32 7, i32 0, float [[TMP7]]) #[[ATTR0:[0-9]+]]
 ; IR-NEXT:    [[TMP8:%.*]] = bitcast i32 [[TMP5]] to float
-; IR-NEXT:    [[TMP9:%.*]] = insertelement <2 x float> undef, float [[TMP8]], i64 0
+; IR-NEXT:    [[TMP9:%.*]] = insertelement <2 x float> poison, float [[TMP8]], i64 0
 ; IR-NEXT:    [[TMP10:%.*]] = bitcast i32 [[TMP6]] to float
 ; IR-NEXT:    [[TMP11:%.*]] = insertelement <2 x float> [[TMP9]], float [[TMP10]], i64 1
 ; IR-NEXT:    call void @lgc.output.export.generic.i32.i32.v2f32(i32 8, i32 0, <2 x float> [[TMP11]]) #[[ATTR0]]
@@ -110,7 +110,7 @@ define dllexport spir_func void @lgc.shader.FS.main() local_unnamed_addr #0 !spi
 ; IR-NEXT:    [[TMP16:%.*]] = fadd reassoc nnan nsz arcp contract afn float [[TMP15]], [[TMP2]]
 ; IR-NEXT:    [[TMP17:%.*]] = fadd reassoc nnan nsz arcp contract afn float [[TMP16]], [[TMP1]]
 ; IR-NEXT:    [[TMP18:%.*]] = fadd reassoc nnan nsz arcp contract afn float [[TMP17]], [[TMP0]]
-; IR-NEXT:    [[TMP19:%.*]] = insertelement <4 x float> undef, float [[TMP18]], i64 0
+; IR-NEXT:    [[TMP19:%.*]] = insertelement <4 x float> poison, float [[TMP18]], i64 0
 ; IR-NEXT:    [[TMP20:%.*]] = shufflevector <4 x float> [[TMP19]], <4 x float> poison, <4 x i32> zeroinitializer
 ; IR-NEXT:    call void @lgc.output.export.generic.i32.i32.v4f32(i32 0, i32 0, <4 x float> [[TMP20]]) #[[ATTR0]]
 ; IR-NEXT:    ret void
@@ -135,7 +135,7 @@ define dllexport spir_func void @lgc.shader.FS.main() local_unnamed_addr #0 !spi
   %16 = fadd reassoc nnan nsz arcp contract afn float %15, %2
   %17 = fadd reassoc nnan nsz arcp contract afn float %16, %1
   %18 = fadd reassoc nnan nsz arcp contract afn float %17, %0
-  %19 = insertelement <4 x float> undef, float %18, i64 0
+  %19 = insertelement <4 x float> poison, float %18, i64 0
   %20 = shufflevector <4 x float> %19, <4 x float> poison, <4 x i32> zeroinitializer
   call void (...) @lgc.create.write.generic.output(<4 x float> %20, i32 0, i32 0, i32 0, i32 0, i32 0, i32 undef)
   ret void

@@ -471,7 +471,7 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
           // Ensure we mark spill table usage.
           m_pipelineState->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords);
         } else if (!m_pipelineState->isUnlinked()) {
-          byteOffset = UndefValue::get(builder.getInt32Ty());
+          byteOffset = PoisonValue::get(builder.getInt32Ty());
         } else {
           // Unlinked shader compilation: Use a reloc.
           byteOffset = builder.CreateRelocationConstant(reloc::Pushconst);
@@ -483,7 +483,7 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
           Value *thisReplacementVal = replacementVal;
           if (!thisReplacementVal) {
             // No use of the push constant pointer remains. Just replace with undef.
-            thisReplacementVal = UndefValue::get(call->getType());
+            thisReplacementVal = PoisonValue::get(call->getType());
           } else {
             builder.SetInsertPoint(call);
             thisReplacementVal = builder.CreateBitCast(thisReplacementVal, call->getType());

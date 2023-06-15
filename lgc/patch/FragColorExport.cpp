@@ -129,8 +129,8 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
     }
   }
 
-  const auto undefFloat = UndefValue::get(builder.getFloatTy());
-  const auto undefFloat16x2 = UndefValue::get(FixedVectorType::get(builder.getHalfTy(), 2));
+  const auto undefFloat = PoisonValue::get(builder.getFloatTy());
+  const auto undefFloat16x2 = PoisonValue::get(FixedVectorType::get(builder.getHalfTy(), 2));
 
   switch (expFmt) {
   case EXP_FORMAT_32_R: {
@@ -544,7 +544,7 @@ void LowerFragColorExport::updateFragColors(CallInst *callInst, ColorExportValue
   auto &expFragColor = expFragColors[hwColorTarget];
 
   while (component + compCount > expFragColor.value.size())
-    expFragColor.value.push_back(UndefValue::get(compTy));
+    expFragColor.value.push_back(PoisonValue::get(compTy));
 
   for (unsigned i = 0; i < compCount; ++i)
     expFragColor.value[component + i] = outputComps[i];
@@ -581,7 +581,7 @@ Value *LowerFragColorExport::getOutputValue(ArrayRef<Value *> expFragColor, unsi
   else {
     const auto compTy = expFragColor[0]->getType();
 
-    output = UndefValue::get(FixedVectorType::get(compTy, compCount));
+    output = PoisonValue::get(FixedVectorType::get(compTy, compCount));
     for (unsigned i = 0; i < compCount; ++i) {
       assert(expFragColor[i]->getType() == compTy);
       output = builder.CreateInsertElement(output, expFragColor[i], i);
@@ -668,7 +668,7 @@ Value *LowerFragColorExport::generateReturn(Function *fragEntryPoint, BuilderBas
   addFunctionArgs(fragEntryPoint, retTy, {}, {});
 
   // Now build the return value.
-  Value *retVal = UndefValue::get(retTy);
+  Value *retVal = PoisonValue::get(retTy);
   unsigned returnLocation = 0;
   for (unsigned idx = 0; idx < m_info.size(); ++idx) {
     const ColorExportInfo &info = m_info[idx];
@@ -737,10 +737,10 @@ void LowerFragColorExport::collectExportInfoForBuiltinOutput(Function *module, B
   }
 
   auto &builtInUsage = m_resUsage->builtInUsage.fs;
-  auto undef = UndefValue::get(Type::getFloatTy(*m_context));
-  Value *fragDepth = undef;
-  Value *fragStencilRef = undef;
-  Value *sampleMask = undef;
+  auto poison = PoisonValue::get(Type::getFloatTy(*m_context));
+  Value *fragDepth = poison;
+  Value *fragStencilRef = poison;
+  Value *sampleMask = poison;
 
   unsigned channelMask = 0x1; // Always export gl_FragDepth
   if (m_fragDepth) {
@@ -770,7 +770,7 @@ void LowerFragColorExport::collectExportInfoForBuiltinOutput(Function *module, B
   info.ty = FixedVectorType::get(builder.getFloatTy(), 4);
   m_info.push_back(info);
 
-  Value *output = UndefValue::get(info.ty);
+  Value *output = PoisonValue::get(info.ty);
   output = builder.CreateInsertElement(output, fragDepth, static_cast<uint64_t>(0));
   output = builder.CreateInsertElement(output, fragStencilRef, 1);
   output = builder.CreateInsertElement(output, sampleMask, 2);
@@ -783,14 +783,14 @@ void LowerFragColorExport::collectExportInfoForBuiltinOutput(Function *module, B
 // @param builder : The builder object that will be used to create new instructions.
 CallInst *FragColorExport::addDummyExport(BuilderBase &builder) {
   auto zero = ConstantFP::get(builder.getFloatTy(), 0.0);
-  auto undef = UndefValue::get(builder.getFloatTy());
+  auto poison = PoisonValue::get(builder.getFloatTy());
   Value *args[] = {
       builder.getInt32(EXP_TARGET_MRT_0), // tgt
       builder.getInt32(0x1),              // en
       zero,                               // src0
-      undef,                              // src1
-      undef,                              // src2
-      undef,                              // src3
+      poison,                             // src1
+      poison,                             // src2
+      poison,                             // src3
       builder.getFalse(),                 // done
       builder.getTrue()                   // vm
   };
@@ -826,7 +826,7 @@ void FragColorExport::setDoneFlag(Value *exportInst, BuilderBase &builder) {
 Value *FragColorExport::dualSourceSwizzle(BuilderBase &builder) {
   Value *result0[4], *result1[4];
   unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageFragment);
-  auto undefFloat = UndefValue::get(builder.getFloatTy());
+  auto undefFloat = PoisonValue::get(builder.getFloatTy());
 
   Value *threadId =
       builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {builder.getInt32(-1), builder.getInt32(0)});
@@ -916,7 +916,7 @@ void FragColorExport::generateExportInstructions(ArrayRef<lgc::ColorExportInfo> 
         lastExport = currentExport;
       }
     } else {
-      auto undef = UndefValue::get(Type::getFloatTy(*m_context));
+      auto poison = PoisonValue::get(Type::getFloatTy(*m_context));
       Value *fragDepth = builder.CreateExtractElement(output, static_cast<uint64_t>(0));
       Value *fragStencilRef = builder.CreateExtractElement(output, 1);
       Value *sampleMask = builder.CreateExtractElement(output, 2);
@@ -926,7 +926,7 @@ void FragColorExport::generateExportInstructions(ArrayRef<lgc::ColorExportInfo> 
           fragDepth,                      // src0
           fragStencilRef,                 // src1
           sampleMask,                     // src2
-          undef,                          // src3
+          poison,                         // src3
           builder.getFalse(),             // done
           builder.getTrue()               // vm
       };

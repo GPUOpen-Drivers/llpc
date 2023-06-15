@@ -207,10 +207,10 @@ Value *BuilderBase::CreateMapToInt32(MapToInt32Func mapFunc, ArrayRef<Value *> m
     SmallVector<Value *, 4> newMappedArgs;
 
     Type *const vectorType = FixedVectorType::get(type, type->getPrimitiveSizeInBits() == 16 ? 2 : 4);
-    Value *const undef = PoisonValue::get(vectorType);
+    Value *const poison = PoisonValue::get(vectorType);
 
     for (Value *const mappedArg : mappedArgs) {
-      Value *const newMappedArg = CreateInsertElement(undef, mappedArg, static_cast<uint64_t>(0));
+      Value *const newMappedArg = CreateInsertElement(poison, mappedArg, static_cast<uint64_t>(0));
       newMappedArgs.push_back(CreateBitCast(newMappedArg, getInt32Ty()));
     }
 

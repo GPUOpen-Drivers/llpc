@@ -451,7 +451,7 @@ void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
     }
 
     // Reconstruct the output value from each component
-    Value *outputValue = UndefValue::get(FixedVectorType::get(builder.getFloatTy(), locDwordSize));
+    Value *outputValue = PoisonValue::get(FixedVectorType::get(builder.getFloatTy(), locDwordSize));
     for (auto &compValueInfo : outputLocCompValue[newLoc]) {
       const unsigned newComp = compValueInfo.first;
       auto compValue = compValueInfo.second;
@@ -607,7 +607,7 @@ Value *PatchCopyShader::loadValueFromGsVsRing(Type *loadTy, unsigned location, u
     coherent.bits.slc = true;
   }
 
-  Value *loadValue = UndefValue::get(loadTy);
+  Value *loadValue = PoisonValue::get(loadTy);
 
   for (unsigned i = 0; i < elemCount; ++i) {
     Value *ringOffset = calcGsVsRingOffsetForInput(location + i / 4, component + i % 4, streamId, builder);

@@ -29,7 +29,7 @@ define amdgpu_gfx float @uniform_select(<4 x i32> inreg %desc0, <4 x i32> inreg 
 define amdgpu_gfx float @divergent_select(<4 x i32> inreg %desc0, <4 x i32> inreg %desc1, i1 %sel) !lgc.shaderstage !0 {
 ; CHECK-LABEL: @divergent_select(
 ; CHECK-NEXT:    [[PTR_0:%.*]] = select i1 [[SEL:%.*]], <4 x i32> [[DESC0:%.*]], <4 x i32> [[DESC1:%.*]]
-; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <4 x i32> [[PTR_0]], <4 x i32> undef, <2 x i32> <i32 0, i32 1>
+; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <4 x i32> [[PTR_0]], <4 x i32> poison, <2 x i32> <i32 0, i32 1>
 ; CHECK-NEXT:    [[TMP2:%.*]] = and <2 x i32> [[TMP1]], <i32 -1, i32 65535>
 ; CHECK-NEXT:    [[TMP3:%.*]] = bitcast <2 x i32> [[TMP2]] to i64
 ; CHECK-NEXT:    [[TMP4:%.*]] = inttoptr i64 [[TMP3]] to ptr addrspace(1)
@@ -50,7 +50,7 @@ define amdgpu_gfx float @divergent_select(<4 x i32> inreg %desc0, <4 x i32> inre
 define amdgpu_gfx float @divergent_select1(<4 x i32> %desc0, <4 x i32> inreg %desc1, i1 inreg %sel) !lgc.shaderstage !0 {
 ; CHECK-LABEL: @divergent_select1(
 ; CHECK-NEXT:    [[PTR_0:%.*]] = select i1 [[SEL:%.*]], <4 x i32> [[DESC0:%.*]], <4 x i32> [[DESC1:%.*]]
-; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <4 x i32> [[PTR_0]], <4 x i32> undef, <2 x i32> <i32 0, i32 1>
+; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <4 x i32> [[PTR_0]], <4 x i32> poison, <2 x i32> <i32 0, i32 1>
 ; CHECK-NEXT:    [[TMP2:%.*]] = and <2 x i32> [[TMP1]], <i32 -1, i32 65535>
 ; CHECK-NEXT:    [[TMP3:%.*]] = bitcast <2 x i32> [[TMP2]] to i64
 ; CHECK-NEXT:    [[TMP4:%.*]] = inttoptr i64 [[TMP3]] to ptr addrspace(1)
@@ -71,7 +71,7 @@ define amdgpu_gfx float @divergent_select1(<4 x i32> %desc0, <4 x i32> inreg %de
 define amdgpu_gfx float @divergent_select2(<4 x i32> inreg %desc0, <4 x i32> %desc1, i1 inreg %sel) !lgc.shaderstage !0 {
 ; CHECK-LABEL: @divergent_select2(
 ; CHECK-NEXT:    [[PTR_0:%.*]] = select i1 [[SEL:%.*]], <4 x i32> [[DESC0:%.*]], <4 x i32> [[DESC1:%.*]]
-; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <4 x i32> [[PTR_0]], <4 x i32> undef, <2 x i32> <i32 0, i32 1>
+; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <4 x i32> [[PTR_0]], <4 x i32> poison, <2 x i32> <i32 0, i32 1>
 ; CHECK-NEXT:    [[TMP2:%.*]] = and <2 x i32> [[TMP1]], <i32 -1, i32 65535>
 ; CHECK-NEXT:    [[TMP3:%.*]] = bitcast <2 x i32> [[TMP2]] to i64
 ; CHECK-NEXT:    [[TMP4:%.*]] = inttoptr i64 [[TMP3]] to ptr addrspace(1)
@@ -131,7 +131,7 @@ define amdgpu_gfx float @divergent_input0_phi(<4 x i32> %desc0, <4 x i32> inreg 
 ; CHECK-NEXT:    br label [[TAIL]]
 ; CHECK:       tail:
 ; CHECK-NEXT:    [[PTR_0:%.*]] = phi <4 x i32> [ [[DESC0:%.*]], [[A]] ], [ [[DESC1:%.*]], [[B]] ]
-; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <4 x i32> [[PTR_0]], <4 x i32> undef, <2 x i32> <i32 0, i32 1>
+; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <4 x i32> [[PTR_0]], <4 x i32> poison, <2 x i32> <i32 0, i32 1>
 ; CHECK-NEXT:    [[TMP2:%.*]] = and <2 x i32> [[TMP1]], <i32 -1, i32 65535>
 ; CHECK-NEXT:    [[TMP3:%.*]] = bitcast <2 x i32> [[TMP2]] to i64
 ; CHECK-NEXT:    [[TMP4:%.*]] = inttoptr i64 [[TMP3]] to ptr addrspace(1)
@@ -167,7 +167,7 @@ define amdgpu_gfx float @divergent_input1_phi(<4 x i32> inreg %desc0, <4 x i32> 
 ; CHECK-NEXT:    br label [[TAIL]]
 ; CHECK:       tail:
 ; CHECK-NEXT:    [[PTR_0:%.*]] = phi <4 x i32> [ [[DESC0:%.*]], [[A]] ], [ [[DESC1:%.*]], [[B]] ]
-; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <4 x i32> [[PTR_0]], <4 x i32> undef, <2 x i32> <i32 0, i32 1>
+; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <4 x i32> [[PTR_0]], <4 x i32> poison, <2 x i32> <i32 0, i32 1>
 ; CHECK-NEXT:    [[TMP2:%.*]] = and <2 x i32> [[TMP1]], <i32 -1, i32 65535>
 ; CHECK-NEXT:    [[TMP3:%.*]] = bitcast <2 x i32> [[TMP2]] to i64
 ; CHECK-NEXT:    [[TMP4:%.*]] = inttoptr i64 [[TMP3]] to ptr addrspace(1)
@@ -203,7 +203,7 @@ define amdgpu_gfx float @divergent_sync_phi(<4 x i32> inreg %desc0, <4 x i32> in
 ; CHECK-NEXT:    br label [[TAIL]]
 ; CHECK:       tail:
 ; CHECK-NEXT:    [[PTR_0:%.*]] = phi <4 x i32> [ [[DESC0:%.*]], [[A]] ], [ [[DESC1:%.*]], [[B]] ]
-; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <4 x i32> [[PTR_0]], <4 x i32> undef, <2 x i32> <i32 0, i32 1>
+; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <4 x i32> [[PTR_0]], <4 x i32> poison, <2 x i32> <i32 0, i32 1>
 ; CHECK-NEXT:    [[TMP2:%.*]] = and <2 x i32> [[TMP1]], <i32 -1, i32 65535>
 ; CHECK-NEXT:    [[TMP3:%.*]] = bitcast <2 x i32> [[TMP2]] to i64
 ; CHECK-NEXT:    [[TMP4:%.*]] = inttoptr i64 [[TMP3]] to ptr addrspace(1)

@@ -221,7 +221,7 @@ Value *ShaderSystemValues::getTessCoord() {
     tessCoordZ =
         primitiveMode == PrimitiveMode::Triangles ? tessCoordZ : ConstantFP::get(Type::getFloatTy(*m_context), 0.0f);
 
-    m_tessCoord = UndefValue::get(FixedVectorType::get(Type::getFloatTy(*m_context), 3));
+    m_tessCoord = PoisonValue::get(FixedVectorType::get(Type::getFloatTy(*m_context), 3));
     m_tessCoord = InsertElementInst::Create(m_tessCoord, tessCoordX, ConstantInt::get(Type::getInt32Ty(*m_context), 0),
                                             "", insertPos);
     m_tessCoord = InsertElementInst::Create(m_tessCoord, tessCoordY, ConstantInt::get(Type::getInt32Ty(*m_context), 1),
@@ -240,7 +240,7 @@ Value *ShaderSystemValues::getEsGsOffsets() {
     auto insertPos = &*m_entryPoint->front().getFirstInsertionPt();
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
 
-    m_esGsOffsets = UndefValue::get(FixedVectorType::get(Type::getInt32Ty(*m_context), 6));
+    m_esGsOffsets = PoisonValue::get(FixedVectorType::get(Type::getInt32Ty(*m_context), 6));
     for (unsigned i = 0; i < InterfaceData::MaxEsGsOffsetCount; ++i) {
       auto esGsOffset =
           getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.gs.esGsOffsets[i], Twine("esGsOffset") + Twine(i));
@@ -498,7 +498,7 @@ Instruction *ShaderSystemValues::makePointer(Value *lowValue, Type *ptrTy, unsig
     extendedPtrValue = m_pc;
   } else {
     // Use constant highValue value.
-    Constant *elements[] = {UndefValue::get(lowValue->getType()), ConstantInt::get(lowValue->getType(), highValue)};
+    Constant *elements[] = {PoisonValue::get(lowValue->getType()), ConstantInt::get(lowValue->getType(), highValue)};
     extendedPtrValue = ConstantVector::get(elements);
   }
   extendedPtrValue = InsertElementInst::Create(extendedPtrValue, lowValue,
