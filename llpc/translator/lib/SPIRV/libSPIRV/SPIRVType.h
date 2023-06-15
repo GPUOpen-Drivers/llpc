@@ -103,10 +103,8 @@ public:
   bool isTypeVectorOrScalarInt(unsigned Bits = 0) const;
   bool isTypeVectorOrScalarFloat(unsigned Bits = 0) const;
   bool isTypeVectorOrScalarBool() const;
-#if VKI_RAY_TRACING
   bool isTypeAccelerationStructureKHR() const;
   bool isTypeRayQueryKHR() const;
-#endif
 };
 
 class SPIRVTypeVoid : public SPIRVType {
@@ -617,7 +615,6 @@ public:
   SPIRVOpaqueGenericType() : SPIRVTypeOpaqueGeneric(TheOpCode) {}
 };
 
-#if VKI_RAY_TRACING
 class SPIRVTypeAccelerationStructureKHR : public SPIRVType {
 public:
   // Complete constructor
@@ -642,7 +639,6 @@ public:
 protected:
   _SPIRV_DEF_DECODE1(Id)
 };
-#endif
 
 template <typename T2, typename T1> bool isType(const T1 *Ty, unsigned Bits = 0) {
   bool Is = Ty->getOpCode() == T2::OC;

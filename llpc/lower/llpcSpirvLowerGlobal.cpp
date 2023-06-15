@@ -250,6 +250,7 @@ bool SpirvLowerGlobal::runImpl(Module &module) {
 
   lowerBufferBlock();
   lowerPushConsts();
+  lowerUniformConstants();
   lowerAliasedVal();
 
   cleanupReturnBlock();
@@ -819,11 +820,9 @@ void SpirvLowerGlobal::lowerInput() {
 // =====================================================================================================================
 // Does lowering operations for SPIR-V outputs, replaces outputs with proxy variables.
 void SpirvLowerGlobal::lowerOutput() {
-#if VKI_RAY_TRACING
   // Note: indirect raytracing does not have output to lower and must return payload value
   if (m_context->getPipelineType() == PipelineType::RayTracing)
     return;
-#endif
 
   m_retBlock = BasicBlock::Create(*m_context, "", m_entryPoint);
   // Invoke handling of "return" instructions or "emit" calls
@@ -2227,8 +2226,8 @@ void SpirvLowerGlobal::lowerBufferBlock() {
   SmallSet<GlobalVariable *, 4> skipGlobals;
 
   for (GlobalVariable &global : m_module->globals()) {
-    // Skip anything that is not a block.
-    if (global.getAddressSpace() != SPIRAS_Uniform)
+    // Skip anything that is not a block or default uniform.
+    if (global.getAddressSpace() != SPIRAS_Uniform || global.hasMetadata(gSPIRVMD::UniformConstant))
       continue;
     if (skipGlobals.count(&global) > 0) {
       globalsToRemove.push_back(&global);
@@ -2595,6 +2594,55 @@ void SpirvLowerGlobal::lowerPushConsts() {
 
       for (Instruction *const inst : usesToReplace)
         inst->replaceUsesOfWith(&global, pushConstants);
+    }
+
+    globalsToRemove.push_back(&global);
+  }
+
+  for (GlobalVariable *const global : globalsToRemove) {
+    global->dropAllReferences();
+    global->eraseFromParent();
+  }
+}
+
+void SpirvLowerGlobal::lowerUniformConstants() {
+  SmallVector<GlobalVariable *, 1> globalsToRemove;
+
+  for (GlobalVariable &global : m_module->globals()) {
+    // Skip anything that is not a default uniform.
+    if (global.getAddressSpace() != SPIRAS_Uniform || !global.hasMetadata(gSPIRVMD::UniformConstant))
+      continue;
+
+    SmallVector<Constant *, 8> constantUsers;
+
+    for (User *const user : global.users()) {
+      if (Constant *const constVal = dyn_cast<Constant>(user))
+        constantUsers.push_back(constVal);
+    }
+
+    for (Constant *const constVal : constantUsers)
+      replaceConstWithInsts(m_context, constVal);
+
+    // A map from the function to the instructions inside it which access the global variable.
+    SmallMapVector<Function *, SmallVector<Instruction *>, 8> globalUsers;
+
+    for (User *const user : global.users()) {
+      Instruction *inst = cast<Instruction>(user);
+      globalUsers[inst->getFunction()].push_back(inst);
+    }
+
+    for (auto &eachFunc : globalUsers) {
+      MDNode *metaNode = global.getMetadata(gSPIRVMD::UniformConstant);
+      auto uniformConstantsSet = mdconst::dyn_extract<ConstantInt>(metaNode->getOperand(0))->getZExtValue();
+      auto uniformConstantsBinding = mdconst::dyn_extract<ConstantInt>(metaNode->getOperand(1))->getZExtValue();
+      auto uniformConstantsOffset = mdconst::dyn_extract<ConstantInt>(metaNode->getOperand(2))->getZExtValue();
+
+      m_builder->SetInsertPointPastAllocas(eachFunc.first);
+      Value *bufferDesc = m_builder->CreateLoadBufferDesc(uniformConstantsSet, uniformConstantsBinding,
+                                                          m_builder->getInt32(0), lgc::Builder::BufferFlagNonConst);
+      Value *newPtr = m_builder->CreateConstInBoundsGEP1_32(m_builder->getInt8Ty(), bufferDesc, uniformConstantsOffset);
+      for (auto *inst : eachFunc.second)
+        inst->replaceUsesOfWith(&global, newPtr);
     }
 
     globalsToRemove.push_back(&global);

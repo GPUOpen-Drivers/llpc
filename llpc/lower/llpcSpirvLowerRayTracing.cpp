@@ -135,6 +135,9 @@ template <> void SpirvLowerRayTracing::createRayTracingFunc<OpTraceRayKHR>(Funct
     auto payloadTy = rayTracingContext->getPayloadType(m_builder);
     Value *payload = m_builder->CreateAlloca(payloadTy, SPIRAS_Private);
 
+    // When constructing the function call, we put a dummy "payload type" argument after all other arguments to indicate
+    // the actual payload size.
+    assert(func->arg_size() == TraceRayParam::TraceRayCount + 1);
     // Copy payload variable to the global payload variable
     auto payloadArg = func->getArg(TraceRayParam::Payload);
     auto payloadTypeArg = func->arg_end() - 1;
@@ -486,7 +489,6 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
 
   // Process traceRays module
   if (m_shaderStage == ShaderStageCompute) {
-    createGlobalStack();
     for (auto funcIt = module.begin(), funcEnd = module.end(); funcIt != funcEnd;) {
       Function *func = &*funcIt++;
       SpirvLowerRayQuery::processLibraryFunction(func);

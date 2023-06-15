@@ -78,6 +78,7 @@ Instruction *BuilderImpl::CreateEndPrimitive(unsigned streamId) {
 // =====================================================================================================================
 // Create a workgroup control barrier.
 Instruction *BuilderImpl::CreateBarrier() {
+
   return CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 }
 

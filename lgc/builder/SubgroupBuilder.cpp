@@ -151,7 +151,8 @@ Value *BuilderImpl::CreateSubgroupAllEqual(Value *const value, const Twine &inst
 // @param instName : Name to give final instruction.
 Value *BuilderImpl::CreateSubgroupBroadcast(Value *const value, Value *const index, const Twine &instName) {
   auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
-    return builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {mappedArgs[0], passthroughArgs[0]});
+    return builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
+                                   {mappedArgs[0], passthroughArgs[0]});
   };
 
   return CreateMapToInt32(mapFunc, value, index);
@@ -167,7 +168,7 @@ Value *BuilderImpl::CreateSubgroupBroadcastWaterfall(Value *const value, Value *
   auto mapFunc = [this](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
                         ArrayRef<Value *> passthroughArgs) -> Value * {
     Value *const readlane =
-        builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {mappedArgs[0], passthroughArgs[0]});
+        builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_readlane, {mappedArgs[0], passthroughArgs[0]});
     return createWaterfallLoop(cast<Instruction>(readlane), 1);
   };
   return CreateMapToInt32(mapFunc, value, index);
@@ -180,7 +181,7 @@ Value *BuilderImpl::CreateSubgroupBroadcastWaterfall(Value *const value, Value *
 // @param instName : Name to give final instruction.
 Value *BuilderImpl::CreateSubgroupBroadcastFirst(Value *const value, const Twine &instName) {
   auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
-    return builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, mappedArgs[0]);
+    return builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, mappedArgs[0]);
   };
 
   return CreateMapToInt32(mapFunc, {BuilderBase::get(*this).CreateInlineAsmSideEffect(value)}, {});
@@ -337,7 +338,7 @@ Value *BuilderImpl::CreateSubgroupShuffle(Value *const value, Value *const index
 
     auto permuteFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
                           ArrayRef<Value *> passthroughArgs) -> Value * {
-      return builder.CreateIntrinsic(Intrinsic::amdgcn_permlane64, {}, {mappedArgs[0]});
+      return builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_permlane64, {mappedArgs[0]});
     };
 
     auto swapped = CreateMapToInt32(permuteFunc, wwmValue, {});
@@ -361,7 +362,7 @@ Value *BuilderImpl::CreateSubgroupShuffle(Value *const value, Value *const index
   auto mapFunc = [this](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
                         ArrayRef<Value *> passthroughArgs) -> Value * {
     Value *const readlane =
-        builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {mappedArgs[0], passthroughArgs[0]});
+        builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_readlane, {mappedArgs[0], passthroughArgs[0]});
     return createWaterfallLoop(cast<Instruction>(readlane), 1);
   };
 
@@ -1108,7 +1109,7 @@ Value *BuilderImpl::CreateSubgroupSwizzleMask(Value *const value, Value *const m
 Value *BuilderImpl::CreateSubgroupWriteInvocation(Value *const inputValue, Value *const writeValue,
                                                   Value *const invocationIndex, const Twine &instName) {
   auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
-    return builder.CreateIntrinsic(Intrinsic::amdgcn_writelane, {},
+    return builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_writelane,
                                    {
                                        mappedArgs[1],
                                        passthroughArgs[0],
@@ -1346,7 +1347,7 @@ Value *BuilderImpl::createPermLaneX16(Value *const origValue, Value *const updat
 // @param updateValue : The value to update with.
 Value *BuilderImpl::createPermLane64(Value *const updateValue) {
   auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
-    return builder.CreateIntrinsic(Intrinsic::amdgcn_permlane64, {}, {mappedArgs[0]});
+    return builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_permlane64, {mappedArgs[0]});
   };
 
   return CreateMapToInt32(mapFunc, updateValue, {});

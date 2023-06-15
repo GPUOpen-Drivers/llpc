@@ -1241,19 +1241,22 @@ Value *BuilderImpl::readCsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
   }
 
   case BuiltInSubgroupId: {
+    GfxIpVersion gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion();
     // From Navi21, it should load the subgroupid from sgpr initialized at wave launch.
-    if (getPipelineState()->getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3})) {
-      Value *multiDispatchInfo =
-          ShaderInputs::getInput(ShaderInput::MultiDispatchInfo, BuilderBase::get(*this), *getLgcContext());
+    {
+      if (gfxIp >= GfxIpVersion({10, 3})) {
+        Value *multiDispatchInfo =
+            ShaderInputs::getInput(ShaderInput::MultiDispatchInfo, BuilderBase::get(*this), *getLgcContext());
 
-      // waveId = dispatchInfo[24:20]
-      Value *waveIdInSubgroup = CreateAnd(CreateLShr(multiDispatchInfo, 20), 0x1F, "waveIdInSubgroup");
-      return waveIdInSubgroup;
-    } else {
-      // Before Navi21, it should read the value before swizzling which is correct to calculate subgroup id.
-      Value *localInvocationIndex = readCsBuiltIn(BuiltInUnswizzledLocalInvocationIndex);
-      unsigned subgroupSize = getPipelineState()->getShaderSubgroupSize(m_shaderStage);
-      return CreateLShr(localInvocationIndex, getInt32(Log2_32(subgroupSize)));
+        // waveId = dispatchInfo[24:20]
+        Value *waveIdInSubgroup = CreateAnd(CreateLShr(multiDispatchInfo, 20), 0x1F, "waveIdInSubgroup");
+        return waveIdInSubgroup;
+      } else {
+        // Before Navi21, it should read the value before swizzling which is correct to calculate subgroup id.
+        Value *localInvocationIndex = readCsBuiltIn(BuiltInUnswizzledLocalInvocationIndex);
+        unsigned subgroupSize = getPipelineState()->getShaderSubgroupSize(m_shaderStage);
+        return CreateLShr(localInvocationIndex, getInt32(Log2_32(subgroupSize)));
+      }
     }
   }
 

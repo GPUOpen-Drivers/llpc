@@ -23,7 +23,7 @@
  #
  #######################################################################################################################
 
-set(LGC_TEST_DEPENDS lgc lgcdis FileCheck count not llvm-mc)
+set(LGC_TEST_DEPENDS lgc lgcdis FileCheck count not llvm-mc llvm-readelf llvm-objdump)
 add_custom_target(lgc-test-depends DEPENDS ${LGC_TEST_DEPENDS})
 set_target_properties(lgc-test-depends PROPERTIES FOLDER "Tests")
 

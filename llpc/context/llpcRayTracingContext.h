@@ -77,6 +77,7 @@ public:
 
   // Set the raytracing shader stages inline/indirect status
   virtual void setIndirectStage(ShaderStage stage) override { m_indirectStageMask |= shaderStageToMask(stage); }
+  void setIndirectPipeline();
 
   virtual void collectPayloadSize(llvm::Type *type, const llvm::DataLayout &dataLayout) override;
   virtual void collectCallableDataSize(llvm::Type *type, const llvm::DataLayout &dataLayout) override;

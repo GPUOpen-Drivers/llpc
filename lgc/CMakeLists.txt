@@ -57,6 +57,9 @@ target_link_libraries(LLVMlgc PUBLIC llvm_dialects)
 
 ### Cached Project Options #############################################################################################
 option(LLPC_BUILD_NAVI12 "LLPC support for NAVI12?" OFF)
+#if VKI_BUILD_NAVI33
+option(LLPC_BUILD_NAVI33 "LLPC support for NAVI33?" OFF)
+#endif
 option(LLPC_BUILD_REMBRANDT "LLPC support for REMBRANDT?" OFF)
 option(LLPC_BUILD_RAPHAEL "LLPC support for RAPHAEL?" OFF)
 option(LLPC_BUILD_MENDOCINO "LLPC support for MENDOCINO?" OFF)
@@ -76,12 +79,23 @@ if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/interface/lgc)
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/interface/lgc")
 endif()
 tablegen(LGC interface/lgc/LgcDialect.h.inc -gen-dialect-decls --dialect lgc
-    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include)
+    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
+    )
 if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/state)
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/state")
 endif()
 tablegen(LGC state/LgcDialect.cpp.inc -gen-dialect-defs --dialect lgc
-    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include)
+    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
+    )
+
+set(LLVM_TARGET_DEFINITIONS interface/lgc/GpurtDialect.td)
+tablegen(LGC interface/lgc/GpurtDialect.h.inc -gen-dialect-decls --dialect lgc.gpurt
+    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
+    )
+tablegen(LGC state/GpurtDialect.cpp.inc -gen-dialect-defs --dialect lgc.gpurt
+    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
+    )
+
 add_public_tablegen_target(LgcDialectTableGen)
 
 add_dependencies(LLVMlgc LgcDialectTableGen)
@@ -109,6 +123,14 @@ target_compile_definitions(LLVMlgc PRIVATE CHIP_HDR_RENOIR)
         CHIP_HDR_NAVI12
     )
   endif()
+#if VKI_BUILD_NAVI33
+  if(LLPC_BUILD_NAVI33)
+    target_compile_definitions(LLVMlgc PRIVATE
+        LLPC_BUILD_NAVI33
+        CHIP_HDR_NAVI33
+    )
+  endif()
+#endif
   if(LLPC_BUILD_REMBRANDT)
     target_compile_definitions(LLVMlgc PRIVATE
         LLPC_BUILD_REMBRANDT
@@ -146,13 +168,6 @@ PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/imported
     ${CMAKE_CURRENT_BINARY_DIR}
 )
-
-#if VKI_RAY_TRACING
-if(VKI_RAY_TRACING)
-  # Public as it is used in the LGC interface.
-  target_compile_definitions(LLVMlgc PUBLIC VKI_RAY_TRACING=1)
-endif()
-#endif
 
 # lgc/builder
 target_sources(LLVMlgc PRIVATE
@@ -226,6 +241,7 @@ target_sources(LLVMlgc PRIVATE
     state/Compiler.cpp
     state/LgcContext.cpp
     state/LgcDialect.cpp
+    state/GpurtDialect.cpp
     state/PalMetadata.cpp
     state/PassManagerCache.cpp
     state/PipelineShaders.cpp
@@ -257,3 +273,4 @@ add_subdirectory(test)
 if (LLPC_BUILD_TESTS)
   add_subdirectory(unittests)
 endif()
+

@@ -36,6 +36,7 @@ namespace llvm {
 
 class Function;
 class Module;
+class BasicBlock;
 
 } // namespace llvm
 
@@ -58,5 +59,8 @@ void setShaderStageToModule(llvm::Module *module, ShaderStage shaderStage);
 
 // Gets the entry point (valid for AMD GPU) of a LLVM module.
 llvm::Function *getEntryPoint(llvm::Module *module);
+
+// Clears the empty block
+llvm::BasicBlock *clearBlock(llvm::Function *func);
 
 } // namespace Llpc

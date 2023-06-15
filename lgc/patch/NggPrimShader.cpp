@@ -990,7 +990,7 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
       // If we distribute primitive ID, there must be at least a s_barrier inserted. Thus, following codes are not
       // needed.
       if (!m_distributedPrimitiveId)
-        m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+        createBarrier();
     }
 
     auto firstWaveInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.waveIdInSubgroup, m_builder.getInt32(0));
@@ -1528,13 +1528,13 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
 
     // The last dword following dwords for all waves (each wave has one dword) stores vertex count of the
     // entire subgroup
-    vertCountInSubgroup = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {},
+    vertCountInSubgroup = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
                                                     {vertCountInWaves, m_builder.getInt32(waveCountInSubgroup)});
 
     if (m_nggControl->compactVertex) {
       // Get vertex count for all waves prior to this wave
-      vertCountInPrevWaves =
-          m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {vertCountInWaves, m_nggInputs.waveIdInSubgroup});
+      vertCountInPrevWaves = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
+                                                       {vertCountInWaves, m_nggInputs.waveIdInSubgroup});
 
       hasCulledVertices = m_builder.CreateICmpULT(vertCountInSubgroup, m_nggInputs.vertCountInSubgroup);
       m_builder.CreateCondBr(m_builder.CreateAnd(drawFlag, hasCulledVertices), compactVertexBlock,
@@ -1623,7 +1623,8 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
     // NOTE: Here, we have to promote revised primitive count in subgroup to SGPR since it is treated
     // as an uniform value later. This is similar to the provided primitive count in subgroup that is
     // a system value.
-    primCountInSubgroup = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primCountInSubgroup);
+    primCountInSubgroup =
+        m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, primCountInSubgroup);
 
     vertCountInSubgroup =
         m_builder.CreateSelect(fullyCulled, m_builder.getInt32(dummyExportCount),
@@ -1632,7 +1633,8 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
     // NOTE: Here, we have to promote revised vertex count in subgroup to SGPR since it is treated as
     // an uniform value later, similar to what we have done for the revised primitive count in
     // subgroup.
-    vertCountInSubgroup = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertCountInSubgroup);
+    vertCountInSubgroup =
+        m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, vertCountInSubgroup);
 
     m_builder.CreateBr(checkSendGsAllocReqBlock);
   }
@@ -2246,12 +2248,12 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
 
       // The last dword following dwords for all waves (each wave has one dword) stores GS output vertex count of the
       // entire subgroup
-      auto vertCountInSubgroup = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {},
+      auto vertCountInSubgroup = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
                                                            {vertCountInWaves, m_builder.getInt32(waveCountInSubgroup)});
 
       // Get output vertex count for all waves prior to this wave
-      vertCountInPrevWaves =
-          m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {vertCountInWaves, m_nggInputs.waveIdInSubgroup});
+      vertCountInPrevWaves = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
+                                                       {vertCountInWaves, m_nggInputs.waveIdInSubgroup});
 
       auto hasCulledVertices = m_builder.CreateICmpULT(vertCountInSubgroup, m_nggInputs.vertCountInSubgroup);
 
@@ -6409,13 +6411,13 @@ void NggPrimShader::processSwXfb(ArrayRef<Argument *> args) {
 
     for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
       if (bufferActive[i]) {
-        streamOutOffsets[i] =
-            m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {xfbStatInfo, m_builder.getInt32(i)});
+        streamOutOffsets[i] = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
+                                                        {xfbStatInfo, m_builder.getInt32(i)});
         streamOutOffsets[i] = m_builder.CreateAdd(m_streamOutBufOffsets[i], streamOutOffsets[i]);
         streamOutOffsets[i] = m_builder.CreateShl(streamOutOffsets[i], 2);
       }
     }
-    auto numPrimsToWrite = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {},
+    auto numPrimsToWrite = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
                                                      {xfbStatInfo, m_builder.getInt32(MaxTransformFeedbackBuffers)});
 
     auto validPrimitive = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, numPrimsToWrite);
@@ -6793,12 +6795,12 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
 
       // The last dword following dwords for all waves (each wave has one dword) stores GS output primitive count of
       // the entire subgroup
-      primCountInSubgroup[i] = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {},
+      primCountInSubgroup[i] = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
                                                          {primCountInWaves, m_builder.getInt32(waveCountInSubgroup)});
 
       // Get output primitive count for all waves prior to this wave
-      primCountInPrevWaves[i] =
-          m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {primCountInWaves, m_nggInputs.waveIdInSubgroup});
+      primCountInPrevWaves[i] = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
+                                                          {primCountInWaves, m_nggInputs.waveIdInSubgroup});
     }
 
     m_builder.CreateCondBr(drawFlag[firstActiveStream], compactPrimitiveIndexBlock[firstActiveStream],
@@ -7002,8 +7004,8 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
         readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInWave, PrimShaderLdsRegion::XfbStats);
     for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
       if (bufferActive[i]) {
-        streamOutOffsets[i] =
-            m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {xfbStatInfo, m_builder.getInt32(i)});
+        streamOutOffsets[i] = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
+                                                        {xfbStatInfo, m_builder.getInt32(i)});
         streamOutOffsets[i] = m_builder.CreateAdd(m_streamOutBufOffsets[i], streamOutOffsets[i]);
         streamOutOffsets[i] = m_builder.CreateShl(streamOutOffsets[i], 2);
       }
@@ -7011,8 +7013,9 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
 
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
       if (streamActive[i]) {
-        numPrimsToWrite[i] = m_builder.CreateIntrinsic(
-            Intrinsic::amdgcn_readlane, {}, {xfbStatInfo, m_builder.getInt32(MaxTransformFeedbackBuffers + i)});
+        numPrimsToWrite[i] =
+            m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
+                                      {xfbStatInfo, m_builder.getInt32(MaxTransformFeedbackBuffers + i)});
       }
     }
 
@@ -7683,12 +7686,19 @@ PHINode *NggPrimShader::createPhi(ArrayRef<std::pair<Value *, BasicBlock *>> inc
 }
 
 // =====================================================================================================================
-// Create LDS fence and barrier to guarantee the synchronization of LDS operations.
+// Create both LDS fence and barrier to guarantee the synchronization of LDS operations.
 void NggPrimShader::createFenceAndBarrier() {
   SyncScope::ID syncScope = m_builder.getContext().getOrInsertSyncScopeID("workgroup");
   m_builder.CreateFence(AtomicOrdering::Release, syncScope);
-  m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+  createBarrier();
   m_builder.CreateFence(AtomicOrdering::Acquire, syncScope);
+}
+
+// =====================================================================================================================
+// Create LDS barrier to guarantee the synchronization of LDS operations.
+void NggPrimShader::createBarrier() {
+
+  m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 }
 
 // =====================================================================================================================

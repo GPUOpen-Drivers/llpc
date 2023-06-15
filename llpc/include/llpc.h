@@ -49,14 +49,11 @@ using Vkgc::OutputAllocFunc;
 using Vkgc::PipelineOptions;
 using Vkgc::PipelineShaderInfo;
 using Vkgc::PipelineShaderOptions;
-using Vkgc::ResourceMappingData;
-using Vkgc::ResourceMappingRootNode;
-using Vkgc::StaticDescriptorValue;
-#if VKI_RAY_TRACING
 using Vkgc::RayTracingPipelineBuildInfo;
-#endif
+using Vkgc::ResourceMappingData;
 using Vkgc::ResourceMappingNode;
 using Vkgc::ResourceMappingNodeType;
+using Vkgc::ResourceMappingRootNode;
 using Vkgc::ResourceNodeData;
 using Vkgc::Result;
 using Vkgc::ShaderHash;
@@ -64,45 +61,41 @@ using Vkgc::ShaderModuleData;
 using Vkgc::ShaderModuleEntryData;
 using Vkgc::ShaderModuleUsage;
 using Vkgc::ShaderStage;
+using Vkgc::ShaderStageBit;
 using Vkgc::ShaderStageCompute;
+using Vkgc::ShaderStageComputeBit;
 using Vkgc::ShaderStageCopyShader;
 using Vkgc::ShaderStageCount;
 using Vkgc::ShaderStageCountInternal;
 using Vkgc::ShaderStageFragment;
+using Vkgc::ShaderStageFragmentBit;
 using Vkgc::ShaderStageGeometry;
+using Vkgc::ShaderStageGeometryBit;
 using Vkgc::ShaderStageGfxCount;
 using Vkgc::ShaderStageInvalid;
 using Vkgc::ShaderStageMesh;
 using Vkgc::ShaderStageNativeStageCount;
-using Vkgc::ShaderStageTask;
-#if VKI_RAY_TRACING
 using Vkgc::ShaderStageRayTracingAnyHit;
+using Vkgc::ShaderStageRayTracingAnyHitBit;
 using Vkgc::ShaderStageRayTracingCallable;
+using Vkgc::ShaderStageRayTracingCallableBit;
 using Vkgc::ShaderStageRayTracingClosestHit;
+using Vkgc::ShaderStageRayTracingClosestHitBit;
 using Vkgc::ShaderStageRayTracingIntersect;
+using Vkgc::ShaderStageRayTracingIntersectBit;
 using Vkgc::ShaderStageRayTracingMiss;
+using Vkgc::ShaderStageRayTracingMissBit;
 using Vkgc::ShaderStageRayTracingRayGen;
-#endif
-using Vkgc::ShaderStageBit;
-using Vkgc::ShaderStageComputeBit;
-using Vkgc::ShaderStageFragmentBit;
-using Vkgc::ShaderStageGeometryBit;
+using Vkgc::ShaderStageRayTracingRayGenBit;
 using Vkgc::ShaderStageTask;
 using Vkgc::ShaderStageTaskBit;
 using Vkgc::ShaderStageTessControl;
-using Vkgc::ShaderStageTessEval;
-using Vkgc::ShaderStageVertex;
-#if VKI_RAY_TRACING
-using Vkgc::ShaderStageRayTracingAnyHitBit;
-using Vkgc::ShaderStageRayTracingCallableBit;
-using Vkgc::ShaderStageRayTracingClosestHitBit;
-using Vkgc::ShaderStageRayTracingIntersectBit;
-using Vkgc::ShaderStageRayTracingMissBit;
-using Vkgc::ShaderStageRayTracingRayGenBit;
-#endif
 using Vkgc::ShaderStageTessControlBit;
+using Vkgc::ShaderStageTessEval;
 using Vkgc::ShaderStageTessEvalBit;
+using Vkgc::ShaderStageVertex;
 using Vkgc::ShaderStageVertexBit;
+using Vkgc::StaticDescriptorValue;
 using Vkgc::WaveBreakSize;
 
 static const unsigned MaxViewports = 16;
@@ -148,8 +141,6 @@ struct ComputePipelineBuildOut {
   CacheAccessInfo stageCacheAccess;    ///< Shader cache access status i.e., hit, miss, or not checked
 };
 
-#if VKI_RAY_TRACING
-
 /// Represents output of building a ray tracing pipeline.
 struct RayTracingPipelineBuildOut {
   unsigned pipelineBinCount;                           ///< Output pipeline binary data count
@@ -158,7 +149,6 @@ struct RayTracingPipelineBuildOut {
   Vkgc::RayTracingShaderPropertySet shaderPropSet;     ///< Output property of a set of shader
   bool hasTraceRay;                                    ///< Output whether have traceray module
 };
-#endif
 
 /// Defines callback function used to lookup shader cache info in an external cache
 typedef Result (*ShaderCacheGetValue)(const void *pClientData, uint64_t hash, void *pValue, size_t *pValueLen);
@@ -221,7 +211,6 @@ protected:
   virtual ~IShaderCache() {}
 };
 
-#if VKI_RAY_TRACING
 // Users of LLPC may implement this interface to allow the compiler to request additional threads.
 //
 // Lifetime of this object:
@@ -252,7 +241,6 @@ public:
   // Wait for all tasks to complete. Called from main thread.
   virtual void WaitForTasks() = 0;
 };
-#endif
 
 // =====================================================================================================================
 /// Represents the interfaces of a pipeline compiler.
@@ -336,7 +324,7 @@ public:
   /// @returns : Result::Success if successful. Other return codes indicate failure.
   virtual Result BuildComputePipeline(const ComputePipelineBuildInfo *pPipelineInfo,
                                       ComputePipelineBuildOut *pPipelineOut, void *pPipelineDumpFile = nullptr) = 0;
-#if VKI_RAY_TRACING
+
   /// Build ray tracing pipeline from the specified info.
   ///
   /// @param [in]  pPipelineInfo  Info to build this ray tracing pipeline
@@ -346,7 +334,6 @@ public:
   virtual Result BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pPipelineInfo,
                                          RayTracingPipelineBuildOut *pPipelineOut, void *pPipelineDumpFile = nullptr,
                                          IHelperThreadProvider *pHelperThreadProvider = nullptr) = 0;
-#endif
 
 #if LLPC_ENABLE_SHADER_CACHE
   /// Creates a shader cache object with the requested properties.
