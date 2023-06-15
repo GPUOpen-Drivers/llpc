@@ -1964,6 +1964,7 @@ unsigned BuilderImpl::getBuiltInValidMask(BuiltInKind builtIn, bool isOutput) {
     C = shaderStageToMask(ShaderStageCompute),
     D = shaderStageToMask(ShaderStageTessEval),
     H = shaderStageToMask(ShaderStageTessControl),
+    G = shaderStageToMask(ShaderStageGeometry),
     HD = shaderStageToMask(ShaderStageTessControl, ShaderStageTessEval),
     HDG = shaderStageToMask(ShaderStageTessControl, ShaderStageTessEval, ShaderStageGeometry),
     HDGP = shaderStageToMask(ShaderStageTessControl, ShaderStageTessEval, ShaderStageGeometry, ShaderStageFragment),

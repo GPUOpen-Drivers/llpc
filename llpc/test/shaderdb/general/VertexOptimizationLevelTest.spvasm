@@ -25,7 +25,7 @@
 ; PIPE-DAG:  options.optimizationLevel = 2
 
 ; Check that we can compile with the pipeline dump as input and get the same optimization level
-; RUN: grep -l "options.optimizationLevel = 1" %t/dump/PipelineVsFs_0x*.pipe \
+; RUN: grep -l "options.optimizationLevel = 1" %t/dump/PipelineLibVs_0x*.pipe \
 ; RUN:   | xargs amdllpc -v %gfxip -o %t.recompile.elf \
 ; RUN:   | FileCheck --match-full-lines -check-prefix=RECOMPILE %s
 ; RECOMPILE-LABEL: TargetMachine optimization level = 1

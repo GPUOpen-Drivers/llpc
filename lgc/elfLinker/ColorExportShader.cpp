@@ -105,7 +105,7 @@ Module *ColorExportShader::generate() {
   // Create the function.
   Function *colorExportFunc = createColorExportFunc();
 
-  // Process each vertex input.
+  // Process each fragment output.
   std::unique_ptr<FragColorExport> fragColorExport(new FragColorExport(&getContext(), m_pipelineState));
   auto ret = cast<ReturnInst>(colorExportFunc->back().getTerminator());
   BuilderBase builder(ret);
@@ -121,7 +121,7 @@ Module *ColorExportShader::generate() {
 }
 
 // =====================================================================================================================
-// Create module with function for the fetch shader. On return, the function contains only the code to copy the
+// Create module with function for the color export shader. On return, the function contains only the code to copy the
 // wave dispatch SGPRs and VGPRs to the return value.
 Function *ColorExportShader::createColorExportFunc() {
   // Create the module

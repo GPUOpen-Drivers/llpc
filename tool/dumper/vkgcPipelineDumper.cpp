@@ -131,7 +131,14 @@ void *VKAPI_CALL IPipelineDumper::BeginPipelineDump(const PipelineDumpOptions *d
 #endif
   else {
     assert(pipelineInfo.pGraphicsInfo);
-    hash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo.pGraphicsInfo, false, false);
+    UnlinkedShaderStage unlinkedStage = UnlinkedStageCount;
+    if (pipelineInfo.pGraphicsInfo->unlinked) {
+      if (pipelineInfo.pGraphicsInfo->fs.pModuleData)
+        unlinkedStage = UnlinkedStageFragment;
+      else
+        unlinkedStage = UnlinkedStageVertexProcess;
+    }
+    hash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo.pGraphicsInfo, false, false, unlinkedStage);
   }
 
   return PipelineDumper::BeginPipelineDump(dumpOptions, pipelineInfo, MetroHash::compact64(&hash));
@@ -362,7 +369,22 @@ std::string PipelineDumper::getPipelineInfoFileName(PipelineBuildInfo pipelineIn
   else {
     assert(pipelineInfo.pGraphicsInfo);
     const char *fileNamePrefix = nullptr;
-    if (pipelineInfo.pGraphicsInfo->tes.pModuleData && pipelineInfo.pGraphicsInfo->gs.pModuleData)
+    if (pipelineInfo.pGraphicsInfo->unlinked) {
+      if (pipelineInfo.pGraphicsInfo->task.pModuleData)
+        fileNamePrefix = "PipelineLibTask";
+      else if (pipelineInfo.pGraphicsInfo->vs.pModuleData)
+        fileNamePrefix = "PipelineLibVs";
+      else if (pipelineInfo.pGraphicsInfo->tcs.pModuleData)
+        fileNamePrefix = "PipelineLibTcs";
+      else if (pipelineInfo.pGraphicsInfo->tes.pModuleData)
+        fileNamePrefix = "PipelineLibTes";
+      else if (pipelineInfo.pGraphicsInfo->gs.pModuleData)
+        fileNamePrefix = "PipelineLibGs";
+      else if (pipelineInfo.pGraphicsInfo->mesh.pModuleData)
+        fileNamePrefix = "PipelineLibMesh";
+      else
+        fileNamePrefix = "PipelineLibFs";
+    } else if (pipelineInfo.pGraphicsInfo->tes.pModuleData && pipelineInfo.pGraphicsInfo->gs.pModuleData)
       fileNamePrefix = "PipelineGsTess";
     else if (pipelineInfo.pGraphicsInfo->gs.pModuleData)
       fileNamePrefix = "PipelineGs";
