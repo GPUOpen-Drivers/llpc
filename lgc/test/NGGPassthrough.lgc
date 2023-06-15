@@ -6,7 +6,7 @@
 define dllexport spir_func void @lgc.shader.VS.main() !spirv.ExecutionModel !3 !lgc.shaderstage !4 {
 ; CHECK-NOT: s_sendmsg
   %1 = insertelement <4 x float> <float poison, float poison, float poison, float 1.000000e+00>, float 0.0, i64 0
-  call void (...) @lgc.create.write.builtin.output(<4 x float> %1, i32 0, i32 0, i32 undef, i32 undef)
+  call void (...) @lgc.create.write.builtin.output(<4 x float> %1, i32 0, i32 0, i32 poison, i32 poison)
   ret void
 }
 
