@@ -551,9 +551,45 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryInitializeKHR>
 
     Type *gpuAddrAsPtrTy = PointerType::get(*m_context, SPIRAS_Global);
     auto loadPtr = m_builder->CreateIntToPtr(gpuAddr, gpuAddrAsPtrTy);
-
     auto loadTy = FixedVectorType::get(Type::getInt32Ty(*m_context), 2);
-    auto loadValue = m_builder->CreateLoad(loadTy, loadPtr);
+
+    Value *loadValue = nullptr;
+
+    if (m_context->getPipelineContext()->getPipelineOptions()->extendedRobustness.nullDescriptor) {
+      // We should not load from a null descriptor (if it is allowed).
+      // We do:
+      // .entry:
+      //   ...
+      //   %gpuAddr = ...
+      //   %loadPtr = inttoptr %gpuAddr
+      //   %isDescValid = icmp ne %gpuAddr, 0
+      //   br %isDescValid, label %.loadDescriptor, label %.continue
+      //
+      // .loadDescriptor:
+      //   %AS = load %loadPtr
+      //
+      // .continue:
+      //   %loadVal = phi [ %AS, %.loadDescriptor ], [ 0, %.entry ]
+
+      BasicBlock *loadDescriptorBlock = BasicBlock::Create(*m_context, ".loadDescriptor", func);
+      BasicBlock *continueBlock = BasicBlock::Create(*m_context, ".continue", func);
+
+      auto isDescValid = m_builder->CreateICmpNE(gpuAddr, m_builder->getInt64(0));
+      m_builder->CreateCondBr(isDescValid, loadDescriptorBlock, continueBlock);
+
+      m_builder->SetInsertPoint(loadDescriptorBlock);
+      auto accelerationStructureAddr = m_builder->CreateLoad(loadTy, loadPtr);
+      m_builder->CreateBr(continueBlock);
+
+      m_builder->SetInsertPoint(continueBlock);
+      auto phi = m_builder->CreatePHI(loadTy, 2);
+      phi->addIncoming(accelerationStructureAddr, loadDescriptorBlock);
+      auto zero = m_builder->getInt32(0);
+      phi->addIncoming(ConstantVector::get({zero, zero}), entryBlock);
+      loadValue = phi;
+    } else {
+      loadValue = m_builder->CreateLoad(loadTy, loadPtr);
+    }
 
     sceneAddLow = m_builder->CreateExtractElement(loadValue, uint64_t(0));
     sceneAddHigh = m_builder->CreateExtractElement(loadValue, 1);
