@@ -54,7 +54,6 @@
  */
 
 #include "lgc/patch/PatchEntryPointMutate.h"
-#include "LgcCpsDialect.h"
 #include "lgc/LgcContext.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/AbiUnlinked.h"
@@ -65,8 +64,9 @@
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/AddressExtender.h"
 #include "lgc/util/BuilderBase.h"
-#include "llvm/ADT/SmallVector.h"
+#include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/Analysis/AliasAnalysis.h" // for MemoryEffects
+#include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -170,7 +170,268 @@ bool PatchEntryPointMutate::runImpl(Module &module, PipelineShadersResult &pipel
   // Fix up shader input uses to use entry args.
   shaderInputs.fixupUses(*m_module, m_pipelineState);
 
+  m_cpsShaderInputCache.clear();
   return true;
+}
+
+constexpr unsigned continuationStackAlignment = 4;
+
+// =====================================================================================================================
+// Split the input into pieces of dword.
+static void splitIntoDwords(const DataLayout &layout, IRBuilder<> &builder, ArrayRef<Value *> input,
+                            SmallVector<Value *> &output) {
+  for (auto *x : input) {
+    Type *xType = x->getType();
+    if (isa<StructType>(xType)) {
+      StructType *structTy = cast<StructType>(xType);
+      for (unsigned idx = 0; idx < structTy->getNumElements(); idx++)
+        splitIntoDwords(layout, builder, builder.CreateExtractValue(x, idx), output);
+    } else if (isa<ArrayType>(xType)) {
+      llvm_unreachable("Array type not supported yet.");
+    } else if (auto *vecTy = dyn_cast<FixedVectorType>(xType)) {
+      Type *scalarTy = vecTy->getElementType();
+      assert((scalarTy->getPrimitiveSizeInBits() & 0x3) == 0);
+      unsigned scalarBytes = scalarTy->getPrimitiveSizeInBits() / 8;
+      if (scalarBytes < 4) {
+        // Use shufflevector for types like <i8 x 6>?
+        llvm_unreachable("vector of type smaller than dword not supported yet.");
+      } else {
+        for (unsigned idx = 0; idx < (unsigned)vecTy->getNumElements(); idx++)
+          splitIntoDwords(layout, builder, builder.CreateExtractElement(x, idx), output);
+      }
+    } else {
+      // pointer or primitive types
+      assert(xType->isPointerTy() || xType->isIntegerTy() || xType->isFloatTy());
+      unsigned size = layout.getTypeSizeInBits(xType).getFixedValue();
+      if (xType->isPointerTy())
+        x = builder.CreatePtrToInt(x, builder.getIntNTy(size));
+
+      if (size > 32) {
+        assert(size % 32 == 0);
+        Value *vecDword = builder.CreateBitCast(x, FixedVectorType::get(builder.getInt32Ty(), size / 32));
+        splitIntoDwords(layout, builder, vecDword, output);
+      } else {
+        output.push_back(x);
+      }
+    }
+  }
+}
+
+// =====================================================================================================================
+// Merge the input into a single struct type.
+static Value *mergeIntoStruct(IRBuilder<> &builder, ArrayRef<Value *> input) {
+  SmallVector<Type *> types;
+  for (auto *v : input)
+    types.push_back(v->getType());
+  Type *structTy = StructType::get(builder.getContext(), types);
+  Value *val = PoisonValue::get(structTy);
+  for (size_t e = 0; e != input.size(); ++e)
+    val = builder.CreateInsertValue(val, input[e], e);
+  return val;
+}
+
+// =====================================================================================================================
+// Construct vectors of dword, the input should be i32 type.
+static Value *mergeDwordsIntoVector(IRBuilder<> &builder, ArrayRef<Value *> input) {
+  unsigned numElem = input.size();
+  Type *vecTy = FixedVectorType::get(builder.getInt32Ty(), numElem);
+  Value *vec = PoisonValue::get(vecTy);
+  unsigned idx = 0;
+  for (auto *src : input)
+    vec = builder.CreateInsertElement(vec, src, idx++);
+  return vec;
+}
+
+// =====================================================================================================================
+// Lower calls to cps function as well as return instructions.
+//
+// @param func : the function to be processed
+bool PatchEntryPointMutate::lowerCpsOps(Function *func) {
+  // TODO: Get all return instruction in cps functions as well.
+  SmallVector<CallInst *> cpsOps;
+  struct Payload {
+    SmallVectorImpl<CallInst *> &calls;
+  };
+  Payload payload = {cpsOps};
+  static auto addCpsCall = [](Payload &payload, CallInst *op) { payload.calls.push_back(op); };
+
+  static auto visitor = llvm_dialects::VisitorBuilder<Payload>()
+                            .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+                            .add<cps::JumpOp>([](auto &payload, auto &op) { addCpsCall(payload, &op); })
+                            .build();
+  visitor.visit(payload, *func);
+
+  bool isCpsFunc = cps::isCpsFunction(*func);
+  if (!isCpsFunc && cpsOps.empty())
+    return false;
+
+  unsigned numUserdata;
+  if (!isCpsFunc) {
+    SmallVector<Type *, 8> argTys;
+    SmallVector<std::string, 8> argNames;
+    generateEntryPointArgTys(nullptr, argTys, argNames, 0);
+    numUserdata = argTys.size();
+  } else {
+    numUserdata = m_cpsShaderInputCache.getTypes().size();
+  }
+
+  for (auto *call : cpsOps)
+    if (auto *jumpOp = dyn_cast<cps::JumpOp>(call))
+      lowerCpsJump(func, jumpOp, numUserdata);
+
+  return true;
+}
+
+// =====================================================================================================================
+// Mutate the argument list of the cps function
+//
+// Mutate the function type from:
+// void @func({} state, args...)
+// into:
+// amdgpu_cs_chain void @func(<N x i32> inreg %userdata, i32 %vcr, ptr addrspace(5) %vsp, args...)
+//
+// @param func : the cps function to be mutated
+// @param userDataTys : the types of user data arguments
+// @param argNames : the name string of the user data arguments
+Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type *> userDataTys,
+                                                  ArrayRef<std::string> argNames) {
+  Value *state = func->getArg(0);
+  const DataLayout &layout = func->getParent()->getDataLayout();
+  IRBuilder<> builder(func->getContext());
+  SmallVector<Type *> newArgTys;
+  newArgTys.append(userDataTys.begin(), userDataTys.end());
+  newArgTys.append({builder.getInt32Ty(), builder.getPtrTy(ADDR_SPACE_PRIVATE)});
+  auto remainingArgs = func->getFunctionType()->params().drop_front(1);
+  newArgTys.append(remainingArgs.begin(), remainingArgs.end());
+  FunctionType *newFuncTy = FunctionType::get(builder.getVoidTy(), newArgTys, false);
+  auto newFunc = Function::Create(newFuncTy, func->getLinkage(), func->getName(), func->getParent());
+  newFunc->copyAttributesFrom(func);
+  newFunc->copyMetadata(func, 0);
+
+  // Setup the argument attributes
+  AttributeSet emptyAttrSet;
+  AttributeSet inRegAttrSet = emptyAttrSet.addAttribute(func->getContext(), Attribute::InReg);
+
+  AttributeList oldAttrs = func->getAttributes();
+  SmallVector<AttributeSet, 8> argAttrs;
+  for (unsigned idx = 0; idx != userDataTys.size(); ++idx)
+    argAttrs.push_back(inRegAttrSet);
+  // %vcr attribute
+  argAttrs.push_back(emptyAttrSet);
+  // %vsp attribute
+  argAttrs.push_back(emptyAttrSet);
+  for (unsigned idx = 1; idx != func->getFunctionType()->getNumParams(); ++idx)
+    argAttrs.push_back(oldAttrs.getParamAttrs(idx));
+  newFunc->setAttributes(
+      AttributeList::get(func->getContext(), oldAttrs.getFnAttrs(), oldAttrs.getRetAttrs(), argAttrs));
+
+  // Move all the basic blocks from the original function into the new one.
+  newFunc->splice(newFunc->begin(), func);
+
+  builder.SetInsertPointPastAllocas(newFunc);
+  Value *vspStorage = builder.CreateAlloca(builder.getPtrTy(ADDR_SPACE_PRIVATE), ADDR_SPACE_PRIVATE);
+  m_funcCpsStackMap[newFunc] = vspStorage;
+
+  Value *vsp = newFunc->getArg(userDataTys.size() + 1);
+  if (!state->getType()->isEmptyTy()) {
+    // Get stack address of pushed state and load it from continuation stack.
+    unsigned stateSize = layout.getTypeStoreSize(state->getType());
+    vsp = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), vsp, -alignTo(stateSize, continuationStackAlignment));
+    Value *newState = builder.CreateAlignedLoad(state->getType(), vsp, Align(continuationStackAlignment), "cps.state");
+    state->replaceAllUsesWith(newState);
+  }
+  builder.CreateStore(vsp, vspStorage);
+
+  // Set name string for arguments.
+  SmallVector<std::string> newArgNames(argNames);
+  newArgNames.append({"vcr", "vsp"});
+  for (unsigned idx = 0; idx < newArgNames.size(); idx++)
+    newFunc->getArg(idx)->setName(newArgNames[idx]);
+
+  // Replace old arguments with new ones (excluding the very first `state`).
+  unsigned argOffsetInNew = userDataTys.size() + 2;
+  for (unsigned idx = 1; idx < func->arg_size(); idx++) {
+    Value *oldArg = func->getArg(idx);
+    Value *newArg = newFunc->getArg(idx - 1 + argOffsetInNew);
+    newArg->setName(oldArg->getName());
+    oldArg->replaceAllUsesWith(newArg);
+  }
+  setShaderStage(newFunc, getShaderStage(func));
+  newFunc->setAlignment(Align(64));
+  // FIXME: set calling convention to amdgpu_cs_chain.
+  return newFunc;
+}
+
+// =====================================================================================================================
+// Lower cps.jump into amdgcn.cs.chain
+// This assume the arguments of the parent function are setup correctly.
+//
+// @param parent : the parent function of the cps.jump operation
+// @param jumpOp : the call instruction of cps.jump
+// @param numUserdata: the number of user data inputs to the parent function
+void PatchEntryPointMutate::lowerCpsJump(Function *parent, cps::JumpOp *jumpOp, unsigned numUserdata) {
+  IRBuilder<> builder(parent->getContext());
+  const DataLayout &layout = parent->getParent()->getDataLayout();
+  // Translate @lgc.cps.jump(CR %target, i32 %levels, T %state, ...) into:
+  // @llvm.amdgcn.cs.chain(ptr %fn, i{32,64} %exec, T %sgprs, U %vgprs, i32 immarg %flags, ...)
+  Value *vcr = jumpOp->getTarget();
+  builder.SetInsertPoint(jumpOp);
+
+  // Pushing state onto stack and get new vsp.
+  Value *state = jumpOp->getState();
+  Value *vsp = builder.CreateAlignedLoad(builder.getPtrTy(ADDR_SPACE_PRIVATE), m_funcCpsStackMap[parent],
+                                         Align(continuationStackAlignment));
+  if (!state->getType()->isEmptyTy()) {
+    unsigned stateSize = layout.getTypeStoreSize(state->getType());
+    builder.CreateStore(state, vsp);
+    // Make vsp properly aligned across cps function.
+    stateSize = alignTo(stateSize, continuationStackAlignment);
+    vsp = builder.CreateConstGEP1_32(builder.getInt8Ty()->getPointerTo(ADDR_SPACE_PRIVATE), vsp, stateSize);
+  }
+
+  // Add extra args specific to the target function.
+  SmallVector<Value *> remainingArgs;
+  for (Value *arg : drop_begin(jumpOp->args(), 3))
+    remainingArgs.push_back(arg);
+
+  // Packing VGPR arguments {vcr, vsp, args...}
+  SmallVector<Value *> vgprArgs;
+  vgprArgs.push_back(vcr);
+  vgprArgs.push_back(vsp);
+  splitIntoDwords(layout, builder, remainingArgs, vgprArgs);
+
+  Value *vgprArg = mergeIntoStruct(builder, vgprArgs);
+
+  // Packing SGPR arguments(user data) into vector of dwords.
+  SmallVector<Value *> userData;
+  for (unsigned idx = 0; idx != numUserdata; ++idx)
+    userData.push_back(parent->getArg(idx));
+
+  SmallVector<Value *> userDataDwords;
+  splitIntoDwords(layout, builder, userData, userDataDwords);
+  Value *userDataVec = mergeDwordsIntoVector(builder, userDataDwords);
+
+  // Mask off metadata bits and setup jump target.
+  Value *addr32 = builder.CreateAnd(vcr, builder.getInt32(~0x3fu));
+  AddressExtender addressExtender(parent);
+  Value *jumpTarget = addressExtender.extend(addr32, builder.getInt32(HighAddrPc), builder.getPtrTy(), builder);
+
+  unsigned waveSize = m_pipelineState->getShaderWaveSize(m_shaderStage);
+  Value *execMask = builder.CreateIntrinsic(Intrinsic::amdgcn_ballot, builder.getIntNTy(waveSize), builder.getTrue());
+
+  SmallVector<Type *> chainArgTys = {builder.getPtrTy(), builder.getIntNTy(waveSize), userDataVec->getType(),
+                                     vgprArg->getType(), builder.getInt32Ty()};
+  FunctionType *funcTy = FunctionType::get(builder.getVoidTy(), chainArgTys, true);
+  auto func = Function::Create(funcTy, GlobalValue::ExternalLinkage, "llvm.amdgcn.cs.chain", parent->getParent());
+
+  SmallVector<Value *> chainArgs;
+  chainArgs.push_back(jumpTarget);
+  chainArgs.push_back(execMask);
+  chainArgs.push_back(userDataVec);
+  chainArgs.push_back(vgprArg);
+  chainArgs.push_back(builder.getInt32(0));
+  builder.CreateCall(func, chainArgs);
+  jumpOp->eraseFromParent();
 }
 
 // =====================================================================================================================
@@ -728,15 +989,23 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
     // Determine what args need to be added on to all functions.
     SmallVector<Type *, 20> shaderInputTys;
     SmallVector<std::string, 20> shaderInputNames;
-    uint64_t inRegMask =
-        generateEntryPointArgTys(shaderInputs, shaderInputTys, shaderInputNames, origType->getNumParams());
+    uint64_t inRegMask;
 
     // Create the new function and transfer code and attributes to it.
-    Function *newFunc =
-        addFunctionArgs(origFunc, origType->getReturnType(), shaderInputTys, shaderInputNames, inRegMask, true);
-    const bool isEntryPoint = isShaderEntryPoint(newFunc);
-    newFunc->setCallingConv(isEntryPoint ? CallingConv::AMDGPU_CS : CallingConv::AMDGPU_Gfx);
-
+    Function *newFunc = nullptr;
+    if (cps::isCpsFunction(*origFunc)) {
+      assert(origType->getReturnType()->isVoidTy());
+      if (!m_cpsShaderInputCache.isAvailable()) {
+        generateEntryPointArgTys(nullptr, shaderInputTys, shaderInputNames, 0);
+        m_cpsShaderInputCache.set(shaderInputTys, shaderInputNames);
+      }
+      newFunc = lowerCpsFunction(origFunc, m_cpsShaderInputCache.getTypes(), m_cpsShaderInputCache.getNames());
+    } else {
+      inRegMask = generateEntryPointArgTys(shaderInputs, shaderInputTys, shaderInputNames, origType->getNumParams());
+      newFunc = addFunctionArgs(origFunc, origType->getReturnType(), shaderInputTys, shaderInputNames, inRegMask, true);
+      const bool isEntryPoint = isShaderEntryPoint(newFunc);
+      newFunc->setCallingConv(isEntryPoint ? CallingConv::AMDGPU_CS : CallingConv::AMDGPU_Gfx);
+    }
     // Set Attributes on new function.
     setFuncAttrs(newFunc);
 
@@ -749,14 +1018,15 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
       *use = bitCastFunc;
 
     // Remove original function.
-    int argOffset = origType->getNumParams();
     origFunc->eraseFromParent();
 
+    if (lowerCpsOps(newFunc))
+      continue;
+    int argOffset = origType->getNumParams();
     if (isComputeWithCalls())
       processCalls(*newFunc, shaderInputTys, shaderInputNames, inRegMask, argOffset);
   }
 }
-
 // =====================================================================================================================
 // Process all real function calls and passes arguments to them.
 //
@@ -977,7 +1247,7 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
 // unmerged shader stage. The code here needs to ensure that it gets the same SGPR user data layout for
 // both shaders that are going to be merged (VS-HS, VS-GS if no tessellation, ES-GS).
 //
-// @param shaderInputs : ShaderInputs object representing hardware-provided shader inputs
+// @param shaderInputs : ShaderInputs object representing hardware-provided shader inputs (may be null)
 // @param [out] argTys : The argument types for the new function type
 // @param [out] argNames : The argument names corresponding to the argument types
 // @returns inRegMask : "Inreg" bit mask for the arguments, with a bit set to indicate that the corresponding
@@ -1077,7 +1347,8 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
   inRegMask = (1ull << argTys.size()) - 1;
 
   // Push the fixed system (not user data) register args.
-  inRegMask |= shaderInputs->getShaderArgTys(m_pipelineState, m_shaderStage, argTys, argNames, argOffset);
+  if (shaderInputs)
+    inRegMask |= shaderInputs->getShaderArgTys(m_pipelineState, m_shaderStage, argTys, argNames, argOffset);
 
   if (m_pipelineState->useRegisterFieldFormat()) {
     constexpr unsigned NumUserSgprs = 32;

@@ -30,10 +30,12 @@
  */
 #pragma once
 
+#include "LgcCpsDialect.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
 
 namespace lgc {
@@ -136,6 +138,11 @@ private:
 
   uint64_t pushFixedShaderArgTys(llvm::SmallVectorImpl<llvm::Type *> &argTys) const;
 
+  bool lowerCpsOps(llvm::Function *func);
+  llvm::Function *lowerCpsFunction(llvm::Function *func, llvm::ArrayRef<llvm::Type *> userDataTys,
+                                   llvm::ArrayRef<std::string> argNames);
+  void lowerCpsJump(llvm::Function *parent, cps::JumpOp *jumpOp, unsigned numUserdata);
+
   // Get UserDataUsage struct for the merged shader stage that contains the given shader stage
   UserDataUsage *getUserDataUsage(ShaderStage stage);
 
@@ -150,6 +157,34 @@ private:
   bool m_computeWithCalls = false;          // Whether this is compute pipeline with calls or compute library
   // Per-HW-shader-stage gathered user data usage information.
   llvm::SmallVector<std::unique_ptr<UserDataUsage>, ShaderStageCount> m_userDataUsage;
+
+  class CpsShaderInputCache {
+  public:
+    void clear() {
+      if (m_cpsCacheAvailable) {
+        m_cpsShaderInputTypes.clear();
+        m_cpsShaderInputNames.clear();
+        m_cpsCacheAvailable = false;
+      }
+    }
+    void set(llvm::ArrayRef<llvm::Type *> types, llvm::ArrayRef<std::string> names) {
+      assert(!m_cpsCacheAvailable);
+      m_cpsCacheAvailable = true;
+      m_cpsShaderInputTypes.append(types.begin(), types.end());
+      m_cpsShaderInputNames.append(names.begin(), names.end());
+    }
+    llvm::ArrayRef<llvm::Type *> getTypes() { return m_cpsShaderInputTypes; }
+    llvm::ArrayRef<std::string> getNames() { return m_cpsShaderInputNames; }
+    bool isAvailable() { return m_cpsCacheAvailable; }
+
+  private:
+    llvm::SmallVector<llvm::Type *> m_cpsShaderInputTypes;
+    llvm::SmallVector<std::string> m_cpsShaderInputNames;
+    bool m_cpsCacheAvailable = false;
+  };
+  CpsShaderInputCache m_cpsShaderInputCache;
+  // Map from a cps function to the alloca where we are holding the latest continuation stack pointer.
+  llvm::DenseMap<llvm::Function *, llvm::Value *> m_funcCpsStackMap;
 };
 
 } // namespace lgc
