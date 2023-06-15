@@ -148,7 +148,12 @@ void LgcContext::initialize() {
   setOptionDefault("enable-phi-of-ops", "0");
   setOptionDefault("simplifycfg-sink-common", "0");
   setOptionDefault("amdgpu-vgpr-index-mode", "1"); // force VGPR indexing on GFX8
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 464446
+  // Old version of the code
   setOptionDefault("amdgpu-atomic-optimizations", "1");
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+#endif
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 463788
   // Old version of the code
 #else
