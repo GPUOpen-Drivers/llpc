@@ -245,6 +245,30 @@ public:
     return 0;
   }
 
+  // Get the number of components of the derivative in one direction for the specified dimension argument.
+  //
+  // @param dim : Image dimension
+  static unsigned getImageDerivativeComponentCount(unsigned dim) {
+    switch (dim) {
+    case Dim1D:
+      return 1;
+    case Dim2D:
+      return 2;
+    case Dim3D:
+      return 3;
+    case DimCube:
+      return 3;
+    case Dim1DArray:
+      return 1;
+    case Dim2DArray:
+      return 2;
+    case DimCubeArray:
+      return 3;
+    }
+    llvm_unreachable("Should never be called!");
+    return 0;
+  }
+
   // Bit settings in flags argument for image methods.
   enum {
     ImageFlagCoherent = 1,                        // Coherent memory access
