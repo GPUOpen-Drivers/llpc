@@ -587,6 +587,106 @@ void PalMetadata::fixUpRegisters() {
       }
     }
   }
+
+  static const std::pair<unsigned, unsigned> ComputeRegRanges[] = {{mmCOMPUTE_USER_DATA_0, 16}};
+  static const std::pair<unsigned, unsigned> Gfx8RegRanges[] = {
+      {mmSPI_SHADER_USER_DATA_PS_0, 16}, {mmSPI_SHADER_USER_DATA_VS_0, 16}, {mmSPI_SHADER_USER_DATA_GS_0, 16},
+      {mmSPI_SHADER_USER_DATA_ES_0, 16}, {mmSPI_SHADER_USER_DATA_HS_0, 16}, {mmSPI_SHADER_USER_DATA_LS_0, 16}};
+  static const std::pair<unsigned, unsigned> Gfx9RegRanges[] = {{mmSPI_SHADER_USER_DATA_PS_0, 32},
+                                                                {mmSPI_SHADER_USER_DATA_VS_0, 32},
+                                                                {mmSPI_SHADER_USER_DATA_ES_0, 32},
+                                                                {mmSPI_SHADER_USER_DATA_HS_0, 32}};
+  static const std::pair<unsigned, unsigned> Gfx10RegRanges[] = {{mmSPI_SHADER_USER_DATA_PS_0, 32},
+                                                                 {mmSPI_SHADER_USER_DATA_VS_0, 32},
+                                                                 {mmSPI_SHADER_USER_DATA_GS_0, 32},
+                                                                 {mmSPI_SHADER_USER_DATA_HS_0, 32}};
+
+  ArrayRef<std::pair<unsigned, unsigned>> regRanges = ComputeRegRanges;
+  if (m_pipelineState->isGraphics()) {
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 9)
+      regRanges = Gfx8RegRanges;
+    else if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 9)
+      regRanges = Gfx9RegRanges;
+    else
+      regRanges = Gfx10RegRanges;
+  }
+
+  // First find the descriptor sets and push const nodes.
+  bool isIndirect = m_pipelineState->getOptions().resourceLayoutScheme == ResourceLayoutScheme::Indirect;
+  SmallVector<const ResourceNode *, 4> descSetNodes;
+  const ResourceNode *pushConstNode = nullptr;
+  for (const auto &node : m_pipelineState->getUserDataNodes()) {
+    if (isIndirect) {
+      if (node.concreteType == ResourceNodeType::DescriptorTableVaPtr && !node.innerTable.empty()) {
+        if (node.innerTable[0].concreteType == ResourceNodeType::PushConst) {
+          descSetNodes.resize(std::max(descSetNodes.size(), size_t(1)));
+          descSetNodes[0] = &node;
+        } else {
+          descSetNodes.resize(std::max(descSetNodes.size(), size_t(node.innerTable[0].set + 2)));
+          descSetNodes[node.innerTable[0].set + 1] = &node;
+        }
+      }
+    } else {
+      if (node.concreteType == ResourceNodeType::DescriptorTableVaPtr && !node.innerTable.empty()) {
+        size_t descSet = node.innerTable[0].set;
+        descSetNodes.resize(std::max(descSetNodes.size(), descSet + 1));
+        descSetNodes[descSet] = &node;
+      } else if ((node.concreteType == ResourceNodeType::DescriptorBuffer) ||
+                 (node.concreteType == ResourceNodeType::DescriptorConstBuffer) ||
+                 (node.concreteType == ResourceNodeType::DescriptorBufferCompact) ||
+                 (node.concreteType == ResourceNodeType::DescriptorConstBufferCompact)) {
+        size_t descSet = node.set;
+        if (descSet != InvalidValue) {
+          descSetNodes.resize(std::max(descSetNodes.size(), descSet + 1));
+          descSetNodes[descSet] = &node;
+        }
+      } else if (node.concreteType == ResourceNodeType::PushConst) {
+        pushConstNode = &node;
+      }
+    }
+  }
+
+  // Scan the PAL metadata registers for user data.
+  unsigned userDataLimit = m_userDataLimit->getUInt();
+  for (const std::pair<unsigned, unsigned> &regRange : regRanges) {
+    unsigned reg = regRange.first;
+    unsigned regEnd = reg + regRange.second;
+    // Scan registers [reg,regEnd), the user data registers for one shader stage. If register 0 in that range is
+    // not set, then the shader stage is not in use, so don't bother to scan the others.
+    auto it = m_registers.find(m_document->getNode(reg));
+    if (it != m_registers.end()) {
+      for (;;) {
+        unsigned value = it->second.getUInt();
+        unsigned descSet = value - static_cast<unsigned>(UserDataMapping::DescriptorSet0);
+        if (descSet <= static_cast<unsigned>(UserDataMapping::DescriptorSetMax) -
+                           static_cast<unsigned>(UserDataMapping::DescriptorSet0)) {
+          // This entry is a descriptor set pointer. Replace it with the dword offset for that descriptor set.
+          if (descSet >= descSetNodes.size() || !descSetNodes[descSet])
+            report_fatal_error("Descriptor set " + Twine(descSet) + " not found");
+          value = descSetNodes[descSet]->offsetInDwords;
+          it->second = value;
+          unsigned extent = value + descSetNodes[descSet]->sizeInDwords;
+          userDataLimit = std::max(userDataLimit, extent);
+        } else {
+          unsigned pushConstOffset = value - static_cast<unsigned>(UserDataMapping::PushConst0);
+          if (pushConstOffset <= static_cast<unsigned>(UserDataMapping::DescriptorSetMax) -
+                                     static_cast<unsigned>(UserDataMapping::DescriptorSet0)) {
+            // This entry is a dword in the push constant.
+            if (!pushConstNode || pushConstNode->sizeInDwords <= pushConstOffset)
+              report_fatal_error("Push constant not found or not big enough");
+            value = pushConstNode->offsetInDwords + pushConstOffset;
+            it->second = value;
+            unsigned extent = pushConstNode->offsetInDwords + pushConstNode->sizeInDwords;
+            userDataLimit = std::max(userDataLimit, extent);
+          }
+        }
+        ++it;
+        if (it == m_registers.end() || it->first.getUInt() >= regEnd)
+          break;
+      }
+    }
+  }
+  *m_userDataLimit = userDataLimit;
 }
 
 // =====================================================================================================================
