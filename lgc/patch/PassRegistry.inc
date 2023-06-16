@@ -50,6 +50,8 @@
 #endif
 
 LLPC_MODULE_ANALYSIS("lgc-pipeline-state", PipelineStateWrapper)
+LLPC_MODULE_PASS("print<lgc-pipeline-state>", PipelineStatePrinter)
+LLPC_MODULE_PASS("lgc-pipeline-state-recorder", PipelineStateRecorder)
 
 LLPC_MODULE_PASS("lgc-builder-replayer", BuilderReplayer)
 LLPC_MODULE_PASS("lgc-patch-resource-collect", PatchResourceCollect)
