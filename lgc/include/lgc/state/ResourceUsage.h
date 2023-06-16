@@ -162,7 +162,6 @@ struct ResourceUsage {
   std::unordered_set<uint64_t> descPairs;  // Pairs of descriptor set/binding
   bool resourceWrite = false;              // Whether shader does resource-write operations (UAV)
   bool resourceRead = false;               // Whether shader does resource-read operations (UAV)
-  bool perShaderTable = false;             // Whether per shader stage table is used
   unsigned numSgprsAvailable = UINT32_MAX; // Number of available SGPRs
   unsigned numVgprsAvailable = UINT32_MAX; // Number of available VGPRs
   bool useImages = false;                  // Whether images are used

@@ -5,7 +5,7 @@
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} final pipeline module info
 ; SHADERTEST: "amdgpu-lds-spill-limit-dwords"="1024"
-; SHADERTEST: "amdgpu-work-group-info-arg-no"="3"
+; SHADERTEST: "amdgpu-work-group-info-arg-no"="2"
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

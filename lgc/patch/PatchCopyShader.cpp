@@ -110,7 +110,6 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
     //
     //   void copyShader(
     //     i32 inreg globalTable,
-    //     i32 inreg perShaderTable,
     //     i32 inreg streamOutTable (GFX6-GFX8) / esGsLdsSize (GFX9+),
     //     i32 inreg esGsLdsSize (GFX6-GFX8) / streamOutTable (GFX9+),
     //     i32 inreg streamOutInfo,
@@ -121,10 +120,9 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
     //     i32 inreg streamOutOffset3,
     //     i32 vertexOffset)
     //
-    argTys = {int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty};
-    argInReg = {true, true, true, true, true, true, true, true, true, true, false};
+    argTys = {int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty};
+    argInReg = {true, true, true, true, true, true, true, true, true, false};
     argNames = {"globalTable",
-                "perShaderTable",
                 gfxIp.major <= 8 ? "streamOutTable" : "esGsLdsSize",
                 gfxIp.major <= 8 ? "esGsLdsSize" : "streamOutTable",
                 "streamOutInfo",
