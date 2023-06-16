@@ -321,12 +321,11 @@ Value *BuilderImpl::CreateLoadPushConstantsPtr(Type *returnTy, const Twine &inst
     // Push const is the sub node of DescriptorTableVaPtr.
     if (m_pipelineState->getUserDataNodes().empty()) {
       Value *highHalf = getInt32(HighAddrPc);
-      Value *descPtr =
-          CreateNamedCall(lgcName::DescriptorTableAddr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
-                          {getInt32(unsigned(ResourceNodeType::PushConst)),
-                           getInt32(unsigned(ResourceNodeType::PushConst)),
-                           getInt64(InternalDescriptorSetId), getInt32(0), highHalf},
-                          Attribute::ReadNone);
+      Value *descPtr = CreateNamedCall(lgcName::DescriptorTableAddr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
+                                       {getInt32(unsigned(ResourceNodeType::PushConst)),
+                                        getInt32(unsigned(ResourceNodeType::PushConst)),
+                                        getInt64(InternalDescriptorSetId), getInt32(0), highHalf},
+                                       Attribute::ReadNone);
       return CreateBitCast(descPtr, returnTy);
     }
 
@@ -336,8 +335,8 @@ Value *BuilderImpl::CreateLoadPushConstantsPtr(Type *returnTy, const Twine &inst
     Value *highHalf = getInt32(HighAddrPc);
     Value *descPtr = CreateNamedCall(lgcName::DescriptorTableAddr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
                                      {getInt32(unsigned(ResourceNodeType::PushConst)),
-                                      getInt32(unsigned(ResourceNodeType::PushConst)),
-                                      getInt64(subNode.set), getInt32(subNode.binding), highHalf},
+                                      getInt32(unsigned(ResourceNodeType::PushConst)), getInt64(subNode.set),
+                                      getInt32(subNode.binding), highHalf},
                                      Attribute::ReadNone);
     return CreateBitCast(descPtr, returnTy);
   }
