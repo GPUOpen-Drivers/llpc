@@ -357,10 +357,10 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
           // The user data nodes are available, so we use the offset of the node as the
           // index.
           const ResourceNode *node;
-          node = m_pipelineState->findResourceNode(searchType, set, binding).first;
+          node = m_pipelineState->findResourceNode(searchType, set, binding, stage).first;
           if (!node) {
             // Handle mutable descriptors
-            node = m_pipelineState->findResourceNode(ResourceNodeType::DescriptorMutable, set, binding).first;
+            node = m_pipelineState->findResourceNode(ResourceNodeType::DescriptorMutable, set, binding, stage).first;
           }
           assert(node && "Could not find resource node");
           uint32_t descTableIndex = node - &m_pipelineState->getUserDataNodes().front();
@@ -463,7 +463,7 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
       Value *replacementVal = nullptr;
       if (userDataUsage->pushConstSpill) {
         // At least one use of the push constant pointer remains.
-        const ResourceNode *node = m_pipelineState->findSingleRootResourceNode(ResourceNodeType::PushConst);
+        const ResourceNode *node = m_pipelineState->findSingleRootResourceNode(ResourceNodeType::PushConst, stage);
         Value *byteOffset = nullptr;
         builder.SetInsertPoint(spillTable->getNextNode());
         if (node) {

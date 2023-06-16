@@ -86,11 +86,11 @@ Value *BuilderImpl::CreateLoadBufferDesc(uint64_t descSet, unsigned binding, Val
     else if (flags & BufferFlagAddress)
       abstractType = ResourceNodeType::DescriptorBufferCompact;
 
-    std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding);
+    std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding, m_shaderStage);
     if (!node) {
       // If we can't find the node, assume mutable descriptor and search for any node.
       std::tie(topNode, node) =
-          m_pipelineState->findResourceNode(ResourceNodeType::DescriptorMutable, descSet, binding);
+          m_pipelineState->findResourceNode(ResourceNodeType::DescriptorMutable, descSet, binding, m_shaderStage);
       if (!node) {
         // We did not find the resource node. Return an poison value.
         return PoisonValue::get(getBufferDescTy());
@@ -222,12 +222,13 @@ Value *BuilderImpl::CreateGetDescStride(ResourceNodeType concreteType, ResourceN
   const ResourceNode *topNode = nullptr;
   const ResourceNode *node = nullptr;
   if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
-    std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding);
+    std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding, m_shaderStage);
     if (!node) {
       // If we can't find the node, assume mutable descriptor and search for any node.
       std::tie(topNode, node) =
-          m_pipelineState->findResourceNode(ResourceNodeType::DescriptorMutable, descSet, binding);
-      if (!node && m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding).second) {
+          m_pipelineState->findResourceNode(ResourceNodeType::DescriptorMutable, descSet, binding, m_shaderStage);
+      if (!node &&
+          m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding, m_shaderStage).second) {
         // NOTE: Resource node may be DescriptorTexelBuffer, but it is defined as OpTypeSampledImage in SPIRV,
         // In this case, a caller may search for the DescriptorSampler and not find it. We return nullptr and
         // expect the caller to handle it.
@@ -257,12 +258,13 @@ Value *BuilderImpl::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNode
   const ResourceNode *topNode = nullptr;
   const ResourceNode *node = nullptr;
   if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
-    std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding);
+    std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding, m_shaderStage);
     if (!node) {
       // If we can't find the node, assume mutable descriptor and search for any node.
       std::tie(topNode, node) =
-          m_pipelineState->findResourceNode(ResourceNodeType::DescriptorMutable, descSet, binding);
-      if (!node && m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding).second) {
+          m_pipelineState->findResourceNode(ResourceNodeType::DescriptorMutable, descSet, binding, m_shaderStage);
+      if (!node &&
+          m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding, m_shaderStage).second) {
         // NOTE: Resource node may be DescriptorTexelBuffer, but it is defined as OpTypeSampledImage in SPIRV,
         // In this case, a caller may search for the DescriptorSampler and not find it. We return nullptr and
         // expect the caller to handle it.
@@ -329,7 +331,7 @@ Value *BuilderImpl::CreateLoadPushConstantsPtr(Type *returnTy, const Twine &inst
       return CreateBitCast(descPtr, returnTy);
     }
 
-    const ResourceNode *topNode = m_pipelineState->findPushConstantResourceNode();
+    const ResourceNode *topNode = m_pipelineState->findPushConstantResourceNode(m_shaderStage);
     assert(topNode);
     const ResourceNode subNode = topNode->innerTable[0];
     Value *highHalf = getInt32(HighAddrPc);
