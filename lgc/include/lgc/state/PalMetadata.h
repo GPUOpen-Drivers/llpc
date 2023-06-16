@@ -38,6 +38,7 @@
 #include "lgc/CommonDefs.h"
 #include "lgc/Pipeline.h"
 #include "lgc/state/AbiMetadata.h"
+#include "lgc/state/IntrinsDefs.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 #include <map>
 
@@ -167,8 +168,11 @@ public:
   // Finalize PAL metadata for pipeline, part-pipeline or shader compilation.
   void finalizePipeline(bool isWholePipeline);
 
-  // Updates the PS register information that depends on the exports.
-  void updateSpiShaderColFormat(llvm::ArrayRef<ColorExportInfo> exps, bool hasDepthExpFmtZero, bool killEnabled);
+  // Sets the PS register information that depends on the exports.
+  void setSpiShaderColFormat(llvm::ArrayRef<ExportFormat> expFormats);
+
+  // Updates the CB shader mask information that depends on the exports.
+  void updateCbShaderMask(llvm::ArrayRef<ColorExportInfo> exps);
 
   // Sets the finalized 128-bit cache hash.  The version identifies the version of LLPC used to generate the hash.
   void setFinalized128BitCacheHash(const lgc::Hash128 &finalizedCacheHash, const llvm::VersionTuple &version);

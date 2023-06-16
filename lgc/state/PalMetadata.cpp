@@ -1145,24 +1145,10 @@ llvm::Type *PalMetadata::getLlvmType(StringRef tyName) const {
 // =====================================================================================================================
 // Updates the SPI_SHADER_COL_FORMAT entry.
 //
-void PalMetadata::updateSpiShaderColFormat(ArrayRef<ColorExportInfo> exps, bool hasDepthExpFmtZero, bool killEnabled) {
+void PalMetadata::setSpiShaderColFormat(ArrayRef<ExportFormat> expFormats) {
   unsigned spiShaderColFormat = 0;
-  for (auto &exp : exps) {
-    if (exp.hwColorTarget == MaxColorTargets)
-      continue;
-    unsigned expFormat = m_pipelineState->computeExportFormat(exp.ty, exp.location);
-    spiShaderColFormat |= (expFormat << (4 * exp.hwColorTarget));
-  }
-
-  if (spiShaderColFormat == 0 && hasDepthExpFmtZero) {
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10 || killEnabled) {
-      // NOTE: Hardware requires that fragment shader always exports "something" (color or depth) to the SX.
-      // If both SPI_SHADER_Z_FORMAT and SPI_SHADER_COL_FORMAT are zero, we need to override
-      // SPI_SHADER_COL_FORMAT to export one channel to MRT0. This dummy export format will be masked
-      // off by CB_SHADER_MASK.
-      spiShaderColFormat = SPI_SHADER_32_R;
-    }
-  }
+  for (auto [i, expFormat] : enumerate(expFormats))
+    spiShaderColFormat |= expFormat << (4 * i);
 
   if (m_pipelineState->useRegisterFieldFormat()) {
     auto spiShaderColFormatNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
@@ -1185,6 +1171,37 @@ void PalMetadata::updateSpiShaderColFormat(ArrayRef<ColorExportInfo> exps, bool 
         (spiShaderColFormat >> 28) & 0xF;
   } else {
     setRegister(mmSPI_SHADER_COL_FORMAT, spiShaderColFormat);
+  }
+}
+
+// =====================================================================================================================
+// Updates the CB_SHADER_MASK entry.
+//
+void PalMetadata::updateCbShaderMask(llvm::ArrayRef<ColorExportInfo> exps) {
+  unsigned cbShaderMask = 0;
+  for (auto &exp : exps) {
+    if (exp.hwColorTarget == MaxColorTargets)
+      continue;
+
+    if (m_pipelineState->computeExportFormat(exp.ty, exp.location) != 0) {
+      cbShaderMask |= (0xF << (4 * exp.hwColorTarget));
+    }
+  }
+
+  if (m_pipelineState->useRegisterFieldFormat()) {
+    auto cbShaderMaskNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
+                                .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::CbShaderMask]
+                                .getMap(true);
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output0Enable] = cbShaderMask & 0xF;
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output1Enable] = (cbShaderMask >> 4) & 0xF;
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output2Enable] = (cbShaderMask >> 8) & 0xF;
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output3Enable] = (cbShaderMask >> 12) & 0xF;
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output4Enable] = (cbShaderMask >> 16) & 0xF;
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output5Enable] = (cbShaderMask >> 20) & 0xF;
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output6Enable] = (cbShaderMask >> 24) & 0xF;
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output7Enable] = (cbShaderMask >> 28) & 0xF;
+  } else {
+    setRegister(mmCB_SHADER_MASK, cbShaderMask);
   }
 }
 

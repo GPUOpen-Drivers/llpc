@@ -61,9 +61,6 @@ class FragColorExport {
 public:
   FragColorExport(llvm::LLVMContext *context, PipelineState *pipelineState);
 
-  llvm::Value *handleColorExportInstructions(llvm::Value *output, unsigned int hwColorTarget, BuilderBase &builder,
-                                             ExportFormat expFmt, const bool signedness);
-
   void generateExportInstructions(llvm::ArrayRef<lgc::ColorExportInfo> info, llvm::ArrayRef<llvm::Value *> values,
                                   llvm::ArrayRef<ExportFormat> exportFormat, bool dummyExport, BuilderBase &builder);
   static void setDoneFlag(llvm::Value *exportInst, BuilderBase &builder);
@@ -76,6 +73,9 @@ private:
   FragColorExport() = delete;
   FragColorExport(const FragColorExport &) = delete;
   FragColorExport &operator=(const FragColorExport &) = delete;
+
+  llvm::Value *handleColorExportInstructions(llvm::Value *output, unsigned int hwColorExport, BuilderBase &builder,
+                                             ExportFormat expFmt, const bool signedness);
 
   llvm::Value *convertToHalf(llvm::Value *value, bool signedness, BuilderBase &builder) const;
   llvm::Value *convertToFloat(llvm::Value *value, bool signedness, BuilderBase &builder) const;
