@@ -454,18 +454,19 @@ struct ShaderInOutDecorate {
 /// Metadata for shader block.
 union ShaderBlockMetadata {
   struct {
-    unsigned offset : 32;      // Offset (bytes) in block
-    unsigned IsMatrix : 1;     // Whether it is a matrix
-    unsigned IsRowMajor : 1;   // Whether it is a "row_major" qualified matrix
-    unsigned MatrixStride : 6; // Matrix stride, valid for matrix
-    unsigned Restrict : 1;     // Whether "restrict" qualifier is present
-    unsigned Coherent : 1;     // Whether "coherent" qualifier is present
-    unsigned Volatile : 1;     // Whether "volatile" qualifier is present
-    unsigned NonWritable : 1;  // Whether "readonly" qualifier is present
-    unsigned NonReadable : 1;  // Whether "writeonly" qualifier is present
-    unsigned IsPointer : 1;    // Whether it is a pointer
-    unsigned IsStruct : 1;     // Whether it is a structure
-    unsigned Unused : 17;
+    unsigned offset : 32;                 // Offset (bytes) in block
+    unsigned IsMatrix : 1;                // Whether it is a matrix
+    unsigned IsRowMajor : 1;              // Whether it is a "row_major" qualified matrix
+    unsigned MatrixStride : 6;            // Matrix stride, valid for matrix
+    unsigned Restrict : 1;                // Whether "restrict" qualifier is present
+    unsigned Coherent : 1;                // Whether "coherent" qualifier is present
+    unsigned Volatile : 1;                // Whether "volatile" qualifier is present
+    unsigned NonWritable : 1;             // Whether "readonly" qualifier is present
+    unsigned NonReadable : 1;             // Whether "writeonly" qualifier is present
+    unsigned IsPointer : 1;               // Whether it is a pointer
+    unsigned IsStruct : 1;                // Whether it is a structure
+    unsigned IsAccelerationStructure : 1; // Whether it is an acceleration structure
+    unsigned Unused : 16;
   };
   uint64_t U64All;
 };
