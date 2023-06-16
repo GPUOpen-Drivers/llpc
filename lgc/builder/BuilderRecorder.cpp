@@ -1866,7 +1866,7 @@ Value *Builder::createFMix(Value *x, Value *y, Value *a, const Twine &instName) 
 // @vars: Printf variable parameters
 // @instName : Instance Name
 Value *Builder::CreateDebugPrintf(ArrayRef<Value *> vars, const Twine &instName) {
-  return record(BuilderOpcode::DebugPrintf, getInt64Ty(), vars, instName);
+  return record(BuilderOpcode::DebugPrintf, getVoidTy(), vars, instName);
 }
 
 // =====================================================================================================================

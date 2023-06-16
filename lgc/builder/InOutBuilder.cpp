@@ -1466,7 +1466,7 @@ Value *BuilderImpl::CreateDebugPrintf(ArrayRef<Value *> args, const Twine &instN
   for (auto arg : args)
     argTys.push_back(arg->getType());
 
-  auto funcTy = FunctionType::get(getInt64Ty(), argTys, false);
+  auto funcTy = FunctionType::get(getVoidTy(), argTys, false);
   auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, lgcName::LowerDebugPrintf, module);
   func->addFnAttr(Attribute::NoUnwind);
   return CreateCall(func, args, instName);
