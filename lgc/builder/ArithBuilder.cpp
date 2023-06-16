@@ -834,7 +834,13 @@ Value *BuilderImpl::CreateLdexp(Value *x, Value *exp, const Twine &instName) {
 
   // We need to scalarize this ourselves.
   Value *result = scalarize(x, exp, [this](Value *x, Value *exp) {
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 463519
+    // Old version of the code
+    Value *ldexp = CreateIntrinsic(Intrinsic::amdgcn_ldexp, x->getType(), {x, exp});
+#else
+    // New version of the code (also handles unknown version, which we treat as latest)
     Value *ldexp = CreateIntrinsic(x->getType(), Intrinsic::ldexp, {x, exp});
+#endif
     if (x->getType()->getScalarType()->isDoubleTy()) {
       // NOTE: If LDEXP result is a denormal, we can flush it to zero. This is allowed. For double type, LDEXP
       // instruction does mantissa rounding instead of truncation, which is not expected by SPIR-V spec.
