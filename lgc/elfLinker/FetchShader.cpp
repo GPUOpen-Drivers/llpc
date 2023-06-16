@@ -323,7 +323,7 @@ Function *FetchShader::createFetchFunc() {
 
   // Copy the wave dispatch SGPRs and VGPRs from inputs to outputs.
   builder.SetInsertPoint(&func->back());
-  Value *retVal = UndefValue::get(retTy);
+  Value *retVal = PoisonValue::get(retTy);
   for (unsigned i = 0; i != m_vsEntryRegInfo.sgprCount + m_vsEntryRegInfo.vgprCount; ++i)
     retVal = builder.CreateInsertValue(retVal, func->getArg(i), i);
   builder.CreateRet(retVal);

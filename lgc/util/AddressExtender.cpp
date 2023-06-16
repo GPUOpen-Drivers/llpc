@@ -62,7 +62,7 @@ Instruction *AddressExtender::extend(Value *addr32, Value *highHalf, Type *ptrTy
     ptr = builder.CreateInsertElement(getPc(), addr32, uint64_t(0));
   } else {
     // Extend with given value
-    ptr = builder.CreateInsertElement(UndefValue::get(FixedVectorType::get(builder.getInt32Ty(), 2)), addr32,
+    ptr = builder.CreateInsertElement(PoisonValue::get(FixedVectorType::get(builder.getInt32Ty(), 2)), addr32,
                                       uint64_t(0));
     ptr = builder.CreateInsertElement(ptr, highHalf, 1);
   }
