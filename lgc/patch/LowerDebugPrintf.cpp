@@ -29,9 +29,11 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/LowerDebugPrintf.h"
+#include "lgc/LgcDialect.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
+#include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 #include "llvm/InitializePasses.h"
@@ -54,27 +56,14 @@ PreservedAnalyses LowerDebugPrintf::run(Module &module, ModuleAnalysisManager &a
   LLVM_DEBUG(dbgs() << "Run the pass Lower-debug-printf\n");
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
   m_pipelineState = pipelineState;
-  SmallVector<CallInst *> callees;
-  BuilderBase builder(module.getContext());
-  for (auto &func : module) {
-    auto name = func.getName();
-    if (name.startswith(lgcName::LowerDebugPrintf)) {
-      for (auto user : func.users()) {
-        if (CallInst *callInst = dyn_cast<CallInst>(user)) {
-          if (!isa<PoisonValue>(callInst->getArgOperand(0))) {
-            builder.SetInsertPoint(callInst);
-            createDebugPrintf(callInst->getArgOperand(0), callInst->getArgOperand(1),
-                              make_range(callInst->arg_begin() + 2, callInst->arg_end()), builder);
-          }
-          callees.push_back(callInst);
-        }
-      }
-    }
-  }
 
-  for (auto callInst : callees) {
-    callInst->eraseFromParent();
-  }
+  static const auto visitor =
+      llvm_dialects::VisitorBuilder<LowerDebugPrintf>().add(&LowerDebugPrintf::visitDebugPrintf).build();
+
+  visitor.visit(*this, module);
+
+  for (auto inst : m_toErase)
+    inst->eraseFromParent();
 
   if (m_elfInfos.empty())
     return PreservedAnalyses::all();
@@ -84,24 +73,28 @@ PreservedAnalyses LowerDebugPrintf::run(Module &module, ModuleAnalysisManager &a
 }
 
 // =====================================================================================================================
-// Create debug printf operation, and write to the output debug buffer
-// @debugPrintfBuffer : Output buffer for debug print data
-// @formatStr : Printf format string
-// @vars : Printf variable parameters
-// @builder : BuilderBase to build instruction
-void LowerDebugPrintf::createDebugPrintf(Value *debugPrintfBuffer, Value *formatStr,
-                                         iterator_range<User::op_iterator> vars, BuilderBase &builder) {
+// Lower a debug printf operation
+//
+// @param op : the operation
+void LowerDebugPrintf::visitDebugPrintf(DebugPrintfOp &op) {
+  m_toErase.push_back(&op);
+
+  Value *debugPrintfBuffer = op.getBuffer();
+  if (isa<PoisonValue>(debugPrintfBuffer))
+    return;
+
+  BuilderBase builder(&op);
 
   // Printf output variables in DWORDs
 
   SmallVector<Value *> printArgs;
   // Records printf output variables are 64bit or not
   SmallBitVector bit64Vector;
-  for (const auto &var : vars) {
+  for (Value *var : op.getArgs()) {
     getDwordValues(var, printArgs, bit64Vector, builder);
   }
 
-  GlobalVariable *globalStr = cast<GlobalVariable>(formatStr);
+  GlobalVariable *globalStr = cast<GlobalVariable>(op.getFormat());
   StringRef strDebugStr = (cast<ConstantDataSequential>(globalStr->getInitializer()))->getAsString();
 
   uint64_t hash = hash_value(strDebugStr);
