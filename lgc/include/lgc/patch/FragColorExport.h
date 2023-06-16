@@ -62,7 +62,7 @@ public:
   FragColorExport(llvm::LLVMContext *context, PipelineState *pipelineState);
 
   llvm::Value *handleColorExportInstructions(llvm::Value *output, unsigned int hwColorTarget, BuilderBase &builder,
-                                             ExportFormat expFmt, const bool signedness, uint8_t* pNumUndefiedTarget);
+                                             ExportFormat expFmt, const bool signedness, uint8_t *pNumUndefinedTarget);
 
   void generateExportInstructions(llvm::ArrayRef<lgc::ColorExportInfo> info, llvm::ArrayRef<llvm::Value *> values,
                                   llvm::ArrayRef<ExportFormat> exportFormat, bool dummyExport, BuilderBase &builder);
