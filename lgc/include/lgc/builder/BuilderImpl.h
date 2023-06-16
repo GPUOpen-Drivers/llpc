@@ -36,7 +36,7 @@
 
 namespace lgc {
 
-// Map vkgc - uint32 -1 is zero exteneded
+// Map vkgc - uint32 -1 is zero extended
 static constexpr uint64_t InternalDescriptorSetId = 0x00000000FFFFFFFFull;
 
 // =====================================================================================================================
