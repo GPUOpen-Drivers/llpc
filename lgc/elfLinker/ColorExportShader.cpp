@@ -132,11 +132,15 @@ Function *ColorExportShader::createColorExportFunc() {
   // Create the function. Mark SGPR inputs as "inreg".
   Function *func = Function::Create(funcTy, GlobalValue::ExternalLinkage, getGlueShaderName(), module);
   func->setCallingConv(CallingConv::AMDGPU_PS);
+  func->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
   setShaderStage(func, ShaderStageFragment);
 
   BasicBlock *block = BasicBlock::Create(func->getContext(), "", func);
   BuilderBase builder(block);
   builder.CreateRetVoid();
+  AttrBuilder attribBuilder(func->getContext());
+  attribBuilder.addAttribute("InitialPSInputAddr", std::to_string(0xFFFFFFFF));
+  func->addFnAttrs(attribBuilder);
   return func;
 }
 
@@ -153,4 +157,5 @@ void ColorExportShader::updatePalMetadata(PalMetadata &palMetadata) {
     }
   }
   palMetadata.updateSpiShaderColFormat(m_exports, hasDepthExpFmtZero, m_killEnabled);
+  palMetadata.updateCbShaderMask(m_exports);
 }

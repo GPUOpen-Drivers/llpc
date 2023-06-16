@@ -899,11 +899,18 @@ llvm::Type *PalMetadata::getLlvmType(StringRef tyName) const {
 //
 void PalMetadata::updateSpiShaderColFormat(ArrayRef<ColorExportInfo> exps, bool hasDepthExpFmtZero, bool killEnabled) {
   unsigned spiShaderColFormat = 0;
+  unsigned undefinedTargets = 0;
+  unsigned cbShaderMask = 0;
   for (auto &exp : exps) {
     if (exp.hwColorTarget == MaxColorTargets)
       continue;
     unsigned expFormat = m_pipelineState->computeExportFormat(exp.ty, exp.location);
-    spiShaderColFormat |= (expFormat << (4 * exp.hwColorTarget));
+
+    // Skip undefined formats to pack those valid color format tightly
+    if (expFormat == 0)
+      undefinedTargets += 1;
+    else
+      spiShaderColFormat |= (expFormat << (4 * (exp.hwColorTarget - undefinedTargets)));
   }
 
   if (spiShaderColFormat == 0 && hasDepthExpFmtZero) {
@@ -937,6 +944,37 @@ void PalMetadata::updateSpiShaderColFormat(ArrayRef<ColorExportInfo> exps, bool 
         (spiShaderColFormat >> 28) & 0xF;
   } else {
     setRegister(mmSPI_SHADER_COL_FORMAT, spiShaderColFormat);
+  }
+}
+
+// =====================================================================================================================
+// Updates the CB_SHADER_MASK entry.
+//
+void PalMetadata::updateCbShaderMask(llvm::ArrayRef<ColorExportInfo> exps) {
+  unsigned cbShaderMask = 0;
+  for (auto &exp : exps) {
+    if (exp.hwColorTarget == MaxColorTargets)
+      continue;
+
+    if (m_pipelineState->computeExportFormat(exp.ty, exp.location) != 0) {
+      cbShaderMask |= (0xF << (4 * exp.hwColorTarget));
+    }
+  }
+
+  if (m_pipelineState->useRegisterFieldFormat()) {
+    auto cbShaderMaskNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
+                                .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::CbShaderMask]
+                                .getMap(true);
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output0Enable] = cbShaderMask & 0xF;
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output1Enable] = (cbShaderMask >> 4) & 0xF;
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output2Enable] = (cbShaderMask >> 8) & 0xF;
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output3Enable] = (cbShaderMask >> 12) & 0xF;
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output4Enable] = (cbShaderMask >> 16) & 0xF;
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output5Enable] = (cbShaderMask >> 20) & 0xF;
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output6Enable] = (cbShaderMask >> 24) & 0xF;
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output7Enable] = (cbShaderMask >> 28) & 0xF;
+  } else {
+    setRegister(mmCB_SHADER_MASK, cbShaderMask);
   }
 }
 

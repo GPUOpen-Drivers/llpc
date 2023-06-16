@@ -93,7 +93,8 @@ static void extractElements(Value *input, BuilderBase &builder, SmallVectorImpl<
 // @param expFmt: The format for the given render target
 // @param signedness: If output should be interpreted as a signed integer
 Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hwColorTarget, BuilderBase &builder,
-                                                      ExportFormat expFmt, const bool signedness) {
+                                                      ExportFormat expFmt, const bool signedness,
+                                                      uint8_t *pNumUndefiedTarget) {
   Type *outputTy = output->getType();
   const unsigned bitWidth = outputTy->getScalarSizeInBits();
   unsigned compCount = outputTy->isVectorTy() ? cast<FixedVectorType>(outputTy)->getNumElements() : 1;
@@ -113,7 +114,10 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
   };
 
   if (expFmt == EXP_FORMAT_ZERO)
+  {
+    *pNumUndefiedTarget += 1;
     return nullptr;
+  }
 
   SmallVector<Value *, 4> comps(4);
 
@@ -258,14 +262,14 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
         comps[i] = undefFloat;
 
       Value *args[] = {
-          builder.getInt32(EXP_TARGET_MRT_0 + hwColorTarget), // tgt
-          builder.getInt32((1 << compCount) - 1),             // en
-          comps[0],                                           // src0
-          comps[1],                                           // src1
-          comps[2],                                           // src2
-          comps[3],                                           // src3
-          builder.getFalse(),                                 // done
-          builder.getTrue()                                   // vm
+          builder.getInt32(EXP_TARGET_MRT_0 + hwColorTarget - *pNumUndefiedTarget), // tgt
+          builder.getInt32((1 << compCount) - 1),                                   // en
+          comps[0],                                                                 // src0
+          comps[1],                                                                 // src1
+          comps[2],                                                                 // src2
+          comps[3],                                                                 // src3
+          builder.getFalse(),                                                       // done
+          builder.getTrue()                                                         // vm
       };
 
       return builder.CreateNamedCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {});
@@ -290,14 +294,14 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
       comps[i] = undefFloat;
 
     Value *args[] = {
-        builder.getInt32(EXP_TARGET_MRT_0 + hwColorTarget), // tgt
-        builder.getInt32((1 << compCount) - 1),             // en
-        comps[0],                                           // src0
-        comps[1],                                           // src1
-        comps[2],                                           // src2
-        comps[3],                                           // src3
-        builder.getFalse(),                                 // done
-        builder.getTrue()                                   // vm
+        builder.getInt32(EXP_TARGET_MRT_0 + hwColorTarget - *pNumUndefiedTarget), // tgt
+        builder.getInt32((1 << compCount) - 1),                                   // en
+        comps[0],                                                                 // src0
+        comps[1],                                                                 // src1
+        comps[2],                                                                 // src2
+        comps[3],                                                                 // src3
+        builder.getFalse(),                                                       // done
+        builder.getTrue()                                                         // vm
     };
 
     exportCall = builder.CreateNamedCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {});
@@ -907,11 +911,13 @@ void FragColorExport::generateExportInstructions(ArrayRef<lgc::ColorExportInfo> 
                                                  ArrayRef<ExportFormat> exportFormat, bool dummyExport,
                                                  BuilderBase &builder) {
   Value *lastExport = nullptr;
+  uint8_t undefinedTargets = 0;
   for (const ColorExportInfo &exp : info) {
     Value *output = values[exp.hwColorTarget];
     if (exp.hwColorTarget != MaxColorTargets) {
       ExportFormat expFmt = exportFormat[exp.hwColorTarget];
-      Value *currentExport = handleColorExportInstructions(output, exp.hwColorTarget, builder, expFmt, exp.isSigned);
+      Value *currentExport =
+          handleColorExportInstructions(output, exp.hwColorTarget, builder, expFmt, exp.isSigned, &undefinedTargets);
       if (currentExport) {
         lastExport = currentExport;
       }
