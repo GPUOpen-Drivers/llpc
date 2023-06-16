@@ -46,15 +46,15 @@ using namespace llvm;
 // =====================================================================================================================
 // Create a load of a buffer descriptor.
 //
-// If descSet = -1, this is an internal user data, which is a plain 64-bit pointer, flags must be 'BufferFlagAddress'
-// i64 address is returned.
+// If descSet = InternalDescriptorSetId (0xFFFFFFFF), this is an internal user data, which is a plain 64-bit pointer,
+// flags must be 'BufferFlagAddress' i64 address is returned.
 //
 // @param descSet : Descriptor set
 // @param binding : Descriptor binding
 // @param descIndex : Descriptor index
 // @param flags : BufferFlag* bit settings
 // @param instName : Name to give instruction(s)
-Value *BuilderImpl::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Value *descIndex, unsigned flags,
+Value *BuilderImpl::CreateLoadBufferDesc(uint64_t descSet, unsigned binding, Value *descIndex, unsigned flags,
                                          const Twine &instName) {
   Value *desc = nullptr;
   bool return64Address = false;
@@ -172,9 +172,9 @@ Value *BuilderImpl::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
       auto descLo = CreateLoad(FixedVectorType::get(getInt32Ty(), 2), descPtrLo);
       auto compactBufferDesc = buildBufferCompactDesc(descLo);
 
-      // If descriptor set is -1, this is a internal resource node, it is a root node
+      // If descriptor set is InternalDescriptorSetId, this is a internal resource node, it is a root node
       // and its type is ResourceNodeType::DescriptorBufferCompact.
-      if (descSet == -1) {
+      if (descSet == InternalDescriptorSetId) {
         assert(return64Address);
         return CreateBitCast(descLo, getInt64Ty());
       } else {
@@ -215,7 +215,7 @@ Value *BuilderImpl::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Val
 // @param descSet : Descriptor set
 // @param binding : Descriptor binding
 // @param instName : Name to give instruction(s)
-Value *BuilderImpl::CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
+Value *BuilderImpl::CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
                                         unsigned binding, const Twine &instName) {
   // Find the descriptor node. If doing a shader compilation with no user data layout provided, don't bother to
   // look; we will use relocs instead.
@@ -250,7 +250,7 @@ Value *BuilderImpl::CreateGetDescStride(ResourceNodeType concreteType, ResourceN
 // @param descSet : Descriptor set
 // @param binding : Descriptor binding
 // @param instName : Name to give instruction(s)
-Value *BuilderImpl::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
+Value *BuilderImpl::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
                                      unsigned binding, const Twine &instName) {
   // Find the descriptor node. If doing a shader compilation with no user data layout provided, don't bother to
   // look; we will use relocs instead.
@@ -321,11 +321,11 @@ Value *BuilderImpl::CreateLoadPushConstantsPtr(Type *returnTy, const Twine &inst
     // Push const is the sub node of DescriptorTableVaPtr.
     if (m_pipelineState->getUserDataNodes().empty()) {
       Value *highHalf = getInt32(HighAddrPc);
-      Value *descPtr =
-          CreateNamedCall(lgcName::DescriptorTableAddr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
-                          {getInt32(unsigned(ResourceNodeType::PushConst)),
-                           getInt32(unsigned(ResourceNodeType::PushConst)), getInt32(-1), getInt32(0), highHalf},
-                          Attribute::ReadNone);
+      Value *descPtr = CreateNamedCall(lgcName::DescriptorTableAddr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
+                                       {getInt32(unsigned(ResourceNodeType::PushConst)),
+                                        getInt32(unsigned(ResourceNodeType::PushConst)),
+                                        getInt64(InternalDescriptorSetId), getInt32(0), highHalf},
+                                       Attribute::ReadNone);
       return CreateBitCast(descPtr, returnTy);
     }
 
@@ -335,7 +335,7 @@ Value *BuilderImpl::CreateLoadPushConstantsPtr(Type *returnTy, const Twine &inst
     Value *highHalf = getInt32(HighAddrPc);
     Value *descPtr = CreateNamedCall(lgcName::DescriptorTableAddr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
                                      {getInt32(unsigned(ResourceNodeType::PushConst)),
-                                      getInt32(unsigned(ResourceNodeType::PushConst)), getInt32(subNode.set),
+                                      getInt32(unsigned(ResourceNodeType::PushConst)), getInt64(subNode.set),
                                       getInt32(subNode.binding), highHalf},
                                      Attribute::ReadNone);
     return CreateBitCast(descPtr, returnTy);
@@ -356,7 +356,7 @@ Value *BuilderImpl::CreateLoadPushConstantsPtr(Type *returnTy, const Twine &inst
 // @param binding : Descriptor binding
 // @param node : The descriptor node (nullptr for shader compilation)
 // @param instName : Name to give instruction(s)
-Value *BuilderImpl::getStride(ResourceNodeType descType, unsigned descSet, unsigned binding, const ResourceNode *node) {
+Value *BuilderImpl::getStride(ResourceNodeType descType, uint64_t descSet, unsigned binding, const ResourceNode *node) {
   if (node && node->immutableSize != 0 && descType == ResourceNodeType::DescriptorSampler) {
     // This is an immutable sampler. Because we put the immutable value into a static variable, the stride is
     // always the size of the descriptor.
@@ -404,7 +404,7 @@ static StringRef GetRelocTypeSuffix(ResourceNodeType type) {
 // @param binding : Binding
 // @param topNode : Node in top-level descriptor table (nullptr for shader compilation)
 // @param node : The descriptor node itself (nullptr for shader compilation)
-Value *BuilderImpl::getDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
+Value *BuilderImpl::getDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
                                unsigned binding, const ResourceNode *topNode, const ResourceNode *node) {
   Value *descPtr = nullptr;
 
@@ -429,7 +429,7 @@ Value *BuilderImpl::getDescPtr(ResourceNodeType concreteType, ResourceNodeType a
       assert(!(isFmask && highAddrOfFmask == ShadowDescriptorTableDisable) && "not implemented");
       Value *highHalf = getInt32(isFmask ? highAddrOfFmask : HighAddrPc);
       return CreateNamedCall(lgcName::DescriptorTableAddr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
-                             {getInt32(unsigned(concreteType)), getInt32(unsigned(abstractType)), getInt32(descSet),
+                             {getInt32(unsigned(concreteType)), getInt32(unsigned(abstractType)), getInt64(descSet),
                               getInt32(binding), highHalf},
                              Attribute::ReadNone);
     }
@@ -440,14 +440,14 @@ Value *BuilderImpl::getDescPtr(ResourceNodeType concreteType, ResourceNodeType a
     // Get the address when the shadow table is disabled.
     Value *nonShadowAddr = CreateNamedCall(lgcName::DescriptorTableAddr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
                                            {getInt32(unsigned(concreteType)), getInt32(unsigned(abstractType)),
-                                            getInt32(descSet), getInt32(binding), getInt32(HighAddrPc)},
+                                            getInt64(descSet), getInt32(binding), getInt32(HighAddrPc)},
                                            Attribute::ReadNone);
 
     // Get the address using a relocation when the shadow table is enabled.
     Value *shadowDescriptorReloc = CreateRelocationConstant(reloc::ShadowDescriptorTable);
     Value *shadowAddr = CreateNamedCall(lgcName::DescriptorTableAddr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
                                         {getInt32(unsigned(concreteType)), getInt32(unsigned(abstractType)),
-                                         getInt32(descSet), getInt32(binding), shadowDescriptorReloc},
+                                         getInt64(descSet), getInt32(binding), shadowDescriptorReloc},
                                         Attribute::ReadNone);
 
     // Use a relocation to select between the two.
@@ -475,8 +475,8 @@ Value *BuilderImpl::getDescPtr(ResourceNodeType concreteType, ResourceNodeType a
     // and low parts of the pointers producing better code overall.
     Value *spillDescPtr = GetSpillTablePtr();
 
-    if (descSet == -1) {
-      // If descriptor set is -1, this is a internal resource node, it is a root node
+    if (descSet == InternalDescriptorSetId) {
+      // If descriptor set is InternalDescriptorSetId, this is a internal resource node, it is a root node
       // and its type is ResourceNodeType::DescriptorBufferCompact. We use spillTable to load it.
       descPtr = spillDescPtr;
       m_pipelineState->getPalMetadata()->setUserDataSpillUsage(0);

@@ -43,10 +43,10 @@ void main()
 
 // SHADERTEST-LABEL: @lgc.shader.FS.main(
 // SHADERTEST-NEXT:  .entry:
-// SHADERTEST-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i32 1, i32 1, i32 0, i32 2)
-// SHADERTEST-NEXT:    [[TMP1:%.*]] = call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i32 2, i32 0, i32 0, i32 0)
+// SHADERTEST-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i64 1, i32 1, i32 0, i32 2)
+// SHADERTEST-NEXT:    [[TMP1:%.*]] = call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i64 2, i32 0, i32 0, i32 0)
 // SHADERTEST-NEXT:    [[TMP2:%.*]] = call ptr @llvm.invariant.start.p7(i64 -1, ptr addrspace(7) [[TMP1]])
-// SHADERTEST-NEXT:    [[TMP3:%.*]] = call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i32 0, i32 0, i32 0, i32 0)
+// SHADERTEST-NEXT:    [[TMP3:%.*]] = call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i64 0, i32 0, i32 0, i32 0)
 // SHADERTEST-NEXT:    [[TMP4:%.*]] = call ptr @llvm.invariant.start.p7(i64 -1, ptr addrspace(7) [[TMP3]])
 // SHADERTEST-NEXT:    [[TMP5:%.*]] = getelementptr inbounds <{ [3 x double], [8 x i8], [3 x %llpc.matrix.row] }>, ptr addrspace(7) [[TMP3]], i64 0, i32 0, i64 1
 // SHADERTEST-NEXT:    [[TMP6:%.*]] = load double, ptr addrspace(7) [[TMP5]], align 8

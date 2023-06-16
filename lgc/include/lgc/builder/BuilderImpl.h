@@ -36,6 +36,9 @@
 
 namespace lgc {
 
+// Map vkgc - uint32 -1 is zero extended
+static constexpr uint64_t InternalDescriptorSetId = 0x00000000FFFFFFFFull;
+
 // =====================================================================================================================
 // Builder implementation class
 class BuilderImpl : public BuilderDefs {
@@ -281,15 +284,15 @@ private:
   // Descriptor operations
 public:
   // Create a load of a buffer descriptor.
-  llvm::Value *CreateLoadBufferDesc(unsigned descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
+  llvm::Value *CreateLoadBufferDesc(uint64_t descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
                                     const llvm::Twine &instName = "");
 
   // Create a get of the stride (in bytes) of a descriptor.
-  llvm::Value *CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
+  llvm::Value *CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
                                    unsigned binding, const llvm::Twine &instName = "");
 
   // Create a pointer to a descriptor.
-  llvm::Value *CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
+  llvm::Value *CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
                                 unsigned binding, const llvm::Twine &instName = "");
 
   // Create a load of the push constants pointer.
@@ -297,14 +300,14 @@ public:
 
 private:
   // Get a struct containing the pointer and byte stride for a descriptor
-  llvm::Value *getDescPtrAndStride(ResourceNodeType resType, unsigned descSet, unsigned binding,
+  llvm::Value *getDescPtrAndStride(ResourceNodeType resType, uint64_t descSet, unsigned binding,
                                    const ResourceNode *topNode, const ResourceNode *node, bool shadow);
 
   // Get the stride (in bytes) of a descriptor.
-  llvm::Value *getStride(ResourceNodeType descType, unsigned descSet, unsigned binding, const ResourceNode *node);
+  llvm::Value *getStride(ResourceNodeType descType, uint64_t descSet, unsigned binding, const ResourceNode *node);
 
   // Get a pointer to a descriptor, as a pointer to i8
-  llvm::Value *getDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
+  llvm::Value *getDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
                           unsigned binding, const ResourceNode *topNode, const ResourceNode *node);
 
   llvm::Value *scalarizeIfUniform(llvm::Value *value, bool isNonUniform);

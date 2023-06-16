@@ -332,7 +332,7 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
         CallInst *call = cast<CallInst>(user);
         ResourceNodeType resType = ResourceNodeType(cast<ConstantInt>(call->getArgOperand(0))->getZExtValue());
         ResourceNodeType searchType = ResourceNodeType(cast<ConstantInt>(call->getArgOperand(1))->getZExtValue());
-        unsigned set = cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
+        uint64_t set = cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
         unsigned binding = cast<ConstantInt>(call->getArgOperand(3))->getZExtValue();
         ShaderStage stage = getShaderStage(call->getFunction());
         assert(stage != ShaderStageCopyShader);

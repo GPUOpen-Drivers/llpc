@@ -1082,11 +1082,11 @@ Value *Builder::CreateCountLeadingSignBits(Value *value, const Twine &instName) 
 // @param descIndex : Descriptor index
 // @param flags : BufferFlag* bit settings
 // @param instName : Name to give instruction(s)
-Value *Builder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Value *descIndex, unsigned flags,
+Value *Builder::CreateLoadBufferDesc(uint64_t descSet, unsigned binding, Value *descIndex, unsigned flags,
                                      const Twine &instName) {
   return record(BuilderOpcode::LoadBufferDesc, getBufferDescTy(),
                 {
-                    getInt32(descSet),
+                    getInt64(descSet),
                     getInt32(binding),
                     descIndex,
                     getInt32(flags),
@@ -1104,11 +1104,11 @@ Value *Builder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Value *
 // @param descSet : Descriptor set
 // @param binding : Descriptor binding
 // @param instName : Name to give instruction(s)
-Value *Builder::CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
+Value *Builder::CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
                                     unsigned binding, const Twine &instName) {
   return record(BuilderOpcode::GetDescStride, getInt32Ty(),
                 {getInt32(static_cast<unsigned>(concreteType)), getInt32(static_cast<unsigned>(abstractType)),
-                 getInt32(descSet), getInt32(binding)},
+                 getInt64(descSet), getInt32(binding)},
                 instName);
 }
 
@@ -1122,11 +1122,11 @@ Value *Builder::CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeT
 // @param descSet : Descriptor set
 // @param binding : Descriptor binding
 // @param instName : Name to give instruction(s)
-Value *Builder::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
+Value *Builder::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
                                  unsigned binding, const Twine &instName) {
   return record(BuilderOpcode::GetDescPtr, getDescPtrTy(concreteType),
                 {getInt32(static_cast<unsigned>(concreteType)), getInt32(static_cast<unsigned>(abstractType)),
-                 getInt32(descSet), getInt32(binding)},
+                 getInt64(descSet), getInt32(binding)},
                 instName);
 }
 

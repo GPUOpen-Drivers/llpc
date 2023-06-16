@@ -856,7 +856,7 @@ public:
   // @param descIndex : Descriptor index
   // @param flags : BufferFlag* bit settings
   // @param instName : Name to give instruction(s)
-  llvm::Value *CreateLoadBufferDesc(unsigned descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
+  llvm::Value *CreateLoadBufferDesc(uint64_t descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
                                     const llvm::Twine &instName = "");
 
   // Get address space of constant memory.
@@ -874,7 +874,7 @@ public:
   // @param descSet : Descriptor set
   // @param binding : Descriptor binding
   // @param instName : Name to give instruction(s)
-  llvm::Value *CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
+  llvm::Value *CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
                                    unsigned binding, const llvm::Twine &instName = "");
 
   // Create a pointer to a descriptor. Returns a value of the type returned by GetSamplerDescPtrTy, GetImageDescPtrTy,
@@ -886,7 +886,7 @@ public:
   // @param descSet : Descriptor set
   // @param binding : Descriptor binding
   // @param instName : Name to give instruction(s)
-  llvm::Value *CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
+  llvm::Value *CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
                                 unsigned binding, const llvm::Twine &instName = "");
 
   // Create a load of the push constants pointer.
