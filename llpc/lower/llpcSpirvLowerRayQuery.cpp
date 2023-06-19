@@ -328,7 +328,7 @@ bool SpirvLowerRayQuery::runImpl(Module &module) {
       processLibraryFunction(func);
     }
   } else {
-    Instruction *insertPos = &*(m_entryPoint->begin()->getFirstInsertionPt());
+    Instruction *insertPos = &*(m_entryPoint->begin()->getFirstNonPHIOrDbgOrAlloca());
     m_builder->SetInsertPoint(insertPos);
     initGlobalVariable();
     m_spirvOpMetaKindId = m_context->getMDKindID(MetaNameSpirvOp);

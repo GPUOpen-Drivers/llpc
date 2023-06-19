@@ -103,7 +103,7 @@ bool SpirvLowerRayTracingBuiltIn::runImpl(Module &module) {
 
   auto traceParamstrLen = strlen(RtName::TraceRaySetTraceParams);
   auto shaderTableStrLen = strlen(RtName::ShaderTable);
-  Instruction *insertPos = &*(m_entryPoint->begin()->getFirstInsertionPt());
+  Instruction *insertPos = &*(m_entryPoint->begin()->getFirstNonPHIOrDbgOrAlloca());
   for (auto globalIt = m_module->global_begin(), end = m_module->global_end(); globalIt != end;) {
     GlobalVariable *global = &*globalIt++;
     if (global->getType()->getAddressSpace() != SPIRAS_Private)
