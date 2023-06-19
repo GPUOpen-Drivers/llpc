@@ -121,16 +121,11 @@ private:
 
   bool needSecondVertexFetch(const VertexInputDescription *inputDesc) const;
 
-  Function *generateFetchFunction(unsigned bitWidth, Module *module);
-
   LgcContext *m_lgcContext = nullptr;   // LGC context
   LLVMContext *m_context = nullptr;     // LLVM context
   Value *m_vertexBufTablePtr = nullptr; // Vertex buffer table pointer
   Value *m_vertexIndex = nullptr;       // Vertex index
   Value *m_instanceIndex = nullptr;     // Instance index
-  Function *m_fetchVertex64 = nullptr;  // 64-bit fetch vertex function
-  Function *m_fetchVertex32 = nullptr;  // 32-bit fetch vertex function
-  Function *m_fetchVertex16 = nullptr;  // 16-bit fetch vertex function
 
   static const VertexCompFormatInfo m_vertexCompFormatInfo[]; // Info table of vertex component format
   static const unsigned char m_vertexFormatMapGfx10[][8];     // Info table of vertex format mapping for GFX10
@@ -680,253 +675,6 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
 }
 
 // =====================================================================================================================
-// Generate vertex fetch function.
-//
-// @param bitWidth : bit width of vertex
-// @param [in/out] module : Module
-// @returns : Generated function
-Function *VertexFetchImpl::generateFetchFunction(unsigned bitWidth, Module *module) {
-  BuilderBase builder(*m_context);
-  // Helper to create basic block
-  auto createBlock = [&](Twine blockName, Function *parent) {
-    return BasicBlock::Create(*m_context, blockName, parent);
-  };
-
-  // 8-bit vertex fetches use the 16-bit path as well.
-  bool is16bitFetch = bitWidth <= 16;
-  bool is64bitFetch = bitWidth == 64;
-
-  auto fetch64Type = FixedVectorType::get(Type::getInt32Ty(*m_context), 2);
-  auto fetch32Type = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
-  auto fetch16Type = FixedVectorType::get(Type::getInt16Ty(*m_context), 4);
-  auto fetchType = is16bitFetch ? fetch16Type : fetch32Type;
-
-  auto createFunction = [&] {
-    // Function args
-    Type *argTypes[] = {
-        FixedVectorType::get(builder.getInt32Ty(), 4), // vbdesc
-        builder.getInt32Ty(),                          // vbIndex
-        builder.getInt32Ty(),                          // vertexOffset
-        builder.getInt32Ty(),                          // component size in byte
-        builder.getInt1Ty(),                           // isPacked
-        builder.getInt1Ty(),                           // isBgr
-        builder.getInt1Ty(),                           // Y component mask
-        builder.getInt1Ty(),                           // Z component mask
-        builder.getInt1Ty(),                           // W component mask
-    };
-    // Return type
-    Type *retTy = FixedVectorType::get(builder.getInt32Ty(), is64bitFetch ? 8 : 4);
-    if (is16bitFetch)
-      retTy = FixedVectorType::get(builder.getInt16Ty(), 4);
-
-    StringRef funcName = is64bitFetch ? "FetchVertex64" : (is16bitFetch ? "FetchVertex16" : "FetchVertex32");
-    FunctionType *const funcTy = FunctionType::get(retTy, argTypes, false);
-    Function *func = Function::Create(funcTy, GlobalValue::InternalLinkage, funcName, module);
-    func->setCallingConv(CallingConv::C);
-    func->addFnAttr(Attribute::AlwaysInline);
-
-    // Name args
-    auto argIt = func->arg_begin();
-    Value *vbDesc = argIt++;
-    vbDesc->setName("vbDesc");
-
-    Value *vbIndex = argIt++;
-    vbIndex->setName("vbIndex");
-
-    Value *vertexOffset = argIt++;
-    vertexOffset->setName("vertexOffset");
-
-    Value *compByteSize = argIt++;
-    compByteSize->setName("compByteSize");
-
-    Value *isPacked = argIt++;
-    isPacked->setName("isPacked");
-
-    Value *isBgr = argIt++;
-    isBgr->setName("isBgr");
-
-    Value *yMask = argIt++;
-    yMask->setName("yMask");
-    Value *zMask = argIt++;
-    zMask->setName("zMask");
-    Value *wMask = argIt++;
-    wMask->setName("wMask");
-
-    auto entry = createBlock(".entry", func);
-    auto wholeVertex = createBlock(".wholeVertex", func);
-    auto comp0Block = createBlock(".comp0Block", func);
-    auto comp1Block = createBlock(".comp1Block", func);
-    auto comp2Block = createBlock(".comp2Block", func);
-    auto comp3Block = createBlock(".comp3Block", func);
-    auto endfun = createBlock(".endfun", func);
-
-    Value *args[] = {
-        vbDesc,              // rsrc
-        vbIndex,             // vindex
-        vertexOffset,        // offset
-        builder.getInt32(0), // soffset
-        builder.getInt32(0)  // glc, slc
-    };
-
-    // .entry
-    {
-      builder.SetInsertPoint(entry);
-      // If ispacked is false, we require per-component fetch
-      builder.CreateCondBr(isPacked, wholeVertex, comp0Block);
-    }
-
-    // .wholeVertex
-    {
-      builder.SetInsertPoint(wholeVertex);
-
-      Value *vertex = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetchType, args, {});
-      if (is64bitFetch) {
-        // If it is 64-bit, we need the second fetch
-        args[2] = builder.CreateAdd(args[2], builder.getInt32(SizeOfVec4));
-        auto secondFetch = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetchType, args, {});
-        std::vector<Constant *> shuffleMask;
-        for (unsigned i = 0; i < 8; ++i)
-          shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), i));
-        vertex = builder.CreateShuffleVector(vertex, secondFetch, ConstantVector::get(shuffleMask));
-      }
-      builder.CreateRet(vertex);
-    }
-
-    // return value
-    Value *lastVert = PoisonValue::get(retTy);
-    Value *comp0 = nullptr;
-    Value *comp1 = nullptr;
-    Value *comp2 = nullptr;
-    Value *comp3 = nullptr;
-    // Per-component fetch
-    // reset
-    args[2] = vertexOffset;
-
-    auto compType = is16bitFetch ? builder.getInt16Ty() : builder.getInt32Ty();
-
-    // X channel
-    // .comp0Block
-    {
-      builder.SetInsertPoint(comp0Block);
-      if (is64bitFetch) {
-        Value *comp = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetch64Type, args, {});
-        Value *elem = builder.CreateExtractElement(comp, uint64_t(0));
-        lastVert = builder.CreateInsertElement(lastVert, elem, uint64_t(0));
-        elem = builder.CreateExtractElement(comp, 1);
-        lastVert = builder.CreateInsertElement(lastVert, elem, 1);
-        comp0 = lastVert;
-      } else {
-        comp0 = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, compType, args, {});
-        lastVert = builder.CreateInsertElement(lastVert, comp0, uint64_t(0));
-        comp0 = lastVert;
-      }
-      // If Y channel is 0, we will fetch the second component.
-      builder.CreateCondBr(yMask, comp1Block, endfun);
-    }
-
-    // Y channel
-    // .comp1Block
-    {
-      builder.SetInsertPoint(comp1Block);
-      // Add offset. offset = offset + componentSize
-      args[2] = builder.CreateAdd(args[2], compByteSize);
-      if (is64bitFetch) {
-        Value *comp = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetch64Type, args, {});
-        Value *elem = builder.CreateExtractElement(comp, uint64_t(0));
-        lastVert = builder.CreateInsertElement(lastVert, elem, 2);
-        elem = builder.CreateExtractElement(comp, 1);
-        lastVert = builder.CreateInsertElement(lastVert, elem, 3);
-        comp1 = lastVert;
-      } else {
-        comp1 = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, compType, args, {});
-        lastVert = builder.CreateInsertElement(lastVert, comp1, 1);
-        comp1 = lastVert;
-      }
-      builder.CreateCondBr(zMask, comp2Block, endfun);
-    }
-
-    // Z channel
-    // .comp2Block
-    {
-      builder.SetInsertPoint(comp2Block);
-      args[2] = builder.CreateAdd(args[2], compByteSize);
-      if (is64bitFetch) {
-        Value *comp = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetch64Type, args, {});
-        Value *elem = builder.CreateExtractElement(comp, uint64_t(0));
-        lastVert = builder.CreateInsertElement(lastVert, elem, 4);
-        elem = builder.CreateExtractElement(comp, 1);
-        lastVert = builder.CreateInsertElement(lastVert, elem, 5);
-        comp2 = lastVert;
-      } else {
-        comp2 = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, compType, args, {});
-        lastVert = builder.CreateInsertElement(lastVert, comp2, 2);
-        comp2 = lastVert;
-      }
-      builder.CreateCondBr(wMask, comp3Block, endfun);
-    }
-
-    // W channel
-    // .comp3Block
-    {
-      builder.SetInsertPoint(comp3Block);
-      args[2] = builder.CreateAdd(args[2], compByteSize);
-      if (is64bitFetch) {
-        Value *comp = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetch64Type, args, {});
-        Value *elem = builder.CreateExtractElement(comp, uint64_t(0));
-        lastVert = builder.CreateInsertElement(lastVert, elem, 6);
-        elem = builder.CreateExtractElement(comp, 1);
-        lastVert = builder.CreateInsertElement(lastVert, elem, 7);
-        comp3 = lastVert;
-      } else {
-        comp3 = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, compType, args, {});
-        lastVert = builder.CreateInsertElement(lastVert, comp3, 3);
-        comp3 = lastVert;
-      }
-      builder.CreateBr(endfun);
-    }
-
-    // .endfun
-    {
-      builder.SetInsertPoint(endfun);
-      auto phiInst = builder.CreatePHI(lastVert->getType(), 4);
-      phiInst->addIncoming(comp0, comp0Block);
-      phiInst->addIncoming(comp1, comp1Block);
-      phiInst->addIncoming(comp2, comp2Block);
-      phiInst->addIncoming(comp3, comp3Block);
-      Value *vertex = phiInst;
-      // If the format is bgr, fix the order. It only is included in 32-bit format.
-      if (!is64bitFetch) {
-        std::vector<Constant *> shuffleMask;
-        shuffleMask.push_back(builder.getInt32(2));
-        shuffleMask.push_back(builder.getInt32(1));
-        shuffleMask.push_back(builder.getInt32(0));
-        shuffleMask.push_back(builder.getInt32(3));
-        auto fixedVertex = builder.CreateShuffleVector(vertex, vertex, ConstantVector::get(shuffleMask));
-        vertex = builder.CreateSelect(isBgr, fixedVertex, vertex);
-      }
-      builder.CreateRet(vertex);
-    }
-    return func;
-  };
-
-  if (is64bitFetch) {
-    if (!m_fetchVertex64)
-      m_fetchVertex64 = createFunction();
-    return m_fetchVertex64;
-  }
-
-  if (is16bitFetch) {
-    if (!m_fetchVertex16)
-      m_fetchVertex16 = createFunction();
-    return m_fetchVertex16;
-  }
-
-  if (!m_fetchVertex32)
-    m_fetchVertex32 = createFunction();
-  return m_fetchVertex32;
-}
-
-// =====================================================================================================================
 // This is an lgc.input.import.generic operation for vertex buffers.
 // Executes vertex fetch operations based on the uber shader buffer.
 //
@@ -960,6 +708,25 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *des
         ShaderInputs::getSpecialUserDataAsPointer(UserDataMapping::VertexBufferTable, vbDescTy, builder);
   }
 
+  // Helper to create basic block
+  auto createBlock = [&](Twine blockName, BasicBlock *bb) {
+    return BasicBlock::Create(*m_context, blockName, &*inst->getFunction(), bb);
+  };
+
+  auto currentBlock = inst->getParent();
+  auto fetchEndBlock = currentBlock->splitBasicBlock(inst);
+
+  auto comp3Block = createBlock(".comp3Block", fetchEndBlock);
+  auto comp2Block = createBlock(".comp2Block", comp3Block);
+  auto comp1Block = createBlock(".comp1Block", comp2Block);
+  auto comp0Block = createBlock(".comp0Block", comp1Block);
+  auto wholeVertexBlock = createBlock(".wholeVertex", comp0Block);
+  auto fetchStartBlock = createBlock("fetchStart", wholeVertexBlock);
+
+  builder.SetInsertPoint(currentBlock->getTerminator());
+  builder.CreateBr(fetchStartBlock);
+  currentBlock->getTerminator()->eraseFromParent();
+  builder.SetInsertPoint(fetchStartBlock);
   // The size of each input descriptor is sizeof(UberFetchShaderAttribInfo). vector4
   auto uberFetchAttrType = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
   descPtr = builder.CreateGEP(uberFetchAttrType, descPtr, {builder.getInt32(location)});
@@ -1035,9 +802,183 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *des
   const unsigned bitWidth = basicTy->getScalarSizeInBits();
   assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
 
-  auto func = generateFetchFunction(bitWidth, inst->getFunction()->getParent());
-  Value *lastVert =
-      builder.CreateCall(func, {vbDesc, vbIndex, byteOffset, componentSize, isPacked, isBgr, yMask, zMask, wMask});
+  // If ispacked is false, we require per-component fetch
+  builder.CreateCondBr(isPacked, wholeVertexBlock, comp0Block);
+
+  // 8-bit vertex fetches use the 16-bit path as well.
+  bool is16bitFetch = bitWidth <= 16;
+  bool is64bitFetch = bitWidth == 64;
+  auto fetch64Type = FixedVectorType::get(Type::getInt32Ty(*m_context), 2);
+  auto fetch32Type = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
+  auto fetch16Type = FixedVectorType::get(Type::getInt16Ty(*m_context), 4);
+  auto fetchType = is16bitFetch ? fetch16Type : fetch32Type;
+
+  Value *args[] = {
+      vbDesc,              // rsrc
+      vbIndex,             // vindex
+      byteOffset,          // offset
+      builder.getInt32(0), // soffset
+      builder.getInt32(0)  // glc, slc
+  };
+
+  Value *wholeVertex = nullptr;
+  {
+    builder.SetInsertPoint(wholeVertexBlock);
+    wholeVertex = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetchType, args, {});
+    if (is64bitFetch) {
+      // If it is 64-bit, we need the second fetch
+      args[2] = builder.CreateAdd(args[2], builder.getInt32(SizeOfVec4));
+      auto secondFetch = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetchType, args, {});
+      std::vector<Constant *> shuffleMask;
+      for (unsigned i = 0; i < 8; ++i)
+        shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), i));
+      wholeVertex = builder.CreateShuffleVector(wholeVertex, secondFetch, ConstantVector::get(shuffleMask));
+    }
+    builder.CreateBr(fetchEndBlock);
+  }
+
+  fetchType = FixedVectorType::get(builder.getInt32Ty(), is64bitFetch ? 8 : 4);
+  if (is16bitFetch)
+    fetchType = FixedVectorType::get(builder.getInt16Ty(), 4);
+  Value *lastVert = UndefValue::get(fetchType);
+
+  auto int16Zero = builder.getInt16(0);
+  auto int16One = builder.getInt16(1);
+  auto float16One = builder.getInt16(0x3C00);
+  // Get default fetch values
+  Constant *defaults = nullptr;
+  if (basicTy->isIntegerTy()) {
+    if (bitWidth <= 16)
+      defaults = ConstantVector::get({int16Zero, int16Zero, int16Zero, int16One});
+    else if (bitWidth == 32)
+      defaults = m_fetchDefaults.int32;
+    else {
+      assert(bitWidth == 64);
+      defaults = m_fetchDefaults.int64;
+    }
+  } else if (basicTy->isFloatingPointTy()) {
+    if (bitWidth == 16)
+      defaults = ConstantVector::get({int16Zero, int16Zero, int16Zero, float16One});
+    else if (bitWidth == 32)
+      defaults = m_fetchDefaults.float32;
+    else {
+      assert(bitWidth == 64);
+      defaults = m_fetchDefaults.double64;
+    }
+  } else
+    llvm_unreachable("Should never be called!");
+
+  Value *comp0 = nullptr;
+  Value *comp1 = nullptr;
+  Value *comp2 = nullptr;
+  Value *comp3 = nullptr;
+  auto compType = is16bitFetch ? builder.getInt16Ty() : builder.getInt32Ty();
+
+  // Per-component fetch
+  // X channel
+  // .comp0Block
+  {
+    builder.SetInsertPoint(comp0Block);
+    for (unsigned i = 0; i < fetchType->getNumElements(); i++)
+      lastVert = builder.CreateInsertElement(lastVert, builder.CreateExtractElement(defaults, i), i);
+
+    args[2] = byteOffset;
+    if (is64bitFetch) {
+      Value *comp = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetch64Type, args, {});
+      Value *elem = builder.CreateExtractElement(comp, uint64_t(0));
+      lastVert = builder.CreateInsertElement(lastVert, elem, uint64_t(0));
+      elem = builder.CreateExtractElement(comp, 1);
+      lastVert = builder.CreateInsertElement(lastVert, elem, 1);
+      comp0 = lastVert;
+    } else {
+      comp0 = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, compType, args, {});
+      lastVert = builder.CreateInsertElement(lastVert, comp0, uint64_t(0));
+      comp0 = lastVert;
+    }
+    // If Y channel is 0, we will fetch the second component.
+    builder.CreateCondBr(yMask, comp1Block, fetchEndBlock);
+  }
+
+  // Y channel
+  // .comp1Block
+  {
+    builder.SetInsertPoint(comp1Block);
+    // Add offset. offset = offset + componentSize
+    args[2] = builder.CreateAdd(args[2], componentSize);
+    if (is64bitFetch) {
+      Value *comp = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetch64Type, args, {});
+      Value *elem = builder.CreateExtractElement(comp, uint64_t(0));
+      lastVert = builder.CreateInsertElement(lastVert, elem, 2);
+      elem = builder.CreateExtractElement(comp, 1);
+      lastVert = builder.CreateInsertElement(lastVert, elem, 3);
+      comp1 = lastVert;
+    } else {
+      comp1 = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, compType, args, {});
+      lastVert = builder.CreateInsertElement(lastVert, comp1, 1);
+      comp1 = lastVert;
+    }
+    builder.CreateCondBr(zMask, comp2Block, fetchEndBlock);
+  }
+
+  // Z channel
+  // .comp2Block
+  {
+    builder.SetInsertPoint(comp2Block);
+    args[2] = builder.CreateAdd(args[2], componentSize);
+    if (is64bitFetch) {
+      Value *comp = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetch64Type, args, {});
+      Value *elem = builder.CreateExtractElement(comp, uint64_t(0));
+      lastVert = builder.CreateInsertElement(lastVert, elem, 4);
+      elem = builder.CreateExtractElement(comp, 1);
+      lastVert = builder.CreateInsertElement(lastVert, elem, 5);
+      comp2 = lastVert;
+    } else {
+      comp2 = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, compType, args, {});
+      lastVert = builder.CreateInsertElement(lastVert, comp2, 2);
+      comp2 = lastVert;
+    }
+    builder.CreateCondBr(wMask, comp3Block, fetchEndBlock);
+  }
+
+  // W channel
+  // .comp3Block
+  {
+    builder.SetInsertPoint(comp3Block);
+    args[2] = builder.CreateAdd(args[2], componentSize);
+    if (is64bitFetch) {
+      Value *comp = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetch64Type, args, {});
+      Value *elem = builder.CreateExtractElement(comp, uint64_t(0));
+      lastVert = builder.CreateInsertElement(lastVert, elem, 6);
+      elem = builder.CreateExtractElement(comp, 1);
+      lastVert = builder.CreateInsertElement(lastVert, elem, 7);
+      comp3 = lastVert;
+    } else {
+      comp3 = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, compType, args, {});
+      lastVert = builder.CreateInsertElement(lastVert, comp3, 3);
+      comp3 = lastVert;
+    }
+    builder.CreateBr(fetchEndBlock);
+  }
+
+  // .fetchEnd
+  builder.SetInsertPoint(&*fetchEndBlock->getFirstInsertionPt());
+  auto phiInst = builder.CreatePHI(lastVert->getType(), 5);
+  phiInst->addIncoming(wholeVertex, wholeVertexBlock);
+  phiInst->addIncoming(comp0, comp0Block);
+  phiInst->addIncoming(comp1, comp1Block);
+  phiInst->addIncoming(comp2, comp2Block);
+  phiInst->addIncoming(comp3, comp3Block);
+  lastVert = phiInst;
+  // If the format is bgr, fix the order. It only is included in 32-bit format.
+  if (!is64bitFetch) {
+    std::vector<Constant *> shuffleMask;
+    shuffleMask.push_back(builder.getInt32(2));
+    shuffleMask.push_back(builder.getInt32(1));
+    shuffleMask.push_back(builder.getInt32(0));
+    shuffleMask.push_back(builder.getInt32(3));
+    auto fixedVertex = builder.CreateShuffleVector(lastVert, lastVert, ConstantVector::get(shuffleMask));
+    lastVert = builder.CreateSelect(isBgr, fixedVertex, lastVert);
+  }
 
   // Get vertex fetch values
   const unsigned fetchCompCount = cast<FixedVectorType>(lastVert->getType())->getNumElements();
