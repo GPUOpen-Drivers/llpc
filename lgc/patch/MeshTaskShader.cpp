@@ -600,6 +600,15 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(entryBlock);
 
+    // Keep allocas in entry block
+    while (true) {
+      auto alloca = apiMeshEntryBlock->begin();
+      if (alloca == apiMeshEntryBlock->end() || !isa<AllocaInst>(alloca))
+        break;
+
+      alloca->moveBefore(*entryBlock, entryBlock->end());
+    }
+
     initWaveThreadInfo(entryPoint);
 
     if (m_needBarrierFlag) {
@@ -1710,7 +1719,7 @@ void MeshTaskShader::lowerMeshShaderBody(BasicBlock *apiMeshEntryBlock, BasicBlo
           unsigned builtIn = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
 
           // NOTE: Mesh shader input lowering is supposed to happen at the beginning of API mesh shader.
-          m_builder.SetInsertPoint(&*apiMeshEntryBlock->getFirstInsertionPt());
+          m_builder.SetInsertPoint(&*apiMeshEntryBlock->getFirstNonPHIOrDbgOrAlloca());
 
           auto meshInput = getMeshInput(static_cast<BuiltInKind>(builtIn));
           assert(meshInput->getType() == call->getType());

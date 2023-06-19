@@ -94,8 +94,7 @@ bool PatchInitializeWorkgroupMemory::runImpl(Module &module, PipelineShadersResu
   m_shaderStage = ShaderStageCompute;
   m_entryPoint = pipelineShaders.getEntryPoint(static_cast<ShaderStage>(m_shaderStage));
   BuilderBase builder(*m_context);
-  Instruction *insertPos = &*m_entryPoint->front().getFirstInsertionPt();
-  builder.SetInsertPoint(insertPos);
+  builder.SetInsertPointPastAllocas(m_entryPoint);
 
   // Fill the map of each variable with zeroinitializer and calculate its corresponding offset on LDS
   unsigned offset = 0;
@@ -135,7 +134,7 @@ bool PatchInitializeWorkgroupMemory::runImpl(Module &module, PipelineShadersResu
 // @param lds : The LDS variable to be initialized
 // @param builder : BuilderBase to use for instruction constructing
 void PatchInitializeWorkgroupMemory::initializeWithZero(GlobalVariable *lds, BuilderBase &builder) {
-  auto entryInsertPos = &*m_entryPoint->front().getFirstInsertionPt();
+  auto entryInsertPos = &*m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
   auto originBlock = entryInsertPos->getParent();
   auto endInitBlock = originBlock->splitBasicBlock(entryInsertPos);
   endInitBlock->setName(".endInit");

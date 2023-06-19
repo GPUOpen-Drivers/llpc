@@ -480,7 +480,7 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
     rayTracingContext->setEntryName("main");
     return true;
   }
-  Instruction *insertPos = &*(m_entryPoint->begin()->getFirstInsertionPt());
+  Instruction *insertPos = &*(m_entryPoint->begin()->getFirstNonPHIOrDbgOrAlloca());
 
   // Process traceRays module
   if (m_shaderStage == ShaderStageCompute) {
@@ -1928,8 +1928,7 @@ void SpirvLowerRayTracing::createEntryFunc(Function *func) {
   m_entryPoint = newFunc;
   m_entryPoint->addFnAttr(Attribute::NoUnwind);
   m_entryPoint->addFnAttr(Attribute::AlwaysInline);
-  Instruction *insertPos = &*(newFunc->begin()->getFirstInsertionPt());
-  m_builder->SetInsertPoint(insertPos);
+  m_builder->SetInsertPointPastAllocas(newFunc);
   auto argIt = newFunc->arg_begin();
 
   // Save the function input parameter value to the global payloads and builtIns
@@ -2102,8 +2101,7 @@ void SpirvLowerRayTracing::createCallableShaderEntryFunc(Function *func) {
   m_entryPoint = newFunc;
   m_entryPoint->addFnAttr(Attribute::NoUnwind);
   m_entryPoint->addFnAttr(Attribute::AlwaysInline);
-  Instruction *insertPos = &*(newFunc->begin()->getFirstInsertionPt());
-  m_builder->SetInsertPoint(insertPos);
+  m_builder->SetInsertPointPastAllocas(newFunc);
 
   auto argIt = newFunc->arg_begin();
 

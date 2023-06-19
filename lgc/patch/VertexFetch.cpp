@@ -567,7 +567,7 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
     // NOTE: The 10_10_10_2 formats are not supported by the uber fetch shader on gfx9 and older.
     // We rely on the driver to fallback to not using the uber fetch shader when those formats are used.
     builder.setShaderStage(ShaderStageVertex);
-    builder.SetInsertPoint(&(*vertexFetches[0]->getFunction()->front().getFirstInsertionPt()));
+    builder.SetInsertPointPastAllocas(vertexFetches[0]->getFunction());
     auto desc = builder.CreateLoadBufferDesc(InternalDescriptorSetId, FetchShaderInternalBufferBinding,
                                              builder.getInt32(0), Builder::BufferFlagAddress);
 
@@ -941,13 +941,13 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *des
 
   if (!m_vertexIndex) {
     IRBuilderBase::InsertPointGuard ipg(builder);
-    builder.SetInsertPoint(&*inst->getFunction()->front().getFirstInsertionPt());
+    builder.SetInsertPointPastAllocas(inst->getFunction());
     m_vertexIndex = ShaderInputs::getVertexIndex(builder, *m_lgcContext);
   }
 
   if (!m_instanceIndex) {
     IRBuilderBase::InsertPointGuard ipg(builder);
-    builder.SetInsertPoint(&*inst->getFunction()->front().getFirstInsertionPt());
+    builder.SetInsertPointPastAllocas(inst->getFunction());
     m_instanceIndex = ShaderInputs::getInstanceIndex(builder, *m_lgcContext);
   }
 
@@ -955,7 +955,7 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *des
   Type *vbDescTy = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
   if (!m_vertexBufTablePtr) {
     IRBuilderBase::InsertPointGuard ipg(builder);
-    builder.SetInsertPoint(&*inst->getFunction()->front().getFirstInsertionPt());
+    builder.SetInsertPointPastAllocas(inst->getFunction());
     m_vertexBufTablePtr =
         ShaderInputs::getSpecialUserDataAsPointer(UserDataMapping::VertexBufferTable, vbDescTy, builder);
   }
