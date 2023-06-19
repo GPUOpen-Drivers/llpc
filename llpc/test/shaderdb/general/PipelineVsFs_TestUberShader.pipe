@@ -10,7 +10,8 @@
 ; SHADERTEST: [[UBERINFO:%[0-9]*]] = load <4 x i32>, ptr addrspace(4) [[INTDESCPTR]], align 16
 
 ; Load vertex
-; SHADERTEST-COUNT-5: call i32 @llvm.amdgcn.struct.buffer.load.format
+; SHADERTEST-COUNT-1: call <3 x i32> @llvm.amdgcn.struct.buffer.load.format.v3i32
+; SHADERTEST-COUNT-2: call i32 @llvm.amdgcn.struct.buffer.load.format.i32
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

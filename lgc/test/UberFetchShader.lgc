@@ -41,8 +41,6 @@
 ; Whether is BGRA format (attr & 0x100000)
 ; CHECK: and i32 [[attr]], 1048576
 
-; fetch vertex function
-; CHECK-LABEL: define internal <4 x i32> @FetchVertex32
 ; Load the whole vertex
 ; CHECK: call <4 x i32> @llvm.amdgcn.struct.buffer.load.format.v4i32(<4 x i32>
 ; Load per channel, 4 channels
