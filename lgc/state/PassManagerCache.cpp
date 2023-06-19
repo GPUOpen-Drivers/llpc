@@ -30,6 +30,7 @@
  */
 #include "lgc/state/PassManagerCache.h"
 #include "lgc/LgcContext.h"
+#include "lgc/patch/PatchLlvmIrInclusion.h"
 #include "lgc/patch/PatchSetupTargetFeatures.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 442438
@@ -110,6 +111,8 @@ std::pair<lgc::PassManager &, LegacyPassManager &> PassManagerCache::getPassMana
   fpm.addPass(EarlyCSEPass(true));
   passManagers.first->addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
   passManagers.first->addPass(PatchSetupTargetFeatures());
+  passManagers.first->addPass(PatchLlvmIrInclusion());
+
   // Add one last pass that does nothing, but invalidates all the analyses.
   // This is required to avoid the pass manager to use results of analyses from
   // previous runs which is causing random crashes.
