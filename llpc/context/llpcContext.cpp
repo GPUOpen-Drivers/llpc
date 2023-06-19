@@ -37,6 +37,7 @@
 #include "llpcShaderCacheManager.h"
 #include "vkgcMetroHash.h"
 #include "lgc/Builder.h"
+#include "lgc/GpurtDialect.h"
 #include "lgc/LgcContext.h"
 #include "lgc/LgcDialect.h"
 #include "llvm/Bitcode/BitcodeReader.h"
@@ -65,7 +66,7 @@ namespace Llpc {
 //
 // @param gfxIp : Graphics IP version info
 Context::Context(GfxIpVersion gfxIp) : LLVMContext(), m_gfxIp(gfxIp) {
-  m_dialectContext = llvm_dialects::DialectContext::make<LgcDialect>(*this);
+  m_dialectContext = llvm_dialects::DialectContext::make<LgcDialect, GpurtDialect>(*this);
 
   reset();
 }

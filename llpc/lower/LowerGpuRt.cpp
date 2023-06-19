@@ -13,7 +13,7 @@
 #include "LowerGpuRt.h"
 #include "llpcContext.h"
 #include "lgc/Builder.h"
-#include "lgc/LgcDialect.h"
+#include "lgc/GpurtDialect.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 

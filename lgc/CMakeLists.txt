@@ -77,15 +77,22 @@ if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/interface/lgc)
 endif()
 tablegen(LGC interface/lgc/LgcDialect.h.inc -gen-dialect-decls --dialect lgc
     EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
-    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/interface/lgc
     )
 if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/state)
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/state")
 endif()
 tablegen(LGC state/LgcDialect.cpp.inc -gen-dialect-defs --dialect lgc
     EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
-    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/interface/lgc
     )
+
+set(LLVM_TARGET_DEFINITIONS interface/lgc/GpurtDialect.td)
+tablegen(LGC interface/lgc/GpurtDialect.h.inc -gen-dialect-decls --dialect lgc.gpurt
+    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
+    )
+tablegen(LGC state/GpurtDialect.cpp.inc -gen-dialect-defs --dialect lgc.gpurt
+    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
+    )
+
 add_public_tablegen_target(LgcDialectTableGen)
 
 add_dependencies(LLVMlgc LgcDialectTableGen)
@@ -229,6 +236,7 @@ target_sources(LLVMlgc PRIVATE
     state/Compiler.cpp
     state/LgcContext.cpp
     state/LgcDialect.cpp
+    state/GpurtDialect.cpp
     state/PalMetadata.cpp
     state/PassManagerCache.cpp
     state/PipelineShaders.cpp
