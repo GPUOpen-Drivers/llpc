@@ -1455,7 +1455,7 @@ void SpirvLowerRayTracing::createRayGenEntryFunc() {
 void SpirvLowerRayTracing::createDbgInfo(Module &module, Function *func) {
   DIBuilder builder(module);
   DIFile *file = builder.createFile(func->getName(), ".");
-
+  builder.createCompileUnit(dwarf::DW_LANG_C99, file, "llvmIR", false, "", 0, "", DICompileUnit::LineTablesOnly);
   // Create the DISubprogram for the module entry function
   auto *funcTy = builder.createSubroutineType(builder.getOrCreateTypeArray({}));
   auto spFlags = DISubprogram::SPFlagDefinition;
