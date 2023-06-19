@@ -900,7 +900,6 @@ llvm::Type *PalMetadata::getLlvmType(StringRef tyName) const {
 void PalMetadata::updateSpiShaderColFormat(ArrayRef<ColorExportInfo> exps, bool hasDepthExpFmtZero, bool killEnabled) {
   unsigned spiShaderColFormat = 0;
   unsigned undefinedTargets = 0;
-  unsigned cbShaderMask = 0;
   for (auto &exp : exps) {
     if (exp.hwColorTarget == MaxColorTargets)
       continue;
