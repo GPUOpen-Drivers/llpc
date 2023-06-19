@@ -1,0 +1,38 @@
+; Check that a pipeline compilation fails when resource nodes are missing
+
+; BEGIN_SHADERTEST
+; RUN: not --crash amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: LLVM FATAL ERROR: Resource node not found
+; END_SHADERTEST
+
+[CsGlsl]
+#version 450
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+layout(set = 0, binding = 1, std140) uniform UBO
+{
+    int a;
+    int b;
+    int c;
+    int objectCount;
+} ubo;
+
+layout(set = 0, binding = 0, std430) buffer Pos
+{
+    vec4 object[];
+} pos;
+
+void main()
+{
+    uint index = gl_GlobalInvocationID.x;
+    if (index >= uint(ubo.objectCount))
+    {
+        return;
+    }
+    vec4 position = pos.object[index];
+    pos.object[index].w = dot(position.xyz, position.xyz);
+}
+
+[CsInfo]
+entryPoint = main
