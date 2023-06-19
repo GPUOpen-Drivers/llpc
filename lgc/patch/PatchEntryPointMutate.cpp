@@ -151,6 +151,7 @@ bool PatchEntryPointMutate::runImpl(Module &module, PipelineShadersResult &pipel
     for (unsigned shaderStage = 0; shaderStage < ShaderStageNativeStageCount; ++shaderStage) {
       m_entryPoint = pipelineShaders.getEntryPoint(static_cast<ShaderStage>(shaderStage));
       if (m_entryPoint) {
+
         m_shaderStage = static_cast<ShaderStage>(shaderStage);
         processShader(&shaderInputs);
       }

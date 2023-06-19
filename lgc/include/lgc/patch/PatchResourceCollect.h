@@ -72,10 +72,7 @@ private:
   void processMissingFs();
 
   bool isVertexReuseDisabled();
-
-#if VKI_RAY_TRACING
   void checkRayQueryLdsStackUsage(llvm::Module *module);
-#endif
 
   void clearInactiveBuiltInInput();
   void clearInactiveBuiltInOutput();

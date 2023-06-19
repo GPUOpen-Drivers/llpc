@@ -143,10 +143,8 @@ public:
   virtual const PipelineOptions *getPipelineOptions() const = 0;
 
   // Gets subgroup size usage denoting which stage uses features relevant to subgroup size.
-  // @returns : Bitmask per stage, in the same order as defined in `Vkgc::ShaderStage`.
-#if VKI_RAY_TRACING
+  // @returns : Bitmask per stage, in the same order as defined in `Vkgc::ShaderStage.
   // NOTE: For raytracing, returns (-1) if the pipeline uses features relevant to subgroup size.
-#endif
   virtual unsigned getSubgroupSizeUsage() const = 0;
 
   // Set pipeline state in lgc::Pipeline object for middle-end, and (optionally) hash the state.
@@ -158,12 +156,10 @@ public:
   // Gets client-defined metadata
   virtual llvm::StringRef getClientMetadata() const = 0;
 
-#if VKI_RAY_TRACING
   virtual void collectPayloadSize(llvm::Type *type, const llvm::DataLayout &dataLayout) {}
   virtual void collectCallableDataSize(llvm::Type *type, const llvm::DataLayout &dataLayout) {}
   virtual void collectAttributeDataSize(llvm::Type *type, const llvm::DataLayout &dataLayout) {}
   virtual void collectBuiltIn(unsigned builtIn) {}
-#endif
 
   static const char *getGpuNameAbbreviation(GfxIpVersion gfxIp);
 
@@ -176,14 +172,12 @@ public:
   // Gets cache hash code compacted to 64-bits.
   uint64_t get64BitCacheHashCode() const { return MetroHash::compact64(&m_cacheHash); }
 
-#if VKI_RAY_TRACING
   unsigned getRayTracingWaveSize() const;
 
   llvm::StringRef getRayTracingFunctionName(unsigned funcType);
 
   // Gets ray tracing state info
   const Vkgc::RtState *getRayTracingState() { return &m_rtState; }
-#endif
 
   // Gets the finalized 128-bit cache hash code.
   lgc::Hash128 get128BitCacheHashCode() const {

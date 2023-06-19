@@ -146,6 +146,7 @@ private:
   void writeValueToLds(llvm::Value *writeValue, llvm::Value *ldsOffset);
   void atomicOpWithLds(llvm::AtomicRMWInst::BinOp atomicOp, llvm::Value *atomicValue, llvm::Value *ldsOffset);
   void createFenceAndBarrier();
+  void createBarrier();
 
   static constexpr unsigned PayloadRingEntrySize = 16 * 1024;    // 16K bytes per group
   static constexpr unsigned DrawDataRingEntrySize = 16;          // 16 bytes per group

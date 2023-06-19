@@ -1559,7 +1559,6 @@ Value *BuilderImpl::CreateImageGetLod(unsigned dim, unsigned flags, Value *image
   return result;
 }
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Create a ray intersect result with specified node in BVH buffer
 //
@@ -1584,8 +1583,6 @@ Value *BuilderImpl::CreateImageBvhIntersectRay(Value *nodePtr, Value *extent, Va
 
   return CreateIntrinsic(FixedVectorType::get(getInt32Ty(), 4), Intrinsic::amdgcn_image_bvh_intersect_ray, args);
 }
-
-#endif
 
 // =====================================================================================================================
 // Change 1D or 1DArray dimension to 2D or 2DArray if needed as a workaround on GFX9+
@@ -2059,7 +2056,7 @@ void BuilderImpl::enforceReadFirstLane(Instruction *imageInst, unsigned descIdx)
   Value *newDesc = PoisonValue::get(FixedVectorType::get(getInt32Ty(), elemCount));
   for (unsigned elemIdx = 0; elemIdx < elemCount; ++elemIdx) {
     Value *elem = CreateExtractElement(origDesc, elemIdx);
-    elem = CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, elem);
+    elem = CreateIntrinsic(getInt32Ty(), Intrinsic::amdgcn_readfirstlane, elem);
     newDesc = CreateInsertElement(newDesc, elem, elemIdx);
   }
   imageInst->setOperand(descIdx, newDesc);

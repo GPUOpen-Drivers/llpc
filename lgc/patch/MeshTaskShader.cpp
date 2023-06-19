@@ -754,7 +754,7 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
       barrierToggle = m_builder.CreateNot(barrierToggle);
       m_builder.CreateStore(barrierToggle, m_barrierToggle);
 
-      m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+      createBarrier();
 
       auto ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::BarrierCompletion));
       auto barrierFlag = readValueFromLds(m_builder.getInt32Ty(), ldsOffset);
@@ -775,7 +775,7 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
       // NOTEL: Here, we don't need barrier completion flag, but we still find API barriers. To match number of API
       // barriers, we add additional barriers in extra waves. The number is known.
       for (unsigned i = 0; i < numBarriers; ++i) {
-        m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+        createBarrier();
       }
       m_builder.CreateBr(checkMeshOutputCountBlock);
     }
@@ -791,12 +791,14 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
 
     Value *ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexCount));
     vertexCount = readValueFromLds(m_builder.getInt32Ty(), ldsOffset);
-    vertexCount = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertexCount); // Promoted to SGPR
+    vertexCount = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane,
+                                            vertexCount); // Promoted to SGPR
     vertexCount->setName("vertexCount");
 
     ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveCount));
     primitiveCount = readValueFromLds(m_builder.getInt32Ty(), ldsOffset);
-    primitiveCount = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primitiveCount); // Promoted to SGPR
+    primitiveCount = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane,
+                                               primitiveCount); // Promoted to SGPR
     primitiveCount->setName("primitiveCount");
 
     auto dummyAllocReq = m_builder.CreateICmpEQ(vertexCount, m_builder.getInt32(InvalidValue));
@@ -1262,11 +1264,12 @@ void MeshTaskShader::initWaveThreadInfo(Function *entryPoint) {
     // Task shader
     auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageTask)->entryArgIdxs.task;
 
-    // waveId = dispatchInfo[24:20]
-    m_waveThreadInfo.waveIdInSubgroup =
-        m_builder.CreateAnd(m_builder.CreateLShr(getFunctionArgument(entryPoint, entryArgIdxs.multiDispatchInfo), 20),
-                            0x1F, "waveIdInSubgroup");
-
+    {
+      // waveId = dispatchInfo[24:20]
+      m_waveThreadInfo.waveIdInSubgroup =
+          m_builder.CreateAnd(m_builder.CreateLShr(getFunctionArgument(entryPoint, entryArgIdxs.multiDispatchInfo), 20),
+                              0x1F, "waveIdInSubgroup");
+    }
     const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageTask);
 
     m_waveThreadInfo.threadIdInWave =
@@ -1459,7 +1462,7 @@ void MeshTaskShader::emitTaskMeshs(Value *groupCountX, Value *groupCountY, Value
     if (m_accessTaskPayload) {
       // Make sure the task payload read/write access is completed
       m_builder.CreateFence(AtomicOrdering::Release, SyncScope::System);
-      m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+      createBarrier();
     }
 
     auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_waveThreadInfo.threadIdInSubgroup, m_builder.getInt32(0));
@@ -1780,8 +1783,8 @@ void MeshTaskShader::setMeshOutputs(Value *vertexCount, Value *primitiveCount) {
     m_builder.SetInsertPoint(setMeshOutputsBlock->getTerminator());
 
     // Promote vertex/primitive count to SGPRs
-    vertexCount = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertexCount);
-    primitiveCount = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primitiveCount);
+    vertexCount = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, vertexCount);
+    primitiveCount = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, primitiveCount);
 
     // Check if vertex count or primitive count is zero. If so, set both to zero in order to disable vertex/primitive
     // exporting.
@@ -1795,8 +1798,8 @@ void MeshTaskShader::setMeshOutputs(Value *vertexCount, Value *primitiveCount) {
     // SGPR. LLVM backend has issues of handling this because it doesn't use s_cselect to translate LLVM IR select
     // instruction (which keeps the destination operand still in SGPR) and it doesn't use readfirstlane to promote
     // VGPR to SGPR for M0.
-    vertexCount = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertexCount);
-    primitiveCount = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primitiveCount);
+    vertexCount = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, vertexCount);
+    primitiveCount = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, primitiveCount);
 
     // M0[10:0] = vertexCount, M0[22:12] = primitiveCount
     Value *m0 = m_builder.CreateShl(primitiveCount, 12);
@@ -2587,7 +2590,8 @@ Value *MeshTaskShader::getMeshFlatWorkgroupId() {
 
   auto ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::FlatWorkgroupId));
   auto flatWorkgroupId = readValueFromLds(m_builder.getInt32Ty(), ldsOffset);
-  flatWorkgroupId = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, flatWorkgroupId); // Promoted to SGPR
+  flatWorkgroupId = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane,
+                                              flatWorkgroupId); // Promoted to SGPR
   flatWorkgroupId->setName("flatWorkgroupId");
 
   return flatWorkgroupId;
@@ -2647,19 +2651,22 @@ Value *MeshTaskShader::getMeshWorkgroupId() {
     auto dispatchDimXMulY = m_builder.CreateMul(dispatchDimX, dispatchDimY);
 
     workgroupIdZ = m_builder.CreateUDiv(flatWorkgroupId, dispatchDimXMulY);
-    workgroupIdZ = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, workgroupIdZ, nullptr,
-                                             "workgroupIdZ"); // Promoted to SGPR
+    workgroupIdZ =
+        m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, workgroupIdZ, nullptr,
+                                  "workgroupIdZ"); // Promoted to SGPR
 
     auto diff = m_builder.CreateMul(dispatchDimXMulY, workgroupIdZ);
     diff = m_builder.CreateSub(flatWorkgroupId, diff);
     workgroupIdY = m_builder.CreateUDiv(diff, dispatchDimX);
-    workgroupIdY = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, workgroupIdY, nullptr,
-                                             "workgroupIdY"); // Promoted to SGPR
+    workgroupIdY =
+        m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, workgroupIdY, nullptr,
+                                  "workgroupIdY"); // Promoted to SGPR
 
     workgroupIdX = m_builder.CreateMul(dispatchDimX, workgroupIdY);
     workgroupIdX = m_builder.CreateSub(diff, workgroupIdX);
-    workgroupIdX = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, workgroupIdX, nullptr,
-                                             "workgroupIdX"); // Promoted to SGPR
+    workgroupIdX =
+        m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, workgroupIdX, nullptr,
+                                  "workgroupIdX"); // Promoted to SGPR
   }
 
   Value *workgroupId = PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 3));
@@ -3141,12 +3148,19 @@ void MeshTaskShader::atomicOpWithLds(AtomicRMWInst::BinOp atomicOp, Value *atomi
 }
 
 // =====================================================================================================================
-// Create LDS fence and barrier to guarantee the synchronization of LDS operations.
+// Create both LDS fence and barrier to guarantee the synchronization of LDS operations.
 void MeshTaskShader::createFenceAndBarrier() {
   SyncScope::ID syncScope = m_builder.getContext().getOrInsertSyncScopeID("workgroup");
   m_builder.CreateFence(AtomicOrdering::Release, syncScope);
-  m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+  createBarrier();
   m_builder.CreateFence(AtomicOrdering::Acquire, syncScope);
+}
+
+// =====================================================================================================================
+// Create LDS barrier to guarantee the synchronization of LDS operations.
+void MeshTaskShader::createBarrier() {
+
+  m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 }
 
 } // namespace lgc

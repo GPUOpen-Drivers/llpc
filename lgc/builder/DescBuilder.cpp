@@ -146,6 +146,14 @@ Value *BuilderImpl::CreateLoadBufferDesc(uint64_t descSet, unsigned binding, Val
         descIndex = CreateMul(descIndex, getStride(resType, descSet, binding, node));
         descPtr = CreateGEP(getInt8Ty(), descPtr, descIndex);
       }
+
+      // The buffer may have an attached counter buffer descriptor which do not have a different set or binding.
+      if (flags & BufferFlagAttachedCounter) {
+        // The node stride must be large enough to hold 2 buffer descriptors.
+        assert(node->stride * sizeof(uint32_t) == 2 * DescriptorSizeBuffer);
+        descPtr = CreateGEP(getInt8Ty(), descPtr, getInt32(DescriptorSizeBuffer));
+      }
+
       // Cast it to the right type.
       descPtr = CreateBitCast(descPtr, getDescPtrTy(resType));
       // Load the descriptor.
@@ -534,7 +542,7 @@ Value *BuilderImpl::scalarizeIfUniform(Value *value, bool isNonUniform) {
   if (!isNonUniform && !isa<Constant>(value)) {
     // NOTE: GFX6 encounters GPU hang with this optimization enabled. So we should skip it.
     if (getPipelineState()->getTargetInfo().getGfxIpVersion().major > 6)
-      value = CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, value);
+      value = CreateIntrinsic(getInt32Ty(), Intrinsic::amdgcn_readfirstlane, value);
   }
   return value;
 }

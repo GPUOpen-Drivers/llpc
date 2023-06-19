@@ -7,7 +7,7 @@
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: [[SMP_DESC:%[0-9]*]] = load <4 x i32>, ptr addrspace(4) %{{[0-9]*}}, align 16, !invariant.load
 ; SHADERTEST: [[IMG_DESC:%[0-9]*]] = load <8 x i32>, ptr addrspace(4) %{{[0-9]*}}, align 32, !invariant.load
-; SHADERTEST: lgc.create.image.sample.v4f32(i32 1, i32 512, <8 x i32> [[IMG_DESC]], <4 x i32> [[SMP_DESC]], i32 33, <2 x float> zeroinitializer, float 0.000000e+00) 
+; SHADERTEST: lgc.create.image.sample.v4f32(i32 1, i32 512, <8 x i32> [[IMG_DESC]], <4 x i32> [[SMP_DESC]], i32 33, <2 x float> zeroinitializer, float 0.000000e+00)
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
 */
 // END_SHADERTEST

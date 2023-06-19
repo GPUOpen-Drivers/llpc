@@ -201,101 +201,100 @@ void PalMetadata::mergeFromBlob(llvm::StringRef blob, bool isGlueCode) {
   // -1: failure
   // 0: success; *dest has been set up with the merged node. For an array, 0 means overwrite the existing array
   //    rather than appending.
-  auto merger =
-      [isGlueCode](msgpack::DocNode *destNode, msgpack::DocNode srcNode, msgpack::DocNode mapKey) {
-        // Allow array and map merging.
-        if (srcNode.isMap() && destNode->isMap())
-          return 0;
-        if (srcNode.isArray() && destNode->isArray())
-          return 0;
-        // Allow string merging as long as the two strings have the same value. If one string has a "_fetchless"
-        // suffix, take the other one. This is for the benefit of the linker linking a fetch shader with a
-        // fetchless VS.
-        if (destNode->isString() && srcNode.isString()) {
-          if (destNode->getString() == srcNode.getString())
-            return 0;
-          if (srcNode.getString().endswith("_fetchless"))
-            return 0;
-          if (destNode->getString().endswith("_fetchless")) {
-            *destNode = srcNode;
-            return 0;
-          }
-          if (srcNode.getString() == "color_export_shader")
-            return 0;
-          if (destNode->getString() == "color_export_shader") {
-            *destNode = srcNode;
-            return 0;
-          }
-        }
-        // Allow bool merging (for things like .uses_viewport_array_index).
-        if (destNode->getKind() == msgpack::Type::Boolean && srcNode.getKind() == msgpack::Type::Boolean) {
-          if (srcNode.getBool())
-            *destNode = srcNode.getDocument()->getNode(true);
-          return 0;
-        }
-        // Disallow merging other than uint.
-        if (destNode->getKind() != msgpack::Type::UInt || srcNode.getKind() != msgpack::Type::UInt)
-          return -1;
-        // Special cases of uint merging.
-        if (mapKey.getKind() == msgpack::Type::UInt) {
-          switch (mapKey.getUInt()) {
-          case mmVGT_SHADER_STAGES_EN:
-            // Ignore new value of VGT_SHADER_STAGES_EN from glue shader, as it might accidentally make the VS
-            // wave32. (This relies on the glue shader's PAL metadata being merged into the vertex-processing
-            // part-pipeline, rather than the other way round.)
-            if (isGlueCode)
-              return 0;
-            break; // Use "default behavior for uint nodes" code below.
-          case mmSPI_SHADER_PGM_RSRC1_LS:
-          case mmSPI_SHADER_PGM_RSRC1_HS:
-          case mmSPI_SHADER_PGM_RSRC1_ES:
-          case mmSPI_SHADER_PGM_RSRC1_GS:
-          case mmSPI_SHADER_PGM_RSRC1_VS:
-          case mmSPI_SHADER_PGM_RSRC1_PS: {
-            // For the RSRC1 registers, we need to consider the VGPRs and SGPRs fields separately, and max them.
-            // This happens when linking in a glue shader.
-            SPI_SHADER_PGM_RSRC1 destRsrc1;
-            SPI_SHADER_PGM_RSRC1 srcRsrc1;
-            SPI_SHADER_PGM_RSRC1 origRsrc1;
-            origRsrc1.u32All = destNode->getUInt();
-            srcRsrc1.u32All = srcNode.getUInt();
-            destRsrc1.u32All = origRsrc1.u32All | srcRsrc1.u32All;
-            destRsrc1.bits.VGPRS = std::max(origRsrc1.bits.VGPRS, srcRsrc1.bits.VGPRS);
-            destRsrc1.bits.SGPRS = std::max(origRsrc1.bits.SGPRS, srcRsrc1.bits.SGPRS);
-            if (isGlueCode) {
-              // The float mode should come from the body of the shader and not the glue code.
-              destRsrc1.bits.FLOAT_MODE = origRsrc1.bits.FLOAT_MODE;
-            }
-            *destNode = srcNode.getDocument()->getNode(destRsrc1.u32All);
-            return 0;
-          }
-          case mmSPI_PS_INPUT_ENA:
-          case mmSPI_PS_INPUT_ADDR:
-          case mmSPI_PS_IN_CONTROL:
-            if (isGlueCode)
-              return 0;
-            break; // Use "default behavior for uint nodes" code below.
-          }
-        } else if (mapKey.isString()) {
-          // For .userdatalimit, register counts, and register limits, take the max value.
-          if (mapKey.getString() == Util::Abi::PipelineMetadataKey::UserDataLimit ||
-              mapKey.getString() == Util::Abi::HardwareStageMetadataKey::SgprCount ||
-              mapKey.getString() == Util::Abi::HardwareStageMetadataKey::SgprLimit ||
-              mapKey.getString() == Util::Abi::HardwareStageMetadataKey::VgprCount ||
-              mapKey.getString() == Util::Abi::HardwareStageMetadataKey::VgprLimit) {
-            *destNode = std::max(destNode->getUInt(), srcNode.getUInt());
-            return 0;
-          }
-          // For .spillthreshold, take the min value.
-          if (mapKey.getString() == Util::Abi::PipelineMetadataKey::SpillThreshold) {
-            *destNode = std::min(destNode->getUInt(), srcNode.getUInt());
-            return 0;
-          }
-        }
-        // Default behavior for uint nodes: "or" the values together.
-        *destNode = destNode->getUInt() | srcNode.getUInt();
+  auto merger = [isGlueCode](msgpack::DocNode *destNode, msgpack::DocNode srcNode, msgpack::DocNode mapKey) {
+    // Allow array and map merging.
+    if (srcNode.isMap() && destNode->isMap())
+      return 0;
+    if (srcNode.isArray() && destNode->isArray())
+      return 0;
+    // Allow string merging as long as the two strings have the same value. If one string has a "_fetchless"
+    // suffix, take the other one. This is for the benefit of the linker linking a fetch shader with a
+    // fetchless VS.
+    if (destNode->isString() && srcNode.isString()) {
+      if (destNode->getString() == srcNode.getString())
         return 0;
-      };
+      if (srcNode.getString().endswith("_fetchless"))
+        return 0;
+      if (destNode->getString().endswith("_fetchless")) {
+        *destNode = srcNode;
+        return 0;
+      }
+      if (srcNode.getString() == "color_export_shader")
+        return 0;
+      if (destNode->getString() == "color_export_shader") {
+        *destNode = srcNode;
+        return 0;
+      }
+    }
+    // Allow bool merging (for things like .uses_viewport_array_index).
+    if (destNode->getKind() == msgpack::Type::Boolean && srcNode.getKind() == msgpack::Type::Boolean) {
+      if (srcNode.getBool())
+        *destNode = srcNode.getDocument()->getNode(true);
+      return 0;
+    }
+    // Disallow merging other than uint.
+    if (destNode->getKind() != msgpack::Type::UInt || srcNode.getKind() != msgpack::Type::UInt)
+      return -1;
+    // Special cases of uint merging.
+    if (mapKey.getKind() == msgpack::Type::UInt) {
+      switch (mapKey.getUInt()) {
+      case mmVGT_SHADER_STAGES_EN:
+        // Ignore new value of VGT_SHADER_STAGES_EN from glue shader, as it might accidentally make the VS
+        // wave32. (This relies on the glue shader's PAL metadata being merged into the vertex-processing
+        // part-pipeline, rather than the other way round.)
+        if (isGlueCode)
+          return 0;
+        break; // Use "default behavior for uint nodes" code below.
+      case mmSPI_SHADER_PGM_RSRC1_LS:
+      case mmSPI_SHADER_PGM_RSRC1_HS:
+      case mmSPI_SHADER_PGM_RSRC1_ES:
+      case mmSPI_SHADER_PGM_RSRC1_GS:
+      case mmSPI_SHADER_PGM_RSRC1_VS:
+      case mmSPI_SHADER_PGM_RSRC1_PS: {
+        // For the RSRC1 registers, we need to consider the VGPRs and SGPRs fields separately, and max them.
+        // This happens when linking in a glue shader.
+        SPI_SHADER_PGM_RSRC1 destRsrc1;
+        SPI_SHADER_PGM_RSRC1 srcRsrc1;
+        SPI_SHADER_PGM_RSRC1 origRsrc1;
+        origRsrc1.u32All = destNode->getUInt();
+        srcRsrc1.u32All = srcNode.getUInt();
+        destRsrc1.u32All = origRsrc1.u32All | srcRsrc1.u32All;
+        destRsrc1.bits.VGPRS = std::max(origRsrc1.bits.VGPRS, srcRsrc1.bits.VGPRS);
+        destRsrc1.bits.SGPRS = std::max(origRsrc1.bits.SGPRS, srcRsrc1.bits.SGPRS);
+        if (isGlueCode) {
+          // The float mode should come from the body of the shader and not the glue code.
+          destRsrc1.bits.FLOAT_MODE = origRsrc1.bits.FLOAT_MODE;
+        }
+        *destNode = srcNode.getDocument()->getNode(destRsrc1.u32All);
+        return 0;
+      }
+      case mmSPI_PS_INPUT_ENA:
+      case mmSPI_PS_INPUT_ADDR:
+      case mmSPI_PS_IN_CONTROL:
+        if (isGlueCode)
+          return 0;
+        break; // Use "default behavior for uint nodes" code below.
+      }
+    } else if (mapKey.isString()) {
+      // For .userdatalimit, register counts, and register limits, take the max value.
+      if (mapKey.getString() == Util::Abi::PipelineMetadataKey::UserDataLimit ||
+          mapKey.getString() == Util::Abi::HardwareStageMetadataKey::SgprCount ||
+          mapKey.getString() == Util::Abi::HardwareStageMetadataKey::SgprLimit ||
+          mapKey.getString() == Util::Abi::HardwareStageMetadataKey::VgprCount ||
+          mapKey.getString() == Util::Abi::HardwareStageMetadataKey::VgprLimit) {
+        *destNode = std::max(destNode->getUInt(), srcNode.getUInt());
+        return 0;
+      }
+      // For .spillthreshold, take the min value.
+      if (mapKey.getString() == Util::Abi::PipelineMetadataKey::SpillThreshold) {
+        *destNode = std::min(destNode->getUInt(), srcNode.getUInt());
+        return 0;
+      }
+    }
+    // Default behavior for uint nodes: "or" the values together.
+    *destNode = destNode->getUInt() | srcNode.getUInt();
+    return 0;
+  };
   auto mergerNew = [isGlueCode](msgpack::DocNode *destNode, msgpack::DocNode srcNode, msgpack::DocNode mapKey) {
     // Allow array and map merging.
     if (srcNode.isMap() && destNode->isMap())
@@ -600,6 +599,11 @@ void PalMetadata::fixUpRegisters() {
                                                                  {mmSPI_SHADER_USER_DATA_VS_0, 32},
                                                                  {mmSPI_SHADER_USER_DATA_GS_0, 32},
                                                                  {mmSPI_SHADER_USER_DATA_HS_0, 32}};
+  static const std::pair<unsigned, unsigned> Gfx10WithTaskRegRanges[] = {{mmCOMPUTE_USER_DATA_0, 16},
+                                                                         {mmSPI_SHADER_USER_DATA_PS_0, 32},
+                                                                         {mmSPI_SHADER_USER_DATA_VS_0, 32},
+                                                                         {mmSPI_SHADER_USER_DATA_GS_0, 32},
+                                                                         {mmSPI_SHADER_USER_DATA_HS_0, 32}};
 
   ArrayRef<std::pair<unsigned, unsigned>> regRanges = ComputeRegRanges;
   if (m_pipelineState->isGraphics()) {
@@ -607,6 +611,8 @@ void PalMetadata::fixUpRegisters() {
       regRanges = Gfx8RegRanges;
     else if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 9)
       regRanges = Gfx9RegRanges;
+    else if (m_pipelineState->hasShaderStage(ShaderStageTask))
+      regRanges = Gfx10WithTaskRegRanges;
     else
       regRanges = Gfx10RegRanges;
   }
@@ -631,17 +637,24 @@ void PalMetadata::fixUpRegisters() {
         size_t descSet = node.innerTable[0].set;
         descSetNodes.resize(std::max(descSetNodes.size(), descSet + 1));
         descSetNodes[descSet] = &node;
-      } else if ((node.concreteType == ResourceNodeType::DescriptorBuffer) ||
+      } else if (node.concreteType == ResourceNodeType::PushConst) {
+        pushConstNode = &node;
+      } else if ((node.concreteType == ResourceNodeType::DescriptorResource) ||
+                 (node.concreteType == ResourceNodeType::DescriptorSampler) ||
+                 (node.concreteType == ResourceNodeType::DescriptorCombinedTexture) ||
+                 (node.concreteType == ResourceNodeType::DescriptorTexelBuffer) ||
+                 (node.concreteType == ResourceNodeType::DescriptorFmask) ||
+                 (node.concreteType == ResourceNodeType::InlineBuffer) ||
+                 (node.concreteType == ResourceNodeType::DescriptorBuffer) ||
                  (node.concreteType == ResourceNodeType::DescriptorConstBuffer) ||
                  (node.concreteType == ResourceNodeType::DescriptorBufferCompact) ||
-                 (node.concreteType == ResourceNodeType::DescriptorConstBufferCompact)) {
+                 (node.concreteType == ResourceNodeType::DescriptorConstBufferCompact) ||
+                 (node.concreteType == ResourceNodeType::DescriptorMutable)) {
         size_t descSet = node.set;
         if (descSet != InvalidValue) {
           descSetNodes.resize(std::max(descSetNodes.size(), descSet + 1));
           descSetNodes[descSet] = &node;
         }
-      } else if (node.concreteType == ResourceNodeType::PushConst) {
-        pushConstNode = &node;
       }
     }
   }

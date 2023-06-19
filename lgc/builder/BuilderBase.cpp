@@ -281,5 +281,5 @@ Value *BuilderBase::CreateSetInactive(Value *active, Value *inactive) {
     return builder.CreateIntrinsic(Intrinsic::amdgcn_set_inactive, active->getType(), {active, inactive});
   };
 
-  return CreateMapToInt32(mapFunc, {CreateInlineAsmSideEffect(active), inactive}, {});
+  return CreateMapToInt32(mapFunc, {active, inactive}, {});
 }

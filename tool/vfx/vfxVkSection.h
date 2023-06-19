@@ -379,9 +379,7 @@ private:
                                      false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enableImplicitInvariantExports, MemberTypeBool, false);
       // One internal member
-#if VKI_RAY_TRACING
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, internalRtShaders, MemberTypeBool, false);
-#endif
 #if VKI_BUILD_GFX11
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, optimizeTessFactor, MemberTypeBool, false);
 #endif
@@ -431,7 +429,6 @@ private:
   SubState m_state;
 };
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Represents the sub section IndirectCalleeSavedRegs state
 class SectionIndirectCalleeSavedRegs : public Section {
@@ -651,7 +648,6 @@ private:
   unsigned m_bvhResDescSize = 0;
   std::vector<unsigned> m_bvhResDesc;
 };
-#endif
 
 // =====================================================================================================================
 // Represents the section graphics state
@@ -692,11 +688,9 @@ public:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, dynamicVertexStride, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableUberFetchShader, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableEarlyCompile, MemberTypeBool, false);
-
-#if VKI_RAY_TRACING
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_shaderLibrary, MemberTypeString, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_rtState, MemberTypeRtState, true);
-#endif
+
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -708,7 +702,6 @@ public:
     m_options.getSubState(m_state.options);
     m_nggState.getSubState(m_state.nggState);
     state = m_state;
-#if VKI_RAY_TRACING
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
     std::string dummySource;
     if (!m_shaderLibrary.empty()) {
@@ -720,7 +713,6 @@ public:
     }
 #endif
     m_rtState.getSubState(docFilename, state.rtState, errorMsg);
-#endif
   };
   SubState &getSubStateRef() { return m_state; };
 
@@ -729,11 +721,9 @@ private:
   SubState m_state;
   SectionColorBuffer m_colorBuffer[Vkgc::MaxColorTargets]; // Color buffer
   SectionPipelineOption m_options;
-#if VKI_RAY_TRACING
   std::string m_shaderLibrary;
   std::vector<uint8_t> m_shaderLibraryBytes;
   SectionRtState m_rtState;
-#endif
 };
 
 // =====================================================================================================================
@@ -751,10 +741,9 @@ public:
       std::vector<StrToMemberAddr> addrTableInitializer;
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionComputeState, deviceIndex, MemberTypeInt, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, m_options, MemberTypePipelineOption, true);
-#if VKI_RAY_TRACING
       INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, m_shaderLibrary, MemberTypeString, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, m_rtState, MemberTypeRtState, true);
-#endif
+
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -763,7 +752,6 @@ public:
   void getSubState(const std::string &docFilename, SubState &state, std::string *errorMsg) {
     m_options.getSubState(m_state.options);
     state = m_state;
-#if VKI_RAY_TRACING
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
     std::string dummySource;
     if (!m_shaderLibrary.empty()) {
@@ -775,21 +763,17 @@ public:
     }
 #endif
     m_rtState.getSubState(docFilename, state.rtState, errorMsg);
-#endif
   }
   SubState &getSubStateRef() { return m_state; }
 
 private:
   SubState m_state;
   SectionPipelineOption m_options;
-#if VKI_RAY_TRACING
   std::string m_shaderLibrary;
   std::vector<uint8_t> m_shaderLibraryBytes;
   SectionRtState m_rtState;
-#endif
 };
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Represents the section ray tracing state
 class SectionRayTracingState : public Section {
@@ -856,6 +840,5 @@ private:
   std::vector<VkRayTracingShaderGroupCreateInfoKHR> m_vkShaderGroups;
   std::vector<uint8_t> m_traceRayBinary;
 };
-#endif
 
 } // namespace Vfx
