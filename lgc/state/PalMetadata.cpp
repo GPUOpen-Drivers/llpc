@@ -683,6 +683,7 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
         m_pipelineState->getColorExportState().alphaToCoverageEnable) {
       DB_SHADER_CONTROL dbShaderControl = {};
       dbShaderControl.u32All = getRegister(mmDB_SHADER_CONTROL);
+      // dbShaderControl.bitfields.ALPHA_TO_MASK_DISABLE = 0;
       dbShaderControl.bitfields.ALPHA_TO_MASK_DISABLE = dbShaderControl.bitfields.MASK_EXPORT_ENABLE;
       setRegister(mmDB_SHADER_CONTROL, dbShaderControl.u32All);
     }

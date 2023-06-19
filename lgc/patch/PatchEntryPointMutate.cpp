@@ -644,7 +644,7 @@ void PatchEntryPointMutate::processShader(ShaderInputs *shaderInputs) {
   // Create new entry-point from the original one
   SmallVector<Type *, 8> argTys;
   SmallVector<std::string, 8> argNames;
-  uint64_t inRegMask = generateEntryPointArgTys(shaderInputs, argTys, argNames, 0);
+  uint64_t inRegMask = generateEntryPointArgTys(shaderInputs, nullptr, argTys, argNames, 0);
 
   Function *origEntryPoint = m_entryPoint;
 
@@ -725,7 +725,7 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
     SmallVector<Type *, 20> shaderInputTys;
     SmallVector<std::string, 20> shaderInputNames;
     uint64_t inRegMask =
-        generateEntryPointArgTys(shaderInputs, shaderInputTys, shaderInputNames, origType->getNumParams());
+        generateEntryPointArgTys(shaderInputs, origFunc, shaderInputTys, shaderInputNames, origType->getNumParams());
 
     // Create the new function and transfer code and attributes to it.
     Function *newFunc =
@@ -974,12 +974,14 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
 // both shaders that are going to be merged (VS-HS, VS-GS if no tessellation, ES-GS).
 //
 // @param shaderInputs : ShaderInputs object representing hardware-provided shader inputs
+// @param origFunc : The original entry point function
 // @param [out] argTys : The argument types for the new function type
 // @param [out] argNames : The argument names corresponding to the argument types
 // @returns inRegMask : "Inreg" bit mask for the arguments, with a bit set to indicate that the corresponding
 //                          arg needs to have an "inreg" attribute to put the arg into SGPRs rather than VGPRs
 //
-uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInputs, SmallVectorImpl<Type *> &argTys,
+uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInputs, Function *origFunc,
+                                                         SmallVectorImpl<Type *> &argTys,
                                                          SmallVectorImpl<std::string> &argNames, unsigned argOffset) {
 
   uint64_t inRegMask = 0;
@@ -1073,7 +1075,7 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
   inRegMask = (1ull << argTys.size()) - 1;
 
   // Push the fixed system (not user data) register args.
-  inRegMask |= shaderInputs->getShaderArgTys(m_pipelineState, m_shaderStage, argTys, argNames, argOffset);
+  inRegMask |= shaderInputs->getShaderArgTys(m_pipelineState, m_shaderStage, origFunc, argTys, argNames, argOffset);
 
   if (m_pipelineState->useRegisterFieldFormat()) {
     constexpr unsigned NumUserSgprs = 32;

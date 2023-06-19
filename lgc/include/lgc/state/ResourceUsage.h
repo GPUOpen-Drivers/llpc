@@ -633,6 +633,8 @@ struct InterfaceData {
 
       // Compute shader
       struct {
+        unsigned workgroupId;       // Workgroup ID
+        unsigned multiDispatchInfo; // Multiple dispatch info
         unsigned localInvocationId; // Local invocation ID
       } cs;
     };

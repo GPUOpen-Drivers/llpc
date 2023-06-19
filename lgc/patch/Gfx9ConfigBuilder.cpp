@@ -1922,9 +1922,22 @@ void ConfigBuilder::buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *confi
   // Set registers based on shader interface data
   SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TRAP_PRESENT, shaderOptions.trapPresent);
   SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, USER_SGPR, intfData->userDataCount);
-  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_X_EN, true);
-  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_Y_EN, true);
-  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_Z_EN, true);
+
+  Function *attribFunc = nullptr;
+  for (Function &func : *m_module) {
+    // Only entrypoint and amd_gfx functions may have the function attribute for workgroup id.
+    if (isShaderEntryPoint(&func) || (func.getCallingConv() == CallingConv::AMDGPU_Gfx)) {
+      attribFunc = &func;
+      break;
+    }
+  }
+  bool xEn = !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-x");
+  bool yEn = !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-y");
+  bool zEn = !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-z");
+
+  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_X_EN, xEn);
+  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_Y_EN, yEn);
+  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_Z_EN, zEn);
   SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TG_SIZE_EN, true);
 
   // 0 = X, 1 = XY, 2 = XYZ
