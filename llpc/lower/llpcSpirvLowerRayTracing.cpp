@@ -470,8 +470,6 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
   initGlobalPayloads();
   initShaderBuiltIns();
   initGlobalCallableData();
-  createGlobalLdsUsage();
-  createGlobalRayQueryObj();
   createGlobalTraceRayStaticId();
   createGlobalTraceParams();
 
@@ -488,7 +486,6 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
   if (m_shaderStage == ShaderStageCompute) {
     for (auto funcIt = module.begin(), funcEnd = module.end(); funcIt != funcEnd;) {
       Function *func = &*funcIt++;
-      SpirvLowerRayQuery::processLibraryFunction(func);
       if (func)
         processLibraryFunction(func);
     }
@@ -499,7 +496,6 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
     m_entryPoint->setName(module.getName());
     m_entryPoint->addFnAttr(Attribute::AlwaysInline);
     m_builder->SetInsertPoint(insertPos);
-    initGlobalVariable();
     m_spirvOpMetaKindId = m_context->getMDKindID(MetaNameSpirvOp);
 
     if (m_shaderStage == ShaderStageRayTracingAnyHit || m_shaderStage == ShaderStageRayTracingClosestHit ||
@@ -554,7 +550,6 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
     }
     for (Function &func : module.functions()) {
       unsigned opcode = getFuncOpcode(&func);
-      SpirvLowerRayQuery::processShaderFunction(&func, opcode);
       if (opcode == OpTraceRayKHR || opcode == OpTraceNV)
         createRayTracingFunc<OpTraceRayKHR>(&func, opcode);
       else if (opcode == OpExecuteCallableKHR)
@@ -1580,8 +1575,6 @@ void SpirvLowerRayTracing::createTraceRay() {
 
   BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
   m_builder->SetInsertPoint(entryBlock);
-  if (indirect)
-    initGlobalVariable();
 
   // traceRaysInline argument types
   Type *funcArgTys[] = {

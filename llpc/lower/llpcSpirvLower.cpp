@@ -192,6 +192,9 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
     LgcContext::createAndAddStartStopTimer(passMgr, lowerTimer, true);
 
 #if VKI_RAY_TRACING
+  if (rayTracing)
+    passMgr.addPass(SpirvLowerRayTracing());
+
   if (isInternalRtShader)
     passMgr.addPass(SpirvLowerRayTracingIntrinsics());
 #endif
