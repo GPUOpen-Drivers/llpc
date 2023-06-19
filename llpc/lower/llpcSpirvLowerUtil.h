@@ -37,6 +37,7 @@ namespace llvm {
 class Function;
 class Module;
 class BasicBlock;
+class StringRef;
 
 } // namespace llvm
 
@@ -62,5 +63,7 @@ llvm::Function *getEntryPoint(llvm::Module *module);
 
 // Clears the empty block
 llvm::BasicBlock *clearBlock(llvm::Function *func);
+// Clear non entry external functions
+void clearNonEntryFunctions(llvm::Module *module, llvm::StringRef entryName);
 
 } // namespace Llpc
