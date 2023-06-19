@@ -927,12 +927,81 @@ Result Compiler::buildPipelineWithRelocatableElf(Context *context, ArrayRef<cons
 }
 
 // =====================================================================================================================
+// Returns true if node is of a descriptor type that is unsupported by relocatable shader compilation.
+//
+// @param [in] node : User data node
+static bool isUnrelocatableResourceMappingRootNode(const ResourceMappingNode *node) {
+  switch (node->type) {
+  case ResourceMappingNodeType::DescriptorTableVaPtr: {
+    const ResourceMappingNode *startInnerNode = node->tablePtr.pNext;
+    const ResourceMappingNode *endInnerNode = startInnerNode + node->tablePtr.nodeCount;
+    for (const ResourceMappingNode *innerNode = startInnerNode; innerNode != endInnerNode; ++innerNode) {
+      if (innerNode->type == ResourceMappingNodeType::InlineBuffer) {
+        // The code to handle an inline buffer cannot be easily patched, so relocatable shaders
+        // assume there are no inline buffers.
+        return true;
+      }
+    }
+    break;
+  }
+  case ResourceMappingNodeType::DescriptorSampler:
+  case ResourceMappingNodeType::DescriptorCombinedTexture:
+  case ResourceMappingNodeType::DescriptorTexelBuffer:
+    // Generic descriptors in the top level are not handled by the linker.
+    return true;
+  case ResourceMappingNodeType::InlineBuffer:
+    // Loading from an inline buffer requires building a descriptor that is not handled by the linker.
+    return true;
+  default:
+    break;
+  }
+  return false;
+}
+
+// =====================================================================================================================
+// Returns true if resourceMapping contains a user data node entry with a descriptor type that is unsupported by
+// relocatable shader compilation.
+//
+// @param [in] resourceMapping : resource mapping data, containing user data nodes
+static bool hasUnrelocatableDescriptorNode(const ResourceMappingData *resourceMapping) {
+  auto descriptorRangeValues = ArrayRef<StaticDescriptorValue>(resourceMapping->pStaticDescriptorValues,
+                                                               resourceMapping->staticDescriptorValueCount);
+  for (const auto &range : descriptorRangeValues) {
+    if (range.type == ResourceMappingNodeType::DescriptorYCbCrSampler) {
+      return true;
+    }
+  }
+
+  for (unsigned i = 0; i < resourceMapping->userDataNodeCount; ++i) {
+    if (isUnrelocatableResourceMappingRootNode(&resourceMapping->pUserDataNodes[i].node))
+      return true;
+  }
+
+  // If there is no 1-to-1 mapping between descriptor sets and descriptor tables, then relocatable shaders will fail.
+  SmallSet<unsigned, 8> descriptorSetsSeen;
+  for (unsigned i = 0; i < resourceMapping->userDataNodeCount; ++i) {
+    const ResourceMappingNode *node = &resourceMapping->pUserDataNodes[i].node;
+    if (node->type != ResourceMappingNodeType::DescriptorTableVaPtr)
+      continue;
+    const ResourceMappingNode *innerNode = node->tablePtr.pNext;
+    if (innerNode && !descriptorSetsSeen.insert(innerNode->srdRange.set).second)
+      return true;
+  }
+
+  return false;
+}
+
+// =====================================================================================================================
 // Returns true if a graphics pipeline can be built out of the given shader infos.
 //
 // @param shaderInfos : Shader infos for the pipeline to be built
 // @param pipelineInfo : Pipeline info for the pipeline to be built
 bool Compiler::canUseRelocatableGraphicsShaderElf(const ArrayRef<const PipelineShaderInfo *> &shaderInfos,
                                                   const GraphicsPipelineBuildInfo *pipelineInfo) {
+  // Check user data nodes for unsupported Descriptor types.
+  if (hasUnrelocatableDescriptorNode(&pipelineInfo->resourceMapping))
+    return false;
+
   if (pipelineInfo->iaState.enableMultiView)
     return false;
 
@@ -962,6 +1031,10 @@ bool Compiler::canUseRelocatableComputeShaderElf(const ComputePipelineBuildInfo 
     if (moduleData && moduleData->binType != BinaryType::Spirv)
       return false;
   }
+
+  // Check UserDataNode for unsupported Descriptor types.
+  if (hasUnrelocatableDescriptorNode(&pipelineInfo->resourceMapping))
+    return false;
 
   if (cl::RelocatableShaderElfLimit != -1) {
     if (m_relocatablePipelineCompilations >= cl::RelocatableShaderElfLimit)
