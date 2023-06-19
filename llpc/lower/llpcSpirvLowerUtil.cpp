@@ -87,4 +87,18 @@ void setShaderStageToModule(Module *module, ShaderStage shaderStage) {
   func->setMetadata(gSPIRVMD::ExecutionModel, execModelMetaNode);
 }
 
+// =====================================================================================================================
+// Clear the block before patching the function
+//
+// @param func : The function to clear
+BasicBlock *clearBlock(Function *func) {
+  assert(func->size() == 1);
+  BasicBlock &entryBlock = func->getEntryBlock();
+  for (auto instIt = entryBlock.begin(); instIt != entryBlock.end();) {
+    auto &inst = *instIt++;
+    inst.eraseFromParent();
+  }
+  return &entryBlock;
+}
+
 } // namespace Llpc
