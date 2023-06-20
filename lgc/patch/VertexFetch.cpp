@@ -716,7 +716,8 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *des
   auto currentBlock = inst->getParent();
   auto fetchEndBlock = currentBlock->splitBasicBlock(inst);
 
-  auto comp3Block = createBlock(".comp3Block", fetchEndBlock);
+  auto perCompEndBlock = createBlock(".perCompEnd", fetchEndBlock);
+  auto comp3Block = createBlock(".comp3Block", perCompEndBlock);
   auto comp2Block = createBlock(".comp2Block", comp3Block);
   auto comp1Block = createBlock(".comp1Block", comp2Block);
   auto comp0Block = createBlock(".comp0Block", comp1Block);
@@ -829,10 +830,7 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *des
       // If it is 64-bit, we need the second fetch
       args[2] = builder.CreateAdd(args[2], builder.getInt32(SizeOfVec4));
       auto secondFetch = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetchType, args, {});
-      std::vector<Constant *> shuffleMask;
-      for (unsigned i = 0; i < 8; ++i)
-        shuffleMask.push_back(ConstantInt::get(Type::getInt32Ty(*m_context), i));
-      wholeVertex = builder.CreateShuffleVector(wholeVertex, secondFetch, ConstantVector::get(shuffleMask));
+      wholeVertex = builder.CreateShuffleVector(wholeVertex, secondFetch, ArrayRef<int>{0, 1, 2, 3, 4, 5, 6, 7});
     }
     builder.CreateBr(fetchEndBlock);
   }
@@ -840,30 +838,29 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *des
   fetchType = FixedVectorType::get(builder.getInt32Ty(), is64bitFetch ? 8 : 4);
   if (is16bitFetch)
     fetchType = FixedVectorType::get(builder.getInt16Ty(), 4);
-  Value *lastVert = UndefValue::get(fetchType);
 
+  // Initialize the default values
+  Value *lastVert = nullptr;
   auto int16Zero = builder.getInt16(0);
   auto int16One = builder.getInt16(1);
   auto float16One = builder.getInt16(0x3C00);
-  // Get default fetch values
-  Constant *defaults = nullptr;
   if (basicTy->isIntegerTy()) {
     if (bitWidth <= 16)
-      defaults = ConstantVector::get({int16Zero, int16Zero, int16Zero, int16One});
+      lastVert = ConstantVector::get({int16Zero, int16Zero, int16Zero, int16One});
     else if (bitWidth == 32)
-      defaults = m_fetchDefaults.int32;
+      lastVert = m_fetchDefaults.int32;
     else {
       assert(bitWidth == 64);
-      defaults = m_fetchDefaults.int64;
+      lastVert = m_fetchDefaults.int64;
     }
   } else if (basicTy->isFloatingPointTy()) {
     if (bitWidth == 16)
-      defaults = ConstantVector::get({int16Zero, int16Zero, int16Zero, float16One});
+      lastVert = ConstantVector::get({int16Zero, int16Zero, int16Zero, float16One});
     else if (bitWidth == 32)
-      defaults = m_fetchDefaults.float32;
+      lastVert = m_fetchDefaults.float32;
     else {
       assert(bitWidth == 64);
-      defaults = m_fetchDefaults.double64;
+      lastVert = m_fetchDefaults.double64;
     }
   } else
     llvm_unreachable("Should never be called!");
@@ -879,8 +876,6 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *des
   // .comp0Block
   {
     builder.SetInsertPoint(comp0Block);
-    for (unsigned i = 0; i < fetchType->getNumElements(); i++)
-      lastVert = builder.CreateInsertElement(lastVert, builder.CreateExtractElement(defaults, i), i);
 
     args[2] = byteOffset;
     if (is64bitFetch) {
@@ -896,7 +891,7 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *des
       comp0 = lastVert;
     }
     // If Y channel is 0, we will fetch the second component.
-    builder.CreateCondBr(yMask, comp1Block, fetchEndBlock);
+    builder.CreateCondBr(yMask, comp1Block, perCompEndBlock);
   }
 
   // Y channel
@@ -917,7 +912,7 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *des
       lastVert = builder.CreateInsertElement(lastVert, comp1, 1);
       comp1 = lastVert;
     }
-    builder.CreateCondBr(zMask, comp2Block, fetchEndBlock);
+    builder.CreateCondBr(zMask, comp2Block, perCompEndBlock);
   }
 
   // Z channel
@@ -937,7 +932,7 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *des
       lastVert = builder.CreateInsertElement(lastVert, comp2, 2);
       comp2 = lastVert;
     }
-    builder.CreateCondBr(wMask, comp3Block, fetchEndBlock);
+    builder.CreateCondBr(wMask, comp3Block, perCompEndBlock);
   }
 
   // W channel
@@ -957,28 +952,32 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *des
       lastVert = builder.CreateInsertElement(lastVert, comp3, 3);
       comp3 = lastVert;
     }
+    builder.CreateBr(perCompEndBlock);
+  }
+
+  // .perCompEnd
+  {
+    builder.SetInsertPoint(perCompEndBlock);
+    auto phiInst = builder.CreatePHI(lastVert->getType(), 4);
+    phiInst->addIncoming(comp0, comp0Block);
+    phiInst->addIncoming(comp1, comp1Block);
+    phiInst->addIncoming(comp2, comp2Block);
+    phiInst->addIncoming(comp3, comp3Block);
+    lastVert = phiInst;
+    // If the format is bgr, fix the order. It only is included in 32-bit format.
+    if (!is64bitFetch) {
+      auto fixedVertex = builder.CreateShuffleVector(lastVert, lastVert, ArrayRef<int>{2, 1, 0, 3});
+      lastVert = builder.CreateSelect(isBgr, fixedVertex, lastVert);
+    }
     builder.CreateBr(fetchEndBlock);
   }
 
   // .fetchEnd
   builder.SetInsertPoint(&*fetchEndBlock->getFirstInsertionPt());
-  auto phiInst = builder.CreatePHI(lastVert->getType(), 5);
+  auto phiInst = builder.CreatePHI(lastVert->getType(), 2);
   phiInst->addIncoming(wholeVertex, wholeVertexBlock);
-  phiInst->addIncoming(comp0, comp0Block);
-  phiInst->addIncoming(comp1, comp1Block);
-  phiInst->addIncoming(comp2, comp2Block);
-  phiInst->addIncoming(comp3, comp3Block);
+  phiInst->addIncoming(lastVert, perCompEndBlock);
   lastVert = phiInst;
-  // If the format is bgr, fix the order. It only is included in 32-bit format.
-  if (!is64bitFetch) {
-    std::vector<Constant *> shuffleMask;
-    shuffleMask.push_back(builder.getInt32(2));
-    shuffleMask.push_back(builder.getInt32(1));
-    shuffleMask.push_back(builder.getInt32(0));
-    shuffleMask.push_back(builder.getInt32(3));
-    auto fixedVertex = builder.CreateShuffleVector(lastVert, lastVert, ConstantVector::get(shuffleMask));
-    lastVert = builder.CreateSelect(isBgr, fixedVertex, lastVert);
-  }
 
   // Get vertex fetch values
   const unsigned fetchCompCount = cast<FixedVectorType>(lastVert->getType())->getNumElements();
