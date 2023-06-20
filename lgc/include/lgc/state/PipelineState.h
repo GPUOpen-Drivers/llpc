@@ -245,14 +245,15 @@ public:
   llvm::ArrayRef<ResourceNode> getUserDataNodes() const { return m_userDataNodes; }
 
   // Find the push constant resource node
-  const ResourceNode *findPushConstantResourceNode() const;
+  const ResourceNode *findPushConstantResourceNode(ShaderStage shaderStage = ShaderStageInvalid) const;
 
   // Find the resource node for the given set,binding
-  std::pair<const ResourceNode *, const ResourceNode *> findResourceNode(ResourceNodeType nodeType, uint64_t descSet,
-                                                                         unsigned binding) const;
+  std::pair<const ResourceNode *, const ResourceNode *>
+  findResourceNode(ResourceNodeType nodeType, uint64_t descSet, unsigned binding,
+                   ShaderStage shaderStage = ShaderStageInvalid) const;
 
   // Find the single root resource node of the given type
-  const ResourceNode *findSingleRootResourceNode(ResourceNodeType nodeType) const;
+  const ResourceNode *findSingleRootResourceNode(ResourceNodeType nodeType, ShaderStage shaderStage) const;
 
   // Accessors for vertex input descriptions.
   llvm::ArrayRef<VertexInputDescription> getVertexInputDescriptions() const { return m_vertexInputDescriptions; }

@@ -737,14 +737,16 @@ void PipelineState::recordUserDataTable(ArrayRef<ResourceNode> nodes, NamedMDNod
     operands.push_back(getResourceTypeName(node.concreteType));
     // Operand 1: matchType
     operands.push_back(ConstantAsMetadata::get(builder.getInt32(static_cast<uint32_t>(node.abstractType))));
-    // Operand 2: offsetInDwords
+    // Operand 2: visibility
+    operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.visibility)));
+    // Operand 3: offsetInDwords
     operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.offsetInDwords)));
-    // Operand 3: sizeInDwords
+    // Operand 4: sizeInDwords
     operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.sizeInDwords)));
 
     switch (node.concreteType) {
     case ResourceNodeType::DescriptorTableVaPtr: {
-      // Operand 4: Node count in sub-table.
+      // Operand 5: Node count in sub-table.
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.innerTable.size())));
       // Create the metadata node here.
       userDataMetaNode->addOperand(MDNode::get(getContext(), operands));
@@ -754,18 +756,18 @@ void PipelineState::recordUserDataTable(ArrayRef<ResourceNode> nodes, NamedMDNod
     }
     case ResourceNodeType::IndirectUserDataVaPtr:
     case ResourceNodeType::StreamOutTableVaPtr: {
-      // Operand 4: Size of the indirect data in dwords.
+      // Operand 5: Size of the indirect data in dwords.
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.indirectSizeInDwords)));
       break;
     }
     default: {
-      // Operand 4: set
+      // Operand 5: set
       operands.push_back(ConstantAsMetadata::get(builder.getInt64(node.set)));
-      // Operand 5: binding
+      // Operand 6: binding
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.binding)));
-      // Operand 6: stride
+      // Operand 7: stride
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.stride)));
-      // Operand 7 onwards: immutable descriptor constants
+      // Operand 8 onwards: immutable descriptor constants
       for (uint32_t element :
            ArrayRef<uint32_t>(node.immutableValue, node.immutableSize * DescriptorSizeSamplerInDwords))
         operands.push_back(ConstantAsMetadata::get(builder.getInt32(element)));
@@ -806,14 +808,16 @@ void PipelineState::readUserDataNodes(Module *module) {
     // Operand 1: matchType
     nextNode->abstractType =
         static_cast<ResourceNodeType>(mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(1))->getZExtValue());
-    // Operand 2: offsetInDwords
-    nextNode->offsetInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(2))->getZExtValue();
-    // Operand 3: sizeInDwords
-    nextNode->sizeInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(3))->getZExtValue();
+    // Operand 2: visibility
+    nextNode->visibility = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(2))->getZExtValue();
+    // Operand 3: offsetInDwords
+    nextNode->offsetInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(3))->getZExtValue();
+    // Operand 4: sizeInDwords
+    nextNode->sizeInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(4))->getZExtValue();
 
     if (nextNode->concreteType == ResourceNodeType::DescriptorTableVaPtr) {
-      // Operand 4: number of nodes in inner table
-      unsigned innerNodeCount = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(4))->getZExtValue();
+      // Operand 5: number of nodes in inner table
+      unsigned innerNodeCount = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(5))->getZExtValue();
       // Go into inner table.
       assert(!endThisInnerTable);
       endThisInnerTable = endNextInnerTable;
@@ -824,18 +828,18 @@ void PipelineState::readUserDataNodes(Module *module) {
     } else {
       if (nextNode->concreteType == ResourceNodeType::IndirectUserDataVaPtr ||
           nextNode->concreteType == ResourceNodeType::StreamOutTableVaPtr) {
-        // Operand 4: Size of the indirect data in dwords
-        nextNode->indirectSizeInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(4))->getZExtValue();
+        // Operand 5: Size of the indirect data in dwords
+        nextNode->indirectSizeInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(5))->getZExtValue();
       } else {
-        // Operand 4: set
-        nextNode->set = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(4))->getZExtValue();
-        // Operand 5: binding
-        nextNode->binding = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(5))->getZExtValue();
-        // Operand 6: stride
-        nextNode->stride = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(6))->getZExtValue();
+        // Operand 5: set
+        nextNode->set = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(5))->getZExtValue();
+        // Operand 6: binding
+        nextNode->binding = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(6))->getZExtValue();
+        // Operand 7: stride
+        nextNode->stride = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(7))->getZExtValue();
         nextNode->immutableValue = nullptr;
-        // Operand 7 onward: immutable descriptor constants
-        constexpr unsigned ImmutableStartOperand = 7;
+        // Operand 8 onward: immutable descriptor constants
+        constexpr unsigned ImmutableStartOperand = 8;
         unsigned immutableSizeInDwords = metadataNode->getNumOperands() - ImmutableStartOperand;
         nextNode->immutableSize = immutableSizeInDwords / DescriptorSizeSamplerInDwords;
         if (nextNode->immutableSize) {
@@ -862,12 +866,22 @@ void PipelineState::readUserDataNodes(Module *module) {
 
 // =====================================================================================================================
 // Returns the resource node for the push constant.
-const ResourceNode *PipelineState::findPushConstantResourceNode() const {
+//
+// @param stage : Shader stage to check against nodes' visibility field, or ShaderStageInvalid for any
+const ResourceNode *PipelineState::findPushConstantResourceNode(ShaderStage stage) const {
+  unsigned visibilityMask = UINT_MAX;
+  if (stage != ShaderStageInvalid)
+    visibilityMask = 1 << std::min(unsigned(stage), unsigned(ShaderStageCompute));
+
   for (const ResourceNode &node : getUserDataNodes()) {
+    if (node.visibility != 0 && (node.visibility & visibilityMask) == 0)
+      continue;
     if (node.concreteType == ResourceNodeType::PushConst)
       return &node;
     if (node.concreteType == ResourceNodeType::DescriptorTableVaPtr) {
       if (!node.innerTable.empty() && node.innerTable[0].concreteType == ResourceNodeType::PushConst) {
+        if (node.innerTable[0].visibility != 0 && (node.innerTable[0].visibility & visibilityMask) == 0)
+          continue;
         assert(ResourceLayoutScheme::Indirect == m_options.resourceLayoutScheme);
         return &node;
       }
@@ -980,10 +994,19 @@ bool PipelineState::matchResourceNode(const ResourceNode &node, ResourceNodeType
 // @param nodeType : Type of the resource mapping node
 // @param descSet : ID of descriptor set
 // @param binding : ID of descriptor binding
-std::pair<const ResourceNode *, const ResourceNode *>
-PipelineState::findResourceNode(ResourceNodeType nodeType, uint64_t descSet, unsigned binding) const {
+// @param stage : Shader stage to check against nodes' visibility field, or ShaderStageInvalid for any
+std::pair<const ResourceNode *, const ResourceNode *> PipelineState::findResourceNode(ResourceNodeType nodeType,
+                                                                                      uint64_t descSet,
+                                                                                      unsigned binding,
+                                                                                      ShaderStage stage) const {
+  unsigned visibilityMask = UINT_MAX;
+  if (stage != ShaderStageInvalid)
+    visibilityMask = 1 << std::min(unsigned(stage), unsigned(ShaderStageCompute));
+
   for (const ResourceNode &node : getUserDataNodes()) {
     if (!nodeTypeHasBinding(node.concreteType))
+      continue;
+    if (node.visibility != 0 && (node.visibility & visibilityMask) == 0)
       continue;
 
     if (node.concreteType == ResourceNodeType::DescriptorTableVaPtr) {
@@ -997,6 +1020,8 @@ PipelineState::findResourceNode(ResourceNodeType nodeType, uint64_t descSet, uns
 
       // Check inner nodes.
       for (const ResourceNode &innerNode : node.innerTable) {
+        if (innerNode.visibility != 0 && (innerNode.visibility & visibilityMask) == 0)
+          continue;
         if (matchResourceNode(innerNode, nodeType, descSet, binding))
           return {&node, &innerNode};
       }
@@ -1013,7 +1038,7 @@ PipelineState::findResourceNode(ResourceNodeType nodeType, uint64_t descSet, uns
 #endif
 
     // If use fmask and no fmask descriptor is found, look for a resource (image) one instead.
-    return findResourceNode(ResourceNodeType::DescriptorResource, descSet, binding);
+    return findResourceNode(ResourceNodeType::DescriptorResource, descSet, binding, stage);
   }
   return {nullptr, nullptr};
 }
@@ -1022,8 +1047,15 @@ PipelineState::findResourceNode(ResourceNodeType nodeType, uint64_t descSet, uns
 // Find the single root resource node of the given type
 //
 // @param nodeType : Type of the resource mapping node
-const ResourceNode *PipelineState::findSingleRootResourceNode(ResourceNodeType nodeType) const {
+// @param stage : Shader stage to check against nodes' visibility field, or ShaderStageInvalid for any
+const ResourceNode *PipelineState::findSingleRootResourceNode(ResourceNodeType nodeType, ShaderStage stage) const {
+  unsigned visibilityMask = UINT_MAX;
+  if (stage != ShaderStageInvalid)
+    visibilityMask = 1 << std::min(unsigned(stage), unsigned(ShaderStageCompute));
+
   for (const ResourceNode &node : getUserDataNodes()) {
+    if (node.visibility != 0 && (node.visibility & visibilityMask) == 0)
+      continue;
     if (node.concreteType == nodeType)
       return &node;
   }

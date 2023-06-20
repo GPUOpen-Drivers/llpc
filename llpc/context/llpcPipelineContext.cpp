@@ -422,6 +422,7 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
     destNode.sizeInDwords = node.sizeInDwords;
     destNode.offsetInDwords = node.offsetInDwords;
     destNode.abstractType = ResourceNodeType::Unknown;
+    destNode.visibility = 0;
 
     switch (node.type) {
     case ResourceMappingNodeType::DescriptorTableVaPtr: {

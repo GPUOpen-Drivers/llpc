@@ -287,6 +287,8 @@ struct ResourceNode {
 
   ResourceNodeType concreteType; // Underlying actual type of this node
   ResourceNodeType abstractType; // Node type for resource node matching
+  unsigned visibility;           // Visibility bitmap: bit N set means entry is visible to ShaderStage(N); value 0
+                                 //  means visible to all shader stages
   unsigned sizeInDwords;         // Size in dwords
   unsigned offsetInDwords;       // Offset in dwords
 
