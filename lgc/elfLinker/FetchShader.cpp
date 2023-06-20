@@ -212,7 +212,7 @@ Value *FetchShader::getReplacementForVertexIdBuiltIn(CallInst *call) const {
 // @param function : The function from which to get the argument.
 // @returns : The value of the argument as a 32-bit integer.
 Value *FetchShader::getVgprArgumentAsAnInt32(unsigned vgpr, Function *function) const {
-  BuilderBase builder(&*function->front().getFirstInsertionPt());
+  BuilderBase builder(&*function->front().getFirstNonPHIOrDbgOrAlloca());
   Value *vertexId = getVpgrArgument(vgpr, builder);
   return builder.CreateBitCast(vertexId, builder.getInt32Ty());
 }
@@ -265,7 +265,7 @@ Value *FetchShader::getReplacementForVertexBufferTableBuiltIn(CallInst *call) co
   Function *callerFunction = call->getFunction();
   AddressExtender extender(callerFunction);
   Value *highAddr = call->getArgOperand(1);
-  BuilderBase builder(&*callerFunction->front().getFirstInsertionPt());
+  BuilderBase builder(&*callerFunction->front().getFirstNonPHIOrDbgOrAlloca());
   Argument *vertexBufferTable = callerFunction->getArg(m_vsEntryRegInfo.vertexBufferTable);
   return extender.extend(vertexBufferTable, highAddr, call->getType(), builder);
 }

@@ -30,6 +30,7 @@
  */
 #include "lgc/patch/PatchLlvmIrInclusion.h"
 #include "lgc/state/Abi.h"
+#include "lgc/state/PipelineState.h"
 #include "llvm/IR/Constants.h"
 
 #define DEBUG_TYPE "lgc-patch-llvm-ir-inclusion"
@@ -46,7 +47,9 @@ namespace lgc {
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
 PreservedAnalyses PatchLlvmIrInclusion::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  runImpl(module);
+  PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
+  if (pipelineState->getOptions().includeIr)
+    runImpl(module);
   return PreservedAnalyses::none();
 }
 

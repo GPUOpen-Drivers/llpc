@@ -1916,12 +1916,7 @@ std::unique_ptr<Module> Compiler::createGpurtShaderLibrary(Context *context) {
   }
 
   lowerPassMgr->addPass(SpirvProcessGpuRtLibrary());
-
-  if (context->getPipelineType() == PipelineType::RayTracing)
-    lowerPassMgr->addPass(SpirvLowerRayTracing());
-  else
-    lowerPassMgr->addPass(SpirvLowerRayQuery(true));
-
+  lowerPassMgr->addPass(SpirvLowerRayQuery(true));
   // Stop timer for translate.
   timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, false);
 
@@ -2340,33 +2335,10 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
 
     // SPIR-V translation, then dump the result.
     lowerPassMgr->addPass(SpirvLowerTranslator(shaderInfoEntry->entryStage, shaderInfoEntry));
-
-    // Run the passes.
-    bool success = runPasses(&*lowerPassMgr, modules[shaderIndex].get());
-    if (!success) {
-      LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
-      return Result::ErrorInvalidShader;
-    }
-  }
-
-  for (unsigned shaderIndex = 0; shaderIndex < shaderInfo.size(); ++shaderIndex) {
-    std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(builderContext));
-    lowerPassMgr->setPassIndex(&passIndex);
-    SpirvLower::registerPasses(*lowerPassMgr);
-
-    // Start timer for translate.
-    timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, true);
-
-    // Any ray tracing shader may access shader record buffer in non-entry function, we will replace all Global SRB to a
-    // combination of instructions at the beginning of entry function in SpirvLowerRayTracing pass, so we need to inline
-    // all functions so that SRB is accessible throughout the shader.
-    // Lower SPIR-V CFG merges before inlining -- don't run in the (empty) entry point module
     lowerPassMgr->addPass(SpirvLowerCfgMerges());
     lowerPassMgr->addPass(AlwaysInlinerPass());
-    lowerPassMgr->addPass(SpirvLowerRayTracing());
-
-    // Stop timer for translate.
-    timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, false);
+    if (moduleData->usage.enableRayQuery)
+      lowerPassMgr->addPass(SpirvLowerRayQuery());
 
     // Run the passes.
     bool success = runPasses(&*lowerPassMgr, modules[shaderIndex].get());
@@ -2398,7 +2370,6 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
   modules.pop_back();
   shaderInfo = shaderInfo.drop_back();
 
-  setShaderStageToModule(entry.get(), ShaderStageCompute);
   newModules.push_back(std::move(entry));
 
   for (unsigned shaderIndex = 0; shaderIndex < pipelineInfo->shaderCount; ++shaderIndex) {

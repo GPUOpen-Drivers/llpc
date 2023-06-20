@@ -161,7 +161,7 @@ Value *ShaderSystemValues::getPrimitiveId() {
 Value *ShaderSystemValues::getInvocationId() {
   assert(m_shaderStage == ShaderStageTessControl);
   if (!m_invocationId) {
-    auto insertPos = &*m_entryPoint->front().getFirstInsertionPt();
+    auto insertPos = &*m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
 
     // invocationId = relPatchId[12:8]
@@ -179,7 +179,7 @@ Value *ShaderSystemValues::getInvocationId() {
 Value *ShaderSystemValues::getRelativeId() {
   assert(m_shaderStage == ShaderStageTessControl);
   if (!m_relativeId) {
-    auto insertPos = &*m_entryPoint->front().getFirstInsertionPt();
+    auto insertPos = &*m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
     auto relPatchId = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.tcs.relPatchId, "relPatchId");
 
@@ -207,7 +207,7 @@ Value *ShaderSystemValues::getOffChipLdsDesc() {
 Value *ShaderSystemValues::getTessCoord() {
   assert(m_shaderStage == ShaderStageTessEval);
   if (!m_tessCoord) {
-    auto insertPos = &*m_entryPoint->front().getFirstInsertionPt();
+    auto insertPos = &*m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
 
     Value *tessCoordX = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.tes.tessCoordX, "tessCoordX");
@@ -237,7 +237,7 @@ Value *ShaderSystemValues::getTessCoord() {
 Value *ShaderSystemValues::getEsGsOffsets() {
   assert(m_shaderStage == ShaderStageGeometry);
   if (!m_esGsOffsets) {
-    auto insertPos = &*m_entryPoint->front().getFirstInsertionPt();
+    auto insertPos = &*m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
 
     m_esGsOffsets = PoisonValue::get(FixedVectorType::get(Type::getInt32Ty(*m_context), 6));
@@ -326,7 +326,7 @@ std::pair<Type *, ArrayRef<Value *>> ShaderSystemValues::getEmitCounterPtr() {
 
     // Setup GS emit vertex counter
     auto &dataLayout = m_entryPoint->getParent()->getDataLayout();
-    auto insertPos = &*m_entryPoint->front().getFirstInsertionPt();
+    auto insertPos = &*m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
     for (int i = 0; i < MaxGsStreams; ++i) {
       auto emitCounterPtr = new AllocaInst(emitCounterTy, dataLayout.getAllocaAddrSpace(), "", insertPos);
       new StoreInst(ConstantInt::get(emitCounterTy, 0), emitCounterPtr, insertPos);
@@ -477,7 +477,7 @@ Instruction *ShaderSystemValues::makePointer(Value *lowValue, Type *ptrTy, unsig
   if (lowValueInst)
     insertPos = lowValueInst->getNextNode();
   else
-    insertPos = &*m_entryPoint->front().getFirstInsertionPt();
+    insertPos = &*m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
 
   Value *extendedPtrValue = nullptr;
   if (highValue == InvalidValue) {
@@ -490,7 +490,7 @@ Instruction *ShaderSystemValues::makePointer(Value *lowValue, Type *ptrTy, unsig
       //    and rely on subsequent CSE to common it up.
       // Insert the s_getpc code at the start of the function, so a later call into here knows it can
       // reuse this PC if its lowValue is an arg rather than an instruction.
-      auto pcInsertPos = &*m_entryPoint->front().getFirstInsertionPt();
+      auto pcInsertPos = &*m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
       Value *pc = emitCall("llvm.amdgcn.s.getpc", Type::getInt64Ty(*m_context), ArrayRef<Value *>(), {}, pcInsertPos);
       m_pc = new BitCastInst(pc, FixedVectorType::get(Type::getInt32Ty(*m_context), 2), "", insertPos);
     } else

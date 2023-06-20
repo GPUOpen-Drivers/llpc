@@ -3617,11 +3617,18 @@ void NggPrimShader::mutateGs() {
   Value *outVertsPtrs[MaxGsStreams] = {};
 
   for (int i = 0; i < MaxGsStreams; ++i) {
-    auto emitVertsPtr = m_builder.CreateAlloca(m_builder.getInt32Ty());
+    Value *emitVertsPtr = nullptr;
+    Value *outVertsPtr = nullptr;
+    {
+      IRBuilder<>::InsertPointGuard allocaGuard(m_builder);
+      m_builder.SetInsertPointPastAllocas(m_gsHandlers.main);
+      emitVertsPtr = m_builder.CreateAlloca(m_builder.getInt32Ty());
+      outVertsPtr = m_builder.CreateAlloca(m_builder.getInt32Ty());
+    }
+
     m_builder.CreateStore(m_builder.getInt32(0), emitVertsPtr); // emitVerts = 0
     emitVertsPtrs[i] = emitVertsPtr;
 
-    auto outVertsPtr = m_builder.CreateAlloca(m_builder.getInt32Ty());
     m_builder.CreateStore(m_builder.getInt32(0), outVertsPtr); // outVerts = 0
     outVertsPtrs[i] = outVertsPtr;
   }
