@@ -54,13 +54,6 @@ set(XGL_CWPACK_PATH ${THIRD_PARTY}/cwpack CACHE PATH "The path of cwpack.")
 add_subdirectory(${XGL_METROHASH_PATH} ${PROJECT_BINARY_DIR}/metrohash)
 add_subdirectory(${XGL_CWPACK_PATH} ${PROJECT_BINARY_DIR}/cwpack)
 
-#if VKI_BUILD_GFX11
-option(LLPC_BUILD_GFX11 "Enable GFX11" ON)
-#endif
-#if VKI_RAY_TRACING
-option(VKI_RAY_TRACING "Enable LLPC ray-tracing" ON)
-#endif
-
 # External Vulkan headers path
 if(EXISTS ${PROJECT_SOURCE_DIR}/../Vulkan-Headers)
     set(VULKAN_HEADERS_PATH ${PROJECT_SOURCE_DIR}/../Vulkan-Headers CACHE PATH "The path of Vulkan headers.")
@@ -78,8 +71,6 @@ else()
     target_include_directories(khronos_vulkan_interface INTERFACE ../../../icd/api/include/khronos)
 endif()
 
-#if VKI_RAY_TRACING
 set(GPURT_CLIENT_INTERFACE_MAJOR_VERSION 9999 CACHE STRING "")
-#endif
 set(LLPC_CLIENT_INTERFACE_MAJOR_VERSION "LLPC_INTERFACE_MAJOR_VERSION")
 set(PAL_CLIENT_INTERFACE_MAJOR_VERSION 9999 CACHE STRING "")

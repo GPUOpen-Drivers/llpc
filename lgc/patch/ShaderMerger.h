@@ -118,13 +118,12 @@ private:
   void gatherTuningAttributes(llvm::AttrBuilder &tuningAttrs, const llvm::Function *srcEntryPoint) const;
   void applyTuningAttributes(llvm::Function *dstEntryPoint, const llvm::AttrBuilder &tuningAttrs) const;
 
-#if VKI_RAY_TRACING
   void processRayQueryLdsStack(llvm::Function *entryPoint1, llvm::Function *entryPoint2) const;
-#endif
 
   void storeTessFactorsWithOpt(llvm::Value *threadIdInWave, llvm::IRBuilder<> &builder);
   llvm::Value *readValueFromLds(llvm::Type *readTy, llvm::Value *ldsOffset, llvm::IRBuilder<> &builder);
   void writeValueToLds(llvm::Value *writeValue, llvm::Value *ldsOffset, llvm::IRBuilder<> &builder);
+  void createBarrier(llvm::IRBuilder<> &builder);
 
   PipelineState *m_pipelineState; // Pipeline state
   llvm::LLVMContext *m_context;   // LLVM context

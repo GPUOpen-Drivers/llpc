@@ -154,9 +154,10 @@ public:
                               //  descriptor entry, rather than DescriptorBuffer/DescriptorBufferCompact
     BufferFlagNonConst = 8,   // Non-const buffer: Find a DescriptorBuffer/DescriptorBufferCompact descriptor
                               //  entry, rather than DescriptorConstBuffer/DescriptorConstBufferCompact/InlineBuffer
-    BufferFlagShaderResource = 16, // Flag to find a Descriptor Resource
-    BufferFlagSampler = 32,        // Flag to find Descriptor Sampler
-    BufferFlagAddress = 64         // Flag to return an i64 address of the descriptor
+    BufferFlagShaderResource = 16,  // Flag to find a Descriptor Resource
+    BufferFlagSampler = 32,         // Flag to find Descriptor Sampler
+    BufferFlagAddress = 64,         // Flag to return an i64 address of the descriptor
+    BufferFlagAttachedCounter = 128 // Flag to return the counter buffer descriptor attached to the main buffer.
   };
 
   // Get the type of a built-in -- static edition of the method below, so you can use it without a BuilderDefs object.
@@ -1072,7 +1073,6 @@ public:
   llvm::Value *CreateImageGetLod(unsigned dim, unsigned flags, llvm::Value *imageDesc, llvm::Value *samplerDesc,
                                  llvm::Value *coord, const llvm::Twine &instName = "");
 
-#if VKI_RAY_TRACING
   // Create a ray intersect result with specified node in BVH buffer.
   // nodePtr is the combination of BVH node offset type.
   //
@@ -1086,8 +1086,6 @@ public:
   llvm::Value *CreateImageBvhIntersectRay(llvm::Value *nodePtr, llvm::Value *extent, llvm::Value *origin,
                                           llvm::Value *direction, llvm::Value *invDirection, llvm::Value *imageDesc,
                                           const llvm::Twine &instName = "");
-
-#endif
 
   // -----------------------------------------------------------------------------------------------------------------
   // Shader input/output methods

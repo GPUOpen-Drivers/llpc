@@ -384,13 +384,10 @@ public:
   llvm::Value *CreateImageGetLod(unsigned dim, unsigned flags, llvm::Value *imageDesc, llvm::Value *samplerDesc,
                                  llvm::Value *coord, const llvm::Twine &instName = "");
 
-#if VKI_RAY_TRACING
   // Create a ray intersect result with specified node in BVH buffer
   llvm::Value *CreateImageBvhIntersectRay(llvm::Value *nodePtr, llvm::Value *extent, llvm::Value *origin,
                                           llvm::Value *direction, llvm::Value *invDirection, llvm::Value *imageDesc,
                                           const llvm::Twine &instName = "");
-
-#endif
 
 private:
   // Implement pre-GFX9 integer gather workaround to patch descriptor or coordinate before the gather

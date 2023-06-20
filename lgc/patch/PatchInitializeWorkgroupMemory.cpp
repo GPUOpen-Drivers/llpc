@@ -241,7 +241,11 @@ void PatchInitializeWorkgroupMemory::initializeWithZero(GlobalVariable *lds, Bui
     builder.SetInsertPoint(&*endInitBlock->getFirstInsertionPt());
     SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
     builder.CreateFence(AtomicOrdering::Release, workgroupScope);
-    builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
+      builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+    } else {
+      llvm_unreachable("Not implemented!");
+    }
     builder.CreateFence(AtomicOrdering::Acquire, workgroupScope);
   }
 }

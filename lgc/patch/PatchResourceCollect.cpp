@@ -134,10 +134,8 @@ bool PatchResourceCollect::runImpl(Module &module, PipelineShadersResult &pipeli
     processShader();
   }
 
-#if VKI_RAY_TRACING
   // Check ray query LDS stack usage
   checkRayQueryLdsStackUsage(&module);
-#endif
 
   if (pipelineState->isGraphics()) {
     // Set NGG control settings
@@ -742,7 +740,6 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
         assert(gsInstanceCount == 1);
       }
 
-#if VKI_RAY_TRACING
       // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
       // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
       // restriction by providing the capability of querying thread ID in the group rather than in wave.
@@ -757,7 +754,6 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
         esVertsPerSubgroup = std::min(MaxRayQueryThreadsPerGroup, esVertsPerSubgroup);
         rayQueryLdsStackSize = MaxRayQueryLdsStackEntries * MaxRayQueryThreadsPerGroup;
       }
-#endif
 
       // Make sure that we have at least one primitive.
       gsPrimsPerSubgroup = std::max(1u, gsPrimsPerSubgroup);
@@ -770,9 +766,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
       unsigned ldsSizeDwords = alignTo(expectedEsLdsSize + expectedGsLdsSize, ldsSizeDwordGranularity);
 
       unsigned maxHwGsLdsSizeDwords = m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipMaxLdsSize;
-#if VKI_RAY_TRACING
       maxHwGsLdsSizeDwords -= rayQueryLdsStackSize; // Exclude LDS space used as ray query stack
-#endif
 
       // In exceedingly rare circumstances, a NGG subgroup might calculate its LDS space requirements and overallocate.
       // In those cases we need to scale down our esVertsPerSubgroup/gsPrimsPerSubgroup so that they'll fit in LDS.
@@ -819,7 +813,6 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
         else if (gfxIp.isGfx(10, 1))
           esVertsPerSubgroup = std::max(24u, esVertsPerSubgroup);
 
-#if VKI_RAY_TRACING
         // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
         // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
         // restriction by providing the capability of querying thread ID in the group rather than in wave.
@@ -827,7 +820,6 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
           gsPrimsPerSubgroup = std::min(MaxRayQueryThreadsPerGroup, gsPrimsPerSubgroup);
         if (esResUsage->useRayQueryLdsStack)
           esVertsPerSubgroup = std::min(MaxRayQueryThreadsPerGroup, esVertsPerSubgroup);
-#endif
 
         // And then recalculate our LDS usage.
         expectedEsLdsSize = (esVertsPerSubgroup * esGsRingItemSize) + esExtraLdsSize;
@@ -858,9 +850,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
 
       gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor = primAmpFactor;
       gsResUsage->inOutUsage.gs.calcFactor.enableMaxVertOut = enableMaxVertOut;
-#if VKI_RAY_TRACING
       gsResUsage->inOutUsage.gs.calcFactor.rayQueryLdsStackSize = rayQueryLdsStackSize;
-#endif
 
       gsOnChip = true; // In NGG mode, GS is always on-chip since copy shader is not present.
     } else {
@@ -911,7 +901,6 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
       // Total LDS use per subgroup aligned to the register granularity.
       unsigned gsOnChipLdsSize = alignTo(esGsLdsSize + esGsExtraLdsDwords, ldsSizeDwordGranularity);
 
-#if VKI_RAY_TRACING
       // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
       // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
       // restriction by providing the capability of querying thread ID in the group rather than in wave.
@@ -920,15 +909,12 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
       unsigned rayQueryLdsStackSize = 0;
       if (esResUsage->useRayQueryLdsStack || gsResUsage->useRayQueryLdsStack)
         rayQueryLdsStackSize = MaxRayQueryLdsStackEntries * MaxRayQueryThreadsPerGroup;
-#endif
 
       // Use the client-specified amount of LDS space per subgroup. If they specified zero, they want us to
       // choose a reasonable default. The final amount must be 128-dword aligned.
       // TODO: Accept DefaultLdsSizePerSubgroup from panel setting
       unsigned maxLdsSize = Gfx9::DefaultLdsSizePerSubgroup;
-#if VKI_RAY_TRACING
       maxLdsSize -= rayQueryLdsStackSize; // Exclude LDS space used as ray query stack
-#endif
 
       // If total LDS usage is too big, refactor partitions based on ratio of ES-GS item sizes.
       if (gsOnChipLdsSize > maxLdsSize) {
@@ -1019,7 +1005,6 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
       // beyond ES_VERTS_PER_SUBGRP.
       esVertsPerSubgroup -= (esMinVertsPerSubgroup - 1);
 
-#if VKI_RAY_TRACING
       // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
       // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
       // restriction by providing the capability of querying thread ID in the group rather than in wave.
@@ -1027,15 +1012,12 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
         esVertsPerSubgroup = std::min(esVertsPerSubgroup, MaxRayQueryThreadsPerGroup);
       if (gsResUsage->useRayQueryLdsStack)
         gsPrimsPerSubgroup = std::min(gsPrimsPerSubgroup, MaxRayQueryThreadsPerGroup);
-#endif
 
       gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = esVertsPerSubgroup;
       gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = gsPrimsPerSubgroup;
       gsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize = esGsLdsSize;
       gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = gsOnChipLdsSize;
-#if VKI_RAY_TRACING
       gsResUsage->inOutUsage.gs.calcFactor.rayQueryLdsStackSize = rayQueryLdsStackSize;
-#endif
 
       gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize = esGsRingItemSize;
       gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize = gsOnChip ? gsVsRingItemSizeOnChip : gsVsRingItemSize;
@@ -1062,7 +1044,6 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
         // Support multiple GS instances
         unsigned gsPrimsNum = Gfx9::GsPrimsOffchipGsOrTess / gsInstanceCount;
 
-#if VKI_RAY_TRACING
         // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
         // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
         // restriction by providing the capability of querying thread ID in the group rather than in wave.
@@ -1070,7 +1051,6 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
           esVertsNum = std::min(esVertsNum, MaxRayQueryThreadsPerGroup);
         if (gsResUsage->useRayQueryLdsStack)
           gsPrimsNum = std::min(gsPrimsNum, MaxRayQueryThreadsPerGroup);
-#endif
 
         gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = esVertsNum;
         gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = gsPrimsNum;
@@ -1114,13 +1094,11 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
   }
 
   if (gsOnChip || m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) {
-#if VKI_RAY_TRACING
     if (gsResUsage->inOutUsage.gs.calcFactor.rayQueryLdsStackSize > 0) {
       LLPC_OUTS("Ray query LDS stack size (in dwords): "
                 << gsResUsage->inOutUsage.gs.calcFactor.rayQueryLdsStackSize
                 << " (start = " << gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize << ")\n\n");
     }
-#endif
 
     if (meshPipeline) {
       LLPC_OUTS("GS primitive amplification factor: " << gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor << "\n");
@@ -1264,7 +1242,6 @@ bool PatchResourceCollect::isVertexReuseDisabled() {
   return disableVertexReuse;
 }
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Check if ray query LDS stack usage.
 //
@@ -1285,7 +1262,6 @@ void PatchResourceCollect::checkRayQueryLdsStackUsage(Module *module) {
     }
   }
 }
-#endif
 
 // =====================================================================================================================
 // Visits "call" instruction.

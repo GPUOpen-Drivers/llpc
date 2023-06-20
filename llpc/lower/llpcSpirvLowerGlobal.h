@@ -75,6 +75,7 @@ private:
   void lowerInOutInPlace();
   void lowerBufferBlock();
   void lowerPushConsts();
+  void lowerUniformConstants();
   void lowerAliasedVal();
 
   void cleanupReturnBlock();

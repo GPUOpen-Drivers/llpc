@@ -23,12 +23,6 @@ declare float @lgc.create.subgroup.shuffle.f32(...)
 ; CHECK-NEXT:    scratch_store_b32 off, v2, s32
 ; CHECK-NEXT:    s_mov_b64 exec, s[0:1]
 ; CHECK-NEXT:    v_lshlrev_b32_e32 v3, 2, v1
-; CHECK-NEXT:    ;;#ASMSTART
-; CHECK-NEXT:    ; %1
-; CHECK-NEXT:    ;;#ASMEND
-; CHECK-NEXT:    ;;#ASMSTART
-; CHECK-NEXT:    ; %1
-; CHECK-NEXT:    ;;#ASMEND
 ; CHECK-NEXT:    s_or_saveexec_b64 s[0:1], -1
 ; CHECK-NEXT:    v_permlane64_b32 v2, v0
 ; CHECK-NEXT:    ds_bpermute_b32 v2, v3, v2

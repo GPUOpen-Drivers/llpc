@@ -34,9 +34,7 @@
 namespace Vkgc {
 
 const std::vector<PipelineDumperReg> PipelineDumperRegs = {
-#if VKI_BUILD_GFX11
     {0x2C01, "SPI_SHADER_PGM_RSRC4_PS"},
-#endif
     {0x2C06, "SPI_SHADER_PGM_CHKSUM_PS"},
     {0x2C07, "SPI_SHADER_PGM_RSRC3_PS"},
     {0x2C0A, "SPI_SHADER_PGM_RSRC1_PS"},
@@ -151,10 +149,8 @@ const std::vector<PipelineDumperReg> PipelineDumperRegs = {
     {0x2CA9, "SPI_SHADER_USER_DATA_GS_29"},
     {0x2CAA, "SPI_SHADER_USER_DATA_GS_30"},
     {0x2CAB, "SPI_SHADER_USER_DATA_GS_31"},
-#if VKI_BUILD_GFX11
     {0x2CAC, "SPI_SHADER_GS_MESHLET_DIM"},
     {0x2CAD, "SPI_SHADER_GS_MESHLET_EXP_ALLOC"},
-#endif
     {0x2CBC, "SPI_SHADER_PGM_RSRC2_ES_GS"},
     {0x2CCA, "SPI_SHADER_PGM_RSRC1_ES"},
     {0x2CCB, "SPI_SHADER_PGM_RSRC2_ES"},
@@ -192,9 +188,7 @@ const std::vector<PipelineDumperReg> PipelineDumperRegs = {
     {0x2CEB, "SPI_SHADER_USER_DATA_ES_31"},
     {0x2CFD, "SPI_SHADER_PGM_RSRC2_LS_ES"},
     {0x2D00, "SPI_SHADER_PGM_CHKSUM_HS"},
-#if VKI_BUILD_GFX11
     {0x2D01, "SPI_SHADER_PGM_RSRC4_HS"},
-#endif
     {0x2D07, "SPI_SHADER_PGM_RSRC3_HS"},
     {0x2D0A, "SPI_SHADER_PGM_RSRC1_HS"},
     {0x2D0B, "SPI_SHADER_PGM_RSRC2_HS"},
@@ -402,9 +396,7 @@ const std::vector<PipelineDumperReg> PipelineDumperRegs = {
     {0xC258, "IA_MULTI_VGT_PARAM_PIPED"},
     {0xC25F, "GE_STEREO_CNTL"},
     {0xC262, "GE_USER_VGPR_EN"},
-#if VKI_BUILD_GFX11
     {0xC266, "VGT_GS_OUT_PRIM_TYPE"},
-#endif
 };
 
 // =====================================================================================================================

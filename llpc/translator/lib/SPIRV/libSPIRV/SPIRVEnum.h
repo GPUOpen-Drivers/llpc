@@ -286,14 +286,12 @@ template <> inline void SPIRVMap<SPIRVStorageClassKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(StorageClassPushConstant, {CapabilityShader});
   ADD_VEC_INIT(StorageClassAtomicCounter, {CapabilityAtomicStorage});
   ADD_VEC_INIT(StorageClassStorageBuffer, {CapabilityShader});
-#if VKI_RAY_TRACING
   ADD_VEC_INIT(StorageClassCallableDataKHR, {CapabilityRayTracingProvisionalKHR});
   ADD_VEC_INIT(StorageClassIncomingCallableDataKHR, {CapabilityRayTracingProvisionalKHR});
   ADD_VEC_INIT(StorageClassRayPayloadKHR, {CapabilityRayTracingProvisionalKHR});
   ADD_VEC_INIT(StorageClassHitAttributeKHR, {CapabilityRayTracingProvisionalKHR});
   ADD_VEC_INIT(StorageClassIncomingRayPayloadKHR, {CapabilityRayTracingProvisionalKHR});
   ADD_VEC_INIT(StorageClassShaderRecordBufferKHR, {CapabilityRayTracingProvisionalKHR});
-#endif
   ADD_VEC_INIT(StorageClassTaskPayloadWorkgroupEXT, {CapabilityMeshShadingEXT});
 }
 

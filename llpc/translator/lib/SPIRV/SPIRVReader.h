@@ -69,6 +69,7 @@ class SPIRVToLLVMDbgTran;
 enum class LayoutMode : uint8_t {
   Native = 0,   ///< Using native LLVM layout rule
   Explicit = 1, ///< Using layout decorations(like offset) from SPIRV
+  Std430 = 2,   ///< Using std430 layout rule
 };
 
 class SPIRVToLLVM {
@@ -295,7 +296,7 @@ private:
     return t;
   }
 
-  Type *getPointeeType(SPIRVValue *v);
+  Type *getPointeeType(SPIRVValue *v, LayoutMode layout = LayoutMode::Native);
 
   Type *tryGetAccessChainRetType(SPIRVValue *v) {
     auto loc = m_accessChainRetTypeMap.find(v);

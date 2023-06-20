@@ -167,10 +167,7 @@ struct ResourceUsage {
   unsigned numVgprsAvailable = UINT32_MAX; // Number of available VGPRs
   bool useImages = false;                  // Whether images are used
   bool useImageOp = false;                 // Whether image instruction is called (for GFX11+, pixel wait sync+)
-
-#if VKI_RAY_TRACING
-  bool useRayQueryLdsStack = false; // Whether ray query uses LDS stack
-#endif
+  bool useRayQueryLdsStack = false;        // Whether ray query uses LDS stack
 
   // Usage of built-ins
   struct {
@@ -415,13 +412,11 @@ struct ResourceUsage {
         unsigned outPatchSize; // Size of an output patch output (in dword, correspond to
                                // "patchOutputSize")
 
-        unsigned patchConstSize;     // Size of an output patch constants (in dword)
-        unsigned tessFactorStride;   // Size of tess factor stride (in dword)
-        unsigned specialTfValueSize; // Size of special TF value (in dword)
-        unsigned tessOnChipLdsSize;  // On-chip LDS size (exclude off-chip LDS buffer) (in dword)
-#if VKI_RAY_TRACING
+        unsigned patchConstSize;       // Size of an output patch constants (in dword)
+        unsigned tessFactorStride;     // Size of tess factor stride (in dword)
+        unsigned specialTfValueSize;   // Size of special TF value (in dword)
+        unsigned tessOnChipLdsSize;    // On-chip LDS size (exclude off-chip LDS buffer) (in dword)
         unsigned rayQueryLdsStackSize; // Ray query LDS stack size
-#endif
 
         bool initialized; // Whether calcFactor has been initialized
       } calcFactor;
@@ -438,18 +433,16 @@ struct ResourceUsage {
       std::unordered_map<unsigned, std::vector<unsigned>> genericOutByteSizes[MaxGsStreams];
 
       struct {
-        unsigned esGsRingItemSize;   // Size of each vertex written to the ES -> GS Ring, in dwords.
-        unsigned gsVsRingItemSize;   // Size of each primitive written to the GS -> VS Ring, in dwords.
-        unsigned esVertsPerSubgroup; // Number of vertices ES exports.
-        unsigned gsPrimsPerSubgroup; // Number of prims GS exports.
-        unsigned esGsLdsSize;        // ES -> GS ring LDS size (GS in)
-        unsigned gsOnChipLdsSize;    // Total LDS size for GS on-chip mode.
-        unsigned inputVertices;      // Number of GS input vertices
-        unsigned primAmpFactor;      // GS primitive amplification factor
-        bool enableMaxVertOut;       // Whether to allow each GS instance to emit maximum vertices (NGG)
-#if VKI_RAY_TRACING
+        unsigned esGsRingItemSize;     // Size of each vertex written to the ES -> GS Ring, in dwords.
+        unsigned gsVsRingItemSize;     // Size of each primitive written to the GS -> VS Ring, in dwords.
+        unsigned esVertsPerSubgroup;   // Number of vertices ES exports.
+        unsigned gsPrimsPerSubgroup;   // Number of prims GS exports.
+        unsigned esGsLdsSize;          // ES -> GS ring LDS size (GS in)
+        unsigned gsOnChipLdsSize;      // Total LDS size for GS on-chip mode.
+        unsigned inputVertices;        // Number of GS input vertices
+        unsigned primAmpFactor;        // GS primitive amplification factor
+        bool enableMaxVertOut;         // Whether to allow each GS instance to emit maximum vertices (NGG)
         unsigned rayQueryLdsStackSize; // Ray query LDS stack size
-#endif
       } calcFactor = {};
 
       unsigned outLocCount[MaxGsStreams] = {};

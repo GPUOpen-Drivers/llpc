@@ -150,7 +150,6 @@ static const char *const VkgcSupportedCapabilities[] = {
     "CapabilityDemoteToHelperInvocationEXT",
     "CapabilityAtomicFloat32MinMaxEXT",
     "CapabilityAtomicFloat64MinMaxEXT",
-#if VKI_RAY_TRACING
     "CapabilityRayTracingNV",
     "CapabilityRayQueryKHR",
     "CapabilityRayTracingKHR",
@@ -160,7 +159,6 @@ static const char *const VkgcSupportedCapabilities[] = {
     "CapabilityRayTraversalPrimitiveCullingProvisionalKHR",
     "CapabilityRayTracingPositionFetchKHR",
     "CapabilityRayQueryPositionFetchKHR",
-#endif
 };
 
 }; // namespace Vkgc

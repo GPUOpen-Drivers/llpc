@@ -89,11 +89,9 @@ struct CompileInfo {
   Llpc::GraphicsPipelineBuildOut gfxPipelineOut;                             // Output of building graphics pipeline
   Llpc::ComputePipelineBuildInfo compPipelineInfo;                           // Info to build compute pipeline
   Llpc::ComputePipelineBuildOut compPipelineOut;                             // Output of building compute pipeline
-#if VKI_RAY_TRACING
-  RayTracingPipelineBuildInfo rayTracePipelineInfo; // Info to build ray tracing pipeline
-  RayTracingPipelineBuildOut rayTracingPipelineOut; // Output of building ray tracing pipeline
+  RayTracingPipelineBuildInfo rayTracePipelineInfo;                          // Info to build ray tracing pipeline
+  RayTracingPipelineBuildOut rayTracingPipelineOut;                          // Output of building ray tracing pipeline
   unsigned bvhNodeStride;
-#endif
   void *pipelineBuf;                   // Allocation buffer of building pipeline
   void *pipelineInfoFile;              // VFX-style file containing pipeline info
   bool unlinked;                       // Whether to generate unlinked shader/part-pipeline ELF
@@ -106,9 +104,7 @@ struct CompileInfo {
   bool enableImplicitInvariantExports; // Whether to enable implicit marking of position exports as invariant
   VfxPipelineType pipelineType;        // Pipeline type
   std::optional<llvm::CodeGenOpt::Level> optimizationLevel; // The optimization level to pass the compiler
-#if VKI_RAY_TRACING
-  bool internalRtShaders; // Whether to enable intrinsics for internal RT shaders
-#endif
+  bool internalRtShaders;                                   // Whether to enable intrinsics for internal RT shaders
 };
 
 // Callback function to allocate buffer for building shader module and building pipeline.

@@ -521,12 +521,10 @@ struct GraphicsPipelineState {
   Vkgc::NggState nggState; // NGG state
 
   ColorBuffer colorBuffer[Vkgc::MaxColorTargets]; // Color target state.
-#if VKI_RAY_TRACING
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   Vkgc::BinaryData shaderLibrary; // Shader library SPIR-V binary
 #endif
-  Vkgc::RtState rtState; // Ray tracing state
-#endif
+  Vkgc::RtState rtState;      // Ray tracing state
   bool dynamicVertexStride;   // Dynamic Vertex input Stride is enabled.
   bool enableUberFetchShader; // Use uber fetch shader
   bool enableEarlyCompile;    // Enable early compile
@@ -537,15 +535,12 @@ struct GraphicsPipelineState {
 struct ComputePipelineState {
   unsigned deviceIndex;          // Device index for device group
   Vkgc::PipelineOptions options; // Pipeline options
-#if VKI_RAY_TRACING
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   Vkgc::BinaryData shaderLibrary; // Shader library SPIR-V binary
 #endif
   Vkgc::RtState rtState; // Ray tracing state
-#endif
 };
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Represents RayTracingPipelineState section.
 struct RayTracingPipelineState {
@@ -569,8 +564,6 @@ struct RayTracingPipelineState {
 };
 #endif
 
-#endif
-
 }; // namespace Vfx
 
 #if VFX_SUPPORT_VK_PIPELINE
@@ -579,23 +572,19 @@ struct RayTracingPipelineState {
 enum VfxPipelineType : unsigned {
   VfxPipelineTypeGraphics = 0,
   VfxPipelineTypeCompute,
-#if VKI_RAY_TRACING
   VfxPipelineTypeRayTracing,
-#endif
 };
 
 // =====================================================================================================================
 // Represents the content of PipelineDocument.
 struct VfxPipelineState {
-  unsigned version;                                // Pipeline state version
-  VfxPipelineType pipelineType;                    // Pipeline type
-  Vkgc::GraphicsPipelineBuildInfo gfxPipelineInfo; // Vkgc graphics pipeline build info
-  Vkgc::ComputePipelineBuildInfo compPipelineInfo; // Vkgc compute pipeline build info
-#if VKI_RAY_TRACING
+  unsigned version;                                  // Pipeline state version
+  VfxPipelineType pipelineType;                      // Pipeline type
+  Vkgc::GraphicsPipelineBuildInfo gfxPipelineInfo;   // Vkgc graphics pipeline build info
+  Vkgc::ComputePipelineBuildInfo compPipelineInfo;   // Vkgc compute pipeline build info
   Vkgc::RayTracingPipelineBuildInfo rayPipelineInfo; // Vkgc ray tracing pipeline build info
-#endif
-  unsigned numStages;        // Number of shader source sections
-  Vfx::ShaderSource *stages; // Shader source sections
+  unsigned numStages;                                // Number of shader source sections
+  Vfx::ShaderSource *stages;                         // Shader source sections
 };
 
 typedef struct VfxPipelineState *VfxPipelineStatePtr;

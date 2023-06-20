@@ -264,17 +264,10 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "image.query.size";
   case BuilderOpcode::ImageGetLod:
     return "image.get.lod";
-#if VKI_RAY_TRACING
   case BuilderOpcode::ImageBvhIntersectRay:
     return "image.bvh.intersect.ray";
   case BuilderOpcode::Reserved2:
     return "reserved2";
-#else
-  case BuilderOpcode::Reserved2:
-    return "reserved2";
-  case BuilderOpcode::Reserved1:
-    return "reserved1";
-#endif
   case BuilderOpcode::GetWaveSize:
     return "get.wave.size";
   case BuilderOpcode::GetSubgroupSize:
@@ -1623,7 +1616,6 @@ Instruction *Builder::CreateWriteBuiltInOutput(Value *valueToWrite, BuiltInKind 
                 "");
 }
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Create a ray intersect result with specified node in BVH buffer
 //
@@ -1639,8 +1631,6 @@ Value *Builder::CreateImageBvhIntersectRay(Value *nodePtr, Value *extent, Value 
   return record(BuilderOpcode::ImageBvhIntersectRay, FixedVectorType::get(getInt32Ty(), 4),
                 {nodePtr, extent, origin, direction, invDirection, imageDesc}, instName);
 }
-
-#endif
 
 // =====================================================================================================================
 // Create a read from (part of) a task payload.
@@ -2207,9 +2197,7 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::DebugBreak:
     case BuilderOpcode::WriteBuiltInOutput:
     case BuilderOpcode::WriteGenericOutput:
-#if VKI_RAY_TRACING
     case BuilderOpcode::ImageBvhIntersectRay:
-#endif
       // TODO: These functions have not been classified yet.
       break;
     default:

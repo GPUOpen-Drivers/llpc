@@ -681,12 +681,9 @@ void SpirvLowerRayQuery::createRayQueryProceedFunc(Function *func) {
 
   m_builder->CreateStore(getDispatchId(), threadId);
 
-  Value *result;
-  {
-    result = m_builder->CreateNamedCall(
-        m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_RAY_QUERY_PROCEED),
-        func->getReturnType(), {rayQuery, constRayFlags, threadId}, {Attribute::NoUnwind, Attribute::AlwaysInline});
-  }
+  Value *result = m_builder->CreateNamedCall(
+      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_RAY_QUERY_PROCEED),
+      func->getReturnType(), {rayQuery, constRayFlags, threadId}, {Attribute::NoUnwind, Attribute::AlwaysInline});
 
   m_builder->CreateStore(m_builder->getInt32(1), m_ldsUsage);
   m_builder->CreateRet(result);
@@ -920,7 +917,6 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryTerminateKHR>(
   Value *rayQuery = func->arg_begin();
   auto rayQueryEltTy = getRayQueryInternalTy(m_builder);
 
-#if VKI_BUILD_GFX11
   if (m_context->getGfxIpVersion().major >= 11) {
     // Navi3x and beyond, use rayQuery.currentNodePtr == TERMINAL_NODE to determine Terminate()
 
@@ -930,9 +926,7 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryTerminateKHR>(
     Value *currNodeAddr = m_builder->CreateGEP(
         rayQueryEltTy, rayQuery, {m_builder->getInt32(0), m_builder->getInt32(RayQueryParams::CurrNodePtr)});
     m_builder->CreateStore(m_builder->getInt32(RayQueryTerminalNode), currNodeAddr);
-  } else
-#endif
-  {
+  } else {
     // Navi2x, use the following combination to determine Terminate()
     //  rayQuery.nodeIndex = 0xFFFFFFFF // invalid index
     //  rayQuery.numStackEntries = 0;
@@ -1652,6 +1646,8 @@ Value *SpirvLowerRayQuery::createLoadMatrixFromAddr(Value *matrixAddr) {
   return matrix;
 }
 
+// =====================================================================================================================
+// Get thread ID in group.
 Value *SpirvLowerRayQuery::getThreadIdInGroup() const {
   // Todo: for graphics shader, subgroupId * waveSize + subgroupLocalInvocationId()
   unsigned builtIn = m_context->getPipelineType() == PipelineType::Graphics ? BuiltInSubgroupLocalInvocationId

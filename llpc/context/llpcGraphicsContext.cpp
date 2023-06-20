@@ -68,17 +68,12 @@ GraphicsContext::GraphicsContext(GfxIpVersion gfxIp, const GraphicsPipelineBuild
   setRayTracingState(pipelineInfo->rtState, gpurtShaderLibrary);
 
   setUnlinked(pipelineInfo->unlinked);
-  // clang-format off
+
   const PipelineShaderInfo *shaderInfo[ShaderStageGfxCount] = {
-    &pipelineInfo->task,
-    &pipelineInfo->vs,
-    &pipelineInfo->tcs,
-    &pipelineInfo->tes,
-    &pipelineInfo->gs,
-    &pipelineInfo->mesh,
-    &pipelineInfo->fs,
+      &pipelineInfo->task, &pipelineInfo->vs,   &pipelineInfo->tcs, &pipelineInfo->tes,
+      &pipelineInfo->gs,   &pipelineInfo->mesh, &pipelineInfo->fs,
   };
-  // clang-format on
+
   for (unsigned stage = 0; stage < ShaderStageGfxCount; ++stage) {
     if (shaderInfo[stage]->pModuleData) {
       m_stageMask |= shaderStageToMask(static_cast<ShaderStage>(stage));
@@ -233,11 +228,7 @@ Options GraphicsContext::computePipelineOptions() const {
     // Only set NGG options for a GFX10+ graphics pipeline.
     auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo());
     const auto &nggState = pipelineInfo->nggState;
-#if VKI_BUILD_GFX11
     if (!nggState.enableNgg && getGfxIpVersion().major < 11) // GFX11+ must enable NGG
-#else
-    if (!nggState.enableNgg)
-#endif
       options.nggFlags |= NggFlagDisable;
     else {
       options.nggFlags = (nggState.enableGsUse ? NggFlagEnableGsUse : 0) |

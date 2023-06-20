@@ -39,18 +39,14 @@
 #include "llpcError.h"
 #include "llpcFile.h"
 #include "llpcGraphicsContext.h"
-#if VKI_RAY_TRACING
 #include "llpcRayTracingContext.h"
-#endif
 #include "llpcShaderModuleHelper.h"
 #include "llpcSpirvLower.h"
 #include "llpcSpirvLowerCfgMerges.h"
-#if VKI_RAY_TRACING
 #include "llpcSpirvLowerRayTracing.h"
-#include "llpcSpirvProcessGpuRtLibrary.h"
-#endif
 #include "llpcSpirvLowerTranslator.h"
 #include "llpcSpirvLowerUtil.h"
+#include "llpcSpirvProcessGpuRtLibrary.h"
 #include "llpcTimerProfiler.h"
 #include "llpcUtil.h"
 #include "spirvExt.h"
@@ -86,9 +82,7 @@
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
-#if VKI_RAY_TRACING
 #include "llvm/Transforms/Utils/Cloning.h"
-#endif
 #include <cassert>
 #include <mutex>
 #include <set>
@@ -98,11 +92,9 @@
 #include "spvgen.h"
 #endif
 
-#if VKI_RAY_TRACING
 namespace RtName {
 extern const char *TraceRayKHR;
 } // namespace RtName
-#endif
 
 #define DEBUG_TYPE "llpc-compiler"
 
@@ -219,7 +211,6 @@ static MetroHash::Hash SOptionHash = {};
 unsigned Compiler::m_instanceCount = 0;
 unsigned Compiler::m_outRedirectCount = 0;
 
-#if VKI_RAY_TRACING
 // Represents the payload used by helper thread to build ray tracing Elf
 struct HelperThreadBuildRayTracingPipelineElfPayload {
   ArrayRef<Module *> modules;                         // Modules to generate ELF packages
@@ -235,7 +226,6 @@ struct HelperThreadBuildRayTracingPipelineElfPayload {
 
 sys::Mutex Compiler::m_helperThreadMutex;
 std::condition_variable_any Compiler::m_helperThreadConditionVariable;
-#endif
 
 // =====================================================================================================================
 // Handler for LLVM fatal error.
@@ -1485,7 +1475,6 @@ Result Compiler::buildGraphicsPipelineInternal(GraphicsContext *graphicsContext,
     unsigned stageMask = context->getShaderStageMask();
     bool buildPartPipeline = (cl::EnablePartPipeline && isShaderStageInMask(ShaderStageFragment, stageMask) &&
                               (stageMask & ~shaderStageToMask(ShaderStageFragment)));
-#if VKI_RAY_TRACING
     if (buildPartPipeline) {
       for (const auto *oneShaderInfo : shaderInfo) {
         if (!oneShaderInfo)
@@ -1497,7 +1486,7 @@ Result Compiler::buildGraphicsPipelineInternal(GraphicsContext *graphicsContext,
         }
       }
     }
-#endif
+
     if (buildPartPipeline)
       result = buildGraphicsPipelineWithPartPipelines(context, shaderInfo, pipelineElf, stageCacheAccesses);
     else
@@ -1940,7 +1929,6 @@ std::unique_ptr<Module> Compiler::createGpurtShaderLibrary(Context *context) {
   return module;
 }
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Build ray tracing pipeline from the specified info.
 //
@@ -2555,7 +2543,7 @@ void Compiler::addRayTracingIndirectPipelineMetadata(ElfPackage *pipelineElf) {
   writer.setNote(&newMetaNote);
   writer.writeToBuffer(pipelineElf);
 }
-#endif
+
 // =====================================================================================================================
 // Builds hash code from compilation-options
 //
@@ -2878,7 +2866,6 @@ lgc::ShaderStage getLgcShaderStage(Llpc::ShaderStage stage) {
     return lgc::ShaderStageFragment;
   case ShaderStageCopyShader:
     return lgc::ShaderStageCopyShader;
-#if VKI_RAY_TRACING
   case ShaderStageRayTracingRayGen:
   case ShaderStageRayTracingIntersect:
   case ShaderStageRayTracingAnyHit:
@@ -2886,7 +2873,6 @@ lgc::ShaderStage getLgcShaderStage(Llpc::ShaderStage stage) {
   case ShaderStageRayTracingMiss:
   case ShaderStageRayTracingCallable:
     return lgc::ShaderStageCompute;
-#endif
   default:
     llvm_unreachable("");
     return lgc::ShaderStageInvalid;
