@@ -156,7 +156,6 @@ enum BuilderOpcode : unsigned {
   Barrier,
   Kill,
   ReadClock,
-  DebugPrintf,
   Derivative,
   DemoteToHelperInvocation,
   IsHelperInvocation,

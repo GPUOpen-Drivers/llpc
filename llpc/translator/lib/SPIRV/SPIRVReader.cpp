@@ -4231,11 +4231,11 @@ Value *SPIRVToLLVM::transDebugPrintf(SPIRVInstruction *bi, const ArrayRef<SPIRVV
 
   auto spvValueItr = spvValues.begin();
   Value *formatStr = mapEntry(*spvValueItr++, nullptr);
-  SmallVector<Value *> args = {m_debugOutputBuffer, formatStr};
+  SmallVector<Value *> args;
   for (; spvValueItr != spvValues.end(); ++spvValueItr) {
     args.push_back(transValue(*spvValueItr, func, bb));
   }
-  return getBuilder()->CreateDebugPrintf(args);
+  return getBuilder()->create<lgc::DebugPrintfOp>(m_debugOutputBuffer, formatStr, args);
 }
 
 // Translate an initializer. This has special handling for the case where the type to initialize to does not match the

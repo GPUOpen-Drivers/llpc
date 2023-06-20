@@ -1889,6 +1889,18 @@ void PipelineState::setXfbStateMetadata(Module *module) {
 }
 
 // =====================================================================================================================
+// Print the pipeline state
+//
+// @param out : output stream
+void PipelineState::print(llvm::raw_ostream &out) const {
+  if (m_palMetadata) {
+    out << "PAL metadata:\n";
+    m_palMetadata->getDocument()->toYAML(out);
+  }
+  out << "(pipeline state printing is incomplete)\n";
+}
+
+// =====================================================================================================================
 // Execute this analysis on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
@@ -1946,4 +1958,30 @@ PipelineStateWrapper::PipelineStateWrapper(LgcContext *builderContext) : m_build
 //
 // @param pipelineState : Pipeline state to wrap
 PipelineStateWrapper::PipelineStateWrapper(PipelineState *pipelineState) : m_pipelineState(pipelineState) {
+}
+
+// =====================================================================================================================
+// Print the pipeline state in a human-readable way
+//
+// @param [in/out] module : IR module
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The analyses that are still valid after this pass)
+PreservedAnalyses PipelineStatePrinter::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
+  pipelineState->print(m_out);
+  return PreservedAnalyses::all();
+}
+
+// =====================================================================================================================
+// Record the PipelineState back into the IR, if present
+//
+// @param [in/out] module : IR module
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The analyses that are still valid after this pass)
+PreservedAnalyses PipelineStateRecorder::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  if (auto *psw = analysisManager.getCachedResult<PipelineStateWrapper>(module)) {
+    PipelineState *pipelineState = psw->getPipelineState();
+    pipelineState->record(&module);
+  }
+  return PreservedAnalyses::none();
 }

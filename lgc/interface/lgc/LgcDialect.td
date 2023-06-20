@@ -30,6 +30,7 @@ def LgcDialect : Dialect {
   let cppNamespace = "lgc";
 }
 
+def ConstantPointer : TgConstant<(PointerType 4)>, Type;
 def PrivatePointer : TgConstant<(PointerType 5)>, Type;
 def BufferPointer : TgConstant<(PointerType 7)>, Type;
 
@@ -78,6 +79,19 @@ def BufferPtrDiffOp : LgcOp<"buffer.ptr.diff", [Memory<[]>, WillReturn]> {
     If `lhs` and `rhs` have different pointer provenance, the result is poison.
 
     If `lhs` and `rhs` are both null, the result is 0.
+  }];
+}
+
+def DebugPrintfOp : LgcOp<"debug.printf", [Memory<[(readwrite InaccessibleMem)]>, WillReturn]> {
+  let arguments = (ins BufferPointer:$buffer, ConstantPointer:$format, varargs:$args);
+  let results = (outs);
+
+  let summary = "print a formatted message";
+  let description = [{
+    Writes an entry to the debug printf buffer pointed to by `buffer`. No-op if `buffer` is literal constant poison.
+
+    `format` must be a non-external global variable in the constant address space of type `[n x i8]` (not
+    null-terminated).
   }];
 }
 
