@@ -45,13 +45,16 @@ PreservedAnalyses LowerGpuRt::run(Module &module, ModuleAnalysisManager &analysi
   createGlobalStack();
   static auto visitor = llvm_dialects::VisitorBuilder<LowerGpuRt>()
                             .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
-                            .add(&LowerGpuRt::getStackSize)
-                            .add(&LowerGpuRt::getStackBase)
-                            .add(&LowerGpuRt::getStackStride)
-                            .add(&LowerGpuRt::stackWrite)
-                            .add(&LowerGpuRt::stackRead)
-                            .add(&LowerGpuRt::ldsStackInit)
-                            .add(&LowerGpuRt::ldsStackStore)
+                            .add(&LowerGpuRt::visitGetStackSize)
+                            .add(&LowerGpuRt::visitGetStackBase)
+                            .add(&LowerGpuRt::visitGetStackStride)
+                            .add(&LowerGpuRt::visitStackWrite)
+                            .add(&LowerGpuRt::visitStackRead)
+                            .add(&LowerGpuRt::visitLdsStackInit)
+                            .add(&LowerGpuRt::visitLdsStackStore)
+                            .add(&LowerGpuRt::visitGetBoxSortHeuristicMode)
+                            .add(&LowerGpuRt::visitGetStaticFlags)
+                            .add(&LowerGpuRt::visitGetTriangleCompressionMode)
                             .build();
 
   visitor.visit(*this, *m_module);
@@ -116,10 +119,10 @@ void LowerGpuRt::createGlobalStack() {
 }
 
 // =====================================================================================================================
-// Create to get stack size
+// Visit "GpurtGetStackSizeOp" instruction
 //
 // @param inst : The dialect instruction to process
-void LowerGpuRt::getStackSize(GpurtGetStackSize &inst) {
+void LowerGpuRt::visitGetStackSize(GpurtGetStackSizeOp &inst) {
   m_builder->SetInsertPoint(&inst);
   Value *size = nullptr;
   size = m_builder->getInt32(MaxLdsStackEntries * getWorkgroupSize());
@@ -129,10 +132,10 @@ void LowerGpuRt::getStackSize(GpurtGetStackSize &inst) {
 }
 
 // =====================================================================================================================
-// Create to get stack base
+// Visit "GpurtGetStackBaseOp" instruction
 //
 // @param inst : The dialect instruction to process
-void LowerGpuRt::getStackBase(GpurtGetStackBase &inst) {
+void LowerGpuRt::visitGetStackBase(GpurtGetStackBaseOp &inst) {
   m_builder->SetInsertPoint(&inst);
   Value *base = getThreadIdInGroup();
   inst.replaceAllUsesWith(base);
@@ -141,10 +144,10 @@ void LowerGpuRt::getStackBase(GpurtGetStackBase &inst) {
 }
 
 // =====================================================================================================================
-// Create to get stack stride, this function
+// Visit "GpurtGetStackStrideOp" instruction
 //
 // @param inst : The dialect instruction to process
-void LowerGpuRt::getStackStride(GpurtGetStackStride &inst) {
+void LowerGpuRt::visitGetStackStride(GpurtGetStackStrideOp &inst) {
   m_builder->SetInsertPoint(&inst);
   Value *stride = m_builder->getInt32(getWorkgroupSize());
   inst.replaceAllUsesWith(stride);
@@ -153,10 +156,10 @@ void LowerGpuRt::getStackStride(GpurtGetStackStride &inst) {
 }
 
 // =====================================================================================================================
-// Create to read stack
+// Visit "GpurtStackReadOp" instruction
 //
 // @param inst : The dialect instruction to process
-void LowerGpuRt::stackRead(GpurtStackRead &inst) {
+void LowerGpuRt::visitStackRead(GpurtStackReadOp &inst) {
   m_builder->SetInsertPoint(&inst);
   Value *stackIndex = inst.getIndex();
   Type *stackTy = PointerType::get(m_builder->getInt32Ty(), 3);
@@ -174,10 +177,10 @@ void LowerGpuRt::stackRead(GpurtStackRead &inst) {
 }
 
 // =====================================================================================================================
-// Create to write stack
+// Visit "GpurtStackWriteOp" instruction
 //
 // @param inst : The dialect instruction to process
-void LowerGpuRt::stackWrite(GpurtStackWrite &inst) {
+void LowerGpuRt::visitStackWrite(GpurtStackWriteOp &inst) {
   m_builder->SetInsertPoint(&inst);
   Value *stackIndex = inst.getIndex();
   Value *stackData = inst.getValue();
@@ -196,10 +199,10 @@ void LowerGpuRt::stackWrite(GpurtStackWrite &inst) {
 }
 
 // =====================================================================================================================
-// Create to init stack LDS
+// Visit "GpurtLdsStackInitOp" instruction
 //
 // @param inst : The dialect instruction to process
-void LowerGpuRt::ldsStackInit(GpurtLdsStackInit &inst) {
+void LowerGpuRt::visitLdsStackInit(GpurtLdsStackInitOp &inst) {
   m_builder->SetInsertPoint(&inst);
   Value *stackBasePerThread = getThreadIdInGroup();
 
@@ -233,10 +236,10 @@ void LowerGpuRt::ldsStackInit(GpurtLdsStackInit &inst) {
 }
 
 // =====================================================================================================================
-// Create to store stack LDS
+// Visit "GpurtLdsStackStoreOp" instruction
 //
 // @param inst : The dialect instruction to process
-void LowerGpuRt::ldsStackStore(GpurtLdsStackStore &inst) {
+void LowerGpuRt::visitLdsStackStore(GpurtLdsStackStoreOp &inst) {
   m_builder->SetInsertPoint(&inst);
   Value *stackAddr = inst.getNewPos();
   Value *stackAddrVal = m_builder->CreateLoad(m_builder->getInt32Ty(), stackAddr);
@@ -261,4 +264,44 @@ void LowerGpuRt::ldsStackStore(GpurtLdsStackStore &inst) {
   m_callsToLower.push_back(&inst);
   m_funcsToLower.insert(inst.getCalledFunction());
 }
+
+// =====================================================================================================================
+// Visit "GpurtGetBoxSortHeuristicModeOp" instruction
+//
+// @param inst : The dialect instruction to process
+void LowerGpuRt::visitGetBoxSortHeuristicMode(GpurtGetBoxSortHeuristicModeOp &inst) {
+  m_builder->SetInsertPoint(&inst);
+  auto rtState = m_context->getPipelineContext()->getRayTracingState();
+  Value *boxSortHeuristicMode = m_builder->getInt32(rtState->boxSortHeuristicMode);
+  inst.replaceAllUsesWith(boxSortHeuristicMode);
+  m_callsToLower.push_back(&inst);
+  m_funcsToLower.insert(inst.getCalledFunction());
+}
+
+// =====================================================================================================================
+// Visit "GpurtGetStaticFlagsOp" instruction
+//
+// @param inst : The dialect instruction to process
+void LowerGpuRt::visitGetStaticFlags(GpurtGetStaticFlagsOp &inst) {
+  m_builder->SetInsertPoint(&inst);
+  auto rtState = m_context->getPipelineContext()->getRayTracingState();
+  Value *staticPipelineFlags = m_builder->getInt32(rtState->staticPipelineFlags);
+  inst.replaceAllUsesWith(staticPipelineFlags);
+  m_callsToLower.push_back(&inst);
+  m_funcsToLower.insert(inst.getCalledFunction());
+}
+
+// =====================================================================================================================
+// Visit "GpurtGetTriangleCompressionModeOp" instruction
+//
+// @param inst : The dialect instruction to process
+void LowerGpuRt::visitGetTriangleCompressionMode(GpurtGetTriangleCompressionModeOp &inst) {
+  m_builder->SetInsertPoint(&inst);
+  auto rtState = m_context->getPipelineContext()->getRayTracingState();
+  Value *triCompressMode = m_builder->getInt32(rtState->triCompressMode);
+  inst.replaceAllUsesWith(triCompressMode);
+  m_callsToLower.push_back(&inst);
+  m_funcsToLower.insert(inst.getCalledFunction());
+}
+
 } // namespace Llpc

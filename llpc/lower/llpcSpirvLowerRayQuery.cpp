@@ -63,10 +63,7 @@ static const char *IntersectBvh = "AmdExtD3DShaderIntrinsics_IntersectInternal";
 #endif
 extern const char *ConvertF32toF16NegInf;
 extern const char *ConvertF32toF16PosInf;
-static const char *GetStaticFlags = "AmdTraceRayGetStaticFlags";
-static const char *GetTriangleCompressionMode = "AmdTraceRayGetTriangleCompressionMode";
 static const char *SetHitTokenData = "AmdTraceRaySetHitTokenData";
-static const char *GetBoxSortHeuristicMode = "AmdTraceRayGetBoxSortHeuristicMode";
 static const char *SampleGpuTimer = "AmdTraceRaySampleGpuTimer";
 static const char *GetStaticId = "AmdTraceRayGetStaticId";
 static const char *FetchTrianglePositionFromRayQuery = "FetchTrianglePositionFromRayQuery";
@@ -346,6 +343,7 @@ bool SpirvLowerRayQuery::runImpl(Module &module) {
 // @param func : The function to create
 void SpirvLowerRayQuery::processLibraryFunction(Function *&func) {
   const auto *rtState = m_context->getPipelineContext()->getRayTracingState();
+  (void(rtState)); // unused
   auto mangledName = func->getName();
   const StringRef rayQueryInitialize =
       m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_TRACE_RAY_INLINE);
@@ -378,28 +376,10 @@ void SpirvLowerRayQuery::processLibraryFunction(Function *&func) {
     createConvertF32toF16(func, 2);
   } else if (mangledName.startswith(RtName::ConvertF32toF16PosInf)) {
     createConvertF32toF16(func, 3);
-  } else if (mangledName.startswith(RtName::GetStaticFlags)) {
-    eraseFunctionBlocks(func);
-    BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
-    m_builder->SetInsertPoint(entryBlock);
-    m_builder->CreateRet(m_builder->getInt32(rtState->staticPipelineFlags));
-    func->setName(RtName::GetStaticFlags);
-  } else if (mangledName.startswith(RtName::GetTriangleCompressionMode)) {
-    eraseFunctionBlocks(func);
-    BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
-    m_builder->SetInsertPoint(entryBlock);
-    m_builder->CreateRet(m_builder->getInt32(rtState->triCompressMode));
-    func->setName(RtName::GetTriangleCompressionMode);
   } else if (mangledName.startswith(RtName::SampleGpuTimer)) {
     createSampleGpuTime(func);
   } else if (mangledName.startswith(RtName::SetHitTokenData)) {
     // TODO: The "hit token" feature that this function is a part of seems non-trivial and
-  } else if (mangledName.startswith(RtName::GetBoxSortHeuristicMode)) {
-    eraseFunctionBlocks(func);
-    BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
-    m_builder->SetInsertPoint(entryBlock);
-    m_builder->CreateRet(m_builder->getInt32(rtState->boxSortHeuristicMode));
-    func->setName(RtName::GetBoxSortHeuristicMode);
   } else if (mangledName.startswith(RtName::GetStaticId)) {
     eraseFunctionBlocks(func);
     BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
