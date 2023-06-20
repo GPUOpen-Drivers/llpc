@@ -56,5 +56,8 @@ private:
   void createGetStackStride(llvm::Function *func);
   void createLdsStackInit(llvm::Function *func);
   void createLdsStackStore(llvm::Function *func);
+  void createGetBoxSortHeuristicMode(llvm::Function *func);
+  void createGetStaticFlags(llvm::Function *func);
+  void createGetTriangleCompressionMode(llvm::Function *func);
 };
 } // namespace Llpc
