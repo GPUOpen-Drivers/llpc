@@ -1456,23 +1456,6 @@ Value *BuilderImpl::CreateTaskPayloadAtomicCompareSwap(AtomicOrdering ordering, 
 }
 
 // =====================================================================================================================
-// Create debug printf operation, and write to the output debug buffer
-// @args : Printf variable parameters
-// @instName : Instance Name
-Value *BuilderImpl::CreateDebugPrintf(ArrayRef<Value *> args, const Twine &instName) {
-  Module *module = GetInsertPoint()->getModule();
-  SmallVector<Type *> argTys;
-  argTys.reserve(args.size());
-  for (auto arg : args)
-    argTys.push_back(arg->getType());
-
-  auto funcTy = FunctionType::get(getInt64Ty(), argTys, false);
-  auto func = Function::Create(funcTy, GlobalValue::InternalLinkage, lgcName::LowerDebugPrintf, module);
-  func->addFnAttr(Attribute::NoUnwind);
-  return CreateCall(func, args, instName);
-}
-
-// =====================================================================================================================
 // Get the type of a built-in. This overrides the one in Builder to additionally recognize the internal built-ins.
 //
 // @param builtIn : Built-in kind

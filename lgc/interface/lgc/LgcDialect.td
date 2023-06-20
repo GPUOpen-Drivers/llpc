@@ -30,6 +30,8 @@ def LgcDialect : Dialect {
   let cppNamespace = "lgc";
 }
 
+def ConstantPointer : TgConstant<(PointerType 4)>, Type;
+def PrivatePointer : TgConstant<(PointerType 5)>, Type;
 def BufferPointer : TgConstant<(PointerType 7)>, Type;
 
 def V4I32 : TgConstant<(FixedVectorType I32, 4)>, Type;
@@ -77,6 +79,19 @@ def BufferPtrDiffOp : LgcOp<"buffer.ptr.diff", [Memory<[]>, WillReturn]> {
     If `lhs` and `rhs` have different pointer provenance, the result is poison.
 
     If `lhs` and `rhs` are both null, the result is 0.
+  }];
+}
+
+def DebugPrintfOp : LgcOp<"debug.printf", [Memory<[(readwrite InaccessibleMem)]>, WillReturn]> {
+  let arguments = (ins BufferPointer:$buffer, ConstantPointer:$format, varargs:$args);
+  let results = (outs);
+
+  let summary = "print a formatted message";
+  let description = [{
+    Writes an entry to the debug printf buffer pointed to by `buffer`. No-op if `buffer` is literal constant poison.
+
+    `format` must be a non-external global variable in the constant address space of type `[n x i8]` (not
+    null-terminated).
   }];
 }
 
@@ -157,7 +172,7 @@ def InputImportInterpolatedOp : LgcOp<"input.import.interpolated", [Memory<[]>, 
     Only used in PS for per-vertex/interpolated inputs. Use `input.import.generic` for per-primitive inputs.
 
     `interpMode` is one of:
-    
+
     - InterpModeSmooth for interpolation using the `<2 x float>` barycentrics in `interpValue`
     - InterpModeFlat for flat shading; `interpValue` is ignored and is recommended to be `poison`
     - InterpModeCustom to retrieve the attribute of the vertex with the `i32` index `interpValue` (which must be 0, 1,

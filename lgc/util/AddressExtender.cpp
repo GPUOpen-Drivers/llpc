@@ -43,7 +43,7 @@ using namespace llvm;
 Instruction *AddressExtender::getFirstInsertionPt() {
   if (m_pc)
     return m_pc->getNextNode();
-  return &*m_func->front().getFirstInsertionPt();
+  return &*m_func->front().getFirstNonPHIOrDbgOrAlloca();
 }
 
 // =====================================================================================================================
@@ -62,7 +62,7 @@ Instruction *AddressExtender::extend(Value *addr32, Value *highHalf, Type *ptrTy
     ptr = builder.CreateInsertElement(getPc(), addr32, uint64_t(0));
   } else {
     // Extend with given value
-    ptr = builder.CreateInsertElement(UndefValue::get(FixedVectorType::get(builder.getInt32Ty(), 2)), addr32,
+    ptr = builder.CreateInsertElement(PoisonValue::get(FixedVectorType::get(builder.getInt32Ty(), 2)), addr32,
                                       uint64_t(0));
     ptr = builder.CreateInsertElement(ptr, highHalf, 1);
   }
@@ -78,7 +78,7 @@ Instruction *AddressExtender::getPc() {
     // This uses its own builder, as it wants to insert at the start of the function, whatever the caller
     // is doing.
     IRBuilder<> builder(m_func->getContext());
-    builder.SetInsertPoint(&*m_func->front().getFirstInsertionPt());
+    builder.SetInsertPointPastAllocas(m_func);
     Value *pc = builder.CreateIntrinsic(llvm::Intrinsic::amdgcn_s_getpc, {}, {});
     pc = cast<Instruction>(builder.CreateBitCast(pc, FixedVectorType::get(builder.getInt32Ty(), 2)));
     m_pc = cast<Instruction>(pc);

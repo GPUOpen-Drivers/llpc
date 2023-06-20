@@ -91,12 +91,10 @@ Value *BuilderImpl::CreateLoadBufferDesc(uint64_t descSet, unsigned binding, Val
       // If we can't find the node, assume mutable descriptor and search for any node.
       std::tie(topNode, node) =
           m_pipelineState->findResourceNode(ResourceNodeType::DescriptorMutable, descSet, binding, m_shaderStage);
-      if (!node) {
-        // We did not find the resource node. Return an poison value.
-        return PoisonValue::get(getBufferDescTy());
-      }
     }
-    assert(node && "missing resource node");
+
+    if (!node)
+      report_fatal_error("Resource node not found");
 
     if (node == topNode && isa<Constant>(descIndex) && node->concreteType != ResourceNodeType::InlineBuffer) {
       // Handle a descriptor in the root table (a "dynamic descriptor") specially, as long as it is not variably

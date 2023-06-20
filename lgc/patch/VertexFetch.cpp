@@ -567,7 +567,7 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
     // NOTE: The 10_10_10_2 formats are not supported by the uber fetch shader on gfx9 and older.
     // We rely on the driver to fallback to not using the uber fetch shader when those formats are used.
     builder.setShaderStage(ShaderStageVertex);
-    builder.SetInsertPoint(&(*vertexFetches[0]->getFunction()->front().getFirstInsertionPt()));
+    builder.SetInsertPointPastAllocas(vertexFetches[0]->getFunction());
     auto desc = builder.CreateLoadBufferDesc(InternalDescriptorSetId, FetchShaderInternalBufferBinding,
                                              builder.getInt32(0), Builder::BufferFlagAddress);
 
@@ -602,7 +602,7 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
 
       if (!description) {
         // If we could not find vertex input info matching this location, just return undefined value.
-        vertex = UndefValue::get(fetch->getType());
+        vertex = PoisonValue::get(fetch->getType());
       } else {
         // Fetch the vertex.
         builder.SetInsertPoint(fetch);
@@ -793,7 +793,7 @@ Function *VertexFetchImpl::generateFetchFunction(unsigned bitWidth, Module *modu
     }
 
     // return value
-    Value *lastVert = UndefValue::get(retTy);
+    Value *lastVert = PoisonValue::get(retTy);
     Value *comp0 = nullptr;
     Value *comp1 = nullptr;
     Value *comp2 = nullptr;
@@ -941,13 +941,13 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *des
 
   if (!m_vertexIndex) {
     IRBuilderBase::InsertPointGuard ipg(builder);
-    builder.SetInsertPoint(&*inst->getFunction()->front().getFirstInsertionPt());
+    builder.SetInsertPointPastAllocas(inst->getFunction());
     m_vertexIndex = ShaderInputs::getVertexIndex(builder, *m_lgcContext);
   }
 
   if (!m_instanceIndex) {
     IRBuilderBase::InsertPointGuard ipg(builder);
-    builder.SetInsertPoint(&*inst->getFunction()->front().getFirstInsertionPt());
+    builder.SetInsertPointPastAllocas(inst->getFunction());
     m_instanceIndex = ShaderInputs::getInstanceIndex(builder, *m_lgcContext);
   }
 
@@ -955,7 +955,7 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *des
   Type *vbDescTy = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
   if (!m_vertexBufTablePtr) {
     IRBuilderBase::InsertPointGuard ipg(builder);
-    builder.SetInsertPoint(&*inst->getFunction()->front().getFirstInsertionPt());
+    builder.SetInsertPointPastAllocas(inst->getFunction());
     m_vertexBufTablePtr =
         ShaderInputs::getSpecialUserDataAsPointer(UserDataMapping::VertexBufferTable, vbDescTy, builder);
   }
@@ -1062,7 +1062,7 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *des
       vertexValues[i] = fetchValues[compIdx + i];
     else {
       llvm_unreachable("Should never be called!");
-      vertexValues[i] = UndefValue::get(Type::getInt32Ty(*m_context));
+      vertexValues[i] = PoisonValue::get(Type::getInt32Ty(*m_context));
     }
   }
 
@@ -1072,7 +1072,7 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *des
   else {
     auto compType = bitWidth <= 16 ? Type::getInt16Ty(*m_context) : Type::getInt32Ty(*m_context);
     Type *vertexTy = FixedVectorType::get(compType, vertexCompCount);
-    vertex = UndefValue::get(vertexTy);
+    vertex = PoisonValue::get(vertexTy);
 
     for (unsigned i = 0; i < vertexCompCount; ++i)
       vertex = builder.CreateInsertElement(vertex, vertexValues[i], ConstantInt::get(Type::getInt32Ty(*m_context), i));
@@ -1319,7 +1319,7 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
       // %vf1 = shufflevector %vf1, %vf1, <0, 1, undef, undef>
       Constant *shuffleMask[] = {
           ConstantInt::get(Type::getInt32Ty(*m_context), 0), ConstantInt::get(Type::getInt32Ty(*m_context), 1),
-          UndefValue::get(Type::getInt32Ty(*m_context)), UndefValue::get(Type::getInt32Ty(*m_context))};
+          PoisonValue::get(Type::getInt32Ty(*m_context)), PoisonValue::get(Type::getInt32Ty(*m_context))};
       vertexFetches[1] =
           new ShuffleVectorInst(vertexFetches[1], vertexFetches[1], ConstantVector::get(shuffleMask), "", insertPos);
     }
@@ -1403,7 +1403,7 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
       vertexValues[i] = defaultValues[compIdx + i];
     else {
       llvm_unreachable("Should never be called!");
-      vertexValues[i] = UndefValue::get(Type::getInt32Ty(*m_context));
+      vertexValues[i] = PoisonValue::get(Type::getInt32Ty(*m_context));
     }
   }
 
@@ -1411,7 +1411,7 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
     vertex = vertexValues[0];
   else {
     Type *vertexTy = FixedVectorType::get(Type::getInt32Ty(*m_context), vertexCompCount);
-    vertex = UndefValue::get(vertexTy);
+    vertex = PoisonValue::get(vertexTy);
 
     for (unsigned i = 0; i < vertexCompCount; ++i) {
       vertex = InsertElementInst::Create(vertex, vertexValues[i], ConstantInt::get(Type::getInt32Ty(*m_context), i), "",
@@ -1704,7 +1704,7 @@ void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bo
     }
 
     Type *fetchTy = FixedVectorType::get(Type::getInt32Ty(*m_context), numChannels);
-    Value *fetch = UndefValue::get(fetchTy);
+    Value *fetch = PoisonValue::get(fetchTy);
 
     // Do vertex per-component fetches
     for (unsigned i = 0; i < formatInfo->compCount; ++i) {

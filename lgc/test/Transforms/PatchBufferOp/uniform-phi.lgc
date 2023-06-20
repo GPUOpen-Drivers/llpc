@@ -16,7 +16,7 @@ define amdgpu_gfx float @uniform_phi(<4 x i32> inreg %desc0, <4 x i32> inreg %de
 ; CHECK-NEXT:    br label [[TAIL]]
 ; CHECK:       tail:
 ; CHECK-NEXT:    [[PTR_0:%.*]] = phi <4 x i32> [ [[DESC0:%.*]], [[A]] ], [ [[DESC1:%.*]], [[B]] ]
-; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <4 x i32> [[PTR_0]], <4 x i32> undef, <2 x i32> <i32 0, i32 1>
+; CHECK-NEXT:    [[TMP1:%.*]] = shufflevector <4 x i32> [[PTR_0]], <4 x i32> poison, <2 x i32> <i32 0, i32 1>
 ; CHECK-NEXT:    [[TMP2:%.*]] = and <2 x i32> [[TMP1]], <i32 -1, i32 65535>
 ; CHECK-NEXT:    [[TMP3:%.*]] = bitcast <2 x i32> [[TMP2]] to i64
 ; CHECK-NEXT:    [[TMP4:%.*]] = inttoptr i64 [[TMP3]] to ptr addrspace(1)

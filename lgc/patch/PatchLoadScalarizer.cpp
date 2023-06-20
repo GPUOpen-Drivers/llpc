@@ -130,7 +130,7 @@ void PatchLoadScalarizer::visitLoadInst(LoadInst &loadInst) {
     Type *compTy = cast<VectorType>(loadTy)->getElementType();
     uint64_t compSize = loadInst.getModule()->getDataLayout().getTypeStoreSize(compTy);
 
-    Value *loadValue = UndefValue::get(loadTy);
+    Value *loadValue = PoisonValue::get(loadTy);
     Type *newLoadPtrTy = PointerType::get(compTy, addrSpace);
     SmallVector<Value *, 4> loadComps;
 

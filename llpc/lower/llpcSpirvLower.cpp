@@ -39,6 +39,7 @@
 #include "llpcSpirvLowerMath.h"
 #include "llpcSpirvLowerMemoryOp.h"
 #if VKI_RAY_TRACING
+#include "LowerGpuRt.h"
 #include "llpcSpirvLowerRayQueryPostInline.h"
 #include "llpcSpirvLowerRayTracingBuiltIn.h"
 #include "llpcSpirvLowerRayTracingIntrinsics.h"
@@ -191,6 +192,9 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
     LgcContext::createAndAddStartStopTimer(passMgr, lowerTimer, true);
 
 #if VKI_RAY_TRACING
+  if (rayTracing)
+    passMgr.addPass(SpirvLowerRayTracing());
+
   if (isInternalRtShader)
     passMgr.addPass(SpirvLowerRayTracingIntrinsics());
 #endif
@@ -255,6 +259,11 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
 
   // Lower SPIR-V instruction metadata remove
   passMgr.addPass(SpirvLowerInstMetaRemove());
+
+#if VKI_RAY_TRACING
+  if (rayTracing || rayQuery)
+    passMgr.addPass(LowerGpuRt());
+#endif
 
   // Stop timer for lowering passes.
   if (lowerTimer)

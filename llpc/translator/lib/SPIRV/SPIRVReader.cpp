@@ -3627,29 +3627,14 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpConvertUToAccelerationStr
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
-  // GpuAddr is 64 bit integer
   Value *gpuAddr = transValue(spvInst->getOperands()[0], func, block);
   Type *gpuAddrTy = gpuAddr->getType();
-  // NOTE: This is a workround for SPIR-V generated from HLSL sources. The input of OpConvertUToAccelerationStructureKHR
-  // could be uvec2 while the spec expects this to be int64.
-  if (gpuAddrTy->isVectorTy() && gpuAddrTy->getPrimitiveSizeInBits() == 64) {
-    gpuAddr = getBuilder()->CreateBitCast(gpuAddr, getBuilder()->getInt64Ty());
+  // NOTE: The input is allowed to be i64 or <2 x i32>, but we always assume acceleration structure is <2 x i32>.
+  if (gpuAddrTy->isIntegerTy()) {
+    assert(gpuAddrTy->getScalarSizeInBits() == 64);
+    gpuAddr = getBuilder()->CreateBitCast(gpuAddr, FixedVectorType::get(getBuilder()->getInt32Ty(), 2));
   }
-
-  Type *gpuAddrAsPtrTy = Type::getInt8PtrTy(*m_context, SPIRAS_Global);
-  auto gpuAddrAsPtr = getBuilder()->CreateIntToPtr(gpuAddr, gpuAddrAsPtrTy);
-
-  // Create GEP to get the byte address with byte offset
-  Value *loadValue = m_builder->CreateGEP(m_builder->getInt8Ty(), gpuAddrAsPtr, getBuilder()->getInt32(0));
-
-  Type *accelStructTy = FixedVectorType::get(Type::getInt32Ty(*m_context), 2);
-  Type *accelStructPtrTy = accelStructTy->getPointerTo(SPIRAS_Global);
-
-  // Cast to the return type pointer
-  loadValue = m_builder->CreateBitCast(loadValue, accelStructPtrTy);
-  auto load = m_builder->CreateLoad(accelStructTy, loadValue);
-  load->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, {}));
-  return mapValue(spvValue, load);
+  return mapValue(spvValue, gpuAddr);
 }
 
 // =====================================================================================================================
@@ -4162,11 +4147,11 @@ Value *SPIRVToLLVM::transDebugPrintf(SPIRVInstruction *bi, const ArrayRef<SPIRVV
 
   auto spvValueItr = spvValues.begin();
   Value *formatStr = mapEntry(*spvValueItr++, nullptr);
-  SmallVector<Value *> args = {m_debugOutputBuffer, formatStr};
+  SmallVector<Value *> args;
   for (; spvValueItr != spvValues.end(); ++spvValueItr) {
     args.push_back(transValue(*spvValueItr, func, bb));
   }
-  return getBuilder()->CreateDebugPrintf(args);
+  return getBuilder()->create<lgc::DebugPrintfOp>(m_debugOutputBuffer, formatStr, args);
 }
 
 // Translate an initializer. This has special handling for the case where the type to initialize to does not match the
@@ -7665,15 +7650,6 @@ bool SPIRVToLLVM::transMetadata() {
           computeMode.workgroupSizeZ = workgroupSizeZ;
         }
         Pipeline::setComputeShaderMode(*m_m, computeMode);
-#if VKI_RAY_TRACING
-        // We also need to set the overall workgroup size on the PipelineContext so that the LowerRayQuery
-        // pass running on the rayQuery library module (a different module to this compute shader) can see it.
-        unsigned workgroupSize = workgroupSizeX == 0 ? 1 : workgroupSizeX;
-        workgroupSize *= workgroupSizeY == 0 ? 1 : workgroupSizeY;
-        workgroupSize *= workgroupSizeZ == 0 ? 1 : workgroupSizeZ;
-        Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
-        llpcContext->getPipelineContext()->setWorkgroupSize(workgroupSize);
-#endif
 
       } else
         llvm_unreachable("Invalid execution model");

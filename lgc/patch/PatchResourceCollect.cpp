@@ -1327,9 +1327,9 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
     m_importedOutputBuiltIns.insert(builtInId);
   } else if (mangledName.startswith(lgcName::OutputExportGeneric)) {
     auto outputValue = callInst.getArgOperand(callInst.arg_size() - 1);
-    if (m_shaderStage != ShaderStageFragment && isa<UndefValue>(outputValue)) {
-      // NOTE: If an output value of vertex processing stages is undefined, we can safely drop it and remove the output
-      // export call.
+    if (m_shaderStage != ShaderStageFragment && (isa<UndefValue>(outputValue) || isa<PoisonValue>(outputValue))) {
+      // NOTE: If an output value of vertex processing stages is unspecified, we can safely drop it and remove the
+      // output export call.
       m_deadCalls.push_back(&callInst);
 
       if (m_pipelineState->getNextShaderStage(m_shaderStage) != ShaderStageInvalid) {
@@ -1371,11 +1371,11 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
       m_outputCalls.push_back(&callInst);
     }
   } else if (mangledName.startswith(lgcName::OutputExportBuiltIn)) {
-    // NOTE: If an output value is undefined, we can safely drop it and remove the output export call.
+    // NOTE: If an output value is unspecified, we can safely drop it and remove the output export call.
     // Currently, do this for geometry shader.
     if (m_shaderStage == ShaderStageGeometry) {
       auto outputValue = callInst.getArgOperand(callInst.arg_size() - 1);
-      if (isa<UndefValue>(outputValue))
+      if (isa<UndefValue>(outputValue) || isa<PoisonValue>(outputValue))
         m_deadCalls.push_back(&callInst);
       else {
         unsigned builtInId = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
@@ -1384,8 +1384,8 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
     }
   } else if (mangledName.startswith(lgcName::OutputExportXfb)) {
     auto outputValue = callInst.getArgOperand(callInst.arg_size() - 1);
-    if (isa<UndefValue>(outputValue)) {
-      // NOTE: If an output value is undefined, we can safely drop it and remove the transform feedback export call.
+    if (isa<UndefValue>(outputValue) || isa<PoisonValue>(outputValue)) {
+      // NOTE: If an output value is unspecified, we can safely drop it and remove the transform feedback export call.
       m_deadCalls.push_back(&callInst);
     } else if (m_pipelineState->enableSwXfb()) {
       // Collect transform feedback export calls, used in SW-emulated stream-out. For GS, the collecting will
@@ -3252,7 +3252,7 @@ void PatchResourceCollect::reassembleOutputExportCalls() {
       outValue = builder.CreateBitCast(outValue, builder.getFloatTy());
     } else {
       // Output a vector
-      outValue = UndefValue::get(FixedVectorType::get(builder.getFloatTy(), compCount));
+      outValue = PoisonValue::get(FixedVectorType::get(builder.getFloatTy(), compCount));
       for (unsigned vectorComp = 0, elemIdx = baseElementIdx; vectorComp < compCount; vectorComp += 1, elemIdx += 2) {
         assert(elemIdx < MaxNumElems);
         Value *component = elementsInfo.elements[elemIdx];

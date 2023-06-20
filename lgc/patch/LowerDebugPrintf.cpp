@@ -29,9 +29,11 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/LowerDebugPrintf.h"
+#include "lgc/LgcDialect.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
+#include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 #include "llvm/InitializePasses.h"
@@ -53,31 +55,15 @@ namespace lgc {
 PreservedAnalyses LowerDebugPrintf::run(Module &module, ModuleAnalysisManager &analysisManager) {
   LLVM_DEBUG(dbgs() << "Run the pass Lower-debug-printf\n");
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
-  Patch::init(&module);
   m_pipelineState = pipelineState;
-  SmallVector<CallInst *> callees;
-  BuilderBase builder(*m_context);
-  for (auto &func : module) {
-    auto name = func.getName();
-    if (name.startswith(lgcName::LowerDebugPrintf)) {
-      for (auto user : func.users()) {
-        if (CallInst *callInst = dyn_cast<CallInst>(user)) {
-          Value *resultVal = builder.getInt64(0);
-          if (!isa<PoisonValue>(callInst->getArgOperand(0))) {
-            builder.SetInsertPoint(callInst);
-            resultVal = createDebugPrintf(callInst->getArgOperand(0), callInst->getArgOperand(1),
-                                          make_range(callInst->arg_begin() + 2, callInst->arg_end()), builder);
-          }
-          callInst->replaceAllUsesWith(resultVal);
-          callees.push_back(callInst);
-        }
-      }
-    }
-  }
 
-  for (auto callInst : callees) {
-    callInst->eraseFromParent();
-  }
+  static const auto visitor =
+      llvm_dialects::VisitorBuilder<LowerDebugPrintf>().add(&LowerDebugPrintf::visitDebugPrintf).build();
+
+  visitor.visit(*this, module);
+
+  for (auto inst : m_toErase)
+    inst->eraseFromParent();
 
   if (m_elfInfos.empty())
     return PreservedAnalyses::all();
@@ -87,24 +73,28 @@ PreservedAnalyses LowerDebugPrintf::run(Module &module, ModuleAnalysisManager &a
 }
 
 // =====================================================================================================================
-// Create debug printf operation, and write to the output debug buffer
-// @debugPrintfBuffer : Output buffer for debug print data
-// @formatStr : Printf format string
-// @vars : Printf variable parameters
-// @builder : BuilderBase to build instruction
-Value *LowerDebugPrintf::createDebugPrintf(Value *debugPrintfBuffer, Value *formatStr,
-                                           iterator_range<User::op_iterator> vars, BuilderBase &builder) {
+// Lower a debug printf operation
+//
+// @param op : the operation
+void LowerDebugPrintf::visitDebugPrintf(DebugPrintfOp &op) {
+  m_toErase.push_back(&op);
+
+  Value *debugPrintfBuffer = op.getBuffer();
+  if (isa<PoisonValue>(debugPrintfBuffer))
+    return;
+
+  BuilderBase builder(&op);
 
   // Printf output variables in DWORDs
 
   SmallVector<Value *> printArgs;
   // Records printf output variables are 64bit or not
   SmallBitVector bit64Vector;
-  for (const auto &var : vars) {
+  for (Value *var : op.getArgs()) {
     getDwordValues(var, printArgs, bit64Vector, builder);
   }
 
-  GlobalVariable *globalStr = cast<GlobalVariable>(formatStr);
+  GlobalVariable *globalStr = cast<GlobalVariable>(op.getFormat());
   StringRef strDebugStr = (cast<ConstantDataSequential>(globalStr->getInitializer()))->getAsString();
 
   uint64_t hash = hash_value(strDebugStr);
@@ -122,23 +112,17 @@ Value *LowerDebugPrintf::createDebugPrintf(Value *debugPrintfBuffer, Value *form
   uint32_t loEntryheader = uint32_t(header);
   uint32_t hiEntryheader = uint32_t(header >> 32);
 
-  auto offsetTy = PointerType::get(builder.getInt64Ty(), ADDR_SPACE_BUFFER_FAT_POINTER);
-  Value *bufferPtr = builder.CreateBitCast(debugPrintfBuffer, offsetTy);
   // uint64_t offset = AtomicAdd64(offsetPtr, entrySize);
-  // maxOffset = 1<<31;
+  // maxOffset = 1 << 29; // corresponds to 2GiB
   // offset = offset < maxOffset ? offset : maxOffset;
-  Value *entryOffset = builder.CreateAtomicRMW(AtomicRMWInst::Add, bufferPtr, builder.getInt64(entrySize), MaybeAlign(),
-                                               AtomicOrdering::Monotonic, SyncScope::SingleThread);
-  Value *maxOffset = builder.getInt64(1U << 31);
+  Value *entryOffset = builder.CreateAtomicRMW(AtomicRMWInst::Add, debugPrintfBuffer, builder.getInt64(entrySize),
+                                               MaybeAlign(8), AtomicOrdering::Monotonic, SyncScope::System);
+  Value *maxOffset = builder.getInt64(1U << 29);
   entryOffset = builder.CreateBinaryIntrinsic(Intrinsic::umin, entryOffset, maxOffset);
+  entryOffset = builder.CreateTrunc(entryOffset, builder.getInt32Ty());
 
-  // Buffer Header is {BufferOffset_Loword, BufferOffset_Hiword, reserved0, reserved1};
-  Type *bufferHeaderType = ArrayType::get(builder.getInt32Ty(), 4);
-  Type *runtimeArrayType = ArrayType::get(builder.getInt32Ty(), ~0U);
-  Type *bufferType = StructType::get(*m_context, {bufferHeaderType, runtimeArrayType});
-  Type *bufferPtrType = PointerType::get(bufferType, ADDR_SPACE_BUFFER_FAT_POINTER);
-
-  bufferPtr = builder.CreateBitCast(debugPrintfBuffer, bufferPtrType);
+  // Skip buffer Header, which is {BufferOffset_Loword, BufferOffset_Hiword, reserved0, reserved1};
+  entryOffset = builder.CreateAdd(entryOffset, builder.getInt32(4));
 
   SmallVector<Value *> outputVals = {builder.getInt32(loEntryheader), builder.getInt32(hiEntryheader)};
   outputVals.reserve(printArgs.size() + 2);
@@ -148,13 +132,10 @@ Value *LowerDebugPrintf::createDebugPrintf(Value *debugPrintfBuffer, Value *form
 
   // Write the payload to debug buffer
   for (auto outValue : outputVals) {
-    Value *bufferOutputPos =
-        builder.CreateGEP(bufferType, bufferPtr, {builder.getInt32(0), builder.getInt32(1), entryOffset});
+    Value *bufferOutputPos = builder.CreateGEP(builder.getInt32Ty(), debugPrintfBuffer, entryOffset);
     builder.CreateStore(outValue, bufferOutputPos);
-    entryOffset = builder.CreateAdd(entryOffset, builder.getInt64(1));
+    entryOffset = builder.CreateAdd(entryOffset, builder.getInt32(1));
   }
-
-  return entryOffset;
 }
 
 // =====================================================================================================================

@@ -600,6 +600,15 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   {
     m_builder.SetInsertPoint(entryBlock);
 
+    // Keep allocas in entry block
+    while (true) {
+      auto alloca = apiMeshEntryBlock->begin();
+      if (alloca == apiMeshEntryBlock->end() || !isa<AllocaInst>(alloca))
+        break;
+
+      alloca->moveBefore(*entryBlock, entryBlock->end());
+    }
+
     initWaveThreadInfo(entryPoint);
 
     if (m_needBarrierFlag) {
@@ -1020,7 +1029,7 @@ Value *MeshTaskShader::readTaskPayload(Type *readTy, Value *byteOffset) {
   } else if (bitWidth == 8 || bitWidth == 16) {
     if (numElements > 1) {
       // Scalarize
-      Value *readValue = UndefValue::get(readTy);
+      Value *readValue = PoisonValue::get(readTy);
       for (unsigned i = 0; i < numElements; ++i) {
         auto elemByteOffset =
             i > 0 ? m_builder.CreateAdd(byteOffset, m_builder.getInt32(i * bitWidth / 8)) : byteOffset;
@@ -1218,7 +1227,7 @@ Value *MeshTaskShader::taskPayloadAtomicCompareSwap(AtomicOrdering ordering, Val
     auto baseAddressHigh = m_builder.CreateExtractElement(payloadRingBufDesc, 1);
     baseAddressHigh = m_builder.CreateAnd(baseAddressHigh, 0xFFFF);
 
-    Value *baseAddress = UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
+    Value *baseAddress = PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
     baseAddress = m_builder.CreateInsertElement(baseAddress, baseAddressLow, static_cast<uint64_t>(0));
     baseAddress = m_builder.CreateInsertElement(baseAddress, baseAddressHigh, 1);
     baseAddress = m_builder.CreateBitCast(baseAddress, m_builder.getInt64Ty());
@@ -1489,7 +1498,7 @@ void MeshTaskShader::emitTaskMeshs(Value *groupCountX, Value *groupCountY, Value
       // NOTE: LLVM backend will try to apply atomics optimization. But here, we only have one active thread to execute
       // the global_atomic_add instruction. Thus, the optimization is completely unnecessary. To avoid this, we try to
       // move the added value to VGPR to mark it as "divergent".
-      Value *valueToAdd = UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
+      Value *valueToAdd = PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
       valueToAdd = m_builder.CreateInsertElement(valueToAdd, convertToDivergent(m_builder.getInt32(numTaskThreads)),
                                                  static_cast<uint64_t>(0));
       valueToAdd =
@@ -1515,7 +1524,7 @@ void MeshTaskShader::emitTaskMeshs(Value *groupCountX, Value *groupCountY, Value
     Value *drawDataRingEntryOffset = getDrawDataRingEntryOffset(entryPoint);
 
     // Draw data = <groupCountX, groupCountY, groupCountZ, readyBit>
-    Value *groupCount = UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 3));
+    Value *groupCount = PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 3));
     groupCount = m_builder.CreateInsertElement(groupCount, groupCountX, static_cast<uint64_t>(0));
     groupCount = m_builder.CreateInsertElement(groupCount, groupCountY, 1);
     groupCount = m_builder.CreateInsertElement(groupCount, groupCountZ, 2);
@@ -1710,7 +1719,7 @@ void MeshTaskShader::lowerMeshShaderBody(BasicBlock *apiMeshEntryBlock, BasicBlo
           unsigned builtIn = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
 
           // NOTE: Mesh shader input lowering is supposed to happen at the beginning of API mesh shader.
-          m_builder.SetInsertPoint(&*apiMeshEntryBlock->getFirstInsertionPt());
+          m_builder.SetInsertPoint(&*apiMeshEntryBlock->getFirstNonPHIOrDbgOrAlloca());
 
           auto meshInput = getMeshInput(static_cast<BuiltInKind>(builtIn));
           assert(meshInput->getType() == call->getType());
@@ -2235,13 +2244,13 @@ void MeshTaskShader::exportVertex() {
       clipCullDistances.push_back(cullDistance);
 
     // Do array padding
-    auto undef = PoisonValue::get(m_builder.getFloatTy());
+    auto poison = PoisonValue::get(m_builder.getFloatTy());
     if (clipCullDistances.size() <= 4) {
       while (clipCullDistances.size() < 4) // <4 x float>
-        clipCullDistances.push_back(undef);
+        clipCullDistances.push_back(poison);
     } else {
       while (clipCullDistances.size() < 8) // <8 x float>
-        clipCullDistances.push_back(undef);
+        clipCullDistances.push_back(poison);
     }
 
     unsigned pos = builtInUsage.pointSize ? 2 : 1;
@@ -2297,14 +2306,14 @@ void MeshTaskShader::exportVertex() {
         const unsigned clipDistanceCount = std::min(fsBuiltInUsage.clipDistance, builtInUsage.clipDistance);
         const unsigned cullDistanceCount = std::min(fsBuiltInUsage.cullDistance, builtInUsage.cullDistance);
 
-        auto undef = PoisonValue::get(m_builder.getFloatTy());
+        auto poison = PoisonValue::get(m_builder.getFloatTy());
 
         clipCullDistances.clear();
         for (unsigned i = 0; i < clipDistanceCount; ++i)
           clipCullDistances.push_back(clipDistances[i]);
 
         for (unsigned i = clipDistanceCount; i < fsBuiltInUsage.clipDistance; ++i)
-          clipCullDistances.push_back(undef);
+          clipCullDistances.push_back(poison);
 
         for (unsigned i = 0; i < cullDistanceCount; ++i)
           clipCullDistances.push_back(cullDistances[i]);
@@ -2312,10 +2321,10 @@ void MeshTaskShader::exportVertex() {
         // Do array padding
         if (clipCullDistances.size() <= 4) {
           while (clipCullDistances.size() < 4) // <4 x float>
-            clipCullDistances.push_back(undef);
+            clipCullDistances.push_back(poison);
         } else {
           while (clipCullDistances.size() < 8) // <8 x float>
-            clipCullDistances.push_back(undef);
+            clipCullDistances.push_back(poison);
         }
       }
     }
@@ -2379,7 +2388,7 @@ void MeshTaskShader::collectMeshStatsInfo(Function *entryPoint, Value *numMeshPr
     // NOTE: LLVM backend will try to apply atomics optimization. But here, we only have one active thread to execute
     // the global_atomic_add instruction. Thus, the optimization is completely unnecessary. To avoid this, we try to
     // move the added value to VGPR to mark it as "divergent".
-    Value *valueToAdd = UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
+    Value *valueToAdd = PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
     valueToAdd = m_builder.CreateInsertElement(valueToAdd, convertToDivergent(m_builder.getInt32(numMeshThreads)),
                                                static_cast<uint64_t>(0));
     valueToAdd =
@@ -2405,7 +2414,7 @@ void MeshTaskShader::collectMeshStatsInfo(Function *entryPoint, Value *numMeshPr
     // NOTE: LLVM backend will try to apply atomics optimization. But here, we only have one active thread to execute
     // the global_atomic_add instruction. Thus, the optimization is completely unnecessary. To avoid this, we try to
     // move the added value to VGPR to mark it as "divergent".
-    Value *valueToAdd = UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
+    Value *valueToAdd = PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
     valueToAdd =
         m_builder.CreateInsertElement(valueToAdd, convertToDivergent(numMeshPrimitives), static_cast<uint64_t>(0));
     valueToAdd = m_builder.CreateInsertElement(valueToAdd, convertToDivergent(m_builder.getInt32(0)), 1);
@@ -2430,7 +2439,7 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
     auto valueTy = values[0]->getType();
     assert(valueTy->isFloatTy() || valueTy->isIntegerTy(32)); // Must be float or i32
 
-    auto undef = PoisonValue::get(valueTy);
+    auto poison = PoisonValue::get(valueTy);
     unsigned validMask = 0;
     for (unsigned j = 0; j < 4; ++j) {
       if (values[j])
@@ -2465,16 +2474,16 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
                                       m_builder.getInt32(target + exports[i].index), // tgt
                                       m_builder.getInt32(validMask),                 // en
                                       values[0],                                     // src0
-                                      values[1] ? values[1] : undef,                 // src1
-                                      values[2] ? values[2] : undef,                 // src2
-                                      values[3] ? values[3] : undef,                 // src3
+                                      values[1] ? values[1] : poison,                // src1
+                                      values[2] ? values[2] : poison,                // src2
+                                      values[3] ? values[3] : poison,                // src3
                                       m_builder.getInt1(exportDone),                 // done
                                       m_waveThreadInfo.rowInSubgroup,                // row number
                                   });
       } else {
         assert(kind == ExportKind::VertAttr || kind == ExportKind::PrimAttr);
 
-        Value *valueToStore = UndefValue::get(FixedVectorType::get(valueTy, 4));
+        Value *valueToStore = PoisonValue::get(FixedVectorType::get(valueTy, 4));
         for (unsigned j = 0; j < 4; ++j) {
           if (values[j])
             valueToStore = m_builder.CreateInsertElement(valueToStore, values[j], j);
@@ -2507,9 +2516,9 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
                                     m_builder.getInt32(target + exports[i].index), // tgt
                                     m_builder.getInt32(validMask),                 // en
                                     values[0],                                     // src0
-                                    values[1] ? values[1] : undef,                 // src1
-                                    values[2] ? values[2] : undef,                 // src2
-                                    values[3] ? values[3] : undef,                 // src3
+                                    values[1] ? values[1] : poison,                // src1
+                                    values[2] ? values[2] : poison,                // src2
+                                    values[3] ? values[3] : poison,                // src3
                                     m_builder.getInt1(exportDone),                 // done
                                     m_builder.getFalse(),                          // vm
                                 });
@@ -2662,7 +2671,7 @@ Value *MeshTaskShader::getMeshWorkgroupId() {
                                              "workgroupIdX"); // Promoted to SGPR
   }
 
-  Value *workgroupId = UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 3));
+  Value *workgroupId = PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 3));
   workgroupId = m_builder.CreateInsertElement(workgroupId, workgroupIdX, static_cast<uint64_t>(0));
   workgroupId = m_builder.CreateInsertElement(workgroupId, workgroupIdY, 1);
   workgroupId = m_builder.CreateInsertElement(workgroupId, workgroupIdZ, 2);
@@ -2724,7 +2733,7 @@ Value *MeshTaskShader::getMeshLocalInvocationId() {
     localInvocationIdX = m_builder.CreateSub(diff, localInvocationIdX, "localInvocationIdX");
   }
 
-  Value *localInvocationId = UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 3));
+  Value *localInvocationId = PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 3));
   localInvocationId = m_builder.CreateInsertElement(localInvocationId, localInvocationIdX, static_cast<uint64_t>(0));
   localInvocationId = m_builder.CreateInsertElement(localInvocationId, localInvocationIdY, 1);
   localInvocationId = m_builder.CreateInsertElement(localInvocationId, localInvocationIdZ, 2);

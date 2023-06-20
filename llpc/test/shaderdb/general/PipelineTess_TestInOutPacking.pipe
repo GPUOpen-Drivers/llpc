@@ -31,7 +31,7 @@
 ; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 40
 ; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 41
 ; SHADERTEST_PP0: call void @llvm.amdgcn.exp.f32(i32 {{.*}}32, i32 {{.*}}15, float %{{[0-9]*}}, float %{{[0-9]*}}, float %{{[0-9]*}}, float %{{[0-9]*}}, i1 {{.*}}false, i1 {{.*}}false)
-; SHADERTEST_PP0: call void @llvm.amdgcn.exp.f32(i32 {{.*}}33, i32 {{.*}}3, float %{{[0-9]*}}, float %{{[0-9]*}}, float undef, float undef, i1 {{.*}}false, i1 {{.*}}false)
+; SHADERTEST_PP0: call void @llvm.amdgcn.exp.f32(i32 {{.*}}33, i32 {{.*}}3, float %{{[0-9]*}}, float %{{[0-9]*}}, float poison, float poison, i1 {{.*}}false, i1 {{.*}}false)
 ; SHADERTEST_PP0: call float @llvm.amdgcn.interp.p1(float %{{[^,]*}}, i32 immarg 1, i32 immarg 1, i32 %PrimMask)
 ; SHADERTEST_PP0: call float @llvm.amdgcn.interp.p1(float %{{[^,]*}}, i32 immarg 2, i32 immarg 0, i32 %PrimMask)
 ; SHADERTEST_PP0: call float @llvm.amdgcn.interp.p1(float %{{[^,]*}}, i32 immarg 3, i32 immarg 0, i32 %PrimMask)
@@ -82,7 +82,7 @@
 ; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 40
 ; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 41
 ; SHADERTEST_PP1: call void @llvm.amdgcn.exp.f32(i32 {{.*}}32, i32 {{.*}}15, float %{{[0-9]*}}, float %{{[0-9]*}}, float %{{[0-9]*}}, float %{{[0-9]*}}, i1 {{.*}}false, i1 {{.*}}false)
-; SHADERTEST_PP1: call void @llvm.amdgcn.exp.f32(i32 {{.*}}33, i32 {{.*}}3, float %{{[0-9]*}}, float %{{[0-9]*}}, float undef, float undef, i1 {{.*}}false, i1 {{.*}}false)
+; SHADERTEST_PP1: call void @llvm.amdgcn.exp.f32(i32 {{.*}}33, i32 {{.*}}3, float %{{[0-9]*}}, float %{{[0-9]*}}, float poison, float poison, i1 {{.*}}false, i1 {{.*}}false)
 ; SHADERTEST_PP1: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

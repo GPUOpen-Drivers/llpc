@@ -56,7 +56,7 @@ extern const char *MetaNameSpirvOp;
 } // namespace SPIRV
 
 namespace RtName {
-const char *TraceRayKHR = "TraceRayKHR";
+const char *TraceRayKHR = "_cs_";
 const char *TraceRaySetTraceParams = "TraceRaySetTraceParams";
 const char *ShaderTable = "ShaderTable";
 static const char *HitAttribute = "HitAttribute";
@@ -470,8 +470,6 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
   initGlobalPayloads();
   initShaderBuiltIns();
   initGlobalCallableData();
-  createGlobalLdsUsage();
-  createGlobalRayQueryObj();
   createGlobalTraceRayStaticId();
   createGlobalTraceParams();
 
@@ -482,14 +480,12 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
     rayTracingContext->setEntryName("main");
     return true;
   }
-  Instruction *insertPos = &*(m_entryPoint->begin()->getFirstInsertionPt());
+  Instruction *insertPos = &*(m_entryPoint->begin()->getFirstNonPHIOrDbgOrAlloca());
 
   // Process traceRays module
   if (m_shaderStage == ShaderStageCompute) {
-    createGlobalStack();
     for (auto funcIt = module.begin(), funcEnd = module.end(); funcIt != funcEnd;) {
       Function *func = &*funcIt++;
-      SpirvLowerRayQuery::processLibraryFunction(func);
       if (func)
         processLibraryFunction(func);
     }
@@ -500,7 +496,6 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
     m_entryPoint->setName(module.getName());
     m_entryPoint->addFnAttr(Attribute::AlwaysInline);
     m_builder->SetInsertPoint(insertPos);
-    initGlobalVariable();
     m_spirvOpMetaKindId = m_context->getMDKindID(MetaNameSpirvOp);
 
     if (m_shaderStage == ShaderStageRayTracingAnyHit || m_shaderStage == ShaderStageRayTracingClosestHit ||
@@ -555,7 +550,6 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
     }
     for (Function &func : module.functions()) {
       unsigned opcode = getFuncOpcode(&func);
-      SpirvLowerRayQuery::processShaderFunction(&func, opcode);
       if (opcode == OpTraceRayKHR || opcode == OpTraceNV)
         createRayTracingFunc<OpTraceRayKHR>(&func, opcode);
       else if (opcode == OpExecuteCallableKHR)
@@ -1456,7 +1450,7 @@ void SpirvLowerRayTracing::createRayGenEntryFunc() {
 void SpirvLowerRayTracing::createDbgInfo(Module &module, Function *func) {
   DIBuilder builder(module);
   DIFile *file = builder.createFile(func->getName(), ".");
-
+  builder.createCompileUnit(dwarf::DW_LANG_C99, file, "llvmIR", false, "", 0, "", DICompileUnit::LineTablesOnly);
   // Create the DISubprogram for the module entry function
   auto *funcTy = builder.createSubroutineType(builder.getOrCreateTypeArray({}));
   auto spFlags = DISubprogram::SPFlagDefinition;
@@ -1567,7 +1561,7 @@ void SpirvLowerRayTracing::createTraceRay() {
   bool indirect = rayTracingContext->getIndirectStageMask() & ShaderStageComputeBit;
 
   auto funcTy = getTraceRayFuncTy();
-  StringRef funcName = indirect ? m_module->getName() : RtName::TraceRayKHR;
+  StringRef funcName = RtName::TraceRayKHR;
   Function *func = Function::Create(funcTy, GlobalValue::ExternalLinkage, funcName, m_module);
   func->setCallingConv(CallingConv::SPIR_FUNC);
   if (!indirect)
@@ -1581,8 +1575,6 @@ void SpirvLowerRayTracing::createTraceRay() {
 
   BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
   m_builder->SetInsertPoint(entryBlock);
-  if (indirect)
-    initGlobalVariable();
 
   // traceRaysInline argument types
   Type *funcArgTys[] = {
@@ -1936,8 +1928,7 @@ void SpirvLowerRayTracing::createEntryFunc(Function *func) {
   m_entryPoint = newFunc;
   m_entryPoint->addFnAttr(Attribute::NoUnwind);
   m_entryPoint->addFnAttr(Attribute::AlwaysInline);
-  Instruction *insertPos = &*(newFunc->begin()->getFirstInsertionPt());
-  m_builder->SetInsertPoint(insertPos);
+  m_builder->SetInsertPointPastAllocas(newFunc);
   auto argIt = newFunc->arg_begin();
 
   // Save the function input parameter value to the global payloads and builtIns
@@ -2110,8 +2101,7 @@ void SpirvLowerRayTracing::createCallableShaderEntryFunc(Function *func) {
   m_entryPoint = newFunc;
   m_entryPoint->addFnAttr(Attribute::NoUnwind);
   m_entryPoint->addFnAttr(Attribute::AlwaysInline);
-  Instruction *insertPos = &*(newFunc->begin()->getFirstInsertionPt());
-  m_builder->SetInsertPoint(insertPos);
+  m_builder->SetInsertPointPastAllocas(newFunc);
 
   auto argIt = newFunc->arg_begin();
 

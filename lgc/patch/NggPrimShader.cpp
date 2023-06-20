@@ -1777,13 +1777,13 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
     {
       m_builder.SetInsertPoint(dummyVertexExportBlock);
 
-      auto undef = PoisonValue::get(m_builder.getFloatTy());
+      auto poison = PoisonValue::get(m_builder.getFloatTy());
       m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getFloatTy(),
                                 {
                                     m_builder.getInt32(EXP_TARGET_POS_0), // tgt
                                     m_builder.getInt32(0x0),              // en
                                     // src0 ~ src3
-                                    undef, undef, undef, undef,
+                                    poison, poison, poison, poison,
                                     m_builder.getTrue(), // done
                                     m_builder.getFalse() // vm
                                 });
@@ -2371,13 +2371,13 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
     {
       m_builder.SetInsertPoint(dummyVertexExportBlock);
 
-      auto undef = PoisonValue::get(m_builder.getFloatTy());
+      auto poison = PoisonValue::get(m_builder.getFloatTy());
       m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getFloatTy(),
                                 {
                                     m_builder.getInt32(EXP_TARGET_POS_0), // tgt
                                     m_builder.getInt32(0x0),              // en
                                     // src0 ~ src3
-                                    undef, undef, undef, undef,
+                                    poison, poison, poison, poison,
                                     m_builder.getTrue(), // done
                                     m_builder.getFalse() // vm
                                 });
@@ -2696,13 +2696,13 @@ void NggPrimShader::exportPassthroughPrimitive() {
   assert(m_nggControl->passthroughMode); // Make sure NGG passthrough mode is enabled
   assert(!m_hasGs);                      // Make sure API GS is not present
 
-  auto undef = PoisonValue::get(m_builder.getInt32Ty());
+  auto poison = PoisonValue::get(m_builder.getInt32Ty());
   m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getInt32Ty(),
                             {
                                 m_builder.getInt32(EXP_TARGET_PRIM), // tgt
                                 m_builder.getInt32(0x1),             // en
                                 // src0 ~ src3
-                                m_nggInputs.primData, undef, undef, undef,
+                                m_nggInputs.primData, poison, poison, poison,
                                 m_builder.getTrue(),  // done, must be set
                                 m_builder.getFalse(), // vm
                             });
@@ -2796,13 +2796,13 @@ void NggPrimShader::exportPrimitive(Value *primitiveCulled) {
   if (primitiveCulled)
     primData = m_builder.CreateSelect(primitiveCulled, m_builder.getInt32(NullPrim), primData);
 
-  auto undef = PoisonValue::get(m_builder.getInt32Ty());
+  auto poison = PoisonValue::get(m_builder.getInt32Ty());
   m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getInt32Ty(),
                             {
                                 m_builder.getInt32(EXP_TARGET_PRIM), // tgt
                                 m_builder.getInt32(0x1),             // en
                                 // src0 ~ src3
-                                primData, undef, undef, undef,
+                                primData, poison, poison, poison,
                                 m_builder.getTrue(),  // done, must be set
                                 m_builder.getFalse(), // vm
                             });
@@ -2909,12 +2909,12 @@ void NggPrimShader::exportPrimitiveWithGs(Value *startingVertexIndex) {
 
   primData = m_builder.CreateSelect(validPrimitive, newPrimData, primData);
 
-  auto undef = PoisonValue::get(m_builder.getInt32Ty());
+  auto poison = PoisonValue::get(m_builder.getInt32Ty());
   m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getInt32Ty(),
                             {
                                 m_builder.getInt32(EXP_TARGET_PRIM), // tgt
                                 m_builder.getInt32(0x1),             // en
-                                primData, undef, undef, undef,       // src0 ~ src3
+                                primData, poison, poison, poison,    // src0 ~ src3
                                 m_builder.getTrue(),                 // done, must be set
                                 m_builder.getFalse(),                // vm
                             });
@@ -2942,14 +2942,13 @@ void NggPrimShader::earlyExitWithDummyExport() {
   {
     m_builder.SetInsertPoint(dummyExportBlock);
 
-    auto undef = PoisonValue::get(m_builder.getInt32Ty());
-
+    auto poison = PoisonValue::get(m_builder.getInt32Ty());
     m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getInt32Ty(),
                               {
                                   m_builder.getInt32(EXP_TARGET_PRIM), // tgt
                                   m_builder.getInt32(0x1),             // en
                                   // src0 ~ src3
-                                  m_builder.getInt32(0), undef, undef, undef,
+                                  m_builder.getInt32(0), poison, poison, poison,
                                   m_builder.getTrue(), // done
                                   m_builder.getFalse() // vm
                               });
@@ -2984,15 +2983,14 @@ void NggPrimShader::earlyExitWithDummyExport() {
       posExpCount += (builtInUsage.clipDistance + builtInUsage.cullDistance) / 4;
     }
 
-    undef = PoisonValue::get(m_builder.getFloatTy());
-
+    poison = PoisonValue::get(m_builder.getFloatTy());
     for (unsigned i = 0; i < posExpCount; ++i) {
       m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getFloatTy(),
                                 {
                                     m_builder.getInt32(EXP_TARGET_POS_0 + i), // tgt
                                     m_builder.getInt32(0x0),                  // en
                                     // src0 ~ src3
-                                    undef, undef, undef, undef,
+                                    poison, poison, poison, poison,
                                     m_builder.getInt1(i == posExpCount - 1), // done
                                     m_builder.getFalse()                     // vm
                                 });
@@ -3422,7 +3420,7 @@ void NggPrimShader::splitEs() {
   SmallVector<CallInst *, 8> removedCalls;
 
   // Fetch position and cull distances
-  Value *position = UndefValue::get(positionTy);
+  Value *position = PoisonValue::get(positionTy);
   SmallVector<Value *, MaxClipCullDistanceCount> clipCullDistance(MaxClipCullDistanceCount);
 
   for (auto func : expFuncs) {
@@ -3466,12 +3464,12 @@ void NggPrimShader::splitEs() {
 
   Value *cullData = position;
   if (m_nggControl->enableCullDistanceCulling) {
-    Value *cullDistance = UndefValue::get(cullDistanceTy);
+    Value *cullDistance = PoisonValue::get(cullDistanceTy);
 
     for (unsigned i = 0; i < cullDistanceCount; ++i)
       cullDistance = m_builder.CreateInsertValue(cullDistance, clipCullDistance[clipDistanceCount + i], i);
 
-    cullData = m_builder.CreateInsertValue(UndefValue::get(cullDataTy), position, 0);
+    cullData = m_builder.CreateInsertValue(PoisonValue::get(cullDataTy), position, 0);
     cullData = m_builder.CreateInsertValue(cullData, cullDistance, 1);
   }
 
@@ -3617,11 +3615,18 @@ void NggPrimShader::mutateGs() {
   Value *outVertsPtrs[MaxGsStreams] = {};
 
   for (int i = 0; i < MaxGsStreams; ++i) {
-    auto emitVertsPtr = m_builder.CreateAlloca(m_builder.getInt32Ty());
+    Value *emitVertsPtr = nullptr;
+    Value *outVertsPtr = nullptr;
+    {
+      IRBuilder<>::InsertPointGuard allocaGuard(m_builder);
+      m_builder.SetInsertPointPastAllocas(m_gsHandlers.main);
+      emitVertsPtr = m_builder.CreateAlloca(m_builder.getInt32Ty());
+      outVertsPtr = m_builder.CreateAlloca(m_builder.getInt32Ty());
+    }
+
     m_builder.CreateStore(m_builder.getInt32(0), emitVertsPtr); // emitVerts = 0
     emitVertsPtrs[i] = emitVertsPtr;
 
-    auto outVertsPtr = m_builder.CreateAlloca(m_builder.getInt32Ty());
     m_builder.CreateStore(m_builder.getInt32(0), outVertsPtr); // outVerts = 0
     outVertsPtrs[i] = outVertsPtr;
   }
@@ -3934,7 +3939,7 @@ void NggPrimShader::writeGsOutput(Value *output, unsigned location, unsigned com
 
     // [n x Ty] -> <n x Ty>
     const unsigned elemCount = outputTy->getArrayNumElements();
-    Value *outputVec = UndefValue::get(FixedVectorType::get(outputElemTy, elemCount));
+    Value *outputVec = PoisonValue::get(FixedVectorType::get(outputElemTy, elemCount));
     for (unsigned i = 0; i < elemCount; ++i) {
       auto outputElem = m_builder.CreateExtractValue(output, i);
       outputVec = m_builder.CreateInsertElement(outputVec, outputElem, i);
@@ -4016,7 +4021,7 @@ Value *NggPrimShader::readGsOutput(Type *outputTy, unsigned location, unsigned c
 
     // <n x Ty> -> [n x Ty]
     const unsigned elemCount = origOutputTy->getArrayNumElements();
-    Value *outputArray = UndefValue::get(origOutputTy);
+    Value *outputArray = PoisonValue::get(origOutputTy);
     for (unsigned i = 0; i < elemCount; ++i) {
       auto outputElem = m_builder.CreateExtractElement(output, i);
       outputArray = m_builder.CreateInsertValue(outputArray, outputElem, i);
@@ -5450,13 +5455,13 @@ Function *NggPrimShader::createSphereCuller() {
     //
 
     // <s, t>
-    auto st = m_builder.CreateInsertElement(UndefValue::get(FixedVectorType::get(m_builder.getHalfTy(), 2)), s,
+    auto st = m_builder.CreateInsertElement(PoisonValue::get(FixedVectorType::get(m_builder.getHalfTy(), 2)), s,
                                             static_cast<uint64_t>(0));
     st = m_builder.CreateInsertElement(st, t, 1);
 
     // <s', t'> = <0.5 - 0.5(t - s), 0.5 + 0.5(t - s)>
     auto tMinusS = m_builder.CreateFSub(t, s);
-    auto sT1 = m_builder.CreateInsertElement(UndefValue::get(FixedVectorType::get(m_builder.getHalfTy(), 2)), tMinusS,
+    auto sT1 = m_builder.CreateInsertElement(PoisonValue::get(FixedVectorType::get(m_builder.getHalfTy(), 2)), tMinusS,
                                              static_cast<uint64_t>(0));
     sT1 = m_builder.CreateInsertElement(sT1, tMinusS, 1);
 
@@ -5929,7 +5934,7 @@ Function *NggPrimShader::createFetchCullingRegister() {
     m_builder.SetInsertPoint(entryBlock);
 
     Value *primShaderTableAddr =
-        m_builder.CreateInsertElement(UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2)),
+        m_builder.CreateInsertElement(PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2)),
                                       primShaderTableAddrLow, static_cast<uint64_t>(0));
 
     primShaderTableAddr = m_builder.CreateInsertElement(primShaderTableAddr, primShaderTableAddrHigh, 1);
@@ -7267,7 +7272,7 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
   // Visit all export calls, removing those unnecessary and mutating the return type
   SmallVector<CallInst *, 8> removedCalls;
 
-  Value *xfbOutputs = UndefValue::get(xfbOutputsTy);
+  Value *xfbOutputs = PoisonValue::get(xfbOutputsTy);
   unsigned outputIndex = 0;
 
   for (auto func : expFuncs) {
@@ -7332,7 +7337,7 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
           // Always pad the output value to <4 x i32>
           if (numElements == 1) {
             outputValue =
-                m_builder.CreateInsertElement(UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 4)),
+                m_builder.CreateInsertElement(PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 4)),
                                               outputValue, static_cast<uint64_t>(0));
           } else if (numElements < 4) {
             outputValue = m_builder.CreateShuffleVector(outputValue, PoisonValue::get(outputValue->getType()),

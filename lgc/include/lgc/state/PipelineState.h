@@ -216,6 +216,12 @@ public:
   // Record pipeline state into IR metadata of specified module.
   void record(llvm::Module *module);
 
+  // Print pipeline state
+  void print(llvm::raw_ostream &out) const;
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  LLVM_DUMP_METHOD void dump() const { print(llvm::dbgs()); }
+#endif
+
   // Accessors for shader stage mask
   unsigned getShaderStageMask();
   bool getPreRasterHasGs() const { return m_preRasterHasGs; }
@@ -617,6 +623,25 @@ public:
   bool runImpl(llvm::Module &module, PipelineState *pipelineState);
 
   static llvm::StringRef name() { return "LLPC pipeline state clearer"; }
+};
+
+// =====================================================================================================================
+// Pass to print the pipeline state in a human-readable way
+class PipelineStatePrinter : public llvm::PassInfoMixin<PipelineStatePrinter> {
+public:
+  explicit PipelineStatePrinter(llvm::raw_ostream &out = llvm::dbgs()) : m_out(out) {}
+
+  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
+
+private:
+  llvm::raw_ostream &m_out;
+};
+
+// =====================================================================================================================
+// Pass to record the pipeline state back into the IR if present
+class PipelineStateRecorder : public llvm::PassInfoMixin<PipelineStateRecorder> {
+public:
+  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 };
 
 } // namespace lgc

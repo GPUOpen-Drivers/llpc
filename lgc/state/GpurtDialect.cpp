@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,44 +24,13 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  LowerDebugPrintf.h
- * @brief LLPC header file : contains declaration of class lgc::LowerDebugPrintf.h
+ * @file  GpurtDialect.cpp
+ * @brief Implementation of the LGC dialect definition
  ***********************************************************************************************************************
  */
-#pragma once
-#include "SystemValues.h"
-#include "lgc/Builder.h"
-#include "lgc/patch/Patch.h"
-#include "lgc/state/PipelineShaders.h"
-#include "lgc/state/PipelineState.h"
-#include "lgc/state/TargetInfo.h"
-#include "llvm/ADT/SmallBitVector.h"
-#include "llvm/IR/Function.h"
 
-namespace lgc {
+#include "lgc/GpurtDialect.h"
 
-class DebugPrintfOp;
-
-// =====================================================================================================================
-// Pass to lower debug.printf calls
-class LowerDebugPrintf : public llvm::PassInfoMixin<LowerDebugPrintf> {
-  struct ElfInfo {
-    llvm::StringRef formatString;  // Printf format string
-    llvm::SmallBitVector bit64Pos; // 64bit position records output variable 32bit/64bit condition.
-  };
-
-public:
-  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
-  static llvm::StringRef name() { return "Lower debug printf calls"; }
-
-private:
-  void visitDebugPrintf(DebugPrintfOp &op);
-  void getDwordValues(llvm::Value *val, llvm::SmallVectorImpl<llvm::Value *> &output,
-                      llvm::SmallBitVector &output64Bits, BuilderBase &builder);
-  void setupElfsPrintfStrings();
-  llvm::DenseMap<uint64_t, ElfInfo> m_elfInfos;
-  llvm::SmallVector<llvm::Instruction *> m_toErase;
-  PipelineState *m_pipelineState = nullptr;
-};
-
-} // namespace lgc
+#define GET_INCLUDES
+#define GET_DIALECT_DEFS
+#include "state/GpurtDialect.cpp.inc"

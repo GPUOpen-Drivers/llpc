@@ -159,6 +159,7 @@ static bool runPassPipeline(Pipeline &pipeline, Module &module, raw_pwrite_strea
   // This mode of the tool is only ever used for development and testing, so unconditionally run the verifier on the
   // final output.
   passMgr->addPass(VerifierPass());
+  passMgr->addPass(PipelineStateRecorder());
 
   switch (codegen::getFileType()) {
   case CGFT_AssemblyFile:
