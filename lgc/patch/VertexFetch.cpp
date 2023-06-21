@@ -133,7 +133,6 @@ private:
 
   // Default values for vertex fetch (<4 x i32> or <8 x i32>)
   struct {
-    Constant *int8;     // < 0, 0, 0, 1 >
     Constant *int16;    // < 0, 0, 0, 1 >
     Constant *int32;    // < 0, 0, 0, 1 >
     Constant *int64;    // < 0, 0, 0, 0, 0, 0, 0, 1 >
@@ -841,12 +840,9 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *des
 
   // Initialize the default values
   Value *lastVert = nullptr;
-  auto int16Zero = builder.getInt16(0);
-  auto int16One = builder.getInt16(1);
-  auto float16One = builder.getInt16(0x3C00);
   if (basicTy->isIntegerTy()) {
     if (bitWidth <= 16)
-      lastVert = ConstantVector::get({int16Zero, int16Zero, int16Zero, int16One});
+      lastVert = m_fetchDefaults.int16;
     else if (bitWidth == 32)
       lastVert = m_fetchDefaults.int32;
     else {
@@ -855,7 +851,7 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *des
     }
   } else if (basicTy->isFloatingPointTy()) {
     if (bitWidth == 16)
-      lastVert = ConstantVector::get({int16Zero, int16Zero, int16Zero, float16One});
+      lastVert = m_fetchDefaults.float16;
     else if (bitWidth == 32)
       lastVert = m_fetchDefaults.float32;
     else {
@@ -1055,12 +1051,11 @@ VertexFetchImpl::VertexFetchImpl(LgcContext *lgcContext)
   // Initialize default fetch values
   auto zero = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
   auto one = ConstantInt::get(Type::getInt32Ty(*m_context), 1);
-
-  // Int8 (0, 0, 0, 1)
-  m_fetchDefaults.int8 = ConstantVector::get({zero, zero, zero, one});
+  auto int16Zero = ConstantInt::get(Type::getInt16Ty(*m_context), 0);
+  auto int16One = ConstantInt::get(Type::getInt16Ty(*m_context), 1);
 
   // Int16 (0, 0, 0, 1)
-  m_fetchDefaults.int16 = ConstantVector::get({zero, zero, zero, one});
+  m_fetchDefaults.int16 = ConstantVector::get({int16Zero, int16Zero, int16Zero, int16One});
 
   // Int (0, 0, 0, 1)
   m_fetchDefaults.int32 = ConstantVector::get({zero, zero, zero, one});
@@ -1070,8 +1065,8 @@ VertexFetchImpl::VertexFetchImpl(LgcContext *lgcContext)
 
   // Float16 (0, 0, 0, 1.0)
   const uint16_t float16One = 0x3C00;
-  auto float16OneVal = ConstantInt::get(Type::getInt32Ty(*m_context), float16One);
-  m_fetchDefaults.float16 = ConstantVector::get({zero, zero, zero, float16OneVal});
+  auto float16OneVal = ConstantInt::get(Type::getInt16Ty(*m_context), float16One);
+  m_fetchDefaults.float16 = ConstantVector::get({int16Zero, int16Zero, int16Zero, float16OneVal});
 
   // Float (0.0, 0.0, 0.0, 1.0)
   union {
@@ -1138,8 +1133,7 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
 
   VertexFormatInfo formatInfo = getVertexFormatInfo(description);
 
-  const bool is8bitFetch = (inputTy->getScalarSizeInBits() == 8);
-  const bool is16bitFetch = (inputTy->getScalarSizeInBits() == 16);
+  const bool is16bitFetch = (inputTy->getScalarSizeInBits() <= 16);
 
   // Do the first vertex fetch operation
   addVertexFetchInst(vbDesc, formatInfo.numChannels, is16bitFetch, vbIndex, description->offset, description->stride,
@@ -1164,6 +1158,11 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
       // Extract alpha channel: %a = extractelement %vf0, 3
       Value *alpha = ExtractElementInst::Create(vertexFetches[0], ConstantInt::get(Type::getInt32Ty(*m_context), 3), "",
                                                 insertPos);
+
+      if (is16bitFetch) {
+        // Extend to 32-bit
+        alpha = new ZExtInst(alpha, Type::getInt32Ty(*m_context), "", insertPos);
+      }
 
       if (formatInfo.nfmt == BufNumFormatSint) {
         // NOTE: For format "SINT 10_10_10_2", vertex fetches incorrectly return the alpha channel as
@@ -1220,6 +1219,10 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
       } else
         llvm_unreachable("Should never be called!");
 
+      if (is16bitFetch) {
+        // Trunc to 16-bit
+        alpha = new TruncInst(alpha, Type::getInt16Ty(*m_context), "", insertPos);
+      }
       // Insert alpha channel: %vf0 = insertelement %vf0, %a, 3
       vertexFetches[0] = InsertElementInst::Create(vertexFetches[0], alpha,
                                                    ConstantInt::get(Type::getInt32Ty(*m_context), 3), "", insertPos);
@@ -1282,9 +1285,7 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
   Constant *defaults = nullptr;
 
   if (basicTy->isIntegerTy()) {
-    if (bitWidth == 8)
-      defaults = m_fetchDefaults.int8;
-    else if (bitWidth == 16)
+    if (bitWidth <= 16)
       defaults = m_fetchDefaults.int16;
     else if (bitWidth == 32)
       defaults = m_fetchDefaults.int32;
@@ -1350,7 +1351,8 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
   if (vertexCompCount == 1)
     vertex = vertexValues[0];
   else {
-    Type *vertexTy = FixedVectorType::get(Type::getInt32Ty(*m_context), vertexCompCount);
+    Type *vertexTy = is16bitFetch ? FixedVectorType::get(Type::getInt16Ty(*m_context), vertexCompCount)
+                                  : FixedVectorType::get(Type::getInt32Ty(*m_context), vertexCompCount);
     vertex = PoisonValue::get(vertexTy);
 
     for (unsigned i = 0; i < vertexCompCount; ++i) {
@@ -1359,22 +1361,14 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
     }
   }
 
+  const bool is8bitFetch = (inputTy->getScalarSizeInBits() == 8);
   if (is8bitFetch) {
-    // NOTE: The vertex fetch results are represented as <n x i32> now. For 8-bit vertex fetch, we have to
-    // convert them to <n x i8> and the 24 high bits is truncated.
+    // NOTE: The vertex fetch results are represented as <n x i16> now. For 8-bit vertex fetch, we have to
+    // convert them to <n x i8> and the 8 high bits is truncated.
     assert(inputTy->isIntOrIntVectorTy()); // Must be integer type
 
     Type *vertexTy = vertex->getType();
     Type *truncTy = Type::getInt8Ty(*m_context);
-    truncTy = vertexTy->isVectorTy()
-                  ? cast<Type>(FixedVectorType::get(truncTy, cast<FixedVectorType>(vertexTy)->getNumElements()))
-                  : truncTy;
-    vertex = new TruncInst(vertex, truncTy, "", insertPos);
-  } else if (is16bitFetch) {
-    // NOTE: The vertex fetch results are represented as <n x i32> now. For 16-bit vertex fetch, we have to
-    // convert them to <n x i16> and the 16 high bits is truncated.
-    Type *vertexTy = vertex->getType();
-    Type *truncTy = Type::getInt16Ty(*m_context);
     truncTy = vertexTy->isVectorTy()
                   ? cast<Type>(FixedVectorType::get(truncTy, cast<FixedVectorType>(vertexTy)->getNumElements()))
                   : truncTy;
@@ -1599,24 +1593,17 @@ void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bo
     Value *fetch = emitCall((Twine("llvm.amdgcn.struct.tbuffer.load") + suffix).str(), fetchTy, args, {}, insertPos);
 
     if (is16bitFetch) {
-      // NOTE: The fetch values are represented by <n x i32>, so we will bitcast the float16 values to
-      // int32 eventually.
+      // NOTE: The fetch values are represented by <n x i16>, so we will bitcast the float16 values to
+      // int16 eventually.
       Type *bitCastTy = Type::getInt16Ty(*m_context);
       bitCastTy = numChannels == 1 ? bitCastTy : FixedVectorType::get(bitCastTy, numChannels >= 3 ? 4 : numChannels);
       fetch = new BitCastInst(fetch, bitCastTy, "", insertPos);
-
-      Type *zExtTy = Type::getInt32Ty(*m_context);
-      zExtTy = numChannels == 1 ? zExtTy : FixedVectorType::get(zExtTy, numChannels >= 3 ? 4 : numChannels);
-      fetch = new ZExtInst(fetch, zExtTy, "", insertPos);
     }
 
     if (numChannels == 3) {
       // NOTE: If valid number of channels is 3, the actual fetch type should be revised from <4 x i32>
       // to <3 x i32>.
-      Constant *shuffleMask[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0),
-                                 ConstantInt::get(Type::getInt32Ty(*m_context), 1),
-                                 ConstantInt::get(Type::getInt32Ty(*m_context), 2)};
-      *ppFetch = new ShuffleVectorInst(fetch, fetch, ConstantVector::get(shuffleMask), "", insertPos);
+      *ppFetch = new ShuffleVectorInst(fetch, fetch, ArrayRef<int>{0, 1, 2}, "", insertPos);
     } else
       *ppFetch = fetch;
   } else {
@@ -1643,7 +1630,8 @@ void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bo
       }
     }
 
-    Type *fetchTy = FixedVectorType::get(Type::getInt32Ty(*m_context), numChannels);
+    Type *fetchTy = is16bitFetch ? FixedVectorType::get(Type::getInt16Ty(*m_context), numChannels)
+                                 : FixedVectorType::get(Type::getInt32Ty(*m_context), numChannels);
     Value *fetch = PoisonValue::get(fetchTy);
 
     // Do vertex per-component fetches
@@ -1662,7 +1650,6 @@ void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bo
         compFetch = emitCall("llvm.amdgcn.struct.tbuffer.load.f16", Type::getHalfTy(*m_context), args, {}, insertPos);
 
         compFetch = new BitCastInst(compFetch, Type::getInt16Ty(*m_context), "", insertPos);
-        compFetch = new ZExtInst(compFetch, Type::getInt32Ty(*m_context), "", insertPos);
       } else {
         compFetch = emitCall("llvm.amdgcn.struct.tbuffer.load.i32", Type::getInt32Ty(*m_context), args, {}, insertPos);
       }
