@@ -85,6 +85,7 @@ private:
                                          llvm::Value *vertexIdx, unsigned interpLoc, llvm::Value *interpInfo,
                                          bool isPerVertexDimension);
 
+  llvm::Value *createRaytracingBuiltIn(BuiltIn builtIn);
   void addCallInstForOutputExport(llvm::Value *outputValue, llvm::Constant *outputMeta, llvm::Value *locOffset,
                                   unsigned maxLocOffset, unsigned xfbOffsetAdjust, unsigned xfbBufferAdjust,
                                   llvm::Value *elemIdx, llvm::Value *vertexIdx, unsigned emitStreamId);

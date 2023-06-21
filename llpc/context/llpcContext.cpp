@@ -30,6 +30,7 @@
  */
 #include "llpcContext.h"
 #include "SPIRVInternal.h"
+#include "lgcrt/LgcRtDialect.h"
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
 #include "llpcPipelineContext.h"
@@ -58,6 +59,7 @@
 #define DEBUG_TYPE "llpc-context"
 
 using namespace lgc;
+using namespace lgc::rt;
 using namespace llvm;
 
 namespace Llpc {
@@ -66,7 +68,7 @@ namespace Llpc {
 //
 // @param gfxIp : Graphics IP version info
 Context::Context(GfxIpVersion gfxIp) : LLVMContext(), m_gfxIp(gfxIp) {
-  m_dialectContext = llvm_dialects::DialectContext::make<LgcDialect, GpurtDialect>(*this);
+  m_dialectContext = llvm_dialects::DialectContext::make<LgcDialect, GpurtDialect, LgcRtDialect>(*this);
 
   reset();
 }
