@@ -1727,7 +1727,7 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
       memberTypes.push_back(memberLoad->getType());
     }
 
-    Value *load = UndefValue::get(StructType::get(m_m->getContext(), memberTypes));
+    Value *load = PoisonValue::get(StructType::get(m_m->getContext(), memberTypes));
 
     for (unsigned i = 0, memberCount = spvType->getStructMemberCount(); i < memberCount; i++)
       load = getBuilder()->CreateInsertValue(load, memberLoads[i], i);
@@ -1743,7 +1743,7 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
 
     Type *elementType = transType(spvElementType);
 
-    Value *load = UndefValue::get(ArrayType::get(elementType, loadType->getArrayNumElements()));
+    Value *load = PoisonValue::get(ArrayType::get(elementType, loadType->getArrayNumElements()));
 
     for (unsigned i = 0, elementCount = loadType->getArrayNumElements(); i < elementCount; i++) {
       SmallVector<Value *, 3> indices;
@@ -1766,7 +1766,7 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
     // Coherent load operand must be integer, pointer, or floating point type, so need to spilte vector.
     SPIRVType *spvElementType = spvType->getVectorComponentType();
     Type *elementType = transType(spvElementType);
-    Value *load = UndefValue::get(VectorType::get(elementType, spvType->getVectorComponentCount(), false));
+    Value *load = PoisonValue::get(VectorType::get(elementType, spvType->getVectorComponentCount(), false));
     for (unsigned i = 0, elementCount = spvType->getVectorComponentCount(); i < elementCount; i++) {
       Value *const elementLoadPointer =
           getBuilder()->CreateGEP(loadType, loadPointer, {zero, getBuilder()->getInt32(i)});
@@ -1954,7 +1954,7 @@ Constant *SPIRVToLLVM::buildConstStoreRecursively(SPIRVType *const spvType, Type
 
     // First run through the final LLVM type and create undef's for the members
     for (unsigned i = 0, memberCount = constMembers.size(); i < memberCount; i++)
-      constMembers[i] = UndefValue::get(storeType->getStructElementType(i));
+      constMembers[i] = PoisonValue::get(storeType->getStructElementType(i));
 
     // Then run through the SPIR-V type and set the non-undef members to actual constants.
     for (unsigned i = 0, memberCount = spvType->getStructMemberCount(); i < memberCount; i++) {
@@ -1973,7 +1973,7 @@ Constant *SPIRVToLLVM::buildConstStoreRecursively(SPIRVType *const spvType, Type
     const bool needsPad = isTypeWithPad(storeType);
 
     SmallVector<Constant *, 8> constElements(storeType->getArrayNumElements(),
-                                             UndefValue::get(storeType->getArrayElementType()));
+                                             PoisonValue::get(storeType->getArrayElementType()));
 
     SPIRVType *const spvElementType =
         spvType->isTypeArray() ? spvType->getArrayElementType() : spvType->getMatrixColumnType();
@@ -2641,7 +2641,7 @@ Value *SPIRVToLLVM::loadImageSampler(Type *elementTy, Value *base) {
       Value *element1 = loadImageSampler(structTy->getElementType(1), ptr1);
       Value *ptr0 = getBuilder()->CreateExtractValue(base, 0);
       Value *element0 = loadImageSampler(structTy->getElementType(0), ptr0);
-      Value *result = getBuilder()->CreateInsertValue(UndefValue::get(structTy), element0, 0);
+      Value *result = getBuilder()->CreateInsertValue(PoisonValue::get(structTy), element0, 0);
       result = getBuilder()->CreateInsertValue(result, element1, 1);
       return result;
     }
@@ -2651,7 +2651,7 @@ Value *SPIRVToLLVM::loadImageSampler(Type *elementTy, Value *base) {
     // {pointer,stride,convertingSamplerIdx} struct that represents the descriptor pointer.
     Value *convertingSamplerIdx = getBuilder()->CreateExtractValue(base, 2);
     Value *loadedVal = loadImageSampler(structTy->getElementType(0), base);
-    loadedVal = getBuilder()->CreateInsertValue(UndefValue::get(structTy), loadedVal, 0);
+    loadedVal = getBuilder()->CreateInsertValue(PoisonValue::get(structTy), loadedVal, 0);
     return getBuilder()->CreateInsertValue(loadedVal, convertingSamplerIdx, 1);
   }
 
@@ -2668,7 +2668,7 @@ Value *SPIRVToLLVM::loadImageSampler(Type *elementTy, Value *base) {
     auto *oneVal = getBuilder()->CreateLoad(elementTy, ptr);
     oneVal->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, {}));
 
-    Value *result = getBuilder()->CreateInsertValue(UndefValue::get(arrayTy), oneVal, 0);
+    Value *result = getBuilder()->CreateInsertValue(PoisonValue::get(arrayTy), oneVal, 0);
     // Pointer to image is represented as a struct containing {pointer, stride, planeStride, isResource}.
     if (!m_convertingSamplers.empty() && base->getType()->getStructNumElements() >= 4) {
       Value *planeStride = getBuilder()->CreateExtractValue(base, 2);
@@ -2735,7 +2735,7 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
       Value *fmaskDescPtr = getDescPointerAndStride(ResourceNodeType::DescriptorFmask, descriptorSet, binding,
                                                     ResourceNodeType::DescriptorFmask);
       imageDescPtr = getBuilder()->CreateInsertValue(
-          UndefValue::get(StructType::get(*m_context, {imageDescPtr->getType(), fmaskDescPtr->getType()})),
+          PoisonValue::get(StructType::get(*m_context, {imageDescPtr->getType(), fmaskDescPtr->getType()})),
           imageDescPtr, 0);
       imageDescPtr = getBuilder()->CreateInsertValue(imageDescPtr, fmaskDescPtr, 1);
     }
@@ -2753,7 +2753,7 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
   if (imageDescPtr) {
     if (samplerDescPtr) {
       Value *descPtr =
-          UndefValue::get(StructType::get(*m_context, {imageDescPtr->getType(), samplerDescPtr->getType()}));
+          PoisonValue::get(StructType::get(*m_context, {imageDescPtr->getType(), samplerDescPtr->getType()}));
       descPtr = getBuilder()->CreateInsertValue(descPtr, imageDescPtr, 0);
       descPtr = getBuilder()->CreateInsertValue(descPtr, samplerDescPtr, 1);
       return descPtr;
@@ -3177,7 +3177,7 @@ Value *SPIRVToLLVM::indexDescPtr(Type *elementTy, Value *base, Value *index) {
     Value *ptr1 = getBuilder()->CreateExtractValue(base, 1);
     ptr0 = indexDescPtr(structTy->getElementType(0), ptr0, index);
     ptr1 = indexDescPtr(structTy->getElementType(1), ptr1, index);
-    base = getBuilder()->CreateInsertValue(UndefValue::get(base->getType()), ptr0, 0);
+    base = getBuilder()->CreateInsertValue(PoisonValue::get(base->getType()), ptr0, 0);
     base = getBuilder()->CreateInsertValue(base, ptr1, 1);
     return base;
   }
@@ -3253,7 +3253,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpSampledImage>(SPIRVValue 
   Value *sampler = transValue(static_cast<SPIRVInstTemplateBase *>(spvValue)->getOpValue(1),
                               getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
 
-  Value *result = UndefValue::get(StructType::get(*m_context, {image->getType(), sampler->getType()}));
+  Value *result = PoisonValue::get(StructType::get(*m_context, {image->getType(), sampler->getType()}));
   result = getBuilder()->CreateInsertValue(result, image, uint64_t(0));
   result = getBuilder()->CreateInsertValue(result, sampler, 1);
   return result;
@@ -3273,7 +3273,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpKill>(SPIRVValue *const s
     getBuilder()->CreateRetVoid();
   } else {
     // Function returns value
-    getBuilder()->CreateRet(UndefValue::get(getBuilder()->getCurrentFunctionReturnType()));
+    getBuilder()->CreateRet(PoisonValue::get(getBuilder()->getCurrentFunctionReturnType()));
   }
 
   return kill;
@@ -4260,7 +4260,7 @@ Constant *SPIRVToLLVM::transInitializer(SPIRVValue *const spvValue, Type *const 
 
     assert(needsPad == false || isRemappedTypeElements(spvType));
 
-    Constant *structInitializer = UndefValue::get(type);
+    Constant *structInitializer = PoisonValue::get(type);
 
     for (unsigned i = 0, memberCount = spvMembers.size(); i < memberCount; i++) {
       const unsigned memberIndex = needsPad ? lookupRemappedTypeElements(spvType, i) : i;
@@ -4282,7 +4282,7 @@ Constant *SPIRVToLLVM::transInitializer(SPIRVValue *const spvValue, Type *const 
     // Matrix and arrays both get here. For both we need to turn [<{element-type, pad}>] into [element-type].
     const bool needsPad = isTypeWithPad(type);
 
-    Constant *arrayInitializer = UndefValue::get(type);
+    Constant *arrayInitializer = PoisonValue::get(type);
 
     for (unsigned i = 0, elementCount = spvElements.size(); i < elementCount; i++) {
       if (needsPad) {
@@ -4354,7 +4354,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
   if (spvInitializer) {
     initializer = transInitializer(spvInitializer, varType);
   } else if (storageClass == SPIRVStorageClassKind::StorageClassWorkgroup) {
-    initializer = UndefValue::get(varType);
+    initializer = PoisonValue::get(varType);
   } else if (m_shaderOptions->workaroundInitializeOutputsToZero &&
              storageClass == SPIRVStorageClassKind::StorageClassOutput) {
     bool isBuiltIn = false;
@@ -4731,7 +4731,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
   }
 
   case OpUndef:
-    return mapValue(bv, UndefValue::get(transType(bv->getType())));
+    return mapValue(bv, PoisonValue::get(transType(bv->getType())));
 
   case OpFunctionParameter: {
     auto ba = static_cast<SPIRVFunctionParameter *>(bv);
@@ -4991,7 +4991,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     switch (bv->getType()->getOpCode()) {
     case OpTypeVector: {
       auto vecTy = transType(cc->getType());
-      Value *v = UndefValue::get(vecTy);
+      Value *v = PoisonValue::get(vecTy);
       for (unsigned idx = 0, i = 0, e = constituents.size(); i < e; ++i) {
         if (constituents[i]->getType()->isVectorTy()) {
           // NOTE: It is allowed to construct a vector from several "smaller"
@@ -5013,7 +5013,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     case OpTypeArray:
     case OpTypeStruct: {
       auto ccTy = transType(cc->getType());
-      Value *v = UndefValue::get(ccTy);
+      Value *v = PoisonValue::get(ccTy);
       for (size_t i = 0, e = constituents.size(); i < e; ++i)
         v = InsertValueInst::Create(v, constituents[i], i, "", bb);
       return mapValue(bv, v);
@@ -5024,7 +5024,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
       auto matCount = bvTy->getMatrixColumnCount();
       auto matTy = ArrayType::get(matClmTy, matCount);
 
-      Value *v = UndefValue::get(matTy);
+      Value *v = PoisonValue::get(matTy);
       for (unsigned i = 0, e = constituents.size(); i < e; ++i)
         v = InsertValueInst::Create(v, constituents[i], i, "", bb);
       return mapValue(bv, v);
@@ -5300,7 +5300,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     Value *val0 = transValue(bc->getOperand(0), f, bb);
     Value *val1 = transValue(bc->getOperand(1), f, bb);
     Value *add = getBuilder()->CreateIntrinsic(Intrinsic::uadd_with_overflow, val0->getType(), {val0, val1});
-    Value *result = UndefValue::get(transType(bc->getType()));
+    Value *result = PoisonValue::get(transType(bc->getType()));
     result = getBuilder()->CreateInsertValue(result, getBuilder()->CreateExtractValue(add, 0), 0);
     result = getBuilder()->CreateInsertValue(
         result, getBuilder()->CreateZExt(getBuilder()->CreateExtractValue(add, 1), val0->getType()), 1);
@@ -5312,7 +5312,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     Value *val0 = transValue(bc->getOperand(0), f, bb);
     Value *val1 = transValue(bc->getOperand(1), f, bb);
     Value *sub = getBuilder()->CreateIntrinsic(Intrinsic::usub_with_overflow, val0->getType(), {val0, val1});
-    Value *result = UndefValue::get(transType(bc->getType()));
+    Value *result = PoisonValue::get(transType(bc->getType()));
     result = getBuilder()->CreateInsertValue(result, getBuilder()->CreateExtractValue(sub, 0), 0);
     result = getBuilder()->CreateInsertValue(
         result, getBuilder()->CreateZExt(getBuilder()->CreateExtractValue(sub, 1), val0->getType()), 1);
@@ -5338,7 +5338,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     Value *loResult = getBuilder()->CreateTrunc(mul, inTy);
     Value *hiResult =
         getBuilder()->CreateTrunc(getBuilder()->CreateLShr(mul, ConstantInt::get(mul->getType(), bitWidth)), inTy);
-    Value *result = UndefValue::get(transType(bc->getType()));
+    Value *result = PoisonValue::get(transType(bc->getType()));
     result = getBuilder()->CreateInsertValue(result, loResult, 0);
     result = getBuilder()->CreateInsertValue(result, hiResult, 1);
     return mapValue(bc, result);
@@ -6403,7 +6403,7 @@ void SPIRVToLLVM::handleImageFetchReadWriteCoord(SPIRVInstruction *bi, Extracted
       components.push_back(getBuilder()->CreateExtractElement(coord, i));
     components.push_back(getBuilder()->CreateUDiv(components[2], getBuilder()->getInt32(6)));
     components[2] = getBuilder()->CreateURem(components[2], getBuilder()->getInt32(6));
-    coord = UndefValue::get(FixedVectorType::get(getBuilder()->getInt32Ty(), 4));
+    coord = PoisonValue::get(FixedVectorType::get(getBuilder()->getInt32Ty(), 4));
     for (unsigned i = 0; i != 4; ++i)
       coord = getBuilder()->CreateInsertElement(coord, components[i], i);
   }
@@ -6438,7 +6438,7 @@ Value *SPIRVToLLVM::transSPIRVFragmentFetchFromInst(SPIRVInstruction *bi, BasicB
   // For a fragment fetch, there is an extra operand for the fragment id, which
   // we must supply as an extra coordinate.
   Value *fragId = transValue(bii->getOpValue(2), bb->getParent(), bb);
-  Value *newCoord = UndefValue::get(FixedVectorType::get(getBuilder()->getInt32Ty(), 3 + imageInfo.desc->Arrayed));
+  Value *newCoord = PoisonValue::get(FixedVectorType::get(getBuilder()->getInt32Ty(), 3 + imageInfo.desc->Arrayed));
   for (unsigned i = 0; i != 2 + imageInfo.desc->Arrayed; ++i) {
     newCoord = getBuilder()->CreateInsertElement(newCoord, getBuilder()->CreateExtractElement(coord, i), i);
   }
@@ -6526,7 +6526,7 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *bi, BasicB
 
   // For a multi-sampled image, put the sample ID on the end.
   if (imageInfo.desc->MS) {
-    sampleNum = getBuilder()->CreateInsertElement(UndefValue::get(coord->getType()), sampleNum, uint64_t(0));
+    sampleNum = getBuilder()->CreateInsertElement(PoisonValue::get(coord->getType()), sampleNum, uint64_t(0));
     SmallVector<int, 4> idxs;
     idxs.push_back(0);
     idxs.push_back(1);
@@ -6748,7 +6748,7 @@ Value *SPIRVToLLVM::transSPIRVImageSampleFromInst(SPIRVInstruction *bi, BasicBlo
 
   // For a sparse sample, swap the struct elements back again.
   if (resultTy != origResultTy) {
-    Value *swappedResult = getBuilder()->CreateInsertValue(UndefValue::get(origResultTy),
+    Value *swappedResult = getBuilder()->CreateInsertValue(PoisonValue::get(origResultTy),
                                                            getBuilder()->CreateExtractValue(result, 1), unsigned(0));
     swappedResult =
         getBuilder()->CreateInsertValue(swappedResult, getBuilder()->CreateExtractValue(result, unsigned(0)), 1);
@@ -6825,10 +6825,10 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *bi, BasicBlo
   if (constOffsets) {
     // A gather with non-standard offsets is done as four separate gathers. If
     // it is a sparse gather, we just use the residency code from the last one.
-    result = UndefValue::get(resultTy);
+    result = PoisonValue::get(resultTy);
     Value *residency = nullptr;
     if (resultTy != origResultTy)
-      result = UndefValue::get(cast<StructType>(resultTy)->getElementType(0));
+      result = PoisonValue::get(cast<StructType>(resultTy)->getElementType(0));
     for (int idx = 3; idx >= 0; --idx) {
       addr[lgc::Builder::ImageAddressIdxOffset] = getBuilder()->CreateExtractValue(constOffsets, idx);
       Value *singleResult = getBuilder()->CreateImageGather(resultTy, imageInfo.dim, imageInfo.flags,
@@ -6842,7 +6842,7 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *bi, BasicBlo
     }
     if (resultTy != origResultTy) {
       // Handle sparse.
-      result = getBuilder()->CreateInsertValue(UndefValue::get(origResultTy), result, 1);
+      result = getBuilder()->CreateInsertValue(PoisonValue::get(origResultTy), result, 1);
       result = getBuilder()->CreateInsertValue(result, residency, 0);
     }
     return result;
@@ -6854,7 +6854,7 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *bi, BasicBlo
 
   // For a sparse gather, swap the struct elements back again.
   if (resultTy != origResultTy) {
-    Value *swappedResult = getBuilder()->CreateInsertValue(UndefValue::get(origResultTy),
+    Value *swappedResult = getBuilder()->CreateInsertValue(PoisonValue::get(origResultTy),
                                                            getBuilder()->CreateExtractValue(result, 1), unsigned(0));
     swappedResult =
         getBuilder()->CreateInsertValue(swappedResult, getBuilder()->CreateExtractValue(result, unsigned(0)), 1);
@@ -6912,7 +6912,7 @@ Value *SPIRVToLLVM::transSPIRVImageFetchReadFromInst(SPIRVInstruction *bi, Basic
       // This is an OpImageRead with sample but not subpass data dimension.
       // Append the sample onto the coordinate.
       assert(imageInfo.dim == lgc::Builder::Dim2DMsaa || imageInfo.dim == lgc::Builder::Dim2DArrayMsaa);
-      sampleNum = getBuilder()->CreateInsertElement(UndefValue::get(coord->getType()), sampleNum, uint64_t(0));
+      sampleNum = getBuilder()->CreateInsertElement(PoisonValue::get(coord->getType()), sampleNum, uint64_t(0));
       coord = getBuilder()->CreateShuffleVector(
           coord, sampleNum,
           ArrayRef<int>({0, 1, 2, 3}).slice(0, cast<FixedVectorType>(coord->getType())->getNumElements() + 1));
@@ -6927,7 +6927,7 @@ Value *SPIRVToLLVM::transSPIRVImageFetchReadFromInst(SPIRVInstruction *bi, Basic
 
   // For a sparse read/fetch, swap the struct elements back again.
   if (resultTy != origResultTy) {
-    Value *swappedResult = getBuilder()->CreateInsertValue(UndefValue::get(origResultTy),
+    Value *swappedResult = getBuilder()->CreateInsertValue(PoisonValue::get(origResultTy),
                                                            getBuilder()->CreateExtractValue(result, 1), unsigned(0));
     swappedResult =
         getBuilder()->CreateInsertValue(swappedResult, getBuilder()->CreateExtractValue(result, unsigned(0)), 1);
@@ -6980,7 +6980,7 @@ Value *SPIRVToLLVM::transSPIRVImageWriteFromInst(SPIRVInstruction *bi, BasicBloc
   if (sampleNum) {
     // Append the sample onto the coordinate.
     assert(imageInfo.dim == lgc::Builder::Dim2DMsaa || imageInfo.dim == lgc::Builder::Dim2DArrayMsaa);
-    sampleNum = getBuilder()->CreateInsertElement(UndefValue::get(coord->getType()), sampleNum, uint64_t(0));
+    sampleNum = getBuilder()->CreateInsertElement(PoisonValue::get(coord->getType()), sampleNum, uint64_t(0));
     coord = getBuilder()->CreateShuffleVector(
         coord, sampleNum,
         ArrayRef<int>({0, 1, 2, 3}).slice(0, cast<FixedVectorType>(coord->getType())->getNumElements() + 1));
@@ -8633,7 +8633,7 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
 
       if (remappedIdx > memberIdx) {
         memberMdTys.push_back(Type::getInt32Ty(*m_context));
-        memberMdValues.push_back(UndefValue::get(Type::getInt32Ty(*m_context)));
+        memberMdValues.push_back(PoisonValue::get(Type::getInt32Ty(*m_context)));
       }
 
       memberMdTys.push_back(memberMdTy);
@@ -8847,7 +8847,7 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
     // Split input into fractional and whole number parts.
     Value *wholeNum = getBuilder()->CreateUnaryIntrinsic(Intrinsic::trunc, args[0]);
     Value *fract = getBuilder()->CreateFSub(args[0], wholeNum);
-    Value *result = UndefValue::get(transType(extInst->getType()));
+    Value *result = PoisonValue::get(transType(extInst->getType()));
     result = getBuilder()->CreateInsertValue(result, fract, 0);
     result = getBuilder()->CreateInsertValue(result, wholeNum, 1);
     return result;
@@ -8951,7 +8951,7 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
     Value *exp = getBuilder()->CreateExtractExponent(args[0]);
     if (extInst->getExtOp() == GLSLstd450FrexpStruct) {
       // FrexpStruct: Return the two values as a struct.
-      Value *result = UndefValue::get(transType(extInst->getType()));
+      Value *result = PoisonValue::get(transType(extInst->getType()));
       result = getBuilder()->CreateInsertValue(result, mant, 0);
       exp = getBuilder()->CreateSExtOrTrunc(exp, result->getType()->getStructElementType(1));
       result = getBuilder()->CreateInsertValue(result, exp, 1);

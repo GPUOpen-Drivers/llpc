@@ -5,9 +5,9 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: @[[LDS0:[^ ]*]] = addrspace(3) global <{ [8 x i32] }> undef, align 4
-; SHADERTEST: @[[LDS1:[^ ]*]] = addrspace(3) global <{ [4 x i32] }> undef, align 4
-; SHADERTEST: @[[LDS2:[^ ]*]] = addrspace(3) global <{ [16 x i8], [4 x i32] }> undef, align 4
+; SHADERTEST: @[[LDS0:[^ ]*]] = addrspace(3) global <{ [8 x i32] }> poison, align 4
+; SHADERTEST: @[[LDS1:[^ ]*]] = addrspace(3) global <{ [4 x i32] }> poison, align 4
+; SHADERTEST: @[[LDS2:[^ ]*]] = addrspace(3) global <{ [16 x i8], [4 x i32] }> poison, align 4
 ; SHADERTEST: store i32 %{{[0-9]*}}, ptr addrspace(3) @[[LDS1]], align 4
 ; SHADERTEST: store i32 %{{[0-9]*}}, ptr addrspace(3) getelementptr {{.*}}([4 x i32], ptr addrspace(3) @[[LDS1]], i32 0, i32 1), align 4
 ; SHADERTEST: store i32 %{{[0-9]*}}, ptr addrspace(3) getelementptr {{.*}}([4 x i32], ptr addrspace(3) @[[LDS1]], i32 0, i32 2), align 4
@@ -26,7 +26,7 @@
 ; SHADERTEST: load i32, ptr addrspace(3) getelementptr {{.*}}([8 x i32], ptr addrspace(3) @[[LDS0]], i32 0, i32 7), align 4
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: @[[LDS:[^ ]*]] = local_unnamed_addr addrspace(3) global <{ [8 x i32] }> undef, align 4
+; SHADERTEST: @[[LDS:[^ ]*]] = local_unnamed_addr addrspace(3) global <{ [8 x i32] }> poison, align 4
 ; SHADERTEST: store i32 %{{[0-9]*}}, ptr addrspace(3) @[[LDS]], align 4
 ; SHADERTEST: store i32 %{{[0-9]*}}, ptr addrspace(3) getelementptr {{.*}}(<{ [8 x i32] }>, ptr addrspace(3) @[[LDS]], i32 0, i32 0, i32 1), align 4
 ; SHADERTEST: store i32 %{{[0-9]*}}, ptr addrspace(3) getelementptr {{.*}}(<{ [8 x i32] }>, ptr addrspace(3) @[[LDS]], i32 0, i32 0, i32 2), align 4

@@ -5,7 +5,7 @@
 ; SHADERTEST: load <4 x float>,
 ; SHADERTEST: load <4 x float>,
 ; SHADERTEST: load <4 x float>,
-; SHADERTEST: insertvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> } undef
+; SHADERTEST: insertvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> } poison
 ; SHADERTEST: insertvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> }
 ; SHADERTEST: insertvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> }
 ; SHADERTEST: insertvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> }
@@ -21,7 +21,7 @@
 ; SHADERTEST: load <4 x float>,
 ; SHADERTEST: load <4 x float>,
 ; SHADERTEST: load <4 x float>,
-; SHADERTEST: insertvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> } undef
+; SHADERTEST: insertvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> } poison
 ; SHADERTEST: insertvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> }
 ; SHADERTEST: insertvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> }
 ; SHADERTEST: insertvalue { <4 x float>, <4 x float>, <4 x float>, <4 x float> }
