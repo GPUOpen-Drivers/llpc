@@ -15,7 +15,7 @@
 ; SHADERTEST: [[d:%[0-9]+]] = sdiv exact i64 [[c]], ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64)
 ; SHADERTEST: [[e:%[0-9]+]] = trunc i64 [[d]] to i32
 
-; SHADERTEST: [[i:%[0-9a-zA-Z.]+]] = insertelement <2 x i32> undef, i32 [[e1]], i32 0
+; SHADERTEST: [[i:%[0-9a-zA-Z.]+]] = insertelement <2 x i32> poison, i32 [[e1]], i32 0
 ; SHADERTEST: {{%[0-9]+}} = insertelement <2 x i32> [[i]], i32 [[e]], i32 1
 
 ; SHADERTEST-LABEL: }

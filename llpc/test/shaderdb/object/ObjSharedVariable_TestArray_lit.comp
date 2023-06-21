@@ -19,7 +19,7 @@ void main()
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: @[[LDS:[^ ]*]] = addrspace(3) global [16 x i32] undef
+; SHADERTEST: @[[LDS:[^ ]*]] = addrspace(3) global [16 x i32] poison
 ; SHADERTEST: %{{[0-9]*}} = getelementptr [16 x i32], ptr addrspace(3) @[[LDS]], i32 0, i32 %{{[0-9]*}}
 ; SHADERTEST: store i32 %{{[0-9]*}}, ptr addrspace(3) %{{[0-9]*}}
 ; SHADERTEST: store i32 %{{[0-9]*}}, ptr addrspace(3) getelementptr inbounds ([16 x i32], ptr addrspace(3) @[[LDS]], i32 0, i32 3)
