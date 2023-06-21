@@ -514,7 +514,7 @@ bool SpirvLowerCfgMerges::runImpl(Module &module) {
         if (loop->returnPhi) {
           loop->returnPhi->addIncoming(m_builder->getFalse(), block);
           if (loop->returnValuePhi)
-            loop->returnValuePhi->addIncoming(UndefValue::get(loop->function->getReturnType()), block);
+            loop->returnValuePhi->addIncoming(PoisonValue::get(loop->function->getReturnType()), block);
         }
       }
 
@@ -554,7 +554,7 @@ bool SpirvLowerCfgMerges::runImpl(Module &module) {
 
         PHINode *sigmaPhi =
             PHINode::Create(headerPhi.getType(), breakPhi->getNumIncomingValues(), "", loop->sigmaBlock);
-        Value *thisUndef = UndefValue::get(headerPhi.getType());
+        Value *poison = PoisonValue::get(headerPhi.getType());
 
         int backedgeIndex = loop->backedgeBlock ? headerPhi.getBasicBlockIndex(loop->backedgeBlock) : -1;
         assert(!loop->backedgeBlock || backedgeIndex >= 0);
@@ -565,7 +565,7 @@ bool SpirvLowerCfgMerges::runImpl(Module &module) {
             assert(backedgeIndex >= 0);
             sigmaPhi->addIncoming(headerPhi.getIncomingValue(backedgeIndex), block);
           } else {
-            sigmaPhi->addIncoming(thisUndef, block);
+            sigmaPhi->addIncoming(poison, block);
           }
         }
         // Account for edge from wave header to sigma block
@@ -633,11 +633,11 @@ bool SpirvLowerCfgMerges::runImpl(Module &module) {
         mergePhi.moveBefore(firstSigmaInst);
 
         // Add any missing predecessor references
-        Value *thisUndef = UndefValue::get(mergePhi.getType());
+        Value *poison = PoisonValue::get(mergePhi.getType());
         for (BasicBlock *block : predecessors(loop->sigmaBlock)) {
           // FIXME: use poison here?
           if (mergePhi.getBasicBlockIndex(block) == -1)
-            mergePhi.addIncoming(thisUndef, block);
+            mergePhi.addIncoming(poison, block);
         }
       }
     }

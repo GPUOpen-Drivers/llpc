@@ -90,7 +90,7 @@ void SpirvLowerMath::flushDenormIfNeeded(Instruction *inst) {
     // Has to flush denormals, insert canonicalize to make a MUL (* 1.0) forcibly
     auto builder = m_context->getBuilder();
     builder->SetInsertPoint(inst->getNextNode());
-    auto canonical = builder->CreateIntrinsic(Intrinsic::canonicalize, destTy, UndefValue::get(destTy));
+    auto canonical = builder->CreateIntrinsic(Intrinsic::canonicalize, destTy, PoisonValue::get(destTy));
 
     inst->replaceAllUsesWith(canonical);
     canonical->setArgOperand(0, inst);

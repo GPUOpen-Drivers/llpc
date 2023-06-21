@@ -753,7 +753,7 @@ void SpirvLowerRayTracing::createSetTraceParams(Function *func) {
   originX = m_builder->CreateLoad(m_builder->getFloatTy(), originX);
   originY = m_builder->CreateLoad(m_builder->getFloatTy(), originY);
   originZ = m_builder->CreateLoad(m_builder->getFloatTy(), originZ);
-  Value *origin = UndefValue::get(FixedVectorType::get(Type::getFloatTy(*m_context), 3));
+  Value *origin = PoisonValue::get(FixedVectorType::get(Type::getFloatTy(*m_context), 3));
   origin = m_builder->CreateInsertElement(origin, originX, uint64_t(0));
   origin = m_builder->CreateInsertElement(origin, originY, 1);
   origin = m_builder->CreateInsertElement(origin, originZ, 2);
@@ -769,7 +769,7 @@ void SpirvLowerRayTracing::createSetTraceParams(Function *func) {
   dirX = m_builder->CreateLoad(m_builder->getFloatTy(), dirX);
   dirY = m_builder->CreateLoad(m_builder->getFloatTy(), dirY);
   dirZ = m_builder->CreateLoad(m_builder->getFloatTy(), dirZ);
-  Value *dir = UndefValue::get(FixedVectorType::get(Type::getFloatTy(*m_context), 3));
+  Value *dir = PoisonValue::get(FixedVectorType::get(Type::getFloatTy(*m_context), 3));
   dir = m_builder->CreateInsertElement(dir, dirX, uint64_t(0));
   dir = m_builder->CreateInsertElement(dir, dirY, 1);
   dir = m_builder->CreateInsertElement(dir, dirZ, 2);
@@ -1029,7 +1029,7 @@ Value *SpirvLowerRayTracing::processBuiltIn(unsigned builtInId, Instruction *ins
     Value *instNodeAddrLo = m_builder->CreateLoad(instNodeAddrTy, m_traceParams[TraceParam::InstNodeAddrLo]);
     Value *instNodeAddrHi = m_builder->CreateLoad(instNodeAddrTy, m_traceParams[TraceParam::InstNodeAddrHi]);
 
-    Value *instNodeAddr = UndefValue::get(int32x2Ty);
+    Value *instNodeAddr = PoisonValue::get(int32x2Ty);
     instNodeAddr = m_builder->CreateInsertElement(instNodeAddr, instNodeAddrLo, uint64_t(0));
     instNodeAddr = m_builder->CreateInsertElement(instNodeAddr, instNodeAddrHi, 1u);
 
@@ -1970,7 +1970,7 @@ void SpirvLowerRayTracing::createEntryFunc(Function *func) {
 
     if (rets.size()) {
       // We have extra values to return here
-      Value *newRetVal = UndefValue::get(getShaderReturnTy(m_shaderStage));
+      Value *newRetVal = PoisonValue::get(getShaderReturnTy(m_shaderStage));
       unsigned index = 0;
       // Get payload value first
       for (; index < payloadSizeInDword; index++)
@@ -2235,7 +2235,7 @@ void SpirvLowerRayTracing::storeFunctionCallResult(ShaderStage stage, Value *res
     m_builder->CreateStore(result, m_globalPayload);
   } else {
     // Return extra values
-    Value *payloadVal = UndefValue::get(rayTracingContext->getPayloadType(m_builder));
+    Value *payloadVal = PoisonValue::get(rayTracingContext->getPayloadType(m_builder));
     unsigned index = 0;
 
     // Store payload first
@@ -2248,7 +2248,7 @@ void SpirvLowerRayTracing::storeFunctionCallResult(ShaderStage stage, Value *res
       Value *retVal = nullptr;
       // If TraceParams type is vector or array
       if (m_traceParamsTys[ret]->isVectorTy() || m_traceParamsTys[ret]->isArrayTy()) {
-        retVal = UndefValue::get(m_traceParamsTys[ret]);
+        retVal = PoisonValue::get(m_traceParamsTys[ret]);
         for (unsigned i = 0; i < TraceParamsTySize[ret]; ++i) {
           Value *retElement = m_builder->CreateExtractValue(result, index++);
           retElement = m_builder->CreateBitCast(retElement, m_traceParamsTys[ret]->getArrayElementType());
@@ -2282,7 +2282,7 @@ void SpirvLowerRayTracing::initInputResult(ShaderStage stage, Value *payload, Va
     m_builder->CreateStore(payload, result);
   } else {
     // Create inputResult values
-    Value *resultVal = UndefValue::get(getShaderReturnTy(stage));
+    Value *resultVal = PoisonValue::get(getShaderReturnTy(stage));
     unsigned index = 0;
 
     // Initialize inputResultVal from payload first
@@ -2329,7 +2329,7 @@ Value *SpirvLowerRayTracing::createLoadRayTracingMatrix(unsigned builtInId, Inst
   Value *instNodeAddrLo = m_builder->CreateLoad(instNodeAddrTy, m_traceParams[TraceParam::InstNodeAddrLo]);
   Value *instNodeAddrHi = m_builder->CreateLoad(instNodeAddrTy, m_traceParams[TraceParam::InstNodeAddrHi]);
 
-  Value *instNodeAddr = UndefValue::get(int32x2Ty);
+  Value *instNodeAddr = PoisonValue::get(int32x2Ty);
   instNodeAddr = m_builder->CreateInsertElement(instNodeAddr, instNodeAddrLo, uint64_t(0));
   instNodeAddr = m_builder->CreateInsertElement(instNodeAddr, instNodeAddrHi, 1u);
 
@@ -2340,7 +2340,7 @@ Value *SpirvLowerRayTracing::createLoadRayTracingMatrix(unsigned builtInId, Inst
     transformOffset = offsetof(RayTracingInstanceNode, extra.Transform);
   }
 
-  Value *matrixOffset = UndefValue::get(int32x2Ty);
+  Value *matrixOffset = PoisonValue::get(int32x2Ty);
   matrixOffset = m_builder->CreateInsertElement(matrixOffset, m_builder->getInt32(transformOffset), uint64_t(0));
   matrixOffset = m_builder->CreateInsertElement(matrixOffset, zero, 1);
 

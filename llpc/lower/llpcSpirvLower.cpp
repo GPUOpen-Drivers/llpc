@@ -131,7 +131,7 @@ void SpirvLower::replaceConstWithInsts(Context *context, Constant *const constVa
       Instruction *const insertPos = builder->Insert(constExpr->getAsInstruction());
       inst->replaceUsesOfWith(constExpr, insertPos);
     } else if (ConstantVector *const constVector = dyn_cast<ConstantVector>(constVal)) {
-      Value *resultValue = UndefValue::get(constVector->getType());
+      Value *resultValue = PoisonValue::get(constVector->getType());
       for (unsigned i = 0; i < constVector->getNumOperands(); i++) {
         // Have to not use the builder here because it will constant fold and we are trying to undo that now!
         Instruction *const insertPos =

@@ -187,7 +187,7 @@ void SpirvLowerConstImmediateStore::convertAllocaToReadOnlyGlobal(StoreInst *sto
         // Remember that we need to replace the uses of the original "getelementptr" with the new one.
         allocaToGlobalMap.push_back(std::pair<Instruction *, Value *>(origGetElemPtrInst, newGetElemPtrInst));
         // Remove the use from the original "getelementptr".
-        *useIt = UndefValue::get(allocaInst->getType());
+        *useIt = PoisonValue::get(allocaInst->getType());
       } else
         *useIt = global;
     }
