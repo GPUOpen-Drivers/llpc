@@ -544,7 +544,7 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryInitializeKHR>
   arg = argIt++;
   m_builder->CreateStore(arg, traceRaysArgs[5]);
   // 6, RayDesc
-  Value *rayDesc = UndefValue::get(rayDescTy);
+  Value *rayDesc = PoisonValue::get(rayDescTy);
   // Insert values Origin,TMin,Direction,TMax to the RayDesc
   // Origin
   arg = argIt++;
@@ -584,7 +584,7 @@ Value *SpirvLowerRayQuery::getDispatchId() {
   if (m_shaderStage < ShaderStageCompute) {
     auto subThreadId =
         m_builder->CreateReadBuiltInInput(lgc::BuiltInSubgroupLocalInvocationId, inputInfo, nullptr, nullptr, "");
-    dispatchId = UndefValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 3));
+    dispatchId = PoisonValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 3));
     dispatchId = m_builder->CreateInsertElement(dispatchId, subThreadId, uint64_t(0));
     dispatchId = m_builder->CreateInsertElement(dispatchId, zero, 1);
     dispatchId = m_builder->CreateInsertElement(dispatchId, zero, 2);
@@ -1152,7 +1152,7 @@ void SpirvLowerRayQuery::createIntersectMatrix(Function *func, unsigned builtInI
   Value *accelStructLo = m_builder->CreateExtractValue(rayQuery, RayQueryParams::TopLevelBvhLo);
   Value *accelStructHi = m_builder->CreateExtractValue(rayQuery, RayQueryParams::TopLevelBvhHi);
 
-  Value *accelStruct = UndefValue::get(FixedVectorType::get(Type::getInt32Ty(*m_context), 2));
+  Value *accelStruct = PoisonValue::get(FixedVectorType::get(Type::getInt32Ty(*m_context), 2));
   accelStruct = m_builder->CreateInsertElement(accelStruct, accelStructLo, uint64_t(0));
   accelStruct = m_builder->CreateInsertElement(accelStruct, accelStructHi, 1);
 
@@ -1356,7 +1356,7 @@ Value *SpirvLowerRayQuery::createTransformMatrix(unsigned builtInId, Value *acce
   auto int32x2Ty = FixedVectorType::get(m_builder->getInt32Ty(), 2);
 
   instanceNodeOffsetVal =
-      m_builder->CreateInsertElement(UndefValue::get(int32x2Ty), instanceNodeOffsetVal, uint64_t(0));
+      m_builder->CreateInsertElement(PoisonValue::get(int32x2Ty), instanceNodeOffsetVal, uint64_t(0));
 
   instanceNodeOffsetVal = m_builder->CreateInsertElement(instanceNodeOffsetVal, zero, 1);
   Value *instanceNodeOffsetAddr = m_builder->CreateAdd(accelStruct, instanceNodeOffsetVal);
@@ -1386,7 +1386,7 @@ Value *SpirvLowerRayQuery::createTransformMatrix(unsigned builtInId, Value *acce
     matrixOffset = m_builder->CreateAdd(matrixOffset, transformOffset);
   }
 
-  Value *vecMatrixOffset = UndefValue::get(int32x2Ty);
+  Value *vecMatrixOffset = PoisonValue::get(int32x2Ty);
   vecMatrixOffset = m_builder->CreateInsertElement(vecMatrixOffset, matrixOffset, uint64_t(0));
   vecMatrixOffset = m_builder->CreateInsertElement(vecMatrixOffset, zero, 1);
   Value *matrixAddr = m_builder->CreateAdd(accelStruct, vecMatrixOffset);
@@ -1522,7 +1522,7 @@ Value *SpirvLowerRayQuery::createLoadInstanceIndex(Value *instNodeAddr) {
 
   const unsigned instanceIndexOffset = offsetof(RayTracingInstanceNode, extra.instanceIndex);
 
-  Value *instanceIndexOffsetVar = UndefValue::get(int32x2Ty);
+  Value *instanceIndexOffsetVar = PoisonValue::get(int32x2Ty);
   instanceIndexOffsetVar =
       m_builder->CreateInsertElement(instanceIndexOffsetVar, m_builder->getInt32(instanceIndexOffset), uint64_t(0));
   instanceIndexOffsetVar = m_builder->CreateInsertElement(instanceIndexOffsetVar, zero, 1);
@@ -1548,7 +1548,7 @@ Value *SpirvLowerRayQuery::createGetInstanceNodeAddr(Value *instNodePtr, Value *
   Value *BvhAddrLo = m_builder->CreateExtractValue(rayQuery, RayQueryParams::TopLevelBvhLo);
   Value *BvhAddrHi = m_builder->CreateExtractValue(rayQuery, RayQueryParams::TopLevelBvhHi);
 
-  Value *BvhAddr = UndefValue::get(FixedVectorType::get(Type::getInt32Ty(*m_context), 2));
+  Value *BvhAddr = PoisonValue::get(FixedVectorType::get(Type::getInt32Ty(*m_context), 2));
   BvhAddr = m_builder->CreateInsertElement(BvhAddr, BvhAddrLo, uint64_t(0));
   BvhAddr = m_builder->CreateInsertElement(BvhAddr, BvhAddrHi, 1);
 
@@ -1560,7 +1560,7 @@ Value *SpirvLowerRayQuery::createGetInstanceNodeAddr(Value *instNodePtr, Value *
   auto nodeOffset = m_builder->CreateAnd(instNodePtr, nodeOffsetMask);
   nodeOffset = m_builder->CreateShl(nodeOffset, nodeOffsetShift);
 
-  Value *instNodeOffset = UndefValue::get(int32x2Ty);
+  Value *instNodeOffset = PoisonValue::get(int32x2Ty);
   instNodeOffset = m_builder->CreateInsertElement(instNodeOffset, nodeOffset, uint64_t(0));
   instNodeOffset = m_builder->CreateInsertElement(instNodeOffset, zero, 1);
 
@@ -1579,7 +1579,7 @@ Value *SpirvLowerRayQuery::createLoadInstanceId(Value *instNodeAddr) {
 
   const unsigned instanceIdOffset = offsetof(RayTracingInstanceNode, desc.InstanceID_and_Mask);
 
-  Value *instanceIdOffsetVar = UndefValue::get(int32x2Ty);
+  Value *instanceIdOffsetVar = PoisonValue::get(int32x2Ty);
   instanceIdOffsetVar =
       m_builder->CreateInsertElement(instanceIdOffsetVar, m_builder->getInt32(instanceIdOffset), uint64_t(0));
   instanceIdOffsetVar = m_builder->CreateInsertElement(instanceIdOffsetVar, zero, 1);
@@ -1617,10 +1617,10 @@ Value *SpirvLowerRayQuery::createLoadMatrixFromAddr(Value *matrixAddr) {
 
   // Construct [4 x <3 x float>]
   Value *matrixRow[4] = {
-      UndefValue::get(floatx3Ty),
-      UndefValue::get(floatx3Ty),
-      UndefValue::get(floatx3Ty),
-      UndefValue::get(floatx3Ty),
+      PoisonValue::get(floatx3Ty),
+      PoisonValue::get(floatx3Ty),
+      PoisonValue::get(floatx3Ty),
+      PoisonValue::get(floatx3Ty),
   };
 
   // Matrix in the memory is [3 x <4 x float>], need to transform to [4 x <3 x float>]
@@ -1637,7 +1637,7 @@ Value *SpirvLowerRayQuery::createLoadMatrixFromAddr(Value *matrixAddr) {
     }
     loadOffset = m_builder->CreateAdd(loadOffset, stride);
   }
-  Value *matrix = UndefValue::get(matrixTy);
+  Value *matrix = PoisonValue::get(matrixTy);
   matrix = m_builder->CreateInsertValue(matrix, matrixRow[0], 0);
   matrix = m_builder->CreateInsertValue(matrix, matrixRow[1], 1);
   matrix = m_builder->CreateInsertValue(matrix, matrixRow[2], 2);

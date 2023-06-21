@@ -1039,7 +1039,7 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
                                                    bool isPerVertexDimension) {
   assert(addrSpace == SPIRAS_Input || (addrSpace == SPIRAS_Output && m_shaderStage == ShaderStageTessControl));
 
-  Value *inOutValue = UndefValue::get(inOutTy);
+  Value *inOutValue = PoisonValue::get(inOutTy);
 
   ShaderInOutMetadata inOutMeta = {};
 
@@ -1494,7 +1494,7 @@ Value *SpirvLowerGlobal::loadDynamicIndexedMembers(Type *inOutTy, unsigned addrS
   assert(m_shaderStage == ShaderStageFragment);
 
   ShaderInOutMetadata inOutMeta = {};
-  Value *inOutValue = UndefValue::get(inOutTy);
+  Value *inOutValue = PoisonValue::get(inOutTy);
   if (inOutTy->isArrayTy()) {
     assert(inOutMetaVal->getNumOperands() == 4);
     inOutMeta.U64All[0] = cast<ConstantInt>(inOutMetaVal->getOperand(2))->getZExtValue();
@@ -1873,7 +1873,7 @@ Value *SpirvLowerGlobal::loadIndexedValueFromTaskPayload(Type *indexedTy, Type *
 Value *SpirvLowerGlobal::loadValueFromTaskPayload(Type *loadTy, Constant *metadata, Value *extraByteOffset) {
   assert(m_shaderStage == ShaderStageTask || m_shaderStage == ShaderStageMesh);
 
-  Value *loadValue = UndefValue::get(loadTy);
+  Value *loadValue = PoisonValue::get(loadTy);
 
   if (loadTy->isArrayTy()) {
     // Array type
@@ -2201,7 +2201,7 @@ Value *SpirvLowerGlobal::atomicOpWithValueInTaskPayload(Instruction *atomicInstT
     // first member <value>.
     auto atomicCall = m_builder->CreateTaskPayloadAtomicCompareSwap(
         cmpXchg->getSuccessOrdering(), cmpXchg->getNewValOperand(), cmpXchg->getCompareOperand(), byteOffset);
-    return m_builder->CreateInsertValue(UndefValue::get(atomicInstToHandle->getType()), atomicCall, 0);
+    return m_builder->CreateInsertValue(PoisonValue::get(atomicInstToHandle->getType()), atomicCall, 0);
   }
 
   return m_builder->CreateTaskPayloadAtomic(atomicRmw->getOperation(), atomicRmw->getOrdering(),
