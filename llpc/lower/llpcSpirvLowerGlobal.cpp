@@ -1018,8 +1018,9 @@ void SpirvLowerGlobal::lowerInOutInPlace() {
 }
 
 // =====================================================================================================================
-
-Value *SpirvLowerGlobal::createRaytracingBuiltIn(BuiltIn builtIn) {
+// @param builtIn : BuiltIn value
+// @param elemIdx : Element Index of struct
+Value *SpirvLowerGlobal::createRaytracingBuiltIn(BuiltIn builtIn, Value *elemIdx) {
   Value *builtinValue = nullptr;
   switch (builtIn) {
   case BuiltInLaunchIdKHR:
@@ -1040,14 +1041,55 @@ Value *SpirvLowerGlobal::createRaytracingBuiltIn(BuiltIn builtIn) {
   case BuiltInObjectRayDirectionKHR:
     builtinValue = m_builder->create<ObjectRayDirectionOp>();
     break;
+  case BuiltInRayTminKHR:
+    builtinValue = m_builder->create<RayTminOp>();
+    break;
+  case BuiltInRayTmaxKHR:
+    builtinValue = m_builder->create<RayTcurrentOp>();
+    break;
+  case BuiltInInstanceCustomIndexKHR:
+    builtinValue = m_builder->create<InstanceIndexOp>();
+    break;
+  case BuiltInObjectToWorldKHR:
+    builtinValue = m_builder->create<ObjectToWorldOp>();
+    break;
+  case BuiltInWorldToObjectKHR:
+    builtinValue = m_builder->create<WorldToObjectOp>();
+    break;
+  case BuiltInHitKindKHR:
+    builtinValue = m_builder->create<HitKindOp>();
+    break;
+  case BuiltInHitTriangleVertexPositionsKHR:
+    builtinValue = m_builder->create<TriangleVertexPositionsOp>(elemIdx);
+    break;
+  case BuiltInIncomingRayFlagsKHR:
+    builtinValue = m_builder->create<RayFlagsOp>();
+    break;
+  case BuiltInRayGeometryIndexKHR:
+    builtinValue = m_builder->create<GeometryIndexOp>();
+    break;
+  case BuiltInInstanceId:
+    builtinValue = m_builder->create<InstanceIdOp>();
+    break;
+  case BuiltInPrimitiveId:
+    builtinValue = m_builder->create<PrimitiveIndexOp>();
+    break;
   }
 
   assert(builtinValue != nullptr);
   return builtinValue;
 }
 
-inline bool isRayTracingBuiltIn(unsigned builtIn) {
-  return builtIn >= BuiltInLaunchIdKHR && builtIn <= BuiltInRayGeometryIndexKHR;
+// =====================================================================================================================
+//
+// @param builtIn : BuiltIn value
+// @param stage : Shader stage
+inline bool isRayTracingBuiltIn(unsigned builtIn, ShaderStage stage) {
+  bool rtbuiltIn = builtIn >= BuiltInLaunchIdKHR && builtIn <= BuiltInRayGeometryIndexKHR;
+  bool rtStage = stage == ShaderStageRayTracingIntersect || stage == ShaderStageRayTracingAnyHit ||
+                 stage == ShaderStageRayTracingClosestHit;
+  bool nonRtBuiltIn = builtIn == BuiltInInstanceId || builtIn == BuiltInPrimitiveId;
+  return rtbuiltIn || (rtStage && nonRtBuiltIn);
 }
 
 // =====================================================================================================================
@@ -1182,9 +1224,9 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
       // Handle structure member recursively
       auto memberTy = inOutTy->getStructElementType(memberIdx);
       auto memberMeta = cast<Constant>(inOutMetaVal->getOperand(memberIdx));
-
-      auto member = addCallInstForInOutImport(memberTy, addrSpace, memberMeta, locOffset, maxLocOffset, nullptr,
-                                              vertexIdx, interpLoc, auxInterpValue, isPerVertexDimension);
+      auto member = addCallInstForInOutImport(memberTy, addrSpace, memberMeta, locOffset, maxLocOffset,
+                                              m_builder->getInt32(memberIdx), vertexIdx, interpLoc, auxInterpValue,
+                                              isPerVertexDimension);
       inOutValue = m_builder->CreateInsertValue(inOutValue, member, {memberIdx});
     }
   } else {
@@ -1195,8 +1237,8 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
     assert(inOutMeta.IsLoc || inOutMeta.IsBuiltIn);
 
     if (inOutMeta.IsBuiltIn) {
-      if (isRayTracingBuiltIn(inOutMeta.Value))
-        inOutValue = createRaytracingBuiltIn(static_cast<BuiltIn>(inOutMeta.Value));
+      if (isRayTracingBuiltIn(inOutMeta.Value, m_shaderStage))
+        inOutValue = createRaytracingBuiltIn(static_cast<BuiltIn>(inOutMeta.Value), elemIdx);
       else {
         auto builtIn = static_cast<lgc::BuiltInKind>(inOutMeta.Value);
         elemIdx = elemIdx == m_builder->getInt32(InvalidValue) ? nullptr : elemIdx;

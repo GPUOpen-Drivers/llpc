@@ -346,3 +346,14 @@ def WorldToObjectOp : LgcRtOp<"world.to.object", [Memory<[]>, WillReturn]> {
     matrix for the current intersection.
   }];
 }
+
+// =========================================================================================================
+def TriangleVertexPositionsOp : LgcRtOp<"triangle.vertex.direction", [Memory<[]>, WillReturn]> {
+  let arguments = (ins I32:$elemIndex);
+  let results = (outs V3F32:$result);
+
+  let summary = "Return the object-space element vertices of the triangle";
+  let description = [{
+    Return <3 x float> object space element vertices of the triangle at the current intersection.
+  }];
+}
