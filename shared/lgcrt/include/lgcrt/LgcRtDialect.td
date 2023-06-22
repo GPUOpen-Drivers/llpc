@@ -349,12 +349,12 @@ def WorldToObjectOp : LgcRtOp<"world.to.object", [Memory<[]>, WillReturn]> {
 }
 
 // =========================================================================================================
-def TriangleVertexPositionsOp : LgcRtOp<"triangle.vertex.position", [Memory<[]>, WillReturn]> {
+def TriangleVertexPositionsOp : LgcRtOp<"triangle.vertex.positions", [Memory<[]>, WillReturn]> {
   let arguments =  (ins);
   let results = (outs A3V3F32:$result);
 
-  let summary = "Return the object-space element vertices of the triangle";
+  let summary = "Return the object-space vertices of the triangle";
   let description = [{
-    Return [3 x <3 x float>] object space element vertices of the triangle at the current intersection.
+    Return [3 x <3 x float>] object space vertices of the triangle at the current intersection.
   }];
 }
