@@ -1020,64 +1020,64 @@ void SpirvLowerGlobal::lowerInOutInPlace() {
 // =====================================================================================================================
 // @param builtIn : BuiltIn value
 // @param elemIdx : Element Index of struct
-Value *SpirvLowerGlobal::createRaytracingBuiltIn(BuiltIn builtIn, Value *elemIdx) {
-  Value *builtinValue = nullptr;
+Value *SpirvLowerGlobal::createRaytracingBuiltIn(BuiltIn builtIn) {
+  Value *builtinOp = nullptr;
   switch (builtIn) {
   case BuiltInLaunchIdKHR:
-    builtinValue = m_builder->create<DispatchRaysIndexOp>();
+    builtinOp = m_builder->create<DispatchRaysIndexOp>();
     break;
   case BuiltInLaunchSizeKHR:
-    builtinValue = m_builder->create<DispatchRaysDimensionsOp>();
+    builtinOp = m_builder->create<DispatchRaysDimensionsOp>();
     break;
   case BuiltInWorldRayOriginKHR:
-    builtinValue = m_builder->create<WorldRayOriginOp>();
+    builtinOp = m_builder->create<WorldRayOriginOp>();
     break;
   case BuiltInWorldRayDirectionKHR:
-    builtinValue = m_builder->create<WorldRayDirectionOp>();
+    builtinOp = m_builder->create<WorldRayDirectionOp>();
     break;
   case BuiltInObjectRayOriginKHR:
-    builtinValue = m_builder->create<ObjectRayOriginOp>();
+    builtinOp = m_builder->create<ObjectRayOriginOp>();
     break;
   case BuiltInObjectRayDirectionKHR:
-    builtinValue = m_builder->create<ObjectRayDirectionOp>();
+    builtinOp = m_builder->create<ObjectRayDirectionOp>();
     break;
   case BuiltInRayTminKHR:
-    builtinValue = m_builder->create<RayTminOp>();
+    builtinOp = m_builder->create<RayTminOp>();
     break;
   case BuiltInRayTmaxKHR:
-    builtinValue = m_builder->create<RayTcurrentOp>();
+    builtinOp = m_builder->create<RayTcurrentOp>();
     break;
   case BuiltInInstanceCustomIndexKHR:
-    builtinValue = m_builder->create<InstanceIndexOp>();
+    builtinOp = m_builder->create<InstanceIndexOp>();
     break;
   case BuiltInObjectToWorldKHR:
-    builtinValue = m_builder->create<ObjectToWorldOp>();
+    builtinOp = m_builder->create<ObjectToWorldOp>();
     break;
   case BuiltInWorldToObjectKHR:
-    builtinValue = m_builder->create<WorldToObjectOp>();
+    builtinOp = m_builder->create<WorldToObjectOp>();
     break;
   case BuiltInHitKindKHR:
-    builtinValue = m_builder->create<HitKindOp>();
+    builtinOp = m_builder->create<HitKindOp>();
     break;
   case BuiltInHitTriangleVertexPositionsKHR:
-    builtinValue = m_builder->create<TriangleVertexPositionsOp>(elemIdx);
+    builtinOp = m_builder->create<TriangleVertexPositionsOp>();
     break;
   case BuiltInIncomingRayFlagsKHR:
-    builtinValue = m_builder->create<RayFlagsOp>();
+    builtinOp = m_builder->create<RayFlagsOp>();
     break;
   case BuiltInRayGeometryIndexKHR:
-    builtinValue = m_builder->create<GeometryIndexOp>();
+    builtinOp = m_builder->create<GeometryIndexOp>();
     break;
   case BuiltInInstanceId:
-    builtinValue = m_builder->create<InstanceIdOp>();
+    builtinOp = m_builder->create<InstanceIdOp>();
     break;
   case BuiltInPrimitiveId:
-    builtinValue = m_builder->create<PrimitiveIndexOp>();
+    builtinOp = m_builder->create<PrimitiveIndexOp>();
     break;
   }
 
-  assert(builtinValue != nullptr);
-  return builtinValue;
+  assert(builtinOp != nullptr);
+  return builtinOp;
 }
 
 // =====================================================================================================================
@@ -1224,9 +1224,8 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
       // Handle structure member recursively
       auto memberTy = inOutTy->getStructElementType(memberIdx);
       auto memberMeta = cast<Constant>(inOutMetaVal->getOperand(memberIdx));
-      auto member = addCallInstForInOutImport(memberTy, addrSpace, memberMeta, locOffset, maxLocOffset,
-                                              m_builder->getInt32(memberIdx), vertexIdx, interpLoc, auxInterpValue,
-                                              isPerVertexDimension);
+      auto member = addCallInstForInOutImport(memberTy, addrSpace, memberMeta, locOffset, maxLocOffset, nullptr,
+                                              vertexIdx, interpLoc, auxInterpValue, isPerVertexDimension);
       inOutValue = m_builder->CreateInsertValue(inOutValue, member, {memberIdx});
     }
   } else {
@@ -1238,7 +1237,7 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
 
     if (inOutMeta.IsBuiltIn) {
       if (isRayTracingBuiltIn(inOutMeta.Value, m_shaderStage))
-        inOutValue = createRaytracingBuiltIn(static_cast<BuiltIn>(inOutMeta.Value), elemIdx);
+        inOutValue = createRaytracingBuiltIn(static_cast<BuiltIn>(inOutMeta.Value));
       else {
         auto builtIn = static_cast<lgc::BuiltInKind>(inOutMeta.Value);
         elemIdx = elemIdx == m_builder->getInt32(InvalidValue) ? nullptr : elemIdx;
