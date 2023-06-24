@@ -1021,63 +1021,45 @@ void SpirvLowerGlobal::lowerInOutInPlace() {
 // @param builtIn : BuiltIn value
 // @param elemIdx : Element Index of struct
 Value *SpirvLowerGlobal::createRaytracingBuiltIn(BuiltIn builtIn) {
-  Value *builtinOp = nullptr;
   switch (builtIn) {
   case BuiltInLaunchIdKHR:
-    builtinOp = m_builder->create<DispatchRaysIndexOp>();
-    break;
+    return m_builder->create<DispatchRaysIndexOp>();
   case BuiltInLaunchSizeKHR:
-    builtinOp = m_builder->create<DispatchRaysDimensionsOp>();
-    break;
+    return m_builder->create<DispatchRaysDimensionsOp>();
   case BuiltInWorldRayOriginKHR:
-    builtinOp = m_builder->create<WorldRayOriginOp>();
-    break;
+    return m_builder->create<WorldRayOriginOp>();
   case BuiltInWorldRayDirectionKHR:
-    builtinOp = m_builder->create<WorldRayDirectionOp>();
-    break;
+    return m_builder->create<WorldRayDirectionOp>();
   case BuiltInObjectRayOriginKHR:
-    builtinOp = m_builder->create<ObjectRayOriginOp>();
-    break;
+    return m_builder->create<ObjectRayOriginOp>();
   case BuiltInObjectRayDirectionKHR:
-    builtinOp = m_builder->create<ObjectRayDirectionOp>();
-    break;
+    return m_builder->create<ObjectRayDirectionOp>();
   case BuiltInRayTminKHR:
-    builtinOp = m_builder->create<RayTminOp>();
-    break;
+    return m_builder->create<RayTminOp>();
   case BuiltInRayTmaxKHR:
-    builtinOp = m_builder->create<RayTcurrentOp>();
-    break;
+    return m_builder->create<RayTcurrentOp>();
   case BuiltInInstanceCustomIndexKHR:
-    builtinOp = m_builder->create<InstanceIndexOp>();
-    break;
+    return m_builder->create<InstanceIndexOp>();
   case BuiltInObjectToWorldKHR:
-    builtinOp = m_builder->create<ObjectToWorldOp>();
-    break;
+    return m_builder->create<ObjectToWorldOp>();
   case BuiltInWorldToObjectKHR:
-    builtinOp = m_builder->create<WorldToObjectOp>();
-    break;
+    return m_builder->create<WorldToObjectOp>();
   case BuiltInHitKindKHR:
-    builtinOp = m_builder->create<HitKindOp>();
-    break;
+    return m_builder->create<HitKindOp>();
   case BuiltInHitTriangleVertexPositionsKHR:
-    builtinOp = m_builder->create<TriangleVertexPositionsOp>();
-    break;
+    return m_builder->create<TriangleVertexPositionsOp>();
   case BuiltInIncomingRayFlagsKHR:
-    builtinOp = m_builder->create<RayFlagsOp>();
-    break;
+    return m_builder->create<RayFlagsOp>();
   case BuiltInRayGeometryIndexKHR:
-    builtinOp = m_builder->create<GeometryIndexOp>();
-    break;
+    return m_builder->create<GeometryIndexOp>();
   case BuiltInInstanceId:
-    builtinOp = m_builder->create<InstanceIdOp>();
-    break;
+    return m_builder->create<InstanceIdOp>();
   case BuiltInPrimitiveId:
-    builtinOp = m_builder->create<PrimitiveIndexOp>();
-    break;
+    return m_builder->create<PrimitiveIndexOp>();
+  default:
+    llvm_unreachable("Should never be called");
+    return nullptr;
   }
-
-  assert(builtinOp != nullptr);
-  return builtinOp;
 }
 
 // =====================================================================================================================
