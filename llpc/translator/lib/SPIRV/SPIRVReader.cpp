@@ -1693,8 +1693,8 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
   }
 
   Constant *const zero = getBuilder()->getInt32(0);
-  if (loadType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage &&
-      spvType->getOpCode() != OpTypeRayQueryKHR) {
+  if (loadType->isStructTy() && !spvType->isTypeSampledImage() && !spvType->isTypeImage() &&
+      !spvType->isTypeSampler() && spvType->getOpCode() != OpTypeRayQueryKHR) {
     // For structs we lookup the mapping of the elements and use it to reverse map the values.
     const bool needsPad = isRemappedTypeElements(spvType);
 
@@ -1736,7 +1736,7 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
 
     return load;
   }
-  if (loadType->isArrayTy() && !spvType->isTypeVector()) {
+  if (loadType->isArrayTy() && !spvType->isTypeVector() && !spvType->isTypeImage()) {
     // Matrix and arrays both get here. For both we need to turn [<{element-type, pad}>] into [element-type].
     const bool needsPad = isTypeWithPad(loadType);
 
@@ -1852,8 +1852,8 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
   }
 
   Value *const zero = getBuilder()->getInt32(0);
-  if (storeType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage &&
-      spvType->getOpCode() != OpTypeRayQueryKHR) {
+  if (storeType->isStructTy() && !spvType->isTypeSampledImage() && !spvType->isTypeImage() &&
+      !spvType->isTypeSampler() && spvType->getOpCode() != OpTypeRayQueryKHR) {
     // For structs we lookup the mapping of the elements and use it to map the values.
     const bool needsPad = isRemappedTypeElements(spvType);
 
@@ -1866,7 +1866,7 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
       addStoreInstRecursively(spvType->getStructMemberType(i), memberStorePointer, memberStoreType, memberStoreValue,
                               isVolatile, isCoherent, isNonTemporal);
     }
-  } else if (storeType->isArrayTy() && !spvType->isTypeVector()) {
+  } else if (storeType->isArrayTy() && !spvType->isTypeVector() && !spvType->isTypeImage()) {
     // Matrix and arrays both get here. For both we need to turn [element-type] into [<{element-type, pad}>].
     const bool needsPad = isTypeWithPad(storeType);
 
@@ -3198,6 +3198,7 @@ Value *SPIRVToLLVM::indexDescPtr(Type *elementTy, Value *base, Value *index) {
   // The descriptor "pointer" is in fact a struct containing the pointer and stride.
   Value *ptr = getBuilder()->CreateExtractValue(base, 0);
   Value *stride = getBuilder()->CreateExtractValue(base, 1);
+  index = getBuilder()->CreateZExtOrTrunc(index, getBuilder()->getInt32Ty());
   index = getBuilder()->CreateMul(index, stride);
 
   // Do the indexing operation by GEPping as a byte pointer.
