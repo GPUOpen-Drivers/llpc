@@ -144,9 +144,6 @@ static bool runPassPipeline(Pipeline &pipeline, Module &module, raw_pwrite_strea
   passMgr->registerModuleAnalysis([&] { return PipelineStateWrapper(static_cast<PipelineState *>(&pipeline)); });
   Patch::registerPasses(*passMgr);
 
-  // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
-  lgcContext->preparePassManager(*passMgr);
-
   PassBuilder passBuilder(lgcContext->getTargetMachine(), PipelineTuningOptions(), {},
                           &passMgr->getInstrumentationCallbacks());
   Patch::registerPasses(passBuilder);

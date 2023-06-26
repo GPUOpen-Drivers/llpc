@@ -176,9 +176,6 @@ void SpirvLower::removeConstantExpr(Context *context, GlobalVariable *global) {
 // @param isInternalRtShader : Whether we are lowering an internal ray tracing shader
 void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager &passMgr, Timer *lowerTimer,
                            bool rayTracing, bool rayQuery, bool isInternalRtShader) {
-  // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
-  context->getLgcContext()->preparePassManager(passMgr);
-
   // Start timer for lowering passes.
   if (lowerTimer)
     LgcContext::createAndAddStartStopTimer(passMgr, lowerTimer, true);

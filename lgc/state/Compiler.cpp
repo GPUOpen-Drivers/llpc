@@ -202,9 +202,6 @@ bool PipelineState::generate(Module *pipelineModule, raw_pwrite_stream &outStrea
   passMgr->registerFunctionAnalysis([&] { return getLgcContext()->getTargetMachine()->getTargetIRAnalysis(); });
   passMgr->registerModuleAnalysis([&] { return PipelineShaders(); });
 
-  // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
-  getLgcContext()->preparePassManager(*passMgr);
-
   // Ensure m_stageMask is set up in this PipelineState, as Patch::addPasses uses it.
   readShaderStageMask(&*pipelineModule);
 

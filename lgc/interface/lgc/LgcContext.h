@@ -126,12 +126,6 @@ public:
   // @param pipeline : Ignored
   Builder *createBuilder(Pipeline *pipeline);
 
-  // Prepare a pass manager. This manually adds a target-aware TLI pass, so middle-end optimizations do not
-  // think that we have library functions.
-  //
-  // @param [in/out] passMgr : Pass manager
-  void preparePassManager(lgc::PassManager &passMgr);
-
   // Adds target passes to pass manager, depending on "-filetype" and "-emit-llvm" options
   void addTargetPasses(lgc::LegacyPassManager &passMgr, llvm::Timer *codeGenTimer, llvm::raw_pwrite_stream &outStream);
 
