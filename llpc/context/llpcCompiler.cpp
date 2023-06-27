@@ -742,7 +742,7 @@ Result Compiler::buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *p
           pipelineOut->stageCacheAccesses[ShaderStageFragment] = PartialPipelineHit;
         } else {
           for (unsigned stage = 0; stage < ShaderStageFragment; stage++) {
-            if (doesShaderStageExist(shaderInfo, static_cast<ShaderStage>(stage)) {
+            if (doesShaderStageExist(shaderInfo, static_cast<ShaderStage>(stage))) {
               pipelineOut->stageCacheAccesses[stage] = PartialPipelineHit;
             }
           }
@@ -765,7 +765,7 @@ Result Compiler::buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *p
     context->setDiagnosticHandler(nullptr);
     if (hasError) {
       for (unsigned stage = 0; stage < ShaderStageGfxCount; stage++) {
-        if (doesShaderStageExist(shaderInfo, static_cast<ShaderStage>(stage)) {
+        if (doesShaderStageExist(shaderInfo, static_cast<ShaderStage>(stage))) {
           pipelineOut->stageCacheAccesses[stage] = CacheMiss;
         }
       }
