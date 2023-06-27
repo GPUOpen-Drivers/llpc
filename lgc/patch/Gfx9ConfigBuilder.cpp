@@ -137,10 +137,14 @@ void ConfigBuilder::buildPipelineVsFsRegConfig() {
     } else {
       SET_REG(&config, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
     }
+  } else {
+    invalidRegConfig(config.vsRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
     buildPsRegConfig<PipelineVsFsRegConfig>(ShaderStageFragment, &config);
+  } else {
+    invalidRegConfig(config.psRegs);
   }
 
   appendConfig(config);
@@ -187,6 +191,8 @@ void ConfigBuilder::buildPipelineVsTsFsRegConfig() {
 
     if (m_gfxIp.major == 10)
       setWaveFrontSize(Util::Abi::HardwareStage::Hs, waveSize);
+  } else {
+    invalidRegConfig(config.lsHsRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageTessEval)) {
@@ -205,10 +211,14 @@ void ConfigBuilder::buildPipelineVsTsFsRegConfig() {
     if (m_pipelineState->getTargetInfo().getGpuProperty().supportShaderPowerProfiling) {
       SET_REG(&config.vsRegs, SPI_SHADER_PGM_CHKSUM_VS, checksum);
     }
+  } else {
+    invalidRegConfig(config.vsRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
     buildPsRegConfig<PipelineVsTsFsRegConfig>(ShaderStageFragment, &config);
+  } else {
+    invalidRegConfig(config.psRegs);
   }
 
   // Set up IA_MULTI_VGT_PARAM
@@ -272,10 +282,14 @@ void ConfigBuilder::buildPipelineVsGsFsRegConfig() {
 
     if (m_gfxIp.major == 10)
       setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveSize);
+  } else {
+    invalidRegConfig(config.esGsRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
     buildPsRegConfig<PipelineVsGsFsRegConfig>(ShaderStageFragment, &config);
+  } else {
+    invalidRegConfig(config.psRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageCopyShader)) {
@@ -288,6 +302,8 @@ void ConfigBuilder::buildPipelineVsGsFsRegConfig() {
 
     if (m_gfxIp.major == 10)
       setWaveFrontSize(Util::Abi::HardwareStage::Vs, waveSize);
+  } else {
+    invalidRegConfig(config.vsRegs);
   }
 
   // Set up IA_MULTI_VGT_PARAM
@@ -347,6 +363,8 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
     //  In GEN_TWO the only supported mode is fully distributed tessellation. The programming model is expected
     //  to set VGT_SHADER_STAGES_EN.DYNAMIC_HS=1 and VGT_TF_PARAM.NUM_DS_WAVES_PER_SIMD=0
     SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, DYNAMIC_HS, true);
+  } else {
+    invalidRegConfig(config.lsHsRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageTessEval) || m_pipelineState->hasShaderStage(ShaderStageGeometry)) {
@@ -371,10 +389,14 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
 
     if (m_gfxIp.major == 10)
       setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveSize);
+  } else {
+    invalidRegConfig(config.esGsRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
     buildPsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageFragment, &config);
+  } else {
+    invalidRegConfig(config.psRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageCopyShader)) {
@@ -387,6 +409,8 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
 
     if (m_gfxIp.major == 10)
       setWaveFrontSize(Util::Abi::HardwareStage::Vs, waveSize);
+  } else {
+    invalidRegConfig(config.vsRegs);
   }
 
   // Set up IA_MULTI_VGT_PARAM
@@ -471,10 +495,14 @@ void ConfigBuilder::buildPipelineNggVsFsRegConfig() {
     iaMultiVgtParam.bits.PRIMGROUP_SIZE = primGroupSize - 1;
 
     SET_REG(&config, IA_MULTI_VGT_PARAM_PIPED, iaMultiVgtParam.u32All);
+  } else {
+    invalidRegConfig(config.primShaderRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
     buildPsRegConfig<PipelineNggVsFsRegConfig>(ShaderStageFragment, &config);
+  } else {
+    invalidRegConfig(config.psRegs);
   }
 
   appendConfig(config);
@@ -531,6 +559,8 @@ void ConfigBuilder::buildPipelineNggVsTsFsRegConfig() {
     SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, HS_W32_EN, (waveSize == 32));
 
     setWaveFrontSize(Util::Abi::HardwareStage::Hs, waveSize);
+  } else {
+    invalidRegConfig(config.lsHsRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageTessEval)) {
@@ -551,10 +581,14 @@ void ConfigBuilder::buildPipelineNggVsTsFsRegConfig() {
     if (m_pipelineState->getTargetInfo().getGpuProperty().supportShaderPowerProfiling) {
       SET_REG_FIELD(&config.primShaderRegs, SPI_SHADER_PGM_CHKSUM_GS, CHECKSUM, checksum);
     }
+  } else {
+    invalidRegConfig(config.primShaderRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
     buildPsRegConfig<PipelineNggVsTsFsRegConfig>(ShaderStageFragment, &config);
+  } else {
+    invalidRegConfig(config.psRegs);
   }
 
   // Set up IA_MULTI_VGT_PARAM
@@ -621,10 +655,14 @@ void ConfigBuilder::buildPipelineNggVsGsFsRegConfig() {
     SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, (waveSize == 32));
 
     setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveSize);
+  } else {
+    invalidRegConfig(config.primShaderRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
     buildPsRegConfig<PipelineNggVsGsFsRegConfig>(ShaderStageFragment, &config);
+  } else {
+    invalidRegConfig(config.psRegs);
   }
 
   // Set up IA_MULTI_VGT_PARAM
@@ -689,6 +727,8 @@ void ConfigBuilder::buildPipelineNggVsTsGsFsRegConfig() {
     SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, HS_W32_EN, (waveSize == 32));
 
     setWaveFrontSize(Util::Abi::HardwareStage::Hs, waveSize);
+  } else {
+    invalidRegConfig(config.lsHsRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageTessEval) || m_pipelineState->hasShaderStage(ShaderStageGeometry)) {
@@ -715,10 +755,14 @@ void ConfigBuilder::buildPipelineNggVsTsGsFsRegConfig() {
     SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, (waveSize == 32));
 
     setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveSize);
+  } else {
+    invalidRegConfig(config.primShaderRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
     buildPsRegConfig<PipelineNggVsTsGsFsRegConfig>(ShaderStageFragment, &config);
+  } else {
+    invalidRegConfig(config.psRegs);
   }
 
   // Set up IA_MULTI_VGT_PARAM
@@ -760,6 +804,8 @@ void ConfigBuilder::buildPipelineMeshFsConfig() {
     unsigned checksum = setShaderHash(ShaderStageFragment);
     if (m_pipelineState->getTargetInfo().getGpuProperty().supportShaderPowerProfiling)
       SET_REG_FIELD(&config.psRegs, SPI_SHADER_PGM_CHKSUM_PS, CHECKSUM, checksum);
+  } else {
+    invalidRegConfig(config.psRegs);
   }
 
   appendConfig(config);
@@ -784,6 +830,8 @@ void ConfigBuilder::buildPipelineTaskMeshFsConfig() {
 
   if (m_pipelineState->hasShaderStage(ShaderStageMesh))
     buildMeshRegConfig<PipelineTaskMeshFsRegConfig>(ShaderStageMesh, &config);
+  else
+    invalidRegConfig(config.meshRegs);
 
   if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
     buildPsRegConfig<PipelineTaskMeshFsRegConfig>(ShaderStageFragment, &config);
@@ -791,6 +839,8 @@ void ConfigBuilder::buildPipelineTaskMeshFsConfig() {
     unsigned checksum = setShaderHash(ShaderStageFragment);
     if (m_pipelineState->getTargetInfo().getGpuProperty().supportShaderPowerProfiling)
       SET_REG_FIELD(&config.psRegs, SPI_SHADER_PGM_CHKSUM_PS, CHECKSUM, checksum);
+  } else {
+    invalidRegConfig(config.psRegs);
   }
 
   appendConfig(config);
