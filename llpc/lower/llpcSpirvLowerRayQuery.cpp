@@ -53,9 +53,6 @@ const char *PrevRayQueryObj = "PrevRayQueryObj";
 const char *RayQueryObjGen = "RayQueryObjGen";
 const char *StaticId = "StaticId";
 static const char *LibraryEntryFuncName = "libraryEntry";
-extern const char *LoadDwordAtAddr;
-extern const char *LoadDwordAtAddrx2;
-extern const char *LoadDwordAtAddrx4;
 #if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 33
 static const char *IntersectBvh = "AmdExtD3DShaderIntrinsics_IntersectBvhNode";
 #else
@@ -359,23 +356,8 @@ void SpirvLowerRayQuery::processLibraryFunction(Function *&func) {
   } else if (!rayQueryProceed.empty() && mangledName.startswith(rayQueryProceed)) {
     func->setName(rayQueryProceed);
     func->setLinkage(GlobalValue::ExternalLinkage);
-  } else if (mangledName.startswith(RtName::LoadDwordAtAddrx4)) {
-    auto int32x4Ty = FixedVectorType::get(m_builder->getInt32Ty(), 4);
-    createLoadDwordAtAddr(func, int32x4Ty);
-    func->setName(RtName::LoadDwordAtAddrx4);
-  } else if (mangledName.startswith(RtName::LoadDwordAtAddrx2)) {
-    auto int32x2Ty = FixedVectorType::get(m_builder->getInt32Ty(), 2);
-    createLoadDwordAtAddr(func, int32x2Ty);
-    func->setName(RtName::LoadDwordAtAddrx2);
-  } else if (mangledName.startswith(RtName::LoadDwordAtAddr)) {
-    createLoadDwordAtAddr(func, m_builder->getInt32Ty());
-    func->setName(RtName::LoadDwordAtAddr);
   } else if (mangledName.startswith(RtName::IntersectBvh)) {
     createIntersectBvh(func);
-  } else if (mangledName.startswith(RtName::ConvertF32toF16NegInf)) {
-    createConvertF32toF16(func, 2);
-  } else if (mangledName.startswith(RtName::ConvertF32toF16PosInf)) {
-    createConvertF32toF16(func, 3);
   } else if (mangledName.startswith(RtName::SampleGpuTimer)) {
     createSampleGpuTime(func);
   } else if (mangledName.startswith(RtName::SetHitTokenData)) {

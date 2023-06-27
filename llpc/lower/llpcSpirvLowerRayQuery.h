@@ -30,7 +30,9 @@
  */
 #pragma once
 
-#include "llpcSpirvLowerRayTracingIntrinsics.h"
+#include "SPIRVInternal.h"
+#include "llpcSpirvLower.h"
+#include "llvm/IR/PassManager.h"
 
 #pragma pack(push, 4)
 // Acceleration structure result data offsets
@@ -110,7 +112,7 @@ enum RayFlag : unsigned {
 
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering ray query.
-class SpirvLowerRayQuery : public SpirvLowerRayTracingIntrinsics {
+class SpirvLowerRayQuery : public SpirvLower, public llvm::PassInfoMixin<SpirvLowerRayQuery> {
 public:
   SpirvLowerRayQuery();
   SpirvLowerRayQuery(bool rayQueryLibrary);

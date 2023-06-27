@@ -40,10 +40,10 @@
 #include "llpcSpirvLowerMemoryOp.h"
 #include "llpcSpirvLowerRayQueryPostInline.h"
 #include "llpcSpirvLowerRayTracingBuiltIn.h"
-#include "llpcSpirvLowerRayTracingIntrinsics.h"
 #include "llpcSpirvLowerTerminator.h"
 #include "llpcSpirvLowerTranslator.h"
 #include "llpcSpirvLowerUtil.h"
+#include "llpcSpirvProcessGpuRtLibrary.h"
 #include "lgc/Builder.h"
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
@@ -187,7 +187,7 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
     passMgr.addPass(SpirvLowerRayTracing());
 
   if (isInternalRtShader)
-    passMgr.addPass(SpirvLowerRayTracingIntrinsics());
+    passMgr.addPass(SpirvProcessGpuRtLibrary());
 
   // Lower SPIR-V CFG merges before inlining
   passMgr.addPass(SpirvLowerCfgMerges());
