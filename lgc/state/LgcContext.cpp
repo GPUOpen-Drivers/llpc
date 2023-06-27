@@ -133,7 +133,6 @@ void LgcContext::initialize() {
   initializeCodeGen(passRegistry);
   initializeShadowStackGCLoweringPass(passRegistry);
   initializeExpandReductionsPass(passRegistry);
-  initializeRewriteSymbolsLegacyPassPass(passRegistry);
 
   // Initialize LGC passes so they can be referenced by -stop-before etc.
   initializeUtilPasses(passRegistry);
