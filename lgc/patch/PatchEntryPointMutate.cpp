@@ -358,7 +358,13 @@ Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type 
   }
   setShaderStage(newFunc, getShaderStage(func));
   newFunc->setAlignment(Align(64));
-  // FIXME: set calling convention to amdgpu_cs_chain.
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 465196
+  // Old version of the code
+#else
+  // New version of the code (also handles unknown version, which we treat as
+  // latest)
+  newFunc->setCallingConv(CallingConv::AMDGPU_CS_Chain);
+#endif
   return newFunc;
 }
 
@@ -419,18 +425,21 @@ void PatchEntryPointMutate::lowerCpsJump(Function *parent, cps::JumpOp *jumpOp, 
   unsigned waveSize = m_pipelineState->getShaderWaveSize(m_shaderStage);
   Value *execMask = builder.CreateIntrinsic(Intrinsic::amdgcn_ballot, builder.getIntNTy(waveSize), builder.getTrue());
 
-  SmallVector<Type *> chainArgTys = {builder.getPtrTy(), builder.getIntNTy(waveSize), userDataVec->getType(),
-                                     vgprArg->getType(), builder.getInt32Ty()};
+  Value *chainArgs[] = {jumpTarget, execMask, userDataVec, vgprArg, builder.getInt32(0)};
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 465197
+  // Old version of the code
+  Type *chainArgTys[] = {builder.getPtrTy(), builder.getIntNTy(waveSize), userDataVec->getType(), vgprArg->getType(),
+                         builder.getInt32Ty()};
   FunctionType *funcTy = FunctionType::get(builder.getVoidTy(), chainArgTys, true);
   auto func = Function::Create(funcTy, GlobalValue::ExternalLinkage, "llvm.amdgcn.cs.chain", parent->getParent());
-
-  SmallVector<Value *> chainArgs;
-  chainArgs.push_back(jumpTarget);
-  chainArgs.push_back(execMask);
-  chainArgs.push_back(userDataVec);
-  chainArgs.push_back(vgprArg);
-  chainArgs.push_back(builder.getInt32(0));
   builder.CreateCall(func, chainArgs);
+#else
+  // New version of the code (also handles unknown version, which we treat as
+  // latest)
+  Type *chainTys[] = {builder.getPtrTy(), builder.getIntNTy(waveSize), userDataVec->getType(), vgprArg->getType()};
+  builder.CreateIntrinsic(Intrinsic::amdgcn_cs_chain, chainTys, chainArgs);
+#endif
+
   jumpOp->eraseFromParent();
 }
 
