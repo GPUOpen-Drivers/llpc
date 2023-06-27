@@ -120,7 +120,8 @@ private:
                     llvm::SmallVectorImpl<std::string> &shaderInputNames, uint64_t inRegMask, unsigned argOffset);
   void setFuncAttrs(llvm::Function *entryPoint);
 
-  uint64_t generateEntryPointArgTys(ShaderInputs *shaderInputs, llvm::SmallVectorImpl<llvm::Type *> &argTys,
+  uint64_t generateEntryPointArgTys(ShaderInputs *shaderInputs, llvm::Function *origFunc,
+                                    llvm::SmallVectorImpl<llvm::Type *> &argTys,
                                     llvm::SmallVectorImpl<std::string> &argNames, unsigned argOffset);
 
   bool isSystemUserDataValue(unsigned userDataValue) const;
