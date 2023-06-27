@@ -45,6 +45,7 @@
 #include "SPIRVType.h"
 #include "SPIRVUtil.h"
 #include "SPIRVValue.h"
+#include "lgcrt/LgcRtDialect.h"
 #include "llpcCompiler.h"
 #include "llpcContext.h"
 #include "llpcDialect.h"
@@ -92,6 +93,7 @@ using namespace lgc;
 using namespace llvm;
 using namespace SPIRV;
 using namespace Llpc;
+using namespace lgc::rt;
 
 namespace Llpc {
 Type *getRayQueryInternalTy(lgc::Builder *builder);
@@ -3700,8 +3702,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpExecuteCallableKHR>(SPIRV
     auto *pipelineContext = static_cast<Llpc::RayTracingContext *>(llpcContext->getPipelineContext());
     pipelineContext->setIndirectPipeline();
   }
+  SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
+  std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
+
   BasicBlock *const block = getBuilder()->GetInsertBlock();
-  return mapValue(spvValue, transSPIRVBuiltinFromInst(static_cast<SPIRVInstruction *>(spvValue), block));
+  Function *const func = getBuilder()->GetInsertBlock()->getParent();
+  Value *const shaderIndex = transValue(spvOperands[0], func, block);
+  Value *const callableData = transValue(spvOperands[1], func, block);
+  Type *callableDataTy = transType(spvOperands[1]->getType()->getPointerElementType());
+  unsigned dataByteSize = alignTo(m_m->getDataLayout().getTypeAllocSize(callableDataTy), 4);
+
+  return getBuilder()->create<CallCallableShaderOp>(shaderIndex, callableData, dataByteSize);
 }
 
 // =====================================================================================================================
@@ -3727,10 +3738,38 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpConvertUToAccelerationStr
 //
 // @param spvValue : A SPIR-V value.
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpTerminateRayKHR>(SPIRVValue *const spvValue) {
+  getBuilder()->create<AcceptHitAndEndSearchOp>();
+  return getBuilder()->CreateUnreachable();
+}
+
+// =====================================================================================================================
+// Handle OpIgnoreIntersectionKHR.
+//
+// @param spvValue : A SPIR-V value.
+template <> Value *SPIRVToLLVM::transValueWithOpcode<OpIgnoreIntersectionKHR>(SPIRVValue *const spvValue) {
+  getBuilder()->create<IgnoreHitOp>();
+  return getBuilder()->CreateUnreachable();
+}
+
+// =====================================================================================================================
+// Handle OpReportIntersectionKHR.
+//
+// @param spvValue : A SPIR-V value.
+template <> Value *SPIRVToLLVM::transValueWithOpcode<OpReportIntersectionKHR>(SPIRVValue *const spvValue) {
+  SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
+  std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
+
   BasicBlock *const block = getBuilder()->GetInsertBlock();
-  transSPIRVBuiltinFromInst(static_cast<SPIRVInstruction *>(spvValue), block);
-  Value *ret = getBuilder()->CreateRetVoid();
-  return mapValue(spvValue, ret);
+  Function *const func = getBuilder()->GetInsertBlock()->getParent();
+  Value *const hitT = transValue(spvOperands[0], func, block);
+  Value *const hitKind = transValue(spvOperands[1], func, block);
+
+  // We don't have attribute for this Op in SPIR-V
+  // TODO: Pass the pointer of hit attribute global variable here after SpirvLowerRayTracing is moved after
+  // SpirvLowerGlobal
+  auto dummyPtr = ConstantPointerNull::get(PointerType::get(getBuilder()->getContext(), SPIRAS_Private));
+
+  return getBuilder()->create<ReportHitOp>(hitT, hitKind, dummyPtr, 0);
 }
 
 // =====================================================================================================================
@@ -5681,12 +5720,15 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
   case OpTraceRayKHR:
     return transValueWithOpcode<OpTraceRayKHR>(bv);
   case OpExecuteCallableKHR:
-    return transValueWithOpcode<OpExecuteCallableKHR>(bv);
+    return mapValue(bv, transValueWithOpcode<OpExecuteCallableKHR>(bv));
   case OpConvertUToAccelerationStructureKHR:
     return transValueWithOpcode<OpConvertUToAccelerationStructureKHR>(bv);
   case OpTerminateRayKHR:
+    return mapValue(bv, transValueWithOpcode<OpTerminateRayKHR>(bv));
   case OpIgnoreIntersectionKHR:
-    return transValueWithOpcode<OpTerminateRayKHR>(bv);
+    return mapValue(bv, transValueWithOpcode<OpIgnoreIntersectionKHR>(bv));
+  case OpReportIntersectionKHR:
+    return mapValue(bv, transValueWithOpcode<OpReportIntersectionKHR>(bv));
   case OpSDotKHR:
   case OpUDotKHR:
   case OpSUDotKHR:
