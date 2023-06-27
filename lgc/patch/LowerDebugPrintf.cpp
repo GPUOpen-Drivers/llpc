@@ -90,10 +90,9 @@ void LowerDebugPrintf::visitDebugPrintf(DebugPrintfOp &op) {
   SmallVector<Value *> printArgs;
   // Records printf output variables are 64bit or not
   SmallBitVector bit64Vector;
-  for (Value *var : op.getArgs()) {
-    getDwordValues(var, printArgs, bit64Vector, builder);
+  for (auto var = op.arg_begin() + 2; var != op.arg_end(); ++var) {
+    getDwordValues(*var, printArgs, bit64Vector, builder);
   }
-
   GlobalVariable *globalStr = cast<GlobalVariable>(op.getFormat());
   StringRef strDebugStr = (cast<ConstantDataSequential>(globalStr->getInitializer()))->getAsString();
 
