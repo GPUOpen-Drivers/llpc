@@ -125,6 +125,7 @@ enum CacheAccessInfo : uint8_t {
   CacheMiss,           ///< Cache miss.
   CacheHit,            ///< Cache hit using VkPipelineCache.
   InternalCacheHit,    ///< cache hit using internal cache.
+  PartialPipelineHit,  ///< cache hit using partial pipeline
 };
 
 /// Represents output of building a graphics pipeline.

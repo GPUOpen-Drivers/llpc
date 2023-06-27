@@ -738,6 +738,15 @@ Result Compiler::buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *p
       if (elfPackage[idx].pCode) {
         auto data = reinterpret_cast<const char *>(elfPackage[idx].pCode);
         elf[idx].assign(data, data + elfPackage[idx].codeSize);
+        if (idx == UnlinkedStageFragment) {
+          pipelineOut->stageCacheAccesses[ShaderStageFragment] = PartialPipelineHit;
+        } else {
+          for (unsigned stage = 0; stage < ShaderStageFragment; stage++) {
+            if (doesShaderStageExist(shaderInfo, static_cast<ShaderStage>(stage)) {
+              pipelineOut->stageCacheAccesses[stage] = PartialPipelineHit;
+            }
+          }
+        }
       } else {
         graphicsContext.setUnlinked(true);
         result = buildUnlinkedShaderInternal(context, shaderInfo, static_cast<UnlinkedShaderStage>(idx), elf[idx],
@@ -754,8 +763,14 @@ Result Compiler::buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *p
     hasError |= !linkRelocatableShaderElf(elf, &pipelineElf, context);
 
     context->setDiagnosticHandler(nullptr);
-    if (hasError)
+    if (hasError) {
+      for (unsigned stage = 0; stage < ShaderStageGfxCount; stage++) {
+        if (doesShaderStageExist(shaderInfo, static_cast<ShaderStage>(stage)) {
+          pipelineOut->stageCacheAccesses[stage] = CacheMiss;
+        }
+      }
       return Result::ErrorInvalidShader;
+    }
 
     elfBin.codeSize = pipelineElf.size();
     elfBin.pCode = pipelineElf.data();
