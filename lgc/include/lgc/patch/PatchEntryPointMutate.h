@@ -35,6 +35,7 @@
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
+#include "lgc/util/TypeLowering.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
 
@@ -151,6 +152,7 @@ private:
                                    llvm::ArrayRef<std::string> argNames);
   void lowerCpsJump(llvm::Function *parent, cps::JumpOp *jumpOp, llvm::BasicBlock *tailBlock,
                     llvm::SmallVectorImpl<CpsExitInfo> &exitInfos);
+  void lowerAsCpsReference(cps::AsContinuationReferenceOp &asCpsReferenceOp);
 
   // Get UserDataUsage struct for the merged shader stage that contains the given shader stage
   UserDataUsage *getUserDataUsage(ShaderStage stage);
