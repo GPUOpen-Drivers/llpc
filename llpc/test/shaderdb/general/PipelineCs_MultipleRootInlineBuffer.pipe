@@ -44,7 +44,6 @@
 ; BEGIN_RELOCTEST
 ; RUN: amdllpc --enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=RELOCTEST %s
 ; RELOCTEST-LABEL: {{^// LLPC}} calculated hash results (compute pipeline)
-; RELOCTEST-LABEL: {{^Warning:}} Relocatable shader compilation requested but not possible
 ; RELOCTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; RELOCTEST: {{^=====}} AMDLLPC SUCCESS
 ; END_RELOCTEST

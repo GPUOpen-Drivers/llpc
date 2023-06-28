@@ -1294,8 +1294,7 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
     break;
   }
 
-  if (!isRelocatableShader)
-    updateHashForResourceMappingInfo(&pipeline->resourceMapping, pipeline->pipelineLayoutApiHash, &hasher);
+  updateHashForResourceMappingInfo(&pipeline->resourceMapping, pipeline->pipelineLayoutApiHash, &hasher);
 
   hasher.Update(pipeline->iaState.deviceIndex);
 
