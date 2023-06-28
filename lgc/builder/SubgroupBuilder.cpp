@@ -1452,20 +1452,8 @@ Value *BuilderImpl::createGroupBallot(Value *const value) {
   // Check the type is definitely an boolean.
   assert(value->getType()->isIntegerTy(1));
 
-  // Turn value into an i32.
-  Value *valueAsInt32 = CreateSelect(value, getInt32(1), getInt32(0));
-
-  // TODO: There is a longstanding bug with LLVM's convergent that forces us to use inline assembly with side effects to
-  // stop any hoisting out of control flow.
-  valueAsInt32 = BuilderBase::get(*this).CreateInlineAsmSideEffect(valueAsInt32);
-
-  // The not equal predicate for the icmp intrinsic is 33.
-  Constant *const predicateNe = getInt32(33);
-
-  // icmp has a new signature (requiring the return type as the first type).
   unsigned waveSize = getShaderWaveSize();
-  Value *result = CreateIntrinsic(Intrinsic::amdgcn_icmp, {getIntNTy(waveSize), getInt32Ty()},
-                                  {valueAsInt32, getInt32(0), predicateNe});
+  Value *result = CreateIntrinsic(getIntNTy(waveSize), Intrinsic::amdgcn_ballot, value);
 
   // If we have a 32-bit subgroup size, we need to turn the 32-bit ballot result into a 64-bit result.
   if (waveSize <= 32)
