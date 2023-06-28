@@ -528,8 +528,15 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
     rayTracingContext->setEntryName("main");
     return true;
   }
-  Instruction *insertPos = &*(m_entryPoint->begin()->getFirstNonPHIOrDbgOrAlloca());
-
+  Instruction *insertPos = nullptr;
+  if (m_shaderStage == ShaderStageRayTracingClosestHit || m_shaderStage == ShaderStageRayTracingAnyHit ||
+      m_shaderStage == ShaderStageRayTracingIntersect || m_shaderStage == ShaderStageRayTracingMiss) {
+    insertPos = createEntryFunc(m_entryPoint);
+  } else if (m_shaderStage == ShaderStageRayTracingCallable) {
+    insertPos = createCallableShaderEntryFunc(m_entryPoint);
+  } else {
+    insertPos = &*(m_entryPoint->begin()->getFirstNonPHIOrDbgOrAlloca());
+  }
   // Process traceRays module
   if (m_shaderStage == ShaderStageCompute) {
     for (auto funcIt = module.begin(), funcEnd = module.end(); funcIt != funcEnd;) {
@@ -621,15 +628,10 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
       func->dropAllReferences();
       func->eraseFromParent();
     }
-
-    if (m_shaderStage == ShaderStageRayTracingClosestHit || m_shaderStage == ShaderStageRayTracingAnyHit ||
-        m_shaderStage == ShaderStageRayTracingIntersect || m_shaderStage == ShaderStageRayTracingMiss) {
-      createEntryFunc(m_entryPoint);
-    }
-
-    if (m_shaderStage == ShaderStageRayTracingCallable) {
-      createCallableShaderEntryFunc(m_entryPoint);
-    }
+  }
+  if (m_shaderStage == ShaderStageRayTracingClosestHit || m_shaderStage == ShaderStageRayTracingAnyHit ||
+      m_shaderStage == ShaderStageRayTracingIntersect || m_shaderStage == ShaderStageRayTracingMiss) {
+    createEntryTerminator(m_entryPoint);
   }
 
   LLVM_DEBUG(dbgs() << "After the pass Spirv-Lower-Ray-Tracing " << module);
@@ -1939,8 +1941,7 @@ FunctionType *SpirvLowerRayTracing::getShaderEntryFuncTy(ShaderStage stage) {
 // Mutate entry function for the shader stage, ClosestHit, Intersect, AnyHit, Miss
 //
 // @param func : Function to create
-void SpirvLowerRayTracing::createEntryFunc(Function *func) {
-  auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
+Instruction *SpirvLowerRayTracing::createEntryFunc(Function *func) {
   // Set old entry function name deprecated
   func->setName("deprecated");
 
@@ -1963,7 +1964,9 @@ void SpirvLowerRayTracing::createEntryFunc(Function *func) {
   m_entryPoint = newFunc;
   m_entryPoint->addFnAttr(Attribute::NoUnwind);
   m_entryPoint->addFnAttr(Attribute::AlwaysInline);
-  m_builder->SetInsertPointPastAllocas(newFunc);
+
+  Instruction *insertPos = &*(newFunc->begin()->getFirstNonPHIOrDbgOrAlloca());
+  m_builder->SetInsertPoint(insertPos);
   auto argIt = newFunc->arg_begin();
 
   // Save the function input parameter value to the global payloads and builtIns
@@ -1989,47 +1992,7 @@ void SpirvLowerRayTracing::createEntryFunc(Function *func) {
         m_shaderStage == ShaderStageRayTracingIntersect ? RayHitStatus::Ignore : RayHitStatus::Accept;
     m_builder->CreateStore(m_builder->getInt32(hitStatus), m_traceParams[TraceParam::Status]);
   }
-
-  // Return incoming payload, and other values if needed
-  SmallVector<Instruction *, 4> rets;
-  getFuncRets(newFunc, rets);
-  for (auto ret : rets) {
-    m_builder->SetInsertPoint(ret);
-    Value *retVal = m_builder->CreateLoad(m_globalPayload->getValueType(), m_globalPayload);
-
-    const auto rets = getShaderExtraRets(m_shaderStage);
-    unsigned payloadSizeInDword = rayTracingContext->getPayloadSizeInDword();
-
-    if (rets.size()) {
-      // We have extra values to return here
-      Value *newRetVal = PoisonValue::get(getShaderReturnTy(m_shaderStage));
-      unsigned index = 0;
-      // Get payload value first
-      for (; index < payloadSizeInDword; index++)
-        newRetVal = m_builder->CreateInsertValue(newRetVal, m_builder->CreateExtractValue(retVal, index), index);
-      // Get other values
-      for (auto ret : rets) {
-        Value *traceParam = m_builder->CreateLoad(m_traceParamsTys[ret], m_traceParams[ret]);
-        // If TraceParams type is vector or array
-        if (m_traceParamsTys[ret]->isVectorTy() || m_traceParamsTys[ret]->isArrayTy()) {
-          for (unsigned i = 0; i < TraceParamsTySize[ret]; ++i) {
-            Value *traceParamElement = m_builder->CreateExtractValue(traceParam, i);
-            newRetVal = m_builder->CreateInsertValue(
-                newRetVal, m_builder->CreateBitCast(traceParamElement, m_builder->getInt32Ty()), index++);
-          }
-        } else {
-          assert(TraceParamsTySize[ret] == 1);
-          newRetVal = m_builder->CreateInsertValue(
-              newRetVal, m_builder->CreateBitCast(traceParam, m_builder->getInt32Ty()), index++);
-        }
-      }
-      retVal = newRetVal;
-    }
-
-    Instruction *newfuncEnd = m_builder->CreateRet(retVal);
-    ret->replaceAllUsesWith(newfuncEnd);
-    ret->eraseFromParent();
-  }
+  return insertPos;
 }
 
 // =====================================================================================================================
@@ -2113,7 +2076,7 @@ FunctionType *SpirvLowerRayTracing::getTraceRayFuncTy() {
 // Mutate entry function for the shader stage callable shader
 //
 // @param func : Function to create
-void SpirvLowerRayTracing::createCallableShaderEntryFunc(Function *func) {
+Instruction *SpirvLowerRayTracing::createCallableShaderEntryFunc(Function *func) {
   // Set old entry function name deprecated
   func->setName("deprecatedCallableShader");
 
@@ -2136,7 +2099,8 @@ void SpirvLowerRayTracing::createCallableShaderEntryFunc(Function *func) {
   m_entryPoint = newFunc;
   m_entryPoint->addFnAttr(Attribute::NoUnwind);
   m_entryPoint->addFnAttr(Attribute::AlwaysInline);
-  m_builder->SetInsertPointPastAllocas(newFunc);
+  Instruction *insertPos = &*(newFunc->begin()->getFirstNonPHIOrDbgOrAlloca());
+  m_builder->SetInsertPoint(insertPos);
 
   auto argIt = newFunc->arg_begin();
 
@@ -2158,6 +2122,8 @@ void SpirvLowerRayTracing::createCallableShaderEntryFunc(Function *func) {
     ret->replaceAllUsesWith(newfuncEnd);
     ret->eraseFromParent();
   }
+
+  return insertPos;
 }
 
 // =====================================================================================================================
@@ -2398,6 +2364,54 @@ void SpirvLowerRayTracing::createSetHitTriangleNodePointer(Function *func) {
     m_builder->CreateStore(triangleData, m_traceParams[TraceParam::HitTriangleVertexPositions]);
   }
   m_builder->CreateRetVoid();
+}
+
+// =====================================================================================================================
+// Process entry function return instruction, replace new return payload/etc info
+//
+// @param func : The function to process
+void SpirvLowerRayTracing::createEntryTerminator(Function *func) {
+  // Return incoming payload, and other values if needed
+  auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
+  SmallVector<Instruction *, 4> rets;
+  getFuncRets(func, rets);
+  for (auto ret : rets) {
+    m_builder->SetInsertPoint(ret);
+    Value *retVal = m_builder->CreateLoad(m_globalPayload->getValueType(), m_globalPayload);
+
+    const auto rets = getShaderExtraRets(m_shaderStage);
+    unsigned payloadSizeInDword = rayTracingContext->getPayloadSizeInDword();
+
+    if (rets.size()) {
+      // We have extra values to return here
+      Value *newRetVal = UndefValue::get(getShaderReturnTy(m_shaderStage));
+      unsigned index = 0;
+      // Get payload value first
+      for (; index < payloadSizeInDword; index++)
+        newRetVal = m_builder->CreateInsertValue(newRetVal, m_builder->CreateExtractValue(retVal, index), index);
+      // Get other values
+      for (auto ret : rets) {
+        Value *traceParam = m_builder->CreateLoad(m_traceParamsTys[ret], m_traceParams[ret]);
+        // If TraceParams type is vector or array
+        if (m_traceParamsTys[ret]->isVectorTy() || m_traceParamsTys[ret]->isArrayTy()) {
+          for (unsigned i = 0; i < TraceParamsTySize[ret]; ++i) {
+            Value *traceParamElement = m_builder->CreateExtractValue(traceParam, i);
+            newRetVal = m_builder->CreateInsertValue(
+                newRetVal, m_builder->CreateBitCast(traceParamElement, m_builder->getInt32Ty()), index++);
+          }
+        } else {
+          assert(TraceParamsTySize[ret] == 1);
+          newRetVal = m_builder->CreateInsertValue(
+              newRetVal, m_builder->CreateBitCast(traceParam, m_builder->getInt32Ty()), index++);
+        }
+      }
+      retVal = newRetVal;
+    }
+
+    Instruction *newfuncEnd = m_builder->CreateRet(retVal);
+    ret->replaceAllUsesWith(newfuncEnd);
+    ret->eraseFromParent();
+  }
 }
 
 // =====================================================================================================================
