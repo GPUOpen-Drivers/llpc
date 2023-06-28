@@ -34,6 +34,7 @@
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "llvm/IR/InstVisitor.h"
+#include <set>
 #include <unordered_set>
 
 namespace lgc {
