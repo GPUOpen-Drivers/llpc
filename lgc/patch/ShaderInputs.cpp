@@ -340,6 +340,11 @@ void ShaderInputs::fixupUses(Module &module, PipelineState *pipelineState) {
     ShaderStage stage = getShaderStage(&func);
     ShaderInputsUsage *inputsUsage = getShaderInputsUsage(stage);
 
+    // Use for compute shader
+    bool useWorkgroupIds[3] = {false};
+    bool useWholeWorkgroupId = false;
+    bool needCheckWorkgroupId = false;
+
     for (unsigned kind = 0; kind != static_cast<unsigned>(ShaderInput::Count); ++kind) {
       ShaderInputUsage *inputUsage = inputsUsage->inputs[kind].get();
       if (!inputUsage)
@@ -354,8 +359,24 @@ void ShaderInputs::fixupUses(Module &module, PipelineState *pipelineState) {
 
       auto inputKind = static_cast<ShaderInput>(kind);
       value->setName(getInputName(inputKind));
+      needCheckWorkgroupId = (inputKind == ShaderInput::WorkgroupId) && (stage == ShaderStageCompute);
       for (Instruction *&call : inputUsage->users) {
         if (call && call->getFunction() == &func) {
+          if (needCheckWorkgroupId) {
+            for (auto user : call->users()) {
+              if (auto extractInst = dyn_cast<ExtractElementInst>(user)) {
+                if (auto indexInst = dyn_cast<ConstantInt>(extractInst->getIndexOperand())) {
+                  unsigned index = indexInst->getZExtValue();
+                  assert(index < 3);
+                  useWorkgroupIds[index] = true;
+                  continue;
+                }
+              }
+
+              useWholeWorkgroupId = true;
+              break;
+            }
+          }
           call->replaceAllUsesWith(value);
           call->eraseFromParent();
           call = nullptr;
@@ -391,6 +412,14 @@ void ShaderInputs::fixupUses(Module &module, PipelineState *pipelineState) {
       default:
         break;
       }
+    }
+    if (needCheckWorkgroupId) {
+      if (!useWholeWorkgroupId && !useWorkgroupIds[0])
+        func.addFnAttr("amdgpu-no-workgroup-id-x");
+      if (!useWholeWorkgroupId && !useWorkgroupIds[1])
+        func.addFnAttr("amdgpu-no-workgroup-id-y");
+      if (!useWholeWorkgroupId && !useWorkgroupIds[2])
+        func.addFnAttr("amdgpu-no-workgroup-id-z");
     }
   }
 }

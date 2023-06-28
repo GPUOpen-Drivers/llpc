@@ -269,7 +269,7 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func) {
   if (!isCpsFunc) {
     SmallVector<Type *, 8> argTys;
     SmallVector<std::string, 8> argNames;
-    generateEntryPointArgTys(nullptr, argTys, argNames, 0);
+    generateEntryPointArgTys(nullptr, nullptr, argTys, argNames, 0);
     numUserdata = argTys.size();
   } else {
     numUserdata = m_cpsShaderInputCache.getTypes().size();
@@ -1010,7 +1010,8 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
       }
       newFunc = lowerCpsFunction(origFunc, m_cpsShaderInputCache.getTypes(), m_cpsShaderInputCache.getNames());
     } else {
-      inRegMask = generateEntryPointArgTys(shaderInputs, origFunc, shaderInputTys, shaderInputNames, origType->getNumParams());
+      inRegMask =
+          generateEntryPointArgTys(shaderInputs, origFunc, shaderInputTys, shaderInputNames, origType->getNumParams());
       newFunc = addFunctionArgs(origFunc, origType->getReturnType(), shaderInputTys, shaderInputNames, inRegMask, true);
       const bool isEntryPoint = isShaderEntryPoint(newFunc);
       newFunc->setCallingConv(isEntryPoint ? CallingConv::AMDGPU_CS : CallingConv::AMDGPU_Gfx);
