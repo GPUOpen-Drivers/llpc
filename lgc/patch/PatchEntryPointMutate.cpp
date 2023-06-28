@@ -64,6 +64,7 @@
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/AddressExtender.h"
 #include "lgc/util/BuilderBase.h"
+#include "lgc/util/CpsStackLowering.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/Analysis/AliasAnalysis.h" // for MemoryEffects
 #include "llvm/IR/IntrinsicsAMDGPU.h"
@@ -174,8 +175,6 @@ bool PatchEntryPointMutate::runImpl(Module &module, PipelineShadersResult &pipel
   return true;
 }
 
-constexpr unsigned continuationStackAlignment = 4;
-
 // =====================================================================================================================
 // Split the input into pieces of i32.
 static void splitIntoI32(const DataLayout &layout, IRBuilder<> &builder, ArrayRef<Value *> input,
@@ -245,26 +244,58 @@ static Value *mergeDwordsIntoVector(IRBuilder<> &builder, ArrayRef<Value *> inpu
 }
 
 // =====================================================================================================================
+// Lower as.continuation.reference call.
+//
+// @param asCpsReferenceOp: the instruction
+void PatchEntryPointMutate::lowerAsCpsReference(cps::AsContinuationReferenceOp &asCpsReferenceOp) {
+  IRBuilder<> builder(&asCpsReferenceOp);
+  auto *ref = builder.CreatePtrToInt(asCpsReferenceOp.getFn(), builder.getInt32Ty());
+
+  Function &callee = cast<Function>(*asCpsReferenceOp.getFn());
+  auto level = cps::getCpsLevelFromFunction(callee);
+  ref = builder.CreateOr(ref, (uint64_t)level);
+
+  asCpsReferenceOp.replaceAllUsesWith(ref);
+}
+
+// =====================================================================================================================
 // Lower calls to cps function as well as return instructions.
 //
 // @param func : the function to be processed
 bool PatchEntryPointMutate::lowerCpsOps(Function *func) {
-  SmallVector<CallInst *> cpsOps;
+  SmallVector<cps::JumpOp *> cpsJumps;
+  SmallVector<CallInst *> tobeErased;
+
   struct Payload {
-    SmallVectorImpl<CallInst *> &calls;
+    SmallVectorImpl<cps::JumpOp *> &jumps;
+    SmallVectorImpl<CallInst *> &tobeErased;
+    PatchEntryPointMutate *self;
   };
-  Payload payload = {cpsOps};
-  static auto addCpsCall = [](Payload &payload, CallInst *op) { payload.calls.push_back(op); };
+  Payload payload = {cpsJumps, tobeErased, this};
 
   static auto visitor = llvm_dialects::VisitorBuilder<Payload>()
                             .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
-                            .add<cps::JumpOp>([](auto &payload, auto &op) { addCpsCall(payload, &op); })
+                            .add<cps::JumpOp>([](auto &payload, auto &op) { payload.jumps.push_back(&op); })
+                            .add<cps::AsContinuationReferenceOp>([](auto &payload, auto &op) {
+                              payload.self->lowerAsCpsReference(op);
+                              payload.tobeErased.push_back(&op);
+                            })
                             .build();
   visitor.visit(payload, *func);
 
+  for (auto *call : tobeErased)
+    call->eraseFromParent();
+
   bool isCpsFunc = cps::isCpsFunction(*func);
-  if (!isCpsFunc && cpsOps.empty())
+  if (!isCpsFunc && cpsJumps.empty())
     return false;
+
+  if (!isCpsFunc) {
+    IRBuilder<> builder(func->getContext());
+    builder.SetInsertPointPastAllocas(func);
+    Value *vspStorage = builder.CreateAlloca(builder.getPtrTy(getLoweredCpsStackAddrSpace()), ADDR_SPACE_PRIVATE);
+    m_funcCpsStackMap[func] = vspStorage;
+  }
 
   // Get the number of user-data arguments.
   unsigned numUserdata;
@@ -289,13 +320,12 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func) {
   IRBuilder<> builder(func->getContext());
 
   // Lower cps jumps.
-  for (auto *call : cpsOps)
-    if (auto *jumpOp = dyn_cast<cps::JumpOp>(call))
-      lowerCpsJump(func, jumpOp, tailBlock, exitInfos);
+  for (auto *jump : cpsJumps)
+    lowerCpsJump(func, jump, tailBlock, exitInfos);
 
   // Lower returns.
   for (auto *ret : retInstrs) {
-    auto *vspTy = PointerType::get(func->getContext(), ADDR_SPACE_PRIVATE);
+    auto *vspTy = builder.getPtrTy(getLoweredCpsStackAddrSpace());
     exitInfos.push_back(CpsExitInfo(ret->getParent(), {builder.getInt32(0), PoisonValue::get(vspTy)}));
     builder.SetInsertPoint(ret);
     builder.CreateBr(tailBlock);
@@ -406,6 +436,10 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func) {
 #endif
   builder.CreateUnreachable();
 
+  // Lower cps stack operations
+  CpsStackLowering stackLowering(func->getContext());
+  stackLowering.lowerCpsStackOps(*func, m_funcCpsStackMap[func]);
+
   return true;
 }
 
@@ -427,7 +461,7 @@ Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type 
   IRBuilder<> builder(func->getContext());
   SmallVector<Type *> newArgTys;
   newArgTys.append(userDataTys.begin(), userDataTys.end());
-  newArgTys.append({builder.getInt32Ty(), builder.getPtrTy(ADDR_SPACE_PRIVATE)});
+  newArgTys.append({builder.getInt32Ty(), builder.getPtrTy(getLoweredCpsStackAddrSpace())});
   auto remainingArgs = func->getFunctionType()->params().drop_front(1);
   newArgTys.append(remainingArgs.begin(), remainingArgs.end());
   FunctionType *newFuncTy = FunctionType::get(builder.getVoidTy(), newArgTys, false);
@@ -459,7 +493,7 @@ Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type 
   newFunc->splice(newFunc->begin(), func);
 
   builder.SetInsertPointPastAllocas(newFunc);
-  Value *vspStorage = builder.CreateAlloca(builder.getPtrTy(ADDR_SPACE_PRIVATE), ADDR_SPACE_PRIVATE);
+  Value *vspStorage = builder.CreateAlloca(builder.getPtrTy(getLoweredCpsStackAddrSpace()), ADDR_SPACE_PRIVATE);
   m_funcCpsStackMap[newFunc] = vspStorage;
 
   Value *vsp = newFunc->getArg(userDataTys.size() + 1);
@@ -516,14 +550,14 @@ void PatchEntryPointMutate::lowerCpsJump(Function *parent, cps::JumpOp *jumpOp, 
 
   // Pushing state onto stack and get new vsp.
   Value *state = jumpOp->getState();
-  Value *vsp = builder.CreateAlignedLoad(builder.getPtrTy(ADDR_SPACE_PRIVATE), m_funcCpsStackMap[parent],
-                                         Align(continuationStackAlignment));
+  Value *vsp = builder.CreateAlignedLoad(builder.getPtrTy(getLoweredCpsStackAddrSpace()), m_funcCpsStackMap[parent],
+                                         Align(getLoweredCpsStackPointerSize(layout)));
   if (!state->getType()->isEmptyTy()) {
     unsigned stateSize = layout.getTypeStoreSize(state->getType());
     builder.CreateStore(state, vsp);
     // Make vsp properly aligned across cps function.
     stateSize = alignTo(stateSize, continuationStackAlignment);
-    vsp = builder.CreateConstGEP1_32(builder.getInt8Ty()->getPointerTo(ADDR_SPACE_PRIVATE), vsp, stateSize);
+    vsp = builder.CreateConstGEP1_32(builder.getInt8Ty(), vsp, stateSize);
   }
 
   // Add extra args specific to the target function.
@@ -578,6 +612,11 @@ void PatchEntryPointMutate::setupComputeWithCalls(Module *module) {
     for (const BasicBlock &block : func) {
       for (const Instruction &inst : block) {
         if (auto *call = dyn_cast<CallInst>(&inst)) {
+          // If a function has a call to cps.jump, we need to treat it as `computeWithCalls`.
+          if (isa<cps::JumpOp>(call)) {
+            m_computeWithCalls = true;
+            return;
+          }
           Value *calledVal = call->getCalledOperand();
           if (isa<Function>(calledVal) || call->isInlineAsm())
             continue;

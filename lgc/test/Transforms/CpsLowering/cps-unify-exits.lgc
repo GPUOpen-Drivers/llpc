@@ -66,7 +66,7 @@ else:
 ; CHECK-NEXT:    [[STATE_THEN:%.*]] = insertvalue { i32 } poison, i32 [[V_THEN]], 0
 ; CHECK-NEXT:    [[TMP15:%.*]] = load ptr addrspace(5), ptr addrspace(5) [[TMP11]], align 4
 ; CHECK-NEXT:    store { i32 } [[STATE_THEN]], ptr addrspace(5) [[TMP15]], align 4
-; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr ptr addrspace(5), ptr addrspace(5) [[TMP15]], i32 4
+; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr i8, ptr addrspace(5) [[TMP15]], i32 4
 ; CHECK-NEXT:    br label [[TAIL_BLOCK:%.*]]
 ; CHECK:       else:
 ; CHECK-NEXT:    [[TABLE_1:%.*]] = getelementptr i32, ptr [[TABLE]], i32 1
@@ -147,7 +147,7 @@ else:
 ; CHECK-NEXT:    [[STATE_THEN:%.*]] = insertvalue { i32 } poison, i32 [[V_THEN]], 0
 ; CHECK-NEXT:    [[TMP15:%.*]] = load ptr addrspace(5), ptr addrspace(5) [[TMP11]], align 4
 ; CHECK-NEXT:    store { i32 } [[STATE_THEN]], ptr addrspace(5) [[TMP15]], align 4
-; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr ptr addrspace(5), ptr addrspace(5) [[TMP15]], i32 4
+; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr i8, ptr addrspace(5) [[TMP15]], i32 4
 ; CHECK-NEXT:    br label [[TAIL_BLOCK:%.*]]
 ; CHECK:       else:
 ; CHECK-NEXT:    br label [[TAIL_BLOCK]]

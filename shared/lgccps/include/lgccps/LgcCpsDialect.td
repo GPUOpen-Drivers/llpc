@@ -85,7 +85,7 @@ def AsContinuationReferenceOp : LgcCpsOp<"as.continuation.reference", [NoUnwind,
 }
 
 // =====================================================================================================================
-def AllocOp : LgcCpsOp<"alloc", [Memory<[(readwrite)]>, NoUnwind, WillReturn]> {
+def AllocOp : LgcCpsOp<"alloc", [Memory<[(readwrite InaccessibleMem)]>, NoUnwind, WillReturn]> {
     let arguments = (ins I32:$size);
     let results = (outs StackPointer:$ptr);
 
@@ -97,7 +97,7 @@ def AllocOp : LgcCpsOp<"alloc", [Memory<[(readwrite)]>, NoUnwind, WillReturn]> {
 }
 
 // =====================================================================================================================
-def FreeOp : LgcCpsOp<"free", [Memory<[(readwrite)]>, NoUnwind, WillReturn]> {
+def FreeOp : LgcCpsOp<"free", [Memory<[(readwrite InaccessibleMem)]>, NoUnwind, WillReturn]> {
     let arguments = (ins I32:$size);
     let results = (outs);
 
@@ -110,7 +110,7 @@ def FreeOp : LgcCpsOp<"free", [Memory<[(readwrite)]>, NoUnwind, WillReturn]> {
 }
 
 // =====================================================================================================================
-def PeekOp : LgcCpsOp<"peek", [Memory<[(read)]>, NoUnwind, WillReturn]> {
+def PeekOp : LgcCpsOp<"peek", [Memory<[(read InaccessibleMem)]>, NoUnwind, WillReturn]> {
     let arguments = (ins I32:$size);
     let results = (outs StackPointer:$ptr);
 
@@ -119,5 +119,27 @@ def PeekOp : LgcCpsOp<"peek", [Memory<[(read)]>, NoUnwind, WillReturn]> {
         Return a pointer to an object of size $size at the top of the continuation stack.
         The current top of the stack needs to have been reserved by a @alloc operation with the same size.
         $size needs to be a multiple of 4.
+    }];
+}
+
+// =====================================================================================================================
+def SetVspOp : LgcCpsOp<"set.vsp", [Memory<[(write InaccessibleMem)]>, NoUnwind, WillReturn]> {
+    let arguments = (ins StackPointer:$ptr);
+    let results = (outs);
+
+    let summary = "Set continuation stack pointer.";
+    let description = [{
+        Mainly used to initialize continuation stack pointer for entry-point compute shader.
+    }];
+}
+
+// =====================================================================================================================
+def GetVspOp : LgcCpsOp<"get.vsp", [Memory<[(read InaccessibleMem)]>, NoUnwind, WillReturn]> {
+    let arguments = (ins);
+    let results = (outs StackPointer:$ptr);
+
+    let summary = "Get the pointer to the continuation stack.";
+    let description = [{
+        Return the current top of continuation stack pointer.
     }];
 }

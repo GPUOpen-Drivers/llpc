@@ -245,6 +245,7 @@ target_sources(LLVMlgc PRIVATE
 target_sources(LLVMlgc PRIVATE
     util/AddressExtender.cpp
     util/Debug.cpp
+    util/CpsStackLowering.cpp
     util/GfxRegHandlerBase.cpp
     util/GfxRegHandler.cpp
     util/Internal.cpp

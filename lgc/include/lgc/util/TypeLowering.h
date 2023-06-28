@@ -139,6 +139,7 @@ public:
   void replaceInstruction(llvm::Instruction *inst, llvm::ArrayRef<llvm::Value *> mapping);
   void eraseInstruction(llvm::Instruction *inst);
 
+  llvm::Function *lowerFunctionArguments(llvm::Function &fn);
   void finishPhis();
   bool finishCleanup();
 
@@ -180,6 +181,7 @@ private:
 
   std::vector<std::pair<llvm::PHINode *, llvm::SmallVector<llvm::PHINode *>>> m_phis;
   std::vector<llvm::Instruction *> m_instructionsToErase;
+  llvm::SmallVector<llvm::Function *> m_functionToErase;
 };
 
 } // namespace lgc
