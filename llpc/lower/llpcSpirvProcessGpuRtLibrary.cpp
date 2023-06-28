@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "llpcSpirvProcessGpuRtLibrary.h"
+#include "SPIRVInternal.h"
 #include "llpcContext.h"
 #include "llpcSpirvLowerUtil.h"
 #include "lgc/Builder.h"
@@ -49,9 +50,12 @@ static const char *AmdLibraryNames[] = {"AmdTraceRayGetStackSize",
                                         "AmdTraceRayLdsStackStore",
                                         "AmdTraceRayGetBoxSortHeuristicMode",
                                         "AmdTraceRayGetStaticFlags",
-                                        "AmdTraceRayGetTriangleCompressionMode"
-
-};
+                                        "AmdTraceRayGetTriangleCompressionMode",
+                                        "AmdExtD3DShaderIntrinsics_LoadDwordAtAddr",
+                                        "AmdExtD3DShaderIntrinsics_LoadDwordAtAddrx2",
+                                        "AmdExtD3DShaderIntrinsics_LoadDwordAtAddrx4",
+                                        "AmdExtD3DShaderIntrinsics_ConvertF32toF16NegInf",
+                                        "AmdExtD3DShaderIntrinsics_ConvertF32toF16PosInf"};
 } // namespace RtName
 
 namespace AmdLibraryFunc {
@@ -66,6 +70,11 @@ enum : unsigned {
   GetBoxSortHeuristicMode,    // Get box sort heuristic mode
   GetStaticFlags,             // Get static flags
   GetTriangleCompressionMode, // Get triangle compression mode
+  LoadDwordAtAddr,            // Load 1 dword at given address
+  LoadDwordAtAddrx2,          // Load 2 dwords at given address
+  LoadDwordAtAddrx4,          // Load 4 dwords at given address
+  ConvertF32toF16NegInf,      // Convert f32 to f16 with rounding toward negative
+  ConvertF32toF16PosInf,      // Convert f32 to f16 with rounding toward positive
   Count
 };
 } // namespace AmdLibraryFunc
@@ -101,7 +110,12 @@ SpirvProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
                                       &SpirvProcessGpuRtLibrary::createLdsStackStore,
                                       &SpirvProcessGpuRtLibrary::createGetBoxSortHeuristicMode,
                                       &SpirvProcessGpuRtLibrary::createGetStaticFlags,
-                                      &SpirvProcessGpuRtLibrary::createGetTriangleCompressionMode
+                                      &SpirvProcessGpuRtLibrary::createGetTriangleCompressionMode,
+                                      &SpirvProcessGpuRtLibrary::createLoadDwordAtAddr,
+                                      &SpirvProcessGpuRtLibrary::createLoadDwordAtAddrx2,
+                                      &SpirvProcessGpuRtLibrary::createLoadDwordAtAddrx4,
+                                      &SpirvProcessGpuRtLibrary::createConvertF32toF16NegInf,
+                                      &SpirvProcessGpuRtLibrary::createConvertF32toF16PosInf
 
   };
   for (unsigned i = 0; i < AmdLibraryFunc::Count; ++i) {
@@ -128,7 +142,7 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
 // Create function to get stack size
 //
 // @param func : The function to process
-void SpirvProcessGpuRtLibrary::createGetStackSize(llvm::Function *func) {
+void SpirvProcessGpuRtLibrary::createGetStackSize(Function *func) {
   m_builder->CreateRet(m_builder->create<GpurtGetStackSizeOp>());
 }
 
@@ -136,7 +150,7 @@ void SpirvProcessGpuRtLibrary::createGetStackSize(llvm::Function *func) {
 // Create function to get stack base
 //
 // @param func : The function to process
-void SpirvProcessGpuRtLibrary::createGetStackBase(llvm::Function *func) {
+void SpirvProcessGpuRtLibrary::createGetStackBase(Function *func) {
   m_builder->CreateRet(m_builder->create<GpurtGetStackBaseOp>());
 }
 
@@ -144,7 +158,7 @@ void SpirvProcessGpuRtLibrary::createGetStackBase(llvm::Function *func) {
 // Create function to write LDS stack
 //
 // @param func : The function to process
-void SpirvProcessGpuRtLibrary::createLdsWrite(llvm::Function *func) {
+void SpirvProcessGpuRtLibrary::createLdsWrite(Function *func) {
   auto argIt = func->arg_begin();
   auto int32ty = m_builder->getInt32Ty();
   Value *stackOffset = m_builder->CreateLoad(int32ty, argIt++);
@@ -156,7 +170,7 @@ void SpirvProcessGpuRtLibrary::createLdsWrite(llvm::Function *func) {
 // Create function to read LDS stack
 //
 // @param func : The function to process
-void SpirvProcessGpuRtLibrary::createLdsRead(llvm::Function *func) {
+void SpirvProcessGpuRtLibrary::createLdsRead(Function *func) {
   Value *stackIndex = func->arg_begin();
   stackIndex = m_builder->CreateLoad(m_builder->getInt32Ty(), stackIndex);
   m_builder->CreateRet(m_builder->create<GpurtStackReadOp>(stackIndex));
@@ -166,7 +180,7 @@ void SpirvProcessGpuRtLibrary::createLdsRead(llvm::Function *func) {
 // Create function to get stack stride
 //
 // @param func : The function to process
-void SpirvProcessGpuRtLibrary::createGetStackStride(llvm::Function *func) {
+void SpirvProcessGpuRtLibrary::createGetStackStride(Function *func) {
   m_builder->CreateRet(m_builder->create<GpurtGetStackStrideOp>());
 }
 
@@ -174,7 +188,7 @@ void SpirvProcessGpuRtLibrary::createGetStackStride(llvm::Function *func) {
 // Create function to init stack LDS
 //
 // @param func : The function to process
-void SpirvProcessGpuRtLibrary::createLdsStackInit(llvm::Function *func) {
+void SpirvProcessGpuRtLibrary::createLdsStackInit(Function *func) {
   m_builder->CreateRet(m_builder->create<GpurtLdsStackInitOp>());
 }
 
@@ -182,7 +196,7 @@ void SpirvProcessGpuRtLibrary::createLdsStackInit(llvm::Function *func) {
 // Create function to store stack LDS
 //
 // @param func : The function to process
-void SpirvProcessGpuRtLibrary::createLdsStackStore(llvm::Function *func) {
+void SpirvProcessGpuRtLibrary::createLdsStackStore(Function *func) {
   auto argIt = func->arg_begin();
   Value *stackAddr = argIt++;
   Value *lastVisited = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt++);
@@ -195,7 +209,7 @@ void SpirvProcessGpuRtLibrary::createLdsStackStore(llvm::Function *func) {
 // Create function to get box sort heuristic mode
 //
 // @param func : The function to process
-void SpirvProcessGpuRtLibrary::createGetBoxSortHeuristicMode(llvm::Function *func) {
+void SpirvProcessGpuRtLibrary::createGetBoxSortHeuristicMode(Function *func) {
   m_builder->CreateRet(m_builder->create<GpurtGetBoxSortHeuristicModeOp>());
 }
 
@@ -203,7 +217,7 @@ void SpirvProcessGpuRtLibrary::createGetBoxSortHeuristicMode(llvm::Function *fun
 // Create function to get static flags
 //
 // @param func : The function to process
-void SpirvProcessGpuRtLibrary::createGetStaticFlags(llvm::Function *func) {
+void SpirvProcessGpuRtLibrary::createGetStaticFlags(Function *func) {
   m_builder->CreateRet(m_builder->create<GpurtGetStaticFlagsOp>());
 }
 
@@ -211,8 +225,97 @@ void SpirvProcessGpuRtLibrary::createGetStaticFlags(llvm::Function *func) {
 // Create function to get triangle compression mode
 //
 // @param func : The function to process
-void SpirvProcessGpuRtLibrary::createGetTriangleCompressionMode(llvm::Function *func) {
+void SpirvProcessGpuRtLibrary::createGetTriangleCompressionMode(Function *func) {
   m_builder->CreateRet(m_builder->create<GpurtGetTriangleCompressionModeOp>());
+}
+
+// =====================================================================================================================
+// Create function to load 1 dword at given address
+//
+// @param func : The function to process
+void SpirvProcessGpuRtLibrary::createLoadDwordAtAddr(Function *func) {
+  createLoadDwordAtAddrWithType(func, m_builder->getInt32Ty());
+}
+
+// =====================================================================================================================
+// Create function to load 2 dwords at given address
+//
+// @param func : The function to process
+void SpirvProcessGpuRtLibrary::createLoadDwordAtAddrx2(Function *func) {
+  auto int32x2Ty = FixedVectorType::get(m_builder->getInt32Ty(), 2);
+  createLoadDwordAtAddrWithType(func, int32x2Ty);
+}
+
+// =====================================================================================================================
+// Create function to load 4 dwords at given address
+//
+// @param func : The function to process
+void SpirvProcessGpuRtLibrary::createLoadDwordAtAddrx4(Function *func) {
+  auto int32x4Ty = FixedVectorType::get(m_builder->getInt32Ty(), 4);
+  createLoadDwordAtAddrWithType(func, int32x4Ty);
+}
+
+// =====================================================================================================================
+// Create function to load dwords at given address based on given type
+//
+// @param func : The function to process
+// @param loadTy : Load type
+void SpirvProcessGpuRtLibrary::createLoadDwordAtAddrWithType(Function *func, Type *loadTy) {
+  auto argIt = func->arg_begin();
+
+  Value *gpuLowAddr = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt++);
+  Value *gpuHighAddr = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt++);
+  Value *offset = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt++);
+
+  // Use (gpuLowAddr, gpuHighAddr) to calculate i64 gpuAddr
+  gpuLowAddr = m_builder->CreateZExt(gpuLowAddr, m_builder->getInt64Ty());
+  gpuHighAddr = m_builder->CreateZExt(gpuHighAddr, m_builder->getInt64Ty());
+  gpuHighAddr = m_builder->CreateShl(gpuHighAddr, m_builder->getInt64(32));
+  Value *gpuAddr = m_builder->CreateOr(gpuLowAddr, gpuHighAddr);
+
+  Type *gpuAddrAsPtrTy = PointerType::get(m_builder->getContext(), SPIRAS_Global);
+  auto gpuAddrAsPtr = m_builder->CreateIntToPtr(gpuAddr, gpuAddrAsPtrTy);
+
+  // Create GEP to get the byte address with byte offset
+  Value *loadPtr = m_builder->CreateGEP(m_builder->getInt8Ty(), gpuAddrAsPtr, offset);
+
+  Value *loadValue = m_builder->CreateLoad(loadTy, loadPtr);
+  m_builder->CreateRet(loadValue);
+}
+
+// =====================================================================================================================
+// Create function to convert f32 to f16 with rounding toward negative
+//
+// @param func : The function to process
+void SpirvProcessGpuRtLibrary::createConvertF32toF16NegInf(Function *func) {
+  createConvertF32toF16WithRoundingMode(func, RoundingMode::TowardNegative);
+}
+
+// =====================================================================================================================
+// Create function to convert f32 to f16 with rounding toward positive
+//
+// @param func : The function to process
+void SpirvProcessGpuRtLibrary::createConvertF32toF16PosInf(Function *func) {
+  createConvertF32toF16WithRoundingMode(func, RoundingMode::TowardPositive);
+}
+
+// =====================================================================================================================
+// Create function to convert f32 to f16 with given rounding mode
+//
+// @param func : The function to process
+// @param rm : Rounding mode
+void SpirvProcessGpuRtLibrary::createConvertF32toF16WithRoundingMode(Function *func, RoundingMode rm) {
+  auto argIt = func->arg_begin();
+
+  Type *convertInputType = FixedVectorType::get(m_builder->getFloatTy(), 3);
+  Value *inVec = m_builder->CreateLoad(convertInputType, argIt);
+
+  Value *result = m_builder->CreateFpTruncWithRounding(inVec, FixedVectorType::get(m_builder->getHalfTy(), 3), rm);
+
+  result = m_builder->CreateBitCast(result, FixedVectorType::get(m_builder->getInt16Ty(), 3));
+  result = m_builder->CreateZExt(result, FixedVectorType::get(m_builder->getInt32Ty(), 3));
+
+  m_builder->CreateRet(result);
 }
 
 } // namespace Llpc

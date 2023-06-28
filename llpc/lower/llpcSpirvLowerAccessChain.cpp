@@ -252,7 +252,7 @@ GetElementPtrInst *SpirvLowerAccessChain::tryToCoalesceChain(GetElementPtrInst *
           // We cannot remove the current instruction that InstWalker is on. Just stop it using its
           // pointer operand, and it will be DCEd later.
           auto &operand = inst->getOperandUse(0);
-          operand = UndefValue::get(operand->getType());
+          operand = PoisonValue::get(operand->getType());
         } else
           inst->eraseFromParent();
       }

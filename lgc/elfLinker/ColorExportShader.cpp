@@ -106,7 +106,7 @@ Module *ColorExportShader::generate() {
   Function *colorExportFunc = createColorExportFunc();
 
   // Process each fragment output.
-  std::unique_ptr<FragColorExport> fragColorExport(new FragColorExport(&getContext(), m_pipelineState));
+  FragColorExport fragColorExport(&getContext(), m_pipelineState);
   auto ret = cast<ReturnInst>(colorExportFunc->back().getTerminator());
   BuilderBase builder(ret);
 
@@ -116,7 +116,7 @@ Module *ColorExportShader::generate() {
   }
 
   bool dummyExport = m_lgcContext->getTargetInfo().getGfxIpVersion().major < 10 || m_killEnabled;
-  fragColorExport->generateExportInstructions(m_exports, values, m_exportFormat, dummyExport, builder);
+  fragColorExport.generateExportInstructions(m_exports, values, m_exportFormat, dummyExport, builder);
   return colorExportFunc->getParent();
 }
 
@@ -139,11 +139,15 @@ Function *ColorExportShader::createColorExportFunc() {
   // Create the function. Mark SGPR inputs as "inreg".
   Function *func = Function::Create(funcTy, GlobalValue::ExternalLinkage, getGlueShaderName(), module);
   func->setCallingConv(CallingConv::AMDGPU_PS);
+  func->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
   setShaderStage(func, ShaderStageFragment);
 
   BasicBlock *block = BasicBlock::Create(func->getContext(), "", func);
   BuilderBase builder(block);
   builder.CreateRetVoid();
+  AttrBuilder attribBuilder(func->getContext());
+  attribBuilder.addAttribute("InitialPSInputAddr", std::to_string(0xFFFFFFFF));
+  func->addFnAttrs(attribBuilder);
   return func;
 }
 
@@ -152,12 +156,5 @@ Function *ColorExportShader::createColorExportFunc() {
 //
 // @param [in/out] outStream : The PAL metadata object in which to update the color format.
 void ColorExportShader::updatePalMetadata(PalMetadata &palMetadata) {
-  bool hasDepthExpFmtZero = true;
-  for (auto &info : m_exports) {
-    if (info.hwColorTarget == MaxColorTargets) {
-      hasDepthExpFmtZero = false;
-      break;
-    }
-  }
-  palMetadata.updateSpiShaderColFormat(m_exports, hasDepthExpFmtZero, m_killEnabled);
+  palMetadata.updateCbShaderMask(m_exports);
 }

@@ -31,7 +31,9 @@
 #pragma once
 
 #include "llpcSpirvLower.h"
+#include "llvm/ADT/FloatingPointMode.h"
 #include "llvm/IR/PassManager.h"
+
 namespace Llpc {
 class SpirvProcessGpuRtLibrary : public SpirvLower, public llvm::PassInfoMixin<SpirvProcessGpuRtLibrary> {
 public:
@@ -59,5 +61,12 @@ private:
   void createGetBoxSortHeuristicMode(llvm::Function *func);
   void createGetStaticFlags(llvm::Function *func);
   void createGetTriangleCompressionMode(llvm::Function *func);
+  void createLoadDwordAtAddr(llvm::Function *func);
+  void createLoadDwordAtAddrx2(llvm::Function *func);
+  void createLoadDwordAtAddrx4(llvm::Function *func);
+  void createLoadDwordAtAddrWithType(llvm::Function *func, llvm::Type *loadTy);
+  void createConvertF32toF16NegInf(llvm::Function *func);
+  void createConvertF32toF16PosInf(llvm::Function *func);
+  void createConvertF32toF16WithRoundingMode(llvm::Function *func, llvm::RoundingMode rm);
 };
 } // namespace Llpc

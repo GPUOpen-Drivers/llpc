@@ -14,8 +14,6 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
 ; SHADERTEST: icmp ult <4 x i32>
-; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
-; SHADERTEST-COUNT-4: icmp ult i32
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -133,7 +133,6 @@ void LgcContext::initialize() {
   initializeCodeGen(passRegistry);
   initializeShadowStackGCLoweringPass(passRegistry);
   initializeExpandReductionsPass(passRegistry);
-  initializeRewriteSymbolsLegacyPassPass(passRegistry);
 
   // Initialize LGC passes so they can be referenced by -stop-before etc.
   initializeUtilPasses(passRegistry);
@@ -307,25 +306,6 @@ Pipeline *LgcContext::createPipeline() {
 // @param pipeline : Ignored
 Builder *LgcContext::createBuilder(Pipeline *pipeline) {
   return new Builder(getContext());
-}
-
-// =====================================================================================================================
-// Prepare a pass manager. This manually adds a target-aware TLI pass, so middle-end optimizations do not think that
-// we have library functions.
-//
-// @param [in/out] passMgr : Pass manager
-void LgcContext::preparePassManager(lgc::PassManager &passMgr) {
-  TargetLibraryInfoImpl targetLibInfo(getTargetMachine()->getTargetTriple());
-
-  // Adjust it to allow memcpy and memset.
-  // TODO: Investigate why the latter is necessary. I found that
-  // test/shaderdb/ObjStorageBlock_TestMemCpyInt32.comp
-  // got unrolled far too much, and at too late a stage for the descriptor loads to be commoned up. It might
-  // be an unfortunate interaction between LoopIdiomRecognize and fat pointer laundering.
-  targetLibInfo.setAvailable(LibFunc_memcpy);
-  targetLibInfo.setAvailable(LibFunc_memset);
-
-  passMgr.registerFunctionAnalysis([&] { return TargetLibraryAnalysis(targetLibInfo); });
 }
 
 // =====================================================================================================================

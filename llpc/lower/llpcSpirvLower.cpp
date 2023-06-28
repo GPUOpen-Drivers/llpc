@@ -40,10 +40,10 @@
 #include "llpcSpirvLowerMemoryOp.h"
 #include "llpcSpirvLowerRayQueryPostInline.h"
 #include "llpcSpirvLowerRayTracingBuiltIn.h"
-#include "llpcSpirvLowerRayTracingIntrinsics.h"
 #include "llpcSpirvLowerTerminator.h"
 #include "llpcSpirvLowerTranslator.h"
 #include "llpcSpirvLowerUtil.h"
+#include "llpcSpirvProcessGpuRtLibrary.h"
 #include "lgc/Builder.h"
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
@@ -131,7 +131,7 @@ void SpirvLower::replaceConstWithInsts(Context *context, Constant *const constVa
       Instruction *const insertPos = builder->Insert(constExpr->getAsInstruction());
       inst->replaceUsesOfWith(constExpr, insertPos);
     } else if (ConstantVector *const constVector = dyn_cast<ConstantVector>(constVal)) {
-      Value *resultValue = UndefValue::get(constVector->getType());
+      Value *resultValue = PoisonValue::get(constVector->getType());
       for (unsigned i = 0; i < constVector->getNumOperands(); i++) {
         // Have to not use the builder here because it will constant fold and we are trying to undo that now!
         Instruction *const insertPos =
@@ -176,9 +176,6 @@ void SpirvLower::removeConstantExpr(Context *context, GlobalVariable *global) {
 // @param isInternalRtShader : Whether we are lowering an internal ray tracing shader
 void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager &passMgr, Timer *lowerTimer,
                            bool rayTracing, bool rayQuery, bool isInternalRtShader) {
-  // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
-  context->getLgcContext()->preparePassManager(passMgr);
-
   // Start timer for lowering passes.
   if (lowerTimer)
     LgcContext::createAndAddStartStopTimer(passMgr, lowerTimer, true);
@@ -187,7 +184,7 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
     passMgr.addPass(SpirvLowerRayTracing());
 
   if (isInternalRtShader)
-    passMgr.addPass(SpirvLowerRayTracingIntrinsics());
+    passMgr.addPass(SpirvProcessGpuRtLibrary());
 
   // Lower SPIR-V CFG merges before inlining
   passMgr.addPass(SpirvLowerCfgMerges());

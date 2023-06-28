@@ -34,6 +34,13 @@
 #include "llvm/ADT/SmallSet.h"
 #include <set>
 
+namespace lgc::rt {
+class AcceptHitAndEndSearchOp;
+class IgnoreHitOp;
+class CallCallableShaderOp;
+class ReportHitOp;
+} // namespace lgc::rt
+
 namespace Llpc {
 // Enum for the ray start parameter
 namespace TraceParam {
@@ -177,6 +184,11 @@ private:
   void createSetHitTriangleNodePointer(llvm::Function *func);
   llvm::Function *getOrCreateRemapCapturedVaToReplayVaFunc();
 
+  void visitAcceptHitAndEndSearchOp(lgc::rt::AcceptHitAndEndSearchOp &inst);
+  void visitIgnoreHitOp(lgc::rt::IgnoreHitOp &inst);
+  void visitCallCallableShaderOp(lgc::rt::CallCallableShaderOp &inst);
+  void visitReportHitOp(lgc::rt::ReportHitOp &inst);
+
   llvm::GlobalVariable *m_traceParams[TraceParam::Count];              // Trace ray set parameters
   llvm::GlobalVariable *m_shaderTable[ShaderTable::Count];             // Shader table variables
   llvm::GlobalVariable *m_funcRetFlag = nullptr;                       // Function return flag
@@ -185,6 +197,8 @@ private:
   llvm::GlobalVariable *m_globalCallableData = nullptr;                // Global callable data variable
   std::set<unsigned, std::less<unsigned>> m_builtInParams;             // Indirect max builtins;
   llvm::SmallVector<llvm::Type *, TraceParam::Count> m_traceParamsTys; // Trace Params types
+  llvm::SmallVector<llvm::Instruction *> m_callsToLower;               // Call instruction to lower
+  llvm::SmallSet<llvm::Function *, 4> m_funcsToLower;                  // Functions to lower
 };
 
 } // namespace Llpc

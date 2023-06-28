@@ -94,9 +94,6 @@ std::pair<lgc::PassManager &, LegacyPassManager &> PassManagerCache::getPassMana
   passManagers.first->registerFunctionAnalysis([&] { return m_lgcContext->getTargetMachine()->getTargetIRAnalysis(); });
   passManagers.first->registerModuleAnalysis([&] { return PipelineStateWrapper(m_lgcContext); });
 
-  // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
-  m_lgcContext->preparePassManager(*passManagers.first);
-
   // Add a few optimizations.
   FunctionPassManager fpm;
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 452298

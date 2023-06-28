@@ -227,7 +227,6 @@ if(ICD_BUILD_LLPC)
         lower/llpcSpirvLowerRayQueryPostInline.cpp
         lower/llpcSpirvLowerRayTracing.cpp
         lower/llpcSpirvLowerRayTracingBuiltIn.cpp
-        lower/llpcSpirvLowerRayTracingIntrinsics.cpp
         lower/llpcSpirvLowerTerminator.cpp
         lower/llpcSpirvLowerTranslator.cpp
         lower/llpcSpirvLowerUtil.cpp

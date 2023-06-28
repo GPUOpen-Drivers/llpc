@@ -16,7 +16,8 @@ void main() {
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call void @llvm.amdgcn.raw.buffer.store.v4i32(<4 x i32> zeroinitializer
+; SHADERTEST-COUNT-32: call void @llvm.amdgcn.raw.buffer.store.i32(i32 0,
+; SHADERTEST-LABEL: {{^// LLPC}} final pipeline module info
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
