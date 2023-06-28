@@ -97,6 +97,16 @@ protected:
   bool usesViewportArrayIndex();
   void setupPrintfStrings();
 
+  template <typename T> void invalidRegConfig(T &config) {
+    static_assert(sizeof(T) % sizeof(PalMetadataNoteEntry) == 0,
+                  "T claims to be isPalAbiMetadataOnly, but sizeof contradicts that");
+    PalMetadataNoteEntry *pEntry = reinterpret_cast<PalMetadataNoteEntry *>(&config);
+    size_t count = sizeof(T) / sizeof(PalMetadataNoteEntry);
+    for (size_t i = 0; i < count; i++) {
+      pEntry->key = InvalidMetadataKey;
+    }
+  }
+
   template <typename T> void appendConfig(const T &config) {
     static_assert(T::ContainsPalAbiMetadataOnly, "may only be used with structs that are fully metadata notes");
     static_assert(sizeof(T) % sizeof(PalMetadataNoteEntry) == 0,
