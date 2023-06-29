@@ -633,6 +633,9 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
       m_shaderStage == ShaderStageRayTracingIntersect || m_shaderStage == ShaderStageRayTracingMiss) {
     createEntryTerminator(m_entryPoint);
   }
+  if (m_shaderStage == ShaderStageRayTracingCallable) {
+    createCallableShaderEntryTerminator(m_entryPoint);
+  }
 
   LLVM_DEBUG(dbgs() << "After the pass Spirv-Lower-Ray-Tracing " << module);
 
@@ -2112,17 +2115,6 @@ Instruction *SpirvLowerRayTracing::createCallableShaderEntryFunc(Function *func)
   // Save the shader record index
   m_builder->CreateStore(argIt++, createShaderTableVariable(ShaderTable::ShaderRecordIndex));
 
-  // Sync global payload variable to the incoming payload,
-  SmallVector<Instruction *, 4> rets;
-  getFuncRets(newFunc, rets);
-  for (auto ret : rets) {
-    m_builder->SetInsertPoint(ret);
-    Instruction *newfuncEnd =
-        m_builder->CreateRet(m_builder->CreateLoad(m_globalCallableData->getValueType(), m_globalCallableData));
-    ret->replaceAllUsesWith(newfuncEnd);
-    ret->eraseFromParent();
-  }
-
   return insertPos;
 }
 
@@ -2384,7 +2376,7 @@ void SpirvLowerRayTracing::createEntryTerminator(Function *func) {
 
     if (rets.size()) {
       // We have extra values to return here
-      Value *newRetVal = UndefValue::get(getShaderReturnTy(m_shaderStage));
+      Value *newRetVal = PoisonValue::get(getShaderReturnTy(m_shaderStage));
       unsigned index = 0;
       // Get payload value first
       for (; index < payloadSizeInDword; index++)
@@ -2409,6 +2401,23 @@ void SpirvLowerRayTracing::createEntryTerminator(Function *func) {
     }
 
     Instruction *newfuncEnd = m_builder->CreateRet(retVal);
+    ret->replaceAllUsesWith(newfuncEnd);
+    ret->eraseFromParent();
+  }
+}
+
+// =====================================================================================================================
+// Add return callable data
+//
+// @param func : The function to process
+void SpirvLowerRayTracing::createCallableShaderEntryTerminator(Function *func) {
+  // return global callable data
+  SmallVector<Instruction *, 4> rets;
+  getFuncRets(func, rets);
+  for (auto ret : rets) {
+    m_builder->SetInsertPoint(ret);
+    Instruction *newfuncEnd =
+        m_builder->CreateRet(m_builder->CreateLoad(m_globalCallableData->getValueType(), m_globalCallableData));
     ret->replaceAllUsesWith(newfuncEnd);
     ret->eraseFromParent();
   }

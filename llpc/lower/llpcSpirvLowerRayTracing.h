@@ -174,6 +174,7 @@ private:
   llvm::FunctionType *getCallableShaderEntryFuncTy();
   llvm::FunctionType *getTraceRayFuncTy();
   llvm::Instruction *createCallableShaderEntryFunc(llvm::Function *func);
+  void createCallableShaderEntryTerminator(llvm::Function *func);
   void getFuncRets(llvm::Function *func, llvm::SmallVector<llvm::Instruction *, 4> &rets);
   llvm::SmallSet<unsigned, 4> getShaderExtraInputParams(ShaderStage stage);
   llvm::SmallSet<unsigned, 4> getShaderExtraRets(ShaderStage stage);
