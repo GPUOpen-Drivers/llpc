@@ -538,11 +538,12 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
       m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.primAmpFactor;
   // If we enable row export, the actual thread group size is determined by work group size provided from API mesh
   // shader.
-  const unsigned flatWorkgroupSize = m_pipelineState->enableMeshRowExport() ? numMeshThreads : primAmpFactor;
+  const unsigned flatWorkgroupSize =
+      alignTo(m_pipelineState->enableMeshRowExport() ? numMeshThreads : primAmpFactor, waveSize);
   entryPoint->addFnAttr("amdgpu-flat-work-group-size",
                         std::to_string(primAmpFactor) + std::string(",") + std::to_string(flatWorkgroupSize));
 
-  const unsigned numWaves = alignTo(flatWorkgroupSize, waveSize) / waveSize;
+  const unsigned numWaves = flatWorkgroupSize / waveSize;
   const unsigned numMeshWaves = alignTo(numMeshThreads, waveSize) / waveSize;
 
   // API mesh shader entry block
