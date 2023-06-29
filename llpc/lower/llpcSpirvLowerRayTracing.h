@@ -168,11 +168,13 @@ private:
   void initGlobalPayloads();
   void initGlobalCallableData();
   void initShaderBuiltIns();
-  void createEntryFunc(llvm::Function *func);
+  llvm::Instruction *createEntryFunc(llvm::Function *func);
+  void createEntryTerminator(llvm::Function *func);
   llvm::FunctionType *getShaderEntryFuncTy(ShaderStage stage);
   llvm::FunctionType *getCallableShaderEntryFuncTy();
   llvm::FunctionType *getTraceRayFuncTy();
-  void createCallableShaderEntryFunc(llvm::Function *func);
+  llvm::Instruction *createCallableShaderEntryFunc(llvm::Function *func);
+  void createCallableShaderEntryTerminator(llvm::Function *func);
   void getFuncRets(llvm::Function *func, llvm::SmallVector<llvm::Instruction *, 4> &rets);
   llvm::SmallSet<unsigned, 4> getShaderExtraInputParams(ShaderStage stage);
   llvm::SmallSet<unsigned, 4> getShaderExtraRets(ShaderStage stage);
