@@ -395,6 +395,8 @@ private:
 
   Function *createLibraryEntryFunc();
 
+  Value *createTraceRayDialectOp(SPIRVValue *const spvValue);
+
   // ========================================================================================================================
   // Wrapper method for easier access to pipeline options.
   // @returns : Pointer to the pipeline options of the current LLPC context.
