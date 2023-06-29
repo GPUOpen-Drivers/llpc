@@ -639,11 +639,9 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
 
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 &&
         m_pipelineState->getColorExportState().alphaToCoverageEnable) {
-      if (graphicsRegNode.find(Util::Abi::DbShaderControlMetadataKey::MaskExportEnable) != graphicsRegNode.end()) {
-        auto dbShaderControl = graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl].getMap(true);
-        dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] =
-            dbShaderControl[Util::Abi::DbShaderControlMetadataKey::MaskExportEnable].getBool();
-      }
+      auto dbShaderControl = graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl].getMap(true);
+      dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] =
+          dbShaderControl[Util::Abi::DbShaderControlMetadataKey::MaskExportEnable].getBool();
     }
 
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10) {

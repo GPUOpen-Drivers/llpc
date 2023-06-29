@@ -160,6 +160,10 @@ Type *ShaderInputs::getInputType(ShaderInput inputKind, const LgcContext &lgcCon
   switch (inputKind) {
   case ShaderInput::WorkgroupId:
     return FixedVectorType::get(Type::getInt32Ty(context), 3);
+  case ShaderInput::WorkgroupId2:
+    return FixedVectorType::get(Type::getInt32Ty(context), 2);
+  case ShaderInput::WorkgroupId1:
+    return Type::getInt32Ty(context);
   case ShaderInput::LocalInvocationId:
     if (lgcContext.getTargetInfo().getGfxIpVersion().major >= 11)
       return Type::getInt32Ty(context);
@@ -198,6 +202,10 @@ const char *ShaderInputs::getInputName(ShaderInput inputKind) {
   switch (inputKind) {
   case ShaderInput::WorkgroupId:
     return "WorkgroupId";
+  case ShaderInput::WorkgroupId2:
+    return "WorkgroupId2";
+  case ShaderInput::WorkgroupId1:
+    return "WorkgroupId1";
   case ShaderInput::MultiDispatchInfo:
     return "MultiDispatchInfo";
   case ShaderInput::PrimMask:
@@ -335,6 +343,7 @@ void ShaderInputs::fixupUses(Module &module, PipelineState *pipelineState) {
     // Use for compute shader
     bool useWorkgroupIds[3] = {false};
     bool useWholeWorkgroupId = false;
+    bool needCheckWorkgroupId = false;
 
     for (unsigned kind = 0; kind != static_cast<unsigned>(ShaderInput::Count); ++kind) {
       ShaderInputUsage *inputUsage = inputsUsage->inputs[kind].get();
@@ -350,10 +359,10 @@ void ShaderInputs::fixupUses(Module &module, PipelineState *pipelineState) {
 
       auto inputKind = static_cast<ShaderInput>(kind);
       value->setName(getInputName(inputKind));
-      const bool needCheckWorgroupId = (inputKind == ShaderInput::WorkgroupId) && (stage == ShaderStageCompute);
+      needCheckWorkgroupId = (inputKind == ShaderInput::WorkgroupId) && (stage == ShaderStageCompute);
       for (Instruction *&call : inputUsage->users) {
         if (call && call->getFunction() == &func) {
-          if (needCheckWorgroupId) {
+          if (needCheckWorkgroupId) {
             for (auto user : call->users()) {
               if (auto extractInst = dyn_cast<ExtractElementInst>(user)) {
                 if (auto indexInst = dyn_cast<ConstantInt>(extractInst->getIndexOperand())) {
@@ -365,6 +374,7 @@ void ShaderInputs::fixupUses(Module &module, PipelineState *pipelineState) {
               }
 
               useWholeWorkgroupId = true;
+              break;
             }
           }
           call->replaceAllUsesWith(value);
@@ -403,7 +413,7 @@ void ShaderInputs::fixupUses(Module &module, PipelineState *pipelineState) {
         break;
       }
     }
-    if (stage == ShaderStageCompute) {
+    if (needCheckWorkgroupId) {
       if (!useWholeWorkgroupId && !useWorkgroupIds[0])
         func.addFnAttr("amdgpu-no-workgroup-id-x");
       if (!useWholeWorkgroupId && !useWorkgroupIds[1])
@@ -481,9 +491,11 @@ static const ShaderInputDesc FsSgprInputs[] = {
 };
 
 // SGPRs: CS
-static const ShaderInputDesc CsSgprInputs[] = {
-    {ShaderInput::WorkgroupId, 0, true},
-    {ShaderInput::MultiDispatchInfo, 0, true},
+static ShaderInputDesc CsSgprInputs[] = {
+    {ShaderInput::WorkgroupId, offsetof(InterfaceData, entryArgIdxs.cs.workgroupId), true},
+    {ShaderInput::WorkgroupId2, offsetof(InterfaceData, entryArgIdxs.cs.workgroupId)},
+    {ShaderInput::WorkgroupId1, offsetof(InterfaceData, entryArgIdxs.cs.workgroupId)},
+    {ShaderInput::MultiDispatchInfo, offsetof(InterfaceData, entryArgIdxs.cs.multiDispatchInfo), true},
 };
 
 // VGPRs: Task (identical to CS)
@@ -555,12 +567,14 @@ static const ShaderInputDesc CsVgprInputs[] = {
 //
 // @param pipelineState : Pipeline state
 // @param shaderStage : Shader stage
+// @param origFunc : The original entry point function
+// @param isComputeWithCalls : Whether this is compute pipeline with calls or compute library
 // @param [in/out] argTys : Argument types vector to add to
 // @param [in/out] argNames : Argument names vector to add to
 // @returns : Bitmap with bits set for SGPR arguments so caller can set "inreg" attribute on the args
-uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage shaderStage,
-                                       SmallVectorImpl<Type *> &argTys, SmallVectorImpl<std::string> &argNames,
-                                       unsigned argOffset) {
+uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage shaderStage, Function *origFunc,
+                                       bool isComputeWithCalls, SmallVectorImpl<Type *> &argTys,
+                                       SmallVectorImpl<std::string> &argNames, unsigned argOffset) {
 
   bool hasTs = pipelineState->hasShaderStage(ShaderStageTessControl);
   bool hasGs = pipelineState->hasShaderStage(ShaderStageGeometry);
@@ -621,6 +635,14 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
     break;
   default:
     break;
+  }
+
+  const unsigned id = static_cast<unsigned>(ShaderInput::WorkgroupId);
+  CsSgprInputs[id].always = true;
+  if (shaderStage == ShaderStageCompute && !isComputeWithCalls && origFunc &&
+      pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
+    CsSgprInputs[id].always = false;
+    tryOptimizeWorkgroupId(pipelineState, shaderStage, origFunc);
   }
 
   // Determine which of the tables above to use for SGPR and VGPR inputs.
@@ -722,4 +744,108 @@ ShaderInputs::ShaderInputUsage *ShaderInputs::getShaderInputUsage(ShaderStage st
   if (!inputsUsage->inputs[inputKind])
     inputsUsage->inputs[inputKind] = std::make_unique<ShaderInputUsage>();
   return &*inputsUsage->inputs[inputKind];
+}
+
+// =====================================================================================================================
+// Try to optimize to use the accurate workgroupID arguments and set the function attribute for corresponding
+// amdgpu-no-workgroup-id-*. If partial components of WorkgroupID are used, the argument type will be aligned and the
+// relevant users will be re-targeted to the new generated lgc.shader.input.workgroupId.*. The related users of <3xi32>
+// workgroupId will be removed. We set amdgpu-no-workgroup-id-* function attribute to control the register tgid_*_en
+// later.
+//
+// @param pipelineState : Pipeline state
+// @param shaderStage : Shader stage
+// @param origFunc : The original entry point function
+void ShaderInputs::tryOptimizeWorkgroupId(PipelineState *pipelineState, ShaderStage shaderStage, Function *origFunc) {
+  assert(shaderStage == ShaderStageCompute);
+  bool useWholeWorkgroupId = false;
+  SmallVector<Instruction *> extractVec3[3];
+  SmallVector<Instruction *> workgroupIdCallInsts;
+  unsigned kindId = static_cast<unsigned>(ShaderInput::WorkgroupId);
+  ShaderInputUsage *inputUsage = getShaderInputsUsage(shaderStage)->inputs[kindId].get();
+
+  unsigned usedCompCount = 0;
+  // Check if the whole or partial components are used
+  if (inputUsage) {
+    for (Instruction *&call : inputUsage->users) {
+      if (!call)
+        continue;
+      for (auto user : call->users()) {
+        if (auto extractInst = dyn_cast<ExtractElementInst>(user)) {
+          if (auto indexInst = dyn_cast<ConstantInt>(extractInst->getIndexOperand())) {
+            unsigned index = indexInst->getZExtValue();
+            assert(index < 3);
+            extractVec3[index].push_back(extractInst);
+            continue;
+          }
+        }
+        useWholeWorkgroupId = true;
+        break;
+      }
+      if (!useWholeWorkgroupId)
+        workgroupIdCallInsts.push_back(call);
+    }
+    if (!useWholeWorkgroupId) {
+      for (auto insts : extractVec3) {
+        if (!insts.empty())
+          ++usedCompCount;
+      }
+    }
+    if (usedCompCount == 3)
+      useWholeWorkgroupId = true;
+  }
+  if (useWholeWorkgroupId)
+    return;
+
+  if (extractVec3[0].empty())
+    origFunc->addFnAttr("amdgpu-no-workgroup-id-x");
+  if (extractVec3[1].empty())
+    origFunc->addFnAttr("amdgpu-no-workgroup-id-y");
+  if (extractVec3[2].empty())
+    origFunc->addFnAttr("amdgpu-no-workgroup-id-z");
+
+  if (!inputUsage)
+    return;
+
+  BuilderBase builder(pipelineState->getContext());
+  builder.SetInsertPoint(workgroupIdCallInsts.front());
+  // Clear the original default <3xi32> workgroupId
+  inputUsage->users.clear();
+  inputUsage = nullptr;
+
+  if (usedCompCount == 1) {
+    // The processing of using one component
+    auto workgroupId1 =
+        static_cast<CallInst *>(getInput(ShaderInput::WorkgroupId1, builder, *pipelineState->getLgcContext()));
+    getShaderInputUsage(shaderStage, ShaderInput::WorkgroupId1)->users.push_back(workgroupId1);
+
+    for (auto instSet : extractVec3) {
+      for (auto inst : instSet) {
+        inst->replaceAllUsesWith(workgroupId1);
+        inst->eraseFromParent();
+      }
+    }
+  } else if (usedCompCount == 2) {
+    // The processing of using two components
+    auto workgroupId2 =
+        static_cast<CallInst *>(getInput(ShaderInput::WorkgroupId2, builder, *pipelineState->getLgcContext()));
+    getShaderInputUsage(shaderStage, ShaderInput::WorkgroupId2)->users.push_back(workgroupId2);
+
+    Value *extractVec2[2] = {builder.CreateExtractElement(workgroupId2, static_cast<uint64_t>(0)),
+                             builder.CreateExtractElement(workgroupId2, 1)};
+    unsigned index = 0;
+    for (auto instSet : extractVec3) {
+      for (auto inst : instSet) {
+        inst->replaceAllUsesWith(extractVec2[index]);
+        inst->eraseFromParent();
+      }
+      if (!instSet.empty())
+        ++index;
+    }
+  } else {
+    assert(usedCompCount == 0);
+  }
+
+  for (auto call : workgroupIdCallInsts)
+    call->eraseFromParent();
 }

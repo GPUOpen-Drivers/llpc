@@ -269,7 +269,7 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func) {
   if (!isCpsFunc) {
     SmallVector<Type *, 8> argTys;
     SmallVector<std::string, 8> argNames;
-    generateEntryPointArgTys(nullptr, argTys, argNames, 0);
+    generateEntryPointArgTys(nullptr, nullptr, argTys, argNames, 0);
     numUserdata = argTys.size();
   } else {
     numUserdata = m_cpsShaderInputCache.getTypes().size();
@@ -918,7 +918,7 @@ void PatchEntryPointMutate::processShader(ShaderInputs *shaderInputs) {
   // Create new entry-point from the original one
   SmallVector<Type *, 8> argTys;
   SmallVector<std::string, 8> argNames;
-  uint64_t inRegMask = generateEntryPointArgTys(shaderInputs, argTys, argNames, 0);
+  uint64_t inRegMask = generateEntryPointArgTys(shaderInputs, nullptr, argTys, argNames, 0);
 
   Function *origEntryPoint = m_entryPoint;
 
@@ -1005,12 +1005,13 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
     if (cps::isCpsFunction(*origFunc)) {
       assert(origType->getReturnType()->isVoidTy());
       if (!m_cpsShaderInputCache.isAvailable()) {
-        generateEntryPointArgTys(nullptr, shaderInputTys, shaderInputNames, 0);
+        generateEntryPointArgTys(nullptr, nullptr, shaderInputTys, shaderInputNames, 0);
         m_cpsShaderInputCache.set(shaderInputTys, shaderInputNames);
       }
       newFunc = lowerCpsFunction(origFunc, m_cpsShaderInputCache.getTypes(), m_cpsShaderInputCache.getNames());
     } else {
-      inRegMask = generateEntryPointArgTys(shaderInputs, shaderInputTys, shaderInputNames, origType->getNumParams());
+      inRegMask =
+          generateEntryPointArgTys(shaderInputs, origFunc, shaderInputTys, shaderInputNames, origType->getNumParams());
       newFunc = addFunctionArgs(origFunc, origType->getReturnType(), shaderInputTys, shaderInputNames, inRegMask, true);
       const bool isEntryPoint = isShaderEntryPoint(newFunc);
       newFunc->setCallingConv(isEntryPoint ? CallingConv::AMDGPU_CS : CallingConv::AMDGPU_Gfx);
@@ -1256,13 +1257,15 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
 // unmerged shader stage. The code here needs to ensure that it gets the same SGPR user data layout for
 // both shaders that are going to be merged (VS-HS, VS-GS if no tessellation, ES-GS).
 //
-// @param shaderInputs : ShaderInputs object representing hardware-provided shader inputs (may be null)
+// @param shaderInputs : ShaderInputs object representing hardware-provided shader inputs
+// @param origFunc : The original entry point function
 // @param [out] argTys : The argument types for the new function type
 // @param [out] argNames : The argument names corresponding to the argument types
 // @returns inRegMask : "Inreg" bit mask for the arguments, with a bit set to indicate that the corresponding
 //                          arg needs to have an "inreg" attribute to put the arg into SGPRs rather than VGPRs
 //
-uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInputs, SmallVectorImpl<Type *> &argTys,
+uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInputs, Function *origFunc,
+                                                         SmallVectorImpl<Type *> &argTys,
                                                          SmallVectorImpl<std::string> &argNames, unsigned argOffset) {
 
   uint64_t inRegMask = 0;
@@ -1356,8 +1359,8 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
   inRegMask = (1ull << argTys.size()) - 1;
 
   // Push the fixed system (not user data) register args.
-  if (shaderInputs)
-    inRegMask |= shaderInputs->getShaderArgTys(m_pipelineState, m_shaderStage, argTys, argNames, argOffset);
+  inRegMask |= shaderInputs->getShaderArgTys(m_pipelineState, m_shaderStage, origFunc, m_computeWithCalls, argTys,
+                                             argNames, argOffset);
 
   if (m_pipelineState->useRegisterFieldFormat()) {
     constexpr unsigned NumUserSgprs = 32;
