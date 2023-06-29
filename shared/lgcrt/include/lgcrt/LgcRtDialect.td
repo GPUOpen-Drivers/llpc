@@ -62,6 +62,7 @@ def LgcRtDialect : Dialect {
 def V3F32 : TgConstant<(FixedVectorType F32, 3)>, Type;
 def V3I32 : TgConstant<(FixedVectorType I32, 3)>, Type;
 def A4V3F32 : TgConstant<(ArrayType V3F32, 4)>, Type;
+def A3V3F32 : TgConstant<(ArrayType V3F32, 3)>, Type;
 
 class LgcRtOp<string mnemonic_, list<Trait> traits_ = []>
     : Op<LgcRtDialect, mnemonic_, traits_ # [NoUnwind]>;
@@ -344,5 +345,16 @@ def WorldToObjectOp : LgcRtOp<"world.to.object", [Memory<[]>, WillReturn]> {
   let description = [{
     Return a [4 x <3 x float>] matrix (array-of-vectors) giving the world-to-object transformation
     matrix for the current intersection.
+  }];
+}
+
+// =========================================================================================================
+def TriangleVertexPositionsOp : LgcRtOp<"triangle.vertex.positions", [Memory<[]>, WillReturn]> {
+  let arguments =  (ins);
+  let results = (outs A3V3F32:$result);
+
+  let summary = "Return the object-space vertices of the triangle";
+  let description = [{
+    Return [3 x <3 x float>] object space vertices of the triangle at the current intersection.
   }];
 }

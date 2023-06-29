@@ -30,6 +30,7 @@
  */
 #include "llpcSpirvLowerGlobal.h"
 #include "SPIRVInternal.h"
+#include "lgcrt/LgcRtDialect.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcSpirvLowerUtil.h"
@@ -48,6 +49,7 @@
 using namespace llvm;
 using namespace SPIRV;
 using namespace Llpc;
+using namespace lgc::rt;
 
 namespace Llpc {
 
@@ -1016,6 +1018,63 @@ void SpirvLowerGlobal::lowerInOutInPlace() {
 }
 
 // =====================================================================================================================
+// @param builtIn : BuiltIn value
+// @param elemIdx : Element Index of struct
+Value *SpirvLowerGlobal::createRaytracingBuiltIn(BuiltIn builtIn) {
+  switch (builtIn) {
+  case BuiltInLaunchIdKHR:
+    return m_builder->create<DispatchRaysIndexOp>();
+  case BuiltInLaunchSizeKHR:
+    return m_builder->create<DispatchRaysDimensionsOp>();
+  case BuiltInWorldRayOriginKHR:
+    return m_builder->create<WorldRayOriginOp>();
+  case BuiltInWorldRayDirectionKHR:
+    return m_builder->create<WorldRayDirectionOp>();
+  case BuiltInObjectRayOriginKHR:
+    return m_builder->create<ObjectRayOriginOp>();
+  case BuiltInObjectRayDirectionKHR:
+    return m_builder->create<ObjectRayDirectionOp>();
+  case BuiltInRayTminKHR:
+    return m_builder->create<RayTminOp>();
+  case BuiltInRayTmaxKHR:
+    return m_builder->create<RayTcurrentOp>();
+  case BuiltInInstanceCustomIndexKHR:
+    return m_builder->create<InstanceIndexOp>();
+  case BuiltInObjectToWorldKHR:
+    return m_builder->create<ObjectToWorldOp>();
+  case BuiltInWorldToObjectKHR:
+    return m_builder->create<WorldToObjectOp>();
+  case BuiltInHitKindKHR:
+    return m_builder->create<HitKindOp>();
+  case BuiltInHitTriangleVertexPositionsKHR:
+    return m_builder->create<TriangleVertexPositionsOp>();
+  case BuiltInIncomingRayFlagsKHR:
+    return m_builder->create<RayFlagsOp>();
+  case BuiltInRayGeometryIndexKHR:
+    return m_builder->create<GeometryIndexOp>();
+  case BuiltInInstanceId:
+    return m_builder->create<InstanceIdOp>();
+  case BuiltInPrimitiveId:
+    return m_builder->create<PrimitiveIndexOp>();
+  default:
+    llvm_unreachable("Should never be called");
+    return nullptr;
+  }
+}
+
+// =====================================================================================================================
+//
+// @param builtIn : BuiltIn value
+// @param stage : Shader stage
+inline bool isRayTracingBuiltIn(unsigned builtIn, ShaderStage stage) {
+  bool rtbuiltIn = builtIn >= BuiltInLaunchIdKHR && builtIn <= BuiltInRayGeometryIndexKHR;
+  bool rtStage = stage == ShaderStageRayTracingIntersect || stage == ShaderStageRayTracingAnyHit ||
+                 stage == ShaderStageRayTracingClosestHit;
+  bool nonRtBuiltIn = builtIn == BuiltInInstanceId || builtIn == BuiltInPrimitiveId;
+  return rtbuiltIn || (rtStage && nonRtBuiltIn);
+}
+
+// =====================================================================================================================
 // Inserts LLVM call instruction to import input/output.
 //
 // @param inOutTy : Type of value imported from input/output
@@ -1147,7 +1206,6 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
       // Handle structure member recursively
       auto memberTy = inOutTy->getStructElementType(memberIdx);
       auto memberMeta = cast<Constant>(inOutMetaVal->getOperand(memberIdx));
-
       auto member = addCallInstForInOutImport(memberTy, addrSpace, memberMeta, locOffset, maxLocOffset, nullptr,
                                               vertexIdx, interpLoc, auxInterpValue, isPerVertexDimension);
       inOutValue = m_builder->CreateInsertValue(inOutValue, member, {memberIdx});
@@ -1160,39 +1218,43 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
     assert(inOutMeta.IsLoc || inOutMeta.IsBuiltIn);
 
     if (inOutMeta.IsBuiltIn) {
-      auto builtIn = static_cast<lgc::BuiltInKind>(inOutMeta.Value);
-      elemIdx = elemIdx == m_builder->getInt32(InvalidValue) ? nullptr : elemIdx;
-      vertexIdx = vertexIdx == m_builder->getInt32(InvalidValue) ? nullptr : vertexIdx;
+      if (isRayTracingBuiltIn(inOutMeta.Value, m_shaderStage))
+        inOutValue = createRaytracingBuiltIn(static_cast<BuiltIn>(inOutMeta.Value));
+      else {
+        auto builtIn = static_cast<lgc::BuiltInKind>(inOutMeta.Value);
+        elemIdx = elemIdx == m_builder->getInt32(InvalidValue) ? nullptr : elemIdx;
+        vertexIdx = vertexIdx == m_builder->getInt32(InvalidValue) ? nullptr : vertexIdx;
 
-      lgc::InOutInfo inOutInfo;
-      inOutInfo.setArraySize(maxLocOffset);
-      inOutInfo.setInterpLoc(interpLoc);
+        lgc::InOutInfo inOutInfo;
+        inOutInfo.setArraySize(maxLocOffset);
+        inOutInfo.setInterpLoc(interpLoc);
 
-      if (builtIn == lgc::BuiltInBaryCoord || builtIn == lgc::BuiltInBaryCoordNoPerspKHR) {
-        if (inOutInfo.getInterpLoc() == InterpLocUnknown)
-          inOutInfo.setInterpLoc(inOutMeta.InterpLoc);
-        return m_builder->CreateReadBaryCoord(builtIn, inOutInfo, auxInterpValue);
-      }
+        if (builtIn == lgc::BuiltInBaryCoord || builtIn == lgc::BuiltInBaryCoordNoPerspKHR) {
+          if (inOutInfo.getInterpLoc() == InterpLocUnknown)
+            inOutInfo.setInterpLoc(inOutMeta.InterpLoc);
+          return m_builder->CreateReadBaryCoord(builtIn, inOutInfo, auxInterpValue);
+        }
 
-      inOutInfo.setPerPrimitive(inOutMeta.PerPrimitive);
-      if (addrSpace == SPIRAS_Input)
-        inOutValue = m_builder->CreateReadBuiltInInput(builtIn, inOutInfo, vertexIdx, elemIdx);
-      else
-        inOutValue = m_builder->CreateReadBuiltInOutput(builtIn, inOutInfo, vertexIdx, elemIdx);
+        inOutInfo.setPerPrimitive(inOutMeta.PerPrimitive);
+        if (addrSpace == SPIRAS_Input)
+          inOutValue = m_builder->CreateReadBuiltInInput(builtIn, inOutInfo, vertexIdx, elemIdx);
+        else
+          inOutValue = m_builder->CreateReadBuiltInOutput(builtIn, inOutInfo, vertexIdx, elemIdx);
 
-      if ((builtIn == lgc::BuiltInSubgroupEqMask || builtIn == lgc::BuiltInSubgroupGeMask ||
-           builtIn == lgc::BuiltInSubgroupGtMask || builtIn == lgc::BuiltInSubgroupLeMask ||
-           builtIn == lgc::BuiltInSubgroupLtMask) &&
-          inOutTy->isIntegerTy(64)) {
-        // NOTE: Glslang has a bug. For gl_SubGroupXXXMaskARB, they are implemented as "uint64_t" while
-        // for gl_subgroupXXXMask they are "uvec4". And the SPIR-V enumerants "BuiltInSubgroupXXXMaskKHR"
-        // and "BuiltInSubgroupXXXMask" share the same numeric values.
-        inOutValue = m_builder->CreateBitCast(inOutValue, FixedVectorType::get(inOutTy, 2));
-        inOutValue = m_builder->CreateExtractElement(inOutValue, uint64_t(0));
-      }
-      if (inOutValue->getType()->isIntegerTy(1)) {
-        // Convert i1 to i32.
-        inOutValue = m_builder->CreateZExt(inOutValue, m_builder->getInt32Ty());
+        if ((builtIn == lgc::BuiltInSubgroupEqMask || builtIn == lgc::BuiltInSubgroupGeMask ||
+             builtIn == lgc::BuiltInSubgroupGtMask || builtIn == lgc::BuiltInSubgroupLeMask ||
+             builtIn == lgc::BuiltInSubgroupLtMask) &&
+            inOutTy->isIntegerTy(64)) {
+          // NOTE: Glslang has a bug. For gl_SubGroupXXXMaskARB, they are implemented as "uint64_t" while
+          // for gl_subgroupXXXMask they are "uvec4". And the SPIR-V enumerants "BuiltInSubgroupXXXMaskKHR"
+          // and "BuiltInSubgroupXXXMask" share the same numeric values.
+          inOutValue = m_builder->CreateBitCast(inOutValue, FixedVectorType::get(inOutTy, 2));
+          inOutValue = m_builder->CreateExtractElement(inOutValue, uint64_t(0));
+        }
+        if (inOutValue->getType()->isIntegerTy(1)) {
+          // Convert i1 to i32.
+          inOutValue = m_builder->CreateZExt(inOutValue, m_builder->getInt32Ty());
+        }
       }
     } else {
       unsigned idx = inOutMeta.Component;
