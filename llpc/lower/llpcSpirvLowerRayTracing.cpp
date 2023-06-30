@@ -87,7 +87,8 @@ static const char *DispatchRayIndex = "AmdTraceRayDispatchRaysIndex";
 } // namespace RtName
 
 namespace Llpc {
-
+static const unsigned TraceRayDescriptorSet = 93;                   // Descriptor set ID in traceRay binary
+static const unsigned RayTracingResourceIndexDispatchRaysInfo = 17; // Dispatch ray info (constant buffer)
 // TraceParams Type size in DWORD
 static unsigned TraceParamsTySize[] = {
     1, // 1, rayFlags
@@ -122,6 +123,7 @@ void SpirvLowerRayTracing::processTraceRayCall(BaseTraceRayOp *inst) {
 
   SmallVector<Value *, 12> implCallArgs(inst->args());
 
+  implCallArgs.push_back(m_dispatchRaysInfoDesc);
   m_builder->SetInsertPoint(inst);
 
   auto newCall = m_builder->CreateNamedCall(mangledName, inst->getFunctionType()->getReturnType(), implCallArgs,
@@ -146,6 +148,7 @@ void SpirvLowerRayTracing::processTraceRayCall(BaseTraceRayOp *inst) {
 
     auto payloadArg = func->getArg(TraceRayParam::Payload);
     auto paqArray = func->getArg(TraceRayParam::Paq);
+    auto bufferDesc = func->arg_end() - 1;
     auto payloadArgSize = m_builder->CreateExtractValue(paqArray, 0);
     const Align align = Align(4);
     m_builder->CreateMemCpy(localPayload, align, payloadArg, align, payloadArgSize);
@@ -174,8 +177,7 @@ void SpirvLowerRayTracing::processTraceRayCall(BaseTraceRayOp *inst) {
     CallInst *result = nullptr;
     auto funcTy = getTraceRayFuncTy();
     if (indirect) {
-      Value *traceRayGpuVa =
-          m_builder->CreateLoad(m_builder->getInt64Ty(), createShaderTableVariable(ShaderTable::TraceRayGpuVirtAddr));
+      Value *traceRayGpuVa = createShaderTableVariable(ShaderTable::TraceRayGpuVirtAddr, bufferDesc);
       auto funcPtrTy = PointerType::get(funcTy, SPIRAS_Generic);
       auto funcPtr = m_builder->CreateIntToPtr(traceRayGpuVa, funcPtrTy);
       // Create the indirect function call
@@ -211,9 +213,10 @@ void SpirvLowerRayTracing::visitCallCallableShaderOp(CallCallableShaderOp &inst)
   auto paramDataSizeBytes = inst.getParamDataSizeBytes();
 
   m_builder->SetInsertPoint(&inst);
-  auto newCall = m_builder->CreateNamedCall(mangledName, m_builder->getVoidTy(),
-                                            {shaderIndex, param, m_builder->getInt32(paramDataSizeBytes)},
-                                            {Attribute::NoUnwind, Attribute::AlwaysInline});
+  auto newCall =
+      m_builder->CreateNamedCall(mangledName, m_builder->getVoidTy(),
+                                 {shaderIndex, param, m_builder->getInt32(paramDataSizeBytes), m_dispatchRaysInfoDesc},
+                                 {Attribute::NoUnwind, Attribute::AlwaysInline});
 
   inst.replaceAllUsesWith(newCall);
 
@@ -238,8 +241,9 @@ void SpirvLowerRayTracing::visitCallCallableShaderOp(CallCallableShaderOp &inst)
     Value *shaderRecordIndexValue = func->arg_begin();
 
     // Copy callable data variable to the global callable variable
-    Value *callableData = func->arg_end() - 2;
-    Value *callableDataSize = func->arg_end() - 1;
+    Value *callableData = func->getArg(1);
+    Value *callableDataSize = func->getArg(2);
+    Value *buffDesc = func->getArg(3);
     const Align align = Align(4);
     m_builder->CreateMemCpy(inputResult, align, callableData, align, callableDataSize);
     SmallVector<Value *, 8> args;
@@ -249,7 +253,7 @@ void SpirvLowerRayTracing::visitCallCallableShaderOp(CallCallableShaderOp &inst)
     // Assemble the argument from shader record index
     args.push_back(shaderRecordIndexValue);
 
-    auto shaderIdentifier = getShaderIdentifier(ShaderStageRayTracingCallable, shaderRecordIndexValue);
+    auto shaderIdentifier = getShaderIdentifier(ShaderStageRayTracingCallable, shaderRecordIndexValue, buffDesc);
     if (indirect) {
       auto funcTy = getCallableShaderEntryFuncTy();
       auto funcPtrTy = PointerType::get(funcTy, SPIRAS_Generic);
@@ -287,7 +291,8 @@ void SpirvLowerRayTracing::visitReportHitOp(ReportHitOp &inst) {
   auto hitKind = inst.getHitKind();
 
   m_builder->SetInsertPoint(&inst);
-  auto newCall = m_builder->CreateNamedCall(mangledName, m_builder->getInt1Ty(), {hitT, hitKind},
+  auto newCall = m_builder->CreateNamedCall(mangledName, m_builder->getInt1Ty(),
+                                            {hitT, hitKind, m_dispatchRaysInfoDesc, m_shaderRecordIndex},
                                             {Attribute::NoUnwind, Attribute::AlwaysInline});
 
   inst.replaceAllUsesWith(newCall);
@@ -352,6 +357,8 @@ void SpirvLowerRayTracing::visitReportHitOp(ReportHitOp &inst) {
     // Function input parameters
     Value *paramHitT = func->arg_begin();
     Value *paramHitKind = func->arg_begin() + 1;
+    Value *bufferDesc = func->arg_begin() + 2;
+    Value *shaderRecordIndex = func->arg_begin() + 3;
 
     // Create the entry block
     auto entryBlock = BasicBlock::Create(*m_context, ".entry", func);
@@ -427,15 +434,12 @@ void SpirvLowerRayTracing::visitReportHitOp(ReportHitOp &inst) {
     m_builder->CreateStore(paramHitKind, m_traceParams[TraceParam::Kind]);
     m_builder->CreateStore(m_builder->getInt32(RayHitStatus::Accept), status);
     if (!anyHitIds.empty() || context->hasLibraryStage(shaderStageToMask(ShaderStageRayTracingAnyHit))) {
-      createShaderTableVariable(ShaderTable::ShaderRecordIndex);
-      auto shaderRecordIndex =
-          m_builder->CreateLoad(m_builder->getInt32Ty(), m_shaderTable[ShaderTable::ShaderRecordIndex]);
-      auto shaderIdentifier = getShaderIdentifier(ShaderStageRayTracingAnyHit, shaderRecordIndex);
+      auto shaderIdentifier = getShaderIdentifier(ShaderStageRayTracingAnyHit, shaderRecordIndex, bufferDesc);
       auto curPos = m_builder->saveIP();
-      createAnyHitFunc(shaderIdentifier);
+      createAnyHitFunc(shaderIdentifier, shaderRecordIndex);
       m_builder->restoreIP(curPos);
-      m_builder->CreateNamedCall(RtName::CallAnyHitShader, m_builder->getVoidTy(), {shaderIdentifier},
-                                 {Attribute::NoUnwind, Attribute::AlwaysInline});
+      m_builder->CreateNamedCall(RtName::CallAnyHitShader, m_builder->getVoidTy(),
+                                 {shaderIdentifier, shaderRecordIndex}, {Attribute::NoUnwind, Attribute::AlwaysInline});
     }
     // Update the status value after callAnyHit function
     statusValue = m_builder->CreateLoad(statusTy, status);
@@ -509,7 +513,6 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
 
   SpirvLower::init(&module);
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
-  memset(m_shaderTable, 0, sizeof(m_shaderTable));
   memset(m_traceParams, 0, sizeof(m_traceParams));
   initTraceParamsTy(rayTracingContext->getAttributeDataSize());
   initGlobalPayloads();
@@ -533,6 +536,7 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
     insertPos = createCallableShaderEntryFunc(m_entryPoint);
   } else {
     insertPos = &*(m_entryPoint->begin()->getFirstNonPHIOrDbgOrAlloca());
+    m_shaderRecordIndex = m_builder->getInt32(0);
   }
   // Process traceRays module
   if (m_shaderStage == ShaderStageCompute) {
@@ -548,6 +552,7 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
     m_entryPoint->setName(module.getName());
     m_entryPoint->addFnAttr(Attribute::AlwaysInline);
     m_builder->SetInsertPoint(insertPos);
+    getDispatchRaysInfoDesc();
     m_spirvOpMetaKindId = m_context->getMDKindID(MetaNameSpirvOp);
 
     if (m_shaderStage == ShaderStageRayTracingAnyHit || m_shaderStage == ShaderStageRayTracingClosestHit ||
@@ -572,7 +577,7 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
         replaceGlobal(global, m_globalCallableData);
         continue;
       } else if (global->getName().startswith(RtName::ShaderRecordBuffer)) {
-        processShaderRecordBuffer(global, insertPos);
+        processShaderRecordBuffer(global, m_dispatchRaysInfoDesc, m_shaderRecordIndex, insertPos);
         continue;
       }
 
@@ -836,6 +841,10 @@ void SpirvLowerRayTracing::createCallShaderFunc(Function *func, ShaderStage stag
     m_builder->SetInsertPoint(entryBlock);
     Value *inputResult = m_builder->CreateAlloca(getShaderReturnTy(stage), SPIRAS_Private);
     updateGlobalFromCallShaderFunc(func, stage);
+    // Table Index is second parameter for non-intersect shader and third for intersect shader
+    Value *tableIndexValue =
+        stage != ShaderStageRayTracingIntersect ? (func->arg_begin() + 1) : (func->arg_begin() + 2);
+    tableIndexValue = m_builder->CreateLoad(m_builder->getInt32Ty(), tableIndexValue);
 
     Type *shaderIdType = nullptr;
 
@@ -855,7 +864,7 @@ void SpirvLowerRayTracing::createCallShaderFunc(Function *func, ShaderStage stag
     Value *shaderId = func->arg_begin();
     shaderId = m_builder->CreateLoad(shaderIdType, shaderId);
     shaderId = m_builder->CreateBitCast(shaderId, m_builder->getInt64Ty());
-    createCallShader(func, stage, intersectId, shaderId, inputResult, entryBlock, endBlock);
+    createCallShader(func, stage, intersectId, shaderId, tableIndexValue, inputResult, entryBlock, endBlock);
   } else {
     m_builder->SetInsertPoint(endBlock);
   }
@@ -870,11 +879,13 @@ void SpirvLowerRayTracing::createCallShaderFunc(Function *func, ShaderStage stag
 // @param stage : Shader stage
 // @param intersectId : Module ID of intersection shader
 // @param shaderId : Shader ID to select shader
+// @param shaderRecordIndex : Shader record index/ table index
 // @param inputResult : input result to get shader selection return value
 // @param entryBlock : Entry block
 // @param endBlock : End block
 void SpirvLowerRayTracing::createCallShader(Function *func, ShaderStage stage, unsigned intersectId, Value *shaderId,
-                                            Value *inputResult, BasicBlock *entryBlock, BasicBlock *endBlock) {
+                                            Value *shaderRecordIndex, Value *inputResult, BasicBlock *entryBlock,
+                                            BasicBlock *endBlock) {
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
   auto indirectStageMask = rayTracingContext->getIndirectStageMask();
   bool indirectShader = indirectStageMask & shaderStageToMask(stage);
@@ -910,8 +921,7 @@ void SpirvLowerRayTracing::createCallShader(Function *func, ShaderStage stage, u
     args.push_back(traceParams[param]);
   }
 
-  args.push_back(
-      m_builder->CreateLoad(m_builder->getInt32Ty(), createShaderTableVariable(ShaderTable::ShaderRecordIndex)));
+  args.push_back(shaderRecordIndex);
 
   if (indirectShader) {
     auto funcTy = getShaderEntryFuncTy(stage);
@@ -999,7 +1009,6 @@ Value *SpirvLowerRayTracing::processBuiltIn(unsigned builtInId, Instruction *ins
   m_builder->SetInsertPoint(insertPos);
   switch (builtInId) {
   case BuiltInLaunchIdKHR:
-  case BuiltInLaunchSizeKHR:
   case BuiltInPrimitiveId:
   case BuiltInHitKindKHR:
   case BuiltInIncomingRayFlagsKHR:
@@ -1012,6 +1021,10 @@ Value *SpirvLowerRayTracing::processBuiltIn(unsigned builtInId, Instruction *ins
     break;
   }
   case BuiltInCullMaskKHR: {
+    break;
+  }
+  case BuiltInLaunchSizeKHR: {
+    input = createShaderTableVariable(ShaderTable::LaunchSize, m_dispatchRaysInfoDesc);
     break;
   }
   case BuiltInObjectToWorldKHR: {
@@ -1085,20 +1098,133 @@ Value *SpirvLowerRayTracing::processBuiltIn(unsigned builtInId, Instruction *ins
 // Create shader table variable
 //
 // @param tableKind : Kind of shader table variable to create
-GlobalVariable *SpirvLowerRayTracing::createShaderTableVariable(ShaderTable tableKind) {
+// =====================================================================================================================
+// Create shader table variable
+//
+// @param tableKind : Kind of shader table variable to create
+// @param bufferDesc : Dispatch ray buffer descriptor
+Value *SpirvLowerRayTracing::createShaderTableVariable(ShaderTable tableKind, Value *bufferDesc) {
   assert(tableKind < ShaderTable::Count);
-  if (!m_shaderTable[tableKind]) {
-    bool tableAddr = (tableKind == ShaderTable::RayGenTableAddr || tableKind == ShaderTable::MissTableAddr ||
-                      tableKind == ShaderTable::HitGroupTableAddr || tableKind == ShaderTable::CallableTableAddr ||
-                      tableKind == ShaderTable::TraceRayGpuVirtAddr);
-
-    Type *globalTy = (tableAddr ? m_builder->getInt64Ty() : m_builder->getInt32Ty());
-    m_shaderTable[tableKind] = new GlobalVariable(*m_module, globalTy, false, GlobalValue::ExternalLinkage, nullptr,
-                                                  Twine(RtName::ShaderTable) + std::to_string(tableKind), nullptr,
-                                                  GlobalValue::NotThreadLocal, SPIRAS_Private);
+  Value *value = nullptr;
+  switch (tableKind) {
+  case ShaderTable::RayGenTableAddr: {
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
+    auto offset = offsetof(GpuRt::DispatchRaysInfoData, rayGenerationTable);
+#else
+    auto offset = offsetof(GpuRt::DispatchRaysConstantData, rayGenerationTableAddressLo);
+    static_assert(
+        offsetof(GpuRt::DispatchRaysConstantData, rayGenerationTableAddressHi) ==
+            offsetof(GpuRt::DispatchRaysConstantData, rayGenerationTableAddressLo) + 4,
+        "GpuRt::DispatchRaysConstantData: rayGenerationTableAddressLo and rayGenerationTableAddressHi mismatch!");
+#endif
+    Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
+    value = m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
+    break;
+  }
+  case ShaderTable::MissTableAddr: {
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
+    auto offset = offsetof(GpuRt::DispatchRaysInfoData, missTable.baseAddress);
+#else
+    auto offset = offsetof(GpuRt::DispatchRaysConstantData, missTableBaseAddressLo);
+    static_assert(offsetof(GpuRt::DispatchRaysConstantData, missTableBaseAddressHi) ==
+                      offsetof(GpuRt::DispatchRaysConstantData, missTableBaseAddressLo) + 4,
+                  "GpuRt::DispatchRaysConstantData: missTableBaseAddressLo and missTableBaseAddressHi mismatch!");
+#endif
+    Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
+    value = m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
+    break;
+  }
+  case ShaderTable::HitGroupTableAddr: {
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
+    auto offset = offsetof(GpuRt::DispatchRaysInfoData, hitGroupTable.baseAddress);
+#else
+    auto offset = offsetof(GpuRt::DispatchRaysConstantData, hitGroupTableBaseAddressLo);
+    static_assert(
+        offsetof(GpuRt::DispatchRaysConstantData, hitGroupTableBaseAddressHi) ==
+            offsetof(GpuRt::DispatchRaysConstantData, hitGroupTableBaseAddressLo) + 4,
+        "GpuRt::DispatchRaysConstantData: hitGroupTableBaseAddressLo and hitGroupTableBaseAddressHi mismatch!");
+#endif
+    Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
+    value = m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
+    break;
+  }
+  case ShaderTable::CallableTableAddr: {
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
+    auto offset = offsetof(GpuRt::DispatchRaysInfoData, callableTable.baseAddress);
+#else
+    auto offset = offsetof(GpuRt::DispatchRaysConstantData, callableTableBaseAddressLo);
+    static_assert(
+        offsetof(GpuRt::DispatchRaysConstantData, callableTableBaseAddressHi) ==
+            offsetof(GpuRt::DispatchRaysConstantData, callableTableBaseAddressLo) + 4,
+        "GpuRt::DispatchRaysConstantData: callableTableBaseAddressLo and callableTableBaseAddressHi mismatch!");
+#endif
+    Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
+    value = m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
+    break;
+  }
+  case ShaderTable::MissTableStride: {
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
+    auto offset = offsetof(GpuRt::DispatchRaysInfoData, missTable.strideInBytes);
+#else
+    auto offset = offsetof(GpuRt::DispatchRaysConstantData, missTableStrideInBytes);
+#endif
+    Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
+    value = m_builder->CreateLoad(m_builder->getInt32Ty(), valuePtr);
+    break;
+  }
+  case ShaderTable::HitGroupTableStride: {
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
+    auto offset = offsetof(GpuRt::DispatchRaysInfoData, hitGroupTable.strideInBytes);
+#else
+    auto offset = offsetof(GpuRt::DispatchRaysConstantData, hitGroupTableStrideInBytes);
+#endif
+    Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
+    value = m_builder->CreateLoad(m_builder->getInt32Ty(), valuePtr);
+    break;
+  }
+  case ShaderTable::CallableTableStride: {
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
+    auto offset = offsetof(GpuRt::DispatchRaysInfoData, callableTable.strideInBytes);
+#else
+    auto offset = offsetof(GpuRt::DispatchRaysConstantData, callableTableStrideInBytes);
+#endif
+    Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
+    value = m_builder->CreateLoad(m_builder->getInt32Ty(), valuePtr);
+    break;
+  }
+  case ShaderTable::TraceRayGpuVirtAddr: {
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
+    auto offset = offsetof(GpuRt::DispatchRaysInfoData, traceRayGpuVa);
+#else
+    auto offset = offsetof(GpuRt::DispatchRaysConstantData, traceRayGpuVaLo);
+    static_assert(offsetof(GpuRt::DispatchRaysConstantData, traceRayGpuVaHi) ==
+                      offsetof(GpuRt::DispatchRaysConstantData, traceRayGpuVaLo) + 4,
+                  "GpuRt::DispatchRaysConstantData: traceRayGpuVaLo and traceRayGpuVaHi mismatch!");
+#endif
+    Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
+    value = m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
+    break;
+  }
+  case ShaderTable::LaunchSize: {
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
+    auto offset = offsetof(GpuRt::DispatchRaysInfoData, rayDispatchWidth);
+#else
+    auto offset = offsetof(GpuRt::DispatchRaysConstantData, rayDispatchWidth);
+#endif
+    Value *offsetOfRayDispatchWidth = m_builder->getInt32(offset);
+    Value *rayDispatchWidthPtr =
+        m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, offsetOfRayDispatchWidth, "");
+    Type *int32x3Ty = FixedVectorType::get(m_builder->getInt32Ty(), 3);
+    value = m_builder->CreateLoad(int32x3Ty, rayDispatchWidthPtr);
+    break;
+  }
+  default: {
+    llvm_unreachable("Should never be called!");
+    break;
+  }
   }
 
-  return m_shaderTable[tableKind];
+  return value;
 }
 
 // =====================================================================================================================
@@ -1161,40 +1287,36 @@ void SpirvLowerRayTracing::createShaderSelection(Function *func, BasicBlock *ent
 // Process global variable shader record buffer
 //
 // @param global : Global variable corresponding to shader record buffer
+// @param bufferDesc: Dispatch ray buffer descriptor
+// @param tableIndex : Shader table record index
 // @param insertPos : Where to insert instruction
-void SpirvLowerRayTracing::processShaderRecordBuffer(GlobalVariable *global, Instruction *insertPos) {
+void SpirvLowerRayTracing::processShaderRecordBuffer(GlobalVariable *global, Value *bufferDesc, Value *tableIndex,
+                                                     Instruction *insertPos) {
   m_builder->SetInsertPoint(insertPos);
   Value *tableAddr = nullptr;
   Value *tableStride = nullptr;
 
   switch (m_shaderStage) {
   case ShaderStageRayTracingRayGen: {
-    tableAddr = createShaderTableVariable(ShaderTable::RayGenTableAddr);
-    tableAddr = m_builder->CreateLoad(m_builder->getInt64Ty(), tableAddr);
+    tableAddr = createShaderTableVariable(ShaderTable::RayGenTableAddr, bufferDesc);
     tableStride = m_builder->getInt32(0);
     break;
   }
   case ShaderStageRayTracingClosestHit:
   case ShaderStageRayTracingAnyHit:
   case ShaderStageRayTracingIntersect: {
-    tableAddr = createShaderTableVariable(ShaderTable::HitGroupTableAddr);
-    tableAddr = m_builder->CreateLoad(m_builder->getInt64Ty(), tableAddr);
-    tableStride = createShaderTableVariable(ShaderTable::HitGroupTableStride);
-    tableStride = m_builder->CreateLoad(m_builder->getInt32Ty(), tableStride);
+    tableAddr = createShaderTableVariable(ShaderTable::HitGroupTableAddr, bufferDesc);
+    tableStride = createShaderTableVariable(ShaderTable::HitGroupTableStride, bufferDesc);
     break;
   }
   case ShaderStageRayTracingCallable: {
-    tableAddr = createShaderTableVariable(ShaderTable::CallableTableAddr);
-    tableAddr = m_builder->CreateLoad(m_builder->getInt64Ty(), tableAddr);
-    tableStride = createShaderTableVariable(ShaderTable::CallableTableStride);
-    tableStride = m_builder->CreateLoad(m_builder->getInt32Ty(), tableStride);
+    tableAddr = createShaderTableVariable(ShaderTable::CallableTableAddr, bufferDesc);
+    tableStride = createShaderTableVariable(ShaderTable::CallableTableStride, bufferDesc);
     break;
   }
   case ShaderStageRayTracingMiss: {
-    tableAddr = createShaderTableVariable(ShaderTable::MissTableAddr);
-    tableAddr = m_builder->CreateLoad(m_builder->getInt64Ty(), tableAddr);
-    tableStride = createShaderTableVariable(ShaderTable::MissTableStride);
-    tableStride = m_builder->CreateLoad(m_builder->getInt32Ty(), tableStride);
+    tableAddr = createShaderTableVariable(ShaderTable::MissTableAddr, bufferDesc);
+    tableStride = createShaderTableVariable(ShaderTable::MissTableStride, bufferDesc);
     break;
   }
   default: {
@@ -1211,8 +1333,6 @@ void SpirvLowerRayTracing::processShaderRecordBuffer(GlobalVariable *global, Ins
   Value *shaderIdsSizeVal = m_builder->getInt32(shaderIdsSize);
 
   // Byte offset = (tableStride * tableIndex) + shaderIdsSize
-  Value *tableIndex = createShaderTableVariable(ShaderTable::ShaderRecordIndex);
-  tableIndex = m_builder->CreateLoad(m_builder->getInt32Ty(), tableIndex);
   Value *offset = m_builder->CreateMul(tableIndex, tableStride);
   offset = m_builder->CreateAdd(offset, shaderIdsSizeVal);
 
@@ -1236,7 +1356,8 @@ void SpirvLowerRayTracing::processShaderRecordBuffer(GlobalVariable *global, Ins
 //
 // @param stage : Shader stage
 // @param shaderRecordIndex : Shader table record index
-Value *SpirvLowerRayTracing::getShaderIdentifier(ShaderStage stage, Value *shaderRecordIndex) {
+// @param bufferDesc : DispatchRay descriptor
+Value *SpirvLowerRayTracing::getShaderIdentifier(ShaderStage stage, Value *shaderRecordIndex, Value *bufferDesc) {
   ShaderTable tableAddr = ShaderTable::Count;
   ShaderTable tableStride = ShaderTable::Count;
   unsigned offset = 0;
@@ -1279,13 +1400,11 @@ Value *SpirvLowerRayTracing::getShaderIdentifier(ShaderStage stage, Value *shade
   }
 
   assert(tableAddr != ShaderTable::Count);
-  Value *tableAddrVal = createShaderTableVariable(tableAddr);
-  tableAddrVal = m_builder->CreateLoad(m_builder->getInt64Ty(), tableAddrVal);
+  Value *tableAddrVal = createShaderTableVariable(tableAddr, bufferDesc);
 
   Value *stride = m_builder->getInt32(0);
   if (tableStride != ShaderTable::Count) {
-    stride = createShaderTableVariable(tableStride);
-    stride = m_builder->CreateLoad(m_builder->getInt32Ty(), stride);
+    stride = createShaderTableVariable(tableStride, bufferDesc);
   }
 
   // Table offset sbtIndex * stride + offset
@@ -1307,10 +1426,12 @@ Value *SpirvLowerRayTracing::getShaderIdentifier(ShaderStage stage, Value *shade
 // Create AnyHit shaders call function for use reportIntersection
 //
 // @param shaderIdentifier : Input shader identifier for the function
-void SpirvLowerRayTracing::createAnyHitFunc(Value *shaderIdentifier) {
+// @param shaderRecordIndex : Shader record index
+void SpirvLowerRayTracing::createAnyHitFunc(Value *shaderIdentifier, Value *shaderRecordIndex) {
   Function *func = dyn_cast_or_null<Function>(m_module->getFunction(RtName::CallAnyHitShader));
   if (!func) {
-    auto funcTy = FunctionType::get(m_builder->getVoidTy(), {shaderIdentifier->getType()}, false);
+    auto funcTy =
+        FunctionType::get(m_builder->getVoidTy(), {shaderIdentifier->getType(), shaderRecordIndex->getType()}, false);
     func = Function::Create(funcTy, GlobalValue::InternalLinkage, RtName::CallAnyHitShader, m_module);
     func->addFnAttr(Attribute::NoUnwind);
     func->addFnAttr(Attribute::AlwaysInline);
@@ -1330,6 +1451,7 @@ void SpirvLowerRayTracing::createAnyHitFunc(Value *shaderIdentifier) {
 
     m_builder->SetInsertPoint(entryBlock);
     Value *shaderId = func->arg_begin();
+    Value *tableIndex = func->arg_begin() + 1;
     Value *inputResult = m_builder->CreateAlloca(getShaderReturnTy(ShaderStageRayTracingAnyHit), SPIRAS_Private);
     Value *anyHitCallATypeAddr = m_traceParams[TraceParam::DuplicateAnyHit];
     Value *anyHitCallType = m_builder->CreateLoad(m_traceParamsTys[TraceParam::DuplicateAnyHit], anyHitCallATypeAddr);
@@ -1337,8 +1459,8 @@ void SpirvLowerRayTracing::createAnyHitFunc(Value *shaderIdentifier) {
     m_builder->CreateCondBr(checkCallType, endBlock, shaderBlock);
 
     m_builder->SetInsertPoint(shaderBlock);
-    createCallShader(func, ShaderStageRayTracingAnyHit, RayTracingContext::InvalidShaderId, shaderId, inputResult,
-                     shaderBlock, duplicateBlock);
+    createCallShader(func, ShaderStageRayTracingAnyHit, RayTracingContext::InvalidShaderId, shaderId, tableIndex,
+                     inputResult, shaderBlock, duplicateBlock);
 
     m_builder->SetInsertPoint(duplicateBlock);
     checkCallType = m_builder->CreateICmpEQ(anyHitCallType, m_builder->getInt32(1));
@@ -1428,11 +1550,9 @@ void SpirvLowerRayTracing::createRayGenEntryFunc() {
 
   lgc::Pipeline::markShaderEntryPoint(func, lgc::ShaderStageCompute);
 
-  GlobalVariable *global = createGlobalBuiltIn(BuiltInLaunchSizeKHR);
-
   // Construct entry block guard the launchId from launchSize
   m_builder->SetInsertPoint(entryBlock);
-  Value *launchSize = m_builder->CreateLoad(global->getValueType(), global);
+  Value *launchSize = createShaderTableVariable(ShaderTable::LaunchSize, getDispatchRaysInfoDesc());
   auto builtIn = lgc::BuiltInGlobalInvocationId;
   lgc::InOutInfo inputInfo = {};
   auto launchlId = m_builder->CreateReadBuiltInInput(builtIn, inputInfo, nullptr, nullptr, "");
@@ -1451,7 +1571,7 @@ void SpirvLowerRayTracing::createRayGenEntryFunc() {
 
   // Construct main block
   m_builder->SetInsertPoint(mainBlock);
-  auto rayGenId = getShaderIdentifier(m_shaderStage, m_builder->getInt32(0));
+  auto rayGenId = getShaderIdentifier(m_shaderStage, m_builder->getInt32(0), getDispatchRaysInfoDesc());
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
   bool indirect = rayTracingContext->getIndirectStageMask() & shaderStageToMask(m_shaderStage);
   if (!indirect) {
@@ -1928,7 +2048,7 @@ FunctionType *SpirvLowerRayTracing::getShaderEntryFuncTy(ShaderStage stage) {
     argTys.push_back(m_traceParamsTys[param]);
   }
 
-  argTys.push_back(createShaderTableVariable(ShaderTable::ShaderRecordIndex)->getValueType());
+  argTys.push_back(m_builder->getInt32Ty());
 
   return FunctionType::get(retTy, argTys, false);
 }
@@ -1980,7 +2100,7 @@ Instruction *SpirvLowerRayTracing::createEntryFunc(Function *func) {
     m_builder->CreateStore(arg, m_traceParams[param]);
   }
 
-  m_builder->CreateStore(argIt, createShaderTableVariable(ShaderTable::ShaderRecordIndex));
+  m_shaderRecordIndex = argIt;
 
   // Initialize hit status for intersection shader (ignore) and any hit shader (accept)
   if (m_shaderStage == ShaderStageRayTracingIntersect || m_shaderStage == ShaderStageRayTracingAnyHit) {
@@ -1999,13 +2119,6 @@ Instruction *SpirvLowerRayTracing::createEntryFunc(Function *func) {
 void SpirvLowerRayTracing::updateGlobalFromCallShaderFunc(Function *func, ShaderStage stage) {
   auto zero = m_builder->getInt32(0);
   auto one = m_builder->getInt32(1);
-
-  // Table Index is second parameter for non-intersect shader and third for intersect shader
-  Value *tableIndexValue = stage != ShaderStageRayTracingIntersect ? (func->arg_begin() + 1) : (func->arg_begin() + 2);
-
-  tableIndexValue = m_builder->CreateLoad(m_builder->getInt32Ty(), tableIndexValue);
-  Value *shaderRecordIndex = createShaderTableVariable(ShaderTable::ShaderRecordIndex);
-  m_builder->CreateStore(tableIndexValue, shaderRecordIndex);
 
   if (stage == ShaderStageRayTracingAnyHit) {
     // Third function parameter attribute
@@ -2033,8 +2146,8 @@ FunctionType *SpirvLowerRayTracing::getCallableShaderEntryFuncTy() {
   SmallVector<Type *, 8> argTys;
   auto callableDataTy = rayTracingContext->getCallableDataType(m_builder);
   argTys.push_back(callableDataTy);
-
-  argTys.push_back(createShaderTableVariable(ShaderTable::ShaderRecordIndex)->getValueType());
+  // Add shaderRecordIndex type
+  argTys.push_back(m_builder->getInt32Ty());
 
   return FunctionType::get(callableDataTy, argTys, false);
 }
@@ -2106,7 +2219,7 @@ Instruction *SpirvLowerRayTracing::createCallableShaderEntryFunc(Function *func)
   m_builder->CreateStore(arg, m_globalCallableData);
 
   // Save the shader record index
-  m_builder->CreateStore(argIt++, createShaderTableVariable(ShaderTable::ShaderRecordIndex));
+  m_shaderRecordIndex = argIt;
 
   return insertPos;
 }
@@ -2507,6 +2620,18 @@ Function *SpirvLowerRayTracing::getOrCreateRemapCapturedVaToReplayVaFunc() {
   }
 
   return func;
+}
+
+// =====================================================================================================================
+// Get DispatchRaysInfo Descriptor
+//
+// @param insertPos : Where to insert instructions
+Value *SpirvLowerRayTracing::getDispatchRaysInfoDesc() {
+  if (!m_dispatchRaysInfoDesc) {
+    m_dispatchRaysInfoDesc = m_builder->CreateLoadBufferDesc(
+        TraceRayDescriptorSet, RayTracingResourceIndexDispatchRaysInfo, m_builder->getInt32(0), 0);
+  }
+  return m_dispatchRaysInfoDesc;
 }
 
 // =====================================================================================================================

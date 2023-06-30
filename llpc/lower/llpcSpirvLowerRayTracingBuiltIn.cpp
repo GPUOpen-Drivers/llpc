@@ -54,7 +54,7 @@ extern const char *ShaderTable;
 namespace Llpc {
 
 // =====================================================================================================================
-SpirvLowerRayTracingBuiltIn::SpirvLowerRayTracingBuiltIn() : m_dispatchRaysInfoDesc(nullptr) {
+SpirvLowerRayTracingBuiltIn::SpirvLowerRayTracingBuiltIn() {
   memset(m_traceParams, 0, sizeof(m_traceParams));
 }
 
@@ -74,7 +74,6 @@ PreservedAnalyses SpirvLowerRayTracingBuiltIn::run(Module &module, ModuleAnalysi
 // @param [in,out] module : LLVM module to be run on
 bool SpirvLowerRayTracingBuiltIn::runImpl(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Ray-Tracing-BuiltIn\n");
-  m_dispatchRaysInfoDesc = nullptr;
   m_module = &module;
   m_context = static_cast<Context *>(&m_module->getContext());
   m_builder = m_context->getBuilder();
@@ -102,7 +101,6 @@ bool SpirvLowerRayTracingBuiltIn::runImpl(Module &module) {
   assert(m_entryPoint);
 
   auto traceParamstrLen = strlen(RtName::TraceRaySetTraceParams);
-  auto shaderTableStrLen = strlen(RtName::ShaderTable);
   Instruction *insertPos = &*(m_entryPoint->begin()->getFirstNonPHIOrDbgOrAlloca());
   for (auto globalIt = m_module->global_begin(), end = m_module->global_end(); globalIt != end;) {
     GlobalVariable *global = &*globalIt++;
@@ -113,10 +111,6 @@ bool SpirvLowerRayTracingBuiltIn::runImpl(Module &module) {
       int index = 0;
       global->getName().substr(traceParamstrLen).consumeInteger(0, index);
       m_traceParams[index] = global;
-    } else if (global->getName().startswith(RtName::ShaderTable)) {
-      int tableKind = 0;
-      global->getName().substr(shaderTableStrLen).consumeInteger(0, tableKind);
-      setShaderTableVariables(global, static_cast<ShaderTable>(tableKind), insertPos);
     }
   }
 
@@ -182,20 +176,6 @@ Value *SpirvLowerRayTracingBuiltIn::processBuiltIn(GlobalVariable *global, Instr
     auto builtIn = lgc::BuiltInGlobalInvocationId;
     lgc::InOutInfo inputInfo = {};
     input = m_builder->CreateReadBuiltInInput(builtIn, inputInfo, nullptr, nullptr, "");
-    break;
-  }
-  case BuiltInLaunchSizeKHR: {
-    Value *const bufferDesc = getDispatchRaysInfoDesc(insertPos);
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
-    auto offset = offsetof(GpuRt::DispatchRaysInfoData, rayDispatchWidth);
-#else
-    auto offset = offsetof(GpuRt::DispatchRaysConstantData, rayDispatchWidth);
-#endif
-    Value *offsetOfRayDispatchWidth = m_builder->getInt32(offset);
-    Value *rayDispatchWidthPtr =
-        m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, offsetOfRayDispatchWidth, "");
-    Type *int32x3Ty = FixedVectorType::get(m_builder->getInt32Ty(), 3);
-    input = m_builder->CreateLoad(int32x3Ty, rayDispatchWidthPtr);
     break;
   }
   case BuiltInPrimitiveId: {
@@ -272,144 +252,6 @@ Value *SpirvLowerRayTracingBuiltIn::processBuiltIn(GlobalVariable *global, Instr
   }
 
   return input;
-}
-
-// =====================================================================================================================
-// Set shader table variable value
-//
-// @param global : Global variable to set value
-// @param tableKind : Kind of shader table variable
-// @param insertPos : where to insert instructions
-void SpirvLowerRayTracingBuiltIn::setShaderTableVariables(GlobalValue *global, ShaderTable tableKind,
-                                                          Instruction *insertPos) {
-  m_builder->SetInsertPoint(insertPos);
-  Value *value = nullptr;
-  Value *const bufferDesc = getDispatchRaysInfoDesc(insertPos);
-
-  switch (tableKind) {
-  case ShaderTable::RayGenTableAddr: {
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
-    auto offset = offsetof(GpuRt::DispatchRaysInfoData, rayGenerationTable);
-#else
-    auto offset = offsetof(GpuRt::DispatchRaysConstantData, rayGenerationTableAddressLo);
-    static_assert(
-        offsetof(GpuRt::DispatchRaysConstantData, rayGenerationTableAddressHi) ==
-            offsetof(GpuRt::DispatchRaysConstantData, rayGenerationTableAddressLo) + 4,
-        "GpuRt::DispatchRaysConstantData: rayGenerationTableAddressLo and rayGenerationTableAddressHi mismatch!");
-#endif
-    Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
-    value = m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
-    break;
-  }
-  case ShaderTable::MissTableAddr: {
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
-    auto offset = offsetof(GpuRt::DispatchRaysInfoData, missTable.baseAddress);
-#else
-    auto offset = offsetof(GpuRt::DispatchRaysConstantData, missTableBaseAddressLo);
-    static_assert(offsetof(GpuRt::DispatchRaysConstantData, missTableBaseAddressHi) ==
-                      offsetof(GpuRt::DispatchRaysConstantData, missTableBaseAddressLo) + 4,
-                  "GpuRt::DispatchRaysConstantData: missTableBaseAddressLo and missTableBaseAddressHi mismatch!");
-#endif
-    Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
-    value = m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
-    break;
-  }
-  case ShaderTable::HitGroupTableAddr: {
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
-    auto offset = offsetof(GpuRt::DispatchRaysInfoData, hitGroupTable.baseAddress);
-#else
-    auto offset = offsetof(GpuRt::DispatchRaysConstantData, hitGroupTableBaseAddressLo);
-    static_assert(
-        offsetof(GpuRt::DispatchRaysConstantData, hitGroupTableBaseAddressHi) ==
-            offsetof(GpuRt::DispatchRaysConstantData, hitGroupTableBaseAddressLo) + 4,
-        "GpuRt::DispatchRaysConstantData: hitGroupTableBaseAddressLo and hitGroupTableBaseAddressHi mismatch!");
-#endif
-    Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
-    value = m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
-    break;
-  }
-  case ShaderTable::CallableTableAddr: {
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
-    auto offset = offsetof(GpuRt::DispatchRaysInfoData, callableTable.baseAddress);
-#else
-    auto offset = offsetof(GpuRt::DispatchRaysConstantData, callableTableBaseAddressLo);
-    static_assert(
-        offsetof(GpuRt::DispatchRaysConstantData, callableTableBaseAddressHi) ==
-            offsetof(GpuRt::DispatchRaysConstantData, callableTableBaseAddressLo) + 4,
-        "GpuRt::DispatchRaysConstantData: callableTableBaseAddressLo and callableTableBaseAddressHi mismatch!");
-#endif
-    Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
-    value = m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
-    break;
-  }
-  case ShaderTable::MissTableStride: {
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
-    auto offset = offsetof(GpuRt::DispatchRaysInfoData, missTable.strideInBytes);
-#else
-    auto offset = offsetof(GpuRt::DispatchRaysConstantData, missTableStrideInBytes);
-#endif
-    Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
-    value = m_builder->CreateLoad(m_builder->getInt32Ty(), valuePtr);
-    break;
-  }
-  case ShaderTable::HitGroupTableStride: {
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
-    auto offset = offsetof(GpuRt::DispatchRaysInfoData, hitGroupTable.strideInBytes);
-#else
-    auto offset = offsetof(GpuRt::DispatchRaysConstantData, hitGroupTableStrideInBytes);
-#endif
-    Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
-    value = m_builder->CreateLoad(m_builder->getInt32Ty(), valuePtr);
-    break;
-  }
-  case ShaderTable::CallableTableStride: {
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
-    auto offset = offsetof(GpuRt::DispatchRaysInfoData, callableTable.strideInBytes);
-#else
-    auto offset = offsetof(GpuRt::DispatchRaysConstantData, callableTableStrideInBytes);
-#endif
-    Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
-    value = m_builder->CreateLoad(m_builder->getInt32Ty(), valuePtr);
-    break;
-  }
-  case ShaderTable::ShaderRecordIndex: {
-    value = m_builder->getInt32(0);
-    break;
-  }
-  case ShaderTable::TraceRayGpuVirtAddr: {
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
-    auto offset = offsetof(GpuRt::DispatchRaysInfoData, traceRayGpuVa);
-#else
-    auto offset = offsetof(GpuRt::DispatchRaysConstantData, traceRayGpuVaLo);
-    static_assert(offsetof(GpuRt::DispatchRaysConstantData, traceRayGpuVaHi) ==
-                      offsetof(GpuRt::DispatchRaysConstantData, traceRayGpuVaLo) + 4,
-                  "GpuRt::DispatchRaysConstantData: traceRayGpuVaLo and traceRayGpuVaHi mismatch!");
-#endif
-    Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
-    value = m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
-    break;
-  }
-  default: {
-    llvm_unreachable("Should never be called!");
-    break;
-  }
-  }
-
-  assert(value);
-  m_builder->CreateStore(value, global);
-}
-
-// =====================================================================================================================
-// Get DispatchRaysInfo Descriptor
-//
-// @param insertPos : Where to insert instructions
-Value *SpirvLowerRayTracingBuiltIn::getDispatchRaysInfoDesc(Instruction *insertPos) {
-  if (!m_dispatchRaysInfoDesc) {
-    m_builder->SetInsertPoint(insertPos);
-    m_dispatchRaysInfoDesc = m_builder->CreateLoadBufferDesc(
-        TraceRayDescriptorSet, RayTracingResourceIndexDispatchRaysInfo, m_builder->getInt32(0), 0);
-  }
-  return m_dispatchRaysInfoDesc;
 }
 
 } // namespace Llpc

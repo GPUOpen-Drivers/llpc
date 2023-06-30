@@ -117,7 +117,7 @@ enum ShaderTable : unsigned {
   MissTableStride,     // Miss table stride
   HitGroupTableStride, // Hit group table stride
   CallableTableStride, // Callable table stride
-  ShaderRecordIndex,   // Shader record index
+  LaunchSize,          // Launch size
   TraceRayGpuVirtAddr, // TraceRay GPU virtual address
   Count                // Count of shader table global variables
 };
@@ -144,15 +144,17 @@ private:
   llvm::GlobalVariable *createGlobalBuiltIn(unsigned builtInId);
   void createRayGenEntryFunc();
   void replaceGlobal(llvm::GlobalVariable *global, llvm::GlobalVariable *replacedGlobal);
-  void processShaderRecordBuffer(llvm::GlobalVariable *global, llvm::Instruction *insertPos);
+  void processShaderRecordBuffer(llvm::GlobalVariable *global, llvm::Value *bufferDesc, llvm::Value *tableIndex,
+                                 llvm::Instruction *insertPos);
   void createTraceRay();
   void createSetHitAttributes(llvm::Function *func);
   void createSetTraceParams(llvm::Function *func);
-  void createAnyHitFunc(llvm::Value *shaderIdentifier);
+  void createAnyHitFunc(llvm::Value *shaderIdentifier, llvm::Value *shaderRecordIndex);
   void processLibraryFunction(llvm::Function *func);
   void createCallShaderFunc(llvm::Function *func, ShaderStage stage, unsigned intersectId, llvm::Value *retVal);
   void createCallShader(llvm::Function *func, ShaderStage stage, unsigned intersectId, llvm::Value *shaderId,
-                        llvm::Value *inputResult, llvm::BasicBlock *entryBlock, llvm::BasicBlock *endBlock);
+                        llvm::Value *shaderRecordIndex, llvm::Value *inputResult, llvm::BasicBlock *entryBlock,
+                        llvm::BasicBlock *endBlock);
   void updateGlobalFromCallShaderFunc(llvm::Function *func, ShaderStage stage);
   void createSetTriangleInsection(llvm::Function *func);
   llvm::Value *processBuiltIn(unsigned builtInId, llvm::Instruction *insertPos);
@@ -160,8 +162,8 @@ private:
                              llvm::Value *shaderId, unsigned intersectId, ShaderStage stage,
                              const llvm::SmallVector<llvm::Value *, 8> &args, llvm::Value *result,
                              llvm::Type *inResultTy);
-  llvm::GlobalVariable *createShaderTableVariable(ShaderTable tableKind);
-  llvm::Value *getShaderIdentifier(ShaderStage stage, llvm::Value *shaderRecordIndex);
+  llvm::Value *createShaderTableVariable(ShaderTable tableKind, llvm::Value *bufferDesc);
+  llvm::Value *getShaderIdentifier(ShaderStage stage, llvm::Value *shaderRecordIndex, llvm::Value *bufferDesc);
   void createDbgInfo(llvm::Module &module, llvm::Function *func);
   void processTerminalFunc(llvm::Function *func, llvm::CallInst *inst, RayHitStatus hitStatus);
   void processPostReportIntersection(llvm::Function *func, llvm::CallInst *inst);
@@ -174,6 +176,7 @@ private:
   llvm::FunctionType *getShaderEntryFuncTy(ShaderStage stage);
   llvm::FunctionType *getCallableShaderEntryFuncTy();
   llvm::FunctionType *getTraceRayFuncTy();
+  llvm::Value *getDispatchRaysInfoDesc();
   llvm::Instruction *createCallableShaderEntryFunc(llvm::Function *func);
   void createCallableShaderEntryTerminator(llvm::Function *func);
   void getFuncRets(llvm::Function *func, llvm::SmallVector<llvm::Instruction *, 4> &rets);
@@ -195,7 +198,6 @@ private:
   void processTraceRayCall(lgc::rt::BaseTraceRayOp *inst);
 
   llvm::GlobalVariable *m_traceParams[TraceParam::Count];              // Trace ray set parameters
-  llvm::GlobalVariable *m_shaderTable[ShaderTable::Count];             // Shader table variables
   llvm::GlobalVariable *m_funcRetFlag = nullptr;                       // Function return flag
   llvm::Value *m_worldToObjMatrix = nullptr;                           // World to Object matrix
   llvm::GlobalVariable *m_globalPayload = nullptr;                     // Global payload variable
@@ -204,6 +206,8 @@ private:
   llvm::SmallVector<llvm::Type *, TraceParam::Count> m_traceParamsTys; // Trace Params types
   llvm::SmallVector<llvm::Instruction *> m_callsToLower;               // Call instruction to lower
   llvm::SmallSet<llvm::Function *, 4> m_funcsToLower;                  // Functions to lower
+  llvm::Value *m_dispatchRaysInfoDesc = nullptr;                       // Descriptor of the DispatchRaysInfo
+  llvm::Value *m_shaderRecordIndex = nullptr;                          // Variable sourced from entry function argument
 };
 
 } // namespace Llpc
