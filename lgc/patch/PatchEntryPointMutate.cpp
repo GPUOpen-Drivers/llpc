@@ -1257,7 +1257,7 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
 // unmerged shader stage. The code here needs to ensure that it gets the same SGPR user data layout for
 // both shaders that are going to be merged (VS-HS, VS-GS if no tessellation, ES-GS).
 //
-// @param shaderInputs : ShaderInputs object representing hardware-provided shader inputs
+// @param shaderInputs : ShaderInputs object representing hardware-provided shader inputs (may be null)
 // @param origFunc : The original entry point function
 // @param [out] argTys : The argument types for the new function type
 // @param [out] argNames : The argument names corresponding to the argument types
@@ -1359,8 +1359,9 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
   inRegMask = (1ull << argTys.size()) - 1;
 
   // Push the fixed system (not user data) register args.
-  inRegMask |= shaderInputs->getShaderArgTys(m_pipelineState, m_shaderStage, origFunc, m_computeWithCalls, argTys,
-                                             argNames, argOffset);
+  if (shaderInputs)
+    inRegMask |= shaderInputs->getShaderArgTys(m_pipelineState, m_shaderStage, origFunc, m_computeWithCalls, argTys,
+                                               argNames, argOffset);
 
   if (m_pipelineState->useRegisterFieldFormat()) {
     constexpr unsigned NumUserSgprs = 32;
