@@ -4770,7 +4770,10 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
   }
 
   case OpUndef:
-    return mapValue(bv, PoisonValue::get(transType(bv->getType())));
+    // TODO: Stop using UndefValue since it is deprecated in favor of PoisonValue. A more faithful translation of
+    // OpUndef semantics would be to insert "freeze poison" before each _use_ of it in a function, but what about uses
+    // that are not in any function?
+    return mapValue(bv, UndefValue::get(transType(bv->getType())));
 
   case OpFunctionParameter: {
     auto ba = static_cast<SPIRVFunctionParameter *>(bv);
