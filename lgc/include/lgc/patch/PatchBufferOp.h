@@ -60,6 +60,8 @@ class TypeLowering;
 class BufferOpLowering {
   // Hide operator bool to safe-guard against accidents.
   struct optional_bool : private std::optional<bool> {
+    optional_bool() = default;
+    optional_bool(const optional_bool &rhs) = default;
     optional_bool &operator=(const optional_bool &rhs) = default;
     optional_bool &operator=(bool rhs) {
       std::optional<bool>::operator=(rhs);
