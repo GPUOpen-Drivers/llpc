@@ -1529,14 +1529,6 @@ void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bo
        dfmt != BufDataFormat8_8 && dfmt != BufDataFormat8_8_8_8 && dfmt != BufDataFormat16_16 &&
        dfmt != BufDataFormat16_16_16_16 && dfmt != BufDataFormat8_8_8) ||
       formatInfo->compDfmt == dfmt) {
-    // NOTE: If the vertex attribute offset is greater than vertex attribute stride, we have to adjust both vertex
-    // buffer index and vertex attribute offset accordingly. Otherwise, vertex fetch might behave unexpectedly.
-    if (stride != 0 && offset > stride) {
-      vbIndex = BinaryOperator::CreateAdd(vbIndex, ConstantInt::get(Type::getInt32Ty(*m_context), offset / stride), "",
-                                          insertPos);
-      offset = offset % stride;
-    }
-
     // Do vertex fetch
     Value *args[] = {
         vbDesc,                                                                      // rsrc
@@ -1616,18 +1608,8 @@ void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bo
 
     for (unsigned i = 0; i < formatInfo->compCount; ++i) {
       unsigned compOffset = offset + i * formatInfo->compByteSize;
-
-      // NOTE: If the vertex attribute per-component offset is greater than vertex attribute stride, we have
-      // to adjust both vertex buffer index and vertex per-component offset accordingly. Otherwise, vertex
-      // fetch might behave unexpectedly.
-      if (stride != 0 && compOffset > stride) {
-        compVbIndices[i] = BinaryOperator::CreateAdd(
-            vbIndex, ConstantInt::get(Type::getInt32Ty(*m_context), compOffset / stride), "", insertPos);
-        compOffsets[i] = compOffset % stride;
-      } else {
-        compVbIndices[i] = vbIndex;
-        compOffsets[i] = compOffset;
-      }
+      compVbIndices[i] = vbIndex;
+      compOffsets[i] = compOffset;
     }
 
     Type *fetchTy = is16bitFetch ? FixedVectorType::get(Type::getInt16Ty(*m_context), numChannels)
