@@ -57,9 +57,6 @@ target_link_libraries(LLVMlgc PUBLIC llvm_dialects)
 
 ### Cached Project Options #############################################################################################
 option(LLPC_BUILD_NAVI12 "LLPC support for NAVI12?" OFF)
-#if VKI_BUILD_NAVI33
-option(LLPC_BUILD_NAVI33 "LLPC support for NAVI33?" OFF)
-#endif
 option(LLPC_BUILD_REMBRANDT "LLPC support for REMBRANDT?" OFF)
 option(LLPC_BUILD_RAPHAEL "LLPC support for RAPHAEL?" OFF)
 option(LLPC_BUILD_MENDOCINO "LLPC support for MENDOCINO?" OFF)
@@ -113,6 +110,7 @@ target_compile_definitions(LLVMlgc PRIVATE
         CHIP_HDR_NAVI23
         CHIP_HDR_NAVI24
         CHIP_HDR_NAVI31
+        CHIP_HDR_NAVI33
         )
 
 target_compile_definitions(LLVMlgc PRIVATE CHIP_HDR_RENOIR)
@@ -123,14 +121,6 @@ target_compile_definitions(LLVMlgc PRIVATE CHIP_HDR_RENOIR)
         CHIP_HDR_NAVI12
     )
   endif()
-#if VKI_BUILD_NAVI33
-  if(LLPC_BUILD_NAVI33)
-    target_compile_definitions(LLVMlgc PRIVATE
-        LLPC_BUILD_NAVI33
-        CHIP_HDR_NAVI33
-    )
-  endif()
-#endif
   if(LLPC_BUILD_REMBRANDT)
     target_compile_definitions(LLVMlgc PRIVATE
         LLPC_BUILD_REMBRANDT
