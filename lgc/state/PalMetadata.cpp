@@ -732,7 +732,7 @@ void PalMetadata::finalizeInputControlRegisterSetting() {
                                 .getArray(true);
       // Check if pointCoordLoc is not used
       auto spiPsInputCntlElem = spiPsInputCntl[viewportIndexLoc].getMap(true);
-      if (spiPsInputCntlElem[Util::Abi::SpiPsInputCntlMetadataKey::PtSpriteTex].getBool()) {
+      if (!spiPsInputCntlElem[Util::Abi::SpiPsInputCntlMetadataKey::PtSpriteTex].getBool()) {
         // Use default value 0 for viewport array index if it is only used in FS (not set in other stages)
         constexpr unsigned defaultVal = (1 << 5);
         spiPsInputCntlElem[Util::Abi::SpiPsInputCntlMetadataKey::Offset] = defaultVal;
