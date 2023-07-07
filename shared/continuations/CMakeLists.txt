@@ -35,7 +35,20 @@ function(set_compiler_options PROJECT_NAME)
   endif()
 endfunction()
 
-add_llvm_library(LLVMContinuations lib/LgcCpsDialect.cpp)
+add_llvm_library(LLVMContinuations
+  lib/LgcCpsDialect.cpp
+
+  DEPENDS
+  intrinsics_gen
+
+  LINK_COMPONENTS
+  Analysis
+  Core
+  IPO
+  Scalar
+  Support
+  TransformUtils
+)
 
 target_include_directories(LLVMContinuations PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

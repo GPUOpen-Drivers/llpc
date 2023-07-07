@@ -37,6 +37,13 @@ endfunction()
 
 add_llvm_library(LLVMLgcRt
   lib/LgcRtDialect.cpp
+
+  DEPENDS
+  intrinsics_gen
+
+  LINK_COMPONENTS
+  Core
+  Support
 )
 
 target_include_directories(LLVMLgcRt PUBLIC
