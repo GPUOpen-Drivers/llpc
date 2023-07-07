@@ -273,18 +273,17 @@ def ReportHitOp : LgcRtOp<"report.hit", []> {
 }
 
 // =========================================================================================================
-def TraceRayOp : LgcRtOp<"trace.ray", [Memory<[(read)]>, WillReturn]> {
-  let arguments = (ins PointerType:$accelBufPtr, I32:$rayFlags, I32:$instanceInclusionMask,
+def BaseTraceRayOp : OpClass<LgcRtDialect> {
+  let arguments = (ins I64:$accelStruct, I32:$rayFlags, I32:$instanceInclusionMask,
       I32:$rayContributionToHitGroupIndex, I32:$multiplierForGeometryContribution, I32:$missShaderIndex,
       V3F32:$origin, F32:$tMin, V3F32:$direction, F32:$tMax, PointerType:$payload, value:$paq);
-  let results = (outs);
 
   let summary = "Trace a ray";
   let description = [{
     Trace a ray in an acceleration structure and invoke intersection, any hit, closest hit and/or miss
     shaders as appropriate.
 
-    - accelBufPtr: Fat pointer (buffer descriptor) to the acceleration structure.
+    - accelStruct: Address of the acceleration structure.
 
     - rayFlags: Per the DXR spec, controls traceRay behavior.
 
@@ -312,6 +311,13 @@ def TraceRayOp : LgcRtOp<"trace.ray", [Memory<[(read)]>, WillReturn]> {
     - paq: The payload access qualifier as a constant int array. In the simplest case, the array has a
       single entry giving the payload size in bytes. TODO: Define and implement other cases.
   }];
+}
+
+// =========================================================================================================
+def TraceRayOp : LgcRtOp<"trace.ray", [Memory<[(read)]>, WillReturn]> {
+  let superclass = BaseTraceRayOp;
+  let arguments = (ins superclass);
+  let results = (outs);
 }
 
 // =========================================================================================================

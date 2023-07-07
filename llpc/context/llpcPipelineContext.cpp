@@ -217,10 +217,11 @@ void PipelineContext::setRayTracingState(const Vkgc::RtState &rtState, const Vkg
   assert(!shaderLibrary);
 #else
   assert(shaderLibrary);
-
-  m_rtState.gpurtOverride = true;
-  m_rtState.rtIpOverride = true;
-  m_rtState.gpurtShaderLibrary = *shaderLibrary;
+  if (!m_rtState.gpurtOverride && shaderLibrary->pCode) {
+    m_rtState.gpurtOverride = true;
+    m_rtState.rtIpOverride = true;
+    m_rtState.gpurtShaderLibrary = *shaderLibrary;
+  }
 #endif
 
 #if HAVE_GPURT_SHIM

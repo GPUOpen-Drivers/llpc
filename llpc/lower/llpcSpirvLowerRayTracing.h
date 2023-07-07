@@ -39,6 +39,8 @@ class AcceptHitAndEndSearchOp;
 class IgnoreHitOp;
 class CallCallableShaderOp;
 class ReportHitOp;
+class BaseTraceRayOp;
+class TraceRayOp;
 } // namespace lgc::rt
 
 namespace Llpc {
@@ -80,7 +82,7 @@ enum : unsigned {
   RayDir,          // Ray direction
   RayTMax,         // Ray Tmax
   Payload,         // Payload
-  TraceRayCount,   // OpTraceRay params count
+  Paq,             // Payload access qualifier
 };
 } // namespace TraceRayParam
 
@@ -146,7 +148,6 @@ private:
   void createTraceRay();
   void createSetHitAttributes(llvm::Function *func);
   void createSetTraceParams(llvm::Function *func);
-  template <spv::Op> void createRayTracingFunc(llvm::Function *func, unsigned opcode);
   void createAnyHitFunc(llvm::Value *shaderIdentifier);
   void processLibraryFunction(llvm::Function *func);
   void createCallShaderFunc(llvm::Function *func, ShaderStage stage, unsigned intersectId, llvm::Value *retVal);
@@ -190,6 +191,8 @@ private:
   void visitIgnoreHitOp(lgc::rt::IgnoreHitOp &inst);
   void visitCallCallableShaderOp(lgc::rt::CallCallableShaderOp &inst);
   void visitReportHitOp(lgc::rt::ReportHitOp &inst);
+  void visitTraceRayOp(lgc::rt::TraceRayOp &inst);
+  void processTraceRayCall(lgc::rt::BaseTraceRayOp *inst);
 
   llvm::GlobalVariable *m_traceParams[TraceParam::Count];              // Trace ray set parameters
   llvm::GlobalVariable *m_shaderTable[ShaderTable::Count];             // Shader table variables

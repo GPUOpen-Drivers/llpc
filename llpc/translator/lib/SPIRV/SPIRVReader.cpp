@@ -3679,17 +3679,38 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleDow
 }
 
 // =====================================================================================================================
-// Handle OpTraceRayKHR.
+// Create TraceRay dialect Op.
 //
 // @param spvValue : A SPIR-V value.
-template <> Value *SPIRVToLLVM::transValueWithOpcode<OpTraceRayKHR>(SPIRVValue *const spvValue) {
+Value *SPIRV::SPIRVToLLVM::createTraceRayDialectOp(SPIRVValue *const spvValue) {
   if (m_execModule != ExecutionModelRayGenerationKHR) {
     Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
     auto *pipelineContext = static_cast<Llpc::RayTracingContext *>(llpcContext->getPipelineContext());
     pipelineContext->setIndirectPipeline();
   }
+
+  SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
+  std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
   BasicBlock *const block = getBuilder()->GetInsertBlock();
-  return mapValue(spvValue, transSPIRVBuiltinFromInst(static_cast<SPIRVInstruction *>(spvValue), block));
+  Function *const func = getBuilder()->GetInsertBlock()->getParent();
+  Value *const accelStruct = transValue(spvOperands[0], func, block);
+  Value *const rayFlags = transValue(spvOperands[1], func, block);
+  Value *const cullMask = transValue(spvOperands[2], func, block);
+  Value *const sbtOffset = transValue(spvOperands[3], func, block);
+  Value *const sbtStride = transValue(spvOperands[4], func, block);
+  Value *const missIndex = transValue(spvOperands[5], func, block);
+  Value *const rayOrigin = transValue(spvOperands[6], func, block);
+  Value *const rayTMin = transValue(spvOperands[7], func, block);
+  Value *const rayDir = transValue(spvOperands[8], func, block);
+  Value *const rayTMax = transValue(spvOperands[9], func, block);
+  Value *const payload = transValue(spvOperands[10], func, block);
+
+  auto accelStructAsI64 = getBuilder()->CreateBitCast(accelStruct, getBuilder()->getInt64Ty());
+
+  Type *payloadTy = transType(spvOperands[10]->getType()->getPointerElementType());
+  auto paq = getPaqFromSize(getBuilder()->getContext(), alignTo(m_m->getDataLayout().getTypeAllocSize(payloadTy), 4));
+  return getBuilder()->create<TraceRayOp>(accelStructAsI64, rayFlags, cullMask, sbtOffset, sbtStride, missIndex,
+                                          rayOrigin, rayTMin, rayDir, rayTMax, payload, paq);
 }
 
 // =====================================================================================================================
@@ -5705,7 +5726,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
   case OpIsHelperInvocationEXT:
     return mapValue(bv, transValueWithOpcode<OpIsHelperInvocationEXT>(bv));
   case OpTraceRayKHR:
-    return transValueWithOpcode<OpTraceRayKHR>(bv);
+    return mapValue(bv, createTraceRayDialectOp(bv));
   case OpExecuteCallableKHR:
     return mapValue(bv, transValueWithOpcode<OpExecuteCallableKHR>(bv));
   case OpConvertUToAccelerationStructureKHR:
@@ -5941,31 +5962,6 @@ Instruction *SPIRVToLLVM::transBuiltinFromInst(const std::string &funcName, SPIR
   for (auto &i : argTys) {
     if (isa<FunctionType>(i))
       i = PointerType::get(i, SPIRAS_Private);
-  }
-
-  // This is the last place where we know the base type of the payload data. Opaque pointers are
-  // removing ability to get base type from pointer type.
-  // Base type of payload data will be added as last argument to the function.
-  SPIRVValue *payload = nullptr;
-  switch (bi->getOpCode()) {
-  case spv::OpTraceRayKHR:
-    payload = ops[getTraceRayParamPayloadIdx()];
-    break;
-  case spv::OpExecuteCallableKHR:
-    payload = ops.back();
-    break;
-  default:
-    payload = nullptr;
-    break;
-  }
-
-  if (payload) {
-    Type *payloadBaseType = transType(payload->getType()->getPointerElementType());
-
-    Value *dummyValue = Constant::getNullValue(payloadBaseType);
-
-    argTys.push_back(payloadBaseType);
-    args.push_back(dummyValue);
   }
 
   std::string mangledName(funcName);

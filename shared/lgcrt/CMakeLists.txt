@@ -58,9 +58,9 @@ add_custom_command(
     OUTPUT lgcrt
     COMMAND ${CMAKE_COMMAND} -E make_directory lgcrt)
 
-tablegen(LGCRT lgcrt/LgcRtDialect.h.inc -gen-dialect-decls --dialect lgc.rt
+tablegen(LGCRT lgcrt/LgcRtDialect.h.inc -gen-dialect-decls --dialect lgc.rt ${LGCRT_TABLEGEN_DEFINES}
     EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../../imported/llvm-dialects/include)
-tablegen(LGCRT LgcRtDialect.cpp.inc -gen-dialect-defs --dialect lgc.rt
+tablegen(LGCRT LgcRtDialect.cpp.inc -gen-dialect-defs --dialect lgc.rt ${LGCRT_TABLEGEN_DEFINES}
     EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../../imported/llvm-dialects/include)
 add_public_tablegen_target(LgcRtDialectTableGen)
 
