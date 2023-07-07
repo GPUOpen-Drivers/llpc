@@ -850,6 +850,9 @@ void RegisterMetadataBuilder::buildPsRegisters() {
       spiPsInputCntlInfo.offset = UseDefaultVal;
     }
 
+    // NOTE: Set SPI_PS_INPUT_CNTL_* here, but the register can still be changed later,
+    // when it becomes known that gl_ViewportIndex is not used and fields OFFSET and FLAT_SHADE
+    // can be amended.
     spiPsInputCntElem[Util::Abi::SpiPsInputCntlMetadataKey::FlatShade] = spiPsInputCntlInfo.flatShade;
     spiPsInputCntElem[Util::Abi::SpiPsInputCntlMetadataKey::Offset] = spiPsInputCntlInfo.offset;
     spiPsInputCntElem[Util::Abi::SpiPsInputCntlMetadataKey::Fp16InterpMode] = spiPsInputCntlInfo.fp16InterMode;
