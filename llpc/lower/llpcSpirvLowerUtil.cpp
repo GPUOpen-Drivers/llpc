@@ -94,6 +94,7 @@ void setShaderStageToModule(Module *module, ShaderStage shaderStage) {
 BasicBlock *clearBlock(Function *func) {
   assert(func->size() == 1);
   BasicBlock &entryBlock = func->getEntryBlock();
+  entryBlock.dropAllReferences();
   for (auto instIt = entryBlock.begin(); instIt != entryBlock.end();) {
     auto &inst = *instIt++;
     inst.eraseFromParent();

@@ -148,11 +148,8 @@ private:
   void createRayQueryProceedFunc(llvm::Function *func);
   llvm::Value *createIntersectSystemValue(llvm::Function *func, unsigned raySystem);
   void createIntersectMatrix(llvm::Function *func, unsigned builtInId);
-  void createIntersectBvh(llvm::Function *func);
-  void createSampleGpuTime(llvm::Function *func);
   llvm::Value *createGetInstanceNodeAddr(llvm::Value *instNodePtr, llvm::Value *rayQuery);
   llvm::Value *getDispatchId();
-  llvm::Value *createGetBvhSrd(llvm::Value *expansion, llvm::Value *boxSortMode);
   bool stageNotSupportLds(ShaderStage stage);
 
   llvm::GlobalVariable *m_ldsUsage;        // LDS usage
