@@ -45,7 +45,7 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 62
+#define LLPC_INTERFACE_MAJOR_VERSION 63
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -83,6 +83,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     63.0 | Add structure ShaderMetaData. Add pExtraMetaData to GraphicsPipelineBuildInfo.                        |
 //  |     62.0 | Default to the compiler getting the GPURT library directly, and move shader library info into RtState |
 //  |     61.14| Add rasterStream to rsState                                                                           |
 //  |     61.13| Add dualSourceBlendDynamic to cbState                                                                 |
@@ -301,6 +302,7 @@ enum ShaderStageBit : unsigned {
 enum UnlinkedShaderStage : unsigned {
   UnlinkedStageVertexProcess,
   UnlinkedStageFragment,
+  UnlinkedStageColorExport,
   UnlinkedStageCompute,
   UnlinkedStageRayTracing,
   UnlinkedStageCount
@@ -565,10 +567,20 @@ struct ShaderModuleData {
 
 /// Represents fragment shader output info
 struct FsOutInfo {
+  unsigned hwColorTarget;  ///< HW color ouput index
   unsigned location;       ///< Output location in resource layout
-  unsigned index;          ///< Output index in resource layout
   BasicType basicType;     ///< Output data type
   unsigned componentCount; ///< Count of components of output data
+};
+
+/// Represents shader meta data
+struct ShaderMetaData {
+  union {
+    struct {
+      FsOutInfo *fsOutInfos;
+      unsigned  fsOutInfoCount;
+    } fs;
+  };
 };
 
 /// Represents the options for pipeline dump.
@@ -1158,6 +1170,7 @@ struct GraphicsPipelineBuildInfo {
   size_t clientMetadataSize;          ///< Size (in bytes) of the client-defined data
   unsigned numUniformConstantMaps;    ///< Number of uniform constant maps
   UniformConstantMap **ppUniformMaps; ///< Pointers to array of pointers for the uniform constant map.
+  const void *pExtraMetaData;         ///< MetaData for extra info.
 };
 
 /// Represents info to build a compute pipeline.

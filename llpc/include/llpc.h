@@ -131,6 +131,7 @@ enum CacheAccessInfo : uint8_t {
 /// Represents output of building a graphics pipeline.
 struct GraphicsPipelineBuildOut {
   BinaryData pipelineBin;              ///< Output pipeline binary data
+  void *palMetaData;                   ///< Pal meta data.
   CacheAccessInfo pipelineCacheAccess; ///< Pipeline cache access status i.e., hit, miss, or not checked
   CacheAccessInfo stageCacheAccesses[ShaderStageCount]; ///< Shader cache access status i.e., hit, miss, or not checked
 };
