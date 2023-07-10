@@ -107,4 +107,3 @@ def GpurtGetTriangleCompressionModeOp : GpurtOp<"get.triangle.compression.mode",
   let results = (outs I32:$result);
   let summary = "return the traceRay triangle compression mode";
 }
-

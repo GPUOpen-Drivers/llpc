@@ -53,15 +53,6 @@ const char *PrevRayQueryObj = "PrevRayQueryObj";
 const char *RayQueryObjGen = "RayQueryObjGen";
 const char *StaticId = "StaticId";
 static const char *LibraryEntryFuncName = "libraryEntry";
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 33
-static const char *IntersectBvh = "AmdExtD3DShaderIntrinsics_IntersectBvhNode";
-#else
-static const char *IntersectBvh = "AmdExtD3DShaderIntrinsics_IntersectInternal";
-#endif
-extern const char *ConvertF32toF16NegInf;
-extern const char *ConvertF32toF16PosInf;
-static const char *SetHitTokenData = "AmdTraceRaySetHitTokenData";
-static const char *SampleGpuTimer = "AmdTraceRaySampleGpuTimer";
 static const char *GetStaticId = "AmdTraceRayGetStaticId";
 static const char *FetchTrianglePositionFromRayQuery = "FetchTrianglePositionFromRayQuery";
 } // namespace RtName
@@ -356,12 +347,6 @@ void SpirvLowerRayQuery::processLibraryFunction(Function *&func) {
   } else if (!rayQueryProceed.empty() && mangledName.startswith(rayQueryProceed)) {
     func->setName(rayQueryProceed);
     func->setLinkage(GlobalValue::ExternalLinkage);
-  } else if (mangledName.startswith(RtName::IntersectBvh)) {
-    createIntersectBvh(func);
-  } else if (mangledName.startswith(RtName::SampleGpuTimer)) {
-    createSampleGpuTime(func);
-  } else if (mangledName.startswith(RtName::SetHitTokenData)) {
-    // TODO: The "hit token" feature that this function is a part of seems non-trivial and
   } else if (mangledName.startswith(RtName::GetStaticId)) {
     eraseFunctionBlocks(func);
     BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
@@ -574,54 +559,6 @@ Value *SpirvLowerRayQuery::getDispatchId() {
     dispatchId = m_builder->CreateReadBuiltInInput(lgc::BuiltInGlobalInvocationId, inputInfo, nullptr, nullptr, "");
 
   return dispatchId;
-}
-
-// =====================================================================================================================
-// Create instructions to get BVH SRD given the expansion and box sort mode at the current insert point
-//
-// @param expansion : Box expansion
-// @param boxSortMode : Box sort mode
-Value *SpirvLowerRayQuery::createGetBvhSrd(llvm::Value *expansion, llvm::Value *boxSortMode) {
-  const auto *rtState = m_context->getPipelineContext()->getRayTracingState();
-  assert(rtState->bvhResDesc.dataSizeInDwords == 4);
-
-  // Construct image descriptor from rtstate.
-  Value *bvhSrd = PoisonValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 4));
-  bvhSrd =
-      m_builder->CreateInsertElement(bvhSrd, m_builder->getInt32(rtState->bvhResDesc.descriptorData[0]), uint64_t(0));
-  bvhSrd = m_builder->CreateInsertElement(bvhSrd, m_builder->getInt32(rtState->bvhResDesc.descriptorData[2]), 2u);
-  bvhSrd = m_builder->CreateInsertElement(bvhSrd, m_builder->getInt32(rtState->bvhResDesc.descriptorData[3]), 3u);
-
-  Value *bvhSrdDw1 = m_builder->getInt32(rtState->bvhResDesc.descriptorData[1]);
-
-  if (expansion) {
-    const unsigned BvhSrdBoxExpansionShift = 23;
-    const unsigned BvhSrdBoxExpansionBitCount = 8;
-    // Update the box expansion ULPs field.
-    bvhSrdDw1 = m_builder->CreateInsertBitField(bvhSrdDw1, expansion, m_builder->getInt32(BvhSrdBoxExpansionShift),
-                                                m_builder->getInt32(BvhSrdBoxExpansionBitCount));
-  }
-
-  if (boxSortMode) {
-    const unsigned BvhSrdBoxSortDisableValue = 3;
-    const unsigned BvhSrdBoxSortModeShift = 21;
-    const unsigned BvhSrdBoxSortModeBitCount = 2;
-    const unsigned BvhSrdBoxSortEnabledFlag = 1u << 31u;
-    // Update the box sort mode field.
-    Value *newBvhSrdDw1 =
-        m_builder->CreateInsertBitField(bvhSrdDw1, boxSortMode, m_builder->getInt32(BvhSrdBoxSortModeShift),
-                                        m_builder->getInt32(BvhSrdBoxSortModeBitCount));
-    // Box sort enabled, need to OR in the box sort flag at bit 31 in DWORD 1.
-    newBvhSrdDw1 = m_builder->CreateOr(newBvhSrdDw1, m_builder->getInt32(BvhSrdBoxSortEnabledFlag));
-
-    Value *boxSortEnabled = m_builder->CreateICmpNE(boxSortMode, m_builder->getInt32(BvhSrdBoxSortDisableValue));
-    bvhSrdDw1 = m_builder->CreateSelect(boxSortEnabled, newBvhSrdDw1, bvhSrdDw1);
-  }
-
-  // Fill in modified DW1 to the BVH SRD.
-  bvhSrd = m_builder->CreateInsertElement(bvhSrd, bvhSrdDw1, 1u);
-
-  return bvhSrd;
 }
 
 void SpirvLowerRayQuery::createRayQueryProceedFunc(Function *func) {
@@ -1374,92 +1311,6 @@ Value *SpirvLowerRayQuery::createTransformMatrix(unsigned builtInId, Value *acce
   Value *matrixAddr = m_builder->CreateAdd(accelStruct, vecMatrixOffset);
 
   return createLoadMatrixFromAddr(matrixAddr);
-}
-
-// =====================================================================================================================
-// Create function to return bvh node intersection result
-//
-// @param func : The function to create
-void SpirvLowerRayQuery::createIntersectBvh(Function *func) {
-  const auto *rtState = m_context->getPipelineContext()->getRayTracingState();
-  if (rtState->bvhResDesc.dataSizeInDwords < 4)
-    return;
-  eraseFunctionBlocks(func);
-  BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
-  m_builder->SetInsertPoint(entryBlock);
-  func->setName(RtName::IntersectBvh);
-
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 33
-  // Ray tracing utility function: AmdExtD3DShaderIntrinsics_IntersectBvhNode
-  // uint4 AmdExtD3DShaderIntrinsics_IntersectBvhNode(
-#else
-  // Ray tracing utility function: AmdExtD3DShaderIntrinsics_IntersectInternal
-  // uint4 AmdExtD3DShaderIntrinsics_IntersectInternal(
-#endif
-  //     in uint2  address,
-  //     in float  ray_extent,
-  //     in float3 ray_origin,
-  //     in float3 ray_dir,
-  //     in float3 ray_inv_dir,
-  //     in uint   flags,
-  //     in uint   expansion)
-  // {
-  //     bvhSrd = SET_DESCRIPTOR_BUF(pOption->bvhSrd.descriptorData)
-  //     return IMAGE_BVH64_INTERSECT_RAY(address, ray_extent, ray_origin, ray_dir, ray_inv_dir, bvhSrd)
-  // }
-
-  auto argIt = func->arg_begin();
-
-  Value *address = m_builder->CreateLoad(FixedVectorType::get(m_builder->getInt32Ty(), 2), argIt);
-  argIt++;
-
-  // Address int64 type
-  address = m_builder->CreateBitCast(address, m_builder->getInt64Ty());
-
-  // Ray extent float Type
-  Value *extent = m_builder->CreateLoad(m_builder->getFloatTy(), argIt);
-  argIt++;
-
-  // Ray origin vec3 Type
-  Value *origin = m_builder->CreateLoad(FixedVectorType::get(m_builder->getFloatTy(), 3), argIt);
-  argIt++;
-
-  // Ray dir vec3 type
-  Value *dir = m_builder->CreateLoad(FixedVectorType::get(m_builder->getFloatTy(), 3), argIt);
-  argIt++;
-
-  // Ray inv_dir vec3 type
-  Value *invDir = m_builder->CreateLoad(FixedVectorType::get(m_builder->getFloatTy(), 3), argIt);
-  argIt++;
-
-  // uint flag
-  Value *flags = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt);
-  argIt++;
-
-  // uint expansion
-  Value *expansion = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt);
-
-  Value *imageDesc = createGetBvhSrd(expansion, flags);
-
-  m_builder->CreateRet(m_builder->CreateImageBvhIntersectRay(address, extent, origin, dir, invDir, imageDesc));
-}
-
-// =====================================================================================================================
-// Create sample gpu time
-//
-void SpirvLowerRayQuery::createSampleGpuTime(llvm::Function *func) {
-  assert(func->size() == 1);
-  m_builder->SetInsertPoint(func->getEntryBlock().getTerminator());
-  Value *clocksHiPtr = func->getArg(0);
-  Value *clocksLoPtr = func->getArg(1);
-  Value *const readClock = m_builder->CreateReadClock(true);
-  Value *clocksLo = m_builder->CreateAnd(readClock, m_builder->getInt64(UINT32_MAX));
-  clocksLo = m_builder->CreateTrunc(clocksLo, m_builder->getInt32Ty());
-  Value *clocksHi = m_builder->CreateLShr(readClock, m_builder->getInt64(32));
-  clocksHi = m_builder->CreateTrunc(clocksHi, m_builder->getInt32Ty());
-
-  m_builder->CreateStore(clocksLo, clocksLoPtr);
-  m_builder->CreateStore(clocksHi, clocksHiPtr);
 }
 
 // =====================================================================================================================
