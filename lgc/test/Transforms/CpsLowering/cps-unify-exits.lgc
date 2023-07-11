@@ -46,7 +46,7 @@ else:
 }
 
 !0 = !{i32 1} ; level 1
-; CHECK-LABEL: define {{[^@]+}}@unify_jumps.1
+; CHECK-LABEL: define {{[^@]+}}@unify_jumps
 ; CHECK-SAME: (i32 inreg [[GLOBALTABLE:%.*]], i32 inreg [[PERSHADERTABLE:%.*]], ptr addrspace(4) inreg [[NUMWORKGROUPSPTR:%.*]], i32 inreg [[TMP0:%.*]], i32 inreg [[TMP1:%.*]], i32 inreg [[TMP2:%.*]], i32 inreg [[TMP3:%.*]], i32 inreg [[TMP4:%.*]], i32 inreg [[TMP5:%.*]], i32 inreg [[TMP6:%.*]], i32 inreg [[TMP7:%.*]], i32 inreg [[TMP8:%.*]], i32 inreg [[TMP9:%.*]], i32 inreg [[TMP10:%.*]], i32 inreg [[SPILLTABLE:%.*]], i32 [[VCR:%.*]], ptr addrspace(5) [[VSP:%.*]], i32 [[ARG:%.*]], ptr [[TABLE:%.*]]) #[[ATTR1:[0-9]+]] align 64 !lgc.cps !2 {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[TMP11:%.*]] = alloca ptr addrspace(5), align 4, addrspace(5)
@@ -127,7 +127,7 @@ else:
 ; CHECK-NEXT:    ret void
 ;
 ;
-; CHECK-LABEL: define {{[^@]+}}@unify_jump_ret.2
+; CHECK-LABEL: define {{[^@]+}}@unify_jump_ret
 ; CHECK-SAME: (i32 inreg [[GLOBALTABLE:%.*]], i32 inreg [[PERSHADERTABLE:%.*]], ptr addrspace(4) inreg [[NUMWORKGROUPSPTR:%.*]], i32 inreg [[TMP0:%.*]], i32 inreg [[TMP1:%.*]], i32 inreg [[TMP2:%.*]], i32 inreg [[TMP3:%.*]], i32 inreg [[TMP4:%.*]], i32 inreg [[TMP5:%.*]], i32 inreg [[TMP6:%.*]], i32 inreg [[TMP7:%.*]], i32 inreg [[TMP8:%.*]], i32 inreg [[TMP9:%.*]], i32 inreg [[TMP10:%.*]], i32 inreg [[SPILLTABLE:%.*]], i32 [[VCR:%.*]], ptr addrspace(5) [[VSP:%.*]], i32 [[ARG:%.*]], ptr [[TABLE:%.*]]) #[[ATTR1]] align 64 !lgc.cps !2 {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[TMP11:%.*]] = alloca ptr addrspace(5), align 4, addrspace(5)
@@ -179,7 +179,7 @@ else:
 ; CHECK-NEXT:    [[TMP41:%.*]] = insertelement <16 x i32> [[TMP40]], i32 [[TMP10]], i64 14
 ; CHECK-NEXT:    [[TMP42:%.*]] = insertelement <16 x i32> [[TMP41]], i32 [[SPILLTABLE]], i64 15
 ; CHECK-NEXT:    [[TMP43:%.*]] = extractvalue { i32, ptr addrspace(5), i32 } [[TMP22]], 0
-; CHECK-NEXT:    [[TMP44:%.*]] = call i32 @llvm.amdgcn.setinactive.chain.arg.3(i32 [[TMP43]], i32 [[VCR]])
+; CHECK-NEXT:    [[TMP44:%.*]] = call i32 @llvm.amdgcn.setinactive.chain.arg.1(i32 [[TMP43]], i32 [[VCR]])
 ; CHECK-NEXT:    [[TMP45:%.*]] = icmp ne i32 [[TMP44]], 0
 ; CHECK-NEXT:    [[TMP46:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP45]])
 ; CHECK-NEXT:    [[TMP47:%.*]] = call i32 @llvm.cttz.i32(i32 [[TMP46]], i1 true)

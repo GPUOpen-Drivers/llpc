@@ -431,9 +431,12 @@ Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type 
   auto remainingArgs = func->getFunctionType()->params().drop_front(1);
   newArgTys.append(remainingArgs.begin(), remainingArgs.end());
   FunctionType *newFuncTy = FunctionType::get(builder.getVoidTy(), newArgTys, false);
-  auto newFunc = Function::Create(newFuncTy, func->getLinkage(), func->getName(), func->getParent());
+  auto newFunc = Function::Create(newFuncTy, func->getLinkage());
   newFunc->copyAttributesFrom(func);
   newFunc->copyMetadata(func, 0);
+  newFunc->takeName(func);
+  // Always insert the new function after the old function
+  func->getParent()->getFunctionList().insertAfter(func->getIterator(), newFunc);
 
   // Setup the argument attributes
   AttributeSet emptyAttrSet;
