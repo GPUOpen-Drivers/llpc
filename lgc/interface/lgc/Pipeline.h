@@ -110,7 +110,6 @@ static const char XfbStateMetadataName[] = "lgc.xfb.state";
 static const char SampleShadingMetaName[] = "lgc.sample.shading";
 
 // Middle-end per-pipeline options to pass to SetOptions.
-// The front-end should zero-initialize it with "= {}" in case future changes add new fields.
 // Note: new fields must be added to the end of this structure to maintain test compatibility.
 struct Options {
   uint64_t hash[2];                    // Pipeline hash to set in ELF PAL metadata
@@ -153,6 +152,19 @@ struct Options {
   bool internalRtShaders;                   // Enable internal RT shader intrinsics
   bool enableUberFetchShader;               // Enable UberShader
   bool reserved16;
+  Options() {
+    // The memory representation of this struct gets written into LLVM metadata. To prevent uninitialized values from
+    // being written, we force everything to 0, including alignment gaps.
+    memset(this, 0, sizeof(Options));
+  }
+
+  Options(const Options &opts) { *this = opts; }
+
+  Options &operator=(const Options &opts) {
+    // Copy everything, including data in alignment because this is used to implement the copy constructor.
+    memcpy(this, &opts, sizeof(Options));
+    return *this;
+  }
 };
 
 /// Represent a pipeline option which can be automatic as well as explicitly set.
