@@ -30,7 +30,7 @@
  */
 #pragma once
 
-#include "LgcCpsDialect.h"
+#include "lgccps/LgcCpsDialect.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/PipelineShaders.h"

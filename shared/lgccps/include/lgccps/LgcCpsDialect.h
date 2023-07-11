@@ -31,7 +31,7 @@
 
 #define GET_INCLUDES
 #define GET_DIALECT_DECLS
-#include "continuations/LgcCpsDialect.h.inc"
+#include "lgccps/LgcCpsDialect.h.inc"
 
 namespace llvm {
 class Type;
