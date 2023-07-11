@@ -24,7 +24,7 @@
 
 cmake_minimum_required(VERSION 3.13.4)
 
-project(Continuations LANGUAGES CXX)
+project(LgcCps LANGUAGES CXX)
 
 function(set_compiler_options PROJECT_NAME)
   # Output with color if in terminal: https://github.com/ninja-build/ninja/wiki/FAQ
@@ -35,7 +35,7 @@ function(set_compiler_options PROJECT_NAME)
   endif()
 endfunction()
 
-add_llvm_library(LLVMContinuations
+add_llvm_library(LLVMLgcCps
   lib/LgcCpsDialect.cpp
 
   DEPENDS
@@ -50,33 +50,30 @@ add_llvm_library(LLVMContinuations
   TransformUtils
 )
 
-target_include_directories(LLVMContinuations PUBLIC
+target_include_directories(LLVMLgcCps PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
 
-target_link_libraries(LLVMContinuations PUBLIC llvm_dialects)
-set_compiler_options(LLVMContinuations)
+target_include_directories(LLVMLgcCps PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/lib)
 
-set(CONTINUATIONS_TABLEGEN_EXE ${LLVM_TOOLS_BINARY_DIR}/llvm-dialects-tblgen)
-set(CONTINUATIONS_TABLEGEN_TARGET llvm-dialects-tblgen)
-set(LLVM_TARGET_DEFINITIONS include/LgcCpsDialect.td)
-set(LLVM_TARGET_DEPENDS continuations)
+target_link_libraries(LLVMLgcCps PUBLIC llvm_dialects)
+set_compiler_options(LLVMLgcCps)
 
-add_custom_command(
-    OUTPUT continuations
-    COMMAND ${CMAKE_COMMAND} -E make_directory continuations)
+set(LGCCPS_TABLEGEN_EXE ${LLVM_TOOLS_BINARY_DIR}/llvm-dialects-tblgen)
+set(LGCCPS_TABLEGEN_TARGET llvm-dialects-tblgen)
+set(LLVM_TARGET_DEFINITIONS include/lgccps/LgcCpsDialect.td)
 
-tablegen(CONTINUATIONS continuations/LgcCpsDialect.h.inc -gen-dialect-decls --dialect lgc.cps
+tablegen(LGCCPS include/lgccps/LgcCpsDialect.h.inc -gen-dialect-decls --dialect lgc.cps
     EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../../imported/llvm-dialects/include)
-tablegen(CONTINUATIONS LgcCpsDialect.cpp.inc -gen-dialect-defs --dialect lgc.cps
+tablegen(LGCCPS lib/LgcCpsDialect.cpp.inc -gen-dialect-defs --dialect lgc.cps
     EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../../imported/llvm-dialects/include)
 add_public_tablegen_target(LgcCpsDialectTableGen)
 
-add_dependencies(LLVMContinuations LgcCpsDialectTableGen)
+add_dependencies(LLVMLgcCps LgcCpsDialectTableGen)
 
-target_compile_features(LLVMContinuations PUBLIC cxx_std_17)
-set_target_properties(LLVMContinuations PROPERTIES CXX_EXTENSIONS OFF)
+target_compile_features(LLVMLgcCps PUBLIC cxx_std_17)
+set_target_properties(LLVMLgcCps PROPERTIES CXX_EXTENSIONS OFF)
 
 add_subdirectory(unittests)

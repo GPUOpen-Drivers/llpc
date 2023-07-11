@@ -24,7 +24,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "LgcCpsDialect.h"
+#include "lgccps/LgcCpsDialect.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/LLVMContext.h"
@@ -59,7 +59,7 @@ using namespace llvm;
 
 // Test the simple case where we are checking the size of a single type.
 #define TEST_DWORD_COUNT(TypeName, ExpectedCount)                              \
-  TEST(ContinuationsUnitTests, ExpectedCount##TypeName) {                      \
+  TEST(LgcCpsUnitTests, ExpectedCount##TypeName) {                             \
     DECLARE_LLVM_LOCALS_SIMPLE(ExpectedCount, TypeName)                        \
     unsigned dwordCount = lgc::cps::getArgumentDwordCount(                     \
         LLVM_DL(ExpectedCount##TypeName),                                      \
@@ -70,7 +70,7 @@ using namespace llvm;
 // Test the case where we are checking the size of a vector of elements.
 #define TEST_DWORD_COUNT_VECTOR(TestName, TypeName, NumElements,               \
                                 ExpectedCount)                                 \
-  TEST(ContinuationsUnitTests, TestName) {                                     \
+  TEST(LgcCpsUnitTests, TestName) {                                            \
     DECLARE_LLVM_LOCALS(TestName)                                              \
     unsigned dwordCount = lgc::cps::getArgumentDwordCount(                     \
         LLVM_DL(TestName),                                                     \
@@ -81,7 +81,7 @@ using namespace llvm;
 
 // Test the case where we are checking the size of struct of arbitrary elements.
 #define TEST_DWORD_COUNT_STRUCT(TestName, ExpectedCount, ...)                  \
-  TEST(ContinuationsUnitTests, TestName) {                                     \
+  TEST(LgcCpsUnitTests, TestName) {                                            \
     DECLARE_LLVM_LOCALS(TestName)                                              \
     unsigned dwordCount = lgc::cps::getArgumentDwordCount(                     \
         LLVM_DL(TestName), StructType::get(__VA_ARGS__));                      \
@@ -90,7 +90,7 @@ using namespace llvm;
 
 // Test the case where we are checking a list of arbitrary elements.
 #define TEST_DWORD_COUNT_LIST(TestName, ExpectedCount, ...)                    \
-  TEST(ContinuationsUnitTests, TestName) {                                     \
+  TEST(LgcCpsUnitTests, TestName) {                                            \
     DECLARE_LLVM_LOCALS(TestName)                                              \
     unsigned dwordCount =                                                      \
         lgc::cps::getArgumentDwordCount(LLVM_DL(TestName), {__VA_ARGS__});     \
