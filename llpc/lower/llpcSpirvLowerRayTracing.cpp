@@ -177,7 +177,7 @@ void SpirvLowerRayTracing::processTraceRayCall(BaseTraceRayOp *inst) {
     CallInst *result = nullptr;
     auto funcTy = getTraceRayFuncTy();
     if (indirect) {
-      Value *traceRayGpuVa = createShaderTableVariable(ShaderTable::TraceRayGpuVirtAddr, bufferDesc);
+      Value *traceRayGpuVa = loadShaderTableVariable(ShaderTable::TraceRayGpuVirtAddr, bufferDesc);
       auto funcPtrTy = PointerType::get(funcTy, SPIRAS_Generic);
       auto funcPtr = m_builder->CreateIntToPtr(traceRayGpuVa, funcPtrTy);
       // Create the indirect function call
@@ -1024,7 +1024,7 @@ Value *SpirvLowerRayTracing::processBuiltIn(unsigned builtInId, Instruction *ins
     break;
   }
   case BuiltInLaunchSizeKHR: {
-    input = createShaderTableVariable(ShaderTable::LaunchSize, m_dispatchRaysInfoDesc);
+    input = loadShaderTableVariable(ShaderTable::LaunchSize, m_dispatchRaysInfoDesc);
     break;
   }
   case BuiltInObjectToWorldKHR: {
@@ -1095,17 +1095,12 @@ Value *SpirvLowerRayTracing::processBuiltIn(unsigned builtInId, Instruction *ins
 }
 
 // =====================================================================================================================
-// Create shader table variable
-//
-// @param tableKind : Kind of shader table variable to create
-// =====================================================================================================================
-// Create shader table variable
+// Load shader table variable
 //
 // @param tableKind : Kind of shader table variable to create
 // @param bufferDesc : Dispatch ray buffer descriptor
-Value *SpirvLowerRayTracing::createShaderTableVariable(ShaderTable tableKind, Value *bufferDesc) {
+Value *SpirvLowerRayTracing::loadShaderTableVariable(ShaderTable tableKind, Value *bufferDesc) {
   assert(tableKind < ShaderTable::Count);
-  Value *value = nullptr;
   switch (tableKind) {
   case ShaderTable::RayGenTableAddr: {
 #if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
@@ -1118,8 +1113,7 @@ Value *SpirvLowerRayTracing::createShaderTableVariable(ShaderTable tableKind, Va
         "GpuRt::DispatchRaysConstantData: rayGenerationTableAddressLo and rayGenerationTableAddressHi mismatch!");
 #endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
-    value = m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
-    break;
+    return m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
   }
   case ShaderTable::MissTableAddr: {
 #if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
@@ -1131,8 +1125,7 @@ Value *SpirvLowerRayTracing::createShaderTableVariable(ShaderTable tableKind, Va
                   "GpuRt::DispatchRaysConstantData: missTableBaseAddressLo and missTableBaseAddressHi mismatch!");
 #endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
-    value = m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
-    break;
+    return m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
   }
   case ShaderTable::HitGroupTableAddr: {
 #if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
@@ -1145,8 +1138,7 @@ Value *SpirvLowerRayTracing::createShaderTableVariable(ShaderTable tableKind, Va
         "GpuRt::DispatchRaysConstantData: hitGroupTableBaseAddressLo and hitGroupTableBaseAddressHi mismatch!");
 #endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
-    value = m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
-    break;
+    return m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
   }
   case ShaderTable::CallableTableAddr: {
 #if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
@@ -1159,8 +1151,7 @@ Value *SpirvLowerRayTracing::createShaderTableVariable(ShaderTable tableKind, Va
         "GpuRt::DispatchRaysConstantData: callableTableBaseAddressLo and callableTableBaseAddressHi mismatch!");
 #endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
-    value = m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
-    break;
+    return m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
   }
   case ShaderTable::MissTableStride: {
 #if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
@@ -1169,8 +1160,7 @@ Value *SpirvLowerRayTracing::createShaderTableVariable(ShaderTable tableKind, Va
     auto offset = offsetof(GpuRt::DispatchRaysConstantData, missTableStrideInBytes);
 #endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
-    value = m_builder->CreateLoad(m_builder->getInt32Ty(), valuePtr);
-    break;
+    return m_builder->CreateLoad(m_builder->getInt32Ty(), valuePtr);
   }
   case ShaderTable::HitGroupTableStride: {
 #if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
@@ -1179,8 +1169,7 @@ Value *SpirvLowerRayTracing::createShaderTableVariable(ShaderTable tableKind, Va
     auto offset = offsetof(GpuRt::DispatchRaysConstantData, hitGroupTableStrideInBytes);
 #endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
-    value = m_builder->CreateLoad(m_builder->getInt32Ty(), valuePtr);
-    break;
+    return m_builder->CreateLoad(m_builder->getInt32Ty(), valuePtr);
   }
   case ShaderTable::CallableTableStride: {
 #if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
@@ -1189,8 +1178,7 @@ Value *SpirvLowerRayTracing::createShaderTableVariable(ShaderTable tableKind, Va
     auto offset = offsetof(GpuRt::DispatchRaysConstantData, callableTableStrideInBytes);
 #endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
-    value = m_builder->CreateLoad(m_builder->getInt32Ty(), valuePtr);
-    break;
+    return m_builder->CreateLoad(m_builder->getInt32Ty(), valuePtr);
   }
   case ShaderTable::TraceRayGpuVirtAddr: {
 #if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
@@ -1202,8 +1190,7 @@ Value *SpirvLowerRayTracing::createShaderTableVariable(ShaderTable tableKind, Va
                   "GpuRt::DispatchRaysConstantData: traceRayGpuVaLo and traceRayGpuVaHi mismatch!");
 #endif
     Value *valuePtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, m_builder->getInt32(offset), "");
-    value = m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
-    break;
+    return m_builder->CreateLoad(m_builder->getInt64Ty(), valuePtr);
   }
   case ShaderTable::LaunchSize: {
 #if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 31
@@ -1215,16 +1202,13 @@ Value *SpirvLowerRayTracing::createShaderTableVariable(ShaderTable tableKind, Va
     Value *rayDispatchWidthPtr =
         m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, offsetOfRayDispatchWidth, "");
     Type *int32x3Ty = FixedVectorType::get(m_builder->getInt32Ty(), 3);
-    value = m_builder->CreateLoad(int32x3Ty, rayDispatchWidthPtr);
-    break;
+    return m_builder->CreateLoad(int32x3Ty, rayDispatchWidthPtr);
   }
   default: {
     llvm_unreachable("Should never be called!");
-    break;
+    return nullptr;
   }
   }
-
-  return value;
 }
 
 // =====================================================================================================================
@@ -1298,25 +1282,25 @@ void SpirvLowerRayTracing::processShaderRecordBuffer(GlobalVariable *global, Val
 
   switch (m_shaderStage) {
   case ShaderStageRayTracingRayGen: {
-    tableAddr = createShaderTableVariable(ShaderTable::RayGenTableAddr, bufferDesc);
+    tableAddr = loadShaderTableVariable(ShaderTable::RayGenTableAddr, bufferDesc);
     tableStride = m_builder->getInt32(0);
     break;
   }
   case ShaderStageRayTracingClosestHit:
   case ShaderStageRayTracingAnyHit:
   case ShaderStageRayTracingIntersect: {
-    tableAddr = createShaderTableVariable(ShaderTable::HitGroupTableAddr, bufferDesc);
-    tableStride = createShaderTableVariable(ShaderTable::HitGroupTableStride, bufferDesc);
+    tableAddr = loadShaderTableVariable(ShaderTable::HitGroupTableAddr, bufferDesc);
+    tableStride = loadShaderTableVariable(ShaderTable::HitGroupTableStride, bufferDesc);
     break;
   }
   case ShaderStageRayTracingCallable: {
-    tableAddr = createShaderTableVariable(ShaderTable::CallableTableAddr, bufferDesc);
-    tableStride = createShaderTableVariable(ShaderTable::CallableTableStride, bufferDesc);
+    tableAddr = loadShaderTableVariable(ShaderTable::CallableTableAddr, bufferDesc);
+    tableStride = loadShaderTableVariable(ShaderTable::CallableTableStride, bufferDesc);
     break;
   }
   case ShaderStageRayTracingMiss: {
-    tableAddr = createShaderTableVariable(ShaderTable::MissTableAddr, bufferDesc);
-    tableStride = createShaderTableVariable(ShaderTable::MissTableStride, bufferDesc);
+    tableAddr = loadShaderTableVariable(ShaderTable::MissTableAddr, bufferDesc);
+    tableStride = loadShaderTableVariable(ShaderTable::MissTableStride, bufferDesc);
     break;
   }
   default: {
@@ -1400,11 +1384,11 @@ Value *SpirvLowerRayTracing::getShaderIdentifier(ShaderStage stage, Value *shade
   }
 
   assert(tableAddr != ShaderTable::Count);
-  Value *tableAddrVal = createShaderTableVariable(tableAddr, bufferDesc);
+  Value *tableAddrVal = loadShaderTableVariable(tableAddr, bufferDesc);
 
   Value *stride = m_builder->getInt32(0);
   if (tableStride != ShaderTable::Count) {
-    stride = createShaderTableVariable(tableStride, bufferDesc);
+    stride = loadShaderTableVariable(tableStride, bufferDesc);
   }
 
   // Table offset sbtIndex * stride + offset
@@ -1552,7 +1536,7 @@ void SpirvLowerRayTracing::createRayGenEntryFunc() {
 
   // Construct entry block guard the launchId from launchSize
   m_builder->SetInsertPoint(entryBlock);
-  Value *launchSize = createShaderTableVariable(ShaderTable::LaunchSize, getDispatchRaysInfoDesc());
+  Value *launchSize = loadShaderTableVariable(ShaderTable::LaunchSize, getDispatchRaysInfoDesc());
   auto builtIn = lgc::BuiltInGlobalInvocationId;
   lgc::InOutInfo inputInfo = {};
   auto launchlId = m_builder->CreateReadBuiltInInput(builtIn, inputInfo, nullptr, nullptr, "");

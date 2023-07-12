@@ -162,7 +162,7 @@ private:
                              llvm::Value *shaderId, unsigned intersectId, ShaderStage stage,
                              const llvm::SmallVector<llvm::Value *, 8> &args, llvm::Value *result,
                              llvm::Type *inResultTy);
-  llvm::Value *createShaderTableVariable(ShaderTable tableKind, llvm::Value *bufferDesc);
+  llvm::Value *loadShaderTableVariable(ShaderTable tableKind, llvm::Value *bufferDesc);
   llvm::Value *getShaderIdentifier(ShaderStage stage, llvm::Value *shaderRecordIndex, llvm::Value *bufferDesc);
   void createDbgInfo(llvm::Module &module, llvm::Function *func);
   void processTerminalFunc(llvm::Function *func, llvm::CallInst *inst, RayHitStatus hitStatus);
