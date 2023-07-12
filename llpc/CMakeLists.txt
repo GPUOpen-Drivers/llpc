@@ -233,6 +233,7 @@ if(ICD_BUILD_LLPC)
         lower/llpcSpirvLowerUtil.cpp
         lower/llpcSpirvProcessGpuRtLibrary.cpp
         lower/LowerGpuRt.cpp
+        lower/llpcSpirvLowerInternalLibraryIntrinsicUtil.cpp
     )
 
 # llpc/translator
