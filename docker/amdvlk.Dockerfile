@@ -66,6 +66,8 @@ RUN wget -P /usr/bin/ https://storage.googleapis.com/git-repo-downloads/repo \
     && chmod +x /usr/bin/repo \
     && repo init -u https://github.com/GPUOpen-Drivers/AMDVLK.git -b "$BRANCH" -m build_with_tools.xml \
     && repo sync -c --no-clone-bundle -j$(nproc) \
+    && sed -i -e 's/enum MemoryAccessMask {/enum MemoryAccessMask : unsigned int {/g' drivers/third_party/glslang/SPIRV/spirv.hpp \
+    && sed -i -e 's/enum ImageOperandsMask {/enum ImageOperandsMask : unsigned int {/g' drivers/third_party/glslang/SPIRV/spirv.hpp \
     && touch ./env.sh
 
 # Copy update script into container
