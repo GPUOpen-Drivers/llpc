@@ -147,8 +147,8 @@ void PalMetadata::initialize() {
   // Pre-find (or create) heavily used nodes.
   m_pipelineNode =
       m_document->getRoot().getMap(true)[Util::Abi::PalCodeObjectMetadataKey::Pipelines].getArray(true)[0].getMap(true);
-  if (!m_useRegisterFieldFormat)
-    m_registers = m_pipelineNode[".registers"].getMap(true);
+  // Add ".registers" unconditionally is a temporary workaround since PAL needs read this section for parsing.
+  m_registers = m_pipelineNode[".registers"].getMap(true);
   m_userDataLimit = &m_pipelineNode[Util::Abi::PipelineMetadataKey::UserDataLimit];
   if (m_userDataLimit->isEmpty())
     *m_userDataLimit = 0U;
