@@ -552,7 +552,7 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
     m_entryPoint->setName(module.getName());
     m_entryPoint->addFnAttr(Attribute::AlwaysInline);
     m_builder->SetInsertPoint(insertPos);
-    getDispatchRaysInfoDesc();
+    createDispatchRaysInfoDesc();
     m_spirvOpMetaKindId = m_context->getMDKindID(MetaNameSpirvOp);
 
     if (m_shaderStage == ShaderStageRayTracingAnyHit || m_shaderStage == ShaderStageRayTracingClosestHit ||
@@ -1536,7 +1536,8 @@ void SpirvLowerRayTracing::createRayGenEntryFunc() {
 
   // Construct entry block guard the launchId from launchSize
   m_builder->SetInsertPoint(entryBlock);
-  Value *launchSize = loadShaderTableVariable(ShaderTable::LaunchSize, getDispatchRaysInfoDesc());
+  createDispatchRaysInfoDesc();
+  Value *launchSize = loadShaderTableVariable(ShaderTable::LaunchSize, m_dispatchRaysInfoDesc);
   auto builtIn = lgc::BuiltInGlobalInvocationId;
   lgc::InOutInfo inputInfo = {};
   auto launchlId = m_builder->CreateReadBuiltInInput(builtIn, inputInfo, nullptr, nullptr, "");
@@ -1555,7 +1556,7 @@ void SpirvLowerRayTracing::createRayGenEntryFunc() {
 
   // Construct main block
   m_builder->SetInsertPoint(mainBlock);
-  auto rayGenId = getShaderIdentifier(m_shaderStage, m_builder->getInt32(0), getDispatchRaysInfoDesc());
+  auto rayGenId = getShaderIdentifier(m_shaderStage, m_builder->getInt32(0), m_dispatchRaysInfoDesc);
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
   bool indirect = rayTracingContext->getIndirectStageMask() & shaderStageToMask(m_shaderStage);
   if (!indirect) {
@@ -2610,12 +2611,11 @@ Function *SpirvLowerRayTracing::getOrCreateRemapCapturedVaToReplayVaFunc() {
 // Get DispatchRaysInfo Descriptor
 //
 // @param insertPos : Where to insert instructions
-Value *SpirvLowerRayTracing::getDispatchRaysInfoDesc() {
+void SpirvLowerRayTracing::createDispatchRaysInfoDesc() {
   if (!m_dispatchRaysInfoDesc) {
     m_dispatchRaysInfoDesc = m_builder->CreateLoadBufferDesc(
         TraceRayDescriptorSet, RayTracingResourceIndexDispatchRaysInfo, m_builder->getInt32(0), 0);
   }
-  return m_dispatchRaysInfoDesc;
 }
 
 // =====================================================================================================================

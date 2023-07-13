@@ -176,7 +176,7 @@ private:
   llvm::FunctionType *getShaderEntryFuncTy(ShaderStage stage);
   llvm::FunctionType *getCallableShaderEntryFuncTy();
   llvm::FunctionType *getTraceRayFuncTy();
-  llvm::Value *getDispatchRaysInfoDesc();
+  void createDispatchRaysInfoDesc();
   llvm::Instruction *createCallableShaderEntryFunc(llvm::Function *func);
   void createCallableShaderEntryTerminator(llvm::Function *func);
   void getFuncRets(llvm::Function *func, llvm::SmallVector<llvm::Instruction *, 4> &rets);
