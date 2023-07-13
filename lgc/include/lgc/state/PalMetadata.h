@@ -39,6 +39,7 @@
 #include "lgc/Pipeline.h"
 #include "lgc/state/AbiMetadata.h"
 #include "lgc/state/IntrinsDefs.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 #include <map>
 

@@ -40,6 +40,7 @@
 #include "llpcUtil.h"
 #include "vkgcUtil.h"
 #include "llvm/ADT/ScopeExit.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Path.h"
 
 using namespace llvm;

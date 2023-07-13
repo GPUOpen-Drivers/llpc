@@ -32,6 +32,7 @@
 #include "lgc/state/ShaderModes.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PipelineState.h"
+#include "llvm/ADT/StringExtras.h"
 
 #define DEBUG_TYPE "lgc-shader-modes"
 
