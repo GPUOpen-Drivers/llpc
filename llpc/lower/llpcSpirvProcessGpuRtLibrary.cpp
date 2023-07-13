@@ -31,6 +31,7 @@
 #include "llpcSpirvProcessGpuRtLibrary.h"
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
+#include "llpcSpirvLowerInternalLibraryIntrinsicUtil.h"
 #include "llpcSpirvLowerUtil.h"
 #include "lgc/Builder.h"
 #include "lgc/GpurtDialect.h"
@@ -136,13 +137,21 @@ SpirvProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
-  auto &funcTable = LibraryFunctionTable::get().m_libFuncPtrs;
-
-  auto funcIt = funcTable.find(func->getName());
-  if (funcIt != funcTable.end()) {
-    auto funcPtr = funcIt->second;
+  auto &gpurtFuncTable = LibraryFunctionTable::get().m_libFuncPtrs;
+  auto gpurtFuncIt = gpurtFuncTable.find(func->getName());
+  if (gpurtFuncIt != gpurtFuncTable.end()) {
+    auto funcPtr = gpurtFuncIt->second;
     m_builder->SetInsertPoint(clearBlock(func));
     (this->*funcPtr)(func);
+    return;
+  }
+
+  auto &commonFuncTable = InternalLibraryIntrinsicUtil::LibraryFunctionTable::get().m_libFuncPtrs;
+  auto commonFuncIt = commonFuncTable.find(func->getName());
+  if (commonFuncIt != commonFuncTable.end()) {
+    auto funcPtr = commonFuncIt->second;
+    m_builder->SetInsertPoint(clearBlock(func));
+    (*funcPtr)(func, m_builder);
   }
 }
 
