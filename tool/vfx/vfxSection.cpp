@@ -611,7 +611,7 @@ bool SectionShader::compileGlsl(const char *entryPoint, std::string *errorMsg) {
 
   sourceList[0] = &glslText;
   fileList[0] = &fileName;
-  int compileOption = SpvGenOptionDefaultDesktop | SpvGenOptionVulkanRules | SpvGenOptionDebug;
+  int compileOption = SpvGenOptionDefaultDesktop | SpvGenOptionVulkanRules;
   if (m_shaderType == Hlsl || m_shaderType == HlslFile)
     compileOption |= SpvGenOptionReadHlsl;
   bool compileResult = spvCompileAndLinkProgramEx(1, &stage, &sourceStringCount, sourceList, fileList, &entryPoint,
