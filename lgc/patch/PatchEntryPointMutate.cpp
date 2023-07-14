@@ -1124,14 +1124,7 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
     // Set Attributes on new function.
     setFuncAttrs(newFunc);
 
-    // Change any uses of the old function to a bitcast of the new function.
-    SmallVector<Use *, 4> funcUses;
-    for (auto &use : origFunc->uses())
-      funcUses.push_back(&use);
-    Constant *bitCastFunc = ConstantExpr::getBitCast(newFunc, origFunc->getType());
-    for (Use *use : funcUses)
-      *use = bitCastFunc;
-
+    origFunc->replaceAllUsesWith(newFunc);
     // Remove original function.
     origFunc->eraseFromParent();
 
