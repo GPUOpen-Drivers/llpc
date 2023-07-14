@@ -32,6 +32,7 @@
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
 #include "llvm/Analysis/ValueTracking.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Support/Debug.h"
@@ -89,6 +90,7 @@ void SpirvLowerConstImmediateStore::processAllocaInsts(Function *func) {
     auto inst = &*instIt;
     if (auto allocaInst = dyn_cast<AllocaInst>(inst)) {
       if (allocaInst->getAllocatedType()->isAggregateType()) {
+        tryCombineStores(allocaInst);
         // Got an "alloca" instruction of aggregate type.
         auto storeInst = findSingleStore(allocaInst);
         if (storeInst && isa<Constant>(storeInst->getValueOperand())) {
@@ -98,6 +100,133 @@ void SpirvLowerConstImmediateStore::processAllocaInsts(Function *func) {
         }
       }
     }
+  }
+}
+
+// =====================================================================================================================
+// Try to combine multiple store instructions into one.
+//
+// Finds multiple store instructions which stores constant values into the same allocated memory.
+// If all found stores are filling all allocated fields in the memory, then multiple stores are replaced with
+// single store. This single store later may be promoted to Global Variable (in `convertAllocaToReadOnlyGlobal`).
+//
+// This may happen when user is not initializing variables at compile time, but rather is
+// doing it at runtime, but still using constant values.
+//
+// int a[10];
+// main() {
+//  a[0] = 1;
+//  a[1] = 2;
+//  a[2] = 3;
+//  ...
+// }
+//
+// @param allocaInst : The "alloca" instruction to process
+void SpirvLowerConstImmediateStore::tryCombineStores(AllocaInst *allocaInst) {
+  if (allocaInst->getAddressSpace() != SPIRAS_Private)
+    return;
+
+  auto *ArrayTy = dyn_cast<ArrayType>(allocaInst->getAllocatedType());
+  if (!ArrayTy)
+    return;
+
+  // Handle one and two-dimensional arrays. [54 x float] or [50 x <2 x float>]
+  auto *VecTy = dyn_cast<FixedVectorType>(ArrayTy->getElementType());
+  if (VecTy && (!VectorType::isValidElementType(VecTy->getElementType()) || VecTy->getNumElements() == 0))
+    return;
+
+  if (!VecTy && (!VectorType::isValidElementType(ArrayTy->getElementType()) || ArrayTy->getNumElements() == 0))
+    return;
+
+  SmallVector<Use *, 20> Uses;
+  for (Use &U : allocaInst->uses())
+    Uses.push_back(&U);
+
+  SmallVector<StoreInst *, 20> storeList;
+  while (!Uses.empty()) {
+    Use *U = Uses.pop_back_val();
+    Instruction *Inst = cast<Instruction>(U->getUser());
+
+    if (auto *storeInst = dyn_cast<StoreInst>(Inst)) {
+      // Skip if any of the stores is not storing constant value or if store is atomic/volatile.
+      if (!isa<Constant>(storeInst->getValueOperand()) ||
+          (storeInst->getValueOperand()->getType() != ArrayTy->getElementType()) || (!storeInst->isSimple())) {
+        return;
+      }
+
+      storeList.push_back(storeInst);
+    } else if (auto *GEP = dyn_cast<GetElementPtrInst>(Inst)) {
+      if (GEP->hasAllConstantIndices() && GEP->getNumIndices() == 2) {
+        // Find more store instructions in GEP uses.
+        for (Use &GEPUse : Inst->uses()) {
+          Uses.push_back(&GEPUse);
+        }
+      }
+    } else if (!isa<LoadInst>(Inst) && !isAssumeLikeIntrinsic(Inst)) {
+      return;
+    }
+  }
+
+  // No stores or only one found. Nothing to do.
+  if (storeList.size() < 2)
+    return;
+
+  BasicBlock *parentBB = storeList.back()->getParent();
+  std::map<int, Constant *> idxConstMap;
+  // Iterate through all store instructions correlated with Alloca and check if
+  // we have enough data to create single store instruction which will initialize
+  // whole Alloca memory.
+  for (auto *storeInst : storeList) {
+    // For simplicity all stores have to be in the same Basic Block.
+    if (storeInst->getParent() != parentBB)
+      return;
+
+    Value *Ptr = storeInst->getPointerOperand()->stripPointerCasts();
+    // by default idx is set to 0 since zero index GEPs may be removed due to
+    // opaque pointers. All other accesses have to be made by GEPs.
+    int idx = 0;
+    if (auto *GEP = dyn_cast<GetElementPtrInst>(Ptr)) {
+      ConstantInt *GEPIdx = cast<ConstantInt>(GEP->getOperand(2));
+      idx = GEPIdx->getZExtValue();
+    }
+
+    auto I = idxConstMap.find(idx);
+    // Check if we are not trying to add the same idx. This may happen when the
+    // same place in table is initialized twice or more.
+    // a[0] = 10;
+    // a[1] = 11;
+    // a[1] = 12;
+    // a[2] = 13;
+    if (I != idxConstMap.end())
+      return;
+    idxConstMap[idx] = cast<Constant>(storeInst->getValueOperand());
+  }
+
+  // Found more or less stores then Alloca memory size.
+  if (idxConstMap.size() != ArrayTy->getNumElements())
+    return;
+
+  SmallVector<Constant *, 20> NewInitVal;
+  for (unsigned i = 0; i < idxConstMap.size(); ++i) {
+    auto I = idxConstMap.find(i);
+    assert(I != idxConstMap.end() && "Must have entry!");
+    NewInitVal.push_back(I->second);
+  }
+
+  Constant *newInitArray = ConstantArray::get(ArrayTy, NewInitVal);
+
+  IRBuilder<> Builder(storeList.back());
+  Builder.CreateAlignedStore(newInitArray, allocaInst, allocaInst->getAlign());
+
+  // Remove no longer needed store and GEP instructions.
+  while (!storeList.empty()) {
+    StoreInst *storeInst = storeList.pop_back_val();
+    GetElementPtrInst *GEP = dyn_cast<GetElementPtrInst>(storeInst->getPointerOperand());
+    bool hasOneUser = GEP ? GEP->hasOneUser() : false;
+
+    storeInst->eraseFromParent();
+    if (hasOneUser)
+      GEP->eraseFromParent();
   }
 }
 

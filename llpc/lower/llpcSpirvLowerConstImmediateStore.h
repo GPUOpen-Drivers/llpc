@@ -53,6 +53,7 @@ private:
   void processAllocaInsts(llvm::Function *func);
   llvm::StoreInst *findSingleStore(llvm::AllocaInst *allocaInst);
   void convertAllocaToReadOnlyGlobal(llvm::StoreInst *storeInst);
+  void tryCombineStores(llvm::AllocaInst *allocaInst);
 };
 
 } // namespace Llpc
