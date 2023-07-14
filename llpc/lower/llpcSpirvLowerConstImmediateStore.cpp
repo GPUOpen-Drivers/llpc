@@ -32,6 +32,7 @@
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
 #include "llvm/Analysis/ValueTracking.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Support/Debug.h"
@@ -51,29 +52,21 @@ namespace Llpc {
 // @param [in/out] module : LLVM module to be run on (empty on entry)
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses SpirvLowerConstImmediateStore::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  runImpl(module);
-  return PreservedAnalyses::none();
-}
-
-// =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-bool SpirvLowerConstImmediateStore::runImpl(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Const-Immediate-Store\n");
 
   SpirvLower::init(&module);
 
   // Process "alloca" instructions to see if they can be optimized to a read-only global
   // variable.
-  for (auto funcIt = module.begin(), funcItEnd = module.end(); funcIt != funcItEnd; ++funcIt) {
-    if (auto func = dyn_cast<Function>(&*funcIt)) {
-      if (!func->empty())
-        processAllocaInsts(func);
+  bool changed = false;
+  for (auto &func : module.functions()) {
+    if (!func.empty()) {
+      if (processAllocaInsts(&func))
+        changed |= true;
     }
   }
 
-  return true;
+  return changed ? PreservedAnalyses::allInSet<CFGAnalyses>() : PreservedAnalyses::all();
 }
 
 // =====================================================================================================================
@@ -81,134 +74,177 @@ bool SpirvLowerConstImmediateStore::runImpl(Module &module) {
 // can be optimized to a read-only global variable.
 //
 // @param func : Function to process
-void SpirvLowerConstImmediateStore::processAllocaInsts(Function *func) {
+bool SpirvLowerConstImmediateStore::processAllocaInsts(Function *func) {
   // NOTE: We only visit the entry block on the basis that SPIR-V translator puts all "alloca"
   // instructions there.
-  auto entryBlock = &func->front();
-  for (auto instIt = entryBlock->begin(), instItEnd = entryBlock->end(); instIt != instItEnd; ++instIt) {
-    auto inst = &*instIt;
-    if (auto allocaInst = dyn_cast<AllocaInst>(inst)) {
-      if (allocaInst->getAllocatedType()->isAggregateType()) {
-        // Got an "alloca" instruction of aggregate type.
-        auto storeInst = findSingleStore(allocaInst);
-        if (storeInst && isa<Constant>(storeInst->getValueOperand())) {
-          // Got an aggregate "alloca" with a single store to the whole type.
-          // Do the optimization.
-          convertAllocaToReadOnlyGlobal(storeInst);
-        }
-      }
+  bool changed = false;
+  SmallVector<AllocaInst *> candidates;
+  for (auto &inst : func->getEntryBlock()) {
+    if (auto allocaInst = dyn_cast<AllocaInst>(&inst)) {
+      if (allocaInst->getAllocatedType()->isAggregateType())
+        candidates.push_back(allocaInst);
     }
   }
+  for (auto *alloca : candidates) {
+    if (tryProcessAlloca(alloca))
+      changed |= true;
+  }
+  return changed;
 }
 
 // =====================================================================================================================
-// Finds the single "store" instruction storing to this pointer.
-//
-// Returns nullptr if no "store", multiple "store", or partial "store" instructions (store only part
-// of the memory) are found.
-//
-// NOTE: This is conservative in that it returns nullptr if the pointer escapes by being used in anything
-// other than "store" (as the pointer), "load" or "getelementptr" instruction.
+// For a single alloca, try to replace it by a constant global variable.
 //
 // @param allocaInst : The "alloca" instruction to process
-StoreInst *SpirvLowerConstImmediateStore::findSingleStore(AllocaInst *allocaInst) {
-  std::vector<Instruction *> pointers;
-  bool isOuterPointer = true;
-  StoreInst *storeInstFound = nullptr;
-  Instruction *pointer = allocaInst;
-  while (true) {
-    for (auto useIt = pointer->use_begin(), useItEnd = pointer->use_end(); useIt != useItEnd; ++useIt) {
-      auto user = cast<Instruction>(useIt->getUser());
-      if (auto storeInst = dyn_cast<StoreInst>(user)) {
-        if (pointer == storeInst->getValueOperand() || storeInstFound || !isOuterPointer) {
-          // Pointer escapes by being stored, or we have already found a "store"
-          // instruction, or this is a partial "store" instruction.
-          return nullptr;
-        }
-        storeInstFound = storeInst;
-      } else if (auto getElemPtrInst = dyn_cast<GetElementPtrInst>(user))
-        pointers.push_back(getElemPtrInst);
-      else if (!isa<LoadInst>(user) && !isAssumeLikeIntrinsic(user)) {
-        // Pointer escapes by being used in some way other than "load/store/getelementptr".
-        return nullptr;
-      }
-    }
+// @return true if the alloca was replaced
+bool SpirvLowerConstImmediateStore::tryProcessAlloca(AllocaInst *allocaInst) {
+  // LLVM IR allocas can have an "arrayness" where multiple elements of the allocated type are allocated at once.
+  // SPIR-V doesn't have this (because it only has OpVariable and not a "true" alloca), but let's guard against it
+  // anyway just in case.
+  if (allocaInst->isArrayAllocation())
+    return false;
 
-    if (pointers.empty())
-      break;
+  auto *allocatedTy = allocaInst->getAllocatedType();
+  auto *arrayTy = dyn_cast<ArrayType>(allocatedTy);
 
-    pointer = pointers.back();
-    pointers.pop_back();
-    isOuterPointer = false;
-  }
+  StoreInst *aggregateStore = nullptr;
+  DenseMap<uint64_t, StoreInst *> elementStores;
 
-  return storeInstFound;
-}
+  SmallVector<Instruction *> toErase;
+  SmallVector<GetElementPtrInst *> geps;
 
-// =====================================================================================================================
-// Converts an "alloca" instruction with a single constant store into a read-only global variable.
-//
-// NOTE: This erases the "store" instruction (so it will not be lowered by a later lowering pass
-// any more) but not the "alloca" or replaced "getelementptr" instruction (they will be removed
-// later by DCE pass).
-//
-// @param storeInst : The single constant store into the "alloca"
-void SpirvLowerConstImmediateStore::convertAllocaToReadOnlyGlobal(StoreInst *storeInst) {
-  auto allocaInst = cast<AllocaInst>(storeInst->getPointerOperand());
-  auto globalType = allocaInst->getAllocatedType();
-  auto initVal = cast<Constant>(storeInst->getValueOperand());
-
-  if (globalType != initVal->getType())
-    return;
-
-  auto global = new GlobalVariable(*m_module, globalType,
-                                   true, // isConstant
-                                   GlobalValue::InternalLinkage, initVal, "", nullptr, GlobalValue::NotThreadLocal,
-                                   SPIRAS_Constant);
-  global->takeName(allocaInst);
-  // Change all uses of allocaInst to use global. We need to do it manually, as there is a change
-  // of address space, and we also need to recreate "getelementptr"s.
-  std::vector<std::pair<Instruction *, Value *>> allocaToGlobalMap;
-  allocaToGlobalMap.push_back(std::pair<Instruction *, Value *>(allocaInst, global));
+  // Step 1: Determine if the alloca can be converted and find the relevant store(s)
+  SmallVector<std::pair<Value *, std::optional<uint64_t>>> pointers;
+  pointers.emplace_back(allocaInst, 0);
   do {
-    auto allocaInst = allocaToGlobalMap.back().first;
-    auto global = allocaToGlobalMap.back().second;
-    allocaToGlobalMap.pop_back();
-    while (!allocaInst->use_empty()) {
-      auto useIt = allocaInst->use_begin();
-      if (auto origGetElemPtrInst = dyn_cast<GetElementPtrInst>(useIt->getUser())) {
-        // This use is a "getelementptr" instruction. Create a replacement one with the new address space.
-        SmallVector<Value *, 4> indices;
-        for (auto idxIt = origGetElemPtrInst->idx_begin(), idxItEnd = origGetElemPtrInst->idx_end(); idxIt != idxItEnd;
-             ++idxIt)
-          indices.push_back(*idxIt);
-        auto newGetElemPtrInst = GetElementPtrInst::Create(globalType, global, indices, "", origGetElemPtrInst);
-        newGetElemPtrInst->takeName(origGetElemPtrInst);
-        newGetElemPtrInst->setIsInBounds(origGetElemPtrInst->isInBounds());
-        newGetElemPtrInst->copyMetadata(*origGetElemPtrInst);
-        // Remember that we need to replace the uses of the original "getelementptr" with the new one.
-        allocaToGlobalMap.push_back(std::pair<Instruction *, Value *>(origGetElemPtrInst, newGetElemPtrInst));
-        // Remove the use from the original "getelementptr".
-        *useIt = PoisonValue::get(allocaInst->getType());
+    auto [pointer, index] = pointers.pop_back_val();
+    for (Use &use : pointer->uses()) {
+      auto user = cast<Instruction>(use.getUser());
+      if (auto storeInst = dyn_cast<StoreInst>(user)) {
+        if (use.getOperandNo() != storeInst->getPointerOperandIndex() || !index.has_value()) {
+          // Pointer escapes by being stored, or we store to a dynamically indexed (or otherwise complex) pointer.
+          return false;
+        }
+
+        Value *storeValue = storeInst->getValueOperand();
+        if (!isa<Constant>(storeValue))
+          return false;
+
+        // We already have a store of the entire variable. Multiple stores means it's not an overall constant.
+        if (aggregateStore)
+          return false;
+
+        if (storeValue->getType() == allocatedTy) {
+          if (index.value() != 0) {
+            // This store is out-of-bounds, which makes it UB if it is ever executed (it might be in control flow that
+            // is unreachable for some reason). Remember the store as to-be-erased and ignore it otherwise.
+            toErase.push_back(storeInst);
+            continue;
+          }
+
+          if (!elementStores.empty())
+            return false;
+          aggregateStore = storeInst;
+          continue;
+        }
+
+        if (arrayTy && storeValue->getType() == arrayTy->getArrayElementType()) {
+          if (index.value() >= arrayTy->getArrayNumElements()) {
+            // This store is out-of-bounds, which makes it UB if it is ever executed (it might be in control flow that
+            // is unreachable for some reason). Remember the store as to-be-erased and ignore it otherwise.
+            toErase.push_back(storeInst);
+            continue;
+          }
+
+          if (!elementStores.try_emplace(index.value(), storeInst).second)
+            return false;
+          continue;
+        }
+
+        return false;
+      }
+
+      if (auto gep = dyn_cast<GetElementPtrInst>(user)) {
+        geps.push_back(gep);
+
+        if (index.has_value() && arrayTy && gep->getSourceElementType() == allocatedTy &&
+            gep->hasAllConstantIndices() && gep->getNumIndices() == 2 &&
+            cast<ConstantInt>(gep->getOperand(1))->isNullValue()) {
+          int64_t gepIdx = cast<ConstantInt>(gep->getOperand(2))->getSExtValue();
+          if (gepIdx >= 0) {
+            pointers.emplace_back(gep, index.value() + gepIdx);
+            continue;
+          }
+        }
+
+        pointers.emplace_back(gep, std::nullopt);
         continue;
       }
 
-      if (auto *intrinsic = dyn_cast<IntrinsicInst>(useIt->getUser())) {
-        switch (intrinsic->getIntrinsicID()) {
-        case Intrinsic::lifetime_start:
-        case Intrinsic::lifetime_end:
-          // Lifetime markers are only useful for allocas, not for globals, and if we did not erase them we would have
-          // to change their name mangling because of the change of address space.
-          intrinsic->eraseFromParent();
-          continue;
-        }
+      if (isa<LoadInst>(user))
+        continue;
+
+      if (isAssumeLikeIntrinsic(user)) {
+        toErase.push_back(user);
+        continue;
       }
 
-      *useIt = global;
+      // Pointer escapes by being used in some way other than "load/store/getelementptr".
+      return false;
     }
-    // Visit next map pair.
-  } while (!allocaToGlobalMap.empty());
-  storeInst->eraseFromParent();
+  } while (!pointers.empty());
+
+  // Step 2: Extract or build the initializer constant
+  Constant *initializer = nullptr;
+
+  if (aggregateStore) {
+    initializer = cast<Constant>(aggregateStore->getValueOperand());
+  } else if (!elementStores.empty()) {
+    // Give up if the array is 4x larger than the number of element stores. This is a fairly arbitrary heuristic to
+    // prevent a super-linear blow-up of the size of IR. (Imagine input IR that defines a giant array and writes to
+    // only a single element of it.)
+    if (arrayTy->getArrayNumElements() / 4 > elementStores.size())
+      return false;
+
+    std::vector<Constant *> elements;
+    elements.resize(arrayTy->getArrayNumElements());
+
+    for (uint64_t index = 0; index < elements.size(); ++index) {
+      if (auto *store = elementStores.lookup(index))
+        elements[index] = cast<Constant>(store->getValueOperand());
+      else
+        elements[index] = PoisonValue::get(arrayTy->getElementType());
+    }
+
+    initializer = ConstantArray::get(arrayTy, elements);
+  } else {
+    initializer = PoisonValue::get(allocatedTy);
+  }
+
+  // Step 3: Create the global variable and replace the alloca
+  auto global = new GlobalVariable(*m_module, allocatedTy,
+                                   true, // isConstant
+                                   GlobalValue::InternalLinkage, initializer, "", nullptr, GlobalValue::NotThreadLocal,
+                                   SPIRAS_Constant);
+  global->takeName(allocaInst);
+
+  for (Use &use : llvm::make_early_inc_range(allocaInst->uses()))
+    use.set(global);
+
+  for (auto *gep : geps)
+    gep->mutateType(global->getType());
+
+  for (auto *inst : toErase)
+    inst->eraseFromParent();
+  if (aggregateStore)
+    aggregateStore->eraseFromParent();
+  for (auto [index, store] : elementStores) {
+    if (store)
+      store->eraseFromParent();
+  }
+  allocaInst->eraseFromParent();
+
+  return true;
 }
 
 } // namespace Llpc
