@@ -45,14 +45,12 @@ namespace Llpc {
 class SpirvLowerConstImmediateStore : public SpirvLower, public llvm::PassInfoMixin<SpirvLowerConstImmediateStore> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
-  bool runImpl(llvm::Module &module);
 
   static llvm::StringRef name() { return "Lower SPIR-V constant immediate store"; }
 
 private:
-  void processAllocaInsts(llvm::Function *func);
-  llvm::StoreInst *findSingleStore(llvm::AllocaInst *allocaInst);
-  void convertAllocaToReadOnlyGlobal(llvm::StoreInst *storeInst);
+  bool processAllocaInsts(llvm::Function *func);
+  bool tryProcessAlloca(llvm::AllocaInst *allocaInst);
 };
 
 } // namespace Llpc
