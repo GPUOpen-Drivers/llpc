@@ -33,6 +33,7 @@
 #include "lgc/LgcContext.h"
 #include "lgc/builder/BuilderImpl.h"
 #include "lgc/state/PipelineState.h"
+#include "lgc/state/TargetInfo.h"
 #include "lgc/util/Internal.h"
 #include "llvm/Support/Debug.h"
 
@@ -73,8 +74,19 @@ bool BuilderReplayer::runImpl(Module &module, PipelineState *pipelineState) {
 
   for (auto &func : module) {
     // Skip non-declarations; they are definitely not lgc.create.* calls.
-    if (!func.isDeclaration())
+    if (!func.isDeclaration()) {
+      if (pipelineState->getTargetInfo().getGfxIpVersion().major >= 10) {
+        // NOTE: The sub-attribute 'wavefrontsize' of 'target-features' is set in advance to let optimization
+        // pass know we are in which wavesize mode.
+        ShaderStage shaderStage = lgc::getShaderStage(&func);
+        if (shaderStage != ShaderStageInvalid) {
+          unsigned waveSize = pipelineState->getShaderWaveSize(shaderStage);
+          func.addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize));
+        }
+      }
+
       continue;
+    }
 
     // Get the opcode if it is an lgc.create.* call, either from the metadata on the declaration, or
     // (in the case that there is no metadata because we are running the lgc command-line tool on the
