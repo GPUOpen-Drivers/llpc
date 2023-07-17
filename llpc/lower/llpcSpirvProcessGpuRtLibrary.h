@@ -71,6 +71,18 @@ private:
   void createIntersectBvh(llvm::Function *func);
   void createSampleGpuTimer(llvm::Function *func);
   void createGetFlattenedGroupThreadId(llvm::Function *func);
+  void createGetHitAttributes(llvm::Function *func);
+  void createSetHitAttributes(llvm::Function *func);
+  void createSetTraceParams(llvm::Function *func);
+  void createCallClosestHitShader(llvm::Function *func);
+  void createCallMissShader(llvm::Function *func);
+  void createCallTriangleAnyHitShader(llvm::Function *func);
+  void createCallIntersectionShader(llvm::Function *func);
+  void createSetTriangleIntersectionAttributes(llvm::Function *func);
+  void createSetHitTriangleNodePointer(llvm::Function *func);
+  void createGetParentId(llvm::Function *func);
+  void createSetParentId(llvm::Function *func);
+  void createDispatchRayIndex(llvm::Function *func);
   llvm::Value *createGetBvhSrd(llvm::Value *expansion, llvm::Value *boxSortMode);
 };
 } // namespace Llpc

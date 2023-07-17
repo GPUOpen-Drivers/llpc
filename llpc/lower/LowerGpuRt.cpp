@@ -324,10 +324,10 @@ void LowerGpuRt::visitGetTriangleCompressionMode(GpurtGetTriangleCompressionMode
 }
 
 // =====================================================================================================================
-// Visit "GetFlattenedGroupThreadIdOp" instruction
+// Visit "GpurtGetFlattenedGroupThreadIdOp" instruction
 //
 // @param inst : The dialect instruction to process
-void LowerGpuRt::visitGetFlattenedGroupThreadId(GetFlattenedGroupThreadIdOp &inst) {
+void LowerGpuRt::visitGetFlattenedGroupThreadId(GpurtGetFlattenedGroupThreadIdOp &inst) {
   m_builder->SetInsertPoint(&inst);
   inst.replaceAllUsesWith(getThreadIdInGroup());
   m_callsToLower.push_back(&inst);

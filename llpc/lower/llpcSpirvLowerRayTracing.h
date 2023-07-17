@@ -41,7 +41,22 @@ class CallCallableShaderOp;
 class ReportHitOp;
 class BaseTraceRayOp;
 class TraceRayOp;
+class DispatchRaysIndexOp;
 } // namespace lgc::rt
+
+namespace lgc {
+class GpurtSetHitAttributesOp;
+class GpurtGetHitAttributesOp;
+class GpurtSetTraceParamsOp;
+class GpurtCallClosestHitShaderOp;
+class GpurtCallMissShaderOp;
+class GpurtCallTriangleAnyHitShaderOp;
+class GpurtCallIntersectionShaderOp;
+class GpurtSetTriangleIntersectionAttributesOp;
+class GpurtSetHitTriangleNodePointerOp;
+class GpurtGetParentIdOp;
+class GpurtSetParentIdOp;
+} // namespace lgc
 
 namespace Llpc {
 // Enum for the ray start parameter
@@ -150,7 +165,6 @@ private:
   void createSetHitAttributes(llvm::Function *func);
   void createSetTraceParams(llvm::Function *func);
   void createAnyHitFunc(llvm::Value *shaderIdentifier, llvm::Value *shaderRecordIndex);
-  void processLibraryFunction(llvm::Function *func);
   void createCallShaderFunc(llvm::Function *func, ShaderStage stage, unsigned intersectId, llvm::Value *retVal);
   void createCallShader(llvm::Function *func, ShaderStage stage, unsigned intersectId, llvm::Value *shaderId,
                         llvm::Value *shaderRecordIndex, llvm::Value *inputResult, llvm::BasicBlock *entryBlock,
@@ -196,6 +210,21 @@ private:
   void visitReportHitOp(lgc::rt::ReportHitOp &inst);
   void visitTraceRayOp(lgc::rt::TraceRayOp &inst);
   void processTraceRayCall(lgc::rt::BaseTraceRayOp *inst);
+
+  llvm::Function *createImplFunc(llvm::CallInst &inst);
+
+  void visitGetHitAttributes(lgc::GpurtGetHitAttributesOp &inst);
+  void visitSetHitAttributes(lgc::GpurtSetHitAttributesOp &inst);
+  void visitSetTraceParams(lgc::GpurtSetTraceParamsOp &inst);
+  void visitCallClosestHitShader(lgc::GpurtCallClosestHitShaderOp &inst);
+  void visitCallMissShader(lgc::GpurtCallMissShaderOp &inst);
+  void visitCallTriangleAnyHitShader(lgc::GpurtCallTriangleAnyHitShaderOp &inst);
+  void visitCallIntersectionShader(lgc::GpurtCallIntersectionShaderOp &inst);
+  void visitSetTriangleIntersectionAttributes(lgc::GpurtSetTriangleIntersectionAttributesOp &inst);
+  void visitSetHitTriangleNodePointer(lgc::GpurtSetHitTriangleNodePointerOp &inst);
+  void visitGetParentId(lgc::GpurtGetParentIdOp &inst);
+  void visitSetParentId(lgc::GpurtSetParentIdOp &inst);
+  void visitDispatchRayIndex(lgc::rt::DispatchRaysIndexOp &inst);
 
   llvm::GlobalVariable *m_traceParams[TraceParam::Count];              // Trace ray set parameters
   llvm::GlobalVariable *m_funcRetFlag = nullptr;                       // Function return flag
