@@ -73,6 +73,7 @@ PreservedAnalyses LowerGpuRt::run(Module &module, ModuleAnalysisManager &analysi
                             .add(&LowerGpuRt::visitGetBoxSortHeuristicMode)
                             .add(&LowerGpuRt::visitGetStaticFlags)
                             .add(&LowerGpuRt::visitGetTriangleCompressionMode)
+                            .add(&LowerGpuRt::visitGetFlattenedGroupThreadId)
                             .build();
 
   visitor.visit(*this, *m_module);
@@ -318,6 +319,17 @@ void LowerGpuRt::visitGetTriangleCompressionMode(GpurtGetTriangleCompressionMode
   auto rtState = m_context->getPipelineContext()->getRayTracingState();
   Value *triCompressMode = m_builder->getInt32(rtState->triCompressMode);
   inst.replaceAllUsesWith(triCompressMode);
+  m_callsToLower.push_back(&inst);
+  m_funcsToLower.insert(inst.getCalledFunction());
+}
+
+// =====================================================================================================================
+// Visit "GetFlattenedGroupThreadIdOp" instruction
+//
+// @param inst : The dialect instruction to process
+void LowerGpuRt::visitGetFlattenedGroupThreadId(GetFlattenedGroupThreadIdOp &inst) {
+  m_builder->SetInsertPoint(&inst);
+  inst.replaceAllUsesWith(getThreadIdInGroup());
   m_callsToLower.push_back(&inst);
   m_funcsToLower.insert(inst.getCalledFunction());
 }

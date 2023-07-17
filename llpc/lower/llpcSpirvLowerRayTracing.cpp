@@ -68,7 +68,6 @@ static const char *GlobalPayload = "GlobalPayload";
 static const char *GlobalCallableData = "GlobalCallableData";
 static const char *IncomingPayLoad = "IncomingRayPayloadKHR";
 static const char *IncomingCallableData = "IncomingCallableDataKHR";
-static const char *GetFlattenedGroupThreadId = "AmdTraceRayGetFlattenedGroupThreadId";
 static const char *GetHitAttributes = "AmdTraceRayGetHitAttributes";
 static const char *SetHitAttributes = "AmdTraceRaySetHitAttributes";
 static const char *SetTraceParams = "AmdTraceRaySetTraceParams";
@@ -651,11 +650,6 @@ void SpirvLowerRayTracing::processLibraryFunction(Function *func) {
 
   if (!traceRayFuncName.empty() && mangledName.startswith(traceRayFuncName)) {
     func->setLinkage(GlobalValue::ExternalLinkage);
-  } else if (mangledName.startswith(RtName::GetFlattenedGroupThreadId)) {
-    eraseFunctionBlocks(func);
-    BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
-    m_builder->SetInsertPoint(entryBlock);
-    m_builder->CreateRet(getThreadIdInGroup());
   } else if (mangledName.startswith(RtName::GetHitAttributes)) {
     eraseFunctionBlocks(func);
     BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);

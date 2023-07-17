@@ -45,6 +45,7 @@ class GpurtLdsStackStoreOp;
 class GpurtGetBoxSortHeuristicModeOp;
 class GpurtGetStaticFlagsOp;
 class GpurtGetTriangleCompressionModeOp;
+class GetFlattenedGroupThreadIdOp;
 } // namespace lgc
 
 namespace llvm {
@@ -73,6 +74,7 @@ private:
   void visitGetBoxSortHeuristicMode(lgc::GpurtGetBoxSortHeuristicModeOp &inst);
   void visitGetStaticFlags(lgc::GpurtGetStaticFlagsOp &inst);
   void visitGetTriangleCompressionMode(lgc::GpurtGetTriangleCompressionModeOp &inst);
+  void visitGetFlattenedGroupThreadId(lgc::GetFlattenedGroupThreadIdOp &inst);
   llvm::Value *m_stack;                                  // Stack array to hold stack value
   llvm::Type *m_stackTy;                                 // Stack type
   bool m_lowerStack;                                     // If it is lowerStack

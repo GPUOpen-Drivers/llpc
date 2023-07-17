@@ -70,6 +70,7 @@ private:
   void createConvertF32toF16WithRoundingMode(llvm::Function *func, llvm::RoundingMode rm);
   void createIntersectBvh(llvm::Function *func);
   void createSampleGpuTimer(llvm::Function *func);
+  void createGetFlattenedGroupThreadId(llvm::Function *func);
   llvm::Value *createGetBvhSrd(llvm::Value *expansion, llvm::Value *boxSortMode);
 };
 } // namespace Llpc

@@ -41,53 +41,6 @@
 using namespace lgc;
 using namespace llvm;
 
-namespace RtName {
-static const char *AmdLibraryNames[] = {"AmdTraceRayGetStackSize",
-                                        "AmdTraceRayLdsRead",
-                                        "AmdTraceRayLdsWrite",
-                                        "AmdTraceRayGetStackBase",
-                                        "AmdTraceRayGetStackStride",
-                                        "AmdTraceRayLdsStackInit",
-                                        "AmdTraceRayLdsStackStore",
-                                        "AmdTraceRayGetBoxSortHeuristicMode",
-                                        "AmdTraceRayGetStaticFlags",
-                                        "AmdTraceRayGetTriangleCompressionMode",
-                                        "AmdExtD3DShaderIntrinsics_LoadDwordAtAddr",
-                                        "AmdExtD3DShaderIntrinsics_LoadDwordAtAddrx2",
-                                        "AmdExtD3DShaderIntrinsics_LoadDwordAtAddrx4",
-                                        "AmdExtD3DShaderIntrinsics_ConvertF32toF16NegInf",
-                                        "AmdExtD3DShaderIntrinsics_ConvertF32toF16PosInf",
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 33
-                                        "AmdExtD3DShaderIntrinsics_IntersectBvhNode",
-#else
-                                        "AmdExtD3DShaderIntrinsics_IntersectInternal",
-#endif
-                                        "AmdTraceRaySampleGpuTimer"};
-} // namespace RtName
-
-namespace AmdLibraryFunc {
-enum : unsigned {
-  GetStackSize = 0,           // Get stack size
-  LdsRead,                    // Read from LDS
-  LdsWrite,                   // Write to LDS
-  GetStackBase,               // Get stack base
-  GetStackStride,             // Get stack stride
-  LdsStackInit,               // Lds stack init
-  LdsStackStore,              // Lds stack store
-  GetBoxSortHeuristicMode,    // Get box sort heuristic mode
-  GetStaticFlags,             // Get static flags
-  GetTriangleCompressionMode, // Get triangle compression mode
-  LoadDwordAtAddr,            // Load 1 dword at given address
-  LoadDwordAtAddrx2,          // Load 2 dwords at given address
-  LoadDwordAtAddrx4,          // Load 4 dwords at given address
-  ConvertF32toF16NegInf,      // Convert f32 to f16 with rounding toward negative
-  ConvertF32toF16PosInf,      // Convert f32 to f16 with rounding toward positive
-  IntersectBvh,               // Intersect BVH node
-  SampleGpuTimer,             // Sample GPU timer
-  Count
-};
-} // namespace AmdLibraryFunc
-
 namespace Llpc {
 SpirvProcessGpuRtLibrary::SpirvProcessGpuRtLibrary() {
 }
@@ -110,26 +63,30 @@ PreservedAnalyses SpirvProcessGpuRtLibrary::run(Module &module, ModuleAnalysisMa
 // =====================================================================================================================
 // Initialize library function pointer table
 SpirvProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
-  LibraryFuncPtr amdLibraryFuncs[] = {&SpirvProcessGpuRtLibrary::createGetStackSize,
-                                      &SpirvProcessGpuRtLibrary::createLdsRead,
-                                      &SpirvProcessGpuRtLibrary::createLdsWrite,
-                                      &SpirvProcessGpuRtLibrary::createGetStackBase,
-                                      &SpirvProcessGpuRtLibrary::createGetStackStride,
-                                      &SpirvProcessGpuRtLibrary::createLdsStackInit,
-                                      &SpirvProcessGpuRtLibrary::createLdsStackStore,
-                                      &SpirvProcessGpuRtLibrary::createGetBoxSortHeuristicMode,
-                                      &SpirvProcessGpuRtLibrary::createGetStaticFlags,
-                                      &SpirvProcessGpuRtLibrary::createGetTriangleCompressionMode,
-                                      &SpirvProcessGpuRtLibrary::createLoadDwordAtAddr,
-                                      &SpirvProcessGpuRtLibrary::createLoadDwordAtAddrx2,
-                                      &SpirvProcessGpuRtLibrary::createLoadDwordAtAddrx4,
-                                      &SpirvProcessGpuRtLibrary::createConvertF32toF16NegInf,
-                                      &SpirvProcessGpuRtLibrary::createConvertF32toF16PosInf,
-                                      &SpirvProcessGpuRtLibrary::createIntersectBvh,
-                                      &SpirvProcessGpuRtLibrary::createSampleGpuTimer};
-  for (unsigned i = 0; i < AmdLibraryFunc::Count; ++i) {
-    m_libFuncPtrs[RtName::AmdLibraryNames[i]] = amdLibraryFuncs[i];
-  }
+  m_libFuncPtrs["AmdTraceRayGetStackSize"] = &SpirvProcessGpuRtLibrary::createGetStackSize;
+  m_libFuncPtrs["AmdTraceRayLdsRead"] = &SpirvProcessGpuRtLibrary::createLdsRead;
+  m_libFuncPtrs["AmdTraceRayLdsWrite"] = &SpirvProcessGpuRtLibrary::createLdsWrite;
+  m_libFuncPtrs["AmdTraceRayGetStackBase"] = &SpirvProcessGpuRtLibrary::createGetStackBase;
+  m_libFuncPtrs["AmdTraceRayGetStackStride"] = &SpirvProcessGpuRtLibrary::createGetStackStride;
+  m_libFuncPtrs["AmdTraceRayLdsStackInit"] = &SpirvProcessGpuRtLibrary::createLdsStackInit;
+  m_libFuncPtrs["AmdTraceRayLdsStackStore"] = &SpirvProcessGpuRtLibrary::createLdsStackStore;
+  m_libFuncPtrs["AmdTraceRayGetBoxSortHeuristicMode"] = &SpirvProcessGpuRtLibrary::createGetBoxSortHeuristicMode;
+  m_libFuncPtrs["AmdTraceRayGetStaticFlags"] = &SpirvProcessGpuRtLibrary::createGetStaticFlags;
+  m_libFuncPtrs["AmdTraceRayGetTriangleCompressionMode"] = &SpirvProcessGpuRtLibrary::createGetTriangleCompressionMode;
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_LoadDwordAtAddr"] = &SpirvProcessGpuRtLibrary::createLoadDwordAtAddr;
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_LoadDwordAtAddrx2"] = &SpirvProcessGpuRtLibrary::createLoadDwordAtAddrx2;
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_LoadDwordAtAddrx4"] = &SpirvProcessGpuRtLibrary::createLoadDwordAtAddrx4;
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_ConvertF32toF16NegInf"] =
+      &SpirvProcessGpuRtLibrary::createConvertF32toF16NegInf;
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_ConvertF32toF16PosInf"] =
+      &SpirvProcessGpuRtLibrary::createConvertF32toF16PosInf;
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 33
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_IntersectBvhNode"] = &SpirvProcessGpuRtLibrary::createIntersectBvh;
+#else
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_IntersectInternal"] = &SpirvProcessGpuRtLibrary::createIntersectBvh;
+#endif
+  m_libFuncPtrs["AmdTraceRaySampleGpuTimer"] = &SpirvProcessGpuRtLibrary::createSampleGpuTimer;
+  m_libFuncPtrs["AmdTraceRayGetFlattenedGroupThreadId"] = &SpirvProcessGpuRtLibrary::createGetFlattenedGroupThreadId;
 }
 
 // =====================================================================================================================
@@ -465,6 +422,14 @@ void SpirvProcessGpuRtLibrary::createSampleGpuTimer(llvm::Function *func) {
   m_builder->CreateStore(clocksHi, timerHiPtr);
 
   m_builder->CreateRetVoid();
+}
+
+// =====================================================================================================================
+// Create function to get flattened group thread ID
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createGetFlattenedGroupThreadId(llvm::Function *func) {
+  m_builder->CreateRet(m_builder->create<GetFlattenedGroupThreadIdOp>());
 }
 
 } // namespace Llpc

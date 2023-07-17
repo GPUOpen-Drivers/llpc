@@ -107,3 +107,9 @@ def GpurtGetTriangleCompressionModeOp : GpurtOp<"get.triangle.compression.mode",
   let results = (outs I32:$result);
   let summary = "return the traceRay triangle compression mode";
 }
+
+def GetFlattenedGroupThreadIdOp : GpurtOp<"get.flattened.group.thread.id", [Memory<[]>, WillReturn]> {
+  let arguments = (ins);
+  let results = (outs I32:$result);
+  let summary = "return the flattened group thread ID";
+}
