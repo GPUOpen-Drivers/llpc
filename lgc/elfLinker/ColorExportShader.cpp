@@ -145,9 +145,15 @@ Function *ColorExportShader::createColorExportFunc() {
   BasicBlock *block = BasicBlock::Create(func->getContext(), "", func);
   BuilderBase builder(block);
   builder.CreateRetVoid();
+
   AttrBuilder attribBuilder(func->getContext());
   attribBuilder.addAttribute("InitialPSInputAddr", std::to_string(0xFFFFFFFF));
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10) {
+    const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageFragment);
+    attribBuilder.addAttribute("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
+  }
   func->addFnAttrs(attribBuilder);
+
   return func;
 }
 

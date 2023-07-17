@@ -975,9 +975,11 @@ Value *LowerFragColorExport::generateValueForOutput(Value *value, Type *outputTy
 // Generate a new fragment shader that has the minimum code needed to make PAL happy.
 //
 // @param [in/out] module : The LLVM module in which to add the shader.
+// @param pipelineState : Pipeline state.
 // @returns : the entry point for the null fragment shader.
-Function *FragColorExport::generateNullFragmentShader(Module &module, StringRef entryPointName) {
-  Function *entryPoint = generateNullFragmentEntryPoint(module, entryPointName);
+Function *FragColorExport::generateNullFragmentShader(Module &module, PipelineState *pipelineState,
+                                                      StringRef entryPointName) {
+  Function *entryPoint = generateNullFragmentEntryPoint(module, pipelineState, entryPointName);
   generateNullFragmentShaderBody(entryPoint);
   return entryPoint;
 }
@@ -986,13 +988,19 @@ Function *FragColorExport::generateNullFragmentShader(Module &module, StringRef 
 // Generate a new entry point for a null fragment shader.
 //
 // @param [in/out] module : The LLVM module in which to add the entry point.
+// @param pipelineState : Pipeline state.
 // @returns : The new entry point.
-Function *FragColorExport::generateNullFragmentEntryPoint(Module &module, StringRef entryPointName) {
+Function *FragColorExport::generateNullFragmentEntryPoint(Module &module, PipelineState *pipelineState,
+                                                          StringRef entryPointName) {
   FunctionType *entryPointTy = FunctionType::get(Type::getVoidTy(module.getContext()), ArrayRef<Type *>(), false);
   Function *entryPoint = Function::Create(entryPointTy, GlobalValue::ExternalLinkage, entryPointName, &module);
   entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
   setShaderStage(entryPoint, ShaderStageFragment);
   entryPoint->setCallingConv(CallingConv::AMDGPU_PS);
+  if (pipelineState->getTargetInfo().getGfxIpVersion().major >= 10) {
+    const unsigned waveSize = pipelineState->getShaderWaveSize(ShaderStageFragment);
+    entryPoint->addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
+  }
   return entryPoint;
 }
 

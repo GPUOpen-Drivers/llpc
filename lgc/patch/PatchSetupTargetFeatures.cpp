@@ -137,10 +137,11 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
     auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
     if (gfxIp.major >= 10) {
-      // Setup wavefront size per shader stage
-      unsigned waveSize = m_pipelineState->getShaderWaveSize(shaderStage);
-
-      targetFeatures += ",+wavefrontsize" + std::to_string(waveSize);
+      // NOTE: The sub-attribute 'wavefrontsize' of 'target-features' is set in advance to let optimization
+      // pass know we are in which wavesize mode. Here, we read back it and append it to finalized target
+      // feature strings.
+      if (func->hasFnAttribute("target-features"))
+        targetFeatures += func->getFnAttribute("target-features").getValueAsString();
 
       if (m_pipelineState->getShaderWgpMode(shaderStage))
         targetFeatures += ",-cumode";

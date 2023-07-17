@@ -181,6 +181,11 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
     entryPoint->getArg(i)->setName(argNames[i]);
   }
 
+  // Set wavefront size
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageCopyShader);
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10)
+    entryPoint->addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize));
+
   // Create ending basic block, and terminate it with return.
   auto endBlock = BasicBlock::Create(*m_context, "", entryPoint, nullptr);
   builder.SetInsertPoint(endBlock);

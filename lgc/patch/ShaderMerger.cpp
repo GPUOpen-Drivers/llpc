@@ -323,6 +323,9 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
 
   entryPoint->addFnAttr("amdgpu-flat-work-group-size",
                         "128,128"); // Force s_barrier to be present (ignore optimization)
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
+  if (m_gfxIp.major >= 10)
+    entryPoint->addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
   applyTuningAttributes(entryPoint, tuningAttrs);
 
   for (auto &arg : entryPoint->args()) {
@@ -382,7 +385,6 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   auto threadIdInWave =
       builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {builder.getInt32(-1), builder.getInt32(0)});
 
-  unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
   if (waveSize == 64) {
     threadIdInWave = builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {builder.getInt32(-1), threadIdInWave});
   }
@@ -664,6 +666,9 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
 
   entryPoint->addFnAttr("amdgpu-flat-work-group-size",
                         "128,128"); // Force s_barrier to be present (ignore optimization)
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
+  if (m_gfxIp.major >= 10)
+    entryPoint->addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
   applyTuningAttributes(entryPoint, tuningAttrs);
 
   for (auto &arg : entryPoint->args()) {
@@ -718,7 +723,6 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   auto threadIdInWave =
       builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {builder.getInt32(-1), builder.getInt32(0)});
 
-  unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
   if (waveSize == 64) {
     threadIdInWave = builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {builder.getInt32(-1), threadIdInWave});
   }

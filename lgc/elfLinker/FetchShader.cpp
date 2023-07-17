@@ -328,5 +328,12 @@ Function *FetchShader::createFetchFunc() {
     retVal = builder.CreateInsertValue(retVal, func->getArg(i), i);
   builder.CreateRet(retVal);
 
+  AttrBuilder attribBuilder(func->getContext());
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10) {
+    const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageVertex);
+    attribBuilder.addAttribute("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
+  }
+  func->addFnAttrs(attribBuilder);
+
   return func;
 }
