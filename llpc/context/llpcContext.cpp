@@ -30,6 +30,7 @@
  */
 #include "llpcContext.h"
 #include "SPIRVInternal.h"
+#include "lgccps/LgcCpsDialect.h"
 #include "lgcrt/LgcRtDialect.h"
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
@@ -150,7 +151,10 @@ std::unique_ptr<Module> Context::loadLibrary(const BinaryData *lib) {
 void Context::setModuleTargetMachine(Module *module) {
   TargetMachine *targetMachine = getLgcContext()->getTargetMachine();
   module->setTargetTriple(targetMachine->getTargetTriple().getTriple());
-  module->setDataLayout(targetMachine->createDataLayout());
+  std::string dataLayoutStr = targetMachine->createDataLayout().getStringRepresentation();
+  // continuation stack address space.
+  dataLayoutStr = dataLayoutStr + "-p" + std::to_string(cps::stackAddrSpace) + ":32:32";
+  module->setDataLayout(dataLayoutStr);
 }
 
 } // namespace Llpc

@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 
+#include "lgccps/LgcCpsDialect.h"
 #include "lgc/ElfLinker.h"
 #include "lgc/LgcContext.h"
 #include "lgc/LgcDialect.h"
@@ -352,7 +353,10 @@ int main(int argc, char **argv) {
       // Set the triple and data layout, so you can write tests without bothering to specify them.
       TargetMachine *targetMachine = lgcContext->getTargetMachine();
       module->setTargetTriple(targetMachine->getTargetTriple().getTriple());
-      module->setDataLayout(targetMachine->createDataLayout());
+      std::string dataLayoutStr = targetMachine->createDataLayout().getStringRepresentation();
+      // continuation stack address space.
+      dataLayoutStr = dataLayoutStr + "-p" + std::to_string(cps::stackAddrSpace) + ":32:32";
+      module->setDataLayout(dataLayoutStr);
 
       // Determine whether we are outputting to a file.
       bool outputToFile = OutFileName != "-";

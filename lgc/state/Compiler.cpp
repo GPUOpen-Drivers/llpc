@@ -234,6 +234,9 @@ bool PipelineState::generate(Module *pipelineModule, raw_pwrite_stream &outStrea
       unsigned passIndex = 2000;
       codegenPassMgr->setPassIndex(&passIndex);
       getLgcContext()->addTargetPasses(*codegenPassMgr, codeGenTimer, outStream);
+      // Get compatible datalayout as what backend require, this is mainly used to remove entries for address space that
+      // are only known to the middle-end.
+      pipelineModule->setDataLayout(getLgcContext()->getTargetMachine()->createDataLayout());
       codegenPassMgr->run(*pipelineModule);
     }
   }
