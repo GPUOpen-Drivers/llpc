@@ -49,6 +49,8 @@ enum class CpsLevel : uint8_t {
   Count,
 };
 
+constexpr unsigned stackAddrSpace = 32;
+
 unsigned getArgumentDwordCount(const llvm::DataLayout &DL, llvm::Type *type);
 unsigned getArgumentDwordCount(const llvm::DataLayout &DL,
                                llvm::ArrayRef<llvm::Type *> types);
