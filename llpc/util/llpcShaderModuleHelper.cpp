@@ -49,7 +49,7 @@ namespace llvm {
 namespace cl {
 
 // -trim-debug-info: Trim debug information in SPIR-V binary
-opt<bool> TrimDebugInfo("trim-debug-info", cl::desc("Trim debug information in SPIR-V binary"), init(true));
+opt<bool> TrimDebugInfo("trim-debug-info", cl::desc("Trim debug information in SPIR-V binary"), init(false));
 
 } // namespace cl
 } // namespace llvm

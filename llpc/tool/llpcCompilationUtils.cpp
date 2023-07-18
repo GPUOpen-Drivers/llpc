@@ -231,7 +231,7 @@ Expected<BinaryData> compileGlsl(const std::string &inFilename, ShaderStage *sta
 
   void *program = nullptr;
   const char *log = nullptr;
-  int compileOption = SpvGenOptionDefaultDesktop | SpvGenOptionVulkanRules | SpvGenOptionDebug;
+  int compileOption = SpvGenOptionDefaultDesktop | SpvGenOptionVulkanRules;
   compileOption |= isHlsl ? SpvGenOptionReadHlsl : 0;
   const char *entryPoints[] = {defaultEntryTarget.c_str()};
   bool compileResult = spvCompileAndLinkProgramEx(1, &lang, &sourceStringCount, sourceList, fileList,
