@@ -640,8 +640,7 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 &&
         m_pipelineState->getColorExportState().alphaToCoverageEnable) {
       auto dbShaderControl = graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl].getMap(true);
-      dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] =
-          dbShaderControl[Util::Abi::DbShaderControlMetadataKey::MaskExportEnable].getBool();
+      dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] = false;
     }
 
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10) {
@@ -658,6 +657,18 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
       else
         graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::AaCoverageToShaderSelect] =
             serializeEnum(Util::Abi::CoverageToShaderSel(INPUT_COVERAGE));
+    }
+
+    if (m_pipelineState->isUseMrt0AToMrtzA()) {
+      // Update z_export_format since depth export has alpha channel
+      unsigned depthExpFmt = graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::SpiShaderZFormat].getUInt();
+      if (depthExpFmt == EXP_FORMAT_32_R)
+        depthExpFmt = EXP_FORMAT_32_AR;
+      else if (depthExpFmt == EXP_FORMAT_32_GR)
+        depthExpFmt = EXP_FORMAT_32_ABGR;
+      else if (depthExpFmt != EXP_FORMAT_32_ABGR)
+        llvm_unreachable("unhandled depth export format");
+      graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::SpiShaderZFormat] = depthExpFmt;
     }
   } else {
     // Set PA_CL_CLIP_CNTL from pipeline state settings.
@@ -680,7 +691,7 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
         m_pipelineState->getColorExportState().alphaToCoverageEnable) {
       DB_SHADER_CONTROL dbShaderControl = {};
       dbShaderControl.u32All = getRegister(mmDB_SHADER_CONTROL);
-      dbShaderControl.bitfields.ALPHA_TO_MASK_DISABLE = dbShaderControl.bitfields.MASK_EXPORT_ENABLE;
+      dbShaderControl.bitfields.ALPHA_TO_MASK_DISABLE = 0;
       setRegister(mmDB_SHADER_CONTROL, dbShaderControl.u32All);
     }
 
@@ -699,6 +710,19 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
         paScAaConfig.bitfields.COVERAGE_TO_SHADER_SELECT = INPUT_COVERAGE;
       }
       setRegister(mmPA_SC_AA_CONFIG, paScAaConfig.u32All);
+    }
+    if (m_pipelineState->isUseMrt0AToMrtzA()) {
+      // Update z_export_format since depth export has alpha channel
+      SPI_SHADER_Z_FORMAT spiShaderZFormat = {};
+      unsigned depthExpFmt = getRegister(mmSPI_SHADER_Z_FORMAT);
+      if (depthExpFmt == EXP_FORMAT_32_R)
+        depthExpFmt = EXP_FORMAT_32_AR;
+      else if (depthExpFmt == EXP_FORMAT_32_GR)
+        depthExpFmt = EXP_FORMAT_32_ABGR;
+      else if (depthExpFmt != EXP_FORMAT_32_ABGR)
+        llvm_unreachable("unhandled depth export format");
+      spiShaderZFormat.bitfields.Z_EXPORT_FORMAT = depthExpFmt;
+      setRegister(mmSPI_SHADER_Z_FORMAT, spiShaderZFormat.u32All);
     }
   }
 }

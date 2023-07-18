@@ -402,6 +402,12 @@ public:
   // Get user data for a specific shader stage
   llvm::ArrayRef<unsigned> getUserDataMap(ShaderStage shaderStage) const { return m_userDataMaps[shaderStage]; }
 
+  // Set the flag for performing the copy from mrt0.z to mrtz.a
+  void setUseMrt0AToMrtzA(bool used) { m_useMrt0AToMrtzA = used; }
+
+  // Get the flag of whether to copy mrt0.a to mrtz.a
+  bool isUseMrt0AToMrtzA() const { return m_useMrt0AToMrtzA; }
+
   // -----------------------------------------------------------------------------------------------------------------
   // Utility method templates to read and write IR metadata, used by PipelineState and ShaderModes
 
@@ -582,6 +588,7 @@ private:
   bool m_outputPackState[ShaderStageGfxCount] = {}; // The output packable state per shader stage
   XfbStateMetadata m_xfbStateMetadata = {};         // Transform feedback state metadata
   llvm::SmallVector<unsigned, 32> m_userDataMaps[ShaderStageCountInternal]; // The user data per-shader
+  bool m_useMrt0AToMrtzA = false;                                           // Whether to copy mrt0.a to mrz.a
 };
 
 // =====================================================================================================================
