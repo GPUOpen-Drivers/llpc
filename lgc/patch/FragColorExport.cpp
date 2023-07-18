@@ -914,17 +914,36 @@ void FragColorExport::generateExportInstructions(ArrayRef<lgc::ColorExportInfo> 
         ++hwColorExport;
       }
     } else {
-      auto poison = PoisonValue::get(Type::getFloatTy(*m_context));
+      // Depth export alpha comes from MRT0.a if there is MRT0.a and A2C is enable on GFX11+
+      Value *alpha = PoisonValue::get(Type::getFloatTy(*m_context));
+      unsigned depthMask = exp.location;
+      if (!dummyExport && m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11 &&
+          m_pipelineState->getColorExportState().alphaToCoverageEnable) {
+        bool canCopyAlpha = false;
+        for (auto &curInfo : info) {
+          if (curInfo.hwColorTarget == EXP_TARGET_MRT_0 && (exportFormat[EXP_TARGET_MRT_0] > EXP_FORMAT_32_GR)) {
+            // Mrt0 is enabled and its alpha channel is enabled
+            canCopyAlpha = true;
+            break;
+          }
+        }
+        if (canCopyAlpha) {
+          // Update Mrtz.a and its mask
+          alpha = builder.CreateExtractElement(values[EXP_TARGET_MRT_0], 3);
+          depthMask |= 0x8;
+          m_pipelineState->setUseMrt0AToMrtzA(canCopyAlpha);
+        }
+      }
       Value *fragDepth = builder.CreateExtractElement(output, static_cast<uint64_t>(0));
       Value *fragStencilRef = builder.CreateExtractElement(output, 1);
       Value *sampleMask = builder.CreateExtractElement(output, 2);
       Value *args[] = {
           builder.getInt32(EXP_TARGET_Z), // tgt
-          builder.getInt32(exp.location), // en
+          builder.getInt32(depthMask),    // en
           fragDepth,                      // src0
           fragStencilRef,                 // src1
           sampleMask,                     // src2
-          poison,                         // src3
+          alpha,                          // src3
           builder.getFalse(),             // done
           builder.getTrue()               // vm
       };

@@ -762,6 +762,17 @@ union PA_SC_SHADER_CONTROL {
   unsigned u32All;
 };
 
+union SPI_SHADER_Z_FORMAT {
+  struct {
+    unsigned int Z_EXPORT_FORMAT : 4;
+    unsigned int : 28;
+  } bits, bitfields;
+
+  unsigned int u32All;
+  signed int i32All;
+  float f32All;
+};
+
 enum CovToShaderSel {
   INPUT_COVERAGE = 0x00000000,
   INPUT_INNER_COVERAGE = 0x00000001,
