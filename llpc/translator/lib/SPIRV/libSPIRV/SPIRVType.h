@@ -64,7 +64,6 @@ public:
 
   SPIRVType *getArrayElementType() const;
   uint64_t getArrayLength() const;
-  unsigned getDerivedArrayStride() const;
   unsigned getBitWidth() const;
   unsigned getSizeInBytes() const;
   unsigned getFloatBitWidth() const;
@@ -78,7 +77,6 @@ public:
   SPIRVType *getVectorComponentType() const;
   SPIRVWord getMatrixColumnCount() const;
   SPIRVType *getMatrixColumnType() const;
-  unsigned getDerivedMatrixStride() const;
   SPIRVType *getCompositeElementType(size_t) const;
   SPIRVWord getCompositeElementCount() const;
   bool isTypeVoid() const;

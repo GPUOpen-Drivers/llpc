@@ -82,7 +82,7 @@ void SpirvLowerAccessChain::tryToAddMissingIndicesBetweenGVandGEP(GEPOperator *g
 
   // We are interested only in address spaces which are used while doing global value lowering for store and load.
   const unsigned addrSpace = gep->getType()->getPointerAddressSpace();
-  if (addrSpace != SPIRAS_Input && addrSpace != SPIRAS_Output && addrSpace != SPIRAS_TaskPayload)
+  if (addrSpace != SPIRAS_Input && addrSpace != SPIRAS_Output)
     return;
 
   GlobalValue *gv = dyn_cast<GlobalValue>(gep->getPointerOperand());
@@ -136,8 +136,7 @@ void SpirvLowerAccessChain::visitGetElementPtrInst(GetElementPtrInst &getElemPtr
   // NOTE: Here, we try to coalesce chained "getelementptr" instructions (created from multi-level access chain).
   // Because the metadata is always decorated on top-level pointer value (actually a global variable).
   const unsigned addrSpace = getElemPtrInst.getType()->getPointerAddressSpace();
-  if (addrSpace == SPIRAS_Private || addrSpace == SPIRAS_Input || addrSpace == SPIRAS_Output ||
-      addrSpace == SPIRAS_TaskPayload) {
+  if (addrSpace == SPIRAS_Private || addrSpace == SPIRAS_Input || addrSpace == SPIRAS_Output) {
     GetElementPtrInst *gep = tryToCoalesceChain(&getElemPtrInst, addrSpace);
     if (GEPOperator *gepOp = dyn_cast<GEPOperator>(gep)) {
       m_builder->SetInsertPoint(gep);

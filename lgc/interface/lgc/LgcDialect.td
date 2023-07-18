@@ -33,6 +33,7 @@ def LgcDialect : Dialect {
 def ConstantPointer : TgConstant<(PointerType 4)>, Type;
 def PrivatePointer : TgConstant<(PointerType 5)>, Type;
 def BufferPointer : TgConstant<(PointerType 7)>, Type;
+def TaskPayloadPointer : TgConstant<(PointerType 7)>, Type;
 
 def V4I32 : TgConstant<(FixedVectorType I32, 4)>, Type;
 
@@ -92,6 +93,18 @@ def DebugPrintfOp : LgcOp<"debug.printf", [Memory<[(readwrite InaccessibleMem)]>
 
     `format` must be a non-external global variable in the constant address space of type `[n x i8]` (not
     null-terminated).
+  }];
+}
+
+def TaskPayloadPtrOp : LgcOp<"task.payload.ptr", [Memory<[]>, WillReturn]> {
+  let arguments = (ins);
+  let results = (outs TaskPayloadPointer:$payload);
+
+  let summary = "return the pointer to task payload";
+  let description = [{
+    Return the point to task payload of task shader.
+
+    The returned task payload pointer is further used by subsequent read/write/atomics operations on task payload.
   }];
 }
 

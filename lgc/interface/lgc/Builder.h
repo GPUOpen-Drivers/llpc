@@ -1248,51 +1248,6 @@ public:
   llvm::Instruction *CreateWriteBuiltInOutput(llvm::Value *valueToWrite, BuiltInKind builtIn, InOutInfo outputInfo,
                                               llvm::Value *vertexOrPrimitiveIndex, llvm::Value *index);
 
-  // Create a read of (part of) a task payload.
-  // The result type is as specified by resultTy, a scalar or vector type with no more than four elements.
-  //
-  // @param resultTy : Type of value to read
-  // @param byteOffset : Byte offset within the payload structure
-  // @param instName : Name to give instruction(s)
-  // @returns : Value read from the task payload
-  llvm::Value *CreateReadTaskPayload(llvm::Type *resultTy, llvm::Value *byteOffset, // NOLINT
-                                     const llvm::Twine &instName = "");
-
-  // Create a write of (part of) a task payload.
-  //
-  // @param valueToWrite : Value to write
-  // @param byteOffset : Byte offset within the payload structure
-  // @param instName : Name to give instruction(s)
-  // @returns Instruction to write value to task payload
-  // @returns : Original value read from the task payload
-  llvm::Instruction *CreateWriteTaskPayload(llvm::Value *valueToWrite, llvm::Value *byteOffset, // NOLINT
-                                            const llvm::Twine &instName = "");
-
-  // Create a task payload atomic operation other than compare-and-swap. An add of +1 or -1, or a sub
-  // of -1 or +1, is generated as inc or dec. Result type is the same as the input value type.
-  //
-  // @param atomicOp : Atomic op to create
-  // @param ordering : Atomic ordering
-  // @param inputValue : Input value
-  // @param byteOffset : Byte offset within the payload structure
-  // @param instName : Name to give instruction(s)
-  // @returns : Original value read from the task payload
-  llvm::Value *CreateTaskPayloadAtomic(unsigned atomicOp, llvm::AtomicOrdering ordering, // NOLINT
-                                       llvm::Value *inputValue, llvm::Value *byteOffset,
-                                       const llvm::Twine &instName = "");
-
-  // Create a task payload atomic compare-and-swap.
-  //
-  // @param ordering : Atomic ordering
-  // @param inputValue : Input value
-  // @param comparatorValue : Value to compare against
-  // @param byteOffset : Byte offset within the payload structure
-  // @param instName : Name to give instruction(s)
-  // @returns : Original value read from the task payload
-  llvm::Value *CreateTaskPayloadAtomicCompareSwap(llvm::AtomicOrdering ordering, // NOLINT
-                                                  llvm::Value *inputValue, llvm::Value *comparatorValue,
-                                                  llvm::Value *byteOffset, const llvm::Twine &instName = "");
-
   // -----------------------------------------------------------------------------------------------------------------
   // Matrix operations
 

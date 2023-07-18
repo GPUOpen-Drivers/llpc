@@ -58,10 +58,6 @@ public:
   void handleStoreInst();
   void handleStoreInstGEP(GlobalVariable *output, ArrayRef<Value *> indexOperands, StoreInst &storeInst);
 
-  void handleAtomicInst();
-  void handleAtomicInstGlobal(Instruction &atomicInst);
-  void handleAtomicInstGEP(GetElementPtrInst *const getElemPtr, Instruction &atomicInst);
-
   static llvm::StringRef name() { return "Lower SPIR-V globals (global variables, inputs, and outputs)"; }
 
 private:
@@ -74,6 +70,7 @@ private:
   void lowerOutput();
   void lowerInOutInPlace();
   void lowerBufferBlock();
+  void lowerTaskPayload();
   void lowerPushConsts();
   void lowerUniformConstants();
   void lowerAliasedVal();
@@ -102,20 +99,6 @@ private:
   void storeOutputMember(llvm::Type *outputTy, llvm::Type *storeTy, llvm::Value *storeValue,
                          llvm::ArrayRef<llvm::Value *> indexOperands, unsigned maxLocOffset, llvm::Constant *outputMeta,
                          llvm::Value *locOffset, llvm::Value *vertexOrPrimitiveIdx);
-
-  llvm::Value *loadIndexedValueFromTaskPayload(llvm::Type *indexedTy, llvm::Type *loadTy,
-                                               llvm::ArrayRef<llvm::Value *> indexOperands, llvm::Constant *metadata,
-                                               llvm::Value *extraByteOffset);
-  llvm::Value *loadValueFromTaskPayload(llvm::Type *loadTy, llvm::Constant *metadata, llvm::Value *extraByteOffset);
-  void storeIndexedValueToTaskPayload(llvm::Type *indexedTy, llvm::Type *storeTy, llvm::Value *storeValue,
-                                      llvm::ArrayRef<llvm::Value *> indexOperands, llvm::Constant *metadata,
-                                      llvm::Value *extraByteOffset);
-  void storeValueToTaskPayload(llvm::Value *storeValue, llvm::Constant *metadata, llvm::Value *extraByteOffse);
-  llvm::Value *atomicOpWithIndexedValueInTaskPayload(llvm::Type *indexedTy, llvm::Instruction *atomicInst,
-                                                     llvm::ArrayRef<llvm::Value *> indexOperands,
-                                                     llvm::Constant *metadata, llvm::Value *extraByteOffset);
-  llvm::Value *atomicOpWithValueInTaskPayload(llvm::Instruction *atomicInst, llvm::Constant *metadata,
-                                              llvm::Value *extraByteOffset);
 
   void interpolateInputElement(unsigned interpLoc, llvm::Value *interpInfo, llvm::CallInst &callInst,
                                GlobalVariable *gv, ArrayRef<Value *> indexOperands);

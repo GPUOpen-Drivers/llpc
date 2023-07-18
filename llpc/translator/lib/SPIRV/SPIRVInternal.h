@@ -166,7 +166,6 @@ enum SPIRAddressSpace {
   SPIRAS_Uniform = 7,  // Memory buffer descriptor
   SPIRAS_Input = 64,
   SPIRAS_Output = 65,
-  SPIRAS_TaskPayload = 66,
   SPIRAS_Count,
 };
 
@@ -179,7 +178,6 @@ template <> inline void SPIRVMap<SPIRAddressSpace, std::string>::init() {
   add(SPIRAS_Input, "Input");
   add(SPIRAS_Output, "Output");
   add(SPIRAS_Uniform, "Uniform");
-  add(SPIRAS_TaskPayload, "TaskPayload");
 }
 
 template <> inline void SPIRVMap<SPIRAddressSpace, SPIRVStorageClassKind>::init() {
@@ -201,7 +199,7 @@ template <> inline void SPIRVMap<SPIRAddressSpace, SPIRVStorageClassKind>::init(
   add(SPIRAS_Private, StorageClassHitAttributeKHR);
   add(SPIRAS_Private, StorageClassIncomingRayPayloadKHR);
   add(SPIRAS_Global, StorageClassShaderRecordBufferKHR);
-  add(SPIRAS_TaskPayload, StorageClassTaskPayloadWorkgroupEXT);
+  add(SPIRAS_Uniform, StorageClassTaskPayloadWorkgroupEXT);
 }
 typedef SPIRVMap<SPIRAddressSpace, SPIRVStorageClassKind> SPIRSPIRVAddrSpaceMap;
 
@@ -223,6 +221,7 @@ const static char InOut[] = "spirv.InOut";
 const static char Block[] = "spirv.Block";
 const static char PushConst[] = "spirv.PushConst";
 const static char Resource[] = "spirv.Resource";
+const static char TaskPayload[] = "spirv.TaskPayload";
 const static char UniformConstant[] = "spirv.UniformConstant";
 const static char ExecutionModel[] = "spirv.ExecutionModel";
 const static char NonUniform[] = "spirv.NonUniform";

@@ -500,22 +500,6 @@ public:
   llvm::Instruction *CreateWriteBuiltInOutput(llvm::Value *valueToWrite, BuiltInKind builtIn, InOutInfo outputInfo,
                                               llvm::Value *vertexOrPrimitiveIndex, llvm::Value *index);
 
-  // Create a read from (part of) a task payload.
-  llvm::Value *CreateReadTaskPayload(llvm::Type *resultTy, llvm::Value *byteOffset, const llvm::Twine &instName = "");
-
-  // Create a write to (part of) a task payload.
-  llvm::Instruction *CreateWriteTaskPayload(llvm::Value *valueToWrite, llvm::Value *byteOffset,
-                                            const llvm::Twine &instName = "");
-
-  // Create a task payload atomic operation other than compare-and-swap.
-  llvm::Value *CreateTaskPayloadAtomic(unsigned atomicOp, llvm::AtomicOrdering ordering, llvm::Value *inputValue,
-                                       llvm::Value *byteOffset, const llvm::Twine &instName = "");
-
-  // Create a task payload atomic compare-and-swap.
-  llvm::Value *CreateTaskPayloadAtomicCompareSwap(llvm::AtomicOrdering ordering, llvm::Value *inputValue,
-                                                  llvm::Value *comparatorValue, llvm::Value *byteOffset,
-                                                  const llvm::Twine &instName = "");
-
 private:
   // Read (a part of) a generic (user) input/output value.
   llvm::Value *readGenericInputOutput(bool isOutput, llvm::Type *resultTy, unsigned location,

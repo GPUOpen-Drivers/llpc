@@ -135,10 +135,6 @@ enum BuilderOpcode : unsigned {
   ReadBuiltInInput,
   ReadBuiltInOutput,
   WriteBuiltInOutput,
-  ReadTaskPayload,
-  WriteTaskPayload,
-  TaskPayloadAtomic,
-  TaskPayloadAtomicCompareSwap,
 
   // Matrix
   TransposeMatrix,

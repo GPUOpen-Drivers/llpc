@@ -657,32 +657,6 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     return m_builder->CreateImageBvhIntersectRay(bvhNodePtr, extent, origin, direction, invDirection, imageDesc);
   }
 
-  case BuilderOpcode::ReadTaskPayload: {
-    return m_builder->CreateReadTaskPayload(call->getType(), // Result type
-                                            args[0]);        // Byte offset within the payload structure
-  }
-
-  case BuilderOpcode::WriteTaskPayload: {
-    return m_builder->CreateWriteTaskPayload(args[0],  // Value to write
-                                             args[1]); // Byte offset within the payload structure
-  }
-
-  case BuilderOpcode::TaskPayloadAtomic: {
-    unsigned atomicOp = cast<ConstantInt>(args[0])->getZExtValue();
-    auto ordering = static_cast<AtomicOrdering>(cast<ConstantInt>(args[1])->getZExtValue());
-    Value *inputValue = args[2];
-    Value *byteOffset = args[3];
-    return m_builder->CreateTaskPayloadAtomic(atomicOp, ordering, inputValue, byteOffset);
-  }
-
-  case BuilderOpcode::TaskPayloadAtomicCompareSwap: {
-    auto ordering = static_cast<AtomicOrdering>(cast<ConstantInt>(args[0])->getZExtValue());
-    Value *inputValue = args[1];
-    Value *comparatorValue = args[2];
-    Value *byteOffset = args[3];
-    return m_builder->CreateTaskPayloadAtomicCompareSwap(ordering, inputValue, comparatorValue, byteOffset);
-  }
-
   // Replayer implementations of MiscBuilder methods
   case BuilderOpcode::EmitVertex: {
     return m_builder->CreateEmitVertex(cast<ConstantInt>(args[0])->getZExtValue());

@@ -194,14 +194,6 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "read.builtin.output";
   case BuilderOpcode::WriteBuiltInOutput:
     return "write.builtin.output";
-  case BuilderOpcode::ReadTaskPayload:
-    return "read.task.payload";
-  case BuilderOpcode::WriteTaskPayload:
-    return "write.task.payload";
-  case BuilderOpcode::TaskPayloadAtomic:
-    return "task.payload.atomic";
-  case BuilderOpcode::TaskPayloadAtomicCompareSwap:
-    return "task.payload.compare.swap";
   case BuilderOpcode::TransposeMatrix:
     return "transpose.matrix";
   case BuilderOpcode::MatrixTimesScalar:
@@ -1633,60 +1625,6 @@ Value *Builder::CreateImageBvhIntersectRay(Value *nodePtr, Value *extent, Value 
 }
 
 // =====================================================================================================================
-// Create a read from (part of) a task payload.
-// The result type is as specified by resultTy, a scalar or vector type with no more than four elements.
-//
-// @param resultTy : Type of value to read
-// @param byteOffset : Byte offset within the payload structure
-// @param instName : Name to give instruction(s)
-// @returns : Value read from the task payload
-Value *Builder::CreateReadTaskPayload(Type *resultTy, Value *byteOffset, const Twine &instName) {
-  return record(BuilderOpcode::ReadTaskPayload, resultTy, byteOffset, instName);
-}
-
-// =====================================================================================================================
-// Create a write to (part of) a task payload.
-//
-// @param valueToWrite : Value to write
-// @param byteOffset : Byte offset within the payload structure
-// @param instName : Name to give instruction(s)
-// @returns : Instruction to write value to task payload
-Instruction *Builder::CreateWriteTaskPayload(Value *valueToWrite, Value *byteOffset, const Twine &instName) {
-  return record(BuilderOpcode::WriteTaskPayload, nullptr, {valueToWrite, byteOffset}, instName);
-}
-
-// =====================================================================================================================
-// Create a task payload atomic operation other than compare-and-swap. An add of +1 or -1, or a sub
-// of -1 or +1, is generated as inc or dec. Result type is the same as the input value type.
-//
-// @param atomicOp : Atomic op to create
-// @param ordering : Atomic ordering
-// @param inputValue : Input value
-// @param byteOffset : Byte offset within the payload structure
-// @param instName : Name to give instruction(s)
-// @returns : Original value read from the task payload
-Value *Builder::CreateTaskPayloadAtomic(unsigned atomicOp, AtomicOrdering ordering, Value *inputValue,
-                                        Value *byteOffset, const Twine &instName) {
-  return record(BuilderOpcode::TaskPayloadAtomic, inputValue->getType(),
-                {getInt32(atomicOp), getInt32(static_cast<unsigned>(ordering)), inputValue, byteOffset}, instName);
-}
-
-// =====================================================================================================================
-// Create a task payload atomic compare-and-swap.
-//
-// @param ordering : Atomic ordering
-// @param inputValue : Input value
-// @param comparatorValue : Value to compare against
-// @param byteOffset : Byte offset within the payload structure
-// @param instName : Name to give instruction(s)
-// @returns : Original value read from the task payload
-Value *Builder::CreateTaskPayloadAtomicCompareSwap(AtomicOrdering ordering, Value *inputValue, Value *comparatorValue,
-                                                   Value *byteOffset, const Twine &instName) {
-  return record(BuilderOpcode::TaskPayloadAtomicCompareSwap, inputValue->getType(),
-                {getInt32(static_cast<unsigned>(ordering)), inputValue, comparatorValue, byteOffset}, instName);
-}
-
-// =====================================================================================================================
 // Create a get wave size query.
 //
 // @param instName : Name to give instruction(s)
@@ -2135,7 +2073,6 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::ReadGenericInput:
     case BuilderOpcode::ReadGenericOutput:
     case BuilderOpcode::ReadPerVertexInput:
-    case BuilderOpcode::ReadTaskPayload:
       // Functions that only read memory.
       func->setOnlyReadsMemory();
       // Must be marked as returning for DCE.
@@ -2148,9 +2085,6 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::ImageAtomic:
     case BuilderOpcode::ImageAtomicCompareSwap:
     case BuilderOpcode::WriteXfbOutput:
-    case BuilderOpcode::WriteTaskPayload:
-    case BuilderOpcode::TaskPayloadAtomic:
-    case BuilderOpcode::TaskPayloadAtomicCompareSwap:
       // Functions that read and write memory.
       break;
     case BuilderOpcode::SubgroupAll:
