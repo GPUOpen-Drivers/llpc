@@ -30,6 +30,7 @@
  */
 #pragma once
 
+#include "lgc/LgcDialect.h"
 #include "lgc/patch/PatchPreparePipelineAbi.h"
 #include "lgc/patch/SystemValues.h"
 #include "lgc/state/PipelineState.h"
@@ -79,12 +80,7 @@ private:
   void processTaskShader(llvm::Function *entryPoint);
   void processMeshShader(llvm::Function *entryPoint);
 
-  llvm::Value *readTaskPayload(llvm::Type *readTy, llvm::Value *byteOffset);
-  void writeTaskPayload(llvm::Value *writeValue, llvm::Value *byteOffset);
-  llvm::Value *taskPayloadAtomic(unsigned atomicOp, llvm::AtomicOrdering ordering, llvm::Value *inputValue,
-                                 llvm::Value *byteOffset);
-  llvm::Value *taskPayloadAtomicCompareSwap(llvm::AtomicOrdering ordering, llvm::Value *inputValue,
-                                            llvm::Value *comparatorValue, llvm::Value *byteOffset);
+  void lowerTaskPayloadPtr(TaskPayloadPtrOp &taskPayloadPtrOp);
 
   void initWaveThreadInfo(llvm::Function *entryPoint);
   llvm::Value *getShaderRingEntryIndex(llvm::Function *entryPoint);
@@ -159,7 +155,7 @@ private:
 
   PipelineSystemValues m_pipelineSysValues; // Cache of ShaderSystemValues objects, one per shader stage
 
-  llvm::IRBuilder<> m_builder; // LLVM IR builder
+  BuilderBase m_builder; // LLVM IR builder
 
   // The wave/thread info used for control shader branching
   struct {
@@ -181,6 +177,9 @@ private:
   llvm::Value *m_barrierToggle = nullptr;            // Toggle used by calculation of barrier completion flag
   bool m_needBarrierFlag = false;                    // Whether barrier completion flag is needed
   llvm::SmallVector<llvm::CallInst *, 8> m_barriers; // Barriers collected from API mesh shader
+
+  llvm::SmallVector<llvm::CallInst *, 16>
+      m_callsToRemove; // Calls relevant to task/mesh shader operations that will be finally removed after lowering
 
   llvm::GlobalValue *m_lds = nullptr; // Global variable to model mesh shader LDS
 

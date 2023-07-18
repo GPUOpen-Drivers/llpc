@@ -2098,11 +2098,8 @@ Value *SPIRVToLLVM::transAtomicRMW(SPIRVValue *const spvValue, const AtomicRMWIn
   Value *const atomicValue = transValue(spvAtomicInst->getOpValue(3), getBuilder()->GetInsertBlock()->getParent(),
                                         getBuilder()->GetInsertBlock());
 
-  // NOTE: This is a workaround. atomic.swap.f64 is not supported in LLVM backend, so we convert double to int64. But
-  // for task payload, this is deferred because it will facilitate lowering of atomic instructions of task payload and
-  // the work is finally done by LGC in task shader processing.
-  if (dyn_cast<PointerType>(atomicPointer->getType())->getAddressSpace() != SPIRAS_TaskPayload &&
-      binOp == AtomicRMWInst::Xchg && atomicValue->getType()->isDoubleTy()) {
+  // NOTE: This is a workaround. atomic.swap.f64 is not supported in LLVM backend, so we convert double to int64.
+  if (binOp == AtomicRMWInst::Xchg && atomicValue->getType()->isDoubleTy()) {
     Value *const int64Value = getBuilder()->CreateBitCast(atomicValue, getBuilder()->getInt64Ty());
 
     Value *const int64AtomicPointer = getBuilder()->CreateBitCast(
@@ -2598,6 +2595,9 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
   if (spvLoad->getMemoryAccessMask(true) & MemoryAccessNonPrivatePointerKHRMask)
     isCoherent = true;
 
+  if (spvLoad->getSrc()->getType()->getPointerStorageClass() == StorageClassTaskPayloadWorkgroupEXT)
+    isCoherent = true;
+
   const bool isNonTemporal = spvLoad->SPIRVMemoryAccess::isNonTemporal(true);
 
   SPIRVType *const spvLoadType = spvLoad->getSrc()->getType();
@@ -2898,7 +2898,11 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpStore>(SPIRVValue *const 
     if (isSystemScope)
       isCoherent = true;
   }
+
   if (spvStore->getMemoryAccessMask(false) & MemoryAccessNonPrivatePointerKHRMask)
+    isCoherent = true;
+
+  if (pointerStorageClass == StorageClassTaskPayloadWorkgroupEXT)
     isCoherent = true;
 
   const bool isNonTemporal = spvStore->SPIRVMemoryAccess::isNonTemporal(false);
@@ -7962,12 +7966,12 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       auto mdNode = MDNode::get(*m_context, mDs);
       gv->addMetadata(gSPIRVMD::InOut, *mdNode);
 
-    } else if (as == SPIRAS_Uniform || as == SPIRAS_TaskPayload) {
+    } else if (as == SPIRAS_Uniform) {
       // Translate decorations of blocks
       SPIRVType *blockTy = bv->getType()->getPointerElementType();
       // If not task payload, try to remove block array dimensions. Note that task
       // payload doesn't have such dimensions.
-      if (as != SPIRAS_TaskPayload) {
+      if (bv->getType()->getPointerStorageClass() != StorageClassTaskPayloadWorkgroupEXT) {
         // Remove array dimensions, it is useless for block metadata building
         while (blockTy->isTypeArray())
           blockTy = blockTy->getArrayElementType();
@@ -7988,10 +7992,10 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       if (!hasDescSet)
         descSet = 0;
 
-      if (bv->getType()->getPointerStorageClass() != StorageClassUniformConstant ||
+      if ((bv->getType()->getPointerStorageClass() != StorageClassUniformConstant &&
+           bv->getType()->getPointerStorageClass() != StorageClassTaskPayloadWorkgroupEXT) ||
           isAccelerationStructureType(blockTy)) {
-        assert(blockTy->isTypeStruct() || blockTy->isTypeAccelerationStructureKHR() ||
-               as == SPIRAS_TaskPayload); // Task payload is not necessarily a structure
+        assert(blockTy->isTypeStruct() || blockTy->isTypeAccelerationStructureKHR());
         // Setup resource metadata
         auto int32Ty = Type::getInt32Ty(*m_context);
         std::vector<Metadata *> resMDs;
@@ -8007,14 +8011,15 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
         ShaderBlockDecorate blockDec = {};
         blockDec.NonWritable = isUniformBlock;
         Type *blockMdTy = nullptr;
-        auto blockMd =
-            buildShaderBlockMetadata(blockTy, blockDec, blockMdTy,
-                                     bv->getType()->getPointerStorageClass() == StorageClassTaskPayloadWorkgroupEXT);
+        auto blockMd = buildShaderBlockMetadata(blockTy, blockDec, blockMdTy);
 
         std::vector<Metadata *> blockMDs;
         blockMDs.push_back(ConstantAsMetadata::get(blockMd));
         auto blockMdNode = MDNode::get(*m_context, blockMDs);
         gv->addMetadata(gSPIRVMD::Block, *blockMdNode);
+      } else if (bv->getType()->getPointerStorageClass() == StorageClassTaskPayloadWorkgroupEXT) {
+        // Setup metadata for task payload
+        gv->addMetadata(gSPIRVMD::TaskPayload, *MDNode::get(*m_context, {}));
       } else {
         // Setup metadata for uniform constant.
         auto int32Ty = Type::getInt32Ty(*m_context);
@@ -8554,8 +8559,7 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
 }
 
 // Builds shader block metadata.
-Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecorate &blockDec, Type *&mdTy,
-                                                bool deriveStride) {
+Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecorate &blockDec, Type *&mdTy) {
   if (bt->isTypeVector() || bt->isTypeScalar()) {
     // Handle scalar or vector type
     ShaderBlockMetadata blockMd = {};
@@ -8586,12 +8590,7 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
       // members.
       blockDec.IsMatrix = false;
       SPIRVWord arrayStride = 0;
-      if (!bt->hasDecorate(DecorationArrayStride, 0, &arrayStride)) {
-        if (deriveStride)
-          arrayStride = bt->getDerivedArrayStride();
-        else
-          llvm_unreachable("Missing array stride decoration");
-      }
+      bt->hasDecorate(DecorationArrayStride, 0, &arrayStride);
       stride = arrayStride;
       elemTy = bt->getArrayElementType();
 
@@ -8605,15 +8604,13 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
     } else {
       blockDec.IsMatrix = true;
       stride = blockDec.MatrixStride;
-      if (stride == 0 && deriveStride)
-        stride = bt->getDerivedMatrixStride();
       elemTy = bt->getMatrixColumnType();
     }
 
     // Build element metadata
     Type *elemMdTy = nullptr;
     auto elemDec = blockDec; // Inherit from parent
-    auto elemMd = buildShaderBlockMetadata(elemTy, elemDec, elemMdTy, deriveStride);
+    auto elemMd = buildShaderBlockMetadata(elemTy, elemDec, elemMdTy);
 
     // Build metadata for the array/matrix
     std::vector<Type *> mdTys;
@@ -8683,7 +8680,7 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
       // Build metadata for structure member
       auto memberTy = bt->getStructMemberType(memberIdx);
       Type *memberMdTy = nullptr;
-      auto memberMeta = buildShaderBlockMetadata(memberTy, memberDec, memberMdTy, deriveStride);
+      auto memberMeta = buildShaderBlockMetadata(memberTy, memberDec, memberMdTy);
 
       if (remappedIdx > memberIdx) {
         memberMdTys.push_back(Type::getInt32Ty(*m_context));

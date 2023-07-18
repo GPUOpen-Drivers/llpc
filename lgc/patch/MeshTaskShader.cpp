@@ -33,6 +33,7 @@
 #include "ShaderMerger.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/util/Debug.h"
+#include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
@@ -338,7 +339,7 @@ void MeshTaskShader::processTaskShader(Function *entryPoint) {
   // Task_Shader() {
   //   Initialize thread/wave info
   //
-  //   Task shader main body (from API shader, lower task payload read/write)
+  //   Task shader main body (from API shader, lower task payload pointer)
   //
   //   Barrier
   //   if (threadIdInSubgroup == 0) {
@@ -351,8 +352,6 @@ void MeshTaskShader::processTaskShader(Function *entryPoint) {
   //
   m_builder.SetInsertPointPastAllocas(entryPoint);
   initWaveThreadInfo(entryPoint);
-
-  SmallVector<CallInst *, 8> removedCalls;
 
   auto module = entryPoint->getParent();
   for (auto &func : module->functions()) {
@@ -368,23 +367,7 @@ void MeshTaskShader::processTaskShader(Function *entryPoint) {
 
         m_builder.SetInsertPoint(call);
 
-        if (func.getName().startswith(lgcName::MeshTaskReadTaskPayload)) {
-          // Read task payload
-          assert(call->arg_size() == 1);
-          auto byteOffset = call->getOperand(0);
-
-          auto readValue = readTaskPayload(call->getType(), byteOffset);
-          call->replaceAllUsesWith(readValue);
-          m_accessTaskPayload = true;
-        } else if (func.getName().startswith(lgcName::MeshTaskWriteTaskPayload)) {
-          // Write task payload
-          assert(call->arg_size() == 2);
-          auto byteOffset = call->getOperand(0);
-          auto writeValue = call->getOperand(1);
-
-          writeTaskPayload(writeValue, byteOffset);
-          m_accessTaskPayload = true;
-        } else if (func.getName().startswith(lgcName::MeshTaskEmitMeshTasks)) {
+        if (func.getName().startswith(lgcName::MeshTaskEmitMeshTasks)) {
           // Emit mesh tasks
           assert(call->arg_size() == 3);
           auto groupCountX = call->getOperand(0);
@@ -392,42 +375,27 @@ void MeshTaskShader::processTaskShader(Function *entryPoint) {
           auto groupCountZ = call->getOperand(2);
 
           emitTaskMeshs(groupCountX, groupCountY, groupCountZ);
-        } else if (func.getName().startswith(lgcName::MeshTaskAtomicTaskPayload)) {
-          // Task payload atomic
-          assert(call->arg_size() == 4);
-          unsigned atomicOp = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
-          AtomicOrdering ordering = static_cast<AtomicOrdering>(cast<ConstantInt>(call->getOperand(1))->getZExtValue());
-          auto inputValue = call->getOperand(2);
-          auto byteOffset = call->getOperand(3);
-
-          Value *atomicCall = taskPayloadAtomic(atomicOp, ordering, inputValue, byteOffset);
-          call->replaceAllUsesWith(atomicCall);
-          m_accessTaskPayload = true;
-        } else if (func.getName().startswith(lgcName::MeshTaskAtomicCompareSwapTaskPayload)) {
-          // Task payload atomic compare swap
-          assert(call->arg_size() == 4);
-          AtomicOrdering ordering = static_cast<AtomicOrdering>(cast<ConstantInt>(call->getOperand(0))->getZExtValue());
-          auto inputValue = call->getOperand(1);
-          auto comparatorValue = call->getOperand(2);
-          auto byteOffset = call->getOperand(3);
-
-          Value *atomicCall = taskPayloadAtomicCompareSwap(ordering, inputValue, comparatorValue, byteOffset);
-          call->replaceAllUsesWith(atomicCall);
-          m_accessTaskPayload = true;
         } else {
           llvm_unreachable("Unknown task shader call!");
         }
 
-        removedCalls.push_back(call);
+        m_callsToRemove.push_back(call);
       }
     }
   }
 
+  static auto visitor = llvm_dialects::VisitorBuilder<MeshTaskShader>()
+                            .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+                            .add<TaskPayloadPtrOp>(&MeshTaskShader::lowerTaskPayloadPtr)
+                            .build();
+  visitor.visit(*this, *entryPoint);
+
   // Clear removed calls
-  for (auto call : removedCalls) {
+  for (auto call : m_callsToRemove) {
     call->dropAllReferences();
     call->eraseFromParent();
   }
+  m_callsToRemove.clear();
 }
 
 // =====================================================================================================================
@@ -465,7 +433,7 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   //           - SetPrimitiveIndices -> Write primitive connectivity data to LDS
   //           - SetPrimitiveCulled -> Write null primitive flag to LDS
   //           - GetMeshInput -> Lower mesh built-in input
-  //           - ReadTaskPayload -> Read task payload from payload ring
+  //           - Lower task payload pointer -> Transform task payload descriptor
   //           - Write primitive/vertex output -> Write output data to LDS
   //     }
   //
@@ -982,285 +950,47 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
 }
 
 // =====================================================================================================================
-// Process the read of task payload.
-//
-// @param readTy : Type of value to read
-// @param byteOffset : Byte offset within the payload entry
-// @returns : Value read from task payload
-Value *MeshTaskShader::readTaskPayload(Type *readTy, Value *byteOffset) {
-  auto entryPoint = m_builder.GetInsertBlock()->getParent();
+// Lower task payload pointer to buffer fat pointer.
+void MeshTaskShader::lowerTaskPayloadPtr(TaskPayloadPtrOp &taskPayloadPtrOp) {
+  m_builder.SetInsertPoint(&taskPayloadPtrOp);
+
+  auto entryPoint = taskPayloadPtrOp.getFunction();
 
   auto payloadRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskPayloadRingBufDesc();
   auto payloadRingEntryOffset = getPayloadRingEntryOffset(entryPoint);
 
-  CoherentFlag coherent = {};
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
-    coherent.bits.glc = true;
-    coherent.bits.dlc = true;
-  }
+  // 48-bit GPU address of from the buffer descriptor: dword1[15:0] + dword0
+  auto descWord0 = m_builder.CreateExtractElement(payloadRingBufDesc, static_cast<uint64_t>(0));
+  auto descWord1 = m_builder.CreateExtractElement(payloadRingBufDesc, 1);
+  auto baseAddressLow = descWord0;
+  auto baseAddressHigh = m_builder.CreateAnd(descWord1, 0xFFFF);
 
-  const unsigned bitWidth = readTy->getScalarSizeInBits();
-  const unsigned numElements = readTy->isVectorTy() ? cast<FixedVectorType>(readTy)->getNumElements() : 1;
-  assert(numElements >= 1 && numElements <= 4);
+  Value *baseAddress = PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
+  baseAddress = m_builder.CreateInsertElement(baseAddress, baseAddressLow, static_cast<uint64_t>(0));
+  baseAddress = m_builder.CreateInsertElement(baseAddress, baseAddressHigh, 1);
+  baseAddress = m_builder.CreateBitCast(baseAddress, m_builder.getInt64Ty());
 
-  // NOTE: There are some special types that LLVM backend couldn't support. We have to lower them here.
-  if (bitWidth == 64) {
-    // 64 -> vec2
-    // 64vec2 -> vec4
-    // 64vec3 -> vec4 + vec2
-    // 64vec4 -> vec4 + vec4
-    Type *readTy1 = FixedVectorType::get(m_builder.getInt32Ty(), std::min(2 * numElements, 4u));
-    Value *readValue1 = readTaskPayload(readTy1, byteOffset);
+  baseAddress = m_builder.CreateAdd(baseAddress, m_builder.CreateZExt(payloadRingEntryOffset, m_builder.getInt64Ty()));
+  baseAddress = m_builder.CreateBitCast(baseAddress, FixedVectorType::get(m_builder.getInt32Ty(), 2));
 
-    Value *readValue = nullptr;
-    if (numElements > 2) {
-      Type *readTy2 = FixedVectorType::get(m_builder.getInt32Ty(), 2 * numElements - 4);
-      byteOffset = m_builder.CreateAdd(byteOffset, m_builder.getInt32(4 * sizeof(unsigned)));
-      Value *readValue2 = readTaskPayload(readTy2, byteOffset);
+  baseAddressLow = m_builder.CreateExtractElement(baseAddress, static_cast<uint64_t>(0));
+  baseAddressHigh = m_builder.CreateExtractElement(baseAddress, 1);
+  baseAddressHigh = m_builder.CreateAnd(baseAddressHigh, 0xFFFF);
+  descWord0 = baseAddressLow;
+  descWord1 = m_builder.CreateAnd(descWord1, 0xFFFF0000);
+  descWord1 = m_builder.CreateOr(descWord1, baseAddressHigh);
 
-      if (numElements == 3) {
-        readValue2 = m_builder.CreateShuffleVector(readValue2, PoisonValue::get(readValue2->getType()),
-                                                   ArrayRef<int>{0, 1, 2, 3});
-      }
-      readValue = m_builder.CreateShuffleVector(readValue1, readValue2,
-                                                ArrayRef<int>{0, 1, 2, 3, 4, 5, 6, 7}.slice(0, numElements * 2));
-    } else {
-      readValue = readValue1;
-    }
+  payloadRingBufDesc = m_builder.CreateInsertElement(payloadRingBufDesc, descWord0, static_cast<uint64_t>(0));
+  payloadRingBufDesc = m_builder.CreateInsertElement(payloadRingBufDesc, descWord1, 1);
 
-    return m_builder.CreateBitCast(readValue, readTy);
-  } else if (bitWidth == 8 || bitWidth == 16) {
-    if (numElements > 1) {
-      // Scalarize
-      Value *readValue = PoisonValue::get(readTy);
-      for (unsigned i = 0; i < numElements; ++i) {
-        auto elemByteOffset =
-            i > 0 ? m_builder.CreateAdd(byteOffset, m_builder.getInt32(i * bitWidth / 8)) : byteOffset;
-        auto elem = readTaskPayload(readTy->getScalarType(), elemByteOffset);
-        readValue = m_builder.CreateInsertElement(readValue, elem, i);
-      }
-      return readValue;
-    }
-  }
+  // Convert to fat pointer.
+  auto taskPayloadPtr = m_builder.create<BufferDescToPtrOp>(payloadRingBufDesc);
+  taskPayloadPtrOp.replaceAllUsesWith(taskPayloadPtr);
 
-  return m_builder.CreateIntrinsic(
-      Intrinsic::amdgcn_raw_buffer_load, readTy,
-      {payloadRingBufDesc, byteOffset, payloadRingEntryOffset, m_builder.getInt32(coherent.u32All)});
-}
+  if (getShaderStage(entryPoint) == ShaderStageTask)
+    m_accessTaskPayload = true; // Mark this flag if task shader accesses task payload
 
-// =====================================================================================================================
-// Process the write of task payload.
-//
-// @param writeValue : Value to write
-// @param byteOffset : Byte offset within the payload entry
-void MeshTaskShader::writeTaskPayload(Value *writeValue, Value *byteOffset) {
-  auto entryPoint = m_builder.GetInsertBlock()->getParent();
-  assert(getShaderStage(entryPoint) == ShaderStageTask);
-
-  auto payloadRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskPayloadRingBufDesc();
-  auto payloadRingEntryOffset = getPayloadRingEntryOffset(entryPoint);
-
-  CoherentFlag coherent = {};
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
-    coherent.bits.glc = true;
-  }
-
-  const auto writeTy = writeValue->getType();
-  const unsigned bitWidth = writeTy->getScalarSizeInBits();
-  const unsigned numElements = writeTy->isVectorTy() ? cast<FixedVectorType>(writeTy)->getNumElements() : 1;
-  assert(numElements >= 1 && numElements <= 4);
-
-  // NOTE: There are some special types that LLVM backend couldn't support. We have to lower them here.
-  if (bitWidth == 64) {
-    // Cast to <n x i32>
-    auto castTy = FixedVectorType::get(m_builder.getInt32Ty(), 2 * numElements);
-    writeValue = m_builder.CreateBitCast(writeValue, castTy);
-
-    // 64scalar -> vec2
-    // 64vec2 -> vec4
-    // 64vec3 -> vec4 + vec2
-    // 64vec4 -> vec4 + vec4
-    auto writeValue1 = writeValue;
-    if (numElements > 2) {
-      writeValue1 = m_builder.CreateShuffleVector(writeValue, PoisonValue::get(writeValue->getType()),
-                                                  ArrayRef<int>({0, 1, 2, 3}));
-    }
-    writeTaskPayload(writeValue1, byteOffset);
-
-    if (numElements > 2) {
-      auto writeValue2 = m_builder.CreateShuffleVector(writeValue, PoisonValue::get(writeValue->getType()),
-                                                       ArrayRef<int>({4, 5, 6, 7}).slice(0, 2 * numElements - 4));
-      byteOffset = m_builder.CreateAdd(byteOffset, m_builder.getInt32(4 * sizeof(unsigned)));
-      writeTaskPayload(writeValue2, byteOffset);
-    }
-
-    return;
-  } else if (bitWidth == 8 || bitWidth == 16) {
-    if (numElements > 1) {
-      // Scalarize
-      for (unsigned i = 0; i < numElements; ++i) {
-        auto elem = m_builder.CreateExtractElement(writeValue, i);
-        auto elemByteOffset =
-            i > 0 ? m_builder.CreateAdd(byteOffset, m_builder.getInt32(i * bitWidth / 8)) : byteOffset;
-        writeTaskPayload(elem, elemByteOffset);
-      }
-      return;
-    }
-  }
-
-  m_builder.CreateIntrinsic(
-      Intrinsic::amdgcn_raw_buffer_store, writeValue->getType(),
-      {writeValue, payloadRingBufDesc, byteOffset, payloadRingEntryOffset, m_builder.getInt32(coherent.u32All)});
-}
-
-// =====================================================================================================================
-// Create a task payload atomic operation other than compare-and-swap. Result type is the same as the input value type.
-//
-// @param atomicOp : Atomic op to perform
-// @param ordering : Atomic ordering
-// @param inputValue : Input value
-// @param byteOffset : Byte offset within the payload structure
-// @returns : Original value read from the task payload
-Value *MeshTaskShader::taskPayloadAtomic(unsigned atomicOp, AtomicOrdering ordering, Value *inputValue,
-                                         Value *byteOffset) {
-  auto entryPoint = m_builder.GetInsertBlock()->getParent();
-  assert(getShaderStage(entryPoint) == ShaderStageTask);
-
-  assert(inputValue->getType()->isIntegerTy() || inputValue->getType()->isFloatingPointTy());
-
-  auto payloadRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskPayloadRingBufDesc();
-  auto payloadRingEntryOffset = getPayloadRingEntryOffset(entryPoint);
-
-  SyncScope::ID syncScope = entryPoint->getParent()->getContext().getOrInsertSyncScopeID("workgroup");
-
-  // NOTE: buffer.atomic.swap.f64 is not supported in LLVM backend, so we convert double to int64.
-  bool doubleToInt64 = atomicOp == AtomicRMWInst::Xchg && inputValue->getType()->isDoubleTy();
-  if (doubleToInt64)
-    inputValue = m_builder.CreateBitCast(inputValue, m_builder.getInt64Ty());
-
-  Intrinsic::ID intrinsic = Intrinsic::not_intrinsic;
-  switch (atomicOp) {
-  case AtomicRMWInst::Xchg:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_swap;
-    break;
-  case AtomicRMWInst::Add:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_add;
-    break;
-  case AtomicRMWInst::Sub:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_sub;
-    break;
-  case AtomicRMWInst::And:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_and;
-    break;
-  case AtomicRMWInst::Or:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_or;
-    break;
-  case AtomicRMWInst::Xor:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_xor;
-    break;
-  case AtomicRMWInst::Max:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_smax;
-    break;
-  case AtomicRMWInst::Min:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_smin;
-    break;
-  case AtomicRMWInst::UMax:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_umax;
-    break;
-  case AtomicRMWInst::UMin:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_umin;
-    break;
-  case AtomicRMWInst::FAdd:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_fadd;
-    break;
-  case AtomicRMWInst::FMax:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_fmax;
-    break;
-  case AtomicRMWInst::FMin:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_fmin;
-    break;
-  default:
-    llvm_unreachable("Unexpected atomic operation!");
-    break;
-  }
-
-  if (ordering == AtomicOrdering::Release || ordering == AtomicOrdering::AcquireRelease ||
-      ordering == AtomicOrdering::SequentiallyConsistent)
-    m_builder.CreateFence(AtomicOrdering::Release, syncScope);
-
-  Value *atomicCall = m_builder.CreateIntrinsic(
-      intrinsic, inputValue->getType(),
-      {inputValue, payloadRingBufDesc, byteOffset, payloadRingEntryOffset, m_builder.getInt32(0)});
-
-  if (doubleToInt64)
-    atomicCall = m_builder.CreateBitCast(atomicCall, m_builder.getDoubleTy());
-
-  if (ordering == AtomicOrdering::Release || ordering == AtomicOrdering::AcquireRelease ||
-      ordering == AtomicOrdering::SequentiallyConsistent)
-    m_builder.CreateFence(AtomicOrdering::Acquire, syncScope);
-
-  return atomicCall;
-}
-
-// =====================================================================================================================
-// Create a task payload atomic compare-and-swap.
-//
-// @param ordering : Atomic ordering
-// @param inputValue : Input value
-// @param comparatorValue : Value to compare against
-// @param byteOffset : Byte offset within the payload structure
-// @returns : Original value read from the task payload
-Value *MeshTaskShader::taskPayloadAtomicCompareSwap(AtomicOrdering ordering, Value *inputValue, Value *comparatorValue,
-                                                    Value *byteOffset) {
-  auto entryPoint = m_builder.GetInsertBlock()->getParent();
-  assert(getShaderStage(entryPoint) == ShaderStageTask);
-
-  assert(inputValue->getType()->isIntegerTy() || inputValue->getType()->isFloatingPointTy());
-
-  auto payloadRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskPayloadRingBufDesc();
-  auto payloadRingEntryOffset = getPayloadRingEntryOffset(entryPoint);
-
-  SyncScope::ID syncScope = entryPoint->getParent()->getContext().getOrInsertSyncScopeID("workgroup");
-
-  if (inputValue->getType()->isIntegerTy(64)) {
-    // NOTE: HW doesn't have buffer_atomic_cmpswap_x2 instruction, we resort to global_atomic_cmpswap_x2.
-
-    // 48-bit GPU address of from the buffer descriptor: dword1[15:0] + dword0
-    auto baseAddressLow = m_builder.CreateExtractElement(payloadRingBufDesc, static_cast<uint64_t>(0));
-    auto baseAddressHigh = m_builder.CreateExtractElement(payloadRingBufDesc, 1);
-    baseAddressHigh = m_builder.CreateAnd(baseAddressHigh, 0xFFFF);
-
-    Value *baseAddress = PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
-    baseAddress = m_builder.CreateInsertElement(baseAddress, baseAddressLow, static_cast<uint64_t>(0));
-    baseAddress = m_builder.CreateInsertElement(baseAddress, baseAddressHigh, 1);
-    baseAddress = m_builder.CreateBitCast(baseAddress, m_builder.getInt64Ty());
-
-    Value *payloadRingBufPtr = m_builder.CreateIntToPtr(baseAddress, m_builder.getInt8PtrTy(ADDR_SPACE_GLOBAL));
-    Value *entryOffset = m_builder.CreateAdd(payloadRingEntryOffset, byteOffset);
-    Value *payloadRingBufEntryPtr = m_builder.CreateGEP(m_builder.getInt8Ty(), payloadRingBufPtr, entryOffset);
-    payloadRingBufEntryPtr =
-        m_builder.CreateBitCast(payloadRingBufEntryPtr, PointerType::get(m_builder.getInt64Ty(), ADDR_SPACE_GLOBAL));
-
-    auto atomicInst = m_builder.CreateAtomicCmpXchg(payloadRingBufEntryPtr, comparatorValue, inputValue, MaybeAlign(),
-                                                    ordering, AtomicOrdering::Monotonic, syncScope);
-    // NOTE: In cmpxchg instruction in LLVM returns a structure-typed result {<value>, i1}, we don't care about the
-    // second member.
-    return m_builder.CreateExtractValue(atomicInst, 0);
-  }
-
-  if (ordering == AtomicOrdering::Release || ordering == AtomicOrdering::AcquireRelease ||
-      ordering == AtomicOrdering::SequentiallyConsistent)
-    m_builder.CreateFence(AtomicOrdering::Release, syncScope);
-
-  Value *atomicCall = m_builder.CreateIntrinsic(
-      Intrinsic::amdgcn_raw_buffer_atomic_cmpswap, inputValue->getType(),
-      {inputValue, comparatorValue, payloadRingBufDesc, byteOffset, payloadRingEntryOffset, m_builder.getInt32(0)});
-
-  if (ordering == AtomicOrdering::Release || ordering == AtomicOrdering::AcquireRelease ||
-      ordering == AtomicOrdering::SequentiallyConsistent)
-    m_builder.CreateFence(AtomicOrdering::Acquire, syncScope);
-
-  return atomicCall;
+  m_callsToRemove.push_back(&taskPayloadPtrOp);
 }
 
 // =====================================================================================================================
@@ -1658,8 +1388,6 @@ void MeshTaskShader::lowerMeshShaderBody(BasicBlock *apiMeshEntryBlock, BasicBlo
   auto entryPoint = apiMeshEntryBlock->getParent();
   assert(getShaderStage(entryPoint) == ShaderStageMesh);
 
-  SmallVector<CallInst *, 8> removedCalls;
-
   // Handle API mesh shader barrier
   if (m_needBarrierFlag) {
     // Flip barrier toggle when we encounter a API barrier
@@ -1728,13 +1456,6 @@ void MeshTaskShader::lowerMeshShaderBody(BasicBlock *apiMeshEntryBlock, BasicBlo
           auto meshInput = getMeshInput(static_cast<BuiltInKind>(builtIn));
           assert(meshInput->getType() == call->getType());
           call->replaceAllUsesWith(meshInput);
-        } else if (func.getName().startswith(lgcName::MeshTaskReadTaskPayload)) {
-          // Read task payload
-          assert(call->arg_size() == 1);
-
-          auto byteOffset = call->getOperand(0);
-          auto readValue = readTaskPayload(call->getType(), byteOffset);
-          call->replaceAllUsesWith(readValue);
         } else if (func.getName().startswith(lgcName::MeshTaskWriteVertexOutput)) {
           // Write vertex output
           assert(call->arg_size() == 3);
@@ -1755,16 +1476,23 @@ void MeshTaskShader::lowerMeshShaderBody(BasicBlock *apiMeshEntryBlock, BasicBlo
           llvm_unreachable("Unknown mesh shader call!");
         }
 
-        removedCalls.push_back(call);
+        m_callsToRemove.push_back(call);
       }
     }
   }
 
+  static auto visitor = llvm_dialects::VisitorBuilder<MeshTaskShader>()
+                            .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+                            .add<TaskPayloadPtrOp>(&MeshTaskShader::lowerTaskPayloadPtr)
+                            .build();
+  visitor.visit(*this, *entryPoint);
+
   // Clear removed calls
-  for (auto call : removedCalls) {
+  for (auto call : m_callsToRemove) {
     call->dropAllReferences();
     call->eraseFromParent();
   }
+  m_callsToRemove.clear();
 }
 
 // =====================================================================================================================
