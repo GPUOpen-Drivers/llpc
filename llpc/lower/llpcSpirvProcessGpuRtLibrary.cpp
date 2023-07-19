@@ -30,6 +30,7 @@
  */
 #include "llpcSpirvProcessGpuRtLibrary.h"
 #include "SPIRVInternal.h"
+#include "lgcrt/LgcRtDialect.h"
 #include "llpcContext.h"
 #include "llpcSpirvLowerInternalLibraryIntrinsicUtil.h"
 #include "llpcSpirvLowerUtil.h"
@@ -40,53 +41,7 @@
 #define DEBUG_TYPE "llpc-spirv-lower-gpurt-library"
 using namespace lgc;
 using namespace llvm;
-
-namespace RtName {
-static const char *AmdLibraryNames[] = {"AmdTraceRayGetStackSize",
-                                        "AmdTraceRayLdsRead",
-                                        "AmdTraceRayLdsWrite",
-                                        "AmdTraceRayGetStackBase",
-                                        "AmdTraceRayGetStackStride",
-                                        "AmdTraceRayLdsStackInit",
-                                        "AmdTraceRayLdsStackStore",
-                                        "AmdTraceRayGetBoxSortHeuristicMode",
-                                        "AmdTraceRayGetStaticFlags",
-                                        "AmdTraceRayGetTriangleCompressionMode",
-                                        "AmdExtD3DShaderIntrinsics_LoadDwordAtAddr",
-                                        "AmdExtD3DShaderIntrinsics_LoadDwordAtAddrx2",
-                                        "AmdExtD3DShaderIntrinsics_LoadDwordAtAddrx4",
-                                        "AmdExtD3DShaderIntrinsics_ConvertF32toF16NegInf",
-                                        "AmdExtD3DShaderIntrinsics_ConvertF32toF16PosInf",
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 33
-                                        "AmdExtD3DShaderIntrinsics_IntersectBvhNode",
-#else
-                                        "AmdExtD3DShaderIntrinsics_IntersectInternal",
-#endif
-                                        "AmdTraceRaySampleGpuTimer"};
-} // namespace RtName
-
-namespace AmdLibraryFunc {
-enum : unsigned {
-  GetStackSize = 0,           // Get stack size
-  LdsRead,                    // Read from LDS
-  LdsWrite,                   // Write to LDS
-  GetStackBase,               // Get stack base
-  GetStackStride,             // Get stack stride
-  LdsStackInit,               // Lds stack init
-  LdsStackStore,              // Lds stack store
-  GetBoxSortHeuristicMode,    // Get box sort heuristic mode
-  GetStaticFlags,             // Get static flags
-  GetTriangleCompressionMode, // Get triangle compression mode
-  LoadDwordAtAddr,            // Load 1 dword at given address
-  LoadDwordAtAddrx2,          // Load 2 dwords at given address
-  LoadDwordAtAddrx4,          // Load 4 dwords at given address
-  ConvertF32toF16NegInf,      // Convert f32 to f16 with rounding toward negative
-  ConvertF32toF16PosInf,      // Convert f32 to f16 with rounding toward positive
-  IntersectBvh,               // Intersect BVH node
-  SampleGpuTimer,             // Sample GPU timer
-  Count
-};
-} // namespace AmdLibraryFunc
+using namespace lgc::rt;
 
 namespace Llpc {
 SpirvProcessGpuRtLibrary::SpirvProcessGpuRtLibrary() {
@@ -110,26 +65,43 @@ PreservedAnalyses SpirvProcessGpuRtLibrary::run(Module &module, ModuleAnalysisMa
 // =====================================================================================================================
 // Initialize library function pointer table
 SpirvProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
-  LibraryFuncPtr amdLibraryFuncs[] = {&SpirvProcessGpuRtLibrary::createGetStackSize,
-                                      &SpirvProcessGpuRtLibrary::createLdsRead,
-                                      &SpirvProcessGpuRtLibrary::createLdsWrite,
-                                      &SpirvProcessGpuRtLibrary::createGetStackBase,
-                                      &SpirvProcessGpuRtLibrary::createGetStackStride,
-                                      &SpirvProcessGpuRtLibrary::createLdsStackInit,
-                                      &SpirvProcessGpuRtLibrary::createLdsStackStore,
-                                      &SpirvProcessGpuRtLibrary::createGetBoxSortHeuristicMode,
-                                      &SpirvProcessGpuRtLibrary::createGetStaticFlags,
-                                      &SpirvProcessGpuRtLibrary::createGetTriangleCompressionMode,
-                                      &SpirvProcessGpuRtLibrary::createLoadDwordAtAddr,
-                                      &SpirvProcessGpuRtLibrary::createLoadDwordAtAddrx2,
-                                      &SpirvProcessGpuRtLibrary::createLoadDwordAtAddrx4,
-                                      &SpirvProcessGpuRtLibrary::createConvertF32toF16NegInf,
-                                      &SpirvProcessGpuRtLibrary::createConvertF32toF16PosInf,
-                                      &SpirvProcessGpuRtLibrary::createIntersectBvh,
-                                      &SpirvProcessGpuRtLibrary::createSampleGpuTimer};
-  for (unsigned i = 0; i < AmdLibraryFunc::Count; ++i) {
-    m_libFuncPtrs[RtName::AmdLibraryNames[i]] = amdLibraryFuncs[i];
-  }
+  m_libFuncPtrs["AmdTraceRayGetStackSize"] = &SpirvProcessGpuRtLibrary::createGetStackSize;
+  m_libFuncPtrs["AmdTraceRayLdsRead"] = &SpirvProcessGpuRtLibrary::createLdsRead;
+  m_libFuncPtrs["AmdTraceRayLdsWrite"] = &SpirvProcessGpuRtLibrary::createLdsWrite;
+  m_libFuncPtrs["AmdTraceRayGetStackBase"] = &SpirvProcessGpuRtLibrary::createGetStackBase;
+  m_libFuncPtrs["AmdTraceRayGetStackStride"] = &SpirvProcessGpuRtLibrary::createGetStackStride;
+  m_libFuncPtrs["AmdTraceRayLdsStackInit"] = &SpirvProcessGpuRtLibrary::createLdsStackInit;
+  m_libFuncPtrs["AmdTraceRayLdsStackStore"] = &SpirvProcessGpuRtLibrary::createLdsStackStore;
+  m_libFuncPtrs["AmdTraceRayGetBoxSortHeuristicMode"] = &SpirvProcessGpuRtLibrary::createGetBoxSortHeuristicMode;
+  m_libFuncPtrs["AmdTraceRayGetStaticFlags"] = &SpirvProcessGpuRtLibrary::createGetStaticFlags;
+  m_libFuncPtrs["AmdTraceRayGetTriangleCompressionMode"] = &SpirvProcessGpuRtLibrary::createGetTriangleCompressionMode;
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_LoadDwordAtAddr"] = &SpirvProcessGpuRtLibrary::createLoadDwordAtAddr;
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_LoadDwordAtAddrx2"] = &SpirvProcessGpuRtLibrary::createLoadDwordAtAddrx2;
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_LoadDwordAtAddrx4"] = &SpirvProcessGpuRtLibrary::createLoadDwordAtAddrx4;
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_ConvertF32toF16NegInf"] =
+      &SpirvProcessGpuRtLibrary::createConvertF32toF16NegInf;
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_ConvertF32toF16PosInf"] =
+      &SpirvProcessGpuRtLibrary::createConvertF32toF16PosInf;
+#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION < 33
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_IntersectBvhNode"] = &SpirvProcessGpuRtLibrary::createIntersectBvh;
+#else
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_IntersectInternal"] = &SpirvProcessGpuRtLibrary::createIntersectBvh;
+#endif
+  m_libFuncPtrs["AmdTraceRaySampleGpuTimer"] = &SpirvProcessGpuRtLibrary::createSampleGpuTimer;
+  m_libFuncPtrs["AmdTraceRayGetFlattenedGroupThreadId"] = &SpirvProcessGpuRtLibrary::createGetFlattenedGroupThreadId;
+  m_libFuncPtrs["AmdTraceRayGetHitAttributes"] = &SpirvProcessGpuRtLibrary::createGetHitAttributes;
+  m_libFuncPtrs["AmdTraceRaySetHitAttributes"] = &SpirvProcessGpuRtLibrary::createSetHitAttributes;
+  m_libFuncPtrs["AmdTraceRaySetTraceParams"] = &SpirvProcessGpuRtLibrary::createSetTraceParams;
+  m_libFuncPtrs["AmdTraceRayCallClosestHitShader"] = &SpirvProcessGpuRtLibrary::createCallClosestHitShader;
+  m_libFuncPtrs["AmdTraceRayCallMissShader"] = &SpirvProcessGpuRtLibrary::createCallMissShader;
+  m_libFuncPtrs["AmdTraceRayCallTriangleAnyHitShader"] = &SpirvProcessGpuRtLibrary::createCallTriangleAnyHitShader;
+  m_libFuncPtrs["AmdTraceRayCallIntersectionShader"] = &SpirvProcessGpuRtLibrary::createCallIntersectionShader;
+  m_libFuncPtrs["AmdTraceRaySetTriangleIntersectionAttributes"] =
+      &SpirvProcessGpuRtLibrary::createSetTriangleIntersectionAttributes;
+  m_libFuncPtrs["AmdTraceRaySetHitTriangleNodePointer"] = &SpirvProcessGpuRtLibrary::createSetHitTriangleNodePointer;
+  m_libFuncPtrs["AmdTraceRayGetParentId"] = &SpirvProcessGpuRtLibrary::createGetParentId;
+  m_libFuncPtrs["AmdTraceRaySetParentId"] = &SpirvProcessGpuRtLibrary::createSetParentId;
+  m_libFuncPtrs["AmdTraceRayDispatchRaysIndex"] = &SpirvProcessGpuRtLibrary::createDispatchRayIndex;
 }
 
 // =====================================================================================================================
@@ -465,6 +437,157 @@ void SpirvProcessGpuRtLibrary::createSampleGpuTimer(llvm::Function *func) {
   m_builder->CreateStore(clocksHi, timerHiPtr);
 
   m_builder->CreateRetVoid();
+}
+
+// =====================================================================================================================
+// Create function to get flattened group thread ID
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createGetFlattenedGroupThreadId(llvm::Function *func) {
+  m_builder->CreateRet(m_builder->create<GpurtGetFlattenedGroupThreadIdOp>());
+}
+
+// =====================================================================================================================
+// Create function to get hit attributes
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createGetHitAttributes(llvm::Function *func) {
+  Value *tCurrentPtr = func->getArg(0);
+  Value *kindPtr = func->getArg(1);
+  Value *statusPtr = func->getArg(2);
+  m_builder->create<GpurtGetHitAttributesOp>(tCurrentPtr, kindPtr, statusPtr);
+  m_builder->CreateRetVoid();
+}
+
+// =====================================================================================================================
+// Create function to set hit attributes
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createSetHitAttributes(llvm::Function *func) {
+  Value *tCurrent = m_builder->CreateLoad(m_builder->getFloatTy(), func->getArg(0));
+  Value *kind = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(1));
+  Value *status = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(2));
+  Value *instNodeAddrLo = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(3));
+  Value *instNodeAddrHi = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(4));
+  Value *primitiveIndex = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(5));
+  Value *anyHitCallType = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(6));
+  Value *geometryIndex = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(7));
+  m_builder->create<GpurtSetHitAttributesOp>(tCurrent, kind, status, instNodeAddrLo, instNodeAddrHi, primitiveIndex,
+                                             anyHitCallType, geometryIndex);
+  m_builder->CreateRetVoid();
+}
+
+// =====================================================================================================================
+// Create function to set trace parameters
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createSetTraceParams(llvm::Function *func) {
+  Value *rayFlags = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(0));
+  Value *instanceInclusionMask = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(1));
+  Value *originX = m_builder->CreateLoad(m_builder->getFloatTy(), func->getArg(2));
+  Value *originY = m_builder->CreateLoad(m_builder->getFloatTy(), func->getArg(3));
+  Value *originZ = m_builder->CreateLoad(m_builder->getFloatTy(), func->getArg(4));
+  Value *tMin = m_builder->CreateLoad(m_builder->getFloatTy(), func->getArg(5));
+  Value *dirX = m_builder->CreateLoad(m_builder->getFloatTy(), func->getArg(6));
+  Value *dirY = m_builder->CreateLoad(m_builder->getFloatTy(), func->getArg(7));
+  Value *dirZ = m_builder->CreateLoad(m_builder->getFloatTy(), func->getArg(8));
+  m_builder->create<GpurtSetTraceParamsOp>(rayFlags, instanceInclusionMask, originX, originY, originZ, tMin, dirX, dirY,
+                                           dirZ);
+  m_builder->CreateRetVoid();
+}
+
+// =====================================================================================================================
+// Create function to call closest-hit shader
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createCallClosestHitShader(llvm::Function *func) {
+  Value *shaderId = m_builder->CreateLoad(FixedVectorType::get(m_builder->getInt32Ty(), 2), func->getArg(0));
+  Value *tableIndex = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(1));
+  m_builder->CreateRet(m_builder->create<GpurtCallClosestHitShaderOp>(shaderId, tableIndex));
+}
+
+// =====================================================================================================================
+// Create function to call miss shader
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createCallMissShader(llvm::Function *func) {
+  Value *shaderId = m_builder->CreateLoad(FixedVectorType::get(m_builder->getInt32Ty(), 2), func->getArg(0));
+  Value *tableIndex = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(1));
+  m_builder->CreateRet(m_builder->create<GpurtCallMissShaderOp>(shaderId, tableIndex));
+}
+
+// =====================================================================================================================
+// Create function to call triangle any-hit shader
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createCallTriangleAnyHitShader(llvm::Function *func) {
+  Value *shaderId = m_builder->CreateLoad(FixedVectorType::get(m_builder->getInt32Ty(), 2), func->getArg(0));
+  Value *tableIndex = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(1));
+
+  Type *attrTy = StructType::get(*m_context, FixedVectorType::get(m_builder->getFloatTy(), 2), false);
+  Value *attr = m_builder->CreateLoad(attrTy, func->getArg(2));
+  attr = m_builder->CreateExtractValue(attr, 0);
+  m_builder->create<GpurtCallTriangleAnyHitShaderOp>(shaderId, tableIndex, attr);
+  m_builder->CreateRetVoid();
+}
+
+// =====================================================================================================================
+// Create function to call intersection shader
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createCallIntersectionShader(llvm::Function *func) {
+  Value *shaderId = m_builder->CreateLoad(FixedVectorType::get(m_builder->getInt32Ty(), 2), func->getArg(0));
+  Value *anyHitShaderId = m_builder->CreateLoad(FixedVectorType::get(m_builder->getInt32Ty(), 2), func->getArg(1));
+  Value *tableIndex = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(2));
+  m_builder->create<GpurtCallIntersectionShaderOp>(shaderId, anyHitShaderId, tableIndex);
+  m_builder->CreateRetVoid();
+}
+
+// =====================================================================================================================
+// Create function to set triangle intersection attributes
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createSetTriangleIntersectionAttributes(llvm::Function *func) {
+  Value *barycentrics = m_builder->CreateLoad(FixedVectorType::get(m_builder->getFloatTy(), 2), func->getArg(0));
+  m_builder->create<GpurtSetTriangleIntersectionAttributesOp>(barycentrics);
+  m_builder->CreateRetVoid();
+}
+
+// =====================================================================================================================
+// Create function to set hit triangle node pointer
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createSetHitTriangleNodePointer(llvm::Function *func) {
+  Value *bvhAddress = m_builder->CreateLoad(m_builder->getInt64Ty(), func->getArg(0));
+  Value *nodePointer = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(1));
+  m_builder->create<GpurtSetHitTriangleNodePointerOp>(bvhAddress, nodePointer);
+  m_builder->CreateRetVoid();
+}
+
+// =====================================================================================================================
+// Create function to get parent ID
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createGetParentId(llvm::Function *func) {
+  m_builder->CreateRet(m_builder->create<GpurtGetParentIdOp>());
+}
+
+// =====================================================================================================================
+// Create function to get set parent ID
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createSetParentId(llvm::Function *func) {
+  Value *rayId = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(0));
+  m_builder->create<GpurtSetParentIdOp>(rayId);
+  m_builder->CreateRetVoid();
+}
+
+// =====================================================================================================================
+// Create function to get dispatch ray index
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createDispatchRayIndex(llvm::Function *func) {
+  m_builder->CreateRet(m_builder->create<DispatchRaysIndexOp>());
 }
 
 } // namespace Llpc
