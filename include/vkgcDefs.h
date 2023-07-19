@@ -45,7 +45,7 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 62
+#define LLPC_INTERFACE_MAJOR_VERSION 63
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -83,6 +83,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     63.0 | Add enableColorExportShader to GraphicsPipelineBuildInfo.                                             |
 //  |     62.0 | Default to the compiler getting the GPURT library directly, and move shader library info into RtState |
 //  |     61.14| Add rasterStream to rsState                                                                           |
 //  |     61.13| Add dualSourceBlendDynamic to cbState                                                                 |
@@ -561,14 +562,6 @@ struct ShaderModuleData {
   BinaryData binCode;      ///< Shader binary data
   unsigned cacheHash[4];   ///< Hash code for calculate pipeline cache key
   ShaderModuleUsage usage; ///< Usage info of a shader module
-};
-
-/// Represents fragment shader output info
-struct FsOutInfo {
-  unsigned location;       ///< Output location in resource layout
-  unsigned index;          ///< Output index in resource layout
-  BasicType basicType;     ///< Output data type
-  unsigned componentCount; ///< Count of components of output data
 };
 
 /// Represents the options for pipeline dump.
@@ -1144,12 +1137,14 @@ struct GraphicsPipelineBuildInfo {
     ColorTarget target[MaxColorTargets]; ///< Per-MRT color target info
   } cbState;                             ///< Color target state
 
-  NggState nggState;          ///< NGG state used for tuning and debugging
-  PipelineOptions options;    ///< Per pipeline tuning/debugging options
-  bool unlinked;              ///< True to build an "unlinked" half-pipeline ELF
-  bool dynamicVertexStride;   ///< Dynamic Vertex input Stride is enabled.
-  bool enableUberFetchShader; ///< Use uber fetch shader
-  bool enableEarlyCompile;    ///< Whether enable early compile
+  NggState nggState;            ///< NGG state used for tuning and debugging
+  PipelineOptions options;      ///< Per pipeline tuning/debugging options
+  bool unlinked;                ///< True to build an "unlinked" half-pipeline ELF
+  bool dynamicVertexStride;     ///< Dynamic Vertex input Stride is enabled.
+  bool enableUberFetchShader;   ///< Use uber fetch shader
+  bool enableColorExportShader; ///< Explicitly build color export shader, UnlinkedStageFragment elf will
+                                ///  return extra meta data.
+  bool enableEarlyCompile;      ///< Whether enable early compile
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   BinaryData shaderLibrary; ///< SPIR-V library binary data
 #endif

@@ -82,6 +82,11 @@ Error GraphicsPipelineBuilder::build() {
   if (Error err = pipelineOrErr.takeError())
     return err;
 
+  if (compileInfo.gfxPipelineInfo.enableColorExportShader) {
+    // Have outputted elf for each stage. No full pipeline ELF.
+    return Error::success();
+  }
+
   Result result = decodePipelineBinary(&*pipelineOrErr, &compileInfo);
   if (result != Result::Success)
     return createResultError(result, "Failed to decode pipeline");
@@ -152,11 +157,35 @@ Expected<BinaryData> GraphicsPipelineBuilder::buildGraphicsPipeline() {
     pipelineInfo->options.optimizationLevel = compileInfo.optimizationLevel.value();
   }
   pipelineInfo->options.internalRtShaders = compileInfo.internalRtShaders;
+  pipelineInfo->enableColorExportShader |= compileInfo.enableColorExportShader;
 
   PipelineBuildInfo localPipelineInfo = {};
   localPipelineInfo.pGraphicsInfo = pipelineInfo;
   void *pipelineDumpHandle = runPreBuildActions(localPipelineInfo);
   auto onExit = make_scope_exit([&] { runPostBuildActions(pipelineDumpHandle, {pipelineOut->pipelineBin}); });
+
+  if (pipelineInfo->enableColorExportShader) {
+    Result result = getCompiler().buildGraphicsShaderStage(pipelineInfo, pipelineOut, UnlinkedStageVertexProcess,
+                                                           pipelineDumpHandle);
+    if (result == Result::Success) {
+      free(compileInfo.pipelineBuf);
+      compileInfo.pipelineBuf = nullptr;
+      result =
+          getCompiler().buildGraphicsShaderStage(pipelineInfo, pipelineOut, UnlinkedStageFragment, pipelineDumpHandle);
+    }
+    if (result == Result::Success) {
+      void *fsOuts = compileInfo.pipelineBuf;
+      compileInfo.pipelineBuf = nullptr;
+      result = getCompiler().BuildColorExportShader(pipelineInfo, pipelineOut->fsOutputMetaData, pipelineOut,
+                                                    pipelineDumpHandle);
+      free(fsOuts);
+    }
+
+    if (result != Result::Success)
+      return createResultError(result, "Graphics pipeline compilation failed");
+
+    return pipelineOut->pipelineBin;
+  }
 
   Result result = getCompiler().BuildGraphicsPipeline(pipelineInfo, pipelineOut, pipelineDumpHandle);
   if (result != Result::Success)

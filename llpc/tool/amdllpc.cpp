@@ -330,6 +330,11 @@ cl::opt<bool> GpuRtUseDumped("gpurt-use-dumped", cl::desc("Use the GPURT shader 
 
 cl::opt<std::string> GpuRtLibrary("gpurt-library", cl::desc("Use the GPURT shader library from the given file"));
 
+// -enable-color-export-shader
+cl::opt<bool> EnableColorExportShader("enable-color-export-shader",
+                                      cl::desc("Enable color export shader, only compile each stage of the pipeline without linking"),
+                                      cl::init(false));
+
 } // namespace
 // clang-format on
 namespace llvm {
@@ -524,6 +529,7 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
   compileInfo->scratchAccessBoundsChecks = EnableScratchAccessBoundsChecks;
   compileInfo->enableImplicitInvariantExports = EnableImplicitInvariantExports;
   compileInfo->bvhNodeStride = BvhNodeStride;
+  compileInfo->enableColorExportShader = EnableColorExportShader;
 
   if (LlpcOptLevel.getPosition() != 0) {
     compileInfo->optimizationLevel = LlpcOptLevel;

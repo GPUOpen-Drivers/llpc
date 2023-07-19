@@ -1706,6 +1706,11 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       specialUserDataArgs.push_back(
           UserDataArg(builder.getInt32Ty(), "viewId", UserDataMapping::ViewId, &intfData->entryArgIdxs.fs.viewIndex));
     }
+    if (userDataUsage->isSpecialUserDataUsed(UserDataMapping::ColorExportAddr)) {
+      assert(m_pipelineState->isUnlinked() && m_pipelineState->getOptions().enableColorExportShader);
+      specialUserDataArgs.push_back(
+          UserDataArg(builder.getInt32Ty(), "colorExpAddr", UserDataMapping::ColorExportAddr));
+    }
   }
 
   // Allocate register for stream-out buffer table, to go before the user data node args (unlike all the ones

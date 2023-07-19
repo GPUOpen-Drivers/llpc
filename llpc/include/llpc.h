@@ -40,7 +40,6 @@ using Vkgc::BinaryType;
 using Vkgc::ColorTarget;
 using Vkgc::ComputePipelineBuildInfo;
 using Vkgc::DenormalMode;
-using Vkgc::FsOutInfo;
 using Vkgc::GfxIpVersion;
 using Vkgc::GraphicsPipelineBuildInfo;
 using Vkgc::MaxColorTargets;
@@ -131,6 +130,7 @@ enum CacheAccessInfo : uint8_t {
 /// Represents output of building a graphics pipeline.
 struct GraphicsPipelineBuildOut {
   BinaryData pipelineBin;              ///< Output pipeline binary data
+  void *fsOutputMetaData;              ///< Fragment outputs meta data. Valid for fragment shader.
   CacheAccessInfo pipelineCacheAccess; ///< Pipeline cache access status i.e., hit, miss, or not checked
   CacheAccessInfo stageCacheAccesses[ShaderStageCount]; ///< Shader cache access status i.e., hit, miss, or not checked
 };
@@ -307,6 +307,17 @@ public:
   /// @returns : Result::Success if successful. Other return codes indicate failure.
   virtual Result buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *pipelineInfo,
                                               GraphicsPipelineBuildOut *pipelineOut, const BinaryData *elfPackage) = 0;
+
+  /// Explicitly build the color export shader.
+  ///
+  /// @param [in]  pipelineInfo : Info to build this shader module
+  /// @param [in]  fsOutputMetaData : Info to fragment outputs
+  /// @param [out] pipelineOut  : Output of building this shader module
+  /// @param [out] pipelineDumpFile : Handle of pipeline dump file
+  ///
+  /// @returns : Result::Success if successful. Other return codes indicate failure.
+  virtual Result BuildColorExportShader(const GraphicsPipelineBuildInfo *pipelineInfo, const void *fsOutputMetaData,
+                                        GraphicsPipelineBuildOut *pipelineOut, void *pipelineDumpFile = nullptr) = 0;
 
   /// Build graphics pipeline from the specified info.
   ///

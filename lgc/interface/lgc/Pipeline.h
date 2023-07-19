@@ -152,6 +152,8 @@ struct Options {
   bool internalRtShaders;                   // Enable internal RT shader intrinsics
   bool enableUberFetchShader;               // Enable UberShader
   bool reserved16;
+  bool enableColorExportShader; // Explicitly build color export shader, UnlinkedStageFragment elf will return extra
+                                // meta data.
   Options() {
     // The memory representation of this struct gets written into LLVM metadata. To prevent uninitialized values from
     // being written, we force everything to 0, including alignment gaps.
@@ -169,6 +171,15 @@ struct Options {
 
 /// Represent a pipeline option which can be automatic as well as explicitly set.
 enum InvariantLoadsOption : unsigned { Auto = 0, EnableOptimization = 1, DisableOptimization = 2, ClearInvariants = 3 };
+
+// =====================================================================================================================
+// Struct with the information for one color export
+struct ColorExportInfo {
+  unsigned hwColorTarget;
+  unsigned location;
+  bool isSigned;
+  llvm::Type *ty;
+};
 
 // Middle-end per-shader options to pass to SetShaderOptions.
 // Note: new fields must be added to the end of this structure to maintain test compatibility.
@@ -653,6 +664,21 @@ enum class PipelineLink : unsigned {
   Unlinked,      // Compiling a shader or part-pipeline that will be ELF linked later
   PartPipeline,  // Compiling in the part-pipeline scheme, compiling the FS first and then using metadata to
                  //  pass its packed input mapping to the compile of the rest of the pipeline.
+};
+
+// Represents fragment shader output info
+struct FsOutInfo {
+  unsigned hwColorTarget; // HW color output index
+  unsigned location;      // Output location in resource layout
+  bool isSigned;          // Whether is signed
+  char typeName[8];       // Output data type Name, like v3f32
+};
+
+// Represents shader meta data
+struct FragmentOutputs {
+  FsOutInfo *fsOutInfos;   // The color export information.
+  unsigned fsOutInfoCount; // The number of color exports.
+  bool discard;            // Whether this fragment shader has kill enabled.
 };
 
 // =====================================================================================================================

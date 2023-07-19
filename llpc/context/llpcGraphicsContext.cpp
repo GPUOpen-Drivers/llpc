@@ -222,11 +222,11 @@ void GraphicsContext::setTcsInputVertices(Module *tcsModule) {
 Options GraphicsContext::computePipelineOptions() const {
   Options options = PipelineContext::computePipelineOptions();
 
-  options.enableUberFetchShader =
-      reinterpret_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->enableUberFetchShader;
+  auto pipelineInfo = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo());
+  options.enableUberFetchShader = pipelineInfo->enableUberFetchShader;
+  options.enableColorExportShader = pipelineInfo->enableColorExportShader;
   if (getGfxIpVersion().major >= 10) {
     // Only set NGG options for a GFX10+ graphics pipeline.
-    auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo());
     const auto &nggState = pipelineInfo->nggState;
     if (!nggState.enableNgg && getGfxIpVersion().major < 11) // GFX11+ must enable NGG
       options.nggFlags |= NggFlagDisable;

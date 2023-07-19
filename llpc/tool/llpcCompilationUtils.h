@@ -105,6 +105,7 @@ struct CompileInfo {
   VfxPipelineType pipelineType;        // Pipeline type
   std::optional<llvm::CodeGenOpt::Level> optimizationLevel; // The optimization level to pass the compiler
   bool internalRtShaders;                                   // Whether to enable intrinsics for internal RT shaders
+  bool enableColorExportShader; // Enable color export shader, only compile each stage of the pipeline without linking
 };
 
 // Callback function to allocate buffer for building shader module and building pipeline.

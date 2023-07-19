@@ -31,12 +31,14 @@
 #include "lgc/patch/FragColorExport.h"
 #include "lgc/LgcContext.h"
 #include "lgc/patch/Patch.h"
+#include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/ResourceUsage.h"
 #include "lgc/state/TargetInfo.h"
+#include "lgc/util/AddressExtender.h"
 #include "lgc/util/BuilderBase.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Instructions.h"
@@ -479,7 +481,10 @@ bool LowerFragColorExport::runImpl(Module &module, PipelineShadersResult &pipeli
 
   bool willGenerateColorExportShader = m_pipelineState->isUnlinked() && !m_pipelineState->hasColorExportFormats();
   if (willGenerateColorExportShader && !m_info.empty()) {
-    generateReturn(fragEntryPoint, builder);
+    if (m_pipelineState->getOptions().enableColorExportShader)
+      jumpColorExport(fragEntryPoint, builder);
+    else
+      generateReturn(fragEntryPoint, builder);
     return true;
   }
 
@@ -679,6 +684,61 @@ Value *LowerFragColorExport::generateReturn(Function *fragEntryPoint, BuilderBas
   retVal = builder.CreateRet(retVal);
   retInst->eraseFromParent();
   return retVal;
+}
+
+// =====================================================================================================================
+// Jump to color export shader if explicitly build color export shader
+//
+// @param fragEntryPoint : The fragment shader to which we should add the export instructions.
+// @param builder : The builder object that will be used to create new instructions.
+llvm::Value *LowerFragColorExport::jumpColorExport(llvm::Function *fragEntryPoint, BuilderBase &builder) {
+
+  // Add the export info to be used when linking shaders to generate the color export shader and compute the spi shader
+  // color format in the metadata.
+  m_pipelineState->getPalMetadata()->addColorExportInfo(m_info);
+  m_pipelineState->getPalMetadata()->setDiscardState(m_resUsage->builtInUsage.fs.discard);
+
+  ReturnInst *retInst = cast<ReturnInst>(builder.GetInsertPoint()->getParent()->getTerminator());
+
+  // First build the argument type for the fragment shader.
+  SmallVector<Type *, 8> outputTypes;
+  for (const ColorExportInfo &info : m_info) {
+    outputTypes.push_back(getVgprTy(info.ty));
+  }
+  Type *argTy = StructType::get(*m_context, outputTypes);
+
+  // Now build the argument value.
+  Value *argVal = PoisonValue::get(argTy);
+  unsigned returnLocation = 0;
+  for (unsigned idx = 0; idx < m_info.size(); ++idx) {
+    const ColorExportInfo &info = m_info[idx];
+    unsigned hwColorTarget = info.hwColorTarget;
+    Value *output = m_exportValues[hwColorTarget];
+    if (!output)
+      continue;
+    if (output->getType() != outputTypes[idx])
+      output = generateValueForOutput(output, outputTypes[idx], builder);
+    argVal = builder.CreateInsertValue(argVal, output, returnLocation);
+    ++returnLocation;
+  }
+
+  // Build color export function type
+  auto funcTy = FunctionType::get(Type::getVoidTy(*m_context), {argTy}, false);
+
+  // Convert color export shader address to function pointer
+  auto funcTyPtr = funcTy->getPointerTo(ADDR_SPACE_CONST);
+  auto colorShaderAddr = ShaderInputs::getSpecialUserData(UserDataMapping::ColorExportAddr, builder);
+  AddressExtender addrExt(builder.GetInsertPoint()->getParent()->getParent());
+  auto funcPtr = addrExt.extend(colorShaderAddr, builder.getInt32(HighAddrPc), funcTyPtr, builder);
+
+  // Jump
+  auto callInst = builder.CreateCall(funcTy, funcPtr, argVal);
+  callInst->setCallingConv(CallingConv::AMDGPU_Gfx);
+  callInst->setDoesNotReturn();
+  callInst->setOnlyWritesMemory();
+  builder.CreateUnreachable();
+  retInst->eraseFromParent();
+  return callInst;
 }
 
 // =====================================================================================================================

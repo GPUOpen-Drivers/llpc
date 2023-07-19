@@ -40,6 +40,7 @@ class raw_pwrite_stream;
 } // namespace llvm
 
 namespace lgc {
+struct ColorExportInfo;
 
 // =====================================================================================================================
 // The public API of the LGC interface for ELF linking.
@@ -74,6 +75,8 @@ public:
   // found blob to ElfLinker::addGlue. If it does not get a cache hit, the client can call ElfLinker::compileGlue to
   // retrieve the compiled glue code to store in the cache.
   virtual llvm::ArrayRef<llvm::StringRef> getGlueInfo() = 0;
+
+  virtual llvm::StringRef buildColorExportShader(llvm::ArrayRef<ColorExportInfo> exports, bool enableKill) = 0;
 
   // Add a blob for a particular chunk of glue code, typically retrieved from a cache. The blob is not copied,
   // and remains in use until the first of the link completing or the ElfLinker's parent Pipeline being destroyed.

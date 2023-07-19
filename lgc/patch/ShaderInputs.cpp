@@ -77,6 +77,8 @@ const char *ShaderInputs::getSpecialUserDataName(UserDataMapping kind) {
     return "MeshPipeStatsBuf";
   case UserDataMapping::StreamOutControlBuf:
     return "StreamOutControlBuf";
+  case UserDataMapping::ColorExportAddr:
+    return "ColorExportAddr";
   default:
     return "";
   }

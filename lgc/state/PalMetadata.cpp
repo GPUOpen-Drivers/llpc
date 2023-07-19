@@ -916,6 +916,14 @@ void PalMetadata::addColorExportInfo(ArrayRef<ColorExportInfo> exports) {
 }
 
 // =====================================================================================================================
+// Set discard state in the PAL metadata for explicitly building color export shader.
+//
+// @param enable : Whether this fragment shader has kill enabled.
+void PalMetadata::setDiscardState(bool enable) {
+  m_pipelineNode[PipelineMetadataKey::DiscardState] = enable;
+}
+
+// =====================================================================================================================
 // Get the count of color exports needed by the fragment shader.
 unsigned PalMetadata::getColorExportCount() {
   if (m_colorExports.isEmpty())

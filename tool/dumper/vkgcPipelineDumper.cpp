@@ -923,6 +923,7 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "dynamicVertexStride = " << pipelineInfo->dynamicVertexStride << "\n";
   dumpFile << "enableUberFetchShader = " << pipelineInfo->enableUberFetchShader << "\n";
   dumpFile << "enableEarlyCompile = " << pipelineInfo->enableEarlyCompile << "\n";
+  dumpFile << "enableColorExportShader = " << pipelineInfo->enableColorExportShader << "\n";
   dumpPipelineOptions(&pipelineInfo->options, dumpFile);
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   // Output shader library binary
@@ -1301,6 +1302,8 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
   // Relocatable shaders force an unlinked compilation.
   hasher.Update(pipeline->unlinked || isRelocatableShader);
   hasher.Update(pipeline->enableEarlyCompile);
+  if (unlinkedShaderType == UnlinkedStageFragment)
+    hasher.Update(pipeline->enableColorExportShader);
   updateHashForPipelineOptions(&pipeline->options, &hasher, isCacheHash, isRelocatableShader, unlinkedShaderType);
 
   if (unlinkedShaderType != UnlinkedStageFragment) {
