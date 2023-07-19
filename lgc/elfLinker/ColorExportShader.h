@@ -65,6 +65,8 @@ public:
   // and export info.
   void updatePalMetadata(PalMetadata &palMetadata) override;
 
+  void enableKill() { m_killEnabled = true; };
+
 protected:
   // Generate the glue shader to IR module
   llvm::Module *generate() override;

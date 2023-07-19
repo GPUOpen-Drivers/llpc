@@ -111,6 +111,9 @@ public:
   virtual Result buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *pipelineInfo,
                                               GraphicsPipelineBuildOut *pipelineOut, const BinaryData *elfPackage);
 
+  virtual Result BuildColorExportShader(const GraphicsPipelineBuildInfo *pipelineInfo, const void *fsOutputMetaData,
+                                        GraphicsPipelineBuildOut *pipelineOut, void *pipelineDumpFile = nullptr);
+
   virtual unsigned ConvertColorBufferFormatToExportFormat(const ColorTarget *target,
                                                           const bool enableAlphaToCoverage) const;
 

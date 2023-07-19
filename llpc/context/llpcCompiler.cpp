@@ -661,22 +661,174 @@ Result Compiler::buildGraphicsShaderStage(const GraphicsPipelineBuildInfo *pipel
   GraphicsContext graphicsContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
   Context *context = acquireContext();
   context->attachPipelineContext(&graphicsContext);
+  auto onExit = make_scope_exit([&] { releaseContext(context); });
 
   ElfPackage candidateElf;
   Result result =
       buildUnlinkedShaderInternal(context, shaderInfo, stage, candidateElf, pipelineOut->stageCacheAccesses);
 
-  releaseContext(context);
-
   if (result != Result::Success)
     return result;
 
-  void *allocBuf = pipelineInfo->pfnOutputAlloc(pipelineInfo->pInstance, pipelineInfo->pUserData, candidateElf.size());
+  unsigned metaDataSize = 0;
+  SmallVector<FsOutInfo, 8> fsOuts;
+  bool discardState = false;
+  if (stage == UnlinkedStageFragment && pipelineInfo->enableColorExportShader) {
+    // Parse ELF to get outputs
+    ElfWriter<Elf64> writer(m_gfxIp);
+    if (writer.ReadFromBuffer(candidateElf.data(), candidateElf.size()) == Result::Success) {
+      ElfNote metaNote = writer.getNote(Abi::MetadataNoteType); // NT_AMDGPU_METADATA
+      msgpack::Document document;
+      document.readFromBlob(StringRef(reinterpret_cast<const char *>(metaNote.data), metaNote.hdr.descSize), false);
+      auto pipeNode =
+          document.getRoot().getMap(true)[PalAbi::CodeObjectMetadataKey::Pipelines].getArray(true)[0].getMap(true);
+
+      // Color export infos
+      auto it = pipeNode.find(Vkgc::ColorExports);
+      if (it != pipeNode.end()) {
+        assert(it->second.isArray());
+        auto colorExports = it->second.getArray();
+        for (unsigned i = 0; i < colorExports.size(); ++i) {
+          msgpack::ArrayDocNode fetchNode = colorExports[i].getArray();
+          FsOutInfo output;
+          output.hwColorTarget = fetchNode[0].getUInt();
+          output.location = fetchNode[1].getUInt();
+          output.isSigned = fetchNode[2].getBool();
+          StringRef typeName = fetchNode[3].getString();
+          memset(output.typeName, 0, sizeof(output.typeName));
+          memcpy(output.typeName, typeName.data(), typeName.size());
+          fsOuts.push_back(output);
+        }
+        metaDataSize = sizeof(FragmentOutputs) + sizeof(FsOutInfo) * fsOuts.size();
+      }
+      // Discard state
+      it = pipeNode.find(Vkgc::DiscardState);
+      if (it != pipeNode.end())
+        discardState = it->second.getBool();
+    }
+  }
+
+  if (pipelineInfo->enableColorExportShader) {
+    // Output elf for each stage if enableColorExportShader
+    if (Llpc::EnableOuts()) {
+      ElfReader<Elf64> reader(m_gfxIp);
+      size_t readSize = 0;
+      if (reader.ReadFromBuffer(candidateElf.data(), &readSize) == Result::Success) {
+        LLPC_OUTS("===============================================================================\n");
+        LLPC_OUTS("// LLPC final " << getUnlinkedShaderStageName(stage) << " ELF\n");
+        LLPC_OUTS(reader);
+      }
+    }
+  }
+
+  void *allocBuf = pipelineInfo->pfnOutputAlloc(pipelineInfo->pInstance, pipelineInfo->pUserData,
+                                                candidateElf.size() + metaDataSize);
   uint8_t *code = static_cast<uint8_t *>(allocBuf);
   memcpy(code, candidateElf.data(), candidateElf.size());
   pipelineOut->pipelineBin.codeSize = candidateElf.size();
   pipelineOut->pipelineBin.pCode = code;
+
+  if (metaDataSize > 0) {
+    pipelineOut->fsOutputMetaData = code + candidateElf.size();
+    FragmentOutputs *outputs = static_cast<FragmentOutputs *>(pipelineOut->fsOutputMetaData);
+    outputs->fsOutInfoCount = fsOuts.size();
+    outputs->discard = discardState;
+    void *offsetData = static_cast<uint8_t *>(pipelineOut->fsOutputMetaData) + sizeof(FragmentOutputs);
+    memcpy(offsetData, fsOuts.data(), sizeof(FsOutInfo) * fsOuts.size());
+    outputs->fsOutInfos = static_cast<FsOutInfo *>(offsetData);
+  }
   return result;
+}
+
+// =====================================================================================================================
+// Explicitly build the color export shader.
+//
+// @param [in]  pipelineInfo : Info to build this shader module
+// @param [in]  fsOutputMetaData : Info to fragment outputs
+// @param [out] pipelineOut  : Output of building this shader module
+// @param [out] pipelineDumpFile : Handle of pipeline dump file
+//
+// @returns : Result::Success if successful. Other return codes indicate failure.
+Result Compiler::BuildColorExportShader(const GraphicsPipelineBuildInfo *pipelineInfo, const void *fsOutputMetaData,
+                                        GraphicsPipelineBuildOut *pipelineOut, void *pipelineDumpFile) {
+
+  if (!pipelineInfo->pfnOutputAlloc)
+    return Result::ErrorInvalidPointer;
+
+  if (!fsOutputMetaData)
+    return Result::Success;
+
+  MetroHash::Hash cacheHash = {};
+  MetroHash::Hash pipelineHash = {};
+  GraphicsContext graphicsContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
+  Context *context = acquireContext();
+  context->attachPipelineContext(&graphicsContext);
+  LgcContext *builderContext = context->getLgcContext();
+  std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
+  context->getPipelineContext()->setPipelineState(&*pipeline, /*hasher=*/nullptr, /*unlinked=*/false);
+  auto onExit = make_scope_exit([&] { releaseContext(context); });
+
+  SmallVector<ColorExportInfo, 8> exports;
+  const FragmentOutputs *fsOuts = static_cast<const FragmentOutputs *>(fsOutputMetaData);
+  for (unsigned idx = 0; idx < fsOuts->fsOutInfoCount; idx++) {
+    auto outInfo = fsOuts->fsOutInfos[idx];
+    ColorExportInfo colorExportInfo;
+    colorExportInfo.hwColorTarget = outInfo.hwColorTarget;
+    colorExportInfo.location = outInfo.location;
+    colorExportInfo.isSigned = outInfo.isSigned;
+    StringRef tyName = outInfo.typeName;
+    Type *ty = nullptr;
+    unsigned vecLength = 0;
+    if (tyName[0] == 'v') {
+      tyName = tyName.drop_front();
+      tyName.consumeInteger(10, vecLength);
+    }
+    if (tyName == "i8")
+      ty = Type::getInt8Ty(*context);
+    else if (tyName == "i16")
+      ty = Type::getInt16Ty(*context);
+    else if (tyName == "i32")
+      ty = Type::getInt32Ty(*context);
+    else if (tyName == "f16")
+      ty = Type::getHalfTy(*context);
+    else if (tyName == "f32")
+      ty = Type::getFloatTy(*context);
+    if (vecLength != 0 && ty != nullptr)
+      ty = FixedVectorType::get(ty, vecLength);
+    colorExportInfo.ty = ty;
+    exports.push_back(colorExportInfo);
+  }
+
+  // If no outputs, return;
+  if (exports.empty())
+    return Result::Success;
+
+  dumpCompilerOptions(pipelineDumpFile);
+  bool hasError = false;
+  context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>(&hasError));
+  std::unique_ptr<ElfLinker> elfLinker(pipeline->createElfLinker({}));
+  StringRef elfStr = elfLinker->buildColorExportShader(exports, fsOuts->discard);
+  context->setDiagnosticHandler(nullptr);
+
+  if (hasError)
+    return Result::ErrorInvalidShader;
+  if (Llpc::EnableOuts()) {
+    ElfReader<Elf64> reader(m_gfxIp);
+    size_t readSize = 0;
+    if (reader.ReadFromBuffer(elfStr.data(), &readSize) == Result::Success) {
+      LLPC_OUTS("===============================================================================\n");
+      LLPC_OUTS("// LLPC final color export shader ELF\n");
+      LLPC_OUTS(reader);
+    }
+  }
+
+  void *allocBuf = pipelineInfo->pfnOutputAlloc(pipelineInfo->pInstance, pipelineInfo->pUserData, elfStr.size());
+  uint8_t *code = static_cast<uint8_t *>(allocBuf);
+  memcpy(code, elfStr.data(), elfStr.size());
+  pipelineOut->pipelineBin.codeSize = elfStr.size();
+  pipelineOut->pipelineBin.pCode = code;
+
+  return Result::Success;
 }
 
 // =====================================================================================================================

@@ -75,15 +75,6 @@ struct VsEntryRegInfo {
 };
 
 // =====================================================================================================================
-// Struct with the information for one color export
-struct ColorExportInfo {
-  unsigned hwColorTarget;
-  unsigned location;
-  bool isSigned;
-  llvm::Type *ty;
-};
-
-// =====================================================================================================================
 // Struct containing the FS input mappings, generated and stored in PAL metadata when compiling an FS by itself,
 // and consumed when generating the rest-of-pipeline that will link to it.
 struct FsInputMappings {
@@ -156,6 +147,9 @@ public:
 
   // Store the color export info in the PAL metadata
   void addColorExportInfo(llvm::ArrayRef<ColorExportInfo> exports);
+
+  // Set discard state in the metadata for explicitly building color export shader.
+  void setDiscardState(bool enable);
 
   // Get the count of vertex fetches for a fetchless vertex shader with shader compilation (or 0 otherwise).
   unsigned getColorExportCount();

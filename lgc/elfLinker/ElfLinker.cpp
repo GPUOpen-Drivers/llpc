@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/ElfLinker.h"
+#include "ColorExportShader.h"
 #include "GlueShader.h"
 #include "RelocHandler.h"
 #include "lgc/state/AbiMetadata.h"
@@ -159,6 +160,9 @@ public:
 
   // Get information on the glue code that will be needed for the link
   llvm::ArrayRef<StringRef> getGlueInfo() override final;
+
+  // Explicitly build color export shader
+  StringRef buildColorExportShader(ArrayRef<ColorExportInfo> exports, bool enableKill) override final;
 
   // Add a blob for a particular chunk of glue code, typically retrieved from a cache
   void addGlue(unsigned glueIndex, StringRef blob) override final;
@@ -357,6 +361,16 @@ ArrayRef<StringRef> ElfLinkerImpl::getGlueInfo() {
       m_glueStrings.push_back(glueShader->getString());
   }
   return m_glueStrings;
+}
+
+StringRef ElfLinkerImpl::buildColorExportShader(ArrayRef<ColorExportInfo> exports, bool enableKill) {
+  assert(m_glueShaders.empty());
+  m_glueShaders.push_back(GlueShader::createColorExportShader(m_pipelineState, exports));
+  ColorExportShader *copyColorShader = static_cast<ColorExportShader *>(m_glueShaders[0].get());
+  if (enableKill)
+    copyColorShader->enableKill();
+  copyColorShader->updatePalMetadata(*m_pipelineState->getPalMetadata());
+  return copyColorShader->getElfBlob();
 }
 
 // =====================================================================================================================

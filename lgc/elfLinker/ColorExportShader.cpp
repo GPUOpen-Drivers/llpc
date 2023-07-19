@@ -33,6 +33,7 @@
 #include "ColorExportShader.h"
 #include "lgc/patch/FragColorExport.h"
 #include "lgc/state/TargetInfo.h"
+#include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Target/TargetMachine.h"
 
 using namespace lgc;
@@ -42,7 +43,7 @@ using namespace llvm;
 // Constructor. This is where we store all the information needed to generate the export shader; other methods
 // do not need to look at PipelineState.
 ColorExportShader::ColorExportShader(PipelineState *pipelineState, ArrayRef<ColorExportInfo> exports)
-    : GlueShader(pipelineState) {
+    : GlueShader(pipelineState), m_killEnabled(false) {
   m_exports.append(exports.begin(), exports.end());
 
   memset(m_exportFormat, 0, sizeof(m_exportFormat));
@@ -53,16 +54,18 @@ ColorExportShader::ColorExportShader(PipelineState *pipelineState, ArrayRef<Colo
         static_cast<ExportFormat>(pipelineState->computeExportFormat(exp.ty, exp.location));
   }
 
-  PalMetadata *metadata = pipelineState->getPalMetadata();
-  if (pipelineState->useRegisterFieldFormat()) {
-    auto dbShaderControl = metadata->getPipelineNode()[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
-                               .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl]
-                               .getMap(true);
-    m_killEnabled = dbShaderControl[Util::Abi::DbShaderControlMetadataKey::KillEnable].getBool();
-  } else {
-    DB_SHADER_CONTROL shaderControl = {};
-    shaderControl.u32All = metadata->getRegister(mmDB_SHADER_CONTROL);
-    m_killEnabled = shaderControl.bits.KILL_ENABLE;
+  if (!pipelineState->getOptions().enableColorExportShader) {
+    PalMetadata *metadata = pipelineState->getPalMetadata();
+    if (pipelineState->useRegisterFieldFormat()) {
+      auto dbShaderControl = metadata->getPipelineNode()[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
+                                 .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl]
+                                 .getMap(true);
+      m_killEnabled = dbShaderControl[Util::Abi::DbShaderControlMetadataKey::KillEnable].getBool();
+    } else {
+      DB_SHADER_CONTROL shaderControl = {};
+      shaderControl.u32All = metadata->getRegister(mmDB_SHADER_CONTROL);
+      m_killEnabled = shaderControl.bits.KILL_ENABLE;
+    }
   }
 }
 
@@ -109,6 +112,12 @@ Module *ColorExportShader::generate() {
   FragColorExport fragColorExport(&getContext(), m_pipelineState);
   auto ret = cast<ReturnInst>(colorExportFunc->back().getTerminator());
   BuilderBase builder(ret);
+
+  if (m_pipelineState->getOptions().enableColorExportShader) {
+    // NOTE: See LowerFragColorExport::jumpColorExport. Fragment shader uses a call amdgpu_gfx. In the amdgpu_gfx
+    // calling convention, the callee is expected to have the necessary waitcnt instructions.
+    builder.CreateIntrinsic(Intrinsic::amdgcn_s_waitcnt, {}, {builder.getInt32(0)});
+  }
 
   SmallVector<Value *, 8> values(MaxColorTargets + 1, nullptr);
   for (unsigned idx = 0; idx != m_exports.size(); ++idx) {

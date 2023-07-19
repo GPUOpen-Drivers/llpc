@@ -524,10 +524,11 @@ struct GraphicsPipelineState {
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   Vkgc::BinaryData shaderLibrary; // Shader library SPIR-V binary
 #endif
-  Vkgc::RtState rtState;      // Ray tracing state
-  bool dynamicVertexStride;   // Dynamic Vertex input Stride is enabled.
-  bool enableUberFetchShader; // Use uber fetch shader
-  bool enableEarlyCompile;    // Enable early compile
+  Vkgc::RtState rtState;        // Ray tracing state
+  bool dynamicVertexStride;     // Dynamic Vertex input Stride is enabled.
+  bool enableUberFetchShader;   // Use uber fetch shader
+  bool enableEarlyCompile;      // Enable early compile
+  bool enableColorExportShader; // Enable color export shader
 };
 
 // =====================================================================================================================

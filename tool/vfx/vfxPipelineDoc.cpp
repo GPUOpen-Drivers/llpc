@@ -136,6 +136,7 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     gfxPipelineInfo->dynamicVertexStride = graphicState.dynamicVertexStride;
     gfxPipelineInfo->enableUberFetchShader = graphicState.enableUberFetchShader;
     gfxPipelineInfo->enableEarlyCompile = graphicState.enableEarlyCompile;
+    gfxPipelineInfo->enableColorExportShader = graphicState.enableColorExportShader;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
     gfxPipelineInfo->shaderLibrary = graphicState.shaderLibrary;
 #endif

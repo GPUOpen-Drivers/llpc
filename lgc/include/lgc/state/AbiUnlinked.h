@@ -139,6 +139,7 @@ static const char ColorExports[] = ".colorExports";
 static const char FragInputMapping1[] = ".fragInputs";
 static const char FragInputMapping2[] = ".fragBuiltInInputs";
 static const char FragInputMapping3[] = ".fragBuiltInInputInfo";
+static const char DiscardState[] = ".discardState";
 
 } // namespace PipelineMetadataKey
 
