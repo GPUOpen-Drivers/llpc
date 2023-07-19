@@ -1001,11 +1001,6 @@ std::vector<Value *> SPIRVToLLVM::transValue(const std::vector<SPIRVValue *> &bv
   return v;
 }
 
-bool SPIRVToLLVM::isSPIRVCmpInstTransToLLVMInst(SPIRVInstruction *bi) const {
-  auto oc = bi->getOpCode();
-  return isCmpOpCode(oc);
-}
-
 void SPIRVToLLVM::setName(llvm::Value *v, SPIRVValue *bv) {
   const auto &name = bv->getName();
 
@@ -1256,7 +1251,7 @@ void SPIRVToLLVM::setFastMathFlags(Value *val) {
   }
 }
 
-Value *SPIRVToLLVM::transShiftLogicalBitwiseInst(SPIRVValue *bv, BasicBlock *bb, Function *f) {
+Value *SPIRVToLLVM::transBinaryShiftBitwiseLogicalInst(SPIRVValue *bv, BasicBlock *bb, Function *f) {
   SPIRVBinary *bbn = static_cast<SPIRVBinary *>(bv);
   assert(bb && "Invalid BB");
   Instruction::BinaryOps bo;
@@ -1283,8 +1278,6 @@ Value *SPIRVToLLVM::transCmpInst(SPIRVValue *bv, BasicBlock *bb, Function *f) {
   assert(bb && "Invalid BB");
   auto op = bc->getOpCode();
 
-  if (isLogicalOpCode(op))
-    op = IntBoolOpMap::rmap(op);
   return getBuilder()->CreateCmp(CmpMap::rmap(op), transValue(bc->getOperand(0), f, bb),
                                  transValue(bc->getOperand(1), f, bb));
 }
@@ -5767,14 +5760,12 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     return transValueWithOpcode<OpSetMeshOutputsEXT>(bv);
   default: {
     auto oc = bv->getOpCode();
-    if (isSPIRVCmpInstTransToLLVMInst(static_cast<SPIRVInstruction *>(bv)))
+    if (isCmpOpCode(oc))
       return mapValue(bv, transCmpInst(bv, bb, f));
-    if (isBinaryShiftLogicalBitwiseOpCode(oc) || isLogicalOpCode(oc))
-      return mapValue(bv, transShiftLogicalBitwiseInst(bv, bb, f));
-    if (isCvtOpCode(oc)) {
-      Value *inst = transConvertInst(bv, f, bb);
-      return mapValue(bv, inst);
-    }
+    if (isBinaryShiftBitwiseOpCode(oc) || isLogicalOpCode(oc))
+      return mapValue(bv, transBinaryShiftBitwiseLogicalInst(bv, bb, f));
+    if (isCvtOpCode(oc))
+      return mapValue(bv, transConvertInst(bv, f, bb));
     return mapValue(bv, transSPIRVBuiltinFromInst(static_cast<SPIRVInstruction *>(bv), bb));
   }
   }

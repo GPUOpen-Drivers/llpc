@@ -75,7 +75,7 @@ inline bool isBitwiseOpCode(Op OpCode) {
   return (unsigned)OpCode >= OpBitwiseOr && (unsigned)OpCode <= OpBitwiseAnd;
 }
 
-inline bool isBinaryShiftLogicalBitwiseOpCode(Op OpCode) {
+inline bool isBinaryShiftBitwiseOpCode(Op OpCode) {
   return (((unsigned)OpCode >= OpShiftRightLogical && (unsigned)OpCode <= OpBitwiseAnd) || isBinaryOpCode(OpCode));
 }
 
