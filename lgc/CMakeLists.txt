@@ -212,6 +212,7 @@ target_sources(LLVMlgc PRIVATE
     patch/Patch.cpp
     patch/PatchBufferOp.cpp
     patch/PatchCheckShaderCache.cpp
+    patch/PatchContinufy.cpp
     patch/PatchCopyShader.cpp
     patch/PatchEntryPointMutate.cpp
     patch/PatchImageDerivatives.cpp

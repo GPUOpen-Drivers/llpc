@@ -5,29 +5,32 @@
 ;  - !continufy.stage metadata added in llpcSpirvLowerRaytracing to functions and calls
 ;  - use lgc::rt::RayTracingShaderStage enum values
 ;  - use -1 to indicate traversal
-; 
+;
 
-define spir_func void @raygen() !lgc.shaderstage !{i32 7} !continufy.stage !{i32 0} {
+declare void @lgc.cps.temp(i32 %target, i32 %levels, ...)
+
+define spir_func void @raygen() !lgc.shaderstage !{i32 7} {
   %pushconst = call ptr addrspace(4) @lgc.user.data(i32 0)
   %fn = load ptr, ptr addrspace(4) %pushconst
   %p8 = getelementptr i8, ptr addrspace(4) %pushconst, i32 8
   %x = load i32, ptr addrspace(4) %p8
   %p16 = getelementptr i8, ptr addrspace(4) %pushconst, i32 16
   %dst = load ptr addrspace(1), ptr addrspace(4) %p16
-  %r = call spir_func [2 x i32] %fn(i32 %x, ptr addrspace(1) %dst) !continufy.stage !{i32 -1}
+  %r = call spir_func [2 x i32] %fn(i32 %x, ptr addrspace(1) %dst)
   store [2 x i32] %r, ptr addrspace(1) %dst
+  ; call void @lgc.cps.temp()
   ret void
 }
 
-define spir_func i32 @chs(i32 %x) !lgc.shaderstage !{i32 7} !continufy.stage !{i32 3} {
+define spir_func i32 @chs(i32 %x) !lgc.shaderstage !{i32 7} {
   %pushconst = call ptr addrspace(4) @lgc.user.data(i32 24)
   %fn = load ptr, ptr addrspace(4) %pushconst
-  %y = call spir_func i32 %fn(i32 %x) !continufy.stage !{i32 5}
+  %y = call spir_func i32 %fn(i32 %x)
   ret i32 %y
 }
 
 ; Note: No !continufy.stage metadata here
-define dllexport void @lgc.shader.CS.main() !lgc.shaderstage !{i32 7} {
+define dllexport void @lgc.shader.CS.main() {
 entry:
   %id = call i32 @lgc.shader.input.LocalInvocationId(i32 49)
   %live = icmp ult i32 %id, 29
@@ -36,7 +39,7 @@ entry:
 main:
   %pushconst = call ptr addrspace(4) @lgc.user.data(i32 32)
   %fn = load ptr, ptr addrspace(4) %pushconst
-  call spir_func void %fn() !continufy.stage !{i32 0}
+  call spir_func void %fn()
   br label %exit
 
 exit:

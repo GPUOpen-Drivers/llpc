@@ -1,0 +1,34 @@
+; RUN: lgc -mcpu=gfx1030 --passes=lgc-patch-continufy --debug-only=lgc-patch-continufy ../drivers/drivers/xgl/icd/api/compiler/lgc/test/Transforms/CpsLowering/continufy-basic.lgc -o -
+;| FileCheck --check-prefixes=CHECK %s
+; REQUIRES: do-not-run-me
+
+declare void @lgc.cps.jump(i32 %target, i32 %levels, ...)
+declare void @lgc.cps.await.void(i32 %target, i32 %levels, ...)
+
+declare void @call_normally()
+declare spir_func void @call_async()
+
+define spir_func void @test() {
+entry:
+  call void () @call_async()
+  call void () @call_normally()
+  ret void
+}
+
+;-------------------------------------------------------------------------------
+; expected
+
+; declare void @lgc.cps.jump(i32 %target, i32 %levels, {i32} %state, ...) noreturn
+; 
+; declare spir_func void @test_function({} %state, i32 %levels, ptr %table)
+; 
+; define void @test({i32} %state, i32 level, ptr %table) {
+; entry:
+;   %ptr_test_function = addr @test_function
+;   %id_test_function = and ptr %ptr_test_function 7
+;   call void () @lgc.cps.await(i32 %id_test_function, i32 2, %state)
+;   call void () @no_opt()
+;   call void () @lgc.cps.jump(i32 0, i32 2, %state)
+;   unreachable()
+; }
+
