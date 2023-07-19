@@ -43,12 +43,11 @@ endif()
 
 ### Set Options and build LLVM #########################################################################################
 if(ICD_BUILD_LLPC)
-    # Set LLVM options and build LLVM
-    # Add LGC as an LLVM external project, but only if its CMakeLists.txt exists.
-    set(LLVM_EXTERNAL_PROJECTS llvm-dialects lgc LgcRt LgcCps)
-    set(LLVM_EXTERNAL_LGCCPS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../shared/lgccps)
-    set(LLVM_EXTERNAL_LLVM_DIALECTS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../imported/llvm-dialects)
-    set(LLVM_EXTERNAL_LGC_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../lgc)
+    # Add LGC and its dependencies as LLVM external projects.
+    include("../cmake/lgc.cmake")
+    add_lgc_projects()
+    # Add other LLPC dependencies as LLVM external projects.
+    list(APPEND LLVM_EXTERNAL_PROJECTS LgcRt)
     set(LLVM_EXTERNAL_LGCRT_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../shared/lgcrt)
 
     # Set other LLVM settings.
@@ -131,7 +130,7 @@ if(ICD_BUILD_LLPC)
     endif()
 
     # Always link statically against libLLVMlgc
-    llvm_map_components_to_libnames(extra_llvm_libs lgc LgcCps)
+    llvm_map_components_to_libnames(extra_llvm_libs LgcRt lgc)
     if(NOT WIN32)
         foreach (lib ${extra_llvm_libs})
             target_compile_options(${lib} PRIVATE "-fno-aligned-new")
