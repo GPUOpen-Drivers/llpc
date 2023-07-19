@@ -1272,8 +1272,11 @@ Value *SPIRVToLLVM::transShiftLogicalBitwiseInst(SPIRVValue *bv, BasicBlock *bb,
   if (shift->getType()->isIntOrIntVectorTy())
     shift = getBuilder()->CreateZExtOrTrunc(shift, base->getType());
 
-  auto inst = BinaryOperator::Create(bo, base, shift, bv->getName(), bb);
+  Instruction *inst = BinaryOperator::Create(bo, base, shift, bv->getName(), bb);
   setFastMathFlags(inst);
+
+  if (isShiftOpCode(op))
+    inst = new FreezeInst(inst, "shift.freeze", bb);
 
   return inst;
 }
