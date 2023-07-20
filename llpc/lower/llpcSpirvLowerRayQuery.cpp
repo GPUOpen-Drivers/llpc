@@ -52,7 +52,6 @@ const char *LdsUsage = "LdsUsage";
 const char *PrevRayQueryObj = "PrevRayQueryObj";
 const char *RayQueryObjGen = "RayQueryObjGen";
 const char *StaticId = "StaticId";
-static const char *LibraryEntryFuncName = "libraryEntry";
 static const char *GetStaticId = "AmdTraceRayGetStaticId";
 static const char *FetchTrianglePositionFromRayQuery = "FetchTrianglePositionFromRayQuery";
 } // namespace RtName
@@ -330,34 +329,14 @@ bool SpirvLowerRayQuery::runImpl(Module &module) {
 //
 // @param func : The function to create
 void SpirvLowerRayQuery::processLibraryFunction(Function *&func) {
-  const auto *rtState = m_context->getPipelineContext()->getRayTracingState();
-  (void(rtState)); // unused
   auto mangledName = func->getName();
-  const StringRef rayQueryInitialize =
-      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_TRACE_RAY_INLINE);
-  const StringRef rayQueryProceed =
-      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_RAY_QUERY_PROCEED);
-  if (mangledName.startswith(RtName::LibraryEntryFuncName)) {
-    func->dropAllReferences();
-    func->eraseFromParent();
-    func = nullptr;
-  } else if (!rayQueryInitialize.empty() && mangledName.startswith(rayQueryInitialize)) {
-    func->setName(rayQueryInitialize);
-    func->setLinkage(GlobalValue::ExternalLinkage);
-  } else if (!rayQueryProceed.empty() && mangledName.startswith(rayQueryProceed)) {
-    func->setName(rayQueryProceed);
-    func->setLinkage(GlobalValue::ExternalLinkage);
-  } else if (mangledName.startswith(RtName::GetStaticId)) {
+
+  if (mangledName.startswith(RtName::GetStaticId)) {
     eraseFunctionBlocks(func);
     BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
     m_builder->SetInsertPoint(entryBlock);
     m_builder->CreateRet(m_builder->CreateLoad(m_builder->getInt32Ty(), m_traceRayStaticId));
     func->setName(RtName::GetStaticId);
-  } else if (mangledName.startswith(RtName::FetchTrianglePositionFromRayQuery)) {
-    func->setName(RtName::FetchTrianglePositionFromRayQuery);
-    func->setLinkage(GlobalValue::ExternalLinkage);
-  } else {
-    // Nothing to do
   }
 }
 

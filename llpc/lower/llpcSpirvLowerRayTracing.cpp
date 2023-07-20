@@ -528,20 +528,6 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
   }
   // Process traceRays module
   if (m_shaderStage == ShaderStageCompute) {
-#if VKI_AMD_ABORT_LONG_RAYS
-    // NOTE: If the extension is enabled, redirect all calls of TraceRay to TraceLongRayAMD. Their inner implementation
-    // is completely the same, except that TraceRay set earlyTerminateThreshold to 0.0 while TraceLongRayAMD uses the
-    // given value.
-    StringRef traceRayFuncName =
-        m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_TRACE_LONG_RAY_AMD);
-#else
-    StringRef traceRayFuncName = m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_TRACE_RAY);
-#endif
-    assert(!traceRayFuncName.empty());
-    auto traceRayFunc = m_module->getFunction(traceRayFuncName);
-    assert(traceRayFunc);
-    traceRayFunc->setLinkage(GlobalValue::ExternalLinkage);
-
     static auto visitor = llvm_dialects::VisitorBuilder<SpirvLowerRayTracing>()
                               .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
                               .add(&SpirvLowerRayTracing::visitGetHitAttributes)
