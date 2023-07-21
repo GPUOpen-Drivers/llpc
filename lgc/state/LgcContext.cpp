@@ -61,7 +61,7 @@ static codegen::RegisterCodeGenFlags CGF;
 static bool Initialized;
 #endif
 
-raw_ostream *LgcContext::m_llpcOuts;
+thread_local raw_ostream *LgcContext::m_llpcOuts;
 
 // -emit-llvm: emit LLVM assembly instead of ISA
 static cl::opt<bool> EmitLlvm("emit-llvm", cl::desc("Emit LLVM assembly instead of AMD GPU ISA"), cl::init(false));
