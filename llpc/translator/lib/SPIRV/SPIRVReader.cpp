@@ -1272,6 +1272,18 @@ Value *SPIRVToLLVM::transShiftLogicalBitwiseInst(SPIRVValue *bv, BasicBlock *bb,
   if (shift->getType()->isIntOrIntVectorTy())
     shift = getBuilder()->CreateZExtOrTrunc(shift, base->getType());
 
+  if (isShiftOpCode(op)) {
+    // An out-of-range shift amount returns an undefined value in SPIR-V but poison in LLVM IR. The least disruptive way
+    // of fixing this is to mask the shift amount so it is always in-range. This generates AND instructions which can
+    // usually be folded away in IR or elided during instruction selection.
+    unsigned baseWidth = base->getType()->getScalarSizeInBits();
+    assert(isPowerOf2_32(baseWidth));
+    Constant *rhs = getBuilder()->getIntN(baseWidth, baseWidth - 1);
+    if (base->getType()->isVectorTy())
+      rhs = ConstantVector::getSplat(cast<VectorType>(base->getType())->getElementCount(), rhs);
+    shift = getBuilder()->CreateAnd(shift, rhs);
+  }
+
   auto inst = BinaryOperator::Create(bo, base, shift, bv->getName(), bb);
   setFastMathFlags(inst);
 
