@@ -2705,8 +2705,7 @@ void SpirvLowerRayTracing::visitGetParentId(lgc::GpurtGetParentIdOp &inst) {
 void SpirvLowerRayTracing::visitSetParentId(lgc::GpurtSetParentIdOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
-  m_builder->CreateStore(m_builder->CreateLoad(m_builder->getInt32Ty(), inst.getRayId()),
-                         m_traceParams[TraceParam::ParentRayId]);
+  m_builder->CreateStore(inst.getRayId(), m_traceParams[TraceParam::ParentRayId]);
 
   m_callsToLower.push_back(&inst);
   m_funcsToLower.insert(inst.getCalledFunction());
