@@ -1865,6 +1865,7 @@ std::unique_ptr<Module> Compiler::createGpurtShaderLibrary(Context *context) {
 
   lowerPassMgr->addPass(SpirvProcessGpuRtLibrary());
   lowerPassMgr->addPass(SpirvLowerRayQuery(true));
+  lowerPassMgr->addPass(AlwaysInlinerPass());
   // Stop timer for translate.
   timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, false);
 

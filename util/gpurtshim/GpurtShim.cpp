@@ -103,4 +103,8 @@ void gpurt::getFuncTable(RtIpVersion rtIpVersion, GpurtFuncTable &table) {
   unmangleDxilName(table.pFunc[RT_ENTRY_INSTANCE_ID], gpurtTable.intrinsic.pGetInstanceID);
   unmangleDxilName(table.pFunc[RT_ENTRY_OBJECT_TO_WORLD_TRANSFORM], gpurtTable.intrinsic.pGetObjectToWorldTransform);
   unmangleDxilName(table.pFunc[RT_ENTRY_WORLD_TO_OBJECT_TRANSFORM], gpurtTable.intrinsic.pGetWorldToObjectTransform);
+  unmangleDxilName(table.pFunc[RT_ENTRY_FETCH_HIT_TRIANGLE_FROM_NODE_POINTER],
+                   gpurtTable.intrinsic.pFetchTrianglePositionFromNodePointer);
+  unmangleDxilName(table.pFunc[RT_ENTRY_FETCH_HIT_TRIANGLE_FROM_RAY_QUERY],
+                   gpurtTable.intrinsic.pFetchTrianglePositionFromRayQuery);
 }

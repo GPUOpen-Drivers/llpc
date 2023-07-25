@@ -59,6 +59,7 @@ PreservedAnalyses SpirvProcessGpuRtLibrary::run(Module &module, ModuleAnalysisMa
     Function *func = &*funcIt++;
     processLibraryFunction(func);
   }
+
   return PreservedAnalyses::none();
 }
 
@@ -109,8 +110,48 @@ SpirvProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
+  auto funcName = func->getName();
+
+  StringRef traceRayFuncName = m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_TRACE_RAY);
+
+  const StringRef rayQueryInitializeFuncName =
+      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_TRACE_RAY_INLINE);
+
+  const StringRef rayQueryProceedFuncName =
+      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_RAY_QUERY_PROCEED);
+
+  const StringRef fetchTrianglePositionFromNodePointerFuncName =
+      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_FETCH_HIT_TRIANGLE_FROM_NODE_POINTER);
+  const StringRef fetchTrianglePositionFromRayQueryFuncName =
+      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_FETCH_HIT_TRIANGLE_FROM_RAY_QUERY);
+
+  assert(!traceRayFuncName.empty());
+  assert(!rayQueryInitializeFuncName.empty());
+  assert(!rayQueryProceedFuncName.empty());
+  assert(!fetchTrianglePositionFromNodePointerFuncName.empty());
+  assert(!fetchTrianglePositionFromRayQueryFuncName.empty());
+
+  // Set external linkage for library entry functions
+  if (funcName.startswith(traceRayFuncName) || funcName.startswith(rayQueryInitializeFuncName) ||
+      funcName.startswith(rayQueryProceedFuncName) ||
+      funcName.startswith(fetchTrianglePositionFromNodePointerFuncName) ||
+      funcName.startswith(fetchTrianglePositionFromRayQueryFuncName)) {
+    func->setLinkage(GlobalValue::ExternalLinkage);
+    return;
+  }
+
+  // Drop dummy entry function.
+  static const char *LibraryEntryFuncName = "libraryEntry";
+  if (funcName.startswith(LibraryEntryFuncName)) {
+    func->dropAllReferences();
+    func->eraseFromParent();
+    func = nullptr;
+    return;
+  }
+
+  // Create implementation for intrinsic functions.
   auto &gpurtFuncTable = LibraryFunctionTable::get().m_libFuncPtrs;
-  auto gpurtFuncIt = gpurtFuncTable.find(func->getName());
+  auto gpurtFuncIt = gpurtFuncTable.find(funcName);
   if (gpurtFuncIt != gpurtFuncTable.end()) {
     auto funcPtr = gpurtFuncIt->second;
     m_builder->SetInsertPoint(clearBlock(func));
@@ -119,7 +160,7 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
   }
 
   auto &commonFuncTable = InternalLibraryIntrinsicUtil::LibraryFunctionTable::get().m_libFuncPtrs;
-  auto commonFuncIt = commonFuncTable.find(func->getName());
+  auto commonFuncIt = commonFuncTable.find(funcName);
   if (commonFuncIt != commonFuncTable.end()) {
     auto funcPtr = commonFuncIt->second;
     m_builder->SetInsertPoint(clearBlock(func));
