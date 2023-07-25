@@ -61,9 +61,7 @@ PreservedAnalyses LowerGpuRt::run(Module &module, ModuleAnalysisManager &analysi
   m_lowerStack = (m_entryPoint->getName().startswith("_ahit") || m_entryPoint->getName().startswith("_sect")) &&
                  (gfxip.major < 11);
   createGlobalStack();
-
-  if (m_context->getPipelineContext()->getRayTracingState()->enableRayTracingCounters)
-    createRayStaticIdValue();
+  createRayStaticIdValue();
 
   static auto visitor = llvm_dialects::VisitorBuilder<LowerGpuRt>()
                             .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)

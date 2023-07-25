@@ -45,17 +45,9 @@ using namespace llvm;
 using namespace Llpc;
 using namespace spv;
 
-namespace RtName {
-extern const char *TraceRayHitAttributes;
-extern const char *TraceRaySetTraceParams;
-extern const char *ShaderTable;
-} // namespace RtName
-
 namespace Llpc {
-
 // =====================================================================================================================
 SpirvLowerRayTracingBuiltIn::SpirvLowerRayTracingBuiltIn() {
-  memset(m_traceParams, 0, sizeof(m_traceParams));
 }
 
 // =====================================================================================================================
@@ -100,158 +92,7 @@ bool SpirvLowerRayTracingBuiltIn::runImpl(Module &module) {
 
   assert(m_entryPoint);
 
-  auto traceParamstrLen = strlen(RtName::TraceRaySetTraceParams);
-  Instruction *insertPos = &*(m_entryPoint->begin()->getFirstNonPHIOrDbgOrAlloca());
-  for (auto globalIt = m_module->global_begin(), end = m_module->global_end(); globalIt != end;) {
-    GlobalVariable *global = &*globalIt++;
-    if (global->getType()->getAddressSpace() != SPIRAS_Private)
-      continue;
-
-    if (global->getName().startswith(RtName::TraceRaySetTraceParams)) {
-      int index = 0;
-      global->getName().substr(traceParamstrLen).consumeInteger(0, index);
-      m_traceParams[index] = global;
-    }
-  }
-
-  for (auto globalIt = m_module->global_begin(), end = m_module->global_end(); globalIt != end;) {
-    GlobalVariable *global = &*globalIt++;
-    if (global->getType()->getAddressSpace() != SPIRAS_Input)
-      continue;
-
-    Value *input = processBuiltIn(global, insertPos);
-    if (!input)
-      continue;
-
-    removeConstantExpr(m_context, global);
-    for (auto user = global->user_begin(), end = global->user_end(); user != end; ++user) {
-      // NOTE: "Getelementptr" and "bitcast" will propagate the address space of pointer value (input variable)
-      // to the element pointer value (destination). We have to clear the address space of this element pointer
-      // value. The original pointer value has been lowered and therefore the address space is invalid now.
-      Instruction *inst = dyn_cast<Instruction>(*user);
-      if (inst) {
-        Type *instTy = inst->getType();
-        if (isa<PointerType>(instTy) && instTy->getPointerAddressSpace() == SPIRAS_Input) {
-          assert(isa<GetElementPtrInst>(inst) || isa<BitCastInst>(inst));
-          Type *newInstTy = PointerType::get(*m_context, SPIRAS_Private);
-          inst->mutateType(newInstTy);
-        }
-      }
-    }
-
-    global->mutateType(input->getType()); // To clear address space for pointer to make replacement valid
-    global->replaceAllUsesWith(input);
-    global->eraseFromParent();
-  }
-
   LLVM_DEBUG(dbgs() << "After the pass Spirv-Lower-Ray-Tracing-BuiltIn " << module);
   return true;
 }
-
-// =====================================================================================================================
-// Processes ray tracing "call" builtIn instruction.
-//
-// @param global : Global variable
-// @param insertPos : Where to insert instructions
-Value *SpirvLowerRayTracingBuiltIn::processBuiltIn(GlobalVariable *global, Instruction *insertPos) {
-  ShaderInOutMetadata inputMeta = {};
-  MDNode *metaNode = global->getMetadata(gSPIRVMD::InOut);
-  auto meta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
-  unsigned startOperand = 0;
-  Type *globalTy = global->getValueType();
-  if (globalTy->isArrayTy()) {
-    assert(meta->getNumOperands() == 4);
-    startOperand += 2;
-  }
-  inputMeta.U64All[0] = cast<ConstantInt>(meta->getOperand(startOperand))->getZExtValue();
-  inputMeta.U64All[1] = cast<ConstantInt>(meta->getOperand(startOperand + 1))->getZExtValue();
-  assert(inputMeta.IsBuiltIn);
-
-  unsigned builtInId = inputMeta.Value;
-  Value *input = nullptr;
-  m_builder->SetInsertPoint(insertPos);
-  bool nonRayTracingBuiltIn = false;
-  switch (builtInId) {
-  case BuiltInLaunchIdKHR: {
-    auto builtIn = lgc::BuiltInGlobalInvocationId;
-    lgc::InOutInfo inputInfo = {};
-    input = m_builder->CreateReadBuiltInInput(builtIn, inputInfo, nullptr, nullptr, "");
-    break;
-  }
-  case BuiltInPrimitiveId: {
-    input = m_traceParams[TraceParam::PrimitiveIndex];
-    break;
-  }
-  case BuiltInHitKindKHR: {
-    input = m_traceParams[TraceParam::Kind];
-    break;
-  }
-  case BuiltInIncomingRayFlagsKHR: {
-    input = m_traceParams[TraceParam::RayFlags];
-    break;
-  }
-  case BuiltInRayTminKHR: {
-    input = m_traceParams[TraceParam::TMin];
-    break;
-  }
-  case BuiltInWorldRayOriginKHR: {
-    input = m_traceParams[TraceParam::Origin];
-    break;
-  }
-  case BuiltInWorldRayDirectionKHR: {
-    input = m_traceParams[TraceParam::Dir];
-    break;
-  }
-  case BuiltInRayGeometryIndexKHR: {
-    input = m_traceParams[TraceParam::GeometryIndex];
-    break;
-  }
-  case BuiltInHitTNV:
-  case BuiltInRayTmaxKHR: {
-    input = m_traceParams[TraceParam::TMax];
-    break;
-  }
-  case BuiltInCullMaskKHR: {
-    input = m_traceParams[TraceParam::InstanceInclusionMask];
-    break;
-  }
-  case BuiltInHitTriangleVertexPositionsKHR: {
-    input = m_traceParams[TraceParam::HitTriangleVertexPositions];
-    break;
-  }
-  case BuiltInObjectToWorldKHR:
-  case BuiltInWorldToObjectKHR:
-  case BuiltInObjectRayOriginKHR:
-  case BuiltInObjectRayDirectionKHR:
-  case BuiltInInstanceCustomIndexKHR:
-  case BuiltInInstanceId:
-    break;
-  default: {
-    nonRayTracingBuiltIn = true;
-    break;
-  }
-  }
-
-  if (nonRayTracingBuiltIn)
-    return nullptr;
-
-  const auto &dataLayout = m_module->getDataLayout();
-
-  if (!input) {
-    // Note: allocate proxy for the BuiltInObjectToWorldKHR, BuiltInWorldToObjectKHR, BuiltInObjectRayOriginKHR,
-    // BuiltInObjectRayDirectionKHR, BuiltInInstanceCustomIndexKHR, BuiltInInstanceId these builtIn are processed in the
-    // previous ray-tracing pass
-    auto proxy = new AllocaInst(globalTy, dataLayout.getAllocaAddrSpace(), LlpcName::InputProxyPrefix, insertPos);
-    input = proxy;
-  } else if (!input->getType()->isPointerTy()) {
-    Instruction *inst = dyn_cast<Instruction>(input);
-    auto proxy = new AllocaInst(input->getType(), dataLayout.getAllocaAddrSpace(),
-                                LlpcName::InputProxyPrefix + input->getName(), inst);
-    new StoreInst(input, proxy, insertPos);
-    input = proxy;
-  }
-
-  return input;
-}
-
 } // namespace Llpc
