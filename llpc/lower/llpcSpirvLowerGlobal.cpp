@@ -806,7 +806,7 @@ void SpirvLowerGlobal::lowerInput() {
         Type *instTy = inst->getType();
         if (isa<PointerType>(instTy) && instTy->getPointerAddressSpace() == SPIRAS_Input) {
           assert(isa<GetElementPtrInst>(inst) || isa<BitCastInst>(inst));
-          Type *newInstTy = PointerType::getWithSamePointeeType(cast<PointerType>(instTy), SPIRAS_Private);
+          Type *newInstTy = PointerType::get(*m_context, SPIRAS_Private);
           inst->mutateType(newInstTy);
         }
       }
@@ -903,7 +903,7 @@ void SpirvLowerGlobal::lowerOutput() {
         Type *instTy = inst->getType();
         if (isa<PointerType>(instTy) && instTy->getPointerAddressSpace() == SPIRAS_Output) {
           assert(isa<GetElementPtrInst>(inst) || isa<BitCastInst>(inst));
-          Type *newInstTy = PointerType::getWithSamePointeeType(cast<PointerType>(instTy), SPIRAS_Private);
+          Type *newInstTy = PointerType::get(*m_context, SPIRAS_Private);
           inst->mutateType(newInstTy);
         }
       }
