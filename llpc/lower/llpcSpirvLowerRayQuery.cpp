@@ -34,6 +34,7 @@
 #include "llpcContext.h"
 #include "llpcSpirvLowerUtil.h"
 #include "lgc/Builder.h"
+#include "lgc/GpurtDialect.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
@@ -51,8 +52,6 @@ namespace RtName {
 const char *LdsUsage = "LdsUsage";
 const char *PrevRayQueryObj = "PrevRayQueryObj";
 const char *RayQueryObjGen = "RayQueryObjGen";
-const char *StaticId = "StaticId";
-static const char *GetStaticId = "AmdTraceRayGetStaticId";
 static const char *FetchTrianglePositionFromRayQuery = "FetchTrianglePositionFromRayQuery";
 } // namespace RtName
 
@@ -305,13 +304,7 @@ bool SpirvLowerRayQuery::runImpl(Module &module) {
   SpirvLower::init(&module);
   createGlobalRayQueryObj();
   createGlobalLdsUsage();
-  createGlobalTraceRayStaticId();
-  if (m_rayQueryLibrary) {
-    for (auto funcIt = module.begin(), funcEnd = module.end(); funcIt != funcEnd;) {
-      Function *func = &*funcIt++;
-      processLibraryFunction(func);
-    }
-  } else {
+  if (!m_rayQueryLibrary) {
     Instruction *insertPos = &*(m_entryPoint->begin()->getFirstNonPHIOrDbgOrAlloca());
     m_builder->SetInsertPoint(insertPos);
     initGlobalVariable();
@@ -322,22 +315,6 @@ bool SpirvLowerRayQuery::runImpl(Module &module) {
     }
   }
   return true;
-}
-
-// =====================================================================================================================
-// Process function in the Graphics/Compute/Raytracing modules
-//
-// @param func : The function to create
-void SpirvLowerRayQuery::processLibraryFunction(Function *&func) {
-  auto mangledName = func->getName();
-
-  if (mangledName.startswith(RtName::GetStaticId)) {
-    eraseFunctionBlocks(func);
-    BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
-    m_builder->SetInsertPoint(entryBlock);
-    m_builder->CreateRet(m_builder->CreateLoad(m_builder->getInt32Ty(), m_traceRayStaticId));
-    func->setName(RtName::GetStaticId);
-  }
 }
 
 // =====================================================================================================================
@@ -1185,16 +1162,6 @@ void SpirvLowerRayQuery::createGlobalLdsUsage() {
 }
 
 // =====================================================================================================================
-// Create global variable for static ID
-void SpirvLowerRayQuery::createGlobalTraceRayStaticId() {
-  m_traceRayStaticId =
-      new GlobalVariable(*m_module, Type::getInt32Ty(m_module->getContext()), true, GlobalValue::ExternalLinkage,
-                         nullptr, RtName::StaticId, nullptr, GlobalValue::NotThreadLocal, SPIRAS_Private);
-
-  m_traceRayStaticId->setAlignment(MaybeAlign(4));
-}
-
-// =====================================================================================================================
 // Create global variable for the prevRayQueryObj
 void SpirvLowerRayQuery::createGlobalRayQueryObj() {
   m_prevRayQueryObj =
@@ -1312,7 +1279,7 @@ void SpirvLowerRayQuery::generateTraceRayStaticId() {
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
 
-  m_builder->CreateStore(m_builder->getInt32(MetroHash::compact32(&hash)), m_traceRayStaticId);
+  m_builder->create<lgc::GpurtSetRayStaticIdOp>(m_builder->getInt32(MetroHash::compact32(&hash)));
 }
 
 // =====================================================================================================================

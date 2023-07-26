@@ -103,6 +103,7 @@ SpirvProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
   m_libFuncPtrs["AmdTraceRayGetParentId"] = &SpirvProcessGpuRtLibrary::createGetParentId;
   m_libFuncPtrs["AmdTraceRaySetParentId"] = &SpirvProcessGpuRtLibrary::createSetParentId;
   m_libFuncPtrs["AmdTraceRayDispatchRaysIndex"] = &SpirvProcessGpuRtLibrary::createDispatchRayIndex;
+  m_libFuncPtrs["AmdTraceRayGetStaticId"] = &SpirvProcessGpuRtLibrary::createGetStaticId;
 }
 
 // =====================================================================================================================
@@ -629,6 +630,14 @@ void SpirvProcessGpuRtLibrary::createSetParentId(llvm::Function *func) {
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createDispatchRayIndex(llvm::Function *func) {
   m_builder->CreateRet(m_builder->create<DispatchRaysIndexOp>());
+}
+
+// =====================================================================================================================
+// Create function to get ray static ID
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createGetStaticId(llvm::Function *func) {
+  m_builder->CreateRet(m_builder->create<GpurtGetRayStaticIdOp>());
 }
 
 } // namespace Llpc

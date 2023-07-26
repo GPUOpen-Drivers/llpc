@@ -114,6 +114,12 @@ void SpirvLowerRayTracing::processTraceRayCall(BaseTraceRayOp *inst) {
   implCallArgs.push_back(m_dispatchRaysInfoDesc);
   m_builder->SetInsertPoint(inst);
 
+  auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
+
+  // Generate a unique static ID for each trace ray call
+  if (rayTracingContext->getRayTracingState()->enableRayTracingCounters)
+    generateTraceRayStaticId();
+
   auto newCall = m_builder->CreateNamedCall(mangledName, inst->getFunctionType()->getReturnType(), implCallArgs,
                                             {Attribute::NoUnwind, Attribute::AlwaysInline});
 
@@ -125,7 +131,6 @@ void SpirvLowerRayTracing::processTraceRayCall(BaseTraceRayOp *inst) {
     func->setLinkage(GlobalVariable::InternalLinkage);
     func->addFnAttr(Attribute::AlwaysInline);
 
-    auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
     bool indirect = rayTracingContext->getIndirectStageMask() & ShaderStageComputeBit;
 
     auto entryBlock = BasicBlock::Create(*m_context, ".entry", func);
@@ -154,13 +159,12 @@ void SpirvLowerRayTracing::processTraceRayCall(BaseTraceRayOp *inst) {
 
     Value *currentParentRayId = nullptr;
     if (rayTracingContext->getRayTracingState()->enableRayTracingCounters) {
-      generateTraceRayStaticId();
       // RayGen shaders are non-recursive, initialize parent ray ID to -1 here.
       if (m_shaderStage == ShaderStageRayTracingRayGen)
         m_builder->CreateStore(m_builder->getInt32(InvalidValue), m_traceParams[TraceParam::ParentRayId]);
       currentParentRayId = m_builder->CreateLoad(m_builder->getInt32Ty(), m_traceParams[TraceParam::ParentRayId]);
       args.push_back(currentParentRayId);
-      args.push_back(m_builder->CreateLoad(m_builder->getInt32Ty(), m_traceRayStaticId));
+      args.push_back(m_builder->create<lgc::GpurtGetRayStaticIdOp>());
     }
     CallInst *result = nullptr;
     auto funcTy = getTraceRayFuncTy();
@@ -506,7 +510,6 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
   initGlobalPayloads();
   initShaderBuiltIns();
   initGlobalCallableData();
-  createGlobalTraceRayStaticId();
   createGlobalTraceParams();
 
   // Create empty raygen main module
@@ -1759,7 +1762,7 @@ void SpirvLowerRayTracing::createTraceRay() {
     arg = ++argIt;
     m_builder->CreateStore(arg, m_traceParams[TraceParam::ParentRayId]);
     arg = ++argIt;
-    m_builder->CreateStore(arg, m_traceRayStaticId);
+    m_builder->create<lgc::GpurtSetRayStaticIdOp>(arg);
   }
 
   // Call TraceRay function from traceRays module
