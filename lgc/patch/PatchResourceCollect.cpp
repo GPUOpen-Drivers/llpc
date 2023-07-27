@@ -2670,32 +2670,6 @@ void PatchResourceCollect::mapGsBuiltInOutput(unsigned builtInId, unsigned elemC
 void PatchResourceCollect::updateInputLocInfoMapWithUnpack() {
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
   auto &inputLocInfoMap = inOutUsage.inputLocInfoMap;
-  // Remove unused locationInfo
-  bool eraseUnusedLocInfo = !m_pipelineState->isUnlinked(); // Should be whole pipeline compilation
-  if (m_shaderStage == ShaderStageTessEval) {
-    // TODO: Here, we keep all generic inputs of tessellation evaluation shader. This is because corresponding
-    // generic outputs of tessellation control shader might involve in output import and dynamic indexing, which
-    // is easy to cause incorrectness of location mapping.
-    // m_inputCalls holds the calls that have users
-    eraseUnusedLocInfo = false;
-  } else if (m_shaderStage == ShaderStageFragment) {
-    // NOTE: If the previous stage of fragment shader is mesh shader, we skip this because the input/output packing
-    // is disable between mesh shader and fragment shader.
-    auto prevStage = m_pipelineState->getPrevShaderStage(ShaderStageFragment);
-    if (prevStage == ShaderStageMesh) {
-      eraseUnusedLocInfo = false;
-    }
-  }
-
-  if (eraseUnusedLocInfo) {
-    for (auto call : m_inputCalls) {
-      InOutLocationInfo origLocInfo;
-      origLocInfo.setLocation(call->getLocation());
-      auto mapIt = inputLocInfoMap.find(origLocInfo);
-      if (mapIt == inputLocInfoMap.end())
-        inputLocInfoMap.erase(mapIt);
-    }
-  }
 
   // Update the value of inputLocInfoMap
   if (!inputLocInfoMap.empty()) {
