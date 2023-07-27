@@ -264,5 +264,4 @@ if (LLPC_BUILD_TESTS)
   add_subdirectory(unittests)
 endif()
 
-target_link_libraries(LLVMlgc PUBLIC LLVMLgcRt)
 target_link_libraries(LLVMlgc PRIVATE LLVMLgcCps)
