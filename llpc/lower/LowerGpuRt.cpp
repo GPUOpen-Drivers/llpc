@@ -46,7 +46,7 @@ static const char *LdsStack = "LdsStack";
 
 namespace Llpc {
 // =====================================================================================================================
-LowerGpuRt::LowerGpuRt() : m_stack(nullptr), m_stackTy(nullptr), m_lowerStack(false) {
+LowerGpuRt::LowerGpuRt() : m_stack(nullptr), m_stackTy(nullptr), m_lowerStack(false), m_rayStaticId(nullptr) {
 }
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
@@ -61,6 +61,10 @@ PreservedAnalyses LowerGpuRt::run(Module &module, ModuleAnalysisManager &analysi
   m_lowerStack = (m_entryPoint->getName().startswith("_ahit") || m_entryPoint->getName().startswith("_sect")) &&
                  (gfxip.major < 11);
   createGlobalStack();
+
+  if (m_context->getPipelineContext()->getRayTracingState()->enableRayTracingCounters)
+    createRayStaticIdValue();
+
   static auto visitor = llvm_dialects::VisitorBuilder<LowerGpuRt>()
                             .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
                             .add(&LowerGpuRt::visitGetStackSize)
@@ -74,6 +78,8 @@ PreservedAnalyses LowerGpuRt::run(Module &module, ModuleAnalysisManager &analysi
                             .add(&LowerGpuRt::visitGetStaticFlags)
                             .add(&LowerGpuRt::visitGetTriangleCompressionMode)
                             .add(&LowerGpuRt::visitGetFlattenedGroupThreadId)
+                            .add(&LowerGpuRt::visitSetRayStaticId)
+                            .add(&LowerGpuRt::visitGetRayStaticId)
                             .build();
 
   visitor.visit(*this, *m_module);
@@ -135,6 +141,13 @@ void LowerGpuRt::createGlobalStack() {
 
   ldsStack->setAlignment(MaybeAlign(4));
   m_stack = ldsStack;
+}
+
+// =====================================================================================================================
+// Create ray static ID value
+void LowerGpuRt::createRayStaticIdValue() {
+  m_builder->SetInsertPointPastAllocas(m_entryPoint);
+  m_rayStaticId = m_builder->CreateAlloca(m_builder->getInt32Ty());
 }
 
 // =====================================================================================================================
@@ -330,6 +343,36 @@ void LowerGpuRt::visitGetTriangleCompressionMode(GpurtGetTriangleCompressionMode
 void LowerGpuRt::visitGetFlattenedGroupThreadId(GpurtGetFlattenedGroupThreadIdOp &inst) {
   m_builder->SetInsertPoint(&inst);
   inst.replaceAllUsesWith(getThreadIdInGroup());
+  m_callsToLower.push_back(&inst);
+  m_funcsToLower.insert(inst.getCalledFunction());
+}
+
+// =====================================================================================================================
+// Visit "GpurtSetRayStaticIdOp" instruction
+//
+// @param inst : The dialect instruction to process
+void LowerGpuRt::visitSetRayStaticId(GpurtSetRayStaticIdOp &inst) {
+  m_builder->SetInsertPoint(&inst);
+
+  assert(m_rayStaticId);
+  auto rayStaticId = inst.getId();
+  auto storeInst = m_builder->CreateStore(rayStaticId, m_rayStaticId);
+
+  inst.replaceAllUsesWith(storeInst);
+  m_callsToLower.push_back(&inst);
+  m_funcsToLower.insert(inst.getCalledFunction());
+}
+
+// =====================================================================================================================
+// Visit "GpurtGetRayStaticIdOp" instruction
+//
+// @param inst : The dialect instruction to process
+void LowerGpuRt::visitGetRayStaticId(GpurtGetRayStaticIdOp &inst) {
+  m_builder->SetInsertPoint(&inst);
+
+  assert(m_rayStaticId);
+  auto rayStaticId = m_builder->CreateLoad(m_builder->getInt32Ty(), m_rayStaticId);
+  inst.replaceAllUsesWith(rayStaticId);
   m_callsToLower.push_back(&inst);
   m_funcsToLower.insert(inst.getCalledFunction());
 }

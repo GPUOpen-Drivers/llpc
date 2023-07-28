@@ -83,6 +83,7 @@ private:
   void createGetParentId(llvm::Function *func);
   void createSetParentId(llvm::Function *func);
   void createDispatchRayIndex(llvm::Function *func);
+  void createGetStaticId(llvm::Function *func);
   llvm::Value *createGetBvhSrd(llvm::Value *expansion, llvm::Value *boxSortMode);
 };
 } // namespace Llpc
