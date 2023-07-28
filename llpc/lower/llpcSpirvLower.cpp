@@ -40,7 +40,7 @@
 #include "llpcSpirvLowerMath.h"
 #include "llpcSpirvLowerMemoryOp.h"
 #include "llpcSpirvLowerRayQueryPostInline.h"
-#include "llpcSpirvLowerRayTracingBuiltIn.h"
+#include "llpcSpirvLowerRayTracing.h"
 #include "llpcSpirvLowerTerminator.h"
 #include "llpcSpirvLowerTranslator.h"
 #include "llpcSpirvLowerUtil.h"
@@ -181,9 +181,6 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   if (lowerTimer)
     LgcContext::createAndAddStartStopTimer(passMgr, lowerTimer, true);
 
-  if (rayTracing)
-    passMgr.addPass(SpirvLowerRayTracing());
-
   if (isInternalRtShader)
     passMgr.addPass(SpirvProcessGpuRtLibrary());
 
@@ -198,9 +195,6 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   // Lower SPIR-V access chain
   passMgr.addPass(SpirvLowerAccessChain());
 
-  if (rayTracing)
-    passMgr.addPass(SpirvLowerRayTracingBuiltIn());
-
   if (rayQuery)
     passMgr.addPass(SpirvLowerRayQueryPostInline());
 
@@ -209,6 +203,11 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
 
   // Lower Glsl compatibility variables and operations
   passMgr.addPass(LowerGLCompatibility());
+
+  if (rayTracing) {
+    passMgr.addPass(SpirvLowerRayTracing());
+    passMgr.addPass(AlwaysInlinerPass());
+  }
 
   // Lower SPIR-V global variables, inputs, and outputs
   passMgr.addPass(SpirvLowerGlobal());

@@ -510,6 +510,14 @@ PreservedAnalyses SpirvLowerRayTracing::run(Module &module, ModuleAnalysisManage
   initShaderBuiltIns();
   initGlobalCallableData();
   Instruction *insertPos = nullptr;
+
+  const auto* rtState = m_context->getPipelineContext()->getRayTracingState();
+  lgc::ComputeShaderMode mode = {};
+  mode.workgroupSizeX = rtState->threadGroupSizeX;
+  mode.workgroupSizeY = rtState->threadGroupSizeY;
+  mode.workgroupSizeZ = rtState->threadGroupSizeZ;
+  lgc::Pipeline::setComputeShaderMode(module, mode);
+
   // Create empty raygen main module
   if (module.empty()) {
     m_shaderStage = ShaderStageRayTracingRayGen;
@@ -635,6 +643,15 @@ PreservedAnalyses SpirvLowerRayTracing::run(Module &module, ModuleAnalysisManage
   for (Function *func : m_funcsToLower) {
     func->dropAllReferences();
     func->eraseFromParent();
+  }
+
+  for (auto funcIt = module.begin(), funcEnd = module.end(); funcIt != funcEnd;) {
+    Function *func = &*funcIt++;
+    if (func->getLinkage() == GlobalValue::ExternalLinkage && !func->empty()) {
+      if (!func->getName().startswith(module.getName())) {
+        func->setLinkage(GlobalValue::InternalLinkage);
+      }
+    }
   }
 
   LLVM_DEBUG(dbgs() << "After the pass Spirv-Lower-Ray-Tracing " << module);
