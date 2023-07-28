@@ -155,23 +155,24 @@ public:
   static llvm::StringRef name() { return "Lower SPIR-V RayTracing operations"; }
 
 private:
-  void createGlobalTraceParams();
+  void createTraceParams(llvm::Function *func);
   llvm::GlobalVariable *createGlobalBuiltIn(unsigned builtInId);
   void createRayGenEntryFunc();
-  void replaceGlobal(llvm::GlobalVariable *global, llvm::GlobalVariable *replacedGlobal);
+  void replaceGlobal(llvm::GlobalVariable *global, llvm::Value *replacedGlobal);
   void processShaderRecordBuffer(llvm::GlobalVariable *global, llvm::Value *bufferDesc, llvm::Value *tableIndex,
                                  llvm::Instruction *insertPos);
   void createTraceRay();
-  void createSetHitAttributes(llvm::Function *func);
-  void createSetTraceParams(llvm::Function *func);
+  void createSetHitAttributes(llvm::Function *func, unsigned instArgsNum, unsigned traceParamsOffset);
+  void createSetTraceParams(llvm::Function *func, unsigned instArgNum);
   void createAnyHitFunc(llvm::Value *shaderIdentifier, llvm::Value *shaderRecordIndex);
-  void createCallShaderFunc(llvm::Function *func, ShaderStage stage, unsigned intersectId, llvm::Value *retVal);
+  void createCallShaderFunc(llvm::Function *func, ShaderStage stage, unsigned intersectId, llvm::Value *retVal,
+                            unsigned traceParamsArgOffset);
   void createCallShader(llvm::Function *func, ShaderStage stage, unsigned intersectId, llvm::Value *shaderId,
                         llvm::Value *shaderRecordIndex, llvm::Value *inputResult, llvm::BasicBlock *entryBlock,
-                        llvm::BasicBlock *endBlock);
-  void updateGlobalFromCallShaderFunc(llvm::Function *func, ShaderStage stage);
+                        llvm::BasicBlock *endBlock, unsigned traceParamsArgOffset);
+  void updateGlobalFromCallShaderFunc(llvm::Function *func, ShaderStage stage, unsigned traceParamsArgOffset);
   void createSetTriangleInsection(llvm::Function *func);
-  llvm::Value *processBuiltIn(unsigned builtInId, llvm::Instruction *insertPos);
+  llvm::Value *processBuiltIn(unsigned builtInId, llvm::Type *globalTy, llvm::Instruction *insertPos);
   void createShaderSelection(llvm::Function *func, llvm::BasicBlock *entryBlock, llvm::BasicBlock *endBlock,
                              llvm::Value *shaderId, unsigned intersectId, ShaderStage stage,
                              const llvm::SmallVector<llvm::Value *, 8> &args, llvm::Value *result,
@@ -197,8 +198,9 @@ private:
   llvm::SmallSet<unsigned, 4> getShaderExtraInputParams(ShaderStage stage);
   llvm::SmallSet<unsigned, 4> getShaderExtraRets(ShaderStage stage);
   llvm::Type *getShaderReturnTy(ShaderStage stage);
-  void storeFunctionCallResult(ShaderStage stage, llvm::Value *result);
-  void initInputResult(ShaderStage stage, llvm::Value *payload, llvm::Value *traceParams[], llvm::Value *result);
+  void storeFunctionCallResult(ShaderStage stage, llvm::Value *result, llvm::Argument *traceIt);
+  void initInputResult(ShaderStage stage, llvm::Value *payload, llvm::Value *traceParams[], llvm::Value *result,
+                       llvm::Argument *traceIt);
   void cloneDbgInfoSubgrogram(llvm::Function *func, llvm::Function *newfunc);
   llvm::Value *createLoadRayTracingMatrix(unsigned builtInId, llvm::Instruction *insertPos);
   void createSetHitTriangleNodePointer(llvm::Function *func);
@@ -211,7 +213,7 @@ private:
   void visitTraceRayOp(lgc::rt::TraceRayOp &inst);
   void processTraceRayCall(lgc::rt::BaseTraceRayOp *inst);
 
-  llvm::Function *createImplFunc(llvm::CallInst &inst);
+  llvm::Function *createImplFunc(llvm::CallInst &inst, llvm::ArrayRef<Value *> args);
 
   void visitGetHitAttributes(lgc::GpurtGetHitAttributesOp &inst);
   void visitSetHitAttributes(lgc::GpurtSetHitAttributesOp &inst);
@@ -226,7 +228,7 @@ private:
   void visitSetParentId(lgc::GpurtSetParentIdOp &inst);
   void visitDispatchRayIndex(lgc::rt::DispatchRaysIndexOp &inst);
 
-  llvm::GlobalVariable *m_traceParams[TraceParam::Count];              // Trace ray set parameters
+  llvm::Value *m_traceParams[TraceParam::Count];                       // Trace ray set parameters
   llvm::GlobalVariable *m_funcRetFlag = nullptr;                       // Function return flag
   llvm::Value *m_worldToObjMatrix = nullptr;                           // World to Object matrix
   llvm::GlobalVariable *m_globalPayload = nullptr;                     // Global payload variable

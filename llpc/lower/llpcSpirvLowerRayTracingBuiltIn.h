@@ -44,10 +44,6 @@ public:
   virtual bool runImpl(llvm::Module &module);
 
   static llvm::StringRef name() { return "Lower SPIR-V ray tracing built-ins"; }
-
-private:
-  llvm::Value *processBuiltIn(llvm::GlobalVariable *global, llvm::Instruction *insertPos);
-  llvm::GlobalValue *m_traceParams[TraceParam::Count]; // Trace ray set parameters
 };
 
 } // namespace Llpc
