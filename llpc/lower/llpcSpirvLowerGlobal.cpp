@@ -614,13 +614,17 @@ void SpirvLowerGlobal::mapInputToProxy(GlobalVariable *input) {
   assert(metaNode);
 
   auto meta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
-  auto proxy = m_builder->CreateAlloca(inputTy, dataLayout.getAllocaAddrSpace(), nullptr,
-                                       Twine(LlpcName::InputProxyPrefix) + input->getName());
+  Value *proxy = m_builder->CreateAlloca(inputTy, dataLayout.getAllocaAddrSpace(), nullptr,
+                                         Twine(LlpcName::InputProxyPrefix) + input->getName());
 
   // Import input to proxy variable
   auto inputValue = addCallInstForInOutImport(inputTy, SPIRAS_Input, meta, nullptr, 0, nullptr, nullptr,
                                               InterpLocUnknown, nullptr, false);
-  m_builder->CreateStore(inputValue, proxy);
+
+  if (isRayTracingShaderStage(m_shaderStage) && inputValue->getType()->isPointerTy())
+    proxy = inputValue;
+  else
+    m_builder->CreateStore(inputValue, proxy);
 
   m_inputProxyMap[input] = proxy;
 }
@@ -958,17 +962,18 @@ Value *SpirvLowerGlobal::createRaytracingBuiltIn(BuiltIn builtIn) {
   case BuiltInLaunchSizeKHR:
     return m_builder->create<DispatchRaysDimensionsOp>();
   case BuiltInWorldRayOriginKHR:
-    return m_builder->create<WorldRayOriginOp>();
+    return m_builder->create<WorldRayOriginPtrOp>();
   case BuiltInWorldRayDirectionKHR:
-    return m_builder->create<WorldRayDirectionOp>();
+    return m_builder->create<WorldRayDirectionPtrOp>();
   case BuiltInObjectRayOriginKHR:
     return m_builder->create<ObjectRayOriginOp>();
   case BuiltInObjectRayDirectionKHR:
     return m_builder->create<ObjectRayDirectionOp>();
   case BuiltInRayTminKHR:
-    return m_builder->create<RayTminOp>();
+    return m_builder->create<RayTminPtrOp>();
+  case BuiltInHitTNV:
   case BuiltInRayTmaxKHR:
-    return m_builder->create<RayTcurrentOp>();
+    return m_builder->create<RayTcurrentPtrOp>();
   case BuiltInInstanceCustomIndexKHR:
     return m_builder->create<InstanceIndexOp>();
   case BuiltInObjectToWorldKHR:
@@ -976,17 +981,19 @@ Value *SpirvLowerGlobal::createRaytracingBuiltIn(BuiltIn builtIn) {
   case BuiltInWorldToObjectKHR:
     return m_builder->create<WorldToObjectOp>();
   case BuiltInHitKindKHR:
-    return m_builder->create<HitKindOp>();
+    return m_builder->create<HitKindPtrOp>();
   case BuiltInHitTriangleVertexPositionsKHR:
-    return m_builder->create<TriangleVertexPositionsOp>();
+    return m_builder->create<TriangleVertexPositionsPtrOp>();
   case BuiltInIncomingRayFlagsKHR:
-    return m_builder->create<RayFlagsOp>();
+    return m_builder->create<RayFlagsPtrOp>();
   case BuiltInRayGeometryIndexKHR:
-    return m_builder->create<GeometryIndexOp>();
+    return m_builder->create<GeometryIndexPtrOp>();
   case BuiltInInstanceId:
     return m_builder->create<InstanceIdOp>();
   case BuiltInPrimitiveId:
-    return m_builder->create<PrimitiveIndexOp>();
+    return m_builder->create<PrimitiveIndexPtrOp>();
+  case BuiltInCullMaskKHR:
+    return m_builder->create<InstanceInclusionMaskPtrOp>();
   default:
     llvm_unreachable("Should never be called");
     return nullptr;
@@ -998,7 +1005,8 @@ Value *SpirvLowerGlobal::createRaytracingBuiltIn(BuiltIn builtIn) {
 // @param builtIn : BuiltIn value
 // @param stage : Shader stage
 inline bool isRayTracingBuiltIn(unsigned builtIn, ShaderStage stage) {
-  bool rtbuiltIn = builtIn >= BuiltInLaunchIdKHR && builtIn <= BuiltInRayGeometryIndexKHR;
+  bool rtbuiltIn =
+      (builtIn >= BuiltInLaunchIdKHR && builtIn <= BuiltInRayGeometryIndexKHR) || (builtIn == BuiltInCullMaskKHR);
   bool rtStage = stage == ShaderStageRayTracingIntersect || stage == ShaderStageRayTracingAnyHit ||
                  stage == ShaderStageRayTracingClosestHit;
   bool nonRtBuiltIn = builtIn == BuiltInInstanceId || builtIn == BuiltInPrimitiveId;
@@ -1047,42 +1055,46 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
 
       unsigned builtInId = inOutMeta.Value;
 
-      if (!vertexIdx && m_shaderStage == ShaderStageGeometry &&
-          (builtInId == spv::BuiltInPerVertex || // GLSL style per-vertex data
-           builtInId == spv::BuiltInPosition ||  // HLSL style per-vertex data
-           builtInId == spv::BuiltInPointSize || builtInId == spv::BuiltInClipDistance ||
-           builtInId == spv::BuiltInCullDistance)) {
-        // NOTE: We are handling vertex indexing of built-in inputs of geometry shader. For tessellation
-        // shader, vertex indexing is handled by "load"/"store" instruction lowering.
-        assert(!vertexIdx); // For per-vertex data, make a serial of per-vertex import calls.
+      if (isRayTracingBuiltIn(builtInId, m_shaderStage))
+        inOutValue = createRaytracingBuiltIn(static_cast<BuiltIn>(inOutMeta.Value));
+      else {
+        if (!vertexIdx && m_shaderStage == ShaderStageGeometry &&
+            (builtInId == spv::BuiltInPerVertex || // GLSL style per-vertex data
+             builtInId == spv::BuiltInPosition ||  // HLSL style per-vertex data
+             builtInId == spv::BuiltInPointSize || builtInId == spv::BuiltInClipDistance ||
+             builtInId == spv::BuiltInCullDistance)) {
+          // NOTE: We are handling vertex indexing of built-in inputs of geometry shader. For tessellation
+          // shader, vertex indexing is handled by "load"/"store" instruction lowering.
+          assert(!vertexIdx); // For per-vertex data, make a serial of per-vertex import calls.
 
-        assert(m_shaderStage == ShaderStageGeometry || m_shaderStage == ShaderStageTessControl ||
-               m_shaderStage == ShaderStageTessEval);
+          assert(m_shaderStage == ShaderStageGeometry || m_shaderStage == ShaderStageTessControl ||
+                 m_shaderStage == ShaderStageTessEval);
 
-        auto elemMeta = cast<Constant>(inOutMetaVal->getOperand(1));
-        auto elemTy = inOutTy->getArrayElementType();
+          auto elemMeta = cast<Constant>(inOutMetaVal->getOperand(1));
+          auto elemTy = inOutTy->getArrayElementType();
 
-        const uint64_t elemCount = inOutTy->getArrayNumElements();
-        for (unsigned idx = 0; idx < elemCount; ++idx) {
-          // Handle array elements recursively
-          vertexIdx = m_builder->getInt32(idx);
-          auto elem = addCallInstForInOutImport(elemTy, addrSpace, elemMeta, nullptr, maxLocOffset, nullptr, vertexIdx,
-                                                interpLoc, auxInterpValue, false);
-          inOutValue = m_builder->CreateInsertValue(inOutValue, elem, {idx});
-        }
-      } else {
-        // Array built-in without vertex indexing (ClipDistance/CullDistance).
-        lgc::InOutInfo inOutInfo;
-        inOutInfo.setArraySize(inOutTy->getArrayNumElements());
-        // For Barycentric interplotation
-        inOutInfo.setInterpLoc(interpLoc);
-        assert(!inOutMeta.PerPrimitive); // No per-primitive arrayed built-in
-        if (addrSpace == SPIRAS_Input) {
-          inOutValue = m_builder->CreateReadBuiltInInput(static_cast<lgc::BuiltInKind>(inOutMeta.Value), inOutInfo,
-                                                         vertexIdx, nullptr);
+          const uint64_t elemCount = inOutTy->getArrayNumElements();
+          for (unsigned idx = 0; idx < elemCount; ++idx) {
+            // Handle array elements recursively
+            vertexIdx = m_builder->getInt32(idx);
+            auto elem = addCallInstForInOutImport(elemTy, addrSpace, elemMeta, nullptr, maxLocOffset, nullptr,
+                                                  vertexIdx, interpLoc, auxInterpValue, false);
+            inOutValue = m_builder->CreateInsertValue(inOutValue, elem, {idx});
+          }
         } else {
-          inOutValue = m_builder->CreateReadBuiltInOutput(static_cast<lgc::BuiltInKind>(inOutMeta.Value), inOutInfo,
-                                                          vertexIdx, nullptr);
+          // Array built-in without vertex indexing (ClipDistance/CullDistance).
+          lgc::InOutInfo inOutInfo;
+          inOutInfo.setArraySize(inOutTy->getArrayNumElements());
+          // For Barycentric interplotation
+          inOutInfo.setInterpLoc(interpLoc);
+          assert(!inOutMeta.PerPrimitive); // No per-primitive arrayed built-in
+          if (addrSpace == SPIRAS_Input) {
+            inOutValue = m_builder->CreateReadBuiltInInput(static_cast<lgc::BuiltInKind>(inOutMeta.Value), inOutInfo,
+                                                           vertexIdx, nullptr);
+          } else {
+            inOutValue = m_builder->CreateReadBuiltInOutput(static_cast<lgc::BuiltInKind>(inOutMeta.Value), inOutInfo,
+                                                            vertexIdx, nullptr);
+          }
         }
       }
     } else {
