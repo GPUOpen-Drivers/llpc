@@ -141,7 +141,7 @@ Module *PipelineState::irLink(ArrayRef<Module *> modules, PipelineLink pipelineL
     pipelineModule = new Module("lgcPipeline", getContext());
     TargetMachine *targetMachine = getLgcContext()->getTargetMachine();
     pipelineModule->setTargetTriple(targetMachine->getTargetTriple().getTriple());
-    pipelineModule->setDataLayout(targetMachine->createDataLayout());
+    pipelineModule->setDataLayout(modules.front()->getDataLayout());
 
     Linker linker(*pipelineModule);
     for (Module *module : modules) {
