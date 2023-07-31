@@ -290,10 +290,12 @@ void SpirvLowerRayTracing::visitReportHitOp(ReportHitOp &inst) {
   for (uint32_t i = TraceParam::RayFlags; i < TraceParam::Count; ++i)
     args.push_back(m_traceParams[i]);
 
-  auto newCall = m_builder->CreateNamedCall(mangledName, m_builder->getInt1Ty(), args,
-                                            {Attribute::NoUnwind, Attribute::AlwaysInline});
+  auto retTy = ArrayType::get(m_builder->getInt1Ty(), 2);
+  auto retVal = m_builder->CreateNamedCall(mangledName, retTy, args, {Attribute::NoUnwind, Attribute::AlwaysInline});
 
-  inst.replaceAllUsesWith(newCall);
+  auto reportHitResult = m_builder->CreateExtractValue(retVal, 0);
+  auto funcRetFlag = m_builder->CreateExtractValue(retVal, 1);
+  inst.replaceAllUsesWith(reportHitResult);
 
   auto func = m_module->getFunction(mangledName);
 
@@ -378,7 +380,15 @@ void SpirvLowerRayTracing::visitReportHitOp(ReportHitOp &inst) {
 
     // Construct entry block
     m_builder->SetInsertPoint(entryBlock);
-    m_builder->CreateStore(m_builder->getTrue(), m_funcRetFlag);
+
+    Value *zero = m_builder->getInt32(0);
+
+    // Use a [2 x i1] to store results, index 0 for report hit result, index 1 for function return flag.
+    auto retPtr = m_builder->CreateAlloca(retTy);
+    auto reportHitResultPtr = m_builder->CreateGEP(retTy, retPtr, {zero, zero});
+    auto funcRetFlagPtr = m_builder->CreateGEP(retTy, retPtr, {zero, m_builder->getInt32(1)});
+
+    m_builder->CreateStore(m_builder->getTrue(), funcRetFlagPtr);
 
     // Create local copies
     auto tCurrentLocal = m_builder->CreateAlloca(m_builder->getFloatTy(), SPIRAS_Private);
@@ -478,17 +488,18 @@ void SpirvLowerRayTracing::visitReportHitOp(ReportHitOp &inst) {
 
     // Construct funcRet block
     m_builder->SetInsertPoint(funcRetBlock);
-    m_builder->CreateStore(m_builder->getFalse(), m_funcRetFlag);
+    m_builder->CreateStore(m_builder->getFalse(), funcRetFlagPtr);
     m_builder->CreateBr(endBlock);
 
     // Construct end block
     m_builder->SetInsertPoint(endBlock);
     Value *result =
         m_builder->CreateICmpNE(m_builder->CreateLoad(statusTy, status), m_builder->getInt32(RayHitStatus::Ignore));
-    m_builder->CreateRet(result);
+    m_builder->CreateStore(result, reportHitResultPtr);
+    m_builder->CreateRet(m_builder->CreateLoad(retTy, retPtr));
   }
 
-  processPostReportIntersection(m_entryPoint, newCall);
+  processPostReportIntersection(m_entryPoint, cast<Instruction>(funcRetFlag));
 
   m_callsToLower.push_back(&inst);
   m_funcsToLower.insert(inst.getCalledFunction());
@@ -511,7 +522,7 @@ PreservedAnalyses SpirvLowerRayTracing::run(Module &module, ModuleAnalysisManage
   initGlobalCallableData();
   Instruction *insertPos = nullptr;
 
-  const auto* rtState = m_context->getPipelineContext()->getRayTracingState();
+  const auto *rtState = m_context->getPipelineContext()->getRayTracingState();
   lgc::ComputeShaderMode mode = {};
   mode.workgroupSizeX = rtState->threadGroupSizeX;
   mode.workgroupSizeY = rtState->threadGroupSizeY;
@@ -568,11 +579,6 @@ PreservedAnalyses SpirvLowerRayTracing::run(Module &module, ModuleAnalysisManage
     if (m_shaderStage == ShaderStageRayTracingAnyHit || m_shaderStage == ShaderStageRayTracingClosestHit ||
         m_shaderStage == ShaderStageRayTracingIntersect) {
       m_worldToObjMatrix = nullptr;
-
-      if (m_shaderStage == ShaderStageRayTracingIntersect) {
-        m_funcRetFlag = new GlobalVariable(*m_module, m_builder->getInt1Ty(), false, GlobalValue::ExternalLinkage,
-                                           nullptr, "", nullptr, GlobalValue::NotThreadLocal, SPIRAS_Private);
-      }
     }
 
     for (auto globalIt = m_module->global_begin(); globalIt != m_module->global_end();) {
@@ -1628,8 +1634,8 @@ void SpirvLowerRayTracing::processTerminalFunc(Function *func, CallInst *callIns
 // Process termination after reportIntersection
 //
 // @param func : Processed function
-// @param callInst : CallInst of reportInspection
-void SpirvLowerRayTracing::processPostReportIntersection(Function *func, CallInst *callInst) {
+// @param inst : The instruction to split block after
+void SpirvLowerRayTracing::processPostReportIntersection(Function *func, Instruction *inst) {
   // .entry:
   // ...
   //    %check = call spir_func i1 @ReportIntersectionKHR
@@ -1647,15 +1653,15 @@ void SpirvLowerRayTracing::processPostReportIntersection(Function *func, CallIns
   // .split:
   // ...
 
-  auto currentBlock = callInst->getParent();
-  auto splitBlock = currentBlock->splitBasicBlock(callInst->getNextNonDebugInstruction(), ".split");
+  auto currentBlock = inst->getParent();
+  auto splitBlock = currentBlock->splitBasicBlock(inst->getNextNonDebugInstruction(), ".split");
   auto retBlock = BasicBlock::Create(*m_context, ".ret", func, splitBlock);
   m_builder->SetInsertPoint(retBlock);
   m_builder->CreateRetVoid();
 
   auto terminator = currentBlock->getTerminator();
   m_builder->SetInsertPoint(terminator);
-  m_builder->CreateCondBr(m_builder->CreateLoad(m_builder->getInt1Ty(), m_funcRetFlag), retBlock, splitBlock);
+  m_builder->CreateCondBr(inst, retBlock, splitBlock);
 
   terminator->dropAllReferences();
   terminator->eraseFromParent();

@@ -180,7 +180,7 @@ private:
   llvm::Value *getShaderIdentifier(ShaderStage stage, llvm::Value *shaderRecordIndex, llvm::Value *bufferDesc);
   void createDbgInfo(llvm::Module &module, llvm::Function *func);
   void processTerminalFunc(llvm::Function *func, llvm::CallInst *inst, RayHitStatus hitStatus);
-  void processPostReportIntersection(llvm::Function *func, llvm::CallInst *inst);
+  void processPostReportIntersection(llvm::Function *func, llvm::Instruction *inst);
   void initTraceParamsTy(unsigned attributeSize);
   void initGlobalPayloads();
   void initGlobalCallableData();
@@ -229,7 +229,6 @@ private:
   void visitDispatchRayIndex(lgc::rt::DispatchRaysIndexOp &inst);
 
   llvm::Value *m_traceParams[TraceParam::Count];                       // Trace ray set parameters
-  llvm::GlobalVariable *m_funcRetFlag = nullptr;                       // Function return flag
   llvm::Value *m_worldToObjMatrix = nullptr;                           // World to Object matrix
   llvm::GlobalVariable *m_globalPayload = nullptr;                     // Global payload variable
   llvm::GlobalVariable *m_globalCallableData = nullptr;                // Global callable data variable
