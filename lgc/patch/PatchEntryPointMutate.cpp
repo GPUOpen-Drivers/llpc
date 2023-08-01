@@ -1744,63 +1744,7 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
 // @param userDataArgs : Vector to add args to
 // @param builder : IRBuilder to get types from
 void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDataArgs, IRBuilder<> &builder) {
-
   auto userDataUsage = getUserDataUsage(m_shaderStage);
-  if (m_pipelineState->isUnlinked() && m_pipelineState->getUserDataNodes().empty()) {
-    // Shader compilation with no user data layout. Add descriptor sets directly from the user data usage
-    // gathered at the start of this pass.
-    for (unsigned descSetIdx = 0; descSetIdx != userDataUsage->descriptorTables.size(); ++descSetIdx) {
-      auto &descriptorTable = userDataUsage->descriptorTables[descSetIdx];
-      if (!descriptorTable.users.empty()) {
-        // Set the PAL metadata user data value to indicate that it needs modifying at link time.
-        assert(descSetIdx <= static_cast<unsigned>(UserDataMapping::DescriptorSetMax) -
-                                 static_cast<unsigned>(UserDataMapping::DescriptorSet0));
-        unsigned userDataValue = static_cast<unsigned>(UserDataMapping::DescriptorSet0) + descSetIdx;
-        userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "descTable" + Twine(descSetIdx), userDataValue,
-                                           &descriptorTable.entryArgIdx));
-      }
-    }
-
-    // Add push constants (if used).
-    // We add a potential unspilled arg for each separate dword offset of the push const at which there is a load.
-    // We already know that loads we have on our pushConstOffsets lists are at dword-aligned offset and dword-aligned
-    // size. We need to ensure that all loads are the same size, by removing ones that are bigger than the
-    // minimum size.
-    for (unsigned dwordOffset = 0, dwordEndOffset = userDataUsage->pushConstOffsets.size();
-         dwordOffset != dwordEndOffset; ++dwordOffset) {
-      UserDataNodeUsage &pushConstOffset = userDataUsage->pushConstOffsets[dwordOffset];
-      if (pushConstOffset.users.empty())
-        continue;
-
-      // Check that the load size does not overlap with the next used offset in the push constant.
-      bool haveOverlap = false;
-      unsigned endOffset =
-          std::min(dwordOffset + pushConstOffset.dwordSize, unsigned(userDataUsage->pushConstOffsets.size()));
-      for (unsigned followingOffset = dwordOffset + 1; followingOffset != endOffset; ++followingOffset) {
-        if (!userDataUsage->pushConstOffsets[followingOffset].users.empty()) {
-          haveOverlap = true;
-          break;
-        }
-      }
-      if (haveOverlap) {
-        userDataUsage->pushConstSpill = true;
-        continue;
-      }
-
-      // Add the arg (part of the push const) that we can potentially unspill.
-      assert(dwordOffset + pushConstOffset.dwordSize - 1 <=
-             static_cast<unsigned>(UserDataMapping::PushConstMax) - static_cast<unsigned>(UserDataMapping::PushConst0));
-      addUserDataArg(userDataArgs, static_cast<unsigned>(UserDataMapping::PushConst0) + dwordOffset,
-                     pushConstOffset.dwordSize, "pushConst" + Twine(dwordOffset), &pushConstOffset.entryArgIdx,
-                     builder);
-    }
-
-    return;
-  }
-
-  // We do have user data layout.
-  // Add entries from the root user data layout (not vertex buffer or streamout, and not unused ones).
-
   llvm::ArrayRef<ResourceNode> userDataNodes = m_pipelineState->getUserDataNodes();
   for (unsigned userDataNodeIdx = 0; userDataNodeIdx != userDataNodes.size(); ++userDataNodeIdx) {
     const ResourceNode &node = userDataNodes[userDataNodeIdx];
@@ -1818,21 +1762,10 @@ void PatchEntryPointMutate::addUserDataArgs(SmallVectorImpl<UserDataArg> &userDa
       if (!isComputeWithCalls() && (!descSetUsage || descSetUsage->users.empty()))
         break;
 
-      unsigned userDataValue = node.offsetInDwords;
-      if (m_pipelineState->getShaderOptions(m_shaderStage).updateDescInElf && m_shaderStage == ShaderStageFragment) {
-        // Put set number to register first, will update offset after merge ELFs
-        // For partial pipeline compile, only fragment shader needs to adjust offset of root descriptor.
-        // This is part of the original "partial pipeline compile" scheme, and it uses a magic number for the
-        // PAL metadata register value because the code to fix it up in llpcElfWriter.cpp just fixes up any
-        // register with the magic value, and hopes it lucks out by not getting a false positive.
-        // TODO: Remove all that code once the new "shader/part-pipeline compile" scheme can replace it.
-        static const unsigned DescRelocMagic = 0xA5A5A500;
-        userDataValue = DescRelocMagic | node.innerTable[0].set;
-      }
       // Add the arg (descriptor set pointer) that we can potentially unspill.
       unsigned *argIndex = descSetUsage == nullptr ? nullptr : &descSetUsage->entryArgIdx;
-      addUserDataArg(userDataArgs, userDataValue, node.sizeInDwords, "descTable" + Twine(userDataNodeIdx), argIndex,
-                     builder);
+      addUserDataArg(userDataArgs, node.offsetInDwords, node.sizeInDwords, "descTable" + Twine(userDataNodeIdx),
+                     argIndex, builder);
       break;
     }
 

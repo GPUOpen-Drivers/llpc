@@ -40,9 +40,11 @@ attributes #1 = { nounwind readonly }
 !lgc.unlinked = !{!10}
 !lgc.options = !{!0}
 !lgc.options.VS = !{!1}
+!lgc.user.data.nodes = !{!2}
 
 !0 = !{i32 739459867, i32 836497279, i32 -1935591037, i32 -652075177, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 2}
 !1 = !{i32 801932830, i32 600683540, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 15, i32 3}
+!2 = !{!"PushConst", i32 9, i32 0, i32 0, i32 18, i32 0, i32 0, i32 0}
 !10 = !{i32 1}
 
 ; VS-ISA-LABEL: amdgpu_vs_main_fetchless:
