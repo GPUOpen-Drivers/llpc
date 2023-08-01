@@ -67,7 +67,7 @@ public:
   static Result verifySpirvBinary(const BinaryData *spvBin);
 
   static bool isLlvmBitcode(const BinaryData *shaderBin);
-  static BinaryType getShaderBinaryType(BinaryData shaderBinary);
+  static Result getShaderBinaryType(BinaryData shaderBinary, BinaryType &binaryType);
   static Result getModuleData(const ShaderModuleBuildInfo *shaderInfo, llvm::MutableArrayRef<unsigned> codeBuffer,
                               Vkgc::ShaderModuleData &moduleData);
   static unsigned getCodeSize(const ShaderModuleBuildInfo *shaderInfo);

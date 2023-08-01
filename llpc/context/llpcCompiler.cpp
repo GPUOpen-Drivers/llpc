@@ -572,13 +572,15 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
                                        codeSize / sizeof(*allocBuf));
 
   memcpy(moduleData->hash, &hash, sizeof(hash));
-  ShaderModuleHelper::getModuleData(shaderInfo, codeBuffer, *moduleData);
+  Result result = ShaderModuleHelper::getModuleData(shaderInfo, codeBuffer, *moduleData);
   shaderOut->pModuleData = moduleData;
 
-  if (moduleData->binType == BinaryType::Spirv && cl::EnablePipelineDump)
+  if (moduleData->binType == BinaryType::Spirv && cl::EnablePipelineDump) {
+    // Dump the original input binary, since the offline tool will re-run BuildShaderModule
     PipelineDumper::DumpSpirvBinary(cl::PipelineDumpDir.c_str(), &shaderInfo->shaderBin, &hash);
+  }
 
-  return Result::Success;
+  return result;
 }
 
 // =====================================================================================================================
