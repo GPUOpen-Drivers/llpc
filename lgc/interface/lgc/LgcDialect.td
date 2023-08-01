@@ -290,3 +290,17 @@ def InputImportInterpolatedOp : LgcOp<"input.import.interpolated", [Memory<[]>, 
       this operation to map between HW and API.
   }];
 }
+
+def UserDataOp : LgcOp<"user.data", [Memory<[]>, WillReturn]> {
+  let arguments = (ins AttrI32:$offset);
+  let results = (outs ConstantPointer:$result);
+
+  let summary = "return a pointer into user data";
+  let description = [{
+    `offset` is a byte offset into user data
+
+    Attempting to access user data before `offset` via a pointer returned by this operation is undefined behavior.
+
+    This operation is used in some cases by OpenGL.
+  }];
+}

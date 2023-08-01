@@ -49,8 +49,6 @@ const static char StreamOutBufferStore[] = "lgc.streamoutbuffer.store";
 const static char ReconfigureLocalInvocationId[] = "lgc.reconfigure.local.invocation.id";
 const static char SwizzleWorkgroupId[] = "lgc.swizzle.workgroup.id";
 
-// Get pointer to spill table (as pointer to i8)
-const static char SpillTable[] = "lgc.spill.table";
 // Get pointer to push constant (as pointer type indicated by the return type)
 const static char PushConst[] = "lgc.push.const";
 // Get a descriptor that is in the root user data (as descriptor type indicated by the return type).
