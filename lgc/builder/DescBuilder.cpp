@@ -403,29 +403,6 @@ Value *BuilderImpl::getStride(ResourceNodeType descType, uint64_t descSet, unsig
 }
 
 // =====================================================================================================================
-// Returns the reloc string suffix for the given resource type.
-// This is used with `reloc::DescriptorOffset` and must match the parsing logic in RelocHandler.cpp.
-//
-// @param type : Resource type
-static StringRef GetRelocTypeSuffix(ResourceNodeType type) {
-  switch (type) {
-  case ResourceNodeType::DescriptorSampler:
-    return "_s";
-  case ResourceNodeType::DescriptorResource:
-    return "_r";
-  case ResourceNodeType::DescriptorBuffer:
-  case ResourceNodeType::DescriptorBufferCompact:
-    return "_b";
-  case ResourceNodeType::DescriptorTexelBuffer:
-    return "_t";
-  case ResourceNodeType::DescriptorFmask:
-    return "_f";
-  default:
-    return "_x";
-  }
-}
-
-// =====================================================================================================================
 // Get a pointer to a descriptor, as a pointer to i8
 //
 // @param concreteType : Concrete resource type
@@ -491,67 +468,21 @@ Value *BuilderImpl::getDescPtr(ResourceNodeType concreteType, ResourceNodeType a
     // Ensure we mark spill table usage.
     descPtr = GetSpillTablePtr();
     getPipelineState()->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords);
-  } else if (!node && !topNode &&
-             (concreteType == ResourceNodeType::DescriptorBuffer ||
-              concreteType == ResourceNodeType::DescriptorBufferCompact)) {
-    // If we do not have user data layout info (topNode and node are nullptr), then
-    // we do not know at compile time whether a DescriptorBuffer is in the root table or the table for its
-    // descriptor set, so we need to generate a select between the two, where the condition is a reloc.
-    // If the descriptor ends up in the root table (top-level), a value from the spill table will be used.
-    // The linking code has to take care of marking PAL metadata for user spill usage.
-
-    // Since the descriptor pointers will be later formed by bitcasting v2i32 to i8* we bitcast them to v2i32
-    // here. This enables the middle-end to eliminate i8* before doing the instruction selection and reason about high
-    // and low parts of the pointers producing better code overall.
-    Value *spillDescPtr = GetSpillTablePtr();
-
-    if (descSet == InternalDescriptorSetId) {
-      // If descriptor set is InternalDescriptorSetId, this is a internal resource node, it is a root node
-      // and its type is ResourceNodeType::DescriptorBufferCompact. We use spillTable to load it.
-      descPtr = spillDescPtr;
-      m_pipelineState->getPalMetadata()->setUserDataSpillUsage(0);
-    } else {
-      // Bitcast the pointer to v2i32.
-      spillDescPtr = CreatePtrToInt(spillDescPtr, getInt64Ty());
-      spillDescPtr = CreateBitCast(spillDescPtr, FixedVectorType::get(getInt32Ty(), 2));
-
-      Value *descriptorTableDescPtr = GetDescriptorSetPtr();
-      // Bitcast the pointer to v2i32.
-      descriptorTableDescPtr = CreatePtrToInt(descriptorTableDescPtr, getInt64Ty());
-      descriptorTableDescPtr = CreateBitCast(descriptorTableDescPtr, FixedVectorType::get(getInt32Ty(), 2));
-
-      Value *reloc = CreateRelocationConstant(reloc::DescriptorUseSpillTable + Twine(descSet) + "_" + Twine(binding));
-      Value *useSpillTable = CreateICmpNE(reloc, getInt32(0));
-      descPtr = CreateSelect(useSpillTable, spillDescPtr, descriptorTableDescPtr);
-      descPtr = CreateBitCast(descPtr, getInt64Ty());
-      descPtr = CreateIntToPtr(descPtr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST));
-    }
   } else {
     descPtr = GetDescriptorSetPtr();
   }
 
-  // Add on the byte offset of the descriptor.
-  Value *offset = nullptr;
-  if (!node) {
-    // Shader compilation with no user data layout. Get the offset for the descriptor using a reloc. The
-    // reloc symbol name needs to contain the descriptor set and binding, and, for image, fmask or sampler,
-    // whether it is a sampler.
-    offset = CreateRelocationConstant(reloc::DescriptorOffset + Twine(descSet) + "_" + Twine(binding) +
-                                      GetRelocTypeSuffix(concreteType));
-  } else {
-    // Get the offset for the descriptor. Where we are getting the second part of a combined resource,
-    // add on the size of the first part.
-    unsigned offsetInDwords = node->offsetInDwords;
-    offsetInDwords += (binding - node->binding) * node->stride;
+  // Get the offset for the descriptor. Where we are getting the second part of a combined resource,
+  // add on the size of the first part.
+  unsigned offsetInDwords = node->offsetInDwords;
+  offsetInDwords += (binding - node->binding) * node->stride;
 
-    unsigned offsetInBytes = offsetInDwords * 4;
-    if (concreteType == ResourceNodeType::DescriptorSampler &&
-        node->concreteType == ResourceNodeType::DescriptorCombinedTexture)
-      offsetInBytes += DescriptorSizeResource;
-    offset = getInt32(offsetInBytes);
-  }
+  unsigned offsetInBytes = offsetInDwords * 4;
+  if (concreteType == ResourceNodeType::DescriptorSampler &&
+      node->concreteType == ResourceNodeType::DescriptorCombinedTexture)
+    offsetInBytes += DescriptorSizeResource;
 
-  return CreateAddByteOffset(descPtr, offset);
+  return CreateAddByteOffset(descPtr, getInt32(offsetInBytes));
 }
 
 // =====================================================================================================================
