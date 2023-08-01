@@ -691,6 +691,19 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
               self.m_pipelineState->getPalMetadata()->setUserDataSpillUsage(op.getOffset() / 4);
             }
           })
+          .add<LoadUserDataOp>([](PatchEntryPointMutate &self, LoadUserDataOp &op) {
+            ShaderStage stage = getShaderStage(op.getFunction());
+            assert(stage != ShaderStageCopyShader);
+            auto *userDataUsage = self.getUserDataUsage(stage);
+
+            UserDataLoad load;
+            load.load = &op;
+            load.dwordOffset = op.getOffset() / 4;
+            load.dwordSize = self.m_module->getDataLayout().getTypeStoreSize(op.getType()) / 4;
+
+            userDataUsage->loads.push_back(load);
+            userDataUsage->addLoad(load.dwordOffset, load.dwordSize);
+          })
           .build();
 
   visitor.visit(*this, *module);
@@ -698,23 +711,6 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
   for (Function &func : *module) {
     if (!func.isDeclaration())
       continue;
-    if (func.getName().startswith(lgcName::RootDescriptor)) {
-      for (User *user : func.users()) {
-        auto *op = cast<CallInst>(user);
-        ShaderStage stage = getShaderStage(op->getFunction());
-        assert(stage != ShaderStageCopyShader);
-        auto *userDataUsage = getUserDataUsage(stage);
-
-        UserDataLoad load;
-        load.load = op;
-        load.dwordOffset = cast<ConstantInt>(op->getArgOperand(0))->getZExtValue();
-        load.dwordSize = m_module->getDataLayout().getTypeStoreSize(op->getType()) / 4;
-
-        userDataUsage->loads.push_back(load);
-        userDataUsage->addLoad(load.dwordOffset, load.dwordSize);
-      }
-      continue;
-    }
 
     if (func.getName().startswith(lgcName::SpecialUserData)) {
       for (User *user : func.users()) {
