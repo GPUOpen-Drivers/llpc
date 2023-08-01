@@ -3,7 +3,7 @@
 
 ; CHECK: [[desc0:%[0-9]+]] = call ptr addrspace(4) @lgc.descriptor.table.addr(i32 6
 ; CHECK-NEXT: %{{.*}} = getelementptr i8, ptr addrspace(4) [[desc0]], i32 16
-; CHECK: call <2 x i32> @lgc.root.descriptor.v2i32(i32 6)
+; CHECK: call <2 x i32> @lgc.load.user.data.v2i32(i32 24)
 ; CHECK: call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32>
 ; CHECK: [[varindex0:%[0-9]+]] = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32>
 ; CHECK: [[varindex1:%[0-9]+]] = load i32, ptr addrspace(7) [[varindex0]], align 4

@@ -49,9 +49,6 @@ const static char StreamOutBufferStore[] = "lgc.streamoutbuffer.store";
 const static char ReconfigureLocalInvocationId[] = "lgc.reconfigure.local.invocation.id";
 const static char SwizzleWorkgroupId[] = "lgc.swizzle.workgroup.id";
 
-// Get a descriptor that is in the root user data (as descriptor type indicated by the return type).
-// The arg is the dword offset of the node in the root user data layout.
-const static char RootDescriptor[] = "lgc.root.descriptor";
 // Get pointer to the descriptor table for the given resource. First arg is the descriptor set number; second arg
 // is the binding number; third arg is the value to use for the high half of the address, or HighAddrPc to use PC.
 const static char DescriptorTableAddr[] = "lgc.descriptor.table.addr";

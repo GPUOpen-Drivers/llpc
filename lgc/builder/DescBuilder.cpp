@@ -124,14 +124,15 @@ Value *BuilderImpl::CreateBufferDesc(uint64_t descSet, unsigned binding, Value *
 
     if (node == topNode && isa<Constant>(descIndex) && node->concreteType != ResourceNodeType::InlineBuffer) {
       // Handle a descriptor in the root table (a "dynamic descriptor") specially, as long as it is not variably
-      // indexed and is not an InlineBuffer. This lgc.root.descriptor call is by default lowered in
-      // PatchEntryPointMutate into a load from the spill table, but it might be able to "unspill" it to
-      // directly use shader entry SGPRs.
-      // TODO: Handle root InlineBuffer specially in a similar way to PushConst. The default handling is
-      // suboptimal as it always loads from the spill table.
-      Type *descTy = getDescTy(node->concreteType);
-      std::string callName = lgcName::RootDescriptor;
-      addTypeMangling(descTy, {}, callName);
+      // indexed and is not an InlineBuffer.
+      Type *descTy;
+      if (return64Address) {
+        assert(node->concreteType == ResourceNodeType::DescriptorBufferCompact);
+        descTy = getInt64Ty();
+      } else {
+        descTy = getDescTy(node->concreteType);
+      }
+
       unsigned dwordSize = descTy->getPrimitiveSizeInBits() / 32;
       unsigned dwordOffset = cast<ConstantInt>(descIndex)->getZExtValue() * dwordSize;
       if (dwordOffset + dwordSize > node->sizeInDwords) {
@@ -140,12 +141,10 @@ Value *BuilderImpl::CreateBufferDesc(uint64_t descSet, unsigned binding, Value *
       } else {
         dwordOffset += node->offsetInDwords;
         dwordOffset += (binding - node->binding) * node->stride;
-        desc = CreateNamedCall(callName, descTy, getInt32(dwordOffset), Attribute::ReadNone);
+        desc = create<LoadUserDataOp>(descTy, dwordOffset * 4);
       }
-      if (return64Address) {
-        assert(node->concreteType == ResourceNodeType::DescriptorBufferCompact);
-        return CreateBitCast(desc, getInt64Ty());
-      }
+      if (return64Address)
+        return desc;
     } else if (node->concreteType == ResourceNodeType::InlineBuffer) {
       // Handle an inline buffer specially. Get a pointer to it, then expand to a descriptor.
       Value *descPtr = getDescPtr(node->concreteType, node->abstractType, descSet, binding, topNode, node);

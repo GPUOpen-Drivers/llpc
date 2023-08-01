@@ -291,6 +291,24 @@ def InputImportInterpolatedOp : LgcOp<"input.import.interpolated", [Memory<[]>, 
   }];
 }
 
+def LoadUserDataOp : LgcOp<"load.user.data", [Memory<[]>, WillReturn]> {
+  let arguments = (ins AttrI32:$offset);
+  let results = (outs value:$result);
+
+  let defaultBuilderHasExplicitResultType = true;
+
+  let verifier = [
+    (or (I32 $result),
+        (I64 $result),
+        (FixedVectorType $result, I32, any)),
+  ];
+
+  let summary = "load from a constant offset in the user data";
+  let description = [{
+    `offset` is the offset into the user data table, in bytes. It must be a multiple of 4.
+  }];
+}
+
 def UserDataOp : LgcOp<"user.data", [Memory<[]>, WillReturn]> {
   let arguments = (ins AttrI32:$offset);
   let results = (outs ConstantPointer:$result);
