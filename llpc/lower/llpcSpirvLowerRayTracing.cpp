@@ -69,8 +69,6 @@ const char *TraceRayKHR = "_cs_";
 const char *TraceRaySetTraceParams = "TraceRaySetTraceParams";
 const char *ShaderTable = "ShaderTable";
 static const char *HitAttribute = "HitAttribute";
-static const char *ShaderRecordBuffer = "ShaderRecordBuffer";
-static const char *GlobalPayload = "GlobalPayload";
 static const char *IncomingPayLoad = "IncomingRayPayloadKHR";
 static const char *IncomingCallableData = "IncomingCallableDataKHR";
 static const char *CallAnyHitShader = "AmdTraceRayCallAnyHitShader";
@@ -623,6 +621,8 @@ PreservedAnalyses SpirvLowerRayTracing::run(Module &module, ModuleAnalysisManage
                               .add(&SpirvLowerRayTracing::visitGeometryIndexPtrOp)
                               .add(&SpirvLowerRayTracing::visitPrimitiveIndexPtrOp)
                               .add(&SpirvLowerRayTracing::visitInstanceInclusionMaskPtrOp)
+                              .add(&SpirvLowerRayTracing::visitShaderIndexOp)
+                              .add(&SpirvLowerRayTracing::visitGetShaderRecordBufferPtrOp)
                               .build();
 
     visitor.visit(*this, *m_module);
@@ -1069,74 +1069,6 @@ void SpirvLowerRayTracing::createShaderSelection(Function *func, BasicBlock *ent
 
     BranchInst::Create(endBlock, shaderBlock);
   }
-}
-
-// =====================================================================================================================
-// Process global variable shader record buffer
-//
-// @param global : Global variable corresponding to shader record buffer
-// @param bufferDesc: Dispatch ray buffer descriptor
-// @param tableIndex : Shader table record index
-// @param insertPos : Where to insert instruction
-void SpirvLowerRayTracing::processShaderRecordBuffer(GlobalVariable *global, Value *bufferDesc, Value *tableIndex,
-                                                     Instruction *insertPos) {
-  m_builder->SetInsertPoint(insertPos);
-  Value *tableAddr = nullptr;
-  Value *tableStride = nullptr;
-
-  switch (m_shaderStage) {
-  case ShaderStageRayTracingRayGen: {
-    tableAddr = loadShaderTableVariable(ShaderTable::RayGenTableAddr, bufferDesc);
-    tableStride = m_builder->getInt32(0);
-    break;
-  }
-  case ShaderStageRayTracingClosestHit:
-  case ShaderStageRayTracingAnyHit:
-  case ShaderStageRayTracingIntersect: {
-    tableAddr = loadShaderTableVariable(ShaderTable::HitGroupTableAddr, bufferDesc);
-    tableStride = loadShaderTableVariable(ShaderTable::HitGroupTableStride, bufferDesc);
-    break;
-  }
-  case ShaderStageRayTracingCallable: {
-    tableAddr = loadShaderTableVariable(ShaderTable::CallableTableAddr, bufferDesc);
-    tableStride = loadShaderTableVariable(ShaderTable::CallableTableStride, bufferDesc);
-    break;
-  }
-  case ShaderStageRayTracingMiss: {
-    tableAddr = loadShaderTableVariable(ShaderTable::MissTableAddr, bufferDesc);
-    tableStride = loadShaderTableVariable(ShaderTable::MissTableStride, bufferDesc);
-    break;
-  }
-  default: {
-    llvm_unreachable("Should never be called!");
-    break;
-  }
-  }
-
-  assert(tableAddr);
-  assert(tableStride);
-
-  // ShaderIdsSize should be 4 * 8 bytes = 32 bytes
-  const unsigned shaderIdsSize = sizeof(Vkgc::RayTracingShaderIdentifier);
-  Value *shaderIdsSizeVal = m_builder->getInt32(shaderIdsSize);
-
-  // Byte offset = (tableStride * tableIndex) + shaderIdsSize
-  Value *offset = m_builder->CreateMul(tableIndex, tableStride);
-  offset = m_builder->CreateAdd(offset, shaderIdsSizeVal);
-
-  // Zero-extend offset value to 64 bit
-  offset = m_builder->CreateZExt(offset, m_builder->getInt64Ty());
-
-  // Final addr
-  tableAddr = m_builder->CreateAdd(tableAddr, offset);
-
-  // Convert to the global shader record buffer type pointer
-  assert(global->getAddressSpace() == SPIRAS_Global);
-  tableAddr = m_builder->CreateIntToPtr(tableAddr, global->getType());
-
-  removeConstantExpr(m_context, global);
-  global->replaceAllUsesWith(tableAddr);
-  global->eraseFromParent();
 }
 
 // =====================================================================================================================
@@ -2999,6 +2931,86 @@ void SpirvLowerRayTracing::visitInstanceInclusionMaskPtrOp(lgc::rt::InstanceIncl
   m_funcsToLower.insert(inst.getCalledFunction());
 }
 
+// Visits "lgc.rt.shader.index" instructions
+//
+// @param inst : The instruction
+void SpirvLowerRayTracing::visitShaderIndexOp(lgc::rt::ShaderIndexOp &inst) {
+  // FIXME: This could be wrong if lgc.rt.shader.index is not in the same function as m_shaderRecordIndex, but is
+  // this really the case?
+  inst.replaceAllUsesWith(m_shaderRecordIndex);
+
+  m_callsToLower.push_back(&inst);
+  m_funcsToLower.insert(inst.getCalledFunction());
+}
+
+// =====================================================================================================================
+// Visits "lgc.rt.get.shader.record.buffer.ptr" instructions
+//
+// @param inst : The instruction
+void SpirvLowerRayTracing::visitGetShaderRecordBufferPtrOp(lgc::rt::GetShaderRecordBufferPtrOp &inst) {
+  m_builder->SetInsertPoint(m_insertPosPastInit);
+
+  auto tableIndex = inst.getShaderIndex();
+
+  Value *tableAddr = nullptr;
+  Value *tableStride = nullptr;
+
+  switch (m_shaderStage) {
+  case ShaderStageRayTracingRayGen: {
+    tableAddr = loadShaderTableVariable(ShaderTable::RayGenTableAddr, m_dispatchRaysInfoDesc);
+    tableStride = m_builder->getInt32(0);
+    break;
+  }
+  case ShaderStageRayTracingClosestHit:
+  case ShaderStageRayTracingAnyHit:
+  case ShaderStageRayTracingIntersect: {
+    tableAddr = loadShaderTableVariable(ShaderTable::HitGroupTableAddr, m_dispatchRaysInfoDesc);
+    tableStride = loadShaderTableVariable(ShaderTable::HitGroupTableStride, m_dispatchRaysInfoDesc);
+    break;
+  }
+  case ShaderStageRayTracingCallable: {
+    tableAddr = loadShaderTableVariable(ShaderTable::CallableTableAddr, m_dispatchRaysInfoDesc);
+    tableStride = loadShaderTableVariable(ShaderTable::CallableTableStride, m_dispatchRaysInfoDesc);
+    break;
+  }
+  case ShaderStageRayTracingMiss: {
+    tableAddr = loadShaderTableVariable(ShaderTable::MissTableAddr, m_dispatchRaysInfoDesc);
+    tableStride = loadShaderTableVariable(ShaderTable::MissTableStride, m_dispatchRaysInfoDesc);
+    break;
+  }
+  default: {
+    llvm_unreachable("Should never be called!");
+    break;
+  }
+  }
+
+  assert(tableAddr);
+  assert(tableStride);
+
+  // ShaderIdsSize should be 4 * 8 bytes = 32 bytes
+  const unsigned shaderIdsSize = sizeof(Vkgc::RayTracingShaderIdentifier);
+  Value *shaderIdsSizeVal = m_builder->getInt32(shaderIdsSize);
+
+  // Byte offset = (tableStride * tableIndex) + shaderIdsSize
+  Value *offset = m_builder->CreateMul(tableIndex, tableStride);
+  offset = m_builder->CreateAdd(offset, shaderIdsSizeVal);
+
+  // Zero-extend offset value to 64 bit
+  offset = m_builder->CreateZExt(offset, m_builder->getInt64Ty());
+
+  // Final addr
+  tableAddr = m_builder->CreateAdd(tableAddr, offset);
+
+  Type *gpuAddrAsPtrTy = PointerType::get(m_builder->getContext(), SPIRAS_Global);
+  tableAddr = m_builder->CreateIntToPtr(tableAddr, gpuAddrAsPtrTy);
+
+  inst.replaceAllUsesWith(tableAddr);
+
+  m_callsToLower.push_back(&inst);
+  m_funcsToLower.insert(inst.getCalledFunction());
+}
+
+// =====================================================================================================================
 // Visit alloca instructions
 //
 // @param alloca : the instruction

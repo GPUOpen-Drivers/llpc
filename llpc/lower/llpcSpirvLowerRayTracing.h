@@ -69,6 +69,8 @@ class RayFlagsPtrOp;
 class GeometryIndexPtrOp;
 class PrimitiveIndexPtrOp;
 class InstanceInclusionMaskPtrOp;
+class ShaderIndexOp;
+class GetShaderRecordBufferPtrOp;
 } // namespace lgc::rt
 
 namespace lgc {
@@ -277,6 +279,8 @@ private:
   void visitGeometryIndexPtrOp(lgc::rt::GeometryIndexPtrOp &inst);
   void visitPrimitiveIndexPtrOp(lgc::rt::PrimitiveIndexPtrOp &inst);
   void visitInstanceInclusionMaskPtrOp(lgc::rt::InstanceInclusionMaskPtrOp &inst);
+  void visitShaderIndexOp(lgc::rt::ShaderIndexOp &inst);
+  void visitGetShaderRecordBufferPtrOp(lgc::rt::GetShaderRecordBufferPtrOp &inst);
 
   void visitAlloca(llvm::AllocaInst &inst);
 

@@ -64,6 +64,7 @@ def V3I32 : TgConstant<(FixedVectorType I32, 3)>, Type;
 def A4V3F32 : TgConstant<(ArrayType V3F32, 4)>, Type;
 def A3V3F32 : TgConstant<(ArrayType V3F32, 3)>, Type;
 
+def GlobalPointer : TgConstant<(PointerType 1)>, Type;
 def PrivatePointer : TgConstant<(PointerType 5)>, Type;
 
 class LgcRtOp<string mnemonic_, list<Trait> traits_ = []>
@@ -271,6 +272,33 @@ def ReportHitOp : LgcRtOp<"report.hit", []> {
     - attributes: User-defined intersection attributes.
 
     - size: Size of the data pointed to by attributes (in bytes)
+  }];
+}
+
+// =========================================================================================================
+def ShaderIndexOp : LgcRtOp<"shader.index", [Memory<[]>, WillReturn]> {
+  let arguments = (ins);
+  let results = (outs I32:$result);
+
+  let summary = "Return the current shader index";
+  let description = [{
+    Return the current shader index.
+
+    The shader index is used to index into the shader binding table, i.e. the table which backs the
+    Vulkan shader record buffers or the DX12 local root signatures.
+  }];
+}
+
+// =========================================================================================================
+def GetShaderRecordBufferPtrOp : LgcRtOp<"get.shader.record.buffer.ptr", [Memory<[]>, WillReturn]> {
+  let arguments = (ins I32:$shaderIndex);
+  let results = (outs GlobalPointer:$ptr);
+
+  let summary = "Return the pointer to shader record buffer";
+  let description = [{
+    Return the pointer to shader record buffer.
+
+    - shaderIndex: The value used to index into the shader binding table.
   }];
 }
 

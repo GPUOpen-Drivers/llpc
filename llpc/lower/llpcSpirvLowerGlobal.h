@@ -77,6 +77,7 @@ private:
   void lowerUniformConstants();
   void lowerAliasedVal();
   void lowerEdgeFlag();
+  void lowerShaderRecordBuffer();
 
   void cleanupReturnBlock();
 

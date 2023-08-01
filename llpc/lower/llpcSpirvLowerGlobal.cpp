@@ -256,6 +256,7 @@ bool SpirvLowerGlobal::runImpl(Module &module) {
   lowerTaskPayload();
   lowerUniformConstants();
   lowerAliasedVal();
+  lowerShaderRecordBuffer();
 
   cleanupReturnBlock();
 
@@ -2442,6 +2443,33 @@ void SpirvLowerGlobal::addCallInstForXfbOutput(const ShaderInOutMetadata &output
                            << "xfbStride = " << xfbStride << ", "
                            << "xfbOffset = " << xfbOffset << ", "
                            << "streamID = " << outputMeta.StreamId << "\n");
+}
+
+// =====================================================================================================================
+// Lowers shader record buffer.
+void SpirvLowerGlobal::lowerShaderRecordBuffer() {
+  // Note: Only ray tracing pipeline has shader record buffer
+  if (m_context->getPipelineType() != PipelineType::RayTracing)
+    return;
+
+  static const char *ShaderRecordBuffer = "ShaderRecordBuffer";
+  for (GlobalVariable &global : m_module->globals()) {
+    if (!global.getName().startswith(ShaderRecordBuffer))
+      continue;
+
+    removeConstantExpr(m_context, &global);
+
+    m_builder->SetInsertPointPastAllocas(m_entryPoint);
+    auto shaderRecordBufferPtr = m_builder->create<GetShaderRecordBufferPtrOp>(m_builder->create<ShaderIndexOp>());
+
+    global.mutateType(shaderRecordBufferPtr->getType()); // To clear address space for pointer to make replacement valid
+    global.replaceAllUsesWith(shaderRecordBufferPtr);
+    global.dropAllReferences();
+    global.eraseFromParent();
+
+    // There should be only one shader record buffer only
+    return;
+  }
 }
 
 } // namespace Llpc
