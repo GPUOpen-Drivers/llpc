@@ -204,13 +204,16 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   // Lower Glsl compatibility variables and operations
   passMgr.addPass(LowerGLCompatibility());
 
+  // Lower SPIR-V global variables, inputs, and outputs
+  passMgr.addPass(SpirvLowerGlobal());
+
+  // Lower SPIR-V ray tracing related stuff, including entry point generation, lgc.rt dialect handling, some of
+  // lgc.gpurt dialect handling.
+  // And do inlining after SpirvLowerRayTracing as it will produce some extra functions.
   if (rayTracing) {
     passMgr.addPass(SpirvLowerRayTracing());
     passMgr.addPass(AlwaysInlinerPass());
   }
-
-  // Lower SPIR-V global variables, inputs, and outputs
-  passMgr.addPass(SpirvLowerGlobal());
 
   // Lower SPIR-V constant immediate store.
   passMgr.addPass(SpirvLowerConstImmediateStore());
