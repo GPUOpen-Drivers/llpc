@@ -349,10 +349,9 @@ Value *BuilderImpl::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNode
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateLoadPushConstantsPtr(const Twine &instName) {
   Value *ptr;
-  const bool isIndirect = getPipelineState()->getOptions().resourceLayoutScheme == ResourceLayoutScheme::Indirect;
-  if (isIndirect) {
-    const ResourceNode *topNode = m_pipelineState->findPushConstantResourceNode(m_shaderStage);
-    assert(topNode);
+  const ResourceNode *topNode = m_pipelineState->findPushConstantResourceNode(m_shaderStage);
+  assert(topNode);
+  if (topNode->concreteType == ResourceNodeType::DescriptorTableVaPtr) {
     const ResourceNode subNode = topNode->innerTable[0];
     Value *highHalf = getInt32(HighAddrPc);
     ptr = CreateNamedCall(lgcName::DescriptorTableAddr, getPtrTy(ADDR_SPACE_CONST),
@@ -361,12 +360,8 @@ Value *BuilderImpl::CreateLoadPushConstantsPtr(const Twine &instName) {
                            getInt32(subNode.binding), highHalf},
                           Attribute::ReadNone);
   } else {
-    // Get the push const pointer. If subsequent code only uses this with constant GEPs and loads,
-    // then PatchEntryPointMutate might be able to "unspill" it so the code uses shader entry SGPRs
-    // directly instead of loading from the spill table.
-    std::string callName = lgcName::PushConst;
-    addTypeMangling(getPtrTy(ADDR_SPACE_CONST), {}, callName);
-    ptr = CreateNamedCall(callName, getPtrTy(ADDR_SPACE_CONST), {}, Attribute::ReadOnly);
+    assert(topNode->concreteType == ResourceNodeType::PushConst);
+    ptr = create<UserDataOp>(topNode->offsetInDwords * 4);
   }
   ptr->setName(instName);
   return ptr;
