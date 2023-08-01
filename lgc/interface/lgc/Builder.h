@@ -893,9 +893,8 @@ public:
   // Create a load of the push constants pointer.
   // This returns a pointer to the ResourceNodeType::PushConst resource in the top-level user data table.
   //
-  // @param returnTy : Return type of the load
   // @param instName : Name to give instruction(s)
-  llvm::Value *CreateLoadPushConstantsPtr(llvm::Type *returnTy, const llvm::Twine &instName = "");
+  llvm::Value *CreateLoadPushConstantsPtr(const llvm::Twine &instName = "");
 
   // -----------------------------------------------------------------------------------------------------------------
   // Image operations

@@ -301,7 +301,7 @@ public:
                                 unsigned binding, const llvm::Twine &instName = "");
 
   // Create a load of the push constants pointer.
-  llvm::Value *CreateLoadPushConstantsPtr(llvm::Type *returnTy, const llvm::Twine &instName = "");
+  llvm::Value *CreateLoadPushConstantsPtr(const llvm::Twine &instName = "");
 
   // Calculate a buffer descriptor for an inline buffer
   llvm::Value *buildInlineBufferDesc(llvm::Value *descPtr);

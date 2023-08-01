@@ -415,7 +415,7 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     );
 
   case BuilderOpcode::LoadPushConstantsPtr: {
-    return m_builder->CreateLoadPushConstantsPtr(call->getType()); // returnTy
+    return m_builder->CreateLoadPushConstantsPtr();
   }
 
   // Replayer implementations of ImageBuilder methods

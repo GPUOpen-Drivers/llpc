@@ -2177,11 +2177,7 @@ void SpirvLowerGlobal::lowerPushConsts() {
     for (Function *const func : funcsUsedIn) {
       m_builder->SetInsertPointPastAllocas(func);
 
-      MDNode *metaNode = global.getMetadata(gSPIRVMD::PushConst);
-      auto pushConstSize = mdconst::dyn_extract<ConstantInt>(metaNode->getOperand(0))->getZExtValue();
-      Type *const pushConstantsType = ArrayType::get(m_builder->getInt8Ty(), pushConstSize);
-      Value *pushConstants =
-          m_builder->CreateLoadPushConstantsPtr(pushConstantsType->getPointerTo(m_builder->getAddrSpaceConst()));
+      Value *pushConstants = m_builder->CreateLoadPushConstantsPtr();
 
       auto addrSpace = pushConstants->getType()->getPointerAddressSpace();
       Type *const castType = global.getValueType()->getPointerTo(addrSpace);
