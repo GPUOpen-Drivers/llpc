@@ -1100,10 +1100,9 @@ Value *Builder::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType
 // =====================================================================================================================
 // Create a load of the spill table pointer for push constants.
 //
-// @param returnTy : Return type of the load
 // @param instName : Name to give instruction(s)
-Value *Builder::CreateLoadPushConstantsPtr(Type *returnTy, const Twine &instName) {
-  return record(BuilderOpcode::LoadPushConstantsPtr, returnTy, {}, instName);
+Value *Builder::CreateLoadPushConstantsPtr(const Twine &instName) {
+  return record(BuilderOpcode::LoadPushConstantsPtr, getPtrTy(ADDR_SPACE_CONST), {}, instName);
 }
 
 // =====================================================================================================================

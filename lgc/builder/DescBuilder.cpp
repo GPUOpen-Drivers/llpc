@@ -346,39 +346,30 @@ Value *BuilderImpl::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNode
 // This returns a pointer to the ResourceNodeType::PushConst resource in the top-level user data table.
 // The type passed must have the correct size for the push constants.
 //
-// @param returnTy : Return type of the load
 // @param instName : Name to give instruction(s)
-Value *BuilderImpl::CreateLoadPushConstantsPtr(Type *returnTy, const Twine &instName) {
+Value *BuilderImpl::CreateLoadPushConstantsPtr(const Twine &instName) {
+  Value *ptr;
   const bool isIndirect = getPipelineState()->getOptions().resourceLayoutScheme == ResourceLayoutScheme::Indirect;
   if (isIndirect) {
-    // Push const is the sub node of DescriptorTableVaPtr.
-    if (m_pipelineState->getUserDataNodes().empty()) {
-      Value *highHalf = getInt32(HighAddrPc);
-      Value *descPtr = CreateNamedCall(lgcName::DescriptorTableAddr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
-                                       {getInt32(unsigned(ResourceNodeType::PushConst)),
-                                        getInt32(unsigned(ResourceNodeType::PushConst)),
-                                        getInt64(InternalDescriptorSetId), getInt32(0), highHalf},
-                                       Attribute::ReadNone);
-      return CreateBitCast(descPtr, returnTy);
-    }
-
     const ResourceNode *topNode = m_pipelineState->findPushConstantResourceNode(m_shaderStage);
     assert(topNode);
     const ResourceNode subNode = topNode->innerTable[0];
     Value *highHalf = getInt32(HighAddrPc);
-    Value *descPtr = CreateNamedCall(lgcName::DescriptorTableAddr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
-                                     {getInt32(unsigned(ResourceNodeType::PushConst)),
-                                      getInt32(unsigned(ResourceNodeType::PushConst)), getInt64(subNode.set),
-                                      getInt32(subNode.binding), highHalf},
-                                     Attribute::ReadNone);
-    return CreateBitCast(descPtr, returnTy);
+    ptr = CreateNamedCall(lgcName::DescriptorTableAddr, getPtrTy(ADDR_SPACE_CONST),
+                          {getInt32(unsigned(ResourceNodeType::PushConst)),
+                           getInt32(unsigned(ResourceNodeType::PushConst)), getInt64(subNode.set),
+                           getInt32(subNode.binding), highHalf},
+                          Attribute::ReadNone);
+  } else {
+    // Get the push const pointer. If subsequent code only uses this with constant GEPs and loads,
+    // then PatchEntryPointMutate might be able to "unspill" it so the code uses shader entry SGPRs
+    // directly instead of loading from the spill table.
+    std::string callName = lgcName::PushConst;
+    addTypeMangling(getPtrTy(ADDR_SPACE_CONST), {}, callName);
+    ptr = CreateNamedCall(callName, getPtrTy(ADDR_SPACE_CONST), {}, Attribute::ReadOnly);
   }
-  // Get the push const pointer. If subsequent code only uses this with constant GEPs and loads,
-  // then PatchEntryPointMutate might be able to "unspill" it so the code uses shader entry SGPRs
-  // directly instead of loading from the spill table.
-  std::string callName = lgcName::PushConst;
-  addTypeMangling(returnTy, {}, callName);
-  return CreateNamedCall(callName, returnTy, {}, Attribute::ReadOnly, instName);
+  ptr->setName(instName);
+  return ptr;
 }
 
 // =====================================================================================================================
