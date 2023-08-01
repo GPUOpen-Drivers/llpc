@@ -184,7 +184,6 @@ private:
   void createTraceParams(llvm::Function *func);
   llvm::GlobalVariable *createGlobalBuiltIn(unsigned builtInId);
   void createRayGenEntryFunc();
-  void replaceGlobal(llvm::GlobalVariable *global, llvm::Value *replacedGlobal);
   void processShaderRecordBuffer(llvm::GlobalVariable *global, llvm::Value *bufferDesc, llvm::Value *tableIndex,
                                  llvm::Instruction *insertPos);
   llvm::CallInst *createTraceRay();
@@ -209,7 +208,6 @@ private:
   void processPostReportIntersection(llvm::Function *func, llvm::Instruction *inst);
   void initTraceParamsTy(unsigned attributeSize);
   void initGlobalPayloads();
-  void initGlobalCallableData();
   void initShaderBuiltIns();
   void inlineTraceRay(llvm::CallInst *callInst, ModuleAnalysisManager &analysisManager);
   llvm::Instruction *createEntryFunc(llvm::Function *func);
@@ -281,13 +279,15 @@ private:
   void visitPrimitiveIndexPtrOp(lgc::rt::PrimitiveIndexPtrOp &inst);
   void visitInstanceInclusionMaskPtrOp(lgc::rt::InstanceInclusionMaskPtrOp &inst);
 
+  void visitAlloca(llvm::AllocaInst &inst);
+
   llvm::Value *createLoadInstNodeAddr();
 
-  llvm::Value *m_traceParams[TraceParam::Count];                       // Trace ray set parameters
-  llvm::Value *m_worldToObjMatrix = nullptr;                           // World to Object matrix
-  llvm::GlobalVariable *m_globalPayload = nullptr;                     // Global payload variable
-  llvm::GlobalVariable *m_globalCallableData = nullptr;                // Global callable data variable
-  std::set<unsigned, std::less<unsigned>> m_builtInParams;             // Indirect max builtins;
+  llvm::GlobalVariable *m_globalPayload = nullptr;         // Global payload variable
+  llvm::Value *m_traceParams[TraceParam::Count];           // Trace ray set parameters
+  llvm::Value *m_worldToObjMatrix = nullptr;               // World to Object matrix
+  llvm::AllocaInst *m_callableData = nullptr;              // Callable data variable for current callable shader
+  std::set<unsigned, std::less<unsigned>> m_builtInParams; // Indirect max builtins;
   llvm::SmallVector<llvm::Type *, TraceParam::Count> m_traceParamsTys; // Trace Params types
   llvm::SmallVector<llvm::Instruction *> m_callsToLower;               // Call instruction to lower
   llvm::SmallSet<llvm::Function *, 4> m_funcsToLower;                  // Functions to lower
