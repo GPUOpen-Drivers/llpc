@@ -645,6 +645,7 @@ PreservedAnalyses SpirvLowerRayTracing::run(Module &module, ModuleAnalysisManage
     func->eraseFromParent();
   }
 
+  // Newly generated implementation functions are external linkage, fix that.
   for (auto funcIt = module.begin(), funcEnd = module.end(); funcIt != funcEnd;) {
     Function *func = &*funcIt++;
     if (func->getLinkage() == GlobalValue::ExternalLinkage && !func->empty()) {
