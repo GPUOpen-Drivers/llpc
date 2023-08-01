@@ -946,18 +946,9 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
             // shared by all users.
             std::string namePrefix = "descTable";
             builder.SetInsertPoint(spillTable->getNextNode());
-            Value *offset = nullptr;
-            if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
-              const ResourceNode *node = &m_pipelineState->getUserDataNodes()[userDataIdx];
-              m_pipelineState->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords);
-              offset = builder.getInt32(node->offsetInDwords * 4);
-            } else {
-              // Shader compilation. Use a relocation to get the descriptor
-              // table offset for the descriptor set userDataIdx.
-              offset = builder.CreateRelocationConstant(reloc::DescriptorTableOffset + Twine(userDataIdx));
-              namePrefix = "descSet";
-            }
-            Value *addr = builder.CreateGEP(builder.getInt8Ty(), spillTable, offset);
+            const ResourceNode *node = &m_pipelineState->getUserDataNodes()[userDataIdx];
+            m_pipelineState->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords);
+            Value *addr = builder.CreateConstGEP1_32(builder.getInt8Ty(), spillTable, node->offsetInDwords * 4);
             addr = builder.CreateBitCast(addr, builder.getInt32Ty()->getPointerTo(ADDR_SPACE_CONST));
             spillTableLoad = builder.CreateLoad(builder.getInt32Ty(), addr);
             spillTableLoad->setName(namePrefix + Twine(userDataIdx));
