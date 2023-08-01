@@ -304,3 +304,9 @@ def GpurtGetRayStaticIdOp : GpurtOp<"get.ray.static.id", [Memory<[(read Inaccess
   let results = (outs I32:$result);
   let summary = "get current ray static ID";
 }
+
+def GpurtGetGlobalPayloadPtrOp : GpurtOp<"get.global.payload.ptr", [Memory<[]>, WillReturn]> {
+  let arguments = (ins);
+  let results = (outs PrivatePointer:$payloadPtr);
+  let summary = "get pointer to global payload";
+}

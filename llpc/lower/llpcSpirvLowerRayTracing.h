@@ -207,7 +207,6 @@ private:
   void processTerminalFunc(llvm::Function *func, llvm::CallInst *inst, RayHitStatus hitStatus);
   void processPostReportIntersection(llvm::Function *func, llvm::Instruction *inst);
   void initTraceParamsTy(unsigned attributeSize);
-  void initGlobalPayloads();
   void initShaderBuiltIns();
   void inlineTraceRay(llvm::CallInst *callInst, ModuleAnalysisManager &analysisManager);
   llvm::Instruction *createEntryFunc(llvm::Function *func);
@@ -282,8 +281,8 @@ private:
   void visitAlloca(llvm::AllocaInst &inst);
 
   llvm::Value *createLoadInstNodeAddr();
+  llvm::Value *createGetGlobalPayloadPtr();
 
-  llvm::GlobalVariable *m_globalPayload = nullptr;         // Global payload variable
   llvm::Value *m_traceParams[TraceParam::Count];           // Trace ray set parameters
   llvm::Value *m_worldToObjMatrix = nullptr;               // World to Object matrix
   llvm::AllocaInst *m_callableData = nullptr;              // Callable data variable for current callable shader

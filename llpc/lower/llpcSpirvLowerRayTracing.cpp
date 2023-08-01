@@ -517,7 +517,6 @@ PreservedAnalyses SpirvLowerRayTracing::run(Module &module, ModuleAnalysisManage
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
   memset(m_traceParams, 0, sizeof(m_traceParams));
   initTraceParamsTy(rayTracingContext->getAttributeDataSize());
-  initGlobalPayloads();
   initShaderBuiltIns();
   Instruction *insertPos = nullptr;
 
@@ -829,7 +828,7 @@ void SpirvLowerRayTracing::createCallShader(Function *func, ShaderStage stage, u
 
   Value *traceParams[TraceParam::Count] = {};
   const auto payloadType = rayTracingContext->getPayloadType(m_builder);
-  Value *payload = m_builder->CreateLoad(payloadType, m_globalPayload);
+  Value *payload = m_builder->CreateLoad(payloadType, createGetGlobalPayloadPtr());
 
   // Assemble the arguments from payloads in traceray module
   args.push_back(payload);
@@ -1526,7 +1525,7 @@ CallInst *SpirvLowerRayTracing::createTraceRay() {
   auto argIt = func->arg_begin();
   // Payload
   Value *arg = argIt++;
-  m_builder->CreateStore(arg, m_globalPayload);
+  m_builder->CreateStore(arg, createGetGlobalPayloadPtr());
 
   // 0, Scene Addr low  1, Scene Addr high
   arg = argIt++;
@@ -1658,8 +1657,9 @@ CallInst *SpirvLowerRayTracing::createTraceRay() {
   // Call TraceRay function from traceRays module
   auto call = m_builder->CreateCall(traceRayFunc, traceRaysArgs);
 
+  const auto payloadType = rayTracingContext->getPayloadType(m_builder);
   (void(call)); // unused
-  m_builder->CreateRet(m_builder->CreateLoad(m_globalPayload->getValueType(), m_globalPayload));
+  m_builder->CreateRet(m_builder->CreateLoad(payloadType, createGetGlobalPayloadPtr()));
   createTraceParams(func);
   return call;
 }
@@ -1712,19 +1712,6 @@ void SpirvLowerRayTracing::initTraceParamsTy(unsigned attributeSize) {
   };
   TraceParamsTySize[TraceParam::HitAttributes] = attributeSize;
   assert(sizeof(TraceParamsTySize) / sizeof(TraceParamsTySize[0]) == TraceParam::Count);
-}
-
-// =====================================================================================================================
-// Initialize m_globalPayloads
-void SpirvLowerRayTracing::initGlobalPayloads() {
-  auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
-  // Payload max size in bytes
-  const auto payloadType = rayTracingContext->getPayloadType(m_builder);
-  if (m_globalPayload == nullptr) {
-    m_globalPayload =
-        new GlobalVariable(*m_module, payloadType, false, GlobalValue::ExternalLinkage, nullptr,
-                           Twine(RtName::GlobalPayload), nullptr, GlobalValue::NotThreadLocal, SPIRAS_Private);
-  }
 }
 
 // =====================================================================================================================
@@ -1866,7 +1853,7 @@ Instruction *SpirvLowerRayTracing::createEntryFunc(Function *func) {
   // Save the function input parameter value to the global payloads and builtIns
   // the global payload here are needed for the recursive traceray function of the shader stage
   Value *arg = argIt++;
-  m_builder->CreateStore(arg, m_globalPayload);
+  m_builder->CreateStore(arg, createGetGlobalPayloadPtr());
 
   for (auto &builtIn : m_builtInParams) {
     Value *arg = argIt++;
@@ -2104,7 +2091,7 @@ void SpirvLowerRayTracing::storeFunctionCallResult(ShaderStage stage, Value *res
   const auto &rets = getShaderExtraRets(stage);
   if (!rets.size()) {
     // No extra return value, only return payload
-    m_builder->CreateStore(result, m_globalPayload);
+    m_builder->CreateStore(result, createGetGlobalPayloadPtr());
   } else {
     // Return extra values
     Value *payloadVal = PoisonValue::get(rayTracingContext->getPayloadType(m_builder));
@@ -2113,7 +2100,7 @@ void SpirvLowerRayTracing::storeFunctionCallResult(ShaderStage stage, Value *res
     // Store payload first
     for (; index < payloadSizeInDword; index++)
       payloadVal = m_builder->CreateInsertValue(payloadVal, m_builder->CreateExtractValue(result, index), index);
-    m_builder->CreateStore(payloadVal, m_globalPayload);
+    m_builder->CreateStore(payloadVal, createGetGlobalPayloadPtr());
 
     // Store extra values, do bitcast if needed
     for (auto ret : rets) {
@@ -2258,7 +2245,8 @@ void SpirvLowerRayTracing::createEntryTerminator(Function *func) {
   getFuncRets(func, rets);
   for (auto ret : rets) {
     m_builder->SetInsertPoint(ret);
-    Value *retVal = m_builder->CreateLoad(m_globalPayload->getValueType(), m_globalPayload);
+    const auto payloadType = rayTracingContext->getPayloadType(m_builder);
+    Value *retVal = m_builder->CreateLoad(payloadType, createGetGlobalPayloadPtr());
 
     const auto rets = getShaderExtraRets(m_shaderStage);
     unsigned payloadSizeInDword = rayTracingContext->getPayloadSizeInDword();
@@ -3020,8 +3008,8 @@ void SpirvLowerRayTracing::visitAlloca(AllocaInst &inst) {
   if (allocaName.contains(RtName::HitAttribute)) {
     inst.replaceAllUsesWith(m_traceParams[TraceParam::HitAttributes]);
   } else if (allocaName.contains(RtName::IncomingPayLoad)) {
-    // TODO
-    return;
+    m_builder->SetInsertPoint(&inst);
+    inst.replaceAllUsesWith(createGetGlobalPayloadPtr());
   } else if (allocaName.contains(RtName::IncomingCallableData)) {
     inst.replaceAllUsesWith(m_callableData);
   } else {
@@ -3032,7 +3020,7 @@ void SpirvLowerRayTracing::visitAlloca(AllocaInst &inst) {
 }
 
 // =====================================================================================================================
-// Creates intructions to load instance node address
+// Creates instructions to load instance node address
 Value *SpirvLowerRayTracing::createLoadInstNodeAddr() {
   auto instNodeAddrTy = m_traceParamsTys[TraceParam::InstNodeAddrLo];
   assert(instNodeAddrTy == m_traceParamsTys[TraceParam::InstNodeAddrHi]);
@@ -3044,6 +3032,12 @@ Value *SpirvLowerRayTracing::createLoadInstNodeAddr() {
   instNodeAddr = m_builder->CreateInsertElement(instNodeAddr, instNodeAddrHi, 1u);
 
   return instNodeAddr;
+}
+
+// =====================================================================================================================
+// Creates instructions to get global payload pointer
+llvm::Value *SpirvLowerRayTracing::createGetGlobalPayloadPtr() {
+  return m_builder->create<lgc::GpurtGetGlobalPayloadPtrOp>();
 }
 
 // =====================================================================================================================
