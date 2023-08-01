@@ -55,6 +55,7 @@
 
 #include "lgc/patch/PatchEntryPointMutate.h"
 #include "lgc/LgcContext.h"
+#include "lgc/LgcDialect.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/IntrinsDefs.h"
@@ -627,27 +628,20 @@ void PatchEntryPointMutate::setupComputeWithCalls(Module *module) {
 //
 // @param module : IR module
 void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
-  // Find lgc.spill.table, lgc.push.constants, lgc.root.descriptor, lgc.descriptor.set functions, and from
-  // there all calls to them. Add each call to the applicable list in the UserDataUsage struct for the
-  // (merged) shader stage.
-  // Find lgc.special.user.data functions, and from there all calls to them. Add each call to the applicable
-  // list in the UserDataUsage struct for the (merged) shader stage.
-  // Also find lgc.input.import.generic calls in VS, indicating that the vertex buffer table is needed.
-  // Also find lgc.output.export.xfb calls anywhere, indicating that the streamout table is needed in the
-  // last vertex-processing stage.
+  // Gather special ops requiring user data.
+  static const auto visitor = llvm_dialects::VisitorBuilder<PatchEntryPointMutate>()
+                                  .add<UserDataOp>([](PatchEntryPointMutate &self, UserDataOp &op) {
+                                    ShaderStage stage = getShaderStage(op.getFunction());
+                                    assert(stage != ShaderStageCopyShader);
+                                    self.getUserDataUsage(stage)->spillTable.users.push_back(&op);
+                                  })
+                                  .build();
+
+  visitor.visit(*this, *module);
+
   for (Function &func : *module) {
     if (!func.isDeclaration())
       continue;
-    if (func.getName().startswith(lgcName::SpillTable)) {
-      for (User *user : func.users()) {
-        CallInst *call = cast<CallInst>(user);
-        ShaderStage stage = getShaderStage(call->getFunction());
-        assert(stage != ShaderStageCopyShader);
-        getUserDataUsage(stage)->spillTable.users.push_back(call);
-      }
-      continue;
-    }
-
     if (func.getName().startswith(lgcName::PushConst)) {
       for (User *user : func.users()) {
         // For this call to lgc.push.const, attempt to find all loads with a constant dword-aligned offset and
@@ -808,12 +802,19 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
     }
 
     // Handle direct uses of the spill table that were generated in DescBuilder.
-    for (Instruction *&call : userDataUsage->spillTable.users) {
-      if (call && call->getFunction() == &func) {
-        call->replaceAllUsesWith(spillTable);
-        call->eraseFromParent();
-        call = nullptr;
-      }
+    for (auto *&call : userDataUsage->spillTable.users) {
+      if (!call || call->getFunction() != &func)
+        continue;
+
+      auto *op = cast<UserDataOp>(call);
+      call = nullptr;
+
+      m_pipelineState->getPalMetadata()->setUserDataSpillUsage(op->getOffset());
+
+      builder.SetInsertPoint(op);
+      Value *ptr = builder.CreateConstGEP1_32(builder.getInt8Ty(), spillTable, op->getOffset());
+      op->replaceAllUsesWith(ptr);
+      op->eraseFromParent();
     }
 
     // Handle unspilled parts of the push constant.

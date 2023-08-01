@@ -413,15 +413,6 @@ Value *BuilderImpl::getStride(ResourceNodeType descType, uint64_t descSet, unsig
 // @param node : The descriptor node itself (nullptr for shader compilation)
 Value *BuilderImpl::getDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
                                unsigned binding, const ResourceNode *topNode, const ResourceNode *node) {
-  Value *descPtr = nullptr;
-
-  auto GetSpillTablePtr = [this]() {
-    // The descriptor is in the top-level table. (This can only happen for a DescriptorBuffer.) Contrary
-    // to what used to happen, we just load from the spill table, so we can get a pointer to the descriptor.
-    // The spill table gets returned as a pointer to array of i8.
-    return CreateNamedCall(lgcName::SpillTable, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST), {}, Attribute::ReadNone);
-  };
-
   auto GetDescriptorSetPtr = [this, node, topNode, concreteType, abstractType, descSet, binding]() -> Value * {
     // Get the descriptor table pointer for the descriptor at the given set and binding, which might be passed as a
     // user SGPR to the shader.
@@ -463,26 +454,19 @@ Value *BuilderImpl::getDescPtr(ResourceNodeType concreteType, ResourceNodeType a
     return CreateSelect(useShadowTable, shadowAddr, nonShadowAddr);
   };
 
-  // Get the descriptor table pointer.
-  if (node && node == topNode) {
-    // Ensure we mark spill table usage.
-    descPtr = GetSpillTablePtr();
-    getPipelineState()->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords);
-  } else {
-    descPtr = GetDescriptorSetPtr();
-  }
-
   // Get the offset for the descriptor. Where we are getting the second part of a combined resource,
   // add on the size of the first part.
-  unsigned offsetInDwords = node->offsetInDwords;
-  offsetInDwords += (binding - node->binding) * node->stride;
-
+  unsigned offsetInDwords = node->offsetInDwords + (binding - node->binding) * node->stride;
   unsigned offsetInBytes = offsetInDwords * 4;
   if (concreteType == ResourceNodeType::DescriptorSampler &&
       node->concreteType == ResourceNodeType::DescriptorCombinedTexture)
     offsetInBytes += DescriptorSizeResource;
 
-  return CreateAddByteOffset(descPtr, getInt32(offsetInBytes));
+  if (node && node == topNode)
+    return create<UserDataOp>(offsetInBytes);
+
+  Value *descPtr = GetDescriptorSetPtr();
+  return CreateConstGEP1_32(getInt8Ty(), descPtr, offsetInBytes);
 }
 
 // =====================================================================================================================
