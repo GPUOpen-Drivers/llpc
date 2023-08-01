@@ -301,6 +301,6 @@ def UserDataOp : LgcOp<"user.data", [Memory<[]>, WillReturn]> {
 
     Attempting to access user data before `offset` via a pointer returned by this operation is undefined behavior.
 
-    This operation is used in some cases by OpenGL.
+    This operation is used for push constants in Vulkan and in some cases by OpenGL.
   }];
 }
