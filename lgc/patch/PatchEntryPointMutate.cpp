@@ -748,7 +748,6 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
     if (func.getName().startswith(lgcName::DescriptorTableAddr)) {
       for (User *user : func.users()) {
         CallInst *call = cast<CallInst>(user);
-        ResourceNodeType resType = ResourceNodeType(cast<ConstantInt>(call->getArgOperand(0))->getZExtValue());
         ResourceNodeType searchType = ResourceNodeType(cast<ConstantInt>(call->getArgOperand(1))->getZExtValue());
         uint64_t set = cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
         unsigned binding = cast<ConstantInt>(call->getArgOperand(3))->getZExtValue();
@@ -756,35 +755,16 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
         assert(stage != ShaderStageCopyShader);
         auto &descriptorTable = getUserDataUsage(stage)->descriptorTables;
 
-        if (m_pipelineState->isUnlinked() && m_pipelineState->getUserDataNodes().empty()) {
-          if (m_pipelineState->getOptions().resourceLayoutScheme == ResourceLayoutScheme::Indirect) {
-            // If the type is pushconst, the index is set 0, others are set + 1.
-            if (resType == ResourceNodeType::PushConst) {
-              descriptorTable.resize(std::max(descriptorTable.size(), size_t(1)));
-              descriptorTable[0].users.push_back(call);
-            } else {
-              descriptorTable.resize(std::max(descriptorTable.size(), size_t(set + 2)));
-              descriptorTable[set + 1].users.push_back(call);
-            }
-          } else {
-            // The user data nodes are not available, so we use the set as the index.
-            descriptorTable.resize(std::max(descriptorTable.size(), size_t(set + 1)));
-            descriptorTable[set].users.push_back(call);
-          }
-        } else {
-          // The user data nodes are available, so we use the offset of the node as the
-          // index.
-          const ResourceNode *node;
-          node = m_pipelineState->findResourceNode(searchType, set, binding, stage).first;
-          if (!node) {
-            // Handle mutable descriptors
-            node = m_pipelineState->findResourceNode(ResourceNodeType::DescriptorMutable, set, binding, stage).first;
-          }
-          assert(node && "Could not find resource node");
-          uint32_t descTableIndex = node - &m_pipelineState->getUserDataNodes().front();
-          descriptorTable.resize(std::max(descriptorTable.size(), size_t(descTableIndex + 1)));
-          descriptorTable[descTableIndex].users.push_back(call);
+        // We use the offset of the node as the index.
+        const ResourceNode *node = m_pipelineState->findResourceNode(searchType, set, binding, stage).first;
+        if (!node) {
+          // Handle mutable descriptors
+          node = m_pipelineState->findResourceNode(ResourceNodeType::DescriptorMutable, set, binding, stage).first;
         }
+        assert(node && "Could not find resource node");
+        uint32_t descTableIndex = node - &m_pipelineState->getUserDataNodes().front();
+        descriptorTable.resize(std::max(descriptorTable.size(), size_t(descTableIndex + 1)));
+        descriptorTable[descTableIndex].users.push_back(call);
       }
     } else if ((func.getName().startswith(lgcName::OutputExportXfb) && !func.use_empty()) ||
                m_pipelineState->enableSwXfb()) {
