@@ -47,6 +47,7 @@ public:
 
 private:
   llvm::Value *processBuiltIn(llvm::GlobalVariable *global, llvm::Instruction *insertPos);
+
   llvm::GlobalValue *m_traceParams[TraceParam::Count]; // Trace ray set parameters
 };
 

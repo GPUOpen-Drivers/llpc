@@ -944,7 +944,7 @@ void FragColorExport::generateExportInstructions(ArrayRef<lgc::ColorExportInfo> 
   if (lastExport)
     FragColorExport::setDoneFlag(lastExport, builder);
 
-  m_pipelineState->getPalMetadata()->setSpiShaderColFormat(finalExportFormats);
+  m_pipelineState->getPalMetadata()->updateSpiShaderColFormat(finalExportFormats);
 }
 
 // =====================================================================================================================

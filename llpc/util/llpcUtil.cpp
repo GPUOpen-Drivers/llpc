@@ -31,6 +31,7 @@
  */
 #include "llpcUtil.h"
 #include "llpc.h"
+#include "llpcContext.h"
 #include "llpcDebug.h"
 #include "palPipelineAbi.h"
 #include "spirvExt.h"
@@ -291,6 +292,42 @@ const ResourceMappingNode *findResourceNode(const ResourceMappingRootNode *userD
   }
 
   return resourceNode;
+}
+
+// Returns the uniform constant map entry of the given location.
+//
+// @param context : The LLPC context
+// @param stage   : The map entry stage
+// @param loc     : The location of the finding uniform constant
+Vkgc::UniformConstantMapEntry *getUniformConstantEntryByLocation(const Llpc::Context *context, Vkgc::ShaderStage stage,
+                                                                 unsigned loc) {
+  Vkgc::UniformConstantMap *accessedUniformMap = nullptr;
+  if (context->getPipelineType() == PipelineType::Graphics) {
+    auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
+    // Find the uniform constant map to use.
+    for (unsigned s = 0; s < buildInfo->numUniformConstantMaps; s++) {
+      if (isShaderStageInMask(stage, buildInfo->ppUniformMaps[s]->visibility)) {
+        accessedUniformMap = buildInfo->ppUniformMaps[s];
+        break;
+      }
+    }
+  } else {
+    assert(context->getPipelineType() == PipelineType::Compute);
+    auto *buildInfo = static_cast<const Vkgc::ComputePipelineBuildInfo *>(context->getPipelineBuildInfo());
+    accessedUniformMap = buildInfo->pUniformMap;
+  }
+
+  if (accessedUniformMap != nullptr) {
+    auto *uniforms = accessedUniformMap->pUniforms;
+    unsigned numUniform = accessedUniformMap->numUniformConstants;
+
+    UniformConstantMapEntry *locationFound =
+        std::find_if(uniforms, uniforms + numUniform,
+                     [&](const Vkgc::UniformConstantMapEntry &item) { return item.location == loc; });
+
+    return locationFound != uniforms + numUniform ? locationFound : nullptr;
+  }
+  return nullptr;
 }
 
 } // namespace Llpc

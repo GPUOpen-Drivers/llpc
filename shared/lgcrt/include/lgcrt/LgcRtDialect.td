@@ -320,6 +320,17 @@ def TraceRayOp : LgcRtOp<"trace.ray", [Memory<[(read)]>, WillReturn]> {
   let results = (outs);
 }
 
+#ifdef VKI_AMD_ABORT_LONG_RAYS
+// =========================================================================================================
+def TraceLongRayOp : LgcRtOp<"trace.long.ray", [Memory<[(read)]>, WillReturn]> {
+  let superclass = BaseTraceRayOp;
+  let arguments = (ins superclass, F32:$threshold);
+  let results = (outs I32:$result);
+
+  let summary = "Trace a ray and abort once active invocations is less than the given threshold";
+}
+#endif
+
 // =========================================================================================================
 def WorldRayDirectionOp : LgcRtOp<"world.ray.direction", [Memory<[]>, WillReturn]> {
   let arguments = (ins);

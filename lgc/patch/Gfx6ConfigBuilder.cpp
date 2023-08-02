@@ -402,6 +402,7 @@ template <typename T> void ConfigBuilder::buildVsRegConfig(ShaderStage shaderSta
 
   // Stage-specific processing
   bool usePointSize = false;
+  bool useEdgeFlag = false;
   bool usePrimitiveId = false;
   bool useLayer = false;
   bool useViewportIndex = false;
@@ -410,6 +411,7 @@ template <typename T> void ConfigBuilder::buildVsRegConfig(ShaderStage shaderSta
 
   if (shaderStage == ShaderStageVertex) {
     usePointSize = builtInUsage.vs.pointSize;
+    useEdgeFlag = builtInUsage.vs.edgeFlag;
     usePrimitiveId = builtInUsage.vs.primitiveId;
     useLayer = builtInUsage.vs.layer;
     useViewportIndex = builtInUsage.vs.viewportIndex;
@@ -472,13 +474,17 @@ template <typename T> void ConfigBuilder::buildVsRegConfig(ShaderStage shaderSta
 
   useLayer = useLayer || m_pipelineState->getInputAssemblyState().enableMultiView;
 
-  bool miscExport = usePointSize || useLayer || useViewportIndex;
+  bool miscExport = usePointSize || useLayer || useViewportIndex || useEdgeFlag;
   if (miscExport) {
     SET_REG_FIELD(&config->vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_POINT_SIZE, usePointSize);
     SET_REG_FIELD(&config->vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_RENDER_TARGET_INDX, useLayer);
     SET_REG_FIELD(&config->vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_VIEWPORT_INDX, useViewportIndex);
     SET_REG_FIELD(&config->vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_VEC_ENA, true);
     SET_REG_FIELD(&config->vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_SIDE_BUS_ENA, true);
+
+    if (useEdgeFlag) {
+      SET_REG_FIELD(&config->vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_EDGE_FLAG, true);
+    }
   }
 
   if (clipDistanceCount > 0 || cullDistanceCount > 0) {

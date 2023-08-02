@@ -8,7 +8,7 @@
 ; RUN:         -enable-relocatable-shader-elf \
 ; RUN:         -cache-full-pipelines=false \
 ; RUN:         -o %t.elf %s -v | FileCheck -check-prefix=CREATE %s
-; REQUIRES: llpc-shader-cache
+; REQUIRES: llpc_enable_shader_cache
 ; CREATE: Building pipeline with relocatable shader elf.
 ; CREATE: Cache miss for shader stage compute
 ; CREATE: Updating the cache for unlinked shader stage compute
@@ -18,7 +18,7 @@
 ; Check that the cache file exists under the expected location and is not empty.
 ; BEGIN_SHADERTEST
 ; RUN: ls -s %t_dir/AMD/LlpcCache/cache.bin | FileCheck -check-prefix=SIZE %s
-; REQUIRES: llpc-shader-cache
+; REQUIRES: llpc_enable_shader_cache
 ; SIZE: {{[1-9][0-9]*}} {{.*}}cache.bin
 ; END_SHADERTEST
 
@@ -31,7 +31,7 @@
 ; RUN:         -enable-relocatable-shader-elf \
 ; RUN:         -cache-full-pipelines=false \
 ; RUN:         -o %t.elf %s -v | FileCheck -check-prefix=LOAD %s
-; REQUIRES: llpc-shader-cache
+; REQUIRES: llpc_enable_shader_cache
 ; LOAD: Building pipeline with relocatable shader elf.
 ; LOAD: Cache hit for shader stage compute
 ; LOAD-NOT: Updating the cache for shader stage compute
@@ -48,7 +48,7 @@
 ; RUN:         -enable-relocatable-shader-elf \
 ; RUN:         -cache-full-pipelines=false \
 ; RUN:         -o %t.elf %s -v | FileCheck -check-prefix=MODIFY %s
-; REQUIRES: llpc-shader-cache
+; REQUIRES: llpc_enable_shader_cache
 ; MODIFY: Building pipeline with relocatable shader elf.
 ; MODIFY: Cache miss for shader stage compute
 ; MODIFY: Updating the cache for unlinked shader stage compute

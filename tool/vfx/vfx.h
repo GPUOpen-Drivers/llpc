@@ -45,9 +45,7 @@
 #define VFX_SUPPORT_VK_PIPELINE 1
 #endif
 
-#if VFX_SUPPORT_VK_PIPELINE
 #include "vkgcDefs.h"
-#endif
 
 #ifdef _WIN32
 #define VFXAPI __cdecl
@@ -59,7 +57,7 @@ extern int Snprintf(char *pOutput, size_t bufSize, const char *pFormat, ...);
 
 namespace Vfx {
 
-#if VFX_SUPPORT_VK_PIPELINE
+#if VFX_SUPPORT_VK_PIPELINE || BIL_CLIENT_INTERFACE_MAJOR_VERSION >= 40
 typedef Vkgc::ShaderStage ShaderStage;
 #else
 #error Not implemented!
@@ -418,6 +416,13 @@ struct VertexState {
 };
 
 // =====================================================================================================================
+// Represents uniform constant information in one pipeline.
+struct UniformConstantState {
+  unsigned numUniformConstantMaps;        // Number of default uniform maps
+  Vkgc::UniformConstantMap **uniformMaps; // Pointer to array of pointers to the default uniform maps
+};
+
+// =====================================================================================================================
 // Represents one BufferView section.
 struct BufferView {
   IUFValue binding;                // Binding of this view, consist of set, binding, arrayIndex
@@ -553,6 +558,7 @@ struct RayTracingPipelineState {
 #endif
   unsigned maxRecursionDepth;     // Ray tracing max recursion depth
   unsigned indirectStageMask;     // Trace-ray indirect stage mask
+  Vkgc::LlpcRaytracingMode mode;  // Raytracing Compiling mode
   Vkgc::RtState rtState;          // Ray tracing state
   unsigned payloadSizeMaxInLib;   // Pipeline library maxPayloadSize
   unsigned attributeSizeMaxInLib; // Pipeline library maxAttributeSize
@@ -562,6 +568,7 @@ struct RayTracingPipelineState {
   /// Combination of GpuRt::ShaderLibraryFeatureFlag
   unsigned gpurtFeatureFlags;
 };
+
 #endif
 
 }; // namespace Vfx

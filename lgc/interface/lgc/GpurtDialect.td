@@ -50,7 +50,7 @@ def GpurtStackReadOp : GpurtOp<"stack.read", [Memory<[(read)]>, WillReturn]> {
   let results = (outs I32:$result);
   let summary = "read a dword from stack";
   let description = [{
-    Read a dword from lds/(scratch buffer) stack at index position
+    Read a dword from lds/(scrach buffer) stack at index position
   }];
 }
 
@@ -59,7 +59,7 @@ def GpurtStackWriteOp : GpurtOp<"stack.write", [Memory<[(write)]>, WillReturn]> 
   let results = (outs I32:$result);
   let summary = "write a dword to stack";
   let description = [{
-    Write a dword to lds/(scratch buffer) stack at index position
+    Write a dword to lds/(scrach buffer) stack at index position
   }];
 }
 

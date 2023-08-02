@@ -222,6 +222,25 @@ void GraphicsContext::setTcsInputVertices(Module *tcsModule) {
 Options GraphicsContext::computePipelineOptions() const {
   Options options = PipelineContext::computePipelineOptions();
 
+  // If enable edge flag, client driver should force pass-through for ngg culling.
+  const GraphicsPipelineBuildInfo *graphicsPipelineBuildInfo =
+      static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo());
+  auto vertexInput = graphicsPipelineBuildInfo->pVertexInput;
+  if (vertexInput) {
+    for (unsigned i = 0; i < vertexInput->vertexBindingDescriptionCount; ++i) {
+      auto binding = &vertexInput->pVertexBindingDescriptions[i];
+      if (binding->binding == Vkgc::GlCompatibilityAttributeLocation::EdgeFlag) {
+        auto nggState = graphicsPipelineBuildInfo->nggState;
+        if (nggState.forceCullingMode || nggState.enableBackfaceCulling || nggState.enableFrustumCulling ||
+            nggState.enableBoxFilterCulling || nggState.enableSphereCulling || nggState.enableCullDistanceCulling ||
+            nggState.enableSmallPrimFilter) {
+          llvm_unreachable("Client driver should force pass-through for ngg culling when EdgeFlag is used.");
+        }
+        break;
+      }
+    }
+  }
+
   options.enableUberFetchShader =
       reinterpret_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->enableUberFetchShader;
   if (getGfxIpVersion().major >= 10) {
@@ -451,6 +470,7 @@ void GraphicsContext::setGraphicsStateInPipeline(Pipeline *pipeline, Util::Metro
 
     inputAssemblyState.disableVertexReuse = inputIaState.disableVertexReuse;
     inputAssemblyState.switchWinding = inputIaState.switchWinding;
+    inputAssemblyState.useVertexBufferDescArray = inputIaState.useVertexBufferDescArray;
 
     if (hasher) {
       // We need to hash patchControlPoints here, even though it is used separately in setTcsInputVertices as
@@ -459,7 +479,6 @@ void GraphicsContext::setGraphicsStateInPipeline(Pipeline *pipeline, Util::Metro
     }
 
     rasterizerState.rasterizerDiscardEnable = inputRsState.rasterizerDiscardEnable;
-    rasterizerState.usrClipPlaneMask = inputRsState.usrClipPlaneMask;
     rasterizerState.provokingVertexMode = static_cast<ProvokingVertexMode>(inputRsState.provokingVertexMode);
     rasterizerState.rasterStream = inputRsState.rasterStream;
   }

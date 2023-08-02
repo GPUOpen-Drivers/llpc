@@ -34,7 +34,6 @@
 #include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcSpirvLowerUtil.h"
-#include "lgc/Builder.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/Instructions.h"
@@ -250,6 +249,9 @@ bool SpirvLowerGlobal::runImpl(Module &module) {
       lowerOutput();
   }
 
+  if (m_shaderStage == ShaderStageVertex)
+    lowerEdgeFlag();
+
   lowerBufferBlock();
   lowerPushConsts();
   lowerUniformConstants();
@@ -258,6 +260,35 @@ bool SpirvLowerGlobal::runImpl(Module &module) {
   cleanupReturnBlock();
 
   return true;
+}
+
+// =====================================================================================================================
+// add edgeflag input output
+void SpirvLowerGlobal::lowerEdgeFlag() {
+  const unsigned int edgeflagInputLocation = Vkgc::GlCompatibilityAttributeLocation::EdgeFlag;
+
+  Llpc::PipelineContext *pipelineContex = m_context->getPipelineContext();
+  const Vkgc::GraphicsPipelineBuildInfo *pipelineInfo =
+      static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(pipelineContex->getPipelineBuildInfo());
+  const VkPipelineVertexInputStateCreateInfo *vertexInfo = pipelineInfo->pVertexInput;
+
+  if (!vertexInfo)
+    return;
+
+  for (unsigned i = 0; i < vertexInfo->vertexBindingDescriptionCount; i++) {
+    auto binding = &vertexInfo->pVertexBindingDescriptions[i];
+
+    if (binding->binding == edgeflagInputLocation) {
+      Type *int32Ty = Type::getInt32Ty(*m_context);
+      Value *zeroValue = m_builder->getInt32(0);
+
+      lgc::InOutInfo inOutInfo;
+      Value *edgeflagValue = m_builder->CreateReadGenericInput(int32Ty, edgeflagInputLocation, zeroValue, zeroValue, 0,
+                                                               inOutInfo, nullptr);
+      m_builder->CreateWriteBuiltInOutput(edgeflagValue, lgc::BuiltInEdgeFlag, inOutInfo, nullptr, nullptr);
+      return;
+    }
+  }
 }
 
 // =====================================================================================================================
@@ -848,6 +879,18 @@ void SpirvLowerGlobal::lowerOutput() {
   // instructions with import/export calls in-place.
   assert(m_shaderStage != ShaderStageTessControl);
 
+  // Set the last vertex processing stage
+  auto shaderStageMask = m_context->getShaderStageMask();
+  m_lastVertexProcessingStage = ShaderStageInvalid;
+  if (shaderStageMask & ShaderStageGeometryBit)
+    m_lastVertexProcessingStage = ShaderStageGeometry;
+  else if (shaderStageMask & ShaderStageTessEvalBit)
+    m_lastVertexProcessingStage = ShaderStageTessEval;
+  else if (shaderStageMask & ShaderStageVertexBit)
+    m_lastVertexProcessingStage = ShaderStageVertex;
+
+  buildApiXfbMap();
+
   // Export output from the proxy variable prior to "return" instruction or "emit" calls
   for (auto outputMap : m_outputProxyMap) {
     auto output = cast<GlobalVariable>(outputMap.first);
@@ -1323,9 +1366,6 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
 
   ShaderInOutMetadata outputMeta = {};
 
-  // NOTE: This special flag is just to check if we need output header of transform feedback info.
-  static unsigned EnableXfb = false;
-
   if (outputTy->isArrayTy()) {
     // Array type
     assert(!elemIdx);
@@ -1353,39 +1393,16 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
       assert(!outputMeta.PerPrimitive); // No per-primitive arrayed built-in
       m_builder->CreateWriteBuiltInOutput(outputValue, builtInId, outputInfo, vertexOrPrimitiveIdx, nullptr);
 
-      if (outputMeta.IsXfb) {
-        // NOTE: For transform feedback outputs, additional stream-out export call will be generated.
-        assert(xfbOffsetAdjust == 0 && xfbBufferAdjust == 0); // Unused for built-ins
-
+      if (m_lastVertexProcessingStage == m_shaderStage) {
         auto elemTy = outputTy->getArrayElementType();
         assert(elemTy->isFloatingPointTy() || elemTy->isIntegerTy()); // Must be scalar
-
         const uint64_t elemCount = outputTy->getArrayNumElements();
         const uint64_t byteSize = elemTy->getScalarSizeInBits() / 8;
 
         for (unsigned idx = 0; idx < elemCount; ++idx) {
-          // Handle array elements recursively
           auto elem = m_builder->CreateExtractValue(outputValue, {idx}, "");
-
-          auto xfbOffset = m_builder->getInt32(outputMeta.XfbOffset + outputMeta.XfbExtraOffset + byteSize * idx);
-          m_builder->CreateWriteXfbOutput(elem,
-                                          /*isBuiltIn=*/true, builtInId, outputMeta.XfbBuffer, outputMeta.XfbStride,
-                                          xfbOffset, outputInfo);
-
-          if (!static_cast<bool>(EnableXfb)) {
-            LLPC_OUTS("\n===============================================================================\n");
-            LLPC_OUTS("// LLPC transform feedback export info (" << getShaderStageName(m_shaderStage)
-                                                                 << " shader)\n\n");
-
-            EnableXfb = true;
-          }
-
-          auto builtInName = getNameMap(static_cast<BuiltIn>(builtInId)).map(static_cast<BuiltIn>(builtInId));
-          LLPC_OUTS(*outputValue->getType() << " (builtin = " << builtInName.substr(strlen("BuiltIn")) << "), "
-                                            << "xfbBuffer = " << outputMeta.XfbBuffer << ", "
-                                            << "xfbStride = " << outputMeta.XfbStride << ", "
-                                            << "xfbOffset = " << cast<ConstantInt>(xfbOffset)->getZExtValue() << ", "
-                                            << "streamId = " << outputMeta.StreamId << "\n");
+          unsigned elemXfbOffset = byteSize * idx;
+          addCallInstForXfbOutput(outputMeta, elem, 0, elemXfbOffset, 0, outputInfo);
         }
       }
     } else {
@@ -1456,28 +1473,8 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
     if (outputMeta.IsBuiltIn) {
       auto builtInId = static_cast<lgc::BuiltInKind>(outputMeta.Value);
       outputInfo.setArraySize(maxLocOffset);
-      if (outputMeta.IsXfb) {
-        // NOTE: For transform feedback outputs, additional stream-out export call will be generated.
-        assert(xfbOffsetAdjust == 0 && xfbBufferAdjust == 0); // Unused for built-ins
-        auto xfbOffset = m_builder->getInt32(outputMeta.XfbOffset + outputMeta.XfbExtraOffset);
-        m_builder->CreateWriteXfbOutput(outputValue,
-                                        /*isBuiltIn=*/true, builtInId, outputMeta.XfbBuffer, outputMeta.XfbStride,
-                                        xfbOffset, outputInfo);
-
-        if (!static_cast<bool>(EnableXfb)) {
-          LLPC_OUTS("\n===============================================================================\n");
-          LLPC_OUTS("// LLPC transform feedback export info (" << getShaderStageName(m_shaderStage) << " shader)\n\n");
-
-          EnableXfb = true;
-        }
-
-        auto builtInName = getNameMap(static_cast<BuiltIn>(builtInId)).map(static_cast<BuiltIn>(builtInId));
-        LLPC_OUTS(*outputValue->getType() << " (builtin = " << builtInName.substr(strlen("BuiltIn")) << "), "
-                                          << "xfbBuffer = " << outputMeta.XfbBuffer << ", "
-                                          << "xfbStride = " << outputMeta.XfbStride << ", "
-                                          << "xfbOffset = " << cast<ConstantInt>(xfbOffset)->getZExtValue() << ", "
-                                          << "streamID = " << outputMeta.StreamId << "\n");
-      }
+      if (m_lastVertexProcessingStage == m_shaderStage)
+        addCallInstForXfbOutput(outputMeta, outputValue, 0, 0, 0, outputInfo);
 
       if (builtInId == lgc::BuiltInCullPrimitive && outputTy->isIntegerTy(32)) {
         // NOTE: In SPIR-V translation, the boolean type (i1) in output block is converted to i32. Here, we convert it
@@ -1500,29 +1497,10 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
     }
     elemIdx = !elemIdx ? m_builder->getInt32(idx) : m_builder->CreateAdd(elemIdx, m_builder->getInt32(idx));
     locOffset = !locOffset ? m_builder->getInt32(0) : locOffset;
-
-    if (outputMeta.IsXfb) {
-      // NOTE: For transform feedback outputs, additional stream-out export call will be generated.
-      assert(xfbOffsetAdjust != InvalidValue);
-      Value *xfbOffset = m_builder->getInt32(outputMeta.XfbOffset + outputMeta.XfbExtraOffset + xfbOffsetAdjust);
-      m_builder->CreateWriteXfbOutput(outputValue,
-                                      /*isBuiltIn=*/false, location + cast<ConstantInt>(locOffset)->getZExtValue(),
-                                      outputMeta.XfbBuffer + xfbBufferAdjust, outputMeta.XfbStride, xfbOffset,
-                                      outputInfo);
-
-      if (!static_cast<bool>(EnableXfb)) {
-        LLPC_OUTS("\n===============================================================================\n");
-        LLPC_OUTS("// LLPC transform feedback export info (" << getShaderStageName(m_shaderStage) << " shader)\n\n");
-
-        EnableXfb = true;
-      }
-
-      LLPC_OUTS(*outputValue->getType() << " (loc = " << location + cast<ConstantInt>(locOffset)->getZExtValue()
-                                        << ", comp = " << outputMeta.Component << "), "
-                                        << "xfbBuffer = " << outputMeta.XfbBuffer + xfbBufferAdjust << ", "
-                                        << "xfbStride = " << outputMeta.XfbStride << ", "
-                                        << "xfbOffset = " << cast<ConstantInt>(xfbOffset)->getZExtValue() << ", "
-                                        << "streamID = " << outputMeta.StreamId << "\n");
+    if (m_lastVertexProcessingStage == m_shaderStage) {
+      assert(isa<ConstantInt>(locOffset));
+      addCallInstForXfbOutput(outputMeta, outputValue, xfbBufferAdjust, xfbOffsetAdjust,
+                              cast<ConstantInt>(locOffset)->getZExtValue(), outputInfo);
     }
 
     m_builder->CreateWriteGenericOutput(outputValue, location, locOffset, elemIdx, maxLocOffset, outputInfo,
@@ -2317,6 +2295,16 @@ void SpirvLowerGlobal::lowerBufferBlock() {
     const unsigned binding = mdconst::dyn_extract<ConstantInt>(resMetaNode->getOperand(1))->getZExtValue();
     SmallVector<Constant *, 8> constantUsers;
 
+    // AtomicCounter is emulated following same impl of SSBO, only qualifier 'offset' will be used in its
+    // MD now. Using a new MD kind to detect it. AtomicCounter's type should be uint, not a structure.
+    // We will use GEP to access them.
+    MDNode *atomicCounterMD = global.getMetadata(gSPIRVMD::AtomicCounter);
+    ShaderBlockMetadata atomicCounterMeta = {};
+    if (atomicCounterMD) {
+      atomicCounterMeta.U64All =
+          cast<ConstantInt>(mdconst::dyn_extract<Constant>(atomicCounterMD->getOperand(0)))->getZExtValue();
+    }
+
     for (User *const user : global.users()) {
       if (Constant *const constVal = dyn_cast<Constant>(user))
         constantUsers.push_back(constVal);
@@ -2388,7 +2376,14 @@ void SpirvLowerGlobal::lowerBufferBlock() {
             if (global.isConstant())
               m_builder->CreateInvariantStart(bufferDesc);
 
-            replaceInstsInfo.otherInst->replaceUsesOfWith(&global, bufferDesc);
+            Value *newDescPtr = bufferDesc;
+            if (atomicCounterMD) {
+              SmallVector<Value *, 8> indices;
+              indices.push_back(m_builder->getInt32(atomicCounterMeta.offset));
+              newDescPtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, indices);
+            }
+
+            replaceInstsInfo.otherInst->replaceUsesOfWith(&global, newDescPtr);
           } else {
             assert(!replaceInstsInfo.getElemPtrInsts.empty());
 
@@ -2411,7 +2406,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                      (isa<ConstantInt>(indices[0]) && cast<ConstantInt>(indices[0])->getZExtValue() == 0));
 
               // Get block index from the second gep index, if it is not zero.
-              Value *const blockIndex = isBlockIndexZero ? m_builder->getInt32(0) : indices[1];
+              Value *const blockIndex = (isBlockIndexZero || atomicCounterMD) ? m_builder->getInt32(0) : indices[1];
 
               bool isNonUniform = isShaderStageInMask(
                   m_shaderStage,
@@ -2519,6 +2514,22 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                 newSelect = m_builder->CreateSelect(select->getCondition(), bitCasts[0], bitCasts[1]);
 
               Value *base = newSelect ? newSelect : bitCasts[0];
+              // If zero-index elimination removed leading zeros from OldGEP indices then we need to use OldGEP Source
+              // type as a Source type for newGEP. In other cases use global variable array element type.
+              Type *newGetElemType = gepsLeadingZerosEliminated ? getElemPtr->getSourceElementType() : elementType;
+              if (atomicCounterMD) {
+                // indices[1] store the array index, but may not be a constant
+                if (isa<ConstantInt>(indices[1])) {
+                  indices[0] =
+                      m_builder->getInt32(atomicCounterMeta.offset + cast<ConstantInt>(indices[1])->getZExtValue() * 4);
+                } else {
+                  auto atomicCounterElemOffset = m_builder->CreateMul(m_builder->getInt32(4), indices[1]);
+                  indices[0] =
+                      m_builder->CreateAdd(atomicCounterElemOffset, m_builder->getInt32(atomicCounterMeta.offset));
+                }
+                newGetElemType = m_builder->getInt8Ty();
+              }
+
               // We need to remove the block index from the original GEP indices so that we can use them, but first we
               // have to check if it was not removed already by zero-index elimination.
               if (!gepsLeadingZerosEliminated)
@@ -2531,9 +2542,6 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                 newIndices = newIndices.drop_front(1);
 
               Value *newGetElemPtr = nullptr;
-              // If zero-index elimination removed leading zeros from OldGEP indices then we need to use OldGEP Source
-              // type as a Source type for newGEP. In other cases use global variable array element type.
-              Type *newGetElemType = gepsLeadingZerosEliminated ? getElemPtr->getSourceElementType() : elementType;
 
               if (getElemPtr->isInBounds())
                 newGetElemPtr = m_builder->CreateInBoundsGEP(newGetElemType, base, newIndices);
@@ -2580,8 +2588,15 @@ void SpirvLowerGlobal::lowerBufferBlock() {
           usesToReplace.push_back(inst);
         }
 
+        Value *newLoadPtr = bitCast;
+        if (atomicCounterMD) {
+          SmallVector<Value *, 8> indices;
+          indices.push_back(m_builder->getInt32(atomicCounterMeta.offset));
+          newLoadPtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bitCast, indices);
+        }
+
         for (Instruction *const use : usesToReplace)
-          use->replaceUsesOfWith(&global, bitCast);
+          use->replaceUsesOfWith(&global, newLoadPtr);
       }
     }
 
@@ -2827,6 +2842,94 @@ void SpirvLowerGlobal::interpolateInputElement(unsigned interpLoc, Value *auxInt
       callInst.eraseFromParent();
     }
   }
+}
+
+// =====================================================================================================================
+// Fill the XFB info map from the Vkgc::ApiXfbOutData if XFB is specified by API inerface
+void SpirvLowerGlobal::buildApiXfbMap() {
+  auto pipelineBuildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+  for (unsigned idx = 0; idx < pipelineBuildInfo->apiXfbOutData.numXfbOutInfo; ++idx) {
+    const auto &xfbInfo = pipelineBuildInfo->apiXfbOutData.pXfbOutInfos[idx];
+    unsigned location = xfbInfo.location;
+    if (xfbInfo.isBuiltIn) {
+      if (m_builtInXfbMap.find(location) == m_builtInXfbMap.end()) {
+        // For built-in array type, we only need add one the first item.
+        m_builtInXfbMap[location] = xfbInfo;
+      }
+    } else {
+      m_genericXfbMap[location] = xfbInfo;
+    }
+  }
+}
+
+// =====================================================================================================================
+// Check if the given output should be written to an XFB buffer and inserts LLVM call instruction to XFB output.
+//
+// @param outputMeta: the metadata of output
+// @param outputValue : Value to write
+// @param xfbBufferAdjust : Adjustment of transform feedback buffer ID for XFB qualifier (for array type, default is 0)
+// @param xfbOffsetAdjust : Adjustment of transform feedback offset (for array type)
+// @param locOffset : Relative location offset, passed from aggregate type
+// @param outputInfo : Extra output info (GS stream ID)
+void SpirvLowerGlobal::addCallInstForXfbOutput(const ShaderInOutMetadata &outputMeta, Value *outputValue,
+                                               unsigned xfbBufferAdjust, unsigned xfbOffsetAdjust, unsigned locOffset,
+                                               lgc::InOutInfo outputInfo) {
+  assert(m_shaderStage == m_lastVertexProcessingStage);
+
+  // If the XFB info is specified from API interface so we try to retrieve the info from m_locXfbMap. Otherwise, the XFB
+  // info is obtained from the output metadata.
+  unsigned xfbBuffer = InvalidValue;
+  unsigned xfbStride = 0;
+  unsigned xfbOffset = 0;
+  unsigned location = outputMeta.Value; // builtInId
+  assert(!outputMeta.IsBuiltIn || locOffset == 0);
+  if (!outputMeta.IsBuiltIn)
+    location += locOffset;
+
+  DenseMap<unsigned, Vkgc::XfbOutInfo> *locXfbMapPtr = outputMeta.IsBuiltIn ? &m_builtInXfbMap : &m_genericXfbMap;
+  if (locXfbMapPtr->size() > 0) {
+    auto iter = locXfbMapPtr->find(location);
+    if (iter == locXfbMapPtr->end())
+      return;
+    // Use API interface
+    xfbBuffer = iter->second.xfbBuffer;
+    xfbStride = iter->second.xfbStride;
+    xfbOffset = iter->second.xfbOffset;
+    if (outputMeta.IsBuiltIn)
+      xfbOffset += xfbOffsetAdjust;
+    else
+      outputInfo.setComponent(iter->second.component);
+  } else {
+    if (!outputMeta.IsXfb)
+      return;
+    // Use XFB qualifier
+    assert(xfbOffsetAdjust != InvalidValue && (!outputMeta.IsBuiltIn || xfbBufferAdjust == 0));
+    xfbBuffer = outputMeta.XfbBuffer + xfbBufferAdjust;
+    xfbStride = outputMeta.XfbStride;
+    xfbOffset = outputMeta.XfbOffset + outputMeta.XfbExtraOffset + xfbOffsetAdjust;
+  }
+
+  m_builder->CreateWriteXfbOutput(outputValue, outputMeta.IsBuiltIn, location, xfbBuffer, xfbStride,
+                                  m_builder->getInt32(xfbOffset), outputInfo);
+
+  if (!m_printedXfbInfo) {
+    LLPC_OUTS("\n===============================================================================\n");
+    LLPC_OUTS("// LLPC transform feedback export info (" << getShaderStageName(m_shaderStage) << " shader)\n\n");
+
+    m_printedXfbInfo = true;
+  }
+  LLPC_OUTS(*outputValue->getType());
+  if (outputMeta.IsBuiltIn) {
+    auto builtInId = static_cast<BuiltIn>(outputMeta.Value);
+    auto builtInName = getNameMap(builtInId).map(builtInId);
+    LLPC_OUTS(" (builtin = " << builtInName.substr(strlen("BuiltIn")) << "), ");
+  } else {
+    LLPC_OUTS(" (loc = " << location << ", comp = " << outputMeta.Component << "), ");
+  }
+  LLPC_OUTS("xfbBuffer = " << xfbBuffer << ", "
+                           << "xfbStride = " << xfbStride << ", "
+                           << "xfbOffset = " << xfbOffset << ", "
+                           << "streamID = " << outputMeta.StreamId << "\n");
 }
 
 } // namespace Llpc

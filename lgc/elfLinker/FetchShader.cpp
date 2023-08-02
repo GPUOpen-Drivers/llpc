@@ -103,7 +103,8 @@ Module *FetchShader::generate() {
 void FetchShader::generateFetchShaderBody(Function *fetchFunc) { // Process each vertex input.
   std::unique_ptr<VertexFetch> vertexFetch(VertexFetch::create(m_lgcContext));
   auto ret = cast<ReturnInst>(fetchFunc->back().getTerminator());
-  BuilderBase builder(ret);
+  BuilderImpl builder(m_pipelineState);
+  builder.SetInsertPoint(ret);
   Value *result = ret->getOperand(0);
 
   for (unsigned idx = 0; idx != m_fetches.size(); ++idx) {

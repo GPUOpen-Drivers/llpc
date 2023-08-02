@@ -70,6 +70,7 @@ void PatchInOutImportExport::initPerShader() {
   m_layer = nullptr;
   m_viewIndex = nullptr;
   m_threadId = nullptr;
+  m_edgeFlag = nullptr;
 
   m_attribExports.clear();
 }
@@ -1173,6 +1174,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
     bool useLayer = false;
     bool useViewportIndex = false;
     bool useShadingRate = false;
+    bool useEdgeFlag = false;
     unsigned clipDistanceCount = 0;
     unsigned cullDistanceCount = 0;
 
@@ -1189,6 +1191,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       useShadingRate = builtInUsage.primitiveShadingRate;
       clipDistanceCount = builtInUsage.clipDistance;
       cullDistanceCount = builtInUsage.cullDistance;
+      useEdgeFlag = builtInUsage.edgeFlag;
     } else if (m_shaderStage == ShaderStageTessEval) {
       auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes;
 
@@ -1280,7 +1283,8 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
           clipCullDistance.push_back(poison);
       }
 
-      bool miscExport = usePointSize || useLayer || useViewportIndex || useShadingRate || enableMultiView;
+      bool miscExport =
+          usePointSize || useLayer || useViewportIndex || useShadingRate || enableMultiView || useEdgeFlag;
       // NOTE: When misc. export is present, gl_ClipDistance[] or gl_CullDistance[] should start from pos2.
       unsigned pos = miscExport ? EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
       Value *args[] = {
@@ -1384,6 +1388,11 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
 
         recordVertexAttribExport(loc, {primitiveId, poison, poison, poison});
       }
+    }
+
+    // Export EdgeFlag
+    if (useEdgeFlag) {
+      addExportInstForBuiltInOutput(m_edgeFlag, BuiltInEdgeFlag, insertPos);
     }
 
     if (m_gfxIp.major <= 8 && (useLayer || enableMultiView)) {
@@ -2953,6 +2962,12 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
       addExportInstForBuiltInOutput(output, builtInId, insertPos);
     }
 
+    break;
+  }
+  case BuiltInEdgeFlag: {
+    if (!m_hasTs && !m_hasGs) {
+      m_edgeFlag = output;
+    }
     break;
   }
   default: {
@@ -5090,6 +5105,22 @@ void PatchInOutImportExport::addExportInstForBuiltInOutput(Value *output, unsign
     assert(m_gfxIp >= GfxIpVersion({10, 3}));
 
     exportShadingRate(output, insertPos);
+    break;
+  }
+  case BuiltInEdgeFlag: {
+    Value *edgeflag = new BitCastInst(output, Type::getFloatTy(*m_context), "", insertPos);
+
+    Value *args[] = {
+        ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_POS_1), // tgt
+        ConstantInt::get(Type::getInt32Ty(*m_context), 0x2),              // en
+        PoisonValue::get(Type::getFloatTy(*m_context)),                   // src1
+        edgeflag,                                                         // src0
+        PoisonValue::get(Type::getFloatTy(*m_context)),                   // src2
+        PoisonValue::get(Type::getFloatTy(*m_context)),                   // src3
+        ConstantInt::get(Type::getInt1Ty(*m_context), false),             // done
+        ConstantInt::get(Type::getInt1Ty(*m_context), false)              // vm
+    };
+    emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
     break;
   }
   default: {
