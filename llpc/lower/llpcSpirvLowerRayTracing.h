@@ -150,7 +150,7 @@ class SpirvLowerRayTracing : public SpirvLowerRayQuery {
 public:
   SpirvLowerRayTracing();
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
-  virtual bool runImpl(llvm::Module &module);
+  bool runImpl(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
   static llvm::StringRef name() { return "Lower SPIR-V RayTracing operations"; }
 
@@ -161,7 +161,7 @@ private:
   void replaceGlobal(llvm::GlobalVariable *global, llvm::Value *replacedGlobal);
   void processShaderRecordBuffer(llvm::GlobalVariable *global, llvm::Value *bufferDesc, llvm::Value *tableIndex,
                                  llvm::Instruction *insertPos);
-  void createTraceRay();
+  llvm::CallInst *createTraceRay();
   void createSetHitAttributes(llvm::Function *func, unsigned instArgsNum, unsigned traceParamsOffset);
   void createSetTraceParams(llvm::Function *func, unsigned instArgNum);
   void createAnyHitFunc(llvm::Value *shaderIdentifier, llvm::Value *shaderRecordIndex);
@@ -186,6 +186,7 @@ private:
   void initGlobalPayloads();
   void initGlobalCallableData();
   void initShaderBuiltIns();
+  void inlineTraceRay(llvm::CallInst *callInst, ModuleAnalysisManager &analysisManager);
   llvm::Instruction *createEntryFunc(llvm::Function *func);
   void createEntryTerminator(llvm::Function *func);
   llvm::FunctionType *getShaderEntryFuncTy(ShaderStage stage);

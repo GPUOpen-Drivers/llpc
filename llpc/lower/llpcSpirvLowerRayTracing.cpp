@@ -40,8 +40,11 @@
 #include "lgc/GpurtDialect.h"
 #include "lgc/Pipeline.h"
 #include "llvm-dialects/Dialect/Visitor.h"
+#include "llvm/Analysis/AliasAnalysis.h"
+#include "llvm/Analysis/ProfileSummaryInfo.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower-ray-tracing"
 
@@ -494,7 +497,7 @@ void SpirvLowerRayTracing::visitReportHitOp(ReportHitOp &inst) {
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses SpirvLowerRayTracing::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  runImpl(module);
+  runImpl(module, analysisManager);
   return PreservedAnalyses::none();
 }
 
@@ -502,7 +505,8 @@ PreservedAnalyses SpirvLowerRayTracing::run(Module &module, ModuleAnalysisManage
 // Executes this SPIR-V lowering pass on the specified LLVM module.
 //
 // @param [in,out] module : LLVM module to be run on
-bool SpirvLowerRayTracing::runImpl(Module &module) {
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+bool SpirvLowerRayTracing::runImpl(Module &module, ModuleAnalysisManager &analysisManager) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Ray-Tracing\n");
 
   SpirvLower::init(&module);
@@ -534,7 +538,8 @@ bool SpirvLowerRayTracing::runImpl(Module &module) {
   // Process traceRays module
   if (m_shaderStage == ShaderStageCompute) {
 
-    createTraceRay();
+    CallInst *call = createTraceRay();
+    inlineTraceRay(call, analysisManager);
     static auto visitor = llvm_dialects::VisitorBuilder<SpirvLowerRayTracing>()
                               .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
                               .add(&SpirvLowerRayTracing::visitGetHitAttributes)
@@ -1649,14 +1654,13 @@ void SpirvLowerRayTracing::processPostReportIntersection(Function *func, CallIns
 
 // =====================================================================================================================
 // Create traceray module entry function
-void SpirvLowerRayTracing::createTraceRay() {
+CallInst *SpirvLowerRayTracing::createTraceRay() {
   assert(m_shaderStage == ShaderStageCompute);
 
   // Create traceRay module entry function
   StringRef traceEntryFuncName = m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_TRACE_RAY);
-  m_entryPoint = m_module->getFunction(traceEntryFuncName);
-  assert(m_entryPoint != nullptr);
-  createTraceParams(m_entryPoint);
+  Function *traceRayFunc = m_module->getFunction(traceEntryFuncName);
+  assert(traceRayFunc != nullptr);
 
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
   bool indirect = rayTracingContext->getIndirectStageMask() & ShaderStageComputeBit;
@@ -1669,6 +1673,7 @@ void SpirvLowerRayTracing::createTraceRay() {
     func->addFnAttr(Attribute::AlwaysInline);
 
   func->addFnAttr(Attribute::NoUnwind);
+  m_entryPoint = func;
 
   // Currently PAL does not support the debug section in the elf file
   if (!cl::TrimDebugInfo)
@@ -1833,10 +1838,33 @@ void SpirvLowerRayTracing::createTraceRay() {
   m_builder->create<lgc::GpurtSetRayStaticIdOp>(arg);
 
   // Call TraceRay function from traceRays module
-  auto call = m_builder->CreateCall(m_entryPoint, traceRaysArgs);
+  auto call = m_builder->CreateCall(traceRayFunc, traceRaysArgs);
 
   (void(call)); // unused
   m_builder->CreateRet(m_builder->CreateLoad(m_globalPayload->getValueType(), m_globalPayload));
+  createTraceParams(func);
+  return call;
+}
+
+// =====================================================================================================================
+// Inline traceray entry function in the _cs_ function
+//
+// @param callInst : Where to inline function
+// @param analysisManager : : Analysis manager to use for this transformation
+void SpirvLowerRayTracing::inlineTraceRay(llvm::CallInst *callInst, ModuleAnalysisManager &analysisManager) {
+  FunctionAnalysisManager &fam = analysisManager.getResult<FunctionAnalysisManagerModuleProxy>(*m_module).getManager();
+  auto getAssumptionCache = [&](Function &F) -> AssumptionCache & { return fam.getResult<AssumptionAnalysis>(F); };
+  auto getBFI = [&](Function &F) -> BlockFrequencyInfo & { return fam.getResult<BlockFrequencyAnalysis>(F); };
+  auto getAAR = [&](Function &F) -> AAResults & { return fam.getResult<AAManager>(F); };
+  auto &psi = analysisManager.getResult<ProfileSummaryAnalysis>(*m_module);
+  auto calleeFunc = callInst->getCalledFunction();
+  auto callingFunc = callInst->getCaller();
+  InlineFunctionInfo IFI(getAssumptionCache, &psi, &getBFI(*callingFunc), &getBFI(*calleeFunc));
+  InlineResult res = InlineFunction(*callInst, IFI, /*MergeAttributes=*/true, &getAAR(*calleeFunc), true);
+  (void(res)); // unused
+  assert(res.isSuccess());
+  calleeFunc->dropAllReferences();
+  calleeFunc->eraseFromParent();
 }
 
 // =====================================================================================================================
