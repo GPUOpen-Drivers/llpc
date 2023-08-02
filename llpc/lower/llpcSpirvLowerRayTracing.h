@@ -150,7 +150,6 @@ class SpirvLowerRayTracing : public SpirvLowerRayQuery {
 public:
   SpirvLowerRayTracing();
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
-  bool runImpl(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
   static llvm::StringRef name() { return "Lower SPIR-V RayTracing operations"; }
 

@@ -497,16 +497,6 @@ void SpirvLowerRayTracing::visitReportHitOp(ReportHitOp &inst) {
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses SpirvLowerRayTracing::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  runImpl(module, analysisManager);
-  return PreservedAnalyses::none();
-}
-
-// =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in,out] module : LLVM module to be run on
-// @param [in/out] analysisManager : Analysis manager to use for this transformation
-bool SpirvLowerRayTracing::runImpl(Module &module, ModuleAnalysisManager &analysisManager) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Ray-Tracing\n");
 
   SpirvLower::init(&module);
@@ -516,15 +506,15 @@ bool SpirvLowerRayTracing::runImpl(Module &module, ModuleAnalysisManager &analys
   initGlobalPayloads();
   initShaderBuiltIns();
   initGlobalCallableData();
-
+  Instruction *insertPos = nullptr;
   // Create empty raygen main module
   if (module.empty()) {
     m_shaderStage = ShaderStageRayTracingRayGen;
     createRayGenEntryFunc();
     rayTracingContext->setEntryName("main");
-    return true;
+    goto end;
   }
-  Instruction *insertPos = nullptr;
+
   if (m_shaderStage == ShaderStageRayTracingClosestHit || m_shaderStage == ShaderStageRayTracingAnyHit ||
       m_shaderStage == ShaderStageRayTracingIntersect || m_shaderStage == ShaderStageRayTracingMiss) {
     insertPos = createEntryFunc(m_entryPoint);
@@ -643,10 +633,9 @@ bool SpirvLowerRayTracing::runImpl(Module &module, ModuleAnalysisManager &analys
     func->dropAllReferences();
     func->eraseFromParent();
   }
-
+end:
   LLVM_DEBUG(dbgs() << "After the pass Spirv-Lower-Ray-Tracing " << module);
-
-  return true;
+  return PreservedAnalyses::none();
 }
 
 // =====================================================================================================================
