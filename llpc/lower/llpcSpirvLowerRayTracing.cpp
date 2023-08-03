@@ -512,7 +512,7 @@ PreservedAnalyses SpirvLowerRayTracing::run(Module &module, ModuleAnalysisManage
     m_shaderStage = ShaderStageRayTracingRayGen;
     createRayGenEntryFunc();
     rayTracingContext->setEntryName("main");
-    goto end;
+    return PreservedAnalyses::none();
   }
 
   if (m_shaderStage == ShaderStageRayTracingClosestHit || m_shaderStage == ShaderStageRayTracingAnyHit ||
@@ -633,7 +633,7 @@ PreservedAnalyses SpirvLowerRayTracing::run(Module &module, ModuleAnalysisManage
     func->dropAllReferences();
     func->eraseFromParent();
   }
-end:
+
   LLVM_DEBUG(dbgs() << "After the pass Spirv-Lower-Ray-Tracing " << module);
   return PreservedAnalyses::none();
 }
