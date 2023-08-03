@@ -228,8 +228,6 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "demote.to.helper.invocation";
   case BuilderOpcode::IsHelperInvocation:
     return "is.helper.invocation";
-  case BuilderOpcode::EmitMeshTasks:
-    return "emit.mesh.tasks";
   case BuilderOpcode::SetMeshOutputs:
     return "set.mesh.outputs";
   case BuilderOpcode::ImageLoad:
@@ -894,20 +892,6 @@ Instruction *Builder::CreateDemoteToHelperInvocation(const Twine &instName) {
 // @param instName : Name to give final instruction
 Value *Builder::CreateIsHelperInvocation(const Twine &instName) {
   return record(BuilderOpcode::IsHelperInvocation, getInt1Ty(), {}, instName);
-}
-
-// =====================================================================================================================
-// In the task shader, emit the current values of all per-task output variables to the current task output by
-// specifying the group count XYZ of the launched child mesh tasks.
-//
-// @param groupCountX : X dimension of the launched child mesh tasks
-// @param groupCountY : Y dimension of the launched child mesh tasks
-// @param groupCountZ : Z dimension of the launched child mesh tasks
-// @param instName : Name to give final instruction
-// @returns Instruction to emit mesh tasks
-Instruction *Builder::CreateEmitMeshTasks(Value *groupCountX, Value *groupCountY, Value *groupCountZ,
-                                          const Twine &instName) {
-  return record(BuilderOpcode::EmitMeshTasks, nullptr, {groupCountX, groupCountY, groupCountZ}, instName);
 }
 
 // =====================================================================================================================
@@ -2124,7 +2108,6 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::ImageQuerySamples:
     case BuilderOpcode::ImageQuerySize:
     case BuilderOpcode::IsHelperInvocation:
-    case BuilderOpcode::EmitMeshTasks:
     case BuilderOpcode::SetMeshOutputs:
     case BuilderOpcode::Kill:
     case BuilderOpcode::ReadClock:

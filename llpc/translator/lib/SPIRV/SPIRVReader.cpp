@@ -3823,7 +3823,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpEmitMeshTasksEXT>(SPIRVVa
   Value *const groupCountX = transValue(spvOperands[0], func, block);
   Value *const groupCountY = transValue(spvOperands[1], func, block);
   Value *const groupCountZ = transValue(spvOperands[2], func, block);
-  getBuilder()->CreateEmitMeshTasks(groupCountX, groupCountY, groupCountZ);
+  getBuilder()->create<lgc::EmitMeshTasksOp>(groupCountX, groupCountY, groupCountZ);
   // NOTE: According to SPIR-V spec, OpEmitMeshTasksEXT is a terminator. Hence, we have to insert
   // a return instruction to implement this semantics.
   return getBuilder()->CreateRetVoid();

@@ -627,11 +627,6 @@ public:
   // Create a helper invocation query. Only allowed in a fragment shader.
   llvm::Value *CreateIsHelperInvocation(const llvm::Twine &instName = "");
 
-  // In the task shader, emit the current values of all per-task output variables to the current task output by
-  // specifying the group count XYZ of the launched child mesh tasks.
-  llvm::Instruction *CreateEmitMeshTasks(llvm::Value *groupCountX, llvm::Value *groupCountY, llvm::Value *groupCountZ,
-                                         const llvm::Twine &instName = "");
-
   // In the mesh shader, set the actual output size of the primitives and vertices that the mesh shader workgroup will
   // emit upon completion.
   llvm::Instruction *CreateSetMeshOutputs(llvm::Value *vertexCount, llvm::Value *primitiveCount,
