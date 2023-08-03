@@ -686,9 +686,6 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   case BuilderOpcode::DebugBreak: {
     return m_builder->CreateDebugBreak();
   }
-  case BuilderOpcode::SetMeshOutputs: {
-    return m_builder->CreateSetMeshOutputs(args[0], args[1]);
-  }
   case BuilderOpcode::TransposeMatrix: {
     return m_builder->CreateTransposeMatrix(args[0]);
   }

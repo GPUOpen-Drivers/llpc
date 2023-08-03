@@ -2062,9 +2062,10 @@ void PatchInOutImportExport::patchMeshGenericOutputExport(Value *output, unsigne
 
   outputOffset = builder.CreateAdd(outputOffset, compIdx);
 
-  std::string callName(isPerPrimitive ? lgcName::MeshTaskWritePrimitiveOutput : lgcName::MeshTaskWriteVertexOutput);
-  callName += getTypeName(outputTy);
-  builder.CreateNamedCall(callName, builder.getVoidTy(), {outputOffset, vertexOrPrimitiveIdx, output}, {});
+  if (isPerPrimitive)
+    builder.create<WriteMeshPrimitiveOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
+  else
+    builder.create<WriteMeshVertexOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
 }
 
 // =====================================================================================================================
@@ -2402,9 +2403,7 @@ Value *PatchInOutImportExport::patchMeshBuiltInInputImport(Type *inputTy, unsign
     break;
   }
 
-  std::string callName(lgcName::MeshTaskGetMeshInput);
-  callName += getTypeName(inputTy);
-  Value *input = builder.CreateNamedCall(callName, inputTy, builder.getInt32(builtInId), {});
+  Value *input = builder.create<GetMeshBuiltinInputOp>(inputTy, builtInId);
   if (elemIdx)
     input = builder.CreateExtractElement(input, elemIdx);
   return input;
@@ -3262,8 +3261,6 @@ void PatchInOutImportExport::patchMeshBuiltInOutputExport(Value *output, unsigne
   BuilderBase builder(*m_context);
   builder.SetInsertPoint(insertPos);
 
-  auto outputTy = output->getType();
-
   // Handle primitive indices built-ins
   if (builtInId == BuiltInPrimitivePointIndices || builtInId == BuiltInPrimitiveLineIndices ||
       builtInId == BuiltInPrimitiveTriangleIndices) {
@@ -3278,17 +3275,15 @@ void PatchInOutImportExport::patchMeshBuiltInOutputExport(Value *output, unsigne
     // whole, partial writes to the vector components for line and triangle primitives is not allowed."
     assert(!elemIdx);
 
-    builder.CreateNamedCall(lgcName::MeshTaskSetPrimitiveIndices + getTypeName(outputTy), builder.getVoidTy(),
-                            {vertexOrPrimitiveIdx, output}, {});
+    builder.create<SetMeshPrimitiveIndicesOp>(vertexOrPrimitiveIdx, output);
     return;
   }
 
   // Handle cull primitive built-in
   if (builtInId == BuiltInCullPrimitive) {
     assert(isPerPrimitive);
-    assert(outputTy->isIntegerTy(1)); // Must be boolean
-    builder.CreateNamedCall(lgcName::MeshTaskSetPrimitiveCulled, builder.getVoidTy(), {vertexOrPrimitiveIdx, output},
-                            {});
+    assert(output->getType()->isIntegerTy(1)); // Must be boolean
+    builder.create<SetMeshPrimitiveCulledOp>(vertexOrPrimitiveIdx, output);
     return;
   }
 
@@ -3350,9 +3345,10 @@ void PatchInOutImportExport::patchMeshBuiltInOutputExport(Value *output, unsigne
   if (elemIdx)
     outputOffset = builder.CreateAdd(builder.getInt32(4 * loc), elemIdx);
 
-  std::string callName(isPerPrimitive ? lgcName::MeshTaskWritePrimitiveOutput : lgcName::MeshTaskWriteVertexOutput);
-  callName += getTypeName(outputTy);
-  builder.CreateNamedCall(callName, builder.getVoidTy(), {outputOffset, vertexOrPrimitiveIdx, output}, {});
+  if (isPerPrimitive)
+    builder.create<WriteMeshPrimitiveOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
+  else
+    builder.create<WriteMeshVertexOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
 }
 
 // =====================================================================================================================

@@ -82,6 +82,12 @@ private:
 
   void lowerTaskPayloadPtr(TaskPayloadPtrOp &taskPayloadPtrOp);
   void lowerEmitMeshTasks(EmitMeshTasksOp &emitMeshTasksOp);
+  void lowerSetMeshOutputs(SetMeshOutputsOp &setMeshOutputsOp);
+  void lowerSetMeshPrimitiveIndices(SetMeshPrimitiveIndicesOp &setMeshPrimitiveIndicesOp);
+  void lowerSetMeshPrimitiveCulled(SetMeshPrimitiveCulledOp &setMeshPrimitiveCulledOp);
+  void lowerGetMeshBuiltinInput(GetMeshBuiltinInputOp &getMeshBuiltinInputOp);
+  void lowerWriteMeshVertexOutput(WriteMeshVertexOutputOp &writeMeshVertexOutputOp);
+  void lowerWriteMeshPrimitiveOutput(WriteMeshPrimitiveOutputOp &writeMeshPrimitiveOutputOp);
 
   void initWaveThreadInfo(llvm::Function *entryPoint);
   llvm::Value *getShaderRingEntryIndex(llvm::Function *entryPoint);
@@ -94,12 +100,6 @@ private:
 
   llvm::Function *mutateMeshShaderEntryPoint(llvm::Function *entryPoint);
   void lowerMeshShaderBody(llvm::BasicBlock *apiMeshEntryBlock, llvm::BasicBlock *apiMeshExitBlock);
-  void setMeshOutputs(llvm::Value *vertexCount, llvm::Value *primitiveCount);
-  void setPrimitiveIndices(llvm::Value *primitiveIndex, llvm::Value *primitiveIndices);
-  void setPrimitiveCulled(llvm::Value *primitiveIndex, llvm::Value *isCulled);
-  llvm::Value *getMeshInput(BuiltInKind builtIn);
-  void writeVertexOutput(llvm::Value *outputOffset, llvm::Value *vertexIndex, llvm::Value *outputValue);
-  void writePrimitiveOutput(llvm::Value *outputOffset, llvm::Value *primitiveIndex, llvm::Value *outputValue);
 
   void exportPrimitive();
   void exportVertex();

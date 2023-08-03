@@ -49,14 +49,6 @@ const static char StreamOutBufferStore[] = "lgc.streamoutbuffer.store";
 const static char ReconfigureLocalInvocationId[] = "lgc.reconfigure.local.invocation.id";
 const static char SwizzleWorkgroupId[] = "lgc.swizzle.workgroup.id";
 
-const static char MeshTaskCallPrefix[] = "lgc.mesh.task.";
-const static char MeshTaskSetMeshOutputs[] = "lgc.mesh.task.set.mesh.outputs";
-const static char MeshTaskSetPrimitiveIndices[] = "lgc.mesh.task.set.primitive.indices.";
-const static char MeshTaskSetPrimitiveCulled[] = "lgc.mesh.task.set.primitive.culled";
-const static char MeshTaskGetMeshInput[] = "lgc.mesh.task.get.mesh.input.";
-const static char MeshTaskWriteVertexOutput[] = "lgc.mesh.task.write.vertex.output.";
-const static char MeshTaskWritePrimitiveOutput[] = "lgc.mesh.task.write.primitive.output.";
-
 // Get pointer to spill table (as pointer to i8)
 const static char SpillTable[] = "lgc.spill.table";
 // Get pointer to push constant (as pointer type indicated by the return type)

@@ -228,8 +228,6 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "demote.to.helper.invocation";
   case BuilderOpcode::IsHelperInvocation:
     return "is.helper.invocation";
-  case BuilderOpcode::SetMeshOutputs:
-    return "set.mesh.outputs";
   case BuilderOpcode::ImageLoad:
     return "image.load";
   case BuilderOpcode::ImageLoadWithFmask:
@@ -892,18 +890,6 @@ Instruction *Builder::CreateDemoteToHelperInvocation(const Twine &instName) {
 // @param instName : Name to give final instruction
 Value *Builder::CreateIsHelperInvocation(const Twine &instName) {
   return record(BuilderOpcode::IsHelperInvocation, getInt1Ty(), {}, instName);
-}
-
-// =====================================================================================================================
-// In the mesh shader, set the actual output size of the primitives and vertices that the mesh shader workgroup will
-// emit upon completion.
-//
-// @param vertexCount : Actual output size of the vertices
-// @param primitiveCount : Actual output size of the primitives
-// @param instName : Name to give final instruction
-// @returns Instruction to set the actual size of mesh outputs
-Instruction *Builder::CreateSetMeshOutputs(Value *vertexCount, Value *primitiveCount, const Twine &instName) {
-  return record(BuilderOpcode::SetMeshOutputs, nullptr, {vertexCount, primitiveCount}, instName);
 }
 
 // =====================================================================================================================
@@ -2108,7 +2094,6 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::ImageQuerySamples:
     case BuilderOpcode::ImageQuerySize:
     case BuilderOpcode::IsHelperInvocation:
-    case BuilderOpcode::SetMeshOutputs:
     case BuilderOpcode::Kill:
     case BuilderOpcode::ReadClock:
     case BuilderOpcode::DebugBreak:

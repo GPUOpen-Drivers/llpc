@@ -3857,7 +3857,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpSetMeshOutputsEXT>(SPIRVV
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const vertexCount = transValue(spvOperands[0], func, block);
   Value *const primitiveCount = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSetMeshOutputs(vertexCount, primitiveCount);
+  return getBuilder()->create<lgc::SetMeshOutputsOp>(vertexCount, primitiveCount);
 }
 
 // =====================================================================================================================
