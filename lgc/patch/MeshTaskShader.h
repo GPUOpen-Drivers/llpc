@@ -81,6 +81,7 @@ private:
   void processMeshShader(llvm::Function *entryPoint);
 
   void lowerTaskPayloadPtr(TaskPayloadPtrOp &taskPayloadPtrOp);
+  void lowerEmitMeshTasks(EmitMeshTasksOp &emitMeshTasksOp);
 
   void initWaveThreadInfo(llvm::Function *entryPoint);
   llvm::Value *getShaderRingEntryIndex(llvm::Function *entryPoint);
@@ -88,7 +89,6 @@ private:
   llvm::Value *getPayloadRingEntryOffset(llvm::Function *entryPoint);
   llvm::Value *getDrawDataRingEntryOffset(llvm::Function *entryPoint);
   llvm::Value *getDrawDataReadyBit(llvm::Function *entryPoint);
-  void emitTaskMeshs(llvm::Value *groupCountX, llvm::Value *groupCountY, llvm::Value *groupCountZ);
 
   llvm::Value *convertToDivergent(llvm::Value *value);
 

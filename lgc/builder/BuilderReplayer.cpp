@@ -686,9 +686,6 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   case BuilderOpcode::DebugBreak: {
     return m_builder->CreateDebugBreak();
   }
-  case BuilderOpcode::EmitMeshTasks: {
-    return m_builder->CreateEmitMeshTasks(args[0], args[1], args[2]);
-  }
   case BuilderOpcode::SetMeshOutputs: {
     return m_builder->CreateSetMeshOutputs(args[0], args[1]);
   }

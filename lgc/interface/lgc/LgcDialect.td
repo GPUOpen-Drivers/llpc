@@ -108,6 +108,21 @@ def TaskPayloadPtrOp : LgcOp<"task.payload.ptr", [Memory<[]>, WillReturn]> {
   }];
 }
 
+def EmitMeshTasksOp : LgcOp<"emit.mesh.tasks", [Memory<[]>]> {
+  let arguments = (ins I32:$groupCountX, I32:$groupCountY, I32:$groupCountZ);
+  let results = (outs);
+
+  let summary = "emit the current values of all per-task output variables to the current task output";
+  let description = [{
+    In the task shader, emit the current values of all per-task output variables to the current task output by
+    specifying the group count XYZ of the launched child mesh tasks.
+
+    `groupCountX` is X dimension of the launched child mesh tasks.
+    `groupCountY` is Y dimension of the launched child mesh tasks.
+    `groupCountZ` is Z dimension of the launched child mesh tasks.
+  }];
+}
+
 def GenericLocationOp : OpClass<LgcDialect> {
   let arguments = (ins AttrI1:$perPrimitive, AttrI32:$location, I32:$locOffset, I32:$elemIdx, I32:$arrayIndex);
 

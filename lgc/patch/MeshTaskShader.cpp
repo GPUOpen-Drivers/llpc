@@ -353,40 +353,10 @@ void MeshTaskShader::processTaskShader(Function *entryPoint) {
   m_builder.SetInsertPointPastAllocas(entryPoint);
   initWaveThreadInfo(entryPoint);
 
-  auto module = entryPoint->getParent();
-  for (auto &func : module->functions()) {
-    if (!func.isDeclaration())
-      continue; // Not targets
-
-    if (func.getName().startswith(lgcName::MeshTaskCallPrefix)) {
-      for (auto user : func.users()) {
-        CallInst *const call = cast<CallInst>(user);
-
-        if (call->getFunction() != entryPoint)
-          continue; // Not belong to task shader
-
-        m_builder.SetInsertPoint(call);
-
-        if (func.getName().startswith(lgcName::MeshTaskEmitMeshTasks)) {
-          // Emit mesh tasks
-          assert(call->arg_size() == 3);
-          auto groupCountX = call->getOperand(0);
-          auto groupCountY = call->getOperand(1);
-          auto groupCountZ = call->getOperand(2);
-
-          emitTaskMeshs(groupCountX, groupCountY, groupCountZ);
-        } else {
-          llvm_unreachable("Unknown task shader call!");
-        }
-
-        m_callsToRemove.push_back(call);
-      }
-    }
-  }
-
   static auto visitor = llvm_dialects::VisitorBuilder<MeshTaskShader>()
                             .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
                             .add<TaskPayloadPtrOp>(&MeshTaskShader::lowerTaskPayloadPtr)
+                            .add<EmitMeshTasksOp>(&MeshTaskShader::lowerEmitMeshTasks)
                             .build();
   visitor.visit(*this, *entryPoint);
 
@@ -951,6 +921,8 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
 
 // =====================================================================================================================
 // Lower task payload pointer to buffer fat pointer.
+//
+// @param taskPayloadPtrOp : Call instruction op to get task payload pointer
 void MeshTaskShader::lowerTaskPayloadPtr(TaskPayloadPtrOp &taskPayloadPtrOp) {
   m_builder.SetInsertPoint(&taskPayloadPtrOp);
 
@@ -991,6 +963,126 @@ void MeshTaskShader::lowerTaskPayloadPtr(TaskPayloadPtrOp &taskPayloadPtrOp) {
     m_accessTaskPayload = true; // Mark this flag if task shader accesses task payload
 
   m_callsToRemove.push_back(&taskPayloadPtrOp);
+}
+
+// =====================================================================================================================
+// Lower emit mesh tasks. Defines the dimension size of subsequent mesh shader workgroups to generate upon completion
+// of the task shader workgroup.
+//
+// @param emitMeshTasksOp : Call instruction op to emit mesh tasks
+void MeshTaskShader::lowerEmitMeshTasks(EmitMeshTasksOp &emitMeshTasksOp) {
+  m_builder.SetInsertPoint(&emitMeshTasksOp);
+
+  auto entryPoint = emitMeshTasksOp.getFunction();
+  assert(getShaderStage(entryPoint) == ShaderStageTask); // Must be task shader
+
+  auto groupCountX = emitMeshTasksOp.getGroupCountX();
+  auto groupCountY = emitMeshTasksOp.getGroupCountY();
+  auto groupCountZ = emitMeshTasksOp.getGroupCountZ();
+
+  // Mark the flag of mesh linear dispatch from task when the group count Y and Z are both ones
+  if (isa<ConstantInt>(groupCountY) && isa<ConstantInt>(groupCountZ)) {
+    const unsigned constGroupCountY = cast<ConstantInt>(groupCountY)->getZExtValue();
+    const unsigned constGroupCountZ = cast<ConstantInt>(groupCountZ)->getZExtValue();
+    m_pipelineState->getShaderResourceUsage(ShaderStageTask)->builtInUsage.task.meshLinearDispatch =
+        constGroupCountY == 1 && constGroupCountZ == 1;
+  }
+
+  auto emitMeshTasksCall = m_builder.GetInsertPoint();
+
+  auto checkEmitMeshTasksBlock = m_builder.GetInsertBlock();
+  auto emitMeshTasksBlock = checkEmitMeshTasksBlock->splitBasicBlock(emitMeshTasksCall, ".emitMeshTasks");
+  auto endEmitMeshTasksBlock = emitMeshTasksBlock->splitBasicBlock(emitMeshTasksCall, ".endEmitMeshTasks");
+
+  // Modify ".checkEmitMeshTasks" block
+  {
+    m_builder.SetInsertPoint(checkEmitMeshTasksBlock->getTerminator());
+
+    if (m_accessTaskPayload) {
+      // Make sure the task payload read/write access is completed
+      m_builder.CreateFence(AtomicOrdering::Release, SyncScope::System);
+      createBarrier();
+    }
+
+    auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_waveThreadInfo.threadIdInSubgroup, m_builder.getInt32(0));
+    m_builder.CreateCondBr(firstThreadInSubgroup, emitMeshTasksBlock, endEmitMeshTasksBlock);
+    checkEmitMeshTasksBlock->getTerminator()->eraseFromParent(); // Remove old terminator
+  }
+
+  // Construct ".emitMeshTasks" block
+  {
+    m_builder.SetInsertPoint(emitMeshTasksBlock->getTerminator());
+
+    //
+    // Collect task statistics info
+    //
+    if (m_pipelineState->needSwMeshPipelineStats()) {
+      auto &computeMode =
+          m_pipelineState->getShaderModes()->getComputeShaderMode(); // Task shader is actually a compute shader
+      const uint64_t numTaskThreads =
+          computeMode.workgroupSizeX * computeMode.workgroupSizeY * computeMode.workgroupSizeZ;
+
+      Value *meshPipeStatsBufPtr = m_pipelineSysValues.get(entryPoint)->getMeshPipeStatsBufPtr();
+      Value *meshPipeStatsBufEntryPtr = m_builder.CreateGEP(
+          m_builder.getInt8Ty(), meshPipeStatsBufPtr, m_builder.getInt32(offsetof(MeshPipeStatsEntry, numTaskThreads)));
+      meshPipeStatsBufEntryPtr = m_builder.CreateBitCast(meshPipeStatsBufEntryPtr,
+                                                         PointerType::get(m_builder.getInt64Ty(), ADDR_SPACE_GLOBAL));
+
+      // NOTE: LLVM backend will try to apply atomics optimization. But here, we only have one active thread to execute
+      // the global_atomic_add instruction. Thus, the optimization is completely unnecessary. To avoid this, we try to
+      // move the added value to VGPR to mark it as "divergent".
+      Value *valueToAdd = PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
+      valueToAdd = m_builder.CreateInsertElement(valueToAdd, convertToDivergent(m_builder.getInt32(numTaskThreads)),
+                                                 static_cast<uint64_t>(0));
+      valueToAdd =
+          m_builder.CreateInsertElement(valueToAdd, convertToDivergent(m_builder.getInt32(numTaskThreads >> 32)), 1);
+      valueToAdd = m_builder.CreateBitCast(valueToAdd, m_builder.getInt64Ty());
+
+      m_builder.CreateAtomicRMW(AtomicRMWInst::Add, meshPipeStatsBufEntryPtr, valueToAdd, MaybeAlign(),
+                                AtomicOrdering::Monotonic, SyncScope::System);
+    }
+
+    //
+    // Write draw data
+    //
+
+    // Set X dimension to 0 if any of X, Y, Z dimension is 0:
+    //   groupCountX = min(groupCountY, groupCountZ) == 0 ? 0 : groupCountX
+    auto minGroupCountYZ =
+        m_builder.CreateIntrinsic(Intrinsic::umin, groupCountY->getType(), {groupCountY, groupCountZ});
+    groupCountX = m_builder.CreateSelect(m_builder.CreateICmpEQ(minGroupCountYZ, m_builder.getInt32(0)),
+                                         m_builder.getInt32(0), groupCountX);
+
+    Value *drawDataRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskDrawDataRingBufDesc();
+    Value *drawDataRingEntryOffset = getDrawDataRingEntryOffset(entryPoint);
+
+    // Draw data = <groupCountX, groupCountY, groupCountZ, readyBit>
+    Value *groupCount = PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 3));
+    groupCount = m_builder.CreateInsertElement(groupCount, groupCountX, static_cast<uint64_t>(0));
+    groupCount = m_builder.CreateInsertElement(groupCount, groupCountY, 1);
+    groupCount = m_builder.CreateInsertElement(groupCount, groupCountZ, 2);
+
+    m_builder.CreateIntrinsic(
+        Intrinsic::amdgcn_raw_buffer_store, groupCount->getType(),
+        {groupCount, drawDataRingBufDesc, m_builder.getInt32(0), drawDataRingEntryOffset, m_builder.getInt32(0)});
+
+    // NOTE: Only the lowest 8 bits are for us to write.
+    Value *readyBit = getDrawDataReadyBit(entryPoint);
+    readyBit = m_builder.CreateZExt(readyBit, m_builder.getInt8Ty());
+
+    m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_store, readyBit->getType(),
+                              {readyBit, drawDataRingBufDesc, m_builder.getInt32(3 * sizeof(unsigned)),
+                               drawDataRingEntryOffset, m_builder.getInt32(0)});
+  }
+
+  // Construct ".endEmitMeshTasks" block
+  {
+    m_builder.SetInsertPoint(endEmitMeshTasksBlock->getTerminator());
+
+    // Currently, nothing to do
+  }
+
+  m_callsToRemove.push_back(&emitMeshTasksOp);
 }
 
 // =====================================================================================================================
@@ -1168,120 +1260,6 @@ Value *MeshTaskShader::getDrawDataReadyBit(Function *entryPoint) {
                                                        m_builder.getInt32(DrawDataRingEntrySize));
   // readyBit = ringEntryIndex & numRingEnties != 0
   return m_builder.CreateICmpNE(m_builder.CreateAnd(ringEntryIndex, numDrawDataRingEntries), m_builder.getInt32(0));
-}
-
-// =====================================================================================================================
-// Emit mesh tasks. Defines the dimension size of subsequent mesh shader workgroups to generate upon completion of the
-// task shader workgroup
-//
-// @param groupCountX : Number of local workgroups in X dimension for the launch of child mesh tasks
-// @param groupCountX : Number of local workgroups in Y dimension for the launch of child mesh tasks
-// @param groupCountX : Number of local workgroups in Z dimension for the launch of child mesh tasks
-void MeshTaskShader::emitTaskMeshs(Value *groupCountX, Value *groupCountY, Value *groupCountZ) {
-  auto entryPoint = m_builder.GetInsertBlock()->getParent();
-  assert(getShaderStage(entryPoint) == ShaderStageTask); // Must be task shader
-
-  // Mark the flag of mesh linear dispatch from task when the group count Y and Z are both ones
-  if (isa<ConstantInt>(groupCountY) && isa<ConstantInt>(groupCountZ)) {
-    const unsigned constGroupCountY = cast<ConstantInt>(groupCountY)->getZExtValue();
-    const unsigned constGroupCountZ = cast<ConstantInt>(groupCountZ)->getZExtValue();
-    m_pipelineState->getShaderResourceUsage(ShaderStageTask)->builtInUsage.task.meshLinearDispatch =
-        constGroupCountY == 1 && constGroupCountZ == 1;
-  }
-
-  auto emitMeshsCall = m_builder.GetInsertPoint();
-
-  auto checkEmitMeshsBlock = m_builder.GetInsertBlock();
-  auto emitMeshsBlock = checkEmitMeshsBlock->splitBasicBlock(emitMeshsCall, ".emitMeshs");
-  auto endEmitMeshsBlock = emitMeshsBlock->splitBasicBlock(emitMeshsCall, ".endEmitMeshs");
-
-  // Modify ".checkEmitMeshs" block
-  {
-    m_builder.SetInsertPoint(checkEmitMeshsBlock->getTerminator());
-
-    if (m_accessTaskPayload) {
-      // Make sure the task payload read/write access is completed
-      m_builder.CreateFence(AtomicOrdering::Release, SyncScope::System);
-      createBarrier();
-    }
-
-    auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_waveThreadInfo.threadIdInSubgroup, m_builder.getInt32(0));
-    m_builder.CreateCondBr(firstThreadInSubgroup, emitMeshsBlock, endEmitMeshsBlock);
-    checkEmitMeshsBlock->getTerminator()->eraseFromParent(); // Remove old terminator
-  }
-
-  // Construct ".emitTaskMeshs" block
-  {
-    m_builder.SetInsertPoint(emitMeshsBlock->getTerminator());
-
-    //
-    // Collect task statistics info
-    //
-    if (m_pipelineState->needSwMeshPipelineStats()) {
-      auto &computeMode =
-          m_pipelineState->getShaderModes()->getComputeShaderMode(); // Task shader is actually a compute shader
-      const uint64_t numTaskThreads =
-          computeMode.workgroupSizeX * computeMode.workgroupSizeY * computeMode.workgroupSizeZ;
-
-      Value *meshPipeStatsBufPtr = m_pipelineSysValues.get(entryPoint)->getMeshPipeStatsBufPtr();
-      Value *meshPipeStatsBufEntryPtr = m_builder.CreateGEP(
-          m_builder.getInt8Ty(), meshPipeStatsBufPtr, m_builder.getInt32(offsetof(MeshPipeStatsEntry, numTaskThreads)));
-      meshPipeStatsBufEntryPtr = m_builder.CreateBitCast(meshPipeStatsBufEntryPtr,
-                                                         PointerType::get(m_builder.getInt64Ty(), ADDR_SPACE_GLOBAL));
-
-      // NOTE: LLVM backend will try to apply atomics optimization. But here, we only have one active thread to execute
-      // the global_atomic_add instruction. Thus, the optimization is completely unnecessary. To avoid this, we try to
-      // move the added value to VGPR to mark it as "divergent".
-      Value *valueToAdd = PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
-      valueToAdd = m_builder.CreateInsertElement(valueToAdd, convertToDivergent(m_builder.getInt32(numTaskThreads)),
-                                                 static_cast<uint64_t>(0));
-      valueToAdd =
-          m_builder.CreateInsertElement(valueToAdd, convertToDivergent(m_builder.getInt32(numTaskThreads >> 32)), 1);
-      valueToAdd = m_builder.CreateBitCast(valueToAdd, m_builder.getInt64Ty());
-
-      m_builder.CreateAtomicRMW(AtomicRMWInst::Add, meshPipeStatsBufEntryPtr, valueToAdd, MaybeAlign(),
-                                AtomicOrdering::Monotonic, SyncScope::System);
-    }
-
-    //
-    // Write draw data
-    //
-
-    // Set X dimension to 0 if any of X, Y, Z dimension is 0:
-    //   groupCountX = min(groupCountY, groupCountZ) == 0 ? 0 : groupCountX
-    auto minGroupCountYZ =
-        m_builder.CreateIntrinsic(Intrinsic::umin, groupCountY->getType(), {groupCountY, groupCountZ});
-    groupCountX = m_builder.CreateSelect(m_builder.CreateICmpEQ(minGroupCountYZ, m_builder.getInt32(0)),
-                                         m_builder.getInt32(0), groupCountX);
-
-    Value *drawDataRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskDrawDataRingBufDesc();
-    Value *drawDataRingEntryOffset = getDrawDataRingEntryOffset(entryPoint);
-
-    // Draw data = <groupCountX, groupCountY, groupCountZ, readyBit>
-    Value *groupCount = PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 3));
-    groupCount = m_builder.CreateInsertElement(groupCount, groupCountX, static_cast<uint64_t>(0));
-    groupCount = m_builder.CreateInsertElement(groupCount, groupCountY, 1);
-    groupCount = m_builder.CreateInsertElement(groupCount, groupCountZ, 2);
-
-    m_builder.CreateIntrinsic(
-        Intrinsic::amdgcn_raw_buffer_store, groupCount->getType(),
-        {groupCount, drawDataRingBufDesc, m_builder.getInt32(0), drawDataRingEntryOffset, m_builder.getInt32(0)});
-
-    // NOTE: Only the lowest 8 bits are for us to write.
-    Value *readyBit = getDrawDataReadyBit(entryPoint);
-    readyBit = m_builder.CreateZExt(readyBit, m_builder.getInt8Ty());
-
-    m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_store, readyBit->getType(),
-                              {readyBit, drawDataRingBufDesc, m_builder.getInt32(3 * sizeof(unsigned)),
-                               drawDataRingEntryOffset, m_builder.getInt32(0)});
-  }
-
-  // Construct ".endEmitTaskMeshs" block
-  {
-    m_builder.SetInsertPoint(endEmitMeshsBlock->getTerminator());
-
-    // Currently, nothing to do
-  }
 }
 
 // =====================================================================================================================
