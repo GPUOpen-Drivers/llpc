@@ -1294,10 +1294,6 @@ unsigned PalMetadata::getFragmentShaderBuiltInLoc(unsigned builtin) {
 unsigned PalMetadata::getCallingConventionForFirstHardwareShaderStage(std::string &hwStageName) {
   if (m_useRegisterFieldFormat) {
     auto hardwareStages = m_pipelineNode[Util::Abi::PipelineMetadataKey::HardwareStages].getMap(true);
-    hwStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Vs)];
-    if (hardwareStages.find(hwStageName) != hardwareStages.end())
-      return CallingConv::AMDGPU_VS;
-
     hwStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Hs)];
     if (hardwareStages.find(hwStageName) != hardwareStages.end())
       return CallingConv::AMDGPU_HS;
@@ -1305,6 +1301,10 @@ unsigned PalMetadata::getCallingConventionForFirstHardwareShaderStage(std::strin
     hwStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Gs)];
     if (hardwareStages.find(hwStageName) != hardwareStages.end())
       return CallingConv::AMDGPU_GS;
+
+    hwStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Vs)];
+    if (hardwareStages.find(hwStageName) != hardwareStages.end())
+      return CallingConv::AMDGPU_VS;
 
     hwStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Cs)];
     return CallingConv::AMDGPU_CS;

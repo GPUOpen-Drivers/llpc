@@ -325,21 +325,21 @@ void ElfWriter<Elf>::mergeMetaNote(Context *pContext, const ElfNote *pNote1, con
   pipelineHash[0] = destDocument.getNode(pContext->getPipelineHashCode());
   pipelineHash[1] = destDocument.getNode(pContext->getPipelineHashCode());
 
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 723
+  // Update .ps_sample_mask
+  // NOTE: We need to erase the node if the cached ELF has it but we actually don't need it.
+  auto srcPsSampleMask = srcPipeline.getMap(true).find(StringRef(PalAbi::PipelineMetadataKey::PsSampleMask));
+  auto destPsSampleMask = destPipeline.getMap(true).find(StringRef(PalAbi::PipelineMetadataKey::PsSampleMask));
+  if (srcPsSampleMask != srcPipeline.getMap(true).end())
+    destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::PsSampleMask] = srcPsSampleMask->second;
+  else if (destPsSampleMask != destPipeline.getMap(true).end())
+    destPipeline.getMap(true).erase(destPsSampleMask);
+#endif
+
   // "amdpal.version >= [3 0]" adopts the new metadata format for ".graphics_registers" section
   auto palVersion = destDocument.getRoot().getMap(true)[PalAbi::CodeObjectMetadataKey::Version].getArray(true);
   if (palVersion[0].getUInt() < 3) {
     // Old metadate format for ".registers" section
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 723
-    // Update .ps_sample_mask
-    // NOTE: We need to erase the node if the cached ELF has it but we actually don't need it.
-    auto srcPsSampleMask = srcPipeline.getMap(true).find(StringRef(PalAbi::PipelineMetadataKey::PsSampleMask));
-    auto destPsSampleMask = destPipeline.getMap(true).find(StringRef(PalAbi::PipelineMetadataKey::PsSampleMask));
-    if (srcPsSampleMask != srcPipeline.getMap(true).end())
-      destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::PsSampleMask] = srcPsSampleMask->second;
-    else if (destPsSampleMask != destPipeline.getMap(true).end())
-      destPipeline.getMap(true).erase(destPsSampleMask);
-#endif
-
     // List of fragment shader related registers.
     static const unsigned PsRegNumbers[] = {
         0x2C0A, // mmSPI_SHADER_PGM_RSRC1_PS
