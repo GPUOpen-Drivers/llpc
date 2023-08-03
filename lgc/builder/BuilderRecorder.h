@@ -155,7 +155,6 @@ enum BuilderOpcode : unsigned {
   Derivative,
   DemoteToHelperInvocation,
   IsHelperInvocation,
-  SetMeshOutputs,
   GetWaveSize,
   DebugBreak,
 

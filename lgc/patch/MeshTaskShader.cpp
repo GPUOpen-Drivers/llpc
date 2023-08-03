@@ -400,11 +400,11 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   //         2. Lower mesh shader specific calls:
   //           - SetMeshOutputs -> Write vertex/primitive count to LDS and send message GS_ALLOC_REQ
   //             (threadIdInSubgroup == 0)
-  //           - SetPrimitiveIndices -> Write primitive connectivity data to LDS
-  //           - SetPrimitiveCulled -> Write null primitive flag to LDS
-  //           - GetMeshInput -> Lower mesh built-in input
-  //           - Lower task payload pointer -> Transform task payload descriptor
-  //           - Write primitive/vertex output -> Write output data to LDS
+  //           - SetMeshPrimitiveIndices -> Write primitive connectivity data to LDS
+  //           - SetMeshPrimitiveCulled -> Write null primitive flag to LDS
+  //           - GetMeshBuiltinInput -> Lower mesh built-in input
+  //           - TaskPayloadPtr -> Transform task payload descriptor
+  //           - WriteMeshVertexOutput/WriteMeshPrimitiveOutput -> Write output data to LDS
   //     }
   //
   //     Barrier (if needBarrierFlag)
@@ -1086,6 +1086,309 @@ void MeshTaskShader::lowerEmitMeshTasks(EmitMeshTasksOp &emitMeshTasksOp) {
 }
 
 // =====================================================================================================================
+// Lower set mesh outputs. Set the actual output size of the primitives and vertices that the mesh shader workgroup
+// will emit.
+//
+// @param setMeshOutputsOp : Call instruction op to set mesh outputs
+void MeshTaskShader::lowerSetMeshOutputs(SetMeshOutputsOp &setMeshOutputsOp) {
+  m_builder.SetInsertPoint(&setMeshOutputsOp);
+
+  assert(getShaderStage(setMeshOutputsOp.getFunction()) == ShaderStageMesh);
+
+  auto vertexCount = setMeshOutputsOp.getVertexCount();
+  auto primitiveCount = setMeshOutputsOp.getPrimitiveCount();
+
+  auto setMeshOutputsCall = m_builder.GetInsertPoint();
+
+  auto checkSetMeshOutputsBlock = m_builder.GetInsertBlock();
+  auto setMeshOutputsBlock = checkSetMeshOutputsBlock->splitBasicBlock(setMeshOutputsCall, ".setMeshOutputs");
+  auto endSetMeshOutputsBlock = setMeshOutputsBlock->splitBasicBlock(setMeshOutputsCall, ".endSetMeshOutputs");
+
+  // Modify ".checkSetMeshOutputs" block
+  {
+    m_builder.SetInsertPoint(checkSetMeshOutputsBlock->getTerminator());
+
+    auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_waveThreadInfo.threadIdInSubgroup, m_builder.getInt32(0));
+    m_builder.CreateCondBr(firstThreadInSubgroup, setMeshOutputsBlock, endSetMeshOutputsBlock);
+    checkSetMeshOutputsBlock->getTerminator()->eraseFromParent(); // Remove old terminator
+  }
+
+  // Construct ".setMeshOutputs" block
+  {
+    m_builder.SetInsertPoint(setMeshOutputsBlock->getTerminator());
+
+    // Promote vertex/primitive count to SGPRs
+    vertexCount = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, vertexCount);
+    primitiveCount = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, primitiveCount);
+
+    // Check if vertex count or primitive count is zero. If so, set both to zero in order to disable vertex/primitive
+    // exporting.
+    auto zeroVertexCount = m_builder.CreateICmpEQ(vertexCount, m_builder.getInt32(0));
+    auto zeroPrimitiveCount = m_builder.CreateICmpEQ(primitiveCount, m_builder.getInt32(0));
+    auto hasZeroCount = m_builder.CreateOr(zeroVertexCount, zeroPrimitiveCount);
+    vertexCount = m_builder.CreateSelect(hasZeroCount, m_builder.getInt32(0), vertexCount);
+    primitiveCount = m_builder.CreateSelect(hasZeroCount, m_builder.getInt32(0), primitiveCount);
+
+    // NOTE: Here, we promote vertex/primitive count to SGPRs once again because M0 implicitly used in s_sendmsg is
+    // SGPR. LLVM backend has issues of handling this because it doesn't use s_cselect to translate LLVM IR select
+    // instruction (which keeps the destination operand still in SGPR) and it doesn't use readfirstlane to promote
+    // VGPR to SGPR for M0.
+    vertexCount = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, vertexCount);
+    primitiveCount = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, primitiveCount);
+
+    // M0[10:0] = vertexCount, M0[22:12] = primitiveCount
+    Value *m0 = m_builder.CreateShl(primitiveCount, 12);
+    m0 = m_builder.CreateOr(m0, vertexCount);
+    m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, {m_builder.getInt32(GsAllocReq), m0});
+
+    Value *ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexCount));
+    writeValueToLds(vertexCount, ldsOffset);
+
+    ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveCount));
+    writeValueToLds(primitiveCount, ldsOffset);
+  }
+
+  // Construct ".endSetMeshOutputs" block
+  {
+    m_builder.SetInsertPoint(endSetMeshOutputsBlock->getTerminator());
+
+    // Currently, nothing to do
+  }
+
+  m_callsToRemove.push_back(&setMeshOutputsOp);
+}
+
+// =====================================================================================================================
+// Lower set mesh primitive indices. Set primitive indices by forming primitive connectivity data and writing it to LDS.
+//
+// @param setMeshPrimitiveIndicesOp : Call instruction op to set primitive indices for mesh shader
+void MeshTaskShader::lowerSetMeshPrimitiveIndices(SetMeshPrimitiveIndicesOp &setMeshPrimitiveIndicesOp) {
+  m_builder.SetInsertPoint(&setMeshPrimitiveIndicesOp);
+
+  assert(getShaderStage(setMeshPrimitiveIndicesOp.getFunction()) == ShaderStageMesh);
+
+  auto primitiveIndex = setMeshPrimitiveIndicesOp.getPrimitiveIndex();
+  auto primitiveIndices = setMeshPrimitiveIndicesOp.getPrimitiveIndices();
+
+  //
+  // HW requires the primitive connectivity data has the following bit layout:
+  //
+  //   +----------------+---------------+---------------+---------------+
+  //   | Null Primitive | Vertex Index2 | Vertex Index1 | Vertex Index0 |
+  //   | [31]           | [28:20]       | [18:10]       | [8:0]         |
+  //   +----------------+---------------+---------------+---------------+
+  //
+  auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
+  Value *primitiveData = nullptr;
+
+  if (meshMode.outputPrimitive == OutputPrimitives::Points) {
+    assert(primitiveIndices->getType() == m_builder.getInt32Ty()); // i32
+    primitiveData = primitiveIndices;
+  } else if (meshMode.outputPrimitive == OutputPrimitives::Lines) {
+    assert(primitiveIndices->getType() == FixedVectorType::get(m_builder.getInt32Ty(), 2)); // v2i32
+    Value *vertex0 = m_builder.CreateExtractElement(primitiveIndices, static_cast<uint64_t>(0));
+    Value *vertex1 = m_builder.CreateExtractElement(primitiveIndices, 1);
+
+    if (m_gfxIp.major <= 11) {
+      primitiveData = m_builder.CreateShl(vertex1, 10);
+      primitiveData = m_builder.CreateOr(primitiveData, vertex0);
+    } else {
+      llvm_unreachable("Not implemented!");
+    }
+  } else {
+    assert(meshMode.outputPrimitive == OutputPrimitives::Triangles);
+    Value *vertex0 = m_builder.CreateExtractElement(primitiveIndices, static_cast<uint64_t>(0));
+    Value *vertex1 = m_builder.CreateExtractElement(primitiveIndices, 1);
+    Value *vertex2 = m_builder.CreateExtractElement(primitiveIndices, 2);
+
+    if (m_gfxIp.major <= 11) {
+      primitiveData = m_builder.CreateShl(vertex2, 10);
+      primitiveData = m_builder.CreateOr(primitiveData, vertex1);
+      primitiveData = m_builder.CreateShl(primitiveData, 10);
+      primitiveData = m_builder.CreateOr(primitiveData, vertex0);
+    } else {
+      llvm_unreachable("Not implemented!");
+    }
+  }
+
+  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveIndices));
+  Value *ldsOffset = m_builder.CreateAdd(ldsStart, primitiveIndex);
+
+  // NOTE: We first clear old primitive connectivity data and use atomic OR operation to set new data. This is because
+  // the null primitive flag might be set via built-in CullPrimitive.
+  static const unsigned ClearMask = (1u << 31);
+  atomicOpWithLds(AtomicRMWInst::And, m_builder.getInt32(ClearMask), ldsOffset);
+  atomicOpWithLds(AtomicRMWInst::Or, primitiveData, ldsOffset);
+
+  m_callsToRemove.push_back(&setMeshPrimitiveIndicesOp);
+}
+
+// =====================================================================================================================
+// Lower get mesh built-in value. Return the value of mesh built-in input.
+//
+// @param getMeshBuiltinInputOp : Call instruction op to return the value of mesh built-in input
+void MeshTaskShader::lowerGetMeshBuiltinInput(GetMeshBuiltinInputOp &getMeshBuiltinInputOp) {
+  m_builder.SetInsertPoint(&getMeshBuiltinInputOp);
+
+  auto entryPoint = getMeshBuiltinInputOp.getFunction();
+  assert(getShaderStage(entryPoint) == ShaderStageMesh);
+
+  Value *input = PoisonValue::get(getMeshBuiltinInputOp.getType());
+  auto builtin = getMeshBuiltinInputOp.getBuiltin();
+  switch (builtin) {
+  case BuiltInDrawIndex: {
+    auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
+    input = getFunctionArgument(entryPoint, entryArgIdxs.drawIndex);
+    break;
+  }
+  case BuiltInViewIndex: {
+    if (m_pipelineState->getInputAssemblyState().enableMultiView) {
+      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
+      input = getFunctionArgument(entryPoint, entryArgIdxs.viewIndex);
+    } else {
+      input = m_builder.getInt32(0);
+    }
+    break;
+  }
+  case BuiltInNumWorkgroups: {
+    input = getMeshNumWorkgroups();
+    break;
+  }
+  case BuiltInWorkgroupId: {
+    input = getMeshWorkgroupId();
+    break;
+  }
+  case BuiltInLocalInvocationId: {
+    input = getMeshLocalInvocationId();
+    break;
+  }
+  case BuiltInGlobalInvocationId: {
+    input = getMeshGlobalInvocationId();
+    break;
+  }
+  case BuiltInLocalInvocationIndex: {
+    input = getMeshLocalInvocationIndex();
+    break;
+  }
+  case BuiltInSubgroupId: {
+    // subgroupId = localInvocationIndex / subgroupSize
+    auto localInvocationIndex = getMeshLocalInvocationIndex();
+    unsigned subgroupSize = m_pipelineState->getShaderSubgroupSize(ShaderStageMesh);
+    assert(subgroupSize > 0 && subgroupSize % 32 == 0);
+    input = m_builder.CreateLShr(localInvocationIndex, m_builder.getInt32(Log2_32(subgroupSize)));
+    break;
+  }
+  case BuiltInNumSubgroups: {
+    // numSubgroups = numMeshThreads / subgroupSize
+    const auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
+    const unsigned numMeshThreads = meshMode.workgroupSizeX * meshMode.workgroupSizeY * meshMode.workgroupSizeZ;
+    unsigned subgroupSize = m_pipelineState->getShaderSubgroupSize(ShaderStageMesh);
+    assert(subgroupSize > 0 && subgroupSize % 32 == 0);
+    const unsigned numSubgroups = alignTo(numMeshThreads, subgroupSize) / subgroupSize;
+    input = m_builder.getInt32(numSubgroups);
+    break;
+  }
+  default: {
+    llvm_unreachable("Unknown mesh built-in input!");
+    break;
+  }
+  }
+
+  assert(!isa<PoisonValue>(input));
+  getMeshBuiltinInputOp.replaceAllUsesWith(input);
+
+  m_callsToRemove.push_back(&getMeshBuiltinInputOp);
+}
+
+// =====================================================================================================================
+// Lower set mesh primitive culled state. Set primitive culled state by writing the null primitive flag to LDS.
+//
+// @param setMeshPrimitiveIndicesOp : Call instruction op to set primitive indices for mesh shader
+void MeshTaskShader::lowerSetMeshPrimitiveCulled(SetMeshPrimitiveCulledOp &setMeshPrimitiveCulledOp) {
+  m_builder.SetInsertPoint(&setMeshPrimitiveCulledOp);
+
+  assert(getShaderStage(setMeshPrimitiveCulledOp.getFunction()) == ShaderStageMesh);
+
+  auto primitiveIndex = setMeshPrimitiveCulledOp.getPrimitiveIndex();
+  auto isCulled = setMeshPrimitiveCulledOp.getIsCulled();
+
+  //
+  // HW requires the primitive connectivity data has the following bit layout:
+  //   [31]    = Null primitive flag
+  //   [28:20] = Index of vertex2
+  //   [18:10] = Index of vertex1
+  //   [8:0]   = Index of vertex0
+  //
+  assert(isCulled->getType()->isIntegerTy(1));
+
+  static const unsigned NullPrimitive = (1u << 31);
+  auto nullPrimitive = m_builder.CreateSelect(isCulled, m_builder.getInt32(NullPrimitive), m_builder.getInt32(0));
+
+  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveIndices));
+  Value *ldsOffset = m_builder.CreateAdd(ldsStart, primitiveIndex);
+
+  // NOTE: We first clear null primitive flag and use atomic OR operation to set new flag. This is because the
+  // primitive connectivity data might be set via built-in PrimitiveXXXIndices.
+  static const unsigned ClearMask = ~(1u << 31);
+  atomicOpWithLds(AtomicRMWInst::And, m_builder.getInt32(ClearMask), ldsOffset);
+  atomicOpWithLds(AtomicRMWInst::Or, nullPrimitive, ldsOffset);
+
+  m_callsToRemove.push_back(&setMeshPrimitiveCulledOp);
+}
+
+// =====================================================================================================================
+// Lower write mesh vertex output. Write mesh shader vertex outputs to LDS.
+//
+// @param writeMeshVertexOutputOp : Call instruction op to write vertex output for mesh shader
+void MeshTaskShader::lowerWriteMeshVertexOutput(WriteMeshVertexOutputOp &writeMeshVertexOutputOp) {
+  m_builder.SetInsertPoint(&writeMeshVertexOutputOp);
+
+  assert(getShaderStage(writeMeshVertexOutputOp.getFunction()) == ShaderStageMesh);
+
+  auto outputOffset = writeMeshVertexOutputOp.getOutputOffset();
+  auto vertexIndex = writeMeshVertexOutputOp.getVertexIndex();
+  auto outputValue = writeMeshVertexOutputOp.getOutputValue();
+
+  const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh);
+  const unsigned vertexStride = 4 * resUsage->inOutUsage.outputMapLocCount; // Corresponds to vec4 output
+
+  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexOutput));
+  Value *ldsOffset = m_builder.CreateMul(vertexIndex, m_builder.getInt32(vertexStride));
+  ldsOffset = m_builder.CreateAdd(ldsOffset, outputOffset);
+  ldsOffset = m_builder.CreateAdd(ldsStart, ldsOffset);
+
+  writeValueToLds(outputValue, ldsOffset);
+
+  m_callsToRemove.push_back(&writeMeshVertexOutputOp);
+}
+
+// =====================================================================================================================
+// Lower write mesh primitive output. Write mesh shader primitive outputs to LDS.
+//
+// @param writeMeshPrimitiveOutputOp : Call instruction op to write primitive output for mesh shader
+void MeshTaskShader::lowerWriteMeshPrimitiveOutput(WriteMeshPrimitiveOutputOp &writeMeshPrimitiveOutputOp) {
+  m_builder.SetInsertPoint(&writeMeshPrimitiveOutputOp);
+
+  assert(getShaderStage(writeMeshPrimitiveOutputOp.getFunction()) == ShaderStageMesh);
+
+  auto outputOffset = writeMeshPrimitiveOutputOp.getOutputOffset();
+  auto primitiveIndex = writeMeshPrimitiveOutputOp.getPrimitiveIndex();
+  auto outputValue = writeMeshPrimitiveOutputOp.getOutputValue();
+
+  const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh);
+  const unsigned primitiveStride = 4 * resUsage->inOutUsage.perPrimitiveOutputMapLocCount; // Corresponds to vec4 output
+
+  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveOutput));
+  Value *ldsOffset = m_builder.CreateMul(primitiveIndex, m_builder.getInt32(primitiveStride));
+  ldsOffset = m_builder.CreateAdd(ldsOffset, outputOffset);
+  ldsOffset = m_builder.CreateAdd(ldsStart, ldsOffset);
+
+  writeValueToLds(outputValue, ldsOffset);
+
+  m_callsToRemove.push_back(&writeMeshPrimitiveOutputOp);
+}
+
+// =====================================================================================================================
 // Initialize the wave/thread info from the entry-point.
 //
 // @param entryPoint : Shader entry-point
@@ -1388,80 +1691,15 @@ void MeshTaskShader::lowerMeshShaderBody(BasicBlock *apiMeshEntryBlock, BasicBlo
   }
 
   // Lower mesh shader calls
-  auto module = entryPoint->getParent();
-  for (auto &func : module->functions()) {
-    if (!func.isDeclaration())
-      continue; // Not targets
-
-    if (func.getName().startswith(lgcName::MeshTaskCallPrefix)) {
-      for (auto user : func.users()) {
-        CallInst *const call = cast<CallInst>(user);
-
-        if (call->getFunction() != entryPoint)
-          continue; // Not belong to mesh shader
-
-        m_builder.SetInsertPoint(call);
-
-        if (func.getName().startswith(lgcName::MeshTaskSetMeshOutputs)) {
-          // Set mesh outputs
-          assert(call->arg_size() == 2);
-          auto vertexCount = call->getOperand(0);
-          auto primitiveCount = call->getOperand(1);
-
-          setMeshOutputs(vertexCount, primitiveCount);
-        } else if (func.getName().startswith(lgcName::MeshTaskSetPrimitiveIndices)) {
-          // Set primitive indices
-          assert(call->arg_size() == 2);
-          auto primitiveIndex = call->getOperand(0);
-          auto primitiveIndices = call->getOperand(1);
-
-          setPrimitiveIndices(primitiveIndex, primitiveIndices);
-        } else if (func.getName().startswith(lgcName::MeshTaskSetPrimitiveCulled)) {
-          // Set primitive culled
-          assert(call->arg_size() == 2);
-          auto primitiveIndex = call->getOperand(0);
-          auto isCulled = call->getOperand(1);
-
-          setPrimitiveCulled(primitiveIndex, isCulled);
-        } else if (func.getName().startswith(lgcName::MeshTaskGetMeshInput)) {
-          // Get mesh input
-          assert(call->arg_size() == 1);
-          unsigned builtIn = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
-
-          // NOTE: Mesh shader input lowering is supposed to happen at the beginning of API mesh shader.
-          m_builder.SetInsertPoint(&*apiMeshEntryBlock->getFirstNonPHIOrDbgOrAlloca());
-
-          auto meshInput = getMeshInput(static_cast<BuiltInKind>(builtIn));
-          assert(meshInput->getType() == call->getType());
-          call->replaceAllUsesWith(meshInput);
-        } else if (func.getName().startswith(lgcName::MeshTaskWriteVertexOutput)) {
-          // Write vertex output
-          assert(call->arg_size() == 3);
-          auto outputOffset = call->getOperand(0);
-          auto vertexIndex = call->getOperand(1);
-          auto outputValue = call->getOperand(2);
-
-          writeVertexOutput(outputOffset, vertexIndex, outputValue);
-        } else if (func.getName().startswith(lgcName::MeshTaskWritePrimitiveOutput)) {
-          // Write primitive output
-          assert(call->arg_size() == 3);
-          auto outputOffset = call->getOperand(0);
-          auto primitiveIndex = call->getOperand(1);
-          auto outputValue = call->getOperand(2);
-
-          writePrimitiveOutput(outputOffset, primitiveIndex, outputValue);
-        } else {
-          llvm_unreachable("Unknown mesh shader call!");
-        }
-
-        m_callsToRemove.push_back(call);
-      }
-    }
-  }
-
   static auto visitor = llvm_dialects::VisitorBuilder<MeshTaskShader>()
                             .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
                             .add<TaskPayloadPtrOp>(&MeshTaskShader::lowerTaskPayloadPtr)
+                            .add<SetMeshOutputsOp>(&MeshTaskShader::lowerSetMeshOutputs)
+                            .add<SetMeshPrimitiveIndicesOp>(&MeshTaskShader::lowerSetMeshPrimitiveIndices)
+                            .add<SetMeshPrimitiveCulledOp>(&MeshTaskShader::lowerSetMeshPrimitiveCulled)
+                            .add<GetMeshBuiltinInputOp>(&MeshTaskShader::lowerGetMeshBuiltinInput)
+                            .add<WriteMeshVertexOutputOp>(&MeshTaskShader::lowerWriteMeshVertexOutput)
+                            .add<WriteMeshPrimitiveOutputOp>(&MeshTaskShader::lowerWriteMeshPrimitiveOutput)
                             .build();
   visitor.visit(*this, *entryPoint);
 
@@ -1471,253 +1709,6 @@ void MeshTaskShader::lowerMeshShaderBody(BasicBlock *apiMeshEntryBlock, BasicBlo
     call->eraseFromParent();
   }
   m_callsToRemove.clear();
-}
-
-// =====================================================================================================================
-// Set the actual output size of the primitives and vertices that the mesh shader workgroup will emit.
-//
-// @param vertexCount : Actual output size of the vertices
-// @param primitiveCount : Actual output size of the primitives
-void MeshTaskShader::setMeshOutputs(Value *vertexCount, Value *primitiveCount) {
-  auto setMeshOutputsCall = m_builder.GetInsertPoint();
-
-  auto checkSetMeshOutputsBlock = m_builder.GetInsertBlock();
-  auto setMeshOutputsBlock = checkSetMeshOutputsBlock->splitBasicBlock(setMeshOutputsCall, ".setMeshOutputs");
-  auto endSetMeshOutputsBlock = setMeshOutputsBlock->splitBasicBlock(setMeshOutputsCall, ".endSetMeshOutputs");
-
-  // Modify ".checkSetMeshOutputs" block
-  {
-    m_builder.SetInsertPoint(checkSetMeshOutputsBlock->getTerminator());
-
-    auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_waveThreadInfo.threadIdInSubgroup, m_builder.getInt32(0));
-    m_builder.CreateCondBr(firstThreadInSubgroup, setMeshOutputsBlock, endSetMeshOutputsBlock);
-    checkSetMeshOutputsBlock->getTerminator()->eraseFromParent(); // Remove old terminator
-  }
-
-  // Construct ".setMeshOutputs" block
-  {
-    m_builder.SetInsertPoint(setMeshOutputsBlock->getTerminator());
-
-    // Promote vertex/primitive count to SGPRs
-    vertexCount = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, vertexCount);
-    primitiveCount = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, primitiveCount);
-
-    // Check if vertex count or primitive count is zero. If so, set both to zero in order to disable vertex/primitive
-    // exporting.
-    auto zeroVertexCount = m_builder.CreateICmpEQ(vertexCount, m_builder.getInt32(0));
-    auto zeroPrimitiveCount = m_builder.CreateICmpEQ(primitiveCount, m_builder.getInt32(0));
-    auto hasZeroCount = m_builder.CreateOr(zeroVertexCount, zeroPrimitiveCount);
-    vertexCount = m_builder.CreateSelect(hasZeroCount, m_builder.getInt32(0), vertexCount);
-    primitiveCount = m_builder.CreateSelect(hasZeroCount, m_builder.getInt32(0), primitiveCount);
-
-    // NOTE: Here, we promote vertex/primitive count to SGPRs once again because M0 implicitly used in s_sendmsg is
-    // SGPR. LLVM backend has issues of handling this because it doesn't use s_cselect to translate LLVM IR select
-    // instruction (which keeps the destination operand still in SGPR) and it doesn't use readfirstlane to promote
-    // VGPR to SGPR for M0.
-    vertexCount = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, vertexCount);
-    primitiveCount = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, primitiveCount);
-
-    // M0[10:0] = vertexCount, M0[22:12] = primitiveCount
-    Value *m0 = m_builder.CreateShl(primitiveCount, 12);
-    m0 = m_builder.CreateOr(m0, vertexCount);
-    m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, {m_builder.getInt32(GsAllocReq), m0});
-
-    Value *ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexCount));
-    writeValueToLds(vertexCount, ldsOffset);
-
-    ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveCount));
-    writeValueToLds(primitiveCount, ldsOffset);
-  }
-
-  // Construct ".endSetMeshOutputs" block
-  {
-    m_builder.SetInsertPoint(endSetMeshOutputsBlock->getTerminator());
-
-    // Currently, nothing to do
-  }
-}
-
-// =====================================================================================================================
-// Set primitive indices by forming primitive connectivity data and writing it to LDS.
-//
-// @param primitiveIndex : Primitive indexing
-// @param primitiveIndices : All vertex index values that are used to form this primitive
-void MeshTaskShader::setPrimitiveIndices(Value *primitiveIndex, Value *primitiveIndices) {
-  //
-  // HW requires the primitive connectivity data has the following bit layout:
-  //
-  //   +----------------+---------------+---------------+---------------+
-  //   | Null Primitive | Vertex Index2 | Vertex Index1 | Vertex Index0 |
-  //   | [31]           | [28:20]       | [18:10]       | [8:0]         |
-  //   +----------------+---------------+---------------+---------------+
-  //
-  auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
-  Value *primitiveData = nullptr;
-
-  if (meshMode.outputPrimitive == OutputPrimitives::Points) {
-    assert(primitiveIndices->getType() == m_builder.getInt32Ty()); // i32
-    primitiveData = primitiveIndices;
-  } else if (meshMode.outputPrimitive == OutputPrimitives::Lines) {
-    assert(primitiveIndices->getType() == FixedVectorType::get(m_builder.getInt32Ty(), 2)); // v2i32
-    Value *vertex0 = m_builder.CreateExtractElement(primitiveIndices, static_cast<uint64_t>(0));
-    Value *vertex1 = m_builder.CreateExtractElement(primitiveIndices, 1);
-
-    if (m_gfxIp.major <= 11) {
-      primitiveData = m_builder.CreateShl(vertex1, 10);
-      primitiveData = m_builder.CreateOr(primitiveData, vertex0);
-    } else {
-      llvm_unreachable("Not implemented!");
-    }
-  } else {
-    assert(meshMode.outputPrimitive == OutputPrimitives::Triangles);
-    Value *vertex0 = m_builder.CreateExtractElement(primitiveIndices, static_cast<uint64_t>(0));
-    Value *vertex1 = m_builder.CreateExtractElement(primitiveIndices, 1);
-    Value *vertex2 = m_builder.CreateExtractElement(primitiveIndices, 2);
-
-    if (m_gfxIp.major <= 11) {
-      primitiveData = m_builder.CreateShl(vertex2, 10);
-      primitiveData = m_builder.CreateOr(primitiveData, vertex1);
-      primitiveData = m_builder.CreateShl(primitiveData, 10);
-      primitiveData = m_builder.CreateOr(primitiveData, vertex0);
-    } else {
-      llvm_unreachable("Not implemented!");
-    }
-  }
-
-  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveIndices));
-  Value *ldsOffset = m_builder.CreateAdd(ldsStart, primitiveIndex);
-
-  // NOTE: We first clear old primitive connectivity data and use atomic OR operation to set new data. This is because
-  // the null primitive flag might be set via built-in CullPrimitive.
-  static const unsigned ClearMask = (1u << 31);
-  atomicOpWithLds(AtomicRMWInst::And, m_builder.getInt32(ClearMask), ldsOffset);
-  atomicOpWithLds(AtomicRMWInst::Or, primitiveData, ldsOffset);
-}
-
-// =====================================================================================================================
-// Set primitive culled state by writing the null primitive flag to LDS.
-//
-// @param primitiveIndex : Primitive indexing
-// @param isCulled : Whether this primitive is culled
-void MeshTaskShader::setPrimitiveCulled(Value *primitiveIndex, Value *isCulled) {
-  //
-  // HW requires the primitive connectivity data has the following bit layout:
-  //   [31]    = Null primitive flag
-  //   [28:20] = Index of vertex2
-  //   [18:10] = Index of vertex1
-  //   [8:0]   = Index of vertex0
-  //
-  assert(isCulled->getType()->isIntegerTy(1));
-
-  static const unsigned NullPrimitive = (1u << 31);
-  auto nullPrimitive = m_builder.CreateSelect(isCulled, m_builder.getInt32(NullPrimitive), m_builder.getInt32(0));
-
-  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveIndices));
-  Value *ldsOffset = m_builder.CreateAdd(ldsStart, primitiveIndex);
-
-  // NOTE: We first clear null primitive flag and use atomic OR operation to set new flag. This is because the
-  // primitive connectivity data might be set via built-in PrimitiveXXXIndices.
-  static const unsigned ClearMask = ~(1u << 31);
-  atomicOpWithLds(AtomicRMWInst::And, m_builder.getInt32(ClearMask), ldsOffset);
-  atomicOpWithLds(AtomicRMWInst::Or, nullPrimitive, ldsOffset);
-}
-
-// =====================================================================================================================
-// Get mesh built-in input.
-//
-// @param builtIn : Input built-in ID of mesh shader
-// @returns : Value of the specified input built-in
-Value *MeshTaskShader::getMeshInput(BuiltInKind builtIn) {
-  auto entryPoint = m_builder.GetInsertBlock()->getParent();
-  assert(getShaderStage(entryPoint) == ShaderStageMesh);
-
-  switch (builtIn) {
-  case BuiltInDrawIndex: {
-    auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
-    return getFunctionArgument(entryPoint, entryArgIdxs.drawIndex);
-  }
-
-  case BuiltInViewIndex: {
-    if (m_pipelineState->getInputAssemblyState().enableMultiView) {
-      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
-      return getFunctionArgument(entryPoint, entryArgIdxs.viewIndex);
-    }
-    return m_builder.getInt32(0);
-  }
-
-  case BuiltInNumWorkgroups:
-    return getMeshNumWorkgroups();
-
-  case BuiltInWorkgroupId:
-    return getMeshWorkgroupId();
-
-  case BuiltInLocalInvocationId:
-    return getMeshLocalInvocationId();
-
-  case BuiltInGlobalInvocationId:
-    return getMeshGlobalInvocationId();
-
-  case BuiltInLocalInvocationIndex:
-    return getMeshLocalInvocationIndex();
-
-  case BuiltInSubgroupId: {
-    // subgroupId = localInvocationIndex / subgroupSize
-    auto localInvocationIndex = getMeshLocalInvocationIndex();
-    unsigned subgroupSize = m_pipelineState->getShaderSubgroupSize(ShaderStageMesh);
-    assert(subgroupSize > 0 && subgroupSize % 32 == 0);
-    return m_builder.CreateLShr(localInvocationIndex, m_builder.getInt32(Log2_32(subgroupSize)));
-  }
-
-  case BuiltInNumSubgroups: {
-    // numSubgroups = numMeshThreads / subgroupSize
-    const auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
-    const unsigned numMeshThreads = meshMode.workgroupSizeX * meshMode.workgroupSizeY * meshMode.workgroupSizeZ;
-    unsigned subgroupSize = m_pipelineState->getShaderSubgroupSize(ShaderStageMesh);
-    assert(subgroupSize > 0 && subgroupSize % 32 == 0);
-    const unsigned numSubgroups = alignTo(numMeshThreads, subgroupSize) / subgroupSize;
-    return m_builder.getInt32(numSubgroups);
-  }
-
-  default:
-    llvm_unreachable("Unknown mesh input built-in!");
-    return nullptr;
-  }
-}
-
-// =====================================================================================================================
-// Write mesh shader vertex outputs to LDS.
-//
-// @param outputOffset : Relative offset of this output (in dwords) within all outputs of the indexed vertex
-// @param vertexIndex : Vertex indexing
-// @param outputValue : Output value to write
-void MeshTaskShader::writeVertexOutput(Value *outputOffset, Value *vertexIndex, Value *outputValue) {
-  const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh);
-  const unsigned vertexStride = 4 * resUsage->inOutUsage.outputMapLocCount; // Corresponds to vec4 output
-
-  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexOutput));
-  Value *ldsOffset = m_builder.CreateMul(vertexIndex, m_builder.getInt32(vertexStride));
-  ldsOffset = m_builder.CreateAdd(ldsOffset, outputOffset);
-  ldsOffset = m_builder.CreateAdd(ldsStart, ldsOffset);
-
-  writeValueToLds(outputValue, ldsOffset);
-}
-
-// =====================================================================================================================
-// Write mesh shader primitive outputs to LDS.
-//
-// @param outputOffset : Relative offset of this output (in dwords) within all outputs of the indexed primitive
-// @param vertexIndex : Primitive indexing
-// @param outputValue : Output value to write
-void MeshTaskShader::writePrimitiveOutput(Value *outputOffset, Value *primitiveIndex, Value *outputValue) {
-  const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh);
-  const unsigned primitiveStride = 4 * resUsage->inOutUsage.perPrimitiveOutputMapLocCount; // Corresponds to vec4 output
-
-  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveOutput));
-  Value *ldsOffset = m_builder.CreateMul(primitiveIndex, m_builder.getInt32(primitiveStride));
-  ldsOffset = m_builder.CreateAdd(ldsOffset, outputOffset);
-  ldsOffset = m_builder.CreateAdd(ldsStart, ldsOffset);
-
-  writeValueToLds(outputValue, ldsOffset);
 }
 
 // =====================================================================================================================

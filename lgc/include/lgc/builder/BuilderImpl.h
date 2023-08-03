@@ -635,11 +635,6 @@ public:
   // Create a helper invocation query. Only allowed in a fragment shader.
   llvm::Value *CreateIsHelperInvocation(const llvm::Twine &instName = "");
 
-  // In the mesh shader, set the actual output size of the primitives and vertices that the mesh shader workgroup will
-  // emit upon completion.
-  llvm::Instruction *CreateSetMeshOutputs(llvm::Value *vertexCount, llvm::Value *primitiveCount,
-                                          const llvm::Twine &instName = "");
-
   // -------------------------------------------------------------------------------------------------------------------
   // Builder implementation subclass for subgroup operations
 public:

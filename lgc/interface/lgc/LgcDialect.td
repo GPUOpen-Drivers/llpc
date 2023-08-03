@@ -123,6 +123,88 @@ def EmitMeshTasksOp : LgcOp<"emit.mesh.tasks", [Memory<[]>]> {
   }];
 }
 
+def SetMeshOutputsOp : LgcOp<"set.mesh.outputs", [Memory<[]>]> {
+  let arguments = (ins I32:$vertexCount, I32:$primitiveCount);
+  let results = (outs);
+
+  let summary = "set the actual output size of the primitives and vertices that the mesh shader workgroup will emit";
+  let description = [{
+    In the mesh shader, set the actual output size of the primitives and vertices that the mesh shader workgroup will
+    emit upon completion.
+
+    `vertexCount` is the actual output size of the vertices.
+    `primitiveCount` is the actual output size of the primitives.
+  }];
+}
+
+def SetMeshPrimitiveIndicesOp : LgcOp<"set.mesh.primitive.indices", [Memory<[]>]> {
+  let arguments = (ins I32:$primitiveIndex, (ScalarOrFixedVector I32):$primitiveIndices);
+  let results = (outs);
+
+  let summary = "set primitive indices for mesh shader";
+  let description = [{
+    In the mesh shader, set primitive indices by forming primitive connectivity data and writing it to LDS.
+
+    `primitiveIndex` is the primitive index specifying which primitive to set.
+    `primitiveIndices` are all vertex index values that are used to form this primitive.
+  }];
+}
+
+def SetMeshPrimitiveCulledOp : LgcOp<"set.mesh.primitive.culled", [Memory<[]>]> {
+  let arguments = (ins I32:$primitiveIndex, I1:$isCulled);
+  let results = (outs);
+
+  let summary = "set primitive culled state for mesh shader";
+  let description = [{
+    In the mesh shader, set primitive culled state by writing the null primitive flag to LDS.
+
+    `primitiveIndex` is the primitive index specifying which primitive to set.
+    `isCulled` is a boolean flag indicating whether this primitive is culled.
+  }];
+}
+
+def GetMeshBuiltinInputOp : LgcOp<"get.mesh.builtin.input", [Memory<[]>, WillReturn]> {
+  let arguments = (ins AttrI32:$builtin);
+  let results = (outs value:$result);
+
+  let defaultBuilderHasExplicitResultType = true;
+
+  let summary = "return the value of mesh built-in input";
+  let description = [{
+    Return the value of mesh built-in input.
+
+    `builtIn` is the input built-in ID of mesh shader.
+  }];
+}
+
+def WriteMeshVertexOutputOp : LgcOp<"write.mesh.vertex.output", [Memory<[]>]> {
+  let arguments = (ins I32:$outputOffset, I32:$vertexIndex, value:$outputValue);
+  let results = (outs);
+
+  let summary = "Write mesh shader vertex outputs";
+  let description = [{
+    In the mesh shader, write mesh shader vertex outputs to LDS.
+
+    `outputOffset` is the relative offset of this output (in dwords) within all outputs of the indexed vertex.
+    `vertexIndex` is the vertex index specifying which vertex to write.
+    `outputValue` is the output value to write.
+  }];
+}
+
+def WriteMeshPrimitiveOutputOp : LgcOp<"write.mesh.primitive.output", [Memory<[]>]> {
+  let arguments = (ins I32:$outputOffset, I32:$primitiveIndex, value:$outputValue);
+  let results = (outs);
+
+  let summary = "Write mesh shader primitive outputs";
+  let description = [{
+    In the mesh shader, write mesh shader primitive outputs to LDS.
+
+    `outputOffset` is the relative offset of this output (in dwords) within all outputs of the indexed primitive.
+    `primitiveIndex` is the primitive index specifying which primitive to write.
+    `outputValue` is the output value to write.
+  }];
+}
+
 def GenericLocationOp : OpClass<LgcDialect> {
   let arguments = (ins AttrI1:$perPrimitive, AttrI32:$location, I32:$locOffset, I32:$elemIdx, I32:$arrayIndex);
 
