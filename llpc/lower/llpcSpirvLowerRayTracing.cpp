@@ -41,6 +41,7 @@
 #include "lgc/Pipeline.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/Analysis/AliasAnalysis.h"
+#include "llvm/Analysis/BlockFrequencyInfo.h"
 #include "llvm/Analysis/ProfileSummaryInfo.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/Support/CommandLine.h"
