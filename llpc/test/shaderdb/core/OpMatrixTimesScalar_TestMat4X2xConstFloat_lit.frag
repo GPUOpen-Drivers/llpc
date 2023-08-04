@@ -16,7 +16,7 @@ void main()
 ; SHADERTEST: [4 x <2 x float>] (...) @lgc.create.matrix.times.scalar.a4v2f32
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: ret { <4 x float> } { <4 x float> <float 5.000000e-01, float 5.000000e-01, float 0.000000e+00, float 0.000000e+00> }
+; SHADERTEST: float 5.000000e-01, float 5.000000e-01, float 0.000000e+00, float 0.000000e+00
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

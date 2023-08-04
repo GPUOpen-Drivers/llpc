@@ -26,10 +26,10 @@
 ; RUN:   | FileCheck --check-prefix=SHADERTEST_BOTH_ST_PP0 %s
 ;
 ; SHADERTEST_BOTH_ST_PP0-LABEL: {{^//}} LLPC final pipeline module info
-; SHADERTEST_BOTH_ST_PP0:       define dllexport amdgpu_vs void @_amdgpu_vs_main_fetchless
-; SHADERTEST_BOTH_ST_PP0:       define dllexport amdgpu_ps { <4 x float> } @_amdgpu_ps_main
+; SHADERTEST_BOTH_ST_PP0:       define dllexport amdgpu_vs void @_amdgpu_vs_main
+; SHADERTEST_BOTH_ST_PP0:       define dllexport amdgpu_ps void @_amdgpu_ps_main
 ; SHADERTEST_BOTH_ST_PP0-LABEL: {{^//}} LLPC final ELF info
-; SHADERTEST_BOTH_ST_PP0-LABEL: _amdgpu_vs_main_fetchless:
+; SHADERTEST_BOTH_ST_PP0-LABEL: _amdgpu_vs_main:
 ; SHADERTEST_BOTH_ST_PP0-LABEL: _amdgpu_ps_main:
 ; SHADERTEST_BOTH_ST_PP0-LABEL: {{^=====}} AMDLLPC SUCCESS =====
 ; END_SHADERTEST_BOTH_ST_PP0
@@ -39,11 +39,11 @@
 ; RUN:   | FileCheck --check-prefix=SHADERTEST_BOTH_ST_PP1 %s
 ;
 ; SHADERTEST_BOTH_ST_PP1-LABEL: {{^//}} LLPC final pipeline module info
-; SHADERTEST_BOTH_ST_PP1:       define dllexport amdgpu_ps { <4 x float> } @_amdgpu_ps_main
+; SHADERTEST_BOTH_ST_PP1:       define dllexport amdgpu_ps void @_amdgpu_ps_main
 ; SHADERTEST_BOTH_ST_PP1-LABEL: {{^//}} LLPC final pipeline module info
-; SHADERTEST_BOTH_ST_PP1:       define dllexport amdgpu_vs void @_amdgpu_vs_main_fetchless
+; SHADERTEST_BOTH_ST_PP1:       define dllexport amdgpu_vs void @_amdgpu_vs_main
 ; SHADERTEST_BOTH_ST_PP1-LABEL: {{^//}} LLPC final ELF info
-; SHADERTEST_BOTH_ST_PP1-LABEL: _amdgpu_vs_main_fetchless:
+; SHADERTEST_BOTH_ST_PP1-LABEL: _amdgpu_vs_main:
 ; SHADERTEST_BOTH_ST_PP1-LABEL: _amdgpu_ps_main:
 ; SHADERTEST_BOTH_ST_PP1-LABEL: {{^=====}} AMDLLPC SUCCESS =====
 ; END_SHADERTEST_BOTH_ST_PP1
@@ -56,7 +56,7 @@
 ; RUN: llvm-objdump --arch=amdgcn --mcpu=gfx900 -d %t.both.elf \
 ; RUN:   | FileCheck --check-prefix=SHADERTEST_BOTH_MT %s
 ;
-; SHADERTEST_BOTH_MT-LABEL: <_amdgpu_vs_main_fetchless>:
+; SHADERTEST_BOTH_MT-LABEL: <_amdgpu_vs_main>:
 ; SHADERTEST_BOTH_MT-LABEL: <_amdgpu_ps_main>:
 ; END_SHADERTEST_BOTH_MT
 
