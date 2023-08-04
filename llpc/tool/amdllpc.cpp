@@ -519,11 +519,9 @@ static Result init(int argc, char *argv[], ICompiler *&compiler) {
 // Performs per-pipeline initialization work for LLPC standalone tool.
 //
 // @param [out] compileInfo : Compilation info of LLPC standalone tool
-// @returns : Result::Success on success, other status codes on failure
-static Result initCompileInfo(CompileInfo *compileInfo) {
+static void initCompileInfo(CompileInfo *compileInfo) {
   compileInfo->gfxIp = ParsedGfxIp;
   compileInfo->relocatableShaderElf = EnableRelocatableShaderElf;
-  compileInfo->autoLayoutDesc = AutoLayoutDesc;
   compileInfo->robustBufferAccess = RobustBufferAccess;
   compileInfo->scalarBlockLayout = ScalarBlockLayout;
   compileInfo->scratchAccessBoundsChecks = EnableScratchAccessBoundsChecks;
@@ -573,8 +571,6 @@ static Result initCompileInfo(CompileInfo *compileInfo) {
   }
 
   compileInfo->internalRtShaders = EnableInternalRtShaders;
-
-  return Result::Success;
 }
 
 static Error fixupRtState(RtState &rtState, std::vector<char> &shaderLibraryStorage) {
@@ -639,15 +635,15 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
 
   // Clean code that gets run automatically before returning.
   auto onExit = make_scope_exit([&compileInfo] { cleanupCompileInfo(&compileInfo); });
-  Result result = initCompileInfo(&compileInfo);
-  if (result != Result::Success)
-    return createResultError(result);
+  initCompileInfo(&compileInfo);
 
   const InputSpec &firstInput = inputSpecs.front();
   if (isPipelineInfoFile(firstInput.filename)) {
+    compileInfo.autoLayoutDesc = false;
     if (Error err = processInputPipeline(compiler, compileInfo, firstInput, Unlinked, IgnoreColorAttachmentFormats))
       return err;
   } else {
+    compileInfo.autoLayoutDesc = true;
     if (Error err = processInputStages(compileInfo, inputSpecs, ValidateSpirv, NumThreads))
       return err;
 
@@ -657,6 +653,9 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
     if (isRayTracingPipeline(compileInfo.stageMask))
       compileInfo.pipelineType = VfxPipelineTypeRayTracing;
   }
+
+  if (AutoLayoutDesc.getNumOccurrences())
+    compileInfo.autoLayoutDesc = AutoLayoutDesc;
 
   RtState *rtState = nullptr;
   switch (compileInfo.pipelineType) {
