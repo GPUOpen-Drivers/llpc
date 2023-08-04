@@ -32,6 +32,8 @@
 
 #include "SPIRVInternal.h"
 #include "llpcSpirvLower.h"
+#include "vkgcDefs.h"
+#include "lgc/Builder.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/PassManager.h"
@@ -74,6 +76,7 @@ private:
   void lowerPushConsts();
   void lowerUniformConstants();
   void lowerAliasedVal();
+  void lowerEdgeFlag();
 
   void cleanupReturnBlock();
 
@@ -103,6 +106,11 @@ private:
   void interpolateInputElement(unsigned interpLoc, llvm::Value *interpInfo, llvm::CallInst &callInst,
                                GlobalVariable *gv, ArrayRef<Value *> indexOperands);
 
+  void buildApiXfbMap();
+
+  void addCallInstForXfbOutput(const ShaderInOutMetadata &outputMeta, Value *outputValue, unsigned xfbBufferAdjust,
+                               unsigned xfbOffsetAdjust, unsigned locOffset, lgc::InOutInfo outputInfo);
+
   std::unordered_map<llvm::Value *, llvm::Value *> m_globalVarProxyMap; // Proxy map for lowering global variables
   std::unordered_map<llvm::Value *, llvm::Value *> m_inputProxyMap;     // Proxy map for lowering inputs
 
@@ -122,6 +130,12 @@ private:
   std::unordered_set<llvm::Instruction *> m_atomicInsts; // "Atomicrwm" or "cmpxchg" instructions to be removed
   std::unordered_set<llvm::CallInst *> m_interpCalls;    // "Call" instruction to do input interpolation
                                                          // (fragment shader)
+  ShaderStage m_lastVertexProcessingStage;               // The last vertex processing stage
+  llvm::DenseMap<unsigned, Vkgc::XfbOutInfo>
+      m_builtInXfbMap; // Map built-in to XFB output info specified by API interface
+  llvm::DenseMap<unsigned, Vkgc::XfbOutInfo>
+      m_genericXfbMap;           // Map generic location to XFB output info specified by API interface
+  bool m_printedXfbInfo = false; // It marks if the XFB info has not been printed yet
 };
 
 } // namespace Llpc

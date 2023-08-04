@@ -62,7 +62,6 @@ if(LLPC_BUILD_GFX11)
 endif()
 #endif
 
-#if VKI_RAY_TRACING
 if(VKI_RAY_TRACING)
     if(NOT LLPC_IS_STANDALONE)
         target_compile_definitions(vkgc_headers INTERFACE HAVE_GPURT_SHIM)
@@ -71,7 +70,6 @@ if(VKI_RAY_TRACING)
     target_compile_definitions(vkgc_headers INTERFACE VKI_RAY_TRACING)
     target_compile_definitions(vkgc_headers INTERFACE GPURT_CLIENT_INTERFACE_MAJOR_VERSION=${GPURT_CLIENT_INTERFACE_MAJOR_VERSION})
 endif()
-#endif
 
 target_link_libraries(vkgc INTERFACE vkgc_headers)
 
@@ -131,7 +129,7 @@ endif()
 endif(LLPC_BUILD_TOOLS)
 
 if(ICD_BUILD_LLPC)
-    # Generate Strings for LLPC standalone tool
+    # Generate Strings for LLPC standalone tool and vkgc_gpurtshim
     add_subdirectory(util ${PROJECT_BINARY_DIR}/util)
 endif()
 

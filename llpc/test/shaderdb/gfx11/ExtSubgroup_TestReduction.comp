@@ -1,0 +1,32 @@
+#version 450
+#extension GL_KHR_shader_subgroup_clustered: enable
+#extension GL_KHR_shader_subgroup_ballot: enable
+layout (local_size_x = 16, local_size_y = 16) in;
+layout(set = 0, binding = 0, std430) buffer Buffer1
+{
+  int result[];
+};
+layout(set = 0, binding = 1, std430) buffer Buffer2
+{
+  int data[];
+};
+
+void main (void)
+{
+  const uint clusterSize1 = 32;
+  int res1 = subgroupClusteredAdd(data[gl_SubgroupInvocationID], clusterSize1);
+
+  const uint clusterSize2 = 64;
+  int res2 = subgroupClusteredAdd(data[gl_SubgroupInvocationID], clusterSize2);
+  result[gl_SubgroupInvocationID] = res1 + res2;
+}
+
+// BEGIN_SHADERTEST
+/*
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: _amdgpu_cs_main
+; SHADERTEST: v_permlanex16_b32
+; SHADERTEST: v_permlane64_b32
+; SHADERTEST: AMDLLPC SUCCESS
+*/
+// END_SHADERTEST

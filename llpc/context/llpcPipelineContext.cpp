@@ -489,6 +489,10 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
         destNode.concreteType = ResourceNodeType::DescriptorBufferCompact;
       else if (node.type == Vkgc::ResourceMappingNodeType::DescriptorConstBuffer)
         destNode.concreteType = ResourceNodeType::DescriptorBuffer;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 63
+      else if (node.type == Vkgc::ResourceMappingNodeType::DescriptorAtomicCounter)
+        destNode.concreteType = ResourceNodeType::DescriptorBuffer;
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
       else if (node.type == Vkgc::ResourceMappingNodeType::DescriptorMutable)
         destNode.concreteType = ResourceNodeType::DescriptorMutable;
@@ -496,7 +500,12 @@ void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<Resourc
       else
         destNode.concreteType = static_cast<ResourceNodeType>(node.type);
 
-      destNode.set = node.srdRange.set;
+      if (getPipelineOptions()->replaceSetWithResourceType && node.srdRange.set == 0) {
+        // Special value InternalDescriptorSetId(-1) will be passed in for internal usage
+        destNode.set = getGlResourceNodeSetFromType(node.type);
+      } else {
+        destNode.set = node.srdRange.set;
+      }
       destNode.binding = node.srdRange.binding;
       destNode.abstractType = destNode.concreteType;
       destNode.immutableValue = nullptr;
@@ -1026,6 +1035,47 @@ std::pair<BufDataFormat, BufNumFormat> PipelineContext::mapVkFormat(VkFormat for
     }
   }
   return {dfmt, nfmt};
+}
+
+// =====================================================================================================================
+// Convert Resource node type to set for OGL
+uint32_t PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType resourceType) {
+  GlResourceMappingSet resourceSet = GlResourceMappingSet::Unknown;
+
+  switch (resourceType) {
+  case ResourceMappingNodeType::DescriptorConstBuffer:
+  case ResourceMappingNodeType::InlineBuffer:
+    resourceSet = GlResourceMappingSet::DescriptorConstBuffer;
+    break;
+  case ResourceMappingNodeType::DescriptorBuffer:
+    resourceSet = GlResourceMappingSet::DescriptorBuffer;
+    break;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 63
+  case ResourceMappingNodeType::DescriptorAtomicCounter:
+    resourceSet = GlResourceMappingSet::DescriptorAtomicCounter;
+    break;
+#endif
+  case ResourceMappingNodeType::DescriptorImage:
+  case ResourceMappingNodeType::DescriptorTexelBuffer:
+    resourceSet = GlResourceMappingSet::DescriptorImage;
+    break;
+  case ResourceMappingNodeType::DescriptorResource:
+  case ResourceMappingNodeType::DescriptorCombinedTexture:
+  case ResourceMappingNodeType::DescriptorConstTexelBuffer:
+    resourceSet = GlResourceMappingSet::DescriptorResource;
+    break;
+  case ResourceMappingNodeType::DescriptorSampler:
+    resourceSet = GlResourceMappingSet::DescriptorSampler;
+    break;
+  case ResourceMappingNodeType::DescriptorFmask:
+    resourceSet = GlResourceMappingSet::DescriptorFmask;
+    break;
+  default:
+    assert("Not supportted resource type.");
+    break;
+  }
+
+  return static_cast<uint32_t>(resourceSet);
 }
 
 } // namespace Llpc

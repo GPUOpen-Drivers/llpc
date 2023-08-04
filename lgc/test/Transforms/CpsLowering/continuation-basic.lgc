@@ -18,21 +18,21 @@ entry:
 
 !0 = !{i32 1} ; level 1
 ; CHECK-LABEL: define {{[^@]+}}@test.1
-; CHECK-SAME: (i32 inreg [[GLOBALTABLE:%.*]], i32 inreg [[PERSHADERTABLE:%.*]], ptr addrspace(4) inreg [[NUMWORKGROUPSPTR:%.*]], i32 inreg [[TMP0:%.*]], i32 inreg [[TMP1:%.*]], i32 inreg [[TMP2:%.*]], i32 inreg [[TMP3:%.*]], i32 inreg [[TMP4:%.*]], i32 inreg [[TMP5:%.*]], i32 inreg [[TMP6:%.*]], i32 inreg [[TMP7:%.*]], i32 inreg [[TMP8:%.*]], i32 inreg [[TMP9:%.*]], i32 inreg [[TMP10:%.*]], i32 inreg [[SPILLTABLE:%.*]], i32 [[VCR:%.*]], ptr addrspace(5) [[VSP:%.*]], i32 [[ARG:%.*]], ptr [[TABLE:%.*]]) #[[ATTR1:[0-9]+]] align 64 !lgc.cps !2 {
+; CHECK-SAME: (i32 inreg [[GLOBALTABLE:%.*]], i32 inreg [[PERSHADERTABLE:%.*]], ptr addrspace(4) inreg [[NUMWORKGROUPSPTR:%.*]], i32 inreg [[TMP0:%.*]], i32 inreg [[TMP1:%.*]], i32 inreg [[TMP2:%.*]], i32 inreg [[TMP3:%.*]], i32 inreg [[TMP4:%.*]], i32 inreg [[TMP5:%.*]], i32 inreg [[TMP6:%.*]], i32 inreg [[TMP7:%.*]], i32 inreg [[TMP8:%.*]], i32 inreg [[TMP9:%.*]], i32 inreg [[TMP10:%.*]], i32 inreg [[SPILLTABLE:%.*]], i32 [[VCR:%.*]], ptr addrspace(5) [[VSP:%.*]], i32 [[ARG:%.*]], ptr [[TABLE:%.*]]) #[[ATTR1:[0-9]+]] align 64 !lgc.cps !0 {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[TMP11:%.*]] = alloca ptr addrspace(5), align 4, addrspace(5)
-; CHECK-NEXT:    [[TMP12:%.*]] = call i64 @llvm.amdgcn.s.getpc()
-; CHECK-NEXT:    [[TMP13:%.*]] = bitcast i64 [[TMP12]] to <2 x i32>
+; CHECK-NEXT:    [[TMP11:%.*]] = call i64 @llvm.amdgcn.s.getpc()
+; CHECK-NEXT:    [[TMP12:%.*]] = bitcast i64 [[TMP11]] to <2 x i32>
+; CHECK-NEXT:    [[TMP13:%.*]] = alloca ptr addrspace(5), align 4, addrspace(5)
 ; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i8, ptr addrspace(5) [[VSP]], i32 -4
 ; CHECK-NEXT:    [[CPS_STATE:%.*]] = load { i32 }, ptr addrspace(5) [[TMP14]], align 4
-; CHECK-NEXT:    store ptr addrspace(5) [[TMP14]], ptr addrspace(5) [[TMP11]], align 4
+; CHECK-NEXT:    store ptr addrspace(5) [[TMP14]], ptr addrspace(5) [[TMP13]], align 4
 ; CHECK-NEXT:    [[V:%.*]] = extractvalue { i32 } [[CPS_STATE]], 0
 ; CHECK-NEXT:    [[TABLE_0:%.*]] = getelementptr i32, ptr [[TABLE]], i32 0
 ; CHECK-NEXT:    [[CR_THEN:%.*]] = load i32, ptr [[TABLE_0]], align 4
 ; CHECK-NEXT:    [[THEN_ARG:%.*]] = add i32 [[ARG]], 1
 ; CHECK-NEXT:    [[V_THEN:%.*]] = mul i32 [[V]], 2
 ; CHECK-NEXT:    [[STATE_THEN:%.*]] = insertvalue { i32 } poison, i32 [[V_THEN]], 0
-; CHECK-NEXT:    [[TMP15:%.*]] = load ptr addrspace(5), ptr addrspace(5) [[TMP11]], align 4
+; CHECK-NEXT:    [[TMP15:%.*]] = load ptr addrspace(5), ptr addrspace(5) [[TMP13]], align 4
 ; CHECK-NEXT:    store { i32 } [[STATE_THEN]], ptr addrspace(5) [[TMP15]], align 4
 ; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr ptr addrspace(5), ptr addrspace(5) [[TMP15]], i32 4
 ; CHECK-NEXT:    [[TMP17:%.*]] = insertvalue { i32, ptr addrspace(5), i32 } poison, i32 [[CR_THEN]], 0
@@ -59,7 +59,7 @@ entry:
 ; CHECK-NEXT:    [[TMP38:%.*]] = insertelement <16 x i32> [[TMP37]], i32 [[TMP10]], i64 14
 ; CHECK-NEXT:    [[TMP39:%.*]] = insertelement <16 x i32> [[TMP38]], i32 [[SPILLTABLE]], i64 15
 ; CHECK-NEXT:    [[TMP40:%.*]] = and i32 [[CR_THEN]], -64
-; CHECK-NEXT:    [[TMP41:%.*]] = insertelement <2 x i32> [[TMP13]], i32 [[TMP40]], i64 0
+; CHECK-NEXT:    [[TMP41:%.*]] = insertelement <2 x i32> [[TMP12]], i32 [[TMP40]], i64 0
 ; CHECK-NEXT:    [[TMP42:%.*]] = bitcast <2 x i32> [[TMP41]] to i64
 ; CHECK-NEXT:    [[TMP43:%.*]] = inttoptr i64 [[TMP42]] to ptr
 ; CHECK-NEXT:    [[TMP44:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 true)

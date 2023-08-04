@@ -192,6 +192,7 @@ template <> inline void SPIRVMap<SPIRAddressSpace, SPIRVStorageClassKind>::init(
   add(SPIRAS_Private, StorageClassPrivate);
   add(SPIRAS_Constant, StorageClassPushConstant);
   add(SPIRAS_Uniform, StorageClassStorageBuffer);
+  add(SPIRAS_Uniform, StorageClassAtomicCounter);
   add(SPIRAS_Global, StorageClassPhysicalStorageBufferEXT);
   add(SPIRAS_Private, StorageClassCallableDataKHR);
   add(SPIRAS_Private, StorageClassIncomingCallableDataKHR);
@@ -225,6 +226,7 @@ const static char TaskPayload[] = "spirv.TaskPayload";
 const static char UniformConstant[] = "spirv.UniformConstant";
 const static char ExecutionModel[] = "spirv.ExecutionModel";
 const static char NonUniform[] = "spirv.NonUniform";
+const static char AtomicCounter[] = "spirv.AtomicCounter";
 const static char Lds[] = "spirv.Lds";
 } // namespace gSPIRVMD
 

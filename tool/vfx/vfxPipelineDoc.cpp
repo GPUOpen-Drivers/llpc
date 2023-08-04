@@ -52,6 +52,9 @@ unsigned PipelineDocument::getMaxSectionCount(SectionType type) {
   case SectionTypeGraphicsState:
     maxSectionCount = 1;
     break;
+  case SectionTypeUniformConstant:
+    maxSectionCount = 1;
+    break;
   case SectionTypeComputeState:
     maxSectionCount = 1;
     break;
@@ -70,6 +73,8 @@ unsigned PipelineDocument::getMaxSectionCount(SectionType type) {
   case SectionTypeShaderInfo:
     maxSectionCount = UINT32_MAX;
     break;
+  case SectionTypeApiXfbOutput:
+    maxSectionCount = 1;
   default:
     break;
   }
@@ -141,6 +146,18 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     gfxPipelineInfo->shaderLibrary = graphicState.shaderLibrary;
 #endif
     gfxPipelineInfo->rtState = graphicState.rtState;
+
+    if (m_sections[SectionTypeUniformConstant].size() > 0) {
+      UniformConstantState uniformState;
+      reinterpret_cast<SectionUniformConstant *>(m_sections[SectionTypeUniformConstant][0])->getSubState(uniformState);
+      gfxPipelineInfo->numUniformConstantMaps = uniformState.numUniformConstantMaps;
+      gfxPipelineInfo->ppUniformMaps = uniformState.uniformMaps;
+    }
+
+    if (m_sections[SectionTypeApiXfbOutput].size() > 0) {
+      ApiXfbOutData *apiXfbOutData = &m_pipelineState.gfxPipelineInfo.apiXfbOutData;
+      reinterpret_cast<SectionApiXfbOutput *>(m_sections[SectionTypeApiXfbOutput][0])->getSubState(*apiXfbOutData);
+    }
   }
 
   // Section "ComputePipelineState"
@@ -157,6 +174,13 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     computePipelineInfo->shaderLibrary = computeState.shaderLibrary;
 #endif
     computePipelineInfo->rtState = computeState.rtState;
+
+    if (m_sections[SectionTypeUniformConstant].size() > 0) {
+      UniformConstantState uniformState;
+      reinterpret_cast<SectionUniformConstant *>(m_sections[SectionTypeUniformConstant][0])->getSubState(uniformState);
+      assert(uniformState.numUniformConstantMaps == 1);
+      computePipelineInfo->pUniformMap = *uniformState.uniformMaps;
+    }
   }
 
   // Section "RayTracingPipelineState"
@@ -175,6 +199,7 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
 #endif
     rayTracingPipelineInfo->maxRecursionDepth = rayTracingState.maxRecursionDepth;
     rayTracingPipelineInfo->indirectStageMask = rayTracingState.indirectStageMask;
+    rayTracingPipelineInfo->mode = rayTracingState.mode;
     rayTracingPipelineInfo->rtState = rayTracingState.rtState;
     rayTracingPipelineInfo->payloadSizeMaxInLib = rayTracingState.payloadSizeMaxInLib;
     rayTracingPipelineInfo->attributeSizeMaxInLib = rayTracingState.attributeSizeMaxInLib;
@@ -397,6 +422,12 @@ Section *PipelineDocument::createSection(const char *sectionName) {
   case SectionTypeResourceMapping:
     section = new SectionResourceMapping();
     break;
+  case SectionTypeUniformConstant:
+    section = new SectionUniformConstant();
+    break;
+  case SectionTypeApiXfbOutput:
+    section = new SectionApiXfbOutput();
+    break;
   default:
     section = Document::createSection(sectionName);
     break;
@@ -426,6 +457,10 @@ bool PipelineDocument::getPtrOfSubSection(Section *section, unsigned lineNum, co
     CASE_SUBSECTION(MemberTypePipelineOption, SectionPipelineOption)
     CASE_SUBSECTION(MemberTypeShaderOption, SectionShaderOption)
     CASE_SUBSECTION(MemberTypeNggState, SectionNggState)
+    CASE_SUBSECTION(MemberTypeUniformConstantMap, SectionUniformConstantMap)
+    CASE_SUBSECTION(MemberTypeUniformConstantMapEntry, SectionUniformConstantMapEntry)
+    CASE_SUBSECTION(MemberTypeUniformConstant, SectionUniformConstant)
+    CASE_SUBSECTION(MemberTypeXfbOutInfo, SectionXfbOutInfo)
     CASE_SUBSECTION(MemberTypeShaderGroup, SectionShaderGroup)
     CASE_SUBSECTION(MemberTypeRtState, SectionRtState)
     CASE_SUBSECTION(MemberTypeRayTracingShaderExportConfig, SectionRayTracingShaderExportConfig)

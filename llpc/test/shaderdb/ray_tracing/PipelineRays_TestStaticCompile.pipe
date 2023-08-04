@@ -1,0 +1,328 @@
+; Check that the ray tracing static compilation is working.
+; Generating the instruction 'image_bvh64_intersect_ray' indicates the trace ray library is linked correctly.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: _amdgpu_cs_main:
+; SHADERTEST: image_bvh64_intersect_ray
+; SHADERTEST: AMDLLPC SUCCESS
+; REQUIRES: do-not-run-me
+; END_SHADERTEST
+
+[Version]
+version = 53
+
+[rgenSpvFile]
+fileName = Shader_0xF10BE264545A9F4B.spv
+
+[rgenInfo]
+entryPoint = main
+options.trapPresent = 0
+options.debugMode = 0
+options.enablePerformanceData = 0
+options.allowReZ = 0
+options.vgprLimit = 0
+options.sgprLimit = 0
+options.maxThreadGroupsPerComputeUnit = 0
+options.waveSize = 32
+options.wgpMode = 0
+options.waveBreakSize = None
+options.forceLoopUnrollCount = 0
+options.useSiScheduler = 0
+options.updateDescInElf = 0
+options.allowVaryWaveSize = 0
+options.enableLoadScalarizer = 0
+options.disableLicm = 0
+options.unrollThreshold = 0
+options.scalarThreshold = 0
+options.disableLoopUnroll = 0
+options.fp32DenormalMode = Auto
+options.adjustDepthImportVrs = 0
+options.disableLicmThreshold = 0
+options.unrollHintThreshold = 0
+options.dontUnrollHintThreshold = 0
+
+[missSpvFile]
+fileName = Shader_0xE7D0EF376FDDEA56.spv
+
+[missInfo]
+entryPoint = main
+options.trapPresent = 0
+options.debugMode = 0
+options.enablePerformanceData = 0
+options.allowReZ = 0
+options.vgprLimit = 0
+options.sgprLimit = 0
+options.maxThreadGroupsPerComputeUnit = 0
+options.waveSize = 0
+options.wgpMode = 0
+options.waveBreakSize = None
+options.forceLoopUnrollCount = 0
+options.useSiScheduler = 0
+options.updateDescInElf = 0
+options.allowVaryWaveSize = 0
+options.enableLoadScalarizer = 0
+options.disableLicm = 0
+options.unrollThreshold = 0
+options.scalarThreshold = 0
+options.disableLoopUnroll = 0
+options.fp32DenormalMode = Auto
+options.adjustDepthImportVrs = 0
+options.disableLicmThreshold = 0
+options.unrollHintThreshold = 0
+options.dontUnrollHintThreshold = 0
+
+[chitSpvFile]
+fileName = Shader_0x04BDF3B158225AFA.spv
+
+[chitInfo]
+entryPoint = main
+options.trapPresent = 0
+options.debugMode = 0
+options.enablePerformanceData = 0
+options.allowReZ = 0
+options.vgprLimit = 0
+options.sgprLimit = 0
+options.maxThreadGroupsPerComputeUnit = 0
+options.waveSize = 0
+options.wgpMode = 0
+options.waveBreakSize = None
+options.forceLoopUnrollCount = 0
+options.useSiScheduler = 0
+options.updateDescInElf = 0
+options.allowVaryWaveSize = 0
+options.enableLoadScalarizer = 0
+options.disableLicm = 0
+options.unrollThreshold = 0
+options.scalarThreshold = 0
+options.disableLoopUnroll = 0
+options.fp32DenormalMode = Auto
+options.adjustDepthImportVrs = 0
+options.disableLicmThreshold = 0
+options.unrollHintThreshold = 0
+options.dontUnrollHintThreshold = 0
+
+[chitSpvFile]
+fileName = Shader_0x89ABD17F2942EFC4.spv
+
+[chitInfo]
+entryPoint = main
+options.trapPresent = 0
+options.debugMode = 0
+options.enablePerformanceData = 0
+options.allowReZ = 0
+options.vgprLimit = 0
+options.sgprLimit = 0
+options.maxThreadGroupsPerComputeUnit = 0
+options.waveSize = 0
+options.wgpMode = 0
+options.waveBreakSize = None
+options.forceLoopUnrollCount = 0
+options.useSiScheduler = 0
+options.updateDescInElf = 0
+options.allowVaryWaveSize = 0
+options.enableLoadScalarizer = 0
+options.disableLicm = 0
+options.unrollThreshold = 0
+options.scalarThreshold = 0
+options.disableLoopUnroll = 0
+options.fp32DenormalMode = Auto
+options.adjustDepthImportVrs = 0
+options.disableLicmThreshold = 0
+options.unrollHintThreshold = 0
+options.dontUnrollHintThreshold = 0
+
+[sectSpvFile]
+fileName = Shader_0xAD98DA756C353EFE.spv
+
+[sectInfo]
+entryPoint = main
+options.trapPresent = 0
+options.debugMode = 0
+options.enablePerformanceData = 0
+options.allowReZ = 0
+options.vgprLimit = 0
+options.sgprLimit = 0
+options.maxThreadGroupsPerComputeUnit = 0
+options.waveSize = 0
+options.wgpMode = 0
+options.waveBreakSize = None
+options.forceLoopUnrollCount = 0
+options.useSiScheduler = 0
+options.updateDescInElf = 0
+options.allowVaryWaveSize = 0
+options.enableLoadScalarizer = 0
+options.disableLicm = 0
+options.unrollThreshold = 0
+options.scalarThreshold = 0
+options.disableLoopUnroll = 0
+options.fp32DenormalMode = Auto
+options.adjustDepthImportVrs = 0
+options.disableLicmThreshold = 0
+options.unrollHintThreshold = 0
+options.dontUnrollHintThreshold = 0
+
+[ResourceMapping]
+userDataNode[0].visibility = 1728
+userDataNode[0].type = DescriptorTableVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].next[0].type = DescriptorConstBuffer
+userDataNode[0].next[0].offsetInDwords = 0
+userDataNode[0].next[0].sizeInDwords = 4
+userDataNode[0].next[0].set = 0x00000000
+userDataNode[0].next[0].binding = 0
+userDataNode[0].next[1].type = DescriptorImage
+userDataNode[0].next[1].offsetInDwords = 4
+userDataNode[0].next[1].sizeInDwords = 8
+userDataNode[0].next[1].set = 0x00000000
+userDataNode[0].next[1].binding = 1
+userDataNode[0].next[2].type = DescriptorImage
+userDataNode[0].next[2].offsetInDwords = 12
+userDataNode[0].next[2].sizeInDwords = 8
+userDataNode[0].next[2].set = 0x00000000
+userDataNode[0].next[2].binding = 2
+userDataNode[0].next[3].type = DescriptorConstBuffer
+userDataNode[0].next[3].offsetInDwords = 20
+userDataNode[0].next[3].sizeInDwords = 4
+userDataNode[0].next[3].set = 0x00000000
+userDataNode[0].next[3].binding = 3
+userDataNode[0].next[4].type = DescriptorBuffer
+userDataNode[0].next[4].offsetInDwords = 24
+userDataNode[0].next[4].sizeInDwords = 4
+userDataNode[0].next[4].set = 0x00000000
+userDataNode[0].next[4].binding = 4
+userDataNode[0].next[5].type = DescriptorBuffer
+userDataNode[0].next[5].offsetInDwords = 28
+userDataNode[0].next[5].sizeInDwords = 4
+userDataNode[0].next[5].set = 0x00000000
+userDataNode[0].next[5].binding = 5
+userDataNode[0].next[6].type = DescriptorBuffer
+userDataNode[0].next[6].offsetInDwords = 32
+userDataNode[0].next[6].sizeInDwords = 4
+userDataNode[0].next[6].set = 0x00000000
+userDataNode[0].next[6].binding = 6
+userDataNode[0].next[7].type = DescriptorBuffer
+userDataNode[0].next[7].offsetInDwords = 36
+userDataNode[0].next[7].sizeInDwords = 4
+userDataNode[0].next[7].set = 0x00000000
+userDataNode[0].next[7].binding = 7
+userDataNode[0].next[8].type = DescriptorCombinedTexture
+userDataNode[0].next[8].offsetInDwords = 40
+userDataNode[0].next[8].sizeInDwords = 12
+userDataNode[0].next[8].set = 0x00000000
+userDataNode[0].next[8].binding = 8
+userDataNode[0].next[9].type = DescriptorBuffer
+userDataNode[0].next[9].offsetInDwords = 52
+userDataNode[0].next[9].sizeInDwords = 4
+userDataNode[0].next[9].set = 0x00000000
+userDataNode[0].next[9].binding = 9
+userDataNode[1].visibility = 4032
+userDataNode[1].type = DescriptorTableVaPtr
+userDataNode[1].offsetInDwords = 2
+userDataNode[1].sizeInDwords = 1
+userDataNode[1].next[0].type = DescriptorConstBufferCompact
+userDataNode[1].next[0].offsetInDwords = 0
+userDataNode[1].next[0].sizeInDwords = 2
+userDataNode[1].next[0].set = 0x0000005D
+userDataNode[1].next[0].binding = 17
+userDataNode[1].next[1].type = DescriptorConstBuffer
+userDataNode[1].next[1].offsetInDwords = 2
+userDataNode[1].next[1].sizeInDwords = 4
+userDataNode[1].next[1].set = 0x0000005D
+userDataNode[1].next[1].binding = 0
+userDataNode[1].next[2].type = DescriptorBuffer
+userDataNode[1].next[2].offsetInDwords = 6
+userDataNode[1].next[2].sizeInDwords = 4
+userDataNode[1].next[2].set = 0x0000005D
+userDataNode[1].next[2].binding = 1
+
+[RayTracingPipelineState]
+deviceIndex = 0
+options.includeDisassembly = 0
+options.scalarBlockLayout = 0
+options.includeIr = 0
+options.robustBufferAccess = 0
+options.reconfigWorkgroupLayout = 0
+options.shadowDescriptorTableUsage = Auto
+options.shadowDescriptorTablePtrHigh = 0
+options.extendedRobustness.robustBufferAccess = 0
+options.extendedRobustness.robustImageAccess = 0
+options.extendedRobustness.nullDescriptor = 0
+groups[0].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR
+groups[0].generalShader = 0
+groups[0].closestHitShader = -1
+groups[0].anyHitShader = -1
+groups[0].intersectionShader = -1
+groups[1].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR
+groups[1].generalShader = 1
+groups[1].closestHitShader = -1
+groups[1].anyHitShader = -1
+groups[1].intersectionShader = -1
+groups[2].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR
+groups[2].generalShader = -1
+groups[2].closestHitShader = 2
+groups[2].anyHitShader = -1
+groups[2].intersectionShader = -1
+groups[3].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_PROCEDURAL_HIT_GROUP_KHR
+groups[3].generalShader = -1
+groups[3].closestHitShader = 3
+groups[3].anyHitShader = -1
+groups[3].intersectionShader = 4
+shaderTraceRay = Shader_0xFC3AF5C307D607CB.spv
+maxRecursionDepth = 1
+indirectStageMask = 0
+rtState.bvhResDescSize = 4
+rtState.bvhResDesc[0] = 0
+rtState.bvhResDesc[1] = 2197815296
+rtState.bvhResDesc[2] = 4294967295
+rtState.bvhResDesc[3] = 2164261887
+rtState.nodeStrideShift = 7
+rtState.staticPipelineFlags = 0
+rtState.triCompressMode = 0
+rtState.pipelineFlags = 0
+rtState.threadGroupSizeX = 8
+rtState.threadGroupSizeY = 4
+rtState.threadGroupSizeZ = 1
+rtState.boxSortHeuristicMode = 0
+rtState.counterMode = 0
+rtState.counterMask = 0
+rtState.rayQueryCsSwizzle = 1
+rtState.ldsStackSize = 16
+rtState.dispatchRaysThreadGroupSize = 32
+rtState.ldsSizePerThreadGroup = 65536
+rtState.outerTileSize = 4
+rtState.dispatchDimSwizzleMode = 0
+rtState.exportConfig.indirectCallingConvention = 1
+rtState.exportConfig.indirectCalleeSavedRegs.raygen = 2
+rtState.exportConfig.indirectCalleeSavedRegs.miss = 40
+rtState.exportConfig.indirectCalleeSavedRegs.closestHit = 50
+rtState.exportConfig.indirectCalleeSavedRegs.anyHit = 75
+rtState.exportConfig.indirectCalleeSavedRegs.intersection = 75
+rtState.exportConfig.indirectCalleeSavedRegs.callable = 28
+rtState.exportConfig.indirectCalleeSavedRegs.traceRays = 28
+rtState.exportConfig.enableUniformNoReturn = 1
+rtState.exportConfig.enableTraceRayArgsInLds = 0
+rtState.exportConfig.readsDispatchRaysIndex = 0
+rtState.exportConfig.enableDynamicLaunch = 0
+rtState.exportConfig.emitRaytracingShaderDataToken = 0
+rtState.enableRayQueryCsSwizzle = 0
+rtState.enableDispatchRaysInnerSwizzle = 1
+rtState.enableDispatchRaysOuterSwizzle = 1
+rtState.forceInvalidAccelStruct = 0
+rtState.enableRayTracingCounters = 0
+rtState.enableOptimalLdsStackSizeForIndirect = 1
+rtState.enableOptimalLdsStackSizeForUnified = 1
+rtState.gpurtFuncTable.pFunc[0] = TraceRay1_1
+rtState.gpurtFuncTable.pFunc[1] = TraceRayInline1_1
+rtState.gpurtFuncTable.pFunc[2] = TraceRayUsingHitToken1_1
+rtState.gpurtFuncTable.pFunc[3] = RayQueryProceed1_1
+rtState.gpurtFuncTable.pFunc[4] = GetInstanceIndex
+rtState.gpurtFuncTable.pFunc[5] = GetInstanceID
+rtState.gpurtFuncTable.pFunc[6] = GetObjectToWorldTransform
+rtState.gpurtFuncTable.pFunc[7] = GetWorldToObjectTransform
+rtState.gpurtFuncTable.pFunc[8] = TraceLongRayAMD1_1
+rtState.gpurtFuncTable.pFunc[9] = LongRayQueryProceed1_1
+payloadSizeMaxInLib = 0
+attributeSizeMaxInLib = 0
+hasPipelineLibrary = 0
