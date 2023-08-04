@@ -84,7 +84,7 @@
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
 //  |     64.0 | Add enableColorExportShader to GraphicsPipelineBuildInfo.                                             |
-//  |     63.0 | Add Atomic Counter, its default descriptor and map its concretType to Buffer.                         |
+//  |     63.0 | Add Atomic Counter, its default descriptor and map its concreteType to Buffer.                        |
 //  |     62.1 | Add ApiXfbOutData GraphicsPipelineBuildInfo                                                           |
 //  |     62.0 | Default to the compiler getting the GPURT library directly, and move shader library info into RtState |
 //  |     61.16| Add replaceSetWithResourceType to PipelineOptions                                                     |

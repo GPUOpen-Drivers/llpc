@@ -267,9 +267,9 @@ bool SpirvLowerGlobal::runImpl(Module &module) {
 void SpirvLowerGlobal::lowerEdgeFlag() {
   const unsigned int edgeflagInputLocation = Vkgc::GlCompatibilityAttributeLocation::EdgeFlag;
 
-  Llpc::PipelineContext *pipelineContex = m_context->getPipelineContext();
+  Llpc::PipelineContext *pipelineContext = m_context->getPipelineContext();
   const Vkgc::GraphicsPipelineBuildInfo *pipelineInfo =
-      static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(pipelineContex->getPipelineBuildInfo());
+      static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(pipelineContext->getPipelineBuildInfo());
   const VkPipelineVertexInputStateCreateInfo *vertexInfo = pipelineInfo->pVertexInput;
 
   if (!vertexInfo)
@@ -2345,7 +2345,7 @@ void SpirvLowerGlobal::interpolateInputElement(unsigned interpLoc, Value *auxInt
 }
 
 // =====================================================================================================================
-// Fill the XFB info map from the Vkgc::ApiXfbOutData if XFB is specified by API inerface
+// Fill the XFB info map from the Vkgc::ApiXfbOutData if XFB is specified by API interface
 void SpirvLowerGlobal::buildApiXfbMap() {
   auto pipelineBuildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
   for (unsigned idx = 0; idx < pipelineBuildInfo->apiXfbOutData.numXfbOutInfo; ++idx) {

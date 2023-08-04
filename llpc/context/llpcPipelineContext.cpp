@@ -1071,7 +1071,7 @@ uint32_t PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNode
     resourceSet = GlResourceMappingSet::DescriptorFmask;
     break;
   default:
-    assert("Not supportted resource type.");
+    assert("Not supported resource type.");
     break;
   }
 
