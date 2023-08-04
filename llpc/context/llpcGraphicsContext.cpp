@@ -197,8 +197,9 @@ void GraphicsContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
     setVertexInputDescriptions(pipeline, hasher);
   }
 
-  if (isShaderStageInMask(ShaderStageFragment, stageMask) && (!unlinked || DisableColorExportShader)) {
-    // Give the color export state to the middle-end.
+  if ((isShaderStageInMask(ShaderStageFragment, stageMask) && (!unlinked || DisableColorExportShader)) ||
+      (stageMask == 0)) {
+    // Give the color export state to the middle-end. Empty stage mask indicates color export shader.
     setColorExportState(pipeline, hasher);
   }
 
