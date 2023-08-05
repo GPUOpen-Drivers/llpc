@@ -296,8 +296,12 @@ Function *FetchShader::createFetchFunc() {
   // Create the function. Mark SGPR inputs as "inreg".
   Function *func = Function::Create(funcTy, GlobalValue::ExternalLinkage, getGlueShaderName(), module);
   func->setCallingConv(m_vsEntryRegInfo.callingConv);
-  for (unsigned i = 0; i != m_vsEntryRegInfo.sgprCount; ++i)
-    func->getArg(i)->addAttr(Attribute::InReg);
+  for (unsigned i = 0; i != m_vsEntryRegInfo.sgprCount + m_vsEntryRegInfo.vgprCount; ++i) {
+    Argument *arg = func->getArg(i);
+    if (i < m_vsEntryRegInfo.sgprCount)
+      arg->addAttr(Attribute::InReg);
+    arg->addAttr(Attribute::NoUndef);
+  }
 
   // Add mnemonic names to input args.
   if (m_vsEntryRegInfo.callingConv == CallingConv::AMDGPU_HS)

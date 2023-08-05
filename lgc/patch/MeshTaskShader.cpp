@@ -1632,7 +1632,7 @@ Function *MeshTaskShader::mutateMeshShaderEntryPoint(Function *entryPoint) {
 
     entryPoint = newEntryPoint;
     newEntryPoint = addFunctionArgs(entryPoint, nullptr, {int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty},
-                                    VgprInputNames, 0, true);
+                                    VgprInputNames, 0, AddFunctionArgsAppend);
 
     assert(entryPoint->use_empty());
     entryPoint->eraseFromParent();
@@ -1649,7 +1649,7 @@ Function *MeshTaskShader::mutateMeshShaderEntryPoint(Function *entryPoint) {
   //   +-----------------------+-----------------------+-----------------------+
   if (m_gfxIp.major >= 11) {
     entryPoint = newEntryPoint;
-    newEntryPoint = addFunctionArgs(entryPoint, nullptr, int32Ty, {"localInvocationId"}, 0, true);
+    newEntryPoint = addFunctionArgs(entryPoint, nullptr, int32Ty, {"localInvocationId"}, 0, AddFunctionArgsAppend);
 
     assert(entryPoint->use_empty());
     entryPoint->eraseFromParent();

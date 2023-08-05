@@ -5,13 +5,13 @@
 ; Skip to the patching results for the fetch shader
 ; SHADERTEST-LABEL: LLPC pipeline patching results
 ; Check the inputs to the vertex shader.  This should be all of the regular inputs.  There is one vertex attribute being passed in: The vector at the end.
-; SHADERTEST: define dllexport amdgpu_vs void @_amdgpu_vs_main_fetchless(i32 inreg %globalTable, i32 inreg %userdata0, i32 inreg %vertexBufferTable, i32 inreg %baseVertex, i32 inreg %baseInstance, i32 %VertexId, i32 %RelVertexId, i32 %PrimitiveId, i32 %InstanceId, <4 x float> %vertex0.0)
+; SHADERTEST: define dllexport amdgpu_vs void @_amdgpu_vs_main_fetchless(i32 inreg noundef %globalTable, i32 inreg noundef %userdata0, i32 inreg noundef %vertexBufferTable, i32 inreg noundef %baseVertex, i32 inreg noundef %baseInstance, i32 noundef %VertexId, i32 noundef %RelVertexId, i32 noundef %PrimitiveId, i32 noundef %InstanceId, <4 x float> noundef %vertex0.0)
 ; SHADERTEST-LABEL: LGC glue shader results
 ; Check the inputs to the fetch shader.  This should match the vertex shader except:
 ; - there are extra inreg inputs because its determination of how many SGPR inputs
 ;   are conservative;
 ; - there is no VGPR input for the vertex input that the fetch shader generates.
-; SHADERTEST: define amdgpu_vs { i32,{{.*}}, i32, float, float, float, float, <4 x float> } @_amdgpu_vs_main(i32 inreg %0, i32 inreg %1, i32 inreg %VertexBufferTable, i32 inreg %BaseVertex, i32 inreg %BaseInstance, {{.*}}, i32 inreg %{{.*}}, float %VertexId, float %{{.*}}, float %{{.*}}, float %InstanceId)
+; SHADERTEST: define amdgpu_vs { i32,{{.*}}, i32, float, float, float, float, <4 x float> } @_amdgpu_vs_main(i32 inreg noundef %0, i32 inreg noundef %1, i32 inreg noundef %VertexBufferTable, i32 inreg noundef %BaseVertex, i32 inreg noundef %BaseInstance, {{.*}}, i32 inreg noundef %{{.*}}, float noundef %VertexId, float noundef %{{.*}}, float noundef %{{.*}}, float noundef %InstanceId)
 ; Check that the attribute is loaded.
 ; SHADERTEST:  [[f0:%.*]] = call i32 @llvm.amdgcn.struct.tbuffer.load.i32(<4 x i32> [[addr:%[0-9]*]], i32 %VertexIndex, i32 0, i32 0, i32 immarg 116, i32 immarg 0)
 ; SHADERTEST:  [[f1:%.*]] = call i32 @llvm.amdgcn.struct.tbuffer.load.i32(<4 x i32> [[addr:%[0-9]*]], i32 %VertexIndex, i32 4, i32 0, i32 immarg 116, i32 immarg 0)

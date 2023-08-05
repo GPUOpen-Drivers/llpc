@@ -1030,7 +1030,8 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
     } else {
       inRegMask = generateEntryPointArgTys(shaderInputs, origFunc, shaderInputTys, shaderInputNames,
                                            origType->getNumParams(), true);
-      newFunc = addFunctionArgs(origFunc, origType->getReturnType(), shaderInputTys, shaderInputNames, inRegMask, true);
+      newFunc = addFunctionArgs(origFunc, origType->getReturnType(), shaderInputTys, shaderInputNames, inRegMask,
+                                AddFunctionArgsAppend);
       const bool isEntryPoint = isShaderEntryPoint(newFunc);
       newFunc->setCallingConv(isEntryPoint ? CallingConv::AMDGPU_CS : CallingConv::AMDGPU_Gfx);
     }

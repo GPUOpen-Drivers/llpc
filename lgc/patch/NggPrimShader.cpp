@@ -564,6 +564,7 @@ Function *NggPrimShader::generate(Function *esMain, Function *gsMain, Function *
     auto argIdx = arg.getArgNo();
     if (inRegMask & (1ull << argIdx))
       arg.addAttr(Attribute::InReg);
+    arg.addAttr(Attribute::NoUndef);
     args.push_back(&arg);
   }
 
@@ -3514,7 +3515,8 @@ void NggPrimShader::splitEs() {
 
   // NOTE: Here, we just mutate original ES to do deferred vertex export. We add vertex position data as an additional
   // argument. This could avoid re-fetching it since we already get the data before NGG culling.
-  auto esVertexExporter = addFunctionArgs(m_esHandlers.main, nullptr, {positionTy}, {"position"});
+  auto esVertexExporter =
+      addFunctionArgs(m_esHandlers.main, nullptr, {positionTy}, {"position"}, 0, AddFunctionArgsMaybeUndef);
   esVertexExporter->setName(NggEsVertexExporter);
 
   position = esVertexExporter->getArg(0); // The first argument is vertex position data

@@ -5,7 +5,7 @@
 ; SHADERTEST: {{^//}} LLPC pipeline patching results
 
 ; The i16vec4 fetch comes in as a <2 x float>, and passed on to the vertex shader.
-; SHADERTEST: define dllexport amdgpu_gs void @_amdgpu_gs_main_fetchless({{.*}}, <2 x float> [[fetch:%[0-9]*]])
+; SHADERTEST: define dllexport amdgpu_gs void @_amdgpu_gs_main_fetchless({{.*}}, <2 x float> noundef [[fetch:%[0-9]*]])
 ; SHADERTEST: call amdgpu_es void @_amdgpu_es_main_fetchless({{.*}}, <2 x float> [[fetch]])
 ; SHADERTEST: =====  AMDLLPC SUCCESS  =====
 ; END_SHADERTEST

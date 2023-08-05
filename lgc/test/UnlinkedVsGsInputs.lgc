@@ -2,9 +2,9 @@
 ; to the vertex shader, which expects it as the last parameter.
 ; RUN: lgc -mcpu=gfx900 %s -o /dev/null -print-after=lgc-patch-prepare-pipeline-abi 2>&1 | FileCheck --check-prefixes=CHECK %s
 ; CHECK: IR Dump After Patch LLVM for preparing pipeline ABI on [module]
-; CHECK: define dllexport amdgpu_gs void @_amdgpu_gs_main_fetchless({{.*}}, <2 x float> [[vertInput:%[0-9]*]])
+; CHECK: define dllexport amdgpu_gs void @_amdgpu_gs_main_fetchless({{.*}}, <2 x float> noundef [[vertInput:%[0-9]*]])
 ; CHECK: call amdgpu_es void @_amdgpu_es_main_fetchless({{.*}}, <2 x float> [[vertInput]])
-; CHECK: define internal{{.*}} amdgpu_es void @_amdgpu_es_main_fetchless({{.*}}, <2 x float> %vertex0.0)
+; CHECK: define internal{{.*}} amdgpu_es void @_amdgpu_es_main_fetchless({{.*}}, <2 x float> noundef %vertex0.0)
 
 ; ModuleID = 'lgcPipeline'
 source_filename = "lgcPipeline"

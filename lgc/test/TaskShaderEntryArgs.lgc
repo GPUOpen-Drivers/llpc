@@ -6,7 +6,7 @@
 ; arguments should be present in order: meshTaskDispatchDims, meshTaskRingIndex, meshPipeStatsBuf.
 ;
 ; CHECK-LABEL: _amdgpu_cs_main
-; CHECK: <3 x i32> inreg %meshTaskDispatchDims, i32 inreg %meshTaskRingIndex, i32 inreg %meshPipeStatsBuf
+; CHECK: <3 x i32> inreg noundef %meshTaskDispatchDims, i32 inreg noundef %meshTaskRingIndex, i32 inreg noundef %meshPipeStatsBuf
 
 ; ModuleID = 'lgcPipeline'
 source_filename = "llpctask1"
