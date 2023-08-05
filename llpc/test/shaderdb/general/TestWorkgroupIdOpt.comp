@@ -16,7 +16,7 @@ void main()
     test = gl_WorkGroupID.x;
 }
 // CHECK-LABEL: define {{[^@]+}}@_amdgpu_cs_main
-// CHECK-SAME: (i32 inreg [[GLOBALTABLE:%.*]], i32 inreg [[USERDATA0:%.*]], i32 inreg [[WORKGROUPID1:%.*]], i32 inreg [[MULTIDISPATCHINFO:%.*]], <3 x i32> [[LOCALINVOCATIONID:%.*]]) #[[ATTR0:[0-9]+]] !lgc.shaderstage !5 {
+// CHECK-SAME: (i32 inreg noundef [[GLOBALTABLE:%.*]], i32 inreg noundef [[USERDATA0:%.*]], i32 inreg noundef [[WORKGROUPID1:%.*]], i32 inreg noundef [[MULTIDISPATCHINFO:%.*]], <3 x i32> noundef [[LOCALINVOCATIONID:%.*]]) #[[ATTR0:[0-9]+]] !lgc.shaderstage !5 {
 // CHECK-NEXT:  .entry:
 // CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.amdgcn.s.getpc()
 // CHECK-NEXT:    [[TMP1:%.*]] = and i64 [[TMP0]], -4294967296

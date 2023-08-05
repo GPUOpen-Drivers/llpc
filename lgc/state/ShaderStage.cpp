@@ -120,15 +120,17 @@ const char *lgc::getShaderStageAbbreviation(ShaderStage shaderStage) {
 // across to it.
 // If this changes the return type, then all the return instructions will be invalid.
 // This does not erase the old function, as the caller needs to do something with its uses (if any).
+// The added arguments are `noundef` by default.
 //
 // @param oldFunc : Original function
 // @param retTy : New return type, nullptr to use the same as in the original function
 // @param argTys : Types of new args
 // @param inRegMask : Bitmask of which args should be marked "inreg", to be passed in SGPRs
-// @param append : Append new arguments if true, prepend new arguments if false
+// @param flags : Bitwise combination of AddFunctionArgsFlags (or 0)
 // @returns : The new function
 Function *lgc::addFunctionArgs(Function *oldFunc, Type *retTy, ArrayRef<Type *> argTys, ArrayRef<std::string> argNames,
-                               uint64_t inRegMask, bool append) {
+                               uint64_t inRegMask, unsigned flags) {
+  const bool append = flags & AddFunctionArgsAppend;
   // Gather all arg types: first the new ones, then the ones from the original function.
   FunctionType *oldFuncTy = oldFunc->getFunctionType();
   SmallVector<Type *, 8> allArgTys;
@@ -170,13 +172,15 @@ Function *lgc::addFunctionArgs(Function *oldFunc, Type *retTy, ArrayRef<Type *> 
   }
 
   // New arguments.
-  AttributeSet emptyAttrSet;
-  AttributeSet inRegAttrSet = emptyAttrSet.addAttribute(oldFunc->getContext(), Attribute::InReg);
+  AttributeSet defaultAttrSet;
+  if (!(flags & AddFunctionArgsMaybeUndef))
+    defaultAttrSet = defaultAttrSet.addAttribute(oldFunc->getContext(), Attribute::NoUndef);
+  AttributeSet inRegAttrSet = defaultAttrSet.addAttribute(oldFunc->getContext(), Attribute::InReg);
   for (unsigned idx = 0; idx != argTys.size(); ++idx)
-    argAttrs.push_back((inRegMask >> idx) & 1 ? inRegAttrSet : emptyAttrSet);
+    argAttrs.push_back((inRegMask >> idx) & 1 ? inRegAttrSet : defaultAttrSet);
   if (!append) {
     // Old arguments.
-    for (unsigned idx = 0; idx != argTys.size(); ++idx)
+    for (unsigned idx = 0; idx != oldFuncTy->getNumParams(); ++idx)
       argAttrs.push_back(oldAttrList.getParamAttrs(idx));
   }
   // Construct new AttributeList and set it on the new function.
@@ -193,20 +197,12 @@ Function *lgc::addFunctionArgs(Function *oldFunc, Type *retTy, ArrayRef<Type *> 
   for (unsigned idx = 0; idx != argTys.size(); ++idx) {
     Argument *arg = newFunc->getArg(append ? idx + oldFuncTy->getNumParams() : idx);
     arg->setName(argNames[idx]);
-    if ((inRegMask >> idx) & 1)
-      arg->addAttr(Attribute::InReg);
-    else if (!oldFuncTy->params().empty())
-      arg->removeAttr(Attribute::AttrKind::InReg);
   }
   for (unsigned idx = 0; idx != oldFuncTy->params().size(); ++idx) {
     Argument *arg = newFunc->getArg(append ? idx : idx + argTys.size());
     Argument *oldArg = oldFunc->getArg(idx);
     arg->setName(oldArg->getName());
     oldArg->replaceAllUsesWith(arg);
-    if (oldArg->hasInRegAttr())
-      arg->addAttr(Attribute::InReg);
-    else
-      arg->removeAttr(Attribute::AttrKind::InReg);
   }
 
   return newFunc;

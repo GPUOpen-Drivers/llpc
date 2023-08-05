@@ -7,7 +7,7 @@
 ; SHADERTEST: {{^//}} LLPC pipeline patching results
 
 ; Make sure the hs shader comes first and has the vertex attribute as its last parameter.
-; SHADERTEST: define dllexport amdgpu_hs void @_amdgpu_hs_main_fetchless({{.*}}, <4 x float> [[vert_attrib:%[0-9]*]])
+; SHADERTEST: define dllexport amdgpu_hs void @_amdgpu_hs_main_fetchless({{.*}}, <4 x float> noundef [[vert_attrib:%[0-9]*]])
 
 ; Call the original vertex shader passing in the attribute
 ; SHADERTEST: call amdgpu_ls void @_amdgpu_ls_main_fetchless({{.*}}, <4 x float> [[vert_attrib]])
@@ -17,14 +17,14 @@
 
 ; Make sure that the GS shader does not have the vertex attribute.  It is not needed if it does not call the original
 ; vertex shader.
-; SHADERTEST: define dllexport amdgpu_gs void @_amdgpu_gs_main({{.*}}, i32 {{%[0-9]*}})
+; SHADERTEST: define dllexport amdgpu_gs void @_amdgpu_gs_main({{.*}}, i32 noundef {{%[0-9]*}})
 
 ; SHADERTEST: {{^//}} LLPC final pipeline module info
 
 ; Test that the vertex input is correctly loaded.  For GFX9, if the HS has no vertecies, then the first two vgpr inputs are dropped.  This must be accounted for.
 ; SHADERTEST: {{^//}} LGC glue shader results
 ; Fist identify the vgpr input in the function parameters.  We want to make sure we get the vertex id and the vgpr 2 place before it.
-; SHADERTEST: define amdgpu_hs { {{.*}} } @_amdgpu_hs_main({{(i32 inreg %[a-zA-Z0-9]+, )+}}float [[vgpr0:%[a-zA-Z0-9]+]], float [[vgpr1:%[a-zA-Z0-9]+]], float %VertexId, float [[vgpr3:%[a-zA-Z0-9]+]], float [[vgpr4:%[a-zA-Z0-9]+]], float %InstanceId)
+; SHADERTEST: define amdgpu_hs { {{.*}} } @_amdgpu_hs_main({{(i32 inreg noundef %[a-zA-Z0-9]+, )+}}float noundef [[vgpr0:%[a-zA-Z0-9]+]], float noundef [[vgpr1:%[a-zA-Z0-9]+]], float noundef %VertexId, float noundef [[vgpr3:%[a-zA-Z0-9]+]], float noundef [[vgpr4:%[a-zA-Z0-9]+]], float noundef %InstanceId)
 ;
 ; Make sure that the code picks the vgpr that actually contains the vertex id by checking if the HS has any vertices.
 ; SHADERTEST: [[hsVertexCount:%[0-9]+]] = and i32 %MergedWaveInfo, 65280
@@ -45,7 +45,7 @@
 
 ; Test that the vertex input is correctly loaded.  GFX10 does not have to issue mentioned above.  Make sure that %VertexId is used.
 ; SHADERTEST_GFX10: {{^//}} LGC glue shader results
-; SHADERTEST_GFX10: define amdgpu_hs { {{.*}} } @_amdgpu_hs_main({{.*}}, float %VertexId
+; SHADERTEST_GFX10: define amdgpu_hs { {{.*}} } @_amdgpu_hs_main({{.*}}, float noundef %VertexId
 ; SHADERTEST_GFX10: [[vgprAsInt:%[0-9]+]] = bitcast float %VertexId to i32
 ; SHADERTEST_GFX10: %VertexIndex = add i32 [[vgprAsInt]], %BaseVertex
 ; SHADERTEST_GFX10: @llvm.amdgcn.struct.tbuffer.load.v4i32(<4 x i32> {{%[0-9]+}}, i32 %VertexIndex,

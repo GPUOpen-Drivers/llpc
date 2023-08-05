@@ -332,6 +332,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
     auto argIdx = arg.getArgNo();
     if (inRegMask & (1ull << argIdx))
       arg.addAttr(Attribute::InReg);
+    arg.addAttr(Attribute::NoUndef);
   }
 
   //
@@ -675,6 +676,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
     auto argIdx = arg.getArgNo();
     if (inRegMask & (1ull << argIdx))
       arg.addAttr(Attribute::InReg);
+    arg.addAttr(Attribute::NoUndef);
   }
 
   //
