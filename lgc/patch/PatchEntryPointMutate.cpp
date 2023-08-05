@@ -585,7 +585,7 @@ void PatchEntryPointMutate::lowerCpsJump(Function *parent, cps::JumpOp *jumpOp, 
 // =====================================================================================================================
 // Set up compute-with-calls flag. It is set for either of these two cases:
 // 1. a compute library;
-// 2. a compute pipeline that does indirect calls or calls to external functions.
+// 2. a compute pipeline that does indirect calls or calls to external application shader functions.
 //
 // When set, this pass behaves differently, not attempting to omit unused shader inputs, since all shader inputs
 // are potentially used in other functions. It also modifies each call to pass the shader inputs between functions.
@@ -608,20 +608,14 @@ void PatchEntryPointMutate::setupComputeWithCalls(Module *module) {
       return;
     }
 
-    // Search for indirect calls
+    // Search for indirect calls between application shaders.
     for (const BasicBlock &block : func) {
       for (const Instruction &inst : block) {
         if (auto *call = dyn_cast<CallInst>(&inst)) {
-          // If a function has a call to cps.jump, we need to treat it as `computeWithCalls`.
-          if (isa<cps::JumpOp>(call)) {
+          if (isa<cps::JumpOp>(call) || call->getCallingConv() == CallingConv::SPIR_FUNC) {
             m_computeWithCalls = true;
             return;
           }
-          Value *calledVal = call->getCalledOperand();
-          if (isa<Function>(calledVal) || call->isInlineAsm())
-            continue;
-          m_computeWithCalls = true;
-          return;
         }
       }
     }
