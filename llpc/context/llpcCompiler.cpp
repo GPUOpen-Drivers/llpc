@@ -1384,10 +1384,6 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
     graphicsShaderCacheChecker.updateAndMerge(result, pipelineElf);
   }
 
-  if (result == Result::Success && fragmentShaderInfo && fragmentShaderInfo->options.updateDescInElf &&
-      (context->getShaderStageMask() & ShaderStageFragmentBit))
-    graphicsShaderCacheChecker.updateRootUserDateOffset(pipelineElf);
-
   context->setDiagnosticHandler(nullptr);
 
   if (result == Result::Success && hasError)
@@ -1444,19 +1440,6 @@ unsigned GraphicsShaderCacheChecker::check(const Module *module, const unsigned 
         stageCacheAccesses[stage] = accessInfo;
   }
   return stagesLeftToCompile;
-}
-
-// =====================================================================================================================
-// Update root level descriptor offset for graphics pipeline.
-//
-// @param [in/out] pipelineElf : ELF that could be from compile or merged
-void GraphicsShaderCacheChecker::updateRootUserDateOffset(ElfPackage *pipelineElf) {
-  ElfWriter<Elf64> writer(m_context->getGfxIpVersion());
-  // Load ELF binary
-  auto result = writer.ReadFromBuffer(pipelineElf->data(), pipelineElf->size());
-  assert(result == Result::Success);
-  (void(result)); // unused
-  writer.updateElfBinary(m_context, pipelineElf);
 }
 
 // =====================================================================================================================
