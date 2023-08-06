@@ -227,9 +227,6 @@ struct ShaderOptions {
   // Schedule for latency even if it reduces occupancy.
   bool favorLatencyHiding;
 
-  // Whether update descriptor root offset in ELF
-  bool updateDescInElf;
-
   // Default unroll threshold for LLVM.
   unsigned unrollThreshold;
 

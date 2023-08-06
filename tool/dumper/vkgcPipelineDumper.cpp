@@ -634,7 +634,6 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.useSiScheduler = " << shaderInfo->options.useSiScheduler << "\n";
   dumpFile << "options.disableCodeSinking = " << shaderInfo->options.disableCodeSinking << "\n";
   dumpFile << "options.favorLatencyHiding = " << shaderInfo->options.favorLatencyHiding << "\n";
-  dumpFile << "options.updateDescInElf = " << shaderInfo->options.updateDescInElf << "\n";
   dumpFile << "options.allowVaryWaveSize = " << shaderInfo->options.allowVaryWaveSize << "\n";
   dumpFile << "options.enableLoadScalarizer = " << shaderInfo->options.enableLoadScalarizer << "\n";
   dumpFile << "options.disableLicm = " << shaderInfo->options.disableLicm << "\n";
@@ -1699,7 +1698,6 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.useSiScheduler);
       hasher->Update(options.disableCodeSinking);
       hasher->Update(options.favorLatencyHiding);
-      hasher->Update(options.updateDescInElf);
       hasher->Update(options.allowVaryWaveSize);
       hasher->Update(options.enableLoadScalarizer);
       hasher->Update(options.disableLicm);
