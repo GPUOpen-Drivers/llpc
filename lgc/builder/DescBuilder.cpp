@@ -94,137 +94,88 @@ Value *BuilderImpl::CreateBufferDesc(uint64_t descSet, unsigned binding, Value *
   else if (flags & BufferFlagAddress)
     return64Address = true;
 
-  // Find the descriptor node. If doing a shader compilation with no user data layout provided, don't bother to
-  // look. Later code will use relocs.
+  // Find the descriptor node.
+  ResourceNodeType abstractType = ResourceNodeType::Unknown;
+  if (flags & BufferFlagConst)
+    abstractType = ResourceNodeType::DescriptorConstBuffer;
+  else if (flags & BufferFlagNonConst)
+    abstractType = ResourceNodeType::DescriptorBuffer;
+  else if (flags & BufferFlagShaderResource)
+    abstractType = ResourceNodeType::DescriptorResource;
+  else if (flags & BufferFlagSampler)
+    abstractType = ResourceNodeType::DescriptorSampler;
+  else if (flags & BufferFlagAddress)
+    abstractType = ResourceNodeType::DescriptorBufferCompact;
+
   const ResourceNode *topNode = nullptr;
   const ResourceNode *node = nullptr;
-  if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
-    // We have the user data layout. Find the node.
-    ResourceNodeType abstractType = ResourceNodeType::Unknown;
-    if (flags & BufferFlagConst)
-      abstractType = ResourceNodeType::DescriptorConstBuffer;
-    else if (flags & BufferFlagNonConst)
-      abstractType = ResourceNodeType::DescriptorBuffer;
-    else if (flags & BufferFlagShaderResource)
-      abstractType = ResourceNodeType::DescriptorResource;
-    else if (flags & BufferFlagSampler)
-      abstractType = ResourceNodeType::DescriptorSampler;
-    else if (flags & BufferFlagAddress)
-      abstractType = ResourceNodeType::DescriptorBufferCompact;
-
-    std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding, m_shaderStage);
-    if (!node) {
-      // If we can't find the node, assume mutable descriptor and search for any node.
-      std::tie(topNode, node) =
-          m_pipelineState->findResourceNode(ResourceNodeType::DescriptorMutable, descSet, binding, m_shaderStage);
-    }
-
-    if (!node)
-      report_fatal_error("Resource node not found");
-
-    if (node == topNode && isa<Constant>(descIndex) && node->concreteType != ResourceNodeType::InlineBuffer) {
-      // Handle a descriptor in the root table (a "dynamic descriptor") specially, as long as it is not variably
-      // indexed and is not an InlineBuffer.
-      Type *descTy;
-      if (return64Address) {
-        assert(node->concreteType == ResourceNodeType::DescriptorBufferCompact);
-        descTy = getInt64Ty();
-      } else {
-        descTy = getDescTy(node->concreteType);
-      }
-
-      unsigned dwordSize = descTy->getPrimitiveSizeInBits() / 32;
-      unsigned dwordOffset = cast<ConstantInt>(descIndex)->getZExtValue() * dwordSize;
-      if (dwordOffset + dwordSize > node->sizeInDwords) {
-        // Index out of range
-        desc = PoisonValue::get(descTy);
-      } else {
-        dwordOffset += node->offsetInDwords;
-        dwordOffset += (binding - node->binding) * node->stride;
-        desc = create<LoadUserDataOp>(descTy, dwordOffset * 4);
-      }
-      if (return64Address)
-        return desc;
-    } else if (node->concreteType == ResourceNodeType::InlineBuffer) {
-      // Handle an inline buffer specially. Get a pointer to it, then expand to a descriptor.
-      Value *descPtr = getDescPtr(node->concreteType, node->abstractType, descSet, binding, topNode, node);
-      desc = buildInlineBufferDesc(descPtr);
-    }
+  std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding, m_shaderStage);
+  if (!node) {
+    // If we can't find the node, assume mutable descriptor and search for any node.
+    std::tie(topNode, node) =
+        m_pipelineState->findResourceNode(ResourceNodeType::DescriptorMutable, descSet, binding, m_shaderStage);
   }
 
-  if (!desc) {
-    if (node) {
-      ResourceNodeType resType = node->concreteType;
-      ResourceNodeType abstractType = node->abstractType;
-      // Handle mutable descriptors
-      if (resType == ResourceNodeType::DescriptorMutable) {
-        resType = ResourceNodeType::DescriptorBuffer;
-      }
-      if (abstractType == ResourceNodeType::DescriptorMutable) {
-        abstractType = ResourceNodeType::DescriptorBuffer;
-      }
-      Value *descPtr = getDescPtr(resType, abstractType, descSet, binding, topNode, node);
-      // Index it.
-      if (descIndex != getInt32(0)) {
-        descIndex = CreateMul(descIndex, getStride(resType, descSet, binding, node));
-        descPtr = CreateGEP(getInt8Ty(), descPtr, descIndex);
-      }
+  if (!node)
+    report_fatal_error("Resource node not found");
 
-      // The buffer may have an attached counter buffer descriptor which do not have a different set or binding.
-      if (flags & BufferFlagAttachedCounter) {
-        // The node stride must be large enough to hold 2 buffer descriptors.
-        assert(node->stride * sizeof(uint32_t) == 2 * DescriptorSizeBuffer);
-        descPtr = CreateGEP(getInt8Ty(), descPtr, getInt32(DescriptorSizeBuffer));
-      }
-
-      // Cast it to the right type.
-      descPtr = CreateBitCast(descPtr, getDescPtrTy(resType));
-      // Load the descriptor.
-      desc = CreateLoad(getDescTy(resType), descPtr);
+  if (node == topNode && isa<Constant>(descIndex) && node->concreteType != ResourceNodeType::InlineBuffer) {
+    // Handle a descriptor in the root table (a "dynamic descriptor") specially, as long as it is not variably
+    // indexed and is not an InlineBuffer.
+    Type *descTy;
+    if (return64Address) {
+      assert(node->concreteType == ResourceNodeType::DescriptorBufferCompact);
+      descTy = getInt64Ty();
     } else {
-      // For shader compilation with no user data layout provided, we don't know if the buffer is dynamic descriptor,
-      // We need to load two dwords for DescriptorBufferCompact, 4 dwords for DescriptorBuffer. To avoid out of bound,
-      // we will use two loads and load two dwords for each time. If the resource type is really DescriptorBuffer, the
-      // address of the second load will add 8 bytes, otherwise the address is the same as the first, it means we load
-      // the same data twice, but the data is not used.
-
-      // Get the descriptor pointer which is from ResourceMapping, ignore the resource type.
-      ResourceNodeType resType = ResourceNodeType::DescriptorBuffer;
-      ResourceNodeType abstractType = resType;
-      Value *descPtr = getDescPtr(resType, abstractType, descSet, binding, nullptr, nullptr);
-      // Index it.
-      if (descIndex != getInt32(0)) {
-        descIndex = CreateMul(descIndex, getStride(resType, descSet, binding, nullptr));
-        descPtr = CreateGEP(getInt8Ty(), descPtr, descIndex);
-      }
-
-      auto descPtrLo = CreateBitCast(descPtr, FixedVectorType::get(getInt32Ty(), 2)->getPointerTo(ADDR_SPACE_CONST));
-      // The first load
-      auto descLo = CreateLoad(FixedVectorType::get(getInt32Ty(), 2), descPtrLo);
-      auto compactBufferDesc = buildBufferCompactDesc(descLo);
-
-      // If descriptor set is InternalDescriptorSetId, this is a internal resource node, it is a root node
-      // and its type is ResourceNodeType::DescriptorBufferCompact.
-      if (descSet == InternalDescriptorSetId) {
-        assert(return64Address);
-        return CreateBitCast(descLo, getInt64Ty());
-      } else {
-        // Add offset
-        Value *descPtrHi = CreateAddByteOffset(descPtr, getInt32(8));
-        auto reloc = CreateRelocationConstant(reloc::CompactBuffer + Twine(descSet) + "_" + Twine(binding));
-        auto isCompactBuffer = CreateICmpNE(reloc, getInt32(0));
-        // Select the address
-        descPtrHi = CreateSelect(isCompactBuffer, descPtr, descPtrHi);
-        descPtrHi = CreateBitCast(descPtrHi, FixedVectorType::get(getInt32Ty(), 2)->getPointerTo(ADDR_SPACE_CONST));
-        // The second load
-        auto descHi = CreateLoad(FixedVectorType::get(getInt32Ty(), 2), descPtrHi);
-        // Merge the whole descriptor for DescriptorBuffer
-        auto bufferDesc = CreateShuffleVector(descLo, descHi, {0, 1, 2, 3});
-        // Select
-        desc = CreateSelect(isCompactBuffer, compactBufferDesc, bufferDesc);
-      }
+      descTy = getDescTy(node->concreteType);
     }
+
+    unsigned dwordSize = descTy->getPrimitiveSizeInBits() / 32;
+    unsigned dwordOffset = cast<ConstantInt>(descIndex)->getZExtValue() * dwordSize;
+    if (dwordOffset + dwordSize > node->sizeInDwords) {
+      // Index out of range
+      desc = PoisonValue::get(descTy);
+    } else {
+      dwordOffset += node->offsetInDwords;
+      dwordOffset += (binding - node->binding) * node->stride;
+      desc = create<LoadUserDataOp>(descTy, dwordOffset * 4);
+    }
+    if (return64Address)
+      return desc;
+  } else if (node->concreteType == ResourceNodeType::InlineBuffer) {
+    // Handle an inline buffer specially. Get a pointer to it, then expand to a descriptor.
+    Value *descPtr = getDescPtr(node->concreteType, node->abstractType, descSet, binding, topNode, node);
+    desc = buildInlineBufferDesc(descPtr);
+  } else {
+    ResourceNodeType resType = node->concreteType;
+    ResourceNodeType abstractType = node->abstractType;
+    // Handle mutable descriptors
+    if (resType == ResourceNodeType::DescriptorMutable) {
+      resType = ResourceNodeType::DescriptorBuffer;
+    }
+    if (abstractType == ResourceNodeType::DescriptorMutable) {
+      abstractType = ResourceNodeType::DescriptorBuffer;
+    }
+    Value *descPtr = getDescPtr(resType, abstractType, descSet, binding, topNode, node);
+    // Index it.
+    if (descIndex != getInt32(0)) {
+      descIndex = CreateMul(descIndex, getStride(resType, descSet, binding, node));
+      descPtr = CreateGEP(getInt8Ty(), descPtr, descIndex);
+    }
+
+    // The buffer may have an attached counter buffer descriptor which do not have a different set or binding.
+    if (flags & BufferFlagAttachedCounter) {
+      // The node stride must be large enough to hold 2 buffer descriptors.
+      assert(node->stride * sizeof(uint32_t) == 2 * DescriptorSizeBuffer);
+      descPtr = CreateGEP(getInt8Ty(), descPtr, getInt32(DescriptorSizeBuffer));
+    }
+
+    // Cast it to the right type.
+    descPtr = CreateBitCast(descPtr, getDescPtrTy(resType));
+    // Load the descriptor.
+    desc = CreateLoad(getDescTy(resType), descPtr);
   }
+
   if (node && (node->concreteType == ResourceNodeType::DescriptorBufferCompact ||
                node->concreteType == ResourceNodeType::DescriptorConstBufferCompact))
     desc = buildBufferCompactDesc(desc);
