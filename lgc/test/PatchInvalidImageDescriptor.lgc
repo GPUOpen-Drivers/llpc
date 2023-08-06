@@ -70,10 +70,13 @@ define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !lgc
   %.query.size = call <2 x i32> (...) @lgc.create.image.query.size.v2i32(i32 1, i32 128, <8 x i32> %.desc, i32 0)
   %.query.levels = call i32 (...) @lgc.create.image.query.levels.i32(i32 1, i32 128, <8 x i32> %.desc)
 
+  %lane = call i32 @llvm.amdgcn.mbcnt.lo(i32 -1, i32 0)  ; just some source of divergence
+  %ofs = mul i32 %lane, 32
+
   ; Use a waterfall loop with last.use to test that is also handled correctly
   %.desc2.ptr2 = call <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 3, i32 4)
   %.desc2.ptr1 = bitcast <8 x i32> addrspace(4)* %.desc2.ptr2 to i8 addrspace(4)*
-  %.desc2.ptr0 = getelementptr i8, i8 addrspace(4)* %.desc2.ptr1, i64 0
+  %.desc2.ptr0 = getelementptr i8, i8 addrspace(4)* %.desc2.ptr1, i32 %ofs
   %.desc2.ptr = bitcast i8 addrspace(4)* %.desc2.ptr0 to <8 x i32> addrspace(4)*
   %.desc2 = load <8 x i32>, <8 x i32> addrspace(4)* %.desc2.ptr, align 32
   call void (...) @lgc.create.image.store(<4 x float> zeroinitializer, i32 0, i32 8, <8 x i32> %.desc2, i32 zeroinitializer)
@@ -91,6 +94,8 @@ declare i32 @lgc.create.image.atomic.i32(...) #0
 declare <2 x float> @lgc.create.image.get.lod.v2f32(...) #0
 declare <2 x i32> @lgc.create.image.query.size.v2i32(...) #0
 declare i32 @lgc.create.image.query.levels.i32(...) #0
+
+declare i32 @llvm.amdgcn.mbcnt.lo(i32, i32)
 
 attributes #0 = { nounwind }
 attributes #1 = { nounwind readonly }
