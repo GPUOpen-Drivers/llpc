@@ -684,7 +684,6 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
   shaderOptions.useSiScheduler = EnableSiScheduler || shaderInfo.options.useSiScheduler;
   shaderOptions.disableCodeSinking = shaderInfo.options.disableCodeSinking;
   shaderOptions.favorLatencyHiding = shaderInfo.options.favorLatencyHiding;
-  shaderOptions.updateDescInElf = shaderInfo.options.updateDescInElf;
   shaderOptions.unrollThreshold = shaderInfo.options.unrollThreshold;
   // A non-zero command line -force-loop-unroll-count value overrides the shaderInfo option value.
   shaderOptions.forceLoopUnrollCount =

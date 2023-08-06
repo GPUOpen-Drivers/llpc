@@ -45,7 +45,7 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 64
+#define LLPC_INTERFACE_MAJOR_VERSION 65
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -83,6 +83,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     65.0 | Remove updateDescInElf                                                                                |
 //  |     64.0 | Add enableColorExportShader to GraphicsPipelineBuildInfo.                                             |
 //  |     63.0 | Add Atomic Counter, its default descriptor and map its concreteType to Buffer.                        |
 //  |     62.1 | Add ApiXfbOutData GraphicsPipelineBuildInfo                                                           |
@@ -769,9 +770,6 @@ struct PipelineShaderOptions {
 
   /// Schedule for latency even if it reduces occupancy.
   bool favorLatencyHiding;
-
-  // Whether update descriptor root offset in ELF
-  bool updateDescInElf;
 
   /// Disable the LLVM backend's LICM pass (equivalent to disableLicmThreshold=1).
   bool disableLicm;
