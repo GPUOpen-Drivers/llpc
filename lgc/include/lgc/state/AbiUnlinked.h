@@ -103,16 +103,6 @@ const static char DeviceIdx[] = "$deviceIdx";
 // The value of the relocation is the offset of the pushconst resource node in the pipeline state.
 const static char Pushconst[] = "pushconst";
 
-// Whether the shadow descriptor is enabled or not.
-//
-// The value of the relocation is either:
-//  * 0: the shadow descriptor table is disabled.
-//  * 1: the shadow descriptor table is enabled.
-const static char ShadowDescriptorTableEnabled[] = "$shadowenabled";
-
-// The high 32-bits of the address of the shadow descriptor table.
-const static char ShadowDescriptorTable[] = "$shadowdesctable";
-
 } // namespace reloc
 
 // =====================================================================================================================

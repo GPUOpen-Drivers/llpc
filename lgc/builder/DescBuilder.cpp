@@ -358,46 +358,7 @@ Value *BuilderImpl::getStride(ResourceNodeType descType, uint64_t descSet, unsig
 // @param node : The descriptor node itself (nullptr for shader compilation)
 Value *BuilderImpl::getDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
                                unsigned binding, const ResourceNode *topNode, const ResourceNode *node) {
-  auto GetDescriptorSetPtr = [this, node, topNode, concreteType, abstractType, descSet, binding]() -> Value * {
-    // Get the descriptor table pointer for the descriptor at the given set and binding, which might be passed as a
-    // user SGPR to the shader.
-    // The args to the lgc.descriptor.table.addr call are:
-    // - requested descriptor type
-    // - descriptor set number
-    // - descriptor binding number
-    // - value for high 32 bits of the pointer; HighAddrPc to use PC
-    if (node || topNode || concreteType != ResourceNodeType::DescriptorFmask) {
-      unsigned highAddrOfFmask = m_pipelineState->getOptions().highAddrOfFmask;
-      bool isFmask = concreteType == ResourceNodeType::DescriptorFmask;
-      assert(!(isFmask && highAddrOfFmask == ShadowDescriptorTableDisable) && "not implemented");
-      Value *highHalf = getInt32(isFmask ? highAddrOfFmask : HighAddrPc);
-      return CreateNamedCall(lgcName::DescriptorTableAddr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
-                             {getInt32(unsigned(concreteType)), getInt32(unsigned(abstractType)), getInt64(descSet),
-                              getInt32(binding), highHalf},
-                             Attribute::ReadNone);
-    }
-    // This should be an unlinked shader, and we will use a relocation for the high half of the address.
-    assert(m_pipelineState->isUnlinked() &&
-           "Cannot add shadow descriptor relocations unless building an unlinked shader.");
-
-    // Get the address when the shadow table is disabled.
-    Value *nonShadowAddr = CreateNamedCall(lgcName::DescriptorTableAddr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
-                                           {getInt32(unsigned(concreteType)), getInt32(unsigned(abstractType)),
-                                            getInt64(descSet), getInt32(binding), getInt32(HighAddrPc)},
-                                           Attribute::ReadNone);
-
-    // Get the address using a relocation when the shadow table is enabled.
-    Value *shadowDescriptorReloc = CreateRelocationConstant(reloc::ShadowDescriptorTable);
-    Value *shadowAddr = CreateNamedCall(lgcName::DescriptorTableAddr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
-                                        {getInt32(unsigned(concreteType)), getInt32(unsigned(abstractType)),
-                                         getInt64(descSet), getInt32(binding), shadowDescriptorReloc},
-                                        Attribute::ReadNone);
-
-    // Use a relocation to select between the two.
-    Value *useShadowReloc = CreateRelocationConstant(reloc::ShadowDescriptorTableEnabled);
-    Value *useShadowTable = CreateICmpNE(useShadowReloc, getInt32(0));
-    return CreateSelect(useShadowTable, shadowAddr, nonShadowAddr);
-  };
+  assert(node && topNode);
 
   // Get the offset for the descriptor. Where we are getting the second part of a combined resource,
   // add on the size of the first part.
@@ -407,10 +368,24 @@ Value *BuilderImpl::getDescPtr(ResourceNodeType concreteType, ResourceNodeType a
       node->concreteType == ResourceNodeType::DescriptorCombinedTexture)
     offsetInBytes += DescriptorSizeResource;
 
-  if (node && node == topNode)
+  if (node == topNode)
     return create<UserDataOp>(offsetInBytes);
 
-  Value *descPtr = GetDescriptorSetPtr();
+  // Get the descriptor table pointer for the descriptor at the given set and binding, which might be passed as a
+  // user SGPR to the shader.
+  // The args to the lgc.descriptor.table.addr call are:
+  // - requested descriptor type
+  // - descriptor set number
+  // - descriptor binding number
+  // - value for high 32 bits of the pointer; HighAddrPc to use PC
+  unsigned highAddrOfFmask = m_pipelineState->getOptions().highAddrOfFmask;
+  bool isFmask = concreteType == ResourceNodeType::DescriptorFmask;
+  Value *highHalf = getInt32(isFmask ? highAddrOfFmask : HighAddrPc);
+  Value *descPtr = CreateNamedCall(lgcName::DescriptorTableAddr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
+                                   {getInt32(unsigned(concreteType)), getInt32(unsigned(abstractType)),
+                                    getInt64(descSet), getInt32(binding), highHalf},
+                                   Attribute::ReadNone);
+
   return CreateConstGEP1_32(getInt8Ty(), descPtr, offsetInBytes);
 }
 
