@@ -162,22 +162,6 @@ bool RelocHandler::getValue(StringRef name, uint64_t &value) {
     }
   }
 
-  if (name.startswith(reloc::DescriptorStride)) {
-    // Descriptor stride in bytes.
-    unsigned descSet = 0;
-    unsigned binding = 0;
-    ResourceNodeType type = ResourceNodeType::Unknown;
-    if (parseDescSetBinding(name.drop_front(strlen(reloc::DescriptorStride)), descSet, binding, type)) {
-      const ResourceNode *outerNode = nullptr;
-      const ResourceNode *node = nullptr;
-      std::tie(outerNode, node) = getPipelineState()->findResourceNode(type, descSet, binding);
-      if (!node)
-        report_fatal_error("No resource node for " + name);
-      value = node->stride * sizeof(uint32_t);
-      return true;
-    }
-  }
-
   if (name.startswith(reloc::CompactBuffer)) {
     // Descriptor stride in bytes.
     unsigned descSet = 0;

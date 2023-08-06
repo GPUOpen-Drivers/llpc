@@ -69,16 +69,6 @@ const static char DescriptorUseSpillTable[] = "dusespill_";
 //
 const static char DescriptorTableOffset[] = "descset_";
 
-// Descriptor stride is "dstride_X_Y" where:
-// * X is the descriptor set number
-// * Y is the binding number
-//
-// The value of the relocation is stride in bytes of the requested array of descriptors in its descriptor set
-// table. It is illegal for the specified descriptor not to exist, and it must be a resource, fmask or sampler
-// descriptor. (The reason the stride needs to be a reloc is that the requested descriptor might or might not
-// be part of a combined texture descriptor.)
-const static char DescriptorStride[] = "dstride_";
-
 // The buffer type is "compactbuffer_X_Y" where:
 // * X is the descriptor set number
 // * Y is the binding number

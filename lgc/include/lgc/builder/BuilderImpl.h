@@ -315,7 +315,7 @@ private:
                                    const ResourceNode *topNode, const ResourceNode *node, bool shadow);
 
   // Get the stride (in bytes) of a descriptor.
-  llvm::Value *getStride(ResourceNodeType descType, uint64_t descSet, unsigned binding, const ResourceNode *node);
+  llvm::Value *getStride(ResourceNodeType descType, const ResourceNode *node);
 
   // Get a pointer to a descriptor, as a pointer to i8
   llvm::Value *getDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
