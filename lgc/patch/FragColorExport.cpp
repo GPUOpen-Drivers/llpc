@@ -729,7 +729,7 @@ llvm::Value *LowerFragColorExport::jumpColorExport(llvm::Function *fragEntryPoin
   auto funcTyPtr = funcTy->getPointerTo(ADDR_SPACE_CONST);
   auto colorShaderAddr = ShaderInputs::getSpecialUserData(UserDataMapping::ColorExportAddr, builder);
   AddressExtender addrExt(builder.GetInsertPoint()->getParent()->getParent());
-  auto funcPtr = addrExt.extend(colorShaderAddr, builder.getInt32(HighAddrPc), funcTyPtr, builder);
+  auto funcPtr = addrExt.extendWithPc(colorShaderAddr, funcTyPtr, builder);
 
   // Jump
   auto callInst = builder.CreateCall(funcTy, funcPtr, argVal);
