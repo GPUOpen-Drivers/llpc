@@ -78,7 +78,6 @@ public:
 
   // Update shader caches with results of compile, and merge ELF outputs if necessary.
   void updateAndMerge(Result result, ElfPackage *pipelineElf);
-  void updateRootUserDateOffset(ElfPackage *pipelineElf);
 
 private:
   Compiler *m_compiler;

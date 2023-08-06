@@ -486,7 +486,6 @@ unsigned PalMetadata::getUserDataReg0(ShaderStage stage) {
 // @param userDataIndex : User data index 0-15 or 0-31 depending on HW and shader stage
 // @param userDataValue : Value to store in that entry, one of:
 //                        - a 0-based integer for the root user data dword offset
-//                        - DescRelocMagic+set_number for an unlinked descriptor set number
 //                        - one of the UserDataMapping values, e.g. UserDataMapping::GlobalTable
 // @param dwordCount : Number of user data entries to set
 void PalMetadata::setUserDataEntry(ShaderStage stage, unsigned userDataIndex, unsigned userDataValue,
