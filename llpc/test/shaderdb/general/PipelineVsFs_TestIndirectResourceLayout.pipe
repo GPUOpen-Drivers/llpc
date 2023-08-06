@@ -8,7 +8,10 @@
 ; SHADERTEST: call void (...) @lgc.create.write.generic.output(<4 x float> [[Value]], i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison)
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-; SHADERTEST: [[Desc:%[0-9]*]] = call ptr addrspace(4) @lgc.descriptor.table.addr(i32 9, i32 9, i64 4294967295, i32 0, i32 -1)
+; SHADERTEST: [[DescLo:%[0-9]*]] = call i32 @lgc.load.user.data.i32(i32 4)
+; SHADERTEST: [[DescVec:%[0-9]*]] = insertelement <2 x i32> %{{[^,]*}}, i32 [[DescLo]], i64 0
+; SHADERTEST: [[Desc64:%[0-9]*]] = bitcast <2 x i32> [[DescVec]] to i64
+; SHADERTEST: [[Desc:%[0-9]*]] = inttoptr i64 [[Desc64]] to ptr addrspace(4)
 ; SHADERTEST: [[Value:%[0-9]*]] = load <4 x float>, ptr addrspace(4) [[Desc]], align 16
 ; SHADERTEST: call void @lgc.output.export.generic.i32.i32.v4f32(i32 0, i32 0, <4 x float> [[Value]])
 

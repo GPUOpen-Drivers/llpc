@@ -1,15 +1,16 @@
 
 ; RUN: lgc %s -print-after=lgc-builder-replayer -o /dev/null 2>&1 - <%s | FileCheck --check-prefixes=CHECK %s
 
-; CHECK: [[desc0:%[0-9]+]] = call ptr addrspace(4) @lgc.descriptor.table.addr(i32 6
-; CHECK-NEXT: %{{.*}} = getelementptr i8, ptr addrspace(4) [[desc0]], i32 16
 ; CHECK: call <2 x i32> @lgc.load.user.data.v2i32(i32 24)
 ; CHECK: call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32>
 ; CHECK: [[varindex0:%[0-9]+]] = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32>
 ; CHECK: [[varindex1:%[0-9]+]] = load i32, ptr addrspace(7) [[varindex0]], align 4
 ; CHECK-NEXT: [[varindex2:%[0-9]+]] = sext i32 [[varindex1]] to i64
 ; CHECK-NEXT: getelementptr <{ [4294967295 x float] }>, ptr addrspace(7) %{{.*}}, i64 0, i32 0, i64 [[varindex2]]
-; CHECK: [[desc1:%[0-9]+]] = call ptr addrspace(4) @lgc.descriptor.table.addr(i32 1
+; CHECK: [[desc1lo:%[0-9]+]] = call i32 @lgc.load.user.data.i32(i32 4
+; CHECK-NEXT: [[desc1vec:%[0-9]+]] = insertelement <2 x i32> %{{[^,]+}}, i32 [[desc1lo]], i64 0
+; CHECK-NEXT: [[desc1lohi:%[0-9]+]] = bitcast <2 x i32> [[desc1vec]] to i64
+; CHECK-NEXT: [[desc1:%[0-9]+]] = inttoptr i64 [[desc1lohi]] to ptr addrspace(4)
 ; CHECK-NEXT: %{{.*}} = getelementptr i8, ptr addrspace(4) [[desc1]], i32 32
 
 ; RUN: lgc -mcpu=gfx1030 -o - - <%s | FileCheck --check-prefixes=SHADER_TEST %s

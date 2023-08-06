@@ -489,11 +489,6 @@ static Value *traceNonUniformIndex(Value *nonUniformVal) {
         return nonUniformVal;
       }
 
-      if (auto calledFunc = call->getCalledFunction()) {
-        if (calledFunc->getName().startswith(lgcName::DescriptorTableAddr))
-          continue; // is always uniform, no need to propagate
-      }
-
       if (isa<UserDataOp>(call) || isa<LoadUserDataOp>(call))
         continue; // is always uniform, no need to propagate
 

@@ -49,9 +49,6 @@ const static char StreamOutBufferStore[] = "lgc.streamoutbuffer.store";
 const static char ReconfigureLocalInvocationId[] = "lgc.reconfigure.local.invocation.id";
 const static char SwizzleWorkgroupId[] = "lgc.swizzle.workgroup.id";
 
-// Get pointer to the descriptor table for the given resource. First arg is the descriptor set number; second arg
-// is the binding number; third arg is the value to use for the high half of the address, or HighAddrPc to use PC.
-const static char DescriptorTableAddr[] = "lgc.descriptor.table.addr";
 // Get special user data input. Arg is UserDataMapping enum value. The optional second arg causes the 32-bit
 // value to be extended to 64-bit pointer and specifies the value to use for the high half, or
 // ShadowDescriptorTable::Disable to use PC.

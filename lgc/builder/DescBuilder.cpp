@@ -35,6 +35,7 @@
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
+#include "lgc/util/AddressExtender.h"
 #include "lgc/util/Internal.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
@@ -144,7 +145,7 @@ Value *BuilderImpl::CreateBufferDesc(uint64_t descSet, unsigned binding, Value *
       return desc;
   } else if (node->concreteType == ResourceNodeType::InlineBuffer) {
     // Handle an inline buffer specially. Get a pointer to it, then expand to a descriptor.
-    Value *descPtr = getDescPtr(node->concreteType, node->abstractType, descSet, binding, topNode, node);
+    Value *descPtr = getDescPtr(node->concreteType, topNode, node, binding);
     desc = buildInlineBufferDesc(descPtr);
   } else {
     ResourceNodeType resType = node->concreteType;
@@ -156,7 +157,7 @@ Value *BuilderImpl::CreateBufferDesc(uint64_t descSet, unsigned binding, Value *
     if (abstractType == ResourceNodeType::DescriptorMutable) {
       abstractType = ResourceNodeType::DescriptorBuffer;
     }
-    Value *descPtr = getDescPtr(resType, abstractType, descSet, binding, topNode, node);
+    Value *descPtr = getDescPtr(resType, topNode, node, binding);
     // Index it.
     if (descIndex != getInt32(0)) {
       descIndex = CreateMul(descIndex, getStride(resType, node));
@@ -279,7 +280,7 @@ Value *BuilderImpl::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNode
     }
   } else {
     // Get a pointer to the descriptor.
-    descPtr = getDescPtr(concreteType, abstractType, descSet, binding, topNode, node);
+    descPtr = getDescPtr(concreteType, topNode, node, binding);
   }
 
   // Cast to the right pointer type.
@@ -297,13 +298,9 @@ Value *BuilderImpl::CreateLoadPushConstantsPtr(const Twine &instName) {
   const ResourceNode *topNode = m_pipelineState->findPushConstantResourceNode(m_shaderStage);
   assert(topNode);
   if (topNode->concreteType == ResourceNodeType::DescriptorTableVaPtr) {
-    const ResourceNode subNode = topNode->innerTable[0];
-    Value *highHalf = getInt32(HighAddrPc);
-    ptr = CreateNamedCall(lgcName::DescriptorTableAddr, getPtrTy(ADDR_SPACE_CONST),
-                          {getInt32(unsigned(ResourceNodeType::PushConst)),
-                           getInt32(unsigned(ResourceNodeType::PushConst)), getInt64(subNode.set),
-                           getInt32(subNode.binding), highHalf},
-                          Attribute::ReadNone);
+    AddressExtender extender(GetInsertBlock()->getParent());
+    ptr = create<LoadUserDataOp>(getInt32Ty(), topNode->offsetInDwords * 4);
+    ptr = extender.extendWithPc(ptr, getPtrTy(ADDR_SPACE_CONST), *this);
   } else {
     assert(topNode->concreteType == ResourceNodeType::PushConst);
     ptr = create<UserDataOp>(topNode->offsetInDwords * 4);
@@ -339,13 +336,11 @@ Value *BuilderImpl::getStride(ResourceNodeType descType, const ResourceNode *nod
 // Get a pointer to a descriptor, as a pointer to i8
 //
 // @param concreteType : Concrete resource type
-// @param abstractType : Abstract Resource type
-// @param descSet : Descriptor set
-// @param binding : Binding
 // @param topNode : Node in top-level descriptor table (nullptr for shader compilation)
 // @param node : The descriptor node itself (nullptr for shader compilation)
-Value *BuilderImpl::getDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
-                               unsigned binding, const ResourceNode *topNode, const ResourceNode *node) {
+// @param binding : Binding
+Value *BuilderImpl::getDescPtr(ResourceNodeType concreteType, const ResourceNode *topNode, const ResourceNode *node,
+                               unsigned binding) {
   assert(node && topNode);
 
   // Get the offset for the descriptor. Where we are getting the second part of a combined resource,
@@ -361,19 +356,12 @@ Value *BuilderImpl::getDescPtr(ResourceNodeType concreteType, ResourceNodeType a
 
   // Get the descriptor table pointer for the descriptor at the given set and binding, which might be passed as a
   // user SGPR to the shader.
-  // The args to the lgc.descriptor.table.addr call are:
-  // - requested descriptor type
-  // - descriptor set number
-  // - descriptor binding number
-  // - value for high 32 bits of the pointer; HighAddrPc to use PC
   unsigned highAddrOfFmask = m_pipelineState->getOptions().highAddrOfFmask;
   bool isFmask = concreteType == ResourceNodeType::DescriptorFmask;
   Value *highHalf = getInt32(isFmask ? highAddrOfFmask : HighAddrPc);
-  Value *descPtr = CreateNamedCall(lgcName::DescriptorTableAddr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
-                                   {getInt32(unsigned(concreteType)), getInt32(unsigned(abstractType)),
-                                    getInt64(descSet), getInt32(binding), highHalf},
-                                   Attribute::ReadNone);
-
+  AddressExtender extender(GetInsertBlock()->getParent());
+  Value *descPtr = create<LoadUserDataOp>(getInt32Ty(), topNode->offsetInDwords * 4);
+  descPtr = extender.extend(descPtr, highHalf, getPtrTy(ADDR_SPACE_CONST), *this);
   return CreateConstGEP1_32(getInt8Ty(), descPtr, offsetInBytes);
 }
 

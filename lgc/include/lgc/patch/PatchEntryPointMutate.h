@@ -99,12 +99,6 @@ private:
     llvm::SmallVector<unsigned> loadSizes;
     // Entry argument index for each user data dword that has one.
     llvm::SmallVector<unsigned> entryArgIdxs;
-    // Per-table lists of lgc.descriptor.table.addr calls
-    // When the user data nodes are available, a table is identifed by its
-    // index in the user data nodes.  Using this index allows for the possibility that a descriptor
-    // set is split over multiple tables.  When it is not available, a table is identified by the
-    // descriptor set it contains, which is consistent with the Vulkan binding model.
-    llvm::SmallVector<UserDataLoad, 8> descriptorTables;
     // Per-UserDataMapping lists of lgc.special.user.data calls
     llvm::SmallVector<SpecialUserDataNodeUsage, 18> specialUserData;
     // Usage of streamout table
