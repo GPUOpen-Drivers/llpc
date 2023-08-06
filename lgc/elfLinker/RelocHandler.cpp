@@ -215,15 +215,6 @@ bool RelocHandler::getValue(StringRef name, uint64_t &value) {
     getPipelineState()->getPalMetadata()->setUserDataSpillUsage(pushConstantNode->offsetInDwords);
     return true;
   }
-  if (name == reloc::ShadowDescriptorTableEnabled) {
-    value = m_pipelineState->getOptions().highAddrOfFmask != ShadowDescriptorTableDisable;
-    return true;
-  }
-
-  if (name == reloc::ShadowDescriptorTable) {
-    value = m_pipelineState->getOptions().highAddrOfFmask;
-    return true;
-  }
 
   return false;
 }
