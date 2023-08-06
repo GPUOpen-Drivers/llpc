@@ -159,7 +159,7 @@ Value *BuilderImpl::CreateBufferDesc(uint64_t descSet, unsigned binding, Value *
     Value *descPtr = getDescPtr(resType, abstractType, descSet, binding, topNode, node);
     // Index it.
     if (descIndex != getInt32(0)) {
-      descIndex = CreateMul(descIndex, getStride(resType, descSet, binding, node));
+      descIndex = CreateMul(descIndex, getStride(resType, node));
       descPtr = CreateGEP(getInt8Ty(), descPtr, descIndex);
     }
 
@@ -198,28 +198,23 @@ Value *BuilderImpl::CreateBufferDesc(uint64_t descSet, unsigned binding, Value *
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
                                         unsigned binding, const Twine &instName) {
-  // Find the descriptor node. If doing a shader compilation with no user data layout provided, don't bother to
-  // look; we will use relocs instead.
   const ResourceNode *topNode = nullptr;
   const ResourceNode *node = nullptr;
-  if (!m_pipelineState->isUnlinked() || !m_pipelineState->getUserDataNodes().empty()) {
-    std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding, m_shaderStage);
-    if (!node) {
-      // If we can't find the node, assume mutable descriptor and search for any node.
-      std::tie(topNode, node) =
-          m_pipelineState->findResourceNode(ResourceNodeType::DescriptorMutable, descSet, binding, m_shaderStage);
-      if (!node &&
-          m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding, m_shaderStage).second) {
-        // NOTE: Resource node may be DescriptorTexelBuffer, but it is defined as OpTypeSampledImage in SPIRV,
-        // In this case, a caller may search for the DescriptorSampler and not find it. We return nullptr and
-        // expect the caller to handle it.
-        return PoisonValue::get(getInt32Ty());
-      }
-      assert(node && "missing resource node");
+  std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding, m_shaderStage);
+  if (!node) {
+    // If we can't find the node, assume mutable descriptor and search for any node.
+    std::tie(topNode, node) =
+        m_pipelineState->findResourceNode(ResourceNodeType::DescriptorMutable, descSet, binding, m_shaderStage);
+    if (!node && m_pipelineState->findResourceNode(ResourceNodeType::Unknown, descSet, binding, m_shaderStage).second) {
+      // NOTE: Resource node may be DescriptorTexelBuffer, but it is defined as OpTypeSampledImage in SPIRV,
+      // In this case, a caller may search for the DescriptorSampler and not find it. We return poison and
+      // expect the caller to handle it.
+      return PoisonValue::get(getInt32Ty());
     }
     assert(node && "missing resource node");
   }
-  return getStride(concreteType, descSet, binding, node);
+  assert(node && "missing resource node");
+  return getStride(concreteType, node);
 }
 
 // =====================================================================================================================
@@ -327,23 +322,16 @@ bool BuilderImpl::useVertexBufferDescArray() {
 // Get the stride (in bytes) of a descriptor. Returns an i32 value.
 //
 // @param descType : Descriptor type
-// @param descSet : Descriptor set
-// @param binding : Descriptor binding
 // @param node : The descriptor node (nullptr for shader compilation)
-// @param instName : Name to give instruction(s)
-Value *BuilderImpl::getStride(ResourceNodeType descType, uint64_t descSet, unsigned binding, const ResourceNode *node) {
-  if (node && node->immutableSize != 0 && descType == ResourceNodeType::DescriptorSampler) {
+Value *BuilderImpl::getStride(ResourceNodeType descType, const ResourceNode *node) {
+  assert(node);
+
+  if (node->immutableSize != 0 && descType == ResourceNodeType::DescriptorSampler) {
     // This is an immutable sampler. Because we put the immutable value into a static variable, the stride is
     // always the size of the descriptor.
     return getInt32(DescriptorSizeSampler);
   }
 
-  if (m_pipelineState->isUnlinked() && m_pipelineState->getUserDataNodes().empty()) {
-    // Shader compilation: Get byte stride using a reloc.
-    return CreateRelocationConstant(reloc::DescriptorStride + Twine(descSet) + "_" + Twine(binding));
-  }
-  // Pipeline compilation: Get the stride from the node.
-  assert(node);
   return getInt32(node->stride * sizeof(uint32_t));
 }
 
