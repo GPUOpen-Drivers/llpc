@@ -318,8 +318,8 @@ private:
   llvm::Value *getStride(ResourceNodeType descType, const ResourceNode *node);
 
   // Get a pointer to a descriptor, as a pointer to i8
-  llvm::Value *getDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
-                          unsigned binding, const ResourceNode *topNode, const ResourceNode *node);
+  llvm::Value *getDescPtr(ResourceNodeType concreteType, const ResourceNode *topNode, const ResourceNode *node,
+                          unsigned binding);
 
   llvm::Value *scalarizeIfUniform(llvm::Value *value, bool isNonUniform);
 

@@ -726,33 +726,7 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
       continue;
     }
 
-    if (func.getName().startswith(lgcName::DescriptorTableAddr)) {
-      for (User *user : func.users()) {
-        CallInst *call = cast<CallInst>(user);
-        ResourceNodeType searchType = ResourceNodeType(cast<ConstantInt>(call->getArgOperand(1))->getZExtValue());
-        uint64_t set = cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
-        unsigned binding = cast<ConstantInt>(call->getArgOperand(3))->getZExtValue();
-        ShaderStage stage = getShaderStage(call->getFunction());
-        assert(stage != ShaderStageCopyShader);
-        auto *userDataUsage = getUserDataUsage(stage);
-
-        const ResourceNode *node = m_pipelineState->findResourceNode(searchType, set, binding, stage).first;
-        if (!node) {
-          // Handle mutable descriptors
-          node = m_pipelineState->findResourceNode(ResourceNodeType::DescriptorMutable, set, binding, stage).first;
-        }
-        assert(node && "Could not find resource node");
-
-        UserDataLoad load;
-        load.load = call;
-        load.dwordOffset = node->offsetInDwords;
-        load.dwordSize = 1;
-
-        userDataUsage->descriptorTables.push_back(load);
-        userDataUsage->addLoad(load.dwordOffset, load.dwordSize);
-      }
-    } else if ((func.getName().startswith(lgcName::OutputExportXfb) && !func.use_empty()) ||
-               m_pipelineState->enableSwXfb()) {
+    if ((func.getName().startswith(lgcName::OutputExportXfb) && !func.use_empty()) || m_pipelineState->enableSwXfb()) {
       // NOTE: For GFX11+, SW emulated stream-out will always use stream-out buffer descriptors and stream-out buffer
       // offsets to calculate numbers of written primitives/dwords and update the counters.  auto lastVertexStage =
       auto lastVertexStage = m_pipelineState->getLastVertexProcessingStage();
@@ -870,25 +844,6 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
           loadUserData(*userDataUsage, spillTable, load.load->getType(), load.dwordOffset, builder));
       load.load->eraseFromParent();
       load.load = nullptr;
-    }
-
-    // Descriptor tables
-    Type *ptrType = builder.getPtrTy(ADDR_SPACE_CONST);
-    for (auto &descriptorTable : userDataUsage->descriptorTables) {
-      if (!descriptorTable.load || descriptorTable.load->getFunction() != &func)
-        continue;
-
-      auto *op = cast<CallInst>(descriptorTable.load);
-      descriptorTable.load = nullptr;
-
-      builder.SetInsertPoint(op);
-      Value *va = loadUserData(*userDataUsage, spillTable, builder.getInt32Ty(), descriptorTable.dwordOffset, builder);
-
-      Value *highHalf = op->getArgOperand(4);
-      Value *ptr = addressExtender.extend(va, highHalf, ptrType, builder);
-
-      op->replaceAllUsesWith(ptr);
-      op->eraseFromParent();
     }
 
     // Special user data from lgc.special.user.data calls

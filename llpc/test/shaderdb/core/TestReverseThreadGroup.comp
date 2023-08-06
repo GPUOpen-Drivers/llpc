@@ -15,10 +15,13 @@ void main()
 // BEGIN_REVERSETEST
 // RUN: amdllpc -v %gfxip %s --reverse-thread-group=1 | FileCheck -check-prefix=REVERSETEST %s
 // REVERSETEST-LABEL: {{^// LLPC}} pipeline before-patching results
-// There should be a call to get the gl_NumWorkGroups
-// REVERSETEST: %{{[0-9]+}} = call ptr addrspace(4) @lgc.special.user.data.Workgroup(i32 268435462)
-// There should be a call to get the internal buffer descriptor
-// REVERSETEST: %{{[0-9]+}} = call ptr addrspace(4) @lgc.descriptor.table.addr(i32 10, i32 10, i64 4294967295, i32 7, i32 -1)
+// There should be a calls to:
+//  - get the descriptor table containing the buffer descriptor
+//  - get the gl_NumWorkGroups
+//  - get the internal descriptor table
+// REVERSETEST-DAG: %{{[0-9]+}} = call i32 @lgc.load.user.data.i32(i32 0)
+// REVERSETEST-DAG: %{{[0-9]+}} = call ptr addrspace(4) @lgc.special.user.data.Workgroup(i32 268435462)
+// REVERSETEST-DAG: %{{[0-9]+}} = call i32 @lgc.load.user.data.i32(i32 4)
 // There should be a select between the reversed thread group ID and original thread group ID
 // REVERSETEST: %{{[0-9]+}} = select i1 %{{[0-9]+}}, <3 x i32> %{{[0-9]+}}, <3 x i32> %{{[0-9]+}}
 // REVERSETEST: AMDLLPC SUCCESS
