@@ -71,6 +71,20 @@ Instruction *AddressExtender::extend(Value *addr32, Value *highHalf, Type *ptrTy
 }
 
 // =====================================================================================================================
+// Extend an i32 into a 64-bit pointer using the high 32 bits of the PC
+//
+// @param addr32 : Address as 32-bit value
+// @param highHalf : Value to use for high half; The constant HighAddrPc to use PC
+// @param ptrTy : Type to cast pointer to
+// @param builder : IRBuilder to use, already set to the required insert point
+// @returns : 64-bit pointer value
+Instruction *AddressExtender::extendWithPc(Value *addr32, Type *ptrTy, IRBuilder<> &builder) {
+  Value *ptr = builder.CreateInsertElement(getPc(), addr32, uint64_t(0));
+  ptr = builder.CreateBitCast(ptr, builder.getInt64Ty());
+  return cast<Instruction>(builder.CreateIntToPtr(ptr, ptrTy));
+}
+
+// =====================================================================================================================
 // Get PC value as v2i32. The caller is only using the high half, so this only writes a single instance of the
 // code at the start of the function.
 Instruction *AddressExtender::getPc() {

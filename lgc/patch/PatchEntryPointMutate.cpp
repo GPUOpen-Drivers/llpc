@@ -837,8 +837,7 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
     if (userDataUsage->spillTableEntryArgIdx != 0) {
       builder.SetInsertPoint(addressExtender.getFirstInsertionPt());
       Argument *arg = getFunctionArgument(&func, userDataUsage->spillTableEntryArgIdx);
-      spillTable = addressExtender.extend(arg, builder.getInt32(HighAddrPc),
-                                          builder.getInt8Ty()->getPointerTo(ADDR_SPACE_CONST), builder);
+      spillTable = addressExtender.extendWithPc(arg, builder.getPtrTy(ADDR_SPACE_CONST), builder);
     }
 
     // Handle direct uses of the spill table that were generated in DescBuilder.
