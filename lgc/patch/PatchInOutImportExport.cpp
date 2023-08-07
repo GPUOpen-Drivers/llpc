@@ -630,8 +630,8 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       }
       case ShaderStageMesh: {
         assert(callInst.arg_size() == 2);
-        Value *elemIdx = isDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
-        input = patchMeshBuiltInInputImport(inputTy, builtInId, elemIdx, builder);
+        assert(isDontCareValue(callInst.getOperand(1)));
+        input = patchMeshBuiltInInputImport(inputTy, builtInId, builder);
         break;
       }
       case ShaderStageFragment: {
@@ -2341,20 +2341,14 @@ Value *PatchInOutImportExport::patchGsBuiltInInputImport(Type *inputTy, unsigned
 //
 // @param inputTy : Type of input value
 // @param builtInId : ID of the built-in variable
-// @param elemIdx : Index used for vector element indexing (could be null)
 // @param builder : The IR builder to create and insert IR instruction
-Value *PatchInOutImportExport::patchMeshBuiltInInputImport(Type *inputTy, unsigned builtInId, Value *elemIdx,
-                                                           BuilderBase &builder) {
+Value *PatchInOutImportExport::patchMeshBuiltInInputImport(Type *inputTy, unsigned builtInId, BuilderBase &builder) {
   // Handle work group size built-in
   if (builtInId == BuiltInWorkgroupSize) {
     // WorkgroupSize is a constant vector supplied by mesh shader mode.
     const auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
-    Value *input =
-        ConstantVector::get({builder.getInt32(meshMode.workgroupSizeX), builder.getInt32(meshMode.workgroupSizeY),
-                             builder.getInt32(meshMode.workgroupSizeZ)});
-    if (elemIdx)
-      input = builder.CreateExtractElement(input, elemIdx);
-    return input;
+    return ConstantVector::get({builder.getInt32(meshMode.workgroupSizeX), builder.getInt32(meshMode.workgroupSizeY),
+                                builder.getInt32(meshMode.workgroupSizeZ)});
   }
 
   // Handle other built-ins
@@ -2364,49 +2358,37 @@ Value *PatchInOutImportExport::patchMeshBuiltInInputImport(Type *inputTy, unsign
   switch (builtInId) {
   case BuiltInDrawIndex:
     assert(builtInUsage.drawIndex);
-    assert(!elemIdx); // No vector element indexing
     break;
   case BuiltInViewIndex:
     assert(builtInUsage.viewIndex);
-    assert(!elemIdx); // No vector element indexing
     break;
   case BuiltInNumWorkgroups:
     assert(builtInUsage.numWorkgroups);
-    inputTy = elemIdx ? FixedVectorType::get(builder.getInt32Ty(), 3) : inputTy;
     break;
   case BuiltInWorkgroupId:
     assert(builtInUsage.workgroupId);
-    inputTy = elemIdx ? FixedVectorType::get(builder.getInt32Ty(), 3) : inputTy;
     break;
   case BuiltInLocalInvocationId:
     assert(builtInUsage.localInvocationId);
-    inputTy = elemIdx ? FixedVectorType::get(builder.getInt32Ty(), 3) : inputTy;
     break;
   case BuiltInGlobalInvocationId:
     assert(builtInUsage.globalInvocationId);
-    inputTy = elemIdx ? FixedVectorType::get(builder.getInt32Ty(), 3) : inputTy;
     break;
   case BuiltInLocalInvocationIndex:
     assert(builtInUsage.localInvocationIndex);
-    assert(!elemIdx); // No vector element indexing
     break;
   case BuiltInSubgroupId:
     assert(builtInUsage.subgroupId);
-    assert(!elemIdx); // No vector element indexing
     break;
   case BuiltInNumSubgroups:
     assert(builtInUsage.numSubgroups);
-    assert(!elemIdx); // No vector element indexing
     break;
   default:
     llvm_unreachable("Unknown mesh shader built-in!");
     break;
   }
 
-  Value *input = builder.create<GetMeshBuiltinInputOp>(inputTy, builtInId);
-  if (elemIdx)
-    input = builder.CreateExtractElement(input, elemIdx);
-  return input;
+  return builder.create<GetMeshBuiltinInputOp>(inputTy, builtInId);
 }
 
 // =====================================================================================================================
