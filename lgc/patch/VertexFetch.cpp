@@ -59,7 +59,11 @@ class PipelineState;
 namespace {
 
 // Map vkgc
-static constexpr unsigned FetchShaderInternalBufferBinding = 5;
+static constexpr unsigned InternalDescriptorSetId = static_cast<unsigned>(-1);
+static constexpr unsigned FetchShaderInternalBufferBinding = 5; // Descriptor binding for uber fetch shader
+static constexpr unsigned CurrentAttributeBufferBinding = 24;   // Descriptor binding for current attribute
+static constexpr unsigned GenericVertexFetchShaderBinding = 0;  // Descriptor binding for generic vertex fetch shader
+static constexpr unsigned VertexInputBindingCurrent = 64;       // Vertex input binding for current attribute
 
 // Represents vertex format info corresponding to vertex attribute format (VkFormat).
 struct VertexFormatInfo {
@@ -90,7 +94,7 @@ public:
 
   // Generate code to fetch a vertex value
   Value *fetchVertex(Type *inputTy, const VertexInputDescription *description, unsigned location, unsigned compIdx,
-                     BuilderBase &builder) override;
+                     BuilderImpl &builderImpl) override;
 
   // Generate code to fetch a vertex value for uber shader
   Value *fetchVertex(InputImportGenericOp *inst, Value *descPtr, BuilderBase &builder) override;
@@ -110,7 +114,7 @@ private:
 
   unsigned mapVertexFormat(unsigned dfmt, unsigned nfmt) const;
 
-  Value *loadVertexBufferDescriptor(unsigned binding, BuilderBase &builder);
+  Value *loadVertexBufferDescriptor(unsigned binding, BuilderImpl &builderImpl);
 
   void addVertexFetchInst(Value *vbDesc, unsigned numChannels, bool is16bitFetch, Value *vbIndex, unsigned offset,
                           unsigned stride, unsigned dfmt, unsigned nfmt, Instruction *insertPos, Value **ppFetch) const;
@@ -121,11 +125,12 @@ private:
 
   bool needSecondVertexFetch(const VertexInputDescription *inputDesc) const;
 
-  LgcContext *m_lgcContext = nullptr;   // LGC context
-  LLVMContext *m_context = nullptr;     // LLVM context
-  Value *m_vertexBufTablePtr = nullptr; // Vertex buffer table pointer
-  Value *m_vertexIndex = nullptr;       // Vertex index
-  Value *m_instanceIndex = nullptr;     // Instance index
+  LgcContext *m_lgcContext = nullptr;      // LGC context
+  LLVMContext *m_context = nullptr;        // LLVM context
+  Value *m_vertexBufTablePtr = nullptr;    // Vertex buffer table pointer
+  Value *m_curAttribBufferDescr = nullptr; // Current attribute buffer descriptor;
+  Value *m_vertexIndex = nullptr;          // Vertex index
+  Value *m_instanceIndex = nullptr;        // Instance index
 
   static const VertexCompFormatInfo m_vertexCompFormatInfo[]; // Info table of vertex component format
   static const unsigned char m_vertexFormatMapGfx10[][8];     // Info table of vertex format mapping for GFX10
@@ -600,8 +605,8 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
       } else {
         // Fetch the vertex.
         builder.SetInsertPoint(fetch);
-        vertex =
-            vertexFetch->fetchVertex(fetch->getType(), description, location, component, BuilderBase::get(builder));
+        builder.setShaderStage(ShaderStageVertex);
+        vertex = vertexFetch->fetchVertex(fetch->getType(), description, location, component, builder);
       }
 
       // Replace and erase this call.
@@ -1095,10 +1100,11 @@ VertexFetchImpl::VertexFetchImpl(LgcContext *lgcContext)
 // @param compIdx : Index used for vector element indexing
 // @param builder : Builder to use to insert vertex fetch instructions
 Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription *description, unsigned location,
-                                    unsigned compIdx, BuilderBase &builder) {
+                                    unsigned compIdx, BuilderImpl &builderImpl) {
   Value *vertex = nullptr;
+  BuilderBase &builder = BuilderBase::get(builderImpl);
   Instruction *insertPos = &*builder.GetInsertPoint();
-  auto vbDesc = loadVertexBufferDescriptor(description->binding, builder);
+  auto vbDesc = loadVertexBufferDescriptor(description->binding, builderImpl);
 
   Value *vbIndex = nullptr;
   if (description->inputRate == VertexInputRateVertex) {
@@ -1481,8 +1487,28 @@ unsigned VertexFetchImpl::mapVertexFormat(unsigned dfmt, unsigned nfmt) const {
 //
 // @param binding : ID of vertex buffer binding
 // @param builder : Builder with insert point set
-Value *VertexFetchImpl::loadVertexBufferDescriptor(unsigned binding, BuilderBase &builder) {
+Value *VertexFetchImpl::loadVertexBufferDescriptor(unsigned binding, BuilderImpl &builderImpl) {
+  if (builderImpl.useVertexBufferDescArray()) {
+    Value *vtxDesc = nullptr;
+    // Create descriptor for current attribute
+    if (binding == VertexInputBindingCurrent) {
+      if (m_curAttribBufferDescr == nullptr) {
+        auto descPtr = builderImpl.CreateBufferDesc(InternalDescriptorSetId, CurrentAttributeBufferBinding,
+                                                    builderImpl.getInt32(0), Builder::BufferFlagAddress);
+        // Create descriptor by a 64-bits pointer
+        m_curAttribBufferDescr = builderImpl.buildInlineBufferDesc(descPtr);
+      }
+      vtxDesc = m_curAttribBufferDescr;
+    } else {
+      // Create descriptor for vertex buffer
+      vtxDesc = builderImpl.CreateBufferDesc(InternalDescriptorSetId, GenericVertexFetchShaderBinding,
+                                             builderImpl.getInt32(binding), Builder::BufferFlagNonConst);
+    }
 
+    return vtxDesc;
+  }
+
+  BuilderBase &builder = BuilderBase::get(builderImpl);
   // Get the vertex buffer table pointer as pointer to v4i32 descriptor.
   Type *vbDescTy = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
   if (!m_vertexBufTablePtr) {
@@ -1496,6 +1522,7 @@ Value *VertexFetchImpl::loadVertexBufferDescriptor(unsigned binding, BuilderBase
   LoadInst *vbDesc = builder.CreateLoad(vbDescTy, vbDescPtr);
   vbDesc->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(vbDesc->getContext(), {}));
   vbDesc->setAlignment(Align(16));
+
   return vbDesc;
 }
 

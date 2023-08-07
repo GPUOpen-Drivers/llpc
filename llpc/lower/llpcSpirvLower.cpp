@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "llpcSpirvLower.h"
+#include "LowerGLCompatibility.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcSpirvLowerAccessChain.h"
@@ -206,6 +207,9 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   // Lower SPIR-V terminators
   passMgr.addPass(SpirvLowerTerminator());
 
+  // Lower Glsl compatibility variables and operations
+  passMgr.addPass(LowerGLCompatibility());
+
   // Lower SPIR-V global variables, inputs, and outputs
   passMgr.addPass(SpirvLowerGlobal());
 
@@ -246,10 +250,8 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   // Lower SPIR-V instruction metadata remove
   passMgr.addPass(SpirvLowerInstMetaRemove());
 
-#if VKI_RAY_TRACING
   if (rayTracing || rayQuery)
     passMgr.addPass(LowerGpuRt());
-#endif
 
   // Stop timer for lowering passes.
   if (lowerTimer)

@@ -663,15 +663,8 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
     // Set PA_CL_CLIP_CNTL from pipeline state settings.
     // DX_CLIP_SPACE_DEF, ZCLIP_NEAR_DISABLE and ZCLIP_FAR_DISABLE are now set internally by PAL (as of
     // version 629), and are no longer part of the PAL ELF ABI.
-    const unsigned usrClipPlaneMask = m_pipelineState->getRasterizerState().usrClipPlaneMask;
     const bool rasterizerDiscardEnable = m_pipelineState->getRasterizerState().rasterizerDiscardEnable;
     PA_CL_CLIP_CNTL paClClipCntl = {};
-    paClClipCntl.bits.UCP_ENA_0 = (usrClipPlaneMask >> 0) & 0x1;
-    paClClipCntl.bits.UCP_ENA_1 = (usrClipPlaneMask >> 1) & 0x1;
-    paClClipCntl.bits.UCP_ENA_2 = (usrClipPlaneMask >> 2) & 0x1;
-    paClClipCntl.bits.UCP_ENA_3 = (usrClipPlaneMask >> 3) & 0x1;
-    paClClipCntl.bits.UCP_ENA_4 = (usrClipPlaneMask >> 4) & 0x1;
-    paClClipCntl.bits.UCP_ENA_5 = (usrClipPlaneMask >> 5) & 0x1;
     paClClipCntl.bits.DX_LINEAR_ATTR_CLIP_ENA = true;
     paClClipCntl.bits.DX_RASTERIZATION_KILL = rasterizerDiscardEnable;
     setRegister(mmPA_CL_CLIP_CNTL, paClClipCntl.u32All);
@@ -1029,7 +1022,7 @@ llvm::Type *PalMetadata::getLlvmType(StringRef tyName) const {
 // =====================================================================================================================
 // Updates the SPI_SHADER_COL_FORMAT entry.
 //
-void PalMetadata::setSpiShaderColFormat(ArrayRef<ExportFormat> expFormats) {
+void PalMetadata::updateSpiShaderColFormat(ArrayRef<ExportFormat> expFormats) {
   unsigned spiShaderColFormat = 0;
   for (auto [i, expFormat] : enumerate(expFormats))
     spiShaderColFormat |= expFormat << (4 * i);
@@ -1068,7 +1061,7 @@ void PalMetadata::updateCbShaderMask(llvm::ArrayRef<ColorExportInfo> exps) {
       continue;
 
     if (m_pipelineState->computeExportFormat(exp.ty, exp.location) != 0) {
-      cbShaderMask |= (0xF << (4 * exp.hwColorTarget));
+      cbShaderMask |= (0xF << (4 * exp.location));
     }
   }
 

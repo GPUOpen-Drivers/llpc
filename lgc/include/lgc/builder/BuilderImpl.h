@@ -53,6 +53,11 @@ public:
   llvm::Value *CreateIntegerDotProduct(llvm::Value *vector1, llvm::Value *vector2, llvm::Value *accumulator,
                                        unsigned flags, const llvm::Twine &instName = "");
 
+  // Create a waterfall loop containing the specified instruction.
+  llvm::Instruction *createWaterfallLoop(llvm::Instruction *nonUniformInst, llvm::ArrayRef<unsigned> operandIdxs,
+                                         bool scalarizeDescriptorLoads = false, bool useVgprForOperands = false,
+                                         const llvm::Twine &instName = "");
+
   // Set the current shader stage, clamp shader stage to the ShaderStageCompute
   void setShaderStage(ShaderStage stage) { m_shaderStage = stage > ShaderStageCompute ? ShaderStageCompute : stage; }
 
@@ -83,10 +88,6 @@ protected:
 
   // Create an "if..endif" or "if..else..endif" structure.
   llvm::BranchInst *createIf(llvm::Value *condition, bool wantElse, const llvm::Twine &instName = "");
-
-  // Create a waterfall loop containing the specified instruction.
-  llvm::Instruction *createWaterfallLoop(llvm::Instruction *nonUniformInst, llvm::ArrayRef<unsigned> operandIdxs,
-                                         bool scalarizeDescriptorLoads = false, const llvm::Twine &instName = "");
 
   // Helper method to scalarize a possibly vector unary operation
   llvm::Value *scalarize(llvm::Value *value, const std::function<llvm::Value *(llvm::Value *)> &callback);
@@ -287,6 +288,10 @@ public:
   llvm::Value *CreateLoadBufferDesc(uint64_t descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
                                     const llvm::Twine &instName = "");
 
+  // Create a buffer descriptor.
+  llvm::Value *CreateBufferDesc(uint64_t descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
+                                const llvm::Twine &instName = "");
+
   // Create a get of the stride (in bytes) of a descriptor.
   llvm::Value *CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
                                    unsigned binding, const llvm::Twine &instName = "");
@@ -297,6 +302,12 @@ public:
 
   // Create a load of the push constants pointer.
   llvm::Value *CreateLoadPushConstantsPtr(llvm::Type *returnTy, const llvm::Twine &instName = "");
+
+  // Calculate a buffer descriptor for an inline buffer
+  llvm::Value *buildInlineBufferDesc(llvm::Value *descPtr);
+
+  // Check whether vertex buffer descriptors are in a descriptor array binding instead of the VertexBufferTable.
+  bool useVertexBufferDescArray();
 
 private:
   // Get a struct containing the pointer and byte stride for a descriptor
@@ -311,9 +322,6 @@ private:
                           unsigned binding, const ResourceNode *topNode, const ResourceNode *node);
 
   llvm::Value *scalarizeIfUniform(llvm::Value *value, bool isNonUniform);
-
-  // Calculate a buffer descriptor for an inline buffer
-  llvm::Value *buildInlineBufferDesc(llvm::Value *descPtr);
 
   // Build buffer compact descriptor
   llvm::Value *buildBufferCompactDesc(llvm::Value *desc);

@@ -3981,6 +3981,14 @@ void NggPrimShader::writeGsOutput(Value *output, unsigned location, unsigned com
   const unsigned attribOffset = (location * 4) + component;
   auto ldsOffset = m_builder.CreateAdd(vertexOffset, m_builder.getInt32(attribOffset));
 
+  if (geometryMode.robustGsEmits) {
+    // skip the lds write by writing to a dummy offset.
+    // ldsOffset = (emitVerts >= outputVertices) ? InvalidValue : ldsOffset
+    auto dummyOffset = m_builder.getInt32(0x80000000);
+    auto outOfRange = m_builder.CreateICmpUGE(emitVerts, m_builder.getInt32(geometryMode.outputVertices));
+    ldsOffset = m_builder.CreateSelect(outOfRange, dummyOffset, ldsOffset);
+  }
+
   writeValueToLds(output, ldsOffset);
 }
 
@@ -4142,6 +4150,12 @@ Function *NggPrimShader::createGsEmitHandler() {
 
     // outVerts++
     outVerts = m_builder.CreateAdd(outVerts, m_builder.getInt32(1));
+
+    if (geometryMode.robustGsEmits) {
+      // outVerts = (emitVerts >= outputVertices) ? 0 : outVerts
+      Value *outOfRange = m_builder.CreateICmpUGT(emitVerts, m_builder.getInt32(geometryMode.outputVertices));
+      outVerts = m_builder.CreateSelect(outOfRange, m_builder.getInt32(0), outVerts);
+    }
 
     // primEmit = (outVerts >= outVertsPerPrim)
     primEmit = m_builder.CreateICmpUGE(outVerts, m_builder.getInt32(outVertsPerPrim));
@@ -7755,8 +7769,7 @@ void NggPrimShader::atomicAdd(Value *ValueToAdd, Value *ldsOffset) {
 // @param offset : Dword offset from the provided buffer pointer
 // @param isVolatile : Whether this is a volatile load
 // @returns : Value read from the constant buffer
-llvm::Value *NggPrimShader::readValueFromCb(llvm::Type *readyTy, llvm::Value *bufPtr, llvm::Value *offset,
-                                            bool isVolatile) {
+llvm::Value *NggPrimShader::readValueFromCb(Type *readyTy, Value *bufPtr, Value *offset, bool isVolatile) {
   assert(bufPtr->getType()->isPointerTy() && bufPtr->getType()->getPointerAddressSpace() == ADDR_SPACE_CONST);
 
   auto loadPtr = m_builder.CreateGEP(m_builder.getInt32Ty(), bufPtr, offset);
@@ -7764,8 +7777,10 @@ llvm::Value *NggPrimShader::readValueFromCb(llvm::Type *readyTy, llvm::Value *bu
   cast<Instruction>(loadPtr)->setMetadata(MetaNameUniform, MDNode::get(m_builder.getContext(), {}));
 
   auto loadValue = m_builder.CreateAlignedLoad(readyTy, loadPtr, Align(4));
-  loadValue->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(m_builder.getContext(), {}));
-  loadValue->setVolatile(isVolatile);
+  if (isVolatile)
+    loadValue->setVolatile(true);
+  else
+    loadValue->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(m_builder.getContext(), {}));
 
   return loadValue;
 }

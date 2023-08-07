@@ -167,13 +167,16 @@ void SpirvLowerRayTracing::processTraceRayCall(BaseTraceRayOp *inst) {
     Value *currentParentRayId = nullptr;
     if (rayTracingContext->getRayTracingState()->enableRayTracingCounters) {
       generateTraceRayStaticId();
+
       // RayGen shaders are non-recursive, initialize parent ray ID to -1 here.
       if (m_shaderStage == ShaderStageRayTracingRayGen)
         m_builder->CreateStore(m_builder->getInt32(InvalidValue), m_traceParams[TraceParam::ParentRayId]);
+
       currentParentRayId = m_builder->CreateLoad(m_builder->getInt32Ty(), m_traceParams[TraceParam::ParentRayId]);
       args.push_back(currentParentRayId);
       args.push_back(m_builder->CreateLoad(m_builder->getInt32Ty(), m_traceRayStaticId));
     }
+
     CallInst *result = nullptr;
     auto funcTy = getTraceRayFuncTy();
     if (indirect) {
@@ -187,10 +190,12 @@ void SpirvLowerRayTracing::processTraceRayCall(BaseTraceRayOp *inst) {
       result =
           m_builder->CreateNamedCall(RtName::TraceRayKHR, funcTy->getReturnType(), args, {Attribute::AlwaysInline});
     }
+
     if (rayTracingContext->getRayTracingState()->enableRayTracingCounters) {
       // Restore parent ray ID after call
       m_builder->CreateStore(currentParentRayId, m_traceParams[TraceParam::ParentRayId]);
     }
+
     // Save the return value to the input payloads for memcpy of type conversion
     m_builder->CreateStore(result, localPayload);
     m_builder->CreateMemCpy(payloadArg, align, localPayload, align, payloadArgSize);

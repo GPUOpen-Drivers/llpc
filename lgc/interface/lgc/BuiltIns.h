@@ -32,6 +32,7 @@
 #pragma once
 
 namespace lgc {
+
 // Max spirv builtIn value
 static constexpr unsigned BuiltInInternalBase = 0x10000000;
 

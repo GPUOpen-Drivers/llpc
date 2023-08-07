@@ -1950,8 +1950,8 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
     std::vector<const PipelineShaderInfo *> rayTracingShaderInfo;
     rayTracingShaderInfo.reserve(pipelineInfo->shaderCount + 1);
     for (unsigned i = 0; i < pipelineInfo->shaderCount; ++i) {
-      auto shaderInfo = &pipelineInfo->pShaders[i];
-      rayTracingShaderInfo.push_back(shaderInfo);
+      rayTracingShaderInfo.push_back(&pipelineInfo->pShaders[i]);
+      auto &shaderInfo = rayTracingShaderInfo[i];
       const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
       if (shaderInfo->entryStage == ShaderStageRayTracingAnyHit ||
           shaderInfo->entryStage == ShaderStageRayTracingIntersect) {

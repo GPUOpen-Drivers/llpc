@@ -13,7 +13,6 @@ Vulkan layers.
 Our internal print debug capability allows us to use `printf` in internal
 SPIR-V applications that are head-scratching hard to debug.
 
-
 ## Interfaces
 
 This section describes interfaces between major components:
@@ -157,7 +156,6 @@ We do _not_ guard against wraparound of `bufferOffset` itself ([rationale](#over
 possible for the payload to be too short for the underlying format string. It is
 up to the parser integrated in the driver to guard against such errors.
 
-
 ## Implementation
 
 ### Vulkan driver
@@ -169,7 +167,6 @@ Most of the implementation is in xgl/icd/api/debug_printf.cpp.
 
 > **Note/Todo:** At time of writing, the implementation is limited to handling
 > only a single pipeline at a time.
-
 
 ### LLPC
 

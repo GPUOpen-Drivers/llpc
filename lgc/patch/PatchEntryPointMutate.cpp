@@ -1137,6 +1137,7 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
 
     if (lowerCpsOps(newFunc))
       continue;
+
     int argOffset = origType->getNumParams();
     if (isComputeWithCalls())
       processCalls(*newFunc, shaderInputTys, shaderInputNames, inRegMask, argOffset);

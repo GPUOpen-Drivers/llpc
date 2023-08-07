@@ -58,6 +58,32 @@ Value *BuilderImpl::CreateLoadBufferDesc(uint64_t descSet, unsigned binding, Val
                                          const Twine &instName) {
   Value *desc = nullptr;
   bool return64Address = false;
+  if (flags & BufferFlagAddress)
+    return64Address = true;
+
+  desc = CreateBufferDesc(descSet, binding, descIndex, flags, instName);
+  if (return64Address || isa<PoisonValue>(desc))
+    return desc;
+
+  // Convert to fat pointer.
+  return create<BufferDescToPtrOp>(desc);
+}
+
+// =====================================================================================================================
+// Create a buffer descriptor, not convert to a fat pointer
+//
+// If descSet = -1, this is an internal user data, which is a plain 64-bit pointer, flags must be 'BufferFlagAddress'
+// i64 address is returned.
+//
+// @param descSet : Descriptor set
+// @param binding : Descriptor binding
+// @param descIndex : Descriptor index
+// @param flags : BufferFlag* bit settings
+// @param instName : Name to give instruction(s)
+Value *BuilderImpl::CreateBufferDesc(uint64_t descSet, unsigned binding, Value *descIndex, unsigned flags,
+                                     const Twine &instName) {
+  Value *desc = nullptr;
+  bool return64Address = false;
   descIndex = scalarizeIfUniform(descIndex, flags & BufferFlagNonUniform);
 
   // Mark the shader as reading and writing (if applicable) a resource.
@@ -207,8 +233,7 @@ Value *BuilderImpl::CreateLoadBufferDesc(uint64_t descSet, unsigned binding, Val
   if (!instName.isTriviallyEmpty())
     desc->setName(instName);
 
-  // Convert to fat pointer.
-  return create<BufferDescToPtrOp>(desc);
+  return desc;
 }
 
 // =====================================================================================================================
@@ -354,6 +379,12 @@ Value *BuilderImpl::CreateLoadPushConstantsPtr(Type *returnTy, const Twine &inst
   std::string callName = lgcName::PushConst;
   addTypeMangling(returnTy, {}, callName);
   return CreateNamedCall(callName, returnTy, {}, Attribute::ReadOnly, instName);
+}
+
+// =====================================================================================================================
+// Check whether vertex buffer descriptors are in a descriptor array binding instead of the VertexBufferTable
+bool BuilderImpl::useVertexBufferDescArray() {
+  return m_pipelineState->getInputAssemblyState().useVertexBufferDescArray == 1;
 }
 
 // =====================================================================================================================

@@ -196,6 +196,7 @@ struct ResourceUsage {
         unsigned viewportIndex : 1;        // Whether gl_ViewportIndex is used
         unsigned layer : 1;                // Whether gl_Layer is used
         unsigned primitiveShadingRate : 1; // Whether gl_PrimitiveShadingRate is used
+        unsigned edgeFlag : 1;             // Whether EdgeFlag is used
       } vs;
 
       // Tessellation control shader

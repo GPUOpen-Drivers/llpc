@@ -15,8 +15,12 @@ config.gfxip = "@AMDLLPC_DEFAULT_TARGET@"
 # Propagate CMake options used in lit feature tests.
 config.llvm_assertions = "@LLVM_ENABLE_ASSERTIONS@"
 config.xgl_sanitizers = "@XGL_USE_SANITIZER@"
-config.llpc_enable_shader_cache = "@LLPC_ENABLE_SHADER_CACHE@"
-config.llpc_client_interface_version = "@LLPC_CLIENT_INTERFACE_MAJOR_VERSION@"
+
+for d in "@LIT_DEFINITIONS@".split(";"):
+    def_split = d.split("=")
+    name = def_split[0].lower()
+    val = def_split[1] if len(def_split) > 1 else "ON"
+    config.available_features.add(name)
 
 # Support substitution of the tools and libs dirs with user parameters. This is
 # used when we can't determine the tool dir at configuration time.

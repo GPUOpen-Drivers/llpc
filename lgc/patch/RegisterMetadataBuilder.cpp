@@ -1195,13 +1195,6 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
   // PA_CL_CLIP_CNTL
   msgpack::MapDocNode paClClipCntl =
       getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::PaClClipCntl].getMap(true);
-  const unsigned usrClipPlaneMask = m_pipelineState->getRasterizerState().usrClipPlaneMask;
-  paClClipCntl[Util::Abi::PaClClipCntlMetadataKey::UserClipPlane0Ena] = (usrClipPlaneMask & 0x1) > 0;
-  paClClipCntl[Util::Abi::PaClClipCntlMetadataKey::UserClipPlane1Ena] = ((usrClipPlaneMask >> 1) & 0x1) > 0;
-  paClClipCntl[Util::Abi::PaClClipCntlMetadataKey::UserClipPlane2Ena] = ((usrClipPlaneMask >> 2) & 0x1) > 0;
-  paClClipCntl[Util::Abi::PaClClipCntlMetadataKey::UserClipPlane3Ena] = ((usrClipPlaneMask >> 3) & 0x1) > 0;
-  paClClipCntl[Util::Abi::PaClClipCntlMetadataKey::UserClipPlane4Ena] = ((usrClipPlaneMask >> 4) & 0x1) > 0;
-  paClClipCntl[Util::Abi::PaClClipCntlMetadataKey::UserClipPlane5Ena] = ((usrClipPlaneMask >> 5) & 0x1) > 0;
   paClClipCntl[Util::Abi::PaClClipCntlMetadataKey::DxLinearAttrClipEna] = true;
   paClClipCntl[Util::Abi::PaClClipCntlMetadataKey::RasterizationKill] =
       m_pipelineState->getRasterizerState().rasterizerDiscardEnable > 0;

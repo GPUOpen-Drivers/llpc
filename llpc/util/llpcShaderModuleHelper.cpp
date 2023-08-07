@@ -124,6 +124,11 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
         }
         }
       }
+      if (decoration == DecorationLocation) {
+        auto location = (opCode == OpDecorate) ? codePos[3] : codePos[4];
+        if (location == static_cast<unsigned>(Vkgc::GlCompatibilityInOutLocation::ClipVertex))
+          shaderModuleUsage.useClipVertex = true;
+      }
       break;
     }
     case OpSpecConstantTrue:
