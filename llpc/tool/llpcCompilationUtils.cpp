@@ -413,13 +413,14 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
                          Twine(getShaderStageName(pipelineState->stages[stage].stage)) + " shader module");
     }
   }
+
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   const BinaryData *shaderLibrary = nullptr;
   if (pipelineState->pipelineType == VfxPipelineTypeRayTracing) {
     shaderLibrary = &pipelineState->rayPipelineInfo.shaderTraceRay;
-  } else if (pipelineState->pipelineType == VfxPipelineTypeCompute) {
+  } else if (pipelineState->pipelineType == VfxPipelineTypeCompute)
     shaderLibrary = &pipelineState->compPipelineInfo.shaderLibrary;
-  } else {
+  else {
     assert(pipelineState->pipelineType == VfxPipelineTypeGraphics);
     shaderLibrary = &pipelineState->gfxPipelineInfo.shaderLibrary;
   }

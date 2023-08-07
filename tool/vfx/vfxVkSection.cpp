@@ -37,6 +37,7 @@ public:
     INIT_SECTION_INFO("callInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageRayTracingCallable)
     INIT_SECTION_INFO("ResourceMapping", SectionTypeResourceMapping, 0)
     INIT_SECTION_INFO("UniformConstant", SectionTypeUniformConstant, 0)
+    INIT_SECTION_INFO("ApiXfbOutInfo", SectionTypeApiXfbOutput, 0)
   };
 
   void initEnumMap() {
@@ -57,6 +58,9 @@ public:
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorImage)
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorConstTexelBuffer)
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, InlineBuffer)
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 63
+    ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorAtomicCounter)
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorMutable)
 #endif

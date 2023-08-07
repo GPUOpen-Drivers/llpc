@@ -1720,6 +1720,9 @@ void BuilderImpl::markBuiltInOutputUsage(BuiltInKind builtIn, unsigned arraySize
     case BuiltInPrimitiveShadingRate:
       usage.vs.primitiveShadingRate = true;
       break;
+    case BuiltInEdgeFlag:
+      usage.vs.edgeFlag = true;
+      break;
     default:
       break;
     }

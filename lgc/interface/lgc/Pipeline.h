@@ -467,10 +467,12 @@ struct ColorExportState {
 
 // Struct to pass to SetInputAssemblyState.
 struct InputAssemblyState {
-  PrimitiveType primitiveType; // Primitive type
-  unsigned disableVertexReuse; // Disable reusing vertex shader output for indexed draws
-  unsigned switchWinding;      // Whether to reverse vertex ordering for tessellation
-  unsigned enableMultiView;    // Whether to enable multi-view support
+  PrimitiveType primitiveType;       // Primitive type
+  unsigned disableVertexReuse;       // Disable reusing vertex shader output for indexed draws
+  unsigned switchWinding;            // Whether to reverse vertex ordering for tessellation
+  unsigned enableMultiView;          // Whether to enable multi-view support
+  unsigned useVertexBufferDescArray; // Whether vertex buffer descriptors are in a descriptor array binding instead of
+                                     // the VertexBufferTable
 };
 
 // Shading rate flags. These happen to have the same values as the corresponding SPIR-V enum.
@@ -500,7 +502,6 @@ struct RasterizerState {
   unsigned samplePatternIdx;               // Index into the currently bound MSAA sample pattern table that
                                            //  matches the sample pattern used by the rasterizer when rendering
                                            //  with this pipeline.
-  unsigned usrClipPlaneMask;               // Mask to indicate the enabled user defined clip planes
   unsigned rasterStream;                   // Which vertex stream to rasterize
   ProvokingVertexMode provokingVertexMode; // Specifies which vertex of a primitive is the _provoking vertex_,
                                            // this impacts which vertex's "flat" VS outputs are passed to the PS.
@@ -609,6 +610,7 @@ struct GeometryShaderMode {
   OutputPrimitives outputPrimitive; // Kind of output primitives
   unsigned invocations;             // Number of times to invoke shader for each input primitive
   unsigned outputVertices;          // Max number of vertices the shader will emit in one invocation
+  unsigned robustGsEmits;           // robust buffer access
 };
 
 // Struct to pass to MeshShaderMode. The front-end should zero-initialize it with "= {}" in case

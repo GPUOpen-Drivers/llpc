@@ -171,5 +171,28 @@ Function *ColorExportShader::createColorExportFunc() {
 //
 // @param [in/out] outStream : The PAL metadata object in which to update the color format.
 void ColorExportShader::updatePalMetadata(PalMetadata &palMetadata) {
+  SmallVector<ExportFormat> finalExportFormats;
+  bool hasDepthExpFmtZero = true;
+  for (auto &info : m_exports) {
+    if (info.hwColorTarget != MaxColorTargets) {
+      ExportFormat expFmt = m_exportFormat[info.hwColorTarget];
+      if (expFmt != EXP_FORMAT_ZERO)
+        finalExportFormats.push_back(expFmt);
+    } else {
+      hasDepthExpFmtZero = false;
+    }
+  }
+
+  if (finalExportFormats.size() == 0 && hasDepthExpFmtZero) {
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10 || m_killEnabled) {
+      // NOTE: Hardware requires that fragment shader always exports "something" (color or depth) to the SX.
+      // If both SPI_SHADER_Z_FORMAT and SPI_SHADER_COL_FORMAT are zero, we need to override
+      // SPI_SHADER_COL_FORMAT to export one channel to MRT0. This dummy export format will be masked
+      // off by updateCbShaderMask().
+      finalExportFormats.push_back(EXP_FORMAT_32_R);
+    }
+  }
+
+  palMetadata.updateSpiShaderColFormat(finalExportFormats);
   palMetadata.updateCbShaderMask(m_exports);
 }

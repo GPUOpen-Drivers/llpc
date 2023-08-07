@@ -162,6 +162,8 @@ void SpirvLowerRayTracing::processTraceRayCall(BaseTraceRayOp *inst) {
       args.push_back(func->getArg(i));
 
     Value *parentRayId = func->arg_end() - 2;
+    generateTraceRayStaticId();
+
     // RayGen shaders are non-recursive, initialize parent ray ID to -1 here.
     if (m_shaderStage == ShaderStageRayTracingRayGen)
       m_builder->CreateStore(m_builder->getInt32(InvalidValue), parentRayId);

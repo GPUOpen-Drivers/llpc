@@ -93,7 +93,11 @@ void gpurt::getFuncTable(RtIpVersion rtIpVersion, GpurtFuncTable &table) {
 
   Pal::RayTracingIpLevel rtIpLevel = getRtIpLevel(rtIpVersion);
   GpuRt::EntryFunctionTable gpurtTable;
+#if GPURT_BUILD_RTIP3
+  GpuRt::QueryRayTracingEntryFunctionTable(rtIpLevel, true, &gpurtTable);
+#else
   GpuRt::QueryRayTracingEntryFunctionTable(rtIpLevel, &gpurtTable);
+#endif
 
   unmangleDxilName(table.pFunc[RT_ENTRY_TRACE_RAY], gpurtTable.traceRay.pTraceRay);
   unmangleDxilName(table.pFunc[RT_ENTRY_TRACE_RAY_INLINE], gpurtTable.rayQuery.pTraceRayInline);

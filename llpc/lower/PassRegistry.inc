@@ -33,6 +33,7 @@
 #define LLPC_MODULE_PASS LLPC_PASS
 #endif
 
+LLPC_MODULE_PASS("llpc-spirv-lower-gl-compatibility", LowerGLCompatibility)
 LLPC_MODULE_PASS("llpc-spirv-lower-access-chain", SpirvLowerAccessChain)
 LLPC_MODULE_PASS("llpc-spirv-lower-cfg-merges", SpirvLowerCfgMerges)
 LLPC_MODULE_PASS("llpc-spirv-lower-const-immediate-store", SpirvLowerConstImmediateStore)

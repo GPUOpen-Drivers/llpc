@@ -45,7 +45,7 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 63
+#define LLPC_INTERFACE_MAJOR_VERSION 64
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -83,12 +83,16 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
-//  |     63.0 | Add enableColorExportShader to GraphicsPipelineBuildInfo.                                             |
+//  |     64.0 | Add enableColorExportShader to GraphicsPipelineBuildInfo.                                             |
+//  |     63.0 | Add Atomic Counter, its default descriptor and map its concreteType to Buffer.                        |
+//  |     62.1 | Add ApiXfbOutData GraphicsPipelineBuildInfo                                                           |
 //  |     62.0 | Default to the compiler getting the GPURT library directly, and move shader library info into RtState |
+//  |     61.16| Add replaceSetWithResourceType to PipelineOptions                                                     |
+//  |     61.15| Add disableReadFirstLaneWorkaround to PipelineShaderOptions                                           |
 //  |     61.14| Add rasterStream to rsState                                                                           |
 //  |     61.13| Add dualSourceBlendDynamic to cbState                                                                 |
 //  |     61.12| Add mode to RayTracingPipelineBuildInfo                                                               |
-//  |     61.11| Add dualSourceBlendDynamic to cbState                                                                 |
+//  |     61.11| Add UniformConstantMap and related structures                                                         |
 //  |     61.10| Add useShadingRate and useSampleInfoto ShaderModuleUsage                                              |
 //  |     61.8 | Add enableImplicitInvariantExports to PipelineOptions                                                 |
 //  |     61.7 | Add disableFMA to PipelineShaderOptions                                                               |
@@ -199,6 +203,13 @@ static const unsigned InternalDescriptorSetId = static_cast<unsigned>(-1);
 static const unsigned MaxVertexAttribs = 64;
 static const unsigned MaxColorTargets = 8;
 static const unsigned MaxFetchShaderInternalBufferSize = 16 * MaxVertexAttribs;
+
+namespace GlCompatibilityLimits {
+static const unsigned MaxUniformLocations = 8000;
+static const unsigned MaxClipPlanes = 8;
+static const unsigned MaxGenericVertexAttribs = 32;
+static const unsigned MaxTextureCoords = 8;
+} // namespace GlCompatibilityLimits
 
 // Forward declarations
 class IShaderCache;
@@ -323,6 +334,58 @@ enum InternalBinding : unsigned {
   RtCaptureReplayInternalBufferBinding = 8, ///< Binding ID of ray-tracing capture replay internal buffer
   SpecConstInternalBufferBindingId = 9,     ///< Binding ID of internal buffer for specialized constant.
   SpecConstInternalBufferBindingIdEnd = SpecConstInternalBufferBindingId + ShaderStageCount,
+  CurrentAttributeBufferBinding = 24, ///< Binding ID of current attribute
+};
+
+/// Internal vertex attribute location start from 0.
+enum GlCompatibilityAttributeLocation : unsigned {
+  FirstAttributeLocation = 0,        ///< Internal vertex attribute start from 0.
+  Generic0 = FirstAttributeLocation, ///< Internal vertex attribute of vertex.attrib[] in Arb shader.
+  Pos = Generic0 + GlCompatibilityLimits::MaxGenericVertexAttribs,
+  ///< Internal vertex attribute of vertex.position in Arb shader
+  Weight,         ///< Internal vertex attribute of vertex.weight in Arb shader.
+  Normal,         ///< Internal vertex attribute of gl_Normal.
+  Color,          ///< Internal vertex attribute of gl_Color.
+  SecondaryColor, ///< Internal vertex attribute of gl_SecondaryColor.
+  FogCoord,       ///< Internal vertex attribute of gl_FogCoord.
+  ColorIndex,     ///< Internal vertex attribute to pass on index of gl_MultiTexCoord.
+  EdgeFlag,       ///< Internal vertex attribute use to pass on the edeg flag.
+  Texcoord0,      ///< Internal vertex attribute of gl_MultiTexCoord0.
+  BaseinstanceOffset = Texcoord0 + GlCompatibilityLimits::MaxTextureCoords,
+  ///< Internal vertex attribute: BaseInstanceOffset,
+  ///  used by MultiDrawElementsIndirectMerger.
+  IndirectVertexId,      ///< Internal vertex attribute to load gl_VertexId from
+                         ///  external buffer, used by MultiDrawElementsIndirectMerger.
+  IndirectBaseInstance,  ///< Internal vertex attribute to load gl_BaseInstance from
+                         ///  external buffer, used by MultiDrawElementsIndirectMerger.
+  AttributeLocationCount ///< The count of Internal vertex attribute.
+};
+
+/// Internal inout location start from 128.
+enum GlCompatibilityInOutLocation : unsigned {
+  FirstInOutLocation = 128,        ///< InOut location start from 128.
+  FrontColor = FirstInOutLocation, ///< InOut location of gl_FrontColor or gl_Color.
+  BackColor,                       ///< InOut location of gl_BackColor.
+  FrontSecondaryColor,             ///< InOut location of gl_FrontSecondaryColor or gl_SecondaryColor.
+  BackSecondaryColor,              ///< InOut location of gl_BackSecondaryColor.
+  FogFragCoord,                    ///< InOut location of gl_FogFragCoord.
+  ClipVertex,                      ///< InOut location of gl_ClipVertex.
+  TexCoord,                        ///< InOut location of gl_TexCoord.
+  PatchTexCoord = TexCoord + GlCompatibilityLimits::MaxTextureCoords,
+  ///< Internal pipeline patch texture coordinate,
+  ///  It is used by glBitMap and glDrawPixels.
+  SpecialFragOut = 0 ///< InOut location 0, use to specify the special output of fragment
+                     ///  shader, eg. gl_FragColor and gl_FragData.
+};
+
+/// Internal uniform location start from 8000.
+enum GlCompatibilityUniformLocation : unsigned {
+  FirstUniformLocation = GlCompatibilityLimits::MaxUniformLocations,
+  ///< Internal uniform location start from MaxUniformLocations.
+  FrameBufferSize = FirstUniformLocation + 0, ///< Internal uniform location use to pass on the size of frame buffer.
+  AlphaTestRef,                               ///< Internal uniform location use to pass on the alpha test ref.
+  ClipPlane,                                  ///< Internal uniform location of gl_ClipPlane.
+  UniformLocationCount = ClipPlane + GlCompatibilityLimits::MaxClipPlanes - GlCompatibilityLimits::MaxUniformLocations
 };
 
 /// Enumerates the function of a particular node in a shader's resource mapping graph.
@@ -349,6 +412,9 @@ enum class ResourceMappingNodeType : unsigned {
   InlineBuffer,                 ///< Push constant with binding
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
   DescriptorMutable, ///< Mutable descriptor type
+#endif
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 63
+  DescriptorAtomicCounter, ///< Generic descriptor: atomic counter
 #endif
   Count, ///< Count of resource mapping node types.
 };
@@ -504,6 +570,7 @@ struct PipelineOptions {
   bool internalRtShaders;                         ///< Whether this pipeline has internal raytracing shaders
   unsigned forceNonUniformResourceIndexStageMask; ///< Mask of the stage to force using non-uniform resource index.
   bool reserved16;
+  bool replaceSetWithResourceType; ///< For OGL only, replace 'set' with resource type during spirv translate
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.
@@ -553,6 +620,7 @@ struct ShaderModuleUsage {
   bool usePointSize;           ///< Whether gl_PointSize is used in output
   bool useShadingRate;         ///< Whether shading rate is used
   bool useSampleInfo;          ///< Whether gl_SamplePosition or InterpolateAtSample are used
+  bool useClipVertex;          ///< Whether gl_useClipVertex is used
 };
 
 /// Represents common part of shader module data
@@ -783,6 +851,9 @@ struct PipelineShaderOptions {
 
   /// Application workaround: Treat GLSL.ext fma instruction as OpFMul + OpFAdd
   bool disableFMA;
+
+  /// Disable to emulate DX's readfirst lane workaround in BIL
+  bool disableReadFirstLaneWorkaround;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor
@@ -1002,9 +1073,10 @@ enum DispatchDimSwizzleMode : unsigned {
 };
 
 enum class LlpcRaytracingMode : unsigned {
-  None = 0, // Not goto any raytracing compiling path
-  Legacy,   // LLpc Legacy compiling path
-  Gpurt2,   // Raytracing lowering at the end of spirvLower.
+  None = 0,      // Not goto any raytracing compiling path
+  Legacy,        // LLpc Legacy compiling path
+  Gpurt2,        // Raytracing lowering at the end of spirvLower.
+  Continuations, // Enable continuation in the new raytracing path
 };
 
 /// RayTracing state
@@ -1071,6 +1143,23 @@ struct UniformConstantMap {
   UniformConstantMapEntry *pUniforms; ///< Mapping of <location, offset> for uniform constant
 };
 
+/// Represents transform feedback info for the caputred output
+struct XfbOutInfo {
+  bool isBuiltIn;     ///< Determine if it is a built-in output
+  unsigned location;  ///< If isBuiltIn is true, it is the buildIn Id
+  unsigned component; ///< The component offset within a location
+  unsigned xfbBuffer; ///< The transform feedback buffer captures the output
+  unsigned xfbOffset; ///< The byte offset in the transform feedback buffer
+  unsigned xfbStride; ///< The bytes consumed by a caputred vertex in the transform feedback buffer
+  unsigned streamId;  ///< The stream index
+};
+
+/// Represents the transform feedback data filled by API interface
+struct ApiXfbOutData {
+  XfbOutInfo *pXfbOutInfos; ///< An array of XfbOutInfo iterms
+  unsigned numXfbOutInfo;   ///< Count of XfbOutInfo iterms
+};
+
 /// Represents info to build a graphics pipeline.
 struct GraphicsPipelineBuildInfo {
   void *pInstance;                ///< Vulkan instance object
@@ -1098,14 +1187,16 @@ struct GraphicsPipelineBuildInfo {
   VkPipelineDepthStencilStateCreateInfo dsState;
 
   struct {
-    VkPrimitiveTopology topology; ///< Primitive topology
-    unsigned patchControlPoints;  ///< Number of control points per patch (valid when the topology is
-                                  ///  "patch")
-    unsigned deviceIndex;         ///< Device index for device group
-    bool disableVertexReuse;      ///< Disable reusing vertex shader output for indexed draws
-    bool switchWinding;           ///< Whether to reverse vertex ordering for tessellation
-    bool enableMultiView;         ///< Whether to enable multi-view support
-  } iaState;                      ///< Input-assembly state
+    VkPrimitiveTopology topology;  ///< Primitive topology
+    unsigned patchControlPoints;   ///< Number of control points per patch (valid when the topology is
+                                   ///  "patch")
+    unsigned deviceIndex;          ///< Device index for device group
+    bool disableVertexReuse;       ///< Disable reusing vertex shader output for indexed draws
+    bool switchWinding;            ///< Whether to reverse vertex ordering for tessellation
+    bool enableMultiView;          ///< Whether to enable multi-view support
+    bool useVertexBufferDescArray; ///< Whether vertex buffer descriptors are in a descriptor array binding instead of
+                                   ///< the VertexBufferTable
+  } iaState;                       ///< Input-assembly state
 
   struct {
     bool depthClipEnable; ///< Enable clipping based on Z coordinate
@@ -1153,6 +1244,7 @@ struct GraphicsPipelineBuildInfo {
   size_t clientMetadataSize;          ///< Size (in bytes) of the client-defined data
   unsigned numUniformConstantMaps;    ///< Number of uniform constant maps
   UniformConstantMap **ppUniformMaps; ///< Pointers to array of pointers for the uniform constant map.
+  ApiXfbOutData apiXfbOutData;        ///< Transform feedback data specified by API interface.
 };
 
 /// Represents info to build a compute pipeline.

@@ -222,6 +222,7 @@ private:
   llvm::Value *m_viewportIndex; // Correspond to "out int gl_ViewportIndex"
   llvm::Value *m_layer;         // Correspond to "out int gl_Layer"
   llvm::Value *m_viewIndex;     // Correspond to "in int gl_Layer"
+  llvm::Value *m_edgeFlag;      // Correspond to "EdgeFlag output"
 
   bool m_hasTs; // Whether the pipeline has tessellation shaders
 

@@ -485,7 +485,6 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(SPIRVType *const spvType, u
   const auto spvElementType = spvColumnType->getVectorComponentType();
   const unsigned spvColumnCount = spvType->getMatrixColumnCount();
   const unsigned spvRowCount = spvColumnType->getVectorComponentCount();
-
   Type *columnType = nullptr;
   unsigned columnCount = 0;
 
@@ -2722,7 +2721,10 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
   unsigned descriptorSet = 0;
 
   spvImagePtr->hasDecorate(DecorationBinding, 0, &binding);
-  spvImagePtr->hasDecorate(DecorationDescriptorSet, 0, &descriptorSet);
+  bool hasDescriptorSet = spvImagePtr->hasDecorate(DecorationDescriptorSet, 0, &descriptorSet);
+  assert(!getPipelineOptions()->replaceSetWithResourceType || !hasDescriptorSet ||
+         static_cast<SPIRVTypePointer *>(spvImagePtr->getType())->getStorageClass() == StorageClassUniformConstant);
+  (void)hasDescriptorSet;
 
   SPIRVType *spvTy = spvImagePtr->getType()->getPointerElementType();
   while (spvTy->getOpCode() == OpTypeArray || spvTy->getOpCode() == OpTypeRuntimeArray)
@@ -2742,9 +2744,20 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
     auto resType =
         desc->Dim == DimBuffer ? ResourceNodeType::DescriptorTexelBuffer : ResourceNodeType::DescriptorResource;
 
+    if (getPipelineOptions()->replaceSetWithResourceType) {
+      if (spvTy->getOpCode() == OpTypeImage) {
+        descriptorSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorImage);
+      } else if (spvTy->getOpCode() == OpTypeSampledImage) {
+        descriptorSet =
+            PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorCombinedTexture);
+      }
+    }
+
     imageDescPtr = getDescPointerAndStride(resType, descriptorSet, binding, resType);
 
     if (desc->MS) {
+      if (getPipelineOptions()->replaceSetWithResourceType)
+        descriptorSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorFmask);
       // A multisampled image pointer is a struct containing an image desc pointer and an fmask desc pointer.
       Value *fmaskDescPtr = getDescPointerAndStride(ResourceNodeType::DescriptorFmask, descriptorSet, binding,
                                                     ResourceNodeType::DescriptorFmask);
@@ -2756,6 +2769,8 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
   }
 
   if (spvTy->getOpCode() != OpTypeImage) {
+    if (getPipelineOptions()->replaceSetWithResourceType && !(spvTy->getOpCode() == OpTypeSampledImage))
+      descriptorSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorSampler);
     // Sampler or sampledimage -- need to get the sampler {pointer,stride,convertingSamplerIdx}
     samplerDescPtr = getDescPointerAndStride(ResourceNodeType::DescriptorSampler, descriptorSet, binding,
                                              ResourceNodeType::DescriptorSampler);
@@ -3726,6 +3741,7 @@ Value *SPIRV::SPIRVToLLVM::createTraceRayDialectOp(SPIRVValue *const spvValue) {
 
   Type *payloadTy = transType(spvOperands[10]->getType()->getPointerElementType());
   auto paq = getPaqFromSize(getBuilder()->getContext(), alignTo(m_m->getDataLayout().getTypeAllocSize(payloadTy), 4));
+
   return getBuilder()->create<TraceRayOp>(accelStructAsI64, rayFlags, cullMask, sbtOffset, sbtStride, missIndex,
                                           rayOrigin, rayTMin, rayDir, rayTMax, payload, paq);
 }
@@ -7396,108 +7412,8 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
   if (!transMetadata())
     return false;
 
-  // Preserve XFB relevant information in named metadata !lgc.xfb.stage, defined as follows:
-  // lgc.xfb.state metadata = {
-  // i32 buffer0Stream, i32 buffer0Stride, i32 buffer1Stream, i32 buffer1Stride,
-  // i32 buffer2Stream, i32 buffer2Stride, i32 buffer3Stream, i32 buffer3Stride }
-  // ; buffer${i}Stream is the vertex StreamId that writes to buffer i, or -1 if that particular buffer is unused (e.g.
-  // StreamId in EmitVertex)
-  if (enableXfb) {
-    static const unsigned MaxXfbBuffers = 4;
-    std::array<unsigned, 2 * MaxXfbBuffers> xfbState{InvalidValue, 0,  // xfbBuffer[0] -> <streamId, xfbStride>
-                                                     InvalidValue, 0,  // xfbBuffer[1] -> <streamId, xfbStride>
-                                                     InvalidValue, 0,  // xfbBuffer[2] -> <streamId, xfbStride>
-                                                     InvalidValue, 0}; // xfbBuffer[3] -> <streamId, xfbStride>
-    for (unsigned i = 0, e = m_bm->getNumVariables(); i != e; ++i) {
-      auto bv = m_bm->getVariable(i);
-      if (bv->getStorageClass() == StorageClassOutput) {
-        SPIRVWord xfbBuffer = InvalidValue;
-        // NOTE: XFbBuffer may be decorated on the pointer element
-        SPIRVType *pointerElemTy = bv->getType()->getPointerElementType();
-        SPIRVEntry *entries[2] = {bv, pointerElemTy};
-        unsigned memberCount = 0;
-        if (pointerElemTy->isTypeStruct())
-          memberCount = pointerElemTy->getStructMemberCount();
-        for (unsigned id = 0; id < 2; ++id) {
-          auto entry = entries[id];
-          if (entry->hasDecorate(DecorationXfbBuffer, 0, &xfbBuffer)) {
-            const unsigned indexOfBuffer = 2 * xfbBuffer;
-            xfbState[indexOfBuffer] = 0;
-            SPIRVWord streamId = InvalidValue;
-            if (entry->hasDecorate(DecorationStream, 0, &streamId))
-              xfbState[indexOfBuffer] = streamId;
-
-            SPIRVWord xfbStride = InvalidValue;
-            if (entry->hasDecorate(DecorationXfbStride, 0, &xfbStride)) {
-              const unsigned indexOfStride = indexOfBuffer + 1;
-              xfbState[indexOfStride] = xfbStride;
-            }
-          } else if (id == 1) {
-            for (unsigned i = 0; i < memberCount; ++i) {
-              if (entry->hasMemberDecorate(i, DecorationXfbBuffer, 0, &xfbBuffer)) {
-                const unsigned indexOfBuffer = 2 * xfbBuffer;
-                xfbState[indexOfBuffer] = 0;
-                SPIRVWord streamId = InvalidValue;
-                if (entry->hasMemberDecorate(i, DecorationStream, 0, &streamId))
-                  xfbState[indexOfBuffer] = streamId;
-
-                SPIRVWord xfbStride = InvalidValue;
-                if (entry->hasMemberDecorate(i, DecorationXfbStride, 0, &xfbStride)) {
-                  const unsigned indexOfStride = indexOfBuffer + 1;
-                  xfbState[indexOfStride] = xfbStride;
-                }
-              }
-            }
-          }
-        }
-        if (xfbBuffer == InvalidValue)
-          continue;
-
-        // Update indexOfBuffer for block array, the N array-elements are captured by N consecutive buffers.
-        SPIRVType *bt = bv->getType()->getPointerElementType();
-        if (bt->isTypeArray()) {
-          assert(m_valueMap.find(bv) != m_valueMap.end());
-          auto output = cast<GlobalVariable>(m_valueMap[bv]);
-          MDNode *metaNode = output->getMetadata(gSPIRVMD::InOut);
-          assert(metaNode);
-          auto elemMeta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
-          // Find the innermost array-element
-          auto elemTy = bt;
-          uint64_t elemCount = 0;
-          ShaderInOutMetadata outMetadata = {};
-          do {
-            assert(elemMeta->getNumOperands() == 4);
-            outMetadata.U64All[0] = cast<ConstantInt>(elemMeta->getOperand(2))->getZExtValue();
-            outMetadata.U64All[1] = cast<ConstantInt>(elemMeta->getOperand(3))->getZExtValue();
-            elemCount = elemTy->getArrayLength();
-
-            elemTy = elemTy->getArrayElementType();
-            elemMeta = cast<Constant>(elemMeta->getOperand(1));
-          } while (elemTy->isTypeArray());
-
-          if (outMetadata.IsBlockArray) {
-            // The even index (0,2,4,6) of !lgc.xfb.state metadata corresponds the buffer index (0~3).
-            const unsigned bufferIdx = outMetadata.XfbBuffer;
-            const int streamId = xfbState[2 * bufferIdx];
-            const unsigned stride = xfbState[2 * bufferIdx + 1];
-            for (unsigned idx = 0; idx < elemCount; ++idx) {
-              const unsigned indexOfBuffer = 2 * (bufferIdx + idx);
-              xfbState[indexOfBuffer] = streamId;
-              xfbState[indexOfBuffer + 1] = stride;
-            }
-          }
-        }
-      }
-    }
-
-    unsigned mdKindId = m_context->getMDKindID(lgc::XfbStateMetadataName);
-    std::array<Metadata *, 2 * MaxXfbBuffers> metadatas{};
-    for (unsigned i = 0; i < 2 * MaxXfbBuffers; ++i)
-      metadatas[i] = ConstantAsMetadata::get(m_builder->getInt32(xfbState[i]));
-    auto entryFunc = m_funcMap[m_entryTarget];
-    assert(entryFunc);
-    entryFunc->setMetadata(mdKindId, MDNode::get(*m_context, metadatas));
-  }
+  if (enableXfb)
+    createXfbMetadata();
 
   postProcessRowMajorMatrix();
   if (!m_moduleUsage->keepUnusedFunctions)
@@ -7824,7 +7740,7 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
     auto spvTy = bv->getType()->getPointerElementType();
     while (spvTy->getOpCode() == OpTypeArray || spvTy->getOpCode() == OpTypeRuntimeArray)
       spvTy = spvTy->getArrayElementType();
-    if (spvTy->isTypeAccelerationStructureKHR()) {
+    if (isAccelerationStructureType(spvTy)) {
       // NOTE: For acceleration structure, we use SPIRAS_Constant address space, but to apply decoration correctly,
       // we assume it is SPIRAS_Uniform here.
       assert(as == SPIRAS_Constant);
@@ -7995,7 +7911,29 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       if ((bv->getType()->getPointerStorageClass() != StorageClassUniformConstant &&
            bv->getType()->getPointerStorageClass() != StorageClassTaskPayloadWorkgroupEXT) ||
           isAccelerationStructureType(blockTy)) {
-        assert(blockTy->isTypeStruct() || blockTy->isTypeAccelerationStructureKHR());
+        assert(blockTy->isTypeStruct() || blockTy->isTypeAccelerationStructureKHR() ||
+               bv->getType()->getPointerStorageClass() == StorageClassAtomicCounter);
+
+        if (getPipelineOptions()->replaceSetWithResourceType) {
+          bool hasBlock = blockTy->hasDecorate(DecorationBlock);
+          bool hasBufferBlock = blockTy->hasDecorate(DecorationBufferBlock);
+
+          if (bv->getType()->getPointerStorageClass() == StorageClassStorageBuffer) {
+            descSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorBuffer);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 63
+          } else if (bv->getType()->getPointerStorageClass() == StorageClassAtomicCounter) {
+            descSet = PipelineContext::getGlResourceNodeSetFromType(ResourceMappingNodeType::DescriptorAtomicCounter);
+#endif
+          } else {
+            if (hasBlock && !hasBufferBlock) {
+              descSet =
+                  PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorConstBuffer);
+            } else if (!hasBlock && hasBufferBlock) {
+              descSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorBuffer);
+            }
+          }
+        }
+
         // Setup resource metadata
         auto int32Ty = Type::getInt32Ty(*m_context);
         std::vector<Metadata *> resMDs;
@@ -8009,14 +7947,23 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
                                     blockTy->hasDecorate(DecorationBlock);
 
         ShaderBlockDecorate blockDec = {};
+        SPIRVWord atomicCounterOffset = SPIRVID_INVALID;
+        if (bv->hasDecorate(DecorationOffset, 0, &atomicCounterOffset)) {
+          blockDec.Offset = atomicCounterOffset;
+        }
+
         blockDec.NonWritable = isUniformBlock;
         Type *blockMdTy = nullptr;
-        auto blockMd = buildShaderBlockMetadata(blockTy, blockDec, blockMdTy);
+        auto blockMd = buildShaderBlockMetadata(blockTy, blockDec, blockMdTy, bv->getType()->getPointerStorageClass());
 
         std::vector<Metadata *> blockMDs;
         blockMDs.push_back(ConstantAsMetadata::get(blockMd));
         auto blockMdNode = MDNode::get(*m_context, blockMDs);
-        gv->addMetadata(gSPIRVMD::Block, *blockMdNode);
+        if (bv->getType()->getPointerStorageClass() == StorageClassAtomicCounter) {
+          gv->addMetadata(gSPIRVMD::AtomicCounter, *blockMdNode);
+        } else {
+          gv->addMetadata(gSPIRVMD::Block, *blockMdNode);
+        }
       } else if (bv->getType()->getPointerStorageClass() == StorageClassTaskPayloadWorkgroupEXT) {
         // Setup metadata for task payload
         gv->addMetadata(gSPIRVMD::TaskPayload, *MDNode::get(*m_context, {}));
@@ -8030,39 +7977,14 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
         assert(loc != SPIRVID_INVALID && "Default uniform constant should get location\n");
 
         // Get the offset in default uniform constant buffer from location
-        Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
-        Vkgc::UniformConstantMap *accessedUniformMap = nullptr;
-        if (llpcContext->getPipelineType() == PipelineType::Graphics) {
-          auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());
-          // Find the uniform constant map to use.
-          for (unsigned s = 0; s < buildInfo->numUniformConstantMaps; s++) {
-            if (isShaderStageInMask(convertToShaderStage(m_execModule), buildInfo->ppUniformMaps[s]->visibility)) {
-              accessedUniformMap = buildInfo->ppUniformMaps[s];
-              break;
-            }
-          }
-        } else {
-          assert(llpcContext->getPipelineType() == PipelineType::Compute);
-          auto *buildInfo = static_cast<const Vkgc::ComputePipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());
-          accessedUniformMap = buildInfo->pUniformMap;
-        }
-
-        assert(accessedUniformMap != nullptr);
-        auto *uniforms = accessedUniformMap->pUniforms;
-        unsigned numUniform = accessedUniformMap->numUniformConstants;
-
-        auto locationFound =
-            std::find_if(uniforms, uniforms + numUniform,
-                         [&](const Vkgc::UniformConstantMapEntry &item) { return item.location == loc; });
-
-        unsigned offset = 0;
-        // Unused uniform constant variable does not appear in the map.
-        if (locationFound != uniforms + numUniform)
-          offset = locationFound->offset;
+        auto locationFound = getUniformConstantEntryByLocation(static_cast<Llpc::Context *>(m_context),
+                                                               convertToShaderStage(m_execModule), loc);
+        unsigned offset = locationFound == nullptr ? 0 : locationFound->offset;
 
         mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, Vkgc::InternalDescriptorSetId)));
         mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, Vkgc::ConstantBuffer0Binding)));
         mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, offset)));
+        mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, loc)));
         auto mdNode = MDNode::get(*m_context, mDs);
         gv->addMetadata(gSPIRVMD::UniformConstant, *mdNode);
       }
@@ -8087,7 +8009,8 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       // Build general block metadata
       ShaderBlockDecorate blockDec = {};
       Type *blockMdTy = nullptr;
-      auto blockMd = buildShaderBlockMetadata(pushConstTy, blockDec, blockMdTy);
+      auto blockMd =
+          buildShaderBlockMetadata(pushConstTy, blockDec, blockMdTy, bv->getType()->getPointerStorageClass());
 
       std::vector<Metadata *> blockMDs;
       blockMDs.push_back(ConstantAsMetadata::get(blockMd));
@@ -8559,8 +8482,9 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
 }
 
 // Builds shader block metadata.
-Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecorate &blockDec, Type *&mdTy) {
-  if (bt->isTypeVector() || bt->isTypeScalar()) {
+Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecorate &blockDec, Type *&mdTy,
+                                                SPIRVStorageClassKind storageClass) {
+  if (bt->isTypeVector() || bt->isTypeScalar() || storageClass == StorageClassAtomicCounter) {
     // Handle scalar or vector type
     ShaderBlockMetadata blockMd = {};
     blockMd.offset = blockDec.Offset;
@@ -8610,7 +8534,7 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
     // Build element metadata
     Type *elemMdTy = nullptr;
     auto elemDec = blockDec; // Inherit from parent
-    auto elemMd = buildShaderBlockMetadata(elemTy, elemDec, elemMdTy);
+    auto elemMd = buildShaderBlockMetadata(elemTy, elemDec, elemMdTy, storageClass);
 
     // Build metadata for the array/matrix
     std::vector<Type *> mdTys;
@@ -8680,7 +8604,7 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
       // Build metadata for structure member
       auto memberTy = bt->getStructMemberType(memberIdx);
       Type *memberMdTy = nullptr;
-      auto memberMeta = buildShaderBlockMetadata(memberTy, memberDec, memberMdTy);
+      auto memberMeta = buildShaderBlockMetadata(memberTy, memberDec, memberMdTy, storageClass);
 
       if (remappedIdx > memberIdx) {
         memberMdTys.push_back(Type::getInt32Ty(*m_context));
@@ -9426,7 +9350,7 @@ llvm::GlobalValue::LinkageTypes SPIRVToLLVM::transLinkageType(const SPIRVValue *
       SPIRVStorageClassKind storageClass = static_cast<const SPIRVVariable *>(v)->getStorageClass();
       if (storageClass == StorageClassUniformConstant || storageClass == StorageClassInput ||
           storageClass == StorageClassUniform || storageClass == StorageClassPushConstant ||
-          storageClass == StorageClassStorageBuffer)
+          storageClass == StorageClassStorageBuffer || storageClass == StorageClassAtomicCounter)
         return GlobalValue::ExternalLinkage;
       if (storageClass == StorageClassPrivate || storageClass == StorageClassOutput)
         return GlobalValue::PrivateLinkage;
@@ -9721,6 +9645,123 @@ void SPIRVToLLVM::insertScratchBoundsChecks(SPIRVValue *memOp, const ScratchBoun
     llvmInstr->replaceAllUsesWith(clone);
     llvmInstr->eraseFromParent();
   }
+}
+
+void SPIRVToLLVM::createXfbMetadata() {
+  // Preserve XFB relevant information in named metadata !lgc.xfb.stage, defined as follows:
+  // lgc.xfb.state metadata = {
+  // i32 buffer0Stream, i32 buffer0Stride, i32 buffer1Stream, i32 buffer1Stride,
+  // i32 buffer2Stream, i32 buffer2Stride, i32 buffer3Stream, i32 buffer3Stride }
+  // ; buffer${i}Stream is the vertex StreamId that writes to buffer i, or -1 if that particular buffer is unused (e.g.
+  // StreamId in EmitVertex)
+  static const unsigned MaxXfbBuffers = 4;
+  std::array<unsigned, 2 * MaxXfbBuffers> xfbState{InvalidValue, 0,  // xfbBuffer[0] -> <streamId, xfbStride>
+                                                   InvalidValue, 0,  // xfbBuffer[1] -> <streamId, xfbStride>
+                                                   InvalidValue, 0,  // xfbBuffer[2] -> <streamId, xfbStride>
+                                                   InvalidValue, 0}; // xfbBuffer[3] -> <streamId, xfbStride>
+
+  auto llpcContext = static_cast<Llpc::Context *>(m_context);
+  auto pipelineBuildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());
+  const bool useXfbDecorations = pipelineBuildInfo->apiXfbOutData.numXfbOutInfo == 0;
+
+  if (useXfbDecorations) {
+    for (unsigned i = 0, e = m_bm->getNumVariables(); i != e; ++i) {
+      auto bv = m_bm->getVariable(i);
+      if (bv->getStorageClass() == StorageClassOutput) {
+        SPIRVWord xfbBuffer = InvalidValue;
+        // NOTE: XFbBuffer may be decorated on the pointer element
+        SPIRVType *pointerElemTy = bv->getType()->getPointerElementType();
+        SPIRVEntry *entries[2] = {bv, pointerElemTy};
+        unsigned memberCount = 0;
+        if (pointerElemTy->isTypeStruct())
+          memberCount = pointerElemTy->getStructMemberCount();
+        for (unsigned id = 0; id < 2; ++id) {
+          auto entry = entries[id];
+          if (entry->hasDecorate(DecorationXfbBuffer, 0, &xfbBuffer)) {
+            const unsigned indexOfBuffer = 2 * xfbBuffer;
+            xfbState[indexOfBuffer] = 0;
+            SPIRVWord streamId = InvalidValue;
+            if (entry->hasDecorate(DecorationStream, 0, &streamId))
+              xfbState[indexOfBuffer] = streamId;
+
+            SPIRVWord xfbStride = InvalidValue;
+            if (entry->hasDecorate(DecorationXfbStride, 0, &xfbStride)) {
+              const unsigned indexOfStride = indexOfBuffer + 1;
+              xfbState[indexOfStride] = xfbStride;
+            }
+          } else if (id == 1) {
+            for (unsigned i = 0; i < memberCount; ++i) {
+              if (entry->hasMemberDecorate(i, DecorationXfbBuffer, 0, &xfbBuffer)) {
+                const unsigned indexOfBuffer = 2 * xfbBuffer;
+                xfbState[indexOfBuffer] = 0;
+                SPIRVWord streamId = InvalidValue;
+                if (entry->hasMemberDecorate(i, DecorationStream, 0, &streamId))
+                  xfbState[indexOfBuffer] = streamId;
+
+                SPIRVWord xfbStride = InvalidValue;
+                if (entry->hasMemberDecorate(i, DecorationXfbStride, 0, &xfbStride)) {
+                  const unsigned indexOfStride = indexOfBuffer + 1;
+                  xfbState[indexOfStride] = xfbStride;
+                }
+              }
+            }
+          }
+        }
+        if (xfbBuffer == InvalidValue)
+          continue;
+
+        // Update indexOfBuffer for block array, the N array-elements are captured by N consecutive buffers.
+        SPIRVType *bt = bv->getType()->getPointerElementType();
+        if (bt->isTypeArray()) {
+          assert(m_valueMap.find(bv) != m_valueMap.end());
+          auto output = cast<GlobalVariable>(m_valueMap[bv]);
+          MDNode *metaNode = output->getMetadata(gSPIRVMD::InOut);
+          assert(metaNode);
+          auto elemMeta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+          // Find the innermost array-element
+          auto elemTy = bt;
+          uint64_t elemCount = 0;
+          ShaderInOutMetadata outMetadata = {};
+          do {
+            assert(elemMeta->getNumOperands() == 4);
+            outMetadata.U64All[0] = cast<ConstantInt>(elemMeta->getOperand(2))->getZExtValue();
+            outMetadata.U64All[1] = cast<ConstantInt>(elemMeta->getOperand(3))->getZExtValue();
+            elemCount = elemTy->getArrayLength();
+
+            elemTy = elemTy->getArrayElementType();
+            elemMeta = cast<Constant>(elemMeta->getOperand(1));
+          } while (elemTy->isTypeArray());
+
+          if (outMetadata.IsBlockArray) {
+            // The even index (0,2,4,6) of !lgc.xfb.state metadata corresponds the buffer index (0~3).
+            const unsigned bufferIdx = outMetadata.XfbBuffer;
+            const int streamId = xfbState[2 * bufferIdx];
+            const unsigned stride = xfbState[2 * bufferIdx + 1];
+            for (unsigned idx = 0; idx < elemCount; ++idx) {
+              const unsigned indexOfBuffer = 2 * (bufferIdx + idx);
+              xfbState[indexOfBuffer] = streamId;
+              xfbState[indexOfBuffer + 1] = stride;
+            }
+          }
+        }
+      }
+    }
+  } else {
+    for (unsigned idx = 0; idx < pipelineBuildInfo->apiXfbOutData.numXfbOutInfo; ++idx) {
+      const auto &xfbInfo = pipelineBuildInfo->apiXfbOutData.pXfbOutInfos[idx];
+      const unsigned indexOfBuffer = 2 * xfbInfo.xfbBuffer;
+      xfbState[indexOfBuffer] = xfbInfo.streamId;
+      xfbState[indexOfBuffer + 1] = xfbInfo.xfbStride;
+    }
+  }
+
+  unsigned mdKindId = m_context->getMDKindID(lgc::XfbStateMetadataName);
+  std::array<Metadata *, 2 * MaxXfbBuffers> metadatas{};
+  for (unsigned i = 0; i < 2 * MaxXfbBuffers; ++i)
+    metadatas[i] = ConstantAsMetadata::get(m_builder->getInt32(xfbState[i]));
+  auto entryFunc = m_funcMap[m_entryTarget];
+  assert(entryFunc);
+  entryFunc->setMetadata(mdKindId, MDNode::get(*m_context, metadatas));
 }
 
 } // namespace SPIRV

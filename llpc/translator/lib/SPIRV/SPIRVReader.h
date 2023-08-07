@@ -109,7 +109,8 @@ public:
   bool transShaderDecoration(SPIRVValue *, Value *);
   bool checkContains64BitType(SPIRVType *bt);
   Constant *buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecorate &inOutDec, Type *&metaTy);
-  Constant *buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecorate &blockDec, Type *&mdTy);
+  Constant *buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecorate &blockDec, Type *&mdTy,
+                                     SPIRVStorageClassKind storageClass);
   unsigned calcShaderBlockSize(SPIRVType *bt, unsigned blockSize, unsigned matrixStride, bool isRowMajor);
   Value *transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb);
   Value *flushDenorm(Value *val);
@@ -199,6 +200,9 @@ public:
   // Post-process translated LLVM module to undo row major matrices.
   bool postProcessRowMajorMatrix();
   Value *getTranslatedValue(SPIRVValue *bv);
+
+  // Create !lgc.xfb.state metadata
+  void createXfbMetadata();
 
 private:
   class SPIRVTypeContext {

@@ -413,7 +413,7 @@ union CB_CACHE_EVICT_POINTS {
         unsigned int FC_CACHE_EVICT_POINT                                         :  8;
         unsigned int                                                              : 16;
     } gfx10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int CC_COLOR_EVICT_POINT                                         :  8;
         unsigned int CC_FMASK_EVICT_POINT                                         :  8;
@@ -509,7 +509,7 @@ union CB_COLOR0_ATTRIB {
         unsigned int LIMIT_COLOR_FETCH_TO_256B_MAX                                :  1;
         unsigned int                                                              : 12;
     } gfx10Core;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int NUM_FRAGMENTS                                                :  2;
         unsigned int FORCE_DST_ALPHA_1                                            :  1;
@@ -703,7 +703,7 @@ union CB_COLOR0_DCC_CONTROL {
         unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
         unsigned int                                                              : 10;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int SAMPLE_MASK_TRACKER_DISABLE                                  :  1;
         unsigned int SAMPLE_MASK_TRACKER_FEA_FORCE                                :  1;
@@ -800,7 +800,7 @@ union CB_COLOR0_INFO {
         unsigned int LINEAR_GENERAL                                               :  1;
         unsigned int                                                              : 24;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int FORMAT                                                       :  5;
         unsigned int                                                              : 27;
@@ -883,7 +883,7 @@ union CB_COLOR1_ATTRIB {
         unsigned int LIMIT_COLOR_FETCH_TO_256B_MAX                                :  1;
         unsigned int                                                              : 12;
     } gfx10Core;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int NUM_FRAGMENTS                                                :  2;
         unsigned int FORCE_DST_ALPHA_1                                            :  1;
@@ -1077,7 +1077,7 @@ union CB_COLOR1_DCC_CONTROL {
         unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
         unsigned int                                                              : 10;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int SAMPLE_MASK_TRACKER_DISABLE                                  :  1;
         unsigned int SAMPLE_MASK_TRACKER_FEA_FORCE                                :  1;
@@ -1174,7 +1174,7 @@ union CB_COLOR1_INFO {
         unsigned int LINEAR_GENERAL                                               :  1;
         unsigned int                                                              : 24;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int FORMAT                                                       :  5;
         unsigned int                                                              : 27;
@@ -1257,7 +1257,7 @@ union CB_COLOR2_ATTRIB {
         unsigned int LIMIT_COLOR_FETCH_TO_256B_MAX                                :  1;
         unsigned int                                                              : 12;
     } gfx10Core;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int NUM_FRAGMENTS                                                :  2;
         unsigned int FORCE_DST_ALPHA_1                                            :  1;
@@ -1451,7 +1451,7 @@ union CB_COLOR2_DCC_CONTROL {
         unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
         unsigned int                                                              : 10;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int SAMPLE_MASK_TRACKER_DISABLE                                  :  1;
         unsigned int SAMPLE_MASK_TRACKER_FEA_FORCE                                :  1;
@@ -1548,7 +1548,7 @@ union CB_COLOR2_INFO {
         unsigned int LINEAR_GENERAL                                               :  1;
         unsigned int                                                              : 24;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int FORMAT                                                       :  5;
         unsigned int                                                              : 27;
@@ -1631,7 +1631,7 @@ union CB_COLOR3_ATTRIB {
         unsigned int LIMIT_COLOR_FETCH_TO_256B_MAX                                :  1;
         unsigned int                                                              : 12;
     } gfx10Core;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int NUM_FRAGMENTS                                                :  2;
         unsigned int FORCE_DST_ALPHA_1                                            :  1;
@@ -1825,7 +1825,7 @@ union CB_COLOR3_DCC_CONTROL {
         unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
         unsigned int                                                              : 10;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int SAMPLE_MASK_TRACKER_DISABLE                                  :  1;
         unsigned int SAMPLE_MASK_TRACKER_FEA_FORCE                                :  1;
@@ -1922,7 +1922,7 @@ union CB_COLOR3_INFO {
         unsigned int LINEAR_GENERAL                                               :  1;
         unsigned int                                                              : 24;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int FORMAT                                                       :  5;
         unsigned int                                                              : 27;
@@ -2005,7 +2005,7 @@ union CB_COLOR4_ATTRIB {
         unsigned int LIMIT_COLOR_FETCH_TO_256B_MAX                                :  1;
         unsigned int                                                              : 12;
     } gfx10Core;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int NUM_FRAGMENTS                                                :  2;
         unsigned int FORCE_DST_ALPHA_1                                            :  1;
@@ -2199,7 +2199,7 @@ union CB_COLOR4_DCC_CONTROL {
         unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
         unsigned int                                                              : 10;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int SAMPLE_MASK_TRACKER_DISABLE                                  :  1;
         unsigned int SAMPLE_MASK_TRACKER_FEA_FORCE                                :  1;
@@ -2296,7 +2296,7 @@ union CB_COLOR4_INFO {
         unsigned int LINEAR_GENERAL                                               :  1;
         unsigned int                                                              : 24;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int FORMAT                                                       :  5;
         unsigned int                                                              : 27;
@@ -2379,7 +2379,7 @@ union CB_COLOR5_ATTRIB {
         unsigned int LIMIT_COLOR_FETCH_TO_256B_MAX                                :  1;
         unsigned int                                                              : 12;
     } gfx10Core;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int NUM_FRAGMENTS                                                :  2;
         unsigned int FORCE_DST_ALPHA_1                                            :  1;
@@ -2573,7 +2573,7 @@ union CB_COLOR5_DCC_CONTROL {
         unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
         unsigned int                                                              : 10;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int SAMPLE_MASK_TRACKER_DISABLE                                  :  1;
         unsigned int SAMPLE_MASK_TRACKER_FEA_FORCE                                :  1;
@@ -2670,7 +2670,7 @@ union CB_COLOR5_INFO {
         unsigned int LINEAR_GENERAL                                               :  1;
         unsigned int                                                              : 24;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int FORMAT                                                       :  5;
         unsigned int                                                              : 27;
@@ -2753,7 +2753,7 @@ union CB_COLOR6_ATTRIB {
         unsigned int LIMIT_COLOR_FETCH_TO_256B_MAX                                :  1;
         unsigned int                                                              : 12;
     } gfx10Core;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int NUM_FRAGMENTS                                                :  2;
         unsigned int FORCE_DST_ALPHA_1                                            :  1;
@@ -2947,7 +2947,7 @@ union CB_COLOR6_DCC_CONTROL {
         unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
         unsigned int                                                              : 10;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int SAMPLE_MASK_TRACKER_DISABLE                                  :  1;
         unsigned int SAMPLE_MASK_TRACKER_FEA_FORCE                                :  1;
@@ -3044,7 +3044,7 @@ union CB_COLOR6_INFO {
         unsigned int LINEAR_GENERAL                                               :  1;
         unsigned int                                                              : 24;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int FORMAT                                                       :  5;
         unsigned int                                                              : 27;
@@ -3127,7 +3127,7 @@ union CB_COLOR7_ATTRIB {
         unsigned int LIMIT_COLOR_FETCH_TO_256B_MAX                                :  1;
         unsigned int                                                              : 12;
     } gfx10Core;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int NUM_FRAGMENTS                                                :  2;
         unsigned int FORCE_DST_ALPHA_1                                            :  1;
@@ -3321,7 +3321,7 @@ union CB_COLOR7_DCC_CONTROL {
         unsigned int SKIP_LOW_COMP_RATIO                                          :  1;
         unsigned int                                                              : 10;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int SAMPLE_MASK_TRACKER_DISABLE                                  :  1;
         unsigned int SAMPLE_MASK_TRACKER_FEA_FORCE                                :  1;
@@ -3418,7 +3418,7 @@ union CB_COLOR7_INFO {
         unsigned int LINEAR_GENERAL                                               :  1;
         unsigned int                                                              : 24;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int FORMAT                                                       :  5;
         unsigned int                                                              : 27;
@@ -3544,7 +3544,7 @@ union CB_DCC_CONFIG {
         unsigned int READ_RETURN_SKID_FIFO_DEPTH                                  :  9;
         unsigned int                                                              :  7;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int SAMPLE_MASK_TRACKER_DEPTH                                    :  5;
         unsigned int SAMPLE_MASK_TRACKER_DISABLE                                  :  1;
@@ -3560,7 +3560,7 @@ union CB_DCC_CONFIG {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union CB_DCC_CONFIG2 {
     struct {
         unsigned int INVALID_KEY_ERROR_CODE                                       :  8;
@@ -3604,7 +3604,7 @@ union CB_DCC_CONTROL {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union CB_FDCC_CONTROL {
     struct {
         unsigned int SAMPLE_MASK_TRACKER_DISABLE                                  :  1;
@@ -3627,7 +3627,7 @@ union CB_FDCC_CONTROL {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union CB_FGCG_SRAM_OVERRIDE {
     struct {
         unsigned int DISABLE_FGCG                                                 : 20;
@@ -3709,7 +3709,7 @@ union CB_HW_CONTROL {
         unsigned int ALLOW_MRT_WITH_DUAL_SOURCE                                   :  1;
         unsigned int                                                              : 31;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              :  2;
         unsigned int DISABLE_SMT_WHEN_NO_FDCC_FIX                                 :  1;
@@ -3760,7 +3760,7 @@ union CB_HW_CONTROL_1 {
         unsigned int CM_TILE_FIFO_DEPTH                                           :  9;
         unsigned int                                                              :  5;
     } gfx103Derivative;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int CC_CACHE_NUM_TAGS                                            :  6;
         unsigned int                                                              : 26;
@@ -3821,7 +3821,7 @@ union CB_HW_CONTROL_2 {
         unsigned int DRR_ASSUMED_FIFO_DEPTH_DIV8                                  :  6;
         unsigned int CHICKEN_BITS                                                 :  2;
     } gfx10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int SPARE_4                                                      :  8;
         unsigned int DRR_ASSUMED_FIFO_DEPTH_DIV8                                  :  6;
@@ -3905,7 +3905,7 @@ union CB_HW_CONTROL_3 {
         unsigned int DISABLE_DCC_VRS_OPT                                          :  1;
         unsigned int                                                              :  3;
     } gfx10Vrs;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int SPARE_5                                                      :  1;
         unsigned int                                                              :  1;
@@ -3964,7 +3964,7 @@ union CB_HW_CONTROL_4 {
         unsigned int DISABLE_BC_COLOR_CACHE_PREFETCH                              :  1;
         unsigned int                                                              : 17;
     } gfx10Core;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int COLOR_CACHE_FETCH_NUM_QB_LOG2                                :  3;
         unsigned int COLOR_CACHE_FETCH_ALGORITHM                                  :  2;
@@ -4008,7 +4008,7 @@ union CB_HW_MEM_ARBITER_RD {
         unsigned int SEND_LASTS_WITHIN_GROUPS                                     :  1;
         unsigned int                                                              :  2;
     } gfx09_10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int WEIGHT_DC                                                    :  2;
@@ -4048,7 +4048,7 @@ union CB_HW_MEM_ARBITER_WR {
         unsigned int SEND_LASTS_WITHIN_GROUPS                                     :  1;
         unsigned int                                                              :  2;
     } gfx09_10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int WEIGHT_DC                                                    :  2;
@@ -4067,7 +4067,7 @@ union CB_HW_MEM_ARBITER_WR {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union CB_KEY_OVERRIDE_0 {
     struct {
         unsigned int OVERRIDE                                                     : 32;
@@ -4079,7 +4079,7 @@ union CB_KEY_OVERRIDE_0 {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union CB_KEY_OVERRIDE_1 {
     struct {
         unsigned int OVERRIDE                                                     : 32;
@@ -4091,7 +4091,7 @@ union CB_KEY_OVERRIDE_1 {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union CB_KEY_OVERRIDE_2 {
     struct {
         unsigned int OVERRIDE                                                     : 32;
@@ -4103,7 +4103,7 @@ union CB_KEY_OVERRIDE_2 {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union CB_KEY_OVERRIDE_3 {
     struct {
         unsigned int OVERRIDE                                                     : 32;
@@ -4115,7 +4115,7 @@ union CB_KEY_OVERRIDE_3 {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union CB_KEY_OVERRIDE_4 {
     struct {
         unsigned int OVERRIDE                                                     : 32;
@@ -4127,7 +4127,7 @@ union CB_KEY_OVERRIDE_4 {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union CB_KEY_OVERRIDE_5 {
     struct {
         unsigned int OVERRIDE                                                     : 32;
@@ -4139,7 +4139,7 @@ union CB_KEY_OVERRIDE_5 {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union CB_KEY_OVERRIDE_6 {
     struct {
         unsigned int OVERRIDE                                                     : 32;
@@ -4151,7 +4151,7 @@ union CB_KEY_OVERRIDE_6 {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union CB_KEY_OVERRIDE_7 {
     struct {
         unsigned int OVERRIDE                                                     : 32;
@@ -4284,7 +4284,7 @@ union CB_PERFCOUNTER0_SELECT {
         unsigned int PERF_SEL1                                                    :  9;
         unsigned int                                                              : 13;
     } most;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int PERF_SEL                                                     : 10;
         unsigned int PERF_SEL1                                                    : 10;
@@ -4309,7 +4309,7 @@ union CB_PERFCOUNTER0_SELECT1 {
         unsigned int PERF_SEL3                                                    :  9;
         unsigned int                                                              : 13;
     } most;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int PERF_SEL2                                                    : 10;
         unsigned int PERF_SEL3                                                    : 10;
@@ -4351,7 +4351,7 @@ union CB_PERFCOUNTER1_SELECT {
         unsigned int PERF_SEL                                                     :  9;
         unsigned int                                                              : 23;
     } most;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int PERF_SEL                                                     : 10;
         unsigned int                                                              : 22;
@@ -4392,7 +4392,7 @@ union CB_PERFCOUNTER2_SELECT {
         unsigned int PERF_SEL                                                     :  9;
         unsigned int                                                              : 23;
     } most;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int PERF_SEL                                                     : 10;
         unsigned int                                                              : 22;
@@ -4433,7 +4433,7 @@ union CB_PERFCOUNTER3_SELECT {
         unsigned int PERF_SEL                                                     :  9;
         unsigned int                                                              : 23;
     } most;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int PERF_SEL                                                     : 10;
         unsigned int                                                              : 22;
@@ -4508,7 +4508,7 @@ union CB_RMI_GL2_CACHE_CONTROL {
         unsigned int FMASK_BIG_PAGE                                               :  1;
         unsigned int                                                              :  1;
     } gfx10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int DCC_WR_POLICY                                                :  2;
         unsigned int COLOR_WR_POLICY                                              :  2;
@@ -5290,7 +5290,7 @@ union COMPUTE_DISPATCH_INITIATOR {
         unsigned int CS_W32_EN                                                    :  1;
         unsigned int                                                              : 16;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 16;
         unsigned int AMP_SHADER_EN                                                :  1;
@@ -5304,7 +5304,7 @@ union COMPUTE_DISPATCH_INITIATOR {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union COMPUTE_DISPATCH_INTERLEAVE {
     struct {
         unsigned int INTERLEAVE                                                   : 10;
@@ -5384,7 +5384,7 @@ union COMPUTE_MISC_RESERVED {
         unsigned int RESERVED2                                                    :  1;
         unsigned int                                                              : 29;
     } gfx09_10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int SEND_SEID                                                    :  3;
         unsigned int                                                              : 29;
@@ -5528,14 +5528,14 @@ union COMPUTE_PGM_RSRC3 {
         unsigned int SHARED_VGPR_CNT                                              :  4;
         unsigned int                                                              : 28;
     } bits, bitfields;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              :  4;
         unsigned int INST_PREF_SIZE                                               :  6;
         unsigned int                                                              : 22;
     } gfx104Plus;
 #endif
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 10;
         unsigned int TRAP_ON_START                                                :  1;
@@ -5840,7 +5840,7 @@ union COMPUTE_STATIC_THREAD_MGMT_SE3 {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union COMPUTE_STATIC_THREAD_MGMT_SE4 {
     struct {
         unsigned int SA0_CU_EN                                                    : 16;
@@ -5853,7 +5853,7 @@ union COMPUTE_STATIC_THREAD_MGMT_SE4 {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union COMPUTE_STATIC_THREAD_MGMT_SE5 {
     struct {
         unsigned int SA0_CU_EN                                                    : 16;
@@ -5866,7 +5866,7 @@ union COMPUTE_STATIC_THREAD_MGMT_SE5 {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union COMPUTE_STATIC_THREAD_MGMT_SE6 {
     struct {
         unsigned int SA0_CU_EN                                                    : 16;
@@ -5879,7 +5879,7 @@ union COMPUTE_STATIC_THREAD_MGMT_SE6 {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union COMPUTE_STATIC_THREAD_MGMT_SE7 {
     struct {
         unsigned int SA0_CU_EN                                                    : 16;
@@ -5923,7 +5923,7 @@ union COMPUTE_TMPRING_SIZE {
         unsigned int WAVESIZE                                                     : 13;
         unsigned int                                                              :  7;
     } gfx09_10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int WAVESIZE                                                     : 15;
@@ -6286,7 +6286,7 @@ union CPC_PERFCOUNTER1_SELECT {
         unsigned int PERF_SEL                                                     : 10;
         unsigned int                                                              : 22;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 28;
         unsigned int CNTR_MODE                                                    :  4;
@@ -6412,7 +6412,7 @@ union CPF_PERFCOUNTER1_SELECT {
         unsigned int PERF_SEL                                                     : 10;
         unsigned int                                                              : 22;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 28;
         unsigned int CNTR_MODE                                                    :  4;
@@ -6538,7 +6538,7 @@ union CPG_PERFCOUNTER1_SELECT {
         unsigned int PERF_SEL                                                     : 10;
         unsigned int                                                              : 22;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 28;
         unsigned int CNTR_MODE                                                    :  4;
@@ -6960,7 +6960,7 @@ union CP_STRMOUT_CNTL {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union CP_VGT_ASINVOC_COUNT_HI {
     struct {
         unsigned int ASINVOC_COUNT_HI                                             : 32;
@@ -6972,7 +6972,7 @@ union CP_VGT_ASINVOC_COUNT_HI {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union CP_VGT_ASINVOC_COUNT_LO {
     struct {
         unsigned int ASINVOC_COUNT_LO                                             : 32;
@@ -7188,7 +7188,7 @@ union DB_CGTT_CLK_CTRL_0 {
         unsigned int RESERVED                                                     :  4;
         unsigned int                                                              : 16;
     } gfx09;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int SOFT_OVERRIDE0                                               :  1;
         unsigned int SOFT_OVERRIDE1                                               :  1;
@@ -7212,6 +7212,12 @@ union DB_CGTT_CLK_CTRL_0 {
         unsigned int                                                              :  9;
         unsigned int RESERVED                                                     : 23;
     } nv3x;
+#endif
+#if CHIP_HDR_PHOENIX1
+    struct {
+        unsigned int                                                              :  9;
+        unsigned int RESERVED                                                     : 23;
+    } phx1;
 #endif
 
     unsigned int u32All;
@@ -7261,7 +7267,7 @@ union DB_CREDIT_LIMIT {
         unsigned int DB_CB_TILE_CREDITS                                           :  7;
         unsigned int                                                              :  1;
     } gfx09_10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 13;
         unsigned int DB_SC_WAVE_CREDITS                                           :  5;
@@ -7615,7 +7621,7 @@ union DB_FGCG_INTERFACES_CLK_CTRL {
         unsigned int DB_CB_LQUAD_OVERRIDE                                         :  1;
         unsigned int                                                              : 29;
     } gfx10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              :  2;
         unsigned int DB_CB_EXPORT_OVERRIDE                                        :  1;
@@ -7662,14 +7668,14 @@ union DB_FGCG_SRAMS_CLK_CTRL {
         unsigned int OVERRIDE26                                                   :  1;
         unsigned int                                                              :  5;
     } most;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 27;
         unsigned int OVERRIDE27                                                   :  1;
         unsigned int                                                              :  4;
     } gfx104Plus;
 #endif
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 28;
         unsigned int OVERRIDE28                                                   :  1;
@@ -7735,7 +7741,7 @@ union DB_FIFO_DEPTH3 {
         unsigned int                                                              : 16;
         unsigned int QUAD_READ_REQS                                               :  8;
     } bits, bitfields;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              :  8;
         unsigned int OSB_WAVE_TABLE_DEPTH                                         :  8;
@@ -7749,7 +7755,7 @@ union DB_FIFO_DEPTH3 {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union DB_FIFO_DEPTH4 {
     struct {
         unsigned int OSB_SQUAD_TABLE_DEPTH                                        :  8;
@@ -8243,7 +8249,7 @@ union DB_RENDER_CONTROL {
         unsigned int                                                              :  1;
         unsigned int                                                              : 18;
     } gfx103;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 14;
         unsigned int                                                              :  1;
@@ -8324,7 +8330,7 @@ union DB_RENDER_OVERRIDE2 {
         unsigned int CENTROID_COMPUTATION_MODE                                    :  2;
         unsigned int                                                              :  3;
     } gfx103Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 29;
         unsigned int DISABLE_NOZ                                                  :  1;
@@ -8503,7 +8509,7 @@ union DB_SHADER_CONTROL {
         unsigned int PRE_SHADER_DEPTH_COVERAGE_ENABLE                             :  1;
         unsigned int                                                              :  8;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int OREO_BLEND_ENABLE                                            :  1;
@@ -8912,6 +8918,13 @@ union DF_PIE_AON_PerfMonCtlHi0 {
         unsigned int Filter                                                       : 24;
     } nv31;
 #endif
+#if CHIP_HDR_PHOENIX1
+    struct {
+        unsigned int EventSelectHi                                                :  6;
+        unsigned int                                                              :  2;
+        unsigned int Filter                                                       : 24;
+    } phx1;
+#endif
     struct {
         unsigned int EventSelectHi                                                :  6;
         unsigned int                                                              :  2;
@@ -8936,6 +8949,13 @@ union DF_PIE_AON_PerfMonCtlHi1 {
         unsigned int                                                              :  2;
         unsigned int Filter                                                       : 24;
     } nv31;
+#endif
+#if CHIP_HDR_PHOENIX1
+    struct {
+        unsigned int EventSelectHi                                                :  6;
+        unsigned int                                                              :  2;
+        unsigned int Filter                                                       : 24;
+    } phx1;
 #endif
     struct {
         unsigned int EventSelectHi                                                :  6;
@@ -8962,6 +8982,13 @@ union DF_PIE_AON_PerfMonCtlHi2 {
         unsigned int Filter                                                       : 24;
     } nv31;
 #endif
+#if CHIP_HDR_PHOENIX1
+    struct {
+        unsigned int EventSelectHi                                                :  6;
+        unsigned int                                                              :  2;
+        unsigned int Filter                                                       : 24;
+    } phx1;
+#endif
     struct {
         unsigned int EventSelectHi                                                :  6;
         unsigned int                                                              :  2;
@@ -8986,6 +9013,13 @@ union DF_PIE_AON_PerfMonCtlHi3 {
         unsigned int                                                              :  2;
         unsigned int Filter                                                       : 24;
     } nv31;
+#endif
+#if CHIP_HDR_PHOENIX1
+    struct {
+        unsigned int EventSelectHi                                                :  6;
+        unsigned int                                                              :  2;
+        unsigned int Filter                                                       : 24;
+    } phx1;
 #endif
     struct {
         unsigned int EventSelectHi                                                :  6;
@@ -9012,6 +9046,13 @@ union DF_PIE_AON_PerfMonCtlHi4 {
         unsigned int Filter                                                       : 24;
     } nv31;
 #endif
+#if CHIP_HDR_PHOENIX1
+    struct {
+        unsigned int EventSelectHi                                                :  6;
+        unsigned int                                                              :  2;
+        unsigned int Filter                                                       : 24;
+    } phx1;
+#endif
     struct {
         unsigned int EventSelectHi                                                :  6;
         unsigned int                                                              :  2;
@@ -9036,6 +9077,13 @@ union DF_PIE_AON_PerfMonCtlHi5 {
         unsigned int                                                              :  2;
         unsigned int Filter                                                       : 24;
     } nv31;
+#endif
+#if CHIP_HDR_PHOENIX1
+    struct {
+        unsigned int EventSelectHi                                                :  6;
+        unsigned int                                                              :  2;
+        unsigned int Filter                                                       : 24;
+    } phx1;
 #endif
     struct {
         unsigned int EventSelectHi                                                :  6;
@@ -9062,6 +9110,13 @@ union DF_PIE_AON_PerfMonCtlHi6 {
         unsigned int Filter                                                       : 24;
     } nv31;
 #endif
+#if CHIP_HDR_PHOENIX1
+    struct {
+        unsigned int EventSelectHi                                                :  6;
+        unsigned int                                                              :  2;
+        unsigned int Filter                                                       : 24;
+    } phx1;
+#endif
     struct {
         unsigned int EventSelectHi                                                :  6;
         unsigned int                                                              :  2;
@@ -9086,6 +9141,13 @@ union DF_PIE_AON_PerfMonCtlHi7 {
         unsigned int                                                              :  2;
         unsigned int Filter                                                       : 24;
     } nv31;
+#endif
+#if CHIP_HDR_PHOENIX1
+    struct {
+        unsigned int EventSelectHi                                                :  6;
+        unsigned int                                                              :  2;
+        unsigned int Filter                                                       : 24;
+    } phx1;
 #endif
     struct {
         unsigned int EventSelectHi                                                :  6;
@@ -9247,6 +9309,16 @@ union DF_PIE_AON_PerfMonCtlLo0 {
         unsigned int                                                              :  4;
     } nv31;
 #endif
+#if CHIP_HDR_PHOENIX1
+    struct {
+        unsigned int                                                              : 20;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int BypassEn                                                     :  1;
+        unsigned int                                                              :  2;
+        unsigned int UnitMaskHi                                                   :  4;
+        unsigned int                                                              :  4;
+    } phx1;
+#endif
     struct {
         unsigned int                                                              : 20;
         unsigned int Mp1Int                                                       :  1;
@@ -9323,6 +9395,16 @@ union DF_PIE_AON_PerfMonCtlLo1 {
         unsigned int UnitMaskHi                                                   :  4;
         unsigned int                                                              :  4;
     } nv31;
+#endif
+#if CHIP_HDR_PHOENIX1
+    struct {
+        unsigned int                                                              : 20;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int BypassEn                                                     :  1;
+        unsigned int                                                              :  2;
+        unsigned int UnitMaskHi                                                   :  4;
+        unsigned int                                                              :  4;
+    } phx1;
 #endif
     struct {
         unsigned int                                                              : 20;
@@ -9401,6 +9483,16 @@ union DF_PIE_AON_PerfMonCtlLo2 {
         unsigned int                                                              :  4;
     } nv31;
 #endif
+#if CHIP_HDR_PHOENIX1
+    struct {
+        unsigned int                                                              : 20;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int BypassEn                                                     :  1;
+        unsigned int                                                              :  2;
+        unsigned int UnitMaskHi                                                   :  4;
+        unsigned int                                                              :  4;
+    } phx1;
+#endif
     struct {
         unsigned int                                                              : 20;
         unsigned int Mp1Int                                                       :  1;
@@ -9477,6 +9569,16 @@ union DF_PIE_AON_PerfMonCtlLo3 {
         unsigned int UnitMaskHi                                                   :  4;
         unsigned int                                                              :  4;
     } nv31;
+#endif
+#if CHIP_HDR_PHOENIX1
+    struct {
+        unsigned int                                                              : 20;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int BypassEn                                                     :  1;
+        unsigned int                                                              :  2;
+        unsigned int UnitMaskHi                                                   :  4;
+        unsigned int                                                              :  4;
+    } phx1;
 #endif
     struct {
         unsigned int                                                              : 20;
@@ -9555,6 +9657,16 @@ union DF_PIE_AON_PerfMonCtlLo4 {
         unsigned int                                                              :  4;
     } nv31;
 #endif
+#if CHIP_HDR_PHOENIX1
+    struct {
+        unsigned int                                                              : 20;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int BypassEn                                                     :  1;
+        unsigned int                                                              :  2;
+        unsigned int UnitMaskHi                                                   :  4;
+        unsigned int                                                              :  4;
+    } phx1;
+#endif
     struct {
         unsigned int                                                              : 20;
         unsigned int Mp1Int                                                       :  1;
@@ -9631,6 +9743,16 @@ union DF_PIE_AON_PerfMonCtlLo5 {
         unsigned int UnitMaskHi                                                   :  4;
         unsigned int                                                              :  4;
     } nv31;
+#endif
+#if CHIP_HDR_PHOENIX1
+    struct {
+        unsigned int                                                              : 20;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int BypassEn                                                     :  1;
+        unsigned int                                                              :  2;
+        unsigned int UnitMaskHi                                                   :  4;
+        unsigned int                                                              :  4;
+    } phx1;
 #endif
     struct {
         unsigned int                                                              : 20;
@@ -9709,6 +9831,16 @@ union DF_PIE_AON_PerfMonCtlLo6 {
         unsigned int                                                              :  4;
     } nv31;
 #endif
+#if CHIP_HDR_PHOENIX1
+    struct {
+        unsigned int                                                              : 20;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int BypassEn                                                     :  1;
+        unsigned int                                                              :  2;
+        unsigned int UnitMaskHi                                                   :  4;
+        unsigned int                                                              :  4;
+    } phx1;
+#endif
     struct {
         unsigned int                                                              : 20;
         unsigned int Mp1Int                                                       :  1;
@@ -9785,6 +9917,16 @@ union DF_PIE_AON_PerfMonCtlLo7 {
         unsigned int UnitMaskHi                                                   :  4;
         unsigned int                                                              :  4;
     } nv31;
+#endif
+#if CHIP_HDR_PHOENIX1
+    struct {
+        unsigned int                                                              : 20;
+        unsigned int Mp1Int                                                       :  1;
+        unsigned int BypassEn                                                     :  1;
+        unsigned int                                                              :  2;
+        unsigned int UnitMaskHi                                                   :  4;
+        unsigned int                                                              :  4;
+    } phx1;
 #endif
     struct {
         unsigned int                                                              : 20;
@@ -10707,7 +10849,7 @@ union GCR_PERFCOUNTER0_SELECT {
         unsigned int PERF_SEL1                                                    :  9;
         unsigned int                                                              : 13;
     } gfx10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int PERF_SEL                                                     : 10;
         unsigned int PERF_SEL1                                                    : 10;
@@ -10732,7 +10874,7 @@ union GCR_PERFCOUNTER0_SELECT1 {
         unsigned int PERF_SEL3                                                    :  9;
         unsigned int                                                              : 13;
     } gfx10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int PERF_SEL2                                                    : 10;
         unsigned int PERF_SEL3                                                    : 10;
@@ -10772,7 +10914,7 @@ union GCR_PERFCOUNTER1_SELECT {
         unsigned int PERF_MODE                                                    :  4;
         unsigned int CNTL_MODE                                                    :  4;
     } gfx10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int PERF_SEL                                                     : 10;
         unsigned int                                                              : 10;
@@ -10997,6 +11139,13 @@ union GC_ATC_L2_PERFCOUNTER2_SELECT {
         unsigned int PERF_MODE1                                                   :  4;
         unsigned int                                                              :  4;
     } most;
+#if CHIP_HDR_PHOENIX1
+    struct {
+        unsigned int PERF_SEL0                                                    : 10;
+        unsigned int                                                              : 18;
+        unsigned int PERF_MODE0                                                   :  4;
+    } apu11;
+#endif
     struct {
         unsigned int PERF_SEL                                                     : 10;
         unsigned int                                                              : 18;
@@ -11343,14 +11492,14 @@ union GE1_PERFCOUNTER0_SELECT {
         unsigned int PERF_SEL0                                                    : 10;
         unsigned int                                                              : 22;
     } gfx103CorePlus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE1                                                   :  4;
         unsigned int                                                              :  4;
     } gfx104Plus;
 #endif
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 28;
         unsigned int PERF_MODE0                                                   :  4;
@@ -11373,7 +11522,7 @@ union GE1_PERFCOUNTER0_SELECT1 {
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
     } gfx103;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE3                                                   :  4;
@@ -11422,14 +11571,14 @@ union GE1_PERFCOUNTER1_SELECT {
         unsigned int PERF_SEL0                                                    : 10;
         unsigned int                                                              : 22;
     } gfx103CorePlus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE1                                                   :  4;
         unsigned int                                                              :  4;
     } gfx104Plus;
 #endif
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 28;
         unsigned int PERF_MODE0                                                   :  4;
@@ -11452,7 +11601,7 @@ union GE1_PERFCOUNTER1_SELECT1 {
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
     } gfx103;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE3                                                   :  4;
@@ -11501,14 +11650,14 @@ union GE1_PERFCOUNTER2_SELECT {
         unsigned int PERF_SEL0                                                    : 10;
         unsigned int                                                              : 22;
     } gfx103CorePlus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE1                                                   :  4;
         unsigned int                                                              :  4;
     } gfx104Plus;
 #endif
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 28;
         unsigned int PERF_MODE0                                                   :  4;
@@ -11531,7 +11680,7 @@ union GE1_PERFCOUNTER2_SELECT1 {
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
     } gfx103;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE3                                                   :  4;
@@ -11580,14 +11729,14 @@ union GE1_PERFCOUNTER3_SELECT {
         unsigned int PERF_SEL0                                                    : 10;
         unsigned int                                                              : 22;
     } gfx103CorePlus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE1                                                   :  4;
         unsigned int                                                              :  4;
     } gfx104Plus;
 #endif
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 28;
         unsigned int PERF_MODE0                                                   :  4;
@@ -11610,7 +11759,7 @@ union GE1_PERFCOUNTER3_SELECT1 {
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
     } gfx103;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE3                                                   :  4;
@@ -11659,14 +11808,14 @@ union GE2_DIST_PERFCOUNTER0_SELECT {
         unsigned int PERF_SEL0                                                    : 10;
         unsigned int                                                              : 22;
     } gfx103CorePlus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE1                                                   :  4;
         unsigned int                                                              :  4;
     } gfx104Plus;
 #endif
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 28;
         unsigned int PERF_MODE0                                                   :  4;
@@ -11689,7 +11838,7 @@ union GE2_DIST_PERFCOUNTER0_SELECT1 {
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
     } gfx103;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE3                                                   :  4;
@@ -11738,14 +11887,14 @@ union GE2_DIST_PERFCOUNTER1_SELECT {
         unsigned int PERF_SEL0                                                    : 10;
         unsigned int                                                              : 22;
     } gfx103CorePlus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE1                                                   :  4;
         unsigned int                                                              :  4;
     } gfx104Plus;
 #endif
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 28;
         unsigned int PERF_MODE0                                                   :  4;
@@ -11768,7 +11917,7 @@ union GE2_DIST_PERFCOUNTER1_SELECT1 {
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
     } gfx103;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE3                                                   :  4;
@@ -11817,14 +11966,14 @@ union GE2_DIST_PERFCOUNTER2_SELECT {
         unsigned int PERF_SEL0                                                    : 10;
         unsigned int                                                              : 22;
     } gfx103CorePlus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE1                                                   :  4;
         unsigned int                                                              :  4;
     } gfx104Plus;
 #endif
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 28;
         unsigned int PERF_MODE0                                                   :  4;
@@ -11847,7 +11996,7 @@ union GE2_DIST_PERFCOUNTER2_SELECT1 {
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
     } gfx103;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE3                                                   :  4;
@@ -11896,14 +12045,14 @@ union GE2_DIST_PERFCOUNTER3_SELECT {
         unsigned int PERF_SEL0                                                    : 10;
         unsigned int                                                              : 22;
     } gfx103CorePlus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE1                                                   :  4;
         unsigned int                                                              :  4;
     } gfx104Plus;
 #endif
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 28;
         unsigned int PERF_MODE0                                                   :  4;
@@ -11926,7 +12075,7 @@ union GE2_DIST_PERFCOUNTER3_SELECT1 {
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
     } gfx103;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE3                                                   :  4;
@@ -11975,14 +12124,14 @@ union GE2_SE_PERFCOUNTER0_SELECT {
         unsigned int PERF_SEL0                                                    : 10;
         unsigned int                                                              : 22;
     } gfx103CorePlus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE1                                                   :  4;
         unsigned int                                                              :  4;
     } gfx104Plus;
 #endif
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 28;
         unsigned int PERF_MODE0                                                   :  4;
@@ -12005,7 +12154,7 @@ union GE2_SE_PERFCOUNTER0_SELECT1 {
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
     } gfx103;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE3                                                   :  4;
@@ -12054,14 +12203,14 @@ union GE2_SE_PERFCOUNTER1_SELECT {
         unsigned int PERF_SEL0                                                    : 10;
         unsigned int                                                              : 22;
     } gfx103CorePlus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE1                                                   :  4;
         unsigned int                                                              :  4;
     } gfx104Plus;
 #endif
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 28;
         unsigned int PERF_MODE0                                                   :  4;
@@ -12084,7 +12233,7 @@ union GE2_SE_PERFCOUNTER1_SELECT1 {
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
     } gfx103;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE3                                                   :  4;
@@ -12133,14 +12282,14 @@ union GE2_SE_PERFCOUNTER2_SELECT {
         unsigned int PERF_SEL0                                                    : 10;
         unsigned int                                                              : 22;
     } gfx103CorePlus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE1                                                   :  4;
         unsigned int                                                              :  4;
     } gfx104Plus;
 #endif
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 28;
         unsigned int PERF_MODE0                                                   :  4;
@@ -12163,7 +12312,7 @@ union GE2_SE_PERFCOUNTER2_SELECT1 {
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
     } gfx103;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE3                                                   :  4;
@@ -12212,14 +12361,14 @@ union GE2_SE_PERFCOUNTER3_SELECT {
         unsigned int PERF_SEL0                                                    : 10;
         unsigned int                                                              : 22;
     } gfx103CorePlus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE1                                                   :  4;
         unsigned int                                                              :  4;
     } gfx104Plus;
 #endif
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 28;
         unsigned int PERF_MODE0                                                   :  4;
@@ -12242,7 +12391,7 @@ union GE2_SE_PERFCOUNTER3_SELECT1 {
         unsigned int PERF_MODE2                                                   :  4;
         unsigned int PERF_MODE3                                                   :  4;
     } gfx103;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int PERF_MODE3                                                   :  4;
@@ -12267,7 +12416,7 @@ union GE_CNTL {
         unsigned int BREAK_WAVE_AT_EOI                                            :  1;
         unsigned int                                                              : 13;
     } gfx10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int PRIMS_PER_SUBGRP                                             :  9;
         unsigned int VERTS_PER_SUBGRP                                             :  9;
@@ -12311,7 +12460,7 @@ union GE_FAST_CLKS {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union GE_GS_FAST_LAUNCH_WG_DIM {
     struct {
         unsigned int GS_FL_DIM_X                                                  : 16;
@@ -12324,7 +12473,7 @@ union GE_GS_FAST_LAUNCH_WG_DIM {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union GE_GS_FAST_LAUNCH_WG_DIM_1 {
     struct {
         unsigned int GS_FL_DIM_Z                                                  : 16;
@@ -12384,7 +12533,7 @@ union GE_MULTI_PRIM_IB_RESET_EN {
         unsigned int MATCH_ALL_BITS                                               :  1;
         unsigned int                                                              : 30;
     } bits, bitfields;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              :  2;
         unsigned int DISABLE_FOR_AUTO_INDEX                                       :  1;
@@ -12409,7 +12558,7 @@ union GE_NGG_SUBGRP_CNTL {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union GE_PA_IF_SAFE_REG {
     struct {
         unsigned int GE_PA_CSB                                                    : 10;
@@ -12926,7 +13075,7 @@ union GE_PRIV_CONTROL {
         unsigned int CLAMP_HS_OFFCHIP_PER_SE_OVERRIDE                             :  1;
         unsigned int                                                              : 15;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int RESERVED                                                     :  1;
         unsigned int                                                              : 16;
@@ -12940,7 +13089,7 @@ union GE_PRIV_CONTROL {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union GE_RATE_CNTL_1 {
     struct {
         unsigned int ADD_X_CLKS_LS_VERT                                           :  4;
@@ -12959,7 +13108,7 @@ union GE_RATE_CNTL_1 {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union GE_RATE_CNTL_2 {
     struct {
         unsigned int ADD_X_CLKS_VS_VERT                                           :  4;
@@ -12981,7 +13130,7 @@ union GE_RATE_CNTL_2 {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union GE_SPI_IF_SAFE_REG {
     struct {
         unsigned int GE_SPI_LS_ES_DATA                                            :  6;
@@ -13881,7 +14030,7 @@ union GRBM_PERFCOUNTER0_SELECT_HI {
         unsigned int GUS_BUSY_USER_DEFINED_MASK                                   :  1;
         unsigned int                                                              : 24;
     } gfx10CorePlus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              :  9;
         unsigned int GL1H_BUSY_USER_DEFINED_MASK                                  :  1;
@@ -13985,7 +14134,7 @@ union GRBM_PERFCOUNTER1_SELECT_HI {
         unsigned int GUS_BUSY_USER_DEFINED_MASK                                   :  1;
         unsigned int                                                              : 24;
     } gfx10CorePlus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              :  9;
         unsigned int GL1H_BUSY_USER_DEFINED_MASK                                  :  1;
@@ -14049,7 +14198,7 @@ union GRBM_SE0_PERFCOUNTER_SELECT {
         unsigned int GL1CC_BUSY_USER_DEFINED_MASK                                 :  1;
         unsigned int                                                              :  6;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 26;
         unsigned int GL1H_BUSY_USER_DEFINED_MASK                                  :  1;
@@ -14121,7 +14270,7 @@ union GRBM_SE1_PERFCOUNTER_SELECT {
         unsigned int GL1CC_BUSY_USER_DEFINED_MASK                                 :  1;
         unsigned int                                                              :  6;
     } gfx10CorePlus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 26;
         unsigned int GL1H_BUSY_USER_DEFINED_MASK                                  :  1;
@@ -15196,7 +15345,7 @@ union PA_CL_ENHANCE {
         unsigned int CLAMP_NEGATIVE_BB_TO_ZERO                                    :  1;
         unsigned int                                                              :  7;
     } gfx103Derivative;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 18;
         unsigned int POLY_INNER_EDGE_FLAG_DISABLE                                 :  1;
@@ -16622,7 +16771,7 @@ union PA_CL_VS_OUT_CNTL {
         unsigned int USE_VTX_LINE_WIDTH                                           :  1;
         unsigned int                                                              :  4;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 31;
         unsigned int USE_VTX_FSR_SELECT                                           :  1;
@@ -16675,7 +16824,7 @@ union PA_PH_ENHANCE {
         unsigned int DISABLE_USE_LAST_PH_ARBITER_PERFCOUNTER_SAMPLE_EVENT         :  1;
         unsigned int                                                              : 18;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 14;
         unsigned int USE_PERFCOUNTER_START_STOP_EVENTS                            :  1;
@@ -16683,7 +16832,7 @@ union PA_PH_ENHANCE {
         unsigned int                                                              : 16;
     } gfx104Plus;
 #endif
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 16;
         unsigned int PH_SPI_GE_THROTTLE_MODE                                      :  1;
@@ -17039,9 +17188,9 @@ union PA_PH_PERFCOUNTER7_SELECT {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union PA_RATE_CNTL {
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int VERTEX_RATE                                                  :  4;
         unsigned int PRIM_RATE                                                    :  4;
@@ -17375,7 +17524,7 @@ union PA_SC_AA_SAMPLE_LOCS_PIXEL_X1Y1_3 {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union PA_SC_ATM_CNTL {
     struct {
         unsigned int SC_PC_IF_SIZE                                                :  6;
@@ -17447,7 +17596,7 @@ union PA_SC_BINNER_CNTL_1 {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union PA_SC_BINNER_CNTL_2 {
     struct {
         unsigned int BIN_SIZE_X_MULT_BY_1P5X                                      :  1;
@@ -17468,6 +17617,13 @@ union PA_SC_BINNER_CNTL_2 {
         unsigned int LIGHT_SHAFT_DRAW_CALL_LIMIT                                  :  3;
         unsigned int                                                              : 25;
     } nv3x;
+#endif
+#if CHIP_HDR_PHOENIX1
+    struct {
+        unsigned int                                                              :  4;
+        unsigned int LIGHT_SHAFT_DRAW_CALL_LIMIT                                  :  3;
+        unsigned int                                                              : 25;
+    } phx1;
 #endif
 
     unsigned int u32All;
@@ -17552,7 +17708,7 @@ union PA_SC_BINNER_EVENT_CNTL_1 {
         unsigned int BIN_CONF_OVERRIDE_CHECK                                      :  2;
         unsigned int                                                              :  4;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 10;
         unsigned int WAIT_SYNC                                                    :  2;
@@ -17643,7 +17799,7 @@ union PA_SC_BINNER_EVENT_CNTL_3 {
         unsigned int                                                              : 16;
         unsigned int DRAW_DONE                                                    :  2;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 28;
         unsigned int ENABLE_PIPELINE_NOT_USED                                     :  2;
@@ -18041,7 +18197,7 @@ union PA_SC_ENHANCE_1 {
         unsigned int DEBUG_PIXEL_PICKER_COUNT_PIXELS                              :  1;
         unsigned int                                                              : 18;
     } gfx10CorePlus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              :  5;
         unsigned int DISABLE_NONBINNED_LIVE_PRIM_DG1_LS0_CL0_EOPKT_POKE           :  1;
@@ -18154,7 +18310,7 @@ union PA_SC_ENHANCE_3 {
         unsigned int DISABLE_CP_CONTEXT_DONE_PERFCOUNT_SAMPLE_EN                  :  1;
         unsigned int                                                              : 26;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              :  6;
         unsigned int ENABLE_SINGLE_PA_EOPKT_FIRST_PHASE_FILTER                    :  1;
@@ -18168,7 +18324,7 @@ union PA_SC_ENHANCE_3 {
         unsigned int                                                              : 18;
     } gfx104Plus;
 #endif
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              :  2;
         unsigned int DISABLE_RB_MASK_COPY_FOR_NONP2_SA_PAIR_HARVEST               :  1;
@@ -18517,7 +18673,7 @@ union PA_SC_NGG_MODE_CNTL {
         unsigned int MAX_FPOVS_IN_WAVE                                            :  8;
         unsigned int                                                              :  8;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int DISABLE_FPOG_AND_DEALLOC_CONFLICT                            :  1;
@@ -18600,7 +18756,7 @@ union PA_SC_P3D_TRAP_SCREEN_V {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union PA_SC_PACKER_WAVE_ID_CNTL {
     struct {
         unsigned int WAVE_TABLE_SIZE                                              : 10;
@@ -19010,7 +19166,7 @@ union PA_SC_SHADER_CONTROL {
         unsigned int WAVE_BREAK_REGION_SIZE                                       :  2;
         unsigned int                                                              : 25;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              :  7;
         unsigned int DISABLE_OREO_CONFLICT_QUAD                                   :  1;
@@ -19060,7 +19216,7 @@ union PA_SC_TILE_STEERING_OVERRIDE {
         unsigned int NUM_PACKER_PER_SC                                            :  1;
         unsigned int                                                              : 11;
     } gfx101;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 20;
         unsigned int NUM_PACKER_PER_SC                                            :  2;
@@ -19921,7 +20077,7 @@ union PA_SC_VPORT_ZMIN_15 {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union PA_SC_VRS_OVERRIDE_CNTL {
     struct {
         unsigned int VRS_OVERRIDE_RATE_COMBINER_MODE                              :  3;
@@ -19940,7 +20096,7 @@ union PA_SC_VRS_OVERRIDE_CNTL {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union PA_SC_VRS_RATE_BASE {
     struct {
         unsigned int BASE_256B                                                    : 32;
@@ -19952,7 +20108,7 @@ union PA_SC_VRS_RATE_BASE {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union PA_SC_VRS_RATE_BASE_EXT {
     struct {
         unsigned int BASE_256B                                                    :  8;
@@ -19966,7 +20122,7 @@ union PA_SC_VRS_RATE_BASE_EXT {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union PA_SC_VRS_RATE_CACHE_CNTL {
     struct {
         unsigned int BIG_PAGE_RD                                                  :  1;
@@ -19989,7 +20145,7 @@ union PA_SC_VRS_RATE_CACHE_CNTL {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union PA_SC_VRS_RATE_FEEDBACK_BASE {
     struct {
         unsigned int BASE_256B                                                    : 32;
@@ -20001,7 +20157,7 @@ union PA_SC_VRS_RATE_FEEDBACK_BASE {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union PA_SC_VRS_RATE_FEEDBACK_BASE_EXT {
     struct {
         unsigned int BASE_256B                                                    :  8;
@@ -20014,7 +20170,7 @@ union PA_SC_VRS_RATE_FEEDBACK_BASE_EXT {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union PA_SC_VRS_RATE_FEEDBACK_SIZE_XY {
     struct {
         unsigned int X_MAX                                                        : 11;
@@ -20029,7 +20185,7 @@ union PA_SC_VRS_RATE_FEEDBACK_SIZE_XY {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union PA_SC_VRS_RATE_SIZE_XY {
     struct {
         unsigned int X_MAX                                                        : 11;
@@ -20044,7 +20200,7 @@ union PA_SC_VRS_RATE_SIZE_XY {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union PA_SC_VRS_SURFACE_CNTL {
     struct {
         unsigned int                                                              :  6;
@@ -20060,6 +20216,13 @@ union PA_SC_VRS_SURFACE_CNTL {
         unsigned int VRC_MAX_TAGS                                                 :  7;
         unsigned int VRC_EVICT_POINT                                              :  6;
     } bits, bitfields;
+#if CHIP_HDR_PHOENIX1
+    struct {
+        unsigned int                                                              :  5;
+        unsigned int VRC_REPROBE_DISABLE                                          :  1;
+        unsigned int                                                              : 26;
+    } apu11;
+#endif
 #if CHIP_HDR_NAVI33
     struct {
         unsigned int                                                              :  5;
@@ -20074,7 +20237,7 @@ union PA_SC_VRS_SURFACE_CNTL {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union PA_SC_VRS_SURFACE_CNTL_1 {
     struct {
         unsigned int FORCE_SC_VRS_RATE_FINE                                       :  1;
@@ -21817,7 +21980,7 @@ union RLC_CGTT_MGCG_OVERRIDE {
         unsigned int RESERVED_15_9                                                :  7;
         unsigned int                                                              : 16;
     } gfx10Core;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int RLC_REPEATER_FGCG_OVERRIDE                                   :  1;
         unsigned int                                                              :  8;
@@ -21964,6 +22127,12 @@ union RLC_SPM_ACCUM_CTRLRAM_ADDR {
         unsigned int addr                                                         :  9;
         unsigned int                                                              : 23;
     } most;
+#if CHIP_HDR_PHOENIX1
+    struct {
+        unsigned int                                                              :  9;
+        unsigned int RESERVED                                                     : 23;
+    } apu11;
+#endif
     struct {
         unsigned int                                                              :  9;
         unsigned int RESERVED                                                     : 23;
@@ -22208,7 +22377,7 @@ union RLC_SPM_ACCUM_STATUS {
         unsigned int SwaAccumArmed                                                :  1;
         unsigned int                                                              : 12;
     } gfx103Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 23;
         unsigned int MultiSampleAborted                                           :  1;
@@ -22486,7 +22655,7 @@ union RLC_SPM_GLOBALS_SAMPLE_SKEW {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union RLC_SPM_GLOBAL_DELAY_IND_ADDR {
     struct {
         unsigned int ADDR                                                         : 12;
@@ -22499,7 +22668,7 @@ union RLC_SPM_GLOBAL_DELAY_IND_ADDR {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union RLC_SPM_GLOBAL_DELAY_IND_DATA {
     struct {
         unsigned int DATA                                                         :  6;
@@ -22520,7 +22689,7 @@ union RLC_SPM_GLOBAL_MUXSEL_ADDR {
         unsigned int PERFMON_SEL_ADDR                                             :  8;
         unsigned int RESERVED                                                     : 24;
     } gfx10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int ADDR                                                         : 12;
         unsigned int                                                              : 20;
@@ -22547,7 +22716,7 @@ union RLC_SPM_GLOBAL_MUXSEL_DATA {
     struct {
         unsigned int PERFMON_SEL_DATA                                             : 32;
     } gfx09_10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int SEL0                                                         : 16;
         unsigned int SEL1                                                         : 16;
@@ -22619,6 +22788,13 @@ union RLC_SPM_MC_CNTL {
         unsigned int RLC_SPM_VMID                                                 :  4;
         unsigned int                                                              : 28;
     } bits, bitfields;
+#if CHIP_HDR_PHOENIX1
+    struct {
+        unsigned int                                                              : 13;
+        unsigned int RESERVED_2                                                   :  1;
+        unsigned int                                                              : 18;
+    } apu11;
+#endif
     struct {
         unsigned int                                                              :  4;
         unsigned int RLC_SPM_POLICY                                               :  1;
@@ -22727,7 +22903,7 @@ union RLC_SPM_MC_CNTL {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union RLC_SPM_MODE {
     struct {
         unsigned int MODE                                                         :  1;
@@ -22740,7 +22916,7 @@ union RLC_SPM_MODE {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union RLC_SPM_PAUSE {
     struct {
         unsigned int PAUSE                                                        :  1;
@@ -22786,7 +22962,7 @@ union RLC_SPM_PERFMON_CNTL {
         unsigned int RESERVED1                                                    : 12;
         unsigned int                                                              : 20;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 14;
         unsigned int DISABLE_GFXCLOCK_COUNT                                       :  1;
@@ -22887,7 +23063,7 @@ union RLC_SPM_PERFMON_SEGMENT_SIZE {
         unsigned int SE2_NUM_LINE                                                 :  5;
         unsigned int RESERVED                                                     :  1;
     } gfx09_10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int TOTAL_NUM_SEGMENT                                            : 16;
         unsigned int GLOBAL_NUM_SEGMENT                                           :  8;
@@ -22973,7 +23149,7 @@ union RLC_SPM_RMI_PERFMON_SAMPLE_DELAY {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union RLC_SPM_RSPM_CMD {
     struct {
         unsigned int CMD                                                          :  4;
@@ -22986,7 +23162,7 @@ union RLC_SPM_RSPM_CMD {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union RLC_SPM_RSPM_CMD_ACK {
     struct {
         unsigned int SE0_ACK                                                      :  1;
@@ -23007,7 +23183,7 @@ union RLC_SPM_RSPM_CMD_ACK {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union RLC_SPM_RSPM_REQ_DATA_HI {
     struct {
         unsigned int DATA                                                         : 12;
@@ -23020,7 +23196,7 @@ union RLC_SPM_RSPM_REQ_DATA_HI {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union RLC_SPM_RSPM_REQ_DATA_LO {
     struct {
         unsigned int DATA                                                         : 32;
@@ -23032,7 +23208,7 @@ union RLC_SPM_RSPM_REQ_DATA_LO {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union RLC_SPM_RSPM_REQ_OP {
     struct {
         unsigned int OP                                                           :  4;
@@ -23045,7 +23221,7 @@ union RLC_SPM_RSPM_REQ_OP {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union RLC_SPM_RSPM_RET_DATA {
     struct {
         unsigned int DATA                                                         : 32;
@@ -23057,7 +23233,7 @@ union RLC_SPM_RSPM_RET_DATA {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union RLC_SPM_RSPM_RET_OP {
     struct {
         unsigned int OP                                                           :  4;
@@ -23107,7 +23283,7 @@ union RLC_SPM_SEGMENT_THRESHOLD {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union RLC_SPM_SE_DELAY_IND_ADDR {
     struct {
         unsigned int ADDR                                                         : 12;
@@ -23120,7 +23296,7 @@ union RLC_SPM_SE_DELAY_IND_ADDR {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union RLC_SPM_SE_DELAY_IND_DATA {
     struct {
         unsigned int DATA                                                         :  6;
@@ -23141,7 +23317,7 @@ union RLC_SPM_SE_MUXSEL_ADDR {
         unsigned int PERFMON_SEL_ADDR                                             :  9;
         unsigned int RESERVED                                                     : 23;
     } gfx10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int ADDR                                                         : 12;
         unsigned int                                                              : 20;
@@ -23168,7 +23344,7 @@ union RLC_SPM_SE_MUXSEL_DATA {
     struct {
         unsigned int PERFMON_SEL_DATA                                             : 32;
     } gfx09_10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int SEL0                                                         : 16;
         unsigned int SEL1                                                         : 16;
@@ -23191,7 +23367,7 @@ union RLC_SPM_SE_MUXSEL_SKEW {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union RLC_SPM_SE_RSPM_REQ_DATA_HI {
     struct {
         unsigned int DATA                                                         : 12;
@@ -23204,7 +23380,7 @@ union RLC_SPM_SE_RSPM_REQ_DATA_HI {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union RLC_SPM_SE_RSPM_REQ_DATA_LO {
     struct {
         unsigned int DATA                                                         : 32;
@@ -23216,7 +23392,7 @@ union RLC_SPM_SE_RSPM_REQ_DATA_LO {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union RLC_SPM_SE_RSPM_REQ_OP {
     struct {
         unsigned int OP                                                           :  4;
@@ -23229,7 +23405,7 @@ union RLC_SPM_SE_RSPM_REQ_OP {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union RLC_SPM_SE_RSPM_RET_DATA {
     struct {
         unsigned int DATA                                                         : 32;
@@ -23241,7 +23417,7 @@ union RLC_SPM_SE_RSPM_RET_DATA {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union RLC_SPM_SE_RSPM_RET_OP {
     struct {
         unsigned int OP                                                           :  4;
@@ -23288,7 +23464,7 @@ union RLC_SPM_SE_SAMPLE_SKEW {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union RLC_SPM_SPARE {
     struct {
         unsigned int SPARE                                                        : 32;
@@ -23322,7 +23498,7 @@ union RLC_SPM_SQG_PERFMON_SAMPLE_DELAY {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union RLC_SPM_STATUS {
     struct {
         unsigned int CTL_BUSY                                                     :  1;
@@ -23534,7 +23710,7 @@ union RMI_PERFCOUNTER0_SELECT {
         unsigned int PERF_SEL1                                                    :  9;
         unsigned int                                                              : 13;
     } most;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int PERF_SEL                                                     : 10;
         unsigned int PERF_SEL1                                                    : 10;
@@ -23559,7 +23735,7 @@ union RMI_PERFCOUNTER0_SELECT1 {
         unsigned int PERF_SEL3                                                    :  9;
         unsigned int                                                              : 13;
     } most;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int PERF_SEL2                                                    : 10;
         unsigned int PERF_SEL3                                                    : 10;
@@ -23601,7 +23777,7 @@ union RMI_PERFCOUNTER1_SELECT {
         unsigned int PERF_SEL                                                     :  9;
         unsigned int                                                              : 23;
     } most;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int PERF_SEL                                                     : 10;
         unsigned int                                                              : 22;
@@ -23646,7 +23822,7 @@ union RMI_PERFCOUNTER2_SELECT {
         unsigned int PERF_SEL1                                                    :  9;
         unsigned int                                                              : 13;
     } most;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int PERF_SEL                                                     : 10;
         unsigned int PERF_SEL1                                                    : 10;
@@ -23671,7 +23847,7 @@ union RMI_PERFCOUNTER2_SELECT1 {
         unsigned int PERF_SEL3                                                    :  9;
         unsigned int                                                              : 13;
     } most;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int PERF_SEL2                                                    : 10;
         unsigned int PERF_SEL3                                                    : 10;
@@ -23713,7 +23889,7 @@ union RMI_PERFCOUNTER3_SELECT {
         unsigned int PERF_SEL                                                     :  9;
         unsigned int                                                              : 23;
     } most;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int PERF_SEL                                                     : 10;
         unsigned int                                                              : 22;
@@ -24955,7 +25131,7 @@ union SPI_ARB_PRIORITY {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SPI_ATTRIBUTE_RING_BASE {
     struct {
         unsigned int BASE                                                         : 32;
@@ -24967,7 +25143,7 @@ union SPI_ATTRIBUTE_RING_BASE {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SPI_ATTRIBUTE_RING_SIZE {
     struct {
         unsigned int MEM_SIZE                                                     :  8;
@@ -25047,7 +25223,7 @@ union SPI_COMPUTE_WF_CTX_SAVE {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SPI_COMPUTE_WF_CTX_SAVE_STATUS {
     struct {
         unsigned int PIPE0_QUEUE0_SAVE_BUSY                                       :  1;
@@ -25164,7 +25340,7 @@ union SPI_CONFIG_CNTL_1 {
         unsigned int SA_SCREEN_MAP                                                :  1;
         unsigned int                                                              :  9;
     } gfx103Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              :  8;
         unsigned int PS_GROUP_TIMEOUT_MODE                                        :  1;
@@ -25180,7 +25356,7 @@ union SPI_CONFIG_CNTL_1 {
         unsigned int EN_USER_ACCUM                                                :  1;
         unsigned int                                                              : 10;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              :  9;
         unsigned int OREO_EXPALLOC_STALL                                          :  1;
@@ -25229,7 +25405,7 @@ union SPI_CONFIG_CNTL_2 {
         unsigned int CONTEXT_SAVE_WAIT_GDS_GRANT_CYCLE_OVHD                       :  4;
         unsigned int                                                              : 24;
     } bits, bitfields;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              :  8;
         unsigned int PWS_CSG_WAIT_DISABLE                                         :  1;
@@ -25316,7 +25492,7 @@ union SPI_CONFIG_PS_CU_EN {
         unsigned int PKR_OFFSET                                                   :  4;
         unsigned int                                                              : 28;
     } gfx103CorePlus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              :  4;
         unsigned int PKR2_OFFSET                                                  :  4;
@@ -25551,7 +25727,7 @@ union SPI_FEATURE_CTRL {
         unsigned int BUS_ACTIVITY_THRESHOLD                                       :  8;
         unsigned int                                                              :  4;
     } gfx101;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int TUNNELING_WAVE_LIMIT                                         :  4;
         unsigned int RA_PROBE_IGNORE                                              :  1;
@@ -25641,7 +25817,7 @@ union SPI_GFX_CRAWLER_CONFIG {
         unsigned int VS_DEPTH                                                     :  5;
         unsigned int                                                              : 10;
     } gfx103Derivative;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 17;
         unsigned int PS_ALLOC_DEPTH                                               :  5;
@@ -25657,7 +25833,7 @@ union SPI_GFX_CRAWLER_CONFIG {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SPI_GFX_SCRATCH_BASE_HI {
     struct {
         unsigned int DATA                                                         :  8;
@@ -25670,7 +25846,7 @@ union SPI_GFX_SCRATCH_BASE_HI {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SPI_GFX_SCRATCH_BASE_LO {
     struct {
         unsigned int DATA                                                         : 32;
@@ -25682,7 +25858,7 @@ union SPI_GFX_SCRATCH_BASE_LO {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SPI_GS_THROTTLE_CNTL1 {
     struct {
         unsigned int PH_POLL_INTERVAL                                             :  4;
@@ -25701,7 +25877,7 @@ union SPI_GS_THROTTLE_CNTL1 {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SPI_GS_THROTTLE_CNTL2 {
     struct {
         unsigned int SPI_THROTTLE_MODE                                            :  2;
@@ -25837,7 +26013,7 @@ union SPI_LB_DATA_PERWGP_WAVE_HSGS {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SPI_LB_DATA_PERWGP_WAVE_PS {
     struct {
         unsigned int WGP_USED_PS                                                  : 16;
@@ -26368,7 +26544,7 @@ union SPI_PS_INPUT_CNTL_0 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -26408,7 +26584,7 @@ union SPI_PS_INPUT_CNTL_1 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -26448,7 +26624,7 @@ union SPI_PS_INPUT_CNTL_2 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -26488,7 +26664,7 @@ union SPI_PS_INPUT_CNTL_3 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -26528,7 +26704,7 @@ union SPI_PS_INPUT_CNTL_4 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -26568,7 +26744,7 @@ union SPI_PS_INPUT_CNTL_5 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -26608,7 +26784,7 @@ union SPI_PS_INPUT_CNTL_6 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -26648,7 +26824,7 @@ union SPI_PS_INPUT_CNTL_7 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -26688,7 +26864,7 @@ union SPI_PS_INPUT_CNTL_8 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -26728,7 +26904,7 @@ union SPI_PS_INPUT_CNTL_9 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -26768,7 +26944,7 @@ union SPI_PS_INPUT_CNTL_10 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -26808,7 +26984,7 @@ union SPI_PS_INPUT_CNTL_11 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -26848,7 +27024,7 @@ union SPI_PS_INPUT_CNTL_12 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -26888,7 +27064,7 @@ union SPI_PS_INPUT_CNTL_13 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -26928,7 +27104,7 @@ union SPI_PS_INPUT_CNTL_14 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -26968,7 +27144,7 @@ union SPI_PS_INPUT_CNTL_15 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -27008,7 +27184,7 @@ union SPI_PS_INPUT_CNTL_16 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -27048,7 +27224,7 @@ union SPI_PS_INPUT_CNTL_17 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -27088,7 +27264,7 @@ union SPI_PS_INPUT_CNTL_18 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -27128,7 +27304,7 @@ union SPI_PS_INPUT_CNTL_19 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -27162,7 +27338,7 @@ union SPI_PS_INPUT_CNTL_20 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -27196,7 +27372,7 @@ union SPI_PS_INPUT_CNTL_21 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -27230,7 +27406,7 @@ union SPI_PS_INPUT_CNTL_22 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -27264,7 +27440,7 @@ union SPI_PS_INPUT_CNTL_23 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -27298,7 +27474,7 @@ union SPI_PS_INPUT_CNTL_24 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -27332,7 +27508,7 @@ union SPI_PS_INPUT_CNTL_25 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -27366,7 +27542,7 @@ union SPI_PS_INPUT_CNTL_26 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -27400,7 +27576,7 @@ union SPI_PS_INPUT_CNTL_27 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -27434,7 +27610,7 @@ union SPI_PS_INPUT_CNTL_28 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -27468,7 +27644,7 @@ union SPI_PS_INPUT_CNTL_29 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -27502,7 +27678,7 @@ union SPI_PS_INPUT_CNTL_30 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -27536,7 +27712,7 @@ union SPI_PS_INPUT_CNTL_31 {
         unsigned int ROTATE_PC_PTR                                                :  1;
         unsigned int                                                              : 20;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int PRIM_ATTR                                                    :  1;
@@ -28229,7 +28405,7 @@ union SPI_SHADER_COL_FORMAT {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SPI_SHADER_GS_MESHLET_DIM {
     struct {
         unsigned int MESHLET_NUM_THREAD_X                                         :  8;
@@ -28244,7 +28420,7 @@ union SPI_SHADER_GS_MESHLET_DIM {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SPI_SHADER_GS_MESHLET_EXP_ALLOC {
     struct {
         unsigned int MAX_EXP_VERTS                                                :  9;
@@ -28347,7 +28523,7 @@ union SPI_SHADER_PGM_HI_GS {
         unsigned int MEM_BASE                                                     :  8;
         unsigned int                                                              : 24;
     } gfx09_10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int MEM_BASE                                                     : 32;
     } gfx11;
@@ -28363,7 +28539,7 @@ union SPI_SHADER_PGM_HI_HS {
         unsigned int MEM_BASE                                                     :  8;
         unsigned int                                                              : 24;
     } gfx09_10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int MEM_BASE                                                     : 32;
     } gfx11;
@@ -29003,7 +29179,7 @@ union SPI_SHADER_PGM_RSRC3_PS {
         unsigned int SIMD_DISABLE                                                 :  4;
         unsigned int                                                              :  2;
     } gfx09;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 22;
         unsigned int LDS_GROUP_SIZE                                               :  2;
@@ -29044,7 +29220,7 @@ union SPI_SHADER_PGM_RSRC4_GS {
         unsigned int CU_EN                                                        : 16;
         unsigned int                                                              : 16;
     } gfx10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 23;
         unsigned int INST_PREF_SIZE                                               :  6;
@@ -29056,7 +29232,7 @@ union SPI_SHADER_PGM_RSRC4_GS {
         unsigned int SPI_SHADER_LATE_ALLOC_GS                                     :  7;
         unsigned int                                                              :  9;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int CU_EN                                                        :  1;
         unsigned int RESERVED                                                     : 13;
@@ -29079,7 +29255,7 @@ union SPI_SHADER_PGM_RSRC4_HS {
         unsigned int GROUP_FIFO_DEPTH                                             :  7;
         unsigned int                                                              : 25;
     } gfx09;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 16;
         unsigned int INST_PREF_SIZE                                               :  6;
@@ -29090,7 +29266,7 @@ union SPI_SHADER_PGM_RSRC4_HS {
         unsigned int CU_EN                                                        : 16;
         unsigned int                                                              : 16;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 29;
         unsigned int TRAP_ON_START                                                :  1;
@@ -29109,14 +29285,14 @@ union SPI_SHADER_PGM_RSRC4_PS {
         unsigned int CU_EN                                                        : 16;
         unsigned int                                                              : 16;
     } bits, bitfields;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 16;
         unsigned int INST_PREF_SIZE                                               :  6;
         unsigned int                                                              : 10;
     } gfx104Plus;
 #endif
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 29;
         unsigned int TRAP_ON_START                                                :  1;
@@ -32191,7 +32367,7 @@ union SPI_TMPRING_SIZE {
         unsigned int WAVESIZE                                                     : 13;
         unsigned int                                                              :  7;
     } gfx09_10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int WAVESIZE                                                     : 15;
@@ -32810,7 +32986,7 @@ union SQG_CONFIG {
         unsigned int UTCL0_RETRY_TIMER                                            :  7;
         unsigned int                                                              : 21;
     } gfx10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 13;
         unsigned int SQG_ICPFT_EN                                                 :  1;
@@ -32818,7 +32994,7 @@ union SQG_CONFIG {
         unsigned int                                                              : 17;
     } gfx104Plus;
 #endif
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int GL1H_PREFETCH_PAGE                                           :  4;
         unsigned int                                                              : 12;
@@ -32855,7 +33031,7 @@ union SQG_CONFIG {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_GL1H_STATUS {
     struct {
         unsigned int R0_ACK_ERR_DETECTED                                          :  1;
@@ -32871,7 +33047,7 @@ union SQG_GL1H_STATUS {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER0_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
@@ -32883,7 +33059,7 @@ union SQG_PERFCOUNTER0_HI {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER0_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
@@ -32895,7 +33071,7 @@ union SQG_PERFCOUNTER0_LO {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER0_SELECT {
     struct {
         unsigned int PERF_SEL                                                     :  9;
@@ -32911,7 +33087,7 @@ union SQG_PERFCOUNTER0_SELECT {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER1_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
@@ -32923,7 +33099,7 @@ union SQG_PERFCOUNTER1_HI {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER1_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
@@ -32935,7 +33111,7 @@ union SQG_PERFCOUNTER1_LO {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER1_SELECT {
     struct {
         unsigned int PERF_SEL                                                     :  9;
@@ -32951,7 +33127,7 @@ union SQG_PERFCOUNTER1_SELECT {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER2_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
@@ -32963,7 +33139,7 @@ union SQG_PERFCOUNTER2_HI {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER2_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
@@ -32975,7 +33151,7 @@ union SQG_PERFCOUNTER2_LO {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER2_SELECT {
     struct {
         unsigned int PERF_SEL                                                     :  9;
@@ -32991,7 +33167,7 @@ union SQG_PERFCOUNTER2_SELECT {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER3_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
@@ -33003,7 +33179,7 @@ union SQG_PERFCOUNTER3_HI {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER3_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
@@ -33015,7 +33191,7 @@ union SQG_PERFCOUNTER3_LO {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER3_SELECT {
     struct {
         unsigned int PERF_SEL                                                     :  9;
@@ -33031,7 +33207,7 @@ union SQG_PERFCOUNTER3_SELECT {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER4_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
@@ -33043,7 +33219,7 @@ union SQG_PERFCOUNTER4_HI {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER4_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
@@ -33055,7 +33231,7 @@ union SQG_PERFCOUNTER4_LO {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER4_SELECT {
     struct {
         unsigned int PERF_SEL                                                     :  9;
@@ -33071,7 +33247,7 @@ union SQG_PERFCOUNTER4_SELECT {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER5_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
@@ -33083,7 +33259,7 @@ union SQG_PERFCOUNTER5_HI {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER5_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
@@ -33095,7 +33271,7 @@ union SQG_PERFCOUNTER5_LO {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER5_SELECT {
     struct {
         unsigned int PERF_SEL                                                     :  9;
@@ -33111,7 +33287,7 @@ union SQG_PERFCOUNTER5_SELECT {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER6_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
@@ -33123,7 +33299,7 @@ union SQG_PERFCOUNTER6_HI {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER6_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
@@ -33135,7 +33311,7 @@ union SQG_PERFCOUNTER6_LO {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER6_SELECT {
     struct {
         unsigned int PERF_SEL                                                     :  9;
@@ -33151,7 +33327,7 @@ union SQG_PERFCOUNTER6_SELECT {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER7_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
@@ -33163,7 +33339,7 @@ union SQG_PERFCOUNTER7_HI {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER7_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
@@ -33175,7 +33351,7 @@ union SQG_PERFCOUNTER7_LO {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER7_SELECT {
     struct {
         unsigned int PERF_SEL                                                     :  9;
@@ -33191,7 +33367,7 @@ union SQG_PERFCOUNTER7_SELECT {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER_CTRL {
     struct {
         unsigned int PS_EN                                                        :  1;
@@ -33217,7 +33393,7 @@ union SQG_PERFCOUNTER_CTRL {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERFCOUNTER_CTRL2 {
     struct {
         unsigned int FORCE_EN                                                     :  1;
@@ -33231,7 +33407,7 @@ union SQG_PERFCOUNTER_CTRL2 {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQG_PERF_SAMPLE_FINISH {
     struct {
         unsigned int STATUS                                                       :  7;
@@ -33437,14 +33613,14 @@ union SQ_CLK_CTRL {
         unsigned int WCLK2DCLK_OVERRIDE                                           :  1;
         unsigned int                                                              : 31;
     } gfx103Derivative;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 16;
         unsigned int SQ_LDS_DIRECT_FGCG_OVERRIDE                                  :  1;
         unsigned int                                                              : 15;
     } gfx104Plus;
 #endif
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int SQ_SP_CMD_FGCG_OVERRIDE                                      :  1;
@@ -33561,7 +33737,7 @@ union SQ_CONFIG {
         unsigned int WCLK_HYSTERESIS_CNT                                          :  2;
         unsigned int                                                              :  9;
     } gfx103PlusExclusive;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              :  9;
         unsigned int DISABLE_VMEM_EXEC_ZERO_SKIP                                  :  1;
@@ -33570,7 +33746,7 @@ union SQ_CONFIG {
         unsigned int                                                              :  4;
     } gfx104Plus;
 #endif
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int ECO_SPARE                                                    :  8;
         unsigned int NEW_TRANS_ARB_SCHEME                                         :  1;
@@ -33804,7 +33980,7 @@ union SQ_FIFO_SIZES {
         unsigned int EXPORT_BUF_REDUCE                                            :  2;
         unsigned int                                                              : 14;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 12;
         unsigned int EXPORT_BUF_GS_RESERVED                                       :  2;
@@ -35345,7 +35521,7 @@ union SQ_PERFCOUNTER_CTRL2 {
         unsigned int FORCE_EN                                                     :  1;
         unsigned int                                                              : 31;
     } bits, bitfields;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              :  1;
         unsigned int VMID_EN                                                      : 16;
@@ -35369,7 +35545,7 @@ union SQ_PERFCOUNTER_MASK {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQ_PERF_SNAPSHOT_CTRL {
     struct {
         unsigned int TIMER_ON_OFF                                                 :  1;
@@ -35385,7 +35561,7 @@ union SQ_PERF_SNAPSHOT_CTRL {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQ_PERF_SNAPSHOT_DATA {
     struct {
         unsigned int VALID                                                        :  1;
@@ -35404,7 +35580,7 @@ union SQ_PERF_SNAPSHOT_DATA {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQ_PERF_SNAPSHOT_PC_HI {
     struct {
         unsigned int PC_HI                                                        : 16;
@@ -35417,7 +35593,7 @@ union SQ_PERF_SNAPSHOT_PC_HI {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union SQ_PERF_SNAPSHOT_PC_LO {
     struct {
         unsigned int PC_LO                                                        : 32;
@@ -35835,7 +36011,7 @@ union SQ_THREAD_TRACE_CTRL {
         unsigned int                                                              : 11;
         unsigned int DRAW_EVENT_EN                                                :  1;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              :  3;
         unsigned int GL1_PERF_EN                                                  :  1;
@@ -35925,7 +36101,7 @@ union SQ_THREAD_TRACE_MASK {
         unsigned int SQ_STALL_EN                                                  :  1;
         unsigned int                                                              : 16;
     } gfx09;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 17;
         unsigned int EXCLUDE_NONDETAIL_SHADERDATA                                 :  1;
@@ -36026,7 +36202,7 @@ union SQ_THREAD_TRACE_STATUS {
         unsigned int BUSY                                                         :  1;
         unsigned int                                                              :  6;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 24;
         unsigned int WRITE_ERROR                                                  :  1;
@@ -36047,7 +36223,7 @@ union SQ_THREAD_TRACE_STATUS2 {
         unsigned int PACKET_LOST_BUF_NO_LOCKDOWN                                  :  1;
         unsigned int                                                              : 27;
     } bits, bitfields;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              :  8;
         unsigned int BUF_ISSUE_STATUS                                             :  5;
@@ -36088,7 +36264,7 @@ union SQ_THREAD_TRACE_TOKEN_MASK {
         unsigned int                                                              :  5;
         unsigned int REG_DETAIL_ALL                                               :  1;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 11;
         unsigned int TTRACE_EXEC                                                  :  1;
@@ -37561,7 +37737,7 @@ union TA_CNTL {
         unsigned int TC_DATA_CREDIT                                               :  3;
         unsigned int                                                              : 16;
     } gfx09;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int TA_SQ_XNACK_FGCG_DISABLE                                     :  1;
         unsigned int                                                              : 31;
@@ -37593,7 +37769,7 @@ union TA_CNTL {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union TA_CNTL2 {
     struct {
         unsigned int                                                              : 16;
@@ -37602,7 +37778,7 @@ union TA_CNTL2 {
         unsigned int ELIMINATE_UNLIT_QUAD_DIS                                     :  1;
         unsigned int                                                              : 12;
     } bits, bitfields;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 17;
         unsigned int ELEMSIZE_HASH_DIS                                            :  1;
@@ -46313,7 +46489,7 @@ union UTCL1_PERFCOUNTER1_SELECT {
     float        f32All;
 };
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union UTCL1_PERFCOUNTER2_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
@@ -46325,7 +46501,7 @@ union UTCL1_PERFCOUNTER2_HI {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union UTCL1_PERFCOUNTER2_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
@@ -46337,7 +46513,7 @@ union UTCL1_PERFCOUNTER2_LO {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union UTCL1_PERFCOUNTER2_SELECT {
     struct {
         unsigned int PERF_SEL                                                     : 10;
@@ -46351,7 +46527,7 @@ union UTCL1_PERFCOUNTER2_SELECT {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union UTCL1_PERFCOUNTER3_HI {
     struct {
         unsigned int PERFCOUNTER_HI                                               : 32;
@@ -46363,7 +46539,7 @@ union UTCL1_PERFCOUNTER3_HI {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union UTCL1_PERFCOUNTER3_LO {
     struct {
         unsigned int PERFCOUNTER_LO                                               : 32;
@@ -46375,7 +46551,7 @@ union UTCL1_PERFCOUNTER3_LO {
 };
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 union UTCL1_PERFCOUNTER3_SELECT {
     struct {
         unsigned int PERF_SEL                                                     : 10;
@@ -47696,7 +47872,7 @@ union VGT_SHADER_STAGES_EN {
         unsigned int GS_FAST_LAUNCH                                               :  2;
         unsigned int                                                              : 11;
     } gfx09_1xPlus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              : 26;
         unsigned int PRIMGEN_PASSTHRU_NO_MSG                                      :  1;
@@ -48094,7 +48270,7 @@ union VGT_TF_PARAM {
         unsigned int MTYPE                                                        :  3;
         unsigned int                                                              :  6;
     } gfx10Plus;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int                                                              :  9;
         unsigned int NOT_USED                                                     :  1;
@@ -48112,7 +48288,7 @@ union VGT_TF_RING_SIZE {
         unsigned int SIZE                                                         : 16;
         unsigned int                                                              : 16;
     } gfx09_10;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int SIZE                                                         : 17;
         unsigned int                                                              : 15;
@@ -48262,7 +48438,7 @@ union WD_CNTL_STATUS {
         unsigned int TE0_BUSY                                                     :  1;
         unsigned int                                                              :  4;
     } gfx103Derivative;
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
     struct {
         unsigned int DIST_BUSY                                                    :  1;
         unsigned int DIST_BE_BUSY                                                 :  1;
