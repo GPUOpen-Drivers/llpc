@@ -89,7 +89,7 @@
 //  |     62.0 | Default to the compiler getting the GPURT library directly, and move shader library info into RtState |
 //  |     61.16| Add replaceSetWithResourceType to PipelineOptions                                                     |
 //  |     61.15| Add disableReadFirstLaneWorkaround to PipelineShaderOptions                                           |
-//  |     61.14| Add rasterStream to rsState
+//  |     61.14| Add rasterStream to rsState                                                                           |
 //  |     61.13| Add dualSourceBlendDynamic to cbState                                                                 |
 //  |     61.12| Add mode to RayTracingPipelineBuildInfo                                                               |
 //  |     61.11| Add UniformConstantMap and related structures                                                         |

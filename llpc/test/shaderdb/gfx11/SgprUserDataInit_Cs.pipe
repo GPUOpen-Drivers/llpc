@@ -143,6 +143,7 @@ options.threadGroupSwizzleMode = Default
 ; CHECK-NEXT:    buffer_load_b64 v[0:1], off, s[4:7], 0
 ; CHECK-NEXT:    s_waitcnt vmcnt(0)
 ; CHECK-NEXT:    buffer_store_format_xy v[0:1], v2, s[0:3], 0 idxen
+; CHECK-NEXT:    s_nop 0
 ; CHECK-NEXT:    s_sendmsg sendmsg(MSG_DEALLOC_VGPRS)
 ; CHECK-NEXT:    s_endpgm
 ;

@@ -182,7 +182,6 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:         .dx_linear_attr_clip_ena: true
 ; CHECK-NEXT:         .rasterization_kill: false
 ; CHECK-NEXT:         .vte_vport_provoke_disable: false
-; CHECK-NEXT:       .pa_cl_vs_out_cntl: {}
 ; CHECK-NEXT:       .pa_cl_vte_cntl:
 ; CHECK-NEXT:         .vtx_w0_fmt:     true
 ; CHECK-NEXT:         .x_offset_ena:   true
