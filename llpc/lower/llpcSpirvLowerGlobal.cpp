@@ -596,10 +596,9 @@ void SpirvLowerGlobal::mapGlobalVariableToProxy(GlobalVariable *globalVar) {
 //
 // @param input : Input to be mapped
 void SpirvLowerGlobal::mapInputToProxy(GlobalVariable *input) {
-  // NOTE: For tessellation shader or mesh shader, we do not map inputs to real proxy variables. Instead, we directly
+  // NOTE: For tessellation shader, we do not map inputs to real proxy variables. Instead, we directly
   // replace "load" instructions with import calls in the lowering operation.
-  if (m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval ||
-      m_shaderStage == ShaderStageMesh) {
+  if (m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval) {
     m_inputProxyMap[input] = nullptr;
     m_lowerInputInPlace = true;
     return;
