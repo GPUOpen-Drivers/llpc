@@ -290,7 +290,7 @@ def ShaderIndexOp : LgcRtOp<"shader.index", [Memory<[]>, WillReturn]> {
 }
 
 // =========================================================================================================
-def GetShaderRecordBufferPtrOp : LgcRtOp<"get.shader.record.buffer.ptr", [Memory<[]>, WillReturn]> {
+def ShaderRecordBufferOp : LgcRtOp<"shader.record.buffer", [Memory<[]>, WillReturn]> {
   let arguments = (ins I32:$shaderIndex);
   let results = (outs GlobalPointer:$ptr);
 
@@ -403,116 +403,5 @@ def InstanceInclusionMaskOp : LgcRtOp<"instance.inclusion.mask", [Memory<[]>, Wi
   let summary = "Return the instance inclusion mask";
   let description = [{
     Return an i32 giving the instance inclusion mask for the ray being traced.
-  }];
-}
-
-// =========================================================================================================
-def WorldRayOriginPtrOp : LgcRtOp<"world.ray.origin.ptr", [Memory<[]>, WillReturn]> {
-  let arguments = (ins);
-  let results = (outs PrivatePointer:$result);
-
-  let summary = "Return a pointer to the world-space origin for the current ray";
-  let description = [{
-    Return a pointer to giving the world-space origin for the current ray.
-  }];
-}
-
-// =========================================================================================================
-def WorldRayDirectionPtrOp : LgcRtOp<"world.ray.direction.ptr", [Memory<[]>, WillReturn]> {
-  let arguments = (ins);
-  let results = (outs PrivatePointer:$result);
-
-  let summary = "Return the world-space direction for the current ray";
-  let description = [{
-    Return a pointer giving the world-space direction for the current ray.
-  }];
-}
-
-// =========================================================================================================
-def RayTminPtrOp : LgcRtOp<"ray.tmin.Ptr", [Memory<[]>, WillReturn]> {
-  let arguments = (ins);
-  let results = (outs PrivatePointer:$result);
-
-  let summary = "Return a pointer to the parametric starting point for the ray";
-  let description = [{
-    Return a pointer giving the parametric starting point for the ray.
-  }];
-}
-
-// =========================================================================================================
-def RayTcurrentPtrOp : LgcRtOp<"ray.tcurrent.ptr", [Memory<[(read)]>, WillReturn]> {
-  let arguments = (ins);
-  let results = (outs PrivatePointer:$result);
-
-  let summary = "Return a pointer to the current parametric ending point for the ray";
-  let description = [{
-    Return a pointer giving the current parametric ending point for the ray.
-  }];
-}
-
-// =========================================================================================================
-def HitKindPtrOp : LgcRtOp<"hit.kind.ptr", [Memory<[]>, WillReturn]> {
-  let arguments = (ins);
-  let results = (outs PrivatePointer:$result);
-
-  let summary = "Return a pointer to the hit kind";
-  let description = [{
-    Return a pointer giving the hit kind passed in to ReportHit. For a fixed-function triangle intersection,
-    it is 254 for front-facing or 255 for back-facing.
-  }];
-}
-
-// =========================================================================================================
-def TriangleVertexPositionsPtrOp : LgcRtOp<"triangle.vertex.positions.ptr", [Memory<[]>, WillReturn]> {
-  let arguments =  (ins);
-  let results = (outs PrivatePointer:$result);
-
-  let summary = "Return a pointer to the object-space vertices of the triangle";
-  let description = [{
-    Return a pointer object space vertices of the triangle at the current intersection.
-  }];
-}
-
-// =========================================================================================================
-def RayFlagsPtrOp : LgcRtOp<"ray.flags.ptr", [Memory<[]>, WillReturn]> {
-  let arguments = (ins);
-  let results = (outs PrivatePointer:$result);
-
-  let summary = "Return a pointer to the current ray flags";
-  let description = [{
-    Return a pointer giving the current ray flags.
-  }];
-}
-
-// =========================================================================================================
-def GeometryIndexPtrOp : LgcRtOp<"geometry.index.ptr", [Memory<[]>, WillReturn]> {
-  let arguments = (ins);
-  let results = (outs PrivatePointer:$result);
-
-  let summary = "Return a pointer to the geometry index";
-  let description = [{
-    Return a pointer giving the geometry index.
-  }];
-}
-
-// =========================================================================================================
-def PrimitiveIndexPtrOp : LgcRtOp<"primitive.index.ptr", [Memory<[]>, WillReturn]> {
-  let arguments = (ins);
-  let results = (outs PrivatePointer:$result);
-
-  let summary = "Return a pointer to the primitive index";
-  let description = [{
-    Return a pointer giving the primitive index.
-  }];
-}
-
-// =========================================================================================================
-def InstanceInclusionMaskPtrOp : LgcRtOp<"instance.inclusion.mask.ptr", [Memory<[]>, WillReturn]> {
-  let arguments =  (ins);
-  let results = (outs PrivatePointer:$result);
-
-  let summary = "Return a pointer to the instance inclusion mask";
-  let description = [{
-    Return a pointer giving the instance inclusion mask for the ray being traced.
   }];
 }

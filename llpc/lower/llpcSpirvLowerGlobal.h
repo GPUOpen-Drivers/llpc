@@ -81,6 +81,8 @@ private:
 
   void cleanupReturnBlock();
 
+  void handleVolatileInput(llvm::GlobalVariable *input, llvm::Value *proxy);
+
   llvm::Value *addCallInstForInOutImport(llvm::Type *inOutTy, unsigned addrSpace, llvm::Constant *inOutMeta,
                                          llvm::Value *startLoc, unsigned maxLocOffset, llvm::Value *compIdx,
                                          llvm::Value *vertexIdx, unsigned interpLoc, llvm::Value *interpInfo,

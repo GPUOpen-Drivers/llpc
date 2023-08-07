@@ -35,6 +35,7 @@
 #include "llpcDebug.h"
 #include "llpcSpirvLowerUtil.h"
 #include "lgc/LgcDialect.h"
+#include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/IR/Constant.h"
 #include "llvm/IR/Instructions.h"
@@ -622,10 +623,7 @@ void SpirvLowerGlobal::mapInputToProxy(GlobalVariable *input) {
   auto inputValue = addCallInstForInOutImport(inputTy, SPIRAS_Input, meta, nullptr, 0, nullptr, nullptr,
                                               InterpLocUnknown, nullptr, false);
 
-  if (isRayTracingShaderStage(m_shaderStage) && inputValue->getType()->isPointerTy())
-    proxy = inputValue;
-  else
-    m_builder->CreateStore(inputValue, proxy);
+  m_builder->CreateStore(inputValue, proxy);
 
   m_inputProxyMap[input] = proxy;
 }
@@ -724,6 +722,7 @@ void SpirvLowerGlobal::lowerInput() {
 
   for (auto inputMap : m_inputProxyMap) {
     auto input = cast<GlobalVariable>(inputMap.first);
+    auto proxy = inputMap.second;
 
     for (auto user = input->user_begin(), end = input->user_end(); user != end; ++user) {
       // NOTE: "Getelementptr" and "bitcast" will propagate the address space of pointer value (input variable)
@@ -740,7 +739,8 @@ void SpirvLowerGlobal::lowerInput() {
       }
     }
 
-    auto proxy = inputMap.second;
+    handleVolatileInput(input, proxy);
+
     input->mutateType(proxy->getType()); // To clear address space for pointer to make replacement valid
     input->replaceAllUsesWith(proxy);
     input->eraseFromParent();
@@ -963,18 +963,18 @@ Value *SpirvLowerGlobal::createRaytracingBuiltIn(BuiltIn builtIn) {
   case BuiltInLaunchSizeKHR:
     return m_builder->create<DispatchRaysDimensionsOp>();
   case BuiltInWorldRayOriginKHR:
-    return m_builder->create<WorldRayOriginPtrOp>();
+    return m_builder->create<WorldRayOriginOp>();
   case BuiltInWorldRayDirectionKHR:
-    return m_builder->create<WorldRayDirectionPtrOp>();
+    return m_builder->create<WorldRayDirectionOp>();
   case BuiltInObjectRayOriginKHR:
     return m_builder->create<ObjectRayOriginOp>();
   case BuiltInObjectRayDirectionKHR:
     return m_builder->create<ObjectRayDirectionOp>();
   case BuiltInRayTminKHR:
-    return m_builder->create<RayTminPtrOp>();
+    return m_builder->create<RayTminOp>();
   case BuiltInHitTNV:
   case BuiltInRayTmaxKHR:
-    return m_builder->create<RayTcurrentPtrOp>();
+    return m_builder->create<RayTcurrentOp>();
   case BuiltInInstanceCustomIndexKHR:
     return m_builder->create<InstanceIndexOp>();
   case BuiltInObjectToWorldKHR:
@@ -982,19 +982,19 @@ Value *SpirvLowerGlobal::createRaytracingBuiltIn(BuiltIn builtIn) {
   case BuiltInWorldToObjectKHR:
     return m_builder->create<WorldToObjectOp>();
   case BuiltInHitKindKHR:
-    return m_builder->create<HitKindPtrOp>();
+    return m_builder->create<HitKindOp>();
   case BuiltInHitTriangleVertexPositionsKHR:
-    return m_builder->create<TriangleVertexPositionsPtrOp>();
+    return m_builder->create<TriangleVertexPositionsOp>();
   case BuiltInIncomingRayFlagsKHR:
-    return m_builder->create<RayFlagsPtrOp>();
+    return m_builder->create<RayFlagsOp>();
   case BuiltInRayGeometryIndexKHR:
-    return m_builder->create<GeometryIndexPtrOp>();
+    return m_builder->create<GeometryIndexOp>();
   case BuiltInInstanceId:
     return m_builder->create<InstanceIdOp>();
   case BuiltInPrimitiveId:
-    return m_builder->create<PrimitiveIndexPtrOp>();
+    return m_builder->create<PrimitiveIndexOp>();
   case BuiltInCullMaskKHR:
-    return m_builder->create<InstanceInclusionMaskPtrOp>();
+    return m_builder->create<InstanceInclusionMaskOp>();
   default:
     llvm_unreachable("Should never be called");
     return nullptr;
@@ -2460,7 +2460,7 @@ void SpirvLowerGlobal::lowerShaderRecordBuffer() {
     removeConstantExpr(m_context, &global);
 
     m_builder->SetInsertPointPastAllocas(m_entryPoint);
-    auto shaderRecordBufferPtr = m_builder->create<GetShaderRecordBufferPtrOp>(m_builder->create<ShaderIndexOp>());
+    auto shaderRecordBufferPtr = m_builder->create<ShaderRecordBufferOp>(m_builder->create<ShaderIndexOp>());
 
     global.mutateType(shaderRecordBufferPtr->getType()); // To clear address space for pointer to make replacement valid
     global.replaceAllUsesWith(shaderRecordBufferPtr);
@@ -2469,6 +2469,63 @@ void SpirvLowerGlobal::lowerShaderRecordBuffer() {
 
     // There should be only one shader record buffer only
     return;
+  }
+}
+
+// =====================================================================================================================
+// Handles an input which is "volatile" (may change during execution).
+//
+// @param input : Input to be handled
+// @param proxy : Proxy of the input
+void SpirvLowerGlobal::handleVolatileInput(GlobalVariable *input, Value *proxy) {
+  // For now, only check for RayTCurrent (BuiltInRayTmaxKHR, BuiltInHitTNV) in intersection shader.
+  // TODO: Maybe also needed for BuiltInSubgroupLocalInvocationId and related.
+  if (!input->getValueType()->isFloatTy())
+    return;
+
+  if (m_shaderStage != ShaderStageRayTracingIntersect)
+    return;
+
+  MDNode *metaNode = input->getMetadata(gSPIRVMD::InOut);
+  assert(metaNode);
+
+  auto meta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+
+  ShaderInOutMetadata inOutMeta = {};
+  inOutMeta.U64All[0] = cast<ConstantInt>(meta->getOperand(0))->getZExtValue();
+  inOutMeta.U64All[1] = cast<ConstantInt>(meta->getOperand(1))->getZExtValue();
+
+  if (!inOutMeta.IsBuiltIn)
+    return;
+
+  unsigned builtInId = inOutMeta.Value;
+
+  switch (builtInId) {
+  case BuiltInHitTNV:
+  case BuiltInRayTmaxKHR: {
+    struct Payload {
+      lgc::Builder *builder;
+      Value *proxy;
+    };
+    Payload payload = {m_builder, proxy};
+
+    // RayTcurrent may change after OpReportIntersectionKHR, get and store it to proxy again after each Op is called.
+    static auto reportHitVisitor = llvm_dialects::VisitorBuilder<Payload>()
+                                       .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+                                       .add<ReportHitOp>([](auto &payload, auto &op) {
+                                         payload.builder->SetInsertPoint(op.getNextNonDebugInstruction());
+                                         auto newRayTCurrent = payload.builder->template create<RayTcurrentOp>();
+                                         payload.builder->CreateStore(newRayTCurrent, payload.proxy);
+                                       })
+                                       .build();
+
+    reportHitVisitor.visit(payload, *m_module);
+    break;
+  }
+  default: {
+    // Do nothing
+    break;
+  }
   }
 }
 

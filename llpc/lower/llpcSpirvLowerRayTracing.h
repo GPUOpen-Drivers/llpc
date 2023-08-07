@@ -59,18 +59,8 @@ class GeometryIndexOp;
 class InstanceIdOp;
 class PrimitiveIndexOp;
 class InstanceInclusionMaskOp;
-class WorldRayOriginPtrOp;
-class WorldRayDirectionPtrOp;
-class RayTminPtrOp;
-class RayTcurrentPtrOp;
-class HitKindPtrOp;
-class TriangleVertexPositionsPtrOp;
-class RayFlagsPtrOp;
-class GeometryIndexPtrOp;
-class PrimitiveIndexPtrOp;
-class InstanceInclusionMaskPtrOp;
 class ShaderIndexOp;
-class GetShaderRecordBufferPtrOp;
+class ShaderRecordBufferOp;
 } // namespace lgc::rt
 
 namespace lgc {
@@ -108,6 +98,7 @@ enum : unsigned {
   HitAttributes,              // Hit attributes
   ParentRayId,                // Ray ID of the parent TraceRay call
   HitTriangleVertexPositions, // Hit triangle vertex positions
+  Payload,                    // Payload
   Count                       // Count of the trace attributes
 };
 }
@@ -184,7 +175,6 @@ public:
 
 private:
   void createTraceParams(llvm::Function *func);
-  llvm::GlobalVariable *createGlobalBuiltIn(unsigned builtInId);
   void createRayGenEntryFunc();
   void processShaderRecordBuffer(llvm::GlobalVariable *global, llvm::Value *bufferDesc, llvm::Value *tableIndex,
                                  llvm::Instruction *insertPos);
@@ -269,23 +259,12 @@ private:
   void visitInstanceIdOp(lgc::rt::InstanceIdOp &inst);
   void visitPrimitiveIndexOp(lgc::rt::PrimitiveIndexOp &inst);
   void visitInstanceInclusionMaskOp(lgc::rt::InstanceInclusionMaskOp &inst);
-  void visitWorldRayOriginPtrOp(lgc::rt::WorldRayOriginPtrOp &inst);
-  void visitWorldRayDirectionPtrOp(lgc::rt::WorldRayDirectionPtrOp &inst);
-  void visitRayTminPtrOp(lgc::rt::RayTminPtrOp &inst);
-  void visitRayTcurrentPtrOp(lgc::rt::RayTcurrentPtrOp &inst);
-  void visitHitKindPtrOp(lgc::rt::HitKindPtrOp &inst);
-  void visitTriangleVertexPositionsPtrOp(lgc::rt::TriangleVertexPositionsPtrOp &inst);
-  void visitRayFlagsPtrOp(lgc::rt::RayFlagsPtrOp &inst);
-  void visitGeometryIndexPtrOp(lgc::rt::GeometryIndexPtrOp &inst);
-  void visitPrimitiveIndexPtrOp(lgc::rt::PrimitiveIndexPtrOp &inst);
-  void visitInstanceInclusionMaskPtrOp(lgc::rt::InstanceInclusionMaskPtrOp &inst);
   void visitShaderIndexOp(lgc::rt::ShaderIndexOp &inst);
-  void visitGetShaderRecordBufferPtrOp(lgc::rt::GetShaderRecordBufferPtrOp &inst);
+  void visitShaderRecordBufferOp(lgc::rt::ShaderRecordBufferOp &inst);
 
   void visitAlloca(llvm::AllocaInst &inst);
 
   llvm::Value *createLoadInstNodeAddr();
-  llvm::Value *createGetGlobalPayloadPtr();
 
   llvm::Value *m_traceParams[TraceParam::Count];           // Trace ray set parameters
   llvm::Value *m_worldToObjMatrix = nullptr;               // World to Object matrix

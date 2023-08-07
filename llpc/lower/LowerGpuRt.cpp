@@ -47,8 +47,7 @@ static const char *LdsStack = "LdsStack";
 
 namespace Llpc {
 // =====================================================================================================================
-LowerGpuRt::LowerGpuRt()
-    : m_stack(nullptr), m_stackTy(nullptr), m_lowerStack(false), m_rayStaticId(nullptr), m_globalPayload(nullptr) {
+LowerGpuRt::LowerGpuRt() : m_stack(nullptr), m_stackTy(nullptr), m_lowerStack(false), m_rayStaticId(nullptr) {
 }
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
@@ -64,7 +63,6 @@ PreservedAnalyses LowerGpuRt::run(Module &module, ModuleAnalysisManager &analysi
                  (gfxip.major < 11);
   createGlobalStack();
   createRayStaticIdValue();
-  createGlobalPayloadValue();
 
   static auto visitor = llvm_dialects::VisitorBuilder<LowerGpuRt>()
                             .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
@@ -81,7 +79,6 @@ PreservedAnalyses LowerGpuRt::run(Module &module, ModuleAnalysisManager &analysi
                             .add(&LowerGpuRt::visitGetFlattenedGroupThreadId)
                             .add(&LowerGpuRt::visitSetRayStaticId)
                             .add(&LowerGpuRt::visitGetRayStaticId)
-                            .add(&LowerGpuRt::visitGetGlobalPayloadPtr)
                             .build();
 
   visitor.visit(*this, *m_module);
@@ -150,15 +147,6 @@ void LowerGpuRt::createGlobalStack() {
 void LowerGpuRt::createRayStaticIdValue() {
   m_builder->SetInsertPointPastAllocas(m_entryPoint);
   m_rayStaticId = m_builder->CreateAlloca(m_builder->getInt32Ty());
-}
-
-// =====================================================================================================================
-// Create global payload value
-void LowerGpuRt::createGlobalPayloadValue() {
-  m_builder->SetInsertPointPastAllocas(m_entryPoint);
-  auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
-  const auto payloadType = rayTracingContext->getPayloadType(m_builder);
-  m_globalPayload = m_builder->CreateAlloca(payloadType);
 }
 
 // =====================================================================================================================
@@ -384,20 +372,6 @@ void LowerGpuRt::visitGetRayStaticId(GpurtGetRayStaticIdOp &inst) {
   assert(m_rayStaticId);
   auto rayStaticId = m_builder->CreateLoad(m_builder->getInt32Ty(), m_rayStaticId);
   inst.replaceAllUsesWith(rayStaticId);
-  m_callsToLower.push_back(&inst);
-  m_funcsToLower.insert(inst.getCalledFunction());
-}
-
-// =====================================================================================================================
-// Visit "GpurtGetGlobalPayloadPtrOp" instruction
-//
-// @param inst : The dialect instruction to process
-void LowerGpuRt::visitGetGlobalPayloadPtr(GpurtGetGlobalPayloadPtrOp &inst) {
-  m_builder->SetInsertPoint(&inst);
-
-  assert(m_globalPayload);
-  inst.replaceAllUsesWith(m_globalPayload);
-
   m_callsToLower.push_back(&inst);
   m_funcsToLower.insert(inst.getCalledFunction());
 }

@@ -48,7 +48,6 @@ class GpurtGetTriangleCompressionModeOp;
 class GpurtGetFlattenedGroupThreadIdOp;
 class GpurtSetRayStaticIdOp;
 class GpurtGetRayStaticIdOp;
-class GpurtGetGlobalPayloadPtrOp;
 } // namespace lgc
 
 namespace llvm {
@@ -68,7 +67,6 @@ private:
   llvm::Value *getThreadIdInGroup() const;
   void createGlobalStack();
   void createRayStaticIdValue();
-  void createGlobalPayloadValue();
   void visitGetStackSize(lgc::GpurtGetStackSizeOp &inst);
   void visitGetStackBase(lgc::GpurtGetStackBaseOp &inst);
   void visitGetStackStride(lgc::GpurtGetStackStrideOp &inst);
@@ -82,13 +80,11 @@ private:
   void visitGetFlattenedGroupThreadId(lgc::GpurtGetFlattenedGroupThreadIdOp &inst);
   void visitSetRayStaticId(lgc::GpurtSetRayStaticIdOp &inst);
   void visitGetRayStaticId(lgc::GpurtGetRayStaticIdOp &inst);
-  void visitGetGlobalPayloadPtr(lgc::GpurtGetGlobalPayloadPtrOp &inst);
   llvm::Value *m_stack;                                  // Stack array to hold stack value
   llvm::Type *m_stackTy;                                 // Stack type
   bool m_lowerStack;                                     // If it is lowerStack
   llvm::SmallVector<llvm::Instruction *> m_callsToLower; // Call instruction to lower
   llvm::SmallSet<llvm::Function *, 4> m_funcsToLower;    // Functions to lower
   llvm::Value *m_rayStaticId;                            // Ray static ID value
-  llvm::Value *m_globalPayload;                          // Global payload
 };
 } // namespace Llpc
