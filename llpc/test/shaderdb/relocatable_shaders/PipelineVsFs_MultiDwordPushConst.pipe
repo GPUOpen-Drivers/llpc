@@ -17,13 +17,13 @@
 ; SHADERTEST-LABEL: _amdgpu_ps_main:
 ; SHADERTEST-NEXT: BB0_0
 ; SHADERTEST: v_mov_b32_e32 v0, 0
-; SHADERTEST-NEXT: v_mov_b32_e32 v5, s2
-; SHADERTEST-NEXT: v_mov_b32_e32 v6, s3
+; SHADERTEST-NEXT: v_mov_b32_e32 v5, s1
+; SHADERTEST-NEXT: v_mov_b32_e32 v6, s2
 ; SHADERTEST: image_gather4_lz v[0:4], v[5:6]
 
 ; Check that the PAL metadata will place the correct values in those registers.
-; SHADERTEST: SPI_SHADER_USER_DATA_PS_2                     0x0000000000000003
-; SHADERTEST: SPI_SHADER_USER_DATA_PS_3                     0x0000000000000004
+; SHADERTEST: SPI_SHADER_USER_DATA_PS_1                     0x0000000000000003
+; SHADERTEST: SPI_SHADER_USER_DATA_PS_2                     0x0000000000000004
 
 ; END_SHADERTEST
 [Version]

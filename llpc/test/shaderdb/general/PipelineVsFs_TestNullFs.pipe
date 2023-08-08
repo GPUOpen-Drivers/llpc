@@ -36,7 +36,7 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:       .ps:
 ; CHECK-NEXT:         .entry_point:    _amdgpu_ps_main
 ; CHECK-NEXT:         .scratch_memory_size: 0
-; CHECK-NEXT:         .sgpr_count:     0x3
+; CHECK-NEXT:         .sgpr_count:     0x2
 ; CHECK-NEXT:         .sgpr_limit:     0x6a
 ; CHECK-NEXT:         .vgpr_count:     0x2
 ; CHECK-NEXT:         .vgpr_limit:     0x100
@@ -44,7 +44,7 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:       .vs:
 ; CHECK-NEXT:         .entry_point:    _amdgpu_vs_main
 ; CHECK-NEXT:         .scratch_memory_size: 0
-; CHECK-NEXT:         .sgpr_count:     0x4
+; CHECK-NEXT:         .sgpr_count:     0x3
 ; CHECK-NEXT:         .sgpr_limit:     0x6a
 ; CHECK-NEXT:         .vgpr_count:     0x4
 ; CHECK-NEXT:         .vgpr_limit:     0x100
@@ -56,14 +56,14 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:       0x2c01:          0
 ; CHECK-NEXT:       0x2c06 (SPI_SHADER_PGM_CHKSUM_PS): {{.*}}
 ; CHECK-NEXT:       0x2c0a (SPI_SHADER_PGM_RSRC1_PS): 0x22c0000
-; CHECK-NEXT:       0x2c0b (SPI_SHADER_PGM_RSRC2_PS): 0x4
+; CHECK-NEXT:       0x2c0b (SPI_SHADER_PGM_RSRC2_PS): 0x2
 ; CHECK-NEXT:       0x2c0c (SPI_SHADER_USER_DATA_PS_0): 0x10000000
 ; CHECK-NEXT:       0x2c45 (SPI_SHADER_PGM_CHKSUM_VS): {{.*}}
 ; CHECK-NEXT:       0x2c4a (SPI_SHADER_PGM_RSRC1_VS): 0x82c0000
-; CHECK-NEXT:       0x2c4b (SPI_SHADER_PGM_RSRC2_VS): 0x8
+; CHECK-NEXT:       0x2c4b (SPI_SHADER_PGM_RSRC2_VS): 0x6
 ; CHECK-NEXT:       0x2c4c (SPI_SHADER_USER_DATA_VS_0): 0x10000000
-; CHECK-NEXT:       0x2c4e (SPI_SHADER_USER_DATA_VS_2): 0x10000003
-; CHECK-NEXT:       0x2c4f (SPI_SHADER_USER_DATA_VS_3): 0x10000004
+; CHECK-NEXT:       0x2c4d (SPI_SHADER_USER_DATA_VS_1): 0x10000003
+; CHECK-NEXT:       0x2c4e (SPI_SHADER_USER_DATA_VS_2): 0x10000004
 ; CHECK-NEXT:       0xa08f (CB_SHADER_MASK): 0
 ; CHECK-NEXT:       0xa191 (SPI_PS_INPUT_CNTL_0): 0
 ; CHECK-NEXT:       0xa1b1 (SPI_VS_OUT_CONFIG): 0x80

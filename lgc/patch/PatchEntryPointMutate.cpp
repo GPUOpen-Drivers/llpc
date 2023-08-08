@@ -1383,7 +1383,6 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
 // * The "user data" SGPRs, up to 32 (GFX9+ non-compute shader) or 16 (compute shader or <=GFX8). Many of the values
 //   here are pointers, but are passed as a single 32-bit register and then expanded to 64-bit in the shader code:
 //   - The "global information table", containing various descriptors such as the inter-shader rings
-//   - The "per-shader table", which is added here but appears to be unused
 //   - The streamout table if needed
 //   - Nodes from the root user data layout, including pointers to descriptor sets.
 //   - Various other system values set up by PAL, such as the vertex buffer table and the vertex base index
@@ -1413,7 +1412,7 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
   entryArgIdxs.initialized = true;
 
   // First we collect the user data args in two vectors:
-  // - userDataArgs: global table, per-shader table and streamout table, followed by the nodes from the root user
+  // - userDataArgs: global table and streamout table, followed by the nodes from the root user
   //   data layout (excluding vertex buffer and streamout tables). Some of them may need to be spilled due to
   //   running out of entry SGPRs
   // - specialUserDataArgs: special values that go at the end, such as ViewId.
@@ -1429,11 +1428,6 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
 
   // Global internal table
   userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "globalTable", UserDataMapping::GlobalTable));
-
-  // Per-shader table
-  // TODO: We need add per shader table per real usage after switch to PAL new interface.
-  // if (pResUsage->perShaderTable)
-  userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "perShaderTable"));
 
   addSpecialUserDataArgs(userDataArgs, specialUserDataArgs, builder);
 

@@ -8,7 +8,7 @@
 
 // SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 // %descTable2 is for uniform buf, it should be %descTable1 in compact mode.
-// SHADERTEST: define dllexport amdgpu_ps { <4 x float> } @_amdgpu_ps_main(i32 inreg %{{[^,]*}}, i32 inreg %{{[^,]*}}, i32 inreg %descTable2,
+// SHADERTEST: define dllexport amdgpu_ps { <4 x float> } @_amdgpu_ps_main(i32 inreg %{{[^,]*}}, i32 inreg %descTable2,
 // SHADERTEST: AMDLLPC SUCCESS
 // END_SHADERTEST
 

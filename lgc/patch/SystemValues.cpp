@@ -352,22 +352,6 @@ Instruction *ShaderSystemValues::getInternalGlobalTablePtr() {
 }
 
 // =====================================================================================================================
-// Get internal per shader table pointer as pointer to i8.
-Value *ShaderSystemValues::getInternalPerShaderTablePtr() {
-  if (!m_internalPerShaderTablePtr) {
-    auto ptrTy = Type::getInt8Ty(*m_context)->getPointerTo(ADDR_SPACE_CONST);
-    // Per shader table is always the second function argument (separate shader) or the ninth function argument (merged
-    // shader). And mesh shader is actually mapped to ES-GS merged shader.
-    m_internalPerShaderTablePtr =
-        makePointer(getFunctionArgument(m_entryPoint,
-                                        getShaderStage(m_entryPoint) == ShaderStageMesh ? NumSpecialSgprInputs + 1 : 1,
-                                        "perShaderTable"),
-                    ptrTy, InvalidValue);
-  }
-  return m_internalPerShaderTablePtr;
-}
-
-// =====================================================================================================================
 // Get the mesh pipeline statistics buffer pointer as pointer to i8
 Value *ShaderSystemValues::getMeshPipeStatsBufPtr() {
   assert(m_pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3})); // Must be GFX10.3+
