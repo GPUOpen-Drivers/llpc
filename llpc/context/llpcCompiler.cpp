@@ -2179,17 +2179,6 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
           shaderHandles[i].intersectionId = getModuleIdByIndex(shaderGroup->intersectionShader);
       }
     }
-
-    // By convention, we're in indirect mode if we produced more than one ELF.
-    if (pipelineOut->pipelineBinCount > 1) {
-      pipelineOut->shaderGroupHandle.shaderMapping = RayTracingShaderIdentifierMapping::ElfModuleGpuVa;
-      pipelineOut->shaderGroupHandle.anyHitMapping = RayTracingShaderIdentifierMapping::ElfModuleGpuVa;
-      pipelineOut->shaderGroupHandle.intersectionMapping = RayTracingShaderIdentifierMapping::ElfModuleGpuVa;
-    } else {
-      pipelineOut->shaderGroupHandle.shaderMapping = RayTracingShaderIdentifierMapping::None;
-      pipelineOut->shaderGroupHandle.anyHitMapping = RayTracingShaderIdentifierMapping::None;
-      pipelineOut->shaderGroupHandle.intersectionMapping = RayTracingShaderIdentifierMapping::None;
-    }
   }
 
   return result;
