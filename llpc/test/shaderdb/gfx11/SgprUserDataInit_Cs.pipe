@@ -136,10 +136,11 @@ options.optimizeTessFactor = 0
 options.optimizationLevel = 2
 options.threadGroupSwizzleMode = Default
 ; CHECK-LABEL: amdgpu_cs_main:
-; CHECK:         s_getpc_b64 s[0:1]
+; CHECK:         s_getpc_b64 s[2:3]
+; CHECK-NEXT:    s_mov_b32 s0, s1
+; CHECK-NEXT:    s_mov_b32 s1, s3
 ; CHECK-NEXT:    v_mov_b32_e32 v2, 0
-; CHECK-NEXT:    s_mov_b32 s3, s1
-; CHECK-NEXT:    s_load_b256 s[0:7], s[2:3], 0x0
+; CHECK-NEXT:    s_load_b256 s[0:7], s[0:1], 0x0
 ; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
 ; CHECK-NEXT:    buffer_load_b64 v[0:1], off, s[4:7], 0
 ; CHECK-NEXT:    s_waitcnt vmcnt(0)
@@ -180,8 +181,8 @@ options.threadGroupSwizzleMode = Default
 ; CHECK-NEXT:         .trap_present:   false
 ; CHECK-NEXT:         .user_data_reg_map:
 ; CHECK-NEXT:           - 0x10000000
-; CHECK-NEXT:           - 0xffffffff
 ; CHECK-NEXT:           - 0
+; CHECK-NEXT:           - 0xffffffff
 ; CHECK-NEXT:           - 0xffffffff
 ; CHECK-NEXT:           - 0xffffffff
 ; CHECK-NEXT:           - 0xffffffff

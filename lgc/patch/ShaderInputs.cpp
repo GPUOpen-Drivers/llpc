@@ -47,8 +47,6 @@ const char *ShaderInputs::getSpecialUserDataName(UserDataMapping kind) {
   switch (kind) {
   case UserDataMapping::GlobalTable:
     return "GlobalTable";
-  case UserDataMapping::PerShaderTable:
-    return "PerShaderTable";
   case UserDataMapping::SpillTable:
     return "SpillTable";
   case UserDataMapping::BaseVertex:

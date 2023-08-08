@@ -125,6 +125,5 @@ static const unsigned MaxRayQueryLdsStackEntries = 16; // Max number of ray quer
 
 // Internal resource table's virtual descriptor sets
 static const unsigned InternalResourceTable = 0x10000000;
-static const unsigned InternalPerShaderTable = 0x10000001;
 
 } // namespace lgc

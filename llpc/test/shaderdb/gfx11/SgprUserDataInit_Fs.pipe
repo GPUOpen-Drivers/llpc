@@ -125,11 +125,12 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:    s_endpgm
 ;
 ; CHECK-LABEL: amdgpu_ps_main:
-; CHECK:         s_getpc_b64 s[0:1]
+; CHECK:         s_getpc_b64 s[2:3]
 ; CHECK-NEXT:    s_mov_b32 s8, exec_lo
-; CHECK-NEXT:    s_mov_b32 s3, s1
+; CHECK-NEXT:    s_mov_b32 s0, s1
+; CHECK-NEXT:    s_mov_b32 s1, s3
 ; CHECK-NEXT:    s_wqm_b32 exec_lo, exec_lo
-; CHECK-NEXT:    s_load_b256 s[0:7], s[2:3], 0x180
+; CHECK-NEXT:    s_load_b256 s[0:7], s[0:1], 0x180
 ; CHECK-NEXT:    v_mov_b32_e32 v0, 0x58005800
 ; CHECK-NEXT:    s_and_b32 exec_lo, exec_lo, s8
 ; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
@@ -302,12 +303,11 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:         .offchip_lds_en: false
 ; CHECK-NEXT:         .scratch_en:     false
 ; CHECK-NEXT:         .scratch_memory_size: 0
-; CHECK-NEXT:         .sgpr_count:     0xd
+; CHECK-NEXT:         .sgpr_count:     0xc
 ; CHECK-NEXT:         .sgpr_limit:     0x6a
 ; CHECK-NEXT:         .trap_present:   0
 ; CHECK-NEXT:         .user_data_reg_map:
 ; CHECK-NEXT:           - 0x10000000
-; CHECK-NEXT:           - 0xffffffff
 ; CHECK-NEXT:           - 0x1000000a
 ; CHECK-NEXT:           - 0x10000003
 ; CHECK-NEXT:           - 0x10000004
@@ -338,7 +338,8 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:           - 0xffffffff
 ; CHECK-NEXT:           - 0xffffffff
 ; CHECK-NEXT:           - 0xffffffff
-; CHECK-NEXT:         .user_sgprs:     0x5
+; CHECK-NEXT:           - 0xffffffff
+; CHECK-NEXT:         .user_sgprs:     0x4
 ; CHECK-NEXT:         .vgpr_count:     0x9
 ; CHECK-NEXT:         .vgpr_limit:     0x100
 ; CHECK-NEXT:         .wavefront_size: 0x40
@@ -358,8 +359,8 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:         .trap_present:   0
 ; CHECK-NEXT:         .user_data_reg_map:
 ; CHECK-NEXT:           - 0x10000000
-; CHECK-NEXT:           - 0xffffffff
 ; CHECK-NEXT:           - 0x12
+; CHECK-NEXT:           - 0xffffffff
 ; CHECK-NEXT:           - 0xffffffff
 ; CHECK-NEXT:           - 0xffffffff
 ; CHECK-NEXT:           - 0xffffffff
