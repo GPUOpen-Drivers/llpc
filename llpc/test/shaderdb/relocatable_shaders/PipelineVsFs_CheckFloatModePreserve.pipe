@@ -4,7 +4,9 @@
 ; RUN: amdllpc -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
 ; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: PalMetadata
-; SHADERTEST: SPI_SHADER_PGM_RSRC1_PS 0x00000000002F
+; SHADERTEST: .hardware_stages: {
+; SHADERTEST:  .ps: {
+; SHADERTEST:   .float_mode: 0x00000000000000F0
 ; END_SHADERTEST
 
 [Version]
