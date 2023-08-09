@@ -184,6 +184,9 @@ void SpirvLowerRayTracing::processTraceRayCall(BaseTraceRayOp *inst) {
           m_builder->CreateNamedCall(RtName::TraceRayKHR, funcTy->getReturnType(), args, {Attribute::AlwaysInline});
     }
 
+    // Restore parent ray ID after call
+    m_builder->CreateStore(currentParentRayId, parentRayId);
+
     // Save the return value to the input payloads for memcpy of type conversion
     m_builder->CreateStore(result, localPayload);
     m_builder->CreateMemCpy(payloadArg, align, localPayload, align, payloadArgSize);
@@ -1568,9 +1571,9 @@ CallInst *SpirvLowerRayTracing::createTraceRay() {
   }
   m_builder->CreateStore(arg, traceRaysArgs[TraceRayLibFuncParam::TMax]);
 
-  // Parent ray ID and static ID if logging feature is enabled
+  // Parent ray ID and static ID for logging feature
   arg = ++argIt;
-  // ParentRayId is ignored for now
+  m_builder->CreateStore(arg, m_traceParams[TraceParam::ParentRayId]);
   arg = ++argIt;
   m_builder->create<lgc::GpurtSetRayStaticIdOp>(arg);
 
@@ -1851,7 +1854,7 @@ FunctionType *SpirvLowerRayTracing::getTraceRayFuncTy() {
       m_builder->getFloatTy(),                          // Ray Tmax
   };
 
-  // Add parent ray ID and static ID if logging feature is enabled.
+  // Add parent ray ID and static ID for logging feature.
   argsTys.push_back(m_builder->getInt32Ty());
   argsTys.push_back(m_builder->getInt32Ty());
 
