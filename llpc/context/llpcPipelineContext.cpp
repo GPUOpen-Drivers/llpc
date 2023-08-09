@@ -283,7 +283,7 @@ void PipelineContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
 // @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing
 // @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
 Options PipelineContext::computePipelineOptions() const {
-  Options options;
+  Options options = {};
   options.hash[0] = getPipelineHashCode();
   options.hash[1] = get64BitCacheHashCode();
 
