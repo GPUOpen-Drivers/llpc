@@ -30,6 +30,7 @@
  */
 #include "LowerGpuRt.h"
 #include "llpcContext.h"
+#include "llpcRayTracingContext.h"
 #include "lgc/Builder.h"
 #include "lgc/GpurtDialect.h"
 #include "llvm-dialects/Dialect/Visitor.h"

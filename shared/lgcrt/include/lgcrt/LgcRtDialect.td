@@ -64,6 +64,9 @@ def V3I32 : TgConstant<(FixedVectorType I32, 3)>, Type;
 def A4V3F32 : TgConstant<(ArrayType V3F32, 4)>, Type;
 def A3V3F32 : TgConstant<(ArrayType V3F32, 3)>, Type;
 
+def GlobalPointer : TgConstant<(PointerType 1)>, Type;
+def PrivatePointer : TgConstant<(PointerType 5)>, Type;
+
 class LgcRtOp<string mnemonic_, list<Trait> traits_ = []>
     : Op<LgcRtDialect, mnemonic_, traits_ # [NoUnwind]>;
 
@@ -273,6 +276,33 @@ def ReportHitOp : LgcRtOp<"report.hit", []> {
 }
 
 // =========================================================================================================
+def ShaderIndexOp : LgcRtOp<"shader.index", [Memory<[]>, WillReturn]> {
+  let arguments = (ins);
+  let results = (outs I32:$result);
+
+  let summary = "Return the current shader index";
+  let description = [{
+    Return the current shader index.
+
+    The shader index is used to index into the shader binding table, i.e. the table which backs the
+    Vulkan shader record buffers or the DX12 local root signatures.
+  }];
+}
+
+// =========================================================================================================
+def ShaderRecordBufferOp : LgcRtOp<"shader.record.buffer", [Memory<[]>, WillReturn]> {
+  let arguments = (ins I32:$shaderIndex);
+  let results = (outs GlobalPointer:$ptr);
+
+  let summary = "Return the pointer to shader record buffer";
+  let description = [{
+    Return the pointer to shader record buffer.
+
+    - shaderIndex: The value used to index into the shader binding table.
+  }];
+}
+
+// =========================================================================================================
 def BaseTraceRayOp : OpClass<LgcRtDialect> {
   let arguments = (ins I64:$accelStruct, I32:$rayFlags, I32:$instanceInclusionMask,
       I32:$rayContributionToHitGroupIndex, I32:$multiplierForGeometryContribution, I32:$missShaderIndex,
@@ -362,5 +392,16 @@ def TriangleVertexPositionsOp : LgcRtOp<"triangle.vertex.positions", [Memory<[]>
   let summary = "Return the object-space vertices of the triangle";
   let description = [{
     Return [3 x <3 x float>] object space vertices of the triangle at the current intersection.
+  }];
+}
+
+// =========================================================================================================
+def InstanceInclusionMaskOp : LgcRtOp<"instance.inclusion.mask", [Memory<[]>, WillReturn]> {
+  let arguments =  (ins);
+  let results = (outs I32:$result);
+
+  let summary = "Return the instance inclusion mask";
+  let description = [{
+    Return an i32 giving the instance inclusion mask for the ray being traced.
   }];
 }

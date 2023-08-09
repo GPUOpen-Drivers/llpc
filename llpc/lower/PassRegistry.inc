@@ -47,7 +47,6 @@ LLPC_MODULE_PASS("llpc-spirv-lower-memory-op", SpirvLowerMemoryOp)
 LLPC_MODULE_PASS("llpc-spirv-lower-ray-query", SpirvLowerRayQuery)
 LLPC_MODULE_PASS("llpc-spirv-lower-ray-tracing", SpirvLowerRayTracing)
 LLPC_MODULE_PASS("llpc-spirv-lower-ray-query-post-inline", SpirvLowerRayQueryPostInline)
-LLPC_MODULE_PASS("llpc-spirv-lower-ray-tracing-builtin", SpirvLowerRayTracingBuiltIn)
 
 #undef LLPC_PASS
 #undef LLPC_MODULE_PASS
