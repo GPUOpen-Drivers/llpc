@@ -140,7 +140,6 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:         - 0
 ; CHECK-NEXT:         - 0
 ; CHECK-NEXT:         - 0
-; CHECK-NEXT:       .spi_shader_z_format: 0
 ; CHECK-NEXT:       .spi_vs_out_config:
 ; CHECK-NEXT:         .no_pc_export:   true
 ; CHECK-NEXT:       .vgt_reuse_off:  false

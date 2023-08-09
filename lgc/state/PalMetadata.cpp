@@ -657,18 +657,6 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
         graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::AaCoverageToShaderSelect] =
             serializeEnum(Util::Abi::CoverageToShaderSel(INPUT_COVERAGE));
     }
-
-    if (m_pipelineState->isUseMrt0AToMrtzA()) {
-      // Update z_export_format since depth export has alpha channel
-      unsigned depthExpFmt = graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::SpiShaderZFormat].getUInt();
-      if (depthExpFmt == EXP_FORMAT_32_R)
-        depthExpFmt = EXP_FORMAT_32_AR;
-      else if (depthExpFmt == EXP_FORMAT_32_GR)
-        depthExpFmt = EXP_FORMAT_32_ABGR;
-      else if (depthExpFmt != EXP_FORMAT_32_ABGR)
-        llvm_unreachable("unhandled depth export format");
-      graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::SpiShaderZFormat] = depthExpFmt;
-    }
   } else {
     // Set PA_CL_CLIP_CNTL from pipeline state settings.
     // DX_CLIP_SPACE_DEF, ZCLIP_NEAR_DISABLE and ZCLIP_FAR_DISABLE are now set internally by PAL (as of
@@ -702,19 +690,6 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
         paScAaConfig.bitfields.COVERAGE_TO_SHADER_SELECT = INPUT_COVERAGE;
       }
       setRegister(mmPA_SC_AA_CONFIG, paScAaConfig.u32All);
-    }
-    if (m_pipelineState->isUseMrt0AToMrtzA()) {
-      // Update z_export_format since depth export has alpha channel
-      SPI_SHADER_Z_FORMAT spiShaderZFormat = {};
-      unsigned depthExpFmt = getRegister(mmSPI_SHADER_Z_FORMAT);
-      if (depthExpFmt == EXP_FORMAT_32_R)
-        depthExpFmt = EXP_FORMAT_32_AR;
-      else if (depthExpFmt == EXP_FORMAT_32_GR)
-        depthExpFmt = EXP_FORMAT_32_ABGR;
-      else if (depthExpFmt != EXP_FORMAT_32_ABGR)
-        llvm_unreachable("unhandled depth export format");
-      spiShaderZFormat.bitfields.Z_EXPORT_FORMAT = depthExpFmt;
-      setRegister(mmSPI_SHADER_Z_FORMAT, spiShaderZFormat.u32All);
     }
   }
 }
@@ -1110,6 +1085,21 @@ void PalMetadata::updateCbShaderMask(llvm::ArrayRef<ColorExportInfo> exps) {
     cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output7Enable] = (cbShaderMask >> 28) & 0xF;
   } else {
     setRegister(mmCB_SHADER_MASK, cbShaderMask);
+  }
+}
+
+// =====================================================================================================================
+// Sets the SPI_SHADER_Z_FORMAT entry.
+//
+// @param zExportFormat : new z-export-format
+void PalMetadata::setSpiShaderZFormat(unsigned zExportFormat) {
+  if (m_pipelineState->useRegisterFieldFormat()) {
+    auto graphicsRegNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
+    graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::SpiShaderZFormat] = zExportFormat;
+  } else {
+    SPI_SHADER_Z_FORMAT spiShaderZFormat = {};
+    spiShaderZFormat.bitfields.Z_EXPORT_FORMAT = zExportFormat;
+    setRegister(mmSPI_SHADER_Z_FORMAT, spiShaderZFormat.u32All);
   }
 }
 

@@ -65,7 +65,8 @@ public:
   // and export info.
   void updatePalMetadata(PalMetadata &palMetadata) override;
 
-  void enableKill() { m_killEnabled = true; };
+  // Fragment shader enables kill state.
+  void enableKill() { m_killEnabled = true; }
 
 protected:
   // Generate the glue shader to IR module

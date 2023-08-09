@@ -905,18 +905,6 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
                 (fragmentMode.earlyFragmentTests && resUsage->resourceWrite));
   SET_REG_FIELD(&config->psRegs, DB_SHADER_CONTROL, EXEC_ON_HIER_FAIL, execOnHeirFail);
 
-  unsigned depthExpFmt = EXP_FORMAT_ZERO;
-  if (builtInUsage.sampleMask)
-    depthExpFmt = EXP_FORMAT_32_ABGR;
-  else if (builtInUsage.fragStencilRef)
-    depthExpFmt = EXP_FORMAT_32_GR;
-  else if (builtInUsage.fragDepth)
-    depthExpFmt = EXP_FORMAT_32_R;
-  SET_REG_FIELD(&config->psRegs, SPI_SHADER_Z_FORMAT, Z_EXPORT_FORMAT, depthExpFmt);
-
-  unsigned cbShaderMask = resUsage->inOutUsage.fs.cbShaderMask;
-  cbShaderMask = resUsage->inOutUsage.fs.isNullFs ? 0 : cbShaderMask;
-  SET_REG(&config->psRegs, CB_SHADER_MASK, cbShaderMask);
   SET_REG_FIELD(&config->psRegs, SPI_PS_IN_CONTROL, NUM_INTERP, resUsage->inOutUsage.fs.interpInfo.size());
 
   unsigned pointCoordLoc = InvalidValue;

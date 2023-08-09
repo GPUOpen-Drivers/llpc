@@ -164,7 +164,6 @@ entryPoint = main
 ; SHADERTEST-NEXT:         - 0
 ; SHADERTEST-NEXT:         - 0
 ; SHADERTEST-NEXT:         - 0
-; SHADERTEST-NEXT:       .spi_shader_z_format: 0
 ; SHADERTEST-NEXT:       .spi_vs_out_config:
 ; SHADERTEST-NEXT:         .no_pc_export:   true
 ; SHADERTEST-NEXT:       .vgt_reuse_off:  false

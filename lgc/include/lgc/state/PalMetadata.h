@@ -169,6 +169,9 @@ public:
   // Updates the CB shader mask information that depends on the exports.
   void updateCbShaderMask(llvm::ArrayRef<ColorExportInfo> exps);
 
+  // Sets the z-export-format
+  void setSpiShaderZFormat(unsigned zExportFormat);
+
   // Sets the finalized 128-bit cache hash.  The version identifies the version of LLPC used to generate the hash.
   void setFinalized128BitCacheHash(const lgc::Hash128 &finalizedCacheHash, const llvm::VersionTuple &version);
 

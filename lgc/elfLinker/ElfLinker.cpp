@@ -363,13 +363,18 @@ ArrayRef<StringRef> ElfLinkerImpl::getGlueInfo() {
   return m_glueStrings;
 }
 
+// =====================================================================================================================
+// Build color export shader
+//
+// @param exports : Fragment export info
+// @param enableKill : Whether this fragment shader has kill enabled.
+// @param zFmt : depth-export-format
 StringRef ElfLinkerImpl::buildColorExportShader(ArrayRef<ColorExportInfo> exports, bool enableKill) {
   assert(m_glueShaders.empty());
   m_glueShaders.push_back(GlueShader::createColorExportShader(m_pipelineState, exports));
   ColorExportShader *copyColorShader = static_cast<ColorExportShader *>(m_glueShaders[0].get());
   if (enableKill)
     copyColorShader->enableKill();
-  copyColorShader->updatePalMetadata(*m_pipelineState->getPalMetadata());
   return copyColorShader->getElfBlob();
 }
 
