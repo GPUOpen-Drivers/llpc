@@ -172,6 +172,9 @@ public:
   // Updates the DB shader control that depends on the CB state.
   void updateDbShaderControl();
 
+  // Sets the z-export-format
+  void setSpiShaderZFormat(unsigned zExportFormat);
+
   // Sets the finalized 128-bit cache hash.  The version identifies the version of LLPC used to generate the hash.
   void setFinalized128BitCacheHash(const lgc::Hash128 &finalizedCacheHash, const llvm::VersionTuple &version);
 

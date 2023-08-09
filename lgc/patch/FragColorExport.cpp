@@ -993,7 +993,6 @@ void FragColorExport::generateExportInstructions(ArrayRef<lgc::ColorExportInfo> 
           // Update Mrtz.a and its mask
           alpha = builder.CreateExtractElement(values[EXP_TARGET_MRT_0], 3);
           depthMask |= 0x8;
-          m_pipelineState->setUseMrt0AToMrtzA(canCopyAlpha);
         }
       }
       Value *fragDepth = builder.CreateExtractElement(output, static_cast<uint64_t>(0));
@@ -1010,6 +1009,16 @@ void FragColorExport::generateExportInstructions(ArrayRef<lgc::ColorExportInfo> 
           builder.getTrue()               // vm
       };
       lastExport = builder.CreateIntrinsic(Intrinsic::amdgcn_exp, builder.getFloatTy(), args);
+
+      unsigned depthExpFmt = EXP_FORMAT_ZERO;
+      if (depthMask & 0x4)
+        depthExpFmt = EXP_FORMAT_32_ABGR;
+      else if (depthMask & 0x2)
+        depthExpFmt = (depthMask & 0x8) ? EXP_FORMAT_32_ABGR : EXP_FORMAT_32_GR;
+      else if (depthMask & 0x1)
+        depthExpFmt = (depthMask & 0x8) ? EXP_FORMAT_32_AR : EXP_FORMAT_32_R;
+
+      m_pipelineState->getPalMetadata()->setSpiShaderZFormat(depthExpFmt);
     }
   }
 
@@ -1026,6 +1035,7 @@ void FragColorExport::generateExportInstructions(ArrayRef<lgc::ColorExportInfo> 
     FragColorExport::setDoneFlag(lastExport, builder);
 
   m_pipelineState->getPalMetadata()->updateSpiShaderColFormat(finalExportFormats);
+  m_pipelineState->getPalMetadata()->updateCbShaderMask(info);
 }
 
 // =====================================================================================================================
