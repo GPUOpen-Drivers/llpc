@@ -1307,29 +1307,12 @@ static constexpr unsigned RayTracingMaxShaderNameLength = 16;
 /// Raytracing invalid shader ID
 static constexpr uint64_t RayTracingInvalidShaderId = 0;
 
-/// The mapping method that the driver should apply to the shader IDs returned by the compiler in
-/// RayTracingShaderIdentifier structures.
-enum class RayTracingShaderIdentifierMapping : unsigned char {
-  /// Interpret the ID as an index into the ELF module array and produce the full GPU VA of its unique contained
-  /// function.
-  ElfModuleGpuVa = 0,
-
-  /// Interpret the ID as an index into the ELF module array and produce the low 32 bits of the GPU VA of its unique
-  /// contained function. The high 32 bits remain 0 (but extraBits are still applied if present).
-  ElfModuleGpuVaLo,
-
-  /// Interpret the ID as an index into the ELF module array and produce the low 32 bits of the GPU VA of its unique
-  /// contained function. The high 32 bits are applied with extraBits
-  ElfModuleGpuVaHi,
-};
-
 /// Represents the property for a single ray-tracing shader
 struct RayTracingShaderProperty {
-  uint64_t shaderId;                                 ///< Ray tracing compiled shader ID
-  char name[RayTracingMaxShaderNameLength];          ///< Ray tracing compiled shader name
-  bool hasTraceRay;                                  ///< Whether TraceRay() is used
-  RayTracingShaderIdentifierMapping shaderIdMapping; ///< RayTracing shader Identifier Mapping
-  unsigned shaderIdExtraBits;                        ///< Raytracing shader identifier extra bits
+  uint64_t shaderId;                        ///< Ray tracing compiled shader ID
+  char name[RayTracingMaxShaderNameLength]; ///< Ray tracing compiled shader name
+  bool hasTraceRay;                         ///< Whether TraceRay() is used
+  uint64_t shaderIdExtraBits;               ///< Raytracing shader identifier extra bits
 };
 
 /// Represents ray-tracing shader identifier.
