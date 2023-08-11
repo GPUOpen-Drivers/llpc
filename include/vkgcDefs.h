@@ -1312,6 +1312,7 @@ struct RayTracingShaderProperty {
   uint64_t shaderId;                        ///< Ray tracing compiled shader ID
   char name[RayTracingMaxShaderNameLength]; ///< Ray tracing compiled shader name
   bool hasTraceRay;                         ///< Whether TraceRay() is used
+  bool onlyGpuVaLo;                         ///< Whether shader identifier LSB metadata is applied
   uint64_t shaderIdExtraBits;               ///< Raytracing shader identifier extra bits
 };
 
