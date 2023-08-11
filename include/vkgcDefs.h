@@ -1312,6 +1312,8 @@ struct RayTracingShaderProperty {
   uint64_t shaderId;                        ///< Ray tracing compiled shader ID
   char name[RayTracingMaxShaderNameLength]; ///< Ray tracing compiled shader name
   bool hasTraceRay;                         ///< Whether TraceRay() is used
+  bool onlyGpuVaLo;                         ///< Whether shader identifier LSB metadata is applied
+  uint64_t shaderIdExtraBits;               ///< Raytracing shader identifier extra bits
 };
 
 /// Represents ray-tracing shader identifier.
@@ -1320,21 +1322,6 @@ struct RayTracingShaderIdentifier {
   uint64_t anyHitId;       ///< AnyHit ID for hit groups
   uint64_t intersectionId; ///< Intersection shader ID for hit groups
   uint64_t padding;        ///< Padding to meet 32-byte api requirement and 8-byte alignment for descriptor table offset
-};
-
-/// The mapping method that the driver should apply to the shader IDs returned by the compiler in
-/// RayTracingShaderIdentifier structures.
-enum class RayTracingShaderIdentifierMapping {
-  /// No mapping, take IDs verbatim.
-  None,
-
-  /// Interpret the ID as an index into the ELF module array and produce the full GPU VA of its unique contained
-  /// function.
-  ElfModuleGpuVa,
-
-  /// Interpret the ID as an index into the ELF module array and produce the low 32 bits of the GPU VA of its unique
-  /// contained function. The high 32 bits remain 0 (but extraBits are still applied if present).
-  ElfModuleGpuVaLo,
 };
 
 /// Values to be bitwise OR'd into the result of the mapping procedure applied to shader IDs.
@@ -1355,13 +1342,8 @@ struct RayTracingCaptureReplayVaMappingEntry {
 
 /// Represents the handles of shader group for ray-tracing pipeline
 struct RayTracingShaderGroupHandle {
-  unsigned shaderHandleCount;                     ///< Count of shader group handle array
-  RayTracingShaderIdentifier *shaderHandles;      ///< Shader group handle array
-  RayTracingShaderIdentifierExtraBits *extraBits; ///< Extra bits array, one for each shader handle (may be null)
-
-  RayTracingShaderIdentifierMapping shaderMapping;       ///< Mapping applied to shaderIds
-  RayTracingShaderIdentifierMapping anyHitMapping;       ///< Mapping applied to anyHitIds
-  RayTracingShaderIdentifierMapping intersectionMapping; ///< Mapping applied to intersectionIds
+  unsigned shaderHandleCount;                ///< Count of shader group handle array
+  RayTracingShaderIdentifier *shaderHandles; ///< Shader group handle array
 };
 
 /// Represents a set of ray-tracing shaders referenced by a ray-tracing pipeline
