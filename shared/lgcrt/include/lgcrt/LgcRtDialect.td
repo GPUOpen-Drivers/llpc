@@ -71,7 +71,7 @@ class LgcRtOp<string mnemonic_, list<Trait> traits_ = []>
     : Op<LgcRtDialect, mnemonic_, traits_ # [NoUnwind]>;
 
 // =========================================================================================================
-def AcceptHitAndEndSearchOp : LgcRtOp<"accept.hit.and.end.search", [NoReturn]> {
+def AcceptHitAndEndSearchOp : LgcRtOp<"accept.hit.and.end.search", [Memory<[(write InaccessibleMem)]>, NoReturn]> {
   let arguments = (ins);
   let results = (outs);
 
@@ -84,7 +84,7 @@ def AcceptHitAndEndSearchOp : LgcRtOp<"accept.hit.and.end.search", [NoReturn]> {
 }
 
 // =========================================================================================================
-def CallCallableShaderOp : LgcRtOp<"call.callable.shader", [WillReturn]> {
+def CallCallableShaderOp : LgcRtOp<"call.callable.shader", [Memory<[(readwrite InaccessibleMem), (readwrite ArgMem)]>, WillReturn]> {
   let arguments = (ins I32:$shaderIndex, PointerType:$param, AttrI32:$paramDataSizeBytes);
   let results = (outs);
 
@@ -142,7 +142,7 @@ def HitKindOp : LgcRtOp<"hit.kind", [Memory<[]>, WillReturn]> {
 }
 
 // =========================================================================================================
-def IgnoreHitOp : LgcRtOp<"ignore.hit", [NoReturn]> {
+def IgnoreHitOp : LgcRtOp<"ignore.hit", [Memory<[(write InaccessibleMem)]>, NoReturn]> {
   let arguments = (ins);
   let results = (outs);
 
@@ -255,7 +255,7 @@ def RayTminOp : LgcRtOp<"ray.tmin", [Memory<[]>, WillReturn]> {
 }
 
 // =========================================================================================================
-def ReportHitOp : LgcRtOp<"report.hit", []> {
+def ReportHitOp : LgcRtOp<"report.hit", [Memory<[(write InaccessibleMem), (read ArgMem)]>]> {
   let arguments = (ins F32:$thit, I32:$hitKind, PointerType:$attributes, AttrI32:$size);
   let results = (outs I1:$result);
 
@@ -344,7 +344,7 @@ def BaseTraceRayOp : OpClass<LgcRtDialect> {
 }
 
 // =========================================================================================================
-def TraceRayOp : LgcRtOp<"trace.ray", [Memory<[(read)]>, WillReturn]> {
+def TraceRayOp : LgcRtOp<"trace.ray", [Memory<[(readwrite InaccessibleMem), (readwrite ArgMem)]>, WillReturn]> {
   let superclass = BaseTraceRayOp;
   let arguments = (ins superclass);
   let results = (outs);

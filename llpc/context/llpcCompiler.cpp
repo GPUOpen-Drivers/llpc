@@ -2476,6 +2476,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
 
   // Step 2: Link rayquery modules
   std::vector<std::unique_ptr<Module>> newModules;
+  std::vector<bool> moduleUsesRayQuery;
   // Record which module calls TraceRay(), except the first one (For indirect mode, it is the entry function which will
   // never call TraceRay(). For inlined mode, we don't need to care).
   std::vector<bool> moduleCallsTraceRay;
@@ -2497,6 +2498,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
   shaderInfo = shaderInfo.drop_back();
 
   newModules.push_back(std::move(entry));
+  moduleUsesRayQuery.push_back(false);
 
   for (unsigned shaderIndex = 0; shaderIndex < pipelineInfo->shaderCount; ++shaderIndex) {
     const auto *shaderInfoEntry = shaderInfo[shaderIndex];
@@ -2511,6 +2513,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
 
     newModules.push_back(std::move(shaderModule));
     moduleCallsTraceRay.push_back(moduleData->usage.hasTraceRay);
+    moduleUsesRayQuery.push_back(moduleData->usage.enableRayQuery);
   }
 
   if (gpurtShaderLibrary) {
@@ -2532,16 +2535,19 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
 
     newModules.push_back(std::move(gpurtShaderLibrary));
     moduleCallsTraceRay.push_back(false);
+    moduleUsesRayQuery.push_back(false);
   }
 
   assert(moduleCallsTraceRay.size() == (newModules.size() - 1));
+  assert(moduleUsesRayQuery.size() == newModules.size());
 
-  for (auto &module : newModules) {
+  for (unsigned i = 0; i < newModules.size(); i++) {
+    auto module = (newModules[i].get());
     std::unique_ptr<lgc::PassManager> passMgr(lgc::PassManager::Create(builderContext));
     SpirvLower::registerPasses(*passMgr);
-    SpirvLower::addPasses(mainContext, ShaderStageCompute, *passMgr, timerProfiler.getTimer(TimerLower), true, false,
-                          false);
-    bool success = runPasses(&*passMgr, module.get());
+    SpirvLower::addPasses(mainContext, ShaderStageCompute, *passMgr, timerProfiler.getTimer(TimerLower), true,
+                          moduleUsesRayQuery[i], false);
+    bool success = runPasses(&*passMgr, module);
     if (!success) {
       LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
       return Result::ErrorInvalidShader;

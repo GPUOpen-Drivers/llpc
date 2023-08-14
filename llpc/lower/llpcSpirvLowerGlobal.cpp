@@ -33,6 +33,7 @@
 #include "lgcrt/LgcRtDialect.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
+#include "llpcRayTracingContext.h"
 #include "llpcSpirvLowerUtil.h"
 #include "lgc/LgcDialect.h"
 #include "llvm-dialects/Dialect/Visitor.h"
@@ -44,6 +45,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 #include <unordered_set>
 
 #define DEBUG_TYPE "llpc-spirv-lower-global"
@@ -52,6 +54,12 @@ using namespace llvm;
 using namespace SPIRV;
 using namespace Llpc;
 using namespace lgc::rt;
+
+namespace RtName {
+static const char *HitAttribute = "HitAttribute";
+static const char *IncomingRayPayLoad = "IncomingRayPayloadKHR";
+static const char *IncomingCallableData = "IncomingCallableDataKHR";
+} // namespace RtName
 
 namespace Llpc {
 
@@ -205,6 +213,8 @@ bool SpirvLowerGlobal::runImpl(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Global\n");
 
   SpirvLower::init(&module);
+
+  changeRtFunctionSignature();
 
   // Map globals to proxy variables
   for (auto global = m_module->global_begin(), end = m_module->global_end(); global != end; ++global) {
@@ -580,8 +590,18 @@ void SpirvLowerGlobal::mapGlobalVariableToProxy(GlobalVariable *globalVar) {
 
   m_builder->SetInsertPointPastAllocas(m_entryPoint);
 
-  auto proxy = m_builder->CreateAlloca(globalVarTy, dataLayout.getAllocaAddrSpace(), nullptr,
-                                       Twine(LlpcName::GlobalProxyPrefix) + globalVar->getName());
+  Value *proxy = nullptr;
+
+  // Handle special globals, regular allocas will be removed by SROA pass.
+  if (globalVar->getName().startswith(RtName::HitAttribute))
+    proxy = m_entryPoint->getArg(1);
+  else if (globalVar->getName().startswith(RtName::IncomingRayPayLoad))
+    proxy = m_entryPoint->getArg(0);
+  else if (globalVar->getName().startswith(RtName::IncomingCallableData))
+    proxy = m_entryPoint->getArg(0);
+  else
+    proxy = m_builder->CreateAlloca(globalVarTy, dataLayout.getAllocaAddrSpace(), nullptr,
+                                    Twine(LlpcName::GlobalProxyPrefix) + globalVar->getName());
 
   if (globalVar->hasInitializer()) {
     auto initializer = globalVar->getInitializer();
@@ -2522,6 +2542,57 @@ void SpirvLowerGlobal::handleVolatileInput(GlobalVariable *input, Value *proxy) 
     break;
   }
   }
+}
+
+// =====================================================================================================================
+// Changes function signature for RT shaders. Specifically, add payload / hit attribute / callable data pointers and
+// metadata to function signature.
+void SpirvLowerGlobal::changeRtFunctionSignature() {
+  if (!isRayTracingShaderStage(m_shaderStage))
+    return;
+
+  // Ray generation shader has no input payload or hit attributes
+  if (m_shaderStage == ShaderStageRayTracingRayGen)
+    return;
+
+  auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
+
+  ValueToValueMapTy VMap;
+  SmallVector<Type *, 2> argTys;
+  SmallVector<ReturnInst *, 8> retInsts;
+  Type *pointerTy = PointerType::get(*m_context, SPIRAS_Private);
+  switch (m_shaderStage) {
+  case ShaderStageRayTracingIntersect:
+  case ShaderStageRayTracingAnyHit:
+  case ShaderStageRayTracingClosestHit:
+    // Hit attribute
+    argTys.push_back(pointerTy);
+    setShaderHitAttributeSize(m_entryPoint, rayTracingContext->getAttributeDataSizeInBytes());
+    LLVM_FALLTHROUGH; // Fall through: Handle payload
+  case ShaderStageRayTracingMiss:
+    // Payload
+    argTys.push_back(pointerTy);
+    setShaderPaq(m_entryPoint, getPaqFromSize(*m_context, rayTracingContext->getPayloadSizeInBytes()));
+    break;
+  case ShaderStageRayTracingCallable:
+    // Callable data
+    argTys.push_back(pointerTy);
+    setShaderArgSize(m_entryPoint, rayTracingContext->getCallableDataSizeInBytes());
+    break;
+  default:
+    llvm_unreachable("Should never be called");
+  }
+
+  assert(m_entryPoint->arg_empty());
+
+  auto newFuncTy = FunctionType::get(m_entryPoint->getReturnType(), argTys, false);
+  auto newFunc = Function::Create(newFuncTy, m_entryPoint->getLinkage(), "", m_module);
+  newFunc->takeName(m_entryPoint);
+
+  CloneFunctionInto(newFunc, m_entryPoint, VMap, CloneFunctionChangeType::LocalChangesOnly, retInsts);
+  assert(m_entryPoint->use_empty());
+  m_entryPoint->eraseFromParent();
+  m_entryPoint = newFunc;
 }
 
 } // namespace Llpc
