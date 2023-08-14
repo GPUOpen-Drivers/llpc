@@ -1120,7 +1120,7 @@ Value *SpirvLowerRayTracing::getShaderIdentifier(ShaderStage stage, Value *shade
   offsetVal = m_builder->CreateAdd(offsetVal, m_builder->getInt32(offset));
 
   // DWord_Load(TableAddr, offset)
-  Type *gpuAddrAsPtrTy = Type::getInt8PtrTy(*m_context, SPIRAS_Global);
+  Type *gpuAddrAsPtrTy = PointerType::get(*m_context, SPIRAS_Global);
   auto shaderIdentifierAsPtr = m_builder->CreateIntToPtr(tableAddrVal, gpuAddrAsPtrTy);
   Value *shaderIdentifier = m_builder->CreateGEP(m_builder->getInt8Ty(), shaderIdentifierAsPtr, offsetVal);
   auto loadPtrTy = m_builder->getInt64Ty()->getPointerTo(SPIRAS_Global);

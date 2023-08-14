@@ -1228,7 +1228,7 @@ Value *SpirvLowerRayQuery::createTransformMatrix(unsigned builtInId, Value *acce
 
   // Bitcast instanceNodeOffsetAddr to i64 integer
   instanceNodeOffsetAddr = m_builder->CreateBitCast(instanceNodeOffsetAddr, m_builder->getInt64Ty());
-  Type *gpuAddrAsPtrTy = Type::getInt8PtrTy(*m_context, SPIRAS_Global);
+  Type *gpuAddrAsPtrTy = PointerType::get(*m_context, SPIRAS_Global);
   auto instNodeOffsetAddrAsPtr = m_builder->CreateIntToPtr(instanceNodeOffsetAddr, gpuAddrAsPtrTy);
   Value *baseInstOffset = m_builder->CreateGEP(m_builder->getInt8Ty(), instNodeOffsetAddrAsPtr, zero);
   Type *baseInstOffsetTy = m_builder->getInt32Ty()->getPointerTo(SPIRAS_Global);
@@ -1296,7 +1296,7 @@ bool SpirvLowerRayQuery::stageNotSupportLds(ShaderStage stage) {
 // @param instNodeAddr : 64-bit instance node address, in <2 x i32>
 Value *SpirvLowerRayQuery::createLoadInstanceIndex(Value *instNodeAddr) {
   Value *zero = m_builder->getInt32(0);
-  Type *gpuAddrAsPtrTy = Type::getInt8PtrTy(*m_context, SPIRAS_Global);
+  Type *gpuAddrAsPtrTy = PointerType::get(*m_context, SPIRAS_Global);
   auto int32x2Ty = FixedVectorType::get(m_builder->getInt32Ty(), 2);
 
   const unsigned instanceIndexOffset = offsetof(RayTracingInstanceNode, extra.instanceIndex);
@@ -1310,7 +1310,7 @@ Value *SpirvLowerRayQuery::createLoadInstanceIndex(Value *instNodeAddr) {
   instanceIndexAddr = m_builder->CreateBitCast(instanceIndexAddr, m_builder->getInt64Ty());
   auto instanceIndexAddrAsPtr = m_builder->CreateIntToPtr(instanceIndexAddr, gpuAddrAsPtrTy);
   auto loadValue = m_builder->CreateGEP(m_builder->getInt8Ty(), instanceIndexAddrAsPtr, zero);
-  loadValue = m_builder->CreateBitCast(loadValue, Type::getInt32PtrTy(*m_context, SPIRAS_Global));
+  loadValue = m_builder->CreateBitCast(loadValue, PointerType::get(*m_context, SPIRAS_Global));
 
   return m_builder->CreateLoad(m_builder->getInt32Ty(), loadValue);
 }
@@ -1353,7 +1353,7 @@ Value *SpirvLowerRayQuery::createGetInstanceNodeAddr(Value *instNodePtr, Value *
 // @param instNodeAddr : 64-bit instance node address, in <2 x i32>
 Value *SpirvLowerRayQuery::createLoadInstanceId(Value *instNodeAddr) {
   Value *zero = m_builder->getInt32(0);
-  Type *gpuAddrAsPtrTy = Type::getInt8PtrTy(*m_context, SPIRAS_Global);
+  Type *gpuAddrAsPtrTy = PointerType::get(*m_context, SPIRAS_Global);
   auto int32x2Ty = FixedVectorType::get(m_builder->getInt32Ty(), 2);
 
   const unsigned instanceIdOffset = offsetof(RayTracingInstanceNode, desc.InstanceID_and_Mask);
@@ -1367,7 +1367,7 @@ Value *SpirvLowerRayQuery::createLoadInstanceId(Value *instNodeAddr) {
   instanceIdAddr = m_builder->CreateBitCast(instanceIdAddr, m_builder->getInt64Ty());
   auto instanceIdAddrAsPtr = m_builder->CreateIntToPtr(instanceIdAddr, gpuAddrAsPtrTy);
   auto loadValue = m_builder->CreateGEP(m_builder->getInt8Ty(), instanceIdAddrAsPtr, zero);
-  loadValue = m_builder->CreateBitCast(loadValue, Type::getInt32PtrTy(*m_context, SPIRAS_Global));
+  loadValue = m_builder->CreateBitCast(loadValue, PointerType::get(*m_context, SPIRAS_Global));
 
   loadValue = m_builder->CreateLoad(m_builder->getInt32Ty(), loadValue);
   // Mask out the instance ID in lower 24 bits
@@ -1382,7 +1382,7 @@ Value *SpirvLowerRayQuery::createLoadInstanceId(Value *instNodeAddr) {
 // @param matrixAddr : Matrix address, which type is <2 x i32>
 Value *SpirvLowerRayQuery::createLoadMatrixFromAddr(Value *matrixAddr) {
   Value *zero = m_builder->getInt32(0);
-  Type *gpuAddrAsPtrTy = Type::getInt8PtrTy(*m_context, SPIRAS_Global);
+  Type *gpuAddrAsPtrTy = PointerType::get(*m_context, SPIRAS_Global);
 
   // Bitcast matrixAddr to i64 integer
   matrixAddr = m_builder->CreateBitCast(matrixAddr, m_builder->getInt64Ty());
