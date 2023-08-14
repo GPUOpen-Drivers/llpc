@@ -262,8 +262,6 @@ private:
   void visitShaderIndexOp(lgc::rt::ShaderIndexOp &inst);
   void visitShaderRecordBufferOp(lgc::rt::ShaderRecordBufferOp &inst);
 
-  void visitAlloca(llvm::AllocaInst &inst);
-
   llvm::Value *createLoadInstNodeAddr();
 
   llvm::Value *m_traceParams[TraceParam::Count];           // Trace ray set parameters

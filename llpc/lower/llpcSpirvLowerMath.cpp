@@ -66,6 +66,9 @@ void SpirvLowerMath::init(Module &module) {
   SpirvLower::init(&module);
   m_changed = false;
 
+  if (m_shaderStage == ShaderStageInvalid)
+    return;
+
   auto commonShaderMode = Pipeline::getCommonShaderMode(module, getLgcShaderStage(m_shaderStage));
   m_fp16DenormFlush = commonShaderMode.fp16DenormMode == FpDenormMode::FlushOut ||
                       commonShaderMode.fp16DenormMode == FpDenormMode::FlushInOut;
@@ -180,6 +183,9 @@ bool SpirvLowerMathConstFolding::runImpl(Module &module,
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Math-Const-Folding\n");
 
   SpirvLowerMath::init(module);
+
+  if (m_shaderStage == ShaderStageInvalid)
+    return false;
 
   if (m_fp16DenormFlush || m_fp32DenormFlush || m_fp64DenormFlush) {
     // Do constant folding if we need flush denorm to zero.

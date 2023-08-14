@@ -68,9 +68,6 @@ namespace RtName {
 const char *TraceRayKHR = "_cs_";
 const char *TraceRaySetTraceParams = "TraceRaySetTraceParams";
 const char *ShaderTable = "ShaderTable";
-static const char *HitAttribute = "HitAttribute";
-static const char *IncomingPayLoad = "IncomingRayPayloadKHR";
-static const char *IncomingCallableData = "IncomingCallableDataKHR";
 static const char *CallAnyHitShader = "AmdTraceRayCallAnyHitShader";
 static const char *FetchTrianglePositionFromNodePointer = "FetchTrianglePositionFromNodePointer";
 static const char *RemapCapturedVaToReplayVa = "AmdTraceRayRemapCapturedVaToReplayVa";
@@ -161,7 +158,6 @@ void SpirvLowerRayTracing::processTraceRayCall(BaseTraceRayOp *inst) {
       args.push_back(func->getArg(i));
 
     Value *parentRayId = func->arg_end() - 2;
-    generateTraceRayStaticId();
 
     // RayGen shaders are non-recursive, initialize parent ray ID to -1 here.
     if (m_shaderStage == ShaderStageRayTracingRayGen)
@@ -580,13 +576,6 @@ PreservedAnalyses SpirvLowerRayTracing::run(Module &module, ModuleAnalysisManage
     }
 
     m_insertPosPastInit = insertPos;
-
-    static auto allocaVisitor = llvm_dialects::VisitorBuilder<SpirvLowerRayTracing>()
-                                    .setStrategy(llvm_dialects::VisitorStrategy::ByInstruction)
-                                    .add(&SpirvLowerRayTracing::visitAlloca)
-                                    .build();
-
-    allocaVisitor.visit(*this, *m_entryPoint);
 
     static auto visitor = llvm_dialects::VisitorBuilder<SpirvLowerRayTracing>()
                               .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
@@ -1754,6 +1743,16 @@ Instruction *SpirvLowerRayTracing::createEntryFunc(Function *func) {
   Function *newFunc = Function::Create(newFuncTy, GlobalValue::ExternalLinkage, m_module->getName(), m_module);
   newFunc->setCallingConv(CallingConv::SPIR_FUNC);
 
+  createTraceParams(func);
+  func->getArg(0)->replaceAllUsesWith(m_traceParams[TraceParam::Payload]);
+  setShaderPaq(newFunc, getShaderPaq(func));
+  if (m_shaderStage != ShaderStageRayTracingMiss) {
+    assert((m_shaderStage == ShaderStageRayTracingIntersect) || (m_shaderStage == ShaderStageRayTracingAnyHit) ||
+           (m_shaderStage == ShaderStageRayTracingClosestHit));
+    func->getArg(1)->replaceAllUsesWith(m_traceParams[TraceParam::HitAttributes]);
+    setShaderHitAttributeSize(newFunc, getShaderHitAttributeSize(func));
+  }
+
   // Transfer code from old entry function to the new entry function
   while (!func->empty()) {
     BasicBlock *block = &func->front();
@@ -1768,7 +1767,6 @@ Instruction *SpirvLowerRayTracing::createEntryFunc(Function *func) {
   m_entryPoint = newFunc;
   m_entryPoint->addFnAttr(Attribute::NoUnwind);
   m_entryPoint->addFnAttr(Attribute::AlwaysInline);
-  createTraceParams(newFunc);
 
   Instruction *insertPos = &*(newFunc->begin()->getFirstNonPHIOrDbgOrAlloca());
   m_builder->SetInsertPoint(insertPos);
@@ -1875,6 +1873,11 @@ Instruction *SpirvLowerRayTracing::createCallableShaderEntryFunc(Function *func)
   Function *newFunc = Function::Create(newFuncTy, GlobalValue::ExternalLinkage, m_module->getName(), m_module);
   newFunc->setCallingConv(CallingConv::C);
 
+  m_builder->SetInsertPointPastAllocas(func);
+  m_callableData = m_builder->CreateAlloca(newFunc->getReturnType());
+  func->getArg(0)->replaceAllUsesWith(m_callableData);
+  setShaderArgSize(newFunc, getShaderArgSize(func));
+
   // Transfer code from old entry function to the new entry function
   while (!func->empty()) {
     BasicBlock *block = &func->front();
@@ -1897,7 +1900,6 @@ Instruction *SpirvLowerRayTracing::createCallableShaderEntryFunc(Function *func)
   // Save the function input parameter value to the global callable
   // the global payload here are needed for the recursive traceray function of the shader stage
   Value *callableData = argIt++;
-  m_callableData = m_builder->CreateAlloca(newFunc->getReturnType());
   m_builder->CreateStore(callableData, m_callableData);
 
   // Save the shader record index
@@ -2830,7 +2832,7 @@ void SpirvLowerRayTracing::visitShaderIndexOp(lgc::rt::ShaderIndexOp &inst) {
 }
 
 // =====================================================================================================================
-// Visits "lgc.rt.get.shader.record.buffer.ptr" instructions
+// Visits "lgc.rt.shader.record.buffer" instructions
 //
 // @param inst : The instruction
 void SpirvLowerRayTracing::visitShaderRecordBufferOp(lgc::rt::ShaderRecordBufferOp &inst) {
@@ -2894,28 +2896,6 @@ void SpirvLowerRayTracing::visitShaderRecordBufferOp(lgc::rt::ShaderRecordBuffer
 
   m_callsToLower.push_back(&inst);
   m_funcsToLower.insert(inst.getCalledFunction());
-}
-
-// =====================================================================================================================
-// Visit alloca instructions
-//
-// @param alloca : the instruction
-void SpirvLowerRayTracing::visitAlloca(AllocaInst &inst) {
-  // This alloca should be in the entry block of the entry function.
-  assert(inst.getParent() == &m_entryPoint->getEntryBlock());
-  auto allocaName = inst.getName();
-  if (allocaName.contains(RtName::HitAttribute)) {
-    inst.replaceAllUsesWith(m_traceParams[TraceParam::HitAttributes]);
-  } else if (allocaName.contains(RtName::IncomingPayLoad)) {
-    m_builder->SetInsertPoint(&inst);
-    inst.replaceAllUsesWith(m_traceParams[TraceParam::Payload]);
-  } else if (allocaName.contains(RtName::IncomingCallableData)) {
-    inst.replaceAllUsesWith(m_callableData);
-  } else {
-    return;
-  }
-
-  m_callsToLower.push_back(&inst);
 }
 
 // =====================================================================================================================
