@@ -945,12 +945,17 @@ void RegisterMetadataBuilder::buildCsRegisters(ShaderStage shaderStage) {
         break;
       }
     }
-    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidXEn] =
-        !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-x");
-    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidYEn] =
-        !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-y");
-    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidZEn] =
-        !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-z");
+
+    // NOTE: We enable TGID if we don't find any function using the attributes 'amdgpu-no-workgroup-id'. If shader
+    // cache is enabled, the cached ELFs will be reused. In such case, we might not find any entry-point functions.
+    // Since the cached ELFs will be reused, it is still safe to enable TGID because the register metadata will not
+    // be actually used.
+    const bool tgidXEn = !attribFunc || !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-x");
+    const bool tgidYEn = !attribFunc || !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-y");
+    const bool tgidZEn = !attribFunc || !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-z");
+    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidXEn] = tgidXEn;
+    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidYEn] = tgidYEn;
+    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidZEn] = tgidZEn;
 
   } else {
     getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidXEn] = true;

@@ -1975,9 +1975,16 @@ void ConfigBuilder::buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *confi
       break;
     }
   }
-  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_X_EN, !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-x"));
-  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_Y_EN, !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-y"));
-  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_Z_EN, !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-z"));
+  // NOTE: We enable TGID if we don't find any function using the attributes 'amdgpu-no-workgroup-id'. If shader
+  // cache is enabled, the cached ELFs will be reused. In such case, we might not find any entry-point functions.
+  // Since the cached ELFs will be reused, it is still safe to enable TGID because the register metadata will not
+  // be actually used.
+  const bool tgidXEn = !attribFunc || !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-x");
+  const bool tgidYEn = !attribFunc || !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-y");
+  const bool tgidZEn = !attribFunc || !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-z");
+  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_X_EN, tgidXEn);
+  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_Y_EN, tgidYEn);
+  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_Z_EN, tgidZEn);
   SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TG_SIZE_EN, true);
 
   // 0 = X, 1 = XY, 2 = XYZ
