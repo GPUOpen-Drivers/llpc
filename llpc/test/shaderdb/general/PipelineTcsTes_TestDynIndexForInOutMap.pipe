@@ -1,0 +1,109 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: LLPC location input/output mapping results (TES shader)
+; SHADERTEST: (TES) Input:  loc = 0, comp = 0 =>  Mapped = 0, 0
+; SHADERTEST: (TES) Input:  loc = 1, comp = 0 =>  Mapped = 1, 0
+; SHADERTEST: (TES) Input:  loc = 2, comp = 0 =>  Mapped = 2, 0
+; SHADERTEST: (TES) Input:  loc = 3, comp = 0 =>  Mapped = 3, 0
+; SHADERTEST: (TES) Input:  loc = 4, comp = 0 =>  Mapped = 4, 0
+; SHADERTEST: (TES) Input:  loc = 5, comp = 0 =>  Mapped = 5, 0
+
+; SHADERTEST: (TES) Input (per-patch):  loc = 6  =>  Mapped = 0
+; SHADERTEST: (TES) Input (per-patch):  loc = 7  =>  Mapped = 1
+; SHADERTEST: (TES) Input (per-patch):  loc = 8  =>  Mapped = 2
+
+; SHADERTEST-LABEL: LLPC location count results (after input/output matching)
+
+; SHADERTEST: (TES) Input:  loc count = 6
+; SHADERTEST: (TES) Output: loc count = 0
+; SHADERTEST: (TES) Input (per-patch):  loc count = 3
+
+; SHADERTEST-LABEL: LLPC builtin-to-generic mapping results (TES shader)
+
+; SHADERTEST: (TES) Input (per-patch):  builtin = TessLevelOuter  =>  Mapped = 3
+
+; SHADERTEST-LABEL: LLPC location count results (after builtin-to-generic mapping)
+
+; SHADERTEST: (TES) Input:  loc count = 6
+; SHADERTEST: (TES) Output: loc count = 0
+; SHADERTEST: (TES) Input (per-patch):  loc count = 4
+
+; SHADERTEST-LABEL: LLPC location input/output mapping results (TCS shader)
+
+; SHADERTEST: (TCS) Output: loc = 0, comp = 0  =>  Mapped = 0, 0
+; SHADERTEST: (TCS) Output: loc = 1, comp = 0  =>  Mapped = 1, 0
+; SHADERTEST: (TCS) Output: loc = 2, comp = 0  =>  Mapped = 2, 0
+; SHADERTEST: (TCS) Output: loc = 3, comp = 0  =>  Mapped = 3, 0
+; SHADERTEST: (TCS) Output: loc = 4, comp = 0  =>  Mapped = 4, 0
+; SHADERTEST: (TCS) Output: loc = 5, comp = 0  =>  Mapped = 5, 0
+
+; SHADERTEST: (TCS) Output (per-patch): loc = 6  =>  Mapped = 0
+; SHADERTEST: (TCS) Output (per-patch): loc = 7  =>  Mapped = 1
+; SHADERTEST: (TCS) Output (per-patch): loc = 8  =>  Mapped = 2
+
+; SHADERTEST-LABEL: LLPC location count results (after input/output matching)
+
+; SHADERTEST: (TCS) Input:  loc count = 0
+; SHADERTEST: (TCS) Output: loc count = 6
+; SHADERTEST: (TCS) Output (per-patch): loc count = 3
+
+; SHADERTEST-LABEL: LLPC builtin-to-generic mapping results (TCS shader)
+
+; SHADERTEST: (TCS) Output (per-patch): builtin = TessLevelOuter  =>  Mapped = 3
+
+; SHADERTEST-LABEL: LLPC location count results (after builtin-to-generic mapping)
+
+; SHADERTEST: (TCS) Input:  loc count = 0
+; SHADERTEST: (TCS) Output: loc count = 6
+; SHADERTEST: (TCS) Output (per-patch): loc count = 4
+
+; END_SHADERTEST
+[TcsGlsl]
+#version 450 core
+
+layout(vertices = 3) out;
+layout(location = 0) out int out1[][3];
+layout(location = 3) out int out2[][3];
+layout(location = 6) patch out int array[3];
+
+int data[3] = {5, 6, 7};
+
+void main (void)
+{
+    int i = gl_InvocationID % 2;
+    gl_TessLevelInner[i] = 1.25;
+
+    int j = gl_InvocationID % 4;
+    gl_TessLevelOuter[j] = 2.0;
+
+    for (int k = 0; k < 3; ++k)
+    {
+        array[k] = data[k];
+        out1[gl_InvocationID][k] = k + 3;
+        out2[gl_InvocationID][k] = k;
+    }
+}
+
+[TcsInfo]
+entryPoint = main
+
+[TesGlsl]
+#version 450 core
+
+layout(triangles) in;
+layout(location = 0) in int in1[][3];
+layout(location = 3) in int in2[][3];
+layout(location = 6) patch in int array[3];
+
+layout(location = 0) out vec3 outColor;
+
+void main()
+{
+    outColor = vec3(float(array[1] + in1[1][1] + in2[1][1]), gl_TessLevelOuter[1], 0.0);
+}
+
+[TesInfo]
+entryPoint = main
+
+[GraphicsPipelineState]
+patchControlPoints = 3
