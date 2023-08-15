@@ -2207,6 +2207,8 @@ Result Compiler::buildRayTracingPipelineElf(Context *context, std::unique_ptr<Mo
     strcpy(&shaderProp.name[0], funcName.data());
     shaderProp.shaderId = moduleIndex;
     shaderProp.hasTraceRay = moduleCallsTraceRay[moduleIndex - 1];
+    shaderProp.onlyGpuVaLo = false;
+    shaderProp.shaderIdExtraBits = 0;
   }
 
   generatePipeline(context, moduleIndex, std::move(module), pipelineElf, pipeline.get(), timerProfiler);
