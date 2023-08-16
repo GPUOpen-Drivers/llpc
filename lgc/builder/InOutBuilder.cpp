@@ -792,7 +792,7 @@ Value *BuilderImpl::CreateReadBaryCoord(BuiltInKind builtIn, InOutInfo inputInfo
                                         const llvm::Twine &instName) {
   assert(builtIn == lgc::BuiltInBaryCoord || builtIn == lgc::BuiltInBaryCoordNoPerspKHR);
 
-  markBuiltInInputUsage(builtIn, 0);
+  markBuiltInInputUsage(builtIn, 0, inputInfo);
 
   // Force override to per-sample interpolation.
   if (getPipelineState()->getOptions().enableInterpModePatch && !auxInterpValue &&
@@ -865,7 +865,7 @@ Value *BuilderImpl::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo in
     arraySize = constIndex->getZExtValue() + 1;
 
   if (!isOutput)
-    markBuiltInInputUsage(builtIn, arraySize);
+    markBuiltInInputUsage(builtIn, arraySize, inOutInfo);
   else
     markBuiltInOutputUsage(builtIn, arraySize, InvalidValue);
 
@@ -1417,7 +1417,8 @@ Type *BuilderImpl::getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo) {
 // @param builtIn : Built-in ID
 // @param arraySize : Number of array elements for ClipDistance and CullDistance. (Multiple calls to this function for
 // this built-in might have different array sizes; we take the max)
-void BuilderImpl::markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySize) {
+// @param inOutInfo : Extra input/output info (shader-defined array size)
+void BuilderImpl::markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySize, InOutInfo inOutInfo) {
   auto &usage = getPipelineState()->getShaderResourceUsage(m_shaderStage)->builtInUsage;
   assert((builtIn != BuiltInClipDistance && builtIn != BuiltInCullDistance) || arraySize != 0);
   switch (m_shaderStage) {
@@ -1573,6 +1574,8 @@ void BuilderImpl::markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySize
     switch (static_cast<unsigned>(builtIn)) {
     case BuiltInFragCoord:
       usage.fs.fragCoord = true;
+      if (inOutInfo.getInterpMode() == InOutInfo::InterpLocSample)
+        usage.fs.fragCoordIsSample = true;
       break;
     case BuiltInFrontFacing:
       usage.fs.frontFacing = true;

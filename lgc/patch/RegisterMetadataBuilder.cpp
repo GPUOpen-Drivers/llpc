@@ -718,10 +718,14 @@ void RegisterMetadataBuilder::buildHwVsRegisters() {
 // Builds register configuration for hardware pixel shader.
 void RegisterMetadataBuilder::buildPsRegisters() {
   ShaderStage shaderStage = ShaderStageFragment;
+  const auto &options = m_pipelineState->getOptions();
   const auto &shaderOptions = m_pipelineState->getShaderOptions(shaderStage);
   const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
   const auto resUsage = m_pipelineState->getShaderResourceUsage(shaderStage);
   const auto &builtInUsage = resUsage->builtInUsage.fs;
+
+  const bool useFloatLocationAtIteratedSampleNumber =
+      options.fragCoordUsesInterpLoc ? builtInUsage.fragCoordIsSample : builtInUsage.runAtSampleRate;
 
   // SPI_BARYC_CNTL
   auto spiBarycCntl = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::SpiBarycCntl].getMap(true);
@@ -729,7 +733,7 @@ void RegisterMetadataBuilder::buildPsRegisters() {
   if (fragmentMode.pixelCenterInteger) {
     // TRUE - Force floating point position to upper left corner of pixel (X.0, Y.0)
     spiBarycCntl[Util::Abi::SpiBarycCntlMetadataKey::PosFloatUlc] = true;
-  } else if (builtInUsage.runAtSampleRate) {
+  } else if (useFloatLocationAtIteratedSampleNumber) {
     // 2 - Calculate per-pixel floating point position at iterated sample number
     spiBarycCntl[Util::Abi::SpiBarycCntlMetadataKey::PosFloatLocation] = 2;
   } else {
