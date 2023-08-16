@@ -157,7 +157,7 @@ union Options {
     bool reserved16;
     bool enableColorExportShader; // Explicitly build color export shader, UnlinkedStageFragment elf will return extra
                                   // meta data.
-    bool fragCoordUsesInterpLoc;  // Determing fragCoord use InterpLoc
+    bool fragCoordUsesInterpLoc;  // Determining fragCoord use InterpLoc
   };
 };
 static_assert(sizeof(Options) == sizeof(Options::u32All));
