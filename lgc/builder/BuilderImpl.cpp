@@ -595,10 +595,12 @@ Instruction *BuilderImpl::createWaterfallLoop(Instruction *nonUniformInst, Array
     }
 
     // Ensure we do not create a waterfall across blocks.
-    // FIXME: we could use dominator check to allow scalarizing descriptor loads on multi-block spans;
-    // however, this also requires backend support for multi-block waterfalls to be implemented.
+    // FIXME: we could use dominator check to allow scalarizing descriptor loads
+    // on multi-block spans; however, this also requires backend support for
+    // multi-block waterfalls to be implemented.
     if (!identicalIndexes || !firstIndexInst ||
-        (firstIndexInst && firstIndexInst->getParent() != nonUniformInst->getParent()))
+        (firstIndexInst && firstIndexInst->getParent() != nonUniformInst->getParent()) ||
+        nonUniformInst->getType()->isVoidTy())
       scalarizeDescriptorLoads = false;
   }
 
