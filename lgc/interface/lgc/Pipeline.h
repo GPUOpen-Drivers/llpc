@@ -486,6 +486,8 @@ struct RasterizerState {
   unsigned rasterStream;                   // Which vertex stream to rasterize
   ProvokingVertexMode provokingVertexMode; // Specifies which vertex of a primitive is the _provoking vertex_,
                                            // this impacts which vertex's "flat" VS outputs are passed to the PS.
+  unsigned pixelShaderSamples;             // Controls the pixel shader execution rate. Must be less than or equal to
+                                           //  coverageSamples. Valid values are 1, 2, 4, and 8.
 };
 
 // Struct to pass to depth/stencil state

@@ -2419,8 +2419,24 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
 
     Value *sampleMaskIn = sampleCoverage;
     if (m_pipelineState->getRasterizerState().perSampleShading || builtInUsage.runAtSampleRate) {
-      // gl_SampleMaskIn[0] = (SampleCoverage & (1 << gl_SampleID))
-      sampleMaskIn = builder.CreateShl(builder.getInt32(1), sampleId);
+      // Fix the failure for multisample_shader_builtin.sample_mask cases "gl_SampleMaskIn" should contain one
+      // or multiple covered sample bit.
+      // (1) If the 4 samples is divided into 2 sub invocation groups, broadcast sample mask bit <0, 1>
+      // to sample <2, 3>.
+      // (2) If the 8 samples is divided into 2 sub invocation groups, broadcast sample mask bit <0, 1>
+      // to sample <2, 3>, then re-broadcast sample mask bit <0, 1, 2, 3> to sample <4, 5, 6, 7>.
+      // (3) If the 8 samples is divided into 4 sub invocation groups, patch to broadcast sample mask bit
+      // <0, 1, 2, 3> to sample <4, 5, 6, 7>.
+
+      unsigned baseMask = 1;
+      unsigned baseMaskSamples = m_pipelineState->getRasterizerState().pixelShaderSamples;
+      while (baseMaskSamples < m_pipelineState->getRasterizerState().numSamples) {
+        baseMask |= baseMask << baseMaskSamples;
+        baseMaskSamples *= 2;
+      }
+
+      // gl_SampleMaskIn[0] = (SampleCoverage & (baseMask << gl_SampleID))
+      sampleMaskIn = builder.CreateShl(builder.getInt32(baseMask), sampleId);
       sampleMaskIn = builder.CreateAnd(sampleCoverage, sampleMaskIn);
     }
 
