@@ -548,7 +548,7 @@ private:
   llvm::Type *getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo);
 
   // Mark usage of a built-in input
-  void markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySize);
+  void markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySize, InOutInfo inOutInfo);
 
   // Mark usage of a built-in output
   void markBuiltInOutputUsage(BuiltInKind builtIn, unsigned arraySize, unsigned streamId);
