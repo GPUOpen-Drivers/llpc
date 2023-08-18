@@ -83,6 +83,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     65.1 | Add FragmentOutputs and FsOutInfo                                                                     |
 //  |     65.0 | Remove updateDescInElf                                                                                |
 //  |     64.0 | Add enableColorExportShader to GraphicsPipelineBuildInfo.                                             |
 //  |     63.0 | Add Atomic Counter, its default descriptor and map its concreteType to Buffer.                        |
@@ -962,6 +963,21 @@ constexpr uint32_t UberFetchShaderAttribMaskComponent1 = 0x0020000u;
 constexpr uint32_t UberFetchShaderAttribMaskComponent2 = 0x0040000u;
 constexpr uint32_t UberFetchShaderAttribMaskComponent3 = 0x0080000u;
 constexpr uint32_t UberFetchShaderAttribMaskIsBgra = 0x0100000u;
+
+// Represents fragment shader output info
+struct FsOutInfo {
+  unsigned hwColorTarget; // HW color output index
+  unsigned location;      // Output location in resource layout
+  bool isSigned;          // Whether is signed
+  char typeName[8];       // Output data type Name, like v3f32
+};
+
+// Represents shader meta data
+struct FragmentOutputs {
+  FsOutInfo *fsOutInfos;   // The color export information.
+  unsigned fsOutInfoCount; // The number of color exports.
+  bool discard;            // Whether this fragment shader has kill enabled.
+};
 
 /// Represents info of a shader attached to a to-be-built pipeline.
 struct PipelineShaderInfo {

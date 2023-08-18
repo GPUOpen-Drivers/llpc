@@ -649,21 +649,6 @@ enum class PipelineLink : unsigned {
                  //  pass its packed input mapping to the compile of the rest of the pipeline.
 };
 
-// Represents fragment shader output info
-struct FsOutInfo {
-  unsigned hwColorTarget; // HW color output index
-  unsigned location;      // Output location in resource layout
-  bool isSigned;          // Whether is signed
-  char typeName[8];       // Output data type Name, like v3f32
-};
-
-// Represents shader meta data
-struct FragmentOutputs {
-  FsOutInfo *fsOutInfos;   // The color export information.
-  unsigned fsOutInfoCount; // The number of color exports.
-  bool discard;            // Whether this fragment shader has kill enabled.
-};
-
 // =====================================================================================================================
 // The public API of the middle-end pipeline state exposed to the front-end for setting state and linking and
 // generating the pipeline
