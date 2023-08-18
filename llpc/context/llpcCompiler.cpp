@@ -2794,45 +2794,6 @@ Result Compiler::validatePipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   return result;
 }
 
-#if LLPC_ENABLE_SHADER_CACHE
-// =====================================================================================================================
-// Creates shader cache object with the requested properties.
-// @param : Shader cache create info.
-// @param [out] : Shader cache object
-// @returns : Result::Success if creation succeeds, error status otherwise.
-Result Compiler::CreateShaderCache(const ShaderCacheCreateInfo *pCreateInfo, IShaderCache **ppShaderCache) {
-  Result result = Result::Success;
-
-  ShaderCacheAuxCreateInfo auxCreateInfo = {};
-  auxCreateInfo.shaderCacheMode = ShaderCacheMode::ShaderCacheEnableRuntime;
-  auxCreateInfo.gfxIp = m_gfxIp;
-  auxCreateInfo.hash = m_optionHash;
-
-  ShaderCache *shaderCache = new ShaderCache();
-
-  if (shaderCache) {
-    result = shaderCache->init(pCreateInfo, &auxCreateInfo);
-    if (result != Result::Success) {
-      shaderCache->Destroy();
-      delete shaderCache;
-      shaderCache = nullptr;
-    }
-  } else {
-    result = Result::ErrorOutOfMemory;
-  }
-
-  *ppShaderCache = shaderCache;
-
-  if ((result == Result::Success) &&
-      ((cl::ShaderCacheMode == ShaderCacheEnableRuntime) || (cl::ShaderCacheMode == ShaderCacheEnableOnDisk)) &&
-      (pCreateInfo->initialDataSize > 0)) {
-    result = m_shaderCache->Merge(1, const_cast<const IShaderCache **>(ppShaderCache));
-  }
-
-  return result;
-}
-#endif
-
 // =====================================================================================================================
 // Acquires a free context from context pool.
 Context *Compiler::acquireContext() const {

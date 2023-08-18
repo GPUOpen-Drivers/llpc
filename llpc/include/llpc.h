@@ -347,16 +347,6 @@ public:
                                          RayTracingPipelineBuildOut *pPipelineOut, void *pPipelineDumpFile = nullptr,
                                          IHelperThreadProvider *pHelperThreadProvider = nullptr) = 0;
 
-#if LLPC_ENABLE_SHADER_CACHE
-  /// Creates a shader cache object with the requested properties.
-  ///
-  /// @param [in]  pCreateInfo    Create info of the shader cache.
-  /// @param [out] ppShaderCache : Constructed shader cache object.
-  ///
-  /// @returns : Success if the shader cache was successfully created. Otherwise, ErrorOutOfMemory is returned.
-  virtual Result CreateShaderCache(const ShaderCacheCreateInfo *pCreateInfo, IShaderCache **ppShaderCache) = 0;
-#endif
-
 protected:
   ICompiler() {}
   /// Destructor

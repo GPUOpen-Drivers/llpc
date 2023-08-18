@@ -89,9 +89,6 @@ RUN EXTRA_COMPILER_FLAGS=() \
          EXTRA_FLAGS+=("-DLLVM_USE_LINKER=lld"); \
          EXTRA_LINKER_FLAGS+=("-fuse-ld=lld"); \
        fi \
-    && if echo "$FEATURES" | grep -q "+shadercache" ; then \
-         EXTRA_FLAGS+=("-DLLPC_ENABLE_SHADER_CACHE=1"); \
-       fi \
     && if echo "$FEATURES" | grep -q "+asan" ; then \
          SANITIZERS+=("Address"); \
          echo "export ASAN_OPTIONS=detect_leaks=0" >> /vulkandriver/env.sh; \
