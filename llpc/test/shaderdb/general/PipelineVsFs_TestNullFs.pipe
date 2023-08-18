@@ -285,7 +285,7 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:           - 0
 ; CHECK-NEXT:         .hardware_mapping:
 ; CHECK-NEXT:           - .vs
-; CHECK-NEXT:     .spill_threshold: 0xffffffff
+; CHECK-NEXT:     .spill_threshold: 0xffff
 ; CHECK-NEXT:     .streamout_vertex_strides:
 ; CHECK-NEXT:       - 0
 ; CHECK-NEXT:       - 0

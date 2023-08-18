@@ -417,7 +417,7 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:           - 0
 ; CHECK-NEXT:         .hardware_mapping:
 ; CHECK-NEXT:           - .gs
-; CHECK-NEXT:     .spill_threshold: 0xffffffff
+; CHECK-NEXT:     .spill_threshold: 0xffff
 ; CHECK-NEXT:     .type:           Ngg
 ; CHECK-NEXT:     .user_data_limit: 0x13
 ; CHECK-NEXT:     .xgl_cache_info:
