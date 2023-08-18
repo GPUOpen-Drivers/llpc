@@ -69,7 +69,7 @@ public:
     m_elf = ca.m_elf;
 
     // Reinitialize ca with not caches.  It needs to be in an appropriate state for the destructor.
-    ca.initialize(nullptr, nullptr, {nullptr, nullptr});
+    ca.initialize(nullptr, {nullptr, nullptr});
     return *this;
   }
 
@@ -122,18 +122,13 @@ private:
     assert(buildInfo);
     Vkgc::ICache *userCache = buildInfo->cache;
 
-    IShaderCache *userShaderCache = nullptr;
-#if LLPC_ENABLE_SHADER_CACHE
-    userShaderCache = reinterpret_cast<IShaderCache *>(buildInfo->pShaderCache);
-#endif
-
-    initialize(userCache, userShaderCache, internalCaches);
+    initialize(userCache, internalCaches);
     lookUpInCaches(hash);
     if (m_cacheResult != Result::Success)
       lookUpInShaderCaches(hash);
   }
 
-  void initialize(Vkgc::ICache *userCache, IShaderCache *userShaderCache, CachePair internalCaches);
+  void initialize(Vkgc::ICache *userCache, CachePair internalCaches);
 
   void lookUpInCaches(const MetroHash::Hash &hash);
   Result lookUpInCache(Vkgc::ICache *cache, bool allocateOnMiss, const Vkgc::HashId &hashId);

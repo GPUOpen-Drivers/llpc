@@ -58,10 +58,6 @@
 #error LLPC client version is too old
 #endif
 
-#ifndef LLPC_ENABLE_SHADER_CACHE
-#define LLPC_ENABLE_SHADER_CACHE 0
-#endif
-
 /// LLPC_NODISCARD - Warns when function return value is discarded.
 //
 // We cannot use the 'nodiscard' attribute until we upgrade to C++17 or newer mode.
@@ -1164,16 +1160,13 @@ struct GraphicsPipelineBuildInfo {
   void *pUserData;                ///< User data
   OutputAllocFunc pfnOutputAlloc; ///< Output buffer allocator
   ICache *cache;                  ///< ICache, used to search for the compiled shader data
-#if LLPC_ENABLE_SHADER_CACHE
-  IShaderCache *pShaderCache; ///< Shader cache, used to search for the compiled shader data
-#endif
-  PipelineShaderInfo task; ///< Task shader
-  PipelineShaderInfo vs;   ///< Vertex shader
-  PipelineShaderInfo tcs;  ///< Tessellation control shader
-  PipelineShaderInfo tes;  ///< Tessellation evaluation shader
-  PipelineShaderInfo gs;   ///< Geometry shader
-  PipelineShaderInfo mesh; ///< Mesh shader
-  PipelineShaderInfo fs;   ///< Fragment shader
+  PipelineShaderInfo task;        ///< Task shader
+  PipelineShaderInfo vs;          ///< Vertex shader
+  PipelineShaderInfo tcs;         ///< Tessellation control shader
+  PipelineShaderInfo tes;         ///< Tessellation evaluation shader
+  PipelineShaderInfo gs;          ///< Geometry shader
+  PipelineShaderInfo mesh;        ///< Mesh shader
+  PipelineShaderInfo fs;          ///< Fragment shader
 
   ResourceMappingData resourceMapping; ///< Resource mapping graph and static descriptor values
   uint64_t pipelineLayoutApiHash;      ///< Pipeline Layout Api Hash
@@ -1247,13 +1240,10 @@ struct GraphicsPipelineBuildInfo {
 
 /// Represents info to build a compute pipeline.
 struct ComputePipelineBuildInfo {
-  void *pInstance;                ///< Vulkan instance object
-  void *pUserData;                ///< User data
-  OutputAllocFunc pfnOutputAlloc; ///< Output buffer allocator
-  ICache *cache;                  ///< ICache, used to search for the compiled shader data
-#if LLPC_ENABLE_SHADER_CACHE
-  IShaderCache *pShaderCache; ///< Shader cache, used to search for the compiled shader data
-#endif
+  void *pInstance;                     ///< Vulkan instance object
+  void *pUserData;                     ///< User data
+  OutputAllocFunc pfnOutputAlloc;      ///< Output buffer allocator
+  ICache *cache;                       ///< ICache, used to search for the compiled shader data
   unsigned deviceIndex;                ///< Device index for device group
   PipelineShaderInfo cs;               ///< Compute shader
   ResourceMappingData resourceMapping; ///< Resource mapping graph and static descriptor values
