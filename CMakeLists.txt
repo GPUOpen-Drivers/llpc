@@ -46,8 +46,7 @@ option(LLPC_BUILD_TOOLS "LLPC build all tools" OFF)
 if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
     target_compile_definitions(vkgc_headers INTERFACE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION})
 else()
-    # LLPC is not compiled, so fall back to the latest version
-    target_compile_definitions(vkgc_headers INTERFACE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=LLPC_INTERFACE_MAJOR_VERSION)
+    message(FATAL_ERROR "Client of LLPC must set LLPC_CLIENT_INTERFACE_MAJOR_VERSION")
 endif()
 
 #if VKI_BUILD_GFX11
