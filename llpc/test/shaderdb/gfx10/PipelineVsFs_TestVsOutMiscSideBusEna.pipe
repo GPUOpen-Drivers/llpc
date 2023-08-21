@@ -309,7 +309,7 @@ entryPoint = main
 ; SHADERTEST-NEXT:           - 0
 ; SHADERTEST-NEXT:         .hardware_mapping:
 ; SHADERTEST-NEXT:           - .vs
-; SHADERTEST-NEXT:     .spill_threshold: 0xffffffff
+; SHADERTEST-NEXT:     .spill_threshold: 0xffff
 ; SHADERTEST-NEXT:     .streamout_vertex_strides:
 ; SHADERTEST-NEXT:       - 0
 ; SHADERTEST-NEXT:       - 0

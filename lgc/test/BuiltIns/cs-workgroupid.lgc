@@ -70,7 +70,7 @@ attributes #0 = { nounwind }
 ; CHECK-NEXT:           - 0
 ; CHECK-NEXT:         .hardware_mapping:
 ; CHECK-NEXT:           - .cs
-; CHECK-NEXT:     .spill_threshold: 0xffffffff
+; CHECK-NEXT:     .spill_threshold: 0xffff
 ; CHECK-NEXT:     .type:           Cs
 ; CHECK-NEXT:     .user_data_limit: 0x3
 ; CHECK-NEXT: amdpal.version:
