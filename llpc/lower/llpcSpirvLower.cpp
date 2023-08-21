@@ -252,8 +252,10 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
     passMgr.addPass(AlwaysInlinerPass());
   }
 
-  if (rayTracing || rayQuery)
+  if (rayTracing || rayQuery) {
     passMgr.addPass(LowerGpuRt());
+    passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(instCombineOpt)));
+  }
 
   // Stop timer for lowering passes.
   if (lowerTimer)
