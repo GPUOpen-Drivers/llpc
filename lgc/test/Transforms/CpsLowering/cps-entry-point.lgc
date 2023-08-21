@@ -87,21 +87,21 @@ attributes #5 = { nounwind willreturn memory(none) }
 ; CHECK-NEXT:    [[TMP23:%.*]] = extractelement <2 x i32> [[TMP22]], i64 0
 ; CHECK-NEXT:    [[TMP24:%.*]] = extractelement <2 x i32> [[TMP22]], i64 1
 ; CHECK-NEXT:    [[TMP25:%.*]] = insertelement <16 x i32> poison, i32 [[GLOBALTABLE]], i64 0
-; CHECK-NEXT:    [[TMP27:%.*]] = insertelement <16 x i32> [[TMP25]], i32 [[TMP23]], i64 1
-; CHECK-NEXT:    [[TMP28:%.*]] = insertelement <16 x i32> [[TMP27]], i32 [[TMP24]], i64 2
-; CHECK-NEXT:    [[TMP29:%.*]] = insertelement <16 x i32> [[TMP28]], i32 [[USERDATA0]], i64 3
-; CHECK-NEXT:    [[TMP30:%.*]] = insertelement <16 x i32> [[TMP29]], i32 [[USERDATA1]], i64 4
-; CHECK-NEXT:    [[TMP31:%.*]] = insertelement <16 x i32> [[TMP30]], i32 [[USERDATA2]], i64 5
-; CHECK-NEXT:    [[TMP32:%.*]] = insertelement <16 x i32> [[TMP31]], i32 [[USERDATA3]], i64 6
-; CHECK-NEXT:    [[TMP33:%.*]] = insertelement <16 x i32> [[TMP32]], i32 [[PAD4]], i64 7
-; CHECK-NEXT:    [[TMP34:%.*]] = insertelement <16 x i32> [[TMP33]], i32 [[PAD5]], i64 8
-; CHECK-NEXT:    [[TMP35:%.*]] = insertelement <16 x i32> [[TMP34]], i32 [[PAD6]], i64 9
-; CHECK-NEXT:    [[TMP36:%.*]] = insertelement <16 x i32> [[TMP35]], i32 [[PAD7]], i64 10
-; CHECK-NEXT:    [[TMP37:%.*]] = insertelement <16 x i32> [[TMP36]], i32 [[PAD8]], i64 11
-; CHECK-NEXT:    [[TMP38:%.*]] = insertelement <16 x i32> [[TMP37]], i32 [[PAD9]], i64 12
-; CHECK-NEXT:    [[TMP39:%.*]] = insertelement <16 x i32> [[TMP38]], i32 [[PAD10]], i64 13
-; CHECK-NEXT:    [[TMP39b:%.*]] = insertelement <16 x i32> [[TMP39]], i32 [[PAD11]], i64 14
-; CHECK-NEXT:    [[TMP40:%.*]] = insertelement <16 x i32> [[TMP39b]], i32 [[SPILLTABLE]], i64 15
+; CHECK-NEXT:    [[TMP26:%.*]] = insertelement <16 x i32> [[TMP25]], i32 [[TMP23]], i64 1
+; CHECK-NEXT:    [[TMP27:%.*]] = insertelement <16 x i32> [[TMP26]], i32 [[TMP24]], i64 2
+; CHECK-NEXT:    [[TMP28:%.*]] = insertelement <16 x i32> [[TMP27]], i32 [[USERDATA0]], i64 3
+; CHECK-NEXT:    [[TMP29:%.*]] = insertelement <16 x i32> [[TMP28]], i32 [[USERDATA1]], i64 4
+; CHECK-NEXT:    [[TMP30:%.*]] = insertelement <16 x i32> [[TMP29]], i32 [[USERDATA2]], i64 5
+; CHECK-NEXT:    [[TMP31:%.*]] = insertelement <16 x i32> [[TMP30]], i32 [[USERDATA3]], i64 6
+; CHECK-NEXT:    [[TMP32:%.*]] = insertelement <16 x i32> [[TMP31]], i32 [[PAD4]], i64 7
+; CHECK-NEXT:    [[TMP33:%.*]] = insertelement <16 x i32> [[TMP32]], i32 [[PAD5]], i64 8
+; CHECK-NEXT:    [[TMP34:%.*]] = insertelement <16 x i32> [[TMP33]], i32 [[PAD6]], i64 9
+; CHECK-NEXT:    [[TMP35:%.*]] = insertelement <16 x i32> [[TMP34]], i32 [[PAD7]], i64 10
+; CHECK-NEXT:    [[TMP36:%.*]] = insertelement <16 x i32> [[TMP35]], i32 [[PAD8]], i64 11
+; CHECK-NEXT:    [[TMP37:%.*]] = insertelement <16 x i32> [[TMP36]], i32 [[PAD9]], i64 12
+; CHECK-NEXT:    [[TMP38:%.*]] = insertelement <16 x i32> [[TMP37]], i32 [[PAD10]], i64 13
+; CHECK-NEXT:    [[TMP39:%.*]] = insertelement <16 x i32> [[TMP38]], i32 [[PAD11]], i64 14
+; CHECK-NEXT:    [[TMP40:%.*]] = insertelement <16 x i32> [[TMP39]], i32 [[SPILLTABLE]], i64 15
 ; CHECK-NEXT:    [[TMP41:%.*]] = extractvalue { i32, ptr addrspace(5), i32, i32 } [[TMP20]], 0
 ; CHECK-NEXT:    [[TMP42:%.*]] = icmp ne i32 [[TMP41]], 0
 ; CHECK-NEXT:    [[TMP43:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP42]])
@@ -116,7 +116,7 @@ attributes #5 = { nounwind willreturn memory(none) }
 ; CHECK-NEXT:    [[TMP50:%.*]] = insertelement <2 x i32> [[TMP7]], i32 [[TMP49]], i64 0
 ; CHECK-NEXT:    [[TMP51:%.*]] = bitcast <2 x i32> [[TMP50]] to i64
 ; CHECK-NEXT:    [[TMP52:%.*]] = inttoptr i64 [[TMP51]] to ptr
-; CHECK-NEXT:    call void (ptr, i32, <16 x i32>, { i32, ptr addrspace(5), i32, i32 }, i32, ...) @llvm.amdgcn.cs.chain.p0.i32.v16i32.sl_i32p5i32i32s(ptr [[TMP52]], i32 [[TMP47]], <16 x i32> [[TMP40]], { i32, ptr addrspace(5), i32, i32 } [[TMP20]], i32 0)
+; CHECK-NEXT:    call void (ptr, i32, <16 x i32>, { i32, ptr addrspace(5), i32, i32 }, i32, ...) @llvm.amdgcn.cs.chain.p0.i32.v16i32.sl_i32p5i32i32s(ptr inreg [[TMP52]], i32 inreg [[TMP47]], <16 x i32> inreg [[TMP40]], { i32, ptr addrspace(5), i32, i32 } [[TMP20]], i32 0)
 ; CHECK-NEXT:    unreachable
 ; CHECK:       ret.block:
 ; CHECK-NEXT:    ret void
