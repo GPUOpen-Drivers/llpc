@@ -433,7 +433,10 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func) {
   // New version of the code (also handles unknown version, which we treat as
   // latest)
   Type *chainTys[] = {builder.getPtrTy(), builder.getIntNTy(waveSize), userDataVec->getType(), vgprArg->getType()};
-  builder.CreateIntrinsic(Intrinsic::amdgcn_cs_chain, chainTys, chainArgs);
+  auto *chainCall = builder.CreateIntrinsic(Intrinsic::amdgcn_cs_chain, chainTys, chainArgs);
+  // Add inreg attribute for (fn, exec, sgprs).
+  for (unsigned arg = 0; arg < 3; arg++)
+    chainCall->addParamAttr(arg, Attribute::InReg);
 #endif
   builder.CreateUnreachable();
 
