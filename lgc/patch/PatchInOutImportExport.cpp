@@ -670,21 +670,31 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
 
       InOutLocationInfo origLocInfo;
       origLocInfo.setLocation(origLoc);
-      auto locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
       if (m_shaderStage == ShaderStageTessEval ||
           (m_shaderStage == ShaderStageFragment &&
            (m_pipelineState->getPrevShaderStage(m_shaderStage) == ShaderStageMesh || m_pipelineState->isUnlinked()))) {
         // NOTE: For generic inputs of tessellation evaluation shader or fragment shader whose previous shader stage
         // is mesh shader or is in unlinked pipeline, they could be per-patch ones or per-primitive ones.
-        if (locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end()) {
-          loc = locInfoMapIt->second.getLocation();
-        } else if (resUsage->inOutUsage.perPatchInputLocMap.find(origLoc) !=
-                   resUsage->inOutUsage.perPatchInputLocMap.end()) {
-          loc = resUsage->inOutUsage.perPatchInputLocMap[origLoc];
+        const bool isPerPrimitive = genericLocationOp.getPerPrimitive();
+        if (isPerPrimitive) {
+          auto &checkedMap = m_shaderStage == ShaderStageTessEval ? resUsage->inOutUsage.perPatchInputLocMap
+                                                                  : resUsage->inOutUsage.perPrimitiveInputLocMap;
+          auto locMapIt = checkedMap.find(origLoc);
+          if (locMapIt != checkedMap.end())
+            loc = locMapIt->second;
         } else {
-          assert(resUsage->inOutUsage.perPrimitiveInputLocMap.find(origLoc) !=
-                 resUsage->inOutUsage.perPrimitiveInputLocMap.end());
-          loc = resUsage->inOutUsage.perPrimitiveInputLocMap[origLoc];
+          // NOTE: We need consider <location, component> key if component index is constant. Because inputs within same
+          // location are compacted.
+          auto locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
+          if (locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end()) {
+            loc = locInfoMapIt->second.getLocation();
+          } else {
+            assert(isa<ConstantInt>(genericLocationOp.getElemIdx()));
+            origLocInfo.setComponent(cast<ConstantInt>(genericLocationOp.getElemIdx())->getZExtValue());
+            auto locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
+            if (locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end())
+              loc = locInfoMapIt->second.getLocation();
+          }
         }
       } else {
         if (m_pipelineState->canPackInput(m_shaderStage)) {
@@ -695,15 +705,26 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
           assert(!isTcs || (isa<ConstantInt>(genericLocationOp.getLocOffset()) &&
                             isa<ConstantInt>(genericLocationOp.getElemIdx())));
           origLocInfo.setComponent(cast<ConstantInt>(genericLocationOp.getElemIdx())->getZExtValue());
-          locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
+          auto locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
           assert(locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end());
 
           loc = locInfoMapIt->second.getLocation();
           elemIdx = builder.getInt32(locInfoMapIt->second.getComponent());
           highHalf = locInfoMapIt->second.isHighHalf();
         } else {
-          assert(locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end());
-          loc = locInfoMapIt->second.getLocation();
+          // NOTE: We need consider <location, component> key if component index is constant. Because inputs within same
+          // location are compacted.
+          auto locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
+          if (locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end()) {
+            loc = locInfoMapIt->second.getLocation();
+          } else {
+            assert(isa<ConstantInt>(genericLocationOp.getElemIdx()));
+            origLocInfo.setComponent(cast<ConstantInt>(genericLocationOp.getElemIdx())->getZExtValue());
+            auto locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
+            assert(locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end());
+            if (locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end())
+              loc = locInfoMapIt->second.getLocation();
+          }
         }
       }
       assert(loc != InvalidValue);
@@ -930,24 +951,39 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       origLocInfo.setLocation(value);
       if (m_shaderStage == ShaderStageGeometry)
         origLocInfo.setStreamId(cast<ConstantInt>(callInst.getOperand(2))->getZExtValue());
-      auto locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
 
       if (m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageMesh) {
         locOffset = callInst.getOperand(1);
 
         // NOTE: For generic outputs of tessellation control shader or mesh shader, they could be per-patch ones or
         // per-primitive ones.
-        if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
-          exist = true;
-          loc = locInfoMapIt->second.getLocation();
-        } else if (resUsage->inOutUsage.perPatchOutputLocMap.find(value) !=
-                   resUsage->inOutUsage.perPatchOutputLocMap.end()) {
-          exist = true;
-          loc = resUsage->inOutUsage.perPatchOutputLocMap[value];
-        } else if (resUsage->inOutUsage.perPrimitiveOutputLocMap.find(value) !=
-                   resUsage->inOutUsage.perPrimitiveOutputLocMap.end()) {
-          exist = true;
-          loc = resUsage->inOutUsage.perPrimitiveOutputLocMap[value];
+        if (m_shaderStage == ShaderStageMesh && cast<ConstantInt>(callInst.getOperand(4))->getZExtValue() != 0) {
+          auto locMapIt = resUsage->inOutUsage.perPrimitiveOutputLocMap.find(value);
+          if (locMapIt != resUsage->inOutUsage.perPrimitiveOutputLocMap.end()) {
+            loc = locMapIt->second;
+            exist = true;
+          }
+        } else if (m_shaderStage == ShaderStageTessControl && isDontCareValue(callInst.getOperand(3))) {
+          auto locMapIt = resUsage->inOutUsage.perPatchOutputLocMap.find(value);
+          if (locMapIt != resUsage->inOutUsage.perPatchOutputLocMap.end()) {
+            loc = locMapIt->second;
+            exist = true;
+          }
+        } else {
+          // NOTE: We need consider <location, component> key if component index is constant. Because outputs within
+          // same location are compacted.
+          auto locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
+          if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
+            loc = locInfoMapIt->second.getLocation();
+            exist = true;
+          } else if (isa<ConstantInt>(callInst.getOperand(2))) {
+            origLocInfo.setComponent(cast<ConstantInt>(callInst.getOperand(2))->getZExtValue());
+            auto locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
+            if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
+              loc = locInfoMapIt->second.getLocation();
+              exist = true;
+            }
+          }
         }
       } else if (m_shaderStage == ShaderStageCopyShader) {
         exist = true;
@@ -962,7 +998,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         if (output->getType()->getScalarSizeInBits() == 64)
           component *= 2; // Component in location info is dword-based
         origLocInfo.setComponent(component);
-        locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
+        auto locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
 
         if (m_pipelineState->canPackOutput(m_shaderStage)) {
           if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
