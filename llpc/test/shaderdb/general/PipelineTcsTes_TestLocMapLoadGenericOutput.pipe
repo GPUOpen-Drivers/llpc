@@ -1,7 +1,34 @@
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST-LABEL:  LLPC location input/output mapping results (TES shader)
+
+; SHADERTEST: (TES) Input:  loc = 2, comp = 0 =>  Mapped = 0, 0
+
+; SHADERTEST: (TES) Input (per-patch):  loc = 3  =>  Mapped = 0
+; SHADERTEST: (TES) Input (per-patch):  loc = 4  =>  Mapped = 1
+; SHADERTEST: (TES) Input (per-patch):  loc = 5  =>  Mapped = 2
+
+; SHADERTEST-LABEL: LLPC location count results (after input/output matching) 
+
+; SHADERTEST: (TES) Input:  loc count = 1
+; SHADERTEST: (TES) Output: loc count = 0
+; SHADERTEST: (TES) Input (per-patch):  loc count = 3
+
+; SHADERTEST-LABEL: LLPC location input/output mapping results (TCS shader)
+
+; SHADERTEST: (TCS) Output: loc = 1, comp = 0  =>  Mapped = 1, 0
+; SHADERTEST: (TCS) Output: loc = 2, comp = 0  =>  Mapped = 0, 0
+
+; SHADERTEST: (TCS) Output (per-patch): loc = 3  =>  Mapped = 0
+; SHADERTEST: (TCS) Output (per-patch): loc = 4  =>  Mapped = 1
+; SHADERTEST: (TCS) Output (per-patch): loc = 5  =>  Mapped = 2
+
+; SHADERTEST-LABEL: LLPC location count results (after input/output matching) 
+
+; SHADERTEST: (TCS) Input:  loc count = 0
+; SHADERTEST: (TCS) Output: loc count = 2
+; SHADERTEST: (TCS) Output (per-patch): loc count = 3
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 
@@ -10,20 +37,24 @@
 
 layout(vertices = 3) out;
 
-layout(location = 0) out vec4 outColor[];
 
-layout(location = 3) out vec4 outData1[];
-layout(location = 4) out vec4 outData2[];
+layout(location = 0) out vec4 unused[];
+layout(location = 1) out vec4 importOut[];
+layout(location = 2) out vec4 outColor[];
+layout(location = 3) patch out vec4 patchDynIdx[3];
 
 void main (void)
 {
     outColor[gl_InvocationID] = gl_in[gl_InvocationID].gl_Position;
 
-    outData1[gl_InvocationID] = vec4(6.0);
-    outData2[gl_InvocationID][2] += 3.0;
+    unused[gl_InvocationID] = vec4(6.0);
+    importOut[gl_InvocationID][1] += 3.0;
 
     gl_TessLevelInner[1] = 1.0;
     gl_TessLevelOuter[1] = 2.0;
+    
+    for (int i = 0; i < 3; ++i)
+      patchDynIdx[i] = vec4(float(i));
 }
 
 [TcsInfo]
@@ -34,13 +65,15 @@ entryPoint = main
 
 layout(triangles) in;
 
-layout(location = 0) in vec4 inColor[];
+layout(location = 2) in vec4 inColor[];
+layout(location = 3) patch in vec4 inPatch[3];
+
 layout(location = 0) out vec4 outColor;
 
 void main()
 {
     outColor += gl_in[1].gl_Position;
-    outColor = inColor[0] + inColor[1] + inColor[2];
+    outColor = inColor[0] + inColor[1] + inColor[2] + inPatch[1];
 }
 
 [TesInfo]

@@ -205,14 +205,16 @@ Value *BuilderImpl::readGenericInputOutput(bool isOutput, Type *resultTy, unsign
 
   // Fold constant locationOffset into location. (Currently a variable locationOffset is only supported in
   // TCS, TES, and FS custom interpolation.)
+  bool isDynLocOffset = true;
   if (auto constLocOffset = dyn_cast<ConstantInt>(locationOffset)) {
     location += constLocOffset->getZExtValue();
     locationOffset = getInt32(0);
     locationCount = (resultTy->getPrimitiveSizeInBits() + 127U) / 128U;
+    isDynLocOffset = false;
   }
 
   // Mark the usage of the input/output.
-  markGenericInputOutputUsage(isOutput, location, locationCount, inOutInfo, vertexIndex);
+  markGenericInputOutputUsage(isOutput, location, locationCount, inOutInfo, vertexIndex, isDynLocOffset);
 
   // Generate LLPC call for reading the input/output.
   Value *result = nullptr;
@@ -290,14 +292,17 @@ Instruction *BuilderImpl::CreateWriteGenericOutput(Value *valueToWrite, unsigned
 
   // Fold constant locationOffset into location. (Currently a variable locationOffset is only supported in
   // TCS.)
+  bool isDynLocOffset = true;
   if (auto constLocOffset = dyn_cast<ConstantInt>(locationOffset)) {
     location += constLocOffset->getZExtValue();
     locationOffset = getInt32(0);
     locationCount = (valueToWrite->getType()->getPrimitiveSizeInBits() + 127U) / 128U;
+    isDynLocOffset = false;
   }
 
   // Mark the usage of the output.
-  markGenericInputOutputUsage(/*isOutput=*/true, location, locationCount, outputInfo, vertexOrPrimitiveIndex);
+  markGenericInputOutputUsage(/*isOutput=*/true, location, locationCount, outputInfo, vertexOrPrimitiveIndex,
+                              isDynLocOffset);
 
   // Set up the args for the llpc call.
   SmallVector<Value *, 6> args;
@@ -370,8 +375,9 @@ Instruction *BuilderImpl::CreateWriteGenericOutput(Value *valueToWrite, unsigned
 //                            for mesh shader per-primitive output: primitive index;
 //                            for FS custom-interpolated input: auxiliary value;
 //                            else nullptr.
+// @param isDynLocOffset : Whether the location offset is dynamic indexing
 void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, unsigned locationCount,
-                                              InOutInfo &inOutInfo, Value *vertexOrPrimIndex) {
+                                              InOutInfo &inOutInfo, Value *vertexOrPrimIndex, bool isDynLocOffset) {
   auto resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
 
   // Mark the input or output locations as in use.
@@ -417,6 +423,8 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
         keepAllLocations = true;
     }
     unsigned startLocation = (keepAllLocations ? 0 : location);
+    // NOTE: The non-invalid value as initial new Location info or new location is used to identify the dynamic indexing
+    // location.
     // Non-GS-output case.
     if (inOutLocInfoMap) {
       for (unsigned i = startLocation; i < location + locationCount; ++i) {
@@ -424,16 +432,16 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
         origLocationInfo.setLocation(i);
         origLocationInfo.setComponent(inOutInfo.getComponent());
         auto &newLocationInfo = (*inOutLocInfoMap)[origLocationInfo];
-        newLocationInfo.setData(InvalidValue);
+        newLocationInfo.setData(isDynLocOffset ? i : InvalidValue);
       }
     }
     if (perPatchInOutLocMap) {
       for (unsigned i = startLocation; i < location + locationCount; ++i)
-        (*perPatchInOutLocMap)[i] = InvalidValue;
+        (*perPatchInOutLocMap)[i] = isDynLocOffset ? i : InvalidValue;
     }
     if (perPrimitiveInOutLocMap) {
       for (unsigned i = startLocation; i < location + locationCount; ++i)
-        (*perPrimitiveInOutLocMap)[i] = InvalidValue;
+        (*perPrimitiveInOutLocMap)[i] = isDynLocOffset ? i : InvalidValue;
     }
   } else {
     // GS output. We include the stream ID with the location in the map key.
