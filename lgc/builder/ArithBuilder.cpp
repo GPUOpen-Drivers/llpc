@@ -114,7 +114,7 @@ Value *BuilderImpl::CreateFpTruncWithRounding(Value *value, Type *destTy, Roundi
     // RTN/RTP: Use fptrunc_round intrinsic.
     StringRef roundingModeStr = convertRoundingModeToStr(roundingMode).value();
     Value *roundingMode = MetadataAsValue::get(getContext(), MDString::get(getContext(), roundingModeStr));
-    Value *result = scalarize(value, [=](Value *inValue) {
+    Value *result = scalarize(value, [=, this](Value *inValue) {
       return CreateIntrinsic(Intrinsic::fptrunc_round, {getHalfTy(), inValue->getType()}, {inValue, roundingMode});
     });
     result->setName(instName);

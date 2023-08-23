@@ -82,7 +82,7 @@ void SPIRVToLLVMDbgTran::createCompilationUnit() {
 }
 
 DIFile *SPIRVToLLVMDbgTran::getDIFile(const string &FileName) {
-  return getOrInsert(FileMap, FileName, [=]() {
+  return getOrInsert(FileMap, FileName, [=, this]() {
     SplitFileName Split(FileName);
     return Builder.createFile(Split.BaseName, Split.Path);
   });
