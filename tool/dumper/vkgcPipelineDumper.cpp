@@ -856,6 +856,7 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.forceNonUniformResourceIndexStageMask = " << options->forceNonUniformResourceIndexStageMask
            << "\n";
   dumpFile << "options.replaceSetWithResourceType = " << options->replaceSetWithResourceType << "\n";
+  dumpFile << "options.disableSampleMask = " << options->disableSampleMask << "\n";
 }
 
 // =====================================================================================================================
@@ -1630,6 +1631,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
 
   if (stage == UnlinkedStageFragment || stage == UnlinkedStageCount) {
     hasher->Update(options->enableInterpModePatch);
+    hasher->Update(options->disableSampleMask);
   }
 
   hasher->Update(options->pageMigrationEnabled);

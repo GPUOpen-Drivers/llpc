@@ -769,10 +769,12 @@ void LowerFragColorExport::collectExportInfoForBuiltinOutput(Function *module, B
       }
       case BuiltInSampleMask: {
         assert(output->getType()->isArrayTy());
+        if (!m_pipelineState->getOptions().disableSampleMask) {
+          // NOTE: Only gl_SampleMask[0] is valid for us.
+          m_sampleMask = builder.CreateExtractValue(output, {0});
+          m_sampleMask = builder.CreateBitCast(m_sampleMask, builder.getFloatTy());
+        }
 
-        // NOTE: Only gl_SampleMask[0] is valid for us.
-        m_sampleMask = builder.CreateExtractValue(output, {0});
-        m_sampleMask = builder.CreateBitCast(m_sampleMask, builder.getFloatTy());
         break;
       }
       case BuiltInFragStencilRef: {

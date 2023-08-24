@@ -340,6 +340,7 @@ Options PipelineContext::computePipelineOptions() const {
   // Driver report full subgroup lanes for compute shader, here we just set fullSubgroups as default options
   options.fullSubgroups = true;
   options.internalRtShaders = getPipelineOptions()->internalRtShaders;
+  options.disableSampleMask = getPipelineOptions()->disableSampleMask;
 
   return options;
 }
