@@ -158,6 +158,7 @@ union Options {
     bool enableColorExportShader; // Explicitly build color export shader, UnlinkedStageFragment elf will return extra
                                   // meta data.
     bool fragCoordUsesInterpLoc;  // Determining fragCoord use InterpLoc
+    bool disableSampleMask;       // Disable export of sample mask from PS
   };
 };
 static_assert(sizeof(Options) == sizeof(Options::u32All));

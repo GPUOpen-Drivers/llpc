@@ -48,7 +48,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 65
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 0
+#define LLPC_INTERFACE_MINOR_VERSION 1
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -79,6 +79,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     65.1 | Add disableSampleMask to PipelineOptions                                                              |
 //  |     65.0 | Remove updateDescInElf                                                                                |
 //  |     64.0 | Add enableColorExportShader to GraphicsPipelineBuildInfo.                                             |
 //  |     63.0 | Add Atomic Counter, its default descriptor and map its concreteType to Buffer.                        |
@@ -568,6 +569,7 @@ struct PipelineOptions {
   unsigned forceNonUniformResourceIndexStageMask; ///< Mask of the stage to force using non-uniform resource index.
   bool reserved16;
   bool replaceSetWithResourceType; ///< For OGL only, replace 'set' with resource type during spirv translate
+  bool disableSampleMask;          ///< For OGL only, disabled if framebuffer doesn't attach multisample texture
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.
