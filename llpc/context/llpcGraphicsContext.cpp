@@ -489,6 +489,7 @@ void GraphicsContext::setGraphicsStateInPipeline(Pipeline *pipeline, Util::Metro
     rasterizerState.perSampleShading = inputRsState.perSampleShading;
     rasterizerState.numSamples = inputRsState.numSamples;
     rasterizerState.samplePatternIdx = inputRsState.samplePatternIdx;
+    rasterizerState.pixelShaderSamples = inputRsState.pixelShaderSamples;
   }
 
   if (pipeline)
