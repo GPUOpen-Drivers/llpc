@@ -186,10 +186,10 @@ void RegisterMetadataBuilder::buildLsHsRegisters() {
   assert(m_hasTcs);
   // VGT_HOS_MIN(MAX)_TESS_LEVEL
   // Minimum and maximum tessellation factors supported by the hardware.
-  constexpr float minTessFactor = 1.0f;
-  constexpr float maxTessFactor = 64.0f;
-  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtHosMinTessLevel] = bit_cast<uint32_t>(minTessFactor);
-  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtHosMaxTessLevel] = bit_cast<uint32_t>(maxTessFactor);
+  constexpr unsigned minTessFactor = 1;
+  constexpr unsigned maxTessFactor = 64;
+  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtHosMinTessLevel] = minTessFactor;
+  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtHosMaxTessLevel] = maxTessFactor;
 
   // VGT_LS_HS_CONFIG
   const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
@@ -1382,20 +1382,18 @@ void RegisterMetadataBuilder::setVgtShaderStagesEn(unsigned hwStageMask) {
   }
 
   if (hwStageMask & Util::Abi::HwShaderGs) {
-    unsigned esStageEn = ES_STAGE_REAL;
     ShaderStage apiStage = ShaderStageVertex;
     if (m_hasGs || m_hasMesh) {
       apiStage = m_hasGs ? ShaderStageGeometry : ShaderStageMesh;
       vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::GsStageEn] = GS_STAGE_ON;
     } else if (m_hasTes) {
       apiStage = ShaderStageTessEval;
-      esStageEn = ES_STAGE_DS;
     }
     const auto waveSize = m_pipelineState->getShaderWaveSize(apiStage);
     vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::GsW32En] = (waveSize == 32);
 
     if (m_gfxIp.major <= 11) {
-      vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::EsStageEn] = esStageEn;
+      vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::EsStageEn] = m_hasTes ? ES_STAGE_DS : ES_STAGE_REAL;
       if (m_isNggMode && !m_hasMesh)
         vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::VsStageEn] = VS_STAGE_REAL;
     }
