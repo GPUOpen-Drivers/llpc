@@ -2685,15 +2685,59 @@ void PatchResourceCollect::updateInputLocInfoMapWithUnpack() {
     if (prevStage == ShaderStageMesh) {
       eraseUnusedLocInfo = false;
     }
+  } else if (m_shaderStage == ShaderStageTessControl) {
+    // NOTE: If location offset or element index (64-bit element type) is dynamic, we keep all generic inputs of TCS.
+    for (auto call : m_inputCalls) {
+      auto locOffset = call->getLocOffset();
+      if (!isa<ConstantInt>(locOffset)) {
+        eraseUnusedLocInfo = false;
+        break;
+      }
+      auto bitWidth = call->getType()->getScalarSizeInBits();
+      if (bitWidth == 64) {
+        auto elemIdx = call->getElemIdx();
+        if (!isa<ConstantInt>(elemIdx)) {
+          eraseUnusedLocInfo = false;
+          break;
+        }
+      }
+    }
   }
 
   if (eraseUnusedLocInfo) {
+    // Collect active locations
+    DenseSet<unsigned> activeLocs;
     for (auto call : m_inputCalls) {
-      InOutLocationInfo origLocInfo;
-      origLocInfo.setLocation(call->getLocation());
-      auto mapIt = inputLocInfoMap.find(origLocInfo);
-      if (mapIt == inputLocInfoMap.end())
-        inputLocInfoMap.erase(mapIt);
+      const unsigned loc = call->getLocation();
+      activeLocs.insert(loc);
+      auto bitWidth = call->getType()->getPrimitiveSizeInBits();
+      if (bitWidth > (8 * SizeOfVec4)) {
+        assert(bitWidth <= (8 * 2 * SizeOfVec4));
+        activeLocs.insert(loc + 1);
+      }
+    }
+    // Clear per-vertex generic inputs
+    auto &locInfoMap = m_resUsage->inOutUsage.inputLocInfoMap;
+    for (auto iter = locInfoMap.begin(); iter != locInfoMap.end();) {
+      auto curIter = iter++;
+      if (activeLocs.count(curIter->first.getLocation()) == 0)
+        locInfoMap.erase(curIter);
+    }
+
+    // clear per-patch inputs
+    auto &perPatchLocMap = m_resUsage->inOutUsage.perPatchInputLocMap;
+    for (auto iter = perPatchLocMap.begin(); iter != perPatchLocMap.end();) {
+      auto curIter = iter++;
+      if (activeLocs.count(curIter->first) == 0)
+        perPatchLocMap.erase(curIter);
+    }
+
+    // Clear per-primitive inputs
+    auto &perPrimitiveLocMap = m_resUsage->inOutUsage.perPrimitiveInputLocMap;
+    for (auto iter = perPrimitiveLocMap.begin(); iter != perPrimitiveLocMap.end();) {
+      auto curIter = iter++;
+      if (activeLocs.count(curIter->first) == 0)
+        perPrimitiveLocMap.erase(curIter);
     }
   }
 
