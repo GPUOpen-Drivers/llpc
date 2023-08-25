@@ -94,6 +94,9 @@ LgcContext *Context::getLgcContext() {
     if (!m_targetMachine)
       report_fatal_error(Twine("Unknown target '") + Twine(gpuName) + Twine("'"));
     m_builderContext.reset(LgcContext::create(&*m_targetMachine, *this, PAL_CLIENT_INTERFACE_MAJOR_VERSION));
+
+    // Pass the state of LLPC_OUTS on to LGC.
+    LgcContext::setLlpcOuts(EnableOuts() ? &outs() : nullptr);
   }
   return &*m_builderContext;
 }

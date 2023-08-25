@@ -147,6 +147,7 @@ public:
   // statements in the middle-end output to that stream, giving a dump of LLVM IR at a
   // few strategic places in the pass flow, as well as information such as input/output
   // mapping.
+  // The pointer set here is thread local.
   static void setLlpcOuts(llvm::raw_ostream *stream) { m_llpcOuts = stream; }
   static llvm::raw_ostream *getLgcOuts() { return m_llpcOuts; }
 
