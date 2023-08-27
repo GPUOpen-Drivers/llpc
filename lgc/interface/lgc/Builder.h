@@ -1397,6 +1397,15 @@ public:
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateSubgroupAllEqual(llvm::Value *const value, const llvm::Twine &instName = "");
 
+  // Create a subgroup rotate call.
+  //
+  // @param value : The value to read from the chosen rotated lane to all active lanes.
+  // @param delta : The delta/offset added to lane id.
+  // @param clusterSize : The cluster size if exists.
+  // @param instName : Name to give instruction.
+  llvm::Value *CreateSubgroupRotate(llvm::Value *const value, llvm::Value *const delta, llvm::Value *const clusterSize,
+                                    const llvm::Twine &instName = "");
+
   // Create a subgroup broadcast.
   //
   // @param value : The value to broadcast
