@@ -164,6 +164,7 @@ enum BuilderOpcode : unsigned {
   SubgroupAll,
   SubgroupAny,
   SubgroupAllEqual,
+  SubgroupRotate,
   SubgroupBroadcast,
   SubgroupBroadcastWaterfall,
   SubgroupBroadcastFirst,
