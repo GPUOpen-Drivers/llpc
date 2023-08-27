@@ -1,0 +1,55 @@
+// Ensure that fast math flags are removed early enough to prevent
+// instruction combine removing subtraction for gl_Position computation.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc --gfxip=10.3.0 -v %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST: fsub float 1.000000e+00, %__llpc_input_proxy_in_Pos.0.vec.extract
+; SHADERTEST-LABEL: _amdgpu_vs_main:
+; SHADERTEST: v_sub_f32_e32 v{{[0-9]+}}, 1.0, v{{[0-9]+}}
+; END_SHADERTEST
+
+[Version]
+version = 46
+
+[VsGlsl]
+#version 450
+
+layout(location = 0) in vec4 in_Pos;
+layout(location = 1) in vec4 in_Col;
+
+void main()
+{
+    float t = (((1.0 - in_Pos.x) * 0.23529411852359771728515625) * (clamp(in_Pos.y * 0.125, 0.25, 1.0) * in_Pos.z)) + in_Pos.w;
+    gl_Position = vec4(t, 0, 0, 1.0);
+}
+
+[VsInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 450
+layout(early_fragment_tests) in;
+
+layout(location = 0, component = 0) out vec4 _out;
+
+void main()
+{
+    _out = vec4(0.0, 1.0, 0.0, 1.0);
+}
+
+[FsInfo]
+entryPoint = main
+
+[GraphicsPipelineState]
+colorBuffer[0].format = VK_FORMAT_B8G8R8A8_UNORM
+colorBuffer[0].channelWriteMask = 15
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 2
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R8G8_SNORM
+attribute[0].offset = 0

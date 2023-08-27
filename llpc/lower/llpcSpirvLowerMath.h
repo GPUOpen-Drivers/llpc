@@ -48,15 +48,12 @@ protected:
 
   void flushDenormIfNeeded(llvm::Instruction *inst);
   bool isOperandNoContract(llvm::Value *operand);
-  void disableFastMath(llvm::Value *value);
 
-  bool m_changed;                        // Whether the module is changed
-  bool m_fp16DenormFlush;                // Whether FP mode wants f16 denorms to be flushed to zero
-  bool m_fp32DenormFlush;                // Whether FP mode wants f32 denorms to be flushed to zero
-  bool m_fp64DenormFlush;                // Whether FP mode wants f64 denorms to be flushed to zero
-  bool m_fp16RoundToZero;                // Whether FP mode wants f16 round-to-zero
-  bool m_enableImplicitInvariantExports; // Whether fast math should be disabled
-                                         // for gl_Position exports
+  bool m_changed;         // Whether the module is changed
+  bool m_fp16DenormFlush; // Whether FP mode wants f16 denorms to be flushed to zero
+  bool m_fp32DenormFlush; // Whether FP mode wants f32 denorms to be flushed to zero
+  bool m_fp64DenormFlush; // Whether FP mode wants f64 denorms to be flushed to zero
+  bool m_fp16RoundToZero; // Whether FP mode wants f16 round-to-zero
 };
 
 // =====================================================================================================================
@@ -76,6 +73,17 @@ public:
   // NOTE: This function is only used by the legacy pass manager wrapper class to retrieve the
   // entry point. The function can be removed once the switch to the new pass manager is completed.
   llvm::Function *getEntryPoint();
+};
+
+// =====================================================================================================================
+// SPIR-V lowering operations to adjust fast math flags.
+class SpirvLowerMathPrecision : public SpirvLower, public llvm::PassInfoMixin<SpirvLowerMathPrecision> {
+
+public:
+  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
+  bool runImpl(llvm::Module &module);
+
+  static llvm::StringRef name() { return "Lower SPIR-V for precision (fast math flags)"; }
 };
 
 // =====================================================================================================================

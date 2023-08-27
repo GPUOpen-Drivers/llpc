@@ -225,8 +225,15 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   // New version of the code (also handles unknown version, which we treat as latest)
   passMgr.addPass(createModuleToFunctionPassAdaptor(SROAPass(SROAOptions::ModifyCFG)));
 #endif
+
+  // Lower SPIR-V precision / adjust fast math flags.
+  // Must be done before instruction combining pass to prevent incorrect contractions.
+  // Should be after SROA to avoid having to track values through memory load/store.
+  passMgr.addPass(SpirvLowerMathPrecision());
+
   passMgr.addPass(GlobalOptPass());
   passMgr.addPass(createModuleToFunctionPassAdaptor(ADCEPass()));
+
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 452298
   // Old version of the code
   unsigned instCombineOpt = 2;
