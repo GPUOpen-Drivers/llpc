@@ -84,8 +84,16 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
     }
     case OpExtInst: {
       auto extInst = static_cast<GLSLstd450>(codePos[4]);
-      if (extInst == GLSLstd450InterpolateAtSample) {
+      switch (extInst) {
+      case GLSLstd450InterpolateAtSample:
         shaderModuleUsage.useSampleInfo = true;
+        break;
+      case GLSLstd450NMin:
+      case GLSLstd450NMax:
+        shaderModuleUsage.useIsNan = true;
+        break;
+      default:
+        break;
       }
       break;
     }
