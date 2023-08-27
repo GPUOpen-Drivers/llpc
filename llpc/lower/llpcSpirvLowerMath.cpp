@@ -45,6 +45,7 @@
 #include "llvm/Transforms/Utils/Local.h"
 
 #define DEBUG_TYPE_CONST_FOLDING "llpc-spirv-lower-math-const-folding"
+#define DEBUG_TYPE_PRECISION "llpc-spirv-lower-math-precision"
 #define DEBUG_TYPE_FLOAT_OP "llpc-spirv-lower-math-float-op"
 
 using namespace lgc;
@@ -77,8 +78,6 @@ void SpirvLowerMath::init(Module &module) {
   m_fp64DenormFlush = commonShaderMode.fp64DenormMode == FpDenormMode::FlushOut ||
                       commonShaderMode.fp64DenormMode == FpDenormMode::FlushInOut;
   m_fp16RoundToZero = commonShaderMode.fp16RoundMode == FpRoundMode::Zero;
-  m_enableImplicitInvariantExports =
-      m_context->getPipelineContext()->getPipelineOptions()->enableImplicitInvariantExports;
 }
 
 // =====================================================================================================================
@@ -126,7 +125,7 @@ bool SpirvLowerMath::isOperandNoContract(Value *operand) {
 // Disable fast math for all values related with the specified value
 //
 // @param value : Value to disable fast math for
-void SpirvLowerMath::disableFastMath(Value *value) {
+static void disableFastMath(Value *value) {
   std::set<Instruction *> allValues;
   std::list<Instruction *> workSet;
   if (isa<Instruction>(value)) {
@@ -241,6 +240,72 @@ Function *SpirvLowerMathConstFolding::getEntryPoint() {
 }
 
 #undef DEBUG_TYPE // DEBUG_TYPE_CONST_FOLDING
+#define DEBUG_TYPE DEBUG_TYPE_PRECISION
+
+// =====================================================================================================================
+// Run precision (fast math flag) adjustment SPIR-V lowering pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on (empty on entry)
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+PreservedAnalyses SpirvLowerMathPrecision::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  if (runImpl(module))
+    return PreservedAnalyses::none();
+  return PreservedAnalyses::all();
+}
+
+// =====================================================================================================================
+// Run precision (fast math flag) adjustment SPIR-V lowering pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+bool SpirvLowerMathPrecision::runImpl(Module &module) {
+  LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Math-Precision\n");
+
+  SpirvLower::init(&module);
+  if (m_shaderStage == ShaderStageInvalid)
+    return false;
+
+  bool enableImplicitInvariantExports =
+      m_context->getPipelineContext()->getPipelineOptions()->enableImplicitInvariantExports;
+  if (!enableImplicitInvariantExports)
+    return false;
+
+  bool changed = false;
+  for (auto &func : module.functions()) {
+    // Disable fast math for gl_Position.
+    // TODO: This requires knowledge of the Builder implementation, which is not ideal.
+    // We need to find a neater way to do it.
+    auto funcName = func.getName();
+    bool isExport;
+    if (funcName.startswith("lgc.output.export.builtin."))
+      isExport = true;
+    else if (funcName.startswith("lgc.create.write.builtin"))
+      isExport = false;
+    else
+      continue;
+
+    for (User *user : func.users()) {
+      CallInst *callInst = cast<CallInst>(user);
+      unsigned builtIn;
+      Value *valueWritten;
+      if (isExport) {
+        builtIn = cast<ConstantInt>(callInst->getOperand(0))->getZExtValue();
+        valueWritten = callInst->getOperand(callInst->arg_size() - 1);
+      } else {
+        builtIn = cast<ConstantInt>(callInst->getOperand(1))->getZExtValue();
+        valueWritten = callInst->getOperand(0);
+      }
+
+      if (valueWritten && builtIn == lgc::BuiltInPosition && enableImplicitInvariantExports) {
+        disableFastMath(valueWritten);
+        changed = true;
+      }
+    }
+  }
+
+  return changed;
+}
+
+#undef DEBUG_TYPE // DEBUG_TYPE_PRECISION
 #define DEBUG_TYPE DEBUG_TYPE_FLOAT_OP
 
 // =====================================================================================================================
@@ -386,22 +451,6 @@ void SpirvLowerMathFloatOp::visitCallInst(CallInst &callInst) {
   if (callee->isIntrinsic() && callee->getIntrinsicID() == Intrinsic::fabs) {
     // NOTE: FABS will be optimized by backend compiler with sign bit removed via AND.
     flushDenormIfNeeded(&callInst);
-  } else {
-    // Disable fast math for gl_Position.
-    // TODO: Having this here is not good, as it requires us to know implementation details of Builder.
-    // We need to find a neater way to do it.
-    auto calleeName = callee->getName();
-    unsigned builtIn = InvalidValue;
-    Value *valueWritten = nullptr;
-    if (calleeName.startswith("lgc.output.export.builtin.")) {
-      builtIn = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
-      valueWritten = callInst.getOperand(callInst.arg_size() - 1);
-    } else if (calleeName.startswith("lgc.create.write.builtin")) {
-      builtIn = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
-      valueWritten = callInst.getOperand(0);
-    }
-    if (builtIn == lgc::BuiltInPosition && m_enableImplicitInvariantExports)
-      disableFastMath(valueWritten);
   }
 }
 
