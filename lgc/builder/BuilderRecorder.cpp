@@ -268,6 +268,8 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "subgroup.any";
   case BuilderOpcode::SubgroupAllEqual:
     return "subgroup.all.equal";
+  case BuilderOpcode::SubgroupRotate:
+    return "subgroup.rotate";
   case BuilderOpcode::SubgroupBroadcast:
     return "subgroup.broadcast";
   case BuilderOpcode::SubgroupBroadcastWaterfall:
@@ -1797,6 +1799,18 @@ Value *Builder::CreateSubgroupShuffleDown(Value *const value, Value *const offse
 }
 
 // =====================================================================================================================
+// Create a subgroup rotate call.
+//
+// @param value : The value to read from the chosen rotated lane to all active lanes.
+// @param delta : The delta/offset added to lane id.
+// @param clusterSize : The cluster size if exists.
+// @param instName : Name to give instruction.
+Value *Builder::CreateSubgroupRotate(Value *const value, Value *const delta, Value *const clusterSize,
+                                     const Twine &instName) {
+  return record(BuilderOpcode::SubgroupRotate, value->getType(), {value, delta, clusterSize}, instName);
+}
+
+// =====================================================================================================================
 // Create a subgroup clustered reduction.
 //
 // @param groupArithOp : The group operation to perform
@@ -2058,6 +2072,7 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
       break;
     case BuilderOpcode::SubgroupAll:
     case BuilderOpcode::SubgroupAllEqual:
+    case BuilderOpcode::SubgroupRotate:
     case BuilderOpcode::SubgroupAny:
     case BuilderOpcode::SubgroupBallot:
     case BuilderOpcode::SubgroupBroadcast:
