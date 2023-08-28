@@ -678,13 +678,23 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         // is mesh shader or is in unlinked pipeline, they could be per-patch ones or per-primitive ones.
         if (locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end()) {
           loc = locInfoMapIt->second.getLocation();
-        } else if (resUsage->inOutUsage.perPatchInputLocMap.find(origLoc) !=
-                   resUsage->inOutUsage.perPatchInputLocMap.end()) {
-          loc = resUsage->inOutUsage.perPatchInputLocMap[origLoc];
         } else {
-          assert(resUsage->inOutUsage.perPrimitiveInputLocMap.find(origLoc) !=
-                 resUsage->inOutUsage.perPrimitiveInputLocMap.end());
-          loc = resUsage->inOutUsage.perPrimitiveInputLocMap[origLoc];
+          auto locMapIt = resUsage->inOutUsage.perPatchInputLocMap.find(origLoc);
+          if (locMapIt != resUsage->inOutUsage.perPatchInputLocMap.end())
+            loc = locMapIt->second;
+          else {
+            locMapIt = resUsage->inOutUsage.perPrimitiveInputLocMap.find(origLoc);
+            if (locMapIt != resUsage->inOutUsage.perPrimitiveInputLocMap.end())
+              loc = locMapIt->second;
+            else {
+              // Allow for component 0 in a TES input not being used, and we have some other component here.
+              origLocInfo.setComponent(cast<ConstantInt>(genericLocationOp.getElemIdx())->getZExtValue());
+              locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
+              assert(locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end());
+              loc = locInfoMapIt->second.getLocation();
+              elemIdx = builder.getInt32(0);
+            }
+          }
         }
       } else {
         if (m_pipelineState->canPackInput(m_shaderStage)) {

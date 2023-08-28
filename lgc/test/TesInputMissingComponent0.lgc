@@ -1,0 +1,59 @@
+; RUN: lgc -mcpu=gfx900 --print-after=lgc-patch-in-out-import-export --verify-ir %s -o=/dev/null 2>&1 | FileCheck %s
+
+; Check that TES input packing works when it only uses a non-zero component
+; number (here, component 3) of a location. Before the fix that this test
+; was written for, LGC asserted with:
+; Assertion failed: (resUsage->inOutUsage.perPrimitiveInputLocMap.find(origLoc) != resUsage->inOutUsage.perPrimitiveInputLocMap.end()), function visitCallInst, file PatchInOutImportExport.cpp, line 671.
+
+; CHECK-LABEL: define dllexport amdgpu_vs
+; CHECK: @llvm.amdgcn.raw.tbuffer.load.i32(<4 x i32> %{{[^, ]*}}, i32 %{{[^, ]*}}, i32 %OffChipLdsBase, i32 immarg 116, i32 immarg 1)
+; CHECK: @llvm.amdgcn.raw.tbuffer.load.i32(<4 x i32> %{{[^, ]*}}, i32 %{{[^, ]*}}, i32 %OffChipLdsBase, i32 immarg 116, i32 immarg 1)
+; CHECK: @llvm.amdgcn.raw.tbuffer.load.i32(<4 x i32> %{{[^, ]*}}, i32 %{{[^, ]*}}, i32 %OffChipLdsBase, i32 immarg 116, i32 immarg 1)
+
+target triple = "amdgcn--amdpal"
+
+; Function Attrs: nounwind willreturn memory(read)
+declare float @lgc.create.read.generic.input.f32(...) #0
+
+; Function Attrs: nounwind
+declare void @lgc.create.write.generic.output(...) #1
+
+define dllexport void @"lgc.shader.TES"() !lgc.shaderstage !41 {
+entry:
+  %Color_BlendFactor32 = call float (...) @lgc.create.read.generic.input.f32(i32 3, i32 0, i32 3, i32 1, i32 393216, i32 0)
+  %Color_BlendFactor36 = call float (...) @lgc.create.read.generic.input.f32(i32 3, i32 0, i32 3, i32 1, i32 393216, i32 1)
+  %Color_BlendFactor40 = call float (...) @lgc.create.read.generic.input.f32(i32 3, i32 0, i32 3, i32 1, i32 393216, i32 2)
+
+  %0 = insertelement <4 x float> poison, float %Color_BlendFactor32, i64 0
+  %1 = insertelement <4 x float> %0, float %Color_BlendFactor36, i64 1
+  %2 = insertelement <4 x float> %1, float %Color_BlendFactor40, i64 2
+  call void (...) @lgc.create.write.builtin.output(<4 x float> %2, i32 0, i32 0, i32 poison, i32 poison)
+  ret void
+}
+
+; Function Attrs: nounwind
+declare void @lgc.create.write.builtin.output(...) #1
+
+define dllexport void @"lgc.shader.TCS"() !lgc.shaderstage !42 {
+  %InvocationId235 = call i32 (...) @lgc.create.read.builtin.input.i32(i32 8, i32 0, i32 poison, i32 poison)
+
+  call void (...) @lgc.create.write.generic.output(float 4.20e+1, i32 3, i32 0, i32 0, i32 1, i32 1792, i32 %InvocationId235)
+  call void (...) @lgc.create.write.generic.output(float 4.225e+1, i32 3, i32 0, i32 1, i32 1, i32 132864, i32 %InvocationId235)
+  call void (...) @lgc.create.write.generic.output(float 4.25e+1, i32 3, i32 0, i32 2, i32 1, i32 263936, i32 %InvocationId235)
+  call void (...) @lgc.create.write.generic.output(float 4.275e+1, i32 3, i32 0, i32 3, i32 1, i32 395008, i32 %InvocationId235)
+  ret void
+}
+
+; Function Attrs: nounwind willreturn memory(read)
+declare i32 @lgc.create.read.builtin.input.i32(...) #0
+
+attributes #0 = { nounwind willreturn memory(read) }
+attributes #1 = { nounwind }
+
+!llpc.tes.mode = !{!0}
+!llpc.tcs.mode = !{!1}
+
+!0 = !{i32 0, i32 0, i32 1}
+!1 = !{i32 3, i32 2, i32 1, i32 0, i32 3, i32 3}
+!41 = !{i32 3}
+!42 = !{i32 2}
