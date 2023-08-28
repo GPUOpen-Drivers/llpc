@@ -1836,7 +1836,7 @@ unsigned PipelineState::getVerticesPerPrimitive() {
       return 1;
     if (tessMode.primitiveMode == PrimitiveMode::Isolines)
       return 2;
-    if (tessMode.primitiveMode == PrimitiveMode::Triangles)
+    if (tessMode.primitiveMode == PrimitiveMode::Triangles || tessMode.primitiveMode == PrimitiveMode::Quads)
       return 3;
   } else {
     auto primType = getInputAssemblyState().primitiveType;
