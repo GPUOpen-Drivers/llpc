@@ -1640,6 +1640,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->reverseThreadGroup);
   hasher->Update(options->internalRtShaders);
   hasher->Update(options->forceNonUniformResourceIndexStageMask);
+  hasher->Update(options->replaceSetWithResourceType);
 }
 
 // =====================================================================================================================
