@@ -132,3 +132,5 @@ BUILTIN(GsWaveId, BuiltInInternalBase + 10, N, G, i32)
 // Internal built-ins for compute input when thread id is swizzled
 BUILTIN(UnswizzledLocalInvocationId, BuiltInInternalBase + 11, N, C, i32)
 BUILTIN(UnswizzledLocalInvocationIndex, BuiltInInternalBase + 12, N, C, i32)
+
+BUILTIN(EdgeFlag, BuiltInInternalBase + 18, V, V, i32) // EdgeFlag output

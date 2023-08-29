@@ -49,29 +49,6 @@ const static char StreamOutBufferStore[] = "lgc.streamoutbuffer.store";
 const static char ReconfigureLocalInvocationId[] = "lgc.reconfigure.local.invocation.id";
 const static char SwizzleWorkgroupId[] = "lgc.swizzle.workgroup.id";
 
-const static char MeshTaskCallPrefix[] = "lgc.mesh.task.";
-const static char MeshTaskReadTaskPayload[] = "lgc.mesh.task.read.task.payload";
-const static char MeshTaskWriteTaskPayload[] = "lgc.mesh.task.write.task.payload";
-const static char MeshTaskAtomicTaskPayload[] = "lgc.mesh.task.atomic.task.payload";
-const static char MeshTaskAtomicCompareSwapTaskPayload[] = "lgc.mesh.task.atomic.compare.swap.task.payload";
-const static char MeshTaskEmitMeshTasks[] = "lgc.mesh.task.emit.mesh.tasks";
-const static char MeshTaskSetMeshOutputs[] = "lgc.mesh.task.set.mesh.outputs";
-const static char MeshTaskSetPrimitiveIndices[] = "lgc.mesh.task.set.primitive.indices.";
-const static char MeshTaskSetPrimitiveCulled[] = "lgc.mesh.task.set.primitive.culled";
-const static char MeshTaskGetMeshInput[] = "lgc.mesh.task.get.mesh.input.";
-const static char MeshTaskWriteVertexOutput[] = "lgc.mesh.task.write.vertex.output.";
-const static char MeshTaskWritePrimitiveOutput[] = "lgc.mesh.task.write.primitive.output.";
-
-// Get pointer to spill table (as pointer to i8)
-const static char SpillTable[] = "lgc.spill.table";
-// Get pointer to push constant (as pointer type indicated by the return type)
-const static char PushConst[] = "lgc.push.const";
-// Get a descriptor that is in the root user data (as descriptor type indicated by the return type).
-// The arg is the dword offset of the node in the root user data layout.
-const static char RootDescriptor[] = "lgc.root.descriptor";
-// Get pointer to the descriptor table for the given resource. First arg is the descriptor set number; second arg
-// is the binding number; third arg is the value to use for the high half of the address, or HighAddrPc to use PC.
-const static char DescriptorTableAddr[] = "lgc.descriptor.table.addr";
 // Get special user data input. Arg is UserDataMapping enum value. The optional second arg causes the 32-bit
 // value to be extended to 64-bit pointer and specifies the value to use for the high half, or
 // ShadowDescriptorTable::Disable to use PC.
@@ -130,6 +107,5 @@ static const unsigned MaxRayQueryLdsStackEntries = 16; // Max number of ray quer
 
 // Internal resource table's virtual descriptor sets
 static const unsigned InternalResourceTable = 0x10000000;
-static const unsigned InternalPerShaderTable = 0x10000001;
 
 } // namespace lgc

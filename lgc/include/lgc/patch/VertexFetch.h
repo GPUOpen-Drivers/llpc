@@ -31,6 +31,7 @@
 #pragma once
 
 #include "lgc/Pipeline.h"
+#include "lgc/builder/BuilderImpl.h"
 #include "lgc/state/PipelineState.h"
 
 namespace lgc {
@@ -49,7 +50,7 @@ public:
 
   // Generate code to fetch a vertex value
   virtual llvm::Value *fetchVertex(llvm::Type *inputTy, const VertexInputDescription *description, unsigned location,
-                                   unsigned compIdx, BuilderBase &builder) = 0;
+                                   unsigned compIdx, BuilderImpl &builderImpl) = 0;
 
   // Generate code to fetch a vertex value for uber shader
   virtual llvm::Value *fetchVertex(InputImportGenericOp *vertexFetch, llvm::Value *inputDesc, BuilderBase &builder) = 0;

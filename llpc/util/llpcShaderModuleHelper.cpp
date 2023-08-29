@@ -84,8 +84,16 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
     }
     case OpExtInst: {
       auto extInst = static_cast<GLSLstd450>(codePos[4]);
-      if (extInst == GLSLstd450InterpolateAtSample) {
+      switch (extInst) {
+      case GLSLstd450InterpolateAtSample:
         shaderModuleUsage.useSampleInfo = true;
+        break;
+      case GLSLstd450NMin:
+      case GLSLstd450NMax:
+        shaderModuleUsage.useIsNan = true;
+        break;
+      default:
+        break;
       }
       break;
     }
@@ -123,6 +131,11 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
           break;
         }
         }
+      }
+      if (decoration == DecorationLocation) {
+        auto location = (opCode == OpDecorate) ? codePos[3] : codePos[4];
+        if (location == static_cast<unsigned>(Vkgc::GlCompatibilityInOutLocation::ClipVertex))
+          shaderModuleUsage.useClipVertex = true;
       }
       break;
     }
@@ -392,19 +405,25 @@ bool ShaderModuleHelper::isLlvmBitcode(const BinaryData *shaderBin) {
 // =====================================================================================================================
 // Returns the binary type for the given shader binary.
 //
-// @param shaderBin : Shader binary code
-// @return : The binary type for the shader or BinaryType::Unknown if it could not be determined.
-BinaryType ShaderModuleHelper::getShaderBinaryType(BinaryData shaderBinary) {
-  if (ShaderModuleHelper::isLlvmBitcode(&shaderBinary))
-    return BinaryType::LlvmBc;
+// @param shaderBinary : Shader binary code
+// @param[out] binaryType : Overwritten with the detected binary type, or BinaryType::Unknown if it could not be
+//                          determined
+// @return : Success is returned if the binary type was detected and any sanity checks have passed
+Result ShaderModuleHelper::getShaderBinaryType(BinaryData shaderBinary, BinaryType &binaryType) {
+  binaryType = BinaryType::Unknown;
+  if (ShaderModuleHelper::isLlvmBitcode(&shaderBinary)) {
+    binaryType = BinaryType::LlvmBc;
+    return Result::Success;
+  }
   if (Vkgc::isSpirvBinary(&shaderBinary)) {
+    binaryType = BinaryType::Spirv;
     if (verifySpirvBinary(&shaderBinary) != Result::Success) {
       LLPC_ERRS("Unsupported SPIR-V instructions found in the SPIR-V binary!\n");
-      return BinaryType::Unknown;
+      return Result::ErrorInvalidShader;
     }
-    return BinaryType::Spirv;
+    return Result::Success;
   }
-  return BinaryType::Unknown;
+  return Result::ErrorInvalidShader;
 }
 
 // =====================================================================================================================
@@ -419,9 +438,9 @@ Result ShaderModuleHelper::getModuleData(const ShaderModuleBuildInfo *shaderInfo
                                          llvm::MutableArrayRef<unsigned> codeBuffer,
                                          Vkgc::ShaderModuleData &moduleData) {
   const BinaryData &shaderBinary = shaderInfo->shaderBin;
-  moduleData.binType = ShaderModuleHelper::getShaderBinaryType(shaderBinary);
-  if (moduleData.binType == BinaryType::Unknown)
-    return Result::ErrorInvalidShader;
+  Result result = ShaderModuleHelper::getShaderBinaryType(shaderBinary, moduleData.binType);
+  if (result != Result::Success)
+    return result;
 
   if (moduleData.binType == BinaryType::Spirv) {
     moduleData.usage = ShaderModuleHelper::getShaderModuleUsageInfo(&shaderBinary);

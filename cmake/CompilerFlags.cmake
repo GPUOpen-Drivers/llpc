@@ -68,6 +68,9 @@ function(set_compiler_options PROJECT_NAME ENABLE_WERROR)
                 -Wno-gnu-anonymous-struct
                 -Wno-nested-anon-types
             )
+            if(XGL_ENABLE_LTO)
+                target_link_libraries("${PROJECT_NAME}" PRIVATE -flto=thin)
+            endif()
         endif()
     elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
         # CMAKE-TODO: These are /W4 (level 4) warnings

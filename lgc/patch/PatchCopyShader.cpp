@@ -110,7 +110,6 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
     //
     //   void copyShader(
     //     i32 inreg globalTable,
-    //     i32 inreg perShaderTable,
     //     i32 inreg streamOutTable (GFX6-GFX8) / esGsLdsSize (GFX9+),
     //     i32 inreg esGsLdsSize (GFX6-GFX8) / streamOutTable (GFX9+),
     //     i32 inreg streamOutInfo,
@@ -121,10 +120,9 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
     //     i32 inreg streamOutOffset3,
     //     i32 vertexOffset)
     //
-    argTys = {int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty};
-    argInReg = {true, true, true, true, true, true, true, true, true, true, false};
+    argTys = {int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty};
+    argInReg = {true, true, true, true, true, true, true, true, true, false};
     argNames = {"globalTable",
-                "perShaderTable",
                 gfxIp.major <= 8 ? "streamOutTable" : "esGsLdsSize",
                 gfxIp.major <= 8 ? "esGsLdsSize" : "streamOutTable",
                 "streamOutInfo",
@@ -199,13 +197,13 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
 
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 8) {
     // For GFX6 ~ GFX8, streamOutTable SGPR index value should be less than esGsLdsSize
-    intfData->userDataUsage.gs.copyShaderEsGsLdsSize = 3;
-    intfData->userDataUsage.gs.copyShaderStreamOutTable = 2;
+    intfData->userDataUsage.gs.copyShaderEsGsLdsSize = 2;
+    intfData->userDataUsage.gs.copyShaderStreamOutTable = 1;
   } else {
     if (!m_pipelineState->getNggControl()->enableNgg) {
       // For GFX9+, streamOutTable SGPR index value should be greater than esGsLdsSize
-      intfData->userDataUsage.gs.copyShaderEsGsLdsSize = 2;
-      intfData->userDataUsage.gs.copyShaderStreamOutTable = 3;
+      intfData->userDataUsage.gs.copyShaderEsGsLdsSize = 1;
+      intfData->userDataUsage.gs.copyShaderStreamOutTable = 2;
     } else {
       // If NGG, both esGsLdsSize and streamOutTable are not used
       intfData->userDataUsage.gs.copyShaderEsGsLdsSize = InvalidValue;
@@ -218,14 +216,29 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
   if (!m_pipelineState->getNggControl()->enableNgg) {
     // If no NGG, the copy shader will become a real HW VS. Set the user data entries in the
     // PAL metadata here.
-    m_pipelineState->getPalMetadata()->setUserDataEntry(ShaderStageCopyShader, 0, UserDataMapping::GlobalTable);
-    if (m_pipelineState->enableXfb()) {
-      m_pipelineState->getPalMetadata()->setUserDataEntry(
-          ShaderStageCopyShader, intfData->userDataUsage.gs.copyShaderStreamOutTable, UserDataMapping::StreamOutTable);
-    }
-    if (cl::InRegEsGsLdsSize && m_pipelineState->isGsOnChip()) {
-      m_pipelineState->getPalMetadata()->setUserDataEntry(
-          ShaderStageCopyShader, intfData->userDataUsage.gs.copyShaderEsGsLdsSize, UserDataMapping::EsGsLdsSize);
+    if (m_pipelineState->useRegisterFieldFormat()) {
+      constexpr unsigned NumUserSgprs = 32;
+      SmallVector<unsigned, NumUserSgprs> userData;
+      userData.resize(NumUserSgprs, static_cast<unsigned>(UserDataMapping::Invalid));
+      userData[0] = static_cast<unsigned>(UserDataMapping::GlobalTable);
+      if (m_pipelineState->enableXfb())
+        userData[intfData->userDataUsage.gs.copyShaderStreamOutTable] =
+            static_cast<unsigned>(UserDataMapping::StreamOutTable);
+      if (cl::InRegEsGsLdsSize && m_pipelineState->isGsOnChip())
+        userData[intfData->userDataUsage.gs.copyShaderEsGsLdsSize] =
+            static_cast<unsigned>(UserDataMapping::EsGsLdsSize);
+      m_pipelineState->setUserDataMap(ShaderStageCopyShader, userData);
+    } else {
+      m_pipelineState->getPalMetadata()->setUserDataEntry(ShaderStageCopyShader, 0, UserDataMapping::GlobalTable);
+      if (m_pipelineState->enableXfb()) {
+        m_pipelineState->getPalMetadata()->setUserDataEntry(ShaderStageCopyShader,
+                                                            intfData->userDataUsage.gs.copyShaderStreamOutTable,
+                                                            UserDataMapping::StreamOutTable);
+      }
+      if (cl::InRegEsGsLdsSize && m_pipelineState->isGsOnChip()) {
+        m_pipelineState->getPalMetadata()->setUserDataEntry(
+            ShaderStageCopyShader, intfData->userDataUsage.gs.copyShaderEsGsLdsSize, UserDataMapping::EsGsLdsSize);
+      }
     }
   }
 

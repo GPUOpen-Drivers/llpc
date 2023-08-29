@@ -108,8 +108,7 @@ private:
                                           llvm::Value *vertexIdx, BuilderBase &builder);
   llvm::Value *patchGsBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Value *vertexIdx,
                                          BuilderBase &builder);
-  llvm::Value *patchMeshBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Value *elemIdx,
-                                           BuilderBase &builder);
+  llvm::Value *patchMeshBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, BuilderBase &builder);
   llvm::Value *patchFsBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Value *sampleId,
                                          BuilderBase &builder);
   llvm::Value *getSamplePosOffset(llvm::Type *inputTy, llvm::Value *sampleId, BuilderBase &builder);
@@ -222,6 +221,7 @@ private:
   llvm::Value *m_viewportIndex; // Correspond to "out int gl_ViewportIndex"
   llvm::Value *m_layer;         // Correspond to "out int gl_Layer"
   llvm::Value *m_viewIndex;     // Correspond to "in int gl_Layer"
+  llvm::Value *m_edgeFlag;      // Correspond to "EdgeFlag output"
 
   bool m_hasTs; // Whether the pipeline has tessellation shaders
 

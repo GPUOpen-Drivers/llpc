@@ -729,7 +729,7 @@ llvm::Value *LowerFragColorExport::jumpColorExport(llvm::Function *fragEntryPoin
   auto funcTyPtr = funcTy->getPointerTo(ADDR_SPACE_CONST);
   auto colorShaderAddr = ShaderInputs::getSpecialUserData(UserDataMapping::ColorExportAddr, builder);
   AddressExtender addrExt(builder.GetInsertPoint()->getParent()->getParent());
-  auto funcPtr = addrExt.extend(colorShaderAddr, builder.getInt32(HighAddrPc), funcTyPtr, builder);
+  auto funcPtr = addrExt.extendWithPc(colorShaderAddr, funcTyPtr, builder);
 
   // Jump
   auto callInst = builder.CreateCall(funcTy, funcPtr, argVal);
@@ -769,10 +769,12 @@ void LowerFragColorExport::collectExportInfoForBuiltinOutput(Function *module, B
       }
       case BuiltInSampleMask: {
         assert(output->getType()->isArrayTy());
+        if (!m_pipelineState->getOptions().disableSampleMask) {
+          // NOTE: Only gl_SampleMask[0] is valid for us.
+          m_sampleMask = builder.CreateExtractValue(output, {0});
+          m_sampleMask = builder.CreateBitCast(m_sampleMask, builder.getFloatTy());
+        }
 
-        // NOTE: Only gl_SampleMask[0] is valid for us.
-        m_sampleMask = builder.CreateExtractValue(output, {0});
-        m_sampleMask = builder.CreateBitCast(m_sampleMask, builder.getFloatTy());
         break;
       }
       case BuiltInFragStencilRef: {
@@ -1023,7 +1025,7 @@ void FragColorExport::generateExportInstructions(ArrayRef<lgc::ColorExportInfo> 
   if (lastExport)
     FragColorExport::setDoneFlag(lastExport, builder);
 
-  m_pipelineState->getPalMetadata()->setSpiShaderColFormat(finalExportFormats);
+  m_pipelineState->getPalMetadata()->updateSpiShaderColFormat(finalExportFormats);
 }
 
 // =====================================================================================================================

@@ -558,7 +558,7 @@ private:
   bool m_preRasterHasGs = false;                        // Whether pre-rasterization part has a geometry shader
   bool m_computeLibrary = false;                        // Whether pipeline is in fact a compute library
   std::string m_client;                                 // Client name for PAL metadata
-  Options m_options;                                    // Per-pipeline options
+  Options m_options = {};                               // Per-pipeline options
   std::vector<ShaderOptions> m_shaderOptions;           // Per-shader options
   std::unique_ptr<ResourceNode[]> m_allocUserDataNodes; // Allocated buffer for user data
   llvm::ArrayRef<ResourceNode> m_userDataNodes;         // Top-level user data node table

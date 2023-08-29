@@ -162,7 +162,6 @@ struct ResourceUsage {
   std::unordered_set<uint64_t> descPairs;  // Pairs of descriptor set/binding
   bool resourceWrite = false;              // Whether shader does resource-write operations (UAV)
   bool resourceRead = false;               // Whether shader does resource-read operations (UAV)
-  bool perShaderTable = false;             // Whether per shader stage table is used
   unsigned numSgprsAvailable = UINT32_MAX; // Number of available SGPRs
   unsigned numVgprsAvailable = UINT32_MAX; // Number of available VGPRs
   bool useImages = false;                  // Whether images are used
@@ -196,6 +195,7 @@ struct ResourceUsage {
         unsigned viewportIndex : 1;        // Whether gl_ViewportIndex is used
         unsigned layer : 1;                // Whether gl_Layer is used
         unsigned primitiveShadingRate : 1; // Whether gl_PrimitiveShadingRate is used
+        unsigned edgeFlag : 1;             // Whether EdgeFlag is used
       } vs;
 
       // Tessellation control shader
@@ -298,6 +298,7 @@ struct ResourceUsage {
         unsigned custom : 1;        // Whether custom interpolation is used
         // Input
         unsigned fragCoord : 1;                // Whether gl_FragCoord is used
+        unsigned fragCoordIsSample : 1;        // Whether gl_FragCoord is used with sample Interpolation
         unsigned frontFacing : 1;              // Whether gl_FrontFacing is used
         unsigned clipDistance : 4;             // Array size of gl_ClipDistance[] (0 means unused)
         unsigned cullDistance : 4;             // Array size of gl_CullDistance[] (0 means unused)

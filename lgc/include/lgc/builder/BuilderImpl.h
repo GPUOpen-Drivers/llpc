@@ -53,6 +53,11 @@ public:
   llvm::Value *CreateIntegerDotProduct(llvm::Value *vector1, llvm::Value *vector2, llvm::Value *accumulator,
                                        unsigned flags, const llvm::Twine &instName = "");
 
+  // Create a waterfall loop containing the specified instruction.
+  llvm::Instruction *createWaterfallLoop(llvm::Instruction *nonUniformInst, llvm::ArrayRef<unsigned> operandIdxs,
+                                         bool scalarizeDescriptorLoads = false, bool useVgprForOperands = false,
+                                         const llvm::Twine &instName = "");
+
   // Set the current shader stage, clamp shader stage to the ShaderStageCompute
   void setShaderStage(ShaderStage stage) { m_shaderStage = stage > ShaderStageCompute ? ShaderStageCompute : stage; }
 
@@ -83,10 +88,6 @@ protected:
 
   // Create an "if..endif" or "if..else..endif" structure.
   llvm::BranchInst *createIf(llvm::Value *condition, bool wantElse, const llvm::Twine &instName = "");
-
-  // Create a waterfall loop containing the specified instruction.
-  llvm::Instruction *createWaterfallLoop(llvm::Instruction *nonUniformInst, llvm::ArrayRef<unsigned> operandIdxs,
-                                         bool scalarizeDescriptorLoads = false, const llvm::Twine &instName = "");
 
   // Helper method to scalarize a possibly vector unary operation
   llvm::Value *scalarize(llvm::Value *value, const std::function<llvm::Value *(llvm::Value *)> &callback);
@@ -287,6 +288,10 @@ public:
   llvm::Value *CreateLoadBufferDesc(uint64_t descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
                                     const llvm::Twine &instName = "");
 
+  // Create a buffer descriptor.
+  llvm::Value *CreateBufferDesc(uint64_t descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
+                                const llvm::Twine &instName = "");
+
   // Create a get of the stride (in bytes) of a descriptor.
   llvm::Value *CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
                                    unsigned binding, const llvm::Twine &instName = "");
@@ -296,7 +301,13 @@ public:
                                 unsigned binding, const llvm::Twine &instName = "");
 
   // Create a load of the push constants pointer.
-  llvm::Value *CreateLoadPushConstantsPtr(llvm::Type *returnTy, const llvm::Twine &instName = "");
+  llvm::Value *CreateLoadPushConstantsPtr(const llvm::Twine &instName = "");
+
+  // Calculate a buffer descriptor for an inline buffer
+  llvm::Value *buildInlineBufferDesc(llvm::Value *descPtr);
+
+  // Check whether vertex buffer descriptors are in a descriptor array binding instead of the VertexBufferTable.
+  bool useVertexBufferDescArray();
 
 private:
   // Get a struct containing the pointer and byte stride for a descriptor
@@ -304,16 +315,13 @@ private:
                                    const ResourceNode *topNode, const ResourceNode *node, bool shadow);
 
   // Get the stride (in bytes) of a descriptor.
-  llvm::Value *getStride(ResourceNodeType descType, uint64_t descSet, unsigned binding, const ResourceNode *node);
+  llvm::Value *getStride(ResourceNodeType descType, const ResourceNode *node);
 
   // Get a pointer to a descriptor, as a pointer to i8
-  llvm::Value *getDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
-                          unsigned binding, const ResourceNode *topNode, const ResourceNode *node);
+  llvm::Value *getDescPtr(ResourceNodeType concreteType, const ResourceNode *topNode, const ResourceNode *node,
+                          unsigned binding);
 
   llvm::Value *scalarizeIfUniform(llvm::Value *value, bool isNonUniform);
-
-  // Calculate a buffer descriptor for an inline buffer
-  llvm::Value *buildInlineBufferDesc(llvm::Value *descPtr);
 
   // Build buffer compact descriptor
   llvm::Value *buildBufferCompactDesc(llvm::Value *desc);
@@ -500,22 +508,6 @@ public:
   llvm::Instruction *CreateWriteBuiltInOutput(llvm::Value *valueToWrite, BuiltInKind builtIn, InOutInfo outputInfo,
                                               llvm::Value *vertexOrPrimitiveIndex, llvm::Value *index);
 
-  // Create a read from (part of) a task payload.
-  llvm::Value *CreateReadTaskPayload(llvm::Type *resultTy, llvm::Value *byteOffset, const llvm::Twine &instName = "");
-
-  // Create a write to (part of) a task payload.
-  llvm::Instruction *CreateWriteTaskPayload(llvm::Value *valueToWrite, llvm::Value *byteOffset,
-                                            const llvm::Twine &instName = "");
-
-  // Create a task payload atomic operation other than compare-and-swap.
-  llvm::Value *CreateTaskPayloadAtomic(unsigned atomicOp, llvm::AtomicOrdering ordering, llvm::Value *inputValue,
-                                       llvm::Value *byteOffset, const llvm::Twine &instName = "");
-
-  // Create a task payload atomic compare-and-swap.
-  llvm::Value *CreateTaskPayloadAtomicCompareSwap(llvm::AtomicOrdering ordering, llvm::Value *inputValue,
-                                                  llvm::Value *comparatorValue, llvm::Value *byteOffset,
-                                                  const llvm::Twine &instName = "");
-
 private:
   // Read (a part of) a generic (user) input/output value.
   llvm::Value *readGenericInputOutput(bool isOutput, llvm::Type *resultTy, unsigned location,
@@ -556,7 +548,7 @@ private:
   llvm::Type *getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo);
 
   // Mark usage of a built-in input
-  void markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySize);
+  void markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySize, InOutInfo inOutInfo);
 
   // Mark usage of a built-in output
   void markBuiltInOutputUsage(BuiltInKind builtIn, unsigned arraySize, unsigned streamId);
@@ -643,16 +635,6 @@ public:
   // Create a helper invocation query. Only allowed in a fragment shader.
   llvm::Value *CreateIsHelperInvocation(const llvm::Twine &instName = "");
 
-  // In the task shader, emit the current values of all per-task output variables to the current task output by
-  // specifying the group count XYZ of the launched child mesh tasks.
-  llvm::Instruction *CreateEmitMeshTasks(llvm::Value *groupCountX, llvm::Value *groupCountY, llvm::Value *groupCountZ,
-                                         const llvm::Twine &instName = "");
-
-  // In the mesh shader, set the actual output size of the primitives and vertices that the mesh shader workgroup will
-  // emit upon completion.
-  llvm::Instruction *CreateSetMeshOutputs(llvm::Value *vertexCount, llvm::Value *primitiveCount,
-                                          const llvm::Twine &instName = "");
-
   // -------------------------------------------------------------------------------------------------------------------
   // Builder implementation subclass for subgroup operations
 public:
@@ -667,6 +649,10 @@ public:
 
   // Create a subgroup all.
   llvm::Value *CreateSubgroupAll(llvm::Value *const value, const llvm::Twine &instName = "");
+
+  // Create a subgroup rotate.
+  llvm::Value *CreateSubgroupRotate(llvm::Value *const value, llvm::Value *const delta, llvm::Value *const clusterSize,
+                                    const llvm::Twine &instName = "");
 
   // Create a subgroup any
   llvm::Value *CreateSubgroupAny(llvm::Value *const value, const llvm::Twine &instName = "");

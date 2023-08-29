@@ -28,9 +28,10 @@ attributes #0 = { nounwind }
 !3 = !{i32 5, i32 6, i32 7}
 
 ; CHECK-LABEL: amdgpu_cs_main:
-; CHECK:         s_getpc_b64 s[0:1]
-; CHECK-NEXT:    s_mov_b32 s3, s1
-; CHECK-NEXT:    s_load_dwordx4 s[0:3], s[2:3], 0x0
+; CHECK:         s_getpc_b64 s[2:3]
+; CHECK-NEXT:    s_mov_b32 s0, s1
+; CHECK-NEXT:    s_mov_b32 s1, s3
+; CHECK-NEXT:    s_load_dwordx4 s[0:3], s[0:1], 0x0
 ; CHECK-NEXT:    v_mov_b32_e32 v0, 5
 ; CHECK-NEXT:    v_mov_b32_e32 v1, 6
 ; CHECK-NEXT:    v_mov_b32_e32 v2, 7

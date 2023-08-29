@@ -163,8 +163,8 @@ public:
   // Finalize PAL metadata for pipeline, part-pipeline or shader compilation.
   void finalizePipeline(bool isWholePipeline);
 
-  // Sets the PS register information that depends on the exports.
-  void setSpiShaderColFormat(llvm::ArrayRef<ExportFormat> expFormats);
+  // Updates the PS register information that depends on the exports.
+  void updateSpiShaderColFormat(llvm::ArrayRef<ExportFormat> expFormats);
 
   // Updates the CB shader mask information that depends on the exports.
   void updateCbShaderMask(llvm::ArrayRef<ColorExportInfo> exps);
@@ -248,7 +248,7 @@ private:
   void finalizeInputControlRegisterSetting();
 
   // The maximum possible value for the spill threshold entry in the PAL metadata.
-  static constexpr uint64_t MAX_SPILL_THRESHOLD = UINT_MAX;
+  static constexpr uint64_t MAX_SPILL_THRESHOLD = USHRT_MAX;
 
   unsigned getUserDataCount(unsigned callingConv);
   unsigned getCallingConventionForFirstHardwareShaderStage(std::string &hwStageName);

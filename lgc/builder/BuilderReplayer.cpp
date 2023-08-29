@@ -415,7 +415,7 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     );
 
   case BuilderOpcode::LoadPushConstantsPtr: {
-    return m_builder->CreateLoadPushConstantsPtr(call->getType()); // returnTy
+    return m_builder->CreateLoadPushConstantsPtr();
   }
 
   // Replayer implementations of ImageBuilder methods
@@ -657,32 +657,6 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     return m_builder->CreateImageBvhIntersectRay(bvhNodePtr, extent, origin, direction, invDirection, imageDesc);
   }
 
-  case BuilderOpcode::ReadTaskPayload: {
-    return m_builder->CreateReadTaskPayload(call->getType(), // Result type
-                                            args[0]);        // Byte offset within the payload structure
-  }
-
-  case BuilderOpcode::WriteTaskPayload: {
-    return m_builder->CreateWriteTaskPayload(args[0],  // Value to write
-                                             args[1]); // Byte offset within the payload structure
-  }
-
-  case BuilderOpcode::TaskPayloadAtomic: {
-    unsigned atomicOp = cast<ConstantInt>(args[0])->getZExtValue();
-    auto ordering = static_cast<AtomicOrdering>(cast<ConstantInt>(args[1])->getZExtValue());
-    Value *inputValue = args[2];
-    Value *byteOffset = args[3];
-    return m_builder->CreateTaskPayloadAtomic(atomicOp, ordering, inputValue, byteOffset);
-  }
-
-  case BuilderOpcode::TaskPayloadAtomicCompareSwap: {
-    auto ordering = static_cast<AtomicOrdering>(cast<ConstantInt>(args[0])->getZExtValue());
-    Value *inputValue = args[1];
-    Value *comparatorValue = args[2];
-    Value *byteOffset = args[3];
-    return m_builder->CreateTaskPayloadAtomicCompareSwap(ordering, inputValue, comparatorValue, byteOffset);
-  }
-
   // Replayer implementations of MiscBuilder methods
   case BuilderOpcode::EmitVertex: {
     return m_builder->CreateEmitVertex(cast<ConstantInt>(args[0])->getZExtValue());
@@ -711,12 +685,6 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   }
   case BuilderOpcode::DebugBreak: {
     return m_builder->CreateDebugBreak();
-  }
-  case BuilderOpcode::EmitMeshTasks: {
-    return m_builder->CreateEmitMeshTasks(args[0], args[1], args[2]);
-  }
-  case BuilderOpcode::SetMeshOutputs: {
-    return m_builder->CreateSetMeshOutputs(args[0], args[1]);
   }
   case BuilderOpcode::TransposeMatrix: {
     return m_builder->CreateTransposeMatrix(args[0]);
@@ -770,6 +738,9 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   }
   case BuilderOpcode::SubgroupAllEqual: {
     return m_builder->CreateSubgroupAllEqual(args[0]);
+  }
+  case BuilderOpcode::SubgroupRotate: {
+    return m_builder->CreateSubgroupRotate(args[0], args[1], isa<PoisonValue>(args[2]) ? nullptr : &*args[2]);
   }
   case BuilderOpcode::SubgroupBroadcast: {
     return m_builder->CreateSubgroupBroadcast(args[0], args[1]);

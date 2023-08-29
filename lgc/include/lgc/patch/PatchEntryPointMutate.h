@@ -41,6 +41,8 @@
 
 namespace lgc {
 
+class UserDataOp;
+
 // =====================================================================================================================
 // The entry-point mutation pass
 class PatchEntryPointMutate : public Patch, public llvm::PassInfoMixin<PatchEntryPointMutate> {
@@ -68,40 +70,37 @@ private:
     unsigned *argIndex;     // Where to store arg index once it is allocated, nullptr for none
   };
 
-  // User data usage for one user data node
-  struct UserDataNodeUsage {
+  // User data usage for one special user data argument
+  struct SpecialUserDataNodeUsage {
     unsigned entryArgIdx = 0;
-    unsigned dwordSize = 0; // Only used in pushConstOffsets
     llvm::SmallVector<llvm::Instruction *, 4> users;
+  };
+
+  // Dword-aligned load from constant userdata offset.
+  struct UserDataLoad {
+    llvm::Instruction *load = nullptr;
+    unsigned dwordOffset = 0;
+    unsigned dwordSize = 0;
   };
 
   // Per-merged-shader-stage gathered user data usage information.
   struct UserDataUsage {
     // Check if special user data value is used by lgc.special.user.data call generated before PatchEntryPointMutate
     bool isSpecialUserDataUsed(UserDataMapping kind);
+    void addLoad(unsigned dwordOffset, unsigned dwordSize);
 
-    // List of lgc.spill.table calls
-    UserDataNodeUsage spillTable;
-    // List of lgc.push.const calls. There is no direct attempt to unspill these; instead we attempt to
-    // unspill the pushConstOffsets loads.
-    UserDataNodeUsage pushConst;
-    // True means that we did not succeed in putting all loads into pushConstOffsets, so lgc.push.const
-    // calls must be kept.
-    bool pushConstSpill = false;
-    // Per-push-const-offset lists of loads from push const. We attempt to unspill these.
-    llvm::SmallVector<UserDataNodeUsage, 8> pushConstOffsets;
-    // Per-user-data-offset lists of lgc.root.descriptor calls
-    llvm::SmallVector<UserDataNodeUsage, 8> rootDescriptors;
-    // Per-table lists of lgc.descriptor.table.addr calls
-    // When the user data nodes are available, a table is identifed by its
-    // index in the user data nodes.  Using this index allows for the possibility that a descriptor
-    // set is split over multiple tables.  When it is not available, a table is identified by the
-    // descriptor set it contains, which is consistent with the Vulkan binding model.
-    llvm::SmallVector<UserDataNodeUsage, 8> descriptorTables;
+    unsigned spillTableEntryArgIdx = 0;
+    // Whether there is any dynamic indexing into lgc.user.data pointers.
+    bool haveDynamicUserDataLoads = false;
+    llvm::SmallVector<UserDataOp *> userDataOps;
+    llvm::SmallVector<UserDataLoad> loads;
+    // Minimum number of consecutive dwords for a statically known load *starting* at a given offset into user data
+    // (0 for dwords that aren't used)
+    llvm::SmallVector<unsigned> loadSizes;
+    // Entry argument index for each user data dword that has one.
+    llvm::SmallVector<unsigned> entryArgIdxs;
     // Per-UserDataMapping lists of lgc.special.user.data calls
-    llvm::SmallVector<UserDataNodeUsage, 18> specialUserData;
-    // Minimum offset at which spill table is used.
-    unsigned spillUsage = UINT_MAX;
+    llvm::SmallVector<SpecialUserDataNodeUsage, 18> specialUserData;
     // Usage of streamout table
     bool usesStreamOutTable = false;
   };
@@ -111,6 +110,9 @@ private:
 
   // Gather user data usage in all shaders.
   void gatherUserDataUsage(llvm::Module *module);
+
+  llvm::Value *loadUserData(const UserDataUsage &userDataUsage, llvm::Value *spillTable, llvm::Type *type,
+                            unsigned dwordOffset, BuilderBase &builder);
 
   // Fix up user data uses.
   void fixupUserDataUses(llvm::Module &module);
@@ -130,13 +132,9 @@ private:
 
   void addSpecialUserDataArgs(llvm::SmallVectorImpl<UserDataArg> &userDataArgs,
                               llvm::SmallVectorImpl<UserDataArg> &specialUserDataArgs, llvm::IRBuilder<> &builder);
-  void addUserDataArgs(llvm::SmallVectorImpl<UserDataArg> &userDataArgs, llvm::IRBuilder<> &builder);
-  void addUserDataArg(llvm::SmallVectorImpl<UserDataArg> &userDataArgs, unsigned userDataValue, unsigned sizeInDwords,
-                      const llvm::Twine &name, unsigned *argIndex, llvm::IRBuilder<> &builder);
 
-  void determineUnspilledUserDataArgs(llvm::ArrayRef<UserDataArg> userDataArgs,
-                                      llvm::ArrayRef<UserDataArg> specialUserDataArgs, llvm::IRBuilder<> &builder,
-                                      llvm::SmallVectorImpl<UserDataArg> &unspilledArgs);
+  void finalizeUserDataArgs(llvm::SmallVectorImpl<UserDataArg> &userDataArgs,
+                            llvm::ArrayRef<UserDataArg> specialUserDataArgs, llvm::IRBuilder<> &builder);
 
   uint64_t pushFixedShaderArgTys(llvm::SmallVectorImpl<llvm::Type *> &argTys) const;
 

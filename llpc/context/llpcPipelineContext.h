@@ -55,6 +55,19 @@ class MetroHash64;
 
 namespace Llpc {
 
+// Enumerates the function of a particular node in a shader's resource mapping graph in OGL.
+enum class GlResourceMappingSet : unsigned {
+  Unknown = 0,             // Invalid type
+  DescriptorConstBuffer,   // Uniform buffer and inline constant with binding
+  DescriptorBuffer,        // Shader storage buffer
+  DescriptorImage,         // Image and image buffer
+  DescriptorResource,      // Texture and texture buffer
+  DescriptorSampler,       // Sampler
+  DescriptorFmask,         // F-mask
+  DescriptorAtomicCounter, // Atomic Counter
+  Count,                   // Count of resource mapping node types.
+};
+
 // Enumerates types of descriptor.
 enum class DescriptorType : unsigned {
   UniformBlock = 0,   // Uniform block
@@ -220,6 +233,9 @@ public:
 
   // Gets ShaderOptions of the specified shader stage.
   lgc::ShaderOptions computeShaderOptions(const PipelineShaderInfo &shaderInfo) const;
+
+  // Convert Resource node type to set for OGL
+  static uint32_t getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType resourceType);
 
 protected:
   // Set the raytracing state

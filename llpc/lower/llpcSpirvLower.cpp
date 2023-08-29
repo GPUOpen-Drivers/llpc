@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "llpcSpirvLower.h"
+#include "LowerGLCompatibility.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcSpirvLowerAccessChain.h"
@@ -39,7 +40,7 @@
 #include "llpcSpirvLowerMath.h"
 #include "llpcSpirvLowerMemoryOp.h"
 #include "llpcSpirvLowerRayQueryPostInline.h"
-#include "llpcSpirvLowerRayTracingBuiltIn.h"
+#include "llpcSpirvLowerRayTracing.h"
 #include "llpcSpirvLowerTerminator.h"
 #include "llpcSpirvLowerTranslator.h"
 #include "llpcSpirvLowerUtil.h"
@@ -180,9 +181,6 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   if (lowerTimer)
     LgcContext::createAndAddStartStopTimer(passMgr, lowerTimer, true);
 
-  if (rayTracing)
-    passMgr.addPass(SpirvLowerRayTracing());
-
   if (isInternalRtShader)
     passMgr.addPass(SpirvProcessGpuRtLibrary());
 
@@ -197,14 +195,14 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   // Lower SPIR-V access chain
   passMgr.addPass(SpirvLowerAccessChain());
 
-  if (rayTracing)
-    passMgr.addPass(SpirvLowerRayTracingBuiltIn());
-
   if (rayQuery)
     passMgr.addPass(SpirvLowerRayQueryPostInline());
 
   // Lower SPIR-V terminators
   passMgr.addPass(SpirvLowerTerminator());
+
+  // Lower Glsl compatibility variables and operations
+  passMgr.addPass(LowerGLCompatibility());
 
   // Lower SPIR-V global variables, inputs, and outputs
   passMgr.addPass(SpirvLowerGlobal());
@@ -246,10 +244,18 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   // Lower SPIR-V instruction metadata remove
   passMgr.addPass(SpirvLowerInstMetaRemove());
 
-#if VKI_RAY_TRACING
-  if (rayTracing || rayQuery)
+  // Lower SPIR-V ray tracing related stuff, including entry point generation, lgc.rt dialect handling, some of
+  // lgc.gpurt dialect handling.
+  // And do inlining after SpirvLowerRayTracing as it will produce some extra functions.
+  if (rayTracing) {
+    passMgr.addPass(SpirvLowerRayTracing());
+    passMgr.addPass(AlwaysInlinerPass());
+  }
+
+  if (rayTracing || rayQuery) {
     passMgr.addPass(LowerGpuRt());
-#endif
+    passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(instCombineOpt)));
+  }
 
   // Stop timer for lowering passes.
   if (lowerTimer)

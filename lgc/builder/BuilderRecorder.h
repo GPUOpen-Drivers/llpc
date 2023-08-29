@@ -135,10 +135,6 @@ enum BuilderOpcode : unsigned {
   ReadBuiltInInput,
   ReadBuiltInOutput,
   WriteBuiltInOutput,
-  ReadTaskPayload,
-  WriteTaskPayload,
-  TaskPayloadAtomic,
-  TaskPayloadAtomicCompareSwap,
 
   // Matrix
   TransposeMatrix,
@@ -159,8 +155,6 @@ enum BuilderOpcode : unsigned {
   Derivative,
   DemoteToHelperInvocation,
   IsHelperInvocation,
-  EmitMeshTasks,
-  SetMeshOutputs,
   GetWaveSize,
   DebugBreak,
 
@@ -170,6 +164,7 @@ enum BuilderOpcode : unsigned {
   SubgroupAll,
   SubgroupAny,
   SubgroupAllEqual,
+  SubgroupRotate,
   SubgroupBroadcast,
   SubgroupBroadcastWaterfall,
   SubgroupBroadcastFirst,

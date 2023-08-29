@@ -69,16 +69,6 @@ const static char DescriptorUseSpillTable[] = "dusespill_";
 //
 const static char DescriptorTableOffset[] = "descset_";
 
-// Descriptor stride is "dstride_X_Y" where:
-// * X is the descriptor set number
-// * Y is the binding number
-//
-// The value of the relocation is stride in bytes of the requested array of descriptors in its descriptor set
-// table. It is illegal for the specified descriptor not to exist, and it must be a resource, fmask or sampler
-// descriptor. (The reason the stride needs to be a reloc is that the requested descriptor might or might not
-// be part of a combined texture descriptor.)
-const static char DescriptorStride[] = "dstride_";
-
 // The buffer type is "compactbuffer_X_Y" where:
 // * X is the descriptor set number
 // * Y is the binding number
@@ -102,16 +92,6 @@ const static char DeviceIdx[] = "$deviceIdx";
 // Pushconst offset is "pushconst"
 // The value of the relocation is the offset of the pushconst resource node in the pipeline state.
 const static char Pushconst[] = "pushconst";
-
-// Whether the shadow descriptor is enabled or not.
-//
-// The value of the relocation is either:
-//  * 0: the shadow descriptor table is disabled.
-//  * 1: the shadow descriptor table is enabled.
-const static char ShadowDescriptorTableEnabled[] = "$shadowenabled";
-
-// The high 32-bits of the address of the shadow descriptor table.
-const static char ShadowDescriptorTable[] = "$shadowdesctable";
 
 } // namespace reloc
 

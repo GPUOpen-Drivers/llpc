@@ -16,7 +16,7 @@
 # - GENERATOR: CMake generator to use (e.g., "Unix Makefiles", Ninja)
 #
 
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
 ARG BRANCH
 ARG CONFIG
@@ -27,32 +27,28 @@ ARG GENERATOR
 SHELL ["/bin/bash", "-c"]
 
 # Install required packages.
-# Use pip to install an up-to-date version of CMake. The apt package is
-# too old for LLVM.
 RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
     && apt-get update \
     && apt-get install -yqq --no-install-recommends \
-       build-essential pkg-config ninja-build \
+       build-essential cmake pkg-config ninja-build \
        gcc g++ binutils-gold \
-       llvm-11 clang-11 clang-tidy-12 libclang-common-11-dev lld-11 \
-       python python3 python3-distutils python3-pip \
+       llvm-14 clang-14 clang-tidy-14 libclang-common-14-dev lld-14 \
+       python3 python3-distutils python-is-python3 \
        libssl-dev libx11-dev libxcb1-dev x11proto-dri2-dev libxcb-dri3-dev \
        libxcb-dri2-0-dev libxcb-present-dev libxshmfence-dev libxrandr-dev \
        libwayland-dev \
-       git curl wget openssh-client \
+       git curl wget ca-certificates openssh-client \
        gpg gpg-agent \
     && rm -rf /var/lib/apt/lists/* \
-    && python3 -m pip install --no-cache-dir --upgrade pip \
-    && python3 -m pip install --no-cache-dir --upgrade cmake \
     && for tool in clang clang++ llvm-cov llvm-profdata llvm-symbolizer lld ld.lld ; do \
-         update-alternatives --install /usr/bin/"$tool" "$tool" /usr/bin/"$tool"-11 10 ; \
+         update-alternatives --install /usr/bin/"$tool" "$tool" /usr/bin/"$tool"-14 10 ; \
         done \
-    && update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-12 10 \
+    && update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-14 10 \
     && update-alternatives --install /usr/bin/ld ld /usr/bin/ld.gold 10
 
 # Update the VulkanSDK 1.3.216 or higher, install the shader compiler tools for gpurt.
-RUN wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | apt-key add - \
-    && wget -qO /etc/apt/sources.list.d/lunarg-vulkan-1.3.216-focal.list https://packages.lunarg.com/vulkan/1.3.216/lunarg-vulkan-1.3.216-focal.list \
+RUN wget -qO /etc/apt/trusted.gpg.d/lunarg.asc https://packages.lunarg.com/lunarg-signing-key-pub.asc \
+    && wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list \
     && apt-get update \
     && apt-get install -yqq --no-install-recommends dxc glslang-tools \
     && rm -rf /var/lib/apt/lists/* \
@@ -88,9 +84,6 @@ RUN EXTRA_COMPILER_FLAGS=() \
          EXTRA_FLAGS+=("-DCMAKE_CXX_COMPILER=clang++"); \
          EXTRA_FLAGS+=("-DLLVM_USE_LINKER=lld"); \
          EXTRA_LINKER_FLAGS+=("-fuse-ld=lld"); \
-       fi \
-    && if echo "$FEATURES" | grep -q "+shadercache" ; then \
-         EXTRA_FLAGS+=("-DLLPC_ENABLE_SHADER_CACHE=1"); \
        fi \
     && if echo "$FEATURES" | grep -q "+asan" ; then \
          SANITIZERS+=("Address"); \

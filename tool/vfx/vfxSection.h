@@ -67,6 +67,7 @@ enum SectionType : unsigned {
   SectionTypeUniformConstantMapEntry, // UniformConstantMapEntry section
   SectionTypeUniformConstantMap,      // UniformConstantMap section
   SectionTypeUniformConstant,         // UniformConstant section
+  SectionTypeApiXfbOutput,            // ApiXfbOutput section
   // GL pipeline
   SectionTypeGlProgramParameter, // GL program parameter section
   SectionTypeGlGraphicsState,    // GL graphic pipeline state section
@@ -120,6 +121,7 @@ enum MemberType : unsigned {
   MemberTypeUniformConstantMapEntry,      // VFX member type: SectionUniformConstantMapEntry
   MemberTypeUniformConstantMap,           // VFX member type: SectionUniformConstantMap
   MemberTypeUniformConstant,              // VFX member type: SectionUniformConstant
+  MemberTypeXfbOutInfo,                   // VFX member type: SectionXfbOutInfo
   MemberTypeShaderGroup,                  // VFX member type: SectionShaderGroup
   MemberTypeRtState,                      // VFX member type: SectionRtState
   MemberTypeRayTracingShaderExportConfig, // VFX member type: SectionRayTracingShaderExportConfig

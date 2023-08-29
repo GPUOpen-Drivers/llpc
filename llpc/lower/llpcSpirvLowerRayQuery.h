@@ -117,7 +117,7 @@ public:
   SpirvLowerRayQuery();
   SpirvLowerRayQuery(bool rayQueryLibrary);
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
-  virtual bool runImpl(llvm::Module &module);
+  bool runImpl(llvm::Module &module);
   llvm::Value *getThreadIdInGroup() const;
 
   static llvm::StringRef name() { return "Lower SPIR-V RayQuery operations"; }
@@ -129,7 +129,6 @@ protected:
   void processShaderFunction(llvm::Function *func, unsigned opcode);
   void createGlobalLdsUsage();
   void createGlobalRayQueryObj();
-  void createGlobalTraceRayStaticId();
   void initGlobalVariable();
   void generateTraceRayStaticId();
   llvm::Value *createTransformMatrix(unsigned builtInId, llvm::Value *accelStruct, llvm::Value *instanceId,
@@ -139,7 +138,6 @@ protected:
   llvm::Value *createLoadInstanceIndex(llvm::Value *instNodeAddr);
   llvm::Value *createLoadInstanceId(llvm::Value *instNodeAddr);
   llvm::Value *createLoadMatrixFromAddr(llvm::Value *matrixAddr);
-  llvm::GlobalVariable *m_traceRayStaticId; // Static trace ray call site identifier
 
   bool m_rayQueryLibrary;       // Whether the module is ray query library
   unsigned m_spirvOpMetaKindId; // Metadata kind ID for "spirv.op"

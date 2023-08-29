@@ -144,6 +144,29 @@ Value *BuilderImpl::CreateSubgroupAllEqual(Value *const value, const Twine &inst
 }
 
 // =====================================================================================================================
+// Create a subgroup rotate call.
+//
+// @param value : The value to read from the chosen rotated lane to all active lanes.
+// @param delta : The delta/offset added to lane id.
+// @param clusterSize : The cluster size if exists.
+// @param instName : Name to give instruction.
+Value *BuilderImpl::CreateSubgroupRotate(Value *const value, Value *const delta, Value *const clusterSize,
+                                         const Twine &instName) {
+  // LocalId = SubgroupLocalInvocationId
+  // RotationGroupSize = hasClusterSize ? ClusterSize : SubgroupSize
+  // InvocationId = ((LocalId + Delta) & (RotationGroupSize - 1)) + (LocalId & ~(RotationGroupSize - 1))
+  Value *localId = CreateSubgroupMbcnt(getInt64(UINT64_MAX), "");
+  Value *invocationId = CreateAdd(localId, delta);
+  if (clusterSize != nullptr) {
+    Value *rotationGroupSize = CreateSub(clusterSize, getInt32(1));
+    invocationId =
+        CreateOr(CreateAnd(invocationId, rotationGroupSize), CreateAnd(localId, CreateNot(rotationGroupSize)));
+  }
+
+  return CreateSubgroupShuffle(value, invocationId, instName);
+}
+
+// =====================================================================================================================
 // Create a subgroup broadcast call.
 //
 // @param value : The value to read from the chosen lane to all active lanes.

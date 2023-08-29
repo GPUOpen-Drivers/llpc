@@ -19,7 +19,7 @@
 ; SHADERTEST: [[cast:%[0-9]+]] = bitcast half [[ld]] to i16
 ; SHADERTEST: [[zext:%[0-9]+]] = zext i16 [[cast]] to i32
 ; SHADERTEST: [[result:%[0-9]+]] = bitcast i32 [[zext]] to float
-; SHADERTEST: [[ret:%[0-9]+]] = insertvalue { {{.*}} } {{%[0-9]+}}, float [[result]], 19
+; SHADERTEST: [[ret:%[0-9]+]] = insertvalue { {{.*}} } {{%[0-9]+}}, float [[result]], 18
 ; SHADERTEST: ret { {{.*}} } [[ret]]
 ; SHADERTEST: =====  AMDLLPC SUCCESS  =====
 ; END_SHADERTEST

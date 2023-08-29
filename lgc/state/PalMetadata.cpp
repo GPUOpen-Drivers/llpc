@@ -486,7 +486,6 @@ unsigned PalMetadata::getUserDataReg0(ShaderStage stage) {
 // @param userDataIndex : User data index 0-15 or 0-31 depending on HW and shader stage
 // @param userDataValue : Value to store in that entry, one of:
 //                        - a 0-based integer for the root user data dword offset
-//                        - DescRelocMagic+set_number for an unlinked descriptor set number
 //                        - one of the UserDataMapping values, e.g. UserDataMapping::GlobalTable
 // @param dwordCount : Number of user data entries to set
 void PalMetadata::setUserDataEntry(ShaderStage stage, unsigned userDataIndex, unsigned userDataValue,
@@ -674,15 +673,8 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
     // Set PA_CL_CLIP_CNTL from pipeline state settings.
     // DX_CLIP_SPACE_DEF, ZCLIP_NEAR_DISABLE and ZCLIP_FAR_DISABLE are now set internally by PAL (as of
     // version 629), and are no longer part of the PAL ELF ABI.
-    const unsigned usrClipPlaneMask = m_pipelineState->getRasterizerState().usrClipPlaneMask;
     const bool rasterizerDiscardEnable = m_pipelineState->getRasterizerState().rasterizerDiscardEnable;
     PA_CL_CLIP_CNTL paClClipCntl = {};
-    paClClipCntl.bits.UCP_ENA_0 = (usrClipPlaneMask >> 0) & 0x1;
-    paClClipCntl.bits.UCP_ENA_1 = (usrClipPlaneMask >> 1) & 0x1;
-    paClClipCntl.bits.UCP_ENA_2 = (usrClipPlaneMask >> 2) & 0x1;
-    paClClipCntl.bits.UCP_ENA_3 = (usrClipPlaneMask >> 3) & 0x1;
-    paClClipCntl.bits.UCP_ENA_4 = (usrClipPlaneMask >> 4) & 0x1;
-    paClClipCntl.bits.UCP_ENA_5 = (usrClipPlaneMask >> 5) & 0x1;
     paClClipCntl.bits.DX_LINEAR_ATTR_CLIP_ENA = true;
     paClClipCntl.bits.DX_RASTERIZATION_KILL = rasterizerDiscardEnable;
     setRegister(mmPA_CL_CLIP_CNTL, paClClipCntl.u32All);
@@ -1061,7 +1053,7 @@ llvm::Type *PalMetadata::getLlvmType(StringRef tyName) const {
 // =====================================================================================================================
 // Updates the SPI_SHADER_COL_FORMAT entry.
 //
-void PalMetadata::setSpiShaderColFormat(ArrayRef<ExportFormat> expFormats) {
+void PalMetadata::updateSpiShaderColFormat(ArrayRef<ExportFormat> expFormats) {
   unsigned spiShaderColFormat = 0;
   for (auto [i, expFormat] : enumerate(expFormats))
     spiShaderColFormat |= expFormat << (4 * i);
@@ -1100,7 +1092,7 @@ void PalMetadata::updateCbShaderMask(llvm::ArrayRef<ColorExportInfo> exps) {
       continue;
 
     if (m_pipelineState->computeExportFormat(exp.ty, exp.location) != 0) {
-      cbShaderMask |= (0xF << (4 * exp.hwColorTarget));
+      cbShaderMask |= (0xF << (4 * exp.location));
     }
   }
 
@@ -1294,10 +1286,6 @@ unsigned PalMetadata::getFragmentShaderBuiltInLoc(unsigned builtin) {
 unsigned PalMetadata::getCallingConventionForFirstHardwareShaderStage(std::string &hwStageName) {
   if (m_useRegisterFieldFormat) {
     auto hardwareStages = m_pipelineNode[Util::Abi::PipelineMetadataKey::HardwareStages].getMap(true);
-    hwStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Vs)];
-    if (hardwareStages.find(hwStageName) != hardwareStages.end())
-      return CallingConv::AMDGPU_VS;
-
     hwStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Hs)];
     if (hardwareStages.find(hwStageName) != hardwareStages.end())
       return CallingConv::AMDGPU_HS;
@@ -1305,6 +1293,10 @@ unsigned PalMetadata::getCallingConventionForFirstHardwareShaderStage(std::strin
     hwStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Gs)];
     if (hardwareStages.find(hwStageName) != hardwareStages.end())
       return CallingConv::AMDGPU_GS;
+
+    hwStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Vs)];
+    if (hardwareStages.find(hwStageName) != hardwareStages.end())
+      return CallingConv::AMDGPU_VS;
 
     hwStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Cs)];
     return CallingConv::AMDGPU_CS;

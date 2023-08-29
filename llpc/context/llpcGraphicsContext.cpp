@@ -197,8 +197,9 @@ void GraphicsContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
     setVertexInputDescriptions(pipeline, hasher);
   }
 
-  if (isShaderStageInMask(ShaderStageFragment, stageMask) && (!unlinked || DisableColorExportShader)) {
-    // Give the color export state to the middle-end.
+  if ((isShaderStageInMask(ShaderStageFragment, stageMask) && (!unlinked || DisableColorExportShader)) ||
+      (stageMask == 0)) {
+    // Give the color export state to the middle-end. Empty stage mask indicates color export shader.
     setColorExportState(pipeline, hasher);
   }
 
@@ -221,6 +222,25 @@ void GraphicsContext::setTcsInputVertices(Module *tcsModule) {
 // Give the pipeline options to the middle-end, and/or hash them.
 Options GraphicsContext::computePipelineOptions() const {
   Options options = PipelineContext::computePipelineOptions();
+
+  // If enable edge flag, client driver should force pass-through for ngg culling.
+  const GraphicsPipelineBuildInfo *graphicsPipelineBuildInfo =
+      static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo());
+  auto vertexInput = graphicsPipelineBuildInfo->pVertexInput;
+  if (vertexInput) {
+    for (unsigned i = 0; i < vertexInput->vertexBindingDescriptionCount; ++i) {
+      auto binding = &vertexInput->pVertexBindingDescriptions[i];
+      if (binding->binding == Vkgc::GlCompatibilityAttributeLocation::EdgeFlag) {
+        auto nggState = graphicsPipelineBuildInfo->nggState;
+        if (nggState.forceCullingMode || nggState.enableBackfaceCulling || nggState.enableFrustumCulling ||
+            nggState.enableBoxFilterCulling || nggState.enableSphereCulling || nggState.enableCullDistanceCulling ||
+            nggState.enableSmallPrimFilter) {
+          llvm_unreachable("Client driver should force pass-through for ngg culling when EdgeFlag is used.");
+        }
+        break;
+      }
+    }
+  }
 
   auto pipelineInfo = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo());
   options.enableUberFetchShader = pipelineInfo->enableUberFetchShader;
@@ -451,6 +471,7 @@ void GraphicsContext::setGraphicsStateInPipeline(Pipeline *pipeline, Util::Metro
 
     inputAssemblyState.disableVertexReuse = inputIaState.disableVertexReuse;
     inputAssemblyState.switchWinding = inputIaState.switchWinding;
+    inputAssemblyState.useVertexBufferDescArray = inputIaState.useVertexBufferDescArray;
 
     if (hasher) {
       // We need to hash patchControlPoints here, even though it is used separately in setTcsInputVertices as
@@ -459,7 +480,6 @@ void GraphicsContext::setGraphicsStateInPipeline(Pipeline *pipeline, Util::Metro
     }
 
     rasterizerState.rasterizerDiscardEnable = inputRsState.rasterizerDiscardEnable;
-    rasterizerState.usrClipPlaneMask = inputRsState.usrClipPlaneMask;
     rasterizerState.provokingVertexMode = static_cast<ProvokingVertexMode>(inputRsState.provokingVertexMode);
     rasterizerState.rasterStream = inputRsState.rasterStream;
   }
@@ -469,6 +489,7 @@ void GraphicsContext::setGraphicsStateInPipeline(Pipeline *pipeline, Util::Metro
     rasterizerState.perSampleShading = inputRsState.perSampleShading;
     rasterizerState.numSamples = inputRsState.numSamples;
     rasterizerState.samplePatternIdx = inputRsState.samplePatternIdx;
+    rasterizerState.pixelShaderSamples = inputRsState.pixelShaderSamples;
   }
 
   if (pipeline)

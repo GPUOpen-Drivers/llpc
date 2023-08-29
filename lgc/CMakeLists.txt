@@ -56,10 +56,13 @@ add_llvm_library(LLVMlgc LINK_COMPONENTS
 target_link_libraries(LLVMlgc PUBLIC llvm_dialects)
 
 ### Cached Project Options #############################################################################################
-option(LLPC_BUILD_NAVI12 "LLPC support for NAVI12?" OFF)
-option(LLPC_BUILD_REMBRANDT "LLPC support for REMBRANDT?" OFF)
-option(LLPC_BUILD_RAPHAEL "LLPC support for RAPHAEL?" OFF)
-option(LLPC_BUILD_MENDOCINO "LLPC support for MENDOCINO?" OFF)
+option(LLPC_BUILD_NAVI12 "LLPC support for NAVI12?" ON)
+option(LLPC_BUILD_REMBRANDT "LLPC support for REMBRANDT?" ON)
+option(LLPC_BUILD_RAPHAEL "LLPC support for RAPHAEL?" ON)
+option(LLPC_BUILD_MENDOCINO "LLPC support for MENDOCINO?" ON)
+#if VKI_BUILD_PHOENIX1
+option(LLPC_BUILD_PHOENIX1 "LLPC support for PHOENIX1?" ON)
+#endif
 option(LLPC_ENABLE_WERROR "Build LLPC with more errors" OFF)
 
 ### Compiler Options ###################################################################################################
@@ -139,6 +142,14 @@ target_compile_definitions(LLVMlgc PRIVATE CHIP_HDR_RENOIR)
         CHIP_HDR_MENDOCINO
     )
   endif()
+#if VKI_BUILD_PHOENIX1
+  if(LLPC_BUILD_PHOENIX1)
+    target_compile_definitions(LLVMlgc PRIVATE
+        LLPC_BUILD_PHOENIX1
+        CHIP_HDR_PHOENIX1
+    )
+  endif()
+#endif
 
 if(WIN32)
     target_compile_definitions(LLVMlgc PRIVATE
@@ -264,5 +275,4 @@ if (LLPC_BUILD_TESTS)
   add_subdirectory(unittests)
 endif()
 
-target_link_libraries(LLVMlgc PUBLIC LLVMLgcRt)
 target_link_libraries(LLVMlgc PRIVATE LLVMLgcCps)

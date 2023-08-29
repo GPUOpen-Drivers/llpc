@@ -194,14 +194,6 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "read.builtin.output";
   case BuilderOpcode::WriteBuiltInOutput:
     return "write.builtin.output";
-  case BuilderOpcode::ReadTaskPayload:
-    return "read.task.payload";
-  case BuilderOpcode::WriteTaskPayload:
-    return "write.task.payload";
-  case BuilderOpcode::TaskPayloadAtomic:
-    return "task.payload.atomic";
-  case BuilderOpcode::TaskPayloadAtomicCompareSwap:
-    return "task.payload.compare.swap";
   case BuilderOpcode::TransposeMatrix:
     return "transpose.matrix";
   case BuilderOpcode::MatrixTimesScalar:
@@ -236,10 +228,6 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "demote.to.helper.invocation";
   case BuilderOpcode::IsHelperInvocation:
     return "is.helper.invocation";
-  case BuilderOpcode::EmitMeshTasks:
-    return "emit.mesh.tasks";
-  case BuilderOpcode::SetMeshOutputs:
-    return "set.mesh.outputs";
   case BuilderOpcode::ImageLoad:
     return "image.load";
   case BuilderOpcode::ImageLoadWithFmask:
@@ -280,6 +268,8 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "subgroup.any";
   case BuilderOpcode::SubgroupAllEqual:
     return "subgroup.all.equal";
+  case BuilderOpcode::SubgroupRotate:
+    return "subgroup.rotate";
   case BuilderOpcode::SubgroupBroadcast:
     return "subgroup.broadcast";
   case BuilderOpcode::SubgroupBroadcastWaterfall:
@@ -905,32 +895,6 @@ Value *Builder::CreateIsHelperInvocation(const Twine &instName) {
 }
 
 // =====================================================================================================================
-// In the task shader, emit the current values of all per-task output variables to the current task output by
-// specifying the group count XYZ of the launched child mesh tasks.
-//
-// @param groupCountX : X dimension of the launched child mesh tasks
-// @param groupCountY : Y dimension of the launched child mesh tasks
-// @param groupCountZ : Z dimension of the launched child mesh tasks
-// @param instName : Name to give final instruction
-// @returns Instruction to emit mesh tasks
-Instruction *Builder::CreateEmitMeshTasks(Value *groupCountX, Value *groupCountY, Value *groupCountZ,
-                                          const Twine &instName) {
-  return record(BuilderOpcode::EmitMeshTasks, nullptr, {groupCountX, groupCountY, groupCountZ}, instName);
-}
-
-// =====================================================================================================================
-// In the mesh shader, set the actual output size of the primitives and vertices that the mesh shader workgroup will
-// emit upon completion.
-//
-// @param vertexCount : Actual output size of the vertices
-// @param primitiveCount : Actual output size of the primitives
-// @param instName : Name to give final instruction
-// @returns Instruction to set the actual size of mesh outputs
-Instruction *Builder::CreateSetMeshOutputs(Value *vertexCount, Value *primitiveCount, const Twine &instName) {
-  return record(BuilderOpcode::SetMeshOutputs, nullptr, {vertexCount, primitiveCount}, instName);
-}
-
-// =====================================================================================================================
 // Create "fclamp" operation.
 //
 // @param x : Value to clamp
@@ -1124,10 +1088,9 @@ Value *Builder::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType
 // =====================================================================================================================
 // Create a load of the spill table pointer for push constants.
 //
-// @param returnTy : Return type of the load
 // @param instName : Name to give instruction(s)
-Value *Builder::CreateLoadPushConstantsPtr(Type *returnTy, const Twine &instName) {
-  return record(BuilderOpcode::LoadPushConstantsPtr, returnTy, {}, instName);
+Value *Builder::CreateLoadPushConstantsPtr(const Twine &instName) {
+  return record(BuilderOpcode::LoadPushConstantsPtr, getPtrTy(ADDR_SPACE_CONST), {}, instName);
 }
 
 // =====================================================================================================================
@@ -1633,60 +1596,6 @@ Value *Builder::CreateImageBvhIntersectRay(Value *nodePtr, Value *extent, Value 
 }
 
 // =====================================================================================================================
-// Create a read from (part of) a task payload.
-// The result type is as specified by resultTy, a scalar or vector type with no more than four elements.
-//
-// @param resultTy : Type of value to read
-// @param byteOffset : Byte offset within the payload structure
-// @param instName : Name to give instruction(s)
-// @returns : Value read from the task payload
-Value *Builder::CreateReadTaskPayload(Type *resultTy, Value *byteOffset, const Twine &instName) {
-  return record(BuilderOpcode::ReadTaskPayload, resultTy, byteOffset, instName);
-}
-
-// =====================================================================================================================
-// Create a write to (part of) a task payload.
-//
-// @param valueToWrite : Value to write
-// @param byteOffset : Byte offset within the payload structure
-// @param instName : Name to give instruction(s)
-// @returns : Instruction to write value to task payload
-Instruction *Builder::CreateWriteTaskPayload(Value *valueToWrite, Value *byteOffset, const Twine &instName) {
-  return record(BuilderOpcode::WriteTaskPayload, nullptr, {valueToWrite, byteOffset}, instName);
-}
-
-// =====================================================================================================================
-// Create a task payload atomic operation other than compare-and-swap. An add of +1 or -1, or a sub
-// of -1 or +1, is generated as inc or dec. Result type is the same as the input value type.
-//
-// @param atomicOp : Atomic op to create
-// @param ordering : Atomic ordering
-// @param inputValue : Input value
-// @param byteOffset : Byte offset within the payload structure
-// @param instName : Name to give instruction(s)
-// @returns : Original value read from the task payload
-Value *Builder::CreateTaskPayloadAtomic(unsigned atomicOp, AtomicOrdering ordering, Value *inputValue,
-                                        Value *byteOffset, const Twine &instName) {
-  return record(BuilderOpcode::TaskPayloadAtomic, inputValue->getType(),
-                {getInt32(atomicOp), getInt32(static_cast<unsigned>(ordering)), inputValue, byteOffset}, instName);
-}
-
-// =====================================================================================================================
-// Create a task payload atomic compare-and-swap.
-//
-// @param ordering : Atomic ordering
-// @param inputValue : Input value
-// @param comparatorValue : Value to compare against
-// @param byteOffset : Byte offset within the payload structure
-// @param instName : Name to give instruction(s)
-// @returns : Original value read from the task payload
-Value *Builder::CreateTaskPayloadAtomicCompareSwap(AtomicOrdering ordering, Value *inputValue, Value *comparatorValue,
-                                                   Value *byteOffset, const Twine &instName) {
-  return record(BuilderOpcode::TaskPayloadAtomicCompareSwap, inputValue->getType(),
-                {getInt32(static_cast<unsigned>(ordering)), inputValue, comparatorValue, byteOffset}, instName);
-}
-
-// =====================================================================================================================
 // Create a get wave size query.
 //
 // @param instName : Name to give instruction(s)
@@ -1887,6 +1796,18 @@ Value *Builder::CreateSubgroupShuffleUp(Value *const value, Value *const offset,
 // @param instName : Name to give instruction(s)
 Value *Builder::CreateSubgroupShuffleDown(Value *const value, Value *const offset, const Twine &instName) {
   return record(BuilderOpcode::SubgroupShuffleDown, value->getType(), {value, offset}, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup rotate call.
+//
+// @param value : The value to read from the chosen rotated lane to all active lanes.
+// @param delta : The delta/offset added to lane id.
+// @param clusterSize : The cluster size if exists.
+// @param instName : Name to give instruction.
+Value *Builder::CreateSubgroupRotate(Value *const value, Value *const delta, Value *const clusterSize,
+                                     const Twine &instName) {
+  return record(BuilderOpcode::SubgroupRotate, value->getType(), {value, delta, clusterSize}, instName);
 }
 
 // =====================================================================================================================
@@ -2135,7 +2056,6 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::ReadGenericInput:
     case BuilderOpcode::ReadGenericOutput:
     case BuilderOpcode::ReadPerVertexInput:
-    case BuilderOpcode::ReadTaskPayload:
       // Functions that only read memory.
       func->setOnlyReadsMemory();
       // Must be marked as returning for DCE.
@@ -2148,13 +2068,11 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::ImageAtomic:
     case BuilderOpcode::ImageAtomicCompareSwap:
     case BuilderOpcode::WriteXfbOutput:
-    case BuilderOpcode::WriteTaskPayload:
-    case BuilderOpcode::TaskPayloadAtomic:
-    case BuilderOpcode::TaskPayloadAtomicCompareSwap:
       // Functions that read and write memory.
       break;
     case BuilderOpcode::SubgroupAll:
     case BuilderOpcode::SubgroupAllEqual:
+    case BuilderOpcode::SubgroupRotate:
     case BuilderOpcode::SubgroupAny:
     case BuilderOpcode::SubgroupBallot:
     case BuilderOpcode::SubgroupBroadcast:
@@ -2190,8 +2108,6 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::ImageQuerySamples:
     case BuilderOpcode::ImageQuerySize:
     case BuilderOpcode::IsHelperInvocation:
-    case BuilderOpcode::EmitMeshTasks:
-    case BuilderOpcode::SetMeshOutputs:
     case BuilderOpcode::Kill:
     case BuilderOpcode::ReadClock:
     case BuilderOpcode::DebugBreak:

@@ -1,0 +1,396 @@
+; Test to check that the optimization of tessellation factors store are handled as expected
+
+; RUN: amdllpc %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: @_amdgpu_hs_main(
+
+; SHADERTEST-LABEL: .distribHsPatchCount:
+; SHADERTEST-NEXT: %[[HS_PATCH_COUNT_SHIFT:[^ ,]*]] = lshr i32 %mergeWaveInfo, 16
+; SHADERTEST-NEXT: %[[HS_PATCH_COUNT:[^ ,]*]] = and i32 %[[HS_PATCH_COUNT_SHIFT]], 255
+; SHADERTEST-NEXT: store i32 %[[HS_PATCH_COUNT]], ptr addrspace(3) getelementptr inbounds ([16384 x i32], ptr addrspace(3) @Lds, i32 0, i32 640), align 4
+; SHADERTEST-NEXT: br label %.endDistribHsPatchCount
+
+; SHADERTEST-LABEL: .endDistribHsPatchCount:
+; SHADERTEST-NEXT: fence syncscope("workgroup") release
+; SHADERTEST-NEXT: call void @llvm.amdgcn.s.barrier()
+; SHADERTEST-NEXT: fence syncscope("workgroup") acquire
+; SHADERTEST-NEXT: %validHsVert = icmp ult i32 %threadIdInWave, %hsVertCount
+; SHADERTEST-NEXT: br i1 %validHsVert, label %.beginHs, label %.endHs
+
+; SHADERTEST-LABEL: .endHs:
+; SHADERTEST: %[[HS_PATCH_COUNT:[^ ,]*]] = load i32, ptr addrspace(3) getelementptr inbounds ([16384 x i32], ptr addrspace(3) @Lds, i32 0, i32 640), align 4
+; SHADERTEST: %hsPatchCount = call i32 @llvm.amdgcn.readfirstlane(i32 %[[HS_PATCH_COUNT]])
+; SHADERTEST: %validHsPatch = icmp ult i32 %threadIdInGroup, %hsPatchCount
+; SHADERTEST: br i1 %validHsPatch, label %.checkSpecialTfInWave, label %.endCheckSpecialTfInWave
+
+; SHADERTEST-LABEL: .checkSpecialTfInWave:
+; SHADERTEST-NEXT: %[[OUTER_TF_OFFSET_0:[^ ,]*]] = mul i32 %threadIdInGroup, 6
+; SHADERTEST-NEXT: %[[OUTER_TF_OFFSET_1:[^ ,]*]] = add i32 %[[OUTER_TF_OFFSET_0]], 256
+; SHADERTEST-NEXT: %[[OUTER_TF_PTR:[^ ,]*]] = getelementptr [16384 x i32], ptr addrspace(3) @Lds, i32 0, i32 %[[OUTER_TF_OFFSET_1]]
+; SHADERTEST-NEXT: %[[OUTER_TF:[^ ,]*]] = load <4 x float>, ptr addrspace(3) %[[OUTER_TF_PTR]], align 4
+; SHADERTEST-NEXT: %[[INNER_TF_OFFSET_0:[^ ,]*]] = mul i32 %threadIdInGroup, 6
+; SHADERTEST-NEXT: %[[INNER_TF_OFFSET_1:[^ ,]*]] = add i32 %[[INNER_TF_OFFSET_0]], 260
+; SHADERTEST-NEXT: %[[INNER_TF_PTR:[^ ,]*]] = getelementptr [16384 x i32], ptr addrspace(3) @Lds, i32 0, i32 %[[INNER_TF_OFFSET_1]]
+; SHADERTEST-NEXT: %[[INNER_TF:[^ ,]*]] = load <2 x float>, ptr addrspace(3) %[[INNER_TF_PTR]], align 4
+; SHADERTEST-NEXT: %[[OUTER_TF_0:[^ ,]*]] = extractelement <4 x float> %[[OUTER_TF]], i64 0
+; SHADERTEST-NEXT: %[[IS_ONE_0:[^ ,]*]] = fcmp oeq float %[[OUTER_TF_0]], 1.000000e+00
+; SHADERTEST-NEXT: %[[IS_ZERO_0:[^ ,]*]] = fcmp oeq float %[[OUTER_TF_0]], 0.000000e+00
+; SHADERTEST-NEXT: %[[OUTER_TF_1:[^ ,]*]] = extractelement <4 x float> %[[OUTER_TF]], i64 1
+; SHADERTEST-NEXT: %[[IS_ONE_1:[^ ,]*]] = fcmp oeq float %[[OUTER_TF_1]], 1.000000e+00
+; SHADERTEST-NEXT: %[[IS_ZERO_1:[^ ,]*]] = fcmp oeq float %[[OUTER_TF_1]], 0.000000e+00
+; SHADERTEST-NEXT: %[[ALL_ONES_0:[^ ,]*]] = and i1 %[[IS_ONE_0]], %[[IS_ONE_1]]
+; SHADERTEST-NEXT: %[[ALL_ZEROS_0:[^ ,]*]] = and i1 %[[IS_ZERO_0]], %[[IS_ZERO_1]]
+; SHADERTEST-NEXT: %[[OUTER_TF_2:[^ ,]*]] = extractelement <4 x float> %[[OUTER_TF]], i64 2
+; SHADERTEST-NEXT: %[[IS_ONE_2:[^ ,]*]] = fcmp oeq float %[[OUTER_TF_2]], 1.000000e+00
+; SHADERTEST-NEXT: %[[IS_ZERO_2:[^ ,]*]] = fcmp oeq float %[[OUTER_TF_2]], 0.000000e+00
+; SHADERTEST-NEXT: %[[ALL_ONES_1:[^ ,]*]] = and i1 %[[ALL_ONES_0]], %[[IS_ONE_2]]
+; SHADERTEST-NEXT: %[[ALL_ZEROS_1:[^ ,]*]] = and i1 %[[ALL_ZEROS_0]], %[[IS_ZERO_2]]
+; SHADERTEST-NEXT: %[[OUTER_TF_3:[^ ,]*]] = extractelement <4 x float> %[[OUTER_TF]], i64 3
+; SHADERTEST-NEXT: %[[IS_ONE_3:[^ ,]*]] = fcmp oeq float %[[OUTER_TF_3]], 1.000000e+00
+; SHADERTEST-NEXT: %[[IS_ZERO_3:[^ ,]*]] = fcmp oeq float %[[OUTER_TF_3]], 0.000000e+00
+; SHADERTEST-NEXT: %[[ALL_ONES_2:[^ ,]*]] = and i1 %[[ALL_ONES_1]], %[[IS_ONE_3]]
+; SHADERTEST-NEXT: %[[ALL_ZEROS_2:[^ ,]*]] = and i1 %[[ALL_ZEROS_1]], %[[IS_ZERO_3]]
+; SHADERTEST-NEXT: %[[INNER_TF_0:[^ ,]*]] = extractelement <2 x float> %[[INNER_TF]], i64 0
+; SHADERTEST-NEXT: %[[IS_ONE_4:[^ ,]*]] = fcmp oeq float %[[INNER_TF_0]], 1.000000e+00
+; SHADERTEST-NEXT: %[[IS_ZERO_4:[^ ,]*]] = fcmp oeq float %[[INNER_TF_0]], 0.000000e+00
+; SHADERTEST-NEXT: %[[ALL_ONES_3:[^ ,]*]] = and i1 %[[ALL_ONES_2]], %[[IS_ONE_4]]
+; SHADERTEST-NEXT: %[[ALL_ZEROS_3:[^ ,]*]] = and i1 %[[ALL_ZEROS_2]], %[[IS_ZERO_4]]
+; SHADERTEST-NEXT: %[[INNER_TF_1:[^ ,]*]] = extractelement <2 x float> %[[INNER_TF]], i64 1
+; SHADERTEST-NEXT: %[[IS_ONE_5:[^ ,]*]] = fcmp oeq float %[[INNER_TF_1]], 1.000000e+00
+; SHADERTEST-NEXT: %[[IS_ZERO_5:[^ ,]*]] = fcmp oeq float %[[INNER_TF_1]], 0.000000e+00
+; SHADERTEST-NEXT: %[[ALL_ONES:[^ ,]*]] = and i1 %[[ALL_ONES_3]], %[[IS_ONE_5]]
+; SHADERTEST-NEXT: %[[ALL_ZEROS:[^ ,]*]] = and i1 %[[ALL_ZEROS_3]], %[[IS_ZERO_5]]
+; SHADERTEST-NEXT: %[[BALLOT_MASK:[^ ,]*]] = call i64 @llvm.amdgcn.ballot.i64(i1 true)
+; SHADERTEST-NEXT: %[[ALL_ONES_MASK:[^ ,]*]] = call i64 @llvm.amdgcn.ballot.i64(i1 %[[ALL_ONES]])
+; SHADERTEST-NEXT: %[[ALL_ONES_IN_WAVE:[^ ,]*]] = icmp eq i64 %[[ALL_ONES_MASK]], %[[BALLOT_MASK]]
+; SHADERTEST-NEXT: %[[ALL_ZEROS_MASK:[^ ,]*]] = call i64 @llvm.amdgcn.ballot.i64(i1 %[[ALL_ZEROS]])
+; SHADERTEST-NEXT: %[[ALL_ZEROS_IN_WAVE:[^ ,]*]] = icmp eq i64 %[[ALL_ZEROS_MASK]], %[[BALLOT_MASK]]
+; SHADERTEST-NEXT: br label %.endCheckSpecialTfInWave
+
+; SHADERTEST-LABEL: .endCheckSpecialTfInWave:
+; SHADERTEST-NEXT: %outerTf = phi <4 x float> [ poison, %.endHs ], [ %[[OUTER_TF]], %.checkSpecialTfInWave ]
+; SHADERTEST-NEXT: %innerTf = phi <2 x float> [ poison, %.endHs ], [ %[[INNER_TF]], %.checkSpecialTfInWave ]
+; SHADERTEST-NEXT: %isAllOnesTfInWave = phi i1 [ true, %.endHs ], [ %[[ALL_ONES_IN_WAVE]], %.checkSpecialTfInWave ]
+; SHADERTEST-NEXT: %isAllZerosTfInWave = phi i1 [ true, %.endHs ], [ %[[ALL_ZEROS_IN_WAVE]], %.checkSpecialTfInWave ]
+; SHADERTEST-NEXT: %[[HS_PATCH_COUNT_ADJUST:[^ ,]*]] = add i32 %hsPatchCount, 63
+; SHADERTEST-NEXT: %multiWave = icmp ugt i32 %[[HS_PATCH_COUNT_ADJUST]], 127
+; SHADERTEST-NEXT: br i1 %multiWave, label %.handleMultiWave, label %.endHandleMultiWave
+
+; SHADERTEST-LABEL: .handleMultiWave:
+; SHADERTEST-NEXT: %hsPatchWaveCount = lshr i32 %[[HS_PATCH_COUNT_ADJUST]], 6
+; SHADERTEST-NEXT: %[[WAVE_ID_OFFSET:[^ ,]*]] = shl nuw nsw i32 %waveIdInGroup, 1
+; SHADERTEST-NEXT: %[[ALL_ONES_OFFSET:[^ ,]*]] = or i32 %[[WAVE_ID_OFFSET]], 641
+; SHADERTEST-NEXT: %[[IS_ALL_ONES_TF:[^ ,]*]] = zext i1 %isAllOnesTfInWave to i32
+; SHADERTEST-NEXT: %[[ALL_ONES_PTR:[^ ,]*]] = getelementptr [16384 x i32], ptr addrspace(3) @Lds, i32 0, i32 %[[ALL_ONES_OFFSET]]
+; SHADERTEST-NEXT: store i32 %[[IS_ALL_ONES_TF]], ptr addrspace(3) %[[ALL_ONES_PTR]], align 4
+; SHADERTEST-NEXT: %[[ALL_ZEROS_OFFSET:[^ ,]*]] = add nuw nsw i32 %[[WAVE_ID_OFFSET]], 642
+; SHADERTEST-NEXT: %[[IS_ALL_ZEROS_TF:[^ ,]*]] = zext i1 %isAllZerosTfInWave to i32
+; SHADERTEST-NEXT: %[[ALL_ZEROS_PTR:[^ ,]*]] = getelementptr [16384 x i32], ptr addrspace(3) @Lds, i32 0, i32 %[[ALL_ZEROS_OFFSET]]
+; SHADERTEST-NEXT: store i32 %[[IS_ALL_ZEROS_TF]], ptr addrspace(3) %[[ALL_ZEROS_PTR]], align 4
+; SHADERTEST-NEXT: fence syncscope("workgroup") release
+; SHADERTEST-NEXT: call void @llvm.amdgcn.s.barrier()
+; SHADERTEST-NEXT: fence syncscope("workgroup") acquire
+; SHADERTEST-NEXT: %validHsPatchWave = icmp ult i32 %threadIdInWave, %hsPatchWaveCount
+; SHADERTEST-NEXT: br i1 %validHsPatchWave, label %.checkSpecialTfInGroup, label %.endHandleMultiWave
+
+; SHADERTEST-LABEL: .checkSpecialTfInGroup:
+; SHADERTEST-NEXT: %[[THREAD_ID_OFFSET:[^ ,]*]] = shl i32 %threadIdInWave, 1
+; SHADERTEST-NEXT: %[[ALL_ONES_OFFSET:[^ ,]*]] = add i32 %[[THREAD_ID_OFFSET]], 641
+; SHADERTEST-NEXT: %[[ALL_ONES_PTR:[^ ,]*]] = getelementptr [16384 x i32], ptr addrspace(3) @Lds, i32 0, i32 %[[ALL_ONES_OFFSET]]
+; SHADERTEST-NEXT: %[[IS_ALL_ONES_TF:[^ ,]*]] = load i32, ptr addrspace(3) %[[ALL_ONES_PTR]], align 4
+; SHADERTEST-NEXT: %[[ALL_ONES_VALUE:[^ ,]*]] = and i32 %[[IS_ALL_ONES_TF]], 1
+; SHADERTEST-NEXT: %[[IS_ALL_ONES:[^ ,]*]] = icmp ne i32 %[[ALL_ONES_VALUE]], 0
+; SHADERTEST-NEXT: %[[ALL_ZEROS_OFFSET:[^ ,]*]] = add i32 %[[THREAD_ID_OFFSET]], 642
+; SHADERTEST-NEXT: %[[ALL_ZEROS_PTR:[^ ,]*]] = getelementptr [16384 x i32], ptr addrspace(3) @Lds, i32 0, i32 %[[ALL_ZEROS_OFFSET]]
+; SHADERTEST-NEXT: %[[IS_ALL_ZEROS_TF:[^ ,]*]] = load i32, ptr addrspace(3) %[[ALL_ZEROS_PTR]], align 4
+; SHADERTEST-NEXT: %[[ALL_ZERO_VALUE:[^ ,]*]] = and i32 %[[IS_ALL_ZEROS_TF]], 1
+; SHADERTEST-NEXT: %[[IS_ALL_ZEROS:[^ ,]*]] = icmp ne i32 %[[ALL_ZERO_VALUE]], 0
+; SHADERTEST-NEXT: %[[BALLOT_MASK:[^ ,]*]] = call i64 @llvm.amdgcn.ballot.i64(i1 true)
+; SHADERTEST-NEXT: %[[ALL_ONES_MASK:[^ ,]*]] = call i64 @llvm.amdgcn.ballot.i64(i1 %[[IS_ALL_ONES]])
+; SHADERTEST-NEXT: %[[ALL_ONES_IN_GROUP:[^ ,]*]] = icmp eq i64 %[[ALL_ONES_MASK]], %[[BALLOT_MASK]]
+; SHADERTEST-NEXT: %[[ALL_ZEROS_MASK:[^ ,]*]] = call i64 @llvm.amdgcn.ballot.i64(i1 %[[IS_ALL_ZEROS]])
+; SHADERTEST-NEXT: %[[ALL_ZEROS_IN_GROUP:[^ ,]*]] = icmp eq i64 %[[ALL_ZEROS_MASK]], %[[BALLOT_MASK]]
+; SHADERTEST-NEXT: br label %.endHandleMultiWave
+
+; SHADERTEST-LABEL: .endHandleMultiWave:
+; SHADERTEST-NEXT: %isAllOnesTf = phi i1 [ %isAllOnesTfInWave, %.endCheckSpecialTfInWave ], [ true, %.handleMultiWave ], [ %[[ALL_ONES_IN_GROUP]], %.checkSpecialTfInGroup ]
+; SHADERTEST-NEXT: %isAllZerosTf = phi i1 [ %isAllZerosTfInWave, %.endCheckSpecialTfInWave ], [ true, %.handleMultiWave ], [ %[[ALL_ZEROS_IN_GROUP]], %.checkSpecialTfInGroup ]
+; SHADERTEST-NEXT: br i1 %validHsPatch, label %.tryStoreTf, label %.endTryStoreTf
+
+; SHADERTEST-LABEL: .tryStoreTf:
+; SHADERTEST-NEXT: %isSpecialTf = or i1 %isAllOnesTf, %isAllZerosTf
+; SHADERTEST-NEXT: br i1 %isSpecialTf, label %.checkSendTfMessage, label %.storeTf
+
+; SHADERTEST-LABEL: .checkSendTfMessage:
+; SHADERTEST-NEXT: %[[FIRST_WAVE:[^ ,]*]] = icmp eq i32 %waveIdInGroup, 0
+; SHADERTEST-NEXT: br i1 %[[FIRST_WAVE]], label %.sendTfMessage, label %.endTryStoreTf
+
+; SHADERTEST-LABEL: .sendTfMessage:
+; SHADERTEST-NEXT: %[[IS_ALL_ONES_TF:[^ ,]*]] = zext i1 %isAllOnesTf to i32
+; SHADERTEST-NEXT: call void @llvm.amdgcn.s.sendmsg(i32 2, i32 %[[IS_ALL_ONES_TF]])
+; SHADERTEST-NEXT: br label %.endTryStoreTf
+
+; SHADERTEST-LABEL: .storeTf:
+; SHADERTEST: %tfBufferDescPtr = getelementptr <4 x i32>, ptr addrspace(4) %globalTablePtr, i64 9
+; SHADERTEST-NEXT: %tfBufferDesc = load <4 x i32>, ptr addrspace(4) %tfBufferDescPtr, align 16
+; SHADERTEST-NEXT: %[[OUTER_TF_OFFSET:[^ ,]*]] = mul i32 %threadIdInGroup, 24
+; SHADERTEST-NEXT: call void @llvm.amdgcn.raw.tbuffer.store.v4f32(<4 x float> %outerTf, <4 x i32> %tfBufferDesc, i32 %[[OUTER_TF_OFFSET]], i32 %tfBufferBase, i32 63, i32 1)
+; SHADERTEST-NEXT: %[[INNER_TF_OFFSET:[^ ,]*]] = add i32 %[[OUTER_TF_OFFSET]], 16
+; SHADERTEST-NEXT: call void @llvm.amdgcn.raw.tbuffer.store.v2f32(<2 x float> %innerTf, <4 x i32> %tfBufferDesc, i32 %[[INNER_TF_OFFSET]], i32 %tfBufferBase, i32 50, i32 1)
+; SHADERTEST-NEXT: br label %.endTryStoreTf
+
+; SHADERTEST-LABEL: .endTryStoreTf:
+; SHADERTEST-NEXT: ret void
+  
+[Version]
+version = 57
+
+[VsGlsl]
+#version 310 es
+
+void main (void)
+{
+}
+
+[VsInfo]
+entryPoint = main
+options.trapPresent = 0
+options.debugMode = 0
+options.enablePerformanceData = 0
+options.allowReZ = 0
+options.forceLateZ = 0
+options.vgprLimit = 0
+options.sgprLimit = 0
+options.maxThreadGroupsPerComputeUnit = 0
+options.waveSize = 0
+options.subgroupSize = 0
+options.wgpMode = 0
+options.waveBreakSize = None
+options.forceLoopUnrollCount = 0
+options.useSiScheduler = 0
+options.disableCodeSinking = 0
+options.favorLatencyHiding = 0
+options.updateDescInElf = 0
+options.allowVaryWaveSize = 0
+options.enableLoadScalarizer = 0
+options.disableLicm = 0
+options.unrollThreshold = 0
+options.scalarThreshold = 0
+options.disableLoopUnroll = 0
+options.fp32DenormalMode = Auto
+options.adjustDepthImportVrs = 0
+options.disableLicmThreshold = 0
+options.unrollHintThreshold = 0
+options.dontUnrollHintThreshold = 0
+options.fastMathFlags = 0
+options.disableFastMathFlags = 0
+options.ldsSpillLimitDwords = 0
+options.scalarizeWaterfallLoads = 0
+options.overrideShaderThreadGroupSizeX = 0
+options.overrideShaderThreadGroupSizeY = 0
+options.overrideShaderThreadGroupSizeZ = 0
+options.nsaThreshold = 0
+options.aggressiveInvariantLoads = Auto
+
+[TcsGlsl]
+#version 310 es
+#extension GL_EXT_tessellation_shader : require
+
+layout(vertices = 1) out;
+
+layout(set = 0, binding = 0, std430) readonly restrict buffer TessLevels {
+    float inner0;
+    float inner1;
+    float outer0;
+    float outer1;
+    float outer2;
+    float outer3;
+} sb_levels;
+
+void main (void)
+{
+    gl_TessLevelInner[0] = sb_levels.inner0;
+    gl_TessLevelInner[1] = sb_levels.inner1;
+
+    gl_TessLevelOuter[0] = sb_levels.outer0;
+    gl_TessLevelOuter[1] = sb_levels.outer1;
+    gl_TessLevelOuter[2] = sb_levels.outer2;
+    gl_TessLevelOuter[3] = sb_levels.outer3;
+}
+
+[TcsInfo]
+entryPoint = main
+options.trapPresent = 0
+options.debugMode = 0
+options.enablePerformanceData = 0
+options.allowReZ = 0
+options.forceLateZ = 0
+options.vgprLimit = 0
+options.sgprLimit = 0
+options.maxThreadGroupsPerComputeUnit = 0
+options.waveSize = 0
+options.subgroupSize = 0
+options.wgpMode = 0
+options.waveBreakSize = None
+options.forceLoopUnrollCount = 0
+options.useSiScheduler = 0
+options.disableCodeSinking = 0
+options.favorLatencyHiding = 0
+options.updateDescInElf = 0
+options.allowVaryWaveSize = 0
+options.enableLoadScalarizer = 0
+options.disableLicm = 0
+options.unrollThreshold = 0
+options.scalarThreshold = 0
+options.disableLoopUnroll = 0
+options.fp32DenormalMode = Auto
+options.adjustDepthImportVrs = 0
+options.disableLicmThreshold = 0
+options.unrollHintThreshold = 0
+options.dontUnrollHintThreshold = 0
+options.fastMathFlags = 0
+options.disableFastMathFlags = 0
+options.ldsSpillLimitDwords = 0
+options.scalarizeWaterfallLoads = 0
+options.overrideShaderThreadGroupSizeX = 0
+options.overrideShaderThreadGroupSizeY = 0
+options.overrideShaderThreadGroupSizeZ = 0
+options.nsaThreshold = 0
+options.aggressiveInvariantLoads = Auto
+
+[TesGlsl]
+#version 310 es
+#extension GL_EXT_tessellation_shader : require
+
+layout(quads, equal_spacing, point_mode) in;
+
+layout(set = 0, binding = 1, std430) coherent restrict buffer Output {
+    int  numInvocations;
+    vec3 tessCoord[];
+} sb_out;
+
+void main (void)
+{
+    int index = atomicAdd(sb_out.numInvocations, 1);
+    sb_out.tessCoord[index] = gl_TessCoord;
+}
+
+[TesInfo]
+entryPoint = main
+options.trapPresent = 0
+options.debugMode = 0
+options.enablePerformanceData = 0
+options.allowReZ = 0
+options.forceLateZ = 0
+options.vgprLimit = 0
+options.sgprLimit = 0
+options.maxThreadGroupsPerComputeUnit = 0
+options.waveSize = 0
+options.subgroupSize = 0
+options.wgpMode = 0
+options.waveBreakSize = None
+options.forceLoopUnrollCount = 0
+options.useSiScheduler = 0
+options.disableCodeSinking = 0
+options.favorLatencyHiding = 0
+options.updateDescInElf = 0
+options.allowVaryWaveSize = 0
+options.enableLoadScalarizer = 0
+options.disableLicm = 0
+options.unrollThreshold = 0
+options.scalarThreshold = 0
+options.disableLoopUnroll = 0
+options.fp32DenormalMode = Auto
+options.adjustDepthImportVrs = 0
+options.disableLicmThreshold = 0
+options.unrollHintThreshold = 0
+options.dontUnrollHintThreshold = 0
+options.fastMathFlags = 0
+options.disableFastMathFlags = 0
+options.ldsSpillLimitDwords = 0
+options.scalarizeWaterfallLoads = 0
+options.overrideShaderThreadGroupSizeX = 0
+options.overrideShaderThreadGroupSizeY = 0
+options.overrideShaderThreadGroupSizeZ = 0
+options.nsaThreshold = 0
+options.aggressiveInvariantLoads = Auto
+
+[ResourceMapping]
+userDataNode[0].visibility = 12
+userDataNode[0].type = DescriptorTableVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].next[0].type = DescriptorBuffer
+userDataNode[0].next[0].offsetInDwords = 0
+userDataNode[0].next[0].sizeInDwords = 4
+userDataNode[0].next[0].set = 0x00000000
+userDataNode[0].next[0].binding = 0
+userDataNode[0].next[1].type = DescriptorBuffer
+userDataNode[0].next[1].offsetInDwords = 4
+userDataNode[0].next[1].sizeInDwords = 4
+userDataNode[0].next[1].set = 0x00000000
+userDataNode[0].next[1].binding = 1
+userDataNode[1].visibility = 16
+userDataNode[1].type = StreamOutTableVaPtr
+userDataNode[1].offsetInDwords = 1
+userDataNode[1].sizeInDwords = 1
+userDataNode[2].visibility = 2
+userDataNode[2].type = IndirectUserDataVaPtr
+userDataNode[2].offsetInDwords = 2
+userDataNode[2].sizeInDwords = 1
+userDataNode[2].indirectUserDataCount = 0
+
+[GraphicsPipelineState]
+topology = VK_PRIMITIVE_TOPOLOGY_PATCH_LIST
+provokingVertexMode = VK_PROVOKING_VERTEX_MODE_FIRST_VERTEX_EXT
+patchControlPoints = 1
+deviceIndex = 0
+disableVertexReuse = 0
+switchWinding = 0
+enableMultiView = 0
+depthClipEnable = 1
+rasterizerDiscardEnable = 1
+perSampleShading = 0
+numSamples = 1
+pixelShaderSamples = 0
+samplePatternIdx = 0
+usrClipPlaneMask = 0
+alphaToCoverageEnable = 0
+dualSourceBlendEnable = 0
+nggState.enableNgg = 1
+nggState.enableGsUse = 0
+nggState.forceCullingMode = 0
+nggState.compactMode = NggCompactDisable
+nggState.enableVertexReuse = 0
+nggState.enableBackfaceCulling = 1
+nggState.enableFrustumCulling = 0
+nggState.enableBoxFilterCulling = 0
+nggState.enableSphereCulling = 0
+nggState.enableSmallPrimFilter = 1
+nggState.enableCullDistanceCulling = 0
+nggState.backfaceExponent = 0
+nggState.subgroupSizing = Auto
+nggState.primsPerSubgroup = 256
+nggState.vertsPerSubgroup = 256
+dynamicVertexStride = 0
+enableUberFetchShader = 0
+enableEarlyCompile = 0
+options.includeDisassembly = 0
+options.scalarBlockLayout = 1
+options.resourceLayoutScheme = Compact
+options.includeIr = 0
+options.robustBufferAccess = 0
+options.reconfigWorkgroupLayout = 0
+options.forceCsThreadIdSwizzling = 0
+options.overrideThreadGroupSizeX = 0
+options.overrideThreadGroupSizeY = 0
+options.overrideThreadGroupSizeZ = 0
+options.shadowDescriptorTableUsage = Disable
+options.shadowDescriptorTablePtrHigh = 2
+options.extendedRobustness.robustBufferAccess = 0
+options.extendedRobustness.robustImageAccess = 1
+options.extendedRobustness.nullDescriptor = 0
+options.optimizeTessFactor = 1
+options.optimizationLevel = 2
+options.threadGroupSwizzleMode = Default
+options.reverseThreadGroup = 0
+options.internalRtShaders = 0

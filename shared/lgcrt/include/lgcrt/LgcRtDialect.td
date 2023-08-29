@@ -64,11 +64,14 @@ def V3I32 : TgConstant<(FixedVectorType I32, 3)>, Type;
 def A4V3F32 : TgConstant<(ArrayType V3F32, 4)>, Type;
 def A3V3F32 : TgConstant<(ArrayType V3F32, 3)>, Type;
 
+def GlobalPointer : TgConstant<(PointerType 1)>, Type;
+def PrivatePointer : TgConstant<(PointerType 5)>, Type;
+
 class LgcRtOp<string mnemonic_, list<Trait> traits_ = []>
     : Op<LgcRtDialect, mnemonic_, traits_ # [NoUnwind]>;
 
 // =========================================================================================================
-def AcceptHitAndEndSearchOp : LgcRtOp<"accept.hit.and.end.search", [NoReturn]> {
+def AcceptHitAndEndSearchOp : LgcRtOp<"accept.hit.and.end.search", [Memory<[(write InaccessibleMem)]>, NoReturn]> {
   let arguments = (ins);
   let results = (outs);
 
@@ -81,7 +84,7 @@ def AcceptHitAndEndSearchOp : LgcRtOp<"accept.hit.and.end.search", [NoReturn]> {
 }
 
 // =========================================================================================================
-def CallCallableShaderOp : LgcRtOp<"call.callable.shader", [WillReturn]> {
+def CallCallableShaderOp : LgcRtOp<"call.callable.shader", [Memory<[(readwrite InaccessibleMem), (readwrite ArgMem)]>, WillReturn]> {
   let arguments = (ins I32:$shaderIndex, PointerType:$param, AttrI32:$paramDataSizeBytes);
   let results = (outs);
 
@@ -139,7 +142,7 @@ def HitKindOp : LgcRtOp<"hit.kind", [Memory<[]>, WillReturn]> {
 }
 
 // =========================================================================================================
-def IgnoreHitOp : LgcRtOp<"ignore.hit", [NoReturn]> {
+def IgnoreHitOp : LgcRtOp<"ignore.hit", [Memory<[(write InaccessibleMem)]>, NoReturn]> {
   let arguments = (ins);
   let results = (outs);
 
@@ -252,7 +255,7 @@ def RayTminOp : LgcRtOp<"ray.tmin", [Memory<[]>, WillReturn]> {
 }
 
 // =========================================================================================================
-def ReportHitOp : LgcRtOp<"report.hit", []> {
+def ReportHitOp : LgcRtOp<"report.hit", [Memory<[(write InaccessibleMem), (read ArgMem)]>]> {
   let arguments = (ins F32:$thit, I32:$hitKind, PointerType:$attributes, AttrI32:$size);
   let results = (outs I1:$result);
 
@@ -269,6 +272,33 @@ def ReportHitOp : LgcRtOp<"report.hit", []> {
     - attributes: User-defined intersection attributes.
 
     - size: Size of the data pointed to by attributes (in bytes)
+  }];
+}
+
+// =========================================================================================================
+def ShaderIndexOp : LgcRtOp<"shader.index", [Memory<[]>, WillReturn]> {
+  let arguments = (ins);
+  let results = (outs I32:$result);
+
+  let summary = "Return the current shader index";
+  let description = [{
+    Return the current shader index.
+
+    The shader index is used to index into the shader binding table, i.e. the table which backs the
+    Vulkan shader record buffers or the DX12 local root signatures.
+  }];
+}
+
+// =========================================================================================================
+def ShaderRecordBufferOp : LgcRtOp<"shader.record.buffer", [Memory<[]>, WillReturn]> {
+  let arguments = (ins I32:$shaderIndex);
+  let results = (outs GlobalPointer:$ptr);
+
+  let summary = "Return the pointer to shader record buffer";
+  let description = [{
+    Return the pointer to shader record buffer.
+
+    - shaderIndex: The value used to index into the shader binding table.
   }];
 }
 
@@ -314,7 +344,7 @@ def BaseTraceRayOp : OpClass<LgcRtDialect> {
 }
 
 // =========================================================================================================
-def TraceRayOp : LgcRtOp<"trace.ray", [Memory<[(read)]>, WillReturn]> {
+def TraceRayOp : LgcRtOp<"trace.ray", [Memory<[(readwrite InaccessibleMem), (readwrite ArgMem)]>, WillReturn]> {
   let superclass = BaseTraceRayOp;
   let arguments = (ins superclass);
   let results = (outs);
@@ -362,5 +392,16 @@ def TriangleVertexPositionsOp : LgcRtOp<"triangle.vertex.positions", [Memory<[]>
   let summary = "Return the object-space vertices of the triangle";
   let description = [{
     Return [3 x <3 x float>] object space vertices of the triangle at the current intersection.
+  }];
+}
+
+// =========================================================================================================
+def InstanceInclusionMaskOp : LgcRtOp<"instance.inclusion.mask", [Memory<[]>, WillReturn]> {
+  let arguments =  (ins);
+  let results = (outs I32:$result);
+
+  let summary = "Return the instance inclusion mask";
+  let description = [{
+    Return an i32 giving the instance inclusion mask for the ray being traced.
   }];
 }

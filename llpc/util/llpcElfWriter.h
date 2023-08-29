@@ -74,8 +74,6 @@ public:
 
   static void mergeMetaNote(Context *context, const ElfNote *note1, const ElfNote *note2, ElfNote *newNote);
 
-  static void updateMetaNote(Context *context, const ElfNote *note, ElfNote *newNote);
-
   LLPC_NODISCARD static size_t numRelocs(const SectionBuffer *relocSection);
 
   LLPC_NODISCARD static size_t getRelocPsStartPos(const SectionBuffer *relocSection, size_t psIsaOffset);
@@ -94,8 +92,6 @@ public:
 
   LLPC_NODISCARD Result ReadFromBuffer(const void *buffer, size_t bufSize);
   LLPC_NODISCARD Result copyFromReader(const ElfReader<Elf> &reader);
-
-  void updateElfBinary(Context *context, ElfPackage *pipelineElf);
 
   void mergeElfBinary(Context *context, const BinaryData *fragmentElf, ElfPackage *pipelineElf);
 

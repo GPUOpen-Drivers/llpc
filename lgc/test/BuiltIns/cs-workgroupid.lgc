@@ -26,12 +26,12 @@ attributes #0 = { nounwind }
 
 ; CHECK-LABEL: amdgpu_cs_main:
 ; CHECK:         s_getpc_b64 s[6:7]
-; CHECK-NEXT:    s_mov_b32 s0, s3
-; CHECK-NEXT:    s_mov_b32 s3, s7
-; CHECK-NEXT:    s_load_dwordx4 s[8:11], s[2:3], 0x0
-; CHECK-NEXT:    v_mov_b32_e32 v0, s0
-; CHECK-NEXT:    v_mov_b32_e32 v1, s4
-; CHECK-NEXT:    v_mov_b32_e32 v2, s5
+; CHECK-NEXT:    s_mov_b32 s0, s1
+; CHECK-NEXT:    s_mov_b32 s1, s7
+; CHECK-NEXT:    s_load_dwordx4 s[8:11], s[0:1], 0x0
+; CHECK-NEXT:    v_mov_b32_e32 v0, s2
+; CHECK-NEXT:    v_mov_b32_e32 v1, s3
+; CHECK-NEXT:    v_mov_b32_e32 v2, s4
 ; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
 ; CHECK-NEXT:    buffer_store_dwordx3 v[0:2], off, s[8:11], 0
 ; CHECK-NEXT:    s_endpgm
@@ -60,9 +60,9 @@ attributes #0 = { nounwind }
 ; CHECK-NEXT:       0x2e08 (COMPUTE_NUM_THREAD_Y): 0
 ; CHECK-NEXT:       0x2e09 (COMPUTE_NUM_THREAD_Z): 0
 ; CHECK-NEXT:       0x2e12 (COMPUTE_PGM_RSRC1): 0x2c02c0
-; CHECK-NEXT:       0x2e13 (COMPUTE_PGM_RSRC2): 0x786
+; CHECK-NEXT:       0x2e13 (COMPUTE_PGM_RSRC2): 0x784
 ; CHECK-NEXT:       0x2e40 (COMPUTE_USER_DATA_0): 0x10000000
-; CHECK-NEXT:       0x2e42 (COMPUTE_USER_DATA_2): 0x2
+; CHECK-NEXT:       0x2e41 (COMPUTE_USER_DATA_1): 0x2
 ; CHECK-NEXT:     .shaders:
 ; CHECK-NEXT:       .compute:
 ; CHECK-NEXT:         .api_shader_hash:
@@ -70,7 +70,7 @@ attributes #0 = { nounwind }
 ; CHECK-NEXT:           - 0
 ; CHECK-NEXT:         .hardware_mapping:
 ; CHECK-NEXT:           - .cs
-; CHECK-NEXT:     .spill_threshold: 0xffffffff
+; CHECK-NEXT:     .spill_threshold: 0xffff
 ; CHECK-NEXT:     .type:           Cs
 ; CHECK-NEXT:     .user_data_limit: 0x3
 ; CHECK-NEXT: amdpal.version:

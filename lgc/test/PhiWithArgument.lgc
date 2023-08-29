@@ -40,20 +40,22 @@ attributes #1 = { nounwind readonly }
 !lgc.unlinked = !{!10}
 !lgc.options = !{!0}
 !lgc.options.VS = !{!1}
+!lgc.user.data.nodes = !{!2}
 
 !0 = !{i32 739459867, i32 836497279, i32 -1935591037, i32 -652075177, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 2}
 !1 = !{i32 801932830, i32 600683540, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 15, i32 3}
+!2 = !{!"PushConst", i32 9, i32 0, i32 0, i32 18, i32 0, i32 0, i32 0}
 !10 = !{i32 1}
 
 ; VS-ISA-LABEL: amdgpu_vs_main_fetchless:
-; VS-ISA:         v_mov_b32_e32 v1, s2
+; VS-ISA:         v_mov_b32_e32 v1, s1
 ; VS-ISA-NEXT:    v_cmp_eq_f32_e32 vcc, 1.0, v4
 ; VS-ISA-NEXT:    v_mov_b32_e32 v0, 1.0
 ; VS-ISA-NEXT:    v_cndmask_b32_e32 v1, v4, v1, vcc
 ; VS-ISA-NEXT:    v_mov_b32_e32 v4, 0
 ; VS-ISA-NEXT:    exp pos0 v4, v4, v4, v0 done
-; VS-ISA-NEXT:    v_mov_b32_e32 v2, s3
-; VS-ISA-NEXT:    v_mov_b32_e32 v3, s4
+; VS-ISA-NEXT:    v_mov_b32_e32 v2, s2
+; VS-ISA-NEXT:    v_mov_b32_e32 v3, s3
 ; VS-ISA-NEXT:    v_cndmask_b32_e32 v2, v5, v2, vcc
 ; VS-ISA-NEXT:    v_cndmask_b32_e32 v3, v6, v3, vcc
 ; VS-ISA-NEXT:    exp param1 v1, v2, v3, off

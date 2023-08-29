@@ -6,24 +6,23 @@
 
 ; Check that the llvm-ir gets the push constant values from as a parameter.
 ; SHADERTEST: // LLPC pipeline patching results
-; SHADERTEST: define dllexport amdgpu_ps { <4 x float> } @_amdgpu_ps_main({{.*}}, <2 x i32> inreg %pushConst2, {{.*}})
-; SHADERTEST: [[bc0:%[a-zA-Z0-9]+]] = bitcast <2 x i32> %pushConst2 to <2 x float>
-; SHADERTEST: [[pushConst0:%[.a-zA-Z0-9]+]] = extractelement <2 x float> [[bc0]], i64 0
-; SHADERTEST: [[bc1:%[a-zA-Z0-9]+]] = bitcast <2 x i32> %pushConst2 to <2 x float>
-; SHADERTEST: [[pushConst1:%[.a-zA-Z0-9]+]] = extractelement <2 x float> [[bc1]], i64 1
+; SHADERTEST: define dllexport amdgpu_ps { <4 x float> } @_amdgpu_ps_main({{.*}}, i32 inreg %userdata3, i32 inreg %userdata4, {{.*}})
+; SHADERTEST: [[pushConst0:%[.a-zA-Z0-9]+]] = bitcast i32 %userdata3 to float
+; SHADERTEST: [[pushConst1:%[.a-zA-Z0-9]+]] = bitcast i32 %userdata4 to float
 ; SHADERTEST: @llvm.amdgcn.image.gather4.lz.2d.sl_v4f32i32s.f32({{.*}}, float [[pushConst0]], float [[pushConst1]], {{.*}})
 
 ; Check that those parameters are passed in as s2 and s3.
 ; SHADERTEST-LABEL: _amdgpu_ps_main:
 ; SHADERTEST-NEXT: BB0_0
 ; SHADERTEST: v_mov_b32_e32 v0, 0
-; SHADERTEST-NEXT: v_mov_b32_e32 v5, s2
-; SHADERTEST-NEXT: v_mov_b32_e32 v6, s3
+; SHADERTEST-NEXT: v_mov_b32_e32 v5, s1
+; SHADERTEST-NEXT: v_mov_b32_e32 v6, s2
 ; SHADERTEST: image_gather4_lz v[0:4], v[5:6]
 
 ; Check that the PAL metadata will place the correct values in those registers.
-; SHADERTEST: SPI_SHADER_USER_DATA_PS_2                     0x0000000000000003
-; SHADERTEST: SPI_SHADER_USER_DATA_PS_3                     0x0000000000000004
+; SHADERTEST: .hardware_stages: {
+; SHADERTEST:  .ps: {
+; SHADERTEST:      .user_data_reg_map: [ 0x0000000010000000 0x0000000000000003 0x0000000000000004 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF 0x00000000FFFFFFFF ]
 
 ; END_SHADERTEST
 [Version]

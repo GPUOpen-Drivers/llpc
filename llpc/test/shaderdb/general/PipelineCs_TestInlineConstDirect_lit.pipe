@@ -1,0 +1,81 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -enable-load-scalarizer=false -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; REQUIRES: do-not-run-me
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+
+; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST: %{{.*}} = call {{.*}} {{.*}}@lgc.create.load.buffer.desc.{{[0-9a-z.]*}}(i64 0, i32 1, i32 0,
+; SHADERTEST: getelementptr inbounds {{.*}}, ptr addrspace(7) %{{.*}}, i64 0, i32 2
+; SHADERTEST: load <2 x double>, ptr addrspace(7) %{{.*}}, align 16
+
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
+; SHADERTEST: %{{.*}} = insertelement <4 x i32> <i32 poison, i32 poison, i32 -1, i32 151468>, i32 %{{.*}}, i64 0
+; SHADERTEST: %{{.*}} = insertelement <4 x i32> %{{.*}}, i32 %{{.*}}, i64 1
+; SHADERTEST: call <4 x i32> @llvm.amdgcn.s.buffer.load.v4i32(<4 x i32> %{{.*}}, i32 64, i32 0)
+
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+; Test the use of InlineBuffer with relocatable shaders.  This is currently not supported, and we
+; should fall back to full pipeline compilation.
+; BEGIN_RELOCTEST
+; RUN: amdllpc --enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=RELOCTEST %s
+; RELOCTEST-LABEL: {{^// LLPC}} calculated hash results (compute pipeline)
+; RELOCTEST-LABEL: {{^Warning:}} Relocatable shader compilation requested but not possible
+; RELOCTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; RELOCTEST: {{^=====}} AMDLLPC SUCCESS
+; END_RELOCTEST
+
+[CsGlsl]
+#version 450
+
+layout(binding = 0, std430) buffer OUT1
+{
+    uvec4 o1;
+} O1;
+
+layout(binding = 1) uniform B1
+{
+    uint  i1;
+    uvec2 i2;
+    uvec3 i3;
+    uvec4 i4;
+    double d1;
+    dvec2  d2;
+    dvec3  d3;
+    dvec4  d4;
+} b1;
+
+layout(binding = 2, std430) buffer OUT2
+{
+    dvec4 o2;
+} O2;
+
+layout(local_size_x = 2, local_size_y = 3) in;
+void main()
+{
+    O1.o1 = uvec4(b1.i1, 0, 0, 0) + uvec4(b1.i2, 0, 0) + uvec4(b1.i3, 0) + b1.i4;
+    O2.o2 = dvec4(b1.d1, 0, 0, 0) + dvec4(b1.d2, 0, 0) + dvec4(b1.d3, 0) + b1.d4;
+}
+
+
+[CsInfo]
+entryPoint = main
+userDataNode[0].type = DescriptorTableVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].next[0].type = DescriptorBuffer
+userDataNode[0].next[0].offsetInDwords = 0
+userDataNode[0].next[0].sizeInDwords = 4
+userDataNode[0].next[0].set = 0
+userDataNode[0].next[0].binding = 0
+userDataNode[0].next[1].type = InlineBuffer
+userDataNode[0].next[1].offsetInDwords = 4
+userDataNode[0].next[1].sizeInDwords = 64
+userDataNode[0].next[1].set = 0
+userDataNode[0].next[1].binding = 1
+userDataNode[0].next[2].type = DescriptorBuffer
+userDataNode[0].next[2].offsetInDwords = 68
+userDataNode[0].next[2].sizeInDwords = 4
+userDataNode[0].next[2].set = 0
+userDataNode[0].next[2].binding = 2

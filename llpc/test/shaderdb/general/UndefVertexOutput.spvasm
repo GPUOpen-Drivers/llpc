@@ -47,10 +47,18 @@
                OpReturn
                OpFunctionEnd
 
-; CHECK-LABEL: amdgpu_vs_main_fetchless:
-; CHECK:         exp pos0 v4, v5, v6, v7 done
-; CHECK-NEXT:    v_mov_b32_e32 v0, 0
-; CHECK-NEXT:    v_mov_b32_e32 v1, 1.0
-; CHECK-NEXT:    exp param8 v1, v0, v0, v1
-; CHECK-NEXT:    exp param7 v0, v0, v1, v1
+; CHECK-LABEL: amdgpu_vs_main:
+; CHECK:         s_getpc_b64 s[4:5]
+; CHECK-NEXT:    s_mov_b32 s0, s1
+; CHECK-NEXT:    s_mov_b32 s1, s5
+; CHECK-NEXT:    s_load_dwordx4 s[4:7], s[0:1], 0x10
+; CHECK-NEXT:    v_add_u32_e32 v0, s2, v0
+; CHECK-NEXT:    v_mov_b32_e32 v4, 0
+; CHECK-NEXT:    v_mov_b32_e32 v5, 1.0
+; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
+; CHECK-NEXT:    tbuffer_load_format_xyzw v[0:3], v0, s[4:7], 0 format:[BUF_DATA_FORMAT_32_32_32_32,BUF_NUM_FORMAT_FLOAT] idxen
+; CHECK-NEXT:    s_waitcnt vmcnt(0)
+; CHECK-NEXT:    exp pos0 v0, v1, v2, v3 done
+; CHECK-NEXT:    exp param8 v5, v4, v4, v5
+; CHECK-NEXT:    exp param7 v4, v4, v5, v5
 ; CHECK-NEXT:    s_endpgm

@@ -78,7 +78,6 @@ public:
 
   // Update shader caches with results of compile, and merge ELF outputs if necessary.
   void updateAndMerge(Result result, ElfPackage *pipelineElf);
-  void updateRootUserDateOffset(ElfPackage *pipelineElf);
 
 private:
   Compiler *m_compiler;
@@ -154,10 +153,6 @@ public:
   static unsigned getOutRedirectCount() { return m_outRedirectCount; }
 
   static MetroHash::Hash generateHashForCompileOptions(unsigned optionCount, const char *const *options);
-
-#if LLPC_ENABLE_SHADER_CACHE
-  virtual Result CreateShaderCache(const ShaderCacheCreateInfo *pCreateInfo, IShaderCache **ppShaderCache);
-#endif
 
   static void buildShaderCacheHash(Context *context, unsigned stageMask,
                                    llvm::ArrayRef<llvm::ArrayRef<uint8_t>> stageHashes, MetroHash::Hash *fragmentHash,

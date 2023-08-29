@@ -34,6 +34,7 @@
 #include "llpcContext.h"
 #include "llpcSpirvLowerUtil.h"
 #include "lgc/Builder.h"
+#include "lgc/GpurtDialect.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
@@ -51,8 +52,6 @@ namespace RtName {
 const char *LdsUsage = "LdsUsage";
 const char *PrevRayQueryObj = "PrevRayQueryObj";
 const char *RayQueryObjGen = "RayQueryObjGen";
-const char *StaticId = "StaticId";
-static const char *GetStaticId = "AmdTraceRayGetStaticId";
 static const char *FetchTrianglePositionFromRayQuery = "FetchTrianglePositionFromRayQuery";
 } // namespace RtName
 
@@ -305,13 +304,7 @@ bool SpirvLowerRayQuery::runImpl(Module &module) {
   SpirvLower::init(&module);
   createGlobalRayQueryObj();
   createGlobalLdsUsage();
-  createGlobalTraceRayStaticId();
-  if (m_rayQueryLibrary) {
-    for (auto funcIt = module.begin(), funcEnd = module.end(); funcIt != funcEnd;) {
-      Function *func = &*funcIt++;
-      processLibraryFunction(func);
-    }
-  } else {
+  if (!m_rayQueryLibrary) {
     Instruction *insertPos = &*(m_entryPoint->begin()->getFirstNonPHIOrDbgOrAlloca());
     m_builder->SetInsertPoint(insertPos);
     initGlobalVariable();
@@ -322,22 +315,6 @@ bool SpirvLowerRayQuery::runImpl(Module &module) {
     }
   }
   return true;
-}
-
-// =====================================================================================================================
-// Process function in the Graphics/Compute/Raytracing modules
-//
-// @param func : The function to create
-void SpirvLowerRayQuery::processLibraryFunction(Function *&func) {
-  auto mangledName = func->getName();
-
-  if (mangledName.startswith(RtName::GetStaticId)) {
-    eraseFunctionBlocks(func);
-    BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
-    m_builder->SetInsertPoint(entryBlock);
-    m_builder->CreateRet(m_builder->CreateLoad(m_builder->getInt32Ty(), m_traceRayStaticId));
-    func->setName(RtName::GetStaticId);
-  }
 }
 
 // =====================================================================================================================
@@ -1185,16 +1162,6 @@ void SpirvLowerRayQuery::createGlobalLdsUsage() {
 }
 
 // =====================================================================================================================
-// Create global variable for static ID
-void SpirvLowerRayQuery::createGlobalTraceRayStaticId() {
-  m_traceRayStaticId =
-      new GlobalVariable(*m_module, Type::getInt32Ty(m_module->getContext()), true, GlobalValue::ExternalLinkage,
-                         nullptr, RtName::StaticId, nullptr, GlobalValue::NotThreadLocal, SPIRAS_Private);
-
-  m_traceRayStaticId->setAlignment(MaybeAlign(4));
-}
-
-// =====================================================================================================================
 // Create global variable for the prevRayQueryObj
 void SpirvLowerRayQuery::createGlobalRayQueryObj() {
   m_prevRayQueryObj =
@@ -1261,7 +1228,7 @@ Value *SpirvLowerRayQuery::createTransformMatrix(unsigned builtInId, Value *acce
 
   // Bitcast instanceNodeOffsetAddr to i64 integer
   instanceNodeOffsetAddr = m_builder->CreateBitCast(instanceNodeOffsetAddr, m_builder->getInt64Ty());
-  Type *gpuAddrAsPtrTy = Type::getInt8PtrTy(*m_context, SPIRAS_Global);
+  Type *gpuAddrAsPtrTy = PointerType::get(*m_context, SPIRAS_Global);
   auto instNodeOffsetAddrAsPtr = m_builder->CreateIntToPtr(instanceNodeOffsetAddr, gpuAddrAsPtrTy);
   Value *baseInstOffset = m_builder->CreateGEP(m_builder->getInt8Ty(), instNodeOffsetAddrAsPtr, zero);
   Type *baseInstOffsetTy = m_builder->getInt32Ty()->getPointerTo(SPIRAS_Global);
@@ -1312,7 +1279,7 @@ void SpirvLowerRayQuery::generateTraceRayStaticId() {
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
 
-  m_builder->CreateStore(m_builder->getInt32(MetroHash::compact32(&hash)), m_traceRayStaticId);
+  m_builder->create<lgc::GpurtSetRayStaticIdOp>(m_builder->getInt32(MetroHash::compact32(&hash)));
 }
 
 // =====================================================================================================================
@@ -1329,7 +1296,7 @@ bool SpirvLowerRayQuery::stageNotSupportLds(ShaderStage stage) {
 // @param instNodeAddr : 64-bit instance node address, in <2 x i32>
 Value *SpirvLowerRayQuery::createLoadInstanceIndex(Value *instNodeAddr) {
   Value *zero = m_builder->getInt32(0);
-  Type *gpuAddrAsPtrTy = Type::getInt8PtrTy(*m_context, SPIRAS_Global);
+  Type *gpuAddrAsPtrTy = PointerType::get(*m_context, SPIRAS_Global);
   auto int32x2Ty = FixedVectorType::get(m_builder->getInt32Ty(), 2);
 
   const unsigned instanceIndexOffset = offsetof(RayTracingInstanceNode, extra.instanceIndex);
@@ -1343,7 +1310,7 @@ Value *SpirvLowerRayQuery::createLoadInstanceIndex(Value *instNodeAddr) {
   instanceIndexAddr = m_builder->CreateBitCast(instanceIndexAddr, m_builder->getInt64Ty());
   auto instanceIndexAddrAsPtr = m_builder->CreateIntToPtr(instanceIndexAddr, gpuAddrAsPtrTy);
   auto loadValue = m_builder->CreateGEP(m_builder->getInt8Ty(), instanceIndexAddrAsPtr, zero);
-  loadValue = m_builder->CreateBitCast(loadValue, Type::getInt32PtrTy(*m_context, SPIRAS_Global));
+  loadValue = m_builder->CreateBitCast(loadValue, PointerType::get(*m_context, SPIRAS_Global));
 
   return m_builder->CreateLoad(m_builder->getInt32Ty(), loadValue);
 }
@@ -1386,7 +1353,7 @@ Value *SpirvLowerRayQuery::createGetInstanceNodeAddr(Value *instNodePtr, Value *
 // @param instNodeAddr : 64-bit instance node address, in <2 x i32>
 Value *SpirvLowerRayQuery::createLoadInstanceId(Value *instNodeAddr) {
   Value *zero = m_builder->getInt32(0);
-  Type *gpuAddrAsPtrTy = Type::getInt8PtrTy(*m_context, SPIRAS_Global);
+  Type *gpuAddrAsPtrTy = PointerType::get(*m_context, SPIRAS_Global);
   auto int32x2Ty = FixedVectorType::get(m_builder->getInt32Ty(), 2);
 
   const unsigned instanceIdOffset = offsetof(RayTracingInstanceNode, desc.InstanceID_and_Mask);
@@ -1400,7 +1367,7 @@ Value *SpirvLowerRayQuery::createLoadInstanceId(Value *instNodeAddr) {
   instanceIdAddr = m_builder->CreateBitCast(instanceIdAddr, m_builder->getInt64Ty());
   auto instanceIdAddrAsPtr = m_builder->CreateIntToPtr(instanceIdAddr, gpuAddrAsPtrTy);
   auto loadValue = m_builder->CreateGEP(m_builder->getInt8Ty(), instanceIdAddrAsPtr, zero);
-  loadValue = m_builder->CreateBitCast(loadValue, Type::getInt32PtrTy(*m_context, SPIRAS_Global));
+  loadValue = m_builder->CreateBitCast(loadValue, PointerType::get(*m_context, SPIRAS_Global));
 
   loadValue = m_builder->CreateLoad(m_builder->getInt32Ty(), loadValue);
   // Mask out the instance ID in lower 24 bits
@@ -1415,7 +1382,7 @@ Value *SpirvLowerRayQuery::createLoadInstanceId(Value *instNodeAddr) {
 // @param matrixAddr : Matrix address, which type is <2 x i32>
 Value *SpirvLowerRayQuery::createLoadMatrixFromAddr(Value *matrixAddr) {
   Value *zero = m_builder->getInt32(0);
-  Type *gpuAddrAsPtrTy = Type::getInt8PtrTy(*m_context, SPIRAS_Global);
+  Type *gpuAddrAsPtrTy = PointerType::get(*m_context, SPIRAS_Global);
 
   // Bitcast matrixAddr to i64 integer
   matrixAddr = m_builder->CreateBitCast(matrixAddr, m_builder->getInt64Ty());

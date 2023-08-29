@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2023 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,11 +24,10 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLowerRayTracingIntrinsics.h
- * @brief LLPC header file: contains declaration of Llpc::SpirvLowerRayTracingIntrinsics
+ * @file  LowerGLCompatibility.h
+ * @brief LLPC header file: contains declaration of Llpc::LowerGLCompatibility
  ***********************************************************************************************************************
  */
-
 #pragma once
 
 #include "SPIRVInternal.h"
@@ -38,20 +37,37 @@
 namespace Llpc {
 
 // =====================================================================================================================
-// Represents the pass of SPIR-V lowering ray tracing intrinsics.
-class SpirvLowerRayTracingIntrinsics : public SpirvLower, public llvm::PassInfoMixin<SpirvLowerRayTracingIntrinsics> {
+// Represents the pass of SPIR-V lowering ray query post inline.
+class LowerGLCompatibility : public SpirvLower, public llvm::PassInfoMixin<LowerGLCompatibility> {
 public:
+  LowerGLCompatibility();
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
-  virtual bool runImpl(llvm::Module &module);
-
-  static llvm::StringRef name() { return "Lower SPIR-V RayTracing intrinsics"; }
-
-protected:
-  void createLoadDwordAtAddr(llvm::Function *func, llvm::Type *loadTy);
-  void createConvertF32toF16(llvm::Function *func, unsigned roundingMode);
+  static llvm::StringRef name() { return "Lower GLSL compatibility variables and operations"; }
 
 private:
-  bool processIntrinsicsFunction(llvm::Function *func);
+  bool needRun();
+  unsigned getUniformLocation(llvm::GlobalVariable *var);
+  void decodeInOutMetaRecursively(llvm::Type *valueTy, llvm::Constant *mds,
+                                  llvm::SmallVector<ShaderInOutMetadata> &out);
+  void unifyFunctionReturn(Function *func);
+  void collectEmitInst();
+  void collectEmulationResource();
+  void buildPatchPositionInfo();
+
+  // The function use to lower gl_ClipVertex
+  bool needLowerClipVertex();
+  void createClipDistance();
+  void createClipPlane();
+  void emulateStoreClipVertex();
+  void lowerClipVertex();
+
+  llvm::SmallVector<llvm::CallInst *> m_emitCalls; // "Call" instructions to emit vertex (geometry shader).
+  llvm::ReturnInst *m_retInst;                     // "Return" of the entry point.
+
+  // The resource use to lower gl_ClipVertex
+  llvm::GlobalVariable *m_clipVertex;   // The global variable of gl_ClipVertex
+  llvm::GlobalVariable *m_clipDistance; // The global variable of gl_ClipDistance
+  llvm::GlobalVariable *m_clipPlane;    // The global variable of gl_ClipPlane
 };
 
 } // namespace Llpc

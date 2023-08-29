@@ -70,6 +70,7 @@ void PatchInOutImportExport::initPerShader() {
   m_layer = nullptr;
   m_viewIndex = nullptr;
   m_threadId = nullptr;
+  m_edgeFlag = nullptr;
 
   m_attribExports.clear();
 }
@@ -629,8 +630,8 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       }
       case ShaderStageMesh: {
         assert(callInst.arg_size() == 2);
-        Value *elemIdx = isDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
-        input = patchMeshBuiltInInputImport(inputTy, builtInId, elemIdx, builder);
+        assert(isDontCareValue(callInst.getOperand(1)));
+        input = patchMeshBuiltInInputImport(inputTy, builtInId, builder);
         break;
       }
       case ShaderStageFragment: {
@@ -1173,6 +1174,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
     bool useLayer = false;
     bool useViewportIndex = false;
     bool useShadingRate = false;
+    bool useEdgeFlag = false;
     unsigned clipDistanceCount = 0;
     unsigned cullDistanceCount = 0;
 
@@ -1189,6 +1191,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       useShadingRate = builtInUsage.primitiveShadingRate;
       clipDistanceCount = builtInUsage.clipDistance;
       cullDistanceCount = builtInUsage.cullDistance;
+      useEdgeFlag = builtInUsage.edgeFlag;
     } else if (m_shaderStage == ShaderStageTessEval) {
       auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes;
 
@@ -1280,7 +1283,8 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
           clipCullDistance.push_back(poison);
       }
 
-      bool miscExport = usePointSize || useLayer || useViewportIndex || useShadingRate || enableMultiView;
+      bool miscExport =
+          usePointSize || useLayer || useViewportIndex || useShadingRate || enableMultiView || useEdgeFlag;
       // NOTE: When misc. export is present, gl_ClipDistance[] or gl_CullDistance[] should start from pos2.
       unsigned pos = miscExport ? EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
       Value *args[] = {
@@ -1384,6 +1388,11 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
 
         recordVertexAttribExport(loc, {primitiveId, poison, poison, poison});
       }
+    }
+
+    // Export EdgeFlag
+    if (useEdgeFlag) {
+      addExportInstForBuiltInOutput(m_edgeFlag, BuiltInEdgeFlag, insertPos);
     }
 
     if (m_gfxIp.major <= 8 && (useLayer || enableMultiView)) {
@@ -2053,9 +2062,10 @@ void PatchInOutImportExport::patchMeshGenericOutputExport(Value *output, unsigne
 
   outputOffset = builder.CreateAdd(outputOffset, compIdx);
 
-  std::string callName(isPerPrimitive ? lgcName::MeshTaskWritePrimitiveOutput : lgcName::MeshTaskWriteVertexOutput);
-  callName += getTypeName(outputTy);
-  builder.CreateNamedCall(callName, builder.getVoidTy(), {outputOffset, vertexOrPrimitiveIdx, output}, {});
+  if (isPerPrimitive)
+    builder.create<WriteMeshPrimitiveOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
+  else
+    builder.create<WriteMeshVertexOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
 }
 
 // =====================================================================================================================
@@ -2331,20 +2341,14 @@ Value *PatchInOutImportExport::patchGsBuiltInInputImport(Type *inputTy, unsigned
 //
 // @param inputTy : Type of input value
 // @param builtInId : ID of the built-in variable
-// @param elemIdx : Index used for vector element indexing (could be null)
 // @param builder : The IR builder to create and insert IR instruction
-Value *PatchInOutImportExport::patchMeshBuiltInInputImport(Type *inputTy, unsigned builtInId, Value *elemIdx,
-                                                           BuilderBase &builder) {
+Value *PatchInOutImportExport::patchMeshBuiltInInputImport(Type *inputTy, unsigned builtInId, BuilderBase &builder) {
   // Handle work group size built-in
   if (builtInId == BuiltInWorkgroupSize) {
     // WorkgroupSize is a constant vector supplied by mesh shader mode.
     const auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
-    Value *input =
-        ConstantVector::get({builder.getInt32(meshMode.workgroupSizeX), builder.getInt32(meshMode.workgroupSizeY),
-                             builder.getInt32(meshMode.workgroupSizeZ)});
-    if (elemIdx)
-      input = builder.CreateExtractElement(input, elemIdx);
-    return input;
+    return ConstantVector::get({builder.getInt32(meshMode.workgroupSizeX), builder.getInt32(meshMode.workgroupSizeY),
+                                builder.getInt32(meshMode.workgroupSizeZ)});
   }
 
   // Handle other built-ins
@@ -2354,51 +2358,37 @@ Value *PatchInOutImportExport::patchMeshBuiltInInputImport(Type *inputTy, unsign
   switch (builtInId) {
   case BuiltInDrawIndex:
     assert(builtInUsage.drawIndex);
-    assert(!elemIdx); // No vector element indexing
     break;
   case BuiltInViewIndex:
     assert(builtInUsage.viewIndex);
-    assert(!elemIdx); // No vector element indexing
     break;
   case BuiltInNumWorkgroups:
     assert(builtInUsage.numWorkgroups);
-    inputTy = elemIdx ? FixedVectorType::get(builder.getInt32Ty(), 3) : inputTy;
     break;
   case BuiltInWorkgroupId:
     assert(builtInUsage.workgroupId);
-    inputTy = elemIdx ? FixedVectorType::get(builder.getInt32Ty(), 3) : inputTy;
     break;
   case BuiltInLocalInvocationId:
     assert(builtInUsage.localInvocationId);
-    inputTy = elemIdx ? FixedVectorType::get(builder.getInt32Ty(), 3) : inputTy;
     break;
   case BuiltInGlobalInvocationId:
     assert(builtInUsage.globalInvocationId);
-    inputTy = elemIdx ? FixedVectorType::get(builder.getInt32Ty(), 3) : inputTy;
     break;
   case BuiltInLocalInvocationIndex:
     assert(builtInUsage.localInvocationIndex);
-    assert(!elemIdx); // No vector element indexing
     break;
   case BuiltInSubgroupId:
     assert(builtInUsage.subgroupId);
-    assert(!elemIdx); // No vector element indexing
     break;
   case BuiltInNumSubgroups:
     assert(builtInUsage.numSubgroups);
-    assert(!elemIdx); // No vector element indexing
     break;
   default:
     llvm_unreachable("Unknown mesh shader built-in!");
     break;
   }
 
-  std::string callName(lgcName::MeshTaskGetMeshInput);
-  callName += getTypeName(inputTy);
-  Value *input = builder.CreateNamedCall(callName, inputTy, builder.getInt32(builtInId), {});
-  if (elemIdx)
-    input = builder.CreateExtractElement(input, elemIdx);
-  return input;
+  return builder.create<GetMeshBuiltinInputOp>(inputTy, builtInId);
 }
 
 // =====================================================================================================================
@@ -2429,8 +2419,24 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
 
     Value *sampleMaskIn = sampleCoverage;
     if (m_pipelineState->getRasterizerState().perSampleShading || builtInUsage.runAtSampleRate) {
-      // gl_SampleMaskIn[0] = (SampleCoverage & (1 << gl_SampleID))
-      sampleMaskIn = builder.CreateShl(builder.getInt32(1), sampleId);
+      // Fix the failure for multisample_shader_builtin.sample_mask cases "gl_SampleMaskIn" should contain one
+      // or multiple covered sample bit.
+      // (1) If the 4 samples is divided into 2 sub invocation groups, broadcast sample mask bit <0, 1>
+      // to sample <2, 3>.
+      // (2) If the 8 samples is divided into 2 sub invocation groups, broadcast sample mask bit <0, 1>
+      // to sample <2, 3>, then re-broadcast sample mask bit <0, 1, 2, 3> to sample <4, 5, 6, 7>.
+      // (3) If the 8 samples is divided into 4 sub invocation groups, patch to broadcast sample mask bit
+      // <0, 1, 2, 3> to sample <4, 5, 6, 7>.
+
+      unsigned baseMask = 1;
+      unsigned baseMaskSamples = m_pipelineState->getRasterizerState().pixelShaderSamples;
+      while (baseMaskSamples < m_pipelineState->getRasterizerState().numSamples) {
+        baseMask |= baseMask << baseMaskSamples;
+        baseMaskSamples *= 2;
+      }
+
+      // gl_SampleMaskIn[0] = (SampleCoverage & (baseMask << gl_SampleID))
+      sampleMaskIn = builder.CreateShl(builder.getInt32(baseMask), sampleId);
       sampleMaskIn = builder.CreateAnd(sampleCoverage, sampleMaskIn);
     }
 
@@ -2955,6 +2961,12 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
 
     break;
   }
+  case BuiltInEdgeFlag: {
+    if (!m_hasTs && !m_hasGs) {
+      m_edgeFlag = output;
+    }
+    break;
+  }
   default: {
     llvm_unreachable("Should never be called!");
     break;
@@ -3247,8 +3259,6 @@ void PatchInOutImportExport::patchMeshBuiltInOutputExport(Value *output, unsigne
   BuilderBase builder(*m_context);
   builder.SetInsertPoint(insertPos);
 
-  auto outputTy = output->getType();
-
   // Handle primitive indices built-ins
   if (builtInId == BuiltInPrimitivePointIndices || builtInId == BuiltInPrimitiveLineIndices ||
       builtInId == BuiltInPrimitiveTriangleIndices) {
@@ -3263,17 +3273,15 @@ void PatchInOutImportExport::patchMeshBuiltInOutputExport(Value *output, unsigne
     // whole, partial writes to the vector components for line and triangle primitives is not allowed."
     assert(!elemIdx);
 
-    builder.CreateNamedCall(lgcName::MeshTaskSetPrimitiveIndices + getTypeName(outputTy), builder.getVoidTy(),
-                            {vertexOrPrimitiveIdx, output}, {});
+    builder.create<SetMeshPrimitiveIndicesOp>(vertexOrPrimitiveIdx, output);
     return;
   }
 
   // Handle cull primitive built-in
   if (builtInId == BuiltInCullPrimitive) {
     assert(isPerPrimitive);
-    assert(outputTy->isIntegerTy(1)); // Must be boolean
-    builder.CreateNamedCall(lgcName::MeshTaskSetPrimitiveCulled, builder.getVoidTy(), {vertexOrPrimitiveIdx, output},
-                            {});
+    assert(output->getType()->isIntegerTy(1)); // Must be boolean
+    builder.create<SetMeshPrimitiveCulledOp>(vertexOrPrimitiveIdx, output);
     return;
   }
 
@@ -3335,9 +3343,10 @@ void PatchInOutImportExport::patchMeshBuiltInOutputExport(Value *output, unsigne
   if (elemIdx)
     outputOffset = builder.CreateAdd(builder.getInt32(4 * loc), elemIdx);
 
-  std::string callName(isPerPrimitive ? lgcName::MeshTaskWritePrimitiveOutput : lgcName::MeshTaskWriteVertexOutput);
-  callName += getTypeName(outputTy);
-  builder.CreateNamedCall(callName, builder.getVoidTy(), {outputOffset, vertexOrPrimitiveIdx, output}, {});
+  if (isPerPrimitive)
+    builder.create<WriteMeshPrimitiveOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
+  else
+    builder.create<WriteMeshVertexOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
 }
 
 // =====================================================================================================================
@@ -5090,6 +5099,22 @@ void PatchInOutImportExport::addExportInstForBuiltInOutput(Value *output, unsign
     assert(m_gfxIp >= GfxIpVersion({10, 3}));
 
     exportShadingRate(output, insertPos);
+    break;
+  }
+  case BuiltInEdgeFlag: {
+    Value *edgeflag = new BitCastInst(output, Type::getFloatTy(*m_context), "", insertPos);
+
+    Value *args[] = {
+        ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_POS_1), // tgt
+        ConstantInt::get(Type::getInt32Ty(*m_context), 0x2),              // en
+        PoisonValue::get(Type::getFloatTy(*m_context)),                   // src1
+        edgeflag,                                                         // src0
+        PoisonValue::get(Type::getFloatTy(*m_context)),                   // src2
+        PoisonValue::get(Type::getFloatTy(*m_context)),                   // src3
+        ConstantInt::get(Type::getInt1Ty(*m_context), false),             // done
+        ConstantInt::get(Type::getInt1Ty(*m_context), false)              // vm
+    };
+    emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
     break;
   }
   default: {
