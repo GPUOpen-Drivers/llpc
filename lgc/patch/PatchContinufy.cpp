@@ -79,12 +79,6 @@ bool PatchContinufy::runImpl(llvm::Module &module, PipelineState *pipelineState)
   SmallVector<Function*> functions;
 
   for (Function &func : module) {
-    if (NeedsToBePatched(func)) {
-      // add parameters, create new function with extra params, call CloneFunctionInto on it
-    }
-  }
-
-  for (Function &func : module) {
     // TODO: also visit body of functions which do not need to be patched
     if (!NeedsToBePatched(func))
       continue;
@@ -102,6 +96,7 @@ bool PatchContinufy::runImpl(llvm::Module &module, PipelineState *pipelineState)
     FunctionType *type = func->getFunctionType();
 
     SmallVector<Type*> newParams;
+    // TODO: this needs to be the state parameter, same for argument below
     newParams.push_back(builder.getInt32Ty());
     newParams.push_back(builder.getInt32Ty());
     for (Type *paramType : type->params()) {
@@ -167,7 +162,9 @@ bool PatchContinufy::runImpl(llvm::Module &module, PipelineState *pipelineState)
   for (CallInst *call : calls) {
     builder.SetInsertPoint(call);
     Value *fptr = builder.CreatePtrToInt(call->getCalledOperand(), builder.getInt32Ty());
+    // TODO: support more return types and pass arguments
     auto await = module.getFunction("lgc.cps.await.void");
+    // TODO: update params with state, see above
     SmallVector<Value*> args = {fptr, builder.getInt32(0)};
     // for(auto arg : call->args()) {
     //   args.push_back(arg);
