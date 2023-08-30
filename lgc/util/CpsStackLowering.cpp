@@ -167,6 +167,8 @@ void CpsStackLowering::visitCpsAlloc(cps::AllocOp &alloc) {
   Value *vsp = builder.CreateAlignedLoad(builder.getPtrTy(getLoweredCpsStackAddrSpace()), m_cpsStackAlloca,
                                          Align(getLoweredCpsStackPointerSize(layout)));
   unsigned alignedSize = alignTo(cast<ConstantInt>(size)->getZExtValue(), continuationStackAlignment);
+  m_stackSizeInBytes += alignedSize;
+
   // update stack pointer
   Value *ptr = builder.CreateConstGEP1_32(builder.getInt8Ty(), vsp, alignedSize);
   builder.CreateAlignedStore(ptr, m_cpsStackAlloca, Align(getLoweredCpsStackPointerSize(layout)));

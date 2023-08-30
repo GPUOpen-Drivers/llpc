@@ -148,8 +148,8 @@ private:
   bool lowerCpsOps(llvm::Function *func);
   llvm::Function *lowerCpsFunction(llvm::Function *func, llvm::ArrayRef<llvm::Type *> userDataTys,
                                    llvm::ArrayRef<std::string> argNames);
-  void lowerCpsJump(llvm::Function *parent, cps::JumpOp *jumpOp, llvm::BasicBlock *tailBlock,
-                    llvm::SmallVectorImpl<CpsExitInfo> &exitInfos);
+  unsigned lowerCpsJump(llvm::Function *parent, cps::JumpOp *jumpOp, llvm::BasicBlock *tailBlock,
+                        llvm::SmallVectorImpl<CpsExitInfo> &exitInfos);
   void lowerAsCpsReference(cps::AsContinuationReferenceOp &asCpsReferenceOp);
 
   // Get UserDataUsage struct for the merged shader stage that contains the given shader stage

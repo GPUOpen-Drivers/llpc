@@ -57,6 +57,7 @@
 #include "lgc/LgcContext.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/patch/ShaderInputs.h"
+#include "lgc/state/AbiMetadata.h"
 #include "lgc/state/AbiUnlinked.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PalMetadata.h"
@@ -321,8 +322,11 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func) {
   IRBuilder<> builder(func->getContext());
 
   // Lower cps jumps.
-  for (auto *jump : cpsJumps)
-    lowerCpsJump(func, jump, tailBlock, exitInfos);
+  unsigned stackSize = 0;
+  for (auto *jump : cpsJumps) {
+    unsigned stateSize = lowerCpsJump(func, jump, tailBlock, exitInfos);
+    stackSize = std::max(stackSize, stateSize);
+  }
 
   // Lower returns.
   for (auto *ret : retInstrs) {
@@ -440,9 +444,18 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func) {
 #endif
   builder.CreateUnreachable();
 
+  auto funcName = func->getName();
   // Lower cps stack operations
   CpsStackLowering stackLowering(func->getContext());
   stackLowering.lowerCpsStackOps(*func, m_funcCpsStackMap[func]);
+
+  stackSize += stackLowering.getStackSize();
+  // Set per-function .frontend_stack_size PAL metadata.
+  auto &shaderFunctions = m_pipelineState->getPalMetadata()
+                              ->getPipelineNode()
+                              .getMap(true)[Util::Abi::PipelineMetadataKey::ShaderFunctions]
+                              .getMap(true);
+  shaderFunctions[funcName].getMap(true)[Util::Abi::HardwareStageMetadataKey::FrontendStackSize] = stackSize;
 
   return true;
 }
@@ -537,14 +550,14 @@ Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type 
 }
 
 // =====================================================================================================================
-// Lower cps.jump, fill cps exit information and branch to tailBlock.
+// Lower cps.jump, fill cps exit information and branch to tailBlock. Return the state size.
 // This assume the arguments of the parent function are setup correctly.
 //
 // @param parent : the parent function of the cps.jump operation
 // @param jumpOp : the call instruction of cps.jump
 // @param [in/out] exitInfos : the vector of cps exit information to be filled
-void PatchEntryPointMutate::lowerCpsJump(Function *parent, cps::JumpOp *jumpOp, BasicBlock *tailBlock,
-                                         SmallVectorImpl<CpsExitInfo> &exitInfos) {
+unsigned PatchEntryPointMutate::lowerCpsJump(Function *parent, cps::JumpOp *jumpOp, BasicBlock *tailBlock,
+                                             SmallVectorImpl<CpsExitInfo> &exitInfos) {
   IRBuilder<> builder(parent->getContext());
   const DataLayout &layout = parent->getParent()->getDataLayout();
   // Translate @lgc.cps.jump(CR %target, i32 %levels, T %state, ...) into:
@@ -556,8 +569,9 @@ void PatchEntryPointMutate::lowerCpsJump(Function *parent, cps::JumpOp *jumpOp, 
   Value *state = jumpOp->getState();
   Value *vsp = builder.CreateAlignedLoad(builder.getPtrTy(getLoweredCpsStackAddrSpace()), m_funcCpsStackMap[parent],
                                          Align(getLoweredCpsStackPointerSize(layout)));
+  unsigned stateSize = 0;
   if (!state->getType()->isEmptyTy()) {
-    unsigned stateSize = layout.getTypeStoreSize(state->getType());
+    stateSize = layout.getTypeStoreSize(state->getType());
     builder.CreateStore(state, vsp);
     // Make vsp properly aligned across cps function.
     stateSize = alignTo(stateSize, continuationStackAlignment);
@@ -584,6 +598,7 @@ void PatchEntryPointMutate::lowerCpsJump(Function *parent, cps::JumpOp *jumpOp, 
   builder.CreateBr(tailBlock);
 
   jumpOp->eraseFromParent();
+  return stateSize;
 }
 
 // =====================================================================================================================
