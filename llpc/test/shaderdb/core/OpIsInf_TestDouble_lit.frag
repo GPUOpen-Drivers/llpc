@@ -14,11 +14,13 @@ void main()
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; REQUIRES: do-not-run-me
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: = call i1 (...) @lgc.create.isinf.i1(double
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call i1 @llvm.is.fpclass.f64(double %{{[0-9]*}}, i32 516)
+; SHADERTEST: %[[FABS:[0-9]+]] = call double @llvm.fabs.f64(double %{{[0-9]*}})
+; SHADERTEST: = fcmp oeq double %[[FABS]], 0x7FF0000000000000
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */
