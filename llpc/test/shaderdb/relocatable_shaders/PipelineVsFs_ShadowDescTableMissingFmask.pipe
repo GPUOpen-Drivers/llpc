@@ -22,20 +22,6 @@ void main() {
 
 [VsInfo]
 entryPoint = main
-userDataNode[0].type = DescriptorTableVaPtr
-userDataNode[0].offsetInDwords = 11
-userDataNode[0].sizeInDwords = 1
-userDataNode[0].set = 0
-userDataNode[0].next[0].type = DescriptorResource
-userDataNode[0].next[0].offsetInDwords = 4
-userDataNode[0].next[0].sizeInDwords = 8
-userDataNode[0].next[0].set = 0
-userDataNode[0].next[0].binding = 0
-userDataNode[1].visibility = 2
-userDataNode[1].type = IndirectUserDataVaPtr
-userDataNode[1].offsetInDwords = 12
-userDataNode[1].sizeInDwords = 1
-userDataNode[1].indirectUserDataCount = 4
 
 
 [FsGlsl]
@@ -60,6 +46,10 @@ colorBuffer[0].format = VK_FORMAT_R32G32B32A32_SFLOAT
 colorBuffer[0].channelWriteMask = 15
 colorBuffer[0].blendEnable = 1
 colorBuffer[0].blendSrcAlphaToColor = 1
+options.shadowDescriptorTableUsage = Enable
+options.shadowDescriptorTablePtrHigh = 0xFFFF
+
+[ResourceMapping]
 userDataNode[0].type = DescriptorTableVaPtr
 userDataNode[0].offsetInDwords = 11
 userDataNode[0].sizeInDwords = 1
@@ -69,13 +59,10 @@ userDataNode[0].next[0].offsetInDwords = 4
 userDataNode[0].next[0].sizeInDwords = 8
 userDataNode[0].next[0].set = 0
 userDataNode[0].next[0].binding = 0
-userDataNode[1].visibility = 2
 userDataNode[1].type = IndirectUserDataVaPtr
 userDataNode[1].offsetInDwords = 12
 userDataNode[1].sizeInDwords = 1
 userDataNode[1].indirectUserDataCount = 4
-options.shadowDescriptorTableUsage = Enable
-options.shadowDescriptorTablePtrHigh = 0xFFFF
 
 [VertexInputState]
 binding[0].binding = 1

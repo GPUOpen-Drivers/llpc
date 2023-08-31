@@ -272,9 +272,9 @@ private:
 
   // Give the user data nodes and descriptor range values to the middle-end, and/or hash them.
   void setUserDataInPipeline(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, unsigned stageMask) const;
-  void setUserDataNodesTable(lgc::Pipeline *pipeline, llvm::ArrayRef<ResourceMappingNode> nodes,
-                             const ImmutableNodesMap &immutableNodesMap, bool isRoot, lgc::ResourceNode *destTable,
-                             lgc::ResourceNode *&destInnerTable) const;
+  void convertResourceNode(lgc::ResourceNode &dst, const ResourceMappingNode &src, unsigned visibility,
+                           const ImmutableNodesMap &immutableNodesMap,
+                           llvm::MutableArrayRef<lgc::ResourceNode> &dstInnerTable) const;
 
   ShaderFpMode m_shaderFpModes[ShaderStageCountInternal] = {};
   bool m_unlinked = false; // Whether we are building an "unlinked" shader ELF

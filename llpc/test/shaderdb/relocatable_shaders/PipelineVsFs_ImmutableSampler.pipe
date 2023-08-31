@@ -41,14 +41,14 @@ void main()
 entryPoint = main
 
 [ResourceMapping]
-descriptorRangeValue[0].visibility = 17
+descriptorRangeValue[0].visibility = 66
 descriptorRangeValue[0].type = DescriptorSampler
 descriptorRangeValue[0].set = 0
 descriptorRangeValue[0].binding = 0
 descriptorRangeValue[0].arraySize = 1
 descriptorRangeValue[0].uintData = 2156034194, 184545280, 3371171840, 2147483648
 
-userDataNode[0].visibility = 17
+userDataNode[0].visibility = 66
 userDataNode[0].type = DescriptorTableVaPtr
 userDataNode[0].offsetInDwords = 11
 userDataNode[0].sizeInDwords = 1

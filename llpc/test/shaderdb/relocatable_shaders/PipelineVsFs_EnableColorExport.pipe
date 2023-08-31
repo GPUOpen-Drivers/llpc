@@ -36,7 +36,6 @@ void main()
 entryPoint = main
 
 [ResourceMapping]
-userDataNode[0].visibility = 17
 userDataNode[0].type = DescriptorTableVaPtr
 userDataNode[0].offsetInDwords = 11
 userDataNode[0].sizeInDwords = 1
@@ -50,7 +49,6 @@ userDataNode[0].next[1].offsetInDwords = 0
 userDataNode[0].next[1].sizeInDwords = 8
 userDataNode[0].next[1].set = 0
 userDataNode[0].next[1].binding = 1
-userDataNode[1].visibility = 2
 userDataNode[1].type = IndirectUserDataVaPtr
 userDataNode[1].offsetInDwords = 12
 userDataNode[1].sizeInDwords = 1
