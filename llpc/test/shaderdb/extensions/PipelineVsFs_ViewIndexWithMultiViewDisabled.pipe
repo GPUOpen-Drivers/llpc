@@ -70,7 +70,6 @@ entryPoint = main
 
 
 [ResourceMapping]
-userDataNode[0].visibility = 1
 userDataNode[0].type = DescriptorConstBufferCompact
 userDataNode[0].offsetInDwords = 2
 userDataNode[0].sizeInDwords = 2

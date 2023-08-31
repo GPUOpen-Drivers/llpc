@@ -83,7 +83,6 @@ entryPoint = main
 entryPoint = main
 
 [ResourceMapping]
-userDataNode[0].visibility = 17
 userDataNode[0].type = PushConst
 userDataNode[0].offsetInDwords = 1
 userDataNode[0].sizeInDwords = 4

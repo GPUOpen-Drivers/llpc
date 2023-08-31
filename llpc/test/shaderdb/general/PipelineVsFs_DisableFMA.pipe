@@ -44,29 +44,24 @@ void main()
 entryPoint = main
 
 [ResourceMapping]
-userDataNode[0].visibility = 1
 userDataNode[0].type = StreamOutTableVaPtr
 userDataNode[0].offsetInDwords = 0
 userDataNode[0].sizeInDwords = 1
-userDataNode[1].visibility = 17
 userDataNode[1].type = DescriptorBuffer
 userDataNode[1].offsetInDwords = 1
 userDataNode[1].sizeInDwords = 4
 userDataNode[1].set = 0
 userDataNode[1].binding = 0
-userDataNode[2].visibility = 17
 userDataNode[2].type = DescriptorBuffer
 userDataNode[2].offsetInDwords = 5
 userDataNode[2].sizeInDwords = 4
 userDataNode[2].set = 1
 userDataNode[2].binding = 0
-userDataNode[3].visibility = 17
 userDataNode[3].type = DescriptorBuffer
 userDataNode[3].offsetInDwords = 9
 userDataNode[3].sizeInDwords = 4
 userDataNode[3].set = 1
 userDataNode[3].binding = 1
-userDataNode[4].visibility = 1
 userDataNode[4].type = IndirectUserDataVaPtr
 userDataNode[4].offsetInDwords = 13
 userDataNode[4].sizeInDwords = 1

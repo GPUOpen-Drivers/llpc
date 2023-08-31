@@ -107,23 +107,19 @@ version = 46
 entryPoint = main
 
 [ResourceMapping]
-userDataNode[0].visibility = 1
 userDataNode[0].type = StreamOutTableVaPtr
 userDataNode[0].offsetInDwords = 0
 userDataNode[0].sizeInDwords = 1
-userDataNode[1].visibility = 32
 userDataNode[1].type = InlineBuffer
 userDataNode[1].offsetInDwords = 1
 userDataNode[1].sizeInDwords = 9
 userDataNode[1].set = 0
 userDataNode[1].binding = 0
-userDataNode[2].visibility = 32
 userDataNode[2].type = InlineBuffer
 userDataNode[2].offsetInDwords = 10
 userDataNode[2].sizeInDwords = 9
 userDataNode[2].set = 0
 userDataNode[2].binding = 1
-userDataNode[3].visibility = 32
 userDataNode[3].type = DescriptorTableVaPtr
 userDataNode[3].offsetInDwords = 10
 userDataNode[3].sizeInDwords = 1
