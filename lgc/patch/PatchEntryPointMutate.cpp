@@ -1674,7 +1674,7 @@ void PatchEntryPointMutate::finalizeUserDataArgs(SmallVectorImpl<UserDataArg> &u
             // No space left for the spill table, we need to backtrack.
             assert(lastSize > 0);
             userDataArgs.erase(userDataArgs.end() - lastSize, userDataArgs.end());
-            userDataEnd -= size;
+            userDataEnd -= lastSize;
             spillUsage = lastIdx;
           }
           --userDataAvailable;
