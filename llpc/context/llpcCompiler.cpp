@@ -402,11 +402,6 @@ Result VKAPI_CALL ICompiler::Create(GfxIpVersion gfxIp, unsigned optionCount, co
     SOptionHash = optionHash;
     *ppCompiler = new Compiler(gfxIp, optionCount, options, SOptionHash, cache);
     assert(*ppCompiler);
-
-    if (EnableOuts()) {
-      // LLPC_OUTS is enabled. Ensure it is enabled in LGC (the middle-end) too.
-      LgcContext::setLlpcOuts(&outs());
-    }
   } else {
     *ppCompiler = nullptr;
     result = Result::ErrorInvalidValue;

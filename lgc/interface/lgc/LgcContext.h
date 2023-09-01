@@ -147,6 +147,7 @@ public:
   // statements in the middle-end output to that stream, giving a dump of LLVM IR at a
   // few strategic places in the pass flow, as well as information such as input/output
   // mapping.
+  // The pointer set here is thread local.
   static void setLlpcOuts(llvm::raw_ostream *stream) { m_llpcOuts = stream; }
   static llvm::raw_ostream *getLgcOuts() { return m_llpcOuts; }
 
@@ -160,13 +161,13 @@ private:
 
   LgcContext(llvm::LLVMContext &context, unsigned palAbiVersion);
 
-  static llvm::raw_ostream *m_llpcOuts;           // nullptr or stream for LLPC_OUTS
-  llvm::LLVMContext &m_context;                   // LLVM context
-  llvm::TargetMachine *m_targetMachine = nullptr; // Target machine
-  TargetInfo *m_targetInfo = nullptr;             // Target info
-  unsigned m_palAbiVersion = 0xFFFFFFFF;          // PAL pipeline ABI version to compile for
-  PassManagerCache *m_passManagerCache = nullptr; // Pass manager cache and creator
-  llvm::CodeGenOpt::Level m_initialOptLevel;      // Optimization level at initialization
+  static thread_local llvm::raw_ostream *m_llpcOuts; // nullptr or stream for LLPC_OUTS
+  llvm::LLVMContext &m_context;                      // LLVM context
+  llvm::TargetMachine *m_targetMachine = nullptr;    // Target machine
+  TargetInfo *m_targetInfo = nullptr;                // Target info
+  unsigned m_palAbiVersion = 0xFFFFFFFF;             // PAL pipeline ABI version to compile for
+  PassManagerCache *m_passManagerCache = nullptr;    // Pass manager cache and creator
+  llvm::CodeGenOpt::Level m_initialOptLevel;         // Optimization level at initialization
 };
 
 } // namespace lgc
