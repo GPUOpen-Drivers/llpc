@@ -657,6 +657,8 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.workaroundStorageImageFormats = " << shaderInfo->options.workaroundStorageImageFormats << "\n";
   dumpFile << "options.workaroundInitializeOutputsToZero = " << shaderInfo->options.workaroundInitializeOutputsToZero << "\n";
   dumpFile << "options.disableFMA = " << shaderInfo->options.disableFMA << "\n";
+  dumpFile << "options.backwardPropagateNoContract = " << shaderInfo->options.backwardPropagateNoContract << "\n";
+  dumpFile << "options.forwardPropagateNoContract = " << shaderInfo->options.forwardPropagateNoContract << "\n";
   dumpFile << "\n";
   // clang-format on
 }
@@ -1724,6 +1726,8 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.workaroundStorageImageFormats);
       hasher->Update(options.workaroundInitializeOutputsToZero);
       hasher->Update(options.disableFMA);
+      hasher->Update(options.backwardPropagateNoContract);
+      hasher->Update(options.forwardPropagateNoContract);
     }
   }
 }

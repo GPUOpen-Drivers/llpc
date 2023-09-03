@@ -79,7 +79,8 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
-//  |     66.0 | Rename noContract in PipelineShaderOptions to noContractOpDot
+//  |     66.1 | Add forwardPropagateNoContract and backwardPropagateNoContract to PipelineShaderOptions               |
+//  |     66.0 | Rename noContract in PipelineShaderOptions to noContractOpDot                                         |
 //  |     65.1 | Add disableSampleMask to PipelineOptions                                                              |
 //  |     65.0 | Remove updateDescInElf                                                                                |
 //  |     64.0 | Add enableColorExportShader to GraphicsPipelineBuildInfo.                                             |
@@ -851,6 +852,12 @@ struct PipelineShaderOptions {
 
   /// Disable to emulate DX's readfirst lane workaround in BIL
   bool disableReadFirstLaneWorkaround;
+
+  /// Application workaround: back propagate NoContraction decoration to all inputs to a NoContraction operation.
+  bool backwardPropagateNoContract;
+
+  /// Application workaround: forward propagate NoContraction decoration to any related FAdd operation.
+  bool forwardPropagateNoContract;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor

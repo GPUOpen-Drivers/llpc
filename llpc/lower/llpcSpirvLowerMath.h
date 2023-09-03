@@ -47,7 +47,6 @@ protected:
   void init(llvm::Module &module);
 
   void flushDenormIfNeeded(llvm::Instruction *inst);
-  bool isOperandNoContract(llvm::Value *operand);
 
   bool m_changed;         // Whether the module is changed
   bool m_fp16DenormFlush; // Whether FP mode wants f16 denorms to be flushed to zero
@@ -84,6 +83,9 @@ public:
   bool runImpl(llvm::Module &module);
 
   static llvm::StringRef name() { return "Lower SPIR-V for precision (fast math flags)"; }
+
+  bool adjustExports(llvm::Module &module);
+  bool propagateNoContract(llvm::Module &module, bool forward, bool backward);
 };
 
 // =====================================================================================================================
