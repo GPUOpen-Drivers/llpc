@@ -355,6 +355,7 @@ void SpirvProcessGpuRtLibrary::createConvertF32toF16WithRoundingMode(Function *f
 // Create function to do the float op with the round Mode.
 //
 // @param func : The function to process
+// 
 void SpirvProcessGpuRtLibrary::createFloatOpWithRoundMode(Function *func) {
 
   enum OperationType : uint32_t { Add = 0, Sub, Mul };
@@ -375,6 +376,9 @@ void SpirvProcessGpuRtLibrary::createFloatOpWithRoundMode(Function *func) {
   Value *result = PoisonValue::get(retType);
 
   // Try to get the op and roundMode through the store intrinsic directly.
+  // Note : we avoid the switch-case for checking the round mode and op type here,
+  // because these args are constant value in SPV code, so just get them from the used calls directly,
+  // and then replace all uesed calls with the operation.
   SmallVector<CallInst *> callsToBeRemoved;
   for (auto user : func->users()) {
     assert(isa<CallInst>(user));
@@ -434,8 +438,8 @@ void SpirvProcessGpuRtLibrary::createFloatOpWithRoundMode(Function *func) {
     call->eraseFromParent();
   }
 
-  m_builder->SetInsertPoint(&func->getEntryBlock());
-  m_builder->CreateRetVoid();
+  func->dropAllReferences();
+  func->eraseFromParent();
 }
 
 // =====================================================================================================================
