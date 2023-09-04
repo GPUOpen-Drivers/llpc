@@ -2010,19 +2010,11 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
   {
     m_builder.SetInsertPoint(initPrimitiveDataBlock);
 
-    if (m_pipelineState->enableSwXfb()) {
-      const auto &streamXfbBuffers = m_pipelineState->getStreamXfbBuffers();
-      for (unsigned i = 0; i < MaxGsStreams; ++i) {
-        // Treat the vertex stream as active if it is associated with XFB buffers or is the rasterization stream.
-        bool streamActive = streamXfbBuffers[i] != 0 || i == rasterStream;
-        if (streamActive) { // Initialize primitive connectivity data if the stream is active
-          writePerThreadDataToLds(m_builder.getInt32(NullPrim), m_nggInputs.threadIdInSubgroup,
-                                  PrimShaderLdsRegion::PrimitiveData, Gfx9::NggMaxThreadsPerSubgroup * i);
-        }
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (m_pipelineState->isVertexStreamActive(i)) { // Initialize primitive connectivity data if the stream is active
+        writePerThreadDataToLds(m_builder.getInt32(NullPrim), m_nggInputs.threadIdInSubgroup,
+                                PrimShaderLdsRegion::PrimitiveData, Gfx9::NggMaxThreadsPerSubgroup * i);
       }
-    } else {
-      writePerThreadDataToLds(m_builder.getInt32(NullPrim), m_nggInputs.threadIdInSubgroup,
-                              PrimShaderLdsRegion::PrimitiveData, Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
     }
 
     m_builder.CreateBr(endInitPrimitiveDataBlock);
@@ -4053,11 +4045,8 @@ Value *NggPrimShader::readGsOutput(Type *outputTy, unsigned location, unsigned c
 // @param [in/out] emitVertsPtr : Pointer to the counter of GS emitted vertices for this stream
 // @param [in/out] outVertsPtr : Pointer to the counter of GS output vertices of current primitive for this stream
 void NggPrimShader::processGsEmit(unsigned streamId, Value *primitiveIndex, Value *emitVertsPtr, Value *outVertsPtr) {
-  if (!m_pipelineState->enableSwXfb() && m_pipelineState->getRasterizerState().rasterStream != streamId) {
-    // NOTE: If SW-emulated stream-out is not enabled, only handle GS_EMIT message that belongs to the rasterization
-    // stream.
-    return;
-  }
+  if (!m_pipelineState->isVertexStreamActive(streamId))
+    return; // Skip if this vertex stream is marked as inactive
 
   if (!m_gsHandlers.emit)
     m_gsHandlers.emit = createGsEmitHandler();
@@ -4071,11 +4060,8 @@ void NggPrimShader::processGsEmit(unsigned streamId, Value *primitiveIndex, Valu
 // @param streamId : ID of output vertex stream
 // @param [in/out] outVertsPtr : Pointer to the counter of GS output vertices of current primitive for this stream
 void NggPrimShader::processGsCut(unsigned streamId, Value *outVertsPtr) {
-  if (!m_pipelineState->enableSwXfb() && m_pipelineState->getRasterizerState().rasterStream != streamId) {
-    // NOTE: If SW-emulated stream-out is not enabled, only handle GS_CUT message that belongs to the rasterization
-    // stream.
-    return;
-  }
+  if (!m_pipelineState->isVertexStreamActive(streamId))
+    return; // Skip if this vertex stream is marked as inactive
 
   if (!m_gsHandlers.cut)
     m_gsHandlers.cut = createGsCutHandler();
@@ -6556,16 +6542,11 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
     lastActiveXfbBuffer = i;
   }
 
-  bool streamActive[MaxGsStreams] = {};
   unsigned firstActiveStream = InvalidValue;
   unsigned lastActiveStream = InvalidValue;
 
-  const unsigned rasterStream = m_pipelineState->getRasterizerState().rasterStream;
-
   for (unsigned i = 0; i < MaxGsStreams; ++i) {
-    // Treat the vertex stream as active if it is associated with XFB buffers or is the rasterization stream.
-    streamActive[i] = streamXfbBuffers[i] != 0 || i == rasterStream;
-    if (!streamActive[i])
+    if (!m_pipelineState->isVertexStreamActive(i))
       continue; // Stream is inactive
 
     if (firstActiveStream == InvalidValue)
@@ -6647,7 +6628,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
   BasicBlock *endCompactPrimitiveIndexBlock[MaxGsStreams] = {};
   BasicBlock *insertPos = endAccumPrimitiveCountsBlock;
   for (unsigned i = 0; i < MaxGsStreams; ++i) {
-    if (streamActive[i]) {
+    if (m_pipelineState->isVertexStreamActive(i)) {
       compactPrimitiveIndexBlock[i] =
           createBlock(xfbEntryBlock->getParent(), ".compactPrimitiveIndexInStream" + std::to_string(i));
       compactPrimitiveIndexBlock[i]->moveAfter(insertPos);
@@ -6669,7 +6650,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
   BasicBlock *endExportXfbOutputBlock[MaxGsStreams] = {};
   insertPos = endPrepareXfbExportBlock;
   for (unsigned i = 0; i < MaxGsStreams; ++i) {
-    if (streamActive[i]) {
+    if (m_pipelineState->isVertexStreamActive(i)) {
       exportXfbOutputBlock[i] = createBlock(xfbEntryBlock->getParent(), ".exportXfbOutputInStream" + std::to_string(i));
       exportXfbOutputBlock[i]->moveAfter(insertPos);
       insertPos = exportXfbOutputBlock[i];
@@ -6693,7 +6674,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
     m_builder.SetInsertPoint(initPrimitiveCountsBlock);
 
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
-      if (streamActive[i]) {
+      if (m_pipelineState->isVertexStreamActive(i)) {
         writePerThreadDataToLds(m_builder.getInt32(0), m_nggInputs.threadIdInSubgroup,
                                 PrimShaderLdsRegion::PrimitiveCounts, (Gfx9::NggMaxWavesPerSubgroup + 1) * i);
       }
@@ -6718,7 +6699,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
     m_builder.SetInsertPoint(checkPrimitiveDrawFlagBlock);
 
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
-      if (streamActive[i]) {
+      if (m_pipelineState->isVertexStreamActive(i)) {
         // drawFlag = primData[N] != NullPrim
         auto primData =
             readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
@@ -6738,14 +6719,14 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
 
     // Update draw flags
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
-      if (streamActive[i]) {
+      if (m_pipelineState->isVertexStreamActive(i)) {
         drawFlag[i] = createPhi(
             {{drawFlag[i], checkPrimitiveDrawFlagBlock}, {m_builder.getFalse(), endInitPrimitiveCountsBlock}});
       }
     }
 
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
-      if (streamActive[i]) {
+      if (m_pipelineState->isVertexStreamActive(i)) {
         drawMask[i] = ballot(drawFlag[i]);
 
         primCountInWave[i] = m_builder.CreateIntrinsic(Intrinsic::ctpop, m_builder.getInt64Ty(), drawMask[i]);
@@ -6768,7 +6749,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
     ldsOffset = m_builder.CreateAdd(ldsOffset, m_builder.getInt32(1));
 
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
-      if (streamActive[i]) {
+      if (m_pipelineState->isVertexStreamActive(i)) {
         atomicAdd(
             primCountInWave[i],
             m_builder.CreateAdd(ldsOffset, m_builder.getInt32(regionStart + (Gfx9::NggMaxWavesPerSubgroup + 1) * i)));
@@ -6787,7 +6768,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
     createFenceAndBarrier();
 
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
-      if (!streamActive[i])
+      if (!m_pipelineState->isVertexStreamActive(i))
         continue;
 
       auto primCountInWaves =
@@ -6811,7 +6792,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
   SmallVector<XfbOutputExport, 32> xfbOutputExports;
 
   for (unsigned i = 0; i < MaxGsStreams; ++i) {
-    if (!streamActive[i])
+    if (!m_pipelineState->isVertexStreamActive(i))
       continue;
 
     // Construct ".compactPrimitiveIndexInStream[N]" block
@@ -6850,7 +6831,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
         m_builder.CreateCondBr(firstThreadInSubgroup, prepareXfbExportBlock, endPrepareXfbExportBlock);
       } else {
         unsigned nextActiveStream = i + 1;
-        while (!streamActive[nextActiveStream]) {
+        while (!m_pipelineState->isVertexStreamActive(nextActiveStream)) {
           ++nextActiveStream;
         }
 
@@ -6970,7 +6951,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
     }
 
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
-      if (!streamActive[i])
+      if (!m_pipelineState->isVertexStreamActive(i))
         continue;
 
       writeValueToLds(numPrimsToWrite[i], m_builder.getInt32(regionStart + MaxTransformFeedbackBuffers + i));
@@ -7013,7 +6994,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
     }
 
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
-      if (streamActive[i]) {
+      if (m_pipelineState->isVertexStreamActive(i)) {
         numPrimsToWrite[i] =
             m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
                                       {xfbStatInfo, m_builder.getInt32(MaxTransformFeedbackBuffers + i)});
@@ -7026,7 +7007,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
   }
 
   for (unsigned i = 0; i < MaxGsStreams; ++i) {
-    if (!streamActive[i])
+    if (!m_pipelineState->isVertexStreamActive(i))
       continue;
 
     // Construct ".exportXfbOutputInStream[N]" block
@@ -7171,7 +7152,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
 
       if (i != lastActiveStream) {
         unsigned nextActiveStream = i + 1;
-        while (!streamActive[nextActiveStream]) {
+        while (!m_pipelineState->isVertexStreamActive(nextActiveStream)) {
           ++nextActiveStream;
         }
 

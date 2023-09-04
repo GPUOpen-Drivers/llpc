@@ -102,8 +102,9 @@ struct NggControl {
 // Represents transform feedback state metadata
 struct XfbStateMetadata {
   bool enableXfb;                                               // Whether transform feedback is active
-  std::array<unsigned, MaxTransformFeedbackBuffers> xfbStrides; // The strides of each XFB buffer.
-  std::array<int, MaxGsStreams> streamXfbBuffers;               // The stream-out XFB buffers bit mask per stream.
+  std::array<unsigned, MaxTransformFeedbackBuffers> xfbStrides; // The strides of each XFB buffer
+  std::array<int, MaxGsStreams> streamXfbBuffers;               // The stream-out XFB buffers bit mask per stream
+  std::array<bool, MaxGsStreams> streamActive;                  // Flag indicating which vertex stream is active
 };
 
 // =====================================================================================================================
@@ -371,12 +372,6 @@ public:
   // Set transform feedback state metadata
   void setXfbStateMetadata(llvm::Module *module);
 
-  // Get XFB state metadata
-  const XfbStateMetadata &getXfbStateMetadata() const { return m_xfbStateMetadata; }
-
-  // Get XFB state metadata
-  XfbStateMetadata &getXfbStateMetadata() { return m_xfbStateMetadata; }
-
   // Check if transform feedback is active
   bool enableXfb() const { return m_xfbStateMetadata.enableXfb; }
 
@@ -393,6 +388,16 @@ public:
 
   // Get transform feedback buffers used for each stream
   std::array<int, MaxGsStreams> &getStreamXfbBuffers() { return m_xfbStateMetadata.streamXfbBuffers; }
+
+  // Set the activness for a vertex stream
+  void setVertexStreamActive(unsigned streamId) { m_xfbStateMetadata.streamActive[streamId] = true; }
+
+  // Get the activeness for a vertex stream
+  bool isVertexStreamActive(unsigned streamId) {
+    if (getRasterizerState().rasterStream == streamId)
+      return true; // Rasterization stream is always active
+    return m_xfbStateMetadata.streamActive[streamId];
+  }
 
   // Set user data for a specific shader stage
   void setUserDataMap(ShaderStage shaderStage, llvm::ArrayRef<unsigned> userDataValues) {

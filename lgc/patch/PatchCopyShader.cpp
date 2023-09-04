@@ -211,8 +211,6 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
     }
   }
 
-  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
-
   if (!m_pipelineState->getNggControl()->enableNgg) {
     // If no NGG, the copy shader will become a real HW VS. Set the user data entries in the
     // PAL metadata here.
@@ -246,13 +244,9 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
     m_lds = Patch::getLdsVariable(m_pipelineState, &module);
 
   unsigned outputStreamCount = 0;
-  unsigned outputStreamId = InvalidValue;
   for (int i = 0; i < MaxGsStreams; ++i) {
-    if (resUsage->inOutUsage.gs.outLocCount[i] > 0) {
+    if (m_pipelineState->isVertexStreamActive(i))
       outputStreamCount++;
-      if (outputStreamId == InvalidValue)
-        outputStreamId = i;
-    }
   }
 
   if (outputStreamCount > 1 && m_pipelineState->enableXfb()) {
@@ -291,7 +285,7 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
       auto switchInst = builder.CreateSwitch(streamId, endBlock, outputStreamCount);
 
       for (unsigned streamId = 0; streamId < MaxGsStreams; ++streamId) {
-        if (resUsage->inOutUsage.gs.outLocCount[streamId] > 0) {
+        if (m_pipelineState->isVertexStreamActive(streamId)) {
           std::string blockName = ".stream" + std::to_string(streamId);
           BasicBlock *streamBlock = BasicBlock::Create(*m_context, blockName, entryPoint, endBlock);
           builder.SetInsertPoint(streamBlock);
@@ -304,7 +298,7 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
       }
     } else {
       // NOTE: If NGG, the copy shader with stream-out is not a real HW VS and will be incorporated into NGG
-      // primitive shader later. Therefore, there is no multiple HW executions.
+      // primitive shader later. Therefore, there are no multiple HW executions.
 
       //
       // copyShader() {
@@ -321,14 +315,14 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
       assert(gfxIp.major >= 11); // Must be GFX11+
 
       for (unsigned streamId = 0; streamId < MaxGsStreams; ++streamId) {
-        if (resUsage->inOutUsage.gs.outLocCount[streamId] > 0)
+        if (m_pipelineState->isVertexStreamActive(streamId))
           exportOutput(streamId, builder);
       }
       builder.CreateBr(endBlock);
     }
   } else {
-    outputStreamId = outputStreamCount == 0 ? 0 : outputStreamId;
-    exportOutput(outputStreamId, builder);
+    // Just export outputs of rasterization stream
+    exportOutput(m_pipelineState->getRasterizerState().rasterStream, builder);
     builder.CreateBr(endBlock);
   }
 

@@ -46,6 +46,10 @@ using namespace llvm;
 Instruction *BuilderImpl::CreateEmitVertex(unsigned streamId) {
   assert(m_shaderStage == ShaderStageGeometry);
 
+  // Mark this vertex stream as active if transform feedback is enabled or this is the rasterization stream.
+  if (m_pipelineState->enableXfb() || m_pipelineState->getRasterizerState().rasterStream == streamId)
+    m_pipelineState->setVertexStreamActive(streamId);
+
   // Get GsWaveId
   std::string callName = lgcName::InputImportBuiltIn;
   callName += "GsWaveId.i32.i32";
@@ -63,6 +67,10 @@ Instruction *BuilderImpl::CreateEmitVertex(unsigned streamId) {
 // @param streamId : Stream number, 0 if only one stream is present
 Instruction *BuilderImpl::CreateEndPrimitive(unsigned streamId) {
   assert(m_shaderStage == ShaderStageGeometry);
+
+  // Mark this vertex stream as active if transform feedback is enabled or this is the rasterization stream.
+  if (m_pipelineState->enableXfb() || m_pipelineState->getRasterizerState().rasterStream == streamId)
+    m_pipelineState->setVertexStreamActive(streamId);
 
   // Get GsWaveId
   std::string callName = lgcName::InputImportBuiltIn;
