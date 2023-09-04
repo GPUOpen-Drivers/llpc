@@ -33,6 +33,7 @@
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
 #include "lgc/builder/BuilderReplayer.h"
+#include "lgc/patch/Continufy.h"
 #include "lgc/patch/FragColorExport.h"
 #include "lgc/patch/LowerDebugPrintf.h"
 #include "lgc/patch/PatchBufferOp.h"

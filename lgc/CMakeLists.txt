@@ -201,6 +201,7 @@ target_sources(LLVMlgc PRIVATE
 # lgc/patch
 target_sources(LLVMlgc PRIVATE
     patch/ConfigBuilderBase.cpp
+    patch/Continufy.cpp
     patch/FragColorExport.cpp
     patch/Gfx6Chip.cpp
     patch/Gfx6ConfigBuilder.cpp
@@ -275,4 +276,4 @@ if (LLPC_BUILD_TESTS)
   add_subdirectory(unittests)
 endif()
 
-target_link_libraries(LLVMlgc PRIVATE LLVMLgcCps)
+target_link_libraries(LLVMlgc PRIVATE LLVMLgcCps LLVMLgcRt)
