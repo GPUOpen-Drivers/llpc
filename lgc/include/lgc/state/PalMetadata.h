@@ -169,6 +169,9 @@ public:
   // Updates the CB shader mask information that depends on the exports.
   void updateCbShaderMask(llvm::ArrayRef<ColorExportInfo> exps);
 
+  // Updates the DB shader control that depends on the CB state.
+  void updateDbShaderControl();
+
   // Sets the finalized 128-bit cache hash.  The version identifies the version of LLPC used to generate the hash.
   void setFinalized128BitCacheHash(const lgc::Hash128 &finalizedCacheHash, const llvm::VersionTuple &version);
 

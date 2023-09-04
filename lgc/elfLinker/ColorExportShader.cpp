@@ -195,4 +195,5 @@ void ColorExportShader::updatePalMetadata(PalMetadata &palMetadata) {
 
   palMetadata.updateSpiShaderColFormat(finalExportFormats);
   palMetadata.updateCbShaderMask(m_exports);
+  palMetadata.updateDbShaderControl();
 }
