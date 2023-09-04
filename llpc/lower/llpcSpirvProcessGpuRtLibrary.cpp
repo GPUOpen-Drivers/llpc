@@ -355,7 +355,6 @@ void SpirvProcessGpuRtLibrary::createConvertF32toF16WithRoundingMode(Function *f
 // Create function to do the float op with the round Mode.
 //
 // @param func : The function to process
-// 
 void SpirvProcessGpuRtLibrary::createFloatOpWithRoundMode(Function *func) {
 
   enum OperationType : uint32_t { Add = 0, Sub, Mul };
