@@ -85,5 +85,6 @@ private:
   void createDispatchRayIndex(llvm::Function *func);
   void createGetStaticId(llvm::Function *func);
   llvm::Value *createGetBvhSrd(llvm::Value *expansion, llvm::Value *boxSortMode);
+  void createFloatOpWithRoundMode(llvm::Function *func);
 };
 } // namespace Llpc

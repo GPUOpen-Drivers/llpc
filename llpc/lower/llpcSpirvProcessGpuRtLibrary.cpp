@@ -104,6 +104,8 @@ SpirvProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
   m_libFuncPtrs["AmdTraceRaySetParentId"] = &SpirvProcessGpuRtLibrary::createSetParentId;
   m_libFuncPtrs["AmdTraceRayDispatchRaysIndex"] = &SpirvProcessGpuRtLibrary::createDispatchRayIndex;
   m_libFuncPtrs["AmdTraceRayGetStaticId"] = &SpirvProcessGpuRtLibrary::createGetStaticId;
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_FloatOpWithRoundMode"] =
+      &SpirvProcessGpuRtLibrary::createFloatOpWithRoundMode;
 }
 
 // =====================================================================================================================
@@ -347,6 +349,93 @@ void SpirvProcessGpuRtLibrary::createConvertF32toF16WithRoundingMode(Function *f
   result = m_builder->CreateZExt(result, FixedVectorType::get(m_builder->getInt32Ty(), 3));
 
   m_builder->CreateRet(result);
+}
+
+// =====================================================================================================================
+// Create function to do the float op with the round Mode.
+//
+// @param func : The function to process
+void SpirvProcessGpuRtLibrary::createFloatOpWithRoundMode(Function *func) {
+
+  enum OperationType : uint32_t { Add = 0, Sub, Mul };
+
+  // Use setReg to set SQ_WAVE_MODE.
+  // hwRegId : SQ related register index.
+  // Offset : register field offset.
+  // Width  : field width.
+  // hwReg : (hwRegId | (Offset << 6) | ((Width - 1) << 11)
+  constexpr uint32_t sqHwRegMode = 1;
+  constexpr uint32_t witdth = 2;
+  constexpr uint32_t offset = 0;
+  uint32_t hwReg = ((sqHwRegMode) | (offset << 6) | ((witdth - 1) << 11));
+
+  uint32_t rm;
+  uint32_t op;
+  auto retType = cast<FixedVectorType>(func->getReturnType());
+  Value *result = PoisonValue::get(retType);
+
+  // Try to get the op and roundMode through the store intrinsic directly.
+  SmallVector<CallInst *> callsToBeRemoved;
+  for (auto user : func->users()) {
+    assert(isa<CallInst>(user));
+    auto call = cast<CallInst>(user);
+
+    // Get all the calls, the calls args(round mode & float op) only be used in:
+    // 1. This func call.
+    // 2. Store intrinsic call.
+    assert(call->getArgOperand(0)->getNumUses() == 2);
+    assert(call->getArgOperand(1)->getNumUses() == 2);
+
+    // Get the roundMode from StoreInst directly.
+    for (auto argUsers : call->getArgOperand(0)->users()) {
+      if (isa<StoreInst>(argUsers)) {
+        auto store = cast<StoreInst>(argUsers);
+        rm = cast<ConstantInt>(store->getOperand(0))->getZExtValue();
+      }
+    }
+
+    // Get the op type from StoreInst directly.
+    for (auto argUsers : call->getArgOperand(1)->users()) {
+      if (isa<StoreInst>(argUsers)) {
+        auto store = cast<StoreInst>(argUsers);
+        op = cast<ConstantInt>(store->getOperand(0))->getZExtValue();
+      }
+    }
+    m_builder->SetInsertPoint(call);
+
+    // Save the current roundMode.
+    Value *tmpRoundMode = m_builder->CreateNamedCall(
+        "llvm.amdgcn.s.getreg", IntegerType::get(m_builder->getContext(), 32), {m_builder->getInt32(hwReg)}, {});
+
+    m_builder->CreateNamedCall("llvm.amdgcn.s.setreg", Type::getVoidTy(m_builder->getContext()),
+                               {m_builder->getInt32(hwReg), m_builder->getInt32(rm)}, {});
+
+    auto src0 = m_builder->CreateLoad(retType, call->getArgOperand(2));
+    auto src1 = m_builder->CreateLoad(retType, call->getArgOperand(3));
+
+    if (op == OperationType::Add)
+      result = m_builder->CreateFAdd(src0, src1);
+    else if (op == OperationType::Sub)
+      result = m_builder->CreateFSub(src0, src1);
+    else
+      result = m_builder->CreateFMul(src0, src1);
+
+    // Restore the roundMode.
+    m_builder->CreateNamedCall("llvm.amdgcn.s.setreg", Type::getVoidTy(m_builder->getContext()),
+                               {m_builder->getInt32(hwReg), tmpRoundMode}, {});
+
+    // Replace all the calls with the op & roundMode result.
+    call->replaceAllUsesWith(result);
+    callsToBeRemoved.push_back(call);
+  }
+
+  for (auto call : callsToBeRemoved) {
+    call->dropAllReferences();
+    call->eraseFromParent();
+  }
+
+  m_builder->SetInsertPoint(&func->getEntryBlock());
+  m_builder->CreateRetVoid();
 }
 
 // =====================================================================================================================
