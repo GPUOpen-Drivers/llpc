@@ -1545,47 +1545,60 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
   if (userDataUsage->usesStreamOutTable || userDataUsage->isSpecialUserDataUsed(UserDataMapping::StreamOutTable)) {
     if (enableNgg || !m_pipelineState->hasShaderStage(ShaderStageCopyShader) && m_pipelineState->enableXfb()) {
       // If no NGG, stream out table will be set to copy shader's user data entry, we should not set it duplicately.
+      unsigned *tablePtr = nullptr;
+
       switch (m_shaderStage) {
       case ShaderStageVertex:
-        userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "streamOutTable", UserDataMapping::StreamOutTable,
-                                           &intfData->entryArgIdxs.vs.streamOutData.tablePtr));
-        if (m_pipelineState->enableSwXfb()) {
-          // NOTE: For GFX11+, the SW stream-out needs an additional special user data SGPR to store the
-          // stream-out control buffer address.
-          specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "streamOutControlBuf",
-                                                    UserDataMapping::StreamOutControlBuf,
-                                                    &intfData->entryArgIdxs.vs.streamOutData.controlBufPtr));
-        }
+        tablePtr = &intfData->entryArgIdxs.vs.streamOutData.tablePtr;
         break;
       case ShaderStageTessEval:
-        userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "streamOutTable", UserDataMapping::StreamOutTable,
-                                           &intfData->entryArgIdxs.tes.streamOutData.tablePtr));
-        if (m_pipelineState->enableSwXfb()) {
-          // NOTE: For GFX11+, the SW stream-out needs an additional special user data SGPR to store the
-          // stream-out control buffer address.
-          specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "streamOutControlBuf",
-                                                    UserDataMapping::StreamOutControlBuf,
-                                                    &intfData->entryArgIdxs.tes.streamOutData.controlBufPtr));
-        }
+        tablePtr = &intfData->entryArgIdxs.tes.streamOutData.tablePtr;
         break;
       case ShaderStageGeometry:
-        if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 10) {
+        if (m_pipelineState->enableSwXfb()) {
+          tablePtr = &intfData->entryArgIdxs.gs.streamOutData.tablePtr;
+        } else {
+          assert(m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 10);
           // Allocate dummy stream-out register for geometry shader
           userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "dummyStreamOut"));
-        } else if (m_pipelineState->enableSwXfb()) {
-          userDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "streamOutTable", UserDataMapping::StreamOutTable,
-                                             &intfData->entryArgIdxs.gs.streamOutData.tablePtr));
-          // NOTE: For GFX11+, the SW stream-out needs an additional special user data SGPR to store the
-          // stream-out control buffer address.
-          specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "streamOutControlBuf",
-                                                    UserDataMapping::StreamOutControlBuf,
-                                                    &intfData->entryArgIdxs.gs.streamOutData.controlBufPtr));
         }
+
         break;
       default:
         llvm_unreachable("Should never be called!");
         break;
       }
+
+      if (tablePtr) {
+        userDataArgs.push_back(
+            UserDataArg(builder.getInt32Ty(), "streamOutTable", UserDataMapping::StreamOutTable, tablePtr));
+      }
+    }
+  }
+
+  // NOTE: For GFX11+, the SW stream-out needs an additional special user data SGPR to store the stream-out control
+  // buffer address.
+  if (m_pipelineState->enableSwXfb()) {
+    unsigned *controlBufPtr = nullptr;
+
+    switch (m_shaderStage) {
+    case ShaderStageVertex:
+      controlBufPtr = &intfData->entryArgIdxs.vs.streamOutData.controlBufPtr;
+      break;
+    case ShaderStageTessEval:
+      controlBufPtr = &intfData->entryArgIdxs.tes.streamOutData.controlBufPtr;
+      break;
+    case ShaderStageGeometry:
+      controlBufPtr = &intfData->entryArgIdxs.gs.streamOutData.controlBufPtr;
+      break;
+    default:
+      // Ignore other shader stages
+      break;
+    }
+
+    if (controlBufPtr) {
+      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "streamOutControlBuf",
+                                                UserDataMapping::StreamOutControlBuf, controlBufPtr));
     }
   }
 }
