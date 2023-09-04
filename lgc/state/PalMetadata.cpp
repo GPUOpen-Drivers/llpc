@@ -1120,10 +1120,10 @@ void PalMetadata::updateDbShaderControl() {
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) {
     if (m_pipelineState->useRegisterFieldFormat()) {
       auto dbShaderControl = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
-                                  .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl]
-                                  .getMap(true);
+                                 .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl]
+                                 .getMap(true);
       dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] =
-        !m_pipelineState->getColorExportState().alphaToCoverageEnable;
+          !m_pipelineState->getColorExportState().alphaToCoverageEnable;
     } else {
       DB_SHADER_CONTROL dbShaderControl = {};
       dbShaderControl.u32All = getRegister(mmDB_SHADER_CONTROL);
