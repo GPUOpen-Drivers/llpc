@@ -1973,9 +1973,9 @@ std::unique_ptr<Module> Compiler::createGpurtShaderLibrary(Context *context) {
   shaderInfo.pEntryTarget = Vkgc::getEntryPointNameFromSpirvBinary(&rtState->gpurtShaderLibrary);
   shaderInfo.pModuleData = &moduleData;
 
-  // Disable fast math Contract when there is no hardware intersectRay
+  // Disable fast math contract on OpDot when there is no hardware intersectRay
   bool hwIntersectRay = rtState->bvhResDesc.dataSizeInDwords > 0;
-  shaderInfo.options.noContract = !hwIntersectRay;
+  shaderInfo.options.noContractOpDot = !hwIntersectRay;
 
   auto module = std::make_unique<Module>(RtName::TraceRayKHR, *context);
   context->setModuleTargetMachine(module.get());

@@ -45,10 +45,10 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 65
+#define LLPC_INTERFACE_MAJOR_VERSION 66
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 1
+#define LLPC_INTERFACE_MINOR_VERSION 0
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -79,6 +79,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     66.0 | Rename noContract in PipelineShaderOptions to noContractOpDot
 //  |     65.1 | Add disableSampleMask to PipelineOptions                                                              |
 //  |     65.0 | Remove updateDescInElf                                                                                |
 //  |     64.0 | Add enableColorExportShader to GraphicsPipelineBuildInfo.                                             |
@@ -796,8 +797,8 @@ struct PipelineShaderOptions {
   /// Threshold to use for loops with "DontUnroll" hint (0 = use llvm.llop.unroll.disable).
   unsigned dontUnrollHintThreshold;
 
-  /// Whether fastmath contract could be disabled
-  bool noContract;
+  /// Whether fastmath contract could be disabled on Dot operations.
+  bool noContractOpDot;
 
   /// The enabled fast math flags (0 = depends on input language).
   unsigned fastMathFlags;

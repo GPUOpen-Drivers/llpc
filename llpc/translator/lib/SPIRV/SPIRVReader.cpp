@@ -4680,7 +4680,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpOuterProduct>(SPIRVValue 
 //
 // @param spvValue : A SPIR-V value.
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpDot>(SPIRVValue *const spvValue) {
-  if (m_shaderOptions->noContract) {
+  if (m_shaderOptions->noContractOpDot) {
     auto fmf = getBuilder()->getFastMathFlags();
     fmf.setAllowContract(false);
     getBuilder()->setFastMathFlags(fmf);
