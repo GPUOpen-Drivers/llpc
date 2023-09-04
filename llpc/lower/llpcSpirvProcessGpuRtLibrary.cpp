@@ -356,7 +356,28 @@ void SpirvProcessGpuRtLibrary::createConvertF32toF16WithRoundingMode(Function *f
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createFloatOpWithRoundMode(Function *func) {
-
+  // void AmdExtD3DShaderIntrinsics_FloatOpWithRoundMode(uint roundMode, uint operation, float src0, float src1))
+  // {
+  //     switch (roundMode)
+  //     {
+  //         case AmdExtD3DShaderIntrinsicsFloatOpWithRoundMode_TiesToEven:
+  //             dest.SetRoundMode(RTE);
+  //             switch (operation)
+  //             {
+  //                 case AmdExtD3DShaderIntrinsicsFloatOpWithRoundMode_Add:
+  //                     dest = src0 + src1
+  //                     break;
+  //                 case AmdExtD3DShaderIntrinsicsFloatOpWithRoundMode_Subtract:
+  //                     dest = src0 - src1
+  //                     break;
+  //                 ...
+  //             }
+  //             break;
+  //         case AmdExtD3DShaderIntrinsicsFloatOpWithRoundMode_TowardPositive:
+  //             dest.SetRoundMode(RTP);
+  //             ...
+  //     }
+  // }
   enum OperationType : uint32_t { Add = 0, Sub, Mul };
 
   // Use setReg to set SQ_WAVE_MODE.
@@ -367,78 +388,68 @@ void SpirvProcessGpuRtLibrary::createFloatOpWithRoundMode(Function *func) {
   constexpr uint32_t sqHwRegMode = 1;
   constexpr uint32_t witdth = 2;
   constexpr uint32_t offset = 0;
-  uint32_t hwReg = ((sqHwRegMode) | (offset << 6) | ((witdth - 1) << 11));
+  uint32_t hwRegField = ((sqHwRegMode) | (offset << 6) | ((witdth - 1) << 11));
 
-  uint32_t rm;
-  uint32_t op;
+  auto int32Ty = m_builder->getInt32Ty();
   auto retType = cast<FixedVectorType>(func->getReturnType());
-  Value *result = PoisonValue::get(retType);
+  auto argIt = func->arg_begin();
+  Value *roundMode = m_builder->CreateLoad(int32Ty, argIt++);
+  Value *operation = m_builder->CreateLoad(int32Ty, argIt++);
+  Value *src0 = m_builder->CreateLoad(retType, argIt++);
+  Value *src1 = m_builder->CreateLoad(retType, argIt);
 
-  // Try to get the op and roundMode through the store intrinsic directly.
-  // Note : we avoid the switch-case for checking the round mode and op type here,
-  // because these args are constant value in SPV code, so just get them from the used calls directly,
-  // and then replace all uesed calls with the operation.
-  SmallVector<CallInst *> callsToBeRemoved;
-  for (auto user : func->users()) {
-    assert(isa<CallInst>(user));
-    auto call = cast<CallInst>(user);
+  // Save the current roundMode.
+  Value *tmpRoundMode = m_builder->CreateNamedCall(
+      "llvm.amdgcn.s.getreg", IntegerType::get(m_builder->getContext(), 32), {m_builder->getInt32(hwRegField)}, {});
 
-    // Get all the calls, the calls args(round mode & float op) only be used in:
-    // 1. This func call.
-    // 2. Store intrinsic call.
-    assert(call->getArgOperand(0)->getNumUses() == 2);
-    assert(call->getArgOperand(1)->getNumUses() == 2);
+  auto rmDefault = BasicBlock::Create(*m_context, ".rmDefault", func, nullptr);
+  auto opBlock = BasicBlock::Create(*m_context, ".opBlock", func, nullptr);
+  auto opDefault = BasicBlock::Create(*m_context, ".opDefault", func, nullptr);
+  auto rmSwitch = m_builder->CreateSwitch(roundMode, rmDefault);
 
-    // Get the roundMode from StoreInst directly.
-    for (auto argUsers : call->getArgOperand(0)->users()) {
-      if (isa<StoreInst>(argUsers)) {
-        auto store = cast<StoreInst>(argUsers);
-        rm = cast<ConstantInt>(store->getOperand(0))->getZExtValue();
-      }
-    }
-
-    // Get the op type from StoreInst directly.
-    for (auto argUsers : call->getArgOperand(1)->users()) {
-      if (isa<StoreInst>(argUsers)) {
-        auto store = cast<StoreInst>(argUsers);
-        op = cast<ConstantInt>(store->getOperand(0))->getZExtValue();
-      }
-    }
-    m_builder->SetInsertPoint(call);
-
-    // Save the current roundMode.
-    Value *tmpRoundMode = m_builder->CreateNamedCall(
-        "llvm.amdgcn.s.getreg", IntegerType::get(m_builder->getContext(), 32), {m_builder->getInt32(hwReg)}, {});
-
+  for (uint32_t rm = static_cast<uint32_t>(RoundingMode::TowardZero);
+       rm <= static_cast<uint32_t>(RoundingMode::TowardNegative); rm++) {
+    std::string blockName = ".roundMode" + std::to_string(rm);
+    auto roundBlock = BasicBlock::Create(*m_context, blockName, func, rmDefault);
+    m_builder->SetInsertPoint(roundBlock);
+    rmSwitch->addCase(m_builder->getInt32(rm), roundBlock);
     m_builder->CreateNamedCall("llvm.amdgcn.s.setreg", Type::getVoidTy(m_builder->getContext()),
-                               {m_builder->getInt32(hwReg), m_builder->getInt32(rm)}, {});
+                               {m_builder->getInt32(hwRegField), m_builder->getInt32(rm)}, {});
+    m_builder->CreateBr(opBlock);
+  }
+  m_builder->SetInsertPoint(rmDefault);
+  m_builder->CreateBr(opBlock);
 
-    auto src0 = m_builder->CreateLoad(retType, call->getArgOperand(2));
-    auto src1 = m_builder->CreateLoad(retType, call->getArgOperand(3));
-
-    if (op == OperationType::Add)
+  m_builder->SetInsertPoint(opBlock);
+  auto opSwitch = m_builder->CreateSwitch(operation, opDefault);
+  for (uint32_t op = OperationType::Add; op <= OperationType::Mul; op++) {
+    std::string blockName = ".opMode" + std::to_string(op);
+    auto opMode = BasicBlock::Create(*m_context, blockName, func, opDefault);
+    m_builder->SetInsertPoint(opMode);
+    opSwitch->addCase(m_builder->getInt32(op), opMode);
+    Value *result = PoisonValue::get(retType);
+    if (op == OperationType::Add) {
       result = m_builder->CreateFAdd(src0, src1);
-    else if (op == OperationType::Sub)
+      // Restore the roundMode.
+      m_builder->CreateNamedCall("llvm.amdgcn.s.setreg", Type::getVoidTy(m_builder->getContext()),
+                                 {m_builder->getInt32(hwRegField), tmpRoundMode}, {});
+      m_builder->CreateRet(result);
+    } else if (op == OperationType::Sub) {
       result = m_builder->CreateFSub(src0, src1);
-    else
+      // Restore the roundMode.
+      m_builder->CreateNamedCall("llvm.amdgcn.s.setreg", Type::getVoidTy(m_builder->getContext()),
+                                 {m_builder->getInt32(hwRegField), tmpRoundMode}, {});
+      m_builder->CreateRet(result);
+    } else {
       result = m_builder->CreateFMul(src0, src1);
-
-    // Restore the roundMode.
-    m_builder->CreateNamedCall("llvm.amdgcn.s.setreg", Type::getVoidTy(m_builder->getContext()),
-                               {m_builder->getInt32(hwReg), tmpRoundMode}, {});
-
-    // Replace all the calls with the op & roundMode result.
-    call->replaceAllUsesWith(result);
-    callsToBeRemoved.push_back(call);
+      // Restore the roundMode.
+      m_builder->CreateNamedCall("llvm.amdgcn.s.setreg", Type::getVoidTy(m_builder->getContext()),
+                                 {m_builder->getInt32(hwRegField), tmpRoundMode}, {});
+      m_builder->CreateRet(result);
+    }
   }
-
-  for (auto call : callsToBeRemoved) {
-    call->dropAllReferences();
-    call->eraseFromParent();
-  }
-
-  func->dropAllReferences();
-  func->eraseFromParent();
+  m_builder->SetInsertPoint(opDefault);
+  m_builder->CreateRet(PoisonValue::get(retType));
 }
 
 // =====================================================================================================================
