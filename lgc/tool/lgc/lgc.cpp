@@ -184,7 +184,7 @@ int main(int argc, char **argv) {
   LgcContext::initialize();
 
   LLVMContext context;
-  auto dialectContext = llvm_dialects::DialectContext::make<LgcDialect>(context);
+  auto dialectContext = llvm_dialects::DialectContext::make<LgcDialect, lgc::cps::LgcCpsDialect>(context);
 
   // Set our category on options that we want to show in -help, and hide other options.
   auto opts = cl::getRegisteredOptions();
