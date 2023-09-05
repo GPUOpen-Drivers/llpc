@@ -2206,6 +2206,19 @@ Result Compiler::buildRayTracingPipelineElf(Context *context, std::unique_ptr<Mo
     shaderProp.shaderIdExtraBits = 0;
   }
 
+  auto options = pipeline->getOptions();
+  MetroHash64 hasher;
+  MetroHash::Hash hash = {};
+  hasher.Update(options.hash[1]);
+  hasher.Update(moduleIndex);
+  hasher.Finalize(hash.bytes);
+  options.hash[1] = MetroHash::compact64(&hash);
+
+  if (static_cast<const RayTracingContext *>(context->getPipelineContext())->getIndirectStageMask() == 0)
+    options.rtIndirectMode = lgc::RayTracingIndirectMode::NotIndirect;
+
+  pipeline->setOptions(options);
+
   generatePipeline(context, moduleIndex, std::move(module), pipelineElf, pipeline.get(), timerProfiler);
 
   if (moduleIndex > 0)
@@ -2226,15 +2239,6 @@ Result Compiler::generatePipeline(Context *context, unsigned moduleIndex, std::u
                                   ElfPackage &pipelineElf, Pipeline *pipeline, TimerProfiler &timerProfiler) {
   // Generate pipeline.
   std::unique_ptr<Module> pipelineModule;
-
-  auto options = pipeline->getOptions();
-  MetroHash64 hasher;
-  MetroHash::Hash hash = {};
-  hasher.Update(options.hash[1]);
-  hasher.Update(moduleIndex);
-  hasher.Finalize(hash.bytes);
-  options.hash[1] = MetroHash::compact64(&hash);
-  pipeline->setOptions(options);
 
   pipelineModule.reset(pipeline->irLink(module.release(), context->getPipelineContext()->isUnlinked()
                                                               ? PipelineLink::Unlinked
