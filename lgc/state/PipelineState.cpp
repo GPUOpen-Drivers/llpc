@@ -1899,22 +1899,24 @@ PrimitiveType PipelineState::getPrimitiveType() {
 void PipelineState::setXfbStateMetadata(Module *module) {
   // Read XFB state metadata
   for (auto &func : *module) {
-    if (isShaderEntryPoint(&func)) {
-      MDNode *xfbStateMetaNode = func.getMetadata(XfbStateMetadataName);
-      if (xfbStateMetaNode) {
-        m_xfbStateMetadata.enableXfb = true;
-        auto &streamXfbBuffers = m_xfbStateMetadata.streamXfbBuffers;
-        auto &xfbStrides = m_xfbStateMetadata.xfbStrides;
-        for (unsigned xfbBuffer = 0; xfbBuffer < MaxTransformFeedbackBuffers; ++xfbBuffer) {
-          // Get the vertex streamId from metadata
-          auto metaOp = cast<ConstantAsMetadata>(xfbStateMetaNode->getOperand(2 * xfbBuffer));
-          int streamId = cast<ConstantInt>(metaOp->getValue())->getSExtValue();
-          if (streamId != InvalidValue)
-            streamXfbBuffers[streamId] |= 1 << xfbBuffer; // Bit mask of used xfbBuffers in a stream
-          // Get the stride from metadata
-          metaOp = cast<ConstantAsMetadata>(xfbStateMetaNode->getOperand(2 * xfbBuffer + 1));
-          xfbStrides[xfbBuffer] = cast<ConstantInt>(metaOp->getValue())->getZExtValue();
-        }
+    if (!isShaderEntryPoint(&func))
+      continue;
+    if (getShaderStage(&func) != getLastVertexProcessingStage())
+      continue;
+    MDNode *xfbStateMetaNode = func.getMetadata(XfbStateMetadataName);
+    if (xfbStateMetaNode) {
+      m_xfbStateMetadata.enableXfb = true;
+      auto &streamXfbBuffers = m_xfbStateMetadata.streamXfbBuffers;
+      auto &xfbStrides = m_xfbStateMetadata.xfbStrides;
+      for (unsigned xfbBuffer = 0; xfbBuffer < MaxTransformFeedbackBuffers; ++xfbBuffer) {
+        // Get the vertex streamId from metadata
+        auto metaOp = cast<ConstantAsMetadata>(xfbStateMetaNode->getOperand(2 * xfbBuffer));
+        int streamId = cast<ConstantInt>(metaOp->getValue())->getSExtValue();
+        if (streamId != InvalidValue)
+          streamXfbBuffers[streamId] |= 1 << xfbBuffer; // Bit mask of used xfbBuffers in a stream
+        // Get the stride from metadata
+        metaOp = cast<ConstantAsMetadata>(xfbStateMetaNode->getOperand(2 * xfbBuffer + 1));
+        xfbStrides[xfbBuffer] = cast<ConstantInt>(metaOp->getValue())->getZExtValue();
       }
     }
   }
