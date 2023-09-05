@@ -47,7 +47,6 @@ protected:
   void init(llvm::Module &module);
 
   void flushDenormIfNeeded(llvm::Instruction *inst);
-  bool isOperandNoContract(llvm::Value *operand);
 
   bool m_changed;         // Whether the module is changed
   bool m_fp16DenormFlush; // Whether FP mode wants f16 denorms to be flushed to zero

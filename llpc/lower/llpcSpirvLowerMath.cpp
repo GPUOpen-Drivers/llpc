@@ -101,27 +101,6 @@ void SpirvLowerMath::flushDenormIfNeeded(Instruction *inst) {
 }
 
 // =====================================================================================================================
-// Recursively finds backward if the FPMathOperator operand does not specify "contract" flag.
-//
-// @param operand : Operand to check
-bool SpirvLowerMath::isOperandNoContract(Value *operand) {
-  if (isa<BinaryOperator>(operand)) {
-    auto inst = dyn_cast<BinaryOperator>(operand);
-
-    if (isa<FPMathOperator>(operand)) {
-      auto fastMathFlags = inst->getFastMathFlags();
-      bool allowContract = fastMathFlags.allowContract();
-      if (fastMathFlags.any() && !allowContract)
-        return true;
-    }
-
-    for (auto opIt = inst->op_begin(), end = inst->op_end(); opIt != end; ++opIt)
-      return isOperandNoContract(*opIt);
-  }
-  return false;
-}
-
-// =====================================================================================================================
 // Disable fast math for all values related with the specified value
 //
 // @param value : Value to disable fast math for
@@ -355,24 +334,10 @@ void SpirvLowerMathFloatOp::visitBinaryOperator(BinaryOperator &binaryOp) {
       isa<ConstantAggregateZero>(src2) || (isa<ConstantFP>(src2) && cast<ConstantFP>(src2)->isZero());
   Value *dest = nullptr;
 
-  if (opCode == Instruction::FAdd) {
-    // Recursively find backward if the operand "does not" specify contract flags
-    auto fastMathFlags = binaryOp.getFastMathFlags();
-    if (fastMathFlags.allowContract()) {
-      bool hasNoContract = isOperandNoContract(src1) || isOperandNoContract(src2);
-      bool allowContract = !hasNoContract;
-
-      // Reassociation and contract should be same
-      fastMathFlags.setAllowReassoc(allowContract);
-      fastMathFlags.setAllowContract(allowContract);
-      binaryOp.copyFastMathFlags(fastMathFlags);
-    }
-  } else if (opCode == Instruction::FSub) {
-    if (src1IsConstZero) {
-      // NOTE: Source1 is constant zero, we might be performing FNEG operation. This will be optimized
-      // by backend compiler with sign bit reversed via XOR. Check floating-point controls.
-      flushDenormIfNeeded(&binaryOp);
-    }
+  if (opCode == Instruction::FSub && src1IsConstZero) {
+    // NOTE: Source1 is constant zero, we might be performing FNEG operation. This will be optimized
+    // by backend compiler with sign bit reversed via XOR. Check floating-point controls.
+    flushDenormIfNeeded(&binaryOp);
   }
 
   // NOTE: We can't do constant folding for the following floating operations if we have floating-point controls that
