@@ -58,6 +58,7 @@ void RegisterMetadataBuilder::buildPalMetadata() {
       m_isNggMode = m_pipelineState->getNggControl()->enableNgg;
 
     Util::Abi::PipelineType pipelineType = Util::Abi::PipelineType::VsPs;
+    auto lastVertexProcessingStage = m_pipelineState->getLastVertexProcessingStage();
 
     DenseMap<unsigned, unsigned> apiHwShaderMap;
     if (m_hasTask || m_hasMesh) {
@@ -81,7 +82,7 @@ void RegisterMetadataBuilder::buildPalMetadata() {
         if (m_hasVs)
           apiHwShaderMap[ShaderStageVertex] = Util::Abi::HwShaderHs;
       }
-      auto lastVertexProcessingStage = m_pipelineState->getLastVertexProcessingStage();
+
       if (lastVertexProcessingStage != ShaderStageInvalid) {
         if (lastVertexProcessingStage == ShaderStageCopyShader)
           lastVertexProcessingStage = ShaderStageGeometry;
@@ -171,6 +172,38 @@ void RegisterMetadataBuilder::buildPalMetadata() {
 
     if (hwStageMask & (Util::Abi::HwShaderGs | Util::Abi::HwShaderVs))
       buildPaSpecificRegisters();
+
+    if (lastVertexProcessingStage != ShaderStageInvalid && m_pipelineState->isUnlinked()) {
+      // Fill ".preraster_output_semantic"
+      auto resUsage = m_pipelineState->getShaderResourceUsage(lastVertexProcessingStage);
+      auto &outputLocInfoMap = resUsage->inOutUsage.outputLocInfoMap;
+      auto &builtInOutputLocMap = resUsage->inOutUsage.builtInOutputLocMap;
+      // Collect semantic info for generic input and builtIns {gl_ClipDistance, gl_CulDistance, gl_Layer,
+      // gl_ViewportIndex} that exports via generic output as well.
+      if (!outputLocInfoMap.empty() || !builtInOutputLocMap.empty()) {
+        auto preRasterOutputSemanticNode =
+            getPipelineNode()[Util::Abi::PipelineMetadataKey::PrerasterOutputSemantic].getArray(true);
+        unsigned elemIdx = 0;
+        for (auto locInfoPair : outputLocInfoMap) {
+          auto preRasterOutputSemanticElem = preRasterOutputSemanticNode[elemIdx].getMap(true);
+          preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Semantic] =
+              MaxBuiltIn + locInfoPair.first.getLocation();
+          preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Index] =
+              locInfoPair.second.getLocation();
+          ++elemIdx;
+        }
+
+        for (auto locPair : builtInOutputLocMap) {
+          if (locPair.first == BuiltInClipDistance || locPair.first == BuiltInCullDistance ||
+              locPair.first == BuiltInLayer || locPair.first == BuiltInViewportIndex) {
+            auto preRasterOutputSemanticElem = preRasterOutputSemanticNode[elemIdx].getMap(true);
+            preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Semantic] = locPair.first;
+            preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Index] = locPair.second;
+            ++elemIdx;
+          }
+        }
+      }
+    }
 
   } else {
     addApiHwShaderMapping(ShaderStageCompute, Util::Abi::HwShaderCs);
@@ -931,6 +964,33 @@ void RegisterMetadataBuilder::buildPsRegisters() {
   cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output5Enable] = (cbShaderMask >> 20) & 0xF;
   cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output6Enable] = (cbShaderMask >> 24) & 0xF;
   cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output7Enable] = (cbShaderMask >> 28) & 0xF;
+
+  // Fill .ps_input_semantic for partial pipeline
+  if (m_pipelineState->isUnlinked()) {
+    // Collect semantic info for generic input and builtIns {gl_ClipDistance, gl_CulDistance, gl_Layer,
+    // gl_ViewportIndex} that exports via generic output as well.
+    auto &inputLocInfoMap = resUsage->inOutUsage.inputLocInfoMap;
+    auto &builtInInputLocMap = resUsage->inOutUsage.builtInInputLocMap;
+    if (!inputLocInfoMap.empty() || !builtInInputLocMap.empty()) {
+      auto psInputSemanticNode = getPipelineNode()[Util::Abi::PipelineMetadataKey::PsInputSemantic].getArray(true);
+      unsigned elemIdx = 0;
+      for (auto locInfoPair : inputLocInfoMap) {
+        auto psInputSemanticElem = psInputSemanticNode[elemIdx].getMap(true);
+        psInputSemanticElem[Util::Abi::PsInputSemanticMetadataKey::Semantic] =
+            MaxBuiltIn + locInfoPair.first.getLocation();
+        ++elemIdx;
+      }
+
+      for (auto locPair : builtInInputLocMap) {
+        if (locPair.first == BuiltInClipDistance || locPair.first == BuiltInCullDistance ||
+            locPair.first == BuiltInLayer || locPair.first == BuiltInViewportIndex) {
+          auto psInputSemanticElem = psInputSemanticNode[elemIdx].getMap(true);
+          psInputSemanticElem[Util::Abi::PsInputSemanticMetadataKey::Semantic] = locPair.first;
+          ++elemIdx;
+        }
+      }
+    }
+  }
 }
 
 // =====================================================================================================================
