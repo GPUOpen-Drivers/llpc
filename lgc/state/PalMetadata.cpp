@@ -1114,6 +1114,26 @@ void PalMetadata::updateCbShaderMask(llvm::ArrayRef<ColorExportInfo> exps) {
 }
 
 // =====================================================================================================================
+//  Updates the DB shader control that depends on the CB state.
+//
+void PalMetadata::updateDbShaderControl() {
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) {
+    if (m_pipelineState->useRegisterFieldFormat()) {
+      auto dbShaderControl = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
+                                 .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl]
+                                 .getMap(true);
+      dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] =
+          !m_pipelineState->getColorExportState().alphaToCoverageEnable;
+    } else {
+      DB_SHADER_CONTROL dbShaderControl = {};
+      dbShaderControl.u32All = getRegister(mmDB_SHADER_CONTROL);
+      dbShaderControl.bitfields.ALPHA_TO_MASK_DISABLE = !m_pipelineState->getColorExportState().alphaToCoverageEnable;
+      setRegister(mmDB_SHADER_CONTROL, dbShaderControl.u32All);
+    }
+  }
+}
+
+// =====================================================================================================================
 // Fills the xglCacheInfo section of the PAL metadata with the given data.
 //
 // @param finalizedCacheHash : The finalized hash that will be used to look for this pipeline in caches.
