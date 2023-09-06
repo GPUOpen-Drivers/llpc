@@ -187,8 +187,15 @@ static void splitIntoI32(const DataLayout &layout, IRBuilder<> &builder, ArrayRe
       StructType *structTy = cast<StructType>(xType);
       for (unsigned idx = 0; idx < structTy->getNumElements(); idx++)
         splitIntoI32(layout, builder, builder.CreateExtractValue(x, idx), output);
-    } else if (isa<ArrayType>(xType)) {
-      llvm_unreachable("Array type not supported yet.");
+    } else if (auto *arrayTy = dyn_cast<ArrayType>(xType)) {
+      auto *elemTy = arrayTy->getElementType();
+      assert(layout.getTypeSizeInBits(elemTy) == 32 && "array of non-32bit type not supported");
+      for (unsigned idx = 0; idx < arrayTy->getNumElements(); idx++) {
+        auto *elem = builder.CreateExtractValue(x, idx);
+        if (!elemTy->isIntegerTy())
+          elem = builder.CreateBitCast(elem, builder.getInt32Ty());
+        output.push_back(elem);
+      }
     } else if (auto *vecTy = dyn_cast<FixedVectorType>(xType)) {
       Type *scalarTy = vecTy->getElementType();
       assert((scalarTy->getPrimitiveSizeInBits() & 0x3) == 0);
