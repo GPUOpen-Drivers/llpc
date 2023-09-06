@@ -88,6 +88,8 @@ SpirvProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
 #else
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_IntersectInternal"] = &SpirvProcessGpuRtLibrary::createIntersectBvh;
 #endif
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_FloatOpWithRoundMode"] =
+      &SpirvProcessGpuRtLibrary::createFloatOpWithRoundMode;
   m_libFuncPtrs["AmdTraceRaySampleGpuTimer"] = &SpirvProcessGpuRtLibrary::createSampleGpuTimer;
   m_libFuncPtrs["AmdTraceRayGetFlattenedGroupThreadId"] = &SpirvProcessGpuRtLibrary::createGetFlattenedGroupThreadId;
   m_libFuncPtrs["AmdTraceRayGetHitAttributes"] = &SpirvProcessGpuRtLibrary::createGetHitAttributes;
@@ -104,8 +106,6 @@ SpirvProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
   m_libFuncPtrs["AmdTraceRaySetParentId"] = &SpirvProcessGpuRtLibrary::createSetParentId;
   m_libFuncPtrs["AmdTraceRayDispatchRaysIndex"] = &SpirvProcessGpuRtLibrary::createDispatchRayIndex;
   m_libFuncPtrs["AmdTraceRayGetStaticId"] = &SpirvProcessGpuRtLibrary::createGetStaticId;
-  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_FloatOpWithRoundMode"] =
-      &SpirvProcessGpuRtLibrary::createFloatOpWithRoundMode;
 }
 
 // =====================================================================================================================
@@ -379,17 +379,6 @@ void SpirvProcessGpuRtLibrary::createFloatOpWithRoundMode(Function *func) {
   //     }
   // }
   enum OperationType : uint32_t { Add = 0, Sub, Mul };
-
-  // Use setReg to set SQ_WAVE_MODE.
-  // hwRegId : SQ related register index.
-  // Offset : register field offset.
-  // Width  : field width.
-  // hwReg : (hwRegId | (Offset << 6) | ((Width - 1) << 11)
-  constexpr uint32_t sqHwRegMode = 1;
-  constexpr uint32_t witdth = 2;
-  constexpr uint32_t offset = 0;
-  uint32_t hwRegField = ((sqHwRegMode) | (offset << 6) | ((witdth - 1) << 11));
-
   auto int32Ty = m_builder->getInt32Ty();
   auto retType = cast<FixedVectorType>(func->getReturnType());
   auto argIt = func->arg_begin();
@@ -398,12 +387,9 @@ void SpirvProcessGpuRtLibrary::createFloatOpWithRoundMode(Function *func) {
   Value *src0 = m_builder->CreateLoad(retType, argIt++);
   Value *src1 = m_builder->CreateLoad(retType, argIt);
 
-  // Save the current roundMode.
-  Value *tmpRoundMode = m_builder->CreateNamedCall(
-      "llvm.amdgcn.s.getreg", IntegerType::get(m_builder->getContext(), 32), {m_builder->getInt32(hwRegField)}, {});
+  Value *fpExcpt = MetadataAsValue::get(*m_context, MDString::get(*m_context, "fpexcept.strict"));
 
   auto rmDefault = BasicBlock::Create(*m_context, ".rmDefault", func, nullptr);
-  auto opBlock = BasicBlock::Create(*m_context, ".opBlock", func, nullptr);
   auto opDefault = BasicBlock::Create(*m_context, ".opDefault", func, nullptr);
   auto rmSwitch = m_builder->CreateSwitch(roundMode, rmDefault);
 
@@ -413,43 +399,35 @@ void SpirvProcessGpuRtLibrary::createFloatOpWithRoundMode(Function *func) {
     auto roundBlock = BasicBlock::Create(*m_context, blockName, func, rmDefault);
     m_builder->SetInsertPoint(roundBlock);
     rmSwitch->addCase(m_builder->getInt32(rm), roundBlock);
-    m_builder->CreateNamedCall("llvm.amdgcn.s.setreg", Type::getVoidTy(m_builder->getContext()),
-                               {m_builder->getInt32(hwRegField), m_builder->getInt32(rm)}, {});
-    m_builder->CreateBr(opBlock);
-  }
-  m_builder->SetInsertPoint(rmDefault);
-  m_builder->CreateBr(opBlock);
+    StringRef roundingModeStr = convertRoundingModeToStr(static_cast<RoundingMode>(rm)).value();
+    Value *roundingMode = MetadataAsValue::get(*m_context, MDString::get(*m_context, roundingModeStr));
 
-  m_builder->SetInsertPoint(opBlock);
-  auto opSwitch = m_builder->CreateSwitch(operation, opDefault);
-  for (uint32_t op = OperationType::Add; op <= OperationType::Mul; op++) {
-    std::string blockName = ".opMode" + std::to_string(op);
-    auto opMode = BasicBlock::Create(*m_context, blockName, func, opDefault);
-    m_builder->SetInsertPoint(opMode);
-    opSwitch->addCase(m_builder->getInt32(op), opMode);
-    Value *result = PoisonValue::get(retType);
-    if (op == OperationType::Add) {
-      result = m_builder->CreateFAdd(src0, src1);
-      // Restore the roundMode.
-      m_builder->CreateNamedCall("llvm.amdgcn.s.setreg", Type::getVoidTy(m_builder->getContext()),
-                                 {m_builder->getInt32(hwRegField), tmpRoundMode}, {});
-      m_builder->CreateRet(result);
-    } else if (op == OperationType::Sub) {
-      result = m_builder->CreateFSub(src0, src1);
-      // Restore the roundMode.
-      m_builder->CreateNamedCall("llvm.amdgcn.s.setreg", Type::getVoidTy(m_builder->getContext()),
-                                 {m_builder->getInt32(hwRegField), tmpRoundMode}, {});
-      m_builder->CreateRet(result);
-    } else {
-      result = m_builder->CreateFMul(src0, src1);
-      // Restore the roundMode.
-      m_builder->CreateNamedCall("llvm.amdgcn.s.setreg", Type::getVoidTy(m_builder->getContext()),
-                                 {m_builder->getInt32(hwRegField), tmpRoundMode}, {});
-      m_builder->CreateRet(result);
+    auto opSwitch = m_builder->CreateSwitch(operation, opDefault);
+    for (uint32_t op = OperationType::Add; op <= OperationType::Mul; op++) {
+      std::string blockName = ".opMode" + std::to_string(rm) + std::to_string(op);
+      auto opMode = BasicBlock::Create(*m_context, blockName, func, opDefault);
+      m_builder->SetInsertPoint(opMode);
+      opSwitch->addCase(m_builder->getInt32(op), opMode);
+      Value *result = PoisonValue::get(retType);
+      if (op == OperationType::Add) {
+        result = m_builder->CreateNamedCall("llvm.experimental.constrained.fadd", retType,
+                                            {src0, src1, roundingMode, fpExcpt}, {});
+        m_builder->CreateRet(result);
+      } else if (op == OperationType::Sub) {
+        result = m_builder->CreateNamedCall("llvm.experimental.constrained.fsub", retType,
+                                            {src0, src1, roundingMode, fpExcpt}, {});
+        m_builder->CreateRet(result);
+      } else {
+        result = m_builder->CreateNamedCall("llvm.experimental.constrained.fmul", retType,
+                                            {src0, src1, roundingMode, fpExcpt}, {});
+        m_builder->CreateRet(result);
+      }
     }
   }
+  m_builder->SetInsertPoint(rmDefault);
+  m_builder->CreateUnreachable();
   m_builder->SetInsertPoint(opDefault);
-  m_builder->CreateRet(PoisonValue::get(retType));
+  m_builder->CreateUnreachable();
 }
 
 // =====================================================================================================================
