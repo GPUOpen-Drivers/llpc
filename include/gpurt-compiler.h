@@ -92,6 +92,15 @@ struct DispatchRaysConstantData {
   unsigned profileMaxIterations;        ///< Maximum traversal iterations for profiling
   unsigned traceRayGpuVaLo;             ///< Traversal shader (shader table) base address low 32-bits
   unsigned traceRayGpuVaHi;             ///< Traversal shader (shader table) base address high 32-bits
+  unsigned counterMode;                 ///< Counter capture mode. see TraceRayCounterMode
+  unsigned counterRayIdRangeBegin;      ///< Counter capture ray ID range begin
+  unsigned counterRayIdRangeEnd;        ///< Counter capture ray ID range end
+  unsigned cpsBackendStackSize;         ///< The scratch memory used as stacks are divided into two parts:
+                                        ///<  (a) Used by a compiler backend, start at offset 0.
+  unsigned cpsFrontendStackSize; ///<  (b) Used by IR (Intermediate Representation), for a continuation passing shader.
+  unsigned cpsGlobalMemoryAddressLo; ///< Separate CPS stack memory base address low 32-bits
+  unsigned cpsGlobalMemoryAddressHi; ///< Separate CPS stack memory base address high 32-bits
+  unsigned counterMask;              ///< Mask for filtering ray history token
 };
 #pragma pack(pop)
 

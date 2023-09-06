@@ -32,6 +32,7 @@
 #include "llpcSpirvLowerRayTracing.h"
 #include "SPIRVInternal.h"
 #include "gpurt-compiler.h"
+#include "lgccps/LgcCpsDialect.h"
 #include "lgcrt/LgcRtDialect.h"
 #include "llpcContext.h"
 #include "llpcRayTracingContext.h"
@@ -1268,6 +1269,16 @@ void SpirvLowerRayTracing::createRayGenEntryFunc() {
   m_builder->SetInsertPoint(mainBlock);
   auto rayGenId = getShaderIdentifier(m_shaderStage, m_builder->getInt32(0), m_dispatchRaysInfoDesc);
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
+
+  if (rayTracingContext->getRaytracingMode() == Vkgc::LlpcRaytracingMode::Continuations) {
+    // Setup continuation stack pointer
+    auto offset = offsetof(GpuRt::DispatchRaysConstantData, cpsBackendStackSize);
+    auto gep = m_builder->CreateConstGEP1_32(m_builder->getInt8Ty(), m_dispatchRaysInfoDesc, offset);
+    Value *stackPtr = m_builder->CreateLoad(m_builder->getInt32Ty(), gep);
+    stackPtr = m_builder->CreateIntToPtr(stackPtr, PointerType::get(*m_context, lgc::cps::stackAddrSpace));
+    m_builder->create<lgc::cps::SetVspOp>(stackPtr);
+  }
+
   bool indirect = rayTracingContext->getIndirectStageMask() & shaderStageToMask(m_shaderStage);
   if (!indirect) {
     // Create Shader selection
