@@ -33,6 +33,7 @@
 #include "vkgcBase.h"
 #include "vulkan.h"
 #include <cassert>
+#include <optional>
 #include <tuple>
 
 // Confliction of Xlib and LLVM headers
@@ -215,6 +216,20 @@ static const unsigned MaxTextureCoords = 8;
 class IShaderCache;
 class ICache;
 class EntryHandle;
+
+// Hide operator bool to safe-guard against accidents.
+struct optional_bool : private std::optional<bool> {
+  optional_bool() = default;
+  optional_bool(const optional_bool &rhs) = default;
+  optional_bool &operator=(const optional_bool &rhs) = default;
+  optional_bool &operator=(bool rhs) {
+    std::optional<bool>::operator=(rhs);
+    return *this;
+  }
+  using std::optional<bool>::has_value;
+  using std::optional<bool>::value;
+  using std::optional<bool>::value_or;
+};
 
 /// Enumerates result codes of LLPC operations.
 enum class Result : int {
