@@ -55,7 +55,7 @@ static cl::opt<bool> EnableRowExport("enable-row-export", cl::desc("Enable row e
                                      cl::init(false));
 
 cl::opt<bool> UseRegisterFieldFormat("use-register-field-format", cl::desc("Use register field format in pipeline ELF"),
-                                     cl::init(true));
+                                     cl::init(false));
 
 // Names for named metadata nodes when storing and reading back pipeline state
 static const char UnlinkedMetadataName[] = "lgc.unlinked";
