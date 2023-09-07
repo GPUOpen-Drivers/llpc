@@ -32,6 +32,7 @@ set(LGC_TEST_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 # required by configure_lit_site_cfg
 set(LLVM_LIT_OUTPUT_DIR ${LLVM_TOOLS_BINARY_DIR})
+get_target_property(LIT_DEFINITIONS LLVMlgc INTERFACE_COMPILE_DEFINITIONS)
 configure_lit_site_cfg(
   ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
   ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg.py
