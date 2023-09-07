@@ -2,9 +2,7 @@
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf -gfxip=10.1.2 %s -v | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST: .spi_ps_in_control: {
-; SHADERTEST:  .num_interps: 0x0000000000000000
-; SHADERTEST:  .ps_w32_en: 0 }
+; SHADERTEST: SPI_PS_IN_CONTROL                             0x0000000000000000
 ; END_SHADERTEST
 
 [Version]

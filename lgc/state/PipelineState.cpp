@@ -323,7 +323,7 @@ ComputeShaderMode Pipeline::getComputeShaderMode(Module &module) {
 // @param emitLgc : Whether the option -emit-lgc is on
 PipelineState::PipelineState(LgcContext *builderContext, bool emitLgc)
     : Pipeline(builderContext), m_emitLgc(emitLgc), m_meshRowExport(EnableRowExport) {
-  m_registerFieldFormat = getTargetInfo().getGfxIpVersion().major >= 9 && UseRegisterFieldFormat;
+  m_registerFieldFormat = getTargetInfo().getGfxIpVersion().major >= 11 && UseRegisterFieldFormat;
 }
 
 // =====================================================================================================================

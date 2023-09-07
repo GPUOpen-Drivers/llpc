@@ -21,41 +21,9 @@
 ; SHADER_TEST: buffer_load_dword {{.*}}, {{.*}}, s[12:15], 0 offen
 ; SHADER_TEST: image_sample {{.*}}, {{.*}}, [[desc]], {{.*}} dmask:0xf
 ; SHADER_TEST: s_load_dwordx4 {{.*}}, {{.*}}, 0x10
-; SHADER_TEST: .hardware_stages:
-; SHADER_TEST:  .ps:
-; SHADER_TEST:   .user_data_reg_map:
-; SHADER_TEST:     - 0x10000000
-; SHADER_TEST:     - 0
-; SHADER_TEST:     - 0x1
-; SHADER_TEST:     - 0x6
-; SHADER_TEST:     - 0x7
-; SHADER_TEST:     - 0x10000002
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
-; SHADER_TEST:     - 0xffffffff
+; SHADER_TEST: .registers:
+; SHADER_TEST: (SPI_SHADER_USER_DATA_PS_3): 0x6
+; SHADER_TEST: (SPI_SHADER_USER_DATA_PS_4): 0x7
 
 ; ModuleID = 'lgcPipeline'
 source_filename = "lgcPipeline"
