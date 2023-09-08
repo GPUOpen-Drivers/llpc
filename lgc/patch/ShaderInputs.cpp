@@ -327,7 +327,8 @@ void ShaderInputs::gatherUsage(Module &module) {
 // Fix up uses of shader inputs to use entry args directly
 //
 // @param module : IR module
-void ShaderInputs::fixupUses(Module &module, PipelineState *pipelineState) {
+// @param computeWithIndirectCall : whether compute shader has indirect call
+void ShaderInputs::fixupUses(Module &module, PipelineState *pipelineState, bool computeWithIndirectCall) {
   // For each function definition...
   for (Function &func : module) {
     if (func.isDeclaration())
@@ -359,7 +360,9 @@ void ShaderInputs::fixupUses(Module &module, PipelineState *pipelineState) {
 
       auto inputKind = static_cast<ShaderInput>(kind);
       value->setName(getInputName(inputKind));
-      needCheckWorkgroupId = (inputKind == ShaderInput::WorkgroupId) && (stage == ShaderStageCompute);
+      // We can possibly optimize workgroupId generation for entry-point compute shader.
+      needCheckWorkgroupId = (inputKind == ShaderInput::WorkgroupId) &&
+                             (func.getCallingConv() == CallingConv::AMDGPU_CS) && !computeWithIndirectCall;
       for (Instruction *&call : inputUsage->users) {
         if (call && call->getFunction() == &func) {
           if (needCheckWorkgroupId) {
@@ -413,12 +416,12 @@ void ShaderInputs::fixupUses(Module &module, PipelineState *pipelineState) {
         break;
       }
     }
-    if (needCheckWorkgroupId) {
-      if (!useWholeWorkgroupId && !useWorkgroupIds[0])
+    if (needCheckWorkgroupId && !useWholeWorkgroupId) {
+      if (!useWorkgroupIds[0])
         func.addFnAttr("amdgpu-no-workgroup-id-x");
-      if (!useWholeWorkgroupId && !useWorkgroupIds[1])
+      if (!useWorkgroupIds[1])
         func.addFnAttr("amdgpu-no-workgroup-id-y");
-      if (!useWholeWorkgroupId && !useWorkgroupIds[2])
+      if (!useWorkgroupIds[2])
         func.addFnAttr("amdgpu-no-workgroup-id-z");
     }
   }

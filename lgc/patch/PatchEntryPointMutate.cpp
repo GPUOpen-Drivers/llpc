@@ -171,7 +171,7 @@ bool PatchEntryPointMutate::runImpl(Module &module, PipelineShadersResult &pipel
   m_userDataUsage.clear();
 
   // Fix up shader input uses to use entry args.
-  shaderInputs.fixupUses(*m_module, m_pipelineState);
+  shaderInputs.fixupUses(*m_module, m_pipelineState, isComputeWithCalls());
 
   m_cpsShaderInputCache.clear();
   return true;

@@ -998,21 +998,20 @@ void RegisterMetadataBuilder::buildPsRegisters() {
 void RegisterMetadataBuilder::buildCsRegisters(ShaderStage shaderStage) {
   assert(shaderStage == ShaderStageCompute || shaderStage == ShaderStageTask);
   if (shaderStage == ShaderStageCompute) {
-    Function *attribFunc = nullptr;
+    Function *entryFunc = nullptr;
     for (Function &func : *m_module) {
-      // Only entrypoint and amd_gfx functions may have the function attribute for workgroup id.
-      if (isShaderEntryPoint(&func) || (func.getCallingConv() == CallingConv::AMDGPU_Gfx)) {
-        attribFunc = &func;
+      // Only entrypoint compute shader may have the function attribute for workgroup id optimization.
+      if (isShaderEntryPoint(&func)) {
+        entryFunc = &func;
         break;
       }
     }
-    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidXEn] =
-        !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-x");
-    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidYEn] =
-        !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-y");
-    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidZEn] =
-        !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-z");
-
+    bool hasWorkgroupIdX = !entryFunc || !entryFunc->hasFnAttribute("amdgpu-no-workgroup-id-x");
+    bool hasWorkgroupIdY = !entryFunc || !entryFunc->hasFnAttribute("amdgpu-no-workgroup-id-y");
+    bool hasWorkgroupIdZ = !entryFunc || !entryFunc->hasFnAttribute("amdgpu-no-workgroup-id-z");
+    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidXEn] = hasWorkgroupIdX;
+    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidYEn] = hasWorkgroupIdY;
+    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidZEn] = hasWorkgroupIdZ;
   } else {
     getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidXEn] = true;
     getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidYEn] = true;
