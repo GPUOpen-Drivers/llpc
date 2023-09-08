@@ -857,6 +857,7 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
            << "\n";
   dumpFile << "options.replaceSetWithResourceType = " << options->replaceSetWithResourceType << "\n";
   dumpFile << "options.disableSampleMask = " << options->disableSampleMask << "\n";
+  dumpFile << "options.buildResourcesDataForShaderModule = " << options->buildResourcesDataForShaderModule << "\n";
 }
 
 // =====================================================================================================================

@@ -209,6 +209,10 @@ private:
   static llvm::sys::Mutex m_helperThreadMutex;  // Mutex for helper thread
   static std::condition_variable_any m_helperThreadConditionVariable; // Condition variable used by helper thread to
                                                                       // wait for main thread switching context
+
+  void buildShaderModuleResourceUsage(const ShaderModuleBuildInfo *shaderInfo, Vkgc::ResourcesNodes &resourcesNodes,
+                                      std::vector<ResourceNodeData> &inputSymbolInfo,
+                                      std::vector<ResourceNodeData> &outputSymbolInfo);
 };
 
 // Convert front-end LLPC shader stage to middle-end LGC shader stage
