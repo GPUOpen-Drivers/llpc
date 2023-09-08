@@ -62,6 +62,7 @@
 using namespace lgc;
 using namespace lgc::rt;
 using namespace llvm;
+using namespace lgc::cps;
 
 namespace Llpc {
 
@@ -69,7 +70,7 @@ namespace Llpc {
 //
 // @param gfxIp : Graphics IP version info
 Context::Context(GfxIpVersion gfxIp) : LLVMContext(), m_gfxIp(gfxIp) {
-  m_dialectContext = llvm_dialects::DialectContext::make<LgcDialect, GpurtDialect, LgcRtDialect>(*this);
+  m_dialectContext = llvm_dialects::DialectContext::make<LgcDialect, GpurtDialect, LgcRtDialect, LgcCpsDialect>(*this);
   reset();
 }
 

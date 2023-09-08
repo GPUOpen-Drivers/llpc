@@ -103,6 +103,14 @@ enum class ThreadGroupSwizzleMode : unsigned {
   Count,
 };
 
+// Enumerate the ray tracing indirect modes.
+enum class RayTracingIndirectMode : unsigned {
+  NotIndirect = 0,            // Not in indirect mode (or not ray tracing pipeline)
+  Legacy = 1,                 // Legacy indirect mode
+  ContinuationsContinufy = 2, // Continuations flow that based on Continufy pass
+  Continuations = 3,          // Continuations flow that based on LowerRaytracingPipeline pass
+};
+
 // Value for shadowDescriptorTable pipeline option.
 static const unsigned ShadowDescriptorTableDisable = ~0U;
 
@@ -113,7 +121,7 @@ static const char SampleShadingMetaName[] = "lgc.sample.shading";
 // The front-end should zero-initialize a struct with "= {}" in case future changes add new fields.
 // Note: new fields must be added to the end of this structure to maintain test compatibility.
 union Options {
-  unsigned u32All[32];
+  unsigned u32All[34];
   struct {
     uint64_t hash[2];                    // Pipeline hash to set in ELF PAL metadata
     unsigned includeDisassembly;         // If set, the disassembly for all compiled shaders will be included
@@ -159,6 +167,8 @@ union Options {
                                   // meta data.
     bool fragCoordUsesInterpLoc;  // Determining fragCoord use InterpLoc
     bool disableSampleMask;       // Disable export of sample mask from PS
+    bool reserved20;
+    RayTracingIndirectMode rtIndirectMode; // Ray tracing indirect mode
   };
 };
 static_assert(sizeof(Options) == sizeof(Options::u32All));
