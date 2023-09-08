@@ -1971,17 +1971,20 @@ void ConfigBuilder::buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *confi
   SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TRAP_PRESENT, shaderOptions.trapPresent);
   SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, USER_SGPR, intfData->userDataCount);
 
-  Function *attribFunc = nullptr;
+  Function *entryFunc = nullptr;
   for (Function &func : *m_module) {
-    // Only entrypoint and amd_gfx functions may have the function attribute for workgroup id.
-    if (isShaderEntryPoint(&func) || (func.getCallingConv() == CallingConv::AMDGPU_Gfx)) {
-      attribFunc = &func;
+    // Only entrypoint compute shader may have the function attribute for workgroup id optimization.
+    if (isShaderEntryPoint(&func)) {
+      entryFunc = &func;
       break;
     }
   }
-  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_X_EN, !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-x"));
-  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_Y_EN, !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-y"));
-  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_Z_EN, !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-z"));
+  bool hasWorkgroupIdX = !entryFunc || !entryFunc->hasFnAttribute("amdgpu-no-workgroup-id-x");
+  bool hasWorkgroupIdY = !entryFunc || !entryFunc->hasFnAttribute("amdgpu-no-workgroup-id-y");
+  bool hasWorkgroupIdZ = !entryFunc || !entryFunc->hasFnAttribute("amdgpu-no-workgroup-id-z");
+  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_X_EN, hasWorkgroupIdX);
+  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_Y_EN, hasWorkgroupIdY);
+  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_Z_EN, hasWorkgroupIdZ);
   SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TG_SIZE_EN, true);
 
   // 0 = X, 1 = XY, 2 = XYZ
