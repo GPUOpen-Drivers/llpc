@@ -554,12 +554,13 @@ PreservedAnalyses SpirvLowerRayTracing::run(Module &module, ModuleAnalysisManage
   }
   // Process traceRays module
   if (m_shaderStage == ShaderStageCompute) {
+    CallInst *call = createTraceRay();
+    inlineTraceRay(call, analysisManager);
+
     unsigned lgcRtStage = ~0u;
     m_entryPoint->setMetadata(RtName::ContinufyStageMeta,
                               MDNode::get(*m_context, ConstantAsMetadata::get(m_builder->getInt32(lgcRtStage))));
 
-    CallInst *call = createTraceRay();
-    inlineTraceRay(call, analysisManager);
     static auto visitor = llvm_dialects::VisitorBuilder<SpirvLowerRayTracing>()
                               .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
                               .add(&SpirvLowerRayTracing::visitGetHitAttributes)
