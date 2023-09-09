@@ -376,7 +376,7 @@ Value *FragColorExport::convertToFloat(Value *value, bool signedness, BuilderBas
     }
   } else {
     assert(bitWidth == 32);
-    if (valueTy->isIntegerTy()) {
+    if (valueTy->isIntOrIntVectorTy()) {
       // %value = bitcast i32 %value to float
       value = builder.CreateBitCast(value, floatTy);
     }
