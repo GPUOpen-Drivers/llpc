@@ -67,17 +67,17 @@ static const unsigned GetRealTime = 0x83; // [7] = 1, [6:0] = 3
 // Count of user SGPRs used in copy shader
 static const unsigned CopyShaderUserSgprCount = 3;
 
-// User SGPR index for the stream info in copy shader
-static const unsigned CopyShaderUserSgprIdxStreamInfo = 3;
+// Entry-point argument index for the stream info in copy shader
+static const unsigned CopyShaderEntryArgIdxStreamInfo = 3;
 
-// User SGPR index for the stream-out write index in copy shader
-static const unsigned CopyShaderUserSgprIdxWriteIndex = 4;
+// Entry-point argument index for the stream-out write index in copy shader
+static const unsigned CopyShaderEntryArgIdxWriteIndex = 4;
 
-// User SGPR index for the stream offsets in copy shader
-static const unsigned CopyShaderUserSgprIdxStreamOffset = 5;
+// Entry-point argument index for the stream offsets in copy shader
+static const unsigned CopyShaderEntryArgIdxStreamOffset = 5;
 
-// Start offset of currently-processed vertex in GS-VS ring buffer
-static const unsigned CopyShaderUserSgprIdxVertexOffset = 9;
+// Entry-point argument index for the LDS offset of current vertices in GS-VS ring
+static const unsigned CopyShaderEntryArgIdxVertexOffset = 9;
 
 // Enumerates address spaces valid for AMD GPU (similar to LLVM header AMDGPU.h)
 enum AddrSpace {

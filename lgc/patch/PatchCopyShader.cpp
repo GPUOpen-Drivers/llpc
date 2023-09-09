@@ -252,7 +252,7 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
   if (outputStreamCount > 1 && m_pipelineState->enableXfb()) {
     if (!m_pipelineState->getNggControl()->enableNgg) {
       // StreamId = streamInfo[25:24]
-      auto streamInfo = getFunctionArgument(entryPoint, CopyShaderUserSgprIdxStreamInfo);
+      auto streamInfo = getFunctionArgument(entryPoint, CopyShaderEntryArgIdxStreamInfo);
 
       Value *streamId = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, builder.getInt32Ty(),
                                                 {
@@ -539,7 +539,7 @@ void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
 Value *PatchCopyShader::calcGsVsRingOffsetForInput(unsigned location, unsigned compIdx, unsigned streamId,
                                                    BuilderBase &builder) {
   auto entryPoint = builder.GetInsertBlock()->getParent();
-  Value *vertexOffset = getFunctionArgument(entryPoint, CopyShaderUserSgprIdxVertexOffset);
+  Value *vertexOffset = getFunctionArgument(entryPoint, CopyShaderEntryArgIdxVertexOffset);
 
   auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
 
