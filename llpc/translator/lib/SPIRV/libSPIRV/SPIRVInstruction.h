@@ -680,16 +680,12 @@ protected:
       assert((Op1Ty->getIntegerBitWidth() == Op2Ty->getIntegerBitWidth()) && "Inconsistent BitWidth");
     } else if (isMatrixOpCode(OpCode)) {
       assert((Op1Ty->getBitWidth() == Op2Ty->getBitWidth()) && "Inconsistent BitWidth");
-    }
-#if SPV_VERSION >= 0x10400
-    else if (OpCode == OpPtrDiff) {
+    } else if (OpCode == OpPtrDiff) {
       assert(Op1Ty->isTypePointer() && Op2Ty->isTypePointer() && "Invalid type for ptr diff instruction");
       Op1Ty = Op1Ty->getPointerElementType();
       Op2Ty = Op2Ty->getPointerElementType();
       assert(Op1Ty == Op2Ty && "Inconsistent type");
-    }
-#endif
-    else {
+    } else {
       assert(0 && "Invalid op code!");
     }
   }
@@ -727,9 +723,7 @@ _SPIRV_OP(VectorTimesMatrix)
 _SPIRV_OP(MatrixTimesVector)
 _SPIRV_OP(MatrixTimesMatrix)
 _SPIRV_OP(OuterProduct)
-#if SPV_VERSION >= 0x10400
 _SPIRV_OP(PtrDiff)
-#endif
 #undef _SPIRV_OP
 
 template <Op TheOpCode> class SPIRVInstNoOperand : public SPIRVInstruction {
@@ -858,11 +852,10 @@ protected:
            getCondition()->getType()->isTypeFloat() || getCondition()->getType()->isTypeInt());
     assert(getTrueLabel()->isForward() || getTrueLabel()->isLabel());
     assert(getFalseLabel()->isForward() || getFalseLabel()->isLabel());
-#if SPV_VERSION >= 0x10600
     // This requirement was added in 1.6, but we also need to accept SPIR-V
-    // from before that, so ignore violations.
-    // assert(TrueLabelId != FalseLabelId);
-#endif
+    // from before that.
+    if (getModule()->getSPIRVVersion() >= 0x10600)
+      assert(TrueLabelId != FalseLabelId);
   }
   SPIRVId ConditionId;
   SPIRVId TrueLabelId;
@@ -989,13 +982,11 @@ protected:
       Op1Ty = getValueType(Op1);
       Op2Ty = getValueType(Op2);
       ResTy = Type;
-#if SPV_VERSION >= 0x10400
       if (Op1Ty->isTypePointer() || Op2Ty->isTypePointer()) {
         assert(Op1Ty == Op2Ty && "Invalid type for ptr cmp inst");
         Op1Ty = Op1Ty->getPointerElementType();
         Op2Ty = Op2Ty->getPointerElementType();
       }
-#endif
     }
     assert(isCmpOpCode(OpCode) && "Invalid op code for cmp inst");
     assert((ResTy->isTypeBool() || ResTy->isTypeInt()) && "Invalid type for compare instruction");
@@ -1029,10 +1020,8 @@ _SPIRV_OP(UGreaterThanEqual)
 _SPIRV_OP(SGreaterThanEqual)
 _SPIRV_OP(FOrdGreaterThanEqual)
 _SPIRV_OP(FUnordGreaterThanEqual)
-#if SPV_VERSION >= 0x10400
 _SPIRV_OP(PtrEqual)
 _SPIRV_OP(PtrNotEqual)
-#endif
 #undef _SPIRV_OP
 
 class SPIRVSelect : public SPIRVInstruction {
@@ -1772,7 +1761,6 @@ private:
   bool checkMemoryDecorates = true;
 };
 
-#if SPV_VERSION >= 0x10400
 class SPIRVCopyLogical : public SPIRVCopyBase {
 public:
   const static Op OC = OpCopyLogical;
@@ -1816,7 +1804,6 @@ private:
     return Match;
   }
 };
-#endif
 
 class SPIRVCopyMemory : public SPIRVInstruction, public SPIRVMemoryAccess {
 public:
