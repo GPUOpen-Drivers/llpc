@@ -3913,11 +3913,11 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsi
   } else {
     assert(m_shaderStage == ShaderStageCopyShader);
 
-    writeIndex = CopyShaderUserSgprIdxWriteIndex;
-    streamInfo = CopyShaderUserSgprIdxStreamInfo;
+    writeIndex = CopyShaderEntryArgIdxWriteIndex;
+    streamInfo = CopyShaderEntryArgIdxStreamInfo;
 
     const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
-    unsigned streamOffset = CopyShaderUserSgprIdxStreamOffset;
+    unsigned streamOffset = CopyShaderEntryArgIdxStreamOffset;
 
     for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
       if (xfbStrides[i] > 0)
