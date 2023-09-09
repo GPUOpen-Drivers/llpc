@@ -145,9 +145,9 @@ private:
     llvm::SmallVector<llvm::Value *> vgpr; // The vgpr values from the exit.
   };
 
-  bool lowerCpsOps(llvm::Function *func);
-  llvm::Function *lowerCpsFunction(llvm::Function *func, llvm::ArrayRef<llvm::Type *> userDataTys,
-                                   llvm::ArrayRef<std::string> argNames);
+  bool lowerCpsOps(llvm::Function *func, ShaderInputs *shaderInputs);
+  llvm::Function *lowerCpsFunction(llvm::Function *func, llvm::ArrayRef<llvm::Type *> fixedShaderArgTys,
+                                   llvm::ArrayRef<std::string> argNames, bool isContinufy);
   unsigned lowerCpsJump(llvm::Function *parent, cps::JumpOp *jumpOp, llvm::BasicBlock *tailBlock,
                         llvm::SmallVectorImpl<CpsExitInfo> &exitInfos);
   void lowerAsCpsReference(cps::AsContinuationReferenceOp &asCpsReferenceOp);
