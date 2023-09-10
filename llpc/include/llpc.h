@@ -107,11 +107,14 @@ struct ShaderModuleOptions {
 
 /// Represents info to build a shader module.
 struct ShaderModuleBuildInfo {
-  void *pInstance;                ///< Vulkan instance object
-  void *pUserData;                ///< User data
-  OutputAllocFunc pfnOutputAlloc; ///< Output buffer allocator
-  BinaryData shaderBin;           ///< Shader binary data (SPIR-V binary)
-  ShaderModuleOptions options;    ///< Per shader module options
+  void *pInstance;                                 ///< Vulkan instance object
+  void *pUserData;                                 ///< User data
+  OutputAllocFunc pfnOutputAlloc;                  ///< Output buffer allocator
+  BinaryData shaderBin;                            ///< Shader binary data (SPIR-V binary)
+  ShaderModuleOptions options;                     ///< Per shader module options
+  const VkSpecializationInfo *pSpecializationInfo; ///< Specialization constant info
+  const char *pEntryTarget;                        ///< Name of the target entry point (for multi-entry)
+  ShaderStage entryStage;                          ///< Vkgc Shader stage of the target entry point
 };
 
 /// Represents output of building a shader module.

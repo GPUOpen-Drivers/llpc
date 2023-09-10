@@ -569,8 +569,9 @@ struct PipelineOptions {
   bool internalRtShaders;                         ///< Whether this pipeline has internal raytracing shaders
   unsigned forceNonUniformResourceIndexStageMask; ///< Mask of the stage to force using non-uniform resource index.
   bool reserved16;
-  bool replaceSetWithResourceType; ///< For OGL only, replace 'set' with resource type during spirv translate
-  bool disableSampleMask;          ///< For OGL only, disabled if framebuffer doesn't attach multisample texture
+  bool replaceSetWithResourceType;        ///< For OGL only, replace 'set' with resource type during spirv translate
+  bool disableSampleMask;                 ///< For OGL only, disabled if framebuffer doesn't attach multisample texture
+  bool buildResourcesDataForShaderModule; ///< For OGL only, build resources usage data while building shader module
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.
@@ -591,6 +592,8 @@ struct ResourceNodeData {
   unsigned set;                 ///< ID of descriptor set
   unsigned binding;             ///< ID of descriptor binding
   unsigned arraySize;           ///< Element count for arrayed binding
+  unsigned location;            ///< ID of resource location
+  BasicType basicType;          ///< Type of the variable or element
 };
 
 /// Represents the information of one shader entry in ShaderModuleExtraData
@@ -601,6 +604,14 @@ struct ShaderModuleEntryData {
   unsigned resNodeDataCount;             ///< Resource node data count
   const ResourceNodeData *pResNodeDatas; ///< Resource node data array
   unsigned pushConstSize;                ///< Push constant size in byte
+};
+
+/// Represents the shader resources
+struct ResourcesNodes {
+  ResourceNodeData *pInputSymbolInfoBuffers;
+  uint32_t inputSymbolInfoCount;
+  ResourceNodeData *pOutputSymbolInfoBuffers;
+  uint32_t outputSymbolInfoCount;
 };
 
 /// Represents usage info of a shader module
@@ -621,6 +632,7 @@ struct ShaderModuleUsage {
   bool useShadingRate;         ///< Whether shading rate is used
   bool useSampleInfo;          ///< Whether gl_SamplePosition or InterpolateAtSample are used
   bool useClipVertex;          ///< Whether gl_useClipVertex is used
+  ResourcesNodes *pResources;  ///< Resource node for buffers and opaque types
 };
 
 /// Represents common part of shader module data

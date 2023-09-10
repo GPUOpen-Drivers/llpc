@@ -30,6 +30,9 @@
  */
 #include "llpcCompiler.h"
 #include "LLVMSPIRVLib.h"
+#include "SPIRVEntry.h"
+#include "SPIRVFunction.h"
+#include "SPIRVInstruction.h"
 #include "SPIRVInternal.h"
 #include "llpcCacheAccessor.h"
 #include "llpcComputeContext.h"
@@ -556,26 +559,217 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
 
   unsigned codeSize = ShaderModuleHelper::getCodeSize(shaderInfo);
   size_t allocSize = sizeof(ShaderModuleData) + codeSize;
-  unsigned *allocBuf =
-      static_cast<unsigned *>(shaderInfo->pfnOutputAlloc(shaderInfo->pInstance, shaderInfo->pUserData, allocSize));
+
+  ShaderModuleData moduleData = {};
+  std::vector<unsigned> codeBufferVector(codeSize / sizeof(unsigned));
+  MutableArrayRef<unsigned> codeBuffer(codeBufferVector);
+  memcpy(moduleData.hash, &hash, sizeof(hash));
+  Result result = ShaderModuleHelper::getModuleData(shaderInfo, codeBuffer, moduleData);
+
+  ResourcesNodes resourceNodes = {};
+  std::vector<ResourceNodeData> inputSymbolInfo;
+  std::vector<ResourceNodeData> outputSymbolInfo;
+  if (shaderInfo->options.pipelineOptions.buildResourcesDataForShaderModule) {
+    buildShaderModuleResourceUsage(shaderInfo, resourceNodes, inputSymbolInfo, outputSymbolInfo);
+
+    allocSize += sizeof(ResourcesNodes);
+    allocSize += inputSymbolInfo.size() * sizeof(ResourceNodeData);
+    allocSize += outputSymbolInfo.size() * sizeof(ResourceNodeData);
+  }
+
+  uint8_t *allocBuf =
+      static_cast<uint8_t *>(shaderInfo->pfnOutputAlloc(shaderInfo->pInstance, shaderInfo->pUserData, allocSize));
   if (!allocBuf)
     return Result::ErrorOutOfMemory;
 
-  ShaderModuleData *moduleData = reinterpret_cast<ShaderModuleData *>(allocBuf);
-  *moduleData = {};
-  MutableArrayRef<unsigned> codeBuffer(allocBuf + sizeof(ShaderModuleData) / sizeof(*allocBuf),
-                                       codeSize / sizeof(*allocBuf));
+  uint8_t *bufferWritePtr = allocBuf;
+  ShaderModuleData *pShaderModuleData = nullptr;
+  ResourcesNodes *pResourcesNodes = nullptr;
 
-  memcpy(moduleData->hash, &hash, sizeof(hash));
-  Result result = ShaderModuleHelper::getModuleData(shaderInfo, codeBuffer, *moduleData);
-  shaderOut->pModuleData = moduleData;
+  memcpy(bufferWritePtr, &moduleData, sizeof(moduleData));
+  pShaderModuleData = reinterpret_cast<ShaderModuleData *>(bufferWritePtr);
+  bufferWritePtr += sizeof(ShaderModuleData);
 
-  if (moduleData->binType == BinaryType::Spirv && cl::EnablePipelineDump) {
+  memcpy(bufferWritePtr, codeBuffer.data(), codeBuffer.size() * sizeof(unsigned));
+  pShaderModuleData->binCode.pCode = bufferWritePtr;
+  bufferWritePtr += codeBuffer.size() * sizeof(unsigned);
+
+  if (shaderInfo->options.pipelineOptions.buildResourcesDataForShaderModule) {
+    memcpy(bufferWritePtr, &resourceNodes, sizeof(ResourcesNodes));
+    pResourcesNodes = reinterpret_cast<ResourcesNodes *>(bufferWritePtr);
+    pShaderModuleData->usage.pResources = pResourcesNodes;
+    bufferWritePtr += sizeof(ResourcesNodes);
+
+    memcpy(bufferWritePtr, inputSymbolInfo.data(), inputSymbolInfo.size() * sizeof(ResourceNodeData));
+    pResourcesNodes->pInputSymbolInfoBuffers = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    bufferWritePtr += inputSymbolInfo.size() * sizeof(ResourceNodeData);
+
+    memcpy(bufferWritePtr, outputSymbolInfo.data(), outputSymbolInfo.size() * sizeof(ResourceNodeData));
+    pResourcesNodes->pOutputSymbolInfoBuffers = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    bufferWritePtr += outputSymbolInfo.size() * sizeof(ResourceNodeData);
+  }
+
+  shaderOut->pModuleData = pShaderModuleData;
+
+  if (moduleData.binType == BinaryType::Spirv && cl::EnablePipelineDump) {
     // Dump the original input binary, since the offline tool will re-run BuildShaderModule
     PipelineDumper::DumpSpirvBinary(cl::PipelineDumpDir.c_str(), &shaderInfo->shaderBin, &hash);
   }
 
   return result;
+}
+
+// =====================================================================================================================
+// Get resource node data info from spriv variable
+//
+// @param spvVar : Spriv variable
+// @param [out] symbolInfo : Resource node data info
+// @return: Whether symbol is builtIn
+static bool getSymbolInfoFromSpvVariable(const SPIRVVariable *spvVar, ResourceNodeData *symbolInfo) {
+  uint32_t arraySize = 1;
+  SPIRVWord location = 0;
+  SPIRVWord binding = 0;
+  BasicType basicType = BasicType::Unknown;
+
+  SPIRVWord builtIn = false;
+  bool isBuiltIn = spvVar->hasDecorate(DecorationBuiltIn, 0, &builtIn);
+  spvVar->hasDecorate(DecorationLocation, 0, &location);
+  spvVar->hasDecorate(DecorationBinding, 0, &binding);
+
+  SPIRVType *varElemTy = spvVar->getType()->getPointerElementType();
+
+  if (varElemTy->getOpCode() == OpTypeArray) {
+    arraySize = varElemTy->getArrayLength();
+    varElemTy = varElemTy->getArrayElementType();
+  }
+  if (varElemTy->getOpCode() == OpTypeStruct) {
+    arraySize = varElemTy->getStructMemberCount();
+    for (uint32_t i = 0; i < arraySize; i++) {
+      if (isBuiltIn)
+        break;
+      isBuiltIn = varElemTy->hasMemberDecorate(i, DecorationBuiltIn, 0, &builtIn);
+    }
+  }
+  if (varElemTy->getOpCode() == OpTypeMatrix)
+    varElemTy = varElemTy->getMatrixColumnType();
+  if (varElemTy->getOpCode() == OpTypeVector)
+    varElemTy = varElemTy->getVectorComponentType();
+
+  switch (varElemTy->getOpCode()) {
+  case OpTypeInt: {
+    bool isSigned = reinterpret_cast<SPIRVTypeInt *>(varElemTy)->isSigned();
+    switch (varElemTy->getIntegerBitWidth()) {
+    case 8:
+      basicType = isSigned ? BasicType::Int8 : BasicType::Uint8;
+      break;
+    case 16:
+      basicType = isSigned ? BasicType::Int16 : BasicType::Uint16;
+      break;
+    case 32:
+      basicType = isSigned ? BasicType::Int : BasicType::Uint;
+      break;
+    case 64:
+      basicType = isSigned ? BasicType::Int64 : BasicType::Uint64;
+      break;
+    }
+    break;
+  }
+  case OpTypeFloat: {
+    switch (varElemTy->getFloatBitWidth()) {
+    case 16:
+      basicType = BasicType::Float16;
+      break;
+    case 32:
+      basicType = BasicType::Float;
+      break;
+    case 64:
+      basicType = BasicType::Double;
+      break;
+    }
+    break;
+  }
+  default: {
+    break;
+  }
+  }
+
+  symbolInfo->arraySize = arraySize;
+  symbolInfo->location = location;
+  symbolInfo->binding = binding;
+  symbolInfo->basicType = basicType;
+
+  return isBuiltIn;
+}
+
+// =====================================================================================================================
+// Parse the spirv binary to build the resource node data for buffers and opaque types, the resource node data will be
+// returned to client driver together with other info of ShaderModuleUsage
+//
+// @param shaderInfo : Input shader info, including spirv binary
+// @param [out] resourcesNodes : Output of resource usage
+// @param [out] inputSymbolInfos : Output of input symbol infos
+// @param [out] outputSymbolInfo : Output of output symbol infos
+void Compiler::buildShaderModuleResourceUsage(const ShaderModuleBuildInfo *shaderInfo,
+                                              Vkgc::ResourcesNodes &resourcesNodes,
+                                              std::vector<ResourceNodeData> &inputSymbolInfo,
+                                              std::vector<ResourceNodeData> &outputSymbolInfo) {
+  // Parse the SPIR-V stream.
+  std::string spirvCode(static_cast<const char *>(shaderInfo->shaderBin.pCode), shaderInfo->shaderBin.codeSize);
+  std::istringstream spirvStream(spirvCode);
+  std::unique_ptr<SPIRVModule> module(SPIRVModule::createSPIRVModule());
+  spirvStream >> *module;
+
+  ShaderStage shaderStage = shaderInfo->entryStage;
+
+  // Find the entry target.
+  SPIRVEntryPoint *entryPoint = nullptr;
+  SPIRVFunction *func = nullptr;
+  for (unsigned i = 0, funcCount = module->getNumFunctions(); i < funcCount; ++i) {
+    func = module->getFunction(i);
+    entryPoint = module->getEntryPoint(func->getId());
+    if (entryPoint && entryPoint->getExecModel() == convertToExecModel(shaderStage) &&
+        entryPoint->getName() == shaderInfo->pEntryTarget)
+      break;
+    func = nullptr;
+  }
+  if (!entryPoint)
+    return;
+
+  // Process resources
+  auto inOuts = entryPoint->getInOuts();
+  std::vector<ResourceNodeData> inputSymbolWithArrayInfo;
+  for (auto varId : ArrayRef<SPIRVWord>(inOuts.first, inOuts.second)) {
+    auto var = static_cast<SPIRVVariable *>(module->getValue(varId));
+
+    if (var->getStorageClass() == StorageClassInput) {
+      if (shaderStage == ShaderStageVertex) {
+        ResourceNodeData inputSymbol = {};
+        if (!getSymbolInfoFromSpvVariable(var, &inputSymbol))
+          inputSymbolWithArrayInfo.push_back(inputSymbol);
+      }
+    } else if (var->getStorageClass() == StorageClassOutput) {
+      ResourceNodeData outputSymbol = {};
+      if (!getSymbolInfoFromSpvVariable(var, &outputSymbol))
+        outputSymbolInfo.push_back(outputSymbol);
+    }
+  }
+
+  if (shaderInfo->entryStage == ShaderStage::ShaderStageVertex) {
+    size_t inputSymbolSize = inputSymbolWithArrayInfo.size();
+    for (size_t i = 0; i < inputSymbolSize; i++) {
+      auto symbol = inputSymbolWithArrayInfo[i];
+      inputSymbolInfo.push_back(symbol);
+
+      for (uint32_t ite = 1; ite < symbol.arraySize; ite++) {
+        ResourceNodeData elemSymbolInfo = symbol;
+        elemSymbolInfo.location = symbol.location + ite;
+        inputSymbolInfo.push_back(elemSymbolInfo);
+      }
+    }
+  }
+
+  resourcesNodes.inputSymbolInfoCount = inputSymbolInfo.size();
+  resourcesNodes.outputSymbolInfoCount = outputSymbolInfo.size();
 }
 
 // =====================================================================================================================
