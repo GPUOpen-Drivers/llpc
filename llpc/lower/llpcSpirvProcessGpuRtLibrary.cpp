@@ -387,7 +387,7 @@ void SpirvProcessGpuRtLibrary::createFloatOpWithRoundMode(Function *func) {
   Value *src0 = m_builder->CreateLoad(retType, argIt++);
   Value *src1 = m_builder->CreateLoad(retType, argIt);
 
-  Value *fpExcpt = MetadataAsValue::get(*m_context, MDString::get(*m_context, "fpexcept.strict"));
+  Value *fpExcpt = MetadataAsValue::get(*m_context, MDString::get(*m_context, "fpexcept.ignore"));
 
   auto rmDefault = BasicBlock::Create(*m_context, ".rmDefault", func, nullptr);
   auto opDefault = BasicBlock::Create(*m_context, ".opDefault", func, nullptr);
