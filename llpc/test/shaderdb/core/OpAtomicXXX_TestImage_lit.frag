@@ -64,7 +64,7 @@ void main()
 ; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 10, i32 3, i32 0, i32 0, <8 x i32>
 ; SHADERTEST: call i32 (...) @lgc.create.image.atomic.i32(i32 0, i32 3, i32 0, i32 0, <8 x i32>
 ; SHADERTEST: call i32 (...) @lgc.create.image.atomic.compare.swap.i32(i32 3, i32 0, i32 0, <8 x i32>
-; SHADERTEST: call reassoc nnan nsz arcp contract afn float (...) @lgc.create.image.atomic.f32(i32 0, i32 1, i32 0, i32 0, <8 x i32>
+; SHADERTEST: call reassoc nnan nsz arcp contract afn float (...) @lgc.create.image.atomic.f32(i32 0, i32 9, i32 0, i32 0, <8 x i32>
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: call i32 @llvm.amdgcn.image.atomic.add.1d.i32.i32(i32 %{{[0-9]*}}, i32 1, <8 x i32> %{{[0-9]*}}, i32 0

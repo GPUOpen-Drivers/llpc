@@ -91,6 +91,7 @@ const static char NggPrimShaderEntryPoint[] = "lgc.shader.PRIM.main";
 const static char EntryPointPrefix[] = "lgc.shader.";
 const static char CopyShaderEntryPoint[] = "lgc.shader.COPY.main";
 const static char NullFsEntryPoint[] = "lgc.shader.FS.null.main";
+const static char TcsPassthroughEntryPoint[] = "lgc.shader.TCS.passthrough.main";
 
 } // namespace lgcName
 

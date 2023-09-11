@@ -295,7 +295,7 @@ bool PatchResourceCollect::canUseNgg(Module *module) {
     return false;
 
   // TODO: If transform feedback is enabled, currently disable NGG.
-  if (m_pipelineState->enableXfb())
+  if (m_pipelineState->enableXfb() || m_pipelineState->enablePrimStats())
     return false;
 
   if (hasTs && hasGs) {
@@ -2789,10 +2789,21 @@ void PatchResourceCollect::clearUnusedOutput() {
       } else {
         // Collect locations of those outputs that are not used
         bool isOutputXfb = false;
-        if (m_shaderStage == ShaderStageGeometry)
+        bool foundInNextStage = false;
+
+        if (m_shaderStage == ShaderStageGeometry) {
           isOutputXfb = inOutUsage.locInfoXfbOutInfoMap.count(locInfoPair.first) > 0;
 
-        if (!isOutputXfb && nextInLocInfoMap.find(locInfoPair.first) == nextInLocInfoMap.end()) {
+          auto locInfo = locInfoPair.first;
+          if (m_pipelineState->getRasterizerState().rasterStream == locInfo.getStreamId()) {
+            // StreamId only valid in GS stage.
+            locInfo.setStreamId(0);
+            foundInNextStage = (nextInLocInfoMap.find(locInfo) != nextInLocInfoMap.end());
+          }
+        } else
+          foundInNextStage = (nextInLocInfoMap.find(locInfoPair.first) != nextInLocInfoMap.end());
+
+        if (!isOutputXfb && !foundInNextStage) {
           bool isActiveLoc = false;
           if (m_shaderStage == ShaderStageTessControl) {
             // NOTE: If either dynamic indexing of generic outputs exists or the generic output involve in

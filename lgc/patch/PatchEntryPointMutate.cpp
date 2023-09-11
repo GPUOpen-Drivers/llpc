@@ -1458,6 +1458,18 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
     }
   }
 
+  // NOTE: We encounter a HW defect on GFX9. When there is only one user SGPR (corresponds to global table, s0),
+  // the SGPR corresponding to scratch offset (s2) of PS is incorrectly initialized. This leads to invalid scratch
+  // memory access, causing GPU hang. Thus, we detect such case and add a dummy user SGPR in order not to map scratch
+  // offset to s2.
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 9 && m_shaderStage == ShaderStageFragment) {
+    if (userDataIdx == 1) {
+      argTys.push_back(builder.getInt32Ty());
+      argNames.push_back("dummyInit");
+      userDataIdx += 1;
+    }
+  }
+
   intfData->userDataCount = userDataIdx;
   inRegMask = (1ull << argTys.size()) - 1;
 
@@ -1672,10 +1684,17 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       specialUserDataArgs.push_back(
           UserDataArg(builder.getInt32Ty(), "viewId", UserDataMapping::ViewId, &intfData->entryArgIdxs.fs.viewIndex));
     }
+
     if (userDataUsage->isSpecialUserDataUsed(UserDataMapping::ColorExportAddr)) {
       assert(m_pipelineState->isUnlinked() && m_pipelineState->getOptions().enableColorExportShader);
       specialUserDataArgs.push_back(
           UserDataArg(builder.getInt32Ty(), "colorExpAddr", UserDataMapping::ColorExportAddr));
+    }
+
+    if (m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs.runAtSampleRate &&
+        (m_pipelineState->isUnlinked() || m_pipelineState->getRasterizerState().dynamicSampleInfo)) {
+      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "sampleInfo", UserDataMapping::SampleInfo,
+                                                &intfData->entryArgIdxs.fs.sampleInfo));
     }
   }
 

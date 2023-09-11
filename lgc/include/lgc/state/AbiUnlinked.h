@@ -87,14 +87,6 @@ const static char DescriptorStride[] = "dstride_";
 // The value of the relocation is whether resource is ResourceNodeType::DescriptorBufferCompact.
 const static char CompactBuffer[] = "compactbuffer_";
 
-// Number of samples is "$numsamples".
-// The value of the relocation is numSamples from the rasterizer state.
-const static char NumSamples[] = "$numsamples";
-
-// Sample pattern index is "$samplePatternIdx".
-// The value of the relocation is samplePatternIdx from the rasterizer state.
-const static char SamplePatternIdx[] = "$samplePatternIdx";
-
 // Device index is "$deviceIdx"
 // The value of the relocation is deviceIdx from the pipeline state.
 const static char DeviceIdx[] = "$deviceIdx";

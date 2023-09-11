@@ -246,12 +246,12 @@ private:
                       unsigned userDataCount);
 
   void writeGsOutput(llvm::Value *output, unsigned location, unsigned component, unsigned streamId,
-                     llvm::Value *primitiveIndex, llvm::Value *emitVerts);
+                     llvm::Value *primitiveIndex, llvm::Value *emitVerts, llvm::Value *totalEmitVertsPtr);
   llvm::Value *readGsOutput(llvm::Type *outputTy, unsigned location, unsigned component, unsigned streamId,
                             llvm::Value *vertexOffset);
 
   void processGsEmit(unsigned streamId, llvm::Value *primitiveIndex, llvm::Value *emitVertsPtr,
-                     llvm::Value *outVertsPtr);
+                     llvm::Value *outVertsPtr, llvm::Value *totalEmitVertsPtr);
   void processGsCut(unsigned streamId, llvm::Value *outVertsPtr);
 
   llvm::Function *createGsEmitHandler();

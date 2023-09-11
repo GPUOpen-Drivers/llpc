@@ -514,6 +514,7 @@ struct GraphicsPipelineState {
   unsigned numSamples;                          // Number of coverage samples used when rendering with this pipeline
   unsigned pixelShaderSamples;                  // Controls the pixel shader execution rate
   unsigned samplePatternIdx;                    // Index into the currently bound MSAA sample pattern table
+  unsigned dynamicSampleInfo;                   // Whether to enable dynamic sample
   unsigned rasterStream;                        // Which vertex stream to rasterize
   unsigned usrClipPlaneMask;                    // Mask to indicate the enabled user defined clip planes
   unsigned alphaToCoverageEnable;               // Enable alpha to coverage
@@ -534,6 +535,9 @@ struct GraphicsPipelineState {
   bool enableUberFetchShader;   // Use uber fetch shader
   bool enableEarlyCompile;      // Enable early compile
   bool enableColorExportShader; // Enable color export shader
+
+  float tessLevelInner[2];
+  float tessLevelOuter[4];
 };
 
 // =====================================================================================================================

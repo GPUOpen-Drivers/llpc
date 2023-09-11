@@ -433,7 +433,6 @@ Value *BuilderImpl::getDescPtr(ResourceNodeType concreteType, ResourceNodeType a
     if (node || topNode || concreteType != ResourceNodeType::DescriptorFmask) {
       unsigned highAddrOfFmask = m_pipelineState->getOptions().highAddrOfFmask;
       bool isFmask = concreteType == ResourceNodeType::DescriptorFmask;
-      assert(!(isFmask && highAddrOfFmask == ShadowDescriptorTableDisable) && "not implemented");
       Value *highHalf = getInt32(isFmask ? highAddrOfFmask : HighAddrPc);
       return CreateNamedCall(lgcName::DescriptorTableAddr, getInt8Ty()->getPointerTo(ADDR_SPACE_CONST),
                              {getInt32(unsigned(concreteType)), getInt32(unsigned(abstractType)), getInt64(descSet),

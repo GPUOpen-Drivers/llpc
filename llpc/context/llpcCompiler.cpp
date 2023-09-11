@@ -656,8 +656,8 @@ Result Compiler::buildGraphicsShaderStage(const GraphicsPipelineBuildInfo *pipel
 
   MetroHash::Hash cacheHash = {};
   MetroHash::Hash pipelineHash = {};
-  cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, true, stage);
-  pipelineHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false, true, stage);
+  cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, stage);
+  pipelineHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false, stage);
 
   // Compile
   GraphicsContext graphicsContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
@@ -865,8 +865,8 @@ Result Compiler::buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *p
 
   MetroHash::Hash cacheHash = {};
   MetroHash::Hash pipelineHash = {};
-  cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, false);
-  pipelineHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false, false);
+  cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true);
+  pipelineHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false);
 
   std::optional<CacheAccessor> cacheAccessor;
   if (cl::CacheFullPipelines) {
@@ -976,12 +976,15 @@ Result Compiler::buildUnlinkedShaderInternal(Context *context, ArrayRef<const Pi
 
   // Check the cache for the relocatable shader for this stage.
   MetroHash::Hash cacheHash = {};
+  auto caches = getInternalCaches();
   if (context->getPipelineType() == PipelineType::Graphics) {
     auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
-    cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, true, stage);
+    cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, stage);
   } else {
     auto pipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo *>(context->getPipelineBuildInfo());
-    cacheHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, true, true);
+    cacheHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, true);
+    // we have pipeline cache for compute pipeline, Per stage cache is not needed for compute pipeline.
+    caches = {};
   }
   // Note that this code updates m_pipelineHash of the pipeline context. It must be restored.
   context->getPipelineContext()->setHashForCacheLookUp(cacheHash);
@@ -996,7 +999,7 @@ Result Compiler::buildUnlinkedShaderInternal(Context *context, ArrayRef<const Pi
   });
 
   Result result = Result::Success;
-  CacheAccessor cacheAccessor(context, cacheHash, getInternalCaches());
+  CacheAccessor cacheAccessor(context, cacheHash, caches);
   if (cacheAccessor.isInCache()) {
     BinaryData elfBin = cacheAccessor.getElfFromCache();
     auto data = reinterpret_cast<const char *>(elfBin.pCode);
@@ -1250,7 +1253,8 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       }
 
       // If this is TCS, set inputVertices from patchControlPoints in the pipeline state.
-      if (entryStage == ShaderStageTessControl)
+      if (entryStage == ShaderStageTessControl ||
+          (entryStage == ShaderStageTessEval && shaderInfo[ShaderStageTessControl]->pModuleData == nullptr))
         context->getPipelineContext()->setTcsInputVertices(modules[shaderIndex]);
     }
 
@@ -1625,8 +1629,7 @@ Result Compiler::buildGraphicsPipelineWithPartPipelines(Context *context,
         ShaderStage stage = shaderInfoEntry->entryStage;
         if (shaderInfoEntry->pModuleData && isShaderStageInMask(stage, partStageMask)) {
           // This is a shader to include in this part pipeline. Add the shader code and options to the hash.
-          PipelineDumper::updateHashForPipelineShaderInfo(stage, shaderInfoEntry, /*isCacheHash=*/true, &hasher,
-                                                          /*isRelocatableShader=*/false);
+          PipelineDumper::updateHashForPipelineShaderInfo(stage, shaderInfoEntry, /*isCacheHash=*/true, &hasher);
         }
       }
     }
@@ -1755,8 +1758,8 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
 
   MetroHash::Hash cacheHash = {};
   MetroHash::Hash pipelineHash = {};
-  cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, false);
-  pipelineHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false, false);
+  cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true);
+  pipelineHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false);
 
   if (result == Result::Success && EnableOuts()) {
     LLPC_OUTS("===============================================================================\n");
@@ -1888,8 +1891,8 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
 
   MetroHash::Hash cacheHash = {};
   MetroHash::Hash pipelineHash = {};
-  cacheHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, true, false);
-  pipelineHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, false, false);
+  cacheHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, true);
+  pipelineHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, false);
 
   if (result == Result::Success && EnableOuts()) {
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(pipelineInfo->cs.pModuleData);
@@ -2929,7 +2932,7 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
     MetroHash64 hasher;
 
     // Update common shader info
-    PipelineDumper::updateHashForPipelineShaderInfo(stage, shaderInfo, true, &hasher, false);
+    PipelineDumper::updateHashForPipelineShaderInfo(stage, shaderInfo, true, &hasher);
     hasher.Update(pipelineInfo->iaState.deviceIndex);
 
     PipelineDumper::updateHashForResourceMappingInfo(context->getResourceMapping(), context->getPipelineLayoutApiHash(),
@@ -2956,15 +2959,14 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
 
   // Add additional pipeline state to final hasher
   if (stageMask & getLgcShaderStageMask(ShaderStageFragment)) {
-    PipelineDumper::updateHashForPipelineOptions(pipelineOptions, &fragmentHasher, true, false, UnlinkedStageFragment);
-    PipelineDumper::updateHashForFragmentState(pipelineInfo, &fragmentHasher, false);
+    PipelineDumper::updateHashForPipelineOptions(pipelineOptions, &fragmentHasher, true, UnlinkedStageFragment);
+    PipelineDumper::updateHashForFragmentState(pipelineInfo, &fragmentHasher);
     fragmentHasher.Finalize(fragmentHash->bytes);
   }
 
   if (stageMask & ~getLgcShaderStageMask(ShaderStageFragment)) {
-    PipelineDumper::updateHashForPipelineOptions(pipelineOptions, &nonFragmentHasher, true, false,
-                                                 UnlinkedStageVertexProcess);
-    PipelineDumper::updateHashForNonFragmentState(pipelineInfo, true, &nonFragmentHasher, false);
+    PipelineDumper::updateHashForPipelineOptions(pipelineOptions, &nonFragmentHasher, true, UnlinkedStageVertexProcess);
+    PipelineDumper::updateHashForNonFragmentState(pipelineInfo, true, &nonFragmentHasher);
     nonFragmentHasher.Finalize(nonFragmentHash->bytes);
   }
 }

@@ -890,10 +890,11 @@ Value *FragColorExport::dualSourceSwizzle(BuilderBase &builder) {
   threadId = builder.CreateAnd(threadId, builder.getInt32(1));
   // mask: 0 1 0 1 0 1 ...
   Value *mask = builder.CreateICmpNE(threadId, builder.getInt32(0));
+  bool onlyOneTarget = m_blendSources[1].empty();
 
   for (unsigned i = 0; i < m_blendSourceChannels; i++) {
     Value *src0 = m_blendSources[0][i];
-    Value *src1 = m_blendSources[1][i];
+    Value *src1 = onlyOneTarget ? PoisonValue::get(src0->getType()) : m_blendSources[1][i];
     src0 = builder.CreateBitCast(src0, builder.getInt32Ty());
     src1 = builder.CreateBitCast(src1, builder.getInt32Ty());
 

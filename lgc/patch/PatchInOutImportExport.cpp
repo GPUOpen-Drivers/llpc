@@ -2615,19 +2615,26 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
   }
   // Handle internal-use built-ins for sample position emulation
   case BuiltInNumSamples: {
-    if (m_pipelineState->isUnlinked()) {
-      input = builder.CreateRelocationConstant(reloc::NumSamples);
+    if (m_pipelineState->isUnlinked() || m_pipelineState->getRasterizerState().dynamicSampleInfo) {
+      assert(entryArgIdxs.sampleInfo != 0);
+      auto sampleInfo = getFunctionArgument(m_entryPoint, entryArgIdxs.sampleInfo);
+      input = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, builder.getInt32Ty(),
+                                      {sampleInfo, builder.getInt32(0), builder.getInt32(16)});
     } else {
       input = builder.getInt32(m_pipelineState->getRasterizerState().numSamples);
     }
     break;
   }
   case BuiltInSamplePatternIdx: {
-    if (m_pipelineState->isUnlinked()) {
-      input = builder.CreateRelocationConstant(reloc::SamplePatternIdx);
+    if (m_pipelineState->isUnlinked() || m_pipelineState->getRasterizerState().dynamicSampleInfo) {
+      assert(entryArgIdxs.sampleInfo != 0);
+      auto sampleInfo = getFunctionArgument(m_entryPoint, entryArgIdxs.sampleInfo);
+      input = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, builder.getInt32Ty(),
+                                      {sampleInfo, builder.getInt32(16), builder.getInt32(16)});
     } else {
       input = builder.getInt32(m_pipelineState->getRasterizerState().samplePatternIdx);
     }
+
     break;
   }
   // Handle internal-use built-ins for interpolation functions and AMD extension (AMD_shader_explicit_vertex_parameter)

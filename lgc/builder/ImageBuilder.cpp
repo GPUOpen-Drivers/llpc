@@ -493,7 +493,10 @@ Value *BuilderImpl::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags
 
     // Get the intrinsic ID from the load intrinsic ID table and call it.
     auto table = mipLevel ? &ImageLoadMipIntrinsicTable[0] : &ImageLoadIntrinsicTable[0];
-    imageInst = CreateIntrinsic(table[dim], {intrinsicDataTy, coords[0]->getType()}, args, nullptr, instName);
+
+    // Rectangle image uses the same Intrinsic ID with 2D image.
+    Intrinsic::ID intrinsicId = (dim == DimRect) ? table[Dim2D] : table[dim];
+    imageInst = CreateIntrinsic(intrinsicId, {intrinsicDataTy, coords[0]->getType()}, args, nullptr, instName);
   } else {
     // Texel buffer descriptor. Use the buffer instruction.
     imageDescArgIndex = args.size();
@@ -683,7 +686,10 @@ Value *BuilderImpl::CreateImageStore(Value *texel, unsigned dim, unsigned flags,
 
     // Get the intrinsic ID from the store intrinsic ID table and call it.
     auto table = mipLevel ? &ImageStoreMipIntrinsicTable[0] : &ImageStoreIntrinsicTable[0];
-    imageStore = CreateIntrinsic(table[dim], {texelTy, coords[0]->getType()}, args, nullptr, instName);
+
+    // Rectangle image uses the same Intrinsic ID with 2D image.
+    Intrinsic::ID intrinsicId = (dim == DimRect) ? table[Dim2D] : table[dim];
+    imageStore = CreateIntrinsic(intrinsicId, {texelTy, coords[0]->getType()}, args, nullptr, instName);
   } else {
     // Texel buffer descriptor. Use the buffer instruction.
     // First widen texel to vec4 if necessary.
@@ -855,6 +861,10 @@ Value *BuilderImpl::CreateImageGather(Type *resultTy, unsigned dim, unsigned fla
 
   // Only the first 4 dwords are sampler descriptor, we need to extract these values under any condition
   samplerDesc = CreateShuffleVector(samplerDesc, samplerDesc, ArrayRef<int>{0, 1, 2, 3});
+
+  if (m_pipelineState->getOptions().disableTruncCoordForGather) {
+    samplerDesc = modifySamplerDescForGather(samplerDesc);
+  }
 
   Value *result = nullptr;
   Value *addrOffset = address[ImageAddressIdxOffset];
@@ -1149,7 +1159,7 @@ Value *BuilderImpl::CreateImageSampleGather(Type *resultTy, unsigned dim, unsign
   args.push_back(samplerDesc);
 
   // i32 Unorm
-  args.push_back(getInt1(false));
+  args.push_back(getInt1(dim == DimRect));
 
   // i32 tfe/lwe bits
   bool tfe = isa<StructType>(resultTy);
@@ -1174,7 +1184,9 @@ Value *BuilderImpl::CreateImageSampleGather(Type *resultTy, unsigned dim, unsign
     if (table->matchMask == addressMask)
       break;
   }
-  Intrinsic::ID intrinsicId = table->ids[dim];
+
+  // Rectangle texture uses the same Intrinsic ID with 2D texture.
+  Intrinsic::ID intrinsicId = (dim == DimRect) ? table->ids[Dim2D] : table->ids[dim];
 
   // Create the intrinsic.
   Instruction *imageOp = CreateIntrinsic(intrinsicId, overloadTys, args, nullptr, instName);
@@ -1282,7 +1294,9 @@ Value *BuilderImpl::CreateImageAtomicCommon(unsigned atomicOp, unsigned dim, uns
     args.push_back(getInt32(0));
 
     // Get the intrinsic ID from the load intrinsic ID table, and create the intrinsic.
-    Intrinsic::ID intrinsicId = ImageAtomicIntrinsicTable[atomicOp][dim];
+    // Rectangle image uses the same Intrinsic ID with 2D image.
+    Intrinsic::ID intrinsicId =
+        (dim == DimRect) ? ImageAtomicIntrinsicTable[atomicOp][Dim2D] : ImageAtomicIntrinsicTable[atomicOp][dim];
     atomicInst = CreateIntrinsic(intrinsicId, {inputValue->getType(), coord->getType()->getScalarType()}, args, nullptr,
                                  instName);
   } else {
@@ -1626,8 +1640,6 @@ unsigned BuilderImpl::prepareCoordinate(unsigned dim, Value *coord, Value *proje
     assert(getImageNumCoords(dim) == 1);
     outCoords.push_back(coord);
   } else {
-    assert(getImageNumCoords(dim) == cast<FixedVectorType>(coordTy)->getNumElements());
-
     // Push the components.
     for (unsigned i = 0; i != getImageNumCoords(dim); ++i)
       outCoords.push_back(CreateExtractElement(coord, i));
@@ -2060,4 +2072,18 @@ void BuilderImpl::enforceReadFirstLane(Instruction *imageInst, unsigned descIdx)
     newDesc = CreateInsertElement(newDesc, elem, elemIdx);
   }
   imageInst->setOperand(descIdx, newDesc);
+}
+
+// =====================================================================================================================
+// Modify sampler descriptor to force set trunc_coord as 0 for gather4 instruction.
+//
+// @param imageDesc : Original sampler descriptor
+// @returns Sampler descriptor, modified if necessary
+Value *BuilderImpl::modifySamplerDescForGather(Value *samplerDesc) {
+  // Need to clear the trunc_coord bit for gather4, which is bit 27 of dword 0.
+  Value *dword0 = CreateExtractElement(samplerDesc, uint64_t(0));
+  dword0 = CreateAnd(dword0, getInt32(0xF7FFFFFF));
+  samplerDesc = CreateInsertElement(samplerDesc, dword0, uint64_t(0));
+
+  return samplerDesc;
 }

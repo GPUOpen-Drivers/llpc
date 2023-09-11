@@ -31,6 +31,8 @@ function(set_compiler_options PROJECT_NAME ENABLE_WERROR)
             -Wunused-function
             -Werror=unused-function
             -Werror=unused-result  # Error out on unused results of functions marked with LLPC_NODISCARD
+            -ffunction-sections
+            -fdata-sections
         )
 
         target_compile_options("${PROJECT_NAME}" PRIVATE $<$<COMPILE_LANGUAGE:CXX>:

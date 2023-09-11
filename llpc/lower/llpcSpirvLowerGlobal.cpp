@@ -184,7 +184,9 @@ static_assert(lgc::ShadingRateHorizontal4Pixels ==
               "Shading rate flag mismatch");
 
 // =====================================================================================================================
-SpirvLowerGlobal::SpirvLowerGlobal() : m_retBlock(nullptr), m_lowerInputInPlace(false), m_lowerOutputInPlace(false) {
+SpirvLowerGlobal::SpirvLowerGlobal()
+    : m_retBlock(nullptr), m_lowerInputInPlace(false), m_lowerOutputInPlace(false),
+      m_lastVertexProcessingStage(ShaderStageInvalid) {
 }
 
 // =====================================================================================================================
@@ -2384,6 +2386,10 @@ void SpirvLowerGlobal::addCallInstForXfbOutput(const ShaderInOutMetadata &output
                                                unsigned xfbBufferAdjust, unsigned xfbOffsetAdjust, unsigned locOffset,
                                                lgc::InOutInfo outputInfo) {
   assert(m_shaderStage == m_lastVertexProcessingStage);
+  auto pipelineBuildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+  DenseMap<unsigned, Vkgc::XfbOutInfo> *locXfbMapPtr = outputMeta.IsBuiltIn ? &m_builtInXfbMap : &m_genericXfbMap;
+  if (pipelineBuildInfo->apiXfbOutData.forceDisableStreamOut || (locXfbMapPtr->empty() && !outputMeta.IsXfb))
+    return;
 
   // If the XFB info is specified from API interface so we try to retrieve the info from m_locXfbMap. Otherwise, the XFB
   // info is obtained from the output metadata.
@@ -2395,7 +2401,6 @@ void SpirvLowerGlobal::addCallInstForXfbOutput(const ShaderInOutMetadata &output
   if (!outputMeta.IsBuiltIn)
     location += locOffset;
 
-  DenseMap<unsigned, Vkgc::XfbOutInfo> *locXfbMapPtr = outputMeta.IsBuiltIn ? &m_builtInXfbMap : &m_genericXfbMap;
   if (locXfbMapPtr->size() > 0) {
     auto iter = locXfbMapPtr->find(location);
     if (iter == locXfbMapPtr->end())
@@ -2409,8 +2414,7 @@ void SpirvLowerGlobal::addCallInstForXfbOutput(const ShaderInOutMetadata &output
     else
       outputInfo.setComponent(iter->second.component);
   } else {
-    if (!outputMeta.IsXfb)
-      return;
+    assert(outputMeta.IsXfb);
     // Use XFB qualifier
     assert(xfbOffsetAdjust != InvalidValue && (!outputMeta.IsBuiltIn || xfbBufferAdjust == 0));
     xfbBuffer = outputMeta.XfbBuffer + xfbBufferAdjust;

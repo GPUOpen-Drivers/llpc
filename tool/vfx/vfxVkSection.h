@@ -84,6 +84,9 @@ private:
       INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionResourceMappingNode, binding, srdRange.binding,
                                              SectionResourceMappingNode::getResourceMapNodeBinding, MemberTypeInt,
                                              false);
+      INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(SectionResourceMappingNode, strideInDwords, srdRange.strideInDwords,
+                                             SectionResourceMappingNode::getResourceMapNodeStride, MemberTypeInt,
+                                             false);
       INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionResourceMappingNode, m_next, MemberTypeResourceMappingNode, true);
       INIT_STATE_MEMBER_EXPLICITNAME_TO_ADDR(
           SectionResourceMappingNode, indirectUserDataCount, userDataPtr.sizeInDwords,
@@ -101,6 +104,11 @@ private:
   static void *getResourceMapNodeBinding(void *obj) {
     SectionResourceMappingNode *castedObj = static_cast<SectionResourceMappingNode *>(obj);
     return static_cast<void *>(&castedObj->m_state.srdRange.binding);
+  }
+
+  static void *getResourceMapNodeStride(void *obj) {
+    SectionResourceMappingNode *castedObj = static_cast<SectionResourceMappingNode *>(obj);
+    return static_cast<void *>(&castedObj->m_state.srdRange.strideInDwords);
   }
 
   static void *getResourceMapNodeUserDataCount(void *obj) {
@@ -487,6 +495,8 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, internalRtShaders, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, optimizeTessFactor, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, replaceSetWithResourceType, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, disableTruncCoordForGather, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, vertex64BitsAttribSingleLoc, MemberTypeBool, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -759,6 +769,11 @@ public:
 
   SectionGraphicsState() : Section(getAddrTable(), SectionTypeGraphicsState, nullptr) {
     memset(&m_state, 0, sizeof(m_state));
+    tessLevelInner[0] = -1.0f;
+    tessLevelInner[1] = -1.0f;
+    tessLevelOuter[0] = -1.0f;
+    tessLevelOuter[1] = -1.0f;
+    tessLevelOuter[2] = -1.0f;
   }
 
   static StrToMemberAddrArrayRef getAddrTable() {
@@ -775,6 +790,7 @@ public:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, numSamples, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, pixelShaderSamples, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, samplePatternIdx, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, dynamicSampleInfo, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, rasterStream, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, usrClipPlaneMask, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, alphaToCoverageEnable, MemberTypeInt, false);
@@ -793,6 +809,8 @@ public:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableColorExportShader, MemberTypeBool, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_shaderLibrary, MemberTypeString, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_rtState, MemberTypeRtState, true);
+      INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGraphicsState, tessLevelInner, MemberTypeFloat, 2, false);
+      INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGraphicsState, tessLevelOuter, MemberTypeFloat, 4, false);
 
       return addrTableInitializer;
     }();
@@ -804,6 +822,8 @@ public:
       m_colorBuffer[i].getSubState(m_state.colorBuffer[i]);
     m_options.getSubState(m_state.options);
     m_nggState.getSubState(m_state.nggState);
+    memcpy(m_state.tessLevelInner, tessLevelInner, sizeof(tessLevelInner));
+    memcpy(m_state.tessLevelOuter, tessLevelOuter, sizeof(tessLevelOuter));
     state = m_state;
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
@@ -828,6 +848,8 @@ private:
   std::string m_shaderLibrary;
   std::vector<uint8_t> m_shaderLibraryBytes;
   SectionRtState m_rtState;
+  float tessLevelInner[2];
+  float tessLevelOuter[4];
 };
 
 // =====================================================================================================================
@@ -990,7 +1012,7 @@ public:
 
   void getSubState(SubState &state) {
     memset(&state, 0, sizeof(SubState));
-
+    state = m_state;
     if (m_xfbOutInfo.size() > 0) {
       state.numXfbOutInfo = static_cast<unsigned>(m_xfbOutInfo.size());
       m_xfbOutInfoData.resize(state.numXfbOutInfo);
@@ -1006,6 +1028,8 @@ private:
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionApiXfbOutput, forceDisableStreamOut, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionApiXfbOutput, forceEnablePrimStats, MemberTypeBool, false);
       INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionApiXfbOutput, m_xfbOutInfo, MemberTypeXfbOutInfo, true);
       return addrTableInitializer;
     }();

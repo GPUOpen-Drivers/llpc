@@ -65,6 +65,11 @@ set_compiler_options(LLVMLgcCps)
 set(LGCCPS_TABLEGEN_EXE ${LLVM_TOOLS_BINARY_DIR}/llvm-dialects-tblgen)
 set(LGCCPS_TABLEGEN_TARGET llvm-dialects-tblgen)
 set(LLVM_TARGET_DEFINITIONS include/lgccps/LgcCpsDialect.td)
+set(LLVM_TARGET_DEPENDS lgccps)
+
+add_custom_command(
+    OUTPUT lgccps
+    COMMAND ${CMAKE_COMMAND} -E make_directory include/lgccps lib)
 
 tablegen(LGCCPS include/lgccps/LgcCpsDialect.h.inc -gen-dialect-decls --dialect lgc.cps
     EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../../imported/llvm-dialects/include)

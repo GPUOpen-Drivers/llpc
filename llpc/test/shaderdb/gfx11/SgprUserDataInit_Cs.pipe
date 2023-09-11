@@ -64,7 +64,6 @@ void main()
 %_ptr_StorageBuffer_v4float = OpTypePointer StorageBuffer %v4float
        %main = OpFunction %void None %4
           %6 = OpLabel
-               OpLine %1 12 0
          %13 = OpLoad %10 %img2D
          %21 = OpAccessChain %_ptr_StorageBuffer_v4float %_ %int_0
          %22 = OpLoad %v4float %21
@@ -161,7 +160,7 @@ options.threadGroupSwizzleMode = Default
 ; CHECK-NEXT:       .tidig_comp_cnt: 0
 ; CHECK-NEXT:     .hardware_stages:
 ; CHECK-NEXT:       .cs:
-; CHECK-NEXT:         .checksum_value: 0x29b83166
+; CHECK-NEXT:         .checksum_value: 0x{{[0-9a-f]+}}
 ; CHECK-NEXT:         .debug_mode:     false
 ; CHECK-NEXT:         .entry_point:    _amdgpu_cs_main
 ; CHECK-NEXT:         .excp_en:        0
