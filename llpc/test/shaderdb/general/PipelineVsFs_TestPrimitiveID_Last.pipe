@@ -65,6 +65,7 @@ userDataNode[2].sizeInDwords = 1
 userDataNode[2].indirectUserDataCount = 4
 
 [GraphicsPipelineState]
+topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
 provokingVertexMode = VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT
 nggState.enableNgg = 1
 
