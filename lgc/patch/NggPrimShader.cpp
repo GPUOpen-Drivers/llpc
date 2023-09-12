@@ -2592,9 +2592,20 @@ void NggPrimShader::distributePrimitiveId(Value *primitiveId) {
   {
     m_builder.SetInsertPoint(distribPrimitiveIdBlock);
 
-    Value *provokingVertexIndex = m_pipelineState->getRasterizerState().provokingVertexMode == ProvokingVertexFirst
-                                      ? m_nggInputs.vertexIndex0
-                                      : m_nggInputs.vertexIndex2;
+    auto primitiveType = m_pipelineState->getInputAssemblyState().primitiveType;
+    Value *provokingVertexIndex = nullptr;
+    if (primitiveType == lgc::PrimitiveType::Point) {
+      provokingVertexIndex = m_nggInputs.vertexIndex0;
+    } else if (primitiveType == lgc::PrimitiveType::LineList || primitiveType == lgc::PrimitiveType::LineStrip) {
+      provokingVertexIndex = m_pipelineState->getRasterizerState().provokingVertexMode == ProvokingVertexFirst
+                                 ? m_nggInputs.vertexIndex0
+                                 : m_nggInputs.vertexIndex1;
+    } else {
+      provokingVertexIndex = m_pipelineState->getRasterizerState().provokingVertexMode == ProvokingVertexFirst
+                                 ? m_nggInputs.vertexIndex0
+                                 : m_nggInputs.vertexIndex2;
+    }
+
     writePerThreadDataToLds(primitiveId, provokingVertexIndex, PrimShaderLdsRegion::DistributedPrimitiveId);
 
     m_builder.CreateBr(endDistribPrimitiveIdBlock);
