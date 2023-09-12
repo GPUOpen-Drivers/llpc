@@ -401,6 +401,7 @@ public:
 
   // Set user data for a specific shader stage
   void setUserDataMap(ShaderStage shaderStage, llvm::ArrayRef<unsigned> userDataValues) {
+    m_userDataMaps[shaderStage].clear();
     m_userDataMaps[shaderStage].append(userDataValues.begin(), userDataValues.end());
   }
 
