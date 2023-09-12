@@ -7,7 +7,7 @@
                OpCapability Shader
           %1 = OpExtInstImport "GLSL.std.450"
                OpMemoryModel Logical GLSL450
-               OpEntryPoint Vertex %2 "main" %3 %gl_Position %5 %6 %7
+               OpEntryPoint Vertex %2 "main" %3 %gl_Position %5 %6 %7 %9 %11
           %8 = OpString ""
                OpDecorate %3 Location 1
                OpDecorate %3 Binding 0
@@ -19,6 +19,12 @@
                OpDecorate %6 Binding 0
                OpDecorate %7 Location 8
                OpDecorate %7 Binding 0
+               OpDecorate %9 Location 9
+               OpDecorate %9 Component 0
+               OpDecorate %9 Binding 0
+               OpDecorate %11 Location 9
+               OpDecorate %11 Component 1
+               OpDecorate %11 Binding 0
        %void = OpTypeVoid
          %10 = OpTypeFunction %void
       %float = OpTypeFloat 32
@@ -29,10 +35,14 @@
 %_ptr_Output_v4float = OpTypePointer Output %v4float
 %gl_Position = OpVariable %_ptr_Output_v4float Output
 %_ptr_Output_v3float = OpTypePointer Output %v3float
+%_ptr_Output_float = OpTypePointer Output %float
           %5 = OpVariable %_ptr_Output_v3float Output
           %6 = OpVariable %_ptr_Output_v4float Output
           %7 = OpVariable %_ptr_Output_v4float Output
+          %9 = OpVariable %_ptr_Output_float Output
+         %11 = OpVariable %_ptr_Output_float Output
          %17 = OpUndef %v3float
+         %24 = OpUndef %float
     %float_0 = OpConstant %float 0
     %float_1 = OpConstant %float 1
          %20 = OpConstantComposite %v4float %float_1 %float_0 %float_0 %float_1
@@ -44,21 +54,23 @@
                OpStore %5 %17
                OpStore %6 %21
                OpStore %7 %20
+               OpStore %9 %24
+               OpStore %11 %float_0
                OpReturn
                OpFunctionEnd
-
 ; CHECK-LABEL: amdgpu_vs_main:
 ; CHECK:         s_getpc_b64 s[4:5]
 ; CHECK-NEXT:    s_mov_b32 s0, s1
 ; CHECK-NEXT:    s_mov_b32 s1, s5
 ; CHECK-NEXT:    s_load_dwordx4 s[4:7], s[0:1], 0x10
 ; CHECK-NEXT:    v_add_u32_e32 v0, s2, v0
-; CHECK-NEXT:    v_mov_b32_e32 v4, 0
-; CHECK-NEXT:    v_mov_b32_e32 v5, 1.0
+; CHECK-NEXT:    v_mov_b32_e32 v4, 1.0
+; CHECK-NEXT:    v_mov_b32_e32 v5, 0
 ; CHECK-NEXT:    s_waitcnt lgkmcnt(0)
 ; CHECK-NEXT:    tbuffer_load_format_xyzw v[0:3], v0, s[4:7], 0 format:[BUF_DATA_FORMAT_32_32_32_32,BUF_NUM_FORMAT_FLOAT] idxen
 ; CHECK-NEXT:    s_waitcnt vmcnt(0)
 ; CHECK-NEXT:    exp pos0 v0, v1, v2, v3 done
-; CHECK-NEXT:    exp param8 v5, v4, v4, v5
-; CHECK-NEXT:    exp param7 v4, v4, v5, v5
+; CHECK-NEXT:    exp param7 v5, v5, v4, v4
+; CHECK-NEXT:    exp param9 off, v5, off, off
+; CHECK-NEXT:    exp param8 v4, v5, v5, v4
 ; CHECK-NEXT:    s_endpgm

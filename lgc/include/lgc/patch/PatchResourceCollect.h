@@ -78,6 +78,7 @@ private:
   void clearInactiveBuiltInInput();
   void clearInactiveBuiltInOutput();
   void clearUnusedOutput();
+  void clearUndefinedOutput();
 
   void matchGenericInOut();
   void mapBuiltInToGenericInOut();
