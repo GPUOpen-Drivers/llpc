@@ -195,6 +195,7 @@ private:
   CpsShaderInputCache m_cpsShaderInputCache;
   // Map from a cps function to the alloca where we are holding the latest continuation stack pointer.
   llvm::DenseMap<llvm::Function *, llvm::Value *> m_funcCpsStackMap;
+  llvm::Intrinsic::ID m_setInactiveChainArgId;
 };
 
 } // namespace lgc

@@ -100,7 +100,7 @@ define void @test.2({ ptr addrspace(32) } %state) !lgc.cps !{i32 1} !lgc.shaders
 ; CHECK-NEXT:    [[TMP39:%.*]] = insertelement <16 x i32> [[TMP38]], i32 [[PAD11]], i64 14
 ; CHECK-NEXT:    [[TMP40:%.*]] = insertelement <16 x i32> [[TMP39]], i32 [[SPILLTABLE]], i64 15
 ; CHECK-NEXT:    [[TMP41:%.*]] = extractvalue { i32, ptr addrspace(5), i32, i32 } [[TMP20]], 0
-; CHECK-NEXT:    [[TMP42:%.*]] = call i32 @llvm.amdgcn.setinactive.chain.arg(i32 [[TMP41]], i32 [[VCR]])
+; CHECK-NEXT:    [[TMP42:%.*]] = call i32 @llvm.amdgcn.set.inactive.{{(chain.arg.)?}}i32(i32 [[TMP41]], i32 [[VCR]])
 ; CHECK-NEXT:    [[TMP43:%.*]] = icmp ne i32 [[TMP42]], 0
 ; CHECK-NEXT:    [[TMP44:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP43]])
 ; CHECK-NEXT:    [[TMP45:%.*]] = call i32 @llvm.cttz.i32(i32 [[TMP44]], i1 true)
@@ -163,7 +163,7 @@ define void @test.2({ ptr addrspace(32) } %state) !lgc.cps !{i32 1} !lgc.shaders
 ; CHECK-NEXT:    [[TMP32:%.*]] = insertelement <16 x i32> [[TMP31]], i32 [[PAD11]], i64 14
 ; CHECK-NEXT:    [[TMP33:%.*]] = insertelement <16 x i32> [[TMP32]], i32 [[SPILLTABLE]], i64 15
 ; CHECK-NEXT:    [[TMP34:%.*]] = extractvalue { i32, ptr addrspace(5) } [[TMP13]], 0
-; CHECK-NEXT:    [[TMP35:%.*]] = call i32 @llvm.amdgcn.setinactive.chain.arg.1(i32 [[TMP34]], i32 [[VCR]])
+; CHECK-NEXT:    [[TMP35:%.*]] = call i32 @llvm.amdgcn.set.inactive.{{(chain.arg.)?}}i32(i32 [[TMP34]], i32 [[VCR]])
 ; CHECK-NEXT:    [[TMP36:%.*]] = icmp ne i32 [[TMP35]], 0
 ; CHECK-NEXT:    [[TMP37:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP36]])
 ; CHECK-NEXT:    [[TMP38:%.*]] = call i32 @llvm.cttz.i32(i32 [[TMP37]], i1 true)
@@ -228,7 +228,7 @@ define void @test.2({ ptr addrspace(32) } %state) !lgc.cps !{i32 1} !lgc.shaders
 ; CHECK-NEXT:    [[TMP31:%.*]] = insertelement <16 x i32> [[TMP30]], i32 [[PAD10]], i64 13
 ; CHECK-NEXT:    [[TMP32:%.*]] = insertelement <16 x i32> [[TMP31]], i32 [[PAD11]], i64 14
 ; CHECK-NEXT:    [[TMP33:%.*]] = insertelement <16 x i32> [[TMP32]], i32 [[SPILLTABLE]], i64 15
-; CHECK-NEXT:    [[TMP34:%.*]] = call i32 @llvm.amdgcn.setinactive.chain.arg.2(i32 0, i32 [[VCR]])
+; CHECK-NEXT:    [[TMP34:%.*]] = call i32 @llvm.amdgcn.set.inactive.{{(chain.arg.)?}}i32(i32 0, i32 [[VCR]])
 ; CHECK-NEXT:    [[TMP35:%.*]] = icmp ne i32 [[TMP34]], 0
 ; CHECK-NEXT:    [[TMP36:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP35]])
 ; CHECK-NEXT:    [[TMP37:%.*]] = call i32 @llvm.cttz.i32(i32 [[TMP36]], i1 true)

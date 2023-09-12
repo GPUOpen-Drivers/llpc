@@ -91,7 +91,9 @@ opt<bool> InRegEsGsLdsSize("inreg-esgs-lds-size", desc("For GS on-chip, add esGs
 } // namespace llvm
 
 // =====================================================================================================================
-PatchEntryPointMutate::PatchEntryPointMutate() : m_hasTs(false), m_hasGs(false) {
+PatchEntryPointMutate::PatchEntryPointMutate()
+    : m_hasTs(false), m_hasGs(false),
+      m_setInactiveChainArgId(Function::lookupIntrinsicID("llvm.amdgcn.set.inactive.chain.arg")) {
 }
 
 // =====================================================================================================================
@@ -408,12 +410,15 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
   auto *vcrTy = vcr->getType();
 
   if (isCpsFunc) {
-    // FIXME: Switch to LLVM intrinsic
-    FunctionType *setInactiveChainTy = FunctionType::get(vcrTy, {vcrTy, vcrTy}, false);
-    auto setInactiveChain = Function::Create(setInactiveChainTy, GlobalValue::ExternalLinkage,
-                                             "llvm.amdgcn.setinactive.chain.arg", func->getParent());
     auto *vcrShaderArg = func->getArg(numShaderArg);
-    vcr = builder.CreateCall(setInactiveChain, {vcr, vcrShaderArg});
+    // When we are working with LLVM version without the llvm.amdgcn.set.inactive.chain.arg, we cannot simply declare
+    // it and call it. LLVM will misrecognize it as llvm.amdgcn.set.inactive, and lit-test would just fail. So here we
+    // just call llvm.amdgcn.set.inactive to pass compilation and lit-test if no *set.inactive.chain.arg support.
+    // TODO: Cleanup this when the related LLVM versions have the intrinsic definition.
+    if (m_setInactiveChainArgId != Intrinsic::not_intrinsic)
+      vcr = builder.CreateIntrinsic(vcrTy, m_setInactiveChainArgId, {vcr, vcrShaderArg});
+    else
+      vcr = builder.CreateIntrinsic(vcrTy, Intrinsic::amdgcn_set_inactive, {vcr, vcrShaderArg});
   }
 
   // Find first lane having non-null vcr, and use as next jump target.

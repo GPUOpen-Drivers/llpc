@@ -65,7 +65,7 @@ entry:
 ; CHECK-NEXT:    [[TMP32:%.*]] = insertelement <16 x i32> [[TMP31]], i32 [[PAD11]], i64 14
 ; CHECK-NEXT:    [[TMP33:%.*]] = insertelement <16 x i32> [[TMP32]], i32 [[SPILLTABLE]], i64 15
 ; CHECK-NEXT:    [[TMP34:%.*]] = extractvalue { i32, ptr addrspace(5), i32 } [[TMP13]], 0
-; CHECK-NEXT:    [[TMP35:%.*]] = call i32 @llvm.amdgcn.setinactive.chain.arg(i32 [[TMP34]], i32 [[VCR]])
+; CHECK-NEXT:    [[TMP35:%.*]] = call i32 @llvm.amdgcn.set.inactive.{{(chain.arg.)?}}i32(i32 [[TMP34]], i32 [[VCR]])
 ; CHECK-NEXT:    [[TMP36:%.*]] = icmp ne i32 [[TMP35]], 0
 ; CHECK-NEXT:    [[TMP37:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP36]])
 ; CHECK-NEXT:    [[TMP38:%.*]] = call i32 @llvm.cttz.i32(i32 [[TMP37]], i1 true)
