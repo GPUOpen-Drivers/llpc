@@ -125,7 +125,8 @@ private:
 
   uint64_t generateEntryPointArgTys(ShaderInputs *shaderInputs, llvm::Function *origFunc,
                                     llvm::SmallVectorImpl<llvm::Type *> &argTys,
-                                    llvm::SmallVectorImpl<std::string> &argNames, unsigned argOffset);
+                                    llvm::SmallVectorImpl<std::string> &argNames, unsigned argOffset,
+                                    bool updateUserDataMap = false);
 
   bool isSystemUserDataValue(unsigned userDataValue) const;
   bool isUnlinkedDescriptorSetValue(unsigned value) const;
