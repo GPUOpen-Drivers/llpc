@@ -42,8 +42,7 @@ public:
                  MetroHash::Hash *cacheHash);
   virtual ~ComputeContext() {}
 
-  // Gets pipeline shader info of the specified shader stage
-  virtual const PipelineShaderInfo *getPipelineShaderInfo(unsigned shaderId) const override;
+  virtual PipelineType getPipelineType() const override { return PipelineType::Compute; }
 
   virtual const void *getPipelineBuildInfo() const override { return m_pipelineInfo; }
 
@@ -68,23 +67,12 @@ public:
   // Gets client-defined metadata
   virtual llvm::StringRef getClientMetadata() const override;
 
-#if VKI_RAY_TRACING
-  virtual bool hasRayQuery() const override { return (m_pipelineInfo->shaderLibrary.codeSize > 0); }
-
-  // Set workgroup size for compute pipeline so that rayQuery lowering can see it.
-  virtual void setWorkgroupSize(unsigned workgroupSize) override { m_workgroupSize = workgroupSize; }
-  virtual unsigned getWorkgroupSize() const override { return m_workgroupSize; }
-#endif
-
 private:
   ComputeContext() = delete;
   ComputeContext(const ComputeContext &) = delete;
   ComputeContext &operator=(const ComputeContext &) = delete;
 
   const ComputePipelineBuildInfo *m_pipelineInfo; // Info to build a compute pipeline
-#if VKI_RAY_TRACING
-  unsigned m_workgroupSize = 0; // Workgroup size for rayQuery lowering
-#endif
 };
 
 } // namespace Llpc

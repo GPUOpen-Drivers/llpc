@@ -206,13 +206,21 @@ static void setGfx8Info(TargetInfo *targetInfo) {
   targetInfo->getGpuWorkarounds().gfx6.shaderEstimateRegisterUsage = 1;
 }
 
-// gfx800/gfx801
+// gfx800
 //
 // @param [in/out] targetInfo : Target info
 static void setGfx800Info(TargetInfo *targetInfo) {
   setGfx8Info(targetInfo);
   targetInfo->getGpuProperty().numShaderEngines = 1;
   targetInfo->getGpuProperty().supportsXnack = 1;
+}
+
+// gfx801
+//
+// @param [in/out] targetInfo : Target info
+static void setGfx801Info(TargetInfo *targetInfo) {
+  setGfx800Info(targetInfo);
+  targetInfo->getGpuProperty().supportsRbPlus = 1;
 }
 
 // gfx802/gfx805
@@ -276,6 +284,22 @@ static void setGfx9Info(TargetInfo *targetInfo) {
 static void setGfx900Info(TargetInfo *targetInfo) {
   setGfx9Info(targetInfo);
   targetInfo->getGpuWorkarounds().gfx9.fixLsVgprInput = 1;
+}
+
+// gfx902
+//
+// @param [in/out] targetInfo : Target info
+static void setGfx902Info(TargetInfo *targetInfo) {
+  setGfx900Info(targetInfo);
+  targetInfo->getGpuProperty().supportsRbPlus = 1;
+}
+
+// gfx904
+//
+// @param [in/out] targetInfo : Target info
+static void setGfx904Info(TargetInfo *targetInfo) {
+  setGfx9Info(targetInfo);
+  targetInfo->getGpuProperty().supportsRbPlus = 1;
 }
 
 // gfx906
@@ -400,6 +424,7 @@ static void setGfx103Info(TargetInfo *targetInfo) {
   targetInfo->getGpuProperty().supportIntegerDotFlag.compBitwidth8 = true;
   targetInfo->getGpuProperty().supportIntegerDotFlag.compBitwidth4 = true;
   targetInfo->getGpuProperty().supportIntegerDotFlag.sameSignedness = true;
+  targetInfo->getGpuProperty().supportsRbPlus = true;
 }
 
 // gfx1030
@@ -475,6 +500,7 @@ static void setGfx11Info(TargetInfo *targetInfo) {
   targetInfo->getGpuProperty().supportIntegerDotFlag.compBitwidth4 = true;
   targetInfo->getGpuProperty().supportIntegerDotFlag.sameSignedness = true;
   targetInfo->getGpuProperty().supportIntegerDotFlag.diffSignedness = true;
+  targetInfo->getGpuProperty().supportsRbPlus = true;
 }
 
 // gfx1100
@@ -489,6 +515,31 @@ static void setGfx1100Info(TargetInfo *targetInfo) {
   targetInfo->getGpuProperty().numShaderEngines = 6;
 }
 
+// gfx1102
+//
+// @param [in/out] targetInfo : Target info
+static void setGfx1102Info(TargetInfo *targetInfo) {
+  setGfx11Info(targetInfo);
+
+  targetInfo->getGpuWorkarounds().gfx11.waUserSgprInitBug = 1;
+  targetInfo->getGpuWorkarounds().gfx11.waAtmPrecedesPos = 1;
+
+  targetInfo->getGpuProperty().numShaderEngines = 2;
+}
+
+#if LLPC_BUILD_PHOENIX1
+// gfx1103
+//
+// @param [in/out] targetInfo : Target info
+static void setGfx1103Info(TargetInfo *targetInfo) {
+  setGfx11Info(targetInfo);
+
+  targetInfo->getGpuWorkarounds().gfx11.waAtmPrecedesPos = 1;
+
+  targetInfo->getGpuProperty().numShaderEngines = 1;
+}
+#endif
+
 // =====================================================================================================================
 // Set TargetInfo. Returns false if the GPU name is not found or not supported.
 //
@@ -500,40 +551,50 @@ bool TargetInfo::setTargetInfo(StringRef gpuName) {
   };
 
   static const GpuNameStringMap GpuNameMap[] = {
-      {"gfx600", &setGfx600Info},   // gfx600, tahiti
-      {"gfx601", &setGfx601Info},   // gfx601, pitcairn, verde
-      {"gfx602", &setGfx602Info},   // gfx601, oland, hainan
-      {"gfx700", &setGfx700Info},   // gfx700, kaveri
-      {"gfx701", &setGfx701Info},   // gfx701, hawaii
-      {"gfx702", &setGfx7Info},     // gfx702
-      {"gfx703", &setGfx703Info},   // gfx703, kabini, mullins
-      {"gfx704", &setGfx703Info},   // gfx704, bonaire
-      {"gfx705", &setGfx705Info},   // gfx705
-      {"gfx800", &setGfx800Info},   // gfx800, iceland
-      {"gfx801", &setGfx800Info},   // gfx801, carrizo
-      {"gfx802", &setGfx802Info},   // gfx802, tonga
-      {"gfx803", &setGfx803Info},   // gfx803, fiji, polaris10, polaris11
-      {"gfx804", &setGfx803Info},   // gfx804
-      {"gfx805", &setGfx802Info},   // gfx805, tongapro
-      {"gfx810", &setGfx81Info},    // gfx810, stoney
-      {"gfx900", &setGfx900Info},   // gfx900
-      {"gfx901", &setGfx9Info},     // gfx901
-      {"gfx902", &setGfx900Info},   // gfx902
-      {"gfx903", &setGfx9Info},     // gfx903
-      {"gfx904", &setGfx9Info},     // gfx904, vega12
-      {"gfx906", &setGfx906Info},   // gfx906, vega20
-      {"gfx909", &setGfx9Info},     // gfx909, raven2
-      {"gfx90c", &setGfx9Info},     // gfx90c
-      {"gfx1010", &setGfx1010Info}, // gfx1010
-      {"gfx1011", &setGfx1011Info}, // gfx1011, navi12
-      {"gfx1012", &setGfx1012Info}, // gfx1012, navi14
-      {"gfx1030", &setGfx1030Info}, // gfx1030, navi21
-      {"gfx1031", &setGfx1031Info}, // gfx1031, navi22
-      {"gfx1032", &setGfx1032Info}, // gfx1032, navi23
-      {"gfx1034", &setGfx1034Info}, // gfx1034, navi24
-      {"gfx1035", &setGfx1035Info}, // gfx1035, rembrandt
-      {"gfx1036", &setGfx1036Info}, // gfx1036, raphael | mendocino
-      {"gfx1100", &setGfx1100Info}, // gfx1100, navi31
+    {"gfx600", &setGfx600Info},   // gfx600, tahiti
+    {"gfx601", &setGfx601Info},   // gfx601, pitcairn, verde
+    {"gfx602", &setGfx602Info},   // gfx601, oland, hainan
+    {"gfx700", &setGfx700Info},   // gfx700, kaveri
+    {"gfx701", &setGfx701Info},   // gfx701, hawaii
+    {"gfx702", &setGfx7Info},     // gfx702
+    {"gfx703", &setGfx703Info},   // gfx703, kabini, mullins
+    {"gfx704", &setGfx703Info},   // gfx704, bonaire
+    {"gfx705", &setGfx705Info},   // gfx705
+    {"gfx800", &setGfx800Info},   // gfx800, iceland
+    {"gfx801", &setGfx801Info},   // gfx801, carrizo
+    {"gfx802", &setGfx802Info},   // gfx802, tonga
+    {"gfx803", &setGfx803Info},   // gfx803, fiji, polaris10, polaris11
+    {"gfx804", &setGfx803Info},   // gfx804
+    {"gfx805", &setGfx802Info},   // gfx805, tongapro
+    {"gfx810", &setGfx81Info},    // gfx810, stoney
+    {"gfx900", &setGfx900Info},   // gfx900
+    {"gfx901", &setGfx9Info},     // gfx901
+    {"gfx902", &setGfx902Info},   // gfx902
+    {"gfx903", &setGfx9Info},     // gfx903
+    {"gfx904", &setGfx904Info},   // gfx904, vega12
+    {"gfx906", &setGfx906Info},   // gfx906, vega20
+    {"gfx909", &setGfx904Info},   // gfx909, raven2
+    {"gfx90c", &setGfx9Info},     // gfx90c
+    {"gfx1010", &setGfx1010Info}, // gfx1010
+    {"gfx1011", &setGfx1011Info}, // gfx1011, navi12
+    {"gfx1012", &setGfx1012Info}, // gfx1012, navi14
+    {"gfx1030", &setGfx1030Info}, // gfx1030, navi21
+    {"gfx1031", &setGfx1031Info}, // gfx1031, navi22
+    {"gfx1032", &setGfx1032Info}, // gfx1032, navi23
+    {"gfx1034", &setGfx1034Info}, // gfx1034, navi24
+    {"gfx1035", &setGfx1035Info}, // gfx1035, rembrandt
+    {"gfx1036", &setGfx1036Info}, // gfx1036, raphael | mendocino
+    {"gfx1100", &setGfx1100Info}, // gfx1100, navi31
+    {"gfx1102", &setGfx1102Info}, // gfx1102, navi33
+    {"gfx1035", &setGfx1035Info}, // gfx1035, rembrandt
+    {"gfx1036", &setGfx1036Info}, // gfx1036, raphael | mendocino
+    {"gfx1100", &setGfx1100Info}, // gfx1100, navi31
+#if LLPC_BUILD_NAVI33
+    {"gfx1102", &setGfx1102Info}, // gfx1102, navi33
+#endif
+#if LLPC_BUILD_PHOENIX1
+    {"gfx1103", &setGfx1103Info}, // gfx1103, phoenix1
+#endif
   };
 
   void (*setTargetInfoFunc)(TargetInfo * targetInfo) = nullptr;

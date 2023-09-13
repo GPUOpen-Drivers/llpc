@@ -33,6 +33,7 @@
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
 #include "lgc/builder/BuilderReplayer.h"
+#include "lgc/patch/Continufy.h"
 #include "lgc/patch/FragColorExport.h"
 #include "lgc/patch/LowerDebugPrintf.h"
 #include "lgc/patch/PatchBufferOp.h"
@@ -52,7 +53,6 @@
 #include "lgc/patch/PatchReadFirstLane.h"
 #include "lgc/patch/PatchResourceCollect.h"
 #include "lgc/patch/PatchSetupTargetFeatures.h"
-#include "lgc/patch/PatchWaveSizeAdjust.h"
 #include "lgc/patch/PatchWorkarounds.h"
 #include "lgc/patch/VertexFetch.h"
 #include "lgc/state/PipelineState.h"
@@ -140,7 +140,6 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   passMgr.addPass(PatchCheckShaderCache(std::move(checkShaderCacheFunc)));
 
   // First part of lowering to "AMDGCN-style"
-  passMgr.addPass(PatchWaveSizeAdjust());
   passMgr.addPass(PatchWorkarounds());
   passMgr.addPass(PatchCopyShader());
   passMgr.addPass(LowerVertexFetch());
@@ -379,7 +378,15 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level o
   fpm.addPass(createFunctionToLoopPassAdaptor(std::move(lpm2), true));
   fpm.addPass(LoopUnrollPass(
       LoopUnrollOptions(optLevel).setPeeling(true).setRuntime(false).setUpperBound(false).setPartial(false)));
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 464212
+  // Old version of the code
   fpm.addPass(ScalarizerPass());
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  ScalarizerPassOptions scalarizerOptions;
+  scalarizerOptions.ScalarizeMinBits = 32;
+  fpm.addPass(ScalarizerPass(scalarizerOptions));
+#endif
   fpm.addPass(PatchLoadScalarizer());
   fpm.addPass(InstSimplifyPass());
   fpm.addPass(NewGVNPass());

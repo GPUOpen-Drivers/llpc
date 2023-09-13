@@ -151,9 +151,9 @@ void PatchWorkarounds::processImageDescWorkaround(CallInst &callInst, bool isLas
   for (Value *arg : callInst.args()) {
     if (auto vecTy = dyn_cast<FixedVectorType>(arg->getType())) {
       if (vecTy->getNumElements() == 8 && vecTy->getElementType()->isIntegerTy(32)) {
-        if (isa<UndefValue>(arg))
-          // We don't need to worry if the value is actually undef. This situation only really occurs in unit test
-          // but either way, it is pointless to apply the workaround to an undef.
+        if (isa<UndefValue>(arg) || isa<PoisonValue>(arg))
+          // We don't need to worry if the value is actually unspecified. This situation only really occurs in unit test
+          // but either way, it is pointless to apply the workaround to an unspecified.
           break;
 
         if (m_processed.count(arg) > 0)

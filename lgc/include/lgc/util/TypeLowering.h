@@ -1,9 +1,27 @@
 /*
-************************************************************************************************************************
-*
-*  Copyright (C) 2020-2023 Advanced Micro Devices, Inc. All rights reserved.
-*
-***********************************************************************************************************************/
+ ***********************************************************************************************************************
+ *
+ *  Copyright (c) 2020-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *
+ *  Permission is hereby granted, free of charge, to any person obtaining a copy
+ *  of this software and associated documentation files (the "Software"), to deal
+ *  in the Software without restriction, including without limitation the rights
+ *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ *  copies of the Software, and to permit persons to whom the Software is
+ *  furnished to do so, subject to the following conditions:
+ *
+ *  The above copyright notice and this permission notice shall be included in all
+ *  copies or substantial portions of the Software.
+ *
+ *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ *  SOFTWARE.
+ *
+ **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
  * @file  TypeLowering.h
@@ -116,11 +134,12 @@ public:
 
   static void registerVisitors(llvm_dialects::VisitorBuilder<TypeLowering> &builder);
 
-  llvm::ArrayRef<llvm::Value *> getValue(llvm::Value *value);
-  llvm::ArrayRef<llvm::Value *> getValueOptional(llvm::Value *value);
+  llvm::SmallVector<llvm::Value *> getValue(llvm::Value *value);
+  llvm::SmallVector<llvm::Value *> getValueOptional(llvm::Value *value);
   void replaceInstruction(llvm::Instruction *inst, llvm::ArrayRef<llvm::Value *> mapping);
   void eraseInstruction(llvm::Instruction *inst);
 
+  llvm::Function *lowerFunctionArguments(llvm::Function &fn);
   void finishPhis();
   bool finishCleanup();
 
@@ -162,6 +181,7 @@ private:
 
   std::vector<std::pair<llvm::PHINode *, llvm::SmallVector<llvm::PHINode *>>> m_phis;
   std::vector<llvm::Instruction *> m_instructionsToErase;
+  llvm::SmallVector<llvm::Function *> m_functionToErase;
 };
 
 } // namespace lgc

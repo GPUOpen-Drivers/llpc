@@ -1,4 +1,5 @@
 #include "lgc/util/TypeLowering.h"
+#include "lgc/util/Internal.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Instructions.h"
 
@@ -92,6 +93,48 @@ TypeLowering::TypeLowering(LLVMContext &context) : m_builder(context) {
 }
 
 // =====================================================================================================================
+// Lower function argument type based on the registered rules. If there is no type remapping needed, will just return
+// the old function, otherwise it will move all the instructions in the old function to the new function and return the
+// new function. So don't operate on the old function if new function was returned! The old function will be cleaned up
+// at the time of TypeLowering::finishCleanup().
+//
+Function *TypeLowering::lowerFunctionArguments(Function &fn) {
+  SmallVector<Type *> newArgTys;
+  SmallVector<unsigned> remappedArgs;
+  for (size_t argIdx = 0; argIdx < fn.arg_size(); ++argIdx) {
+    auto *arg = fn.getArg(argIdx);
+    auto converted = convertType(arg->getType());
+    assert(converted.size() == 1 && "Only 1:1 type remapping supported now");
+    if (converted[0] == arg->getType()) {
+      newArgTys.push_back(arg->getType());
+    } else {
+      remappedArgs.push_back(argIdx);
+      newArgTys.push_back(converted[0]);
+    }
+  }
+
+  if (remappedArgs.empty())
+    return &fn;
+
+  auto *newFn = mutateFunctionArguments(fn, fn.getReturnType(), newArgTys, fn.getAttributes());
+  fn.replaceAllUsesWith(newFn);
+  for (unsigned argIdx : remappedArgs)
+    recordValue(fn.getArg(argIdx), {newFn->getArg(argIdx)});
+
+  // Setup names and replace argument uses except the remapped ones.
+  // The remapped argument will be handled by later instruction visitor.
+  for (unsigned idx = 0; idx < newFn->arg_size(); idx++) {
+    Value *oldArg = fn.getArg(idx);
+    Value *newArg = newFn->getArg(idx);
+    newArg->setName(oldArg->getName());
+    if (!llvm::is_contained(remappedArgs, idx))
+      oldArg->replaceAllUsesWith(newArg);
+  }
+  m_functionToErase.push_back(&fn);
+  return newFn;
+}
+
+// =====================================================================================================================
 // Add a type conversion rule.
 //
 // Rules are applied in LIFO order.
@@ -162,7 +205,7 @@ void TypeLowering::registerVisitors(llvm_dialects::VisitorBuilder<TypeLowering> 
 // post-order, and phi nodes are fixed up at the end. Therefore, this method should be preferred over getValueOptional.
 //
 // @param value : the value
-ArrayRef<Value *> TypeLowering::getValue(Value *value) {
+SmallVector<Value *> TypeLowering::getValue(Value *value) {
   auto values = getValueOptional(value);
   assert(!values.empty());
   return values;
@@ -177,7 +220,7 @@ ArrayRef<Value *> TypeLowering::getValue(Value *value) {
 // Note that constant conversion is invoked on-the-fly as needed.
 //
 // @param value : the value
-ArrayRef<Value *> TypeLowering::getValueOptional(Value *value) {
+SmallVector<Value *> TypeLowering::getValueOptional(Value *value) {
   auto valueIt = m_valueMap.find(value);
   if (valueIt == m_valueMap.end()) {
     auto *constant = dyn_cast<Constant>(value);
@@ -208,15 +251,15 @@ ArrayRef<Value *> TypeLowering::getValueOptional(Value *value) {
     assert(valueIt != m_valueMap.end());
   }
 
-  if ((valueIt->second & 1) == 0)
-    return reinterpret_cast<Value *>(valueIt->second);
+  if ((valueIt->second & 1) == 0) {
+    return SmallVector<Value *>(ArrayRef(reinterpret_cast<Value *>(valueIt->second)));
+  }
 
   size_t begin = valueIt->second >> 1;
   auto typeIt = m_multiTypeConversions.find(value->getType());
   assert(typeIt != m_multiTypeConversions.end());
   size_t count = typeIt->second.size();
-
-  return {&m_convertedValueList[begin], count};
+  return SmallVector<Value *>(ArrayRef(&m_convertedValueList[begin], count));
 }
 
 // =====================================================================================================================
@@ -379,6 +422,10 @@ bool TypeLowering::finishCleanup() {
   for (Instruction *inst : llvm::reverse(m_instructionsToErase))
     inst->eraseFromParent();
   m_instructionsToErase.clear();
+
+  for (Function *fn : m_functionToErase)
+    fn->eraseFromParent();
+  m_functionToErase.clear();
 
   m_valueMap.clear();
   m_convertedValueList.clear();

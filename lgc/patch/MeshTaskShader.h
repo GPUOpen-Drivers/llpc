@@ -30,6 +30,7 @@
  */
 #pragma once
 
+#include "lgc/LgcDialect.h"
 #include "lgc/patch/PatchPreparePipelineAbi.h"
 #include "lgc/patch/SystemValues.h"
 #include "lgc/state/PipelineState.h"
@@ -79,12 +80,14 @@ private:
   void processTaskShader(llvm::Function *entryPoint);
   void processMeshShader(llvm::Function *entryPoint);
 
-  llvm::Value *readTaskPayload(llvm::Type *readTy, llvm::Value *byteOffset);
-  void writeTaskPayload(llvm::Value *writeValue, llvm::Value *byteOffset);
-  llvm::Value *taskPayloadAtomic(unsigned atomicOp, llvm::AtomicOrdering ordering, llvm::Value *inputValue,
-                                 llvm::Value *byteOffset);
-  llvm::Value *taskPayloadAtomicCompareSwap(llvm::AtomicOrdering ordering, llvm::Value *inputValue,
-                                            llvm::Value *comparatorValue, llvm::Value *byteOffset);
+  void lowerTaskPayloadPtr(TaskPayloadPtrOp &taskPayloadPtrOp);
+  void lowerEmitMeshTasks(EmitMeshTasksOp &emitMeshTasksOp);
+  void lowerSetMeshOutputs(SetMeshOutputsOp &setMeshOutputsOp);
+  void lowerSetMeshPrimitiveIndices(SetMeshPrimitiveIndicesOp &setMeshPrimitiveIndicesOp);
+  void lowerSetMeshPrimitiveCulled(SetMeshPrimitiveCulledOp &setMeshPrimitiveCulledOp);
+  void lowerGetMeshBuiltinInput(GetMeshBuiltinInputOp &getMeshBuiltinInputOp);
+  void lowerWriteMeshVertexOutput(WriteMeshVertexOutputOp &writeMeshVertexOutputOp);
+  void lowerWriteMeshPrimitiveOutput(WriteMeshPrimitiveOutputOp &writeMeshPrimitiveOutputOp);
 
   void initWaveThreadInfo(llvm::Function *entryPoint);
   llvm::Value *getShaderRingEntryIndex(llvm::Function *entryPoint);
@@ -92,18 +95,11 @@ private:
   llvm::Value *getPayloadRingEntryOffset(llvm::Function *entryPoint);
   llvm::Value *getDrawDataRingEntryOffset(llvm::Function *entryPoint);
   llvm::Value *getDrawDataReadyBit(llvm::Function *entryPoint);
-  void emitTaskMeshs(llvm::Value *groupCountX, llvm::Value *groupCountY, llvm::Value *groupCountZ);
 
   llvm::Value *convertToDivergent(llvm::Value *value);
 
   llvm::Function *mutateMeshShaderEntryPoint(llvm::Function *entryPoint);
   void lowerMeshShaderBody(llvm::BasicBlock *apiMeshEntryBlock, llvm::BasicBlock *apiMeshExitBlock);
-  void setMeshOutputs(llvm::Value *vertexCount, llvm::Value *primitiveCount);
-  void setPrimitiveIndices(llvm::Value *primitiveIndex, llvm::Value *primitiveIndices);
-  void setPrimitiveCulled(llvm::Value *primitiveIndex, llvm::Value *isCulled);
-  llvm::Value *getMeshInput(BuiltInKind builtIn);
-  void writeVertexOutput(llvm::Value *outputOffset, llvm::Value *vertexIndex, llvm::Value *outputValue);
-  void writePrimitiveOutput(llvm::Value *outputOffset, llvm::Value *primitiveIndex, llvm::Value *outputValue);
 
   void exportPrimitive();
   void exportVertex();
@@ -146,6 +142,7 @@ private:
   void writeValueToLds(llvm::Value *writeValue, llvm::Value *ldsOffset);
   void atomicOpWithLds(llvm::AtomicRMWInst::BinOp atomicOp, llvm::Value *atomicValue, llvm::Value *ldsOffset);
   void createFenceAndBarrier();
+  void createBarrier();
 
   static constexpr unsigned PayloadRingEntrySize = 16 * 1024;    // 16K bytes per group
   static constexpr unsigned DrawDataRingEntrySize = 16;          // 16 bytes per group
@@ -158,7 +155,7 @@ private:
 
   PipelineSystemValues m_pipelineSysValues; // Cache of ShaderSystemValues objects, one per shader stage
 
-  llvm::IRBuilder<> m_builder; // LLVM IR builder
+  BuilderBase m_builder; // LLVM IR builder
 
   // The wave/thread info used for control shader branching
   struct {
@@ -180,6 +177,9 @@ private:
   llvm::Value *m_barrierToggle = nullptr;            // Toggle used by calculation of barrier completion flag
   bool m_needBarrierFlag = false;                    // Whether barrier completion flag is needed
   llvm::SmallVector<llvm::CallInst *, 8> m_barriers; // Barriers collected from API mesh shader
+
+  llvm::SmallVector<llvm::CallInst *, 16>
+      m_callsToRemove; // Calls relevant to task/mesh shader operations that will be finally removed after lowering
 
   llvm::GlobalValue *m_lds = nullptr; // Global variable to model mesh shader LDS
 

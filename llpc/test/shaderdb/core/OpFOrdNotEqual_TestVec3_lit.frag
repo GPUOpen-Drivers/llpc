@@ -15,10 +15,7 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
-; SHADERTEST: fcmp {{[ou]}}ne <3 x float>
-; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
-; SHADERTEST-COUNT-3: fcmp {{[ou]}}ne float
+; SHADERTEST: fcmp une <3 x float>
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

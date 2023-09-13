@@ -65,6 +65,9 @@ public:
   // and export info.
   void updatePalMetadata(PalMetadata &palMetadata) override;
 
+  // Fragment shader enables kill state.
+  void enableKill() { m_killEnabled = true; }
+
 protected:
   // Generate the glue shader to IR module
   llvm::Module *generate() override;
@@ -79,8 +82,7 @@ private:
   ExportFormat m_exportFormat[MaxColorTargets] = {}; // The export format for each hw color target.
   // The encoded or hashed (in some way) single string version of the above.
   std::string m_shaderString;
-  PipelineState *m_pipelineState; // The pipeline state.  Used to set meta data information.
-  bool m_killEnabled;             // True if this fragment shader has kill enabled.
+  bool m_killEnabled; // True if this fragment shader has kill enabled.
 };
 
 } // namespace lgc

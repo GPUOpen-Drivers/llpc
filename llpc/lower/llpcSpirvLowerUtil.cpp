@@ -87,4 +87,35 @@ void setShaderStageToModule(Module *module, ShaderStage shaderStage) {
   func->setMetadata(gSPIRVMD::ExecutionModel, execModelMetaNode);
 }
 
+// =====================================================================================================================
+// Clear the block before patching the function
+//
+// @param func : The function to clear
+BasicBlock *clearBlock(Function *func) {
+  assert(func->size() == 1);
+  BasicBlock &entryBlock = func->getEntryBlock();
+  entryBlock.dropAllReferences();
+  for (auto instIt = entryBlock.begin(); instIt != entryBlock.end();) {
+    auto &inst = *instIt++;
+    inst.eraseFromParent();
+  }
+  return &entryBlock;
+}
+
+// =====================================================================================================================
+// Clear non entry external functions
+// @param module : LLVM module to remove functions.
+// @param entryName : Entry Function Name
+void clearNonEntryFunctions(Module *module, StringRef entryName) {
+  for (auto funcIt = module->begin(), funcEnd = module->end(); funcIt != funcEnd;) {
+    Function *func = &*funcIt++;
+    if (func->getLinkage() == GlobalValue::ExternalLinkage && !func->empty()) {
+      if (!func->getName().startswith(entryName)) {
+        func->dropAllReferences();
+        func->eraseFromParent();
+      }
+    }
+  }
+}
+
 } // namespace Llpc

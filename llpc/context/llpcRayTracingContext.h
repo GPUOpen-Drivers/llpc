@@ -45,11 +45,11 @@ namespace Llpc {
 class RayTracingContext : public PipelineContext {
 public:
   RayTracingContext(GfxIpVersion gfxIp, const RayTracingPipelineBuildInfo *pipelineInfo,
-                    const PipelineShaderInfo *traceRayShaderInfo, MetroHash::Hash *pipelineHash,
+                    const PipelineShaderInfo *representativeShaderInfo, MetroHash::Hash *pipelineHash,
                     MetroHash::Hash *cacheHash, unsigned indirectStageMask);
   virtual ~RayTracingContext() {}
 
-  virtual const PipelineShaderInfo *getPipelineShaderInfo(unsigned shaderId) const override;
+  virtual PipelineType getPipelineType() const override { return PipelineType::RayTracing; }
 
   // Gets pipeline build info
   virtual const void *getPipelineBuildInfo() const override { return m_pipelineInfo; }
@@ -75,11 +75,8 @@ public:
   // Gets client-defined metadata
   virtual llvm::StringRef getClientMetadata() const override;
 
-  // Checks whether the pipeline is ray tracing
-  virtual bool isRayTracing() const override { return true; }
-
-  // Set the raytracing shader stages inline/indirect status
-  virtual void setIndirectStage(ShaderStage stage) override { m_indirectStageMask |= shaderStageToMask(stage); }
+  // Override to force an indirect compile
+  void setIndirectPipeline();
 
   virtual void collectPayloadSize(llvm::Type *type, const llvm::DataLayout &dataLayout) override;
   virtual void collectCallableDataSize(llvm::Type *type, const llvm::DataLayout &dataLayout) override;
@@ -105,13 +102,17 @@ public:
   static const unsigned TriangleHitGroup = static_cast<unsigned>(-2);
   llvm::Type *getPayloadType(lgc::Builder *builder);
   llvm::Type *getCallableDataType(lgc::Builder *builder);
+  unsigned getCallableDataSizeInBytes() { return m_callableDataMaxSize; }
   unsigned getAttributeDataSize();
+  unsigned getAttributeDataSizeInBytes() { return m_attributeDataMaxSize; };
   std::set<unsigned, std::less<unsigned>> &getBuiltIns() { return m_builtIns; }
   bool getHitAttribute() { return m_attributeDataMaxSize > 0; }
   unsigned getPayloadSizeInDword() { return m_payloadMaxSize / 4; }
+  unsigned getPayloadSizeInBytes() { return m_payloadMaxSize; }
   bool hasPipelineLibrary() { return m_pipelineInfo->hasPipelineLibrary; }
   unsigned hasLibraryStage(unsigned stageMask) { return m_pipelineInfo->pipelineLibStageMask & stageMask; }
   bool isReplay() { return m_pipelineInfo->isReplay; }
+  Vkgc::LlpcRaytracingMode getRaytracingMode() { return m_pipelineInfo->mode; }
 
 protected:
   // Give the pipeline options to the middle-end, and/or hash them.
@@ -123,8 +124,12 @@ private:
   RayTracingContext &operator=(const RayTracingContext &) = delete;
   bool isRayTracingBuiltIn(unsigned builtIn);
 
-  const RayTracingPipelineBuildInfo *m_pipelineInfo;  // Info to build a ray tracing pipeline
-  const PipelineShaderInfo *m_traceRayShaderInfo;     // Trace Ray shaderInfo
+  /// Info to build a ray tracing pipeline
+  const RayTracingPipelineBuildInfo *m_pipelineInfo;
+
+  /// Shader info that is representative of the pipeline as a whole. It does not actually contain module data.
+  PipelineShaderInfo m_representativeShaderInfo;
+
   bool m_linked;                                      // Whether the context is linked or not
   unsigned m_indirectStageMask;                       // Which stages enable indirect call for ray tracing
   std::string m_entryName;                            // Entry function of the raytracing module

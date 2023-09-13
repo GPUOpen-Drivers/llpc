@@ -353,7 +353,7 @@ template <typename T> void ConfigBuilder::buildVsRegConfig(ShaderStage shaderSta
     SET_REG_FIELD(&config->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_1_EN, streamXfbBuffers[1] > 0);
     SET_REG_FIELD(&config->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_2_EN, streamXfbBuffers[2] > 0);
     SET_REG_FIELD(&config->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_3_EN, streamXfbBuffers[3] > 0);
-    SET_REG_FIELD(&config->vsRegs, VGT_STRMOUT_CONFIG, RAST_STREAM, resUsage->inOutUsage.gs.rasterStream);
+    SET_REG_FIELD(&config->vsRegs, VGT_STRMOUT_CONFIG, RAST_STREAM, m_pipelineState->getRasterizerState().rasterStream);
   } else {
     const auto &shaderOptions = m_pipelineState->getShaderOptions(shaderStage);
     SET_REG_FIELD(&config->vsRegs, SPI_SHADER_PGM_RSRC1_VS, DEBUG_MODE, shaderOptions.debugMode);
@@ -402,6 +402,7 @@ template <typename T> void ConfigBuilder::buildVsRegConfig(ShaderStage shaderSta
 
   // Stage-specific processing
   bool usePointSize = false;
+  bool useEdgeFlag = false;
   bool usePrimitiveId = false;
   bool useLayer = false;
   bool useViewportIndex = false;
@@ -410,6 +411,7 @@ template <typename T> void ConfigBuilder::buildVsRegConfig(ShaderStage shaderSta
 
   if (shaderStage == ShaderStageVertex) {
     usePointSize = builtInUsage.vs.pointSize;
+    useEdgeFlag = builtInUsage.vs.edgeFlag;
     usePrimitiveId = builtInUsage.vs.primitiveId;
     useLayer = builtInUsage.vs.layer;
     useViewportIndex = builtInUsage.vs.viewportIndex;
@@ -472,13 +474,17 @@ template <typename T> void ConfigBuilder::buildVsRegConfig(ShaderStage shaderSta
 
   useLayer = useLayer || m_pipelineState->getInputAssemblyState().enableMultiView;
 
-  bool miscExport = usePointSize || useLayer || useViewportIndex;
+  bool miscExport = usePointSize || useLayer || useViewportIndex || useEdgeFlag;
   if (miscExport) {
     SET_REG_FIELD(&config->vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_POINT_SIZE, usePointSize);
     SET_REG_FIELD(&config->vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_RENDER_TARGET_INDX, useLayer);
     SET_REG_FIELD(&config->vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_VIEWPORT_INDX, useViewportIndex);
     SET_REG_FIELD(&config->vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_VEC_ENA, true);
     SET_REG_FIELD(&config->vsRegs, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_SIDE_BUS_ENA, true);
+
+    if (useEdgeFlag) {
+      SET_REG_FIELD(&config->vsRegs, PA_CL_VS_OUT_CNTL, USE_VTX_EDGE_FLAG, true);
+    }
   }
 
   if (clipDistanceCount > 0 || cullDistanceCount > 0) {
@@ -492,8 +498,10 @@ template <typename T> void ConfigBuilder::buildVsRegConfig(ShaderStage shaderSta
 
     // Set fields CLIP_DIST_ENA_0 ~ CLIP_DIST_ENA_7 and CULL_DIST_ENA_0 ~ CULL_DIST_ENA_7
     unsigned paClVsOutCntl = GET_REG(&config->vsRegs, PA_CL_VS_OUT_CNTL);
-    paClVsOutCntl |= clipDistanceMask;
-    paClVsOutCntl |= (cullDistanceMask << 8);
+
+    // Note: Point primitives are only affected by the cull mask, so enable culling also based on clip distances
+    unsigned finalMask = clipDistanceMask | cullDistanceMask;
+    paClVsOutCntl |= clipDistanceMask | (finalMask << 8);
     SET_REG(&config->vsRegs, PA_CL_VS_OUT_CNTL, paClVsOutCntl);
   }
 
@@ -833,10 +841,14 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
   assert(shaderStage == ShaderStageFragment);
 
   const auto intfData = m_pipelineState->getShaderInterfaceData(shaderStage);
+  const auto &options = m_pipelineState->getOptions();
   const auto &shaderOptions = m_pipelineState->getShaderOptions(shaderStage);
   const auto resUsage = m_pipelineState->getShaderResourceUsage(shaderStage);
   const auto &builtInUsage = resUsage->builtInUsage.fs;
   const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
+
+  const bool useFloatLocationAtIteratedSampleNumber =
+      options.fragCoordUsesInterpLoc ? builtInUsage.fragCoordIsSample : builtInUsage.runAtSampleRate;
 
   unsigned floatMode = setupFloatingPointMode(shaderStage);
   SET_REG_FIELD(&config->psRegs, SPI_SHADER_PGM_RSRC1_PS, FLOAT_MODE, floatMode);
@@ -850,7 +862,7 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
   if (fragmentMode.pixelCenterInteger) {
     // TRUE - Force floating point position to upper left corner of pixel (X.0, Y.0)
     SET_REG_FIELD(&config->psRegs, SPI_BARYC_CNTL, POS_FLOAT_ULC, true);
-  } else if (builtInUsage.runAtSampleRate) {
+  } else if (useFloatLocationAtIteratedSampleNumber) {
     // 2 - Calculate per-pixel floating point position at iterated sample number
     SET_REG_FIELD(&config->psRegs, SPI_BARYC_CNTL, POS_FLOAT_LOCATION, 2);
   } else {
@@ -893,18 +905,6 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
                 (fragmentMode.earlyFragmentTests && resUsage->resourceWrite));
   SET_REG_FIELD(&config->psRegs, DB_SHADER_CONTROL, EXEC_ON_HIER_FAIL, execOnHeirFail);
 
-  unsigned depthExpFmt = EXP_FORMAT_ZERO;
-  if (builtInUsage.sampleMask)
-    depthExpFmt = EXP_FORMAT_32_ABGR;
-  else if (builtInUsage.fragStencilRef)
-    depthExpFmt = EXP_FORMAT_32_GR;
-  else if (builtInUsage.fragDepth)
-    depthExpFmt = EXP_FORMAT_32_R;
-  SET_REG_FIELD(&config->psRegs, SPI_SHADER_Z_FORMAT, Z_EXPORT_FORMAT, depthExpFmt);
-
-  unsigned cbShaderMask = resUsage->inOutUsage.fs.cbShaderMask;
-  cbShaderMask = resUsage->inOutUsage.fs.isNullFs ? 0 : cbShaderMask;
-  SET_REG(&config->psRegs, CB_SHADER_MASK, cbShaderMask);
   SET_REG_FIELD(&config->psRegs, SPI_PS_IN_CONTROL, NUM_INTERP, resUsage->inOutUsage.fs.interpInfo.size());
 
   unsigned pointCoordLoc = InvalidValue;

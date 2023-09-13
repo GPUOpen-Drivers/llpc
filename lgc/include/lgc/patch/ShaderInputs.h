@@ -43,7 +43,7 @@
 #include "lgc/state/AbiMetadata.h"
 #include "lgc/state/TargetInfo.h"
 #include "llvm/ADT/SmallVector.h"
-
+#include "llvm/IR/Function.h"
 namespace llvm {
 class CallInst;
 class Instruction;
@@ -63,6 +63,8 @@ class PipelineState;
 enum class ShaderInput : unsigned {
   // TasK/CS SGPRs
   WorkgroupId,       // WorkgroupId (v3i32)
+  WorkgroupId2,      // WorkgroupId (v2i32)
+  WorkgroupId1,      // WorkgroupId (i32)
   MultiDispatchInfo, // Multiple dispatch info, include TG_SIZE and etc.
 
   // FS SGPRs
@@ -136,7 +138,6 @@ enum class ShaderInput : unsigned {
 
   // Task/CS VGPRs
   LocalInvocationId, // LocalInvocationId (v3i32)
-
   Count
 };
 
@@ -195,12 +196,12 @@ public:
   void gatherUsage(llvm::Module &module);
 
   // Fix up uses of shader inputs to use entry args directly
-  void fixupUses(llvm::Module &module, PipelineState *pipelineState);
+  void fixupUses(llvm::Module &module, PipelineState *pipelineState, bool computeWithIndirectCall);
 
   // Get argument types for shader inputs
-  uint64_t getShaderArgTys(PipelineState *pipelineState, ShaderStage shaderStage,
-                           llvm::SmallVectorImpl<llvm::Type *> &argTys, llvm::SmallVectorImpl<std::string> &argNames,
-                           unsigned argOffset);
+  uint64_t getShaderArgTys(PipelineState *pipelineState, ShaderStage shaderStage, llvm::Function *origFunc,
+                           bool isComputeWithCalls, llvm::SmallVectorImpl<llvm::Type *> &argTys,
+                           llvm::SmallVectorImpl<std::string> &argNames, unsigned argOffset);
 
 private:
   // Usage for one system shader input in one shader stage
@@ -223,6 +224,10 @@ private:
     return getShaderInputUsage(stage, static_cast<unsigned>(inputKind));
   }
   ShaderInputUsage *getShaderInputUsage(ShaderStage stage, unsigned inputKind);
+
+  // Try to optimize to use the accurate workgroupID arguments and set the function attribute for corresponding
+  // amdgpu-no-workgroup-id-*
+  void tryOptimizeWorkgroupId(PipelineState *pipelineState, ShaderStage shaderStage, llvm::Function *origFunc);
 
   llvm::SmallVector<ShaderInputsUsage, ShaderStageCountInternal> m_shaderInputsUsage;
 };

@@ -29,14 +29,14 @@ void main()
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
-; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i32 0, i32 0)
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i64 0, i32 0)
 ; SHADERTEST: call {{.*}} @lgc.create.image.load.v4f32(i32 0, i32 512, {{.*}}, i32 1)
-; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i32 0, i32 1)
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i64 0, i32 1)
 ; SHADERTEST: call {{.*}} @lgc.create.image.load.v4f32(i32 1, i32 512, {{.*}}, <2 x i32> <i32 2, i32 3>)
 ; SHADERTEST: call {{.*}} @lgc.create.image.load.v4f32(i32 0, i32 128, {{.*}}, i32 4)
-; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i32 2, i32 0)
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i64 2, i32 0)
 ; SHADERTEST: call {{.*}} @lgc.create.image.load.v4f32(i32 8, i32 128, {{.*}}, <4 x i32> <i32 5, i32 6, i32 1, i32 1>)
-; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i32 0, i32 2)
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i64 0, i32 2)
 ; SHADERTEST: call {{.*}} @lgc.create.image.load.v4f32(i32 6, i32 512, {{.*}}, <3 x i32> <i32 8, i32 9, i32 2>)
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results

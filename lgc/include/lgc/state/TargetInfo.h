@@ -83,6 +83,7 @@ struct GpuProperty {
   bool supportsDpp;              // GPU supports DPP
   bool supportsDppRowXmask;      // GPU supports DPP ROW_XMASK
   bool supportsPermLane16;       // GPU supports perm lane 16
+  bool supportsRbPlus;           // GPU supports RB+
 };
 
 // Contains flags for all of the hardware workarounds which affect pipeline compilation.

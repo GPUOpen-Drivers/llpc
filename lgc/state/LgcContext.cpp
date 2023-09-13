@@ -61,7 +61,7 @@ static codegen::RegisterCodeGenFlags CGF;
 static bool Initialized;
 #endif
 
-raw_ostream *LgcContext::m_llpcOuts;
+thread_local raw_ostream *LgcContext::m_llpcOuts;
 
 // -emit-llvm: emit LLVM assembly instead of ISA
 static cl::opt<bool> EmitLlvm("emit-llvm", cl::desc("Emit LLVM assembly instead of AMD GPU ISA"), cl::init(false));
@@ -133,7 +133,6 @@ void LgcContext::initialize() {
   initializeCodeGen(passRegistry);
   initializeShadowStackGCLoweringPass(passRegistry);
   initializeExpandReductionsPass(passRegistry);
-  initializeRewriteSymbolsLegacyPassPass(passRegistry);
 
   // Initialize LGC passes so they can be referenced by -stop-before etc.
   initializeUtilPasses(passRegistry);
@@ -148,12 +147,23 @@ void LgcContext::initialize() {
   setOptionDefault("enable-phi-of-ops", "0");
   setOptionDefault("simplifycfg-sink-common", "0");
   setOptionDefault("amdgpu-vgpr-index-mode", "1"); // force VGPR indexing on GFX8
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 464446
+  // Old version of the code
   setOptionDefault("amdgpu-atomic-optimizations", "1");
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+#endif
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 463788
+  // Old version of the code
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  setOptionDefault("amdgpu-atomic-optimizer-strategy", "DPP");
+#endif
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
   // Old version of the code
   setOptionDefault("use-gpu-divergence-analysis", "1");
 #else
-// New version of the code (also handles unknown version, which we treat as latest)
+  // New version of the code (also handles unknown version, which we treat as latest)
 #endif
   setOptionDefault("structurizecfg-skip-uniform-regions", "1");
   setOptionDefault("spec-exec-max-speculation-cost", "10");
@@ -296,25 +306,6 @@ Pipeline *LgcContext::createPipeline() {
 // @param pipeline : Ignored
 Builder *LgcContext::createBuilder(Pipeline *pipeline) {
   return new Builder(getContext());
-}
-
-// =====================================================================================================================
-// Prepare a pass manager. This manually adds a target-aware TLI pass, so middle-end optimizations do not think that
-// we have library functions.
-//
-// @param [in/out] passMgr : Pass manager
-void LgcContext::preparePassManager(lgc::PassManager &passMgr) {
-  TargetLibraryInfoImpl targetLibInfo(getTargetMachine()->getTargetTriple());
-
-  // Adjust it to allow memcpy and memset.
-  // TODO: Investigate why the latter is necessary. I found that
-  // test/shaderdb/ObjStorageBlock_TestMemCpyInt32.comp
-  // got unrolled far too much, and at too late a stage for the descriptor loads to be commoned up. It might
-  // be an unfortunate interaction between LoopIdiomRecognize and fat pointer laundering.
-  targetLibInfo.setAvailable(LibFunc_memcpy);
-  targetLibInfo.setAvailable(LibFunc_memset);
-
-  passMgr.registerFunctionAnalysis([&] { return TargetLibraryAnalysis(targetLibInfo); });
 }
 
 // =====================================================================================================================

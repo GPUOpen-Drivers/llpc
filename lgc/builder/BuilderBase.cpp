@@ -187,7 +187,7 @@ Value *BuilderBase::CreateMapToInt32(MapToInt32Func mapFunc, ArrayRef<Value *> m
       results.push_back(CreateMapToInt32(mapFunc, newMappedArgs, passthroughArgs));
     }
 
-    Value *result = UndefValue::get(FixedVectorType::get(results[0]->getType(), compCount));
+    Value *result = PoisonValue::get(FixedVectorType::get(results[0]->getType(), compCount));
 
     for (unsigned i = 0; i < compCount; i++)
       result = CreateInsertElement(result, results[i], i);
@@ -207,10 +207,10 @@ Value *BuilderBase::CreateMapToInt32(MapToInt32Func mapFunc, ArrayRef<Value *> m
     SmallVector<Value *, 4> newMappedArgs;
 
     Type *const vectorType = FixedVectorType::get(type, type->getPrimitiveSizeInBits() == 16 ? 2 : 4);
-    Value *const undef = UndefValue::get(vectorType);
+    Value *const poison = PoisonValue::get(vectorType);
 
     for (Value *const mappedArg : mappedArgs) {
-      Value *const newMappedArg = CreateInsertElement(undef, mappedArg, static_cast<uint64_t>(0));
+      Value *const newMappedArg = CreateInsertElement(poison, mappedArg, static_cast<uint64_t>(0));
       newMappedArgs.push_back(CreateBitCast(newMappedArg, getInt32Ty()));
     }
 
@@ -223,7 +223,7 @@ Value *BuilderBase::CreateMapToInt32(MapToInt32Func mapFunc, ArrayRef<Value *> m
     for (Value *const mappedArg : mappedArgs)
       castMappedArgs.push_back(CreateBitCast(mappedArg, FixedVectorType::get(getInt32Ty(), 2)));
 
-    Value *result = UndefValue::get(castMappedArgs[0]->getType());
+    Value *result = PoisonValue::get(castMappedArgs[0]->getType());
 
     for (unsigned i = 0; i < 2; i++) {
       SmallVector<Value *, 4> newMappedArgs;
@@ -281,5 +281,5 @@ Value *BuilderBase::CreateSetInactive(Value *active, Value *inactive) {
     return builder.CreateIntrinsic(Intrinsic::amdgcn_set_inactive, active->getType(), {active, inactive});
   };
 
-  return CreateMapToInt32(mapFunc, {CreateInlineAsmSideEffect(active), inactive}, {});
+  return CreateMapToInt32(mapFunc, {active, inactive}, {});
 }

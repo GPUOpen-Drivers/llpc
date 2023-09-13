@@ -66,8 +66,6 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
   switch (opcode) {
   case BuilderOpcode::Nop:
     return "nop";
-  case BuilderOpcode::DebugPrintf:
-    return "debug.printf";
   case BuilderOpcode::DotProduct:
     return "dot.product";
   case BuilderOpcode::IntegerDotProduct:
@@ -166,6 +164,8 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "extract.bit.field";
   case BuilderOpcode::FindSMsb:
     return "find.smsb";
+  case BuilderOpcode::CountLeadingSignBits:
+    return "count.leading.sign.bits";
   case BuilderOpcode::FMix:
     return "fmix";
   case BuilderOpcode::LoadBufferDesc:
@@ -194,14 +194,6 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "read.builtin.output";
   case BuilderOpcode::WriteBuiltInOutput:
     return "write.builtin.output";
-  case BuilderOpcode::ReadTaskPayload:
-    return "read.task.payload";
-  case BuilderOpcode::WriteTaskPayload:
-    return "write.task.payload";
-  case BuilderOpcode::TaskPayloadAtomic:
-    return "task.payload.atomic";
-  case BuilderOpcode::TaskPayloadAtomicCompareSwap:
-    return "task.payload.compare.swap";
   case BuilderOpcode::TransposeMatrix:
     return "transpose.matrix";
   case BuilderOpcode::MatrixTimesScalar:
@@ -236,10 +228,6 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "demote.to.helper.invocation";
   case BuilderOpcode::IsHelperInvocation:
     return "is.helper.invocation";
-  case BuilderOpcode::EmitMeshTasks:
-    return "emit.mesh.tasks";
-  case BuilderOpcode::SetMeshOutputs:
-    return "set.mesh.outputs";
   case BuilderOpcode::ImageLoad:
     return "image.load";
   case BuilderOpcode::ImageLoadWithFmask:
@@ -264,17 +252,10 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "image.query.size";
   case BuilderOpcode::ImageGetLod:
     return "image.get.lod";
-#if VKI_RAY_TRACING
   case BuilderOpcode::ImageBvhIntersectRay:
     return "image.bvh.intersect.ray";
   case BuilderOpcode::Reserved2:
     return "reserved2";
-#else
-  case BuilderOpcode::Reserved2:
-    return "reserved2";
-  case BuilderOpcode::Reserved1:
-    return "reserved1";
-#endif
   case BuilderOpcode::GetWaveSize:
     return "get.wave.size";
   case BuilderOpcode::GetSubgroupSize:
@@ -287,6 +268,8 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "subgroup.any";
   case BuilderOpcode::SubgroupAllEqual:
     return "subgroup.all.equal";
+  case BuilderOpcode::SubgroupRotate:
+    return "subgroup.rotate";
   case BuilderOpcode::SubgroupBroadcast:
     return "subgroup.broadcast";
   case BuilderOpcode::SubgroupBroadcastWaterfall:
@@ -912,32 +895,6 @@ Value *Builder::CreateIsHelperInvocation(const Twine &instName) {
 }
 
 // =====================================================================================================================
-// In the task shader, emit the current values of all per-task output variables to the current task output by
-// specifying the group count XYZ of the launched child mesh tasks.
-//
-// @param groupCountX : X dimension of the launched child mesh tasks
-// @param groupCountY : Y dimension of the launched child mesh tasks
-// @param groupCountZ : Z dimension of the launched child mesh tasks
-// @param instName : Name to give final instruction
-// @returns Instruction to emit mesh tasks
-Instruction *Builder::CreateEmitMeshTasks(Value *groupCountX, Value *groupCountY, Value *groupCountZ,
-                                          const Twine &instName) {
-  return record(BuilderOpcode::EmitMeshTasks, nullptr, {groupCountX, groupCountY, groupCountZ}, instName);
-}
-
-// =====================================================================================================================
-// In the mesh shader, set the actual output size of the primitives and vertices that the mesh shader workgroup will
-// emit upon completion.
-//
-// @param vertexCount : Actual output size of the vertices
-// @param primitiveCount : Actual output size of the primitives
-// @param instName : Name to give final instruction
-// @returns Instruction to set the actual size of mesh outputs
-Instruction *Builder::CreateSetMeshOutputs(Value *vertexCount, Value *primitiveCount, const Twine &instName) {
-  return record(BuilderOpcode::SetMeshOutputs, nullptr, {vertexCount, primitiveCount}, instName);
-}
-
-// =====================================================================================================================
 // Create "fclamp" operation.
 //
 // @param x : Value to clamp
@@ -1064,6 +1021,15 @@ Value *Builder::CreateFindSMsb(Value *value, const Twine &instName) {
 }
 
 // =====================================================================================================================
+// Create "count leading sign bits" operation for a (vector of) signed int.
+//
+// @param value : Input value
+// @param instName : Name to give instruction(s)
+Value *Builder::CreateCountLeadingSignBits(Value *value, const Twine &instName) {
+  return record(BuilderOpcode::CountLeadingSignBits, value->getType(), value, instName);
+}
+
+// =====================================================================================================================
 // Create a load of a buffer descriptor.
 //
 // @param descSet : Descriptor set
@@ -1071,11 +1037,11 @@ Value *Builder::CreateFindSMsb(Value *value, const Twine &instName) {
 // @param descIndex : Descriptor index
 // @param flags : BufferFlag* bit settings
 // @param instName : Name to give instruction(s)
-Value *Builder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Value *descIndex, unsigned flags,
+Value *Builder::CreateLoadBufferDesc(uint64_t descSet, unsigned binding, Value *descIndex, unsigned flags,
                                      const Twine &instName) {
   return record(BuilderOpcode::LoadBufferDesc, getBufferDescTy(),
                 {
-                    getInt32(descSet),
+                    getInt64(descSet),
                     getInt32(binding),
                     descIndex,
                     getInt32(flags),
@@ -1093,11 +1059,11 @@ Value *Builder::CreateLoadBufferDesc(unsigned descSet, unsigned binding, Value *
 // @param descSet : Descriptor set
 // @param binding : Descriptor binding
 // @param instName : Name to give instruction(s)
-Value *Builder::CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
+Value *Builder::CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
                                     unsigned binding, const Twine &instName) {
   return record(BuilderOpcode::GetDescStride, getInt32Ty(),
                 {getInt32(static_cast<unsigned>(concreteType)), getInt32(static_cast<unsigned>(abstractType)),
-                 getInt32(descSet), getInt32(binding)},
+                 getInt64(descSet), getInt32(binding)},
                 instName);
 }
 
@@ -1111,21 +1077,20 @@ Value *Builder::CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeT
 // @param descSet : Descriptor set
 // @param binding : Descriptor binding
 // @param instName : Name to give instruction(s)
-Value *Builder::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
+Value *Builder::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
                                  unsigned binding, const Twine &instName) {
   return record(BuilderOpcode::GetDescPtr, getDescPtrTy(concreteType),
                 {getInt32(static_cast<unsigned>(concreteType)), getInt32(static_cast<unsigned>(abstractType)),
-                 getInt32(descSet), getInt32(binding)},
+                 getInt64(descSet), getInt32(binding)},
                 instName);
 }
 
 // =====================================================================================================================
 // Create a load of the spill table pointer for push constants.
 //
-// @param returnTy : Return type of the load
 // @param instName : Name to give instruction(s)
-Value *Builder::CreateLoadPushConstantsPtr(Type *returnTy, const Twine &instName) {
-  return record(BuilderOpcode::LoadPushConstantsPtr, returnTy, {}, instName);
+Value *Builder::CreateLoadPushConstantsPtr(const Twine &instName) {
+  return record(BuilderOpcode::LoadPushConstantsPtr, getPtrTy(ADDR_SPACE_CONST), {}, instName);
 }
 
 // =====================================================================================================================
@@ -1404,7 +1369,7 @@ Value *Builder::CreateReadGenericInput(Type *resultTy, unsigned location, Value 
                     elemIdx,
                     getInt32(locationCount),
                     getInt32(inputInfo.getData()),
-                    vertexIndex ? vertexIndex : UndefValue::get(getInt32Ty()),
+                    vertexIndex ? vertexIndex : PoisonValue::get(getInt32Ty()),
                 },
                 instName);
 }
@@ -1459,7 +1424,7 @@ Value *Builder::CreateReadGenericOutput(Type *resultTy, unsigned location, Value
                     elemIdx,
                     getInt32(locationCount),
                     getInt32(outputInfo.getData()),
-                    vertexIndex ? vertexIndex : UndefValue::get(getInt32Ty()),
+                    vertexIndex ? vertexIndex : PoisonValue::get(getInt32Ty()),
                 },
                 instName);
 }
@@ -1491,7 +1456,7 @@ Instruction *Builder::CreateWriteGenericOutput(Value *valueToWrite, unsigned loc
                     elemIdx,
                     getInt32(locationCount),
                     getInt32(outputInfo.getData()),
-                    vertexOrPrimitiveIndex ? vertexOrPrimitiveIndex : UndefValue::get(getInt32Ty()),
+                    vertexOrPrimitiveIndex ? vertexOrPrimitiveIndex : PoisonValue::get(getInt32Ty()),
                 },
                 "");
 }
@@ -1557,8 +1522,8 @@ Value *Builder::CreateReadBuiltInInput(BuiltInKind builtIn, InOutInfo inputInfo,
                 {
                     getInt32(builtIn),
                     getInt32(inputInfo.getData()),
-                    vertexIndex ? vertexIndex : UndefValue::get(getInt32Ty()),
-                    index ? index : UndefValue::get(getInt32Ty()),
+                    vertexIndex ? vertexIndex : PoisonValue::get(getInt32Ty()),
+                    index ? index : PoisonValue::get(getInt32Ty()),
                 },
                 instName);
 }
@@ -1586,8 +1551,8 @@ Value *Builder::CreateReadBuiltInOutput(BuiltInKind builtIn, InOutInfo outputInf
                 {
                     getInt32(builtIn),
                     getInt32(outputInfo.getData()),
-                    vertexIndex ? vertexIndex : UndefValue::get(getInt32Ty()),
-                    index ? index : UndefValue::get(getInt32Ty()),
+                    vertexIndex ? vertexIndex : PoisonValue::get(getInt32Ty()),
+                    index ? index : PoisonValue::get(getInt32Ty()),
                 },
                 instName);
 }
@@ -1608,13 +1573,12 @@ Instruction *Builder::CreateWriteBuiltInOutput(Value *valueToWrite, BuiltInKind 
                     valueToWrite,
                     getInt32(builtIn),
                     getInt32(outputInfo.getData()),
-                    vertexOrPrimitiveIndex ? vertexOrPrimitiveIndex : UndefValue::get(getInt32Ty()),
-                    index ? index : UndefValue::get(getInt32Ty()),
+                    vertexOrPrimitiveIndex ? vertexOrPrimitiveIndex : PoisonValue::get(getInt32Ty()),
+                    index ? index : PoisonValue::get(getInt32Ty()),
                 },
                 "");
 }
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Create a ray intersect result with specified node in BVH buffer
 //
@@ -1629,61 +1593,6 @@ Value *Builder::CreateImageBvhIntersectRay(Value *nodePtr, Value *extent, Value 
                                            Value *invDirection, Value *imageDesc, const Twine &instName) {
   return record(BuilderOpcode::ImageBvhIntersectRay, FixedVectorType::get(getInt32Ty(), 4),
                 {nodePtr, extent, origin, direction, invDirection, imageDesc}, instName);
-}
-#endif
-
-// =====================================================================================================================
-// Create a read from (part of) a task payload.
-// The result type is as specified by resultTy, a scalar or vector type with no more than four elements.
-//
-// @param resultTy : Type of value to read
-// @param byteOffset : Byte offset within the payload structure
-// @param instName : Name to give instruction(s)
-// @returns : Value read from the task payload
-Value *Builder::CreateReadTaskPayload(Type *resultTy, Value *byteOffset, const Twine &instName) {
-  return record(BuilderOpcode::ReadTaskPayload, resultTy, byteOffset, instName);
-}
-
-// =====================================================================================================================
-// Create a write to (part of) a task payload.
-//
-// @param valueToWrite : Value to write
-// @param byteOffset : Byte offset within the payload structure
-// @param instName : Name to give instruction(s)
-// @returns : Instruction to write value to task payload
-Instruction *Builder::CreateWriteTaskPayload(Value *valueToWrite, Value *byteOffset, const Twine &instName) {
-  return record(BuilderOpcode::WriteTaskPayload, nullptr, {valueToWrite, byteOffset}, instName);
-}
-
-// =====================================================================================================================
-// Create a task payload atomic operation other than compare-and-swap. An add of +1 or -1, or a sub
-// of -1 or +1, is generated as inc or dec. Result type is the same as the input value type.
-//
-// @param atomicOp : Atomic op to create
-// @param ordering : Atomic ordering
-// @param inputValue : Input value
-// @param byteOffset : Byte offset within the payload structure
-// @param instName : Name to give instruction(s)
-// @returns : Original value read from the task payload
-Value *Builder::CreateTaskPayloadAtomic(unsigned atomicOp, AtomicOrdering ordering, Value *inputValue,
-                                        Value *byteOffset, const Twine &instName) {
-  return record(BuilderOpcode::TaskPayloadAtomic, inputValue->getType(),
-                {getInt32(atomicOp), getInt32(static_cast<unsigned>(ordering)), inputValue, byteOffset}, instName);
-}
-
-// =====================================================================================================================
-// Create a task payload atomic compare-and-swap.
-//
-// @param ordering : Atomic ordering
-// @param inputValue : Input value
-// @param comparatorValue : Value to compare against
-// @param byteOffset : Byte offset within the payload structure
-// @param instName : Name to give instruction(s)
-// @returns : Original value read from the task payload
-Value *Builder::CreateTaskPayloadAtomicCompareSwap(AtomicOrdering ordering, Value *inputValue, Value *comparatorValue,
-                                                   Value *byteOffset, const Twine &instName) {
-  return record(BuilderOpcode::TaskPayloadAtomicCompareSwap, inputValue->getType(),
-                {getInt32(static_cast<unsigned>(ordering)), inputValue, comparatorValue, byteOffset}, instName);
 }
 
 // =====================================================================================================================
@@ -1850,14 +1759,6 @@ Value *Builder::createFMix(Value *x, Value *y, Value *a, const Twine &instName) 
 }
 
 // =====================================================================================================================
-// Create debug printf operation, and write to the output debug buffer
-// @vars: Printf variable parameters
-// @instName : Instance Name
-Value *Builder::CreateDebugPrintf(ArrayRef<Value *> vars, const Twine &instName) {
-  return record(BuilderOpcode::DebugPrintf, getInt64Ty(), vars, instName);
-}
-
-// =====================================================================================================================
 // Create a subgroup shuffle.
 //
 // @param value : The value to shuffle
@@ -1895,6 +1796,18 @@ Value *Builder::CreateSubgroupShuffleUp(Value *const value, Value *const offset,
 // @param instName : Name to give instruction(s)
 Value *Builder::CreateSubgroupShuffleDown(Value *const value, Value *const offset, const Twine &instName) {
   return record(BuilderOpcode::SubgroupShuffleDown, value->getType(), {value, offset}, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup rotate call.
+//
+// @param value : The value to read from the chosen rotated lane to all active lanes.
+// @param delta : The delta/offset added to lane id.
+// @param clusterSize : The cluster size if exists.
+// @param instName : Name to give instruction.
+Value *Builder::CreateSubgroupRotate(Value *const value, Value *const delta, Value *const clusterSize,
+                                     const Twine &instName) {
+  return record(BuilderOpcode::SubgroupRotate, value->getType(), {value, delta, clusterSize}, instName);
 }
 
 // =====================================================================================================================
@@ -2074,7 +1987,6 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::CrossProduct:
     case BuilderOpcode::CubeFaceCoord:
     case BuilderOpcode::CubeFaceIndex:
-    case BuilderOpcode::DebugPrintf:
     case BuilderOpcode::Derivative:
     case BuilderOpcode::DotProduct:
     case BuilderOpcode::IntegerDotProduct:
@@ -2092,6 +2004,7 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::FSign:
     case BuilderOpcode::FaceForward:
     case BuilderOpcode::FindSMsb:
+    case BuilderOpcode::CountLeadingSignBits:
     case BuilderOpcode::Fma:
     case BuilderOpcode::FpTruncWithRounding:
     case BuilderOpcode::Fract:
@@ -2143,7 +2056,6 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::ReadGenericInput:
     case BuilderOpcode::ReadGenericOutput:
     case BuilderOpcode::ReadPerVertexInput:
-    case BuilderOpcode::ReadTaskPayload:
       // Functions that only read memory.
       func->setOnlyReadsMemory();
       // Must be marked as returning for DCE.
@@ -2156,13 +2068,11 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::ImageAtomic:
     case BuilderOpcode::ImageAtomicCompareSwap:
     case BuilderOpcode::WriteXfbOutput:
-    case BuilderOpcode::WriteTaskPayload:
-    case BuilderOpcode::TaskPayloadAtomic:
-    case BuilderOpcode::TaskPayloadAtomicCompareSwap:
       // Functions that read and write memory.
       break;
     case BuilderOpcode::SubgroupAll:
     case BuilderOpcode::SubgroupAllEqual:
+    case BuilderOpcode::SubgroupRotate:
     case BuilderOpcode::SubgroupAny:
     case BuilderOpcode::SubgroupBallot:
     case BuilderOpcode::SubgroupBroadcast:
@@ -2198,16 +2108,12 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::ImageQuerySamples:
     case BuilderOpcode::ImageQuerySize:
     case BuilderOpcode::IsHelperInvocation:
-    case BuilderOpcode::EmitMeshTasks:
-    case BuilderOpcode::SetMeshOutputs:
     case BuilderOpcode::Kill:
     case BuilderOpcode::ReadClock:
     case BuilderOpcode::DebugBreak:
     case BuilderOpcode::WriteBuiltInOutput:
     case BuilderOpcode::WriteGenericOutput:
-#if VKI_RAY_TRACING
     case BuilderOpcode::ImageBvhIntersectRay:
-#endif
       // TODO: These functions have not been classified yet.
       break;
     default:

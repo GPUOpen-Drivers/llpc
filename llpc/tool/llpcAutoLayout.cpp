@@ -105,57 +105,6 @@ static const ResourceMappingRootNode *findDescriptorTableVaPtr(const ResourceMap
 }
 
 // =====================================================================================================================
-// Find userDataNode with specified set and binding. And return Node index.
-//
-// @param userDataNode : ResourceMappingNode pointer
-// @param nodeCount : User data node count
-// @param set : Find same set in node array
-// @param binding : Find same binding in node array
-// @param [out] index : Return node position in node array
-static const ResourceMappingNode *findResourceNode(const ResourceMappingNode *userDataNode, unsigned nodeCount,
-                                                   unsigned set, unsigned binding, unsigned *index) {
-  const ResourceMappingNode *resourceNode = nullptr;
-
-  for (unsigned j = 0; j < nodeCount; ++j) {
-    const ResourceMappingNode *next = &userDataNode[j];
-
-    if (set == next->srdRange.set && binding == next->srdRange.binding) {
-      resourceNode = next;
-      *index = j;
-      break;
-    }
-  }
-
-  return resourceNode;
-}
-
-// =====================================================================================================================
-// Find userDataNode with specified set and binding. And return Node index.
-//
-// @param userDataNode : ResourceMappingRootNode pointer
-// @param nodeCount : User data node count
-// @param set : Find same set in node array
-// @param binding : Find same binding in node array
-// @param [out] index : Return node position in node array
-// @returns : The Node index
-static const ResourceMappingRootNode *findResourceNode(const ResourceMappingRootNode *userDataNode, unsigned nodeCount,
-                                                       unsigned set, unsigned binding, unsigned *index) {
-  const ResourceMappingRootNode *resourceNode = nullptr;
-
-  for (unsigned j = 0; j < nodeCount; ++j) {
-    const ResourceMappingRootNode *next = &userDataNode[j];
-
-    if (set == next->node.srdRange.set && binding == next->node.srdRange.binding) {
-      resourceNode = next;
-      *index = j;
-      break;
-    }
-  }
-
-  return resourceNode;
-}
-
-// =====================================================================================================================
 // Check if autoLayoutUserDataNodes is a subset of userDataNodes.
 //
 // @param [in] resourceMapping : Resource mapping data, which can contain user data nodes
@@ -227,10 +176,10 @@ bool checkResourceMappingCompatible(const ResourceMappingData *resourceMapping, 
       // Single level
       else {
         unsigned index = 0;
-        const ResourceMappingRootNode *node = findResourceNode(
+        const ResourceMappingNode *node = findResourceNode(
             resourceMapping->pUserDataNodes, resourceMapping->userDataNodeCount,
             autoLayoutUserDataNode->node.srdRange.set, autoLayoutUserDataNode->node.srdRange.binding, &index);
-        if (node && autoLayoutUserDataNode->node.sizeInDwords == node->node.sizeInDwords) {
+        if (node && autoLayoutUserDataNode->node.sizeInDwords == node->sizeInDwords) {
           hit = true;
           continue;
         } else { // NOLINT
@@ -610,7 +559,10 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
         auto varElemTy = var->getType()->getPointerElementType();
         unsigned arraySize = 1;
         while (varElemTy->isTypeArray()) {
-          arraySize *= varElemTy->getArrayLength();
+          if (varElemTy->isTypeRuntimeArray())
+            arraySize *= 16; // arbitrarily pick something semi-plausible
+          else
+            arraySize *= varElemTy->getArrayLength();
           varElemTy = varElemTy->getArrayElementType();
         }
 

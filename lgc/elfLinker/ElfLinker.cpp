@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "lgc/ElfLinker.h"
+#include "ColorExportShader.h"
 #include "GlueShader.h"
 #include "RelocHandler.h"
 #include "lgc/state/AbiMetadata.h"
@@ -160,6 +161,9 @@ public:
   // Get information on the glue code that will be needed for the link
   llvm::ArrayRef<StringRef> getGlueInfo() override final;
 
+  // Explicitly build color export shader
+  StringRef buildColorExportShader(ArrayRef<ColorExportInfo> exports, bool enableKill) override final;
+
   // Add a blob for a particular chunk of glue code, typically retrieved from a cache
   void addGlue(unsigned glueIndex, StringRef blob) override final;
 
@@ -210,10 +214,10 @@ private:
   void readIsaName(object::ObjectFile &objectFile);
 
   // Write ISA name into the .note section.
-  void writeIsaName();
+  void writeIsaName(Align align);
 
   // Write the PAL metadata out into the .note section.
-  void writePalMetadata();
+  void writePalMetadata(Align align);
 
   // Create a GlueShader object for each glue shader needed for this link.
   void createGlueShaders();
@@ -357,6 +361,21 @@ ArrayRef<StringRef> ElfLinkerImpl::getGlueInfo() {
       m_glueStrings.push_back(glueShader->getString());
   }
   return m_glueStrings;
+}
+
+// =====================================================================================================================
+// Build color export shader
+//
+// @param exports : Fragment export info
+// @param enableKill : Whether this fragment shader has kill enabled.
+// @param zFmt : depth-export-format
+StringRef ElfLinkerImpl::buildColorExportShader(ArrayRef<ColorExportInfo> exports, bool enableKill) {
+  assert(m_glueShaders.empty());
+  m_glueShaders.push_back(GlueShader::createColorExportShader(m_pipelineState, exports));
+  ColorExportShader *copyColorShader = static_cast<ColorExportShader *>(m_glueShaders[0].get());
+  if (enableKill)
+    copyColorShader->enableKill();
+  return copyColorShader->getElfBlob();
 }
 
 // =====================================================================================================================
@@ -603,16 +622,17 @@ bool ElfLinkerImpl::link(raw_pwrite_stream &outStream) {
     }
   }
 
+  OutputSection &noteOutputSection = m_outputSections[noteSectionIdx];
+  Align align = std::min(noteOutputSection.getAlignment(), Align(4));
+
   // Write ISA name into the .note section.
-  writeIsaName();
+  writeIsaName(align);
 
   // Write the PAL metadata out into the .note section.  The relocations can change the metadata, so we cannot write the
   // PAL metadata any earlier.
-  writePalMetadata();
+  writePalMetadata(align);
 
   // Output the note section now that the metadata has been finalized.
-  OutputSection &noteOutputSection = m_outputSections[noteSectionIdx];
-  Align align = std::min(noteOutputSection.getAlignment(), Align(4));
   outStream << StringRef("\0\0\0", 3).slice(0, offsetToAlignment(outStream.tell(), align));
   shdrs[noteSectionIdx].sh_offset = outStream.tell();
   noteOutputSection.write(outStream, &shdrs[noteSectionIdx]);
@@ -715,7 +735,13 @@ void ElfLinkerImpl::mergePalMetadataFromElf(object::ObjectFile &objectFile, bool
       auto shdr = cantFail(elfFile.getSection(elfSection.getIndex()));
       for (auto note : elfFile.notes(*shdr, err)) {
         if (note.getName() == Util::Abi::AmdGpuArchName && note.getType() == ELF::NT_AMDGPU_METADATA) {
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 460558
+          // Old version of the code
           ArrayRef<uint8_t> desc = note.getDesc();
+#else
+          // New version of the code (also handles unknown version, which we treat as latest)
+          ArrayRef<uint8_t> desc = note.getDesc(shdr->sh_addralign);
+#endif
           m_pipelineState->mergePalMetadataFromBlob(StringRef(reinterpret_cast<const char *>(desc.data()), desc.size()),
                                                     isGlueCode);
         }
@@ -739,7 +765,13 @@ void ElfLinkerImpl::readIsaName(object::ObjectFile &objectFile) {
       auto shdr = cantFail(elfFile.getSection(elfSection.getIndex()));
       for (auto note : elfFile.notes(*shdr, err)) {
         if (note.getName() == Util::Abi::AmdGpuVendorName && note.getType() == ELF::NT_AMD_HSA_ISA_NAME) {
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 460558
+          // Old version of the code
           ArrayRef<uint8_t> desc = note.getDesc();
+#else
+          // New version of the code (also handles unknown version, which we treat as latest)
+          ArrayRef<uint8_t> desc = note.getDesc(shdr->sh_addralign);
+#endif
           m_isaName = StringRef(reinterpret_cast<const char *>(desc.data()), desc.size());
           return;
         }
@@ -750,7 +782,7 @@ void ElfLinkerImpl::readIsaName(object::ObjectFile &objectFile) {
 
 // =====================================================================================================================
 // Write ISA name into the .note section.
-void ElfLinkerImpl::writeIsaName() {
+void ElfLinkerImpl::writeIsaName(Align align) {
   StringRef noteName = Util::Abi::AmdGpuVendorName;
   typedef object::Elf_Nhdr_Impl<object::ELF64LE> NoteHeader;
   NoteHeader noteHeader;
@@ -760,15 +792,15 @@ void ElfLinkerImpl::writeIsaName() {
   m_notes.append(reinterpret_cast<const char *>(&noteHeader), sizeof(noteHeader));
   // Write the note name, followed by 1-4 zero bytes to terminate and align.
   m_notes += noteName;
-  m_notes.append(NoteHeader::Align - (m_notes.size() & NoteHeader::Align - 1), '\0');
+  m_notes.append(offsetToAlignment(m_notes.size(), align), '\0');
   // Write ISA name, followed by 0-3 zero bytes to align.
   m_notes += m_isaName;
-  m_notes.append(-m_notes.size() & NoteHeader::Align - 1, '\0');
+  m_notes.append(offsetToAlignment(m_notes.size(), align), '\0');
 }
 
 // =====================================================================================================================
 // Write the PAL metadata out into the .note section.
-void ElfLinkerImpl::writePalMetadata() {
+void ElfLinkerImpl::writePalMetadata(Align align) {
   // Fix up user data registers.
   PalMetadata *palMetadata = m_pipelineState->getPalMetadata();
   palMetadata->fixUpRegisters();
@@ -790,10 +822,10 @@ void ElfLinkerImpl::writePalMetadata() {
   m_notes.append(reinterpret_cast<const char *>(&noteHeader), sizeof(noteHeader));
   // Write the note name, followed by 1-4 zero bytes to terminate and align.
   m_notes += noteName;
-  m_notes.append(NoteHeader::Align - (m_notes.size() & NoteHeader::Align - 1), '\0');
+  m_notes.append(offsetToAlignment(m_notes.size(), align), '\0');
   // Write the blob, followed by 0-3 zero bytes to align.
   m_notes += blob;
-  m_notes.append(-m_notes.size() & NoteHeader::Align - 1, '\0');
+  m_notes.append(offsetToAlignment(m_notes.size(), align), '\0');
 }
 
 // =====================================================================================================================

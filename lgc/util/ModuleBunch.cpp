@@ -76,7 +76,7 @@ LLVM_DUMP_METHOD
 void ModuleBunch::dump() const {
   print(dbgs(), nullptr, false, /*IsForDebug=*/true);
 }
-#endif // !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+#endif
 
 // Copied from IRPrintingPasses.cpp and edited.
 PreservedAnalyses PrintModuleBunchPass::run(ModuleBunch &MB, ModuleBunchAnalysisManager &AM) {
@@ -198,7 +198,7 @@ PreservedAnalyses ModuleBunchToModulePassAdaptor::run(ModuleBunch &Bunch, Module
     // Use the single Pass if it was set. Otherwise call PassMaker to create a Pass each time
     // round the outer per-LLVMContext loop.
     std::unique_ptr<PassConceptT> AllocatedPass;
-    PassConceptT *ThisPass = &*Pass;
+    PassConceptT *ThisPass = Pass.get();
     if (!ThisPass) {
       AllocatedPass = PassMaker();
       ThisPass = &*AllocatedPass;

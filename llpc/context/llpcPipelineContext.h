@@ -55,6 +55,19 @@ class MetroHash64;
 
 namespace Llpc {
 
+// Enumerates the function of a particular node in a shader's resource mapping graph in OGL.
+enum class GlResourceMappingSet : unsigned {
+  Unknown = 0,             // Invalid type
+  DescriptorConstBuffer,   // Uniform buffer and inline constant with binding
+  DescriptorBuffer,        // Shader storage buffer
+  DescriptorImage,         // Image and image buffer
+  DescriptorResource,      // Texture and texture buffer
+  DescriptorSampler,       // Sampler
+  DescriptorFmask,         // F-mask
+  DescriptorAtomicCounter, // Atomic Counter
+  Count,                   // Count of resource mapping node types.
+};
+
 // Enumerates types of descriptor.
 enum class DescriptorType : unsigned {
   UniformBlock = 0,   // Uniform block
@@ -94,24 +107,22 @@ struct ShaderFpMode {
   unsigned roundingModeRTZ : 4;          // Bitmask of roundingModeRTZ flags
 };
 
+// Pipeline type enumeration
+enum class PipelineType {
+  Graphics,
+  Compute,
+  RayTracing,
+};
+
 // =====================================================================================================================
 // Represents pipeline-specific context for pipeline compilation, it is a part of LLPC context
 class PipelineContext {
 public:
-  PipelineContext(GfxIpVersion gfxIp, MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash
-#if VKI_RAY_TRACING
-                  ,
-                  const Vkgc::RtState *rtState
-
-#endif
-  );
+  PipelineContext(GfxIpVersion gfxIp, MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash);
   virtual ~PipelineContext();
 
-  // Checks whether the pipeline is graphics or compute
-  virtual bool isGraphics() const { return false; }
-
-  // Gets pipeline shader info of the specified shader stage
-  virtual const PipelineShaderInfo *getPipelineShaderInfo(unsigned shaderId) const = 0;
+  // Returns the pipeline type
+  virtual PipelineType getPipelineType() const = 0;
 
   // Gets pipeline build info
   virtual const void *getPipelineBuildInfo() const = 0;
@@ -121,6 +132,14 @@ public:
 
   // Sets the mask of active shader stages bound to this pipeline
   virtual void setShaderStageMask(unsigned mask) = 0;
+
+  // Sets whether dual source blend is used in fragment shader
+  // NOTE: Only applicable in the part pipeline compilation mode.
+  virtual void setUseDualSourceBlend(bool useDualSourceBlend) { llvm_unreachable("Should never be called!"); }
+
+  // Gets whether dual source blend is used in fragment shader
+  // NOTE: Only applicable in the part pipeline compilation mode.
+  virtual bool getUseDualSourceBlend() const { return false; }
 
   // Sets whether pre-rasterization part has a geometry shader.
   // NOTE: Only applicable in the part pipeline compilation mode.
@@ -137,10 +156,8 @@ public:
   virtual const PipelineOptions *getPipelineOptions() const = 0;
 
   // Gets subgroup size usage denoting which stage uses features relevant to subgroup size.
-  // @returns : Bitmask per stage, in the same order as defined in `Vkgc::ShaderStage`.
-#if VKI_RAY_TRACING
+  // @returns : Bitmask per stage, in the same order as defined in `Vkgc::ShaderStage.
   // NOTE: For raytracing, returns (-1) if the pipeline uses features relevant to subgroup size.
-#endif
   virtual unsigned getSubgroupSizeUsage() const = 0;
 
   // Set pipeline state in lgc::Pipeline object for middle-end, and (optionally) hash the state.
@@ -152,23 +169,10 @@ public:
   // Gets client-defined metadata
   virtual llvm::StringRef getClientMetadata() const = 0;
 
-#if VKI_RAY_TRACING
-  // Checks whether the pipeline is ray tracing
-  virtual bool isRayTracing() const { return false; }
-
-  virtual bool hasRayQuery() const { return false; }
-
-  virtual void setIndirectStage(ShaderStage stage) {}
-
   virtual void collectPayloadSize(llvm::Type *type, const llvm::DataLayout &dataLayout) {}
   virtual void collectCallableDataSize(llvm::Type *type, const llvm::DataLayout &dataLayout) {}
   virtual void collectAttributeDataSize(llvm::Type *type, const llvm::DataLayout &dataLayout) {}
   virtual void collectBuiltIn(unsigned builtIn) {}
-
-  // Set workgroup size for compute pipeline so that rayQuery lowering can see it.
-  virtual void setWorkgroupSize(unsigned workgroupSize) {}
-  virtual unsigned getWorkgroupSize() const { return 0; }
-#endif
 
   static const char *getGpuNameAbbreviation(GfxIpVersion gfxIp);
 
@@ -181,14 +185,12 @@ public:
   // Gets cache hash code compacted to 64-bits.
   uint64_t get64BitCacheHashCode() const { return MetroHash::compact64(&m_cacheHash); }
 
-#if VKI_RAY_TRACING
   unsigned getRayTracingWaveSize() const;
 
   llvm::StringRef getRayTracingFunctionName(unsigned funcType);
 
   // Gets ray tracing state info
-  const Vkgc::RtState *getRayTracingState() { return m_rtState; }
-#endif
+  const Vkgc::RtState *getRayTracingState() { return &m_rtState; }
 
   // Gets the finalized 128-bit cache hash code.
   lgc::Hash128 get128BitCacheHashCode() const {
@@ -232,7 +234,13 @@ public:
   // Gets ShaderOptions of the specified shader stage.
   lgc::ShaderOptions computeShaderOptions(const PipelineShaderInfo &shaderInfo) const;
 
+  // Convert Resource node type to set for OGL
+  static uint32_t getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType resourceType);
+
 protected:
+  // Set the raytracing state
+  void setRayTracingState(const Vkgc::RtState &rtState, const Vkgc::BinaryData *shaderLibrary = nullptr);
+
   // Gets dummy vertex input create info
   virtual VkPipelineVertexInputStateCreateInfo *getDummyVertexInputInfo() { return nullptr; }
 
@@ -250,9 +258,6 @@ protected:
   MetroHash::Hash m_cacheHash;           // Cache hash code
   ResourceMappingData m_resourceMapping; // Contains resource mapping nodes and static descriptor values
   uint64_t m_pipelineLayoutApiHash;      // Pipeline Layout Api Hash
-#if VKI_RAY_TRACING
-  const Vkgc::RtState *m_rtState; // Ray tracing state
-#endif
 
 private:
   PipelineContext() = delete;
@@ -267,12 +272,13 @@ private:
 
   // Give the user data nodes and descriptor range values to the middle-end, and/or hash them.
   void setUserDataInPipeline(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, unsigned stageMask) const;
-  void setUserDataNodesTable(lgc::Pipeline *pipeline, llvm::ArrayRef<ResourceMappingNode> nodes,
-                             const ImmutableNodesMap &immutableNodesMap, bool isRoot, lgc::ResourceNode *destTable,
-                             lgc::ResourceNode *&destInnerTable) const;
+  void convertResourceNode(lgc::ResourceNode &dst, const ResourceMappingNode &src, unsigned visibility,
+                           const ImmutableNodesMap &immutableNodesMap,
+                           llvm::MutableArrayRef<lgc::ResourceNode> &dstInnerTable) const;
 
   ShaderFpMode m_shaderFpModes[ShaderStageCountInternal] = {};
   bool m_unlinked = false; // Whether we are building an "unlinked" shader ELF
+  Vkgc::RtState m_rtState = {};
 };
 
 } // namespace Llpc

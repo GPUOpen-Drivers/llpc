@@ -56,10 +56,13 @@ add_llvm_library(LLVMlgc LINK_COMPONENTS
 target_link_libraries(LLVMlgc PUBLIC llvm_dialects)
 
 ### Cached Project Options #############################################################################################
-option(LLPC_BUILD_NAVI12 "LLPC support for NAVI12?" OFF)
-option(LLPC_BUILD_REMBRANDT "LLPC support for REMBRANDT?" OFF)
-option(LLPC_BUILD_RAPHAEL "LLPC support for RAPHAEL?" OFF)
-option(LLPC_BUILD_MENDOCINO "LLPC support for MENDOCINO?" OFF)
+option(LLPC_BUILD_NAVI12 "LLPC support for NAVI12?" ON)
+option(LLPC_BUILD_REMBRANDT "LLPC support for REMBRANDT?" ON)
+option(LLPC_BUILD_RAPHAEL "LLPC support for RAPHAEL?" ON)
+option(LLPC_BUILD_MENDOCINO "LLPC support for MENDOCINO?" ON)
+#if VKI_BUILD_PHOENIX1
+option(LLPC_BUILD_PHOENIX1 "LLPC support for PHOENIX1?" ON)
+#endif
 option(LLPC_ENABLE_WERROR "Build LLPC with more errors" OFF)
 
 ### Compiler Options ###################################################################################################
@@ -76,12 +79,23 @@ if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/interface/lgc)
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/interface/lgc")
 endif()
 tablegen(LGC interface/lgc/LgcDialect.h.inc -gen-dialect-decls --dialect lgc
-    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include)
+    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
+    )
 if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/state)
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/state")
 endif()
 tablegen(LGC state/LgcDialect.cpp.inc -gen-dialect-defs --dialect lgc
-    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include)
+    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
+    )
+
+set(LLVM_TARGET_DEFINITIONS interface/lgc/GpurtDialect.td)
+tablegen(LGC interface/lgc/GpurtDialect.h.inc -gen-dialect-decls --dialect lgc.gpurt
+    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
+    )
+tablegen(LGC state/GpurtDialect.cpp.inc -gen-dialect-defs --dialect lgc.gpurt
+    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
+    )
+
 add_public_tablegen_target(LgcDialectTableGen)
 
 add_dependencies(LLVMlgc LgcDialectTableGen)
@@ -99,6 +113,7 @@ target_compile_definitions(LLVMlgc PRIVATE
         CHIP_HDR_NAVI23
         CHIP_HDR_NAVI24
         CHIP_HDR_NAVI31
+        CHIP_HDR_NAVI33
         )
 
 target_compile_definitions(LLVMlgc PRIVATE CHIP_HDR_RENOIR)
@@ -127,6 +142,14 @@ target_compile_definitions(LLVMlgc PRIVATE CHIP_HDR_RENOIR)
         CHIP_HDR_MENDOCINO
     )
   endif()
+#if VKI_BUILD_PHOENIX1
+  if(LLPC_BUILD_PHOENIX1)
+    target_compile_definitions(LLVMlgc PRIVATE
+        LLPC_BUILD_PHOENIX1
+        CHIP_HDR_PHOENIX1
+    )
+  endif()
+#endif
 
 if(WIN32)
     target_compile_definitions(LLVMlgc PRIVATE
@@ -146,13 +169,6 @@ PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/imported
     ${CMAKE_CURRENT_BINARY_DIR}
 )
-
-#if VKI_RAY_TRACING
-if(VKI_RAY_TRACING)
-  # Public as it is used in the LGC interface.
-  target_compile_definitions(LLVMlgc PUBLIC VKI_RAY_TRACING=1)
-endif()
-#endif
 
 # lgc/builder
 target_sources(LLVMlgc PRIVATE
@@ -185,6 +201,7 @@ target_sources(LLVMlgc PRIVATE
 # lgc/patch
 target_sources(LLVMlgc PRIVATE
     patch/ConfigBuilderBase.cpp
+    patch/Continufy.cpp
     patch/FragColorExport.cpp
     patch/Gfx6Chip.cpp
     patch/Gfx6ConfigBuilder.cpp
@@ -217,7 +234,6 @@ target_sources(LLVMlgc PRIVATE
     patch/SystemValues.cpp
     patch/VertexFetch.cpp
     patch/PatchImageOpCollect.cpp
-    patch/PatchWaveSizeAdjust.cpp
     patch/RegisterMetadataBuilder.cpp
 )
 
@@ -226,6 +242,7 @@ target_sources(LLVMlgc PRIVATE
     state/Compiler.cpp
     state/LgcContext.cpp
     state/LgcDialect.cpp
+    state/GpurtDialect.cpp
     state/PalMetadata.cpp
     state/PassManagerCache.cpp
     state/PipelineShaders.cpp
@@ -240,6 +257,7 @@ target_sources(LLVMlgc PRIVATE
 target_sources(LLVMlgc PRIVATE
     util/AddressExtender.cpp
     util/Debug.cpp
+    util/CpsStackLowering.cpp
     util/GfxRegHandlerBase.cpp
     util/GfxRegHandler.cpp
     util/Internal.cpp
@@ -257,3 +275,5 @@ add_subdirectory(test)
 if (LLPC_BUILD_TESTS)
   add_subdirectory(unittests)
 endif()
+
+target_link_libraries(LLVMlgc PRIVATE LLVMLgcCps LLVMLgcRt)

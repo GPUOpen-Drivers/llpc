@@ -46,25 +46,16 @@ namespace Llpc {
 // @param cacheHash : Cache hash code
 ComputeContext::ComputeContext(GfxIpVersion gfxIp, const ComputePipelineBuildInfo *pipelineInfo,
                                MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash)
-    : PipelineContext(gfxIp, pipelineHash, cacheHash
-#if VKI_RAY_TRACING
-                      ,
-                      &pipelineInfo->rtState
+    : PipelineContext(gfxIp, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo) {
+  const Vkgc::BinaryData *gpurtShaderLibrary = nullptr;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
+  gpurtShaderLibrary = &pipelineInfo->shaderLibrary;
 #endif
-                      ),
-      m_pipelineInfo(pipelineInfo) {
+  setRayTracingState(pipelineInfo->rtState, gpurtShaderLibrary);
+
   setUnlinked(pipelineInfo->unlinked);
   m_resourceMapping = pipelineInfo->resourceMapping;
   m_pipelineLayoutApiHash = pipelineInfo->pipelineLayoutApiHash;
-}
-
-// =====================================================================================================================
-// Gets pipeline shader info of the specified shader stage
-//
-// @param shaderStage : Shader stage
-const PipelineShaderInfo *ComputeContext::getPipelineShaderInfo(unsigned shaderId) const {
-  assert(shaderId == ShaderStageCompute);
-  return &m_pipelineInfo->cs;
 }
 
 // =====================================================================================================================
@@ -79,9 +70,6 @@ unsigned ComputeContext::getSubgroupSizeUsage() const {
 // =====================================================================================================================
 // Set pipeline state in Pipeline object for middle-end and/or calculate the hash for the state to be added.
 // Doing both these things in the same code ensures that we hash and use the same pipeline state in all situations.
-// For graphics, we use the shader stage mask to decide which parts of graphics state to use, omitting
-// pre-rasterization state if there are no pre-rasterization shaders, and omitting fragment state if there is
-// no FS.
 //
 // @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing pipeline state
 // @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
@@ -89,19 +77,9 @@ unsigned ComputeContext::getSubgroupSizeUsage() const {
 //                   is needed
 void ComputeContext::setPipelineState(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, bool unlinked) const {
   PipelineContext::setPipelineState(pipeline, hasher, unlinked);
-  const unsigned stageMask = getShaderStageMask();
 
-  if (pipeline) {
-    // Give the shader options (including the hash) to the middle-end.
-    const auto allStages = maskToShaderStages(stageMask);
-    for (ShaderStage stage : make_filter_range(allStages, isNativeStage)) {
-      const PipelineShaderInfo *shaderInfo = getPipelineShaderInfo(stage);
-
-      assert(shaderInfo);
-
-      pipeline->setShaderOptions(getLgcShaderStage(static_cast<ShaderStage>(stage)), computeShaderOptions(*shaderInfo));
-    }
-  }
+  if (pipeline)
+    pipeline->setShaderOptions(lgc::ShaderStageCompute, computeShaderOptions(m_pipelineInfo->cs));
 }
 
 // =====================================================================================================================

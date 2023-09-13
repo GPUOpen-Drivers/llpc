@@ -96,4 +96,9 @@ bool isDontCareValue(llvm::Value *value);
 // type in a return value struct, ensuring it gets into VGPRs.
 llvm::Type *getVgprTy(llvm::Type *ty);
 
+// Modify the function argument types, and return the new function. NOTE: the function does not do any uses
+// replacement, so the caller should call replaceAllUsesWith() for the function and arguments afterwards.
+llvm::Function *mutateFunctionArguments(llvm::Function &fn, llvm::Type *retTy,
+                                        const llvm::ArrayRef<llvm::Type *> argTys, llvm::AttributeList attributes);
+
 } // namespace lgc

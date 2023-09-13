@@ -50,8 +50,11 @@
 #endif
 
 LLPC_MODULE_ANALYSIS("lgc-pipeline-state", PipelineStateWrapper)
+LLPC_MODULE_PASS("print<lgc-pipeline-state>", PipelineStatePrinter)
+LLPC_MODULE_PASS("lgc-pipeline-state-recorder", PipelineStateRecorder)
 
 LLPC_MODULE_PASS("lgc-builder-replayer", BuilderReplayer)
+LLPC_MODULE_PASS("lgc-continufy", Continufy)
 LLPC_MODULE_PASS("lgc-patch-resource-collect", PatchResourceCollect)
 LLPC_MODULE_PASS("lgc-patch-initialize-workgroup-memory", PatchInitializeWorkgroupMemory)
 LLPC_MODULE_PASS("lgc-patch-image-derivatives", PatchImageDerivatives)
@@ -62,7 +65,6 @@ LLPC_MODULE_PASS("lgc-patch-copy-shader", PatchCopyShader)
 LLPC_MODULE_PASS("lgc-patch-prepare-pipeline-abi", PatchPreparePipelineAbi)
 LLPC_FUNCTION_PASS("lgc-patch-read-first-lane", PatchReadFirstLane)
 LLPC_MODULE_PASS("lgc-patch-llvm-ir-inclusion", PatchLlvmIrInclusion)
-LLPC_MODULE_PASS("lgc-patch-wave-size-adjust", PatchWaveSizeAdjust)
 LLPC_FUNCTION_PASS("lgc-patch-peephole-opt", PatchPeepholeOpt)
 LLPC_MODULE_PASS("lgc-patch-entry-point-mutate", PatchEntryPointMutate)
 LLPC_MODULE_PASS("lgc-patch-check-shader-cache", PatchCheckShaderCache)
@@ -73,6 +75,7 @@ LLPC_FUNCTION_PASS("lgc-patch-load-scalarizer", PatchLoadScalarizer)
 LLPC_MODULE_PASS("lgc-patch-null-frag-shader", PatchNullFragShader)
 LLPC_MODULE_PASS("lgc-patch-image-op-collect", PatchImageOpCollect)
 LLPC_MODULE_PASS("lgc-vertex-fetch", LowerVertexFetch)
+LLPC_MODULE_PASS("lgc-frag-color-export", LowerFragColorExport)
 LLPC_MODULE_PASS("lgc-lower-debug-printf", LowerDebugPrintf)
 
 #undef LLPC_PASS

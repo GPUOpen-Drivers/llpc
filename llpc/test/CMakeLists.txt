@@ -35,6 +35,7 @@ set(AMDLLPC_TEST_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 # required by configure_lit_site_cfg.
 set(LLVM_LIT_OUTPUT_DIR ${LLVM_TOOLS_BINARY_DIR})
+get_target_property(LIT_DEFINITIONS vkgc_headers INTERFACE_COMPILE_DEFINITIONS)
 # Main config for shaderdb tests.
 configure_lit_site_cfg(
   ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
@@ -48,3 +49,9 @@ add_lit_testsuite(check-amdllpc "Running the AMDLLPC regression tests"
   DEPENDS
     ${AMDLLPC_TEST_DEPS}
 )
+
+if(CMAKE_GENERATOR MATCHES "Visual Studio")
+    add_custom_command(TARGET check-amdllpc PRE_BUILD
+         COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${AMDLLPC_DIR}/$<CONFIG>/amdllpc.exe" "${AMDLLPC_DIR}/amdllpc.exe")
+
+endif()

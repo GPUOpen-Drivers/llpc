@@ -33,6 +33,7 @@
 #include "lgc/LgcContext.h"
 #include "lgc/builder/BuilderImpl.h"
 #include "lgc/state/PipelineState.h"
+#include "lgc/state/TargetInfo.h"
 #include "lgc/util/Internal.h"
 #include "llvm/Support/Debug.h"
 
@@ -73,8 +74,19 @@ bool BuilderReplayer::runImpl(Module &module, PipelineState *pipelineState) {
 
   for (auto &func : module) {
     // Skip non-declarations; they are definitely not lgc.create.* calls.
-    if (!func.isDeclaration())
+    if (!func.isDeclaration()) {
+      if (pipelineState->getTargetInfo().getGfxIpVersion().major >= 10) {
+        // NOTE: The sub-attribute 'wavefrontsize' of 'target-features' is set in advance to let optimization
+        // pass know we are in which wavesize mode.
+        ShaderStage shaderStage = lgc::getShaderStage(&func);
+        if (shaderStage != ShaderStageInvalid) {
+          unsigned waveSize = pipelineState->getShaderWaveSize(shaderStage);
+          func.addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize));
+        }
+      }
+
       continue;
+    }
 
     // Get the opcode if it is an lgc.create.* call, either from the metadata on the declaration, or
     // (in the case that there is no metadata because we are running the lgc command-line tool on the
@@ -372,6 +384,10 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     return m_builder->CreateFindSMsb(args[0]);
   }
 
+  case BuilderOpcode::CountLeadingSignBits: {
+    return m_builder->CreateCountLeadingSignBits(args[0]);
+  }
+
   case BuilderOpcode::FMix: {
     return m_builder->createFMix(args[0], args[1], args[2]);
   }
@@ -399,7 +415,7 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     );
 
   case BuilderOpcode::LoadPushConstantsPtr: {
-    return m_builder->CreateLoadPushConstantsPtr(call->getType()); // returnTy
+    return m_builder->CreateLoadPushConstantsPtr();
   }
 
   // Replayer implementations of ImageBuilder methods
@@ -542,46 +558,46 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   // Replayer implementations of InOutBuilder methods
   case BuilderOpcode::ReadGenericInput: {
     InOutInfo inputInfo(cast<ConstantInt>(args[4])->getZExtValue());
-    return m_builder->CreateReadGenericInput(call->getType(),                                 // Result type
-                                             cast<ConstantInt>(args[0])->getZExtValue(),      // Location
-                                             args[1],                                         // Location offset
-                                             isa<UndefValue>(args[2]) ? nullptr : &*args[2],  // Element index
-                                             cast<ConstantInt>(args[3])->getZExtValue(),      // Location count
-                                             inputInfo,                                       // Input info
-                                             isa<UndefValue>(args[5]) ? nullptr : &*args[5]); // Vertex index
+    return m_builder->CreateReadGenericInput(call->getType(),                                  // Result type
+                                             cast<ConstantInt>(args[0])->getZExtValue(),       // Location
+                                             args[1],                                          // Location offset
+                                             isa<PoisonValue>(args[2]) ? nullptr : &*args[2],  // Element index
+                                             cast<ConstantInt>(args[3])->getZExtValue(),       // Location count
+                                             inputInfo,                                        // Input info
+                                             isa<PoisonValue>(args[5]) ? nullptr : &*args[5]); // Vertex index
   }
 
   case BuilderOpcode::ReadPerVertexInput: {
     InOutInfo inputInfo(cast<ConstantInt>(args[4])->getZExtValue());
-    return m_builder->CreateReadPerVertexInput(call->getType(),                                // Result type
-                                               cast<ConstantInt>(args[0])->getZExtValue(),     // Location
-                                               args[1],                                        // Location offset
-                                               isa<UndefValue>(args[2]) ? nullptr : &*args[2], // Element index
-                                               cast<ConstantInt>(args[3])->getZExtValue(),     // Location count
-                                               inputInfo,                                      // Input info
-                                               args[5]);                                       // Vertex index
+    return m_builder->CreateReadPerVertexInput(call->getType(),                                 // Result type
+                                               cast<ConstantInt>(args[0])->getZExtValue(),      // Location
+                                               args[1],                                         // Location offset
+                                               isa<PoisonValue>(args[2]) ? nullptr : &*args[2], // Element index
+                                               cast<ConstantInt>(args[3])->getZExtValue(),      // Location count
+                                               inputInfo,                                       // Input info
+                                               args[5]);                                        // Vertex index
   }
 
   case BuilderOpcode::ReadGenericOutput: {
     InOutInfo outputInfo(cast<ConstantInt>(args[4])->getZExtValue());
-    return m_builder->CreateReadGenericOutput(call->getType(),                                 // Result type
-                                              cast<ConstantInt>(args[0])->getZExtValue(),      // Location
-                                              args[1],                                         // Location offset
-                                              isa<UndefValue>(args[2]) ? nullptr : &*args[2],  // Element index
-                                              cast<ConstantInt>(args[3])->getZExtValue(),      // Location count
-                                              outputInfo,                                      // Output info
-                                              isa<UndefValue>(args[5]) ? nullptr : &*args[5]); // Vertex index
+    return m_builder->CreateReadGenericOutput(call->getType(),                                  // Result type
+                                              cast<ConstantInt>(args[0])->getZExtValue(),       // Location
+                                              args[1],                                          // Location offset
+                                              isa<PoisonValue>(args[2]) ? nullptr : &*args[2],  // Element index
+                                              cast<ConstantInt>(args[3])->getZExtValue(),       // Location count
+                                              outputInfo,                                       // Output info
+                                              isa<PoisonValue>(args[5]) ? nullptr : &*args[5]); // Vertex index
   }
 
   case BuilderOpcode::WriteGenericOutput: {
     InOutInfo outputInfo(cast<ConstantInt>(args[5])->getZExtValue());
-    return m_builder->CreateWriteGenericOutput(args[0],                                         // Value to write
-                                               cast<ConstantInt>(args[1])->getZExtValue(),      // Location
-                                               args[2],                                         // Location offset
-                                               isa<UndefValue>(args[3]) ? nullptr : &*args[3],  // Element index
-                                               cast<ConstantInt>(args[4])->getZExtValue(),      // Location count
-                                               outputInfo,                                      // Output info
-                                               isa<UndefValue>(args[6]) ? nullptr : &*args[6]); // Vertex index
+    return m_builder->CreateWriteGenericOutput(args[0],                                          // Value to write
+                                               cast<ConstantInt>(args[1])->getZExtValue(),       // Location
+                                               args[2],                                          // Location offset
+                                               isa<PoisonValue>(args[3]) ? nullptr : &*args[3],  // Element index
+                                               cast<ConstantInt>(args[4])->getZExtValue(),       // Location count
+                                               outputInfo,                                       // Output info
+                                               isa<PoisonValue>(args[6]) ? nullptr : &*args[6]); // Vertex index
   }
 
   case BuilderOpcode::WriteXfbOutput: {
@@ -598,40 +614,39 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   case BuilderOpcode::ReadBaryCoord: {
     auto builtIn = static_cast<BuiltInKind>(cast<ConstantInt>(args[0])->getZExtValue());
     InOutInfo inputInfo(cast<ConstantInt>(args[1])->getZExtValue());
-    return m_builder->CreateReadBaryCoord(builtIn,                                         // BuiltIn
-                                          inputInfo,                                       // Input info
-                                          isa<UndefValue>(args[2]) ? nullptr : &*args[2]); // auxInterpValue
+    return m_builder->CreateReadBaryCoord(builtIn,                                          // BuiltIn
+                                          inputInfo,                                        // Input info
+                                          isa<PoisonValue>(args[2]) ? nullptr : &*args[2]); // auxInterpValue
   }
 
   case BuilderOpcode::ReadBuiltInInput: {
     auto builtIn = static_cast<BuiltInKind>(cast<ConstantInt>(args[0])->getZExtValue());
     InOutInfo inputInfo(cast<ConstantInt>(args[1])->getZExtValue());
-    return m_builder->CreateReadBuiltInInput(builtIn,                                         // BuiltIn
-                                             inputInfo,                                       // Input info
-                                             isa<UndefValue>(args[2]) ? nullptr : &*args[2],  // Vertex index
-                                             isa<UndefValue>(args[3]) ? nullptr : &*args[3]); // Index
+    return m_builder->CreateReadBuiltInInput(builtIn,                                          // BuiltIn
+                                             inputInfo,                                        // Input info
+                                             isa<PoisonValue>(args[2]) ? nullptr : &*args[2],  // Vertex index
+                                             isa<PoisonValue>(args[3]) ? nullptr : &*args[3]); // Index
   }
 
   case BuilderOpcode::ReadBuiltInOutput: {
     auto builtIn = static_cast<BuiltInKind>(cast<ConstantInt>(args[0])->getZExtValue());
     InOutInfo outputInfo(cast<ConstantInt>(args[1])->getZExtValue());
-    return m_builder->CreateReadBuiltInOutput(builtIn,                                         // BuiltIn
-                                              outputInfo,                                      // Output info
-                                              isa<UndefValue>(args[2]) ? nullptr : &*args[2],  // Vertex index
-                                              isa<UndefValue>(args[3]) ? nullptr : &*args[3]); // Index
+    return m_builder->CreateReadBuiltInOutput(builtIn,                                          // BuiltIn
+                                              outputInfo,                                       // Output info
+                                              isa<PoisonValue>(args[2]) ? nullptr : &*args[2],  // Vertex index
+                                              isa<PoisonValue>(args[3]) ? nullptr : &*args[3]); // Index
   }
 
   case BuilderOpcode::WriteBuiltInOutput: {
     auto builtIn = static_cast<BuiltInKind>(cast<ConstantInt>(args[1])->getZExtValue());
     InOutInfo outputInfo(cast<ConstantInt>(args[2])->getZExtValue());
-    return m_builder->CreateWriteBuiltInOutput(args[0],                                         // Val to write
-                                               builtIn,                                         // BuiltIn
-                                               outputInfo,                                      // Output info
-                                               isa<UndefValue>(args[3]) ? nullptr : &*args[3],  // Vertex index
-                                               isa<UndefValue>(args[4]) ? nullptr : &*args[4]); // Index
+    return m_builder->CreateWriteBuiltInOutput(args[0],                                          // Val to write
+                                               builtIn,                                          // BuiltIn
+                                               outputInfo,                                       // Output info
+                                               isa<PoisonValue>(args[3]) ? nullptr : &*args[3],  // Vertex index
+                                               isa<PoisonValue>(args[4]) ? nullptr : &*args[4]); // Index
   }
 
-#if VKI_RAY_TRACING
   case BuilderOpcode::ImageBvhIntersectRay: {
     Value *bvhNodePtr = args[0];
     Value *extent = args[1];
@@ -640,33 +655,6 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     Value *invDirection = args[4];
     Value *imageDesc = args[5];
     return m_builder->CreateImageBvhIntersectRay(bvhNodePtr, extent, origin, direction, invDirection, imageDesc);
-  }
-
-#endif
-  case BuilderOpcode::ReadTaskPayload: {
-    return m_builder->CreateReadTaskPayload(call->getType(), // Result type
-                                            args[0]);        // Byte offset within the payload structure
-  }
-
-  case BuilderOpcode::WriteTaskPayload: {
-    return m_builder->CreateWriteTaskPayload(args[0],  // Value to write
-                                             args[1]); // Byte offset within the payload structure
-  }
-
-  case BuilderOpcode::TaskPayloadAtomic: {
-    unsigned atomicOp = cast<ConstantInt>(args[0])->getZExtValue();
-    auto ordering = static_cast<AtomicOrdering>(cast<ConstantInt>(args[1])->getZExtValue());
-    Value *inputValue = args[2];
-    Value *byteOffset = args[3];
-    return m_builder->CreateTaskPayloadAtomic(atomicOp, ordering, inputValue, byteOffset);
-  }
-
-  case BuilderOpcode::TaskPayloadAtomicCompareSwap: {
-    auto ordering = static_cast<AtomicOrdering>(cast<ConstantInt>(args[0])->getZExtValue());
-    Value *inputValue = args[1];
-    Value *comparatorValue = args[2];
-    Value *byteOffset = args[3];
-    return m_builder->CreateTaskPayloadAtomicCompareSwap(ordering, inputValue, comparatorValue, byteOffset);
   }
 
   // Replayer implementations of MiscBuilder methods
@@ -698,12 +686,6 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   case BuilderOpcode::DebugBreak: {
     return m_builder->CreateDebugBreak();
   }
-  case BuilderOpcode::EmitMeshTasks: {
-    return m_builder->CreateEmitMeshTasks(args[0], args[1], args[2]);
-  }
-  case BuilderOpcode::SetMeshOutputs: {
-    return m_builder->CreateSetMeshOutputs(args[0], args[1]);
-  }
   case BuilderOpcode::TransposeMatrix: {
     return m_builder->CreateTransposeMatrix(args[0]);
   }
@@ -724,14 +706,6 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   }
   case BuilderOpcode::DotProduct: {
     return m_builder->CreateDotProduct(args[0], args[1]);
-  }
-  case BuilderOpcode::DebugPrintf: {
-    SmallVector<Value *> vars;
-    vars.reserve(args.size());
-    for (const auto &arg : args) {
-      vars.push_back(arg);
-    }
-    return m_builder->CreateDebugPrintf(vars);
   }
   case BuilderOpcode::IntegerDotProduct: {
     Value *vector1 = args[0];
@@ -764,6 +738,9 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   }
   case BuilderOpcode::SubgroupAllEqual: {
     return m_builder->CreateSubgroupAllEqual(args[0]);
+  }
+  case BuilderOpcode::SubgroupRotate: {
+    return m_builder->CreateSubgroupRotate(args[0], args[1], isa<PoisonValue>(args[2]) ? nullptr : &*args[2]);
   }
   case BuilderOpcode::SubgroupBroadcast: {
     return m_builder->CreateSubgroupBroadcast(args[0], args[1]);

@@ -526,7 +526,7 @@ Value *BuilderImpl::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags
     texel = CreateBitCast(texel, getInt64Ty()); // Casted to i64
 
     if (origTexelTy->isVectorTy()) {
-      texel = CreateInsertElement(UndefValue::get(origTexelTy), texel, uint64_t(0));
+      texel = CreateInsertElement(PoisonValue::get(origTexelTy), texel, uint64_t(0));
 
       SmallVector<Value *, 3> defaults = {getInt64(0), getInt64(0), getInt64(1)};
       // The default of W channel is set to 0 if allowNullDescriptor is on and image descriptor is a null descriptor
@@ -543,7 +543,7 @@ Value *BuilderImpl::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags
     if (isa<StructType>(resultTy)) {
       // TFE
       intrinsicDataTy = StructType::get(origTexelTy->getContext(), {origTexelTy, getInt32Ty()});
-      result = CreateInsertValue(CreateInsertValue(UndefValue::get(intrinsicDataTy), texel, uint64_t(0)),
+      result = CreateInsertValue(CreateInsertValue(PoisonValue::get(intrinsicDataTy), texel, uint64_t(0)),
                                  CreateExtractValue(result, 1), 1);
     } else {
       result = texel;
@@ -604,7 +604,7 @@ Value *BuilderImpl::CreateImageLoadWithFmask(Type *resultTy, unsigned dim, unsig
     // Use that to select the calculated sample number or the provided one, then append that to the coordinates.
     sampleNum = CreateSelect(fmaskValidFormat, calcSampleNum, sampleNum);
   }
-  sampleNum = CreateInsertElement(UndefValue::get(coord->getType()), sampleNum, uint64_t(0));
+  sampleNum = CreateInsertElement(PoisonValue::get(coord->getType()), sampleNum, uint64_t(0));
   static const int Idxs[] = {0, 1, 2, 3};
   coord = CreateShuffleVector(coord, sampleNum, ArrayRef<int>(Idxs).slice(0, dim == Dim2DArrayMsaa ? 4 : 3));
 
@@ -864,7 +864,7 @@ Value *BuilderImpl::CreateImageGather(Type *resultTy, unsigned dim, unsigned fla
     SmallVector<Value *, ImageAddressCount> modifiedAddress;
     modifiedAddress.insert(modifiedAddress.begin(), address.begin(), address.end());
     auto gatherStructTy = dyn_cast<StructType>(gatherTy);
-    result = UndefValue::get(gatherStructTy ? gatherStructTy->getElementType(0) : gatherTy);
+    result = PoisonValue::get(gatherStructTy ? gatherStructTy->getElementType(0) : gatherTy);
     for (unsigned index = 0; index < 4; ++index) {
       modifiedAddress[ImageAddressIdxOffset] = CreateExtractValue(addrOffset, index);
       Value *singleResult = CreateImageSampleGather(gatherTy, dim, flags, coord, imageDesc, samplerDesc,
@@ -876,7 +876,7 @@ Value *BuilderImpl::CreateImageGather(Type *resultTy, unsigned dim, unsigned fla
       result = CreateInsertElement(result, CreateExtractElement(singleResult, 3), index);
     }
     if (residency) {
-      result = CreateInsertValue(UndefValue::get(gatherTy), result, 0);
+      result = CreateInsertValue(PoisonValue::get(gatherTy), result, 0);
       result = CreateInsertValue(result, residency, 1);
     }
   } else {
@@ -897,7 +897,7 @@ Value *BuilderImpl::CreateImageGather(Type *resultTy, unsigned dim, unsigned fla
     Value *texel = CreateExtractValue(result, 0);
     Value *tfe = CreateExtractValue(result, 1);
     texel = cast<Instruction>(CreateBitCast(texel, texelTy));
-    result = UndefValue::get(StructType::get(getContext(), {texel->getType(), tfe->getType()}));
+    result = PoisonValue::get(StructType::get(getContext(), {texel->getType(), tfe->getType()}));
     result = CreateInsertValue(result, texel, 0);
     result = CreateInsertValue(result, tfe, 1);
   } else
@@ -1464,7 +1464,7 @@ Value *BuilderImpl::CreateImageQuerySize(unsigned dim, unsigned flags, Value *im
     depth = CreateSelect(isNullDesc, getInt32(0), depth);
   }
 
-  resInfo = CreateInsertElement(UndefValue::get(FixedVectorType::get(getInt32Ty(), 4)), width, uint64_t(0));
+  resInfo = CreateInsertElement(PoisonValue::get(FixedVectorType::get(getInt32Ty(), 4)), width, uint64_t(0));
   if (dim == Dim1DArray)
     resInfo = CreateInsertElement(resInfo, depth, 1);
   else
@@ -1559,7 +1559,6 @@ Value *BuilderImpl::CreateImageGetLod(unsigned dim, unsigned flags, Value *image
   return result;
 }
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Create a ray intersect result with specified node in BVH buffer
 //
@@ -1584,8 +1583,6 @@ Value *BuilderImpl::CreateImageBvhIntersectRay(Value *nodePtr, Value *extent, Va
 
   return CreateIntrinsic(FixedVectorType::get(getInt32Ty(), 4), Intrinsic::amdgcn_image_bvh_intersect_ray, args);
 }
-
-#endif
 
 // =====================================================================================================================
 // Change 1D or 1DArray dimension to 2D or 2DArray if needed as a workaround on GFX9+
@@ -2056,10 +2053,10 @@ void BuilderImpl::enforceReadFirstLane(Instruction *imageInst, unsigned descIdx)
   SetInsertPoint(imageInst);
   Value *origDesc = imageInst->getOperand(descIdx);
   const unsigned elemCount = cast<FixedVectorType>(origDesc->getType())->getNumElements();
-  Value *newDesc = UndefValue::get(FixedVectorType::get(getInt32Ty(), elemCount));
+  Value *newDesc = PoisonValue::get(FixedVectorType::get(getInt32Ty(), elemCount));
   for (unsigned elemIdx = 0; elemIdx < elemCount; ++elemIdx) {
     Value *elem = CreateExtractElement(origDesc, elemIdx);
-    elem = CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, elem);
+    elem = CreateIntrinsic(getInt32Ty(), Intrinsic::amdgcn_readfirstlane, elem);
     newDesc = CreateInsertElement(newDesc, elem, elemIdx);
   }
   imageInst->setOperand(descIdx, newDesc);

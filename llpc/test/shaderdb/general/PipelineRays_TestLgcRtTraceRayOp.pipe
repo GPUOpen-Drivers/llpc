@@ -1,0 +1,110 @@
+; Check lgc.rt.trace.ray dialect is being generated.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc --print-after=llpc-spirv-lower-translator -gfxip 10.3 -o /dev/null 2>&1 %s | FileCheck -check-prefixes=SHADERTEST %s
+; SHADERTEST-LABEL: @main(
+; SHADERTEST: call void (...) @lgc.rt.trace.ray(i64 %{{[0-9]+}}, i32 0, i32 %{{[0-9]+}}, i32 0, i32 0, i32 0, <3 x float> %{{[0-9]+}}, float %{{[0-9]+}}, <3 x float> %{{[0-9]+}}, float %{{[0-9]+}}, ptr addrspace(5) @RayPayloadKHR0, [1 x i32] [i32 16])
+; END_SHADERTEST
+
+[rgenGlsl]
+#version 460
+#extension GL_EXT_ray_tracing : require
+layout(location = 0) rayPayloadEXT vec4 payload;
+layout(set = 0, binding = 1) uniform accelerationStructureEXT topLevelAS;
+
+void main()
+{
+  uint  cullMask = 0xFF;
+  float tmin     = 0.0;
+  float tmax     = 9.0;
+  vec3  origin   = vec3(0.0, 0.0, 0.0);
+  vec3  direct   = vec3(0.0, 0.0, -1.0);
+  traceRayEXT(topLevelAS, 0, cullMask, 0, 0, 0, origin, tmin, direct, tmax, 0);
+}
+
+[rgenInfo]
+entryPoint = main
+
+[ResourceMapping]
+userDataNode[0].visibility = 16128
+userDataNode[0].type = DescriptorTableVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].next[0].type = DescriptorImage
+userDataNode[0].next[0].offsetInDwords = 0
+userDataNode[0].next[0].sizeInDwords = 8
+userDataNode[0].next[0].set = 0x00000000
+userDataNode[0].next[0].binding = 0
+userDataNode[0].next[0].strideInDwords = 0
+userDataNode[0].next[1].type = DescriptorConstBuffer
+userDataNode[0].next[1].offsetInDwords = 8
+userDataNode[0].next[1].sizeInDwords = 4
+userDataNode[0].next[1].set = 0x00000000
+userDataNode[0].next[1].binding = 1
+userDataNode[0].next[1].strideInDwords = 0
+userDataNode[1].visibility = 2
+userDataNode[1].type = StreamOutTableVaPtr
+userDataNode[1].offsetInDwords = 1
+userDataNode[1].sizeInDwords = 1
+userDataNode[2].visibility = 16128
+userDataNode[2].type = DescriptorTableVaPtr
+userDataNode[2].offsetInDwords = 5
+userDataNode[2].sizeInDwords = 1
+userDataNode[2].next[0].type = DescriptorConstBufferCompact
+userDataNode[2].next[0].offsetInDwords = 0
+userDataNode[2].next[0].sizeInDwords = 2
+userDataNode[2].next[0].set = 0x0000005D
+userDataNode[2].next[0].binding = 17
+userDataNode[2].next[0].strideInDwords = 0
+userDataNode[2].next[1].type = DescriptorConstBuffer
+userDataNode[2].next[1].offsetInDwords = 2
+userDataNode[2].next[1].sizeInDwords = 4
+userDataNode[2].next[1].set = 0x0000005D
+userDataNode[2].next[1].binding = 0
+userDataNode[2].next[1].strideInDwords = 0
+userDataNode[2].next[2].type = DescriptorBuffer
+userDataNode[2].next[2].offsetInDwords = 6
+userDataNode[2].next[2].sizeInDwords = 4
+userDataNode[2].next[2].set = 0x0000005D
+userDataNode[2].next[2].binding = 1
+userDataNode[2].next[2].strideInDwords = 0
+
+[RayTracingPipelineState]
+deviceIndex = 0
+groups[0].type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR
+groups[0].generalShader = 0
+groups[0].closestHitShader = -1
+groups[0].anyHitShader = -1
+groups[0].intersectionShader = -1
+rtState.bvhResDescSize = 4
+rtState.bvhResDesc[0] = 0
+rtState.bvhResDesc[1] = 2197815296
+rtState.bvhResDesc[2] = 4294967295
+rtState.bvhResDesc[3] = 2164261887
+rtState.nodeStrideShift = 7
+rtState.staticPipelineFlags = 512
+rtState.triCompressMode = 0
+rtState.pipelineFlags = 8192
+rtState.threadGroupSizeX = 8
+rtState.threadGroupSizeY = 4
+rtState.threadGroupSizeZ = 1
+rtState.boxSortHeuristicMode = 0
+rtState.counterMode = 0
+rtState.counterMask = 0
+rtState.rayQueryCsSwizzle = 1
+rtState.ldsStackSize = 16
+rtState.dispatchRaysThreadGroupSize = 32
+rtState.ldsSizePerThreadGroup = 65536
+rtState.gpurtFuncTable.pFunc[0] = TraceRay1_1
+rtState.gpurtFuncTable.pFunc[1] = TraceRayInline1_1
+rtState.gpurtFuncTable.pFunc[2] = TraceRayUsingHitToken1_1
+rtState.gpurtFuncTable.pFunc[3] = RayQueryProceed1_1
+rtState.gpurtFuncTable.pFunc[4] = GetInstanceIndex
+rtState.gpurtFuncTable.pFunc[5] = GetInstanceID
+rtState.gpurtFuncTable.pFunc[6] = GetObjectToWorldTransform
+rtState.gpurtFuncTable.pFunc[7] = GetWorldToObjectTransform
+rtState.gpurtFuncTable.pFunc[8] = TraceLongRayAMD1_1
+rtState.gpurtFuncTable.pFunc[9] = LongRayQueryProceedAMD1_1
+rtState.gpurtFuncTable.pFunc[10] = FetchTrianglePositionFromNodePointer
+rtState.gpurtFuncTable.pFunc[11] = FetchTrianglePositionFromRayQuery
+rtState.rtIpVersion = 1.1

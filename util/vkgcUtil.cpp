@@ -63,45 +63,13 @@ const char *getShaderStageAbbreviation(ShaderStage shaderStage, bool upper) {
     abbr = upper ? "COPY" : "Copy";
   else if (shaderStage < ShaderStageCount) {
     if (upper) {
-      static const char *ShaderStageAbbrs[] = {
-        "TASK",
-        "VS",
-        "TCS",
-        "TES",
-        "GS",
-        "MESH",
-        "FS",
-        "CS",
-#if VKI_RAY_TRACING
-        "RGEN",
-        "SECT",
-        "AHIT",
-        "CHIT",
-        "MISS",
-        "CALL"
-#endif
-      };
+      static const char *ShaderStageAbbrs[] = {"TASK", "VS",   "TCS",  "TES",  "GS",   "MESH", "FS",
+                                               "CS",   "RGEN", "SECT", "AHIT", "CHIT", "MISS", "CALL"};
 
       abbr = ShaderStageAbbrs[static_cast<unsigned>(shaderStage)];
     } else {
-      static const char *ShaderStageAbbrs[] = {
-        "Task",
-        "Vs",
-        "Tcs",
-        "Tes",
-        "Gs",
-        "Mesh",
-        "Fs",
-        "Cs",
-#if VKI_RAY_TRACING
-        "rgen",
-        "sect",
-        "ahit",
-        "chit",
-        "miss",
-        "call"
-#endif
-      };
+      static const char *ShaderStageAbbrs[] = {"Task", "Vs",   "Tcs",  "Tes",  "Gs",   "Mesh", "Fs",
+                                               "Cs",   "rgen", "sect", "ahit", "chit", "miss", "call"};
 
       abbr = ShaderStageAbbrs[static_cast<unsigned>(shaderStage)];
     }
@@ -157,6 +125,9 @@ const char *getResourceMappingNodeTypeName(ResourceMappingNodeType type) {
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorBufferCompact)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, StreamOutTableVaPtr)
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, InlineBuffer)
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 63
+    CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorAtomicCounter)
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
     CASE_CLASSENUM_TO_STRING(ResourceMappingNodeType, DescriptorMutable)
 #endif

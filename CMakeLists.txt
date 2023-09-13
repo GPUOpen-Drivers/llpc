@@ -43,17 +43,10 @@ add_library(vkgc_headers INTERFACE)
 option(LLPC_BUILD_TOOLS "LLPC build all tools" OFF)
 
 ### Options that affect the headers ####################################################################################
-option(LLPC_ENABLE_SHADER_CACHE "Enable experimental shader cache" OFF)
-
-if(LLPC_ENABLE_SHADER_CACHE)
-    target_compile_definitions(vkgc_headers INTERFACE LLPC_ENABLE_SHADER_CACHE)
-endif()
-
 if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
     target_compile_definitions(vkgc_headers INTERFACE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION})
 else()
-    # LLPC is not compiled, so fall back to the latest version
-    target_compile_definitions(vkgc_headers INTERFACE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=LLPC_INTERFACE_MAJOR_VERSION)
+    message(FATAL_ERROR "Client of LLPC must set LLPC_CLIENT_INTERFACE_MAJOR_VERSION")
 endif()
 
 #if VKI_BUILD_GFX11
@@ -62,12 +55,14 @@ if(LLPC_BUILD_GFX11)
 endif()
 #endif
 
-#if VKI_RAY_TRACING
 if(VKI_RAY_TRACING)
+    if(NOT LLPC_IS_STANDALONE)
+        target_compile_definitions(vkgc_headers INTERFACE HAVE_GPURT_SHIM)
+    endif()
+
     target_compile_definitions(vkgc_headers INTERFACE VKI_RAY_TRACING)
     target_compile_definitions(vkgc_headers INTERFACE GPURT_CLIENT_INTERFACE_MAJOR_VERSION=${GPURT_CLIENT_INTERFACE_MAJOR_VERSION})
 endif()
-#endif
 
 target_link_libraries(vkgc INTERFACE vkgc_headers)
 
@@ -124,6 +119,11 @@ if(EXISTS ${XGL_SPVGEN_PATH})
     add_subdirectory(${XGL_SPVGEN_PATH} ${XGL_SPVGEN_BUILD_PATH} EXCLUDE_FROM_ALL)
 endif()
 
+endif(LLPC_BUILD_TOOLS)
+
+if(ICD_BUILD_LLPC)
+    # Generate Strings for LLPC standalone tool and vkgc_gpurtshim
+    add_subdirectory(util ${PROJECT_BINARY_DIR}/util)
 endif()
 
 ### VKGC build LLPC ################################################################

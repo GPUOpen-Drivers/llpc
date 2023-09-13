@@ -153,6 +153,9 @@ static constexpr char ApiCreateInfo[] = ".api_create_info";
 static constexpr char PsSampleMask[] = ".ps_sample_mask";
 static constexpr char GraphicsRegisters[] = ".graphics_registers";
 static constexpr char ComputeRegisters[] = ".compute_registers";
+static constexpr char PsInputSemantic[] = ".ps_input_semantic";
+static constexpr char PrerasterOutputSemantic[] = ".preraster_output_semantic";
+static constexpr char ShaderFunctions[] = ".shader_functions";
 }; // namespace PipelineMetadataKey
 
 namespace HardwareStageMetadataKey {
@@ -182,6 +185,7 @@ static constexpr char WgpMode[] = ".wgp_mode";
 static constexpr char OffchipLdsEn[] = ".offchip_lds_en";
 static constexpr char UserDataRegMap[] = ".user_data_reg_map";
 static constexpr char ImageOp[] = ".image_op";
+static constexpr char FrontendStackSize[] = ".frontend_stack_size";
 }; // namespace HardwareStageMetadataKey
 
 namespace ShaderMetadataKey {
@@ -524,6 +528,34 @@ static constexpr char Output6Enable[] = ".output6_enable";
 static constexpr char Output7Enable[] = ".output7_enable";
 }; // namespace CbShaderMaskMetadataKey
 
+namespace SpiPsInputAddrMetadataKey {
+static constexpr char PerspSampleEna[] = ".persp_sample_ena";
+static constexpr char PerspCenterEna[] = ".persp_center_ena";
+static constexpr char PerspCentroidEna[] = ".persp_centroid_ena";
+static constexpr char PerspPullModelEna[] = ".persp_pull_model_ena";
+static constexpr char LinearSampleEna[] = ".linear_sample_ena";
+static constexpr char LinearCenterEna[] = ".linear_center_ena";
+static constexpr char LinearCentroidEna[] = ".linear_centroid_ena";
+static constexpr char LineStippleTexEna[] = ".line_stipple_tex_ena";
+static constexpr char PosXFloatEna[] = ".pos_x_float_ena";
+static constexpr char PosYFloatEna[] = ".pos_y_float_ena";
+static constexpr char PosZFloatEna[] = ".pos_z_float_ena";
+static constexpr char PosWFloatEna[] = ".pos_w_float_ena";
+static constexpr char FrontFaceEna[] = ".front_face_ena";
+static constexpr char AncillaryEna[] = ".ancillary_ena";
+static constexpr char SampleCoverageEna[] = ".sample_coverage_ena";
+static constexpr char PosFixedPtEna[] = ".pos_fixed_pt_ena";
+}; // namespace SpiPsInputAddrMetadataKey
+
+namespace PrerasterOutputSemanticMetadataKey {
+static constexpr char Semantic[] = ".semantic";
+static constexpr char Index[] = ".index";
+}; // namespace PrerasterOutputSemanticMetadataKey
+
+namespace PsInputSemanticMetadataKey {
+static constexpr char Semantic[] = ".semantic";
+}; // namespace PsInputSemanticMetadataKey
+
 } // namespace Abi
 
 } // namespace Util
@@ -562,6 +594,7 @@ enum class UserDataMapping : unsigned {
                                      //  pipeline stats query.
   StreamOutControlBuf = 0x10000016,  // 32-bit GPU virtual address to the streamout control buffer for GPUs that
                                      // use SW-emulated streamout.
+  ColorExportAddr = 0x10000020,      // Color export address
 
   // Values used in a user data PAL metadata register to be resolved at link time.
   // This is part of the "unlinked" ABI, so should arguably be in AbiUnlinked.h.
@@ -741,6 +774,17 @@ union PA_SC_SHADER_CONTROL {
   } gfx10;
 
   unsigned u32All;
+};
+
+union SPI_SHADER_Z_FORMAT {
+  struct {
+    unsigned int Z_EXPORT_FORMAT : 4;
+    unsigned int : 28;
+  } bits, bitfields;
+
+  unsigned int u32All;
+  signed int i32All;
+  float f32All;
 };
 
 enum CovToShaderSel {

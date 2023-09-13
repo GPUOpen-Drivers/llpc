@@ -61,21 +61,23 @@ class FragColorExport {
 public:
   FragColorExport(llvm::LLVMContext *context, PipelineState *pipelineState);
 
-  llvm::Value *handleColorExportInstructions(llvm::Value *output, unsigned int hwColorTarget, BuilderBase &builder,
-                                             ExportFormat expFmt, const bool signedness);
-
   void generateExportInstructions(llvm::ArrayRef<lgc::ColorExportInfo> info, llvm::ArrayRef<llvm::Value *> values,
                                   llvm::ArrayRef<ExportFormat> exportFormat, bool dummyExport, BuilderBase &builder);
   static void setDoneFlag(llvm::Value *exportInst, BuilderBase &builder);
   static llvm::CallInst *addDummyExport(BuilderBase &builder);
-  static llvm::Function *generateNullFragmentShader(llvm::Module &module, llvm::StringRef entryPointName);
-  static llvm::Function *generateNullFragmentEntryPoint(llvm::Module &module, llvm::StringRef entryPointName);
+  static llvm::Function *generateNullFragmentShader(llvm::Module &module, PipelineState *pipelineState,
+                                                    llvm::StringRef entryPointName);
+  static llvm::Function *generateNullFragmentEntryPoint(llvm::Module &module, PipelineState *pipelineState,
+                                                        llvm::StringRef entryPointName);
   static void generateNullFragmentShaderBody(llvm::Function *entryPoint);
 
 private:
   FragColorExport() = delete;
   FragColorExport(const FragColorExport &) = delete;
   FragColorExport &operator=(const FragColorExport &) = delete;
+
+  llvm::Value *handleColorExportInstructions(llvm::Value *output, unsigned int hwColorExport, BuilderBase &builder,
+                                             ExportFormat expFmt, const bool signedness);
 
   llvm::Value *convertToHalf(llvm::Value *value, bool signedness, BuilderBase &builder) const;
   llvm::Value *convertToFloat(llvm::Value *value, bool signedness, BuilderBase &builder) const;
@@ -117,6 +119,7 @@ private:
   void collectExportInfoForBuiltinOutput(llvm::Function *module, BuilderBase &builder);
   llvm::Value *generateValueForOutput(llvm::Value *value, llvm::Type *outputTy, BuilderBase &builder);
   llvm::Value *generateReturn(llvm::Function *fragEntryPoint, BuilderBase &builder);
+  llvm::Value *jumpColorExport(llvm::Function *fragEntryPoint, BuilderBase &builder);
 
   llvm::LLVMContext *m_context;                        // The context the pass is being run in.
   PipelineState *m_pipelineState;                      // The pipeline state

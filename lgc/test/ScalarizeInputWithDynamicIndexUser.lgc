@@ -10,9 +10,9 @@ target triple = "amdgcn--amdpal"
 ; Function Attrs: nounwind
 define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !lgc.shaderstage !15 {
 .entry:
-  %0 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 2, i32 0, i32 0, i32 0, i32 0, i32 undef)
-  %1 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 1, i32 0, i32 0, i32 0, i32 0, i32 undef)
-  %2 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 0, i32 0, i32 0, i32 0, i32 0, i32 undef)
+  %0 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 2, i32 0, i32 0, i32 0, i32 0, i32 poison)
+  %1 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 1, i32 0, i32 0, i32 0, i32 0, i32 poison)
+  %2 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison)
   call void (...) @lgc.create.write.generic.output(<4 x float> %2, i32 0, i32 0, i32 0, i32 0, i32 0, i32 undef)
   call void (...) @lgc.create.write.generic.output(<4 x float> %1, i32 1, i32 0, i32 0, i32 0, i32 0, i32 undef)
   call void (...) @lgc.create.write.generic.output(<4 x float> %0, i32 2, i32 0, i32 0, i32 0, i32 0, i32 undef)
@@ -47,7 +47,7 @@ define dllexport spir_func void @lgc.shader.FS.main() local_unnamed_addr #0 !lgc
 ; CHECK-NEXT:    ret void
 ;
 .entry:
-  %input0 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 2, i32 0, i32 0, i32 0, i32 16, i32 undef)
+  %input0 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 2, i32 0, i32 0, i32 0, i32 16, i32 poison)
   %idx0 = call i32 (...) @lgc.create.extract.bit.field.i32(i32 12816, i32 0, i32 4, i1 false)
   %input1 = extractelement <4 x float> %input0, i32 %idx0
   %output = insertelement <4 x float> undef, float %input1, i32 0
@@ -82,9 +82,9 @@ attributes #4 = { nofree nosync nounwind readnone speculatable willreturn }
 !2 = !{i32 -1861977700, i32 -726079217, i32 -248869534, i32 2063972137, i32 1, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 2, i32 1}
 !3 = !{i32 1581426283, i32 -161330761, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 20, i32 1800}
 !4 = !{i32 -1618560552, i32 -939433038, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 20, i32 1800}
-!5 = !{!"StreamOutTableVaPtr", i32 0, i32 0, i32 1, i32 0}
-!6 = !{!"DescriptorBuffer", i32 6, i32 1, i32 4, i32 0, i32 0, i32 4}
-!7 = !{!"IndirectUserDataVaPtr", i32 0, i32 5, i32 1, i32 12}
+!5 = !{!"StreamOutTableVaPtr", i32 0, i32 0, i32 0, i32 1, i32 0}
+!6 = !{!"DescriptorBuffer", i32 6, i32 0, i32 1, i32 4, i32 0, i32 0, i32 4}
+!7 = !{!"IndirectUserDataVaPtr", i32 0, i32 0, i32 5, i32 1, i32 12}
 !8 = !{i32 0, i32 0, i32 0, i32 12, i32 11, i32 7, i32 -1}
 !9 = !{i32 1, i32 1, i32 0, i32 12, i32 10, i32 0, i32 -1}
 !10 = !{i32 2, i32 2, i32 0, i32 4, i32 4, i32 7, i32 -1}

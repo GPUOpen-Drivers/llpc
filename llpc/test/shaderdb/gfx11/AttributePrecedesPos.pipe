@@ -1,0 +1,206 @@
+; Test to check that attributes-through-memory precedes vertex position data exporting
+
+; RUN: amdllpc %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: @_amdgpu_gs_main(
+; SHADERTEST: call void @llvm.amdgcn.struct.buffer.store.v4f32(<4 x float> %{{.*}}, <4 x i32> %{{.*}}, i32 %{{.*}}, i32 0, i32 %{{.*}}, i32 3)
+; SHADERTEST: fence release
+; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 immarg 12, i32 immarg 15, float %{{.*}}, float %{{.*}}, float %{{.*}}, float %{{.*}}, i1 immarg false, i1 immarg false)
+; SHADERTEST: call void @llvm.amdgcn.exp.f32(i32 immarg 13, i32 immarg 1, float 1.000000e+00, float poison, float poison, float poison, i1 immarg true, i1 immarg false)
+; SHADERTEST-LABEL: _amdgpu_gs_main:
+; SHADERTEST: buffer_store_b128 {{v[[0-9]*:[0-9]*]}}, {{v[0-9]*}}, {{s[[0-9]*:[0-9]*]}}, {{s[0-9]*}} idxen glc slc
+; SHADERTEST: s_waitcnt_vscnt null, 0x0
+; SHADERTEST: exp pos0 {{v[0-9]*}}, {{v[0-9]*}}, {{v[0-9]*}}, {{v[0-9]*}}
+; SHADERTEST: exp pos1 {{v[0-9]*}}, off, off, off done
+
+[Version]
+version = 56
+
+[VsGlsl]
+#version 430
+layout(location = 0) in vec4 in_position;
+layout(location = 1) in vec4 in_color;
+layout(location = 0) out vec4 out_color;
+out gl_PerVertex {
+    vec4  gl_Position;
+    float gl_PointSize;
+};
+void main() {
+    gl_PointSize = 1.0;
+    out_color    = in_color;
+    gl_Position  = in_position;
+}
+
+[VsInfo]
+entryPoint = main
+options.trapPresent = 0
+options.debugMode = 0
+options.enablePerformanceData = 0
+options.allowReZ = 0
+options.forceLateZ = 0
+options.vgprLimit = 0
+options.sgprLimit = 0
+options.maxThreadGroupsPerComputeUnit = 0
+options.waveSize = 0
+options.subgroupSize = 0
+options.wgpMode = 0
+options.waveBreakSize = None
+options.forceLoopUnrollCount = 0
+options.useSiScheduler = 0
+options.disableCodeSinking = 0
+options.favorLatencyHiding = 0
+options.updateDescInElf = 0
+options.allowVaryWaveSize = 0
+options.enableLoadScalarizer = 0
+options.disableLicm = 0
+options.unrollThreshold = 0
+options.scalarThreshold = 0
+options.disableLoopUnroll = 0
+options.fp32DenormalMode = Auto
+options.adjustDepthImportVrs = 0
+options.disableLicmThreshold = 0
+options.unrollHintThreshold = 0
+options.dontUnrollHintThreshold = 0
+options.fastMathFlags = 0
+options.disableFastMathFlags = 0
+options.ldsSpillLimitDwords = 0
+options.scalarizeWaterfallLoads = 0
+options.overrideShaderThreadGroupSizeX = 0
+options.overrideShaderThreadGroupSizeY = 0
+options.overrideShaderThreadGroupSizeZ = 0
+options.nsaThreshold = 0
+options.aggressiveInvariantLoads = Auto
+
+[FsGlsl]
+#version 430
+layout(location = 0) in vec4 in_color;
+layout(location = 0) out vec4 out_color;
+void main()
+{
+    out_color = in_color;
+}
+
+[FsInfo]
+entryPoint = main
+options.trapPresent = 0
+options.debugMode = 0
+options.enablePerformanceData = 0
+options.allowReZ = 0
+options.forceLateZ = 0
+options.vgprLimit = 0
+options.sgprLimit = 0
+options.maxThreadGroupsPerComputeUnit = 0
+options.waveSize = 0
+options.subgroupSize = 0
+options.wgpMode = 0
+options.waveBreakSize = None
+options.forceLoopUnrollCount = 0
+options.useSiScheduler = 0
+options.disableCodeSinking = 0
+options.favorLatencyHiding = 0
+options.updateDescInElf = 0
+options.allowVaryWaveSize = 0
+options.enableLoadScalarizer = 0
+options.disableLicm = 0
+options.unrollThreshold = 0
+options.scalarThreshold = 0
+options.disableLoopUnroll = 0
+options.fp32DenormalMode = Auto
+options.adjustDepthImportVrs = 0
+options.disableLicmThreshold = 0
+options.unrollHintThreshold = 0
+options.dontUnrollHintThreshold = 0
+options.fastMathFlags = 0
+options.disableFastMathFlags = 0
+options.ldsSpillLimitDwords = 0
+options.scalarizeWaterfallLoads = 0
+options.overrideShaderThreadGroupSizeX = 0
+options.overrideShaderThreadGroupSizeY = 0
+options.overrideShaderThreadGroupSizeZ = 0
+options.nsaThreshold = 0
+options.aggressiveInvariantLoads = Auto
+
+[ResourceMapping]
+userDataNode[0].visibility = 4
+userDataNode[0].type = StreamOutTableVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[1].visibility = 2
+userDataNode[1].type = IndirectUserDataVaPtr
+userDataNode[1].offsetInDwords = 1
+userDataNode[1].sizeInDwords = 1
+userDataNode[1].indirectUserDataCount = 4
+
+[GraphicsPipelineState]
+topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+provokingVertexMode = VK_PROVOKING_VERTEX_MODE_FIRST_VERTEX_EXT
+patchControlPoints = 0
+deviceIndex = 0
+disableVertexReuse = 0
+switchWinding = 0
+enableMultiView = 0
+depthClipEnable = 1
+rasterizerDiscardEnable = 0
+perSampleShading = 0
+numSamples = 0
+pixelShaderSamples = 0
+samplePatternIdx = 0
+usrClipPlaneMask = 0
+alphaToCoverageEnable = 0
+dualSourceBlendEnable = 0
+colorBuffer[0].format = VK_FORMAT_R8G8B8A8_UNORM
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 0
+nggState.enableNgg = 1
+nggState.enableGsUse = 0
+nggState.forceCullingMode = 0
+nggState.compactMode = NggCompactDisable
+nggState.enableVertexReuse = 0
+nggState.enableBackfaceCulling = 0
+nggState.enableFrustumCulling = 0
+nggState.enableBoxFilterCulling = 0
+nggState.enableSphereCulling = 0
+nggState.enableSmallPrimFilter = 0
+nggState.enableCullDistanceCulling = 0
+nggState.backfaceExponent = 0
+nggState.subgroupSizing = Auto
+nggState.primsPerSubgroup = 256
+nggState.vertsPerSubgroup = 256
+dynamicVertexStride = 0
+enableUberFetchShader = 0
+enableEarlyCompile = 0
+options.includeDisassembly = 0
+options.scalarBlockLayout = 1
+options.resourceLayoutScheme = Compact
+options.includeIr = 0
+options.robustBufferAccess = 0
+options.reconfigWorkgroupLayout = 0
+options.forceCsThreadIdSwizzling = 0
+options.overrideThreadGroupSizeX = 0
+options.overrideThreadGroupSizeY = 0
+options.overrideThreadGroupSizeZ = 0
+options.shadowDescriptorTableUsage = Disable
+options.shadowDescriptorTablePtrHigh = 2
+options.extendedRobustness.robustBufferAccess = 0
+options.extendedRobustness.robustImageAccess = 1
+options.extendedRobustness.nullDescriptor = 0
+options.optimizeTessFactor = 0
+options.optimizationLevel = 2
+options.threadGroupSwizzleMode = Default
+options.reverseThreadGroup = 0
+options.internalRtShaders = 0
+
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 32
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[0].offset = 0
+attribute[1].location = 1
+attribute[1].binding = 0
+attribute[1].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[1].offset = 16
+shaderTraceMask = 0

@@ -137,10 +137,14 @@ void ConfigBuilder::buildPipelineVsFsRegConfig() {
     } else {
       SET_REG(&config, IA_MULTI_VGT_PARAM, iaMultiVgtParam.u32All);
     }
+  } else {
+    invalidRegConfig(config.vsRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
     buildPsRegConfig<PipelineVsFsRegConfig>(ShaderStageFragment, &config);
+  } else {
+    invalidRegConfig(config.psRegs);
   }
 
   appendConfig(config);
@@ -187,6 +191,8 @@ void ConfigBuilder::buildPipelineVsTsFsRegConfig() {
 
     if (m_gfxIp.major == 10)
       setWaveFrontSize(Util::Abi::HardwareStage::Hs, waveSize);
+  } else {
+    invalidRegConfig(config.lsHsRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageTessEval)) {
@@ -205,10 +211,14 @@ void ConfigBuilder::buildPipelineVsTsFsRegConfig() {
     if (m_pipelineState->getTargetInfo().getGpuProperty().supportShaderPowerProfiling) {
       SET_REG(&config.vsRegs, SPI_SHADER_PGM_CHKSUM_VS, checksum);
     }
+  } else {
+    invalidRegConfig(config.vsRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
     buildPsRegConfig<PipelineVsTsFsRegConfig>(ShaderStageFragment, &config);
+  } else {
+    invalidRegConfig(config.psRegs);
   }
 
   // Set up IA_MULTI_VGT_PARAM
@@ -272,10 +282,14 @@ void ConfigBuilder::buildPipelineVsGsFsRegConfig() {
 
     if (m_gfxIp.major == 10)
       setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveSize);
+  } else {
+    invalidRegConfig(config.esGsRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
     buildPsRegConfig<PipelineVsGsFsRegConfig>(ShaderStageFragment, &config);
+  } else {
+    invalidRegConfig(config.psRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageCopyShader)) {
@@ -288,6 +302,8 @@ void ConfigBuilder::buildPipelineVsGsFsRegConfig() {
 
     if (m_gfxIp.major == 10)
       setWaveFrontSize(Util::Abi::HardwareStage::Vs, waveSize);
+  } else {
+    invalidRegConfig(config.vsRegs);
   }
 
   // Set up IA_MULTI_VGT_PARAM
@@ -347,6 +363,8 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
     //  In GEN_TWO the only supported mode is fully distributed tessellation. The programming model is expected
     //  to set VGT_SHADER_STAGES_EN.DYNAMIC_HS=1 and VGT_TF_PARAM.NUM_DS_WAVES_PER_SIMD=0
     SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, DYNAMIC_HS, true);
+  } else {
+    invalidRegConfig(config.lsHsRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageTessEval) || m_pipelineState->hasShaderStage(ShaderStageGeometry)) {
@@ -371,10 +389,14 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
 
     if (m_gfxIp.major == 10)
       setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveSize);
+  } else {
+    invalidRegConfig(config.esGsRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
     buildPsRegConfig<PipelineVsTsGsFsRegConfig>(ShaderStageFragment, &config);
+  } else {
+    invalidRegConfig(config.psRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageCopyShader)) {
@@ -387,6 +409,8 @@ void ConfigBuilder::buildPipelineVsTsGsFsRegConfig() {
 
     if (m_gfxIp.major == 10)
       setWaveFrontSize(Util::Abi::HardwareStage::Vs, waveSize);
+  } else {
+    invalidRegConfig(config.vsRegs);
   }
 
   // Set up IA_MULTI_VGT_PARAM
@@ -471,10 +495,14 @@ void ConfigBuilder::buildPipelineNggVsFsRegConfig() {
     iaMultiVgtParam.bits.PRIMGROUP_SIZE = primGroupSize - 1;
 
     SET_REG(&config, IA_MULTI_VGT_PARAM_PIPED, iaMultiVgtParam.u32All);
+  } else {
+    invalidRegConfig(config.primShaderRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
     buildPsRegConfig<PipelineNggVsFsRegConfig>(ShaderStageFragment, &config);
+  } else {
+    invalidRegConfig(config.psRegs);
   }
 
   appendConfig(config);
@@ -531,6 +559,8 @@ void ConfigBuilder::buildPipelineNggVsTsFsRegConfig() {
     SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, HS_W32_EN, (waveSize == 32));
 
     setWaveFrontSize(Util::Abi::HardwareStage::Hs, waveSize);
+  } else {
+    invalidRegConfig(config.lsHsRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageTessEval)) {
@@ -551,10 +581,14 @@ void ConfigBuilder::buildPipelineNggVsTsFsRegConfig() {
     if (m_pipelineState->getTargetInfo().getGpuProperty().supportShaderPowerProfiling) {
       SET_REG_FIELD(&config.primShaderRegs, SPI_SHADER_PGM_CHKSUM_GS, CHECKSUM, checksum);
     }
+  } else {
+    invalidRegConfig(config.primShaderRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
     buildPsRegConfig<PipelineNggVsTsFsRegConfig>(ShaderStageFragment, &config);
+  } else {
+    invalidRegConfig(config.psRegs);
   }
 
   // Set up IA_MULTI_VGT_PARAM
@@ -621,10 +655,14 @@ void ConfigBuilder::buildPipelineNggVsGsFsRegConfig() {
     SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, (waveSize == 32));
 
     setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveSize);
+  } else {
+    invalidRegConfig(config.primShaderRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
     buildPsRegConfig<PipelineNggVsGsFsRegConfig>(ShaderStageFragment, &config);
+  } else {
+    invalidRegConfig(config.psRegs);
   }
 
   // Set up IA_MULTI_VGT_PARAM
@@ -689,6 +727,8 @@ void ConfigBuilder::buildPipelineNggVsTsGsFsRegConfig() {
     SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, HS_W32_EN, (waveSize == 32));
 
     setWaveFrontSize(Util::Abi::HardwareStage::Hs, waveSize);
+  } else {
+    invalidRegConfig(config.lsHsRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageTessEval) || m_pipelineState->hasShaderStage(ShaderStageGeometry)) {
@@ -715,10 +755,14 @@ void ConfigBuilder::buildPipelineNggVsTsGsFsRegConfig() {
     SET_REG_GFX10_PLUS_FIELD(&config, VGT_SHADER_STAGES_EN, GS_W32_EN, (waveSize == 32));
 
     setWaveFrontSize(Util::Abi::HardwareStage::Gs, waveSize);
+  } else {
+    invalidRegConfig(config.primShaderRegs);
   }
 
   if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
     buildPsRegConfig<PipelineNggVsTsGsFsRegConfig>(ShaderStageFragment, &config);
+  } else {
+    invalidRegConfig(config.psRegs);
   }
 
   // Set up IA_MULTI_VGT_PARAM
@@ -760,6 +804,8 @@ void ConfigBuilder::buildPipelineMeshFsConfig() {
     unsigned checksum = setShaderHash(ShaderStageFragment);
     if (m_pipelineState->getTargetInfo().getGpuProperty().supportShaderPowerProfiling)
       SET_REG_FIELD(&config.psRegs, SPI_SHADER_PGM_CHKSUM_PS, CHECKSUM, checksum);
+  } else {
+    invalidRegConfig(config.psRegs);
   }
 
   appendConfig(config);
@@ -784,6 +830,8 @@ void ConfigBuilder::buildPipelineTaskMeshFsConfig() {
 
   if (m_pipelineState->hasShaderStage(ShaderStageMesh))
     buildMeshRegConfig<PipelineTaskMeshFsRegConfig>(ShaderStageMesh, &config);
+  else
+    invalidRegConfig(config.meshRegs);
 
   if (m_pipelineState->hasShaderStage(ShaderStageFragment)) {
     buildPsRegConfig<PipelineTaskMeshFsRegConfig>(ShaderStageFragment, &config);
@@ -791,6 +839,8 @@ void ConfigBuilder::buildPipelineTaskMeshFsConfig() {
     unsigned checksum = setShaderHash(ShaderStageFragment);
     if (m_pipelineState->getTargetInfo().getGpuProperty().supportShaderPowerProfiling)
       SET_REG_FIELD(&config.psRegs, SPI_SHADER_PGM_CHKSUM_PS, CHECKSUM, checksum);
+  } else {
+    invalidRegConfig(config.psRegs);
   }
 
   appendConfig(config);
@@ -847,7 +897,7 @@ template <typename T> void ConfigBuilder::buildVsRegConfig(ShaderStage shaderSta
     SET_REG_FIELD(&config->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_1_EN, streamXfbBuffers[1] > 0);
     SET_REG_FIELD(&config->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_2_EN, streamXfbBuffers[2] > 0);
     SET_REG_FIELD(&config->vsRegs, VGT_STRMOUT_CONFIG, STREAMOUT_3_EN, streamXfbBuffers[3] > 0);
-    SET_REG_FIELD(&config->vsRegs, VGT_STRMOUT_CONFIG, RAST_STREAM, resUsage->inOutUsage.gs.rasterStream);
+    SET_REG_FIELD(&config->vsRegs, VGT_STRMOUT_CONFIG, RAST_STREAM, m_pipelineState->getRasterizerState().rasterStream);
   } else {
     const auto &shaderOptions = m_pipelineState->getShaderOptions(shaderStage);
     SET_REG_FIELD(&config->vsRegs, SPI_SHADER_PGM_RSRC1_VS, DEBUG_MODE, shaderOptions.debugMode);
@@ -975,9 +1025,7 @@ void ConfigBuilder::buildLsHsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   const unsigned ldsSizeDwordGranularity = 1u << ldsSizeDwordGranularityShift;
 
   unsigned ldsSizeInDwords = calcFactor.tessOnChipLdsSize;
-#if VKI_RAY_TRACING
   ldsSizeInDwords += calcFactor.rayQueryLdsStackSize;
-#endif
   ldsSizeInDwords = alignTo(ldsSizeInDwords, ldsSizeDwordGranularity);
 
   const unsigned ldsSize = ldsSizeInDwords >> ldsSizeDwordGranularityShift;
@@ -1101,9 +1149,7 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   const unsigned ldsSizeDwordGranularity = 1u << ldsSizeDwordGranularityShift;
 
   unsigned ldsSizeInDwords = calcFactor.gsOnChipLdsSize;
-#if VKI_RAY_TRACING
   ldsSizeInDwords += calcFactor.rayQueryLdsStackSize;
-#endif
   ldsSizeInDwords = alignTo(ldsSizeInDwords, ldsSizeDwordGranularity);
 
   const unsigned ldsSize = ldsSizeInDwords >> ldsSizeDwordGranularityShift;
@@ -1319,9 +1365,7 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   const unsigned ldsSizeDwordGranularity = 1u << ldsSizeDwordGranularityShift;
 
   unsigned ldsSizeInDwords = calcFactor.gsOnChipLdsSize;
-#if VKI_RAY_TRACING
   ldsSizeInDwords += calcFactor.rayQueryLdsStackSize;
-#endif
   ldsSizeInDwords = alignTo(ldsSizeInDwords, ldsSizeDwordGranularity);
 
   const unsigned ldsSize = ldsSizeInDwords >> ldsSizeDwordGranularityShift;
@@ -1492,6 +1536,7 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
   assert(shaderStage == ShaderStageFragment);
 
   const auto intfData = m_pipelineState->getShaderInterfaceData(shaderStage);
+  const auto &options = m_pipelineState->getOptions();
   const auto &shaderOptions = m_pipelineState->getShaderOptions(shaderStage);
   const auto resUsage = m_pipelineState->getShaderResourceUsage(shaderStage);
   const auto &builtInUsage = resUsage->builtInUsage.fs;
@@ -1520,11 +1565,14 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
     SET_REG_GFX11_FIELD(&config->psRegs, SPI_SHADER_PGM_RSRC4_PS, IMAGE_OP, resUsage->useImageOp);
   }
 
+  const bool useFloatLocationAtIteratedSampleNumber =
+      options.fragCoordUsesInterpLoc ? builtInUsage.fragCoordIsSample : builtInUsage.runAtSampleRate;
+
   SET_REG_FIELD(&config->psRegs, SPI_BARYC_CNTL, FRONT_FACE_ALL_BITS, true);
   if (fragmentMode.pixelCenterInteger) {
     // TRUE - Force floating point position to upper left corner of pixel (X.0, Y.0)
     SET_REG_FIELD(&config->psRegs, SPI_BARYC_CNTL, POS_FLOAT_ULC, true);
-  } else if (builtInUsage.runAtSampleRate) {
+  } else if (useFloatLocationAtIteratedSampleNumber) {
     // 2 - Calculate per-pixel floating point position at iterated sample number
     SET_REG_FIELD(&config->psRegs, SPI_BARYC_CNTL, POS_FLOAT_LOCATION, 2);
   } else {
@@ -1578,19 +1626,6 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
     SET_REG_GFX10_PLUS_FIELD(&config->psRegs, DB_SHADER_CONTROL, PRE_SHADER_DEPTH_COVERAGE_ENABLE,
                              fragmentMode.postDepthCoverage);
   }
-
-  unsigned depthExpFmt = EXP_FORMAT_ZERO;
-  if (builtInUsage.sampleMask)
-    depthExpFmt = EXP_FORMAT_32_ABGR;
-  else if (builtInUsage.fragStencilRef)
-    depthExpFmt = EXP_FORMAT_32_GR;
-  else if (builtInUsage.fragDepth)
-    depthExpFmt = EXP_FORMAT_32_R;
-  SET_REG_FIELD(&config->psRegs, SPI_SHADER_Z_FORMAT, Z_EXPORT_FORMAT, depthExpFmt);
-
-  unsigned cbShaderMask = resUsage->inOutUsage.fs.cbShaderMask;
-  cbShaderMask = resUsage->inOutUsage.fs.isNullFs ? 0 : cbShaderMask;
-  SET_REG(&config->psRegs, CB_SHADER_MASK, cbShaderMask);
 
   const auto waveSize = m_pipelineState->getShaderWaveSize(shaderStage);
   SET_REG_GFX10_PLUS_FIELD(&config->psRegs, SPI_PS_IN_CONTROL, PS_W32_EN, (waveSize == 32));
@@ -1922,9 +1957,21 @@ void ConfigBuilder::buildCsRegConfig(ShaderStage shaderStage, CsRegConfig *confi
   // Set registers based on shader interface data
   SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TRAP_PRESENT, shaderOptions.trapPresent);
   SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, USER_SGPR, intfData->userDataCount);
-  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_X_EN, true);
-  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_Y_EN, true);
-  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_Z_EN, true);
+
+  Function *entryFunc = nullptr;
+  for (Function &func : *m_module) {
+    // Only entrypoint compute shader may have the function attribute for workgroup id optimization.
+    if (isShaderEntryPoint(&func)) {
+      entryFunc = &func;
+      break;
+    }
+  }
+  bool hasWorkgroupIdX = !entryFunc || !entryFunc->hasFnAttribute("amdgpu-no-workgroup-id-x");
+  bool hasWorkgroupIdY = !entryFunc || !entryFunc->hasFnAttribute("amdgpu-no-workgroup-id-y");
+  bool hasWorkgroupIdZ = !entryFunc || !entryFunc->hasFnAttribute("amdgpu-no-workgroup-id-z");
+  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_X_EN, hasWorkgroupIdX);
+  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_Y_EN, hasWorkgroupIdY);
+  SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TGID_Z_EN, hasWorkgroupIdZ);
   SET_REG_FIELD(config, COMPUTE_PGM_RSRC2, TG_SIZE_EN, true);
 
   // 0 = X, 1 = XY, 2 = XYZ
@@ -2022,15 +2069,7 @@ template <typename T> void ConfigBuilder::setupPaSpecificRegisters(T *config) {
   const bool meshPipeline =
       m_pipelineState->hasShaderStage(ShaderStageTask) || m_pipelineState->hasShaderStage(ShaderStageMesh);
 
-  uint8_t usrClipPlaneMask = m_pipelineState->getRasterizerState().usrClipPlaneMask;
   bool rasterizerDiscardEnable = m_pipelineState->getRasterizerState().rasterizerDiscardEnable;
-
-  SET_REG_FIELD(config, PA_CL_CLIP_CNTL, UCP_ENA_0, (usrClipPlaneMask >> 0) & 0x1);
-  SET_REG_FIELD(config, PA_CL_CLIP_CNTL, UCP_ENA_1, (usrClipPlaneMask >> 1) & 0x1);
-  SET_REG_FIELD(config, PA_CL_CLIP_CNTL, UCP_ENA_2, (usrClipPlaneMask >> 2) & 0x1);
-  SET_REG_FIELD(config, PA_CL_CLIP_CNTL, UCP_ENA_3, (usrClipPlaneMask >> 3) & 0x1);
-  SET_REG_FIELD(config, PA_CL_CLIP_CNTL, UCP_ENA_4, (usrClipPlaneMask >> 4) & 0x1);
-  SET_REG_FIELD(config, PA_CL_CLIP_CNTL, UCP_ENA_5, (usrClipPlaneMask >> 5) & 0x1);
   SET_REG_FIELD(config, PA_CL_CLIP_CNTL, DX_LINEAR_ATTR_CLIP_ENA, true);
   SET_REG_FIELD(config, PA_CL_CLIP_CNTL, DX_RASTERIZATION_KILL, rasterizerDiscardEnable);
 
@@ -2048,6 +2087,7 @@ template <typename T> void ConfigBuilder::setupPaSpecificRegisters(T *config) {
 
   // Stage-specific processing
   bool usePointSize = false;
+  bool useEdgeFlag = false;
   bool useLayer = false;
   bool useViewportIndex = false;
   bool useShadingRate = false;
@@ -2114,6 +2154,7 @@ template <typename T> void ConfigBuilder::setupPaSpecificRegisters(T *config) {
       const auto &builtInUsage = resUsage->builtInUsage.vs;
 
       usePointSize = builtInUsage.pointSize;
+      useEdgeFlag = builtInUsage.edgeFlag;
       usePrimitiveId = builtInUsage.primitiveId;
       useLayer = builtInUsage.layer;
       useViewportIndex = builtInUsage.viewportIndex;
@@ -2171,7 +2212,7 @@ template <typename T> void ConfigBuilder::setupPaSpecificRegisters(T *config) {
 
   SET_REG_FIELD(config, VGT_REUSE_OFF, REUSE_OFF, disableVertexReuse || m_pipelineState->enableSwXfb());
 
-  bool miscExport = usePointSize;
+  bool miscExport = usePointSize || useEdgeFlag;
   if (!meshPipeline) {
     // NOTE: Those built-ins are exported through primitive payload for mesh pipeline rather than vertex position data.
     miscExport |= useLayer || useViewportIndex || useShadingRate;
@@ -2198,6 +2239,10 @@ template <typename T> void ConfigBuilder::setupPaSpecificRegisters(T *config) {
       }
     }
 
+    if (useEdgeFlag) {
+      SET_REG_FIELD(config, PA_CL_VS_OUT_CNTL, USE_VTX_EDGE_FLAG, true);
+    }
+
     SET_REG_FIELD(config, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_VEC_ENA, true);
     SET_REG_FIELD(config, PA_CL_VS_OUT_CNTL, VS_OUT_MISC_SIDE_BUS_ENA, true);
   }
@@ -2213,8 +2258,10 @@ template <typename T> void ConfigBuilder::setupPaSpecificRegisters(T *config) {
 
     // Set fields CLIP_DIST_ENA_0 ~ CLIP_DIST_ENA_7 and CULL_DIST_ENA_0 ~ CULL_DIST_ENA_7
     unsigned paClVsOutCntl = GET_REG(config, PA_CL_VS_OUT_CNTL);
-    paClVsOutCntl |= clipDistanceMask;
-    paClVsOutCntl |= (cullDistanceMask << 8);
+
+    // Note: Point primitives are only affected by the cull mask, so enable culling also based on clip distances
+    unsigned finalMask = clipDistanceMask | cullDistanceMask;
+    paClVsOutCntl |= clipDistanceMask | (finalMask << 8);
     SET_REG(config, PA_CL_VS_OUT_CNTL, paClVsOutCntl);
 
     // On 10.3+ all auxiliary position exports are optimized, not just the misc exports.

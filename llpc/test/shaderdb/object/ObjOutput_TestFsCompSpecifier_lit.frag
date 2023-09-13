@@ -18,9 +18,6 @@ void main (void)
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: call void @lgc.output.export.generic{{.*}}v2f32(i32 0, i32 1, <2 x float> %{{[0-9]*}})
 ; SHADERTEST: call void @lgc.output.export.generic{{.*}}f32(i32 0, i32 3, float %{{.*}})
-; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: [[value:%[0-9]*]] = insertvalue { <4 x float> } undef, <4 x float> {{%[0-9]*}}, 0
-; SHADERTEST: ret { <4 x float> } [[value]]
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

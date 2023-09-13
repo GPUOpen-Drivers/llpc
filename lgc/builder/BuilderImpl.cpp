@@ -30,8 +30,10 @@
  */
 #include "lgc/builder/BuilderImpl.h"
 #include "lgc/LgcContext.h"
+#include "lgc/LgcDialect.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
 using namespace lgc;
@@ -338,23 +340,13 @@ BranchInst *BuilderImpl::createIf(Value *condition, bool wantElse, const Twine &
 // find the non-uniform index used in it. If that fails, we just use the
 // operand value as the index.
 //
-// Note: this code has to cope with relocs as well, this is why we have to
-// have a worklist of instructions to trace back
-// through. Something like this:
-// %1 = call .... @lgc.descriptor.set(...)          ;; Known uniform base
-// %2 = call .... @llvm.amdgcn.reloc.constant(...)  ;; Known uniform reloc constant
-// %3 = ptrtoint ... %1 to i64
-// %4 = zext ... %2 to i64
-// %5 = add i64 %3, %4
-// %6 = inttoptr i64 %5 to ....
-// %7 = bitcast .... %6 to ....
-// %8 = getelementptr .... %7, i64 %offset
+// Note that this function may return null, which means that the given value has been shown to be uniform.
 //
-// As long as the base pointer %7 can be traced back to a descriptor set and
-// reloc we can infer that it is truly uniform and use the gep index as the waterfall index safely.
+// This uses a fairly simple heuristic that nevertheless allows temporary expansion of the search breadth to handle
+// the common case where a base pointer is assembled from separate high and low halves.
 //
 // @param nonUniformVal : Value representing non-uniform descriptor
-// @return : Value representing the non-uniform index
+// @return : Value representing the non-uniform index, or null if nonUniformVal could be proven to be uniform
 static Value *traceNonUniformIndex(Value *nonUniformVal) {
   auto load = dyn_cast<LoadInst>(nonUniformVal);
   if (!load) {
@@ -388,90 +380,128 @@ static Value *traceNonUniformIndex(Value *nonUniformVal) {
     }
   }
 
-  SmallVector<Value *, 2> worklist;
-  Value *base = load->getOperand(0);
-  Value *index = nullptr;
+  auto getSize = [](Value *value) -> uint64_t {
+    uint64_t size = value->getType()->getPrimitiveSizeInBits().getFixedValue();
+    return size ? size : std::numeric_limits<uint64_t>::max();
+  };
 
-  // Loop until a descriptor table reference or unexpected operation is reached.
-  // In the worst case this may visit all instructions in a function.
-  for (;;) {
-    if (auto bitcast = dyn_cast<BitCastInst>(base)) {
-      base = bitcast->getOperand(0);
+  uint64_t nonUniformValSize = getSize(nonUniformVal);
+
+  // Loop until all nonUniforms have been found to be uniform or a heuristic abort criterion has been reached.
+  Value *candidateIndex = nullptr;
+  SmallVector<Instruction *, 2> nonUniforms;
+  nonUniforms.push_back(load);
+
+  auto propagate = [&](Value *value) -> bool {
+    if (auto inst = dyn_cast<Instruction>(value)) {
+      if (nonUniforms.size() >= 2)
+        return false;
+      nonUniforms.push_back(inst);
+      return true;
+    }
+    return isa<Constant>(value);
+  };
+
+  do {
+    Instruction *current = nonUniforms.pop_back_val();
+
+    // Immediately replace the current nonUniformVal by a strictly smaller one if possible.
+    if (!candidateIndex && nonUniforms.empty() && current != nonUniformVal) {
+      uint64_t size = getSize(current);
+      if (size < nonUniformValSize) {
+        nonUniformVal = current;
+        nonUniformValSize = size;
+      }
+    }
+
+    // See if we can propagate the search further.
+    if (current->isCast() || current->isUnaryOp()) {
+      if (!propagate(current->getOperand(0)))
+        return nonUniformVal;
       continue;
     }
-    if (auto gep = dyn_cast<GetElementPtrInst>(base)) {
+
+    if (current->isBinaryOp()) {
+      if (!propagate(current->getOperand(0)) || !propagate(current->getOperand(1)))
+        return nonUniformVal;
+      continue;
+    }
+
+    if (auto *load = dyn_cast<LoadInst>(current)) {
+      Value *ptr = load->getPointerOperand();
+      unsigned as = ptr->getType()->getPointerAddressSpace();
+      if (as == ADDR_SPACE_FLAT || as == ADDR_SPACE_PRIVATE)
+        return nonUniformVal; // load is a source of divergence, can't propagate
+
+      if (!propagate(ptr))
+        return nonUniformVal;
+      continue;
+    }
+
+    if (auto gep = dyn_cast<GetElementPtrInst>(current)) {
       if (gep->hasAllConstantIndices()) {
-        base = gep->getPointerOperand();
+        if (!propagate(gep->getPointerOperand()))
+          return nonUniformVal;
         continue;
       }
-      // Variable GEP, to provide the index for the waterfall.
-      if (index || gep->getNumIndices() != 1)
-        break;
-      index = *gep->idx_begin();
-      base = gep->getPointerOperand();
-      continue;
-    }
-    if (auto extract = dyn_cast<ExtractValueInst>(base)) {
-      if (extract->getIndices().size() == 1 && extract->getIndices()[0] == 0) {
-        base = extract->getAggregateOperand();
-        continue;
-      }
-      break;
-    }
-    if (auto insert = dyn_cast<InsertValueInst>(base)) {
-      if (insert->getIndices()[0] != 0) {
-        base = insert->getAggregateOperand();
-        continue;
-      }
-      if (insert->getIndices().size() == 1 && insert->getIndices()[0] == 0) {
-        base = insert->getInsertedValueOperand();
-        continue;
-      }
-      break;
-    }
-    if (auto intToPtr = dyn_cast<IntToPtrInst>(base)) {
-      base = intToPtr->getOperand(0);
-      continue;
-    }
-    if (auto ptrToInt = dyn_cast<PtrToIntInst>(base)) {
-      base = ptrToInt->getOperand(0);
-      continue;
-    }
-    if (auto zExt = dyn_cast<ZExtInst>(base)) {
-      base = zExt->getOperand(0);
-      continue;
-    }
-    if (auto call = dyn_cast<CallInst>(base)) {
-      if (index) {
-        if (auto calledFunc = call->getCalledFunction()) {
-          if (calledFunc->getName().startswith(lgcName::DescriptorTableAddr) ||
-              calledFunc->getName().startswith("llvm.amdgcn.reloc.constant")) {
-            if (!worklist.empty()) {
-              base = worklist.pop_back_val();
-              continue;
-            }
-            nonUniformVal = index;
-            break;
-          }
-        }
-      }
-    }
-    if (auto addInst = dyn_cast<Instruction>(base)) {
-      // In this case we have to trace back both operands
-      // Set one to base for continued processing and put the other onto the worklist
-      // Give up if the worklist already has an entry - too complicated
-      if (addInst->isBinaryOp() && addInst->getOpcode() == Instruction::BinaryOps::Add) {
-        if (!worklist.empty())
-          break;
-        base = addInst->getOperand(0);
-        worklist.push_back(addInst->getOperand(1));
-        continue;
-      }
-    }
-    break;
-  }
 
-  return nonUniformVal;
+      // Variable GEP, assume that the index is non-uniform.
+      if (candidateIndex || gep->getNumIndices() != 1)
+        return nonUniformVal;
+
+      if (!propagate(gep->getPointerOperand()))
+        return nonUniformVal;
+
+      candidateIndex = *gep->idx_begin();
+      if (getSize(candidateIndex) > nonUniformValSize)
+        return nonUniformVal; // propagating further is worthless
+      continue;
+    }
+
+    if (auto extract = dyn_cast<ExtractValueInst>(current)) {
+      if (!propagate(extract->getAggregateOperand()))
+        return nonUniformVal;
+      continue;
+    }
+    if (auto insert = dyn_cast<InsertValueInst>(current)) {
+      if (!propagate(insert->getAggregateOperand()) || !propagate(insert->getInsertedValueOperand()))
+        return nonUniformVal;
+      continue;
+    }
+    if (auto extract = dyn_cast<ExtractElementInst>(current)) {
+      if (!isa<Constant>(extract->getIndexOperand()) || !propagate(extract->getVectorOperand()))
+        return nonUniformVal;
+      continue;
+    }
+    if (auto insert = dyn_cast<InsertElementInst>(current)) {
+      if (!isa<Constant>(insert->getOperand(2)) || !propagate(insert->getOperand(0)) ||
+          !propagate(insert->getOperand(1)))
+        return nonUniformVal;
+      continue;
+    }
+
+    if (auto call = dyn_cast<CallInst>(current)) {
+      if (auto intrinsic = dyn_cast<IntrinsicInst>(call)) {
+        unsigned id = intrinsic->getIntrinsicID();
+        if (id == Intrinsic::amdgcn_readfirstlane || id == Intrinsic::amdgcn_s_getpc ||
+            id == Intrinsic::amdgcn_reloc_constant)
+          continue; // is always uniform, no need to propagate
+        return nonUniformVal;
+      }
+
+      if (isa<UserDataOp>(call) || isa<LoadUserDataOp>(call))
+        continue; // is always uniform, no need to propagate
+
+      return nonUniformVal;
+    }
+
+    // If we reach this point, it means we don't understand the instruction. It's likely a fairly complex instruction
+    // and we should heuristically abort the propagation anyway. It may even be a source of divergence, in which case
+    // propagating further would be incorrect.
+    return nonUniformVal;
+  } while (!nonUniforms.empty());
+
+  return candidateIndex;
 }
 
 // =====================================================================================================================
@@ -510,9 +540,12 @@ static bool instructionsEqual(Instruction *lhs, Instruction *rhs) {
 //
 // @param nonUniformInst : The instruction to put in a waterfall loop
 // @param operandIdxs : The operand index/indices for non-uniform inputs that need to be uniform
+// @param scalarizeDescriptorLoads : Attempt to scalarize descriptor loads
+// @param useVgprForOperands : Non-uniform inputs should be put in VGPRs
 // @param instName : Name to give instruction(s)
 Instruction *BuilderImpl::createWaterfallLoop(Instruction *nonUniformInst, ArrayRef<unsigned> operandIdxs,
-                                              bool scalarizeDescriptorLoads, const Twine &instName) {
+                                              bool scalarizeDescriptorLoads, bool useVgprForOperands,
+                                              const Twine &instName) {
 #if !defined(LLVM_HAVE_BRANCH_AMD_GFX)
 #warning[!amd-gfx] Waterfall feature disabled
   errs() << "Generating invalid waterfall loop code\n";
@@ -523,8 +556,11 @@ Instruction *BuilderImpl::createWaterfallLoop(Instruction *nonUniformInst, Array
   SmallVector<Value *, 2> nonUniformIndices;
   for (unsigned operandIdx : operandIdxs) {
     Value *nonUniformIndex = traceNonUniformIndex(nonUniformInst->getOperand(operandIdx));
-    nonUniformIndices.push_back(nonUniformIndex);
+    if (nonUniformIndex)
+      nonUniformIndices.push_back(nonUniformIndex);
   }
+  if (nonUniformIndices.empty())
+    return nonUniformInst;
 
   // For any index that is 64 bit, change it back to 32 bit for comparison at the top of the
   // waterfall loop.
@@ -618,12 +654,25 @@ Instruction *BuilderImpl::createWaterfallLoop(Instruction *nonUniformInst, Array
     for (unsigned operandIdx : operandIdxs) {
       Value *desc = nonUniformInst->getOperand(operandIdx);
       auto descTy = desc->getType();
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 463892
+      // Old version of the code
+#else
+      // When the non-uniform use is in a VGPR, we can save a v_mov by not inserting the amdgcn_waterfall_readfirstlane
+      if (!useVgprForOperands)
+#endif
       desc = CreateIntrinsic(Intrinsic::amdgcn_waterfall_readfirstlane, {descTy, descTy}, {waterfallBegin, desc},
                              nullptr, instName);
       if (nonUniformInst->getType()->isVoidTy()) {
         // The buffer/image operation we are waterfalling is a store with no return value. Use
         // llvm.amdgcn.waterfall.last.use on the descriptor.
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 463892
+        // Old version of the code
         desc = CreateIntrinsic(Intrinsic::amdgcn_waterfall_last_use, descTy, {waterfallBegin, desc}, nullptr, instName);
+#else
+        desc = CreateIntrinsic(useVgprForOperands ? Intrinsic::amdgcn_waterfall_last_use_vgpr
+                                                  : Intrinsic::amdgcn_waterfall_last_use,
+                               descTy, {waterfallBegin, desc}, nullptr, instName);
+#endif
       }
       // Replace the descriptor operand in the buffer/image operation.
       nonUniformInst->setOperand(operandIdx, desc);
@@ -658,7 +707,7 @@ Instruction *BuilderImpl::createWaterfallLoop(Instruction *nonUniformInst, Array
       resultValue = cast<Instruction>(CreateBitCast(resultValue, nonUniformInst->getType(), instName));
 
     // Replace all uses of nonUniformInst with the result of this code.
-    *useOfNonUniformInst = UndefValue::get(nonUniformInst->getType());
+    *useOfNonUniformInst = PoisonValue::get(nonUniformInst->getType());
     nonUniformInst->replaceAllUsesWith(resultValue);
     *useOfNonUniformInst = nonUniformInst;
   }
@@ -675,7 +724,7 @@ Instruction *BuilderImpl::createWaterfallLoop(Instruction *nonUniformInst, Array
 Value *BuilderImpl::scalarize(Value *value, const std::function<Value *(Value *)> &callback) {
   if (auto vecTy = dyn_cast<FixedVectorType>(value->getType())) {
     Value *result0 = callback(CreateExtractElement(value, uint64_t(0)));
-    Value *result = UndefValue::get(FixedVectorType::get(result0->getType(), vecTy->getNumElements()));
+    Value *result = PoisonValue::get(FixedVectorType::get(result0->getType(), vecTy->getNumElements()));
     result = CreateInsertElement(result, result0, uint64_t(0));
     for (unsigned idx = 1, end = vecTy->getNumElements(); idx != end; ++idx)
       result = CreateInsertElement(result, callback(CreateExtractElement(value, idx)), idx);
@@ -696,7 +745,7 @@ Value *BuilderImpl::scalarizeInPairs(Value *value, const std::function<Value *(V
     Value *inComps = CreateShuffleVector(value, value, ArrayRef<int>{0, 1});
     Value *resultComps = callback(inComps);
     Value *result =
-        UndefValue::get(FixedVectorType::get(resultComps->getType()->getScalarType(), vecTy->getNumElements()));
+        PoisonValue::get(FixedVectorType::get(resultComps->getType()->getScalarType(), vecTy->getNumElements()));
     result = CreateInsertElement(result, CreateExtractElement(resultComps, uint64_t(0)), uint64_t(0));
     if (vecTy->getNumElements() > 1)
       result = CreateInsertElement(result, CreateExtractElement(resultComps, 1), 1);
@@ -713,7 +762,7 @@ Value *BuilderImpl::scalarizeInPairs(Value *value, const std::function<Value *(V
   }
 
   // For the scalar case, we need to create a vec2.
-  Value *inComps = UndefValue::get(FixedVectorType::get(value->getType(), 2));
+  Value *inComps = PoisonValue::get(FixedVectorType::get(value->getType(), 2));
   inComps = CreateInsertElement(inComps, value, uint64_t(0));
   inComps = CreateInsertElement(inComps, Constant::getNullValue(value->getType()), 1);
   Value *result = callback(inComps);
@@ -729,7 +778,7 @@ Value *BuilderImpl::scalarizeInPairs(Value *value, const std::function<Value *(V
 Value *BuilderImpl::scalarize(Value *value0, Value *value1, const std::function<Value *(Value *, Value *)> &callback) {
   if (auto vecTy = dyn_cast<FixedVectorType>(value0->getType())) {
     Value *result0 = callback(CreateExtractElement(value0, uint64_t(0)), CreateExtractElement(value1, uint64_t(0)));
-    Value *result = UndefValue::get(FixedVectorType::get(result0->getType(), vecTy->getNumElements()));
+    Value *result = PoisonValue::get(FixedVectorType::get(result0->getType(), vecTy->getNumElements()));
     result = CreateInsertElement(result, result0, uint64_t(0));
     for (unsigned idx = 1, end = vecTy->getNumElements(); idx != end; ++idx) {
       result = CreateInsertElement(result,
@@ -753,7 +802,7 @@ Value *BuilderImpl::scalarize(Value *value0, Value *value1, Value *value2,
   if (auto vecTy = dyn_cast<FixedVectorType>(value0->getType())) {
     Value *result0 = callback(CreateExtractElement(value0, uint64_t(0)), CreateExtractElement(value1, uint64_t(0)),
                               CreateExtractElement(value2, uint64_t(0)));
-    Value *result = UndefValue::get(FixedVectorType::get(result0->getType(), vecTy->getNumElements()));
+    Value *result = PoisonValue::get(FixedVectorType::get(result0->getType(), vecTy->getNumElements()));
     result = CreateInsertElement(result, result0, uint64_t(0));
     for (unsigned idx = 1, end = vecTy->getNumElements(); idx != end; ++idx) {
       result = CreateInsertElement(result,

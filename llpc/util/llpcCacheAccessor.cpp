@@ -53,7 +53,7 @@ namespace Llpc {
 // @param internalCaches : The internal caches to check.
 CacheAccessor::CacheAccessor(Context *context, MetroHash::Hash &cacheHash, CachePair internalCaches) {
   assert(context);
-  if (context->isGraphics()) {
+  if (context->getPipelineType() == PipelineType::Graphics) {
     const auto *pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
     initializeUsingBuildInfo(pipelineInfo, cacheHash, internalCaches);
   } else {
@@ -66,11 +66,10 @@ CacheAccessor::CacheAccessor(Context *context, MetroHash::Hash &cacheHash, Cache
 // Initializes the cache accessor to check the given caches.  The caches can be nullptr.
 //
 // @param userCache : The ICache supplied by the application. nullptr if no cache is provided.
-// @param userShaderCache : The shader cache supplied by the application. nullptr if no cache is provided.
 // @param internalCaches : The internal caches to check.
-void CacheAccessor::initialize(Vkgc::ICache *userCache, IShaderCache *userShaderCache, CachePair internalCaches) {
+void CacheAccessor::initialize(Vkgc::ICache *userCache, CachePair internalCaches) {
   m_internalCaches = internalCaches;
-  m_applicationCaches = {userCache, userShaderCache};
+  m_applicationCaches = {userCache, nullptr};
   resetShaderCacheTrackingData();
   m_cacheResult = Result::ErrorUnknown;
   m_cacheEntry = Vkgc::EntryHandle();

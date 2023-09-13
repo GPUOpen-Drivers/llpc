@@ -49,6 +49,8 @@ namespace Vkgc {
 static const char AmdGpuDisasmName[] = ".AMDGPU.disasm"; // Name of ".AMDGPU.disasm" section
 static const char AmdGpuCsdataName[] = ".AMDGPU.csdata"; // Name of ".AMDGPU.csdata" section
 static const char AmdGpuConfigName[] = ".AMDGPU.config"; // Name of ".AMDGPU.config" section
+static const char ColorExports[] = ".colorExports";      // Name of color export meta data
+static const char DiscardState[] = ".discardState";      // Name of discard state
 
 // e_ident size and indices
 enum {
@@ -182,10 +184,10 @@ struct Elf32 {
     uint32_t e_flags;     // Architecture-specific flags
     uint16_t e_ehsize;    // Size of this ELF header
     uint16_t e_phentsize; // Size of an entry in program header (unused, 0)
-    uint16_t e_phnum;     // # of entries in program header (0)
+    uint16_t e_phnum;
     uint16_t e_shentsize; // Size of an entry in section header
-    uint16_t e_shnum;     // # of entries in section header
-    uint16_t e_shstrndx;  // Section # that contains section name strings
+    uint16_t e_shnum;
+    uint16_t e_shstrndx; // Section # that contains section name strings
   };
 
   // ELF section header (used to locate each data section)
@@ -262,10 +264,10 @@ struct Elf64 {
     uint32_t e_flags;     // Architecture-specific flags
     uint16_t e_ehsize;    // Size of this ELF header
     uint16_t e_phentsize; // Size of an entry in program header (unused, 0)
-    uint16_t e_phnum;     // # of entries in program header (0)
+    uint16_t e_phnum;
     uint16_t e_shentsize; // Size of an entry in section header
-    uint16_t e_shnum;     // # of entries in section header
-    uint16_t e_shstrndx;  // Section # that contains section name strings
+    uint16_t e_shnum;
+    uint16_t e_shstrndx; // Section # that contains section name strings
   };
 
   // ELF section header (used to locate each data section)

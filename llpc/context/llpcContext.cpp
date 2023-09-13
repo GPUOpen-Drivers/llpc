@@ -30,6 +30,8 @@
  */
 #include "llpcContext.h"
 #include "SPIRVInternal.h"
+#include "lgccps/LgcCpsDialect.h"
+#include "lgcrt/LgcRtDialect.h"
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
 #include "llpcPipelineContext.h"
@@ -37,6 +39,7 @@
 #include "llpcShaderCacheManager.h"
 #include "vkgcMetroHash.h"
 #include "lgc/Builder.h"
+#include "lgc/GpurtDialect.h"
 #include "lgc/LgcContext.h"
 #include "lgc/LgcDialect.h"
 #include "llvm/Bitcode/BitcodeReader.h"
@@ -57,7 +60,9 @@
 #define DEBUG_TYPE "llpc-context"
 
 using namespace lgc;
+using namespace lgc::rt;
 using namespace llvm;
+using namespace lgc::cps;
 
 namespace Llpc {
 
@@ -65,8 +70,7 @@ namespace Llpc {
 //
 // @param gfxIp : Graphics IP version info
 Context::Context(GfxIpVersion gfxIp) : LLVMContext(), m_gfxIp(gfxIp) {
-  m_dialectContext = llvm_dialects::DialectContext::make<LgcDialect>(*this);
-
+  m_dialectContext = llvm_dialects::DialectContext::make<LgcDialect, GpurtDialect, LgcRtDialect, LgcCpsDialect>(*this);
   reset();
 }
 
@@ -87,10 +91,16 @@ LgcContext *Context::getLgcContext() {
   // Create the LgcContext on first execution or optimization level change.
   if (!m_builderContext || getLastOptimizationLevel() != getOptimizationLevel()) {
     std::string gpuName = LgcContext::getGpuNameString(m_gfxIp.major, m_gfxIp.minor, m_gfxIp.stepping);
+    // Pass the state of LLPC_OUTS on to LGC for the logging inside createTargetMachine.
+    LgcContext::setLlpcOuts(EnableOuts() ? &outs() : nullptr);
     m_targetMachine = LgcContext::createTargetMachine(gpuName, getOptimizationLevel());
+    LgcContext::setLlpcOuts(nullptr);
     if (!m_targetMachine)
       report_fatal_error(Twine("Unknown target '") + Twine(gpuName) + Twine("'"));
     m_builderContext.reset(LgcContext::create(&*m_targetMachine, *this, PAL_CLIENT_INTERFACE_MAJOR_VERSION));
+
+    // Pass the state of LLPC_OUTS on to LGC.
+    LgcContext::setLlpcOuts(EnableOuts() ? &outs() : nullptr);
   }
   return &*m_builderContext;
 }
@@ -148,7 +158,10 @@ std::unique_ptr<Module> Context::loadLibrary(const BinaryData *lib) {
 void Context::setModuleTargetMachine(Module *module) {
   TargetMachine *targetMachine = getLgcContext()->getTargetMachine();
   module->setTargetTriple(targetMachine->getTargetTriple().getTriple());
-  module->setDataLayout(targetMachine->createDataLayout());
+  std::string dataLayoutStr = targetMachine->createDataLayout().getStringRepresentation();
+  // continuation stack address space.
+  dataLayoutStr = dataLayoutStr + "-p" + std::to_string(cps::stackAddrSpace) + ":32:32";
+  module->setDataLayout(dataLayoutStr);
 }
 
 } // namespace Llpc

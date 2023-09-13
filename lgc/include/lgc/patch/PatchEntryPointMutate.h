@@ -30,13 +30,18 @@
  */
 #pragma once
 
+#include "lgccps/LgcCpsDialect.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
+#include "lgc/util/TypeLowering.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
 
 namespace lgc {
+
+class UserDataOp;
 
 // =====================================================================================================================
 // The entry-point mutation pass
@@ -65,40 +70,37 @@ private:
     unsigned *argIndex;     // Where to store arg index once it is allocated, nullptr for none
   };
 
-  // User data usage for one user data node
-  struct UserDataNodeUsage {
+  // User data usage for one special user data argument
+  struct SpecialUserDataNodeUsage {
     unsigned entryArgIdx = 0;
-    unsigned dwordSize = 0; // Only used in pushConstOffsets
     llvm::SmallVector<llvm::Instruction *, 4> users;
+  };
+
+  // Dword-aligned load from constant userdata offset.
+  struct UserDataLoad {
+    llvm::Instruction *load = nullptr;
+    unsigned dwordOffset = 0;
+    unsigned dwordSize = 0;
   };
 
   // Per-merged-shader-stage gathered user data usage information.
   struct UserDataUsage {
     // Check if special user data value is used by lgc.special.user.data call generated before PatchEntryPointMutate
     bool isSpecialUserDataUsed(UserDataMapping kind);
+    void addLoad(unsigned dwordOffset, unsigned dwordSize);
 
-    // List of lgc.spill.table calls
-    UserDataNodeUsage spillTable;
-    // List of lgc.push.const calls. There is no direct attempt to unspill these; instead we attempt to
-    // unspill the pushConstOffsets loads.
-    UserDataNodeUsage pushConst;
-    // True means that we did not succeed in putting all loads into pushConstOffsets, so lgc.push.const
-    // calls must be kept.
-    bool pushConstSpill = false;
-    // Per-push-const-offset lists of loads from push const. We attempt to unspill these.
-    llvm::SmallVector<UserDataNodeUsage, 8> pushConstOffsets;
-    // Per-user-data-offset lists of lgc.root.descriptor calls
-    llvm::SmallVector<UserDataNodeUsage, 8> rootDescriptors;
-    // Per-table lists of lgc.descriptor.table.addr calls
-    // When the user data nodes are available, a table is identifed by its
-    // index in the user data nodes.  Using this index allows for the possibility that a descriptor
-    // set is split over multiple tables.  When it is not available, a table is identified by the
-    // descriptor set it contains, which is consistent with the Vulkan binding model.
-    llvm::SmallVector<UserDataNodeUsage, 8> descriptorTables;
+    unsigned spillTableEntryArgIdx = 0;
+    // Whether there is any dynamic indexing into lgc.user.data pointers.
+    bool haveDynamicUserDataLoads = false;
+    llvm::SmallVector<UserDataOp *> userDataOps;
+    llvm::SmallVector<UserDataLoad> loads;
+    // Minimum number of consecutive dwords for a statically known load *starting* at a given offset into user data
+    // (0 for dwords that aren't used)
+    llvm::SmallVector<unsigned> loadSizes;
+    // Entry argument index for each user data dword that has one.
+    llvm::SmallVector<unsigned> entryArgIdxs;
     // Per-UserDataMapping lists of lgc.special.user.data calls
-    llvm::SmallVector<UserDataNodeUsage, 18> specialUserData;
-    // Minimum offset at which spill table is used.
-    unsigned spillUsage = UINT_MAX;
+    llvm::SmallVector<SpecialUserDataNodeUsage, 18> specialUserData;
     // Usage of streamout table
     bool usesStreamOutTable = false;
   };
@@ -109,6 +111,9 @@ private:
   // Gather user data usage in all shaders.
   void gatherUserDataUsage(llvm::Module *module);
 
+  llvm::Value *loadUserData(const UserDataUsage &userDataUsage, llvm::Value *spillTable, llvm::Type *type,
+                            unsigned dwordOffset, BuilderBase &builder);
+
   // Fix up user data uses.
   void fixupUserDataUses(llvm::Module &module);
 
@@ -118,7 +123,8 @@ private:
                     llvm::SmallVectorImpl<std::string> &shaderInputNames, uint64_t inRegMask, unsigned argOffset);
   void setFuncAttrs(llvm::Function *entryPoint);
 
-  uint64_t generateEntryPointArgTys(ShaderInputs *shaderInputs, llvm::SmallVectorImpl<llvm::Type *> &argTys,
+  uint64_t generateEntryPointArgTys(ShaderInputs *shaderInputs, llvm::Function *origFunc,
+                                    llvm::SmallVectorImpl<llvm::Type *> &argTys,
                                     llvm::SmallVectorImpl<std::string> &argNames, unsigned argOffset);
 
   bool isSystemUserDataValue(unsigned userDataValue) const;
@@ -126,15 +132,25 @@ private:
 
   void addSpecialUserDataArgs(llvm::SmallVectorImpl<UserDataArg> &userDataArgs,
                               llvm::SmallVectorImpl<UserDataArg> &specialUserDataArgs, llvm::IRBuilder<> &builder);
-  void addUserDataArgs(llvm::SmallVectorImpl<UserDataArg> &userDataArgs, llvm::IRBuilder<> &builder);
-  void addUserDataArg(llvm::SmallVectorImpl<UserDataArg> &userDataArgs, unsigned userDataValue, unsigned sizeInDwords,
-                      const llvm::Twine &name, unsigned *argIndex, llvm::IRBuilder<> &builder);
 
-  void determineUnspilledUserDataArgs(llvm::ArrayRef<UserDataArg> userDataArgs,
-                                      llvm::ArrayRef<UserDataArg> specialUserDataArgs, llvm::IRBuilder<> &builder,
-                                      llvm::SmallVectorImpl<UserDataArg> &unspilledArgs);
+  void finalizeUserDataArgs(llvm::SmallVectorImpl<UserDataArg> &userDataArgs,
+                            llvm::ArrayRef<UserDataArg> specialUserDataArgs, llvm::IRBuilder<> &builder);
 
   uint64_t pushFixedShaderArgTys(llvm::SmallVectorImpl<llvm::Type *> &argTys) const;
+
+  // Information about each cps exit (return or cps.jump) used for exit unification.
+  struct CpsExitInfo {
+    CpsExitInfo(llvm::BasicBlock *_pred, llvm::SmallVector<llvm::Value *> _vgpr) : pred(_pred), vgpr(_vgpr) {}
+    llvm::BasicBlock *pred;                // The predecessor that will branch to the unified exit.
+    llvm::SmallVector<llvm::Value *> vgpr; // The vgpr values from the exit.
+  };
+
+  bool lowerCpsOps(llvm::Function *func);
+  llvm::Function *lowerCpsFunction(llvm::Function *func, llvm::ArrayRef<llvm::Type *> userDataTys,
+                                   llvm::ArrayRef<std::string> argNames);
+  unsigned lowerCpsJump(llvm::Function *parent, cps::JumpOp *jumpOp, llvm::BasicBlock *tailBlock,
+                        llvm::SmallVectorImpl<CpsExitInfo> &exitInfos);
+  void lowerAsCpsReference(cps::AsContinuationReferenceOp &asCpsReferenceOp);
 
   // Get UserDataUsage struct for the merged shader stage that contains the given shader stage
   UserDataUsage *getUserDataUsage(ShaderStage stage);
@@ -150,6 +166,34 @@ private:
   bool m_computeWithCalls = false;          // Whether this is compute pipeline with calls or compute library
   // Per-HW-shader-stage gathered user data usage information.
   llvm::SmallVector<std::unique_ptr<UserDataUsage>, ShaderStageCount> m_userDataUsage;
+
+  class CpsShaderInputCache {
+  public:
+    void clear() {
+      if (m_cpsCacheAvailable) {
+        m_cpsShaderInputTypes.clear();
+        m_cpsShaderInputNames.clear();
+        m_cpsCacheAvailable = false;
+      }
+    }
+    void set(llvm::ArrayRef<llvm::Type *> types, llvm::ArrayRef<std::string> names) {
+      assert(!m_cpsCacheAvailable);
+      m_cpsCacheAvailable = true;
+      m_cpsShaderInputTypes.append(types.begin(), types.end());
+      m_cpsShaderInputNames.append(names.begin(), names.end());
+    }
+    llvm::ArrayRef<llvm::Type *> getTypes() { return m_cpsShaderInputTypes; }
+    llvm::ArrayRef<std::string> getNames() { return m_cpsShaderInputNames; }
+    bool isAvailable() { return m_cpsCacheAvailable; }
+
+  private:
+    llvm::SmallVector<llvm::Type *> m_cpsShaderInputTypes;
+    llvm::SmallVector<std::string> m_cpsShaderInputNames;
+    bool m_cpsCacheAvailable = false;
+  };
+  CpsShaderInputCache m_cpsShaderInputCache;
+  // Map from a cps function to the alloca where we are holding the latest continuation stack pointer.
+  llvm::DenseMap<llvm::Function *, llvm::Value *> m_funcCpsStackMap;
 };
 
 } // namespace lgc

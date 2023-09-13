@@ -154,9 +154,10 @@ public:
                               //  descriptor entry, rather than DescriptorBuffer/DescriptorBufferCompact
     BufferFlagNonConst = 8,   // Non-const buffer: Find a DescriptorBuffer/DescriptorBufferCompact descriptor
                               //  entry, rather than DescriptorConstBuffer/DescriptorConstBufferCompact/InlineBuffer
-    BufferFlagShaderResource = 16, // Flag to find a Descriptor Resource
-    BufferFlagSampler = 32,        // Flag to find Descriptor Sampler
-    BufferFlagAddress = 64         // Flag to return an i64 address of the descriptor
+    BufferFlagShaderResource = 16,  // Flag to find a Descriptor Resource
+    BufferFlagSampler = 32,         // Flag to find Descriptor Sampler
+    BufferFlagAddress = 64,         // Flag to return an i64 address of the descriptor
+    BufferFlagAttachedCounter = 128 // Flag to return the counter buffer descriptor attached to the main buffer.
   };
 
   // Get the type of a built-in -- static edition of the method below, so you can use it without a BuilderDefs object.
@@ -238,6 +239,30 @@ public:
       return 2;
     case Dim2DArrayMsaa:
       return 3;
+    case DimCubeArray:
+      return 3;
+    }
+    llvm_unreachable("Should never be called!");
+    return 0;
+  }
+
+  // Get the number of components of the derivative in one direction for the specified dimension argument.
+  //
+  // @param dim : Image dimension
+  static unsigned getImageDerivativeComponentCount(unsigned dim) {
+    switch (dim) {
+    case Dim1D:
+      return 1;
+    case Dim2D:
+      return 2;
+    case Dim3D:
+      return 3;
+    case DimCube:
+      return 3;
+    case Dim1DArray:
+      return 1;
+    case Dim2DArray:
+      return 2;
     case DimCubeArray:
       return 3;
     }
@@ -782,6 +807,15 @@ public:
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateFindSMsb(llvm::Value *value, const llvm::Twine &instName = "");
 
+  // Create "count leading sign bits" operation for a (vector of) signed i32. For a positive number, the result is
+  // the count of the most leading significant 1-bit. For a negative number, the result is the bit number of the
+  // most significant 0-bit.
+  // For a value of 0 or -1, the result is -1.
+  //
+  // @param value : Input value
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateCountLeadingSignBits(llvm::Value *value, const llvm::Twine &instName = "");
+
   // Create "fmix" operation, returning ( 1 - A ) * X + A * Y. Result would be FP scalar or vector value.
   // Returns scalar, if and only if "pX", "pY" and "pA" are all scalars.
   // Returns vector, if "pX" and "pY" are vector but "pA" is a scalar, under such condition, "pA" will be splatted.
@@ -823,7 +857,7 @@ public:
   // @param descIndex : Descriptor index
   // @param flags : BufferFlag* bit settings
   // @param instName : Name to give instruction(s)
-  llvm::Value *CreateLoadBufferDesc(unsigned descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
+  llvm::Value *CreateLoadBufferDesc(uint64_t descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
                                     const llvm::Twine &instName = "");
 
   // Get address space of constant memory.
@@ -841,7 +875,7 @@ public:
   // @param descSet : Descriptor set
   // @param binding : Descriptor binding
   // @param instName : Name to give instruction(s)
-  llvm::Value *CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
+  llvm::Value *CreateGetDescStride(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
                                    unsigned binding, const llvm::Twine &instName = "");
 
   // Create a pointer to a descriptor. Returns a value of the type returned by GetSamplerDescPtrTy, GetImageDescPtrTy,
@@ -853,15 +887,14 @@ public:
   // @param descSet : Descriptor set
   // @param binding : Descriptor binding
   // @param instName : Name to give instruction(s)
-  llvm::Value *CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, unsigned descSet,
+  llvm::Value *CreateGetDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
                                 unsigned binding, const llvm::Twine &instName = "");
 
   // Create a load of the push constants pointer.
   // This returns a pointer to the ResourceNodeType::PushConst resource in the top-level user data table.
   //
-  // @param returnTy : Return type of the load
   // @param instName : Name to give instruction(s)
-  llvm::Value *CreateLoadPushConstantsPtr(llvm::Type *returnTy, const llvm::Twine &instName = "");
+  llvm::Value *CreateLoadPushConstantsPtr(const llvm::Twine &instName = "");
 
   // -----------------------------------------------------------------------------------------------------------------
   // Image operations
@@ -1039,13 +1072,8 @@ public:
   llvm::Value *CreateImageGetLod(unsigned dim, unsigned flags, llvm::Value *imageDesc, llvm::Value *samplerDesc,
                                  llvm::Value *coord, const llvm::Twine &instName = "");
 
-#if VKI_RAY_TRACING
   // Create a ray intersect result with specified node in BVH buffer.
   // nodePtr is the combination of BVH node offset type.
-  //# TODO: This is not because making it virtual introduces weird runtime bugs if the
-  //# front-end and LGC are accidentally compiled with different VKI_IMAGE_BVH_INTERSECT_RAY settings,
-  //# making the vtables mismatch in a way that the linker cannot spot.
-  //# Once the feature is in released hardware, we can remove the #if and make the function virtual.
   //
   // @param nodePtr : BVH node pointer
   // @param extent : The valid range on which intersections can occur
@@ -1057,8 +1085,6 @@ public:
   llvm::Value *CreateImageBvhIntersectRay(llvm::Value *nodePtr, llvm::Value *extent, llvm::Value *origin,
                                           llvm::Value *direction, llvm::Value *invDirection, llvm::Value *imageDesc,
                                           const llvm::Twine &instName = "");
-
-#endif
 
   // -----------------------------------------------------------------------------------------------------------------
   // Shader input/output methods
@@ -1221,51 +1247,6 @@ public:
   llvm::Instruction *CreateWriteBuiltInOutput(llvm::Value *valueToWrite, BuiltInKind builtIn, InOutInfo outputInfo,
                                               llvm::Value *vertexOrPrimitiveIndex, llvm::Value *index);
 
-  // Create a read of (part of) a task payload.
-  // The result type is as specified by resultTy, a scalar or vector type with no more than four elements.
-  //
-  // @param resultTy : Type of value to read
-  // @param byteOffset : Byte offset within the payload structure
-  // @param instName : Name to give instruction(s)
-  // @returns : Value read from the task payload
-  llvm::Value *CreateReadTaskPayload(llvm::Type *resultTy, llvm::Value *byteOffset, // NOLINT
-                                     const llvm::Twine &instName = "");
-
-  // Create a write of (part of) a task payload.
-  //
-  // @param valueToWrite : Value to write
-  // @param byteOffset : Byte offset within the payload structure
-  // @param instName : Name to give instruction(s)
-  // @returns Instruction to write value to task payload
-  // @returns : Original value read from the task payload
-  llvm::Instruction *CreateWriteTaskPayload(llvm::Value *valueToWrite, llvm::Value *byteOffset, // NOLINT
-                                            const llvm::Twine &instName = "");
-
-  // Create a task payload atomic operation other than compare-and-swap. An add of +1 or -1, or a sub
-  // of -1 or +1, is generated as inc or dec. Result type is the same as the input value type.
-  //
-  // @param atomicOp : Atomic op to create
-  // @param ordering : Atomic ordering
-  // @param inputValue : Input value
-  // @param byteOffset : Byte offset within the payload structure
-  // @param instName : Name to give instruction(s)
-  // @returns : Original value read from the task payload
-  llvm::Value *CreateTaskPayloadAtomic(unsigned atomicOp, llvm::AtomicOrdering ordering, // NOLINT
-                                       llvm::Value *inputValue, llvm::Value *byteOffset,
-                                       const llvm::Twine &instName = "");
-
-  // Create a task payload atomic compare-and-swap.
-  //
-  // @param ordering : Atomic ordering
-  // @param inputValue : Input value
-  // @param comparatorValue : Value to compare against
-  // @param byteOffset : Byte offset within the payload structure
-  // @param instName : Name to give instruction(s)
-  // @returns : Original value read from the task payload
-  llvm::Value *CreateTaskPayloadAtomicCompareSwap(llvm::AtomicOrdering ordering, // NOLINT
-                                                  llvm::Value *inputValue, llvm::Value *comparatorValue,
-                                                  llvm::Value *byteOffset, const llvm::Twine &instName = "");
-
   // -----------------------------------------------------------------------------------------------------------------
   // Matrix operations
 
@@ -1380,31 +1361,6 @@ public:
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateIsHelperInvocation(const llvm::Twine &instName = "");
 
-  // In the task shader, emit the current values of all per-task output variables to the current task output by
-  // specifying the group count XYZ of the launched child mesh tasks.
-  //
-  // @param groupCountX : X dimension of the launched child mesh tasks
-  // @param groupCountY : Y dimension of the launched child mesh tasks
-  // @param groupCountZ : Z dimension of the launched child mesh tasks
-  // @param instName : Name to give final instruction
-  // @returns Instruction to emit mesh tasks
-  llvm::Instruction *CreateEmitMeshTasks(llvm::Value *groupCountX, llvm::Value *groupCountY, // NOLINT
-                                         llvm::Value *groupCountZ, const llvm::Twine &instName = "");
-
-  // In the mesh shader, set the actual output size of the primitives and vertices that the mesh shader workgroup will
-  // emit upon completion.
-  //
-  // @param vertexCount : Actual output size of the vertices
-  // @param primitiveCount : Actual output size of the primitives
-  // @param instName : Name to give final instruction
-  // @returns Instruction to set the actual size of mesh outputs
-  llvm::Instruction *CreateSetMeshOutputs(llvm::Value *vertexCount, llvm::Value *primitiveCount, // NOLINT
-                                          const llvm::Twine &instName = "");
-
-  // Create debug printf operation, and write to the output debug buffer
-  // @vars: Printf variable parameters
-  // @instName : Instance Name
-  llvm::Value *CreateDebugPrintf(llvm::ArrayRef<llvm::Value *> vars, const llvm::Twine &instName = "");
   // -----------------------------------------------------------------------------------------------------------------
   // Subgroup operations
 
@@ -1440,6 +1396,15 @@ public:
   // @param value : The value to compare
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateSubgroupAllEqual(llvm::Value *const value, const llvm::Twine &instName = "");
+
+  // Create a subgroup rotate call.
+  //
+  // @param value : The value to read from the chosen rotated lane to all active lanes.
+  // @param delta : The delta/offset added to lane id.
+  // @param clusterSize : The cluster size if exists.
+  // @param instName : Name to give instruction.
+  llvm::Value *CreateSubgroupRotate(llvm::Value *const value, llvm::Value *const delta, llvm::Value *const clusterSize,
+                                    const llvm::Twine &instName = "");
 
   // Create a subgroup broadcast.
   //

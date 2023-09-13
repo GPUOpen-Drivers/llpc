@@ -31,6 +31,7 @@
 #include "llpcSpirvLowerConstImmediateStore.h"
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
+#include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/Support/Debug.h"
 #include <vector>
@@ -126,7 +127,7 @@ StoreInst *SpirvLowerConstImmediateStore::findSingleStore(AllocaInst *allocaInst
         storeInstFound = storeInst;
       } else if (auto getElemPtrInst = dyn_cast<GetElementPtrInst>(user))
         pointers.push_back(getElemPtrInst);
-      else if (!isa<LoadInst>(user)) {
+      else if (!isa<LoadInst>(user) && !isAssumeLikeIntrinsic(user)) {
         // Pointer escapes by being used in some way other than "load/store/getelementptr".
         return nullptr;
       }
@@ -187,7 +188,7 @@ void SpirvLowerConstImmediateStore::convertAllocaToReadOnlyGlobal(StoreInst *sto
         // Remember that we need to replace the uses of the original "getelementptr" with the new one.
         allocaToGlobalMap.push_back(std::pair<Instruction *, Value *>(origGetElemPtrInst, newGetElemPtrInst));
         // Remove the use from the original "getelementptr".
-        *useIt = UndefValue::get(allocaInst->getType());
+        *useIt = PoisonValue::get(allocaInst->getType());
       } else
         *useIt = global;
     }

@@ -113,3 +113,24 @@ BUILTIN(VertexId, 5, N, V, i32)                          // Index of current ver
 BUILTIN(InstanceId, 6, N, V, i32)                        // Index of current primitive
 
 // Reserved LGC internal built-ins
+
+// Internal built-ins for fragment input interpolation (I/J)
+BUILTIN(InterpPerspSample, BuiltInInternalBase + 0, N, P, v2f32)
+BUILTIN(InterpPerspCenter, BuiltInInternalBase + 1, N, P, v2f32)
+BUILTIN(InterpPerspCentroid, BuiltInInternalBase + 2, N, P, v2f32)
+BUILTIN(InterpPullMode, BuiltInInternalBase + 3, N, P, v3f32)
+BUILTIN(InterpLinearSample, BuiltInInternalBase + 4, N, P, v2f32)
+BUILTIN(InterpLinearCenter, BuiltInInternalBase + 5, N, P, v2f32)
+BUILTIN(InterpLinearCentroid, BuiltInInternalBase + 6, N, P, v2f32)
+
+// Internal built-ins for sample position emulation
+BUILTIN(SamplePosOffset, BuiltInInternalBase + 7, N, P, i32)
+BUILTIN(NumSamples, BuiltInInternalBase + 8, N, P, i32)
+BUILTIN(SamplePatternIdx, BuiltInInternalBase + 9, N, P, i32)
+BUILTIN(GsWaveId, BuiltInInternalBase + 10, N, G, i32)
+
+// Internal built-ins for compute input when thread id is swizzled
+BUILTIN(UnswizzledLocalInvocationId, BuiltInInternalBase + 11, N, C, i32)
+BUILTIN(UnswizzledLocalInvocationIndex, BuiltInInternalBase + 12, N, C, i32)
+
+BUILTIN(EdgeFlag, BuiltInInternalBase + 18, V, V, i32) // EdgeFlag output

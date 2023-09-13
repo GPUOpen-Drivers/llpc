@@ -103,181 +103,193 @@ enum class ThreadGroupSwizzleMode : unsigned {
   Count,
 };
 
+// Enumerate the ray tracing indirect modes.
+enum class RayTracingIndirectMode : unsigned {
+  NotIndirect = 0,            // Not in indirect mode (or not ray tracing pipeline)
+  Legacy = 1,                 // Legacy indirect mode
+  ContinuationsContinufy = 2, // Continuations flow that based on Continufy pass
+  Continuations = 3,          // Continuations flow that based on LowerRaytracingPipeline pass
+};
+
 // Value for shadowDescriptorTable pipeline option.
 static const unsigned ShadowDescriptorTableDisable = ~0U;
 
 static const char XfbStateMetadataName[] = "lgc.xfb.state";
+static const char SampleShadingMetaName[] = "lgc.sample.shading";
 
 // Middle-end per-pipeline options to pass to SetOptions.
-// The front-end should zero-initialize it with "= {}" in case future changes add new fields.
+// The front-end should zero-initialize a struct with "= {}" in case future changes add new fields.
 // Note: new fields must be added to the end of this structure to maintain test compatibility.
-struct Options {
-  uint64_t hash[2];                    // Pipeline hash to set in ELF PAL metadata
-  unsigned includeDisassembly;         // If set, the disassembly for all compiled shaders will be included
-                                       //   in the pipeline ELF.
-  unsigned reconfigWorkgroupLayout;    // If set, allows automatic workgroup reconfigure to take place on
-                                       //   compute shaders.
-  bool forceCsThreadIdSwizzling;       // Force rearranges threadId within group into blocks of 8*8 or 8*4.
-  unsigned overrideThreadGroupSizeX;   // Override value for thread group size.X
-  unsigned overrideThreadGroupSizeY;   // Override value for thread group size.Y
-  unsigned overrideThreadGroupSizeZ;   // Override value for thread group size.Z
-  unsigned includeIr;                  // If set, the IR for all compiled shaders will be included in the
-                                       //   pipeline ELF.
-  unsigned nggFlags;                   // Flags to control NGG (NggFlag* values ored together)
-  unsigned nggBackfaceExponent;        // Value from 1 to UINT32_MAX that will cause the backface culling
-                                       // algorithm to ignore area calculations that are less than
-                                       // (10 ^ -(backfaceExponent)) / abs(w0 * w1 * w2)
-                                       //  Only valid if the NGG backface culler is enabled.
-                                       //  A value of 0 will disable the threshold.
-  NggSubgroupSizing nggSubgroupSizing; // NGG subgroup sizing type
-  bool fullSubgroups;                  // Use full subgroup lanes
-  unsigned nggVertsPerSubgroup;        // How to determine NGG verts per subgroup
-  unsigned nggPrimsPerSubgroup;        // How to determine NGG prims per subgroup
-  unsigned highAddrOfFmask;            // High dword of Fmask address
-  bool enableFmask;                    // Whether to use Fmasks when loading from MSAA images
-  unsigned allowNullDescriptor;        // Allow and give defined behavior for null descriptor
-  unsigned disableImageResourceCheck;  // Don't do image resource type check
-  unsigned reserved0f;                 // Reserved for future functionality
-  unsigned useResourceBindingRange;    // A resource node binding is the start of a range whose size is
-                                       //  sizeInDwords/stride.
-  unsigned optimizeTessFactor;    // If set, we can determine either send HT_TessFactor message or write to TF buffer
-                                  // depending the values of tessellation factors.
-  unsigned enableInterpModePatch; // Enable to do per-sample interpolation for nonperspective and smooth input
-  unsigned pageMigrationEnabled;  // Enable page migration
-  ResourceLayoutScheme resourceLayoutScheme;     // Resource layout scheme
-  ThreadGroupSwizzleMode threadGroupSwizzleMode; // Thread group swizzle mode
-  unsigned reverseThreadGroupBufferDescSet;      // Descriptor set ID of the internal buffer for reverse thread group
-                                                 // optimization
-  unsigned reverseThreadGroupBufferBinding; // Binding ID of the internal buffer for reverse thread group optimization
-#if VKI_RAY_TRACING
-  bool internalRtShaders; // Enable internal RT shader intrinsics
-#else
-  bool reserved15;
-#endif
-  bool enableUberFetchShader; // Enable UberShader
-  bool reserved16;
+union Options {
+  unsigned u32All[34];
+  struct {
+    uint64_t hash[2];                    // Pipeline hash to set in ELF PAL metadata
+    unsigned includeDisassembly;         // If set, the disassembly for all compiled shaders will be included
+                                         //   in the pipeline ELF.
+    unsigned reconfigWorkgroupLayout;    // If set, allows automatic workgroup reconfigure to take place on
+                                         //   compute shaders.
+    bool forceCsThreadIdSwizzling;       // Force rearranges threadId within group into blocks of 8*8 or 8*4.
+    unsigned overrideThreadGroupSizeX;   // Override value for thread group size.X
+    unsigned overrideThreadGroupSizeY;   // Override value for thread group size.Y
+    unsigned overrideThreadGroupSizeZ;   // Override value for thread group size.Z
+    unsigned includeIr;                  // If set, the IR for all compiled shaders will be included in the
+                                         //   pipeline ELF.
+    unsigned nggFlags;                   // Flags to control NGG (NggFlag* values ored together)
+    unsigned nggBackfaceExponent;        // Value from 1 to UINT32_MAX that will cause the backface culling
+                                         // algorithm to ignore area calculations that are less than
+                                         // (10 ^ -(backfaceExponent)) / abs(w0 * w1 * w2)
+                                         //  Only valid if the NGG backface culler is enabled.
+                                         //  A value of 0 will disable the threshold.
+    NggSubgroupSizing nggSubgroupSizing; // NGG subgroup sizing type
+    bool fullSubgroups;                  // Use full subgroup lanes
+    unsigned nggVertsPerSubgroup;        // How to determine NGG verts per subgroup
+    unsigned nggPrimsPerSubgroup;        // How to determine NGG prims per subgroup
+    unsigned highAddrOfFmask;            // High dword of Fmask address
+    bool enableFmask;                    // Whether to use Fmasks when loading from MSAA images
+    unsigned allowNullDescriptor;        // Allow and give defined behavior for null descriptor
+    unsigned disableImageResourceCheck;  // Don't do image resource type check
+    unsigned reserved0f;                 // Reserved for future functionality
+    unsigned useResourceBindingRange;    // A resource node binding is the start of a range whose size is
+                                         //  sizeInDwords/stride.
+    unsigned optimizeTessFactor;    // If set, we can determine either send HT_TessFactor message or write to TF buffer
+                                    // depending the values of tessellation factors.
+    unsigned enableInterpModePatch; // Enable to do per-sample interpolation for nonperspective and smooth input
+    unsigned pageMigrationEnabled;  // Enable page migration
+    ResourceLayoutScheme resourceLayoutScheme;     // Resource layout scheme
+    ThreadGroupSwizzleMode threadGroupSwizzleMode; // Thread group swizzle mode
+    unsigned reverseThreadGroupBufferDescSet;      // Descriptor set ID of the internal buffer for reverse thread group
+                                                   // optimization
+    unsigned reverseThreadGroupBufferBinding; // Binding ID of the internal buffer for reverse thread group optimization
+    bool internalRtShaders;                   // Enable internal RT shader intrinsics
+    bool enableUberFetchShader;               // Enable UberShader
+    bool reserved16;
+    bool enableColorExportShader; // Explicitly build color export shader, UnlinkedStageFragment elf will return extra
+                                  // meta data.
+    bool fragCoordUsesInterpLoc;  // Determining fragCoord use InterpLoc
+    bool disableSampleMask;       // Disable export of sample mask from PS
+    bool reserved20;
+    RayTracingIndirectMode rtIndirectMode; // Ray tracing indirect mode
+  };
 };
+static_assert(sizeof(Options) == sizeof(Options::u32All));
 
 /// Represent a pipeline option which can be automatic as well as explicitly set.
 enum InvariantLoadsOption : unsigned { Auto = 0, EnableOptimization = 1, DisableOptimization = 2, ClearInvariants = 3 };
 
+// =====================================================================================================================
+// Struct with the information for one color export
+struct ColorExportInfo {
+  unsigned hwColorTarget;
+  unsigned location;
+  bool isSigned;
+  llvm::Type *ty;
+};
+
 // Middle-end per-shader options to pass to SetShaderOptions.
 // Note: new fields must be added to the end of this structure to maintain test compatibility.
-struct ShaderOptions {
-  uint64_t hash[2];     // Shader hash to set in ELF PAL metadata
-  unsigned trapPresent; // Indicates a trap handler will be present when this pipeline is executed,
-                        //  and any trap conditions encountered in this shader should call the trap
-                        //  handler. This could include an arithmetic exception, an explicit trap
-                        //  request from the host, or a trap after every instruction when in debug
-                        //  mode.
-  unsigned debugMode;   // When set, this shader should cause the trap handler to be executed after
-                        //  every instruction.  Only valid if trapPresent is set.
-  unsigned allowReZ;    // Allow the DB ReZ feature to be enabled.  This will cause an early-Z test
-                        //  to potentially kill PS waves before launch, and also issues a late-Z test
-                        //  in case the PS kills pixels.  Only valid for pixel shaders.
+// The front-end should zero-initialize this with "= {}" in case future changes add new fields.
+union ShaderOptions {
+  unsigned u32All[32];
+  struct {
+    uint64_t hash[2];     // Shader hash to set in ELF PAL metadata
+    unsigned trapPresent; // Indicates a trap handler will be present when this pipeline is executed,
+                          //  and any trap conditions encountered in this shader should call the trap
+                          //  handler. This could include an arithmetic exception, an explicit trap
+                          //  request from the host, or a trap after every instruction when in debug
+                          //  mode.
+    unsigned debugMode;   // When set, this shader should cause the trap handler to be executed after
+                          //  every instruction.  Only valid if trapPresent is set.
+    unsigned allowReZ;    // Allow the DB ReZ feature to be enabled.  This will cause an early-Z test
+                          //  to potentially kill PS waves before launch, and also issues a late-Z test
+                          //  in case the PS kills pixels.  Only valid for pixel shaders.
 
-  // Maximum VGPR limit for this shader. The actual limit used by back-end for shader compilation is the smaller
-  // of this value and whatever the target GPU supports. To effectively disable this limit, set this to 0.
-  unsigned vgprLimit;
+    // Maximum VGPR limit for this shader. The actual limit used by back-end for shader compilation is the smaller
+    // of this value and whatever the target GPU supports. To effectively disable this limit, set this to 0.
+    unsigned vgprLimit;
 
-  // Maximum SGPR limit for this shader. The actual limit used by back-end for shader compilation is the smaller
-  // of this value and whatever the target GPU supports. To effectively disable this limit, set this to 0.
-  unsigned sgprLimit;
+    // Maximum SGPR limit for this shader. The actual limit used by back-end for shader compilation is the smaller
+    // of this value and whatever the target GPU supports. To effectively disable this limit, set this to 0.
+    unsigned sgprLimit;
 
-  /// Overrides the number of CS thread-groups which the GPU will launch per compute-unit. This throttles the
-  /// shader, which can sometimes enable more graphics shader work to complete in parallel. A value of zero
-  /// disables limiting the number of thread-groups to launch. This field is ignored for graphics shaders.
-  unsigned maxThreadGroupsPerComputeUnit;
+    /// Overrides the number of CS thread-groups which the GPU will launch per compute-unit. This throttles the
+    /// shader, which can sometimes enable more graphics shader work to complete in parallel. A value of zero
+    /// disables limiting the number of thread-groups to launch. This field is ignored for graphics shaders.
+    unsigned maxThreadGroupsPerComputeUnit;
 
-  unsigned waveSize;       // Control the number of threads per wavefront (GFX10+)
-  unsigned subgroupSize;   // Override for the wave size when the shader uses gl_SubgroupSize, 0 for no override
-  unsigned wgpMode;        // Whether to choose WGP mode or CU mode (GFX10+)
-  WaveBreak waveBreakSize; // Size of region to force the end of a wavefront (GFX10+).
-                           // Only valid for fragment shaders.
+    unsigned waveSize;       // Control the number of threads per wavefront (GFX10+)
+    unsigned subgroupSize;   // Override for the wave size when the shader uses gl_SubgroupSize, 0 for no override
+    unsigned wgpMode;        // Whether to choose WGP mode or CU mode (GFX10+)
+    WaveBreak waveBreakSize; // Size of region to force the end of a wavefront (GFX10+).
+                             // Only valid for fragment shaders.
 
-  // Vector size threshold for load scalarizer. 0 means do not scalarize loads at all.
-  unsigned loadScalarizerThreshold;
+    // Vector size threshold for load scalarizer. 0 means do not scalarize loads at all.
+    unsigned loadScalarizerThreshold;
 
-  // Use the LLVM backend's SI scheduler instead of the default scheduler.
-  bool useSiScheduler;
+    // Use the LLVM backend's SI scheduler instead of the default scheduler.
+    bool useSiScheduler;
 
-  // Disable various LLVM IR code sinking passes.
-  bool disableCodeSinking;
+    // Disable various LLVM IR code sinking passes.
+    bool disableCodeSinking;
 
-  // Schedule for latency even if it reduces occupancy.
-  bool favorLatencyHiding;
+    // Schedule for latency even if it reduces occupancy.
+    bool favorLatencyHiding;
 
-  // Whether update descriptor root offset in ELF
-  bool updateDescInElf;
+    // Default unroll threshold for LLVM.
+    unsigned unrollThreshold;
 
-  // Default unroll threshold for LLVM.
-  unsigned unrollThreshold;
+    /// Override FP32 denormal handling.
+    DenormalMode fp32DenormalMode;
 
-  /// Override FP32 denormal handling.
-  DenormalMode fp32DenormalMode;
+    /// Whether enable adjustment of the fragment shader depth import for the variable shading rate
+    bool adjustDepthImportVrs;
 
-  /// Whether enable adjustment of the fragment shader depth import for the variable shading rate
-  bool adjustDepthImportVrs;
+    // Unroll loops by specified amount. 0 is default, 1 is no unroll.
+    unsigned forceLoopUnrollCount;
 
-  // Unroll loops by specified amount. 0 is default, 1 is no unroll.
-  unsigned forceLoopUnrollCount;
+    // Disable loop unrolling.
+    bool disableLoopUnroll;
 
-  // Disable loop unrolling.
-  bool disableLoopUnroll;
+    // Threshold for minimum number of blocks in a loop to disable the LICM pass.
+    unsigned disableLicmThreshold;
 
-  // Threshold for minimum number of blocks in a loop to disable the LICM pass.
-  unsigned disableLicmThreshold;
+    // Threshold to use for loops with Unroll hint. 0 to use llvm.loop.unroll.full metadata.
+    unsigned unrollHintThreshold;
 
-  // Threshold to use for loops with Unroll hint. 0 to use llvm.loop.unroll.full metadata.
-  unsigned unrollHintThreshold;
+    // Threshold to use for loops with DontUnroll hint. 0 to use llvm.loop.unroll.disable metadata.
+    unsigned dontUnrollHintThreshold;
 
-  // Threshold to use for loops with DontUnroll hint. 0 to use llvm.loop.unroll.disable metadata.
-  unsigned dontUnrollHintThreshold;
+    // Maximum amount of LDS space to be used for spilling.
+    unsigned ldsSpillLimitDwords;
 
-  // Maximum amount of LDS space to be used for spilling.
-  unsigned ldsSpillLimitDwords;
+    // Attempt to scalarize waterfall descriptor loads.
+    bool scalarizeWaterfallLoads;
 
-  // Attempt to scalarize waterfall descriptor loads.
-  bool scalarizeWaterfallLoads;
+    /// Override value for ThreadGroupSizeX
+    unsigned overrideShaderThreadGroupSizeX;
 
-  /// Override value for ThreadGroupSizeX
-  unsigned overrideShaderThreadGroupSizeX;
+    /// Override value for ThreadGroupSizeY
+    unsigned overrideShaderThreadGroupSizeY;
 
-  /// Override value for ThreadGroupSizeY
-  unsigned overrideShaderThreadGroupSizeY;
+    /// Override value for ThreadGroupSizeZ
+    unsigned overrideShaderThreadGroupSizeZ;
 
-  /// Override value for ThreadGroupSizeZ
-  unsigned overrideShaderThreadGroupSizeZ;
+    // When there is a valid "feedback loop" in renderpass, lateZ needs to be enabled
+    // In Vulkan a "feedback loop" is described as a subpass where there is at least
+    // one input attachment that is also a color or depth/stencil attachment
+    // Feedback loops are allowed and their behavior is well defined under certain conditions.
+    // When there is a feedback loop it is possible for the shaders to read
+    // the contents of the color and depth/stencil attachments
+    // from the shader during draw. Because of that possibility you have to use late-z
+    bool forceLateZ;
 
-  // When there is a valid "feedback loop" in renderpass, lateZ needs to be enabled
-  // In Vulkan a "feedback loop" is described as a subpass where there is at least
-  // one input attachment that is also a color or depth/stencil attachment
-  // Feedback loops are allowed and their behavior is well defined under certain conditions.
-  // When there is a feedback loop it is possible for the shaders to read
-  // the contents of the color and depth/stencil attachments
-  // from the shader during draw. Because of that possibility you have to use late-z
-  bool forceLateZ;
+    /// Minimum number of addresses to use NSA encoding on GFX10+ (0 = backend decides).
+    unsigned nsaThreshold;
 
-  /// Minimum number of addresses to use NSA encoding on GFX10+ (0 = backend decides).
-  unsigned nsaThreshold;
-
-  /// Aggressively mark shader loads as invariant (where it is safe to do so).
-  InvariantLoadsOption aggressiveInvariantLoads;
-
-  ShaderOptions() {
-    // The memory representation of this struct gets written into LLVM metadata. To prevent uninitialized values from
-    // being written, we force everything to 0, including alignment gaps.
-    memset(this, 0, sizeof(ShaderOptions));
-  }
-
-  ShaderOptions(const ShaderOptions &opts) { *this = opts; }
-
-  ShaderOptions &operator=(const ShaderOptions &opts) {
-    // Copy everything, including data in alignment because this is used to implement the copy constructor
-    memcpy(this, &opts, sizeof(ShaderOptions));
-    return *this;
-  }
+    /// Aggressively mark shader loads as invariant (where it is safe to do so).
+    InvariantLoadsOption aggressiveInvariantLoads;
+  };
 };
+static_assert(sizeof(ShaderOptions) == sizeof(ShaderOptions::u32All));
 
 // =====================================================================================================================
 // Definitions for user data resource nodes
@@ -290,13 +302,15 @@ struct ResourceNode {
 
   ResourceNodeType concreteType; // Underlying actual type of this node
   ResourceNodeType abstractType; // Node type for resource node matching
+  unsigned visibility;           // Visibility bitmap: bit N set means entry is visible to ShaderStage(N); value 0
+                                 //  means visible to all shader stages
   unsigned sizeInDwords;         // Size in dwords
   unsigned offsetInDwords;       // Offset in dwords
 
   union {
     // Info for generic descriptor nodes.
     struct {
-      unsigned set;                   // Descriptor set
+      uint64_t set;                   // Descriptor set
       unsigned binding;               // Binding
                                       // If pipeline option "useResourceBindingRange" is set, then this is the
                                       //  start of a range of bindings whose size is sizeInDwords/stride.
@@ -445,10 +459,12 @@ struct ColorExportState {
 
 // Struct to pass to SetInputAssemblyState.
 struct InputAssemblyState {
-  PrimitiveType primitiveType; // Primitive type
-  unsigned disableVertexReuse; // Disable reusing vertex shader output for indexed draws
-  unsigned switchWinding;      // Whether to reverse vertex ordering for tessellation
-  unsigned enableMultiView;    // Whether to enable multi-view support
+  PrimitiveType primitiveType;       // Primitive type
+  unsigned disableVertexReuse;       // Disable reusing vertex shader output for indexed draws
+  unsigned switchWinding;            // Whether to reverse vertex ordering for tessellation
+  unsigned enableMultiView;          // Whether to enable multi-view support
+  unsigned useVertexBufferDescArray; // Whether vertex buffer descriptors are in a descriptor array binding instead of
+                                     // the VertexBufferTable
 };
 
 // Shading rate flags. These happen to have the same values as the corresponding SPIR-V enum.
@@ -469,19 +485,20 @@ enum ProvokingVertexMode : unsigned {
 
 // Struct to pass to SetRasterizerState
 struct RasterizerState {
-  unsigned rasterizerDiscardEnable; // Kill all rasterized pixels. This is implicitly true if stream out
-                                    //  is enabled and no streams are rasterized
-  unsigned innerCoverage;           // Related to conservative rasterization.  Must be false if
-                                    //  conservative rasterization is disabled.
-  unsigned perSampleShading;        // Enable per sample shading
-  unsigned numSamples;              // Number of coverage samples used when rendering with this pipeline
-  unsigned samplePatternIdx;        // Index into the currently bound MSAA sample pattern table that
-                                    //  matches the sample pattern used by the rasterizer when rendering
-                                    //  with this pipeline.
-  unsigned usrClipPlaneMask;        // Mask to indicate the enabled user defined clip planes
-
+  unsigned rasterizerDiscardEnable;        // Kill all rasterized pixels. This is implicitly true if stream out
+                                           //  is enabled and no streams are rasterized
+  unsigned innerCoverage;                  // Related to conservative rasterization.  Must be false if
+                                           //  conservative rasterization is disabled.
+  unsigned perSampleShading;               // Enable per sample shading
+  unsigned numSamples;                     // Number of coverage samples used when rendering with this pipeline
+  unsigned samplePatternIdx;               // Index into the currently bound MSAA sample pattern table that
+                                           //  matches the sample pattern used by the rasterizer when rendering
+                                           //  with this pipeline.
+  unsigned rasterStream;                   // Which vertex stream to rasterize
   ProvokingVertexMode provokingVertexMode; // Specifies which vertex of a primitive is the _provoking vertex_,
                                            // this impacts which vertex's "flat" VS outputs are passed to the PS.
+  unsigned pixelShaderSamples;             // Controls the pixel shader execution rate. Must be less than or equal to
+                                           //  coverageSamples. Valid values are 1, 2, 4, and 8.
 };
 
 // Struct to pass to depth/stencil state
@@ -587,6 +604,7 @@ struct GeometryShaderMode {
   OutputPrimitives outputPrimitive; // Kind of output primitives
   unsigned invocations;             // Number of times to invoke shader for each input primitive
   unsigned outputVertices;          // Max number of vertices the shader will emit in one invocation
+  unsigned robustGsEmits;           // robust buffer access
 };
 
 // Struct to pass to MeshShaderMode. The front-end should zero-initialize it with "= {}" in case
@@ -642,6 +660,21 @@ enum class PipelineLink : unsigned {
   Unlinked,      // Compiling a shader or part-pipeline that will be ELF linked later
   PartPipeline,  // Compiling in the part-pipeline scheme, compiling the FS first and then using metadata to
                  //  pass its packed input mapping to the compile of the rest of the pipeline.
+};
+
+// Represents fragment shader output info
+struct FsOutInfo {
+  unsigned hwColorTarget; // HW color output index
+  unsigned location;      // Output location in resource layout
+  bool isSigned;          // Whether is signed
+  char typeName[8];       // Output data type Name, like v3f32
+};
+
+// Represents shader meta data
+struct FragmentOutputs {
+  FsOutInfo *fsOutInfos;   // The color export information.
+  unsigned fsOutInfoCount; // The number of color exports.
+  bool discard;            // Whether this fragment shader has kill enabled.
 };
 
 // =====================================================================================================================

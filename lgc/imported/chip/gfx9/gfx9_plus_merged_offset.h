@@ -966,6 +966,37 @@ namespace Apu09_1xPlus
     constexpr unsigned int mmSPI_SHADER_PGM_CHKSUM_PS                         = 0x2C06;
 } // namespace Apu09_1xPlus
 
+#if CHIP_HDR_PHOENIX1
+namespace Apu11
+{
+    constexpr unsigned int mmATC_PERFCOUNTER0_CFG                             = 0x0C0D;
+    constexpr unsigned int mmATC_PERFCOUNTER1_CFG                             = 0x0C0E;
+    constexpr unsigned int mmATC_PERFCOUNTER2_CFG                             = 0x0C0F;
+    constexpr unsigned int mmATC_PERFCOUNTER3_CFG                             = 0x0C10;
+    constexpr unsigned int mmATC_PERFCOUNTER_HI                               = 0x0C0C;
+    constexpr unsigned int mmATC_PERFCOUNTER_LO                               = 0x0C0B;
+    constexpr unsigned int mmATC_PERFCOUNTER_RSLT_CNTL                        = 0x0C11;
+    constexpr unsigned int mmGC_ATC_L2_PERFCOUNTER0_CFG                       = 0xDD44;
+    constexpr unsigned int mmGC_ATC_L2_PERFCOUNTER1_CFG                       = 0xDD45;
+    constexpr unsigned int mmGC_ATC_L2_PERFCOUNTER2_HI                        = 0xD4F5;
+    constexpr unsigned int mmGC_ATC_L2_PERFCOUNTER2_LO                        = 0xD4F4;
+    constexpr unsigned int mmGC_ATC_L2_PERFCOUNTER2_MODE                      = 0xDD42;
+    constexpr unsigned int mmGC_ATC_L2_PERFCOUNTER2_SELECT                    = 0xDD40;
+    constexpr unsigned int mmGC_ATC_L2_PERFCOUNTER2_SELECT1                   = 0xDD41;
+    constexpr unsigned int mmGC_ATC_L2_PERFCOUNTER_HI                         = 0xD4F9;
+    constexpr unsigned int mmGC_ATC_L2_PERFCOUNTER_LO                         = 0xD4F8;
+    constexpr unsigned int mmGC_ATC_L2_PERFCOUNTER_RSLT_CNTL                  = 0xDD46;
+    constexpr unsigned int mmRPB_PERFCOUNTER0_CFG                             = 0x0CE8;
+    constexpr unsigned int mmRPB_PERFCOUNTER1_CFG                             = 0x0CE9;
+    constexpr unsigned int mmRPB_PERFCOUNTER2_CFG                             = 0x0CEA;
+    constexpr unsigned int mmRPB_PERFCOUNTER3_CFG                             = 0x0CEB;
+    constexpr unsigned int mmRPB_PERFCOUNTER_HI                               = 0x0CEE;
+    constexpr unsigned int mmRPB_PERFCOUNTER_LO                               = 0x0CEF;
+    constexpr unsigned int mmRPB_PERFCOUNTER_RSLT_CNTL                        = 0x0CEC;
+    constexpr unsigned int mmRPB_PERF_COUNTER_CNTL                            = 0x0CED;
+} // namespace Apu11
+#endif
+
 namespace Core
 {
     constexpr unsigned int mmDB_RING_CONTROL                                  = 0x261B;
@@ -2513,7 +2544,7 @@ namespace Gfx103PlusExclusive
     constexpr unsigned int mmSX_PS_DOWNCONVERT_CONTROL                        = 0xA1D4;
 } // namespace Gfx103PlusExclusive
 
-#if CHIP_HDR_NAVI31
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 namespace Gfx104Plus
 {
     constexpr unsigned int mmGE_RATE_CNTL_1                                   = 0x2254;
@@ -2992,7 +3023,7 @@ namespace Gfx10Vrs
     constexpr unsigned int mmRLC_SPM_SE_MUXSEL_ADDR_OFFSET                    = 0xDCA8;
 } // namespace Gfx10Vrs
 
-#if CHIP_HDR_NAVI31
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 namespace Gfx11
 {
     constexpr unsigned int mmCB_DCC_CONFIG2                                   = 0x268B;
@@ -5225,7 +5256,21 @@ namespace Nv31
 } // namespace Nv31
 #endif
 
-#if CHIP_HDR_NAVI31
+#if CHIP_HDR_NAVI33
+namespace Nv33
+{
+    constexpr unsigned int mmRPB_PERFCOUNTER0_CFG                             = 0x0C80;
+    constexpr unsigned int mmRPB_PERFCOUNTER1_CFG                             = 0x0C81;
+    constexpr unsigned int mmRPB_PERFCOUNTER2_CFG                             = 0x0C82;
+    constexpr unsigned int mmRPB_PERFCOUNTER3_CFG                             = 0x0C83;
+    constexpr unsigned int mmRPB_PERFCOUNTER_HI                               = 0x0C86;
+    constexpr unsigned int mmRPB_PERFCOUNTER_LO                               = 0x0C87;
+    constexpr unsigned int mmRPB_PERFCOUNTER_RSLT_CNTL                        = 0x0C84;
+    constexpr unsigned int mmRPB_PERF_COUNTER_CNTL                            = 0x0C85;
+} // namespace Nv33
+#endif
+
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
 namespace Nv3x
 {
     constexpr unsigned int mmCHCG_PERFCOUNTER0_HI                             = 0xD3C9;
@@ -5298,6 +5343,45 @@ namespace Oss50
     constexpr unsigned int mmSDMA1_PERFCOUNTER_TAG_DELAY_RANGE                = 0x18BA;
     constexpr unsigned int mmSDMA1_PERFMON_CNTL                               = 0x18B7;
 } // namespace Oss50
+
+#if CHIP_HDR_PHOENIX1
+namespace Phx1
+{
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtlHi0                         = 0x12400C81;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtlHi1                         = 0x12400C83;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtlHi2                         = 0x12400C85;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtlHi3                         = 0x12400C87;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtlHi4                         = 0x12400C89;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtlHi5                         = 0x12400C8B;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtlHi6                         = 0x12400C8D;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtlHi7                         = 0x12400C8F;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtlLo0                         = 0x12400C80;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtlLo1                         = 0x12400C82;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtlLo2                         = 0x12400C84;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtlLo3                         = 0x12400C86;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtlLo4                         = 0x12400C88;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtlLo5                         = 0x12400C8A;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtlLo6                         = 0x12400C8C;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtlLo7                         = 0x12400C8E;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtrHi0                         = 0x12400CC1;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtrHi1                         = 0x12400CC3;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtrHi2                         = 0x12400CC5;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtrHi3                         = 0x12400CC7;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtrHi4                         = 0x12400CC9;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtrHi5                         = 0x12400CCB;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtrHi6                         = 0x12400CCD;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtrHi7                         = 0x12400CCF;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtrLo0                         = 0x12400CC0;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtrLo1                         = 0x12400CC2;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtrLo2                         = 0x12400CC4;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtrLo3                         = 0x12400CC6;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtrLo4                         = 0x12400CC8;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtrLo5                         = 0x12400CCA;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtrLo6                         = 0x12400CCC;
+    constexpr unsigned int mmDF_PIE_AON_PerfMonCtrLo7                         = 0x12400CCE;
+    constexpr unsigned int mmMP1_SMN_FPS_CNT                                  = 0x162C4;
+} // namespace Phx1
+#endif
 
 namespace Raphael
 {

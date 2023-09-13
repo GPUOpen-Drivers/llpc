@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 
+#include "lgccps/LgcCpsDialect.h"
 #include "lgc/ElfLinker.h"
 #include "lgc/LgcContext.h"
 #include "lgc/LgcDialect.h"
@@ -144,9 +145,6 @@ static bool runPassPipeline(Pipeline &pipeline, Module &module, raw_pwrite_strea
   passMgr->registerModuleAnalysis([&] { return PipelineStateWrapper(static_cast<PipelineState *>(&pipeline)); });
   Patch::registerPasses(*passMgr);
 
-  // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
-  lgcContext->preparePassManager(*passMgr);
-
   PassBuilder passBuilder(lgcContext->getTargetMachine(), PipelineTuningOptions(), {},
                           &passMgr->getInstrumentationCallbacks());
   Patch::registerPasses(passBuilder);
@@ -159,6 +157,7 @@ static bool runPassPipeline(Pipeline &pipeline, Module &module, raw_pwrite_strea
   // This mode of the tool is only ever used for development and testing, so unconditionally run the verifier on the
   // final output.
   passMgr->addPass(VerifierPass());
+  passMgr->addPass(PipelineStateRecorder());
 
   switch (codegen::getFileType()) {
   case CGFT_AssemblyFile:
@@ -185,7 +184,7 @@ int main(int argc, char **argv) {
   LgcContext::initialize();
 
   LLVMContext context;
-  auto dialectContext = llvm_dialects::DialectContext::make<LgcDialect>(context);
+  auto dialectContext = llvm_dialects::DialectContext::make<LgcDialect, lgc::cps::LgcCpsDialect>(context);
 
   // Set our category on options that we want to show in -help, and hide other options.
   auto opts = cl::getRegisteredOptions();
@@ -354,7 +353,10 @@ int main(int argc, char **argv) {
       // Set the triple and data layout, so you can write tests without bothering to specify them.
       TargetMachine *targetMachine = lgcContext->getTargetMachine();
       module->setTargetTriple(targetMachine->getTargetTriple().getTriple());
-      module->setDataLayout(targetMachine->createDataLayout());
+      std::string dataLayoutStr = targetMachine->createDataLayout().getStringRepresentation();
+      // continuation stack address space.
+      dataLayoutStr = dataLayoutStr + "-p" + std::to_string(cps::stackAddrSpace) + ":32:32";
+      module->setDataLayout(dataLayoutStr);
 
       // Determine whether we are outputting to a file.
       bool outputToFile = OutFileName != "-";

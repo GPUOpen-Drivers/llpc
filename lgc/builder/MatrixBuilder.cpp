@@ -65,7 +65,7 @@ Value *BuilderImpl::CreateTransposeMatrix(Value *const matrix, const Twine &inst
   SmallVector<Value *, 4> newColumns;
 
   for (unsigned row = 0; row < rowCount; row++)
-    newColumns.push_back(UndefValue::get(newColumnVectorType));
+    newColumns.push_back(PoisonValue::get(newColumnVectorType));
 
   for (unsigned column = 0; column < columnCount; column++) {
     for (unsigned row = 0; row < rowCount; row++) {
@@ -74,7 +74,7 @@ Value *BuilderImpl::CreateTransposeMatrix(Value *const matrix, const Twine &inst
     }
   }
 
-  Value *newMatrix = UndefValue::get(newMatrixType);
+  Value *newMatrix = PoisonValue::get(newMatrixType);
 
   for (unsigned row = 0; row < rowCount; row++)
     newMatrix = CreateInsertValue(newMatrix, newColumns[row], row);
@@ -96,7 +96,7 @@ Value *BuilderImpl::CreateMatrixTimesScalar(Value *const matrix, Value *const sc
   unsigned columnCount = matrixTy->getArrayNumElements();
   auto smearScalar = CreateVectorSplat(rowCount, scalar);
 
-  Value *result = UndefValue::get(matrixTy);
+  Value *result = PoisonValue::get(matrixTy);
   for (unsigned column = 0; column < columnCount; column++) {
     auto columnVector = CreateExtractValue(matrix, column);
     columnVector = CreateFMul(columnVector, smearScalar);
@@ -118,7 +118,7 @@ Value *BuilderImpl::CreateVectorTimesMatrix(Value *const vector, Value *const ma
   Type *const compTy = cast<VectorType>(cast<ArrayType>(matrixTy)->getElementType())->getElementType();
   const unsigned columnCount = matrixTy->getArrayNumElements();
   Type *const resultTy = FixedVectorType::get(compTy, columnCount);
-  Value *result = UndefValue::get(resultTy);
+  Value *result = PoisonValue::get(resultTy);
 
   for (unsigned column = 0; column < columnCount; column++) {
     auto columnVector = CreateExtractValue(matrix, column);
@@ -164,7 +164,7 @@ Value *BuilderImpl::CreateMatrixTimesMatrix(Value *const matrix1, Value *const m
   Type *const mat1ColumnType = matrix1->getType()->getArrayElementType();
   const unsigned mat2ColCount = matrix2->getType()->getArrayNumElements();
   Type *const resultTy = ArrayType::get(mat1ColumnType, mat2ColCount);
-  Value *result = UndefValue::get(resultTy);
+  Value *result = PoisonValue::get(resultTy);
 
   for (unsigned i = 0; i < mat2ColCount; ++i) {
     Value *newColumnVector = CreateMatrixTimesVector(matrix1, CreateExtractValue(matrix2, i));
@@ -185,7 +185,7 @@ Value *BuilderImpl::CreateOuterProduct(Value *const vector1, Value *const vector
   const unsigned rowCount = cast<FixedVectorType>(vector1->getType())->getNumElements();
   const unsigned colCount = cast<FixedVectorType>(vector2->getType())->getNumElements();
   Type *const resultTy = ArrayType::get(vector1->getType(), colCount);
-  Value *result = UndefValue::get(resultTy);
+  Value *result = PoisonValue::get(resultTy);
 
   for (unsigned i = 0; i < colCount; ++i) {
     SmallVector<int, 4> shuffleIdx(rowCount, i);
@@ -331,9 +331,9 @@ Value *BuilderImpl::CreateMatrixInverse(Value *const matrix, const Twine &instNa
   }
 
   // Create the result matrix.
-  Value *result = UndefValue::get(matrix->getType());
+  Value *result = PoisonValue::get(matrix->getType());
   for (unsigned columnIdx = 0; columnIdx != order; ++columnIdx) {
-    Value *column = UndefValue::get(matrix->getType()->getArrayElementType());
+    Value *column = PoisonValue::get(matrix->getType()->getArrayElementType());
     for (unsigned rowIdx = 0; rowIdx != order; ++rowIdx)
       column = CreateInsertElement(column, resultElements[rowIdx + columnIdx * order], rowIdx);
     result = CreateInsertValue(result, column, columnIdx);

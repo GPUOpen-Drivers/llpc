@@ -139,7 +139,6 @@ void SpirvLowerTranslator::translateSpirvToLlvm(const PipelineShaderInfo *shader
       continue;
 
     if (func.getDLLStorageClass() == GlobalValue::DLLExportStorageClass) {
-#if VKI_RAY_TRACING
       // A ray-tracing shader stage does not count as an LGC shader stage, as they are all linked into
       // a compute shader or compute library. For those, remove the dllexport, and leave as external.
       if (entryStage > ShaderStageCompute) {
@@ -147,7 +146,7 @@ void SpirvLowerTranslator::translateSpirvToLlvm(const PipelineShaderInfo *shader
         func.setLinkage(GlobalValue::ExternalLinkage);
         continue;
       }
-#endif
+
       lgc::Pipeline::markShaderEntryPoint(&func, getLgcShaderStage(entryStage));
       continue;
     }

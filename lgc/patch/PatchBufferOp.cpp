@@ -197,6 +197,7 @@ void BufferOpLowering::registerVisitors(llvm_dialects::VisitorBuilder<BufferOpLo
   builder.add(&BufferOpLowering::visitPhiInst);
   builder.add(&BufferOpLowering::visitStoreInst);
   builder.add(&BufferOpLowering::visitICmpInst);
+  builder.addIntrinsic(Intrinsic::invariant_start, &BufferOpLowering::visitInvariantStart);
 }
 
 // =====================================================================================================================
@@ -289,7 +290,6 @@ BufferOpLowering::DescriptorInfo BufferOpLowering::getDescriptorInfo(Value *desc
 
     current = searchWorklist.pop_back_val();
   }
-
   // Fixed-point iteration to propagate "variant" and "divergent" flags.
   while (!propagationWorklist.empty()) {
     current = propagationWorklist.pop_back_val();
@@ -418,7 +418,7 @@ void BufferOpLowering::visitAtomicCmpXchgInst(AtomicCmpXchgInst &atomicCmpXchgIn
     }
     }
 
-    Value *resultValue = UndefValue::get(atomicCmpXchgInst.getType());
+    Value *resultValue = PoisonValue::get(atomicCmpXchgInst.getType());
 
     resultValue = m_builder.CreateInsertValue(resultValue, atomicCall, static_cast<uint64_t>(0));
     copyMetadata(resultValue, &atomicCmpXchgInst);
@@ -663,7 +663,7 @@ void BufferOpLowering::visitBufferDescToPtr(BufferDescToPtrOp &descToPtr) {
   m_typeLowering.replaceInstruction(&descToPtr, {descToPtr.getDesc(), nullPointer});
 
   auto &di = m_descriptors[descToPtr.getDesc()];
-  di.invariant = removeUsersForInvariantStarts(&descToPtr);
+
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
   // Old version of the code
   di.divergent = m_uniformityInfo.isDivergent(*descToPtr.getDesc());
@@ -961,6 +961,23 @@ void BufferOpLowering::visitICmpInst(ICmpInst &icmpInst) {
 }
 
 // =====================================================================================================================
+// Visits invariant start intrinsic.
+//
+// @param intrinsic : The intrinsic
+void BufferOpLowering::visitInvariantStart(llvm::IntrinsicInst &intrinsic) {
+  Value *ptr = intrinsic.getArgOperand(1);
+  if (ptr->getType()->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
+    return;
+
+  auto values = m_typeLowering.getValue(ptr);
+  Value *desc = values[0];
+
+  m_descriptors[desc].invariant = true;
+
+  m_typeLowering.eraseInstruction(&intrinsic);
+}
+
+// =====================================================================================================================
 // Post-process visits "memcpy" instruction.
 //
 // @param memCpyInst : The memcpy instruction
@@ -1189,7 +1206,7 @@ Value *BufferOpLowering::getBaseAddressFromBufferDesc(Value *const bufferDesc) {
   Type *const descType = bufferDesc->getType();
 
   // Get the base address of our buffer by extracting the two components with the 48-bit address, and masking.
-  Value *baseAddr = m_builder.CreateShuffleVector(bufferDesc, UndefValue::get(descType), ArrayRef<int>{0, 1});
+  Value *baseAddr = m_builder.CreateShuffleVector(bufferDesc, PoisonValue::get(descType), ArrayRef<int>{0, 1});
   Value *const baseAddrMask = ConstantVector::get({m_builder.getInt32(0xFFFFFFFF), m_builder.getInt32(0xFFFF)});
   baseAddr = m_builder.CreateAnd(baseAddr, baseAddrMask);
   baseAddr = m_builder.CreateBitCast(baseAddr, m_builder.getInt64Ty());
@@ -1219,38 +1236,6 @@ void BufferOpLowering::copyMetadata(Value *const dest, const Value *const src) c
 
   for (auto metaNode : allMetaNodes)
     destInst->setMetadata(metaNode.first, metaNode.second);
-}
-
-// =====================================================================================================================
-// Remove any users that are invariant starts, returning if any were removed.
-//
-// @param value : The value to check the users of.
-bool BufferOpLowering::removeUsersForInvariantStarts(Value *const value) {
-  bool modified = false;
-
-  for (User *const user : value->users()) {
-    if (BitCastInst *const bitCast = dyn_cast<BitCastInst>(user)) {
-      // Remove any users of the bitcast too.
-      if (removeUsersForInvariantStarts(bitCast))
-        modified = true;
-    } else {
-      IntrinsicInst *const intrinsic = dyn_cast<IntrinsicInst>(user);
-
-      // If the user isn't an intrinsic, bail.
-      if (!intrinsic)
-        continue;
-
-      // If the intrinsic is not an invariant load, bail.
-      if (intrinsic->getIntrinsicID() != Intrinsic::invariant_start)
-        continue;
-
-      // Remember the intrinsic because we will want to delete it.
-      m_typeLowering.eraseInstruction(intrinsic);
-      modified = true;
-    }
-  }
-
-  return modified;
 }
 
 // =====================================================================================================================
@@ -1376,7 +1361,7 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
     Type *storeTy = storeValue->getType();
     if (storeTy->isArrayTy()) {
       const unsigned elemCount = cast<ArrayType>(storeTy)->getNumElements();
-      Value *castValue = UndefValue::get(castType);
+      Value *castValue = PoisonValue::get(castType);
       for (unsigned elemIdx = 0; elemIdx != elemCount; ++elemIdx) {
         Value *elem = m_builder.CreateExtractValue(storeValue, elemIdx);
         elem = m_builder.CreateBitCast(elem, smallestType);
@@ -1467,7 +1452,7 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
     } else {
       // Store
       unsigned compCount = accessSize / smallestByteSize;
-      part = UndefValue::get(FixedVectorType::get(smallestType, compCount));
+      part = PoisonValue::get(FixedVectorType::get(smallestType, compCount));
 
       for (unsigned i = 0; i < compCount; i++) {
         Value *const storeElem = m_builder.CreateExtractElement(storeValue, storeIndex++);
@@ -1494,7 +1479,7 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
       newInst = parts.front();
     } else {
       // And create an undef vector whose total size is the number of bytes we loaded.
-      newInst = UndefValue::get(FixedVectorType::get(smallestType, bytesToHandle / smallestByteSize));
+      newInst = PoisonValue::get(FixedVectorType::get(smallestType, bytesToHandle / smallestByteSize));
 
       unsigned index = 0;
 

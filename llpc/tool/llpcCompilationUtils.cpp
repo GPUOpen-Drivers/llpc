@@ -145,7 +145,6 @@ static ShaderStage sourceLangToShaderStage(SpvGenStage sourceLang) {
     return ShaderStage::ShaderStageFragment;
   case SpvGenStageCompute:
     return ShaderStage::ShaderStageCompute;
-#if VKI_RAY_TRACING
   case SpvGenStageRayTracingRayGen:
     return ShaderStage::ShaderStageRayTracingRayGen;
   case SpvGenStageRayTracingIntersect:
@@ -158,7 +157,6 @@ static ShaderStage sourceLangToShaderStage(SpvGenStage sourceLang) {
     return ShaderStage::ShaderStageRayTracingMiss;
   case SpvGenStageRayTracingCallable:
     return ShaderStage::ShaderStageRayTracingCallable;
-#endif
   default:
     llvm_unreachable("Unexpected shading language type!");
     return ShaderStage::ShaderStageInvalid;
@@ -233,7 +231,7 @@ Expected<BinaryData> compileGlsl(const std::string &inFilename, ShaderStage *sta
 
   void *program = nullptr;
   const char *log = nullptr;
-  int compileOption = SpvGenOptionDefaultDesktop | SpvGenOptionVulkanRules | SpvGenOptionDebug;
+  int compileOption = SpvGenOptionDefaultDesktop | SpvGenOptionVulkanRules;
   compileOption |= isHlsl ? SpvGenOptionReadHlsl : 0;
   const char *entryPoints[] = {defaultEntryTarget.c_str()};
   bool compileResult = spvCompileAndLinkProgramEx(1, &lang, &sourceStringCount, sourceList, fileList,
@@ -385,9 +383,7 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
 
   compileInfo.compPipelineInfo = pipelineState->compPipelineInfo;
   compileInfo.gfxPipelineInfo = pipelineState->gfxPipelineInfo;
-#if VKI_RAY_TRACING
   compileInfo.rayTracePipelineInfo = pipelineState->rayPipelineInfo;
-#endif
   compileInfo.pipelineType = pipelineState->pipelineType;
 
   if (ignoreColorAttachmentFormats) {
@@ -417,14 +413,13 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
                          Twine(getShaderStageName(pipelineState->stages[stage].stage)) + " shader module");
     }
   }
-#if VKI_RAY_TRACING
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   const BinaryData *shaderLibrary = nullptr;
-  if (pipelineState->pipelineType == VfxPipelineTypeRayTracing)
+  if (pipelineState->pipelineType == VfxPipelineTypeRayTracing) {
     shaderLibrary = &pipelineState->rayPipelineInfo.shaderTraceRay;
-  else if (pipelineState->pipelineType == VfxPipelineTypeCompute)
+  } else if (pipelineState->pipelineType == VfxPipelineTypeCompute)
     shaderLibrary = &pipelineState->compPipelineInfo.shaderLibrary;
-#endif
-#if VKI_RAY_TRACING
   else {
     assert(pipelineState->pipelineType == VfxPipelineTypeGraphics);
     shaderLibrary = &pipelineState->gfxPipelineInfo.shaderLibrary;

@@ -18,7 +18,7 @@ void main()
 ; SHADERTEST: {{.*}} OpImageFetch {{.*}} Lod|ConstOffset {{.*}}
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}}  SPIR-V lowering results
-; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i32 0, i32 0
+; SHADERTEST: call {{.*}} @lgc.create.get.desc.ptr.p4(i32 1, i32 1, i64 0, i32 0
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.v4f32(i32 1, i32 1536, {{.*}}, i32 2)
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results

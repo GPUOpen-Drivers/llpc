@@ -66,6 +66,12 @@ namespace SPIRV {
 class SPIRVLoopMerge;
 class SPIRVToLLVMDbgTran;
 
+enum class LayoutMode : uint8_t {
+  Native = 0,   ///< Using native LLVM layout rule
+  Explicit = 1, ///< Using layout decorations(like offset) from SPIRV
+  Std430 = 2,   ///< Using std430 layout rule
+};
+
 class SPIRVToLLVM {
 public:
   SPIRVToLLVM(Module *llvmModule, SPIRVModule *theSpirvModule, const SPIRVSpecConstMap &theSpecConstMap,
@@ -77,10 +83,10 @@ public:
   void updateDebugLoc(SPIRVValue *bv, Function *f);
 
   Type *transType(SPIRVType *bt, unsigned matrixStride = 0, bool columnMajor = true, bool parentIsPointer = false,
-                  bool explicitlyLaidOut = false);
+                  LayoutMode layout = LayoutMode::Native);
   template <spv::Op>
   Type *transTypeWithOpcode(SPIRVType *bt, unsigned matrixStride, bool columnMajor, bool parentIsPointer,
-                            bool explicitlyLaidOut);
+                            LayoutMode layout);
   std::vector<Type *> transTypeVector(const std::vector<SPIRVType *> &);
   bool translate(ExecutionModel entryExecModel, const char *entryName);
   bool transAddressingModel();
@@ -104,7 +110,7 @@ public:
   bool checkContains64BitType(SPIRVType *bt);
   Constant *buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecorate &inOutDec, Type *&metaTy);
   Constant *buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecorate &blockDec, Type *&mdTy,
-                                     bool deriveStride = false);
+                                     SPIRVStorageClassKind storageClass);
   unsigned calcShaderBlockSize(SPIRVType *bt, unsigned blockSize, unsigned matrixStride, bool isRowMajor);
   Value *transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb);
   Value *flushDenorm(Value *val);
@@ -195,6 +201,9 @@ public:
   bool postProcessRowMajorMatrix();
   Value *getTranslatedValue(SPIRVValue *bv);
 
+  // Create !lgc.xfb.state metadata
+  void createXfbMetadata();
+
 private:
   class SPIRVTypeContext {
     SPIRVWord m_typeId;
@@ -202,12 +211,11 @@ private:
     uint8_t m_predicates;
 
   public:
-    SPIRVTypeContext(SPIRVType *type, uint32_t matrixStride, bool columnMajor, bool isParentPointer,
-                     bool isExplicitlyLaidOut)
+    SPIRVTypeContext(SPIRVType *type, uint32_t matrixStride, bool columnMajor, bool isParentPointer, LayoutMode layout)
         : m_typeId(type->getId()), m_matrixStride(matrixStride), m_predicates(0) {
       m_predicates |= uint8_t(columnMajor);
       m_predicates |= uint8_t(isParentPointer << 1);
-      m_predicates |= uint8_t(isExplicitlyLaidOut << 2);
+      m_predicates |= uint8_t((uint8_t)layout << 2);
     }
 
     // Tuple representation to make it easily hashable.
@@ -284,15 +292,14 @@ private:
   lgc::Builder *getBuilder() const { return m_builder; }
 
   // Perform type translation for uncached types. Used in `transType`. Returns the new LLVM type.
-  Type *transTypeImpl(SPIRVType *bt, unsigned matrixStride, bool columnMajor, bool parentIsPointer,
-                      bool explicitlyLaidOut);
+  Type *transTypeImpl(SPIRVType *bt, unsigned matrixStride, bool columnMajor, bool parentIsPointer, LayoutMode layout);
 
   Type *mapType(SPIRVType *bt, Type *t) {
     m_typeMap[bt] = t;
     return t;
   }
 
-  Type *getPointeeType(SPIRVValue *v);
+  Type *getPointeeType(SPIRVValue *v, LayoutMode layout = LayoutMode::Native);
 
   Type *tryGetAccessChainRetType(SPIRVValue *v) {
     auto loc = m_accessChainRetTypeMap.find(v);
@@ -390,6 +397,8 @@ private:
                                              const std::function<Value *(Value *)> &createImageOp);
 
   Function *createLibraryEntryFunc();
+
+  Value *createTraceRayDialectOp(SPIRVValue *const spvValue);
 
   // ========================================================================================================================
   // Wrapper method for easier access to pipeline options.

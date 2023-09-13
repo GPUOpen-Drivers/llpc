@@ -94,8 +94,7 @@ bool PatchInitializeWorkgroupMemory::runImpl(Module &module, PipelineShadersResu
   m_shaderStage = ShaderStageCompute;
   m_entryPoint = pipelineShaders.getEntryPoint(static_cast<ShaderStage>(m_shaderStage));
   BuilderBase builder(*m_context);
-  Instruction *insertPos = &*m_entryPoint->front().getFirstInsertionPt();
-  builder.SetInsertPoint(insertPos);
+  builder.SetInsertPointPastAllocas(m_entryPoint);
 
   // Fill the map of each variable with zeroinitializer and calculate its corresponding offset on LDS
   unsigned offset = 0;
@@ -135,7 +134,7 @@ bool PatchInitializeWorkgroupMemory::runImpl(Module &module, PipelineShadersResu
 // @param lds : The LDS variable to be initialized
 // @param builder : BuilderBase to use for instruction constructing
 void PatchInitializeWorkgroupMemory::initializeWithZero(GlobalVariable *lds, BuilderBase &builder) {
-  auto entryInsertPos = &*m_entryPoint->front().getFirstInsertionPt();
+  auto entryInsertPos = &*m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
   auto originBlock = entryInsertPos->getParent();
   auto endInitBlock = originBlock->splitBasicBlock(entryInsertPos);
   endInitBlock->setName(".endInit");
@@ -156,7 +155,7 @@ void PatchInitializeWorkgroupMemory::initializeWithZero(GlobalVariable *lds, Bui
     assert(localInvocationId->getType() == builder.getInt32Ty());
 
     static constexpr unsigned LocalInvocationIdPackMask = 0x3FF;
-    Value *unpackedLocalInvocationId = UndefValue::get(FixedVectorType::get(builder.getInt32Ty(), 3));
+    Value *unpackedLocalInvocationId = PoisonValue::get(FixedVectorType::get(builder.getInt32Ty(), 3));
 
     // X = PackedId[9:0]
     unpackedLocalInvocationId = builder.CreateInsertElement(
@@ -242,7 +241,11 @@ void PatchInitializeWorkgroupMemory::initializeWithZero(GlobalVariable *lds, Bui
     builder.SetInsertPoint(&*endInitBlock->getFirstInsertionPt());
     SyncScope::ID workgroupScope = m_context->getOrInsertSyncScopeID("workgroup");
     builder.CreateFence(AtomicOrdering::Release, workgroupScope);
-    builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
+      builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+    } else {
+      llvm_unreachable("Not implemented!");
+    }
     builder.CreateFence(AtomicOrdering::Acquire, workgroupScope);
   }
 }

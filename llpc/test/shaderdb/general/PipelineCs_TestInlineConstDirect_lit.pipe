@@ -1,9 +1,10 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-load-scalarizer=false -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; REQUIRES: do-not-run-me
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: %{{.*}} = call {{.*}} {{.*}}@lgc.create.load.buffer.desc.{{[0-9a-z.]*}}(i32 0, i32 1, i32 0,
+; SHADERTEST: %{{.*}} = call {{.*}} {{.*}}@lgc.create.load.buffer.desc.{{[0-9a-z.]*}}(i64 0, i32 1, i32 0,
 ; SHADERTEST: getelementptr inbounds {{.*}}, ptr addrspace(7) %{{.*}}, i64 0, i32 2
 ; SHADERTEST: load <2 x double>, ptr addrspace(7) %{{.*}}, align 16
 

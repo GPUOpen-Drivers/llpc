@@ -31,6 +31,7 @@
 #pragma once
 
 #include "lgc/patch/Patch.h"
+#include "lgc/patch/SystemValues.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/util/BuilderBase.h"
@@ -56,8 +57,6 @@ private:
   llvm::Value *loadValueFromGsVsRing(llvm::Type *loadTy, unsigned location, unsigned component, unsigned streamId,
                                      BuilderBase &builder);
 
-  llvm::Value *loadGsVsRingBufferDescriptor(BuilderBase &builder);
-
   void exportGenericOutput(llvm::Value *outputValue, unsigned location, BuilderBase &builder);
   void exportXfbOutput(llvm::Value *outputValue, const XfbOutInfo &XfbOutInfo, BuilderBase &builder);
   void exportBuiltInOutput(llvm::Value *outputValue, BuiltInKind builtInId, unsigned streamId, BuilderBase &builder);
@@ -65,11 +64,13 @@ private:
   // Low part of global internal table pointer
   static const unsigned EntryArgIdxInternalTablePtrLow = 0;
 
-  PipelineState *m_pipelineState;                                             // Pipeline state
-  llvm::GlobalVariable *m_lds = nullptr;                                      // Global variable representing LDS
-  llvm::Value *m_gsVsRingBufDesc = nullptr;                                   // Descriptor for GS-VS ring
-  llvm::DenseMap<unsigned, unsigned> m_newLocByteSizesMapArray[MaxGsStreams]; // The byte sizes of the output value at
-                                                                              // the mapped location for each stream
+  PipelineState *m_pipelineState = nullptr; // Pipeline state
+  PipelineSystemValues m_pipelineSysValues; // Cache of ShaderSystemValues objects
+  llvm::GlobalVariable *m_lds = nullptr;    // Global variable representing LDS
+
+  llvm::DenseMap<unsigned, llvm::DenseMap<unsigned, unsigned>>
+      m_outputLocCompSizeMap[MaxGsStreams]; // The dword size of the output value at the new mapped <location,
+                                            // component> for each stream
 };
 
 } // namespace lgc

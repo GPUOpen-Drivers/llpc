@@ -115,6 +115,112 @@ private:
 };
 
 // =====================================================================================================================
+// Represents one entry in a default uniform constant map
+class SectionUniformConstantMapEntry : public Section {
+public:
+  typedef Vkgc::UniformConstantMapEntry SubState;
+
+  SectionUniformConstantMapEntry()
+      : Section(getAddrTable(), SectionTypeUniformConstantMapEntry, "UniformConstantMapEntry") {
+    memset(&m_state, 0, sizeof(m_state));
+  }
+
+  SubState &getSubStateRef() { return m_state; }
+
+  void getSubState(SubState &state) { state = m_state; }
+
+private:
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionUniformConstantMapEntry, location, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionUniformConstantMapEntry, offset, MemberTypeInt, false);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
+  SubState m_state;
+};
+
+// =====================================================================================================================
+// Represents one default uniform constant map
+class SectionUniformConstantMap : public Section {
+public:
+  typedef Vkgc::UniformConstantMap SubState;
+
+  SectionUniformConstantMap() : Section(getAddrTable(), SectionTypeUniformConstantMap, "UniformConstantMap") {
+    memset(&m_state, 0, sizeof(m_state));
+  }
+  SubState &getSubStateRef() { return m_state; }
+
+  void getSubState(SubState &state) {
+    m_uniformConstantsData.resize(m_uniformConstants.size());
+    for (unsigned i = 0; i < m_uniformConstants.size(); i++) {
+      auto &s = m_uniformConstants[i];
+      s.getSubState(m_uniformConstantsData[i]);
+    }
+    m_state.numUniformConstants = m_uniformConstants.size();
+    m_state.pUniforms = m_uniformConstantsData.data();
+    state = m_state;
+  }
+
+private:
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionUniformConstantMap, visibility, MemberTypeInt, false);
+      INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionUniformConstantMap, m_uniformConstants,
+                                        MemberTypeUniformConstantMapEntry, true);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
+  SubState m_state;
+  std::vector<SectionUniformConstantMapEntry> m_uniformConstants;
+  std::vector<SectionUniformConstantMapEntry::SubState> m_uniformConstantsData;
+};
+
+// =====================================================================================================================
+// Represents default uniform constant map information in one pipeline
+class SectionUniformConstant : public Section {
+public:
+  typedef UniformConstantState SubState;
+
+  SectionUniformConstant() : Section(getAddrTable(), SectionTypeUniformConstant, "UniformConstant") {
+    memset(&m_state, 0, sizeof(m_state));
+  }
+  SubState &getSubStateRef() { return m_state; }
+
+  void getSubState(SubState &state) {
+    m_uniformConstantMapData.resize(m_uniformConstantMaps.size());
+    for (unsigned i = 0; i < m_uniformConstantMaps.size(); i++) {
+      auto &s = m_uniformConstantMaps[i];
+      s.getSubState(m_uniformConstantMapData[i]);
+      m_uniformConstantMapPtr.push_back(&m_uniformConstantMapData[i]);
+    }
+    m_state.numUniformConstantMaps = m_uniformConstantMaps.size();
+    m_state.uniformMaps = m_uniformConstantMapPtr.data();
+    state = m_state;
+  }
+
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionUniformConstant, m_uniformConstantMaps, MemberTypeUniformConstantMap,
+                                        true);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
+
+private:
+  SubState m_state;
+  std::vector<SectionUniformConstantMap> m_uniformConstantMaps;
+  std::vector<Vkgc::UniformConstantMap *> m_uniformConstantMapPtr;
+  std::vector<Vkgc::UniformConstantMap> m_uniformConstantMapData;
+};
+
+// =====================================================================================================================
 // Represents the sub section shader option
 class SectionShaderOption : public Section {
 public:
@@ -146,7 +252,6 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, useSiScheduler, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableCodeSinking, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, favorLatencyHiding, MemberTypeBool, false);
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, updateDescInElf, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, allowVaryWaveSize, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, enableLoadScalarizer, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableLicm, MemberTypeBool, false);
@@ -170,6 +275,8 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, workaroundStorageImageFormats, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, workaroundInitializeOutputsToZero, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableFMA, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, backwardPropagateNoContract, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forwardPropagateNoContract, MemberTypeBool, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -377,13 +484,13 @@ private:
       INIT_MEMBER_NAME_TO_ADDR(SectionPipelineOption, m_extendedRobustness, MemberTypeExtendedRobustness, true);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, forceNonUniformResourceIndexStageMask, MemberTypeInt,
                                      false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enableImplicitInvariantExports, MemberTypeBool, false);
       // One internal member
-#if VKI_RAY_TRACING
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, internalRtShaders, MemberTypeBool, false);
-#endif
-#if VKI_BUILD_GFX11
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, optimizeTessFactor, MemberTypeBool, false);
-#endif
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, replaceSetWithResourceType, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, disableSampleMask, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, buildResourcesDataForShaderModule, MemberTypeBool, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -430,7 +537,6 @@ private:
   SubState m_state;
 };
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Represents the sub section IndirectCalleeSavedRegs state
 class SectionIndirectCalleeSavedRegs : public Section {
@@ -570,18 +676,33 @@ public:
   typedef Vkgc::RtState SubState;
   SectionRtState() : Section(getAddrTable(), SectionTypeUnset, "rtState") { memset(&m_state, 0, sizeof(m_state)); }
 
-  void getSubState(SubState &state) {
+  void getSubState(const std::string &docFilename, SubState &state, std::string *errorMsg) {
     state = m_state;
     state.bvhResDesc.dataSizeInDwords = m_bvhResDescSize;
     for (unsigned i = 0; i < m_bvhResDesc.size(); ++i)
       state.bvhResDesc.descriptorData[i] = m_bvhResDesc[i];
     m_exportConfig.getSubState(state.exportConfig);
     m_gpurtFuncTable.getSubState(state.gpurtFuncTable);
+
+    if (!parseRtIpVersion(&state.rtIpVersion)) {
+      PARSE_ERROR(*errorMsg, 0, "Failed to parse rtIpVersion\n");
+    }
+
+    std::string dummySource;
+    if (!m_gpurtShaderLibrary.empty()) {
+      bool ret = readFile(docFilename, m_gpurtShaderLibrary, true, &m_gpurtShaderLibraryBinary, &dummySource, errorMsg);
+      if (ret) {
+        state.gpurtShaderLibrary.codeSize = m_gpurtShaderLibraryBinary.size();
+        state.gpurtShaderLibrary.pCode = &m_gpurtShaderLibraryBinary[0];
+      }
+    }
   }
 
   SubState &getSubStateRef() { return m_state; }
 
 private:
+  bool parseRtIpVersion(Vkgc::RtIpVersion *rtIpVersion);
+
   static StrToMemberAddrArrayRef getAddrTable() {
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
@@ -608,14 +729,17 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableDispatchRaysOuterSwizzle, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, forceInvalidAccelStruct, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableRayTracingCounters, MemberTypeBool, false);
-#if VKI_BUILD_GFX11
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableRayTracingHwTraversalStack, MemberTypeBool, false);
-#endif
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableOptimalLdsStackSizeForIndirect, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, enableOptimalLdsStackSizeForUnified, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, maxRayLength, MemberTypeFloat, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionRtState, m_exportConfig, MemberTypeRayTracingShaderExportConfig, true);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, gpurtFeatureFlags, MemberTypeInt, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionRtState, m_gpurtShaderLibrary, MemberTypeString, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionRtState, m_gpurtFuncTable, MemberTypeGpurtFuncTable, true);
+      INIT_MEMBER_NAME_TO_ADDR(SectionRtState, m_rtIpVersion, MemberTypeString, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, gpurtOverride, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRtState, rtIpOverride, MemberTypeBool, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -623,11 +747,13 @@ private:
 
   SubState m_state;
   SectionRayTracingShaderExportConfig m_exportConfig;
+  std::string m_gpurtShaderLibrary;
+  std::vector<uint8_t> m_gpurtShaderLibraryBinary;
   SectionGpurtFuncTable m_gpurtFuncTable;
-  unsigned m_bvhResDescSize;
+  std::string m_rtIpVersion;
+  unsigned m_bvhResDescSize = 0;
   std::vector<unsigned> m_bvhResDesc;
 };
-#endif
 
 // =====================================================================================================================
 // Represents the section graphics state
@@ -653,9 +779,11 @@ public:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, numSamples, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, pixelShaderSamples, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, samplePatternIdx, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, rasterStream, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, usrClipPlaneMask, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, alphaToCoverageEnable, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, dualSourceBlendEnable, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, dualSourceBlendDynamic, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, switchWinding, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableMultiView, MemberTypeInt, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_options, MemberTypePipelineOption, true);
@@ -666,11 +794,10 @@ public:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, dynamicVertexStride, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableUberFetchShader, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableEarlyCompile, MemberTypeBool, false);
-
-#if VKI_RAY_TRACING
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableColorExportShader, MemberTypeBool, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_shaderLibrary, MemberTypeString, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_rtState, MemberTypeRtState, true);
-#endif
+
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -682,7 +809,8 @@ public:
     m_options.getSubState(m_state.options);
     m_nggState.getSubState(m_state.nggState);
     state = m_state;
-#if VKI_RAY_TRACING
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
     std::string dummySource;
     if (!m_shaderLibrary.empty()) {
       bool ret = readFile(docFilename, m_shaderLibrary, true, &m_shaderLibraryBytes, &dummySource, errorMsg);
@@ -690,9 +818,9 @@ public:
         state.shaderLibrary.codeSize = m_shaderLibraryBytes.size();
         state.shaderLibrary.pCode = &m_shaderLibraryBytes[0];
       }
-      m_rtState.getSubState(state.rtState);
     }
 #endif
+    m_rtState.getSubState(docFilename, state.rtState, errorMsg);
   };
   SubState &getSubStateRef() { return m_state; };
 
@@ -701,11 +829,9 @@ private:
   SubState m_state;
   SectionColorBuffer m_colorBuffer[Vkgc::MaxColorTargets]; // Color buffer
   SectionPipelineOption m_options;
-#if VKI_RAY_TRACING
   std::string m_shaderLibrary;
   std::vector<uint8_t> m_shaderLibraryBytes;
   SectionRtState m_rtState;
-#endif
 };
 
 // =====================================================================================================================
@@ -723,10 +849,9 @@ public:
       std::vector<StrToMemberAddr> addrTableInitializer;
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionComputeState, deviceIndex, MemberTypeInt, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, m_options, MemberTypePipelineOption, true);
-#if VKI_RAY_TRACING
       INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, m_shaderLibrary, MemberTypeString, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionComputeState, m_rtState, MemberTypeRtState, true);
-#endif
+
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -735,7 +860,8 @@ public:
   void getSubState(const std::string &docFilename, SubState &state, std::string *errorMsg) {
     m_options.getSubState(m_state.options);
     state = m_state;
-#if VKI_RAY_TRACING
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
     std::string dummySource;
     if (!m_shaderLibrary.empty()) {
       bool ret = readFile(docFilename, m_shaderLibrary, true, &m_shaderLibraryBytes, &dummySource, errorMsg);
@@ -743,23 +869,20 @@ public:
         state.shaderLibrary.codeSize = m_shaderLibraryBytes.size();
         state.shaderLibrary.pCode = &m_shaderLibraryBytes[0];
       }
-      m_rtState.getSubState(state.rtState);
     }
 #endif
-  };
-  SubState &getSubStateRef() { return m_state; };
+    m_rtState.getSubState(docFilename, state.rtState, errorMsg);
+  }
+  SubState &getSubStateRef() { return m_state; }
 
 private:
   SubState m_state;
   SectionPipelineOption m_options;
-#if VKI_RAY_TRACING
   std::string m_shaderLibrary;
   std::vector<uint8_t> m_shaderLibraryBytes;
   SectionRtState m_rtState;
-#endif
 };
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Represents the section ray tracing state
 class SectionRayTracingState : public Section {
@@ -776,14 +899,18 @@ public:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, deviceIndex, MemberTypeInt, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionRayTracingState, m_options, MemberTypePipelineOption, true);
       INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionRayTracingState, m_groups, MemberTypeShaderGroup, true);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
       INIT_MEMBER_NAME_TO_ADDR(SectionRayTracingState, m_shaderTraceRay, MemberTypeString, false);
+#endif
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, maxRecursionDepth, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, indirectStageMask, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, mode, MemberTypeInt, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionRayTracingState, m_rtState, MemberTypeRtState, true);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, payloadSizeMaxInLib, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, attributeSizeMaxInLib, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, hasPipelineLibrary, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, pipelineLibStageMask, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionRayTracingState, gpurtFeatureFlags, MemberTypeInt, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -797,6 +924,7 @@ public:
       m_groups[i].getSubState(m_vkShaderGroups[i]);
 
     m_state.pShaderGroups = (m_state.shaderGroupCount) > 0 ? &m_vkShaderGroups[0] : nullptr;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
     std::string dummySource;
     if (!m_shaderTraceRay.empty()) {
       bool ret = readFile(docFilename, m_shaderTraceRay, true, &m_traceRayBinary, &dummySource, errorMsg);
@@ -805,7 +933,8 @@ public:
         m_state.shaderTraceRay.pCode = &m_traceRayBinary[0];
       }
     }
-    m_rtState.getSubState(m_state.rtState);
+#endif
+    m_rtState.getSubState(docFilename, m_state.rtState, errorMsg);
     state = m_state;
   };
   SubState &getSubStateRef() { return m_state; };
@@ -814,11 +943,82 @@ private:
   SubState m_state;
   SectionPipelineOption m_options;
   SectionRtState m_rtState;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   std::string m_shaderTraceRay;
+#endif
   std::vector<SectionShaderGroup> m_groups;
   std::vector<VkRayTracingShaderGroupCreateInfoKHR> m_vkShaderGroups;
   std::vector<uint8_t> m_traceRayBinary;
 };
-#endif
+
+// =====================================================================================================================
+// Represents the sub section XfbOutInfo
+class SectionXfbOutInfo : public Section {
+public:
+  typedef Vkgc::XfbOutInfo SubState;
+
+  SectionXfbOutInfo() : Section(getAddrTable(), SectionTypeUnset, "XfbOutInfo") {
+    memset(&m_state, 0, sizeof(m_state));
+  }
+
+  void getSubState(SubState &state) { state = m_state; };
+  SubState &getSubStateRef() { return m_state; };
+
+private:
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionXfbOutInfo, isBuiltIn, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionXfbOutInfo, location, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionXfbOutInfo, component, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionXfbOutInfo, xfbBuffer, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionXfbOutInfo, xfbOffset, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionXfbOutInfo, xfbStride, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionXfbOutInfo, streamId, MemberTypeInt, false);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
+
+  SubState m_state;
+};
+
+// =====================================================================================================================
+// Represents the sub section ApiXfb
+class SectionApiXfbOutput : public Section {
+public:
+  typedef Vkgc::ApiXfbOutData SubState;
+  SectionApiXfbOutput() : Section(getAddrTable(), SectionTypeApiXfbOutput, "ApiXfbOutput") {
+    memset(&m_state, 0, sizeof(m_state));
+  }
+
+  void getSubState(SubState &state) {
+    memset(&state, 0, sizeof(SubState));
+
+    if (m_xfbOutInfo.size() > 0) {
+      state.numXfbOutInfo = static_cast<unsigned>(m_xfbOutInfo.size());
+      m_xfbOutInfoData.resize(state.numXfbOutInfo);
+      for (unsigned i = 0; i < state.numXfbOutInfo; ++i)
+        m_xfbOutInfo[i].getSubState(m_xfbOutInfoData[i]);
+      state.pXfbOutInfos = &m_xfbOutInfoData[0];
+    }
+  }
+
+  SubState &getSubStateRef() { return m_state; };
+
+private:
+  static StrToMemberAddrArrayRef getAddrTable() {
+    static std::vector<StrToMemberAddr> addrTable = []() {
+      std::vector<StrToMemberAddr> addrTableInitializer;
+      INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionApiXfbOutput, m_xfbOutInfo, MemberTypeXfbOutInfo, true);
+      return addrTableInitializer;
+    }();
+    return {addrTable.data(), addrTable.size()};
+  }
+
+  SubState m_state;
+  std::vector<SectionXfbOutInfo> m_xfbOutInfo; // Contains the info of the capture output
+  std::vector<Vkgc::XfbOutInfo> m_xfbOutInfoData;
+};
 
 } // namespace Vfx

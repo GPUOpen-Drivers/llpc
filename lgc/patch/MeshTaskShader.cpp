@@ -33,6 +33,7 @@
 #include "ShaderMerger.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/util/Debug.h"
+#include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
@@ -338,7 +339,7 @@ void MeshTaskShader::processTaskShader(Function *entryPoint) {
   // Task_Shader() {
   //   Initialize thread/wave info
   //
-  //   Task shader main body (from API shader, lower task payload read/write)
+  //   Task shader main body (from API shader, lower task payload pointer)
   //
   //   Barrier
   //   if (threadIdInSubgroup == 0) {
@@ -352,82 +353,19 @@ void MeshTaskShader::processTaskShader(Function *entryPoint) {
   m_builder.SetInsertPointPastAllocas(entryPoint);
   initWaveThreadInfo(entryPoint);
 
-  SmallVector<CallInst *, 8> removedCalls;
-
-  auto module = entryPoint->getParent();
-  for (auto &func : module->functions()) {
-    if (!func.isDeclaration())
-      continue; // Not targets
-
-    if (func.getName().startswith(lgcName::MeshTaskCallPrefix)) {
-      for (auto user : func.users()) {
-        CallInst *const call = cast<CallInst>(user);
-
-        if (call->getFunction() != entryPoint)
-          continue; // Not belong to task shader
-
-        m_builder.SetInsertPoint(call);
-
-        if (func.getName().startswith(lgcName::MeshTaskReadTaskPayload)) {
-          // Read task payload
-          assert(call->arg_size() == 1);
-          auto byteOffset = call->getOperand(0);
-
-          auto readValue = readTaskPayload(call->getType(), byteOffset);
-          call->replaceAllUsesWith(readValue);
-          m_accessTaskPayload = true;
-        } else if (func.getName().startswith(lgcName::MeshTaskWriteTaskPayload)) {
-          // Write task payload
-          assert(call->arg_size() == 2);
-          auto byteOffset = call->getOperand(0);
-          auto writeValue = call->getOperand(1);
-
-          writeTaskPayload(writeValue, byteOffset);
-          m_accessTaskPayload = true;
-        } else if (func.getName().startswith(lgcName::MeshTaskEmitMeshTasks)) {
-          // Emit mesh tasks
-          assert(call->arg_size() == 3);
-          auto groupCountX = call->getOperand(0);
-          auto groupCountY = call->getOperand(1);
-          auto groupCountZ = call->getOperand(2);
-
-          emitTaskMeshs(groupCountX, groupCountY, groupCountZ);
-        } else if (func.getName().startswith(lgcName::MeshTaskAtomicTaskPayload)) {
-          // Task payload atomic
-          assert(call->arg_size() == 4);
-          unsigned atomicOp = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
-          AtomicOrdering ordering = static_cast<AtomicOrdering>(cast<ConstantInt>(call->getOperand(1))->getZExtValue());
-          auto inputValue = call->getOperand(2);
-          auto byteOffset = call->getOperand(3);
-
-          Value *atomicCall = taskPayloadAtomic(atomicOp, ordering, inputValue, byteOffset);
-          call->replaceAllUsesWith(atomicCall);
-          m_accessTaskPayload = true;
-        } else if (func.getName().startswith(lgcName::MeshTaskAtomicCompareSwapTaskPayload)) {
-          // Task payload atomic compare swap
-          assert(call->arg_size() == 4);
-          AtomicOrdering ordering = static_cast<AtomicOrdering>(cast<ConstantInt>(call->getOperand(0))->getZExtValue());
-          auto inputValue = call->getOperand(1);
-          auto comparatorValue = call->getOperand(2);
-          auto byteOffset = call->getOperand(3);
-
-          Value *atomicCall = taskPayloadAtomicCompareSwap(ordering, inputValue, comparatorValue, byteOffset);
-          call->replaceAllUsesWith(atomicCall);
-          m_accessTaskPayload = true;
-        } else {
-          llvm_unreachable("Unknown task shader call!");
-        }
-
-        removedCalls.push_back(call);
-      }
-    }
-  }
+  static auto visitor = llvm_dialects::VisitorBuilder<MeshTaskShader>()
+                            .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+                            .add<TaskPayloadPtrOp>(&MeshTaskShader::lowerTaskPayloadPtr)
+                            .add<EmitMeshTasksOp>(&MeshTaskShader::lowerEmitMeshTasks)
+                            .build();
+  visitor.visit(*this, *entryPoint);
 
   // Clear removed calls
-  for (auto call : removedCalls) {
+  for (auto call : m_callsToRemove) {
     call->dropAllReferences();
     call->eraseFromParent();
   }
+  m_callsToRemove.clear();
 }
 
 // =====================================================================================================================
@@ -462,11 +400,11 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   //         2. Lower mesh shader specific calls:
   //           - SetMeshOutputs -> Write vertex/primitive count to LDS and send message GS_ALLOC_REQ
   //             (threadIdInSubgroup == 0)
-  //           - SetPrimitiveIndices -> Write primitive connectivity data to LDS
-  //           - SetPrimitiveCulled -> Write null primitive flag to LDS
-  //           - GetMeshInput -> Lower mesh built-in input
-  //           - ReadTaskPayload -> Read task payload from payload ring
-  //           - Write primitive/vertex output -> Write output data to LDS
+  //           - SetMeshPrimitiveIndices -> Write primitive connectivity data to LDS
+  //           - SetMeshPrimitiveCulled -> Write null primitive flag to LDS
+  //           - GetMeshBuiltinInput -> Lower mesh built-in input
+  //           - TaskPayloadPtr -> Transform task payload descriptor
+  //           - WriteMeshVertexOutput/WriteMeshPrimitiveOutput -> Write output data to LDS
   //     }
   //
   //     Barrier (if needBarrierFlag)
@@ -538,11 +476,12 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
       m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.primAmpFactor;
   // If we enable row export, the actual thread group size is determined by work group size provided from API mesh
   // shader.
-  const unsigned flatWorkgroupSize = m_pipelineState->enableMeshRowExport() ? numMeshThreads : primAmpFactor;
+  const unsigned flatWorkgroupSize =
+      alignTo(m_pipelineState->enableMeshRowExport() ? numMeshThreads : primAmpFactor, waveSize);
   entryPoint->addFnAttr("amdgpu-flat-work-group-size",
                         std::to_string(primAmpFactor) + std::string(",") + std::to_string(flatWorkgroupSize));
 
-  const unsigned numWaves = alignTo(flatWorkgroupSize, waveSize) / waveSize;
+  const unsigned numWaves = flatWorkgroupSize / waveSize;
   const unsigned numMeshWaves = alignTo(numMeshThreads, waveSize) / waveSize;
 
   // API mesh shader entry block
@@ -599,6 +538,15 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   // Construct ".entry" block
   {
     m_builder.SetInsertPoint(entryBlock);
+
+    // Keep allocas in entry block
+    while (true) {
+      auto alloca = apiMeshEntryBlock->begin();
+      if (alloca == apiMeshEntryBlock->end() || !isa<AllocaInst>(alloca))
+        break;
+
+      alloca->moveBefore(*entryBlock, entryBlock->end());
+    }
 
     initWaveThreadInfo(entryPoint);
 
@@ -754,7 +702,7 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
       barrierToggle = m_builder.CreateNot(barrierToggle);
       m_builder.CreateStore(barrierToggle, m_barrierToggle);
 
-      m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+      createBarrier();
 
       auto ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::BarrierCompletion));
       auto barrierFlag = readValueFromLds(m_builder.getInt32Ty(), ldsOffset);
@@ -775,7 +723,7 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
       // NOTEL: Here, we don't need barrier completion flag, but we still find API barriers. To match number of API
       // barriers, we add additional barriers in extra waves. The number is known.
       for (unsigned i = 0; i < numBarriers; ++i) {
-        m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+        createBarrier();
       }
       m_builder.CreateBr(checkMeshOutputCountBlock);
     }
@@ -791,12 +739,14 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
 
     Value *ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexCount));
     vertexCount = readValueFromLds(m_builder.getInt32Ty(), ldsOffset);
-    vertexCount = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertexCount); // Promoted to SGPR
+    vertexCount = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane,
+                                            vertexCount); // Promoted to SGPR
     vertexCount->setName("vertexCount");
 
     ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveCount));
     primitiveCount = readValueFromLds(m_builder.getInt32Ty(), ldsOffset);
-    primitiveCount = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primitiveCount); // Promoted to SGPR
+    primitiveCount = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane,
+                                               primitiveCount); // Promoted to SGPR
     primitiveCount->setName("primitiveCount");
 
     auto dummyAllocReq = m_builder.CreateICmpEQ(vertexCount, m_builder.getInt32(InvalidValue));
@@ -970,285 +920,472 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
 }
 
 // =====================================================================================================================
-// Process the read of task payload.
+// Lower task payload pointer to buffer fat pointer.
 //
-// @param readTy : Type of value to read
-// @param byteOffset : Byte offset within the payload entry
-// @returns : Value read from task payload
-Value *MeshTaskShader::readTaskPayload(Type *readTy, Value *byteOffset) {
-  auto entryPoint = m_builder.GetInsertBlock()->getParent();
+// @param taskPayloadPtrOp : Call instruction op to get task payload pointer
+void MeshTaskShader::lowerTaskPayloadPtr(TaskPayloadPtrOp &taskPayloadPtrOp) {
+  m_builder.SetInsertPoint(&taskPayloadPtrOp);
+
+  auto entryPoint = taskPayloadPtrOp.getFunction();
 
   auto payloadRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskPayloadRingBufDesc();
   auto payloadRingEntryOffset = getPayloadRingEntryOffset(entryPoint);
 
-  CoherentFlag coherent = {};
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
-    coherent.bits.glc = true;
-    coherent.bits.dlc = true;
+  // 48-bit GPU address of from the buffer descriptor: dword1[15:0] + dword0
+  auto descWord0 = m_builder.CreateExtractElement(payloadRingBufDesc, static_cast<uint64_t>(0));
+  auto descWord1 = m_builder.CreateExtractElement(payloadRingBufDesc, 1);
+  auto baseAddressLow = descWord0;
+  auto baseAddressHigh = m_builder.CreateAnd(descWord1, 0xFFFF);
+
+  Value *baseAddress = PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
+  baseAddress = m_builder.CreateInsertElement(baseAddress, baseAddressLow, static_cast<uint64_t>(0));
+  baseAddress = m_builder.CreateInsertElement(baseAddress, baseAddressHigh, 1);
+  baseAddress = m_builder.CreateBitCast(baseAddress, m_builder.getInt64Ty());
+
+  baseAddress = m_builder.CreateAdd(baseAddress, m_builder.CreateZExt(payloadRingEntryOffset, m_builder.getInt64Ty()));
+  baseAddress = m_builder.CreateBitCast(baseAddress, FixedVectorType::get(m_builder.getInt32Ty(), 2));
+
+  baseAddressLow = m_builder.CreateExtractElement(baseAddress, static_cast<uint64_t>(0));
+  baseAddressHigh = m_builder.CreateExtractElement(baseAddress, 1);
+  baseAddressHigh = m_builder.CreateAnd(baseAddressHigh, 0xFFFF);
+  descWord0 = baseAddressLow;
+  descWord1 = m_builder.CreateAnd(descWord1, 0xFFFF0000);
+  descWord1 = m_builder.CreateOr(descWord1, baseAddressHigh);
+
+  payloadRingBufDesc = m_builder.CreateInsertElement(payloadRingBufDesc, descWord0, static_cast<uint64_t>(0));
+  payloadRingBufDesc = m_builder.CreateInsertElement(payloadRingBufDesc, descWord1, 1);
+
+  // Convert to fat pointer.
+  auto taskPayloadPtr = m_builder.create<BufferDescToPtrOp>(payloadRingBufDesc);
+  taskPayloadPtrOp.replaceAllUsesWith(taskPayloadPtr);
+
+  if (getShaderStage(entryPoint) == ShaderStageTask)
+    m_accessTaskPayload = true; // Mark this flag if task shader accesses task payload
+
+  m_callsToRemove.push_back(&taskPayloadPtrOp);
+}
+
+// =====================================================================================================================
+// Lower emit mesh tasks. Defines the dimension size of subsequent mesh shader workgroups to generate upon completion
+// of the task shader workgroup.
+//
+// @param emitMeshTasksOp : Call instruction op to emit mesh tasks
+void MeshTaskShader::lowerEmitMeshTasks(EmitMeshTasksOp &emitMeshTasksOp) {
+  m_builder.SetInsertPoint(&emitMeshTasksOp);
+
+  auto entryPoint = emitMeshTasksOp.getFunction();
+  assert(getShaderStage(entryPoint) == ShaderStageTask); // Must be task shader
+
+  auto groupCountX = emitMeshTasksOp.getGroupCountX();
+  auto groupCountY = emitMeshTasksOp.getGroupCountY();
+  auto groupCountZ = emitMeshTasksOp.getGroupCountZ();
+
+  // Mark the flag of mesh linear dispatch from task when the group count Y and Z are both ones
+  if (isa<ConstantInt>(groupCountY) && isa<ConstantInt>(groupCountZ)) {
+    const unsigned constGroupCountY = cast<ConstantInt>(groupCountY)->getZExtValue();
+    const unsigned constGroupCountZ = cast<ConstantInt>(groupCountZ)->getZExtValue();
+    m_pipelineState->getShaderResourceUsage(ShaderStageTask)->builtInUsage.task.meshLinearDispatch =
+        constGroupCountY == 1 && constGroupCountZ == 1;
   }
 
-  const unsigned bitWidth = readTy->getScalarSizeInBits();
-  const unsigned numElements = readTy->isVectorTy() ? cast<FixedVectorType>(readTy)->getNumElements() : 1;
-  assert(numElements >= 1 && numElements <= 4);
+  auto emitMeshTasksCall = m_builder.GetInsertPoint();
 
-  // NOTE: There are some special types that LLVM backend couldn't support. We have to lower them here.
-  if (bitWidth == 64) {
-    // 64 -> vec2
-    // 64vec2 -> vec4
-    // 64vec3 -> vec4 + vec2
-    // 64vec4 -> vec4 + vec4
-    Type *readTy1 = FixedVectorType::get(m_builder.getInt32Ty(), std::min(2 * numElements, 4u));
-    Value *readValue1 = readTaskPayload(readTy1, byteOffset);
+  auto checkEmitMeshTasksBlock = m_builder.GetInsertBlock();
+  auto emitMeshTasksBlock = checkEmitMeshTasksBlock->splitBasicBlock(emitMeshTasksCall, ".emitMeshTasks");
+  auto endEmitMeshTasksBlock = emitMeshTasksBlock->splitBasicBlock(emitMeshTasksCall, ".endEmitMeshTasks");
 
-    Value *readValue = nullptr;
-    if (numElements > 2) {
-      Type *readTy2 = FixedVectorType::get(m_builder.getInt32Ty(), 2 * numElements - 4);
-      byteOffset = m_builder.CreateAdd(byteOffset, m_builder.getInt32(4 * sizeof(unsigned)));
-      Value *readValue2 = readTaskPayload(readTy2, byteOffset);
+  // Modify ".checkEmitMeshTasks" block
+  {
+    m_builder.SetInsertPoint(checkEmitMeshTasksBlock->getTerminator());
 
-      if (numElements == 3) {
-        readValue2 = m_builder.CreateShuffleVector(readValue2, PoisonValue::get(readValue2->getType()),
-                                                   ArrayRef<int>{0, 1, 2, 3});
-      }
-      readValue = m_builder.CreateShuffleVector(readValue1, readValue2,
-                                                ArrayRef<int>{0, 1, 2, 3, 4, 5, 6, 7}.slice(0, numElements * 2));
+    if (m_accessTaskPayload) {
+      // Make sure the task payload read/write access is completed
+      m_builder.CreateFence(AtomicOrdering::Release, SyncScope::System);
+      createBarrier();
+    }
+
+    auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_waveThreadInfo.threadIdInSubgroup, m_builder.getInt32(0));
+    m_builder.CreateCondBr(firstThreadInSubgroup, emitMeshTasksBlock, endEmitMeshTasksBlock);
+    checkEmitMeshTasksBlock->getTerminator()->eraseFromParent(); // Remove old terminator
+  }
+
+  // Construct ".emitMeshTasks" block
+  {
+    m_builder.SetInsertPoint(emitMeshTasksBlock->getTerminator());
+
+    //
+    // Collect task statistics info
+    //
+    if (m_pipelineState->needSwMeshPipelineStats()) {
+      auto &computeMode =
+          m_pipelineState->getShaderModes()->getComputeShaderMode(); // Task shader is actually a compute shader
+      const uint64_t numTaskThreads =
+          computeMode.workgroupSizeX * computeMode.workgroupSizeY * computeMode.workgroupSizeZ;
+
+      Value *meshPipeStatsBufPtr = m_pipelineSysValues.get(entryPoint)->getMeshPipeStatsBufPtr();
+      Value *meshPipeStatsBufEntryPtr = m_builder.CreateGEP(
+          m_builder.getInt8Ty(), meshPipeStatsBufPtr, m_builder.getInt32(offsetof(MeshPipeStatsEntry, numTaskThreads)));
+      meshPipeStatsBufEntryPtr = m_builder.CreateBitCast(meshPipeStatsBufEntryPtr,
+                                                         PointerType::get(m_builder.getInt64Ty(), ADDR_SPACE_GLOBAL));
+
+      // NOTE: LLVM backend will try to apply atomics optimization. But here, we only have one active thread to execute
+      // the global_atomic_add instruction. Thus, the optimization is completely unnecessary. To avoid this, we try to
+      // move the added value to VGPR to mark it as "divergent".
+      Value *valueToAdd = PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
+      valueToAdd = m_builder.CreateInsertElement(valueToAdd, convertToDivergent(m_builder.getInt32(numTaskThreads)),
+                                                 static_cast<uint64_t>(0));
+      valueToAdd =
+          m_builder.CreateInsertElement(valueToAdd, convertToDivergent(m_builder.getInt32(numTaskThreads >> 32)), 1);
+      valueToAdd = m_builder.CreateBitCast(valueToAdd, m_builder.getInt64Ty());
+
+      m_builder.CreateAtomicRMW(AtomicRMWInst::Add, meshPipeStatsBufEntryPtr, valueToAdd, MaybeAlign(),
+                                AtomicOrdering::Monotonic, SyncScope::System);
+    }
+
+    //
+    // Write draw data
+    //
+
+    // Set X dimension to 0 if any of X, Y, Z dimension is 0:
+    //   groupCountX = min(groupCountY, groupCountZ) == 0 ? 0 : groupCountX
+    auto minGroupCountYZ =
+        m_builder.CreateIntrinsic(Intrinsic::umin, groupCountY->getType(), {groupCountY, groupCountZ});
+    groupCountX = m_builder.CreateSelect(m_builder.CreateICmpEQ(minGroupCountYZ, m_builder.getInt32(0)),
+                                         m_builder.getInt32(0), groupCountX);
+
+    Value *drawDataRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskDrawDataRingBufDesc();
+    Value *drawDataRingEntryOffset = getDrawDataRingEntryOffset(entryPoint);
+
+    // Draw data = <groupCountX, groupCountY, groupCountZ, readyBit>
+    Value *groupCount = PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 3));
+    groupCount = m_builder.CreateInsertElement(groupCount, groupCountX, static_cast<uint64_t>(0));
+    groupCount = m_builder.CreateInsertElement(groupCount, groupCountY, 1);
+    groupCount = m_builder.CreateInsertElement(groupCount, groupCountZ, 2);
+
+    m_builder.CreateIntrinsic(
+        Intrinsic::amdgcn_raw_buffer_store, groupCount->getType(),
+        {groupCount, drawDataRingBufDesc, m_builder.getInt32(0), drawDataRingEntryOffset, m_builder.getInt32(0)});
+
+    // NOTE: Only the lowest 8 bits are for us to write.
+    Value *readyBit = getDrawDataReadyBit(entryPoint);
+    readyBit = m_builder.CreateZExt(readyBit, m_builder.getInt8Ty());
+
+    m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_store, readyBit->getType(),
+                              {readyBit, drawDataRingBufDesc, m_builder.getInt32(3 * sizeof(unsigned)),
+                               drawDataRingEntryOffset, m_builder.getInt32(0)});
+  }
+
+  // Construct ".endEmitMeshTasks" block
+  {
+    m_builder.SetInsertPoint(endEmitMeshTasksBlock->getTerminator());
+
+    // Currently, nothing to do
+  }
+
+  m_callsToRemove.push_back(&emitMeshTasksOp);
+}
+
+// =====================================================================================================================
+// Lower set mesh outputs. Set the actual output size of the primitives and vertices that the mesh shader workgroup
+// will emit.
+//
+// @param setMeshOutputsOp : Call instruction op to set mesh outputs
+void MeshTaskShader::lowerSetMeshOutputs(SetMeshOutputsOp &setMeshOutputsOp) {
+  m_builder.SetInsertPoint(&setMeshOutputsOp);
+
+  assert(getShaderStage(setMeshOutputsOp.getFunction()) == ShaderStageMesh);
+
+  auto vertexCount = setMeshOutputsOp.getVertexCount();
+  auto primitiveCount = setMeshOutputsOp.getPrimitiveCount();
+
+  auto setMeshOutputsCall = m_builder.GetInsertPoint();
+
+  auto checkSetMeshOutputsBlock = m_builder.GetInsertBlock();
+  auto setMeshOutputsBlock = checkSetMeshOutputsBlock->splitBasicBlock(setMeshOutputsCall, ".setMeshOutputs");
+  auto endSetMeshOutputsBlock = setMeshOutputsBlock->splitBasicBlock(setMeshOutputsCall, ".endSetMeshOutputs");
+
+  // Modify ".checkSetMeshOutputs" block
+  {
+    m_builder.SetInsertPoint(checkSetMeshOutputsBlock->getTerminator());
+
+    auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_waveThreadInfo.threadIdInSubgroup, m_builder.getInt32(0));
+    m_builder.CreateCondBr(firstThreadInSubgroup, setMeshOutputsBlock, endSetMeshOutputsBlock);
+    checkSetMeshOutputsBlock->getTerminator()->eraseFromParent(); // Remove old terminator
+  }
+
+  // Construct ".setMeshOutputs" block
+  {
+    m_builder.SetInsertPoint(setMeshOutputsBlock->getTerminator());
+
+    // Promote vertex/primitive count to SGPRs
+    vertexCount = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, vertexCount);
+    primitiveCount = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, primitiveCount);
+
+    // Check if vertex count or primitive count is zero. If so, set both to zero in order to disable vertex/primitive
+    // exporting.
+    auto zeroVertexCount = m_builder.CreateICmpEQ(vertexCount, m_builder.getInt32(0));
+    auto zeroPrimitiveCount = m_builder.CreateICmpEQ(primitiveCount, m_builder.getInt32(0));
+    auto hasZeroCount = m_builder.CreateOr(zeroVertexCount, zeroPrimitiveCount);
+    vertexCount = m_builder.CreateSelect(hasZeroCount, m_builder.getInt32(0), vertexCount);
+    primitiveCount = m_builder.CreateSelect(hasZeroCount, m_builder.getInt32(0), primitiveCount);
+
+    // NOTE: Here, we promote vertex/primitive count to SGPRs once again because M0 implicitly used in s_sendmsg is
+    // SGPR. LLVM backend has issues of handling this because it doesn't use s_cselect to translate LLVM IR select
+    // instruction (which keeps the destination operand still in SGPR) and it doesn't use readfirstlane to promote
+    // VGPR to SGPR for M0.
+    vertexCount = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, vertexCount);
+    primitiveCount = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, primitiveCount);
+
+    // M0[10:0] = vertexCount, M0[22:12] = primitiveCount
+    Value *m0 = m_builder.CreateShl(primitiveCount, 12);
+    m0 = m_builder.CreateOr(m0, vertexCount);
+    m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, {m_builder.getInt32(GsAllocReq), m0});
+
+    Value *ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexCount));
+    writeValueToLds(vertexCount, ldsOffset);
+
+    ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveCount));
+    writeValueToLds(primitiveCount, ldsOffset);
+  }
+
+  // Construct ".endSetMeshOutputs" block
+  {
+    m_builder.SetInsertPoint(endSetMeshOutputsBlock->getTerminator());
+
+    // Currently, nothing to do
+  }
+
+  m_callsToRemove.push_back(&setMeshOutputsOp);
+}
+
+// =====================================================================================================================
+// Lower set mesh primitive indices. Set primitive indices by forming primitive connectivity data and writing it to LDS.
+//
+// @param setMeshPrimitiveIndicesOp : Call instruction op to set primitive indices for mesh shader
+void MeshTaskShader::lowerSetMeshPrimitiveIndices(SetMeshPrimitiveIndicesOp &setMeshPrimitiveIndicesOp) {
+  m_builder.SetInsertPoint(&setMeshPrimitiveIndicesOp);
+
+  assert(getShaderStage(setMeshPrimitiveIndicesOp.getFunction()) == ShaderStageMesh);
+
+  auto primitiveIndex = setMeshPrimitiveIndicesOp.getPrimitiveIndex();
+  auto primitiveIndices = setMeshPrimitiveIndicesOp.getPrimitiveIndices();
+
+  //
+  // HW requires the primitive connectivity data has the following bit layout:
+  //
+  //   +----------------+---------------+---------------+---------------+
+  //   | Null Primitive | Vertex Index2 | Vertex Index1 | Vertex Index0 |
+  //   | [31]           | [28:20]       | [18:10]       | [8:0]         |
+  //   +----------------+---------------+---------------+---------------+
+  //
+  auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
+  Value *primitiveData = nullptr;
+
+  if (meshMode.outputPrimitive == OutputPrimitives::Points) {
+    assert(primitiveIndices->getType() == m_builder.getInt32Ty()); // i32
+    primitiveData = primitiveIndices;
+  } else if (meshMode.outputPrimitive == OutputPrimitives::Lines) {
+    assert(primitiveIndices->getType() == FixedVectorType::get(m_builder.getInt32Ty(), 2)); // v2i32
+    Value *vertex0 = m_builder.CreateExtractElement(primitiveIndices, static_cast<uint64_t>(0));
+    Value *vertex1 = m_builder.CreateExtractElement(primitiveIndices, 1);
+
+    if (m_gfxIp.major <= 11) {
+      primitiveData = m_builder.CreateShl(vertex1, 10);
+      primitiveData = m_builder.CreateOr(primitiveData, vertex0);
     } else {
-      readValue = readValue1;
+      llvm_unreachable("Not implemented!");
     }
+  } else {
+    assert(meshMode.outputPrimitive == OutputPrimitives::Triangles);
+    Value *vertex0 = m_builder.CreateExtractElement(primitiveIndices, static_cast<uint64_t>(0));
+    Value *vertex1 = m_builder.CreateExtractElement(primitiveIndices, 1);
+    Value *vertex2 = m_builder.CreateExtractElement(primitiveIndices, 2);
 
-    return m_builder.CreateBitCast(readValue, readTy);
-  } else if (bitWidth == 8 || bitWidth == 16) {
-    if (numElements > 1) {
-      // Scalarize
-      Value *readValue = UndefValue::get(readTy);
-      for (unsigned i = 0; i < numElements; ++i) {
-        auto elemByteOffset =
-            i > 0 ? m_builder.CreateAdd(byteOffset, m_builder.getInt32(i * bitWidth / 8)) : byteOffset;
-        auto elem = readTaskPayload(readTy->getScalarType(), elemByteOffset);
-        readValue = m_builder.CreateInsertElement(readValue, elem, i);
-      }
-      return readValue;
+    if (m_gfxIp.major <= 11) {
+      primitiveData = m_builder.CreateShl(vertex2, 10);
+      primitiveData = m_builder.CreateOr(primitiveData, vertex1);
+      primitiveData = m_builder.CreateShl(primitiveData, 10);
+      primitiveData = m_builder.CreateOr(primitiveData, vertex0);
+    } else {
+      llvm_unreachable("Not implemented!");
     }
   }
 
-  return m_builder.CreateIntrinsic(
-      Intrinsic::amdgcn_raw_buffer_load, readTy,
-      {payloadRingBufDesc, byteOffset, payloadRingEntryOffset, m_builder.getInt32(coherent.u32All)});
+  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveIndices));
+  Value *ldsOffset = m_builder.CreateAdd(ldsStart, primitiveIndex);
+
+  // NOTE: We first clear old primitive connectivity data and use atomic OR operation to set new data. This is because
+  // the null primitive flag might be set via built-in CullPrimitive.
+  static const unsigned ClearMask = (1u << 31);
+  atomicOpWithLds(AtomicRMWInst::And, m_builder.getInt32(ClearMask), ldsOffset);
+  atomicOpWithLds(AtomicRMWInst::Or, primitiveData, ldsOffset);
+
+  m_callsToRemove.push_back(&setMeshPrimitiveIndicesOp);
 }
 
 // =====================================================================================================================
-// Process the write of task payload.
+// Lower get mesh built-in value. Return the value of mesh built-in input.
 //
-// @param writeValue : Value to write
-// @param byteOffset : Byte offset within the payload entry
-void MeshTaskShader::writeTaskPayload(Value *writeValue, Value *byteOffset) {
-  auto entryPoint = m_builder.GetInsertBlock()->getParent();
-  assert(getShaderStage(entryPoint) == ShaderStageTask);
+// @param getMeshBuiltinInputOp : Call instruction op to return the value of mesh built-in input
+void MeshTaskShader::lowerGetMeshBuiltinInput(GetMeshBuiltinInputOp &getMeshBuiltinInputOp) {
+  m_builder.SetInsertPoint(&getMeshBuiltinInputOp);
 
-  auto payloadRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskPayloadRingBufDesc();
-  auto payloadRingEntryOffset = getPayloadRingEntryOffset(entryPoint);
+  auto entryPoint = getMeshBuiltinInputOp.getFunction();
+  assert(getShaderStage(entryPoint) == ShaderStageMesh);
 
-  CoherentFlag coherent = {};
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
-    coherent.bits.glc = true;
+  Value *input = PoisonValue::get(getMeshBuiltinInputOp.getType());
+  auto builtin = getMeshBuiltinInputOp.getBuiltin();
+  switch (builtin) {
+  case BuiltInDrawIndex: {
+    auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
+    input = getFunctionArgument(entryPoint, entryArgIdxs.drawIndex);
+    break;
+  }
+  case BuiltInViewIndex: {
+    if (m_pipelineState->getInputAssemblyState().enableMultiView) {
+      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
+      input = getFunctionArgument(entryPoint, entryArgIdxs.viewIndex);
+    } else {
+      input = m_builder.getInt32(0);
+    }
+    break;
+  }
+  case BuiltInNumWorkgroups: {
+    input = getMeshNumWorkgroups();
+    break;
+  }
+  case BuiltInWorkgroupId: {
+    input = getMeshWorkgroupId();
+    break;
+  }
+  case BuiltInLocalInvocationId: {
+    input = getMeshLocalInvocationId();
+    break;
+  }
+  case BuiltInGlobalInvocationId: {
+    input = getMeshGlobalInvocationId();
+    break;
+  }
+  case BuiltInLocalInvocationIndex: {
+    input = getMeshLocalInvocationIndex();
+    break;
+  }
+  case BuiltInSubgroupId: {
+    // subgroupId = localInvocationIndex / subgroupSize
+    auto localInvocationIndex = getMeshLocalInvocationIndex();
+    unsigned subgroupSize = m_pipelineState->getShaderSubgroupSize(ShaderStageMesh);
+    assert(subgroupSize > 0 && subgroupSize % 32 == 0);
+    input = m_builder.CreateLShr(localInvocationIndex, m_builder.getInt32(Log2_32(subgroupSize)));
+    break;
+  }
+  case BuiltInNumSubgroups: {
+    // numSubgroups = numMeshThreads / subgroupSize
+    const auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
+    const unsigned numMeshThreads = meshMode.workgroupSizeX * meshMode.workgroupSizeY * meshMode.workgroupSizeZ;
+    unsigned subgroupSize = m_pipelineState->getShaderSubgroupSize(ShaderStageMesh);
+    assert(subgroupSize > 0 && subgroupSize % 32 == 0);
+    const unsigned numSubgroups = alignTo(numMeshThreads, subgroupSize) / subgroupSize;
+    input = m_builder.getInt32(numSubgroups);
+    break;
+  }
+  default: {
+    llvm_unreachable("Unknown mesh built-in input!");
+    break;
+  }
   }
 
-  const auto writeTy = writeValue->getType();
-  const unsigned bitWidth = writeTy->getScalarSizeInBits();
-  const unsigned numElements = writeTy->isVectorTy() ? cast<FixedVectorType>(writeTy)->getNumElements() : 1;
-  assert(numElements >= 1 && numElements <= 4);
+  assert(!isa<PoisonValue>(input));
+  getMeshBuiltinInputOp.replaceAllUsesWith(input);
 
-  // NOTE: There are some special types that LLVM backend couldn't support. We have to lower them here.
-  if (bitWidth == 64) {
-    // Cast to <n x i32>
-    auto castTy = FixedVectorType::get(m_builder.getInt32Ty(), 2 * numElements);
-    writeValue = m_builder.CreateBitCast(writeValue, castTy);
-
-    // 64scalar -> vec2
-    // 64vec2 -> vec4
-    // 64vec3 -> vec4 + vec2
-    // 64vec4 -> vec4 + vec4
-    auto writeValue1 = writeValue;
-    if (numElements > 2) {
-      writeValue1 = m_builder.CreateShuffleVector(writeValue, PoisonValue::get(writeValue->getType()),
-                                                  ArrayRef<int>({0, 1, 2, 3}));
-    }
-    writeTaskPayload(writeValue1, byteOffset);
-
-    if (numElements > 2) {
-      auto writeValue2 = m_builder.CreateShuffleVector(writeValue, PoisonValue::get(writeValue->getType()),
-                                                       ArrayRef<int>({4, 5, 6, 7}).slice(0, 2 * numElements - 4));
-      byteOffset = m_builder.CreateAdd(byteOffset, m_builder.getInt32(4 * sizeof(unsigned)));
-      writeTaskPayload(writeValue2, byteOffset);
-    }
-
-    return;
-  } else if (bitWidth == 8 || bitWidth == 16) {
-    if (numElements > 1) {
-      // Scalarize
-      for (unsigned i = 0; i < numElements; ++i) {
-        auto elem = m_builder.CreateExtractElement(writeValue, i);
-        auto elemByteOffset =
-            i > 0 ? m_builder.CreateAdd(byteOffset, m_builder.getInt32(i * bitWidth / 8)) : byteOffset;
-        writeTaskPayload(elem, elemByteOffset);
-      }
-      return;
-    }
-  }
-
-  m_builder.CreateIntrinsic(
-      Intrinsic::amdgcn_raw_buffer_store, writeValue->getType(),
-      {writeValue, payloadRingBufDesc, byteOffset, payloadRingEntryOffset, m_builder.getInt32(coherent.u32All)});
+  m_callsToRemove.push_back(&getMeshBuiltinInputOp);
 }
 
 // =====================================================================================================================
-// Create a task payload atomic operation other than compare-and-swap. Result type is the same as the input value type.
+// Lower set mesh primitive culled state. Set primitive culled state by writing the null primitive flag to LDS.
 //
-// @param atomicOp : Atomic op to perform
-// @param ordering : Atomic ordering
-// @param inputValue : Input value
-// @param byteOffset : Byte offset within the payload structure
-// @returns : Original value read from the task payload
-Value *MeshTaskShader::taskPayloadAtomic(unsigned atomicOp, AtomicOrdering ordering, Value *inputValue,
-                                         Value *byteOffset) {
-  auto entryPoint = m_builder.GetInsertBlock()->getParent();
-  assert(getShaderStage(entryPoint) == ShaderStageTask);
+// @param setMeshPrimitiveIndicesOp : Call instruction op to set primitive indices for mesh shader
+void MeshTaskShader::lowerSetMeshPrimitiveCulled(SetMeshPrimitiveCulledOp &setMeshPrimitiveCulledOp) {
+  m_builder.SetInsertPoint(&setMeshPrimitiveCulledOp);
 
-  assert(inputValue->getType()->isIntegerTy() || inputValue->getType()->isFloatingPointTy());
+  assert(getShaderStage(setMeshPrimitiveCulledOp.getFunction()) == ShaderStageMesh);
 
-  auto payloadRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskPayloadRingBufDesc();
-  auto payloadRingEntryOffset = getPayloadRingEntryOffset(entryPoint);
+  auto primitiveIndex = setMeshPrimitiveCulledOp.getPrimitiveIndex();
+  auto isCulled = setMeshPrimitiveCulledOp.getIsCulled();
 
-  SyncScope::ID syncScope = entryPoint->getParent()->getContext().getOrInsertSyncScopeID("workgroup");
+  //
+  // HW requires the primitive connectivity data has the following bit layout:
+  //   [31]    = Null primitive flag
+  //   [28:20] = Index of vertex2
+  //   [18:10] = Index of vertex1
+  //   [8:0]   = Index of vertex0
+  //
+  assert(isCulled->getType()->isIntegerTy(1));
 
-  // NOTE: buffer.atomic.swap.f64 is not supported in LLVM backend, so we convert double to int64.
-  bool doubleToInt64 = atomicOp == AtomicRMWInst::Xchg && inputValue->getType()->isDoubleTy();
-  if (doubleToInt64)
-    inputValue = m_builder.CreateBitCast(inputValue, m_builder.getInt64Ty());
+  static const unsigned NullPrimitive = (1u << 31);
+  auto nullPrimitive = m_builder.CreateSelect(isCulled, m_builder.getInt32(NullPrimitive), m_builder.getInt32(0));
 
-  Intrinsic::ID intrinsic = Intrinsic::not_intrinsic;
-  switch (atomicOp) {
-  case AtomicRMWInst::Xchg:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_swap;
-    break;
-  case AtomicRMWInst::Add:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_add;
-    break;
-  case AtomicRMWInst::Sub:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_sub;
-    break;
-  case AtomicRMWInst::And:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_and;
-    break;
-  case AtomicRMWInst::Or:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_or;
-    break;
-  case AtomicRMWInst::Xor:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_xor;
-    break;
-  case AtomicRMWInst::Max:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_smax;
-    break;
-  case AtomicRMWInst::Min:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_smin;
-    break;
-  case AtomicRMWInst::UMax:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_umax;
-    break;
-  case AtomicRMWInst::UMin:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_umin;
-    break;
-  case AtomicRMWInst::FAdd:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_fadd;
-    break;
-  case AtomicRMWInst::FMax:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_fmax;
-    break;
-  case AtomicRMWInst::FMin:
-    intrinsic = Intrinsic::amdgcn_raw_buffer_atomic_fmin;
-    break;
-  default:
-    llvm_unreachable("Unexpected atomic operation!");
-    break;
-  }
+  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveIndices));
+  Value *ldsOffset = m_builder.CreateAdd(ldsStart, primitiveIndex);
 
-  if (ordering == AtomicOrdering::Release || ordering == AtomicOrdering::AcquireRelease ||
-      ordering == AtomicOrdering::SequentiallyConsistent)
-    m_builder.CreateFence(AtomicOrdering::Release, syncScope);
+  // NOTE: We first clear null primitive flag and use atomic OR operation to set new flag. This is because the
+  // primitive connectivity data might be set via built-in PrimitiveXXXIndices.
+  static const unsigned ClearMask = ~(1u << 31);
+  atomicOpWithLds(AtomicRMWInst::And, m_builder.getInt32(ClearMask), ldsOffset);
+  atomicOpWithLds(AtomicRMWInst::Or, nullPrimitive, ldsOffset);
 
-  Value *atomicCall = m_builder.CreateIntrinsic(
-      intrinsic, inputValue->getType(),
-      {inputValue, payloadRingBufDesc, byteOffset, payloadRingEntryOffset, m_builder.getInt32(0)});
-
-  if (doubleToInt64)
-    atomicCall = m_builder.CreateBitCast(atomicCall, m_builder.getDoubleTy());
-
-  if (ordering == AtomicOrdering::Release || ordering == AtomicOrdering::AcquireRelease ||
-      ordering == AtomicOrdering::SequentiallyConsistent)
-    m_builder.CreateFence(AtomicOrdering::Acquire, syncScope);
-
-  return atomicCall;
+  m_callsToRemove.push_back(&setMeshPrimitiveCulledOp);
 }
 
 // =====================================================================================================================
-// Create a task payload atomic compare-and-swap.
+// Lower write mesh vertex output. Write mesh shader vertex outputs to LDS.
 //
-// @param ordering : Atomic ordering
-// @param inputValue : Input value
-// @param comparatorValue : Value to compare against
-// @param byteOffset : Byte offset within the payload structure
-// @returns : Original value read from the task payload
-Value *MeshTaskShader::taskPayloadAtomicCompareSwap(AtomicOrdering ordering, Value *inputValue, Value *comparatorValue,
-                                                    Value *byteOffset) {
-  auto entryPoint = m_builder.GetInsertBlock()->getParent();
-  assert(getShaderStage(entryPoint) == ShaderStageTask);
+// @param writeMeshVertexOutputOp : Call instruction op to write vertex output for mesh shader
+void MeshTaskShader::lowerWriteMeshVertexOutput(WriteMeshVertexOutputOp &writeMeshVertexOutputOp) {
+  m_builder.SetInsertPoint(&writeMeshVertexOutputOp);
 
-  assert(inputValue->getType()->isIntegerTy() || inputValue->getType()->isFloatingPointTy());
+  assert(getShaderStage(writeMeshVertexOutputOp.getFunction()) == ShaderStageMesh);
 
-  auto payloadRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskPayloadRingBufDesc();
-  auto payloadRingEntryOffset = getPayloadRingEntryOffset(entryPoint);
+  auto outputOffset = writeMeshVertexOutputOp.getOutputOffset();
+  auto vertexIndex = writeMeshVertexOutputOp.getVertexIndex();
+  auto outputValue = writeMeshVertexOutputOp.getOutputValue();
 
-  SyncScope::ID syncScope = entryPoint->getParent()->getContext().getOrInsertSyncScopeID("workgroup");
+  const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh);
+  const unsigned vertexStride = 4 * resUsage->inOutUsage.outputMapLocCount; // Corresponds to vec4 output
 
-  if (inputValue->getType()->isIntegerTy(64)) {
-    // NOTE: HW doesn't have buffer_atomic_cmpswap_x2 instruction, we resort to global_atomic_cmpswap_x2.
+  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexOutput));
+  Value *ldsOffset = m_builder.CreateMul(vertexIndex, m_builder.getInt32(vertexStride));
+  ldsOffset = m_builder.CreateAdd(ldsOffset, outputOffset);
+  ldsOffset = m_builder.CreateAdd(ldsStart, ldsOffset);
 
-    // 48-bit GPU address of from the buffer descriptor: dword1[15:0] + dword0
-    auto baseAddressLow = m_builder.CreateExtractElement(payloadRingBufDesc, static_cast<uint64_t>(0));
-    auto baseAddressHigh = m_builder.CreateExtractElement(payloadRingBufDesc, 1);
-    baseAddressHigh = m_builder.CreateAnd(baseAddressHigh, 0xFFFF);
+  writeValueToLds(outputValue, ldsOffset);
 
-    Value *baseAddress = UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
-    baseAddress = m_builder.CreateInsertElement(baseAddress, baseAddressLow, static_cast<uint64_t>(0));
-    baseAddress = m_builder.CreateInsertElement(baseAddress, baseAddressHigh, 1);
-    baseAddress = m_builder.CreateBitCast(baseAddress, m_builder.getInt64Ty());
+  m_callsToRemove.push_back(&writeMeshVertexOutputOp);
+}
 
-    Value *payloadRingBufPtr = m_builder.CreateIntToPtr(baseAddress, m_builder.getInt8PtrTy(ADDR_SPACE_GLOBAL));
-    Value *entryOffset = m_builder.CreateAdd(payloadRingEntryOffset, byteOffset);
-    Value *payloadRingBufEntryPtr = m_builder.CreateGEP(m_builder.getInt8Ty(), payloadRingBufPtr, entryOffset);
-    payloadRingBufEntryPtr =
-        m_builder.CreateBitCast(payloadRingBufEntryPtr, PointerType::get(m_builder.getInt64Ty(), ADDR_SPACE_GLOBAL));
+// =====================================================================================================================
+// Lower write mesh primitive output. Write mesh shader primitive outputs to LDS.
+//
+// @param writeMeshPrimitiveOutputOp : Call instruction op to write primitive output for mesh shader
+void MeshTaskShader::lowerWriteMeshPrimitiveOutput(WriteMeshPrimitiveOutputOp &writeMeshPrimitiveOutputOp) {
+  m_builder.SetInsertPoint(&writeMeshPrimitiveOutputOp);
 
-    auto atomicInst = m_builder.CreateAtomicCmpXchg(payloadRingBufEntryPtr, comparatorValue, inputValue, MaybeAlign(),
-                                                    ordering, AtomicOrdering::Monotonic, syncScope);
-    // NOTE: In cmpxchg instruction in LLVM returns a structure-typed result {<value>, i1}, we don't care about the
-    // second member.
-    return m_builder.CreateExtractValue(atomicInst, 0);
-  }
+  assert(getShaderStage(writeMeshPrimitiveOutputOp.getFunction()) == ShaderStageMesh);
 
-  if (ordering == AtomicOrdering::Release || ordering == AtomicOrdering::AcquireRelease ||
-      ordering == AtomicOrdering::SequentiallyConsistent)
-    m_builder.CreateFence(AtomicOrdering::Release, syncScope);
+  auto outputOffset = writeMeshPrimitiveOutputOp.getOutputOffset();
+  auto primitiveIndex = writeMeshPrimitiveOutputOp.getPrimitiveIndex();
+  auto outputValue = writeMeshPrimitiveOutputOp.getOutputValue();
 
-  Value *atomicCall = m_builder.CreateIntrinsic(
-      Intrinsic::amdgcn_raw_buffer_atomic_cmpswap, inputValue->getType(),
-      {inputValue, comparatorValue, payloadRingBufDesc, byteOffset, payloadRingEntryOffset, m_builder.getInt32(0)});
+  const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh);
+  const unsigned primitiveStride = 4 * resUsage->inOutUsage.perPrimitiveOutputMapLocCount; // Corresponds to vec4 output
 
-  if (ordering == AtomicOrdering::Release || ordering == AtomicOrdering::AcquireRelease ||
-      ordering == AtomicOrdering::SequentiallyConsistent)
-    m_builder.CreateFence(AtomicOrdering::Acquire, syncScope);
+  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveOutput));
+  Value *ldsOffset = m_builder.CreateMul(primitiveIndex, m_builder.getInt32(primitiveStride));
+  ldsOffset = m_builder.CreateAdd(ldsOffset, outputOffset);
+  ldsOffset = m_builder.CreateAdd(ldsStart, ldsOffset);
 
-  return atomicCall;
+  writeValueToLds(outputValue, ldsOffset);
+
+  m_callsToRemove.push_back(&writeMeshPrimitiveOutputOp);
 }
 
 // =====================================================================================================================
@@ -1262,11 +1399,12 @@ void MeshTaskShader::initWaveThreadInfo(Function *entryPoint) {
     // Task shader
     auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageTask)->entryArgIdxs.task;
 
-    // waveId = dispatchInfo[24:20]
-    m_waveThreadInfo.waveIdInSubgroup =
-        m_builder.CreateAnd(m_builder.CreateLShr(getFunctionArgument(entryPoint, entryArgIdxs.multiDispatchInfo), 20),
-                            0x1F, "waveIdInSubgroup");
-
+    {
+      // waveId = dispatchInfo[24:20]
+      m_waveThreadInfo.waveIdInSubgroup =
+          m_builder.CreateAnd(m_builder.CreateLShr(getFunctionArgument(entryPoint, entryArgIdxs.multiDispatchInfo), 20),
+                              0x1F, "waveIdInSubgroup");
+    }
     const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageTask);
 
     m_waveThreadInfo.threadIdInWave =
@@ -1428,120 +1566,6 @@ Value *MeshTaskShader::getDrawDataReadyBit(Function *entryPoint) {
 }
 
 // =====================================================================================================================
-// Emit mesh tasks. Defines the dimension size of subsequent mesh shader workgroups to generate upon completion of the
-// task shader workgroup
-//
-// @param groupCountX : Number of local workgroups in X dimension for the launch of child mesh tasks
-// @param groupCountX : Number of local workgroups in Y dimension for the launch of child mesh tasks
-// @param groupCountX : Number of local workgroups in Z dimension for the launch of child mesh tasks
-void MeshTaskShader::emitTaskMeshs(Value *groupCountX, Value *groupCountY, Value *groupCountZ) {
-  auto entryPoint = m_builder.GetInsertBlock()->getParent();
-  assert(getShaderStage(entryPoint) == ShaderStageTask); // Must be task shader
-
-  // Mark the flag of mesh linear dispatch from task when the group count Y and Z are both ones
-  if (isa<ConstantInt>(groupCountY) && isa<ConstantInt>(groupCountZ)) {
-    const unsigned constGroupCountY = cast<ConstantInt>(groupCountY)->getZExtValue();
-    const unsigned constGroupCountZ = cast<ConstantInt>(groupCountZ)->getZExtValue();
-    m_pipelineState->getShaderResourceUsage(ShaderStageTask)->builtInUsage.task.meshLinearDispatch =
-        constGroupCountY == 1 && constGroupCountZ == 1;
-  }
-
-  auto emitMeshsCall = m_builder.GetInsertPoint();
-
-  auto checkEmitMeshsBlock = m_builder.GetInsertBlock();
-  auto emitMeshsBlock = checkEmitMeshsBlock->splitBasicBlock(emitMeshsCall, ".emitMeshs");
-  auto endEmitMeshsBlock = emitMeshsBlock->splitBasicBlock(emitMeshsCall, ".endEmitMeshs");
-
-  // Modify ".checkEmitMeshs" block
-  {
-    m_builder.SetInsertPoint(checkEmitMeshsBlock->getTerminator());
-
-    if (m_accessTaskPayload) {
-      // Make sure the task payload read/write access is completed
-      m_builder.CreateFence(AtomicOrdering::Release, SyncScope::System);
-      m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
-    }
-
-    auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_waveThreadInfo.threadIdInSubgroup, m_builder.getInt32(0));
-    m_builder.CreateCondBr(firstThreadInSubgroup, emitMeshsBlock, endEmitMeshsBlock);
-    checkEmitMeshsBlock->getTerminator()->eraseFromParent(); // Remove old terminator
-  }
-
-  // Construct ".emitTaskMeshs" block
-  {
-    m_builder.SetInsertPoint(emitMeshsBlock->getTerminator());
-
-    //
-    // Collect task statistics info
-    //
-    if (m_pipelineState->needSwMeshPipelineStats()) {
-      auto &computeMode =
-          m_pipelineState->getShaderModes()->getComputeShaderMode(); // Task shader is actually a compute shader
-      const uint64_t numTaskThreads =
-          computeMode.workgroupSizeX * computeMode.workgroupSizeY * computeMode.workgroupSizeZ;
-
-      Value *meshPipeStatsBufPtr = m_pipelineSysValues.get(entryPoint)->getMeshPipeStatsBufPtr();
-      Value *meshPipeStatsBufEntryPtr = m_builder.CreateGEP(
-          m_builder.getInt8Ty(), meshPipeStatsBufPtr, m_builder.getInt32(offsetof(MeshPipeStatsEntry, numTaskThreads)));
-      meshPipeStatsBufEntryPtr = m_builder.CreateBitCast(meshPipeStatsBufEntryPtr,
-                                                         PointerType::get(m_builder.getInt64Ty(), ADDR_SPACE_GLOBAL));
-
-      // NOTE: LLVM backend will try to apply atomics optimization. But here, we only have one active thread to execute
-      // the global_atomic_add instruction. Thus, the optimization is completely unnecessary. To avoid this, we try to
-      // move the added value to VGPR to mark it as "divergent".
-      Value *valueToAdd = UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
-      valueToAdd = m_builder.CreateInsertElement(valueToAdd, convertToDivergent(m_builder.getInt32(numTaskThreads)),
-                                                 static_cast<uint64_t>(0));
-      valueToAdd =
-          m_builder.CreateInsertElement(valueToAdd, convertToDivergent(m_builder.getInt32(numTaskThreads >> 32)), 1);
-      valueToAdd = m_builder.CreateBitCast(valueToAdd, m_builder.getInt64Ty());
-
-      m_builder.CreateAtomicRMW(AtomicRMWInst::Add, meshPipeStatsBufEntryPtr, valueToAdd, MaybeAlign(),
-                                AtomicOrdering::Monotonic, SyncScope::System);
-    }
-
-    //
-    // Write draw data
-    //
-
-    // Set X dimension to 0 if any of X, Y, Z dimension is 0:
-    //   groupCountX = min(groupCountY, groupCountZ) == 0 ? 0 : groupCountX
-    auto minGroupCountYZ =
-        m_builder.CreateIntrinsic(Intrinsic::umin, groupCountY->getType(), {groupCountY, groupCountZ});
-    groupCountX = m_builder.CreateSelect(m_builder.CreateICmpEQ(minGroupCountYZ, m_builder.getInt32(0)),
-                                         m_builder.getInt32(0), groupCountX);
-
-    Value *drawDataRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskDrawDataRingBufDesc();
-    Value *drawDataRingEntryOffset = getDrawDataRingEntryOffset(entryPoint);
-
-    // Draw data = <groupCountX, groupCountY, groupCountZ, readyBit>
-    Value *groupCount = UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 3));
-    groupCount = m_builder.CreateInsertElement(groupCount, groupCountX, static_cast<uint64_t>(0));
-    groupCount = m_builder.CreateInsertElement(groupCount, groupCountY, 1);
-    groupCount = m_builder.CreateInsertElement(groupCount, groupCountZ, 2);
-
-    m_builder.CreateIntrinsic(
-        Intrinsic::amdgcn_raw_buffer_store, groupCount->getType(),
-        {groupCount, drawDataRingBufDesc, m_builder.getInt32(0), drawDataRingEntryOffset, m_builder.getInt32(0)});
-
-    // NOTE: Only the lowest 8 bits are for us to write.
-    Value *readyBit = getDrawDataReadyBit(entryPoint);
-    readyBit = m_builder.CreateZExt(readyBit, m_builder.getInt8Ty());
-
-    m_builder.CreateIntrinsic(Intrinsic::amdgcn_raw_buffer_store, readyBit->getType(),
-                              {readyBit, drawDataRingBufDesc, m_builder.getInt32(3 * sizeof(unsigned)),
-                               drawDataRingEntryOffset, m_builder.getInt32(0)});
-  }
-
-  // Construct ".endEmitTaskMeshs" block
-  {
-    m_builder.SetInsertPoint(endEmitMeshsBlock->getTerminator());
-
-    // Currently, nothing to do
-  }
-}
-
-// =====================================================================================================================
 // Convert a i32 value to divergent one by inserting a "v_mov_b32" forcibly.
 //
 // @param value : Input i32 value
@@ -1645,8 +1669,6 @@ void MeshTaskShader::lowerMeshShaderBody(BasicBlock *apiMeshEntryBlock, BasicBlo
   auto entryPoint = apiMeshEntryBlock->getParent();
   assert(getShaderStage(entryPoint) == ShaderStageMesh);
 
-  SmallVector<CallInst *, 8> removedCalls;
-
   // Handle API mesh shader barrier
   if (m_needBarrierFlag) {
     // Flip barrier toggle when we encounter a API barrier
@@ -1669,336 +1691,24 @@ void MeshTaskShader::lowerMeshShaderBody(BasicBlock *apiMeshEntryBlock, BasicBlo
   }
 
   // Lower mesh shader calls
-  auto module = entryPoint->getParent();
-  for (auto &func : module->functions()) {
-    if (!func.isDeclaration())
-      continue; // Not targets
-
-    if (func.getName().startswith(lgcName::MeshTaskCallPrefix)) {
-      for (auto user : func.users()) {
-        CallInst *const call = cast<CallInst>(user);
-
-        if (call->getFunction() != entryPoint)
-          continue; // Not belong to mesh shader
-
-        m_builder.SetInsertPoint(call);
-
-        if (func.getName().startswith(lgcName::MeshTaskSetMeshOutputs)) {
-          // Set mesh outputs
-          assert(call->arg_size() == 2);
-          auto vertexCount = call->getOperand(0);
-          auto primitiveCount = call->getOperand(1);
-
-          setMeshOutputs(vertexCount, primitiveCount);
-        } else if (func.getName().startswith(lgcName::MeshTaskSetPrimitiveIndices)) {
-          // Set primitive indices
-          assert(call->arg_size() == 2);
-          auto primitiveIndex = call->getOperand(0);
-          auto primitiveIndices = call->getOperand(1);
-
-          setPrimitiveIndices(primitiveIndex, primitiveIndices);
-        } else if (func.getName().startswith(lgcName::MeshTaskSetPrimitiveCulled)) {
-          // Set primitive culled
-          assert(call->arg_size() == 2);
-          auto primitiveIndex = call->getOperand(0);
-          auto isCulled = call->getOperand(1);
-
-          setPrimitiveCulled(primitiveIndex, isCulled);
-        } else if (func.getName().startswith(lgcName::MeshTaskGetMeshInput)) {
-          // Get mesh input
-          assert(call->arg_size() == 1);
-          unsigned builtIn = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
-
-          // NOTE: Mesh shader input lowering is supposed to happen at the beginning of API mesh shader.
-          m_builder.SetInsertPoint(&*apiMeshEntryBlock->getFirstInsertionPt());
-
-          auto meshInput = getMeshInput(static_cast<BuiltInKind>(builtIn));
-          assert(meshInput->getType() == call->getType());
-          call->replaceAllUsesWith(meshInput);
-        } else if (func.getName().startswith(lgcName::MeshTaskReadTaskPayload)) {
-          // Read task payload
-          assert(call->arg_size() == 1);
-
-          auto byteOffset = call->getOperand(0);
-          auto readValue = readTaskPayload(call->getType(), byteOffset);
-          call->replaceAllUsesWith(readValue);
-        } else if (func.getName().startswith(lgcName::MeshTaskWriteVertexOutput)) {
-          // Write vertex output
-          assert(call->arg_size() == 3);
-          auto outputOffset = call->getOperand(0);
-          auto vertexIndex = call->getOperand(1);
-          auto outputValue = call->getOperand(2);
-
-          writeVertexOutput(outputOffset, vertexIndex, outputValue);
-        } else if (func.getName().startswith(lgcName::MeshTaskWritePrimitiveOutput)) {
-          // Write primitive output
-          assert(call->arg_size() == 3);
-          auto outputOffset = call->getOperand(0);
-          auto primitiveIndex = call->getOperand(1);
-          auto outputValue = call->getOperand(2);
-
-          writePrimitiveOutput(outputOffset, primitiveIndex, outputValue);
-        } else {
-          llvm_unreachable("Unknown mesh shader call!");
-        }
-
-        removedCalls.push_back(call);
-      }
-    }
-  }
+  static auto visitor = llvm_dialects::VisitorBuilder<MeshTaskShader>()
+                            .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+                            .add<TaskPayloadPtrOp>(&MeshTaskShader::lowerTaskPayloadPtr)
+                            .add<SetMeshOutputsOp>(&MeshTaskShader::lowerSetMeshOutputs)
+                            .add<SetMeshPrimitiveIndicesOp>(&MeshTaskShader::lowerSetMeshPrimitiveIndices)
+                            .add<SetMeshPrimitiveCulledOp>(&MeshTaskShader::lowerSetMeshPrimitiveCulled)
+                            .add<GetMeshBuiltinInputOp>(&MeshTaskShader::lowerGetMeshBuiltinInput)
+                            .add<WriteMeshVertexOutputOp>(&MeshTaskShader::lowerWriteMeshVertexOutput)
+                            .add<WriteMeshPrimitiveOutputOp>(&MeshTaskShader::lowerWriteMeshPrimitiveOutput)
+                            .build();
+  visitor.visit(*this, *entryPoint);
 
   // Clear removed calls
-  for (auto call : removedCalls) {
+  for (auto call : m_callsToRemove) {
     call->dropAllReferences();
     call->eraseFromParent();
   }
-}
-
-// =====================================================================================================================
-// Set the actual output size of the primitives and vertices that the mesh shader workgroup will emit.
-//
-// @param vertexCount : Actual output size of the vertices
-// @param primitiveCount : Actual output size of the primitives
-void MeshTaskShader::setMeshOutputs(Value *vertexCount, Value *primitiveCount) {
-  auto setMeshOutputsCall = m_builder.GetInsertPoint();
-
-  auto checkSetMeshOutputsBlock = m_builder.GetInsertBlock();
-  auto setMeshOutputsBlock = checkSetMeshOutputsBlock->splitBasicBlock(setMeshOutputsCall, ".setMeshOutputs");
-  auto endSetMeshOutputsBlock = setMeshOutputsBlock->splitBasicBlock(setMeshOutputsCall, ".endSetMeshOutputs");
-
-  // Modify ".checkSetMeshOutputs" block
-  {
-    m_builder.SetInsertPoint(checkSetMeshOutputsBlock->getTerminator());
-
-    auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_waveThreadInfo.threadIdInSubgroup, m_builder.getInt32(0));
-    m_builder.CreateCondBr(firstThreadInSubgroup, setMeshOutputsBlock, endSetMeshOutputsBlock);
-    checkSetMeshOutputsBlock->getTerminator()->eraseFromParent(); // Remove old terminator
-  }
-
-  // Construct ".setMeshOutputs" block
-  {
-    m_builder.SetInsertPoint(setMeshOutputsBlock->getTerminator());
-
-    // Promote vertex/primitive count to SGPRs
-    vertexCount = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertexCount);
-    primitiveCount = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primitiveCount);
-
-    // Check if vertex count or primitive count is zero. If so, set both to zero in order to disable vertex/primitive
-    // exporting.
-    auto zeroVertexCount = m_builder.CreateICmpEQ(vertexCount, m_builder.getInt32(0));
-    auto zeroPrimitiveCount = m_builder.CreateICmpEQ(primitiveCount, m_builder.getInt32(0));
-    auto hasZeroCount = m_builder.CreateOr(zeroVertexCount, zeroPrimitiveCount);
-    vertexCount = m_builder.CreateSelect(hasZeroCount, m_builder.getInt32(0), vertexCount);
-    primitiveCount = m_builder.CreateSelect(hasZeroCount, m_builder.getInt32(0), primitiveCount);
-
-    // NOTE: Here, we promote vertex/primitive count to SGPRs once again because M0 implicitly used in s_sendmsg is
-    // SGPR. LLVM backend has issues of handling this because it doesn't use s_cselect to translate LLVM IR select
-    // instruction (which keeps the destination operand still in SGPR) and it doesn't use readfirstlane to promote
-    // VGPR to SGPR for M0.
-    vertexCount = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertexCount);
-    primitiveCount = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primitiveCount);
-
-    // M0[10:0] = vertexCount, M0[22:12] = primitiveCount
-    Value *m0 = m_builder.CreateShl(primitiveCount, 12);
-    m0 = m_builder.CreateOr(m0, vertexCount);
-    m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, {m_builder.getInt32(GsAllocReq), m0});
-
-    Value *ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexCount));
-    writeValueToLds(vertexCount, ldsOffset);
-
-    ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveCount));
-    writeValueToLds(primitiveCount, ldsOffset);
-  }
-
-  // Construct ".endSetMeshOutputs" block
-  {
-    m_builder.SetInsertPoint(endSetMeshOutputsBlock->getTerminator());
-
-    // Currently, nothing to do
-  }
-}
-
-// =====================================================================================================================
-// Set primitive indices by forming primitive connectivity data and writing it to LDS.
-//
-// @param primitiveIndex : Primitive indexing
-// @param primitiveIndices : All vertex index values that are used to form this primitive
-void MeshTaskShader::setPrimitiveIndices(Value *primitiveIndex, Value *primitiveIndices) {
-  //
-  // HW requires the primitive connectivity data has the following bit layout:
-  //
-  //   +----------------+---------------+---------------+---------------+
-  //   | Null Primitive | Vertex Index2 | Vertex Index1 | Vertex Index0 |
-  //   | [31]           | [28:20]       | [18:10]       | [8:0]         |
-  //   +----------------+---------------+---------------+---------------+
-  //
-  auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
-  Value *primitiveData = nullptr;
-
-  if (meshMode.outputPrimitive == OutputPrimitives::Points) {
-    assert(primitiveIndices->getType() == m_builder.getInt32Ty()); // i32
-    primitiveData = primitiveIndices;
-  } else if (meshMode.outputPrimitive == OutputPrimitives::Lines) {
-    assert(primitiveIndices->getType() == FixedVectorType::get(m_builder.getInt32Ty(), 2)); // v2i32
-    Value *vertex0 = m_builder.CreateExtractElement(primitiveIndices, static_cast<uint64_t>(0));
-    Value *vertex1 = m_builder.CreateExtractElement(primitiveIndices, 1);
-
-    if (m_gfxIp.major <= 11) {
-      primitiveData = m_builder.CreateShl(vertex1, 10);
-      primitiveData = m_builder.CreateOr(primitiveData, vertex0);
-    } else {
-      llvm_unreachable("Not implemented!");
-    }
-  } else {
-    assert(meshMode.outputPrimitive == OutputPrimitives::Triangles);
-    Value *vertex0 = m_builder.CreateExtractElement(primitiveIndices, static_cast<uint64_t>(0));
-    Value *vertex1 = m_builder.CreateExtractElement(primitiveIndices, 1);
-    Value *vertex2 = m_builder.CreateExtractElement(primitiveIndices, 2);
-
-    if (m_gfxIp.major <= 11) {
-      primitiveData = m_builder.CreateShl(vertex2, 10);
-      primitiveData = m_builder.CreateOr(primitiveData, vertex1);
-      primitiveData = m_builder.CreateShl(primitiveData, 10);
-      primitiveData = m_builder.CreateOr(primitiveData, vertex0);
-    } else {
-      llvm_unreachable("Not implemented!");
-    }
-  }
-
-  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveIndices));
-  Value *ldsOffset = m_builder.CreateAdd(ldsStart, primitiveIndex);
-
-  // NOTE: We first clear old primitive connectivity data and use atomic OR operation to set new data. This is because
-  // the null primitive flag might be set via built-in CullPrimitive.
-  static const unsigned ClearMask = (1u << 31);
-  atomicOpWithLds(AtomicRMWInst::And, m_builder.getInt32(ClearMask), ldsOffset);
-  atomicOpWithLds(AtomicRMWInst::Or, primitiveData, ldsOffset);
-}
-
-// =====================================================================================================================
-// Set primitive culled state by writing the null primitive flag to LDS.
-//
-// @param primitiveIndex : Primitive indexing
-// @param isCulled : Whether this primitive is culled
-void MeshTaskShader::setPrimitiveCulled(Value *primitiveIndex, Value *isCulled) {
-  //
-  // HW requires the primitive connectivity data has the following bit layout:
-  //   [31]    = Null primitive flag
-  //   [28:20] = Index of vertex2
-  //   [18:10] = Index of vertex1
-  //   [8:0]   = Index of vertex0
-  //
-  assert(isCulled->getType()->isIntegerTy(1));
-
-  static const unsigned NullPrimitive = (1u << 31);
-  auto nullPrimitive = m_builder.CreateSelect(isCulled, m_builder.getInt32(NullPrimitive), m_builder.getInt32(0));
-
-  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveIndices));
-  Value *ldsOffset = m_builder.CreateAdd(ldsStart, primitiveIndex);
-
-  // NOTE: We first clear null primitive flag and use atomic OR operation to set new flag. This is because the
-  // primitive connectivity data might be set via built-in PrimitiveXXXIndices.
-  static const unsigned ClearMask = ~(1u << 31);
-  atomicOpWithLds(AtomicRMWInst::And, m_builder.getInt32(ClearMask), ldsOffset);
-  atomicOpWithLds(AtomicRMWInst::Or, nullPrimitive, ldsOffset);
-}
-
-// =====================================================================================================================
-// Get mesh built-in input.
-//
-// @param builtIn : Input built-in ID of mesh shader
-// @returns : Value of the specified input built-in
-Value *MeshTaskShader::getMeshInput(BuiltInKind builtIn) {
-  auto entryPoint = m_builder.GetInsertBlock()->getParent();
-  assert(getShaderStage(entryPoint) == ShaderStageMesh);
-
-  switch (builtIn) {
-  case BuiltInDrawIndex: {
-    auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
-    return getFunctionArgument(entryPoint, entryArgIdxs.drawIndex);
-  }
-
-  case BuiltInViewIndex: {
-    if (m_pipelineState->getInputAssemblyState().enableMultiView) {
-      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
-      return getFunctionArgument(entryPoint, entryArgIdxs.viewIndex);
-    }
-    return m_builder.getInt32(0);
-  }
-
-  case BuiltInNumWorkgroups:
-    return getMeshNumWorkgroups();
-
-  case BuiltInWorkgroupId:
-    return getMeshWorkgroupId();
-
-  case BuiltInLocalInvocationId:
-    return getMeshLocalInvocationId();
-
-  case BuiltInGlobalInvocationId:
-    return getMeshGlobalInvocationId();
-
-  case BuiltInLocalInvocationIndex:
-    return getMeshLocalInvocationIndex();
-
-  case BuiltInSubgroupId: {
-    // subgroupId = localInvocationIndex / subgroupSize
-    auto localInvocationIndex = getMeshLocalInvocationIndex();
-    unsigned subgroupSize = m_pipelineState->getShaderSubgroupSize(ShaderStageMesh);
-    assert(subgroupSize > 0 && subgroupSize % 32 == 0);
-    return m_builder.CreateLShr(localInvocationIndex, m_builder.getInt32(Log2_32(subgroupSize)));
-  }
-
-  case BuiltInNumSubgroups: {
-    // numSubgroups = numMeshThreads / subgroupSize
-    const auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
-    const unsigned numMeshThreads = meshMode.workgroupSizeX * meshMode.workgroupSizeY * meshMode.workgroupSizeZ;
-    unsigned subgroupSize = m_pipelineState->getShaderSubgroupSize(ShaderStageMesh);
-    assert(subgroupSize > 0 && subgroupSize % 32 == 0);
-    const unsigned numSubgroups = alignTo(numMeshThreads, subgroupSize) / subgroupSize;
-    return m_builder.getInt32(numSubgroups);
-  }
-
-  default:
-    llvm_unreachable("Unknown mesh input built-in!");
-    return nullptr;
-  }
-}
-
-// =====================================================================================================================
-// Write mesh shader vertex outputs to LDS.
-//
-// @param outputOffset : Relative offset of this output (in dwords) within all outputs of the indexed vertex
-// @param vertexIndex : Vertex indexing
-// @param outputValue : Output value to write
-void MeshTaskShader::writeVertexOutput(Value *outputOffset, Value *vertexIndex, Value *outputValue) {
-  const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh);
-  const unsigned vertexStride = 4 * resUsage->inOutUsage.outputMapLocCount; // Corresponds to vec4 output
-
-  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexOutput));
-  Value *ldsOffset = m_builder.CreateMul(vertexIndex, m_builder.getInt32(vertexStride));
-  ldsOffset = m_builder.CreateAdd(ldsOffset, outputOffset);
-  ldsOffset = m_builder.CreateAdd(ldsStart, ldsOffset);
-
-  writeValueToLds(outputValue, ldsOffset);
-}
-
-// =====================================================================================================================
-// Write mesh shader primitive outputs to LDS.
-//
-// @param outputOffset : Relative offset of this output (in dwords) within all outputs of the indexed primitive
-// @param vertexIndex : Primitive indexing
-// @param outputValue : Output value to write
-void MeshTaskShader::writePrimitiveOutput(Value *outputOffset, Value *primitiveIndex, Value *outputValue) {
-  const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh);
-  const unsigned primitiveStride = 4 * resUsage->inOutUsage.perPrimitiveOutputMapLocCount; // Corresponds to vec4 output
-
-  Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveOutput));
-  Value *ldsOffset = m_builder.CreateMul(primitiveIndex, m_builder.getInt32(primitiveStride));
-  ldsOffset = m_builder.CreateAdd(ldsOffset, outputOffset);
-  ldsOffset = m_builder.CreateAdd(ldsStart, ldsOffset);
-
-  writeValueToLds(outputValue, ldsOffset);
+  m_callsToRemove.clear();
 }
 
 // =====================================================================================================================
@@ -2235,13 +1945,13 @@ void MeshTaskShader::exportVertex() {
       clipCullDistances.push_back(cullDistance);
 
     // Do array padding
-    auto undef = PoisonValue::get(m_builder.getFloatTy());
+    auto poison = PoisonValue::get(m_builder.getFloatTy());
     if (clipCullDistances.size() <= 4) {
       while (clipCullDistances.size() < 4) // <4 x float>
-        clipCullDistances.push_back(undef);
+        clipCullDistances.push_back(poison);
     } else {
       while (clipCullDistances.size() < 8) // <8 x float>
-        clipCullDistances.push_back(undef);
+        clipCullDistances.push_back(poison);
     }
 
     unsigned pos = builtInUsage.pointSize ? 2 : 1;
@@ -2297,14 +2007,14 @@ void MeshTaskShader::exportVertex() {
         const unsigned clipDistanceCount = std::min(fsBuiltInUsage.clipDistance, builtInUsage.clipDistance);
         const unsigned cullDistanceCount = std::min(fsBuiltInUsage.cullDistance, builtInUsage.cullDistance);
 
-        auto undef = PoisonValue::get(m_builder.getFloatTy());
+        auto poison = PoisonValue::get(m_builder.getFloatTy());
 
         clipCullDistances.clear();
         for (unsigned i = 0; i < clipDistanceCount; ++i)
           clipCullDistances.push_back(clipDistances[i]);
 
         for (unsigned i = clipDistanceCount; i < fsBuiltInUsage.clipDistance; ++i)
-          clipCullDistances.push_back(undef);
+          clipCullDistances.push_back(poison);
 
         for (unsigned i = 0; i < cullDistanceCount; ++i)
           clipCullDistances.push_back(cullDistances[i]);
@@ -2312,10 +2022,10 @@ void MeshTaskShader::exportVertex() {
         // Do array padding
         if (clipCullDistances.size() <= 4) {
           while (clipCullDistances.size() < 4) // <4 x float>
-            clipCullDistances.push_back(undef);
+            clipCullDistances.push_back(poison);
         } else {
           while (clipCullDistances.size() < 8) // <8 x float>
-            clipCullDistances.push_back(undef);
+            clipCullDistances.push_back(poison);
         }
       }
     }
@@ -2379,7 +2089,7 @@ void MeshTaskShader::collectMeshStatsInfo(Function *entryPoint, Value *numMeshPr
     // NOTE: LLVM backend will try to apply atomics optimization. But here, we only have one active thread to execute
     // the global_atomic_add instruction. Thus, the optimization is completely unnecessary. To avoid this, we try to
     // move the added value to VGPR to mark it as "divergent".
-    Value *valueToAdd = UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
+    Value *valueToAdd = PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
     valueToAdd = m_builder.CreateInsertElement(valueToAdd, convertToDivergent(m_builder.getInt32(numMeshThreads)),
                                                static_cast<uint64_t>(0));
     valueToAdd =
@@ -2405,7 +2115,7 @@ void MeshTaskShader::collectMeshStatsInfo(Function *entryPoint, Value *numMeshPr
     // NOTE: LLVM backend will try to apply atomics optimization. But here, we only have one active thread to execute
     // the global_atomic_add instruction. Thus, the optimization is completely unnecessary. To avoid this, we try to
     // move the added value to VGPR to mark it as "divergent".
-    Value *valueToAdd = UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
+    Value *valueToAdd = PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2));
     valueToAdd =
         m_builder.CreateInsertElement(valueToAdd, convertToDivergent(numMeshPrimitives), static_cast<uint64_t>(0));
     valueToAdd = m_builder.CreateInsertElement(valueToAdd, convertToDivergent(m_builder.getInt32(0)), 1);
@@ -2430,7 +2140,7 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
     auto valueTy = values[0]->getType();
     assert(valueTy->isFloatTy() || valueTy->isIntegerTy(32)); // Must be float or i32
 
-    auto undef = PoisonValue::get(valueTy);
+    auto poison = PoisonValue::get(valueTy);
     unsigned validMask = 0;
     for (unsigned j = 0; j < 4; ++j) {
       if (values[j])
@@ -2465,16 +2175,16 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
                                       m_builder.getInt32(target + exports[i].index), // tgt
                                       m_builder.getInt32(validMask),                 // en
                                       values[0],                                     // src0
-                                      values[1] ? values[1] : undef,                 // src1
-                                      values[2] ? values[2] : undef,                 // src2
-                                      values[3] ? values[3] : undef,                 // src3
+                                      values[1] ? values[1] : poison,                // src1
+                                      values[2] ? values[2] : poison,                // src2
+                                      values[3] ? values[3] : poison,                // src3
                                       m_builder.getInt1(exportDone),                 // done
                                       m_waveThreadInfo.rowInSubgroup,                // row number
                                   });
       } else {
         assert(kind == ExportKind::VertAttr || kind == ExportKind::PrimAttr);
 
-        Value *valueToStore = UndefValue::get(FixedVectorType::get(valueTy, 4));
+        Value *valueToStore = PoisonValue::get(FixedVectorType::get(valueTy, 4));
         for (unsigned j = 0; j < 4; ++j) {
           if (values[j])
             valueToStore = m_builder.CreateInsertElement(valueToStore, values[j], j);
@@ -2507,9 +2217,9 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
                                     m_builder.getInt32(target + exports[i].index), // tgt
                                     m_builder.getInt32(validMask),                 // en
                                     values[0],                                     // src0
-                                    values[1] ? values[1] : undef,                 // src1
-                                    values[2] ? values[2] : undef,                 // src2
-                                    values[3] ? values[3] : undef,                 // src3
+                                    values[1] ? values[1] : poison,                // src1
+                                    values[2] ? values[2] : poison,                // src2
+                                    values[3] ? values[3] : poison,                // src3
                                     m_builder.getInt1(exportDone),                 // done
                                     m_builder.getFalse(),                          // vm
                                 });
@@ -2587,7 +2297,8 @@ Value *MeshTaskShader::getMeshFlatWorkgroupId() {
 
   auto ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::FlatWorkgroupId));
   auto flatWorkgroupId = readValueFromLds(m_builder.getInt32Ty(), ldsOffset);
-  flatWorkgroupId = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, flatWorkgroupId); // Promoted to SGPR
+  flatWorkgroupId = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane,
+                                              flatWorkgroupId); // Promoted to SGPR
   flatWorkgroupId->setName("flatWorkgroupId");
 
   return flatWorkgroupId;
@@ -2647,22 +2358,25 @@ Value *MeshTaskShader::getMeshWorkgroupId() {
     auto dispatchDimXMulY = m_builder.CreateMul(dispatchDimX, dispatchDimY);
 
     workgroupIdZ = m_builder.CreateUDiv(flatWorkgroupId, dispatchDimXMulY);
-    workgroupIdZ = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, workgroupIdZ, nullptr,
-                                             "workgroupIdZ"); // Promoted to SGPR
+    workgroupIdZ =
+        m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, workgroupIdZ, nullptr,
+                                  "workgroupIdZ"); // Promoted to SGPR
 
     auto diff = m_builder.CreateMul(dispatchDimXMulY, workgroupIdZ);
     diff = m_builder.CreateSub(flatWorkgroupId, diff);
     workgroupIdY = m_builder.CreateUDiv(diff, dispatchDimX);
-    workgroupIdY = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, workgroupIdY, nullptr,
-                                             "workgroupIdY"); // Promoted to SGPR
+    workgroupIdY =
+        m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, workgroupIdY, nullptr,
+                                  "workgroupIdY"); // Promoted to SGPR
 
     workgroupIdX = m_builder.CreateMul(dispatchDimX, workgroupIdY);
     workgroupIdX = m_builder.CreateSub(diff, workgroupIdX);
-    workgroupIdX = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, workgroupIdX, nullptr,
-                                             "workgroupIdX"); // Promoted to SGPR
+    workgroupIdX =
+        m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, workgroupIdX, nullptr,
+                                  "workgroupIdX"); // Promoted to SGPR
   }
 
-  Value *workgroupId = UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 3));
+  Value *workgroupId = PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 3));
   workgroupId = m_builder.CreateInsertElement(workgroupId, workgroupIdX, static_cast<uint64_t>(0));
   workgroupId = m_builder.CreateInsertElement(workgroupId, workgroupIdY, 1);
   workgroupId = m_builder.CreateInsertElement(workgroupId, workgroupIdZ, 2);
@@ -2724,7 +2438,7 @@ Value *MeshTaskShader::getMeshLocalInvocationId() {
     localInvocationIdX = m_builder.CreateSub(diff, localInvocationIdX, "localInvocationIdX");
   }
 
-  Value *localInvocationId = UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 3));
+  Value *localInvocationId = PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 3));
   localInvocationId = m_builder.CreateInsertElement(localInvocationId, localInvocationIdX, static_cast<uint64_t>(0));
   localInvocationId = m_builder.CreateInsertElement(localInvocationId, localInvocationIdY, 1);
   localInvocationId = m_builder.CreateInsertElement(localInvocationId, localInvocationIdZ, 2);
@@ -3141,12 +2855,19 @@ void MeshTaskShader::atomicOpWithLds(AtomicRMWInst::BinOp atomicOp, Value *atomi
 }
 
 // =====================================================================================================================
-// Create LDS fence and barrier to guarantee the synchronization of LDS operations.
+// Create both LDS fence and barrier to guarantee the synchronization of LDS operations.
 void MeshTaskShader::createFenceAndBarrier() {
   SyncScope::ID syncScope = m_builder.getContext().getOrInsertSyncScopeID("workgroup");
   m_builder.CreateFence(AtomicOrdering::Release, syncScope);
-  m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+  createBarrier();
   m_builder.CreateFence(AtomicOrdering::Acquire, syncScope);
+}
+
+// =====================================================================================================================
+// Create LDS barrier to guarantee the synchronization of LDS operations.
+void MeshTaskShader::createBarrier() {
+
+  m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 }
 
 } // namespace lgc

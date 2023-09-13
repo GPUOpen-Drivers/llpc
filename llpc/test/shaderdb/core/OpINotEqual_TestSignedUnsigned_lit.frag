@@ -23,10 +23,10 @@ void main()
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
-; SHADERTEST: %{{[0-9]*}} = icmp ne i32 %{{[0-9]*}}, 0
+; SHADERTEST: %{{[0-9]*}} = icmp ne i32 %{{[0-9a-zA-Z.]*}}, 0
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
-; SHADERTEST: icmp eq i32 %{{[0-9]*}}, 0
+; SHADERTEST: icmp eq i32 %{{[0-9a-zA-Z.]*}}, 0
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

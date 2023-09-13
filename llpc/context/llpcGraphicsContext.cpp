@@ -59,26 +59,21 @@ static cl::opt<bool> DisableColorExportShader("disable-color-export-shader", cl:
 // @param cacheHash : Cache hash code
 GraphicsContext::GraphicsContext(GfxIpVersion gfxIp, const GraphicsPipelineBuildInfo *pipelineInfo,
                                  MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash)
-    : PipelineContext(gfxIp, pipelineHash, cacheHash
-#if VKI_RAY_TRACING
-                      ,
-                      &pipelineInfo->rtState
+    : PipelineContext(gfxIp, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo), m_stageMask(0),
+      m_preRasterHasGs(false), m_useDualSourceBlend(false), m_activeStageCount(0) {
+  const Vkgc::BinaryData *gpurtShaderLibrary = nullptr;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
+  gpurtShaderLibrary = &pipelineInfo->shaderLibrary;
 #endif
-                      ),
-      m_pipelineInfo(pipelineInfo), m_stageMask(0), m_preRasterHasGs(false), m_activeStageCount(0) {
+  setRayTracingState(pipelineInfo->rtState, gpurtShaderLibrary);
 
   setUnlinked(pipelineInfo->unlinked);
-  // clang-format off
+
   const PipelineShaderInfo *shaderInfo[ShaderStageGfxCount] = {
-    &pipelineInfo->task,
-    &pipelineInfo->vs,
-    &pipelineInfo->tcs,
-    &pipelineInfo->tes,
-    &pipelineInfo->gs,
-    &pipelineInfo->mesh,
-    &pipelineInfo->fs,
+      &pipelineInfo->task, &pipelineInfo->vs,   &pipelineInfo->tcs, &pipelineInfo->tes,
+      &pipelineInfo->gs,   &pipelineInfo->mesh, &pipelineInfo->fs,
   };
-  // clang-format on
+
   for (unsigned stage = 0; stage < ShaderStageGfxCount; ++stage) {
     if (shaderInfo[stage]->pModuleData) {
       m_stageMask |= shaderStageToMask(static_cast<ShaderStage>(stage));
@@ -202,8 +197,9 @@ void GraphicsContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
     setVertexInputDescriptions(pipeline, hasher);
   }
 
-  if (isShaderStageInMask(ShaderStageFragment, stageMask) && (!unlinked || DisableColorExportShader)) {
-    // Give the color export state to the middle-end.
+  if ((isShaderStageInMask(ShaderStageFragment, stageMask) && (!unlinked || DisableColorExportShader)) ||
+      (stageMask == 0)) {
+    // Give the color export state to the middle-end. Empty stage mask indicates color export shader.
     setColorExportState(pipeline, hasher);
   }
 
@@ -227,17 +223,32 @@ void GraphicsContext::setTcsInputVertices(Module *tcsModule) {
 Options GraphicsContext::computePipelineOptions() const {
   Options options = PipelineContext::computePipelineOptions();
 
-  options.enableUberFetchShader =
-      reinterpret_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->enableUberFetchShader;
+  // If enable edge flag, client driver should force pass-through for ngg culling.
+  const GraphicsPipelineBuildInfo *graphicsPipelineBuildInfo =
+      static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo());
+  auto vertexInput = graphicsPipelineBuildInfo->pVertexInput;
+  if (vertexInput) {
+    for (unsigned i = 0; i < vertexInput->vertexBindingDescriptionCount; ++i) {
+      auto binding = &vertexInput->pVertexBindingDescriptions[i];
+      if (binding->binding == Vkgc::GlCompatibilityAttributeLocation::EdgeFlag) {
+        auto nggState = graphicsPipelineBuildInfo->nggState;
+        if (nggState.forceCullingMode || nggState.enableBackfaceCulling || nggState.enableFrustumCulling ||
+            nggState.enableBoxFilterCulling || nggState.enableSphereCulling || nggState.enableCullDistanceCulling ||
+            nggState.enableSmallPrimFilter) {
+          llvm_unreachable("Client driver should force pass-through for ngg culling when EdgeFlag is used.");
+        }
+        break;
+      }
+    }
+  }
+
+  auto pipelineInfo = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo());
+  options.enableUberFetchShader = pipelineInfo->enableUberFetchShader;
+  options.enableColorExportShader = pipelineInfo->enableColorExportShader;
   if (getGfxIpVersion().major >= 10) {
     // Only set NGG options for a GFX10+ graphics pipeline.
-    auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo());
     const auto &nggState = pipelineInfo->nggState;
-#if VKI_BUILD_GFX11
     if (!nggState.enableNgg && getGfxIpVersion().major < 11) // GFX11+ must enable NGG
-#else
-    if (!nggState.enableNgg)
-#endif
       options.nggFlags |= NggFlagDisable;
     else {
       options.nggFlags = (nggState.enableGsUse ? NggFlagEnableGsUse : 0) |
@@ -282,7 +293,9 @@ Options GraphicsContext::computePipelineOptions() const {
 // @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing
 // @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
 void GraphicsContext::setColorExportState(Pipeline *pipeline, Util::MetroHash64 *hasher) const {
-  const auto &cbState = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->cbState;
+  auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo());
+  const auto &cbState = pipelineInfo->cbState;
+
   if (hasher)
     hasher->Update(cbState);
   if (!pipeline)
@@ -292,7 +305,8 @@ void GraphicsContext::setColorExportState(Pipeline *pipeline, Util::MetroHash64 
   SmallVector<ColorExportFormat, MaxColorTargets> formats;
 
   state.alphaToCoverageEnable = cbState.alphaToCoverageEnable;
-  state.dualSourceBlendEnable = cbState.dualSourceBlendEnable;
+  state.dualSourceBlendEnable =
+      cbState.dualSourceBlendEnable || (pipelineInfo->cbState.dualSourceBlendDynamic && getUseDualSourceBlend());
 
   for (unsigned targetIndex = 0; targetIndex < MaxColorTargets; ++targetIndex) {
     if (cbState.target[targetIndex].format != VK_FORMAT_UNDEFINED) {
@@ -457,6 +471,7 @@ void GraphicsContext::setGraphicsStateInPipeline(Pipeline *pipeline, Util::Metro
 
     inputAssemblyState.disableVertexReuse = inputIaState.disableVertexReuse;
     inputAssemblyState.switchWinding = inputIaState.switchWinding;
+    inputAssemblyState.useVertexBufferDescArray = inputIaState.useVertexBufferDescArray;
 
     if (hasher) {
       // We need to hash patchControlPoints here, even though it is used separately in setTcsInputVertices as
@@ -465,8 +480,8 @@ void GraphicsContext::setGraphicsStateInPipeline(Pipeline *pipeline, Util::Metro
     }
 
     rasterizerState.rasterizerDiscardEnable = inputRsState.rasterizerDiscardEnable;
-    rasterizerState.usrClipPlaneMask = inputRsState.usrClipPlaneMask;
     rasterizerState.provokingVertexMode = static_cast<ProvokingVertexMode>(inputRsState.provokingVertexMode);
+    rasterizerState.rasterStream = inputRsState.rasterStream;
   }
 
   if (isShaderStageInMask(ShaderStageFragment, stageMask)) {
@@ -474,6 +489,7 @@ void GraphicsContext::setGraphicsStateInPipeline(Pipeline *pipeline, Util::Metro
     rasterizerState.perSampleShading = inputRsState.perSampleShading;
     rasterizerState.numSamples = inputRsState.numSamples;
     rasterizerState.samplePatternIdx = inputRsState.samplePatternIdx;
+    rasterizerState.pixelShaderSamples = inputRsState.pixelShaderSamples;
   }
 
   if (pipeline)

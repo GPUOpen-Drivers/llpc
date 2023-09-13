@@ -44,22 +44,23 @@ namespace Llpc {
 // @param pipelineHash : Pipeline hash code
 // @param cacheHash : Cache hash code
 RayTracingContext::RayTracingContext(GfxIpVersion gfxIP, const RayTracingPipelineBuildInfo *pipelineInfo,
-                                     const PipelineShaderInfo *traceRayShaderInfo, MetroHash::Hash *pipelineHash,
+                                     const PipelineShaderInfo *representativeShaderInfo, MetroHash::Hash *pipelineHash,
                                      MetroHash::Hash *cacheHash, unsigned indirectStageMask)
-    : PipelineContext(gfxIP, pipelineHash, cacheHash, &pipelineInfo->rtState), m_pipelineInfo(pipelineInfo),
-      m_traceRayShaderInfo(traceRayShaderInfo), m_linked(false), m_indirectStageMask(indirectStageMask),
-      m_entryName(""), m_payloadMaxSize(pipelineInfo->payloadSizeMaxInLib), m_callableDataMaxSize(0),
+    : PipelineContext(gfxIP, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo), m_representativeShaderInfo(),
+      m_linked(false), m_indirectStageMask(indirectStageMask), m_entryName(""),
+      m_payloadMaxSize(pipelineInfo->payloadSizeMaxInLib), m_callableDataMaxSize(0),
       m_attributeDataMaxSize(pipelineInfo->attributeSizeMaxInLib) {
+  const Vkgc::BinaryData *gpurtShaderLibrary = nullptr;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
+  gpurtShaderLibrary = &pipelineInfo->shaderTraceRay;
+#endif
+  setRayTracingState(pipelineInfo->rtState, gpurtShaderLibrary);
+
   m_resourceMapping = pipelineInfo->resourceMapping;
   m_pipelineLayoutApiHash = pipelineInfo->pipelineLayoutApiHash;
-}
 
-// =====================================================================================================================
-// Gets pipeline shader info of the specified shader stage
-//
-// @param shaderStage : Shader stage
-const PipelineShaderInfo *RayTracingContext::getPipelineShaderInfo(unsigned shaderId) const {
-  return m_traceRayShaderInfo;
+  if (representativeShaderInfo)
+    m_representativeShaderInfo.options = representativeShaderInfo->options;
 }
 
 // =====================================================================================================================
@@ -169,6 +170,7 @@ bool RayTracingContext::isRayTracingBuiltIn(unsigned builtIn) {
   case BuiltInObjectRayOriginKHR:
   case BuiltInObjectRayDirectionKHR:
   case BuiltInCullMaskKHR:
+  case BuiltInHitTriangleVertexPositionsKHR:
     return true;
   default:
     return false;
@@ -223,6 +225,16 @@ unsigned RayTracingContext::getSubgroupSizeUsage() const {
 }
 
 // =====================================================================================================================
+// Set the raytracing pipeline as indirect shader
+void RayTracingContext::setIndirectPipeline() {
+  m_indirectStageMask |=
+      shaderStageToMask(Vkgc::ShaderStageRayTracingClosestHit) | shaderStageToMask(Vkgc::ShaderStageRayTracingAnyHit) |
+      shaderStageToMask(Vkgc::ShaderStageCompute) | shaderStageToMask(Vkgc::ShaderStageRayTracingRayGen) |
+      shaderStageToMask(Vkgc::ShaderStageRayTracingIntersect) | shaderStageToMask(Vkgc::ShaderStageRayTracingMiss) |
+      shaderStageToMask(Vkgc::ShaderStageRayTracingCallable);
+}
+
+// =====================================================================================================================
 // Set pipeline state in Pipeline object for middle-end and/or calculate the hash for the state to be added.
 // Doing both these things in the same code ensures that we hash and use the same pipeline state in all situations.
 // For graphics, we use the shader stage mask to decide which parts of graphics state to use, omitting
@@ -240,8 +252,7 @@ void RayTracingContext::setPipelineState(lgc::Pipeline *pipeline, Util::MetroHas
   if (pipeline) {
     // Give the shader options (including the hash) to the middle-end.
     const auto allStages = maskToShaderStages(stageMask);
-    assert(m_traceRayShaderInfo);
-    lgc::ShaderOptions options = computeShaderOptions(*m_traceRayShaderInfo);
+    lgc::ShaderOptions options = computeShaderOptions(m_representativeShaderInfo);
     for (ShaderStage stage : make_filter_range(allStages, isNativeStage)) {
       pipeline->setShaderOptions(getLgcShaderStage(static_cast<ShaderStage>(stage)), options);
     }
@@ -262,6 +273,11 @@ lgc::Options RayTracingContext::computePipelineOptions() const {
   lgc::Options options = PipelineContext::computePipelineOptions();
   // NOTE: raytracing waveSize and subgroupSize can be different.
   options.fullSubgroups = false;
+
+  // TODO: Add a mode in Vkgc::LlpcRaytracingMode to represent lgc::RayTracingIndirectMode::Continuations.
+  if (m_pipelineInfo->mode == Vkgc::LlpcRaytracingMode::Continuations)
+    options.rtIndirectMode = lgc::RayTracingIndirectMode::ContinuationsContinufy;
+
   return options;
 }
 

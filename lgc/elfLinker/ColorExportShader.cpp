@@ -33,6 +33,7 @@
 #include "ColorExportShader.h"
 #include "lgc/patch/FragColorExport.h"
 #include "lgc/state/TargetInfo.h"
+#include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Target/TargetMachine.h"
 
 using namespace lgc;
@@ -42,7 +43,7 @@ using namespace llvm;
 // Constructor. This is where we store all the information needed to generate the export shader; other methods
 // do not need to look at PipelineState.
 ColorExportShader::ColorExportShader(PipelineState *pipelineState, ArrayRef<ColorExportInfo> exports)
-    : GlueShader(pipelineState->getLgcContext()), m_pipelineState(pipelineState) {
+    : GlueShader(pipelineState), m_killEnabled(false) {
   m_exports.append(exports.begin(), exports.end());
 
   memset(m_exportFormat, 0, sizeof(m_exportFormat));
@@ -53,10 +54,19 @@ ColorExportShader::ColorExportShader(PipelineState *pipelineState, ArrayRef<Colo
         static_cast<ExportFormat>(pipelineState->computeExportFormat(exp.ty, exp.location));
   }
 
-  PalMetadata *metadata = pipelineState->getPalMetadata();
-  DB_SHADER_CONTROL shaderControl = {};
-  shaderControl.u32All = metadata->getRegister(mmDB_SHADER_CONTROL);
-  m_killEnabled = shaderControl.bits.KILL_ENABLE;
+  if (!pipelineState->getOptions().enableColorExportShader) {
+    PalMetadata *metadata = pipelineState->getPalMetadata();
+    if (pipelineState->useRegisterFieldFormat()) {
+      auto dbShaderControl = metadata->getPipelineNode()[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
+                                 .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl]
+                                 .getMap(true);
+      m_killEnabled = dbShaderControl[Util::Abi::DbShaderControlMetadataKey::KillEnable].getBool();
+    } else {
+      DB_SHADER_CONTROL shaderControl = {};
+      shaderControl.u32All = metadata->getRegister(mmDB_SHADER_CONTROL);
+      m_killEnabled = shaderControl.bits.KILL_ENABLE;
+    }
+  }
 }
 
 // =====================================================================================================================
@@ -98,10 +108,16 @@ Module *ColorExportShader::generate() {
   // Create the function.
   Function *colorExportFunc = createColorExportFunc();
 
-  // Process each vertex input.
-  std::unique_ptr<FragColorExport> fragColorExport(new FragColorExport(&getContext(), m_pipelineState));
+  // Process each fragment output.
+  FragColorExport fragColorExport(&getContext(), m_pipelineState);
   auto ret = cast<ReturnInst>(colorExportFunc->back().getTerminator());
   BuilderBase builder(ret);
+
+  if (m_pipelineState->getOptions().enableColorExportShader) {
+    // NOTE: See LowerFragColorExport::jumpColorExport. Fragment shader uses a call amdgpu_gfx. In the amdgpu_gfx
+    // calling convention, the callee is expected to have the necessary waitcnt instructions.
+    builder.CreateIntrinsic(Intrinsic::amdgcn_s_waitcnt, {}, {builder.getInt32(0)});
+  }
 
   SmallVector<Value *, 8> values(MaxColorTargets + 1, nullptr);
   for (unsigned idx = 0; idx != m_exports.size(); ++idx) {
@@ -109,12 +125,12 @@ Module *ColorExportShader::generate() {
   }
 
   bool dummyExport = m_lgcContext->getTargetInfo().getGfxIpVersion().major < 10 || m_killEnabled;
-  fragColorExport->generateExportInstructions(m_exports, values, m_exportFormat, dummyExport, builder);
+  fragColorExport.generateExportInstructions(m_exports, values, m_exportFormat, dummyExport, builder);
   return colorExportFunc->getParent();
 }
 
 // =====================================================================================================================
-// Create module with function for the fetch shader. On return, the function contains only the code to copy the
+// Create module with function for the color export shader. On return, the function contains only the code to copy the
 // wave dispatch SGPRs and VGPRs to the return value.
 Function *ColorExportShader::createColorExportFunc() {
   // Create the module
@@ -132,11 +148,21 @@ Function *ColorExportShader::createColorExportFunc() {
   // Create the function. Mark SGPR inputs as "inreg".
   Function *func = Function::Create(funcTy, GlobalValue::ExternalLinkage, getGlueShaderName(), module);
   func->setCallingConv(CallingConv::AMDGPU_PS);
+  func->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
   setShaderStage(func, ShaderStageFragment);
 
   BasicBlock *block = BasicBlock::Create(func->getContext(), "", func);
   BuilderBase builder(block);
   builder.CreateRetVoid();
+
+  AttrBuilder attribBuilder(func->getContext());
+  attribBuilder.addAttribute("InitialPSInputAddr", std::to_string(0xFFFFFFFF));
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10) {
+    const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageFragment);
+    attribBuilder.addAttribute("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
+  }
+  func->addFnAttrs(attribBuilder);
+
   return func;
 }
 
@@ -145,12 +171,49 @@ Function *ColorExportShader::createColorExportFunc() {
 //
 // @param [in/out] outStream : The PAL metadata object in which to update the color format.
 void ColorExportShader::updatePalMetadata(PalMetadata &palMetadata) {
+  SmallVector<ExportFormat> finalExportFormats;
   bool hasDepthExpFmtZero = true;
   for (auto &info : m_exports) {
-    if (info.hwColorTarget == MaxColorTargets) {
+    if (info.hwColorTarget != MaxColorTargets) {
+      ExportFormat expFmt = m_exportFormat[info.hwColorTarget];
+      if (expFmt != EXP_FORMAT_ZERO)
+        finalExportFormats.push_back(expFmt);
+    } else {
       hasDepthExpFmtZero = false;
-      break;
+      unsigned depthMask = info.location;
+      if (!m_killEnabled && m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11 &&
+          m_pipelineState->getColorExportState().alphaToCoverageEnable) {
+        for (auto &curInfo : m_exports) {
+          if (curInfo.hwColorTarget == EXP_TARGET_MRT_0 && (m_exportFormat[EXP_TARGET_MRT_0] > EXP_FORMAT_32_GR)) {
+            // Mrt0 is enabled and its alpha channel is enabled
+            depthMask |= 0x8;
+            break;
+          }
+        }
+      }
+
+      unsigned depthExpFmt = EXP_FORMAT_ZERO;
+      if (depthMask & 0x4)
+        depthExpFmt = EXP_FORMAT_32_ABGR;
+      else if (depthMask & 0x2)
+        depthExpFmt = (depthMask & 0x8) ? EXP_FORMAT_32_ABGR : EXP_FORMAT_32_GR;
+      else if (depthMask & 0x1)
+        depthExpFmt = (depthMask & 0x8) ? EXP_FORMAT_32_AR : EXP_FORMAT_32_R;
+      palMetadata.setSpiShaderZFormat(depthExpFmt);
     }
   }
-  palMetadata.updateSpiShaderColFormat(m_exports, hasDepthExpFmtZero, m_killEnabled);
+
+  if (finalExportFormats.size() == 0 && hasDepthExpFmtZero) {
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10 || m_killEnabled) {
+      // NOTE: Hardware requires that fragment shader always exports "something" (color or depth) to the SX.
+      // If both SPI_SHADER_Z_FORMAT and SPI_SHADER_COL_FORMAT are zero, we need to override
+      // SPI_SHADER_COL_FORMAT to export one channel to MRT0. This dummy export format will be masked
+      // off by updateCbShaderMask().
+      finalExportFormats.push_back(EXP_FORMAT_32_R);
+    }
+  }
+
+  palMetadata.updateSpiShaderColFormat(finalExportFormats);
+  palMetadata.updateCbShaderMask(m_exports);
+  palMetadata.updateDbShaderControl();
 }

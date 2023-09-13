@@ -1,0 +1,26 @@
+; RUN: lgc -o - -passes='require<lgc-pipeline-state>,lgc-lower-debug-printf' %s | FileCheck --check-prefixes=IR %s
+; RUN: lgc -o - -passes='require<lgc-pipeline-state>,lgc-lower-debug-printf,print<lgc-pipeline-state>' %s -o /dev/null 2>&1 | FileCheck --check-prefixes=PALMD %s
+
+@str = internal addrspace(4) global [8 x i8] c"Test: %u"
+
+define spir_func void @simple(ptr addrspace(7) %buffer) !lgc.shaderstage !0 {
+; IR-LABEL: @simple(
+; IR-NOT: call {{.*}} @lgc.debug.printf
+  call void (...) @lgc.debug.printf(ptr addrspace(7) %buffer, ptr addrspace(4) @str, i32 42)
+  ret void
+}
+
+; IR: !amdgpu.pal.metadata.msgpack =
+
+; PALMD:      amdpal.format_strings:
+; PALMD-NEXT:   .strings:
+; PALMD-NEXT:     - .64bit_arguments:
+; PALMD-NEXT:         - 0
+; PALMD-NEXT:       .argument_count: 1
+; PALMD-NEXT:       .index:
+; PALMD-NEXT:       .string:         'Test: %u'
+; PALMD-NEXT:   .version:        1
+
+declare void @lgc.debug.printf(...)
+
+!0 = !{i32 7}
