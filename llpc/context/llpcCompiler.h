@@ -210,9 +210,12 @@ private:
   static std::condition_variable_any m_helperThreadConditionVariable; // Condition variable used by helper thread to
                                                                       // wait for main thread switching context
 
-  void buildShaderModuleResourceUsage(const ShaderModuleBuildInfo *shaderInfo, Vkgc::ResourcesNodes &resourcesNodes,
-                                      std::vector<ResourceNodeData> &inputSymbolInfo,
-                                      std::vector<ResourceNodeData> &outputSymbolInfo);
+  void buildShaderModuleResourceUsage(
+      const ShaderModuleBuildInfo *shaderInfo, Vkgc::ResourcesNodes &resourcesNodes,
+      std::vector<ResourceNodeData> &inputSymbolInfo, std::vector<ResourceNodeData> &outputSymbolInfo,
+      std::vector<ResourceNodeData> &uniformBufferInfo, std::vector<ResourceNodeData> &storageBufferInfo,
+      std::vector<ResourceNodeData> &textureSymbolInfo, std::vector<ResourceNodeData> &imageSymbolInfo,
+      std::vector<ResourceNodeData> &atomicCounterSymbolInfo, std::vector<ResourceNodeData> &defaultUniformSymbolInfo);
 };
 
 // Convert front-end LLPC shader stage to middle-end LGC shader stage
