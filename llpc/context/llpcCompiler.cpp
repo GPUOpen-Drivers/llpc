@@ -569,12 +569,26 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   ResourcesNodes resourceNodes = {};
   std::vector<ResourceNodeData> inputSymbolInfo;
   std::vector<ResourceNodeData> outputSymbolInfo;
+  std::vector<ResourceNodeData> uniformBufferInfo;
+  std::vector<ResourceNodeData> storageBufferInfo;
+  std::vector<ResourceNodeData> textureSymbolInfo;
+  std::vector<ResourceNodeData> imageSymbolInfo;
+  std::vector<ResourceNodeData> atomicCounterSymbolInfo;
+  std::vector<ResourceNodeData> defaultUniformSymbolInfo;
   if (shaderInfo->options.pipelineOptions.buildResourcesDataForShaderModule) {
-    buildShaderModuleResourceUsage(shaderInfo, resourceNodes, inputSymbolInfo, outputSymbolInfo);
+    buildShaderModuleResourceUsage(shaderInfo, resourceNodes, inputSymbolInfo, outputSymbolInfo, uniformBufferInfo,
+                                   storageBufferInfo, textureSymbolInfo, imageSymbolInfo, atomicCounterSymbolInfo,
+                                   defaultUniformSymbolInfo);
 
     allocSize += sizeof(ResourcesNodes);
     allocSize += inputSymbolInfo.size() * sizeof(ResourceNodeData);
     allocSize += outputSymbolInfo.size() * sizeof(ResourceNodeData);
+    allocSize += uniformBufferInfo.size() * sizeof(ResourceNodeData);
+    allocSize += storageBufferInfo.size() * sizeof(ResourceNodeData);
+    allocSize += textureSymbolInfo.size() * sizeof(ResourceNodeData);
+    allocSize += imageSymbolInfo.size() * sizeof(ResourceNodeData);
+    allocSize += atomicCounterSymbolInfo.size() * sizeof(ResourceNodeData);
+    allocSize += defaultUniformSymbolInfo.size() * sizeof(ResourceNodeData);
   }
 
   uint8_t *allocBuf =
@@ -601,12 +615,36 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     bufferWritePtr += sizeof(ResourcesNodes);
 
     memcpy(bufferWritePtr, inputSymbolInfo.data(), inputSymbolInfo.size() * sizeof(ResourceNodeData));
-    pResourcesNodes->pInputSymbolInfoBuffers = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    pResourcesNodes->pInputInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
     bufferWritePtr += inputSymbolInfo.size() * sizeof(ResourceNodeData);
 
     memcpy(bufferWritePtr, outputSymbolInfo.data(), outputSymbolInfo.size() * sizeof(ResourceNodeData));
-    pResourcesNodes->pOutputSymbolInfoBuffers = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    pResourcesNodes->pOutputInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
     bufferWritePtr += outputSymbolInfo.size() * sizeof(ResourceNodeData);
+
+    memcpy(bufferWritePtr, uniformBufferInfo.data(), uniformBufferInfo.size() * sizeof(ResourceNodeData));
+    pResourcesNodes->pUniformBufferInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    bufferWritePtr += uniformBufferInfo.size() * sizeof(ResourceNodeData);
+
+    memcpy(bufferWritePtr, storageBufferInfo.data(), storageBufferInfo.size() * sizeof(ResourceNodeData));
+    pResourcesNodes->pShaderStorageInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    bufferWritePtr += storageBufferInfo.size() * sizeof(ResourceNodeData);
+
+    memcpy(bufferWritePtr, textureSymbolInfo.data(), textureSymbolInfo.size() * sizeof(ResourceNodeData));
+    pResourcesNodes->pTexturesInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    bufferWritePtr += textureSymbolInfo.size() * sizeof(ResourceNodeData);
+
+    memcpy(bufferWritePtr, imageSymbolInfo.data(), imageSymbolInfo.size() * sizeof(ResourceNodeData));
+    pResourcesNodes->pImagesInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    bufferWritePtr += imageSymbolInfo.size() * sizeof(ResourceNodeData);
+
+    memcpy(bufferWritePtr, atomicCounterSymbolInfo.data(), atomicCounterSymbolInfo.size() * sizeof(ResourceNodeData));
+    pResourcesNodes->pAtomicCounterInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    bufferWritePtr += atomicCounterSymbolInfo.size() * sizeof(ResourceNodeData);
+
+    memcpy(bufferWritePtr, defaultUniformSymbolInfo.data(), defaultUniformSymbolInfo.size() * sizeof(ResourceNodeData));
+    pResourcesNodes->pDefaultUniformInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    bufferWritePtr += defaultUniformSymbolInfo.size() * sizeof(ResourceNodeData);
   }
 
   shaderOut->pModuleData = pShaderModuleData;
@@ -637,13 +675,11 @@ static bool getSymbolInfoFromSpvVariable(const SPIRVVariable *spvVar, ResourceNo
   spvVar->hasDecorate(DecorationBinding, 0, &binding);
 
   SPIRVType *varElemTy = spvVar->getType()->getPointerElementType();
-
-  if (varElemTy->getOpCode() == OpTypeArray) {
+  while (varElemTy->isTypeArray()) {
     arraySize = varElemTy->getArrayLength();
     varElemTy = varElemTy->getArrayElementType();
   }
   if (varElemTy->getOpCode() == OpTypeStruct) {
-    arraySize = varElemTy->getStructMemberCount();
     for (uint32_t i = 0; i < arraySize; i++) {
       if (isBuiltIn)
         break;
@@ -702,6 +738,41 @@ static bool getSymbolInfoFromSpvVariable(const SPIRVVariable *spvVar, ResourceNo
 }
 
 // =====================================================================================================================
+// Get sampler array size in default uniform struct
+//
+// @param spvStruct : Spriv default uniform struct type
+// @return: Sampler array size in this struct
+static unsigned getSamplerArraySizeInSpvStruct(const SPIRVType *spvStruct) {
+  assert(spvStruct->isTypeStruct());
+
+  unsigned memberCount = spvStruct->getStructMemberCount();
+  unsigned samplerArraySize = 0;
+
+  for (unsigned memberIdx = 0; memberIdx < memberCount; memberIdx++) {
+    SPIRVType *memberTy = spvStruct->getStructMemberType(memberIdx);
+
+    if (memberTy->isTypeSampledImage()) {
+      samplerArraySize += 1;
+    } else if (memberTy->isTypeArray()) {
+      unsigned arraySize = 1;
+      while (memberTy->isTypeArray()) {
+        arraySize = memberTy->getArrayLength();
+        memberTy = memberTy->getArrayElementType();
+      }
+      if (memberTy->isTypeSampledImage()) {
+        samplerArraySize += arraySize;
+      } else if (memberTy->isTypeStruct()) {
+        samplerArraySize += (arraySize * getSamplerArraySizeInSpvStruct(memberTy));
+      }
+    } else if (memberTy->isTypeStruct()) {
+      samplerArraySize *= getSamplerArraySizeInSpvStruct(memberTy);
+    }
+  }
+
+  return samplerArraySize;
+}
+
+// =====================================================================================================================
 // Parse the spirv binary to build the resource node data for buffers and opaque types, the resource node data will be
 // returned to client driver together with other info of ShaderModuleUsage
 //
@@ -709,10 +780,18 @@ static bool getSymbolInfoFromSpvVariable(const SPIRVVariable *spvVar, ResourceNo
 // @param [out] resourcesNodes : Output of resource usage
 // @param [out] inputSymbolInfos : Output of input symbol infos
 // @param [out] outputSymbolInfo : Output of output symbol infos
-void Compiler::buildShaderModuleResourceUsage(const ShaderModuleBuildInfo *shaderInfo,
-                                              Vkgc::ResourcesNodes &resourcesNodes,
-                                              std::vector<ResourceNodeData> &inputSymbolInfo,
-                                              std::vector<ResourceNodeData> &outputSymbolInfo) {
+// @param [out] uniformBufferInfo : Output of uniform buffer infos
+// @param [out] storageBufferInfo : Output of shader storage buffer infos
+// @param [out] textureSymbolInfo : Output of texture symbol infos
+// @param [out] imageSymbolInfo : Output of image symbol infos
+// @param [out] atomicCounterSymbolInfo : Output of atomic counter symbol infos
+// @param [out] defaultUniformSymbolInfo : Output of default uniform symbol infos
+void Compiler::buildShaderModuleResourceUsage(
+    const ShaderModuleBuildInfo *shaderInfo, Vkgc::ResourcesNodes &resourcesNodes,
+    std::vector<ResourceNodeData> &inputSymbolInfo, std::vector<ResourceNodeData> &outputSymbolInfo,
+    std::vector<ResourceNodeData> &uniformBufferInfo, std::vector<ResourceNodeData> &storageBufferInfo,
+    std::vector<ResourceNodeData> &textureSymbolInfo, std::vector<ResourceNodeData> &imageSymbolInfo,
+    std::vector<ResourceNodeData> &atomicCounterSymbolInfo, std::vector<ResourceNodeData> &defaultUniformSymbolInfo) {
   // Parse the SPIR-V stream.
   std::string spirvCode(static_cast<const char *>(shaderInfo->shaderBin.pCode), shaderInfo->shaderBin.codeSize);
   std::istringstream spirvStream(spirvCode);
@@ -768,8 +847,77 @@ void Compiler::buildShaderModuleResourceUsage(const ShaderModuleBuildInfo *shade
     }
   }
 
-  resourcesNodes.inputSymbolInfoCount = inputSymbolInfo.size();
-  resourcesNodes.outputSymbolInfoCount = outputSymbolInfo.size();
+  for (unsigned i = 0, varCount = module->getNumVariables(); i < varCount; ++i) {
+    SPIRVVariable *var = module->getVariable(i);
+    SPIRVType *varElemTy = var->getType()->getPointerElementType();
+    while (varElemTy->isTypeArray())
+      varElemTy = varElemTy->getArrayElementType();
+
+    switch (var->getStorageClass()) {
+    case StorageClassUniform: {
+      if (varElemTy->hasDecorate(DecorationBlock)) {
+        ResourceNodeData uniformBufferSymbol = {};
+        if (!getSymbolInfoFromSpvVariable(var, &uniformBufferSymbol))
+          uniformBufferInfo.push_back(uniformBufferSymbol);
+      } else {
+        ResourceNodeData shaderStorageSymbol = {};
+        if (!getSymbolInfoFromSpvVariable(var, &shaderStorageSymbol))
+          storageBufferInfo.push_back(shaderStorageSymbol);
+      }
+    } break;
+    case StorageClassStorageBuffer: {
+      ResourceNodeData shaderStorageSymbol = {};
+      if (!getSymbolInfoFromSpvVariable(var, &shaderStorageSymbol))
+        storageBufferInfo.push_back(shaderStorageSymbol);
+    } break;
+    case StorageClassUniformConstant: {
+      if (varElemTy->isTypeImage()) {
+        ResourceNodeData imageSymbol = {};
+        if (!getSymbolInfoFromSpvVariable(var, &imageSymbol)) {
+          SPIRVTypeImage *imageType = static_cast<SPIRVTypeImage *>(varElemTy);
+          imageSymbol.isTexelBuffer = imageType->getDescriptor().Dim == spv::DimBuffer;
+          imageSymbolInfo.push_back(imageSymbol);
+        }
+      } else if (varElemTy->isTypeSampledImage()) {
+        ResourceNodeData textureSymbol = {};
+        if (!getSymbolInfoFromSpvVariable(var, &textureSymbol)) {
+          SPIRVTypeSampledImage *sampledImageType = static_cast<SPIRVTypeSampledImage *>(varElemTy);
+          SPIRVTypeImage *imageType = sampledImageType->getImageType();
+          textureSymbol.isTexelBuffer = imageType->getDescriptor().Dim == spv::DimBuffer;
+          textureSymbolInfo.push_back(textureSymbol);
+        }
+      } else {
+        ResourceNodeData defaultUniformSymbol = {};
+        if (!getSymbolInfoFromSpvVariable(var, &defaultUniformSymbol))
+          defaultUniformSymbolInfo.push_back(defaultUniformSymbol);
+        // Process image sampler in default uniform
+        if (varElemTy->isTypeStruct()) {
+          ResourceNodeData textureSymbol = {};
+          textureSymbol.location = defaultUniformSymbol.location;
+          textureSymbol.arraySize = getSamplerArraySizeInSpvStruct(varElemTy) * defaultUniformSymbol.arraySize;
+          textureSymbol.isDefaultUniformSampler = true;
+          textureSymbolInfo.push_back(textureSymbol);
+        }
+      }
+    } break;
+    case StorageClassAtomicCounter: {
+      ResourceNodeData atomicCounterSymbol = {};
+      if (!getSymbolInfoFromSpvVariable(var, &atomicCounterSymbol))
+        atomicCounterSymbolInfo.push_back(atomicCounterSymbol);
+    } break;
+    default:
+      break;
+    }
+  }
+
+  resourcesNodes.inputInfoCount = inputSymbolInfo.size();
+  resourcesNodes.outputInfoCount = outputSymbolInfo.size();
+  resourcesNodes.uniformBufferInfoCount = uniformBufferInfo.size();
+  resourcesNodes.shaderStorageInfoCount = storageBufferInfo.size();
+  resourcesNodes.textureInfoCount = textureSymbolInfo.size();
+  resourcesNodes.imageInfoCount = imageSymbolInfo.size();
+  resourcesNodes.atomicCounterInfoCount = atomicCounterSymbolInfo.size();
+  resourcesNodes.defaultUniformInfoCount = defaultUniformSymbolInfo.size();
 }
 
 // =====================================================================================================================

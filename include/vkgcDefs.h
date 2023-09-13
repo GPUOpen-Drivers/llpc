@@ -589,12 +589,14 @@ enum class BinaryType : unsigned {
 
 /// Represents resource node data
 struct ResourceNodeData {
-  ResourceMappingNodeType type; ///< Type of this resource mapping node
-  unsigned set;                 ///< ID of descriptor set
-  unsigned binding;             ///< ID of descriptor binding
-  unsigned arraySize;           ///< Element count for arrayed binding
-  unsigned location;            ///< ID of resource location
-  BasicType basicType;          ///< Type of the variable or element
+  ResourceMappingNodeType type;     ///< Type of this resource mapping node
+  unsigned set;                     ///< ID of descriptor set
+  unsigned binding;                 ///< ID of descriptor binding
+  unsigned arraySize;               ///< Element count for arrayed binding
+  unsigned location;                ///< ID of resource location
+  unsigned isTexelBuffer;           ///< TRUE if it is ImageBuffer or TextureBuffer
+  unsigned isDefaultUniformSampler; ///< TRUE if it's sampler image in default uniform struct
+  BasicType basicType;              ///< Type of the variable or element
 };
 
 /// Represents the information of one shader entry in ShaderModuleExtraData
@@ -609,10 +611,22 @@ struct ShaderModuleEntryData {
 
 /// Represents the shader resources
 struct ResourcesNodes {
-  ResourceNodeData *pInputSymbolInfoBuffers;
-  uint32_t inputSymbolInfoCount;
-  ResourceNodeData *pOutputSymbolInfoBuffers;
-  uint32_t outputSymbolInfoCount;
+  ResourceNodeData *pInputInfo;
+  uint32_t inputInfoCount;
+  ResourceNodeData *pOutputInfo;
+  uint32_t outputInfoCount;
+  ResourceNodeData *pUniformBufferInfo;
+  uint32_t uniformBufferInfoCount;
+  ResourceNodeData *pShaderStorageInfo;
+  uint32_t shaderStorageInfoCount;
+  ResourceNodeData *pTexturesInfo;
+  uint32_t textureInfoCount;
+  ResourceNodeData *pImagesInfo;
+  uint32_t imageInfoCount;
+  ResourceNodeData *pAtomicCounterInfo;
+  uint32_t atomicCounterInfoCount;
+  ResourceNodeData *pDefaultUniformInfo;
+  uint32_t defaultUniformInfoCount;
 };
 
 /// Represents usage info of a shader module
