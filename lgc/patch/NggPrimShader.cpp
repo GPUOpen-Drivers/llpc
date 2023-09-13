@@ -2594,13 +2594,15 @@ void NggPrimShader::distributePrimitiveId(Value *primitiveId) {
 
     auto primitiveType = m_pipelineState->getInputAssemblyState().primitiveType;
     Value *provokingVertexIndex = nullptr;
-    if (primitiveType == lgc::PrimitiveType::Point) {
+    if (primitiveType == PrimitiveType::Point) {
       provokingVertexIndex = m_nggInputs.vertexIndex0;
-    } else if (primitiveType == lgc::PrimitiveType::LineList || primitiveType == lgc::PrimitiveType::LineStrip) {
+    } else if (primitiveType == PrimitiveType::LineList || primitiveType == PrimitiveType::LineStrip) {
       provokingVertexIndex = m_pipelineState->getRasterizerState().provokingVertexMode == ProvokingVertexFirst
                                  ? m_nggInputs.vertexIndex0
                                  : m_nggInputs.vertexIndex1;
     } else {
+      assert(primitiveType != PrimitiveType::Rect && primitiveType != PrimitiveType::Quad &&
+             primitiveType != PrimitiveType::Patch);
       provokingVertexIndex = m_pipelineState->getRasterizerState().provokingVertexMode == ProvokingVertexFirst
                                  ? m_nggInputs.vertexIndex0
                                  : m_nggInputs.vertexIndex2;
