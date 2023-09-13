@@ -2741,11 +2741,13 @@ void PatchResourceCollect::updateInputLocInfoMapWithUnpack() {
     }
   }
 
-  // Special processing for TES inputLocInfoMap and prePatchInputLocMap
-  // If TCS output has dynamic location indexing from [0,2], we need add the corresponding location info to TES input
-  // map. Otherwise, it will cause mismatch when the dynamic indexing is in a loop and TES only uses location 1.
+  // Special processing for TES/Mesh inputLocInfoMap and TES prePatchInputLocMap as their output location offset can be
+  // dynamic. The dynamic location offset is marked with non-invalid value in the output map. We should keep the
+  // corresponding input location in the next stage. For example, if TCS output has dynamic location indexing from
+  // [0,2], we need add the corresponding location info to TES input map. Otherwise, it will cause mismatch when the
+  // dynamic indexing is in a loop and TES only uses location 1.
   auto preStage = m_pipelineState->getPrevShaderStage(m_shaderStage);
-  if (m_shaderStage == ShaderStageTessEval && preStage != ShaderStageInvalid) {
+  if (preStage == ShaderStageTessControl || preStage == ShaderStageMesh) {
     if (!inputLocInfoMap.empty()) {
       auto &outputLocInfoMap = m_pipelineState->getShaderResourceUsage(preStage)->inOutUsage.outputLocInfoMap;
       for (auto &infoPair : outputLocInfoMap) {
