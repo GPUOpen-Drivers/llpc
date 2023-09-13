@@ -123,10 +123,8 @@ template <> inline void SPIRVMap<CmpInst::Predicate, Op>::init() {
   _SPIRV_OP(ICMP_SGE, SGreaterThanEqual)
   _SPIRV_OP(ICMP_SLT, SLessThan)
   _SPIRV_OP(ICMP_SLE, SLessThanEqual)
-#if SPV_VERSION >= 0x10400
   _SPIRV_OP(ICMP_EQ, PtrEqual)
   _SPIRV_OP(ICMP_NE, PtrNotEqual)
-#endif
 #undef _SPIRV_OP
 }
 typedef SPIRVMap<CmpInst::Predicate, Op> CmpMap;

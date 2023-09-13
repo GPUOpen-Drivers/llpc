@@ -196,7 +196,7 @@ public:
   void gatherUsage(llvm::Module &module);
 
   // Fix up uses of shader inputs to use entry args directly
-  void fixupUses(llvm::Module &module, PipelineState *pipelineState);
+  void fixupUses(llvm::Module &module, PipelineState *pipelineState, bool computeWithIndirectCall);
 
   // Get argument types for shader inputs
   uint64_t getShaderArgTys(PipelineState *pipelineState, ShaderStage shaderStage, llvm::Function *origFunc,

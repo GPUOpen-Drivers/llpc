@@ -76,6 +76,10 @@ public:
   // retrieve the compiled glue code to store in the cache.
   virtual llvm::ArrayRef<llvm::StringRef> getGlueInfo() = 0;
 
+  // Build color export shader
+  //
+  // @param exports : Fragment export info
+  // @param enableKill : Whether this fragment shader has kill enabled.
   virtual llvm::StringRef buildColorExportShader(llvm::ArrayRef<ColorExportInfo> exports, bool enableKill) = 0;
 
   // Add a blob for a particular chunk of glue code, typically retrieved from a cache. The blob is not copied,

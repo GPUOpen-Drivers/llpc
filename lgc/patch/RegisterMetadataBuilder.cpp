@@ -816,16 +816,6 @@ void RegisterMetadataBuilder::buildPsRegisters() {
     dbShaderControl[Util::Abi::DbShaderControlMetadataKey::PreShaderDepthCoverageEnable] =
         fragmentMode.postDepthCoverage;
 
-  // SPI_SHADER_Z_FORMAT
-  unsigned depthExpFmt = EXP_FORMAT_ZERO;
-  if (builtInUsage.sampleMask)
-    depthExpFmt = EXP_FORMAT_32_ABGR;
-  else if (builtInUsage.fragStencilRef)
-    depthExpFmt = EXP_FORMAT_32_GR;
-  else if (builtInUsage.fragDepth)
-    depthExpFmt = EXP_FORMAT_32_R;
-  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::SpiShaderZFormat] = depthExpFmt;
-
   // SPI_PS_INPUT_CNTL_0..31
   // NOTE: PAL expects at least one mmSPI_PS_INPUT_CNTL_0 register set, so we always patch it at least one if none
   // were identified in the shader.
@@ -952,19 +942,6 @@ void RegisterMetadataBuilder::buildPsRegisters() {
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::UsesUavs] = resUsage->resourceWrite;
   }
 
-  // CB_SHADER_MASK
-  unsigned cbShaderMask = resUsage->inOutUsage.fs.cbShaderMask;
-  cbShaderMask = resUsage->inOutUsage.fs.isNullFs ? 0 : cbShaderMask;
-  auto cbShaderMaskNode = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::CbShaderMask].getMap(true);
-  cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output0Enable] = cbShaderMask & 0xF;
-  cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output1Enable] = (cbShaderMask >> 4) & 0xF;
-  cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output2Enable] = (cbShaderMask >> 8) & 0xF;
-  cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output3Enable] = (cbShaderMask >> 12) & 0xF;
-  cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output4Enable] = (cbShaderMask >> 16) & 0xF;
-  cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output5Enable] = (cbShaderMask >> 20) & 0xF;
-  cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output6Enable] = (cbShaderMask >> 24) & 0xF;
-  cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output7Enable] = (cbShaderMask >> 28) & 0xF;
-
   // Fill .ps_input_semantic for partial pipeline
   if (m_pipelineState->isUnlinked()) {
     // Collect semantic info for generic input and builtIns {gl_ClipDistance, gl_CulDistance, gl_Layer,
@@ -998,21 +975,20 @@ void RegisterMetadataBuilder::buildPsRegisters() {
 void RegisterMetadataBuilder::buildCsRegisters(ShaderStage shaderStage) {
   assert(shaderStage == ShaderStageCompute || shaderStage == ShaderStageTask);
   if (shaderStage == ShaderStageCompute) {
-    Function *attribFunc = nullptr;
+    Function *entryFunc = nullptr;
     for (Function &func : *m_module) {
-      // Only entrypoint and amd_gfx functions may have the function attribute for workgroup id.
-      if (isShaderEntryPoint(&func) || (func.getCallingConv() == CallingConv::AMDGPU_Gfx)) {
-        attribFunc = &func;
+      // Only entrypoint compute shader may have the function attribute for workgroup id optimization.
+      if (isShaderEntryPoint(&func)) {
+        entryFunc = &func;
         break;
       }
     }
-    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidXEn] =
-        !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-x");
-    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidYEn] =
-        !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-y");
-    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidZEn] =
-        !attribFunc->hasFnAttribute("amdgpu-no-workgroup-id-z");
-
+    bool hasWorkgroupIdX = !entryFunc || !entryFunc->hasFnAttribute("amdgpu-no-workgroup-id-x");
+    bool hasWorkgroupIdY = !entryFunc || !entryFunc->hasFnAttribute("amdgpu-no-workgroup-id-y");
+    bool hasWorkgroupIdZ = !entryFunc || !entryFunc->hasFnAttribute("amdgpu-no-workgroup-id-z");
+    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidXEn] = hasWorkgroupIdX;
+    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidYEn] = hasWorkgroupIdY;
+    getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidZEn] = hasWorkgroupIdZ;
   } else {
     getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidXEn] = true;
     getComputeRegNode()[Util::Abi::ComputeRegisterMetadataKey::TgidYEn] = true;

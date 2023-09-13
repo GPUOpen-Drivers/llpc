@@ -1038,16 +1038,13 @@ void SPIRVToLLVM::setLLVMLoopMetadata(SPIRVLoopMerge *lm, BranchInst *bi) {
   } else if (lm->getLoopControl() == LoopControlDontUnrollMask) {
     name = llvm::MDString::get(*m_context, "llvm.loop.unroll.disable");
     mDs.push_back(name);
-  }
-#if SPV_VERSION >= 0x10400
-  else if (lm->getLoopControl() & LoopControlPartialCountMask) {
+  } else if (lm->getLoopControl() & LoopControlPartialCountMask) {
     name = llvm::MDString::get(*m_context, "llvm.loop.unroll.count");
     mDs.push_back(name);
 
     auto partialCount = ConstantInt::get(Type::getInt32Ty(*m_context), lm->getLoopControlParameters().at(0));
     mDs.push_back(ConstantAsMetadata::get(partialCount));
   }
-#endif
 
   if (lm->getLoopControl() & LoopControlDependencyInfiniteMask ||
       (lm->getLoopControl() & LoopControlDependencyLengthMask)) {
@@ -1056,7 +1053,6 @@ void SPIRVToLLVM::setLLVMLoopMetadata(SPIRVLoopMerge *lm, BranchInst *bi) {
     return;
   }
 
-#if SPV_VERSION >= 0x10400
   if (lm->getLoopControl() & LoopControlIterationMultipleMask) {
     // TODO: Potentially useful but without llvm mappings
     return;
@@ -1066,7 +1062,6 @@ void SPIRVToLLVM::setLLVMLoopMetadata(SPIRVLoopMerge *lm, BranchInst *bi) {
     // No LLVM mapping and not too important
     return;
   }
-#endif
 
   if (mDs.empty())
     return;
@@ -5058,7 +5053,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     return mapValue(bv, v);
   }
 
-#if SPV_VERSION >= 0x10400
   case OpCopyLogical: {
     SPIRVCopyBase *copy = static_cast<SPIRVCopyBase *>(bv);
     AllocaInst *ai = nullptr;
@@ -5075,7 +5069,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     LoadInst *li = new LoadInst(at, ai, "", bb);
     return mapValue(bv, li);
   }
-#endif
 
   case OpCompositeConstruct: {
     auto cc = static_cast<SPIRVCompositeConstruct *>(bv);
@@ -5546,7 +5539,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
   }
   case OpImageTexelPointer:
     return nullptr;
-#if SPV_VERSION >= 0x10400
   case OpPtrDiff: {
     SPIRVBinary *const bi = static_cast<SPIRVBinary *>(bv);
     Value *const op1 =
@@ -5565,7 +5557,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
 
     return mapValue(bv, ptrDiff);
   }
-#endif
 
   case OpAtomicLoad:
     return mapValue(bv, transValueWithOpcode<OpAtomicLoad>(bv));
@@ -6408,7 +6399,6 @@ void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *bi, unsigned maskI
       imageInfo->flags |= lgc::Builder::ImageFlagVolatile;
     }
 
-#if SPV_VERSION >= 0x10400
     // SignExtend (0x1000)
     if (mask & ImageOperandsSignExtendMask) {
       mask &= ~ImageOperandsSignExtendMask;
@@ -6418,13 +6408,10 @@ void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *bi, unsigned maskI
     // ZeroExtend (0x2000)
     if (mask & ImageOperandsZeroExtendMask)
       mask &= ~ImageOperandsZeroExtendMask;
-#endif
 
-#if SPV_VERSION >= 0x10600
     // Nontemporal (0x4000)
     if (mask & ImageOperandsNontemporalMask)
       mask &= ~ImageOperandsNontemporalMask;
-#endif
 
     assert(!mask && "Unknown image operand");
   }
