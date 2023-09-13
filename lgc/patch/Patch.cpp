@@ -378,6 +378,7 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level o
   fpm.addPass(createFunctionToLoopPassAdaptor(std::move(lpm2), true));
   fpm.addPass(LoopUnrollPass(
       LoopUnrollOptions(optLevel).setPeeling(true).setRuntime(false).setUpperBound(false).setPartial(false)));
+  fpm.addPass(SROAPass(SROAOptions::ModifyCFG));
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 464212
   // Old version of the code
   fpm.addPass(ScalarizerPass());
@@ -402,6 +403,7 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level o
                                   .needCanonicalLoops(true)
                                   .sinkCommonInsts(true)));
   fpm.addPass(LoopUnrollPass(LoopUnrollOptions(optLevel)));
+  fpm.addPass(SROAPass(SROAOptions::ModifyCFG));
   // uses UniformityAnalysis
   fpm.addPass(PatchReadFirstLane());
   fpm.addPass(InstCombinePass(instCombineOpt));
