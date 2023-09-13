@@ -927,7 +927,7 @@ void PatchEntryPointMutate::processShader(ShaderInputs *shaderInputs) {
   // Create new entry-point from the original one
   SmallVector<Type *, 8> argTys;
   SmallVector<std::string, 8> argNames;
-  uint64_t inRegMask = generateEntryPointArgTys(shaderInputs, nullptr, argTys, argNames, 0);
+  uint64_t inRegMask = generateEntryPointArgTys(shaderInputs, nullptr, argTys, argNames, 0, true);
 
   Function *origEntryPoint = m_entryPoint;
 
@@ -1023,8 +1023,8 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
       newFunc =
           lowerCpsFunction(origFunc, m_cpsShaderInputCache.getTypes(), m_cpsShaderInputCache.getNames(), isContinufy);
     } else {
-      inRegMask =
-          generateEntryPointArgTys(shaderInputs, origFunc, shaderInputTys, shaderInputNames, origType->getNumParams());
+      inRegMask = generateEntryPointArgTys(shaderInputs, origFunc, shaderInputTys, shaderInputNames,
+                                           origType->getNumParams(), true);
       newFunc = addFunctionArgs(origFunc, origType->getReturnType(), shaderInputTys, shaderInputNames, inRegMask, true);
       const bool isEntryPoint = isShaderEntryPoint(newFunc);
       newFunc->setCallingConv(isEntryPoint ? CallingConv::AMDGPU_CS : CallingConv::AMDGPU_Gfx);
@@ -1267,12 +1267,16 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
 // @param origFunc : The original entry point function
 // @param [out] argTys : The argument types for the new function type
 // @param [out] argNames : The argument names corresponding to the argument types
+// @param [out] argNames : The argument names corresponding to the argument types
+// @param argOffset : The argument index offset to apply to the user data arguments
+// @param updateUserDataMap : whether the user data map should be updated
 // @returns inRegMask : "Inreg" bit mask for the arguments, with a bit set to indicate that the corresponding
 //                          arg needs to have an "inreg" attribute to put the arg into SGPRs rather than VGPRs
 //
 uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInputs, Function *origFunc,
                                                          SmallVectorImpl<Type *> &argTys,
-                                                         SmallVectorImpl<std::string> &argNames, unsigned argOffset) {
+                                                         SmallVectorImpl<std::string> &argNames, unsigned argOffset,
+                                                         bool updateUserDataMap) {
 
   uint64_t inRegMask = 0;
   IRBuilder<> builder(*m_context);
@@ -1372,7 +1376,7 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
     inRegMask |= shaderInputs->getShaderArgTys(m_pipelineState, m_shaderStage, origFunc, m_computeWithCalls, argTys,
                                                argNames, argOffset);
 
-  if (m_pipelineState->useRegisterFieldFormat()) {
+  if (updateUserDataMap && m_pipelineState->useRegisterFieldFormat()) {
     constexpr unsigned NumUserSgprs = 32;
     constexpr unsigned InvalidMapVal = static_cast<unsigned>(UserDataMapping::Invalid);
     SmallVector<unsigned, NumUserSgprs> userDataMap;
