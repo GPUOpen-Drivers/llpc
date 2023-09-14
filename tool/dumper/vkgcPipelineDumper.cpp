@@ -648,8 +648,7 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.fastMathFlags = " << shaderInfo->options.fastMathFlags << "\n";
   dumpFile << "options.disableFastMathFlags = " << shaderInfo->options.disableFastMathFlags << "\n";
   dumpFile << "options.ldsSpillLimitDwords = " << shaderInfo->options.ldsSpillLimitDwords << "\n";
-  if (shaderInfo->options.scalarizeWaterfallLoads.has_value())
-    dumpFile << "options.scalarizeWaterfallLoads = " << *shaderInfo->options.scalarizeWaterfallLoads << "\n";
+  dumpFile << "options.scalarizeWaterfallLoads = " << shaderInfo->options.scalarizeWaterfallLoads << "\n";
   dumpFile << "options.overrideShaderThreadGroupSizeX = " << shaderInfo->options.overrideShaderThreadGroupSizeX << "\n";
   dumpFile << "options.overrideShaderThreadGroupSizeY = " << shaderInfo->options.overrideShaderThreadGroupSizeY << "\n";
   dumpFile << "options.overrideShaderThreadGroupSizeZ = " << shaderInfo->options.overrideShaderThreadGroupSizeZ << "\n";

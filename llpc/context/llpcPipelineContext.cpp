@@ -614,9 +614,10 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
   if (ScalarizeWaterfallDescriptorLoads.getNumOccurrences() > 0) {
     shaderOptions.scalarizeWaterfallLoads = ScalarizeWaterfallDescriptorLoads;
   } else {
-    shaderOptions.scalarizeWaterfallLoads = true;
-    if (shaderInfo.options.scalarizeWaterfallLoads.has_value())
-      shaderOptions.scalarizeWaterfallLoads = *shaderInfo.options.scalarizeWaterfallLoads;
+    shaderOptions.scalarizeWaterfallLoads = shaderInfo.options.scalarizeWaterfallLoads;
+    // Enable waterfall load scalarization when vgpr limit is set.
+    if (shaderOptions.vgprLimit != 0 && shaderOptions.vgprLimit != UINT_MAX)
+      shaderOptions.scalarizeWaterfallLoads = true;
   }
 
   shaderOptions.sgprLimit = shaderInfo.options.sgprLimit;
