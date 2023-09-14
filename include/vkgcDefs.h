@@ -229,7 +229,6 @@ struct optional_bool : private std::optional<bool> {
   using std::optional<bool>::has_value;
   using std::optional<bool>::value;
   using std::optional<bool>::value_or;
-  using std::optional<bool>::operator*;
 };
 
 /// Enumerates result codes of LLPC operations.
@@ -853,7 +852,7 @@ struct PipelineShaderOptions {
   unsigned ldsSpillLimitDwords;
 
   /// Attempt to scalarize waterfall descriptor loads.
-  optional_bool scalarizeWaterfallLoads;
+  bool scalarizeWaterfallLoads;
 
   /// Force rearranges threadId within group into blocks of 8*8 or 8*4
   bool overrideForceThreadIdSwizzling;

@@ -21,14 +21,13 @@ void main()
 // BEGIN_SHADERTEST
 /*
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; Make sure that the begin indices chosen are the non-uniform offsets rather than the whole resource desc
+; Make sure that there's a waterfall.readfirstlane for both the image resource desc and sample desc
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call i32 @llvm.amdgcn.waterfall.begin.i32
-; SHADERTEST-NEXT: %[[readfirstlane:[0-9]+]] = call i32 @llvm.amdgcn.waterfall.readfirstlane.i32.i32
-; SHADERTEST-NEXT: %[[sext:[0-9]+]] = sext i32 %[[readfirstlane]] to i64
-; SHADERTEST-NEXT: %[[gep1:[0-9]+]] = getelementptr i8, ptr addrspace(4) %{{.*}}, i64 %[[sext]]
-; SHADERTEST-NEXT: %[[gep2:[0-9]+]] = getelementptr i8, ptr addrspace(4) %{{.*}}, i64 %[[sext]]
-; SHADERTEST-NEXT: load <4 x i32>, ptr addrspace(4) %[[gep2]], align 16
-; SHADERTEST-NEXT: load <8 x i32>, ptr addrspace(4) %[[gep1]], align 32
+; SHADERTEST-DAG: call i32 @llvm.amdgcn.waterfall.begin.i32
+; SHADERTEST-DAG: call i32 @llvm.amdgcn.waterfall.begin.i32
+; SHADERTEST-DAG: call <8 x i32> @llvm.amdgcn.waterfall.readfirstlane.v8i32.v8i32
+; SHADERTEST-DAG: call <4 x i32> @llvm.amdgcn.waterfall.readfirstlane.v4i32.v4i32
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
