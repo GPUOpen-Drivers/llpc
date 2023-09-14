@@ -2596,8 +2596,9 @@ void NggPrimShader::distributePrimitiveId(Value *primitiveId) {
                                  ? m_nggInputs.vertexIndex0
                                  : m_nggInputs.vertexIndex1;
     } else {
-      assert(primitiveType != PrimitiveType::Rect && primitiveType != PrimitiveType::Quad &&
-             primitiveType != PrimitiveType::Patch);
+      assert(primitiveType == PrimitiveType::TriangleList || primitiveType == PrimitiveType::TriangleStrip ||
+             primitiveType == PrimitiveType::TriangleFan || primitiveType == PrimitiveType::TriangleListAdjacency ||
+             primitiveType == PrimitiveType::TriangleStripAdjacency);
       provokingVertexIndex = m_pipelineState->getRasterizerState().provokingVertexMode == ProvokingVertexFirst
                                  ? m_nggInputs.vertexIndex0
                                  : m_nggInputs.vertexIndex2;
