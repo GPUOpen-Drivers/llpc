@@ -259,7 +259,7 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   // Lower SPIR-V instruction metadata remove
   passMgr.addPass(SpirvLowerInstMetaRemove());
 
-  if (rayTracing || rayQuery) {
+  if (rayTracing || rayQuery || isInternalRtShader) {
     passMgr.addPass(LowerGpuRt());
     passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(instCombineOpt)));
   }
