@@ -621,9 +621,10 @@ struct InterfaceData {
           unsigned w; // W channel
         } fragCoord;
 
-        unsigned frontFacing;    // FrontFacing
-        unsigned ancillary;      // Ancillary
-        unsigned sampleCoverage; // Sample coverage
+        unsigned frontFacing;      // FrontFacing
+        unsigned ancillary;        // Ancillary
+        unsigned sampleCoverage;   // Sample coverage
+        unsigned provokingVtxInfo; // Provoking vertex info
       } fs;
 
       // Compute shader

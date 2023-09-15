@@ -1561,6 +1561,10 @@ template <typename T> void ConfigBuilder::buildPsRegConfig(ShaderStage shaderSta
     SET_REG_GFX9_FIELD(&config->psRegs, SPI_SHADER_PGM_RSRC2_PS, USER_SGPR_MSB, userSgprMsb);
   }
 
+  if (m_gfxIp >= GfxIpVersion{10, 3} && (intfData->entryArgIdxs.fs.provokingVtxInfo != 0)) {
+    SET_REG_GFX10_3_PLUS_EXCLUSIVE_FIELD(&config->psRegs, SPI_SHADER_PGM_RSRC1_PS, LOAD_PROVOKING_VTX, true);
+  }
+
   if (m_gfxIp.major >= 11) {
     // Pixel wait sync+
     SET_REG_GFX11_FIELD(&config->psRegs, SPI_SHADER_PGM_RSRC4_PS, IMAGE_OP, resUsage->useImageOp);

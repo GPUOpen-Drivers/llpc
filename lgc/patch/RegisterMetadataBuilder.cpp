@@ -774,6 +774,11 @@ void RegisterMetadataBuilder::buildPsRegisters() {
     spiBarycCntl[Util::Abi::SpiBarycCntlMetadataKey::PosFloatLocation] = 0;
   }
 
+  // Provoking vtx
+  if (m_gfxIp >= GfxIpVersion{10, 3} &&
+      (m_pipelineState->getShaderInterfaceData(shaderStage)->entryArgIdxs.fs.provokingVtxInfo != 0))
+    getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::PsLoadProvokingVtx] = true;
+
   // PA_SC_MODE_CNTL_1
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::PsIterSample] =
       m_pipelineState->getShaderResourceUsage(shaderStage)->builtInUsage.fs.runAtSampleRate > 0;
