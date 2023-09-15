@@ -122,8 +122,21 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     gfxPipelineInfo->rsState.numSamples = graphicState.numSamples;
     gfxPipelineInfo->rsState.pixelShaderSamples = graphicState.pixelShaderSamples;
     gfxPipelineInfo->rsState.samplePatternIdx = graphicState.samplePatternIdx;
+    gfxPipelineInfo->rsState.dynamicSampleInfo = graphicState.dynamicSampleInfo;
     gfxPipelineInfo->rsState.rasterStream = graphicState.rasterStream;
     gfxPipelineInfo->rsState.usrClipPlaneMask = static_cast<uint8_t>(graphicState.usrClipPlaneMask);
+    if (graphicState.tessLevelInner[0] < 0 || graphicState.tessLevelInner[1] < 0 ||
+        graphicState.tessLevelOuter[0] < 0 || graphicState.tessLevelOuter[1] < 0 || graphicState.tessLevelOuter[2] < 0)
+      gfxPipelineInfo->iaState.tessLevel = nullptr;
+    else {
+      m_tessellationLevel.inner[0] = graphicState.tessLevelInner[0];
+      m_tessellationLevel.inner[1] = graphicState.tessLevelInner[1];
+      m_tessellationLevel.outer[0] = graphicState.tessLevelOuter[0];
+      m_tessellationLevel.outer[1] = graphicState.tessLevelOuter[1];
+      m_tessellationLevel.outer[2] = graphicState.tessLevelOuter[2];
+      m_tessellationLevel.outer[3] = graphicState.tessLevelOuter[3];
+      gfxPipelineInfo->iaState.tessLevel = &m_tessellationLevel;
+    }
 
     gfxPipelineInfo->cbState.alphaToCoverageEnable = graphicState.alphaToCoverageEnable != 0;
     gfxPipelineInfo->cbState.dualSourceBlendEnable = graphicState.dualSourceBlendEnable != 0;

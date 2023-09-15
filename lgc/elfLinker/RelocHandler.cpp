@@ -181,14 +181,6 @@ bool RelocHandler::getValue(StringRef name, uint64_t &value) {
     }
   }
 
-  if (name == reloc::NumSamples) {
-    value = m_pipelineState->getRasterizerState().numSamples;
-    return true;
-  }
-  if (name == reloc::SamplePatternIdx) {
-    value = m_pipelineState->getRasterizerState().samplePatternIdx;
-    return true;
-  }
   if (name == reloc::DeviceIdx) {
     value = m_pipelineState->getDeviceIndex();
     return true;

@@ -341,6 +341,7 @@ Options PipelineContext::computePipelineOptions() const {
   options.fullSubgroups = true;
   options.internalRtShaders = getPipelineOptions()->internalRtShaders;
   options.disableSampleMask = getPipelineOptions()->disableSampleMask;
+  options.disableTruncCoordForGather = getPipelineOptions()->disableTruncCoordForGather;
 
   return options;
 }

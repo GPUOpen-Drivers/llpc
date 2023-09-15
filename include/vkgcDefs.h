@@ -49,7 +49,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 66
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 0
+#define LLPC_INTERFACE_MINOR_VERSION 1
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -84,8 +84,13 @@
 //  |     66.0 | Rename noContract in PipelineShaderOptions to noContractOpDot                                         |
 //  |     65.1 | Add disableSampleMask to PipelineOptions                                                              |
 //  |     65.0 | Remove updateDescInElf                                                                                |
+//  |     64.2 | Add dynamicSampleInfo to GraphicsPipelineBuildInfo::rsState                                           |
+//  |     64.1 | Add disableTruncCoordForGather to PipelineOptions.                                                    |
 //  |     64.0 | Add enableColorExportShader to GraphicsPipelineBuildInfo.                                             |
-//  |     63.0 | Add Atomic Counter, its default descriptor and map its concreteType to Buffer.                        |
+//  |     63.3 | Add TesssellationLevel to iaState                                                                     |
+//  |     63.2 | Add vertex64BitsAttribSingleLoc to PipelineOptions                                                    |
+//  |     63.1 | Add forceDisableStreamOut and forceEnablePrimStats to ApiXfbOutData                                   |
+//  |     63.0 | Add Atomic Counter, its default descriptor and map its concertType to Buffer.                         |
 //  |     62.1 | Add ApiXfbOutData GraphicsPipelineBuildInfo                                                           |
 //  |     62.0 | Default to the compiler getting the GPURT library directly, and move shader library info into RtState |
 //  |     61.16| Add replaceSetWithResourceType to PipelineOptions                                                     |
@@ -459,9 +464,6 @@ struct ResourceMappingNode {
       unsigned strideInDwords; ///< Stride of elements in a descriptor array (used for mutable descriptors)
                                ///  a stride of zero will use the type of the node to determine the stride
 #endif
-      unsigned reserv0;
-      unsigned reserv1;
-      unsigned reserv2;
     } srdRange;
     /// Info for hierarchical nodes (DescriptorTableVaPtr)
     struct {
@@ -588,6 +590,10 @@ struct PipelineOptions {
   bool replaceSetWithResourceType;        ///< For OGL only, replace 'set' with resource type during spirv translate
   bool disableSampleMask;                 ///< For OGL only, disabled if framebuffer doesn't attach multisample texture
   bool buildResourcesDataForShaderModule; ///< For OGL only, build resources usage data while building shader module
+  bool disableTruncCoordForGather;        ///< If set, trunc_coord of sampler srd is disabled for gather4
+  bool enableCombinedTexture;             ///< For OGL only, use the 'set' for DescriptorCombinedTexture
+                                          ///< for sampled images and samplers
+  bool vertex64BitsAttribSingleLoc;       ///< For OGL only, dvec3/dvec4 vertex attrib only consumes 1 location.
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.
@@ -1201,8 +1207,16 @@ struct XfbOutInfo {
 
 /// Represents the transform feedback data filled by API interface
 struct ApiXfbOutData {
-  XfbOutInfo *pXfbOutInfos; ///< An array of XfbOutInfo iterms
-  unsigned numXfbOutInfo;   ///< Count of XfbOutInfo iterms
+  XfbOutInfo *pXfbOutInfos;   ///< An array of XfbOutInfo iterms
+  unsigned numXfbOutInfo;     ///< Count of XfbOutInfo iterms
+  bool forceDisableStreamOut; ///< Force to disable stream out XFB outputs
+  bool forceEnablePrimStats;  ///< Force to enable counting generated primitives
+};
+
+/// Represents the tessellation level passed from driver API
+struct TessellationLevel {
+  float inner[2]; ///< Inner tessellation level
+  float outer[4]; ///< Outer tessellation level
 };
 
 /// Represents info to build a graphics pipeline.
@@ -1238,6 +1252,7 @@ struct GraphicsPipelineBuildInfo {
     bool enableMultiView;          ///< Whether to enable multi-view support
     bool useVertexBufferDescArray; ///< Whether vertex buffer descriptors are in a descriptor array binding instead of
                                    ///< the VertexBufferTable
+    TessellationLevel *tessLevel;  ///< Tessellation level passed from driver
   } iaState;                       ///< Input-assembly state
 
   struct {
@@ -1257,6 +1272,7 @@ struct GraphicsPipelineBuildInfo {
     unsigned samplePatternIdx;    ///< Index into the currently bound MSAA sample pattern table that
                                   ///  matches the sample pattern used by the rasterizer when rendering
                                   ///  with this pipeline.
+    unsigned dynamicSampleInfo;   ///< Dynamic sampling is enabled.
     unsigned rasterStream;        ///< Which vertex stream to rasterize
     VkProvokingVertexModeEXT provokingVertexMode; ///< Specifies which vertex of a primitive is the _provoking
                                                   ///  vertex_, this impacts which vertex's "flat" VS outputs

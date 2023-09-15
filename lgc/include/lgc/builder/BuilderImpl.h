@@ -441,6 +441,9 @@ private:
   // Enforce readfirstlane on the image or sampler descriptors
   void enforceReadFirstLane(llvm::Instruction *imageInst, unsigned descIdx);
 
+  // Modify sampler descriptor to force set trunc_coord as 0 for gather4 instruction.
+  llvm::Value *modifySamplerDescForGather(llvm::Value *samplerDesc);
+
   enum ImgDataFormat {
     IMG_DATA_FORMAT_32 = 4,
     IMG_DATA_FORMAT_8_8_8_8 = 10,

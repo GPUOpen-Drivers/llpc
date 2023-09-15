@@ -44,7 +44,6 @@ using PipelineDumperTest = ::testing::Test;
 // The parameters to run a pipeline options test.
 struct GenerateHashParams {
   bool isCacheHash;
-  bool isRelocatableShader;
   UnlinkedShaderStage unlinkedShaderStage;
 };
 
@@ -73,12 +72,12 @@ using ModifyGraphicsBuildInfo = std::function<void(GraphicsPipelineBuildInfo *)>
 void runGraphicsPipelineOptionsHashTest(GenerateHashParams params, const ModifyGraphicsBuildInfo &modifyBuildInfoFunc,
                                         bool expectHashesToBeEqual) {
   auto buildInfo = std::make_unique<GraphicsPipelineBuildInfo>();
-  auto originalHash = PipelineDumper::generateHashForGraphicsPipeline(
-      buildInfo.get(), params.isCacheHash, params.isRelocatableShader, params.unlinkedShaderStage);
+  auto originalHash =
+      PipelineDumper::generateHashForGraphicsPipeline(buildInfo.get(), params.isCacheHash, params.unlinkedShaderStage);
 
   modifyBuildInfoFunc(buildInfo.get());
-  auto modifiedHash = PipelineDumper::generateHashForGraphicsPipeline(
-      buildInfo.get(), params.isCacheHash, params.isRelocatableShader, params.unlinkedShaderStage);
+  auto modifiedHash =
+      PipelineDumper::generateHashForGraphicsPipeline(buildInfo.get(), params.isCacheHash, params.unlinkedShaderStage);
   if (expectHashesToBeEqual) {
     EXPECT_EQ(originalHash, modifiedHash);
   } else {
@@ -96,10 +95,8 @@ void runGraphicsPipelineVariations(const ModifyGraphicsBuildInfo &modifyBuildInf
                                    const HashModifiedFunc &expectHashToBeEqual) {
   for (auto unlinkedShaderStage : {UnlinkedStageVertexProcess, UnlinkedStageFragment, UnlinkedStageCount}) {
     for (bool isCacheHash : {false, true}) {
-      for (bool isRelocatableShader : {false, true}) {
-        GenerateHashParams params = {isCacheHash, isRelocatableShader, unlinkedShaderStage};
-        runGraphicsPipelineOptionsHashTest(params, modifyBuildInfo, expectHashToBeEqual(params));
-      }
+      GenerateHashParams params = {isCacheHash, unlinkedShaderStage};
+      runGraphicsPipelineOptionsHashTest(params, modifyBuildInfo, expectHashToBeEqual(params));
     }
   }
 }
@@ -120,12 +117,10 @@ void runGraphicsPipelineVariations(const ModifyGraphicsBuildInfo &modifyBuildInf
 void runComputePipelineOptionsHashTest(GenerateHashParams params, const ModifyComputeBuildInfo &modifyBuildInfoFunc,
                                        bool expectHashesToBeEqual) {
   auto buildInfo = std::make_unique<ComputePipelineBuildInfo>();
-  auto originalHash =
-      PipelineDumper::generateHashForComputePipeline(buildInfo.get(), params.isCacheHash, params.isRelocatableShader);
+  auto originalHash = PipelineDumper::generateHashForComputePipeline(buildInfo.get(), params.isCacheHash);
 
   modifyBuildInfoFunc(buildInfo.get());
-  auto modifiedHash =
-      PipelineDumper::generateHashForComputePipeline(buildInfo.get(), params.isCacheHash, params.isRelocatableShader);
+  auto modifiedHash = PipelineDumper::generateHashForComputePipeline(buildInfo.get(), params.isCacheHash);
   if (expectHashesToBeEqual) {
     EXPECT_EQ(originalHash, modifiedHash);
   } else {
@@ -143,10 +138,8 @@ void runComputePipelineVariations(const ModifyComputeBuildInfo &modifyBuildInfo,
                                   const HashModifiedFunc &expectHashToBeEqual) {
   UnlinkedShaderStage unlinkedShaderStage = UnlinkedStageCount;
   for (bool isCacheHash : {false, true}) {
-    for (bool isRelocatableShader : {false, true}) {
-      GenerateHashParams params = {isCacheHash, isRelocatableShader, unlinkedShaderStage};
-      runComputePipelineOptionsHashTest(params, modifyBuildInfo, expectHashToBeEqual(params));
-    }
+    GenerateHashParams params = {isCacheHash, unlinkedShaderStage};
+    runComputePipelineOptionsHashTest(params, modifyBuildInfo, expectHashToBeEqual(params));
   }
 }
 
@@ -158,17 +151,13 @@ TEST(PipelineDumperTest, TestTopologyForFragmentState) {
   auto buildInfo = std::make_unique<GraphicsPipelineBuildInfo>();
   MetroHash::Hash originalHash;
   MetroHash::Hash modifiedHash;
-  for (bool isRelocatableShader : {false, true}) {
-    for (uint32_t i = 0; i <= VK_PRIMITIVE_TOPOLOGY_PATCH_LIST; i++) {
-      buildInfo->iaState.topology = static_cast<VkPrimitiveTopology>(i);
-      originalHash = PipelineDumper::generateHashForGraphicsPipeline(buildInfo.get(), false, isRelocatableShader,
-                                                                     UnlinkedStageFragment);
-      for (uint32_t j = i + 1; j <= VK_PRIMITIVE_TOPOLOGY_PATCH_LIST; j++) {
-        buildInfo->iaState.topology = static_cast<VkPrimitiveTopology>(j);
-        modifiedHash = PipelineDumper::generateHashForGraphicsPipeline(buildInfo.get(), false, isRelocatableShader,
-                                                                       UnlinkedStageFragment);
-        EXPECT_NE(originalHash, modifiedHash);
-      }
+  for (uint32_t i = 0; i <= VK_PRIMITIVE_TOPOLOGY_PATCH_LIST; i++) {
+    buildInfo->iaState.topology = static_cast<VkPrimitiveTopology>(i);
+    originalHash = PipelineDumper::generateHashForGraphicsPipeline(buildInfo.get(), false, UnlinkedStageFragment);
+    for (uint32_t j = i + 1; j <= VK_PRIMITIVE_TOPOLOGY_PATCH_LIST; j++) {
+      buildInfo->iaState.topology = static_cast<VkPrimitiveTopology>(j);
+      modifiedHash = PipelineDumper::generateHashForGraphicsPipeline(buildInfo.get(), false, UnlinkedStageFragment);
+      EXPECT_NE(originalHash, modifiedHash);
     }
   }
 }
@@ -242,7 +231,7 @@ TEST(PipelineDumperTest, TestShadowDescriptorTableUsageGraphics) {
     buildInfo->options.shadowDescriptorTableUsage = ShadowDescriptorTableUsage::Enable;
   };
 
-  HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &params) { return params.isRelocatableShader; };
+  HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &params) { return false; };
   runGraphicsPipelineVariations(modifyBuildInfo, expectHashToBeEqual);
 }
 
@@ -250,7 +239,7 @@ TEST(PipelineDumperTest, TestShadowDescriptorTableUsageCompute) {
   ModifyComputeBuildInfo modifyBuildInfo = [](ComputePipelineBuildInfo *buildInfo) {
     buildInfo->options.shadowDescriptorTableUsage = ShadowDescriptorTableUsage::Enable;
   };
-  HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &params) { return params.isRelocatableShader; };
+  HashModifiedFunc expectHashToBeEqual = [](const GenerateHashParams &params) { return false; };
   runComputePipelineVariations(modifyBuildInfo, expectHashToBeEqual);
 }
 

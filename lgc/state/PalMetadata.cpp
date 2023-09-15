@@ -757,6 +757,12 @@ void PalMetadata::finalizePipeline(bool isWholePipeline) {
   if (m_pipelineState->isGraphics())
     finalizeRegisterSettings(isWholePipeline);
 
+  // Set pipeline hash.
+  auto pipelineHashNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
+  const auto &options = m_pipelineState->getOptions();
+  pipelineHashNode[0] = options.hash[0];
+  pipelineHashNode[1] = options.hash[1];
+
   // The rest of this function is used only for whole pipeline PAL metadata or an ELF link.
   if (!isWholePipeline)
     return;
@@ -764,12 +770,6 @@ void PalMetadata::finalizePipeline(bool isWholePipeline) {
   // In the part-pipeline compilation only at ELF link stage do we know how gl_ViewportIndex was used in all stages.
   if (isShaderStageInMask(ShaderStageFragment, m_pipelineState->getShaderStageMask()))
     finalizeInputControlRegisterSetting();
-
-  // Set pipeline hash.
-  auto pipelineHashNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
-  const auto &options = m_pipelineState->getOptions();
-  pipelineHashNode[0] = options.hash[0];
-  pipelineHashNode[1] = options.hash[1];
 
   // Erase the PAL metadata for FS input mappings.
   eraseFragmentInputInfo();

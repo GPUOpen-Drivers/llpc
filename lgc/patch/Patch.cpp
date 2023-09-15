@@ -54,6 +54,7 @@
 #include "lgc/patch/PatchResourceCollect.h"
 #include "lgc/patch/PatchSetupTargetFeatures.h"
 #include "lgc/patch/PatchWorkarounds.h"
+#include "lgc/patch/TcsPassthroughShader.h"
 #include "lgc/patch/VertexFetch.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
@@ -132,6 +133,10 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
 
   passMgr.addPass(IPSCCPPass());
   passMgr.addPass(LowerDebugPrintf());
+
+  if (pipelineState->hasShaderStage(ShaderStageVertex) && !pipelineState->hasShaderStage(ShaderStageTessControl) &&
+      pipelineState->hasShaderStage(ShaderStageTessEval))
+    passMgr.addPass(TcsPassthroughShader());
 
   passMgr.addPass(PatchNullFragShader());
   passMgr.addPass(PatchResourceCollect()); // also removes inactive/unused resources

@@ -163,6 +163,7 @@ union Options {
     bool internalRtShaders;                   // Enable internal RT shader intrinsics
     bool enableUberFetchShader;               // Enable UberShader
     bool reserved16;
+    bool disableTruncCoordForGather; // If set, trunc_coord of sampler srd is disabled for gather4
     bool enableColorExportShader; // Explicitly build color export shader, UnlinkedStageFragment elf will return extra
                                   // meta data.
     bool fragCoordUsesInterpLoc;  // Determining fragCoord use InterpLoc
@@ -494,6 +495,7 @@ struct RasterizerState {
   unsigned samplePatternIdx;               // Index into the currently bound MSAA sample pattern table that
                                            //  matches the sample pattern used by the rasterizer when rendering
                                            //  with this pipeline.
+  unsigned dynamicSampleInfo;              // Dynamic sampling is enabled
   unsigned rasterStream;                   // Which vertex stream to rasterize
   ProvokingVertexMode provokingVertexMode; // Specifies which vertex of a primitive is the _provoking vertex_,
                                            // this impacts which vertex's "flat" VS outputs are passed to the PS.
@@ -812,6 +814,13 @@ public:
 
   // Set the client-defined metadata to be stored inside the ELF
   virtual void setClientMetadata(llvm::StringRef clientMetadata) = 0;
+
+  // Set default tessellation inner/outer level from driver API
+  virtual void setTessLevel(const float *tessLevelInner, const float *tessLevelOuter) = 0;
+
+  // Get default tessellation inner/outer level
+  virtual float getTessLevelInner(unsigned level) = 0;
+  virtual float getTessLevelOuter(unsigned level) = 0;
 
   // -----------------------------------------------------------------------------------------------------------------
   // IR link and generate pipeline/library methods
