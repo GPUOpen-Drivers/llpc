@@ -242,7 +242,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
     ldsUsageInfo.gsExtraLdsSize += ldsRegionSize;
 
     // Primitive counts
-    if (pipelineState->enableSwXfb()) {
+    if (pipelineState->enableSwXfb() || pipelineState->enablePrimStats()) {
       ldsRegionSize =
           (Gfx9::NggMaxWavesPerSubgroup + 1) * MaxGsStreams; // 1 dword per wave and 1 dword per subgroup, 4 GS streams
       if (ldsLayout) {
@@ -265,9 +265,10 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
     }
 
     // Vertex counts
-    if (pipelineState->enableSwXfb()) {
+    if (pipelineState->enableSwXfb() || pipelineState->enablePrimStats()) {
       if (ldsLayout) {
-        // NOTE: If SW emulated stream-out is enabled, this region is overlapped with PrimitiveCounts
+        // NOTE: If SW emulated stream-out or primitive statistics counting is enabled, this region is overlapped with
+        // PrimitiveCounts.
         (*ldsLayout)[PrimShaderLdsRegion::VertexCounts] = (*ldsLayout)[PrimShaderLdsRegion::PrimitiveCounts];
         printLdsRegionInfo("Vertex Counts", (*ldsLayout)[PrimShaderLdsRegion::VertexCounts].first,
                            (*ldsLayout)[PrimShaderLdsRegion::VertexCounts].second);
@@ -287,7 +288,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
     if (pipelineState->getNggControl()->compactVertex) {
       if (pipelineState->enableSwXfb()) {
         if (ldsLayout) {
-          // NOTE: If SW emulated stream-out is enabled, this region is overlapped with PrimitiveIndexMap
+          // NOTE: If SW emulated stream-out is enabled, this region is overlapped with PrimitiveIndexMap.
           (*ldsLayout)[PrimShaderLdsRegion::VertexIndexMap] = (*ldsLayout)[PrimShaderLdsRegion::PrimitiveIndexMap];
           printLdsRegionInfo("Vertex Index Map (To Uncompacted)",
                              (*ldsLayout)[PrimShaderLdsRegion::VertexIndexMap].first,
@@ -512,9 +513,6 @@ Function *NggPrimShader::generate(Function *esMain, Function *gsMain, Function *
 
   // ES and GS could not be null at the same time
   assert((!esMain && !gsMain) == false);
-
-  // TODO: support counting generated primitives in software emulated stream-out
-  assert(!m_pipelineState->enablePrimStats());
 
   // Assign names to ES, GS and copy shader main functions
   Module *module = nullptr;
@@ -860,16 +858,18 @@ void NggPrimShader::buildPrimShaderCbLayoutLookupTable() {
 }
 
 // =====================================================================================================================
-// Calculate the dword offset of each item in the stream-out control buffer
+// Calculate the dword offset of each item in the stream-out control buffer.
 void NggPrimShader::calcStreamOutControlCbOffsets() {
-  assert(m_pipelineState->enableSwXfb());
+  assert(m_pipelineState->enableSwXfb() || m_pipelineState->enablePrimStats());
 
   m_streamOutControlCbOffsets = {};
 
-  for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
-    m_streamOutControlCbOffsets.bufOffsets[i] = (offsetof(Util::Abi::StreamOutControlCb, bufOffsets[0]) +
-                                                 sizeof(Util::Abi::StreamOutControlCb::bufOffsets[0]) * i) /
-                                                4;
+  if (m_pipelineState->enableSwXfb()) {
+    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+      m_streamOutControlCbOffsets.bufOffsets[i] = (offsetof(Util::Abi::StreamOutControlCb, bufOffsets[0]) +
+                                                   sizeof(Util::Abi::StreamOutControlCb::bufOffsets[0]) * i) /
+                                                  4;
+    }
   }
 }
 
@@ -936,6 +936,9 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
   //   if (Enable SW XFB)
   //     Process SW XFB (Run ES)
   //   else {
+  //     if (Enable primitive statistics counting)
+  //       Collect primitive statistics
+  //
   //     if (threadIdInSubgroup < vertCountInSubgroup)
   //       Run ES (export vertex)
   //   }
@@ -964,7 +967,7 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
       // Record attribute ring base ([14:0])
       m_nggInputs.attribRingBase = createUBfe(attribRingBase, 0, 15);
 
-      if (m_pipelineState->enableSwXfb())
+      if (m_pipelineState->enableSwXfb() || m_pipelineState->enablePrimStats())
         loadStreamOutBufferInfo(userData);
     }
 
@@ -1035,8 +1038,11 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
   {
     m_builder.SetInsertPoint(endExportPrimitiveBlock);
 
+    // Process SW XFB or primitive statistics counting
     if (m_pipelineState->enableSwXfb())
       processSwXfb(args);
+    else if (m_pipelineState->enablePrimStats())
+      collectPrimitiveStats();
 
     auto validVertex = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
     m_builder.CreateCondBr(validVertex, exportVertexBlock, endExportVertexBlock);
@@ -1159,6 +1165,8 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
   //
   //   if (Enable SW XFB)
   //     Process SW XFB
+  //   else if (Enable primitive statistics counting)
+  //     Collect primitive statistics
   //
   //   if (threadIdInWave < vertCountInWave)
   //     Run part ES to fetch vertex cull data
@@ -1287,7 +1295,7 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
       // Record attribute ring base ([14:0])
       m_nggInputs.attribRingBase = createUBfe(attribRingBase, 0, 15);
 
-      if (m_pipelineState->enableSwXfb())
+      if (m_pipelineState->enableSwXfb() || m_pipelineState->enablePrimStats())
         loadStreamOutBufferInfo(userData);
     }
 
@@ -1308,9 +1316,11 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
     // Distribute primitive ID if needed
     distributePrimitiveId(primitiveId);
 
-    // Process SW XFB
+    // Process SW XFB or primitive statistics counting
     if (m_pipelineState->enableSwXfb())
       processSwXfb(args);
+    else if (m_pipelineState->enablePrimStats())
+      collectPrimitiveStats();
 
     m_builder.CreateBr(checkFetchVertexCullDataBlock);
   }
@@ -1891,6 +1901,8 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
   //
   //   if (Enable SW XFB)
   //     Process SW XFB
+  //   else if (Enable primitive statistics counting)
+  //     Collect primitive statistics
   //
   //  if (threadIdInSubgroup < waveCount + 1)
   //     Initialize per-wave and per-subgroup count of output vertices
@@ -1981,7 +1993,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
       // Record attribute ring base ([14:0])
       m_nggInputs.attribRingBase = createUBfe(attribRingBase, 0, 15);
 
-      if (m_pipelineState->enableSwXfb())
+      if (m_pipelineState->enableSwXfb() || m_pipelineState->enablePrimStats())
         loadStreamOutBufferInfo(userData);
     }
 
@@ -2046,8 +2058,11 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
   {
     m_builder.SetInsertPoint(endGsBlock);
 
+    // Process SW XFB or primitive statistics counting
     if (m_pipelineState->enableSwXfb())
       processSwXfbWithGs(args);
+    else if (m_pipelineState->enablePrimStats())
+      collectPrimitiveStats();
 
     auto validWave =
         m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(waveCountInSubgroup + 1));
@@ -2468,7 +2483,8 @@ void NggPrimShader::initWaveThreadInfo(Value *mergedGroupInfo, Value *mergedWave
 //
 // @param userData : User data
 void NggPrimShader::loadStreamOutBufferInfo(Value *userData) {
-  assert(m_pipelineState->enableSwXfb()); // Must enable SW emulated stream-out
+  // Must enable SW emulated stream-out or primitive statistics counting
+  assert(m_pipelineState->enableSwXfb() || m_pipelineState->enablePrimStats());
 
   calcStreamOutControlCbOffsets();
 
@@ -2489,22 +2505,6 @@ void NggPrimShader::loadStreamOutBufferInfo(Value *userData) {
     return userDataIndex;
   };
 
-  // Get stream-out table pointer value and stream-out control buffer pointer value
-  const auto gsOrEsMain = m_hasGs ? m_gsHandlers.main : m_esHandlers.main;
-  StreamOutData streamOutData = {};
-  if (m_hasGs)
-    streamOutData = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs.streamOutData;
-  else if (m_hasTes)
-    streamOutData = m_pipelineState->getShaderInterfaceData(ShaderStageTessEval)->entryArgIdxs.tes.streamOutData;
-  else
-    streamOutData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs.streamOutData;
-
-  assert(userData->getType()->isVectorTy());
-  auto streamOutTablePtrValue =
-      m_builder.CreateExtractElement(userData, getUserDataIndex(gsOrEsMain, streamOutData.tablePtr));
-  auto streamOutControlBufPtrValue =
-      m_builder.CreateExtractElement(userData, getUserDataIndex(gsOrEsMain, streamOutData.controlBufPtr));
-
   // Helper to make a pointer from its integer address value and the type
   auto makePointer = [&](Value *ptrValue, Type *ptrTy) {
     Value *pc = m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_getpc, {}, {});
@@ -2517,29 +2517,49 @@ void NggPrimShader::loadStreamOutBufferInfo(Value *userData) {
     return ptr;
   };
 
+  const auto gsOrEsMain = m_hasGs ? m_gsHandlers.main : m_esHandlers.main;
+  StreamOutData streamOutData = {};
+  if (m_hasGs)
+    streamOutData = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs.streamOutData;
+  else if (m_hasTes)
+    streamOutData = m_pipelineState->getShaderInterfaceData(ShaderStageTessEval)->entryArgIdxs.tes.streamOutData;
+  else
+    streamOutData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs.streamOutData;
+
+  assert(userData->getType()->isVectorTy());
   const auto constBufferPtrTy = PointerType::get(m_builder.getContext(), ADDR_SPACE_CONST);
-  auto streamOutTablePtr = makePointer(streamOutTablePtrValue, constBufferPtrTy);
+
+  // Get stream-out control buffer pointer value
+  auto streamOutControlBufPtrValue =
+      m_builder.CreateExtractElement(userData, getUserDataIndex(gsOrEsMain, streamOutData.controlBufPtr));
   m_streamOutControlBufPtr = makePointer(streamOutControlBufPtrValue, constBufferPtrTy);
 
-  const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
-  for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
-    bool bufferActive = xfbStrides[i] > 0;
-    if (!bufferActive)
-      continue; // Transform feedback buffer inactive
+  if (m_pipelineState->enableSwXfb()) {
+    // Get stream-out table pointer value
+    auto streamOutTablePtrValue =
+        m_builder.CreateExtractElement(userData, getUserDataIndex(gsOrEsMain, streamOutData.tablePtr));
+    auto streamOutTablePtr = makePointer(streamOutTablePtrValue, constBufferPtrTy);
 
-    // Get stream-out buffer descriptors and record them
-    m_streamOutBufDescs[i] = readValueFromCb(FixedVectorType::get(m_builder.getInt32Ty(), 4), streamOutTablePtr,
-                                             m_builder.getInt32(4 * i)); // <4 x i32>
+    const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
+    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+      bool bufferActive = xfbStrides[i] > 0;
+      if (!bufferActive)
+        continue; // Transform feedback buffer inactive
 
-    // NOTE: PAL decided not to invalidate the SQC and L1 for every stream-out update, mainly because that will hurt
-    // overall performance worse than just forcing this one buffer to be read via L2. Since PAL would not have wider
-    // context, PAL believed that they would have to perform that invalidation on every Set/Load unconditionally.
-    // Thus, we force the load of stream-out control buffer to be volatile to let LLVM backend add GLC and DLC flags.
-    const bool isVolatile = m_gfxIp.major == 11;
-    // Get stream-out buffer offsets and record them
-    m_streamOutBufOffsets[i] =
-        readValueFromCb(m_builder.getInt32Ty(), m_streamOutControlBufPtr,
-                        m_builder.getInt32(m_streamOutControlCbOffsets.bufOffsets[i]), isVolatile); // i32
+      // Get stream-out buffer descriptors and record them
+      m_streamOutBufDescs[i] = readValueFromCb(FixedVectorType::get(m_builder.getInt32Ty(), 4), streamOutTablePtr,
+                                               m_builder.getInt32(4 * i)); // <4 x i32>
+
+      // NOTE: PAL decided not to invalidate the SQC and L1 for every stream-out update, mainly because that will hurt
+      // overall performance worse than just forcing this one buffer to be read via L2. Since PAL would not have wider
+      // context, PAL believed that they would have to perform that invalidation on every Set/Load unconditionally.
+      // Thus, we force the load of stream-out control buffer to be volatile to let LLVM backend add GLC and DLC flags.
+      const bool isVolatile = m_gfxIp.major == 11;
+      // Get stream-out buffer offsets and record them
+      m_streamOutBufOffsets[i] =
+          readValueFromCb(m_builder.getInt32Ty(), m_streamOutControlBufPtr,
+                          m_builder.getInt32(m_streamOutControlCbOffsets.bufOffsets[i]), isVolatile); // i32
+    }
   }
 }
 
@@ -6218,7 +6238,7 @@ void NggPrimShader::processSwXfb(ArrayRef<Argument *> args) {
   //     Calculate primsToWrite and dwordsToWrite
   //     Increment GDS_STRMOUT_DWORDS_WRITTEN_X and release the control
   //     Store XFB statistics info to LDS
-  //     Increment GDS_STRMOUT_PRIMS_NEEDED_X and GDS_STRMOUT_PRIMS_WRITTEN_X
+  //     Increment GDS_STRMOUT_PRIMS_NEEDED_0 and GDS_STRMOUT_PRIMS_WRITTEN_0
   //   }
   //   Barrier
   //
@@ -7512,6 +7532,245 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
   assert(xfbFetcherArgs.size() == xfbFetcher->arg_size()); // Must have visit all arguments
 
   return m_builder.CreateCall(xfbFetcher, xfbFetcherArgs);
+}
+
+// =====================================================================================================================
+// Collect primitive statistics (primitive statistics counting) and update the values in HW counters.
+void NggPrimShader::collectPrimitiveStats() {
+  // NOTE: For SW emulated stream-out, the processing will update HW counters at the same time unconditionally. We don't
+  // have to particularly call this function.
+  assert(!m_pipelineState->enableSwXfb());
+  assert(m_pipelineState->enablePrimStats()); // Make sure we do need to count generated primitives
+
+  if (!m_hasGs) {
+    // GS is not present
+
+    //
+    // The processing is something like this:
+    //
+    // NGG_PRIM_STATS() {
+    //   if (threadIdInSubgroup == 0)
+    //     Increment GDS_STRMOUT_PRIMS_NEEDED_0 and GDS_STRMOUT_PRIMS_WRITTEN_0
+    // }
+    //
+    BasicBlock *insertBlock = m_builder.GetInsertBlock();
+
+    BasicBlock *collectPrimitiveStatsBlock = createBlock(insertBlock->getParent(), ".collectPrimitiveStats");
+    collectPrimitiveStatsBlock->moveAfter(insertBlock);
+    BasicBlock *endCollectPrimitiveStatsBlock = createBlock(insertBlock->getParent(), ".endCollectPrimitiveStats");
+    endCollectPrimitiveStatsBlock->moveAfter(collectPrimitiveStatsBlock);
+
+    // Insert branching in current block to collect primitive statistics
+    {
+      auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(0));
+      m_builder.CreateCondBr(firstThreadInSubgroup, collectPrimitiveStatsBlock, endCollectPrimitiveStatsBlock);
+    }
+
+    // Construct ".collectPrimitiveStats" block
+    {
+      m_builder.SetInsertPoint(collectPrimitiveStatsBlock);
+
+      if (m_gfxIp.major <= 11) {
+        m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, m_nggInputs.primCountInSubgroup->getType(),
+                                  {m_nggInputs.primCountInSubgroup,                       // value to add
+                                   m_builder.getInt32(GDS_STRMOUT_PRIMS_NEEDED_0 << 2)}); // count index
+
+        m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, m_builder.getInt32Ty(),
+                                  {m_builder.getInt32(0),                                  // value to add
+                                   m_builder.getInt32(GDS_STRMOUT_PRIMS_WRITTEN_0 << 2)}); // count index
+      } else {
+        llvm_unreachable("Not implemented!");
+      }
+
+      m_builder.CreateBr(endCollectPrimitiveStatsBlock);
+    }
+
+    // Construct ".endCollectPrimitiveStats" block
+    { m_builder.SetInsertPoint(endCollectPrimitiveStatsBlock); }
+
+    return;
+  }
+
+  // GS is present
+  assert(m_hasGs);
+
+  //
+  // The processing is something like this:
+  //
+  // NGG_GS_PRIM_STATS() {
+  //   if (threadIdInSubgroup < MaxGsStreams)
+  //     Initialize output primitive count for each vertex stream
+  //   Barrier
+  //
+  //   if (threadIdInSubgroup < primCountInSubgroup)
+  //     Check the draw flag of output primitives and compute draw mask
+  //
+  //   if (threadIdInWave == 0)
+  //     Accumulate output primitive count
+  //   Barrier
+  //
+  //   if (threadIdInSubgroup == 0) {
+  //     for each vertex stream
+  //       Increment GDS_STRMOUT_PRIMS_NEEDED_X and GDS_STRMOUT_PRIMS_WRITTEN_X
+  //   }
+  // }
+  //
+  BasicBlock *insertBlock = m_builder.GetInsertBlock();
+
+  BasicBlock *initPrimitiveCountsBlock = createBlock(insertBlock->getParent(), ".initPrimitiveCounts");
+  initPrimitiveCountsBlock->moveAfter(insertBlock);
+  BasicBlock *endInitPrimitiveCountsBlock = createBlock(insertBlock->getParent(), ".endInitPrimitiveCounts");
+  endInitPrimitiveCountsBlock->moveAfter(initPrimitiveCountsBlock);
+
+  BasicBlock *checkPrimitiveDrawFlagBlock = createBlock(insertBlock->getParent(), ".checkPrimitiveDrawFlag");
+  checkPrimitiveDrawFlagBlock->moveAfter(endInitPrimitiveCountsBlock);
+  BasicBlock *endCheckPrimitiveDrawFlagBlock = createBlock(insertBlock->getParent(), ".endCheckPrimitiveDrawFlag");
+  endCheckPrimitiveDrawFlagBlock->moveAfter(checkPrimitiveDrawFlagBlock);
+
+  BasicBlock *countPrimitivesBlock = createBlock(insertBlock->getParent(), ".countPrimitives");
+  countPrimitivesBlock->moveAfter(endCheckPrimitiveDrawFlagBlock);
+  BasicBlock *endCountPrimitivesBlock = createBlock(insertBlock->getParent(), ".endCountPrimitives");
+  endCountPrimitivesBlock->moveAfter(countPrimitivesBlock);
+
+  BasicBlock *collectPrimitiveStatsBlock = createBlock(insertBlock->getParent(), ".collectPrimitiveStats");
+  collectPrimitiveStatsBlock->moveAfter(endCountPrimitivesBlock);
+  BasicBlock *endCollectPrimitiveStatsBlock = createBlock(insertBlock->getParent(), ".endCollectPrimitiveStats");
+  endCollectPrimitiveStatsBlock->moveAfter(collectPrimitiveStatsBlock);
+
+  // Insert branching in current block to collect primitive statistics
+  {
+    auto validStream = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(MaxGsStreams));
+    m_builder.CreateCondBr(validStream, initPrimitiveCountsBlock, endInitPrimitiveCountsBlock);
+  }
+
+  // Construct ".initPrimitiveCounts" block
+  {
+    m_builder.SetInsertPoint(initPrimitiveCountsBlock);
+
+    writePerThreadDataToLds(m_builder.getInt32(0), m_nggInputs.threadIdInSubgroup,
+                            PrimShaderLdsRegion::PrimitiveCounts);
+
+    m_builder.CreateBr(endInitPrimitiveCountsBlock);
+  }
+
+  // Construct ".endInitPrimitiveCounts" block
+  {
+    m_builder.SetInsertPoint(endInitPrimitiveCountsBlock);
+
+    createFenceAndBarrier();
+
+    auto validPrimitive = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
+    m_builder.CreateCondBr(validPrimitive, checkPrimitiveDrawFlagBlock, endCheckPrimitiveDrawFlagBlock);
+  }
+
+  // Construct ".checkPrimitiveDrawFlag" block
+  Value *drawFlag[MaxGsStreams] = {};
+  {
+    m_builder.SetInsertPoint(checkPrimitiveDrawFlagBlock);
+
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (m_pipelineState->isVertexStreamActive(i)) {
+        // drawFlag = primData[N] != NullPrim
+        auto primData =
+            readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
+                                     PrimShaderLdsRegion::PrimitiveData, Gfx9::NggMaxThreadsPerSubgroup * i);
+        drawFlag[i] = m_builder.CreateICmpNE(primData, m_builder.getInt32(NullPrim));
+      }
+    }
+
+    m_builder.CreateBr(endCheckPrimitiveDrawFlagBlock);
+  }
+
+  // Construct ".endCheckPrimitiveDrawFlag" block
+  Value *drawMask[MaxGsStreams] = {};
+  Value *primCountInWave[MaxGsStreams] = {};
+  {
+    m_builder.SetInsertPoint(endCheckPrimitiveDrawFlagBlock);
+
+    // Update draw flags
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (m_pipelineState->isVertexStreamActive(i)) {
+        drawFlag[i] = createPhi(
+            {{drawFlag[i], checkPrimitiveDrawFlagBlock}, {m_builder.getFalse(), endInitPrimitiveCountsBlock}});
+      }
+    }
+
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (m_pipelineState->isVertexStreamActive(i)) {
+        drawMask[i] = ballot(drawFlag[i]);
+
+        primCountInWave[i] = m_builder.CreateUnaryIntrinsic(Intrinsic::ctpop, drawMask[i]);
+        primCountInWave[i] = m_builder.CreateTrunc(primCountInWave[i], m_builder.getInt32Ty());
+      }
+    }
+
+    auto firstThreadInWave = m_builder.CreateICmpEQ(m_nggInputs.threadIdInWave, m_builder.getInt32(0));
+    m_builder.CreateCondBr(firstThreadInWave, countPrimitivesBlock, endCountPrimitivesBlock);
+  }
+
+  // Construct ".countPrimitives" block
+  {
+    m_builder.SetInsertPoint(countPrimitivesBlock);
+
+    unsigned regionStart = getLdsRegionStart(PrimShaderLdsRegion::PrimitiveCounts);
+
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (m_pipelineState->isVertexStreamActive(i)) {
+        atomicAdd(primCountInWave[i], m_builder.getInt32(regionStart + i));
+      }
+    }
+
+    m_builder.CreateBr(endCountPrimitivesBlock);
+  }
+
+  // Construct ".endCountPrimitives" block
+  Value *primCountInSubgroup[MaxGsStreams] = {};
+  {
+    m_builder.SetInsertPoint(endCountPrimitivesBlock);
+
+    createFenceAndBarrier();
+
+    auto primCountInStreams = readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInWave,
+                                                       PrimShaderLdsRegion::PrimitiveCounts);
+
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (!m_pipelineState->isVertexStreamActive(i))
+        continue;
+
+      primCountInSubgroup[i] = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
+                                                         {primCountInStreams, m_builder.getInt32(i)});
+    }
+
+    auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(0));
+    m_builder.CreateCondBr(firstThreadInSubgroup, collectPrimitiveStatsBlock, endCollectPrimitiveStatsBlock);
+  }
+
+  // Construct ".collectPrimitiveStats" block
+  {
+    m_builder.SetInsertPoint(collectPrimitiveStatsBlock);
+
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (!m_pipelineState->isVertexStreamActive(i))
+        continue;
+
+      if (m_gfxIp.major <= 11) {
+        m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, primCountInSubgroup[i]->getType(),
+                                  {primCountInSubgroup[i],                                          // value to add
+                                   m_builder.getInt32((GDS_STRMOUT_PRIMS_NEEDED_0 + 2 * i) << 2)}); // count index
+
+        m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, m_builder.getInt32Ty(),
+                                  {m_builder.getInt32(0),                                            // value to add
+                                   m_builder.getInt32((GDS_STRMOUT_PRIMS_WRITTEN_0 + 2 * i) << 2)}); // count index
+      } else {
+        llvm_unreachable("Not implemented!");
+      }
+    }
+
+    m_builder.CreateBr(endCollectPrimitiveStatsBlock);
+  }
+
+  // Construct ".endCollectPrimitiveStats" block
+  { m_builder.SetInsertPoint(endCollectPrimitiveStatsBlock); }
 }
 
 // =====================================================================================================================

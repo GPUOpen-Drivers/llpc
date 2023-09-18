@@ -396,7 +396,7 @@ public:
   // Check if transform feedback is active
   bool enableXfb() const { return m_xfbStateMetadata.enableXfb; }
 
-  // Check if we need count primitives if XFB is disabled
+  // Check if we need primitive statistics counting
   bool enablePrimStats() const { return m_xfbStateMetadata.enablePrimStats; }
 
   // Get transform feedback strides
