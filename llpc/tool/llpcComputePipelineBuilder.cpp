@@ -138,7 +138,7 @@ Expected<BinaryData> ComputePipelineBuilder::buildComputePipeline() {
   pipelineInfo->options.overrideThreadGroupSizeY = compileInfo.compPipelineInfo.options.overrideThreadGroupSizeY;
   pipelineInfo->options.overrideThreadGroupSizeZ = compileInfo.compPipelineInfo.options.overrideThreadGroupSizeZ;
   if (compileInfo.optimizationLevel.has_value()) {
-    pipelineInfo->options.optimizationLevel = compileInfo.optimizationLevel.value();
+    pipelineInfo->options.optimizationLevel = static_cast<uint32_t>(compileInfo.optimizationLevel.value());
   }
   pipelineInfo->options.threadGroupSwizzleMode = compileInfo.compPipelineInfo.options.threadGroupSwizzleMode;
   pipelineInfo->options.reverseThreadGroup = compileInfo.compPipelineInfo.options.reverseThreadGroup;
