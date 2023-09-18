@@ -159,6 +159,8 @@ static bool runPassPipeline(Pipeline &pipeline, Module &module, raw_pwrite_strea
   passMgr->addPass(VerifierPass());
   passMgr->addPass(PipelineStateRecorder());
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
+  // Old version of the code
   switch (codegen::getFileType()) {
   case CGFT_AssemblyFile:
     passMgr->addPass(PrintModulePass(outStream));
@@ -169,6 +171,19 @@ static bool runPassPipeline(Pipeline &pipeline, Module &module, raw_pwrite_strea
   case CGFT_Null:
     break;
   }
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  switch (codegen::getFileType()) {
+  case CodeGenFileType::AssemblyFile:
+    passMgr->addPass(PrintModulePass(outStream));
+    break;
+  case CodeGenFileType::ObjectFile:
+    passMgr->addPass(BitcodeWriterPass(outStream));
+    break;
+  case CodeGenFileType::Null:
+    break;
+  }
+#endif
 
   passMgr->run(module);
   return true;
@@ -239,11 +254,23 @@ int main(int argc, char **argv) {
     assert(optIterator != cl::getRegisteredOptions().end());
     cl::Option *opt = optIterator->second;
     if (opt->getNumOccurrences() == 0)
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
+      // Old version of the code
       *static_cast<cl::opt<CodeGenFileType> *>(opt) = CGFT_AssemblyFile;
+#else
+      // New version of the code (also handles unknown version, which we treat as latest)
+      *static_cast<cl::opt<CodeGenFileType> *>(opt) = CodeGenFileType::AssemblyFile;
+#endif
   }
 
   // Create the LgcContext.
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
+  // Old version of the code
   std::unique_ptr<TargetMachine> targetMachine(LgcContext::createTargetMachine(gpuName, CodeGenOpt::Level::Default));
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  std::unique_ptr<TargetMachine> targetMachine(LgcContext::createTargetMachine(gpuName, CodeGenOptLevel::Default));
+#endif
   if (!targetMachine) {
     errs() << progName << ": GPU type '" << gpuName << "' not recognized\n";
     return 1;

@@ -105,12 +105,15 @@ LgcContext *Context::getLgcContext() {
   return &*m_builderContext;
 }
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
+// Old version of the code
 // =====================================================================================================================
 // Get optimization level. Also resets what getLastOptimizationLevel() returns.
 //
 // @returns: the optimization level for the context.
 CodeGenOpt::Level Context::getOptimizationLevel() {
-  uint32_t optLevel = CodeGenOpt::Level::Default;
+  uint32_t optLevel = static_cast<uint32_t>(CodeGenOpt::Level::Default);
+
   optLevel = getPipelineContext()->getPipelineOptions()->optimizationLevel;
   if (optLevel > 3)
     optLevel = 3;
@@ -125,6 +128,33 @@ CodeGenOpt::Level Context::getOptimizationLevel() {
 CodeGenOpt::Level Context::getLastOptimizationLevel() const {
   return *m_lastOptLevel;
 }
+
+#else
+// New version of the code (also handles unknown version, which we treat as latest)
+
+// =====================================================================================================================
+// Get optimization level. Also resets what getLastOptimizationLevel() returns.
+//
+// @returns: the optimization level for the context.
+CodeGenOptLevel Context::getOptimizationLevel() {
+  uint32_t optLevel = static_cast<uint32_t>(CodeGenOptLevel::Default);
+
+  optLevel = getPipelineContext()->getPipelineOptions()->optimizationLevel;
+  if (optLevel > 3)
+    optLevel = 3;
+  else if (optLevel == 0) // Workaround for noopt bugs in the AMDGPU backend in LLVM.
+    optLevel = 1;
+  m_lastOptLevel = CodeGenOptLevel(optLevel);
+  return *m_lastOptLevel;
+}
+
+// =====================================================================================================================
+// Get the optimization level returned by the last getOptimizationLevel().
+CodeGenOptLevel Context::getLastOptimizationLevel() const {
+  return *m_lastOptLevel;
+}
+
+#endif
 
 // =====================================================================================================================
 // Loads library from external LLVM library.

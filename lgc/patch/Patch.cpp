@@ -117,7 +117,7 @@ namespace lgc {
 // @param optLevel : The optimization level uses to adjust the aggressiveness of
 //                   passes and which passes to add.
 void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, Timer *patchTimer, Timer *optTimer,
-                      Pipeline::CheckShaderCacheFunc checkShaderCacheFunc, CodeGenOpt::Level optLevel) {
+                      Pipeline::CheckShaderCacheFunc checkShaderCacheFunc, uint32_t optLevel) {
   // Start timer for patching passes.
   if (patchTimer)
     LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
@@ -340,7 +340,7 @@ void Patch::registerPasses(PassBuilder &passBuilder) {
 // @param [in/out] passMgr : Pass manager to add passes to
 // @param optLevel : The optimization level uses to adjust the aggressiveness of
 //                   passes and which passes to add.
-void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level optLevel) {
+void Patch::addOptimizationPasses(lgc::PassManager &passMgr, uint32_t optLevel) {
   LLPC_OUTS("PassManager optimization level = " << optLevel << "\n");
 
   passMgr.addPass(ForceFunctionAttrsPass());
