@@ -178,7 +178,7 @@ Value *BuilderImpl::CreateSubgroupBroadcast(Value *const value, Value *const ind
                                    {mappedArgs[0], passthroughArgs[0]});
   };
 
-  return CreateMapToInt32(mapFunc, value, index);
+  return CreateMapToSimpleType(mapFunc, value, index);
 }
 
 // =====================================================================================================================
@@ -194,7 +194,7 @@ Value *BuilderImpl::CreateSubgroupBroadcastWaterfall(Value *const value, Value *
         builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_readlane, {mappedArgs[0], passthroughArgs[0]});
     return createWaterfallLoop(cast<Instruction>(readlane), 1);
   };
-  return CreateMapToInt32(mapFunc, value, index);
+  return CreateMapToSimpleType(mapFunc, value, index);
 }
 
 // =====================================================================================================================
@@ -207,7 +207,7 @@ Value *BuilderImpl::CreateSubgroupBroadcastFirst(Value *const value, const Twine
     return builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, mappedArgs[0]);
   };
 
-  return CreateMapToInt32(mapFunc, {BuilderBase::get(*this).CreateInlineAsmSideEffect(value)}, {});
+  return CreateMapToSimpleType(mapFunc, {BuilderBase::get(*this).CreateInlineAsmSideEffect(value)}, {});
 }
 
 // =====================================================================================================================
@@ -346,7 +346,7 @@ Value *BuilderImpl::CreateSubgroupShuffle(Value *const value, Value *const index
     };
 
     // The ds_bpermute intrinsic requires the index be multiplied by 4.
-    return CreateMapToInt32(mapFunc, value, CreateMul(index, getInt32(4)));
+    return CreateMapToSimpleType(mapFunc, value, CreateMul(index, getInt32(4)));
   }
 
   if (supportPermLane64Dpp()) {
@@ -364,15 +364,15 @@ Value *BuilderImpl::CreateSubgroupShuffle(Value *const value, Value *const index
       return builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_permlane64, {mappedArgs[0]});
     };
 
-    auto swapped = CreateMapToInt32(permuteFunc, wwmValue, {});
+    auto swapped = CreateMapToSimpleType(permuteFunc, wwmValue, {});
 
     auto bPermFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
                         ArrayRef<Value *> passthroughArgs) -> Value * {
       return builder.CreateIntrinsic(Intrinsic::amdgcn_ds_bpermute, {}, {passthroughArgs[0], mappedArgs[0]});
     };
 
-    auto bPermSameHalf = CreateMapToInt32(bPermFunc, wwmValue, wwmIndex);
-    auto bPermOtherHalf = CreateMapToInt32(bPermFunc, swapped, wwmIndex);
+    auto bPermSameHalf = CreateMapToSimpleType(bPermFunc, wwmValue, wwmIndex);
+    auto bPermOtherHalf = CreateMapToSimpleType(bPermFunc, swapped, wwmIndex);
     bPermOtherHalf = createWwm(bPermOtherHalf);
 
     auto const threadId = CreateSubgroupMbcnt(getInt64(UINT64_MAX), "");
@@ -389,7 +389,7 @@ Value *BuilderImpl::CreateSubgroupShuffle(Value *const value, Value *const index
     return createWaterfallLoop(cast<Instruction>(readlane), 1);
   };
 
-  return CreateMapToInt32(mapFunc, value, index);
+  return CreateMapToSimpleType(mapFunc, value, index);
 }
 
 // =====================================================================================================================
@@ -1143,7 +1143,7 @@ Value *BuilderImpl::CreateSubgroupWriteInvocation(Value *const inputValue, Value
                                    });
   };
 
-  return CreateMapToInt32(mapFunc, {inputValue, writeValue}, invocationIndex);
+  return CreateMapToSimpleType(mapFunc, {inputValue, writeValue}, invocationIndex);
 }
 
 // =====================================================================================================================
@@ -1282,7 +1282,7 @@ Value *BuilderImpl::createDppMov(Value *const value, DppCtrl dppCtrl, unsigned r
         {mappedArgs[0], passthroughArgs[0], passthroughArgs[1], passthroughArgs[2], passthroughArgs[3]});
   };
 
-  return CreateMapToInt32(
+  return CreateMapToSimpleType(
       mapFunc, value,
       {getInt32(static_cast<unsigned>(dppCtrl)), getInt32(rowMask), getInt32(bankMask), getInt1(boundCtrl)});
 }
@@ -1304,7 +1304,7 @@ Value *BuilderImpl::createDppUpdate(Value *const origValue, Value *const updateV
         {mappedArgs[0], mappedArgs[1], passthroughArgs[0], passthroughArgs[1], passthroughArgs[2], passthroughArgs[3]});
   };
 
-  return CreateMapToInt32(
+  return CreateMapToSimpleType(
       mapFunc,
       {
           origValue,
@@ -1331,7 +1331,7 @@ Value *BuilderImpl::createPermLane16(Value *const origValue, Value *const update
         {mappedArgs[0], mappedArgs[1], passthroughArgs[0], passthroughArgs[1], passthroughArgs[2], passthroughArgs[3]});
   };
 
-  return CreateMapToInt32(
+  return CreateMapToSimpleType(
       mapFunc,
       {
           origValue,
@@ -1358,7 +1358,7 @@ Value *BuilderImpl::createPermLaneX16(Value *const origValue, Value *const updat
         {mappedArgs[0], mappedArgs[1], passthroughArgs[0], passthroughArgs[1], passthroughArgs[2], passthroughArgs[3]});
   };
 
-  return CreateMapToInt32(
+  return CreateMapToSimpleType(
       mapFunc,
       {
           origValue,
@@ -1376,7 +1376,7 @@ Value *BuilderImpl::createPermLane64(Value *const updateValue) {
     return builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_permlane64, {mappedArgs[0]});
   };
 
-  return CreateMapToInt32(mapFunc, updateValue, {});
+  return CreateMapToSimpleType(mapFunc, updateValue, {});
 }
 
 // =====================================================================================================================
@@ -1389,7 +1389,7 @@ Value *BuilderImpl::createDsSwizzle(Value *const value, uint16_t dsPattern) {
     return builder.CreateIntrinsic(Intrinsic::amdgcn_ds_swizzle, {}, {mappedArgs[0], passthroughArgs[0]});
   };
 
-  return CreateMapToInt32(mapFunc, value, getInt32(dsPattern));
+  return CreateMapToSimpleType(mapFunc, value, getInt32(dsPattern));
 }
 
 // =====================================================================================================================
@@ -1401,7 +1401,7 @@ Value *BuilderImpl::createWwm(Value *const value) {
     return builder.CreateUnaryIntrinsic(Intrinsic::amdgcn_wwm, mappedArgs[0]);
   };
 
-  return CreateMapToInt32(mapFunc, value, {});
+  return CreateMapToSimpleType(mapFunc, value, {});
 }
 
 // =====================================================================================================================
@@ -1415,7 +1415,7 @@ Value *BuilderImpl::createWqm(Value *const value) {
   };
 
   if (m_shaderStage == ShaderStageFragment)
-    return CreateMapToInt32(mapFunc, value, {});
+    return CreateMapToSimpleType(mapFunc, value, {});
 
   return value;
 }

@@ -117,9 +117,11 @@ protected:
   llvm::Value *CreateAddByteOffset(llvm::Value *pointer, llvm::Value *byteOffset, const llvm::Twine &instName = "") {
     return BuilderBase::get(*this).CreateAddByteOffset(pointer, byteOffset, instName);
   }
-  llvm::Value *CreateMapToInt32(BuilderBase::MapToInt32Func mapFunc, llvm::ArrayRef<llvm::Value *> mappedArgs,
-                                llvm::ArrayRef<llvm::Value *> passthroughArgs) {
-    return BuilderBase::get(*this).CreateMapToInt32(mapFunc, mappedArgs, passthroughArgs);
+
+  llvm::Value *CreateMapToSimpleType(BuilderBase::MapToSimpleTypeFunc mapFunc, llvm::ArrayRef<llvm::Value *> mappedArgs,
+                                     llvm::ArrayRef<llvm::Value *> passthroughArgs,
+                                     MapToSimpleMode simpleMode = MapToSimpleMode::Int32) {
+    return BuilderBase::get(*this).CreateMapToSimpleType(mapFunc, mappedArgs, passthroughArgs, simpleMode);
   }
 
   PipelineState *m_pipelineState = nullptr;       // Pipeline state
