@@ -836,7 +836,7 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGenerateInters
   //      {
   //          rayQuery.commit = rayQuery.candidate
   //          rayQuery.committedStatus = gl_RayQueryCommittedIntersectionGeneratedEXT
-  //          rayQuery.committed.rayTCurrent = tHit
+  //          rayQuery.committed.rayTCurrent = tHit - rayQuery.rayTMin
   //      }
   // }
   func->addFnAttr(Attribute::AlwaysInline);
@@ -864,7 +864,11 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGenerateInters
   storeAddr = m_builder->CreateGEP(
       rayQueryTy, rayQuery,
       {zero, m_builder->getInt32(RayQueryParams::Committed), m_builder->getInt32(RaySystemParams::RayTCurrent)});
-  m_builder->CreateStore(hitT, storeAddr);
+  Value *rayTMinAddr = m_builder->CreateGEP(rayQueryTy, rayQuery,
+                                            {m_builder->getInt32(0), m_builder->getInt32(RayQueryParams::RayTMin)});
+  auto minTVal = m_builder->CreateLoad(m_builder->getFloatTy(), rayTMinAddr);
+  // NOTE: rayTCurrent stored in rayQuery is relative to rayTMin, but tHit given by app is relative to ray origin.
+  m_builder->CreateStore(m_builder->CreateFSub(hitT, minTVal), storeAddr);
   m_builder->CreateBr(endBlock);
 
   m_builder->SetInsertPoint(endBlock);
