@@ -9739,8 +9739,11 @@ void SPIRVToLLVM::insertScratchBoundsChecks(SPIRVValue *memOp, const ScratchBoun
 void SPIRVToLLVM::createXfbMetadata(bool hasXfbOuts) {
   auto llpcContext = static_cast<Llpc::Context *>(m_context);
   auto pipelineBuildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());
-  const bool needXfbMetadata = (hasXfbOuts && !pipelineBuildInfo->apiXfbOutData.forceDisableStreamOut) ||
-                               pipelineBuildInfo->apiXfbOutData.forceEnablePrimStats;
+  bool needXfbMetadata = hasXfbOuts && !pipelineBuildInfo->apiXfbOutData.forceDisableStreamOut;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 69
+  needXfbMetadata |= pipelineBuildInfo->apiXfbOutData.forceEnablePrimStats;
+#endif
+
   if (!needXfbMetadata)
     return;
 

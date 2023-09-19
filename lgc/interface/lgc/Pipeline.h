@@ -173,6 +173,7 @@ union Options {
     bool disableSampleMask;       // Disable export of sample mask from PS
     bool reserved20;
     RayTracingIndirectMode rtIndirectMode; // Ray tracing indirect mode
+    bool enablePrimGeneratedQuery;         // Whether to enable primitive generated counter
   };
 };
 static_assert(sizeof(Options) == sizeof(Options::u32All));
