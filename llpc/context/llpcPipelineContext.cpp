@@ -339,6 +339,7 @@ Options PipelineContext::computePipelineOptions() const {
   options.internalRtShaders = getPipelineOptions()->internalRtShaders;
   options.disableSampleMask = getPipelineOptions()->disableSampleMask;
   options.disableTruncCoordForGather = getPipelineOptions()->disableTruncCoordForGather;
+  options.enablePrimGeneratedQuery = getPipelineOptions()->enablePrimGeneratedQuery;
 
   return options;
 }

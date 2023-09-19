@@ -46,7 +46,7 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 68
+#define LLPC_INTERFACE_MAJOR_VERSION 69
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -80,6 +80,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     69.0 | Add enablePrimGeneratedQuery to PipelineOptions                                                       |
 //  |     68.0 | Remove ICache *cache in all PipelineBuildInfo                                                         |
 //  |     67.0 | Modify the uber fetch shader. Adds locationMask(64bit) at the beginning of uber fetch shader internal |
 //  |          | buffer which flags whether the related attribute data is valid.                                       |
@@ -603,6 +604,7 @@ struct PipelineOptions {
   bool enableCombinedTexture;             ///< For OGL only, use the 'set' for DescriptorCombinedTexture
                                           ///< for sampled images and samplers
   bool vertex64BitsAttribSingleLoc;       ///< For OGL only, dvec3/dvec4 vertex attrib only consumes 1 location.
+  bool enablePrimGeneratedQuery;          ///< If set, primitive generated query is enabled
   unsigned reserved20;
 };
 
@@ -1254,7 +1256,9 @@ struct ApiXfbOutData {
   XfbOutInfo *pXfbOutInfos;   ///< An array of XfbOutInfo items
   unsigned numXfbOutInfo;     ///< Count of XfbOutInfo items
   bool forceDisableStreamOut; ///< Force to disable stream out XFB outputs
-  bool forceEnablePrimStats;  ///< Force to enable counting generated primitives
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 69
+  bool forceEnablePrimStats; ///< Force to enable counting generated primitives
+#endif
 };
 
 /// Represents the tessellation level passed from driver API

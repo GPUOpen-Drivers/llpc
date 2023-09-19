@@ -861,6 +861,7 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.buildResourcesDataForShaderModule = " << options->buildResourcesDataForShaderModule << "\n";
   dumpFile << "options.disableTruncCoordForGather = " << options->disableTruncCoordForGather << "\n";
   dumpFile << "options.vertex64BitsAttribSingleLoc = " << options->vertex64BitsAttribSingleLoc << "\n";
+  dumpFile << "options.enablePrimGeneratedQuery = " << options->enablePrimGeneratedQuery << "\n";
 }
 
 // =====================================================================================================================
@@ -1016,7 +1017,9 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
 
   dumpFile << "\n[ApiXfbOutInfo]\n";
   dumpFile << "forceDisableStreamOut = " << pipelineInfo->apiXfbOutData.forceDisableStreamOut << "\n";
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 69
   dumpFile << "forceEnablePrimStats = " << pipelineInfo->apiXfbOutData.forceEnablePrimStats << "\n";
+#endif
   const auto pXfbOutInfos = pipelineInfo->apiXfbOutData.pXfbOutInfos;
   for (unsigned idx = 0; idx < pipelineInfo->apiXfbOutData.numXfbOutInfo; ++idx) {
     dumpFile << "xfbOutInfo[" << idx << "].isBuiltIn = " << pXfbOutInfos[idx].isBuiltIn << "\n";
@@ -1566,7 +1569,9 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   }
 
   hasher->Update(pipeline->apiXfbOutData.forceDisableStreamOut);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 69
   hasher->Update(pipeline->apiXfbOutData.forceEnablePrimStats);
+#endif
 }
 
 // =====================================================================================================================
@@ -1653,6 +1658,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->forceNonUniformResourceIndexStageMask);
   hasher->Update(options->replaceSetWithResourceType);
   hasher->Update(options->disableTruncCoordForGather);
+  hasher->Update(options->enablePrimGeneratedQuery);
 }
 
 // =====================================================================================================================
