@@ -343,6 +343,14 @@ cl::opt<bool> GpuRtUseDumped("gpurt-use-dumped", cl::desc("Use the GPURT shader 
 
 cl::opt<std::string> GpuRtLibrary("gpurt-library", cl::desc("Use the GPURT shader library from the given file"));
 
+cl::opt<LlpcRaytracingMode>
+LlpcRaytracingModeSetting("llpc-raytracing-mode", cl::init(LlpcRaytracingMode::Legacy),
+                          cl::desc("Override the LLPC raytracing mode"),
+                          cl::values(
+                            clEnumValN(LlpcRaytracingMode::Legacy, "legacy", "Legacy mode"),
+                            clEnumValN(LlpcRaytracingMode::Gpurt2, "continufy", "Legacy RT pipeline with continufy"),
+                            clEnumValN(LlpcRaytracingMode::Continuations, "continuations", "Continuations mode")));
+
 // -enable-color-export-shader
 cl::opt<bool> EnableColorExportShader("enable-color-export-shader",
                                       cl::desc("Enable color export shader, only compile each stage of the pipeline without linking"),
@@ -667,6 +675,11 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
     compileInfo.autoLayoutDesc = false;
     if (Error err = processInputPipeline(compiler, compileInfo, firstInput, Unlinked, IgnoreColorAttachmentFormats))
       return err;
+
+    if (isRayTracingPipeline(compileInfo.stageMask)) {
+      if (LlpcRaytracingModeSetting.getNumOccurrences())
+        compileInfo.rayTracePipelineInfo.mode = LlpcRaytracingModeSetting;
+    }
   } else {
     compileInfo.autoLayoutDesc = true;
     if (Error err = processInputStages(compileInfo, inputSpecs, ValidateSpirv, NumThreads))
@@ -686,7 +699,7 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
       compileInfo.doAutoLayout = true;
       compileInfo.autoLayoutDesc = true;
 
-      compileInfo.rayTracePipelineInfo.mode = LlpcRaytracingMode::Legacy;
+      compileInfo.rayTracePipelineInfo.mode = LlpcRaytracingModeSetting;
       compileInfo.rayTracePipelineInfo.maxRecursionDepth = 1;
 
       RtState &state = compileInfo.rayTracePipelineInfo.rtState;
