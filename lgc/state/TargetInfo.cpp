@@ -586,12 +586,6 @@ bool TargetInfo::setTargetInfo(StringRef gpuName) {
     {"gfx1036", &setGfx1036Info}, // gfx1036, raphael | mendocino
     {"gfx1100", &setGfx1100Info}, // gfx1100, navi31
     {"gfx1102", &setGfx1102Info}, // gfx1102, navi33
-    {"gfx1035", &setGfx1035Info}, // gfx1035, rembrandt
-    {"gfx1036", &setGfx1036Info}, // gfx1036, raphael | mendocino
-    {"gfx1100", &setGfx1100Info}, // gfx1100, navi31
-#if LLPC_BUILD_NAVI33
-    {"gfx1102", &setGfx1102Info}, // gfx1102, navi33
-#endif
 #if LLPC_BUILD_PHOENIX1
     {"gfx1103", &setGfx1103Info}, // gfx1103, phoenix1
 #endif

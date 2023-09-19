@@ -102,6 +102,7 @@ struct NggControl {
 // Represents transform feedback state metadata
 struct XfbStateMetadata {
   bool enableXfb;                                               // Whether transform feedback is active
+  bool enablePrimStats;                                         // Whether to count generated primitives
   std::array<unsigned, MaxTransformFeedbackBuffers> xfbStrides; // The strides of each XFB buffer
   std::array<int, MaxGsStreams> streamXfbBuffers;               // The stream-out XFB buffers bit mask per stream
   std::array<bool, MaxGsStreams> streamActive;                  // Flag indicating which vertex stream is active
@@ -187,6 +188,26 @@ public:
 
   // Set the client-defined metadata to be stored inside the ELF
   void setClientMetadata(llvm::StringRef clientMetadata) override final;
+
+  // Set default tessellation inner/outer level from driver API
+  void setTessLevel(const float *tessLevelInner, const float *tessLevelOuter) override final {
+    m_tessLevel.inner[0] = tessLevelInner[0];
+    m_tessLevel.inner[1] = tessLevelInner[1];
+    m_tessLevel.outer[0] = tessLevelOuter[0];
+    m_tessLevel.outer[1] = tessLevelOuter[1];
+    m_tessLevel.outer[2] = tessLevelOuter[2];
+    m_tessLevel.outer[3] = tessLevelOuter[3];
+  }
+
+  // Get default tessellation inner/outer level from driver API
+  float getTessLevelInner(unsigned level) override final {
+    assert(level <= 2);
+    return m_tessLevel.inner[level];
+  }
+  float getTessLevelOuter(unsigned level) override final {
+    assert(level <= 4);
+    return m_tessLevel.outer[level];
+  }
 
   // -----------------------------------------------------------------------------------------------------------------
   // Other methods
@@ -374,6 +395,9 @@ public:
 
   // Check if transform feedback is active
   bool enableXfb() const { return m_xfbStateMetadata.enableXfb; }
+
+  // Check if we need count primitives if XFB is disabled
+  bool enablePrimStats() const { return m_xfbStateMetadata.enablePrimStats; }
 
   // Get transform feedback strides
   const std::array<unsigned, MaxTransformFeedbackBuffers> &getXfbBufferStrides() const {
@@ -588,6 +612,12 @@ private:
   bool m_outputPackState[ShaderStageGfxCount] = {}; // The output packable state per shader stage
   XfbStateMetadata m_xfbStateMetadata = {};         // Transform feedback state metadata
   llvm::SmallVector<unsigned, 32> m_userDataMaps[ShaderStageCountInternal]; // The user data per-shader
+  bool m_useMrt0AToMrtzA = false;                                           // Whether to copy mrt0.a to mrz.a
+
+  struct {
+    float inner[2]; // default tessellation inner level
+    float outer[4]; // default tessellation outer level
+  } m_tessLevel;
 };
 
 // =====================================================================================================================

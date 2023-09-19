@@ -295,7 +295,7 @@ bool PatchResourceCollect::canUseNgg(Module *module) {
     return false;
 
   // TODO: If transform feedback is enabled, currently disable NGG.
-  if (m_pipelineState->enableXfb())
+  if (m_pipelineState->enableXfb() || m_pipelineState->enablePrimStats())
     return false;
 
   if (hasTs && hasGs) {
@@ -1130,6 +1130,7 @@ void PatchResourceCollect::processShader() {
 
   clearInactiveBuiltInInput();
   clearInactiveBuiltInOutput();
+  clearUndefinedOutput();
 
   if (m_pipelineState->isGraphics()) {
     matchGenericInOut();
@@ -1302,50 +1303,7 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
     unsigned builtInId = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
     m_importedOutputBuiltIns.insert(builtInId);
   } else if (mangledName.startswith(lgcName::OutputExportGeneric)) {
-    auto outputValue = callInst.getArgOperand(callInst.arg_size() - 1);
-    if (m_shaderStage != ShaderStageFragment && (isa<UndefValue>(outputValue) || isa<PoisonValue>(outputValue))) {
-      // NOTE: If an output value of vertex processing stages is unspecified, we can safely drop it and remove the
-      // output export call.
-      m_deadCalls.push_back(&callInst);
-
-      if (m_pipelineState->getNextShaderStage(m_shaderStage) != ShaderStageInvalid) {
-        // Also, we remove the output location info from the map if it exists
-        const unsigned location = cast<ConstantInt>(callInst.getArgOperand(0))->getZExtValue();
-        unsigned component = cast<ConstantInt>(callInst.getArgOperand(1))->getZExtValue();
-        if (outputValue->getType()->getScalarSizeInBits() == 64)
-          component *= 2; // Component in location info is dword-based
-
-        InOutLocationInfo outLocInfo;
-        outLocInfo.setLocation(location);
-        outLocInfo.setComponent(component);
-        if (m_shaderStage == ShaderStageGeometry)
-          outLocInfo.setStreamId(cast<ConstantInt>(callInst.getArgOperand(2))->getZExtValue());
-
-        auto &outLocInfoMap = m_resUsage->inOutUsage.outputLocInfoMap;
-        if (outLocInfoMap.count(outLocInfo) > 0) {
-          outLocInfoMap.erase(outLocInfo);
-          if (outputValue->getType()->getPrimitiveSizeInBits() > 128) {
-            // NOTE: For any data that is larger than <4 x dword>, there are two consecutive locations occupied.
-            outLocInfo.setLocation(location + 1);
-            outLocInfoMap.erase(outLocInfo);
-          }
-        }
-
-        // Remove transform feedback location info as well if it exists
-        outLocInfo.setLocation(location);
-        auto &locInfoXfbOutInfoMap = m_resUsage->inOutUsage.locInfoXfbOutInfoMap;
-        if (locInfoXfbOutInfoMap.count(outLocInfo) > 0) {
-          locInfoXfbOutInfoMap.erase(outLocInfo);
-          if (outputValue->getType()->getPrimitiveSizeInBits() > 128) {
-            // NOTE: For any data that is larger than <4 x dword>, there are two consecutive locations occupied.
-            outLocInfo.setLocation(location + 1);
-            locInfoXfbOutInfoMap.erase(outLocInfo);
-          }
-        }
-      }
-    } else {
-      m_outputCalls.push_back(&callInst);
-    }
+    m_outputCalls.push_back(&callInst);
   } else if (mangledName.startswith(lgcName::OutputExportBuiltIn)) {
     // NOTE: If an output value is unspecified, we can safely drop it and remove the output export call.
     // Currently, do this for geometry shader.
@@ -2866,10 +2824,21 @@ void PatchResourceCollect::clearUnusedOutput() {
       } else {
         // Collect locations of those outputs that are not used
         bool isOutputXfb = false;
-        if (m_shaderStage == ShaderStageGeometry)
+        bool foundInNextStage = false;
+
+        if (m_shaderStage == ShaderStageGeometry) {
           isOutputXfb = inOutUsage.locInfoXfbOutInfoMap.count(locInfoPair.first) > 0;
 
-        if (!isOutputXfb && nextInLocInfoMap.find(locInfoPair.first) == nextInLocInfoMap.end()) {
+          auto locInfo = locInfoPair.first;
+          if (m_pipelineState->getRasterizerState().rasterStream == locInfo.getStreamId()) {
+            // StreamId only valid in GS stage.
+            locInfo.setStreamId(0);
+            foundInNextStage = (nextInLocInfoMap.find(locInfo) != nextInLocInfoMap.end());
+          }
+        } else
+          foundInNextStage = (nextInLocInfoMap.find(locInfoPair.first) != nextInLocInfoMap.end());
+
+        if (!isOutputXfb && !foundInNextStage) {
           bool isActiveLoc = false;
           if (m_shaderStage == ShaderStageTessControl) {
             // NOTE: if the output is used as imported in TCS, it is marked as active.
@@ -3582,6 +3551,110 @@ void PatchResourceCollect::scalarizeGenericOutput(CallInst *call) {
   }
 
   call->eraseFromParent();
+}
+
+// =====================================================================================================================
+// Clear non-specified output value in non-fragment shader stages
+void PatchResourceCollect::clearUndefinedOutput() {
+  if (m_shaderStage == ShaderStageFragment)
+    return;
+  // NOTE: If a vector or all used channels in a location are not specified, we can safely drop it and remove the output
+  // export call
+  struct CandidateInfo {
+    unsigned undefMask = 0;
+    unsigned usedMask = 0;
+    SmallVector<CallInst *> candidateCalls;
+  };
+  // Collect candidate info with undefined value at a location.
+  std::map<InOutLocationInfo, CandidateInfo> locCandidateInfoMap;
+
+  for (auto call : m_outputCalls) {
+    auto outputValue = call->getArgOperand(call->arg_size() - 1);
+    bool isUndefVal = isa<UndefValue>(outputValue) || isa<PoisonValue>(outputValue);
+    unsigned index = (m_shaderStage == ShaderStageMesh || m_shaderStage == ShaderStageTessControl) ? 2 : 1;
+    bool isDynElemIndexing = !isa<ConstantInt>(call->getArgOperand(index));
+
+    InOutLocationInfo locInfo;
+    locInfo.setLocation(cast<ConstantInt>(call->getArgOperand(0))->getZExtValue());
+    if (m_shaderStage == ShaderStageGeometry)
+      locInfo.setStreamId(cast<ConstantInt>(call->getArgOperand(2))->getZExtValue());
+
+    unsigned undefMask = 0;
+    unsigned usedMask = 0;
+    if (isDynElemIndexing)
+      usedMask = 1; // keep the call
+    else {
+      const unsigned elemIdx = cast<ConstantInt>(call->getArgOperand(index))->getZExtValue();
+      usedMask = 1 << elemIdx;
+      if (isUndefVal)
+        undefMask = 1 << elemIdx;
+    }
+
+    auto iter = locCandidateInfoMap.find(locInfo);
+    if (iter == locCandidateInfoMap.end()) {
+      CandidateInfo candidataInfo;
+      candidataInfo.undefMask = undefMask;
+      candidataInfo.usedMask = usedMask;
+      candidataInfo.candidateCalls.push_back(call);
+      locCandidateInfoMap[locInfo] = candidataInfo;
+    } else {
+      iter->second.undefMask |= undefMask;
+      iter->second.usedMask |= usedMask;
+      iter->second.candidateCalls.push_back(call);
+    }
+  }
+  m_outputCalls.clear();
+  // Check if all used channels are undefined in a location in a stream
+  for (auto &locCandidate : locCandidateInfoMap) {
+    auto candidateCalls = locCandidate.second.candidateCalls;
+    if (locCandidate.second.usedMask != locCandidate.second.undefMask) {
+      m_outputCalls.insert(m_outputCalls.end(), candidateCalls.begin(), candidateCalls.end());
+      continue;
+    }
+
+    m_deadCalls.insert(m_deadCalls.end(), candidateCalls.begin(), candidateCalls.end());
+
+    for (auto call : candidateCalls) {
+      // For unlinked case, we should keep the location info map unchanged.
+      if (m_pipelineState->getNextShaderStage(m_shaderStage) != ShaderStageInvalid) {
+        // Remove the output location info if it exists
+        unsigned index = m_shaderStage == ShaderStageMesh ? 2 : 1;
+        unsigned component = cast<ConstantInt>(call->getArgOperand(index))->getZExtValue();
+        auto outputValue = call->getArgOperand(call->arg_size() - 1);
+        if (outputValue->getType()->getScalarSizeInBits() == 64)
+          component *= 2; // Component in location info is dword-based
+
+        InOutLocationInfo outLocInfo;
+        const unsigned location = locCandidate.first.getLocation();
+        outLocInfo.setLocation(location);
+        outLocInfo.setComponent(component);
+        if (m_shaderStage == ShaderStageGeometry)
+          outLocInfo.setStreamId(locCandidate.first.getStreamId());
+
+        auto &outLocInfoMap = m_resUsage->inOutUsage.outputLocInfoMap;
+        if (outLocInfoMap.count(outLocInfo) > 0) {
+          outLocInfoMap.erase(outLocInfo);
+          if (outputValue->getType()->getPrimitiveSizeInBits() > 128) {
+            // NOTE: For any data that is larger than <4 x dword>, there are two consecutive locations occupied.
+            outLocInfo.setLocation(location + 1);
+            outLocInfoMap.erase(outLocInfo);
+          }
+        }
+
+        // Remove transform location info if it exists
+        outLocInfo.setLocation(location);
+        auto &locInfoXfbOutInfoMap = m_resUsage->inOutUsage.locInfoXfbOutInfoMap;
+        if (locInfoXfbOutInfoMap.count(outLocInfo) > 0) {
+          locInfoXfbOutInfoMap.erase(outLocInfo);
+          if (outputValue->getType()->getPrimitiveSizeInBits() > 128) {
+            // NOTE: For any data that is larger than <4 x dword>, there are two consecutive locations occupied.
+            outLocInfo.setLocation(location + 1);
+            locInfoXfbOutInfoMap.erase(outLocInfo);
+          }
+        }
+      }
+    }
+  }
 }
 
 // =====================================================================================================================

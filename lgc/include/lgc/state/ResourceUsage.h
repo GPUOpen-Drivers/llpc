@@ -594,8 +594,9 @@ struct InterfaceData {
 
       // Fragment shader
       struct {
-        unsigned viewIndex; // View Index
-        unsigned primMask;  // Primitive mask
+        unsigned viewIndex;  // View Index
+        unsigned primMask;   // Primitive mask
+        unsigned sampleInfo; // Sample Info: numSample + samplePattern
 
         // Perspective interpolation (I/J)
         struct {

@@ -117,7 +117,6 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
 
   const StringRef rayQueryInitializeFuncName =
       m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_TRACE_RAY_INLINE);
-
   const StringRef rayQueryProceedFuncName =
       m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_RAY_QUERY_PROCEED);
 

@@ -513,6 +513,9 @@ Function *NggPrimShader::generate(Function *esMain, Function *gsMain, Function *
   // ES and GS could not be null at the same time
   assert((!esMain && !gsMain) == false);
 
+  // TODO: support counting generated primitives in software emulated stream-out
+  assert(!m_pipelineState->enablePrimStats());
+
   // Assign names to ES, GS and copy shader main functions
   Module *module = nullptr;
   if (esMain) {
@@ -2587,9 +2590,23 @@ void NggPrimShader::distributePrimitiveId(Value *primitiveId) {
   {
     m_builder.SetInsertPoint(distribPrimitiveIdBlock);
 
-    Value *provokingVertexIndex = m_pipelineState->getRasterizerState().provokingVertexMode == ProvokingVertexFirst
-                                      ? m_nggInputs.vertexIndex0
-                                      : m_nggInputs.vertexIndex2;
+    auto primitiveType = m_pipelineState->getInputAssemblyState().primitiveType;
+    Value *provokingVertexIndex = nullptr;
+    if (primitiveType == PrimitiveType::Point) {
+      provokingVertexIndex = m_nggInputs.vertexIndex0;
+    } else if (primitiveType == PrimitiveType::LineList || primitiveType == PrimitiveType::LineStrip) {
+      provokingVertexIndex = m_pipelineState->getRasterizerState().provokingVertexMode == ProvokingVertexFirst
+                                 ? m_nggInputs.vertexIndex0
+                                 : m_nggInputs.vertexIndex1;
+    } else {
+      assert(primitiveType == PrimitiveType::TriangleList || primitiveType == PrimitiveType::TriangleStrip ||
+             primitiveType == PrimitiveType::TriangleFan || primitiveType == PrimitiveType::TriangleListAdjacency ||
+             primitiveType == PrimitiveType::TriangleStripAdjacency);
+      provokingVertexIndex = m_pipelineState->getRasterizerState().provokingVertexMode == ProvokingVertexFirst
+                                 ? m_nggInputs.vertexIndex0
+                                 : m_nggInputs.vertexIndex2;
+    }
+
     writePerThreadDataToLds(primitiveId, provokingVertexIndex, PrimShaderLdsRegion::DistributedPrimitiveId);
 
     m_builder.CreateBr(endDistribPrimitiveIdBlock);
@@ -3609,22 +3626,24 @@ void NggPrimShader::mutateGs() {
   // Initialize counters of GS emitted vertices and GS output vertices of current primitive
   Value *emitVertsPtrs[MaxGsStreams] = {};
   Value *outVertsPtrs[MaxGsStreams] = {};
+  Value *totalEmitVertsPtr = nullptr;
 
-  for (int i = 0; i < MaxGsStreams; ++i) {
-    Value *emitVertsPtr = nullptr;
-    Value *outVertsPtr = nullptr;
-    {
-      IRBuilder<>::InsertPointGuard allocaGuard(m_builder);
-      m_builder.SetInsertPointPastAllocas(m_gsHandlers.main);
-      emitVertsPtr = m_builder.CreateAlloca(m_builder.getInt32Ty());
-      outVertsPtr = m_builder.CreateAlloca(m_builder.getInt32Ty());
+  {
+    IRBuilder<>::InsertPointGuard allocaGuard(m_builder);
+    m_builder.SetInsertPointPastAllocas(m_gsHandlers.main);
+
+    for (int i = 0; i < MaxGsStreams; ++i) {
+      auto emitVertsPtr = m_builder.CreateAlloca(m_builder.getInt32Ty());
+      m_builder.CreateStore(m_builder.getInt32(0), emitVertsPtr); // emitVerts = 0
+      emitVertsPtrs[i] = emitVertsPtr;
+
+      auto outVertsPtr = m_builder.CreateAlloca(m_builder.getInt32Ty());
+      m_builder.CreateStore(m_builder.getInt32(0), outVertsPtr); // outVerts = 0
+      outVertsPtrs[i] = outVertsPtr;
     }
 
-    m_builder.CreateStore(m_builder.getInt32(0), emitVertsPtr); // emitVerts = 0
-    emitVertsPtrs[i] = emitVertsPtr;
-
-    m_builder.CreateStore(m_builder.getInt32(0), outVertsPtr); // outVerts = 0
-    outVertsPtrs[i] = outVertsPtr;
+    totalEmitVertsPtr = m_builder.CreateAlloca(m_builder.getInt32Ty());
+    m_builder.CreateStore(m_builder.getInt32(0), totalEmitVertsPtr); // emitTotalVerts = 0
   }
 
   // Initialize thread ID in wave
@@ -3662,7 +3681,8 @@ void NggPrimShader::mutateGs() {
         Value *output = call->getOperand(3);
 
         auto emitVerts = m_builder.CreateLoad(m_builder.getInt32Ty(), emitVertsPtrs[streamId]);
-        writeGsOutput(output, location, compIdx, streamId, threadIdInSubgroup, emitVerts);
+        auto totalEmitVerts = m_builder.CreateLoad(m_builder.getInt32Ty(), totalEmitVertsPtr);
+        writeGsOutput(output, location, compIdx, streamId, threadIdInSubgroup, emitVerts, totalEmitVerts);
 
         removedCalls.push_back(call);
       }
@@ -3681,7 +3701,8 @@ void NggPrimShader::mutateGs() {
           // Handle GS_EMIT, MSG[9:8] = STREAM_ID
           unsigned streamId = (message & GsEmitCutStreamIdMask) >> GsEmitCutStreamIdShift;
           assert(streamId < MaxGsStreams);
-          processGsEmit(streamId, threadIdInSubgroup, emitVertsPtrs[streamId], outVertsPtrs[streamId]);
+          processGsEmit(streamId, threadIdInSubgroup, emitVertsPtrs[streamId], outVertsPtrs[streamId],
+                        totalEmitVertsPtr);
         } else if (message == GsCutStreaM0 || message == GsCutStreaM1 || message == GsCutStreaM2 ||
                    message == GsCutStreaM3) {
           // Handle GS_CUT, MSG[9:8] = STREAM_ID
@@ -3919,8 +3940,9 @@ void NggPrimShader::appendUserData(SmallVectorImpl<Value *> &args, Function *tar
 // @param streamId : ID of output vertex stream
 // @param primitiveIndex : Relative primitive index in subgroup
 // @param emitVerts : Counter of GS emitted vertices for this stream
+// @param totalEmitVerts : Counter of GS emitted vertices for all streams
 void NggPrimShader::writeGsOutput(Value *output, unsigned location, unsigned component, unsigned streamId,
-                                  Value *primitiveIndex, Value *emitVerts) {
+                                  Value *primitiveIndex, Value *emitVerts, llvm::Value *totalEmitVerts) {
   if (!m_pipelineState->enableSwXfb() && m_pipelineState->getRasterizerState().rasterStream != streamId) {
     // NOTE: If SW-emulated stream-out is not enabled, only import those outputs that belong to the rasterization
     // stream.
@@ -3977,9 +3999,9 @@ void NggPrimShader::writeGsOutput(Value *output, unsigned location, unsigned com
 
   if (geometryMode.robustGsEmits) {
     // skip the lds write by writing to a dummy offset.
-    // ldsOffset = (emitVerts >= outputVertices) ? InvalidValue : ldsOffset
+    // ldsOffset = (totalEmitVerts >= outputVertices) ? InvalidValue : ldsOffset
     auto dummyOffset = m_builder.getInt32(0x80000000);
-    auto outOfRange = m_builder.CreateICmpUGE(emitVerts, m_builder.getInt32(geometryMode.outputVertices));
+    auto outOfRange = m_builder.CreateICmpUGE(totalEmitVerts, m_builder.getInt32(geometryMode.outputVertices));
     ldsOffset = m_builder.CreateSelect(outOfRange, dummyOffset, ldsOffset);
   }
 
@@ -4044,14 +4066,17 @@ Value *NggPrimShader::readGsOutput(Type *outputTy, unsigned location, unsigned c
 // @param primitiveIndex : Relative primitive index in subgroup
 // @param [in/out] emitVertsPtr : Pointer to the counter of GS emitted vertices for this stream
 // @param [in/out] outVertsPtr : Pointer to the counter of GS output vertices of current primitive for this stream
-void NggPrimShader::processGsEmit(unsigned streamId, Value *primitiveIndex, Value *emitVertsPtr, Value *outVertsPtr) {
+// @param [in/out] totalEmitVertsPtr : Pointer to the counter of GS emitted vertices for all stream
+void NggPrimShader::processGsEmit(unsigned streamId, Value *primitiveIndex, Value *emitVertsPtr, Value *outVertsPtr,
+                                  Value *totalEmitVertsPtr) {
   if (!m_pipelineState->isVertexStreamActive(streamId))
     return; // Skip if this vertex stream is marked as inactive
 
   if (!m_gsHandlers.emit)
     m_gsHandlers.emit = createGsEmitHandler();
 
-  m_builder.CreateCall(m_gsHandlers.emit, {primitiveIndex, m_builder.getInt32(streamId), emitVertsPtr, outVertsPtr});
+  m_builder.CreateCall(m_gsHandlers.emit,
+                       {primitiveIndex, m_builder.getInt32(streamId), emitVertsPtr, outVertsPtr, totalEmitVertsPtr});
 }
 
 // =====================================================================================================================
@@ -4079,6 +4104,8 @@ Function *NggPrimShader::createGsEmitHandler() {
   //
   //   emitVerts++
   //   outVerts++
+  //   totalEmitVerts++
+  //   outVerts = (totalEmitVerts >= outputVertices) ? 0 : outVerts
   //
   //   if (outVerts >= outVertsPerPrim) {
   //     winding = triangleStrip ? ((outVerts - outVertsPerPrim) & 0x1) : 0
@@ -4093,6 +4120,7 @@ Function *NggPrimShader::createGsEmitHandler() {
                                       m_builder.getInt32Ty(),                              // %streamId
                                       PointerType::get(m_builder.getInt32Ty(), addrSpace), // %emitVertsPtr
                                       PointerType::get(m_builder.getInt32Ty(), addrSpace), // %outVertsPtr
+                                      PointerType::get(m_builder.getInt32Ty(), addrSpace), // %totalEmitVertsPtr
                                   },
                                   false);
   auto func =
@@ -4114,6 +4142,9 @@ Function *NggPrimShader::createGsEmitHandler() {
   Value *outVertsPtr = argIt++;
   outVertsPtr->setName("outVertsPtr");
 
+  Value *totalEmitVertsPtr = argIt++;
+  totalEmitVertsPtr->setName("totalEmitVertsPtr");
+
   auto entryBlock = createBlock(func, ".entry");
   auto emitPrimBlock = createBlock(func, ".emitPrim");
   auto endEmitPrimBlock = createBlock(func, ".endEmitPrim");
@@ -4126,6 +4157,7 @@ Function *NggPrimShader::createGsEmitHandler() {
   // Construct ".entry" block
   Value *emitVerts = nullptr;
   Value *outVerts = nullptr;
+  Value *totalEmitVerts = nullptr;
   Value *primEmit = nullptr;
   {
     m_builder.SetInsertPoint(entryBlock);
@@ -4140,8 +4172,11 @@ Function *NggPrimShader::createGsEmitHandler() {
     outVerts = m_builder.CreateAdd(outVerts, m_builder.getInt32(1));
 
     if (geometryMode.robustGsEmits) {
-      // outVerts = (emitVerts >= outputVertices) ? 0 : outVerts
-      Value *outOfRange = m_builder.CreateICmpUGT(emitVerts, m_builder.getInt32(geometryMode.outputVertices));
+      totalEmitVerts = m_builder.CreateLoad(m_builder.getInt32Ty(), totalEmitVertsPtr);
+      // totalEmitVerts++
+      totalEmitVerts = m_builder.CreateAdd(totalEmitVerts, m_builder.getInt32(1));
+      // outVerts = (totalEmitVerts >= outputVertices) ? 0 : outVerts
+      Value *outOfRange = m_builder.CreateICmpUGT(totalEmitVerts, m_builder.getInt32(geometryMode.outputVertices));
       outVerts = m_builder.CreateSelect(outOfRange, m_builder.getInt32(0), outVerts);
     }
 
@@ -4182,6 +4217,10 @@ Function *NggPrimShader::createGsEmitHandler() {
 
     m_builder.CreateStore(emitVerts, emitVertsPtr);
     m_builder.CreateStore(outVerts, outVertsPtr);
+
+    if (geometryMode.robustGsEmits)
+      m_builder.CreateStore(totalEmitVerts, totalEmitVertsPtr);
+
     m_builder.CreateRetVoid();
   }
 

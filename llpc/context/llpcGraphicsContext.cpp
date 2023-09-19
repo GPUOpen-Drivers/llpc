@@ -205,6 +205,10 @@ void GraphicsContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
 
   // Give the graphics pipeline state to the middle-end.
   setGraphicsStateInPipeline(pipeline, hasher, stageMask);
+
+  // Set default tessellation inner/outer level from driver API
+  if (m_pipelineInfo->iaState.tessLevel)
+    pipeline->setTessLevel(m_pipelineInfo->iaState.tessLevel->inner, m_pipelineInfo->iaState.tessLevel->outer);
 }
 
 // =====================================================================================================================
@@ -490,6 +494,7 @@ void GraphicsContext::setGraphicsStateInPipeline(Pipeline *pipeline, Util::Metro
     rasterizerState.numSamples = inputRsState.numSamples;
     rasterizerState.samplePatternIdx = inputRsState.samplePatternIdx;
     rasterizerState.pixelShaderSamples = inputRsState.pixelShaderSamples;
+    rasterizerState.dynamicSampleInfo = inputRsState.dynamicSampleInfo;
   }
 
   if (pipeline)

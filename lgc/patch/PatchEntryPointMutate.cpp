@@ -1555,10 +1555,17 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       specialUserDataArgs.push_back(
           UserDataArg(builder.getInt32Ty(), "viewId", UserDataMapping::ViewId, &intfData->entryArgIdxs.fs.viewIndex));
     }
+
     if (userDataUsage->isSpecialUserDataUsed(UserDataMapping::ColorExportAddr)) {
       assert(m_pipelineState->isUnlinked() && m_pipelineState->getOptions().enableColorExportShader);
       specialUserDataArgs.push_back(
           UserDataArg(builder.getInt32Ty(), "colorExpAddr", UserDataMapping::ColorExportAddr));
+    }
+
+    if (m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs.runAtSampleRate &&
+        (m_pipelineState->isUnlinked() || m_pipelineState->getRasterizerState().dynamicSampleInfo)) {
+      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "sampleInfo", UserDataMapping::SampleInfo,
+                                                &intfData->entryArgIdxs.fs.sampleInfo));
     }
   }
 

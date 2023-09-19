@@ -69,6 +69,7 @@ static const char IaStateMetadataName[] = "lgc.input.assembly.state";
 static const char RsStateMetadataName[] = "lgc.rasterizer.state";
 static const char ColorExportFormatsMetadataName[] = "lgc.color.export.formats";
 static const char ColorExportStateMetadataName[] = "lgc.color.export.state";
+static const char TessLevelMetadataName[] = "lgc.tessellation.level.state";
 
 namespace {
 
@@ -324,6 +325,12 @@ ComputeShaderMode Pipeline::getComputeShaderMode(Module &module) {
 PipelineState::PipelineState(LgcContext *builderContext, bool emitLgc)
     : Pipeline(builderContext), m_emitLgc(emitLgc), m_meshRowExport(EnableRowExport) {
   m_registerFieldFormat = getTargetInfo().getGfxIpVersion().major >= 9 && UseRegisterFieldFormat;
+  m_tessLevel.inner[0] = -1.0f;
+  m_tessLevel.inner[1] = -1.0f;
+  m_tessLevel.outer[0] = -1.0f;
+  m_tessLevel.outer[1] = -1.0f;
+  m_tessLevel.outer[2] = -1.0f;
+  m_tessLevel.outer[3] = -1.0f;
 }
 
 // =====================================================================================================================
@@ -1280,6 +1287,9 @@ void PipelineState::readDeviceIndex(Module *module) {
 void PipelineState::recordGraphicsState(Module *module) {
   setNamedMetadataToArrayOfInt32(module, m_inputAssemblyState, IaStateMetadataName);
   setNamedMetadataToArrayOfInt32(module, m_rasterizerState, RsStateMetadataName);
+  if (m_tessLevel.inner[0] >= 0 || m_tessLevel.inner[1] >= 0 || m_tessLevel.outer[0] >= 0 ||
+      m_tessLevel.outer[1] >= 0 || m_tessLevel.outer[2] >= 0 || m_tessLevel.outer[3] >= 0)
+    setNamedMetadataToArrayOfInt32(module, m_tessLevel, TessLevelMetadataName);
 }
 
 // =====================================================================================================================
@@ -1289,6 +1299,7 @@ void PipelineState::recordGraphicsState(Module *module) {
 void PipelineState::readGraphicsState(Module *module) {
   readNamedMetadataArrayOfInt32(module, IaStateMetadataName, m_inputAssemblyState);
   readNamedMetadataArrayOfInt32(module, RsStateMetadataName, m_rasterizerState);
+  readNamedMetadataArrayOfInt32(module, TessLevelMetadataName, m_tessLevel);
 
   auto nameMeta = module->getNamedMetadata(SampleShadingMetaName);
   if (nameMeta)
@@ -1905,19 +1916,21 @@ void PipelineState::setXfbStateMetadata(Module *module) {
       continue;
     MDNode *xfbStateMetaNode = func.getMetadata(XfbStateMetadataName);
     if (xfbStateMetaNode) {
-      m_xfbStateMetadata.enableXfb = true;
       auto &streamXfbBuffers = m_xfbStateMetadata.streamXfbBuffers;
       auto &xfbStrides = m_xfbStateMetadata.xfbStrides;
       for (unsigned xfbBuffer = 0; xfbBuffer < MaxTransformFeedbackBuffers; ++xfbBuffer) {
         // Get the vertex streamId from metadata
         auto metaOp = cast<ConstantAsMetadata>(xfbStateMetaNode->getOperand(2 * xfbBuffer));
         int streamId = cast<ConstantInt>(metaOp->getValue())->getSExtValue();
-        if (streamId != InvalidValue)
-          streamXfbBuffers[streamId] |= 1 << xfbBuffer; // Bit mask of used xfbBuffers in a stream
+        if (streamId == InvalidValue)
+          continue;
+        streamXfbBuffers[streamId] |= 1 << xfbBuffer; // Bit mask of used xfbBuffers in a stream
         // Get the stride from metadata
         metaOp = cast<ConstantAsMetadata>(xfbStateMetaNode->getOperand(2 * xfbBuffer + 1));
         xfbStrides[xfbBuffer] = cast<ConstantInt>(metaOp->getValue())->getZExtValue();
+        m_xfbStateMetadata.enableXfb = true;
       }
+      m_xfbStateMetadata.enablePrimStats = !m_xfbStateMetadata.enableXfb;
     }
   }
 }

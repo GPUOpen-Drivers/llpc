@@ -122,7 +122,7 @@ void *VKAPI_CALL IPipelineDumper::BeginPipelineDump(const PipelineDumpOptions *d
                                                     PipelineBuildInfo pipelineInfo) {
   MetroHash::Hash hash = {};
   if (pipelineInfo.pComputeInfo)
-    hash = PipelineDumper::generateHashForComputePipeline(pipelineInfo.pComputeInfo, false, false);
+    hash = PipelineDumper::generateHashForComputePipeline(pipelineInfo.pComputeInfo, false);
   else if (pipelineInfo.pRayTracingInfo)
     hash = PipelineDumper::generateHashForRayTracingPipeline(pipelineInfo.pRayTracingInfo, false);
   else {
@@ -134,7 +134,7 @@ void *VKAPI_CALL IPipelineDumper::BeginPipelineDump(const PipelineDumpOptions *d
       else
         unlinkedStage = UnlinkedStageVertexProcess;
     }
-    hash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo.pGraphicsInfo, false, false, unlinkedStage);
+    hash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo.pGraphicsInfo, false, unlinkedStage);
   }
 
   return PipelineDumper::BeginPipelineDump(dumpOptions, pipelineInfo, MetroHash::compact64(&hash));
@@ -201,7 +201,7 @@ uint64_t VKAPI_CALL IPipelineDumper::GetGraphicsShaderBinaryHash(const GraphicsP
     unlinkedStage = UnlinkedStageVertexProcess;
   else
     unlinkedStage = UnlinkedStageFragment;
-  auto hash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false, false, unlinkedStage);
+  auto hash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false, unlinkedStage);
   return MetroHash::compact64(&hash);
 }
 
@@ -210,7 +210,7 @@ uint64_t VKAPI_CALL IPipelineDumper::GetGraphicsShaderBinaryHash(const GraphicsP
 //
 // @param pipelineInfo : Info to build this graphics pipeline
 uint64_t VKAPI_CALL IPipelineDumper::GetPipelineHash(const GraphicsPipelineBuildInfo *pipelineInfo) {
-  auto hash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false, false);
+  auto hash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false);
   return MetroHash::compact64(&hash);
 }
 
@@ -222,7 +222,7 @@ uint64_t VKAPI_CALL IPipelineDumper::GetPipelineHash(const GraphicsPipelineBuild
 // @param nameBufSize : Size of the buffer to store pipeline name
 void VKAPI_CALL IPipelineDumper::GetPipelineName(const GraphicsPipelineBuildInfo *graphicsPipelineInfo,
                                                  char *pipeNameOut, const size_t nameBufSize) {
-  auto hash = PipelineDumper::generateHashForGraphicsPipeline(graphicsPipelineInfo, false, false);
+  auto hash = PipelineDumper::generateHashForGraphicsPipeline(graphicsPipelineInfo, false);
   PipelineBuildInfo pipelineInfo = {};
   pipelineInfo.pGraphicsInfo = graphicsPipelineInfo;
   std::string pipeName = PipelineDumper::getPipelineInfoFileName(pipelineInfo, MetroHash::compact64(&hash));
@@ -237,7 +237,7 @@ void VKAPI_CALL IPipelineDumper::GetPipelineName(const GraphicsPipelineBuildInfo
 // @param nameBufSize : Size of the buffer to store pipeline name
 void VKAPI_CALL IPipelineDumper::GetPipelineName(const ComputePipelineBuildInfo *computePipelineInfo, char *pipeNameOut,
                                                  const size_t nameBufSize) {
-  auto hash = PipelineDumper::generateHashForComputePipeline(computePipelineInfo, false, false);
+  auto hash = PipelineDumper::generateHashForComputePipeline(computePipelineInfo, false);
   PipelineBuildInfo pipelineInfo = {};
   pipelineInfo.pComputeInfo = computePipelineInfo;
 
@@ -281,7 +281,7 @@ void VKAPI_CALL IPipelineDumper::GetPipelineName(const ComputePipelineBuildInfo 
 //
 // @param pipelineInfo : Info to build this compute pipeline
 uint64_t VKAPI_CALL IPipelineDumper::GetPipelineHash(const ComputePipelineBuildInfo *pipelineInfo) {
-  auto hash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, false, false);
+  auto hash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, false);
   return MetroHash::compact64(&hash);
 }
 
@@ -860,6 +860,8 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.replaceSetWithResourceType = " << options->replaceSetWithResourceType << "\n";
   dumpFile << "options.disableSampleMask = " << options->disableSampleMask << "\n";
   dumpFile << "options.buildResourcesDataForShaderModule = " << options->buildResourcesDataForShaderModule << "\n";
+  dumpFile << "options.disableTruncCoordForGather = " << options->disableTruncCoordForGather << "\n";
+  dumpFile << "options.vertex64BitsAttribSingleLoc = " << options->vertex64BitsAttribSingleLoc << "\n";
 }
 
 // =====================================================================================================================
@@ -899,6 +901,14 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "disableVertexReuse = " << pipelineInfo->iaState.disableVertexReuse << "\n";
   dumpFile << "switchWinding = " << pipelineInfo->iaState.switchWinding << "\n";
   dumpFile << "enableMultiView = " << pipelineInfo->iaState.enableMultiView << "\n";
+  if (pipelineInfo->iaState.tessLevel) {
+    dumpFile << "tessLevelInner[0] = " << pipelineInfo->iaState.tessLevel->inner[0] << "\n";
+    dumpFile << "tessLevelInner[1] = " << pipelineInfo->iaState.tessLevel->inner[1] << "\n";
+    dumpFile << "tessLevelOuter[0] = " << pipelineInfo->iaState.tessLevel->outer[0] << "\n";
+    dumpFile << "tessLevelOuter[1] = " << pipelineInfo->iaState.tessLevel->outer[1] << "\n";
+    dumpFile << "tessLevelOuter[2] = " << pipelineInfo->iaState.tessLevel->outer[2] << "\n";
+    dumpFile << "tessLevelOuter[3] = " << pipelineInfo->iaState.tessLevel->outer[3] << "\n";
+  }
   dumpFile << "depthClipEnable = " << pipelineInfo->vpState.depthClipEnable << "\n";
 
   dumpFile << "rasterizerDiscardEnable = " << pipelineInfo->rsState.rasterizerDiscardEnable << "\n";
@@ -906,6 +916,7 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "numSamples = " << pipelineInfo->rsState.numSamples << "\n";
   dumpFile << "pixelShaderSamples = " << pipelineInfo->rsState.pixelShaderSamples << "\n";
   dumpFile << "samplePatternIdx = " << pipelineInfo->rsState.samplePatternIdx << "\n";
+  dumpFile << "dynamicSampleInfo = " << pipelineInfo->rsState.dynamicSampleInfo << "\n";
   dumpFile << "rasterStream = " << pipelineInfo->rsState.rasterStream << "\n";
   dumpFile << "usrClipPlaneMask = " << static_cast<unsigned>(pipelineInfo->rsState.usrClipPlaneMask) << "\n";
   dumpFile << "alphaToCoverageEnable = " << pipelineInfo->cbState.alphaToCoverageEnable << "\n";
@@ -990,6 +1001,8 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   if (pipelineInfo->numUniformConstantMaps != 0) {
     dumpFile << "\n[UniformConstant]\n";
     for (unsigned s = 0; s < pipelineInfo->numUniformConstantMaps; s++) {
+      if (!pipelineInfo->ppUniformMaps[s])
+        continue;
       dumpFile << "uniformConstantMaps[" << s << "].visibility = " << pipelineInfo->ppUniformMaps[s]->visibility
                << "\n";
       UniformConstantMapEntry *locationOffsetMap = pipelineInfo->ppUniformMaps[s]->pUniforms;
@@ -1002,18 +1015,18 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
     }
   }
 
-  if (pipelineInfo->apiXfbOutData.numXfbOutInfo > 0) {
-    dumpFile << "\n[ApiXfbOutInfo]\n";
-    const auto pXfbOutInfos = pipelineInfo->apiXfbOutData.pXfbOutInfos;
-    for (unsigned idx = 0; idx < pipelineInfo->apiXfbOutData.numXfbOutInfo; ++idx) {
-      dumpFile << "xfbOutInfo[" << idx << "].isBuiltIn = " << pXfbOutInfos[idx].isBuiltIn << "\n";
-      dumpFile << "xfbOutInfo[" << idx << "].location = " << pXfbOutInfos[idx].location << "\n";
-      dumpFile << "xfbOutInfo[" << idx << "].component = " << pXfbOutInfos[idx].component << "\n";
-      dumpFile << "xfbOutInfo[" << idx << "].xfbBuffer = " << pXfbOutInfos[idx].xfbBuffer << "\n";
-      dumpFile << "xfbOutInfo[" << idx << "].xfbOffset = " << pXfbOutInfos[idx].xfbOffset << "\n";
-      dumpFile << "xfbOutInfo[" << idx << "].xfbStride = " << pXfbOutInfos[idx].xfbStride << "\n";
-      dumpFile << "xfbOutInfo[" << idx << "].streamId = " << pXfbOutInfos[idx].streamId << "\n";
-    }
+  dumpFile << "\n[ApiXfbOutInfo]\n";
+  dumpFile << "forceDisableStreamOut = " << pipelineInfo->apiXfbOutData.forceDisableStreamOut << "\n";
+  dumpFile << "forceEnablePrimStats = " << pipelineInfo->apiXfbOutData.forceEnablePrimStats << "\n";
+  const auto pXfbOutInfos = pipelineInfo->apiXfbOutData.pXfbOutInfos;
+  for (unsigned idx = 0; idx < pipelineInfo->apiXfbOutData.numXfbOutInfo; ++idx) {
+    dumpFile << "xfbOutInfo[" << idx << "].isBuiltIn = " << pXfbOutInfos[idx].isBuiltIn << "\n";
+    dumpFile << "xfbOutInfo[" << idx << "].location = " << pXfbOutInfos[idx].location << "\n";
+    dumpFile << "xfbOutInfo[" << idx << "].component = " << pXfbOutInfos[idx].component << "\n";
+    dumpFile << "xfbOutInfo[" << idx << "].xfbBuffer = " << pXfbOutInfos[idx].xfbBuffer << "\n";
+    dumpFile << "xfbOutInfo[" << idx << "].xfbOffset = " << pXfbOutInfos[idx].xfbOffset << "\n";
+    dumpFile << "xfbOutInfo[" << idx << "].xfbStride = " << pXfbOutInfos[idx].xfbStride << "\n";
+    dumpFile << "xfbOutInfo[" << idx << "].streamId = " << pXfbOutInfos[idx].streamId << "\n";
   }
 }
 
@@ -1310,57 +1323,60 @@ void PipelineDumper::updateHashForRtState(const RtState *rtState, MetroHash64 *h
 // @param isRelocatableShader : TRUE if we are building relocatable shader
 // @param stage : The stage for which we are building the hash. ShaderStageInvalid if building for the entire pipeline.
 MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline,
-                                                                bool isCacheHash, bool isRelocatableShader,
+                                                                bool isCacheHash,
                                                                 UnlinkedShaderStage unlinkedShaderType) {
   MetroHash64 hasher;
 
   switch (unlinkedShaderType) {
   case UnlinkedStageVertexProcess:
-    updateHashForPipelineShaderInfo(ShaderStageTask, &pipeline->task, isCacheHash, &hasher, isRelocatableShader);
-    updateHashForPipelineShaderInfo(ShaderStageVertex, &pipeline->vs, isCacheHash, &hasher, isRelocatableShader);
-    updateHashForPipelineShaderInfo(ShaderStageTessControl, &pipeline->tcs, isCacheHash, &hasher, isRelocatableShader);
-    updateHashForPipelineShaderInfo(ShaderStageTessEval, &pipeline->tes, isCacheHash, &hasher, isRelocatableShader);
-    updateHashForPipelineShaderInfo(ShaderStageGeometry, &pipeline->gs, isCacheHash, &hasher, isRelocatableShader);
-    updateHashForPipelineShaderInfo(ShaderStageMesh, &pipeline->mesh, isCacheHash, &hasher, isRelocatableShader);
+    updateHashForPipelineShaderInfo(ShaderStageTask, &pipeline->task, isCacheHash, &hasher);
+    updateHashForPipelineShaderInfo(ShaderStageVertex, &pipeline->vs, isCacheHash, &hasher);
+    updateHashForPipelineShaderInfo(ShaderStageTessControl, &pipeline->tcs, isCacheHash, &hasher);
+    updateHashForPipelineShaderInfo(ShaderStageTessEval, &pipeline->tes, isCacheHash, &hasher);
+    updateHashForPipelineShaderInfo(ShaderStageGeometry, &pipeline->gs, isCacheHash, &hasher);
+    updateHashForPipelineShaderInfo(ShaderStageMesh, &pipeline->mesh, isCacheHash, &hasher);
     break;
   case UnlinkedStageFragment:
-    updateHashForPipelineShaderInfo(ShaderStageFragment, &pipeline->fs, isCacheHash, &hasher, isRelocatableShader);
+    updateHashForPipelineShaderInfo(ShaderStageFragment, &pipeline->fs, isCacheHash, &hasher);
     break;
   case UnlinkedStageCount:
-    updateHashForPipelineShaderInfo(ShaderStageTask, &pipeline->task, isCacheHash, &hasher, isRelocatableShader);
-    updateHashForPipelineShaderInfo(ShaderStageVertex, &pipeline->vs, isCacheHash, &hasher, isRelocatableShader);
-    updateHashForPipelineShaderInfo(ShaderStageTessControl, &pipeline->tcs, isCacheHash, &hasher, isRelocatableShader);
-    updateHashForPipelineShaderInfo(ShaderStageTessEval, &pipeline->tes, isCacheHash, &hasher, isRelocatableShader);
-    updateHashForPipelineShaderInfo(ShaderStageGeometry, &pipeline->gs, isCacheHash, &hasher, isRelocatableShader);
-    updateHashForPipelineShaderInfo(ShaderStageMesh, &pipeline->mesh, isCacheHash, &hasher, isRelocatableShader);
-    updateHashForPipelineShaderInfo(ShaderStageFragment, &pipeline->fs, isCacheHash, &hasher, isRelocatableShader);
+    updateHashForPipelineShaderInfo(ShaderStageTask, &pipeline->task, isCacheHash, &hasher);
+    updateHashForPipelineShaderInfo(ShaderStageVertex, &pipeline->vs, isCacheHash, &hasher);
+    updateHashForPipelineShaderInfo(ShaderStageTessControl, &pipeline->tcs, isCacheHash, &hasher);
+    updateHashForPipelineShaderInfo(ShaderStageTessEval, &pipeline->tes, isCacheHash, &hasher);
+    updateHashForPipelineShaderInfo(ShaderStageGeometry, &pipeline->gs, isCacheHash, &hasher);
+    updateHashForPipelineShaderInfo(ShaderStageMesh, &pipeline->mesh, isCacheHash, &hasher);
+    updateHashForPipelineShaderInfo(ShaderStageFragment, &pipeline->fs, isCacheHash, &hasher);
     break;
   default:
     llvm_unreachable("Should never be called!");
     break;
   }
 
-  updateHashForResourceMappingInfo(&pipeline->resourceMapping, pipeline->pipelineLayoutApiHash, &hasher);
-
+  updateHashForResourceMappingInfo(&pipeline->resourceMapping, pipeline->unlinked ? 0 : pipeline->pipelineLayoutApiHash,
+                                   &hasher);
   hasher.Update(pipeline->iaState.deviceIndex);
 
   // Relocatable shaders force an unlinked compilation.
-  hasher.Update(pipeline->unlinked || isRelocatableShader);
+  hasher.Update(pipeline->unlinked);
   hasher.Update(pipeline->enableEarlyCompile);
   if (unlinkedShaderType == UnlinkedStageFragment)
     hasher.Update(pipeline->enableColorExportShader);
-  updateHashForPipelineOptions(&pipeline->options, &hasher, isCacheHash, isRelocatableShader, unlinkedShaderType);
+  updateHashForPipelineOptions(&pipeline->options, &hasher, isCacheHash, unlinkedShaderType);
 
   if (unlinkedShaderType != UnlinkedStageFragment) {
-    if (!isRelocatableShader && !pipeline->enableUberFetchShader)
+    if (!pipeline->enableUberFetchShader)
       updateHashForVertexInputState(pipeline->pVertexInput, pipeline->dynamicVertexStride, &hasher);
-    updateHashForNonFragmentState(pipeline, isCacheHash, &hasher, isRelocatableShader);
+    updateHashForNonFragmentState(pipeline, isCacheHash, &hasher);
   }
 
   if (unlinkedShaderType != UnlinkedStageVertexProcess)
-    updateHashForFragmentState(pipeline, &hasher, isRelocatableShader);
+    updateHashForFragmentState(pipeline, &hasher);
 
   updateHashForRtState(&pipeline->rtState, &hasher, isCacheHash);
+
+  if (pipeline->iaState.tessLevel)
+    hasher.Update(*pipeline->iaState.tessLevel);
 
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
@@ -1375,22 +1391,21 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
 // @param isCacheHash : TRUE if the hash is used by shader cache
 // @param isRelocatableShader : TRUE if we are building relocatable shader
 MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipelineBuildInfo *pipeline,
-                                                               bool isCacheHash, bool isRelocatableShader) {
+                                                               bool isCacheHash) {
   MetroHash64 hasher;
 
-  updateHashForPipelineShaderInfo(ShaderStageCompute, &pipeline->cs, isCacheHash, &hasher, isRelocatableShader);
+  updateHashForPipelineShaderInfo(ShaderStageCompute, &pipeline->cs, isCacheHash, &hasher);
 
-  if (!isRelocatableShader)
-    updateHashForResourceMappingInfo(&pipeline->resourceMapping, pipeline->pipelineLayoutApiHash, &hasher);
+  updateHashForResourceMappingInfo(&pipeline->resourceMapping, pipeline->pipelineLayoutApiHash, &hasher);
 
   hasher.Update(pipeline->deviceIndex);
 
-  updateHashForPipelineOptions(&pipeline->options, &hasher, isCacheHash, isRelocatableShader, UnlinkedStageCompute);
+  updateHashForPipelineOptions(&pipeline->options, &hasher, isCacheHash, UnlinkedStageCompute);
 
   updateHashForRtState(&pipeline->rtState, &hasher, isCacheHash);
 
   // Relocatable shaders force an unlinked compilation.
-  hasher.Update(pipeline->unlinked || isRelocatableShader);
+  hasher.Update(pipeline->unlinked);
 
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
@@ -1409,16 +1424,14 @@ MetroHash::Hash PipelineDumper::generateHashForRayTracingPipeline(const RayTraci
 
   hasher.Update(pipeline->shaderCount);
   for (unsigned i = 0; i < pipeline->shaderCount; ++i) {
-    updateHashForPipelineShaderInfo(pipeline->pShaders[i].entryStage, &pipeline->pShaders[i], isCacheHash, &hasher,
-                                    /*isRelocatableShader=*/false);
+    updateHashForPipelineShaderInfo(pipeline->pShaders[i].entryStage, &pipeline->pShaders[i], isCacheHash, &hasher);
   }
 
   updateHashForResourceMappingInfo(&pipeline->resourceMapping, pipeline->pipelineLayoutApiHash, &hasher);
 
   hasher.Update(pipeline->deviceIndex);
 
-  updateHashForPipelineOptions(&pipeline->options, &hasher, isCacheHash, /*isRelocatableShader=*/false,
-                               UnlinkedStageRayTracing);
+  updateHashForPipelineOptions(&pipeline->options, &hasher, isCacheHash, UnlinkedStageRayTracing);
 
   hasher.Update(pipeline->shaderGroupCount);
   for (unsigned i = 0; i < pipeline->shaderGroupCount; ++i) {
@@ -1497,7 +1510,7 @@ void PipelineDumper::updateHashForVertexInputState(const VkPipelineVertexInputSt
 // @param [in/out] hasher : Hasher to generate hash code
 // @param isRelocatableShader : TRUE if we are building relocatable shader
 void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildInfo *pipeline, bool isCacheHash,
-                                                   MetroHash64 *hasher, bool isRelocatableShader) {
+                                                   MetroHash64 *hasher) {
   auto nggState = &pipeline->nggState;
   bool enableNgg = nggState->enableNgg;
 
@@ -1513,13 +1526,11 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   hasher->Update(iaState->switchWinding);
   hasher->Update(iaState->enableMultiView);
 
-  if (!isRelocatableShader) {
-    auto vpState = &pipeline->vpState;
-    hasher->Update(vpState->depthClipEnable);
+  auto vpState = &pipeline->vpState;
+  hasher->Update(vpState->depthClipEnable);
 
-    auto rsState = &pipeline->rsState;
-    hasher->Update(rsState->rasterizerDiscardEnable);
-  }
+  auto rsState = &pipeline->rsState;
+  hasher->Update(rsState->rasterizerDiscardEnable);
 
   hasher->Update(pipeline->dynamicVertexStride);
   hasher->Update(pipeline->enableUberFetchShader);
@@ -1532,7 +1543,6 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   updateHashFromRs |= (enableNgg && !passthroughMode);
 
   if (updateHashFromRs) {
-    auto rsState = &pipeline->rsState;
     hasher->Update(rsState->usrClipPlaneMask);
     hasher->Update(rsState->rasterStream);
   }
@@ -1555,6 +1565,9 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
       hasher->Update(nggState->vertsPerSubgroup);
     }
   }
+
+  hasher->Update(pipeline->apiXfbOutData.forceDisableStreamOut);
+  hasher->Update(pipeline->apiXfbOutData.forceEnablePrimStats);
 }
 
 // =====================================================================================================================
@@ -1563,8 +1576,7 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
 // @param pipeline : Info to build a graphics pipeline
 // @param [in/out] hasher : Hasher to generate hash code
 // @param isRelocatableShader : TRUE if we are building relocatable shader
-void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo *pipeline, MetroHash64 *hasher,
-                                                bool isRelocatableShader) {
+void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo *pipeline, MetroHash64 *hasher) {
   auto rsState = &pipeline->rsState;
   hasher->Update(rsState->perSampleShading);
   hasher->Update(rsState->provokingVertexMode);
@@ -1576,22 +1588,21 @@ void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo 
   // View index in fragment shader depends on the enablement of multi-view
   hasher->Update(pipeline->iaState.enableMultiView);
 
-  if (!isRelocatableShader) {
-    hasher->Update(rsState->innerCoverage);
-    hasher->Update(rsState->numSamples);
-    hasher->Update(rsState->samplePatternIdx);
-    hasher->Update(rsState->rasterStream);
+  hasher->Update(rsState->innerCoverage);
+  hasher->Update(rsState->numSamples);
+  hasher->Update(rsState->samplePatternIdx);
+  hasher->Update(rsState->rasterStream);
+  hasher->Update(rsState->dynamicSampleInfo);
 
-    auto cbState = &pipeline->cbState;
-    hasher->Update(cbState->alphaToCoverageEnable);
-    hasher->Update(cbState->dualSourceBlendEnable);
-    hasher->Update(cbState->dualSourceBlendDynamic);
-    for (unsigned i = 0; i < MaxColorTargets; ++i) {
-      hasher->Update(cbState->target[i].channelWriteMask);
-      hasher->Update(cbState->target[i].blendEnable);
-      hasher->Update(cbState->target[i].blendSrcAlphaToColor);
-      hasher->Update(cbState->target[i].format);
-    }
+  auto cbState = &pipeline->cbState;
+  hasher->Update(cbState->alphaToCoverageEnable);
+  hasher->Update(cbState->dualSourceBlendEnable);
+  hasher->Update(cbState->dualSourceBlendDynamic);
+  for (unsigned i = 0; i < MaxColorTargets; ++i) {
+    hasher->Update(cbState->target[i].channelWriteMask);
+    hasher->Update(cbState->target[i].blendEnable);
+    hasher->Update(cbState->target[i].blendSrcAlphaToColor);
+    hasher->Update(cbState->target[i].format);
   }
 }
 
@@ -1604,7 +1615,7 @@ void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo 
 // @param isRelocatableShader : TRUE if we are building a relocatable shader
 // @param stage : The unlinked shader stage that should be included in the hash.
 void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options, MetroHash64 *hasher, bool isCacheHash,
-                                                  bool isRelocatableShader, UnlinkedShaderStage stage) {
+                                                  UnlinkedShaderStage stage) {
   hasher->Update(options->includeDisassembly);
   hasher->Update(options->scalarBlockLayout);
   hasher->Update(options->includeIr);
@@ -1620,10 +1631,8 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->enableImplicitInvariantExports);
   hasher->Update(options->resourceLayoutScheme);
 
-  if (!isRelocatableShader) {
-    hasher->Update(options->shadowDescriptorTableUsage);
-    hasher->Update(options->shadowDescriptorTablePtrHigh);
-  }
+  hasher->Update(options->shadowDescriptorTableUsage);
+  hasher->Update(options->shadowDescriptorTablePtrHigh);
 
   hasher->Update(options->extendedRobustness.robustBufferAccess);
   hasher->Update(options->extendedRobustness.robustImageAccess);
@@ -1644,6 +1653,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->internalRtShaders);
   hasher->Update(options->forceNonUniformResourceIndexStageMask);
   hasher->Update(options->replaceSetWithResourceType);
+  hasher->Update(options->disableTruncCoordForGather);
 }
 
 // =====================================================================================================================
@@ -1655,7 +1665,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
 // @param [in/out] hasher : Hasher to generate hash code
 // @param isRelocatableShader : TRUE if we are building relocatable shader
 void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const PipelineShaderInfo *shaderInfo,
-                                                     bool isCacheHash, MetroHash64 *hasher, bool isRelocatableShader) {
+                                                     bool isCacheHash, MetroHash64 *hasher) {
   if (shaderInfo->pModuleData) {
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
     hasher->Update(stage);
@@ -1696,10 +1706,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.waveSize);
       hasher->Update(options.subgroupSize);
       hasher->Update(options.wgpMode);
-
-      if (!isRelocatableShader)
-        hasher->Update(options.waveBreakSize);
-
+      hasher->Update(options.waveBreakSize);
       hasher->Update(options.forceLoopUnrollCount);
       hasher->Update(options.useSiScheduler);
       hasher->Update(options.disableCodeSinking);

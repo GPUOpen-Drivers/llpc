@@ -109,6 +109,9 @@ attributes #0 = { nounwind }
 ; CHECK-NEXT:         .vgpr_limit:     0x100
 ; CHECK-NEXT:         .wavefront_size: 0x20
 ; CHECK-NEXT:         .wgp_mode:       false
+; CHECK-NEXT:     .internal_pipeline_hash:
+; CHECK-NEXT:       - 0x{{[0-9a-f]+}}
+; CHECK-NEXT:       - 0x{{[0-9a-f]+}}
 ; CHECK-NEXT:     .registers:      {}
 ; CHECK-NEXT:     .shaders:
 ; CHECK-NEXT:       .task:

@@ -227,6 +227,7 @@ target_sources(LLVMlgc PRIVATE
     patch/PatchReadFirstLane.cpp
     patch/PatchResourceCollect.cpp
     patch/PatchSetupTargetFeatures.cpp
+    patch/TcsPassthroughShader.cpp
     patch/PatchInitializeWorkgroupMemory.cpp
     patch/PatchWorkarounds.cpp
     patch/ShaderInputs.cpp

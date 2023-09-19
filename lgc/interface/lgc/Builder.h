@@ -188,6 +188,7 @@ public:
     Dim2DArrayMsaa = 7, // Coordinate: x, y, slice, fragid
     DimCubeArray = 8,   // Coordinate: x, y, face, slice (despite both SPIR-V and ISA
                         //    combining face and slice into one component)
+    DimRect = 9,        // Coordinate: x, y
   };
 
   // Get the number of coordinates for the specified dimension argument.
@@ -213,6 +214,8 @@ public:
       return 4;
     case DimCubeArray:
       return 4;
+    case DimRect:
+      return 2;
     }
     llvm_unreachable("Should never be called!");
     return 0;
@@ -241,6 +244,8 @@ public:
       return 3;
     case DimCubeArray:
       return 3;
+    case DimRect:
+      return 2;
     }
     llvm_unreachable("Should never be called!");
     return 0;
@@ -265,6 +270,8 @@ public:
       return 2;
     case DimCubeArray:
       return 3;
+    case DimRect:
+      return 2;
     }
     llvm_unreachable("Should never be called!");
     return 0;
