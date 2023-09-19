@@ -103,7 +103,8 @@ constexpr llvm::StringLiteral LlvmIr = ".ll";
 constexpr llvm::StringLiteral IsaText = ".s";
 constexpr llvm::StringLiteral IsaBin = ".elf";
 
-constexpr llvm::StringLiteral GlslShaders[] = {".task", ".vert", ".tesc", ".tese", ".geom", ".mesh", ".frag", ".comp"};
+constexpr llvm::StringLiteral GlslShaders[] = {".task", ".vert", ".tesc", ".tese",  ".geom",  ".mesh",  ".frag",
+                                               ".comp", ".rgen", ".rint", ".rahit", ".rchit", ".rmiss", ".rcall"};
 
 } // namespace Ext
 

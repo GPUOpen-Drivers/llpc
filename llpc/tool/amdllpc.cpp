@@ -656,6 +656,7 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
   CompileInfo compileInfo = {};
   compileInfo.unlinked = true;
   compileInfo.doAutoLayout = true;
+  std::vector<PipelineShaderInfo> standaloneRtShaders;
 
   // Clean code that gets run automatically before returning.
   auto onExit = make_scope_exit([&compileInfo] { cleanupCompileInfo(&compileInfo); });
@@ -671,11 +672,49 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
     if (Error err = processInputStages(compileInfo, inputSpecs, ValidateSpirv, NumThreads))
       return err;
 
-    compileInfo.pipelineType =
-        isComputePipeline(compileInfo.stageMask) ? VfxPipelineTypeCompute : VfxPipelineTypeGraphics;
-
-    if (isRayTracingPipeline(compileInfo.stageMask))
+    if (isRayTracingPipeline(compileInfo.stageMask)) {
       compileInfo.pipelineType = VfxPipelineTypeRayTracing;
+      compileInfo.rayTracePipelineInfo.indirectStageMask = 0xFFFFFFFF;
+      compileInfo.rayTracePipelineInfo.pipelineLibStageMask = 0xFFFFFFFF;
+      compileInfo.rayTracePipelineInfo.hasPipelineLibrary = true;
+
+      standaloneRtShaders.resize(compileInfo.shaderModuleDatas.size());
+      memset(&standaloneRtShaders[0], 0, sizeof(PipelineShaderInfo) * standaloneRtShaders.size());
+      compileInfo.rayTracePipelineInfo.pShaders = &standaloneRtShaders[0];
+
+      compileInfo.unlinked = true;
+      compileInfo.doAutoLayout = true;
+      compileInfo.autoLayoutDesc = true;
+
+      compileInfo.rayTracePipelineInfo.mode = LlpcRaytracingMode::Legacy;
+      compileInfo.rayTracePipelineInfo.maxRecursionDepth = 1;
+
+      RtState &state = compileInfo.rayTracePipelineInfo.rtState;
+      state.pipelineFlags = 0;
+      state.nodeStrideShift = 7;
+      state.bvhResDesc.dataSizeInDwords = 4;
+      state.threadGroupSizeX = 8;
+      state.threadGroupSizeY = 4;
+      state.threadGroupSizeZ = 1;
+
+      state.rayQueryCsSwizzle = 1;
+      state.ldsStackSize = 16;
+      state.dispatchRaysThreadGroupSize = 32;
+      state.ldsSizePerThreadGroup = 0xFFFF;
+      state.outerTileSize = 4;
+
+      state.exportConfig.indirectCallingConvention = 1;
+      state.exportConfig.enableUniformNoReturn = true;
+
+      state.enableDispatchRaysInnerSwizzle = true;
+      state.enableDispatchRaysOuterSwizzle = true;
+      state.enableOptimalLdsStackSizeForIndirect = true;
+      state.enableOptimalLdsStackSizeForUnified = true;
+    } else if (isComputePipeline(compileInfo.stageMask)) {
+      compileInfo.pipelineType = VfxPipelineTypeCompute;
+    } else {
+      compileInfo.pipelineType = VfxPipelineTypeGraphics;
+    }
   }
 
   if (AutoLayoutDesc.getNumOccurrences())

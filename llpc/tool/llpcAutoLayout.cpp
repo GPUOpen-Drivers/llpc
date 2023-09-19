@@ -681,6 +681,8 @@ void buildTopLevelMapping(unsigned shaderMask, const ResourceMappingNodeMap &res
   unsigned subLevelCount = 0;
   for (const auto &resNodeSet : resNodeSets)
     subLevelCount += resNodeSet.second.nodes.size();
+  if (shaderMask & Vkgc::ShaderStageAllRayTracingBit)
+    subLevelCount += 3; // see handling of ShaderStageAllRayTracingBit below
 
   size_t bufferSize = sizeof(ResourceMappingRootNode) * topLevelCount + sizeof(ResourceMappingNode) * subLevelCount;
   auto rootNodes = static_cast<ResourceMappingRootNode *>(malloc(bufferSize));
@@ -721,6 +723,50 @@ void buildTopLevelMapping(unsigned shaderMask, const ResourceMappingNodeMap &res
     rootNodes->node.offsetInDwords = topLevelOffset;
     topLevelOffset += rootNodes->node.sizeInDwords;
     rootNodes->visibility = xfbStageMask & shaderMask;
+    ++rootNodes;
+  }
+
+  if (shaderMask & Vkgc::ShaderStageAllRayTracingBit) {
+    // Add a node for RT
+    rootNodes->node.type = ResourceMappingNodeType::DescriptorTableVaPtr;
+    rootNodes->node.sizeInDwords = 1;
+    rootNodes->node.offsetInDwords = topLevelOffset;
+    topLevelOffset += rootNodes->node.sizeInDwords;
+    rootNodes->visibility = Vkgc::ShaderStageAllRayTracingBit & shaderMask;
+    rootNodes->node.tablePtr.nodeCount = 0;
+    rootNodes->node.tablePtr.pNext = nullptr;
+    ++rootNodes;
+
+    rootNodes->node.type = ResourceMappingNodeType::DescriptorTableVaPtr;
+    rootNodes->node.sizeInDwords = 1;
+    rootNodes->node.offsetInDwords = topLevelOffset;
+    topLevelOffset += rootNodes->node.sizeInDwords;
+    rootNodes->visibility = Vkgc::ShaderStageAllRayTracingBit & shaderMask;
+
+    rootNodes->node.tablePtr.nodeCount = 3;
+    rootNodes->node.tablePtr.pNext = subNodes;
+
+    subNodes->type = ResourceMappingNodeType::DescriptorConstBufferCompact;
+    subNodes->offsetInDwords = 0;
+    subNodes->sizeInDwords = 2;
+    subNodes->srdRange.set = 0x5D;
+    subNodes->srdRange.binding = 17;
+    ++subNodes;
+
+    subNodes->type = ResourceMappingNodeType::DescriptorConstBuffer;
+    subNodes->offsetInDwords = 2;
+    subNodes->sizeInDwords = 4;
+    subNodes->srdRange.set = 0x5D;
+    subNodes->srdRange.binding = 0;
+    ++subNodes;
+
+    subNodes->type = ResourceMappingNodeType::DescriptorBuffer;
+    subNodes->offsetInDwords = 6;
+    subNodes->sizeInDwords = 4;
+    subNodes->srdRange.set = 0x5D;
+    subNodes->srdRange.binding = 1;
+    ++subNodes;
+
     ++rootNodes;
   }
 
