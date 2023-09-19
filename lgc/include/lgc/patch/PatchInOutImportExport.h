@@ -131,12 +131,10 @@ private:
   void patchCopyShaderBuiltInOutputExport(llvm::Value *output, unsigned builtInId, llvm::Instruction *insertPos);
 
   void patchXfbOutputExport(llvm::Value *output, unsigned xfbBuffer, unsigned xfbOffset, unsigned streamId,
-                            llvm::Instruction *insertPos);
+                            BuilderBase &builder);
 
   void storeValueToStreamOutBuffer(llvm::Value *storeValue, unsigned xfbBuffer, unsigned xfbOffset, unsigned xfbStride,
-                                   unsigned streamId, llvm::Instruction *insertPos);
-
-  void createStreamOutBufferStoreFunction(llvm::Value *storeValue, unsigned xfbStrde, std::string &funcName);
+                                   unsigned streamId, BuilderBase &builder);
 
   unsigned combineBufferStore(const std::vector<llvm::Value *> &storeValues, unsigned startIdx, unsigned valueOffset,
                               llvm::Value *bufDesc, llvm::Value *storeOffset, llvm::Value *bufBase,

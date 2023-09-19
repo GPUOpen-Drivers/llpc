@@ -44,7 +44,6 @@ const static char OutputImportBuiltIn[] = "lgc.output.import.builtin.";
 const static char OutputExportGeneric[] = "lgc.output.export.generic.";
 const static char OutputExportBuiltIn[] = "lgc.output.export.builtin.";
 const static char OutputExportXfb[] = "lgc.output.export.xfb.";
-const static char StreamOutBufferStore[] = "lgc.streamoutbuffer.store";
 const static char ReconfigureLocalInvocationId[] = "lgc.reconfigure.local.invocation.id";
 const static char SwizzleWorkgroupId[] = "lgc.swizzle.workgroup.id";
 
