@@ -2364,6 +2364,7 @@ void SpirvLowerRayTracing::createDispatchRaysInfoDesc() {
   if (!m_dispatchRaysInfoDesc) {
     m_dispatchRaysInfoDesc = m_builder->CreateLoadBufferDesc(
         TraceRayDescriptorSet, RayTracingResourceIndexDispatchRaysInfo, m_builder->getInt32(0), 0);
+    m_builder->CreateInvariantStart(m_dispatchRaysInfoDesc);
   }
 }
 
