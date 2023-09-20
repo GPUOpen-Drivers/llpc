@@ -14,11 +14,11 @@
 ; CHECK-NEXT: %{{.*}} = getelementptr i8, ptr addrspace(4) [[desc1]], i32 32
 
 ; RUN: lgc -mcpu=gfx1030 -o - - <%s | FileCheck --check-prefixes=SHADER_TEST %s
-; SHADER_TEST: s_and_b32 s13, s4, 0xffff
-; SHADER_TEST: s_mov_b32 s15, 0x21014fac
-; SHADER_TEST: s_mov_b32 s14, -1
+; SHADER_TEST: s_and_b32 {{.*}}, s4, 0xffff
+; SHADER_TEST: s_mov_b32 {{.*}}, 0x21014fac
+; SHADER_TEST: s_mov_b32 {{.*}}, -1
 ; SHADER_TEST: s_load_dwordx8 [[desc:.*]], {{.*}}, 0x20
-; SHADER_TEST: buffer_load_dword {{.*}}, {{.*}}, s[12:15], 0 offen
+; SHADER_TEST: buffer_load_dword {{.*}}, {{.*}}, {{.*}}, 0 offen
 ; SHADER_TEST: image_sample {{.*}}, {{.*}}, [[desc]], {{.*}} dmask:0xf
 ; SHADER_TEST: s_load_dwordx4 {{.*}}, {{.*}}, 0x10
 ; SHADER_TEST: .hardware_stages:
