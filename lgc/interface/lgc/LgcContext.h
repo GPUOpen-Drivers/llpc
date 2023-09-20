@@ -84,7 +84,15 @@ public:
   // @param gpuName : LLVM GPU name (e.g. "gfx900"); empty to use -mcpu option setting
   // @param optLevel : LLVM optimization level used to initialize target machine
   static std::unique_ptr<llvm::TargetMachine> createTargetMachine(llvm::StringRef gpuName,
-                                                                  llvm::CodeGenOpt::Level optLevel);
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
+                                                                  // Old version of the code
+                                                                  llvm::CodeGenOpt::Level optLevel
+#else
+                                                                  // New version of the code (also handles unknown
+                                                                  // version, which we treat as latest)
+                                                                  llvm::CodeGenOptLevel optLevel
+#endif
+  );
 
   // Create the LgcContext.
   //
@@ -129,11 +137,21 @@ public:
   // Adds target passes to pass manager, depending on "-filetype" and "-emit-llvm" options
   void addTargetPasses(lgc::LegacyPassManager &passMgr, llvm::Timer *codeGenTimer, llvm::raw_pwrite_stream &outStream);
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
+  // Old version of the code
   // Returns the optimization level for the context.
   llvm::CodeGenOpt::Level getOptimizationLevel() const;
 
   // Returns the optimization level used for context initialization.
   llvm::CodeGenOpt::Level getInitialOptimizationLevel() const { return m_initialOptLevel; }
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  // Returns the optimization level for the context.
+  llvm::CodeGenOptLevel getOptimizationLevel() const;
+
+  // Returns the optimization level used for context initialization.
+  llvm::CodeGenOptLevel getInitialOptimizationLevel() const { return m_initialOptLevel; }
+#endif
 
   // Utility method to create a start/stop timer pass
   static llvm::ModulePass *createStartStopTimer(llvm::Timer *timer, bool starting);
@@ -167,7 +185,13 @@ private:
   TargetInfo *m_targetInfo = nullptr;                // Target info
   unsigned m_palAbiVersion = 0xFFFFFFFF;             // PAL pipeline ABI version to compile for
   PassManagerCache *m_passManagerCache = nullptr;    // Pass manager cache and creator
-  llvm::CodeGenOpt::Level m_initialOptLevel;         // Optimization level at initialization
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
+  // Old version of the code
+  llvm::CodeGenOpt::Level m_initialOptLevel; // Optimization level at initialization
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  llvm::CodeGenOptLevel m_initialOptLevel; // Optimization level at initialization
+#endif
 };
 
 } // namespace lgc

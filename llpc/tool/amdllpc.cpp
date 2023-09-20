@@ -303,12 +303,24 @@ cl::opt<bool> DumpDuplicatePipelines(
 // -llpc_opt: Override the optimization level passed in to LGC with the given one.  This options is the same as the
 // `-opt` option in lgc.  The reason for the second option is to be able to test the LLPC API.  If both options are set
 // then `-opt` wins.
+
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
+// Old version of the code
 cl::opt<CodeGenOpt::Level> LlpcOptLevel("llpc-opt", cl::desc("The optimization level for amdllpc to pass to LLPC:"),
                                         cl::init(CodeGenOpt::Default),
                                         values(clEnumValN(CodeGenOpt::None, "none", "no optimizations"),
                                                clEnumValN(CodeGenOpt::Less, "quick", "quick compilation time"),
                                                clEnumValN(CodeGenOpt::Default, "default", "default optimizations"),
                                                clEnumValN(CodeGenOpt::Aggressive, "fast", "fast execution time")));
+#else
+    // New version of the code (also handles unknown version, which we treat as latest)
+cl::opt<CodeGenOptLevel> LlpcOptLevel("llpc-opt", cl::desc("The optimization level for amdllpc to pass to LLPC:"),
+                                        cl::init(CodeGenOptLevel::Default),
+                                        values(clEnumValN(CodeGenOptLevel::None, "none", "no optimizations"),
+                                               clEnumValN(CodeGenOptLevel::Less, "quick", "quick compilation time"),
+                                               clEnumValN(CodeGenOptLevel::Default, "default", "default optimizations"),
+                                               clEnumValN(CodeGenOptLevel::Aggressive, "fast", "fast execution time")));
+#endif
 
 // -resource-layout-scheme: specifies the layout scheme of the resource
 cl::opt<ResourceLayoutScheme> LayoutScheme("resource-layout-scheme", cl::desc("The resource layout scheme:"),
@@ -534,8 +546,16 @@ static void initCompileInfo(CompileInfo *compileInfo) {
   }
 
   // We want the default optimization level to be "Default" which is not 0.
-  compileInfo->gfxPipelineInfo.options.optimizationLevel = CodeGenOpt::Level::Default;
-  compileInfo->compPipelineInfo.options.optimizationLevel = CodeGenOpt::Level::Default;
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
+  // Old version of the code
+  compileInfo->gfxPipelineInfo.options.optimizationLevel = static_cast<uint32_t>(CodeGenOpt::Level::Default);
+  compileInfo->compPipelineInfo.options.optimizationLevel = static_cast<uint32_t>(CodeGenOpt::Level::Default);
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  compileInfo->gfxPipelineInfo.options.optimizationLevel = static_cast<uint32_t>(CodeGenOptLevel::Default);
+  compileInfo->compPipelineInfo.options.optimizationLevel = static_cast<uint32_t>(CodeGenOptLevel::Default);
+#endif
+
   compileInfo->gfxPipelineInfo.options.resourceLayoutScheme = LayoutScheme;
   compileInfo->compPipelineInfo.options.forceCsThreadIdSwizzling = ForceCsThreadIdSwizzling;
   compileInfo->compPipelineInfo.options.overrideThreadGroupSizeX = OverrideThreadGroupSizeX;
