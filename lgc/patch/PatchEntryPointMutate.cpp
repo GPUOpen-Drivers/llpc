@@ -1710,30 +1710,20 @@ void PatchEntryPointMutate::finalizeUserDataArgs(SmallVectorImpl<UserDataArg> &u
 
       if (userDataEnd + size > userDataAvailable) {
         // We ran out of SGPR space -- need to spill.
+        unsigned spillUsage = i;
         if (!spill) {
-          --userDataAvailable;
-          spill = true;
-          if (userDataEnd > userDataAvailable) {
+          if (userDataEnd >= userDataAvailable) {
             // No space left for the spill table, we need to backtrack.
             assert(lastSize > 0);
             userDataArgs.erase(userDataArgs.end() - lastSize, userDataArgs.end());
             userDataEnd -= lastSize;
-            assert(userDataEnd <= userDataAvailable);
-            m_pipelineState->getPalMetadata()->setUserDataSpillUsage(lastIdx);
-
-            // Retry since the current load may now fit.
-            continue;
-          } else {
-            m_pipelineState->getPalMetadata()->setUserDataSpillUsage(i);
+            spillUsage = lastIdx;
           }
+          --userDataAvailable;
+          spill = true;
         }
-
-        if (userDataEnd >= userDataAvailable)
-          break; // All SGPRs in use, may as well give up.
-
-        // Subsequent loads may be smaller and could still fit.
-        ++i;
-        continue;
+        m_pipelineState->getPalMetadata()->setUserDataSpillUsage(spillUsage);
+        break;
       }
 
       lastSize = size;
