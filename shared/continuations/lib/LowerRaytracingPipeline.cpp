@@ -954,7 +954,7 @@ void LowerRaytracingPipelinePassImpl::copyHitAttributes(
 
   // Hit attribute storage in payload storage
   Value *PayloadHitAttrs = nullptr;
-  unsigned PayloadHitAttrBytes = 0;
+  [[maybe_unused]] unsigned PayloadHitAttrBytes = 0;
 
   // Find hit attributes in layout if present
   if (Layout) {
