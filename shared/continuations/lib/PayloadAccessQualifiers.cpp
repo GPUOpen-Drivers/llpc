@@ -682,7 +682,8 @@ static void createNestedStructHierarchyRecursively(
     Node.LifetimeClass = Node.Children[0].LifetimeClass;
 }
 
-static void dumpPAQTree(StructType *PayloadType, const PAQNode &Node) {
+[[maybe_unused]] static void dumpPAQTree(StructType *PayloadType,
+                                         const PAQNode &Node) {
   // print for testing
   llvm::dbgs() << "PAQ qualifiers for payload struct " << PayloadType->getName()
                << ":\n";
@@ -937,7 +938,7 @@ checkSerializationLayout(const PAQSerializationLayout &Layout,
 //       structs. If at some point we also use inner nodes in serialization
 //       structs, we should also check consistency between a node and its
 //       ancestors (i.e. parent structs).
-static void checkTraceRaySerializationInfoImpl(
+[[maybe_unused]] static void checkTraceRaySerializationInfoImpl(
     ArrayRef<const PAQSerializationLayout *> Layouts,
     const SmallDenseMap<const PAQNode *, const PAQNode *> &EquivalentNodes,
     const DataLayout &DL) {
@@ -1012,7 +1013,7 @@ static void checkTraceRaySerializationInfoImpl(
 // HitGroupLayouts in TraceRaySerializationInfo are not checked.
 // However, if HitGroupLayout is non-null, its consistency with the
 // other layouts will be checked as well.
-static void checkTraceRaySerializationInfo(
+[[maybe_unused]] static void checkTraceRaySerializationInfo(
     const PAQTraceRaySerializationInfo &TraceRaySerializationInfo,
     const DataLayout &DL,
     const PAQHitGroupLayoutInfo *HitGroupLayout = nullptr) {
@@ -1782,7 +1783,7 @@ PAQHitGroupLayoutInfo PAQTraceRaySerializationInfo::createHitGroupLayoutInfo(
   return HitGroupLayoutInfo;
 }
 
-static void
+[[maybe_unused]] static void
 checkCallShaderSerializationInfo(const PAQCallShaderSerializationInfo &Info,
                                  const DataLayout &DL) {
   checkSerializationLayout(Info.CallShaderSerializationLayout, DL);

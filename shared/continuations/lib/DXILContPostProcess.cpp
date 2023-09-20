@@ -290,7 +290,7 @@ static bool addGetAddrAndMDIntrinsicCalls(Module &M) {
             B.CreateCall(GetAddrAndMD, {B.CreatePtrToInt(CE, B.getInt64Ty())});
         // Can't RAUW because the CE might be used by different instructions.
         // Instead, manually replace the instruction's operand.
-        bool Found = false;
+        [[maybe_unused]] bool Found = false;
         for (unsigned OpIdx = 0, E = I->getNumOperands(); OpIdx < E; ++OpIdx) {
           if (I->getOperand(OpIdx) == CE) {
             I->setOperand(OpIdx, AddrWithMD);
@@ -308,7 +308,7 @@ static bool addGetAddrAndMDIntrinsicCalls(Module &M) {
 
 /// Checks some properties guaranteed for a module containing continuations
 /// as expected by the backend.
-static void checkContinuationsModule(const Module &M) {
+[[maybe_unused]] static void checkContinuationsModule(const Module &M) {
   // Check that all continuation.continue calls have registercount metadata.
   SmallVector<CallInst *> CallInsts;
   collectContinueCalls(M, CallInsts);
