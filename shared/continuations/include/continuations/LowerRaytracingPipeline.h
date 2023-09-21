@@ -194,6 +194,8 @@ private:
 
   void collectDriverFunctions();
 
+  void handleGetUninitialized(Function &Func);
+
   // Copy the payload content between global payload and local payload.
   // Excludes the stack pointer or hit attributes which may also reside in
   // payload storage. If Stage is not set, all fields in SerializationInfo are

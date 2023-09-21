@@ -31,6 +31,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "continuations/ContinuationsUtil.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 
@@ -70,7 +71,7 @@ bool DialectUtils::isLgcRtOp(const llvm::Function *F) {
 // of a function
 void llvm::forEachCall(Function &F,
                        const std::function<void(CallInst &)> &Callback) {
-  for (auto &Use : F.uses()) {
+  for (auto &Use : make_early_inc_range(F.uses())) {
     if (auto *CInst = dyn_cast<CallInst>(Use.getUser()))
       if (CInst->isCallee(&Use))
         Callback(*CInst);

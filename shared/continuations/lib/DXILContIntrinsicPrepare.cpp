@@ -309,6 +309,7 @@ static bool isUtilFunction(StringRef Name) {
       "GetResumePointAddr",
       "GetShaderKind",
       "GetTriangleHitAttributes",
+      "GetUninitialized",
       "I32Count",
       "IsEndSearch",
       "ReportHit",
