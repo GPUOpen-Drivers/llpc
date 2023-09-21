@@ -1652,6 +1652,19 @@ void LowerRaytracingPipelinePassImpl::handleAmdInternalFunc(Function &Func) {
   if (FuncName == "_AmdContinuationStackIsGlobal") {
     handleContinuationStackIsGlobal(Func);
   }
+
+  if (FuncName.starts_with("_AmdGetUninitialized")) {
+    handleGetUninitialized(Func);
+  }
+}
+
+void LowerRaytracingPipelinePassImpl::handleGetUninitialized(Function &Func) {
+  auto *ArgTy = Func.getReturnType();
+  auto *Poison = PoisonValue::get(ArgTy);
+  llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
+    CInst.replaceAllUsesWith(Poison);
+    CInst.eraseFromParent();
+  });
 }
 
 // Search for known intrinsics that cannot be rematerialized
