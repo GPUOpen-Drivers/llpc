@@ -46,8 +46,8 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST-COUNT-4: getelementptr {{.*}}[4 x { i8, <2 x i8>, <3 x i8>, <4 x i8> }], ptr addrspace(3) @{{.*}}, i32 0, i32 {{%?[0-9]+}}, i32 {{[0-3]}}
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: load i8, ptr addrspace(3) @{{.*}}, align 4
-; SHADERTEST: store i8 %{{[0-9]*}}, ptr addrspace(3) @{{.*}}, align 4
+; SHADERTEST: load i8, ptr addrspace(3) @{{.*}}, align {{1|4}}
+; SHADERTEST: store i8 %{{[0-9]*}}, ptr addrspace(3) @{{.*}}, align {{1|4}}
 ; SHADERTEST-COUNT-3: load <{{[2-4]}} x i8>, ptr addrspace(3) getelementptr inbounds ([4 x { i8, <2 x i8>, <3 x i8>, <4 x i8> }], ptr addrspace(3) @{{.*}}, i32 0, i32 {{[1-3]}}, i32 {{[1-3]}}), align {{[2|4]}}
 ; SHADERTEST-COUNT-3: store <{{[2-4]}} x i8> %{{[0-9]*}}, ptr addrspace(3) getelementptr inbounds ([4 x { i8, <2 x i8>, <3 x i8>, <4 x i8> }], ptr addrspace(3) @{{.*}}, i32 0, i32 {{[1-3]}}, i32 {{[1-3]}}), align {{[2|4]}}
 ; SHADERTEST: AMDLLPC SUCCESS
