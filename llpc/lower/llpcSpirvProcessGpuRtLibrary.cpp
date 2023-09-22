@@ -24,8 +24,8 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLowerExecutionGraph.cpp
- * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerExecutionGraph.
+ * @file  llpcSpirvProcessGpuRtLibrary.cpp
+ * @brief LLPC source file: contains implementation of class Llpc::SpirvProcessGpuRtLibrary.
  ***********************************************************************************************************************
  */
 #include "llpcSpirvProcessGpuRtLibrary.h"
