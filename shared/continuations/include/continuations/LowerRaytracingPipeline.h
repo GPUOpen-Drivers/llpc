@@ -188,6 +188,8 @@ private:
 
   void handleContinuationStackIsGlobal(Function &Func);
 
+  void handleGetFuncAddr(Function &Func);
+
   void handleAmdInternalFunc(Function &Func);
 
   void handleUnrematerializableCandidates();

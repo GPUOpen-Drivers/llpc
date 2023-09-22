@@ -305,6 +305,7 @@ static bool isUtilFunction(StringRef Name) {
       "GetContinuationStackAddr",
       "GetContinuationStackGlobalMemBase",
       "GetCurrentFuncAddr",
+      "GetFuncAddr",
       "GetLocalRootIndex",
       "GetResumePointAddr",
       "GetShaderKind",
