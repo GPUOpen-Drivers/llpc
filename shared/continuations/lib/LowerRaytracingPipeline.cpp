@@ -57,6 +57,7 @@
 #include "llvm/IR/Type.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Cloning.h"
@@ -749,14 +750,43 @@ void LowerRaytracingPipelinePassImpl::handleContinuationStackIsGlobal(
 
   auto *IsGlobal =
       ConstantInt::getBool(*Context, MetadataState.isGlobalAddressSpace());
-  for (auto &Use : make_early_inc_range(Func.uses())) {
-    if (auto *CInst = dyn_cast<CallInst>(Use.getUser())) {
-      if (CInst->isCallee(&Use)) {
-        CInst->replaceAllUsesWith(IsGlobal);
-        CInst->eraseFromParent();
-      }
-    }
-  }
+
+  llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
+    CInst->replaceAllUsesWith(IsGlobal);
+    CInst->eraseFromParent();
+  });
+}
+
+void LowerRaytracingPipelinePassImpl::handleGetFuncAddr(Function &Func) {
+  assert(Func.arg_empty()
+         // returns i64 or i32
+         && (Func.getFunctionType()->getReturnType()->isIntegerTy(64) ||
+             Func.getFunctionType()->getReturnType()->isIntegerTy(32)));
+
+  auto Name = Func.getName();
+  bool Consumed = Name.consume_front("_AmdGetFuncAddr");
+  assert(Consumed);
+  (void)Consumed;
+
+  Constant *Addr = Mod->getFunction(Name);
+  if (!Addr)
+    report_fatal_error(Twine("Did not find function '") + Name +
+                       "' requested by _AmdGetFuncAddr");
+  Addr = ConstantExpr::getPtrToInt(Addr, Func.getReturnType());
+
+  llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
+    CInst->replaceAllUsesWith(Addr);
+    CInst->eraseFromParent();
+  });
+}
+
+void LowerRaytracingPipelinePassImpl::handleGetUninitialized(Function &Func) {
+  auto *ArgTy = Func.getReturnType();
+  auto *Poison = PoisonValue::get(ArgTy);
+  llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
+    CInst.replaceAllUsesWith(Poison);
+    CInst.eraseFromParent();
+  });
 }
 
 void llvm::copyBytes(IRBuilder<> &B, Value *Dst, Value *Src,
@@ -1653,18 +1683,13 @@ void LowerRaytracingPipelinePassImpl::handleAmdInternalFunc(Function &Func) {
     handleContinuationStackIsGlobal(Func);
   }
 
+  if (FuncName.starts_with("_AmdGetFuncAddr")) {
+    handleGetFuncAddr(Func);
+  }
+
   if (FuncName.starts_with("_AmdGetUninitialized")) {
     handleGetUninitialized(Func);
   }
-}
-
-void LowerRaytracingPipelinePassImpl::handleGetUninitialized(Function &Func) {
-  auto *ArgTy = Func.getReturnType();
-  auto *Poison = PoisonValue::get(ArgTy);
-  llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
-    CInst.replaceAllUsesWith(Poison);
-    CInst.eraseFromParent();
-  });
 }
 
 // Search for known intrinsics that cannot be rematerialized
