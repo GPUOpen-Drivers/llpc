@@ -383,15 +383,13 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryInitializeKHR>
 
   // NOTE: Initialize rayQuery.committed to zero, as a workaround for CTS that uses it without committed intersection.
   auto rayQueryTy = getRayQueryInternalTy(m_builder);
-  Value *committedAddr =
-      m_builder->CreateGEP(rayQueryTy, traceRaysArgs[0], {zero, m_builder->getInt32(RayQueryParams::Committed)});
+  Value *committedAddr = m_builder->CreateConstGEP2_32(rayQueryTy, traceRaysArgs[0], 0, RayQueryParams::Committed);
   auto committedTy = rayQueryTy->getStructElementType(RayQueryParams::Committed);
   m_builder->CreateStore(ConstantAggregateZero::get(committedTy), committedAddr);
 
   // Setup the rayQuery Object ID
   Value *rayQueryObjId = m_builder->CreateLoad(m_builder->getInt32Ty(), m_rayQueryObjGen);
-  Value *rayQueryObjAddr =
-      m_builder->CreateGEP(rayQueryTy, traceRaysArgs[0], {zero, m_builder->getInt32(RayQueryParams::RayQueryObj)});
+  Value *rayQueryObjAddr = m_builder->CreateConstGEP2_32(rayQueryTy, traceRaysArgs[0], 0, RayQueryParams::RayQueryObj);
   m_builder->CreateStore(rayQueryObjId, rayQueryObjAddr);
   m_builder->CreateStore(m_builder->CreateAdd(rayQueryObjId, m_builder->getInt32(1)), m_rayQueryObjGen);
 
@@ -538,13 +536,12 @@ void SpirvLowerRayQuery::createRayQueryProceedFunc(Function *func) {
 
   // Get RayQueryObj for rayquery object comparison
   Value *rayQueryObj = m_builder->CreateLoad(
-      m_builder->getInt32Ty(),
-      m_builder->CreateGEP(rayQueryEltTy, rayQuery, {zero, m_builder->getInt32(RayQueryParams::RayQueryObj)}));
+      m_builder->getInt32Ty(), m_builder->CreateConstGEP2_32(rayQueryEltTy, rayQuery, 0, RayQueryParams::RayQueryObj));
   Value *notEqual =
       m_builder->CreateICmpNE(rayQueryObj, m_builder->CreateLoad(m_builder->getInt32Ty(), m_prevRayQueryObj));
 
   Value *stackNumEntriesAddr =
-      m_builder->CreateGEP(rayQueryEltTy, rayQuery, {zero, m_builder->getInt32(RayQueryParams::StackNumEntries)});
+      m_builder->CreateConstGEP2_32(rayQueryEltTy, rayQuery, 0, RayQueryParams::StackNumEntries);
 
   Value *stackNumEntries = m_builder->CreateLoad(m_builder->getInt32Ty(), stackNumEntriesAddr);
   stackNumEntries = m_builder->CreateSelect(notEqual, zero, stackNumEntries);
@@ -670,8 +667,7 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetIntersectio
   Value *rayQuery = func->arg_begin();
   auto rayQueryEltTy = getRayQueryInternalTy(m_builder);
   Value *intersect = func->arg_begin() + 1;
-  Value *rayTMinAddr = m_builder->CreateGEP(rayQueryEltTy, rayQuery,
-                                            {m_builder->getInt32(0), m_builder->getInt32(RayQueryParams::RayTMin)});
+  Value *rayTMinAddr = m_builder->CreateConstGEP2_32(rayQueryEltTy, rayQuery, 0, RayQueryParams::RayTMin);
   auto minTVal = m_builder->CreateLoad(m_builder->getFloatTy(), rayTMinAddr);
 
   intersect = m_builder->CreateTrunc(intersect, m_builder->getInt1Ty());
@@ -798,8 +794,7 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryTerminateKHR>(
     // TERMINAL_NODE defined in GPURT is 0xFFFFFFFE
     static const unsigned RayQueryTerminalNode = 0xFFFFFFFE;
 
-    Value *currNodeAddr = m_builder->CreateGEP(
-        rayQueryEltTy, rayQuery, {m_builder->getInt32(0), m_builder->getInt32(RayQueryParams::CurrNodePtr)});
+    Value *currNodeAddr = m_builder->CreateConstGEP2_32(rayQueryEltTy, rayQuery, 0, RayQueryParams::CurrNodePtr);
     m_builder->CreateStore(m_builder->getInt32(RayQueryTerminalNode), currNodeAddr);
   } else {
     // Navi2x, use the following combination to determine Terminate()
@@ -807,16 +802,13 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryTerminateKHR>(
     //  rayQuery.numStackEntries = 0;
     //  rayQuery.stackPtr = ThreadIdInGroup()
 
-    Value *currNodeAddr = m_builder->CreateGEP(
-        rayQueryEltTy, rayQuery, {m_builder->getInt32(0), m_builder->getInt32(RayQueryParams::CurrNodePtr)});
+    Value *currNodeAddr = m_builder->CreateConstGEP2_32(rayQueryEltTy, rayQuery, 0, RayQueryParams::CurrNodePtr);
     m_builder->CreateStore(m_builder->getInt32(InvalidValue), currNodeAddr);
 
-    Value *stackNumEntries = m_builder->CreateGEP(
-        rayQueryEltTy, rayQuery, {m_builder->getInt32(0), m_builder->getInt32(RayQueryParams::StackNumEntries)});
+    Value *stackNumEntries = m_builder->CreateConstGEP2_32(rayQueryEltTy, rayQuery, 0, RayQueryParams::StackNumEntries);
     m_builder->CreateStore(m_builder->getInt32(0), stackNumEntries);
 
-    Value *stackPtr = m_builder->CreateGEP(rayQueryEltTy, rayQuery,
-                                           {m_builder->getInt32(0), m_builder->getInt32(RayQueryParams::StackPtr)});
+    Value *stackPtr = m_builder->CreateConstGEP2_32(rayQueryEltTy, rayQuery, 0, RayQueryParams::StackPtr);
     m_builder->CreateStore(getThreadIdInGroup(), stackPtr);
   }
   m_builder->CreateRetVoid();
@@ -857,15 +849,14 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGenerateInters
   m_builder->SetInsertPoint(setBlock);
   Value *candidate = m_builder->CreateExtractValue(rayQueryVal, RayQueryParams::Candidate);
   Value *zero = m_builder->getInt32(0);
-  Value *storeAddr = m_builder->CreateGEP(rayQueryTy, rayQuery, {zero, m_builder->getInt32(RayQueryParams::Committed)});
+  Value *storeAddr = m_builder->CreateConstGEP2_32(rayQueryTy, rayQuery, 0, RayQueryParams::Committed);
   m_builder->CreateStore(candidate, storeAddr);
-  storeAddr = m_builder->CreateGEP(rayQueryTy, rayQuery, {zero, m_builder->getInt32(RayQueryParams::CommittedStatus)});
+  storeAddr = m_builder->CreateConstGEP2_32(rayQueryTy, rayQuery, 0, RayQueryParams::CommittedStatus);
   m_builder->CreateStore(m_builder->getInt32(RayQueryCommittedIntersection::Generated), storeAddr);
   storeAddr = m_builder->CreateGEP(
       rayQueryTy, rayQuery,
       {zero, m_builder->getInt32(RayQueryParams::Committed), m_builder->getInt32(RaySystemParams::RayTCurrent)});
-  Value *rayTMinAddr = m_builder->CreateGEP(rayQueryTy, rayQuery,
-                                            {m_builder->getInt32(0), m_builder->getInt32(RayQueryParams::RayTMin)});
+  Value *rayTMinAddr = m_builder->CreateConstGEP2_32(rayQueryTy, rayQuery, 0, RayQueryParams::RayTMin);
   auto minTVal = m_builder->CreateLoad(m_builder->getFloatTy(), rayTMinAddr);
   // NOTE: rayTCurrent stored in rayQuery is relative to rayTMin, but tHit given by app is relative to ray origin.
   m_builder->CreateStore(m_builder->CreateFSub(hitT, minTVal), storeAddr);
@@ -907,10 +898,9 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryConfirmInterse
   // Set confirm block, set committed status and value
   m_builder->SetInsertPoint(setBlock);
   Value *candidate = m_builder->CreateExtractValue(rayQueryVal, RayQueryParams::Candidate);
-  Value *zero = m_builder->getInt32(0);
-  Value *storeAddr = m_builder->CreateGEP(rayQueryTy, rayQuery, {zero, m_builder->getInt32(RayQueryParams::Committed)});
+  Value *storeAddr = m_builder->CreateConstGEP2_32(rayQueryTy, rayQuery, 0, RayQueryParams::Committed);
   m_builder->CreateStore(candidate, storeAddr);
-  storeAddr = m_builder->CreateGEP(rayQueryTy, rayQuery, {zero, m_builder->getInt32(RayQueryParams::CommittedStatus)});
+  storeAddr = m_builder->CreateConstGEP2_32(rayQueryTy, rayQuery, 0, RayQueryParams::CommittedStatus);
   m_builder->CreateStore(m_builder->getInt32(RayQueryCommittedIntersection::Triangle), storeAddr);
   m_builder->CreateBr(endBlock);
 
@@ -929,8 +919,7 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetRayTMinKHR>
 
   Value *rayQuery = func->arg_begin();
   auto rayQueryEltTy = getRayQueryInternalTy(m_builder);
-  Value *rayTMinAddr = m_builder->CreateGEP(rayQueryEltTy, rayQuery,
-                                            {m_builder->getInt32(0), m_builder->getInt32(RayQueryParams::RayTMin)});
+  Value *rayTMinAddr = m_builder->CreateConstGEP2_32(rayQueryEltTy, rayQuery, 0, RayQueryParams::RayTMin);
 
   m_builder->CreateRet(m_builder->CreateLoad(m_builder->getFloatTy(), rayTMinAddr));
 }
@@ -946,8 +935,7 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetRayFlagsKHR
 
   Value *rayQuery = func->arg_begin();
   auto rayQueryEltTy = getRayQueryInternalTy(m_builder);
-  Value *rayFlagsAddr = m_builder->CreateGEP(rayQueryEltTy, rayQuery,
-                                             {m_builder->getInt32(0), m_builder->getInt32(RayQueryParams::RayFlags)});
+  Value *rayFlagsAddr = m_builder->CreateConstGEP2_32(rayQueryEltTy, rayQuery, 0, RayQueryParams::RayFlags);
 
   m_builder->CreateRet(m_builder->CreateLoad(m_builder->getInt32Ty(), rayFlagsAddr));
 }
@@ -968,8 +956,7 @@ void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetIntersectionCandidateAA
 
   Value *rayQuery = func->arg_begin();
   auto rayQueryEltTy = getRayQueryInternalTy(m_builder);
-  Value *candidateTypeAddr = m_builder->CreateGEP(
-      rayQueryEltTy, rayQuery, {m_builder->getInt32(0), m_builder->getInt32(RayQueryParams::CandidateType)});
+  Value *candidateTypeAddr = m_builder->CreateConstGEP2_32(rayQueryEltTy, rayQuery, 0, RayQueryParams::CandidateType);
   Value *candidateType = m_builder->CreateLoad(m_builder->getInt32Ty(), candidateTypeAddr);
   Value *ret =
       m_builder->CreateICmpNE(candidateType, m_builder->getInt32(RayQueryCandidateIntersection::NonOpaqueAabb));
@@ -1234,7 +1221,7 @@ Value *SpirvLowerRayQuery::createTransformMatrix(unsigned builtInId, Value *acce
   instanceNodeOffsetAddr = m_builder->CreateBitCast(instanceNodeOffsetAddr, m_builder->getInt64Ty());
   Type *gpuAddrAsPtrTy = PointerType::get(*m_context, SPIRAS_Global);
   auto instNodeOffsetAddrAsPtr = m_builder->CreateIntToPtr(instanceNodeOffsetAddr, gpuAddrAsPtrTy);
-  Value *baseInstOffset = m_builder->CreateGEP(m_builder->getInt8Ty(), instNodeOffsetAddrAsPtr, zero);
+  Value *baseInstOffset = m_builder->CreateConstGEP1_32(m_builder->getInt8Ty(), instNodeOffsetAddrAsPtr, 0);
   Type *baseInstOffsetTy = m_builder->getInt32Ty()->getPointerTo(SPIRAS_Global);
 
   // Load base instance offset from InstanceNodeOffsetAddr
@@ -1313,7 +1300,7 @@ Value *SpirvLowerRayQuery::createLoadInstanceIndex(Value *instNodeAddr) {
 
   instanceIndexAddr = m_builder->CreateBitCast(instanceIndexAddr, m_builder->getInt64Ty());
   auto instanceIndexAddrAsPtr = m_builder->CreateIntToPtr(instanceIndexAddr, gpuAddrAsPtrTy);
-  auto loadValue = m_builder->CreateGEP(m_builder->getInt8Ty(), instanceIndexAddrAsPtr, zero);
+  auto loadValue = m_builder->CreateConstGEP1_32(m_builder->getInt8Ty(), instanceIndexAddrAsPtr, 0);
   loadValue = m_builder->CreateBitCast(loadValue, PointerType::get(*m_context, SPIRAS_Global));
 
   return m_builder->CreateLoad(m_builder->getInt32Ty(), loadValue);
@@ -1370,7 +1357,7 @@ Value *SpirvLowerRayQuery::createLoadInstanceId(Value *instNodeAddr) {
 
   instanceIdAddr = m_builder->CreateBitCast(instanceIdAddr, m_builder->getInt64Ty());
   auto instanceIdAddrAsPtr = m_builder->CreateIntToPtr(instanceIdAddr, gpuAddrAsPtrTy);
-  auto loadValue = m_builder->CreateGEP(m_builder->getInt8Ty(), instanceIdAddrAsPtr, zero);
+  auto loadValue = m_builder->CreateConstGEP1_32(m_builder->getInt8Ty(), instanceIdAddrAsPtr, 0);
   loadValue = m_builder->CreateBitCast(loadValue, PointerType::get(*m_context, SPIRAS_Global));
 
   loadValue = m_builder->CreateLoad(m_builder->getInt32Ty(), loadValue);
