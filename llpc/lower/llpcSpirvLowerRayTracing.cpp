@@ -2769,7 +2769,7 @@ void SpirvLowerRayTracing::visitInstanceIndexOp(lgc::rt::InstanceIndexOp &inst) 
   m_builder->SetInsertPoint(&inst);
 
   auto instNodeAddr = createLoadInstNodeAddr();
-  auto instanceIndex = createLoadInstanceId(instNodeAddr);
+  auto instanceIndex = createLoadInstanceIndexOrId(instNodeAddr, false);
   inst.replaceAllUsesWith(instanceIndex);
 
   m_callsToLower.push_back(&inst);
@@ -2877,7 +2877,7 @@ void SpirvLowerRayTracing::visitInstanceIdOp(lgc::rt::InstanceIdOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   auto instNodeAddr = createLoadInstNodeAddr();
-  auto instanceId = createLoadInstanceIndex(instNodeAddr);
+  auto instanceId = createLoadInstanceIndexOrId(instNodeAddr, true);
   inst.replaceAllUsesWith(instanceId);
 
   m_callsToLower.push_back(&inst);

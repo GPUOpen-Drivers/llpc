@@ -135,8 +135,7 @@ protected:
                                      llvm::Instruction *insertPos);
   void eraseFunctionBlocks(llvm::Function *func);
   unsigned getFuncOpcode(llvm::Function *func);
-  llvm::Value *createLoadInstanceIndex(llvm::Value *instNodeAddr);
-  llvm::Value *createLoadInstanceId(llvm::Value *instNodeAddr);
+  llvm::Value *createLoadInstanceIndexOrId(Value *instNodeAddr, bool isIndex);
   llvm::Value *createLoadMatrixFromAddr(llvm::Value *matrixAddr);
 
   bool m_rayQueryLibrary;       // Whether the module is ray query library

@@ -698,7 +698,7 @@ void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetIntersectionInstanceCus
   auto instanceNodeAddr = createGetInstanceNodeAddr(instanceNodePtr, rayQuery);
 
   // Load instance index from instance node address
-  auto instanceIndex = createLoadInstanceId(instanceNodeAddr);
+  auto instanceIndex = createLoadInstanceIndexOrId(instanceNodeAddr, false);
 
   m_builder->CreateRet(instanceIndex);
 }
@@ -718,7 +718,7 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetIntersectio
   auto instanceNodeAddr = createGetInstanceNodeAddr(instanceNodePtr, rayQuery);
 
   // Load instance index from instance node address
-  auto instanceId = createLoadInstanceIndex(instanceNodeAddr);
+  auto instanceId = createLoadInstanceIndexOrId(instanceNodeAddr, true);
 
   m_builder->CreateRet(instanceId);
 }
@@ -1029,7 +1029,7 @@ void SpirvLowerRayQuery::createIntersectMatrix(Function *func, unsigned builtInI
   auto committedInstanceNodePtr = m_builder->CreateExtractValue(committed, RaySystemParams::InstanceNodePtr);
   Value *instanceNodePtr = m_builder->CreateSelect(intersect, committedInstanceNodePtr, candidateInstanceNodePtr);
   Value *instanceNodeAddr = createGetInstanceNodeAddr(instanceNodePtr, rayQuery);
-  Value *instanceId = createLoadInstanceIndex(instanceNodeAddr);
+  Value *instanceId = createLoadInstanceIndexOrId(instanceNodeAddr, true);
 
   Instruction *brInst = m_builder->CreateBr(endBlock);
   Value *matrix = createTransformMatrix(builtInId, accelStruct, instanceId, brInst);
@@ -1282,28 +1282,21 @@ bool SpirvLowerRayQuery::stageNotSupportLds(ShaderStage stage) {
 }
 
 // =====================================================================================================================
-// Create instructions to load instance index given the 64-bit instance node address at the current insert point
+// Create instructions to load instance index/id given the 64-bit instance node address at the current insert point
 //
 // @param instNodeAddr : 64-bit instance node address, in <2 x i32>
-Value *SpirvLowerRayQuery::createLoadInstanceIndex(Value *instNodeAddr) {
-  Value *zero = m_builder->getInt32(0);
-  Type *gpuAddrAsPtrTy = PointerType::get(*m_context, SPIRAS_Global);
-  auto int32x2Ty = FixedVectorType::get(m_builder->getInt32Ty(), 2);
+Value *SpirvLowerRayQuery::createLoadInstanceIndexOrId(Value *instNodeAddr, bool isIndex) {
+  Type *gpuAddrAsPtrTy = PointerType::get(*m_context, SPIRAS_Private);
+  auto instanceIdAddr = m_builder->CreateBitCast(instNodeAddr, m_builder->getInt64Ty());
+  auto instanceIdAddrAsPtr = m_builder->CreateIntToPtr(instanceIdAddr, gpuAddrAsPtrTy);
 
-  const unsigned instanceIndexOffset = offsetof(RayTracingInstanceNode, extra.instanceIndex);
+  StringRef rayQueryGetInstanceIndx =
+      isIndex ? m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_INSTANCE_INDEX)
+              : m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_INSTANCE_ID);
 
-  Value *instanceIndexOffsetVar = PoisonValue::get(int32x2Ty);
-  instanceIndexOffsetVar =
-      m_builder->CreateInsertElement(instanceIndexOffsetVar, m_builder->getInt32(instanceIndexOffset), uint64_t(0));
-  instanceIndexOffsetVar = m_builder->CreateInsertElement(instanceIndexOffsetVar, zero, 1);
-  Value *instanceIndexAddr = m_builder->CreateAdd(instNodeAddr, instanceIndexOffsetVar);
-
-  instanceIndexAddr = m_builder->CreateBitCast(instanceIndexAddr, m_builder->getInt64Ty());
-  auto instanceIndexAddrAsPtr = m_builder->CreateIntToPtr(instanceIndexAddr, gpuAddrAsPtrTy);
-  auto loadValue = m_builder->CreateConstGEP1_32(m_builder->getInt8Ty(), instanceIndexAddrAsPtr, 0);
-  loadValue = m_builder->CreateBitCast(loadValue, PointerType::get(*m_context, SPIRAS_Global));
-
-  return m_builder->CreateLoad(m_builder->getInt32Ty(), loadValue);
+  Value *result = m_builder->CreateNamedCall(rayQueryGetInstanceIndx, m_builder->getInt32Ty(), {instanceIdAddrAsPtr},
+                                             {Attribute::NoUnwind, Attribute::AlwaysInline});
+  return result;
 }
 
 // =====================================================================================================================
@@ -1335,35 +1328,6 @@ Value *SpirvLowerRayQuery::createGetInstanceNodeAddr(Value *instNodePtr, Value *
 
   auto instNodeAddr = m_builder->CreateAdd(BvhAddr, instNodeOffset);
   return instNodeAddr;
-}
-
-// =====================================================================================================================
-// Create instructions to load instance ID given the 64-bit instance node address at the current insert point
-//
-// @param instNodeAddr : 64-bit instance node address, in <2 x i32>
-Value *SpirvLowerRayQuery::createLoadInstanceId(Value *instNodeAddr) {
-  Value *zero = m_builder->getInt32(0);
-  Type *gpuAddrAsPtrTy = PointerType::get(*m_context, SPIRAS_Global);
-  auto int32x2Ty = FixedVectorType::get(m_builder->getInt32Ty(), 2);
-
-  const unsigned instanceIdOffset = offsetof(RayTracingInstanceNode, desc.InstanceID_and_Mask);
-
-  Value *instanceIdOffsetVar = PoisonValue::get(int32x2Ty);
-  instanceIdOffsetVar =
-      m_builder->CreateInsertElement(instanceIdOffsetVar, m_builder->getInt32(instanceIdOffset), uint64_t(0));
-  instanceIdOffsetVar = m_builder->CreateInsertElement(instanceIdOffsetVar, zero, 1);
-  Value *instanceIdAddr = m_builder->CreateAdd(instNodeAddr, instanceIdOffsetVar);
-
-  instanceIdAddr = m_builder->CreateBitCast(instanceIdAddr, m_builder->getInt64Ty());
-  auto instanceIdAddrAsPtr = m_builder->CreateIntToPtr(instanceIdAddr, gpuAddrAsPtrTy);
-  auto loadValue = m_builder->CreateConstGEP1_32(m_builder->getInt8Ty(), instanceIdAddrAsPtr, 0);
-  loadValue = m_builder->CreateBitCast(loadValue, PointerType::get(*m_context, SPIRAS_Global));
-
-  loadValue = m_builder->CreateLoad(m_builder->getInt32Ty(), loadValue);
-  // Mask out the instance ID in lower 24 bits
-  loadValue = m_builder->CreateAnd(loadValue, 0x00FFFFFFu);
-
-  return loadValue;
 }
 
 // =====================================================================================================================
