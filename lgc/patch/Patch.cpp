@@ -211,10 +211,10 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
     fpm.addPass(PatchBufferOp());
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 452298
     // Old version of the code
-    unsigned instCombineOpt = 2;
+    unsigned instCombineOpt = 1;
 #else
     // New version of the code (also handles unknown version, which we treat as latest)
-    auto instCombineOpt = InstCombineOptions().setMaxIterations(2);
+    auto instCombineOpt = InstCombineOptions().setMaxIterations(1);
 #endif
     fpm.addPass(InstCombinePass(instCombineOpt));
     passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
