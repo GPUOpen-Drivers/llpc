@@ -132,10 +132,10 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
   const StringRef fetchTrianglePositionFromRayQueryFuncName =
       m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_FETCH_HIT_TRIANGLE_FROM_RAY_QUERY);
 
-  const StringRef rayQueryGetInstanceIndx =
+  const StringRef getInstanceIndx =
       m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_INSTANCE_INDEX);
 
-  const StringRef rayQueryGetInstanceId =
+  const StringRef getInstanceId =
       m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_INSTANCE_ID);
 
   assert(!traceRayFuncName.empty());
@@ -143,15 +143,15 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
   assert(!rayQueryProceedFuncName.empty());
   assert(!fetchTrianglePositionFromNodePointerFuncName.empty());
   assert(!fetchTrianglePositionFromRayQueryFuncName.empty());
-  assert(!rayQueryGetInstanceIndx.empty());
-  assert(!rayQueryGetInstanceId.empty());
+  assert(!getInstanceIndx.empty());
+  assert(!getInstanceId.empty());
 
   // Set external linkage for library entry functions
   if (funcName.startswith(traceRayFuncName) || funcName.startswith(rayQueryInitializeFuncName) ||
       funcName.startswith(rayQueryProceedFuncName) ||
       funcName.startswith(fetchTrianglePositionFromNodePointerFuncName) ||
-      funcName.startswith(fetchTrianglePositionFromRayQueryFuncName) || funcName.startswith(rayQueryGetInstanceIndx) ||
-      funcName.startswith(rayQueryGetInstanceId)) {
+      funcName.startswith(fetchTrianglePositionFromRayQueryFuncName) || funcName.startswith(getInstanceIndx) ||
+      funcName.startswith(getInstanceId)) {
     func->setLinkage(GlobalValue::ExternalLinkage);
     return;
   }
