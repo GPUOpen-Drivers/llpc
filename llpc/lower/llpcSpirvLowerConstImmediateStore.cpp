@@ -33,6 +33,7 @@
 #include "llpcContext.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Support/Debug.h"
 #include <vector>
 
@@ -189,8 +190,21 @@ void SpirvLowerConstImmediateStore::convertAllocaToReadOnlyGlobal(StoreInst *sto
         allocaToGlobalMap.push_back(std::pair<Instruction *, Value *>(origGetElemPtrInst, newGetElemPtrInst));
         // Remove the use from the original "getelementptr".
         *useIt = PoisonValue::get(allocaInst->getType());
-      } else
-        *useIt = global;
+        continue;
+      }
+
+      if (auto *intrinsic = dyn_cast<IntrinsicInst>(useIt->getUser())) {
+        switch (intrinsic->getIntrinsicID()) {
+        case Intrinsic::lifetime_start:
+        case Intrinsic::lifetime_end:
+          // Lifetime markers are only useful for allocas, not for globals, and if we did not erase them we would have
+          // to change their name mangling because of the change of address space.
+          intrinsic->eraseFromParent();
+          continue;
+        }
+      }
+
+      *useIt = global;
     }
     // Visit next map pair.
   } while (!allocaToGlobalMap.empty());
