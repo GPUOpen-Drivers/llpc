@@ -1286,15 +1286,15 @@ bool SpirvLowerRayQuery::stageNotSupportLds(ShaderStage stage) {
 //
 // @param instNodeAddr : 64-bit instance node address, in <2 x i32>
 Value *SpirvLowerRayQuery::createLoadInstanceIndexOrId(Value *instNodeAddr, bool isIndex) {
-  Type *gpuAddrAsPtrTy = PointerType::get(*m_context, SPIRAS_Private);
   auto instanceIdAddr = m_builder->CreateBitCast(instNodeAddr, m_builder->getInt64Ty());
-  auto instanceIdAddrAsPtr = m_builder->CreateIntToPtr(instanceIdAddr, gpuAddrAsPtrTy);
+  Value *instanceIdPtr = m_builder->CreateAlloca(m_builder->getInt64Ty());
+  m_builder->CreateStore(instanceIdAddr, instanceIdPtr);
 
   StringRef rayQueryGetInstanceIndx =
       isIndex ? m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_INSTANCE_INDEX)
               : m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_INSTANCE_ID);
 
-  Value *result = m_builder->CreateNamedCall(rayQueryGetInstanceIndx, m_builder->getInt32Ty(), {instanceIdAddrAsPtr},
+  Value *result = m_builder->CreateNamedCall(rayQueryGetInstanceIndx, m_builder->getInt32Ty(), {instanceIdPtr},
                                              {Attribute::NoUnwind, Attribute::AlwaysInline});
   return result;
 }
