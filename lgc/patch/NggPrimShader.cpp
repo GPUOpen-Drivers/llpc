@@ -3233,7 +3233,7 @@ Value *NggPrimShader::runPartEs(ArrayRef<Argument *> args, Value *position) {
       auto vertexItemOffset = m_builder.CreateMul(uncompactedVertexIndex, m_builder.getInt32(esGsRingItemSize));
 
       newPosition = readPerThreadDataFromLds(FixedVectorType::get(m_builder.getFloatTy(), 4), uncompactedVertexIndex,
-                                             PrimShaderLdsRegion::VertexPosition, true);
+                                             PrimShaderLdsRegion::VertexPosition, 0, true);
 
       // NOTE: For deferred vertex export, some system values could be from vertex compaction info rather than from
       // VGPRs (caused by NGG culling and vertex compaction)
