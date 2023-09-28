@@ -35,8 +35,6 @@
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
 #include "llpcPipelineContext.h"
-#include "llpcShaderCache.h"
-#include "llpcShaderCacheManager.h"
 #include "vkgcMetroHash.h"
 #include "lgc/Builder.h"
 #include "lgc/GpurtDialect.h"

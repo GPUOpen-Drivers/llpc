@@ -257,14 +257,14 @@ private:
   bool NeedDialectContext;
 };
 
-class CleanupContinuationsPass
-    : public llvm::PassInfoMixin<CleanupContinuationsPass> {
+class LegacyCleanupContinuationsPass
+    : public llvm::PassInfoMixin<LegacyCleanupContinuationsPass> {
 public:
-  CleanupContinuationsPass();
+  LegacyCleanupContinuationsPass();
   llvm::PreservedAnalyses run(llvm::Module &Module,
                               llvm::ModuleAnalysisManager &AnalysisManager);
 
-  static llvm::StringRef name() { return "continuation cleanup"; }
+  static llvm::StringRef name() { return "legacy continuation cleanup"; }
 
 private:
   struct ContinuationData {
@@ -306,6 +306,46 @@ private:
   uint32_t MaxContStateBytes;
 };
 
+class CleanupContinuationsPass
+    : public llvm::PassInfoMixin<CleanupContinuationsPass> {
+public:
+  CleanupContinuationsPass();
+  llvm::PreservedAnalyses run(llvm::Module &Module,
+                              llvm::ModuleAnalysisManager &AnalysisManager);
+
+  static llvm::StringRef name() { return "continuation cleanup"; }
+
+private:
+  struct ContinuationData {
+    /// All functions belonging to this continuation, the entry function is the
+    /// first one
+    SmallVector<Function *> Functions;
+    /// Size of the continuation state in byte
+    uint32_t ContStateBytes = 0;
+    CallInst *MallocCall = nullptr;
+    MDNode *MD = nullptr;
+    SmallVector<Function *> NewFunctions;
+  };
+
+  void removeContFreeCall(Function *F, Function *ContFree);
+  Value *getContinuationFramePtr(Function *F, bool IsStart,
+                                 const ContinuationData &ContinuationInfo,
+                                 SmallVector<Instruction *> &InstsToRemove);
+  void freeCpsStack(Function *F, ContinuationData &CpsInfo);
+  void updateCpsStack(Function *F, Function *NewFunc, bool IsStart,
+                      ContinuationData &CpsInfo);
+  void analyzeContinuation(Function &F, MDNode *MD);
+  void processContinuations();
+  void handleContinue(ContinuationData &Data, Instruction *Ret);
+  void handleSingleContinue(ContinuationData &Data, CallInst *Call,
+                            Value *ResumeFun);
+
+  llvm_dialects::Builder *Builder;
+  Function *ContMalloc;
+  Function *ContFree;
+  MapVector<Function *, ContinuationData> ToProcess;
+  uint32_t MaxContStateBytes;
+};
 class LowerRaytracingPipelinePass
     : public llvm::PassInfoMixin<LowerRaytracingPipelinePass> {
 public:
@@ -501,13 +541,21 @@ public:
   }
 };
 
-// Pass to add !types metadata to function definitions and declarations
-class AddTypesMetadataPass : public llvm::PassInfoMixin<AddTypesMetadataPass> {
-public:
-  llvm::PreservedAnalyses run(llvm::Module &Module,
-                              llvm::ModuleAnalysisManager &AnalysisManager);
+// Rematerializable callback specific to LgcCps - mainly used to extend what's
+// considered rematerializable for continuations
+bool LgcMaterializable(Instruction &I);
 
-  static llvm::StringRef name() { return "Add types metadata"; }
+// Define a wrapper pass that is used for testing using opt (lgc-coro-split vs
+// coro-split)
+class LgcCoroSplitPass : public CoroSplitPass {
+public:
+  LgcCoroSplitPass()
+      : CoroSplitPass(std::function<bool(Instruction &)>(&LgcMaterializable),
+                      true) {}
+
+  static llvm::StringRef name() {
+    return "Lgc continuations coro split pass wrapper";
+  }
 };
 
 // Pass to remove !types metadata from function definitions and declarations
@@ -551,6 +599,9 @@ private:
   void addDXILPayloadTypeToCall(Function &DXILFunc, CallInst &CI);
   void applyPayloadMetadataTypesOnShaders();
 };
+
+/// Add necessary continuation transform passes for LGC.
+void addLgcContinuationTransform(ModulePassManager &MPM);
 
 /// LLVM parser callback which adds !types metadata during DXIL parsing
 void DXILValueTypeMetadataCallback(Value *V, unsigned TypeID,

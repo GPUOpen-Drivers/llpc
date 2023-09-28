@@ -132,7 +132,7 @@ const char *getUnlinkedShaderStageName(Vkgc::UnlinkedShaderStage type);
 const char *getPartPipelineStageName(Vkgc::PartPipelineStage type);
 
 // Returns the uniform constant map entry of the given location.
-Vkgc::UniformConstantMapEntry *getUniformConstantEntryByLocation(const Llpc::Context *context, Vkgc::ShaderStage stage,
+Vkgc::UniformConstantMapEntry *getUniformConstantEntryByLocation(const Llpc::Context *contex, Vkgc::ShaderStage stage,
                                                                  unsigned loc);
 
 inline bool doesShaderStageExist(llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo, ShaderStage stage) {

@@ -405,3 +405,4 @@ def InstanceInclusionMaskOp : LgcRtOp<"instance.inclusion.mask", [Memory<[]>, Wi
     Return an i32 giving the instance inclusion mask for the ray being traced.
   }];
 }
+

@@ -123,7 +123,6 @@ enum BuilderOpcode : unsigned {
   ImageQuerySize,
   ImageGetLod,
   ImageBvhIntersectRay,
-  Reserved2,
 
   // Input/output
   ReadGenericInput,
@@ -191,7 +190,6 @@ enum BuilderOpcode : unsigned {
   SubgroupSwizzleMask,
   SubgroupWriteInvocation,
   SubgroupMbcnt,
-
   // Total count of opcodes
   Count
 };

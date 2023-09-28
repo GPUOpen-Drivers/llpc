@@ -104,6 +104,21 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
       }
       break;
     }
+    case OpExecutionMode: {
+      auto execMode = static_cast<ExecutionMode>(codePos[2]);
+      switch (execMode) {
+      case ExecutionModeOriginUpperLeft:
+        shaderModuleUsage.originUpperLeft = true;
+        break;
+      case ExecutionModePixelCenterInteger:
+        shaderModuleUsage.pixelCenterInteger = true;
+        break;
+      default: {
+        break;
+      }
+      }
+      break;
+    }
     case OpDecorate:
     case OpMemberDecorate: {
       auto decoration =
@@ -125,6 +140,18 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
         }
         case BuiltInSamplePosition: {
           shaderModuleUsage.useSampleInfo = true;
+          break;
+        }
+        case BuiltInFragCoord: {
+          shaderModuleUsage.useFragCoord = true;
+          break;
+        }
+        case BuiltInPointCoord:
+        case BuiltInPrimitiveId:
+        case BuiltInLayer:
+        case BuiltInClipDistance:
+        case BuiltInCullDistance: {
+          shaderModuleUsage.useGenericBuiltIn = true;
           break;
         }
         default: {

@@ -2484,13 +2484,18 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     break;
   }
   case BuiltInFragCoord: {
-    // TODO: Support layout qualifiers "pixel_center_integer" and "origin_upper_left".
     Value *fragCoord[4] = {
         getFunctionArgument(m_entryPoint, entryArgIdxs.fragCoord.x),
         getFunctionArgument(m_entryPoint, entryArgIdxs.fragCoord.y),
         getFunctionArgument(m_entryPoint, entryArgIdxs.fragCoord.z),
         getFunctionArgument(m_entryPoint, entryArgIdxs.fragCoord.w),
     };
+
+    if (m_pipelineState->getShaderModes()->getFragmentShaderMode().pixelCenterInteger) {
+      fragCoord[0] = builder.CreateFSub(fragCoord[0], ConstantFP::get(builder.getFloatTy(), 0.5));
+      fragCoord[1] = builder.CreateFSub(fragCoord[1], ConstantFP::get(builder.getFloatTy(), 0.5));
+    }
+
     // Adjust gl_FragCoord.z value for the shading rate X,
     //
     // adjustedFragCoordZ = gl_FragCood.z + dFdxFine(gl_FragCood.z) * 1/16

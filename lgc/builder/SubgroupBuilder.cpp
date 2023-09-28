@@ -149,12 +149,12 @@ Value *BuilderImpl::CreateSubgroupAllEqual(Value *const value, const Twine &inst
 // @param value : The value to read from the chosen rotated lane to all active lanes.
 // @param delta : The delta/offset added to lane id.
 // @param clusterSize : The cluster size if exists.
-// @param instName : Name to give instruction.
+// @param instName : Name to give final instruction.
 Value *BuilderImpl::CreateSubgroupRotate(Value *const value, Value *const delta, Value *const clusterSize,
                                          const Twine &instName) {
   // LocalId = SubgroupLocalInvocationId
-  // RotationGroupSize = hasClusterSize ? ClusterSize : SubgroupSize
-  // InvocationId = ((LocalId + Delta) & (RotationGroupSize - 1)) + (LocalId & ~(RotationGroupSize - 1))
+  // RotationGroupSize = hasClusterSIze? ClusterSize : SubgroupSize.
+  // Invocation ID = ((LocalId + Delta) & (RotationGroupSize - 1)) + (LocalId & ~(RotationGroupSize - 1))
   Value *localId = CreateSubgroupMbcnt(getInt64(UINT64_MAX), "");
   Value *invocationId = CreateAdd(localId, delta);
   if (clusterSize != nullptr) {
@@ -1014,12 +1014,14 @@ Value *BuilderImpl::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, 
 }
 
 // =====================================================================================================================
-// Create a subgroup quad broadcast call.
+// Create a quad broadcast call.
 //
 // @param value : The value to broadcast across the quad.
 // @param index : The index in the quad to broadcast the value from.
+// @param inWqm : Whether it's in whole quad mode.
 // @param instName : Name to give final instruction.
-Value *BuilderImpl::CreateSubgroupQuadBroadcast(Value *const value, Value *const index, const Twine &instName) {
+Value *BuilderImpl::CreateSubgroupQuadBroadcast(Value *const value, Value *const index, bool inWqm,
+                                                const Twine &instName) {
   Value *result = PoisonValue::get(value->getType());
 
   const unsigned indexBits = index->getType()->getPrimitiveSizeInBits();
@@ -1049,12 +1051,13 @@ Value *BuilderImpl::CreateSubgroupQuadBroadcast(Value *const value, Value *const
     compare = CreateICmpEQ(index, getIntN(indexBits, 3));
     result = CreateSelect(compare, createDsSwizzle(value, getDsSwizzleQuadMode(3, 3, 3, 3)), result);
   }
-
-  return createWqm(result);
+  if (inWqm)
+    result = createWqm(result);
+  return result;
 }
 
 // =====================================================================================================================
-// Create a subgroup quad swap horizontal call.
+// Create a quad swap horizontal call.
 //
 // @param value : The value to swap.
 // @param instName : Name to give final instruction.
@@ -1066,7 +1069,7 @@ Value *BuilderImpl::CreateSubgroupQuadSwapHorizontal(Value *const value, const T
 }
 
 // =====================================================================================================================
-// Create a subgroup quad swap vertical call.
+// Create a quad swap vertical call.
 //
 // @param value : The value to swap.
 // @param instName : Name to give final instruction.
@@ -1078,7 +1081,7 @@ Value *BuilderImpl::CreateSubgroupQuadSwapVertical(Value *const value, const Twi
 }
 
 // =====================================================================================================================
-// Create a subgroup quadswapdiagonal call.
+// Create a quadswapdiagonal call.
 //
 // @param value : The value to swap.
 // @param instName : Name to give final instruction.
@@ -1090,7 +1093,7 @@ Value *BuilderImpl::CreateSubgroupQuadSwapDiagonal(Value *const value, const Twi
 }
 
 // =====================================================================================================================
-// Create a subgroup quad swap swizzle.
+// Create a quad swap swizzle.
 //
 // @param value : The value to swizzle.
 // @param offset : The value to specify the swizzle offsets.

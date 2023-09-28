@@ -800,7 +800,7 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     return m_builder->CreateSubgroupClusteredExclusive(groupArithOp, args[1], args[2]);
   }
   case BuilderOpcode::SubgroupQuadBroadcast: {
-    return m_builder->CreateSubgroupQuadBroadcast(args[0], args[1]);
+    return m_builder->CreateSubgroupQuadBroadcast(args[0], args[1], cast<ConstantInt>(args[2])->getZExtValue());
   }
   case BuilderOpcode::SubgroupQuadSwapHorizontal: {
     return m_builder->CreateSubgroupQuadSwapHorizontal(args[0]);

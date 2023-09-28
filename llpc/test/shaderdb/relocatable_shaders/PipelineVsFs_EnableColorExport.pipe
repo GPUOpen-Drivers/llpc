@@ -91,12 +91,12 @@ attribute[0].offset = 0
 ; SHADERTEST-NEXT:    [[TMP21:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP15]], align 16, !invariant.load !10
 ; SHADERTEST-NEXT:    [[DOTI01:%.*]] = sitofp i32 [[DOTI0]] to float
 ; SHADERTEST-NEXT:    [[DOTI12:%.*]] = sitofp i32 [[DOTI1]] to float
-; SHADERTEST-NEXT:    [[TMP22:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float [[DOTI01]], float [[DOTI12]], <8 x i32> [[TMP20]], <4 x i32> [[TMP21]], i1 false, i32 0, i32 0)
-; SHADERTEST-NEXT:    [[TMP23:%.*]] = insertvalue { <4 x float> } poison, <4 x float> [[TMP22]], 0
-; SHADERTEST-NEXT:    [[TMP24:%.*]] = zext i32 [[COLOREXPADDR:%.*]] to i64
-; SHADERTEST-NEXT:    [[TMP25:%.*]] = or i64 [[TMP12]], [[TMP24]]
-; SHADERTEST-NEXT:    [[TMP26:%.*]] = inttoptr i64 [[TMP25]] to ptr addrspace(4)
-; SHADERTEST-NEXT:    call amdgpu_gfx addrspace(4) void [[TMP26]]({ <4 x float> } [[TMP23]])
+; SHADERTEST-NEXT:    [[TMP23:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float [[DOTI01]], float [[DOTI12]], <8 x i32> [[TMP20]], <4 x i32> [[TMP21]], i1 false, i32 0, i32 0)
+; SHADERTEST-NEXT:    [[TMP24:%.*]] = insertvalue { <4 x float> } poison, <4 x float> [[TMP23]], 0
+; SHADERTEST-NEXT:    [[TMP25:%.*]] = zext i32 [[COLOREXPADDR:%.*]] to i64
+; SHADERTEST-NEXT:    [[TMP26:%.*]] = or i64 [[TMP12]], [[TMP25]]
+; SHADERTEST-NEXT:    [[TMP27:%.*]] = inttoptr i64 [[TMP26]] to ptr addrspace(4)
+; SHADERTEST-NEXT:    call amdgpu_gfx addrspace(4) void [[TMP27]]({ <4 x float> } [[TMP24]])
 ; SHADERTEST-NEXT:    unreachable
 ;
 ;
@@ -134,13 +134,13 @@ attribute[0].offset = 0
 ;
 ;
 ; SHADERTEST-LABEL: @color_export_shader(
-; SHADERTEST-NEXT:    call void @llvm.amdgcn.s.waitcnt(i32 0)
 ; SHADERTEST-NEXT:    [[TMP2:%.*]] = extractelement <4 x float> [[TMP0:%.*]], i64 0
 ; SHADERTEST-NEXT:    [[TMP3:%.*]] = extractelement <4 x float> [[TMP0]], i64 1
 ; SHADERTEST-NEXT:    [[TMP4:%.*]] = extractelement <4 x float> [[TMP0]], i64 2
 ; SHADERTEST-NEXT:    [[TMP5:%.*]] = extractelement <4 x float> [[TMP0]], i64 3
 ; SHADERTEST-NEXT:    call void @llvm.amdgcn.exp.f32(i32 immarg 0, i32 immarg 15, float [[TMP2]], float [[TMP3]], float [[TMP4]], float [[TMP5]], i1 immarg true, i1 immarg true)
-; SHADERTEST-NEXT:    ret void
+; SHADERTEST-NEXT:    call void @llvm.amdgcn.endpgm()
+; SHADERTEST-NEXT:    unreachable
 ;
 ; SHADERTEST-LABEL: color_export_shader:
 ; SHADERTEST:         s_waitcnt vmcnt(0) expcnt(0) lgkmcnt(0)

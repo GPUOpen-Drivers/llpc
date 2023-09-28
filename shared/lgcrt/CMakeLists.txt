@@ -57,7 +57,7 @@ target_link_libraries(LLVMLgcRt PUBLIC llvm_dialects)
 set_compiler_options(LLVMLgcRt)
 
 # TableGen for the lgc.rt dialect
-set(LGCRT_TABLEGEN_EXE ${LLVM_TOOLS_BINARY_DIR}/llvm-dialects-tblgen)
+set(LGCRT_TABLEGEN_EXE $<TARGET_FILE:llvm-dialects-tblgen>)
 set(LGCRT_TABLEGEN_TARGET llvm-dialects-tblgen)
 set(LLVM_TARGET_DEFINITIONS include/lgcrt/LgcRtDialect.td)
 set(LLVM_TARGET_DEPENDS lgcrt)

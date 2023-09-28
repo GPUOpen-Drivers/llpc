@@ -97,8 +97,15 @@ const unsigned FirstPayloadHitAttributeStorageRegister = 1;
 /// = D3D12_RAYTRACING_MAX_ATTRIBUTE_SIZE_IN_BYTES
 /// Smaller limits may be specified in metadata.
 const unsigned GlobalMaxHitAttributeBytes = 32;
-/// The minimum size for the pre-allocated continuation state is the size of a
-/// pointer.
+/// We tell the LLVM coroutine passes the size of a preallocated buffer
+/// for the continuation state that can be used without dynamic allocations.
+/// If the continuation state is larger, coroutine passes will use a special
+/// malloc call that will be replaced later. If we find the malloc, we know
+/// the exact continuation state size. If we don't find a malloc, but there
+/// are usages of the frame pointer, we need to pessimistically assume
+/// that the full size is required.
+/// TODO: Figure out whether we can pass a fixed size of 0, eliminating
+///       this pessimism.
 const unsigned MinimumContinuationStateBytes = 8;
 
 struct DxRayIntrinsic {
@@ -197,7 +204,6 @@ public:
   DXILContArgTy ReturnTy;
   SmallVector<DXILContArgTy> ArgTys;
 
-  static DXILContFuncTy get(const FunctionType *FuncTy);
   static DXILContFuncTy get(const Function *F);
   static DXILContFuncTy get(const Metadata *MD, LLVMContext &Context);
 
@@ -438,6 +444,24 @@ public:
     return extractZExtI32Constant(F.getMetadata(MDMaxPayloadBytesName));
   }
 
+  static void setStackSize(Function *F, uint32_t StackSize) {
+    F->setMetadata(MDStackSizeName,
+                   getI32MDConstant(F->getContext(), StackSize));
+  }
+
+  // If the function already has stacksize metadata, add the given value.
+  // Otherwise, assume an existing value of zero, and set the pass value.
+  static void addStackSize(Function *F, uint32_t AddedStackSize) {
+    auto ExistingSize = tryGetStackSize(F).value_or(0);
+    F->setMetadata(
+        MDStackSizeName,
+        getI32MDConstant(F->getContext(), ExistingSize + AddedStackSize));
+  }
+
+  static std::optional<uint32_t> tryGetStackSize(const Function *F) {
+    return extractZExtI32Constant(F->getMetadata(MDStackSizeName));
+  }
+
   // If there is module-level metadata specifying the stack addrspace,
   // return that value. Otherwise, return std::nullopt.
   static std::optional<ContStackAddrspace>
@@ -468,15 +492,6 @@ public:
   static std::optional<uint32_t>
   tryGetContinuationStateByteCount(const Function &F) {
     return extractZExtI32Constant(F.getMetadata(MDStateName));
-  }
-
-  static Function *getAliasedFunction(Module &M, StringRef Name) {
-    llvm::Constant *FuncOrAlias = M.getNamedValue(Name);
-    if (!FuncOrAlias)
-      return nullptr;
-    while (auto *Alias = dyn_cast<GlobalAlias>(FuncOrAlias))
-      FuncOrAlias = Alias->getAliasee();
-    return dyn_cast<Function>(FuncOrAlias);
   }
 
   static bool isTraversal(Function &F) {

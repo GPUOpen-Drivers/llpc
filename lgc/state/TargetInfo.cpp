@@ -515,6 +515,19 @@ static void setGfx1100Info(TargetInfo *targetInfo) {
   targetInfo->getGpuProperty().numShaderEngines = 6;
 }
 
+#if LLPC_BUILD_NAVI32
+// gfx1101
+//
+// @param [in/out] targetInfo : Target info
+static void setGfx1101Info(TargetInfo *targetInfo) {
+  setGfx11Info(targetInfo);
+
+  targetInfo->getGpuWorkarounds().gfx11.waAtmPrecedesPos = 1;
+
+  targetInfo->getGpuProperty().numShaderEngines = 3;
+}
+#endif
+
 // gfx1102
 //
 // @param [in/out] targetInfo : Target info
@@ -585,6 +598,9 @@ bool TargetInfo::setTargetInfo(StringRef gpuName) {
     {"gfx1035", &setGfx1035Info}, // gfx1035, rembrandt
     {"gfx1036", &setGfx1036Info}, // gfx1036, raphael | mendocino
     {"gfx1100", &setGfx1100Info}, // gfx1100, navi31
+#if LLPC_BUILD_NAVI32
+    {"gfx1101", &setGfx1101Info}, // gfx1101, navi32
+#endif
     {"gfx1102", &setGfx1102Info}, // gfx1102, navi33
 #if LLPC_BUILD_PHOENIX1
     {"gfx1103", &setGfx1103Info}, // gfx1103, phoenix1

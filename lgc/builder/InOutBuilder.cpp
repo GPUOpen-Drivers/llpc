@@ -459,6 +459,10 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
     // Mark usage for interpolation info.
     markInterpolationInfo(inOutInfo);
   }
+
+  if (isOutput && m_shaderStage == ShaderStageFragment && inOutInfo.isDualSourceBlendDynamic()) {
+    m_pipelineState->getColorExportState().dynamicDualSourceBlendEnable = true;
+  }
 }
 
 // =====================================================================================================================

@@ -112,7 +112,7 @@ struct PayloadCopyHelper {
       return;
     }
 
-    copyField(Node, It->second.IndexIntervals);
+    copyField(Node->Ty, It->second.IndexIntervals);
 
     // Register node as copied
     if (CopiedNodes)
@@ -121,13 +121,49 @@ struct PayloadCopyHelper {
 
   // Perform copy for each index interval (i.e, for each contiguous range of
   // storage memory)
-  void copyField(const PAQNode *Node, const PAQIndexIntervals &Intervals) {
+  void copyField(Type *FieldTy, const PAQIndexIntervals &Intervals) {
     auto *I32 = Type::getInt32Ty(M.getContext());
     // Pointer to the node field in the local payload
     auto *LocalFieldPtr =
         B.CreateInBoundsGEP(&PayloadTy, LocalPayload, PayloadIdxList);
     assert(cast<PointerType>(LocalFieldPtr->getType())
-               ->isOpaqueOrPointeeTypeMatches(Node->Ty));
+               ->isOpaqueOrPointeeTypeMatches(FieldTy));
+
+    // If the field is serialized in multiple intervals in the global,
+    // we perform a manual bytewise copy using i32 and i8.
+    // However, if the field is serialized using a single, contiguous interval
+    // and does not have stricter alignment requirements than i32,
+    // then we can just load/store the field type from/to the global storage.
+    //
+    // We currently restrict this mechanism to single-DWord fields to avoid
+    // issues with the RegisterBuffer pass which struggles with loads and stores
+    // of large vector types, leading to bad IR with additional allocas.
+    // TODO: Remove this restriction once we have moved to LLPC-style
+    //       continuations without the RegisterBuffer pass.
+    const DataLayout &DL = M.getDataLayout();
+    if (Intervals.size() == 1 &&
+        DL.getABITypeAlign(FieldTy) <= DL.getABITypeAlign(I32) &&
+        Intervals[0].size() == 1) {
+
+      // Do a single load+store
+      Value *Src = LocalFieldPtr;
+
+      auto *GlobalIntervalI32Ptr = B.CreateInBoundsGEP(
+          Layout->SerializationTy, Serialization,
+          {B.getInt32(0), B.getInt32(0), B.getInt32(Intervals[0].Begin)});
+      Value *Dst = B.CreateBitCast(
+          GlobalIntervalI32Ptr,
+          FieldTy->getPointerTo(
+              GlobalIntervalI32Ptr->getType()->getPointerAddressSpace()));
+
+      if (GlobalAccessKind != PAQAccessKind::Write)
+        std::swap(Src, Dst);
+
+      auto *Val = B.CreateLoad(FieldTy, Src);
+      B.CreateStore(Val, Dst);
+      return;
+    }
+
     // I32 pointer to start of field in local payload
     Value *FieldI32Ptr = B.CreateBitCast(
         LocalFieldPtr,
@@ -136,7 +172,7 @@ struct PayloadCopyHelper {
     // Counts how many bytes have already been copied
     unsigned FieldByteOffset = 0;
     unsigned FieldNumBytes =
-        M.getDataLayout().getTypeStoreSize(Node->Ty).getFixedValue();
+        M.getDataLayout().getTypeStoreSize(FieldTy).getFixedValue();
     for (unsigned IntervalIdx = 0; IntervalIdx < Intervals.size();
          ++IntervalIdx) {
       const PAQIndexInterval &Interval = Intervals[IntervalIdx];
@@ -228,17 +264,9 @@ static void setStacksizeMetadata(Function &F, uint64_t PayloadI32s,
   uint64_t NeededStackSize = computeNeededStackSizeForRegisterBuffer(
       PayloadI32s, PayloadRegisterCount);
   if (NeededStackSize) {
-    auto &Context = F.getContext();
-    uint64_t CurStackSize = 0;
-    if (auto *StackSizeMD = F.getMetadata(DXILContHelper::MDStackSizeName))
-      CurStackSize = mdconst::extract<ConstantInt>(StackSizeMD->getOperand(0))
-                         ->getZExtValue();
+    uint64_t CurStackSize = DXILContHelper::tryGetStackSize(&F).value_or(0);
     if (NeededStackSize > CurStackSize)
-      F.setMetadata(
-          DXILContHelper::MDStackSizeName,
-          MDTuple::get(Context,
-                       {ConstantAsMetadata::get(ConstantInt::get(
-                           Type::getInt32Ty(Context), NeededStackSize))}));
+      DXILContHelper::setStackSize(&F, NeededStackSize);
   }
 }
 
@@ -365,28 +393,30 @@ CallInst *LowerRaytracingPipelinePassImpl::replaceCall(
   AwaitData.CallType = CallType;
   AwaitData.FuncConfig = Data.FuncConfig;
   if (!SpecializedFunction) {
-    // Copy function
-    // Construct new function type via DXILContFuncTy: This way, we also get
-    // type metadata
-    DXILContFuncTy SpecializedContFuncTy;
-    DXILContFuncTy OldContFuncTy = DXILContFuncTy::get(Func);
+    // Copy function, modify argument types
+    SmallVector<Type *, 4> ArgTys;
+    ArgTys.reserve(Func->getFunctionType()->params().size() + 1);
 
     // Add system data argument
-    SpecializedContFuncTy.ArgTys.push_back(
-        DXILContArgTy(SystemDataTy->getPointerTo(), SystemDataTy));
+    ArgTys.push_back(SystemDataTy->getPointerTo());
 
     // Skip intrinsic id argument
-    SpecializedContFuncTy.ArgTys.append(OldContFuncTy.ArgTys.begin() + 1,
-                                        OldContFuncTy.ArgTys.end());
+    ArgTys.append(Func->getFunctionType()->params().begin() + 1,
+                  Func->getFunctionType()->params().end());
+
     // Add payload argument
-    SpecializedContFuncTy.ArgTys.push_back(
-        Call->getArgOperand(Call->arg_size() - 2)->getType());
-    SpecializedContFuncTy.ReturnTy = DXILContArgTy(Func->getReturnType());
+    ArgTys.push_back(Call->getArgOperand(Call->arg_size() - 2)->getType());
 
     SpecializedFunction = cloneFunctionHeader(
-        *Func, SpecializedContFuncTy.asFunctionType(Mod->getContext()), {});
+        *Func, FunctionType::get(Func->getReturnType(), ArgTys, false), {});
     SpecializedFunction->setName(NewName);
-    SpecializedContFuncTy.writeMetadata(SpecializedFunction);
+
+    assert(PayloadOrAttrTypesForSpecializedFunctions.count(
+               SpecializedFunction) == 0);
+    // Store payload or hit attribute type for later. Despite the name, payload
+    // metadata also gives hit attribute types for ReportHit.
+    PayloadOrAttrTypesForSpecializedFunctions[SpecializedFunction] =
+        DXILContHelper::getPayloadTypeFromMetadata(*Call);
 
     assert(!AwaitsToProcess.count(SpecializedFunction) &&
            "Unexpected existing await data entry!");
@@ -410,6 +440,10 @@ CallInst *LowerRaytracingPipelinePassImpl::replaceCall(
     SmallVector<ReturnInst *> Returns;
     CloneFunctionInto(SpecializedFunction, Func, VMap,
                       CloneFunctionChangeType::LocalChangesOnly, Returns);
+
+    // Do not propagate type metadata to the cloned function. It would be
+    // incorrect, because arguments differ, and we should no longer need it.
+    SpecializedFunction->setMetadata(DXILContHelper::MDTypesName, nullptr);
 
     if (CallType == ContinuationCallType::AnyHit)
       handleReportHit(Data, *SpecializedFunction);
@@ -543,7 +577,7 @@ void LowerRaytracingPipelinePassImpl::replaceContinuationCall(
   if (CallType != ContinuationCallType::AnyHit) {
     // Payload is unchanged by Intersection and passed implicitly
     PassedPayload = F->getArg(F->arg_size() - 1);
-    PayloadTy = getFuncArgPtrElementType(F, PassedPayload);
+    PayloadTy = PayloadOrAttrTypesForSpecializedFunctions.at(F);
   }
 
   const PAQSerializationLayout *OutgoingSerializationLayout = nullptr;
@@ -663,7 +697,7 @@ void LowerRaytracingPipelinePassImpl::replaceContinuationCall(
     SystemDataTy = TraversalDataTy;
     // Add hit attributes to arguments
     auto *HitAttrsArg = F->getArg(F->arg_size() - 1);
-    auto *HitAttrsTy = getFuncArgPtrElementType(F, HitAttrsArg);
+    auto *HitAttrsTy = PayloadOrAttrTypesForSpecializedFunctions.at(F);
     ArgTys.push_back(HitAttrsTy);
     auto *HitAttrs = B.CreateLoad(HitAttrsTy, HitAttrsArg);
     Args.push_back(HitAttrs);
@@ -727,8 +761,8 @@ void LowerRaytracingPipelinePassImpl::handleReportHit(FunctionData &Data,
         if (Call->getCalledFunction()->getName() == "_AmdAcceptHitAttributes") {
           // Commit hit attributes
           B.SetInsertPoint(Call);
-          auto *SystemDataTy = getFuncArgPtrElementType(&F, 0);
-          copyHitAttributes(B, Data, Call->getArgOperand(0), SystemDataTy,
+          assert(TraversalDataTy != 0 && "Missing traversal system data!");
+          copyHitAttributes(B, Data, Call->getArgOperand(0), TraversalDataTy,
                             HitAttrsArg, false, nullptr);
           // Make sure that we store the hit attributes into the correct system
           // data (just in case dxc copied them around).
@@ -1788,10 +1822,10 @@ bool LowerRaytracingPipelinePassImpl::run() {
                 Data->second.CallShaderCalls.push_back(&CallCallableShader);
               })
           .add<ReportHitOp>([](VisitorState &State, auto &ReportHitOp) {
-            auto *HitAttributesArg =
-                ReportHitOp.getArgOperand(ReportHitOp.arg_size() - 2);
-            auto *HitAttributesTy = DXILContArgTy(HitAttributesArg->getType())
-                                        .getPointerElementType();
+            // The converter uses payload type metadata also to indicate hit
+            // attribute types
+            auto HitAttributesTy =
+                DXILContHelper::getPayloadTypeFromMetadata(ReportHitOp);
             auto Data = State.Processables.find(ReportHitOp.getFunction());
             if (Data == State.Processables.end())
               return;

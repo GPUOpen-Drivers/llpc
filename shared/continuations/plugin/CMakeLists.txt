@@ -2,6 +2,9 @@ set(LLVM_CONTINUATIONSPLUGIN_LINK_INTO_TOOLS ON CACHE BOOL "Link plugin into too
 
 add_llvm_pass_plugin(ContinuationsPlugin
   Plugin.cpp
+
+  LINK_COMPONENTS
+  Support
 )
 
 target_link_libraries(ContinuationsPlugin PRIVATE LLVMContinuations)

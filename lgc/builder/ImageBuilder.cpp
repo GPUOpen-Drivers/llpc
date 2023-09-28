@@ -1373,9 +1373,12 @@ Value *BuilderImpl::CreateImageQueryLevels(unsigned dim, unsigned flags, Value *
 // @param imageDesc : Image descriptor or texel buffer descriptor
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateImageQuerySamples(unsigned dim, unsigned flags, Value *imageDesc, const Twine &instName) {
-  // Extract LAST_LEVEL (SQ_IMG_RSRC_WORD3, [19:16])
   Value *descWord3 = CreateExtractElement(imageDesc, 3);
-  Value *lastLevel = CreateIntrinsic(Intrinsic::amdgcn_ubfe, getInt32Ty(), {descWord3, getInt32(16), getInt32(4)});
+  Value *lastLevel = nullptr;
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
+    // Extract LAST_LEVEL (SQ_IMG_RSRC_WORD3, [19:16])
+    lastLevel = CreateIntrinsic(Intrinsic::amdgcn_ubfe, getInt32Ty(), {descWord3, getInt32(16), getInt32(4)});
+  }
   // Sample number = 1 << LAST_LEVEL
   Value *sampleNumber = CreateShl(getInt32(1), lastLevel);
 

@@ -47,20 +47,22 @@
 //
 // Convert the result from the coroutine passes to something more suitable for
 // the compiler backend.
-//
-// Instead of return values, use continue, waitContinue and complete intrinsics.
-// Add arguments to resume functions, which are the return values of the called
-// continuation.
-//
-// Add a global register buffer to store the continuation state.
-//
+// 1. Replace returning handle with lgc.cps.jump() with the right continuation
+//    reference.
+// 2. Replace @continuation.return with simple `ret`, which means thread
+//    termination.
+// 3. Edit function signatures, like removing coroutine frame pointer argument,
+//    adding needed ones (state, rcr, returned_values) for resume function.
+// 4. Allocating/freeing cps stack space as needed.
 //===----------------------------------------------------------------------===//
 
 #include "continuations/Continuations.h"
 #include "continuations/ContinuationsDialect.h"
+#include "lgccps/LgcCpsDialect.h"
+#include "llvm-dialects/Dialect/Visitor.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
-#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
@@ -69,6 +71,7 @@
 #include <cassert>
 
 using namespace llvm;
+using namespace lgc;
 
 #define DEBUG_TYPE "cleanup-continuations"
 
@@ -145,17 +148,6 @@ findTokenOrigin(BasicBlock *BB, Value *V,
   return Result;
 }
 
-/// Create a memcopy of an array, which the translator understands
-static void createCopy(IRBuilder<> &B, Value *Dst, Value *Src, Type *Ty) {
-  assert(Ty->isArrayTy() && "Can only copy arrays");
-  for (unsigned I = 0; I < Ty->getArrayNumElements(); I++) {
-    auto *SrcGep = B.CreateConstInBoundsGEP2_32(Ty, Src, 0, I);
-    auto *DstGep = B.CreateConstInBoundsGEP2_32(Ty, Dst, 0, I);
-    auto *Load = B.CreateLoad(Ty->getArrayElementType(), SrcGep);
-    B.CreateStore(Load, DstGep);
-  }
-}
-
 void CleanupContinuationsPass::analyzeContinuation(Function &F, MDNode *MD) {
   // Only analyze main continuation
   auto *MDTup = cast<MDTuple>(MD);
@@ -191,24 +183,236 @@ void CleanupContinuationsPass::analyzeContinuation(Function &F, MDNode *MD) {
     MaxContStateBytes = Data.ContStateBytes;
 }
 
-void CleanupContinuationsPass::processContinuations() {
-  auto &Context = M->getContext();
-  auto *Void = Type::getVoidTy(Context);
+void CleanupContinuationsPass::updateCpsStack(Function *F, Function *NewFunc,
+                                              bool IsStart,
+                                              ContinuationData &CpsInfo) {
 
+  Builder->SetInsertPoint(
+      &*NewFunc->getEntryBlock().getFirstNonPHIOrDbgOrAlloca());
+  Value *CpsStack = nullptr;
+  if (IsStart) {
+    CpsStack = Builder->create<cps::AllocOp>(
+        Builder->getInt32(CpsInfo.ContStateBytes));
+  } else {
+    CpsStack =
+        Builder->create<cps::PeekOp>(Builder->getInt32(CpsInfo.ContStateBytes));
+  }
+
+  SmallVector<Instruction *> ToBeRemoved;
+  Value *OldBase = getContinuationFramePtr(F, IsStart, CpsInfo, ToBeRemoved);
+
+  // Traversal through the users and setup the addrspace for the cps stack
+  // pointers.
+  // TODO: Investigate whether we can do this through mutateType().
+  SmallVector<Value *> Worklist(OldBase->users());
+  DenseMap<Value *, Value *> Replaced;
+  Replaced.insert(std::pair(OldBase, CpsStack));
+
+  while (!Worklist.empty()) {
+    Value *Ptr = Worklist.pop_back_val();
+
+    Instruction *Inst = cast<Instruction>(Ptr);
+    switch (Inst->getOpcode()) {
+    default:
+      LLVM_DEBUG(Inst->dump());
+      llvm_unreachable("Unhandled instruction\n");
+      break;
+    case Instruction::Call: {
+      if (Inst->isLifetimeStartOrEnd()) {
+        // The lifetime marker is not useful anymore.
+        Inst->eraseFromParent();
+      } else {
+        LLVM_DEBUG(Inst->dump());
+        llvm_unreachable("Unhandled call instruction\n");
+      }
+      // No further processing needed for the users.
+      continue;
+    }
+    case Instruction::Load:
+    case Instruction::Store:
+      Ptr = getLoadStorePointerOperand(Inst);
+      Inst->replaceUsesOfWith(Ptr, Replaced.at(Ptr));
+      // No further processing needed for the users.
+      continue;
+    case Instruction::And:
+    case Instruction::Add:
+      break;
+    case Instruction::AddrSpaceCast:
+      Replaced.insert(std::pair(Inst, Replaced.at(Inst)));
+      ToBeRemoved.push_back(Inst);
+      break;
+    case Instruction::PtrToInt: {
+      Builder->SetInsertPoint(Inst);
+      auto *NewInst = Builder->CreatePtrToInt(Replaced.at(Inst->getOperand(0)),
+                                              Inst->getType());
+      Replaced.insert(std::pair(Inst, NewInst));
+      ToBeRemoved.push_back(Inst);
+      break;
+    }
+    case Instruction::IntToPtr: {
+      Builder->SetInsertPoint(Inst);
+      auto *NewInst = Builder->CreateIntToPtr(
+          Inst->getOperand(0), Builder->getPtrTy(lgc::cps::stackAddrSpace));
+      Replaced.insert(std::pair(Inst, NewInst));
+      ToBeRemoved.push_back(Inst);
+      break;
+    }
+    case Instruction::GetElementPtr: {
+      GetElementPtrInst *GEP = cast<GetElementPtrInst>(Ptr);
+      Builder->SetInsertPoint(GEP);
+      SmallVector<Value *, 8> Indexes(GEP->idx_begin(), GEP->idx_end());
+
+      Value *NewGEP = nullptr;
+      auto *NewPtr = Replaced.at(GEP->getPointerOperand());
+      auto *ElemTy = GEP->getSourceElementType();
+      if (GEP->isInBounds())
+        NewGEP = Builder->CreateInBoundsGEP(ElemTy, NewPtr, Indexes);
+      else
+        NewGEP = Builder->CreateGEP(ElemTy, NewPtr, Indexes);
+      Replaced.insert(std::pair(GEP, NewGEP));
+      cast<Instruction>(NewGEP)->copyMetadata(*GEP);
+      ToBeRemoved.push_back(GEP);
+      break;
+    }
+    }
+
+    Worklist.append(Ptr->users().begin(), Ptr->users().end());
+  }
+  for (auto *I : reverse(ToBeRemoved))
+    I->eraseFromParent();
+}
+
+static void updateCpsFunctionArgs(Function *OldFunc, Function *NewFunc,
+                                  const SmallVector<Value *> &AllArgValues) {
+  // Set arg names for new function
+  for (unsigned Idx = 0; Idx != NewFunc->getFunctionType()->params().size();
+       ++Idx) {
+    Argument *Arg = NewFunc->getArg(Idx);
+    Value *OldVal = AllArgValues[Idx];
+    if (OldVal) {
+      Arg->setName(OldVal->getName());
+      OldVal->replaceAllUsesWith(Arg);
+    }
+  }
+}
+
+static void buildCpsArgInfos(Function *F, bool IsStart,
+                             SmallVector<Type *> &AllArgTypes,
+                             SmallVector<Value *> &AllArgValues,
+                             SmallVector<AttributeSet> &ParamAttrs,
+                             SmallVector<Instruction *> &InstsToRemove) {
+
+  auto &Context = F->getContext();
+  AttributeList FAttrs = F->getAttributes();
+  if (IsStart) {
+    unsigned ArgNo = 0;
+    assert(F->arg_size() >= 1 && "Entry function has at least one argument");
+    // Use all arguments except the last (pre-allocated buffer for the
+    // coroutine passes) for the continuation start
+    for (auto Arg = F->arg_begin(), ArgEnd = F->arg_end() - 1; Arg != ArgEnd;
+         Arg++) {
+      AllArgTypes.push_back(Arg->getType());
+      AllArgValues.push_back(Arg);
+      ParamAttrs.push_back(FAttrs.getParamAttrs(ArgNo));
+      ArgNo++;
+    }
+  } else {
+    //  Add extra arguments ({} %state, i32 %rcr) for resume part. But for now,
+    //  we always use continuation stack to pass continuation state.
+    AllArgTypes.push_back(StructType::get(Context, {}));
+    AllArgValues.push_back(nullptr);
+    AllArgTypes.push_back(IntegerType::get(Context, 32));
+    AllArgValues.push_back(nullptr);
+
+    // Find arguments from continuation.returnvalue calls
+    for (auto &I : F->getEntryBlock()) {
+      if (auto *Intr = dyn_cast<continuations::GetReturnValueOp>(&I)) {
+        AllArgTypes.push_back(Intr->getType());
+        AllArgValues.push_back(Intr);
+        InstsToRemove.push_back(Intr);
+      }
+    }
+  }
+}
+
+/// Find the continuation state pointer, either returned by the malloc or
+/// given as an argument
+Value *CleanupContinuationsPass::getContinuationFramePtr(
+    Function *F, bool IsStart, const ContinuationData &ContinuationInfo,
+    SmallVector<Instruction *> &InstsToRemove) {
+  if (!ContinuationInfo.MallocCall)
+    return IsStart ? F->getArg(F->arg_size() - 1) : F->getArg(0);
+
+  if (IsStart) {
+    InstsToRemove.push_back(ContinuationInfo.MallocCall);
+
+    auto *BufferArg = F->getArg(F->arg_size() - 1);
+    auto *Store = cast<Instruction>(BufferArg->getUniqueUndroppableUser());
+    // Erase immediately to make later continuation stack setup easy.
+    Store->eraseFromParent();
+    return ContinuationInfo.MallocCall;
+  }
+  // Look for the load of the allocated pointer
+  Instruction *Load =
+      cast<Instruction>(F->getArg(0)->getUniqueUndroppableUser());
+  InstsToRemove.push_back(Load); // Load needs to be eliminated
+  return Load;
+}
+
+/// Remove call to continuation.free() in F, ContFree is the pointer to
+/// declaration of continuation.free().
+void CleanupContinuationsPass::removeContFreeCall(Function *F,
+                                                  Function *ContFree) {
+  for (auto *User : make_early_inc_range(ContFree->users())) {
+    if (auto *Call = dyn_cast<CallInst>(User)) {
+      if (Call->getFunction() == F) {
+        Call->eraseFromParent();
+        break;
+      }
+    }
+  }
+}
+
+/// Insert cps.free() before the original function exits.
+/// Note: we skip the cps.free() insertion before calls to @continuation.return.
+/// Because this is not useful any more as it means the thread termination.
+void CleanupContinuationsPass::freeCpsStack(Function *F,
+                                            ContinuationData &CpsInfo) {
+  struct VisitState {
+    ContinuationData &CpsInfo;
+    llvm_dialects::Builder *Builder;
+    Function *F;
+  };
+  VisitState State = {CpsInfo, Builder, F};
+  static const auto Visitor =
+      llvm_dialects::VisitorBuilder<VisitState>()
+          .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+          .add<cps::JumpOp>([](auto &State, auto &Jump) {
+            if (Jump.getFunction() == State.F) {
+              State.Builder->SetInsertPoint(&Jump);
+              State.Builder->template create<cps::FreeOp>(
+                  State.Builder->getInt32(State.CpsInfo.ContStateBytes));
+            }
+          })
+          .build();
+  Visitor.visit(State, *F);
+}
+
+void CleanupContinuationsPass::processContinuations() {
+  // Summarize of what to do here:
+  // 1. Continuation Stack
+  //    a.) cps.alloc() in start, and cps.peek() cps.free() in resume.
+  //    b.) change the address space for cps stack to 32.
+  // 2. prepare arguments passed to cps.jump and insert the call at the exit of
+  //    start part.
+  // 3. Edit resume signature to add the state/rcr/returnvalues.
   for (auto &FuncData : ToProcess) {
     LLVM_DEBUG(dbgs() << "Processing function: " << FuncData.first->getName()
                       << "\n");
-    bool IsEntry = FuncData.first->hasMetadata(DXILContHelper::MDEntryName);
-
     for (auto *F : FuncData.second.Functions) {
-      if (F != FuncData.first) {
-        // Entry marker should only be on the start and not on resume functions
-        F->eraseMetadata(Context.getMDKindID(DXILContHelper::MDEntryName));
-        // Same for stacksize
-        F->eraseMetadata(Context.getMDKindID(DXILContHelper::MDStackSizeName));
-        // Set same linkage as for start function
+      // Set same linkage as for start function
+      if (F != FuncData.first)
         F->setLinkage(FuncData.first->getLinkage());
-      }
 
       // Ignore the stub created for the coroutine passes
       if (F->empty())
@@ -217,89 +421,30 @@ void CleanupContinuationsPass::processContinuations() {
       LLVM_DEBUG(dbgs() << "Processing function part: " << F->getName()
                         << "\n");
 
-      bool IsStart = F == FuncData.first; // If this is the continuation start
+      // If this is the continuation start
+      bool IsStart = F == FuncData.first;
+      // We don't need to touch resume part of non-cps function, this usually
+      // should be entry-point compute kernel. The resume part will be erased
+      // at the end.
+      if (!IsStart && !cps::isCpsFunction(*F))
+        continue;
+
       SmallVector<Type *> AllArgTypes;
       SmallVector<Value *> AllArgValues;
-      SmallVector<Instruction *> InstsToRemove;
-      AttributeList FAttrs = F->getAttributes();
       SmallVector<AttributeSet> ParamAttrs;
+      SmallVector<Instruction *> InstsToRemove;
 
-      // Use all arguments except the last (pre-allocated buffer for the
-      // coroutine passes) for the continuation start
-      if (IsStart) {
-        unsigned ArgNo = 0;
-        assert(F->arg_size() >= 1 &&
-               "Entry function has at least one argument");
-        for (auto Arg = F->arg_begin(), ArgEnd = F->arg_end() - 1;
-             Arg != ArgEnd; Arg++) {
-          AllArgTypes.push_back(Arg->getType());
-          AllArgValues.push_back(Arg);
-          ParamAttrs.push_back(FAttrs.getParamAttrs(ArgNo));
-          ArgNo++;
-        }
-      } else {
-        IRBuilder<> B(&*F->getEntryBlock().getFirstNonPHIOrDbgOrAlloca());
-        AllArgTypes.push_back(
-            getContinuationStackOffsetType(Context)); // continuation stack ptr
-        AllArgValues.push_back(nullptr);
+      buildCpsArgInfos(F, IsStart, AllArgTypes, AllArgValues, ParamAttrs,
+                       InstsToRemove);
 
-        // Find arguments from continuation.returnvalue calls
-        for (auto &I : F->getEntryBlock()) {
-          if (auto *Intr = dyn_cast<continuations::GetReturnValueOp>(&I)) {
-            AllArgTypes.push_back(Intr->getType());
-            AllArgValues.push_back(Intr);
-            InstsToRemove.push_back(Intr);
-          }
-        }
-      }
-
-      // Find the free call if there is one
-      if (ContFree) {
-        for (auto *User : ContFree->users()) {
-          if (auto *Call = dyn_cast<CallInst>(User)) {
-            if (Call->getFunction() == F) {
-              InstsToRemove.push_back(Call);
-              break;
-            }
-          }
-        }
-      }
-
-      // Find the continuation state pointer, either returned by the malloc or
-      // given as an argument
-      Value *ContFrame = nullptr;
-      if (FuncData.second.MallocCall) {
-        if (IsStart) {
-          ContFrame = FuncData.second.MallocCall;
-          InstsToRemove.push_back(FuncData.second.MallocCall);
-
-          auto *BufferArg = F->getArg(F->arg_size() - 1);
-          auto *Cast = cast<BitCastInst>(BufferArg->getUniqueUndroppableUser());
-          auto *CastUser = Cast->getUniqueUndroppableUser();
-          auto *Store = cast<StoreInst>(CastUser);
-          InstsToRemove.push_back(Store); // Store needs to be eliminated first
-          InstsToRemove.push_back(Cast);
-        } else {
-          // Look for the load of the allocated pointer
-          auto *User = F->getArg(0)->getUniqueUndroppableUser();
-          auto *Cast = cast<BitCastInst>(User);
-
-          auto *CastUser = Cast->getUniqueUndroppableUser();
-          auto *Load = cast<LoadInst>(CastUser);
-          InstsToRemove.push_back(Load); // Load needs to be eliminated first
-          InstsToRemove.push_back(Cast);
-          ContFrame = Load;
-        }
-      } else {
-        if (IsStart)
-          ContFrame = F->getArg(F->arg_size() - 1);
-        else
-          ContFrame = F->getArg(0);
-      }
+      if (ContFree)
+        removeContFreeCall(F, ContFree);
 
       // Create new empty function
       F->eraseMetadata(FuncData.second.MD->getMetadataID());
-      auto *NewFuncTy = FunctionType::get(Void, AllArgTypes, false);
+      auto &Context = F->getContext();
+      auto *NewFuncTy =
+          FunctionType::get(Type::getVoidTy(Context), AllArgTypes, false);
       Function *NewFunc = cloneFunctionHeader(*F, NewFuncTy, ParamAttrs);
       NewFunc->takeName(F);
       FuncData.second.NewFunctions.push_back(NewFunc);
@@ -307,46 +452,31 @@ void CleanupContinuationsPass::processContinuations() {
       // Transfer code from old function to new function
       llvm::moveFunctionBody(*F, *NewFunc);
 
-      // Set arg names for new function
-      for (unsigned Idx = 0; Idx != NewFunc->getFunctionType()->params().size();
-           ++Idx) {
-        Argument *Arg = NewFunc->getArg(Idx);
-        Value *OldVal = AllArgValues[Idx];
-        if (OldVal) {
-          Arg->setName(OldVal->getName());
-          OldVal->replaceAllUsesWith(Arg);
-        }
-        if (IsStart) {
-          Argument *OldArg = F->getArg(Idx);
-          if (OldArg->hasInRegAttr())
-            Arg->addAttr(Attribute::InReg);
-          else
-            Arg->removeAttr(Attribute::AttrKind::InReg);
-        }
-      }
+      auto &CpsInfo = FuncData.second;
+      if (CpsInfo.ContStateBytes)
+        updateCpsStack(F, NewFunc, IsStart, CpsInfo);
 
-      // Handle the function entry
-      IRBuilder<> B(&*NewFunc->getEntryBlock().getFirstNonPHIOrDbgOrAlloca());
-      if (IsStart)
-        FuncData.second.NewStart = NewFunc;
-      handleFunctionEntry(B, FuncData.second, NewFunc, IsEntry);
+      updateCpsFunctionArgs(F, NewFunc, AllArgValues);
 
-      // Handle the function body
-      // Use the global continuation state
-      ContFrame->replaceAllUsesWith(B.CreateBitOrPointerCast(
-          FuncData.second.NewContState, ContFrame->getType()));
-
+      freeCpsStack(NewFunc, CpsInfo);
       // Handle the function returns
       for (auto &BB : make_early_inc_range(*NewFunc)) {
         auto *I = BB.getTerminator();
-        if (I->getOpcode() == Instruction::Ret) {
-          handleContinue(B, FuncData.second, I);
+        if (isa<ReturnInst>(I)) {
+          handleContinue(FuncData.second, I);
         } else if (I->getOpcode() == Instruction::Unreachable) {
-          if (auto *Call = dyn_cast<CallInst>(--I->getIterator())) {
-            if (auto *Called = Call->getCalledFunction()) {
-              if (Called->getName() == "continuation.return")
-                handleReturn(B, FuncData.second, Call);
-            }
+          // We should only possibly have 'continuation.return' or
+          // 'lgc.cps.jump' call before unreachable.
+          auto *Call = cast<CallInst>(--I->getIterator());
+          auto *Called = Call->getCalledFunction();
+          if (Called->getName() == "continuation.return") {
+            assert(Call->arg_empty() && "Should have no argument\n");
+            Builder->SetInsertPoint(Call);
+            Builder->CreateRetVoid();
+            Call->eraseFromParent();
+            I->eraseFromParent();
+          } else {
+            assert(isa<cps::JumpOp>(*Call));
           }
         }
       }
@@ -354,136 +484,38 @@ void CleanupContinuationsPass::processContinuations() {
       for (auto *I : InstsToRemove)
         I->eraseFromParent();
 
-      // Remove the old function
-      F->replaceAllUsesWith(ConstantExpr::getBitCast(NewFunc, F->getType()));
+      // Replace the old function with the new one.
+      F->replaceAllUsesWith(NewFunc);
     }
   }
 
-  // Remove the old functions and update metadata
+  // Remove the old functions
   for (auto &FuncData : ToProcess) {
     if (FuncData.second.Functions.size() > 1) {
       // Only for functions that were split
       for (auto *F : FuncData.second.Functions)
         F->eraseFromParent();
-
-      MDTuple *ContMDTuple = MDTuple::get(
-          Context, {ValueAsMetadata::get(FuncData.second.NewStart)});
-      for (auto *F : FuncData.second.NewFunctions) {
-        F->setMetadata(DXILContHelper::MDContinuationName, ContMDTuple);
-        if (F != FuncData.second.NewStart) {
-          // For non-start functions, set (incoming) continuation registercount
-          // metadata by looking at the continue calls that reference this
-          // function. These continue calls both specify the number of their
-          // outgoing registers, and the number of incoming payload registers
-          // coming back into the resume function (i.e. us).
-          SmallVector<User *> Worklist(F->users());
-          std::optional<uint32_t> RegCount;
-          while (!Worklist.empty()) {
-            auto *U = Worklist.pop_back_val();
-            if (auto *Const = dyn_cast<Constant>(U)) {
-              Worklist.append(Const->user_begin(), Const->user_end());
-              continue;
-            }
-            assert(isa<CallInst>(U) &&
-                   "User of a resume function should be a call to continue");
-            auto *Inst = cast<CallInst>(U);
-            if (auto Count =
-                    DXILContHelper::tryGetReturnedRegisterCount(Inst)) {
-              assert((!RegCount || *RegCount == *Count) &&
-                     "Got different returned registercounts in continues to "
-                     "the same resume function");
-              RegCount = *Count;
-#ifdef NDEBUG
-              break;
-#endif
-            } else {
-              LLVM_DEBUG(Inst->dump());
-              report_fatal_error(
-                  "Found a continue call without "
-                  "continuation returned registercount metadata");
-            }
-          }
-
-          // Add metadata
-          DXILContHelper::setIncomingRegisterCount(F, RegCount.value());
-        }
-      }
-    }
-  }
-
-  fixupDxilMetadata(*M);
-}
-
-void CleanupContinuationsPass::handleFunctionEntry(IRBuilder<> &B,
-                                                   ContinuationData &Data,
-                                                   Function *F, bool IsEntry) {
-  auto &Context = F->getContext();
-  bool IsStart = F == Data.NewStart;
-
-  // Create alloca to keep the continuation state
-  uint64_t ContStateNumI32s = divideCeil(Data.ContStateBytes, RegisterBytes);
-  auto *ContStateTy = ArrayType::get(I32, ContStateNumI32s);
-  Data.NewContState = B.CreateAlloca(ContStateTy, nullptr, "cont.state");
-
-  uint64_t NeededStackSize = computeNeededStackSizeForRegisterBuffer(
-      ContStateNumI32s, ContinuationStateRegisterCount);
-  if (IsStart) {
-    // Add function metadata that stores how big the continuation state is in
-    // bytes
-    DXILContHelper::setContinuationStateByteCount(*F, Data.ContStateBytes);
-
-    // Add intrinsic call to save the previous continuation state
-    if (!IsEntry && Data.ContStateBytes)
-      B.CreateCall(SaveContState);
-
-    if (NeededStackSize) {
-      // Add to continuation stack size metadata
-      uint64_t CurStackSize = 0;
-      if (auto *StackSizeMD = F->getMetadata(DXILContHelper::MDStackSizeName))
-        CurStackSize = mdconst::extract<ConstantInt>(StackSizeMD->getOperand(0))
-                           ->getZExtValue();
-      F->setMetadata(
-          DXILContHelper::MDStackSizeName,
-          MDTuple::get(Context, {ConstantAsMetadata::get(ConstantInt::get(
-                                    I32, NeededStackSize + CurStackSize))}));
-    }
-  } else {
-    // Read continuation state from global into local variable
-    createCopy(
-        B, Data.NewContState,
-        B.CreateBitOrPointerCast(
-            ContState, ContStateTy->getPointerTo(ContState->getAddressSpace())),
-        ContStateTy);
-
-    // Deallocate continuation stack space if necessary
-    if (NeededStackSize) {
-      // Add barrier so that the csp is only decremented after the continuation
-      // state is read
-      auto *Csp = B.CreateCall(
-          getContinuationStackOffset(*B.GetInsertPoint()->getModule()));
-      B.CreateCall(RegisterBufferSetPointerBarrier, {ContState, Csp});
-
-      moveContinuationStackOffset(B, -NeededStackSize);
     }
   }
 }
 
 /// Transform
-///   %tok = call %continuation.token* @foo() !continuation.registercount !0
-///   %0 = insertvalue { i8*, %continuation.token* } { i8* bitcast ({ i8*,
-///     %continuation.token* } (i8*, i1)* @fun.resume.0 to i8*),
-///     %continuation.token* undef }, %continuation.token* %tok, 1
-///   ret { i8*, %continuation.token* } %0
-/// to
-///   %resume_addr = ptrtoint i8* ... @fun.resume.0 to i64
-///   %foo = ptrtoint %continuation.token* () @foo to i64
-///   call void @continuation.continue(i64 %foo, i8 addrspace(21)* %csp, i64
-///     %resume_addr, <foo args>) !continuation.registercount !0
-///   unreachable
+///  %cr = call i32 @lgc.cps.as.continuation.reference(ptr @callee)
+///  %2 = inttoptr i32 %cr to ptr
+///  %3 = call i32 %2(i32 %cr, i32 2, ...)
+///  %4 = insertvalue { ptr, i32 } undef, ptr @test.resume.0, 0
+///  %5 = insertvalue { ptr, i32 } %4, i32 %3, 1
+///  ret { ptr, i32 } %5
+///
+///  To:
+///  %cr = call i32 @lgc.cps.as.continuation.reference(ptr @callee)
+///  %cr2 = call i32 (...) @lgc.cps.as.continuation.reference(ptr
+///                          @test.resume.0)
+///   call void (...) @lgc.cps.jump(i32 %cr, i32 2, {} poison,
+///                                 i32 %cr2, ...)
 ///
 /// Also handles cases where the token and resume function are behind a phi.
-void CleanupContinuationsPass::handleContinue(IRBuilder<> &B,
-                                              ContinuationData &Data,
+void CleanupContinuationsPass::handleContinue(ContinuationData &Data,
                                               Instruction *Ret) {
   // Find the function call that generates the token
   LLVM_DEBUG(dbgs() << "Converting ret to continue: " << *Ret
@@ -502,7 +534,7 @@ void CleanupContinuationsPass::handleContinue(IRBuilder<> &B,
                       << "\n");
     auto *Call = Entry.second.first;
     auto *ResumeFun = Entry.second.second;
-    handleSingleContinue(B, Data, Call, ResumeFun);
+    handleSingleContinue(Data, Call, ResumeFun);
   }
 
   if (BB->empty()) {
@@ -512,114 +544,54 @@ void CleanupContinuationsPass::handleContinue(IRBuilder<> &B,
   }
 }
 
-void CleanupContinuationsPass::handleSingleContinue(IRBuilder<> &B,
-                                                    ContinuationData &Data,
+void CleanupContinuationsPass::handleSingleContinue(ContinuationData &Data,
                                                     CallInst *Call,
                                                     Value *ResumeFun) {
-  // Pass resume address as argument
-  B.SetInsertPoint(Call);
-  auto *ReturnAddrInt = B.CreatePtrToInt(ResumeFun, I64);
+  Builder->SetInsertPoint(Call);
 
-  auto *CpsType = getContinuationStackOffsetType(Call->getContext());
-  auto *CspFun = getContinuationStackOffset(*Call->getModule());
-
-  // Write local continuation state to stack and registers
-  uint64_t ContStateNumI32s = divideCeil(Data.ContStateBytes, RegisterBytes);
-  uint64_t NeededStackSize = computeNeededStackSizeForRegisterBuffer(
-      ContStateNumI32s, ContinuationStateRegisterCount);
-
-  if (NeededStackSize) {
-    // Allocate continuation stack space if necessary
-    moveContinuationStackOffset(B, NeededStackSize);
-    // Add barrier so that the csp is only incremented before the continuation
-    // state is written
-    auto *Csp = B.CreateCall(CspFun);
-    B.CreateCall(RegisterBufferSetPointerBarrier, {ContState, Csp});
+  SmallVector<Value *> TailArgs;
+  // %rcr (aka. return continuation reference) for the callee.
+  if (cps::isCpsFunction(*cast<Function>(ResumeFun))) {
+    auto *ResumeCR = Builder->create<cps::AsContinuationReferenceOp>(ResumeFun);
+    TailArgs.push_back(ResumeCR);
+  } else {
+    // For entry-point compute kernel, pass a poison %rcr.
+    TailArgs.push_back(PoisonValue::get(Builder->getInt32Ty()));
   }
-
-  // Copy continuation state from local variable into global
-  auto *ContStateTy = Data.NewContState->getAllocatedType();
-  createCopy(
-      B,
-      B.CreateBitOrPointerCast(
-          ContState, ContStateTy->getPointerTo(ContState->getAddressSpace())),
-      Data.NewContState, ContStateTy);
-
-  auto *Csp = B.CreateLoad(CpsType, B.CreateCall(CspFun));
-
-  // Replace this instruction with a call to continuation.continue
-  SmallVector<Value *> Args;
-  Args.push_back(B.CreatePointerCast(Call->getCalledOperand(), I64));
-  Args.push_back(Csp);
-  Args.push_back(ReturnAddrInt);
-  Args.append(Call->arg_begin(), Call->arg_end());
-  auto *ContinueCall = B.CreateCall(Continue, Args);
-  ContinueCall->copyMetadata(*Call);
-  assert(DXILContHelper::tryGetOutgoingRegisterCount(ContinueCall) &&
-         "Missing registercount metadata!");
+  // Skip continuation.reference and levels.
+  TailArgs.append(SmallVector<Value *>(drop_begin(Call->args(), 2)));
+  auto *CR = Call->getArgOperand(0);
+  Value *Level = Call->getArgOperand(1);
+  unsigned LevelImm = cast<ConstantInt>(Level)->getZExtValue();
+  // TODO: Continuation state are passed through stack for now.
+  auto *State = PoisonValue::get(StructType::get(Builder->getContext(), {}));
+  auto *JumpCall = Builder->create<cps::JumpOp>(CR, LevelImm, State, TailArgs);
+  // Replace this instruction with a call to cps.jump.
+  JumpCall->copyMetadata(*Call);
 
   // Remove instructions at the end of the block
-  auto *Unreachable = B.CreateUnreachable();
-  for (auto &I : make_early_inc_range(reverse(*ContinueCall->getParent()))) {
+  Builder->SetInsertPoint(Call);
+  auto *Unreachable = Builder->CreateUnreachable();
+  for (auto &I : make_early_inc_range(reverse(*JumpCall->getParent()))) {
     if (&I == Unreachable)
       break;
     I.eraseFromParent();
   }
 }
 
-/// Transform
-///   call void (i64, ...) @continuation.return(i64 %returnaddr, <return value>)
-///   unreachable
-/// to
-///   <decrement CSP>
-///   call void @continuation.restore.continuation_state()
-///   call void @continuation.continue(i64 %returnaddr, i8 addrspace(21)* %csp,
-///     <return value>)
-///   unreachable
-void CleanupContinuationsPass::handleReturn(IRBuilder<> &B,
-                                            ContinuationData &Data,
-                                            CallInst *ContRet) {
-  LLVM_DEBUG(dbgs() << "Converting return to continue: " << *ContRet << "\n");
-  bool IsEntry = isa<UndefValue>(ContRet->getArgOperand(0));
-  B.SetInsertPoint(ContRet);
-  if (IsEntry) {
-    assert(ContRet->arg_size() == 1 &&
-           "Entry functions ignore the return value");
-    B.CreateCall(Complete);
-  } else {
-    // Add intrinsic call to restore the previous continuation state
-    if (Data.ContStateBytes)
-      B.CreateCall(RestoreContState);
-
-    SmallVector<Value *> Args(ContRet->args());
-    auto *CspType = getContinuationStackOffsetType(ContRet->getContext());
-    auto *CspFun = getContinuationStackOffset(*ContRet->getModule());
-    auto *Csp = B.CreateLoad(CspType, B.CreateCall(CspFun));
-    Args.insert(Args.begin() + 1, Csp);
-
-    auto *ContinueCall = B.CreateCall(Continue, Args);
-    Data.NewReturnContinues.push_back(ContinueCall);
-
-    ContinueCall->copyMetadata(*ContRet);
-    assert(DXILContHelper::tryGetOutgoingRegisterCount(ContinueCall) &&
-           "Missing registercount metadata!");
-  }
-
-  ContRet->eraseFromParent();
-}
-
 llvm::PreservedAnalyses
 CleanupContinuationsPass::run(llvm::Module &Mod,
                               llvm::ModuleAnalysisManager &AnalysisManager) {
-  LLVM_DEBUG(dbgs() << "Run the cleanup-continuations pass\n");
+  LLVM_DEBUG(dbgs() << "Run the lgc-cleanup-continuations pass\n");
   AnalysisManager.getResult<DialectContextAnalysis>(Mod);
 
-  M = &Mod;
   ToProcess.clear();
   MaxContStateBytes = 0;
   ContMalloc = Mod.getFunction("continuation.malloc");
   ContFree = Mod.getFunction("continuation.free");
 
+  llvm_dialects::Builder B(Mod.getContext());
+  Builder = &B;
   // Map the entry function of a continuation to the analysis result
   for (auto &F : Mod.functions()) {
     if (F.empty())
@@ -632,8 +604,8 @@ CleanupContinuationsPass::run(llvm::Module &Mod,
   for (auto &FuncData : ToProcess) {
     if (!FuncData.second.MallocCall) {
       for (auto *F : FuncData.second.Functions) {
-        bool IsStart =
-            (F == FuncData.first); // If this is the continuation start
+        // If this is the continuation start part.
+        bool IsStart = (F == FuncData.first);
         Value *ContFrame;
         if (IsStart)
           ContFrame = F->getArg(F->arg_size() - 1);
@@ -649,46 +621,8 @@ CleanupContinuationsPass::run(llvm::Module &Mod,
   }
 
   if (!ToProcess.empty()) {
-    auto &Context = Mod.getContext();
-    I32 = Type::getInt32Ty(Context);
-    I64 = Type::getInt64Ty(Context);
-    SaveContState = getContinuationSaveContinuationState(Mod);
-    RestoreContState = getContinuationRestoreContinuationState(Mod);
-    Continue = getContinuationContinue(Mod);
-    Complete = getContinuationComplete(Mod);
-
-    // Add global
-    // Size is the maximum of all continuations, but at least the register size
-    uint32_t ContStateSize = std::max(
-        MaxContStateBytes, ContinuationStateRegisterCount * RegisterBytes);
-    auto *ContStateTy =
-        ArrayType::get(I32, divideCeil(ContStateSize, RegisterBytes));
-    ContState = cast<GlobalVariable>(Mod.getOrInsertGlobal(
-        DXILContHelper::GlobalContStateName, ContStateTy, [&] {
-          return new GlobalVariable(Mod, ContStateTy, false,
-                                    GlobalVariable::ExternalLinkage, nullptr,
-                                    DXILContHelper::GlobalContStateName,
-                                    nullptr, GlobalVariable::NotThreadLocal);
-        }));
-
-    RegisterBufferSetPointerBarrier = getRegisterBufferSetPointerBarrier(Mod);
-
-    // Add registerbuffer metadata to split accesses at into i32s and spill to
-    // memory if necessary
-    std::optional<ContStackAddrspace> StackAddrspace =
-        DXILContHelper::tryGetStackAddrspace(*M);
-    if (!StackAddrspace)
-      report_fatal_error("Missing stack addrspace metadata!");
-    RegisterBufferMD RMD;
-    RMD.RegisterCount = ContinuationStateRegisterCount;
-    RMD.Addrspace = static_cast<uint32_t>(*StackAddrspace);
-    auto *MD = createRegisterBufferMetadata(Context, RMD);
-    ContState->addMetadata("registerbuffer", *MD);
-
     processContinuations();
-  }
-
-  if (!ToProcess.empty())
     return PreservedAnalyses::none();
+  }
   return PreservedAnalyses::all();
 }
