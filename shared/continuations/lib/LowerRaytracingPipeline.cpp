@@ -752,8 +752,8 @@ void LowerRaytracingPipelinePassImpl::handleContinuationStackIsGlobal(
       ConstantInt::getBool(*Context, MetadataState.isGlobalAddressSpace());
 
   llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
-    CInst->replaceAllUsesWith(IsGlobal);
-    CInst->eraseFromParent();
+    CInst.replaceAllUsesWith(IsGlobal);
+    CInst.eraseFromParent();
   });
 }
 
@@ -775,8 +775,8 @@ void LowerRaytracingPipelinePassImpl::handleGetFuncAddr(Function &Func) {
   Addr = ConstantExpr::getPtrToInt(Addr, Func.getReturnType());
 
   llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
-    CInst->replaceAllUsesWith(Addr);
-    CInst->eraseFromParent();
+    CInst.replaceAllUsesWith(Addr);
+    CInst.eraseFromParent();
   });
 }
 
