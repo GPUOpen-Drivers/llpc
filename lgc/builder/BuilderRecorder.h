@@ -123,7 +123,6 @@ enum BuilderOpcode : unsigned {
   ImageQuerySize,
   ImageGetLod,
   ImageBvhIntersectRay,
-  Reserved2,
 
   // Input/output
   ReadGenericInput,
@@ -155,7 +154,6 @@ enum BuilderOpcode : unsigned {
   Derivative,
   DemoteToHelperInvocation,
   IsHelperInvocation,
-  SetMeshOutputs,
   GetWaveSize,
   DebugBreak,
 
@@ -165,6 +163,7 @@ enum BuilderOpcode : unsigned {
   SubgroupAll,
   SubgroupAny,
   SubgroupAllEqual,
+  SubgroupRotate,
   SubgroupBroadcast,
   SubgroupBroadcastWaterfall,
   SubgroupBroadcastFirst,
@@ -191,7 +190,6 @@ enum BuilderOpcode : unsigned {
   SubgroupSwizzleMask,
   SubgroupWriteInvocation,
   SubgroupMbcnt,
-
   // Total count of opcodes
   Count
 };

@@ -52,7 +52,7 @@ def GpurtStackReadOp : GpurtOp<"stack.read", [Memory<[(read)]>, WillReturn]> {
   let results = (outs I32:$result);
   let summary = "read a dword from stack";
   let description = [{
-    Read a dword from lds/(scratch buffer) stack at index position
+    Read a dword from lds/(scrach buffer) stack at index position
   }];
 }
 
@@ -61,7 +61,7 @@ def GpurtStackWriteOp : GpurtOp<"stack.write", [Memory<[(write)]>, WillReturn]> 
   let results = (outs I32:$result);
   let summary = "write a dword to stack";
   let description = [{
-    Write a dword to lds/(scratch buffer) stack at index position
+    Write a dword to lds/(scrach buffer) stack at index position
   }];
 }
 
@@ -187,7 +187,7 @@ def GpurtSetTraceParamsOp : GpurtOp<"set.trace.params", [Memory<[(write Inaccess
   }];
 }
 
-def GpurtCallClosestHitShaderOp : GpurtOp<"call.closest.hit.shader", [WillReturn]> {
+def GpurtCallClosestHitShaderOp : GpurtOp<"call.closest.hit.shader", [Memory<[(readwrite InaccessibleMem)]>, WillReturn]> {
   let arguments =  (ins V2I32:$shaderId, I32:$tableIndex);
   let results = (outs I1:$result);
 
@@ -203,7 +203,7 @@ def GpurtCallClosestHitShaderOp : GpurtOp<"call.closest.hit.shader", [WillReturn
   }];
 }
 
-def GpurtCallMissShaderOp : GpurtOp<"call.miss.shader", [WillReturn]> {
+def GpurtCallMissShaderOp : GpurtOp<"call.miss.shader", [Memory<[(readwrite InaccessibleMem)]>, WillReturn]> {
   let arguments =  (ins V2I32:$shaderId, I32:$tableIndex);
   let results = (outs I1:$result);
 
@@ -219,7 +219,7 @@ def GpurtCallMissShaderOp : GpurtOp<"call.miss.shader", [WillReturn]> {
   }];
 }
 
-def GpurtCallTriangleAnyHitShaderOp : GpurtOp<"call.triangle.any.hit.shader", [WillReturn]> {
+def GpurtCallTriangleAnyHitShaderOp : GpurtOp<"call.triangle.any.hit.shader", [Memory<[(readwrite InaccessibleMem)]>, WillReturn]> {
   let arguments =  (ins V2I32:$shaderId, I32:$tableIndex, V2F32:$attr);
   let results = (outs);
 
@@ -235,7 +235,7 @@ def GpurtCallTriangleAnyHitShaderOp : GpurtOp<"call.triangle.any.hit.shader", [W
   }];
 }
 
-def GpurtCallIntersectionShaderOp : GpurtOp<"call.intersection.shader", [WillReturn]> {
+def GpurtCallIntersectionShaderOp : GpurtOp<"call.intersection.shader", [Memory<[(readwrite InaccessibleMem)]>, WillReturn]> {
   let arguments =  (ins V2I32:$shaderId, V2I32:$anyHitShaderId, I32:$tableIndex);
   let results = (outs);
 

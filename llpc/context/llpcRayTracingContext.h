@@ -102,13 +102,17 @@ public:
   static const unsigned TriangleHitGroup = static_cast<unsigned>(-2);
   llvm::Type *getPayloadType(lgc::Builder *builder);
   llvm::Type *getCallableDataType(lgc::Builder *builder);
+  unsigned getCallableDataSizeInBytes() { return m_callableDataMaxSize; }
   unsigned getAttributeDataSize();
+  unsigned getAttributeDataSizeInBytes() { return m_attributeDataMaxSize; };
   std::set<unsigned, std::less<unsigned>> &getBuiltIns() { return m_builtIns; }
   bool getHitAttribute() { return m_attributeDataMaxSize > 0; }
   unsigned getPayloadSizeInDword() { return m_payloadMaxSize / 4; }
+  unsigned getPayloadSizeInBytes() { return m_payloadMaxSize; }
   bool hasPipelineLibrary() { return m_pipelineInfo->hasPipelineLibrary; }
   unsigned hasLibraryStage(unsigned stageMask) { return m_pipelineInfo->pipelineLibStageMask & stageMask; }
   bool isReplay() { return m_pipelineInfo->isReplay; }
+  Vkgc::LlpcRaytracingMode getRaytracingMode() { return m_pipelineInfo->mode; }
 
 protected:
   // Give the pipeline options to the middle-end, and/or hash them.

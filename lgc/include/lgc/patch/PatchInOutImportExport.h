@@ -108,8 +108,7 @@ private:
                                           llvm::Value *vertexIdx, BuilderBase &builder);
   llvm::Value *patchGsBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Value *vertexIdx,
                                          BuilderBase &builder);
-  llvm::Value *patchMeshBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Value *elemIdx,
-                                           BuilderBase &builder);
+  llvm::Value *patchMeshBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, BuilderBase &builder);
   llvm::Value *patchFsBuiltInInputImport(llvm::Type *inputTy, unsigned builtInId, llvm::Value *sampleId,
                                          BuilderBase &builder);
   llvm::Value *getSamplePosOffset(llvm::Type *inputTy, llvm::Value *sampleId, BuilderBase &builder);

@@ -3,7 +3,17 @@
 ; RUN: amdllpc -enable-part-pipeline=0 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; RUN: amdllpc -enable-part-pipeline=1 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: LLPC final ELF info
-; SHADERTEST: DB_SHADER_CONTROL 0x0000000000000010
+; SHADERTEST: .db_shader_control: {
+; SHADERTEST:  .alpha_to_mask_disable: 0 
+; SHADERTEST:  .conservative_z_export: 0x0000000000000000 
+; SHADERTEST:  .depth_before_shader: 0x0000000000000000 
+; SHADERTEST:  .exec_on_hier_fail: 0 
+; SHADERTEST:  .exec_on_noop: 0 
+; SHADERTEST:  .kill_enable: 0 
+; SHADERTEST:  .mask_export_enable: 0 
+; SHADERTEST:  .stencil_test_val_export_enable: 0x0000000000000000 
+; SHADERTEST:  .z_export_enable: 0x0000000000000000 
+; SHADERTEST:  .z_order: 0x0000000000000001 }
 ; SHADERTEST: AMDLLPC SUCCESS
 
 [Version]

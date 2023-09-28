@@ -298,6 +298,7 @@ struct ResourceUsage {
         unsigned custom : 1;        // Whether custom interpolation is used
         // Input
         unsigned fragCoord : 1;                // Whether gl_FragCoord is used
+        unsigned fragCoordIsSample : 1;        // Whether gl_FragCoord is used with sample Interpolation
         unsigned frontFacing : 1;              // Whether gl_FrontFacing is used
         unsigned clipDistance : 4;             // Array size of gl_ClipDistance[] (0 means unused)
         unsigned cullDistance : 4;             // Array size of gl_CullDistance[] (0 means unused)

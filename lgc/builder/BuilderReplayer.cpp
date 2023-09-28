@@ -686,9 +686,6 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   case BuilderOpcode::DebugBreak: {
     return m_builder->CreateDebugBreak();
   }
-  case BuilderOpcode::SetMeshOutputs: {
-    return m_builder->CreateSetMeshOutputs(args[0], args[1]);
-  }
   case BuilderOpcode::TransposeMatrix: {
     return m_builder->CreateTransposeMatrix(args[0]);
   }
@@ -741,6 +738,9 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   }
   case BuilderOpcode::SubgroupAllEqual: {
     return m_builder->CreateSubgroupAllEqual(args[0]);
+  }
+  case BuilderOpcode::SubgroupRotate: {
+    return m_builder->CreateSubgroupRotate(args[0], args[1], isa<PoisonValue>(args[2]) ? nullptr : &*args[2]);
   }
   case BuilderOpcode::SubgroupBroadcast: {
     return m_builder->CreateSubgroupBroadcast(args[0], args[1]);
@@ -800,7 +800,7 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     return m_builder->CreateSubgroupClusteredExclusive(groupArithOp, args[1], args[2]);
   }
   case BuilderOpcode::SubgroupQuadBroadcast: {
-    return m_builder->CreateSubgroupQuadBroadcast(args[0], args[1]);
+    return m_builder->CreateSubgroupQuadBroadcast(args[0], args[1], cast<ConstantInt>(args[2])->getZExtValue());
   }
   case BuilderOpcode::SubgroupQuadSwapHorizontal: {
     return m_builder->CreateSubgroupQuadSwapHorizontal(args[0]);

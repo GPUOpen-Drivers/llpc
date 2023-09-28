@@ -33,7 +33,6 @@
 #include "vkgcUtil.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/raw_ostream.h"
-#include <algorithm>
 #include <fstream>
 #include <sstream>
 #include <sys/stat.h>
@@ -856,6 +855,7 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.forceNonUniformResourceIndexStageMask = " << options->forceNonUniformResourceIndexStageMask
            << "\n";
   dumpFile << "options.replaceSetWithResourceType = " << options->replaceSetWithResourceType << "\n";
+  dumpFile << "options.disableSampleMask = " << options->disableSampleMask << "\n";
   dumpFile << "options.disableTruncCoordForGather = " << options->disableTruncCoordForGather << "\n";
   dumpFile << "options.vertex64BitsAttribSingleLoc = " << options->vertex64BitsAttribSingleLoc << "\n";
 }
@@ -1639,6 +1639,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
 
   if (stage == UnlinkedStageFragment || stage == UnlinkedStageCount) {
     hasher->Update(options->enableInterpModePatch);
+    hasher->Update(options->disableSampleMask);
   }
 
   hasher->Update(options->pageMigrationEnabled);
@@ -1647,6 +1648,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->reverseThreadGroup);
   hasher->Update(options->internalRtShaders);
   hasher->Update(options->forceNonUniformResourceIndexStageMask);
+  hasher->Update(options->replaceSetWithResourceType);
   hasher->Update(options->disableTruncCoordForGather);
 }
 
@@ -1935,7 +1937,6 @@ template <class OStream, class Elf>
 // @param [out] out : Output stream
 // @param reader : ELF object
 OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
-
   unsigned sectionCount = reader.getSectionCount();
   char formatBuf[256];
 

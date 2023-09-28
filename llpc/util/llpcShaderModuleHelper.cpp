@@ -84,8 +84,16 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
     }
     case OpExtInst: {
       auto extInst = static_cast<GLSLstd450>(codePos[4]);
-      if (extInst == GLSLstd450InterpolateAtSample) {
+      switch (extInst) {
+      case GLSLstd450InterpolateAtSample:
         shaderModuleUsage.useSampleInfo = true;
+        break;
+      case GLSLstd450NMin:
+      case GLSLstd450NMax:
+        shaderModuleUsage.useIsNan = true;
+        break;
+      default:
+        break;
       }
       break;
     }
@@ -93,6 +101,21 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
       StringRef extName = reinterpret_cast<const char *>(&codePos[1]);
       if (extName == "SPV_AMD_shader_ballot") {
         shaderModuleUsage.useSubgroupSize = true;
+      }
+      break;
+    }
+    case OpExecutionMode: {
+      auto execMode = static_cast<ExecutionMode>(codePos[2]);
+      switch (execMode) {
+      case ExecutionModeOriginUpperLeft:
+        shaderModuleUsage.originUpperLeft = true;
+        break;
+      case ExecutionModePixelCenterInteger:
+        shaderModuleUsage.pixelCenterInteger = true;
+        break;
+      default: {
+        break;
+      }
       }
       break;
     }
@@ -117,6 +140,18 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
         }
         case BuiltInSamplePosition: {
           shaderModuleUsage.useSampleInfo = true;
+          break;
+        }
+        case BuiltInFragCoord: {
+          shaderModuleUsage.useFragCoord = true;
+          break;
+        }
+        case BuiltInPointCoord:
+        case BuiltInPrimitiveId:
+        case BuiltInLayer:
+        case BuiltInClipDistance:
+        case BuiltInCullDistance: {
+          shaderModuleUsage.useGenericBuiltIn = true;
           break;
         }
         default: {

@@ -98,6 +98,7 @@ static unsigned getMaxComponentBitCount(BufDataFormat dfmt) {
   case BufDataFormat8_8_8_Bgr:
   case BufDataFormat8_8_8_8:
   case BufDataFormat8_8_8_8_Bgra:
+  case BufDataFormat8_A:
     return 8;
   case BufDataFormat5_9_9_9:
     return 9;
@@ -146,6 +147,7 @@ static bool hasAlpha(BufDataFormat dfmt) {
   case BufDataFormat5_6_5_1_Bgra:
   case BufDataFormat1_5_6_5:
   case BufDataFormat5_9_9_9:
+  case BufDataFormat8_A:
     return true;
   default:
     return false;
@@ -164,6 +166,7 @@ static unsigned getNumChannels(BufDataFormat dfmt) {
   case BufDataFormat16:
   case BufDataFormat32:
   case BufDataFormat64:
+  case BufDataFormat8_A:
     return 1;
   case BufDataFormat4_4:
   case BufDataFormat8_8:
@@ -324,7 +327,7 @@ ComputeShaderMode Pipeline::getComputeShaderMode(Module &module) {
 // @param emitLgc : Whether the option -emit-lgc is on
 PipelineState::PipelineState(LgcContext *builderContext, bool emitLgc)
     : Pipeline(builderContext), m_emitLgc(emitLgc), m_meshRowExport(EnableRowExport) {
-  m_registerFieldFormat = getTargetInfo().getGfxIpVersion().major >= 11 && UseRegisterFieldFormat;
+  m_registerFieldFormat = getTargetInfo().getGfxIpVersion().major >= 9 && UseRegisterFieldFormat;
   m_tessLevel.inner[0] = -1.0f;
   m_tessLevel.inner[1] = -1.0f;
   m_tessLevel.outer[0] = -1.0f;
@@ -1184,7 +1187,7 @@ void PipelineState::setColorExportState(ArrayRef<ColorExportFormat> formats, con
 //
 // @param location : Export location
 const ColorExportFormat &PipelineState::getColorExportFormat(unsigned location) {
-  if (getColorExportState().dualSourceBlendEnable)
+  if (getColorExportState().dualSourceBlendEnable || getColorExportState().dynamicDualSourceBlendEnable)
     location = 0;
 
   if (location >= m_colorExportFormats.size()) {
@@ -1608,7 +1611,9 @@ unsigned PipelineState::computeExportFormat(Type *outputTy, unsigned location) {
   // When dual source blend is enabled, location 1 is location 0 index 1 in shader source. we need generate same export
   // format.
   const bool enableAlphaToCoverage =
-      (cbState->alphaToCoverageEnable && ((location == 0) || ((location == 1) && cbState->dualSourceBlendEnable)));
+      (cbState->alphaToCoverageEnable &&
+       ((location == 0) ||
+        ((location == 1) && (cbState->dualSourceBlendEnable || cbState->dynamicDualSourceBlendEnable))));
 
   const bool blendEnabled = colorExportFormat->blendEnable;
 
@@ -1628,7 +1633,7 @@ unsigned PipelineState::computeExportFormat(Type *outputTy, unsigned location) {
 
   const bool formatHasAlpha = hasAlpha(colorExportFormat->dfmt);
   const bool alphaExport =
-      (outputMask == 0xF && (formatHasAlpha || colorExportFormat->blendSrcAlphaToColor || enableAlphaToCoverage));
+      (outputMask & 0x8 && (formatHasAlpha || colorExportFormat->blendSrcAlphaToColor || enableAlphaToCoverage));
 
   const CompSetting compSetting = computeCompSetting(colorExportFormat->dfmt);
 
@@ -1847,7 +1852,7 @@ unsigned PipelineState::getVerticesPerPrimitive() {
       return 1;
     if (tessMode.primitiveMode == PrimitiveMode::Isolines)
       return 2;
-    if (tessMode.primitiveMode == PrimitiveMode::Triangles)
+    if (tessMode.primitiveMode == PrimitiveMode::Triangles || tessMode.primitiveMode == PrimitiveMode::Quads)
       return 3;
   } else {
     auto primType = getInputAssemblyState().primitiveType;
@@ -1910,25 +1915,27 @@ PrimitiveType PipelineState::getPrimitiveType() {
 void PipelineState::setXfbStateMetadata(Module *module) {
   // Read XFB state metadata
   for (auto &func : *module) {
-    if (isShaderEntryPoint(&func)) {
-      MDNode *xfbStateMetaNode = func.getMetadata(XfbStateMetadataName);
-      if (xfbStateMetaNode) {
-        auto &streamXfbBuffers = m_xfbStateMetadata.streamXfbBuffers;
-        auto &xfbStrides = m_xfbStateMetadata.xfbStrides;
-        for (unsigned xfbBuffer = 0; xfbBuffer < MaxTransformFeedbackBuffers; ++xfbBuffer) {
-          // Get the vertex streamId from metadata
-          auto metaOp = cast<ConstantAsMetadata>(xfbStateMetaNode->getOperand(2 * xfbBuffer));
-          int streamId = cast<ConstantInt>(metaOp->getValue())->getSExtValue();
-          if (streamId == InvalidValue)
-            continue;
-          streamXfbBuffers[streamId] |= 1 << xfbBuffer; // Bit mask of used xfbBuffers in a stream
-          // Get the stride from metadata
-          metaOp = cast<ConstantAsMetadata>(xfbStateMetaNode->getOperand(2 * xfbBuffer + 1));
-          xfbStrides[xfbBuffer] = cast<ConstantInt>(metaOp->getValue())->getZExtValue();
-          m_xfbStateMetadata.enableXfb = true;
-        }
-        m_xfbStateMetadata.enablePrimStats = !m_xfbStateMetadata.enableXfb;
+    if (!isShaderEntryPoint(&func))
+      continue;
+    if (getShaderStage(&func) != getLastVertexProcessingStage())
+      continue;
+    MDNode *xfbStateMetaNode = func.getMetadata(XfbStateMetadataName);
+    if (xfbStateMetaNode) {
+      auto &streamXfbBuffers = m_xfbStateMetadata.streamXfbBuffers;
+      auto &xfbStrides = m_xfbStateMetadata.xfbStrides;
+      for (unsigned xfbBuffer = 0; xfbBuffer < MaxTransformFeedbackBuffers; ++xfbBuffer) {
+        // Get the vertex streamId from metadata
+        auto metaOp = cast<ConstantAsMetadata>(xfbStateMetaNode->getOperand(2 * xfbBuffer));
+        int streamId = cast<ConstantInt>(metaOp->getValue())->getSExtValue();
+        if (streamId == InvalidValue)
+          continue;
+        streamXfbBuffers[streamId] |= 1 << xfbBuffer; // Bit mask of used xfbBuffers in a stream
+        // Get the stride from metadata
+        metaOp = cast<ConstantAsMetadata>(xfbStateMetaNode->getOperand(2 * xfbBuffer + 1));
+        xfbStrides[xfbBuffer] = cast<ConstantInt>(metaOp->getValue())->getZExtValue();
+        m_xfbStateMetadata.enableXfb = true;
       }
+      m_xfbStateMetadata.enablePrimStats = !m_xfbStateMetadata.enableXfb;
     }
   }
 }

@@ -2685,30 +2685,116 @@ void PatchResourceCollect::updateInputLocInfoMapWithUnpack() {
     if (prevStage == ShaderStageMesh) {
       eraseUnusedLocInfo = false;
     }
+  } else if (m_shaderStage == ShaderStageTessControl) {
+    // NOTE: If location offset or element index (64-bit element type) is dynamic, we keep all generic inputs of TCS.
+    for (auto call : m_inputCalls) {
+      auto locOffset = call->getLocOffset();
+      if (!isa<ConstantInt>(locOffset)) {
+        eraseUnusedLocInfo = false;
+        break;
+      }
+      auto bitWidth = call->getType()->getScalarSizeInBits();
+      if (bitWidth == 64) {
+        auto elemIdx = call->getElemIdx();
+        if (!isa<ConstantInt>(elemIdx)) {
+          eraseUnusedLocInfo = false;
+          break;
+        }
+      }
+    }
   }
 
   if (eraseUnusedLocInfo) {
+    // Collect active locations
+    DenseSet<unsigned> activeLocs;
     for (auto call : m_inputCalls) {
-      InOutLocationInfo origLocInfo;
-      origLocInfo.setLocation(call->getLocation());
-      auto mapIt = inputLocInfoMap.find(origLocInfo);
-      if (mapIt == inputLocInfoMap.end())
-        inputLocInfoMap.erase(mapIt);
+      const unsigned loc = call->getLocation();
+      activeLocs.insert(loc);
+      auto bitWidth = call->getType()->getPrimitiveSizeInBits();
+      if (bitWidth > (8 * SizeOfVec4)) {
+        assert(bitWidth <= (8 * 2 * SizeOfVec4));
+        activeLocs.insert(loc + 1);
+      }
+    }
+    // Clear per-vertex generic inputs
+    auto &locInfoMap = m_resUsage->inOutUsage.inputLocInfoMap;
+    for (auto iter = locInfoMap.begin(); iter != locInfoMap.end();) {
+      auto curIter = iter++;
+      if (activeLocs.count(curIter->first.getLocation()) == 0)
+        locInfoMap.erase(curIter);
+    }
+
+    // clear per-patch inputs
+    auto &perPatchLocMap = m_resUsage->inOutUsage.perPatchInputLocMap;
+    for (auto iter = perPatchLocMap.begin(); iter != perPatchLocMap.end();) {
+      auto curIter = iter++;
+      if (activeLocs.count(curIter->first) == 0)
+        perPatchLocMap.erase(curIter);
+    }
+
+    // Clear per-primitive inputs
+    auto &perPrimitiveLocMap = m_resUsage->inOutUsage.perPrimitiveInputLocMap;
+    for (auto iter = perPrimitiveLocMap.begin(); iter != perPrimitiveLocMap.end();) {
+      auto curIter = iter++;
+      if (activeLocs.count(curIter->first) == 0)
+        perPrimitiveLocMap.erase(curIter);
+    }
+  }
+
+  // Special processing for TES/Mesh inputLocInfoMap and TES prePatchInputLocMap as their output location offset can be
+  // dynamic. The dynamic location offset is marked with non-invalid value in the output map. We should keep the
+  // corresponding input location in the next stage. For example, if TCS output has dynamic location indexing from
+  // [0,2], we need add the corresponding location info to TES input map. Otherwise, it will cause mismatch when the
+  // dynamic indexing is in a loop and TES only uses location 1.
+  auto preStage = m_pipelineState->getPrevShaderStage(m_shaderStage);
+  if (preStage == ShaderStageTessControl || preStage == ShaderStageMesh) {
+    if (!inputLocInfoMap.empty()) {
+      auto &outputLocInfoMap = m_pipelineState->getShaderResourceUsage(preStage)->inOutUsage.outputLocInfoMap;
+      for (auto &infoPair : outputLocInfoMap) {
+        if (infoPair.second != InvalidValue) {
+          inputLocInfoMap[infoPair.first] = InvalidValue;
+          infoPair.second = InvalidValue;
+        }
+      }
+    }
+    auto &perPatchInLocMap = inOutUsage.perPatchInputLocMap;
+    if (!perPatchInLocMap.empty()) {
+      auto &perPatchOutLocMap = m_pipelineState->getShaderResourceUsage(preStage)->inOutUsage.perPatchOutputLocMap;
+      for (auto &locPair : perPatchOutLocMap) {
+        if (locPair.second != InvalidValue) {
+          perPatchInLocMap[locPair.first] = InvalidValue;
+          locPair.second = InvalidValue;
+        }
+      }
     }
   }
 
   // Update the value of inputLocInfoMap
   if (!inputLocInfoMap.empty()) {
     unsigned nextMapLoc = 0;
+    DenseMap<unsigned, unsigned> alreadyMappedLocs; // Map from original location to new location
     for (auto &locInfoPair : inputLocInfoMap) {
       auto &newLocationInfo = locInfoPair.second;
       if (m_shaderStage == ShaderStageVertex) {
         // NOTE: For vertex shader, use the original location as the remapped location
         newLocationInfo.setData(locInfoPair.first.getData());
       } else {
+        const unsigned origLoc = locInfoPair.first.getLocation();
+        unsigned mappedLoc = InvalidValue;
         // For other shaders, map the location to continuous locations
+        auto locMapIt = alreadyMappedLocs.find(origLoc);
+        if (locMapIt != alreadyMappedLocs.end()) {
+          mappedLoc = locMapIt->second;
+        } else {
+          mappedLoc = nextMapLoc++;
+          // NOTE: Record the map because we are handling multiple pairs of <location, component>. Some pairs have the
+          // same location while the components are different.
+          alreadyMappedLocs.insert({origLoc, mappedLoc});
+        }
+
         newLocationInfo.setData(0);
-        newLocationInfo.setLocation(nextMapLoc++);
+        newLocationInfo.setLocation(mappedLoc);
+        newLocationInfo.setComponent(locInfoPair.first.getComponent());
       }
     }
   }
@@ -2717,10 +2803,8 @@ void PatchResourceCollect::updateInputLocInfoMapWithUnpack() {
   auto &perPatchInLocMap = inOutUsage.perPatchInputLocMap;
   if (!perPatchInLocMap.empty()) {
     unsigned nextMapLoc = 0;
-    for (auto &locPair : perPatchInLocMap) {
-      assert(locPair.second == InvalidValue);
+    for (auto &locPair : perPatchInLocMap)
       locPair.second = nextMapLoc++;
-    }
   }
 
   // Update the value of perPrimitiveInputLocMap
@@ -2743,22 +2827,15 @@ void PatchResourceCollect::clearUnusedOutput() {
   auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
   auto &outputLocInfoMap = inOutUsage.outputLocInfoMap;
   if (nextStage != ShaderStageInvalid) {
-    // Collect the locations of TCS with dynamic indexing or as imported output
-    DenseSet<unsigned> dynIndexedOrImportOutputLocs;
+    // Collect the locations of TCS's imported outputs
+    DenseSet<unsigned> importOutputLocs;
     if (m_shaderStage == ShaderStageTessControl) {
-      // Generic output export calls
-      for (auto &call : m_outputCalls) {
-        if (!isa<ConstantInt>(call->getOperand(1)) || !isa<ConstantInt>(call->getOperand(2))) {
-          const unsigned loc = cast<ConstantInt>(call->getOperand(0))->getZExtValue();
-          dynIndexedOrImportOutputLocs.insert(loc);
-        }
-      }
       // Imported output calls
       for (auto &outputImport : m_importedOutputCalls) {
         unsigned loc = outputImport->getLocation();
         Value *const locOffset = outputImport->getLocOffset();
         Value *const compIdx = outputImport->getElemIdx();
-        dynIndexedOrImportOutputLocs.insert(loc);
+        importOutputLocs.insert(loc);
         // Location offset and component index are both constant
         if (isa<ConstantInt>(locOffset) && isa<ConstantInt>(compIdx)) {
           loc += cast<ConstantInt>(locOffset)->getZExtValue();
@@ -2766,7 +2843,7 @@ void PatchResourceCollect::clearUnusedOutput() {
           if (bitWidth == 64 && cast<ConstantInt>(compIdx)->getZExtValue() >= 2) {
             // NOTE: For the addressing of .z/.w component of 64-bit vector/scalar, the count of
             // occupied locations are two.
-            dynIndexedOrImportOutputLocs.insert(loc + 1);
+            importOutputLocs.insert(loc + 1);
           }
         }
       }
@@ -2806,9 +2883,8 @@ void PatchResourceCollect::clearUnusedOutput() {
         if (!isOutputXfb && !foundInNextStage) {
           bool isActiveLoc = false;
           if (m_shaderStage == ShaderStageTessControl) {
-            // NOTE: If either dynamic indexing of generic outputs exists or the generic output involve in
-            // output import, we have to mark it as active.
-            isActiveLoc = dynIndexedOrImportOutputLocs.find(origLoc) != dynIndexedOrImportOutputLocs.end();
+            // NOTE: if the output is used as imported in TCS, it is marked as active.
+            isActiveLoc = importOutputLocs.find(origLoc) != importOutputLocs.end();
           }
           if (isActiveLoc) {
             // The assigned location must not overlap with those used by inputs of next shader stage.
@@ -2831,12 +2907,12 @@ void PatchResourceCollect::clearUnusedOutput() {
       const auto &nextPerPatchInLocMap = nextResUsage->inOutUsage.perPatchInputLocMap;
       unsigned availPerPatchInMapLoc = nextResUsage->inOutUsage.perPatchInputMapLocCount;
 
-      // Collect locations of those outputs that are not used by next shader stage
+      // Collect locations of those outputs that are not used by next shader stage or read by TCS
       SmallVector<unsigned, 4> unusedLocs;
       for (auto &locPair : perPatchOutputLocMap) {
         const unsigned loc = locPair.first;
         if (nextPerPatchInLocMap.find(loc) == nextPerPatchInLocMap.end()) {
-          if (dynIndexedOrImportOutputLocs.find(loc) != dynIndexedOrImportOutputLocs.end())
+          if (importOutputLocs.find(loc) != importOutputLocs.end())
             locPair.second = availPerPatchInMapLoc++;
           else
             unusedLocs.push_back(loc);
@@ -2858,7 +2934,7 @@ void PatchResourceCollect::clearUnusedOutput() {
       for (auto &locPair : perPrimitiveOutputLocMap) {
         const unsigned loc = locPair.first;
         if (nextPerPrimitiveInLocMap.find(loc) == nextPerPrimitiveInLocMap.end()) {
-          if (dynIndexedOrImportOutputLocs.find(loc) != dynIndexedOrImportOutputLocs.end())
+          if (importOutputLocs.find(loc) != importOutputLocs.end())
             locPair.second = availPerPrimitiveInMapLoc++;
           else
             unusedLocs.push_back(loc);

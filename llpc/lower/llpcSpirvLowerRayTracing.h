@@ -61,6 +61,7 @@ class PrimitiveIndexOp;
 class InstanceInclusionMaskOp;
 class ShaderIndexOp;
 class ShaderRecordBufferOp;
+enum class RayTracingShaderStage;
 } // namespace lgc::rt
 
 namespace lgc {
@@ -262,9 +263,9 @@ private:
   void visitShaderIndexOp(lgc::rt::ShaderIndexOp &inst);
   void visitShaderRecordBufferOp(lgc::rt::ShaderRecordBufferOp &inst);
 
-  void visitAlloca(llvm::AllocaInst &inst);
-
   llvm::Value *createLoadInstNodeAddr();
+
+  lgc::rt::RayTracingShaderStage mapStageToLgcRtShaderStage(ShaderStage stage);
 
   llvm::Value *m_traceParams[TraceParam::Count];           // Trace ray set parameters
   llvm::Value *m_worldToObjMatrix = nullptr;               // World to Object matrix

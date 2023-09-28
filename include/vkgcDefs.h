@@ -45,7 +45,7 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 65
+#define LLPC_INTERFACE_MAJOR_VERSION 68
 
 /// LLPC minor interface version.
 #define LLPC_INTERFACE_MINOR_VERSION 0
@@ -56,10 +56,6 @@
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 60
 #error LLPC client version is too old
-#endif
-
-#ifndef LLPC_ENABLE_SHADER_CACHE
-#define LLPC_ENABLE_SHADER_CACHE 0
 #endif
 
 /// LLPC_NODISCARD - Warns when function return value is discarded.
@@ -83,23 +79,32 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     68.0 | Remove ICache *cache in all PipelineBuildInfo                                                         |
+//  |     67.0 | Modify the uber fetch shader. Adds locationMask(64bit) at the beginning of uber fetch shader internal |
+//  |          | buffer which flags whether the related attribute data is valid.                                       |
+//  |     66.0 | Remove shader cache in LLPC                                                                           |
+//  |     65.6 | Add Result::RequireFullPipeline, returned if unlink shader fails.                                     |
+//  |     65.5 | Rename noContract in PipelineShaderOptions to noContractOpDot                                         |
+//  |     65.4 | Add disableSampleMask to PipelineOptions                                                              |
+//  |     65.3 | Add originUpperLeft to GraphicsPipelineBuildInfo                                                      |
+//  |     65.2 | Support SPIRV extended vertex attribute formats during vertex fetch module.                           |
 //  |     65.0 | Remove updateDescInElf                                                                                |
 //  |     64.2 | Add dynamicSampleInfo to GraphicsPipelineBuildInfo::rsState                                           |
 //  |     64.1 | Add disableTruncCoordForGather to PipelineOptions.                                                    |
 //  |     64.0 | Add enableColorExportShader to GraphicsPipelineBuildInfo.                                             |
-//  |     63.3 | Add TesssellationLevel to iaState                                                                     |
+//  |     63.3 | Add TessellationLevel to iaState                                                                      |
 //  |     63.2 | Add vertex64BitsAttribSingleLoc to PipelineOptions                                                    |
 //  |     63.1 | Add forceDisableStreamOut and forceEnablePrimStats to ApiXfbOutData                                   |
-//  |     63.0 | Add Atomic Counter, its default descriptor and map its concertType to Buffer.                         |
+//  |     63.0 | Add Atomic Counter, its default descriptor and map its concreteType to Buffer.                        |
 //  |     62.1 | Add ApiXfbOutData GraphicsPipelineBuildInfo                                                           |
 //  |     62.0 | Default to the compiler getting the GPURT library directly, and move shader library info into RtState |
 //  |     61.16| Add replaceSetWithResourceType to PipelineOptions                                                     |
 //  |     61.15| Add disableReadFirstLaneWorkaround to PipelineShaderOptions                                           |
-//  |     61.14| Add rasterStream to rsState                                                                           |
+//  |     61.14| Add rasterStream to rsState
 //  |     61.13| Add dualSourceBlendDynamic to cbState                                                                 |
 //  |     61.12| Add mode to RayTracingPipelineBuildInfo                                                               |
 //  |     61.11| Add UniformConstantMap and related structures                                                         |
-//  |     61.10| Add useShadingRate and useSampleInfoto ShaderModuleUsage                                              |
+//  |     61.10| Add useShadingRate and useSampleInfo to ShaderModuleUsage                                             |
 //  |     61.8 | Add enableImplicitInvariantExports to PipelineOptions                                                 |
 //  |     61.7 | Add disableFMA to PipelineShaderOptions                                                               |
 //  |     61.6 | Add workaroundInitializeOutputsToZero to PipelineShaderOptions                                        |
@@ -141,7 +146,7 @@
 //  |     52.1 | Add pageMigrationEnabled to PipelineOptions                                                           |
 //  |     52.0 | Add the member word4 and word5 to SamplerYCbCrConversionMetaData                                      |
 //  |     51.2 | Added new pipeline shader info to support mesh shader                                                 |
-//  |     51.0 | Added new shader stage enumerants to support mesh shader                                              |
+//  |     51.0 | Added new shader stage enumerates to support mesh shader                                              |
 //  |     50.2 | Add the member dsState to GraphicsPipelineBuildInfo                                                   |
 //  |     50.1 | Disclose ResourceMappingNodeType::InlineBuffer                                                        |
 //  |     50.0 | Removed the member 'enableOpt' of ShaderModuleOptions                                                 |
@@ -163,7 +168,7 @@
 //  |     45.0 | Remove the member 'enableFastLaunch' of NGG state                                                     |
 //  |     44.0 | Rename the member 'forceNonPassthrough' of NGG state to 'forceCullingMode'                            |
 //  |     43.1 | Add disableImageResourceCheck in PipelineOptions                                                      |
-//  |     43.0 | Removed the enumerant WaveBreakSize::DrawTime                                                         |
+//  |     43.0 | Removed the enumerate WaveBreakSize::DrawTime                                                         |
 //  |     42.0 | Removed tileOptimal flag from SamplerYcbcrConversion metadata struct                                  |
 //  |     41.0 | Moved resource mapping from ShaderPipeline-level to Pipeline-level                                    |
 //  |     40.4 | Added fp32DenormalMode in PipelineShaderOptions to allow overriding SPIR-V denormal settings          |
@@ -171,7 +176,7 @@
 //  |     40.2 | Added extendedRobustness in PipelineOptions to support VK_EXT_robustness2                             |
 //  |     40.1 | Added disableLoopUnroll to PipelineShaderOptions                                                      |
 //  |     40.0 | Added DescriptorReserved12, which moves DescriptorYCbCrSampler down to 13                             |
-//  |     39.0 | Non-LLPC-specific XGL code should #include vkcgDefs.h instead of llpc.h                               |
+//  |     39.0 | Non-LLPC-specific XGL code should #include vkgcDefs.h instead of llpc.h                               |
 //  |     38.3 | Added shadowDescriptorTableUsage and shadowDescriptorTablePtrHigh to PipelineOptions                  |
 //  |     38.2 | Added scalarThreshold to PipelineShaderOptions                                                        |
 //  |     38.1 | Added unrollThreshold to PipelineShaderOptions                                                        |
@@ -234,6 +239,8 @@ enum class Result : int {
   NotReady = 0x00000003,
   // A required resource (e.g. cache entry) was not found.
   NotFound = 0x00000004,
+  /// Required full pipeline compilation
+  RequireFullPipeline = 0x00000005,
   /// The requested operation is unavailable at this time
   ErrorUnavailable = -(0x00000001),
   /// The operation could not complete due to insufficient system memory
@@ -355,7 +362,7 @@ enum GlCompatibilityAttributeLocation : unsigned {
   SecondaryColor, ///< Internal vertex attribute of gl_SecondaryColor.
   FogCoord,       ///< Internal vertex attribute of gl_FogCoord.
   ColorIndex,     ///< Internal vertex attribute to pass on index of gl_MultiTexCoord.
-  EdgeFlag,       ///< Internal vertex attribute use to pass on the edeg flag.
+  EdgeFlag,       ///< Internal vertex attribute use to pass on the edge flag.
   Texcoord0,      ///< Internal vertex attribute of gl_MultiTexCoord0.
   BaseinstanceOffset = Texcoord0 + GlCompatibilityLimits::MaxTextureCoords,
   ///< Internal vertex attribute: BaseInstanceOffset,
@@ -573,11 +580,13 @@ struct PipelineOptions {
   bool internalRtShaders;                         ///< Whether this pipeline has internal raytracing shaders
   unsigned forceNonUniformResourceIndexStageMask; ///< Mask of the stage to force using non-uniform resource index.
   bool reserved16;
-  bool replaceSetWithResourceType;        ///< For OGL only, replace 'set' with resource type during spirv translate
-  bool disableTruncCoordForGather;        //< If set, trunc_coord of sampler srd is disabled for gather4
-  bool enableCombinedTexture;             ///< For OGL only, use the 'set' for DescriptorCombinedTexture
-                                          ///< for sampled images and samplers
-  bool vertex64BitsAttribSingleLoc;       ///< For OGL only, dvec3/dvec4 vertex attrib only consumes 1 location.
+  bool replaceSetWithResourceType;  ///< For OGL only, replace 'set' with resource type during spirv translate
+  bool disableSampleMask;           ///< For OGL only, disabled if framebuffer doesn't attach multisample texture
+  bool disableTruncCoordForGather;  ///< If set, trunc_coord of sampler srd is disabled for gather4
+  bool enableCombinedTexture;       ///< For OGL only, use the 'set' for DescriptorCombinedTexture
+                                    ///< for sampled images and samplers
+  bool vertex64BitsAttribSingleLoc; ///< For OGL only, dvec3/dvec4 vertex attrib only consumes 1 location.
+  unsigned reserved20;
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.
@@ -628,6 +637,11 @@ struct ShaderModuleUsage {
   bool useShadingRate;         ///< Whether shading rate is used
   bool useSampleInfo;          ///< Whether gl_SamplePosition or InterpolateAtSample are used
   bool useClipVertex;          ///< Whether gl_useClipVertex is used
+  bool useFragCoord;           ///< Whether gl_FragCoord is used
+  bool originUpperLeft;        ///< Whether pixel origin is upper-left
+  bool pixelCenterInteger;     ///< Whether pixel coord is Integer
+  bool useGenericBuiltIn;      ///< Whether to use builtIn inputs that include gl_PointCoord, gl_PrimitiveId,
+                               ///  gl_Layer, gl_ClipDistance or gl_CullDistance.
 };
 
 /// Represents common part of shader module data
@@ -798,14 +812,14 @@ struct PipelineShaderOptions {
   /// Threshold number of blocks in a loop for LICM pass to be disabled.
   unsigned disableLicmThreshold;
 
-  /// Threshold to use for loops with "Unroll" hint (0 = use llvm.llop.unroll.full).
+  /// Threshold to use for loops with "Unroll" hint (0 = use llvm.loop.unroll.full).
   unsigned unrollHintThreshold;
 
-  /// Threshold to use for loops with "DontUnroll" hint (0 = use llvm.llop.unroll.disable).
+  /// Threshold to use for loops with "DontUnroll" hint (0 = use llvm.loop.unroll.disable).
   unsigned dontUnrollHintThreshold;
 
-  /// Whether fastmath contract could be disabled
-  bool noContract;
+  /// Whether fast math contract could be disabled on Dot operations.
+  bool noContractOpDot;
 
   /// The enabled fast math flags (0 = depends on input language).
   unsigned fastMathFlags;
@@ -968,6 +982,35 @@ constexpr uint32_t UberFetchShaderAttribMaskComponent1 = 0x0020000u;
 constexpr uint32_t UberFetchShaderAttribMaskComponent2 = 0x0040000u;
 constexpr uint32_t UberFetchShaderAttribMaskComponent3 = 0x0080000u;
 constexpr uint32_t UberFetchShaderAttribMaskIsBgra = 0x0100000u;
+
+/// Represents the bit field info of struct BilUberFetchShaderAttribInfo
+
+// OpenGL extended vertex attribute format
+typedef enum VKInternalExtFormat {
+  VK_FORMAT_EXT_R32_UNORM = 0x00020000,
+  VK_FORMAT_EXT_R32_SNORM = 0x00020001,
+  VK_FORMAT_EXT_R32G32_UNORM = 0x00020002,
+  VK_FORMAT_EXT_R32G32_SNORM = 0x00020003,
+  VK_FORMAT_EXT_R32G32B32_UNORM = 0x00020004,
+  VK_FORMAT_EXT_R32G32B32_SNORM = 0x00020005,
+  VK_FORMAT_EXT_R32G32B32A32_UNORM = 0x00020006,
+  VK_FORMAT_EXT_R32G32B32A32_SNORM = 0x00020007,
+  VK_FORMAT_EXT_R32_FIXED = 0x00020008,
+  VK_FORMAT_EXT_R32G32_FIXED = 0x00020009,
+  VK_FORMAT_EXT_R32G32B32_FIXED = 0x0002000A,
+  VK_FORMAT_EXT_R32G32B32A32_FIXED = 0x0002000B,
+  VK_FORMAT_EXT_R32_USCALED = 0x0002000C,
+  VK_FORMAT_EXT_R32_SSCALED = 0x0002000D,
+  VK_FORMAT_EXT_R32G32_USCALED = 0x0002000E,
+  VK_FORMAT_EXT_R32G32_SSCALED = 0x0002000F,
+  VK_FORMAT_EXT_R32G32B32_USCALED = 0x00020010,
+  VK_FORMAT_EXT_R32G32B32_SSCALED = 0x00020011,
+  VK_FORMAT_EXT_R32G32B32A32_USCALED = 0x00020012,
+  VK_FORMAT_EXT_R32G32B32A32_SSCALED = 0x00020013,
+  VK_FORMAT_EXT_BEGIN_RANGE = VK_FORMAT_EXT_R32_UNORM,
+  VK_FORMAT_EXT_END_RANGE = VK_FORMAT_EXT_R32G32B32A32_SSCALED,
+  VK_FORMAT_EXT_RANGE_SIZE = VK_FORMAT_EXT_END_RANGE - VK_FORMAT_EXT_BEGIN_RANGE + 1
+} VKInternalExtFormat;
 
 /// Represents info of a shader attached to a to-be-built pipeline.
 struct PipelineShaderInfo {
@@ -1147,21 +1190,21 @@ struct UniformConstantMap {
   UniformConstantMapEntry *pUniforms; ///< Mapping of <location, offset> for uniform constant
 };
 
-/// Represents transform feedback info for the caputred output
+/// Represents transform feedback info for the captured output
 struct XfbOutInfo {
   bool isBuiltIn;     ///< Determine if it is a built-in output
   unsigned location;  ///< If isBuiltIn is true, it is the buildIn Id
   unsigned component; ///< The component offset within a location
   unsigned xfbBuffer; ///< The transform feedback buffer captures the output
   unsigned xfbOffset; ///< The byte offset in the transform feedback buffer
-  unsigned xfbStride; ///< The bytes consumed by a caputred vertex in the transform feedback buffer
+  unsigned xfbStride; ///< The bytes consumed by a captured vertex in the transform feedback buffer
   unsigned streamId;  ///< The stream index
 };
 
 /// Represents the transform feedback data filled by API interface
 struct ApiXfbOutData {
-  XfbOutInfo *pXfbOutInfos;   ///< An array of XfbOutInfo iterms
-  unsigned numXfbOutInfo;     ///< Count of XfbOutInfo iterms
+  XfbOutInfo *pXfbOutInfos;   ///< An array of XfbOutInfo items
+  unsigned numXfbOutInfo;     ///< Count of XfbOutInfo items
   bool forceDisableStreamOut; ///< Force to disable stream out XFB outputs
   bool forceEnablePrimStats;  ///< Force to enable counting generated primitives
 };
@@ -1177,9 +1220,8 @@ struct GraphicsPipelineBuildInfo {
   void *pInstance;                ///< Vulkan instance object
   void *pUserData;                ///< User data
   OutputAllocFunc pfnOutputAlloc; ///< Output buffer allocator
-  ICache *cache;                  ///< ICache, used to search for the compiled shader data
-#if LLPC_ENABLE_SHADER_CACHE
-  IShaderCache *pShaderCache; ///< Shader cache, used to search for the compiled shader data
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 68
+  ICache *cache; ///< ICache, used to search for the compiled shader data
 #endif
   PipelineShaderInfo task; ///< Task shader
   PipelineShaderInfo vs;   ///< Vertex shader
@@ -1254,11 +1296,12 @@ struct GraphicsPipelineBuildInfo {
   BinaryData shaderLibrary; ///< SPIR-V library binary data
 #endif
   RtState rtState;                    ///< Ray tracing state
+  bool originUpperLeft;               ///< Whether origin coordinate of framebuffer is upper-left.
   const void *pClientMetadata;        ///< Pointer to (optional) client-defined data to be stored inside the ELF
   size_t clientMetadataSize;          ///< Size (in bytes) of the client-defined data
   unsigned numUniformConstantMaps;    ///< Number of uniform constant maps
   UniformConstantMap **ppUniformMaps; ///< Pointers to array of pointers for the uniform constant map.
-  ApiXfbOutData apiXfbOutData;        ///< Transform feedback data specified by API interface.
+  ApiXfbOutData apiXfbOutData;        ///< Transform feedback data specified by API inteface.
 };
 
 /// Represents info to build a compute pipeline.
@@ -1266,9 +1309,8 @@ struct ComputePipelineBuildInfo {
   void *pInstance;                ///< Vulkan instance object
   void *pUserData;                ///< User data
   OutputAllocFunc pfnOutputAlloc; ///< Output buffer allocator
-  ICache *cache;                  ///< ICache, used to search for the compiled shader data
-#if LLPC_ENABLE_SHADER_CACHE
-  IShaderCache *pShaderCache; ///< Shader cache, used to search for the compiled shader data
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 68
+  ICache *cache; ///< ICache, used to search for the compiled shader data
 #endif
   unsigned deviceIndex;                ///< Device index for device group
   PipelineShaderInfo cs;               ///< Compute shader
@@ -1287,10 +1329,12 @@ struct ComputePipelineBuildInfo {
 
 /// Represents output of building a ray tracing pipeline.
 struct RayTracingPipelineBuildInfo {
-  void *pInstance;                                           ///< Vulkan instance object
-  void *pUserData;                                           ///< User data
-  OutputAllocFunc pfnOutputAlloc;                            ///< Output buffer allocator
-  ICache *cache;                                             ///< ICache, used to search for the compiled shader data
+  void *pInstance;                ///< Vulkan instance object
+  void *pUserData;                ///< User data
+  OutputAllocFunc pfnOutputAlloc; ///< Output buffer allocator
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 68
+  ICache *cache; ///< ICache, used to search for the compiled shader data
+#endif
   unsigned deviceIndex;                                      ///< Device index for device group
   unsigned deviceCount;                                      ///< Device count for device group
   unsigned shaderCount;                                      ///< Count of shader info
@@ -1328,6 +1372,8 @@ struct RayTracingShaderProperty {
   uint64_t shaderId;                        ///< Ray tracing compiled shader ID
   char name[RayTracingMaxShaderNameLength]; ///< Ray tracing compiled shader name
   bool hasTraceRay;                         ///< Whether TraceRay() is used
+  bool onlyGpuVaLo;                         ///< Whether shader identifier LSB metadata is applied
+  uint64_t shaderIdExtraBits;               ///< Raytracing shader identifier extra bits
 };
 
 /// Represents ray-tracing shader identifier.
@@ -1336,21 +1382,6 @@ struct RayTracingShaderIdentifier {
   uint64_t anyHitId;       ///< AnyHit ID for hit groups
   uint64_t intersectionId; ///< Intersection shader ID for hit groups
   uint64_t padding;        ///< Padding to meet 32-byte api requirement and 8-byte alignment for descriptor table offset
-};
-
-/// The mapping method that the driver should apply to the shader IDs returned by the compiler in
-/// RayTracingShaderIdentifier structures.
-enum class RayTracingShaderIdentifierMapping {
-  /// No mapping, take IDs verbatim.
-  None,
-
-  /// Interpret the ID as an index into the ELF module array and produce the full GPU VA of its unique contained
-  /// function.
-  ElfModuleGpuVa,
-
-  /// Interpret the ID as an index into the ELF module array and produce the low 32 bits of the GPU VA of its unique
-  /// contained function. The high 32 bits remain 0 (but extraBits are still applied if present).
-  ElfModuleGpuVaLo,
 };
 
 /// Values to be bitwise OR'd into the result of the mapping procedure applied to shader IDs.
@@ -1371,13 +1402,8 @@ struct RayTracingCaptureReplayVaMappingEntry {
 
 /// Represents the handles of shader group for ray-tracing pipeline
 struct RayTracingShaderGroupHandle {
-  unsigned shaderHandleCount;                     ///< Count of shader group handle array
-  RayTracingShaderIdentifier *shaderHandles;      ///< Shader group handle array
-  RayTracingShaderIdentifierExtraBits *extraBits; ///< Extra bits array, one for each shader handle (may be null)
-
-  RayTracingShaderIdentifierMapping shaderMapping;       ///< Mapping applied to shaderIds
-  RayTracingShaderIdentifierMapping anyHitMapping;       ///< Mapping applied to anyHitIds
-  RayTracingShaderIdentifierMapping intersectionMapping; ///< Mapping applied to intersectionIds
+  unsigned shaderHandleCount;                ///< Count of shader group handle array
+  RayTracingShaderIdentifier *shaderHandles; ///< Shader group handle array
 };
 
 /// Represents a set of ray-tracing shaders referenced by a ray-tracing pipeline

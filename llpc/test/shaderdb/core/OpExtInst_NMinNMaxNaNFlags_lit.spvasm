@@ -1,0 +1,57 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+
+; Test nnan flags are removed when NMin or NMax are used.
+
+; SHADERTEST-LABEL: {{^// LLPC.*}} final pipeline module info
+; SHADERTEST-NOT: nnan
+; SHADERTEST: ret void
+
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+
+; SPIR-V
+; Version: 1.3
+; Schema: 0
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %MainVS "MainVS" %in_var_Position %out_var_Position
+               OpName %in_var_Position "in.var.Position"
+               OpName %out_var_Position "out.var.Position"
+               OpName %MainVS "MainVS"
+               OpDecorate %in_var_Position Location 0
+               OpDecorate %out_var_Position Location 0
+       %void = OpTypeVoid
+      %float = OpTypeFloat 32
+    %float_0 = OpConstant %float 0
+    %v4float = OpTypeVector %float 4
+%_ptr_Input_v4float = OpTypePointer Input %v4float
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+%in_var_Position = OpVariable %_ptr_Input_v4float Input
+%out_var_Position = OpVariable %_ptr_Output_v4float Output
+%float_1_10000002 = OpConstant %float 1.10000002
+%float_0_400000006 = OpConstant %float 0.400000006
+  %main_type = OpTypeFunction %void
+     %MainVS = OpFunction %void None %main_type
+      %entry = OpLabel
+         %c0 = OpExtInst %float %1 NMin %float_0_400000006 %float_1_10000002
+         %c1 = OpExtInst %float %1 NMax %float_0_400000006 %float_1_10000002
+         %v0 = OpFDiv %float %c0 %c1
+        %pos = OpLoad %v4float %in_var_Position
+         %p0 = OpCompositeExtract %float %pos 0
+         %p1 = OpCompositeExtract %float %pos 1
+         %p2 = OpCompositeExtract %float %pos 2
+         %p3 = OpCompositeExtract %float %pos 3
+         %t0 = OpFAdd %float %p0 %p1
+         %v1 = OpExtInst %float %1 NMin %t0 %p0
+         %v2 = OpExtInst %float %1 NMax %t0 %p1
+         %v3 = OpFAdd %float %p2 %p3
+         %r0 = OpCompositeInsert %v4float %v0 %pos 0
+         %r1 = OpCompositeInsert %v4float %v1 %r0 1
+         %r2 = OpCompositeInsert %v4float %v2 %r1 2
+         %r3 = OpCompositeInsert %v4float %v3 %r2 3
+               OpStore %out_var_Position %r3
+               OpReturn
+               OpFunctionEnd

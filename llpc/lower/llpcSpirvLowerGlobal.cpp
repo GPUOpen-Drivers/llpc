@@ -33,6 +33,7 @@
 #include "lgcrt/LgcRtDialect.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
+#include "llpcRayTracingContext.h"
 #include "llpcSpirvLowerUtil.h"
 #include "lgc/LgcDialect.h"
 #include "llvm-dialects/Dialect/Visitor.h"
@@ -44,6 +45,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include "llvm/Transforms/Utils/Cloning.h"
 #include <unordered_set>
 
 #define DEBUG_TYPE "llpc-spirv-lower-global"
@@ -52,6 +54,12 @@ using namespace llvm;
 using namespace SPIRV;
 using namespace Llpc;
 using namespace lgc::rt;
+
+namespace RtName {
+static const char *HitAttribute = "HitAttribute";
+static const char *IncomingRayPayLoad = "IncomingRayPayloadKHR";
+static const char *IncomingCallableData = "IncomingCallableDataKHR";
+} // namespace RtName
 
 namespace Llpc {
 
@@ -208,6 +216,8 @@ bool SpirvLowerGlobal::runImpl(Module &module) {
 
   SpirvLower::init(&module);
 
+  changeRtFunctionSignature();
+
   // Map globals to proxy variables
   for (auto global = m_module->global_begin(), end = m_module->global_end(); global != end; ++global) {
     if (global->getType()->getAddressSpace() == SPIRAS_Private)
@@ -271,9 +281,9 @@ bool SpirvLowerGlobal::runImpl(Module &module) {
 void SpirvLowerGlobal::lowerEdgeFlag() {
   const unsigned int edgeflagInputLocation = Vkgc::GlCompatibilityAttributeLocation::EdgeFlag;
 
-  Llpc::PipelineContext *pipelineContext = m_context->getPipelineContext();
+  Llpc::PipelineContext *pipelineContex = m_context->getPipelineContext();
   const Vkgc::GraphicsPipelineBuildInfo *pipelineInfo =
-      static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(pipelineContext->getPipelineBuildInfo());
+      static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(pipelineContex->getPipelineBuildInfo());
   const VkPipelineVertexInputStateCreateInfo *vertexInfo = pipelineInfo->pVertexInput;
 
   if (!vertexInfo)
@@ -582,8 +592,18 @@ void SpirvLowerGlobal::mapGlobalVariableToProxy(GlobalVariable *globalVar) {
 
   m_builder->SetInsertPointPastAllocas(m_entryPoint);
 
-  auto proxy = m_builder->CreateAlloca(globalVarTy, dataLayout.getAllocaAddrSpace(), nullptr,
-                                       Twine(LlpcName::GlobalProxyPrefix) + globalVar->getName());
+  Value *proxy = nullptr;
+
+  // Handle special globals, regular allocas will be removed by SROA pass.
+  if (globalVar->getName().startswith(RtName::HitAttribute))
+    proxy = m_entryPoint->getArg(1);
+  else if (globalVar->getName().startswith(RtName::IncomingRayPayLoad))
+    proxy = m_entryPoint->getArg(0);
+  else if (globalVar->getName().startswith(RtName::IncomingCallableData))
+    proxy = m_entryPoint->getArg(0);
+  else
+    proxy = m_builder->CreateAlloca(globalVarTy, dataLayout.getAllocaAddrSpace(), nullptr,
+                                    Twine(LlpcName::GlobalProxyPrefix) + globalVar->getName());
 
   if (globalVar->hasInitializer()) {
     auto initializer = globalVar->getInitializer();
@@ -598,10 +618,9 @@ void SpirvLowerGlobal::mapGlobalVariableToProxy(GlobalVariable *globalVar) {
 //
 // @param input : Input to be mapped
 void SpirvLowerGlobal::mapInputToProxy(GlobalVariable *input) {
-  // NOTE: For tessellation shader or mesh shader, we do not map inputs to real proxy variables. Instead, we directly
+  // NOTE: For tessellation shader, we do not map inputs to real proxy variables. Instead, we directly
   // replace "load" instructions with import calls in the lowering operation.
-  if (m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval ||
-      m_shaderStage == ShaderStageMesh) {
+  if (m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval) {
     m_inputProxyMap[input] = nullptr;
     m_lowerInputInPlace = true;
     return;
@@ -1196,6 +1215,27 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
           // and "BuiltInSubgroupXXXMask" share the same numeric values.
           inOutValue = m_builder->CreateBitCast(inOutValue, FixedVectorType::get(inOutTy, 2));
           inOutValue = m_builder->CreateExtractElement(inOutValue, uint64_t(0));
+        } else if (builtIn == lgc::BuiltInFragCoord) {
+          auto buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+          if (buildInfo->originUpperLeft !=
+              static_cast<const ShaderModuleData *>(buildInfo->fs.pModuleData)->usage.originUpperLeft) {
+            unsigned offset = 0;
+            auto winSize = getUniformConstantEntryByLocation(m_context, m_shaderStage,
+                                                             Vkgc::GlCompatibilityUniformLocation::FrameBufferSize);
+            if (winSize) {
+              offset = winSize->offset;
+              Value *bufferDesc =
+                  m_builder->CreateLoadBufferDesc(Vkgc::InternalDescriptorSetId, Vkgc::ConstantBuffer0Binding,
+                                                  m_builder->getInt32(0), lgc::Builder::BufferFlagNonConst);
+              // Layout is {width, height}, so the offset of height is added sizeof(float).
+              Value *winHeightPtr =
+                  m_builder->CreateConstInBoundsGEP1_32(m_builder->getInt8Ty(), bufferDesc, offset + sizeof(float));
+              auto winHeight = m_builder->CreateLoad(m_builder->getFloatTy(), winHeightPtr);
+              auto fragCoordY = m_builder->CreateExtractElement(inOutValue, 1);
+              fragCoordY = m_builder->CreateFSub(winHeight, fragCoordY);
+              inOutValue = m_builder->CreateInsertElement(inOutValue, fragCoordY, 1);
+            }
+          }
         }
         if (inOutValue->getType()->isIntegerTy(1)) {
           // Convert i1 to i32.
@@ -1406,6 +1446,9 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
                               cast<ConstantInt>(locOffset)->getZExtValue(), outputInfo);
     }
 
+    if (m_context->getPipelineContext()->getUseDualSourceBlend()) {
+      outputInfo.setDualSourceBlendDynamic(true);
+    }
     m_builder->CreateWriteGenericOutput(outputValue, location, locOffset, elemIdx, maxLocOffset, outputInfo,
                                         vertexOrPrimitiveIdx);
   }
@@ -2356,7 +2399,7 @@ void SpirvLowerGlobal::interpolateInputElement(unsigned interpLoc, Value *auxInt
 }
 
 // =====================================================================================================================
-// Fill the XFB info map from the Vkgc::ApiXfbOutData if XFB is specified by API interface
+// Fill the XFB info map from the Vkgc::ApiXfbOutData if XFB is specified by API inerface
 void SpirvLowerGlobal::buildApiXfbMap() {
   auto pipelineBuildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
   for (unsigned idx = 0; idx < pipelineBuildInfo->apiXfbOutData.numXfbOutInfo; ++idx) {
@@ -2527,6 +2570,57 @@ void SpirvLowerGlobal::handleVolatileInput(GlobalVariable *input, Value *proxy) 
     break;
   }
   }
+}
+
+// =====================================================================================================================
+// Changes function signature for RT shaders. Specifically, add payload / hit attribute / callable data pointers and
+// metadata to function signature.
+void SpirvLowerGlobal::changeRtFunctionSignature() {
+  if (!isRayTracingShaderStage(m_shaderStage))
+    return;
+
+  // Ray generation shader has no input payload or hit attributes
+  if (m_shaderStage == ShaderStageRayTracingRayGen)
+    return;
+
+  auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
+
+  ValueToValueMapTy VMap;
+  SmallVector<Type *, 2> argTys;
+  SmallVector<ReturnInst *, 8> retInsts;
+  Type *pointerTy = PointerType::get(*m_context, SPIRAS_Private);
+  switch (m_shaderStage) {
+  case ShaderStageRayTracingIntersect:
+  case ShaderStageRayTracingAnyHit:
+  case ShaderStageRayTracingClosestHit:
+    // Hit attribute
+    argTys.push_back(pointerTy);
+    setShaderHitAttributeSize(m_entryPoint, rayTracingContext->getAttributeDataSizeInBytes());
+    LLVM_FALLTHROUGH; // Fall through: Handle payload
+  case ShaderStageRayTracingMiss:
+    // Payload
+    argTys.push_back(pointerTy);
+    setShaderPaq(m_entryPoint, getPaqFromSize(*m_context, rayTracingContext->getPayloadSizeInBytes()));
+    break;
+  case ShaderStageRayTracingCallable:
+    // Callable data
+    argTys.push_back(pointerTy);
+    setShaderArgSize(m_entryPoint, rayTracingContext->getCallableDataSizeInBytes());
+    break;
+  default:
+    llvm_unreachable("Should never be called");
+  }
+
+  assert(m_entryPoint->arg_empty());
+
+  auto newFuncTy = FunctionType::get(m_entryPoint->getReturnType(), argTys, false);
+  auto newFunc = Function::Create(newFuncTy, m_entryPoint->getLinkage(), "", m_module);
+  newFunc->takeName(m_entryPoint);
+
+  CloneFunctionInto(newFunc, m_entryPoint, VMap, CloneFunctionChangeType::LocalChangesOnly, retInsts);
+  assert(m_entryPoint->use_empty());
+  m_entryPoint->eraseFromParent();
+  m_entryPoint = newFunc;
 }
 
 } // namespace Llpc

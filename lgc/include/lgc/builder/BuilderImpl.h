@@ -315,11 +315,11 @@ private:
                                    const ResourceNode *topNode, const ResourceNode *node, bool shadow);
 
   // Get the stride (in bytes) of a descriptor.
-  llvm::Value *getStride(ResourceNodeType descType, uint64_t descSet, unsigned binding, const ResourceNode *node);
+  llvm::Value *getStride(ResourceNodeType descType, const ResourceNode *node);
 
   // Get a pointer to a descriptor, as a pointer to i8
-  llvm::Value *getDescPtr(ResourceNodeType concreteType, ResourceNodeType abstractType, uint64_t descSet,
-                          unsigned binding, const ResourceNode *topNode, const ResourceNode *node);
+  llvm::Value *getDescPtr(ResourceNodeType concreteType, const ResourceNode *topNode, const ResourceNode *node,
+                          unsigned binding);
 
   llvm::Value *scalarizeIfUniform(llvm::Value *value, bool isNonUniform);
 
@@ -519,7 +519,7 @@ private:
 
   // Mark usage for a generic (user) input or output
   void markGenericInputOutputUsage(bool isOutput, unsigned location, unsigned locationCount, InOutInfo &inOutInfo,
-                                   llvm::Value *vertexOrPrimIndex);
+                                   llvm::Value *vertexOrPrimIndex, bool isDynLocOffset = false);
 
   // Mark interpolation info for FS input.
   void markInterpolationInfo(InOutInfo &interpInfo);
@@ -551,7 +551,7 @@ private:
   llvm::Type *getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo);
 
   // Mark usage of a built-in input
-  void markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySize);
+  void markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySize, InOutInfo inOutInfo);
 
   // Mark usage of a built-in output
   void markBuiltInOutputUsage(BuiltInKind builtIn, unsigned arraySize, unsigned streamId);
@@ -638,11 +638,6 @@ public:
   // Create a helper invocation query. Only allowed in a fragment shader.
   llvm::Value *CreateIsHelperInvocation(const llvm::Twine &instName = "");
 
-  // In the mesh shader, set the actual output size of the primitives and vertices that the mesh shader workgroup will
-  // emit upon completion.
-  llvm::Instruction *CreateSetMeshOutputs(llvm::Value *vertexCount, llvm::Value *primitiveCount,
-                                          const llvm::Twine &instName = "");
-
   // -------------------------------------------------------------------------------------------------------------------
   // Builder implementation subclass for subgroup operations
 public:
@@ -664,6 +659,9 @@ public:
   // Create a subgroup all equal.
   llvm::Value *CreateSubgroupAllEqual(llvm::Value *const value, const llvm::Twine &instName = "");
 
+  // Create a subgroup rotate.
+  llvm::Value *CreateSubgroupRotate(llvm::Value *const value, llvm::Value *const delta, llvm::Value *const clusterSize,
+                                    const llvm::Twine &instName = "");
   // Create a subgroup broadcast.
   llvm::Value *CreateSubgroupBroadcast(llvm::Value *const value, llvm::Value *const index,
                                        const llvm::Twine &instName = "");
@@ -728,17 +726,17 @@ public:
   llvm::Value *CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, llvm::Value *const value,
                                                 llvm::Value *const clusterSize, const llvm::Twine &instName = "");
 
-  // Create a subgroup quad broadcast.
-  llvm::Value *CreateSubgroupQuadBroadcast(llvm::Value *const value, llvm::Value *const index,
+  // Create a quad broadcast.
+  llvm::Value *CreateSubgroupQuadBroadcast(llvm::Value *const value, llvm::Value *const index, bool inWQM = true,
                                            const llvm::Twine &instName = "");
 
-  // Create a subgroup quad swap horizontal.
+  // Create a quad swap horizontal.
   llvm::Value *CreateSubgroupQuadSwapHorizontal(llvm::Value *const value, const llvm::Twine &instName = "");
 
-  // Create a subgroup quad swap vertical.
+  // Create a quad swap vertical.
   llvm::Value *CreateSubgroupQuadSwapVertical(llvm::Value *const value, const llvm::Twine &instName = "");
 
-  // Create a subgroup quad swap diagonal.
+  // Create a quad swap diagonal.
   llvm::Value *CreateSubgroupQuadSwapDiagonal(llvm::Value *const value, const llvm::Twine &instName = "");
 
   // Create a subgroup swizzle quad.

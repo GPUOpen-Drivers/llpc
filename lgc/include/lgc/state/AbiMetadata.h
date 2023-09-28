@@ -153,6 +153,9 @@ static constexpr char ApiCreateInfo[] = ".api_create_info";
 static constexpr char PsSampleMask[] = ".ps_sample_mask";
 static constexpr char GraphicsRegisters[] = ".graphics_registers";
 static constexpr char ComputeRegisters[] = ".compute_registers";
+static constexpr char PsInputSemantic[] = ".ps_input_semantic";
+static constexpr char PrerasterOutputSemantic[] = ".preraster_output_semantic";
+static constexpr char ShaderFunctions[] = ".shader_functions";
 }; // namespace PipelineMetadataKey
 
 namespace HardwareStageMetadataKey {
@@ -182,6 +185,7 @@ static constexpr char WgpMode[] = ".wgp_mode";
 static constexpr char OffchipLdsEn[] = ".offchip_lds_en";
 static constexpr char UserDataRegMap[] = ".user_data_reg_map";
 static constexpr char ImageOp[] = ".image_op";
+static constexpr char FrontendStackSize[] = ".frontend_stack_size";
 }; // namespace HardwareStageMetadataKey
 
 namespace ShaderMetadataKey {
@@ -542,6 +546,15 @@ static constexpr char AncillaryEna[] = ".ancillary_ena";
 static constexpr char SampleCoverageEna[] = ".sample_coverage_ena";
 static constexpr char PosFixedPtEna[] = ".pos_fixed_pt_ena";
 }; // namespace SpiPsInputAddrMetadataKey
+
+namespace PrerasterOutputSemanticMetadataKey {
+static constexpr char Semantic[] = ".semantic";
+static constexpr char Index[] = ".index";
+}; // namespace PrerasterOutputSemanticMetadataKey
+
+namespace PsInputSemanticMetadataKey {
+static constexpr char Semantic[] = ".semantic";
+}; // namespace PsInputSemanticMetadataKey
 
 } // namespace Abi
 

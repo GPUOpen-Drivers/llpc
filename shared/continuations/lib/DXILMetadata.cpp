@@ -33,21 +33,11 @@
 
 namespace llvm {
 
-// -enforce-pointer-metadata: Always use metadata to get pointer type, missing
-// metadata is an error.
-static cl::opt<bool> EnforcePointerMetadata(
-    "enforce-pointer-metadata",
-    cl::desc("Pointer types are only retrieved by metadata"), cl::init(false));
-
 DXILContArgTy::DXILContArgTy(Type *Arg) {
-  if (auto *PT = dyn_cast<PointerType>(Arg)) {
-    assert(!PT->isOpaque() && "opaque pointers are not supported");
-    ArgTy = Arg;
-    ElemTy = PT->getNonOpaquePointerElementType();
-  } else {
-    ArgTy = Arg;
-    ElemTy = nullptr;
-  }
+  assert(!Arg->isPointerTy() &&
+         "pointers are not supported by this constructor");
+  ArgTy = Arg;
+  ElemTy = nullptr;
 }
 
 DXILContArgTy DXILContArgTy::get(const Function *F, const Argument *Arg) {
@@ -66,18 +56,10 @@ DXILContArgTy DXILContArgTy::get(const Function *F, const Argument *Arg) {
 
     DXILContArgTy Result = get(&*TypesMD->getOperand(ArgNo), F->getContext());
 
-    assert(ArgTy->isOpaquePointerTy() ||
-           Result ==
-               DXILContArgTy(ArgTy, ArgTy->getNonOpaquePointerElementType()));
-
     return Result;
   }
 
-  if (EnforcePointerMetadata)
-    report_fatal_error("Missing metadata for pointer type!");
-
-  assert(!ArgTy->isOpaquePointerTy() && "opaque pointers are not supported");
-  return DXILContArgTy(ArgTy, ArgTy->getNonOpaquePointerElementType());
+  report_fatal_error("Missing metadata for pointer type!");
 }
 
 DXILContArgTy DXILContArgTy::get(const Function *F, const unsigned ArgNo) {
@@ -146,29 +128,9 @@ Metadata *DXILContArgTy::getTypeMetadata(LLVMContext &Context) {
   return MDTuple::get(Context, MD);
 }
 
-DXILContFuncTy DXILContFuncTy::get(const FunctionType *FuncTy) {
-  DXILContFuncTy FT;
-  FT.ReturnTy = DXILContArgTy(FuncTy->getReturnType());
-  for (Type *Param : FuncTy->params())
-    FT.ArgTys.emplace_back(Param);
-  return FT;
-}
-
 DXILContFuncTy DXILContFuncTy::get(const Function *F) {
   auto *TypesMD = F->getMetadata(DXILContHelper::MDTypesName);
-
-  // NOTE: fallback path code to be removed later
-  if (!TypesMD) {
-    assert(!F->getReturnType()->isOpaquePointerTy() &&
-           !llvm::any_of(F->args(), [](const Argument &Arg) {
-             return Arg.getType()->isOpaquePointerTy();
-           }));
-    DXILContFuncTy FuncTy;
-    for (auto &Arg : F->args())
-      FuncTy.ArgTys.push_back(DXILContArgTy(Arg.getType()));
-    FuncTy.ReturnTy = DXILContArgTy(F->getReturnType());
-    return FuncTy;
-  }
+  assert(TypesMD);
 
   return get(TypesMD, F->getContext());
 }

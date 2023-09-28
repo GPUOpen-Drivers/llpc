@@ -40,6 +40,7 @@
 #include "llpcFile.h"
 #include "llpcInputUtils.h"
 #include "llpcPipelineBuilder.h"
+#include "llpcShaderCacheWrap.h"
 #include "llpcThreading.h"
 #include "llpcUtil.h"
 #include "spvgen.h"
@@ -303,12 +304,24 @@ cl::opt<bool> DumpDuplicatePipelines(
 // -llpc_opt: Override the optimization level passed in to LGC with the given one.  This options is the same as the
 // `-opt` option in lgc.  The reason for the second option is to be able to test the LLPC API.  If both options are set
 // then `-opt` wins.
+
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
+// Old version of the code
 cl::opt<CodeGenOpt::Level> LlpcOptLevel("llpc-opt", cl::desc("The optimization level for amdllpc to pass to LLPC:"),
                                         cl::init(CodeGenOpt::Default),
                                         values(clEnumValN(CodeGenOpt::None, "none", "no optimizations"),
                                                clEnumValN(CodeGenOpt::Less, "quick", "quick compilation time"),
                                                clEnumValN(CodeGenOpt::Default, "default", "default optimizations"),
                                                clEnumValN(CodeGenOpt::Aggressive, "fast", "fast execution time")));
+#else
+    // New version of the code (also handles unknown version, which we treat as latest)
+cl::opt<CodeGenOptLevel> LlpcOptLevel("llpc-opt", cl::desc("The optimization level for amdllpc to pass to LLPC:"),
+                                        cl::init(CodeGenOptLevel::Default),
+                                        values(clEnumValN(CodeGenOptLevel::None, "none", "no optimizations"),
+                                               clEnumValN(CodeGenOptLevel::Less, "quick", "quick compilation time"),
+                                               clEnumValN(CodeGenOptLevel::Default, "default", "default optimizations"),
+                                               clEnumValN(CodeGenOptLevel::Aggressive, "fast", "fast execution time")));
+#endif
 
 // -resource-layout-scheme: specifies the layout scheme of the resource
 cl::opt<ResourceLayoutScheme> LayoutScheme("resource-layout-scheme", cl::desc("The resource layout scheme:"),
@@ -334,7 +347,6 @@ cl::opt<std::string> GpuRtLibrary("gpurt-library", cl::desc("Use the GPURT shade
 cl::opt<bool> EnableColorExportShader("enable-color-export-shader",
                                       cl::desc("Enable color export shader, only compile each stage of the pipeline without linking"),
                                       cl::init(false));
-
 } // namespace
 // clang-format on
 namespace llvm {
@@ -398,8 +410,9 @@ cl::opt<ExtensionPrinter, true, cl::parser<bool>> ExtPrinter{"ext", cl::desc("Di
 // @param argc : Count of arguments
 // @param argv : List of arguments
 // @param [out] compiler : Created LLPC compiler object
+// @param [out] cache : Created LLPC cache object
 // @returns : Result::Success on success, other status codes on failure
-static Result init(int argc, char *argv[], ICompiler *&compiler) {
+static Result init(int argc, char *argv[], ICompiler *&compiler, ShaderCacheWrap *&cache) {
   // Before we get to LLVM command-line option parsing, we need to find the -gfxip option value.
   for (int i = 1; i != argc; ++i) {
     StringRef arg = argv[i];
@@ -491,7 +504,10 @@ static Result init(int argc, char *argv[], ICompiler *&compiler) {
     return Result::Unsupported;
   }
 
-  Result result = ICompiler::Create(ParsedGfxIp, argc, argv, &compiler);
+  // Create internal cache
+  cache = ShaderCacheWrap::Create(argc, argv);
+
+  Result result = ICompiler::Create(ParsedGfxIp, argc, argv, &compiler, cache);
   if (result != Result::Success)
     return result;
 
@@ -534,8 +550,16 @@ static void initCompileInfo(CompileInfo *compileInfo) {
   }
 
   // We want the default optimization level to be "Default" which is not 0.
-  compileInfo->gfxPipelineInfo.options.optimizationLevel = CodeGenOpt::Level::Default;
-  compileInfo->compPipelineInfo.options.optimizationLevel = CodeGenOpt::Level::Default;
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
+  // Old version of the code
+  compileInfo->gfxPipelineInfo.options.optimizationLevel = static_cast<uint32_t>(CodeGenOpt::Level::Default);
+  compileInfo->compPipelineInfo.options.optimizationLevel = static_cast<uint32_t>(CodeGenOpt::Level::Default);
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  compileInfo->gfxPipelineInfo.options.optimizationLevel = static_cast<uint32_t>(CodeGenOptLevel::Default);
+  compileInfo->compPipelineInfo.options.optimizationLevel = static_cast<uint32_t>(CodeGenOptLevel::Default);
+#endif
+
   compileInfo->gfxPipelineInfo.options.resourceLayoutScheme = LayoutScheme;
   compileInfo->compPipelineInfo.options.forceCsThreadIdSwizzling = ForceCsThreadIdSwizzling;
   compileInfo->compPipelineInfo.options.overrideThreadGroupSizeX = OverrideThreadGroupSizeX;
@@ -758,7 +782,8 @@ int main(int argc, char *argv[]) {
 #endif
 
   ICompiler *compiler = nullptr;
-  Result result = init(argc, argv, compiler);
+  ShaderCacheWrap *cache = nullptr;
+  Result result = init(argc, argv, compiler, cache);
 
 #ifdef WIN_OS
   if (AssertToMsgBox) {
@@ -767,11 +792,14 @@ int main(int argc, char *argv[]) {
 #endif
 
   // Cleanup code that gets run automatically before returning.
-  auto onExit = make_scope_exit([compiler, &result] {
+  auto onExit = make_scope_exit([compiler, cache, &result] {
     FinalizeSpvgen();
 
     if (compiler)
       compiler->Destroy();
+
+    if (cache)
+      cache->Destroy();
 
     if (result == Result::Success)
       LLPC_OUTS("\n=====  AMDLLPC SUCCESS  =====\n");

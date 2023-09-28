@@ -36,6 +36,9 @@ namespace lgc {
 // Max spirv builtIn value
 static constexpr unsigned BuiltInInternalBase = 0x10000000;
 
+// Max builtIn value = BuiltInInternalBase + 13
+static constexpr unsigned MaxBuiltIn = 0x1000000D;
+
 // Define built-in kind enum.
 enum BuiltInKind : unsigned {
 #define BUILTIN(name, number, out, in, type) BuiltIn##name = number,

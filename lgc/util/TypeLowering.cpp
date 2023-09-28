@@ -1,4 +1,5 @@
 #include "lgc/util/TypeLowering.h"
+#include "lgc/util/Internal.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Instructions.h"
 
@@ -115,15 +116,7 @@ Function *TypeLowering::lowerFunctionArguments(Function &fn) {
   if (remappedArgs.empty())
     return &fn;
 
-  FunctionType *newFnTy = FunctionType::get(fn.getReturnType(), newArgTys, false);
-  auto *newFn = Function::Create(newFnTy, fn.getLinkage());
-  newFn->copyAttributesFrom(&fn);
-  newFn->copyMetadata(&fn, 0);
-  newFn->takeName(&fn);
-  newFn->setAttributes(fn.getAttributes());
-  newFn->splice(newFn->begin(), &fn);
-  fn.getParent()->getFunctionList().insertAfter(fn.getIterator(), newFn);
-
+  auto *newFn = mutateFunctionArguments(fn, fn.getReturnType(), newArgTys, fn.getAttributes());
   fn.replaceAllUsesWith(newFn);
   for (unsigned argIdx : remappedArgs)
     recordValue(fn.getArg(argIdx), {newFn->getArg(argIdx)});

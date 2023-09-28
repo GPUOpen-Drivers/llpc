@@ -8,6 +8,12 @@ config.llvm_tools_dir = "@LLVM_TOOLS_DIR@"
 config.lit_tools_dir = "@LLVM_LIT_TOOLS_DIR@"
 config.python_executable = "@PYTHON_EXECUTABLE@"
 
+for d in "@LIT_DEFINITIONS@".split(";"):
+    def_split = d.split("=")
+    name = def_split[0].lower()
+    val = def_split[1] if len(def_split) > 1 else "ON"
+    config.available_features.add(name)
+
 # Support substitution of the tools_dir with user parameters. This is
 # used when we can't determine the tool dir at configuration time.
 try:

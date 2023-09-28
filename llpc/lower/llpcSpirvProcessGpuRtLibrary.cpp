@@ -377,7 +377,6 @@ void SpirvProcessGpuRtLibrary::createIntersectBvh(Function *func) {
   // }
 
   auto argIt = func->arg_begin();
-
   Value *address = m_builder->CreateLoad(FixedVectorType::get(m_builder->getInt32Ty(), 2), argIt);
   argIt++;
 

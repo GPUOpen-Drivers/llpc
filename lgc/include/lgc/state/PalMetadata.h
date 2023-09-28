@@ -169,6 +169,9 @@ public:
   // Updates the CB shader mask information that depends on the exports.
   void updateCbShaderMask(llvm::ArrayRef<ColorExportInfo> exps);
 
+  // Updates the DB shader control that depends on the CB state.
+  void updateDbShaderControl();
+
   // Sets the finalized 128-bit cache hash.  The version identifies the version of LLPC used to generate the hash.
   void setFinalized128BitCacheHash(const lgc::Hash128 &finalizedCacheHash, const llvm::VersionTuple &version);
 
@@ -197,9 +200,6 @@ public:
 
   // Erase the PAL metadata for FS input mappings. Used when finalizing the PAL metadata in the link.
   void eraseFragmentInputInfo();
-
-  // Returns true if the fragment input info has an entry for a builtin.
-  bool fragmentShaderUsesMappedBuiltInInputs();
 
   // Returns the location of the fragment builtin or InvalidValue if the builtin is not found.
   unsigned getFragmentShaderBuiltInLoc(unsigned builtIn);
@@ -248,7 +248,7 @@ private:
   void finalizeInputControlRegisterSetting();
 
   // The maximum possible value for the spill threshold entry in the PAL metadata.
-  static constexpr uint64_t MAX_SPILL_THRESHOLD = UINT_MAX;
+  static constexpr uint64_t MAX_SPILL_THRESHOLD = USHRT_MAX;
 
   unsigned getUserDataCount(unsigned callingConv);
   unsigned getCallingConventionForFirstHardwareShaderStage(std::string &hwStageName);

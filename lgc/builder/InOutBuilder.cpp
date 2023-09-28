@@ -205,14 +205,16 @@ Value *BuilderImpl::readGenericInputOutput(bool isOutput, Type *resultTy, unsign
 
   // Fold constant locationOffset into location. (Currently a variable locationOffset is only supported in
   // TCS, TES, and FS custom interpolation.)
+  bool isDynLocOffset = true;
   if (auto constLocOffset = dyn_cast<ConstantInt>(locationOffset)) {
     location += constLocOffset->getZExtValue();
     locationOffset = getInt32(0);
     locationCount = (resultTy->getPrimitiveSizeInBits() + 127U) / 128U;
+    isDynLocOffset = false;
   }
 
   // Mark the usage of the input/output.
-  markGenericInputOutputUsage(isOutput, location, locationCount, inOutInfo, vertexIndex);
+  markGenericInputOutputUsage(isOutput, location, locationCount, inOutInfo, vertexIndex, isDynLocOffset);
 
   // Generate LLPC call for reading the input/output.
   Value *result = nullptr;
@@ -290,14 +292,17 @@ Instruction *BuilderImpl::CreateWriteGenericOutput(Value *valueToWrite, unsigned
 
   // Fold constant locationOffset into location. (Currently a variable locationOffset is only supported in
   // TCS.)
+  bool isDynLocOffset = true;
   if (auto constLocOffset = dyn_cast<ConstantInt>(locationOffset)) {
     location += constLocOffset->getZExtValue();
     locationOffset = getInt32(0);
     locationCount = (valueToWrite->getType()->getPrimitiveSizeInBits() + 127U) / 128U;
+    isDynLocOffset = false;
   }
 
   // Mark the usage of the output.
-  markGenericInputOutputUsage(/*isOutput=*/true, location, locationCount, outputInfo, vertexOrPrimitiveIndex);
+  markGenericInputOutputUsage(/*isOutput=*/true, location, locationCount, outputInfo, vertexOrPrimitiveIndex,
+                              isDynLocOffset);
 
   // Set up the args for the llpc call.
   SmallVector<Value *, 6> args;
@@ -370,8 +375,9 @@ Instruction *BuilderImpl::CreateWriteGenericOutput(Value *valueToWrite, unsigned
 //                            for mesh shader per-primitive output: primitive index;
 //                            for FS custom-interpolated input: auxiliary value;
 //                            else nullptr.
+// @param isDynLocOffset : Whether the location offset is dynamic indexing
 void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, unsigned locationCount,
-                                              InOutInfo &inOutInfo, Value *vertexOrPrimIndex) {
+                                              InOutInfo &inOutInfo, Value *vertexOrPrimIndex, bool isDynLocOffset) {
   auto resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
 
   // Mark the input or output locations as in use.
@@ -417,6 +423,8 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
         keepAllLocations = true;
     }
     unsigned startLocation = (keepAllLocations ? 0 : location);
+    // NOTE: The non-invalid value as initial new Location info or new location is used to identify the dynamic indexing
+    // location.
     // Non-GS-output case.
     if (inOutLocInfoMap) {
       for (unsigned i = startLocation; i < location + locationCount; ++i) {
@@ -424,16 +432,16 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
         origLocationInfo.setLocation(i);
         origLocationInfo.setComponent(inOutInfo.getComponent());
         auto &newLocationInfo = (*inOutLocInfoMap)[origLocationInfo];
-        newLocationInfo.setData(InvalidValue);
+        newLocationInfo.setData(isDynLocOffset ? i : InvalidValue);
       }
     }
     if (perPatchInOutLocMap) {
       for (unsigned i = startLocation; i < location + locationCount; ++i)
-        (*perPatchInOutLocMap)[i] = InvalidValue;
+        (*perPatchInOutLocMap)[i] = isDynLocOffset ? i : InvalidValue;
     }
     if (perPrimitiveInOutLocMap) {
       for (unsigned i = startLocation; i < location + locationCount; ++i)
-        (*perPrimitiveInOutLocMap)[i] = InvalidValue;
+        (*perPrimitiveInOutLocMap)[i] = isDynLocOffset ? i : InvalidValue;
     }
   } else {
     // GS output. We include the stream ID with the location in the map key.
@@ -450,6 +458,10 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
   if (!isOutput && m_shaderStage == ShaderStageFragment) {
     // Mark usage for interpolation info.
     markInterpolationInfo(inOutInfo);
+  }
+
+  if (isOutput && m_shaderStage == ShaderStageFragment && inOutInfo.isDualSourceBlendDynamic()) {
+    m_pipelineState->getColorExportState().dynamicDualSourceBlendEnable = true;
   }
 }
 
@@ -792,7 +804,7 @@ Value *BuilderImpl::CreateReadBaryCoord(BuiltInKind builtIn, InOutInfo inputInfo
                                         const llvm::Twine &instName) {
   assert(builtIn == lgc::BuiltInBaryCoord || builtIn == lgc::BuiltInBaryCoordNoPerspKHR);
 
-  markBuiltInInputUsage(builtIn, 0);
+  markBuiltInInputUsage(builtIn, 0, inputInfo);
 
   // Force override to per-sample interpolation.
   if (getPipelineState()->getOptions().enableInterpModePatch && !auxInterpValue &&
@@ -865,7 +877,7 @@ Value *BuilderImpl::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo in
     arraySize = constIndex->getZExtValue() + 1;
 
   if (!isOutput)
-    markBuiltInInputUsage(builtIn, arraySize);
+    markBuiltInInputUsage(builtIn, arraySize, inOutInfo);
   else
     markBuiltInOutputUsage(builtIn, arraySize, InvalidValue);
 
@@ -1417,7 +1429,8 @@ Type *BuilderImpl::getBuiltInTy(BuiltInKind builtIn, InOutInfo inOutInfo) {
 // @param builtIn : Built-in ID
 // @param arraySize : Number of array elements for ClipDistance and CullDistance. (Multiple calls to this function for
 // this built-in might have different array sizes; we take the max)
-void BuilderImpl::markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySize) {
+// @param inOutInfo : Extra input/output info (shader-defined array size)
+void BuilderImpl::markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySize, InOutInfo inOutInfo) {
   auto &usage = getPipelineState()->getShaderResourceUsage(m_shaderStage)->builtInUsage;
   assert((builtIn != BuiltInClipDistance && builtIn != BuiltInCullDistance) || arraySize != 0);
   switch (m_shaderStage) {
@@ -1573,6 +1586,8 @@ void BuilderImpl::markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySize
     switch (static_cast<unsigned>(builtIn)) {
     case BuiltInFragCoord:
       usage.fs.fragCoord = true;
+      if (inOutInfo.getInterpMode() == InOutInfo::InterpLocSample)
+        usage.fs.fragCoordIsSample = true;
       break;
     case BuiltInFrontFacing:
       usage.fs.frontFacing = true;

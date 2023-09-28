@@ -228,8 +228,6 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "demote.to.helper.invocation";
   case BuilderOpcode::IsHelperInvocation:
     return "is.helper.invocation";
-  case BuilderOpcode::SetMeshOutputs:
-    return "set.mesh.outputs";
   case BuilderOpcode::ImageLoad:
     return "image.load";
   case BuilderOpcode::ImageLoadWithFmask:
@@ -256,8 +254,6 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "image.get.lod";
   case BuilderOpcode::ImageBvhIntersectRay:
     return "image.bvh.intersect.ray";
-  case BuilderOpcode::Reserved2:
-    return "reserved2";
   case BuilderOpcode::GetWaveSize:
     return "get.wave.size";
   case BuilderOpcode::GetSubgroupSize:
@@ -270,6 +266,8 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "subgroup.any";
   case BuilderOpcode::SubgroupAllEqual:
     return "subgroup.all.equal";
+  case BuilderOpcode::SubgroupRotate:
+    return "subgroup.rotate";
   case BuilderOpcode::SubgroupBroadcast:
     return "subgroup.broadcast";
   case BuilderOpcode::SubgroupBroadcastWaterfall:
@@ -892,18 +890,6 @@ Instruction *Builder::CreateDemoteToHelperInvocation(const Twine &instName) {
 // @param instName : Name to give final instruction
 Value *Builder::CreateIsHelperInvocation(const Twine &instName) {
   return record(BuilderOpcode::IsHelperInvocation, getInt1Ty(), {}, instName);
-}
-
-// =====================================================================================================================
-// In the mesh shader, set the actual output size of the primitives and vertices that the mesh shader workgroup will
-// emit upon completion.
-//
-// @param vertexCount : Actual output size of the vertices
-// @param primitiveCount : Actual output size of the primitives
-// @param instName : Name to give final instruction
-// @returns Instruction to set the actual size of mesh outputs
-Instruction *Builder::CreateSetMeshOutputs(Value *vertexCount, Value *primitiveCount, const Twine &instName) {
-  return record(BuilderOpcode::SetMeshOutputs, nullptr, {vertexCount, primitiveCount}, instName);
 }
 
 // =====================================================================================================================
@@ -1811,6 +1797,18 @@ Value *Builder::CreateSubgroupShuffleDown(Value *const value, Value *const offse
 }
 
 // =====================================================================================================================
+// Create a subgroup rotate call.
+//
+// @param value : The value to read from the chosen rotated lane to all active lanes.
+// @param delta : The delta/offset added to lane id.
+// @param clusterSize : The cluster size if exists.
+// @param instName : Name to give final instruction.
+Value *Builder::CreateSubgroupRotate(Value *const value, Value *const delta, Value *const clusterSize,
+                                     const Twine &instName) {
+  return record(BuilderOpcode::SubgroupRotate, value->getType(), {value, delta, clusterSize}, instName);
+}
+
+// =====================================================================================================================
 // Create a subgroup clustered reduction.
 //
 // @param groupArithOp : The group operation to perform
@@ -1854,9 +1852,10 @@ Value *Builder::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, Valu
 //
 // @param value : The value to broadcast
 // @param index : The index within the quad to broadcast from
+// @param inWQM : Whether it's in whole quad mode
 // @param instName : Name to give instruction(s)
-Value *Builder::CreateSubgroupQuadBroadcast(Value *const value, Value *const index, const Twine &instName) {
-  return record(BuilderOpcode::SubgroupQuadBroadcast, value->getType(), {value, index}, instName);
+Value *Builder::CreateSubgroupQuadBroadcast(Value *const value, Value *const index, bool inWQM, const Twine &instName) {
+  return record(BuilderOpcode::SubgroupQuadBroadcast, value->getType(), {value, index, getInt1(inWQM)}, instName);
 }
 
 // =====================================================================================================================
@@ -2072,6 +2071,7 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
       break;
     case BuilderOpcode::SubgroupAll:
     case BuilderOpcode::SubgroupAllEqual:
+    case BuilderOpcode::SubgroupRotate:
     case BuilderOpcode::SubgroupAny:
     case BuilderOpcode::SubgroupBallot:
     case BuilderOpcode::SubgroupBroadcast:
@@ -2107,7 +2107,6 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::ImageQuerySamples:
     case BuilderOpcode::ImageQuerySize:
     case BuilderOpcode::IsHelperInvocation:
-    case BuilderOpcode::SetMeshOutputs:
     case BuilderOpcode::Kill:
     case BuilderOpcode::ReadClock:
     case BuilderOpcode::DebugBreak:

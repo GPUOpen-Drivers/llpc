@@ -308,6 +308,7 @@ enum BufNumFmt {
   BUF_NUM_FORMAT_SINT = 5,      // Sint
   BUF_NUM_FORMAT_SNORM_OGL = 6, // Snorm_ogl
   BUF_NUM_FORMAT_FLOAT = 7,     // Float
+  BUF_NUM_FORMAT_FIXED = 8,     // Fixed point (for emulation format)
 };
 
 // Enumerates float round modes.

@@ -351,43 +351,6 @@ static void replaceGlobal(const DataLayout &DL, GlobalVariable *Registers,
                             Registers->getValueType(), Registers, Indices);
   auto *Repl = ConstantExpr::getBitCast(Gep, G->getType());
 
-  // TODO Can remove i64 handling
-  if (G->getValueType()->isIntegerTy(64)) {
-    auto *I32 = Type::getInt32Ty(G->getContext());
-    auto *I32Ptr = ConstantExpr::getBitCast(
-        Gep, I32->getPointerTo(Registers->getAddressSpace()));
-    // Special case the return address: Convert i64 loads and stores to i32
-    // ones for the translator
-    for (auto *U : make_early_inc_range(G->users())) {
-      if (auto *Load = dyn_cast<LoadInst>(U)) {
-        if (Load->getPointerOperand() != G)
-          continue;
-        IRBuilder<> B(Load);
-        auto *Part0 = B.CreateLoad(I32, I32Ptr);
-        auto *Part1 = B.CreateLoad(I32, ConstantExpr::getInBoundsGetElementPtr(
-                                            I32, I32Ptr, B.getInt64(1)));
-        auto *Vec = B.CreateInsertElement(FixedVectorType::get(I32, 2), Part0,
-                                          static_cast<uint64_t>(0));
-        Vec = B.CreateInsertElement(Vec, Part1, 1);
-        auto *Loaded = B.CreateBitCast(Vec, I64);
-        Load->replaceAllUsesWith(Loaded);
-        Load->eraseFromParent();
-      } else if (auto *Store = dyn_cast<StoreInst>(U)) {
-        if (Store->getPointerOperand() != G)
-          continue;
-        IRBuilder<> B(Store);
-        auto *Vec = B.CreateBitCast(Store->getValueOperand(),
-                                    FixedVectorType::get(I32, 2));
-        auto *Part0 = B.CreateExtractElement(Vec, static_cast<uint64_t>(0));
-        auto *Part1 = B.CreateExtractElement(Vec, 1);
-        B.CreateStore(Part0, I32Ptr);
-        B.CreateStore(Part1, ConstantExpr::getInBoundsGetElementPtr(
-                                 I32, I32Ptr, B.getInt64(1)));
-        Store->eraseFromParent();
-      }
-    }
-  }
-
   G->replaceAllUsesWith(Repl);
   G->eraseFromParent();
 }
@@ -849,17 +812,7 @@ void DXILContPostProcessPass::handleContStackAlloc(FunctionAnalysisManager &FAM,
         CInst->eraseFromParent();
 
         // Add allocation to the stack size of this function
-        uint64_t CurStackSize = 0;
-        if (auto *StackSizeMD =
-                Func->getMetadata(DXILContHelper::MDStackSizeName))
-          CurStackSize =
-              mdconst::extract<ConstantInt>(StackSizeMD->getOperand(0))
-                  ->getZExtValue();
-        Func->setMetadata(
-            DXILContHelper::MDStackSizeName,
-            MDTuple::get(Func->getContext(),
-                         {ConstantAsMetadata::get(ConstantInt::get(
-                             B.getInt32Ty(), Size + CurStackSize))}));
+        DXILContHelper::addStackSize(Func, Size);
       }
     }
   }
@@ -876,8 +829,7 @@ DXILContPostProcessPass::run(llvm::Module &M,
   ToProcess.clear();
   MapVector<Function *, DXILShaderKind> ShaderKinds;
   analyzeShaderKinds(M, ShaderKinds);
-  auto *SetupRayGen =
-      DXILContHelper::getAliasedFunction(M, "_cont_SetupRayGen");
+  auto *SetupRayGen = M.getFunction("_cont_SetupRayGen");
   for (auto &Entry : ShaderKinds) {
     switch (Entry.second) {
     case DXILShaderKind::RayGeneration:

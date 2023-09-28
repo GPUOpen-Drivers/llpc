@@ -238,7 +238,8 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
   }
 
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11 &&
-      m_pipelineState->getColorExportState().dualSourceBlendEnable) {
+      (m_pipelineState->getColorExportState().dualSourceBlendEnable ||
+       m_pipelineState->getColorExportState().dynamicDualSourceBlendEnable)) {
     // Save them for later dual-source-swizzle
     m_blendSourceChannels = exportTy->isHalfTy() ? (compCount + 1) / 2 : compCount;
     assert(hwColorExport <= 1);
@@ -698,8 +699,6 @@ llvm::Value *LowerFragColorExport::jumpColorExport(llvm::Function *fragEntryPoin
   m_pipelineState->getPalMetadata()->addColorExportInfo(m_info);
   m_pipelineState->getPalMetadata()->setDiscardState(m_resUsage->builtInUsage.fs.discard);
 
-  ReturnInst *retInst = cast<ReturnInst>(builder.GetInsertPoint()->getParent()->getTerminator());
-
   // First build the argument type for the fragment shader.
   SmallVector<Type *, 8> outputTypes;
   for (const ColorExportInfo &info : m_info) {
@@ -729,15 +728,13 @@ llvm::Value *LowerFragColorExport::jumpColorExport(llvm::Function *fragEntryPoin
   auto funcTyPtr = funcTy->getPointerTo(ADDR_SPACE_CONST);
   auto colorShaderAddr = ShaderInputs::getSpecialUserData(UserDataMapping::ColorExportAddr, builder);
   AddressExtender addrExt(builder.GetInsertPoint()->getParent()->getParent());
-  auto funcPtr = addrExt.extend(colorShaderAddr, builder.getInt32(HighAddrPc), funcTyPtr, builder);
+  auto funcPtr = addrExt.extendWithPc(colorShaderAddr, funcTyPtr, builder);
 
   // Jump
   auto callInst = builder.CreateCall(funcTy, funcPtr, argVal);
   callInst->setCallingConv(CallingConv::AMDGPU_Gfx);
   callInst->setDoesNotReturn();
   callInst->setOnlyWritesMemory();
-  builder.CreateUnreachable();
-  retInst->eraseFromParent();
   return callInst;
 }
 
@@ -769,10 +766,12 @@ void LowerFragColorExport::collectExportInfoForBuiltinOutput(Function *module, B
       }
       case BuiltInSampleMask: {
         assert(output->getType()->isArrayTy());
+        if (!m_pipelineState->getOptions().disableSampleMask) {
+          // NOTE: Only gl_SampleMask[0] is valid for us.
+          m_sampleMask = builder.CreateExtractValue(output, {0});
+          m_sampleMask = builder.CreateBitCast(m_sampleMask, builder.getFloatTy());
+        }
 
-        // NOTE: Only gl_SampleMask[0] is valid for us.
-        m_sampleMask = builder.CreateExtractValue(output, {0});
-        m_sampleMask = builder.CreateBitCast(m_sampleMask, builder.getFloatTy());
         break;
       }
       case BuiltInFragStencilRef: {
@@ -1013,7 +1012,8 @@ void FragColorExport::generateExportInstructions(ArrayRef<lgc::ColorExportInfo> 
   }
 
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11 &&
-      m_pipelineState->getColorExportState().dualSourceBlendEnable)
+      (m_pipelineState->getColorExportState().dualSourceBlendEnable ||
+       m_pipelineState->getColorExportState().dynamicDualSourceBlendEnable))
     lastExport = dualSourceSwizzle(builder);
 
   if (!lastExport && dummyExport) {

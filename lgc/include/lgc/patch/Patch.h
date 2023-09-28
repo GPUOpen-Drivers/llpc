@@ -53,8 +53,7 @@ public:
   virtual ~Patch() {}
 
   static void addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, llvm::Timer *patchTimer,
-                        llvm::Timer *optTimer, Pipeline::CheckShaderCacheFunc checkShaderCacheFunc,
-                        llvm::CodeGenOpt::Level optLevel);
+                        llvm::Timer *optTimer, Pipeline::CheckShaderCacheFunc checkShaderCacheFunc, uint32_t optLevel);
 
   // Register all the patching passes into the given pass manager
   static void registerPasses(lgc::PassManager &passMgr);
@@ -65,7 +64,7 @@ public:
   static llvm::GlobalVariable *getLdsVariable(PipelineState *pipelineState, llvm::Module *module);
 
 protected:
-  static void addOptimizationPasses(lgc::PassManager &passMgr, llvm::CodeGenOpt::Level optLevel);
+  static void addOptimizationPasses(lgc::PassManager &passMgr, uint32_t optLevel);
 
   void init(llvm::Module *module);
 

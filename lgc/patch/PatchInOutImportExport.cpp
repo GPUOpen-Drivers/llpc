@@ -630,8 +630,8 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       }
       case ShaderStageMesh: {
         assert(callInst.arg_size() == 2);
-        Value *elemIdx = isDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
-        input = patchMeshBuiltInInputImport(inputTy, builtInId, elemIdx, builder);
+        assert(isDontCareValue(callInst.getOperand(1)));
+        input = patchMeshBuiltInInputImport(inputTy, builtInId, builder);
         break;
       }
       case ShaderStageFragment: {
@@ -670,21 +670,31 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
 
       InOutLocationInfo origLocInfo;
       origLocInfo.setLocation(origLoc);
-      auto locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
       if (m_shaderStage == ShaderStageTessEval ||
           (m_shaderStage == ShaderStageFragment &&
            (m_pipelineState->getPrevShaderStage(m_shaderStage) == ShaderStageMesh || m_pipelineState->isUnlinked()))) {
         // NOTE: For generic inputs of tessellation evaluation shader or fragment shader whose previous shader stage
         // is mesh shader or is in unlinked pipeline, they could be per-patch ones or per-primitive ones.
-        if (locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end()) {
-          loc = locInfoMapIt->second.getLocation();
-        } else if (resUsage->inOutUsage.perPatchInputLocMap.find(origLoc) !=
-                   resUsage->inOutUsage.perPatchInputLocMap.end()) {
-          loc = resUsage->inOutUsage.perPatchInputLocMap[origLoc];
+        const bool isPerPrimitive = genericLocationOp.getPerPrimitive();
+        if (isPerPrimitive) {
+          auto &checkedMap = m_shaderStage == ShaderStageTessEval ? resUsage->inOutUsage.perPatchInputLocMap
+                                                                  : resUsage->inOutUsage.perPrimitiveInputLocMap;
+          auto locMapIt = checkedMap.find(origLoc);
+          if (locMapIt != checkedMap.end())
+            loc = locMapIt->second;
         } else {
-          assert(resUsage->inOutUsage.perPrimitiveInputLocMap.find(origLoc) !=
-                 resUsage->inOutUsage.perPrimitiveInputLocMap.end());
-          loc = resUsage->inOutUsage.perPrimitiveInputLocMap[origLoc];
+          // NOTE: We need consider <location, component> key if component index is constant. Because inputs within same
+          // location are compacted.
+          auto locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
+          if (locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end()) {
+            loc = locInfoMapIt->second.getLocation();
+          } else {
+            assert(isa<ConstantInt>(genericLocationOp.getElemIdx()));
+            origLocInfo.setComponent(cast<ConstantInt>(genericLocationOp.getElemIdx())->getZExtValue());
+            auto locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
+            if (locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end())
+              loc = locInfoMapIt->second.getLocation();
+          }
         }
       } else {
         if (m_pipelineState->canPackInput(m_shaderStage)) {
@@ -695,15 +705,26 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
           assert(!isTcs || (isa<ConstantInt>(genericLocationOp.getLocOffset()) &&
                             isa<ConstantInt>(genericLocationOp.getElemIdx())));
           origLocInfo.setComponent(cast<ConstantInt>(genericLocationOp.getElemIdx())->getZExtValue());
-          locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
+          auto locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
           assert(locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end());
 
           loc = locInfoMapIt->second.getLocation();
           elemIdx = builder.getInt32(locInfoMapIt->second.getComponent());
           highHalf = locInfoMapIt->second.isHighHalf();
         } else {
-          assert(locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end());
-          loc = locInfoMapIt->second.getLocation();
+          // NOTE: We need consider <location, component> key if component index is constant. Because inputs within same
+          // location are compacted.
+          auto locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
+          if (locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end()) {
+            loc = locInfoMapIt->second.getLocation();
+          } else {
+            assert(isa<ConstantInt>(genericLocationOp.getElemIdx()));
+            origLocInfo.setComponent(cast<ConstantInt>(genericLocationOp.getElemIdx())->getZExtValue());
+            auto locInfoMapIt = resUsage->inOutUsage.inputLocInfoMap.find(origLocInfo);
+            assert(locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end());
+            if (locInfoMapIt != resUsage->inOutUsage.inputLocInfoMap.end())
+              loc = locInfoMapIt->second.getLocation();
+          }
         }
       }
       assert(loc != InvalidValue);
@@ -930,24 +951,39 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       origLocInfo.setLocation(value);
       if (m_shaderStage == ShaderStageGeometry)
         origLocInfo.setStreamId(cast<ConstantInt>(callInst.getOperand(2))->getZExtValue());
-      auto locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
 
       if (m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageMesh) {
         locOffset = callInst.getOperand(1);
 
         // NOTE: For generic outputs of tessellation control shader or mesh shader, they could be per-patch ones or
         // per-primitive ones.
-        if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
-          exist = true;
-          loc = locInfoMapIt->second.getLocation();
-        } else if (resUsage->inOutUsage.perPatchOutputLocMap.find(value) !=
-                   resUsage->inOutUsage.perPatchOutputLocMap.end()) {
-          exist = true;
-          loc = resUsage->inOutUsage.perPatchOutputLocMap[value];
-        } else if (resUsage->inOutUsage.perPrimitiveOutputLocMap.find(value) !=
-                   resUsage->inOutUsage.perPrimitiveOutputLocMap.end()) {
-          exist = true;
-          loc = resUsage->inOutUsage.perPrimitiveOutputLocMap[value];
+        if (m_shaderStage == ShaderStageMesh && cast<ConstantInt>(callInst.getOperand(4))->getZExtValue() != 0) {
+          auto locMapIt = resUsage->inOutUsage.perPrimitiveOutputLocMap.find(value);
+          if (locMapIt != resUsage->inOutUsage.perPrimitiveOutputLocMap.end()) {
+            loc = locMapIt->second;
+            exist = true;
+          }
+        } else if (m_shaderStage == ShaderStageTessControl && isDontCareValue(callInst.getOperand(3))) {
+          auto locMapIt = resUsage->inOutUsage.perPatchOutputLocMap.find(value);
+          if (locMapIt != resUsage->inOutUsage.perPatchOutputLocMap.end()) {
+            loc = locMapIt->second;
+            exist = true;
+          }
+        } else {
+          // NOTE: We need consider <location, component> key if component index is constant. Because outputs within
+          // same location are compacted.
+          auto locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
+          if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
+            loc = locInfoMapIt->second.getLocation();
+            exist = true;
+          } else if (isa<ConstantInt>(callInst.getOperand(2))) {
+            origLocInfo.setComponent(cast<ConstantInt>(callInst.getOperand(2))->getZExtValue());
+            auto locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
+            if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
+              loc = locInfoMapIt->second.getLocation();
+              exist = true;
+            }
+          }
         }
       } else if (m_shaderStage == ShaderStageCopyShader) {
         exist = true;
@@ -962,7 +998,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         if (output->getType()->getScalarSizeInBits() == 64)
           component *= 2; // Component in location info is dword-based
         origLocInfo.setComponent(component);
-        locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
+        auto locInfoMapIt = resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
 
         if (m_pipelineState->canPackOutput(m_shaderStage)) {
           if (locInfoMapIt != resUsage->inOutUsage.outputLocInfoMap.end()) {
@@ -2062,9 +2098,10 @@ void PatchInOutImportExport::patchMeshGenericOutputExport(Value *output, unsigne
 
   outputOffset = builder.CreateAdd(outputOffset, compIdx);
 
-  std::string callName(isPerPrimitive ? lgcName::MeshTaskWritePrimitiveOutput : lgcName::MeshTaskWriteVertexOutput);
-  callName += getTypeName(outputTy);
-  builder.CreateNamedCall(callName, builder.getVoidTy(), {outputOffset, vertexOrPrimitiveIdx, output}, {});
+  if (isPerPrimitive)
+    builder.create<WriteMeshPrimitiveOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
+  else
+    builder.create<WriteMeshVertexOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
 }
 
 // =====================================================================================================================
@@ -2340,20 +2377,14 @@ Value *PatchInOutImportExport::patchGsBuiltInInputImport(Type *inputTy, unsigned
 //
 // @param inputTy : Type of input value
 // @param builtInId : ID of the built-in variable
-// @param elemIdx : Index used for vector element indexing (could be null)
 // @param builder : The IR builder to create and insert IR instruction
-Value *PatchInOutImportExport::patchMeshBuiltInInputImport(Type *inputTy, unsigned builtInId, Value *elemIdx,
-                                                           BuilderBase &builder) {
+Value *PatchInOutImportExport::patchMeshBuiltInInputImport(Type *inputTy, unsigned builtInId, BuilderBase &builder) {
   // Handle work group size built-in
   if (builtInId == BuiltInWorkgroupSize) {
     // WorkgroupSize is a constant vector supplied by mesh shader mode.
     const auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
-    Value *input =
-        ConstantVector::get({builder.getInt32(meshMode.workgroupSizeX), builder.getInt32(meshMode.workgroupSizeY),
-                             builder.getInt32(meshMode.workgroupSizeZ)});
-    if (elemIdx)
-      input = builder.CreateExtractElement(input, elemIdx);
-    return input;
+    return ConstantVector::get({builder.getInt32(meshMode.workgroupSizeX), builder.getInt32(meshMode.workgroupSizeY),
+                                builder.getInt32(meshMode.workgroupSizeZ)});
   }
 
   // Handle other built-ins
@@ -2363,51 +2394,37 @@ Value *PatchInOutImportExport::patchMeshBuiltInInputImport(Type *inputTy, unsign
   switch (builtInId) {
   case BuiltInDrawIndex:
     assert(builtInUsage.drawIndex);
-    assert(!elemIdx); // No vector element indexing
     break;
   case BuiltInViewIndex:
     assert(builtInUsage.viewIndex);
-    assert(!elemIdx); // No vector element indexing
     break;
   case BuiltInNumWorkgroups:
     assert(builtInUsage.numWorkgroups);
-    inputTy = elemIdx ? FixedVectorType::get(builder.getInt32Ty(), 3) : inputTy;
     break;
   case BuiltInWorkgroupId:
     assert(builtInUsage.workgroupId);
-    inputTy = elemIdx ? FixedVectorType::get(builder.getInt32Ty(), 3) : inputTy;
     break;
   case BuiltInLocalInvocationId:
     assert(builtInUsage.localInvocationId);
-    inputTy = elemIdx ? FixedVectorType::get(builder.getInt32Ty(), 3) : inputTy;
     break;
   case BuiltInGlobalInvocationId:
     assert(builtInUsage.globalInvocationId);
-    inputTy = elemIdx ? FixedVectorType::get(builder.getInt32Ty(), 3) : inputTy;
     break;
   case BuiltInLocalInvocationIndex:
     assert(builtInUsage.localInvocationIndex);
-    assert(!elemIdx); // No vector element indexing
     break;
   case BuiltInSubgroupId:
     assert(builtInUsage.subgroupId);
-    assert(!elemIdx); // No vector element indexing
     break;
   case BuiltInNumSubgroups:
     assert(builtInUsage.numSubgroups);
-    assert(!elemIdx); // No vector element indexing
     break;
   default:
     llvm_unreachable("Unknown mesh shader built-in!");
     break;
   }
 
-  std::string callName(lgcName::MeshTaskGetMeshInput);
-  callName += getTypeName(inputTy);
-  Value *input = builder.CreateNamedCall(callName, inputTy, builder.getInt32(builtInId), {});
-  if (elemIdx)
-    input = builder.CreateExtractElement(input, elemIdx);
-  return input;
+  return builder.create<GetMeshBuiltinInputOp>(inputTy, builtInId);
 }
 
 // =====================================================================================================================
@@ -2438,8 +2455,26 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
 
     Value *sampleMaskIn = sampleCoverage;
     if (m_pipelineState->getRasterizerState().perSampleShading || builtInUsage.runAtSampleRate) {
-      // gl_SampleMaskIn[0] = (SampleCoverage & (1 << gl_SampleID))
-      sampleMaskIn = builder.CreateShl(builder.getInt32(1), sampleId);
+      unsigned baseMask = 1;
+      if (!builtInUsage.sampleId) {
+        // Fix the failure for multisample_shader_builtin.sample_mask cases "gl_SampleMaskIn" should contain one
+        // or multiple covered sample bit.
+        // (1) If the 4 samples is divided into 2 sub invocation groups, broadcast sample mask bit <0, 1>
+        // to sample <2, 3>.
+        // (2) If the 8 samples is divided into 2 sub invocation groups, broadcast sample mask bit <0, 1>
+        // to sample <2, 3>, then re-broadcast sample mask bit <0, 1, 2, 3> to sample <4, 5, 6, 7>.
+        // (3) If the 8 samples is divided into 4 sub invocation groups, patch to broadcast sample mask bit
+        // <0, 1, 2, 3> to sample <4, 5, 6, 7>.
+
+        unsigned baseMaskSamples = m_pipelineState->getRasterizerState().pixelShaderSamples;
+        while (baseMaskSamples < m_pipelineState->getRasterizerState().numSamples) {
+          baseMask |= baseMask << baseMaskSamples;
+          baseMaskSamples *= 2;
+        }
+      }
+
+      // gl_SampleMaskIn[0] = (SampleCoverage & (baseMask << gl_SampleID))
+      sampleMaskIn = builder.CreateShl(builder.getInt32(baseMask), sampleId);
       sampleMaskIn = builder.CreateAnd(sampleCoverage, sampleMaskIn);
     }
 
@@ -2449,13 +2484,18 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     break;
   }
   case BuiltInFragCoord: {
-    // TODO: Support layout qualifiers "pixel_center_integer" and "origin_upper_left".
     Value *fragCoord[4] = {
         getFunctionArgument(m_entryPoint, entryArgIdxs.fragCoord.x),
         getFunctionArgument(m_entryPoint, entryArgIdxs.fragCoord.y),
         getFunctionArgument(m_entryPoint, entryArgIdxs.fragCoord.z),
         getFunctionArgument(m_entryPoint, entryArgIdxs.fragCoord.w),
     };
+
+    if (m_pipelineState->getShaderModes()->getFragmentShaderMode().pixelCenterInteger) {
+      fragCoord[0] = builder.CreateFSub(fragCoord[0], ConstantFP::get(builder.getFloatTy(), 0.5));
+      fragCoord[1] = builder.CreateFSub(fragCoord[1], ConstantFP::get(builder.getFloatTy(), 0.5));
+    }
+
     // Adjust gl_FragCoord.z value for the shading rate X,
     //
     // adjustedFragCoordZ = gl_FragCood.z + dFdxFine(gl_FragCood.z) * 1/16
@@ -3269,8 +3309,6 @@ void PatchInOutImportExport::patchMeshBuiltInOutputExport(Value *output, unsigne
   BuilderBase builder(*m_context);
   builder.SetInsertPoint(insertPos);
 
-  auto outputTy = output->getType();
-
   // Handle primitive indices built-ins
   if (builtInId == BuiltInPrimitivePointIndices || builtInId == BuiltInPrimitiveLineIndices ||
       builtInId == BuiltInPrimitiveTriangleIndices) {
@@ -3285,17 +3323,15 @@ void PatchInOutImportExport::patchMeshBuiltInOutputExport(Value *output, unsigne
     // whole, partial writes to the vector components for line and triangle primitives is not allowed."
     assert(!elemIdx);
 
-    builder.CreateNamedCall(lgcName::MeshTaskSetPrimitiveIndices + getTypeName(outputTy), builder.getVoidTy(),
-                            {vertexOrPrimitiveIdx, output}, {});
+    builder.create<SetMeshPrimitiveIndicesOp>(vertexOrPrimitiveIdx, output);
     return;
   }
 
   // Handle cull primitive built-in
   if (builtInId == BuiltInCullPrimitive) {
     assert(isPerPrimitive);
-    assert(outputTy->isIntegerTy(1)); // Must be boolean
-    builder.CreateNamedCall(lgcName::MeshTaskSetPrimitiveCulled, builder.getVoidTy(), {vertexOrPrimitiveIdx, output},
-                            {});
+    assert(output->getType()->isIntegerTy(1)); // Must be boolean
+    builder.create<SetMeshPrimitiveCulledOp>(vertexOrPrimitiveIdx, output);
     return;
   }
 
@@ -3357,9 +3393,10 @@ void PatchInOutImportExport::patchMeshBuiltInOutputExport(Value *output, unsigne
   if (elemIdx)
     outputOffset = builder.CreateAdd(builder.getInt32(4 * loc), elemIdx);
 
-  std::string callName(isPerPrimitive ? lgcName::MeshTaskWritePrimitiveOutput : lgcName::MeshTaskWriteVertexOutput);
-  callName += getTypeName(outputTy);
-  builder.CreateNamedCall(callName, builder.getVoidTy(), {outputOffset, vertexOrPrimitiveIdx, output}, {});
+  if (isPerPrimitive)
+    builder.create<WriteMeshPrimitiveOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
+  else
+    builder.create<WriteMeshVertexOutputOp>(outputOffset, vertexOrPrimitiveIdx, output);
 }
 
 // =====================================================================================================================

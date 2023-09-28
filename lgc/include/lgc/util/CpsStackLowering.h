@@ -49,6 +49,8 @@ class CpsStackLowering {
 public:
   CpsStackLowering(llvm::LLVMContext &context) : m_typeLowering(context) {}
   void lowerCpsStackOps(llvm::Function &function, llvm::Value *);
+  // Get continuation stack size (in bytes).
+  unsigned getStackSize() { return m_stackSizeInBytes; }
 
   TypeLowering m_typeLowering;
 
@@ -66,6 +68,7 @@ private:
 
   llvm::Module *m_module;
   llvm::Value *m_cpsStackAlloca;
+  unsigned m_stackSizeInBytes = 0;
 };
 
 } // namespace lgc

@@ -35,8 +35,6 @@
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
 #include "llpcPipelineContext.h"
-#include "llpcShaderCache.h"
-#include "llpcShaderCacheManager.h"
 #include "vkgcMetroHash.h"
 #include "lgc/Builder.h"
 #include "lgc/GpurtDialect.h"
@@ -62,6 +60,7 @@
 using namespace lgc;
 using namespace lgc::rt;
 using namespace llvm;
+using namespace lgc::cps;
 
 namespace Llpc {
 
@@ -69,7 +68,7 @@ namespace Llpc {
 //
 // @param gfxIp : Graphics IP version info
 Context::Context(GfxIpVersion gfxIp) : LLVMContext(), m_gfxIp(gfxIp) {
-  m_dialectContext = llvm_dialects::DialectContext::make<LgcDialect, GpurtDialect, LgcRtDialect>(*this);
+  m_dialectContext = llvm_dialects::DialectContext::make<LgcDialect, GpurtDialect, LgcRtDialect, LgcCpsDialect>(*this);
   reset();
 }
 
@@ -90,20 +89,29 @@ LgcContext *Context::getLgcContext() {
   // Create the LgcContext on first execution or optimization level change.
   if (!m_builderContext || getLastOptimizationLevel() != getOptimizationLevel()) {
     std::string gpuName = LgcContext::getGpuNameString(m_gfxIp.major, m_gfxIp.minor, m_gfxIp.stepping);
+    // Pass the state of LLPC_OUTS on to LGC for the logging inside createTargetMachine.
+    LgcContext::setLlpcOuts(EnableOuts() ? &outs() : nullptr);
     m_targetMachine = LgcContext::createTargetMachine(gpuName, getOptimizationLevel());
+    LgcContext::setLlpcOuts(nullptr);
     if (!m_targetMachine)
       report_fatal_error(Twine("Unknown target '") + Twine(gpuName) + Twine("'"));
     m_builderContext.reset(LgcContext::create(&*m_targetMachine, *this, PAL_CLIENT_INTERFACE_MAJOR_VERSION));
+
+    // Pass the state of LLPC_OUTS on to LGC.
+    LgcContext::setLlpcOuts(EnableOuts() ? &outs() : nullptr);
   }
   return &*m_builderContext;
 }
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
+// Old version of the code
 // =====================================================================================================================
 // Get optimization level. Also resets what getLastOptimizationLevel() returns.
 //
 // @returns: the optimization level for the context.
 CodeGenOpt::Level Context::getOptimizationLevel() {
-  uint32_t optLevel = CodeGenOpt::Level::Default;
+  uint32_t optLevel = static_cast<uint32_t>(CodeGenOpt::Level::Default);
+
   optLevel = getPipelineContext()->getPipelineOptions()->optimizationLevel;
   if (optLevel > 3)
     optLevel = 3;
@@ -118,6 +126,33 @@ CodeGenOpt::Level Context::getOptimizationLevel() {
 CodeGenOpt::Level Context::getLastOptimizationLevel() const {
   return *m_lastOptLevel;
 }
+
+#else
+// New version of the code (also handles unknown version, which we treat as latest)
+
+// =====================================================================================================================
+// Get optimization level. Also resets what getLastOptimizationLevel() returns.
+//
+// @returns: the optimization level for the context.
+CodeGenOptLevel Context::getOptimizationLevel() {
+  uint32_t optLevel = static_cast<uint32_t>(CodeGenOptLevel::Default);
+
+  optLevel = getPipelineContext()->getPipelineOptions()->optimizationLevel;
+  if (optLevel > 3)
+    optLevel = 3;
+  else if (optLevel == 0) // Workaround for noopt bugs in the AMDGPU backend in LLVM.
+    optLevel = 1;
+  m_lastOptLevel = CodeGenOptLevel(optLevel);
+  return *m_lastOptLevel;
+}
+
+// =====================================================================================================================
+// Get the optimization level returned by the last getOptimizationLevel().
+CodeGenOptLevel Context::getLastOptimizationLevel() const {
+  return *m_lastOptLevel;
+}
+
+#endif
 
 // =====================================================================================================================
 // Loads library from external LLVM library.

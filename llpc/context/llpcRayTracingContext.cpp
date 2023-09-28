@@ -273,6 +273,11 @@ lgc::Options RayTracingContext::computePipelineOptions() const {
   lgc::Options options = PipelineContext::computePipelineOptions();
   // NOTE: raytracing waveSize and subgroupSize can be different.
   options.fullSubgroups = false;
+
+  // TODO: Add a mode in Vkgc::LlpcRaytracingMode to represent lgc::RayTracingIndirectMode::Continuations.
+  if (m_pipelineInfo->mode == Vkgc::LlpcRaytracingMode::Continuations)
+    options.rtIndirectMode = lgc::RayTracingIndirectMode::ContinuationsContinufy;
+
   return options;
 }
 

@@ -1655,13 +1655,16 @@ PAQTraceRaySerializationInfo::create(Module &M,
   // Some serialization structs include storage for committed hit attributes.
   // Because we do not know whether intersection shaders are part of the
   // pipeline or not, let alone the maximum size of occurring attribute types,
-  // we need to be pessimistic and assume the largest size allowed by the API.
-  // SystemData provides some storage for attributes (currently 2 registers),
-  // which leaves 6 registers in the payload storage.
-  // A whole-pipeline analysis should allow to eliminate these registers,
-  // e.g. in case no intersection shaders are present.
+  // we need to be pessimistic and assume the maximum possible hit attribute
+  // size as specified by the app, obtained from
+  // PAQConfig.MaxHitAttributeByteCount. SystemData provides some storage for
+  // attributes (currently 2 registers), which leaves 6 registers in the payload
+  // storage. A whole-pipeline analysis should allow to eliminate these
+  // registers, e.g. in case no intersection shaders are present.
   assert(PAQConfig.MaxHitAttributeByteCount <= GlobalMaxHitAttributeBytes);
-  const uint64_t InlineHitAttrBytes = getInlineHitAttrsBytes(M);
+  const uint32_t MaxInlineHitAttrBytes = getInlineHitAttrsBytes(M);
+  const uint32_t InlineHitAttrBytes =
+      std::min(MaxInlineHitAttrBytes, PAQConfig.MaxHitAttributeByteCount);
   const uint64_t PayloadHitAttrI32s = divideCeil(
       PAQConfig.MaxHitAttributeByteCount - InlineHitAttrBytes, RegisterBytes);
 
