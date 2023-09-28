@@ -663,6 +663,9 @@ public:
   // Create a subgroup all equal.
   llvm::Value *CreateSubgroupAllEqual(llvm::Value *const value, const llvm::Twine &instName = "");
 
+  // Create a subgroup rotate.
+  llvm::Value *CreateSubgroupRotate(llvm::Value *const value, llvm::Value *const delta, llvm::Value *const clusterSize,
+                                    const llvm::Twine &instName = "");
   // Create a subgroup broadcast.
   llvm::Value *CreateSubgroupBroadcast(llvm::Value *const value, llvm::Value *const index,
                                        const llvm::Twine &instName = "");
@@ -727,17 +730,17 @@ public:
   llvm::Value *CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, llvm::Value *const value,
                                                 llvm::Value *const clusterSize, const llvm::Twine &instName = "");
 
-  // Create a subgroup quad broadcast.
-  llvm::Value *CreateSubgroupQuadBroadcast(llvm::Value *const value, llvm::Value *const index,
+  // Create a quad broadcast.
+  llvm::Value *CreateSubgroupQuadBroadcast(llvm::Value *const value, llvm::Value *const index, bool inWQM = true,
                                            const llvm::Twine &instName = "");
 
-  // Create a subgroup quad swap horizontal.
+  // Create a quad swap horizontal.
   llvm::Value *CreateSubgroupQuadSwapHorizontal(llvm::Value *const value, const llvm::Twine &instName = "");
 
-  // Create a subgroup quad swap vertical.
+  // Create a quad swap vertical.
   llvm::Value *CreateSubgroupQuadSwapVertical(llvm::Value *const value, const llvm::Twine &instName = "");
 
-  // Create a subgroup quad swap diagonal.
+  // Create a quad swap diagonal.
   llvm::Value *CreateSubgroupQuadSwapDiagonal(llvm::Value *const value, const llvm::Twine &instName = "");
 
   // Create a subgroup swizzle quad.

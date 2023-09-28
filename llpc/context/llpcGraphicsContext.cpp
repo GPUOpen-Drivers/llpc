@@ -309,8 +309,7 @@ void GraphicsContext::setColorExportState(Pipeline *pipeline, Util::MetroHash64 
   SmallVector<ColorExportFormat, MaxColorTargets> formats;
 
   state.alphaToCoverageEnable = cbState.alphaToCoverageEnable;
-  state.dualSourceBlendEnable =
-      cbState.dualSourceBlendEnable || (pipelineInfo->cbState.dualSourceBlendDynamic && getUseDualSourceBlend());
+  state.dualSourceBlendEnable = cbState.dualSourceBlendEnable;
 
   for (unsigned targetIndex = 0; targetIndex < MaxColorTargets; ++targetIndex) {
     if (cbState.target[targetIndex].format != VK_FORMAT_UNDEFINED) {

@@ -33,7 +33,6 @@
 #include "vkgcUtil.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/raw_ostream.h"
-#include <algorithm>
 #include <fstream>
 #include <sstream>
 #include <sys/stat.h>
@@ -1943,7 +1942,6 @@ template <class OStream, class Elf>
 // @param [out] out : Output stream
 // @param reader : ELF object
 OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
-
   unsigned sectionCount = reader.getSectionCount();
   char formatBuf[256];
 

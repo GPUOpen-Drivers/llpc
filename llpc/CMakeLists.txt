@@ -46,9 +46,6 @@ if(ICD_BUILD_LLPC)
     # Add LGC and its dependencies as LLVM external projects.
     include("../cmake/lgc.cmake")
     add_lgc_projects()
-    # Add other LLPC dependencies as LLVM external projects.
-    list(APPEND LLVM_EXTERNAL_PROJECTS LgcRt)
-    set(LLVM_EXTERNAL_LGCRT_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../shared/lgcrt)
 
     # Set other LLVM settings.
     set(LLVM_TARGETS_TO_BUILD AMDGPU CACHE STRING Force)
@@ -207,10 +204,8 @@ if(ICD_BUILD_LLPC)
         context/llpcContext.cpp
         context/llpcComputeContext.cpp
         context/llpcGraphicsContext.cpp
-        context/llpcShaderCache.cpp
         context/llpcPipelineContext.cpp
         context/llpcRayTracingContext.cpp
-        context/llpcShaderCacheManager.cpp
     )
 
 # llpc/lower
@@ -354,6 +349,8 @@ add_library(llpc_standalone_compiler
     tool/llpcInputUtils.cpp
     tool/llpcPipelineBuilder.cpp
     tool/llpcRayTracingPipelineBuilder.cpp
+    tool/llpcShaderCache.cpp
+    tool/llpcShaderCacheWrap.cpp
 )
 
 add_dependencies(llpc_standalone_compiler llpc)

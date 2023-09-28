@@ -1,7 +1,10 @@
 function(set_compiler_options PROJECT_NAME ENABLE_WERROR)
-    target_compile_features("${PROJECT_NAME}" PUBLIC cxx_std_17)
-    set_target_properties("${PROJECT_NAME}" PROPERTIES CXX_EXTENSIONS OFF)
-    set_target_properties("${PROJECT_NAME}" PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS OFF
+        POSITION_INDEPENDENT_CODE ON)
 
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         if(ENABLE_WERROR)

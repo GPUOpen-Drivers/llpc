@@ -62,7 +62,7 @@ target_include_directories(LLVMLgcCps PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/lib)
 target_link_libraries(LLVMLgcCps PUBLIC llvm_dialects)
 set_compiler_options(LLVMLgcCps)
 
-set(LGCCPS_TABLEGEN_EXE ${LLVM_TOOLS_BINARY_DIR}/llvm-dialects-tblgen)
+set(LGCCPS_TABLEGEN_EXE $<TARGET_FILE:llvm-dialects-tblgen>)
 set(LGCCPS_TABLEGEN_TARGET llvm-dialects-tblgen)
 set(LLVM_TARGET_DEFINITIONS include/lgccps/LgcCpsDialect.td)
 set(LLVM_TARGET_DEPENDS lgccps)

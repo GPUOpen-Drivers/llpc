@@ -254,8 +254,6 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "image.get.lod";
   case BuilderOpcode::ImageBvhIntersectRay:
     return "image.bvh.intersect.ray";
-  case BuilderOpcode::Reserved2:
-    return "reserved2";
   case BuilderOpcode::GetWaveSize:
     return "get.wave.size";
   case BuilderOpcode::GetSubgroupSize:
@@ -1854,9 +1852,10 @@ Value *Builder::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, Valu
 //
 // @param value : The value to broadcast
 // @param index : The index within the quad to broadcast from
+// @param inWQM : Whether it's in whole quad mode
 // @param instName : Name to give instruction(s)
-Value *Builder::CreateSubgroupQuadBroadcast(Value *const value, Value *const index, const Twine &instName) {
-  return record(BuilderOpcode::SubgroupQuadBroadcast, value->getType(), {value, index}, instName);
+Value *Builder::CreateSubgroupQuadBroadcast(Value *const value, Value *const index, bool inWQM, const Twine &instName) {
+  return record(BuilderOpcode::SubgroupQuadBroadcast, value->getType(), {value, index, getInt1(inWQM)}, instName);
 }
 
 // =====================================================================================================================

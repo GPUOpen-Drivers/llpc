@@ -33,7 +33,13 @@
 
 namespace Vkgc {
 
-const std::vector<PipelineDumperReg> PipelineDumperRegs = {
+// A single register in the pipelineDumperRegs table
+struct PipelineDumperReg {
+  unsigned number;
+  const char *name;
+};
+
+const PipelineDumperReg PipelineDumperRegs[] = {
     {0x2C01, "SPI_SHADER_PGM_RSRC4_PS"},
     {0x2C06, "SPI_SHADER_PGM_CHKSUM_PS"},
     {0x2C07, "SPI_SHADER_PGM_RSRC3_PS"},
@@ -404,7 +410,7 @@ const std::vector<PipelineDumperReg> PipelineDumperRegs = {
 //
 // @param regNumber : Register number
 const char *PipelineDumper::getRegisterNameString(unsigned regNumber) {
-  for (unsigned idx = 0, end = PipelineDumperRegs.size(); idx != end; ++idx) {
+  for (unsigned idx = 0, end = sizeof(PipelineDumperRegs) / sizeof(PipelineDumperRegs[0]); idx != end; ++idx) {
     const auto &regEntry = PipelineDumperRegs[idx];
     if (regEntry.number == regNumber)
       return regEntry.name;

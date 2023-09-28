@@ -108,14 +108,7 @@ bool SaveContinuationStatePass::lowerCalls(Function *Intr, bool IsSave) {
 
     if (IsSave) {
       // Add to continuation stack size metadata
-      uint64_t CurStackSize = 0;
-      if (auto *StackSizeMD = F->getMetadata(DXILContHelper::MDStackSizeName))
-        CurStackSize = mdconst::extract<ConstantInt>(StackSizeMD->getOperand(0))
-                           ->getZExtValue();
-      F->setMetadata(DXILContHelper::MDStackSizeName,
-                     MDTuple::get(F->getContext(),
-                                  {ConstantAsMetadata::get(ConstantInt::get(
-                                      I32, NeededStackSize + CurStackSize))}));
+      DXILContHelper::addStackSize(F, NeededStackSize);
     }
 
     Call->eraseFromParent();

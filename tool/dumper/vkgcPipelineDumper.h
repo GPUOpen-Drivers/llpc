@@ -32,7 +32,6 @@
 
 #include "vkgcDefs.h"
 #include "vkgcMetroHash.h"
-#include "vkgcRegisterDefs.h"
 #include <fstream>
 
 namespace Vkgc {

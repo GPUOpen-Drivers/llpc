@@ -190,7 +190,7 @@ struct ColorExportInfo {
 // Note: new fields must be added to the end of this structure to maintain test compatibility.
 // The front-end should zero-initialize this with "= {}" in case future changes add new fields.
 union ShaderOptions {
-  unsigned u32All[32];
+  unsigned u32All[34];
   struct {
     uint64_t hash[2];     // Shader hash to set in ELF PAL metadata
     unsigned trapPresent; // Indicates a trap handler will be present when this pipeline is executed,
@@ -288,6 +288,8 @@ union ShaderOptions {
 
     /// Aggressively mark shader loads as invariant (where it is safe to do so).
     InvariantLoadsOption aggressiveInvariantLoads;
+
+    bool reserved;
   };
 };
 static_assert(sizeof(ShaderOptions) == sizeof(ShaderOptions::u32All));
@@ -386,6 +388,7 @@ enum BufDataFormat {
   BufDataFormat5_6_5_1_Bgra,
   BufDataFormat1_5_6_5,
   BufDataFormat5_9_9_9,
+  BufDataFormat8_A
 };
 
 // Numeric format of vertex buffer entry. These match the GFX9 hardware encoding.
@@ -398,6 +401,7 @@ enum BufNumFormat {
   BufNumFormatSint = 5,
   BufNumFormatSnorm_Ogl = 6,
   BufNumFormatFloat = 7,
+  BufNumFormatFixed = 8,
   // Extra formats not in GFX9 hardware encoding:
   BufNumFormatSrgb,
   BufNumFormatOther,
@@ -454,8 +458,9 @@ struct ColorExportFormat {
 
 // Struct to pass to SetColorExportState
 struct ColorExportState {
-  unsigned alphaToCoverageEnable; // Enable alpha to coverage
-  unsigned dualSourceBlendEnable; // Blend state bound at draw time will use a dual source blend mode
+  unsigned alphaToCoverageEnable;        // Enable alpha to coverage
+  unsigned dualSourceBlendEnable;        // Blend state bound at draw time will use a dual source blend mode
+  unsigned dynamicDualSourceBlendEnable; // Dynamic dual source blend enable
 };
 
 // Struct to pass to SetInputAssemblyState.
@@ -668,15 +673,14 @@ enum class PipelineLink : unsigned {
 struct FsOutInfo {
   unsigned hwColorTarget; // HW color output index
   unsigned location;      // Output location in resource layout
-  bool isSigned;          // Whether is signed
+  unsigned isSigned;      // Whether is signed
   char typeName[8];       // Output data type Name, like v3f32
 };
 
 // Represents shader meta data
 struct FragmentOutputs {
-  FsOutInfo *fsOutInfos;   // The color export information.
+  unsigned discard;        // Whether this fragment shader has kill enabled.
   unsigned fsOutInfoCount; // The number of color exports.
-  bool discard;            // Whether this fragment shader has kill enabled.
 };
 
 // =====================================================================================================================
