@@ -617,7 +617,7 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(SPIRVType *const spvType, 
         return samplerPtrTy;
       return StructType::get(*m_context, {imagePtrTy, samplerPtrTy});
     } else {
-      // Uniform contant variable outside of a block use std430 layout.
+      // Uniform constant variable outside of a block use std430 layout.
       pointeeLayout = isAccelerationStructureType(spvElementType) ? LayoutMode::Explicit : LayoutMode::Std430;
       // From now on (GPURT major version >= 34), AS header may start at a non-zero offset, GPURT now request base
       // offset of the resource, and it will calculate the actual GPUVA, instead of compiler providing one loaded from

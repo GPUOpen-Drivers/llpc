@@ -1349,7 +1349,7 @@ struct GraphicsPipelineBuildInfo {
   size_t clientMetadataSize;          ///< Size (in bytes) of the client-defined data
   unsigned numUniformConstantMaps;    ///< Number of uniform constant maps
   UniformConstantMap **ppUniformMaps; ///< Pointers to array of pointers for the uniform constant map.
-  ApiXfbOutData apiXfbOutData;        ///< Transform feedback data specified by API inteface.
+  ApiXfbOutData apiXfbOutData;        ///< Transform feedback data specified by API interface.
 };
 
 /// Represents info to build a compute pipeline.
