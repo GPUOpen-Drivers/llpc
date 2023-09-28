@@ -653,10 +653,6 @@ public:
   // Create a subgroup all.
   llvm::Value *CreateSubgroupAll(llvm::Value *const value, const llvm::Twine &instName = "");
 
-  // Create a subgroup rotate.
-  llvm::Value *CreateSubgroupRotate(llvm::Value *const value, llvm::Value *const delta, llvm::Value *const clusterSize,
-                                    const llvm::Twine &instName = "");
-
   // Create a subgroup any
   llvm::Value *CreateSubgroupAny(llvm::Value *const value, const llvm::Twine &instName = "");
 
