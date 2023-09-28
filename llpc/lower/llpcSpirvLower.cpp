@@ -265,23 +265,23 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
     passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(instCombineOpt)));
   }
 
-    FunctionPassManager fpm;
-    fpm.addPass(SROAPass(SROAOptions::PreserveCFG));
-    fpm.addPass(InstCombinePass(instCombineOpt));
-    passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
-  }
+  FunctionPassManager fpm;
+  fpm.addPass(SROAPass(SROAOptions::PreserveCFG));
+  fpm.addPass(InstCombinePass(instCombineOpt));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
+}
 
-  // Stop timer for lowering passes.
-  if (lowerTimer)
-    LgcContext::createAndAddStartStopTimer(passMgr, lowerTimer, false);
+// Stop timer for lowering passes.
+if (lowerTimer)
+  LgcContext::createAndAddStartStopTimer(passMgr, lowerTimer, false);
 
-  // Dump the result
-  if (EnableOuts()) {
-    passMgr.addPass(PrintModulePass(outs(),
-                                    "\n"
-                                    "===============================================================================\n"
-                                    "// LLPC SPIR-V lowering results\n"));
-  }
+// Dump the result
+if (EnableOuts()) {
+  passMgr.addPass(PrintModulePass(outs(),
+                                  "\n"
+                                  "===============================================================================\n"
+                                  "// LLPC SPIR-V lowering results\n"));
+}
 }
 
 // =====================================================================================================================

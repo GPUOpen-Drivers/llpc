@@ -1269,15 +1269,15 @@ struct GraphicsPipelineBuildInfo {
   void *pUserData;                ///< User data
   OutputAllocFunc pfnOutputAlloc; ///< Output buffer allocator
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 68
-  ICache *cache;                  ///< ICache, used to search for the compiled shader data
-#endif  
-  PipelineShaderInfo task;        ///< Task shader
-  PipelineShaderInfo vs;          ///< Vertex shader
-  PipelineShaderInfo tcs;         ///< Tessellation control shader
-  PipelineShaderInfo tes;         ///< Tessellation evaluation shader
-  PipelineShaderInfo gs;          ///< Geometry shader
-  PipelineShaderInfo mesh;        ///< Mesh shader
-  PipelineShaderInfo fs;          ///< Fragment shader
+  ICache *cache; ///< ICache, used to search for the compiled shader data
+#endif
+  PipelineShaderInfo task; ///< Task shader
+  PipelineShaderInfo vs;   ///< Vertex shader
+  PipelineShaderInfo tcs;  ///< Tessellation control shader
+  PipelineShaderInfo tes;  ///< Tessellation evaluation shader
+  PipelineShaderInfo gs;   ///< Geometry shader
+  PipelineShaderInfo mesh; ///< Mesh shader
+  PipelineShaderInfo fs;   ///< Fragment shader
 
   ResourceMappingData resourceMapping; ///< Resource mapping graph and static descriptor values
   uint64_t pipelineLayoutApiHash;      ///< Pipeline Layout Api Hash
@@ -1354,12 +1354,12 @@ struct GraphicsPipelineBuildInfo {
 
 /// Represents info to build a compute pipeline.
 struct ComputePipelineBuildInfo {
-  void *pInstance;                     ///< Vulkan instance object
-  void *pUserData;                     ///< User data
-  OutputAllocFunc pfnOutputAlloc;      ///< Output buffer allocator
+  void *pInstance;                ///< Vulkan instance object
+  void *pUserData;                ///< User data
+  OutputAllocFunc pfnOutputAlloc; ///< Output buffer allocator
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 68
-  ICache *cache;                       ///< ICache, used to search for the compiled shader data
-#endif  
+  ICache *cache; ///< ICache, used to search for the compiled shader data
+#endif
   unsigned deviceIndex;                ///< Device index for device group
   PipelineShaderInfo cs;               ///< Compute shader
   ResourceMappingData resourceMapping; ///< Resource mapping graph and static descriptor values
