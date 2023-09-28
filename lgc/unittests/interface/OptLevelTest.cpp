@@ -41,7 +41,15 @@ TEST(LgcInterfaceTests, DefaultOptLevel) {
   unsigned palAbiVersion = 0xFFFFFFFF;
   StringRef gpuName = "gfx802";
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
+  // Old version of the code
   for (auto optLevel : {Level::None, Level::Less, Level::Default, Level::Aggressive}) {
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  // Returns the optimization level for the context.
+  for (auto optLevel :
+       {CodeGenOptLevel::None, CodeGenOptLevel::Less, CodeGenOptLevel::Default, CodeGenOptLevel::Aggressive}) {
+#endif
     std::unique_ptr<TargetMachine> targetMachine = LgcContext::createTargetMachine(gpuName, optLevel);
     std::unique_ptr<LgcContext> lgcContext(LgcContext::create(&*targetMachine, context, palAbiVersion));
     EXPECT_EQ(lgcContext->getOptimizationLevel(), optLevel);
