@@ -2,6 +2,7 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc \
 ; RUN:         -shader-cache-mode=1 \
+; RUN:         -cache-full-pipelines=true \
 ; RUN:         -enable-relocatable-shader-elf \
 ; RUN:         -o %t.elf %gfxip %s %s -v | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST: Cache miss for graphics pipeline.

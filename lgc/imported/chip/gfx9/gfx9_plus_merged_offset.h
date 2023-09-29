@@ -2544,7 +2544,7 @@ namespace Gfx103PlusExclusive
     constexpr unsigned int mmSX_PS_DOWNCONVERT_CONTROL                        = 0xA1D4;
 } // namespace Gfx103PlusExclusive
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
+#if CHIP_HDR_NAVI31|| CHIP_HDR_NAVI32|| CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 namespace Gfx104Plus
 {
     constexpr unsigned int mmGE_RATE_CNTL_1                                   = 0x2254;
@@ -3023,7 +3023,7 @@ namespace Gfx10Vrs
     constexpr unsigned int mmRLC_SPM_SE_MUXSEL_ADDR_OFFSET                    = 0xDCA8;
 } // namespace Gfx10Vrs
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
+#if CHIP_HDR_NAVI31|| CHIP_HDR_NAVI32|| CHIP_HDR_NAVI33|| CHIP_HDR_PHOENIX1
 namespace Gfx11
 {
     constexpr unsigned int mmCB_DCC_CONFIG2                                   = 0x268B;
@@ -5256,6 +5256,34 @@ namespace Nv31
 } // namespace Nv31
 #endif
 
+#if CHIP_HDR_NAVI32
+namespace Nv32
+{
+    constexpr unsigned int mmGC_ATC_L2_PERFCOUNTER0_CFG                       = 0xDD44;
+    constexpr unsigned int mmGC_ATC_L2_PERFCOUNTER1_CFG                       = 0xDD45;
+    constexpr unsigned int mmGC_ATC_L2_PERFCOUNTER2_HI                        = 0xD4F5;
+    constexpr unsigned int mmGC_ATC_L2_PERFCOUNTER2_LO                        = 0xD4F4;
+    constexpr unsigned int mmGC_ATC_L2_PERFCOUNTER2_MODE                      = 0xDD42;
+    constexpr unsigned int mmGC_ATC_L2_PERFCOUNTER2_SELECT                    = 0xDD40;
+    constexpr unsigned int mmGC_ATC_L2_PERFCOUNTER2_SELECT1                   = 0xDD41;
+    constexpr unsigned int mmGC_ATC_L2_PERFCOUNTER_HI                         = 0xD4F9;
+    constexpr unsigned int mmGC_ATC_L2_PERFCOUNTER_LO                         = 0xD4F8;
+    constexpr unsigned int mmGC_ATC_L2_PERFCOUNTER_RSLT_CNTL                  = 0xDD46;
+    constexpr unsigned int mmGE_FED_STATUS                                    = 0x224A;
+    constexpr unsigned int mmGRBM_SE3_PERFCOUNTER_HI                          = 0xD04C;
+    constexpr unsigned int mmGRBM_SE3_PERFCOUNTER_LO                          = 0xD04B;
+    constexpr unsigned int mmGRBM_SE3_PERFCOUNTER_SELECT                      = 0xD845;
+    constexpr unsigned int mmRPB_PERFCOUNTER0_CFG                             = 0x0C80;
+    constexpr unsigned int mmRPB_PERFCOUNTER1_CFG                             = 0x0C81;
+    constexpr unsigned int mmRPB_PERFCOUNTER2_CFG                             = 0x0C82;
+    constexpr unsigned int mmRPB_PERFCOUNTER3_CFG                             = 0x0C83;
+    constexpr unsigned int mmRPB_PERFCOUNTER_HI                               = 0x0C86;
+    constexpr unsigned int mmRPB_PERFCOUNTER_LO                               = 0x0C87;
+    constexpr unsigned int mmRPB_PERFCOUNTER_RSLT_CNTL                        = 0x0C84;
+    constexpr unsigned int mmRPB_PERF_COUNTER_CNTL                            = 0x0C85;
+} // namespace Nv32
+#endif
+
 #if CHIP_HDR_NAVI33
 namespace Nv33
 {
@@ -5270,7 +5298,7 @@ namespace Nv33
 } // namespace Nv33
 #endif
 
-#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI33
+#if CHIP_HDR_NAVI31 || CHIP_HDR_NAVI32 || CHIP_HDR_NAVI33
 namespace Nv3x
 {
     constexpr unsigned int mmCHCG_PERFCOUNTER0_HI                             = 0xD3C9;

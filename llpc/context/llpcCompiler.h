@@ -32,11 +32,13 @@
 
 #include "llpc.h"
 #include "llpcCacheAccessor.h"
-#include "llpcShaderCacheManager.h"
 #include "llpcShaderModuleHelper.h"
+#include "llpcUtil.h"
 #include "vkgcElfReader.h"
 #include "vkgcMetroHash.h"
 #include "lgc/CommonDefs.h"
+#include "llvm/Support/Mutex.h"
+#include <condition_variable>
 #include <optional>
 
 namespace llvm {
@@ -158,7 +160,7 @@ public:
                                    llvm::ArrayRef<llvm::ArrayRef<uint8_t>> stageHashes, MetroHash::Hash *fragmentHash,
                                    MetroHash::Hash *nonFragmentHash);
 
-  CachePair getInternalCaches() { return {m_cache, m_shaderCache.get()}; }
+  Vkgc::ICache *getInternalCaches() { return m_cache; }
 
   Context *acquireContext() const;
   void releaseContext(Context *context) const;
@@ -202,7 +204,6 @@ private:
   Vkgc::ICache *m_cache;                        // Point to ICache implemented in client
   static unsigned m_instanceCount;              // The count of compiler instance
   static unsigned m_outRedirectCount;           // The count of output redirect
-  ShaderCachePtr m_shaderCache;                 // Shader cache
   static llvm::sys::Mutex m_contextPoolMutex;   // Mutex for context pool access
   static std::vector<Context *> *m_contextPool; // Context pool
   unsigned m_relocatablePipelineCompilations;   // The number of pipelines compiled using relocatable shader elf

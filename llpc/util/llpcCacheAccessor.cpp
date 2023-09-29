@@ -37,40 +37,14 @@
 
 using namespace llvm;
 
-namespace llvm {
-namespace cl {
-extern opt<unsigned> ShaderCacheMode;
-} // namespace cl
-} // namespace llvm
-
 namespace Llpc {
-
-// =====================================================================================================================
-// Access the given caches using the hash.
-//
-// @param context : The context that will give the caches from the application.
-// @param hash : The hash for the entry to access.
-// @param internalCaches : The internal caches to check.
-CacheAccessor::CacheAccessor(Context *context, MetroHash::Hash &cacheHash, CachePair internalCaches) {
-  assert(context);
-  if (context->getPipelineType() == PipelineType::Graphics) {
-    const auto *pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
-    initializeUsingBuildInfo(pipelineInfo, cacheHash, internalCaches);
-  } else {
-    const auto *pipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo *>(context->getPipelineBuildInfo());
-    initializeUsingBuildInfo(pipelineInfo, cacheHash, internalCaches);
-  }
-}
-
 // =====================================================================================================================
 // Initializes the cache accessor to check the given caches.  The caches can be nullptr.
 //
 // @param userCache : The ICache supplied by the application. nullptr if no cache is provided.
 // @param internalCaches : The internal caches to check.
-void CacheAccessor::initialize(Vkgc::ICache *userCache, CachePair internalCaches) {
-  m_internalCaches = internalCaches;
-  m_applicationCaches = {userCache, nullptr};
-  resetShaderCacheTrackingData();
+void CacheAccessor::initialize(Vkgc::ICache *internalCache) {
+  m_internalCache = internalCache;
   m_cacheResult = Result::ErrorUnknown;
   m_cacheEntry = Vkgc::EntryHandle();
   m_elf = {0, nullptr};
@@ -86,12 +60,8 @@ void CacheAccessor::lookUpInCaches(const MetroHash::Hash &hash) {
 
   Result cacheResult = Result::Unsupported;
   if (getInternalCache()) {
-    cacheResult = lookUpInCache(getInternalCache(), !getApplicationCache(), hashId);
-    if (cacheResult == Result::Success)
-      m_internalCacheHit = true;
+    cacheResult = lookUpInCache(getInternalCache(), true, hashId);
   }
-  if (getApplicationCache() && cacheResult != Result::Success)
-    cacheResult = lookUpInCache(getApplicationCache(), true, hashId);
   m_cacheResult = cacheResult;
 }
 
@@ -119,72 +89,11 @@ Result CacheAccessor::lookUpInCache(Vkgc::ICache *cache, bool allocateOnMiss, co
 }
 
 // =====================================================================================================================
-// Looks for the given hash in the shader caches and sets the cache accessor state with the results.
-//
-// @param hash : The hash to look up.
-void CacheAccessor::lookUpInShaderCaches(MetroHash::Hash &hash) {
-  ShaderCache *applicationCache = static_cast<ShaderCache *>(getApplicationShaderCache());
-  ShaderCache *internalCache = static_cast<ShaderCache *>(getInternalShaderCache());
-  bool usingApplicationCache = applicationCache && cl::ShaderCacheMode != ShaderCacheForceInternalCacheOnDisk;
-  if (internalCache) {
-    if (lookUpInShaderCache(hash, !usingApplicationCache, internalCache))
-      return;
-  }
-  if (usingApplicationCache) {
-    if (lookUpInShaderCache(hash, true, applicationCache))
-      return;
-  }
-  resetShaderCacheTrackingData();
-}
-
-// =====================================================================================================================
-// Set to entry tracking the shader cache to indicate that it is not tracking any shader cache entry.
-void CacheAccessor::resetShaderCacheTrackingData() {
-  m_shaderCache = nullptr;
-  m_shaderCacheEntry = nullptr;
-  m_shaderCacheEntryState = ShaderEntryState::New;
-}
-
-// =====================================================================================================================
-// Looks for the given hash in the given shader cache and sets the cache accessor state with the results.  A new entry
-// will be allocated if there is a cache miss and allocateOnMiss is true.
-//
-// @param hash : The hash to look up.
-// @param allocateOnMiss : Will add an entry to the cache on a miss if true.
-// @param cache : The cache in with to look.
-bool CacheAccessor::lookUpInShaderCache(const MetroHash::Hash &hash, bool allocateOnMiss, ShaderCache *cache) {
-  CacheEntryHandle currentEntry;
-  ShaderEntryState cacheEntryState = cache->findShader(hash, allocateOnMiss, &currentEntry);
-  if (cacheEntryState == ShaderEntryState::Ready) {
-    Result result = cache->retrieveShader(currentEntry, &m_elf.pCode, &m_elf.codeSize);
-    if (result == Result::Success) {
-      m_shaderCacheEntryState = ShaderEntryState::Ready;
-      return true;
-    }
-  } else if (cacheEntryState == ShaderEntryState::Compiling) {
-    m_shaderCache = cache;
-    m_shaderCacheEntry = currentEntry;
-    m_shaderCacheEntryState = ShaderEntryState::Compiling;
-    return true;
-  }
-  return false;
-}
-
-// =====================================================================================================================
 // Sets the ELF entry for the hash on a cache miss.  Does nothing if there was a cache hit or the ELF has already been
 // set.
 //
 // @param elf : The binary encoding of the elf to place in the cache.
 void CacheAccessor::setElfInCache(BinaryData elf) {
-  if (m_shaderCacheEntryState == ShaderEntryState::Compiling && m_shaderCacheEntry) {
-    updateShaderCache(elf);
-    if (m_shaderCache->retrieveShader(m_shaderCacheEntry, &m_elf.pCode, &m_elf.codeSize) == Result::Success) {
-      m_shaderCacheEntryState = ShaderEntryState::Ready;
-    } else {
-      return;
-    }
-  }
-
   if (!m_cacheEntry.IsEmpty()) {
     m_cacheResult = Result::ErrorUnknown;
     if (elf.pCode) {
@@ -194,25 +103,6 @@ void CacheAccessor::setElfInCache(BinaryData elf) {
     Vkgc::EntryHandle::ReleaseHandle(std::move(m_cacheEntry));
     m_cacheResult = elf.pCode ? Result::Success : Result::ErrorUnknown;
   }
-}
-
-// =====================================================================================================================
-// Updates the entry in the shader cache, if there is one, for this access.
-//
-// @param elf : The binary encoding of the elf to place in the cache.
-void CacheAccessor::updateShaderCache(BinaryData &elf) {
-  ShaderCache *shaderCache = m_shaderCache;
-  if (!m_shaderCacheEntry)
-    return;
-
-  if (!shaderCache)
-    shaderCache = static_cast<ShaderCache *>(getInternalShaderCache());
-
-  if (elf.pCode) {
-    assert(elf.codeSize > 0);
-    shaderCache->insertShader(m_shaderCacheEntry, elf.pCode, elf.codeSize);
-  } else
-    shaderCache->resetShader(m_shaderCacheEntry);
 }
 
 } // namespace Llpc

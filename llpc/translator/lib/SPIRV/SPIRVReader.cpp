@@ -3468,7 +3468,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupFMax>(SPIRVValue *co
 //
 // @param spvValue : A SPIR-V value.
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformElect>(SPIRVValue *const spvValue) {
-  return getBuilder()->CreateSubgroupElect();
+  Value *result = nullptr;
+
+  result = getBuilder()->CreateSubgroupElect();
+  return result;
 }
 
 // =====================================================================================================================
@@ -3478,12 +3481,16 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformElect>(SPI
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAll>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
-
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const predicate = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupAll(predicate);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupAll(predicate);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3493,12 +3500,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAll>(SPIRV
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAny>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const predicate = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupAny(predicate);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupAny(predicate);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3508,12 +3520,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAny>(SPIRV
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAllEqual>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupAllEqual(value);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupAllEqual(value);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3523,13 +3540,18 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAllEqual>(
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcast>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
   Value *const index = transValue(spvOperands[2], func, block);
-  return getBuilder()->CreateSubgroupBroadcastWaterfall(value, index);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupBroadcastWaterfall(value, index);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3539,12 +3561,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcast>
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcastFirst>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupBroadcastFirst(value);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupBroadcastFirst(value);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3554,12 +3581,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcastF
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallot>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const predicate = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupBallot(predicate);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupBallot(predicate);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3569,12 +3601,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallot>(SP
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformInverseBallot>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupInverseBallot(value);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupInverseBallot(value);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3584,13 +3621,18 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformInverseBal
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotBitExtract>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
   Value *const index = transValue(spvOperands[2], func, block);
-  return getBuilder()->CreateSubgroupBallotBitExtract(value, index);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupBallotBitExtract(value, index);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3600,22 +3642,24 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotBitE
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotBitCount>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[2], func, block);
 
-  switch (static_cast<SPIRVConstant *>(spvOperands[1])->getZExtIntValue()) {
-  case GroupOperationReduce:
-    return getBuilder()->CreateSubgroupBallotBitCount(value);
-  case GroupOperationInclusiveScan:
-    return getBuilder()->CreateSubgroupBallotInclusiveBitCount(value);
-  case GroupOperationExclusiveScan:
-    return getBuilder()->CreateSubgroupBallotExclusiveBitCount(value);
-  default:
-    llvm_unreachable("Should never be called!");
-    return nullptr;
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    switch (static_cast<SPIRVConstant *>(spvOperands[1])->getZExtIntValue()) {
+    case GroupOperationReduce:
+      return getBuilder()->CreateSubgroupBallotBitCount(value);
+    case GroupOperationInclusiveScan:
+      return getBuilder()->CreateSubgroupBallotInclusiveBitCount(value);
+    case GroupOperationExclusiveScan:
+      return getBuilder()->CreateSubgroupBallotExclusiveBitCount(value);
+    default:
+      llvm_unreachable("Should never be called!");
+      return nullptr;
+    }
   }
 }
 
@@ -3626,12 +3670,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotBitC
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotFindLSB>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupBallotFindLsb(value);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupBallotFindLsb(value);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3641,12 +3690,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotFind
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotFindMSB>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupBallotFindMsb(value);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupBallotFindMsb(value);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3656,13 +3710,18 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotFind
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffle>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
   Value *const index = transValue(spvOperands[2], func, block);
-  return getBuilder()->CreateSubgroupShuffle(value, index);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupShuffle(value, index);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3672,13 +3731,18 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffle>(S
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleXor>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
   Value *const mask = transValue(spvOperands[2], func, block);
-  return getBuilder()->CreateSubgroupShuffleXor(value, mask);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupShuffleXor(value, mask);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3688,13 +3752,18 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleXor
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleUp>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
   Value *const delta = transValue(spvOperands[2], func, block);
-  return getBuilder()->CreateSubgroupShuffleUp(value, delta);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupShuffleUp(value, delta);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3704,13 +3773,18 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleUp>
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleDown>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
   Value *const delta = transValue(spvOperands[2], func, block);
-  return getBuilder()->CreateSubgroupShuffleDown(value, delta);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupShuffleDown(value, delta);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -7236,6 +7310,7 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
 
     if (m_execModule >= ExecutionModelVertex && m_execModule <= ExecutionModelGeometry)
       hasXfbOuts = m_entryTarget->getExecutionMode(ExecutionModeXfb) != nullptr;
+
   } else {
     createLibraryEntryFunc();
   }
@@ -7857,7 +7932,8 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       }
 
       // If dual source blend is dynamically set, need to confirm whether the fragment shader actually uses
-      // dual-source blending by checking if there is an output at Location 0, Index 1
+      // dual-source blending by checking if there is an output at Location 0. If there isn't any output in
+      // index, the poison value will be exported.
       Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
       if ((llpcContext->getPipelineType() == PipelineType::Graphics) && (m_execModule == spv::ExecutionModelFragment)) {
         auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());

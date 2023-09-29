@@ -57,6 +57,9 @@ target_link_libraries(LLVMlgc PUBLIC llvm_dialects)
 
 ### Cached Project Options #############################################################################################
 option(LLPC_BUILD_NAVI12 "LLPC support for NAVI12?" ON)
+#if VKI_BUILD_NAVI32
+option(LLPC_BUILD_NAVI32 "LLPC support for NAVI32?" ON)
+#endif
 option(LLPC_BUILD_REMBRANDT "LLPC support for REMBRANDT?" ON)
 option(LLPC_BUILD_RAPHAEL "LLPC support for RAPHAEL?" ON)
 option(LLPC_BUILD_MENDOCINO "LLPC support for MENDOCINO?" ON)
@@ -71,7 +74,7 @@ set_compiler_options(LLVMlgc ${LLPC_ENABLE_WERROR})
 
 ### TableGen for LGC dialect ###########################################################################################
 
-set(LGC_TABLEGEN_EXE ${LLVM_TOOLS_BINARY_DIR}/llvm-dialects-tblgen)
+set(LGC_TABLEGEN_EXE $<TARGET_FILE:llvm-dialects-tblgen>)
 set(LGC_TABLEGEN_TARGET llvm-dialects-tblgen)
 set(LLVM_TARGET_DEFINITIONS interface/lgc/LgcDialect.td)
 
@@ -124,6 +127,14 @@ target_compile_definitions(LLVMlgc PRIVATE CHIP_HDR_RENOIR)
         CHIP_HDR_NAVI12
     )
   endif()
+#if VKI_BUILD_NAVI32
+  if(LLPC_BUILD_NAVI32)
+    target_compile_definitions(LLVMlgc PRIVATE
+        LLPC_BUILD_NAVI32
+        CHIP_HDR_NAVI32
+    )
+  endif()
+#endif
   if(LLPC_BUILD_REMBRANDT)
     target_compile_definitions(LLVMlgc PRIVATE
         LLPC_BUILD_REMBRANDT

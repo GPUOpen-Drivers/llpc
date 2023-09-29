@@ -131,10 +131,6 @@ opt<std::string> PipelineDumpDir("pipeline-dump-dir", desc("Directory where pipe
 // -enable-pipeline-dump: enable pipeline info dump
 opt<bool> EnablePipelineDump("enable-pipeline-dump", desc("Enable pipeline info dump"), init(false));
 
-// -shader-cache-file-dir: root directory to store shader cache
-opt<std::string> ShaderCacheFileDir("shader-cache-file-dir", desc("Root directory to store shader cache"),
-                                    value_desc("dir"), init("."));
-
 // DEPRECATED: This option should be removed once XGL sets the corresponding pipeline option.
 // -use-relocatable-shader-elf: Gets LLVM to generate more generic elf files for each shader individually, and LLPC will
 // then link those ELF files to generate the compiled pipeline.
@@ -153,24 +149,9 @@ opt<int> RelocatableShaderElfLimit("relocatable-shader-elf-limit",
                                             "relocatable shader ELF.  -1 means unlimited."),
                                    init(-1));
 
-// -shader-cache-mode: shader cache mode:
-// 0 - Disable
-// 1 - Runtime cache
-// 2 - Cache to disk
-// 3 - Use internal on-disk cache in read/write mode.
-// 4 - Use internal on-disk cache in read-only mode.
-opt<unsigned> ShaderCacheMode("shader-cache-mode",
-                              desc("Shader cache mode, 0 - disable, 1 - runtime cache, 2 - cache to disk, 3 - "
-                                   "load on-disk cache for read/write, 4 - load on-disk cache for read only"),
-                              init(0));
-
 // -cache-full-pipelines: Add full pipelines to the caches that are provided.
 opt<bool> CacheFullPipelines("cache-full-pipelines", desc("Add full pipelines to the caches that are provided."),
                              init(true));
-
-// -executable-name: executable file name
-static opt<std::string> ExecutableName("executable-name", desc("Executable file name"), value_desc("filename"),
-                                       init("amdllpc"));
 
 // -enable-per-stage-cache: Enable shader cache per shader stage
 opt<bool> EnablePerStageCache("enable-per-stage-cache", cl::desc("Enable shader cache per shader stage"), init(true));
@@ -188,6 +169,27 @@ opt<bool> EnablePartPipeline("enable-part-pipeline", cl::desc("Enable part pipel
 // -add-rt-helpers: Spawn additional helper threads to run RT pipeline compilations
 opt<int> AddRtHelpers("add-rt-helpers", cl::desc("Add this number of helper threads for each RT pipeline compile"),
                       init(0));
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 66
+// -shader-cache-file-dir: root directory to store shader cache
+opt<std::string> ShaderCacheFileDir("shader-cache-file-dir", desc("Root directory to store shader cache"),
+                                    value_desc("dir"), init("."));
+
+// -shader-cache-mode: shader cache mode:
+// 0 - Disable
+// 1 - Runtime cache
+// 2 - Cache to disk
+// 3 - Use internal on-disk cache in read/write mode.
+// 4 - Use internal on-disk cache in read-only mode.
+opt<unsigned> ShaderCacheMode("shader-cache-mode",
+                              desc("Shader cache mode, 0 - disable, 1 - runtime cache, 2 - cache to disk, 3 - "
+                                   "load on-disk cache for read/write, 4 - load on-disk cache for read only"),
+                              init(0));
+
+// -executable-name: executable file name
+opt<std::string> ExecutableName("executable-name", desc("Executable file name"), value_desc("filename"),
+                                init("amdllpc"));
+#endif
 
 extern opt<bool> EnableOuts;
 
@@ -255,10 +257,10 @@ static void fatalErrorHandler(void *userData, const char *reason, bool genCrashD
 // @param glueShaderIdentifier : The linker object for which the glue shaders are needed.
 // @param context : The context that contains the application caches.
 // @param compiler : The compiler object that contains the internal caches.
-static CacheAccessor checkCacheForGlueShader(StringRef glueShaderIdentifier, Context *context, Compiler *compiler) {
+static CacheAccessor checkCacheForGlueShader(StringRef glueShaderIdentifier, Compiler *compiler) {
   Hash glueShaderCacheHash =
       PipelineDumper::generateHashForGlueShader({glueShaderIdentifier.size(), glueShaderIdentifier.data()});
-  return CacheAccessor(context, glueShaderCacheHash, compiler->getInternalCaches());
+  return CacheAccessor(glueShaderCacheHash, compiler->getInternalCaches());
 }
 
 // =====================================================================================================================
@@ -294,7 +296,7 @@ static void setGlueBinaryBlobsInLinker(ElfLinker *elfLinker, Context *context, C
   ArrayRef<StringRef> glueShaderIdentifiers = elfLinker->getGlueInfo();
   for (unsigned i = 0; i < glueShaderIdentifiers.size(); ++i) {
     LLPC_OUTS("ID for glue shader" << i << ": " << llvm::toHex(glueShaderIdentifiers[i]) << "\n");
-    CacheAccessor cacheAccessor = checkCacheForGlueShader(glueShaderIdentifiers[i], context, compiler);
+    CacheAccessor cacheAccessor = checkCacheForGlueShader(glueShaderIdentifiers[i], compiler);
 
     if (cacheAccessor.isInCache()) {
       LLPC_OUTS("Cache hit for glue shader " << i << "\n");
@@ -449,33 +451,6 @@ Compiler::Compiler(GfxIpVersion gfxIp, unsigned optionCount, const char *const *
     }
   }
 
-  // Initialize shader cache
-  ShaderCacheCreateInfo createInfo = {};
-  ShaderCacheAuxCreateInfo auxCreateInfo = {};
-  unsigned shaderCacheMode = cl::ShaderCacheMode;
-  auxCreateInfo.shaderCacheMode = static_cast<ShaderCacheMode>(shaderCacheMode);
-  auxCreateInfo.gfxIp = m_gfxIp;
-  auxCreateInfo.hash = m_optionHash;
-  auxCreateInfo.executableName = cl::ExecutableName.c_str();
-
-  const char *shaderCachePath = cl::ShaderCacheFileDir.c_str();
-  if (cl::ShaderCacheFileDir.empty()) {
-#ifdef WIN_OS
-    shaderCachePath = getenv("LOCALAPPDATA");
-    assert(shaderCachePath);
-#else
-    llvm_unreachable("Should never be called!");
-#endif
-  }
-
-  if (strlen(shaderCachePath) >= Llpc::MaxPathLen) {
-    LLPC_ERRS("The shader-cache-file-dir exceed the maximum length (" << Llpc::MaxPathLen << ")\n");
-    llvm_unreachable("ShaderCacheFileDir is too long");
-  }
-  auxCreateInfo.cacheFilePath = shaderCachePath;
-
-  m_shaderCache = ShaderCacheManager::getShaderCacheManager()->getShaderCacheObject(&createInfo, &auxCreateInfo);
-
   ++m_instanceCount;
   ++m_outRedirectCount;
 }
@@ -514,8 +489,6 @@ Compiler::~Compiler() {
     --m_outRedirectCount;
     if (m_outRedirectCount == 0)
       redirectLogOutput(true, 0, nullptr);
-
-    ShaderCacheManager::getShaderCacheManager()->releaseShaderCacheObject(m_shaderCache);
   }
 
   {
@@ -527,7 +500,6 @@ Compiler::~Compiler() {
   }
 
   if (shutdown) {
-    ShaderCacheManager::shutdown();
     remove_fatal_error_handler();
     delete m_contextPool;
     m_contextPool = nullptr;
@@ -1069,12 +1041,12 @@ Result Compiler::buildGraphicsShaderStage(const GraphicsPipelineBuildInfo *pipel
 
   if (metaDataSize > 0) {
     pipelineOut->fsOutputMetaData = code + candidateElf.size();
+    pipelineOut->fsOutputMetaDataSize = metaDataSize;
     FragmentOutputs *outputs = static_cast<FragmentOutputs *>(pipelineOut->fsOutputMetaData);
     outputs->fsOutInfoCount = fsOuts.size();
     outputs->discard = discardState;
     void *offsetData = static_cast<uint8_t *>(pipelineOut->fsOutputMetaData) + sizeof(FragmentOutputs);
     memcpy(offsetData, fsOuts.data(), sizeof(FsOutInfo) * fsOuts.size());
-    outputs->fsOutInfos = static_cast<FsOutInfo *>(offsetData);
   }
   return result;
 }
@@ -1094,6 +1066,11 @@ Result Compiler::BuildColorExportShader(const GraphicsPipelineBuildInfo *pipelin
   if (!pipelineInfo->pfnOutputAlloc)
     return Result::ErrorInvalidPointer;
 
+  if (pipelineInfo->iaState.enableMultiView) {
+    LLPC_OUTS("Relocatable shader doesn't support \"MultiView\"");
+    return Result::RequireFullPipeline;
+  }
+
   if (!fsOutputMetaData)
     return Result::Success;
 
@@ -1109,8 +1086,13 @@ Result Compiler::BuildColorExportShader(const GraphicsPipelineBuildInfo *pipelin
 
   SmallVector<ColorExportInfo, 8> exports;
   const FragmentOutputs *fsOuts = static_cast<const FragmentOutputs *>(fsOutputMetaData);
+
+  const uint8 *metaPtr = static_cast<const uint8 *>(fsOutputMetaData);
+  metaPtr = metaPtr + sizeof(FragmentOutputs);
+  const FsOutInfo *outInfos = reinterpret_cast<const FsOutInfo *>(metaPtr);
+
   for (unsigned idx = 0; idx < fsOuts->fsOutInfoCount; idx++) {
-    auto outInfo = fsOuts->fsOutInfos[idx];
+    auto outInfo = outInfos[idx];
     ColorExportInfo colorExportInfo;
     colorExportInfo.hwColorTarget = outInfo.hwColorTarget;
     colorExportInfo.location = outInfo.location;
@@ -1197,7 +1179,7 @@ Result Compiler::buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *p
 
   if (!canUseRelocatableGraphicsShaderElf(shaderInfo, pipelineInfo)) {
     LLPC_OUTS("Relocatable shader compilation requested but not possible.\n");
-    return Result::ErrorInvalidValue;
+    return Result::RequireFullPipeline;
   }
 
   MetroHash::Hash cacheHash = {};
@@ -1207,7 +1189,7 @@ Result Compiler::buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *p
 
   std::optional<CacheAccessor> cacheAccessor;
   if (cl::CacheFullPipelines) {
-    cacheAccessor.emplace(pipelineInfo, cacheHash, getInternalCaches());
+    cacheAccessor.emplace(cacheHash, getInternalCaches());
   }
 
   Result result = Result::Success;
@@ -1217,8 +1199,7 @@ Result Compiler::buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *p
   if (cacheAccessor && cacheAccessor->isInCache()) {
     LLPC_OUTS("Cache hit for graphics pipeline.\n");
     elfBin = cacheAccessor->getElfFromCache();
-    pipelineOut->pipelineCacheAccess =
-        cacheAccessor->hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
+    pipelineOut->pipelineCacheAccess = CacheAccessInfo::InternalCacheHit;
   } else {
     LLPC_OUTS("Cache miss for graphics pipeline.\n");
     if (cacheAccessor && pipelineOut->pipelineCacheAccess == CacheAccessInfo::CacheNotChecked)
@@ -1258,16 +1239,8 @@ Result Compiler::buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *p
     bool hasError = false;
     context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>(&hasError));
     hasError |= !linkRelocatableShaderElf(elf, &pipelineElf, context);
-
     context->setDiagnosticHandler(nullptr);
-    if (hasError) {
-      for (unsigned stage = 0; stage < ShaderStageGfxCount; stage++) {
-        if (doesShaderStageExist(shaderInfo, static_cast<ShaderStage>(stage))) {
-          pipelineOut->stageCacheAccesses[stage] = CacheMiss;
-        }
-      }
-      return Result::ErrorInvalidShader;
-    }
+    assert(!hasError);
 
     elfBin.codeSize = pipelineElf.size();
     elfBin.pCode = pipelineElf.data();
@@ -1304,6 +1277,15 @@ Result Compiler::buildUnlinkedShaderInternal(Context *context, ArrayRef<const Pi
   if (!hasDataForUnlinkedShaderType(stage, shaderInfo))
     return Result::Success;
 
+  if (stage == UnlinkedStageFragment) {
+    assert(shaderInfo[ShaderStageFragment]->pModuleData);
+    // If fragment use builtIn inputs, return RequireFullPipeline.
+    const ShaderModuleData *moduleData =
+        static_cast<const ShaderModuleData *>(shaderInfo[ShaderStageFragment]->pModuleData);
+    if (moduleData->usage.useGenericBuiltIn)
+      return Result::RequireFullPipeline;
+  }
+
   unsigned originalShaderStageMask = context->getPipelineContext()->getShaderStageMask();
   const MetroHash::Hash originalCacheHash = context->getPipelineContext()->getCacheHashCodeWithoutCompact();
   unsigned shaderStageMask = getShaderStageMaskForType(stage) & originalShaderStageMask;
@@ -1336,15 +1318,14 @@ Result Compiler::buildUnlinkedShaderInternal(Context *context, ArrayRef<const Pi
   });
 
   Result result = Result::Success;
-  CacheAccessor cacheAccessor(context, cacheHash, caches);
+  CacheAccessor cacheAccessor(cacheHash, caches);
   if (cacheAccessor.isInCache()) {
     BinaryData elfBin = cacheAccessor.getElfFromCache();
     auto data = reinterpret_cast<const char *>(elfBin.pCode);
     elfPackage.assign(data, data + elfBin.codeSize);
     LLPC_OUTS("Cache hit for shader stage " << getUnlinkedShaderStageName(stage) << "\n");
     for (ShaderStage gfxStage : shaderStages)
-      stageCacheAccesses[gfxStage] =
-          cacheAccessor.hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
+      stageCacheAccesses[gfxStage] = CacheAccessInfo::InternalCacheHit;
   } else {
     LLPC_OUTS("Cache miss for shader stage " << getUnlinkedShaderStageName(stage) << "\n");
     for (ShaderStage gfxStage : shaderStages)
@@ -1753,12 +1734,11 @@ unsigned GraphicsShaderCacheChecker::check(const Module *module, const unsigned 
   unsigned stagesLeftToCompile = stageMask;
 
   if (stageMask & getLgcShaderStageMask(ShaderStageFragment)) {
-    m_fragmentCacheAccessor.emplace(m_context, fragmentHash, m_compiler->getInternalCaches());
+    m_fragmentCacheAccessor.emplace(fragmentHash, m_compiler->getInternalCaches());
     if (m_fragmentCacheAccessor->isInCache()) {
       // Remove fragment shader stages.
       stagesLeftToCompile &= ~getLgcShaderStageMask(ShaderStageFragment);
-      stageCacheAccesses[ShaderStageFragment] =
-          m_fragmentCacheAccessor->hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
+      stageCacheAccesses[ShaderStageFragment] = CacheAccessInfo::InternalCacheHit;
     } else {
       stageCacheAccesses[ShaderStageFragment] = CacheAccessInfo::CacheMiss;
     }
@@ -1766,12 +1746,11 @@ unsigned GraphicsShaderCacheChecker::check(const Module *module, const unsigned 
 
   if (stageMask & ~getLgcShaderStageMask(ShaderStageFragment)) {
     auto accessInfo = CacheAccessInfo::CacheNotChecked;
-    m_nonFragmentCacheAccessor.emplace(m_context, nonFragmentHash, m_compiler->getInternalCaches());
+    m_nonFragmentCacheAccessor.emplace(nonFragmentHash, m_compiler->getInternalCaches());
     if (m_nonFragmentCacheAccessor->isInCache()) {
       // Remove non-fragment shader stages.
       stagesLeftToCompile &= getLgcShaderStageMask(ShaderStageFragment);
-      accessInfo = m_nonFragmentCacheAccessor->hitInternalCache() ? CacheAccessInfo::InternalCacheHit
-                                                                  : CacheAccessInfo::CacheHit;
+      accessInfo = CacheAccessInfo::InternalCacheHit;
     } else {
       accessInfo = CacheAccessInfo::CacheMiss;
     }
@@ -1985,14 +1964,13 @@ Result Compiler::buildGraphicsPipelineWithPartPipelines(Context *context,
     // Finalize the hash, and look it up in the cache.
     MetroHash::Hash partPipelineHash = {};
     hasher.Finalize(partPipelineHash.bytes);
-    CacheAccessor cacheAccessor(context, partPipelineHash, getInternalCaches());
+    CacheAccessor cacheAccessor(partPipelineHash, getInternalCaches());
     if (cacheAccessor.isInCache()) {
       LLPC_OUTS("Cache hit for stage " << getPartPipelineStageName(partPipelineStage) << ".\n");
 
       // Mark the applicable entries in stageCacheAccesses.
       for (ShaderStage shaderStage : maskToShaderStages(partStageMask)) {
-        stageCacheAccesses[shaderStage] =
-            cacheAccessor.hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
+        stageCacheAccesses[shaderStage] = CacheAccessInfo::InternalCacheHit;
       }
       // Get the ELF from the cache.
       partPipelineElf = llvm::StringRef(static_cast<const char *>(cacheAccessor.getElfFromCache().pCode),
@@ -2122,7 +2100,7 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
 
   std::optional<CacheAccessor> cacheAccessor;
   if (cl::CacheFullPipelines) {
-    cacheAccessor.emplace(pipelineInfo, cacheHash, getInternalCaches());
+    cacheAccessor.emplace(cacheHash, getInternalCaches());
   }
 
   ElfPackage candidateElf;
@@ -2144,8 +2122,7 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
     LLPC_OUTS("Cache hit for graphics pipeline.\n");
     elfBin = cacheAccessor->getElfFromCache();
     if (cacheAccessor->isInCache()) {
-      pipelineOut->pipelineCacheAccess =
-          cacheAccessor->hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
+      pipelineOut->pipelineCacheAccess = CacheAccessInfo::InternalCacheHit;
     }
   }
 
@@ -2251,7 +2228,7 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
 
   std::optional<CacheAccessor> cacheAccessor;
   if (cl::CacheFullPipelines) {
-    cacheAccessor.emplace(pipelineInfo, cacheHash, getInternalCaches());
+    cacheAccessor.emplace(cacheHash, getInternalCaches());
   }
 
   ElfPackage candidateElf;
@@ -2270,8 +2247,7 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
   } else {
     LLPC_OUTS("Cache hit for compute pipeline.\n");
     elfBin = cacheAccessor->getElfFromCache();
-    pipelineOut->pipelineCacheAccess =
-        cacheAccessor->hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
+    pipelineOut->pipelineCacheAccess = CacheAccessInfo::InternalCacheHit;
   }
 
   if (result == Result::Success) {
@@ -2402,52 +2378,48 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
     PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile *>(pipelineDumpFile), &extraInfo);
   }
 
-  ShaderEntryState cacheEntryState = ShaderEntryState::Compiling;
-
   std::vector<ElfPackage> elfBinarys;
   std::vector<RayTracingShaderProperty> shaderProps;
 
-  if (cacheEntryState == ShaderEntryState::Compiling) {
-    const PipelineShaderInfo *representativeShaderInfo = nullptr;
-    if (pipelineInfo->shaderCount > 0)
-      representativeShaderInfo = &pipelineInfo->pShaders[0];
+  const PipelineShaderInfo *representativeShaderInfo = nullptr;
+  if (pipelineInfo->shaderCount > 0)
+    representativeShaderInfo = &pipelineInfo->pShaders[0];
 
-    RayTracingContext rayTracingContext(m_gfxIp, pipelineInfo, representativeShaderInfo, &pipelineHash, &cacheHash,
-                                        pipelineInfo->indirectStageMask);
+  RayTracingContext rayTracingContext(m_gfxIp, pipelineInfo, representativeShaderInfo, &pipelineHash, &cacheHash,
+                                      pipelineInfo->indirectStageMask);
 
-    pipelineOut->hasTraceRay = false;
-    for (unsigned i = 0; i < pipelineInfo->shaderCount; ++i) {
-      const auto &shaderInfo = pipelineInfo->pShaders[i];
-      const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo.pModuleData);
-      if (moduleData->usage.hasTraceRay) {
-        pipelineOut->hasTraceRay = true;
-        break;
-      }
+  pipelineOut->hasTraceRay = false;
+  for (unsigned i = 0; i < pipelineInfo->shaderCount; ++i) {
+    const auto &shaderInfo = pipelineInfo->pShaders[i];
+    const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo.pModuleData);
+    if (moduleData->usage.hasTraceRay) {
+      pipelineOut->hasTraceRay = true;
+      break;
     }
-
-    std::vector<const PipelineShaderInfo *> rayTracingShaderInfo;
-    rayTracingShaderInfo.reserve(pipelineInfo->shaderCount + 1);
-    for (unsigned i = 0; i < pipelineInfo->shaderCount; ++i) {
-      rayTracingShaderInfo.push_back(&pipelineInfo->pShaders[i]);
-      auto &shaderInfo = rayTracingShaderInfo[i];
-      const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
-      if (shaderInfo->entryStage == ShaderStageRayTracingAnyHit ||
-          shaderInfo->entryStage == ShaderStageRayTracingIntersect) {
-        if (moduleData->usage.enableRayQuery) {
-          rayTracingContext.setIndirectPipeline();
-        }
-      }
-    }
-
-    // Add entry module
-    PipelineShaderInfo raygenMainShaderInfo = pipelineInfo->pShaders[0];
-    raygenMainShaderInfo.entryStage = ShaderStageRayTracingRayGen;
-    raygenMainShaderInfo.pModuleData = nullptr;
-    rayTracingShaderInfo.push_back(&raygenMainShaderInfo);
-
-    result = buildRayTracingPipelineInternal(rayTracingContext, rayTracingShaderInfo, false, elfBinarys, shaderProps,
-                                             helperThreadProvider);
   }
+
+  std::vector<const PipelineShaderInfo *> rayTracingShaderInfo;
+  rayTracingShaderInfo.reserve(pipelineInfo->shaderCount + 1);
+  for (unsigned i = 0; i < pipelineInfo->shaderCount; ++i) {
+    rayTracingShaderInfo.push_back(&pipelineInfo->pShaders[i]);
+    auto &shaderInfo = rayTracingShaderInfo[i];
+    const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
+    if (shaderInfo->entryStage == ShaderStageRayTracingAnyHit ||
+        shaderInfo->entryStage == ShaderStageRayTracingIntersect) {
+      if (moduleData->usage.enableRayQuery) {
+        rayTracingContext.setIndirectPipeline();
+      }
+    }
+  }
+
+  // Add entry module
+  PipelineShaderInfo raygenMainShaderInfo = pipelineInfo->pShaders[0];
+  raygenMainShaderInfo.entryStage = ShaderStageRayTracingRayGen;
+  raygenMainShaderInfo.pModuleData = nullptr;
+  rayTracingShaderInfo.push_back(&raygenMainShaderInfo);
+
+  result = buildRayTracingPipelineInternal(rayTracingContext, rayTracingShaderInfo, false, elfBinarys, shaderProps,
+                                           helperThreadProvider);
 
   if (result == Result::Success) {
     void *allocBuf = nullptr;
@@ -3060,13 +3032,10 @@ MetroHash::Hash Compiler::generateHashForCompileOptions(unsigned optionCount, co
   // Options which needn't affect compilation results
   static StringRef IgnoredOptions[] = {cl::PipelineDumpDir.ArgStr,
                                        cl::EnablePipelineDump.ArgStr,
-                                       cl::ShaderCacheFileDir.ArgStr,
-                                       cl::ShaderCacheMode.ArgStr,
                                        cl::EnableOuts.ArgStr,
                                        cl::EnableErrs.ArgStr,
                                        cl::LogFileDbgs.ArgStr,
                                        cl::LogFileOuts.ArgStr,
-                                       cl::ExecutableName.ArgStr,
                                        "unlinked",
                                        "o"};
 
@@ -3292,11 +3261,6 @@ bool Compiler::linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipe
       elfs.push_back(MemoryBufferRef(shaderElfs[stage].str(), getUnlinkedShaderStageName(stage)));
   }
   std::unique_ptr<ElfLinker> elfLinker(pipeline->createElfLinker(elfs));
-
-  if (elfLinker->fragmentShaderUsesMappedBuiltInInputs()) {
-    LLPC_OUTS("Failed to link relocatable shaders because FS uses builtin inputs.");
-    return false;
-  }
 
   setGlueBinaryBlobsInLinker(elfLinker.get(), context, this);
   // Do the link.

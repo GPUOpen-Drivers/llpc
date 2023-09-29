@@ -256,11 +256,16 @@ void LowerGpuRt::visitLdsStackInit(GpurtLdsStackInitOp &inst) {
   Value *stackBaseAsInt = m_builder->CreatePtrToInt(
       m_builder->CreateGEP(m_stackTy, m_stack, {m_builder->getInt32(0), stackBasePerThread}), m_builder->getInt32Ty());
 
-  // stack_addr[31:18] = stack_base[15:2]
-  // stack_addr[17:0] = stack_index[17:0]
-  // The low 18 bits of stackAddr contain stackIndex which we always initialize to 0.
-  // Note that this relies on stackAddr being a multiple of 4, so that bits 17 and 16 are 0.
-  Value *stackAddr = m_builder->CreateShl(stackBaseAsInt, 16);
+  Value *stackAddr;
+  {
+    // stack_addr[31:18] = stack_base[15:2]
+    // stack_addr[17:0] = stack_index[17:0]
+    // The low 18 bits of stackAddr contain stackIndex which we always initialize to 0.
+    // Note that this relies on stackAddr being a multiple of 4, so that bits 17 and 16 are 0.
+    // stackAddrDw = (stackAddr >> 2) << 18.
+    stackAddr = m_builder->CreateShl(stackBaseAsInt, 16);
+  }
+
   inst.replaceAllUsesWith(stackAddr);
   m_callsToLower.push_back(&inst);
   m_funcsToLower.insert(inst.getCalledFunction());

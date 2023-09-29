@@ -40,6 +40,7 @@
 #include "llpcFile.h"
 #include "llpcInputUtils.h"
 #include "llpcPipelineBuilder.h"
+#include "llpcShaderCacheWrap.h"
 #include "llpcThreading.h"
 #include "llpcUtil.h"
 #include "spvgen.h"
@@ -346,7 +347,6 @@ cl::opt<std::string> GpuRtLibrary("gpurt-library", cl::desc("Use the GPURT shade
 cl::opt<bool> EnableColorExportShader("enable-color-export-shader",
                                       cl::desc("Enable color export shader, only compile each stage of the pipeline without linking"),
                                       cl::init(false));
-
 } // namespace
 // clang-format on
 namespace llvm {
@@ -410,8 +410,9 @@ cl::opt<ExtensionPrinter, true, cl::parser<bool>> ExtPrinter{"ext", cl::desc("Di
 // @param argc : Count of arguments
 // @param argv : List of arguments
 // @param [out] compiler : Created LLPC compiler object
+// @param [out] cache : Created LLPC cache object
 // @returns : Result::Success on success, other status codes on failure
-static Result init(int argc, char *argv[], ICompiler *&compiler) {
+static Result init(int argc, char *argv[], ICompiler *&compiler, ShaderCacheWrap *&cache) {
   // Before we get to LLVM command-line option parsing, we need to find the -gfxip option value.
   for (int i = 1; i != argc; ++i) {
     StringRef arg = argv[i];
@@ -503,7 +504,10 @@ static Result init(int argc, char *argv[], ICompiler *&compiler) {
     return Result::Unsupported;
   }
 
-  Result result = ICompiler::Create(ParsedGfxIp, argc, argv, &compiler);
+  // Create internal cache
+  cache = ShaderCacheWrap::Create(argc, argv);
+
+  Result result = ICompiler::Create(ParsedGfxIp, argc, argv, &compiler, cache);
   if (result != Result::Success)
     return result;
 
@@ -778,7 +782,8 @@ int main(int argc, char *argv[]) {
 #endif
 
   ICompiler *compiler = nullptr;
-  Result result = init(argc, argv, compiler);
+  ShaderCacheWrap *cache = nullptr;
+  Result result = init(argc, argv, compiler, cache);
 
 #ifdef WIN_OS
   if (AssertToMsgBox) {
@@ -787,11 +792,14 @@ int main(int argc, char *argv[]) {
 #endif
 
   // Cleanup code that gets run automatically before returning.
-  auto onExit = make_scope_exit([compiler, &result] {
+  auto onExit = make_scope_exit([compiler, cache, &result] {
     FinalizeSpvgen();
 
     if (compiler)
       compiler->Destroy();
+
+    if (cache)
+      cache->Destroy();
 
     if (result == Result::Success)
       LLPC_OUTS("\n=====  AMDLLPC SUCCESS  =====\n");

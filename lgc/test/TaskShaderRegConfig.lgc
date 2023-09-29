@@ -3,8 +3,6 @@
 
 ; RUN: lgc -mcpu=gfx1030 -o - -filetype=asm %s | FileCheck --check-prefixes=CHECK %s
 
-; In this test case, we check if relevant registers of a task shader is built correctly.
-
 ; ModuleID = 'lgcPipeline'
 source_filename = "llpctask1"
 target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5-G1-ni:7"
@@ -34,7 +32,6 @@ attributes #0 = { nounwind }
 !5 = !{i32 0, i32 3}
 !6 = !{!"\82\B0amdpal.pipelines\91\84\AA.registers\80\B0.spill_threshold\CE\FF\FF\FF\FF\B0.user_data_limit\00\AF.xgl_cache_info\82\B3.128_bit_cache_hash\92\CF*\B3\1C8\12\A8\7F\8D\CF\0B\01_tf\C7\1A\C5\AD.llpc_version\A452.2\AEamdpal.version\92\02\03"}
 !7 = !{i32 0}
-
 ; CHECK-LABEL: amdgpu_cs_main:
 ; CHECK:         s_endpgm
 ;

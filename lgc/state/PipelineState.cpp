@@ -98,6 +98,7 @@ static unsigned getMaxComponentBitCount(BufDataFormat dfmt) {
   case BufDataFormat8_8_8_Bgr:
   case BufDataFormat8_8_8_8:
   case BufDataFormat8_8_8_8_Bgra:
+  case BufDataFormat8_A:
     return 8;
   case BufDataFormat5_9_9_9:
     return 9;
@@ -146,6 +147,7 @@ static bool hasAlpha(BufDataFormat dfmt) {
   case BufDataFormat5_6_5_1_Bgra:
   case BufDataFormat1_5_6_5:
   case BufDataFormat5_9_9_9:
+  case BufDataFormat8_A:
     return true;
   default:
     return false;
@@ -164,6 +166,7 @@ static unsigned getNumChannels(BufDataFormat dfmt) {
   case BufDataFormat16:
   case BufDataFormat32:
   case BufDataFormat64:
+  case BufDataFormat8_A:
     return 1;
   case BufDataFormat4_4:
   case BufDataFormat8_8:
@@ -1184,7 +1187,7 @@ void PipelineState::setColorExportState(ArrayRef<ColorExportFormat> formats, con
 //
 // @param location : Export location
 const ColorExportFormat &PipelineState::getColorExportFormat(unsigned location) {
-  if (getColorExportState().dualSourceBlendEnable)
+  if (getColorExportState().dualSourceBlendEnable || getColorExportState().dynamicDualSourceBlendEnable)
     location = 0;
 
   if (location >= m_colorExportFormats.size()) {
@@ -1608,7 +1611,9 @@ unsigned PipelineState::computeExportFormat(Type *outputTy, unsigned location) {
   // When dual source blend is enabled, location 1 is location 0 index 1 in shader source. we need generate same export
   // format.
   const bool enableAlphaToCoverage =
-      (cbState->alphaToCoverageEnable && ((location == 0) || ((location == 1) && cbState->dualSourceBlendEnable)));
+      (cbState->alphaToCoverageEnable &&
+       ((location == 0) ||
+        ((location == 1) && (cbState->dualSourceBlendEnable || cbState->dynamicDualSourceBlendEnable))));
 
   const bool blendEnabled = colorExportFormat->blendEnable;
 
@@ -1628,7 +1633,7 @@ unsigned PipelineState::computeExportFormat(Type *outputTy, unsigned location) {
 
   const bool formatHasAlpha = hasAlpha(colorExportFormat->dfmt);
   const bool alphaExport =
-      (outputMask == 0xF && (formatHasAlpha || colorExportFormat->blendSrcAlphaToColor || enableAlphaToCoverage));
+      (outputMask & 0x8 && (formatHasAlpha || colorExportFormat->blendSrcAlphaToColor || enableAlphaToCoverage));
 
   const CompSetting compSetting = computeCompSetting(colorExportFormat->dfmt);
 

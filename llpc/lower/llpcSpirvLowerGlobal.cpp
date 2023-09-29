@@ -1215,6 +1215,27 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
           // and "BuiltInSubgroupXXXMask" share the same numeric values.
           inOutValue = m_builder->CreateBitCast(inOutValue, FixedVectorType::get(inOutTy, 2));
           inOutValue = m_builder->CreateExtractElement(inOutValue, uint64_t(0));
+        } else if (builtIn == lgc::BuiltInFragCoord) {
+          auto buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+          if (buildInfo->originUpperLeft !=
+              static_cast<const ShaderModuleData *>(buildInfo->fs.pModuleData)->usage.originUpperLeft) {
+            unsigned offset = 0;
+            auto winSize = getUniformConstantEntryByLocation(m_context, m_shaderStage,
+                                                             Vkgc::GlCompatibilityUniformLocation::FrameBufferSize);
+            if (winSize) {
+              offset = winSize->offset;
+              Value *bufferDesc =
+                  m_builder->CreateLoadBufferDesc(Vkgc::InternalDescriptorSetId, Vkgc::ConstantBuffer0Binding,
+                                                  m_builder->getInt32(0), lgc::Builder::BufferFlagNonConst);
+              // Layout is {width, height}, so the offset of height is added sizeof(float).
+              Value *winHeightPtr =
+                  m_builder->CreateConstInBoundsGEP1_32(m_builder->getInt8Ty(), bufferDesc, offset + sizeof(float));
+              auto winHeight = m_builder->CreateLoad(m_builder->getFloatTy(), winHeightPtr);
+              auto fragCoordY = m_builder->CreateExtractElement(inOutValue, 1);
+              fragCoordY = m_builder->CreateFSub(winHeight, fragCoordY);
+              inOutValue = m_builder->CreateInsertElement(inOutValue, fragCoordY, 1);
+            }
+          }
         }
         if (inOutValue->getType()->isIntegerTy(1)) {
           // Convert i1 to i32.
@@ -1425,6 +1446,9 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
                               cast<ConstantInt>(locOffset)->getZExtValue(), outputInfo);
     }
 
+    if (m_context->getPipelineContext()->getUseDualSourceBlend()) {
+      outputInfo.setDualSourceBlendDynamic(true);
+    }
     m_builder->CreateWriteGenericOutput(outputValue, location, locOffset, elemIdx, maxLocOffset, outputInfo,
                                         vertexOrPrimitiveIdx);
   }

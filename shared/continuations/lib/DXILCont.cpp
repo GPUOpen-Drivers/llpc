@@ -33,6 +33,7 @@
 #include "continuations/ContinuationsDialect.h"
 #include "continuations/ContinuationsUtil.h"
 #include "continuations/LowerRaytracingPipeline.h"
+#include "lgccps/LgcCpsDialect.h"
 #include "lgcrt/LgcRtDialect.h"
 #include "llvm-dialects/Dialect/Builder.h"
 #include "llvm-dialects/Dialect/Dialect.h"
@@ -208,7 +209,7 @@ void DXILContHelper::addContinuationPasses(ModulePassManager &MPM) {
   MPM.addPass(createModuleToFunctionPassAdaptor(CoroElidePass()));
   MPM.addPass(CoroCleanupPass());
 
-  MPM.addPass(CleanupContinuationsPass());
+  MPM.addPass(LegacyCleanupContinuationsPass());
   MPM.addPass(RegisterBufferPass());
   MPM.addPass(SaveContinuationStatePass());
   MPM.addPass(DXILContPostProcessPass());
@@ -258,7 +259,8 @@ DialectContextAnalysis::run(llvm::Module &M,
   if (NeedDialectContext) {
     Context =
         llvm_dialects::DialectContext::make<continuations::ContinuationsDialect,
-                                            lgc::rt::LgcRtDialect>(
+                                            lgc::rt::LgcRtDialect,
+                                            lgc::cps::LgcCpsDialect>(
             M.getContext());
   }
   return DialectContextAnalysis::Result();
@@ -595,7 +597,7 @@ CallInst *llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy,
     return nullptr;
 
   std::string Name = ("_cont_" + IntrImplEntry->Name).str();
-  auto *IntrImpl = DXILContHelper::getAliasedFunction(M, Name);
+  auto *IntrImpl = M.getFunction(Name);
   if (!IntrImpl)
     cantFail(make_error<StringError>(Twine("Intrinsic implementation '") +
                                          Name + "' not found",
@@ -697,13 +699,78 @@ Type *llvm::getFuncArgPtrElementType(const Function *F, const Argument *Arg) {
   if (!ArgTy->isPointerTy())
     return nullptr;
 
-  // NOTE: fast path code to be removed later
-  if (!ArgTy->isOpaquePointerTy())
-    return ArgTy->getNonOpaquePointerElementType();
-
   return DXILContArgTy::get(F, Arg).getPointerElementType();
 }
 
 Type *llvm::getFuncArgPtrElementType(const Function *F, int ArgNo) {
   return getFuncArgPtrElementType(F, F->getArg(ArgNo));
 }
+
+namespace llvm {
+namespace coro {
+bool defaultMaterializable(Instruction &V);
+} // End namespace coro
+} // End namespace llvm
+
+bool llvm::LgcMaterializable(Instruction &OrigI) {
+  Instruction *V = &OrigI;
+
+  // extract instructions are rematerializable, but increases the size of the
+  // continuation state, so as a heuristic only rematerialize this if the source
+  // can be rematerialized as well.
+  while (true) {
+    Instruction *NewInst = nullptr;
+    if (auto *Val = dyn_cast<ExtractElementInst>(V))
+      NewInst = dyn_cast<Instruction>(Val->getVectorOperand());
+    else if (auto *Val = dyn_cast<ExtractValueInst>(V))
+      NewInst = dyn_cast<Instruction>(Val->getAggregateOperand());
+
+    if (NewInst)
+      V = NewInst;
+    else
+      break;
+  }
+
+  if (coro::defaultMaterializable(*V))
+    return true;
+
+  if (auto *LI = dyn_cast<LoadInst>(V)) {
+    // load from constant address space
+    if (LI->getPointerAddressSpace() == 4)
+      return true;
+  }
+
+  if (auto *CInst = dyn_cast<CallInst>(V)) {
+    if (auto *CalledFunc = CInst->getCalledFunction()) {
+      // Before rematerialization happens, lgc.rt dialect operations that cannot
+      // be rematerialized are replaced by their implementation, so that the
+      // necessary values can be put into the coroutine frame. Therefore, we
+      // can assume all left-over intrinsics can be rematerialized.
+      if (isRematerializableLgcRtOp(*CInst))
+        return true;
+
+      auto CalledName = CalledFunc->getName();
+      // FIXME: switch to dialectOp check.
+      if (CalledName.startswith("lgc.user.data") ||
+          CalledName.startswith("lgc.load.user.data"))
+        return true;
+    }
+  }
+
+  return false;
+}
+
+namespace llvm {
+void addLgcContinuationTransform(ModulePassManager &MPM) {
+  MPM.addPass(LowerAwaitPass());
+
+  MPM.addPass(CoroEarlyPass());
+  CGSCCPassManager CGPM;
+  CGPM.addPass(LgcCoroSplitPass());
+  MPM.addPass(createModuleToPostOrderCGSCCPassAdaptor(std::move(CGPM)));
+  MPM.addPass(createModuleToFunctionPassAdaptor(CoroElidePass()));
+  MPM.addPass(CoroCleanupPass());
+
+  MPM.addPass(CleanupContinuationsPass());
+}
+} // End namespace llvm

@@ -110,6 +110,11 @@ public:
     m_data.bits.component = component;
   }
 
+  bool isDualSourceBlendDynamic() const { return m_data.bits.dualSourceBlendDynamic; }
+  void setDualSourceBlendDynamic(bool dualSourceBlendDynamic = true) {
+    m_data.bits.dualSourceBlendDynamic = dualSourceBlendDynamic;
+  }
+
 private:
   union {
     struct {
@@ -125,6 +130,7 @@ private:
                                  //    whole array or of an element with a variable index.
       unsigned perPrimitive : 1; // Mesh shader output: whether it is a per-primitive output
       unsigned component : 2;    // Component offset, specifying which components within a location is consumed
+      unsigned dualSourceBlendDynamic : 1; // Fs output: whether it's dynamic dual source blend output
     } bits;
     unsigned u32All;
   } m_data;
@@ -1544,27 +1550,28 @@ public:
   llvm::Value *CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, llvm::Value *const value,
                                                 llvm::Value *const clusterSize, const llvm::Twine &instName = "");
 
-  // Create a subgroup quad broadcast.
+  // Create a quad broadcast.
   //
   // @param value : The value to broadcast
   // @param index : The index within the quad to broadcast from
+  // @param inWQM : Whether it's in whole quad mode
   // @param instName : Name to give instruction(s)
-  llvm::Value *CreateSubgroupQuadBroadcast(llvm::Value *const value, llvm::Value *const index,
+  llvm::Value *CreateSubgroupQuadBroadcast(llvm::Value *const value, llvm::Value *const index, bool inWQM = true,
                                            const llvm::Twine &instName = "");
 
-  // Create a subgroup quad swap horizontal.
+  // Create a quad swap horizontal.
   //
   // @param value : The value to swap
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateSubgroupQuadSwapHorizontal(llvm::Value *const value, const llvm::Twine &instName = "");
 
-  // Create a subgroup quad swap vertical.
+  // Create a quad swap vertical.
   //
   // @param value : The value to swap
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateSubgroupQuadSwapVertical(llvm::Value *const value, const llvm::Twine &instName = "");
 
-  // Create a subgroup quad swap diagonal.
+  // Create a quad swap diagonal.
   //
   // @param value : The value to swap
   // @param instName : Name to give instruction(s)

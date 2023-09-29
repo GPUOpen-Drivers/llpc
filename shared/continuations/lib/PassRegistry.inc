@@ -47,7 +47,7 @@
 CONT_MODULE_ANALYSIS("dialect-context-analysis",
                      DialectContextAnalysis(NeedDialectContext))
 
-CONT_MODULE_PASS("add-types-metadata", AddTypesMetadataPass())
+CONT_MODULE_PASS("legacy-cleanup-continuations", LegacyCleanupContinuationsPass())
 CONT_MODULE_PASS("cleanup-continuations", CleanupContinuationsPass())
 CONT_MODULE_PASS("lower-raytracing-pipeline", LowerRaytracingPipelinePass())
 CONT_MODULE_PASS("dxil-cont-intrinsic-prepare", DXILContIntrinsicPreparePass())
@@ -62,6 +62,7 @@ CONT_MODULE_PASS("remove-types-metadata", RemoveTypesMetadataPass())
 CONT_MODULE_PASS("save-continuation-state", SaveContinuationStatePass())
 
 CONT_CGSCC_PASS("dxil-coro-split", DXILCoroSplitPass())
+CONT_CGSCC_PASS("lgc-coro-split", LgcCoroSplitPass())
 
 #undef CONT_PASS
 #undef CONT_LOOP_PASS

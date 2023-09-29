@@ -173,9 +173,6 @@ public:
   // Link the unlinked shader/part-pipeline ELFs and the compiled glue code into a pipeline ELF
   bool link(raw_pwrite_stream &outStream) override final;
 
-  // Returns true if the fragment shader uses a builtin input that gets mapped.
-  bool fragmentShaderUsesMappedBuiltInInputs() override final;
-
   // -----------------------------------------------------------------------------------------------------------------
   // Accessors
 
@@ -643,12 +640,6 @@ bool ElfLinkerImpl::link(raw_pwrite_stream &outStream) {
                    sizeof(m_ehdr));
 
   return m_pipelineState->getLastError() == "";
-}
-
-// =====================================================================================================================
-// Returns true if the fragment shader uses a builtin input that gets mapped.
-bool ElfLinkerImpl::fragmentShaderUsesMappedBuiltInInputs() {
-  return m_pipelineState->getPalMetadata()->fragmentShaderUsesMappedBuiltInInputs();
 }
 
 // =====================================================================================================================

@@ -113,12 +113,6 @@ Module *ColorExportShader::generate() {
   auto ret = cast<ReturnInst>(colorExportFunc->back().getTerminator());
   BuilderBase builder(ret);
 
-  if (m_pipelineState->getOptions().enableColorExportShader) {
-    // NOTE: See LowerFragColorExport::jumpColorExport. Fragment shader uses a call amdgpu_gfx. In the amdgpu_gfx
-    // calling convention, the callee is expected to have the necessary waitcnt instructions.
-    builder.CreateIntrinsic(Intrinsic::amdgcn_s_waitcnt, {}, {builder.getInt32(0)});
-  }
-
   SmallVector<Value *, 8> values(MaxColorTargets + 1, nullptr);
   for (unsigned idx = 0; idx != m_exports.size(); ++idx) {
     values[m_exports[idx].hwColorTarget] = colorExportFunc->getArg(idx);
@@ -126,6 +120,13 @@ Module *ColorExportShader::generate() {
 
   bool dummyExport = m_lgcContext->getTargetInfo().getGfxIpVersion().major < 10 || m_killEnabled;
   fragColorExport.generateExportInstructions(m_exports, values, m_exportFormat, dummyExport, builder);
+
+  if (m_pipelineState->getOptions().enableColorExportShader) {
+    builder.CreateIntrinsic(Intrinsic::amdgcn_endpgm, {}, {});
+    builder.CreateUnreachable();
+    ret->eraseFromParent();
+  }
+
   return colorExportFunc->getParent();
 }
 
@@ -147,7 +148,11 @@ Function *ColorExportShader::createColorExportFunc() {
 
   // Create the function. Mark SGPR inputs as "inreg".
   Function *func = Function::Create(funcTy, GlobalValue::ExternalLinkage, getGlueShaderName(), module);
-  func->setCallingConv(CallingConv::AMDGPU_PS);
+  if (m_pipelineState->getOptions().enableColorExportShader)
+    func->setCallingConv(CallingConv::AMDGPU_Gfx);
+  else
+    func->setCallingConv(CallingConv::AMDGPU_PS);
+
   func->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
   setShaderStage(func, ShaderStageFragment);
 

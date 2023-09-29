@@ -110,9 +110,6 @@ public:
   //           getLastError() to get a textual representation of the error, for use in logging or in error
   //           reporting in a command-line utility.
   virtual bool link(llvm::raw_pwrite_stream &outStream) = 0;
-
-  // Returns true if the fragment input info has an entry for a builtin.
-  virtual bool fragmentShaderUsesMappedBuiltInInputs() = 0;
 };
 
 } // namespace lgc

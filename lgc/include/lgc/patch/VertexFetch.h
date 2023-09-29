@@ -53,7 +53,8 @@ public:
                                    unsigned compIdx, BuilderImpl &builderImpl) = 0;
 
   // Generate code to fetch a vertex value for uber shader
-  virtual llvm::Value *fetchVertex(InputImportGenericOp *vertexFetch, llvm::Value *inputDesc, BuilderBase &builder) = 0;
+  virtual llvm::Value *fetchVertex(InputImportGenericOp *vertexFetch, llvm::Value *inputDesc, llvm::Value *locMasks,
+                                   BuilderBase &builder) = 0;
 };
 
 // =====================================================================================================================

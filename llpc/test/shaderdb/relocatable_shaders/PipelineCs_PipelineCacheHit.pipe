@@ -1,6 +1,7 @@
 ; Test that there is a pipeline cache hit when the same pipeline is compiled twice.
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -shader-cache-mode=1 \
+; RUN:         -cache-full-pipelines=true \
 ; RUN:         -enable-relocatable-shader-elf \
 ; RUN:         -o %t.elf %gfxip %s %s -v | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST: Cache miss for compute pipeline.

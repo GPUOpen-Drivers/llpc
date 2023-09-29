@@ -1263,17 +1263,6 @@ void PalMetadata::eraseFragmentInputInfo() {
 }
 
 // =====================================================================================================================
-// Returns true if the fragment input info has an entry for a builtin.
-bool PalMetadata::fragmentShaderUsesMappedBuiltInInputs() {
-  auto array2It = m_pipelineNode.find(m_document->getNode(PipelineMetadataKey::FragInputMapping2));
-  if (array2It != m_pipelineNode.end()) {
-    auto fragInputMappingArray2 = array2It->second.getArray(true);
-    return !fragInputMappingArray2.empty();
-  }
-  return false;
-}
-
-// =====================================================================================================================
 // Returns the location of the fragment builtin or InvalidValue if the builtin is not found.
 //
 // @param builtin : Fragment builtin to check.

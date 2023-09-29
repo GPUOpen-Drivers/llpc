@@ -134,6 +134,7 @@ enum CacheAccessInfo : uint8_t {
 struct GraphicsPipelineBuildOut {
   BinaryData pipelineBin;              ///< Output pipeline binary data
   void *fsOutputMetaData;              ///< Fragment outputs meta data. Valid for fragment shader.
+  unsigned fsOutputMetaDataSize;       ///< Meta data size
   CacheAccessInfo pipelineCacheAccess; ///< Pipeline cache access status i.e., hit, miss, or not checked
   CacheAccessInfo stageCacheAccesses[ShaderStageCount]; ///< Shader cache access status i.e., hit, miss, or not checked
 };
@@ -154,6 +155,7 @@ struct RayTracingPipelineBuildOut {
   bool hasTraceRay;                                    ///< Output whether have traceray module
 };
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 66
 /// Defines callback function used to lookup shader cache info in an external cache
 typedef Result (*ShaderCacheGetValue)(const void *pClientData, uint64_t hash, void *pValue, size_t *pValueLen);
 
@@ -214,6 +216,7 @@ protected:
   /// @internal Destructor. Prevent use of delete operator on this interface.
   virtual ~IShaderCache() {}
 };
+#endif
 
 // Users of LLPC may implement this interface to allow the compiler to request additional threads.
 //
@@ -311,7 +314,8 @@ public:
   virtual Result buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *pipelineInfo,
                                               GraphicsPipelineBuildOut *pipelineOut, const BinaryData *elfPackage) = 0;
 
-  /// Explicitly build the color export shader.
+  /// Explicitly build the color export shader. GraphicsPipelineBuildInfo::enableColorExportShader must be true,
+  /// Color export shader depends on cbState.
   ///
   /// @param [in]  pipelineInfo : Info to build this shader module
   /// @param [in]  fsOutputMetaData : Info to fragment outputs
