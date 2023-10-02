@@ -476,15 +476,6 @@ bool SpirvLowerMathFloatOp::runImpl(Module &module) {
 }
 
 // =====================================================================================================================
-// Visits unary operator instruction.
-//
-// @param unaryOp : Unary operator instruction
-void SpirvLowerMathFloatOp::visitUnaryOperator(UnaryOperator &unaryOp) {
-  if (unaryOp.getOpcode() == Instruction::FNeg)
-    flushDenormIfNeeded(&unaryOp);
-}
-
-// =====================================================================================================================
 // Visits binary operator instruction.
 //
 // @param binaryOp : Binary operator instruction
