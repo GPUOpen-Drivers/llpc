@@ -7666,6 +7666,16 @@ bool SPIRVToLLVM::transMetadata() {
           }
         }
 
+        unsigned overrideShaderGroupSizeX = m_shaderOptions->overrideShaderThreadGroupSizeX;
+        unsigned overrideShaderGroupSizeY = m_shaderOptions->overrideShaderThreadGroupSizeY;
+        unsigned overrideShaderGroupSizeZ = m_shaderOptions->overrideShaderThreadGroupSizeZ;
+
+        if (overrideShaderGroupSizeX != 0 || overrideShaderGroupSizeY != 0 || overrideShaderGroupSizeZ != 0) {
+          meshMode.workgroupSizeX = overrideShaderGroupSizeX;
+          meshMode.workgroupSizeY = overrideShaderGroupSizeY;
+          meshMode.workgroupSizeZ = overrideShaderGroupSizeZ;
+        }
+
         Pipeline::setMeshShaderMode(*m_m, meshMode);
       } else if (execModel == ExecutionModelFragment) {
         FragmentShaderMode fragmentMode = {};
