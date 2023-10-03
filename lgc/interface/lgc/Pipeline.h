@@ -123,15 +123,18 @@ static const char SampleShadingMetaName[] = "lgc.sample.shading";
 union Options {
   unsigned u32All[34];
   struct {
-    uint64_t hash[2];                    // Pipeline hash to set in ELF PAL metadata
-    unsigned includeDisassembly;         // If set, the disassembly for all compiled shaders will be included
-                                         //   in the pipeline ELF.
-    unsigned reconfigWorkgroupLayout;    // If set, allows automatic workgroup reconfigure to take place on
-                                         //   compute shaders.
-    bool forceCsThreadIdSwizzling;       // Force rearranges threadId within group into blocks of 8*8 or 8*4.
-    unsigned overrideThreadGroupSizeX;   // Override value for thread group size.X
-    unsigned overrideThreadGroupSizeY;   // Override value for thread group size.Y
-    unsigned overrideThreadGroupSizeZ;   // Override value for thread group size.Z
+    uint64_t hash[2];                 // Pipeline hash to set in ELF PAL metadata
+    unsigned includeDisassembly;      // If set, the disassembly for all compiled shaders will be included
+                                      //   in the pipeline ELF.
+    unsigned reconfigWorkgroupLayout; // If set, allows automatic workgroup reconfigure to take place on
+                                      //   compute shaders.
+    bool forceCsThreadIdSwizzling;    // Force rearranges threadId within group into blocks of 8*8 or 8*4.
+
+    // Unused members, kept in place to keep LLVM IR metadata stable.
+    unsigned unused0;
+    unsigned unused1;
+    unsigned unused2;
+
     unsigned includeIr;                  // If set, the IR for all compiled shaders will be included in the
                                          //   pipeline ELF.
     unsigned nggFlags;                   // Flags to control NGG (NggFlag* values ored together)
@@ -265,14 +268,10 @@ union ShaderOptions {
     // Attempt to scalarize waterfall descriptor loads.
     bool scalarizeWaterfallLoads;
 
-    /// Override value for ThreadGroupSizeX
-    unsigned overrideShaderThreadGroupSizeX;
-
-    /// Override value for ThreadGroupSizeY
-    unsigned overrideShaderThreadGroupSizeY;
-
-    /// Override value for ThreadGroupSizeZ
-    unsigned overrideShaderThreadGroupSizeZ;
+    // Unused members, kept in place to keep LLVM IR metadata stable.
+    unsigned unused0;
+    unsigned unused1;
+    unsigned unused2;
 
     // When there is a valid "feedback loop" in renderpass, lateZ needs to be enabled
     // In Vulkan a "feedback loop" is described as a subpass where there is at least

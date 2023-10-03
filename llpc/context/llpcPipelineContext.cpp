@@ -290,9 +290,6 @@ Options PipelineContext::computePipelineOptions() const {
   options.includeDisassembly = (cl::EnablePipelineDump || EnableOuts() || getPipelineOptions()->includeDisassembly);
   options.reconfigWorkgroupLayout = getPipelineOptions()->reconfigWorkgroupLayout;
   options.forceCsThreadIdSwizzling = getPipelineOptions()->forceCsThreadIdSwizzling;
-  options.overrideThreadGroupSizeX = getPipelineOptions()->overrideThreadGroupSizeX;
-  options.overrideThreadGroupSizeY = getPipelineOptions()->overrideThreadGroupSizeY;
-  options.overrideThreadGroupSizeZ = getPipelineOptions()->overrideThreadGroupSizeZ;
   options.includeIr = (IncludeLlvmIr || getPipelineOptions()->includeIr);
 
   options.threadGroupSwizzleMode =
@@ -718,10 +715,6 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
     shaderOptions.ldsSpillLimitDwords = shaderInfo.options.ldsSpillLimitDwords;
   else
     shaderOptions.ldsSpillLimitDwords = LdsSpillLimitDwords;
-
-  shaderOptions.overrideShaderThreadGroupSizeX = shaderInfo.options.overrideShaderThreadGroupSizeX;
-  shaderOptions.overrideShaderThreadGroupSizeY = shaderInfo.options.overrideShaderThreadGroupSizeY;
-  shaderOptions.overrideShaderThreadGroupSizeZ = shaderInfo.options.overrideShaderThreadGroupSizeZ;
 
   shaderOptions.nsaThreshold = shaderInfo.options.nsaThreshold;
 
