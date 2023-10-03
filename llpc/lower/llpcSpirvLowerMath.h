@@ -98,7 +98,6 @@ public:
   bool runImpl(llvm::Module &module);
 
   virtual void visitBinaryOperator(llvm::BinaryOperator &binaryOp);
-  virtual void visitUnaryOperator(llvm::UnaryOperator &unaryOp);
   virtual void visitCallInst(llvm::CallInst &callInst);
   virtual void visitFPTruncInst(llvm::FPTruncInst &fptruncInst);
 

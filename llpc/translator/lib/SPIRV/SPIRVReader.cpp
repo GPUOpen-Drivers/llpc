@@ -5362,10 +5362,12 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
   }
   case OpFNegate: {
     SPIRVUnary *bc = static_cast<SPIRVUnary *>(bv);
-    // Implement -x as -0.0 - x.
-    Value *negZero = ConstantFP::getNegativeZero(transType(bc->getType()));
-    auto fNeg = BinaryOperator::CreateFSub(negZero, transValue(bc->getOperand(0), f, bb), bv->getName(), bb);
+    Value *val0 = transValue(bc->getOperand(0), f, bb);
+    auto fNeg = getBuilder()->CreateFNeg(val0);
     setFastMathFlags(fNeg);
+    // Since OpFNegate is considered a floating point instruction, we must take
+    // that into account (since LLVM fneg is not).
+    fNeg = flushDenorm(fNeg);
     return mapValue(bv, fNeg);
   }
 
