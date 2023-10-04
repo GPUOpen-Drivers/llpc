@@ -2131,7 +2131,9 @@ Value *PatchInOutImportExport::patchTcsBuiltInInputImport(Type *inputTy, unsigne
 
     break;
   }
-  case BuiltInPointSize: {
+  case BuiltInPointSize:
+  case BuiltInLayer:
+  case BuiltInViewportIndex: {
     assert(!elemIdx);
     assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
     const unsigned loc = builtInInLocMap.find(builtInId)->second;
@@ -2181,14 +2183,6 @@ Value *PatchInOutImportExport::patchTcsBuiltInInputImport(Type *inputTy, unsigne
       input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
     else
       input = builder.getInt32(0);
-    break;
-  }
-  case BuiltInLayer:
-  case BuiltInViewportIndex: {
-    assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
-    const unsigned loc = builtInInLocMap.find(builtInId)->second;
-    auto ldsOffset = calcLdsOffsetForTcsInput(inputTy, loc, nullptr, elemIdx, vertexIdx, builder);
-    input = readValueFromLds(false, inputTy, ldsOffset, builder);
     break;
   }
   default: {
@@ -3089,9 +3083,13 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
 
   switch (builtInId) {
   case BuiltInPosition:
-  case BuiltInPointSize: {
+  case BuiltInPointSize:
+  case BuiltInLayer:
+  case BuiltInViewportIndex: {
     if ((builtInId == BuiltInPosition && !builtInUsage.position) ||
-        (builtInId == BuiltInPointSize && !builtInUsage.pointSize))
+        (builtInId == BuiltInPointSize && !builtInUsage.pointSize) ||
+        (builtInId == BuiltInLayer && !builtInUsage.layer) ||
+        (builtInId == BuiltInViewportIndex && !builtInUsage.viewportIndex))
       return;
 
     assert(builtInId != BuiltInPointSize || !elemIdx);
@@ -3128,14 +3126,6 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
       writeValueToLds(m_pipelineState->isTessOffChip(), output, ldsOffset, builder);
     }
 
-    break;
-  }
-  case BuiltInLayer:
-  case BuiltInViewportIndex: {
-    assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
-    unsigned loc = builtInOutLocMap.find(builtInId)->second;
-    auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, elemIdx, vertexIdx, builder);
-    writeValueToLds(m_pipelineState->isTessOffChip(), output, ldsOffset, builder);
     break;
   }
   case BuiltInTessLevelOuter:
