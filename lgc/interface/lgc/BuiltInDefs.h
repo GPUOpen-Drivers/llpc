@@ -74,7 +74,7 @@ BUILTIN(GlobalInvocationId, 28, N, TMC, v3i32)           // Invocation ID within
 BUILTIN(HelperInvocation, 23, N, P, i1)                  // Helper invocation flag
 BUILTIN(InstanceIndex, 43, N, V, i32)                    // Instance index
 BUILTIN(InvocationId, 8, N, HG, i32)                     // Invocation ID
-BUILTIN(Layer, 9, MVHDG,  HDGP, i32)                     // Layer of multi-layer framebuffer attachment
+BUILTIN(Layer, 9, MVHDG, HDGP, i32)                      // Layer of multi-layer framebuffer attachment
 BUILTIN(LocalInvocationId, 27, N, TMC, v3i32)            // Invocation location within local workgroup
 BUILTIN(LocalInvocationIndex, 29, N, TMC, i32)           // Linearized LocalInvocationId
 BUILTIN(NumSubgroups, 38, N, TMC, i32)                   // Number of subgroups in the local workgroup
