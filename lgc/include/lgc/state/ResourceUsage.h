@@ -249,15 +249,15 @@ struct ResourceUsage {
       // Geometry shader
       struct {
         // Input
-        unsigned pointSizeIn : 1;    // Whether gl_in[].gl_PointSize is used
-        unsigned positionIn : 1;     // Whether gl_in[].gl_Position is used
-        unsigned clipDistanceIn : 4; // Array size of gl_in[].gl_ClipDistance[] (0 means unused)
-        unsigned cullDistanceIn : 4; // Array size of gl_in[].gl_CullDistance[] (0 means unused)
-        unsigned primitiveIdIn : 1;  // Whether gl_PrimitiveIDIn is used
-        unsigned invocationId : 1;   // Whether gl_InvocationID is used
-        unsigned viewIndex : 1;      // Whether gl_ViewIndex is used
-        unsigned viewportIndex : 1;  // Whether DX SV_ViewportArrayIndex is used
-        unsigned layerIn : 1;        // Whether DX SV_RenderTargetArrayIndex is used
+        unsigned pointSizeIn : 1;     // Whether gl_in[].gl_PointSize is used
+        unsigned positionIn : 1;      // Whether gl_in[].gl_Position is used
+        unsigned clipDistanceIn : 4;  // Array size of gl_in[].gl_ClipDistance[] (0 means unused)
+        unsigned cullDistanceIn : 4;  // Array size of gl_in[].gl_CullDistance[] (0 means unused)
+        unsigned primitiveIdIn : 1;   // Whether gl_PrimitiveIDIn is used
+        unsigned invocationId : 1;    // Whether gl_InvocationID is used
+        unsigned viewIndex : 1;       // Whether gl_ViewIndex is used
+        unsigned viewportIndexIn : 1; // Whether DX SV_ViewportArrayIndex is used
+        unsigned layerIn : 1;         // Whether DX SV_RenderTargetArrayIndex is used
         // Output
         unsigned pointSize : 1;            // Whether gl_PointSize is used
         unsigned position : 1;             // Whether gl_Position is used
