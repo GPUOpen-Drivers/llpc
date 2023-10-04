@@ -658,7 +658,7 @@ struct ComputeShaderMode {
   unsigned workgroupSizeX;    // X dimension of workgroup size. 0 is taken to be 1
   unsigned workgroupSizeY;    // Y dimension of workgroup size. 0 is taken to be 1
   unsigned workgroupSizeZ;    // Z dimension of workgroup size. 0 is taken to be 1
-  unsigned waveSize;          // If non-zero, wave size should be overridden
+  unsigned subgroupSize;      // Override for the wave size if it is non-zero
   DerivativeMode derivatives; // derivativeMode for computeShader
 };
 

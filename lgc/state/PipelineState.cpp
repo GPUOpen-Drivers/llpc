@@ -1428,7 +1428,7 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStage stage) {
   }
 
   if (checkingStage == ShaderStageCompute)
-    m_waveSize[checkingStage] = m_shaderModes.getComputeShaderMode().waveSize;
+    m_waveSize[checkingStage] = m_shaderModes.getComputeShaderMode().subgroupSize;
 
   if (!m_waveSize[checkingStage]) {
     unsigned waveSize = getTargetInfo().getGpuProperty().waveSize;
