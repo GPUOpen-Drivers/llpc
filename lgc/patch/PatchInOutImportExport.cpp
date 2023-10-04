@@ -2360,7 +2360,7 @@ Value *PatchInOutImportExport::patchGsBuiltInInputImport(Type *inputTy, unsigned
   case BuiltInClipDistance:
   case BuiltInCullDistance:
   case BuiltInLayer:
-  case BuiltInViewportIndex:  {
+  case BuiltInViewportIndex: {
     assert(inOutUsage.builtInInputLocMap.find(builtInId) != inOutUsage.builtInInputLocMap.end());
     const unsigned loc = inOutUsage.builtInInputLocMap.find(builtInId)->second;
     assert(loc != InvalidValue);
