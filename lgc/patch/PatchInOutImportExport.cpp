@@ -2183,6 +2183,14 @@ Value *PatchInOutImportExport::patchTcsBuiltInInputImport(Type *inputTy, unsigne
       input = builder.getInt32(0);
     break;
   }
+  case BuiltInLayer:
+  case BuiltInViewportIndex: {
+    assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
+    const unsigned loc = builtInInLocMap.find(builtInId)->second;
+    auto ldsOffset = calcLdsOffsetForTcsInput(inputTy, loc, nullptr, elemIdx, vertexIdx, builder);
+    input = readValueFromLds(false, inputTy, ldsOffset, builder);
+    break;
+  }
   default: {
     llvm_unreachable("Should never be called!");
     break;
@@ -2309,6 +2317,20 @@ Value *PatchInOutImportExport::patchTesBuiltInInputImport(Type *inputTy, unsigne
       input = builder.getInt32(0);
     break;
   }
+  case BuiltInLayer: {
+    assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
+    const unsigned loc = builtInInLocMap.find(builtInId)->second;
+    auto ldsOffset = calcLdsOffsetForTesInput(inputTy, loc, nullptr, elemIdx, vertexIdx, builder);
+    input = readValueFromLds(m_pipelineState->isTessOffChip(), inputTy, ldsOffset, builder);
+    break;
+  }
+  case BuiltInViewportIndex: {
+    assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
+    const unsigned loc = builtInInLocMap.find(builtInId)->second;
+    auto ldsOffset = calcLdsOffsetForTesInput(inputTy, loc, nullptr, elemIdx, vertexIdx, builder);
+    input = readValueFromLds(m_pipelineState->isTessOffChip(), inputTy, ldsOffset, builder);
+    break;
+  }
   default: {
     llvm_unreachable("Should never be called!");
     break;
@@ -2336,7 +2358,9 @@ Value *PatchInOutImportExport::patchGsBuiltInInputImport(Type *inputTy, unsigned
   case BuiltInPosition:
   case BuiltInPointSize:
   case BuiltInClipDistance:
-  case BuiltInCullDistance: {
+  case BuiltInCullDistance:
+  case BuiltInLayer:
+  case BuiltInViewportIndex:  {
     assert(inOutUsage.builtInInputLocMap.find(builtInId) != inOutUsage.builtInInputLocMap.end());
     const unsigned loc = inOutUsage.builtInInputLocMap.find(builtInId)->second;
     assert(loc != InvalidValue);
@@ -2978,6 +3002,16 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
     if (!m_hasTs && !m_hasGs) {
       // NOTE: The export of gl_Layer is delayed and is done before entry-point returns.
       m_layer = output;
+    } else if (m_hasTs) {
+      assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+      unsigned loc = builtInOutLocMap.find(builtInId)->second;
+      auto ldsOffset = calcLdsOffsetForVsOutput(outputTy, loc, 0, builder);
+      writeValueToLds(false, output, ldsOffset, builder);
+    } else if (m_hasGs) {
+      assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+      unsigned loc = builtInOutLocMap.find(builtInId)->second;
+
+      storeValueToEsGsRing(output, loc, 0, insertPos);
     }
 
     break;
@@ -2994,6 +3028,16 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
         // NOTE: The export of gl_ViewportIndex is delayed and is done before entry-point returns.
         m_viewportIndex = output;
       }
+    } else if (m_hasTs) {
+      assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+      unsigned loc = builtInOutLocMap.find(builtInId)->second;
+      auto ldsOffset = calcLdsOffsetForVsOutput(outputTy, loc, 0, builder);
+      writeValueToLds(false, output, ldsOffset, builder);
+    } else if (m_hasGs) {
+      assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+      unsigned loc = builtInOutLocMap.find(builtInId)->second;
+
+      storeValueToEsGsRing(output, loc, 0, insertPos);
     }
 
     break;
@@ -3084,6 +3128,14 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
       writeValueToLds(m_pipelineState->isTessOffChip(), output, ldsOffset, builder);
     }
 
+    break;
+  }
+  case BuiltInLayer:
+  case BuiltInViewportIndex: {
+    assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+    unsigned loc = builtInOutLocMap.find(builtInId)->second;
+    auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, elemIdx, vertexIdx, builder);
+    writeValueToLds(m_pipelineState->isTessOffChip(), output, ldsOffset, builder);
     break;
   }
   case BuiltInTessLevelOuter:
@@ -3217,6 +3269,11 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned
     if (!m_hasGs) {
       // NOTE: The export of gl_Layer is delayed and is done before entry-point returns.
       m_layer = output;
+    } else {
+      assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+      unsigned loc = builtInOutLocMap.find(builtInId)->second;
+
+      storeValueToEsGsRing(output, loc, 0, insertPos);
     }
 
     break;
@@ -3233,6 +3290,11 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned
         // NOTE: The export of gl_ViewportIndex is delayed and is done before entry-point returns.
         m_viewportIndex = output;
       }
+    } else {
+      assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+      unsigned loc = builtInOutLocMap.find(builtInId)->second;
+
+      storeValueToEsGsRing(output, loc, 0, insertPos);
     }
 
     break;

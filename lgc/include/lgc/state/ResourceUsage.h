@@ -209,6 +209,8 @@ struct ResourceUsage {
         unsigned primitiveId : 1;    // Whether gl_PrimitiveID is used
         unsigned invocationId : 1;   // Whether gl_InvocationID is used
         unsigned viewIndex : 1;      // Whether gl_ViewIndex is used
+        unsigned viewportIndexIn : 1;// Whether DX SV_ViewportArrayIndex is used
+        unsigned layerIn : 1;        // Whether DX SV_RenderTargetArrayIndex is used
         // Output
         unsigned pointSize : 1;      // Whether gl_out[].gl_PointSize is used
         unsigned position : 1;       // Whether gl_out[].gl_Position is used
@@ -216,6 +218,8 @@ struct ResourceUsage {
         unsigned cullDistance : 4;   // Array size of gl_out[].gl_CullDistance[] (0 means unused)
         unsigned tessLevelOuter : 1; // Whether gl_TessLevelOuter[] is used
         unsigned tessLevelInner : 1; // Whether gl_TessLevelInner[] is used
+        unsigned viewportIndex  : 1; // Whether DX SV_ViewportArrayIndex is used
+        unsigned layer;              // Whether DX SV_RenderTargetArrayIndex is used
       } tcs;
 
       // Tessellation evaluation shader
@@ -231,6 +235,8 @@ struct ResourceUsage {
         unsigned tessLevelOuter : 1; // Whether gl_TessLevelOuter[] is used
         unsigned tessLevelInner : 1; // Whether gl_TessLevelInner[] is used
         unsigned viewIndex : 1;      // Whether gl_ViewIndex is used
+        unsigned viewportIndexIn : 1;// Whether DX SV_ViewportArrayIndex is used
+        unsigned layerIn : 1;        // Whether DX SV_RenderTargetArrayIndex is used
         // Output
         unsigned pointSize : 1;     // Whether gl_PointSize is used
         unsigned position : 1;      // Whether gl_Position is used
@@ -250,6 +256,8 @@ struct ResourceUsage {
         unsigned primitiveIdIn : 1;  // Whether gl_PrimitiveIDIn is used
         unsigned invocationId : 1;   // Whether gl_InvocationID is used
         unsigned viewIndex : 1;      // Whether gl_ViewIndex is used
+        unsigned viewportIndex : 1;  // Whether DX SV_ViewportArrayIndex is used
+        unsigned layerIn : 1;        // Whether DX SV_RenderTargetArrayIndex is used
         // Output
         unsigned pointSize : 1;            // Whether gl_PointSize is used
         unsigned position : 1;             // Whether gl_Position is used
