@@ -207,7 +207,7 @@ Value *BuilderImpl::CreateSubgroupBroadcastFirst(Value *const value, const Twine
     return builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, mappedArgs[0]);
   };
 
-  return CreateMapToSimpleType(mapFunc, {BuilderBase::get(*this).CreateInlineAsmSideEffect(value)}, {});
+  return CreateMapToSimpleType(mapFunc, value, {});
 }
 
 // =====================================================================================================================
