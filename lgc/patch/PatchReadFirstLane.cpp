@@ -320,8 +320,7 @@ void ReadFirstLaneOptimizer::collectAssumeUniforms(BasicBlock *block,
   //  1. Records this fact and
   //  2. Determines whether the assumption of a uniform result could be propagated to the candidate's operands.
   auto tryPropagate = [&](Instruction *candidate, bool isInitialReadFirstLane) {
-    bool cannotPropagate = m_targetTransformInfo.isSourceOfDivergence(candidate) || isa<PHINode>(candidate) ||
-                           (!isInitialReadFirstLane && isa<CallInst>(candidate));
+    bool cannotPropagate = m_targetTransformInfo.isSourceOfDivergence(candidate) || isa<PHINode>(candidate);
 
     SmallVector<Instruction *, 3> operandInsts;
     if (!cannotPropagate) {
