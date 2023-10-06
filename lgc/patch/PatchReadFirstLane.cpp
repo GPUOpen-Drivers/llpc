@@ -85,13 +85,12 @@ private:
 
   UniformityInfo &m_uniformityInfo;
   TargetTransformInfo &m_targetTransformInfo;
-  DenseMap<Instruction *, SmallVector<Instruction *, 2>>
-      m_uniformDivergentUsesMap; // The map key is an instruction `I` that can be assumed uniform.
-                                 // That is, we can apply readfirstlane to the result of `I` and remain
-                                 // correct. If the map value vector is non-empty, it contains a list of
-                                 // instructions that we can apply readfirstlane on to achieve the same effect
-                                 // as a readfirstlane on `I`. An empty vector means that it is not possible to
-                                 // life a readfirstlane beyond `I`.
+
+  // The map key is an instruction `I` that can be assumed uniform. That is, we can apply readfirstlane to the result
+  // of `I` and remain correct. If the map value vector is non-empty, it contains a list of instructions that we can
+  // apply readfirstlane on to achieve the same effect as a readfirstlane on `I`. An empty vector means that it is not
+  // possible to lift a readfirstlane beyond `I`.
+  DenseMap<Instruction *, SmallVector<Instruction *, 2>> m_uniformDivergentUsesMap;
   DenseSet<Instruction *> m_insertLocations; // The insert locations of readfirstlane
 };
 
@@ -397,9 +396,7 @@ void ReadFirstLaneOptimizer::findBestInsertLocation(const SmallVectorImpl<Instru
 
     for (;;) {
       const auto &mapIt = m_uniformDivergentUsesMap.find(current);
-      if (mapIt == m_uniformDivergentUsesMap.end())
-        break; // no further propagation possible
-
+      assert(mapIt != m_uniformDivergentUsesMap.end());
       const auto &divergentOperands = mapIt->second;
       if (divergentOperands.empty())
         break; // no further propagation possible
@@ -471,6 +468,9 @@ void ReadFirstLaneOptimizer::findBestInsertLocation(const SmallVectorImpl<Instru
 
         current = queue[0]; // move to the found bottleneck
       }
+
+      if (!m_uniformDivergentUsesMap.count(current))
+        break;
 
       if (enforcedUniform.count(current)) {
         // Already enforced to be uniform, no need to continue the search or even consider inserting a new
