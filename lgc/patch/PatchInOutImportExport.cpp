@@ -2131,7 +2131,9 @@ Value *PatchInOutImportExport::patchTcsBuiltInInputImport(Type *inputTy, unsigne
 
     break;
   }
-  case BuiltInPointSize: {
+  case BuiltInPointSize:
+  case BuiltInLayer:
+  case BuiltInViewportIndex: {
     assert(!elemIdx);
     assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
     const unsigned loc = builtInInLocMap.find(builtInId)->second;
@@ -2221,7 +2223,9 @@ Value *PatchInOutImportExport::patchTesBuiltInInputImport(Type *inputTy, unsigne
 
     break;
   }
-  case BuiltInPointSize: {
+  case BuiltInPointSize:
+  case BuiltInLayer:
+  case BuiltInViewportIndex: {
     assert(!elemIdx);
     assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
     const unsigned loc = builtInInLocMap.find(builtInId)->second;
@@ -2336,7 +2340,9 @@ Value *PatchInOutImportExport::patchGsBuiltInInputImport(Type *inputTy, unsigned
   case BuiltInPosition:
   case BuiltInPointSize:
   case BuiltInClipDistance:
-  case BuiltInCullDistance: {
+  case BuiltInCullDistance:
+  case BuiltInLayer:
+  case BuiltInViewportIndex: {
     assert(inOutUsage.builtInInputLocMap.find(builtInId) != inOutUsage.builtInInputLocMap.end());
     const unsigned loc = inOutUsage.builtInInputLocMap.find(builtInId)->second;
     assert(loc != InvalidValue);
@@ -2978,6 +2984,16 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
     if (!m_hasTs && !m_hasGs) {
       // NOTE: The export of gl_Layer is delayed and is done before entry-point returns.
       m_layer = output;
+    } else if (m_hasTs) {
+      assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+      unsigned loc = builtInOutLocMap.find(builtInId)->second;
+      auto ldsOffset = calcLdsOffsetForVsOutput(outputTy, loc, 0, builder);
+      writeValueToLds(false, output, ldsOffset, builder);
+    } else if (m_hasGs) {
+      assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+      unsigned loc = builtInOutLocMap.find(builtInId)->second;
+
+      storeValueToEsGsRing(output, loc, 0, insertPos);
     }
 
     break;
@@ -2994,6 +3010,16 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
         // NOTE: The export of gl_ViewportIndex is delayed and is done before entry-point returns.
         m_viewportIndex = output;
       }
+    } else if (m_hasTs) {
+      assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+      unsigned loc = builtInOutLocMap.find(builtInId)->second;
+      auto ldsOffset = calcLdsOffsetForVsOutput(outputTy, loc, 0, builder);
+      writeValueToLds(false, output, ldsOffset, builder);
+    } else if (m_hasGs) {
+      assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+      unsigned loc = builtInOutLocMap.find(builtInId)->second;
+
+      storeValueToEsGsRing(output, loc, 0, insertPos);
     }
 
     break;
@@ -3045,9 +3071,13 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
 
   switch (builtInId) {
   case BuiltInPosition:
-  case BuiltInPointSize: {
+  case BuiltInPointSize:
+  case BuiltInLayer:
+  case BuiltInViewportIndex: {
     if ((builtInId == BuiltInPosition && !builtInUsage.position) ||
-        (builtInId == BuiltInPointSize && !builtInUsage.pointSize))
+        (builtInId == BuiltInPointSize && !builtInUsage.pointSize) ||
+        (builtInId == BuiltInLayer && !builtInUsage.layer) ||
+        (builtInId == BuiltInViewportIndex && !builtInUsage.viewportIndex))
       return;
 
     assert(builtInId != BuiltInPointSize || !elemIdx);
@@ -3217,6 +3247,11 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned
     if (!m_hasGs) {
       // NOTE: The export of gl_Layer is delayed and is done before entry-point returns.
       m_layer = output;
+    } else {
+      assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+      unsigned loc = builtInOutLocMap.find(builtInId)->second;
+
+      storeValueToEsGsRing(output, loc, 0, insertPos);
     }
 
     break;
@@ -3233,6 +3268,11 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned
         // NOTE: The export of gl_ViewportIndex is delayed and is done before entry-point returns.
         m_viewportIndex = output;
       }
+    } else {
+      assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
+      unsigned loc = builtInOutLocMap.find(builtInId)->second;
+
+      storeValueToEsGsRing(output, loc, 0, insertPos);
     }
 
     break;

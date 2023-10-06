@@ -74,7 +74,7 @@ BUILTIN(GlobalInvocationId, 28, N, TMC, v3i32)           // Invocation ID within
 BUILTIN(HelperInvocation, 23, N, P, i1)                  // Helper invocation flag
 BUILTIN(InstanceIndex, 43, N, V, i32)                    // Instance index
 BUILTIN(InvocationId, 8, N, HG, i32)                     // Invocation ID
-BUILTIN(Layer, 9, MVDG, P, i32)                          // Layer of multi-layer framebuffer attachment
+BUILTIN(Layer, 9, MVHDG, HDGP, i32)                      // Layer of multi-layer framebuffer attachment
 BUILTIN(LocalInvocationId, 27, N, TMC, v3i32)            // Invocation location within local workgroup
 BUILTIN(LocalInvocationIndex, 29, N, TMC, i32)           // Linearized LocalInvocationId
 BUILTIN(NumSubgroups, 38, N, TMC, i32)                   // Number of subgroups in the local workgroup
@@ -102,7 +102,7 @@ BUILTIN(TessLevelInner, 12, H, D, a2f32)                 // Tessellation inner l
 BUILTIN(TessLevelOuter, 11, H, D, a4f32)                 // Tessellation outer levels
 BUILTIN(VertexIndex, 42, N, V, i32)                      // Index of current vertex
 BUILTIN(ViewIndex, 4440, N, MVHDGP, i32)                 // View index
-BUILTIN(ViewportIndex, 10, MVDG, P, i32)                 // Viewport index
+BUILTIN(ViewportIndex, 10, MVHDG, HDGP, i32)             // Viewport index
 BUILTIN(WorkgroupId, 26, N, TMC, v3i32)                  // ID of global workgroup
 BUILTIN(WorkgroupSize, 25, N, TMC, v3i32)                // Size of global workgroup
 BUILTIN(CullPrimitive, 5299, N, M, i1)                   // Whether primitive should be culled

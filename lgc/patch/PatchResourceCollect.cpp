@@ -1823,35 +1823,55 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
         const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPosition];
         inOutUsage.builtInOutputLocMap[BuiltInPosition] = mapLoc;
         availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
-      } else
+      } else {
         builtInUsage.vs.position = false;
+      }
 
       if (nextBuiltInUsage.pointSizeIn) {
         assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPointSize) != nextInOutUsage.builtInInputLocMap.end());
         const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPointSize];
         inOutUsage.builtInOutputLocMap[BuiltInPointSize] = mapLoc;
         availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
-      } else
+      } else {
         builtInUsage.vs.pointSize = false;
+      }
 
       if (nextBuiltInUsage.clipDistanceIn > 0) {
         assert(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) != nextInOutUsage.builtInInputLocMap.end());
         const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
         inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = mapLoc;
         availOutMapLoc = std::max(availOutMapLoc, mapLoc + (nextBuiltInUsage.clipDistanceIn > 4 ? 2u : 1u));
-      } else
+      } else {
         builtInUsage.vs.clipDistance = 0;
+      }
 
       if (nextBuiltInUsage.cullDistanceIn > 0) {
         assert(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) != nextInOutUsage.builtInInputLocMap.end());
         const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
         inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = mapLoc;
         availOutMapLoc = std::max(availOutMapLoc, mapLoc + (nextBuiltInUsage.cullDistanceIn > 4 ? 2u : 1u));
-      } else
+      } else {
         builtInUsage.vs.cullDistance = 0;
+      }
 
-      builtInUsage.vs.layer = false;
-      builtInUsage.vs.viewportIndex = false;
+      if (nextBuiltInUsage.layerIn) {
+        assert(nextInOutUsage.builtInInputLocMap.find(BuiltInLayer) != nextInOutUsage.builtInInputLocMap.end());
+        const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInLayer];
+        inOutUsage.builtInOutputLocMap[BuiltInLayer] = mapLoc;
+        availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
+      } else {
+        builtInUsage.vs.layer = false;
+      }
+
+      if (nextBuiltInUsage.viewportIndexIn) {
+        assert(nextInOutUsage.builtInInputLocMap.find(BuiltInViewportIndex) != nextInOutUsage.builtInInputLocMap.end());
+        const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewportIndex];
+        inOutUsage.builtInOutputLocMap[BuiltInViewportIndex] = mapLoc;
+        availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
+      } else {
+        builtInUsage.vs.viewportIndex = false;
+      }
+
       builtInUsage.vs.primitiveShadingRate = false;
     } else if (nextStage == ShaderStageGeometry) {
       // VS  ==>  GS
@@ -1863,35 +1883,55 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
         const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPosition];
         inOutUsage.builtInOutputLocMap[BuiltInPosition] = mapLoc;
         availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
-      } else
+      } else {
         builtInUsage.vs.position = false;
+      }
 
       if (nextBuiltInUsage.pointSizeIn) {
         assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPointSize) != nextInOutUsage.builtInInputLocMap.end());
         const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPointSize];
         inOutUsage.builtInOutputLocMap[BuiltInPointSize] = mapLoc;
         availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
-      } else
+      } else {
         builtInUsage.vs.pointSize = false;
+      }
 
       if (nextBuiltInUsage.clipDistanceIn > 0) {
         assert(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) != nextInOutUsage.builtInInputLocMap.end());
         const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
         inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = mapLoc;
         availOutMapLoc = std::max(availOutMapLoc, mapLoc + (nextBuiltInUsage.clipDistanceIn > 4 ? 2u : 1u));
-      } else
+      } else {
         builtInUsage.vs.clipDistance = 0;
+      }
 
       if (nextBuiltInUsage.cullDistanceIn > 0) {
         assert(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) != nextInOutUsage.builtInInputLocMap.end());
         const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
         inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = mapLoc;
         availOutMapLoc = std::max(availOutMapLoc, mapLoc + (nextBuiltInUsage.cullDistanceIn > 4 ? 2u : 1u));
-      } else
+      } else {
         builtInUsage.vs.cullDistance = 0;
+      }
 
-      builtInUsage.vs.layer = false;
-      builtInUsage.vs.viewportIndex = false;
+      if (nextBuiltInUsage.layerIn) {
+        assert(nextInOutUsage.builtInInputLocMap.find(BuiltInLayer) != nextInOutUsage.builtInInputLocMap.end());
+        const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInLayer];
+        inOutUsage.builtInOutputLocMap[BuiltInLayer] = mapLoc;
+        availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
+      } else {
+        builtInUsage.vs.layer = 0;
+      }
+
+      if (nextBuiltInUsage.viewportIndexIn) {
+        assert(nextInOutUsage.builtInInputLocMap.find(BuiltInViewportIndex) != nextInOutUsage.builtInInputLocMap.end());
+        const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewportIndex];
+        inOutUsage.builtInOutputLocMap[BuiltInViewportIndex] = mapLoc;
+        availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
+      } else {
+        builtInUsage.vs.viewportIndex = 0;
+      }
+
       builtInUsage.vs.primitiveShadingRate = false;
     } else if (nextStage == ShaderStageInvalid) {
       // VS only
@@ -1945,6 +1985,12 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
       if (builtInUsage.tcs.cullDistanceIn > 4)
         ++availInMapLoc;
     }
+
+    if (builtInUsage.tcs.layerIn)
+      inOutUsage.builtInInputLocMap[BuiltInLayer] = availInMapLoc++;
+
+    if (builtInUsage.tcs.viewportIndexIn)
+      inOutUsage.builtInInputLocMap[BuiltInViewportIndex] = availInMapLoc++;
 
     // Map built-in outputs to generic ones
     if (nextStage == ShaderStageTessEval) {
@@ -2002,6 +2048,20 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
           builtInUsage.tcs.cullDistance = 0;
       }
 
+      if (nextBuiltInUsage.layerIn) {
+        assert(nextInOutUsage.builtInInputLocMap.find(BuiltInLayer) != nextInOutUsage.builtInInputLocMap.end());
+        const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInLayer];
+        inOutUsage.builtInOutputLocMap[BuiltInLayer] = mapLoc;
+        availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
+      }
+
+      if (nextBuiltInUsage.viewportIndexIn) {
+        assert(nextInOutUsage.builtInInputLocMap.find(BuiltInViewportIndex) != nextInOutUsage.builtInInputLocMap.end());
+        const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewportIndex];
+        inOutUsage.builtInOutputLocMap[BuiltInViewportIndex] = mapLoc;
+        availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
+      }
+
       // NOTE: We shouldn't clear the usage of tessellation levels if the next stage doesn't read them back because they
       // are always required to be written to TF buffer.
       if (nextBuiltInUsage.tessLevelOuter) {
@@ -2055,6 +2115,12 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
         if (builtInUsage.tcs.cullDistance > 4)
           ++availOutMapLoc;
       }
+
+      if (builtInUsage.tcs.layerIn)
+        inOutUsage.builtInOutputLocMap[BuiltInLayer] = availOutMapLoc++;
+
+      if (builtInUsage.tcs.viewportIndexIn)
+        inOutUsage.builtInOutputLocMap[BuiltInViewportIndex] = availOutMapLoc++;
 
       if (builtInUsage.tcs.tessLevelOuter)
         inOutUsage.perPatchBuiltInOutputLocMap[BuiltInTessLevelOuter] = availPerPatchOutMapLoc++;
@@ -2111,6 +2177,12 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
         ++availInMapLoc;
     }
 
+    if (builtInUsage.tes.layerIn)
+      inOutUsage.builtInInputLocMap[BuiltInLayer] = availInMapLoc++;
+
+    if (builtInUsage.tes.viewportIndexIn)
+      inOutUsage.builtInInputLocMap[BuiltInViewportIndex] = availInMapLoc++;
+
     if (builtInUsage.tes.tessLevelOuter)
       inOutUsage.perPatchBuiltInInputLocMap[BuiltInTessLevelOuter] = availPerPatchInMapLoc++;
 
@@ -2159,35 +2231,54 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
         const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPosition];
         inOutUsage.builtInOutputLocMap[BuiltInPosition] = mapLoc;
         availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
-      } else
+      } else {
         builtInUsage.tes.position = false;
+      }
 
       if (nextBuiltInUsage.pointSizeIn) {
         assert(nextInOutUsage.builtInInputLocMap.find(BuiltInPointSize) != nextInOutUsage.builtInInputLocMap.end());
         const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInPointSize];
         inOutUsage.builtInOutputLocMap[BuiltInPointSize] = mapLoc;
         availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
-      } else
+      } else {
         builtInUsage.tes.pointSize = false;
+      }
 
       if (nextBuiltInUsage.clipDistanceIn > 0) {
         assert(nextInOutUsage.builtInInputLocMap.find(BuiltInClipDistance) != nextInOutUsage.builtInInputLocMap.end());
         const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInClipDistance];
         inOutUsage.builtInOutputLocMap[BuiltInClipDistance] = mapLoc;
         availOutMapLoc = std::max(availOutMapLoc, mapLoc + (nextBuiltInUsage.clipDistanceIn > 4 ? 2u : 1u));
-      } else
+      } else {
         builtInUsage.tes.clipDistance = 0;
+      }
 
       if (nextBuiltInUsage.cullDistanceIn > 0) {
         assert(nextInOutUsage.builtInInputLocMap.find(BuiltInCullDistance) != nextInOutUsage.builtInInputLocMap.end());
         const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInCullDistance];
         inOutUsage.builtInOutputLocMap[BuiltInCullDistance] = mapLoc;
         availOutMapLoc = std::max(availOutMapLoc, mapLoc + (nextBuiltInUsage.cullDistanceIn > 4 ? 2u : 1u));
-      } else
+      } else {
         builtInUsage.tes.cullDistance = 0;
+      }
 
-      builtInUsage.tes.layer = false;
-      builtInUsage.tes.viewportIndex = false;
+      if (nextBuiltInUsage.layerIn) {
+        assert(nextInOutUsage.builtInInputLocMap.find(BuiltInLayer) != nextInOutUsage.builtInInputLocMap.end());
+        const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInLayer];
+        inOutUsage.builtInOutputLocMap[BuiltInLayer] = mapLoc;
+        availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
+      } else {
+        builtInUsage.tes.layer = 0;
+      }
+
+      if (nextBuiltInUsage.viewportIndexIn) {
+        assert(nextInOutUsage.builtInInputLocMap.find(BuiltInViewportIndex) != nextInOutUsage.builtInInputLocMap.end());
+        const unsigned mapLoc = nextInOutUsage.builtInInputLocMap[BuiltInViewportIndex];
+        inOutUsage.builtInOutputLocMap[BuiltInViewportIndex] = mapLoc;
+        availOutMapLoc = std::max(availOutMapLoc, mapLoc + 1);
+      } else {
+        builtInUsage.tes.viewportIndex = 0;
+      }
     } else if (nextStage == ShaderStageInvalid) {
       // TES only
       if (builtInUsage.tes.clipDistance > 0 || builtInUsage.tes.cullDistance > 0) {
@@ -2240,6 +2331,12 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
       if (builtInUsage.gs.cullDistanceIn > 4)
         ++availInMapLoc;
     }
+
+    if (builtInUsage.gs.layerIn)
+      inOutUsage.builtInInputLocMap[BuiltInLayer] = availInMapLoc++;
+
+    if (builtInUsage.gs.viewportIndexIn)
+      inOutUsage.builtInInputLocMap[BuiltInViewportIndex] = availInMapLoc++;
 
     // Map built-in outputs to generic ones (for GS)
     if (builtInUsage.gs.position)
