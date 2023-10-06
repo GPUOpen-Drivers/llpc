@@ -477,15 +477,11 @@ DINode *SPIRVToLLVMDbgTran::transFunction(const SPIRVExtInst *DebugInst) {
 
   SPIRVWord SPIRVDebugFlags = getConstant(Ops[FlagsIdx]);
   DINode::DIFlags Flags = mapToDIFlags(SPIRVDebugFlags);
-  // TODO: IsDefinition is always true for DebugFunction, but should be false
-  // for DebugFunctionDeclaration.
-  const bool IsDefinition = true;
-
   bool IsOptimized = SPIRVDebugFlags & SPIRVDebug::FlagIsOptimized;
   bool IsLocal = SPIRVDebugFlags & SPIRVDebug::FlagIsLocal;
-  bool IsMainSubprogram = BM->getEntryPoint(Ops[FunctionIdIdx]) != nullptr;
   DISubprogram::DISPFlags SPFlags =
-      DISubprogram::toSPFlags(IsLocal, IsDefinition, IsOptimized, DISubprogram::SPFlagNonvirtual, IsMainSubprogram);
+      DISubprogram::toSPFlags(IsLocal, /*IsDefinition*/ true, IsOptimized, DISubprogram::SPFlagNonvirtual,
+                              /*IsMainSubprogram*/ false);
 
   unsigned ScopeLine = getConstant(Ops[ScopeLineIdx]);
 
