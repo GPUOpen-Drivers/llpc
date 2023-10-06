@@ -1513,7 +1513,6 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
                                        llvm::MutableArrayRef<CacheAccessInfo> stageCacheAccesses) {
   Result result = Result::Success;
   unsigned passIndex = 0;
-  const PipelineShaderInfo *fragmentShaderInfo = nullptr;
   TimerProfiler timerProfiler(context->getPipelineHashCode(), "LLPC", TimerProfiler::PipelineTimerEnableMask);
   bool buildingRelocatableElf = context->getPipelineContext()->isUnlinked();
 
@@ -1570,8 +1569,6 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       const PipelineShaderInfo *shaderInfoEntry = shaderInfo[shaderIndex];
       ShaderStage entryStage = shaderInfoEntry ? shaderInfoEntry->entryStage : ShaderStageInvalid;
 
-      if (entryStage == ShaderStageFragment)
-        fragmentShaderInfo = shaderInfoEntry;
       if (!shaderInfoEntry || !shaderInfoEntry->pModuleData || (stageSkipMask & shaderStageToMask(entryStage)))
         continue;
 
