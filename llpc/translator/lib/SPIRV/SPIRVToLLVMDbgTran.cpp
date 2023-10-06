@@ -503,19 +503,6 @@ DINode *SPIRVToLLVMDbgTran::transFunction(const SPIRVExtInst *DebugInst) {
   DISubprogram *DIS =
       Builder.createFunction(Scope, Name, LinkageName, File, LineNo, Ty, ScopeLine, Flags, SPFlags, TParamsArray, FD);
   DebugInstCache[DebugInst] = DIS;
-  SPIRVId RealFuncId = Ops[FunctionIdIdx];
-  FuncMap[RealFuncId] = DIS;
-
-  // Function.
-  SPIRVEntry *E = BM->getEntry(Ops[FunctionIdIdx]);
-  if (E->getOpCode() == OpFunction) {
-    SPIRVFunction *BF = static_cast<SPIRVFunction *>(E);
-    llvm::Function *F = SPIRVReader->transFunction(BF);
-    assert(F && "Translation of function failed!");
-    if (!F->hasMetadata())
-      F->setMetadata("dbg", DIS);
-    F->setSubprogram(DIS);
-  }
   return DIS;
 }
 
@@ -879,12 +866,15 @@ Instruction *SPIRVToLLVMDbgTran::transDebugIntrinsic(const SPIRVExtInst *DebugIn
   case SPIRVDebug::NoScope:
     return nullptr;
   case SPIRVDebug::FunctionDefinition: {
-    using namespace SPIRVDebug::Operand::Function;
-    SPIRVExtInst *funcExt = BM->get<SPIRVExtInst>(Ops[0]);
-    std::vector<SPIRVWord> &args = funcExt->getArguments();
-    assert(args.size() > FunctionIdIdx);
-    args[FunctionIdIdx] = Ops[1];
-    transDebugInst<DISubprogram>(funcExt);
+    SPIRVExtInst *dbgDef = BM->get<SPIRVExtInst>(Ops[0]);
+    SPIRVFunction *opDef = BM->get<SPIRVFunction>(Ops[1]);
+    DISubprogram *DIS = transDebugInst<DISubprogram>(dbgDef);
+
+    FuncMap[opDef->getId()] = DIS;
+
+    llvm::Function *F = SPIRVReader->transFunction(opDef);
+    assert(F && "Translation of function failed!");
+    F->setSubprogram(DIS);
     return nullptr;
   }
 

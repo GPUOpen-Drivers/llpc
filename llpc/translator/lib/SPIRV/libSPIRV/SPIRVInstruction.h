@@ -1560,11 +1560,6 @@ public:
         SPIRVLine *line = Module->add(new SPIRVLine(Module, Args[0], dbgLn, dbgCol));
         Module->setCurrentLine(line);
       }
-      // NonSemanticShaderDebugInfo100DebugFunction has one less argument than
-      // OpenCL.DebugInfo.100 DebugFunction
-      else if (ExtOpDebug == NonSemanticShaderDebugInfo100DebugFunction) {
-        Args.push_back(0);
-      }
     }
   }
   void validate() const override {
