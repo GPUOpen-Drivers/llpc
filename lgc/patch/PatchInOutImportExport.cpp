@@ -2223,7 +2223,9 @@ Value *PatchInOutImportExport::patchTesBuiltInInputImport(Type *inputTy, unsigne
 
     break;
   }
-  case BuiltInPointSize: {
+  case BuiltInPointSize:
+  case BuiltInLayer:
+  case BuiltInViewportIndex: {
     assert(!elemIdx);
     assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
     const unsigned loc = builtInInLocMap.find(builtInId)->second;
@@ -2309,20 +2311,6 @@ Value *PatchInOutImportExport::patchTesBuiltInInputImport(Type *inputTy, unsigne
       input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
     else
       input = builder.getInt32(0);
-    break;
-  }
-  case BuiltInLayer: {
-    assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
-    const unsigned loc = builtInInLocMap.find(builtInId)->second;
-    auto ldsOffset = calcLdsOffsetForTesInput(inputTy, loc, nullptr, elemIdx, vertexIdx, builder);
-    input = readValueFromLds(m_pipelineState->isTessOffChip(), inputTy, ldsOffset, builder);
-    break;
-  }
-  case BuiltInViewportIndex: {
-    assert(builtInInLocMap.find(builtInId) != builtInInLocMap.end());
-    const unsigned loc = builtInInLocMap.find(builtInId)->second;
-    auto ldsOffset = calcLdsOffsetForTesInput(inputTy, loc, nullptr, elemIdx, vertexIdx, builder);
-    input = readValueFromLds(m_pipelineState->isTessOffChip(), inputTy, ldsOffset, builder);
     break;
   }
   default: {
