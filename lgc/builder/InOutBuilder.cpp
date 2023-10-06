@@ -1782,11 +1782,11 @@ void BuilderImpl::markBuiltInOutputUsage(BuiltInKind builtIn, unsigned arraySize
     case BuiltInTessLevelInner:
       usage.tcs.tessLevelInner = true;
       break;
-    case BuiltInViewportIndex:
-      usage.tcs.viewportIndex = true;
-      break;
     case BuiltInLayer:
       usage.tcs.layer = true;
+      break;
+    case BuiltInViewportIndex:
+      usage.tcs.viewportIndex = true;
       break;
     default:
       break;
