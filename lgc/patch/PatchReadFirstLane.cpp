@@ -148,7 +148,7 @@ PreservedAnalyses PatchReadFirstLane::run(Function &function, FunctionAnalysisMa
 
   ReadFirstLaneOptimizer rflo(uniformityInfo, targetTransformInfo);
   bool changed = rflo.run(function);
-  return changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
+  return changed ? PreservedAnalyses::allInSet<CFGAnalyses>() : PreservedAnalyses::all();
 }
 
 // =====================================================================================================================
