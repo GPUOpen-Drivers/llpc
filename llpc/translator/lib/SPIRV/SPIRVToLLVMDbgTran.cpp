@@ -504,12 +504,8 @@ DINode *SPIRVToLLVMDbgTran::transFunction(const SPIRVExtInst *DebugInst) {
   DINodeArray TParams = Builder.getOrCreateArray(Elts);
   llvm::DITemplateParameterArray TParamsArray = TParams.get();
 
-  DISubprogram *DIS = nullptr;
-  if ((isa<DICompositeType>(Scope) || isa<DINamespace>(Scope)) && !IsDefinition)
-    DIS = Builder.createMethod(Scope, Name, LinkageName, File, LineNo, Ty, 0, 0, nullptr, Flags, SPFlags, TParamsArray);
-  else
-    DIS =
-        Builder.createFunction(Scope, Name, LinkageName, File, LineNo, Ty, ScopeLine, Flags, SPFlags, TParamsArray, FD);
+  DISubprogram *DIS =
+      Builder.createFunction(Scope, Name, LinkageName, File, LineNo, Ty, ScopeLine, Flags, SPFlags, TParamsArray, FD);
   DebugInstCache[DebugInst] = DIS;
   SPIRVId RealFuncId = Ops[FunctionIdIdx];
   FuncMap[RealFuncId] = DIS;
