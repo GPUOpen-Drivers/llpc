@@ -185,7 +185,7 @@ enum InvariantLoadsOption : unsigned { Auto = 0, EnableOptimization = 1, Disable
 // Struct with the information for one color export
 struct ColorExportInfo {
   unsigned hwColorTarget;
-  unsigned location;
+  unsigned location; // Overloaded to a bitmask for mrtz exports
   bool isSigned;
   llvm::Type *ty;
 };
