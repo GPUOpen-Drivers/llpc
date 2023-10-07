@@ -117,8 +117,7 @@ private:
   void collectExportInfoForGenericOutputs(llvm::Function *fragEntryPoint, BuilderBase &builder);
   void collectExportInfoForBuiltinOutput(llvm::Function *module, BuilderBase &builder);
   llvm::Value *generateValueForOutput(llvm::Value *value, llvm::Type *outputTy, BuilderBase &builder);
-  llvm::Value *generateReturn(llvm::Function *fragEntryPoint, BuilderBase &builder);
-  llvm::Value *jumpColorExport(llvm::Function *fragEntryPoint, BuilderBase &builder);
+  void createTailJump(llvm::Function *fragEntryPoint, BuilderBase &builder);
 
   llvm::LLVMContext *m_context;                        // The context the pass is being run in.
   PipelineState *m_pipelineState;                      // The pipeline state
