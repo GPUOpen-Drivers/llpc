@@ -638,6 +638,7 @@ struct FragmentShaderMode {
   unsigned earlyFragmentTests;
   unsigned postDepthCoverage;
   unsigned earlyAndLatFragmentTests;
+  unsigned innerCoverage;
   ConservativeDepth conservativeDepth;
   ConservativeDepth conservativeStencilFront;
   ConservativeDepth conservativeStencilBack;

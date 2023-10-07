@@ -1247,6 +1247,10 @@ void PipelineState::readColorExportState(Module *module) {
 void PipelineState::setGraphicsState(const InputAssemblyState &iaState, const RasterizerState &rsState) {
   m_inputAssemblyState = iaState;
   m_rasterizerState = rsState;
+
+  const auto &fragmentMode = getShaderModes()->getFragmentShaderMode();
+  if (fragmentMode.innerCoverage)
+    m_rasterizerState.innerCoverage = 1;
 }
 
 // =====================================================================================================================
