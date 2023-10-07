@@ -228,6 +228,9 @@ public:
   // Create "count leading sign bits" operation for a (vector of) signed int.
   llvm::Value *CreateCountLeadingSignBits(llvm::Value *value, const llvm::Twine &instName = "");
 
+  // Create "Masked Sum of Absolute Differences" operation.
+  llvm::Value *CreateMsad4(llvm::Value *src, llvm::Value *ref, llvm::Value *accum, const llvm::Twine &instName = "");
+
   // Create "fmix" operation.
   llvm::Value *createFMix(llvm::Value *x, llvm::Value *y, llvm::Value *a, const llvm::Twine &instName = "");
 

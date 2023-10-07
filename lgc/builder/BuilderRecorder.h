@@ -102,6 +102,7 @@ enum BuilderOpcode : unsigned {
   FindSMsb,
   CountLeadingSignBits,
   FMix,
+  Msad4,
 
   // Descriptor
   LoadBufferDesc,
