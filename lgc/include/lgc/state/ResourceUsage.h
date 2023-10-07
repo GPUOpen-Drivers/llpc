@@ -473,17 +473,8 @@ struct ResourceUsage {
     } mesh;
 
     struct {
-      // Original shader specified locations before location map (from tightly packed locations to shader
-      // specified locations)
-      //
-      // NOTE: This collected info is used to revise the calculated CB shader channel mask. Hardware requires
-      // the targets of fragment color export (MRTs) to be tightly packed while the CB shader channel masks
-      // should correspond to original shader specified targets.
-      unsigned outputOrigLocs[MaxColorTargets];
-
       std::vector<FsInterpInfo> interpInfo;   // Array of interpolation info
       BasicType outputTypes[MaxColorTargets]; // Array of basic types of fragment outputs
-      unsigned cbShaderMask;                  // CB shader channel mask (correspond to register CB_SHADER_MASK)
       bool isNullFs;                          // Is null FS, so should set final cbShaderMask to 0
     } fs;
   } inOutUsage;

@@ -51,7 +51,6 @@ ResourceUsage::ResourceUsage(ShaderStage shaderStage) {
       inOutUsage.fs.outputTypes[i] = BasicType::Unknown;
     }
 
-    inOutUsage.fs.cbShaderMask = 0;
     inOutUsage.fs.isNullFs = false;
   }
 }

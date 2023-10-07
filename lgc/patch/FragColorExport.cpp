@@ -505,21 +505,15 @@ bool LowerFragColorExport::runImpl(Module &module, PipelineShadersResult &pipeli
 // Updates the value in the entry in expFragColors that callInst is writing to.
 //
 // @param callInst : An call to the generic output export builtin in a fragment shader.
-// @param [in/out] expFragColors : An array with the current color export information for each hw color target.
-void LowerFragColorExport::updateFragColors(CallInst *callInst, ColorExportValueInfo expFragColors[],
+// @param [in/out] outFragColors : An array with the current color output information for each color output location.
+// @param builder : builder to use
+void LowerFragColorExport::updateFragColors(CallInst *callInst, MutableArrayRef<ColorOutputValueInfo> outFragColors,
                                             BuilderBase &builder) {
   const unsigned location = cast<ConstantInt>(callInst->getOperand(0))->getZExtValue();
   const unsigned component = cast<ConstantInt>(callInst->getOperand(1))->getZExtValue();
   Value *output = callInst->getOperand(2);
   assert(output->getType()->getScalarSizeInBits() <= 32); // 64-bit output is not allowed
-
-  InOutLocationInfo origLocInfo;
-  origLocInfo.setLocation(location);
-  origLocInfo.setComponent(component);
-  auto locInfoMapIt = m_resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
-  if (locInfoMapIt == m_resUsage->inOutUsage.outputLocInfoMap.end())
-    return;
-  unsigned hwColorTarget = locInfoMapIt->second.getLocation();
+  assert(component < 4);
 
   Type *outputTy = output->getType();
 
@@ -527,68 +521,18 @@ void LowerFragColorExport::updateFragColors(CallInst *callInst, ColorExportValue
   assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32);
   (void(bitWidth)); // unused
 
-  auto compTy = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getElementType() : outputTy;
-  unsigned compCount = outputTy->isVectorTy() ? cast<FixedVectorType>(outputTy)->getNumElements() : 1;
+  auto &expFragColor = outFragColors[location];
 
-  std::vector<Value *> outputComps;
-  for (unsigned i = 0; i < compCount; ++i) {
-    Value *outputComp = nullptr;
-    if (compCount == 1)
-      outputComp = output;
-    else {
-      outputComp = builder.CreateExtractElement(output, i);
-    }
-    outputComps.push_back(outputComp);
+  if (auto *vecTy = dyn_cast<FixedVectorType>(outputTy)) {
+    assert(component + vecTy->getNumElements() <= 4);
+    for (unsigned i = 0; i < vecTy->getNumElements(); ++i)
+      expFragColor.value[component + i] = builder.CreateExtractElement(output, i);
+  } else {
+    expFragColor.value[component] = output;
   }
-
-  assert(hwColorTarget < MaxColorTargets);
-  auto &expFragColor = expFragColors[hwColorTarget];
-
-  while (component + compCount > expFragColor.value.size())
-    expFragColor.value.push_back(PoisonValue::get(compTy));
-
-  for (unsigned i = 0; i < compCount; ++i)
-    expFragColor.value[component + i] = outputComps[i];
-
-  expFragColor.location = location;
   BasicType outputType = m_resUsage->inOutUsage.fs.outputTypes[location];
   expFragColor.isSigned =
       (outputType == BasicType::Int8 || outputType == BasicType::Int16 || outputType == BasicType::Int);
-}
-
-// =====================================================================================================================
-// Returns a value that is a combination of the values in expFragColor into a single value.  Returns a nullptr if no
-// value needs to be exported.
-//
-// @param expFragColor : The array of values that will be exported in each component.
-// @param location : The location of this color export.
-// @param builder : The builder object that will be used to create new instructions.
-Value *LowerFragColorExport::getOutputValue(ArrayRef<Value *> expFragColor, unsigned int location,
-                                            BuilderBase &builder) {
-  if (expFragColor.empty())
-    return nullptr;
-
-  Value *output = nullptr;
-  unsigned compCount = expFragColor.size();
-  assert(compCount <= 4);
-
-  // Set CB shader mask
-  const unsigned channelMask = ((1 << compCount) - 1);
-  m_resUsage->inOutUsage.fs.cbShaderMask |= (channelMask << (4 * location));
-
-  // Construct exported fragment colors
-  if (compCount == 1)
-    output = expFragColor[0];
-  else {
-    const auto compTy = expFragColor[0]->getType();
-
-    output = PoisonValue::get(FixedVectorType::get(compTy, compCount));
-    for (unsigned i = 0; i < compCount; ++i) {
-      assert(expFragColor[i]->getType() == compTy);
-      output = builder.CreateInsertElement(output, expFragColor[i], i);
-    }
-  }
-  return output;
 }
 
 // =====================================================================================================================
@@ -616,33 +560,45 @@ void LowerFragColorExport::collectExportInfoForGenericOutputs(Function *fragEntr
     return;
 
   // Collect all of the values that need to be exported for each hardware color target.
-  auto originalInsPos = builder.GetInsertPoint();
-  ColorExportValueInfo expFragColors[MaxColorTargets] = {};
-  for (CallInst *callInst : colorExports) {
-    builder.SetInsertPoint(callInst);
-    updateFragColors(callInst, expFragColors, builder);
-    callInst->eraseFromParent();
+  ColorOutputValueInfo outFragColors[MaxColorTargets] = {};
+  {
+    IRBuilderBase::InsertPointGuard ipg(builder);
+    for (CallInst *callInst : colorExports) {
+      builder.SetInsertPoint(callInst);
+      updateFragColors(callInst, outFragColors, builder);
+      callInst->eraseFromParent();
+    }
   }
 
-  // This insertion point should be the return instruction, so we know we can dereference the iterator.
-  builder.SetInsertPoint(&*originalInsPos);
-
-  // Recombine the values being exported for each hw color target.
-  for (unsigned hwColorTarget = 0; hwColorTarget < MaxColorTargets; ++hwColorTarget) {
-    unsigned location = m_resUsage->inOutUsage.fs.outputOrigLocs[hwColorTarget];
-    if (location == InvalidValue)
-      m_exportValues[hwColorTarget] = nullptr;
-    else
-      m_exportValues[hwColorTarget] = getOutputValue(expFragColors[hwColorTarget].value, location, builder);
-  }
-
-  // Add the color export information to the palmetadata.
-  for (unsigned hwColorTarget = 0; hwColorTarget < MaxColorTargets; ++hwColorTarget) {
-    Value *output = m_exportValues[hwColorTarget];
-    if (!output)
+  // Recombine the vectors and pack them.
+  unsigned exportIndex = 0;
+  for (const auto &[location, info] : llvm::enumerate(ArrayRef(outFragColors))) {
+    Type *compTy = nullptr;
+    unsigned numComponents = 0;
+    for (const auto &[i, value] : llvm::enumerate(info.value)) {
+      if (value) {
+        numComponents = i + 1;
+        compTy = value->getType();
+      }
+    }
+    if (!numComponents)
       continue;
-    const ColorExportValueInfo &colorExportInfo = expFragColors[hwColorTarget];
-    m_info.push_back({hwColorTarget, colorExportInfo.location, colorExportInfo.isSigned, output->getType()});
+
+    // Construct exported fragment colors
+    Value *value = nullptr;
+    if (numComponents == 1) {
+      value = info.value[0];
+    } else {
+      value = PoisonValue::get(FixedVectorType::get(compTy, numComponents));
+      for (unsigned i = 0; i < numComponents; ++i) {
+        if (info.value[i])
+          value = builder.CreateInsertElement(value, info.value[i], i);
+      }
+    }
+
+    m_exportValues[exportIndex] = value;
+    m_info.push_back({exportIndex, (unsigned)location, info.isSigned, value->getType()});
+    ++exportIndex;
   }
 }
 
