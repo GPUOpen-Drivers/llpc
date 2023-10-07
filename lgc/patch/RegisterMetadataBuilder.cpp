@@ -187,7 +187,7 @@ void RegisterMetadataBuilder::buildPalMetadata() {
         for (auto locInfoPair : outputLocInfoMap) {
           auto preRasterOutputSemanticElem = preRasterOutputSemanticNode[elemIdx].getMap(true);
           preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Semantic] =
-              MaxBuiltIn + locInfoPair.first.getLocation();
+              MaxBuiltInSemantic + locInfoPair.first.getLocation();
           preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Index] =
               locInfoPair.second.getLocation();
           ++elemIdx;
@@ -196,6 +196,7 @@ void RegisterMetadataBuilder::buildPalMetadata() {
         for (auto locPair : builtInOutputLocMap) {
           if (locPair.first == BuiltInClipDistance || locPair.first == BuiltInCullDistance ||
               locPair.first == BuiltInLayer || locPair.first == BuiltInViewportIndex) {
+            assert(locPair.first < MaxBuiltInSemantic);
             auto preRasterOutputSemanticElem = preRasterOutputSemanticNode[elemIdx].getMap(true);
             preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Semantic] = locPair.first;
             preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Index] = locPair.second;
@@ -954,13 +955,14 @@ void RegisterMetadataBuilder::buildPsRegisters() {
       for (auto locInfoPair : inputLocInfoMap) {
         auto psInputSemanticElem = psInputSemanticNode[elemIdx].getMap(true);
         psInputSemanticElem[Util::Abi::PsInputSemanticMetadataKey::Semantic] =
-            MaxBuiltIn + locInfoPair.first.getLocation();
+            MaxBuiltInSemantic + locInfoPair.first.getLocation();
         ++elemIdx;
       }
 
       for (auto locPair : builtInInputLocMap) {
         if (locPair.first == BuiltInClipDistance || locPair.first == BuiltInCullDistance ||
             locPair.first == BuiltInLayer || locPair.first == BuiltInViewportIndex) {
+          assert(locPair.first < MaxBuiltInSemantic);
           auto psInputSemanticElem = psInputSemanticNode[elemIdx].getMap(true);
           psInputSemanticElem[Util::Abi::PsInputSemanticMetadataKey::Semantic] = locPair.first;
           ++elemIdx;
