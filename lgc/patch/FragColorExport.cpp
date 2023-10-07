@@ -482,10 +482,7 @@ bool LowerFragColorExport::runImpl(Module &module, PipelineShadersResult &pipeli
 
   bool willGenerateColorExportShader = m_pipelineState->isUnlinked() && !m_pipelineState->hasColorExportFormats();
   if (willGenerateColorExportShader && !m_info.empty()) {
-    if (m_pipelineState->getOptions().enableColorExportShader)
-      jumpColorExport(fragEntryPoint, builder);
-    else
-      generateReturn(fragEntryPoint, builder);
+    createTailJump(fragEntryPoint, builder);
     return true;
   }
 
@@ -603,26 +600,24 @@ void LowerFragColorExport::collectExportInfoForGenericOutputs(Function *fragEntr
 }
 
 // =====================================================================================================================
-// Generates a return instruction that will make all of the values for the exports available to the color export shader.
-// The color export information is added to the pal metadata, so that everything needed to generate the color export
-// shader is available.
+// Generates a return instruction or a tail call that will make all of the values for the exports available to the
+// color export shader. The color export information is added to the pal metadata, so that everything needed to
+// generate the color export shader is available.
 //
 // @param fragEntryPoint : The fragment shader to which we should add the export instructions.
 // @param builder : The builder object that will be used to create new instructions.
-Value *LowerFragColorExport::generateReturn(Function *fragEntryPoint, BuilderBase &builder) {
+void LowerFragColorExport::createTailJump(Function *fragEntryPoint, BuilderBase &builder) {
   // Add the export info to be used when linking shaders to generate the color export shader and compute the spi shader
   // color format in the metadata.
   m_pipelineState->getPalMetadata()->addColorExportInfo(m_info);
+  m_pipelineState->getPalMetadata()->setDiscardState(m_resUsage->builtInUsage.fs.discard);
 
-  ReturnInst *retInst = cast<ReturnInst>(builder.GetInsertPoint()->getParent()->getTerminator());
-
-  // First build the return type for the fragment shader.
+  // First build the type for passing outputs to the color export shader.
   SmallVector<Type *, 8> outputTypes;
   for (const ColorExportInfo &info : m_info) {
     outputTypes.push_back(getVgprTy(info.ty));
   }
   Type *retTy = StructType::get(*m_context, outputTypes);
-  addFunctionArgs(fragEntryPoint, retTy, {}, {});
 
   // Now build the return value.
   Value *retVal = PoisonValue::get(retTy);
@@ -638,60 +633,29 @@ Value *LowerFragColorExport::generateReturn(Function *fragEntryPoint, BuilderBas
     retVal = builder.CreateInsertValue(retVal, output, returnLocation);
     ++returnLocation;
   }
-  retVal = builder.CreateRet(retVal);
-  retInst->eraseFromParent();
-  return retVal;
-}
 
-// =====================================================================================================================
-// Jump to color export shader if explicitly build color export shader
-//
-// @param fragEntryPoint : The fragment shader to which we should add the export instructions.
-// @param builder : The builder object that will be used to create new instructions.
-llvm::Value *LowerFragColorExport::jumpColorExport(llvm::Function *fragEntryPoint, BuilderBase &builder) {
+  if (m_pipelineState->getOptions().enableColorExportShader) {
+    // Build color export function type
+    auto funcTy = FunctionType::get(builder.getVoidTy(), {retTy}, false);
 
-  // Add the export info to be used when linking shaders to generate the color export shader and compute the spi shader
-  // color format in the metadata.
-  m_pipelineState->getPalMetadata()->addColorExportInfo(m_info);
-  m_pipelineState->getPalMetadata()->setDiscardState(m_resUsage->builtInUsage.fs.discard);
+    // Convert color export shader address to function pointer
+    auto funcTyPtr = funcTy->getPointerTo(ADDR_SPACE_CONST);
+    auto colorShaderAddr = ShaderInputs::getSpecialUserData(UserDataMapping::ColorExportAddr, builder);
+    AddressExtender addrExt(builder.GetInsertPoint()->getParent()->getParent());
+    auto funcPtr = addrExt.extendWithPc(colorShaderAddr, funcTyPtr, builder);
 
-  // First build the argument type for the fragment shader.
-  SmallVector<Type *, 8> outputTypes;
-  for (const ColorExportInfo &info : m_info) {
-    outputTypes.push_back(getVgprTy(info.ty));
+    // Jump
+    auto callInst = builder.CreateCall(funcTy, funcPtr, retVal);
+    callInst->setCallingConv(CallingConv::AMDGPU_Gfx);
+    callInst->setDoesNotReturn();
+    callInst->setOnlyWritesMemory();
+  } else {
+    addFunctionArgs(fragEntryPoint, retTy, {}, {});
+
+    auto *retInst = builder.GetInsertPoint()->getParent()->getTerminator();
+    retVal = builder.CreateRet(retVal);
+    retInst->eraseFromParent();
   }
-  Type *argTy = StructType::get(*m_context, outputTypes);
-
-  // Now build the argument value.
-  Value *argVal = PoisonValue::get(argTy);
-  unsigned returnLocation = 0;
-  for (unsigned idx = 0; idx < m_info.size(); ++idx) {
-    const ColorExportInfo &info = m_info[idx];
-    unsigned hwColorTarget = info.hwColorTarget;
-    Value *output = m_exportValues[hwColorTarget];
-    if (!output)
-      continue;
-    if (output->getType() != outputTypes[idx])
-      output = generateValueForOutput(output, outputTypes[idx], builder);
-    argVal = builder.CreateInsertValue(argVal, output, returnLocation);
-    ++returnLocation;
-  }
-
-  // Build color export function type
-  auto funcTy = FunctionType::get(Type::getVoidTy(*m_context), {argTy}, false);
-
-  // Convert color export shader address to function pointer
-  auto funcTyPtr = funcTy->getPointerTo(ADDR_SPACE_CONST);
-  auto colorShaderAddr = ShaderInputs::getSpecialUserData(UserDataMapping::ColorExportAddr, builder);
-  AddressExtender addrExt(builder.GetInsertPoint()->getParent()->getParent());
-  auto funcPtr = addrExt.extendWithPc(colorShaderAddr, funcTyPtr, builder);
-
-  // Jump
-  auto callInst = builder.CreateCall(funcTy, funcPtr, argVal);
-  callInst->setCallingConv(CallingConv::AMDGPU_Gfx);
-  callInst->setDoesNotReturn();
-  callInst->setOnlyWritesMemory();
-  return callInst;
 }
 
 // =====================================================================================================================
