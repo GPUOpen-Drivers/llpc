@@ -92,7 +92,6 @@ void PatchNullFragShader::updatePipelineState(PipelineState *pipelineState) cons
   pipelineState->setShaderStageMask(pipelineState->getShaderStageMask() | shaderStageToMask(ShaderStageFragment));
 
   // Add usage info for dummy output
-  resUsage->inOutUsage.fs.cbShaderMask = 0;
   resUsage->inOutUsage.fs.isNullFs = true;
   InOutLocationInfo origLocInfo;
   origLocInfo.setLocation(0);

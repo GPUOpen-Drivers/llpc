@@ -1645,10 +1645,6 @@ void PatchResourceCollect::matchGenericInOut() {
   }
 
   if (!outLocInfoMap.empty()) {
-    auto &outOrigLocs = inOutUsage.fs.outputOrigLocs;
-    if (m_shaderStage == ShaderStageFragment)
-      memset(&outOrigLocs, InvalidValue, sizeof(inOutUsage.fs.outputOrigLocs));
-
     assert(inOutUsage.outputMapLocCount == 0);
 
     // Update the value of outLocMap for non pack case
@@ -1672,9 +1668,6 @@ void PatchResourceCollect::matchGenericInOut() {
         inOutUsage.outputMapLocCount = std::max(inOutUsage.outputMapLocCount, newLoc + 1);
         LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output: loc = " << origLoc
                       << ", comp = " << origComp << "  =>  Mapped = " << newLoc << ", " << newComp << "\n");
-
-        if (m_shaderStage == ShaderStageFragment)
-          outOrigLocs[newLoc] = origLoc;
       }
     }
     LLPC_OUTS("\n");

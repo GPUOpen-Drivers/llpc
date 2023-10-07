@@ -95,10 +95,9 @@ private:
 };
 
 // The information needed for an export to a hardware color target.
-struct ColorExportValueInfo {
-  std::vector<llvm::Value *> value; // The value of each component to be exported.
-  unsigned location;                // The location that corresponds to the hardware color target.
-  bool isSigned;                    // True if the values should be interpreted as signed integers.
+struct ColorOutputValueInfo {
+  std::array<llvm::Value *, 4> value; // The value of each component to be exported.
+  bool isSigned;                      // True if the values should be interpreted as signed integers.
 };
 
 // =====================================================================================================================
@@ -113,8 +112,8 @@ public:
   static llvm::StringRef name() { return "Lower fragment color export calls"; }
 
 private:
-  void updateFragColors(llvm::CallInst *callInst, ColorExportValueInfo expFragColors[], BuilderBase &builder);
-  llvm::Value *getOutputValue(llvm::ArrayRef<llvm::Value *> expFragColor, unsigned int location, BuilderBase &builder);
+  void updateFragColors(llvm::CallInst *callInst, llvm::MutableArrayRef<ColorOutputValueInfo> outFragColors,
+                        BuilderBase &builder);
   void collectExportInfoForGenericOutputs(llvm::Function *fragEntryPoint, BuilderBase &builder);
   void collectExportInfoForBuiltinOutput(llvm::Function *module, BuilderBase &builder);
   llvm::Value *generateValueForOutput(llvm::Value *value, llvm::Type *outputTy, BuilderBase &builder);
