@@ -176,49 +176,5 @@ Function *ColorExportShader::createColorExportFunc() {
 //
 // @param [in/out] outStream : The PAL metadata object in which to update the color format.
 void ColorExportShader::updatePalMetadata(PalMetadata &palMetadata) {
-  SmallVector<ExportFormat> finalExportFormats;
-  bool hasDepthExpFmtZero = true;
-  for (auto &info : m_exports) {
-    if (info.hwColorTarget != MaxColorTargets) {
-      ExportFormat expFmt = m_exportFormat[info.hwColorTarget];
-      if (expFmt != EXP_FORMAT_ZERO)
-        finalExportFormats.push_back(expFmt);
-    } else {
-      hasDepthExpFmtZero = false;
-      unsigned depthMask = info.location;
-      if (!m_killEnabled && m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11 &&
-          m_pipelineState->getColorExportState().alphaToCoverageEnable) {
-        for (auto &curInfo : m_exports) {
-          if (curInfo.hwColorTarget == EXP_TARGET_MRT_0 && (m_exportFormat[EXP_TARGET_MRT_0] > EXP_FORMAT_32_GR)) {
-            // Mrt0 is enabled and its alpha channel is enabled
-            depthMask |= 0x8;
-            break;
-          }
-        }
-      }
-
-      unsigned depthExpFmt = EXP_FORMAT_ZERO;
-      if (depthMask & 0x4)
-        depthExpFmt = EXP_FORMAT_32_ABGR;
-      else if (depthMask & 0x2)
-        depthExpFmt = (depthMask & 0x8) ? EXP_FORMAT_32_ABGR : EXP_FORMAT_32_GR;
-      else if (depthMask & 0x1)
-        depthExpFmt = (depthMask & 0x8) ? EXP_FORMAT_32_AR : EXP_FORMAT_32_R;
-      palMetadata.setSpiShaderZFormat(depthExpFmt);
-    }
-  }
-
-  if (finalExportFormats.size() == 0 && hasDepthExpFmtZero) {
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10 || m_killEnabled) {
-      // NOTE: Hardware requires that fragment shader always exports "something" (color or depth) to the SX.
-      // If both SPI_SHADER_Z_FORMAT and SPI_SHADER_COL_FORMAT are zero, we need to override
-      // SPI_SHADER_COL_FORMAT to export one channel to MRT0. This dummy export format will be masked
-      // off by updateCbShaderMask().
-      finalExportFormats.push_back(EXP_FORMAT_32_R);
-    }
-  }
-
-  palMetadata.updateSpiShaderColFormat(finalExportFormats);
-  palMetadata.updateCbShaderMask(m_exports);
   palMetadata.updateDbShaderControl();
 }
