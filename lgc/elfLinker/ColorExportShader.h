@@ -79,7 +79,6 @@ private:
   // have access to PipelineState, so we can hash the information here and let the front-end use it as the
   // key for a cache of glue shaders.
   llvm::SmallVector<ColorExportInfo, 8> m_exports;
-  ExportFormat m_exportFormat[MaxColorTargets] = {}; // The export format for each hw color target.
   // The encoded or hashed (in some way) single string version of the above.
   std::string m_shaderString;
   bool m_killEnabled; // True if this fragment shader has kill enabled.

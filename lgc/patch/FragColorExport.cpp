@@ -487,14 +487,9 @@ bool LowerFragColorExport::runImpl(Module &module, PipelineShadersResult &pipeli
   }
 
   FragColorExport fragColorExport(m_context, m_pipelineState);
-  SmallVector<ExportFormat, 8> exportFormat(MaxColorTargets + 1, EXP_FORMAT_ZERO);
-  for (auto &exp : m_info) {
-    exportFormat[exp.hwColorTarget] =
-        static_cast<ExportFormat>(m_pipelineState->computeExportFormat(exp.ty, exp.location));
-  }
   bool dummyExport =
       (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10 || m_resUsage->builtInUsage.fs.discard);
-  fragColorExport.generateExportInstructions(m_info, m_exportValues, exportFormat, dummyExport, builder);
+  fragColorExport.generateExportInstructions(m_info, m_exportValues, dummyExport, builder);
   return !m_info.empty() || dummyExport;
 }
 
@@ -878,68 +873,85 @@ Value *FragColorExport::dualSourceSwizzle(BuilderBase &builder) {
 // @param values : The values that are to be exported.  Indexed by the hw color target.
 // @param exportFormat : The export format for each color target. Indexed by the hw color target.
 // @param builder : The builder object that will be used to create new instructions.
-void FragColorExport::generateExportInstructions(ArrayRef<lgc::ColorExportInfo> info, ArrayRef<llvm::Value *> values,
-                                                 ArrayRef<ExportFormat> exportFormat, bool dummyExport,
-                                                 BuilderBase &builder) {
+void FragColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info, ArrayRef<Value *> values,
+                                                 bool dummyExport, BuilderBase &builder) {
   SmallVector<ExportFormat> finalExportFormats;
   Value *lastExport = nullptr;
+
+  // MRTZ export comes first if it exists (this is a HW requirement on gfx11+ and an optional good idea on earlier HW).
+  // We make the assume here that it is also first in the info list.
+  if (!info.empty() && info[0].hwColorTarget == MaxColorTargets) {
+    unsigned depthMask = info[0].location;
+
+    // Depth export alpha comes from MRT0.a if there is MRT0.a and A2C is enabled on GFX11+
+    Value *alpha = PoisonValue::get(Type::getFloatTy(*m_context));
+    if (!dummyExport && m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11 &&
+        m_pipelineState->getColorExportState().alphaToCoverageEnable) {
+      for (auto &curInfo : info) {
+        if (curInfo.location != 0)
+          continue;
+
+        auto *vecTy = dyn_cast<FixedVectorType>(values[curInfo.hwColorTarget]->getType());
+        if (!vecTy || vecTy->getNumElements() < 4)
+          break;
+
+        // Mrt0 is enabled and its alpha channel is enabled
+        alpha = builder.CreateExtractElement(values[curInfo.hwColorTarget], 3);
+        if (alpha->getType()->isIntegerTy())
+          alpha = builder.CreateBitCast(alpha, builder.getFloatTy());
+        depthMask |= 0x8;
+        break;
+      }
+    }
+
+    Value *output = values[MaxColorTargets];
+    Value *fragDepth = builder.CreateExtractElement(output, static_cast<uint64_t>(0));
+    Value *fragStencilRef = builder.CreateExtractElement(output, 1);
+    Value *sampleMask = builder.CreateExtractElement(output, 2);
+    Value *args[] = {
+        builder.getInt32(EXP_TARGET_Z), // tgt
+        builder.getInt32(depthMask),    // en
+        fragDepth,                      // src0
+        fragStencilRef,                 // src1
+        sampleMask,                     // src2
+        alpha,                          // src3
+        builder.getFalse(),             // done
+        builder.getTrue()               // vm
+    };
+    lastExport = builder.CreateIntrinsic(Intrinsic::amdgcn_exp, builder.getFloatTy(), args);
+
+    unsigned depthExpFmt = EXP_FORMAT_ZERO;
+    if (depthMask & 0x4)
+      depthExpFmt = EXP_FORMAT_32_ABGR;
+    else if (depthMask & 0x2)
+      depthExpFmt = (depthMask & 0x8) ? EXP_FORMAT_32_ABGR : EXP_FORMAT_32_GR;
+    else if (depthMask & 0x1)
+      depthExpFmt = (depthMask & 0x8) ? EXP_FORMAT_32_AR : EXP_FORMAT_32_R;
+
+    m_pipelineState->getPalMetadata()->setSpiShaderZFormat(depthExpFmt);
+    info = info.drop_front(1);
+  }
+
+  // Now do color exports by color buffer.
   unsigned hwColorExport = 0;
-  for (const ColorExportInfo &exp : info) {
-    Value *output = values[exp.hwColorTarget];
-    if (exp.hwColorTarget != MaxColorTargets) {
-      ExportFormat expFmt = exportFormat[exp.hwColorTarget];
-      if (expFmt != EXP_FORMAT_ZERO) {
-        lastExport = handleColorExportInstructions(output, hwColorExport, builder, expFmt, exp.isSigned);
-        finalExportFormats.push_back(expFmt);
-        ++hwColorExport;
-      }
-    } else {
-      // Depth export alpha comes from MRT0.a if there is MRT0.a and A2C is enable on GFX11+
-      Value *alpha = PoisonValue::get(Type::getFloatTy(*m_context));
-      unsigned depthMask = exp.location;
-      if (!dummyExport && m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11 &&
-          m_pipelineState->getColorExportState().alphaToCoverageEnable) {
-        bool canCopyAlpha = false;
-        for (auto &curInfo : info) {
-          if (curInfo.hwColorTarget == EXP_TARGET_MRT_0 && (exportFormat[EXP_TARGET_MRT_0] > EXP_FORMAT_32_GR)) {
-            // Mrt0 is enabled and its alpha channel is enabled
-            canCopyAlpha = true;
-            break;
-          }
-        }
-        if (canCopyAlpha) {
-          // Update Mrtz.a and its mask
-          alpha = builder.CreateExtractElement(values[EXP_TARGET_MRT_0], 3);
-          depthMask |= 0x8;
-        }
-      }
-      Value *fragDepth = builder.CreateExtractElement(output, static_cast<uint64_t>(0));
-      Value *fragStencilRef = builder.CreateExtractElement(output, 1);
-      Value *sampleMask = builder.CreateExtractElement(output, 2);
-      Value *args[] = {
-          builder.getInt32(EXP_TARGET_Z), // tgt
-          builder.getInt32(depthMask),    // en
-          fragDepth,                      // src0
-          fragStencilRef,                 // src1
-          sampleMask,                     // src2
-          alpha,                          // src3
-          builder.getFalse(),             // done
-          builder.getTrue()               // vm
-      };
-      lastExport = builder.CreateIntrinsic(Intrinsic::amdgcn_exp, builder.getFloatTy(), args);
+  for (unsigned location = 0; location < MaxColorTargets; ++location) {
+    auto infoIt = llvm::find_if(info, [&](const ColorExportInfo &info) { return info.location == location; });
+    if (infoIt == info.end())
+      continue;
 
-      unsigned depthExpFmt = EXP_FORMAT_ZERO;
-      if (depthMask & 0x4)
-        depthExpFmt = EXP_FORMAT_32_ABGR;
-      else if (depthMask & 0x2)
-        depthExpFmt = (depthMask & 0x8) ? EXP_FORMAT_32_ABGR : EXP_FORMAT_32_GR;
-      else if (depthMask & 0x1)
-        depthExpFmt = (depthMask & 0x8) ? EXP_FORMAT_32_AR : EXP_FORMAT_32_R;
+    assert(infoIt->hwColorTarget < MaxColorTargets);
 
-      m_pipelineState->getPalMetadata()->setSpiShaderZFormat(depthExpFmt);
+    auto expFmt = static_cast<ExportFormat>(m_pipelineState->computeExportFormat(infoIt->ty, location));
+    if (expFmt != EXP_FORMAT_ZERO) {
+      lastExport = handleColorExportInstructions(values[infoIt->hwColorTarget], hwColorExport, builder, expFmt,
+                                                 infoIt->isSigned);
+      finalExportFormats.push_back(expFmt);
+      ++hwColorExport;
     }
   }
 
+  // Special case of color exports: dual swizzle on gfx11+. They are implicitly captured above, and this case implies
+  // no other color exports. (TODO: Cleanup the implicit capture; we should just check this up-front.)
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11 &&
       (m_pipelineState->getColorExportState().dualSourceBlendEnable ||
        m_pipelineState->getColorExportState().dynamicDualSourceBlendEnable))

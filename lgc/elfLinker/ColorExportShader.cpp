@@ -46,14 +46,6 @@ ColorExportShader::ColorExportShader(PipelineState *pipelineState, ArrayRef<Colo
     : GlueShader(pipelineState), m_killEnabled(false) {
   m_exports.append(exports.begin(), exports.end());
 
-  memset(m_exportFormat, 0, sizeof(m_exportFormat));
-  for (auto &exp : m_exports) {
-    if (exp.hwColorTarget == MaxColorTargets)
-      continue;
-    m_exportFormat[exp.hwColorTarget] =
-        static_cast<ExportFormat>(pipelineState->computeExportFormat(exp.ty, exp.location));
-  }
-
   if (!pipelineState->getOptions().enableColorExportShader) {
     PalMetadata *metadata = pipelineState->getPalMetadata();
     if (pipelineState->useRegisterFieldFormat()) {
@@ -77,7 +69,6 @@ StringRef ColorExportShader::getString() {
   if (m_shaderString.empty()) {
     constexpr uint32_t estimatedTypeSize = 10;
     uint32_t sizeEstimate = (sizeof(ColorExportInfo) + estimatedTypeSize) * m_exports.size();
-    sizeEstimate += sizeof(m_exportFormat);
     sizeEstimate += sizeof(m_killEnabled);
     m_shaderString.reserve(sizeEstimate);
 
@@ -90,7 +81,6 @@ StringRef ColorExportShader::getString() {
           StringRef(reinterpret_cast<const char *>(&colorExportInfo.location), sizeof(colorExportInfo.location));
       m_shaderString += getTypeName(colorExportInfo.ty);
     }
-    m_shaderString += StringRef(reinterpret_cast<const char *>(m_exportFormat), sizeof(m_exportFormat)).str();
     m_shaderString += StringRef(reinterpret_cast<const char *>(&m_killEnabled), sizeof(m_killEnabled));
   }
   return m_shaderString;
@@ -119,7 +109,7 @@ Module *ColorExportShader::generate() {
   }
 
   bool dummyExport = m_lgcContext->getTargetInfo().getGfxIpVersion().major < 10 || m_killEnabled;
-  fragColorExport.generateExportInstructions(m_exports, values, m_exportFormat, dummyExport, builder);
+  fragColorExport.generateExportInstructions(m_exports, values, dummyExport, builder);
 
   if (m_pipelineState->getOptions().enableColorExportShader) {
     builder.CreateIntrinsic(Intrinsic::amdgcn_endpgm, {}, {});
