@@ -14,13 +14,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        host-os:             ["ubuntu-20.04"]
+        host-os:             ["ubuntu-22.04"]
         image-template:      ["amdvlkadmin/amdvlk_%s%s:nightly"]
         config:              [Release]
         feature-set:         ["+gcc", "+gcc+assertions",
                               "+clang",
-                              "+clang+shadercache+ubsan+asan",
-                              "+clang+shadercache+ubsan+asan+assertions"]
+                              "+clang+ubsan+asan",
+                              "+clang+ubsan+asan+assertions"]
     steps:
       - name: Free up disk space
         if: contains(matrix.feature-set, '+ubsan') || contains(matrix.feature-set, '+asan') || contains(matrix.feature-set, '+tsan') || contains(matrix.feature-set, '+coverage')

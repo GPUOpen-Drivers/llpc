@@ -122,13 +122,7 @@ enum BuilderOpcode : unsigned {
   ImageQuerySamples,
   ImageQuerySize,
   ImageGetLod,
-#if VKI_RAY_TRACING
   ImageBvhIntersectRay,
-  Reserved2,
-#else
-  Reserved2,
-  Reserved1,
-#endif
 
   // Input/output
   ReadGenericInput,
@@ -140,10 +134,6 @@ enum BuilderOpcode : unsigned {
   ReadBuiltInInput,
   ReadBuiltInOutput,
   WriteBuiltInOutput,
-  ReadTaskPayload,
-  WriteTaskPayload,
-  TaskPayloadAtomic,
-  TaskPayloadAtomicCompareSwap,
 
   // Matrix
   TransposeMatrix,
@@ -161,12 +151,9 @@ enum BuilderOpcode : unsigned {
   Barrier,
   Kill,
   ReadClock,
-  DebugPrintf,
   Derivative,
   DemoteToHelperInvocation,
   IsHelperInvocation,
-  EmitMeshTasks,
-  SetMeshOutputs,
   GetWaveSize,
   DebugBreak,
 
@@ -176,6 +163,7 @@ enum BuilderOpcode : unsigned {
   SubgroupAll,
   SubgroupAny,
   SubgroupAllEqual,
+  SubgroupRotate,
   SubgroupBroadcast,
   SubgroupBroadcastWaterfall,
   SubgroupBroadcastFirst,
@@ -202,7 +190,6 @@ enum BuilderOpcode : unsigned {
   SubgroupSwizzleMask,
   SubgroupWriteInvocation,
   SubgroupMbcnt,
-
   // Total count of opcodes
   Count
 };

@@ -55,7 +55,7 @@ static cl::opt<bool> EnableRowExport("enable-row-export", cl::desc("Enable row e
                                      cl::init(false));
 
 cl::opt<bool> UseRegisterFieldFormat("use-register-field-format", cl::desc("Use register field format in pipeline ELF"),
-                                     cl::init(false));
+                                     cl::init(true));
 
 // Names for named metadata nodes when storing and reading back pipeline state
 static const char UnlinkedMetadataName[] = "lgc.unlinked";
@@ -69,6 +69,7 @@ static const char IaStateMetadataName[] = "lgc.input.assembly.state";
 static const char RsStateMetadataName[] = "lgc.rasterizer.state";
 static const char ColorExportFormatsMetadataName[] = "lgc.color.export.formats";
 static const char ColorExportStateMetadataName[] = "lgc.color.export.state";
+static const char TessLevelMetadataName[] = "lgc.tessellation.level.state";
 
 namespace {
 
@@ -97,6 +98,7 @@ static unsigned getMaxComponentBitCount(BufDataFormat dfmt) {
   case BufDataFormat8_8_8_Bgr:
   case BufDataFormat8_8_8_8:
   case BufDataFormat8_8_8_8_Bgra:
+  case BufDataFormat8_A:
     return 8;
   case BufDataFormat5_9_9_9:
     return 9;
@@ -145,6 +147,7 @@ static bool hasAlpha(BufDataFormat dfmt) {
   case BufDataFormat5_6_5_1_Bgra:
   case BufDataFormat1_5_6_5:
   case BufDataFormat5_9_9_9:
+  case BufDataFormat8_A:
     return true;
   default:
     return false;
@@ -163,6 +166,7 @@ static unsigned getNumChannels(BufDataFormat dfmt) {
   case BufDataFormat16:
   case BufDataFormat32:
   case BufDataFormat64:
+  case BufDataFormat8_A:
     return 1;
   case BufDataFormat4_4:
   case BufDataFormat8_8:
@@ -323,7 +327,13 @@ ComputeShaderMode Pipeline::getComputeShaderMode(Module &module) {
 // @param emitLgc : Whether the option -emit-lgc is on
 PipelineState::PipelineState(LgcContext *builderContext, bool emitLgc)
     : Pipeline(builderContext), m_emitLgc(emitLgc), m_meshRowExport(EnableRowExport) {
-  m_registerFieldFormat = getTargetInfo().getGfxIpVersion().major >= 11 && UseRegisterFieldFormat;
+  m_registerFieldFormat = getTargetInfo().getGfxIpVersion().major >= 9 && UseRegisterFieldFormat;
+  m_tessLevel.inner[0] = -1.0f;
+  m_tessLevel.inner[1] = -1.0f;
+  m_tessLevel.outer[0] = -1.0f;
+  m_tessLevel.outer[1] = -1.0f;
+  m_tessLevel.outer[2] = -1.0f;
+  m_tessLevel.outer[3] = -1.0f;
 }
 
 // =====================================================================================================================
@@ -737,14 +747,16 @@ void PipelineState::recordUserDataTable(ArrayRef<ResourceNode> nodes, NamedMDNod
     operands.push_back(getResourceTypeName(node.concreteType));
     // Operand 1: matchType
     operands.push_back(ConstantAsMetadata::get(builder.getInt32(static_cast<uint32_t>(node.abstractType))));
-    // Operand 2: offsetInDwords
+    // Operand 2: visibility
+    operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.visibility)));
+    // Operand 3: offsetInDwords
     operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.offsetInDwords)));
-    // Operand 3: sizeInDwords
+    // Operand 4: sizeInDwords
     operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.sizeInDwords)));
 
     switch (node.concreteType) {
     case ResourceNodeType::DescriptorTableVaPtr: {
-      // Operand 4: Node count in sub-table.
+      // Operand 5: Node count in sub-table.
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.innerTable.size())));
       // Create the metadata node here.
       userDataMetaNode->addOperand(MDNode::get(getContext(), operands));
@@ -754,18 +766,18 @@ void PipelineState::recordUserDataTable(ArrayRef<ResourceNode> nodes, NamedMDNod
     }
     case ResourceNodeType::IndirectUserDataVaPtr:
     case ResourceNodeType::StreamOutTableVaPtr: {
-      // Operand 4: Size of the indirect data in dwords.
+      // Operand 5: Size of the indirect data in dwords.
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.indirectSizeInDwords)));
       break;
     }
     default: {
-      // Operand 4: set
-      operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.set)));
-      // Operand 5: binding
+      // Operand 5: set
+      operands.push_back(ConstantAsMetadata::get(builder.getInt64(node.set)));
+      // Operand 6: binding
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.binding)));
-      // Operand 6: stride
+      // Operand 7: stride
       operands.push_back(ConstantAsMetadata::get(builder.getInt32(node.stride)));
-      // Operand 7 onwards: immutable descriptor constants
+      // Operand 8 onwards: immutable descriptor constants
       for (uint32_t element :
            ArrayRef<uint32_t>(node.immutableValue, node.immutableSize * DescriptorSizeSamplerInDwords))
         operands.push_back(ConstantAsMetadata::get(builder.getInt32(element)));
@@ -806,14 +818,16 @@ void PipelineState::readUserDataNodes(Module *module) {
     // Operand 1: matchType
     nextNode->abstractType =
         static_cast<ResourceNodeType>(mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(1))->getZExtValue());
-    // Operand 2: offsetInDwords
-    nextNode->offsetInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(2))->getZExtValue();
-    // Operand 3: sizeInDwords
-    nextNode->sizeInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(3))->getZExtValue();
+    // Operand 2: visibility
+    nextNode->visibility = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(2))->getZExtValue();
+    // Operand 3: offsetInDwords
+    nextNode->offsetInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(3))->getZExtValue();
+    // Operand 4: sizeInDwords
+    nextNode->sizeInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(4))->getZExtValue();
 
     if (nextNode->concreteType == ResourceNodeType::DescriptorTableVaPtr) {
-      // Operand 4: number of nodes in inner table
-      unsigned innerNodeCount = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(4))->getZExtValue();
+      // Operand 5: number of nodes in inner table
+      unsigned innerNodeCount = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(5))->getZExtValue();
       // Go into inner table.
       assert(!endThisInnerTable);
       endThisInnerTable = endNextInnerTable;
@@ -824,18 +838,18 @@ void PipelineState::readUserDataNodes(Module *module) {
     } else {
       if (nextNode->concreteType == ResourceNodeType::IndirectUserDataVaPtr ||
           nextNode->concreteType == ResourceNodeType::StreamOutTableVaPtr) {
-        // Operand 4: Size of the indirect data in dwords
-        nextNode->indirectSizeInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(4))->getZExtValue();
+        // Operand 5: Size of the indirect data in dwords
+        nextNode->indirectSizeInDwords = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(5))->getZExtValue();
       } else {
-        // Operand 4: set
-        nextNode->set = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(4))->getZExtValue();
-        // Operand 5: binding
-        nextNode->binding = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(5))->getZExtValue();
-        // Operand 6: stride
-        nextNode->stride = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(6))->getZExtValue();
+        // Operand 5: set
+        nextNode->set = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(5))->getZExtValue();
+        // Operand 6: binding
+        nextNode->binding = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(6))->getZExtValue();
+        // Operand 7: stride
+        nextNode->stride = mdconst::dyn_extract<ConstantInt>(metadataNode->getOperand(7))->getZExtValue();
         nextNode->immutableValue = nullptr;
-        // Operand 7 onward: immutable descriptor constants
-        constexpr unsigned ImmutableStartOperand = 7;
+        // Operand 8 onward: immutable descriptor constants
+        constexpr unsigned ImmutableStartOperand = 8;
         unsigned immutableSizeInDwords = metadataNode->getNumOperands() - ImmutableStartOperand;
         nextNode->immutableSize = immutableSizeInDwords / DescriptorSizeSamplerInDwords;
         if (nextNode->immutableSize) {
@@ -862,12 +876,22 @@ void PipelineState::readUserDataNodes(Module *module) {
 
 // =====================================================================================================================
 // Returns the resource node for the push constant.
-const ResourceNode *PipelineState::findPushConstantResourceNode() const {
+//
+// @param stage : Shader stage to check against nodes' visibility field, or ShaderStageInvalid for any
+const ResourceNode *PipelineState::findPushConstantResourceNode(ShaderStage stage) const {
+  unsigned visibilityMask = UINT_MAX;
+  if (stage != ShaderStageInvalid)
+    visibilityMask = 1 << std::min(unsigned(stage), unsigned(ShaderStageCompute));
+
   for (const ResourceNode &node : getUserDataNodes()) {
+    if (node.visibility != 0 && (node.visibility & visibilityMask) == 0)
+      continue;
     if (node.concreteType == ResourceNodeType::PushConst)
       return &node;
     if (node.concreteType == ResourceNodeType::DescriptorTableVaPtr) {
       if (!node.innerTable.empty() && node.innerTable[0].concreteType == ResourceNodeType::PushConst) {
+        if (node.innerTable[0].visibility != 0 && (node.innerTable[0].visibility & visibilityMask) == 0)
+          continue;
         assert(ResourceLayoutScheme::Indirect == m_options.resourceLayoutScheme);
         return &node;
       }
@@ -956,7 +980,7 @@ static bool nodeTypeHasBinding(ResourceNodeType nodeType) {
 // @param nodeType : Resource node type being searched for
 // @param descSet : Descriptor set being searched for
 // @param binding : Descriptor binding being searched for
-bool PipelineState::matchResourceNode(const ResourceNode &node, ResourceNodeType nodeType, unsigned descSet,
+bool PipelineState::matchResourceNode(const ResourceNode &node, ResourceNodeType nodeType, uint64_t descSet,
                                       unsigned binding) const {
   if (node.set != descSet || !isNodeTypeCompatible(nodeType, node.abstractType))
     return false;
@@ -980,10 +1004,19 @@ bool PipelineState::matchResourceNode(const ResourceNode &node, ResourceNodeType
 // @param nodeType : Type of the resource mapping node
 // @param descSet : ID of descriptor set
 // @param binding : ID of descriptor binding
-std::pair<const ResourceNode *, const ResourceNode *>
-PipelineState::findResourceNode(ResourceNodeType nodeType, unsigned descSet, unsigned binding) const {
+// @param stage : Shader stage to check against nodes' visibility field, or ShaderStageInvalid for any
+std::pair<const ResourceNode *, const ResourceNode *> PipelineState::findResourceNode(ResourceNodeType nodeType,
+                                                                                      uint64_t descSet,
+                                                                                      unsigned binding,
+                                                                                      ShaderStage stage) const {
+  unsigned visibilityMask = UINT_MAX;
+  if (stage != ShaderStageInvalid)
+    visibilityMask = 1 << std::min(unsigned(stage), unsigned(ShaderStageCompute));
+
   for (const ResourceNode &node : getUserDataNodes()) {
     if (!nodeTypeHasBinding(node.concreteType))
+      continue;
+    if (node.visibility != 0 && (node.visibility & visibilityMask) == 0)
       continue;
 
     if (node.concreteType == ResourceNodeType::DescriptorTableVaPtr) {
@@ -997,6 +1030,8 @@ PipelineState::findResourceNode(ResourceNodeType nodeType, unsigned descSet, uns
 
       // Check inner nodes.
       for (const ResourceNode &innerNode : node.innerTable) {
+        if (innerNode.visibility != 0 && (innerNode.visibility & visibilityMask) == 0)
+          continue;
         if (matchResourceNode(innerNode, nodeType, descSet, binding))
           return {&node, &innerNode};
       }
@@ -1013,7 +1048,7 @@ PipelineState::findResourceNode(ResourceNodeType nodeType, unsigned descSet, uns
 #endif
 
     // If use fmask and no fmask descriptor is found, look for a resource (image) one instead.
-    return findResourceNode(ResourceNodeType::DescriptorResource, descSet, binding);
+    return findResourceNode(ResourceNodeType::DescriptorResource, descSet, binding, stage);
   }
   return {nullptr, nullptr};
 }
@@ -1022,8 +1057,15 @@ PipelineState::findResourceNode(ResourceNodeType nodeType, unsigned descSet, uns
 // Find the single root resource node of the given type
 //
 // @param nodeType : Type of the resource mapping node
-const ResourceNode *PipelineState::findSingleRootResourceNode(ResourceNodeType nodeType) const {
+// @param stage : Shader stage to check against nodes' visibility field, or ShaderStageInvalid for any
+const ResourceNode *PipelineState::findSingleRootResourceNode(ResourceNodeType nodeType, ShaderStage stage) const {
+  unsigned visibilityMask = UINT_MAX;
+  if (stage != ShaderStageInvalid)
+    visibilityMask = 1 << std::min(unsigned(stage), unsigned(ShaderStageCompute));
+
   for (const ResourceNode &node : getUserDataNodes()) {
+    if (node.visibility != 0 && (node.visibility & visibilityMask) == 0)
+      continue;
     if (node.concreteType == nodeType)
       return &node;
   }
@@ -1145,7 +1187,7 @@ void PipelineState::setColorExportState(ArrayRef<ColorExportFormat> formats, con
 //
 // @param location : Export location
 const ColorExportFormat &PipelineState::getColorExportFormat(unsigned location) {
-  if (getColorExportState().dualSourceBlendEnable)
+  if (getColorExportState().dualSourceBlendEnable || getColorExportState().dynamicDualSourceBlendEnable)
     location = 0;
 
   if (location >= m_colorExportFormats.size()) {
@@ -1248,6 +1290,9 @@ void PipelineState::readDeviceIndex(Module *module) {
 void PipelineState::recordGraphicsState(Module *module) {
   setNamedMetadataToArrayOfInt32(module, m_inputAssemblyState, IaStateMetadataName);
   setNamedMetadataToArrayOfInt32(module, m_rasterizerState, RsStateMetadataName);
+  if (m_tessLevel.inner[0] >= 0 || m_tessLevel.inner[1] >= 0 || m_tessLevel.outer[0] >= 0 ||
+      m_tessLevel.outer[1] >= 0 || m_tessLevel.outer[2] >= 0 || m_tessLevel.outer[3] >= 0)
+    setNamedMetadataToArrayOfInt32(module, m_tessLevel, TessLevelMetadataName);
 }
 
 // =====================================================================================================================
@@ -1257,6 +1302,7 @@ void PipelineState::recordGraphicsState(Module *module) {
 void PipelineState::readGraphicsState(Module *module) {
   readNamedMetadataArrayOfInt32(module, IaStateMetadataName, m_inputAssemblyState);
   readNamedMetadataArrayOfInt32(module, RsStateMetadataName, m_rasterizerState);
+  readNamedMetadataArrayOfInt32(module, TessLevelMetadataName, m_tessLevel);
 
   auto nameMeta = module->getNamedMetadata(SampleShadingMetaName);
   if (nameMeta)
@@ -1380,6 +1426,9 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStage stage) {
     // In such cases, we check the property of VS or TES.
     checkingStage = hasShaderStage(ShaderStageTessEval) ? ShaderStageTessEval : ShaderStageVertex;
   }
+
+  if (checkingStage == ShaderStageCompute)
+    m_waveSize[checkingStage] = m_shaderModes.getComputeShaderMode().subgroupSize;
 
   if (!m_waveSize[checkingStage]) {
     unsigned waveSize = getTargetInfo().getGpuProperty().waveSize;
@@ -1562,7 +1611,12 @@ unsigned PipelineState::computeExportFormat(Type *outputTy, unsigned location) {
   unsigned outputMask = outputTy->isVectorTy() ? (1 << cast<FixedVectorType>(outputTy)->getNumElements()) - 1 : 1;
   const auto cbState = &getColorExportState();
   // NOTE: Alpha-to-coverage only takes effect for outputs from color target 0.
-  const bool enableAlphaToCoverage = (cbState->alphaToCoverageEnable && location == 0);
+  // When dual source blend is enabled, location 1 is location 0 index 1 in shader source. we need generate same export
+  // format.
+  const bool enableAlphaToCoverage =
+      (cbState->alphaToCoverageEnable &&
+       ((location == 0) ||
+        ((location == 1) && (cbState->dualSourceBlendEnable || cbState->dynamicDualSourceBlendEnable))));
 
   const bool blendEnabled = colorExportFormat->blendEnable;
 
@@ -1582,7 +1636,7 @@ unsigned PipelineState::computeExportFormat(Type *outputTy, unsigned location) {
 
   const bool formatHasAlpha = hasAlpha(colorExportFormat->dfmt);
   const bool alphaExport =
-      (outputMask == 0xF && (formatHasAlpha || colorExportFormat->blendSrcAlphaToColor || enableAlphaToCoverage));
+      (outputMask & 0x8 && (formatHasAlpha || colorExportFormat->blendSrcAlphaToColor || enableAlphaToCoverage));
 
   const CompSetting compSetting = computeCompSetting(colorExportFormat->dfmt);
 
@@ -1690,24 +1744,6 @@ StringRef PipelineState::getBuiltInName(BuiltInKind builtIn) {
     return #name;
 #include "lgc/BuiltInDefs.h"
 #undef BUILTIN
-
-  // Internal built-ins.
-  case BuiltInSamplePosOffset:
-    return "SamplePosOffset";
-  case BuiltInInterpLinearCenter:
-    return "InterpLinearCenter";
-  case BuiltInInterpPullMode:
-    return "InterpPullMode";
-  case BuiltInInterpPerspCenter:
-    return "InterpPerspCenter";
-  case BuiltInInterpPerspCentroid:
-    return "InterpPerspCentroid";
-  case BuiltInInterpLinearCentroid:
-    return "InterpLinearCentroid";
-  case BuiltInInterpPerspSample:
-    return "InterpPerspSample";
-  case BuiltInInterpLinearSample:
-    return "InterpLinearSample";
   default:
     llvm_unreachable("Should never be called!");
     return "unknown";
@@ -1819,7 +1855,7 @@ unsigned PipelineState::getVerticesPerPrimitive() {
       return 1;
     if (tessMode.primitiveMode == PrimitiveMode::Isolines)
       return 2;
-    if (tessMode.primitiveMode == PrimitiveMode::Triangles)
+    if (tessMode.primitiveMode == PrimitiveMode::Triangles || tessMode.primitiveMode == PrimitiveMode::Quads)
       return 3;
   } else {
     auto primType = getInputAssemblyState().primitiveType;
@@ -1882,25 +1918,41 @@ PrimitiveType PipelineState::getPrimitiveType() {
 void PipelineState::setXfbStateMetadata(Module *module) {
   // Read XFB state metadata
   for (auto &func : *module) {
-    if (isShaderEntryPoint(&func)) {
-      MDNode *xfbStateMetaNode = func.getMetadata(XfbStateMetadataName);
-      if (xfbStateMetaNode) {
+    if (!isShaderEntryPoint(&func))
+      continue;
+    if (getShaderStage(&func) != getLastVertexProcessingStage())
+      continue;
+    MDNode *xfbStateMetaNode = func.getMetadata(XfbStateMetadataName);
+    if (xfbStateMetaNode) {
+      auto &streamXfbBuffers = m_xfbStateMetadata.streamXfbBuffers;
+      auto &xfbStrides = m_xfbStateMetadata.xfbStrides;
+      for (unsigned xfbBuffer = 0; xfbBuffer < MaxTransformFeedbackBuffers; ++xfbBuffer) {
+        // Get the vertex streamId from metadata
+        auto metaOp = cast<ConstantAsMetadata>(xfbStateMetaNode->getOperand(2 * xfbBuffer));
+        int streamId = cast<ConstantInt>(metaOp->getValue())->getSExtValue();
+        if (streamId == InvalidValue)
+          continue;
+        streamXfbBuffers[streamId] |= 1 << xfbBuffer; // Bit mask of used xfbBuffers in a stream
+        // Get the stride from metadata
+        metaOp = cast<ConstantAsMetadata>(xfbStateMetaNode->getOperand(2 * xfbBuffer + 1));
+        xfbStrides[xfbBuffer] = cast<ConstantInt>(metaOp->getValue())->getZExtValue();
         m_xfbStateMetadata.enableXfb = true;
-        auto &streamXfbBuffers = m_xfbStateMetadata.streamXfbBuffers;
-        auto &xfbStrides = m_xfbStateMetadata.xfbStrides;
-        for (unsigned xfbBuffer = 0; xfbBuffer < MaxTransformFeedbackBuffers; ++xfbBuffer) {
-          // Get the vertex streamId from metadata
-          auto metaOp = cast<ConstantAsMetadata>(xfbStateMetaNode->getOperand(2 * xfbBuffer));
-          int streamId = cast<ConstantInt>(metaOp->getValue())->getSExtValue();
-          if (streamId != InvalidValue)
-            streamXfbBuffers[streamId] |= 1 << xfbBuffer; // Bit mask of used xfbBuffers in a stream
-          // Get the stride from metadata
-          metaOp = cast<ConstantAsMetadata>(xfbStateMetaNode->getOperand(2 * xfbBuffer + 1));
-          xfbStrides[xfbBuffer] = cast<ConstantInt>(metaOp->getValue())->getZExtValue();
-        }
       }
+      m_xfbStateMetadata.enablePrimStats = !m_xfbStateMetadata.enableXfb;
     }
   }
+}
+
+// =====================================================================================================================
+// Print the pipeline state
+//
+// @param out : output stream
+void PipelineState::print(llvm::raw_ostream &out) const {
+  if (m_palMetadata) {
+    out << "PAL metadata:\n";
+    m_palMetadata->getDocument()->toYAML(out);
+  }
+  out << "(pipeline state printing is incomplete)\n";
 }
 
 // =====================================================================================================================
@@ -1961,4 +2013,30 @@ PipelineStateWrapper::PipelineStateWrapper(LgcContext *builderContext) : m_build
 //
 // @param pipelineState : Pipeline state to wrap
 PipelineStateWrapper::PipelineStateWrapper(PipelineState *pipelineState) : m_pipelineState(pipelineState) {
+}
+
+// =====================================================================================================================
+// Print the pipeline state in a human-readable way
+//
+// @param [in/out] module : IR module
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The analyses that are still valid after this pass)
+PreservedAnalyses PipelineStatePrinter::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
+  pipelineState->print(m_out);
+  return PreservedAnalyses::all();
+}
+
+// =====================================================================================================================
+// Record the PipelineState back into the IR, if present
+//
+// @param [in/out] module : IR module
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The analyses that are still valid after this pass)
+PreservedAnalyses PipelineStateRecorder::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  if (auto *psw = analysisManager.getCachedResult<PipelineStateWrapper>(module)) {
+    PipelineState *pipelineState = psw->getPipelineState();
+    pipelineState->record(&module);
+  }
+  return PreservedAnalyses::none();
 }

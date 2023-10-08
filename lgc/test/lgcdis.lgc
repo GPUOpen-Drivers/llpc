@@ -9,8 +9,60 @@
 ; CHECK-LABEL: _amdgpu_ps_main:
 ; CHECK: v_interp_p1
 ; CHECK-LABEL: amdpal.pipelines:
-; CHECK: .registers:
-; CHECK: 0x2c0a (SPI_SHADER_PGM_RSRC1_PS):
+; CHECK: .hardware_stages:
+; CHECK:  .ps:
+; CHECK:  .checksum_value: 0x759bd992
+; CHECK:  .debug_mode:     false
+; CHECK:  .entry_point:    _amdgpu_ps_main
+; CHECK:  .float_mode:     0xc0
+; CHECK:  .ieee_mode:      false
+; CHECK:  .mem_ordered:    true
+; CHECK:  .scratch_en:     false
+; CHECK:  .scratch_memory_size: 0
+; CHECK:  .sgpr_count:     0xe
+; CHECK:  .sgpr_limit:     0x6a
+; CHECK:  .trap_present:   0
+; CHECK:  .user_data_reg_map:
+; CHECK:    - 0x10000000
+; CHECK:    - 0xa
+; CHECK:    - 0x10
+; CHECK:    - 0x11
+; CHECK:    - 0x12
+; CHECK:    - 0x13
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:    - 0xffffffff
+; CHECK:  .user_sgprs:     0x6
+; CHECK:  .uses_uavs:      false
+; CHECK:  .vgpr_count:     0x4
+; CHECK:  .vgpr_limit:     0x100
+; CHECK:  .wavefront_size: 0x40
+; CHECK:  .wgp_mode:       false
+; CHECK:  .writes_depth:   0
+; CHECK:  .writes_uavs:    false
 
 target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5-G1-ni:7"
 target triple = "amdgcn--amdpal"
@@ -19,11 +71,11 @@ target triple = "amdgcn--amdpal"
 
 define dllexport void @lgc.shader.VS.main() !lgc.shaderstage !24 {
 entry:
-  %TEXCOORD = call <2 x float> (...) @lgc.create.read.generic.input.v2f32(i32 1, i32 0, i32 0, i32 1, i32 16, i32 undef)
-  %POSITION = call <3 x float> (...) @lgc.create.read.generic.input.v3f32(i32 0, i32 0, i32 0, i32 1, i32 16, i32 undef)
+  %TEXCOORD = call <2 x float> (...) @lgc.create.read.generic.input.v2f32(i32 1, i32 0, i32 0, i32 1, i32 16, i32 poison)
+  %POSITION = call <3 x float> (...) @lgc.create.read.generic.input.v3f32(i32 0, i32 0, i32 0, i32 1, i32 16, i32 poison)
   %posext = shufflevector <3 x float> %POSITION, <3 x float> <float 1.0, float 1.0, float 1.0>, <4 x i32> <i32 0, i32 1, i32 2, i32 3>
-  call void (...) @lgc.create.write.builtin.output(<4 x float> %posext, i32 0, i32 0, i32 undef, i32 undef)
-  call void (...) @lgc.create.write.generic.output(<2 x float> %TEXCOORD, i32 1, i32 0, i32 0, i32 1, i32 0, i32 undef)
+  call void (...) @lgc.create.write.builtin.output(<4 x float> %posext, i32 0, i32 0, i32 poison, i32 poison)
+  call void (...) @lgc.create.write.generic.output(<2 x float> %TEXCOORD, i32 1, i32 0, i32 0, i32 1, i32 0, i32 poison)
   ret void
 }
 
@@ -41,13 +93,13 @@ declare void @lgc.create.write.generic.output(...) #1
 
 define dllexport void @lgc.shader.FS.main() !lgc.shaderstage !25 {
 entry:
-  %TEXCOORD = call <2 x float> (...) @lgc.create.read.generic.input.v2f32(i32 1, i32 0, i32 0, i32 1, i32 16, i32 undef)
+  %TEXCOORD = call <2 x float> (...) @lgc.create.read.generic.input.v2f32(i32 1, i32 0, i32 0, i32 1, i32 16, i32 poison)
   %imageptr = call <8 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v8i32(i32 1, i32 1, i32 0, i32 1)
   %image = load <8 x i32>, <8 x i32> addrspace(4)* %imageptr, align 32
   %samplerptr = call <4 x i32> addrspace(4)* (...) @lgc.create.get.desc.ptr.p4v4i32(i32 2, i32 2, i32 0, i32 2)
   %sampler = load <4 x i32>, <4 x i32> addrspace(4)* %samplerptr, align 16
   %sample = call <4 x float> (...) @lgc.create.image.sample.v4f32(i32 1, i32 0, <8 x i32> %image, <4 x i32> %sampler, i32 1, <2 x float> %TEXCOORD)
-  call void (...) @lgc.create.write.generic.output(<4 x float> %sample, i32 0, i32 0, i32 0, i32 1, i32 0, i32 undef)
+  call void (...) @lgc.create.write.generic.output(<4 x float> %sample, i32 0, i32 0, i32 0, i32 1, i32 0, i32 poison)
   ret void
 }
 
@@ -76,9 +128,9 @@ attributes #2 = { nounwind readnone }
 !2 = !{i32 -794094415, i32 0, i32 1583596299, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 1}
 !3 = !{i32 -225903757, i32 -647980161, i32 1491774676, i32 -114025882}
 !4 = !{i32 -1843601953, i32 337452067, i32 -1234379640, i32 1173800166}
-!8 = !{!"DescriptorTableVaPtr", i32 0, i32 10, i32 1, i32 1}
-!9 = !{!"DescriptorResource", i32 1, i32 0, i32 16, i32 0, i32 1, i32 8}
-!14 = !{!"DescriptorSampler", i32 2, i32 -1, i32 4, i32 0, i32 2, i32 4, <4 x i32> <i32 12288, i32 117436416, i32 1750073344, i32 -2147483648>}
+!8 = !{!"DescriptorTableVaPtr", i32 0, i32 0, i32 10, i32 1, i32 1}
+!9 = !{!"DescriptorResource", i32 1, i32 0, i32 0, i32 16, i32 0, i32 1, i32 8}
+!14 = !{!"DescriptorSampler", i32 2, i32 0, i32 16, i32 4, i32 0, i32 2, i32 4, <4 x i32> <i32 12288, i32 117436416, i32 1750073344, i32 -2147483648>}
 !19 = !{i32 0, i32 0, i32 0, i32 0, i32 13, i32 7, i32 -1}
 !20 = !{i32 1, i32 0, i32 24, i32 0, i32 11, i32 7, i32 -1}
 !21 = !{i32 10, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0}

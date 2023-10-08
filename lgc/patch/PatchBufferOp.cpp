@@ -418,7 +418,7 @@ void BufferOpLowering::visitAtomicCmpXchgInst(AtomicCmpXchgInst &atomicCmpXchgIn
     }
     }
 
-    Value *resultValue = UndefValue::get(atomicCmpXchgInst.getType());
+    Value *resultValue = PoisonValue::get(atomicCmpXchgInst.getType());
 
     resultValue = m_builder.CreateInsertValue(resultValue, atomicCall, static_cast<uint64_t>(0));
     copyMetadata(resultValue, &atomicCmpXchgInst);
@@ -1206,7 +1206,7 @@ Value *BufferOpLowering::getBaseAddressFromBufferDesc(Value *const bufferDesc) {
   Type *const descType = bufferDesc->getType();
 
   // Get the base address of our buffer by extracting the two components with the 48-bit address, and masking.
-  Value *baseAddr = m_builder.CreateShuffleVector(bufferDesc, UndefValue::get(descType), ArrayRef<int>{0, 1});
+  Value *baseAddr = m_builder.CreateShuffleVector(bufferDesc, PoisonValue::get(descType), ArrayRef<int>{0, 1});
   Value *const baseAddrMask = ConstantVector::get({m_builder.getInt32(0xFFFFFFFF), m_builder.getInt32(0xFFFF)});
   baseAddr = m_builder.CreateAnd(baseAddr, baseAddrMask);
   baseAddr = m_builder.CreateBitCast(baseAddr, m_builder.getInt64Ty());
@@ -1361,7 +1361,7 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
     Type *storeTy = storeValue->getType();
     if (storeTy->isArrayTy()) {
       const unsigned elemCount = cast<ArrayType>(storeTy)->getNumElements();
-      Value *castValue = UndefValue::get(castType);
+      Value *castValue = PoisonValue::get(castType);
       for (unsigned elemIdx = 0; elemIdx != elemCount; ++elemIdx) {
         Value *elem = m_builder.CreateExtractValue(storeValue, elemIdx);
         elem = m_builder.CreateBitCast(elem, smallestType);
@@ -1452,7 +1452,7 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
     } else {
       // Store
       unsigned compCount = accessSize / smallestByteSize;
-      part = UndefValue::get(FixedVectorType::get(smallestType, compCount));
+      part = PoisonValue::get(FixedVectorType::get(smallestType, compCount));
 
       for (unsigned i = 0; i < compCount; i++) {
         Value *const storeElem = m_builder.CreateExtractElement(storeValue, storeIndex++);
@@ -1479,7 +1479,7 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
       newInst = parts.front();
     } else {
       // And create an undef vector whose total size is the number of bytes we loaded.
-      newInst = UndefValue::get(FixedVectorType::get(smallestType, bytesToHandle / smallestByteSize));
+      newInst = PoisonValue::get(FixedVectorType::get(smallestType, bytesToHandle / smallestByteSize));
 
       unsigned index = 0;
 

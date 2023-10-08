@@ -55,6 +55,19 @@ class MetroHash64;
 
 namespace Llpc {
 
+// Enumerates the function of a particular node in a shader's resource mapping graph in OGL.
+enum class GlResourceMappingSet : unsigned {
+  Unknown = 0,             // Invalid type
+  DescriptorConstBuffer,   // Uniform buffer and inline constant with binding
+  DescriptorBuffer,        // Shader storage buffer
+  DescriptorImage,         // Image and image buffer
+  DescriptorResource,      // Texture and texture buffer
+  DescriptorSampler,       // Sampler
+  DescriptorFmask,         // F-mask
+  DescriptorAtomicCounter, // Atomic Counter
+  Count,                   // Count of resource mapping node types.
+};
+
 // Enumerates types of descriptor.
 enum class DescriptorType : unsigned {
   UniformBlock = 0,   // Uniform block
@@ -143,10 +156,8 @@ public:
   virtual const PipelineOptions *getPipelineOptions() const = 0;
 
   // Gets subgroup size usage denoting which stage uses features relevant to subgroup size.
-  // @returns : Bitmask per stage, in the same order as defined in `Vkgc::ShaderStage`.
-#if VKI_RAY_TRACING
+  // @returns : Bitmask per stage, in the same order as defined in `Vkgc::ShaderStage.
   // NOTE: For raytracing, returns (-1) if the pipeline uses features relevant to subgroup size.
-#endif
   virtual unsigned getSubgroupSizeUsage() const = 0;
 
   // Set pipeline state in lgc::Pipeline object for middle-end, and (optionally) hash the state.
@@ -158,16 +169,10 @@ public:
   // Gets client-defined metadata
   virtual llvm::StringRef getClientMetadata() const = 0;
 
-#if VKI_RAY_TRACING
   virtual void collectPayloadSize(llvm::Type *type, const llvm::DataLayout &dataLayout) {}
   virtual void collectCallableDataSize(llvm::Type *type, const llvm::DataLayout &dataLayout) {}
   virtual void collectAttributeDataSize(llvm::Type *type, const llvm::DataLayout &dataLayout) {}
   virtual void collectBuiltIn(unsigned builtIn) {}
-
-  // Set workgroup size for compute pipeline so that rayQuery lowering can see it.
-  virtual void setWorkgroupSize(unsigned workgroupSize) {}
-  virtual unsigned getWorkgroupSize() const { return 0; }
-#endif
 
   static const char *getGpuNameAbbreviation(GfxIpVersion gfxIp);
 
@@ -180,14 +185,12 @@ public:
   // Gets cache hash code compacted to 64-bits.
   uint64_t get64BitCacheHashCode() const { return MetroHash::compact64(&m_cacheHash); }
 
-#if VKI_RAY_TRACING
   unsigned getRayTracingWaveSize() const;
 
   llvm::StringRef getRayTracingFunctionName(unsigned funcType);
 
   // Gets ray tracing state info
   const Vkgc::RtState *getRayTracingState() { return &m_rtState; }
-#endif
 
   // Gets the finalized 128-bit cache hash code.
   lgc::Hash128 get128BitCacheHashCode() const {
@@ -231,6 +234,9 @@ public:
   // Gets ShaderOptions of the specified shader stage.
   lgc::ShaderOptions computeShaderOptions(const PipelineShaderInfo &shaderInfo) const;
 
+  // Convert Resource node type to set for OGL
+  static uint32_t getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType resourceType);
+
 protected:
   // Set the raytracing state
   void setRayTracingState(const Vkgc::RtState &rtState, const Vkgc::BinaryData *shaderLibrary = nullptr);
@@ -266,9 +272,9 @@ private:
 
   // Give the user data nodes and descriptor range values to the middle-end, and/or hash them.
   void setUserDataInPipeline(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher, unsigned stageMask) const;
-  void setUserDataNodesTable(lgc::Pipeline *pipeline, llvm::ArrayRef<ResourceMappingNode> nodes,
-                             const ImmutableNodesMap &immutableNodesMap, bool isRoot, lgc::ResourceNode *destTable,
-                             lgc::ResourceNode *&destInnerTable) const;
+  void convertResourceNode(lgc::ResourceNode &dst, const ResourceMappingNode &src, unsigned visibility,
+                           const ImmutableNodesMap &immutableNodesMap,
+                           llvm::MutableArrayRef<lgc::ResourceNode> &dstInnerTable) const;
 
   ShaderFpMode m_shaderFpModes[ShaderStageCountInternal] = {};
   bool m_unlinked = false; // Whether we are building an "unlinked" shader ELF

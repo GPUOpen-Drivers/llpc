@@ -162,15 +162,11 @@ struct ResourceUsage {
   std::unordered_set<uint64_t> descPairs;  // Pairs of descriptor set/binding
   bool resourceWrite = false;              // Whether shader does resource-write operations (UAV)
   bool resourceRead = false;               // Whether shader does resource-read operations (UAV)
-  bool perShaderTable = false;             // Whether per shader stage table is used
   unsigned numSgprsAvailable = UINT32_MAX; // Number of available SGPRs
   unsigned numVgprsAvailable = UINT32_MAX; // Number of available VGPRs
   bool useImages = false;                  // Whether images are used
   bool useImageOp = false;                 // Whether image instruction is called (for GFX11+, pixel wait sync+)
-
-#if VKI_RAY_TRACING
-  bool useRayQueryLdsStack = false; // Whether ray query uses LDS stack
-#endif
+  bool useRayQueryLdsStack = false;        // Whether ray query uses LDS stack
 
   // Usage of built-ins
   struct {
@@ -199,19 +195,22 @@ struct ResourceUsage {
         unsigned viewportIndex : 1;        // Whether gl_ViewportIndex is used
         unsigned layer : 1;                // Whether gl_Layer is used
         unsigned primitiveShadingRate : 1; // Whether gl_PrimitiveShadingRate is used
+        unsigned edgeFlag : 1;             // Whether EdgeFlag is used
       } vs;
 
       // Tessellation control shader
       struct {
         // Input
-        unsigned pointSizeIn : 1;    // Whether gl_in[].gl_PointSize is used
-        unsigned positionIn : 1;     // Whether gl_in[].gl_Position is used
-        unsigned clipDistanceIn : 4; // Array size of gl_in[].gl_ClipDistance[] (0 means unused)
-        unsigned cullDistanceIn : 4; // Array size of gl_in[].gl_CullDistance[] (0 means unused)
-        unsigned patchVertices : 1;  // Whether gl_PatchVerticesIn is used
-        unsigned primitiveId : 1;    // Whether gl_PrimitiveID is used
-        unsigned invocationId : 1;   // Whether gl_InvocationID is used
-        unsigned viewIndex : 1;      // Whether gl_ViewIndex is used
+        unsigned pointSizeIn : 1;     // Whether gl_in[].gl_PointSize is used
+        unsigned positionIn : 1;      // Whether gl_in[].gl_Position is used
+        unsigned clipDistanceIn : 4;  // Array size of gl_in[].gl_ClipDistance[] (0 means unused)
+        unsigned cullDistanceIn : 4;  // Array size of gl_in[].gl_CullDistance[] (0 means unused)
+        unsigned patchVertices : 1;   // Whether gl_PatchVerticesIn is used
+        unsigned primitiveId : 1;     // Whether gl_PrimitiveID is used
+        unsigned invocationId : 1;    // Whether gl_InvocationID is used
+        unsigned viewIndex : 1;       // Whether gl_ViewIndex is used
+        unsigned viewportIndexIn : 1; // Whether DX SV_ViewportArrayIndex is used
+        unsigned layerIn : 1;         // Whether DX SV_RenderTargetArrayIndex is used
         // Output
         unsigned pointSize : 1;      // Whether gl_out[].gl_PointSize is used
         unsigned position : 1;       // Whether gl_out[].gl_Position is used
@@ -219,21 +218,25 @@ struct ResourceUsage {
         unsigned cullDistance : 4;   // Array size of gl_out[].gl_CullDistance[] (0 means unused)
         unsigned tessLevelOuter : 1; // Whether gl_TessLevelOuter[] is used
         unsigned tessLevelInner : 1; // Whether gl_TessLevelInner[] is used
+        unsigned viewportIndex : 1;  // Whether DX SV_ViewportArrayIndex is used
+        unsigned layer;              // Whether DX SV_RenderTargetArrayIndex is used
       } tcs;
 
       // Tessellation evaluation shader
       struct {
         // Input
-        unsigned pointSizeIn : 1;    // Whether gl_in[].gl_PointSize is used
-        unsigned positionIn : 1;     // Whether gl_in[].gl_Position is used
-        unsigned clipDistanceIn : 4; // Array size of gl_in[].gl_ClipDistance[] (0 means unused)
-        unsigned cullDistanceIn : 4; // Array size of gl_in[].gl_CullDistance[] (0 means unused)
-        unsigned patchVertices : 1;  // Whether gl_PatchVerticesIn is used
-        unsigned primitiveId : 1;    // Whether gl_PrimitiveID is used
-        unsigned tessCoord : 1;      // Whether gl_TessCoord is used
-        unsigned tessLevelOuter : 1; // Whether gl_TessLevelOuter[] is used
-        unsigned tessLevelInner : 1; // Whether gl_TessLevelInner[] is used
-        unsigned viewIndex : 1;      // Whether gl_ViewIndex is used
+        unsigned pointSizeIn : 1;     // Whether gl_in[].gl_PointSize is used
+        unsigned positionIn : 1;      // Whether gl_in[].gl_Position is used
+        unsigned clipDistanceIn : 4;  // Array size of gl_in[].gl_ClipDistance[] (0 means unused)
+        unsigned cullDistanceIn : 4;  // Array size of gl_in[].gl_CullDistance[] (0 means unused)
+        unsigned patchVertices : 1;   // Whether gl_PatchVerticesIn is used
+        unsigned primitiveId : 1;     // Whether gl_PrimitiveID is used
+        unsigned tessCoord : 1;       // Whether gl_TessCoord is used
+        unsigned tessLevelOuter : 1;  // Whether gl_TessLevelOuter[] is used
+        unsigned tessLevelInner : 1;  // Whether gl_TessLevelInner[] is used
+        unsigned viewIndex : 1;       // Whether gl_ViewIndex is used
+        unsigned viewportIndexIn : 1; // Whether DX SV_ViewportArrayIndex is used
+        unsigned layerIn : 1;         // Whether DX SV_RenderTargetArrayIndex is used
         // Output
         unsigned pointSize : 1;     // Whether gl_PointSize is used
         unsigned position : 1;      // Whether gl_Position is used
@@ -246,13 +249,15 @@ struct ResourceUsage {
       // Geometry shader
       struct {
         // Input
-        unsigned pointSizeIn : 1;    // Whether gl_in[].gl_PointSize is used
-        unsigned positionIn : 1;     // Whether gl_in[].gl_Position is used
-        unsigned clipDistanceIn : 4; // Array size of gl_in[].gl_ClipDistance[] (0 means unused)
-        unsigned cullDistanceIn : 4; // Array size of gl_in[].gl_CullDistance[] (0 means unused)
-        unsigned primitiveIdIn : 1;  // Whether gl_PrimitiveIDIn is used
-        unsigned invocationId : 1;   // Whether gl_InvocationID is used
-        unsigned viewIndex : 1;      // Whether gl_ViewIndex is used
+        unsigned pointSizeIn : 1;     // Whether gl_in[].gl_PointSize is used
+        unsigned positionIn : 1;      // Whether gl_in[].gl_Position is used
+        unsigned clipDistanceIn : 4;  // Array size of gl_in[].gl_ClipDistance[] (0 means unused)
+        unsigned cullDistanceIn : 4;  // Array size of gl_in[].gl_CullDistance[] (0 means unused)
+        unsigned primitiveIdIn : 1;   // Whether gl_PrimitiveIDIn is used
+        unsigned invocationId : 1;    // Whether gl_InvocationID is used
+        unsigned viewIndex : 1;       // Whether gl_ViewIndex is used
+        unsigned viewportIndexIn : 1; // Whether DX SV_ViewportArrayIndex is used
+        unsigned layerIn : 1;         // Whether DX SV_RenderTargetArrayIndex is used
         // Output
         unsigned pointSize : 1;            // Whether gl_PointSize is used
         unsigned position : 1;             // Whether gl_Position is used
@@ -301,6 +306,7 @@ struct ResourceUsage {
         unsigned custom : 1;        // Whether custom interpolation is used
         // Input
         unsigned fragCoord : 1;                // Whether gl_FragCoord is used
+        unsigned fragCoordIsSample : 1;        // Whether gl_FragCoord is used with sample Interpolation
         unsigned frontFacing : 1;              // Whether gl_FrontFacing is used
         unsigned clipDistance : 4;             // Array size of gl_ClipDistance[] (0 means unused)
         unsigned cullDistance : 4;             // Array size of gl_CullDistance[] (0 means unused)
@@ -415,13 +421,11 @@ struct ResourceUsage {
         unsigned outPatchSize; // Size of an output patch output (in dword, correspond to
                                // "patchOutputSize")
 
-        unsigned patchConstSize;     // Size of an output patch constants (in dword)
-        unsigned tessFactorStride;   // Size of tess factor stride (in dword)
-        unsigned specialTfValueSize; // Size of special TF value (in dword)
-        unsigned tessOnChipLdsSize;  // On-chip LDS size (exclude off-chip LDS buffer) (in dword)
-#if VKI_RAY_TRACING
+        unsigned patchConstSize;       // Size of an output patch constants (in dword)
+        unsigned tessFactorStride;     // Size of tess factor stride (in dword)
+        unsigned specialTfValueSize;   // Size of special TF value (in dword)
+        unsigned tessOnChipLdsSize;    // On-chip LDS size (exclude off-chip LDS buffer) (in dword)
         unsigned rayQueryLdsStackSize; // Ray query LDS stack size
-#endif
 
         bool initialized; // Whether calcFactor has been initialized
       } calcFactor;
@@ -438,18 +442,16 @@ struct ResourceUsage {
       std::unordered_map<unsigned, std::vector<unsigned>> genericOutByteSizes[MaxGsStreams];
 
       struct {
-        unsigned esGsRingItemSize;   // Size of each vertex written to the ES -> GS Ring, in dwords.
-        unsigned gsVsRingItemSize;   // Size of each primitive written to the GS -> VS Ring, in dwords.
-        unsigned esVertsPerSubgroup; // Number of vertices ES exports.
-        unsigned gsPrimsPerSubgroup; // Number of prims GS exports.
-        unsigned esGsLdsSize;        // ES -> GS ring LDS size (GS in)
-        unsigned gsOnChipLdsSize;    // Total LDS size for GS on-chip mode.
-        unsigned inputVertices;      // Number of GS input vertices
-        unsigned primAmpFactor;      // GS primitive amplification factor
-        bool enableMaxVertOut;       // Whether to allow each GS instance to emit maximum vertices (NGG)
-#if VKI_RAY_TRACING
+        unsigned esGsRingItemSize;     // Size of each vertex written to the ES -> GS Ring, in dwords.
+        unsigned gsVsRingItemSize;     // Size of each primitive written to the GS -> VS Ring, in dwords.
+        unsigned esVertsPerSubgroup;   // Number of vertices ES exports.
+        unsigned gsPrimsPerSubgroup;   // Number of prims GS exports.
+        unsigned esGsLdsSize;          // ES -> GS ring LDS size (GS in)
+        unsigned gsOnChipLdsSize;      // Total LDS size for GS on-chip mode.
+        unsigned inputVertices;        // Number of GS input vertices
+        unsigned primAmpFactor;        // GS primitive amplification factor
+        bool enableMaxVertOut;         // Whether to allow each GS instance to emit maximum vertices (NGG)
         unsigned rayQueryLdsStackSize; // Ray query LDS stack size
-#endif
       } calcFactor = {};
 
       unsigned outLocCount[MaxGsStreams] = {};
@@ -600,8 +602,9 @@ struct InterfaceData {
 
       // Fragment shader
       struct {
-        unsigned viewIndex; // View Index
-        unsigned primMask;  // Primitive mask
+        unsigned viewIndex;  // View Index
+        unsigned primMask;   // Primitive mask
+        unsigned sampleInfo; // Sample Info: numSample + samplePattern
 
         // Perspective interpolation (I/J)
         struct {
@@ -633,6 +636,8 @@ struct InterfaceData {
 
       // Compute shader
       struct {
+        unsigned workgroupId;       // Workgroup ID
+        unsigned multiDispatchInfo; // Multiple dispatch info
         unsigned localInvocationId; // Local invocation ID
       } cs;
     };

@@ -9,28 +9,6 @@
 ; SHADERTEST: {{^=====}} AMDLLPC SUCCESS
 ; END_SHADERTEST
 
-// Test that the immutable sampler (descriptorRangeValue) does not affect the
-// hash for the relocatable shaders.
-
-; BEGIN_HASHTEST
-; Remove the immutable sampler from this file and store the result in another
-; file.
-; RUN: grep -v "descriptorRangeValue" %s > %t.pipe
-
-; Run amdllpc on the two versions of the file an make sure the hashes for
-; vertex and fragment shader stages are the same for both.
-; RUN: amdllpc \
-; RUN:         -enable-relocatable-shader-elf \
-; RUN:         -v %gfxip %s %t.pipe | FileCheck -check-prefix=HASHTEST %s
-; HASHTEST-LABEL: {{^// LLPC}} calculated hash results (graphics pipeline)
-; HASHTEST-LABEL: Building pipeline with relocatable shader elf.
-; HASHTEST: Finalized hash for vertex stage cache lookup: [[vhash1:0x[0-9a-f]*]] [[vhash2:0x[0-9a-f]*]]
-; HASHTEST: Finalized hash for fragment stage cache lookup: [[fhash1:0x[0-9a-f]*]] [[fhash2:0x[0-9a-f]*]]
-; HASHTEST: Finalized hash for vertex stage cache lookup: [[vhash1]] [[vhash2]]
-; HASHTEST: Finalized hash for fragment stage cache lookup: [[fhash1]] [[fhash2]]
-; HASHTEST: {{^=====}} AMDLLPC SUCCESS
-; END_HASHTEST
-
 [VsGlsl]
 #version 450
 
@@ -63,14 +41,14 @@ void main()
 entryPoint = main
 
 [ResourceMapping]
-descriptorRangeValue[0].visibility = 17
+descriptorRangeValue[0].visibility = 66
 descriptorRangeValue[0].type = DescriptorSampler
 descriptorRangeValue[0].set = 0
 descriptorRangeValue[0].binding = 0
 descriptorRangeValue[0].arraySize = 1
 descriptorRangeValue[0].uintData = 2156034194, 184545280, 3371171840, 2147483648
 
-userDataNode[0].visibility = 17
+userDataNode[0].visibility = 66
 userDataNode[0].type = DescriptorTableVaPtr
 userDataNode[0].offsetInDwords = 11
 userDataNode[0].sizeInDwords = 1

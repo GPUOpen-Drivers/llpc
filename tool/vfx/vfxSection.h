@@ -57,15 +57,17 @@ enum SectionType : unsigned {
   SectionTypeImageView,   // Image view section
   SectionTypeSampler,     // Sampler section
   // VKGC pipeline
-  SectionTypeGraphicsState, // Graphics state section
-  SectionTypeComputeState,  // Compute state section
-#if VKI_RAY_TRACING
-  SectionTypeRayTracingState, // Ray tracing state section
-  SectionTypeRtState,         // Ray tracing rtState section
-#endif
-  SectionTypeVertexInputState, // Vertex input state section
-  SectionTypeShaderInfo,       // Shader info section
-  SectionTypeResourceMapping,  // Resource mapping section
+  SectionTypeGraphicsState,           // Graphics state section
+  SectionTypeComputeState,            // Compute state section
+  SectionTypeRayTracingState,         // Ray tracing state section
+  SectionTypeRtState,                 // Ray tracing rtState section
+  SectionTypeVertexInputState,        // Vertex input state section
+  SectionTypeShaderInfo,              // Shader info section
+  SectionTypeResourceMapping,         // Resource mapping section
+  SectionTypeUniformConstantMapEntry, // UniformConstantMapEntry section
+  SectionTypeUniformConstantMap,      // UniformConstantMap section
+  SectionTypeUniformConstant,         // UniformConstant section
+  SectionTypeApiXfbOutput,            // ApiXfbOutput section
   // GL pipeline
   SectionTypeGlProgramParameter, // GL program parameter section
   SectionTypeGlGraphicsState,    // GL graphic pipeline state section
@@ -79,60 +81,62 @@ enum SectionType : unsigned {
 // =====================================================================================================================
 // Enumerates VFX member type.
 enum MemberType : unsigned {
-  MemberTypeInt,                      // VFX member type: 32 bit integer
-  MemberTypeFloat,                    // VFX member type: 32 bit float
-  MemberTypeFloat16,                  // VFX member type: 16 bit float
-  MemberTypeDouble,                   // VFX member type: 64 bit double
-  MemberTypeBool,                     // VFX member type: boolean
-  MemberTypeIVec4,                    // VFX member type: int vec4
-  MemberTypeI64Vec2,                  // VFX member type: int64 vec2
-  MemberTypeFVec4,                    // VFX member type: float vec4
-  MemberTypeF16Vec4,                  // VFX member type: float16 vec4
-  MemberTypeDVec2,                    // VFX member type: double vec2
-  MemberTypeIArray,                   // VFX member type: int vector (dynamic array)
-  MemberTypeUArray,                   // VFX member type: uint vector (dynamic array)
-  MemberTypeI64Array,                 // VFX member type: int64 vector (dynamic array)
-  MemberTypeU64Array,                 // VFX member type: uint64 vector (dynamic array)
-  MemberTypeFArray,                   // VFX member type: float vector (dynamic array)
-  MemberTypeF16Array,                 // VFX member type: float16 vector (dynamic array)
-  MemberTypeDArray,                   // VFX member type: double vector (dynamic array)
-  MemberTypeEnum,                     // VFX member type: Enums from Vulkan API
-  MemberTypeBinding,                  // VFX member type: Binding
-  MemberTypeString,                   // VFX member type: String
-  MemberTypeResultItem,               // VFX member type: SectionResultItem
-  MemberTypeVertexBufferBindingItem,  // VFX member type: SectionVertexBufferBinding
-  MemberTypeVertexAttributeItem,      // VFX member type: SectionVertexAttribute
-  MemberTypeSpecConstItem,            // VFX member type: SectionSpecConstItem
-  MemberTypeSpecConst,                // VFX member type: SectionSpecConst
-  MemberTypePushConstRange,           // VFX member type: SectionPushConstRange
-  MemberTypeVertexInputBindingItem,   // VFX member type: SectionVertexInputBinding
-  MemberTypeVertexInputAttributeItem, // VFX member type: SectionVertexInputAttribute
-  MemberTypeVertexInputDivisorItem,   // VFX member type: SectionVertexInputDivisor
-  MemberTypeColorBufferItem,          // VFX member type: SectionColorBuffer
-  MemberTypeSpecEntryItem,            // VFX member type: SectionSpecEntryItem
-  MemberTypeResourceMappingNode,      // VFX member type: SectionResourceMappingNode
-  MemberTypeSpecInfo,                 // VFX member type: SectionSpecInfo
-  MemberTypeDescriptorRangeValue,     // VFX member type: SectionDescriptorRangeValueItem
-  MemberTypePipelineOption,           // VFX member type: SectionPipelineOption
-  MemberTypeShaderOption,             // VFX member type: SectionShaderOption
-  MemberTypeNggState,                 // VFX member type: SectionNggState
-#if VKI_RAY_TRACING
+  MemberTypeInt,                          // VFX member type: 32 bit integer
+  MemberTypeFloat,                        // VFX member type: 32 bit float
+  MemberTypeFloat16,                      // VFX member type: 16 bit float
+  MemberTypeDouble,                       // VFX member type: 64 bit double
+  MemberTypeBool,                         // VFX member type: boolean
+  MemberTypeIVec4,                        // VFX member type: int vec4
+  MemberTypeI64Vec2,                      // VFX member type: int64 vec2
+  MemberTypeFVec4,                        // VFX member type: float vec4
+  MemberTypeF16Vec4,                      // VFX member type: float16 vec4
+  MemberTypeDVec2,                        // VFX member type: double vec2
+  MemberTypeIArray,                       // VFX member type: int vector (dynamic array)
+  MemberTypeUArray,                       // VFX member type: uint vector (dynamic array)
+  MemberTypeI64Array,                     // VFX member type: int64 vector (dynamic array)
+  MemberTypeU64Array,                     // VFX member type: uint64 vector (dynamic array)
+  MemberTypeFArray,                       // VFX member type: float vector (dynamic array)
+  MemberTypeF16Array,                     // VFX member type: float16 vector (dynamic array)
+  MemberTypeDArray,                       // VFX member type: double vector (dynamic array)
+  MemberTypeEnum,                         // VFX member type: Enums from Vulkan API
+  MemberTypeBinding,                      // VFX member type: Binding
+  MemberTypeString,                       // VFX member type: String
+  MemberTypeResultItem,                   // VFX member type: SectionResultItem
+  MemberTypeVertexBufferBindingItem,      // VFX member type: SectionVertexBufferBinding
+  MemberTypeVertexAttributeItem,          // VFX member type: SectionVertexAttribute
+  MemberTypeSpecConstItem,                // VFX member type: SectionSpecConstItem
+  MemberTypeSpecConst,                    // VFX member type: SectionSpecConst
+  MemberTypePushConstRange,               // VFX member type: SectionPushConstRange
+  MemberTypeVertexInputBindingItem,       // VFX member type: SectionVertexInputBinding
+  MemberTypeVertexInputAttributeItem,     // VFX member type: SectionVertexInputAttribute
+  MemberTypeVertexInputDivisorItem,       // VFX member type: SectionVertexInputDivisor
+  MemberTypeColorBufferItem,              // VFX member type: SectionColorBuffer
+  MemberTypeSpecEntryItem,                // VFX member type: SectionSpecEntryItem
+  MemberTypeResourceMappingNode,          // VFX member type: SectionResourceMappingNode
+  MemberTypeSpecInfo,                     // VFX member type: SectionSpecInfo
+  MemberTypeDescriptorRangeValue,         // VFX member type: SectionDescriptorRangeValueItem
+  MemberTypePipelineOption,               // VFX member type: SectionPipelineOption
+  MemberTypeShaderOption,                 // VFX member type: SectionShaderOption
+  MemberTypeNggState,                     // VFX member type: SectionNggState
+  MemberTypeUniformConstantMapEntry,      // VFX member type: SectionUniformConstantMapEntry
+  MemberTypeUniformConstantMap,           // VFX member type: SectionUniformConstantMap
+  MemberTypeUniformConstant,              // VFX member type: SectionUniformConstant
+  MemberTypeXfbOutInfo,                   // VFX member type: SectionXfbOutInfo
   MemberTypeShaderGroup,                  // VFX member type: SectionShaderGroup
   MemberTypeRtState,                      // VFX member type: SectionRtState
   MemberTypeRayTracingShaderExportConfig, // VFX member type: SectionRayTracingShaderExportConfig
   MemberTypeIndirectCalleeSavedRegs,      // VFX member type: SectionIndirectCalleeSavedRegs
   MemberTypeGpurtFuncTable,               // VFX member type: SectionGpurtFuncTable
-#endif
-  MemberTypeExtendedRobustness,      // VFX member type: SectionExtendedRobustness
-  MemberTypeGlAttribLocation,        // GL vertex attribute location
-  MemberTypeGlShaderInfo,            // GL SPIRV parameters
-  MemberTypeGlVertexAttrib,          // GL vertex input attribute
-  MemberTypeGlVertexBinding,         // GL vertex input binding
-  MemberTypeGlVertexFormat,          // GL vertex attribute format
-  MemberTypeGlSpirvPipelineLayout,   // GL SPIRV explicit pipeline layout
-  MemberTypeGlPatchParameter,        // GL program patch parameter
-  MemberTypeGlSpeicalizeUniformDesc, // GL program specialized uniform
-  MemberTypeGlFfxTexturekey,         // GL FFX texture key
+  MemberTypeExtendedRobustness,           // VFX member type: SectionExtendedRobustness
+  MemberTypeGlAttribLocation,             // GL vertex attribute location
+  MemberTypeGlShaderInfo,                 // GL SPIRV parameters
+  MemberTypeGlVertexAttrib,               // GL vertex input attribute
+  MemberTypeGlVertexBinding,              // GL vertex input binding
+  MemberTypeGlVertexFormat,               // GL vertex attribute format
+  MemberTypeGlSpirvPipelineLayout,        // GL SPIRV explicit pipeline layout
+  MemberTypeGlPatchParameter,             // GL program patch parameter
+  MemberTypeGlSpeicalizeUniformDesc,      // GL program specialized uniform
+  MemberTypeGlFfxTexturekey,              // GL FFX texture key
 };
 
 // =====================================================================================================================
@@ -616,7 +620,6 @@ private:
   std::string m_palFormat;
 };
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Represents the sub section shader group
 class SectionShaderGroup : public Section {
@@ -644,7 +647,6 @@ private:
 
   SubState m_state;
 };
-#endif
 
 // =====================================================================================================================
 // Represents the sub section vertex input binding

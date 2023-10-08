@@ -78,7 +78,7 @@ bool PatchNullFragShader::runImpl(Module &module, PipelineState *pipelineState) 
   if (hasFs || !pipelineState->isGraphics())
     return false;
 
-  FragColorExport::generateNullFragmentShader(module, lgcName::NullFsEntryPoint);
+  FragColorExport::generateNullFragmentShader(module, pipelineState, lgcName::NullFsEntryPoint);
   updatePipelineState(pipelineState);
   return true;
 }

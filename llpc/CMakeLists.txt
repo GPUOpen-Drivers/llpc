@@ -43,12 +43,9 @@ endif()
 
 ### Set Options and build LLVM #########################################################################################
 if(ICD_BUILD_LLPC)
-    # Set LLVM options and build LLVM
-    # Add LGC as an LLVM external project, but only if its CMakeLists.txt exists.
-    set(LLVM_EXTERNAL_PROJECTS llvm-dialects lgc LgcRt)
-    set(LLVM_EXTERNAL_LLVM_DIALECTS_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../imported/llvm-dialects)
-    set(LLVM_EXTERNAL_LGC_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../lgc)
-    set(LLVM_EXTERNAL_LGCRT_SOURCE_DIR ${PROJECT_SOURCE_DIR}/../shared/lgcrt)
+    # Add LGC and its dependencies as LLVM external projects.
+    include("../cmake/lgc.cmake")
+    add_lgc_projects()
 
     # Set other LLVM settings.
     set(LLVM_TARGETS_TO_BUILD AMDGPU CACHE STRING Force)
@@ -130,7 +127,7 @@ if(ICD_BUILD_LLPC)
     endif()
 
     # Always link statically against libLLVMlgc
-    llvm_map_components_to_libnames(extra_llvm_libs lgc)
+    llvm_map_components_to_libnames(extra_llvm_libs LgcRt lgc LgcCps)
     if(NOT WIN32)
         foreach (lib ${extra_llvm_libs})
             target_compile_options(${lib} PRIVATE "-fno-aligned-new")
@@ -207,17 +204,9 @@ if(ICD_BUILD_LLPC)
         context/llpcContext.cpp
         context/llpcComputeContext.cpp
         context/llpcGraphicsContext.cpp
-        context/llpcShaderCache.cpp
         context/llpcPipelineContext.cpp
-        context/llpcShaderCacheManager.cpp
+        context/llpcRayTracingContext.cpp
     )
-#if VKI_RAY_TRACING
-if(VKI_RAY_TRACING)
-    target_sources(llpcinternal PRIVATE
-         context/llpcRayTracingContext.cpp
-         )
-endif()
-#endif
 
 # llpc/lower
     target_sources(llpcinternal PRIVATE
@@ -229,22 +218,17 @@ endif()
         lower/llpcSpirvLowerInstMetaRemove.cpp
         lower/llpcSpirvLowerMath.cpp
         lower/llpcSpirvLowerMemoryOp.cpp
-        lower/llpcSpirvLowerTerminator.cpp
-        lower/llpcSpirvLowerTranslator.cpp
-        lower/llpcSpirvLowerUtil.cpp
-    )
-
-#if VKI_RAY_TRACING
-if(VKI_RAY_TRACING)
-    target_sources(llpcinternal PRIVATE
         lower/llpcSpirvLowerRayQuery.cpp
         lower/llpcSpirvLowerRayQueryPostInline.cpp
         lower/llpcSpirvLowerRayTracing.cpp
-        lower/llpcSpirvLowerRayTracingBuiltIn.cpp
-        lower/llpcSpirvLowerRayTracingIntrinsics.cpp
+        lower/llpcSpirvLowerTerminator.cpp
+        lower/llpcSpirvLowerTranslator.cpp
+        lower/llpcSpirvLowerUtil.cpp
+        lower/llpcSpirvProcessGpuRtLibrary.cpp
+        lower/LowerGpuRt.cpp
+        lower/llpcSpirvLowerInternalLibraryIntrinsicUtil.cpp
+        lower/LowerGLCompatibility.cpp
     )
-endif()
-#endif
 
 # llpc/translator
     target_sources(llpcinternal PRIVATE
@@ -364,15 +348,10 @@ add_library(llpc_standalone_compiler
     tool/llpcGraphicsPipelineBuilder.cpp
     tool/llpcInputUtils.cpp
     tool/llpcPipelineBuilder.cpp
+    tool/llpcRayTracingPipelineBuilder.cpp
+    tool/llpcShaderCache.cpp
+    tool/llpcShaderCacheWrap.cpp
 )
-
-#if VKI_RAY_TRACING
-if(VKI_RAY_TRACING)
-    target_sources(llpc_standalone_compiler PRIVATE
-        tool/llpcRayTracingPipelineBuilder.cpp
-        )
-endif()
-#endif
 
 add_dependencies(llpc_standalone_compiler llpc)
 

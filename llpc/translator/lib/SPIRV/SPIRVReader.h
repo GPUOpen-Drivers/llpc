@@ -69,6 +69,7 @@ class SPIRVToLLVMDbgTran;
 enum class LayoutMode : uint8_t {
   Native = 0,   ///< Using native LLVM layout rule
   Explicit = 1, ///< Using layout decorations(like offset) from SPIRV
+  Std430 = 2,   ///< Using std430 layout rule
 };
 
 class SPIRVToLLVM {
@@ -107,9 +108,9 @@ public:
   bool transDecoration(SPIRVValue *, Value *);
   bool transShaderDecoration(SPIRVValue *, Value *);
   bool checkContains64BitType(SPIRVType *bt);
-  Constant *buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecorate &inOutDec, Type *&metaTy);
+  Constant *buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecorate &inOutDec, Type *&metaTy, bool vs64bitsAttrib);
   Constant *buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecorate &blockDec, Type *&mdTy,
-                                     bool deriveStride = false);
+                                     SPIRVStorageClassKind storageClass);
   unsigned calcShaderBlockSize(SPIRVType *bt, unsigned blockSize, unsigned matrixStride, bool isRowMajor);
   Value *transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb);
   Value *flushDenorm(Value *val);
@@ -199,6 +200,9 @@ public:
   // Post-process translated LLVM module to undo row major matrices.
   bool postProcessRowMajorMatrix();
   Value *getTranslatedValue(SPIRVValue *bv);
+
+  // Create !lgc.xfb.state metadata
+  void createXfbMetadata(bool hasXfbOuts);
 
 private:
   class SPIRVTypeContext {
@@ -295,7 +299,7 @@ private:
     return t;
   }
 
-  Type *getPointeeType(SPIRVValue *v);
+  Type *getPointeeType(SPIRVValue *v, LayoutMode layout = LayoutMode::Native);
 
   Type *tryGetAccessChainRetType(SPIRVValue *v) {
     auto loc = m_accessChainRetTypeMap.find(v);
@@ -393,6 +397,8 @@ private:
                                              const std::function<Value *(Value *)> &createImageOp);
 
   Function *createLibraryEntryFunc();
+
+  Value *createTraceRayDialectOp(SPIRVValue *const spvValue);
 
   // ========================================================================================================================
   // Wrapper method for easier access to pipeline options.

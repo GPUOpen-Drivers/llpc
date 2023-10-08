@@ -32,6 +32,7 @@
 #include "SPIRVInternal.h"
 #include "hex_float.h"
 #include "llpcContext.h"
+#include "llpcGraphicsContext.h"
 #include "llpcSpirvLower.h"
 #include "lgc/Builder.h"
 #include "lgc/Pipeline.h"
@@ -45,6 +46,7 @@
 #include "llvm/Transforms/Utils/Local.h"
 
 #define DEBUG_TYPE_CONST_FOLDING "llpc-spirv-lower-math-const-folding"
+#define DEBUG_TYPE_PRECISION "llpc-spirv-lower-math-precision"
 #define DEBUG_TYPE_FLOAT_OP "llpc-spirv-lower-math-float-op"
 
 using namespace lgc;
@@ -52,10 +54,33 @@ using namespace llvm;
 using namespace SPIRV;
 using namespace Llpc;
 
+static cl::opt<bool>
+    ForwardPropagateNoContract("forward-propagate-no-contract",
+                               cl::desc("Forward propagate NoContraction decorations to dependent FAdd operations"),
+                               cl::init(false));
+static cl::opt<bool>
+    BackwardPropagateNoContract("backward-propagate-no-contract",
+                                cl::desc("Backward propagate NoContraction decorations to input operations"),
+                                cl::init(false));
+
 // =====================================================================================================================
 SpirvLowerMath::SpirvLowerMath()
     : m_changed(false), m_fp16DenormFlush(false), m_fp32DenormFlush(false), m_fp64DenormFlush(false),
       m_fp16RoundToZero(false) {
+}
+
+// =====================================================================================================================
+// Set denormal-fp-math attribute to the specified function according to provided FP denormal mode.
+//
+// @param func : Function to set the attribute
+// @param fp32 : Whether the attribute is for FP32
+// @param denormMode : FP denormal mode
+static void setFpMathAttribute(Function &func, bool fp32, FpDenormMode denormMode) {
+  const char *attrName = fp32 ? "denormal-fp-math-f32" : "denormal-fp-math";
+  if (denormMode == FpDenormMode::FlushNone || denormMode == FpDenormMode::FlushIn)
+    func.addFnAttr(attrName, "ieee");
+  else if (fp32 || denormMode == FpDenormMode::FlushOut || denormMode == FpDenormMode::FlushInOut)
+    func.addFnAttr(attrName, "preserve-sign");
 }
 
 // =====================================================================================================================
@@ -66,16 +91,23 @@ void SpirvLowerMath::init(Module &module) {
   SpirvLower::init(&module);
   m_changed = false;
 
-  auto commonShaderMode = Pipeline::getCommonShaderMode(module, getLgcShaderStage(m_shaderStage));
-  m_fp16DenormFlush = commonShaderMode.fp16DenormMode == FpDenormMode::FlushOut ||
-                      commonShaderMode.fp16DenormMode == FpDenormMode::FlushInOut;
-  m_fp32DenormFlush = commonShaderMode.fp32DenormMode == FpDenormMode::FlushOut ||
-                      commonShaderMode.fp32DenormMode == FpDenormMode::FlushInOut;
-  m_fp64DenormFlush = commonShaderMode.fp64DenormMode == FpDenormMode::FlushOut ||
-                      commonShaderMode.fp64DenormMode == FpDenormMode::FlushInOut;
-  m_fp16RoundToZero = commonShaderMode.fp16RoundMode == FpRoundMode::Zero;
-  m_enableImplicitInvariantExports =
-      m_context->getPipelineContext()->getPipelineOptions()->enableImplicitInvariantExports;
+  if (m_shaderStage == ShaderStageInvalid)
+    return;
+
+  // NOTE: We try to set denormal-fp-math here because later optimization passes will detect the attributes and decide
+  // what to do. Such attributes will be set once again in LGC.
+  auto shaderMode = Pipeline::getCommonShaderMode(module, getLgcShaderStage(m_shaderStage));
+  setFpMathAttribute(*m_entryPoint, false, shaderMode.fp16DenormMode);
+  setFpMathAttribute(*m_entryPoint, true, shaderMode.fp32DenormMode);
+  setFpMathAttribute(*m_entryPoint, false, shaderMode.fp64DenormMode);
+
+  m_fp16DenormFlush =
+      shaderMode.fp16DenormMode == FpDenormMode::FlushOut || shaderMode.fp16DenormMode == FpDenormMode::FlushInOut;
+  m_fp32DenormFlush =
+      shaderMode.fp32DenormMode == FpDenormMode::FlushOut || shaderMode.fp32DenormMode == FpDenormMode::FlushInOut;
+  m_fp64DenormFlush =
+      shaderMode.fp64DenormMode == FpDenormMode::FlushOut || shaderMode.fp64DenormMode == FpDenormMode::FlushInOut;
+  m_fp16RoundToZero = shaderMode.fp16RoundMode == FpRoundMode::Zero;
 }
 
 // =====================================================================================================================
@@ -90,7 +122,7 @@ void SpirvLowerMath::flushDenormIfNeeded(Instruction *inst) {
     // Has to flush denormals, insert canonicalize to make a MUL (* 1.0) forcibly
     auto builder = m_context->getBuilder();
     builder->SetInsertPoint(inst->getNextNode());
-    auto canonical = builder->CreateIntrinsic(Intrinsic::canonicalize, destTy, UndefValue::get(destTy));
+    auto canonical = builder->CreateIntrinsic(Intrinsic::canonicalize, destTy, PoisonValue::get(destTy));
 
     inst->replaceAllUsesWith(canonical);
     canonical->setArgOperand(0, inst);
@@ -99,31 +131,24 @@ void SpirvLowerMath::flushDenormIfNeeded(Instruction *inst) {
 }
 
 // =====================================================================================================================
-// Recursively finds backward if the FPMathOperator operand does not specify "contract" flag.
+// Identify if a value does not specify "contract" flag.
 //
-// @param operand : Operand to check
-bool SpirvLowerMath::isOperandNoContract(Value *operand) {
-  if (isa<BinaryOperator>(operand)) {
-    auto inst = dyn_cast<BinaryOperator>(operand);
-
-    if (isa<FPMathOperator>(operand)) {
-      auto fastMathFlags = inst->getFastMathFlags();
-      bool allowContract = fastMathFlags.allowContract();
-      if (fastMathFlags.any() && !allowContract)
-        return true;
-    }
-
-    for (auto opIt = inst->op_begin(), end = inst->op_end(); opIt != end; ++opIt)
-      return isOperandNoContract(*opIt);
-  }
-  return false;
+// Note: FPMathOperators without any fast math flags are ignored.
+//
+// @param value : Value to check
+static bool isNoContract(Value *value) {
+  if (!isa<FPMathOperator>(value))
+    return false;
+  auto inst = cast<FPMathOperator>(value);
+  FastMathFlags fastMathFlags = inst->getFastMathFlags();
+  return (fastMathFlags.any() && !fastMathFlags.allowContract());
 }
 
 // =====================================================================================================================
 // Disable fast math for all values related with the specified value
 //
 // @param value : Value to disable fast math for
-void SpirvLowerMath::disableFastMath(Value *value) {
+static void disableFastMath(Value *value) {
   std::set<Instruction *> allValues;
   std::list<Instruction *> workSet;
   if (isa<Instruction>(value)) {
@@ -181,6 +206,9 @@ bool SpirvLowerMathConstFolding::runImpl(Module &module,
 
   SpirvLowerMath::init(module);
 
+  if (m_shaderStage == ShaderStageInvalid)
+    return false;
+
   if (m_fp16DenormFlush || m_fp32DenormFlush || m_fp64DenormFlush) {
     // Do constant folding if we need flush denorm to zero.
     auto &targetLibInfo = getTargetLibraryInfo();
@@ -235,6 +263,193 @@ Function *SpirvLowerMathConstFolding::getEntryPoint() {
 }
 
 #undef DEBUG_TYPE // DEBUG_TYPE_CONST_FOLDING
+#define DEBUG_TYPE DEBUG_TYPE_PRECISION
+
+// =====================================================================================================================
+// Run precision (fast math flag) adjustment SPIR-V lowering pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on (empty on entry)
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+PreservedAnalyses SpirvLowerMathPrecision::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  if (runImpl(module))
+    return PreservedAnalyses::none();
+  return PreservedAnalyses::all();
+}
+
+bool SpirvLowerMathPrecision::adjustExports(Module &module) {
+  bool changed = false;
+  for (auto &func : module.functions()) {
+    // Disable fast math for gl_Position.
+    // TODO: This requires knowledge of the Builder implementation, which is not ideal.
+    // We need to find a neater way to do it.
+    auto funcName = func.getName();
+    bool isExport;
+    if (funcName.startswith("lgc.output.export.builtin."))
+      isExport = true;
+    else if (funcName.startswith("lgc.create.write.builtin"))
+      isExport = false;
+    else
+      continue;
+
+    for (User *user : func.users()) {
+      CallInst *callInst = cast<CallInst>(user);
+      unsigned builtIn;
+      Value *valueWritten;
+      if (isExport) {
+        builtIn = cast<ConstantInt>(callInst->getOperand(0))->getZExtValue();
+        valueWritten = callInst->getOperand(callInst->arg_size() - 1);
+      } else {
+        builtIn = cast<ConstantInt>(callInst->getOperand(1))->getZExtValue();
+        valueWritten = callInst->getOperand(0);
+      }
+
+      if (valueWritten && builtIn == lgc::BuiltInPosition) {
+        disableFastMath(valueWritten);
+        changed = true;
+      }
+    }
+  }
+  return changed;
+}
+
+static bool clearContractFlag(Instruction *inst) {
+  if (!isa<FPMathOperator>(inst))
+    return false;
+  LLVM_DEBUG(dbgs() << "clearing contract flags: " << *inst << "\n");
+  FastMathFlags fastMathFlags = inst->getFastMathFlags();
+  fastMathFlags.setAllowReassoc(false);
+  fastMathFlags.setAllowContract(false);
+  inst->copyFastMathFlags(fastMathFlags);
+  return true;
+}
+
+bool SpirvLowerMathPrecision::propagateNoContract(Module &module, bool forward, bool backward) {
+  bool changed = false;
+
+  SmallVector<Instruction *> roots;
+  DenseSet<Instruction *> visited;
+
+  // Find all NoContract instructions to build root set
+  LLVM_DEBUG(dbgs() << "locate no contract roots\n");
+  for (auto &func : module) {
+    for (auto &block : func) {
+      for (auto &inst : block) {
+        if (isNoContract(&inst)) {
+          LLVM_DEBUG(dbgs() << "root: " << inst << "\n");
+          roots.push_back(&inst);
+          visited.insert(&inst);
+        }
+      }
+    }
+  }
+
+  SmallVector<Instruction *> worklist;
+
+  // Backward propagate via operands
+  if (backward) {
+    LLVM_DEBUG(dbgs() << "backward propagate no contract\n");
+    worklist = roots;
+    while (!worklist.empty()) {
+      auto inst = worklist.pop_back_val();
+      LLVM_DEBUG(dbgs() << "visit: " << *inst << "\n");
+      for (Value *operand : inst->operands()) {
+        if (auto opInst = dyn_cast<Instruction>(operand)) {
+          if (!visited.insert(opInst).second)
+            continue;
+          if (clearContractFlag(opInst))
+            changed = true;
+          worklist.push_back(opInst);
+        }
+      }
+    }
+  }
+
+  // Forward propagate via users
+  if (forward) {
+    LLVM_DEBUG(dbgs() << "forward propagate no contract\n");
+    worklist = roots;
+    while (!worklist.empty()) {
+      auto inst = worklist.pop_back_val();
+      LLVM_DEBUG(dbgs() << "visit: " << *inst << "\n");
+      for (User *user : inst->users()) {
+        // Only propagate through instructions
+        if (auto userInst = dyn_cast<Instruction>(user)) {
+          if (!visited.insert(userInst).second)
+            continue;
+          // Only update FAdd instructions
+          if (userInst->getOpcode() == Instruction::FAdd) {
+            if (clearContractFlag(userInst))
+              changed = true;
+          }
+          worklist.push_back(userInst);
+        }
+      }
+    }
+  }
+
+  return changed;
+}
+
+// =====================================================================================================================
+// Run precision (fast math flag) adjustment SPIR-V lowering pass on the specified LLVM module.
+//
+// @param [in/out] module : LLVM module to be run on
+bool SpirvLowerMathPrecision::runImpl(Module &module) {
+  LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Math-Precision\n");
+
+  SpirvLower::init(&module);
+  if (m_shaderStage == ShaderStageInvalid)
+    return false;
+
+  bool forwardPropagate = false;
+  bool backwardPropagate = false;
+  auto pipelineContext = m_context->getPipelineContext();
+  switch (pipelineContext->getPipelineType()) {
+  case PipelineType::Graphics: {
+    auto shaderInfo = (static_cast<const GraphicsContext *>(pipelineContext))->getPipelineShaderInfo(m_shaderStage);
+    forwardPropagate = forwardPropagate || shaderInfo->options.forwardPropagateNoContract;
+    backwardPropagate = backwardPropagate || shaderInfo->options.backwardPropagateNoContract;
+    break;
+  }
+  case PipelineType::Compute: {
+    auto shaderInfo = &(static_cast<const ComputePipelineBuildInfo *>(pipelineContext->getPipelineBuildInfo()))->cs;
+    forwardPropagate = forwardPropagate || shaderInfo->options.forwardPropagateNoContract;
+    backwardPropagate = backwardPropagate || shaderInfo->options.backwardPropagateNoContract;
+    break;
+  }
+  case PipelineType::RayTracing: {
+    auto pipelineInfo = static_cast<const RayTracingPipelineBuildInfo *>(pipelineContext->getPipelineBuildInfo());
+    // Note: turn on options if any of the shaders from this stage specify them, because we do not know exactly
+    // shader this module is.
+    for (unsigned i = 0; i < pipelineInfo->shaderCount; ++i) {
+      if (pipelineInfo->pShaders[i].entryStage != m_shaderStage)
+        continue;
+      forwardPropagate = forwardPropagate || pipelineInfo->pShaders[i].options.forwardPropagateNoContract;
+      backwardPropagate = backwardPropagate || pipelineInfo->pShaders[i].options.backwardPropagateNoContract;
+    }
+    break;
+  }
+  default:
+    break;
+  }
+
+  if (ForwardPropagateNoContract.getNumOccurrences())
+    forwardPropagate = ForwardPropagateNoContract;
+  if (BackwardPropagateNoContract.getNumOccurrences())
+    backwardPropagate = BackwardPropagateNoContract;
+
+  bool adjustedExports = false;
+  if (pipelineContext->getPipelineOptions()->enableImplicitInvariantExports)
+    adjustedExports = adjustExports(module);
+
+  bool propagatedNoContract = false;
+  if (forwardPropagate || backwardPropagate)
+    propagatedNoContract = propagateNoContract(module, forwardPropagate, backwardPropagate);
+
+  return adjustedExports || propagatedNoContract;
+}
+
+#undef DEBUG_TYPE // DEBUG_TYPE_PRECISION
 #define DEBUG_TYPE DEBUG_TYPE_FLOAT_OP
 
 // =====================================================================================================================
@@ -261,15 +476,6 @@ bool SpirvLowerMathFloatOp::runImpl(Module &module) {
 }
 
 // =====================================================================================================================
-// Visits unary operator instruction.
-//
-// @param unaryOp : Unary operator instruction
-void SpirvLowerMathFloatOp::visitUnaryOperator(UnaryOperator &unaryOp) {
-  if (unaryOp.getOpcode() == Instruction::FNeg)
-    flushDenormIfNeeded(&unaryOp);
-}
-
-// =====================================================================================================================
 // Visits binary operator instruction.
 //
 // @param binaryOp : Binary operator instruction
@@ -284,24 +490,10 @@ void SpirvLowerMathFloatOp::visitBinaryOperator(BinaryOperator &binaryOp) {
       isa<ConstantAggregateZero>(src2) || (isa<ConstantFP>(src2) && cast<ConstantFP>(src2)->isZero());
   Value *dest = nullptr;
 
-  if (opCode == Instruction::FAdd) {
-    // Recursively find backward if the operand "does not" specify contract flags
-    auto fastMathFlags = binaryOp.getFastMathFlags();
-    if (fastMathFlags.allowContract()) {
-      bool hasNoContract = isOperandNoContract(src1) || isOperandNoContract(src2);
-      bool allowContract = !hasNoContract;
-
-      // Reassociation and contract should be same
-      fastMathFlags.setAllowReassoc(allowContract);
-      fastMathFlags.setAllowContract(allowContract);
-      binaryOp.copyFastMathFlags(fastMathFlags);
-    }
-  } else if (opCode == Instruction::FSub) {
-    if (src1IsConstZero) {
-      // NOTE: Source1 is constant zero, we might be performing FNEG operation. This will be optimized
-      // by backend compiler with sign bit reversed via XOR. Check floating-point controls.
-      flushDenormIfNeeded(&binaryOp);
-    }
+  if (opCode == Instruction::FSub && src1IsConstZero) {
+    // NOTE: Source1 is constant zero, we might be performing FNEG operation. This will be optimized
+    // by backend compiler with sign bit reversed via XOR. Check floating-point controls.
+    flushDenormIfNeeded(&binaryOp);
   }
 
   // NOTE: We can't do constant folding for the following floating operations if we have floating-point controls that
@@ -380,22 +572,6 @@ void SpirvLowerMathFloatOp::visitCallInst(CallInst &callInst) {
   if (callee->isIntrinsic() && callee->getIntrinsicID() == Intrinsic::fabs) {
     // NOTE: FABS will be optimized by backend compiler with sign bit removed via AND.
     flushDenormIfNeeded(&callInst);
-  } else {
-    // Disable fast math for gl_Position.
-    // TODO: Having this here is not good, as it requires us to know implementation details of Builder.
-    // We need to find a neater way to do it.
-    auto calleeName = callee->getName();
-    unsigned builtIn = InvalidValue;
-    Value *valueWritten = nullptr;
-    if (calleeName.startswith("lgc.output.export.builtin.")) {
-      builtIn = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
-      valueWritten = callInst.getOperand(callInst.arg_size() - 1);
-    } else if (calleeName.startswith("lgc.create.write.builtin")) {
-      builtIn = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
-      valueWritten = callInst.getOperand(0);
-    }
-    if (builtIn == lgc::BuiltInPosition && m_enableImplicitInvariantExports)
-      disableFastMath(valueWritten);
   }
 }
 

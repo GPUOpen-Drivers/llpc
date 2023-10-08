@@ -50,18 +50,13 @@ using Vkgc::voidPtrInc;
 // Size of vec4
 static const unsigned SizeOfVec4 = sizeof(float) * 4;
 
-// Descriptor offset reloc magic number
-static const unsigned DescRelocMagic = 0xA5A5A500;
-static const unsigned DescRelocMagicMask = 0xFFFFFF00;
-static const unsigned DescSetMask = 0x000000FF;
+class Context;
 
 // Gets the name string of shader stage.
 const char *getShaderStageName(ShaderStage shaderStage);
 
-#if VKI_RAY_TRACING
 bool isRayTracingShaderStage(ShaderStage stage);
 bool hasRayTracingShaderStage(unsigned shageMask);
-#endif
 
 // Convert shader stage to the SPIR-V execution model
 spv::ExecutionModel convertToExecModel(ShaderStage shaderStage);
@@ -136,6 +131,10 @@ const char *getUnlinkedShaderStageName(Vkgc::UnlinkedShaderStage type);
 // Returns the name of the given part-pipeline stage.
 const char *getPartPipelineStageName(Vkgc::PartPipelineStage type);
 
+// Returns the uniform constant map entry of the given location.
+Vkgc::UniformConstantMapEntry *getUniformConstantEntryByLocation(const Llpc::Context *context, Vkgc::ShaderStage stage,
+                                                                 unsigned loc);
+
 inline bool doesShaderStageExist(llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo, ShaderStage stage) {
   return stage < shaderInfo.size() && shaderInfo[stage] && shaderInfo[stage]->pModuleData;
 }
@@ -202,7 +201,6 @@ const ResourceMappingNode *findResourceNode(const ResourceMappingNode *userDataN
 const ResourceMappingNode *findResourceNode(const ResourceMappingRootNode *userDataNodes, unsigned nodeCount,
                                             unsigned set, unsigned binding, unsigned *index);
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Returns true iff the compiled pipeline is a raytracing pipeline.
 //
@@ -210,7 +208,7 @@ const ResourceMappingNode *findResourceNode(const ResourceMappingRootNode *userD
 inline bool isRayTracingPipeline(unsigned stageMask) {
   return hasRayTracingShaderStage(stageMask);
 }
-#endif
+
 } // namespace Llpc
 
 namespace llvm {

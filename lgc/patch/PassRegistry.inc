@@ -50,8 +50,11 @@
 #endif
 
 LLPC_MODULE_ANALYSIS("lgc-pipeline-state", PipelineStateWrapper)
+LLPC_MODULE_PASS("print<lgc-pipeline-state>", PipelineStatePrinter)
+LLPC_MODULE_PASS("lgc-pipeline-state-recorder", PipelineStateRecorder)
 
 LLPC_MODULE_PASS("lgc-builder-replayer", BuilderReplayer)
+LLPC_MODULE_PASS("lgc-continufy", Continufy)
 LLPC_MODULE_PASS("lgc-patch-resource-collect", PatchResourceCollect)
 LLPC_MODULE_PASS("lgc-patch-initialize-workgroup-memory", PatchInitializeWorkgroupMemory)
 LLPC_MODULE_PASS("lgc-patch-image-derivatives", PatchImageDerivatives)
@@ -70,8 +73,10 @@ LLPC_FUNCTION_PASS("lgc-patch-buffer-op", PatchBufferOp)
 LLPC_MODULE_PASS("lgc-patch-workarounds", PatchWorkarounds)
 LLPC_FUNCTION_PASS("lgc-patch-load-scalarizer", PatchLoadScalarizer)
 LLPC_MODULE_PASS("lgc-patch-null-frag-shader", PatchNullFragShader)
+LLPC_MODULE_PASS("lgc-patch-tcs-passthrough-shader", TcsPassthroughShader)
 LLPC_MODULE_PASS("lgc-patch-image-op-collect", PatchImageOpCollect)
 LLPC_MODULE_PASS("lgc-vertex-fetch", LowerVertexFetch)
+LLPC_MODULE_PASS("lgc-frag-color-export", LowerFragColorExport)
 LLPC_MODULE_PASS("lgc-lower-debug-printf", LowerDebugPrintf)
 
 #undef LLPC_PASS

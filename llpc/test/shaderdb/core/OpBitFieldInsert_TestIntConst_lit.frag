@@ -16,7 +16,7 @@ void main()
 ; SHADERTEST: = call i32 (...) @lgc.create.insert.bit.field.i32(i32 3, i32 6, i32 4, i32 5)
 
 ; SHADERTEST-LABEL: {{^// LLPC.*}} pipeline patching results
-; SHADERTEST: ret { <4 x float> } { <4 x float> <float 9.900000e+01, float 9.900000e+01, float 9.900000e+01, float 9.900000e+01> }
+; SHADERTEST: float 9.900000e+01
 
 ; SHADERTEST: AMDLLPC SUCCESS
 */

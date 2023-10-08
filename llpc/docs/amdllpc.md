@@ -77,7 +77,7 @@ amdllpc [<options>...] [<input_file[,entry_point]>...]
 
 | Option Name                      | Description                                                       | Default Value                 |
 | -------------------------------- | ----------------------------------------------------------------- | ------------------------------|
-| `-auto-layout-desc`              | Automatically create descriptor layout based on resource usages   | false                         |
+| `-auto-layout-desc`              | Automatically create descriptor layout based on resource usages   | false for .pipe files, true for individual shaders |
 | `-robust-buffer-access`          | Validate if buffer index is out of bounds                         | false                         |
 | `-enable-relocatable-shader-elf` | Compile pipelines using relocatable shader elf                    | false                         |
 | `-enable-scratch-bounds-checks`  | Insert scratch access bounds checks on loads and stores           | false                         |

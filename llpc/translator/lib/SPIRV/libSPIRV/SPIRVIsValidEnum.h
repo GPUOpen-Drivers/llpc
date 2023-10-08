@@ -74,14 +74,12 @@ inline bool isValid(spv::ExecutionModel V) {
   case ExecutionModelGeometry:
   case ExecutionModelFragment:
   case ExecutionModelGLCompute:
-#if VKI_RAY_TRACING
   case ExecutionModelRayGenerationKHR:
   case ExecutionModelIntersectionKHR:
   case ExecutionModelAnyHitKHR:
   case ExecutionModelClosestHitKHR:
   case ExecutionModelMissKHR:
   case ExecutionModelCallableKHR:
-#endif
   case ExecutionModelTaskEXT:
   case ExecutionModelMeshEXT:
     return true;
@@ -95,11 +93,7 @@ inline bool isValid(spv::AddressingModel V) {
   case AddressingModelLogical:
   case AddressingModelPhysical32:
   case AddressingModelPhysical64:
-#if SPV_VERSION >= 0x10500
   case AddressingModelPhysicalStorageBuffer64:
-#else
-  case AddressingModelPhysicalStorageBuffer64EXT:
-#endif
     return true;
   default:
     return false;
@@ -110,9 +104,7 @@ inline bool isValid(spv::MemoryModel V) {
   switch (V) {
   case MemoryModelSimple:
   case MemoryModelGLSL450:
-#if SPV_VERSION >= 0x10500
   case MemoryModelVulkan:
-#endif
     return true;
   default:
     return false;
@@ -192,19 +184,13 @@ inline bool isValid(spv::StorageClass V) {
   case StorageClassAtomicCounter:
   case StorageClassImage:
   case StorageClassStorageBuffer:
-#if SPV_VERSION >= 0x10500
   case StorageClassPhysicalStorageBuffer:
-#else
-  case StorageClassPhysicalStorageBufferEXT:
-#endif
-#if VKI_RAY_TRACING
   case StorageClassCallableDataKHR:
   case StorageClassIncomingCallableDataKHR:
   case StorageClassRayPayloadKHR:
   case StorageClassHitAttributeKHR:
   case StorageClassIncomingRayPayloadKHR:
   case StorageClassShaderRecordBufferKHR:
-#endif
   case StorageClassTaskPayloadWorkgroupEXT:
     return true;
   default:
@@ -329,9 +315,7 @@ inline bool isValid(spv::Decoration V) {
   case DecorationNonWritable:
   case DecorationNonReadable:
   case DecorationUniform:
-#if SPV_VERSION >= 0x10400
   case DecorationUniformId:
-#endif
   case DecorationStream:
   case DecorationLocation:
   case DecorationComponent:
@@ -346,20 +330,14 @@ inline bool isValid(spv::Decoration V) {
   case DecorationNoContraction:
   case DecorationInputAttachmentIndex:
   case DecorationMaxByteOffset:
-#if SPV_VERSION >= 0x10400
   case DecorationNoSignedWrap:
   case DecorationNoUnsignedWrap:
-#endif
   case DecorationExplicitInterpAMD:
   case DecorationPerPrimitiveEXT:
   case DecorationPerVertexKHR:
-#if SPV_VERSION >= 0x10500
   case DecorationNonUniform:
   case DecorationRestrictPointer:
   case DecorationAliasedPointer:
-#else
-  case DecorationNonUniformEXT:
-#endif
   case DecorationHlslCounterBufferGOOGLE:
   case DecorationHlslSemanticGOOGLE:
   case DecorationUserTypeGOOGLE:
@@ -445,9 +423,7 @@ inline bool isValid(spv::Scope V) {
   case ScopeWorkgroup:
   case ScopeSubgroup:
   case ScopeInvocation:
-#if SPV_VERSION >= 0x10500
   case ScopeQueueFamily:
-#endif
     return true;
   default:
     return false;
@@ -526,10 +502,8 @@ inline bool isValid(spv::Capability V) {
   case CapabilityGroupNonUniformShuffleRelative:
   case CapabilityGroupNonUniformClustered:
   case CapabilityGroupNonUniformQuad:
-#if SPV_VERSION >= 0x10500
   case CapabilityShaderLayer:
   case CapabilityShaderViewportIndex:
-#endif
   case CapabilityStencilExportEXT:
   case CapabilityShaderViewportIndexLayerEXT:
   case CapabilitySubgroupBallotKHR:
@@ -551,10 +525,8 @@ inline bool isValid(spv::Capability V) {
   case CapabilityRoundingModeRTZ:
   case CapabilityImageGatherBiasLodAMD:
   case CapabilityFragmentMaskAMD:
-#if VKI_RAY_TRACING
   case CapabilityRayQueryProvisionalKHR:
   case CapabilityRayTraversalPrimitiveCullingKHR:
-#endif
   case CapabilityFloat16ImageAMD:
   case CapabilityShaderClockKHR:
   case CapabilityVariablePointersStorageBuffer:
@@ -563,7 +535,6 @@ inline bool isValid(spv::Capability V) {
   case CapabilityInt64ImageEXT:
   case CapabilityMeshShadingEXT:
   case CapabilityFragmentBarycentricKHR:
-#if SPV_VERSION >= 0x10500
   case CapabilityShaderNonUniform:
   case CapabilityRuntimeDescriptorArray:
   case CapabilityInputAttachmentArrayDynamicIndexing:
@@ -579,20 +550,6 @@ inline bool isValid(spv::Capability V) {
   case CapabilityVulkanMemoryModel:
   case CapabilityVulkanMemoryModelDeviceScope:
   case CapabilityPhysicalStorageBufferAddresses:
-#else
-  case CapabilityShaderNonUniformEXT:
-  case CapabilityRuntimeDescriptorArrayEXT:
-  case CapabilityInputAttachmentArrayDynamicIndexingEXT:
-  case CapabilityUniformTexelBufferArrayDynamicIndexingEXT:
-  case CapabilityStorageTexelBufferArrayDynamicIndexingEXT:
-  case CapabilityUniformBufferArrayNonUniformIndexingEXT:
-  case CapabilitySampledImageArrayNonUniformIndexingEXT:
-  case CapabilityStorageBufferArrayNonUniformIndexingEXT:
-  case CapabilityStorageImageArrayNonUniformIndexingEXT:
-  case CapabilityInputAttachmentArrayNonUniformIndexingEXT:
-  case CapabilityUniformTexelBufferArrayNonUniformIndexingEXT:
-  case CapabilityStorageTexelBufferArrayNonUniformIndexingEXT:
-#endif
   case CapabilityDemoteToHelperInvocationEXT:
   case CapabilityAtomicFloat32MinMaxEXT:
   case CapabilityAtomicFloat64MinMaxEXT:
@@ -856,10 +813,8 @@ inline bool isValid(spv::Op V) {
   case OpModuleProcessed:
   case OpExecutionModeId:
   case OpDecorateId:
-#if SPV_VERSION >= 0x10400
   case OpDecorateString:
   case OpMemberDecorateString:
-#endif
   case OpGroupNonUniformElect:
   case OpGroupNonUniformAll:
   case OpGroupNonUniformAny:
@@ -894,18 +849,15 @@ inline bool isValid(spv::Op V) {
   case OpGroupNonUniformLogicalXor:
   case OpGroupNonUniformQuadBroadcast:
   case OpGroupNonUniformQuadSwap:
-#if SPV_VERSION >= 0x10400
   case OpCopyLogical:
   case OpPtrEqual:
   case OpPtrNotEqual:
   case OpPtrDiff:
-#endif
   case OpForward:
   case OpTerminateInvocation:
   case OpSubgroupBallotKHR:
   case OpSubgroupFirstInvocationKHR:
   case OpSubgroupReadInvocationKHR:
-#if VKI_RAY_TRACING
   case OpTypeRayQueryKHR:
   case OpRayQueryInitializeKHR:
   case OpRayQueryTerminateKHR:
@@ -913,7 +865,6 @@ inline bool isValid(spv::Op V) {
   case OpRayQueryConfirmIntersectionKHR:
   case OpRayQueryProceedKHR:
   case OpRayQueryGetIntersectionTypeKHR:
-#endif
   case OpSubgroupAllKHR:
   case OpSubgroupAnyKHR:
   case OpSubgroupAllEqualKHR:
@@ -936,7 +887,6 @@ inline bool isValid(spv::Op V) {
   case OpReadClockKHR:
   case OpEmitMeshTasksEXT:
   case OpSetMeshOutputsEXT:
-#if VKI_RAY_TRACING
   case OpReportIntersectionKHR:
   case OpIgnoreIntersectionKHR:
   case OpIgnoreIntersectionNV:
@@ -947,7 +897,6 @@ inline bool isValid(spv::Op V) {
   case OpExecuteCallableKHR:
   case OpTraceRayKHR:
   case OpConvertUToAccelerationStructureKHR:
-#endif
   case OpSubgroupShuffleINTEL:
   case OpSubgroupShuffleDownINTEL:
   case OpSubgroupShuffleUpINTEL:
@@ -958,7 +907,6 @@ inline bool isValid(spv::Op V) {
   case OpSubgroupImageBlockWriteINTEL:
   case OpDemoteToHelperInvocationEXT:
   case OpIsHelperInvocationEXT:
-#if VKI_RAY_TRACING
   case OpRayQueryGetRayTMinKHR:
   case OpRayQueryGetRayFlagsKHR:
   case OpRayQueryGetIntersectionTKHR:
@@ -977,7 +925,6 @@ inline bool isValid(spv::Op V) {
   case OpRayQueryGetIntersectionObjectToWorldKHR:
   case OpRayQueryGetIntersectionWorldToObjectKHR:
   case OpRayQueryGetIntersectionTriangleVertexPositionsKHR:
-#endif
     return true;
   default:
     return false;
@@ -1003,16 +950,12 @@ inline bool isValidImageOperandsMask(SPIRVWord Mask) {
   ValidMask |= ImageOperandsConstOffsetsMask;
   ValidMask |= ImageOperandsSampleMask;
   ValidMask |= ImageOperandsMinLodMask;
-#if SPV_VERSION >= 0x10500
   ValidMask |= ImageOperandsMakeTexelAvailableMask;
   ValidMask |= ImageOperandsMakeTexelVisibleMask;
   ValidMask |= ImageOperandsNonPrivateTexelMask;
   ValidMask |= ImageOperandsVolatileTexelMask;
-#endif
-#if SPV_VERSION >= 0x10400
   ValidMask |= ImageOperandsSignExtendMask;
   ValidMask |= ImageOperandsZeroExtendMask;
-#endif
 
   return (Mask & ~ValidMask) == 0;
 }
@@ -1031,13 +974,11 @@ inline bool isValidLoopControlMask(SPIRVWord Mask) {
   ValidMask |= LoopControlDontUnrollMask;
   ValidMask |= LoopControlDependencyInfiniteMask;
   ValidMask |= LoopControlDependencyLengthMask;
-#if SPV_VERSION >= 0x10400
   ValidMask |= LoopControlMinIterationsMask;
   ValidMask |= LoopControlMaxIterationsMask;
   ValidMask |= LoopControlIterationMultipleMask;
   ValidMask |= LoopControlPeelCountMask;
   ValidMask |= LoopControlPartialCountMask;
-#endif
 
   return (Mask & ~ValidMask) == 0;
 }
@@ -1064,12 +1005,10 @@ inline bool isValidMemorySemanticsMask(SPIRVWord Mask) {
   ValidMask |= MemorySemanticsCrossWorkgroupMemoryMask;
   ValidMask |= MemorySemanticsAtomicCounterMemoryMask;
   ValidMask |= MemorySemanticsImageMemoryMask;
-#if SPV_VERSION >= 0x10500
   ValidMask |= MemorySemanticsOutputMemoryMask;
   ValidMask |= MemorySemanticsMakeAvailableMask;
   ValidMask |= MemorySemanticsMakeVisibleMask;
   ValidMask |= MemorySemanticsVolatileMask;
-#endif
 
   return (Mask & ~ValidMask) == 0;
 }
@@ -1079,11 +1018,9 @@ inline bool isValidMemoryAccessMask(SPIRVWord Mask) {
   ValidMask |= MemoryAccessVolatileMask;
   ValidMask |= MemoryAccessAlignedMask;
   ValidMask |= MemoryAccessNontemporalMask;
-#if SPV_VERSION >= 0x10500
   ValidMask |= MemoryAccessMakePointerAvailableMask;
   ValidMask |= MemoryAccessMakePointerVisibleMask;
   ValidMask |= MemoryAccessNonPrivatePointerMask;
-#endif
 
   return (Mask & ~ValidMask) == 0;
 }

@@ -84,7 +84,15 @@ public:
   // @param gpuName : LLVM GPU name (e.g. "gfx900"); empty to use -mcpu option setting
   // @param optLevel : LLVM optimization level used to initialize target machine
   static std::unique_ptr<llvm::TargetMachine> createTargetMachine(llvm::StringRef gpuName,
-                                                                  llvm::CodeGenOpt::Level optLevel);
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
+                                                                  // Old version of the code
+                                                                  llvm::CodeGenOpt::Level optLevel
+#else
+                                                                  // New version of the code (also handles unknown
+                                                                  // version, which we treat as latest)
+                                                                  llvm::CodeGenOptLevel optLevel
+#endif
+  );
 
   // Create the LgcContext.
   //
@@ -126,20 +134,24 @@ public:
   // @param pipeline : Ignored
   Builder *createBuilder(Pipeline *pipeline);
 
-  // Prepare a pass manager. This manually adds a target-aware TLI pass, so middle-end optimizations do not
-  // think that we have library functions.
-  //
-  // @param [in/out] passMgr : Pass manager
-  void preparePassManager(lgc::PassManager &passMgr);
-
   // Adds target passes to pass manager, depending on "-filetype" and "-emit-llvm" options
   void addTargetPasses(lgc::LegacyPassManager &passMgr, llvm::Timer *codeGenTimer, llvm::raw_pwrite_stream &outStream);
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
+  // Old version of the code
   // Returns the optimization level for the context.
   llvm::CodeGenOpt::Level getOptimizationLevel() const;
 
   // Returns the optimization level used for context initialization.
   llvm::CodeGenOpt::Level getInitialOptimizationLevel() const { return m_initialOptLevel; }
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  // Returns the optimization level for the context.
+  llvm::CodeGenOptLevel getOptimizationLevel() const;
+
+  // Returns the optimization level used for context initialization.
+  llvm::CodeGenOptLevel getInitialOptimizationLevel() const { return m_initialOptLevel; }
+#endif
 
   // Utility method to create a start/stop timer pass
   static llvm::ModulePass *createStartStopTimer(llvm::Timer *timer, bool starting);
@@ -153,6 +165,7 @@ public:
   // statements in the middle-end output to that stream, giving a dump of LLVM IR at a
   // few strategic places in the pass flow, as well as information such as input/output
   // mapping.
+  // The pointer set here is thread local.
   static void setLlpcOuts(llvm::raw_ostream *stream) { m_llpcOuts = stream; }
   static llvm::raw_ostream *getLgcOuts() { return m_llpcOuts; }
 
@@ -166,13 +179,19 @@ private:
 
   LgcContext(llvm::LLVMContext &context, unsigned palAbiVersion);
 
-  static llvm::raw_ostream *m_llpcOuts;           // nullptr or stream for LLPC_OUTS
-  llvm::LLVMContext &m_context;                   // LLVM context
-  llvm::TargetMachine *m_targetMachine = nullptr; // Target machine
-  TargetInfo *m_targetInfo = nullptr;             // Target info
-  unsigned m_palAbiVersion = 0xFFFFFFFF;          // PAL pipeline ABI version to compile for
-  PassManagerCache *m_passManagerCache = nullptr; // Pass manager cache and creator
-  llvm::CodeGenOpt::Level m_initialOptLevel;      // Optimization level at initialization
+  static thread_local llvm::raw_ostream *m_llpcOuts; // nullptr or stream for LLPC_OUTS
+  llvm::LLVMContext &m_context;                      // LLVM context
+  llvm::TargetMachine *m_targetMachine = nullptr;    // Target machine
+  TargetInfo *m_targetInfo = nullptr;                // Target info
+  unsigned m_palAbiVersion = 0xFFFFFFFF;             // PAL pipeline ABI version to compile for
+  PassManagerCache *m_passManagerCache = nullptr;    // Pass manager cache and creator
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
+  // Old version of the code
+  llvm::CodeGenOpt::Level m_initialOptLevel; // Optimization level at initialization
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  llvm::CodeGenOptLevel m_initialOptLevel; // Optimization level at initialization
+#endif
 };
 
 } // namespace lgc

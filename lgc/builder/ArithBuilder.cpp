@@ -57,7 +57,7 @@ Value *BuilderImpl::CreateCubeFaceCoord(Value *coord, const Twine &instName) {
   Value *cubeTc = CreateIntrinsic(Intrinsic::amdgcn_cubetc, {}, {coordX, coordY, coordZ}, nullptr);
   Value *tcDivMa = CreateFMul(recipMa, cubeTc);
   Value *resultY = CreateFAdd(tcDivMa, ConstantFP::get(getFloatTy(), 0.5));
-  Value *result = CreateInsertElement(UndefValue::get(FixedVectorType::get(getFloatTy(), 2)), resultX, uint64_t(0));
+  Value *result = CreateInsertElement(PoisonValue::get(FixedVectorType::get(getFloatTy(), 2)), resultX, uint64_t(0));
   result = CreateInsertElement(result, resultY, 1, instName);
   return result;
 }
@@ -114,7 +114,7 @@ Value *BuilderImpl::CreateFpTruncWithRounding(Value *value, Type *destTy, Roundi
     // RTN/RTP: Use fptrunc_round intrinsic.
     StringRef roundingModeStr = convertRoundingModeToStr(roundingMode).value();
     Value *roundingMode = MetadataAsValue::get(getContext(), MDString::get(getContext(), roundingModeStr));
-    Value *result = scalarize(value, [=](Value *inValue) {
+    Value *result = scalarize(value, [=, this](Value *inValue) {
       return CreateIntrinsic(Intrinsic::fptrunc_round, {getHalfTy(), inValue->getType()}, {inValue, roundingMode});
     });
     result->setName(instName);
@@ -618,61 +618,6 @@ Value *BuilderImpl::CreateLog(Value *x, const Twine &instName) {
 // @param x : Input value X
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateSqrt(Value *x, const Twine &instName) {
-  if (x->getType()->getScalarType()->isDoubleTy()) {
-    // NOTE: For double type, the SQRT and RSQ instructions don't have required precision, we apply Goldschmidt's
-    // algorithm to improve the result:
-    //
-    //   y0 = rsq(x)
-    //   g0 = x * y0
-    //   h0 = 0.5 * y0
-    //
-    //   r0 = 0.5 - h0 * g0
-    //   g1 = g0 * r0 + g0
-    //   h1 = h0 * r0 + h0
-    //
-    //   r1 = 0.5 - h1 * g1 => d0 = x - g1 * g1
-    //   g2 = g1 * r1 + g1     g2 = d0 * h1 + g1
-    //   h2 = h1 * r1 + h1
-    //
-    //   r2 = 0.5 - h2 * g2 => d1 = x - g2 * g2
-    //   g3 = g2 * r2 + g2     g3 = d1 * h1 + g2
-    //
-    //   sqrt(x) = g3
-    //
-
-    // TODO: In the future, this should be totally done in LLVM backend.
-
-    // x < 2^-768
-    auto scaling = CreateFCmpOLT(x, getFpConstant(x->getType(), llvm::APFloat(llvm::APFloat::IEEEdouble(),
-                                                                              llvm::APInt(64, 0x1000000000000000))));
-    auto expTy = BuilderBase::getConditionallyVectorizedTy(getInt32Ty(), x->getType());
-    auto scaleUp = CreateSelect(scaling, ConstantInt::get(expTy, 256), ConstantInt::get(expTy, 0));
-    auto scaleDown = CreateSelect(scaling, ConstantInt::get(expTy, -128, true), ConstantInt::get(expTy, 0));
-    auto half = ConstantFP::get(x->getType(), 0.5);
-
-    x = CreateLdexp(x, scaleUp); // Scale up x if it is too small, make it a normal one
-    auto y = scalarize(x, [this](Value *x) { return CreateUnaryIntrinsic(Intrinsic::amdgcn_rsq, x); });
-    auto g = CreateFMul(x, y);
-    auto h = CreateFMul(half, y);
-
-    auto r = CreateIntrinsic(Intrinsic::fma, x->getType(), {CreateFNeg(h), g, half});
-    g = CreateIntrinsic(Intrinsic::fma, x->getType(), {g, r, g});
-    h = CreateIntrinsic(Intrinsic::fma, x->getType(), {h, r, h});
-
-    auto d = CreateIntrinsic(Intrinsic::fma, x->getType(), {CreateFNeg(g), g, x});
-    g = CreateIntrinsic(Intrinsic::fma, x->getType(), {d, h, g});
-
-    d = CreateIntrinsic(Intrinsic::fma, x->getType(), {CreateFNeg(g), g, x});
-    g = CreateIntrinsic(Intrinsic::fma, x->getType(), {d, h, g});
-
-    g = CreateLdexp(g, scaleDown); // Scale down the result
-
-    // If x is +INF, +0, or -0, use its original value
-    return CreateSelect(
-        createIsFPClass(x, CmpClass::PositiveInfinity | CmpClass::PositiveZero | CmpClass::NegativeZero), x, g,
-        instName);
-  }
-
   return CreateUnaryIntrinsic(Intrinsic::sqrt, x, nullptr, instName);
 }
 
@@ -683,61 +628,9 @@ Value *BuilderImpl::CreateSqrt(Value *x, const Twine &instName) {
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateInverseSqrt(Value *x, const Twine &instName) {
   if (x->getType()->getScalarType()->isDoubleTy()) {
-    // NOTE: For double type, the SQRT and RSQ instructions don't have required precision, we apply Goldschmidt's
-    // algorithm to improve the result:
-    //
-    //   y0 = rsq(x)
-    //   g0 = x * y0
-    //   h0 = 0.5 * y0
-    //
-    //   r0 = 0.5 - h0 * g0
-    //   g1 = g0 * r0 + g0
-    //   h1 = h0 * r0 + h0
-    //
-    //   r1 = 0.5 - h1 * g1
-    //   g2 = g1 * r1 + g1
-    //   h2 = h1 * r1 + h1
-    //
-    //   r2 = 0.5 - h2 * g2
-    //   h3 = h2 * r2 + h2
-    //
-    //   inverseSqrt(x) = 2 * h3
-    //
-
-    // TODO: In the future, this should be totally done in LLVM backend.
-
-    // x < 2^-768
-    auto scaling = CreateFCmpOLT(x, getFpConstant(x->getType(), llvm::APFloat(llvm::APFloat::IEEEdouble(),
-                                                                              llvm::APInt(64, 0x1000000000000000))));
-    auto expTy = BuilderBase::getConditionallyVectorizedTy(getInt32Ty(), x->getType());
-    auto scaleUp = CreateSelect(scaling, ConstantInt::get(expTy, 256), ConstantInt::get(expTy, 0));
-    auto scaleDown = CreateSelect(scaling, ConstantInt::get(expTy, 128), ConstantInt::get(expTy, 0));
-    auto half = ConstantFP::get(x->getType(), 0.5);
-
-    x = CreateLdexp(x, scaleUp); // Scale up x if it is too small, make it a normal one
-    auto y = scalarize(x, [this](Value *x) { return CreateUnaryIntrinsic(Intrinsic::amdgcn_rsq, x); });
-    auto g = CreateFMul(x, y);
-    auto h = CreateFMul(half, y);
-
-    auto r = CreateIntrinsic(Intrinsic::fma, x->getType(), {CreateFNeg(h), g, half});
-    g = CreateIntrinsic(Intrinsic::fma, x->getType(), {g, r, g});
-    h = CreateIntrinsic(Intrinsic::fma, x->getType(), {h, r, h});
-
-    r = CreateIntrinsic(Intrinsic::fma, x->getType(), {CreateFNeg(h), g, half});
-    g = CreateIntrinsic(Intrinsic::fma, x->getType(), {g, r, g});
-    h = CreateIntrinsic(Intrinsic::fma, x->getType(), {h, r, h});
-
-    r = CreateIntrinsic(Intrinsic::fma, x->getType(), {CreateFNeg(h), g, half});
-    h = CreateIntrinsic(Intrinsic::fma, x->getType(), {h, r, h});
-
-    h = CreateFMul(ConstantFP::get(x->getType(), 2.0), h);
-
-    h = CreateLdexp(h, scaleDown); // Scale down the result
-
-    // If x is +INF, +0, or -0, use the initial value of reciprocal square root
-    return CreateSelect(
-        createIsFPClass(x, CmpClass::PositiveInfinity | CmpClass::PositiveZero | CmpClass::NegativeZero), y, h,
-        instName);
+    // NOTE: For double type, the intrinsic amdgcn_rsq doesn't have required precision, we resort to LLVM native
+    // intrinsic sqrt since it will be expanded in backend with Goldschmidt's algorithm to improve the precision.
+    return CreateFDiv(ConstantFP::get(x->getType(), 1.0), CreateUnaryIntrinsic(Intrinsic::sqrt, x));
   }
 
   Value *result = scalarize(x, [this](Value *x) { return CreateUnaryIntrinsic(Intrinsic::amdgcn_rsq, x); });
@@ -834,7 +727,13 @@ Value *BuilderImpl::CreateLdexp(Value *x, Value *exp, const Twine &instName) {
 
   // We need to scalarize this ourselves.
   Value *result = scalarize(x, exp, [this](Value *x, Value *exp) {
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 463519
+    // Old version of the code
+    Value *ldexp = CreateIntrinsic(Intrinsic::amdgcn_ldexp, x->getType(), {x, exp});
+#else
+    // New version of the code (also handles unknown version, which we treat as latest)
     Value *ldexp = CreateIntrinsic(x->getType(), Intrinsic::ldexp, {x, exp});
+#endif
     if (x->getType()->getScalarType()->isDoubleTy()) {
       // NOTE: If LDEXP result is a denormal, we can flush it to zero. This is allowed. For double type, LDEXP
       // instruction does mantissa rounding instead of truncation, which is not expected by SPIR-V spec.
@@ -890,8 +789,8 @@ Value *BuilderImpl::CreateExtractExponent(Value *value, const Twine &instName) {
 Value *BuilderImpl::CreateCrossProduct(Value *x, Value *y, const Twine &instName) {
   assert(x->getType() == y->getType() && cast<FixedVectorType>(x->getType())->getNumElements() == 3);
 
-  Value *left = UndefValue::get(x->getType());
-  Value *right = UndefValue::get(x->getType());
+  Value *left = PoisonValue::get(x->getType());
+  Value *right = PoisonValue::get(x->getType());
   for (unsigned idx = 0; idx != 3; ++idx) {
     left = CreateInsertElement(
         left, CreateFMul(CreateExtractElement(x, (idx + 1) % 3), CreateExtractElement(y, (idx + 2) % 3)), idx);

@@ -14,8 +14,8 @@ target triple = "amdgcn--amdpal"
 ; Function Attrs: nounwind
 define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !lgc.shaderstage !2 {
 .entry:
-  %0 = call <2 x float> (...) @lgc.create.read.generic.input.v2f32(i32 0, i32 0, i32 0, i32 0, i32 0, i32 undef)
-  call void (...) @lgc.create.write.generic.output(<2 x float> %0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 undef)
+  %0 = call <2 x float> (...) @lgc.create.read.generic.input.v2f32(i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison)
+  call void (...) @lgc.create.write.generic.output(<2 x float> %0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison)
   ret void
 }
 
@@ -28,20 +28,20 @@ declare void @lgc.create.write.generic.output(...) local_unnamed_addr #0
 ; Function Attrs: nounwind
 define dllexport spir_func void @lgc.shader.GS.main() local_unnamed_addr #0 !lgc.shaderstage !9 {
 .entry:
-  %0 = call <4 x float> (...) @lgc.create.read.builtin.input.v4f32(i32 0, i32 0, i32 0, i32 undef)
-  %1 = call <4 x float> (...) @lgc.create.read.builtin.input.v4f32(i32 0, i32 0, i32 1, i32 undef)
-  %2 = call <4 x float> (...) @lgc.create.read.builtin.input.v4f32(i32 0, i32 0, i32 2, i32 undef)
-  call void (...) @lgc.create.write.builtin.output(<4 x float> %0, i32 0, i32 1024, i32 undef, i32 undef)
-  call void (...) @lgc.create.write.builtin.output(float undef, i32 1, i32 1024, i32 undef, i32 undef)
-  call void (...) @lgc.create.write.builtin.output([1 x float] undef, i32 3, i32 5120, i32 undef, i32 undef)
+  %0 = call <4 x float> (...) @lgc.create.read.builtin.input.v4f32(i32 0, i32 0, i32 0, i32 poison)
+  %1 = call <4 x float> (...) @lgc.create.read.builtin.input.v4f32(i32 0, i32 0, i32 1, i32 poison)
+  %2 = call <4 x float> (...) @lgc.create.read.builtin.input.v4f32(i32 0, i32 0, i32 2, i32 poison)
+  call void (...) @lgc.create.write.builtin.output(<4 x float> %0, i32 0, i32 1024, i32 poison, i32 poison)
+  call void (...) @lgc.create.write.builtin.output(float undef, i32 1, i32 1024, i32 poison, i32 poison)
+  call void (...) @lgc.create.write.builtin.output([1 x float] undef, i32 3, i32 5120, i32 poison, i32 poison)
   call void (...) @lgc.create.emit.vertex(i32 0)
-  call void (...) @lgc.create.write.builtin.output(<4 x float> %1, i32 0, i32 1024, i32 undef, i32 undef)
-  call void (...) @lgc.create.write.builtin.output(float undef, i32 1, i32 1024, i32 undef, i32 undef)
-  call void (...) @lgc.create.write.builtin.output([1 x float] undef, i32 3, i32 5120, i32 undef, i32 undef)
+  call void (...) @lgc.create.write.builtin.output(<4 x float> %1, i32 0, i32 1024, i32 poison, i32 poison)
+  call void (...) @lgc.create.write.builtin.output(float undef, i32 1, i32 1024, i32 poison, i32 poison)
+  call void (...) @lgc.create.write.builtin.output([1 x float] undef, i32 3, i32 5120, i32 poison, i32 poison)
   call void (...) @lgc.create.emit.vertex(i32 0)
-  call void (...) @lgc.create.write.builtin.output(<4 x float> %2, i32 0, i32 1024, i32 undef, i32 undef)
-  call void (...) @lgc.create.write.builtin.output(float undef, i32 1, i32 1024, i32 undef, i32 undef)
-  call void (...) @lgc.create.write.builtin.output([1 x float] undef, i32 3, i32 5120, i32 undef, i32 undef)
+  call void (...) @lgc.create.write.builtin.output(<4 x float> %2, i32 0, i32 1024, i32 poison, i32 poison)
+  call void (...) @lgc.create.write.builtin.output(float undef, i32 1, i32 1024, i32 poison, i32 poison)
+  call void (...) @lgc.create.write.builtin.output([1 x float] undef, i32 3, i32 5120, i32 poison, i32 poison)
   call void (...) @lgc.create.emit.vertex(i32 0)
   ret void
 }

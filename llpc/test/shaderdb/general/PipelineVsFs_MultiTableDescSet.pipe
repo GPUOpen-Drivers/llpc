@@ -13,8 +13,9 @@
 ; SHADERTEST: s_mov_b32
 ; SHADERTEST: s_mov_b32
 ; SHADERTEST: s_load_dwordx4
+; SHADERTEST: s_mov_b32 s[[TO_ADDR_LO:[0-9]*]], s[[table0:[0-9]*]]
 ; SHADERTEST: s_mov_b32 s[[TO_ADDR_HI:[0-9]*]], s[[VS_PC_HI]]
-; SHADERTEST: s_load_dwordx4 s{{\[}}[[T0_DESC:[0-9]*]]:{{[0-9]*}}], s{{\[}}[[table0:[0-9]*]]:[[TO_ADDR_HI]]], 0x0
+; SHADERTEST: s_load_dwordx4 s{{\[}}[[T0_DESC:[0-9]*]]:{{[0-9]*}}], s{{\[}}[[TO_ADDR_LO]]:[[TO_ADDR_HI]]], 0x0
 ; SHADERTEST: s_buffer_load_dwordx8 s[0:7], s{{\[}}[[T0_DESC]]:{{[0-9]*}}], 0x0
 ; SHADERTEST: s_buffer_load_dwordx8 s[8:15], s{{\[}}[[T0_DESC]]:{{[0-9]*}}], 0x20
 ; Now check that the image sample in the pixel shader uses the correct
@@ -22,16 +23,16 @@
 ; The low half should come from the user data node at offset 1 and 2.
 ; SHADERTEST-LABEL: _amdgpu_ps_main:
 ; SHADERTEST: s_getpc_b64 s{{\[}}[[VS_PC_LO:[0-9]*]]:[[VS_PC_HI:[0-9]*]]]
-; SHADERTEST: s_mov_b32 s[[T2_ADDR_LO:[0-9]*]], s[[table2:[0-9]*]]
-; SHADERTEST: s_mov_b32 s[[T2_ADDR_HI:[0-9]*]], s[[VS_PC_HI]]
-; SHADERTEST: s_mov_b32 s[[T1_ADDR_HI:[0-9]*]], s[[VS_PC_HI]]
-; SHADERTEST: s_load_dwordx8 s{{\[}}[[T1_DESC:[0-9]*]]:{{[0-9]*}}], s{{\[}}[[table1:[0-9]*]]:[[T1_ADDR_HI]]], 0x0
-; SHADERTEST: s_load_dwordx4 s{{\[}}[[T2_DESC:[0-9]*]]:{{[0-9]*}}], s{{\[}}[[T2_ADDR_LO]]:[[T2_ADDR_HI]]], 0x0
+; SHADERTEST: s_mov_b32 s0, s1
+; SHADERTEST: s_mov_b32 s1, s[[VS_PC_HI]]
+; SHADERTEST: s_mov_b32 s3, s[[VS_PC_HI]]
+; SHADERTEST: s_load_dwordx8 s{{\[}}[[T1_DESC:[0-9]*]]:{{[0-9]*}}], s[0:1], 0x0
+; SHADERTEST: s_load_dwordx4 s{{\[}}[[T2_DESC:[0-9]*]]:{{[0-9]*}}], s[2:3], 0x0
 ; SHADERTEST: image_sample v[{{[0-9]*:[0-9]*}}], v[{{[0-9]*:[0-9]*}}], s{{\[}}[[T1_DESC]]:{{[0-9]*}}], s{{\[}}[[T2_DESC]]:{{[0-9]*}}]
 ; SHADERTEST-LABEL: PalMetadata
 ; SHADERTEST-LABEL: .registers:
-; SHADERTEST: SPI_SHADER_USER_DATA_PS_[[table1]]                     0x0000000000000002
-; SHADERTEST: SPI_SHADER_USER_DATA_PS_[[table2]]                     0x0000000000000003
+; SHADERTEST: SPI_SHADER_USER_DATA_PS_1                              0x0000000000000002
+; SHADERTEST: SPI_SHADER_USER_DATA_PS_2                              0x0000000000000003
 ; SHADERTEST: SPI_SHADER_USER_DATA_VS_[[table0]]                     0x0000000000000001
 ; END_SHADERTEST
 

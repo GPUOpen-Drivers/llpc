@@ -3,7 +3,10 @@
 ; RUN: amdllpc -enable-part-pipeline=0 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; RUN: amdllpc -enable-part-pipeline=1 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: LLPC final ELF info
-; SHADERTEST: VGT_SHADER_STAGES_EN 0x0000000000010000
+; SHADERTEST: .vgt_shader_stages_en: {
+; SHADERTEST: .max_primgroup_in_wave: 0x0000000000000002
+; SHADERTEST: .vs_stage_en: 0x0000000000000000
+; SHADERTEST: .vs_w32_en: 0 }
 ; SHADERTEST: AMDLLPC SUCCESS
 
 [Version]

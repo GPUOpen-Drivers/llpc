@@ -67,7 +67,6 @@ static SpvGenStage shaderStageToSpvGenStage(ShaderStage shaderStage) {
     return SpvGenStageFragment;
   case ShaderStage::ShaderStageCompute:
     return SpvGenStageCompute;
-#if VKI_RAY_TRACING
   case ShaderStage::ShaderStageRayTracingRayGen:
     return SpvGenStageRayTracingRayGen;
   case ShaderStage::ShaderStageRayTracingIntersect:
@@ -80,7 +79,6 @@ static SpvGenStage shaderStageToSpvGenStage(ShaderStage shaderStage) {
     return SpvGenStageRayTracingMiss;
   case ShaderStage::ShaderStageRayTracingCallable:
     return SpvGenStageRayTracingCallable;
-#endif
   default:
     VFX_NEVER_CALLED();
     return SpvGenStageInvalid;
@@ -144,14 +142,12 @@ void Section::initSectionInfo() {
   INIT_SECTION_INFO("MeshGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageMesh)
   INIT_SECTION_INFO("FsGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageFragment)
   INIT_SECTION_INFO("CsGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageCompute)
-#if VKI_RAY_TRACING
   INIT_SECTION_INFO("rgenGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageRayTracingRayGen)
   INIT_SECTION_INFO("sectGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageRayTracingIntersect)
   INIT_SECTION_INFO("ahitGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageRayTracingAnyHit)
   INIT_SECTION_INFO("chitGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageRayTracingClosestHit)
   INIT_SECTION_INFO("missGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageRayTracingMiss)
   INIT_SECTION_INFO("callGlsl", SectionTypeShader, Glsl, ShaderStage::ShaderStageRayTracingCallable)
-#endif
 
   INIT_SECTION_INFO("TaskSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageTask)
   INIT_SECTION_INFO("VsSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageVertex)
@@ -161,14 +157,12 @@ void Section::initSectionInfo() {
   INIT_SECTION_INFO("MeshSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageMesh)
   INIT_SECTION_INFO("FsSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageFragment)
   INIT_SECTION_INFO("CsSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageCompute)
-#if VKI_RAY_TRACING
   INIT_SECTION_INFO("rgenSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageRayTracingRayGen)
   INIT_SECTION_INFO("sectSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageRayTracingIntersect)
   INIT_SECTION_INFO("ahitSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageRayTracingAnyHit)
   INIT_SECTION_INFO("chitSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageRayTracingClosestHit)
   INIT_SECTION_INFO("missSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageRayTracingMiss)
   INIT_SECTION_INFO("callSpirv", SectionTypeShader, SpirvAsm, ShaderStage::ShaderStageRayTracingCallable)
-#endif
 
   // Shader source file section
   INIT_SECTION_INFO("TaskGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageTask)
@@ -179,14 +173,12 @@ void Section::initSectionInfo() {
   INIT_SECTION_INFO("MeshGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageMesh)
   INIT_SECTION_INFO("FsGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageFragment)
   INIT_SECTION_INFO("CsGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageCompute)
-#if VKI_RAY_TRACING
   INIT_SECTION_INFO("rgenGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageRayTracingRayGen)
   INIT_SECTION_INFO("sectGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageRayTracingIntersect)
   INIT_SECTION_INFO("ahitGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageRayTracingAnyHit)
   INIT_SECTION_INFO("chitGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageRayTracingClosestHit)
   INIT_SECTION_INFO("missGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageRayTracingMiss)
   INIT_SECTION_INFO("callGlslFile", SectionTypeShader, GlslFile, ShaderStage::ShaderStageRayTracingCallable)
-#endif
 
   INIT_SECTION_INFO("TaskSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageTask)
   INIT_SECTION_INFO("VsSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageVertex)
@@ -196,14 +188,12 @@ void Section::initSectionInfo() {
   INIT_SECTION_INFO("MeshSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageMesh)
   INIT_SECTION_INFO("FsSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageFragment)
   INIT_SECTION_INFO("CsSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageCompute)
-#if VKI_RAY_TRACING
   INIT_SECTION_INFO("rgenSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageRayTracingRayGen)
   INIT_SECTION_INFO("sectSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageRayTracingIntersect)
   INIT_SECTION_INFO("ahitSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageRayTracingAnyHit)
   INIT_SECTION_INFO("chitSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageRayTracingClosestHit)
   INIT_SECTION_INFO("missSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageRayTracingMiss)
   INIT_SECTION_INFO("callSpvFile", SectionTypeShader, SpirvFile, ShaderStage::ShaderStageRayTracingCallable)
-#endif
 
   INIT_SECTION_INFO("TaskSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageTask)
   INIT_SECTION_INFO("VsSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageVertex)
@@ -213,14 +203,12 @@ void Section::initSectionInfo() {
   INIT_SECTION_INFO("MeshSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageMesh)
   INIT_SECTION_INFO("FsSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageFragment)
   INIT_SECTION_INFO("CsSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageCompute)
-#if VKI_RAY_TRACING
   INIT_SECTION_INFO("rgenSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageRayTracingRayGen)
   INIT_SECTION_INFO("sectSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageRayTracingIntersect)
   INIT_SECTION_INFO("ahitSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageRayTracingAnyHit)
   INIT_SECTION_INFO("chitSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageRayTracingClosestHit)
   INIT_SECTION_INFO("missSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageRayTracingMiss)
   INIT_SECTION_INFO("callSpvasmFile", SectionTypeShader, SpirvAsmFile, ShaderStage::ShaderStageRayTracingCallable)
-#endif
 
   INIT_SECTION_INFO("TaskHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageTask)
   INIT_SECTION_INFO("VsHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageVertex)
@@ -230,15 +218,12 @@ void Section::initSectionInfo() {
   INIT_SECTION_INFO("MeshHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageMesh)
   INIT_SECTION_INFO("FsHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageFragment)
   INIT_SECTION_INFO("CsHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageCompute)
-#if VKI_RAY_TRACING
   INIT_SECTION_INFO("rgenHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageRayTracingRayGen)
   INIT_SECTION_INFO("sectHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageRayTracingIntersect)
   INIT_SECTION_INFO("ahitHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageRayTracingAnyHit)
   INIT_SECTION_INFO("chitHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageRayTracingClosestHit)
   INIT_SECTION_INFO("missHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageRayTracingMiss)
   INIT_SECTION_INFO("callHlsl", SectionTypeShader, Hlsl, ShaderStage::ShaderStageRayTracingCallable)
-#endif
-
   INIT_SECTION_INFO("TaskHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageTask)
   INIT_SECTION_INFO("VsHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageVertex)
   INIT_SECTION_INFO("TcsHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageTessControl)
@@ -247,14 +232,13 @@ void Section::initSectionInfo() {
   INIT_SECTION_INFO("MeshHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageMesh)
   INIT_SECTION_INFO("FsHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageFragment)
   INIT_SECTION_INFO("CsHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageCompute)
-#if VKI_RAY_TRACING
   INIT_SECTION_INFO("rgenHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageRayTracingRayGen)
   INIT_SECTION_INFO("sectHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageRayTracingIntersect)
   INIT_SECTION_INFO("ahitHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageRayTracingAnyHit)
   INIT_SECTION_INFO("chitHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageRayTracingClosestHit)
   INIT_SECTION_INFO("missHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageRayTracingMiss)
   INIT_SECTION_INFO("callHlslFile", SectionTypeShader, HlslFile, ShaderStage::ShaderStageRayTracingCallable)
-#endif
+
   INIT_SECTION_INFO("Version", SectionTypeVersion, 0)
   INIT_SECTION_INFO("CompileLog", SectionTypeCompileLog, 0)
 }
@@ -627,7 +611,7 @@ bool SectionShader::compileGlsl(const char *entryPoint, std::string *errorMsg) {
 
   sourceList[0] = &glslText;
   fileList[0] = &fileName;
-  int compileOption = SpvGenOptionDefaultDesktop | SpvGenOptionVulkanRules | SpvGenOptionDebug;
+  int compileOption = SpvGenOptionDefaultDesktop | SpvGenOptionVulkanRules;
   if (m_shaderType == Hlsl || m_shaderType == HlslFile)
     compileOption |= SpvGenOptionReadHlsl;
   bool compileResult = spvCompileAndLinkProgramEx(1, &stage, &sourceStringCount, sourceList, fileList, &entryPoint,

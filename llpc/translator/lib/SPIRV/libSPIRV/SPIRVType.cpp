@@ -58,11 +58,6 @@ uint64_t SPIRVType::getArrayLength() const {
   return static_cast<const SPIRVTypeArray *const>(this)->getLength()->getZExtIntValue();
 }
 
-unsigned SPIRVType::getDerivedArrayStride() const {
-  assert((OpCode == OpTypeArray || OpCode == OpTypeRuntimeArray) && "Not array type");
-  return getArrayElementType()->getSizeInBytes();
-}
-
 SPIRVWord SPIRVType::getBitWidth() const {
   if (isTypeVector())
     return getVectorComponentType()->getBitWidth();
@@ -170,11 +165,6 @@ SPIRVType *SPIRVType::getMatrixColumnType() const {
   return static_cast<const SPIRVTypeMatrix *const>(this)->getColumnType();
 }
 
-unsigned SPIRVType::getDerivedMatrixStride() const {
-  assert(OpCode == OpTypeMatrix && "Not matrix type");
-  return getMatrixColumnType()->getSizeInBytes();
-}
-
 SPIRVType *SPIRVType::getCompositeElementType(size_t Index) const {
   if (OpCode == OpTypeStruct)
     return getStructMemberType(Index);
@@ -265,7 +255,6 @@ bool SPIRVType::isTypeMatrix() const {
   return OpCode == OpTypeMatrix;
 }
 
-#if VKI_RAY_TRACING
 bool SPIRVType::isTypeAccelerationStructureKHR() const {
   return OpCode == OpTypeAccelerationStructureKHR;
 }
@@ -273,7 +262,6 @@ bool SPIRVType::isTypeAccelerationStructureKHR() const {
 bool SPIRVType::isTypeRayQueryKHR() const {
   return OpCode == OpTypeRayQueryKHR;
 }
-#endif
 
 bool SPIRVType::isTypeVectorBool() const {
   return isTypeVector() && getVectorComponentType()->isTypeBool();

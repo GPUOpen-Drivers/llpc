@@ -6,7 +6,6 @@ void main()
 // BEGIN_SHADERTEST
 /*
 
-; REQUIRES: llpc-client-interface-53
 ; Test that the amdllpc option set the optimization level through the interface.
 ; We expect the "OPT_QUICK" result for --llpc-opt=none because it is currently suppose to bump the opt level to quick
 ; to work around bug in the AMDGPU backend at noopt.

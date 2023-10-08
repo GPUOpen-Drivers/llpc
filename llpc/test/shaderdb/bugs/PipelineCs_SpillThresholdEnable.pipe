@@ -1,0 +1,48 @@
+; RUN: amdllpc -gfxip 11.0 -o - -filetype=asm %s | FileCheck -check-prefix=CHECK %s
+
+[Version]
+version = 68
+
+[CsGlsl]
+#version 450 core
+
+layout(push_constant) uniform PushConstants {
+    uint pc_index;
+    float pc_array[32];
+};
+
+layout(set = 0, binding = 0) buffer BO {
+    float x;
+} bos[8];
+
+void main() {
+    bos[0].x = pc_array[pc_index] + bos[1].x + bos[2].x + bos[3].x + bos[4].x + bos[5].x + bos[6].x + bos[7].x;
+}
+
+[CsInfo]
+entryPoint = main
+
+[ResourceMapping]
+userDataNode[0].type = DescriptorBufferCompact
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 16
+userDataNode[0].set = 0
+userDataNode[0].binding = 0
+userDataNode[0].strideInDwords = 2
+userDataNode[1].type = PushConst
+userDataNode[1].offsetInDwords = 16
+userDataNode[1].sizeInDwords = 33
+userDataNode[1].set = 0xFFFFFFFF
+userDataNode[1].binding = 0
+
+[ComputePipelineState]
+deviceIndex = 0
+
+; The shader and pipeline is set up to:
+;  - use all user data nodes
+;  - dynamically index into the push constants, which a priori forces spilling regardless of user data register
+;    availability
+;  - actually spill a descriptor
+; There was at one point a regression in which the spill threshold wasn't set low enough.
+;
+; CHECK: .spill_threshold: 0xe

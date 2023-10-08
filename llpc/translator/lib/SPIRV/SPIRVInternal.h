@@ -123,10 +123,8 @@ template <> inline void SPIRVMap<CmpInst::Predicate, Op>::init() {
   _SPIRV_OP(ICMP_SGE, SGreaterThanEqual)
   _SPIRV_OP(ICMP_SLT, SLessThan)
   _SPIRV_OP(ICMP_SLE, SLessThanEqual)
-#if SPV_VERSION >= 0x10400
   _SPIRV_OP(ICMP_EQ, PtrEqual)
   _SPIRV_OP(ICMP_NE, PtrNotEqual)
-#endif
 #undef _SPIRV_OP
 }
 typedef SPIRVMap<CmpInst::Predicate, Op> CmpMap;
@@ -166,7 +164,6 @@ enum SPIRAddressSpace {
   SPIRAS_Uniform = 7,  // Memory buffer descriptor
   SPIRAS_Input = 64,
   SPIRAS_Output = 65,
-  SPIRAS_TaskPayload = 66,
   SPIRAS_Count,
 };
 
@@ -179,7 +176,6 @@ template <> inline void SPIRVMap<SPIRAddressSpace, std::string>::init() {
   add(SPIRAS_Input, "Input");
   add(SPIRAS_Output, "Output");
   add(SPIRAS_Uniform, "Uniform");
-  add(SPIRAS_TaskPayload, "TaskPayload");
 }
 
 template <> inline void SPIRVMap<SPIRAddressSpace, SPIRVStorageClassKind>::init() {
@@ -194,16 +190,15 @@ template <> inline void SPIRVMap<SPIRAddressSpace, SPIRVStorageClassKind>::init(
   add(SPIRAS_Private, StorageClassPrivate);
   add(SPIRAS_Constant, StorageClassPushConstant);
   add(SPIRAS_Uniform, StorageClassStorageBuffer);
+  add(SPIRAS_Uniform, StorageClassAtomicCounter);
   add(SPIRAS_Global, StorageClassPhysicalStorageBufferEXT);
-#if VKI_RAY_TRACING
   add(SPIRAS_Private, StorageClassCallableDataKHR);
   add(SPIRAS_Private, StorageClassIncomingCallableDataKHR);
   add(SPIRAS_Private, StorageClassRayPayloadKHR);
   add(SPIRAS_Private, StorageClassHitAttributeKHR);
   add(SPIRAS_Private, StorageClassIncomingRayPayloadKHR);
   add(SPIRAS_Global, StorageClassShaderRecordBufferKHR);
-#endif
-  add(SPIRAS_TaskPayload, StorageClassTaskPayloadWorkgroupEXT);
+  add(SPIRAS_Uniform, StorageClassTaskPayloadWorkgroupEXT);
 }
 typedef SPIRVMap<SPIRAddressSpace, SPIRVStorageClassKind> SPIRSPIRVAddrSpaceMap;
 
@@ -225,8 +220,11 @@ const static char InOut[] = "spirv.InOut";
 const static char Block[] = "spirv.Block";
 const static char PushConst[] = "spirv.PushConst";
 const static char Resource[] = "spirv.Resource";
+const static char TaskPayload[] = "spirv.TaskPayload";
+const static char UniformConstant[] = "spirv.UniformConstant";
 const static char ExecutionModel[] = "spirv.ExecutionModel";
 const static char NonUniform[] = "spirv.NonUniform";
+const static char AtomicCounter[] = "spirv.AtomicCounter";
 const static char Lds[] = "spirv.Lds";
 } // namespace gSPIRVMD
 
@@ -454,18 +452,19 @@ struct ShaderInOutDecorate {
 /// Metadata for shader block.
 union ShaderBlockMetadata {
   struct {
-    unsigned offset : 32;      // Offset (bytes) in block
-    unsigned IsMatrix : 1;     // Whether it is a matrix
-    unsigned IsRowMajor : 1;   // Whether it is a "row_major" qualified matrix
-    unsigned MatrixStride : 6; // Matrix stride, valid for matrix
-    unsigned Restrict : 1;     // Whether "restrict" qualifier is present
-    unsigned Coherent : 1;     // Whether "coherent" qualifier is present
-    unsigned Volatile : 1;     // Whether "volatile" qualifier is present
-    unsigned NonWritable : 1;  // Whether "readonly" qualifier is present
-    unsigned NonReadable : 1;  // Whether "writeonly" qualifier is present
-    unsigned IsPointer : 1;    // Whether it is a pointer
-    unsigned IsStruct : 1;     // Whether it is a structure
-    unsigned Unused : 17;
+    unsigned offset : 32;                 // Offset (bytes) in block
+    unsigned IsMatrix : 1;                // Whether it is a matrix
+    unsigned IsRowMajor : 1;              // Whether it is a "row_major" qualified matrix
+    unsigned MatrixStride : 6;            // Matrix stride, valid for matrix
+    unsigned Restrict : 1;                // Whether "restrict" qualifier is present
+    unsigned Coherent : 1;                // Whether "coherent" qualifier is present
+    unsigned Volatile : 1;                // Whether "volatile" qualifier is present
+    unsigned NonWritable : 1;             // Whether "readonly" qualifier is present
+    unsigned NonReadable : 1;             // Whether "writeonly" qualifier is present
+    unsigned IsPointer : 1;               // Whether it is a pointer
+    unsigned IsStruct : 1;                // Whether it is a structure
+    unsigned IsAccelerationStructure : 1; // Whether it is an acceleration structure
+    unsigned Unused : 16;
   };
   uint64_t U64All;
 };

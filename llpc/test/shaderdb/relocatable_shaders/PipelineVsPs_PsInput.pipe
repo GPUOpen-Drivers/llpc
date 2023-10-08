@@ -1,10 +1,52 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v \
 ; RUN:   | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST: SPI_PS_INPUT_CNTL_0                           0x0000000000000000
-; SHADERTEST: SPI_PS_INPUT_ENA                              0x0000000000000002
-; SHADERTEST: SPI_PS_INPUT_ADDR                             0x0000000000000002
-; SHADERTEST: SPI_PS_IN_CONTROL                             0x0000000000000001
+; SHADERTEST-LABEL: PalMetadata
+; SHADERTEST: .spi_ps_in_control: {
+; SHADERTEST:  .num_interps: 0x0000000000000001
+; SHADERTEST:  .ps_w32_en: 0 }
+; SHADERTEST: .spi_ps_input_addr: {
+; SHADERTEST:  .ancillary_ena: 0
+; SHADERTEST:  .front_face_ena: 0
+; SHADERTEST:  .line_stipple_tex_ena: 0
+; SHADERTEST:  .linear_center_ena: 0
+; SHADERTEST:  .linear_centroid_ena: 0
+; SHADERTEST:  .linear_sample_ena: 0
+; SHADERTEST:  .persp_center_ena: 1
+; SHADERTEST:  .persp_centroid_ena: 0
+; SHADERTEST:  .persp_pull_model_ena: 0
+; SHADERTEST:  .persp_sample_ena: 0
+; SHADERTEST:  .pos_fixed_pt_ena: 0
+; SHADERTEST:  .pos_w_float_ena: 0
+; SHADERTEST:  .pos_x_float_ena: 0
+; SHADERTEST:  .pos_y_float_ena: 0
+; SHADERTEST:  .pos_z_float_ena: 0
+; SHADERTEST:  .sample_coverage_ena: 0 }
+; SHADERTEST: .spi_ps_input_cntl: [ {
+; SHADERTEST:  .attr0_valid: 0x0000000000000000
+; SHADERTEST:  .attr1_valid: 0x0000000000000000
+; SHADERTEST:  .flat_shade: 0
+; SHADERTEST:  .fp16_interp_mode: 0
+; SHADERTEST:  .offset: 0x0000000000000000
+; SHADERTEST:  .prim_attr: 0
+; SHADERTEST:  .pt_sprite_tex: 0 }]
+; SHADERTEST: .spi_ps_input_ena: {
+; SHADERTEST:  .ancillary_ena: 0
+; SHADERTEST:  .front_face_ena: 0
+; SHADERTEST:  .line_stipple_tex_ena: 0
+; SHADERTEST:  .linear_center_ena: 0
+; SHADERTEST:  .linear_centroid_ena: 0
+; SHADERTEST:  .linear_sample_ena: 0
+; SHADERTEST:  .persp_center_ena: 1
+; SHADERTEST:  .persp_centroid_ena: 0
+; SHADERTEST:  .persp_pull_model_ena: 0
+; SHADERTEST:  .persp_sample_ena: 0
+; SHADERTEST:  .pos_fixed_pt_ena: 0
+; SHADERTEST:  .pos_w_float_ena: 0
+; SHADERTEST:  .pos_x_float_ena: 0
+; SHADERTEST:  .pos_y_float_ena: 0
+; SHADERTEST:  .pos_z_float_ena: 0
+; SHADERTEST:  .sample_coverage_ena: 0 }
 ; END_SHADERTEST
 
 [Version]

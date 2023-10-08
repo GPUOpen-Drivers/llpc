@@ -11,14 +11,14 @@
 
 ; Check that all the expected dump files are in place.
 ; RUN: ls -1 %t/dump | FileCheck -check-prefix=FILES %s
-; FILES:     {{^}}PipelineVsFs_0x[[PIPE_HASH:[0-9A-F]+]].elf{{$}}
-; FILES:     {{^}}PipelineVsFs_0x[[PIPE_HASH]].pipe{{$}}
+; FILES:     {{^}}PipelineLibVs_0x[[PIPE_HASH:[0-9A-F]+]].elf{{$}}
+; FILES:     {{^}}PipelineLibVs_0x[[PIPE_HASH]].pipe{{$}}
 ; FILES-NOT: {{^}}Pipeline
 ; FILES:     {{^}}Shader_0x{{[0-9A-F]+}}.spv{{$}}
 ; FILES-NOT: {{^}}Shader_
 
 ; Check that we can compile with the pipeline dump as input.
-; RUN: amdllpc -v %gfxip %t/dump/PipelineVsFs_0x*.pipe -o %t.recompile.elf \
+; RUN: amdllpc -v %gfxip %t/dump/PipelineLibVs_0x*.pipe -o %t.recompile.elf \
 ; RUN:   | FileCheck -check-prefix=RECOMPILE %s
 ; RECOMPILE-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; RECOMPILE-LABEL: ==== AMDLLPC SUCCESS ====

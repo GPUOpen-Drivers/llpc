@@ -32,6 +32,8 @@
 
 #include "SPIRVInternal.h"
 #include "llpcSpirvLower.h"
+#include "vkgcDefs.h"
+#include "lgc/Builder.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/PassManager.h"
@@ -58,10 +60,6 @@ public:
   void handleStoreInst();
   void handleStoreInstGEP(GlobalVariable *output, ArrayRef<Value *> indexOperands, StoreInst &storeInst);
 
-  void handleAtomicInst();
-  void handleAtomicInstGlobal(Instruction &atomicInst);
-  void handleAtomicInstGEP(GetElementPtrInst *const getElemPtr, Instruction &atomicInst);
-
   static llvm::StringRef name() { return "Lower SPIR-V globals (global variables, inputs, and outputs)"; }
 
 private:
@@ -74,16 +72,25 @@ private:
   void lowerOutput();
   void lowerInOutInPlace();
   void lowerBufferBlock();
+  void lowerTaskPayload();
   void lowerPushConsts();
+  void lowerUniformConstants();
   void lowerAliasedVal();
+  void lowerEdgeFlag();
+  void lowerShaderRecordBuffer();
 
   void cleanupReturnBlock();
+
+  void handleVolatileInput(llvm::GlobalVariable *input, llvm::Value *proxy);
+
+  void changeRtFunctionSignature();
 
   llvm::Value *addCallInstForInOutImport(llvm::Type *inOutTy, unsigned addrSpace, llvm::Constant *inOutMeta,
                                          llvm::Value *startLoc, unsigned maxLocOffset, llvm::Value *compIdx,
                                          llvm::Value *vertexIdx, unsigned interpLoc, llvm::Value *interpInfo,
                                          bool isPerVertexDimension);
 
+  llvm::Value *createRaytracingBuiltIn(BuiltIn builtIn);
   void addCallInstForOutputExport(llvm::Value *outputValue, llvm::Constant *outputMeta, llvm::Value *locOffset,
                                   unsigned maxLocOffset, unsigned xfbOffsetAdjust, unsigned xfbBufferAdjust,
                                   llvm::Value *elemIdx, llvm::Value *vertexIdx, unsigned emitStreamId);
@@ -101,22 +108,13 @@ private:
                          llvm::ArrayRef<llvm::Value *> indexOperands, unsigned maxLocOffset, llvm::Constant *outputMeta,
                          llvm::Value *locOffset, llvm::Value *vertexOrPrimitiveIdx);
 
-  llvm::Value *loadIndexedValueFromTaskPayload(llvm::Type *indexedTy, llvm::Type *loadTy,
-                                               llvm::ArrayRef<llvm::Value *> indexOperands, llvm::Constant *metadata,
-                                               llvm::Value *extraByteOffset);
-  llvm::Value *loadValueFromTaskPayload(llvm::Type *loadTy, llvm::Constant *metadata, llvm::Value *extraByteOffset);
-  void storeIndexedValueToTaskPayload(llvm::Type *indexedTy, llvm::Type *storeTy, llvm::Value *storeValue,
-                                      llvm::ArrayRef<llvm::Value *> indexOperands, llvm::Constant *metadata,
-                                      llvm::Value *extraByteOffset);
-  void storeValueToTaskPayload(llvm::Value *storeValue, llvm::Constant *metadata, llvm::Value *extraByteOffse);
-  llvm::Value *atomicOpWithIndexedValueInTaskPayload(llvm::Type *indexedTy, llvm::Instruction *atomicInst,
-                                                     llvm::ArrayRef<llvm::Value *> indexOperands,
-                                                     llvm::Constant *metadata, llvm::Value *extraByteOffset);
-  llvm::Value *atomicOpWithValueInTaskPayload(llvm::Instruction *atomicInst, llvm::Constant *metadata,
-                                              llvm::Value *extraByteOffset);
-
   void interpolateInputElement(unsigned interpLoc, llvm::Value *interpInfo, llvm::CallInst &callInst,
                                GlobalVariable *gv, ArrayRef<Value *> indexOperands);
+
+  void buildApiXfbMap();
+
+  void addCallInstForXfbOutput(const ShaderInOutMetadata &outputMeta, Value *outputValue, unsigned xfbBufferAdjust,
+                               unsigned xfbOffsetAdjust, unsigned locOffset, lgc::InOutInfo outputInfo);
 
   std::unordered_map<llvm::Value *, llvm::Value *> m_globalVarProxyMap; // Proxy map for lowering global variables
   std::unordered_map<llvm::Value *, llvm::Value *> m_inputProxyMap;     // Proxy map for lowering inputs
@@ -137,6 +135,12 @@ private:
   std::unordered_set<llvm::Instruction *> m_atomicInsts; // "Atomicrwm" or "cmpxchg" instructions to be removed
   std::unordered_set<llvm::CallInst *> m_interpCalls;    // "Call" instruction to do input interpolation
                                                          // (fragment shader)
+  ShaderStage m_lastVertexProcessingStage;               // The last vertex processing stage
+  llvm::DenseMap<unsigned, Vkgc::XfbOutInfo>
+      m_builtInXfbMap; // Map built-in to XFB output info specified by API interface
+  llvm::DenseMap<unsigned, Vkgc::XfbOutInfo>
+      m_genericXfbMap;           // Map generic location to XFB output info specified by API interface
+  bool m_printedXfbInfo = false; // It marks if the XFB info has not been printed yet
 };
 
 } // namespace Llpc

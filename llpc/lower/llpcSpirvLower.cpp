@@ -29,6 +29,7 @@
  ***********************************************************************************************************************
  */
 #include "llpcSpirvLower.h"
+#include "LowerGLCompatibility.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcSpirvLowerAccessChain.h"
@@ -38,19 +39,18 @@
 #include "llpcSpirvLowerInstMetaRemove.h"
 #include "llpcSpirvLowerMath.h"
 #include "llpcSpirvLowerMemoryOp.h"
-#if VKI_RAY_TRACING
 #include "llpcSpirvLowerRayQueryPostInline.h"
-#include "llpcSpirvLowerRayTracingBuiltIn.h"
-#include "llpcSpirvLowerRayTracingIntrinsics.h"
-#endif
+#include "llpcSpirvLowerRayTracing.h"
 #include "llpcSpirvLowerTerminator.h"
 #include "llpcSpirvLowerTranslator.h"
 #include "llpcSpirvLowerUtil.h"
+#include "llpcSpirvProcessGpuRtLibrary.h"
 #include "lgc/Builder.h"
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/IR/IRPrintingPasses.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/IR/Verifier.h"
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 442438
 // Old version of the code
@@ -58,6 +58,7 @@
 // New version of the code (also handles unknown version, which we treat as latest)
 #include "llvm/IRPrinter/IRPrintingPasses.h"
 #endif
+#include "LowerGpuRt.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Transforms/AggressiveInstCombine/AggressiveInstCombine.h"
 #include "llvm/Transforms/IPO.h"
@@ -132,7 +133,7 @@ void SpirvLower::replaceConstWithInsts(Context *context, Constant *const constVa
       Instruction *const insertPos = builder->Insert(constExpr->getAsInstruction());
       inst->replaceUsesOfWith(constExpr, insertPos);
     } else if (ConstantVector *const constVector = dyn_cast<ConstantVector>(constVal)) {
-      Value *resultValue = UndefValue::get(constVector->getType());
+      Value *resultValue = PoisonValue::get(constVector->getType());
       for (unsigned i = 0; i < constVector->getNumOperands(); i++) {
         // Have to not use the builder here because it will constant fold and we are trying to undo that now!
         Instruction *const insertPos =
@@ -172,28 +173,17 @@ void SpirvLower::removeConstantExpr(Context *context, GlobalVariable *global) {
 // @param stage : Shader stage
 // @param [in/out] passMgr : Pass manager to add passes to
 // @param lowerTimer : Timer to time lower passes with, nullptr if not timing
-#if VKI_RAY_TRACING
 // @param rayTracing : Whether we are lowering a ray tracing pipeline shader
 // @param rayQuery : Whether we are lowering a ray query library
 // @param isInternalRtShader : Whether we are lowering an internal ray tracing shader
-#endif
-void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager &passMgr, Timer *lowerTimer
-#if VKI_RAY_TRACING
-                           ,
-                           bool rayTracing, bool rayQuery, bool isInternalRtShader
-#endif
-) {
-  // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
-  context->getLgcContext()->preparePassManager(passMgr);
-
+void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager &passMgr, Timer *lowerTimer,
+                           bool rayTracing, bool rayQuery, bool isInternalRtShader) {
   // Start timer for lowering passes.
   if (lowerTimer)
     LgcContext::createAndAddStartStopTimer(passMgr, lowerTimer, true);
 
-#if VKI_RAY_TRACING
   if (isInternalRtShader)
-    passMgr.addPass(SpirvLowerRayTracingIntrinsics());
-#endif
+    passMgr.addPass(SpirvProcessGpuRtLibrary());
 
   // Lower SPIR-V CFG merges before inlining
   passMgr.addPass(SpirvLowerCfgMerges());
@@ -206,18 +196,25 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   // Lower SPIR-V access chain
   passMgr.addPass(SpirvLowerAccessChain());
 
-#if VKI_RAY_TRACING
-  if (rayTracing)
-    passMgr.addPass(SpirvLowerRayTracingBuiltIn());
   if (rayQuery)
     passMgr.addPass(SpirvLowerRayQueryPostInline());
-#endif
 
   // Lower SPIR-V terminators
   passMgr.addPass(SpirvLowerTerminator());
 
+  // Lower Glsl compatibility variables and operations
+  passMgr.addPass(LowerGLCompatibility());
+
   // Lower SPIR-V global variables, inputs, and outputs
   passMgr.addPass(SpirvLowerGlobal());
+
+  // Lower SPIR-V ray tracing related stuff, including entry point generation, lgc.rt dialect handling, some of
+  // lgc.gpurt dialect handling.
+  // And do inlining after SpirvLowerRayTracing as it will produce some extra functions.
+  if (rayTracing) {
+    passMgr.addPass(SpirvLowerRayTracing());
+    passMgr.addPass(AlwaysInlinerPass());
+  }
 
   // Lower SPIR-V constant immediate store.
   passMgr.addPass(SpirvLowerConstImmediateStore());
@@ -237,8 +234,15 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   // New version of the code (also handles unknown version, which we treat as latest)
   passMgr.addPass(createModuleToFunctionPassAdaptor(SROAPass(SROAOptions::ModifyCFG)));
 #endif
+
+  // Lower SPIR-V precision / adjust fast math flags.
+  // Must be done before instruction combining pass to prevent incorrect contractions.
+  // Should be after SROA to avoid having to track values through memory load/store.
+  passMgr.addPass(SpirvLowerMathPrecision());
+
   passMgr.addPass(GlobalOptPass());
   passMgr.addPass(createModuleToFunctionPassAdaptor(ADCEPass()));
+
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 452298
   // Old version of the code
   unsigned instCombineOpt = 2;
@@ -255,6 +259,16 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
 
   // Lower SPIR-V instruction metadata remove
   passMgr.addPass(SpirvLowerInstMetaRemove());
+
+  if (rayTracing || rayQuery || isInternalRtShader) {
+    passMgr.addPass(LowerGpuRt());
+    passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(instCombineOpt)));
+  }
+
+  FunctionPassManager fpm;
+  fpm.addPass(SROAPass(SROAOptions::PreserveCFG));
+  fpm.addPass(InstCombinePass(instCombineOpt));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
 
   // Stop timer for lowering passes.
   if (lowerTimer)
@@ -314,11 +328,9 @@ void SpirvLower::init(Module *module) {
     m_shaderStage = getShaderStageFromModule(m_module);
     m_entryPoint = getEntryPoint(m_module);
     if (m_shaderStage == ShaderStageInvalid) {
-#if VKI_RAY_TRACING
       // There might be cases we fail to get shader stage from a module that is not directly converted from SPIR-V, for
       // example, unified ray tracing pipeline shader, or entry for indirect ray tracing pipeline. In such case, clamp
       // the shader stage to compute.
-#endif
       assert(m_entryPoint);
       m_shaderStage = ShaderStageCompute;
     }

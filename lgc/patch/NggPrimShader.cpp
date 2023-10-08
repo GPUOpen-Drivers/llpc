@@ -242,7 +242,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
     ldsUsageInfo.gsExtraLdsSize += ldsRegionSize;
 
     // Primitive counts
-    if (pipelineState->enableSwXfb()) {
+    if (pipelineState->enableSwXfb() || pipelineState->enablePrimStats()) {
       ldsRegionSize =
           (Gfx9::NggMaxWavesPerSubgroup + 1) * MaxGsStreams; // 1 dword per wave and 1 dword per subgroup, 4 GS streams
       if (ldsLayout) {
@@ -265,9 +265,10 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
     }
 
     // Vertex counts
-    if (pipelineState->enableSwXfb()) {
+    if (pipelineState->enableSwXfb() || pipelineState->enablePrimStats()) {
       if (ldsLayout) {
-        // NOTE: If SW emulated stream-out is enabled, this region is overlapped with PrimitiveCounts
+        // NOTE: If SW emulated stream-out or primitive statistics counting is enabled, this region is overlapped with
+        // PrimitiveCounts.
         (*ldsLayout)[PrimShaderLdsRegion::VertexCounts] = (*ldsLayout)[PrimShaderLdsRegion::PrimitiveCounts];
         printLdsRegionInfo("Vertex Counts", (*ldsLayout)[PrimShaderLdsRegion::VertexCounts].first,
                            (*ldsLayout)[PrimShaderLdsRegion::VertexCounts].second);
@@ -287,7 +288,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
     if (pipelineState->getNggControl()->compactVertex) {
       if (pipelineState->enableSwXfb()) {
         if (ldsLayout) {
-          // NOTE: If SW emulated stream-out is enabled, this region is overlapped with PrimitiveIndexMap
+          // NOTE: If SW emulated stream-out is enabled, this region is overlapped with PrimitiveIndexMap.
           (*ldsLayout)[PrimShaderLdsRegion::VertexIndexMap] = (*ldsLayout)[PrimShaderLdsRegion::PrimitiveIndexMap];
           printLdsRegionInfo("Vertex Index Map (To Uncompacted)",
                              (*ldsLayout)[PrimShaderLdsRegion::VertexIndexMap].first,
@@ -551,6 +552,8 @@ Function *NggPrimShader::generate(Function *esMain, Function *gsMain, Function *
 
   Function *primShader = Function::Create(primShaderTy, GlobalValue::ExternalLinkage, lgcName::NggPrimShaderEntryPoint);
   primShader->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
+  primShader->addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
   primShader->addFnAttr("amdgpu-flat-work-group-size",
                         "128,128"); // Force s_barrier to be present (ignore optimization)
 
@@ -855,16 +858,18 @@ void NggPrimShader::buildPrimShaderCbLayoutLookupTable() {
 }
 
 // =====================================================================================================================
-// Calculate the dword offset of each item in the stream-out control buffer
+// Calculate the dword offset of each item in the stream-out control buffer.
 void NggPrimShader::calcStreamOutControlCbOffsets() {
-  assert(m_pipelineState->enableSwXfb());
+  assert(m_pipelineState->enableSwXfb() || m_pipelineState->enablePrimStats());
 
   m_streamOutControlCbOffsets = {};
 
-  for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
-    m_streamOutControlCbOffsets.bufOffsets[i] = (offsetof(Util::Abi::StreamOutControlCb, bufOffsets[0]) +
-                                                 sizeof(Util::Abi::StreamOutControlCb::bufOffsets[0]) * i) /
-                                                4;
+  if (m_pipelineState->enableSwXfb()) {
+    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+      m_streamOutControlCbOffsets.bufOffsets[i] = (offsetof(Util::Abi::StreamOutControlCb, bufOffsets[0]) +
+                                                   sizeof(Util::Abi::StreamOutControlCb::bufOffsets[0]) * i) /
+                                                  4;
+    }
   }
 }
 
@@ -931,6 +936,9 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
   //   if (Enable SW XFB)
   //     Process SW XFB (Run ES)
   //   else {
+  //     if (Enable primitive statistics counting)
+  //       Collect primitive statistics
+  //
   //     if (threadIdInSubgroup < vertCountInSubgroup)
   //       Run ES (export vertex)
   //   }
@@ -959,7 +967,7 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
       // Record attribute ring base ([14:0])
       m_nggInputs.attribRingBase = createUBfe(attribRingBase, 0, 15);
 
-      if (m_pipelineState->enableSwXfb())
+      if (m_pipelineState->enableSwXfb() || m_pipelineState->enablePrimStats())
         loadStreamOutBufferInfo(userData);
     }
 
@@ -990,7 +998,7 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
       // If we distribute primitive ID, there must be at least a s_barrier inserted. Thus, following codes are not
       // needed.
       if (!m_distributedPrimitiveId)
-        m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+        createBarrier();
     }
 
     auto firstWaveInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.waveIdInSubgroup, m_builder.getInt32(0));
@@ -1030,8 +1038,11 @@ void NggPrimShader::buildPassthroughPrimShader(Function *primShader) {
   {
     m_builder.SetInsertPoint(endExportPrimitiveBlock);
 
+    // Process SW XFB or primitive statistics counting
     if (m_pipelineState->enableSwXfb())
       processSwXfb(args);
+    else if (m_pipelineState->enablePrimStats())
+      collectPrimitiveStats();
 
     auto validVertex = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.vertCountInSubgroup);
     m_builder.CreateCondBr(validVertex, exportVertexBlock, endExportVertexBlock);
@@ -1154,6 +1165,8 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
   //
   //   if (Enable SW XFB)
   //     Process SW XFB
+  //   else if (Enable primitive statistics counting)
+  //     Collect primitive statistics
   //
   //   if (threadIdInWave < vertCountInWave)
   //     Run part ES to fetch vertex cull data
@@ -1282,7 +1295,7 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
       // Record attribute ring base ([14:0])
       m_nggInputs.attribRingBase = createUBfe(attribRingBase, 0, 15);
 
-      if (m_pipelineState->enableSwXfb())
+      if (m_pipelineState->enableSwXfb() || m_pipelineState->enablePrimStats())
         loadStreamOutBufferInfo(userData);
     }
 
@@ -1303,9 +1316,11 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
     // Distribute primitive ID if needed
     distributePrimitiveId(primitiveId);
 
-    // Process SW XFB
+    // Process SW XFB or primitive statistics counting
     if (m_pipelineState->enableSwXfb())
       processSwXfb(args);
+    else if (m_pipelineState->enablePrimStats())
+      collectPrimitiveStats();
 
     m_builder.CreateBr(checkFetchVertexCullDataBlock);
   }
@@ -1528,13 +1543,13 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
 
     // The last dword following dwords for all waves (each wave has one dword) stores vertex count of the
     // entire subgroup
-    vertCountInSubgroup = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {},
+    vertCountInSubgroup = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
                                                     {vertCountInWaves, m_builder.getInt32(waveCountInSubgroup)});
 
     if (m_nggControl->compactVertex) {
       // Get vertex count for all waves prior to this wave
-      vertCountInPrevWaves =
-          m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {vertCountInWaves, m_nggInputs.waveIdInSubgroup});
+      vertCountInPrevWaves = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
+                                                       {vertCountInWaves, m_nggInputs.waveIdInSubgroup});
 
       hasCulledVertices = m_builder.CreateICmpULT(vertCountInSubgroup, m_nggInputs.vertCountInSubgroup);
       m_builder.CreateCondBr(m_builder.CreateAnd(drawFlag, hasCulledVertices), compactVertexBlock,
@@ -1623,7 +1638,8 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
     // NOTE: Here, we have to promote revised primitive count in subgroup to SGPR since it is treated
     // as an uniform value later. This is similar to the provided primitive count in subgroup that is
     // a system value.
-    primCountInSubgroup = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, primCountInSubgroup);
+    primCountInSubgroup =
+        m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, primCountInSubgroup);
 
     vertCountInSubgroup =
         m_builder.CreateSelect(fullyCulled, m_builder.getInt32(dummyExportCount),
@@ -1632,7 +1648,8 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
     // NOTE: Here, we have to promote revised vertex count in subgroup to SGPR since it is treated as
     // an uniform value later, similar to what we have done for the revised primitive count in
     // subgroup.
-    vertCountInSubgroup = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, vertCountInSubgroup);
+    vertCountInSubgroup =
+        m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, vertCountInSubgroup);
 
     m_builder.CreateBr(checkSendGsAllocReqBlock);
   }
@@ -1777,13 +1794,13 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
     {
       m_builder.SetInsertPoint(dummyVertexExportBlock);
 
-      auto undef = PoisonValue::get(m_builder.getFloatTy());
+      auto poison = PoisonValue::get(m_builder.getFloatTy());
       m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getFloatTy(),
                                 {
                                     m_builder.getInt32(EXP_TARGET_POS_0), // tgt
                                     m_builder.getInt32(0x0),              // en
                                     // src0 ~ src3
-                                    undef, undef, undef, undef,
+                                    poison, poison, poison, poison,
                                     m_builder.getTrue(), // done
                                     m_builder.getFalse() // vm
                                 });
@@ -1884,6 +1901,8 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
   //
   //   if (Enable SW XFB)
   //     Process SW XFB
+  //   else if (Enable primitive statistics counting)
+  //     Collect primitive statistics
   //
   //  if (threadIdInSubgroup < waveCount + 1)
   //     Initialize per-wave and per-subgroup count of output vertices
@@ -1974,7 +1993,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
       // Record attribute ring base ([14:0])
       m_nggInputs.attribRingBase = createUBfe(attribRingBase, 0, 15);
 
-      if (m_pipelineState->enableSwXfb())
+      if (m_pipelineState->enableSwXfb() || m_pipelineState->enablePrimStats())
         loadStreamOutBufferInfo(userData);
     }
 
@@ -2006,19 +2025,11 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
   {
     m_builder.SetInsertPoint(initPrimitiveDataBlock);
 
-    if (m_pipelineState->enableSwXfb()) {
-      const auto &streamXfbBuffers = m_pipelineState->getStreamXfbBuffers();
-      for (unsigned i = 0; i < MaxGsStreams; ++i) {
-        // Treat the vertex stream as active if it is associated with XFB buffers or is the rasterization stream.
-        bool streamActive = streamXfbBuffers[i] != 0 || i == rasterStream;
-        if (streamActive) { // Initialize primitive connectivity data if the stream is active
-          writePerThreadDataToLds(m_builder.getInt32(NullPrim), m_nggInputs.threadIdInSubgroup,
-                                  PrimShaderLdsRegion::PrimitiveData, Gfx9::NggMaxThreadsPerSubgroup * i);
-        }
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (m_pipelineState->isVertexStreamActive(i)) { // Initialize primitive connectivity data if the stream is active
+        writePerThreadDataToLds(m_builder.getInt32(NullPrim), m_nggInputs.threadIdInSubgroup,
+                                PrimShaderLdsRegion::PrimitiveData, Gfx9::NggMaxThreadsPerSubgroup * i);
       }
-    } else {
-      writePerThreadDataToLds(m_builder.getInt32(NullPrim), m_nggInputs.threadIdInSubgroup,
-                              PrimShaderLdsRegion::PrimitiveData, Gfx9::NggMaxThreadsPerSubgroup * rasterStream);
     }
 
     m_builder.CreateBr(endInitPrimitiveDataBlock);
@@ -2047,8 +2058,11 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
   {
     m_builder.SetInsertPoint(endGsBlock);
 
+    // Process SW XFB or primitive statistics counting
     if (m_pipelineState->enableSwXfb())
       processSwXfbWithGs(args);
+    else if (m_pipelineState->enablePrimStats())
+      collectPrimitiveStats();
 
     auto validWave =
         m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(waveCountInSubgroup + 1));
@@ -2245,12 +2259,12 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
 
       // The last dword following dwords for all waves (each wave has one dword) stores GS output vertex count of the
       // entire subgroup
-      auto vertCountInSubgroup = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {},
+      auto vertCountInSubgroup = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
                                                            {vertCountInWaves, m_builder.getInt32(waveCountInSubgroup)});
 
       // Get output vertex count for all waves prior to this wave
-      vertCountInPrevWaves =
-          m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {vertCountInWaves, m_nggInputs.waveIdInSubgroup});
+      vertCountInPrevWaves = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
+                                                       {vertCountInWaves, m_nggInputs.waveIdInSubgroup});
 
       auto hasCulledVertices = m_builder.CreateICmpULT(vertCountInSubgroup, m_nggInputs.vertCountInSubgroup);
 
@@ -2371,13 +2385,13 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
     {
       m_builder.SetInsertPoint(dummyVertexExportBlock);
 
-      auto undef = PoisonValue::get(m_builder.getFloatTy());
+      auto poison = PoisonValue::get(m_builder.getFloatTy());
       m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getFloatTy(),
                                 {
                                     m_builder.getInt32(EXP_TARGET_POS_0), // tgt
                                     m_builder.getInt32(0x0),              // en
                                     // src0 ~ src3
-                                    undef, undef, undef, undef,
+                                    poison, poison, poison, poison,
                                     m_builder.getTrue(), // done
                                     m_builder.getFalse() // vm
                                 });
@@ -2469,7 +2483,8 @@ void NggPrimShader::initWaveThreadInfo(Value *mergedGroupInfo, Value *mergedWave
 //
 // @param userData : User data
 void NggPrimShader::loadStreamOutBufferInfo(Value *userData) {
-  assert(m_pipelineState->enableSwXfb()); // Must enable SW emulated stream-out
+  // Must enable SW emulated stream-out or primitive statistics counting
+  assert(m_pipelineState->enableSwXfb() || m_pipelineState->enablePrimStats());
 
   calcStreamOutControlCbOffsets();
 
@@ -2490,22 +2505,6 @@ void NggPrimShader::loadStreamOutBufferInfo(Value *userData) {
     return userDataIndex;
   };
 
-  // Get stream-out table pointer value and stream-out control buffer pointer value
-  const auto gsOrEsMain = m_hasGs ? m_gsHandlers.main : m_esHandlers.main;
-  StreamOutData streamOutData = {};
-  if (m_hasGs)
-    streamOutData = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs.streamOutData;
-  else if (m_hasTes)
-    streamOutData = m_pipelineState->getShaderInterfaceData(ShaderStageTessEval)->entryArgIdxs.tes.streamOutData;
-  else
-    streamOutData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs.streamOutData;
-
-  assert(userData->getType()->isVectorTy());
-  auto streamOutTablePtrValue =
-      m_builder.CreateExtractElement(userData, getUserDataIndex(gsOrEsMain, streamOutData.tablePtr));
-  auto streamOutControlBufPtrValue =
-      m_builder.CreateExtractElement(userData, getUserDataIndex(gsOrEsMain, streamOutData.controlBufPtr));
-
   // Helper to make a pointer from its integer address value and the type
   auto makePointer = [&](Value *ptrValue, Type *ptrTy) {
     Value *pc = m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_getpc, {}, {});
@@ -2518,29 +2517,49 @@ void NggPrimShader::loadStreamOutBufferInfo(Value *userData) {
     return ptr;
   };
 
+  const auto gsOrEsMain = m_hasGs ? m_gsHandlers.main : m_esHandlers.main;
+  StreamOutData streamOutData = {};
+  if (m_hasGs)
+    streamOutData = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs.streamOutData;
+  else if (m_hasTes)
+    streamOutData = m_pipelineState->getShaderInterfaceData(ShaderStageTessEval)->entryArgIdxs.tes.streamOutData;
+  else
+    streamOutData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs.streamOutData;
+
+  assert(userData->getType()->isVectorTy());
   const auto constBufferPtrTy = PointerType::get(m_builder.getContext(), ADDR_SPACE_CONST);
-  auto streamOutTablePtr = makePointer(streamOutTablePtrValue, constBufferPtrTy);
+
+  // Get stream-out control buffer pointer value
+  auto streamOutControlBufPtrValue =
+      m_builder.CreateExtractElement(userData, getUserDataIndex(gsOrEsMain, streamOutData.controlBufPtr));
   m_streamOutControlBufPtr = makePointer(streamOutControlBufPtrValue, constBufferPtrTy);
 
-  const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
-  for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
-    bool bufferActive = xfbStrides[i] > 0;
-    if (!bufferActive)
-      continue; // Transform feedback buffer inactive
+  if (m_pipelineState->enableSwXfb()) {
+    // Get stream-out table pointer value
+    auto streamOutTablePtrValue =
+        m_builder.CreateExtractElement(userData, getUserDataIndex(gsOrEsMain, streamOutData.tablePtr));
+    auto streamOutTablePtr = makePointer(streamOutTablePtrValue, constBufferPtrTy);
 
-    // Get stream-out buffer descriptors and record them
-    m_streamOutBufDescs[i] = readValueFromCb(FixedVectorType::get(m_builder.getInt32Ty(), 4), streamOutTablePtr,
-                                             m_builder.getInt32(4 * i)); // <4 x i32>
+    const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
+    for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
+      bool bufferActive = xfbStrides[i] > 0;
+      if (!bufferActive)
+        continue; // Transform feedback buffer inactive
 
-    // NOTE: PAL decided not to invalidate the SQC and L1 for every stream-out update, mainly because that will hurt
-    // overall performance worse than just forcing this one buffer to be read via L2. Since PAL would not have wider
-    // context, PAL believed that they would have to perform that invalidation on every Set/Load unconditionally.
-    // Thus, we force the load of stream-out control buffer to be volatile to let LLVM backend add GLC and DLC flags.
-    const bool isVolatile = m_gfxIp.major == 11;
-    // Get stream-out buffer offsets and record them
-    m_streamOutBufOffsets[i] =
-        readValueFromCb(m_builder.getInt32Ty(), m_streamOutControlBufPtr,
-                        m_builder.getInt32(m_streamOutControlCbOffsets.bufOffsets[i]), isVolatile); // i32
+      // Get stream-out buffer descriptors and record them
+      m_streamOutBufDescs[i] = readValueFromCb(FixedVectorType::get(m_builder.getInt32Ty(), 4), streamOutTablePtr,
+                                               m_builder.getInt32(4 * i)); // <4 x i32>
+
+      // NOTE: PAL decided not to invalidate the SQC and L1 for every stream-out update, mainly because that will hurt
+      // overall performance worse than just forcing this one buffer to be read via L2. Since PAL would not have wider
+      // context, PAL believed that they would have to perform that invalidation on every Set/Load unconditionally.
+      // Thus, we force the load of stream-out control buffer to be volatile to let LLVM backend add GLC and DLC flags.
+      const bool isVolatile = m_gfxIp.major == 11;
+      // Get stream-out buffer offsets and record them
+      m_streamOutBufOffsets[i] =
+          readValueFromCb(m_builder.getInt32Ty(), m_streamOutControlBufPtr,
+                          m_builder.getInt32(m_streamOutControlCbOffsets.bufOffsets[i]), isVolatile); // i32
+    }
   }
 }
 
@@ -2591,9 +2610,23 @@ void NggPrimShader::distributePrimitiveId(Value *primitiveId) {
   {
     m_builder.SetInsertPoint(distribPrimitiveIdBlock);
 
-    Value *provokingVertexIndex = m_pipelineState->getRasterizerState().provokingVertexMode == ProvokingVertexFirst
-                                      ? m_nggInputs.vertexIndex0
-                                      : m_nggInputs.vertexIndex2;
+    auto primitiveType = m_pipelineState->getInputAssemblyState().primitiveType;
+    Value *provokingVertexIndex = nullptr;
+    if (primitiveType == PrimitiveType::Point) {
+      provokingVertexIndex = m_nggInputs.vertexIndex0;
+    } else if (primitiveType == PrimitiveType::LineList || primitiveType == PrimitiveType::LineStrip) {
+      provokingVertexIndex = m_pipelineState->getRasterizerState().provokingVertexMode == ProvokingVertexFirst
+                                 ? m_nggInputs.vertexIndex0
+                                 : m_nggInputs.vertexIndex1;
+    } else {
+      assert(primitiveType == PrimitiveType::TriangleList || primitiveType == PrimitiveType::TriangleStrip ||
+             primitiveType == PrimitiveType::TriangleFan || primitiveType == PrimitiveType::TriangleListAdjacency ||
+             primitiveType == PrimitiveType::TriangleStripAdjacency);
+      provokingVertexIndex = m_pipelineState->getRasterizerState().provokingVertexMode == ProvokingVertexFirst
+                                 ? m_nggInputs.vertexIndex0
+                                 : m_nggInputs.vertexIndex2;
+    }
+
     writePerThreadDataToLds(primitiveId, provokingVertexIndex, PrimShaderLdsRegion::DistributedPrimitiveId);
 
     m_builder.CreateBr(endDistribPrimitiveIdBlock);
@@ -2696,13 +2729,13 @@ void NggPrimShader::exportPassthroughPrimitive() {
   assert(m_nggControl->passthroughMode); // Make sure NGG passthrough mode is enabled
   assert(!m_hasGs);                      // Make sure API GS is not present
 
-  auto undef = PoisonValue::get(m_builder.getInt32Ty());
+  auto poison = PoisonValue::get(m_builder.getInt32Ty());
   m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getInt32Ty(),
                             {
                                 m_builder.getInt32(EXP_TARGET_PRIM), // tgt
                                 m_builder.getInt32(0x1),             // en
                                 // src0 ~ src3
-                                m_nggInputs.primData, undef, undef, undef,
+                                m_nggInputs.primData, poison, poison, poison,
                                 m_builder.getTrue(),  // done, must be set
                                 m_builder.getFalse(), // vm
                             });
@@ -2796,13 +2829,13 @@ void NggPrimShader::exportPrimitive(Value *primitiveCulled) {
   if (primitiveCulled)
     primData = m_builder.CreateSelect(primitiveCulled, m_builder.getInt32(NullPrim), primData);
 
-  auto undef = PoisonValue::get(m_builder.getInt32Ty());
+  auto poison = PoisonValue::get(m_builder.getInt32Ty());
   m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getInt32Ty(),
                             {
                                 m_builder.getInt32(EXP_TARGET_PRIM), // tgt
                                 m_builder.getInt32(0x1),             // en
                                 // src0 ~ src3
-                                primData, undef, undef, undef,
+                                primData, poison, poison, poison,
                                 m_builder.getTrue(),  // done, must be set
                                 m_builder.getFalse(), // vm
                             });
@@ -2909,12 +2942,12 @@ void NggPrimShader::exportPrimitiveWithGs(Value *startingVertexIndex) {
 
   primData = m_builder.CreateSelect(validPrimitive, newPrimData, primData);
 
-  auto undef = PoisonValue::get(m_builder.getInt32Ty());
+  auto poison = PoisonValue::get(m_builder.getInt32Ty());
   m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getInt32Ty(),
                             {
                                 m_builder.getInt32(EXP_TARGET_PRIM), // tgt
                                 m_builder.getInt32(0x1),             // en
-                                primData, undef, undef, undef,       // src0 ~ src3
+                                primData, poison, poison, poison,    // src0 ~ src3
                                 m_builder.getTrue(),                 // done, must be set
                                 m_builder.getFalse(),                // vm
                             });
@@ -2942,14 +2975,13 @@ void NggPrimShader::earlyExitWithDummyExport() {
   {
     m_builder.SetInsertPoint(dummyExportBlock);
 
-    auto undef = PoisonValue::get(m_builder.getInt32Ty());
-
+    auto poison = PoisonValue::get(m_builder.getInt32Ty());
     m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getInt32Ty(),
                               {
                                   m_builder.getInt32(EXP_TARGET_PRIM), // tgt
                                   m_builder.getInt32(0x1),             // en
                                   // src0 ~ src3
-                                  m_builder.getInt32(0), undef, undef, undef,
+                                  m_builder.getInt32(0), poison, poison, poison,
                                   m_builder.getTrue(), // done
                                   m_builder.getFalse() // vm
                               });
@@ -2984,15 +3016,14 @@ void NggPrimShader::earlyExitWithDummyExport() {
       posExpCount += (builtInUsage.clipDistance + builtInUsage.cullDistance) / 4;
     }
 
-    undef = PoisonValue::get(m_builder.getFloatTy());
-
+    poison = PoisonValue::get(m_builder.getFloatTy());
     for (unsigned i = 0; i < posExpCount; ++i) {
       m_builder.CreateIntrinsic(Intrinsic::amdgcn_exp, m_builder.getFloatTy(),
                                 {
                                     m_builder.getInt32(EXP_TARGET_POS_0 + i), // tgt
                                     m_builder.getInt32(0x0),                  // en
                                     // src0 ~ src3
-                                    undef, undef, undef, undef,
+                                    poison, poison, poison, poison,
                                     m_builder.getInt1(i == posExpCount - 1), // done
                                     m_builder.getFalse()                     // vm
                                 });
@@ -3202,7 +3233,7 @@ Value *NggPrimShader::runPartEs(ArrayRef<Argument *> args, Value *position) {
       auto vertexItemOffset = m_builder.CreateMul(uncompactedVertexIndex, m_builder.getInt32(esGsRingItemSize));
 
       newPosition = readPerThreadDataFromLds(FixedVectorType::get(m_builder.getFloatTy(), 4), uncompactedVertexIndex,
-                                             PrimShaderLdsRegion::VertexPosition, true);
+                                             PrimShaderLdsRegion::VertexPosition, 0, true);
 
       // NOTE: For deferred vertex export, some system values could be from vertex compaction info rather than from
       // VGPRs (caused by NGG culling and vertex compaction)
@@ -3422,7 +3453,7 @@ void NggPrimShader::splitEs() {
   SmallVector<CallInst *, 8> removedCalls;
 
   // Fetch position and cull distances
-  Value *position = UndefValue::get(positionTy);
+  Value *position = PoisonValue::get(positionTy);
   SmallVector<Value *, MaxClipCullDistanceCount> clipCullDistance(MaxClipCullDistanceCount);
 
   for (auto func : expFuncs) {
@@ -3466,12 +3497,12 @@ void NggPrimShader::splitEs() {
 
   Value *cullData = position;
   if (m_nggControl->enableCullDistanceCulling) {
-    Value *cullDistance = UndefValue::get(cullDistanceTy);
+    Value *cullDistance = PoisonValue::get(cullDistanceTy);
 
     for (unsigned i = 0; i < cullDistanceCount; ++i)
       cullDistance = m_builder.CreateInsertValue(cullDistance, clipCullDistance[clipDistanceCount + i], i);
 
-    cullData = m_builder.CreateInsertValue(UndefValue::get(cullDataTy), position, 0);
+    cullData = m_builder.CreateInsertValue(PoisonValue::get(cullDataTy), position, 0);
     cullData = m_builder.CreateInsertValue(cullData, cullDistance, 1);
   }
 
@@ -3615,15 +3646,24 @@ void NggPrimShader::mutateGs() {
   // Initialize counters of GS emitted vertices and GS output vertices of current primitive
   Value *emitVertsPtrs[MaxGsStreams] = {};
   Value *outVertsPtrs[MaxGsStreams] = {};
+  Value *totalEmitVertsPtr = nullptr;
 
-  for (int i = 0; i < MaxGsStreams; ++i) {
-    auto emitVertsPtr = m_builder.CreateAlloca(m_builder.getInt32Ty());
-    m_builder.CreateStore(m_builder.getInt32(0), emitVertsPtr); // emitVerts = 0
-    emitVertsPtrs[i] = emitVertsPtr;
+  {
+    IRBuilder<>::InsertPointGuard allocaGuard(m_builder);
+    m_builder.SetInsertPointPastAllocas(m_gsHandlers.main);
 
-    auto outVertsPtr = m_builder.CreateAlloca(m_builder.getInt32Ty());
-    m_builder.CreateStore(m_builder.getInt32(0), outVertsPtr); // outVerts = 0
-    outVertsPtrs[i] = outVertsPtr;
+    for (int i = 0; i < MaxGsStreams; ++i) {
+      auto emitVertsPtr = m_builder.CreateAlloca(m_builder.getInt32Ty());
+      m_builder.CreateStore(m_builder.getInt32(0), emitVertsPtr); // emitVerts = 0
+      emitVertsPtrs[i] = emitVertsPtr;
+
+      auto outVertsPtr = m_builder.CreateAlloca(m_builder.getInt32Ty());
+      m_builder.CreateStore(m_builder.getInt32(0), outVertsPtr); // outVerts = 0
+      outVertsPtrs[i] = outVertsPtr;
+    }
+
+    totalEmitVertsPtr = m_builder.CreateAlloca(m_builder.getInt32Ty());
+    m_builder.CreateStore(m_builder.getInt32(0), totalEmitVertsPtr); // emitTotalVerts = 0
   }
 
   // Initialize thread ID in wave
@@ -3661,7 +3701,8 @@ void NggPrimShader::mutateGs() {
         Value *output = call->getOperand(3);
 
         auto emitVerts = m_builder.CreateLoad(m_builder.getInt32Ty(), emitVertsPtrs[streamId]);
-        writeGsOutput(output, location, compIdx, streamId, threadIdInSubgroup, emitVerts);
+        auto totalEmitVerts = m_builder.CreateLoad(m_builder.getInt32Ty(), totalEmitVertsPtr);
+        writeGsOutput(output, location, compIdx, streamId, threadIdInSubgroup, emitVerts, totalEmitVerts);
 
         removedCalls.push_back(call);
       }
@@ -3680,7 +3721,8 @@ void NggPrimShader::mutateGs() {
           // Handle GS_EMIT, MSG[9:8] = STREAM_ID
           unsigned streamId = (message & GsEmitCutStreamIdMask) >> GsEmitCutStreamIdShift;
           assert(streamId < MaxGsStreams);
-          processGsEmit(streamId, threadIdInSubgroup, emitVertsPtrs[streamId], outVertsPtrs[streamId]);
+          processGsEmit(streamId, threadIdInSubgroup, emitVertsPtrs[streamId], outVertsPtrs[streamId],
+                        totalEmitVertsPtr);
         } else if (message == GsCutStreaM0 || message == GsCutStreaM1 || message == GsCutStreaM2 ||
                    message == GsCutStreaM3) {
           // Handle GS_CUT, MSG[9:8] = STREAM_ID
@@ -3918,8 +3960,9 @@ void NggPrimShader::appendUserData(SmallVectorImpl<Value *> &args, Function *tar
 // @param streamId : ID of output vertex stream
 // @param primitiveIndex : Relative primitive index in subgroup
 // @param emitVerts : Counter of GS emitted vertices for this stream
+// @param totalEmitVerts : Counter of GS emitted vertices for all streams
 void NggPrimShader::writeGsOutput(Value *output, unsigned location, unsigned component, unsigned streamId,
-                                  Value *primitiveIndex, Value *emitVerts) {
+                                  Value *primitiveIndex, Value *emitVerts, llvm::Value *totalEmitVerts) {
   if (!m_pipelineState->enableSwXfb() && m_pipelineState->getRasterizerState().rasterStream != streamId) {
     // NOTE: If SW-emulated stream-out is not enabled, only import those outputs that belong to the rasterization
     // stream.
@@ -3934,7 +3977,7 @@ void NggPrimShader::writeGsOutput(Value *output, unsigned location, unsigned com
 
     // [n x Ty] -> <n x Ty>
     const unsigned elemCount = outputTy->getArrayNumElements();
-    Value *outputVec = UndefValue::get(FixedVectorType::get(outputElemTy, elemCount));
+    Value *outputVec = PoisonValue::get(FixedVectorType::get(outputElemTy, elemCount));
     for (unsigned i = 0; i < elemCount; ++i) {
       auto outputElem = m_builder.CreateExtractValue(output, i);
       outputVec = m_builder.CreateInsertElement(outputVec, outputElem, i);
@@ -3973,6 +4016,14 @@ void NggPrimShader::writeGsOutput(Value *output, unsigned location, unsigned com
   auto vertexOffset = calcVertexItemOffset(streamId, vertexIndex);
   const unsigned attribOffset = (location * 4) + component;
   auto ldsOffset = m_builder.CreateAdd(vertexOffset, m_builder.getInt32(attribOffset));
+
+  if (geometryMode.robustGsEmits) {
+    // skip the lds write by writing to a dummy offset.
+    // ldsOffset = (totalEmitVerts >= outputVertices) ? InvalidValue : ldsOffset
+    auto dummyOffset = m_builder.getInt32(0x80000000);
+    auto outOfRange = m_builder.CreateICmpUGE(totalEmitVerts, m_builder.getInt32(geometryMode.outputVertices));
+    ldsOffset = m_builder.CreateSelect(outOfRange, dummyOffset, ldsOffset);
+  }
 
   writeValueToLds(output, ldsOffset);
 }
@@ -4016,7 +4067,7 @@ Value *NggPrimShader::readGsOutput(Type *outputTy, unsigned location, unsigned c
 
     // <n x Ty> -> [n x Ty]
     const unsigned elemCount = origOutputTy->getArrayNumElements();
-    Value *outputArray = UndefValue::get(origOutputTy);
+    Value *outputArray = PoisonValue::get(origOutputTy);
     for (unsigned i = 0; i < elemCount; ++i) {
       auto outputElem = m_builder.CreateExtractElement(output, i);
       outputArray = m_builder.CreateInsertValue(outputArray, outputElem, i);
@@ -4035,17 +4086,17 @@ Value *NggPrimShader::readGsOutput(Type *outputTy, unsigned location, unsigned c
 // @param primitiveIndex : Relative primitive index in subgroup
 // @param [in/out] emitVertsPtr : Pointer to the counter of GS emitted vertices for this stream
 // @param [in/out] outVertsPtr : Pointer to the counter of GS output vertices of current primitive for this stream
-void NggPrimShader::processGsEmit(unsigned streamId, Value *primitiveIndex, Value *emitVertsPtr, Value *outVertsPtr) {
-  if (!m_pipelineState->enableSwXfb() && m_pipelineState->getRasterizerState().rasterStream != streamId) {
-    // NOTE: If SW-emulated stream-out is not enabled, only handle GS_EMIT message that belongs to the rasterization
-    // stream.
-    return;
-  }
+// @param [in/out] totalEmitVertsPtr : Pointer to the counter of GS emitted vertices for all stream
+void NggPrimShader::processGsEmit(unsigned streamId, Value *primitiveIndex, Value *emitVertsPtr, Value *outVertsPtr,
+                                  Value *totalEmitVertsPtr) {
+  if (!m_pipelineState->isVertexStreamActive(streamId))
+    return; // Skip if this vertex stream is marked as inactive
 
   if (!m_gsHandlers.emit)
     m_gsHandlers.emit = createGsEmitHandler();
 
-  m_builder.CreateCall(m_gsHandlers.emit, {primitiveIndex, m_builder.getInt32(streamId), emitVertsPtr, outVertsPtr});
+  m_builder.CreateCall(m_gsHandlers.emit,
+                       {primitiveIndex, m_builder.getInt32(streamId), emitVertsPtr, outVertsPtr, totalEmitVertsPtr});
 }
 
 // =====================================================================================================================
@@ -4054,11 +4105,8 @@ void NggPrimShader::processGsEmit(unsigned streamId, Value *primitiveIndex, Valu
 // @param streamId : ID of output vertex stream
 // @param [in/out] outVertsPtr : Pointer to the counter of GS output vertices of current primitive for this stream
 void NggPrimShader::processGsCut(unsigned streamId, Value *outVertsPtr) {
-  if (!m_pipelineState->enableSwXfb() && m_pipelineState->getRasterizerState().rasterStream != streamId) {
-    // NOTE: If SW-emulated stream-out is not enabled, only handle GS_CUT message that belongs to the rasterization
-    // stream.
-    return;
-  }
+  if (!m_pipelineState->isVertexStreamActive(streamId))
+    return; // Skip if this vertex stream is marked as inactive
 
   if (!m_gsHandlers.cut)
     m_gsHandlers.cut = createGsCutHandler();
@@ -4076,6 +4124,8 @@ Function *NggPrimShader::createGsEmitHandler() {
   //
   //   emitVerts++
   //   outVerts++
+  //   totalEmitVerts++
+  //   outVerts = (totalEmitVerts >= outputVertices) ? 0 : outVerts
   //
   //   if (outVerts >= outVertsPerPrim) {
   //     winding = triangleStrip ? ((outVerts - outVertsPerPrim) & 0x1) : 0
@@ -4090,6 +4140,7 @@ Function *NggPrimShader::createGsEmitHandler() {
                                       m_builder.getInt32Ty(),                              // %streamId
                                       PointerType::get(m_builder.getInt32Ty(), addrSpace), // %emitVertsPtr
                                       PointerType::get(m_builder.getInt32Ty(), addrSpace), // %outVertsPtr
+                                      PointerType::get(m_builder.getInt32Ty(), addrSpace), // %totalEmitVertsPtr
                                   },
                                   false);
   auto func =
@@ -4111,6 +4162,9 @@ Function *NggPrimShader::createGsEmitHandler() {
   Value *outVertsPtr = argIt++;
   outVertsPtr->setName("outVertsPtr");
 
+  Value *totalEmitVertsPtr = argIt++;
+  totalEmitVertsPtr->setName("totalEmitVertsPtr");
+
   auto entryBlock = createBlock(func, ".entry");
   auto emitPrimBlock = createBlock(func, ".emitPrim");
   auto endEmitPrimBlock = createBlock(func, ".endEmitPrim");
@@ -4123,6 +4177,7 @@ Function *NggPrimShader::createGsEmitHandler() {
   // Construct ".entry" block
   Value *emitVerts = nullptr;
   Value *outVerts = nullptr;
+  Value *totalEmitVerts = nullptr;
   Value *primEmit = nullptr;
   {
     m_builder.SetInsertPoint(entryBlock);
@@ -4135,6 +4190,15 @@ Function *NggPrimShader::createGsEmitHandler() {
 
     // outVerts++
     outVerts = m_builder.CreateAdd(outVerts, m_builder.getInt32(1));
+
+    if (geometryMode.robustGsEmits) {
+      totalEmitVerts = m_builder.CreateLoad(m_builder.getInt32Ty(), totalEmitVertsPtr);
+      // totalEmitVerts++
+      totalEmitVerts = m_builder.CreateAdd(totalEmitVerts, m_builder.getInt32(1));
+      // outVerts = (totalEmitVerts >= outputVertices) ? 0 : outVerts
+      Value *outOfRange = m_builder.CreateICmpUGT(totalEmitVerts, m_builder.getInt32(geometryMode.outputVertices));
+      outVerts = m_builder.CreateSelect(outOfRange, m_builder.getInt32(0), outVerts);
+    }
 
     // primEmit = (outVerts >= outVertsPerPrim)
     primEmit = m_builder.CreateICmpUGE(outVerts, m_builder.getInt32(outVertsPerPrim));
@@ -4173,6 +4237,10 @@ Function *NggPrimShader::createGsEmitHandler() {
 
     m_builder.CreateStore(emitVerts, emitVertsPtr);
     m_builder.CreateStore(outVerts, outVertsPtr);
+
+    if (geometryMode.robustGsEmits)
+      m_builder.CreateStore(totalEmitVerts, totalEmitVertsPtr);
+
     m_builder.CreateRetVoid();
   }
 
@@ -5450,13 +5518,13 @@ Function *NggPrimShader::createSphereCuller() {
     //
 
     // <s, t>
-    auto st = m_builder.CreateInsertElement(UndefValue::get(FixedVectorType::get(m_builder.getHalfTy(), 2)), s,
+    auto st = m_builder.CreateInsertElement(PoisonValue::get(FixedVectorType::get(m_builder.getHalfTy(), 2)), s,
                                             static_cast<uint64_t>(0));
     st = m_builder.CreateInsertElement(st, t, 1);
 
     // <s', t'> = <0.5 - 0.5(t - s), 0.5 + 0.5(t - s)>
     auto tMinusS = m_builder.CreateFSub(t, s);
-    auto sT1 = m_builder.CreateInsertElement(UndefValue::get(FixedVectorType::get(m_builder.getHalfTy(), 2)), tMinusS,
+    auto sT1 = m_builder.CreateInsertElement(PoisonValue::get(FixedVectorType::get(m_builder.getHalfTy(), 2)), tMinusS,
                                              static_cast<uint64_t>(0));
     sT1 = m_builder.CreateInsertElement(sT1, tMinusS, 1);
 
@@ -5929,7 +5997,7 @@ Function *NggPrimShader::createFetchCullingRegister() {
     m_builder.SetInsertPoint(entryBlock);
 
     Value *primShaderTableAddr =
-        m_builder.CreateInsertElement(UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2)),
+        m_builder.CreateInsertElement(PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 2)),
                                       primShaderTableAddrLow, static_cast<uint64_t>(0));
 
     primShaderTableAddr = m_builder.CreateInsertElement(primShaderTableAddr, primShaderTableAddrHigh, 1);
@@ -5965,20 +6033,7 @@ Value *NggPrimShader::ballot(Value *value) {
   const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
   assert(waveSize == 32 || waveSize == 64);
 
-  value = m_builder.CreateSelect(value, m_builder.getInt32(1), m_builder.getInt32(0));
-
-  auto inlineAsmTy = FunctionType::get(m_builder.getInt32Ty(), m_builder.getInt32Ty(), false);
-  auto inlineAsm = InlineAsm::get(inlineAsmTy, "; %1", "=v,0", true);
-  value = m_builder.CreateCall(inlineAsm, value);
-
-  static const unsigned PredicateNE = 33; // 33 = predicate NE
-  Value *result = m_builder.CreateIntrinsic(Intrinsic::amdgcn_icmp,
-                                            {
-                                                m_builder.getIntNTy(waveSize), // Return type
-                                                m_builder.getInt32Ty()         // Argument type
-                                            },
-                                            {value, m_builder.getInt32(0), m_builder.getInt32(PredicateNE)});
-
+  Value *result = m_builder.CreateIntrinsic(Intrinsic::amdgcn_ballot, m_builder.getIntNTy(waveSize), value);
   if (waveSize == 32)
     result = m_builder.CreateZExt(result, m_builder.getInt64Ty());
 
@@ -6183,7 +6238,7 @@ void NggPrimShader::processSwXfb(ArrayRef<Argument *> args) {
   //     Calculate primsToWrite and dwordsToWrite
   //     Increment GDS_STRMOUT_DWORDS_WRITTEN_X and release the control
   //     Store XFB statistics info to LDS
-  //     Increment GDS_STRMOUT_PRIMS_NEEDED_X and GDS_STRMOUT_PRIMS_WRITTEN_X
+  //     Increment GDS_STRMOUT_PRIMS_NEEDED_0 and GDS_STRMOUT_PRIMS_WRITTEN_0
   //   }
   //   Barrier
   //
@@ -6403,13 +6458,13 @@ void NggPrimShader::processSwXfb(ArrayRef<Argument *> args) {
 
     for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
       if (bufferActive[i]) {
-        streamOutOffsets[i] =
-            m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {xfbStatInfo, m_builder.getInt32(i)});
+        streamOutOffsets[i] = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
+                                                        {xfbStatInfo, m_builder.getInt32(i)});
         streamOutOffsets[i] = m_builder.CreateAdd(m_streamOutBufOffsets[i], streamOutOffsets[i]);
         streamOutOffsets[i] = m_builder.CreateShl(streamOutOffsets[i], 2);
       }
     }
-    auto numPrimsToWrite = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {},
+    auto numPrimsToWrite = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
                                                      {xfbStatInfo, m_builder.getInt32(MaxTransformFeedbackBuffers)});
 
     auto validPrimitive = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, numPrimsToWrite);
@@ -6546,16 +6601,11 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
     lastActiveXfbBuffer = i;
   }
 
-  bool streamActive[MaxGsStreams] = {};
   unsigned firstActiveStream = InvalidValue;
   unsigned lastActiveStream = InvalidValue;
 
-  const unsigned rasterStream = m_pipelineState->getRasterizerState().rasterStream;
-
   for (unsigned i = 0; i < MaxGsStreams; ++i) {
-    // Treat the vertex stream as active if it is associated with XFB buffers or is the rasterization stream.
-    streamActive[i] = streamXfbBuffers[i] != 0 || i == rasterStream;
-    if (!streamActive[i])
+    if (!m_pipelineState->isVertexStreamActive(i))
       continue; // Stream is inactive
 
     if (firstActiveStream == InvalidValue)
@@ -6637,7 +6687,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
   BasicBlock *endCompactPrimitiveIndexBlock[MaxGsStreams] = {};
   BasicBlock *insertPos = endAccumPrimitiveCountsBlock;
   for (unsigned i = 0; i < MaxGsStreams; ++i) {
-    if (streamActive[i]) {
+    if (m_pipelineState->isVertexStreamActive(i)) {
       compactPrimitiveIndexBlock[i] =
           createBlock(xfbEntryBlock->getParent(), ".compactPrimitiveIndexInStream" + std::to_string(i));
       compactPrimitiveIndexBlock[i]->moveAfter(insertPos);
@@ -6659,7 +6709,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
   BasicBlock *endExportXfbOutputBlock[MaxGsStreams] = {};
   insertPos = endPrepareXfbExportBlock;
   for (unsigned i = 0; i < MaxGsStreams; ++i) {
-    if (streamActive[i]) {
+    if (m_pipelineState->isVertexStreamActive(i)) {
       exportXfbOutputBlock[i] = createBlock(xfbEntryBlock->getParent(), ".exportXfbOutputInStream" + std::to_string(i));
       exportXfbOutputBlock[i]->moveAfter(insertPos);
       insertPos = exportXfbOutputBlock[i];
@@ -6683,7 +6733,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
     m_builder.SetInsertPoint(initPrimitiveCountsBlock);
 
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
-      if (streamActive[i]) {
+      if (m_pipelineState->isVertexStreamActive(i)) {
         writePerThreadDataToLds(m_builder.getInt32(0), m_nggInputs.threadIdInSubgroup,
                                 PrimShaderLdsRegion::PrimitiveCounts, (Gfx9::NggMaxWavesPerSubgroup + 1) * i);
       }
@@ -6708,7 +6758,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
     m_builder.SetInsertPoint(checkPrimitiveDrawFlagBlock);
 
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
-      if (streamActive[i]) {
+      if (m_pipelineState->isVertexStreamActive(i)) {
         // drawFlag = primData[N] != NullPrim
         auto primData =
             readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
@@ -6728,14 +6778,14 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
 
     // Update draw flags
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
-      if (streamActive[i]) {
+      if (m_pipelineState->isVertexStreamActive(i)) {
         drawFlag[i] = createPhi(
             {{drawFlag[i], checkPrimitiveDrawFlagBlock}, {m_builder.getFalse(), endInitPrimitiveCountsBlock}});
       }
     }
 
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
-      if (streamActive[i]) {
+      if (m_pipelineState->isVertexStreamActive(i)) {
         drawMask[i] = ballot(drawFlag[i]);
 
         primCountInWave[i] = m_builder.CreateIntrinsic(Intrinsic::ctpop, m_builder.getInt64Ty(), drawMask[i]);
@@ -6758,7 +6808,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
     ldsOffset = m_builder.CreateAdd(ldsOffset, m_builder.getInt32(1));
 
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
-      if (streamActive[i]) {
+      if (m_pipelineState->isVertexStreamActive(i)) {
         atomicAdd(
             primCountInWave[i],
             m_builder.CreateAdd(ldsOffset, m_builder.getInt32(regionStart + (Gfx9::NggMaxWavesPerSubgroup + 1) * i)));
@@ -6777,7 +6827,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
     createFenceAndBarrier();
 
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
-      if (!streamActive[i])
+      if (!m_pipelineState->isVertexStreamActive(i))
         continue;
 
       auto primCountInWaves =
@@ -6786,12 +6836,12 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
 
       // The last dword following dwords for all waves (each wave has one dword) stores GS output primitive count of
       // the entire subgroup
-      primCountInSubgroup[i] = m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {},
+      primCountInSubgroup[i] = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
                                                          {primCountInWaves, m_builder.getInt32(waveCountInSubgroup)});
 
       // Get output primitive count for all waves prior to this wave
-      primCountInPrevWaves[i] =
-          m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {primCountInWaves, m_nggInputs.waveIdInSubgroup});
+      primCountInPrevWaves[i] = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
+                                                          {primCountInWaves, m_nggInputs.waveIdInSubgroup});
     }
 
     m_builder.CreateCondBr(drawFlag[firstActiveStream], compactPrimitiveIndexBlock[firstActiveStream],
@@ -6801,7 +6851,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
   SmallVector<XfbOutputExport, 32> xfbOutputExports;
 
   for (unsigned i = 0; i < MaxGsStreams; ++i) {
-    if (!streamActive[i])
+    if (!m_pipelineState->isVertexStreamActive(i))
       continue;
 
     // Construct ".compactPrimitiveIndexInStream[N]" block
@@ -6840,7 +6890,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
         m_builder.CreateCondBr(firstThreadInSubgroup, prepareXfbExportBlock, endPrepareXfbExportBlock);
       } else {
         unsigned nextActiveStream = i + 1;
-        while (!streamActive[nextActiveStream]) {
+        while (!m_pipelineState->isVertexStreamActive(nextActiveStream)) {
           ++nextActiveStream;
         }
 
@@ -6960,7 +7010,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
     }
 
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
-      if (!streamActive[i])
+      if (!m_pipelineState->isVertexStreamActive(i))
         continue;
 
       writeValueToLds(numPrimsToWrite[i], m_builder.getInt32(regionStart + MaxTransformFeedbackBuffers + i));
@@ -6995,17 +7045,18 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
         readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInWave, PrimShaderLdsRegion::XfbStats);
     for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
       if (bufferActive[i]) {
-        streamOutOffsets[i] =
-            m_builder.CreateIntrinsic(Intrinsic::amdgcn_readlane, {}, {xfbStatInfo, m_builder.getInt32(i)});
+        streamOutOffsets[i] = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
+                                                        {xfbStatInfo, m_builder.getInt32(i)});
         streamOutOffsets[i] = m_builder.CreateAdd(m_streamOutBufOffsets[i], streamOutOffsets[i]);
         streamOutOffsets[i] = m_builder.CreateShl(streamOutOffsets[i], 2);
       }
     }
 
     for (unsigned i = 0; i < MaxGsStreams; ++i) {
-      if (streamActive[i]) {
-        numPrimsToWrite[i] = m_builder.CreateIntrinsic(
-            Intrinsic::amdgcn_readlane, {}, {xfbStatInfo, m_builder.getInt32(MaxTransformFeedbackBuffers + i)});
+      if (m_pipelineState->isVertexStreamActive(i)) {
+        numPrimsToWrite[i] =
+            m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
+                                      {xfbStatInfo, m_builder.getInt32(MaxTransformFeedbackBuffers + i)});
       }
     }
 
@@ -7015,7 +7066,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
   }
 
   for (unsigned i = 0; i < MaxGsStreams; ++i) {
-    if (!streamActive[i])
+    if (!m_pipelineState->isVertexStreamActive(i))
       continue;
 
     // Construct ".exportXfbOutputInStream[N]" block
@@ -7160,7 +7211,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
 
       if (i != lastActiveStream) {
         unsigned nextActiveStream = i + 1;
-        while (!streamActive[nextActiveStream]) {
+        while (!m_pipelineState->isVertexStreamActive(nextActiveStream)) {
           ++nextActiveStream;
         }
 
@@ -7267,7 +7318,7 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
   // Visit all export calls, removing those unnecessary and mutating the return type
   SmallVector<CallInst *, 8> removedCalls;
 
-  Value *xfbOutputs = UndefValue::get(xfbOutputsTy);
+  Value *xfbOutputs = PoisonValue::get(xfbOutputsTy);
   unsigned outputIndex = 0;
 
   for (auto func : expFuncs) {
@@ -7332,7 +7383,7 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
           // Always pad the output value to <4 x i32>
           if (numElements == 1) {
             outputValue =
-                m_builder.CreateInsertElement(UndefValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 4)),
+                m_builder.CreateInsertElement(PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 4)),
                                               outputValue, static_cast<uint64_t>(0));
           } else if (numElements < 4) {
             outputValue = m_builder.CreateShuffleVector(outputValue, PoisonValue::get(outputValue->getType()),
@@ -7481,6 +7532,245 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
   assert(xfbFetcherArgs.size() == xfbFetcher->arg_size()); // Must have visit all arguments
 
   return m_builder.CreateCall(xfbFetcher, xfbFetcherArgs);
+}
+
+// =====================================================================================================================
+// Collect primitive statistics (primitive statistics counting) and update the values in HW counters.
+void NggPrimShader::collectPrimitiveStats() {
+  // NOTE: For SW emulated stream-out, the processing will update HW counters at the same time unconditionally. We don't
+  // have to particularly call this function.
+  assert(!m_pipelineState->enableSwXfb());
+  assert(m_pipelineState->enablePrimStats()); // Make sure we do need to count generated primitives
+
+  if (!m_hasGs) {
+    // GS is not present
+
+    //
+    // The processing is something like this:
+    //
+    // NGG_PRIM_STATS() {
+    //   if (threadIdInSubgroup == 0)
+    //     Increment GDS_STRMOUT_PRIMS_NEEDED_0 and GDS_STRMOUT_PRIMS_WRITTEN_0
+    // }
+    //
+    BasicBlock *insertBlock = m_builder.GetInsertBlock();
+
+    BasicBlock *collectPrimitiveStatsBlock = createBlock(insertBlock->getParent(), ".collectPrimitiveStats");
+    collectPrimitiveStatsBlock->moveAfter(insertBlock);
+    BasicBlock *endCollectPrimitiveStatsBlock = createBlock(insertBlock->getParent(), ".endCollectPrimitiveStats");
+    endCollectPrimitiveStatsBlock->moveAfter(collectPrimitiveStatsBlock);
+
+    // Insert branching in current block to collect primitive statistics
+    {
+      auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(0));
+      m_builder.CreateCondBr(firstThreadInSubgroup, collectPrimitiveStatsBlock, endCollectPrimitiveStatsBlock);
+    }
+
+    // Construct ".collectPrimitiveStats" block
+    {
+      m_builder.SetInsertPoint(collectPrimitiveStatsBlock);
+
+      if (m_gfxIp.major <= 11) {
+        m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, m_nggInputs.primCountInSubgroup->getType(),
+                                  {m_nggInputs.primCountInSubgroup,                       // value to add
+                                   m_builder.getInt32(GDS_STRMOUT_PRIMS_NEEDED_0 << 2)}); // count index
+
+        m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, m_builder.getInt32Ty(),
+                                  {m_builder.getInt32(0),                                  // value to add
+                                   m_builder.getInt32(GDS_STRMOUT_PRIMS_WRITTEN_0 << 2)}); // count index
+      } else {
+        llvm_unreachable("Not implemented!");
+      }
+
+      m_builder.CreateBr(endCollectPrimitiveStatsBlock);
+    }
+
+    // Construct ".endCollectPrimitiveStats" block
+    { m_builder.SetInsertPoint(endCollectPrimitiveStatsBlock); }
+
+    return;
+  }
+
+  // GS is present
+  assert(m_hasGs);
+
+  //
+  // The processing is something like this:
+  //
+  // NGG_GS_PRIM_STATS() {
+  //   if (threadIdInSubgroup < MaxGsStreams)
+  //     Initialize output primitive count for each vertex stream
+  //   Barrier
+  //
+  //   if (threadIdInSubgroup < primCountInSubgroup)
+  //     Check the draw flag of output primitives and compute draw mask
+  //
+  //   if (threadIdInWave == 0)
+  //     Accumulate output primitive count
+  //   Barrier
+  //
+  //   if (threadIdInSubgroup == 0) {
+  //     for each vertex stream
+  //       Increment GDS_STRMOUT_PRIMS_NEEDED_X and GDS_STRMOUT_PRIMS_WRITTEN_X
+  //   }
+  // }
+  //
+  BasicBlock *insertBlock = m_builder.GetInsertBlock();
+
+  BasicBlock *initPrimitiveCountsBlock = createBlock(insertBlock->getParent(), ".initPrimitiveCounts");
+  initPrimitiveCountsBlock->moveAfter(insertBlock);
+  BasicBlock *endInitPrimitiveCountsBlock = createBlock(insertBlock->getParent(), ".endInitPrimitiveCounts");
+  endInitPrimitiveCountsBlock->moveAfter(initPrimitiveCountsBlock);
+
+  BasicBlock *checkPrimitiveDrawFlagBlock = createBlock(insertBlock->getParent(), ".checkPrimitiveDrawFlag");
+  checkPrimitiveDrawFlagBlock->moveAfter(endInitPrimitiveCountsBlock);
+  BasicBlock *endCheckPrimitiveDrawFlagBlock = createBlock(insertBlock->getParent(), ".endCheckPrimitiveDrawFlag");
+  endCheckPrimitiveDrawFlagBlock->moveAfter(checkPrimitiveDrawFlagBlock);
+
+  BasicBlock *countPrimitivesBlock = createBlock(insertBlock->getParent(), ".countPrimitives");
+  countPrimitivesBlock->moveAfter(endCheckPrimitiveDrawFlagBlock);
+  BasicBlock *endCountPrimitivesBlock = createBlock(insertBlock->getParent(), ".endCountPrimitives");
+  endCountPrimitivesBlock->moveAfter(countPrimitivesBlock);
+
+  BasicBlock *collectPrimitiveStatsBlock = createBlock(insertBlock->getParent(), ".collectPrimitiveStats");
+  collectPrimitiveStatsBlock->moveAfter(endCountPrimitivesBlock);
+  BasicBlock *endCollectPrimitiveStatsBlock = createBlock(insertBlock->getParent(), ".endCollectPrimitiveStats");
+  endCollectPrimitiveStatsBlock->moveAfter(collectPrimitiveStatsBlock);
+
+  // Insert branching in current block to collect primitive statistics
+  {
+    auto validStream = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(MaxGsStreams));
+    m_builder.CreateCondBr(validStream, initPrimitiveCountsBlock, endInitPrimitiveCountsBlock);
+  }
+
+  // Construct ".initPrimitiveCounts" block
+  {
+    m_builder.SetInsertPoint(initPrimitiveCountsBlock);
+
+    writePerThreadDataToLds(m_builder.getInt32(0), m_nggInputs.threadIdInSubgroup,
+                            PrimShaderLdsRegion::PrimitiveCounts);
+
+    m_builder.CreateBr(endInitPrimitiveCountsBlock);
+  }
+
+  // Construct ".endInitPrimitiveCounts" block
+  {
+    m_builder.SetInsertPoint(endInitPrimitiveCountsBlock);
+
+    createFenceAndBarrier();
+
+    auto validPrimitive = m_builder.CreateICmpULT(m_nggInputs.threadIdInSubgroup, m_nggInputs.primCountInSubgroup);
+    m_builder.CreateCondBr(validPrimitive, checkPrimitiveDrawFlagBlock, endCheckPrimitiveDrawFlagBlock);
+  }
+
+  // Construct ".checkPrimitiveDrawFlag" block
+  Value *drawFlag[MaxGsStreams] = {};
+  {
+    m_builder.SetInsertPoint(checkPrimitiveDrawFlagBlock);
+
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (m_pipelineState->isVertexStreamActive(i)) {
+        // drawFlag = primData[N] != NullPrim
+        auto primData =
+            readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
+                                     PrimShaderLdsRegion::PrimitiveData, Gfx9::NggMaxThreadsPerSubgroup * i);
+        drawFlag[i] = m_builder.CreateICmpNE(primData, m_builder.getInt32(NullPrim));
+      }
+    }
+
+    m_builder.CreateBr(endCheckPrimitiveDrawFlagBlock);
+  }
+
+  // Construct ".endCheckPrimitiveDrawFlag" block
+  Value *drawMask[MaxGsStreams] = {};
+  Value *primCountInWave[MaxGsStreams] = {};
+  {
+    m_builder.SetInsertPoint(endCheckPrimitiveDrawFlagBlock);
+
+    // Update draw flags
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (m_pipelineState->isVertexStreamActive(i)) {
+        drawFlag[i] = createPhi(
+            {{drawFlag[i], checkPrimitiveDrawFlagBlock}, {m_builder.getFalse(), endInitPrimitiveCountsBlock}});
+      }
+    }
+
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (m_pipelineState->isVertexStreamActive(i)) {
+        drawMask[i] = ballot(drawFlag[i]);
+
+        primCountInWave[i] = m_builder.CreateUnaryIntrinsic(Intrinsic::ctpop, drawMask[i]);
+        primCountInWave[i] = m_builder.CreateTrunc(primCountInWave[i], m_builder.getInt32Ty());
+      }
+    }
+
+    auto firstThreadInWave = m_builder.CreateICmpEQ(m_nggInputs.threadIdInWave, m_builder.getInt32(0));
+    m_builder.CreateCondBr(firstThreadInWave, countPrimitivesBlock, endCountPrimitivesBlock);
+  }
+
+  // Construct ".countPrimitives" block
+  {
+    m_builder.SetInsertPoint(countPrimitivesBlock);
+
+    unsigned regionStart = getLdsRegionStart(PrimShaderLdsRegion::PrimitiveCounts);
+
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (m_pipelineState->isVertexStreamActive(i)) {
+        atomicAdd(primCountInWave[i], m_builder.getInt32(regionStart + i));
+      }
+    }
+
+    m_builder.CreateBr(endCountPrimitivesBlock);
+  }
+
+  // Construct ".endCountPrimitives" block
+  Value *primCountInSubgroup[MaxGsStreams] = {};
+  {
+    m_builder.SetInsertPoint(endCountPrimitivesBlock);
+
+    createFenceAndBarrier();
+
+    auto primCountInStreams = readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInWave,
+                                                       PrimShaderLdsRegion::PrimitiveCounts);
+
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (!m_pipelineState->isVertexStreamActive(i))
+        continue;
+
+      primCountInSubgroup[i] = m_builder.CreateIntrinsic(m_builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
+                                                         {primCountInStreams, m_builder.getInt32(i)});
+    }
+
+    auto firstThreadInSubgroup = m_builder.CreateICmpEQ(m_nggInputs.threadIdInSubgroup, m_builder.getInt32(0));
+    m_builder.CreateCondBr(firstThreadInSubgroup, collectPrimitiveStatsBlock, endCollectPrimitiveStatsBlock);
+  }
+
+  // Construct ".collectPrimitiveStats" block
+  {
+    m_builder.SetInsertPoint(collectPrimitiveStatsBlock);
+
+    for (unsigned i = 0; i < MaxGsStreams; ++i) {
+      if (!m_pipelineState->isVertexStreamActive(i))
+        continue;
+
+      if (m_gfxIp.major <= 11) {
+        m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, primCountInSubgroup[i]->getType(),
+                                  {primCountInSubgroup[i],                                          // value to add
+                                   m_builder.getInt32((GDS_STRMOUT_PRIMS_NEEDED_0 + 2 * i) << 2)}); // count index
+
+        m_builder.CreateIntrinsic(Intrinsic::amdgcn_ds_add_gs_reg_rtn, m_builder.getInt32Ty(),
+                                  {m_builder.getInt32(0),                                            // value to add
+                                   m_builder.getInt32((GDS_STRMOUT_PRIMS_WRITTEN_0 + 2 * i) << 2)}); // count index
+      } else {
+        llvm_unreachable("Not implemented!");
+      }
+    }
+
+    m_builder.CreateBr(endCollectPrimitiveStatsBlock);
+  }
+
+  // Construct ".endCollectPrimitiveStats" block
+  { m_builder.SetInsertPoint(endCollectPrimitiveStatsBlock); }
 }
 
 // =====================================================================================================================
@@ -7676,12 +7966,19 @@ PHINode *NggPrimShader::createPhi(ArrayRef<std::pair<Value *, BasicBlock *>> inc
 }
 
 // =====================================================================================================================
-// Create LDS fence and barrier to guarantee the synchronization of LDS operations.
+// Create both LDS fence and barrier to guarantee the synchronization of LDS operations.
 void NggPrimShader::createFenceAndBarrier() {
   SyncScope::ID syncScope = m_builder.getContext().getOrInsertSyncScopeID("workgroup");
   m_builder.CreateFence(AtomicOrdering::Release, syncScope);
-  m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+  createBarrier();
   m_builder.CreateFence(AtomicOrdering::Acquire, syncScope);
+}
+
+// =====================================================================================================================
+// Create LDS barrier to guarantee the synchronization of LDS operations.
+void NggPrimShader::createBarrier() {
+
+  m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 }
 
 // =====================================================================================================================
@@ -7753,8 +8050,7 @@ void NggPrimShader::atomicAdd(Value *ValueToAdd, Value *ldsOffset) {
 // @param offset : Dword offset from the provided buffer pointer
 // @param isVolatile : Whether this is a volatile load
 // @returns : Value read from the constant buffer
-llvm::Value *NggPrimShader::readValueFromCb(llvm::Type *readyTy, llvm::Value *bufPtr, llvm::Value *offset,
-                                            bool isVolatile) {
+llvm::Value *NggPrimShader::readValueFromCb(Type *readyTy, Value *bufPtr, Value *offset, bool isVolatile) {
   assert(bufPtr->getType()->isPointerTy() && bufPtr->getType()->getPointerAddressSpace() == ADDR_SPACE_CONST);
 
   auto loadPtr = m_builder.CreateGEP(m_builder.getInt32Ty(), bufPtr, offset);
@@ -7762,8 +8058,10 @@ llvm::Value *NggPrimShader::readValueFromCb(llvm::Type *readyTy, llvm::Value *bu
   cast<Instruction>(loadPtr)->setMetadata(MetaNameUniform, MDNode::get(m_builder.getContext(), {}));
 
   auto loadValue = m_builder.CreateAlignedLoad(readyTy, loadPtr, Align(4));
-  loadValue->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(m_builder.getContext(), {}));
-  loadValue->setVolatile(isVolatile);
+  if (isVolatile)
+    loadValue->setVolatile(true);
+  else
+    loadValue->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(m_builder.getContext(), {}));
 
   return loadValue;
 }

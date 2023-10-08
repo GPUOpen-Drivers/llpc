@@ -32,7 +32,6 @@
 
 #include "vkgcDefs.h"
 #include "vkgcMetroHash.h"
-#include "vkgcRegisterDefs.h"
 #include <fstream>
 
 namespace Vkgc {
@@ -68,22 +67,18 @@ public:
   static void DumpPipelineExtraInfo(PipelineDumpFile *binaryFile, const std::string *str);
 
   static MetroHash::Hash generateHashForGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline, bool isCacheHash,
-                                                         bool isRelocatableShader,
                                                          UnlinkedShaderStage unlinkedShaderType = UnlinkedStageCount);
 
-  static MetroHash::Hash generateHashForComputePipeline(const ComputePipelineBuildInfo *pipeline, bool isCacheHash,
-                                                        bool isRelocatableShader);
-#if VKI_RAY_TRACING
+  static MetroHash::Hash generateHashForComputePipeline(const ComputePipelineBuildInfo *pipeline, bool isCacheHash);
   static MetroHash::Hash generateHashForRayTracingPipeline(const RayTracingPipelineBuildInfo *pipeline,
                                                            bool isCacheHash);
   static void dumpRayTracingRtState(const RtState *rtState, const char *dumpDir, std::ostream &dumpFile);
   static void dumpRayTracingPipelineMetadata(PipelineDumpFile *binaryFile, const BinaryData *pipelineBin);
-#endif
 
   static std::string getPipelineInfoFileName(PipelineBuildInfo pipelineInfo, const uint64_t hashCode64);
 
   static void updateHashForPipelineShaderInfo(ShaderStage stage, const PipelineShaderInfo *shaderInfo, bool isCacheHash,
-                                              MetroHash64 *hasher, bool isRelocatableShader);
+                                              MetroHash64 *hasher);
 
   static void updateHashForResourceMappingInfo(const ResourceMappingData *resourceMapping,
                                                const uint64_t pipelineLayoutApiHash, MetroHash64 *hasher,
@@ -102,13 +97,12 @@ public:
   }
 
   static void updateHashForNonFragmentState(const GraphicsPipelineBuildInfo *pipeline, bool isCacheHash,
-                                            MetroHash64 *hasher, bool isRelocatableShader);
+                                            MetroHash64 *hasher);
 
-  static void updateHashForFragmentState(const GraphicsPipelineBuildInfo *pipeline, MetroHash64 *hasher,
-                                         bool isRelocatableShader);
+  static void updateHashForFragmentState(const GraphicsPipelineBuildInfo *pipeline, MetroHash64 *hasher);
 
   static void updateHashForPipelineOptions(const PipelineOptions *options, MetroHash64 *hasher, bool isCacheHash,
-                                           bool isRelocatableShader, UnlinkedShaderStage stage);
+                                           UnlinkedShaderStage stage);
 
   // Get name of register, or "" if not known
   static const char *getRegisterNameString(unsigned regNumber);
@@ -123,14 +117,11 @@ private:
                                       const ComputePipelineBuildInfo *pipelineInfo);
   static void dumpGraphicsPipelineInfo(std::ostream *dumpFile, const char *dumpDir,
                                        const GraphicsPipelineBuildInfo *pipelineInfo);
-#if VKI_RAY_TRACING
   static void dumpRayTracingPipelineInfo(std::ostream *dumpFile, const char *dumpDir,
                                          const RayTracingPipelineBuildInfo *pipelineInfo);
-
   static void dumpRayTracingStateInfo(const RayTracingPipelineBuildInfo *pipelineInfo, const char *dumpDir,
                                       std::ostream &dumpFile);
   static void updateHashForRtState(const RtState *rtState, MetroHash64 *hasher, bool isCacheHash);
-#endif
 
   static void dumpVersionInfo(std::ostream &dumpFile);
   static void dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo, std::ostream &dumpFile);

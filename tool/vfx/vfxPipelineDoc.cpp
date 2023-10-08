@@ -52,14 +52,15 @@ unsigned PipelineDocument::getMaxSectionCount(SectionType type) {
   case SectionTypeGraphicsState:
     maxSectionCount = 1;
     break;
+  case SectionTypeUniformConstant:
+    maxSectionCount = 1;
+    break;
   case SectionTypeComputeState:
     maxSectionCount = 1;
     break;
-#if VKI_RAY_TRACING
   case SectionTypeRayTracingState:
     maxSectionCount = 1;
     break;
-#endif
   case SectionTypeVertexInputState:
     maxSectionCount = 1;
     break;
@@ -72,6 +73,8 @@ unsigned PipelineDocument::getMaxSectionCount(SectionType type) {
   case SectionTypeShaderInfo:
     maxSectionCount = UINT32_MAX;
     break;
+  case SectionTypeApiXfbOutput:
+    maxSectionCount = 1;
   default:
     break;
   }
@@ -119,8 +122,21 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     gfxPipelineInfo->rsState.numSamples = graphicState.numSamples;
     gfxPipelineInfo->rsState.pixelShaderSamples = graphicState.pixelShaderSamples;
     gfxPipelineInfo->rsState.samplePatternIdx = graphicState.samplePatternIdx;
+    gfxPipelineInfo->rsState.dynamicSampleInfo = graphicState.dynamicSampleInfo;
     gfxPipelineInfo->rsState.rasterStream = graphicState.rasterStream;
     gfxPipelineInfo->rsState.usrClipPlaneMask = static_cast<uint8_t>(graphicState.usrClipPlaneMask);
+    if (graphicState.tessLevelInner[0] < 0 || graphicState.tessLevelInner[1] < 0 ||
+        graphicState.tessLevelOuter[0] < 0 || graphicState.tessLevelOuter[1] < 0 || graphicState.tessLevelOuter[2] < 0)
+      gfxPipelineInfo->iaState.tessLevel = nullptr;
+    else {
+      m_tessellationLevel.inner[0] = graphicState.tessLevelInner[0];
+      m_tessellationLevel.inner[1] = graphicState.tessLevelInner[1];
+      m_tessellationLevel.outer[0] = graphicState.tessLevelOuter[0];
+      m_tessellationLevel.outer[1] = graphicState.tessLevelOuter[1];
+      m_tessellationLevel.outer[2] = graphicState.tessLevelOuter[2];
+      m_tessellationLevel.outer[3] = graphicState.tessLevelOuter[3];
+      gfxPipelineInfo->iaState.tessLevel = &m_tessellationLevel;
+    }
 
     gfxPipelineInfo->cbState.alphaToCoverageEnable = graphicState.alphaToCoverageEnable != 0;
     gfxPipelineInfo->cbState.dualSourceBlendEnable = graphicState.dualSourceBlendEnable != 0;
@@ -138,12 +154,23 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     gfxPipelineInfo->dynamicVertexStride = graphicState.dynamicVertexStride;
     gfxPipelineInfo->enableUberFetchShader = graphicState.enableUberFetchShader;
     gfxPipelineInfo->enableEarlyCompile = graphicState.enableEarlyCompile;
-#if VKI_RAY_TRACING
+    gfxPipelineInfo->enableColorExportShader = graphicState.enableColorExportShader;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
     gfxPipelineInfo->shaderLibrary = graphicState.shaderLibrary;
 #endif
     gfxPipelineInfo->rtState = graphicState.rtState;
-#endif
+
+    if (m_sections[SectionTypeUniformConstant].size() > 0) {
+      UniformConstantState uniformState;
+      reinterpret_cast<SectionUniformConstant *>(m_sections[SectionTypeUniformConstant][0])->getSubState(uniformState);
+      gfxPipelineInfo->numUniformConstantMaps = uniformState.numUniformConstantMaps;
+      gfxPipelineInfo->ppUniformMaps = uniformState.uniformMaps;
+    }
+
+    if (m_sections[SectionTypeApiXfbOutput].size() > 0) {
+      ApiXfbOutData *apiXfbOutData = &m_pipelineState.gfxPipelineInfo.apiXfbOutData;
+      reinterpret_cast<SectionApiXfbOutput *>(m_sections[SectionTypeApiXfbOutput][0])->getSubState(*apiXfbOutData);
+    }
   }
 
   // Section "ComputePipelineState"
@@ -156,15 +183,19 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     computePipelineInfo->deviceIndex = computeState.deviceIndex;
     computePipelineInfo->options = computeState.options;
     computePipelineInfo->cs.entryStage = Vkgc::ShaderStageCompute;
-#if VKI_RAY_TRACING
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
     computePipelineInfo->shaderLibrary = computeState.shaderLibrary;
 #endif
     computePipelineInfo->rtState = computeState.rtState;
-#endif
+
+    if (m_sections[SectionTypeUniformConstant].size() > 0) {
+      UniformConstantState uniformState;
+      reinterpret_cast<SectionUniformConstant *>(m_sections[SectionTypeUniformConstant][0])->getSubState(uniformState);
+      assert(uniformState.numUniformConstantMaps == 1);
+      computePipelineInfo->pUniformMap = *uniformState.uniformMaps;
+    }
   }
 
-#if VKI_RAY_TRACING
   // Section "RayTracingPipelineState"
   if (m_sections[SectionTypeRayTracingState].size() > 0) {
     RayTracingPipelineState rayTracingState;
@@ -181,31 +212,27 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
 #endif
     rayTracingPipelineInfo->maxRecursionDepth = rayTracingState.maxRecursionDepth;
     rayTracingPipelineInfo->indirectStageMask = rayTracingState.indirectStageMask;
+    rayTracingPipelineInfo->mode = rayTracingState.mode;
     rayTracingPipelineInfo->rtState = rayTracingState.rtState;
     rayTracingPipelineInfo->payloadSizeMaxInLib = rayTracingState.payloadSizeMaxInLib;
     rayTracingPipelineInfo->attributeSizeMaxInLib = rayTracingState.attributeSizeMaxInLib;
     rayTracingPipelineInfo->hasPipelineLibrary = rayTracingState.hasPipelineLibrary;
     rayTracingPipelineInfo->pipelineLibStageMask = rayTracingState.pipelineLibStageMask;
   }
-#endif
 
   // Section "VertexInputState"
   if (m_sections[SectionTypeVertexInputState].size() > 0) {
     reinterpret_cast<SectionVertexInput *>(m_sections[SectionTypeVertexInputState][0])->getSubState(m_vertexInputState);
     m_pipelineState.gfxPipelineInfo.pVertexInput = &m_vertexInputState;
   }
-  // clang-format off
+
   if (m_pipelineState.pipelineType == VfxPipelineTypeGraphics ||
       m_pipelineState.pipelineType == VfxPipelineTypeCompute) {
     PipelineShaderInfo *shaderInfo[NativeShaderStageCount] = {
-      &m_pipelineState.gfxPipelineInfo.task,
-      &m_pipelineState.gfxPipelineInfo.vs,
-      &m_pipelineState.gfxPipelineInfo.tcs,
-      &m_pipelineState.gfxPipelineInfo.tes,
-      &m_pipelineState.gfxPipelineInfo.gs,
-      &m_pipelineState.gfxPipelineInfo.mesh,
-      &m_pipelineState.gfxPipelineInfo.fs,
-      &m_pipelineState.compPipelineInfo.cs,
+        &m_pipelineState.gfxPipelineInfo.task, &m_pipelineState.gfxPipelineInfo.vs,
+        &m_pipelineState.gfxPipelineInfo.tcs,  &m_pipelineState.gfxPipelineInfo.tes,
+        &m_pipelineState.gfxPipelineInfo.gs,   &m_pipelineState.gfxPipelineInfo.mesh,
+        &m_pipelineState.gfxPipelineInfo.fs,   &m_pipelineState.compPipelineInfo.cs,
     };
 
     m_shaderSources.resize(NativeShaderStageCount);
@@ -231,9 +258,7 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
       shaderInfoSection->getSubState(m_resourceMappingNodes);
       shaderInfoSection->getSubState(m_descriptorRangeValues);
     }
-  }
-#if VKI_RAY_TRACING
-  else if (m_pipelineState.pipelineType == VfxPipelineTypeRayTracing) {
+  } else if (m_pipelineState.pipelineType == VfxPipelineTypeRayTracing) {
     m_pipelineState.numStages = static_cast<unsigned>(m_sections[SectionTypeShader].size());
     m_shaderSources.resize(m_pipelineState.numStages);
     m_shaderInfos.resize(m_pipelineState.numStages);
@@ -262,12 +287,10 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
       mapIt.second.second->getSubState(m_descriptorRangeValues);
       stageIndex++;
     }
-  }
-#endif
-  else {
+  } else {
     VFX_NEVER_CALLED();
   }
-  // clang-format on
+
   ResourceMappingData *resourceMapping = nullptr;
   switch (m_pipelineState.pipelineType) {
   case VfxPipelineTypeGraphics:
@@ -276,11 +299,9 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
   case VfxPipelineTypeCompute:
     resourceMapping = &m_pipelineState.compPipelineInfo.resourceMapping;
     break;
-#if VKI_RAY_TRACING
   case VfxPipelineTypeRayTracing:
     resourceMapping = &m_pipelineState.rayPipelineInfo.resourceMapping;
     break;
-#endif
   default:
     VFX_NEVER_CALLED();
     break;
@@ -329,16 +350,11 @@ bool PipelineDocument::validate() {
 
   const unsigned graphicsStageMask = ShaderStageBit::ShaderStageAllGraphicsBit;
   const unsigned computeStageMask = ShaderStageBit::ShaderStageComputeBit;
-#if VKI_RAY_TRACING
   const unsigned rayTracingStageMask = ShaderStageAllRayTracingBit;
-#endif
 
-  if (((stageMask & graphicsStageMask) && (stageMask & computeStageMask))
-#if VKI_RAY_TRACING
-      || ((stageMask & graphicsStageMask) && (stageMask & rayTracingStageMask)) ||
-      ((stageMask & computeStageMask) && (stageMask & rayTracingStageMask))
-#endif
-  ) {
+  if (((stageMask & graphicsStageMask) && (stageMask & computeStageMask)) ||
+      ((stageMask & graphicsStageMask) && (stageMask & rayTracingStageMask)) ||
+      ((stageMask & computeStageMask) && (stageMask & rayTracingStageMask))) {
     PARSE_ERROR(m_errorMsg, 0, "Stage Conflict! Different pipeline stage can't in same pipeline file.\n");
     return false;
   }
@@ -349,13 +365,12 @@ bool PipelineDocument::validate() {
                   "Section ComputePipelineState conflict with graphic shader stages\n");
       return false;
     }
-#if VKI_RAY_TRACING
+
     if (m_sections[SectionTypeRayTracingState].size() != 0) {
       PARSE_ERROR(m_errorMsg, m_sections[SectionTypeRayTracingState][0]->getLineNum(),
                   "Section RayTracingPipelineState conflict with graphic shader stages\n");
       return false;
     }
-#endif
   }
 
   if (stageMask & computeStageMask) {
@@ -364,16 +379,14 @@ bool PipelineDocument::validate() {
                   "Section GraphicsPipelineState conflict with compute shader stages\n");
       return false;
     }
-#if VKI_RAY_TRACING
+
     if (m_sections[SectionTypeRayTracingState].size() != 0) {
       PARSE_ERROR(m_errorMsg, m_sections[SectionTypeRayTracingState][0]->getLineNum(),
                   "Section RayTracingPipelineState conflict with compute shader stages\n");
       return false;
     }
-#endif
   }
 
-#if VKI_RAY_TRACING
   if (stageMask & rayTracingStageMask) {
     if (m_sections[SectionTypeComputeState].size() != 0) {
       PARSE_ERROR(m_errorMsg, m_sections[SectionTypeComputeState][0]->getLineNum(),
@@ -387,7 +400,6 @@ bool PipelineDocument::validate() {
       return false;
     }
   }
-#endif
 
   return true;
 }
@@ -408,14 +420,12 @@ Section *PipelineDocument::createSection(const char *sectionName) {
   case SectionTypeComputeState:
     section = new SectionComputeState();
     break;
-#if VKI_RAY_TRACING
   case SectionTypeRayTracingState:
     section = new SectionRayTracingState();
     break;
   case SectionTypeRtState:
     section = new SectionRtState();
     break;
-#endif
   case SectionTypeVertexInputState:
     section = new SectionVertexInput();
     break;
@@ -424,6 +434,12 @@ Section *PipelineDocument::createSection(const char *sectionName) {
     break;
   case SectionTypeResourceMapping:
     section = new SectionResourceMapping();
+    break;
+  case SectionTypeUniformConstant:
+    section = new SectionUniformConstant();
+    break;
+  case SectionTypeApiXfbOutput:
+    section = new SectionApiXfbOutput();
     break;
   default:
     section = Document::createSection(sectionName);
@@ -454,14 +470,16 @@ bool PipelineDocument::getPtrOfSubSection(Section *section, unsigned lineNum, co
     CASE_SUBSECTION(MemberTypePipelineOption, SectionPipelineOption)
     CASE_SUBSECTION(MemberTypeShaderOption, SectionShaderOption)
     CASE_SUBSECTION(MemberTypeNggState, SectionNggState)
-#if VKI_RAY_TRACING
+    CASE_SUBSECTION(MemberTypeUniformConstantMap, SectionUniformConstantMap)
+    CASE_SUBSECTION(MemberTypeUniformConstantMapEntry, SectionUniformConstantMapEntry)
+    CASE_SUBSECTION(MemberTypeUniformConstant, SectionUniformConstant)
+    CASE_SUBSECTION(MemberTypeXfbOutInfo, SectionXfbOutInfo)
     CASE_SUBSECTION(MemberTypeShaderGroup, SectionShaderGroup)
     CASE_SUBSECTION(MemberTypeRtState, SectionRtState)
     CASE_SUBSECTION(MemberTypeRayTracingShaderExportConfig, SectionRayTracingShaderExportConfig)
     CASE_SUBSECTION(MemberTypeIndirectCalleeSavedRegs, SectionIndirectCalleeSavedRegs)
 #if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 15
     CASE_SUBSECTION(MemberTypeGpurtFuncTable, SectionGpurtFuncTable)
-#endif
 #endif
     CASE_SUBSECTION(MemberTypeExtendedRobustness, SectionExtendedRobustness)
   default:

@@ -44,17 +44,10 @@ add_library(vkgc_headers INTERFACE)
 option(LLPC_BUILD_TOOLS "LLPC build all tools" OFF)
 
 ### Options that affect the headers ####################################################################################
-option(LLPC_ENABLE_SHADER_CACHE "Enable experimental shader cache" OFF)
-
-if(LLPC_ENABLE_SHADER_CACHE)
-    target_compile_definitions(vkgc_headers INTERFACE LLPC_ENABLE_SHADER_CACHE)
-endif()
-
 if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
     target_compile_definitions(vkgc_headers INTERFACE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION})
 else()
-    # LLPC is not compiled, so fall back to the latest version
-    target_compile_definitions(vkgc_headers INTERFACE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=LLPC_INTERFACE_MAJOR_VERSION)
+    message(FATAL_ERROR "Client of LLPC must set LLPC_CLIENT_INTERFACE_MAJOR_VERSION")
 endif()
 
 #if VKI_BUILD_GFX11
@@ -63,7 +56,6 @@ if(LLPC_BUILD_GFX11)
 endif()
 #endif
 
-#if VKI_RAY_TRACING
 if(VKI_RAY_TRACING)
     if(NOT LLPC_IS_STANDALONE)
         target_compile_definitions(vkgc_headers INTERFACE HAVE_GPURT_SHIM)
@@ -72,7 +64,6 @@ if(VKI_RAY_TRACING)
     target_compile_definitions(vkgc_headers INTERFACE VKI_RAY_TRACING)
     target_compile_definitions(vkgc_headers INTERFACE GPURT_CLIENT_INTERFACE_MAJOR_VERSION=${GPURT_CLIENT_INTERFACE_MAJOR_VERSION})
 endif()
-#endif
 
 target_link_libraries(vkgc INTERFACE vkgc_headers)
 
@@ -132,7 +123,7 @@ endif()
 endif(LLPC_BUILD_TOOLS)
 
 if(ICD_BUILD_LLPC)
-    # Generate Strings for LLPC standalone tool
+    # Generate Strings for LLPC standalone tool and vkgc_gpurtshim
     add_subdirectory(util ${PROJECT_BINARY_DIR}/util)
 endif()
 
@@ -147,6 +138,7 @@ if(ICD_BUILD_LLPC)
     add_subdirectory(llpc ${PROJECT_BINARY_DIR}/llpc)
 
     if(LLPC_BUILD_TESTS)
+        set(LLVM_INCLUDE_TESTS ON CACHE BOOL "Force enable LLVM_INCLUDE_TESTS to include gmock" FORCE)
         add_subdirectory(test)
     endif()
 
@@ -160,4 +152,63 @@ if(ICD_BUILD_LLPC)
     endif()
 
     target_link_libraries(vkgc INTERFACE llpc)
+endif()
+
+# Set sub library properties
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+
+    if (TARGET dumper)
+        set_property(TARGET dumper_base PROPERTY FOLDER Compiler)
+        set_property(TARGET dumper PROPERTY FOLDER Compiler)
+    endif()
+
+    if (TARGET vfx)
+        set_property(TARGET vfx PROPERTY FOLDER Compiler)
+    endif()
+
+    if(ICD_BUILD_LLPC)
+        set_property(TARGET llpc PROPERTY FOLDER Compiler)
+        set_property(TARGET llpcinternal PROPERTY FOLDER Compiler)
+        if(VKI_RAY_TRACING AND NOT LLPC_IS_STANDALONE)
+            set_property(TARGET vkgc_gpurtshim PROPERTY FOLDER Compiler)
+        endif()
+        set_property(TARGET vkgc_util PROPERTY FOLDER Compiler)
+        if (LLPC_BUILD_TOOLS)
+            set_property(TARGET amdllpc PROPERTY FOLDER Compiler)
+        endif()
+
+        set_property(TARGET all-targets PROPERTY FOLDER Misc)
+        set_property(TARGET AMDGPU PROPERTY FOLDER Misc)
+        set_property(TARGET benchmark PROPERTY FOLDER Misc)
+        set_property(TARGET benchmark_main PROPERTY FOLDER Misc)
+        set_property(TARGET distribution PROPERTY FOLDER Misc)
+        set_property(TARGET Engine PROPERTY FOLDER Misc)
+        set_property(TARGET install-distribution PROPERTY FOLDER Misc)
+        set_property(TARGET install-distribution-stripped PROPERTY FOLDER Misc)
+        set_property(TARGET LLVMSupportBlake3 PROPERTY FOLDER Misc)
+        set_property(TARGET Native PROPERTY FOLDER Misc)
+        set_property(TARGET NativeCodeGen PROPERTY FOLDER Misc)
+        set_property(TARGET opt-viewer PROPERTY FOLDER Misc)
+        if (TARGET llvm-dialects-example)
+            set_property(TARGET llvm-dialects-example PROPERTY FOLDER Misc)
+        endif()
+        if (LLVM_OPTIMIZED_TABLEGEN)
+            set_property(TARGET llvm_nm_target PROPERTY FOLDER Misc)
+            set_property(TARGET llvm_readobj_target PROPERTY FOLDER Misc)
+            set_property(TARGET llvm-min-tblgen-host PROPERTY FOLDER Misc)
+            set_property(TARGET llvm-tblgen-host PROPERTY FOLDER Misc)
+            set_property(TARGET CONFIGURE_LLVM_NATIVE PROPERTY FOLDER Misc)
+            set_property(TARGET CREATE_LLVM_NATIVE PROPERTY FOLDER Misc)
+        endif()
+        if (LLPC_BUILD_TESTS)
+            set_property(TARGET check-all PROPERTY FOLDER Tests)
+            if(NOT LLPC_IS_STANDALONE)
+                set_property(TARGET check-amber PROPERTY FOLDER "LLPC Tests")
+            endif()
+            set_property(TARGET check-amdllpc PROPERTY FOLDER "LLPC Tests")
+            set_property(TARGET check-amdllpc-units PROPERTY FOLDER "LLPC Tests")
+            set_property(TARGET check-lgccps-units PROPERTY FOLDER "LgcCps Tests")
+            set_property(TARGET check-lgc-units PROPERTY FOLDER "LGC Tests")
+        endif()
+    endif()
 endif()

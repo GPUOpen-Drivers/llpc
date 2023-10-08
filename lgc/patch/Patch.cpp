@@ -33,6 +33,7 @@
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
 #include "lgc/builder/BuilderReplayer.h"
+#include "lgc/patch/Continufy.h"
 #include "lgc/patch/FragColorExport.h"
 #include "lgc/patch/LowerDebugPrintf.h"
 #include "lgc/patch/PatchBufferOp.h"
@@ -53,6 +54,7 @@
 #include "lgc/patch/PatchResourceCollect.h"
 #include "lgc/patch/PatchSetupTargetFeatures.h"
 #include "lgc/patch/PatchWorkarounds.h"
+#include "lgc/patch/TcsPassthroughShader.h"
 #include "lgc/patch/VertexFetch.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
@@ -115,7 +117,7 @@ namespace lgc {
 // @param optLevel : The optimization level uses to adjust the aggressiveness of
 //                   passes and which passes to add.
 void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, Timer *patchTimer, Timer *optTimer,
-                      Pipeline::CheckShaderCacheFunc checkShaderCacheFunc, CodeGenOpt::Level optLevel) {
+                      Pipeline::CheckShaderCacheFunc checkShaderCacheFunc, uint32_t optLevel) {
   // Start timer for patching passes.
   if (patchTimer)
     LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
@@ -131,6 +133,10 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
 
   passMgr.addPass(IPSCCPPass());
   passMgr.addPass(LowerDebugPrintf());
+
+  if (pipelineState->hasShaderStage(ShaderStageVertex) && !pipelineState->hasShaderStage(ShaderStageTessControl) &&
+      pipelineState->hasShaderStage(ShaderStageTessEval))
+    passMgr.addPass(TcsPassthroughShader());
 
   passMgr.addPass(PatchNullFragShader());
   passMgr.addPass(PatchResourceCollect()); // also removes inactive/unused resources
@@ -203,14 +209,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   } else {
     FunctionPassManager fpm;
     fpm.addPass(PatchBufferOp());
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 452298
-    // Old version of the code
-    unsigned instCombineOpt = 2;
-#else
-    // New version of the code (also handles unknown version, which we treat as latest)
-    auto instCombineOpt = InstCombineOptions().setMaxIterations(2);
-#endif
-    fpm.addPass(InstCombinePass(instCombineOpt));
+    fpm.addPass(InstCombinePass());
     passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
   }
 
@@ -334,19 +333,12 @@ void Patch::registerPasses(PassBuilder &passBuilder) {
 // @param [in/out] passMgr : Pass manager to add passes to
 // @param optLevel : The optimization level uses to adjust the aggressiveness of
 //                   passes and which passes to add.
-void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level optLevel) {
+void Patch::addOptimizationPasses(lgc::PassManager &passMgr, uint32_t optLevel) {
   LLPC_OUTS("PassManager optimization level = " << optLevel << "\n");
 
   passMgr.addPass(ForceFunctionAttrsPass());
   FunctionPassManager fpm;
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 452298
-  // Old version of the code
-  unsigned instCombineOpt = 1;
-#else
-  // New version of the code (also handles unknown version, which we treat as latest)
-  auto instCombineOpt = InstCombineOptions().setMaxIterations(1);
-#endif
-  fpm.addPass(InstCombinePass(instCombineOpt));
+  fpm.addPass(InstCombinePass());
   fpm.addPass(SimplifyCFGPass());
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 444780
   // Old version of the code
@@ -360,7 +352,7 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level o
   fpm.addPass(CorrelatedValuePropagationPass());
   fpm.addPass(SimplifyCFGPass());
   fpm.addPass(AggressiveInstCombinePass());
-  fpm.addPass(InstCombinePass(instCombineOpt));
+  fpm.addPass(InstCombinePass());
   fpm.addPass(PatchPeepholeOpt());
   fpm.addPass(SimplifyCFGPass());
   fpm.addPass(ReassociatePass());
@@ -369,7 +361,7 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level o
   lpm.addPass(LICMPass(LICMOptions()));
   fpm.addPass(createFunctionToLoopPassAdaptor(std::move(lpm), true));
   fpm.addPass(SimplifyCFGPass());
-  fpm.addPass(InstCombinePass(instCombineOpt));
+  fpm.addPass(InstCombinePass());
   LoopPassManager lpm2;
   lpm2.addPass(IndVarSimplifyPass());
   lpm2.addPass(LoopIdiomRecognizePass());
@@ -377,12 +369,21 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level o
   fpm.addPass(createFunctionToLoopPassAdaptor(std::move(lpm2), true));
   fpm.addPass(LoopUnrollPass(
       LoopUnrollOptions(optLevel).setPeeling(true).setRuntime(false).setUpperBound(false).setPartial(false)));
+  fpm.addPass(SROAPass(SROAOptions::ModifyCFG));
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 464212
+  // Old version of the code
   fpm.addPass(ScalarizerPass());
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  ScalarizerPassOptions scalarizerOptions;
+  scalarizerOptions.ScalarizeMinBits = 32;
+  fpm.addPass(ScalarizerPass(scalarizerOptions));
+#endif
   fpm.addPass(PatchLoadScalarizer());
   fpm.addPass(InstSimplifyPass());
   fpm.addPass(NewGVNPass());
   fpm.addPass(BDCEPass());
-  fpm.addPass(InstCombinePass(instCombineOpt));
+  fpm.addPass(InstCombinePass());
   fpm.addPass(CorrelatedValuePropagationPass());
   fpm.addPass(ADCEPass());
   fpm.addPass(createFunctionToLoopPassAdaptor(LoopRotatePass()));
@@ -393,9 +394,10 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, CodeGenOpt::Level o
                                   .needCanonicalLoops(true)
                                   .sinkCommonInsts(true)));
   fpm.addPass(LoopUnrollPass(LoopUnrollOptions(optLevel)));
+  fpm.addPass(SROAPass(SROAOptions::ModifyCFG));
   // uses UniformityAnalysis
   fpm.addPass(PatchReadFirstLane());
-  fpm.addPass(InstCombinePass(instCombineOpt));
+  fpm.addPass(InstCombinePass());
   passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
   passMgr.addPass(ConstantMergePass());
   FunctionPassManager fpm2;

@@ -64,12 +64,6 @@ if 'Address' in config.xgl_sanitizers:
 if 'Undefined' in config.xgl_sanitizers:
     config.available_features.add('ubsan')
 
-if config.llpc_enable_shader_cache == 'ON' or config.llpc_enable_shader_cache == '1':
-    config.available_features.add('llpc-shader-cache')
-
-if (not config.llpc_client_interface_version.isdigit()) or (int(config.llpc_client_interface_version) > 52):
-    config.available_features.add('llpc-client-interface-53')
-
 llvm_config.use_default_substitutions()
 
 config.substitutions.append(('%PATH%', config.environment['PATH']))
@@ -81,13 +75,3 @@ tool_dirs = [config.llvm_tools_dir, config.amdllpc_dir]
 tools = ['amdllpc', 'llvm-objdump', 'llvm-readelf', 'not', 'count']
 
 llvm_config.add_tool_substitutions(tools, tool_dirs)
-
-#if LLPC_BUILD_NAVI31
-# Propagate options for lit feature tests. These can be used in XFAIL, REQUIRES, and UNSUPPORTED
-p = subprocess.Popen([config.amdllpc_dir + "/amdllpc", "-gfxip=11.0.0","dummy.comp"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-out,err = p.communicate()
-check_str = out.decode("utf-8")
-if check_str.find("Invalid gfxip: gfx1100") == -1:
-    config.available_features.add('gfx11')
-#endif
-

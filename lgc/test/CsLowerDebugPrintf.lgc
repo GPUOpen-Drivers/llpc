@@ -26,12 +26,12 @@ define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !spi
   %11 = insertelement <2 x i32> poison, i32 0, i64 0
   %12 = insertelement <2 x i32> %11, i32 0, i64 1
   %13 = bitcast <2 x i32> %12 to i64
-  %" " = call i64 @lgc.debug.printf(ptr addrspace(7) %10, ptr addrspace(4) @str.1, i32 %__llpc_input_proxy_gl_GlobalInvocationID.0.vec.extract, i64 %13)
+  call void (...) @lgc.debug.printf(ptr addrspace(7) %10, ptr addrspace(4) @str.1, i32 %__llpc_input_proxy_gl_GlobalInvocationID.0.vec.extract, i64 %13)
   ret void
 }
 
 ; Function Attrs: nounwind
-declare i64 @lgc.debug.printf(ptr addrspace(7), ptr addrspace(4), i32) #0
+declare void @lgc.debug.printf(...) #0
 
 ; Function Attrs: nounwind memory(none)
 declare <3 x i32> @lgc.shader.input.WorkgroupId(i32) #1
@@ -63,8 +63,8 @@ attributes #2 = { nounwind willreturn memory(none) }
 !1 = !{!"Vulkan"}
 !2 = !{i32 -158142355, i32 1527082450, i32 -1021507957, i32 -258612566, i32 1, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 1, i32 0, i32 0, i32 2}
 !3 = !{i32 -297365566, i32 -915288882, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 20, i32 1800}
-!4 = !{!"DescriptorTableVaPtr", i32 7, i32 0, i32 1, i32 1}
-!5 = !{!"DescriptorBuffer", i32 6, i32 0, i32 4, i32 -1, i32 6, i32 4}
+!4 = !{!"DescriptorTableVaPtr", i32 7, i32 0, i32 0, i32 1, i32 1}
+!5 = !{!"DescriptorBuffer", i32 6, i32 0, i32 0, i32 4, i32 -1, i32 6, i32 4}
 !6 = !{!"\82\B0amdpal.pipelines\91\84\AA.registers\80\B0.spill_threshold\CE\FF\FF\FF\FF\B0.user_data_limit\00\AF.xgl_cache_info\82\B3.128_bit_cache_hash\92\CFIv3\E9\C4\9B\CEd\CF31\1AG\C6\99\D0\DE\AD.llpc_version\A461.0\AEamdpal.version\92\02\06"}
 !7 = !{i32 5}
 !8 = !{i32 7}
@@ -88,22 +88,24 @@ attributes #2 = { nounwind willreturn memory(none) }
 ; CHECK-NEXT:    [[TMP14:%.*]] = trunc i64 [[TMP13]] to i32
 ; CHECK-NEXT:    [[TMP15:%.*]] = lshr i64 [[TMP13]], 32
 ; CHECK-NEXT:    [[TMP16:%.*]] = trunc i64 [[TMP15]] to i32
-; CHECK-NEXT:    [[TMP17:%.*]] = atomicrmw add ptr addrspace(7) [[TMP10]], i64 5 syncscope("singlethread") monotonic, align 8
-; CHECK-NEXT:    [[TMP18:%.*]] = call i64 @llvm.umin.i64(i64 [[TMP17]], i64 2147483648)
-; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr { [4 x i32], [4294967295 x i32] }, ptr addrspace(7) [[TMP10]], i32 0, i32 1, i64 [[TMP18]]
-; CHECK-NEXT:    store i32 {{-*[0-9]+}}, ptr addrspace(7) [[TMP19]], align 4
-; CHECK-NEXT:    [[TMP20:%.*]] = add i64 [[TMP18]], 1
-; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr { [4 x i32], [4294967295 x i32] }, ptr addrspace(7) [[TMP10]], i32 0, i32 1, i64 [[TMP20]]
-; CHECK-NEXT:    store i32 {{-*[0-9]+}}, ptr addrspace(7) [[TMP21]], align 4
-; CHECK-NEXT:    [[TMP22:%.*]] = add i64 [[TMP20]], 1
-; CHECK-NEXT:    [[TMP23:%.*]] = getelementptr { [4 x i32], [4294967295 x i32] }, ptr addrspace(7) [[TMP10]], i32 0, i32 1, i64 [[TMP22]]
-; CHECK-NEXT:    store i32 [[__LLPC_INPUT_PROXY_GL_GLOBALINVOCATIONID_0_VEC_EXTRACT]], ptr addrspace(7) [[TMP23]], align 4
-; CHECK-NEXT:    [[TMP24:%.*]] = add i64 [[TMP22]], 1
-; CHECK-NEXT:    [[TMP25:%.*]] = getelementptr { [4 x i32], [4294967295 x i32] }, ptr addrspace(7) [[TMP10]], i32 0, i32 1, i64 [[TMP24]]
-; CHECK-NEXT:    store i32 [[TMP14]], ptr addrspace(7) [[TMP25]], align 4
-; CHECK-NEXT:    [[TMP26:%.*]] = add i64 [[TMP24]], 1
-; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr { [4 x i32], [4294967295 x i32] }, ptr addrspace(7) [[TMP10]], i32 0, i32 1, i64 [[TMP26]]
-; CHECK-NEXT:    store i32 [[TMP16]], ptr addrspace(7) [[TMP27]], align 4
-; CHECK-NEXT:    [[TMP28:%.*]] = add i64 [[TMP26]], 1
+; CHECK-NEXT:    [[TMP17:%.*]] = atomicrmw add ptr addrspace(7) [[TMP10]], i64 5 monotonic, align 8
+; CHECK-NEXT:    [[TMP18:%.*]] = call i64 @llvm.umin.i64(i64 [[TMP17]], i64 536870912)
+; CHECK-NEXT:    [[TMP19:%.*]] = trunc i64 [[TMP18]] to i32
+; CHECK-NEXT:    [[TMP20:%.*]] = add i32 [[TMP19]], 4
+; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr i32, ptr addrspace(7) [[TMP10]], i32 [[TMP20]]
+; CHECK-NEXT:    store i32 {{-?[0-9]+}}, ptr addrspace(7) [[TMP21]], align 4
+; CHECK-NEXT:    [[TMP22:%.*]] = add i32 [[TMP20]], 1
+; CHECK-NEXT:    [[TMP23:%.*]] = getelementptr i32, ptr addrspace(7) [[TMP10]], i32 [[TMP22]]
+; CHECK-NEXT:    store i32 {{-?[0-9]+}}, ptr addrspace(7) [[TMP23]], align 4
+; CHECK-NEXT:    [[TMP24:%.*]] = add i32 [[TMP22]], 1
+; CHECK-NEXT:    [[TMP25:%.*]] = getelementptr i32, ptr addrspace(7) [[TMP10]], i32 [[TMP24]]
+; CHECK-NEXT:    store i32 [[__LLPC_INPUT_PROXY_GL_GLOBALINVOCATIONID_0_VEC_EXTRACT]], ptr addrspace(7) [[TMP25]], align 4
+; CHECK-NEXT:    [[TMP26:%.*]] = add i32 [[TMP24]], 1
+; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr i32, ptr addrspace(7) [[TMP10]], i32 [[TMP26]]
+; CHECK-NEXT:    store i32 [[TMP14]], ptr addrspace(7) [[TMP27]], align 4
+; CHECK-NEXT:    [[TMP28:%.*]] = add i32 [[TMP26]], 1
+; CHECK-NEXT:    [[TMP29:%.*]] = getelementptr i32, ptr addrspace(7) [[TMP10]], i32 [[TMP28]]
+; CHECK-NEXT:    store i32 [[TMP16]], ptr addrspace(7) [[TMP29]], align 4
+; CHECK-NEXT:    [[TMP30:%.*]] = add i32 [[TMP28]], 1
 ; CHECK-NEXT:    ret void
 ;

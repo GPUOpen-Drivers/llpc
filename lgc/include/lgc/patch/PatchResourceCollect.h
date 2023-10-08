@@ -34,6 +34,7 @@
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
 #include "llvm/IR/InstVisitor.h"
+#include <set>
 #include <unordered_set>
 
 namespace lgc {
@@ -72,14 +73,12 @@ private:
   void processMissingFs();
 
   bool isVertexReuseDisabled();
-
-#if VKI_RAY_TRACING
   void checkRayQueryLdsStackUsage(llvm::Module *module);
-#endif
 
   void clearInactiveBuiltInInput();
   void clearInactiveBuiltInOutput();
   void clearUnusedOutput();
+  void clearUndefinedOutput();
 
   void matchGenericInOut();
   void mapBuiltInToGenericInOut();

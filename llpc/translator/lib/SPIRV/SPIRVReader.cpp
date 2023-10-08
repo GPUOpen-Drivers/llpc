@@ -45,6 +45,7 @@
 #include "SPIRVType.h"
 #include "SPIRVUtil.h"
 #include "SPIRVValue.h"
+#include "lgcrt/LgcRtDialect.h"
 #include "llpcCompiler.h"
 #include "llpcContext.h"
 #include "llpcDialect.h"
@@ -92,14 +93,12 @@ using namespace lgc;
 using namespace llvm;
 using namespace SPIRV;
 using namespace Llpc;
+using namespace lgc::rt;
 
-#if VKI_RAY_TRACING
 namespace Llpc {
 Type *getRayQueryInternalTy(lgc::Builder *builder);
 unsigned getTraceRayParamPayloadIdx(void);
 } // namespace Llpc
-
-#endif
 
 namespace SPIRV {
 
@@ -159,13 +158,96 @@ static void dumpLLVM(Module *m, const std::string &fName) {
   }
 }
 
+bool isAccelerationStructureType(SPIRVType *type) {
+  return type->isTypeAccelerationStructureKHR();
+}
+
+SPIRVWord getStd430TypeAlignment(SPIRVType *const spvType) {
+  switch (spvType->getOpCode()) {
+  case OpTypeInt:
+  case OpTypeBool:
+  case OpTypeFloat:
+    return spvType->getSizeInBytes();
+  case OpTypeVector: {
+    auto Components = spvType->getVectorComponentCount();
+    if (Components == 3)
+      Components = 4;
+    return Components * spvType->getVectorComponentType()->getSizeInBytes();
+  }
+  case OpTypeStruct: {
+    SPIRVWord maxAlign = 0;
+    SPIRVTypeStruct *const spvStructType = static_cast<SPIRVTypeStruct *>(spvType);
+    for (SPIRVWord i = 0, memberCount = spvStructType->getMemberCount(); i < memberCount; i++) {
+      SPIRVType *const memberTy = spvStructType->getMemberType(i);
+      auto memberAlign = getStd430TypeAlignment(memberTy);
+      if (memberAlign > maxAlign)
+        maxAlign = memberAlign;
+    }
+    return maxAlign;
+  }
+  case OpTypeArray: {
+    SPIRVTypeArray *const spvArrayType = static_cast<SPIRVTypeArray *>(spvType);
+    return getStd430TypeAlignment(spvArrayType->getArrayElementType());
+  }
+  case OpTypeMatrix: {
+    auto *columnTy = spvType->getMatrixColumnType();
+    return getStd430TypeAlignment(columnTy);
+  }
+  default:
+    llvm_unreachable("unexpected type");
+    break;
+  }
+  return 0;
+}
+
+// Return the aligned size, considering the padding between sub-members.
+SPIRVWord getStd430AlignedTypeSize(SPIRVType *const spvType) {
+  switch (spvType->getOpCode()) {
+  case OpTypeInt:
+  case OpTypeBool:
+  case OpTypeFloat:
+  case OpTypeVector:
+    return spvType->getSizeInBytes();
+  case OpTypeStruct: {
+    SPIRVTypeStruct *const spvStructType = static_cast<SPIRVTypeStruct *>(spvType);
+    SPIRVWord accumulatedOffset = 0;
+    for (SPIRVWord i = 0, memberCount = spvStructType->getMemberCount(); i < memberCount; i++) {
+      SPIRVType *const memberTy = spvStructType->getMemberType(i);
+      auto memberAlign = getStd430TypeAlignment(memberTy);
+      auto size = getStd430AlignedTypeSize(memberTy);
+      accumulatedOffset = roundUpToMultiple(accumulatedOffset, memberAlign);
+      accumulatedOffset += size;
+    }
+    return accumulatedOffset;
+  }
+  case OpTypeArray: {
+    SPIRVTypeArray *const spvArrayType = static_cast<SPIRVTypeArray *>(spvType);
+    SPIRVType *elemTy = spvArrayType->getArrayElementType();
+    SPIRVWord elemAlign = getStd430TypeAlignment(elemTy);
+    auto elemSize = getStd430AlignedTypeSize(elemTy);
+    // We need tail-padding if element size is not multiple of element alignment
+    SPIRVWord stride = elemSize;
+    if (elemSize % elemAlign != 0)
+      stride = roundUpToMultiple(elemSize, elemAlign);
+    return stride * spvArrayType->getLength()->getZExtIntValue();
+  }
+  case OpTypeMatrix: {
+    auto *columnTy = spvType->getMatrixColumnType();
+    SPIRVWord columnCount = spvType->getMatrixColumnCount();
+    return getStd430TypeAlignment(columnTy) * columnCount;
+  }
+  default:
+    llvm_unreachable("unexpected type");
+    break;
+  }
+  return 0;
+}
+
 static bool isStorageClassExplicitlyLaidOut(SPIRVModule *m_bm, SPIRVStorageClassKind storageClass) {
   return llvm::is_contained({StorageClassStorageBuffer, StorageClassUniform, StorageClassPushConstant,
                              StorageClassPhysicalStorageBufferEXT},
                             storageClass) ||
-#if VKI_RAY_TRACING
          storageClass == StorageClassShaderRecordBufferKHR ||
-#endif
          (storageClass == StorageClassWorkgroup && m_bm->hasCapability(CapabilityWorkgroupMemoryExplicitLayoutKHR));
 }
 
@@ -298,13 +380,18 @@ Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeArray>(SPIRVType *const spvTyp
 
   SPIRVWord arrayStride = 0;
   const bool hasArrayStride = spvType->hasDecorate(DecorationArrayStride, 0, &arrayStride);
-  assert(hasArrayStride ^ (arrayStride == 0));
+  assert((hasArrayStride ^ (arrayStride == 0)) || layout == LayoutMode::Std430);
 
   const uint64_t storeSize = getTypeStoreSize(elementType);
+  if (layout == LayoutMode::Std430) {
+    SPIRVWord elementAlign = getStd430TypeAlignment(spvType->getArrayElementType());
+    arrayStride = roundUpToMultiple((SPIRVWord)storeSize, elementAlign);
+  }
 
+  bool maybePadded = (layout == LayoutMode::Explicit && hasArrayStride) || layout == LayoutMode::Std430;
   bool paddedArray = false;
 
-  if (layout == LayoutMode::Explicit && hasArrayStride) {
+  if (maybePadded) {
     assert(arrayStride >= storeSize);
 
     const unsigned padding = static_cast<unsigned>(arrayStride - storeSize);
@@ -368,9 +455,7 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeForwardPointer>(SPIRVType *const sp
 
   const bool isBufferBlockPointer = storageClass == StorageClassStorageBuffer || storageClass == StorageClassUniform ||
                                     storageClass == StorageClassPushConstant ||
-#if VKI_RAY_TRACING
                                     storageClass == StorageClassShaderRecordBufferKHR ||
-#endif
                                     storageClass == StorageClassPhysicalStorageBufferEXT;
   LayoutMode structLayout = isBufferBlockPointer ? LayoutMode::Explicit : LayoutMode::Native;
 
@@ -400,7 +485,6 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(SPIRVType *const spvType, u
   const auto spvElementType = spvColumnType->getVectorComponentType();
   const unsigned spvColumnCount = spvType->getMatrixColumnCount();
   const unsigned spvRowCount = spvColumnType->getVectorComponentCount();
-
   Type *columnType = nullptr;
   unsigned columnCount = 0;
 
@@ -431,8 +515,14 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeMatrix>(SPIRVType *const spvType, u
     }
   }
 
+  if (layout == LayoutMode::Std430) {
+    // For std430 layout, set matrix stride to the alignment of column vector to make every column vector properly
+    // aligned.
+    matrixStride = getStd430TypeAlignment(spvType->getMatrixColumnType());
+  }
+
   const bool isPaddedMatrix = matrixStride > 0;
-  const bool usePadding = (layout == LayoutMode::Explicit) && isPaddedMatrix;
+  const bool usePadding = (layout == LayoutMode::Explicit || layout == LayoutMode::Std430) && isPaddedMatrix;
 
   if (usePadding) {
     SmallVector<Type *, 2> memberTypes;
@@ -472,6 +562,7 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(SPIRVType *const spvType, 
   SPIRVStorageClassKind storageClass = spvType->getPointerStorageClass();
   LayoutMode pointeeLayout =
       isStorageClassExplicitlyLaidOut(m_bm, storageClass) ? LayoutMode::Explicit : LayoutMode::Native;
+  auto addrSpace = SPIRSPIRVAddrSpaceMap::rmap(storageClass);
 
   // Handle image etc types first, if in UniformConstant memory.
   if (storageClass == StorageClassUniformConstant) {
@@ -525,18 +616,21 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypePointer>(SPIRVType *const spvType, 
       if (!imagePtrTy)
         return samplerPtrTy;
       return StructType::get(*m_context, {imagePtrTy, samplerPtrTy});
+    } else {
+      // Uniform constant variable outside of a block use std430 layout.
+      pointeeLayout = isAccelerationStructureType(spvElementType) ? LayoutMode::Explicit : LayoutMode::Std430;
+      // From now on (GPURT major version >= 34), AS header may start at a non-zero offset, GPURT now request base
+      // offset of the resource, and it will calculate the actual GPUVA, instead of compiler providing one loaded from
+      // offset 0. Here we use SPIRAS_Constant because later in llpcSpirvLowerGlobal the AS will be lowered to
+      // get.desc.ptr which returns SPIRAS_Constant ptr.
+      addrSpace = isAccelerationStructureType(spvElementType) ? SPIRAS_Constant : addrSpace;
     }
-#if VKI_RAY_TRACING
-    else if (spvElementType->isTypeAccelerationStructureKHR()) {
-      pointeeLayout = LayoutMode::Explicit;
-    }
-#endif
   }
 
   Type *const pointeeType =
       transType(spvType->getPointerElementType(), matrixStride, isColumnMajor, true, pointeeLayout);
 
-  return PointerType::get(pointeeType, SPIRSPIRVAddrSpaceMap::rmap(storageClass));
+  return PointerType::get(pointeeType, addrSpace);
 }
 
 // =====================================================================================================================
@@ -600,10 +694,20 @@ Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(SPIRVType *const spvTy
   using StructMember = std::tuple<SPIRVWord, SPIRVWord>;
 
   SmallVector<StructMember, 8> structMembers;
-
+  // For uniform constants, we need to calculate the alignment of each member first. Based on the alignment,
+  // we get the offset.
+  SPIRVWord accumulatedOffset = 0;
   for (SPIRVWord i = 0, memberCount = spvStructType->getMemberCount(); i < memberCount; i++) {
     SPIRVWord offset = 0;
 
+    if (layout == LayoutMode::Std430) {
+      auto align = getStd430TypeAlignment(spvStructType->getMemberType(i));
+      auto size = getStd430AlignedTypeSize(spvStructType->getMemberType(i));
+      accumulatedOffset = roundUpToMultiple(accumulatedOffset, align);
+      structMembers.push_back(StructMember(i, accumulatedOffset));
+      accumulatedOffset += size;
+      continue;
+    }
     // If we have a member decorate, we need to handle the struct carefully. To do this we use a packed LLVM struct
     // type with manually added byte array pads. We record all the remappings of original index -> new index that
     // have occurred so that we can fixup GEPs and insert/extract's later.
@@ -631,14 +735,14 @@ Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(SPIRVType *const spvTy
 
   SPIRVWord lastIndex = 0;
   uint64_t lastValidByte = 0;
-
+  bool usePadding = (isExplicitlyLaidOut && hasMemberOffset) || layout == LayoutMode::Std430;
   SmallVector<Type *, 16> memberTypes;
 
   for (const StructMember &structMember : structMembers) {
     const SPIRVWord index = std::get<0>(structMember);
     const SPIRVWord offset = std::get<1>(structMember);
 
-    if (isExplicitlyLaidOut && hasMemberOffset) {
+    if (usePadding) {
       // HLSL-derived shaders contain some (entirely valid) strange mappings for arrays that cannot be represented
       // in LLVM. This manifests as an offset for a struct member that overlaps the previous data in the struct.
       // To workaround this, we need to change the previous member in the struct to a pad array that we'll sort
@@ -702,7 +806,7 @@ Type *SPIRVToLLVM::transTypeWithOpcode<spv::OpTypeStruct>(SPIRVType *const spvTy
     structType->setBody(memberTypes, isPacked);
   }
 
-  return isExplicitlyLaidOut && hasMemberOffset ? recordTypeWithPad(structType) : structType;
+  return usePadding ? recordTypeWithPad(structType) : structType;
 }
 
 // =====================================================================================================================
@@ -722,8 +826,9 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeVector>(SPIRVType *const spvType, c
   Type *const compType =
       transType(spvType->getVectorComponentType(), matrixStride, isColumnMajor, isParentPointer, layout);
 
-  // If the vector is in a pointer, we need to use an array to represent it because of LLVMs data layout rules.
-  if (layout == LayoutMode::Explicit)
+  // If the vector needs explicit/std430 layout, we need to use an array to represent it because of LLVM's data layout
+  // rules.
+  if (layout == LayoutMode::Explicit || layout == LayoutMode::Std430)
     return ArrayType::get(compType, spvType->getVectorComponentCount());
   return FixedVectorType::get(compType, spvType->getVectorComponentCount());
 }
@@ -732,7 +837,8 @@ Type *SPIRVToLLVM::transTypeWithOpcode<OpTypeVector>(SPIRVType *const spvType, c
 // Get pointee type from SPIRV Value.
 //
 // @param v : SPIRV Value
-Type *SPIRVToLLVM::getPointeeType(SPIRVValue *v) {
+// @param layout : The layout mode will be used for the type translation.
+Type *SPIRVToLLVM::getPointeeType(SPIRVValue *v, LayoutMode layout) {
   auto opCode = v->getOpCode();
   if (isAccessChainOpCode(opCode)) {
     // If the Base of the AccessChain is a structure then additional padding may be added (depending on the structure
@@ -756,9 +862,8 @@ Type *SPIRVToLLVM::getPointeeType(SPIRVValue *v) {
     if (pointeeType)
       return pointeeType;
   }
-  LayoutMode layout = isStorageClassExplicitlyLaidOut(m_bm, v->getType()->getPointerStorageClass())
-                          ? LayoutMode::Explicit
-                          : LayoutMode::Native;
+  if (isStorageClassExplicitlyLaidOut(m_bm, v->getType()->getPointerStorageClass()))
+    layout = LayoutMode::Explicit;
 
   return transType(v->getType()->getPointerElementType(), 0, true, true, layout);
 }
@@ -834,15 +939,12 @@ Type *SPIRVToLLVM::transTypeImpl(SPIRVType *t, unsigned matrixStride, bool colum
     }
     return mapType(t, ty);
   }
-#if VKI_RAY_TRACING
   case OpTypeAccelerationStructureKHR: {
     auto int32x2Ty = FixedVectorType::get(Type::getInt32Ty(*m_context), 2);
     return mapType(t, int32x2Ty);
   }
   case OpTypeRayQueryKHR:
     return mapType(t, getRayQueryInternalTy(m_builder));
-#endif
-
   case OpTypeArray: {
     Type *newTy = transTypeWithOpcode<OpTypeArray>(t, matrixStride, columnMajor, parentIsPointer, layout);
     return parentIsPointer ? newTy : mapType(t, newTy);
@@ -875,7 +977,6 @@ Type *SPIRVToLLVM::transTypeImpl(SPIRVType *t, unsigned matrixStride, bool colum
     Type *newTy = transTypeWithOpcode<OpTypeVector>(t, matrixStride, columnMajor, parentIsPointer, layout);
     return parentIsPointer ? newTy : mapType(t, newTy);
   }
-
   default: {
     llvm_unreachable("Not implemented");
   }
@@ -937,16 +1038,13 @@ void SPIRVToLLVM::setLLVMLoopMetadata(SPIRVLoopMerge *lm, BranchInst *bi) {
   } else if (lm->getLoopControl() == LoopControlDontUnrollMask) {
     name = llvm::MDString::get(*m_context, "llvm.loop.unroll.disable");
     mDs.push_back(name);
-  }
-#if SPV_VERSION >= 0x10400
-  else if (lm->getLoopControl() & LoopControlPartialCountMask) {
+  } else if (lm->getLoopControl() & LoopControlPartialCountMask) {
     name = llvm::MDString::get(*m_context, "llvm.loop.unroll.count");
     mDs.push_back(name);
 
     auto partialCount = ConstantInt::get(Type::getInt32Ty(*m_context), lm->getLoopControlParameters().at(0));
     mDs.push_back(ConstantAsMetadata::get(partialCount));
   }
-#endif
 
   if (lm->getLoopControl() & LoopControlDependencyInfiniteMask ||
       (lm->getLoopControl() & LoopControlDependencyLengthMask)) {
@@ -955,7 +1053,6 @@ void SPIRVToLLVM::setLLVMLoopMetadata(SPIRVLoopMerge *lm, BranchInst *bi) {
     return;
   }
 
-#if SPV_VERSION >= 0x10400
   if (lm->getLoopControl() & LoopControlIterationMultipleMask) {
     // TODO: Potentially useful but without llvm mappings
     return;
@@ -965,7 +1062,6 @@ void SPIRVToLLVM::setLLVMLoopMetadata(SPIRVLoopMerge *lm, BranchInst *bi) {
     // No LLVM mapping and not too important
     return;
   }
-#endif
 
   if (mDs.empty())
     return;
@@ -1169,6 +1265,18 @@ Value *SPIRVToLLVM::transShiftLogicalBitwiseInst(SPIRVValue *bv, BasicBlock *bb,
   // bit width.
   if (shift->getType()->isIntOrIntVectorTy())
     shift = getBuilder()->CreateZExtOrTrunc(shift, base->getType());
+
+  if (isShiftOpCode(op)) {
+    // An out-of-range shift amount returns an undefined value in SPIR-V but poison in LLVM IR. The least disruptive way
+    // of fixing this is to mask the shift amount so it is always in-range. This generates AND instructions which can
+    // usually be folded away in IR or elided during instruction selection.
+    unsigned baseWidth = base->getType()->getScalarSizeInBits();
+    assert(isPowerOf2_32(baseWidth));
+    Constant *rhs = getBuilder()->getIntN(baseWidth, baseWidth - 1);
+    if (base->getType()->isVectorTy())
+      rhs = ConstantVector::getSplat(cast<VectorType>(base->getType())->getElementCount(), rhs);
+    shift = getBuilder()->CreateAnd(shift, rhs);
+  }
 
   auto inst = BinaryOperator::Create(bo, base, shift, bv->getName(), bb);
   setFastMathFlags(inst);
@@ -1591,13 +1699,8 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
   }
 
   Constant *const zero = getBuilder()->getInt32(0);
-  // clang-format off
-  if (loadType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage
-#if VKI_RAY_TRACING
-      && spvType->getOpCode() != OpTypeRayQueryKHR
-#endif
-  ) {
-    // clang-format on
+  if (loadType->isStructTy() && !spvType->isTypeSampledImage() && !spvType->isTypeImage() &&
+      !spvType->isTypeSampler() && spvType->getOpCode() != OpTypeRayQueryKHR) {
     // For structs we lookup the mapping of the elements and use it to reverse map the values.
     const bool needsPad = isRemappedTypeElements(spvType);
 
@@ -1632,14 +1735,14 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
       memberTypes.push_back(memberLoad->getType());
     }
 
-    Value *load = UndefValue::get(StructType::get(m_m->getContext(), memberTypes));
+    Value *load = PoisonValue::get(StructType::get(m_m->getContext(), memberTypes));
 
     for (unsigned i = 0, memberCount = spvType->getStructMemberCount(); i < memberCount; i++)
       load = getBuilder()->CreateInsertValue(load, memberLoads[i], i);
 
     return load;
   }
-  if (loadType->isArrayTy() && !spvType->isTypeVector()) {
+  if (loadType->isArrayTy() && !spvType->isTypeVector() && !spvType->isTypeImage()) {
     // Matrix and arrays both get here. For both we need to turn [<{element-type, pad}>] into [element-type].
     const bool needsPad = isTypeWithPad(loadType);
 
@@ -1648,7 +1751,7 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
 
     Type *elementType = transType(spvElementType);
 
-    Value *load = UndefValue::get(ArrayType::get(elementType, loadType->getArrayNumElements()));
+    Value *load = PoisonValue::get(ArrayType::get(elementType, loadType->getArrayNumElements()));
 
     for (unsigned i = 0, elementCount = loadType->getArrayNumElements(); i < elementCount; i++) {
       SmallVector<Value *, 3> indices;
@@ -1660,7 +1763,6 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
 
       Value *elementLoadPointer = getBuilder()->CreateGEP(loadType, loadPointer, indices);
       Type *const elementLoadType = GetElementPtrInst::getIndexedType(loadType, indices);
-
       Value *const elementLoad = addLoadInstRecursively(spvElementType, elementLoadPointer, elementLoadType, isVolatile,
                                                         isCoherent, isNonTemporal);
       load = getBuilder()->CreateInsertValue(load, elementLoad, i);
@@ -1672,7 +1774,7 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
     // Coherent load operand must be integer, pointer, or floating point type, so need to spilte vector.
     SPIRVType *spvElementType = spvType->getVectorComponentType();
     Type *elementType = transType(spvElementType);
-    Value *load = UndefValue::get(VectorType::get(elementType, spvType->getVectorComponentCount(), false));
+    Value *load = PoisonValue::get(VectorType::get(elementType, spvType->getVectorComponentCount(), false));
     for (unsigned i = 0, elementCount = spvType->getVectorComponentCount(); i < elementCount; i++) {
       Value *const elementLoadPointer =
           getBuilder()->CreateGEP(loadType, loadPointer, {zero, getBuilder()->getInt32(i)});
@@ -1756,13 +1858,8 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
   }
 
   Value *const zero = getBuilder()->getInt32(0);
-  // clang-format off
-  if (storeType->isStructTy() && spvType->getOpCode() != OpTypeSampledImage && spvType->getOpCode() != OpTypeImage
-#if VKI_RAY_TRACING
-      && spvType->getOpCode() != OpTypeRayQueryKHR
-#endif
-  ) {
-    // clang-format on
+  if (storeType->isStructTy() && !spvType->isTypeSampledImage() && !spvType->isTypeImage() &&
+      !spvType->isTypeSampler() && spvType->getOpCode() != OpTypeRayQueryKHR) {
     // For structs we lookup the mapping of the elements and use it to map the values.
     const bool needsPad = isRemappedTypeElements(spvType);
 
@@ -1775,7 +1872,7 @@ void SPIRVToLLVM::addStoreInstRecursively(SPIRVType *const spvType, Value *store
       addStoreInstRecursively(spvType->getStructMemberType(i), memberStorePointer, memberStoreType, memberStoreValue,
                               isVolatile, isCoherent, isNonTemporal);
     }
-  } else if (storeType->isArrayTy() && !spvType->isTypeVector()) {
+  } else if (storeType->isArrayTy() && !spvType->isTypeVector() && !spvType->isTypeImage()) {
     // Matrix and arrays both get here. For both we need to turn [element-type] into [<{element-type, pad}>].
     const bool needsPad = isTypeWithPad(storeType);
 
@@ -1865,7 +1962,7 @@ Constant *SPIRVToLLVM::buildConstStoreRecursively(SPIRVType *const spvType, Type
 
     // First run through the final LLVM type and create undef's for the members
     for (unsigned i = 0, memberCount = constMembers.size(); i < memberCount; i++)
-      constMembers[i] = UndefValue::get(storeType->getStructElementType(i));
+      constMembers[i] = PoisonValue::get(storeType->getStructElementType(i));
 
     // Then run through the SPIR-V type and set the non-undef members to actual constants.
     for (unsigned i = 0, memberCount = spvType->getStructMemberCount(); i < memberCount; i++) {
@@ -1884,7 +1981,7 @@ Constant *SPIRVToLLVM::buildConstStoreRecursively(SPIRVType *const spvType, Type
     const bool needsPad = isTypeWithPad(storeType);
 
     SmallVector<Constant *, 8> constElements(storeType->getArrayNumElements(),
-                                             UndefValue::get(storeType->getArrayElementType()));
+                                             PoisonValue::get(storeType->getArrayElementType()));
 
     SPIRVType *const spvElementType =
         spvType->isTypeArray() ? spvType->getArrayElementType() : spvType->getMatrixColumnType();
@@ -1995,11 +2092,8 @@ Value *SPIRVToLLVM::transAtomicRMW(SPIRVValue *const spvValue, const AtomicRMWIn
   Value *const atomicValue = transValue(spvAtomicInst->getOpValue(3), getBuilder()->GetInsertBlock()->getParent(),
                                         getBuilder()->GetInsertBlock());
 
-  // NOTE: This is a workaround. atomic.swap.f64 is not supported in LLVM backend, so we convert double to int64. But
-  // for task payload, this is deferred because it will facilitate lowering of atomic instructions of task payload and
-  // the work is finally done by LGC in task shader processing.
-  if (dyn_cast<PointerType>(atomicPointer->getType())->getAddressSpace() != SPIRAS_TaskPayload &&
-      binOp == AtomicRMWInst::Xchg && atomicValue->getType()->isDoubleTy()) {
+  // NOTE: This is a workaround. atomic.swap.f64 is not supported in LLVM backend, so we convert double to int64.
+  if (binOp == AtomicRMWInst::Xchg && atomicValue->getType()->isDoubleTy()) {
     Value *const int64Value = getBuilder()->CreateBitCast(atomicValue, getBuilder()->getInt64Ty());
 
     Value *const int64AtomicPointer = getBuilder()->CreateBitCast(
@@ -2420,6 +2514,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpCopyMemory>(SPIRVValue *c
 // @param spvValue : A SPIR-V value.
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const spvValue) {
   SPIRVLoad *const spvLoad = static_cast<SPIRVLoad *>(spvValue);
+  LayoutMode layout = LayoutMode::Native;
 
   // Handle UniformConstant image/sampler/sampledimage load.
   if (static_cast<SPIRVTypePointer *>(spvLoad->getSrc()->getType())->getStorageClass() == StorageClassUniformConstant) {
@@ -2428,7 +2523,6 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
     case OpTypeSampler:
     case OpTypeSampledImage:
       return transLoadImage(spvLoad->getSrc());
-#if VKI_RAY_TRACING
     case OpTypeAccelerationStructureKHR: {
       auto pipelineContext = (static_cast<Llpc::Context *>(m_context))->getPipelineContext();
       if (pipelineContext->getRayTracingState()->forceInvalidAccelStruct) {
@@ -2438,29 +2532,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
         (void(loadType)); // unused
         return ConstantVector::get({m_builder->getInt32(0), m_builder->getInt32(0)});
       }
-#if GPURT_CLIENT_INTERFACE_MAJOR_VERSION >= 34
-      else {
-        // From now on, AS header may start at a non-zero offset, GPURT now request base offset of the resource, and it
-        // will calculate the actual GPUVA, instead of compiler providing one loaded from offset 0.
-        unsigned binding = 0u;
-        unsigned descSet = 0u;
-        bool valid = spvLoad->getSrc()->hasDecorate(DecorationBinding, 0, &binding);
-        valid &= spvLoad->getSrc()->hasDecorate(DecorationDescriptorSet, 0, &descSet);
-        assert(valid);
-
-        auto descTy = ResourceNodeType::DescriptorBuffer;
-        auto descPtr = getBuilder()->CreateGetDescPtr(descTy, descTy, descSet, binding);
-        // Base address is the first 48-bit of descriptor.
-        Value *accelAddr = getBuilder()->CreateLoad(FixedVectorType::get(getBuilder()->getInt32Ty(), 2), descPtr);
-        accelAddr = getBuilder()->CreateInsertElement(
-            accelAddr, getBuilder()->CreateAnd(getBuilder()->CreateExtractElement(accelAddr, 1), 0xFFFF), 1);
-        return accelAddr;
-      }
-#endif
       break;
     }
-#endif
     default:
+      layout = LayoutMode::Std430;
       break;
     }
   }
@@ -2514,6 +2589,9 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
   if (spvLoad->getMemoryAccessMask(true) & MemoryAccessNonPrivatePointerKHRMask)
     isCoherent = true;
 
+  if (spvLoad->getSrc()->getType()->getPointerStorageClass() == StorageClassTaskPayloadWorkgroupEXT)
+    isCoherent = true;
+
   const bool isNonTemporal = spvLoad->SPIRVMemoryAccess::isNonTemporal(true);
 
   SPIRVType *const spvLoadType = spvLoad->getSrc()->getType();
@@ -2521,7 +2599,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
   Instruction *baseNode = getLastInsertedValue();
   BasicBlock *currentBlock = getBuilder()->GetInsertBlock();
 
-  Type *loadType = getPointeeType(spvLoad->getSrc());
+  Type *loadType = getPointeeType(spvLoad->getSrc(), layout);
 
   auto loadInst = addLoadInstRecursively(spvLoadType->getPointerElementType(), loadPointer, loadType, isVolatile,
                                          isCoherent, isNonTemporal);
@@ -2529,6 +2607,15 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpLoad>(SPIRVValue *const s
   // Record all load instructions inserted by addLoadInstRecursively.
   if (m_scratchBoundsChecksEnabled) {
     gatherScratchBoundsChecksMemOps(spvLoad, baseNode, currentBlock, LlvmMemOpType::IS_LOAD, currentBlock->getParent());
+  }
+
+  if (spvLoad->getType()->getOpCode() == OpTypeAccelerationStructureKHR) {
+    // From now on (GPURT major version >= 34), AS header may start at a non-zero offset, GPURT now request base offset
+    // of the resource, and it will calculate the actual GPUVA, instead of compiler providing one loaded from offset 0.
+    // We'll lower the AS global value later in llpcSpirvLowerGlobal, here we clamp the loaded GPUVA to first 48 bits.
+    assert(loadInst->getType()->isVectorTy());
+    loadInst = getBuilder()->CreateInsertElement(
+        loadInst, getBuilder()->CreateAnd(getBuilder()->CreateExtractElement(loadInst, 1), 0xFFFF), 1);
   }
 
   return loadInst;
@@ -2562,7 +2649,7 @@ Value *SPIRVToLLVM::loadImageSampler(Type *elementTy, Value *base) {
       Value *element1 = loadImageSampler(structTy->getElementType(1), ptr1);
       Value *ptr0 = getBuilder()->CreateExtractValue(base, 0);
       Value *element0 = loadImageSampler(structTy->getElementType(0), ptr0);
-      Value *result = getBuilder()->CreateInsertValue(UndefValue::get(structTy), element0, 0);
+      Value *result = getBuilder()->CreateInsertValue(PoisonValue::get(structTy), element0, 0);
       result = getBuilder()->CreateInsertValue(result, element1, 1);
       return result;
     }
@@ -2572,7 +2659,7 @@ Value *SPIRVToLLVM::loadImageSampler(Type *elementTy, Value *base) {
     // {pointer,stride,convertingSamplerIdx} struct that represents the descriptor pointer.
     Value *convertingSamplerIdx = getBuilder()->CreateExtractValue(base, 2);
     Value *loadedVal = loadImageSampler(structTy->getElementType(0), base);
-    loadedVal = getBuilder()->CreateInsertValue(UndefValue::get(structTy), loadedVal, 0);
+    loadedVal = getBuilder()->CreateInsertValue(PoisonValue::get(structTy), loadedVal, 0);
     return getBuilder()->CreateInsertValue(loadedVal, convertingSamplerIdx, 1);
   }
 
@@ -2589,7 +2676,7 @@ Value *SPIRVToLLVM::loadImageSampler(Type *elementTy, Value *base) {
     auto *oneVal = getBuilder()->CreateLoad(elementTy, ptr);
     oneVal->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, {}));
 
-    Value *result = getBuilder()->CreateInsertValue(UndefValue::get(arrayTy), oneVal, 0);
+    Value *result = getBuilder()->CreateInsertValue(PoisonValue::get(arrayTy), oneVal, 0);
     // Pointer to image is represented as a struct containing {pointer, stride, planeStride, isResource}.
     if (!m_convertingSamplers.empty() && base->getType()->getStructNumElements() >= 4) {
       Value *planeStride = getBuilder()->CreateExtractValue(base, 2);
@@ -2629,7 +2716,10 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
   unsigned descriptorSet = 0;
 
   spvImagePtr->hasDecorate(DecorationBinding, 0, &binding);
-  spvImagePtr->hasDecorate(DecorationDescriptorSet, 0, &descriptorSet);
+  bool hasDescriptorSet = spvImagePtr->hasDecorate(DecorationDescriptorSet, 0, &descriptorSet);
+  assert(!getPipelineOptions()->replaceSetWithResourceType || !hasDescriptorSet ||
+         static_cast<SPIRVTypePointer *>(spvImagePtr->getType())->getStorageClass() == StorageClassUniformConstant);
+  (void)hasDescriptorSet;
 
   SPIRVType *spvTy = spvImagePtr->getType()->getPointerElementType();
   while (spvTy->getOpCode() == OpTypeArray || spvTy->getOpCode() == OpTypeRuntimeArray)
@@ -2637,6 +2727,9 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
 
   Value *imageDescPtr = nullptr;
   Value *samplerDescPtr = nullptr;
+
+  if (getPipelineOptions()->replaceSetWithResourceType)
+    assert(spvTy->getOpCode() != OpTypeSampler);
 
   if (spvTy->getOpCode() != OpTypeSampler) {
     // Image or sampledimage -- need to get the image pointer-and-stride.
@@ -2649,20 +2742,38 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
     auto resType =
         desc->Dim == DimBuffer ? ResourceNodeType::DescriptorTexelBuffer : ResourceNodeType::DescriptorResource;
 
+    if (getPipelineOptions()->replaceSetWithResourceType) {
+      if (spvTy->getOpCode() == OpTypeImage) {
+        descriptorSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorImage);
+      } else if (spvTy->getOpCode() == OpTypeSampledImage) {
+        if (getPipelineOptions()->enableCombinedTexture) {
+          descriptorSet =
+              PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorCombinedTexture);
+        } else {
+          descriptorSet =
+              PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorResource);
+        }
+      }
+    }
+
     imageDescPtr = getDescPointerAndStride(resType, descriptorSet, binding, resType);
 
     if (desc->MS) {
+      if (getPipelineOptions()->replaceSetWithResourceType && spvTy->getOpCode() != OpTypeImage)
+        descriptorSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorFmask);
       // A multisampled image pointer is a struct containing an image desc pointer and an fmask desc pointer.
       Value *fmaskDescPtr = getDescPointerAndStride(ResourceNodeType::DescriptorFmask, descriptorSet, binding,
                                                     ResourceNodeType::DescriptorFmask);
       imageDescPtr = getBuilder()->CreateInsertValue(
-          UndefValue::get(StructType::get(*m_context, {imageDescPtr->getType(), fmaskDescPtr->getType()})),
+          PoisonValue::get(StructType::get(*m_context, {imageDescPtr->getType(), fmaskDescPtr->getType()})),
           imageDescPtr, 0);
       imageDescPtr = getBuilder()->CreateInsertValue(imageDescPtr, fmaskDescPtr, 1);
     }
   }
 
   if (spvTy->getOpCode() != OpTypeImage) {
+    if (getPipelineOptions()->replaceSetWithResourceType && !getPipelineOptions()->enableCombinedTexture)
+      descriptorSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorSampler);
     // Sampler or sampledimage -- need to get the sampler {pointer,stride,convertingSamplerIdx}
     samplerDescPtr = getDescPointerAndStride(ResourceNodeType::DescriptorSampler, descriptorSet, binding,
                                              ResourceNodeType::DescriptorSampler);
@@ -2674,7 +2785,7 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
   if (imageDescPtr) {
     if (samplerDescPtr) {
       Value *descPtr =
-          UndefValue::get(StructType::get(*m_context, {imageDescPtr->getType(), samplerDescPtr->getType()}));
+          PoisonValue::get(StructType::get(*m_context, {imageDescPtr->getType(), samplerDescPtr->getType()}));
       descPtr = getBuilder()->CreateInsertValue(descPtr, imageDescPtr, 0);
       descPtr = getBuilder()->CreateInsertValue(descPtr, samplerDescPtr, 1);
       return descPtr;
@@ -2805,7 +2916,11 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpStore>(SPIRVValue *const 
     if (isSystemScope)
       isCoherent = true;
   }
+
   if (spvStore->getMemoryAccessMask(false) & MemoryAccessNonPrivatePointerKHRMask)
+    isCoherent = true;
+
+  if (pointerStorageClass == StorageClassTaskPayloadWorkgroupEXT)
     isCoherent = true;
 
   const bool isNonTemporal = spvStore->SPIRVMemoryAccess::isNonTemporal(false);
@@ -2890,6 +3005,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpArrayLength>(SPIRVValue *
 // @param spvValue : A SPIR-V value.
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *const spvValue) {
   SPIRVAccessChainBase *const spvAccessChain = static_cast<SPIRVAccessChainBase *>(spvValue);
+  LayoutMode layout = LayoutMode::Native;
 
   // Special handling for UniformConstant if the ultimate element type is image/sampler/sampledimage.
   if (static_cast<SPIRVTypePointer *>(spvAccessChain->getBase()->getType())->getStorageClass() ==
@@ -2905,6 +3021,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
     case OpTypeSampledImage:
       return transOpAccessChainForImage(spvAccessChain);
     default:
+      layout = isAccelerationStructureType(spvUltimateElementType) ? LayoutMode::Explicit : LayoutMode::Std430;
       break;
     }
   }
@@ -2922,9 +3039,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
 
   SPIRVType *spvAccessType = spvAccessChain->getBase()->getType();
   const SPIRVStorageClassKind storageClass = spvAccessType->getPointerStorageClass();
-  const bool isBufferBlockPointer = isStorageClassExplicitlyLaidOut(m_bm, storageClass);
+  const bool typeMaybeRemapped =
+      isStorageClassExplicitlyLaidOut(m_bm, storageClass) || storageClass == StorageClassUniformConstant;
 
-  Type *basePointeeType = getPointeeType(spvAccessChain->getBase());
+  Type *basePointeeType = getPointeeType(spvAccessChain->getBase(), layout);
 
   SmallVector<Value *, 8> gepIndices;
 
@@ -2961,7 +3079,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
       const uint64_t origMemberIndex = constIndex->getZExtValue();
       Type *castType = nullptr;
 
-      if (isBufferBlockPointer) {
+      if (typeMaybeRemapped) {
         if (isRemappedTypeElements(spvAccessType)) {
           const uint64_t remappedMemberIndex = lookupRemappedTypeElements(spvAccessType, origMemberIndex);
           constIndex = getBuilder()->getInt32(remappedMemberIndex);
@@ -2990,7 +3108,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
     case OpTypeRuntimeArray: {
       gepIndices.push_back(index);
 
-      if (isBufferBlockPointer && isRemappedTypeElements(spvAccessType)) {
+      if (typeMaybeRemapped && isRemappedTypeElements(spvAccessType)) {
         // If we have padding in an array, we inserted a struct to add that
         // padding, and so we need an extra constant 0 index.
         gepIndices.push_back(getBuilder()->getInt32(0));
@@ -3004,7 +3122,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpAccessChain>(SPIRVValue *
       Type *const matrixType = GetElementPtrInst::getIndexedType(basePointeeType, gepIndices);
       assert(matrixType && matrixType->isArrayTy());
 
-      if (isBufferBlockPointer && isTypeWithPadRowMajorMatrix(matrixType)) {
+      if (typeMaybeRemapped && isTypeWithPadRowMajorMatrix(matrixType)) {
         // We have a row major matrix, we need to split the access chain here to handle it.
         flushGep();
 
@@ -3095,7 +3213,7 @@ Value *SPIRVToLLVM::indexDescPtr(Type *elementTy, Value *base, Value *index) {
     Value *ptr1 = getBuilder()->CreateExtractValue(base, 1);
     ptr0 = indexDescPtr(structTy->getElementType(0), ptr0, index);
     ptr1 = indexDescPtr(structTy->getElementType(1), ptr1, index);
-    base = getBuilder()->CreateInsertValue(UndefValue::get(base->getType()), ptr0, 0);
+    base = getBuilder()->CreateInsertValue(PoisonValue::get(base->getType()), ptr0, 0);
     base = getBuilder()->CreateInsertValue(base, ptr1, 1);
     return base;
   }
@@ -3114,6 +3232,7 @@ Value *SPIRVToLLVM::indexDescPtr(Type *elementTy, Value *base, Value *index) {
   // The descriptor "pointer" is in fact a struct containing the pointer and stride.
   Value *ptr = getBuilder()->CreateExtractValue(base, 0);
   Value *stride = getBuilder()->CreateExtractValue(base, 1);
+  index = getBuilder()->CreateZExtOrTrunc(index, getBuilder()->getInt32Ty());
   index = getBuilder()->CreateMul(index, stride);
 
   // Do the indexing operation by GEPping as a byte pointer.
@@ -3171,7 +3290,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpSampledImage>(SPIRVValue 
   Value *sampler = transValue(static_cast<SPIRVInstTemplateBase *>(spvValue)->getOpValue(1),
                               getBuilder()->GetInsertBlock()->getParent(), getBuilder()->GetInsertBlock());
 
-  Value *result = UndefValue::get(StructType::get(*m_context, {image->getType(), sampler->getType()}));
+  Value *result = PoisonValue::get(StructType::get(*m_context, {image->getType(), sampler->getType()}));
   result = getBuilder()->CreateInsertValue(result, image, uint64_t(0));
   result = getBuilder()->CreateInsertValue(result, sampler, 1);
   return result;
@@ -3191,7 +3310,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpKill>(SPIRVValue *const s
     getBuilder()->CreateRetVoid();
   } else {
     // Function returns value
-    getBuilder()->CreateRet(UndefValue::get(getBuilder()->getCurrentFunctionReturnType()));
+    getBuilder()->CreateRet(PoisonValue::get(getBuilder()->getCurrentFunctionReturnType()));
   }
 
   return kill;
@@ -3349,7 +3468,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupFMax>(SPIRVValue *co
 //
 // @param spvValue : A SPIR-V value.
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformElect>(SPIRVValue *const spvValue) {
-  return getBuilder()->CreateSubgroupElect();
+  Value *result = nullptr;
+
+  result = getBuilder()->CreateSubgroupElect();
+  return result;
 }
 
 // =====================================================================================================================
@@ -3359,12 +3481,16 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformElect>(SPI
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAll>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
-
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const predicate = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupAll(predicate);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupAll(predicate);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3374,12 +3500,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAll>(SPIRV
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAny>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const predicate = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupAny(predicate);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupAny(predicate);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3389,12 +3520,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAny>(SPIRV
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAllEqual>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupAllEqual(value);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupAllEqual(value);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3404,13 +3540,18 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAllEqual>(
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcast>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
   Value *const index = transValue(spvOperands[2], func, block);
-  return getBuilder()->CreateSubgroupBroadcastWaterfall(value, index);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupBroadcastWaterfall(value, index);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3420,12 +3561,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcast>
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcastFirst>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupBroadcastFirst(value);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupBroadcastFirst(value);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3435,12 +3581,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcastF
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallot>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const predicate = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupBallot(predicate);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupBallot(predicate);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3450,12 +3601,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallot>(SP
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformInverseBallot>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupInverseBallot(value);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupInverseBallot(value);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3465,13 +3621,18 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformInverseBal
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotBitExtract>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
   Value *const index = transValue(spvOperands[2], func, block);
-  return getBuilder()->CreateSubgroupBallotBitExtract(value, index);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupBallotBitExtract(value, index);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3481,22 +3642,24 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotBitE
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotBitCount>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[2], func, block);
 
-  switch (static_cast<SPIRVConstant *>(spvOperands[1])->getZExtIntValue()) {
-  case GroupOperationReduce:
-    return getBuilder()->CreateSubgroupBallotBitCount(value);
-  case GroupOperationInclusiveScan:
-    return getBuilder()->CreateSubgroupBallotInclusiveBitCount(value);
-  case GroupOperationExclusiveScan:
-    return getBuilder()->CreateSubgroupBallotExclusiveBitCount(value);
-  default:
-    llvm_unreachable("Should never be called!");
-    return nullptr;
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    switch (static_cast<SPIRVConstant *>(spvOperands[1])->getZExtIntValue()) {
+    case GroupOperationReduce:
+      return getBuilder()->CreateSubgroupBallotBitCount(value);
+    case GroupOperationInclusiveScan:
+      return getBuilder()->CreateSubgroupBallotInclusiveBitCount(value);
+    case GroupOperationExclusiveScan:
+      return getBuilder()->CreateSubgroupBallotExclusiveBitCount(value);
+    default:
+      llvm_unreachable("Should never be called!");
+      return nullptr;
+    }
   }
 }
 
@@ -3507,12 +3670,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotBitC
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotFindLSB>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupBallotFindLsb(value);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupBallotFindLsb(value);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3522,12 +3690,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotFind
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotFindMSB>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupBallotFindMsb(value);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupBallotFindMsb(value);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3537,13 +3710,18 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotFind
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffle>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
   Value *const index = transValue(spvOperands[2], func, block);
-  return getBuilder()->CreateSubgroupShuffle(value, index);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupShuffle(value, index);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3553,13 +3731,18 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffle>(S
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleXor>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
   Value *const mask = transValue(spvOperands[2], func, block);
-  return getBuilder()->CreateSubgroupShuffleXor(value, mask);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupShuffleXor(value, mask);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3569,13 +3752,18 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleXor
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleUp>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
   Value *const delta = transValue(spvOperands[2], func, block);
-  return getBuilder()->CreateSubgroupShuffleUp(value, delta);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupShuffleUp(value, delta);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3585,28 +3773,54 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleUp>
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleDown>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
   Value *const delta = transValue(spvOperands[2], func, block);
-  return getBuilder()->CreateSubgroupShuffleDown(value, delta);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupShuffleDown(value, delta);
+  }
+  return result;
 }
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
-// Handle OpTraceRayKHR.
+// Create TraceRay dialect Op.
 //
 // @param spvValue : A SPIR-V value.
-template <> Value *SPIRVToLLVM::transValueWithOpcode<OpTraceRayKHR>(SPIRVValue *const spvValue) {
+Value *SPIRV::SPIRVToLLVM::createTraceRayDialectOp(SPIRVValue *const spvValue) {
   if (m_execModule != ExecutionModelRayGenerationKHR) {
     Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
     auto *pipelineContext = static_cast<Llpc::RayTracingContext *>(llpcContext->getPipelineContext());
     pipelineContext->setIndirectPipeline();
   }
+
+  SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
+  std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
   BasicBlock *const block = getBuilder()->GetInsertBlock();
-  return mapValue(spvValue, transSPIRVBuiltinFromInst(static_cast<SPIRVInstruction *>(spvValue), block));
+  Function *const func = getBuilder()->GetInsertBlock()->getParent();
+  Value *const accelStruct = transValue(spvOperands[0], func, block);
+  Value *const rayFlags = transValue(spvOperands[1], func, block);
+  Value *const cullMask = transValue(spvOperands[2], func, block);
+  Value *const sbtOffset = transValue(spvOperands[3], func, block);
+  Value *const sbtStride = transValue(spvOperands[4], func, block);
+  Value *const missIndex = transValue(spvOperands[5], func, block);
+  Value *const rayOrigin = transValue(spvOperands[6], func, block);
+  Value *const rayTMin = transValue(spvOperands[7], func, block);
+  Value *const rayDir = transValue(spvOperands[8], func, block);
+  Value *const rayTMax = transValue(spvOperands[9], func, block);
+  Value *const payload = transValue(spvOperands[10], func, block);
+
+  auto accelStructAsI64 = getBuilder()->CreateBitCast(accelStruct, getBuilder()->getInt64Ty());
+
+  Type *payloadTy = transType(spvOperands[10]->getType()->getPointerElementType());
+  auto paq = getPaqFromSize(getBuilder()->getContext(), alignTo(m_m->getDataLayout().getTypeAllocSize(payloadTy), 4));
+
+  return getBuilder()->create<TraceRayOp>(accelStructAsI64, rayFlags, cullMask, sbtOffset, sbtStride, missIndex,
+                                          rayOrigin, rayTMin, rayDir, rayTMax, payload, paq);
 }
 
 // =====================================================================================================================
@@ -3619,8 +3833,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpExecuteCallableKHR>(SPIRV
     auto *pipelineContext = static_cast<Llpc::RayTracingContext *>(llpcContext->getPipelineContext());
     pipelineContext->setIndirectPipeline();
   }
+  SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
+  std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
+
   BasicBlock *const block = getBuilder()->GetInsertBlock();
-  return mapValue(spvValue, transSPIRVBuiltinFromInst(static_cast<SPIRVInstruction *>(spvValue), block));
+  Function *const func = getBuilder()->GetInsertBlock()->getParent();
+  Value *const shaderIndex = transValue(spvOperands[0], func, block);
+  Value *const callableData = transValue(spvOperands[1], func, block);
+  Type *callableDataTy = transType(spvOperands[1]->getType()->getPointerElementType());
+  unsigned dataByteSize = alignTo(m_m->getDataLayout().getTypeAllocSize(callableDataTy), 4);
+
+  return getBuilder()->create<CallCallableShaderOp>(shaderIndex, callableData, dataByteSize);
 }
 
 // =====================================================================================================================
@@ -3631,29 +3854,14 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpConvertUToAccelerationStr
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
-  // GpuAddr is 64 bit integer
   Value *gpuAddr = transValue(spvInst->getOperands()[0], func, block);
   Type *gpuAddrTy = gpuAddr->getType();
-  // NOTE: This is a workround for SPIR-V generated from HLSL sources. The input of OpConvertUToAccelerationStructureKHR
-  // could be uvec2 while the spec expects this to be int64.
-  if (gpuAddrTy->isVectorTy() && gpuAddrTy->getPrimitiveSizeInBits() == 64) {
-    gpuAddr = getBuilder()->CreateBitCast(gpuAddr, getBuilder()->getInt64Ty());
+  // NOTE: The input is allowed to be i64 or <2 x i32>, but we always assume acceleration structure is <2 x i32>.
+  if (gpuAddrTy->isIntegerTy()) {
+    assert(gpuAddrTy->getScalarSizeInBits() == 64);
+    gpuAddr = getBuilder()->CreateBitCast(gpuAddr, FixedVectorType::get(getBuilder()->getInt32Ty(), 2));
   }
-
-  Type *gpuAddrAsPtrTy = Type::getInt8PtrTy(*m_context, SPIRAS_Global);
-  auto gpuAddrAsPtr = getBuilder()->CreateIntToPtr(gpuAddr, gpuAddrAsPtrTy);
-
-  // Create GEP to get the byte address with byte offset
-  Value *loadValue = m_builder->CreateGEP(m_builder->getInt8Ty(), gpuAddrAsPtr, getBuilder()->getInt32(0));
-
-  Type *accelStructTy = FixedVectorType::get(Type::getInt32Ty(*m_context), 2);
-  Type *accelStructPtrTy = accelStructTy->getPointerTo(SPIRAS_Global);
-
-  // Cast to the return type pointer
-  loadValue = m_builder->CreateBitCast(loadValue, accelStructPtrTy);
-  auto load = m_builder->CreateLoad(accelStructTy, loadValue);
-  load->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(*m_context, {}));
-  return mapValue(spvValue, load);
+  return mapValue(spvValue, gpuAddr);
 }
 
 // =====================================================================================================================
@@ -3661,12 +3869,39 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpConvertUToAccelerationStr
 //
 // @param spvValue : A SPIR-V value.
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpTerminateRayKHR>(SPIRVValue *const spvValue) {
-  BasicBlock *const block = getBuilder()->GetInsertBlock();
-  transSPIRVBuiltinFromInst(static_cast<SPIRVInstruction *>(spvValue), block);
-  Value *ret = getBuilder()->CreateRetVoid();
-  return mapValue(spvValue, ret);
+  getBuilder()->create<AcceptHitAndEndSearchOp>();
+  return getBuilder()->CreateUnreachable();
 }
-#endif
+
+// =====================================================================================================================
+// Handle OpIgnoreIntersectionKHR.
+//
+// @param spvValue : A SPIR-V value.
+template <> Value *SPIRVToLLVM::transValueWithOpcode<OpIgnoreIntersectionKHR>(SPIRVValue *const spvValue) {
+  getBuilder()->create<IgnoreHitOp>();
+  return getBuilder()->CreateUnreachable();
+}
+
+// =====================================================================================================================
+// Handle OpReportIntersectionKHR.
+//
+// @param spvValue : A SPIR-V value.
+template <> Value *SPIRVToLLVM::transValueWithOpcode<OpReportIntersectionKHR>(SPIRVValue *const spvValue) {
+  SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
+  std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
+
+  BasicBlock *const block = getBuilder()->GetInsertBlock();
+  Function *const func = getBuilder()->GetInsertBlock()->getParent();
+  Value *const hitT = transValue(spvOperands[0], func, block);
+  Value *const hitKind = transValue(spvOperands[1], func, block);
+
+  // We don't have attribute for this Op in SPIR-V
+  // TODO: Pass the pointer of hit attribute global variable here after SpirvLowerRayTracing is moved after
+  // SpirvLowerGlobal
+  auto dummyPtr = ConstantPointerNull::get(PointerType::get(getBuilder()->getContext(), SPIRAS_Private));
+
+  return getBuilder()->create<ReportHitOp>(hitT, hitKind, dummyPtr, 0);
+}
 
 // =====================================================================================================================
 // Handle OpEmitMeshTasksEXT.
@@ -3681,7 +3916,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpEmitMeshTasksEXT>(SPIRVVa
   Value *const groupCountX = transValue(spvOperands[0], func, block);
   Value *const groupCountY = transValue(spvOperands[1], func, block);
   Value *const groupCountZ = transValue(spvOperands[2], func, block);
-  getBuilder()->CreateEmitMeshTasks(groupCountX, groupCountY, groupCountZ);
+  getBuilder()->create<lgc::EmitMeshTasksOp>(groupCountX, groupCountY, groupCountZ);
   // NOTE: According to SPIR-V spec, OpEmitMeshTasksEXT is a terminator. Hence, we have to insert
   // a return instruction to implement this semantics.
   return getBuilder()->CreateRetVoid();
@@ -3699,7 +3934,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpSetMeshOutputsEXT>(SPIRVV
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const vertexCount = transValue(spvOperands[0], func, block);
   Value *const primitiveCount = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSetMeshOutputs(vertexCount, primitiveCount);
+  return getBuilder()->create<lgc::SetMeshOutputsOp>(vertexCount, primitiveCount);
 }
 
 // =====================================================================================================================
@@ -4166,11 +4401,11 @@ Value *SPIRVToLLVM::transDebugPrintf(SPIRVInstruction *bi, const ArrayRef<SPIRVV
 
   auto spvValueItr = spvValues.begin();
   Value *formatStr = mapEntry(*spvValueItr++, nullptr);
-  SmallVector<Value *> args = {m_debugOutputBuffer, formatStr};
+  SmallVector<Value *> args;
   for (; spvValueItr != spvValues.end(); ++spvValueItr) {
     args.push_back(transValue(*spvValueItr, func, bb));
   }
-  return getBuilder()->CreateDebugPrintf(args);
+  return getBuilder()->create<lgc::DebugPrintfOp>(m_debugOutputBuffer, formatStr, args);
 }
 
 // Translate an initializer. This has special handling for the case where the type to initialize to does not match the
@@ -4195,7 +4430,7 @@ Constant *SPIRVToLLVM::transInitializer(SPIRVValue *const spvValue, Type *const 
 
     assert(needsPad == false || isRemappedTypeElements(spvType));
 
-    Constant *structInitializer = UndefValue::get(type);
+    Constant *structInitializer = PoisonValue::get(type);
 
     for (unsigned i = 0, memberCount = spvMembers.size(); i < memberCount; i++) {
       const unsigned memberIndex = needsPad ? lookupRemappedTypeElements(spvType, i) : i;
@@ -4217,7 +4452,7 @@ Constant *SPIRVToLLVM::transInitializer(SPIRVValue *const spvValue, Type *const 
     // Matrix and arrays both get here. For both we need to turn [<{element-type, pad}>] into [element-type].
     const bool needsPad = isTypeWithPad(type);
 
-    Constant *arrayInitializer = UndefValue::get(type);
+    Constant *arrayInitializer = PoisonValue::get(type);
 
     for (unsigned i = 0, elementCount = spvElements.size(); i < elementCount; i++) {
       if (needsPad) {
@@ -4256,6 +4491,9 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
   const SPIRVStorageClassKind storageClass = spvVar->getStorageClass();
   SPIRVType *const spvVarType = spvVar->getType()->getPointerElementType();
 
+  LayoutMode layout = isStorageClassExplicitlyLaidOut(m_bm, spvVar->getType()->getPointerStorageClass())
+                          ? LayoutMode::Explicit
+                          : LayoutMode::Native;
   if (storageClass == StorageClassUniformConstant) {
     SPIRVType *spvElementType = spvVarType;
     while (spvElementType->getOpCode() == OpTypeArray || spvElementType->getOpCode() == OpTypeRuntimeArray)
@@ -4267,15 +4505,14 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
       // Do nothing for image/sampler/sampledimage.
       return nullptr;
     default:
+      if (!isAccelerationStructureType(spvElementType))
+        layout = LayoutMode::Std430;
       break;
     }
   }
 
   Type *const ptrType = transType(spvVar->getType());
   unsigned addrSpace = ptrType->getPointerAddressSpace();
-  LayoutMode layout = isStorageClassExplicitlyLaidOut(m_bm, spvVar->getType()->getPointerStorageClass())
-                          ? LayoutMode::Explicit
-                          : LayoutMode::Native;
 
   Type *const varType = transType(spvVar->getType()->getPointerElementType(), 0, true, true, layout);
 
@@ -4287,7 +4524,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
   if (spvInitializer) {
     initializer = transInitializer(spvInitializer, varType);
   } else if (storageClass == SPIRVStorageClassKind::StorageClassWorkgroup) {
-    initializer = UndefValue::get(varType);
+    initializer = PoisonValue::get(varType);
   } else if (m_shaderOptions->workaroundInitializeOutputsToZero &&
              storageClass == SPIRVStorageClassKind::StorageClassOutput) {
     bool isBuiltIn = false;
@@ -4329,7 +4566,6 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
     break;
   }
   case StorageClassUniformConstant: {
-#if VKI_RAY_TRACING
     if (spvVarType->isTypeAccelerationStructureKHR()) {
       readOnly = true;
     }
@@ -4337,7 +4573,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
     if (spvVarType->isTypeArray() && spvVarType->getArrayElementType()->isTypeAccelerationStructureKHR()) {
       readOnly = true;
     }
-#endif
+
     break;
   }
 
@@ -4388,7 +4624,6 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
   }
 
   string varName = spvVar->getName();
-#if VKI_RAY_TRACING
   if (storageClass == StorageClassCallableDataKHR || storageClass == StorageClassIncomingCallableDataKHR ||
       storageClass == StorageClassRayPayloadKHR || storageClass == StorageClassHitAttributeKHR ||
       storageClass == StorageClassIncomingRayPayloadKHR || storageClass == StorageClassShaderRecordBufferKHR) {
@@ -4408,7 +4643,6 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
     if (storageClass == StorageClassHitAttributeKHR)
       llpcContext->getPipelineContext()->collectAttributeDataSize(varType, m_m->getDataLayout());
   }
-#endif
 
   GlobalVariable *const globalVar =
       new GlobalVariable(*m_m, varType, readOnly, GlobalValue::ExternalLinkage, initializer, varName, nullptr,
@@ -4424,12 +4658,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpVariable>(SPIRVValue *con
       globalVar->setName("lds");
   }
 
-#if VKI_RAY_TRACING
   if (storageClass == StorageClassCallableDataKHR || storageClass == StorageClassIncomingCallableDataKHR ||
       storageClass == StorageClassRayPayloadKHR || storageClass == StorageClassHitAttributeKHR ||
       storageClass == StorageClassIncomingRayPayloadKHR)
     globalVar->setAlignment(MaybeAlign(4));
-#endif
 
   SPIRVBuiltinVariableKind builtinKind;
   if (spvVar->isBuiltin(&builtinKind))
@@ -4525,7 +4757,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpOuterProduct>(SPIRVValue 
 //
 // @param spvValue : A SPIR-V value.
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpDot>(SPIRVValue *const spvValue) {
-  if (m_shaderOptions->noContract) {
+  if (m_shaderOptions->noContractOpDot) {
     auto fmf = getBuilder()->getFastMathFlags();
     fmf.setAllowContract(false);
     getBuilder()->setFastMathFlags(fmf);
@@ -4669,6 +4901,9 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
   }
 
   case OpUndef:
+    // TODO: Stop using UndefValue since it is deprecated in favor of PoisonValue. A more faithful translation of
+    // OpUndef semantics would be to insert "freeze poison" before each _use_ of it in a function, but what about uses
+    // that are not in any function?
     return mapValue(bv, UndefValue::get(transType(bv->getType())));
 
   case OpFunctionParameter: {
@@ -4900,7 +5135,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     return mapValue(bv, v);
   }
 
-#if SPV_VERSION >= 0x10400
   case OpCopyLogical: {
     SPIRVCopyBase *copy = static_cast<SPIRVCopyBase *>(bv);
     AllocaInst *ai = nullptr;
@@ -4917,7 +5151,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     LoadInst *li = new LoadInst(at, ai, "", bb);
     return mapValue(bv, li);
   }
-#endif
 
   case OpCompositeConstruct: {
     auto cc = static_cast<SPIRVCompositeConstruct *>(bv);
@@ -4929,7 +5162,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     switch (bv->getType()->getOpCode()) {
     case OpTypeVector: {
       auto vecTy = transType(cc->getType());
-      Value *v = UndefValue::get(vecTy);
+      Value *v = PoisonValue::get(vecTy);
       for (unsigned idx = 0, i = 0, e = constituents.size(); i < e; ++i) {
         if (constituents[i]->getType()->isVectorTy()) {
           // NOTE: It is allowed to construct a vector from several "smaller"
@@ -4951,7 +5184,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     case OpTypeArray:
     case OpTypeStruct: {
       auto ccTy = transType(cc->getType());
-      Value *v = UndefValue::get(ccTy);
+      Value *v = PoisonValue::get(ccTy);
       for (size_t i = 0, e = constituents.size(); i < e; ++i)
         v = InsertValueInst::Create(v, constituents[i], i, "", bb);
       return mapValue(bv, v);
@@ -4962,7 +5195,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
       auto matCount = bvTy->getMatrixColumnCount();
       auto matTy = ArrayType::get(matClmTy, matCount);
 
-      Value *v = UndefValue::get(matTy);
+      Value *v = PoisonValue::get(matTy);
       for (unsigned i = 0, e = constituents.size(); i < e; ++i)
         v = InsertValueInst::Create(v, constituents[i], i, "", bb);
       return mapValue(bv, v);
@@ -5129,10 +5362,12 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
   }
   case OpFNegate: {
     SPIRVUnary *bc = static_cast<SPIRVUnary *>(bv);
-    // Implement -x as -0.0 - x.
-    Value *negZero = ConstantFP::getNegativeZero(transType(bc->getType()));
-    auto fNeg = BinaryOperator::CreateFSub(negZero, transValue(bc->getOperand(0), f, bb), bv->getName(), bb);
+    Value *val0 = transValue(bc->getOperand(0), f, bb);
+    auto fNeg = getBuilder()->CreateFNeg(val0);
     setFastMathFlags(fNeg);
+    // Since OpFNegate is considered a floating point instruction, we must take
+    // that into account (since LLVM fneg is not).
+    fNeg = flushDenorm(fNeg);
     return mapValue(bv, fNeg);
   }
 
@@ -5238,7 +5473,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     Value *val0 = transValue(bc->getOperand(0), f, bb);
     Value *val1 = transValue(bc->getOperand(1), f, bb);
     Value *add = getBuilder()->CreateIntrinsic(Intrinsic::uadd_with_overflow, val0->getType(), {val0, val1});
-    Value *result = UndefValue::get(transType(bc->getType()));
+    Value *result = PoisonValue::get(transType(bc->getType()));
     result = getBuilder()->CreateInsertValue(result, getBuilder()->CreateExtractValue(add, 0), 0);
     result = getBuilder()->CreateInsertValue(
         result, getBuilder()->CreateZExt(getBuilder()->CreateExtractValue(add, 1), val0->getType()), 1);
@@ -5250,7 +5485,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     Value *val0 = transValue(bc->getOperand(0), f, bb);
     Value *val1 = transValue(bc->getOperand(1), f, bb);
     Value *sub = getBuilder()->CreateIntrinsic(Intrinsic::usub_with_overflow, val0->getType(), {val0, val1});
-    Value *result = UndefValue::get(transType(bc->getType()));
+    Value *result = PoisonValue::get(transType(bc->getType()));
     result = getBuilder()->CreateInsertValue(result, getBuilder()->CreateExtractValue(sub, 0), 0);
     result = getBuilder()->CreateInsertValue(
         result, getBuilder()->CreateZExt(getBuilder()->CreateExtractValue(sub, 1), val0->getType()), 1);
@@ -5276,7 +5511,7 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     Value *loResult = getBuilder()->CreateTrunc(mul, inTy);
     Value *hiResult =
         getBuilder()->CreateTrunc(getBuilder()->CreateLShr(mul, ConstantInt::get(mul->getType(), bitWidth)), inTy);
-    Value *result = UndefValue::get(transType(bc->getType()));
+    Value *result = PoisonValue::get(transType(bc->getType()));
     result = getBuilder()->CreateInsertValue(result, loResult, 0);
     result = getBuilder()->CreateInsertValue(result, hiResult, 1);
     return mapValue(bc, result);
@@ -5388,7 +5623,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
   }
   case OpImageTexelPointer:
     return nullptr;
-#if SPV_VERSION >= 0x10400
   case OpPtrDiff: {
     SPIRVBinary *const bi = static_cast<SPIRVBinary *>(bv);
     Value *const op1 =
@@ -5407,7 +5641,6 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
 
     return mapValue(bv, ptrDiff);
   }
-#endif
 
   case OpAtomicLoad:
     return mapValue(bv, transValueWithOpcode<OpAtomicLoad>(bv));
@@ -5616,17 +5849,18 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     return mapValue(bv, transValueWithOpcode<OpDemoteToHelperInvocationEXT>(bv));
   case OpIsHelperInvocationEXT:
     return mapValue(bv, transValueWithOpcode<OpIsHelperInvocationEXT>(bv));
-#if VKI_RAY_TRACING
   case OpTraceRayKHR:
-    return transValueWithOpcode<OpTraceRayKHR>(bv);
+    return mapValue(bv, createTraceRayDialectOp(bv));
   case OpExecuteCallableKHR:
-    return transValueWithOpcode<OpExecuteCallableKHR>(bv);
+    return mapValue(bv, transValueWithOpcode<OpExecuteCallableKHR>(bv));
   case OpConvertUToAccelerationStructureKHR:
     return transValueWithOpcode<OpConvertUToAccelerationStructureKHR>(bv);
   case OpTerminateRayKHR:
+    return mapValue(bv, transValueWithOpcode<OpTerminateRayKHR>(bv));
   case OpIgnoreIntersectionKHR:
-    return transValueWithOpcode<OpTerminateRayKHR>(bv);
-#endif
+    return mapValue(bv, transValueWithOpcode<OpIgnoreIntersectionKHR>(bv));
+  case OpReportIntersectionKHR:
+    return mapValue(bv, transValueWithOpcode<OpReportIntersectionKHR>(bv));
   case OpSDotKHR:
   case OpUDotKHR:
   case OpSUDotKHR:
@@ -5854,33 +6088,6 @@ Instruction *SPIRVToLLVM::transBuiltinFromInst(const std::string &funcName, SPIR
       i = PointerType::get(i, SPIRAS_Private);
   }
 
-#if VKI_RAY_TRACING
-  // This is the last place where we know the base type of the payload data. Opaque pointers are
-  // removing ability to get base type from pointer type.
-  // Base type of payload data will be added as last argument to the function.
-  SPIRVValue *payload = nullptr;
-  switch (bi->getOpCode()) {
-  case spv::OpTraceRayKHR:
-    payload = ops[getTraceRayParamPayloadIdx()];
-    break;
-  case spv::OpExecuteCallableKHR:
-    payload = ops.back();
-    break;
-  default:
-    payload = nullptr;
-    break;
-  }
-
-  if (payload) {
-    Type *payloadBaseType = transType(payload->getType()->getPointerElementType());
-
-    Value *dummyValue = Constant::getNullValue(payloadBaseType);
-
-    argTys.push_back(payloadBaseType);
-    args.push_back(dummyValue);
-  }
-#endif
-
   std::string mangledName(funcName);
   appendTypeMangling(retTy, args, mangledName);
   Function *func = m_m->getFunction(mangledName);
@@ -5921,7 +6128,7 @@ static unsigned convertDimension(const SPIRVTypeImageDescriptor *desc) {
     case Dim2D:
       return lgc::Builder::Dim2D;
     case DimRect:
-      return lgc::Builder::Dim2D;
+      return lgc::Builder::DimRect;
     case DimCube:
       return lgc::Builder::DimCube;
     case Dim3D:
@@ -6276,7 +6483,6 @@ void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *bi, unsigned maskI
       imageInfo->flags |= lgc::Builder::ImageFlagVolatile;
     }
 
-#if SPV_VERSION >= 0x10400
     // SignExtend (0x1000)
     if (mask & ImageOperandsSignExtendMask) {
       mask &= ~ImageOperandsSignExtendMask;
@@ -6286,13 +6492,10 @@ void SPIRVToLLVM::setupImageAddressOperands(SPIRVInstruction *bi, unsigned maskI
     // ZeroExtend (0x2000)
     if (mask & ImageOperandsZeroExtendMask)
       mask &= ~ImageOperandsZeroExtendMask;
-#endif
 
-#if SPV_VERSION >= 0x10600
     // Nontemporal (0x4000)
     if (mask & ImageOperandsNontemporalMask)
       mask &= ~ImageOperandsNontemporalMask;
-#endif
 
     assert(!mask && "Unknown image operand");
   }
@@ -6345,7 +6548,7 @@ void SPIRVToLLVM::handleImageFetchReadWriteCoord(SPIRVInstruction *bi, Extracted
       components.push_back(getBuilder()->CreateExtractElement(coord, i));
     components.push_back(getBuilder()->CreateUDiv(components[2], getBuilder()->getInt32(6)));
     components[2] = getBuilder()->CreateURem(components[2], getBuilder()->getInt32(6));
-    coord = UndefValue::get(FixedVectorType::get(getBuilder()->getInt32Ty(), 4));
+    coord = PoisonValue::get(FixedVectorType::get(getBuilder()->getInt32Ty(), 4));
     for (unsigned i = 0; i != 4; ++i)
       coord = getBuilder()->CreateInsertElement(coord, components[i], i);
   }
@@ -6380,7 +6583,7 @@ Value *SPIRVToLLVM::transSPIRVFragmentFetchFromInst(SPIRVInstruction *bi, BasicB
   // For a fragment fetch, there is an extra operand for the fragment id, which
   // we must supply as an extra coordinate.
   Value *fragId = transValue(bii->getOpValue(2), bb->getParent(), bb);
-  Value *newCoord = UndefValue::get(FixedVectorType::get(getBuilder()->getInt32Ty(), 3 + imageInfo.desc->Arrayed));
+  Value *newCoord = PoisonValue::get(FixedVectorType::get(getBuilder()->getInt32Ty(), 3 + imageInfo.desc->Arrayed));
   for (unsigned i = 0; i != 2 + imageInfo.desc->Arrayed; ++i) {
     newCoord = getBuilder()->CreateInsertElement(newCoord, getBuilder()->CreateExtractElement(coord, i), i);
   }
@@ -6468,7 +6671,7 @@ Value *SPIRVToLLVM::transSPIRVImageAtomicOpFromInst(SPIRVInstruction *bi, BasicB
 
   // For a multi-sampled image, put the sample ID on the end.
   if (imageInfo.desc->MS) {
-    sampleNum = getBuilder()->CreateInsertElement(UndefValue::get(coord->getType()), sampleNum, uint64_t(0));
+    sampleNum = getBuilder()->CreateInsertElement(PoisonValue::get(coord->getType()), sampleNum, uint64_t(0));
     SmallVector<int, 4> idxs;
     idxs.push_back(0);
     idxs.push_back(1);
@@ -6690,7 +6893,7 @@ Value *SPIRVToLLVM::transSPIRVImageSampleFromInst(SPIRVInstruction *bi, BasicBlo
 
   // For a sparse sample, swap the struct elements back again.
   if (resultTy != origResultTy) {
-    Value *swappedResult = getBuilder()->CreateInsertValue(UndefValue::get(origResultTy),
+    Value *swappedResult = getBuilder()->CreateInsertValue(PoisonValue::get(origResultTy),
                                                            getBuilder()->CreateExtractValue(result, 1), unsigned(0));
     swappedResult =
         getBuilder()->CreateInsertValue(swappedResult, getBuilder()->CreateExtractValue(result, unsigned(0)), 1);
@@ -6767,10 +6970,10 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *bi, BasicBlo
   if (constOffsets) {
     // A gather with non-standard offsets is done as four separate gathers. If
     // it is a sparse gather, we just use the residency code from the last one.
-    result = UndefValue::get(resultTy);
+    result = PoisonValue::get(resultTy);
     Value *residency = nullptr;
     if (resultTy != origResultTy)
-      result = UndefValue::get(cast<StructType>(resultTy)->getElementType(0));
+      result = PoisonValue::get(cast<StructType>(resultTy)->getElementType(0));
     for (int idx = 3; idx >= 0; --idx) {
       addr[lgc::Builder::ImageAddressIdxOffset] = getBuilder()->CreateExtractValue(constOffsets, idx);
       Value *singleResult = getBuilder()->CreateImageGather(resultTy, imageInfo.dim, imageInfo.flags,
@@ -6784,7 +6987,7 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *bi, BasicBlo
     }
     if (resultTy != origResultTy) {
       // Handle sparse.
-      result = getBuilder()->CreateInsertValue(UndefValue::get(origResultTy), result, 1);
+      result = getBuilder()->CreateInsertValue(PoisonValue::get(origResultTy), result, 1);
       result = getBuilder()->CreateInsertValue(result, residency, 0);
     }
     return result;
@@ -6796,7 +6999,7 @@ Value *SPIRVToLLVM::transSPIRVImageGatherFromInst(SPIRVInstruction *bi, BasicBlo
 
   // For a sparse gather, swap the struct elements back again.
   if (resultTy != origResultTy) {
-    Value *swappedResult = getBuilder()->CreateInsertValue(UndefValue::get(origResultTy),
+    Value *swappedResult = getBuilder()->CreateInsertValue(PoisonValue::get(origResultTy),
                                                            getBuilder()->CreateExtractValue(result, 1), unsigned(0));
     swappedResult =
         getBuilder()->CreateInsertValue(swappedResult, getBuilder()->CreateExtractValue(result, unsigned(0)), 1);
@@ -6854,7 +7057,7 @@ Value *SPIRVToLLVM::transSPIRVImageFetchReadFromInst(SPIRVInstruction *bi, Basic
       // This is an OpImageRead with sample but not subpass data dimension.
       // Append the sample onto the coordinate.
       assert(imageInfo.dim == lgc::Builder::Dim2DMsaa || imageInfo.dim == lgc::Builder::Dim2DArrayMsaa);
-      sampleNum = getBuilder()->CreateInsertElement(UndefValue::get(coord->getType()), sampleNum, uint64_t(0));
+      sampleNum = getBuilder()->CreateInsertElement(PoisonValue::get(coord->getType()), sampleNum, uint64_t(0));
       coord = getBuilder()->CreateShuffleVector(
           coord, sampleNum,
           ArrayRef<int>({0, 1, 2, 3}).slice(0, cast<FixedVectorType>(coord->getType())->getNumElements() + 1));
@@ -6869,7 +7072,7 @@ Value *SPIRVToLLVM::transSPIRVImageFetchReadFromInst(SPIRVInstruction *bi, Basic
 
   // For a sparse read/fetch, swap the struct elements back again.
   if (resultTy != origResultTy) {
-    Value *swappedResult = getBuilder()->CreateInsertValue(UndefValue::get(origResultTy),
+    Value *swappedResult = getBuilder()->CreateInsertValue(PoisonValue::get(origResultTy),
                                                            getBuilder()->CreateExtractValue(result, 1), unsigned(0));
     swappedResult =
         getBuilder()->CreateInsertValue(swappedResult, getBuilder()->CreateExtractValue(result, unsigned(0)), 1);
@@ -6922,7 +7125,7 @@ Value *SPIRVToLLVM::transSPIRVImageWriteFromInst(SPIRVInstruction *bi, BasicBloc
   if (sampleNum) {
     // Append the sample onto the coordinate.
     assert(imageInfo.dim == lgc::Builder::Dim2DMsaa || imageInfo.dim == lgc::Builder::Dim2DArrayMsaa);
-    sampleNum = getBuilder()->CreateInsertElement(UndefValue::get(coord->getType()), sampleNum, uint64_t(0));
+    sampleNum = getBuilder()->CreateInsertElement(PoisonValue::get(coord->getType()), sampleNum, uint64_t(0));
     coord = getBuilder()->CreateShuffleVector(
         coord, sampleNum,
         ArrayRef<int>({0, 1, 2, 3}).slice(0, cast<FixedVectorType>(coord->getType())->getNumElements() + 1));
@@ -7090,7 +7293,7 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
   static_assert(SPIRVTW_32Bit == (32 >> 3), "Unexpected value!");
   static_assert(SPIRVTW_64Bit == (64 >> 3), "Unexpected value!");
 
-  bool enableXfb = false;
+  bool hasXfbOuts = false;
   if (m_entryTarget) {
     if (auto em = m_entryTarget->getExecutionMode(ExecutionModeDenormPreserve))
       m_fpControlFlags.DenormPreserve = em->getLiterals()[0] >> 3;
@@ -7108,7 +7311,8 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
       m_fpControlFlags.RoundingModeRTZ = em->getLiterals()[0] >> 3;
 
     if (m_execModule >= ExecutionModelVertex && m_execModule <= ExecutionModelGeometry)
-      enableXfb = m_entryTarget->getExecutionMode(ExecutionModeXfb) != nullptr;
+      hasXfbOuts = m_entryTarget->getExecutionMode(ExecutionModeXfb) != nullptr;
+
   } else {
     createLibraryEntryFunc();
   }
@@ -7149,11 +7353,9 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
   // Shader modes contain also data for other modules (subgroup size usage), so query it in the pipeline context.
   auto pipelineContext = (static_cast<Llpc::Context *>(m_context))->getPipelineContext();
   unsigned subgroupSizeUsage = pipelineContext->getSubgroupSizeUsage();
-#if VKI_RAY_TRACING
   // NOTE: setCommonShaderMode() supports the graphics and compute stage, does not support raytracing stage
   shaderMode.useSubgroupSize =
       pipelineContext->getPipelineType() == PipelineType::RayTracing ? subgroupSizeUsage : shaderMode.useSubgroupSize;
-#endif
 
   if (pipelineContext->getPipelineType() == PipelineType::Graphics && subgroupSizeUsage) {
     for (lgc::ShaderStage stage : lgc::enumRange<lgc::ShaderStage>()) {
@@ -7282,108 +7484,8 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
   if (!transMetadata())
     return false;
 
-  // Preserve XFB relevant information in named metadata !lgc.xfb.stage, defined as follows:
-  // lgc.xfb.state metadata = {
-  // i32 buffer0Stream, i32 buffer0Stride, i32 buffer1Stream, i32 buffer1Stride,
-  // i32 buffer2Stream, i32 buffer2Stride, i32 buffer3Stream, i32 buffer3Stride }
-  // ; buffer${i}Stream is the vertex StreamId that writes to buffer i, or -1 if that particular buffer is unused (e.g.
-  // StreamId in EmitVertex)
-  if (enableXfb) {
-    static const unsigned MaxXfbBuffers = 4;
-    std::array<unsigned, 2 * MaxXfbBuffers> xfbState{InvalidValue, 0,  // xfbBuffer[0] -> <streamId, xfbStride>
-                                                     InvalidValue, 0,  // xfbBuffer[1] -> <streamId, xfbStride>
-                                                     InvalidValue, 0,  // xfbBuffer[2] -> <streamId, xfbStride>
-                                                     InvalidValue, 0}; // xfbBuffer[3] -> <streamId, xfbStride>
-    for (unsigned i = 0, e = m_bm->getNumVariables(); i != e; ++i) {
-      auto bv = m_bm->getVariable(i);
-      if (bv->getStorageClass() == StorageClassOutput) {
-        SPIRVWord xfbBuffer = InvalidValue;
-        // NOTE: XFbBuffer may be decorated on the pointer element
-        SPIRVType *pointerElemTy = bv->getType()->getPointerElementType();
-        SPIRVEntry *entries[2] = {bv, pointerElemTy};
-        unsigned memberCount = 0;
-        if (pointerElemTy->isTypeStruct())
-          memberCount = pointerElemTy->getStructMemberCount();
-        for (unsigned id = 0; id < 2; ++id) {
-          auto entry = entries[id];
-          if (entry->hasDecorate(DecorationXfbBuffer, 0, &xfbBuffer)) {
-            const unsigned indexOfBuffer = 2 * xfbBuffer;
-            xfbState[indexOfBuffer] = 0;
-            SPIRVWord streamId = InvalidValue;
-            if (entry->hasDecorate(DecorationStream, 0, &streamId))
-              xfbState[indexOfBuffer] = streamId;
-
-            SPIRVWord xfbStride = InvalidValue;
-            if (entry->hasDecorate(DecorationXfbStride, 0, &xfbStride)) {
-              const unsigned indexOfStride = indexOfBuffer + 1;
-              xfbState[indexOfStride] = xfbStride;
-            }
-          } else if (id == 1) {
-            for (unsigned i = 0; i < memberCount; ++i) {
-              if (entry->hasMemberDecorate(i, DecorationXfbBuffer, 0, &xfbBuffer)) {
-                const unsigned indexOfBuffer = 2 * xfbBuffer;
-                xfbState[indexOfBuffer] = 0;
-                SPIRVWord streamId = InvalidValue;
-                if (entry->hasMemberDecorate(i, DecorationStream, 0, &streamId))
-                  xfbState[indexOfBuffer] = streamId;
-
-                SPIRVWord xfbStride = InvalidValue;
-                if (entry->hasMemberDecorate(i, DecorationXfbStride, 0, &xfbStride)) {
-                  const unsigned indexOfStride = indexOfBuffer + 1;
-                  xfbState[indexOfStride] = xfbStride;
-                }
-              }
-            }
-          }
-        }
-        if (xfbBuffer == InvalidValue)
-          continue;
-
-        // Update indexOfBuffer for block array, the N array-elements are captured by N consecutive buffers.
-        SPIRVType *bt = bv->getType()->getPointerElementType();
-        if (bt->isTypeArray()) {
-          assert(m_valueMap.find(bv) != m_valueMap.end());
-          auto output = cast<GlobalVariable>(m_valueMap[bv]);
-          MDNode *metaNode = output->getMetadata(gSPIRVMD::InOut);
-          assert(metaNode);
-          auto elemMeta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
-          // Find the innermost array-element
-          auto elemTy = bt;
-          uint64_t elemCount = 0;
-          ShaderInOutMetadata outMetadata = {};
-          do {
-            assert(elemMeta->getNumOperands() == 4);
-            outMetadata.U64All[0] = cast<ConstantInt>(elemMeta->getOperand(2))->getZExtValue();
-            outMetadata.U64All[1] = cast<ConstantInt>(elemMeta->getOperand(3))->getZExtValue();
-            elemCount = elemTy->getArrayLength();
-
-            elemTy = elemTy->getArrayElementType();
-            elemMeta = cast<Constant>(elemMeta->getOperand(1));
-          } while (elemTy->isTypeArray());
-
-          if (outMetadata.IsBlockArray) {
-            // The even index (0,2,4,6) of !lgc.xfb.state metadata corresponds the buffer index (0~3).
-            const unsigned bufferIdx = outMetadata.XfbBuffer;
-            const int streamId = xfbState[2 * bufferIdx];
-            const unsigned stride = xfbState[2 * bufferIdx + 1];
-            for (unsigned idx = 0; idx < elemCount; ++idx) {
-              const unsigned indexOfBuffer = 2 * (bufferIdx + idx);
-              xfbState[indexOfBuffer] = streamId;
-              xfbState[indexOfBuffer + 1] = stride;
-            }
-          }
-        }
-      }
-    }
-
-    unsigned mdKindId = m_context->getMDKindID(lgc::XfbStateMetadataName);
-    std::array<Metadata *, 2 * MaxXfbBuffers> metadatas{};
-    for (unsigned i = 0; i < 2 * MaxXfbBuffers; ++i)
-      metadatas[i] = ConstantAsMetadata::get(m_builder->getInt32(xfbState[i]));
-    auto entryFunc = m_funcMap[m_entryTarget];
-    assert(entryFunc);
-    entryFunc->setMetadata(mdKindId, MDNode::get(*m_context, metadatas));
-  }
+  if (pipelineContext->getPipelineType() == PipelineType::Graphics)
+    createXfbMetadata(hasXfbOuts);
 
   postProcessRowMajorMatrix();
   if (!m_moduleUsage->keepUnusedFunctions)
@@ -7564,6 +7666,16 @@ bool SPIRVToLLVM::transMetadata() {
           }
         }
 
+        unsigned overrideShaderGroupSizeX = m_shaderOptions->overrideShaderThreadGroupSizeX;
+        unsigned overrideShaderGroupSizeY = m_shaderOptions->overrideShaderThreadGroupSizeY;
+        unsigned overrideShaderGroupSizeZ = m_shaderOptions->overrideShaderThreadGroupSizeZ;
+
+        if (overrideShaderGroupSizeX != 0 || overrideShaderGroupSizeY != 0 || overrideShaderGroupSizeZ != 0) {
+          meshMode.workgroupSizeX = overrideShaderGroupSizeX;
+          meshMode.workgroupSizeY = overrideShaderGroupSizeY;
+          meshMode.workgroupSizeZ = overrideShaderGroupSizeZ;
+        }
+
         Pipeline::setMeshShaderMode(*m_m, meshMode);
       } else if (execModel == ExecutionModelFragment) {
         FragmentShaderMode fragmentMode = {};
@@ -7659,25 +7771,14 @@ bool SPIRVToLLVM::transMetadata() {
           computeMode.workgroupSizeX = overrideThreadGroupSizeX;
           computeMode.workgroupSizeY = overrideThreadGroupSizeY;
           computeMode.workgroupSizeZ = overrideThreadGroupSizeZ;
-#if VKI_RAY_TRACING
         } else if (m_moduleUsage->rayQueryLibrary) {
           // Ray Query library Shader can not overwrite the compute mode settings
-#endif
         } else {
           computeMode.workgroupSizeX = workgroupSizeX;
           computeMode.workgroupSizeY = workgroupSizeY;
           computeMode.workgroupSizeZ = workgroupSizeZ;
         }
         Pipeline::setComputeShaderMode(*m_m, computeMode);
-#if VKI_RAY_TRACING
-        // We also need to set the overall workgroup size on the PipelineContext so that the LowerRayQuery
-        // pass running on the rayQuery library module (a different module to this compute shader) can see it.
-        unsigned workgroupSize = workgroupSizeX == 0 ? 1 : workgroupSizeX;
-        workgroupSize *= workgroupSizeY == 0 ? 1 : workgroupSizeY;
-        workgroupSize *= workgroupSizeZ == 0 ? 1 : workgroupSizeZ;
-        Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
-        llpcContext->getPipelineContext()->setWorkgroupSize(workgroupSize);
-#endif
 
       } else
         llvm_unreachable("Invalid execution model");
@@ -7717,6 +7818,17 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
   // so we must explicitly check both the SPIR-V opcode and the LLVM type.
   if (gv && bv->getOpCode() == OpVariable) {
     auto as = gv->getType()->getAddressSpace();
+
+    auto spvTy = bv->getType()->getPointerElementType();
+    while (spvTy->getOpCode() == OpTypeArray || spvTy->getOpCode() == OpTypeRuntimeArray)
+      spvTy = spvTy->getArrayElementType();
+    if (isAccelerationStructureType(spvTy)) {
+      // NOTE: For acceleration structure, we use SPIRAS_Constant address space, but to apply decoration correctly,
+      // we assume it is SPIRAS_Uniform here.
+      assert(as == SPIRAS_Constant);
+      as = SPIRAS_Uniform;
+    }
+
     if (as == SPIRAS_Input || as == SPIRAS_Output) {
       // Translate decorations of inputs and outputs
 
@@ -7763,10 +7875,9 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
             nameMeta->addOperand(MDNode::get(*m_context, MDString::get(*m_context, lgc::SampleShadingMetaName)));
           }
         }
-#if VKI_RAY_TRACING
+
         Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
         llpcContext->getPipelineContext()->collectBuiltIn(builtIn);
-#endif
       } else if (bv->getName() == "gl_in" || bv->getName() == "gl_out" || bv->getName() == "gl_MeshVerticesEXT") {
         inOutDec.IsBuiltIn = true;
         inOutDec.Value.BuiltIn = BuiltInPerVertex;
@@ -7833,7 +7944,8 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       }
 
       // If dual source blend is dynamically set, need to confirm whether the fragment shader actually uses
-      // dual-source blending by checking if there is an output at Location 0, Index 1
+      // dual-source blending by checking if there is an output at Location 0. If there isn't any output in
+      // index, the poison value will be exported.
       Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
       if ((llpcContext->getPipelineType() == PipelineType::Graphics) && (m_execModule == spv::ExecutionModelFragment)) {
         auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());
@@ -7845,7 +7957,9 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
 
       Type *mdTy = nullptr;
       SPIRVType *bt = bv->getType()->getPointerElementType();
-      auto md = buildShaderInOutMetadata(bt, inOutDec, mdTy);
+      bool vs64BitsAttribInputSingleLoc = (as == SPIRAS_Input && m_execModule == ExecutionModelVertex &&
+                                           getPipelineOptions()->vertex64BitsAttribSingleLoc);
+      auto md = buildShaderInOutMetadata(bt, inOutDec, mdTy, vs64BitsAttribInputSingleLoc);
 
       // Setup input/output metadata
       std::vector<Metadata *> mDs;
@@ -7853,22 +7967,16 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       auto mdNode = MDNode::get(*m_context, mDs);
       gv->addMetadata(gSPIRVMD::InOut, *mdNode);
 
-    } else if (as == SPIRAS_Uniform || as == SPIRAS_TaskPayload) {
+    } else if (as == SPIRAS_Uniform) {
       // Translate decorations of blocks
       SPIRVType *blockTy = bv->getType()->getPointerElementType();
       // If not task payload, try to remove block array dimensions. Note that task
       // payload doesn't have such dimensions.
-      if (as != SPIRAS_TaskPayload) {
+      if (bv->getType()->getPointerStorageClass() != StorageClassTaskPayloadWorkgroupEXT) {
         // Remove array dimensions, it is useless for block metadata building
         while (blockTy->isTypeArray())
           blockTy = blockTy->getArrayElementType();
       }
-      bool isStructTy = blockTy->isTypeStruct();
-#if VKI_RAY_TRACING
-      isStructTy = isStructTy || blockTy->isTypeAccelerationStructureKHR();
-#endif
-      assert(isStructTy || as == SPIRAS_TaskPayload); // Task payload is not necessarily a structure
-      (void)isStructTy;
 
       // Get values of descriptor binding and set based on corresponding
       // decorations
@@ -7885,29 +7993,86 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       if (!hasDescSet)
         descSet = 0;
 
-      // Setup resource metadata
-      auto int32Ty = Type::getInt32Ty(*m_context);
-      std::vector<Metadata *> resMDs;
-      resMDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, descSet)));
-      resMDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, binding)));
-      auto resMdNode = MDNode::get(*m_context, resMDs);
-      gv->addMetadata(gSPIRVMD::Resource, *resMdNode);
+      if ((bv->getType()->getPointerStorageClass() != StorageClassUniformConstant &&
+           bv->getType()->getPointerStorageClass() != StorageClassTaskPayloadWorkgroupEXT) ||
+          isAccelerationStructureType(blockTy)) {
+        assert(blockTy->isTypeStruct() || blockTy->isTypeAccelerationStructureKHR() ||
+               bv->getType()->getPointerStorageClass() == StorageClassAtomicCounter);
 
-      // Build block metadata
-      const bool isUniformBlock =
-          bv->getType()->getPointerStorageClass() != StorageClassStorageBuffer && blockTy->hasDecorate(DecorationBlock);
+        if (getPipelineOptions()->replaceSetWithResourceType) {
+          bool hasBlock = blockTy->hasDecorate(DecorationBlock);
+          bool hasBufferBlock = blockTy->hasDecorate(DecorationBufferBlock);
 
-      ShaderBlockDecorate blockDec = {};
-      blockDec.NonWritable = isUniformBlock;
-      Type *blockMdTy = nullptr;
-      auto blockMd = buildShaderBlockMetadata(
-          blockTy, blockDec, blockMdTy, bv->getType()->getPointerStorageClass() == StorageClassTaskPayloadWorkgroupEXT);
+          if (bv->getType()->getPointerStorageClass() == StorageClassStorageBuffer) {
+            descSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorBuffer);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 63
+          } else if (bv->getType()->getPointerStorageClass() == StorageClassAtomicCounter) {
+            descSet = PipelineContext::getGlResourceNodeSetFromType(ResourceMappingNodeType::DescriptorAtomicCounter);
+#endif
+          } else {
+            if (hasBlock && !hasBufferBlock) {
+              descSet =
+                  PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorConstBuffer);
+            } else if (!hasBlock && hasBufferBlock) {
+              descSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorBuffer);
+            }
+          }
+        }
 
-      std::vector<Metadata *> blockMDs;
-      blockMDs.push_back(ConstantAsMetadata::get(blockMd));
-      auto blockMdNode = MDNode::get(*m_context, blockMDs);
-      gv->addMetadata(gSPIRVMD::Block, *blockMdNode);
+        // Setup resource metadata
+        auto int32Ty = Type::getInt32Ty(*m_context);
+        std::vector<Metadata *> resMDs;
+        resMDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, descSet)));
+        resMDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, binding)));
+        auto resMdNode = MDNode::get(*m_context, resMDs);
+        gv->addMetadata(gSPIRVMD::Resource, *resMdNode);
 
+        // Build block metadata
+        const bool isUniformBlock = bv->getType()->getPointerStorageClass() != StorageClassStorageBuffer &&
+                                    blockTy->hasDecorate(DecorationBlock);
+
+        ShaderBlockDecorate blockDec = {};
+        SPIRVWord atomicCounterOffset = SPIRVID_INVALID;
+        if (bv->hasDecorate(DecorationOffset, 0, &atomicCounterOffset)) {
+          blockDec.Offset = atomicCounterOffset;
+        }
+
+        blockDec.NonWritable = isUniformBlock;
+        Type *blockMdTy = nullptr;
+        auto blockMd = buildShaderBlockMetadata(blockTy, blockDec, blockMdTy, bv->getType()->getPointerStorageClass());
+
+        std::vector<Metadata *> blockMDs;
+        blockMDs.push_back(ConstantAsMetadata::get(blockMd));
+        auto blockMdNode = MDNode::get(*m_context, blockMDs);
+        if (bv->getType()->getPointerStorageClass() == StorageClassAtomicCounter) {
+          gv->addMetadata(gSPIRVMD::AtomicCounter, *blockMdNode);
+        } else {
+          gv->addMetadata(gSPIRVMD::Block, *blockMdNode);
+        }
+      } else if (bv->getType()->getPointerStorageClass() == StorageClassTaskPayloadWorkgroupEXT) {
+        // Setup metadata for task payload
+        gv->addMetadata(gSPIRVMD::TaskPayload, *MDNode::get(*m_context, {}));
+      } else {
+        // Setup metadata for uniform constant.
+        auto int32Ty = Type::getInt32Ty(*m_context);
+        std::vector<Metadata *> mDs;
+
+        SPIRVWord loc = SPIRVID_INVALID;
+        bv->hasDecorate(DecorationLocation, 0, &loc);
+        assert(loc != SPIRVID_INVALID && "Default uniform constant should get location\n");
+
+        // Get the offset in default uniform constant buffer from location
+        auto locationFound = getUniformConstantEntryByLocation(static_cast<Llpc::Context *>(m_context),
+                                                               convertToShaderStage(m_execModule), loc);
+        unsigned offset = locationFound == nullptr ? 0 : locationFound->offset;
+
+        mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, Vkgc::InternalDescriptorSetId)));
+        mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, Vkgc::ConstantBuffer0Binding)));
+        mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, offset)));
+        mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, loc)));
+        auto mdNode = MDNode::get(*m_context, mDs);
+        gv->addMetadata(gSPIRVMD::UniformConstant, *mdNode);
+      }
     } else if (bv->getType()->isTypePointer() && bv->getType()->getPointerStorageClass() == StorageClassPushConstant) {
       // Translate decorations of push constants
 
@@ -7929,7 +8094,8 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       // Build general block metadata
       ShaderBlockDecorate blockDec = {};
       Type *blockMdTy = nullptr;
-      auto blockMd = buildShaderBlockMetadata(pushConstTy, blockDec, blockMdTy);
+      auto blockMd =
+          buildShaderBlockMetadata(pushConstTy, blockDec, blockMdTy, bv->getType()->getPointerStorageClass());
 
       std::vector<Metadata *> blockMDs;
       blockMDs.push_back(ConstantAsMetadata::get(blockMd));
@@ -8038,7 +8204,8 @@ unsigned SPIRVToLLVM::calcShaderBlockSize(SPIRVType *bt, unsigned blockSize, uns
 }
 
 // Builds shader input/output metadata.
-Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecorate &inOutDec, Type *&mdTy) {
+Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecorate &inOutDec, Type *&mdTy,
+                                                bool vs64BitsAttribInputSingleLoc) {
   SPIRVWord loc = SPIRVID_INVALID;
   if (bt->hasDecorate(DecorationLocation, 0, &loc)) {
     inOutDec.Value.Loc = loc;
@@ -8142,7 +8309,10 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
         width *= bt->getVectorComponentCount();
       assert(width <= 64 * 4);
 
-      inOutDec.Value.Loc += width <= 32 * 4 ? 1 : 2;
+      if (vs64BitsAttribInputSingleLoc)
+        inOutDec.Value.Loc += 1;
+      else
+        inOutDec.Value.Loc += width <= 32 * 4 ? 1 : 2;
       unsigned alignment = 32;
       unsigned baseStride = 4; // Strides in (bytes)
       inOutDec.XfbExtraOffset += (((width + alignment - 1) / alignment) * baseStride);
@@ -8185,7 +8355,7 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
     Type *elemMdTy = nullptr;
     auto elemDec = inOutDec; // Inherit from parent
     elemDec.XfbExtraOffset = startXfbExtraOffset;
-    auto elemMd = buildShaderInOutMetadata(elemTy, elemDec, elemMdTy);
+    auto elemMd = buildShaderInOutMetadata(elemTy, elemDec, elemMdTy, vs64BitsAttribInputSingleLoc);
 
     inOutDec.PerVertexDimension = isPerVertexDimension;
 
@@ -8365,7 +8535,7 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
       if (bt->hasMemberDecorate(memberIdx, DecorationStream, 0, &memberStreamId))
         memberDec.StreamId = memberStreamId;
       Type *memberMdTy = nullptr;
-      auto memberMd = buildShaderInOutMetadata(memberTy, memberDec, memberMdTy);
+      auto memberMd = buildShaderInOutMetadata(memberTy, memberDec, memberMdTy, vs64BitsAttribInputSingleLoc);
 
       // Align next XfbExtraOffset to 64-bit (8 bytes)
       xfbExtraOffset = memberDec.XfbExtraOffset;
@@ -8402,8 +8572,8 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
 
 // Builds shader block metadata.
 Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecorate &blockDec, Type *&mdTy,
-                                                bool deriveStride) {
-  if (bt->isTypeVector() || bt->isTypeScalar()) {
+                                                SPIRVStorageClassKind storageClass) {
+  if (bt->isTypeVector() || bt->isTypeScalar() || storageClass == StorageClassAtomicCounter) {
     // Handle scalar or vector type
     ShaderBlockMetadata blockMd = {};
     blockMd.offset = blockDec.Offset;
@@ -8433,12 +8603,7 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
       // members.
       blockDec.IsMatrix = false;
       SPIRVWord arrayStride = 0;
-      if (!bt->hasDecorate(DecorationArrayStride, 0, &arrayStride)) {
-        if (deriveStride)
-          arrayStride = bt->getDerivedArrayStride();
-        else
-          llvm_unreachable("Missing array stride decoration");
-      }
+      bt->hasDecorate(DecorationArrayStride, 0, &arrayStride);
       stride = arrayStride;
       elemTy = bt->getArrayElementType();
 
@@ -8452,15 +8617,13 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
     } else {
       blockDec.IsMatrix = true;
       stride = blockDec.MatrixStride;
-      if (stride == 0 && deriveStride)
-        stride = bt->getDerivedMatrixStride();
       elemTy = bt->getMatrixColumnType();
     }
 
     // Build element metadata
     Type *elemMdTy = nullptr;
     auto elemDec = blockDec; // Inherit from parent
-    auto elemMd = buildShaderBlockMetadata(elemTy, elemDec, elemMdTy, deriveStride);
+    auto elemMd = buildShaderBlockMetadata(elemTy, elemDec, elemMdTy, storageClass);
 
     // Build metadata for the array/matrix
     std::vector<Type *> mdTys;
@@ -8530,11 +8693,11 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
       // Build metadata for structure member
       auto memberTy = bt->getStructMemberType(memberIdx);
       Type *memberMdTy = nullptr;
-      auto memberMeta = buildShaderBlockMetadata(memberTy, memberDec, memberMdTy, deriveStride);
+      auto memberMeta = buildShaderBlockMetadata(memberTy, memberDec, memberMdTy, storageClass);
 
       if (remappedIdx > memberIdx) {
         memberMdTys.push_back(Type::getInt32Ty(*m_context));
-        memberMdValues.push_back(UndefValue::get(Type::getInt32Ty(*m_context)));
+        memberMdValues.push_back(PoisonValue::get(Type::getInt32Ty(*m_context)));
       }
 
       memberMdTys.push_back(memberMdTy);
@@ -8577,14 +8740,12 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
 
     mdTy = Type::getInt64Ty(*m_context);
     return ConstantInt::get(mdTy, blockMd.U64All);
-  }
-#if VKI_RAY_TRACING
-  else if (bt->isTypeAccelerationStructureKHR()) {
+  } else if (bt->isTypeAccelerationStructureKHR()) {
     ShaderBlockMetadata blockMd = {};
+    blockMd.IsAccelerationStructure = true;
     mdTy = Type::getInt64Ty(*m_context);
     return ConstantInt::get(mdTy, blockMd.U64All);
   }
-#endif
 
   llvm_unreachable("Invalid type");
   return nullptr;
@@ -8750,7 +8911,7 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
     // Split input into fractional and whole number parts.
     Value *wholeNum = getBuilder()->CreateUnaryIntrinsic(Intrinsic::trunc, args[0]);
     Value *fract = getBuilder()->CreateFSub(args[0], wholeNum);
-    Value *result = UndefValue::get(transType(extInst->getType()));
+    Value *result = PoisonValue::get(transType(extInst->getType()));
     result = getBuilder()->CreateInsertValue(result, fract, 0);
     result = getBuilder()->CreateInsertValue(result, wholeNum, 1);
     return result;
@@ -8854,7 +9015,7 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
     Value *exp = getBuilder()->CreateExtractExponent(args[0]);
     if (extInst->getExtOp() == GLSLstd450FrexpStruct) {
       // FrexpStruct: Return the two values as a struct.
-      Value *result = UndefValue::get(transType(extInst->getType()));
+      Value *result = PoisonValue::get(transType(extInst->getType()));
       result = getBuilder()->CreateInsertValue(result, mant, 0);
       exp = getBuilder()->CreateSExtOrTrunc(exp, result->getType()->getStructElementType(1));
       result = getBuilder()->CreateInsertValue(result, exp, 1);
@@ -9278,7 +9439,7 @@ llvm::GlobalValue::LinkageTypes SPIRVToLLVM::transLinkageType(const SPIRVValue *
       SPIRVStorageClassKind storageClass = static_cast<const SPIRVVariable *>(v)->getStorageClass();
       if (storageClass == StorageClassUniformConstant || storageClass == StorageClassInput ||
           storageClass == StorageClassUniform || storageClass == StorageClassPushConstant ||
-          storageClass == StorageClassStorageBuffer)
+          storageClass == StorageClassStorageBuffer || storageClass == StorageClassAtomicCounter)
         return GlobalValue::ExternalLinkage;
       if (storageClass == StorageClassPrivate || storageClass == StorageClassOutput)
         return GlobalValue::PrivateLinkage;
@@ -9573,6 +9734,128 @@ void SPIRVToLLVM::insertScratchBoundsChecks(SPIRVValue *memOp, const ScratchBoun
     llvmInstr->replaceAllUsesWith(clone);
     llvmInstr->eraseFromParent();
   }
+}
+
+void SPIRVToLLVM::createXfbMetadata(bool hasXfbOuts) {
+  auto llpcContext = static_cast<Llpc::Context *>(m_context);
+  auto pipelineBuildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());
+  const bool needXfbMetadata = (hasXfbOuts && !pipelineBuildInfo->apiXfbOutData.forceDisableStreamOut) ||
+                               pipelineBuildInfo->apiXfbOutData.forceEnablePrimStats;
+  if (!needXfbMetadata)
+    return;
+
+  // Preserve XFB relevant information in named metadata !lgc.xfb.stage, defined as follows:
+  // lgc.xfb.state metadata = {
+  // i32 buffer0Stream, i32 buffer0Stride, i32 buffer1Stream, i32 buffer1Stride,
+  // i32 buffer2Stream, i32 buffer2Stride, i32 buffer3Stream, i32 buffer3Stride }
+  // ; buffer${i}Stream is the vertex StreamId that writes to buffer i, or -1 if that particular buffer is unused (e.g.
+  // StreamId in EmitVertex)
+  static const unsigned MaxXfbBuffers = 4;
+  std::array<unsigned, 2 * MaxXfbBuffers> xfbState{InvalidValue, 0,  // xfbBuffer[0] -> <streamId, xfbStride>
+                                                   InvalidValue, 0,  // xfbBuffer[1] -> <streamId, xfbStride>
+                                                   InvalidValue, 0,  // xfbBuffer[2] -> <streamId, xfbStride>
+                                                   InvalidValue, 0}; // xfbBuffer[3] -> <streamId, xfbStride>
+  if (hasXfbOuts && !pipelineBuildInfo->apiXfbOutData.forceDisableStreamOut) {
+    const bool useXfbDecorations = pipelineBuildInfo->apiXfbOutData.numXfbOutInfo == 0;
+    if (useXfbDecorations) {
+      for (unsigned i = 0, e = m_bm->getNumVariables(); i != e; ++i) {
+        auto bv = m_bm->getVariable(i);
+        if (bv->getStorageClass() == StorageClassOutput) {
+          SPIRVWord xfbBuffer = InvalidValue;
+          // NOTE: XFbBuffer may be decorated on the pointer element
+          SPIRVType *pointerElemTy = bv->getType()->getPointerElementType();
+          SPIRVEntry *entries[2] = {bv, pointerElemTy};
+          unsigned memberCount = 0;
+          if (pointerElemTy->isTypeStruct())
+            memberCount = pointerElemTy->getStructMemberCount();
+          for (unsigned id = 0; id < 2; ++id) {
+            auto entry = entries[id];
+            if (entry->hasDecorate(DecorationXfbBuffer, 0, &xfbBuffer)) {
+              const unsigned indexOfBuffer = 2 * xfbBuffer;
+              xfbState[indexOfBuffer] = 0;
+              SPIRVWord streamId = InvalidValue;
+              if (entry->hasDecorate(DecorationStream, 0, &streamId))
+                xfbState[indexOfBuffer] = streamId;
+
+              SPIRVWord xfbStride = InvalidValue;
+              if (entry->hasDecorate(DecorationXfbStride, 0, &xfbStride)) {
+                const unsigned indexOfStride = indexOfBuffer + 1;
+                xfbState[indexOfStride] = xfbStride;
+              }
+            } else if (id == 1) {
+              for (unsigned i = 0; i < memberCount; ++i) {
+                if (entry->hasMemberDecorate(i, DecorationXfbBuffer, 0, &xfbBuffer)) {
+                  const unsigned indexOfBuffer = 2 * xfbBuffer;
+                  xfbState[indexOfBuffer] = 0;
+                  SPIRVWord streamId = InvalidValue;
+                  if (entry->hasMemberDecorate(i, DecorationStream, 0, &streamId))
+                    xfbState[indexOfBuffer] = streamId;
+
+                  SPIRVWord xfbStride = InvalidValue;
+                  if (entry->hasMemberDecorate(i, DecorationXfbStride, 0, &xfbStride)) {
+                    const unsigned indexOfStride = indexOfBuffer + 1;
+                    xfbState[indexOfStride] = xfbStride;
+                  }
+                }
+              }
+            }
+          }
+          if (xfbBuffer == InvalidValue)
+            continue;
+
+          // Update indexOfBuffer for block array, the N array-elements are captured by N consecutive buffers.
+          SPIRVType *bt = bv->getType()->getPointerElementType();
+          if (bt->isTypeArray()) {
+            assert(m_valueMap.find(bv) != m_valueMap.end());
+            auto output = cast<GlobalVariable>(m_valueMap[bv]);
+            MDNode *metaNode = output->getMetadata(gSPIRVMD::InOut);
+            assert(metaNode);
+            auto elemMeta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+            // Find the innermost array-element
+            auto elemTy = bt;
+            uint64_t elemCount = 0;
+            ShaderInOutMetadata outMetadata = {};
+            do {
+              assert(elemMeta->getNumOperands() == 4);
+              outMetadata.U64All[0] = cast<ConstantInt>(elemMeta->getOperand(2))->getZExtValue();
+              outMetadata.U64All[1] = cast<ConstantInt>(elemMeta->getOperand(3))->getZExtValue();
+              elemCount = elemTy->getArrayLength();
+
+              elemTy = elemTy->getArrayElementType();
+              elemMeta = cast<Constant>(elemMeta->getOperand(1));
+            } while (elemTy->isTypeArray());
+
+            if (outMetadata.IsBlockArray) {
+              // The even index (0,2,4,6) of !lgc.xfb.state metadata corresponds the buffer index (0~3).
+              const unsigned bufferIdx = outMetadata.XfbBuffer;
+              const int streamId = xfbState[2 * bufferIdx];
+              const unsigned stride = xfbState[2 * bufferIdx + 1];
+              for (unsigned idx = 0; idx < elemCount; ++idx) {
+                const unsigned indexOfBuffer = 2 * (bufferIdx + idx);
+                xfbState[indexOfBuffer] = streamId;
+                xfbState[indexOfBuffer + 1] = stride;
+              }
+            }
+          }
+        }
+      }
+    } else {
+      for (unsigned idx = 0; idx < pipelineBuildInfo->apiXfbOutData.numXfbOutInfo; ++idx) {
+        const auto &xfbInfo = pipelineBuildInfo->apiXfbOutData.pXfbOutInfos[idx];
+        const unsigned indexOfBuffer = 2 * xfbInfo.xfbBuffer;
+        xfbState[indexOfBuffer] = xfbInfo.streamId;
+        xfbState[indexOfBuffer + 1] = xfbInfo.xfbStride;
+      }
+    }
+  }
+
+  unsigned mdKindId = m_context->getMDKindID(lgc::XfbStateMetadataName);
+  std::array<Metadata *, 2 * MaxXfbBuffers> metadatas{};
+  for (unsigned i = 0; i < 2 * MaxXfbBuffers; ++i)
+    metadatas[i] = ConstantAsMetadata::get(m_builder->getInt32(xfbState[i]));
+  auto entryFunc = m_funcMap[m_entryTarget];
+  assert(entryFunc);
+  entryFunc->setMetadata(mdKindId, MDNode::get(*m_context, metadatas));
 }
 
 } // namespace SPIRV

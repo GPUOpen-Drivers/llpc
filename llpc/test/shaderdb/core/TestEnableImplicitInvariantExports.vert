@@ -24,7 +24,7 @@ void main()
 ; WITHOUT_IIE: %[[val:.*]] = extractvalue [4 x <4 x float>] %{{.*}}, 3
 ; WITHOUT_IIE: %[[mul:.*]] = fmul <4 x float> %[[val]], %{{.*}}
 ; WITHOUT_IIE: %[[arg:.*]] = fadd <4 x float> %{{.*}}, %[[mul]]
-; WITHOUT_IIE-NEXT: call void @lgc.output.export.builtin.Position.i32.v4f32(i32 0, <4 x float> %[[arg]]) #0
+; WITHOUT_IIE-NEXT: call void @lgc.output.export.builtin.Position.i32.v4f32(i32 0, <4 x float> %[[arg]])
 ; WITHOUT_IIE: AMDLLPC SUCCESS
 */
 // END_WITHOUT_IIE
@@ -36,7 +36,7 @@ void main()
 ; WITH_IIE: %[[val:.*]] = extractvalue [4 x <4 x float>] %{{.*}}, 3
 ; WITH_IIE: %[[mul:.*]] = fmul reassoc nnan nsz arcp contract afn <4 x float> %[[val]], %{{.*}}
 ; WITH_IIE: %[[arg:.*]] = fadd reassoc nnan nsz arcp contract afn <4 x float> %{{.*}}, %[[mul]]
-; WITH_IIE-NEXT: call void @lgc.output.export.builtin.Position.i32.v4f32(i32 0, <4 x float> %[[arg]]) #0
+; WITH_IIE-NEXT: call void @lgc.output.export.builtin.Position.i32.v4f32(i32 0, <4 x float> %[[arg]])
 ; WITH_IIE: AMDLLPC SUCCESS
 */
 // END_WITH_IIE

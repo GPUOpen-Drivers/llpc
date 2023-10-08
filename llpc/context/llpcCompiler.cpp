@@ -30,6 +30,9 @@
  */
 #include "llpcCompiler.h"
 #include "LLVMSPIRVLib.h"
+#include "SPIRVEntry.h"
+#include "SPIRVFunction.h"
+#include "SPIRVInstruction.h"
 #include "SPIRVInternal.h"
 #include "llpcCacheAccessor.h"
 #include "llpcComputeContext.h"
@@ -39,17 +42,15 @@
 #include "llpcError.h"
 #include "llpcFile.h"
 #include "llpcGraphicsContext.h"
-#if VKI_RAY_TRACING
 #include "llpcRayTracingContext.h"
-#endif
 #include "llpcShaderModuleHelper.h"
 #include "llpcSpirvLower.h"
 #include "llpcSpirvLowerCfgMerges.h"
-#if VKI_RAY_TRACING
 #include "llpcSpirvLowerRayTracing.h"
-#endif
 #include "llpcSpirvLowerTranslator.h"
 #include "llpcSpirvLowerUtil.h"
+#include "llpcSpirvProcessGpuRtLibrary.h"
+#include "llpcThreading.h"
 #include "llpcTimerProfiler.h"
 #include "llpcUtil.h"
 #include "spirvExt.h"
@@ -85,10 +86,9 @@
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
-#if VKI_RAY_TRACING
 #include "llvm/Transforms/Utils/Cloning.h"
-#endif
 #include <cassert>
+#include <condition_variable>
 #include <mutex>
 #include <set>
 #include <unordered_set>
@@ -97,11 +97,9 @@
 #include "spvgen.h"
 #endif
 
-#if VKI_RAY_TRACING
 namespace RtName {
 extern const char *TraceRayKHR;
 } // namespace RtName
-#endif
 
 #define DEBUG_TYPE "llpc-compiler"
 
@@ -133,10 +131,6 @@ opt<std::string> PipelineDumpDir("pipeline-dump-dir", desc("Directory where pipe
 // -enable-pipeline-dump: enable pipeline info dump
 opt<bool> EnablePipelineDump("enable-pipeline-dump", desc("Enable pipeline info dump"), init(false));
 
-// -shader-cache-file-dir: root directory to store shader cache
-opt<std::string> ShaderCacheFileDir("shader-cache-file-dir", desc("Root directory to store shader cache"),
-                                    value_desc("dir"), init("."));
-
 // DEPRECATED: This option should be removed once XGL sets the corresponding pipeline option.
 // -use-relocatable-shader-elf: Gets LLVM to generate more generic elf files for each shader individually, and LLPC will
 // then link those ELF files to generate the compiled pipeline.
@@ -155,24 +149,9 @@ opt<int> RelocatableShaderElfLimit("relocatable-shader-elf-limit",
                                             "relocatable shader ELF.  -1 means unlimited."),
                                    init(-1));
 
-// -shader-cache-mode: shader cache mode:
-// 0 - Disable
-// 1 - Runtime cache
-// 2 - Cache to disk
-// 3 - Use internal on-disk cache in read/write mode.
-// 4 - Use internal on-disk cache in read-only mode.
-opt<unsigned> ShaderCacheMode("shader-cache-mode",
-                              desc("Shader cache mode, 0 - disable, 1 - runtime cache, 2 - cache to disk, 3 - "
-                                   "load on-disk cache for read/write, 4 - load on-disk cache for read only"),
-                              init(0));
-
 // -cache-full-pipelines: Add full pipelines to the caches that are provided.
 opt<bool> CacheFullPipelines("cache-full-pipelines", desc("Add full pipelines to the caches that are provided."),
                              init(true));
-
-// -executable-name: executable file name
-static opt<std::string> ExecutableName("executable-name", desc("Executable file name"), value_desc("filename"),
-                                       init("amdllpc"));
 
 // -enable-per-stage-cache: Enable shader cache per shader stage
 opt<bool> EnablePerStageCache("enable-per-stage-cache", cl::desc("Enable shader cache per shader stage"), init(true));
@@ -186,6 +165,31 @@ opt<bool> FatalLlvmErrors("fatal-llvm-errors", cl::desc("Make all LLVM errors fa
 
 // -enable-part-pipeline: Use part pipeline compilation scheme (experimental)
 opt<bool> EnablePartPipeline("enable-part-pipeline", cl::desc("Enable part pipeline compilation scheme"), init(false));
+
+// -add-rt-helpers: Spawn additional helper threads to run RT pipeline compilations
+opt<int> AddRtHelpers("add-rt-helpers", cl::desc("Add this number of helper threads for each RT pipeline compile"),
+                      init(0));
+
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 66
+// -shader-cache-file-dir: root directory to store shader cache
+opt<std::string> ShaderCacheFileDir("shader-cache-file-dir", desc("Root directory to store shader cache"),
+                                    value_desc("dir"), init("."));
+
+// -shader-cache-mode: shader cache mode:
+// 0 - Disable
+// 1 - Runtime cache
+// 2 - Cache to disk
+// 3 - Use internal on-disk cache in read/write mode.
+// 4 - Use internal on-disk cache in read-only mode.
+opt<unsigned> ShaderCacheMode("shader-cache-mode",
+                              desc("Shader cache mode, 0 - disable, 1 - runtime cache, 2 - cache to disk, 3 - "
+                                   "load on-disk cache for read/write, 4 - load on-disk cache for read only"),
+                              init(0));
+
+// -executable-name: executable file name
+opt<std::string> ExecutableName("executable-name", desc("Executable file name"), value_desc("filename"),
+                                init("amdllpc"));
+#endif
 
 extern opt<bool> EnableOuts;
 
@@ -218,7 +222,6 @@ static MetroHash::Hash SOptionHash = {};
 unsigned Compiler::m_instanceCount = 0;
 unsigned Compiler::m_outRedirectCount = 0;
 
-#if VKI_RAY_TRACING
 // Represents the payload used by helper thread to build ray tracing Elf
 struct HelperThreadBuildRayTracingPipelineElfPayload {
   ArrayRef<Module *> modules;                         // Modules to generate ELF packages
@@ -228,13 +231,12 @@ struct HelperThreadBuildRayTracingPipelineElfPayload {
   std::vector<Result> &results;                       // Build result of each module
   RayTracingContext *rayTracingContext;               // The ray tracing context across the pipeline
   Compiler *compiler;                                 // The compiler instance
-  volatile bool helperThreadJoined;                   // Whether helper thread has joined
-  volatile bool mainThreadSwitchedContext;            // Whether main thread has finished switching context
+  std::atomic<bool> helperThreadJoined;               // Whether helper thread has joined
+  std::atomic<bool> mainThreadSwitchedContext;        // Whether main thread has finished switching context
 };
 
 sys::Mutex Compiler::m_helperThreadMutex;
 std::condition_variable_any Compiler::m_helperThreadConditionVariable;
-#endif
 
 // =====================================================================================================================
 // Handler for LLVM fatal error.
@@ -255,10 +257,10 @@ static void fatalErrorHandler(void *userData, const char *reason, bool genCrashD
 // @param glueShaderIdentifier : The linker object for which the glue shaders are needed.
 // @param context : The context that contains the application caches.
 // @param compiler : The compiler object that contains the internal caches.
-static CacheAccessor checkCacheForGlueShader(StringRef glueShaderIdentifier, Context *context, Compiler *compiler) {
+static CacheAccessor checkCacheForGlueShader(StringRef glueShaderIdentifier, Compiler *compiler) {
   Hash glueShaderCacheHash =
       PipelineDumper::generateHashForGlueShader({glueShaderIdentifier.size(), glueShaderIdentifier.data()});
-  return CacheAccessor(context, glueShaderCacheHash, compiler->getInternalCaches());
+  return CacheAccessor(glueShaderCacheHash, compiler->getInternalCaches());
 }
 
 // =====================================================================================================================
@@ -294,7 +296,7 @@ static void setGlueBinaryBlobsInLinker(ElfLinker *elfLinker, Context *context, C
   ArrayRef<StringRef> glueShaderIdentifiers = elfLinker->getGlueInfo();
   for (unsigned i = 0; i < glueShaderIdentifiers.size(); ++i) {
     LLPC_OUTS("ID for glue shader" << i << ": " << llvm::toHex(glueShaderIdentifiers[i]) << "\n");
-    CacheAccessor cacheAccessor = checkCacheForGlueShader(glueShaderIdentifiers[i], context, compiler);
+    CacheAccessor cacheAccessor = checkCacheForGlueShader(glueShaderIdentifiers[i], compiler);
 
     if (cacheAccessor.isInCache()) {
       LLPC_OUTS("Cache hit for glue shader " << i << "\n");
@@ -405,11 +407,6 @@ Result VKAPI_CALL ICompiler::Create(GfxIpVersion gfxIp, unsigned optionCount, co
     SOptionHash = optionHash;
     *ppCompiler = new Compiler(gfxIp, optionCount, options, SOptionHash, cache);
     assert(*ppCompiler);
-
-    if (EnableOuts()) {
-      // LLPC_OUTS is enabled. Ensure it is enabled in LGC (the middle-end) too.
-      LgcContext::setLlpcOuts(&outs());
-    }
   } else {
     *ppCompiler = nullptr;
     result = Result::ErrorInvalidValue;
@@ -454,33 +451,6 @@ Compiler::Compiler(GfxIpVersion gfxIp, unsigned optionCount, const char *const *
     }
   }
 
-  // Initialize shader cache
-  ShaderCacheCreateInfo createInfo = {};
-  ShaderCacheAuxCreateInfo auxCreateInfo = {};
-  unsigned shaderCacheMode = cl::ShaderCacheMode;
-  auxCreateInfo.shaderCacheMode = static_cast<ShaderCacheMode>(shaderCacheMode);
-  auxCreateInfo.gfxIp = m_gfxIp;
-  auxCreateInfo.hash = m_optionHash;
-  auxCreateInfo.executableName = cl::ExecutableName.c_str();
-
-  const char *shaderCachePath = cl::ShaderCacheFileDir.c_str();
-  if (cl::ShaderCacheFileDir.empty()) {
-#ifdef WIN_OS
-    shaderCachePath = getenv("LOCALAPPDATA");
-    assert(shaderCachePath);
-#else
-    llvm_unreachable("Should never be called!");
-#endif
-  }
-
-  if (strlen(shaderCachePath) >= Llpc::MaxPathLen) {
-    LLPC_ERRS("The shader-cache-file-dir exceed the maximum length (" << Llpc::MaxPathLen << ")\n");
-    llvm_unreachable("ShaderCacheFileDir is too long");
-  }
-  auxCreateInfo.cacheFilePath = shaderCachePath;
-
-  m_shaderCache = ShaderCacheManager::getShaderCacheManager()->getShaderCacheObject(&createInfo, &auxCreateInfo);
-
   ++m_instanceCount;
   ++m_outRedirectCount;
 }
@@ -519,8 +489,6 @@ Compiler::~Compiler() {
     --m_outRedirectCount;
     if (m_outRedirectCount == 0)
       redirectLogOutput(true, 0, nullptr);
-
-    ShaderCacheManager::getShaderCacheManager()->releaseShaderCacheObject(m_shaderCache);
   }
 
   {
@@ -532,7 +500,6 @@ Compiler::~Compiler() {
   }
 
   if (shutdown) {
-    ShaderCacheManager::shutdown();
     remove_fatal_error_handler();
     delete m_contextPool;
     m_contextPool = nullptr;
@@ -564,24 +531,365 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
 
   unsigned codeSize = ShaderModuleHelper::getCodeSize(shaderInfo);
   size_t allocSize = sizeof(ShaderModuleData) + codeSize;
-  unsigned *allocBuf =
-      static_cast<unsigned *>(shaderInfo->pfnOutputAlloc(shaderInfo->pInstance, shaderInfo->pUserData, allocSize));
+
+  ShaderModuleData moduleData = {};
+  std::vector<unsigned> codeBufferVector(codeSize / sizeof(unsigned));
+  MutableArrayRef<unsigned> codeBuffer(codeBufferVector);
+  memcpy(moduleData.hash, &hash, sizeof(hash));
+  Result result = ShaderModuleHelper::getModuleData(shaderInfo, codeBuffer, moduleData);
+
+  ResourcesNodes resourceNodes = {};
+  std::vector<ResourceNodeData> inputSymbolInfo;
+  std::vector<ResourceNodeData> outputSymbolInfo;
+  std::vector<ResourceNodeData> uniformBufferInfo;
+  std::vector<ResourceNodeData> storageBufferInfo;
+  std::vector<ResourceNodeData> textureSymbolInfo;
+  std::vector<ResourceNodeData> imageSymbolInfo;
+  std::vector<ResourceNodeData> atomicCounterSymbolInfo;
+  std::vector<ResourceNodeData> defaultUniformSymbolInfo;
+  if (shaderInfo->options.pipelineOptions.buildResourcesDataForShaderModule) {
+    buildShaderModuleResourceUsage(shaderInfo, resourceNodes, inputSymbolInfo, outputSymbolInfo, uniformBufferInfo,
+                                   storageBufferInfo, textureSymbolInfo, imageSymbolInfo, atomicCounterSymbolInfo,
+                                   defaultUniformSymbolInfo);
+
+    allocSize += sizeof(ResourcesNodes);
+    allocSize += inputSymbolInfo.size() * sizeof(ResourceNodeData);
+    allocSize += outputSymbolInfo.size() * sizeof(ResourceNodeData);
+    allocSize += uniformBufferInfo.size() * sizeof(ResourceNodeData);
+    allocSize += storageBufferInfo.size() * sizeof(ResourceNodeData);
+    allocSize += textureSymbolInfo.size() * sizeof(ResourceNodeData);
+    allocSize += imageSymbolInfo.size() * sizeof(ResourceNodeData);
+    allocSize += atomicCounterSymbolInfo.size() * sizeof(ResourceNodeData);
+    allocSize += defaultUniformSymbolInfo.size() * sizeof(ResourceNodeData);
+  }
+
+  uint8_t *allocBuf =
+      static_cast<uint8_t *>(shaderInfo->pfnOutputAlloc(shaderInfo->pInstance, shaderInfo->pUserData, allocSize));
   if (!allocBuf)
     return Result::ErrorOutOfMemory;
 
-  ShaderModuleData *moduleData = reinterpret_cast<ShaderModuleData *>(allocBuf);
-  *moduleData = {};
-  MutableArrayRef<unsigned> codeBuffer(allocBuf + sizeof(ShaderModuleData) / sizeof(*allocBuf),
-                                       codeSize / sizeof(*allocBuf));
+  uint8_t *bufferWritePtr = allocBuf;
+  ShaderModuleData *pShaderModuleData = nullptr;
+  ResourcesNodes *pResourcesNodes = nullptr;
 
-  memcpy(moduleData->hash, &hash, sizeof(hash));
-  ShaderModuleHelper::getModuleData(shaderInfo, codeBuffer, *moduleData);
-  shaderOut->pModuleData = moduleData;
+  memcpy(bufferWritePtr, &moduleData, sizeof(moduleData));
+  pShaderModuleData = reinterpret_cast<ShaderModuleData *>(bufferWritePtr);
+  bufferWritePtr += sizeof(ShaderModuleData);
 
-  if (moduleData->binType == BinaryType::Spirv && cl::EnablePipelineDump)
+  memcpy(bufferWritePtr, codeBuffer.data(), codeBuffer.size() * sizeof(unsigned));
+  pShaderModuleData->binCode.pCode = bufferWritePtr;
+  bufferWritePtr += codeBuffer.size() * sizeof(unsigned);
+
+  if (shaderInfo->options.pipelineOptions.buildResourcesDataForShaderModule) {
+    memcpy(bufferWritePtr, &resourceNodes, sizeof(ResourcesNodes));
+    pResourcesNodes = reinterpret_cast<ResourcesNodes *>(bufferWritePtr);
+    pShaderModuleData->usage.pResources = pResourcesNodes;
+    bufferWritePtr += sizeof(ResourcesNodes);
+
+    memcpy(bufferWritePtr, inputSymbolInfo.data(), inputSymbolInfo.size() * sizeof(ResourceNodeData));
+    pResourcesNodes->pInputInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    bufferWritePtr += inputSymbolInfo.size() * sizeof(ResourceNodeData);
+
+    memcpy(bufferWritePtr, outputSymbolInfo.data(), outputSymbolInfo.size() * sizeof(ResourceNodeData));
+    pResourcesNodes->pOutputInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    bufferWritePtr += outputSymbolInfo.size() * sizeof(ResourceNodeData);
+
+    memcpy(bufferWritePtr, uniformBufferInfo.data(), uniformBufferInfo.size() * sizeof(ResourceNodeData));
+    pResourcesNodes->pUniformBufferInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    bufferWritePtr += uniformBufferInfo.size() * sizeof(ResourceNodeData);
+
+    memcpy(bufferWritePtr, storageBufferInfo.data(), storageBufferInfo.size() * sizeof(ResourceNodeData));
+    pResourcesNodes->pShaderStorageInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    bufferWritePtr += storageBufferInfo.size() * sizeof(ResourceNodeData);
+
+    memcpy(bufferWritePtr, textureSymbolInfo.data(), textureSymbolInfo.size() * sizeof(ResourceNodeData));
+    pResourcesNodes->pTexturesInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    bufferWritePtr += textureSymbolInfo.size() * sizeof(ResourceNodeData);
+
+    memcpy(bufferWritePtr, imageSymbolInfo.data(), imageSymbolInfo.size() * sizeof(ResourceNodeData));
+    pResourcesNodes->pImagesInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    bufferWritePtr += imageSymbolInfo.size() * sizeof(ResourceNodeData);
+
+    memcpy(bufferWritePtr, atomicCounterSymbolInfo.data(), atomicCounterSymbolInfo.size() * sizeof(ResourceNodeData));
+    pResourcesNodes->pAtomicCounterInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    bufferWritePtr += atomicCounterSymbolInfo.size() * sizeof(ResourceNodeData);
+
+    memcpy(bufferWritePtr, defaultUniformSymbolInfo.data(), defaultUniformSymbolInfo.size() * sizeof(ResourceNodeData));
+    pResourcesNodes->pDefaultUniformInfo = reinterpret_cast<ResourceNodeData *>(bufferWritePtr);
+    bufferWritePtr += defaultUniformSymbolInfo.size() * sizeof(ResourceNodeData);
+  }
+
+  shaderOut->pModuleData = pShaderModuleData;
+
+  if (moduleData.binType == BinaryType::Spirv && cl::EnablePipelineDump) {
+    // Dump the original input binary, since the offline tool will re-run BuildShaderModule
     PipelineDumper::DumpSpirvBinary(cl::PipelineDumpDir.c_str(), &shaderInfo->shaderBin, &hash);
+  }
 
-  return Result::Success;
+  return result;
+}
+
+// =====================================================================================================================
+// Get resource node data info from spriv variable
+//
+// @param spvVar : Spriv variable
+// @param [out] symbolInfo : Resource node data info
+// @return: Whether symbol is builtIn
+static bool getSymbolInfoFromSpvVariable(const SPIRVVariable *spvVar, ResourceNodeData *symbolInfo) {
+  uint32_t arraySize = 1;
+  SPIRVWord location = 0;
+  SPIRVWord binding = 0;
+  BasicType basicType = BasicType::Unknown;
+
+  SPIRVWord builtIn = false;
+  bool isBuiltIn = spvVar->hasDecorate(DecorationBuiltIn, 0, &builtIn);
+  spvVar->hasDecorate(DecorationLocation, 0, &location);
+  spvVar->hasDecorate(DecorationBinding, 0, &binding);
+
+  SPIRVType *varElemTy = spvVar->getType()->getPointerElementType();
+  while (varElemTy->isTypeArray()) {
+    arraySize = varElemTy->getArrayLength();
+    varElemTy = varElemTy->getArrayElementType();
+  }
+  if (varElemTy->getOpCode() == OpTypeStruct) {
+    for (uint32_t i = 0; i < arraySize; i++) {
+      if (isBuiltIn)
+        break;
+      isBuiltIn = varElemTy->hasMemberDecorate(i, DecorationBuiltIn, 0, &builtIn);
+    }
+  }
+  if (varElemTy->getOpCode() == OpTypeMatrix)
+    varElemTy = varElemTy->getMatrixColumnType();
+  if (varElemTy->getOpCode() == OpTypeVector)
+    varElemTy = varElemTy->getVectorComponentType();
+
+  switch (varElemTy->getOpCode()) {
+  case OpTypeInt: {
+    bool isSigned = reinterpret_cast<SPIRVTypeInt *>(varElemTy)->isSigned();
+    switch (varElemTy->getIntegerBitWidth()) {
+    case 8:
+      basicType = isSigned ? BasicType::Int8 : BasicType::Uint8;
+      break;
+    case 16:
+      basicType = isSigned ? BasicType::Int16 : BasicType::Uint16;
+      break;
+    case 32:
+      basicType = isSigned ? BasicType::Int : BasicType::Uint;
+      break;
+    case 64:
+      basicType = isSigned ? BasicType::Int64 : BasicType::Uint64;
+      break;
+    }
+    break;
+  }
+  case OpTypeFloat: {
+    switch (varElemTy->getFloatBitWidth()) {
+    case 16:
+      basicType = BasicType::Float16;
+      break;
+    case 32:
+      basicType = BasicType::Float;
+      break;
+    case 64:
+      basicType = BasicType::Double;
+      break;
+    }
+    break;
+  }
+  default: {
+    break;
+  }
+  }
+
+  symbolInfo->arraySize = arraySize;
+  symbolInfo->location = location;
+  symbolInfo->binding = binding;
+  symbolInfo->basicType = basicType;
+
+  return isBuiltIn;
+}
+
+// =====================================================================================================================
+// Get sampler array size in default uniform struct
+//
+// @param spvStruct : Spriv default uniform struct type
+// @return: Sampler array size in this struct
+static unsigned getSamplerArraySizeInSpvStruct(const SPIRVType *spvStruct) {
+  assert(spvStruct->isTypeStruct());
+
+  unsigned memberCount = spvStruct->getStructMemberCount();
+  unsigned samplerArraySize = 0;
+
+  for (unsigned memberIdx = 0; memberIdx < memberCount; memberIdx++) {
+    SPIRVType *memberTy = spvStruct->getStructMemberType(memberIdx);
+
+    if (memberTy->isTypeSampledImage()) {
+      samplerArraySize += 1;
+    } else if (memberTy->isTypeArray()) {
+      unsigned arraySize = 1;
+      while (memberTy->isTypeArray()) {
+        arraySize = memberTy->getArrayLength();
+        memberTy = memberTy->getArrayElementType();
+      }
+      if (memberTy->isTypeSampledImage()) {
+        samplerArraySize += arraySize;
+      } else if (memberTy->isTypeStruct()) {
+        samplerArraySize += (arraySize * getSamplerArraySizeInSpvStruct(memberTy));
+      }
+    } else if (memberTy->isTypeStruct()) {
+      samplerArraySize *= getSamplerArraySizeInSpvStruct(memberTy);
+    }
+  }
+
+  return samplerArraySize;
+}
+
+// =====================================================================================================================
+// Parse the spirv binary to build the resource node data for buffers and opaque types, the resource node data will be
+// returned to client driver together with other info of ShaderModuleUsage
+//
+// @param shaderInfo : Input shader info, including spirv binary
+// @param [out] resourcesNodes : Output of resource usage
+// @param [out] inputSymbolInfos : Output of input symbol infos
+// @param [out] outputSymbolInfo : Output of output symbol infos
+// @param [out] uniformBufferInfo : Output of uniform buffer infos
+// @param [out] storageBufferInfo : Output of shader storage buffer infos
+// @param [out] textureSymbolInfo : Output of texture symbol infos
+// @param [out] imageSymbolInfo : Output of image symbol infos
+// @param [out] atomicCounterSymbolInfo : Output of atomic counter symbol infos
+// @param [out] defaultUniformSymbolInfo : Output of default uniform symbol infos
+void Compiler::buildShaderModuleResourceUsage(
+    const ShaderModuleBuildInfo *shaderInfo, Vkgc::ResourcesNodes &resourcesNodes,
+    std::vector<ResourceNodeData> &inputSymbolInfo, std::vector<ResourceNodeData> &outputSymbolInfo,
+    std::vector<ResourceNodeData> &uniformBufferInfo, std::vector<ResourceNodeData> &storageBufferInfo,
+    std::vector<ResourceNodeData> &textureSymbolInfo, std::vector<ResourceNodeData> &imageSymbolInfo,
+    std::vector<ResourceNodeData> &atomicCounterSymbolInfo, std::vector<ResourceNodeData> &defaultUniformSymbolInfo) {
+  // Parse the SPIR-V stream.
+  std::string spirvCode(static_cast<const char *>(shaderInfo->shaderBin.pCode), shaderInfo->shaderBin.codeSize);
+  std::istringstream spirvStream(spirvCode);
+  std::unique_ptr<SPIRVModule> module(SPIRVModule::createSPIRVModule());
+  spirvStream >> *module;
+
+  ShaderStage shaderStage = shaderInfo->entryStage;
+
+  // Find the entry target.
+  SPIRVEntryPoint *entryPoint = nullptr;
+  SPIRVFunction *func = nullptr;
+  for (unsigned i = 0, funcCount = module->getNumFunctions(); i < funcCount; ++i) {
+    func = module->getFunction(i);
+    entryPoint = module->getEntryPoint(func->getId());
+    if (entryPoint && entryPoint->getExecModel() == convertToExecModel(shaderStage) &&
+        entryPoint->getName() == shaderInfo->pEntryTarget)
+      break;
+    func = nullptr;
+  }
+  if (!entryPoint)
+    return;
+
+  // Process resources
+  auto inOuts = entryPoint->getInOuts();
+  std::vector<ResourceNodeData> inputSymbolWithArrayInfo;
+  for (auto varId : ArrayRef<SPIRVWord>(inOuts.first, inOuts.second)) {
+    auto var = static_cast<SPIRVVariable *>(module->getValue(varId));
+
+    if (var->getStorageClass() == StorageClassInput) {
+      if (shaderStage == ShaderStageVertex) {
+        ResourceNodeData inputSymbol = {};
+        if (!getSymbolInfoFromSpvVariable(var, &inputSymbol))
+          inputSymbolWithArrayInfo.push_back(inputSymbol);
+      }
+    } else if (var->getStorageClass() == StorageClassOutput) {
+      ResourceNodeData outputSymbol = {};
+      if (!getSymbolInfoFromSpvVariable(var, &outputSymbol))
+        outputSymbolInfo.push_back(outputSymbol);
+    }
+  }
+
+  if (shaderInfo->entryStage == ShaderStage::ShaderStageVertex) {
+    size_t inputSymbolSize = inputSymbolWithArrayInfo.size();
+    for (size_t i = 0; i < inputSymbolSize; i++) {
+      auto symbol = inputSymbolWithArrayInfo[i];
+      inputSymbolInfo.push_back(symbol);
+
+      for (uint32_t ite = 1; ite < symbol.arraySize; ite++) {
+        ResourceNodeData elemSymbolInfo = symbol;
+        elemSymbolInfo.location = symbol.location + ite;
+        inputSymbolInfo.push_back(elemSymbolInfo);
+      }
+    }
+  }
+
+  for (unsigned i = 0, varCount = module->getNumVariables(); i < varCount; ++i) {
+    SPIRVVariable *var = module->getVariable(i);
+    SPIRVType *varElemTy = var->getType()->getPointerElementType();
+    while (varElemTy->isTypeArray())
+      varElemTy = varElemTy->getArrayElementType();
+
+    switch (var->getStorageClass()) {
+    case StorageClassUniform: {
+      if (varElemTy->hasDecorate(DecorationBlock)) {
+        ResourceNodeData uniformBufferSymbol = {};
+        if (!getSymbolInfoFromSpvVariable(var, &uniformBufferSymbol))
+          uniformBufferInfo.push_back(uniformBufferSymbol);
+      } else {
+        ResourceNodeData shaderStorageSymbol = {};
+        if (!getSymbolInfoFromSpvVariable(var, &shaderStorageSymbol))
+          storageBufferInfo.push_back(shaderStorageSymbol);
+      }
+    } break;
+    case StorageClassStorageBuffer: {
+      ResourceNodeData shaderStorageSymbol = {};
+      if (!getSymbolInfoFromSpvVariable(var, &shaderStorageSymbol))
+        storageBufferInfo.push_back(shaderStorageSymbol);
+    } break;
+    case StorageClassUniformConstant: {
+      if (varElemTy->isTypeImage()) {
+        ResourceNodeData imageSymbol = {};
+        if (!getSymbolInfoFromSpvVariable(var, &imageSymbol)) {
+          SPIRVTypeImage *imageType = static_cast<SPIRVTypeImage *>(varElemTy);
+          imageSymbol.isTexelBuffer = imageType->getDescriptor().Dim == spv::DimBuffer;
+          imageSymbolInfo.push_back(imageSymbol);
+        }
+      } else if (varElemTy->isTypeSampledImage()) {
+        ResourceNodeData textureSymbol = {};
+        if (!getSymbolInfoFromSpvVariable(var, &textureSymbol)) {
+          SPIRVTypeSampledImage *sampledImageType = static_cast<SPIRVTypeSampledImage *>(varElemTy);
+          SPIRVTypeImage *imageType = sampledImageType->getImageType();
+          textureSymbol.isTexelBuffer = imageType->getDescriptor().Dim == spv::DimBuffer;
+          textureSymbolInfo.push_back(textureSymbol);
+        }
+      } else {
+        ResourceNodeData defaultUniformSymbol = {};
+        if (!getSymbolInfoFromSpvVariable(var, &defaultUniformSymbol))
+          defaultUniformSymbolInfo.push_back(defaultUniformSymbol);
+        // Process image sampler in default uniform
+        if (varElemTy->isTypeStruct()) {
+          ResourceNodeData textureSymbol = {};
+          textureSymbol.location = defaultUniformSymbol.location;
+          textureSymbol.arraySize = getSamplerArraySizeInSpvStruct(varElemTy) * defaultUniformSymbol.arraySize;
+          textureSymbol.isDefaultUniformSampler = true;
+          textureSymbolInfo.push_back(textureSymbol);
+        }
+      }
+    } break;
+    case StorageClassAtomicCounter: {
+      ResourceNodeData atomicCounterSymbol = {};
+      if (!getSymbolInfoFromSpvVariable(var, &atomicCounterSymbol))
+        atomicCounterSymbolInfo.push_back(atomicCounterSymbol);
+    } break;
+    default:
+      break;
+    }
+  }
+
+  resourcesNodes.inputInfoCount = inputSymbolInfo.size();
+  resourcesNodes.outputInfoCount = outputSymbolInfo.size();
+  resourcesNodes.uniformBufferInfoCount = uniformBufferInfo.size();
+  resourcesNodes.shaderStorageInfoCount = storageBufferInfo.size();
+  resourcesNodes.textureInfoCount = textureSymbolInfo.size();
+  resourcesNodes.imageInfoCount = imageSymbolInfo.size();
+  resourcesNodes.atomicCounterInfoCount = atomicCounterSymbolInfo.size();
+  resourcesNodes.defaultUniformInfoCount = defaultUniformSymbolInfo.size();
 }
 
 // =====================================================================================================================
@@ -657,29 +965,191 @@ Result Compiler::buildGraphicsShaderStage(const GraphicsPipelineBuildInfo *pipel
 
   MetroHash::Hash cacheHash = {};
   MetroHash::Hash pipelineHash = {};
-  cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, true, stage);
-  pipelineHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false, true, stage);
+  cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, stage);
+  pipelineHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false, stage);
 
   // Compile
   GraphicsContext graphicsContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
   Context *context = acquireContext();
   context->attachPipelineContext(&graphicsContext);
+  auto onExit = make_scope_exit([&] { releaseContext(context); });
 
   ElfPackage candidateElf;
   Result result =
       buildUnlinkedShaderInternal(context, shaderInfo, stage, candidateElf, pipelineOut->stageCacheAccesses);
 
-  releaseContext(context);
-
   if (result != Result::Success)
     return result;
 
-  void *allocBuf = pipelineInfo->pfnOutputAlloc(pipelineInfo->pInstance, pipelineInfo->pUserData, candidateElf.size());
+  unsigned metaDataSize = 0;
+  SmallVector<FsOutInfo, 8> fsOuts;
+  bool discardState = false;
+  if (stage == UnlinkedStageFragment && pipelineInfo->enableColorExportShader) {
+    // Parse ELF to get outputs
+    ElfWriter<Elf64> writer(m_gfxIp);
+    if (writer.ReadFromBuffer(candidateElf.data(), candidateElf.size()) == Result::Success) {
+      ElfNote metaNote = writer.getNote(Abi::MetadataNoteType); // NT_AMDGPU_METADATA
+      msgpack::Document document;
+      document.readFromBlob(StringRef(reinterpret_cast<const char *>(metaNote.data), metaNote.hdr.descSize), false);
+      auto pipeNode =
+          document.getRoot().getMap(true)[PalAbi::CodeObjectMetadataKey::Pipelines].getArray(true)[0].getMap(true);
+
+      // Color export infos
+      auto it = pipeNode.find(Vkgc::ColorExports);
+      if (it != pipeNode.end()) {
+        assert(it->second.isArray());
+        auto colorExports = it->second.getArray();
+        for (unsigned i = 0; i < colorExports.size(); ++i) {
+          msgpack::ArrayDocNode fetchNode = colorExports[i].getArray();
+          FsOutInfo output;
+          output.hwColorTarget = fetchNode[0].getUInt();
+          output.location = fetchNode[1].getUInt();
+          output.isSigned = fetchNode[2].getBool();
+          StringRef typeName = fetchNode[3].getString();
+          memset(output.typeName, 0, sizeof(output.typeName));
+          memcpy(output.typeName, typeName.data(), typeName.size());
+          fsOuts.push_back(output);
+        }
+        metaDataSize = sizeof(FragmentOutputs) + sizeof(FsOutInfo) * fsOuts.size();
+      }
+      // Discard state
+      it = pipeNode.find(Vkgc::DiscardState);
+      if (it != pipeNode.end())
+        discardState = it->second.getBool();
+    }
+  }
+
+  if (pipelineInfo->enableColorExportShader) {
+    // Output elf for each stage if enableColorExportShader
+    if (Llpc::EnableOuts()) {
+      ElfReader<Elf64> reader(m_gfxIp);
+      size_t readSize = 0;
+      if (reader.ReadFromBuffer(candidateElf.data(), &readSize) == Result::Success) {
+        LLPC_OUTS("===============================================================================\n");
+        LLPC_OUTS("// LLPC final " << getUnlinkedShaderStageName(stage) << " ELF\n");
+        LLPC_OUTS(reader);
+      }
+    }
+  }
+
+  void *allocBuf = pipelineInfo->pfnOutputAlloc(pipelineInfo->pInstance, pipelineInfo->pUserData,
+                                                candidateElf.size() + metaDataSize);
   uint8_t *code = static_cast<uint8_t *>(allocBuf);
   memcpy(code, candidateElf.data(), candidateElf.size());
   pipelineOut->pipelineBin.codeSize = candidateElf.size();
   pipelineOut->pipelineBin.pCode = code;
+
+  if (metaDataSize > 0) {
+    pipelineOut->fsOutputMetaData = code + candidateElf.size();
+    pipelineOut->fsOutputMetaDataSize = metaDataSize;
+    FragmentOutputs *outputs = static_cast<FragmentOutputs *>(pipelineOut->fsOutputMetaData);
+    outputs->fsOutInfoCount = fsOuts.size();
+    outputs->discard = discardState;
+    void *offsetData = static_cast<uint8_t *>(pipelineOut->fsOutputMetaData) + sizeof(FragmentOutputs);
+    memcpy(offsetData, fsOuts.data(), sizeof(FsOutInfo) * fsOuts.size());
+  }
   return result;
+}
+
+// =====================================================================================================================
+// Explicitly build the color export shader.
+//
+// @param [in]  pipelineInfo : Info to build this shader module
+// @param [in]  fsOutputMetaData : Info to fragment outputs
+// @param [out] pipelineOut  : Output of building this shader module
+// @param [out] pipelineDumpFile : Handle of pipeline dump file
+//
+// @returns : Result::Success if successful. Other return codes indicate failure.
+Result Compiler::BuildColorExportShader(const GraphicsPipelineBuildInfo *pipelineInfo, const void *fsOutputMetaData,
+                                        GraphicsPipelineBuildOut *pipelineOut, void *pipelineDumpFile) {
+
+  if (!pipelineInfo->pfnOutputAlloc)
+    return Result::ErrorInvalidPointer;
+
+  if (pipelineInfo->iaState.enableMultiView) {
+    LLPC_OUTS("Relocatable shader doesn't support \"MultiView\"");
+    return Result::RequireFullPipeline;
+  }
+
+  if (!fsOutputMetaData)
+    return Result::Success;
+
+  MetroHash::Hash cacheHash = {};
+  MetroHash::Hash pipelineHash = {};
+  GraphicsContext graphicsContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
+  Context *context = acquireContext();
+  context->attachPipelineContext(&graphicsContext);
+  LgcContext *builderContext = context->getLgcContext();
+  std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
+  context->getPipelineContext()->setPipelineState(&*pipeline, /*hasher=*/nullptr, /*unlinked=*/false);
+  auto onExit = make_scope_exit([&] { releaseContext(context); });
+
+  SmallVector<ColorExportInfo, 8> exports;
+  const FragmentOutputs *fsOuts = static_cast<const FragmentOutputs *>(fsOutputMetaData);
+
+  const uint8 *metaPtr = static_cast<const uint8 *>(fsOutputMetaData);
+  metaPtr = metaPtr + sizeof(FragmentOutputs);
+  const FsOutInfo *outInfos = reinterpret_cast<const FsOutInfo *>(metaPtr);
+
+  for (unsigned idx = 0; idx < fsOuts->fsOutInfoCount; idx++) {
+    auto outInfo = outInfos[idx];
+    ColorExportInfo colorExportInfo;
+    colorExportInfo.hwColorTarget = outInfo.hwColorTarget;
+    colorExportInfo.location = outInfo.location;
+    colorExportInfo.isSigned = outInfo.isSigned;
+    StringRef tyName = outInfo.typeName;
+    Type *ty = nullptr;
+    unsigned vecLength = 0;
+    if (tyName[0] == 'v') {
+      tyName = tyName.drop_front();
+      tyName.consumeInteger(10, vecLength);
+    }
+    if (tyName == "i8")
+      ty = Type::getInt8Ty(*context);
+    else if (tyName == "i16")
+      ty = Type::getInt16Ty(*context);
+    else if (tyName == "i32")
+      ty = Type::getInt32Ty(*context);
+    else if (tyName == "f16")
+      ty = Type::getHalfTy(*context);
+    else if (tyName == "f32")
+      ty = Type::getFloatTy(*context);
+    if (vecLength != 0 && ty != nullptr)
+      ty = FixedVectorType::get(ty, vecLength);
+    colorExportInfo.ty = ty;
+    exports.push_back(colorExportInfo);
+  }
+
+  // If no outputs, return;
+  if (exports.empty())
+    return Result::Success;
+
+  dumpCompilerOptions(pipelineDumpFile);
+  bool hasError = false;
+  context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>(&hasError));
+  std::unique_ptr<ElfLinker> elfLinker(pipeline->createElfLinker({}));
+  StringRef elfStr = elfLinker->buildColorExportShader(exports, fsOuts->discard);
+  context->setDiagnosticHandler(nullptr);
+
+  if (hasError)
+    return Result::ErrorInvalidShader;
+  if (Llpc::EnableOuts()) {
+    ElfReader<Elf64> reader(m_gfxIp);
+    size_t readSize = 0;
+    if (reader.ReadFromBuffer(elfStr.data(), &readSize) == Result::Success) {
+      LLPC_OUTS("===============================================================================\n");
+      LLPC_OUTS("// LLPC final color export shader ELF\n");
+      LLPC_OUTS(reader);
+    }
+  }
+
+  void *allocBuf = pipelineInfo->pfnOutputAlloc(pipelineInfo->pInstance, pipelineInfo->pUserData, elfStr.size());
+  uint8_t *code = static_cast<uint8_t *>(allocBuf);
+  memcpy(code, elfStr.data(), elfStr.size());
+  pipelineOut->pipelineBin.codeSize = elfStr.size();
+  pipelineOut->pipelineBin.pCode = code;
+
+  return Result::Success;
 }
 
 // =====================================================================================================================
@@ -709,17 +1179,17 @@ Result Compiler::buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *p
 
   if (!canUseRelocatableGraphicsShaderElf(shaderInfo, pipelineInfo)) {
     LLPC_OUTS("Relocatable shader compilation requested but not possible.\n");
-    return Result::ErrorInvalidValue;
+    return Result::RequireFullPipeline;
   }
 
   MetroHash::Hash cacheHash = {};
   MetroHash::Hash pipelineHash = {};
-  cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, false);
-  pipelineHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false, false);
+  cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true);
+  pipelineHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false);
 
   std::optional<CacheAccessor> cacheAccessor;
   if (cl::CacheFullPipelines) {
-    cacheAccessor.emplace(pipelineInfo, cacheHash, getInternalCaches());
+    cacheAccessor.emplace(cacheHash, getInternalCaches());
   }
 
   Result result = Result::Success;
@@ -729,8 +1199,7 @@ Result Compiler::buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *p
   if (cacheAccessor && cacheAccessor->isInCache()) {
     LLPC_OUTS("Cache hit for graphics pipeline.\n");
     elfBin = cacheAccessor->getElfFromCache();
-    pipelineOut->pipelineCacheAccess =
-        cacheAccessor->hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
+    pipelineOut->pipelineCacheAccess = CacheAccessInfo::InternalCacheHit;
   } else {
     LLPC_OUTS("Cache miss for graphics pipeline.\n");
     if (cacheAccessor && pipelineOut->pipelineCacheAccess == CacheAccessInfo::CacheNotChecked)
@@ -747,6 +1216,15 @@ Result Compiler::buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *p
       if (elfPackage[idx].pCode) {
         auto data = reinterpret_cast<const char *>(elfPackage[idx].pCode);
         elf[idx].assign(data, data + elfPackage[idx].codeSize);
+        if (idx == UnlinkedStageFragment) {
+          pipelineOut->stageCacheAccesses[ShaderStageFragment] = PartialPipelineHit;
+        } else {
+          for (unsigned stage = 0; stage < ShaderStageFragment; stage++) {
+            if (doesShaderStageExist(shaderInfo, static_cast<ShaderStage>(stage))) {
+              pipelineOut->stageCacheAccesses[stage] = PartialPipelineHit;
+            }
+          }
+        }
       } else {
         graphicsContext.setUnlinked(true);
         result = buildUnlinkedShaderInternal(context, shaderInfo, static_cast<UnlinkedShaderStage>(idx), elf[idx],
@@ -761,10 +1239,8 @@ Result Compiler::buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *p
     bool hasError = false;
     context->setDiagnosticHandler(std::make_unique<LlpcDiagnosticHandler>(&hasError));
     hasError |= !linkRelocatableShaderElf(elf, &pipelineElf, context);
-
     context->setDiagnosticHandler(nullptr);
-    if (hasError)
-      return Result::ErrorInvalidShader;
+    assert(!hasError);
 
     elfBin.codeSize = pipelineElf.size();
     elfBin.pCode = pipelineElf.data();
@@ -801,6 +1277,15 @@ Result Compiler::buildUnlinkedShaderInternal(Context *context, ArrayRef<const Pi
   if (!hasDataForUnlinkedShaderType(stage, shaderInfo))
     return Result::Success;
 
+  if (stage == UnlinkedStageFragment) {
+    assert(shaderInfo[ShaderStageFragment]->pModuleData);
+    // If fragment use builtIn inputs, return RequireFullPipeline.
+    const ShaderModuleData *moduleData =
+        static_cast<const ShaderModuleData *>(shaderInfo[ShaderStageFragment]->pModuleData);
+    if (moduleData->usage.useGenericBuiltIn)
+      return Result::RequireFullPipeline;
+  }
+
   unsigned originalShaderStageMask = context->getPipelineContext()->getShaderStageMask();
   const MetroHash::Hash originalCacheHash = context->getPipelineContext()->getCacheHashCodeWithoutCompact();
   unsigned shaderStageMask = getShaderStageMaskForType(stage) & originalShaderStageMask;
@@ -810,12 +1295,15 @@ Result Compiler::buildUnlinkedShaderInternal(Context *context, ArrayRef<const Pi
 
   // Check the cache for the relocatable shader for this stage.
   MetroHash::Hash cacheHash = {};
+  auto caches = getInternalCaches();
   if (context->getPipelineType() == PipelineType::Graphics) {
     auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
-    cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, true, stage);
+    cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, stage);
   } else {
     auto pipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo *>(context->getPipelineBuildInfo());
-    cacheHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, true, true);
+    cacheHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, true);
+    // we have pipeline cache for compute pipeline, Per stage cache is not needed for compute pipeline.
+    caches = {};
   }
   // Note that this code updates m_pipelineHash of the pipeline context. It must be restored.
   context->getPipelineContext()->setHashForCacheLookUp(cacheHash);
@@ -830,15 +1318,14 @@ Result Compiler::buildUnlinkedShaderInternal(Context *context, ArrayRef<const Pi
   });
 
   Result result = Result::Success;
-  CacheAccessor cacheAccessor(context, cacheHash, getInternalCaches());
+  CacheAccessor cacheAccessor(cacheHash, caches);
   if (cacheAccessor.isInCache()) {
     BinaryData elfBin = cacheAccessor.getElfFromCache();
     auto data = reinterpret_cast<const char *>(elfBin.pCode);
     elfPackage.assign(data, data + elfBin.codeSize);
     LLPC_OUTS("Cache hit for shader stage " << getUnlinkedShaderStageName(stage) << "\n");
     for (ShaderStage gfxStage : shaderStages)
-      stageCacheAccesses[gfxStage] =
-          cacheAccessor.hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
+      stageCacheAccesses[gfxStage] = CacheAccessInfo::InternalCacheHit;
   } else {
     LLPC_OUTS("Cache miss for shader stage " << getUnlinkedShaderStageName(stage) << "\n");
     for (ShaderStage gfxStage : shaderStages)
@@ -1084,7 +1571,8 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       }
 
       // If this is TCS, set inputVertices from patchControlPoints in the pipeline state.
-      if (entryStage == ShaderStageTessControl)
+      if (entryStage == ShaderStageTessControl ||
+          (entryStage == ShaderStageTessEval && shaderInfo[ShaderStageTessControl]->pModuleData == nullptr))
         context->getPipelineContext()->setTcsInputVertices(modules[shaderIndex]);
     }
 
@@ -1218,10 +1706,6 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
     graphicsShaderCacheChecker.updateAndMerge(result, pipelineElf);
   }
 
-  if (result == Result::Success && fragmentShaderInfo && fragmentShaderInfo->options.updateDescInElf &&
-      (context->getShaderStageMask() & ShaderStageFragmentBit))
-    graphicsShaderCacheChecker.updateRootUserDateOffset(pipelineElf);
-
   context->setDiagnosticHandler(nullptr);
 
   if (result == Result::Success && hasError)
@@ -1250,12 +1734,11 @@ unsigned GraphicsShaderCacheChecker::check(const Module *module, const unsigned 
   unsigned stagesLeftToCompile = stageMask;
 
   if (stageMask & getLgcShaderStageMask(ShaderStageFragment)) {
-    m_fragmentCacheAccessor.emplace(m_context, fragmentHash, m_compiler->getInternalCaches());
+    m_fragmentCacheAccessor.emplace(fragmentHash, m_compiler->getInternalCaches());
     if (m_fragmentCacheAccessor->isInCache()) {
       // Remove fragment shader stages.
       stagesLeftToCompile &= ~getLgcShaderStageMask(ShaderStageFragment);
-      stageCacheAccesses[ShaderStageFragment] =
-          m_fragmentCacheAccessor->hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
+      stageCacheAccesses[ShaderStageFragment] = CacheAccessInfo::InternalCacheHit;
     } else {
       stageCacheAccesses[ShaderStageFragment] = CacheAccessInfo::CacheMiss;
     }
@@ -1263,12 +1746,11 @@ unsigned GraphicsShaderCacheChecker::check(const Module *module, const unsigned 
 
   if (stageMask & ~getLgcShaderStageMask(ShaderStageFragment)) {
     auto accessInfo = CacheAccessInfo::CacheNotChecked;
-    m_nonFragmentCacheAccessor.emplace(m_context, nonFragmentHash, m_compiler->getInternalCaches());
+    m_nonFragmentCacheAccessor.emplace(nonFragmentHash, m_compiler->getInternalCaches());
     if (m_nonFragmentCacheAccessor->isInCache()) {
       // Remove non-fragment shader stages.
       stagesLeftToCompile &= getLgcShaderStageMask(ShaderStageFragment);
-      accessInfo = m_nonFragmentCacheAccessor->hitInternalCache() ? CacheAccessInfo::InternalCacheHit
-                                                                  : CacheAccessInfo::CacheHit;
+      accessInfo = CacheAccessInfo::InternalCacheHit;
     } else {
       accessInfo = CacheAccessInfo::CacheMiss;
     }
@@ -1278,19 +1760,6 @@ unsigned GraphicsShaderCacheChecker::check(const Module *module, const unsigned 
         stageCacheAccesses[stage] = accessInfo;
   }
   return stagesLeftToCompile;
-}
-
-// =====================================================================================================================
-// Update root level descriptor offset for graphics pipeline.
-//
-// @param [in/out] pipelineElf : ELF that could be from compile or merged
-void GraphicsShaderCacheChecker::updateRootUserDateOffset(ElfPackage *pipelineElf) {
-  ElfWriter<Elf64> writer(m_context->getGfxIpVersion());
-  // Load ELF binary
-  auto result = writer.ReadFromBuffer(pipelineElf->data(), pipelineElf->size());
-  assert(result == Result::Success);
-  (void(result)); // unused
-  writer.updateElfBinary(m_context, pipelineElf);
 }
 
 // =====================================================================================================================
@@ -1411,7 +1880,6 @@ Result Compiler::buildGraphicsPipelineInternal(GraphicsContext *graphicsContext,
     unsigned stageMask = context->getShaderStageMask();
     bool buildPartPipeline = (cl::EnablePartPipeline && isShaderStageInMask(ShaderStageFragment, stageMask) &&
                               (stageMask & ~shaderStageToMask(ShaderStageFragment)));
-#if VKI_RAY_TRACING
     if (buildPartPipeline) {
       for (const auto *oneShaderInfo : shaderInfo) {
         if (!oneShaderInfo)
@@ -1423,7 +1891,7 @@ Result Compiler::buildGraphicsPipelineInternal(GraphicsContext *graphicsContext,
         }
       }
     }
-#endif
+
     if (buildPartPipeline)
       result = buildGraphicsPipelineWithPartPipelines(context, shaderInfo, pipelineElf, stageCacheAccesses);
     else
@@ -1477,8 +1945,7 @@ Result Compiler::buildGraphicsPipelineWithPartPipelines(Context *context,
         ShaderStage stage = shaderInfoEntry->entryStage;
         if (shaderInfoEntry->pModuleData && isShaderStageInMask(stage, partStageMask)) {
           // This is a shader to include in this part pipeline. Add the shader code and options to the hash.
-          PipelineDumper::updateHashForPipelineShaderInfo(stage, shaderInfoEntry, /*isCacheHash=*/true, &hasher,
-                                                          /*isRelocatableShader=*/false);
+          PipelineDumper::updateHashForPipelineShaderInfo(stage, shaderInfoEntry, /*isCacheHash=*/true, &hasher);
         }
       }
     }
@@ -1497,14 +1964,13 @@ Result Compiler::buildGraphicsPipelineWithPartPipelines(Context *context,
     // Finalize the hash, and look it up in the cache.
     MetroHash::Hash partPipelineHash = {};
     hasher.Finalize(partPipelineHash.bytes);
-    CacheAccessor cacheAccessor(context, partPipelineHash, getInternalCaches());
+    CacheAccessor cacheAccessor(partPipelineHash, getInternalCaches());
     if (cacheAccessor.isInCache()) {
       LLPC_OUTS("Cache hit for stage " << getPartPipelineStageName(partPipelineStage) << ".\n");
 
       // Mark the applicable entries in stageCacheAccesses.
       for (ShaderStage shaderStage : maskToShaderStages(partStageMask)) {
-        stageCacheAccesses[shaderStage] =
-            cacheAccessor.hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
+        stageCacheAccesses[shaderStage] = CacheAccessInfo::InternalCacheHit;
       }
       // Get the ELF from the cache.
       partPipelineElf = llvm::StringRef(static_cast<const char *>(cacheAccessor.getElfFromCache().pCode),
@@ -1607,8 +2073,8 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
 
   MetroHash::Hash cacheHash = {};
   MetroHash::Hash pipelineHash = {};
-  cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true, false);
-  pipelineHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false, false);
+  cacheHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, true);
+  pipelineHash = PipelineDumper::generateHashForGraphicsPipeline(pipelineInfo, false);
 
   if (result == Result::Success && EnableOuts()) {
     LLPC_OUTS("===============================================================================\n");
@@ -1634,7 +2100,7 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
 
   std::optional<CacheAccessor> cacheAccessor;
   if (cl::CacheFullPipelines) {
-    cacheAccessor.emplace(pipelineInfo, cacheHash, getInternalCaches());
+    cacheAccessor.emplace(cacheHash, getInternalCaches());
   }
 
   ElfPackage candidateElf;
@@ -1656,8 +2122,7 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
     LLPC_OUTS("Cache hit for graphics pipeline.\n");
     elfBin = cacheAccessor->getElfFromCache();
     if (cacheAccessor->isInCache()) {
-      pipelineOut->pipelineCacheAccess =
-          cacheAccessor->hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
+      pipelineOut->pipelineCacheAccess = CacheAccessInfo::InternalCacheHit;
     }
   }
 
@@ -1740,8 +2205,8 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
 
   MetroHash::Hash cacheHash = {};
   MetroHash::Hash pipelineHash = {};
-  cacheHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, true, false);
-  pipelineHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, false, false);
+  cacheHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, true);
+  pipelineHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, false);
 
   if (result == Result::Success && EnableOuts()) {
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(pipelineInfo->cs.pModuleData);
@@ -1763,7 +2228,7 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
 
   std::optional<CacheAccessor> cacheAccessor;
   if (cl::CacheFullPipelines) {
-    cacheAccessor.emplace(pipelineInfo, cacheHash, getInternalCaches());
+    cacheAccessor.emplace(cacheHash, getInternalCaches());
   }
 
   ElfPackage candidateElf;
@@ -1782,8 +2247,7 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
   } else {
     LLPC_OUTS("Cache hit for compute pipeline.\n");
     elfBin = cacheAccessor->getElfFromCache();
-    pipelineOut->pipelineCacheAccess =
-        cacheAccessor->hitInternalCache() ? CacheAccessInfo::InternalCacheHit : CacheAccessInfo::CacheHit;
+    pipelineOut->pipelineCacheAccess = CacheAccessInfo::InternalCacheHit;
   }
 
   if (result == Result::Success) {
@@ -1830,11 +2294,11 @@ std::unique_ptr<Module> Compiler::createGpurtShaderLibrary(Context *context) {
   shaderInfo.pEntryTarget = Vkgc::getEntryPointNameFromSpirvBinary(&rtState->gpurtShaderLibrary);
   shaderInfo.pModuleData = &moduleData;
 
-  // Disable fast math Contract when there is no hardware intersectRay
+  // Disable fast math contract on OpDot when there is no hardware intersectRay
   bool hwIntersectRay = rtState->bvhResDesc.dataSizeInDwords > 0;
-  shaderInfo.options.noContract = !hwIntersectRay;
+  shaderInfo.options.noContractOpDot = !hwIntersectRay;
 
-  auto module = std::make_unique<Module>("gpurt", *context);
+  auto module = std::make_unique<Module>(RtName::TraceRayKHR, *context);
   context->setModuleTargetMachine(module.get());
 
   TimerProfiler timerProfiler(context->getPipelineHashCode(), "LLPC", TimerProfiler::PipelineTimerEnableMask);
@@ -1852,11 +2316,9 @@ std::unique_ptr<Module> Compiler::createGpurtShaderLibrary(Context *context) {
                                 "// LLPC SPIRV-to-LLVM translation results\n"));
   }
 
-  if (context->getPipelineType() == PipelineType::RayTracing)
-    lowerPassMgr->addPass(SpirvLowerRayTracing());
-  else
-    lowerPassMgr->addPass(SpirvLowerRayQuery(true));
-
+  lowerPassMgr->addPass(SpirvProcessGpuRtLibrary());
+  lowerPassMgr->addPass(SpirvLowerRayQuery(true));
+  lowerPassMgr->addPass(AlwaysInlinerPass());
   // Stop timer for translate.
   timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, false);
 
@@ -1869,7 +2331,6 @@ std::unique_ptr<Module> Compiler::createGpurtShaderLibrary(Context *context) {
   return module;
 }
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Build ray tracing pipeline from the specified info.
 //
@@ -1917,43 +2378,48 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
     PipelineDumper::DumpPipelineExtraInfo(reinterpret_cast<PipelineDumpFile *>(pipelineDumpFile), &extraInfo);
   }
 
-  ShaderEntryState cacheEntryState = ShaderEntryState::Compiling;
-
   std::vector<ElfPackage> elfBinarys;
   std::vector<RayTracingShaderProperty> shaderProps;
 
-  if (cacheEntryState == ShaderEntryState::Compiling) {
-    const PipelineShaderInfo *representativeShaderInfo = nullptr;
-    if (pipelineInfo->shaderCount > 0)
-      representativeShaderInfo = &pipelineInfo->pShaders[0];
+  const PipelineShaderInfo *representativeShaderInfo = nullptr;
+  if (pipelineInfo->shaderCount > 0)
+    representativeShaderInfo = &pipelineInfo->pShaders[0];
 
-    RayTracingContext rayTracingContext(m_gfxIp, pipelineInfo, representativeShaderInfo, &pipelineHash, &cacheHash,
-                                        pipelineInfo->indirectStageMask);
+  RayTracingContext rayTracingContext(m_gfxIp, pipelineInfo, representativeShaderInfo, &pipelineHash, &cacheHash,
+                                      pipelineInfo->indirectStageMask);
 
-    pipelineOut->hasTraceRay = false;
-    for (unsigned i = 0; i < pipelineInfo->shaderCount; ++i) {
-      const auto &shaderInfo = pipelineInfo->pShaders[i];
-      const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo.pModuleData);
-      if (moduleData->usage.hasTraceRay) {
-        pipelineOut->hasTraceRay = true;
-        break;
+  pipelineOut->hasTraceRay = false;
+  for (unsigned i = 0; i < pipelineInfo->shaderCount; ++i) {
+    const auto &shaderInfo = pipelineInfo->pShaders[i];
+    const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo.pModuleData);
+    if (moduleData->usage.hasTraceRay) {
+      pipelineOut->hasTraceRay = true;
+      break;
+    }
+  }
+
+  std::vector<const PipelineShaderInfo *> rayTracingShaderInfo;
+  rayTracingShaderInfo.reserve(pipelineInfo->shaderCount + 1);
+  for (unsigned i = 0; i < pipelineInfo->shaderCount; ++i) {
+    rayTracingShaderInfo.push_back(&pipelineInfo->pShaders[i]);
+    auto &shaderInfo = rayTracingShaderInfo[i];
+    const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
+    if (shaderInfo->entryStage == ShaderStageRayTracingAnyHit ||
+        shaderInfo->entryStage == ShaderStageRayTracingIntersect) {
+      if (moduleData->usage.enableRayQuery) {
+        rayTracingContext.setIndirectPipeline();
       }
     }
-
-    std::vector<const PipelineShaderInfo *> rayTracingShaderInfo;
-    rayTracingShaderInfo.reserve(pipelineInfo->shaderCount + 1);
-    for (unsigned i = 0; i < pipelineInfo->shaderCount; ++i)
-      rayTracingShaderInfo.push_back(&pipelineInfo->pShaders[i]);
-
-    // Add entry module
-    PipelineShaderInfo raygenMainShaderInfo = pipelineInfo->pShaders[0];
-    raygenMainShaderInfo.entryStage = ShaderStageRayTracingRayGen;
-    raygenMainShaderInfo.pModuleData = nullptr;
-    rayTracingShaderInfo.push_back(&raygenMainShaderInfo);
-
-    result = buildRayTracingPipelineInternal(rayTracingContext, rayTracingShaderInfo, false, elfBinarys, shaderProps,
-                                             helperThreadProvider);
   }
+
+  // Add entry module
+  PipelineShaderInfo raygenMainShaderInfo = pipelineInfo->pShaders[0];
+  raygenMainShaderInfo.entryStage = ShaderStageRayTracingRayGen;
+  raygenMainShaderInfo.pModuleData = nullptr;
+  rayTracingShaderInfo.push_back(&raygenMainShaderInfo);
+
+  result = buildRayTracingPipelineInternal(rayTracingContext, rayTracingShaderInfo, false, elfBinarys, shaderProps,
+                                           helperThreadProvider);
 
   if (result == Result::Success) {
     void *allocBuf = nullptr;
@@ -2045,20 +2511,6 @@ Result Compiler::buildRayTracingPipelineElf(Context *context, std::unique_ptr<Mo
                                             std::vector<RayTracingShaderProperty> &shaderProps,
                                             std::vector<bool> &moduleCallsTraceRay, unsigned moduleIndex,
                                             std::unique_ptr<Pipeline> &pipeline, TimerProfiler &timerProfiler) {
-  // Per-shader SPIR-V lowering passes.
-  unsigned passIndex = 0;
-  std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(context->getLgcContext()));
-  lowerPassMgr->setPassIndex(&passIndex);
-  SpirvLower::registerPasses(*lowerPassMgr);
-
-  SpirvLower::addPasses(context, ShaderStageCompute, *lowerPassMgr, timerProfiler.getTimer(TimerLower), true, false,
-                        false);
-  // Run the passes.
-  bool success = runPasses(&*lowerPassMgr, module.get());
-  if (!success) {
-    LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
-    return Result::ErrorInvalidShader;
-  }
 
   if (moduleIndex > 0) {
     auto &shaderProp = shaderProps[moduleIndex - 1];
@@ -2067,22 +2519,41 @@ Result Compiler::buildRayTracingPipelineElf(Context *context, std::unique_ptr<Mo
     strcpy(&shaderProp.name[0], funcName.data());
     shaderProp.shaderId = moduleIndex;
     shaderProp.hasTraceRay = moduleCallsTraceRay[moduleIndex - 1];
-
-    // NOTE: We need to distinguish each pipelines's cache hash from others, so that RGP can capture them correctly.
-    auto options = pipeline->getOptions();
-    uint64_t originalCacheHash = options.hash[1];
-
-    // Re-hash the cache hash with module index.
-    MetroHash64 hasher;
-    MetroHash::Hash hash = {};
-    hasher.Update(originalCacheHash);
-    hasher.Update(moduleIndex);
-    hasher.Finalize(hash.bytes);
-
-    options.hash[1] = MetroHash::compact64(&hash);
-    pipeline->setOptions(options);
+    shaderProp.onlyGpuVaLo = false;
+    shaderProp.shaderIdExtraBits = 0;
   }
 
+  auto options = pipeline->getOptions();
+  MetroHash64 hasher;
+  MetroHash::Hash hash = {};
+  hasher.Update(options.hash[1]);
+  hasher.Update(moduleIndex);
+  hasher.Finalize(hash.bytes);
+  options.hash[1] = MetroHash::compact64(&hash);
+
+  if (static_cast<const RayTracingContext *>(context->getPipelineContext())->getIndirectStageMask() == 0)
+    options.rtIndirectMode = lgc::RayTracingIndirectMode::NotIndirect;
+
+  pipeline->setOptions(options);
+
+  generatePipeline(context, moduleIndex, std::move(module), pipelineElf, pipeline.get(), timerProfiler);
+
+  if (moduleIndex > 0)
+    addRayTracingIndirectPipelineMetadata(&pipelineElf);
+
+  return Result::Success;
+}
+
+// =====================================================================================================================
+// Run lgc passes
+// @param context : Acquired context
+// @param moduleIndex : Module index
+// @param module : The module used to build Elf package
+// @param [out] pipelineElf : Output Elf package
+// @param pipeline : The pipeline object
+// @param timerProfiler : Timer profiler
+Result Compiler::generatePipeline(Context *context, unsigned moduleIndex, std::unique_ptr<Module> module,
+                                  ElfPackage &pipelineElf, Pipeline *pipeline, TimerProfiler &timerProfiler) {
   // Generate pipeline.
   std::unique_ptr<Module> pipelineModule;
 
@@ -2094,8 +2565,7 @@ Result Compiler::buildRayTracingPipelineElf(Context *context, std::unique_ptr<Mo
     return Result::ErrorInvalidShader;
   }
 
-  ElfPackage *elfPackage = &pipelineElf;
-  raw_svector_ostream elfStream(*elfPackage);
+  raw_svector_ostream elfStream(pipelineElf);
 
 #if LLPC_ENABLE_EXCEPTION
   try
@@ -2114,9 +2584,6 @@ Result Compiler::buildRayTracingPipelineElf(Context *context, std::unique_ptr<Mo
     return Result::ErrorInvalidShader;
   }
 #endif
-
-  if (moduleIndex > 0)
-    addRayTracingIndirectPipelineMetadata(elfPackage);
 
   return Result::Success;
 }
@@ -2158,7 +2625,7 @@ void helperThreadBuildRayTracingPipelineElf(IHelperThreadProvider *helperThreadP
     // Compiler::buildRayTracingPipelineInternal for why we need this.
     std::unique_lock<sys::Mutex> lock(helperThreadPayload->compiler->getHelperThreadMutex());
     helperThreadPayload->compiler->getHelperThreadConditionVariable().wait(
-        lock, [helperThreadPayload]() { return helperThreadPayload->mainThreadSwitchedContext; });
+        lock, [helperThreadPayload]() { return helperThreadPayload->mainThreadSwitchedContext.load(); });
   }
 
   do {
@@ -2195,7 +2662,6 @@ void helperThreadBuildRayTracingPipelineElf(IHelperThreadProvider *helperThreadP
       helperThreadProvider->TaskCompleted();
       continue;
     }
-
     auto result = helperThreadPayload->compiler->buildRayTracingPipelineElf(
         context, std::move(module), helperThreadPayload->pipelineElfs[moduleIndex], helperThreadPayload->shaderProps,
         helperThreadPayload->moduleCallsTraceRay, moduleIndex, pipeline, timerProfiler);
@@ -2208,6 +2674,44 @@ void helperThreadBuildRayTracingPipelineElf(IHelperThreadProvider *helperThreadP
   context->setDiagnosticHandler(nullptr);
   helperThreadPayload->compiler->releaseContext(context);
 }
+
+// =====================================================================================================================
+// Limited implementation of Llpc::IHelperThreadProvider to support -add-rt-helpers.
+//
+// If no deferred work helper thread providers is available when additional threads are requested via -add-rt-helpers
+// then use an instances of this class to coordinate helper threads.
+class InternalHelperThreadProvider : public Llpc::IHelperThreadProvider {
+public:
+  virtual void SetTasks(ThreadFunction *pFunction, uint32_t numTasks, void *pPayload) override {
+    assert(!m_totalInstances && "InternalHelperThreadProvider is single use");
+    m_totalInstances = numTasks;
+  }
+
+  virtual bool GetNextTask(uint32_t *pTaskIndex) override {
+    assert(pTaskIndex != nullptr);
+    *pTaskIndex = m_nextInstance.fetch_add(1);
+    return (*pTaskIndex < m_totalInstances);
+  }
+
+  virtual void TaskCompleted() override {
+    uint32_t completedInstances = m_completedInstances.fetch_add(1) + 1;
+    if (completedInstances == m_totalInstances)
+      m_event.notify_all();
+  }
+
+  virtual void WaitForTasks() override {
+    std::unique_lock<std::mutex> lock(m_lock);
+    while (m_completedInstances < m_totalInstances)
+      m_event.wait(lock);
+  }
+
+private:
+  uint32_t m_totalInstances = 0;
+  std::atomic<uint32_t> m_nextInstance = 0;
+  std::atomic<uint32_t> m_completedInstances = 0;
+  std::condition_variable m_event;
+  std::mutex m_lock;
+};
 
 // =====================================================================================================================
 // Build raytracing pipeline internally
@@ -2273,6 +2777,10 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
 
     // SPIR-V translation, then dump the result.
     lowerPassMgr->addPass(SpirvLowerTranslator(shaderInfoEntry->entryStage, shaderInfoEntry));
+    lowerPassMgr->addPass(SpirvLowerCfgMerges());
+    lowerPassMgr->addPass(AlwaysInlinerPass());
+    if (moduleData->usage.enableRayQuery)
+      lowerPassMgr->addPass(SpirvLowerRayQuery());
 
     // Run the passes.
     bool success = runPasses(&*lowerPassMgr, modules[shaderIndex].get());
@@ -2282,39 +2790,9 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     }
   }
 
-  for (unsigned shaderIndex = 0; shaderIndex < shaderInfo.size(); ++shaderIndex) {
-    ShaderStage entryStage = shaderInfo[shaderIndex]->entryStage;
-
-    std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(builderContext));
-    lowerPassMgr->setPassIndex(&passIndex);
-    SpirvLower::registerPasses(*lowerPassMgr);
-
-    // Start timer for translate.
-    timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, true);
-
-    // Any ray tracing shader may access shader record buffer in non-entry function, we will replace all Global SRB to a
-    // combination of instructions at the beginning of entry function in SpirvLowerRayTracing pass, so we need to inline
-    // all functions so that SRB is accessible throughout the shader.
-    if (entryStage != ShaderStageCompute) {
-      // Lower SPIR-V CFG merges before inlining -- don't run in the (empty) entry point module
-      lowerPassMgr->addPass(SpirvLowerCfgMerges());
-      lowerPassMgr->addPass(AlwaysInlinerPass());
-    }
-    lowerPassMgr->addPass(SpirvLowerRayTracing());
-
-    // Stop timer for translate.
-    timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, false);
-
-    // Run the passes.
-    bool success = runPasses(&*lowerPassMgr, modules[shaderIndex].get());
-    if (!success) {
-      LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
-      return Result::ErrorInvalidShader;
-    }
-  }
-
-  // Step 2: Link modules.
+  // Step 2: Link rayquery modules
   std::vector<std::unique_ptr<Module>> newModules;
+  std::vector<bool> moduleUsesRayQuery;
   // Record which module calls TraceRay(), except the first one (For indirect mode, it is the entry function which will
   // never call TraceRay(). For inlined mode, we don't need to care).
   std::vector<bool> moduleCallsTraceRay;
@@ -2329,57 +2807,93 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
   // Vulkan driver's shader group handle construction logic assume that if any shader identifier uses a VA mapping, then
   // all of them do.
   auto indirectStageMask = rtContext.getIndirectStageMask() & ShaderStageAllRayTracingBit;
-
   assert(indirectStageMask == 0 || indirectStageMask == ShaderStageAllRayTracingBit);
 
-  std::optional<Linker> linker;
-  {
-    std::unique_ptr<Module> entry = std::move(modules.back());
-    modules.pop_back();
-    shaderInfo = shaderInfo.drop_back();
+  std::unique_ptr<Module> entry = std::move(modules.back());
+  modules.pop_back();
+  shaderInfo = shaderInfo.drop_back();
 
-    if (indirectStageMask == 0)
-      linker.emplace(*entry);
-
-    setShaderStageToModule(entry.get(), ShaderStageCompute);
-    newModules.push_back(std::move(entry));
-  }
+  newModules.push_back(std::move(entry));
+  moduleUsesRayQuery.push_back(false);
 
   for (unsigned shaderIndex = 0; shaderIndex < pipelineInfo->shaderCount; ++shaderIndex) {
     const auto *shaderInfoEntry = shaderInfo[shaderIndex];
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfoEntry->pModuleData);
     auto shaderModule = std::move(modules[shaderIndex]);
 
-    if (linker) {
-      if (linker->linkInModule(std::move(shaderModule)))
+    if (moduleData->usage.enableRayQuery) {
+      Linker linker(*shaderModule);
+      if (linker.linkInModule(CloneModule(*gpurtShaderLibrary)))
         return Result::ErrorInvalidShader;
-    } else {
-      if (moduleData->usage.enableRayQuery) {
-        Linker linker(*shaderModule);
-        if (linker.linkInModule(CloneModule(*gpurtShaderLibrary)))
-          return Result::ErrorInvalidShader;
-      }
-
-      newModules.push_back(std::move(shaderModule));
-      moduleCallsTraceRay.push_back(moduleData->usage.hasTraceRay);
     }
+
+    newModules.push_back(std::move(shaderModule));
+    moduleCallsTraceRay.push_back(moduleData->usage.hasTraceRay);
+    moduleUsesRayQuery.push_back(moduleData->usage.enableRayQuery);
   }
 
   if (gpurtShaderLibrary) {
-    if (linker) {
-      if (linker->linkInModule(std::move(gpurtShaderLibrary)))
-        return Result::ErrorInvalidShader;
-    } else {
-      newModules.push_back(std::move(gpurtShaderLibrary));
-      moduleCallsTraceRay.push_back(false);
+    StringRef traceRayFuncName = mainContext->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_TRACE_RAY);
+    StringRef fetchTrianglePosFunc = mainContext->getPipelineContext()->getRayTracingFunctionName(
+        Vkgc::RT_ENTRY_FETCH_HIT_TRIANGLE_FROM_NODE_POINTER);
+
+    // NOTE: The GPURT shader library generated by DXC will contain some global constant value (0, 1, 2, etc.) shared
+    // across different functions. SpirvLowerGlobal pass cannot handle such case, so we drop all unneeded functions.
+    for (auto funcIt = gpurtShaderLibrary->begin(), funcEnd = gpurtShaderLibrary->end(); funcIt != funcEnd;) {
+      Function *func = &*funcIt++;
+      if (func->getLinkage() == GlobalValue::ExternalLinkage && !func->empty()) {
+        if (!func->getName().startswith(traceRayFuncName) && !func->getName().startswith(fetchTrianglePosFunc)) {
+          func->dropAllReferences();
+          func->eraseFromParent();
+        }
+      }
     }
+
+    newModules.push_back(std::move(gpurtShaderLibrary));
+    moduleCallsTraceRay.push_back(false);
+    moduleUsesRayQuery.push_back(false);
   }
 
   assert(moduleCallsTraceRay.size() == (newModules.size() - 1));
+  assert(moduleUsesRayQuery.size() == newModules.size());
+
+  for (unsigned i = 0; i < newModules.size(); i++) {
+    auto module = (newModules[i].get());
+    std::unique_ptr<lgc::PassManager> passMgr(lgc::PassManager::Create(builderContext));
+    SpirvLower::registerPasses(*passMgr);
+    SpirvLower::addPasses(mainContext, ShaderStageCompute, *passMgr, timerProfiler.getTimer(TimerLower), true,
+                          moduleUsesRayQuery[i], false);
+    bool success = runPasses(&*passMgr, module);
+    if (!success) {
+      LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
+      return Result::ErrorInvalidShader;
+    }
+  }
+
+  if (indirectStageMask == 0) {
+    auto &mainModule = newModules[0];
+    Linker linker(*mainModule);
+    for (unsigned i = 1; i < newModules.size(); ++i) {
+      linker.linkInModule(std::move(newModules[i]));
+    }
+    std::unique_ptr<lgc::PassManager> passMgr(lgc::PassManager::Create(builderContext));
+    passMgr->addPass(AlwaysInlinerPass());
+    bool success = runPasses(&*passMgr, mainModule.get());
+    if (!success) {
+      LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
+      return Result::ErrorInvalidShader;
+    }
+    clearNonEntryFunctions(mainModule.get(), "main");
+    newModules.erase(newModules.begin() + 1, newModules.end());
+  }
 
   rtContext.setLinked(true);
   pipelineElfs.resize(newModules.size());
   shaderProps.resize(newModules.size() - 1);
+
+  InternalHelperThreadProvider ourHelperThreadProvider;
+  if (cl::AddRtHelpers && !helperThreadProvider)
+    helperThreadProvider = &ourHelperThreadProvider;
 
   if (helperThreadProvider) {
     std::vector<Result> results(newModules.size(), Result::Success);
@@ -2391,7 +2905,15 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     helperThreadProvider->SetTasks(&helperThreadBuildRayTracingPipelineElf, newModules.size(),
                                    static_cast<void *>(&helperThreadPayload));
 
+    std::vector<std::thread> workers(cl::AddRtHelpers);
+    for (std::thread &worker : workers) {
+      worker = std::thread([&helperThreadProvider, &helperThreadPayload] {
+        helperThreadBuildRayTracingPipelineElf(helperThreadProvider, &helperThreadPayload);
+      });
+    }
+
     unsigned moduleIndex = 0;
+
     while (!helperThreadPayload.helperThreadJoined && helperThreadProvider->GetNextTask(&moduleIndex)) {
       // NOTE: When a helper thread joins, it will move modules from the original context into a new one. However,
       // main thread may be processing on the original context at the same time, results in out of sync situation.
@@ -2412,6 +2934,9 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
       helperThreadBuildRayTracingPipelineElf(helperThreadProvider, &helperThreadPayload);
     }
     helperThreadProvider->WaitForTasks();
+
+    for (std::thread &worker : workers)
+      worker.join();
 
     for (auto res : results) {
       if (res != Result::Success)
@@ -2497,7 +3022,6 @@ void Compiler::addRayTracingIndirectPipelineMetadata(ElfPackage *pipelineElf) {
   writer.setNote(&newMetaNote);
   writer.writeToBuffer(pipelineElf);
 }
-#endif
 
 // =====================================================================================================================
 // Builds hash code from compilation-options
@@ -2508,13 +3032,10 @@ MetroHash::Hash Compiler::generateHashForCompileOptions(unsigned optionCount, co
   // Options which needn't affect compilation results
   static StringRef IgnoredOptions[] = {cl::PipelineDumpDir.ArgStr,
                                        cl::EnablePipelineDump.ArgStr,
-                                       cl::ShaderCacheFileDir.ArgStr,
-                                       cl::ShaderCacheMode.ArgStr,
                                        cl::EnableOuts.ArgStr,
                                        cl::EnableErrs.ArgStr,
                                        cl::LogFileDbgs.ArgStr,
                                        cl::LogFileOuts.ArgStr,
-                                       cl::ExecutableName.ArgStr,
                                        "unlinked",
                                        "o"};
 
@@ -2585,45 +3106,6 @@ Result Compiler::validatePipelineShaderInfo(const PipelineShaderInfo *shaderInfo
 
   return result;
 }
-
-#if LLPC_ENABLE_SHADER_CACHE
-// =====================================================================================================================
-// Creates shader cache object with the requested properties.
-// @param : Shader cache create info.
-// @param [out] : Shader cache object
-// @returns : Result::Success if creation succeeds, error status otherwise.
-Result Compiler::CreateShaderCache(const ShaderCacheCreateInfo *pCreateInfo, IShaderCache **ppShaderCache) {
-  Result result = Result::Success;
-
-  ShaderCacheAuxCreateInfo auxCreateInfo = {};
-  auxCreateInfo.shaderCacheMode = ShaderCacheMode::ShaderCacheEnableRuntime;
-  auxCreateInfo.gfxIp = m_gfxIp;
-  auxCreateInfo.hash = m_optionHash;
-
-  ShaderCache *shaderCache = new ShaderCache();
-
-  if (shaderCache) {
-    result = shaderCache->init(pCreateInfo, &auxCreateInfo);
-    if (result != Result::Success) {
-      shaderCache->Destroy();
-      delete shaderCache;
-      shaderCache = nullptr;
-    }
-  } else {
-    result = Result::ErrorOutOfMemory;
-  }
-
-  *ppShaderCache = shaderCache;
-
-  if ((result == Result::Success) &&
-      ((cl::ShaderCacheMode == ShaderCacheEnableRuntime) || (cl::ShaderCacheMode == ShaderCacheEnableOnDisk)) &&
-      (pCreateInfo->initialDataSize > 0)) {
-    result = m_shaderCache->Merge(1, const_cast<const IShaderCache **>(ppShaderCache));
-  }
-
-  return result;
-}
-#endif
 
 // =====================================================================================================================
 // Acquires a free context from context pool.
@@ -2718,7 +3200,7 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
     MetroHash64 hasher;
 
     // Update common shader info
-    PipelineDumper::updateHashForPipelineShaderInfo(stage, shaderInfo, true, &hasher, false);
+    PipelineDumper::updateHashForPipelineShaderInfo(stage, shaderInfo, true, &hasher);
     hasher.Update(pipelineInfo->iaState.deviceIndex);
 
     PipelineDumper::updateHashForResourceMappingInfo(context->getResourceMapping(), context->getPipelineLayoutApiHash(),
@@ -2745,15 +3227,14 @@ void Compiler::buildShaderCacheHash(Context *context, unsigned stageMask, ArrayR
 
   // Add additional pipeline state to final hasher
   if (stageMask & getLgcShaderStageMask(ShaderStageFragment)) {
-    PipelineDumper::updateHashForPipelineOptions(pipelineOptions, &fragmentHasher, true, false, UnlinkedStageFragment);
-    PipelineDumper::updateHashForFragmentState(pipelineInfo, &fragmentHasher, false);
+    PipelineDumper::updateHashForPipelineOptions(pipelineOptions, &fragmentHasher, true, UnlinkedStageFragment);
+    PipelineDumper::updateHashForFragmentState(pipelineInfo, &fragmentHasher);
     fragmentHasher.Finalize(fragmentHash->bytes);
   }
 
   if (stageMask & ~getLgcShaderStageMask(ShaderStageFragment)) {
-    PipelineDumper::updateHashForPipelineOptions(pipelineOptions, &nonFragmentHasher, true, false,
-                                                 UnlinkedStageVertexProcess);
-    PipelineDumper::updateHashForNonFragmentState(pipelineInfo, true, &nonFragmentHasher, false);
+    PipelineDumper::updateHashForPipelineOptions(pipelineOptions, &nonFragmentHasher, true, UnlinkedStageVertexProcess);
+    PipelineDumper::updateHashForNonFragmentState(pipelineInfo, true, &nonFragmentHasher);
     nonFragmentHasher.Finalize(nonFragmentHash->bytes);
   }
 }
@@ -2780,11 +3261,6 @@ bool Compiler::linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipe
       elfs.push_back(MemoryBufferRef(shaderElfs[stage].str(), getUnlinkedShaderStageName(stage)));
   }
   std::unique_ptr<ElfLinker> elfLinker(pipeline->createElfLinker(elfs));
-
-  if (elfLinker->fragmentShaderUsesMappedBuiltInInputs()) {
-    LLPC_OUTS("Failed to link relocatable shaders because FS uses builtin inputs.");
-    return false;
-  }
 
   setGlueBinaryBlobsInLinker(elfLinker.get(), context, this);
   // Do the link.
@@ -2821,7 +3297,6 @@ lgc::ShaderStage getLgcShaderStage(Llpc::ShaderStage stage) {
     return lgc::ShaderStageFragment;
   case ShaderStageCopyShader:
     return lgc::ShaderStageCopyShader;
-#if VKI_RAY_TRACING
   case ShaderStageRayTracingRayGen:
   case ShaderStageRayTracingIntersect:
   case ShaderStageRayTracingAnyHit:
@@ -2829,7 +3304,6 @@ lgc::ShaderStage getLgcShaderStage(Llpc::ShaderStage stage) {
   case ShaderStageRayTracingMiss:
   case ShaderStageRayTracingCallable:
     return lgc::ShaderStageCompute;
-#endif
   default:
     llvm_unreachable("");
     return lgc::ShaderStageInvalid;

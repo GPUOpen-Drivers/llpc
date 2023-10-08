@@ -48,37 +48,71 @@ TEST(LlpcContextTests, MatchPipelineOptLevel) {
 
   LgcContext::initialize();
 
-  Context *context = new Context(GfxIp);
-
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
+  // Old version of the code
   for (auto optLevel : {Level::None, Level::Less, Level::Default, Level::Aggressive}) {
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  // Returns the optimization level for the context.
+  for (auto optLevel :
+       {CodeGenOptLevel::None, CodeGenOptLevel::Less, CodeGenOptLevel::Default, CodeGenOptLevel::Aggressive}) {
+#endif
+
+    Context context(GfxIp);
+
     GraphicsPipelineBuildInfo pipelineInfo = {};
-    pipelineInfo.options.optimizationLevel = optLevel;
+    pipelineInfo.options.optimizationLevel = static_cast<uint32_t>(optLevel);
 
     GraphicsContext graphicsContext(GfxIp, &pipelineInfo, &pipelineHash, &cacheHash);
 
-    context->attachPipelineContext(&graphicsContext);
+    context.attachPipelineContext(&graphicsContext);
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
+    // Old version of the code
     if (optLevel == Level::None) {
+#else
+    // New version of the code (also handles unknown version, which we treat as latest)
+    // Returns the optimization level for the context.
+    if (optLevel == CodeGenOptLevel::None) {
+#endif
       // None might not be possible, so accept >= Level::None
-      EXPECT_GE(context->getLgcContext()->getOptimizationLevel(), optLevel);
+      EXPECT_GE(context.getLgcContext()->getOptimizationLevel(), optLevel);
     } else {
-      EXPECT_EQ(context->getLgcContext()->getOptimizationLevel(), optLevel);
+      EXPECT_EQ(context.getLgcContext()->getOptimizationLevel(), optLevel);
     }
   }
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
+  // Old version of the code
   for (auto optLevel : {Level::None, Level::Less, Level::Default, Level::Aggressive}) {
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  // Returns the optimization level for the context.
+  for (auto optLevel :
+       {CodeGenOptLevel::None, CodeGenOptLevel::Less, CodeGenOptLevel::Default, CodeGenOptLevel::Aggressive}) {
+#endif
+
+    Context context(GfxIp);
+
     ComputePipelineBuildInfo pipelineInfo = {};
-    pipelineInfo.options.optimizationLevel = optLevel;
+    pipelineInfo.options.optimizationLevel = static_cast<uint32_t>(optLevel);
 
     ComputeContext computeContext(GfxIp, &pipelineInfo, &pipelineHash, &cacheHash);
 
-    context->attachPipelineContext(&computeContext);
+    context.attachPipelineContext(&computeContext);
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
+    // Old version of the code
     if (optLevel == Level::None) {
+#else
+    // New version of the code (also handles unknown version, which we treat as latest)
+    // Returns the optimization level for the context.
+    if (optLevel == CodeGenOptLevel::None) {
+#endif
       // None might not be possible, so accept >= Level::None
-      EXPECT_GE(context->getLgcContext()->getOptimizationLevel(), optLevel);
+      EXPECT_GE(context.getLgcContext()->getOptimizationLevel(), optLevel);
     } else {
-      EXPECT_EQ(context->getLgcContext()->getOptimizationLevel(), optLevel);
+      EXPECT_EQ(context.getLgcContext()->getOptimizationLevel(), optLevel);
     }
   }
 }

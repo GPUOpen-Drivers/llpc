@@ -49,6 +49,8 @@ namespace Vkgc {
 static const char AmdGpuDisasmName[] = ".AMDGPU.disasm"; // Name of ".AMDGPU.disasm" section
 static const char AmdGpuCsdataName[] = ".AMDGPU.csdata"; // Name of ".AMDGPU.csdata" section
 static const char AmdGpuConfigName[] = ".AMDGPU.config"; // Name of ".AMDGPU.config" section
+static const char ColorExports[] = ".colorExports";      // Name of color export meta data
+static const char DiscardState[] = ".discardState";      // Name of discard state
 
 // e_ident size and indices
 enum {

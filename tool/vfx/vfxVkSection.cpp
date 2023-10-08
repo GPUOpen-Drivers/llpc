@@ -18,10 +18,8 @@ public:
     // Sections for PipelineDocument
     INIT_SECTION_INFO("GraphicsPipelineState", SectionTypeGraphicsState, 0)
     INIT_SECTION_INFO("ComputePipelineState", SectionTypeComputeState, 0)
-#if VKI_RAY_TRACING
     INIT_SECTION_INFO("RayTracingPipelineState", SectionTypeRayTracingState, 0)
     INIT_SECTION_INFO("RtState", SectionTypeRtState, 0)
-#endif
     INIT_SECTION_INFO("VertexInputState", SectionTypeVertexInputState, 0)
     INIT_SECTION_INFO("TaskInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageTask)
     INIT_SECTION_INFO("VsInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageVertex)
@@ -31,15 +29,15 @@ public:
     INIT_SECTION_INFO("MeshInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageMesh)
     INIT_SECTION_INFO("FsInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageFragment)
     INIT_SECTION_INFO("CsInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageCompute)
-#if VKI_RAY_TRACING
     INIT_SECTION_INFO("rgenInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageRayTracingRayGen)
     INIT_SECTION_INFO("sectInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageRayTracingIntersect)
     INIT_SECTION_INFO("ahitInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageRayTracingAnyHit)
     INIT_SECTION_INFO("chitInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageRayTracingClosestHit)
     INIT_SECTION_INFO("missInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageRayTracingMiss)
     INIT_SECTION_INFO("callInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageRayTracingCallable)
-#endif
     INIT_SECTION_INFO("ResourceMapping", SectionTypeResourceMapping, 0)
+    INIT_SECTION_INFO("UniformConstant", SectionTypeUniformConstant, 0)
+    INIT_SECTION_INFO("ApiXfbOutInfo", SectionTypeApiXfbOutput, 0)
   };
 
   void initEnumMap() {
@@ -60,6 +58,9 @@ public:
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorImage)
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorConstTexelBuffer)
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, InlineBuffer)
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 63
+    ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorAtomicCounter)
+#endif
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
     ADD_CLASS_ENUM_MAP(ResourceMappingNodeType, DescriptorMutable)
 #endif

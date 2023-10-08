@@ -212,63 +212,6 @@ void ElfWriter<Elf>::mergeMapItem(msgpack::MapDocNode &destMap, msgpack::MapDocN
 }
 
 // =====================================================================================================================
-// Update descriptor offset to USER_DATA in metaNote, in place in the messagepack document.
-//
-// @param context : Context related to ElfNote
-// @param [in/out] document : The parsed message pack document of the metadata note.
-static void updateRootDescriptorRegisters(Context *context, msgpack::Document &document) {
-  auto pipeline = document.getRoot().getMap(true)[PalAbi::CodeObjectMetadataKey::Pipelines].getArray(true)[0];
-  auto registers = pipeline.getMap(true)[PalAbi::PipelineMetadataKey::Registers].getMap(true);
-
-  const unsigned mmSpiShaderUserDataVs0 = 0x2C4C;
-  const unsigned mmSpiShaderUserDataPs0 = 0x2c0c;
-  const unsigned mmComputeUserData0 = 0x2E40;
-  unsigned userDataBaseRegisters[] = {mmSpiShaderUserDataVs0, mmSpiShaderUserDataPs0, mmComputeUserData0};
-  const unsigned vsPsUserDataCount = context->getGfxIpVersion().major < 9 ? 16 : 32;
-  unsigned userDataCount[] = {vsPsUserDataCount, vsPsUserDataCount, 16};
-  for (auto stage = 0; stage < sizeof(userDataBaseRegisters) / sizeof(unsigned); ++stage) {
-    unsigned baseRegister = userDataBaseRegisters[stage];
-    unsigned registerCount = userDataCount[stage];
-    for (unsigned i = 0; i < registerCount; ++i) {
-      unsigned key = baseRegister + i;
-      auto keyNode = registers.getDocument()->getNode(key);
-      auto keyIt = registers.find(keyNode);
-      if (keyIt != registers.end()) {
-        assert(keyIt->first.getUInt() == key);
-        // Reloc Descriptor user data value is consisted by DescRelocMagic | set.
-        unsigned regValue = keyIt->second.getUInt();
-        if (DescRelocMagic == (regValue & DescRelocMagicMask)) {
-          const ResourceMappingData *resourceMapping = nullptr;
-          if (baseRegister == mmComputeUserData0) {
-            auto pipelineInfo = reinterpret_cast<const ComputePipelineBuildInfo *>(context->getPipelineBuildInfo());
-            resourceMapping = &pipelineInfo->resourceMapping;
-          } else {
-            auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
-            resourceMapping = &pipelineInfo->resourceMapping;
-          }
-          unsigned set = regValue & DescSetMask;
-          for (unsigned j = 0; j < resourceMapping->userDataNodeCount; ++j) {
-            auto userDataNode = &resourceMapping->pUserDataNodes[j].node;
-            if (userDataNode->type == ResourceMappingNodeType::DescriptorTableVaPtr &&
-                set == userDataNode->tablePtr.pNext[0].srdRange.set) {
-              // If it's descriptor user data, then update its offset to it.
-              unsigned value = userDataNode->offsetInDwords;
-              keyIt->second = registers.getDocument()->getNode(value);
-              // Update userDataLimit if necessary
-              unsigned userDataLimit = pipeline.getMap(true)[PalAbi::PipelineMetadataKey::UserDataLimit].getUInt();
-              pipeline.getMap(true)[PalAbi::PipelineMetadataKey::UserDataLimit] =
-                  document.getNode(std::max(userDataLimit, value + 1));
-
-              break;
-            }
-          }
-        }
-      }
-    }
-  }
-}
-
-// =====================================================================================================================
 // Merges fragment shader related info for meta notes.
 //
 // @param pContext : The first note section to merge
@@ -325,21 +268,21 @@ void ElfWriter<Elf>::mergeMetaNote(Context *pContext, const ElfNote *pNote1, con
   pipelineHash[0] = destDocument.getNode(pContext->getPipelineHashCode());
   pipelineHash[1] = destDocument.getNode(pContext->getPipelineHashCode());
 
+#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 723
+  // Update .ps_sample_mask
+  // NOTE: We need to erase the node if the cached ELF has it but we actually don't need it.
+  auto srcPsSampleMask = srcPipeline.getMap(true).find(StringRef(PalAbi::PipelineMetadataKey::PsSampleMask));
+  auto destPsSampleMask = destPipeline.getMap(true).find(StringRef(PalAbi::PipelineMetadataKey::PsSampleMask));
+  if (srcPsSampleMask != srcPipeline.getMap(true).end())
+    destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::PsSampleMask] = srcPsSampleMask->second;
+  else if (destPsSampleMask != destPipeline.getMap(true).end())
+    destPipeline.getMap(true).erase(destPsSampleMask);
+#endif
+
   // "amdpal.version >= [3 0]" adopts the new metadata format for ".graphics_registers" section
   auto palVersion = destDocument.getRoot().getMap(true)[PalAbi::CodeObjectMetadataKey::Version].getArray(true);
   if (palVersion[0].getUInt() < 3) {
     // Old metadate format for ".registers" section
-#if PAL_CLIENT_INTERFACE_MAJOR_VERSION >= 723
-    // Update .ps_sample_mask
-    // NOTE: We need to erase the node if the cached ELF has it but we actually don't need it.
-    auto srcPsSampleMask = srcPipeline.getMap(true).find(StringRef(PalAbi::PipelineMetadataKey::PsSampleMask));
-    auto destPsSampleMask = destPipeline.getMap(true).find(StringRef(PalAbi::PipelineMetadataKey::PsSampleMask));
-    if (srcPsSampleMask != srcPipeline.getMap(true).end())
-      destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::PsSampleMask] = srcPsSampleMask->second;
-    else if (destPsSampleMask != destPipeline.getMap(true).end())
-      destPipeline.getMap(true).erase(destPsSampleMask);
-#endif
-
     // List of fragment shader related registers.
     static const unsigned PsRegNumbers[] = {
         0x2C0A, // mmSPI_SHADER_PGM_RSRC1_PS
@@ -383,8 +326,6 @@ void ElfWriter<Elf>::mergeMetaNote(Context *pContext, const ElfNote *pNote1, con
     for (unsigned regNumber = mmSpiShaderUserDataPs0; regNumber != mmSpiShaderUserDataPs0 + psUserDataCount;
          ++regNumber)
       mergeMapItem(destRegisters, srcRegisters, regNumber);
-
-    updateRootDescriptorRegisters(pContext, destDocument);
   } else {
     // List of fragment shader related registers.
     static const char *PsRegNames[] = {
@@ -773,31 +714,6 @@ Result ElfWriter<Elf>::getSectionDataBySectionIndex(unsigned secIdx, const Secti
 }
 
 // =====================================================================================================================
-// Update descriptor offset to USER_DATA in metaNote.
-//
-// @param pContext : Context related to ElfNote
-// @param pNote : Note section to update
-// @param [out] pNewNote : New note section
-template <class Elf> void ElfWriter<Elf>::updateMetaNote(Context *pContext, const ElfNote *pNote, ElfNote *pNewNote) {
-  msgpack::Document document;
-
-  auto success =
-      document.readFromBlob(StringRef(reinterpret_cast<const char *>(pNote->data), pNote->hdr.descSize), false);
-  assert(success);
-  (void(success)); // unused
-
-  updateRootDescriptorRegisters(pContext, document);
-
-  std::string blob;
-  document.writeToBlob(blob);
-  *pNewNote = *pNote;
-  auto data = new uint8_t[blob.size()];
-  memcpy(data, blob.data(), blob.size());
-  pNewNote->hdr.descSize = blob.size();
-  pNewNote->data = data;
-}
-
-// =====================================================================================================================
 // Get the number of relocs in the reloc section
 //
 // @param relocSection : Reloc sectionN
@@ -1165,24 +1081,6 @@ Result ElfWriter<Elf>::getSectionTextShader(const char *name, const void **data,
     }
   }
   return Result::Success;
-}
-
-// =====================================================================================================================
-// Update descriptor root offset in ELF binary
-//
-// @param pContext : Pipeline context
-// @param [out] pPipelineElf : Final ELF binary
-template <class Elf> void ElfWriter<Elf>::updateElfBinary(Context *pContext, ElfPackage *pPipelineElf) {
-  // Merge PAL metadata
-  ElfNote metaNote = {};
-  metaNote = getNote(Util::Abi::MetadataNoteType);
-
-  assert(metaNote.data);
-  ElfNote newMetaNote = {};
-  updateMetaNote(pContext, &metaNote, &newMetaNote);
-  setNote(&newMetaNote);
-
-  writeToBuffer(pPipelineElf);
 }
 
 // =====================================================================================================================

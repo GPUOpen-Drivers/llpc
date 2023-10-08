@@ -47,16 +47,12 @@ protected:
   void init(llvm::Module &module);
 
   void flushDenormIfNeeded(llvm::Instruction *inst);
-  bool isOperandNoContract(llvm::Value *operand);
-  void disableFastMath(llvm::Value *value);
 
-  bool m_changed;                        // Whether the module is changed
-  bool m_fp16DenormFlush;                // Whether FP mode wants f16 denorms to be flushed to zero
-  bool m_fp32DenormFlush;                // Whether FP mode wants f32 denorms to be flushed to zero
-  bool m_fp64DenormFlush;                // Whether FP mode wants f64 denorms to be flushed to zero
-  bool m_fp16RoundToZero;                // Whether FP mode wants f16 round-to-zero
-  bool m_enableImplicitInvariantExports; // Whether fast math should be disabled
-                                         // for gl_Position exports
+  bool m_changed;         // Whether the module is changed
+  bool m_fp16DenormFlush; // Whether FP mode wants f16 denorms to be flushed to zero
+  bool m_fp32DenormFlush; // Whether FP mode wants f32 denorms to be flushed to zero
+  bool m_fp64DenormFlush; // Whether FP mode wants f64 denorms to be flushed to zero
+  bool m_fp16RoundToZero; // Whether FP mode wants f16 round-to-zero
 };
 
 // =====================================================================================================================
@@ -79,6 +75,20 @@ public:
 };
 
 // =====================================================================================================================
+// SPIR-V lowering operations to adjust fast math flags.
+class SpirvLowerMathPrecision : public SpirvLower, public llvm::PassInfoMixin<SpirvLowerMathPrecision> {
+
+public:
+  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
+  bool runImpl(llvm::Module &module);
+
+  static llvm::StringRef name() { return "Lower SPIR-V for precision (fast math flags)"; }
+
+  bool adjustExports(llvm::Module &module);
+  bool propagateNoContract(llvm::Module &module, bool forward, bool backward);
+};
+
+// =====================================================================================================================
 // SPIR-V lowering operations for math floating point optimisation.
 class SpirvLowerMathFloatOp : public SpirvLowerMath,
                               public llvm::PassInfoMixin<SpirvLowerMathFloatOp>,
@@ -88,7 +98,6 @@ public:
   bool runImpl(llvm::Module &module);
 
   virtual void visitBinaryOperator(llvm::BinaryOperator &binaryOp);
-  virtual void visitUnaryOperator(llvm::UnaryOperator &unaryOp);
   virtual void visitCallInst(llvm::CallInst &callInst);
   virtual void visitFPTruncInst(llvm::FPTruncInst &fptruncInst);
 

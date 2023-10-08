@@ -32,11 +32,13 @@
 
 #include "llpc.h"
 #include "llpcCacheAccessor.h"
-#include "llpcShaderCacheManager.h"
 #include "llpcShaderModuleHelper.h"
+#include "llpcUtil.h"
 #include "vkgcElfReader.h"
 #include "vkgcMetroHash.h"
 #include "lgc/CommonDefs.h"
+#include "llvm/Support/Mutex.h"
+#include <condition_variable>
 #include <optional>
 
 namespace llvm {
@@ -63,11 +65,8 @@ class Compiler;
 class ComputeContext;
 class Context;
 class GraphicsContext;
-
-#if VKI_RAY_TRACING
 class RayTracingContext;
 class TimerProfiler;
-#endif
 
 // =====================================================================================================================
 // Object to manage checking and updating shader cache for graphics pipeline.
@@ -81,7 +80,6 @@ public:
 
   // Update shader caches with results of compile, and merge ELF outputs if necessary.
   void updateAndMerge(Result result, ElfPackage *pipelineElf);
-  void updateRootUserDateOffset(ElfPackage *pipelineElf);
 
 private:
   Compiler *m_compiler;
@@ -114,6 +112,9 @@ public:
   virtual Result buildGraphicsPipelineWithElf(const GraphicsPipelineBuildInfo *pipelineInfo,
                                               GraphicsPipelineBuildOut *pipelineOut, const BinaryData *elfPackage);
 
+  virtual Result BuildColorExportShader(const GraphicsPipelineBuildInfo *pipelineInfo, const void *fsOutputMetaData,
+                                        GraphicsPipelineBuildOut *pipelineOut, void *pipelineDumpFile = nullptr);
+
   virtual unsigned ConvertColorBufferFormatToExportFormat(const ColorTarget *target,
                                                           const bool enableAlphaToCoverage) const;
 
@@ -122,11 +123,9 @@ public:
 
   virtual Result BuildComputePipeline(const ComputePipelineBuildInfo *pipelineInfo,
                                       ComputePipelineBuildOut *pipelineOut, void *pipelineDumpFile = nullptr);
-#if VKI_RAY_TRACING
   virtual Result BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipelineInfo,
                                          RayTracingPipelineBuildOut *pipelineOut, void *pipelineDumpFile = nullptr,
                                          IHelperThreadProvider *pHelperThreadProvider = nullptr);
-#endif
 
   Result buildGraphicsPipelineInternal(GraphicsContext *graphicsContext,
                                        llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo,
@@ -157,28 +156,21 @@ public:
 
   static MetroHash::Hash generateHashForCompileOptions(unsigned optionCount, const char *const *options);
 
-#if LLPC_ENABLE_SHADER_CACHE
-  virtual Result CreateShaderCache(const ShaderCacheCreateInfo *pCreateInfo, IShaderCache **ppShaderCache);
-#endif
-
   static void buildShaderCacheHash(Context *context, unsigned stageMask,
                                    llvm::ArrayRef<llvm::ArrayRef<uint8_t>> stageHashes, MetroHash::Hash *fragmentHash,
                                    MetroHash::Hash *nonFragmentHash);
 
-  CachePair getInternalCaches() { return {m_cache, m_shaderCache.get()}; }
+  Vkgc::ICache *getInternalCaches() { return m_cache; }
 
   Context *acquireContext() const;
   void releaseContext(Context *context) const;
 
-#if VKI_RAY_TRACING
   Result buildRayTracingPipelineElf(Context *context, std::unique_ptr<llvm::Module> module, ElfPackage &pipelineElf,
                                     std::vector<Vkgc::RayTracingShaderProperty> &shaderProps,
                                     std::vector<bool> &moduleCallsTraceRay, unsigned moduleIndex,
                                     std::unique_ptr<lgc::Pipeline> &pipeline, TimerProfiler &timerProfiler);
   llvm::sys::Mutex &getHelperThreadMutex() { return m_helperThreadMutex; }
   std::condition_variable_any &getHelperThreadConditionVariable() { return m_helperThreadConditionVariable; }
-
-#endif
 
 private:
   Compiler() = delete;
@@ -193,18 +185,18 @@ private:
                                           const GraphicsPipelineBuildInfo *pipelineInfo);
   bool canUseRelocatableComputeShaderElf(const ComputePipelineBuildInfo *pipelineInfo);
   std::unique_ptr<llvm::Module> createGpurtShaderLibrary(Context *context);
-#if VKI_RAY_TRACING
   Result buildRayTracingPipelineInternal(RayTracingContext &rtContext,
                                          llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo, bool unlinked,
                                          std::vector<ElfPackage> &pipelineElfs,
                                          std::vector<Vkgc::RayTracingShaderProperty> &shaderProps,
                                          IHelperThreadProvider *helperThreadProvider);
   void addRayTracingIndirectPipelineMetadata(ElfPackage *pipelineElf);
-#endif
   Result buildUnlinkedShaderInternal(Context *context, llvm::ArrayRef<const PipelineShaderInfo *> shaderInfo,
                                      Vkgc::UnlinkedShaderStage stage, ElfPackage &elfPackage,
                                      llvm::MutableArrayRef<CacheAccessInfo> stageCacheAccesses);
   void dumpCompilerOptions(void *pipelineDumpFile);
+  Result generatePipeline(Context *context, unsigned moduleIndex, std::unique_ptr<llvm::Module> module,
+                          ElfPackage &pipelineElf, lgc::Pipeline *pipeline, TimerProfiler &timerProfiler);
 
   std::vector<std::string> m_options;           // Compilation options
   MetroHash::Hash m_optionHash;                 // Hash code of compilation options
@@ -212,15 +204,19 @@ private:
   Vkgc::ICache *m_cache;                        // Point to ICache implemented in client
   static unsigned m_instanceCount;              // The count of compiler instance
   static unsigned m_outRedirectCount;           // The count of output redirect
-  ShaderCachePtr m_shaderCache;                 // Shader cache
   static llvm::sys::Mutex m_contextPoolMutex;   // Mutex for context pool access
   static std::vector<Context *> *m_contextPool; // Context pool
   unsigned m_relocatablePipelineCompilations;   // The number of pipelines compiled using relocatable shader elf
-#if VKI_RAY_TRACING
-  static llvm::sys::Mutex m_helperThreadMutex;                        // Mutex for helper thread
+  static llvm::sys::Mutex m_helperThreadMutex;  // Mutex for helper thread
   static std::condition_variable_any m_helperThreadConditionVariable; // Condition variable used by helper thread to
                                                                       // wait for main thread switching context
-#endif
+
+  void buildShaderModuleResourceUsage(
+      const ShaderModuleBuildInfo *shaderInfo, Vkgc::ResourcesNodes &resourcesNodes,
+      std::vector<ResourceNodeData> &inputSymbolInfo, std::vector<ResourceNodeData> &outputSymbolInfo,
+      std::vector<ResourceNodeData> &uniformBufferInfo, std::vector<ResourceNodeData> &storageBufferInfo,
+      std::vector<ResourceNodeData> &textureSymbolInfo, std::vector<ResourceNodeData> &imageSymbolInfo,
+      std::vector<ResourceNodeData> &atomicCounterSymbolInfo, std::vector<ResourceNodeData> &defaultUniformSymbolInfo);
 };
 
 // Convert front-end LLPC shader stage to middle-end LGC shader stage

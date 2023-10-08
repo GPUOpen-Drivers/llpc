@@ -40,6 +40,7 @@ class raw_pwrite_stream;
 } // namespace llvm
 
 namespace lgc {
+struct ColorExportInfo;
 
 // =====================================================================================================================
 // The public API of the LGC interface for ELF linking.
@@ -75,6 +76,12 @@ public:
   // retrieve the compiled glue code to store in the cache.
   virtual llvm::ArrayRef<llvm::StringRef> getGlueInfo() = 0;
 
+  // Build color export shader
+  //
+  // @param exports : Fragment export info
+  // @param enableKill : Whether this fragment shader has kill enabled.
+  virtual llvm::StringRef buildColorExportShader(llvm::ArrayRef<ColorExportInfo> exports, bool enableKill) = 0;
+
   // Add a blob for a particular chunk of glue code, typically retrieved from a cache. The blob is not copied,
   // and remains in use until the first of the link completing or the ElfLinker's parent Pipeline being destroyed.
   //
@@ -103,9 +110,6 @@ public:
   //           getLastError() to get a textual representation of the error, for use in logging or in error
   //           reporting in a command-line utility.
   virtual bool link(llvm::raw_pwrite_stream &outStream) = 0;
-
-  // Returns true if the fragment input info has an entry for a builtin.
-  virtual bool fragmentShaderUsesMappedBuiltInInputs() = 0;
 };
 
 } // namespace lgc

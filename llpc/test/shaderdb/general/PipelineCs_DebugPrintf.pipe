@@ -24,8 +24,10 @@ userDataNode[0].next[0].set = 0xFFFFFFFF
 userDataNode[0].next[0].binding = 6
 ; CHECK-LABEL: @lgc.shader.CS.main(
 ; CHECK-NEXT:  .entry:
-; CHECK:         [[TMP1:%.*]] = call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i32 -1, i32 6, i32 0, i32 2)
-; CHECK:         [[TMP2:%.*]] = call i64 (...) @lgc.create.debug.printf.i64(ptr addrspace(7) [[TMP1]], ptr addrspace(4) @str.1, i32 %{{.*}})
-; CHECK-NEXT:    [[TMP3:%.*]] = call i64 (...) @lgc.create.debug.printf.i64(ptr addrspace(7) [[TMP1]], ptr addrspace(4) @str.2, double 1.000000e+00, double 1.000000e+00)
+; CHECK-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i64 4294967295, i32 6, i32 0, i32 2)
+; CHECK-NEXT:    [[TMP1:%.*]] = call <3 x i32> (...) @lgc.create.read.builtin.input.v3i32(i32 28, i32 0, i32 poison, i32 poison)
+; CHECK-NEXT:    [[__LLPC_INPUT_PROXY_GL_GLOBALINVOCATIONID_0_VEC_EXTRACT:%.*]] = extractelement <3 x i32> [[TMP1]], i64 0
+; CHECK-NEXT:    call void (...) @lgc.debug.printf(ptr addrspace(7) [[TMP0]], ptr addrspace(4) @str, i32 [[__LLPC_INPUT_PROXY_GL_GLOBALINVOCATIONID_0_VEC_EXTRACT]])
+; CHECK-NEXT:    call void (...) @lgc.debug.printf(ptr addrspace(7) [[TMP0]], ptr addrspace(4) @str.1, double 1.000000e+00, double 1.000000e+00)
 ; CHECK-NEXT:    ret void
 ;

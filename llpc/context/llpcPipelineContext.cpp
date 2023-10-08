@@ -193,7 +193,6 @@ ShaderHash PipelineContext::getShaderHashCode(const PipelineShaderInfo &shaderIn
   return hash;
 }
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Return ray tracing/ray query entry function names
 //
@@ -204,7 +203,6 @@ StringRef PipelineContext::getRayTracingFunctionName(unsigned funcType) {
   assert(funcType < Vkgc::RT_ENTRY_FUNC_COUNT);
   return m_rtState.gpurtFuncTable.pFunc[funcType];
 }
-#endif
 
 // =====================================================================================================================
 // Set the raytracing state
@@ -219,10 +217,11 @@ void PipelineContext::setRayTracingState(const Vkgc::RtState &rtState, const Vkg
   assert(!shaderLibrary);
 #else
   assert(shaderLibrary);
-
-  m_rtState.gpurtOverride = true;
-  m_rtState.rtIpOverride = true;
-  m_rtState.gpurtShaderLibrary = *shaderLibrary;
+  if (!m_rtState.gpurtOverride && shaderLibrary->pCode) {
+    m_rtState.gpurtOverride = true;
+    m_rtState.rtIpOverride = true;
+    m_rtState.gpurtShaderLibrary = *shaderLibrary;
+  }
 #endif
 
 #if HAVE_GPURT_SHIM
@@ -259,10 +258,9 @@ void PipelineContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
   // Give the shader stage mask to the middle-end. We need to translate the Vkgc::ShaderStage bit numbers
   // to lgc::ShaderStage bit numbers. We only process native shader stages, ignoring the CopyShader stage.
   unsigned stageMask = getShaderStageMask();
-#if VKI_RAY_TRACING
   if (hasRayTracingShaderStage(stageMask))
     stageMask = ShaderStageComputeBit;
-#endif
+
   // Give the user data nodes to the middle-end, and/or hash them.
   setUserDataInPipeline(pipeline, hasher, stageMask);
 
@@ -292,9 +290,6 @@ Options PipelineContext::computePipelineOptions() const {
   options.includeDisassembly = (cl::EnablePipelineDump || EnableOuts() || getPipelineOptions()->includeDisassembly);
   options.reconfigWorkgroupLayout = getPipelineOptions()->reconfigWorkgroupLayout;
   options.forceCsThreadIdSwizzling = getPipelineOptions()->forceCsThreadIdSwizzling;
-  options.overrideThreadGroupSizeX = getPipelineOptions()->overrideThreadGroupSizeX;
-  options.overrideThreadGroupSizeY = getPipelineOptions()->overrideThreadGroupSizeY;
-  options.overrideThreadGroupSizeZ = getPipelineOptions()->overrideThreadGroupSizeZ;
   options.includeIr = (IncludeLlvmIr || getPipelineOptions()->includeIr);
 
   options.threadGroupSwizzleMode =
@@ -334,18 +329,17 @@ Options PipelineContext::computePipelineOptions() const {
 
   options.allowNullDescriptor = getPipelineOptions()->extendedRobustness.nullDescriptor;
   options.disableImageResourceCheck = getPipelineOptions()->disableImageResourceCheck;
-#if VKI_BUILD_GFX11
   options.optimizeTessFactor = getPipelineOptions()->optimizeTessFactor;
-#endif
   options.enableInterpModePatch = getPipelineOptions()->enableInterpModePatch;
   options.pageMigrationEnabled = getPipelineOptions()->pageMigrationEnabled;
   options.resourceLayoutScheme = static_cast<lgc::ResourceLayoutScheme>(getPipelineOptions()->resourceLayoutScheme);
 
   // Driver report full subgroup lanes for compute shader, here we just set fullSubgroups as default options
   options.fullSubgroups = true;
-#if VKI_RAY_TRACING
   options.internalRtShaders = getPipelineOptions()->internalRtShaders;
-#endif
+  options.disableSampleMask = getPipelineOptions()->disableSampleMask;
+  options.disableTruncCoordForGather = getPipelineOptions()->disableTruncCoordForGather;
+
   return options;
 }
 
@@ -373,212 +367,219 @@ void PipelineContext::setUserDataInPipeline(Pipeline *pipeline, Util::MetroHash6
   if (!pipeline)
     return; // Only hashing
 
-  auto allocNodes = std::make_unique<ResourceMappingNode[]>(resourceMapping->userDataNodeCount);
-
-  for (unsigned idx = 0; idx < resourceMapping->userDataNodeCount; ++idx)
-    allocNodes[idx] = resourceMapping->pUserDataNodes[idx].node;
-
   // Translate the resource nodes into the LGC format expected by Pipeline::SetUserDataNodes.
-  ArrayRef<ResourceMappingNode> nodes(allocNodes.get(), resourceMapping->userDataNodeCount);
-  ArrayRef<StaticDescriptorValue> descriptorRangeValues(resourceMapping->pStaticDescriptorValues,
-                                                        resourceMapping->staticDescriptorValueCount);
+  auto srcNodes = ArrayRef(resourceMapping->pUserDataNodes, resourceMapping->userDataNodeCount);
+  auto staticDescriptorValues =
+      ArrayRef(resourceMapping->pStaticDescriptorValues, resourceMapping->staticDescriptorValueCount);
 
   // First, create a map of immutable nodes.
   ImmutableNodesMap immutableNodesMap;
-  for (auto &rangeValue : descriptorRangeValues)
+  for (auto &rangeValue : staticDescriptorValues)
     immutableNodesMap[{rangeValue.set, rangeValue.binding}] = &rangeValue;
 
   // Count how many user data nodes we have, and allocate the buffer.
-  unsigned nodeCount = nodes.size();
-  for (auto &node : nodes) {
-    if (node.type == ResourceMappingNodeType::DescriptorTableVaPtr)
-      nodeCount += node.tablePtr.nodeCount;
+  unsigned totalNodeCount = srcNodes.size();
+  for (auto &node : srcNodes) {
+    if (node.node.type == ResourceMappingNodeType::DescriptorTableVaPtr)
+      totalNodeCount += node.node.tablePtr.nodeCount;
   }
-  auto allocUserDataNodes = std::make_unique<ResourceNode[]>(nodeCount);
 
-  // Copy nodes in.
-  ResourceNode *destTable = allocUserDataNodes.get();
-  ResourceNode *destInnerTable = destTable + nodeCount;
-  auto userDataNodes = ArrayRef<ResourceNode>(destTable, nodes.size());
-  setUserDataNodesTable(pipeline, nodes, immutableNodesMap, /*isRoot=*/true, destTable, destInnerTable);
-  assert(destInnerTable == destTable + nodes.size());
+  std::vector<ResourceNode> allDstNodes;
+  allDstNodes.resize(totalNodeCount);
+
+  auto dstNodes = MutableArrayRef(allDstNodes).take_front(srcNodes.size());
+  auto dstInnerTable = MutableArrayRef(allDstNodes).drop_front(srcNodes.size());
+  for (auto [dst, src] : llvm::zip(dstNodes, srcNodes)) {
+    unsigned visibility = src.visibility;
+    if (visibility & ShaderStageAllRayTracingBit) {
+      visibility &= ~ShaderStageAllRayTracingBit;
+      visibility |= ShaderStageComputeBit;
+    }
+    convertResourceNode(dst, src.node, visibility, immutableNodesMap, dstInnerTable);
+  }
 
   // Give the table to the LGC Pipeline interface.
-  pipeline->setUserDataNodes(userDataNodes);
+  pipeline->setUserDataNodes(dstNodes);
 }
 
 // =====================================================================================================================
-// Set one user data table, and its inner tables. Used by SetUserDataInPipeline above, and recursively calls
-// itself for an inner table. This translates from a Vkgc ResourceMappingNode to an LGC ResourceNode.
+// Convert one Vkgc::ResourceMappingNode into one lgc::ResourceNode, applying the given visibility.
 //
-// @param context : LLVM context
-// @param nodes : The resource mapping nodes
-// @param immutableNodesMap : Map of immutable nodes
-// @param isRoot : Whether this is the root table
-// @param [out] destTable : Where to write nodes
-// @param [in/out] destInnerTable : End of space available for inner tables
-void PipelineContext::setUserDataNodesTable(Pipeline *pipeline, ArrayRef<ResourceMappingNode> nodes,
-                                            const ImmutableNodesMap &immutableNodesMap, bool isRoot,
-                                            ResourceNode *destTable, ResourceNode *&destInnerTable) const {
-  for (unsigned idx = 0; idx != nodes.size(); ++idx) {
-    auto &node = nodes[idx];
-    auto &destNode = destTable[idx];
+// If the source node is a descriptor table, its children are recursively converted into the dstInnerTable, which is a
+// reference to a sufficiently large pre-allocated array; the reference is updated to account for the consumed storage
+// locations.
+//
+// @param dst : The destination resource node
+// @param src : The source resource node
+// @param visibility : A shader stage mask indicating visibility
+// @param immutableNodesMap : Immutable nodes information (for immutable samplers)
+// @param [in/out] dstInnerTable : Pre-allocated space for inner tables
+void PipelineContext::convertResourceNode(ResourceNode &dst, const ResourceMappingNode &src, unsigned visibility,
+                                          const ImmutableNodesMap &immutableNodesMap,
+                                          MutableArrayRef<lgc::ResourceNode> &dstInnerTable) const {
+  dst.sizeInDwords = src.sizeInDwords;
+  dst.offsetInDwords = src.offsetInDwords;
+  dst.abstractType = ResourceNodeType::Unknown;
+  dst.visibility = visibility;
 
-    destNode.sizeInDwords = node.sizeInDwords;
-    destNode.offsetInDwords = node.offsetInDwords;
-    destNode.abstractType = ResourceNodeType::Unknown;
+  switch (src.type) {
+  case ResourceMappingNodeType::DescriptorTableVaPtr: {
+    // Process an inner table.
+    dst.concreteType = ResourceNodeType::DescriptorTableVaPtr;
+    dst.abstractType = ResourceNodeType::DescriptorTableVaPtr;
+    auto innerTable = dstInnerTable.take_front(src.tablePtr.nodeCount);
+    dstInnerTable = dstInnerTable.drop_front(src.tablePtr.nodeCount);
+    dst.innerTable = innerTable;
 
-    switch (node.type) {
-    case ResourceMappingNodeType::DescriptorTableVaPtr: {
-      // Process an inner table.
-      destNode.concreteType = ResourceNodeType::DescriptorTableVaPtr;
-      destNode.abstractType = ResourceNodeType::DescriptorTableVaPtr;
-      destInnerTable -= node.tablePtr.nodeCount;
-      destNode.innerTable = ArrayRef<ResourceNode>(destInnerTable, node.tablePtr.nodeCount);
-      setUserDataNodesTable(pipeline, ArrayRef<ResourceMappingNode>(node.tablePtr.pNext, node.tablePtr.nodeCount),
-                            immutableNodesMap, /*isRoot=*/false, destInnerTable, destInnerTable);
-      break;
-    }
-    case ResourceMappingNodeType::IndirectUserDataVaPtr: {
-      // Process an indirect pointer.
-      destNode.concreteType = ResourceNodeType::IndirectUserDataVaPtr;
-      destNode.abstractType = ResourceNodeType::IndirectUserDataVaPtr;
-      destNode.indirectSizeInDwords = node.userDataPtr.sizeInDwords;
-      break;
-    }
-    case ResourceMappingNodeType::StreamOutTableVaPtr: {
-      // Process an indirect pointer.
-      destNode.concreteType = ResourceNodeType::StreamOutTableVaPtr;
-      destNode.abstractType = ResourceNodeType::StreamOutTableVaPtr;
-      destNode.indirectSizeInDwords = node.userDataPtr.sizeInDwords;
-      break;
-    }
-    default: {
-      // Process an SRD. First check that a static_cast works to convert a Vkgc ResourceMappingNodeType
-      // to an LGC ResourceNodeType (with the exception of DescriptorCombinedBvhBuffer, whose value
-      // accidentally depends on LLPC version).
-      static_assert(ResourceNodeType::DescriptorResource ==
-                        static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorResource),
-                    "Mismatch");
-      static_assert(ResourceNodeType::DescriptorSampler ==
-                        static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorSampler),
-                    "Mismatch");
-      static_assert(ResourceNodeType::DescriptorCombinedTexture ==
-                        static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorCombinedTexture),
-                    "Mismatch");
-      static_assert(ResourceNodeType::DescriptorTexelBuffer ==
-                        static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorTexelBuffer),
-                    "Mismatch");
-      static_assert(ResourceNodeType::DescriptorFmask ==
-                        static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorFmask),
-                    "Mismatch");
-      static_assert(ResourceNodeType::DescriptorBuffer ==
-                        static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorBuffer),
-                    "Mismatch");
-      static_assert(ResourceNodeType::PushConst == static_cast<ResourceNodeType>(ResourceMappingNodeType::PushConst),
-                    "Mismatch");
-      static_assert(ResourceNodeType::DescriptorBufferCompact ==
-                        static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorBufferCompact),
-                    "Mismatch");
+    for (auto [childDst, childSrc] : llvm::zip(innerTable, ArrayRef(src.tablePtr.pNext, src.tablePtr.nodeCount)))
+      convertResourceNode(childDst, childSrc, visibility, immutableNodesMap, dstInnerTable);
+    break;
+  }
+  case ResourceMappingNodeType::IndirectUserDataVaPtr: {
+    // Process an indirect pointer.
+    dst.concreteType = ResourceNodeType::IndirectUserDataVaPtr;
+    dst.abstractType = ResourceNodeType::IndirectUserDataVaPtr;
+    dst.indirectSizeInDwords = src.userDataPtr.sizeInDwords;
+    break;
+  }
+  case ResourceMappingNodeType::StreamOutTableVaPtr: {
+    // Process an indirect pointer.
+    dst.concreteType = ResourceNodeType::StreamOutTableVaPtr;
+    dst.abstractType = ResourceNodeType::StreamOutTableVaPtr;
+    dst.indirectSizeInDwords = src.userDataPtr.sizeInDwords;
+    break;
+  }
+  default: {
+    // Process an SRD. First check that a static_cast works to convert a Vkgc ResourceMappingNodeType
+    // to an LGC ResourceNodeType (with the exception of DescriptorCombinedBvhBuffer, whose value
+    // accidentally depends on LLPC version).
+    static_assert(ResourceNodeType::DescriptorResource ==
+                      static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorResource),
+                  "Mismatch");
+    static_assert(ResourceNodeType::DescriptorSampler ==
+                      static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorSampler),
+                  "Mismatch");
+    static_assert(ResourceNodeType::DescriptorCombinedTexture ==
+                      static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorCombinedTexture),
+                  "Mismatch");
+    static_assert(ResourceNodeType::DescriptorTexelBuffer ==
+                      static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorTexelBuffer),
+                  "Mismatch");
+    static_assert(ResourceNodeType::DescriptorFmask ==
+                      static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorFmask),
+                  "Mismatch");
+    static_assert(ResourceNodeType::DescriptorBuffer ==
+                      static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorBuffer),
+                  "Mismatch");
+    static_assert(ResourceNodeType::PushConst == static_cast<ResourceNodeType>(ResourceMappingNodeType::PushConst),
+                  "Mismatch");
+    static_assert(ResourceNodeType::DescriptorBufferCompact ==
+                      static_cast<ResourceNodeType>(ResourceMappingNodeType::DescriptorBufferCompact),
+                  "Mismatch");
 
-      if (node.type == ResourceMappingNodeType::InlineBuffer)
-        destNode.concreteType = ResourceNodeType::InlineBuffer;
-      else if (node.type == ResourceMappingNodeType::DescriptorYCbCrSampler)
-        destNode.concreteType = ResourceNodeType::DescriptorResource;
-      else if (node.type == ResourceMappingNodeType::DescriptorImage)
-        destNode.concreteType = ResourceNodeType::DescriptorResource;
-      else if (node.type == ResourceMappingNodeType::DescriptorConstTexelBuffer)
-        destNode.concreteType = ResourceNodeType::DescriptorTexelBuffer;
-      else if (node.type == Vkgc::ResourceMappingNodeType::DescriptorConstBufferCompact)
-        destNode.concreteType = ResourceNodeType::DescriptorBufferCompact;
-      else if (node.type == Vkgc::ResourceMappingNodeType::DescriptorConstBuffer)
-        destNode.concreteType = ResourceNodeType::DescriptorBuffer;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
-      else if (node.type == Vkgc::ResourceMappingNodeType::DescriptorMutable)
-        destNode.concreteType = ResourceNodeType::DescriptorMutable;
+    if (src.type == ResourceMappingNodeType::InlineBuffer)
+      dst.concreteType = ResourceNodeType::InlineBuffer;
+    else if (src.type == ResourceMappingNodeType::DescriptorYCbCrSampler)
+      dst.concreteType = ResourceNodeType::DescriptorResource;
+    else if (src.type == ResourceMappingNodeType::DescriptorImage)
+      dst.concreteType = ResourceNodeType::DescriptorResource;
+    else if (src.type == ResourceMappingNodeType::DescriptorConstTexelBuffer)
+      dst.concreteType = ResourceNodeType::DescriptorTexelBuffer;
+    else if (src.type == Vkgc::ResourceMappingNodeType::DescriptorConstBufferCompact)
+      dst.concreteType = ResourceNodeType::DescriptorBufferCompact;
+    else if (src.type == Vkgc::ResourceMappingNodeType::DescriptorConstBuffer)
+      dst.concreteType = ResourceNodeType::DescriptorBuffer;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 63
+    else if (src.type == Vkgc::ResourceMappingNodeType::DescriptorAtomicCounter)
+      dst.concreteType = ResourceNodeType::DescriptorBuffer;
 #endif
-      else
-        destNode.concreteType = static_cast<ResourceNodeType>(node.type);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
+    else if (src.type == Vkgc::ResourceMappingNodeType::DescriptorMutable)
+      dst.concreteType = ResourceNodeType::DescriptorMutable;
+#endif
+    else
+      dst.concreteType = static_cast<ResourceNodeType>(src.type);
 
-      destNode.set = node.srdRange.set;
-      destNode.binding = node.srdRange.binding;
-      destNode.abstractType = destNode.concreteType;
-      destNode.immutableValue = nullptr;
-      destNode.immutableSize = 0;
+    if (getPipelineOptions()->replaceSetWithResourceType && src.srdRange.set == 0) {
+      // Special value InternalDescriptorSetId(-1) will be passed in for internal usage
+      dst.set = getGlResourceNodeSetFromType(src.type);
+    } else {
+      dst.set = src.srdRange.set;
+    }
+    dst.binding = src.srdRange.binding;
+    dst.abstractType = dst.concreteType;
+    dst.immutableValue = nullptr;
+    dst.immutableSize = 0;
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
-      // Normally we know the stride of items in a descriptor array. However in specific circumstances
-      // the type is not known by llpc. This is the case with mutable descriptors where we need the
-      // stride to be explicitly specified.
-      if (node.srdRange.strideInDwords > 0) {
-        destNode.stride = node.srdRange.strideInDwords;
-      } else {
+    // Normally we know the stride of items in a descriptor array. However in specific circumstances
+    // the type is not known by llpc. This is the case with mutable descriptors where we need the
+    // stride to be explicitly specified.
+    if (src.srdRange.strideInDwords > 0) {
+      dst.stride = src.srdRange.strideInDwords;
+    } else {
 #endif
-        switch (node.type) {
-        case ResourceMappingNodeType::DescriptorImage:
-        case ResourceMappingNodeType::DescriptorResource:
-        case ResourceMappingNodeType::DescriptorFmask:
-          destNode.stride = DescriptorSizeResource / sizeof(uint32_t);
-          break;
-        case ResourceMappingNodeType::DescriptorSampler:
-          destNode.stride = DescriptorSizeSampler / sizeof(uint32_t);
-          break;
-        case ResourceMappingNodeType::DescriptorCombinedTexture:
-          destNode.stride = (DescriptorSizeResource + DescriptorSizeSampler) / sizeof(uint32_t);
-          break;
-        case ResourceMappingNodeType::InlineBuffer:
-        case ResourceMappingNodeType::DescriptorYCbCrSampler:
-          // Current node.sizeInDwords = resourceDescSizeInDwords * M * N (M means plane count, N means array count)
-          // TODO: Desired destNode.stride = resourceDescSizeInDwords * M
-          //
-          // Temporary set stride to be node.sizeInDwords, for that the stride varies from different plane
-          // counts, and we don't know the real plane count currently.
-          // Thus, set stride to sizeInDwords, and just divide array count when it is available in handling immutable
-          // sampler descriptor (For YCbCrSampler, immutable sampler is always accessible)
-          destNode.stride = node.sizeInDwords;
-          break;
-        case ResourceMappingNodeType::DescriptorBufferCompact:
-        case ResourceMappingNodeType::DescriptorConstBufferCompact:
-          destNode.stride = 2;
-          break;
-        default:
-          destNode.stride = DescriptorSizeBuffer / sizeof(uint32_t);
-          break;
-        }
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
-      }
-#endif
-
-      // Only check for an immutable value if the resource is or contains a sampler. This specifically excludes
-      // YCbCrSampler; that was handled in the SPIR-V reader.
-      if (node.type != ResourceMappingNodeType::DescriptorSampler &&
-          node.type != ResourceMappingNodeType::DescriptorCombinedTexture &&
-          node.type != ResourceMappingNodeType::DescriptorYCbCrSampler)
+      switch (src.type) {
+      case ResourceMappingNodeType::DescriptorImage:
+      case ResourceMappingNodeType::DescriptorResource:
+      case ResourceMappingNodeType::DescriptorFmask:
+        dst.stride = DescriptorSizeResource / sizeof(uint32_t);
         break;
-
-      auto it = immutableNodesMap.find(std::pair<unsigned, unsigned>(node.srdRange.set, node.srdRange.binding));
-      if (it != immutableNodesMap.end()) {
-        // This set/binding is (or contains) an immutable value. The value can only be a sampler, so we
-        // can assume it is four dwords.
-        auto &immutableNode = *it->second;
-
-        IRBuilder<> builder(pipeline->getContext());
-        SmallVector<Constant *, 8> values;
-
-        if (immutableNode.arraySize != 0) {
-          if (node.type == ResourceMappingNodeType::DescriptorYCbCrSampler) {
-            // TODO: Remove the statement when destNode.stride is per array size
-            // Update destNode.stride = node.sizeInDwords / immutableNode.arraySize
-            destNode.stride /= immutableNode.arraySize;
-          }
-
-          destNode.immutableSize = immutableNode.arraySize;
-          destNode.immutableValue = immutableNode.pValue;
-        }
+      case ResourceMappingNodeType::DescriptorSampler:
+        dst.stride = DescriptorSizeSampler / sizeof(uint32_t);
+        break;
+      case ResourceMappingNodeType::DescriptorCombinedTexture:
+        dst.stride = (DescriptorSizeResource + DescriptorSizeSampler) / sizeof(uint32_t);
+        break;
+      case ResourceMappingNodeType::InlineBuffer:
+      case ResourceMappingNodeType::DescriptorYCbCrSampler:
+        // Current src.sizeInDwords = resourceDescSizeInDwords * M * N (M means plane count, N means array count)
+        // TODO: Desired dst.stride = resourceDescSizeInDwords * M
+        //
+        // Temporary set stride to be src.sizeInDwords, for that the stride varies from different plane
+        // counts, and we don't know the real plane count currently.
+        // Thus, set stride to sizeInDwords, and just divide array count when it is available in handling immutable
+        // sampler descriptor (For YCbCrSampler, immutable sampler is always accessible)
+        dst.stride = src.sizeInDwords;
+        break;
+      case ResourceMappingNodeType::DescriptorBufferCompact:
+      case ResourceMappingNodeType::DescriptorConstBufferCompact:
+        dst.stride = 2;
+        break;
+      default:
+        dst.stride = DescriptorSizeBuffer / sizeof(uint32_t);
+        break;
       }
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 61
+    }
+#endif
+
+    // Only check for an immutable value if the resource is or contains a sampler. This specifically excludes
+    // YCbCrSampler; that was handled in the SPIR-V reader.
+    if (src.type != ResourceMappingNodeType::DescriptorSampler &&
+        src.type != ResourceMappingNodeType::DescriptorCombinedTexture &&
+        src.type != ResourceMappingNodeType::DescriptorYCbCrSampler)
       break;
+
+    auto it = immutableNodesMap.find(std::pair<unsigned, unsigned>(src.srdRange.set, src.srdRange.binding));
+    if (it != immutableNodesMap.end()) {
+      // This set/binding is (or contains) an immutable value. The value can only be a sampler, so we
+      // can assume it is four dwords.
+      auto &immutableNode = *it->second;
+
+      if (immutableNode.arraySize != 0) {
+        if (src.type == ResourceMappingNodeType::DescriptorYCbCrSampler) {
+          // TODO: Remove the statement when dst.stride is per array size
+          // Update dst.stride = node.sizeInDwords / immutableNode.arraySize
+          dst.stride /= immutableNode.arraySize;
+        }
+
+        dst.immutableSize = immutableNode.arraySize;
+        dst.immutableValue = immutableNode.pValue;
+      }
     }
-    }
+    break;
+  }
   }
 }
 
@@ -644,7 +645,7 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
     // size for a shader that uses gl_SubgroupSize.
     shaderOptions.subgroupSize = SubgroupSize;
   }
-#if VKI_RAY_TRACING
+
   // NOTE: WaveSize of raytracing usually be 32
   bool useRayTracingWaveSize = false;
   if (getPipelineType() == PipelineType::RayTracing) {
@@ -656,7 +657,6 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
   }
   if (useRayTracingWaveSize)
     shaderOptions.waveSize = getRayTracingWaveSize();
-#endif
 
   // Use a static cast from Vkgc WaveBreakSize to LGC WaveBreak, and static assert that
   // that is valid.
@@ -680,7 +680,6 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
   shaderOptions.useSiScheduler = EnableSiScheduler || shaderInfo.options.useSiScheduler;
   shaderOptions.disableCodeSinking = shaderInfo.options.disableCodeSinking;
   shaderOptions.favorLatencyHiding = shaderInfo.options.favorLatencyHiding;
-  shaderOptions.updateDescInElf = shaderInfo.options.updateDescInElf;
   shaderOptions.unrollThreshold = shaderInfo.options.unrollThreshold;
   // A non-zero command line -force-loop-unroll-count value overrides the shaderInfo option value.
   shaderOptions.forceLoopUnrollCount =
@@ -717,10 +716,6 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
   else
     shaderOptions.ldsSpillLimitDwords = LdsSpillLimitDwords;
 
-  shaderOptions.overrideShaderThreadGroupSizeX = shaderInfo.options.overrideShaderThreadGroupSizeX;
-  shaderOptions.overrideShaderThreadGroupSizeY = shaderInfo.options.overrideShaderThreadGroupSizeY;
-  shaderOptions.overrideShaderThreadGroupSizeZ = shaderInfo.options.overrideShaderThreadGroupSizeZ;
-
   shaderOptions.nsaThreshold = shaderInfo.options.nsaThreshold;
 
   static_assert(static_cast<InvariantLoadsOption>(InvariantLoads::Auto) == InvariantLoadsOption::Auto, "Mismatch");
@@ -739,7 +734,6 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
   return shaderOptions;
 }
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Get wave size used for raytracing
 unsigned PipelineContext::getRayTracingWaveSize() const {
@@ -747,8 +741,6 @@ unsigned PipelineContext::getRayTracingWaveSize() const {
     return 32;
   return 64;
 }
-
-#endif
 
 // =====================================================================================================================
 // Map a VkFormat to a {BufDataFormat, BufNumFormat}. Returns BufDataFormatInvalid if the
@@ -984,6 +976,10 @@ std::pair<BufDataFormat, BufNumFormat> PipelineContext::mapVkFormat(VkFormat for
   {                                                                                                                    \
     format, { format, dfmt, nfmt, true, false }                                                                        \
   }
+#define EXT_VERTEX_FORMAT_ENTRY(format, dfmt, nfmt)                                                                    \
+  {                                                                                                                    \
+    format, { static_cast<VkFormat>(format), dfmt, nfmt, true, true }                                                  \
+  }
 #define COLOR_FORMAT_ENTRY_EXT(format, dfmt, nfmt)                                                                     \
   {                                                                                                                    \
     format, { format, dfmt, nfmt, false, true }                                                                        \
@@ -1001,6 +997,10 @@ std::pair<BufDataFormat, BufNumFormat> PipelineContext::mapVkFormat(VkFormat for
   {                                                                                                                    \
     format, { dfmt, nfmt, true, false }                                                                                \
   }
+#define EXT_VERTEX_FORMAT_ENTRY(format, dfmt, nfmt)                                                                    \
+  {                                                                                                                    \
+    format, { dfmt, nfmt, true, true }                                                                                 \
+  }
 #define COLOR_FORMAT_ENTRY_EXT(format, dfmt, nfmt)                                                                     \
   {                                                                                                                    \
     format, { dfmt, nfmt, false, true }                                                                                \
@@ -1012,6 +1012,28 @@ std::pair<BufDataFormat, BufNumFormat> PipelineContext::mapVkFormat(VkFormat for
 #endif
       COLOR_FORMAT_ENTRY_EXT(VK_FORMAT_A4R4G4B4_UNORM_PACK16_EXT, BufDataFormat4_4_4_4, BufNumFormatUnorm),
       COLOR_FORMAT_ENTRY_EXT(VK_FORMAT_A4B4G4R4_UNORM_PACK16_EXT, BufDataFormat4_4_4_4, BufNumFormatUnorm),
+      /// Currently OGL-only : Internal spv ext vertex attribute format - begin
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32_UNORM, BufDataFormat32, BufNumFormatUnorm),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32_UNORM, BufDataFormat32_32, BufNumFormatUnorm),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32B32_UNORM, BufDataFormat32_32_32, BufNumFormatUnorm),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32B32A32_UNORM, BufDataFormat32_32_32_32, BufNumFormatUnorm),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32_SNORM, BufDataFormat32, BufNumFormatSnorm),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32_SNORM, BufDataFormat32_32, BufNumFormatSnorm),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32B32_SNORM, BufDataFormat32_32_32, BufNumFormatSnorm),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32B32A32_SNORM, BufDataFormat32_32_32_32, BufNumFormatSnorm),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32_FIXED, BufDataFormat32, BufNumFormatFixed),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32_FIXED, BufDataFormat32_32, BufNumFormatFixed),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32B32_FIXED, BufDataFormat32_32_32, BufNumFormatFixed),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32B32A32_FIXED, BufDataFormat32_32_32_32, BufNumFormatFixed),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32_USCALED, BufDataFormat32, BufNumFormatUscaled),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32_USCALED, BufDataFormat32_32, BufNumFormatUscaled),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32B32_USCALED, BufDataFormat32_32_32, BufNumFormatUscaled),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32B32A32_USCALED, BufDataFormat32_32_32_32, BufNumFormatUscaled),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32_SSCALED, BufDataFormat32, BufNumFormatSscaled),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32_SSCALED, BufDataFormat32_32, BufNumFormatSscaled),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32B32_SSCALED, BufDataFormat32_32_32, BufNumFormatSscaled),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32B32A32_SSCALED, BufDataFormat32_32_32_32, BufNumFormatSscaled)
+      /// Currently OGL only : Internal spv ext vertex attribute format - end
   };
 
   BufDataFormat dfmt = BufDataFormatInvalid;
@@ -1034,6 +1056,47 @@ std::pair<BufDataFormat, BufNumFormat> PipelineContext::mapVkFormat(VkFormat for
     }
   }
   return {dfmt, nfmt};
+}
+
+// =====================================================================================================================
+// Convert Resource node type to set for OGL
+uint32_t PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType resourceType) {
+  GlResourceMappingSet resourceSet = GlResourceMappingSet::Unknown;
+
+  switch (resourceType) {
+  case ResourceMappingNodeType::DescriptorConstBuffer:
+  case ResourceMappingNodeType::InlineBuffer:
+    resourceSet = GlResourceMappingSet::DescriptorConstBuffer;
+    break;
+  case ResourceMappingNodeType::DescriptorBuffer:
+    resourceSet = GlResourceMappingSet::DescriptorBuffer;
+    break;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 63
+  case ResourceMappingNodeType::DescriptorAtomicCounter:
+    resourceSet = GlResourceMappingSet::DescriptorAtomicCounter;
+    break;
+#endif
+  case ResourceMappingNodeType::DescriptorImage:
+  case ResourceMappingNodeType::DescriptorTexelBuffer:
+    resourceSet = GlResourceMappingSet::DescriptorImage;
+    break;
+  case ResourceMappingNodeType::DescriptorResource:
+  case ResourceMappingNodeType::DescriptorCombinedTexture:
+  case ResourceMappingNodeType::DescriptorConstTexelBuffer:
+    resourceSet = GlResourceMappingSet::DescriptorResource;
+    break;
+  case ResourceMappingNodeType::DescriptorSampler:
+    resourceSet = GlResourceMappingSet::DescriptorSampler;
+    break;
+  case ResourceMappingNodeType::DescriptorFmask:
+    resourceSet = GlResourceMappingSet::DescriptorFmask;
+    break;
+  default:
+    assert("Not supported resource type.");
+    break;
+  }
+
+  return static_cast<uint32_t>(resourceSet);
 }
 
 } // namespace Llpc

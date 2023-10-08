@@ -3,7 +3,7 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 // barycentric coordinate: (i ,j , 1 - i - j)
-; SHADERTEST-LABEL: define dllexport amdgpu_ps void @_amdgpu_ps_main(i32 inreg %globalTable, i32 inreg %perShaderTable,
+; SHADERTEST-LABEL: define dllexport amdgpu_ps void @_amdgpu_ps_main(i32 inreg %globalTable,
 ; SHADERTEST: %[[jCoord:[^,]*]] = extractelement <2 x float> %PerspInterpCenter, i64 1
 ; SHADERTEST: %[[iCoord:[^,]*]] = extractelement <2 x float> %PerspInterpCenter, i64 0
 ; SHADERTEST: %[[subICoord:[0-9]*]] = fsub float 1.000000e+00, %[[iCoord]]

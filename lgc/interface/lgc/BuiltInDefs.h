@@ -74,7 +74,7 @@ BUILTIN(GlobalInvocationId, 28, N, TMC, v3i32)           // Invocation ID within
 BUILTIN(HelperInvocation, 23, N, P, i1)                  // Helper invocation flag
 BUILTIN(InstanceIndex, 43, N, V, i32)                    // Instance index
 BUILTIN(InvocationId, 8, N, HG, i32)                     // Invocation ID
-BUILTIN(Layer, 9, MVDG, P, i32)                          // Layer of multi-layer framebuffer attachment
+BUILTIN(Layer, 9, MVHDG, HDGP, i32)                      // Layer of multi-layer framebuffer attachment
 BUILTIN(LocalInvocationId, 27, N, TMC, v3i32)            // Invocation location within local workgroup
 BUILTIN(LocalInvocationIndex, 29, N, TMC, i32)           // Linearized LocalInvocationId
 BUILTIN(NumSubgroups, 38, N, TMC, i32)                   // Number of subgroups in the local workgroup
@@ -102,7 +102,7 @@ BUILTIN(TessLevelInner, 12, H, D, a2f32)                 // Tessellation inner l
 BUILTIN(TessLevelOuter, 11, H, D, a4f32)                 // Tessellation outer levels
 BUILTIN(VertexIndex, 42, N, V, i32)                      // Index of current vertex
 BUILTIN(ViewIndex, 4440, N, MVHDGP, i32)                 // View index
-BUILTIN(ViewportIndex, 10, MVDG, P, i32)                 // Viewport index
+BUILTIN(ViewportIndex, 10, MVHDG, HDGP, i32)             // Viewport index
 BUILTIN(WorkgroupId, 26, N, TMC, v3i32)                  // ID of global workgroup
 BUILTIN(WorkgroupSize, 25, N, TMC, v3i32)                // Size of global workgroup
 BUILTIN(CullPrimitive, 5299, N, M, i1)                   // Whether primitive should be culled
@@ -113,3 +113,24 @@ BUILTIN(VertexId, 5, N, V, i32)                          // Index of current ver
 BUILTIN(InstanceId, 6, N, V, i32)                        // Index of current primitive
 
 // Reserved LGC internal built-ins
+
+// Internal built-ins for fragment input interpolation (I/J)
+BUILTIN(InterpPerspSample, BuiltInInternalBase + 0, N, P, v2f32)
+BUILTIN(InterpPerspCenter, BuiltInInternalBase + 1, N, P, v2f32)
+BUILTIN(InterpPerspCentroid, BuiltInInternalBase + 2, N, P, v2f32)
+BUILTIN(InterpPullMode, BuiltInInternalBase + 3, N, P, v3f32)
+BUILTIN(InterpLinearSample, BuiltInInternalBase + 4, N, P, v2f32)
+BUILTIN(InterpLinearCenter, BuiltInInternalBase + 5, N, P, v2f32)
+BUILTIN(InterpLinearCentroid, BuiltInInternalBase + 6, N, P, v2f32)
+
+// Internal built-ins for sample position emulation
+BUILTIN(SamplePosOffset, BuiltInInternalBase + 7, N, P, i32)
+BUILTIN(NumSamples, BuiltInInternalBase + 8, N, P, i32)
+BUILTIN(SamplePatternIdx, BuiltInInternalBase + 9, N, P, i32)
+BUILTIN(GsWaveId, BuiltInInternalBase + 10, N, G, i32)
+
+// Internal built-ins for compute input when thread id is swizzled
+BUILTIN(UnswizzledLocalInvocationId, BuiltInInternalBase + 11, N, C, i32)
+BUILTIN(UnswizzledLocalInvocationIndex, BuiltInInternalBase + 12, N, C, i32)
+
+BUILTIN(EdgeFlag, BuiltInInternalBase + 18, V, V, i32) // EdgeFlag output

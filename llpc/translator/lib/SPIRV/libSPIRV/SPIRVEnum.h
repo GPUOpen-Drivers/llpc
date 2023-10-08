@@ -194,9 +194,6 @@ template <> inline void SPIRVMap<SPIRVCapabilityKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(CapabilityFloat16ImageAMD, {CapabilityShader});
   ADD_VEC_INIT(CapabilityVariablePointersStorageBuffer, {CapabilityShader});
   ADD_VEC_INIT(CapabilityVariablePointers, {CapabilityVariablePointersStorageBuffer});
-#if VK_AMD_SHADER_ENQUEUE
-  ADD_VEC_INIT(CapabilityShaderEnqueueAMD, {CapabilityShader});
-#endif
   ADD_VEC_INIT(CapabilityShaderNonUniformEXT, {CapabilityShader});
   ADD_VEC_INIT(CapabilityRuntimeDescriptorArrayEXT, {CapabilityShader});
   ADD_VEC_INIT(CapabilityInputAttachmentArrayDynamicIndexingEXT, {CapabilityInputAttachment});
@@ -286,14 +283,12 @@ template <> inline void SPIRVMap<SPIRVStorageClassKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(StorageClassPushConstant, {CapabilityShader});
   ADD_VEC_INIT(StorageClassAtomicCounter, {CapabilityAtomicStorage});
   ADD_VEC_INIT(StorageClassStorageBuffer, {CapabilityShader});
-#if VKI_RAY_TRACING
   ADD_VEC_INIT(StorageClassCallableDataKHR, {CapabilityRayTracingProvisionalKHR});
   ADD_VEC_INIT(StorageClassIncomingCallableDataKHR, {CapabilityRayTracingProvisionalKHR});
   ADD_VEC_INIT(StorageClassRayPayloadKHR, {CapabilityRayTracingProvisionalKHR});
   ADD_VEC_INIT(StorageClassHitAttributeKHR, {CapabilityRayTracingProvisionalKHR});
   ADD_VEC_INIT(StorageClassIncomingRayPayloadKHR, {CapabilityRayTracingProvisionalKHR});
   ADD_VEC_INIT(StorageClassShaderRecordBufferKHR, {CapabilityRayTracingProvisionalKHR});
-#endif
   ADD_VEC_INIT(StorageClassTaskPayloadWorkgroupEXT, {CapabilityMeshShadingEXT});
 }
 
@@ -372,9 +367,7 @@ template <> inline void SPIRVMap<Decoration, SPIRVCapVec>::init() {
   ADD_VEC_INIT(DecorationSample, {CapabilitySampleRateShading});
   ADD_VEC_INIT(DecorationInvariant, {CapabilityShader});
   ADD_VEC_INIT(DecorationUniform, {CapabilityShader});
-#if SPV_VERSION >= 0x10400
   ADD_VEC_INIT(DecorationUniformId, {CapabilityShader});
-#endif
   ADD_VEC_INIT(DecorationStream, {CapabilityGeometryStreams});
   ADD_VEC_INIT(DecorationLocation, {CapabilityShader});
   ADD_VEC_INIT(DecorationComponent, {CapabilityShader});

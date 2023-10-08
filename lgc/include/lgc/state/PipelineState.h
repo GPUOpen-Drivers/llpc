@@ -102,8 +102,10 @@ struct NggControl {
 // Represents transform feedback state metadata
 struct XfbStateMetadata {
   bool enableXfb;                                               // Whether transform feedback is active
-  std::array<unsigned, MaxTransformFeedbackBuffers> xfbStrides; // The strides of each XFB buffer.
-  std::array<int, MaxGsStreams> streamXfbBuffers;               // The stream-out XFB buffers bit mask per stream.
+  bool enablePrimStats;                                         // Whether to count generated primitives
+  std::array<unsigned, MaxTransformFeedbackBuffers> xfbStrides; // The strides of each XFB buffer
+  std::array<int, MaxGsStreams> streamXfbBuffers;               // The stream-out XFB buffers bit mask per stream
+  std::array<bool, MaxGsStreams> streamActive;                  // Flag indicating which vertex stream is active
 };
 
 // =====================================================================================================================
@@ -187,6 +189,26 @@ public:
   // Set the client-defined metadata to be stored inside the ELF
   void setClientMetadata(llvm::StringRef clientMetadata) override final;
 
+  // Set default tessellation inner/outer level from driver API
+  void setTessLevel(const float *tessLevelInner, const float *tessLevelOuter) override final {
+    m_tessLevel.inner[0] = tessLevelInner[0];
+    m_tessLevel.inner[1] = tessLevelInner[1];
+    m_tessLevel.outer[0] = tessLevelOuter[0];
+    m_tessLevel.outer[1] = tessLevelOuter[1];
+    m_tessLevel.outer[2] = tessLevelOuter[2];
+    m_tessLevel.outer[3] = tessLevelOuter[3];
+  }
+
+  // Get default tessellation inner/outer level from driver API
+  float getTessLevelInner(unsigned level) override final {
+    assert(level <= 2);
+    return m_tessLevel.inner[level];
+  }
+  float getTessLevelOuter(unsigned level) override final {
+    assert(level <= 4);
+    return m_tessLevel.outer[level];
+  }
+
   // -----------------------------------------------------------------------------------------------------------------
   // Other methods
 
@@ -216,6 +238,12 @@ public:
   // Record pipeline state into IR metadata of specified module.
   void record(llvm::Module *module);
 
+  // Print pipeline state
+  void print(llvm::raw_ostream &out) const;
+#if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
+  LLVM_DUMP_METHOD void dump() const { print(llvm::dbgs()); }
+#endif
+
   // Accessors for shader stage mask
   unsigned getShaderStageMask();
   bool getPreRasterHasGs() const { return m_preRasterHasGs; }
@@ -239,14 +267,15 @@ public:
   llvm::ArrayRef<ResourceNode> getUserDataNodes() const { return m_userDataNodes; }
 
   // Find the push constant resource node
-  const ResourceNode *findPushConstantResourceNode() const;
+  const ResourceNode *findPushConstantResourceNode(ShaderStage shaderStage = ShaderStageInvalid) const;
 
   // Find the resource node for the given set,binding
-  std::pair<const ResourceNode *, const ResourceNode *> findResourceNode(ResourceNodeType nodeType, unsigned descSet,
-                                                                         unsigned binding) const;
+  std::pair<const ResourceNode *, const ResourceNode *>
+  findResourceNode(ResourceNodeType nodeType, uint64_t descSet, unsigned binding,
+                   ShaderStage shaderStage = ShaderStageInvalid) const;
 
   // Find the single root resource node of the given type
-  const ResourceNode *findSingleRootResourceNode(ResourceNodeType nodeType) const;
+  const ResourceNode *findSingleRootResourceNode(ResourceNodeType nodeType, ShaderStage shaderStage) const;
 
   // Accessors for vertex input descriptions.
   llvm::ArrayRef<VertexInputDescription> getVertexInputDescriptions() const { return m_vertexInputDescriptions; }
@@ -255,7 +284,7 @@ public:
   // Accessors for color export state
   const ColorExportFormat &getColorExportFormat(unsigned location);
   const bool hasColorExportFormats() { return !m_colorExportFormats.empty(); }
-  const ColorExportState &getColorExportState() { return m_colorExportState; }
+  ColorExportState &getColorExportState() { return m_colorExportState; }
 
   // Accessors for pipeline state
   unsigned getDeviceIndex() const { return m_deviceIndex; }
@@ -364,14 +393,11 @@ public:
   // Set transform feedback state metadata
   void setXfbStateMetadata(llvm::Module *module);
 
-  // Get XFB state metadata
-  const XfbStateMetadata &getXfbStateMetadata() const { return m_xfbStateMetadata; }
-
-  // Get XFB state metadata
-  XfbStateMetadata &getXfbStateMetadata() { return m_xfbStateMetadata; }
-
   // Check if transform feedback is active
   bool enableXfb() const { return m_xfbStateMetadata.enableXfb; }
+
+  // Check if we need primitive statistics counting
+  bool enablePrimStats() const { return m_xfbStateMetadata.enablePrimStats; }
 
   // Get transform feedback strides
   const std::array<unsigned, MaxTransformFeedbackBuffers> &getXfbBufferStrides() const {
@@ -387,8 +413,19 @@ public:
   // Get transform feedback buffers used for each stream
   std::array<int, MaxGsStreams> &getStreamXfbBuffers() { return m_xfbStateMetadata.streamXfbBuffers; }
 
+  // Set the activness for a vertex stream
+  void setVertexStreamActive(unsigned streamId) { m_xfbStateMetadata.streamActive[streamId] = true; }
+
+  // Get the activeness for a vertex stream
+  bool isVertexStreamActive(unsigned streamId) {
+    if (getRasterizerState().rasterStream == streamId)
+      return true; // Rasterization stream is always active
+    return m_xfbStateMetadata.streamActive[streamId];
+  }
+
   // Set user data for a specific shader stage
   void setUserDataMap(ShaderStage shaderStage, llvm::ArrayRef<unsigned> userDataValues) {
+    m_userDataMaps[shaderStage].clear();
     m_userDataMaps[shaderStage].append(userDataValues.begin(), userDataValues.end());
   }
 
@@ -519,7 +556,7 @@ private:
   llvm::ArrayRef<llvm::MDString *> getResourceTypeNames();
   llvm::MDString *getResourceTypeName(ResourceNodeType type);
   ResourceNodeType getResourceTypeFromName(llvm::MDString *typeName);
-  bool matchResourceNode(const ResourceNode &node, ResourceNodeType nodeType, unsigned descSet, unsigned binding) const;
+  bool matchResourceNode(const ResourceNode &node, ResourceNodeType nodeType, uint64_t descSet, unsigned binding) const;
 
   // Device index handling
   void recordDeviceIndex(llvm::Module *module);
@@ -575,6 +612,12 @@ private:
   bool m_outputPackState[ShaderStageGfxCount] = {}; // The output packable state per shader stage
   XfbStateMetadata m_xfbStateMetadata = {};         // Transform feedback state metadata
   llvm::SmallVector<unsigned, 32> m_userDataMaps[ShaderStageCountInternal]; // The user data per-shader
+  bool m_useMrt0AToMrtzA = false;                                           // Whether to copy mrt0.a to mrz.a
+
+  struct {
+    float inner[2]; // default tessellation inner level
+    float outer[4]; // default tessellation outer level
+  } m_tessLevel;
 };
 
 // =====================================================================================================================
@@ -616,6 +659,25 @@ public:
   bool runImpl(llvm::Module &module, PipelineState *pipelineState);
 
   static llvm::StringRef name() { return "LLPC pipeline state clearer"; }
+};
+
+// =====================================================================================================================
+// Pass to print the pipeline state in a human-readable way
+class PipelineStatePrinter : public llvm::PassInfoMixin<PipelineStatePrinter> {
+public:
+  explicit PipelineStatePrinter(llvm::raw_ostream &out = llvm::dbgs()) : m_out(out) {}
+
+  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
+
+private:
+  llvm::raw_ostream &m_out;
+};
+
+// =====================================================================================================================
+// Pass to record the pipeline state back into the IR if present
+class PipelineStateRecorder : public llvm::PassInfoMixin<PipelineStateRecorder> {
+public:
+  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 };
 
 } // namespace lgc

@@ -31,6 +31,7 @@
  */
 #include "llpcUtil.h"
 #include "llpc.h"
+#include "llpcContext.h"
 #include "llpcDebug.h"
 #include "palPipelineAbi.h"
 #include "spirvExt.h"
@@ -54,24 +55,20 @@ const char *getShaderStageName(ShaderStage shaderStage) {
   if (shaderStage == ShaderStageCopyShader)
     name = "copy";
   else if (shaderStage < ShaderStageCount) {
-    static const char *ShaderStageNames[] = {
-      "task",
-      "vertex",
-      "tessellation control",
-      "tessellation evaluation",
-      "geometry",
-      "mesh",
-      "fragment",
-      "compute",
-#if VKI_RAY_TRACING
-      "raygen",
-      "intersect",
-      "anyhit",
-      "closesthit",
-      "miss",
-      "callable"
-#endif
-    };
+    static const char *ShaderStageNames[] = {"task",
+                                             "vertex",
+                                             "tessellation control",
+                                             "tessellation evaluation",
+                                             "geometry",
+                                             "mesh",
+                                             "fragment",
+                                             "compute",
+                                             "raygen",
+                                             "intersect",
+                                             "anyhit",
+                                             "closesthit",
+                                             "miss",
+                                             "callable"};
 
     name = ShaderStageNames[static_cast<unsigned>(shaderStage)];
   } else
@@ -104,7 +101,6 @@ ShaderStage convertToShaderStage(unsigned execModel) {
     return ShaderStageCompute;
   case spv::ExecutionModelCopyShader:
     return ShaderStageCopyShader;
-#if VKI_RAY_TRACING
   case spv::ExecutionModelRayGenerationKHR:
     return ShaderStageRayTracingRayGen;
   case spv::ExecutionModelIntersectionKHR:
@@ -117,7 +113,6 @@ ShaderStage convertToShaderStage(unsigned execModel) {
     return ShaderStageRayTracingMiss;
   case spv::ExecutionModelCallableKHR:
     return ShaderStageRayTracingCallable;
-#endif
   default:
     llvm_unreachable("Unknown execution model");
     return ShaderStageInvalid;
@@ -148,7 +143,6 @@ spv::ExecutionModel convertToExecModel(ShaderStage shaderStage) {
     return spv::ExecutionModelGLCompute;
   case ShaderStageCopyShader:
     return spv::ExecutionModelCopyShader;
-#if VKI_RAY_TRACING
   case ShaderStageRayTracingRayGen:
     return spv::ExecutionModelRayGenerationKHR;
   case ShaderStageRayTracingIntersect:
@@ -161,14 +155,12 @@ spv::ExecutionModel convertToExecModel(ShaderStage shaderStage) {
     return spv::ExecutionModelMissKHR;
   case ShaderStageRayTracingCallable:
     return spv::ExecutionModelCallableKHR;
-#endif
   default:
     llvm_unreachable("Unknown shader stage");
     return spv::ExecutionModelMax;
   }
 }
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Checks whether a specified shader stage is for ray tracing.
 //
@@ -184,7 +176,6 @@ bool isRayTracingShaderStage(ShaderStage stage) {
 bool hasRayTracingShaderStage(unsigned shageMask) {
   return (shageMask & ShaderStageAllRayTracingBit) != 0;
 }
-#endif
 
 // =====================================================================================================================
 // Returns true if shaderInfo has the information required to compile an unlinked shader of the given type.
@@ -301,6 +292,43 @@ const ResourceMappingNode *findResourceNode(const ResourceMappingRootNode *userD
   }
 
   return resourceNode;
+}
+
+// Returns the uniform constant map entry of the given location.
+//
+// @param context : The LLPC context
+// @param stage   : The map entry stage
+// @param loc     : The location of the finding uniform constant
+Vkgc::UniformConstantMapEntry *getUniformConstantEntryByLocation(const Llpc::Context *context, Vkgc::ShaderStage stage,
+                                                                 unsigned loc) {
+  Vkgc::UniformConstantMap *accessedUniformMap = nullptr;
+  if (context->getPipelineType() == PipelineType::Graphics) {
+    auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
+    // Find the uniform constant map to use.
+    for (unsigned s = 0; s < buildInfo->numUniformConstantMaps; s++) {
+      if (buildInfo->ppUniformMaps[s] != nullptr &&
+          isShaderStageInMask(stage, buildInfo->ppUniformMaps[s]->visibility)) {
+        accessedUniformMap = buildInfo->ppUniformMaps[s];
+        break;
+      }
+    }
+  } else {
+    assert(context->getPipelineType() == PipelineType::Compute);
+    auto *buildInfo = static_cast<const Vkgc::ComputePipelineBuildInfo *>(context->getPipelineBuildInfo());
+    accessedUniformMap = buildInfo->pUniformMap;
+  }
+
+  if (accessedUniformMap != nullptr) {
+    auto *uniforms = accessedUniformMap->pUniforms;
+    unsigned numUniform = accessedUniformMap->numUniformConstants;
+
+    UniformConstantMapEntry *locationFound =
+        std::find_if(uniforms, uniforms + numUniform,
+                     [&](const Vkgc::UniformConstantMapEntry &item) { return item.location == loc; });
+
+    return locationFound != uniforms + numUniform ? locationFound : nullptr;
+  }
+  return nullptr;
 }
 
 } // namespace Llpc

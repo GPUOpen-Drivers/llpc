@@ -3,8 +3,8 @@
 ; RUN: lgc -mcpu=gfx1010 -print-after=lgc-patch-entry-point-mutate -o /dev/null 2>&1 - <%s | FileCheck --check-prefixes=CHECK %s
 ; CHECK: IR Dump After Patch LLVM for entry-point mutation
 ; CHECK: declare amdgpu_gfx i32 @compute_library_func() #0
-; CHECK: define dllexport amdgpu_cs void @lgc.shader.CS.main(i32 inreg %globalTable, i32 inreg %perShaderTable, ptr addrspace(4) inreg %numWorkgroupsPtr, i32 inreg %descTable2, i32 inreg %0, i32 inreg %1, i32 inreg %2, i32 inreg %3, i32 inreg %4, i32 inreg %5, i32 inreg %6, i32 inreg %7, i32 inreg %8, i32 inreg %9, i32 inreg %spillTable, <3 x i32> inreg %WorkgroupId, i32 inreg %MultiDispatchInfo, <3 x i32> %LocalInvocationId) #1 !lgc.shaderstage !7 {
-; CHECK: call amdgpu_gfx i32 @compute_library_func(i32 inreg %globalTable, i32 inreg %perShaderTable, ptr addrspace(4) inreg %numWorkgroupsPtr, i32 inreg %descTable2, i32 inreg %0, i32 inreg %1, i32 inreg %2, i32 inreg %3, i32 inreg %4, i32 inreg %5, i32 inreg %6, i32 inreg %7, i32 inreg %8, i32 inreg %9, i32 inreg %spillTable, <3 x i32> inreg %WorkgroupId, i32 inreg %MultiDispatchInfo, <3 x i32> %LocalInvocationId)
+; CHECK: define dllexport amdgpu_cs void @lgc.shader.CS.main(i32 inreg %globalTable, ptr addrspace(4) inreg %numWorkgroupsPtr, i32 inreg %userdata0, i32 inreg %userdata1, i32 inreg %userdata2, i32 inreg %userdata3, i32 inreg %userdata4, i32 inreg %userdata5, i32 inreg %userdata6, i32 inreg %userdata7, i32 inreg %userdata8, i32 inreg %userdata9, i32 inreg %userdata10, i32 inreg %userdata11, i32 inreg %spillTable, <3 x i32> inreg %WorkgroupId, i32 inreg %MultiDispatchInfo, <3 x i32> %LocalInvocationId) #1 !lgc.shaderstage !7 {
+; CHECK: call amdgpu_gfx i32 @compute_library_func(i32 inreg %globalTable, ptr addrspace(4) inreg %numWorkgroupsPtr, i32 inreg %userdata0, i32 inreg %userdata1, i32 inreg %userdata2, i32 inreg %userdata3, i32 inreg %userdata4, i32 inreg %userdata5, i32 inreg %userdata6, i32 inreg %userdata7, i32 inreg %userdata8, i32 inreg %userdata9, i32 inreg %userdata10, i32 inreg %userdata11, i32 inreg %spillTable, <3 x i32> inreg %WorkgroupId, i32 inreg %MultiDispatchInfo, <3 x i32> %LocalInvocationId)
 ; CHECK: !7 = !{i32 7}
 
 ; ModuleID = 'lgcPipeline'
@@ -57,8 +57,8 @@ attributes #1 = { nounwind readonly }
 !0 = !{i32 2, i32 3, i32 1}
 !1 = !{i32 2113342239, i32 1385488414, i32 -1007072744, i32 -815526592, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 2}
 !2 = !{i32 1792639877, i32 1348715323, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 0, i32 3}
-!3 = !{!"DescriptorBuffer", i32 6, i32 0, i32 4, i32 0, i32 0, i32 4}
-!4 = !{!"DescriptorBuffer", i32 6, i32 4, i32 16, i32 0, i32 1, i32 4}
-!5 = !{!"DescriptorTableVaPtr", i32 0, i32 20, i32 1, i32 1}
-!6 = !{!"DescriptorBuffer", i32 6, i32 0, i32 4, i32 0, i32 2, i32 4}
+!3 = !{!"DescriptorBuffer", i32 6, i32 0, i32 0, i32 4, i32 0, i32 0, i32 4}
+!4 = !{!"DescriptorBuffer", i32 6, i32 0, i32 4, i32 16, i32 0, i32 1, i32 4}
+!5 = !{!"DescriptorTableVaPtr", i32 0, i32 0, i32 20, i32 1, i32 1}
+!6 = !{!"DescriptorBuffer", i32 6, i32 0, i32 0, i32 4, i32 0, i32 2, i32 4}
 !7 = !{i32 7}

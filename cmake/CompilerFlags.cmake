@@ -1,7 +1,10 @@
 function(set_compiler_options PROJECT_NAME ENABLE_WERROR)
-    target_compile_features("${PROJECT_NAME}" PUBLIC cxx_std_17)
-    set_target_properties("${PROJECT_NAME}" PROPERTIES CXX_EXTENSIONS OFF)
-    set_target_properties("${PROJECT_NAME}" PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS OFF
+        POSITION_INDEPENDENT_CODE ON)
 
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
         if(ENABLE_WERROR)
@@ -31,6 +34,8 @@ function(set_compiler_options PROJECT_NAME ENABLE_WERROR)
             -Wunused-function
             -Werror=unused-function
             -Werror=unused-result  # Error out on unused results of functions marked with LLPC_NODISCARD
+            -ffunction-sections
+            -fdata-sections
         )
 
         target_compile_options("${PROJECT_NAME}" PRIVATE $<$<COMPILE_LANGUAGE:CXX>:
@@ -68,6 +73,9 @@ function(set_compiler_options PROJECT_NAME ENABLE_WERROR)
                 -Wno-gnu-anonymous-struct
                 -Wno-nested-anon-types
             )
+            if(XGL_ENABLE_LTO)
+                target_link_libraries("${PROJECT_NAME}" PRIVATE -flto=thin)
+            endif()
         endif()
     elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
         # CMAKE-TODO: These are /W4 (level 4) warnings

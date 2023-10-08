@@ -103,7 +103,8 @@ Module *FetchShader::generate() {
 void FetchShader::generateFetchShaderBody(Function *fetchFunc) { // Process each vertex input.
   std::unique_ptr<VertexFetch> vertexFetch(VertexFetch::create(m_lgcContext));
   auto ret = cast<ReturnInst>(fetchFunc->back().getTerminator());
-  BuilderBase builder(ret);
+  BuilderImpl builder(m_pipelineState);
+  builder.SetInsertPoint(ret);
   Value *result = ret->getOperand(0);
 
   for (unsigned idx = 0; idx != m_fetches.size(); ++idx) {
@@ -212,7 +213,7 @@ Value *FetchShader::getReplacementForVertexIdBuiltIn(CallInst *call) const {
 // @param function : The function from which to get the argument.
 // @returns : The value of the argument as a 32-bit integer.
 Value *FetchShader::getVgprArgumentAsAnInt32(unsigned vgpr, Function *function) const {
-  BuilderBase builder(&*function->front().getFirstInsertionPt());
+  BuilderBase builder(&*function->front().getFirstNonPHIOrDbgOrAlloca());
   Value *vertexId = getVpgrArgument(vgpr, builder);
   return builder.CreateBitCast(vertexId, builder.getInt32Ty());
 }
@@ -265,7 +266,7 @@ Value *FetchShader::getReplacementForVertexBufferTableBuiltIn(CallInst *call) co
   Function *callerFunction = call->getFunction();
   AddressExtender extender(callerFunction);
   Value *highAddr = call->getArgOperand(1);
-  BuilderBase builder(&*callerFunction->front().getFirstInsertionPt());
+  BuilderBase builder(&*callerFunction->front().getFirstNonPHIOrDbgOrAlloca());
   Argument *vertexBufferTable = callerFunction->getArg(m_vsEntryRegInfo.vertexBufferTable);
   return extender.extend(vertexBufferTable, highAddr, call->getType(), builder);
 }
@@ -323,10 +324,17 @@ Function *FetchShader::createFetchFunc() {
 
   // Copy the wave dispatch SGPRs and VGPRs from inputs to outputs.
   builder.SetInsertPoint(&func->back());
-  Value *retVal = UndefValue::get(retTy);
+  Value *retVal = PoisonValue::get(retTy);
   for (unsigned i = 0; i != m_vsEntryRegInfo.sgprCount + m_vsEntryRegInfo.vgprCount; ++i)
     retVal = builder.CreateInsertValue(retVal, func->getArg(i), i);
   builder.CreateRet(retVal);
+
+  AttrBuilder attribBuilder(func->getContext());
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10) {
+    const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageVertex);
+    attribBuilder.addAttribute("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
+  }
+  func->addFnAttrs(attribBuilder);
 
   return func;
 }

@@ -246,12 +246,12 @@ private:
                       unsigned userDataCount);
 
   void writeGsOutput(llvm::Value *output, unsigned location, unsigned component, unsigned streamId,
-                     llvm::Value *primitiveIndex, llvm::Value *emitVerts);
+                     llvm::Value *primitiveIndex, llvm::Value *emitVerts, llvm::Value *totalEmitVertsPtr);
   llvm::Value *readGsOutput(llvm::Type *outputTy, unsigned location, unsigned component, unsigned streamId,
                             llvm::Value *vertexOffset);
 
   void processGsEmit(unsigned streamId, llvm::Value *primitiveIndex, llvm::Value *emitVertsPtr,
-                     llvm::Value *outVertsPtr);
+                     llvm::Value *outVertsPtr, llvm::Value *totalEmitVertsPtr);
   void processGsCut(unsigned streamId, llvm::Value *outVertsPtr);
 
   llvm::Function *createGsEmitHandler();
@@ -315,11 +315,14 @@ private:
   llvm::PHINode *createPhi(llvm::ArrayRef<std::pair<llvm::Value *, llvm::BasicBlock *>> incomings,
                            const llvm::Twine &name = "");
   void createFenceAndBarrier();
+  void createBarrier();
 
   unsigned getLdsRegionStart(PrimShaderLdsRegion region) {
     assert(m_ldsLayout.count(region) > 0);
     return m_ldsLayout[region].first;
   }
+
+  void collectPrimitiveStats();
 
   llvm::Value *readValueFromLds(llvm::Type *readTy, llvm::Value *ldsOffset, bool useDs128 = false);
   void writeValueToLds(llvm::Value *writeValue, llvm::Value *ldsOffset, bool useDs128 = false);
@@ -393,9 +396,9 @@ private:
   bool m_hasTes = false; // Whether the pipeline has tessellation evaluation shader
   bool m_hasGs = false;  // Whether the pipeline has geometry shader
 
-  llvm::Value *m_streamOutControlBufPtr;                           // Stream-out control buffer pointer
-  llvm::Value *m_streamOutBufDescs[MaxTransformFeedbackBuffers];   // Stream-out buffer descriptors
-  llvm::Value *m_streamOutBufOffsets[MaxTransformFeedbackBuffers]; // Stream-out buffer offsets
+  llvm::Value *m_streamOutControlBufPtr = nullptr;                      // Stream-out control buffer pointer
+  llvm::Value *m_streamOutBufDescs[MaxTransformFeedbackBuffers] = {};   // Stream-out buffer descriptors
+  llvm::Value *m_streamOutBufOffsets[MaxTransformFeedbackBuffers] = {}; // Stream-out buffer offsets
 
   bool m_constPositionZ = false; // Whether the Z channel of vertex position data is constant
 

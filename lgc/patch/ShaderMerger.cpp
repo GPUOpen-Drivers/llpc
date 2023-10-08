@@ -216,9 +216,7 @@ void ShaderMerger::applyTuningAttributes(Function *dstEntryPoint, const AttrBuil
 // @param copyShaderEntryPoint : Entry-point of hardware vertex shader (VS, copy shader) (could be null)
 Function *ShaderMerger::buildPrimShader(Function *esEntryPoint, Function *gsEntryPoint,
                                         Function *copyShaderEntryPoint) {
-#if VKI_RAY_TRACING
   processRayQueryLdsStack(esEntryPoint, gsEntryPoint);
-#endif
 
   AttrBuilder tuningAttrs(*m_context);
   gatherTuningAttributes(tuningAttrs, esEntryPoint);
@@ -306,9 +304,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   hsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
   hsEntryPoint->addFnAttr(Attribute::AlwaysInline);
 
-#if VKI_RAY_TRACING
   processRayQueryLdsStack(lsEntryPoint, hsEntryPoint);
-#endif
 
   uint64_t inRegMask = 0;
   auto entryPointTy = generateLsHsEntryPointType(&inRegMask);
@@ -327,6 +323,9 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
 
   entryPoint->addFnAttr("amdgpu-flat-work-group-size",
                         "128,128"); // Force s_barrier to be present (ignore optimization)
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
+  if (m_gfxIp.major >= 10)
+    entryPoint->addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
   applyTuningAttributes(entryPoint, tuningAttrs);
 
   for (auto &arg : entryPoint->args()) {
@@ -386,7 +385,6 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   auto threadIdInWave =
       builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {builder.getInt32(-1), builder.getInt32(0)});
 
-  unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
   if (waveSize == 64) {
     threadIdInWave = builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {builder.getInt32(-1), threadIdInWave});
   }
@@ -500,7 +498,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
 
   SyncScope::ID syncScope = m_context->getOrInsertSyncScopeID("workgroup");
   builder.CreateFence(AtomicOrdering::Release, syncScope);
-  builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+  createBarrier(builder);
   builder.CreateFence(AtomicOrdering::Acquire, syncScope);
 
   auto validHsVert = builder.CreateICmpULT(threadIdInWave, hsVertCount, "validHsVert");
@@ -647,9 +645,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   gsEntryPoint->setLinkage(GlobalValue::InternalLinkage);
   gsEntryPoint->addFnAttr(Attribute::AlwaysInline);
 
-#if VKI_RAY_TRACING
   processRayQueryLdsStack(esEntryPoint, gsEntryPoint);
-#endif
 
   auto module = gsEntryPoint->getParent();
   const bool hasTs = (m_hasTcs || m_hasTes);
@@ -670,6 +666,9 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
 
   entryPoint->addFnAttr("amdgpu-flat-work-group-size",
                         "128,128"); // Force s_barrier to be present (ignore optimization)
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
+  if (m_gfxIp.major >= 10)
+    entryPoint->addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
   applyTuningAttributes(entryPoint, tuningAttrs);
 
   for (auto &arg : entryPoint->args()) {
@@ -724,7 +723,6 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   auto threadIdInWave =
       builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {builder.getInt32(-1), builder.getInt32(0)});
 
-  unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
   if (waveSize == 64) {
     threadIdInWave = builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {builder.getInt32(-1), threadIdInWave});
   }
@@ -840,7 +838,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
 
   SyncScope::ID syncScope = m_context->getOrInsertSyncScopeID("workgroup");
   builder.CreateFence(AtomicOrdering::Release, syncScope);
-  builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+  createBarrier(builder);
   builder.CreateFence(AtomicOrdering::Acquire, syncScope);
 
   auto validGsPrim = builder.CreateICmpULT(threadIdInWave, gsPrimCount, "validGsPrim");
@@ -983,7 +981,6 @@ void ShaderMerger::appendArguments(SmallVectorImpl<Value *> &args, ArrayRef<Argu
   }
 }
 
-#if VKI_RAY_TRACING
 // =====================================================================================================================
 // Process ray query LDS stack lowering by incorporating it to the LDS of merged shader. For merged HS, we place the
 // LDS stack after the use of tessellation on-chip LDS; for merged GS, we place it after the use of GS on-chip LDS.
@@ -1047,7 +1044,6 @@ void ShaderMerger::processRayQueryLdsStack(Function *entryPoint1, Function *entr
       ldsStack->eraseFromParent();
   }
 }
-#endif
 
 // =====================================================================================================================
 // Handle the store of tessellation factors with optimization (TF0/TF1 messaging)
@@ -1115,20 +1111,10 @@ void ShaderMerger::storeTessFactorsWithOpt(Value *threadIdInWave, IRBuilder<> &b
   auto ballot = [&](Value *value) {
     assert(value->getType()->isIntegerTy(1)); // Should be i1
 
-    value = builder.CreateSelect(value, builder.getInt32(1), builder.getInt32(0));
-    auto inlineAsmTy = FunctionType::get(builder.getInt32Ty(), builder.getInt32Ty(), false);
-    auto inlineAsm = InlineAsm::get(inlineAsmTy, "; %1", "=v,0", true);
-    value = builder.CreateCall(inlineAsm, value);
-
-    static const unsigned PredicateNE = 33; // 33 = predicate NE
-    Value *ballot = builder.CreateIntrinsic(Intrinsic::amdgcn_icmp,
-                                            {
-                                                builder.getIntNTy(waveSize), // Return type
-                                                builder.getInt32Ty()         // Argument type
-                                            },
-                                            {value, builder.getInt32(0), builder.getInt32(PredicateNE)});
+    Value *ballot = builder.CreateIntrinsic(Intrinsic::amdgcn_ballot, builder.getIntNTy(waveSize), value);
     if (waveSize == 32)
       ballot = builder.CreateZExt(ballot, builder.getInt64Ty());
+
     return ballot;
   };
 
@@ -1161,7 +1147,7 @@ void ShaderMerger::storeTessFactorsWithOpt(Value *threadIdInWave, IRBuilder<> &b
 
     const auto hsPatchCountStart = calcFactor.onChip.hsPatchCountStart;
     hsPatchCount = readValueFromLds(builder.getInt32Ty(), builder.getInt32(hsPatchCountStart), builder);
-    hsPatchCount = builder.CreateIntrinsic(Intrinsic::amdgcn_readfirstlane, {}, hsPatchCount);
+    hsPatchCount = builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, hsPatchCount);
     hsPatchCount->setName("hsPatchCount");
 
     validHsPatch = builder.CreateICmpULT(threadIdInGroup, hsPatchCount, "validHsPatch");
@@ -1271,7 +1257,7 @@ void ShaderMerger::storeTessFactorsWithOpt(Value *threadIdInWave, IRBuilder<> &b
 
     SyncScope::ID syncScope = m_context->getOrInsertSyncScopeID("workgroup");
     builder.CreateFence(AtomicOrdering::Release, syncScope);
-    builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
+    createBarrier(builder);
     builder.CreateFence(AtomicOrdering::Acquire, syncScope);
 
     auto validHsPatchWave = builder.CreateICmpULT(threadIdInWave, hsPatchWaveCount, "validHsPatchWave");
@@ -1431,4 +1417,13 @@ void ShaderMerger::writeValueToLds(Value *writeValue, Value *ldsOffset, IRBuilde
   Value *writePtr = builder.CreateGEP(lds->getValueType(), lds, {builder.getInt32(0), ldsOffset});
   writePtr = builder.CreateBitCast(writePtr, PointerType::get(writeTy, writePtr->getType()->getPointerAddressSpace()));
   builder.CreateAlignedStore(writeValue, writePtr, Align(4));
+}
+
+// =====================================================================================================================
+// Create LDS barrier to guarantee the synchronization of LDS operations.
+//
+// @param builder : IR builder to insert instructions
+void ShaderMerger::createBarrier(IRBuilder<> &builder) {
+
+  builder.CreateIntrinsic(Intrinsic::amdgcn_s_barrier, {}, {});
 }

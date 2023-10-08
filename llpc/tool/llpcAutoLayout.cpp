@@ -559,7 +559,10 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
         auto varElemTy = var->getType()->getPointerElementType();
         unsigned arraySize = 1;
         while (varElemTy->isTypeArray()) {
-          arraySize *= varElemTy->getArrayLength();
+          if (varElemTy->isTypeRuntimeArray())
+            arraySize *= 16; // arbitrarily pick something semi-plausible
+          else
+            arraySize *= varElemTy->getArrayLength();
           varElemTy = varElemTy->getArrayElementType();
         }
 

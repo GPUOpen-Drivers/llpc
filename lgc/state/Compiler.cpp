@@ -141,7 +141,7 @@ Module *PipelineState::irLink(ArrayRef<Module *> modules, PipelineLink pipelineL
     pipelineModule = new Module("lgcPipeline", getContext());
     TargetMachine *targetMachine = getLgcContext()->getTargetMachine();
     pipelineModule->setTargetTriple(targetMachine->getTargetTriple().getTriple());
-    pipelineModule->setDataLayout(targetMachine->createDataLayout());
+    pipelineModule->setDataLayout(modules.front()->getDataLayout());
 
     Linker linker(*pipelineModule);
     for (Module *module : modules) {
@@ -202,9 +202,6 @@ bool PipelineState::generate(Module *pipelineModule, raw_pwrite_stream &outStrea
   passMgr->registerFunctionAnalysis([&] { return getLgcContext()->getTargetMachine()->getTargetIRAnalysis(); });
   passMgr->registerModuleAnalysis([&] { return PipelineShaders(); });
 
-  // Manually add a target-aware TLI pass, so optimizations do not think that we have library functions.
-  getLgcContext()->preparePassManager(*passMgr);
-
   // Ensure m_stageMask is set up in this PipelineState, as Patch::addPasses uses it.
   readShaderStageMask(&*pipelineModule);
 
@@ -222,7 +219,7 @@ bool PipelineState::generate(Module *pipelineModule, raw_pwrite_stream &outStrea
   } else {
     // Patching.
     Patch::addPasses(this, *passMgr, patchTimer, optTimer, std::move(checkShaderCacheFunc),
-                     getLgcContext()->getOptimizationLevel());
+                     static_cast<uint32_t>(getLgcContext()->getOptimizationLevel()));
 
     // Add pass to clear pipeline state from IR
     passMgr->addPass(PipelineStateClearer());
@@ -237,6 +234,9 @@ bool PipelineState::generate(Module *pipelineModule, raw_pwrite_stream &outStrea
       unsigned passIndex = 2000;
       codegenPassMgr->setPassIndex(&passIndex);
       getLgcContext()->addTargetPasses(*codegenPassMgr, codeGenTimer, outStream);
+      // Get compatible datalayout as what backend require, this is mainly used to remove entries for address space that
+      // are only known to the middle-end.
+      pipelineModule->setDataLayout(getLgcContext()->getTargetMachine()->createDataLayout());
       codegenPassMgr->run(*pipelineModule);
     }
   }

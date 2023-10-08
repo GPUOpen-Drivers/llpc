@@ -201,101 +201,100 @@ void PalMetadata::mergeFromBlob(llvm::StringRef blob, bool isGlueCode) {
   // -1: failure
   // 0: success; *dest has been set up with the merged node. For an array, 0 means overwrite the existing array
   //    rather than appending.
-  auto merger =
-      [isGlueCode](msgpack::DocNode *destNode, msgpack::DocNode srcNode, msgpack::DocNode mapKey) {
-        // Allow array and map merging.
-        if (srcNode.isMap() && destNode->isMap())
-          return 0;
-        if (srcNode.isArray() && destNode->isArray())
-          return 0;
-        // Allow string merging as long as the two strings have the same value. If one string has a "_fetchless"
-        // suffix, take the other one. This is for the benefit of the linker linking a fetch shader with a
-        // fetchless VS.
-        if (destNode->isString() && srcNode.isString()) {
-          if (destNode->getString() == srcNode.getString())
-            return 0;
-          if (srcNode.getString().endswith("_fetchless"))
-            return 0;
-          if (destNode->getString().endswith("_fetchless")) {
-            *destNode = srcNode;
-            return 0;
-          }
-          if (srcNode.getString() == "color_export_shader")
-            return 0;
-          if (destNode->getString() == "color_export_shader") {
-            *destNode = srcNode;
-            return 0;
-          }
-        }
-        // Allow bool merging (for things like .uses_viewport_array_index).
-        if (destNode->getKind() == msgpack::Type::Boolean && srcNode.getKind() == msgpack::Type::Boolean) {
-          if (srcNode.getBool())
-            *destNode = srcNode.getDocument()->getNode(true);
-          return 0;
-        }
-        // Disallow merging other than uint.
-        if (destNode->getKind() != msgpack::Type::UInt || srcNode.getKind() != msgpack::Type::UInt)
-          return -1;
-        // Special cases of uint merging.
-        if (mapKey.getKind() == msgpack::Type::UInt) {
-          switch (mapKey.getUInt()) {
-          case mmVGT_SHADER_STAGES_EN:
-            // Ignore new value of VGT_SHADER_STAGES_EN from glue shader, as it might accidentally make the VS
-            // wave32. (This relies on the glue shader's PAL metadata being merged into the vertex-processing
-            // part-pipeline, rather than the other way round.)
-            if (isGlueCode)
-              return 0;
-            break; // Use "default behavior for uint nodes" code below.
-          case mmSPI_SHADER_PGM_RSRC1_LS:
-          case mmSPI_SHADER_PGM_RSRC1_HS:
-          case mmSPI_SHADER_PGM_RSRC1_ES:
-          case mmSPI_SHADER_PGM_RSRC1_GS:
-          case mmSPI_SHADER_PGM_RSRC1_VS:
-          case mmSPI_SHADER_PGM_RSRC1_PS: {
-            // For the RSRC1 registers, we need to consider the VGPRs and SGPRs fields separately, and max them.
-            // This happens when linking in a glue shader.
-            SPI_SHADER_PGM_RSRC1 destRsrc1;
-            SPI_SHADER_PGM_RSRC1 srcRsrc1;
-            SPI_SHADER_PGM_RSRC1 origRsrc1;
-            origRsrc1.u32All = destNode->getUInt();
-            srcRsrc1.u32All = srcNode.getUInt();
-            destRsrc1.u32All = origRsrc1.u32All | srcRsrc1.u32All;
-            destRsrc1.bits.VGPRS = std::max(origRsrc1.bits.VGPRS, srcRsrc1.bits.VGPRS);
-            destRsrc1.bits.SGPRS = std::max(origRsrc1.bits.SGPRS, srcRsrc1.bits.SGPRS);
-            if (isGlueCode) {
-              // The float mode should come from the body of the shader and not the glue code.
-              destRsrc1.bits.FLOAT_MODE = origRsrc1.bits.FLOAT_MODE;
-            }
-            *destNode = srcNode.getDocument()->getNode(destRsrc1.u32All);
-            return 0;
-          }
-          case mmSPI_PS_INPUT_ENA:
-          case mmSPI_PS_INPUT_ADDR:
-          case mmSPI_PS_IN_CONTROL:
-            if (isGlueCode)
-              return 0;
-            break; // Use "default behavior for uint nodes" code below.
-          }
-        } else if (mapKey.isString()) {
-          // For .userdatalimit, register counts, and register limits, take the max value.
-          if (mapKey.getString() == Util::Abi::PipelineMetadataKey::UserDataLimit ||
-              mapKey.getString() == Util::Abi::HardwareStageMetadataKey::SgprCount ||
-              mapKey.getString() == Util::Abi::HardwareStageMetadataKey::SgprLimit ||
-              mapKey.getString() == Util::Abi::HardwareStageMetadataKey::VgprCount ||
-              mapKey.getString() == Util::Abi::HardwareStageMetadataKey::VgprLimit) {
-            *destNode = std::max(destNode->getUInt(), srcNode.getUInt());
-            return 0;
-          }
-          // For .spillthreshold, take the min value.
-          if (mapKey.getString() == Util::Abi::PipelineMetadataKey::SpillThreshold) {
-            *destNode = std::min(destNode->getUInt(), srcNode.getUInt());
-            return 0;
-          }
-        }
-        // Default behavior for uint nodes: "or" the values together.
-        *destNode = destNode->getUInt() | srcNode.getUInt();
+  auto merger = [isGlueCode](msgpack::DocNode *destNode, msgpack::DocNode srcNode, msgpack::DocNode mapKey) {
+    // Allow array and map merging.
+    if (srcNode.isMap() && destNode->isMap())
+      return 0;
+    if (srcNode.isArray() && destNode->isArray())
+      return 0;
+    // Allow string merging as long as the two strings have the same value. If one string has a "_fetchless"
+    // suffix, take the other one. This is for the benefit of the linker linking a fetch shader with a
+    // fetchless VS.
+    if (destNode->isString() && srcNode.isString()) {
+      if (destNode->getString() == srcNode.getString())
         return 0;
-      };
+      if (srcNode.getString().endswith("_fetchless"))
+        return 0;
+      if (destNode->getString().endswith("_fetchless")) {
+        *destNode = srcNode;
+        return 0;
+      }
+      if (srcNode.getString() == "color_export_shader")
+        return 0;
+      if (destNode->getString() == "color_export_shader") {
+        *destNode = srcNode;
+        return 0;
+      }
+    }
+    // Allow bool merging (for things like .uses_viewport_array_index).
+    if (destNode->getKind() == msgpack::Type::Boolean && srcNode.getKind() == msgpack::Type::Boolean) {
+      if (srcNode.getBool())
+        *destNode = srcNode.getDocument()->getNode(true);
+      return 0;
+    }
+    // Disallow merging other than uint.
+    if (destNode->getKind() != msgpack::Type::UInt || srcNode.getKind() != msgpack::Type::UInt)
+      return -1;
+    // Special cases of uint merging.
+    if (mapKey.getKind() == msgpack::Type::UInt) {
+      switch (mapKey.getUInt()) {
+      case mmVGT_SHADER_STAGES_EN:
+        // Ignore new value of VGT_SHADER_STAGES_EN from glue shader, as it might accidentally make the VS
+        // wave32. (This relies on the glue shader's PAL metadata being merged into the vertex-processing
+        // part-pipeline, rather than the other way round.)
+        if (isGlueCode)
+          return 0;
+        break; // Use "default behavior for uint nodes" code below.
+      case mmSPI_SHADER_PGM_RSRC1_LS:
+      case mmSPI_SHADER_PGM_RSRC1_HS:
+      case mmSPI_SHADER_PGM_RSRC1_ES:
+      case mmSPI_SHADER_PGM_RSRC1_GS:
+      case mmSPI_SHADER_PGM_RSRC1_VS:
+      case mmSPI_SHADER_PGM_RSRC1_PS: {
+        // For the RSRC1 registers, we need to consider the VGPRs and SGPRs fields separately, and max them.
+        // This happens when linking in a glue shader.
+        SPI_SHADER_PGM_RSRC1 destRsrc1;
+        SPI_SHADER_PGM_RSRC1 srcRsrc1;
+        SPI_SHADER_PGM_RSRC1 origRsrc1;
+        origRsrc1.u32All = destNode->getUInt();
+        srcRsrc1.u32All = srcNode.getUInt();
+        destRsrc1.u32All = origRsrc1.u32All | srcRsrc1.u32All;
+        destRsrc1.bits.VGPRS = std::max(origRsrc1.bits.VGPRS, srcRsrc1.bits.VGPRS);
+        destRsrc1.bits.SGPRS = std::max(origRsrc1.bits.SGPRS, srcRsrc1.bits.SGPRS);
+        if (isGlueCode) {
+          // The float mode should come from the body of the shader and not the glue code.
+          destRsrc1.bits.FLOAT_MODE = origRsrc1.bits.FLOAT_MODE;
+        }
+        *destNode = srcNode.getDocument()->getNode(destRsrc1.u32All);
+        return 0;
+      }
+      case mmSPI_PS_INPUT_ENA:
+      case mmSPI_PS_INPUT_ADDR:
+      case mmSPI_PS_IN_CONTROL:
+        if (isGlueCode)
+          return 0;
+        break; // Use "default behavior for uint nodes" code below.
+      }
+    } else if (mapKey.isString()) {
+      // For .userdatalimit, register counts, and register limits, take the max value.
+      if (mapKey.getString() == Util::Abi::PipelineMetadataKey::UserDataLimit ||
+          mapKey.getString() == Util::Abi::HardwareStageMetadataKey::SgprCount ||
+          mapKey.getString() == Util::Abi::HardwareStageMetadataKey::SgprLimit ||
+          mapKey.getString() == Util::Abi::HardwareStageMetadataKey::VgprCount ||
+          mapKey.getString() == Util::Abi::HardwareStageMetadataKey::VgprLimit) {
+        *destNode = std::max(destNode->getUInt(), srcNode.getUInt());
+        return 0;
+      }
+      // For .spillthreshold, take the min value.
+      if (mapKey.getString() == Util::Abi::PipelineMetadataKey::SpillThreshold) {
+        *destNode = std::min(destNode->getUInt(), srcNode.getUInt());
+        return 0;
+      }
+    }
+    // Default behavior for uint nodes: "or" the values together.
+    *destNode = destNode->getUInt() | srcNode.getUInt();
+    return 0;
+  };
   auto mergerNew = [isGlueCode](msgpack::DocNode *destNode, msgpack::DocNode srcNode, msgpack::DocNode mapKey) {
     // Allow array and map merging.
     if (srcNode.isMap() && destNode->isMap())
@@ -487,7 +486,6 @@ unsigned PalMetadata::getUserDataReg0(ShaderStage stage) {
 // @param userDataIndex : User data index 0-15 or 0-31 depending on HW and shader stage
 // @param userDataValue : Value to store in that entry, one of:
 //                        - a 0-based integer for the root user data dword offset
-//                        - DescRelocMagic+set_number for an unlinked descriptor set number
 //                        - one of the UserDataMapping values, e.g. UserDataMapping::GlobalTable
 // @param dwordCount : Number of user data entries to set
 void PalMetadata::setUserDataEntry(ShaderStage stage, unsigned userDataIndex, unsigned userDataValue,
@@ -640,11 +638,8 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
 
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 &&
         m_pipelineState->getColorExportState().alphaToCoverageEnable) {
-      if (graphicsRegNode.find(Util::Abi::DbShaderControlMetadataKey::MaskExportEnable) != graphicsRegNode.end()) {
-        auto dbShaderControl = graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl].getMap(true);
-        dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] =
-            dbShaderControl[Util::Abi::DbShaderControlMetadataKey::MaskExportEnable].getBool();
-      }
+      auto dbShaderControl = graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl].getMap(true);
+      dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] = false;
     }
 
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10) {
@@ -666,15 +661,8 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
     // Set PA_CL_CLIP_CNTL from pipeline state settings.
     // DX_CLIP_SPACE_DEF, ZCLIP_NEAR_DISABLE and ZCLIP_FAR_DISABLE are now set internally by PAL (as of
     // version 629), and are no longer part of the PAL ELF ABI.
-    const unsigned usrClipPlaneMask = m_pipelineState->getRasterizerState().usrClipPlaneMask;
     const bool rasterizerDiscardEnable = m_pipelineState->getRasterizerState().rasterizerDiscardEnable;
     PA_CL_CLIP_CNTL paClClipCntl = {};
-    paClClipCntl.bits.UCP_ENA_0 = (usrClipPlaneMask >> 0) & 0x1;
-    paClClipCntl.bits.UCP_ENA_1 = (usrClipPlaneMask >> 1) & 0x1;
-    paClClipCntl.bits.UCP_ENA_2 = (usrClipPlaneMask >> 2) & 0x1;
-    paClClipCntl.bits.UCP_ENA_3 = (usrClipPlaneMask >> 3) & 0x1;
-    paClClipCntl.bits.UCP_ENA_4 = (usrClipPlaneMask >> 4) & 0x1;
-    paClClipCntl.bits.UCP_ENA_5 = (usrClipPlaneMask >> 5) & 0x1;
     paClClipCntl.bits.DX_LINEAR_ATTR_CLIP_ENA = true;
     paClClipCntl.bits.DX_RASTERIZATION_KILL = rasterizerDiscardEnable;
     setRegister(mmPA_CL_CLIP_CNTL, paClClipCntl.u32All);
@@ -683,7 +671,7 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
         m_pipelineState->getColorExportState().alphaToCoverageEnable) {
       DB_SHADER_CONTROL dbShaderControl = {};
       dbShaderControl.u32All = getRegister(mmDB_SHADER_CONTROL);
-      dbShaderControl.bitfields.ALPHA_TO_MASK_DISABLE = dbShaderControl.bitfields.MASK_EXPORT_ENABLE;
+      dbShaderControl.bitfields.ALPHA_TO_MASK_DISABLE = 0;
       setRegister(mmDB_SHADER_CONTROL, dbShaderControl.u32All);
     }
 
@@ -735,7 +723,7 @@ void PalMetadata::finalizeInputControlRegisterSetting() {
                                 .getArray(true);
       // Check if pointCoordLoc is not used
       auto spiPsInputCntlElem = spiPsInputCntl[viewportIndexLoc].getMap(true);
-      if (spiPsInputCntlElem[Util::Abi::SpiPsInputCntlMetadataKey::PtSpriteTex].getBool()) {
+      if (!spiPsInputCntlElem[Util::Abi::SpiPsInputCntlMetadataKey::PtSpriteTex].getBool()) {
         // Use default value 0 for viewport array index if it is only used in FS (not set in other stages)
         constexpr unsigned defaultVal = (1 << 5);
         spiPsInputCntlElem[Util::Abi::SpiPsInputCntlMetadataKey::Offset] = defaultVal;
@@ -769,6 +757,12 @@ void PalMetadata::finalizePipeline(bool isWholePipeline) {
   if (m_pipelineState->isGraphics())
     finalizeRegisterSettings(isWholePipeline);
 
+  // Set pipeline hash.
+  auto pipelineHashNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
+  const auto &options = m_pipelineState->getOptions();
+  pipelineHashNode[0] = options.hash[0];
+  pipelineHashNode[1] = options.hash[1];
+
   // The rest of this function is used only for whole pipeline PAL metadata or an ELF link.
   if (!isWholePipeline)
     return;
@@ -776,12 +770,6 @@ void PalMetadata::finalizePipeline(bool isWholePipeline) {
   // In the part-pipeline compilation only at ELF link stage do we know how gl_ViewportIndex was used in all stages.
   if (isShaderStageInMask(ShaderStageFragment, m_pipelineState->getShaderStageMask()))
     finalizeInputControlRegisterSetting();
-
-  // Set pipeline hash.
-  auto pipelineHashNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
-  const auto &options = m_pipelineState->getOptions();
-  pipelineHashNode[0] = options.hash[0];
-  pipelineHashNode[1] = options.hash[1];
 
   // Erase the PAL metadata for FS input mappings.
   eraseFragmentInputInfo();
@@ -892,6 +880,14 @@ void PalMetadata::addColorExportInfo(ArrayRef<ColorExportInfo> exports) {
     fetchNode.push_back(m_document->getNode(getTypeName(exportInfo.ty), /*copy=*/true));
     colorExportArray.push_back(fetchNode);
   }
+}
+
+// =====================================================================================================================
+// Set discard state in the PAL metadata for explicitly building color export shader.
+//
+// @param enable : Whether this fragment shader has kill enabled.
+void PalMetadata::setDiscardState(bool enable) {
+  m_pipelineNode[PipelineMetadataKey::DiscardState] = enable;
 }
 
 // =====================================================================================================================
@@ -1032,24 +1028,10 @@ llvm::Type *PalMetadata::getLlvmType(StringRef tyName) const {
 // =====================================================================================================================
 // Updates the SPI_SHADER_COL_FORMAT entry.
 //
-void PalMetadata::updateSpiShaderColFormat(ArrayRef<ColorExportInfo> exps, bool hasDepthExpFmtZero, bool killEnabled) {
+void PalMetadata::updateSpiShaderColFormat(ArrayRef<ExportFormat> expFormats) {
   unsigned spiShaderColFormat = 0;
-  for (auto &exp : exps) {
-    if (exp.hwColorTarget == MaxColorTargets)
-      continue;
-    unsigned expFormat = m_pipelineState->computeExportFormat(exp.ty, exp.location);
-    spiShaderColFormat |= (expFormat << (4 * exp.hwColorTarget));
-  }
-
-  if (spiShaderColFormat == 0 && hasDepthExpFmtZero) {
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10 || killEnabled) {
-      // NOTE: Hardware requires that fragment shader always exports "something" (color or depth) to the SX.
-      // If both SPI_SHADER_Z_FORMAT and SPI_SHADER_COL_FORMAT are zero, we need to override
-      // SPI_SHADER_COL_FORMAT to export one channel to MRT0. This dummy export format will be masked
-      // off by CB_SHADER_MASK.
-      spiShaderColFormat = SPI_SHADER_32_R;
-    }
-  }
+  for (auto [i, expFormat] : enumerate(expFormats))
+    spiShaderColFormat |= expFormat << (4 * i);
 
   if (m_pipelineState->useRegisterFieldFormat()) {
     auto spiShaderColFormatNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
@@ -1072,6 +1054,72 @@ void PalMetadata::updateSpiShaderColFormat(ArrayRef<ColorExportInfo> exps, bool 
         (spiShaderColFormat >> 28) & 0xF;
   } else {
     setRegister(mmSPI_SHADER_COL_FORMAT, spiShaderColFormat);
+  }
+}
+
+// =====================================================================================================================
+// Updates the CB_SHADER_MASK entry.
+//
+void PalMetadata::updateCbShaderMask(llvm::ArrayRef<ColorExportInfo> exps) {
+  unsigned cbShaderMask = 0;
+  for (auto &exp : exps) {
+    if (exp.hwColorTarget == MaxColorTargets)
+      continue;
+
+    if (m_pipelineState->computeExportFormat(exp.ty, exp.location) != 0) {
+      cbShaderMask |= (0xF << (4 * exp.location));
+    }
+  }
+
+  if (m_pipelineState->useRegisterFieldFormat()) {
+    auto cbShaderMaskNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
+                                .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::CbShaderMask]
+                                .getMap(true);
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output0Enable] = cbShaderMask & 0xF;
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output1Enable] = (cbShaderMask >> 4) & 0xF;
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output2Enable] = (cbShaderMask >> 8) & 0xF;
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output3Enable] = (cbShaderMask >> 12) & 0xF;
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output4Enable] = (cbShaderMask >> 16) & 0xF;
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output5Enable] = (cbShaderMask >> 20) & 0xF;
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output6Enable] = (cbShaderMask >> 24) & 0xF;
+    cbShaderMaskNode[Util::Abi::CbShaderMaskMetadataKey::Output7Enable] = (cbShaderMask >> 28) & 0xF;
+  } else {
+    setRegister(mmCB_SHADER_MASK, cbShaderMask);
+  }
+}
+
+// =====================================================================================================================
+//  Updates the DB shader control that depends on the CB state.
+//
+void PalMetadata::updateDbShaderControl() {
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) {
+    if (m_pipelineState->useRegisterFieldFormat()) {
+      auto dbShaderControl = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
+                                 .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl]
+                                 .getMap(true);
+      dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] =
+          !m_pipelineState->getColorExportState().alphaToCoverageEnable;
+    } else {
+      DB_SHADER_CONTROL dbShaderControl = {};
+      dbShaderControl.u32All = getRegister(mmDB_SHADER_CONTROL);
+      dbShaderControl.bitfields.ALPHA_TO_MASK_DISABLE = !m_pipelineState->getColorExportState().alphaToCoverageEnable;
+      setRegister(mmDB_SHADER_CONTROL, dbShaderControl.u32All);
+    }
+  }
+}
+
+// =====================================================================================================================
+// Sets the SPI_SHADER_Z_FORMAT entry.
+//
+// @param zExportFormat : new z-export-format
+void PalMetadata::setSpiShaderZFormat(unsigned zExportFormat) {
+  if (m_pipelineState->useRegisterFieldFormat()) {
+    auto graphicsRegNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
+    graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::SpiShaderZFormat] = zExportFormat;
+  } else {
+    SPI_SHADER_Z_FORMAT spiShaderZFormat = {};
+    spiShaderZFormat.bitfields.Z_EXPORT_FORMAT = zExportFormat;
+    setRegister(mmSPI_SHADER_Z_FORMAT, spiShaderZFormat.u32All);
   }
 }
 
@@ -1215,17 +1263,6 @@ void PalMetadata::eraseFragmentInputInfo() {
 }
 
 // =====================================================================================================================
-// Returns true if the fragment input info has an entry for a builtin.
-bool PalMetadata::fragmentShaderUsesMappedBuiltInInputs() {
-  auto array2It = m_pipelineNode.find(m_document->getNode(PipelineMetadataKey::FragInputMapping2));
-  if (array2It != m_pipelineNode.end()) {
-    auto fragInputMappingArray2 = array2It->second.getArray(true);
-    return !fragInputMappingArray2.empty();
-  }
-  return false;
-}
-
-// =====================================================================================================================
 // Returns the location of the fragment builtin or InvalidValue if the builtin is not found.
 //
 // @param builtin : Fragment builtin to check.
@@ -1248,10 +1285,6 @@ unsigned PalMetadata::getFragmentShaderBuiltInLoc(unsigned builtin) {
 unsigned PalMetadata::getCallingConventionForFirstHardwareShaderStage(std::string &hwStageName) {
   if (m_useRegisterFieldFormat) {
     auto hardwareStages = m_pipelineNode[Util::Abi::PipelineMetadataKey::HardwareStages].getMap(true);
-    hwStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Vs)];
-    if (hardwareStages.find(hwStageName) != hardwareStages.end())
-      return CallingConv::AMDGPU_VS;
-
     hwStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Hs)];
     if (hardwareStages.find(hwStageName) != hardwareStages.end())
       return CallingConv::AMDGPU_HS;
@@ -1259,6 +1292,10 @@ unsigned PalMetadata::getCallingConventionForFirstHardwareShaderStage(std::strin
     hwStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Gs)];
     if (hardwareStages.find(hwStageName) != hardwareStages.end())
       return CallingConv::AMDGPU_GS;
+
+    hwStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Vs)];
+    if (hardwareStages.find(hwStageName) != hardwareStages.end())
+      return CallingConv::AMDGPU_VS;
 
     hwStageName = HwStageNames[static_cast<unsigned>(Util::Abi::HardwareStage::Cs)];
     return CallingConv::AMDGPU_CS;

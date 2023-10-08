@@ -287,7 +287,8 @@ Value *YCbCrConverter::createImageSampleInternal(SmallVectorImpl<Value *> &coord
 
   unsigned imageDim = ycbcrInfo->dim;
 
-  Value *coords = UndefValue::get(FixedVectorType::get(coordsIn[0]->getType(), m_builder->getImageNumCoords(imageDim)));
+  Value *coords =
+      PoisonValue::get(FixedVectorType::get(coordsIn[0]->getType(), m_builder->getImageNumCoords(imageDim)));
   coords = m_builder->CreateInsertElement(coords, coordsIn[0], uint64_t(0));
   coords = m_builder->CreateInsertElement(coords, coordsIn[1], uint64_t(1));
 
@@ -526,7 +527,7 @@ Value *YCbCrConverter::rangeExpand(SamplerYCbCrRange range, const unsigned *chan
     float row0Num = static_cast<float>(0x1u << (channelBits[0] - 0x1u)) / ((0x1u << channelBits[0]) - 1u);
     float row2Num = static_cast<float>(0x1u << (channelBits[2] - 0x1u)) / ((0x1u << channelBits[2]) - 1u);
 
-    Value *convVec1 = UndefValue::get(FixedVectorType::get(m_builder->getFloatTy(), 3));
+    Value *convVec1 = PoisonValue::get(FixedVectorType::get(m_builder->getFloatTy(), 3));
     convVec1 = m_builder->CreateInsertElement(convVec1, ConstantFP::get(m_builder->getFloatTy(), row0Num), uint64_t(0));
     convVec1 = m_builder->CreateInsertElement(convVec1, ConstantFP::get(m_builder->getFloatTy(), 0.0f), uint64_t(1));
     convVec1 = m_builder->CreateInsertElement(convVec1, ConstantFP::get(m_builder->getFloatTy(), row2Num), uint64_t(2));
@@ -544,7 +545,7 @@ Value *YCbCrConverter::rangeExpand(SamplerYCbCrRange range, const unsigned *chan
     float row1Num = static_cast<float>((0x1u << channelBits[1]) - 1u) / (219u * (0x1u << (channelBits[1] - 8)));
     float row2Num = static_cast<float>((0x1u << channelBits[2]) - 1u) / (224u * (0x1u << (channelBits[2] - 8)));
 
-    Value *convVec1 = UndefValue::get(FixedVectorType::get(m_builder->getFloatTy(), 3));
+    Value *convVec1 = PoisonValue::get(FixedVectorType::get(m_builder->getFloatTy(), 3));
     convVec1 = m_builder->CreateInsertElement(convVec1, ConstantFP::get(m_builder->getFloatTy(), row0Num), uint64_t(0));
     convVec1 = m_builder->CreateInsertElement(convVec1, ConstantFP::get(m_builder->getFloatTy(), row1Num), uint64_t(1));
     convVec1 = m_builder->CreateInsertElement(convVec1, ConstantFP::get(m_builder->getFloatTy(), row2Num), uint64_t(2));
@@ -556,7 +557,7 @@ Value *YCbCrConverter::rangeExpand(SamplerYCbCrRange range, const unsigned *chan
     row1Num = static_cast<float>(16u * (0x1u << (channelBits[1] - 8))) / (219u * (0x1u << (channelBits[1] - 8)));
     row2Num = static_cast<float>(128u * (0x1u << (channelBits[2] - 8))) / (224u * (0x1u << (channelBits[2] - 8)));
 
-    Value *convVec2 = UndefValue::get(FixedVectorType::get(m_builder->getFloatTy(), 3));
+    Value *convVec2 = PoisonValue::get(FixedVectorType::get(m_builder->getFloatTy(), 3));
     convVec2 = m_builder->CreateInsertElement(convVec2, ConstantFP::get(m_builder->getFloatTy(), row0Num), uint64_t(0));
     convVec2 = m_builder->CreateInsertElement(convVec2, ConstantFP::get(m_builder->getFloatTy(), row1Num), uint64_t(1));
     convVec2 = m_builder->CreateInsertElement(convVec2, ConstantFP::get(m_builder->getFloatTy(), row2Num), uint64_t(2));
@@ -796,17 +797,17 @@ Value *YCbCrConverter::convertColor(Type *resultTy, SamplerYCbCrModelConversion 
 
   Type *floatTy = m_builder->getFloatTy();
 
-  Value *minVec = UndefValue::get(FixedVectorType::get(floatTy, 3));
+  Value *minVec = PoisonValue::get(FixedVectorType::get(floatTy, 3));
   minVec = m_builder->CreateInsertElement(minVec, ConstantFP::get(floatTy, -0.5), uint64_t(0));
   minVec = m_builder->CreateInsertElement(minVec, ConstantFP::get(floatTy, 0.0), uint64_t(1));
   minVec = m_builder->CreateInsertElement(minVec, ConstantFP::get(floatTy, -0.5), uint64_t(2));
 
-  Value *maxVec = UndefValue::get(FixedVectorType::get(floatTy, 3));
+  Value *maxVec = PoisonValue::get(FixedVectorType::get(floatTy, 3));
   maxVec = m_builder->CreateInsertElement(maxVec, ConstantFP::get(floatTy, 0.5), uint64_t(0));
   maxVec = m_builder->CreateInsertElement(maxVec, ConstantFP::get(floatTy, 1.0), uint64_t(1));
   maxVec = m_builder->CreateInsertElement(maxVec, ConstantFP::get(floatTy, 0.5), uint64_t(2));
 
-  Value *result = UndefValue::get(resultTy);
+  Value *result = PoisonValue::get(resultTy);
 
   switch (colorModel) {
   case SamplerYCbCrModelConversion::RgbIdentity: {
