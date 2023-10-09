@@ -104,6 +104,8 @@ enum : unsigned {
   HitTriangleVertexPositions, // Hit triangle vertex positions
   Payload,                    // Payload
   RayStaticId,                // Ray static ID
+  InstNodeId,                 // Instance Node id
+  InstNodeIndex,              // Instance Node index
   Count                       // Count of the trace attributes
 };
 }
@@ -144,8 +146,6 @@ enum : unsigned {
   DirY,                                           // World ray direction Y
   DirZ,                                           // World ray direction Z
   TMax,                                           // T max
-  InstNodeId,                                     // Instance node id
-  InstNodeIndex,                                  // Instance node index
   Count
 };
 } // namespace TraceRayLibFuncParam
