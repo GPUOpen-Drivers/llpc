@@ -90,9 +90,6 @@ public:
                                      llvm::ArrayRef<llvm::Value *> passthroughArgs,
                                      MapToSimpleMode simpleMode = MapToSimpleMode::Int32);
 
-  // Create an inline assembly call to cause a side effect (used to work around miscompiles with convergent).
-  llvm::Value *CreateInlineAsmSideEffect(llvm::Value *const value);
-
   // Create a call to set inactive. Both active and inactive should have the same type.
   llvm::Value *CreateSetInactive(llvm::Value *const active, llvm::Value *const inactive);
 

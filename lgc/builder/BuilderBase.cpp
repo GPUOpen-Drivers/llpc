@@ -32,7 +32,6 @@
 #include "lgc/util/BuilderBase.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/state/IntrinsDefs.h"
-#include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
@@ -277,22 +276,6 @@ Value *BuilderBase::CreateMapToSimpleType(MapToSimpleTypeFunc mapFunc, ArrayRef<
     return mapFunc(*this, mappedArgs, passthroughArgs);
   llvm_unreachable("Should never be called!");
   return nullptr;
-}
-
-// =====================================================================================================================
-// Create an inline assembly call to cause a side effect (used to work around miscompiles with convergent).
-//
-// @param value : The value to ensure doesn't move in control flow.
-Value *BuilderBase::CreateInlineAsmSideEffect(Value *const value) {
-  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *>) -> Value * {
-    Value *const value = mappedArgs[0];
-    Type *const type = value->getType();
-    FunctionType *const funcType = FunctionType::get(type, type, false);
-    InlineAsm *const inlineAsm = InlineAsm::get(funcType, "; %1", "=v,0", true);
-    return builder.CreateCall(inlineAsm, value);
-  };
-
-  return CreateMapToSimpleType(mapFunc, value, {});
 }
 
 // =====================================================================================================================
