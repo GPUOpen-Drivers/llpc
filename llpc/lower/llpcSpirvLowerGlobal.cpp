@@ -1840,7 +1840,6 @@ void SpirvLowerGlobal::lowerBufferBlock() {
       // Check if our block is an array of blocks.
       if (global.getValueType()->isArrayTy()) {
         Type *const elementType = global.getValueType()->getArrayElementType();
-        Type *const blockType = elementType->getPointerTo(global.getAddressSpace());
 
         // We need to run over the users of the global, find the GEPs, and add a load for each.
         for (User *const user : global.users()) {
@@ -1974,7 +1973,6 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                 bufferFlags |= lgc::Builder::BufferFlagWritten;
 
               Value *bufferDescs[2] = {nullptr};
-              Value *bitCasts[2] = {nullptr};
               unsigned descSets[2] = {descSet, 0};
               unsigned bindings[2] = {binding, 0};
               GlobalVariable *globals[2] = {&global, nullptr};
@@ -2006,11 +2004,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                   auto descPtr = m_builder->CreateGetDescPtr(descTy, descTy, descSet, binding);
                   auto stride = m_builder->CreateGetDescStride(descTy, descTy, descSet, binding);
                   auto index = m_builder->CreateMul(blockIndex, stride);
-                  Value *castDescPtr = m_builder->CreateBitCast(
-                      descPtr,
-                      m_builder->getInt8Ty()->getPointerTo(cast<PointerType>(descPtr->getType())->getAddressSpace()));
-                  Value *indexedDescPtr = m_builder->CreateGEP(m_builder->getInt8Ty(), castDescPtr, index);
-                  bufferDescs[idx] = m_builder->CreateBitCast(indexedDescPtr, descPtr->getType());
+                  bufferDescs[idx] = m_builder->CreateGEP(m_builder->getInt8Ty(), descPtr, index);
                 } else {
                   bufferDescs[idx] =
                       m_builder->CreateLoadBufferDesc(descSets[idx], bindings[idx], blockIndex, bufferFlags);
@@ -2018,15 +2012,13 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                 // If the global variable is a constant, the data it points to is invariant.
                 if (global.isConstant())
                   m_builder->CreateInvariantStart(bufferDescs[idx]);
-
-                bitCasts[idx] = m_builder->CreateBitCast(bufferDescs[idx], blockType);
               }
 
               Value *newSelect = nullptr;
               if (select)
-                newSelect = m_builder->CreateSelect(select->getCondition(), bitCasts[0], bitCasts[1]);
+                newSelect = m_builder->CreateSelect(select->getCondition(), bufferDescs[0], bufferDescs[1]);
 
-              Value *base = newSelect ? newSelect : bitCasts[0];
+              Value *base = newSelect ? newSelect : bufferDescs[0];
               // If zero-index elimination removed leading zeros from OldGEP indices then we need to use OldGEP Source
               // type as a Source type for newGEP. In other cases use global variable array element type.
               Type *newGetElemType = gepsLeadingZerosEliminated ? getElemPtr->getSourceElementType() : elementType;
@@ -2083,8 +2075,6 @@ void SpirvLowerGlobal::lowerBufferBlock() {
         if (global.isConstant())
           m_builder->CreateInvariantStart(bufferDesc);
 
-        Value *const bitCast = m_builder->CreateBitCast(bufferDesc, global.getType());
-
         SmallVector<Instruction *, 8> usesToReplace;
 
         for (User *const user : global.users()) {
@@ -2101,11 +2091,11 @@ void SpirvLowerGlobal::lowerBufferBlock() {
           usesToReplace.push_back(inst);
         }
 
-        Value *newLoadPtr = bitCast;
+        Value *newLoadPtr = bufferDesc;
         if (atomicCounterMD) {
           SmallVector<Value *, 8> indices;
           indices.push_back(m_builder->getInt32(atomicCounterMeta.offset));
-          newLoadPtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bitCast, indices);
+          newLoadPtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, indices);
         }
 
         for (Instruction *const use : usesToReplace)
