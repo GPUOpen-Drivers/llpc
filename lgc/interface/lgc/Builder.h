@@ -829,6 +829,13 @@ public:
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateCountLeadingSignBits(llvm::Value *value, const llvm::Twine &instName = "");
 
+  // Create "msad" (Masked Sum of Absolute Differences) operation , returning an 32-bit integer of msad result.
+  //
+  // @param src : Contains 4 packed 8-bit unsigned integers in 32 bits.
+  // @param ref : Contains 4 packed 8-bit unsigned integers in 32 bits.
+  // @param accum : A 32-bit unsigned integer, providing an existing accumulation.
+  llvm::Value *CreateMsad4(llvm::Value *src, llvm::Value *ref, llvm::Value *accum, const llvm::Twine &instName = "");
+
   // Create "fmix" operation, returning ( 1 - A ) * X + A * Y. Result would be FP scalar or vector value.
   // Returns scalar, if and only if "pX", "pY" and "pA" are all scalars.
   // Returns vector, if "pX" and "pY" are vector but "pA" is a scalar, under such condition, "pA" will be splatted.

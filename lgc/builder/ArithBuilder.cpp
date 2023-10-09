@@ -1232,6 +1232,22 @@ Value *BuilderImpl::CreateCountLeadingSignBits(Value *value, const Twine &instNa
 }
 
 // =====================================================================================================================
+// Create "msad" (Masked Sum of Absolute Differences) operation , returning an 32-bit integer of msad result.
+//
+// @param src : Contains 4 packed 8-bit unsigned integers in 32 bits.
+// @param ref : Contains 4 packed 8-bit unsigned integers in 32 bits.
+// @param accum : A 32-bit unsigned integer, providing an existing accumulation.
+Value *BuilderImpl::CreateMsad4(Value *src, Value *ref, Value *accum, const Twine &instName) {
+  assert(ref->getType()->getScalarType()->isIntegerTy(32));
+
+  Value *result = scalarize(src, ref, accum, [this](Value *src, Value *ref, Value *accum) {
+    return CreateIntrinsic(src->getType(), Intrinsic::amdgcn_msad_u8, {src, ref, accum});
+  });
+  result->setName(instName);
+  return result;
+}
+
+// =====================================================================================================================
 // Create "fmix" operation, returning ( 1 - A ) * X + A * Y. Result would be FP scalar or vector value.
 // Returns scalar, if and only if "pX", "pY" and "pA" are all scalars.
 // Returns vector, if "pX" and "pY" are vector but "pA" is a scalar, under such condition, "pA" will be splatted.
