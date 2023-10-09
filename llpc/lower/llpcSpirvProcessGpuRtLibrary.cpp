@@ -24,8 +24,8 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  llpcSpirvLowerExecutionGraph.cpp
- * @brief LLPC source file: contains implementation of class Llpc::SpirvLowerExecutionGraph.
+ * @file  llpcSpirvProcessGpuRtLibrary.cpp
+ * @brief LLPC source file: contains implementation of class Llpc::SpirvProcessGpuRtLibrary.
  ***********************************************************************************************************************
  */
 #include "llpcSpirvProcessGpuRtLibrary.h"
@@ -117,7 +117,6 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
 
   const StringRef rayQueryInitializeFuncName =
       m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_TRACE_RAY_INLINE);
-
   const StringRef rayQueryProceedFuncName =
       m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_RAY_QUERY_PROCEED);
 
@@ -378,7 +377,6 @@ void SpirvProcessGpuRtLibrary::createIntersectBvh(Function *func) {
   // }
 
   auto argIt = func->arg_begin();
-
   Value *address = m_builder->CreateLoad(FixedVectorType::get(m_builder->getInt32Ty(), 2), argIt);
   argIt++;
 

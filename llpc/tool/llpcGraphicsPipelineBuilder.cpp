@@ -154,7 +154,7 @@ Expected<BinaryData> GraphicsPipelineBuilder::buildGraphicsPipeline() {
   pipelineInfo->options.enableScratchAccessBoundsChecks = compileInfo.scratchAccessBoundsChecks;
   pipelineInfo->options.enableImplicitInvariantExports = compileInfo.enableImplicitInvariantExports;
   if (compileInfo.optimizationLevel.has_value()) {
-    pipelineInfo->options.optimizationLevel = compileInfo.optimizationLevel.value();
+    pipelineInfo->options.optimizationLevel = static_cast<uint32_t>(compileInfo.optimizationLevel.value());
   }
   pipelineInfo->options.internalRtShaders = compileInfo.internalRtShaders;
   pipelineInfo->enableColorExportShader |= compileInfo.enableColorExportShader;

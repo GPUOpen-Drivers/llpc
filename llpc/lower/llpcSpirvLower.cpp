@@ -50,6 +50,7 @@
 #include "lgc/PassManager.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/IR/IRPrintingPasses.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/IR/Verifier.h"
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 442438
 // Old version of the code
@@ -259,10 +260,15 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   // Lower SPIR-V instruction metadata remove
   passMgr.addPass(SpirvLowerInstMetaRemove());
 
-  if (rayTracing || rayQuery) {
+  if (rayTracing || rayQuery || isInternalRtShader) {
     passMgr.addPass(LowerGpuRt());
     passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(instCombineOpt)));
   }
+
+  FunctionPassManager fpm;
+  fpm.addPass(SROAPass(SROAOptions::PreserveCFG));
+  fpm.addPass(InstCombinePass(instCombineOpt));
+  passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
 
   // Stop timer for lowering passes.
   if (lowerTimer)

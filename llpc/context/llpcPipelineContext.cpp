@@ -290,9 +290,6 @@ Options PipelineContext::computePipelineOptions() const {
   options.includeDisassembly = (cl::EnablePipelineDump || EnableOuts() || getPipelineOptions()->includeDisassembly);
   options.reconfigWorkgroupLayout = getPipelineOptions()->reconfigWorkgroupLayout;
   options.forceCsThreadIdSwizzling = getPipelineOptions()->forceCsThreadIdSwizzling;
-  options.overrideThreadGroupSizeX = getPipelineOptions()->overrideThreadGroupSizeX;
-  options.overrideThreadGroupSizeY = getPipelineOptions()->overrideThreadGroupSizeY;
-  options.overrideThreadGroupSizeZ = getPipelineOptions()->overrideThreadGroupSizeZ;
   options.includeIr = (IncludeLlvmIr || getPipelineOptions()->includeIr);
 
   options.threadGroupSwizzleMode =
@@ -341,6 +338,7 @@ Options PipelineContext::computePipelineOptions() const {
   options.fullSubgroups = true;
   options.internalRtShaders = getPipelineOptions()->internalRtShaders;
   options.disableSampleMask = getPipelineOptions()->disableSampleMask;
+  options.disableTruncCoordForGather = getPipelineOptions()->disableTruncCoordForGather;
 
   return options;
 }
@@ -718,10 +716,6 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
   else
     shaderOptions.ldsSpillLimitDwords = LdsSpillLimitDwords;
 
-  shaderOptions.overrideShaderThreadGroupSizeX = shaderInfo.options.overrideShaderThreadGroupSizeX;
-  shaderOptions.overrideShaderThreadGroupSizeY = shaderInfo.options.overrideShaderThreadGroupSizeY;
-  shaderOptions.overrideShaderThreadGroupSizeZ = shaderInfo.options.overrideShaderThreadGroupSizeZ;
-
   shaderOptions.nsaThreshold = shaderInfo.options.nsaThreshold;
 
   static_assert(static_cast<InvariantLoadsOption>(InvariantLoads::Auto) == InvariantLoadsOption::Auto, "Mismatch");
@@ -982,6 +976,10 @@ std::pair<BufDataFormat, BufNumFormat> PipelineContext::mapVkFormat(VkFormat for
   {                                                                                                                    \
     format, { format, dfmt, nfmt, true, false }                                                                        \
   }
+#define EXT_VERTEX_FORMAT_ENTRY(format, dfmt, nfmt)                                                                    \
+  {                                                                                                                    \
+    format, { static_cast<VkFormat>(format), dfmt, nfmt, true, true }                                                  \
+  }
 #define COLOR_FORMAT_ENTRY_EXT(format, dfmt, nfmt)                                                                     \
   {                                                                                                                    \
     format, { format, dfmt, nfmt, false, true }                                                                        \
@@ -999,6 +997,10 @@ std::pair<BufDataFormat, BufNumFormat> PipelineContext::mapVkFormat(VkFormat for
   {                                                                                                                    \
     format, { dfmt, nfmt, true, false }                                                                                \
   }
+#define EXT_VERTEX_FORMAT_ENTRY(format, dfmt, nfmt)                                                                    \
+  {                                                                                                                    \
+    format, { dfmt, nfmt, true, true }                                                                                 \
+  }
 #define COLOR_FORMAT_ENTRY_EXT(format, dfmt, nfmt)                                                                     \
   {                                                                                                                    \
     format, { dfmt, nfmt, false, true }                                                                                \
@@ -1010,6 +1012,28 @@ std::pair<BufDataFormat, BufNumFormat> PipelineContext::mapVkFormat(VkFormat for
 #endif
       COLOR_FORMAT_ENTRY_EXT(VK_FORMAT_A4R4G4B4_UNORM_PACK16_EXT, BufDataFormat4_4_4_4, BufNumFormatUnorm),
       COLOR_FORMAT_ENTRY_EXT(VK_FORMAT_A4B4G4R4_UNORM_PACK16_EXT, BufDataFormat4_4_4_4, BufNumFormatUnorm),
+      /// Currently OGL-only : Internal spv ext vertex attribute format - begin
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32_UNORM, BufDataFormat32, BufNumFormatUnorm),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32_UNORM, BufDataFormat32_32, BufNumFormatUnorm),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32B32_UNORM, BufDataFormat32_32_32, BufNumFormatUnorm),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32B32A32_UNORM, BufDataFormat32_32_32_32, BufNumFormatUnorm),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32_SNORM, BufDataFormat32, BufNumFormatSnorm),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32_SNORM, BufDataFormat32_32, BufNumFormatSnorm),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32B32_SNORM, BufDataFormat32_32_32, BufNumFormatSnorm),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32B32A32_SNORM, BufDataFormat32_32_32_32, BufNumFormatSnorm),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32_FIXED, BufDataFormat32, BufNumFormatFixed),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32_FIXED, BufDataFormat32_32, BufNumFormatFixed),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32B32_FIXED, BufDataFormat32_32_32, BufNumFormatFixed),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32B32A32_FIXED, BufDataFormat32_32_32_32, BufNumFormatFixed),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32_USCALED, BufDataFormat32, BufNumFormatUscaled),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32_USCALED, BufDataFormat32_32, BufNumFormatUscaled),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32B32_USCALED, BufDataFormat32_32_32, BufNumFormatUscaled),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32B32A32_USCALED, BufDataFormat32_32_32_32, BufNumFormatUscaled),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32_SSCALED, BufDataFormat32, BufNumFormatSscaled),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32_SSCALED, BufDataFormat32_32, BufNumFormatSscaled),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32B32_SSCALED, BufDataFormat32_32_32, BufNumFormatSscaled),
+      EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32B32A32_SSCALED, BufDataFormat32_32_32_32, BufNumFormatSscaled)
+      /// Currently OGL only : Internal spv ext vertex attribute format - end
   };
 
   BufDataFormat dfmt = BufDataFormatInvalid;

@@ -46,8 +46,10 @@ using namespace llvm;
 Instruction *BuilderImpl::CreateEmitVertex(unsigned streamId) {
   assert(m_shaderStage == ShaderStageGeometry);
 
-  // Mark this vertex stream as active if transform feedback is enabled or this is the rasterization stream.
-  if (m_pipelineState->enableXfb() || m_pipelineState->getRasterizerState().rasterStream == streamId)
+  // Mark this vertex stream as active if transform feedback is enabled, or primitive statistics counting is enabled,
+  // or this is the rasterization stream.
+  if (m_pipelineState->enableXfb() || m_pipelineState->enablePrimStats() ||
+      m_pipelineState->getRasterizerState().rasterStream == streamId)
     m_pipelineState->setVertexStreamActive(streamId);
 
   // Get GsWaveId
@@ -68,8 +70,10 @@ Instruction *BuilderImpl::CreateEmitVertex(unsigned streamId) {
 Instruction *BuilderImpl::CreateEndPrimitive(unsigned streamId) {
   assert(m_shaderStage == ShaderStageGeometry);
 
-  // Mark this vertex stream as active if transform feedback is enabled or this is the rasterization stream.
-  if (m_pipelineState->enableXfb() || m_pipelineState->getRasterizerState().rasterStream == streamId)
+  // Mark this vertex stream as active if transform feedback is enabled, or primitive statistics counting is enabled,
+  // or this is the rasterization stream.
+  if (m_pipelineState->enableXfb() || m_pipelineState->enablePrimStats() ||
+      m_pipelineState->getRasterizerState().rasterStream == streamId)
     m_pipelineState->setVertexStreamActive(streamId);
 
   // Get GsWaveId

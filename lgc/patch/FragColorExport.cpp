@@ -238,7 +238,8 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
   }
 
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11 &&
-      m_pipelineState->getColorExportState().dualSourceBlendEnable) {
+      (m_pipelineState->getColorExportState().dualSourceBlendEnable ||
+       m_pipelineState->getColorExportState().dynamicDualSourceBlendEnable)) {
     // Save them for later dual-source-swizzle
     m_blendSourceChannels = exportTy->isHalfTy() ? (compCount + 1) / 2 : compCount;
     assert(hwColorExport <= 1);
@@ -698,8 +699,6 @@ llvm::Value *LowerFragColorExport::jumpColorExport(llvm::Function *fragEntryPoin
   m_pipelineState->getPalMetadata()->addColorExportInfo(m_info);
   m_pipelineState->getPalMetadata()->setDiscardState(m_resUsage->builtInUsage.fs.discard);
 
-  ReturnInst *retInst = cast<ReturnInst>(builder.GetInsertPoint()->getParent()->getTerminator());
-
   // First build the argument type for the fragment shader.
   SmallVector<Type *, 8> outputTypes;
   for (const ColorExportInfo &info : m_info) {
@@ -736,8 +735,6 @@ llvm::Value *LowerFragColorExport::jumpColorExport(llvm::Function *fragEntryPoin
   callInst->setCallingConv(CallingConv::AMDGPU_Gfx);
   callInst->setDoesNotReturn();
   callInst->setOnlyWritesMemory();
-  builder.CreateUnreachable();
-  retInst->eraseFromParent();
   return callInst;
 }
 
@@ -892,10 +889,11 @@ Value *FragColorExport::dualSourceSwizzle(BuilderBase &builder) {
   threadId = builder.CreateAnd(threadId, builder.getInt32(1));
   // mask: 0 1 0 1 0 1 ...
   Value *mask = builder.CreateICmpNE(threadId, builder.getInt32(0));
+  bool onlyOneTarget = m_blendSources[1].empty();
 
   for (unsigned i = 0; i < m_blendSourceChannels; i++) {
     Value *src0 = m_blendSources[0][i];
-    Value *src1 = m_blendSources[1][i];
+    Value *src1 = onlyOneTarget ? PoisonValue::get(src0->getType()) : m_blendSources[1][i];
     src0 = builder.CreateBitCast(src0, builder.getInt32Ty());
     src1 = builder.CreateBitCast(src1, builder.getInt32Ty());
 
@@ -1023,7 +1021,8 @@ void FragColorExport::generateExportInstructions(ArrayRef<lgc::ColorExportInfo> 
   }
 
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11 &&
-      m_pipelineState->getColorExportState().dualSourceBlendEnable)
+      (m_pipelineState->getColorExportState().dualSourceBlendEnable ||
+       m_pipelineState->getColorExportState().dynamicDualSourceBlendEnable))
     lastExport = dualSourceSwizzle(builder);
 
   if (!lastExport && dummyExport) {

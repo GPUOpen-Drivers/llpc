@@ -34,6 +34,11 @@
 
 namespace lgc {
 
+enum class MapToSimpleMode : unsigned {
+  Int32,
+  SimpleVector,
+};
+
 // =====================================================================================================================
 // BuilderBase extends BuilderCommon, and provides some utility methods used within LGC.
 // Methods here can be used directly from a BuilderImpl subclass, such as InOutBuilder.
@@ -69,24 +74,30 @@ public:
   // @param instName : Name to give instruction
   llvm::Value *CreateAddByteOffset(llvm::Value *pointer, llvm::Value *byteOffset, const llvm::Twine &instName = "");
 
-  // Type of function to pass to CreateMapToInt32
+  // Type of function to pass to CreateMapToSimpleType
   typedef llvm::function_ref<llvm::Value *(BuilderBase &builder, llvm::ArrayRef<llvm::Value *> mappedArgs,
                                            llvm::ArrayRef<llvm::Value *> passthroughArgs)>
-      MapToInt32Func;
+      MapToSimpleTypeFunc;
 
-  // Create a call that'll map the massage arguments to an i32 type (for functions that only take i32).
+  // Create a call that'll map the massage arguments to a simple type (for functions that only take i32 or simple
+  // vector).
   //
-  // @param mapFunc : Pointer to the function to call on each i32.
-  // @param mappedArgs : The arguments to massage into an i32 type.
+  // @param mapFunc : Pointer to the function to call on each simple type.
+  // @param mappedArgs : The arguments to massage into a simple type.
   // @param passthroughArgs : The arguments to pass-through without massaging.
-  llvm::Value *CreateMapToInt32(MapToInt32Func mapFunc, llvm::ArrayRef<llvm::Value *> mappedArgs,
-                                llvm::ArrayRef<llvm::Value *> passthroughArgs);
+  // @param simpleMode: The arguments to give the simple type
+  llvm::Value *CreateMapToSimpleType(MapToSimpleTypeFunc mapFunc, llvm::ArrayRef<llvm::Value *> mappedArgs,
+                                     llvm::ArrayRef<llvm::Value *> passthroughArgs,
+                                     MapToSimpleMode simpleMode = MapToSimpleMode::Int32);
 
   // Create an inline assembly call to cause a side effect (used to work around miscompiles with convergent).
   llvm::Value *CreateInlineAsmSideEffect(llvm::Value *const value);
 
   // Create a call to set inactive. Both active and inactive should have the same type.
   llvm::Value *CreateSetInactive(llvm::Value *const active, llvm::Value *const inactive);
+
+  // Create a waterfall end intrinsic.
+  llvm::Instruction *CreateWaterfallEnd(llvm::Value *nonUniformInst, llvm::Value *waterfallBegin);
 };
 
 } // namespace lgc

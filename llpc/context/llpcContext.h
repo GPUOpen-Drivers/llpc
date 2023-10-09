@@ -84,8 +84,15 @@ public:
   // Get (create if necessary) LgcContext
   lgc::LgcContext *getLgcContext();
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
+  // Old version of the code
   llvm::CodeGenOpt::Level getOptimizationLevel();
   llvm::CodeGenOpt::Level getLastOptimizationLevel() const;
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  llvm::CodeGenOptLevel getOptimizationLevel();
+  llvm::CodeGenOptLevel getLastOptimizationLevel() const;
+#endif
 
   std::unique_ptr<llvm::Module> loadLibrary(const BinaryData *lib);
 
@@ -129,7 +136,14 @@ private:
   std::unique_ptr<llvm::TargetMachine> m_targetMachine; // Target machine for LGC context
   std::unique_ptr<lgc::LgcContext> m_builderContext;    // LGC context
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
+  // Old version of the code
   std::optional<llvm::CodeGenOpt::Level> m_lastOptLevel{}; // What getOptimizationLevel() last returned
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  std::optional<llvm::CodeGenOptLevel> m_lastOptLevel{}; // What getOptimizationLevel() last returned
+#endif
+
   std::unique_ptr<llvm_dialects::DialectContext> m_dialectContext;
 
   unsigned m_useCount = 0; // Number of times this context is used.

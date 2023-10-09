@@ -594,6 +594,7 @@ enum class UserDataMapping : unsigned {
                                      //  pipeline stats query.
   StreamOutControlBuf = 0x10000016,  // 32-bit GPU virtual address to the streamout control buffer for GPUs that
                                      // use SW-emulated streamout.
+  SampleInfo = 0x10000018,           // Sample Info, numsamples + Sample Pattern
   ColorExportAddr = 0x10000020,      // Color export address
 
   // Values used in a user data PAL metadata register to be resolved at link time.

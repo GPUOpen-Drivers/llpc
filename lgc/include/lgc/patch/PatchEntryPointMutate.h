@@ -125,7 +125,8 @@ private:
 
   uint64_t generateEntryPointArgTys(ShaderInputs *shaderInputs, llvm::Function *origFunc,
                                     llvm::SmallVectorImpl<llvm::Type *> &argTys,
-                                    llvm::SmallVectorImpl<std::string> &argNames, unsigned argOffset);
+                                    llvm::SmallVectorImpl<std::string> &argNames, unsigned argOffset,
+                                    bool updateUserDataMap = false);
 
   bool isSystemUserDataValue(unsigned userDataValue) const;
   bool isUnlinkedDescriptorSetValue(unsigned value) const;
@@ -145,9 +146,9 @@ private:
     llvm::SmallVector<llvm::Value *> vgpr; // The vgpr values from the exit.
   };
 
-  bool lowerCpsOps(llvm::Function *func);
-  llvm::Function *lowerCpsFunction(llvm::Function *func, llvm::ArrayRef<llvm::Type *> userDataTys,
-                                   llvm::ArrayRef<std::string> argNames);
+  bool lowerCpsOps(llvm::Function *func, ShaderInputs *shaderInputs);
+  llvm::Function *lowerCpsFunction(llvm::Function *func, llvm::ArrayRef<llvm::Type *> fixedShaderArgTys,
+                                   llvm::ArrayRef<std::string> argNames, bool isContinufy);
   unsigned lowerCpsJump(llvm::Function *parent, cps::JumpOp *jumpOp, llvm::BasicBlock *tailBlock,
                         llvm::SmallVectorImpl<CpsExitInfo> &exitInfos);
   void lowerAsCpsReference(cps::AsContinuationReferenceOp &asCpsReferenceOp);
@@ -194,6 +195,7 @@ private:
   CpsShaderInputCache m_cpsShaderInputCache;
   // Map from a cps function to the alloca where we are holding the latest continuation stack pointer.
   llvm::DenseMap<llvm::Function *, llvm::Value *> m_funcCpsStackMap;
+  llvm::Intrinsic::ID m_setInactiveChainArgId;
 };
 
 } // namespace lgc

@@ -108,7 +108,7 @@ public:
   bool transDecoration(SPIRVValue *, Value *);
   bool transShaderDecoration(SPIRVValue *, Value *);
   bool checkContains64BitType(SPIRVType *bt);
-  Constant *buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecorate &inOutDec, Type *&metaTy);
+  Constant *buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecorate &inOutDec, Type *&metaTy, bool vs64bitsAttrib);
   Constant *buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecorate &blockDec, Type *&mdTy,
                                      SPIRVStorageClassKind storageClass);
   unsigned calcShaderBlockSize(SPIRVType *bt, unsigned blockSize, unsigned matrixStride, bool isRowMajor);
@@ -202,7 +202,7 @@ public:
   Value *getTranslatedValue(SPIRVValue *bv);
 
   // Create !lgc.xfb.state metadata
-  void createXfbMetadata();
+  void createXfbMetadata(bool hasXfbOuts);
 
 private:
   class SPIRVTypeContext {

@@ -44,7 +44,6 @@ const static char OutputImportBuiltIn[] = "lgc.output.import.builtin.";
 const static char OutputExportGeneric[] = "lgc.output.export.generic.";
 const static char OutputExportBuiltIn[] = "lgc.output.export.builtin.";
 const static char OutputExportXfb[] = "lgc.output.export.xfb.";
-const static char StreamOutBufferStore[] = "lgc.streamoutbuffer.store";
 const static char ReconfigureLocalInvocationId[] = "lgc.reconfigure.local.invocation.id";
 const static char SwizzleWorkgroupId[] = "lgc.swizzle.workgroup.id";
 
@@ -72,6 +71,7 @@ const static char NggPrimShaderEntryPoint[] = "lgc.shader.PRIM.main";
 const static char EntryPointPrefix[] = "lgc.shader.";
 const static char CopyShaderEntryPoint[] = "lgc.shader.COPY.main";
 const static char NullFsEntryPoint[] = "lgc.shader.FS.null.main";
+const static char TcsPassthroughEntryPoint[] = "lgc.shader.TCS.passthrough.main";
 
 } // namespace lgcName
 

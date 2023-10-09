@@ -91,7 +91,9 @@ opt<bool> InRegEsGsLdsSize("inreg-esgs-lds-size", desc("For GS on-chip, add esGs
 } // namespace llvm
 
 // =====================================================================================================================
-PatchEntryPointMutate::PatchEntryPointMutate() : m_hasTs(false), m_hasGs(false) {
+PatchEntryPointMutate::PatchEntryPointMutate()
+    : m_hasTs(false), m_hasGs(false),
+      m_setInactiveChainArgId(Function::lookupIntrinsicID("llvm.amdgcn.set.inactive.chain.arg")) {
 }
 
 // =====================================================================================================================
@@ -271,7 +273,10 @@ void PatchEntryPointMutate::lowerAsCpsReference(cps::AsContinuationReferenceOp &
 // Lower calls to cps function as well as return instructions.
 //
 // @param func : the function to be processed
-bool PatchEntryPointMutate::lowerCpsOps(Function *func) {
+// @param shaderInputs: the ShaderInputs information for the parent function. This is only used for continufy based
+// continuation transform, under which we still need to pass ShaderInput arguments(WorkgroupId/LocalInvocationId) during
+// cps chain call.
+bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInputs) {
   SmallVector<cps::JumpOp *> cpsJumps;
   SmallVector<CallInst *> tobeErased;
 
@@ -307,15 +312,19 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func) {
   }
 
   // Get the number of user-data arguments.
-  unsigned numUserdata;
+  unsigned numShaderArg;
   if (!isCpsFunc) {
     SmallVector<Type *, 8> argTys;
     SmallVector<std::string, 8> argNames;
-    generateEntryPointArgTys(nullptr, nullptr, argTys, argNames, 0);
-    numUserdata = argTys.size();
+    generateEntryPointArgTys(shaderInputs, nullptr, argTys, argNames, 0);
+    numShaderArg = argTys.size();
+    assert(!shaderInputs || argNames.back() == "LocalInvocationId");
   } else {
-    numUserdata = m_cpsShaderInputCache.getTypes().size();
+    numShaderArg = m_cpsShaderInputCache.getTypes().size();
   }
+
+  // Exclude LocalInvocationId if shaderInputs is non-null (for Continufy based continuation).
+  unsigned numUserdata = shaderInputs ? numShaderArg - 1 : numShaderArg;
 
   // Get all the return instructions.
   SmallVector<ReturnInst *> retInstrs;
@@ -349,10 +358,14 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func) {
     vgprNum = std::max(exit.vgpr.size(), vgprNum);
 
   SmallVector<Value *> newVgpr;
+  // Put LocalInvocationId before {vcr, vsp}.
+  if (shaderInputs)
+    newVgpr.push_back(func->getArg(numUserdata));
+
   builder.SetInsertPoint(tailBlock);
 
   if (exitInfos.size() == 1) {
-    newVgpr = exitInfos[0].vgpr;
+    newVgpr.append(exitInfos[0].vgpr);
   } else {
     for (size_t vgprIdx = 0; vgprIdx < vgprNum; vgprIdx++) {
       // We always have the leading two fixed vgpr arguments: vcr, vsp. The other remaining payloads are i32 type.
@@ -391,15 +404,21 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func) {
   Type *waveMaskTy = builder.getIntNTy(waveSize);
   auto *chainBlock = BasicBlock::Create(func->getContext(), "chain.block", func);
   auto *retBlock = BasicBlock::Create(func->getContext(), "ret.block", func);
-  auto *vcr = builder.CreateExtractValue(vgprArg, 0);
+  // For continufy based continuation, the vgpr list: LocalInvocationId, vcr, vsp, ...
+  unsigned vcrIndexInVgpr = shaderInputs ? 1 : 0;
+  auto *vcr = builder.CreateExtractValue(vgprArg, vcrIndexInVgpr);
   auto *vcrTy = vcr->getType();
 
   if (isCpsFunc) {
-    // FIXME: Switch to LLVM intrinsic
-    FunctionType *setInactiveChainTy = FunctionType::get(vcrTy, {vcrTy, vcrTy}, false);
-    auto setInactiveChain = Function::Create(setInactiveChainTy, GlobalValue::ExternalLinkage,
-                                             "llvm.amdgcn.setinactive.chain.arg", func->getParent());
-    vcr = builder.CreateCall(setInactiveChain, {vcr, func->getArg(numUserdata)});
+    auto *vcrShaderArg = func->getArg(numShaderArg);
+    // When we are working with LLVM version without the llvm.amdgcn.set.inactive.chain.arg, we cannot simply declare
+    // it and call it. LLVM will misrecognize it as llvm.amdgcn.set.inactive, and lit-test would just fail. So here we
+    // just call llvm.amdgcn.set.inactive to pass compilation and lit-test if no *set.inactive.chain.arg support.
+    // TODO: Cleanup this when the related LLVM versions have the intrinsic definition.
+    if (m_setInactiveChainArgId != Intrinsic::not_intrinsic)
+      vcr = builder.CreateIntrinsic(vcrTy, m_setInactiveChainArgId, {vcr, vcrShaderArg});
+    else
+      vcr = builder.CreateIntrinsic(vcrTy, Intrinsic::amdgcn_set_inactive, {vcr, vcrShaderArg});
   }
 
   // Find first lane having non-null vcr, and use as next jump target.
@@ -473,18 +492,19 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func) {
 // Mutate the function type from:
 // void @func({} state, args...)
 // into:
-// amdgpu_cs_chain void @func(<N x i32> inreg %userdata, i32 %vcr, ptr addrspace(5) %vsp, args...)
+// amdgpu_cs_chain void @func(fixed_shader_args, i32 %vcr, ptr addrspace(5) %vsp, args...)
 //
 // @param func : the cps function to be mutated
-// @param userDataTys : the types of user data arguments
-// @param argNames : the name string of the user data arguments
-Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type *> userDataTys,
-                                                  ArrayRef<std::string> argNames) {
+// @param fixedShaderArgTys : the types of the fixed shader arguments(userdata + possibly shader inputs)
+// @param argNames : the name string of the fixed shader arguments
+// @param isContinufy : whether the function is output of Continufy pass.
+Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type *> fixedShaderArgTys,
+                                                  ArrayRef<std::string> argNames, bool isContinufy) {
   Value *state = func->getArg(0);
   const DataLayout &layout = func->getParent()->getDataLayout();
   IRBuilder<> builder(func->getContext());
   SmallVector<Type *> newArgTys;
-  newArgTys.append(userDataTys.begin(), userDataTys.end());
+  newArgTys.append(fixedShaderArgTys.begin(), fixedShaderArgTys.end());
   newArgTys.append({builder.getInt32Ty(), builder.getPtrTy(getLoweredCpsStackAddrSpace())});
   auto remainingArgs = func->getFunctionType()->params().drop_front(1);
   newArgTys.append(remainingArgs.begin(), remainingArgs.end());
@@ -502,8 +522,15 @@ Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type 
 
   AttributeList oldAttrs = func->getAttributes();
   SmallVector<AttributeSet, 8> argAttrs;
-  for (unsigned idx = 0; idx != userDataTys.size(); ++idx)
+  assert(!isContinufy || argNames.back() == "LocalInvocationId");
+  unsigned numUserdataArg = isContinufy ? fixedShaderArgTys.size() - 1 : fixedShaderArgTys.size();
+  for (unsigned idx = 0; idx != numUserdataArg; ++idx)
     argAttrs.push_back(inRegAttrSet);
+
+  // %LocalInvocationId for Continufy path.
+  if (isContinufy)
+    argAttrs.push_back(emptyAttrSet);
+
   // %vcr attribute
   argAttrs.push_back(emptyAttrSet);
   // %vsp attribute
@@ -520,7 +547,8 @@ Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type 
   Value *vspStorage = builder.CreateAlloca(builder.getPtrTy(getLoweredCpsStackAddrSpace()), ADDR_SPACE_PRIVATE);
   m_funcCpsStackMap[newFunc] = vspStorage;
 
-  Value *vsp = newFunc->getArg(userDataTys.size() + 1);
+  // Function arguments: {fixed_shader_arguments, vcr, vsp, original_func_arguments_exclude_state}
+  Value *vsp = newFunc->getArg(fixedShaderArgTys.size() + 1);
   if (!state->getType()->isEmptyTy()) {
     // Get stack address of pushed state and load it from continuation stack.
     unsigned stateSize = layout.getTypeStoreSize(state->getType());
@@ -537,7 +565,7 @@ Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type 
     newFunc->getArg(idx)->setName(newArgNames[idx]);
 
   // Replace old arguments with new ones (excluding the very first `state`).
-  unsigned argOffsetInNew = userDataTys.size() + 2;
+  unsigned argOffsetInNew = fixedShaderArgTys.size() + 2;
   for (unsigned idx = 1; idx < func->arg_size(); idx++) {
     Value *oldArg = func->getArg(idx);
     Value *newArg = newFunc->getArg(idx - 1 + argOffsetInNew);
@@ -823,10 +851,6 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
     if (func.isDeclaration())
       continue;
 
-    // Only entrypoint and amd_gfx functions use user data, others don't use.
-    if (!isShaderEntryPoint(&func) && (func.getCallingConv() != CallingConv::AMDGPU_Gfx))
-      continue;
-
     ShaderStage stage = getShaderStage(&func);
     auto userDataUsage = getUserDataUsage(stage);
 
@@ -908,7 +932,7 @@ void PatchEntryPointMutate::processShader(ShaderInputs *shaderInputs) {
   // Create new entry-point from the original one
   SmallVector<Type *, 8> argTys;
   SmallVector<std::string, 8> argNames;
-  uint64_t inRegMask = generateEntryPointArgTys(shaderInputs, nullptr, argTys, argNames, 0);
+  uint64_t inRegMask = generateEntryPointArgTys(shaderInputs, nullptr, argTys, argNames, 0, true);
 
   Function *origEntryPoint = m_entryPoint;
 
@@ -992,16 +1016,20 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
 
     // Create the new function and transfer code and attributes to it.
     Function *newFunc = nullptr;
+    // For continufy based ray-tracing, we still need to add shader inputs like workgroupId and LocalInvocationId.
+    bool isContinufy = m_pipelineState->getOptions().rtIndirectMode == RayTracingIndirectMode::ContinuationsContinufy;
+    ShaderInputs *cpsShaderInputs = isContinufy ? shaderInputs : nullptr;
     if (cps::isCpsFunction(*origFunc)) {
       assert(origType->getReturnType()->isVoidTy());
       if (!m_cpsShaderInputCache.isAvailable()) {
-        generateEntryPointArgTys(nullptr, nullptr, shaderInputTys, shaderInputNames, 0);
+        generateEntryPointArgTys(cpsShaderInputs, nullptr, shaderInputTys, shaderInputNames, 0);
         m_cpsShaderInputCache.set(shaderInputTys, shaderInputNames);
       }
-      newFunc = lowerCpsFunction(origFunc, m_cpsShaderInputCache.getTypes(), m_cpsShaderInputCache.getNames());
+      newFunc =
+          lowerCpsFunction(origFunc, m_cpsShaderInputCache.getTypes(), m_cpsShaderInputCache.getNames(), isContinufy);
     } else {
-      inRegMask =
-          generateEntryPointArgTys(shaderInputs, origFunc, shaderInputTys, shaderInputNames, origType->getNumParams());
+      inRegMask = generateEntryPointArgTys(shaderInputs, origFunc, shaderInputTys, shaderInputNames,
+                                           origType->getNumParams(), true);
       newFunc = addFunctionArgs(origFunc, origType->getReturnType(), shaderInputTys, shaderInputNames, inRegMask, true);
       const bool isEntryPoint = isShaderEntryPoint(newFunc);
       newFunc->setCallingConv(isEntryPoint ? CallingConv::AMDGPU_CS : CallingConv::AMDGPU_Gfx);
@@ -1013,7 +1041,7 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
     // Remove original function.
     origFunc->eraseFromParent();
 
-    if (lowerCpsOps(newFunc))
+    if (lowerCpsOps(newFunc, cpsShaderInputs))
       continue;
 
     int argOffset = origType->getNumParams();
@@ -1244,12 +1272,16 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
 // @param origFunc : The original entry point function
 // @param [out] argTys : The argument types for the new function type
 // @param [out] argNames : The argument names corresponding to the argument types
+// @param [out] argNames : The argument names corresponding to the argument types
+// @param argOffset : The argument index offset to apply to the user data arguments
+// @param updateUserDataMap : whether the user data map should be updated
 // @returns inRegMask : "Inreg" bit mask for the arguments, with a bit set to indicate that the corresponding
 //                          arg needs to have an "inreg" attribute to put the arg into SGPRs rather than VGPRs
 //
 uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInputs, Function *origFunc,
                                                          SmallVectorImpl<Type *> &argTys,
-                                                         SmallVectorImpl<std::string> &argNames, unsigned argOffset) {
+                                                         SmallVectorImpl<std::string> &argNames, unsigned argOffset,
+                                                         bool updateUserDataMap) {
 
   uint64_t inRegMask = 0;
   IRBuilder<> builder(*m_context);
@@ -1349,7 +1381,7 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
     inRegMask |= shaderInputs->getShaderArgTys(m_pipelineState, m_shaderStage, origFunc, m_computeWithCalls, argTys,
                                                argNames, argOffset);
 
-  if (m_pipelineState->useRegisterFieldFormat()) {
+  if (updateUserDataMap && m_pipelineState->useRegisterFieldFormat()) {
     constexpr unsigned NumUserSgprs = 32;
     constexpr unsigned InvalidMapVal = static_cast<unsigned>(UserDataMapping::Invalid);
     SmallVector<unsigned, NumUserSgprs> userDataMap;
@@ -1555,10 +1587,17 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       specialUserDataArgs.push_back(
           UserDataArg(builder.getInt32Ty(), "viewId", UserDataMapping::ViewId, &intfData->entryArgIdxs.fs.viewIndex));
     }
+
     if (userDataUsage->isSpecialUserDataUsed(UserDataMapping::ColorExportAddr)) {
       assert(m_pipelineState->isUnlinked() && m_pipelineState->getOptions().enableColorExportShader);
       specialUserDataArgs.push_back(
           UserDataArg(builder.getInt32Ty(), "colorExpAddr", UserDataMapping::ColorExportAddr));
+    }
+
+    if (m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs.runAtSampleRate &&
+        (m_pipelineState->isUnlinked() || m_pipelineState->getRasterizerState().dynamicSampleInfo)) {
+      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "sampleInfo", UserDataMapping::SampleInfo,
+                                                &intfData->entryArgIdxs.fs.sampleInfo));
     }
   }
 
@@ -1689,7 +1728,7 @@ void PatchEntryPointMutate::finalizeUserDataArgs(SmallVectorImpl<UserDataArg> &u
       m_pipelineState->getPalMetadata()->setUserDataSpillUsage(node->offsetInDwords);
   } else {
     // Greedily fit as many generic user data arguments as possible.
-    // Pre-allocate entryArgIdxs since we rely on stabgle pointers.
+    // Pre-allocate entryArgIdxs since we rely on stable pointers.
     userDataUsage->entryArgIdxs.resize(userDataUsage->loadSizes.size());
 
     unsigned lastIdx = 0;
@@ -1716,10 +1755,10 @@ void PatchEntryPointMutate::finalizeUserDataArgs(SmallVectorImpl<UserDataArg> &u
 
             // Retry since the current load may now fit.
             continue;
-          } else {
-            m_pipelineState->getPalMetadata()->setUserDataSpillUsage(i);
           }
         }
+
+        m_pipelineState->getPalMetadata()->setUserDataSpillUsage(i);
 
         if (userDataEnd >= userDataAvailable)
           break; // All SGPRs in use, may as well give up.

@@ -459,6 +459,10 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
     // Mark usage for interpolation info.
     markInterpolationInfo(inOutInfo);
   }
+
+  if (isOutput && m_shaderStage == ShaderStageFragment && inOutInfo.isDualSourceBlendDynamic()) {
+    m_pipelineState->getColorExportState().dynamicDualSourceBlendEnable = true;
+  }
 }
 
 // =====================================================================================================================
@@ -1470,6 +1474,12 @@ void BuilderImpl::markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySize
     case BuiltInViewIndex:
       usage.tcs.viewIndex = true;
       break;
+    case BuiltInLayer:
+      usage.tcs.layerIn = true;
+      break;
+    case BuiltInViewportIndex:
+      usage.tcs.viewportIndexIn = true;
+      break;
     default:
       break;
     }
@@ -1508,6 +1518,12 @@ void BuilderImpl::markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySize
     case BuiltInViewIndex:
       usage.tes.viewIndex = true;
       break;
+    case BuiltInLayer:
+      usage.tes.layerIn = true;
+      break;
+    case BuiltInViewportIndex:
+      usage.tes.viewportIndexIn = true;
+      break;
     default:
       break;
     }
@@ -1536,6 +1552,12 @@ void BuilderImpl::markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySize
       break;
     case BuiltInViewIndex:
       usage.gs.viewIndex = true;
+      break;
+    case BuiltInLayer:
+      usage.gs.layerIn = true;
+      break;
+    case BuiltInViewportIndex:
+      usage.gs.viewportIndexIn = true;
       break;
     default:
       break;
@@ -1759,6 +1781,12 @@ void BuilderImpl::markBuiltInOutputUsage(BuiltInKind builtIn, unsigned arraySize
       break;
     case BuiltInTessLevelInner:
       usage.tcs.tessLevelInner = true;
+      break;
+    case BuiltInLayer:
+      usage.tcs.layer = true;
+      break;
+    case BuiltInViewportIndex:
+      usage.tcs.viewportIndex = true;
       break;
     default:
       break;

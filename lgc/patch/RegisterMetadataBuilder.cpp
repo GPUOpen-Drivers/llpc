@@ -254,7 +254,6 @@ void RegisterMetadataBuilder::buildLsHsRegisters() {
   auto hwShaderNode = getHwShaderNode(Util::Abi::HardwareStage::Hs);
   hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = calcLdsSize(ldsSizeInDwords);
 
-  //# Performance fix after the removal of Errata 5506
   if (m_gfxIp.major == 10 && !m_hasGs && !m_isNggMode) {
     auto vgtGsOnChipCntl = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtGsOnchipCntl].getMap(true);
     vgtGsOnChipCntl[Util::Abi::VgtGsOnchipCntlMetadataKey::EsVertsPerSubgroup] = EsVertsOffchipGsOrTess;
@@ -695,13 +694,14 @@ void RegisterMetadataBuilder::buildHwVsRegisters() {
   const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
   const auto &streamXfbBuffers = m_pipelineState->getStreamXfbBuffers();
   const bool enableXfb = m_pipelineState->enableXfb();
+  const bool enablePrimStats = m_pipelineState->enablePrimStats();
 
   // VGT_STRMOUT_CONFIG
   auto vgtStrmoutConfig = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtStrmoutConfig].getMap(true);
-  vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::Streamout_0En] = streamXfbBuffers[0] > 0;
-  vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::Streamout_1En] = streamXfbBuffers[1] > 0;
-  vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::Streamout_2En] = streamXfbBuffers[2] > 0;
-  vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::Streamout_3En] = streamXfbBuffers[3] > 0;
+  vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::Streamout_0En] = enablePrimStats || streamXfbBuffers[0] > 0;
+  vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::Streamout_1En] = enablePrimStats || streamXfbBuffers[1] > 0;
+  vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::Streamout_2En] = enablePrimStats || streamXfbBuffers[2] > 0;
+  vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::Streamout_3En] = enablePrimStats || streamXfbBuffers[3] > 0;
   if (shaderStage == ShaderStageCopyShader)
     vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::RastStream] =
         m_pipelineState->getRasterizerState().rasterStream;

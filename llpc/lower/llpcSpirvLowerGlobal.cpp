@@ -192,7 +192,9 @@ static_assert(lgc::ShadingRateHorizontal4Pixels ==
               "Shading rate flag mismatch");
 
 // =====================================================================================================================
-SpirvLowerGlobal::SpirvLowerGlobal() : m_retBlock(nullptr), m_lowerInputInPlace(false), m_lowerOutputInPlace(false) {
+SpirvLowerGlobal::SpirvLowerGlobal()
+    : m_retBlock(nullptr), m_lowerInputInPlace(false), m_lowerOutputInPlace(false),
+      m_lastVertexProcessingStage(ShaderStageInvalid) {
 }
 
 // =====================================================================================================================
@@ -1213,6 +1215,27 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
           // and "BuiltInSubgroupXXXMask" share the same numeric values.
           inOutValue = m_builder->CreateBitCast(inOutValue, FixedVectorType::get(inOutTy, 2));
           inOutValue = m_builder->CreateExtractElement(inOutValue, uint64_t(0));
+        } else if (builtIn == lgc::BuiltInFragCoord) {
+          auto buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+          if (buildInfo->originUpperLeft !=
+              static_cast<const ShaderModuleData *>(buildInfo->fs.pModuleData)->usage.originUpperLeft) {
+            unsigned offset = 0;
+            auto winSize = getUniformConstantEntryByLocation(m_context, m_shaderStage,
+                                                             Vkgc::GlCompatibilityUniformLocation::FrameBufferSize);
+            if (winSize) {
+              offset = winSize->offset;
+              Value *bufferDesc =
+                  m_builder->CreateLoadBufferDesc(Vkgc::InternalDescriptorSetId, Vkgc::ConstantBuffer0Binding,
+                                                  m_builder->getInt32(0), lgc::Builder::BufferFlagNonConst);
+              // Layout is {width, height}, so the offset of height is added sizeof(float).
+              Value *winHeightPtr =
+                  m_builder->CreateConstInBoundsGEP1_32(m_builder->getInt8Ty(), bufferDesc, offset + sizeof(float));
+              auto winHeight = m_builder->CreateLoad(m_builder->getFloatTy(), winHeightPtr);
+              auto fragCoordY = m_builder->CreateExtractElement(inOutValue, 1);
+              fragCoordY = m_builder->CreateFSub(winHeight, fragCoordY);
+              inOutValue = m_builder->CreateInsertElement(inOutValue, fragCoordY, 1);
+            }
+          }
         }
         if (inOutValue->getType()->isIntegerTy(1)) {
           // Convert i1 to i32.
@@ -1423,6 +1446,9 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
                               cast<ConstantInt>(locOffset)->getZExtValue(), outputInfo);
     }
 
+    if (m_context->getPipelineContext()->getUseDualSourceBlend()) {
+      outputInfo.setDualSourceBlendDynamic(true);
+    }
     m_builder->CreateWriteGenericOutput(outputValue, location, locOffset, elemIdx, maxLocOffset, outputInfo,
                                         vertexOrPrimitiveIdx);
   }
@@ -2403,6 +2429,10 @@ void SpirvLowerGlobal::addCallInstForXfbOutput(const ShaderInOutMetadata &output
                                                unsigned xfbBufferAdjust, unsigned xfbOffsetAdjust, unsigned locOffset,
                                                lgc::InOutInfo outputInfo) {
   assert(m_shaderStage == m_lastVertexProcessingStage);
+  auto pipelineBuildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+  DenseMap<unsigned, Vkgc::XfbOutInfo> *locXfbMapPtr = outputMeta.IsBuiltIn ? &m_builtInXfbMap : &m_genericXfbMap;
+  if (pipelineBuildInfo->apiXfbOutData.forceDisableStreamOut || (locXfbMapPtr->empty() && !outputMeta.IsXfb))
+    return;
 
   // If the XFB info is specified from API interface so we try to retrieve the info from m_locXfbMap. Otherwise, the XFB
   // info is obtained from the output metadata.
@@ -2414,7 +2444,6 @@ void SpirvLowerGlobal::addCallInstForXfbOutput(const ShaderInOutMetadata &output
   if (!outputMeta.IsBuiltIn)
     location += locOffset;
 
-  DenseMap<unsigned, Vkgc::XfbOutInfo> *locXfbMapPtr = outputMeta.IsBuiltIn ? &m_builtInXfbMap : &m_genericXfbMap;
   if (locXfbMapPtr->size() > 0) {
     auto iter = locXfbMapPtr->find(location);
     if (iter == locXfbMapPtr->end())
@@ -2428,8 +2457,7 @@ void SpirvLowerGlobal::addCallInstForXfbOutput(const ShaderInOutMetadata &output
     else
       outputInfo.setComponent(iter->second.component);
   } else {
-    if (!outputMeta.IsXfb)
-      return;
+    assert(outputMeta.IsXfb);
     // Use XFB qualifier
     assert(xfbOffsetAdjust != InvalidValue && (!outputMeta.IsBuiltIn || xfbBufferAdjust == 0));
     xfbBuffer = outputMeta.XfbBuffer + xfbBufferAdjust;

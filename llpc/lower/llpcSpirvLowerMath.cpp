@@ -70,6 +70,20 @@ SpirvLowerMath::SpirvLowerMath()
 }
 
 // =====================================================================================================================
+// Set denormal-fp-math attribute to the specified function according to provided FP denormal mode.
+//
+// @param func : Function to set the attribute
+// @param fp32 : Whether the attribute is for FP32
+// @param denormMode : FP denormal mode
+static void setFpMathAttribute(Function &func, bool fp32, FpDenormMode denormMode) {
+  const char *attrName = fp32 ? "denormal-fp-math-f32" : "denormal-fp-math";
+  if (denormMode == FpDenormMode::FlushNone || denormMode == FpDenormMode::FlushIn)
+    func.addFnAttr(attrName, "ieee");
+  else if (fp32 || denormMode == FpDenormMode::FlushOut || denormMode == FpDenormMode::FlushInOut)
+    func.addFnAttr(attrName, "preserve-sign");
+}
+
+// =====================================================================================================================
 // Initialise transform class.
 //
 // @param [in/out] module : LLVM module to be run on
@@ -80,14 +94,20 @@ void SpirvLowerMath::init(Module &module) {
   if (m_shaderStage == ShaderStageInvalid)
     return;
 
-  auto commonShaderMode = Pipeline::getCommonShaderMode(module, getLgcShaderStage(m_shaderStage));
-  m_fp16DenormFlush = commonShaderMode.fp16DenormMode == FpDenormMode::FlushOut ||
-                      commonShaderMode.fp16DenormMode == FpDenormMode::FlushInOut;
-  m_fp32DenormFlush = commonShaderMode.fp32DenormMode == FpDenormMode::FlushOut ||
-                      commonShaderMode.fp32DenormMode == FpDenormMode::FlushInOut;
-  m_fp64DenormFlush = commonShaderMode.fp64DenormMode == FpDenormMode::FlushOut ||
-                      commonShaderMode.fp64DenormMode == FpDenormMode::FlushInOut;
-  m_fp16RoundToZero = commonShaderMode.fp16RoundMode == FpRoundMode::Zero;
+  // NOTE: We try to set denormal-fp-math here because later optimization passes will detect the attributes and decide
+  // what to do. Such attributes will be set once again in LGC.
+  auto shaderMode = Pipeline::getCommonShaderMode(module, getLgcShaderStage(m_shaderStage));
+  setFpMathAttribute(*m_entryPoint, false, shaderMode.fp16DenormMode);
+  setFpMathAttribute(*m_entryPoint, true, shaderMode.fp32DenormMode);
+  setFpMathAttribute(*m_entryPoint, false, shaderMode.fp64DenormMode);
+
+  m_fp16DenormFlush =
+      shaderMode.fp16DenormMode == FpDenormMode::FlushOut || shaderMode.fp16DenormMode == FpDenormMode::FlushInOut;
+  m_fp32DenormFlush =
+      shaderMode.fp32DenormMode == FpDenormMode::FlushOut || shaderMode.fp32DenormMode == FpDenormMode::FlushInOut;
+  m_fp64DenormFlush =
+      shaderMode.fp64DenormMode == FpDenormMode::FlushOut || shaderMode.fp64DenormMode == FpDenormMode::FlushInOut;
+  m_fp16RoundToZero = shaderMode.fp16RoundMode == FpRoundMode::Zero;
 }
 
 // =====================================================================================================================
@@ -453,15 +473,6 @@ bool SpirvLowerMathFloatOp::runImpl(Module &module) {
   visit(m_module);
 
   return m_changed;
-}
-
-// =====================================================================================================================
-// Visits unary operator instruction.
-//
-// @param unaryOp : Unary operator instruction
-void SpirvLowerMathFloatOp::visitUnaryOperator(UnaryOperator &unaryOp) {
-  if (unaryOp.getOpcode() == Instruction::FNeg)
-    flushDenormIfNeeded(&unaryOp);
 }
 
 // =====================================================================================================================

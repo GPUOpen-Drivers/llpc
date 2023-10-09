@@ -2728,6 +2728,9 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
   Value *imageDescPtr = nullptr;
   Value *samplerDescPtr = nullptr;
 
+  if (getPipelineOptions()->replaceSetWithResourceType)
+    assert(spvTy->getOpCode() != OpTypeSampler);
+
   if (spvTy->getOpCode() != OpTypeSampler) {
     // Image or sampledimage -- need to get the image pointer-and-stride.
     SPIRVType *spvImageTy = spvTy;
@@ -2743,15 +2746,20 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
       if (spvTy->getOpCode() == OpTypeImage) {
         descriptorSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorImage);
       } else if (spvTy->getOpCode() == OpTypeSampledImage) {
-        descriptorSet =
-            PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorCombinedTexture);
+        if (getPipelineOptions()->enableCombinedTexture) {
+          descriptorSet =
+              PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorCombinedTexture);
+        } else {
+          descriptorSet =
+              PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorResource);
+        }
       }
     }
 
     imageDescPtr = getDescPointerAndStride(resType, descriptorSet, binding, resType);
 
     if (desc->MS) {
-      if (getPipelineOptions()->replaceSetWithResourceType)
+      if (getPipelineOptions()->replaceSetWithResourceType && spvTy->getOpCode() != OpTypeImage)
         descriptorSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorFmask);
       // A multisampled image pointer is a struct containing an image desc pointer and an fmask desc pointer.
       Value *fmaskDescPtr = getDescPointerAndStride(ResourceNodeType::DescriptorFmask, descriptorSet, binding,
@@ -2764,7 +2772,7 @@ Value *SPIRVToLLVM::transImagePointer(SPIRVValue *spvImagePtr) {
   }
 
   if (spvTy->getOpCode() != OpTypeImage) {
-    if (getPipelineOptions()->replaceSetWithResourceType && !(spvTy->getOpCode() == OpTypeSampledImage))
+    if (getPipelineOptions()->replaceSetWithResourceType && !getPipelineOptions()->enableCombinedTexture)
       descriptorSet = PipelineContext::getGlResourceNodeSetFromType(Vkgc::ResourceMappingNodeType::DescriptorSampler);
     // Sampler or sampledimage -- need to get the sampler {pointer,stride,convertingSamplerIdx}
     samplerDescPtr = getDescPointerAndStride(ResourceNodeType::DescriptorSampler, descriptorSet, binding,
@@ -3460,7 +3468,10 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupFMax>(SPIRVValue *co
 //
 // @param spvValue : A SPIR-V value.
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformElect>(SPIRVValue *const spvValue) {
-  return getBuilder()->CreateSubgroupElect();
+  Value *result = nullptr;
+
+  result = getBuilder()->CreateSubgroupElect();
+  return result;
 }
 
 // =====================================================================================================================
@@ -3470,12 +3481,16 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformElect>(SPI
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAll>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
-
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const predicate = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupAll(predicate);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupAll(predicate);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3485,12 +3500,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAll>(SPIRV
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAny>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const predicate = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupAny(predicate);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupAny(predicate);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3500,12 +3520,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAny>(SPIRV
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAllEqual>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupAllEqual(value);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupAllEqual(value);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3515,13 +3540,18 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAllEqual>(
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcast>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
   Value *const index = transValue(spvOperands[2], func, block);
-  return getBuilder()->CreateSubgroupBroadcastWaterfall(value, index);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupBroadcastWaterfall(value, index);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3531,12 +3561,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcast>
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcastFirst>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupBroadcastFirst(value);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupBroadcastFirst(value);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3546,12 +3581,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBroadcastF
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallot>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const predicate = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupBallot(predicate);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupBallot(predicate);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3561,12 +3601,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallot>(SP
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformInverseBallot>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupInverseBallot(value);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupInverseBallot(value);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3576,13 +3621,18 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformInverseBal
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotBitExtract>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
   Value *const index = transValue(spvOperands[2], func, block);
-  return getBuilder()->CreateSubgroupBallotBitExtract(value, index);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupBallotBitExtract(value, index);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3592,22 +3642,24 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotBitE
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotBitCount>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[2], func, block);
 
-  switch (static_cast<SPIRVConstant *>(spvOperands[1])->getZExtIntValue()) {
-  case GroupOperationReduce:
-    return getBuilder()->CreateSubgroupBallotBitCount(value);
-  case GroupOperationInclusiveScan:
-    return getBuilder()->CreateSubgroupBallotInclusiveBitCount(value);
-  case GroupOperationExclusiveScan:
-    return getBuilder()->CreateSubgroupBallotExclusiveBitCount(value);
-  default:
-    llvm_unreachable("Should never be called!");
-    return nullptr;
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    switch (static_cast<SPIRVConstant *>(spvOperands[1])->getZExtIntValue()) {
+    case GroupOperationReduce:
+      return getBuilder()->CreateSubgroupBallotBitCount(value);
+    case GroupOperationInclusiveScan:
+      return getBuilder()->CreateSubgroupBallotInclusiveBitCount(value);
+    case GroupOperationExclusiveScan:
+      return getBuilder()->CreateSubgroupBallotExclusiveBitCount(value);
+    default:
+      llvm_unreachable("Should never be called!");
+      return nullptr;
+    }
   }
 }
 
@@ -3618,12 +3670,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotBitC
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotFindLSB>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupBallotFindLsb(value);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupBallotFindLsb(value);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3633,12 +3690,17 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotFind
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotFindMSB>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupBallotFindMsb(value);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupBallotFindMsb(value);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3648,13 +3710,18 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformBallotFind
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffle>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
   Value *const index = transValue(spvOperands[2], func, block);
-  return getBuilder()->CreateSubgroupShuffle(value, index);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupShuffle(value, index);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3664,13 +3731,18 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffle>(S
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleXor>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
   Value *const mask = transValue(spvOperands[2], func, block);
-  return getBuilder()->CreateSubgroupShuffleXor(value, mask);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupShuffleXor(value, mask);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3680,13 +3752,18 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleXor
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleUp>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
   Value *const delta = transValue(spvOperands[2], func, block);
-  return getBuilder()->CreateSubgroupShuffleUp(value, delta);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupShuffleUp(value, delta);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -3696,13 +3773,18 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleUp>
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleDown>(SPIRVValue *const spvValue) {
   SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
   std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
-  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
 
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
   Value *const delta = transValue(spvOperands[2], func, block);
-  return getBuilder()->CreateSubgroupShuffleDown(value, delta);
+  Value *result = nullptr;
+
+  {
+    assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+    result = getBuilder()->CreateSubgroupShuffleDown(value, delta);
+  }
+  return result;
 }
 
 // =====================================================================================================================
@@ -5280,10 +5362,12 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
   }
   case OpFNegate: {
     SPIRVUnary *bc = static_cast<SPIRVUnary *>(bv);
-    // Implement -x as -0.0 - x.
-    Value *negZero = ConstantFP::getNegativeZero(transType(bc->getType()));
-    auto fNeg = BinaryOperator::CreateFSub(negZero, transValue(bc->getOperand(0), f, bb), bv->getName(), bb);
+    Value *val0 = transValue(bc->getOperand(0), f, bb);
+    auto fNeg = getBuilder()->CreateFNeg(val0);
     setFastMathFlags(fNeg);
+    // Since OpFNegate is considered a floating point instruction, we must take
+    // that into account (since LLVM fneg is not).
+    fNeg = flushDenorm(fNeg);
     return mapValue(bv, fNeg);
   }
 
@@ -6044,7 +6128,7 @@ static unsigned convertDimension(const SPIRVTypeImageDescriptor *desc) {
     case Dim2D:
       return lgc::Builder::Dim2D;
     case DimRect:
-      return lgc::Builder::Dim2D;
+      return lgc::Builder::DimRect;
     case DimCube:
       return lgc::Builder::DimCube;
     case Dim3D:
@@ -7209,7 +7293,7 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
   static_assert(SPIRVTW_32Bit == (32 >> 3), "Unexpected value!");
   static_assert(SPIRVTW_64Bit == (64 >> 3), "Unexpected value!");
 
-  bool enableXfb = false;
+  bool hasXfbOuts = false;
   if (m_entryTarget) {
     if (auto em = m_entryTarget->getExecutionMode(ExecutionModeDenormPreserve))
       m_fpControlFlags.DenormPreserve = em->getLiterals()[0] >> 3;
@@ -7227,7 +7311,8 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
       m_fpControlFlags.RoundingModeRTZ = em->getLiterals()[0] >> 3;
 
     if (m_execModule >= ExecutionModelVertex && m_execModule <= ExecutionModelGeometry)
-      enableXfb = m_entryTarget->getExecutionMode(ExecutionModeXfb) != nullptr;
+      hasXfbOuts = m_entryTarget->getExecutionMode(ExecutionModeXfb) != nullptr;
+
   } else {
     createLibraryEntryFunc();
   }
@@ -7399,8 +7484,8 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
   if (!transMetadata())
     return false;
 
-  if (enableXfb)
-    createXfbMetadata();
+  if (pipelineContext->getPipelineType() == PipelineType::Graphics)
+    createXfbMetadata(hasXfbOuts);
 
   postProcessRowMajorMatrix();
   if (!m_moduleUsage->keepUnusedFunctions)
@@ -7579,6 +7664,16 @@ bool SPIRVToLLVM::transMetadata() {
               break;
             }
           }
+        }
+
+        unsigned overrideShaderGroupSizeX = m_shaderOptions->overrideShaderThreadGroupSizeX;
+        unsigned overrideShaderGroupSizeY = m_shaderOptions->overrideShaderThreadGroupSizeY;
+        unsigned overrideShaderGroupSizeZ = m_shaderOptions->overrideShaderThreadGroupSizeZ;
+
+        if (overrideShaderGroupSizeX != 0 || overrideShaderGroupSizeY != 0 || overrideShaderGroupSizeZ != 0) {
+          meshMode.workgroupSizeX = overrideShaderGroupSizeX;
+          meshMode.workgroupSizeY = overrideShaderGroupSizeY;
+          meshMode.workgroupSizeZ = overrideShaderGroupSizeZ;
         }
 
         Pipeline::setMeshShaderMode(*m_m, meshMode);
@@ -7849,7 +7944,8 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
       }
 
       // If dual source blend is dynamically set, need to confirm whether the fragment shader actually uses
-      // dual-source blending by checking if there is an output at Location 0, Index 1
+      // dual-source blending by checking if there is an output at Location 0. If there isn't any output in
+      // index, the poison value will be exported.
       Llpc::Context *llpcContext = static_cast<Llpc::Context *>(m_context);
       if ((llpcContext->getPipelineType() == PipelineType::Graphics) && (m_execModule == spv::ExecutionModelFragment)) {
         auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());
@@ -7861,7 +7957,9 @@ bool SPIRVToLLVM::transShaderDecoration(SPIRVValue *bv, Value *v) {
 
       Type *mdTy = nullptr;
       SPIRVType *bt = bv->getType()->getPointerElementType();
-      auto md = buildShaderInOutMetadata(bt, inOutDec, mdTy);
+      bool vs64BitsAttribInputSingleLoc = (as == SPIRAS_Input && m_execModule == ExecutionModelVertex &&
+                                           getPipelineOptions()->vertex64BitsAttribSingleLoc);
+      auto md = buildShaderInOutMetadata(bt, inOutDec, mdTy, vs64BitsAttribInputSingleLoc);
 
       // Setup input/output metadata
       std::vector<Metadata *> mDs;
@@ -8106,7 +8204,8 @@ unsigned SPIRVToLLVM::calcShaderBlockSize(SPIRVType *bt, unsigned blockSize, uns
 }
 
 // Builds shader input/output metadata.
-Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecorate &inOutDec, Type *&mdTy) {
+Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecorate &inOutDec, Type *&mdTy,
+                                                bool vs64BitsAttribInputSingleLoc) {
   SPIRVWord loc = SPIRVID_INVALID;
   if (bt->hasDecorate(DecorationLocation, 0, &loc)) {
     inOutDec.Value.Loc = loc;
@@ -8210,7 +8309,10 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
         width *= bt->getVectorComponentCount();
       assert(width <= 64 * 4);
 
-      inOutDec.Value.Loc += width <= 32 * 4 ? 1 : 2;
+      if (vs64BitsAttribInputSingleLoc)
+        inOutDec.Value.Loc += 1;
+      else
+        inOutDec.Value.Loc += width <= 32 * 4 ? 1 : 2;
       unsigned alignment = 32;
       unsigned baseStride = 4; // Strides in (bytes)
       inOutDec.XfbExtraOffset += (((width + alignment - 1) / alignment) * baseStride);
@@ -8253,7 +8355,7 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
     Type *elemMdTy = nullptr;
     auto elemDec = inOutDec; // Inherit from parent
     elemDec.XfbExtraOffset = startXfbExtraOffset;
-    auto elemMd = buildShaderInOutMetadata(elemTy, elemDec, elemMdTy);
+    auto elemMd = buildShaderInOutMetadata(elemTy, elemDec, elemMdTy, vs64BitsAttribInputSingleLoc);
 
     inOutDec.PerVertexDimension = isPerVertexDimension;
 
@@ -8433,7 +8535,7 @@ Constant *SPIRVToLLVM::buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecora
       if (bt->hasMemberDecorate(memberIdx, DecorationStream, 0, &memberStreamId))
         memberDec.StreamId = memberStreamId;
       Type *memberMdTy = nullptr;
-      auto memberMd = buildShaderInOutMetadata(memberTy, memberDec, memberMdTy);
+      auto memberMd = buildShaderInOutMetadata(memberTy, memberDec, memberMdTy, vs64BitsAttribInputSingleLoc);
 
       // Align next XfbExtraOffset to 64-bit (8 bytes)
       xfbExtraOffset = memberDec.XfbExtraOffset;
@@ -9634,7 +9736,14 @@ void SPIRVToLLVM::insertScratchBoundsChecks(SPIRVValue *memOp, const ScratchBoun
   }
 }
 
-void SPIRVToLLVM::createXfbMetadata() {
+void SPIRVToLLVM::createXfbMetadata(bool hasXfbOuts) {
+  auto llpcContext = static_cast<Llpc::Context *>(m_context);
+  auto pipelineBuildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());
+  const bool needXfbMetadata = (hasXfbOuts && !pipelineBuildInfo->apiXfbOutData.forceDisableStreamOut) ||
+                               pipelineBuildInfo->apiXfbOutData.forceEnablePrimStats;
+  if (!needXfbMetadata)
+    return;
+
   // Preserve XFB relevant information in named metadata !lgc.xfb.stage, defined as follows:
   // lgc.xfb.state metadata = {
   // i32 buffer0Stream, i32 buffer0Stride, i32 buffer1Stream, i32 buffer1Stride,
@@ -9646,99 +9755,97 @@ void SPIRVToLLVM::createXfbMetadata() {
                                                    InvalidValue, 0,  // xfbBuffer[1] -> <streamId, xfbStride>
                                                    InvalidValue, 0,  // xfbBuffer[2] -> <streamId, xfbStride>
                                                    InvalidValue, 0}; // xfbBuffer[3] -> <streamId, xfbStride>
+  if (hasXfbOuts && !pipelineBuildInfo->apiXfbOutData.forceDisableStreamOut) {
+    const bool useXfbDecorations = pipelineBuildInfo->apiXfbOutData.numXfbOutInfo == 0;
+    if (useXfbDecorations) {
+      for (unsigned i = 0, e = m_bm->getNumVariables(); i != e; ++i) {
+        auto bv = m_bm->getVariable(i);
+        if (bv->getStorageClass() == StorageClassOutput) {
+          SPIRVWord xfbBuffer = InvalidValue;
+          // NOTE: XFbBuffer may be decorated on the pointer element
+          SPIRVType *pointerElemTy = bv->getType()->getPointerElementType();
+          SPIRVEntry *entries[2] = {bv, pointerElemTy};
+          unsigned memberCount = 0;
+          if (pointerElemTy->isTypeStruct())
+            memberCount = pointerElemTy->getStructMemberCount();
+          for (unsigned id = 0; id < 2; ++id) {
+            auto entry = entries[id];
+            if (entry->hasDecorate(DecorationXfbBuffer, 0, &xfbBuffer)) {
+              const unsigned indexOfBuffer = 2 * xfbBuffer;
+              xfbState[indexOfBuffer] = 0;
+              SPIRVWord streamId = InvalidValue;
+              if (entry->hasDecorate(DecorationStream, 0, &streamId))
+                xfbState[indexOfBuffer] = streamId;
 
-  auto llpcContext = static_cast<Llpc::Context *>(m_context);
-  auto pipelineBuildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());
-  const bool useXfbDecorations = pipelineBuildInfo->apiXfbOutData.numXfbOutInfo == 0;
+              SPIRVWord xfbStride = InvalidValue;
+              if (entry->hasDecorate(DecorationXfbStride, 0, &xfbStride)) {
+                const unsigned indexOfStride = indexOfBuffer + 1;
+                xfbState[indexOfStride] = xfbStride;
+              }
+            } else if (id == 1) {
+              for (unsigned i = 0; i < memberCount; ++i) {
+                if (entry->hasMemberDecorate(i, DecorationXfbBuffer, 0, &xfbBuffer)) {
+                  const unsigned indexOfBuffer = 2 * xfbBuffer;
+                  xfbState[indexOfBuffer] = 0;
+                  SPIRVWord streamId = InvalidValue;
+                  if (entry->hasMemberDecorate(i, DecorationStream, 0, &streamId))
+                    xfbState[indexOfBuffer] = streamId;
 
-  if (useXfbDecorations) {
-    for (unsigned i = 0, e = m_bm->getNumVariables(); i != e; ++i) {
-      auto bv = m_bm->getVariable(i);
-      if (bv->getStorageClass() == StorageClassOutput) {
-        SPIRVWord xfbBuffer = InvalidValue;
-        // NOTE: XFbBuffer may be decorated on the pointer element
-        SPIRVType *pointerElemTy = bv->getType()->getPointerElementType();
-        SPIRVEntry *entries[2] = {bv, pointerElemTy};
-        unsigned memberCount = 0;
-        if (pointerElemTy->isTypeStruct())
-          memberCount = pointerElemTy->getStructMemberCount();
-        for (unsigned id = 0; id < 2; ++id) {
-          auto entry = entries[id];
-          if (entry->hasDecorate(DecorationXfbBuffer, 0, &xfbBuffer)) {
-            const unsigned indexOfBuffer = 2 * xfbBuffer;
-            xfbState[indexOfBuffer] = 0;
-            SPIRVWord streamId = InvalidValue;
-            if (entry->hasDecorate(DecorationStream, 0, &streamId))
-              xfbState[indexOfBuffer] = streamId;
-
-            SPIRVWord xfbStride = InvalidValue;
-            if (entry->hasDecorate(DecorationXfbStride, 0, &xfbStride)) {
-              const unsigned indexOfStride = indexOfBuffer + 1;
-              xfbState[indexOfStride] = xfbStride;
-            }
-          } else if (id == 1) {
-            for (unsigned i = 0; i < memberCount; ++i) {
-              if (entry->hasMemberDecorate(i, DecorationXfbBuffer, 0, &xfbBuffer)) {
-                const unsigned indexOfBuffer = 2 * xfbBuffer;
-                xfbState[indexOfBuffer] = 0;
-                SPIRVWord streamId = InvalidValue;
-                if (entry->hasMemberDecorate(i, DecorationStream, 0, &streamId))
-                  xfbState[indexOfBuffer] = streamId;
-
-                SPIRVWord xfbStride = InvalidValue;
-                if (entry->hasMemberDecorate(i, DecorationXfbStride, 0, &xfbStride)) {
-                  const unsigned indexOfStride = indexOfBuffer + 1;
-                  xfbState[indexOfStride] = xfbStride;
+                  SPIRVWord xfbStride = InvalidValue;
+                  if (entry->hasMemberDecorate(i, DecorationXfbStride, 0, &xfbStride)) {
+                    const unsigned indexOfStride = indexOfBuffer + 1;
+                    xfbState[indexOfStride] = xfbStride;
+                  }
                 }
               }
             }
           }
-        }
-        if (xfbBuffer == InvalidValue)
-          continue;
+          if (xfbBuffer == InvalidValue)
+            continue;
 
-        // Update indexOfBuffer for block array, the N array-elements are captured by N consecutive buffers.
-        SPIRVType *bt = bv->getType()->getPointerElementType();
-        if (bt->isTypeArray()) {
-          assert(m_valueMap.find(bv) != m_valueMap.end());
-          auto output = cast<GlobalVariable>(m_valueMap[bv]);
-          MDNode *metaNode = output->getMetadata(gSPIRVMD::InOut);
-          assert(metaNode);
-          auto elemMeta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
-          // Find the innermost array-element
-          auto elemTy = bt;
-          uint64_t elemCount = 0;
-          ShaderInOutMetadata outMetadata = {};
-          do {
-            assert(elemMeta->getNumOperands() == 4);
-            outMetadata.U64All[0] = cast<ConstantInt>(elemMeta->getOperand(2))->getZExtValue();
-            outMetadata.U64All[1] = cast<ConstantInt>(elemMeta->getOperand(3))->getZExtValue();
-            elemCount = elemTy->getArrayLength();
+          // Update indexOfBuffer for block array, the N array-elements are captured by N consecutive buffers.
+          SPIRVType *bt = bv->getType()->getPointerElementType();
+          if (bt->isTypeArray()) {
+            assert(m_valueMap.find(bv) != m_valueMap.end());
+            auto output = cast<GlobalVariable>(m_valueMap[bv]);
+            MDNode *metaNode = output->getMetadata(gSPIRVMD::InOut);
+            assert(metaNode);
+            auto elemMeta = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+            // Find the innermost array-element
+            auto elemTy = bt;
+            uint64_t elemCount = 0;
+            ShaderInOutMetadata outMetadata = {};
+            do {
+              assert(elemMeta->getNumOperands() == 4);
+              outMetadata.U64All[0] = cast<ConstantInt>(elemMeta->getOperand(2))->getZExtValue();
+              outMetadata.U64All[1] = cast<ConstantInt>(elemMeta->getOperand(3))->getZExtValue();
+              elemCount = elemTy->getArrayLength();
 
-            elemTy = elemTy->getArrayElementType();
-            elemMeta = cast<Constant>(elemMeta->getOperand(1));
-          } while (elemTy->isTypeArray());
+              elemTy = elemTy->getArrayElementType();
+              elemMeta = cast<Constant>(elemMeta->getOperand(1));
+            } while (elemTy->isTypeArray());
 
-          if (outMetadata.IsBlockArray) {
-            // The even index (0,2,4,6) of !lgc.xfb.state metadata corresponds the buffer index (0~3).
-            const unsigned bufferIdx = outMetadata.XfbBuffer;
-            const int streamId = xfbState[2 * bufferIdx];
-            const unsigned stride = xfbState[2 * bufferIdx + 1];
-            for (unsigned idx = 0; idx < elemCount; ++idx) {
-              const unsigned indexOfBuffer = 2 * (bufferIdx + idx);
-              xfbState[indexOfBuffer] = streamId;
-              xfbState[indexOfBuffer + 1] = stride;
+            if (outMetadata.IsBlockArray) {
+              // The even index (0,2,4,6) of !lgc.xfb.state metadata corresponds the buffer index (0~3).
+              const unsigned bufferIdx = outMetadata.XfbBuffer;
+              const int streamId = xfbState[2 * bufferIdx];
+              const unsigned stride = xfbState[2 * bufferIdx + 1];
+              for (unsigned idx = 0; idx < elemCount; ++idx) {
+                const unsigned indexOfBuffer = 2 * (bufferIdx + idx);
+                xfbState[indexOfBuffer] = streamId;
+                xfbState[indexOfBuffer + 1] = stride;
+              }
             }
           }
         }
       }
-    }
-  } else {
-    for (unsigned idx = 0; idx < pipelineBuildInfo->apiXfbOutData.numXfbOutInfo; ++idx) {
-      const auto &xfbInfo = pipelineBuildInfo->apiXfbOutData.pXfbOutInfos[idx];
-      const unsigned indexOfBuffer = 2 * xfbInfo.xfbBuffer;
-      xfbState[indexOfBuffer] = xfbInfo.streamId;
-      xfbState[indexOfBuffer + 1] = xfbInfo.xfbStride;
+    } else {
+      for (unsigned idx = 0; idx < pipelineBuildInfo->apiXfbOutData.numXfbOutInfo; ++idx) {
+        const auto &xfbInfo = pipelineBuildInfo->apiXfbOutData.pXfbOutInfos[idx];
+        const unsigned indexOfBuffer = 2 * xfbInfo.xfbBuffer;
+        xfbState[indexOfBuffer] = xfbInfo.streamId;
+        xfbState[indexOfBuffer + 1] = xfbInfo.xfbStride;
+      }
     }
   }
 

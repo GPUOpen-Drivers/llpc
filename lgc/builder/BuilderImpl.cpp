@@ -679,38 +679,16 @@ Instruction *BuilderImpl::createWaterfallLoop(Instruction *nonUniformInst, Array
     }
   }
 
-  Instruction *resultValue = nonUniformInst;
+  if (nonUniformInst->getType()->isVoidTy())
+    return nonUniformInst;
 
-  // End the waterfall loop (as long as nonUniformInst is not a store with no result).
-  if (!nonUniformInst->getType()->isVoidTy()) {
-    SetInsertPoint(nonUniformInst->getNextNode());
-    SetCurrentDebugLocation(nonUniformInst->getDebugLoc());
+  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
+    return builder.CreateWaterfallEnd(mappedArgs[0], passthroughArgs[0]);
+  };
 
-    Use *useOfNonUniformInst = nullptr;
-    Type *waterfallEndTy = resultValue->getType();
-    if (auto vecTy = dyn_cast<FixedVectorType>(waterfallEndTy)) {
-      if (vecTy->getElementType()->isIntegerTy(8)) {
-        // ISel does not like waterfall.end with vector of i8 type, so cast if necessary.
-        assert((vecTy->getNumElements() % 4) == 0);
-        waterfallEndTy = getInt32Ty();
-        if (vecTy->getNumElements() != 4)
-          waterfallEndTy = FixedVectorType::get(getInt32Ty(), vecTy->getNumElements() / 4);
-        resultValue = cast<Instruction>(CreateBitCast(resultValue, waterfallEndTy, instName));
-        useOfNonUniformInst = &resultValue->getOperandUse(0);
-      }
-    }
-    resultValue = CreateIntrinsic(Intrinsic::amdgcn_waterfall_end, waterfallEndTy, {waterfallBegin, resultValue},
-                                  nullptr, instName);
-    if (!useOfNonUniformInst)
-      useOfNonUniformInst = &resultValue->getOperandUse(1);
-    if (waterfallEndTy != nonUniformInst->getType())
-      resultValue = cast<Instruction>(CreateBitCast(resultValue, nonUniformInst->getType(), instName));
-
-    // Replace all uses of nonUniformInst with the result of this code.
-    *useOfNonUniformInst = PoisonValue::get(nonUniformInst->getType());
-    nonUniformInst->replaceAllUsesWith(resultValue);
-    *useOfNonUniformInst = nonUniformInst;
-  }
+  SetInsertPoint(nonUniformInst->getNextNode());
+  auto resultValue =
+      cast<Instruction>(CreateMapToSimpleType(mapFunc, nonUniformInst, waterfallBegin, MapToSimpleMode::SimpleVector));
 
   return resultValue;
 #endif

@@ -306,7 +306,8 @@ Vkgc::UniformConstantMapEntry *getUniformConstantEntryByLocation(const Llpc::Con
     auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
     // Find the uniform constant map to use.
     for (unsigned s = 0; s < buildInfo->numUniformConstantMaps; s++) {
-      if (isShaderStageInMask(stage, buildInfo->ppUniformMaps[s]->visibility)) {
+      if (buildInfo->ppUniformMaps[s] != nullptr &&
+          isShaderStageInMask(stage, buildInfo->ppUniformMaps[s]->visibility)) {
         accessedUniformMap = buildInfo->ppUniformMaps[s];
         break;
       }

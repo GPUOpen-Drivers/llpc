@@ -117,9 +117,11 @@ protected:
   llvm::Value *CreateAddByteOffset(llvm::Value *pointer, llvm::Value *byteOffset, const llvm::Twine &instName = "") {
     return BuilderBase::get(*this).CreateAddByteOffset(pointer, byteOffset, instName);
   }
-  llvm::Value *CreateMapToInt32(BuilderBase::MapToInt32Func mapFunc, llvm::ArrayRef<llvm::Value *> mappedArgs,
-                                llvm::ArrayRef<llvm::Value *> passthroughArgs) {
-    return BuilderBase::get(*this).CreateMapToInt32(mapFunc, mappedArgs, passthroughArgs);
+
+  llvm::Value *CreateMapToSimpleType(BuilderBase::MapToSimpleTypeFunc mapFunc, llvm::ArrayRef<llvm::Value *> mappedArgs,
+                                     llvm::ArrayRef<llvm::Value *> passthroughArgs,
+                                     MapToSimpleMode simpleMode = MapToSimpleMode::Int32) {
+    return BuilderBase::get(*this).CreateMapToSimpleType(mapFunc, mappedArgs, passthroughArgs, simpleMode);
   }
 
   PipelineState *m_pipelineState = nullptr;       // Pipeline state
@@ -441,6 +443,9 @@ private:
   // Enforce readfirstlane on the image or sampler descriptors
   void enforceReadFirstLane(llvm::Instruction *imageInst, unsigned descIdx);
 
+  // Modify sampler descriptor to force set trunc_coord as 0 for gather4 instruction.
+  llvm::Value *modifySamplerDescForGather(llvm::Value *samplerDesc);
+
   enum ImgDataFormat {
     IMG_DATA_FORMAT_32 = 4,
     IMG_DATA_FORMAT_8_8_8_8 = 10,
@@ -650,16 +655,15 @@ public:
   // Create a subgroup all.
   llvm::Value *CreateSubgroupAll(llvm::Value *const value, const llvm::Twine &instName = "");
 
-  // Create a subgroup rotate.
-  llvm::Value *CreateSubgroupRotate(llvm::Value *const value, llvm::Value *const delta, llvm::Value *const clusterSize,
-                                    const llvm::Twine &instName = "");
-
   // Create a subgroup any
   llvm::Value *CreateSubgroupAny(llvm::Value *const value, const llvm::Twine &instName = "");
 
   // Create a subgroup all equal.
   llvm::Value *CreateSubgroupAllEqual(llvm::Value *const value, const llvm::Twine &instName = "");
 
+  // Create a subgroup rotate.
+  llvm::Value *CreateSubgroupRotate(llvm::Value *const value, llvm::Value *const delta, llvm::Value *const clusterSize,
+                                    const llvm::Twine &instName = "");
   // Create a subgroup broadcast.
   llvm::Value *CreateSubgroupBroadcast(llvm::Value *const value, llvm::Value *const index,
                                        const llvm::Twine &instName = "");
@@ -724,17 +728,17 @@ public:
   llvm::Value *CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, llvm::Value *const value,
                                                 llvm::Value *const clusterSize, const llvm::Twine &instName = "");
 
-  // Create a subgroup quad broadcast.
-  llvm::Value *CreateSubgroupQuadBroadcast(llvm::Value *const value, llvm::Value *const index,
+  // Create a quad broadcast.
+  llvm::Value *CreateSubgroupQuadBroadcast(llvm::Value *const value, llvm::Value *const index, bool inWQM = true,
                                            const llvm::Twine &instName = "");
 
-  // Create a subgroup quad swap horizontal.
+  // Create a quad swap horizontal.
   llvm::Value *CreateSubgroupQuadSwapHorizontal(llvm::Value *const value, const llvm::Twine &instName = "");
 
-  // Create a subgroup quad swap vertical.
+  // Create a quad swap vertical.
   llvm::Value *CreateSubgroupQuadSwapVertical(llvm::Value *const value, const llvm::Twine &instName = "");
 
-  // Create a subgroup quad swap diagonal.
+  // Create a quad swap diagonal.
   llvm::Value *CreateSubgroupQuadSwapDiagonal(llvm::Value *const value, const llvm::Twine &instName = "");
 
   // Create a subgroup swizzle quad.

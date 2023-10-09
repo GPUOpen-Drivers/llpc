@@ -57,7 +57,7 @@ target_link_libraries(LLVMLgcRt PUBLIC llvm_dialects)
 set_compiler_options(LLVMLgcRt)
 
 # TableGen for the lgc.rt dialect
-set(LGCRT_TABLEGEN_EXE ${LLVM_TOOLS_BINARY_DIR}/llvm-dialects-tblgen)
+set(LGCRT_TABLEGEN_EXE $<TARGET_FILE:llvm-dialects-tblgen>)
 set(LGCRT_TABLEGEN_TARGET llvm-dialects-tblgen)
 set(LLVM_TARGET_DEFINITIONS include/lgcrt/LgcRtDialect.td)
 set(LLVM_TARGET_DEPENDS lgcrt)
@@ -66,10 +66,12 @@ add_custom_command(
     OUTPUT lgcrt
     COMMAND ${CMAKE_COMMAND} -E make_directory lgcrt)
 
+set(llvm_dialects_includes ${CMAKE_CURRENT_SOURCE_DIR}/../../imported/llvm-dialects/include)
+
 tablegen(LGCRT lgcrt/LgcRtDialect.h.inc -gen-dialect-decls --dialect lgc.rt ${LGCRT_TABLEGEN_DEFINES}
-    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../../imported/llvm-dialects/include)
+    EXTRA_INCLUDES ${llvm_dialects_includes})
 tablegen(LGCRT LgcRtDialect.cpp.inc -gen-dialect-defs --dialect lgc.rt ${LGCRT_TABLEGEN_DEFINES}
-    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../../imported/llvm-dialects/include)
+    EXTRA_INCLUDES ${llvm_dialects_includes})
 add_public_tablegen_target(LgcRtDialectTableGen)
 
 add_dependencies(LLVMLgcRt LgcRtDialectTableGen)

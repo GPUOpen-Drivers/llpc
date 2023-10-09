@@ -97,7 +97,7 @@ public:
                      BuilderImpl &builderImpl) override;
 
   // Generate code to fetch a vertex value for uber shader
-  Value *fetchVertex(InputImportGenericOp *inst, Value *descPtr, BuilderBase &builder) override;
+  Value *fetchVertex(InputImportGenericOp *inst, Value *descPtr, Value *locMasks, BuilderBase &builder) override;
 
 private:
   void initialize(PipelineState *pipelineState);
@@ -125,6 +125,8 @@ private:
 
   bool needSecondVertexFetch(const VertexInputDescription *inputDesc) const;
 
+  bool needPatch32(const VertexInputDescription *inputDesc) const;
+
   LgcContext *m_lgcContext = nullptr;      // LGC context
   LLVMContext *m_context = nullptr;        // LLVM context
   Value *m_vertexBufTablePtr = nullptr;    // Vertex buffer table pointer
@@ -133,8 +135,8 @@ private:
   Value *m_instanceIndex = nullptr;        // Instance index
 
   static const VertexCompFormatInfo m_vertexCompFormatInfo[]; // Info table of vertex component format
-  static const unsigned char m_vertexFormatMapGfx10[][8];     // Info table of vertex format mapping for GFX10
-  static const unsigned char m_vertexFormatMapGfx11[][8];     // Info table of vertex format mapping for GFX11
+  static const unsigned char m_vertexFormatMapGfx10[][9];     // Info table of vertex format mapping for GFX10
+  static const unsigned char m_vertexFormatMapGfx11[][9];     // Info table of vertex format mapping for GFX11
 
   // Default values for vertex fetch (<4 x i32> or <8 x i32>)
   struct {
@@ -178,7 +180,7 @@ const VertexCompFormatInfo VertexFetchImpl::m_vertexCompFormatInfo[] = {
 };
 
 // clang-format off
-const unsigned char VertexFetchImpl::m_vertexFormatMapGfx10[][8] = {
+const unsigned char VertexFetchImpl::m_vertexFormatMapGfx10[][9] = {
     // BUF_DATA_FORMAT
     //   BUF_NUM_FORMAT_UNORM
     //   BUF_NUM_FORMAT_SNORM
@@ -188,9 +190,11 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx10[][8] = {
     //   BUF_NUM_FORMAT_SINT
     //   BUF_NUM_FORMAT_SNORM_NZ
     //   BUF_NUM_FORMAT_FLOAT
+    //   BUF_NUM_FORMAT_FIXED
 
     // BUF_DATA_FORMAT_INVALID
     {BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID,
@@ -207,6 +211,7 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx10[][8] = {
      BUF_FORMAT_8_UINT,
      BUF_FORMAT_8_SINT,
      BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_16
@@ -217,7 +222,8 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx10[][8] = {
      BUF_FORMAT_16_UINT,
      BUF_FORMAT_16_SINT,
      BUF_FORMAT_INVALID,
-     BUF_FORMAT_16_FLOAT},
+     BUF_FORMAT_16_FLOAT,
+     BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_8_8
     {BUF_FORMAT_8_8_UNORM,
@@ -227,17 +233,19 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx10[][8] = {
      BUF_FORMAT_8_8_UINT,
      BUF_FORMAT_8_8_SINT,
      BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_32
-    {BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
+    {BUF_FORMAT_32_UINT,
+     BUF_FORMAT_32_SINT,
+     BUF_FORMAT_32_UINT,
+     BUF_FORMAT_32_SINT,
      BUF_FORMAT_32_UINT,
      BUF_FORMAT_32_SINT,
      BUF_FORMAT_INVALID,
-     BUF_FORMAT_32_FLOAT},
+     BUF_FORMAT_32_FLOAT,
+     BUF_FORMAT_32_SINT},
 
     // BUF_DATA_FORMAT_16_16
     {BUF_FORMAT_16_16_UNORM,
@@ -247,7 +255,8 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx10[][8] = {
      BUF_FORMAT_16_16_UINT,
      BUF_FORMAT_16_16_SINT,
      BUF_FORMAT_INVALID,
-     BUF_FORMAT_16_16_FLOAT},
+     BUF_FORMAT_16_16_FLOAT,
+     BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_10_11_11
     {BUF_FORMAT_10_11_11_UNORM_GFX10,
@@ -257,7 +266,8 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx10[][8] = {
      BUF_FORMAT_10_11_11_UINT_GFX10,
      BUF_FORMAT_10_11_11_SINT_GFX10,
      BUF_FORMAT_INVALID,
-     BUF_FORMAT_10_11_11_FLOAT_GFX10},
+     BUF_FORMAT_10_11_11_FLOAT_GFX10,
+     BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_11_11_10
     {BUF_FORMAT_11_11_10_UNORM_GFX10,
@@ -267,7 +277,8 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx10[][8] = {
      BUF_FORMAT_11_11_10_UINT_GFX10,
      BUF_FORMAT_11_11_10_SINT_GFX10,
      BUF_FORMAT_INVALID,
-     BUF_FORMAT_11_11_10_FLOAT_GFX10},
+     BUF_FORMAT_11_11_10_FLOAT_GFX10,
+     BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_10_10_10_2
     {BUF_FORMAT_10_10_10_2_UNORM_GFX10,
@@ -276,6 +287,7 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx10[][8] = {
      BUF_FORMAT_10_10_10_2_SSCALED_GFX10,
      BUF_FORMAT_10_10_10_2_UINT_GFX10,
      BUF_FORMAT_10_10_10_2_SINT_GFX10,
+     BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID},
 
@@ -287,6 +299,7 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx10[][8] = {
      BUF_FORMAT_2_10_10_10_UINT_GFX10,
      BUF_FORMAT_2_10_10_10_SINT_GFX10,
      BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_8_8_8_8
@@ -297,17 +310,19 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx10[][8] = {
      BUF_FORMAT_8_8_8_8_UINT_GFX10,
      BUF_FORMAT_8_8_8_8_SINT_GFX10,
      BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_32_32
-    {BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
+    {BUF_FORMAT_32_32_UINT_GFX10,
+     BUF_FORMAT_32_32_SINT_GFX10,
+     BUF_FORMAT_32_32_UINT_GFX10,
+     BUF_FORMAT_32_32_SINT_GFX10,
      BUF_FORMAT_32_32_UINT_GFX10,
      BUF_FORMAT_32_32_SINT_GFX10,
      BUF_FORMAT_INVALID,
-     BUF_FORMAT_32_32_FLOAT_GFX10},
+     BUF_FORMAT_32_32_FLOAT_GFX10,
+     BUF_FORMAT_32_32_SINT_GFX10},
 
     // BUF_DATA_FORMAT_16_16_16_16
     {BUF_FORMAT_16_16_16_16_UNORM_GFX10,
@@ -317,30 +332,34 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx10[][8] = {
      BUF_FORMAT_16_16_16_16_UINT_GFX10,
      BUF_FORMAT_16_16_16_16_SINT_GFX10,
      BUF_FORMAT_INVALID,
-     BUF_FORMAT_16_16_16_16_FLOAT_GFX10},
+     BUF_FORMAT_16_16_16_16_FLOAT_GFX10,
+     BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_32_32_32
-    {BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
+    {BUF_FORMAT_32_32_32_UINT_GFX10,
+     BUF_FORMAT_32_32_32_SINT_GFX10,
+     BUF_FORMAT_32_32_32_UINT_GFX10,
+     BUF_FORMAT_32_32_32_SINT_GFX10,
      BUF_FORMAT_32_32_32_UINT_GFX10,
      BUF_FORMAT_32_32_32_SINT_GFX10,
      BUF_FORMAT_INVALID,
-     BUF_FORMAT_32_32_32_FLOAT_GFX10},
+     BUF_FORMAT_32_32_32_FLOAT_GFX10,
+     BUF_FORMAT_32_32_32_SINT_GFX10},
 
     // BUF_DATA_FORMAT_32_32_32_32
-    {BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
+    {BUF_FORMAT_32_32_32_32_UINT_GFX10,
+     BUF_FORMAT_32_32_32_32_SINT_GFX10,
+     BUF_FORMAT_32_32_32_32_UINT_GFX10,
+     BUF_FORMAT_32_32_32_32_SINT_GFX10,
      BUF_FORMAT_32_32_32_32_UINT_GFX10,
      BUF_FORMAT_32_32_32_32_SINT_GFX10,
      BUF_FORMAT_INVALID,
-     BUF_FORMAT_32_32_32_32_FLOAT_GFX10},
+     BUF_FORMAT_32_32_32_32_FLOAT_GFX10,
+     BUF_FORMAT_32_32_32_32_SINT_GFX10},
 
     // BUF_DATA_FORMAT_RESERVED_15
     {BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID,
@@ -352,7 +371,7 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx10[][8] = {
 // clang-format on
 
 // clang-format off
-const unsigned char VertexFetchImpl::m_vertexFormatMapGfx11[][8] = {
+const unsigned char VertexFetchImpl::m_vertexFormatMapGfx11[][9] = {
     // BUF_DATA_FORMAT
     //   BUF_NUM_FORMAT_UNORM
     //   BUF_NUM_FORMAT_SNORM
@@ -362,9 +381,11 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx11[][8] = {
     //   BUF_NUM_FORMAT_SINT
     //   BUF_NUM_FORMAT_SNORM_NZ
     //   BUF_NUM_FORMAT_FLOAT
+    //   BUF_NUM_FORMAT_FIXED
 
     // BUF_DATA_FORMAT_INVALID
     {BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID,
@@ -381,6 +402,7 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx11[][8] = {
      BUF_FORMAT_8_UINT,
      BUF_FORMAT_8_SINT,
      BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_16
@@ -391,7 +413,8 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx11[][8] = {
      BUF_FORMAT_16_UINT,
      BUF_FORMAT_16_SINT,
      BUF_FORMAT_INVALID,
-     BUF_FORMAT_16_FLOAT},
+     BUF_FORMAT_16_FLOAT,
+     BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_8_8
     {BUF_FORMAT_8_8_UNORM,
@@ -401,17 +424,19 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx11[][8] = {
      BUF_FORMAT_8_8_UINT,
      BUF_FORMAT_8_8_SINT,
      BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_32
-    {BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
+    {BUF_FORMAT_32_UINT,
+     BUF_FORMAT_32_SINT,
+     BUF_FORMAT_32_UINT,
+     BUF_FORMAT_32_SINT,
      BUF_FORMAT_32_UINT,
      BUF_FORMAT_32_SINT,
      BUF_FORMAT_INVALID,
-     BUF_FORMAT_32_FLOAT},
+     BUF_FORMAT_32_FLOAT,
+     BUF_FORMAT_32_SINT},
 
     // BUF_DATA_FORMAT_16_16
     {BUF_FORMAT_16_16_UNORM,
@@ -421,7 +446,8 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx11[][8] = {
      BUF_FORMAT_16_16_UINT,
      BUF_FORMAT_16_16_SINT,
      BUF_FORMAT_INVALID,
-     BUF_FORMAT_16_16_FLOAT},
+     BUF_FORMAT_16_16_FLOAT,
+     BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_10_11_11
     {BUF_FORMAT_INVALID,
@@ -431,7 +457,8 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx11[][8] = {
      BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID,
-     BUF_FORMAT_10_11_11_FLOAT_GFX11},
+     BUF_FORMAT_10_11_11_FLOAT_GFX11,
+     BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_11_11_10
     {BUF_FORMAT_INVALID,
@@ -441,7 +468,8 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx11[][8] = {
      BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID,
-     BUF_FORMAT_11_11_10_FLOAT_GFX11},
+     BUF_FORMAT_11_11_10_FLOAT_GFX11,
+     BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_10_10_10_2
     {BUF_FORMAT_10_10_10_2_UNORM_GFX11,
@@ -450,6 +478,7 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx11[][8] = {
      BUF_FORMAT_INVALID,
      BUF_FORMAT_10_10_10_2_UINT_GFX11,
      BUF_FORMAT_10_10_10_2_SINT_GFX11,
+     BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID},
 
@@ -461,6 +490,7 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx11[][8] = {
      BUF_FORMAT_2_10_10_10_UINT_GFX11,
      BUF_FORMAT_2_10_10_10_SINT_GFX11,
      BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_8_8_8_8
@@ -471,17 +501,19 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx11[][8] = {
      BUF_FORMAT_8_8_8_8_UINT_GFX11,
      BUF_FORMAT_8_8_8_8_SINT_GFX11,
      BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_32_32
-    {BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
+    {BUF_FORMAT_32_32_UINT_GFX11,
+     BUF_FORMAT_32_32_SINT_GFX11,
+     BUF_FORMAT_32_32_UINT_GFX11,
+     BUF_FORMAT_32_32_SINT_GFX11,
      BUF_FORMAT_32_32_UINT_GFX11,
      BUF_FORMAT_32_32_SINT_GFX11,
      BUF_FORMAT_INVALID,
-     BUF_FORMAT_32_32_FLOAT_GFX11},
+     BUF_FORMAT_32_32_FLOAT_GFX11,
+     BUF_FORMAT_32_32_SINT_GFX11},
 
     // BUF_DATA_FORMAT_16_16_16_16
     {BUF_FORMAT_16_16_16_16_UNORM_GFX11,
@@ -491,30 +523,34 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx11[][8] = {
      BUF_FORMAT_16_16_16_16_UINT_GFX11,
      BUF_FORMAT_16_16_16_16_SINT_GFX11,
      BUF_FORMAT_INVALID,
-     BUF_FORMAT_16_16_16_16_FLOAT_GFX11},
+     BUF_FORMAT_16_16_16_16_FLOAT_GFX11,
+     BUF_FORMAT_INVALID},
 
     // BUF_DATA_FORMAT_32_32_32
-    {BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
+    {BUF_FORMAT_32_32_32_UINT_GFX11,
+     BUF_FORMAT_32_32_32_SINT_GFX11,
+     BUF_FORMAT_32_32_32_UINT_GFX11,
+     BUF_FORMAT_32_32_32_SINT_GFX11,
      BUF_FORMAT_32_32_32_UINT_GFX11,
      BUF_FORMAT_32_32_32_SINT_GFX11,
      BUF_FORMAT_INVALID,
-     BUF_FORMAT_32_32_32_FLOAT_GFX11},
+     BUF_FORMAT_32_32_32_FLOAT_GFX11,
+     BUF_FORMAT_32_32_32_SINT_GFX11},
 
     // BUF_DATA_FORMAT_32_32_32_32
-    {BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
-     BUF_FORMAT_INVALID,
+    {BUF_FORMAT_32_32_32_32_UINT_GFX11,
+     BUF_FORMAT_32_32_32_32_SINT_GFX11,
+     BUF_FORMAT_32_32_32_32_UINT_GFX11,
+     BUF_FORMAT_32_32_32_32_SINT_GFX11,
      BUF_FORMAT_32_32_32_32_UINT_GFX11,
      BUF_FORMAT_32_32_32_32_SINT_GFX11,
      BUF_FORMAT_INVALID,
-     BUF_FORMAT_32_32_32_32_FLOAT_GFX11},
+     BUF_FORMAT_32_32_32_32_FLOAT_GFX11,
+     BUF_FORMAT_32_32_32_32_SINT_GFX11},
 
     // BUF_DATA_FORMAT_RESERVED_15
     {BUF_FORMAT_INVALID,
+     BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID,
      BUF_FORMAT_INVALID,
@@ -570,13 +606,16 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
     auto desc = builder.CreateLoadBufferDesc(InternalDescriptorSetId, FetchShaderInternalBufferBinding,
                                              builder.getInt32(0), Builder::BufferFlagAddress);
 
-    // The size of each input descriptor is sizeof(UberFetchShaderAttribInfo). vector4
-    auto uberFetchAttrType = FixedVectorType::get(builder.getInt32Ty(), 4);
-    auto descPtr = builder.CreateIntToPtr(desc, PointerType::get(uberFetchAttrType, ADDR_SPACE_CONST));
+    auto descPtr = builder.CreateIntToPtr(desc, builder.getPtrTy(ADDR_SPACE_CONST));
 
+    Value *locationMasks = builder.getInt64(~0);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 67
+    locationMasks = builder.CreateLoad(builder.getInt64Ty(), descPtr);
+    descPtr = builder.CreateGEP(builder.getInt64Ty(), descPtr, {builder.getInt32(1)});
+#endif
     for (InputImportGenericOp *inst : vertexFetches) {
       builder.SetInsertPoint(inst);
-      Value *vertex = vertexFetch->fetchVertex(inst, descPtr, BuilderBase::get(builder));
+      Value *vertex = vertexFetch->fetchVertex(inst, descPtr, locationMasks, BuilderBase::get(builder));
       // Replace and erase this instruction.
       inst->replaceAllUsesWith(vertex);
       inst->eraseFromParent();
@@ -684,13 +723,10 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
 //
 // @param inst : the input instruction
 // @param descPtr : 64bit address of buffer
+// @param locMasks : determine if the attribute data is valid.
 // @param builder : Builder to use to insert vertex fetch instructions
 // @returns : vertex
-Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *descPtr, BuilderBase &builder) {
-  unsigned location = inst->getLocation();
-  unsigned compIdx = cast<ConstantInt>(inst->getElemIdx())->getZExtValue();
-  auto zero = builder.getInt32(0);
-
+Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, Value *descPtr, Value *locMasks, BuilderBase &builder) {
   if (!m_vertexIndex) {
     IRBuilderBase::InsertPointGuard ipg(builder);
     builder.SetInsertPointPastAllocas(inst->getFunction());
@@ -720,18 +756,28 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *des
   auto currentBlock = inst->getParent();
   auto fetchEndBlock = currentBlock->splitBasicBlock(inst);
 
-  auto perCompEndBlock = createBlock(".perCompEnd", fetchEndBlock);
+  auto fetchUberEndBlock = createBlock(".fetchUberEndBlock", fetchEndBlock);
+  auto perCompEndBlock = createBlock(".perCompEnd", fetchUberEndBlock);
   auto comp3Block = createBlock(".comp3Block", perCompEndBlock);
   auto comp2Block = createBlock(".comp2Block", comp3Block);
   auto comp1Block = createBlock(".comp1Block", comp2Block);
   auto comp0Block = createBlock(".comp0Block", comp1Block);
   auto wholeVertexBlock = createBlock(".wholeVertex", comp0Block);
-  auto fetchStartBlock = createBlock("fetchStart", wholeVertexBlock);
+  auto fetchUberStartBlock = createBlock(".fetchUberStartBlock", wholeVertexBlock);
+  auto fetchStartBlock = createBlock(".fetchStart", fetchUberStartBlock);
 
+  unsigned location = inst->getLocation();
+  auto zero = builder.getInt32(0);
   builder.SetInsertPoint(currentBlock->getTerminator());
   builder.CreateBr(fetchStartBlock);
   currentBlock->getTerminator()->eraseFromParent();
   builder.SetInsertPoint(fetchStartBlock);
+
+  auto locationAnd = builder.CreateAnd(locMasks, builder.getInt64(1ull << location));
+  auto isAttriValid = builder.CreateICmpNE(locationAnd, builder.getInt64(0));
+  builder.CreateCondBr(isAttriValid, fetchUberStartBlock, fetchEndBlock);
+
+  builder.SetInsertPoint(fetchUberStartBlock);
   // The size of each input descriptor is sizeof(UberFetchShaderAttribInfo). vector4
   auto uberFetchAttrType = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
   descPtr = builder.CreateGEP(uberFetchAttrType, descPtr, {builder.getInt32(location)});
@@ -836,7 +882,7 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *des
       auto secondFetch = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetchType, args, {});
       wholeVertex = builder.CreateShuffleVector(wholeVertex, secondFetch, ArrayRef<int>{0, 1, 2, 3, 4, 5, 6, 7});
     }
-    builder.CreateBr(fetchEndBlock);
+    builder.CreateBr(fetchUberEndBlock);
   }
 
   fetchType = FixedVectorType::get(builder.getInt32Ty(), is64bitFetch ? 8 : 4);
@@ -970,11 +1016,11 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *des
       auto fixedVertex = builder.CreateShuffleVector(lastVert, lastVert, ArrayRef<int>{2, 1, 0, 3});
       lastVert = builder.CreateSelect(isBgr, fixedVertex, lastVert);
     }
-    builder.CreateBr(fetchEndBlock);
+    builder.CreateBr(fetchUberEndBlock);
   }
 
-  // .fetchEnd
-  builder.SetInsertPoint(&*fetchEndBlock->getFirstInsertionPt());
+  // .fetchUberEndBlock
+  builder.SetInsertPoint(fetchUberEndBlock);
   auto phiInst = builder.CreatePHI(lastVert->getType(), 2);
   phiInst->addIncoming(wholeVertex, wholeVertexBlock);
   phiInst->addIncoming(lastVert, perCompEndBlock);
@@ -995,6 +1041,7 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *des
   std::vector<Value *> vertexValues(vertexCompCount);
 
   // NOTE: Original component index is based on the basic scalar type.
+  unsigned compIdx = cast<ConstantInt>(inst->getElemIdx())->getZExtValue();
   compIdx *= (bitWidth == 64 ? 2 : 1);
 
   // Vertex input might take values from vertex fetch values or default fetch values
@@ -1036,7 +1083,17 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, llvm::Value *des
 
   if (vertex->getType() != inputTy)
     vertex = builder.CreateBitCast(vertex, inputTy);
-  vertex->setName("vertex");
+  builder.CreateBr(fetchEndBlock);
+
+  // .fetchEndBlock
+  {
+    builder.SetInsertPoint(&*fetchEndBlock->getFirstInsertionPt());
+    auto phiInst = builder.CreatePHI(inputTy, 2);
+    phiInst->addIncoming(PoisonValue::get(inputTy), fetchStartBlock);
+    phiInst->addIncoming(vertex, fetchUberEndBlock);
+    vertex = phiInst;
+    vertex->setName("vertex");
+  }
   return vertex;
 }
 
@@ -1149,7 +1206,8 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
   std::vector<Constant *> shuffleMask;
   bool postShuffle = needPostShuffle(description, shuffleMask);
   bool patchA2S = needPatchA2S(description);
-  if (postShuffle || patchA2S) {
+  bool patch32 = needPatch32(description);
+  if (postShuffle || patchA2S || patch32) {
     if (postShuffle) {
       // NOTE: If we are fetching a swizzled format, we have to add an extra "shufflevector" instruction to
       // get the components in the right order.
@@ -1233,6 +1291,56 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
       vertexFetches[0] = InsertElementInst::Create(vertexFetches[0], alpha,
                                                    ConstantInt::get(Type::getInt32Ty(*m_context), 3), "", insertPos);
     }
+
+    if (patch32) {
+      bool isSigned = (description->nfmt == BufNumFormatSscaled || description->nfmt == BufNumFormatSnorm ||
+                       description->nfmt == BufNumFormatFixed);
+
+      // Whether need to do normalization emulation.
+      bool isNorm = (description->nfmt == BufNumFormatSnorm || description->nfmt == BufNumFormatUnorm);
+
+      // Whether need to do fixed point emulation
+      bool isFixed = (description->nfmt == BufNumFormatFixed);
+
+      // Whether need to translate from int bits to float bits.
+      bool needTransToFp = (description->nfmt == BufNumFormatSscaled || description->nfmt == BufNumFormatSnorm ||
+                            description->nfmt == BufNumFormatUscaled || description->nfmt == BufNumFormatUnorm);
+
+      // Only for 32 bits format patch and emulation.
+      for (unsigned i = 0; i < formatInfo.numChannels; ++i) {
+        Value *elemInstr = ExtractElementInst::Create(vertexFetches[0],
+                                                      ConstantInt::get(Type::getInt32Ty(*m_context), i), "", insertPos);
+        if (needTransToFp) {
+          // A constant divisor for normalization emulation.
+          float normDiv = 2.14748365e+09f;
+          if (isSigned) {
+            // Signed int to float
+            elemInstr = new SIToFPInst(elemInstr, Type::getFloatTy(*m_context), "", insertPos);
+          } else {
+            // Unsigned int to float
+            elemInstr = new UIToFPInst(elemInstr, Type::getFloatTy(*m_context), "", insertPos);
+            normDiv = 4.29496730e+09f;
+          }
+          if (isNorm) {
+            // Normalization emulation.
+            elemInstr = BinaryOperator::CreateFDiv(elemInstr, ConstantFP::get(Type::getFloatTy(*m_context), normDiv),
+                                                   "", insertPos);
+          }
+        } else if (isFixed) {
+          // A constant divisor to translate loaded float bits to fixed point format.
+          float fixedPointMul = 1.0f / 65536.0f;
+          elemInstr = new SIToFPInst(elemInstr, Type::getFloatTy(*m_context), "", insertPos);
+          elemInstr = BinaryOperator::CreateFMul(
+              elemInstr, ConstantFP::get(Type::getFloatTy(*m_context), fixedPointMul), "", insertPos);
+        } else {
+          llvm_unreachable("Should never be called!");
+        }
+
+        elemInstr = new BitCastInst(elemInstr, Type::getInt32Ty(*m_context), "", insertPos);
+        vertexFetches[0] = InsertElementInst::Create(vertexFetches[0], elemInstr,
+                                                     ConstantInt::get(Type::getInt32Ty(*m_context), i), "", insertPos);
+      }
+    }
   }
 
   // Do the second vertex fetch operation
@@ -1284,6 +1392,10 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
 
   // Finalize vertex fetch
   Type *basicTy = inputTy->isVectorTy() ? cast<VectorType>(inputTy)->getElementType() : inputTy;
+  bool needDoubleEmulation =
+      description->dfmt >= BufDataFormat64 && description->dfmt <= BufDataFormat64_64_64_64 && basicTy->isFloatTy();
+  if (needDoubleEmulation)
+    basicTy = Type::getDoubleTy(*m_context);
   const unsigned bitWidth = basicTy->getScalarSizeInBits();
   assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
 
@@ -1381,6 +1493,14 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
     vertex = new TruncInst(vertex, truncTy, "", insertPos);
   }
 
+  if (needDoubleEmulation) {
+    // SPIR-V extended format emulation
+    // If input type is float32 but vertex attribute data format is float64, we need another float point trunc step.
+    int vecSize = cast<FixedVectorType>(vertex->getType())->getNumElements() / 2;
+    vertex = new BitCastInst(vertex, FixedVectorType::get(Type::getDoubleTy(*m_context), vecSize), "", insertPos);
+    vertex = new FPTruncInst(vertex, FixedVectorType::get(Type::getFloatTy(*m_context), vecSize), "", insertPos);
+  }
+
   if (vertex->getType() != inputTy)
     vertex = new BitCastInst(vertex, inputTy, "", insertPos);
   vertex->setName("vertex" + Twine(location) + "." + Twine(compIdx));
@@ -1456,7 +1576,7 @@ const VertexCompFormatInfo *VertexFetchImpl::getVertexComponentFormatInfo(unsign
 // @param nfmt : Numeric format
 unsigned VertexFetchImpl::mapVertexFormat(unsigned dfmt, unsigned nfmt) const {
   assert(dfmt < 16);
-  assert(nfmt < 8);
+  assert(nfmt < 9);
   unsigned format = 0;
 
   GfxIpVersion gfxIp = m_lgcContext->getTargetInfo().getGfxIpVersion();
@@ -1694,6 +1814,30 @@ bool VertexFetchImpl::needPostShuffle(const VertexInputDescription *inputDesc,
   }
 
   return needShuffle;
+}
+
+// =====================================================================================================================
+// Checks whether a patch (emulation) step is needed for some 32 bits vertex attribute formats.
+//
+// @param inputDesc : Vertex input description
+bool VertexFetchImpl::needPatch32(const VertexInputDescription *inputDesc) const {
+  bool needPatch = false;
+
+  switch (inputDesc->dfmt) {
+  case BufDataFormat32:
+  case BufDataFormat32_32:
+  case BufDataFormat32_32_32:
+  case BufDataFormat32_32_32_32:
+    if (inputDesc->nfmt == BufNumFormatSscaled || inputDesc->nfmt == BufNumFormatUscaled ||
+        inputDesc->nfmt == BufNumFormatSnorm || inputDesc->nfmt == BufNumFormatUnorm ||
+        inputDesc->nfmt == BufNumFormatFixed)
+      needPatch = true;
+    break;
+  default:
+    break;
+  }
+
+  return needPatch;
 }
 
 // =====================================================================================================================

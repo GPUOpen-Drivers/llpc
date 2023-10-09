@@ -219,7 +219,7 @@ bool PipelineState::generate(Module *pipelineModule, raw_pwrite_stream &outStrea
   } else {
     // Patching.
     Patch::addPasses(this, *passMgr, patchTimer, optTimer, std::move(checkShaderCacheFunc),
-                     getLgcContext()->getOptimizationLevel());
+                     static_cast<uint32_t>(getLgcContext()->getOptimizationLevel()));
 
     // Add pass to clear pipeline state from IR
     passMgr->addPass(PipelineStateClearer());

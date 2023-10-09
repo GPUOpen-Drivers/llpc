@@ -205,6 +205,10 @@ void GraphicsContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
 
   // Give the graphics pipeline state to the middle-end.
   setGraphicsStateInPipeline(pipeline, hasher, stageMask);
+
+  // Set default tessellation inner/outer level from driver API
+  if (m_pipelineInfo->iaState.tessLevel)
+    pipeline->setTessLevel(m_pipelineInfo->iaState.tessLevel->inner, m_pipelineInfo->iaState.tessLevel->outer);
 }
 
 // =====================================================================================================================
@@ -305,8 +309,7 @@ void GraphicsContext::setColorExportState(Pipeline *pipeline, Util::MetroHash64 
   SmallVector<ColorExportFormat, MaxColorTargets> formats;
 
   state.alphaToCoverageEnable = cbState.alphaToCoverageEnable;
-  state.dualSourceBlendEnable =
-      cbState.dualSourceBlendEnable || (pipelineInfo->cbState.dualSourceBlendDynamic && getUseDualSourceBlend());
+  state.dualSourceBlendEnable = cbState.dualSourceBlendEnable;
 
   for (unsigned targetIndex = 0; targetIndex < MaxColorTargets; ++targetIndex) {
     if (cbState.target[targetIndex].format != VK_FORMAT_UNDEFINED) {
@@ -490,6 +493,7 @@ void GraphicsContext::setGraphicsStateInPipeline(Pipeline *pipeline, Util::Metro
     rasterizerState.numSamples = inputRsState.numSamples;
     rasterizerState.samplePatternIdx = inputRsState.samplePatternIdx;
     rasterizerState.pixelShaderSamples = inputRsState.pixelShaderSamples;
+    rasterizerState.dynamicSampleInfo = inputRsState.dynamicSampleInfo;
   }
 
   if (pipeline)
