@@ -76,6 +76,7 @@ class GpurtSetTriangleIntersectionAttributesOp;
 class GpurtSetHitTriangleNodePointerOp;
 class GpurtGetParentIdOp;
 class GpurtSetParentIdOp;
+class GpurtGetRayStaticIdOp;
 } // namespace lgc
 
 namespace Llpc {
@@ -100,6 +101,7 @@ enum : unsigned {
   ParentRayId,                // Ray ID of the parent TraceRay call
   HitTriangleVertexPositions, // Hit triangle vertex positions
   Payload,                    // Payload
+  RayStaticId,                // Ray static ID
   Count                       // Count of the trace attributes
 };
 }
@@ -242,6 +244,7 @@ private:
   void visitSetHitTriangleNodePointer(lgc::GpurtSetHitTriangleNodePointerOp &inst);
   void visitGetParentId(lgc::GpurtGetParentIdOp &inst);
   void visitSetParentId(lgc::GpurtSetParentIdOp &inst);
+  void visitGetRayStaticId(lgc::GpurtGetRayStaticIdOp &inst);
   void visitDispatchRayIndex(lgc::rt::DispatchRaysIndexOp &inst);
   void visitDispatchRaysDimensionsOp(lgc::rt::DispatchRaysDimensionsOp &inst);
   void visitWorldRayOriginOp(lgc::rt::WorldRayOriginOp &inst);

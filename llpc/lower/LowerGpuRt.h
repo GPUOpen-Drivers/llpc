@@ -46,8 +46,6 @@ class GpurtGetBoxSortHeuristicModeOp;
 class GpurtGetStaticFlagsOp;
 class GpurtGetTriangleCompressionModeOp;
 class GpurtGetFlattenedGroupThreadIdOp;
-class GpurtSetRayStaticIdOp;
-class GpurtGetRayStaticIdOp;
 } // namespace lgc
 
 namespace llvm {
@@ -78,13 +76,10 @@ private:
   void visitGetStaticFlags(lgc::GpurtGetStaticFlagsOp &inst);
   void visitGetTriangleCompressionMode(lgc::GpurtGetTriangleCompressionModeOp &inst);
   void visitGetFlattenedGroupThreadId(lgc::GpurtGetFlattenedGroupThreadIdOp &inst);
-  void visitSetRayStaticId(lgc::GpurtSetRayStaticIdOp &inst);
-  void visitGetRayStaticId(lgc::GpurtGetRayStaticIdOp &inst);
   llvm::Value *m_stack;                                  // Stack array to hold stack value
   llvm::Type *m_stackTy;                                 // Stack type
   bool m_lowerStack;                                     // If it is lowerStack
   llvm::SmallVector<llvm::Instruction *> m_callsToLower; // Call instruction to lower
   llvm::SmallSet<llvm::Function *, 4> m_funcsToLower;    // Functions to lower
-  llvm::Value *m_rayStaticId;                            // Ray static ID value
 };
 } // namespace Llpc

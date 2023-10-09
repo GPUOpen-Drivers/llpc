@@ -293,12 +293,6 @@ def GpurtSetParentIdOp : GpurtOp<"set.parent.id", [Memory<[(write InaccessibleMe
   let summary = "Store TraceRay rayId";
 }
 
-def GpurtSetRayStaticIdOp : GpurtOp<"set.ray.static.id", [Memory<[(write InaccessibleMem)]>, WillReturn]> {
-  let arguments = (ins I32:$id);
-  let results = (outs);
-  let summary = "set a unique static ID for a ray";
-}
-
 def GpurtGetRayStaticIdOp : GpurtOp<"get.ray.static.id", [Memory<[(read InaccessibleMem)]>, WillReturn]> {
   let arguments = (ins);
   let results = (outs I32:$result);
