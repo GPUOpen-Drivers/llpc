@@ -2191,7 +2191,7 @@ Value *SpirvLowerRayTracing::createLoadRayTracingMatrix(unsigned builtInId) {
   Value *zero = m_builder->getInt32(0);
 
   // Get matrix address from instance node address
-  Value *instNodeAddr = Value *instNodeAddr =
+  Value *instNodeAddr =
       createLoadInstNodeAddr(m_traceParams[TraceParam::InstNodeAddrLo], m_traceParams[TraceParam::InstNodeAddrHi]);
 
   Value *matrixAddr = instNodeAddr;
