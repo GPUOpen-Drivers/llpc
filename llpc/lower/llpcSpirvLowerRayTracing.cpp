@@ -97,8 +97,10 @@ static unsigned TraceParamsTySize[] = {
     8, // 15, hit attribute
     1, // 16, parentId
     9, // 17, HitTriangleVertexPositions
-    1, // 18, Payload,
+    1, // 18, Payload
     1, // 19, RayStaticId
+    1, // 20, InstNodeId
+    1, // 21, InstNodeIndex
 };
 
 // =====================================================================================================================
@@ -654,11 +656,18 @@ PreservedAnalyses SpirvLowerRayTracing::run(Module &module, ModuleAnalysisManage
     func->eraseFromParent();
   }
 
+  StringRef traceRayGetInstanceIndx =
+      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_INSTANCE_INDEX);
+
+  StringRef traceRayGetInstanceId =
+      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_INSTANCE_ID);
+
   // Newly generated implementation functions are external linkage, fix that.
   for (auto funcIt = module.begin(), funcEnd = module.end(); funcIt != funcEnd;) {
     Function *func = &*funcIt++;
     if (func->getLinkage() == GlobalValue::ExternalLinkage && !func->empty()) {
-      if (!func->getName().startswith(module.getName())) {
+      if (!func->getName().startswith(module.getName()) && !func->getName().startswith(traceRayGetInstanceId) &&
+          !func->getName().startswith(traceRayGetInstanceIndx)) {
         func->setLinkage(GlobalValue::InternalLinkage);
       }
     }
@@ -836,6 +845,14 @@ void SpirvLowerRayTracing::createCallShader(Function *func, ShaderStage stage, u
   SmallVector<Value *, 8> args;
 
   Value *traceParams[TraceParam::Count] = {};
+  if (m_shaderStage == ShaderStageCompute) {
+    auto instNodeAddr =
+        createLoadInstNodeAddr(traceParamsIt + TraceParam::InstNodeAddrLo, traceParamsIt + TraceParam::InstNodeAddrHi);
+    auto instanceIndex = createLoadInstanceIndexOrId(instNodeAddr, false);
+    auto instanceId = createLoadInstanceIndexOrId(instNodeAddr, true);
+    m_builder->CreateStore(instanceIndex, traceParamsIt + TraceParam::InstNodeId);
+    m_builder->CreateStore(instanceId, traceParamsIt + TraceParam::InstNodeIndex);
+  }
 
   // Assemble the arguments from builtIns
   for (auto builtIn : m_builtInParams) {
@@ -1679,6 +1696,8 @@ void SpirvLowerRayTracing::initTraceParamsTy(unsigned attributeSize) {
       StructType::get(*m_context, {floatx3Ty, floatx3Ty, floatx3Ty}), // 17, HitTriangleVertexPositions
       payloadType,                                                    // 18, Payload
       m_builder->getInt32Ty(),                                        // 19, rayStaticId
+      m_builder->getInt32Ty(),                                        // 20, InstanceNodeId
+      m_builder->getInt32Ty(),                                        // 21, InstanceNodeIndex
   };
   TraceParamsTySize[TraceParam::HitAttributes] = attributeSize;
   TraceParamsTySize[TraceParam::Payload] = payloadType->getArrayNumElements();
@@ -1706,10 +1725,12 @@ void SpirvLowerRayTracing::initShaderBuiltIns() {
     case BuiltInInstanceCustomIndexKHR:
       m_builtInParams.insert(TraceParam::InstNodeAddrLo);
       m_builtInParams.insert(TraceParam::InstNodeAddrHi);
+      m_builtInParams.insert(TraceParam::InstNodeId);
       break;
     case BuiltInInstanceId:
       m_builtInParams.insert(TraceParam::InstNodeAddrLo);
       m_builtInParams.insert(TraceParam::InstNodeAddrHi);
+      m_builtInParams.insert(TraceParam::InstNodeIndex);
       break;
     case BuiltInRayTminKHR:
       m_builtInParams.insert(TraceParam::TMin);
@@ -2170,7 +2191,8 @@ Value *SpirvLowerRayTracing::createLoadRayTracingMatrix(unsigned builtInId) {
   Value *zero = m_builder->getInt32(0);
 
   // Get matrix address from instance node address
-  Value *instNodeAddr = createLoadInstNodeAddr();
+  Value *instNodeAddr = Value *instNodeAddr =
+      createLoadInstNodeAddr(m_traceParams[TraceParam::InstNodeAddrLo], m_traceParams[TraceParam::InstNodeAddrHi]);
 
   Value *matrixAddr = instNodeAddr;
 
@@ -2768,8 +2790,8 @@ void SpirvLowerRayTracing::visitRayTcurrentOp(lgc::rt::RayTcurrentOp &inst) {
 void SpirvLowerRayTracing::visitInstanceIndexOp(lgc::rt::InstanceIndexOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
-  auto instNodeAddr = createLoadInstNodeAddr();
-  auto instanceIndex = createLoadInstanceIndexOrId(instNodeAddr, false);
+  auto instanceIndex =
+      m_builder->CreateLoad(m_traceParamsTys[TraceParam::InstNodeId], m_traceParams[TraceParam::InstNodeId]);
   inst.replaceAllUsesWith(instanceIndex);
 
   m_callsToLower.push_back(&inst);
@@ -2876,8 +2898,9 @@ void SpirvLowerRayTracing::visitGeometryIndexOp(lgc::rt::GeometryIndexOp &inst) 
 void SpirvLowerRayTracing::visitInstanceIdOp(lgc::rt::InstanceIdOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
-  auto instNodeAddr = createLoadInstNodeAddr();
-  auto instanceId = createLoadInstanceIndexOrId(instNodeAddr, true);
+  auto instanceId =
+      m_builder->CreateLoad(m_traceParamsTys[TraceParam::InstNodeIndex], m_traceParams[TraceParam::InstNodeIndex]);
+
   inst.replaceAllUsesWith(instanceId);
 
   m_callsToLower.push_back(&inst);
@@ -2995,15 +3018,15 @@ void SpirvLowerRayTracing::visitShaderRecordBufferOp(lgc::rt::ShaderRecordBuffer
 
 // =====================================================================================================================
 // Creates instructions to load instance node address
-Value *SpirvLowerRayTracing::createLoadInstNodeAddr() {
+Value *SpirvLowerRayTracing::createLoadInstNodeAddr(Value *instNodeAddrLo, Value *instNodeAddrHi) {
   auto instNodeAddrTy = m_traceParamsTys[TraceParam::InstNodeAddrLo];
   assert(instNodeAddrTy == m_traceParamsTys[TraceParam::InstNodeAddrHi]);
-  Value *instNodeAddrLo = m_builder->CreateLoad(instNodeAddrTy, m_traceParams[TraceParam::InstNodeAddrLo]);
-  Value *instNodeAddrHi = m_builder->CreateLoad(instNodeAddrTy, m_traceParams[TraceParam::InstNodeAddrHi]);
+  Value *addrLo = m_builder->CreateLoad(instNodeAddrTy, instNodeAddrLo);
+  Value *addrHi = m_builder->CreateLoad(instNodeAddrTy, instNodeAddrHi);
 
   Value *instNodeAddr = PoisonValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 2));
-  instNodeAddr = m_builder->CreateInsertElement(instNodeAddr, instNodeAddrLo, uint64_t(0));
-  instNodeAddr = m_builder->CreateInsertElement(instNodeAddr, instNodeAddrHi, 1u);
+  instNodeAddr = m_builder->CreateInsertElement(instNodeAddr, addrLo, uint64_t(0));
+  instNodeAddr = m_builder->CreateInsertElement(instNodeAddr, addrHi, 1u);
 
   return instNodeAddr;
 }

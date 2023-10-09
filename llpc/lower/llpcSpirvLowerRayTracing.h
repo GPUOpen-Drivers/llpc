@@ -144,6 +144,8 @@ enum : unsigned {
   DirY,                                           // World ray direction Y
   DirZ,                                           // World ray direction Z
   TMax,                                           // T max
+  InstNodeId,                                     // Instance node id
+  InstNodeIndex,                                  // Instance node index
   Count
 };
 } // namespace TraceRayLibFuncParam
@@ -270,7 +272,7 @@ private:
   void visitShaderIndexOp(lgc::rt::ShaderIndexOp &inst);
   void visitShaderRecordBufferOp(lgc::rt::ShaderRecordBufferOp &inst);
 
-  llvm::Value *createLoadInstNodeAddr();
+  llvm::Value *createLoadInstNodeAddr(Value *instNodeAddrLo, Value *instNodeAddrHi);
 
   lgc::rt::RayTracingShaderStage mapStageToLgcRtShaderStage(ShaderStage stage);
 
