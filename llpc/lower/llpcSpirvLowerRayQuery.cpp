@@ -1262,7 +1262,7 @@ void SpirvLowerRayQuery::initGlobalVariable() {
 // =====================================================================================================================
 // Generate a static ID for current Trace Ray call
 //
-void SpirvLowerRayQuery::generateTraceRayStaticId() {
+unsigned SpirvLowerRayQuery::generateTraceRayStaticId() {
   Util::MetroHash64 hasher;
   hasher.Update(m_nextTraceRayId++);
   hasher.Update(m_module->getName());
@@ -1270,7 +1270,7 @@ void SpirvLowerRayQuery::generateTraceRayStaticId() {
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
 
-  m_builder->create<lgc::GpurtSetRayStaticIdOp>(m_builder->getInt32(MetroHash::compact32(&hash)));
+  return MetroHash::compact32(&hash);
 }
 
 // =====================================================================================================================
