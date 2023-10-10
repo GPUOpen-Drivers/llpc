@@ -5764,21 +5764,32 @@ Function *NggPrimShader::createSmallPrimFilterCuller() {
     Value *screenMinY = nullptr;
     Value *screenMaxY = nullptr;
     if (!m_nggControl->enableFrustumCulling) {
+      // The scale can be negative, which causes the orientation of the viewport to be flipped.
+      // Handle both orientations by checking the sign of the viewport scale and negating the offset
+      // if negative.
+      Value *xScalelessThanZero = m_builder.CreateFCmpOLT(xScale, ConstantFP::get(m_builder.getFloatTy(), 0.0));
+      Value *yScalelessThanZero = m_builder.CreateFCmpOLT(yScale, ConstantFP::get(m_builder.getFloatTy(), 0.0));
+      Value *xBoundaryOffset =
+          m_builder.CreateSelect(xScalelessThanZero, ConstantFP::get(m_builder.getFloatTy(), -0.75),
+                                 ConstantFP::get(m_builder.getFloatTy(), 0.75));
+      Value *yBoundaryOffset =
+          m_builder.CreateSelect(yScalelessThanZero, ConstantFP::get(m_builder.getFloatTy(), -0.75),
+                                 ConstantFP::get(m_builder.getFloatTy(), 0.75));
       // screenMinX = -xScale + xOffset - 0.75
       screenMinX = m_builder.CreateFAdd(m_builder.CreateFNeg(xScale), xOffset);
-      screenMinX = m_builder.CreateFAdd(screenMinX, ConstantFP::get(m_builder.getFloatTy(), -0.75));
+      screenMinX = m_builder.CreateFAdd(screenMinX, m_builder.CreateFNeg(xBoundaryOffset));
 
       // screenMaxX = xScale + xOffset + 0.75
       screenMaxX = m_builder.CreateFAdd(xScale, xOffset);
-      screenMaxX = m_builder.CreateFAdd(screenMaxX, ConstantFP::get(m_builder.getFloatTy(), 0.75));
+      screenMaxX = m_builder.CreateFAdd(screenMaxX, xBoundaryOffset);
 
       // screenMinY = -yScale + yOffset - 0.75
       screenMinY = m_builder.CreateFAdd(m_builder.CreateFNeg(yScale), yOffset);
-      screenMinY = m_builder.CreateFAdd(screenMinY, ConstantFP::get(m_builder.getFloatTy(), -0.75));
+      screenMinY = m_builder.CreateFAdd(screenMinY, m_builder.CreateFNeg(yBoundaryOffset));
 
       // screenMaxY = yScale + yOffset + 0.75
       screenMaxY = m_builder.CreateFAdd(yScale, yOffset);
-      screenMaxY = m_builder.CreateFAdd(screenMaxY, ConstantFP::get(m_builder.getFloatTy(), 0.75));
+      screenMaxY = m_builder.CreateFAdd(screenMaxY, yBoundaryOffset);
     }
 
     // screenX0' = x0' * xScale + xOffset
