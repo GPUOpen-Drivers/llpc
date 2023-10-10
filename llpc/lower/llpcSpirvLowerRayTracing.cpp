@@ -656,18 +656,11 @@ PreservedAnalyses SpirvLowerRayTracing::run(Module &module, ModuleAnalysisManage
     func->eraseFromParent();
   }
 
-  StringRef traceRayGetInstanceIndx =
-      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_INSTANCE_INDEX);
-
-  StringRef traceRayGetInstanceId =
-      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_INSTANCE_ID);
-
   // Newly generated implementation functions are external linkage, fix that.
   for (auto funcIt = module.begin(), funcEnd = module.end(); funcIt != funcEnd;) {
     Function *func = &*funcIt++;
     if (func->getLinkage() == GlobalValue::ExternalLinkage && !func->empty()) {
-      if (!func->getName().startswith(module.getName()) && !func->getName().startswith(traceRayGetInstanceId) &&
-          !func->getName().startswith(traceRayGetInstanceIndx)) {
+      if (!func->getName().startswith(module.getName())) {
         func->setLinkage(GlobalValue::InternalLinkage);
       }
     }
