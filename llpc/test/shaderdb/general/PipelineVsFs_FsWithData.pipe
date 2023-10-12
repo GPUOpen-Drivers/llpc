@@ -1,11 +1,13 @@
 ; Test that constant data in the fragment shader is handled correctly.
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=gfx900 -d -j .text -j .rodata -r %t.elf | FileCheck -check-prefix=SHADERTEST %s
+; REQUIRES: do-not-run-me
 ; SHADERTEST-LABEL: <_amdgpu_ps_main>:
-; SHADERTEST: s_add_u32 {{s[0-9]*}}, {{s[0-9]*}}, 4
-; SHADERTEST-NEXT: R_AMDGPU_REL32_LO    [[fs_data_sym:[.a-z]*]]
-; SHADERTEST-NEXT: s_addc_u32 {{s[0-9]*}}, {{s[0-9]*}}, {{4|12}}
-; SHADERTEST-NEXT: R_AMDGPU_REL32_HI    [[fs_data_sym]]
+; SHADERTEST: s_mov_b32 {{s[0-9]*}}, {{0 3}}
+; SHADERTEST-NEXT: R_AMDGPU_ABS32_LO    [[fs_data_sym:[.a-z]*]]
+; SHADERTEST-NEXT: v_add_co_u32_e32 {{v[0-9]*}}, vcc, {{s[0-9]*}}, {{v[0-9]*}}
+; SHADERTEST-NEXT: v_mov_b32_e32 {{v[0-9]*}}, 0
+; SHADERTEST-NEXT: R_AMDGPU_ABS32_HI    [[fs_data_sym]]
 ; SHADERTEST: 0000000000000000 <[[fs_data_sym]]>:
 ; SHADERTEST-NEXT: 000000000000: 3F800000
 ; SHADERTEST-NEXT: 000000000004: 00000000
@@ -24,10 +26,11 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-part-pipeline=0 -o %t.elf %gfxip %s && llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=gfx900 -d -j .text -j .rodata -r %t.elf | FileCheck -check-prefix=SHADERTEST2_PP0 %s
 ; SHADERTEST2_PP0-LABEL: <_amdgpu_ps_main>:
-; SHADERTEST2_PP0: s_add_u32 {{s[0-9]*}}, {{s[0-9]*}}, 4
-; SHADERTEST2_PP0-NEXT: R_AMDGPU_REL32_LO    .rodata
-; SHADERTEST2_PP0-NEXT: s_addc_u32 {{s[0-9]*}}, {{s[0-9]*}}, {{4|12}}
-; SHADERTEST2_PP0-NEXT: R_AMDGPU_REL32_HI    .rodata
+; SHADERTEST2_PP0: s_mov_b32 {{s[0-9]*}}, {{0 2}}
+; SHADERTEST2_PP0-NEXT: R_AMDGPU_ABS32_LO    .rodata
+; SHADERTEST2_PP0-NEXT: v_add_co_u32_e32 {{v[0-9]*}}, vcc, {{s[0-9]*}}, {{v[0-9]*}}
+; SHADERTEST2_PP0-NEXT: v_mov_b32_e32 {{v[0-9]*}}, {{0 }}
+; SHADERTEST2_PP0-NEXT: R_AMDGPU_ABS32_HI    .rodata
 ; SHADERTEST2_PP0-LABEL: <__llpc_global_proxy_{{.*}}>:
 ; SHADERTEST2_PP0-NEXT: {{[0-9]*}}: 3F800000
 ; SHADERTEST2_PP0-NEXT: {{[0-9]*}}: 00000000
@@ -47,10 +50,11 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-part-pipeline=1 -o %t.elf %gfxip %s && llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=gfx900 -d -j .text -j .rodata -r %t.elf | FileCheck -check-prefix=SHADERTEST2_PP1 %s
 ; SHADERTEST2_PP1-LABEL: <_amdgpu_ps_main>:
-; SHADERTEST2_PP1: s_add_u32 {{s[0-9]*}}, {{s[0-9]*}}, 4
-; SHADERTEST2_PP1-NEXT: R_AMDGPU_REL32_LO    [[fs_data_sym:[.a-z]*]]
-; SHADERTEST2_PP1-NEXT: s_addc_u32 {{s[0-9]*}}, {{s[0-9]*}}, {{4|12}}
-; SHADERTEST2_PP1-NEXT: R_AMDGPU_REL32_HI    [[fs_data_sym]]
+; SHADERTEST2_PP1: s_mov_b32 {{s[0-9]*}}, {{0 }}
+; SHADERTEST2_PP1-NEXT: R_AMDGPU_ABS32_LO    [[fs_data_sym:[.a-z]*]]
+; SHADERTEST2_PP1-NEXT: v_add_co_u32_e32 {{v[0-9]*}}, vcc, {{s[0-9]*}}, {{v[0-9]*}}
+; SHADERTEST2_PP1-NEXT: v_mov_b32_e32 {{v[0-9]*}}, {{0 }}
+; SHADERTEST2_PP1-NEXT: R_AMDGPU_ABS32_HI    [[fs_data_sym]]
 ; SHADERTEST2_PP1: 0000000000000000 <[[fs_data_sym]]>:
 ; SHADERTEST2_PP1-NEXT: {{[0-9]*}}: 3F800000
 ; SHADERTEST2_PP1-NEXT: {{[0-9]*}}: 00000000
