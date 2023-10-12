@@ -7642,7 +7642,8 @@ bool SPIRVToLLVM::transMetadata() {
         for (unsigned i = 0, e = m_bm->getNumConstants(); i != e; ++i) {
           auto bv = m_bm->getConstant(i);
           SPIRVWord builtIn = SPIRVID_INVALID;
-          if ((bv->getOpCode() == OpSpecConstant || bv->getOpCode() == OpSpecConstantComposite) &&
+          if ((bv->getOpCode() == OpSpecConstant || bv->getOpCode() == OpSpecConstantComposite ||
+               bv->getOpCode() == OpConstant || bv->getOpCode() == OpConstantComposite) &&
               bv->hasDecorate(DecorationBuiltIn, 0, &builtIn)) {
             if (builtIn == spv::BuiltInWorkgroupSize) {
               // NOTE: Overwrite values of local sizes specified in execution

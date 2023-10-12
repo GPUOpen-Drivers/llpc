@@ -1,0 +1,62 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
+; SHADERTEST: call <3 x i32> @lgc.shader.input.WorkgroupId(i32 0) #1
+; SHADERTEST: %{{[0-9]*}} = mul <3 x i32> %{{[0-9]*}}, <i32 1, i32 1, i32 1>
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+; SPIR-V
+; Version: 1.0
+; Generator: Khronos SPIR-V Tools Assembler; 0
+; Bound: 32
+; Schema: 0
+               OpCapability Shader
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint GLCompute %main "main" %gl_GlobalInvocationID
+               OpSource GLSL 430
+               OpName %main "main"
+               OpName %gl_GlobalInvocationID "gl_GlobalInvocationID"
+               OpDecorate %gl_GlobalInvocationID BuiltIn GlobalInvocationId
+               OpDecorate %gl_WorkGroupSize BuiltIn WorkgroupSize
+               OpDecorate %_struct_4 BufferBlock
+               OpDecorate %5 DescriptorSet 0
+               OpDecorate %5 Binding 0
+               OpDecorate %6 DescriptorSet 0
+               OpDecorate %6 Binding 1
+               OpDecorate %_runtimearr_float ArrayStride 4
+               OpMemberDecorate %_struct_4 0 Offset 0
+       %bool = OpTypeBool
+       %void = OpTypeVoid
+         %10 = OpTypeFunction %void
+       %uint = OpTypeInt 32 0
+        %int = OpTypeInt 32 1
+      %float = OpTypeFloat 32
+     %v3uint = OpTypeVector %uint 3
+    %v3float = OpTypeVector %float 3
+%_ptr_Input_v3uint = OpTypePointer Input %v3uint
+%_ptr_Uniform_int = OpTypePointer Uniform %int
+%_ptr_Uniform_float = OpTypePointer Uniform %float
+%_runtimearr_int = OpTypeRuntimeArray %int
+%_runtimearr_float = OpTypeRuntimeArray %float
+  %_struct_4 = OpTypeStruct %_runtimearr_float
+%_ptr_Uniform__struct_4 = OpTypePointer Uniform %_struct_4
+          %5 = OpVariable %_ptr_Uniform__struct_4 Uniform
+          %6 = OpVariable %_ptr_Uniform__struct_4 Uniform
+%gl_GlobalInvocationID = OpVariable %_ptr_Input_v3uint Input
+      %int_0 = OpConstant %int 0
+     %uint_1 = OpConstant %uint 1
+   %uint_1_0 = OpConstant %uint 1
+   %uint_1_1 = OpConstant %uint 1
+%gl_WorkGroupSize = OpConstantComposite %v3uint %uint_1 %uint_1_0 %uint_1_1
+       %main = OpFunction %void None %10
+         %25 = OpLabel
+         %26 = OpLoad %v3uint %gl_GlobalInvocationID
+         %27 = OpCompositeExtract %uint %26 0
+         %28 = OpAccessChain %_ptr_Uniform_float %5 %int_0 %27
+         %29 = OpLoad %float %28
+         %30 = OpFNegate %float %29
+         %31 = OpAccessChain %_ptr_Uniform_float %6 %int_0 %27
+               OpStore %31 %30
+               OpReturn
+               OpFunctionEnd
