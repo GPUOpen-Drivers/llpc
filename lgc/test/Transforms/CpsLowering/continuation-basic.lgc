@@ -74,15 +74,10 @@ entry:
 ; CHECK-NEXT:    [[TMP41:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP40]])
 ; CHECK-NEXT:    [[TMP42:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP39]])
 ; CHECK-NEXT:    [[TMP43:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP41]])
-; CHECK-NEXT:    [[TMP44:%.*]] = icmp eq i32 [[TMP42]], 0
-; CHECK-NEXT:    br i1 [[TMP44]], label [[RET_BLOCK:%.*]], label [[CHAIN_BLOCK:%.*]]
-; CHECK:       chain.block:
-; CHECK-NEXT:    [[TMP45:%.*]] = and i32 [[TMP42]], -64
-; CHECK-NEXT:    [[TMP46:%.*]] = insertelement <2 x i32> [[TMP7]], i32 [[TMP45]], i64 0
-; CHECK-NEXT:    [[TMP47:%.*]] = bitcast <2 x i32> [[TMP46]] to i64
-; CHECK-NEXT:    [[TMP48:%.*]] = inttoptr i64 [[TMP47]] to ptr
-; CHECK-NEXT:    call void (ptr, i32, <16 x i32>, { i32, ptr addrspace(5), i32 }, i32, ...) @llvm.amdgcn.cs.chain.p0.i32.v16i32.sl_i32p5i32s(ptr inreg [[TMP48]], i32 inreg [[TMP43]], <16 x i32> inreg [[TMP33]], { i32, ptr addrspace(5), i32 } [[TMP13]], i32 0)
+; CHECK-NEXT:    [[TMP44:%.*]] = and i32 [[TMP42]], -64
+; CHECK-NEXT:    [[TMP45:%.*]] = insertelement <2 x i32> [[TMP7]], i32 [[TMP44]], i64 0
+; CHECK-NEXT:    [[TMP46:%.*]] = bitcast <2 x i32> [[TMP45]] to i64
+; CHECK-NEXT:    [[TMP47:%.*]] = inttoptr i64 [[TMP46]] to ptr
+; CHECK-NEXT:    call void (ptr, i32, <16 x i32>, { i32, ptr addrspace(5), i32 }, i32, ...) @llvm.amdgcn.cs.chain.p0.i32.v16i32.sl_i32p5i32s(ptr inreg [[TMP47]], i32 inreg [[TMP43]], <16 x i32> inreg [[TMP33]], { i32, ptr addrspace(5), i32 } [[TMP13]], i32 0)
 ; CHECK-NEXT:    unreachable
-; CHECK:       ret.block:
-; CHECK-NEXT:    ret void
 ;

@@ -402,8 +402,6 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
   //      ret void
   unsigned waveSize = m_pipelineState->getShaderWaveSize(m_shaderStage);
   Type *waveMaskTy = builder.getIntNTy(waveSize);
-  auto *chainBlock = BasicBlock::Create(func->getContext(), "chain.block", func);
-  auto *retBlock = BasicBlock::Create(func->getContext(), "ret.block", func);
   // For continufy based continuation, the vgpr list: LocalInvocationId, vcr, vsp, ...
   unsigned vcrIndexInVgpr = shaderInputs ? 1 : 0;
   auto *vcr = builder.CreateExtractValue(vgprArg, vcrIndexInVgpr);
@@ -437,13 +435,21 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
     execMask = builder.CreateUnaryIntrinsic(Intrinsic::amdgcn_wwm, execMask);
   }
 
-  auto *isNullTarget = builder.CreateICmpEQ(targetVcr, builder.getInt32(0));
-  builder.CreateCondBr(isNullTarget, retBlock, chainBlock);
+  BasicBlock *chainBlock = nullptr;
+  // We only need to insert the return block if there is any return in original function, otherwise we just insert
+  // everything in the tail block.
+  if (!retInstrs.empty()) {
+    chainBlock = BasicBlock::Create(func->getContext(), "chain.block", func);
+    auto *retBlock = BasicBlock::Create(func->getContext(), "ret.block", func);
+    auto *isNullTarget = builder.CreateICmpEQ(targetVcr, builder.getInt32(0));
+    builder.CreateCondBr(isNullTarget, retBlock, chainBlock);
 
-  builder.SetInsertPoint(retBlock);
-  builder.CreateRetVoid();
+    builder.SetInsertPoint(retBlock);
+    builder.CreateRetVoid();
+  }
 
-  builder.SetInsertPoint(chainBlock);
+  if (chainBlock)
+    builder.SetInsertPoint(chainBlock);
   // Mask off metadata bits and setup jump target.
   Value *addr32 = builder.CreateAnd(targetVcr, builder.getInt32(~0x3fu));
   AddressExtender addressExtender(func);
