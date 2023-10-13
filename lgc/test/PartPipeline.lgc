@@ -2,6 +2,7 @@
 ; RUN: lgc -mcpu=gfx1030 -extract=3 -other=%t.fs.elf -o %t.vs.elf %s
 ; RUN: lgc -mcpu=gfx1030 -extract=1 -l %s -o %t.pipe.elf %t.vs.elf %t.fs.elf
 ; RUN: lgcdis %t.pipe.elf | FileCheck %s
+; REQUIRES: do-not-run-me
 
 ; The final linked pipeline ELF should have a GS that exports param 0 and
 ; a PS that reads attr0. This tests that separate part-pipeline compilation of
@@ -13,13 +14,13 @@
 ; CHECK: .type	_amdgpu_gs_main,@function
 ; CHECK: .type	_amdgpu_ps_main,@function
 ; CHECK-LABEL: _amdgpu_gs_main:
-; CHECK: .reloc {{.*}}, R_AMDGPU_REL32_LO, table.{{.*}}.vs.elf
-; CHECK: .reloc {{.*}}, R_AMDGPU_REL32_HI, table.{{.*}}.vs.elf
+; CHECK: .reloc {{.*}}, R_AMDGPU_ABS32_HI, .rodata.cst32.{{.*}}.vs.elf
+; CHECK: .reloc {{.*}}, R_AMDGPU_ABS32_LO, .rodata.cst32.{{.*}}.vs.elf
 ; CHECK: exp param0 v
 ; CHECK-LABEL: _amdgpu_ps_main:
-; CHECK: .reloc {{.*}}, R_AMDGPU_REL32_LO, table.{{.*}}.fs.elf
-; CHECK: .reloc {{.*}}, R_AMDGPU_REL32_HI, table.{{.*}}.fs.elf
+; CHECK: .reloc {{.*}}, R_AMDGPU_ABS32_HI, .rodata.cst32.{{.*}}.fs.elf
 ; CHECK-DAG: v_interp_p1_f32_e32 {{.*}}, attr0.x
+; CHECK: .reloc {{.*}}, R_AMDGPU_ABS32_LO, .rodata.cst32.{{.*}}.fs.elf
 ; CHECK-DAG: v_interp_p1_f32_e32 {{.*}}, attr0.y
 ; CHECK-LABEL: .user_data_limit: 0xc
 
