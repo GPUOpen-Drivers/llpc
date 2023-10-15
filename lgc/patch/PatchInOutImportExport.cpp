@@ -3795,28 +3795,36 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsi
 
     streamInfo = getFunctionArgument(m_entryPoint, CopyShaderEntryArgIdxStreamInfo);
     writeIndex = getFunctionArgument(m_entryPoint, CopyShaderEntryArgIdxWriteIndex);
-    streamOffset = getFunctionArgument(m_entryPoint, CopyShaderEntryArgIdxStreamOffset + xfbBuffer);
+
+    const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
+    assert(xfbStrides[xfbBuffer] > 0);
+
+    // NOTE: The correct mapping between xfbBuffer[X] and streamOffset[X] must be determined according to the enablement
+    // of previous streamOffsets. This is controlled by the register field SO_BASEX_EN.
+    unsigned entryArgIdx = CopyShaderEntryArgIdxStreamOffset;
+    if (xfbBuffer > 0) {
+      for (unsigned i = 0; i < xfbBuffer; ++i) {
+        if (xfbStrides[i] > 0)
+          ++entryArgIdx;
+      }
+    }
+    streamOffset = getFunctionArgument(m_entryPoint, entryArgIdx);
   }
 
-  // vertexCount = streamInfo[22:16]
-  Value *vertexCount = builder.CreateAnd(builder.CreateLShr(streamInfo, 16), 0x7F);
-
-  // writeIndex += threadIdInWave
-  if (m_gfxIp.major >= 9)
-    writeIndex = builder.CreateAdd(writeIndex, m_threadId);
+  // streamOutVertexCount = streamInfo[22:16]
+  Value *streamOutVertexCount = builder.CreateAnd(builder.CreateLShr(streamInfo, 16), 0x7F);
 
   // The stream offset provided by GE is dword-based. Convert it to byte-based.
   streamOffset = builder.CreateShl(streamOffset, 2);
 
-  // GPU will drop stream-out buffer store when the thread ID is invalid.
-  unsigned outOfRangeWriteIndex = 0xFFFFFFFF;
-  if (m_gfxIp.major == 8) {
-    // Divide outofRangeValue by xfbStride only for GFX8.
-    outOfRangeWriteIndex /= xfbStride;
-  }
-  outOfRangeWriteIndex -= (m_pipelineState->getShaderWaveSize(m_shaderStage) - 1);
-  auto validVertex = builder.CreateICmpULT(m_threadId, vertexCount);
-  writeIndex = builder.CreateSelect(validVertex, writeIndex, builder.getInt32(outOfRangeWriteIndex));
+  // GPU will drop stream-out buffer store when the thread ID is invalid (OOB_select is set to SQ_OOB_INDEX_ONLY).
+  const unsigned outOfRangeWriteIndex = InvalidValue - (m_pipelineState->getShaderWaveSize(m_shaderStage) - 1);
+  // validStreamOutVertex = threadId < streamOutVertexCount
+  auto validStreamOutVertex = builder.CreateICmpULT(m_threadId, streamOutVertexCount);
+  // writeIndex = validStreamOutVertex ? writeIndex : outOfRangeWriteIndex
+  writeIndex = builder.CreateSelect(validStreamOutVertex, writeIndex, builder.getInt32(outOfRangeWriteIndex));
+  // writeIndex += threadId
+  writeIndex = builder.CreateAdd(writeIndex, m_threadId);
 
   unsigned format = 0;
   switch (m_gfxIp.major) {
