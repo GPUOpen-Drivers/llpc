@@ -42,7 +42,10 @@
 #include "llpcDebug.h"
 #include "llpcUtil.h"
 #include "vfx.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/Support/Format.h"
+
+#include "spvgen.h"
 
 #define DEBUG_TYPE "llpc-auto-layout"
 
@@ -251,8 +254,28 @@ bool checkPipelineStateCompatible(const ICompiler *compiler, Llpc::GraphicsPipel
 void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipelineBuildInfo *pipelineInfo,
                       PipelineShaderInfo *shaderInfo, ResourceMappingNodeMap &resNodeSets, unsigned &pushConstSize,
                       bool autoLayoutDesc, bool reverseThreadGroup) {
+
+  const void *spvBuf = spirvBin.pCode;
+  unsigned spvBufSize = spirvBin.codeSize;
+
+  // Remove the unused variables.
+  void *optBuf = nullptr;
+  unsigned optBufSize = 0;
+  const char *options[] = {"--remove-unused-interface-variables", "--eliminate-dead-variables"};
+  bool ret = spvOptimizeSpirv(spirvBin.codeSize, spirvBin.pCode, sizeof(options) / sizeof(options[0]), options, &optBufSize, &optBuf, 0, nullptr);
+  if (ret) {
+    spvBuf = optBuf;
+    spvBufSize = optBufSize;
+  }
+
+  // Release optimized spirv data.
+  auto freeSpvData = make_scope_exit([&] {
+      if (ret)
+        free(optBuf);
+    });
+
   // Read the SPIR-V.
-  std::string spirvCode(static_cast<const char *>(spirvBin.pCode), spirvBin.codeSize);
+  std::string spirvCode(static_cast<const char *>(spvBuf), spvBufSize);
   std::istringstream spirvStream(spirvCode);
   std::unique_ptr<SPIRVModule> module(SPIRVModule::createSPIRVModule());
   spirvStream >> *module;
