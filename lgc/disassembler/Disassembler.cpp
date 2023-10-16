@@ -138,7 +138,7 @@ private:
   size_t decodeNote(StringRef data);
   MCSymbol *getOrCreateSymbol(SymbolPool &symbols, uint64_t offset, Twine name = {}, unsigned type = ELF::STT_NOTYPE);
 
-  support::endianness endian() { return m_objFile->isLittleEndian() ? support::little : support::big; }
+  endianness endian() { return m_objFile->isLittleEndian() ? endianness::little : endianness::big; }
 };
 
 } // anonymous namespace
@@ -674,7 +674,7 @@ void ObjDisassembler::addBinaryEncodingComment(raw_ostream &stream, unsigned ins
     if ((subOffset & (instAlignment - 1)) == 0)
       stream << " ";
     unsigned byte = instBytes[subOffset];
-    if (endian() == support::little)
+    if (endian() == endianness::little)
       byte = instBytes[subOffset ^ (instAlignment - 1)];
     stream << format("%02x", byte);
   }
