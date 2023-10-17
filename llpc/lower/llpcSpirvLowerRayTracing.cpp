@@ -32,13 +32,13 @@
 #include "llpcSpirvLowerRayTracing.h"
 #include "SPIRVInternal.h"
 #include "gpurt-compiler.h"
-#include "lgccps/LgcCpsDialect.h"
-#include "lgcrt/LgcRtDialect.h"
 #include "llpcContext.h"
 #include "llpcRayTracingContext.h"
 #include "llpcSpirvLowerUtil.h"
 #include "lgc/Builder.h"
 #include "lgc/GpurtDialect.h"
+#include "lgc/LgcCpsDialect.h"
+#include "lgc/LgcRtDialect.h"
 #include "lgc/Pipeline.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/Analysis/AliasAnalysis.h"
@@ -1278,7 +1278,11 @@ void SpirvLowerRayTracing::createRayGenEntryFunc() {
   auto rayGenId = getShaderIdentifier(m_shaderStage, m_builder->getInt32(0), m_dispatchRaysInfoDesc);
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION > 68
+  if (rayTracingContext->getRaytracingMode() == Vkgc::LlpcRaytracingMode::Continufy) {
+#else
   if (rayTracingContext->getRaytracingMode() == Vkgc::LlpcRaytracingMode::Continuations) {
+#endif
     // Setup continuation stack pointer
     auto offset = offsetof(GpuRt::DispatchRaysConstantData, cpsBackendStackSize);
     auto gep = m_builder->CreateConstGEP1_32(m_builder->getInt8Ty(), m_dispatchRaysInfoDesc, offset);

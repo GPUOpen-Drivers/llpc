@@ -144,6 +144,8 @@ void SpirvLowerTranslator::translateSpirvToLlvm(const PipelineShaderInfo *shader
       if (entryStage > ShaderStageCompute) {
         func.setDLLStorageClass(GlobalValue::DefaultStorageClass);
         func.setLinkage(GlobalValue::ExternalLinkage);
+        if (auto rtStage = getLgcRtShaderStage(entryStage))
+          lgc::rt::setLgcRtShaderStage(&func, rtStage);
         continue;
       }
 

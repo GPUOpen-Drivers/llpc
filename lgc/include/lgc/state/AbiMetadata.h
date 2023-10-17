@@ -182,6 +182,7 @@ static constexpr char TrapPresent[] = ".trap_present";
 static constexpr char UserSgprs[] = ".user_sgprs";
 static constexpr char MemOrdered[] = ".mem_ordered";
 static constexpr char WgpMode[] = ".wgp_mode";
+static constexpr char LoadProvokingVtx[] = ".load_provoking_vtx";
 static constexpr char OffchipLdsEn[] = ".offchip_lds_en";
 static constexpr char UserDataRegMap[] = ".user_data_reg_map";
 static constexpr char ImageOp[] = ".image_op";

@@ -65,8 +65,8 @@ declare !types !27 void @_cont_IgnoreHit(%struct.DispatchSystemData* nocapture r
 ; Function Attrs: nounwind
 declare !types !28 void @_AmdAcceptHitAttributes(%struct.AnyHitTraversalData* nocapture readnone) #1
 
-; CHECK: define{{.*}}_cont_TraceRay.struct.RayPayload.attr_max_24_bytes(
 ; CHECK: define{{.*}}_cont_TraceRay.struct.RayPayload.attr_max_8_bytes(
+; CHECK: define{{.*}}_cont_TraceRay.struct.RayPayload.attr_max_24_bytes(
 define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i32 %2, i32 %3, i32 %4, i32 %5, float %6, float %7, float %8, float %9, float %10, float %11, float %12, float %13) !types !29 {
   %dis_data = load %struct.DispatchSystemData, %struct.DispatchSystemData* %data, align 4
   %sys_data = insertvalue %struct.SystemData undef, %struct.DispatchSystemData %dis_data, 0

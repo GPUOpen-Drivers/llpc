@@ -1302,7 +1302,7 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
       // Whether need to do fixed point emulation
       bool isFixed = (description->nfmt == BufNumFormatFixed);
 
-      // Whether need to translate from int bits to float bits.
+      // Whether need to tranlate from int bits to float bits.
       bool needTransToFp = (description->nfmt == BufNumFormatSscaled || description->nfmt == BufNumFormatSnorm ||
                             description->nfmt == BufNumFormatUscaled || description->nfmt == BufNumFormatUnorm);
 

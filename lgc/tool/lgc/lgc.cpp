@@ -29,9 +29,9 @@
  ***********************************************************************************************************************
  */
 
-#include "lgccps/LgcCpsDialect.h"
 #include "lgc/ElfLinker.h"
 #include "lgc/LgcContext.h"
+#include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/PassManager.h"
 #include "lgc/Pipeline.h"

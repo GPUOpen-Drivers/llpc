@@ -30,12 +30,12 @@
  */
 #include "llpcSpirvLowerGlobal.h"
 #include "SPIRVInternal.h"
-#include "lgcrt/LgcRtDialect.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcRayTracingContext.h"
 #include "llpcSpirvLowerUtil.h"
 #include "lgc/LgcDialect.h"
+#include "lgc/LgcRtDialect.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/IR/Constant.h"
@@ -270,7 +270,6 @@ bool SpirvLowerGlobal::runImpl(Module &module) {
   lowerUniformConstants();
   lowerAliasedVal();
   lowerShaderRecordBuffer();
-
   cleanupReturnBlock();
 
   return true;
@@ -281,9 +280,9 @@ bool SpirvLowerGlobal::runImpl(Module &module) {
 void SpirvLowerGlobal::lowerEdgeFlag() {
   const unsigned int edgeflagInputLocation = Vkgc::GlCompatibilityAttributeLocation::EdgeFlag;
 
-  Llpc::PipelineContext *pipelineContext = m_context->getPipelineContext();
+  Llpc::PipelineContext *pipelineContex = m_context->getPipelineContext();
   const Vkgc::GraphicsPipelineBuildInfo *pipelineInfo =
-      static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(pipelineContext->getPipelineBuildInfo());
+      static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(pipelineContex->getPipelineBuildInfo());
   const VkPipelineVertexInputStateCreateInfo *vertexInfo = pipelineInfo->pVertexInput;
 
   if (!vertexInfo)
@@ -1195,6 +1194,7 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
         inOutInfo.setInterpLoc(interpLoc);
 
         if (builtIn == lgc::BuiltInBaryCoord || builtIn == lgc::BuiltInBaryCoordNoPerspKHR) {
+          inOutInfo.setInterpMode(InterpModeCustom);
           if (inOutInfo.getInterpLoc() == InterpLocUnknown)
             inOutInfo.setInterpLoc(inOutMeta.InterpLoc);
           return m_builder->CreateReadBaryCoord(builtIn, inOutInfo, auxInterpValue);
@@ -2389,7 +2389,7 @@ void SpirvLowerGlobal::interpolateInputElement(unsigned interpLoc, Value *auxInt
 }
 
 // =====================================================================================================================
-// Fill the XFB info map from the Vkgc::ApiXfbOutData if XFB is specified by API interface
+// Fill the XFB info map from the Vkgc::ApiXfbOutData if XFB is specified by API inerface
 void SpirvLowerGlobal::buildApiXfbMap() {
   auto pipelineBuildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
   for (unsigned idx = 0; idx < pipelineBuildInfo->apiXfbOutData.numXfbOutInfo; ++idx) {

@@ -11,8 +11,8 @@ declare %struct.DispatchSystemData @_cont_SetupRayGen()
 
 declare !types !8 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 
-define { i64, i32 } @main() {
-; CHECK-LABEL: define { i64, i32 } @main() !continuation.entry !12 !continuation.registercount !6 !continuation !13 {
+define { i64, i32 } @main() !lgc.rt.shaderstage !10 {
+; CHECK-LABEL: define void @main() !lgc.rt.shaderstage !6 !continuation.entry !12 !continuation.registercount !6 !continuation !13 {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA:%.*]], align 8
 ; CHECK-NEXT:    [[TMP0:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @continuations.getSystemData.s_struct.DispatchSystemDatas()
@@ -21,7 +21,7 @@ define { i64, i32 } @main() {
 ; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
 ; CHECK-NEXT:    [[V0:%.*]] = insertvalue { i64, i32 } undef, i64 ptrtoint (ptr @MyFunc to i64), 0
 ; CHECK-NEXT:    [[V1:%.*]] = insertvalue { i64, i32 } undef, i32 ptrtoint (ptr @MyFunc2 to i32), 1
-; CHECK-NEXT:    ret { i64, i32 } [[V1]]
+; CHECK-NEXT:    ret void, !continuation.registercount !9
 ;
 entry:
   %val = call i64 @_AmdGetFuncAddrMyFunc()
@@ -58,3 +58,4 @@ define i32 @MyFunc2() {
 !7 = !{i32 21}
 !8 = !{!"function", i32 poison, !9}
 !9 = !{i32 0, %struct.DispatchSystemData poison}
+!10 = !{i32 0}

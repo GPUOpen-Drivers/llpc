@@ -202,7 +202,7 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   // Lower SPIR-V terminators
   passMgr.addPass(SpirvLowerTerminator());
 
-  // Lower Glsl compatibility variables and operations
+  // Lower Glsl compatibility varaibles and operations
   passMgr.addPass(LowerGLCompatibility());
 
   // Lower SPIR-V global variables, inputs, and outputs

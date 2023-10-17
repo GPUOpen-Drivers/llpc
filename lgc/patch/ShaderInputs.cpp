@@ -234,6 +234,8 @@ const char *ShaderInputs::getInputName(ShaderInput inputKind) {
     return "EsGsOffset";
   case ShaderInput::TfBufferBase:
     return "TfBufferBase";
+  case ShaderInput::ProvokingVtxInfo:
+    return "ProvokingVtxInfo";
   case ShaderInput::VertexId:
     return "VertexId";
   case ShaderInput::RelVertexId:
@@ -487,6 +489,7 @@ static const ShaderInputDesc GsSgprInputs[] = {
 // SGPRs: FS
 static const ShaderInputDesc FsSgprInputs[] = {
     {ShaderInput::PrimMask, offsetof(InterfaceData, entryArgIdxs.fs.primMask), true},
+    {ShaderInput::ProvokingVtxInfo, offsetof(InterfaceData, entryArgIdxs.fs.provokingVtxInfo), false},
 };
 
 // SGPRs: CS

@@ -47,6 +47,11 @@ void GlueShader::compile(raw_pwrite_stream &outStream) {
   // Generate the glue shader IR module.
   std::unique_ptr<Module> module(generate());
 
+  // For explicit color export shader, some registers are required.
+  if (m_pipelineState->getOptions().enableColorExportShader) {
+    m_pipelineState->getPalMetadata()->updateDbShaderControl();
+  }
+
   // Record pipeline state
   m_pipelineState->record(&*module);
 

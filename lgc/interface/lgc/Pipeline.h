@@ -171,7 +171,7 @@ union Options {
                                   // meta data.
     bool fragCoordUsesInterpLoc;  // Determining fragCoord use InterpLoc
     bool disableSampleMask;       // Disable export of sample mask from PS
-    bool reserved20;
+    unsigned reserved20;
     RayTracingIndirectMode rtIndirectMode; // Ray tracing indirect mode
     bool enablePrimGeneratedQuery;         // Whether to enable primitive generated counter
   };

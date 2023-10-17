@@ -4,25 +4,29 @@
 
 %struct.DispatchSystemData = type { i32 }
 
+@debug_global = external global i1
+
 declare i1 @_AmdContinuationStackIsGlobal()
 
 declare %struct.DispatchSystemData @_cont_SetupRayGen()
 
 declare !types !8 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 
-define i1 @main() {
-; CHECK-LABEL: define i1 @main() !continuation.entry !12 !continuation.registercount !6 !continuation !13 {
+define void @main() {
+; CHECK-LABEL: define void @main() !lgc.rt.shaderstage !6 !continuation.entry !12 !continuation.registercount !6 !continuation !13 {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA:%.*]], align 8
 ; CHECK-NEXT:    [[TMP0:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @continuations.getSystemData.s_struct.DispatchSystemDatas()
 ; CHECK-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; CHECK-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[SYSTEM_DATA_ALLOCA]])
 ; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
-; CHECK-NEXT:    ret i1 true
+; CHECK-NEXT:    store i1 true, ptr @debug_global, align 1
+; CHECK-NEXT:    ret void, !continuation.registercount !9
 ;
 entry:
   %val = call i1 @_AmdContinuationStackIsGlobal()
-  ret i1 %val
+  store i1 %val, ptr @debug_global
+  ret void
 }
 
 !dx.entryPoints = !{!0, !3}

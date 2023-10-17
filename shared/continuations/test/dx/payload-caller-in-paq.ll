@@ -30,8 +30,8 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-i1:32-i8:8-i16:32-i32:32-
 
 ; Function Attrs: nounwind
 define void @RayGen() #0 {
-; LOWERRAYTRACINGPIPELINE-LABEL: define void @RayGen(
-; LOWERRAYTRACINGPIPELINE-SAME: ) #[[ATTR0:[0-9]+]] !continuation.entry !14 !continuation.registercount !24 !continuation !27 {
+; LOWERRAYTRACINGPIPELINE-LABEL: define void @RayGen
+; LOWERRAYTRACINGPIPELINE-SAME: () #[[ATTR0:[0-9]+]] !lgc.rt.shaderstage !24 !continuation.entry !14 !continuation.registercount !24 !continuation !27 {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP1:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @continuations.getSystemData.s_struct.DispatchSystemDatas()
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
@@ -53,6 +53,7 @@ define void @RayGen() #0 {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP10]], ptr @PAYLOAD, align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP11:%.*]] = call ptr inttoptr (i64 4 to ptr)([[STRUCT_TRAVERSALDATA]] [[TRAV_DATA_I]]), !continuation.registercount !32, !continuation.returnedRegistercount !33
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP12:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @await.struct.DispatchSystemData(ptr [[TMP11]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_MYPAYLOAD]] poison, ptr [[TMP4]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP13:%.*]] = load float, ptr @PAYLOAD, align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP13]], ptr [[TMP4]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [[STRUCT_MYPAYLOAD]], ptr [[TMP4]], i32 0, i32 1

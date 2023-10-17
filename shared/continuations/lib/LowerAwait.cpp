@@ -36,7 +36,7 @@
 
 #include "continuations/Continuations.h"
 #include "continuations/ContinuationsDialect.h"
-#include "lgccps/LgcCpsDialect.h"
+#include "lgc/LgcCpsDialect.h"
 #include "llvm-dialects/Dialect/Builder.h"
 #include "llvm-dialects/Dialect/Dialect.h"
 #include "llvm-dialects/Dialect/Visitor.h"

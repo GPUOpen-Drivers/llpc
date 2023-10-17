@@ -30,8 +30,10 @@
  */
 #include "lgc/patch/Patch.h"
 #include "PatchNullFragShader.h"
+#include "continuations/Continuations.h"
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
+#include "lgc/Pipeline.h"
 #include "lgc/builder/BuilderReplayer.h"
 #include "lgc/patch/Continufy.h"
 #include "lgc/patch/FragColorExport.h"
@@ -129,6 +131,17 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
     passMgr.addPass(PrintModulePass(*outs,
                                     "===============================================================================\n"
                                     "// LLPC pipeline before-patching results\n"));
+  }
+
+  const auto indirectMode = pipelineState->getOptions().rtIndirectMode;
+  if (indirectMode == RayTracingIndirectMode::ContinuationsContinufy ||
+      indirectMode == RayTracingIndirectMode::Continuations) {
+    if (indirectMode == RayTracingIndirectMode::ContinuationsContinufy)
+      passMgr.addPass(Continufy());
+    else
+      passMgr.addPass(LowerRaytracingPipelinePass());
+
+    addLgcContinuationTransform(passMgr);
   }
 
   passMgr.addPass(IPSCCPPass());

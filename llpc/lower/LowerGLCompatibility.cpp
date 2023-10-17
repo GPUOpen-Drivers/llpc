@@ -261,11 +261,11 @@ void LowerGLCompatibility::createClipDistance() {
   mdValues.push_back(mdElement);
   mdValues.push_back(ConstantInt::get(int64Type, inOutMd.U64All[0]));
   mdValues.push_back(ConstantInt::get(int64Type, inOutMd.U64All[1]));
-  auto *mdVariable = ConstantStruct::get(static_cast<StructType *>(mdTy), mdValues);
+  auto *mdVriable = ConstantStruct::get(static_cast<StructType *>(mdTy), mdValues);
 
   // Setup input/output metadata
   std::vector<Metadata *> mDs;
-  mDs.push_back(ConstantAsMetadata::get(mdVariable));
+  mDs.push_back(ConstantAsMetadata::get(mdVriable));
   auto mdNode = MDNode::get(*m_context, mDs);
   m_clipDistance->addMetadata(gSPIRVMD::InOut, *mdNode);
 }

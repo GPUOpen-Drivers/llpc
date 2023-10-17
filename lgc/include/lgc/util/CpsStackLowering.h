@@ -30,7 +30,7 @@
  */
 #pragma once
 
-#include "lgccps/LgcCpsDialect.h"
+#include "lgc/LgcCpsDialect.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/util/TypeLowering.h"
 #include "llvm/ADT/SmallVector.h"

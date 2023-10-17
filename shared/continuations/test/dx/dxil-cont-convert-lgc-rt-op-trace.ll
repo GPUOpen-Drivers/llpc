@@ -60,7 +60,7 @@ define void @Intersection() #0 {
 }
 
 define void @main() {
-; CHECK-LABEL: define void @main() {
+; CHECK-LABEL: define void @main() !lgc.rt.shaderstage !8 {
 ; CHECK-NEXT:    [[PARAMS:%.*]] = alloca [[STRUCT_THEIRPARAMS:%.*]], align 4
 ; CHECK-NEXT:    call void (...) @lgc.rt.call.callable.shader(i32 1, ptr [[PARAMS]], i32 256), !dxil.payload.type !26
 ; CHECK-NEXT:    ret void
@@ -71,7 +71,7 @@ define void @main() {
 }
 
 define void @mainTrace() {
-; CHECK-LABEL: define void @mainTrace() {
+; CHECK-LABEL: define void @mainTrace() !lgc.rt.shaderstage !8 {
 ; CHECK-NEXT:    [[TMP1:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = load [[DX_TYPES_HANDLE]], ptr @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
 ; CHECK-NEXT:    [[TMP3:%.*]] = alloca [[STRUCT_RAYPAYLOAD:%.*]], align 4
@@ -94,9 +94,9 @@ define void @mainTrace() {
 
 define void @called(%struct.MyParams* %arg) !types !38 {
 ; CHECK-LABEL: define void @called
-; CHECK-SAME: (ptr [[ARG:%.*]]) !types !28 !dxil.payload.type !30 {
+; CHECK-SAME: (ptr [[ARG:%.*]]) !types !28 !lgc.rt.shaderstage !30 !dxil.payload.type !31 {
 ; CHECK-NEXT:    [[PARAMS:%.*]] = alloca [[STRUCT_THEIRPARAMS2:%.*]], align 4
-; CHECK-NEXT:    call void (...) @lgc.rt.call.callable.shader(i32 2, ptr [[PARAMS]], i32 260), !dxil.payload.type !31
+; CHECK-NEXT:    call void (...) @lgc.rt.call.callable.shader(i32 2, ptr [[PARAMS]], i32 260), !dxil.payload.type !32
 ; CHECK-NEXT:    ret void
 ;
   %params = alloca %struct.TheirParams2, align 4
