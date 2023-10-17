@@ -262,13 +262,12 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
 
   if (rayTracing || rayQuery || isInternalRtShader) {
     passMgr.addPass(LowerGpuRt());
-    passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(instCombineOpt)));
-  }
 
-  FunctionPassManager fpm;
-  fpm.addPass(SROAPass(SROAOptions::PreserveCFG));
-  fpm.addPass(InstCombinePass(instCombineOpt));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
+    FunctionPassManager fpm;
+    fpm.addPass(SROAPass(SROAOptions::PreserveCFG));
+    fpm.addPass(InstCombinePass(instCombineOpt));
+    passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
+  }
 
   // Stop timer for lowering passes.
   if (lowerTimer)
