@@ -77,7 +77,7 @@ private:
   FragColorExport &operator=(const FragColorExport &) = delete;
 
   llvm::Value *handleColorExportInstructions(llvm::Value *output, unsigned int hwColorExport, BuilderBase &builder,
-                                             ExportFormat expFmt, const bool signedness);
+                                             ExportFormat expFmt, const bool signedness, unsigned channelWriteMask);
 
   llvm::Value *convertToHalf(llvm::Value *value, bool signedness, BuilderBase &builder) const;
   llvm::Value *convertToFloat(llvm::Value *value, bool signedness, BuilderBase &builder) const;

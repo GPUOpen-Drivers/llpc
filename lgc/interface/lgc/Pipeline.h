@@ -454,6 +454,7 @@ struct ColorExportFormat {
   unsigned blendEnable;          // Blend will be enabled for this target at draw time
   unsigned blendSrcAlphaToColor; // Whether source alpha is blended to color channels for this target
                                  //  at draw time
+  unsigned channelWriteMask;     // Write mask to specify destination channels
 };
 
 // Struct to pass to SetColorExportState

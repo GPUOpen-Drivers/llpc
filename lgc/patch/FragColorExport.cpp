@@ -70,7 +70,7 @@ LowerFragColorExport::LowerFragColorExport() : m_exportValues(MaxColorTargets + 
 // @param input : The value we want to extract elements from
 // @param builder : The IR builder for inserting instructions
 // @param [out] results : The returned elements
-static void extractElements(Value *input, BuilderBase &builder, SmallVectorImpl<Value *> &results) {
+static void extractElements(Value *input, BuilderBase &builder, std::array<Value *, 4> &results) {
   Type *valueTy = input->getType();
   unsigned compCount = valueTy->isVectorTy() ? cast<FixedVectorType>(valueTy)->getNumElements() : 1;
   assert(compCount <= 4 && "At-most four elements allowed\n");
@@ -94,8 +94,10 @@ static void extractElements(Value *input, BuilderBase &builder, SmallVectorImpl<
 // @param builder : The IR builder for inserting instructions
 // @param expFmt: The format for the given render target
 // @param signedness: If output should be interpreted as a signed integer
+// @param channelWriteMask: Write mask to specify destination channels
 Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hwColorExport, BuilderBase &builder,
-                                                      ExportFormat expFmt, const bool signedness) {
+                                                      ExportFormat expFmt, const bool signedness,
+                                                      unsigned channelWriteMask) {
   assert(expFmt != EXP_FORMAT_ZERO);
 
   Type *outputTy = output->getType();
@@ -116,9 +118,17 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
       floatTy, //  EXP_FORMAT_32_ABGR = 9,
   };
 
-  SmallVector<Value *, 4> comps(4);
+  const auto undefFloat = PoisonValue::get(builder.getFloatTy());
+  const auto undefFloat16x2 = PoisonValue::get(FixedVectorType::get(builder.getHalfTy(), 2));
+
+  std::array<Value *, 4> comps;
+  std::array<Value *, 4> exports{undefFloat, undefFloat, undefFloat, undefFloat};
+  unsigned exportMask = 0;
 
   Type *exportTy = exportTypeMapping[expFmt];
+
+  const bool dualSourceBlendedEnable = m_pipelineState->getColorExportState().dualSourceBlendEnable ||
+                                       m_pipelineState->getColorExportState().dynamicDualSourceBlendEnable;
 
   // For 32bit output, we always to scalarize, but for 16bit output we may just operate on vector.
   if (exportTy->isFloatTy()) {
@@ -130,56 +140,56 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
     }
   }
 
-  const auto undefFloat = PoisonValue::get(builder.getFloatTy());
-  const auto undefFloat16x2 = PoisonValue::get(FixedVectorType::get(builder.getHalfTy(), 2));
-
   switch (expFmt) {
-  case EXP_FORMAT_32_R: {
-    compCount = 1;
-    comps[0] = convertToFloat(comps[0], signedness, builder);
-    break;
-  }
-  case EXP_FORMAT_32_GR: {
-    if (compCount >= 2) {
+  case EXP_FORMAT_32_R:
+  case EXP_FORMAT_32_GR:
+  case EXP_FORMAT_32_ABGR: {
+    if (expFmt == EXP_FORMAT_32_GR && compCount >= 2)
       compCount = 2;
-      comps[0] = convertToFloat(comps[0], signedness, builder);
-      comps[1] = convertToFloat(comps[1], signedness, builder);
-    } else {
+    else if (expFmt != EXP_FORMAT_32_ABGR)
       compCount = 1;
-      comps[0] = convertToFloat(comps[0], signedness, builder);
+
+    for (unsigned idx = 0; idx < compCount; ++idx) {
+      unsigned compMask = 1 << idx;
+      if (compMask & channelWriteMask) {
+        exports[idx] = convertToFloat(comps[idx], signedness, builder);
+        exportMask |= compMask;
+      }
     }
     break;
   }
   case EXP_FORMAT_32_AR: {
+    if (1 & channelWriteMask) {
+      exports[0] = convertToFloat(comps[0], signedness, builder);
+      exportMask = 1;
+    }
     if (compCount == 4) {
+      if (0x8 & channelWriteMask) {
+        exports[1] = convertToFloat(comps[3], signedness, builder);
+        exportMask |= 0x2;
+      }
       compCount = 2;
-      comps[0] = convertToFloat(comps[0], signedness, builder);
-      comps[1] = convertToFloat(comps[3], signedness, builder);
     } else {
       compCount = 1;
-      comps[0] = convertToFloat(comps[0], signedness, builder);
     }
     break;
   }
-  case EXP_FORMAT_32_ABGR: {
-    for (unsigned i = 0; i < compCount; ++i)
-      comps[i] = convertToFloat(comps[i], signedness, builder);
-
-    for (unsigned i = compCount; i < 4; ++i)
-      comps[i] = undefFloat;
-    break;
-  }
   case EXP_FORMAT_FP16_ABGR: {
+    const unsigned compactCompCount = (compCount + 1) / 2;
+    exports[0] = exports[1] = undefFloat16x2;
     // convert to half type
     if (bitWidth <= 16) {
       output = convertToHalf(output, signedness, builder);
       extractElements(output, builder, comps);
       // re-pack
-      comps[0] = builder.CreateInsertElement(undefFloat16x2, comps[0], builder.getInt32(0));
-      comps[0] = builder.CreateInsertElement(comps[0], comps[1], builder.getInt32(1));
-      if (compCount > 2) {
-        comps[1] = builder.CreateInsertElement(undefFloat16x2, comps[2], builder.getInt32(0));
-        comps[1] = builder.CreateInsertElement(comps[1], comps[3], builder.getInt32(1));
+      for (unsigned idx = 0; idx < compactCompCount; ++idx) {
+        unsigned origIdx = 2 * idx;
+        unsigned compMask = (1 << origIdx) | (1 << (origIdx + 1));
+        if (compMask & channelWriteMask) {
+          exports[idx] = builder.CreateInsertElement(undefFloat16x2, comps[origIdx], builder.getInt32(0));
+          exports[idx] = builder.CreateInsertElement(exports[idx], comps[origIdx + 1], builder.getInt32(1));
+          exportMask |= compMask;
+        }
       }
     } else {
       if (outputTy->isIntOrIntVectorTy())
@@ -188,47 +198,47 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
                                                                  : builder.getFloatTy());
       extractElements(output, builder, comps);
 
-      Attribute::AttrKind attribs[] = {Attribute::ReadNone};
-      comps[0] = builder.CreateNamedCall("llvm.amdgcn.cvt.pkrtz", FixedVectorType::get(builder.getHalfTy(), 2),
-                                         {comps[0], comps[1]}, attribs);
-      if (compCount > 2)
-        comps[1] = builder.CreateNamedCall("llvm.amdgcn.cvt.pkrtz", FixedVectorType::get(builder.getHalfTy(), 2),
-                                           {comps[2], comps[3]}, attribs);
+      for (unsigned idx = 0; idx < compactCompCount; ++idx) {
+        unsigned origIdx = 2 * idx;
+        unsigned compMask = (1 << origIdx) | (1 << (origIdx + 1));
+        if (compMask & channelWriteMask) {
+          exports[idx] = builder.CreateIntrinsic(FixedVectorType::get(builder.getHalfTy(), 2),
+                                                 Intrinsic::amdgcn_cvt_pkrtz, {comps[origIdx], comps[origIdx + 1]});
+          exportMask |= compMask;
+        }
+      }
     }
     break;
   }
   case EXP_FORMAT_UNORM16_ABGR:
-  case EXP_FORMAT_SNORM16_ABGR: {
-    output = convertToFloat(output, signedness, builder);
-    extractElements(output, builder, comps);
-
-    StringRef funcName =
-        expFmt == EXP_FORMAT_SNORM16_ABGR ? "llvm.amdgcn.cvt.pknorm.i16" : "llvm.amdgcn.cvt.pknorm.u16";
-
-    for (unsigned idx = 0; idx < (compCount + 1) / 2; idx++) {
-      Value *packedComps = builder.CreateNamedCall(funcName, FixedVectorType::get(builder.getInt16Ty(), 2),
-                                                   {comps[2 * idx], comps[2 * idx + 1]}, {});
-
-      comps[idx] = builder.CreateBitCast(packedComps, FixedVectorType::get(builder.getHalfTy(), 2));
-    }
-
-    break;
-  }
+  case EXP_FORMAT_SNORM16_ABGR:
   case EXP_FORMAT_UINT16_ABGR:
   case EXP_FORMAT_SINT16_ABGR: {
     assert(compCount <= 4);
-    output = convertToInt(output, signedness, builder);
+
+    unsigned cvtIntrinsic;
+    if (expFmt == EXP_FORMAT_SNORM16_ABGR || expFmt == EXP_FORMAT_UNORM16_ABGR) {
+      output = convertToFloat(output, signedness, builder);
+      cvtIntrinsic =
+          expFmt == EXP_FORMAT_SNORM16_ABGR ? Intrinsic::amdgcn_cvt_pknorm_i16 : Intrinsic::amdgcn_cvt_pknorm_u16;
+    } else {
+      output = convertToInt(output, signedness, builder);
+      cvtIntrinsic = expFmt == EXP_FORMAT_SINT16_ABGR ? Intrinsic::amdgcn_cvt_pk_i16 : Intrinsic::amdgcn_cvt_pk_u16;
+    }
     extractElements(output, builder, comps);
 
-    StringRef funcName = expFmt == EXP_FORMAT_SINT16_ABGR ? "llvm.amdgcn.cvt.pk.i16" : "llvm.amdgcn.cvt.pk.u16";
-
-    for (unsigned idx = 0; idx < (compCount + 1) / 2; idx++) {
-      Value *packedComps = builder.CreateNamedCall(funcName, FixedVectorType::get(builder.getInt16Ty(), 2),
-                                                   {comps[2 * idx], comps[2 * idx + 1]}, {});
-
-      comps[idx] = builder.CreateBitCast(packedComps, FixedVectorType::get(builder.getHalfTy(), 2));
+    const unsigned compactCompCount = (compCount + 1) / 2;
+    exports[0] = exports[1] = undefFloat16x2;
+    for (unsigned idx = 0; idx < compactCompCount; idx++) {
+      unsigned origIdx = 2 * idx;
+      unsigned compMask = (1 << origIdx) | (1 << (origIdx + 1));
+      if (compMask & channelWriteMask) {
+        Value *packedComps = builder.CreateIntrinsic(FixedVectorType::get(builder.getInt16Ty(), 2), cvtIntrinsic,
+                                                     {comps[2 * idx], comps[2 * idx + 1]});
+        exports[idx] = builder.CreateBitCast(packedComps, FixedVectorType::get(builder.getHalfTy(), 2));
+        exportMask |= compMask;
+      }
     }
-
     break;
   }
   default: {
@@ -237,67 +247,48 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
   }
   }
 
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11 &&
-      (m_pipelineState->getColorExportState().dualSourceBlendEnable ||
-       m_pipelineState->getColorExportState().dynamicDualSourceBlendEnable)) {
-    // Save them for later dual-source-swizzle
-    m_blendSourceChannels = exportTy->isHalfTy() ? (compCount + 1) / 2 : compCount;
-    assert(hwColorExport <= 1);
-    m_blendSources[hwColorExport].append(comps.begin(), comps.end());
-    return nullptr;
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
+    if (dualSourceBlendedEnable) {
+      // Save them for later dual-source-swizzle
+      m_blendSourceChannels = exportTy->isHalfTy() ? (compCount + 1) / 2 : compCount;
+      assert(hwColorExport <= 1);
+      m_blendSources[hwColorExport].append(exports.begin(), exports.end());
+      return nullptr;
+    } else if (exportTy->isHalfTy()) {
+      // GFX11 removes compressed export, simply use 32bit-data export.
+      exportMask = 0;
+      const unsigned compactCompCount = (compCount + 1) / 2;
+      for (unsigned idx = 0; idx < compactCompCount; ++idx) {
+        exports[idx] = builder.CreateBitCast(exports[idx], builder.getFloatTy());
+        exportMask |= 1 << idx;
+      }
+      for (unsigned idx = compactCompCount; idx < 4; ++idx)
+        exports[idx] = undefFloat;
+    }
   }
 
   Value *exportCall = nullptr;
 
-  if (exportTy->isHalfTy()) {
-    // GFX11 removes compressed export, simply use 32bit-data export.
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
-      // Translate compCount into the number of 32bit data.
-      compCount = (compCount + 1) / 2;
-      for (unsigned i = 0; i < compCount; i++)
-        comps[i] = builder.CreateBitCast(comps[i], builder.getFloatTy());
-      for (unsigned i = compCount; i < 4; i++)
-        comps[i] = undefFloat;
-
-      Value *args[] = {
-          builder.getInt32(EXP_TARGET_MRT_0 + hwColorExport), // tgt
-          builder.getInt32((1 << compCount) - 1),             // en
-          comps[0],                                           // src0
-          comps[1],                                           // src1
-          comps[2],                                           // src2
-          comps[3],                                           // src3
-          builder.getFalse(),                                 // done
-          builder.getTrue()                                   // vm
-      };
-
-      return builder.CreateNamedCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {});
-    }
-
+  if (exportTy->isHalfTy() && m_pipelineState->getTargetInfo().getGfxIpVersion().major < 11) {
     // 16-bit export (compressed)
-    if (compCount <= 2)
-      comps[1] = undefFloat16x2;
     Value *args[] = {
         builder.getInt32(EXP_TARGET_MRT_0 + hwColorExport), // tgt
-        builder.getInt32(compCount > 2 ? 0xF : 0x3),        // en
-        comps[0],                                           // src0
-        comps[1],                                           // src1
+        builder.getInt32(exportMask),                       // en
+        exports[0],                                         // src0
+        exports[1],                                         // src1
         builder.getFalse(),                                 // done
         builder.getTrue()                                   // vm
     };
 
     exportCall = builder.CreateNamedCall("llvm.amdgcn.exp.compr.v2f16", Type::getVoidTy(*m_context), args, {});
   } else {
-    // 32-bit export
-    for (unsigned i = compCount; i < 4; i++)
-      comps[i] = undefFloat;
-
     Value *args[] = {
         builder.getInt32(EXP_TARGET_MRT_0 + hwColorExport), // tgt
-        builder.getInt32((1 << compCount) - 1),             // en
-        comps[0],                                           // src0
-        comps[1],                                           // src1
-        comps[2],                                           // src2
-        comps[3],                                           // src3
+        builder.getInt32(exportMask),                       // en
+        exports[0],                                         // src0
+        exports[1],                                         // src1
+        exports[2],                                         // src2
+        exports[3],                                         // src3
         builder.getFalse(),                                 // done
         builder.getTrue()                                   // vm
     };
@@ -942,9 +933,10 @@ void FragColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info,
     assert(infoIt->hwColorTarget < MaxColorTargets);
 
     auto expFmt = static_cast<ExportFormat>(m_pipelineState->computeExportFormat(infoIt->ty, location));
-    if (expFmt != EXP_FORMAT_ZERO) {
+    const unsigned channelWriteMask = m_pipelineState->getColorExportFormat(location).channelWriteMask;
+    if (expFmt != EXP_FORMAT_ZERO && channelWriteMask != 0) {
       lastExport = handleColorExportInstructions(values[infoIt->hwColorTarget], hwColorExport, builder, expFmt,
-                                                 infoIt->isSigned);
+                                                 infoIt->isSigned, channelWriteMask);
       finalExportFormats.push_back(expFmt);
       ++hwColorExport;
     }
