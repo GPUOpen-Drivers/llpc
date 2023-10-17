@@ -1212,7 +1212,7 @@ void PipelineState::recordColorExportState(Module *module) {
 
     // The color export formats named metadata node's operands are:
     // - N metadata nodes for N color targets, each one containing
-    // { dfmt, nfmt, blendEnable, blendSrcAlphaToColor }
+    // { dfmt, nfmt, blendEnable, blendSrcAlphaToColor, channelWriteMask }
     for (const ColorExportFormat &target : m_colorExportFormats)
       exportFormatsMetaNode->addOperand(getArrayOfInt32MetaNode(getContext(), target, /*atLeastOneValue=*/true));
   }

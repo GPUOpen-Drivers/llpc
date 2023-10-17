@@ -321,6 +321,7 @@ void GraphicsContext::setColorExportState(Pipeline *pipeline, Util::MetroHash64 
       formats[targetIndex].nfmt = nfmt;
       formats[targetIndex].blendEnable = cbState.target[targetIndex].blendEnable;
       formats[targetIndex].blendSrcAlphaToColor = cbState.target[targetIndex].blendSrcAlphaToColor;
+      formats[targetIndex].channelWriteMask = cbState.target[targetIndex].channelWriteMask;
     }
   }
 
