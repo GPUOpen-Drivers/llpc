@@ -1252,6 +1252,8 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
       elemIdx = !elemIdx ? m_builder->getInt32(idx) : m_builder->CreateAdd(elemIdx, m_builder->getInt32(idx));
 
       lgc::InOutInfo inOutInfo;
+      inOutInfo.setComponent(inOutMeta.Component);
+
       if (!locOffset)
         locOffset = m_builder->getInt32(0);
 
