@@ -1,0 +1,363 @@
+; Test to check GS output handling with XFB on GFX11. The XFB has a hole by specifying the component
+; qualifier. In a location, only part of its components are exported to XFB buffer and they are not
+; consecutive.
+
+; RUN: amdllpc -gfxip=11 -stop-after=lgc-patch-copy-shader -v %s | FileCheck -check-prefix=CHECK %s
+
+; CHECK-LABEL: @lgc.shader.COPY.main(
+; CHECK: [[TMP1:%.*]] = call float @lgc.ngg.read.GS.output.f32(i32 0, i32 0, i32 0)
+; CHECK: [[TMP2:%.*]] = call float @lgc.ngg.read.GS.output.f32(i32 0, i32 2, i32 0)
+; CHECK: [[TMP3:%.*]] = call float @lgc.ngg.read.GS.output.f32(i32 0, i32 1, i32 0)
+; CHECK: call void @lgc.output.export.xfb.i32.i32.i32.f32(i32 0, i32 0, i32 0, float [[TMP1]])
+; CHECK: call void @lgc.output.export.xfb.i32.i32.i32.f32(i32 0, i32 8, i32 0, float [[TMP2]])
+; CHECK: [[TMP4:%.*]] = insertelement <3 x float> poison, float [[TMP1]], i64 0
+; CHECK: [[TMP5:%.*]] = insertelement <3 x float> [[TMP4]], float [[TMP2]], i64 2
+; CHECK: [[TMP6:%.*]] = insertelement <3 x float> [[TMP5]], float [[TMP3]], i64 1
+; CHECK: call void @lgc.output.export.generic.v3f32(i32 0, <3 x float> [[TMP6]])
+
+[Version]
+version = 69
+
+[VsGlsl]
+#version 460
+
+layout (location = 0) in vec4 inPos;
+
+void main ()
+{
+    gl_Position  = inPos;
+    gl_PointSize = 1.0;
+
+}
+
+[VsInfo]
+entryPoint = main
+options.trapPresent = 0
+options.debugMode = 0
+options.enablePerformanceData = 0
+options.allowReZ = 0
+options.forceLateZ = 0
+options.vgprLimit = 0
+options.sgprLimit = 0
+options.maxThreadGroupsPerComputeUnit = 0
+options.waveSize = 0
+options.subgroupSize = 0
+options.wgpMode = 0
+options.waveBreakSize = None
+options.forceLoopUnrollCount = 0
+options.useSiScheduler = 0
+options.disableCodeSinking = 0
+options.favorLatencyHiding = 0
+options.allowVaryWaveSize = 0
+options.enableLoadScalarizer = 0
+options.disableLicm = 0
+options.unrollThreshold = 0
+options.scalarThreshold = 0
+options.disableLoopUnroll = 0
+options.fp32DenormalMode = Auto
+options.adjustDepthImportVrs = 0
+options.disableLicmThreshold = 0
+options.unrollHintThreshold = 0
+options.dontUnrollHintThreshold = 0
+options.fastMathFlags = 0
+options.disableFastMathFlags = 0
+options.ldsSpillLimitDwords = 0
+options.scalarizeWaterfallLoads = 0
+options.overrideShaderThreadGroupSizeX = 0
+options.overrideShaderThreadGroupSizeY = 0
+options.overrideShaderThreadGroupSizeZ = 0
+options.nsaThreshold = 0
+options.aggressiveInvariantLoads = Auto
+options.workaroundStorageImageFormats = 0
+options.workaroundInitializeOutputsToZero = 0
+options.disableFMA = 0
+options.backwardPropagateNoContract = 0
+options.forwardPropagateNoContract = 1
+
+[GsGlsl]
+#version 460
+layout (points) in;
+layout (max_vertices=1, points) out;
+
+layout (location = 0, xfb_buffer = 0, xfb_stride = 12, xfb_offset = 0) flat out float goku;
+layout (location = 0, component = 1) flat out float trunks;
+layout (location = 0, xfb_buffer = 0, xfb_stride = 12, xfb_offset = 8, component = 2) flat out float vegeta;
+
+layout (push_constant, std430) uniform PushConstantBlock {
+    vec3 values;
+} pc;
+
+void main ()
+{
+    gl_Position  = gl_in[0].gl_Position;
+    gl_PointSize = gl_in[0].gl_PointSize;
+
+    goku   = pc.values.x;
+    trunks = pc.values.y;
+    vegeta = pc.values.z;
+
+    EmitVertex();
+}
+
+[GsInfo]
+entryPoint = main
+options.trapPresent = 0
+options.debugMode = 0
+options.enablePerformanceData = 0
+options.allowReZ = 0
+options.forceLateZ = 0
+options.vgprLimit = 0
+options.sgprLimit = 0
+options.maxThreadGroupsPerComputeUnit = 0
+options.waveSize = 0
+options.subgroupSize = 0
+options.wgpMode = 0
+options.waveBreakSize = None
+options.forceLoopUnrollCount = 0
+options.useSiScheduler = 0
+options.disableCodeSinking = 0
+options.favorLatencyHiding = 0
+options.allowVaryWaveSize = 0
+options.enableLoadScalarizer = 0
+options.disableLicm = 0
+options.unrollThreshold = 0
+options.scalarThreshold = 0
+options.disableLoopUnroll = 0
+options.fp32DenormalMode = Auto
+options.adjustDepthImportVrs = 0
+options.disableLicmThreshold = 0
+options.unrollHintThreshold = 0
+options.dontUnrollHintThreshold = 0
+options.fastMathFlags = 0
+options.disableFastMathFlags = 0
+options.ldsSpillLimitDwords = 0
+options.scalarizeWaterfallLoads = 0
+options.overrideShaderThreadGroupSizeX = 0
+options.overrideShaderThreadGroupSizeY = 0
+options.overrideShaderThreadGroupSizeZ = 0
+options.nsaThreshold = 0
+options.aggressiveInvariantLoads = Auto
+options.workaroundStorageImageFormats = 0
+options.workaroundInitializeOutputsToZero = 0
+options.disableFMA = 0
+options.backwardPropagateNoContract = 0
+options.forwardPropagateNoContract = 1
+
+[FsGlsl]
+#version 460
+layout (location=0) out vec4 outColor;
+
+layout (location = 0) in float goku;
+layout (location = 0, component = 1) in float trunks;
+layout (location = 0, component = 2) in float vegeta;
+
+void main ()
+{
+    outColor = ((goku == 10.0 && trunks == 20.0 && vegeta == 30.0)
+             ? vec4(0.0, 0.0, 1.0, 1.0)
+             : vec4(0.0, 0.0, 0.0, 1.0));
+}
+
+[FsInfo]
+entryPoint = main
+options.trapPresent = 0
+options.debugMode = 0
+options.enablePerformanceData = 0
+options.allowReZ = 0
+options.forceLateZ = 0
+options.vgprLimit = 0
+options.sgprLimit = 0
+options.maxThreadGroupsPerComputeUnit = 0
+options.waveSize = 64
+options.subgroupSize = 0
+options.wgpMode = 0
+options.waveBreakSize = None
+options.forceLoopUnrollCount = 0
+options.useSiScheduler = 0
+options.disableCodeSinking = 0
+options.favorLatencyHiding = 0
+options.allowVaryWaveSize = 0
+options.enableLoadScalarizer = 0
+options.disableLicm = 0
+options.unrollThreshold = 0
+options.scalarThreshold = 0
+options.disableLoopUnroll = 0
+options.fp32DenormalMode = Auto
+options.adjustDepthImportVrs = 0
+options.disableLicmThreshold = 0
+options.unrollHintThreshold = 0
+options.dontUnrollHintThreshold = 0
+options.fastMathFlags = 0
+options.disableFastMathFlags = 0
+options.ldsSpillLimitDwords = 0
+options.scalarizeWaterfallLoads = 0
+options.overrideShaderThreadGroupSizeX = 0
+options.overrideShaderThreadGroupSizeY = 0
+options.overrideShaderThreadGroupSizeZ = 0
+options.nsaThreshold = 0
+options.aggressiveInvariantLoads = Auto
+options.workaroundStorageImageFormats = 0
+options.workaroundInitializeOutputsToZero = 0
+options.disableFMA = 0
+options.backwardPropagateNoContract = 0
+options.forwardPropagateNoContract = 1
+
+[ResourceMapping]
+userDataNode[0].visibility = 2
+userDataNode[0].type = IndirectUserDataVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].indirectUserDataCount = 4
+userDataNode[1].visibility = 32
+userDataNode[1].type = StreamOutTableVaPtr
+userDataNode[1].offsetInDwords = 3
+userDataNode[1].sizeInDwords = 1
+userDataNode[2].visibility = 82
+userDataNode[2].type = PushConst
+userDataNode[2].offsetInDwords = 4
+userDataNode[2].sizeInDwords = 3
+userDataNode[2].set = 0xFFFFFFFF
+userDataNode[2].binding = 0
+userDataNode[2].strideInDwords = 0
+
+[GraphicsPipelineState]
+topology = VK_PRIMITIVE_TOPOLOGY_POINT_LIST
+provokingVertexMode = VK_PROVOKING_VERTEX_MODE_FIRST_VERTEX_EXT
+patchControlPoints = 0
+deviceIndex = 0
+disableVertexReuse = 0
+switchWinding = 0
+enableMultiView = 0
+depthClipEnable = 1
+rasterizerDiscardEnable = 0
+perSampleShading = 0
+numSamples = 1
+pixelShaderSamples = 0
+samplePatternIdx = 0
+dynamicSampleInfo = 0
+rasterStream = 0
+usrClipPlaneMask = 0
+alphaToCoverageEnable = 0
+dualSourceBlendEnable = 0
+dualSourceBlendDynamic = 0
+colorBuffer[0].format = VK_FORMAT_R8G8B8A8_UNORM
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 0
+nggState.enableNgg = 0
+nggState.enableGsUse = 0
+nggState.forceCullingMode = 0
+nggState.compactVertex = 0
+nggState.enableBackfaceCulling = 0
+nggState.enableFrustumCulling = 0
+nggState.enableBoxFilterCulling = 0
+nggState.enableSphereCulling = 0
+nggState.enableSmallPrimFilter = 0
+nggState.enableCullDistanceCulling = 0
+nggState.backfaceExponent = 0
+nggState.subgroupSizing = Auto
+nggState.primsPerSubgroup = 256
+nggState.vertsPerSubgroup = 256
+dynamicVertexStride = 0
+enableUberFetchShader = 0
+enableEarlyCompile = 0
+enableColorExportShader = 0
+options.includeDisassembly = 0
+options.scalarBlockLayout = 1
+options.resourceLayoutScheme = Compact
+options.includeIr = 0
+options.robustBufferAccess = 0
+options.reconfigWorkgroupLayout = 0
+options.forceCsThreadIdSwizzling = 0
+options.overrideThreadGroupSizeX = 0
+options.overrideThreadGroupSizeY = 0
+options.overrideThreadGroupSizeZ = 0
+options.shadowDescriptorTableUsage = Disable
+options.shadowDescriptorTablePtrHigh = 0
+options.extendedRobustness.robustBufferAccess = 0
+options.extendedRobustness.robustImageAccess = 0
+options.extendedRobustness.nullDescriptor = 0
+options.optimizeTessFactor = 1
+options.optimizationLevel = 2
+options.threadGroupSwizzleMode = Default
+options.reverseThreadGroup = 0
+options.enableImplicitInvariantExports = 1
+options.internalRtShaders = 0
+options.forceNonUniformResourceIndexStageMask = 0
+options.replaceSetWithResourceType = 0
+options.disableSampleMask = 0
+options.buildResourcesDataForShaderModule = 0
+options.disableTruncCoordForGather = 1
+options.vertex64BitsAttribSingleLoc = 0
+options.enablePrimGeneratedQuery = 0
+rtState.bvhResDescSize = 0
+rtState.nodeStrideShift = 0
+rtState.staticPipelineFlags = 0
+rtState.triCompressMode = 0
+rtState.pipelineFlags = 0
+rtState.threadGroupSizeX = 0
+rtState.threadGroupSizeY = 0
+rtState.threadGroupSizeZ = 0
+rtState.boxSortHeuristicMode = 0
+rtState.counterMode = 0
+rtState.counterMask = 0
+rtState.rayQueryCsSwizzle = 0
+rtState.ldsStackSize = 0
+rtState.dispatchRaysThreadGroupSize = 0
+rtState.ldsSizePerThreadGroup = 0
+rtState.outerTileSize = 0
+rtState.dispatchDimSwizzleMode = 0
+rtState.exportConfig.indirectCallingConvention = 0
+rtState.exportConfig.indirectCalleeSavedRegs.raygen = 0
+rtState.exportConfig.indirectCalleeSavedRegs.miss = 0
+rtState.exportConfig.indirectCalleeSavedRegs.closestHit = 0
+rtState.exportConfig.indirectCalleeSavedRegs.anyHit = 0
+rtState.exportConfig.indirectCalleeSavedRegs.intersection = 0
+rtState.exportConfig.indirectCalleeSavedRegs.callable = 0
+rtState.exportConfig.indirectCalleeSavedRegs.traceRays = 0
+rtState.exportConfig.enableUniformNoReturn = 0
+rtState.exportConfig.enableTraceRayArgsInLds = 0
+rtState.exportConfig.readsDispatchRaysIndex = 0
+rtState.exportConfig.enableDynamicLaunch = 0
+rtState.exportConfig.emitRaytracingShaderDataToken = 0
+rtState.enableRayQueryCsSwizzle = 0
+rtState.enableDispatchRaysInnerSwizzle = 0
+rtState.enableDispatchRaysOuterSwizzle = 0
+rtState.forceInvalidAccelStruct = 0
+rtState.enableRayTracingCounters = 0
+rtState.enableRayTracingHwTraversalStack = 0
+rtState.enableOptimalLdsStackSizeForIndirect = 0
+rtState.enableOptimalLdsStackSizeForUnified = 0
+rtState.maxRayLength = 0
+rtState.enablePickClosestLaneResultForAbortRays = 0
+rtState.gpurtFeatureFlags = 0
+rtState.gpurtFuncTable.pFunc[0] = 
+rtState.gpurtFuncTable.pFunc[1] = 
+rtState.gpurtFuncTable.pFunc[2] = 
+rtState.gpurtFuncTable.pFunc[3] = 
+rtState.gpurtFuncTable.pFunc[4] = 
+rtState.gpurtFuncTable.pFunc[5] = 
+rtState.gpurtFuncTable.pFunc[6] = 
+rtState.gpurtFuncTable.pFunc[7] = 
+rtState.gpurtFuncTable.pFunc[8] = 
+rtState.gpurtFuncTable.pFunc[9] = 
+rtState.gpurtFuncTable.pFunc[10] = 
+rtState.gpurtFuncTable.pFunc[11] = 
+rtState.rtIpVersion = 0.0
+rtState.gpurtOverride = 0
+rtState.rtIpOverride = 0
+
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 16
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[0].offset = 0
+shaderTraceMask = 0
+
+[ApiXfbOutInfo]
+forceDisableStreamOut = 0
+forceEnablePrimStats = 0
