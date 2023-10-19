@@ -76,7 +76,11 @@ public:
   virtual llvm::PassInstrumentationCallbacks &getInstrumentationCallbacks() = 0;
 
 protected:
+  // NOTE: The analysis managers are intentionally placed in inner->outer order so that the outmost analysis is
+  // destructed first, this help workaround crash when stop-after is used.
+  llvm::LoopAnalysisManager m_loopAnalysisManager;
   llvm::FunctionAnalysisManager m_functionAnalysisManager;
+  llvm::CGSCCAnalysisManager m_cgsccAnalysisManager;
   llvm::ModuleAnalysisManager m_moduleAnalysisManager;
 };
 
