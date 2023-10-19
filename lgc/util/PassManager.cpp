@@ -115,8 +115,6 @@ private:
 
   // -----------------------------------------------------------------------------------------------------------------
 
-  LoopAnalysisManager m_loopAnalysisManager;               // Loop analysis manager used when running the passes.
-  CGSCCAnalysisManager m_cgsccAnalysisManager;             // CGSCC analysis manager used when running the passes.
   PassInstrumentationCallbacks m_instrumentationCallbacks; // Instrumentation callbacks ran when running the passes.
   StandardInstrumentations m_instrumentationStandard;      // LLVM's Standard instrumentations
   unsigned *m_passIndex = nullptr;                         // Pass Index.
