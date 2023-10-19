@@ -2,16 +2,16 @@
 ; is no relocation. It also checks the ISA name is correctly generated in the
 ; .note section.
 
-; RUN: lgc -mcpu=gfx802 -extract=2 -filetype=obj -o %t.vs.elf %s
-; RUN: lgc -mcpu=gfx802 -extract=3 -filetype=obj -o %t.fs.elf %s
-; RUN: lgc -mcpu=gfx802 -extract=1 -l -o %t.pipe.elf %s %t.vs.elf %t.fs.elf
+; RUN: lgc -mcpu=gfx1010 -extract=2 -filetype=obj -o %t.vs.elf %s
+; RUN: lgc -mcpu=gfx1010 -extract=3 -filetype=obj -o %t.fs.elf %s
+; RUN: lgc -mcpu=gfx1010 -extract=1 -l -o %t.pipe.elf %s %t.vs.elf %t.fs.elf
 
 ; RUN: llvm-readelf %t.pipe.elf --section-headers --elf-output-style=LLVM | FileCheck %s --check-prefix=EMPTY
 ; RUN: llvm-objdump -sj .note %t.pipe.elf | FileCheck %s --check-prefix=ISA
 
 ; EMPTY-NOT: .rel.text
 ; ISA: amdgcn--amdpal--
-; ISA-NEXT: gfx802
+; ISA-NEXT: gfx1010
 
 ; ----------------------------------------------------------------------
 ; Extract 1: The pipeline state with no shaders.

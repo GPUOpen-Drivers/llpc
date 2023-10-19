@@ -1,10 +1,7 @@
 ; Test building the vertex shader by itself.
 
-; RUN: lgc -mcpu=gfx802 -extract=2 - <%s | FileCheck --check-prefixes=VS-ISA,VS-NOTNGG-ISA %s
-; RUN: lgc -mcpu=gfx900 -extract=2 - <%s | FileCheck --check-prefixes=VS-ISA,VS-NOTNGG-ISA %s
 ; RUN: lgc -mcpu=gfx1010 -extract=2 - <%s | FileCheck --check-prefixes=VS-ISA,VS-NGG-ISA %s
 ; VS-ISA: .p2align 8
-; VS-NOTNGG-ISA-LABEL: _amdgpu_vs_main_fetchless:
 ; VS-NGG-ISA-LABEL: _amdgpu_gs_main_fetchless:
 ; VS-ISA: exp pos0
 ; VS-ISA: s_endpgm
@@ -15,13 +12,8 @@
 
 ; Test building the vertex and fragment shaders to separate ELFs, then building the fetch shader to ISA.
 
-; RUN: lgc -mcpu=gfx802 -extract=2 -filetype=obj -o %t.vs.elf - <%s && lgc -mcpu=gfx802 -extract=3 -filetype=obj -o %t.fs.elf - <%s && lgc -mcpu=gfx802 -extract=1 -o - -l -glue=1 %s %t.vs.elf %t.fs.elf | FileCheck -check-prefixes=FETCH-ISA,FETCH-ISA-NOTNGG %s
-; RUN: lgc -mcpu=gfx900 -extract=2 -filetype=obj -o %t.vs.elf - <%s && lgc -mcpu=gfx900 -extract=3 -filetype=obj -o %t.fs.elf - <%s && lgc -mcpu=gfx900 -extract=1 -o - -l -glue=1 %s %t.vs.elf %t.fs.elf | FileCheck -check-prefixes=FETCH-ISA,FETCH-ISA-NOTNGG %s
 ; RUN: lgc -mcpu=gfx1010 -extract=2 -filetype=obj -o %t.vs.elf - <%s && lgc -mcpu=gfx1010 -extract=3 -filetype=obj -o %t.fs.elf - <%s && lgc -mcpu=gfx1010 -extract=1 -o - -l -glue=1 %s %t.vs.elf %t.fs.elf | FileCheck -check-prefixes=FETCH-ISA,FETCH-ISA-NGG %s
 ; FETCH-ISA: .p2align 8
-; FETCH-ISA-NOTNGG: _amdgpu_vs_main:
-; FETCH-ISA-NOTNGG-NOT: s_bfm_b32 exec
-; FETCH-ISA-NOTNGG: tbuffer_load_format_xyz v[4:6],
 ; FETCH-ISA-NGG: _amdgpu_gs_main:
 ; FETCH-ISA-NGG: s_bfe_u32 {{.*}}, s3, 0x70000
 ; FETCH-ISA-NGG: s_bfm_b32 exec

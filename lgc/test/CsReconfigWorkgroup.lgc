@@ -1,11 +1,12 @@
 ; ----------------------------------------------------------------------
 ; Extract 1: Reconfiguring of workgroup size disabled
 
-; RUN: lgc -extract=1 -mcpu=gfx802 %s -o - | FileCheck --check-prefixes=CHECK1 %s
+; RUN: lgc -extract=1 -mcpu=gfx1010 %s -o - | FileCheck --check-prefixes=CHECK1 %s
 ; CHECK1-LABEL: _amdgpu_cs_main:
-; CHECK1: COMPUTE_NUM_THREAD_X): 0x5
-; CHECK1: COMPUTE_NUM_THREAD_Y): 0x6
-; CHECK1: COMPUTE_NUM_THREAD_Z): 0x7
+; CHECK1: .threadgroup_dimensions:
+; CHECK1:   - 0x5
+; CHECK1:   - 0x6
+; CHECK1:   - 0x7
 
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
 .entry:
@@ -36,11 +37,12 @@ attributes #0 = { nounwind }
 ; ----------------------------------------------------------------------
 ; Extract 2: Reconfiguring of workgroup size uses 8x8
 
-; RUN: lgc -extract=2 -mcpu=gfx802 %s -o - | FileCheck --check-prefixes=CHECK2 %s
+; RUN: lgc -extract=2 -mcpu=gfx1010 %s -o - | FileCheck --check-prefixes=CHECK2 %s
 ; CHECK2-LABEL: _amdgpu_cs_main:
-; CHECK2: COMPUTE_NUM_THREAD_X): 0x50
-; CHECK2: COMPUTE_NUM_THREAD_Y): 0x6
-; CHECK2: COMPUTE_NUM_THREAD_Z): 0x1
+; CHECK2: .threadgroup_dimensions:
+; CHECK2:   - 0x50
+; CHECK2:   - 0x6
+; CHECK2:   - 0x7
 
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
 .entry:
@@ -83,11 +85,12 @@ attributes #0 = { nounwind }
 ; ----------------------------------------------------------------------
 ; Extract 3: Reconfiguring of workgroup size uses 2x2
 
-; RUN: lgc -extract=3 -mcpu=gfx802 %s -o - | FileCheck --check-prefixes=CHECK3 %s
+; RUN: lgc -extract=3 -mcpu=gfx1010 %s -o - | FileCheck --check-prefixes=CHECK3 %s
 ; CHECK3-LABEL: _amdgpu_cs_main:
-; CHECK3: COMPUTE_NUM_THREAD_X): 0x24
-; CHECK3: COMPUTE_NUM_THREAD_Y): 0x5
-; CHECK3: COMPUTE_NUM_THREAD_Z): 0x1
+; CHECK3: .threadgroup_dimensions:
+; CHECK3:   - 0x24
+; CHECK3:   - 0x5
+; CHECK3:   - 0x1
 
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !0 {
 .entry:

@@ -239,7 +239,7 @@ int main(int argc, char **argv) {
   auto *mcpuOpt = reinterpret_cast<cl::opt<std::string> *>(mcpu->second);
   StringRef gpuName = *mcpuOpt;
   if (gpuName == "")
-    gpuName = "gfx802";
+    gpuName = "gfx1010";
 
   // Default to reading from stdin and writing to stdout
   if (InFiles.empty())
