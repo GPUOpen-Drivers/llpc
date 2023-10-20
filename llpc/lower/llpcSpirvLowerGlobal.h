@@ -78,7 +78,6 @@ private:
   void lowerAliasedVal();
   void lowerEdgeFlag();
   void lowerShaderRecordBuffer();
-
   void cleanupReturnBlock();
 
   void handleVolatileInput(llvm::GlobalVariable *input, llvm::Value *proxy);

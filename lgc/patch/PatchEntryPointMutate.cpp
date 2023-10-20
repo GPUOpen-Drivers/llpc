@@ -260,11 +260,13 @@ static Value *mergeDwordsIntoVector(IRBuilder<> &builder, ArrayRef<Value *> inpu
 // @param asCpsReferenceOp: the instruction
 void PatchEntryPointMutate::lowerAsCpsReference(cps::AsContinuationReferenceOp &asCpsReferenceOp) {
   IRBuilder<> builder(&asCpsReferenceOp);
-  auto *ref = builder.CreatePtrToInt(asCpsReferenceOp.getFn(), builder.getInt32Ty());
 
   Function &callee = cast<Function>(*asCpsReferenceOp.getFn());
   auto level = cps::getCpsLevelFromFunction(callee);
-  ref = builder.CreateOr(ref, (uint64_t)level);
+
+  // Use GEP since that is easier for the backend to combine into a relocation fixup.
+  Value *ref = builder.CreateConstGEP1_32(builder.getInt8Ty(), asCpsReferenceOp.getFn(), static_cast<uint32_t>(level));
+  ref = builder.CreatePtrToInt(ref, builder.getInt32Ty());
 
   asCpsReferenceOp.replaceAllUsesWith(ref);
 }

@@ -32,7 +32,9 @@
 
 #include "llpcRayTracingContext.h"
 #include "SPIRVInternal.h"
+#include "vkgcDefs.h"
 #include "lgc/Builder.h"
+#include "lgc/Pipeline.h"
 
 using namespace llvm;
 namespace Llpc {
@@ -274,9 +276,12 @@ lgc::Options RayTracingContext::computePipelineOptions() const {
   // NOTE: raytracing waveSize and subgroupSize can be different.
   options.fullSubgroups = false;
 
-  // TODO: Add a mode in Vkgc::LlpcRaytracingMode to represent lgc::RayTracingIndirectMode::Continuations.
-  if (m_pipelineInfo->mode == Vkgc::LlpcRaytracingMode::Continuations)
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION > 68
+  if (m_pipelineInfo->mode == Vkgc::LlpcRaytracingMode::Continufy)
     options.rtIndirectMode = lgc::RayTracingIndirectMode::ContinuationsContinufy;
+  else if (m_pipelineInfo->mode == Vkgc::LlpcRaytracingMode::Continuations)
+    options.rtIndirectMode = lgc::RayTracingIndirectMode::Continuations;
+#endif
 
   return options;
 }

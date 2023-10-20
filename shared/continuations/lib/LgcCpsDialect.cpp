@@ -23,7 +23,7 @@
  *
  **********************************************************************************************************************/
 
-#include "lgccps/LgcCpsDialect.h"
+#include "lgc/LgcCpsDialect.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -31,6 +31,8 @@
 #include "llvm/IR/Type.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MathExtras.h"
+
+#include <bitset>
 
 #define GET_INCLUDES
 #define GET_DIALECT_DEFS
@@ -154,4 +156,59 @@ lgc::cps::CpsLevel lgc::cps::getCpsLevelFromFunction(const Function &fn) {
   assert(level < static_cast<unsigned>(CpsLevel::Count) &&
          "Invalid CPS level!");
   return static_cast<CpsLevel>(level);
+}
+
+// =====================================================================================================================
+// Transform a shader type into the corresponding CPS level.
+lgc::cps::CpsLevel lgc::cps::getCpsLevelForShaderStage(CpsShaderStage stage) {
+  if (stage == CpsShaderStage::RayGen)
+    return CpsLevel::RayGen;
+
+  if (stage == CpsShaderStage::Traversal)
+    return CpsLevel::Traversal;
+
+  if (stage == CpsShaderStage::ClosestHit || stage == CpsShaderStage::Miss ||
+      stage == CpsShaderStage::Callable)
+    return CpsLevel::ClosestHit_Miss_Callable;
+
+  if (stage == CpsShaderStage::AnyHit)
+    return CpsLevel::AnyHit_CombinedIntersection_AnyHit;
+
+  if (stage == CpsShaderStage::Intersection)
+    return CpsLevel::Intersection;
+
+  llvm_unreachable("Cannot determine CPS level.");
+}
+
+// =====================================================================================================================
+// Tries to convert a shader stage into the corresponding CPS levels in which
+// the continued-to function can operate.
+uint8_t lgc::cps::getPotentialCpsReturnLevels(lgc::cps::CpsShaderStage stage) {
+  std::bitset<8> CpsLevels;
+
+  auto SetLevel = [&CpsLevels](CpsLevel Level) -> void {
+    CpsLevels.set(static_cast<uint8_t>(Level));
+  };
+
+  if (stage == CpsShaderStage::RayGen) {
+    SetLevel(CpsLevel::Traversal);
+  } else if (stage == CpsShaderStage::ClosestHit) {
+    SetLevel(CpsLevel::Traversal);
+    SetLevel(CpsLevel::ClosestHit_Miss_Callable);
+  } else if (stage == CpsShaderStage::Callable) {
+    SetLevel(CpsLevel::ClosestHit_Miss_Callable);
+  } else if (stage == CpsShaderStage::AnyHit) {
+    SetLevel(CpsLevel::ClosestHit_Miss_Callable);
+    SetLevel(CpsLevel::Intersection);
+  } else if (stage == CpsShaderStage::Intersection) {
+    SetLevel(CpsLevel::ClosestHit_Miss_Callable);
+    SetLevel(CpsLevel::AnyHit_CombinedIntersection_AnyHit);
+  } else if (stage == CpsShaderStage::Miss) {
+    SetLevel(CpsLevel::Traversal);
+    SetLevel(CpsLevel::ClosestHit_Miss_Callable);
+  } else {
+    llvm_unreachable("Cannot determine CPS level.");
+  }
+
+  return static_cast<uint8_t>(CpsLevels.to_ulong());
 }

@@ -23,7 +23,7 @@
  *
  **********************************************************************************************************************/
 
-//===- DXILContPreCoroutine.cpp - Split BB for rematerialized code --------===//
+//===- PreCoroutineLowering.cpp - Split BB for rematerialized code --------===//
 //
 // A pass that splits the BB after a TraceRay/CallShader/ReportHit call.
 // That moves all rematerialized code after the inlined TraceRay/etc. and
@@ -31,8 +31,8 @@
 //
 // Also removes already inline driver functions that are not needed anymore.
 //
-// Also lowers the GetShaderKind() intrinsic which is now possible that driver
-// functions have been inlined.
+// Also lowers the GetShaderKind() and GetCurrentFuncAddr() intrinsics which is
+// now possible that driver functions have been inlined.
 //
 //===----------------------------------------------------------------------===//
 
@@ -48,9 +48,9 @@
 
 using namespace llvm;
 
-#define DEBUG_TYPE "dxil-cont-pre-coroutine"
+#define DEBUG_TYPE "pre-coroutine-lowering"
 
-DXILContPreCoroutinePass::DXILContPreCoroutinePass() {}
+PreCoroutineLoweringPass::PreCoroutineLoweringPass() {}
 
 // Split BB after _AmdRestoreSystemData.
 // The coroutine passes rematerialize to the start of the basic block of a use.
@@ -59,7 +59,7 @@ DXILContPreCoroutinePass::DXILContPreCoroutinePass() {}
 // If we did not do that, an intrinsic that is rematerialized to before
 // RestoreSystemData is called gets an uninitialized system data struct as
 // argument.
-bool DXILContPreCoroutinePass::splitBB() {
+bool PreCoroutineLoweringPass::splitBB() {
   bool Changed = false;
   for (auto &F : *Mod) {
     if (F.getName().startswith("_AmdRestoreSystemData")) {
@@ -80,7 +80,7 @@ bool DXILContPreCoroutinePass::splitBB() {
   return Changed;
 }
 
-bool DXILContPreCoroutinePass::removeInlinedIntrinsics() {
+bool PreCoroutineLoweringPass::removeInlinedIntrinsics() {
   bool Changed = false;
 
   // Remove functions
@@ -99,9 +99,9 @@ bool DXILContPreCoroutinePass::removeInlinedIntrinsics() {
 }
 
 llvm::PreservedAnalyses
-DXILContPreCoroutinePass::run(llvm::Module &M,
+PreCoroutineLoweringPass::run(llvm::Module &M,
                               llvm::ModuleAnalysisManager &AnalysisManager) {
-  LLVM_DEBUG(dbgs() << "Run the dxil-cont-pre-coroutine pass\n");
+  LLVM_DEBUG(dbgs() << "Run the pre-coroutine-lowering pass\n");
 
   Mod = &M;
 
@@ -111,13 +111,14 @@ DXILContPreCoroutinePass::run(llvm::Module &M,
   Changed |= removeInlinedIntrinsics();
 
   Changed |= lowerGetShaderKind();
+  Changed |= lowerGetCurrentFuncAddr();
 
   if (Changed)
     return PreservedAnalyses::none();
   return PreservedAnalyses::all();
 }
 
-bool DXILContPreCoroutinePass::lowerGetShaderKind() {
+bool PreCoroutineLoweringPass::lowerGetShaderKind() {
   auto *GetShaderKind = Mod->getFunction("_AmdGetShaderKind");
 
   if (!GetShaderKind)
@@ -127,9 +128,6 @@ bool DXILContPreCoroutinePass::lowerGetShaderKind() {
          GetShaderKind->arg_size() == 0);
 
   if (!GetShaderKind->use_empty()) {
-    MapVector<Function *, DXILShaderKind> ShaderKinds;
-    analyzeShaderKinds(*Mod, ShaderKinds);
-
     for (auto &Use : make_early_inc_range(GetShaderKind->uses())) {
       auto *CInst = dyn_cast<CallInst>(Use.getUser());
 
@@ -140,21 +138,58 @@ bool DXILContPreCoroutinePass::lowerGetShaderKind() {
       }
 
       Function *F = CInst->getFunction();
-      auto ShaderKindIt = ShaderKinds.find(F);
+      auto Stage = lgc::rt::getLgcRtShaderStage(F);
 
       // Ignore GetShaderKind calls where we cannot find the shader kind.
       // This happens e.g. in gpurt-implemented intrinsics that got inlined,
       // but not removed.
-      if (ShaderKindIt == ShaderKinds.end())
+      if (!Stage)
         continue;
 
-      DXILShaderKind ShaderKind = ShaderKindIt->second;
+      DXILShaderKind ShaderKind =
+          DXILContHelper::shaderStageToDxilShaderKind(*Stage);
       auto *ShaderKindVal = ConstantInt::get(GetShaderKind->getReturnType(),
                                              static_cast<uint64_t>(ShaderKind));
       CInst->replaceAllUsesWith(ShaderKindVal);
       CInst->eraseFromParent();
     }
   }
+
+  return true;
+}
+
+bool PreCoroutineLoweringPass::lowerGetCurrentFuncAddr() {
+  auto *GetCurrentFuncAddr = Mod->getFunction("_AmdGetCurrentFuncAddr");
+
+  if (!GetCurrentFuncAddr)
+    return false;
+
+  assert(GetCurrentFuncAddr->arg_size() == 0 &&
+         // Returns an i32 or i64
+         (GetCurrentFuncAddr->getReturnType()->isIntegerTy(32) ||
+          GetCurrentFuncAddr->getReturnType()->isIntegerTy(64)));
+
+  for (auto &Use : make_early_inc_range(GetCurrentFuncAddr->uses())) {
+    auto *CInst = dyn_cast<CallInst>(Use.getUser());
+
+    if (!CInst || !CInst->isCallee(&Use)) {
+      // Non-call use. This will likely result in a remaining non-lowered use
+      // reported as error at the end of this function.
+      continue;
+    }
+
+    auto *FuncPtrToInt = ConstantExpr::getPtrToInt(
+        CInst->getFunction(), GetCurrentFuncAddr->getReturnType());
+    CInst->replaceAllUsesWith(FuncPtrToInt);
+    CInst->eraseFromParent();
+  }
+
+  if (!GetCurrentFuncAddr->use_empty())
+    report_fatal_error("Unknown uses of GetCurrentFuncAddr remain!");
+
+  // Delete the declaration of the intrinsic after lowering, as future calls to
+  // it are invalid.
+  GetCurrentFuncAddr->eraseFromParent();
 
   return true;
 }

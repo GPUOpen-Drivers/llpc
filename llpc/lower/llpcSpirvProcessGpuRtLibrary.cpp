@@ -30,13 +30,13 @@
  */
 #include "llpcSpirvProcessGpuRtLibrary.h"
 #include "SPIRVInternal.h"
-#include "lgcrt/LgcRtDialect.h"
 #include "llpcContext.h"
 #include "llpcSpirvLowerInternalLibraryIntrinsicUtil.h"
 #include "llpcSpirvLowerUtil.h"
 #include "lgc/Builder.h"
 #include "lgc/GpurtDialect.h"
 #include "lgc/LgcContext.h"
+#include "lgc/LgcRtDialect.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower-gpurt-library"
 using namespace lgc;

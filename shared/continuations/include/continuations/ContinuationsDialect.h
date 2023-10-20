@@ -27,4 +27,4 @@
 
 #define GET_INCLUDES
 #define GET_DIALECT_DECLS
-#include "continuations/ContinuationsDialect.h.inc"
+#include "ContinuationsDialect.h.inc"

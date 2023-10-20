@@ -19,7 +19,7 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-i1:32-i8:8-i16:32-i32:32-
 ; Function Attrs: nounwind
 define void @ClosestHit(%struct.RayPayload*, %struct.BuiltInTriangleIntersectionAttributes*) #0 !types !31 {
 ; CHECK-LABEL: define void @ClosestHit(
-; CHECK-SAME: ptr [[TMP0:%.*]], ptr [[TMP1:%.*]]) #[[ATTR0:[0-9]+]] !dxil.payload.type !19 {
+; CHECK-SAME: ptr [[TMP0:%.*]], ptr [[TMP1:%.*]]) #[[ATTR0:[0-9]+]] !lgc.rt.shaderstage !19 !dxil.payload.type !20 {
 ; CHECK-NEXT:    [[TMP3:%.*]] = alloca [4 x <3 x float>], align 4
 ; CHECK-NEXT:    [[TMP4:%.*]] = alloca [4 x <3 x float>], align 4
 ; CHECK-NEXT:    [[TMP5:%.*]] = alloca [4 x <3 x float>], align 4

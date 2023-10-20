@@ -990,6 +990,8 @@ void FragColorExport::generateExportInstructions(ArrayRef<lgc::ColorExportInfo> 
         if (canCopyAlpha) {
           // Update Mrtz.a and its mask
           alpha = builder.CreateExtractElement(values[EXP_TARGET_MRT_0], 3);
+          if (alpha->getType()->isIntegerTy())
+            alpha = builder.CreateBitCast(alpha, builder.getFloatTy());
           depthMask |= 0x8;
         }
       }

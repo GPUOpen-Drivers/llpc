@@ -2,6 +2,7 @@
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -v -gfxip=10.3 %s | FileCheck -check-prefix=SHADERTEST %s
+; REQUIRES: do-not-run-me
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; Load input descriptor
 

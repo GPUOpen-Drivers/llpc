@@ -143,16 +143,22 @@ attribute[1].format = VK_FORMAT_R32G32B32A32_SFLOAT
 attribute[1].offset = 16
 
 ; SHADERTEST-LABEL: amdgpu_ps_main:
-; SHADERTEST:         s_mov_b32 m0, s1
-; SHADERTEST-NEXT:    v_interp_mov_f32_e32 v3, p0, attr0.x
+; SHADERTEST:         v_mbcnt_lo_u32_b32 v3, -1, 0
+; SHADERTEST-NEXT:    v_mbcnt_hi_u32_b32 v3, -1, v3
+; SHADERTEST-NEXT:    v_lshrrev_b32_e32 v3, 1, v3
+; SHADERTEST-NEXT:    v_and_b32_e32 v3, 62, v3
 ; SHADERTEST-NEXT:    v_sub_f32_e32 v2, 1.0, v0
-; SHADERTEST-NEXT:    v_and_b32_e32 v3, 1, v3
+; SHADERTEST-NEXT:    v_bfe_u32 v3, s2, v3, 2
 ; SHADERTEST-NEXT:    v_sub_f32_e32 v2, v2, v1
-; SHADERTEST-NEXT:    v_cmp_eq_u32_e32 vcc, 0, v3
-; SHADERTEST-NEXT:    v_cndmask_b32_e32 v3, v1, v2, vcc
-; SHADERTEST-NEXT:    v_cndmask_b32_e32 v2, v2, v0, vcc
-; SHADERTEST-NEXT:    v_cndmask_b32_e32 v0, v0, v1, vcc
-; SHADERTEST-NEXT:    v_cvt_pkrtz_f16_f32 v1, v3, v2
-; SHADERTEST-NEXT:    v_cvt_pkrtz_f16_f32 v0, v0, 1.0
-; SHADERTEST-NEXT:    exp mrt0 v1, v1, v0, v0 done compr vm
+; SHADERTEST-NEXT:    v_cmp_eq_u32_e32 vcc, 2, v3
+; SHADERTEST-NEXT:    v_cndmask_b32_e32 v4, v2, v1, vcc
+; SHADERTEST-NEXT:    v_cndmask_b32_e32 v5, v0, v2, vcc
+; SHADERTEST-NEXT:    v_cndmask_b32_e32 v6, v1, v0, vcc
+; SHADERTEST-NEXT:    v_cmp_eq_u32_e32 vcc, 1, v3
+; SHADERTEST-NEXT:    v_cndmask_b32_e32 v0, v4, v0, vcc
+; SHADERTEST-NEXT:    v_cndmask_b32_e32 v1, v5, v1, vcc
+; SHADERTEST-NEXT:    v_cndmask_b32_e32 v2, v6, v2, vcc
+; SHADERTEST-NEXT:    v_cvt_pkrtz_f16_f32 v0, v0, v1
+; SHADERTEST-NEXT:    v_cvt_pkrtz_f16_f32 v1, v2, 1.0
+; SHADERTEST-NEXT:    exp mrt0 v0, v0, v1, v1 done compr vm
 ; SHADERTEST-NEXT:    s_endpgm

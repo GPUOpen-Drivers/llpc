@@ -25,20 +25,19 @@
 
 set(LLPC_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/..")
 
-# Function to add LGC and its dependencies as LLVM external projects.
+include("${LLPC_SOURCE_DIR}/cmake/continuations.cmake")
+
+# Macro to add LGC and its dependencies as LLVM external projects.
 # This appends the project names to LLVM_EXTERNAL_PROJECTS and sets each LLVM_EXTERNAL_*_SOURCE_DIR,
 # all in the caller's scope.
-function(add_lgc_projects)
-    if (NOT "${LLVM_EXTERNAL_LGC_SOURCE_DIR}")
-        if (NOT "${LLVM_EXTERNAL_LLVM_DIALECTS_SOURCE_DIR}")
+macro(add_lgc_projects)
+    add_continuations_projects()
+    if (NOT lgc IN_LIST LLVM_EXTERNAL_PROJECTS)
+        if (NOT llvm_dialects IN_LIST LLVM_EXTERNAL_PROJECTS)
             list(APPEND LLVM_EXTERNAL_PROJECTS llvm_dialects)
-            set(LLVM_EXTERNAL_LLVM_DIALECTS_SOURCE_DIR "${LLPC_SOURCE_DIR}/imported/llvm-dialects" PARENT_SCOPE)
+            set(LLVM_EXTERNAL_LLVM_DIALECTS_SOURCE_DIR "${LLPC_SOURCE_DIR}/imported/llvm-dialects")
         endif()
-        list(APPEND LLVM_EXTERNAL_PROJECTS LgcCps LgcRt Continuations lgc)
-        set(LLVM_EXTERNAL_PROJECTS "${LLVM_EXTERNAL_PROJECTS}" PARENT_SCOPE)
-        set(LLVM_EXTERNAL_LGCCPS_SOURCE_DIR "${LLPC_SOURCE_DIR}/shared/lgccps" PARENT_SCOPE)
-        set(LLVM_EXTERNAL_LGCRT_SOURCE_DIR "${LLPC_SOURCE_DIR}/shared/lgcrt" PARENT_SCOPE)
-        set(LLVM_EXTERNAL_CONTINUATIONS_SOURCE_DIR "${LLPC_SOURCE_DIR}/shared/continuations" PARENT_SCOPE)
-        set(LLVM_EXTERNAL_LGC_SOURCE_DIR "${LLPC_SOURCE_DIR}/lgc" PARENT_SCOPE)
+        list(APPEND LLVM_EXTERNAL_PROJECTS lgc)
+        set(LLVM_EXTERNAL_LGC_SOURCE_DIR "${LLPC_SOURCE_DIR}/lgc")
     endif()
-endfunction()
+endmacro()

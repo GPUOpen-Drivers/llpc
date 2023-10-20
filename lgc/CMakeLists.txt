@@ -53,7 +53,7 @@ add_llvm_library(LLVMlgc LINK_COMPONENTS
     Vectorize
 )
 
-target_link_libraries(LLVMlgc PUBLIC llvm_dialects)
+target_link_libraries(LLVMlgc PUBLIC LLVMContinuations)
 
 ### Cached Project Options #############################################################################################
 option(LLPC_BUILD_NAVI12 "LLPC support for NAVI12?" ON)
@@ -88,14 +88,6 @@ if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/state)
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/state")
 endif()
 tablegen(LGC state/LgcDialect.cpp.inc -gen-dialect-defs --dialect lgc
-    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
-    )
-
-set(LLVM_TARGET_DEFINITIONS interface/lgc/GpurtDialect.td)
-tablegen(LGC interface/lgc/GpurtDialect.h.inc -gen-dialect-decls --dialect lgc.gpurt
-    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
-    )
-tablegen(LGC state/GpurtDialect.cpp.inc -gen-dialect-defs --dialect lgc.gpurt
     EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
     )
 
@@ -254,7 +246,6 @@ target_sources(LLVMlgc PRIVATE
     state/Compiler.cpp
     state/LgcContext.cpp
     state/LgcDialect.cpp
-    state/GpurtDialect.cpp
     state/PalMetadata.cpp
     state/PassManagerCache.cpp
     state/PipelineShaders.cpp
@@ -288,4 +279,4 @@ if (LLPC_BUILD_TESTS)
   add_subdirectory(unittests)
 endif()
 
-target_link_libraries(LLVMlgc PRIVATE LLVMLgcCps LLVMLgcRt)
+target_link_libraries(LLVMlgc PRIVATE LLVMContinuations)

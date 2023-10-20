@@ -31,7 +31,7 @@
 
 #define GET_INCLUDES
 #define GET_DIALECT_DECLS
-#include "lgcrt/LgcRtDialect.h.inc"
+#include "LgcRtDialect.h.inc"
 
 namespace llvm {
 class Constant;
@@ -42,12 +42,14 @@ namespace lgc {
 
 namespace rt {
 enum class RayTracingShaderStage {
-  ShaderStageRayGeneration,
-  ShaderStageIntersection,
-  ShaderStageAnyHit,
-  ShaderStageClosestHit,
-  ShaderStageMiss,
-  ShaderStageCallable
+  RayGeneration,
+  Intersection,
+  AnyHit,
+  ClosestHit,
+  Miss,
+  Callable,
+  // Not an input shader stage but we need to annotate it as well
+  Traversal
 };
 
 // Set shader stage metadata on a LLVM function and erase it by setting

@@ -30,10 +30,10 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/Continufy.h"
-#include "lgccps/LgcCpsDialect.h"
-#include "lgcrt/LgcRtDialect.h"
 #include "lgc/Builder.h"
+#include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcDialect.h"
+#include "lgc/LgcRtDialect.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/state/PalMetadata.h"
 #include "llvm/Support/Debug.h"
@@ -79,19 +79,19 @@ static unsigned getReturnedLevels(int stage) {
 
   RtStage rtStage = static_cast<RtStage>(stage);
   switch (rtStage) {
-  case RtStage::ShaderStageRayGeneration:
+  case RtStage::RayGeneration:
     llvm_unreachable("Raygen shader should not arrive here.");
-  case RtStage::ShaderStageClosestHit:
-  case RtStage::ShaderStageMiss:
+  case RtStage::ClosestHit:
+  case RtStage::Miss:
     // Traversal
     return (1u << (unsigned)CpsLevel::Traversal);
-  case RtStage::ShaderStageCallable:
+  case RtStage::Callable:
     // CHS/Miss/Callable | RGS
     return (1u << (unsigned)CpsLevel::ClosestHit_Miss_Callable | 1u << (unsigned)CpsLevel::RayGen);
-  case RtStage::ShaderStageAnyHit:
+  case RtStage::AnyHit:
     // IS | Traversal
     return (1u << (unsigned)CpsLevel::Intersection | 1u << (unsigned)CpsLevel::Traversal);
-  case RtStage::ShaderStageIntersection:
+  case RtStage::Intersection:
     // Traversal
     return 1u << (unsigned)CpsLevel::Traversal;
   default:
@@ -107,15 +107,15 @@ static CpsLevel getCpsLevelFromRtStage(int stage) {
 
   RtStage rtStage = static_cast<RtStage>(stage);
   switch (rtStage) {
-  case RtStage::ShaderStageRayGeneration:
+  case RtStage::RayGeneration:
     return CpsLevel::RayGen;
-  case RtStage::ShaderStageClosestHit:
-  case RtStage::ShaderStageMiss:
-  case RtStage::ShaderStageCallable:
+  case RtStage::ClosestHit:
+  case RtStage::Miss:
+  case RtStage::Callable:
     return CpsLevel::ClosestHit_Miss_Callable;
-  case RtStage::ShaderStageAnyHit:
+  case RtStage::AnyHit:
     return CpsLevel::AnyHit_CombinedIntersection_AnyHit;
-  case RtStage::ShaderStageIntersection:
+  case RtStage::Intersection:
     return CpsLevel::Intersection;
   default:
     llvm_unreachable("Unknown raytracing shader type.");
@@ -177,7 +177,7 @@ PreservedAnalyses Continufy::run(Module &module, ModuleAnalysisManager &analysis
       if (!currentRtStage.has_value())
         continue;
       // Skip the 'ret' in RGS.
-      if (currentRtStage.value() == (int32_t)RtStage::ShaderStageRayGeneration)
+      if (currentRtStage.value() == (int32_t)RtStage::RayGeneration)
         continue;
       Instruction *term = block.getTerminator();
       if (auto *retInst = dyn_cast<ReturnInst>(term)) {

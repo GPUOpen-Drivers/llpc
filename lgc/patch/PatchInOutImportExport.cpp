@@ -3749,6 +3749,9 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsi
     return;
   }
 
+  // NOTE: SW XFB must have been handled. Here we only handle HW XFB on pre-GFX11 generations.
+  assert(m_gfxIp.major < 11);
+
   auto storeTy = storeValue->getType();
 
   unsigned compCount = storeTy->isVectorTy() ? cast<FixedVectorType>(storeTy)->getNumElements() : 1;
@@ -3843,23 +3846,11 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsi
     format = formatTable[compCount - 1][bitWidth == 32];
     break;
   }
-  case 11: {
-    static unsigned char formatTable[4][2] = {
-        {BUF_FORMAT_16_FLOAT, BUF_FORMAT_32_FLOAT},
-        {BUF_FORMAT_16_16_FLOAT, BUF_FORMAT_32_32_FLOAT_GFX11},
-        {},
-        {BUF_FORMAT_16_16_16_16_FLOAT_GFX11, BUF_FORMAT_32_32_32_32_FLOAT_GFX11},
-    };
-    format = formatTable[compCount - 1][bitWidth == 32];
-    break;
-  }
   }
 
   CoherentFlag coherent = {};
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
-    coherent.bits.glc = true;
-    coherent.bits.slc = true;
-  }
+  coherent.bits.glc = true;
+  coherent.bits.slc = true;
 
   builder.CreateIntrinsic(Intrinsic::amdgcn_struct_tbuffer_store, storeTy,
                           {storeValue, m_pipelineSysValues.get(m_entryPoint)->getStreamOutBufDesc(xfbBuffer),
@@ -4080,6 +4071,9 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
     return;
   }
 
+  // NOTE: NGG with GS must have been handled. Here we only handle pre-GFX11 generations.
+  assert(m_pipelineState->getTargetInfo().getGfxIpVersion().major < 11);
+
   if (storeTy->isArrayTy() || storeTy->isVectorTy()) {
     const unsigned elemCount = storeTy->isArrayTy() ? cast<ArrayType>(storeTy)->getNumElements()
                                                     : cast<FixedVectorType>(storeTy)->getNumElements();
@@ -4141,11 +4135,10 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
       }
 
       CoherentFlag coherent = {};
-      if (m_gfxIp.major <= 11) {
-        coherent.bits.glc = true;
-        coherent.bits.slc = true;
-        coherent.bits.swz = true;
-      }
+      coherent.bits.glc = true;
+      coherent.bits.slc = true;
+      coherent.bits.swz = true;
+
       Value *args[] = {
           storeValue,                                                          // vdata
           m_pipelineSysValues.get(m_entryPoint)->getGsVsRingBufDesc(streamId), // rsrc

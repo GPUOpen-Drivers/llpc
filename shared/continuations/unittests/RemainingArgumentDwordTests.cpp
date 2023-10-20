@@ -29,7 +29,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "lgccps/LgcCpsDialect.h"
+#include "lgc/LgcCpsDialect.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/LLVMContext.h"
