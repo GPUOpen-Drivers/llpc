@@ -1814,7 +1814,7 @@ Value *Builder::CreateSubgroupShuffleDown(Value *const value, Value *const offse
 // @param value : The value to read from the chosen rotated lane to all active lanes.
 // @param delta : The delta/offset added to lane id.
 // @param clusterSize : The cluster size if exists.
-// @param instName : Name to give instruction.
+// @param instName : Name to give final instruction.
 Value *Builder::CreateSubgroupRotate(Value *const value, Value *const delta, Value *const clusterSize,
                                      const Twine &instName) {
   return record(BuilderOpcode::SubgroupRotate, value->getType(), {value, delta, clusterSize}, instName);

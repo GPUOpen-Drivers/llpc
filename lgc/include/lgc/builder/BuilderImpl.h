@@ -543,6 +543,9 @@ private:
   // Reorder the barycoord
   llvm::Value *normalizeBaryCoord(llvm::Value *ijCoord);
 
+  // Get provoking vertex value
+  void getProvokingVertexInfo(llvm::Value **isOne, llvm::Value **isTwo);
+
   // Read and directly handle certain built-ins that are common between shader stages
   llvm::Value *readCommonBuiltIn(BuiltInKind builtIn, llvm::Type *resultTy, const llvm::Twine &instName = "");
 

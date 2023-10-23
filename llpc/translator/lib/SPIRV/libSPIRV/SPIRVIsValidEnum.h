@@ -960,6 +960,18 @@ inline bool isValidImageOperandsMask(SPIRVWord Mask) {
   return (Mask & ~ValidMask) == 0;
 }
 
+inline bool isValidFPFastMathModeMask(SPIRVWord Mask) {
+  SPIRVWord ValidMask = 0u;
+  ValidMask |= FPFastMathModeMaskNone;
+  ValidMask |= FPFastMathModeNotNaNMask;
+  ValidMask |= FPFastMathModeNotInfMask;
+  ValidMask |= FPFastMathModeNSZMask;
+  ValidMask |= FPFastMathModeAllowRecipMask;
+  ValidMask |= FPFastMathModeFastMask;
+
+  return (Mask & ~ValidMask) == 0;
+}
+
 inline bool isValidSelectionControlMask(SPIRVWord Mask) {
   SPIRVWord ValidMask = 0u;
   ValidMask |= SelectionControlFlattenMask;

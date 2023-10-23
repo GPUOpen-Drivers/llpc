@@ -92,6 +92,9 @@ enum class ShaderInput : unsigned {
   // Unmerged hardware HS SGPRs
   TfBufferBase, // TF buffer base
 
+  // FS SGPRs
+  ProvokingVtxInfo, // Provoking vertex info
+
   FirstVgpr, // Enums less than this are SGPRs
 
   // API VS VGPRs

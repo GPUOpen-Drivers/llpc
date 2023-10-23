@@ -30,8 +30,7 @@
  */
 #include "llpcContext.h"
 #include "SPIRVInternal.h"
-#include "lgccps/LgcCpsDialect.h"
-#include "lgcrt/LgcRtDialect.h"
+#include "continuations/ContinuationsDialect.h"
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
 #include "llpcPipelineContext.h"
@@ -39,7 +38,9 @@
 #include "lgc/Builder.h"
 #include "lgc/GpurtDialect.h"
 #include "lgc/LgcContext.h"
+#include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcDialect.h"
+#include "lgc/LgcRtDialect.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Bitstream/BitstreamReader.h"
@@ -68,7 +69,9 @@ namespace Llpc {
 //
 // @param gfxIp : Graphics IP version info
 Context::Context(GfxIpVersion gfxIp) : LLVMContext(), m_gfxIp(gfxIp) {
-  m_dialectContext = llvm_dialects::DialectContext::make<LgcDialect, GpurtDialect, LgcRtDialect, LgcCpsDialect>(*this);
+  m_dialectContext = llvm_dialects::DialectContext::make<LgcDialect, GpurtDialect, LgcRtDialect, LgcCpsDialect,
+                                                         continuations::ContinuationsDialect>(*this);
+
   reset();
 }
 

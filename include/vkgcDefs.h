@@ -49,7 +49,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 69
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 0
+#define LLPC_INTERFACE_MINOR_VERSION 2
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -80,7 +80,9 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
-//  |     69.0 | Add enablePrimGeneratedQuery to PipelineOptions                                                       |
+//  |     69.2 | Add enablePrimGeneratedQuery to PipelineOptions                                                       |
+//  |     69.1 | Add useBarycentric to ShaderModuleUsage                                                               |
+//  |     69.0 | Enable continuations transform in LLPC                                                                |
 //  |     68.0 | Remove ICache *cache in all PipelineBuildInfo                                                         |
 //  |     67.0 | Modify the uber fetch shader. Adds locationMask(64bit) at the beginning of uber fetch shader internal |
 //  |          | buffer which flags whether the related attribute data is valid.                                       |
@@ -686,6 +688,11 @@ struct ShaderModuleUsage {
   bool pixelCenterInteger;     ///< Whether pixel coord is Integer
   bool useGenericBuiltIn;      ///< Whether to use builtIn inputs that include gl_PointCoord, gl_PrimitiveId,
                                ///  gl_Layer, gl_ClipDistance or gl_CullDistance.
+  bool enableXfb;              ///< Whether transform feedback is enabled
+  unsigned localSizeX;         ///< Compute shader work-group size in the X dimension
+  unsigned localSizeY;         ///< Compute shader work-group size in the Y dimension
+  unsigned localSizeZ;         ///< Compute shader work-group size in the Z dimension
+  bool useBarycentric;         ///< Whether to use gl_BarycentricXX or pervertexEXT decoration
 };
 
 /// Represents common part of shader module data
@@ -862,7 +869,7 @@ struct PipelineShaderOptions {
   /// Threshold to use for loops with "DontUnroll" hint (0 = use llvm.loop.unroll.disable).
   unsigned dontUnrollHintThreshold;
 
-  /// Whether fastmath contract could be disabled on Dot operations.
+  /// Whether fast math contract could be disabled on Dot operations.
   bool noContractOpDot;
 
   /// The enabled fast math flags (0 = depends on input language).
@@ -1170,9 +1177,13 @@ enum DispatchDimSwizzleMode : unsigned {
 };
 
 enum class LlpcRaytracingMode : unsigned {
-  None = 0,      // Not goto any raytracing compiling path
-  Legacy,        // LLpc Legacy compiling path
-  Gpurt2,        // Raytracing lowering at the end of spirvLower.
+  None = 0, // Not goto any raytracing compiling path
+  Legacy,   // LLpc Legacy compiling path
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 69
+  Gpurt2, // Raytracing lowering at the end of spirvLower.
+#else
+  Continufy, // Enable continuation with the continufy path.
+#endif
   Continuations, // Enable continuation in the new raytracing path
 };
 

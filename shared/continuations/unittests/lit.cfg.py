@@ -4,14 +4,14 @@ import os
 import lit.formats
 
 # name: The name of this test suite.
-config.name = 'LgcCps_Unit'
+config.name = 'Continuations_Unit'
 
 # suffixes: A list of file extensions to treat as test files.
 config.suffixes = []
 
 # test_source_root: The root path where tests are located.
 # test_exec_root: The root path where tests should be run.
-config.test_exec_root = config.lgccps_unit_test_binary_dir
+config.test_exec_root = config.continuations_unit_test_binary_dir
 config.test_source_root = config.test_exec_root
 
 # testFormat: The test format to use to interpret tests.

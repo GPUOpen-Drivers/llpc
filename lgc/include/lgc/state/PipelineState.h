@@ -613,7 +613,6 @@ private:
   bool m_outputPackState[ShaderStageGfxCount] = {}; // The output packable state per shader stage
   XfbStateMetadata m_xfbStateMetadata = {};         // Transform feedback state metadata
   llvm::SmallVector<unsigned, 32> m_userDataMaps[ShaderStageCountInternal]; // The user data per-shader
-  bool m_useMrt0AToMrtzA = false;                                           // Whether to copy mrt0.a to mrz.a
 
   struct {
     float inner[2]; // default tessellation inner level

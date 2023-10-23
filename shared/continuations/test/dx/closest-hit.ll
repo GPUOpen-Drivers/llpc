@@ -120,7 +120,7 @@ declare !types !29 i32 @_cont_HitKind(%struct.SystemData* nocapture readnone, %s
 ; Function Attrs: nounwind
 define void @ClosestHit(%struct.RayPayload* noalias nocapture %payload, %struct.BuiltInTriangleIntersectionAttributes* nocapture readonly %attr) #3 !types !30 {
 ; LOWERRAYTRACINGPIPELINE-LABEL: define %struct.DispatchSystemData @ClosestHit(
-; LOWERRAYTRACINGPIPELINE-SAME: [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR4:[0-9]+]] !continuation !12 !continuation.registercount !13 {
+; LOWERRAYTRACINGPIPELINE-SAME: [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR4:[0-9]+]] !continuation !12 !lgc.rt.shaderstage !13 !continuation.registercount !14 {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_SYSTEMDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = alloca [[STRUCT_RAYPAYLOAD:%.*]], align 8
@@ -166,7 +166,7 @@ define void @ClosestHit(%struct.RayPayload* noalias nocapture %payload, %struct.
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP26]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP27:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP28:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP27]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    ret [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP28]], !continuation.registercount !13
+; LOWERRAYTRACINGPIPELINE-NEXT:    ret [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP28]], !continuation.registercount !14
 ;
   %ptr = getelementptr inbounds %struct.RayPayload, %struct.RayPayload* %payload, i32 0, i32 0
   %baryPtr = getelementptr inbounds %struct.BuiltInTriangleIntersectionAttributes, %struct.BuiltInTriangleIntersectionAttributes* %attr, i32 0, i32 0

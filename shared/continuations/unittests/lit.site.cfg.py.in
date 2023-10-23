@@ -6,7 +6,7 @@ config.llvm_src_root = "@LLVM_BUILD_MAIN_SRC_DIR@"
 config.llvm_obj_root = "@LLVM_BINARY_DIR@"
 config.llvm_tools_dir = "@LLVM_TOOLS_DIR@"
 config.llvm_build_mode = "@LLVM_BUILD_MODE@"
-config.lgccps_unit_test_binary_dir = "@LGCCPS_UNIT_TEST_BINARY_DIR@"
+config.continuations_unit_test_binary_dir = "@CONTINUATIONS_UNIT_TEST_BINARY_DIR@"
 
 # Support substitution of the tools and libs dirs with user parameters. This is
 # used when we can't determine the tool dir at configuration time.
@@ -19,4 +19,4 @@ except KeyError:
     lit_config.fatal("unable to find %r parameter, use '--param=%s=VALUE'" % (key,key))
 
 # Let the main config do the real work.
-lit_config.load_config(config, "@LGCCPS_UNIT_TEST_SOURCE_DIR@/lit.cfg.py")
+lit_config.load_config(config, "@CONTINUATIONS_UNIT_TEST_SOURCE_DIR@/lit.cfg.py")

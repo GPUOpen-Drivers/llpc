@@ -25,7 +25,7 @@
 
 // Implementation of the lgc.rt dialect definition
 
-#include "lgcrt/LgcRtDialect.h"
+#include "lgc/LgcRtDialect.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Metadata.h"

@@ -60,6 +60,7 @@
 #include "lgc/Builder.h"
 #include "lgc/ElfLinker.h"
 #include "lgc/EnumIterator.h"
+#include "lgc/LgcRtDialect.h"
 #include "lgc/PassManager.h"
 #include "llvm-dialects/Dialect/Dialect.h"
 #include "llvm/ADT/ScopeExit.h"
@@ -71,6 +72,7 @@
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/IRPrintingPasses.h"
+#include "llvm/Support/ErrorHandling.h"
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 442438
 // Old version of the code
 #else
@@ -550,7 +552,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   if (shaderInfo->options.pipelineOptions.buildResourcesDataForShaderModule) {
     buildShaderModuleResourceUsage(shaderInfo, resourceNodes, inputSymbolInfo, outputSymbolInfo, uniformBufferInfo,
                                    storageBufferInfo, textureSymbolInfo, imageSymbolInfo, atomicCounterSymbolInfo,
-                                   defaultUniformSymbolInfo);
+                                   defaultUniformSymbolInfo, moduleData.usage);
 
     allocSize += sizeof(ResourcesNodes);
     allocSize += inputSymbolInfo.size() * sizeof(ResourceNodeData);
@@ -763,7 +765,8 @@ void Compiler::buildShaderModuleResourceUsage(
     std::vector<ResourceNodeData> &inputSymbolInfo, std::vector<ResourceNodeData> &outputSymbolInfo,
     std::vector<ResourceNodeData> &uniformBufferInfo, std::vector<ResourceNodeData> &storageBufferInfo,
     std::vector<ResourceNodeData> &textureSymbolInfo, std::vector<ResourceNodeData> &imageSymbolInfo,
-    std::vector<ResourceNodeData> &atomicCounterSymbolInfo, std::vector<ResourceNodeData> &defaultUniformSymbolInfo) {
+    std::vector<ResourceNodeData> &atomicCounterSymbolInfo, std::vector<ResourceNodeData> &defaultUniformSymbolInfo,
+    ShaderModuleUsage &shaderModuleUsage) {
   // Parse the SPIR-V stream.
   std::string spirvCode(static_cast<const char *>(shaderInfo->shaderBin.pCode), shaderInfo->shaderBin.codeSize);
   std::istringstream spirvStream(spirvCode);
@@ -785,6 +788,17 @@ void Compiler::buildShaderModuleResourceUsage(
   }
   if (!entryPoint)
     return;
+
+  if (func) {
+    if (shaderStage >= ShaderStageVertex && shaderStage <= ShaderStageGeometry)
+      shaderModuleUsage.enableXfb = func->getExecutionMode(ExecutionModeXfb) != nullptr;
+
+    if (auto em = func->getExecutionMode(ExecutionModeLocalSize)) {
+      shaderModuleUsage.localSizeX = em->getLiterals()[0];
+      shaderModuleUsage.localSizeX = em->getLiterals()[1];
+      shaderModuleUsage.localSizeX = em->getLiterals()[2];
+    }
+  }
 
   // Process resources
   auto inOuts = entryPoint->getInOuts();
@@ -1282,7 +1296,7 @@ Result Compiler::buildUnlinkedShaderInternal(Context *context, ArrayRef<const Pi
     // If fragment use builtIn inputs, return RequireFullPipeline.
     const ShaderModuleData *moduleData =
         static_cast<const ShaderModuleData *>(shaderInfo[ShaderStageFragment]->pModuleData);
-    if (moduleData->usage.useGenericBuiltIn)
+    if (moduleData->usage.useGenericBuiltIn || moduleData->usage.useBarycentric)
       return Result::RequireFullPipeline;
   }
 
@@ -3271,6 +3285,30 @@ bool Compiler::linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipe
     report_fatal_error("Link failed; need full pipeline compile instead: " + pipeline->getLastError());
   }
   return true;
+}
+
+// =====================================================================================================================
+// Convert front-end LLPC shader stage to LGC ray tracing shader stage
+// Returns nullopt if not a raytracing stage.
+//
+// @param stage : Front-end LLPC shader stage
+std::optional<lgc::rt::RayTracingShaderStage> getLgcRtShaderStage(Llpc::ShaderStage stage) {
+  switch (stage) {
+  case ShaderStageRayTracingRayGen:
+    return lgc::rt::RayTracingShaderStage::RayGeneration;
+  case ShaderStageRayTracingIntersect:
+    return lgc::rt::RayTracingShaderStage::Intersection;
+  case ShaderStageRayTracingAnyHit:
+    return lgc::rt::RayTracingShaderStage::AnyHit;
+  case ShaderStageRayTracingClosestHit:
+    return lgc::rt::RayTracingShaderStage::ClosestHit;
+  case ShaderStageRayTracingMiss:
+    return lgc::rt::RayTracingShaderStage::Miss;
+  case ShaderStageRayTracingCallable:
+    return lgc::rt::RayTracingShaderStage::Callable;
+  default:
+    return std::nullopt;
+  }
 }
 
 // =====================================================================================================================

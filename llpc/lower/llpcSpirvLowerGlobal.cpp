@@ -30,12 +30,12 @@
  */
 #include "llpcSpirvLowerGlobal.h"
 #include "SPIRVInternal.h"
-#include "lgcrt/LgcRtDialect.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
 #include "llpcRayTracingContext.h"
 #include "llpcSpirvLowerUtil.h"
 #include "lgc/LgcDialect.h"
+#include "lgc/LgcRtDialect.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/IR/Constant.h"
@@ -270,7 +270,6 @@ bool SpirvLowerGlobal::runImpl(Module &module) {
   lowerUniformConstants();
   lowerAliasedVal();
   lowerShaderRecordBuffer();
-
   cleanupReturnBlock();
 
   return true;
@@ -1195,6 +1194,7 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
         inOutInfo.setInterpLoc(interpLoc);
 
         if (builtIn == lgc::BuiltInBaryCoord || builtIn == lgc::BuiltInBaryCoordNoPerspKHR) {
+          inOutInfo.setInterpMode(InterpModeCustom);
           if (inOutInfo.getInterpLoc() == InterpLocUnknown)
             inOutInfo.setInterpLoc(inOutMeta.InterpLoc);
           return m_builder->CreateReadBaryCoord(builtIn, inOutInfo, auxInterpValue);

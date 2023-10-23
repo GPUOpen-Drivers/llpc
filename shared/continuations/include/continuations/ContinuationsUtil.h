@@ -32,8 +32,9 @@
 #ifndef CONTINUATIONS_CONTINUATIONS_UTIL_H
 #define CONTINUATIONS_CONTINUATIONS_UTIL_H
 
+#include "lgc/LgcCpsDialect.h"
+#include "lgc/LgcRtDialect.h"
 #include "llvm-dialects/Dialect/OpDescription.h"
-#include "llvm-dialects/TableGen/Operations.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -41,6 +42,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <cstdint>
 #include <functional>
 #include <limits>
@@ -316,6 +318,7 @@ public:
   static constexpr const char *MDTypesFunctionName = "function";
   static constexpr const char *MDTypesVoidName = "void";
   static constexpr const char *MDDXILPayloadTyName = "dxil.payload.type";
+  static constexpr const char *MDLgcCpsModule = "lgc.cps.module";
 
   // Global variable names
   static constexpr const char *GlobalPayloadName = "PAYLOAD";
@@ -514,6 +517,52 @@ public:
 
     report_fatal_error(Twine(MDDXILPayloadTyName) +
                        " metadata not found on CallInst!");
+  }
+
+  static bool isLgcCpsModule(Module &Mod) {
+    return Mod.getNamedMetadata(MDLgcCpsModule) != nullptr;
+  }
+
+  static DXILShaderKind
+  shaderStageToDxilShaderKind(lgc::rt::RayTracingShaderStage Stage) {
+    switch (Stage) {
+    case lgc::rt::RayTracingShaderStage::RayGeneration:
+      return DXILShaderKind::RayGeneration;
+    case lgc::rt::RayTracingShaderStage::Intersection:
+      return DXILShaderKind::Intersection;
+    case lgc::rt::RayTracingShaderStage::AnyHit:
+      return DXILShaderKind::AnyHit;
+    case lgc::rt::RayTracingShaderStage::ClosestHit:
+      return DXILShaderKind::ClosestHit;
+    case lgc::rt::RayTracingShaderStage::Miss:
+      return DXILShaderKind::Miss;
+    case lgc::rt::RayTracingShaderStage::Callable:
+      return DXILShaderKind::Callable;
+    case lgc::rt::RayTracingShaderStage::Traversal:
+      return DXILShaderKind::Compute;
+    }
+  }
+
+  static lgc::rt::RayTracingShaderStage
+  dxilShaderKindToShaderStage(DXILShaderKind Kind) {
+    switch (Kind) {
+    case DXILShaderKind::RayGeneration:
+      return lgc::rt::RayTracingShaderStage::RayGeneration;
+    case DXILShaderKind::Intersection:
+      return lgc::rt::RayTracingShaderStage::Intersection;
+    case DXILShaderKind::AnyHit:
+      return lgc::rt::RayTracingShaderStage::AnyHit;
+    case DXILShaderKind::ClosestHit:
+      return lgc::rt::RayTracingShaderStage::ClosestHit;
+    case DXILShaderKind::Miss:
+      return lgc::rt::RayTracingShaderStage::Miss;
+    case DXILShaderKind::Callable:
+      return lgc::rt::RayTracingShaderStage::Callable;
+    default:
+      report_fatal_error(Twine("Cannot convert DXILShaderKind ") +
+                         Twine(static_cast<uint32_t>(Kind)) +
+                         " to RayTracingShaderStage");
+    }
   }
 };
 
