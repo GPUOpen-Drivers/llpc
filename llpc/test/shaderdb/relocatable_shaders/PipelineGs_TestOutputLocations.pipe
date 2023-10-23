@@ -3,7 +3,7 @@
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s
-; RUN: llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
+; RUN: llvm-objdump --triple=amdgcn --mcpu=gfx1010 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: <_amdgpu_vs_main>:
 ; SHADERTEST: exp param[[loc:[0-9]*]] v{{[0-9]*}}, v{{[0-9]*}}, v{{[0-9]*}}, v{{[0-9]*}}
 ; SHADERTEST-LABEL: <_amdgpu_ps_main>:

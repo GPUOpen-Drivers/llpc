@@ -46,9 +46,9 @@
 
 ; Compare the disassembly to make sure all 3 Elfs have the same code. We do not expect the binaries to be bit-identical,
 ; but the text section and symbol table should be the same.
-; RUN: llvm-objdump --triple=amdgcn --mcpu=gfx900 --syms --reloc -d %t.orig.elf | tail -n +4 > %t.orig.s
-; RUN: llvm-objdump --triple=amdgcn --mcpu=gfx900 --syms --reloc -d %t/dump/PipelineCs_0x*.elf | tail -n +4 > %t.dump.s
-; RUN: llvm-objdump --triple=amdgcn --mcpu=gfx900 --syms --reloc -d %t.recompile.elf | tail -n +4 > %t.recompile.s
+; RUN: llvm-objdump --triple=amdgcn --mcpu=gfx1010 --syms --reloc -d %t.orig.elf | tail -n +4 > %t.orig.s
+; RUN: llvm-objdump --triple=amdgcn --mcpu=gfx1010 --syms --reloc -d %t/dump/PipelineCs_0x*.elf | tail -n +4 > %t.dump.s
+; RUN: llvm-objdump --triple=amdgcn --mcpu=gfx1010 --syms --reloc -d %t.recompile.elf | tail -n +4 > %t.recompile.s
 ;
 ; RUN: cmp %t.orig.s %t.dump.s
 ; RUN: cmp %t.orig.s %t.recompile.s

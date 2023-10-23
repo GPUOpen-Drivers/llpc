@@ -1,7 +1,7 @@
 ; Test that constant data in the vertex shader is handled correctly.
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-relocatable-shader-elf -o %t_0.elf %gfxip %s
-; RUN: llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=gfx900 --section=.text --section=.rodata -D -r %t_0.elf | FileCheck -check-prefix=SHADERTEST %s
+; RUN: llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=gfx1010 --section=.text --section=.rodata -D -r %t_0.elf | FileCheck -check-prefix=SHADERTEST %s
 ; REQUIRES: do-not-run-me
 ; SHADERTEST-LABEL: <_amdgpu_vs_main>:
 ; SHADERTEST: s_mov_b32 {{s[0-9]*}}, {{0 }}
@@ -26,7 +26,7 @@
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-part-pipeline=0 -o %t_01.elf %gfxip %s
-; RUN: llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=gfx900 --section=.text --section=.rodata -D -r %t_01.elf | FileCheck -check-prefix=SHADERTEST2_PP0 %s
+; RUN: llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=gfx1010 --section=.text --section=.rodata -D -r %t_01.elf | FileCheck -check-prefix=SHADERTEST2_PP0 %s
 ; SHADERTEST2_PP0-LABEL: <_amdgpu_vs_main>:
 ; SHADERTEST2_PP0: s_mov_b32 {{s[0-9]*}}, {{0 }}
 ; SHADERTEST2_PP0-NEXT: R_AMDGPU_ABS32_LO    .rodata
@@ -50,7 +50,7 @@
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-part-pipeline=1 -o %t_01.elf %gfxip %s
-; RUN: llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=gfx900 --section=.text --section=.rodata -D -r %t_01.elf | FileCheck -check-prefix=SHADERTEST2_PP1 %s
+; RUN: llvm-objdump --arch=amdgcn --disassemble-zeroes --mcpu=gfx1010 --section=.text --section=.rodata -D -r %t_01.elf | FileCheck -check-prefix=SHADERTEST2_PP1 %s
 ; SHADERTEST2_PP1-LABEL: <_amdgpu_vs_main>:
 ; SHADERTEST2_PP1: s_mov_b32 {{s[0-9]*}}, {{0 }}
 ; SHADERTEST2_PP1-NEXT: R_AMDGPU_ABS32_LO    [[vs_data_sym:[.a-z]*]]

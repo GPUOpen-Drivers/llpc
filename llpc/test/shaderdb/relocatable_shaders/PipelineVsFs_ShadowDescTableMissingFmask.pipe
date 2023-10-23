@@ -3,7 +3,7 @@
 // Also check that the user data limit is set correctly.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx1010 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: _amdgpu_ps_main
 ; SHADERTEST: s_mov_b32 s[[highaddr:[0-9]*]], 0xffff
 ; SHADERTEST: s_load_dwordx8 s[{{[0-9]*}}:{{[0-9]*}}], s[{{[0-9]*}}:[[highaddr]]], 0x10

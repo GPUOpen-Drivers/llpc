@@ -2,7 +2,7 @@
 // the depth, and that the done flag is set.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx1010 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST: <color_export_shader>:
 ; SHADERTEST-NEXT: exp mrtz v0, off, off, off done vm
 ; SHADERTEST-NEXT: s_endpgm
