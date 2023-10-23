@@ -2940,9 +2940,9 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
   if (gpurtShaderLibrary) {
 
     auto fetchRayTracingFuncName = [&](StringRef attribute) -> StringRef {
-      return mainContext->getPipelineContext()->getRaytracingFunctionName(attribute);
+      return mainContext->getPipelineContext()->getRayTracingFunctionName(attribute);
     };
-    
+
     StringRef traceRayFuncName = fetchRayTracingFuncName(Vkgc::RT_ENTRY_TRACE_RAY);
 
     StringRef fetchTrianglePosFunc = fetchRayTracingFuncName(Vkgc::RT_ENTRY_FETCH_HIT_TRIANGLE_FROM_NODE_POINTER);
