@@ -433,7 +433,7 @@ void GraphicsContext::setGraphicsStateInPipeline(Pipeline *pipeline, Util::Metro
   const auto &inputRsState = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->rsState;
 
   InputAssemblyState inputAssemblyState = {};
-  inputAssemblyState.enableMultiView = inputIaState.enableMultiView;
+  inputAssemblyState.multiView = inputIaState.enableMultiView ? MultiViewModeSimple : MultiViewModeDisable;
   RasterizerState rasterizerState = {};
 
   if (stageMask & ~shaderStageToMask(ShaderStageFragment)) {

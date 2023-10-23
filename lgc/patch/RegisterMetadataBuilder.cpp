@@ -563,7 +563,7 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
   if (m_hasMesh) {
     maxVertsPerSubgroup = std::min(meshMode.outputVertices, NggMaxThreadsPerSubgroup);
     threadsPerSubgroup = calcFactor.primAmpFactor;
-    const bool enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
+    const bool enableMultiView = m_pipelineState->getInputAssemblyState().multiView != MultiViewModeDisable;
     bool hasPrimitivePayload = meshBuiltInUsage.layer || meshBuiltInUsage.viewportIndex ||
                                meshBuiltInUsage.primitiveShadingRate || enableMultiView;
     if (m_gfxIp.major < 11)
@@ -1133,6 +1133,7 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
   bool usePointSize = false;
   bool useLayer = false;
   bool useViewportIndex = false;
+  bool useViewportIndexImplicitly = false;
   bool useShadingRate = false;
   unsigned clipDistanceCount = 0;
   unsigned cullDistanceCount = 0;
@@ -1207,7 +1208,12 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
       expCount = resUsage->inOutUsage.expCount;
     }
 
-    useLayer = useLayer || m_pipelineState->getInputAssemblyState().enableMultiView;
+    useLayer = useLayer || m_pipelineState->getInputAssemblyState().multiView != MultiViewModeDisable;
+    // useViewportIndex must be set in this mode as API shader may not export viewport index.
+    if (m_pipelineState->getInputAssemblyState().multiView == MultiViewModePerView) {
+      useViewportIndexImplicitly = !useViewportIndex;
+      useViewportIndex = true;
+    }
 
     if (usePrimitiveId) {
       getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtPrimitiveIdEn] = true;
@@ -1238,7 +1244,8 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
   // VGT_REUSE_OFF
   bool disableVertexReuse = m_pipelineState->getInputAssemblyState().disableVertexReuse;
   disableVertexReuse |= meshPipeline; // Mesh pipeline always disable vertex reuse
-  if (useViewportIndex)
+  // If viewport index is implicitly set by multiview, then it must be uniform and reuse should be allowed.
+  if (useViewportIndex && !useViewportIndexImplicitly)
     disableVertexReuse = true;
 
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtReuseOff] =

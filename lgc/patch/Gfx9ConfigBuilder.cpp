@@ -1864,7 +1864,7 @@ template <typename T> void ConfigBuilder::buildMeshRegConfig(ShaderStage shaderS
   SET_REG_FIELD(&config->meshRegs, GE_NGG_SUBGRP_CNTL, PRIM_AMP_FACTOR, calcFactor.primAmpFactor);
   SET_REG_FIELD(&config->meshRegs, GE_NGG_SUBGRP_CNTL, THDS_PER_SUBGRP, calcFactor.primAmpFactor);
 
-  const bool enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
+  const bool enableMultiView = m_pipelineState->getInputAssemblyState().multiView != MultiViewModeDisable;
   bool hasPrimitivePayload =
       builtInUsage.layer || builtInUsage.viewportIndex || builtInUsage.primitiveShadingRate || enableMultiView;
   if (m_gfxIp.major < 11)
@@ -2166,7 +2166,9 @@ template <typename T> void ConfigBuilder::setupPaSpecificRegisters(T *config) {
       expCount = resUsage->inOutUsage.expCount;
     }
 
-    useLayer = useLayer || m_pipelineState->getInputAssemblyState().enableMultiView;
+    useLayer = useLayer || m_pipelineState->getInputAssemblyState().multiView != MultiViewModeDisable;
+    if (m_pipelineState->getInputAssemblyState().multiView == MultiViewModePerView)
+      useViewportIndex = true;
 
     if (usePrimitiveId) {
       SET_REG_FIELD(config, VGT_PRIMITIVEID_EN, PRIMITIVEID_EN, true);

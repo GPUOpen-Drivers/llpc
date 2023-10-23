@@ -837,7 +837,11 @@ Value *BuilderImpl::CreateReadBaryCoord(BuiltInKind builtIn, InOutInfo inputInfo
 Value *BuilderImpl::CreateReadBuiltInInput(BuiltInKind builtIn, InOutInfo inputInfo, Value *vertexIndex, Value *index,
                                            const Twine &instName) {
   assert(isBuiltInInput(builtIn));
-  return readBuiltIn(false, builtIn, inputInfo, vertexIndex, index, instName);
+  Value *builtInVal = readBuiltIn(false, builtIn, inputInfo, vertexIndex, index, instName);
+  if (builtIn == BuiltInViewIndex)
+    // View index can only use bit[3:0] of view id register.
+    builtInVal = CreateAnd(builtInVal, getInt32(0xF));
+  return builtInVal;
 }
 
 // =====================================================================================================================
@@ -1306,7 +1310,7 @@ Value *BuilderImpl::readVsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
   case BuiltInInstanceIndex:
     return ShaderInputs::getInstanceIndex(builder, *getLgcContext());
   case BuiltInViewIndex:
-    if (m_pipelineState->getInputAssemblyState().enableMultiView)
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewModeDisable)
       return ShaderInputs::getSpecialUserData(UserDataMapping::ViewId, builder);
     return builder.getInt32(0);
   case BuiltInVertexId:

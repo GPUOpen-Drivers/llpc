@@ -1459,7 +1459,7 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
 
     // NOTE: The user data to emulate gl_ViewIndex is somewhat common. To make it consistent for GFX9
     // merged shader, we place it prior to any other special user data.
-    if (m_pipelineState->getInputAssemblyState().enableMultiView) {
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewModeDisable) {
       unsigned *argIdx = nullptr;
       auto userDataValue = UserDataMapping::ViewId;
       switch (m_shaderStage) {
@@ -1571,7 +1571,7 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "drawIndex", UserDataMapping::DrawIndex,
                                                 &intfData->entryArgIdxs.mesh.drawIndex));
     }
-    if (m_pipelineState->getInputAssemblyState().enableMultiView) {
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewModeDisable) {
       specialUserDataArgs.push_back(
           UserDataArg(builder.getInt32Ty(), "viewId", UserDataMapping::ViewId, &intfData->entryArgIdxs.mesh.viewIndex));
     }
@@ -1587,7 +1587,7 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
                                                 &intfData->entryArgIdxs.mesh.pipeStatsBuf));
     }
   } else if (m_shaderStage == ShaderStageFragment) {
-    if (m_pipelineState->getInputAssemblyState().enableMultiView &&
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewModeDisable &&
         m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs.viewIndex) {
       // NOTE: Only add special user data of view index when multi-view is enabled and gl_ViewIndex is used in fragment
       // shader.
