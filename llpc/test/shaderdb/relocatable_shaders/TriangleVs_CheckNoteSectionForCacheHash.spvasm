@@ -1,6 +1,6 @@
 ; This test case checks that the 128-bit cache hash is correctly added to the PAL metadata.
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -gfxip=9 -unlinked -enable-relocatable-shader-elf -v -o %t.elf %s | FileCheck --check-prefix=CHECK %s
+; RUN: amdllpc -gfxip=10.1 -unlinked -enable-relocatable-shader-elf -v -o %t.elf %s | FileCheck --check-prefix=CHECK %s
 
 ; CHECK-LABEL: {{^// LLPC}} calculated hash results (graphics pipeline)
 ; CHECK-LABEL: Building pipeline with relocatable shader elf.

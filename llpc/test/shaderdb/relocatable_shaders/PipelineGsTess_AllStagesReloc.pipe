@@ -1,7 +1,7 @@
 ; Test a relocatable shader compilation with every shader stage and a vertex input.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf -gfxip=9 %s -v | \
+; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf -gfxip=10.1 %s -v | \
 ; RUN: FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST: Building pipeline with relocatable shader elf.
 ; SHADERTEST: {{^//}} LLPC pipeline patching results
@@ -21,36 +21,14 @@
 
 ; SHADERTEST: {{^//}} LLPC final pipeline module info
 
-; Test that the vertex input is correctly loaded.  For GFX9, if the HS has no vertecies, then the first two vgpr inputs are dropped.  This must be accounted for.
+; Test that the vertex input is correctly loaded. Make sure that %VertexId is used.
 ; SHADERTEST: {{^//}} LGC glue shader results
-; Fist identify the vgpr input in the function parameters.  We want to make sure we get the vertex id and the vgpr 2 place before it.
-; SHADERTEST: define amdgpu_hs { {{.*}} } @_amdgpu_hs_main({{(i32 inreg noundef %[a-zA-Z0-9]+, )+}}float noundef [[vgpr0:%[a-zA-Z0-9]+]], float noundef [[vgpr1:%[a-zA-Z0-9]+]], float noundef %VertexId, float noundef [[vgpr3:%[a-zA-Z0-9]+]], float noundef [[vgpr4:%[a-zA-Z0-9]+]], float noundef %InstanceId)
-;
-; Make sure that the code picks the vgpr that actually contains the vertex id by checking if the HS has any vertices.
-; SHADERTEST: [[hsVertexCount:%[0-9]+]] = and i32 %MergedWaveInfo, 65280
-; SHADERTEST: %IsNullHs = icmp eq i32 [[hsVertexCount]], 0
-; SHADERTEST: %VgprArgument = select i1 %IsNullHs, float [[vgpr0]], float %VertexId
-; SHADERTEST: [[vgprAsInt:%[0-9]+]] = bitcast float %VgprArgument to i32
-
-; Calculate the vertex index and load the data.
+; SHADERTEST: define amdgpu_hs { {{.*}} } @_amdgpu_hs_main({{.*}}, float noundef %VertexId
+; SHADERTEST: [[vgprAsInt:%[0-9]+]] = bitcast float %VertexId to i32
 ; SHADERTEST: %VertexIndex = add i32 [[vgprAsInt]], %BaseVertex
 ; SHADERTEST: @llvm.amdgcn.struct.tbuffer.load.v4i32(<4 x i32> {{%[0-9]+}}, i32 %VertexIndex,
 
 ; SHADERTEST: AMDLLPC SUCCESS
-; END_SHADERTEST
-
-; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf -gfxip=10.1 %s -v | \
-; RUN: FileCheck -check-prefix=SHADERTEST_GFX10 %s
-
-; Test that the vertex input is correctly loaded.  GFX10 does not have to issue mentioned above.  Make sure that %VertexId is used.
-; SHADERTEST_GFX10: {{^//}} LGC glue shader results
-; SHADERTEST_GFX10: define amdgpu_hs { {{.*}} } @_amdgpu_hs_main({{.*}}, float noundef %VertexId
-; SHADERTEST_GFX10: [[vgprAsInt:%[0-9]+]] = bitcast float %VertexId to i32
-; SHADERTEST_GFX10: %VertexIndex = add i32 [[vgprAsInt]], %BaseVertex
-; SHADERTEST_GFX10: @llvm.amdgcn.struct.tbuffer.load.v4i32(<4 x i32> {{%[0-9]+}}, i32 %VertexIndex,
-
-; SHADERTEST_GFX10: AMDLLPC SUCCESS
 ; END_SHADERTEST
 
 [Version]

@@ -1,7 +1,7 @@
 ; Check that selecting between spill descriptor pointer and descriptor table descriptor pointer results in just a single scalar select instruction.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -o %t.elf -gfxip=9 -amdgpu-transform-discard-to-demote %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -o %t.elf -gfxip=10.1 -amdgpu-transform-discard-to-demote %s && llvm-objdump --triple=amdgcn --mcpu=gfx1010 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
 ; REQUIRES: do-not-run-me
 ; SHADERTEST-LABEL:_amdgpu_ps_main
 ; SHADERTEST: s_getpc_b64
