@@ -46,7 +46,7 @@ using ::testing::ElementsAreArray;
 namespace Llpc {
 namespace {
 
-constexpr Vkgc::GfxIpVersion GfxIp = {9, 0, 0};
+constexpr Vkgc::GfxIpVersion GfxIp = {10, 1, 0};
 
 // Test class for tests that initialize a runtime ShaderCache.
 class ShaderCacheTest : public ::testing::Test {
