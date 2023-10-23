@@ -1,7 +1,7 @@
 // This test tests pervertex variable, the input variable is 2-dim array, we must load value for each vertex,
 // the index is 0-2.
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v -gfxip=10.3 %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: %{{[0-9]*}} = call float {{.*}} @lgc.create.read.per.vertex.input.f32(i32 0, i32 0, i32 0, i32 0, i32 195, i32 0)

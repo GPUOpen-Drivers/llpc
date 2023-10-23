@@ -89,10 +89,10 @@ namespace {
 // Parsing "--gfxip" instead is done in the init(..) function,
 // before calling ICompiler::Create, which invokes the cl::opt parsing.
 cl::opt<std::string> GfxIp("gfxip", cl::desc("Graphics IP version"), cl::value_desc("major.minor.step"),
-                           cl::init("8.0.2"));
+                           cl::init("10.1.0"));
 
 // The GFXIP version parsed out of the -gfxip option before normal option processing occurs.
-GfxIpVersion ParsedGfxIp = {8, 0, 2};
+GfxIpVersion ParsedGfxIp = {10, 1, 0};
 
 // Input sources
 cl::list<std::string> InFiles(cl::Positional, cl::OneOrMore, cl::ValueRequired,

@@ -17,15 +17,15 @@
 ; SHADERTEST: call {{.*}} @lgc.create.image.load.v3f32(i32 1, i32 512, {{.*}}, <2 x i32> <i32 1, i32 1>)
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
-; SHADERTEST: call i32 @llvm.amdgcn.image.load.2d.i32.i32(i32 1, i32 0, i32 0,{{.*}}, i32 0, i32 0)
-; SHADERTEST: call <2 x i32> @llvm.amdgcn.image.load.2d.v2i32.i32(i32 3, i32 0, i32 1,{{.*}}, i32 0, i32 0)
-; SHADERTEST: call <3 x i32> @llvm.amdgcn.image.load.2d.v3i32.i32(i32 7, i32 1, i32 1,{{.*}}, i32 0, i32 0)
-; SHADERTEST: call i32 @llvm.amdgcn.image.load.2d.i32.i32(i32 1, i32 0, i32 0,{{.*}}, i32 0, i32 0)
-; SHADERTEST: call <2 x i32> @llvm.amdgcn.image.load.2d.v2i32.i32(i32 3, i32 0, i32 1,{{.*}}, i32 0, i32 0)
-; SHADERTEST: call <3 x i32> @llvm.amdgcn.image.load.2d.v3i32.i32(i32 7, i32 1, i32 1,{{.*}}, i32 0, i32 0)
-; SHADERTEST: call reassoc nnan nsz arcp contract afn float @llvm.amdgcn.image.load.2d.f32.i32(i32 1, i32 0, i32 0,{{.*}}, i32 0, i32 0)
-; SHADERTEST: call reassoc nnan nsz arcp contract afn <2 x float> @llvm.amdgcn.image.load.2d.v2f32.i32(i32 3, i32 0, i32 1,{{.*}}, i32 0, i32 0)
-; SHADERTEST: call reassoc nnan nsz arcp contract afn <3 x float> @llvm.amdgcn.image.load.2d.v3f32.i32(i32 7, i32 1, i32 1,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call i32 @llvm.amdgcn.image.load.2d.i32.i16(i32 1, i16 0, i16 0, <8 x i32> %{{.*}}, i32 0, i32 0)
+; SHADERTEST: call <2 x i32> @llvm.amdgcn.image.load.2d.v2i32.i16(i32 3, i16 0, i16 1, <8 x i32> %{{.*}}, i32 0, i32 0)
+; SHADERTEST: call <3 x i32> @llvm.amdgcn.image.load.2d.v3i32.i16(i32 7, i16 1, i16 1, <8 x i32> %{{.*}}, i32 0, i32 0)
+; SHADERTEST: call i32 @llvm.amdgcn.image.load.2d.i32.i16(i32 1, i16 0, i16 0, <8 x i32> %{{.*}}, i32 0, i32 0)
+; SHADERTEST: call <2 x i32> @llvm.amdgcn.image.load.2d.v2i32.i16(i32 3, i16 0, i16 1, <8 x i32> %{{.*}}, i32 0, i32 0)
+; SHADERTEST: call <3 x i32> @llvm.amdgcn.image.load.2d.v3i32.i16(i32 7, i16 1, i16 1, <8 x i32> %{{.*}}, i32 0, i32 0)
+; SHADERTEST: call reassoc nnan nsz arcp contract afn float @llvm.amdgcn.image.load.2d.f32.i16(i32 1, i16 0, i16 0,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call reassoc nnan nsz arcp contract afn <2 x float> @llvm.amdgcn.image.load.2d.v2f32.i16(i32 3, i16 0, i16 1,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call reassoc nnan nsz arcp contract afn <3 x float> @llvm.amdgcn.image.load.2d.v3f32.i16(i32 7, i16 1, i16 1,{{.*}}, i32 0, i32 0)
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

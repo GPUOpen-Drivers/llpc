@@ -10,7 +10,10 @@
 ; BEGIN_PAL_RELOC
 ; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s -v | FileCheck -check-prefix=PAL_RELOC %s
 ; Make sure the DX_RASTERIZATION_KILL is set in the PAL_RELOC metadata.
-; PAL_RELOC: PA_CL_CLIP_CNTL 0x0000000001400000
+; PAL_RELOC: pa_cl_clip_cntl: {
+; PAL_RELOC: dx_linear_attr_clip_ena: 1
+; PAL_RELOC: rasterization_kill: 1
+; PAL_RELOC: vte_vport_provoke_disable: 0 }
 ; BEGIN_PAL_RELOC
 
 ; BEGIN_GEN_FULL
@@ -23,7 +26,10 @@
 ; BEGIN_PAL_FULL
 ; RUN: amdllpc -o %t.elf %gfxip %s -v | FileCheck -check-prefix=PAL_FULL %s
 ; Make sure the DX_RASTERIZATION_KILL is set in the PAL_FULL metadata.
-; PAL_FULL: PA_CL_CLIP_CNTL 0x0000000001400000
+; PAL_FULL: pa_cl_clip_cntl: {
+; PAL_FULL: dx_linear_attr_clip_ena: 1
+; PAL_FULL: rasterization_kill: 1
+; PAL_FULL: vte_vport_provoke_disable: 0 }
 ; BEGIN_PAL_FULL
 
 [Version]

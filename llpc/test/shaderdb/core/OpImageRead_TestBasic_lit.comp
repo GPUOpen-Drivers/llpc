@@ -41,12 +41,12 @@ void main()
 ; SHADERTEST: call {{.*}} @lgc.create.image.load.v4f32(i32 9, i32 512, {{.*}}, <2 x i32> zeroinitializer)
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
-; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.2d.v4f32.i32(i32 15, i32 0, i32 0,{{.*}}, i32 0, i32 0)
-; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.1d.v4f32.i32(i32 15, i32 0,{{.*}}, i32 0, i32 0)
-; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.3d.v4f32.i32(i32 15, i32 0, i32 0, i32 0,{{.*}}, i32 0, i32 0)
-; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.1darray.v4f32.i32(i32 15, i32 0, i32 0,{{.*}}, i32 0, i32 0)
-; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.2darray.v4f32.i32(i32 15, i32 0, i32 0, i32 0,{{.*}}, i32 0, i32 0)
-; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.2d.v4f32.i32(i32 15, i32 0, i32 0,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.2d.v4f32.i16(i32 15, i16 0, i16 0, <8 x i32> %{{.*}}, i32 0, i32 0)
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.1d.v4f32.i16(i32 15, i16 0, <8 x i32> %{{.*}}, i32 0, i32 0)
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.3d.v4f32.i16(i32 15, i16 0, i16 0, i16 0, <8 x i32> %{{.*}}, i32 0, i32 0)
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.1darray.v4f32.i16(i32 15, i16 0, i16 0, <8 x i32> %{{.*}}, i32 0, i32 0)
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.2darray.v4f32.i16(i32 15, i16 0, i16 0, i16 0, <8 x i32> %{{.*}}, i32 0, i32 0)
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.2d.v4f32.i16(i32 15, i16 0, i16 0, <8 x i32> %{{.*}}, i32 0, i32 0)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

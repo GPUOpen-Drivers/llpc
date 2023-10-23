@@ -51,12 +51,12 @@ void main()
 ; SHADERTEST: call reassoc nnan nsz arcp contract afn <4 x float> (...) @lgc.create.image.load.v4f32(i32 5, i32 128, {{.*}}, <3 x i32> <i32 4, i32 4, i32 1>, i32 2)
 
 ; SHADERTEST-LABEL: {{^// LLPC}}  pipeline patching results
-; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.mip.1d.v4f32.i32(i32 15, i32 6, i32 3,{{.*}}, i32 0, i32 0), !invariant.load
-; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.mip.2d.v4f32.i32(i32 15, i32 12, i32 12, i32 6,{{.*}}, i32 0, i32 0)
-; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.mip.3d.v4f32.i32(i32 15, i32 4, i32 4, i32 4, i32 2,{{.*}}, i32 0, i32 0), !invariant.load
-; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.2d.v4f32.i32(i32 15, i32 9, i32 9,{{.*}}, i32 0, i32 0), !invariant.load
-; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.mip.1darray.v4f32.i32(i32 15, i32 12, i32 5, i32 6,{{.*}}, i32 0, i32 0), !invariant.load
-; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.mip.2darray.v4f32.i32(i32 15, i32 4, i32 4, i32 1, i32 2,{{.*}}, i32 0, i32 0)
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.mip.1d.v4f32.i16(i32 15, i16 6, i16 3, <8 x i32> %{{.*}}, i32 0, i32 0), !invariant.load !18
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.mip.2d.v4f32.i16(i32 15, i16 12, i16 12, i16 6, <8 x i32> %{{.*}}, i32 0, i32 0)
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.mip.3d.v4f32.i16(i32 15, i16 4, i16 4, i16 4, i16 2, <8 x i32> %{{.*}}, i32 0, i32 0), !invariant.load !18
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.2d.v4f32.i16(i32 15, i16 9, i16 9, <8 x i32> %{{.*}}, i32 0, i32 0), !invariant.load !18
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.mip.1darray.v4f32.i16(i32 15, i16 12, i16 5, i16 6, <8 x i32> %{{.*}}, i32 0, i32 0), !invariant.load !18
+; SHADERTEST: call {{.*}} <4 x float> @llvm.amdgcn.image.load.mip.2darray.v4f32.i16(i32 15, i16 4, i16 4, i16 1, i16 2, <8 x i32> %{{.*}}, i32 0, i32 0)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

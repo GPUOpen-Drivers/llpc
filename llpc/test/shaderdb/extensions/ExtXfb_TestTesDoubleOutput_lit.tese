@@ -20,7 +20,11 @@ void main(void)
 ; SHADERTEST: call void @lgc.output.export.generic{{.*}}v3f64
 ; SHADERTEST: call void @lgc.output.export.xfb{{.*}}v2f64
 ; SHADERTEST: call void @lgc.output.export.generic{{.*}}v2f64
-; SHADERTEST: VGT_STRMOUT_BUFFER_CONFIG 0x{{0*}}3
+; SHADERTEST: .vgt_strmout_buffer_config:
+; SHADERTEST:   .stream_0_buffer_en: 0x0000000000000003
+; SHADERTEST:   .stream_1_buffer_en: 0x0000000000000000
+; SHADERTEST:   .stream_2_buffer_en: 0x0000000000000000
+; SHADERTEST:   .stream_3_buffer_en: 0x0000000000000000
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

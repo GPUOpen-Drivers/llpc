@@ -8,10 +8,10 @@
 ; RUN: | FileCheck -check-prefix=SHADERTEST_PP0 %s
 ;
 ; SHADERTEST_PP0-LABEL: {{^//}} LLPC final pipeline module info
-; SHADERTEST_PP0:       define dllexport amdgpu_vs void @_amdgpu_vs_main
+; SHADERTEST_PP0:       define dllexport amdgpu_gs void @_amdgpu_gs_main
 ; SHADERTEST_PP0:       define dllexport amdgpu_ps void @_amdgpu_ps_main
 ; SHADERTEST_PP0-LABEL: {{^//}} LLPC final ELF info
-; SHADERTEST_PP0-LABEL: _amdgpu_vs_main:
+; SHADERTEST_PP0-LABEL: _amdgpu_gs_main:
 ; SHADERTEST_PP0-LABEL: _amdgpu_ps_main:
 ; SHADERTEST_PP0-LABEL: {{^=====}} AMDLLPC SUCCESS ====
 ; END_SHADERTEST
@@ -26,9 +26,9 @@
 ; SHADERTEST_PP1-LABEL: {{^//}} LLPC final pipeline module info
 ; SHADERTEST_PP1:       define dllexport amdgpu_ps void @_amdgpu_ps_main
 ; SHADERTEST_PP1-LABEL: {{^//}} LLPC final pipeline module info
-; SHADERTEST_PP1:       define dllexport amdgpu_vs void @_amdgpu_vs_main
+; SHADERTEST_PP1:       define dllexport amdgpu_gs void @_amdgpu_gs_main
 ; SHADERTEST_PP1-LABEL: {{^//}} LLPC final ELF info
-; SHADERTEST_PP1-LABEL: _amdgpu_vs_main:
+; SHADERTEST_PP1-LABEL: _amdgpu_gs_main:
 ; SHADERTEST_PP1-LABEL: _amdgpu_ps_main:
 ; SHADERTEST_PP1-LABEL: {{^=====}} AMDLLPC SUCCESS ====
 ; END_SHADERTEST
