@@ -30,10 +30,11 @@
 ; SHADERTEST: s_load_dwordx4 s{{\[}}[[T2_DESC:[0-9]*]]:{{[0-9]*}}], s[2:3], 0x0
 ; SHADERTEST: image_sample v[{{[0-9]*:[0-9]*}}], v[{{[0-9]*:[0-9]*}}], s{{\[}}[[T1_DESC]]:{{[0-9]*}}], s{{\[}}[[T2_DESC]]:{{[0-9]*}}]
 ; SHADERTEST-LABEL: PalMetadata
-; SHADERTEST-LABEL: .registers:
-; SHADERTEST: SPI_SHADER_USER_DATA_PS_1                              0x0000000000000002
-; SHADERTEST: SPI_SHADER_USER_DATA_PS_2                              0x0000000000000003
-; SHADERTEST: SPI_SHADER_USER_DATA_VS_[[table0]]                     0x0000000000000001
+; SHADERTEST:     .hardware_stages:
+; SHADERTEST:       .ps:
+; SHADERTEST:         .user_data_reg_map: [ 0x0000000010000000 0x0000000000000002 0x0000000000000003
+; SHADERTEST:       .vs:
+; SHADERTEST:         .user_data_reg_map: [ 0x0000000010000000 0x0000000000000001 0x000000001000000F 0x0000000010000003 0x0000000010000004 
 ; END_SHADERTEST
 
 [Version]

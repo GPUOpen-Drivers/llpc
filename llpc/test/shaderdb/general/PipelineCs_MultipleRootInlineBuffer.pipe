@@ -24,7 +24,7 @@
 
 ; The rest of the descriptor is filled in with the literals.
 ; SHADERTEST: [[desc1_2:%[0-9]*]] = insertelement <4 x i32> [[desc1_1]], i32 -1, i64 2
-; SHADERTEST: [[desc1_3:%[0-9]*]] = insertelement <4 x i32> [[desc1_2]], i32 151468, i64 3
+; SHADERTEST: [[desc1_3:%[0-9]*]] = insertelement <4 x i32> [[desc1_2]], i32 553734060, i64 3
 
 ; Get the "fat pointer" for the buffer
 ; SHADERTEST: call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> [[desc1_3]])

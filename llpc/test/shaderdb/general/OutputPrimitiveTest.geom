@@ -8,8 +8,9 @@
 ; SHADERTEST-LABEL: _amdgpu_gs_main:
 ; SHADERTEST-COUNT-2: s_sendmsg sendmsg(MSG_GS, GS_OP_EMIT, 0)
 ; SHADERTEST-LABEL: PalMetadata
-; SHADERTEST-LABEL: .registers:
-; SHADERTEST: VGT_GS_OUT_PRIM_TYPE                          0x0000000000000001
+; SHADERTEST-LABEL: .graphics_registers:
+; SHADERTEST:         .vgt_gs_out_prim_type:
+; SHADERTEST:         .outprim_type:   LineStrip
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST
