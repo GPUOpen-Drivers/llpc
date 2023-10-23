@@ -817,13 +817,13 @@ Value *BuilderImpl::CreateNormalizeVector(Value *x, const Twine &instName) {
   Value *dot = CreateDotProduct(x, x);
   Value *sqrt = CreateSqrt(dot);
   Value *rsq = CreateFDiv(ConstantFP::get(sqrt->getType(), 1.0), sqrt);
-  // We use fmul.legacy for float so that a zero vector is normalized to a zero vector,
-  // rather than NaNs. We must scalarize it ourselves.
-  Value *result = scalarize(x, [this, rsq](Value *x) -> Value * {
-    if (rsq->getType()->isFloatTy())
-      return CreateIntrinsic(Intrinsic::amdgcn_fmul_legacy, {}, {x, rsq});
-    return CreateFMul(x, rsq);
-  });
+  if (x->getType()->getScalarType()->isFloatTy()) {
+    // Make sure a FP32 zero vector is normalized to a FP32 zero vector, rather than NaNs.
+    auto zero = ConstantFP::get(getFloatTy(), 0.0);
+    auto isZeroDot = CreateFCmpOEQ(dot, zero);
+    rsq = CreateSelect(isZeroDot, zero, rsq);
+  }
+  Value *result = scalarize(x, [this, rsq](Value *x) -> Value * { return CreateFMul(x, rsq); });
   result->setName(instName);
   return result;
 }
