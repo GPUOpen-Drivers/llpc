@@ -11,11 +11,11 @@
 ; - there are extra inreg inputs because its determination of how many SGPR inputs
 ;   are conservative;
 ; - there is no VGPR input for the vertex input that the fetch shader generates.
-; SHADERTEST: define amdgpu_vs { i32,{{.*}}, i32, float, float, float, float, <4 x float> } @_amdgpu_vs_main(i32 inreg noundef %0, i32 inreg noundef %1, i32 inreg noundef %VertexBufferTable, i32 inreg noundef %BaseVertex, i32 inreg noundef %BaseInstance, {{.*}}, i32 inreg noundef %{{.*}}, float noundef %VertexId, float noundef %{{.*}}, float noundef %{{.*}}, float noundef %InstanceId)
+; SHADERTEST: define amdgpu_vs { i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, i32, float, float, float, float, <4 x float> } @_amdgpu_vs_main(i32 inreg noundef %0, i32 inreg noundef %1, i32 inreg noundef %VertexBufferTable, i32 inreg noundef %BaseVertex, i32 inreg noundef %BaseInstance, i32 inreg noundef %2, i32 inreg noundef %3, i32 inreg noundef %4, i32 inreg noundef %5, i32 inreg noundef %6, i32 inreg noundef %7, i32 inreg noundef %8, i32 inreg noundef %9, i32 inreg noundef %10, i32 inreg noundef %11, float noundef %VertexId, float noundef %12, float noundef %13, float noundef %InstanceId)
 ; Check that the attribute is loaded.
-; SHADERTEST:  [[f0:%.*]] = call i32 @llvm.amdgcn.struct.tbuffer.load.i32(<4 x i32> [[addr:%[0-9]*]], i32 %VertexIndex, i32 0, i32 0, i32 immarg 116, i32 immarg 0)
-; SHADERTEST:  [[f1:%.*]] = call i32 @llvm.amdgcn.struct.tbuffer.load.i32(<4 x i32> [[addr:%[0-9]*]], i32 %VertexIndex, i32 4, i32 0, i32 immarg 116, i32 immarg 0)
-; SHADERTEST:  [[f2:%.*]] = call i32 @llvm.amdgcn.struct.tbuffer.load.i32(<4 x i32> [[addr:%[0-9]*]], i32 %VertexIndex, i32 8, i32 0, i32 immarg 116, i32 immarg 0)
+; SHADERTEST:  [[f0:%.*]] = call i32 @llvm.amdgcn.struct.tbuffer.load.i32(<4 x i32> [[addr:%[0-9]*]], i32 %VertexIndex, i32 0, i32 0, i32 immarg 22, i32 immarg 0)
+; SHADERTEST:  [[f1:%.*]] = call i32 @llvm.amdgcn.struct.tbuffer.load.i32(<4 x i32> [[addr:%[0-9]*]], i32 %VertexIndex, i32 4, i32 0, i32 immarg 22, i32 immarg 0)
+; SHADERTEST:  [[f2:%.*]] = call i32 @llvm.amdgcn.struct.tbuffer.load.i32(<4 x i32> [[addr:%[0-9]*]], i32 %VertexIndex, i32 8, i32 0, i32 immarg 22, i32 immarg 0)
 ; SHADERTEST:  [[vectmp0:%.*]] = insertelement <4 x i32> <i32 {{undef|poison}}, i32 {{undef|poison}}, i32 {{undef|poison}}, i32 1065353216>, i32 [[f0]], i{{32|64}} 0
 ; SHADERTEST:  [[vectmp1:%.*]] = insertelement <4 x i32> [[vectmp0]], i32 [[f1]], i{{32|64}} 1
 ; SHADERTEST:  [[vecf:%.*]] = insertelement <4 x i32> [[vectmp1]], i32 [[f2]], i{{32|64}} 2
@@ -28,11 +28,11 @@
 
 ; BEGIN_SHADERTEST
 ; Check that the fetch shader loads the inputs into the correct registers.
-; RUN: amdllpc -use-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST2 %s
+; RUN: amdllpc -use-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx1010 -d %t.elf | FileCheck -check-prefix=SHADERTEST2 %s
 ; SHADERTEST2: Disassembly of section .text:
 ; SHADERTEST2: 0000000000000000 <_amdgpu_vs_main>
 ; SHADERTEST2-DAG: v_mov_b32_e32 v7, 1.0
-; SHADERTEST2-DAG: tbuffer_load_format_xyz v[4:6], v{{[0-9]*}}, s[{{[0-9]+}}:{{[0-9]+}}],  {{dfmt:13, nfmt:7, 0|0 format:\[BUF_DATA_FORMAT_32_32_32,BUF_NUM_FORMAT_FLOAT\]}} idxen
+; SHADERTEST2-DAG: tbuffer_load_format_xyz v[4:6], v{{[0-9]*}}, s[{{[0-9]+}}:{{[0-9]+}}], 0 format:[BUF_FMT_32_32_32_FLOAT] idxen
 ; Identify the start of the vertex shader
 ; SHADERTEST2: <_amdgpu_vs_main_fetchless>:
 ; SHADERTEST2: s_getpc_b64 s[{{[0-9]+}}:{{[0-9]+}}]
