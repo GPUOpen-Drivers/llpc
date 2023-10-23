@@ -2939,7 +2939,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
 
   if (gpurtShaderLibrary) {
 
-    auto fetchRayTracingFuncName = [&](StringRef attribute) -> StringRef {
+    auto fetchRayTracingFuncName = [&](Vkgc::RAYTRACING_ENTRY_FUNC attribute) -> StringRef {
       return mainContext->getPipelineContext()->getRayTracingFunctionName(attribute);
     };
 
