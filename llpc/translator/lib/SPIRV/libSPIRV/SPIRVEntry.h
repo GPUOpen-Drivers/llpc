@@ -483,11 +483,12 @@ typedef SPIRVEntryOpCodeOnly<OpNoLine> SPIRVNoLine;
 class SPIRVExecutionMode : public SPIRVAnnotation<OpExecutionMode> {
 public:
   // Complete constructor for LocalSize
-  SPIRVExecutionMode(SPIRVEntry *TheTarget, SPIRVExecutionModeKind TheExecMode, SPIRVWord X, SPIRVWord Y, SPIRVWord Z)
+  SPIRVExecutionMode(SPIRVEntry *TheTarget, SPIRVExecutionModeKind TheExecMode, SPIRVWord Word0, SPIRVWord Word1,
+                     SPIRVWord Word2)
       : SPIRVAnnotation(TheTarget, 6), ExecMode(TheExecMode) {
-    WordLiterals.push_back(X);
-    WordLiterals.push_back(Y);
-    WordLiterals.push_back(Z);
+    WordLiterals.push_back(Word0);
+    WordLiterals.push_back(Word1);
+    WordLiterals.push_back(Word2);
     updateModuleVersion();
   }
   // Complete constructor for SubgroupSize, SubgroupsPerWorkgroup
@@ -501,6 +502,10 @@ public:
   SPIRVExecutionMode() : ExecMode(ExecutionModeInvocations) {}
   SPIRVExecutionModeKind getExecutionMode() const { return ExecMode; }
   const std::vector<SPIRVWord> &getLiterals() const { return WordLiterals; }
+  void updateLiteral(unsigned index, SPIRVWord Literal) {
+    assert(index < WordLiterals.size());
+    WordLiterals[index] = Literal;
+  }
   SPIRVCapVec getRequiredCapability() const override { return getCapability(ExecMode); }
 
   SPIRVWord getRequiredSPIRVVersion() const override {
@@ -515,6 +520,9 @@ public:
   }
 
   void mergeExecutionMode(SPIRVExecutionMode *EM) {
+    assert(ExecMode == ExecutionModeDenormPreserve || ExecMode == ExecutionModeDenormFlushToZero ||
+           ExecMode == ExecutionModeSignedZeroInfNanPreserve || ExecMode == ExecutionModeRoundingModeRTE ||
+           ExecMode == ExecutionModeRoundingModeRTZ);
     assert(WordLiterals.size() == 1);
     assert(ExecMode == EM->ExecMode);
     assert(EM->WordLiterals[0] == 16 || EM->WordLiterals[0] == 32 || EM->WordLiterals[0] == 64);

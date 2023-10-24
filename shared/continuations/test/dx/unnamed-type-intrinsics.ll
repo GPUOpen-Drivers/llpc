@@ -320,6 +320,7 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP26]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP27:%.*]] = call ptr inttoptr (i64 4 to ptr)([[TMP1]] [[TRAV_DATA2]]), !continuation.registercount !20, !continuation.returnedRegistercount !20
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP28:%.*]] = call [[TMP0]] @await.(ptr [[TMP27]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_RAYPAYLOAD]] poison, ptr [[TMP14]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP29:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP14]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP30:%.*]] = getelementptr i32, ptr [[TMP29]], i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP31:%.*]] = getelementptr i32, ptr [[TMP30]], i64 0
@@ -438,9 +439,9 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-LABEL: define void @MyRayGen(
-; LOWERRAYTRACINGPIPELINE-SAME: ) #[[ATTR2:[0-9]+]] !continuation.registercount !15 !continuation !21 !continuation.entry !22 {
+; LOWERRAYTRACINGPIPELINE-SAME: ) #[[ATTR2:[0-9]+]] !lgc.rt.shaderstage !15 !continuation.entry !21 !continuation.registercount !15 !continuation !22 {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[TMP0:%.*]], align 8
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP1:%.*]] = call [[TMP0]] @continuations.getSystemData.s_s_0()
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP1:%.*]] = call [[TMP0]] @continuations.getSystemData.s_s()
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[TMP0]] [[TMP1]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[SYSTEM_DATA_ALLOCA]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
@@ -472,12 +473,12 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-LABEL: define %0 @MyClosestHit(
-; LOWERRAYTRACINGPIPELINE-SAME: [[TMP2:%.*]] [[TMP0:%.*]]) #[[ATTR2]] !continuation.registercount !20 !continuation !26 {
+; LOWERRAYTRACINGPIPELINE-SAME: [[TMP2:%.*]] [[TMP0:%.*]]) #[[ATTR2]] !lgc.rt.shaderstage !26 !continuation.registercount !20 !continuation !27 {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[TMP2]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = alloca [[STRUCT_RAYPAYLOAD:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[HITATTRS:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], align 8
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = call [[TMP2]] @continuations.getSystemData.s_s()
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = call [[TMP2]] @continuations.getSystemData.s_s_0()
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[TMP2]] [[TMP4]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[TMP2]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP5]])

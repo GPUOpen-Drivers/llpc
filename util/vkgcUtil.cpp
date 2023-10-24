@@ -31,6 +31,7 @@
 #include "vkgcUtil.h"
 #include "spirv.hpp"
 #include "vkgcElfReader.h"
+#include <filesystem>
 #if defined(_WIN32)
 #include <direct.h>
 #else
@@ -80,17 +81,40 @@ const char *getShaderStageAbbreviation(ShaderStage shaderStage, bool upper) {
 }
 
 // =====================================================================================================================
-// Create directory.
+// Create directory recursively.
 //
 // @param dir : The path of directory
 bool createDirectory(const char *dir) {
+  namespace fs = std::filesystem;
+  char *dirdup = strdup(dir);
+  char *token = strtok(dirdup, "/");
+
+  bool result = false;
+
 #if defined(_WIN32)
-  int result = _mkdir(dir);
-  return (result == 0);
+  // Windows path starts without "/"
+  std::string tmp;
 #else
-  int result = mkdir(dir, S_IRWXU);
-  return result == 0;
+  std::string tmp("/");
 #endif
+
+  while (token != NULL) {
+    tmp += token;
+
+    if (!fs::exists(tmp)) {
+      result = fs::create_directories(tmp);
+
+      if (!result) {
+        break;
+      }
+    }
+
+    token = strtok(NULL, "/");
+    tmp += "/";
+  }
+
+  free(dirdup);
+  return result;
 }
 
 // =====================================================================================================================

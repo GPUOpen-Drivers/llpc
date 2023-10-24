@@ -11,8 +11,8 @@ declare i32 @_cont_GetContinuationStackAddr()
 declare i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 declare %struct.DispatchSystemData @_cont_SetupRayGen()
 
-define void @RayGen() !continuation.entry !0 !continuation !3 {
-; CHECK-LABEL: define void @RayGen() !continuation.entry !3 !continuation !4 {
+define void @RayGen() !lgc.rt.shaderstage !5 !continuation.entry !0 !continuation !3 {
+; CHECK-LABEL: define void @RayGen() !lgc.rt.shaderstage !3 !continuation.entry !4 !continuation !5 {
 ; CHECK-NEXT:    [[SYSTEM_DATA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA:%.*]], align 8
 ; CHECK-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; CHECK-NEXT:    [[TMP1:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @_cont_SetupRayGen()
@@ -27,9 +27,9 @@ define void @RayGen() !continuation.entry !0 !continuation !3 {
   ret void
 }
 
-define void @RayGen.resume.0(i32 %0, %struct.DispatchSystemData %1) !continuation !3 {
+define void @RayGen.resume.0(i32 %0, %struct.DispatchSystemData %1) !lgc.rt.shaderstage !5 !continuation !3 {
 ; CHECK-LABEL: define void @RayGen.resume.0(
-; CHECK-SAME: i32 [[TMP0:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP1:%.*]]) !continuation !4 {
+; CHECK-SAME: i32 [[TMP0:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP1:%.*]]) !lgc.rt.shaderstage !3 !continuation !5 {
 ; CHECK-NEXT:    [[SYSTEM_DATA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
 ; CHECK-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], ptr [[SYSTEM_DATA]], align 4
 ; CHECK-NEXT:    ret void
@@ -45,3 +45,4 @@ define void @RayGen.resume.0(i32 %0, %struct.DispatchSystemData %1) !continuatio
 !2 = !{i32 8, i32 7}
 !3 = !{void ()* @RayGen}
 !4 = !{i32 21}
+!5 = !{i32 0}

@@ -33,8 +33,8 @@
 #include "continuations/ContinuationsDialect.h"
 #include "continuations/ContinuationsUtil.h"
 #include "continuations/LowerRaytracingPipeline.h"
-#include "lgccps/LgcCpsDialect.h"
-#include "lgcrt/LgcRtDialect.h"
+#include "lgc/LgcCpsDialect.h"
+#include "lgc/LgcRtDialect.h"
 #include "llvm-dialects/Dialect/Builder.h"
 #include "llvm-dialects/Dialect/Dialect.h"
 #include "llvm/Passes/PassBuilder.h"
@@ -194,7 +194,7 @@ void DXILContHelper::addContinuationPasses(ModulePassManager &MPM) {
 
   // Splits basic blocks after the systemDataRestored marker and removes already
   // inlined intrinsic implementations
-  MPM.addPass(DXILContPreCoroutinePass());
+  MPM.addPass(PreCoroutineLoweringPass());
 
   // Convert the system data struct to a value, so it isn't stored in the
   // continuation state
@@ -522,41 +522,6 @@ Function *llvm::extractFunctionOrNull(Metadata *N) {
   return dyn_cast_or_null<Function>(C);
 }
 
-void llvm::analyzeShaderKinds(
-    Module &M, MapVector<Function *, DXILShaderKind> &ShaderKinds) {
-  auto *EntryPoints = M.getNamedMetadata("dx.entryPoints");
-  if (!EntryPoints)
-    return;
-  for (auto *EntryMD : EntryPoints->operands()) {
-    auto *C = mdconst::extract_or_null<Constant>(EntryMD->getOperand(0));
-    // Strip bitcasts
-    while (auto *Expr = dyn_cast_or_null<ConstantExpr>(C)) {
-      if (Expr->getOpcode() == Instruction::BitCast)
-        C = Expr->getOperand(0);
-      else
-        C = nullptr;
-    }
-    auto *F = extractFunctionOrNull(EntryMD->getOperand(0));
-    if (!F)
-      continue;
-    auto *Props = cast_or_null<MDTuple>(EntryMD->getOperand(4));
-    if (!Props)
-      continue;
-
-    // Iterate through tag-value pairs
-    for (size_t I = 0; I < Props->getNumOperands(); I += 2) {
-      auto Tag =
-          mdconst::extract<ConstantInt>(Props->getOperand(I))->getZExtValue();
-      if (Tag != 8) // kDxilShaderKindTag
-        continue;
-      auto KindI = mdconst::extract<ConstantInt>(Props->getOperand(I + 1))
-                       ->getZExtValue();
-      auto Kind = static_cast<DXILShaderKind>(KindI);
-      ShaderKinds[F] = Kind;
-    }
-  }
-}
-
 /// Recurse into the first member of the given SystemData to find an object of
 /// the wanted type.
 Value *llvm::getDXILSystemData(IRBuilder<> &B, Value *SystemData,
@@ -762,6 +727,12 @@ bool llvm::LgcMaterializable(Instruction &OrigI) {
 
 namespace llvm {
 void addLgcContinuationTransform(ModulePassManager &MPM) {
+  // Inline TraceRay and similar intrinsic implementations
+  MPM.addPass(AlwaysInlinerPass(/*InsertLifetimeIntrinsics=*/false));
+
+  // Lower GetShaderKind and GetCurrentFuncAddr
+  MPM.addPass(PreCoroutineLoweringPass());
+
   MPM.addPass(LowerAwaitPass());
 
   MPM.addPass(CoroEarlyPass());

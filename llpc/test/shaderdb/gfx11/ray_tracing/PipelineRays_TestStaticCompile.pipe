@@ -6,7 +6,6 @@
 ; SHADERTEST-LABEL: _amdgpu_cs_main:
 ; SHADERTEST: image_bvh64_intersect_ray
 ; SHADERTEST: AMDLLPC SUCCESS
-; REQUIRES: do-not-run-me
 ; END_SHADERTEST
 
 [Version]
@@ -269,7 +268,6 @@ groups[3].generalShader = -1
 groups[3].closestHitShader = 3
 groups[3].anyHitShader = -1
 groups[3].intersectionShader = 4
-shaderTraceRay = Shader_0xFC3AF5C307D607CB.spv
 maxRecursionDepth = 1
 indirectStageMask = 0
 rtState.bvhResDescSize = 4

@@ -104,7 +104,7 @@ attributes #3 = { nounwind memory(none) }
 !29 = !{i32 0, %struct.AnyHitTraversalData poison}
 !30 = !{!"function", i32 poison, !27}
 ; LOWERRAYTRACINGPIPELINE-LABEL: define %struct.DispatchSystemData @Miss(
-; LOWERRAYTRACINGPIPELINE-SAME: [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR0:[0-9]+]] !continuation.registercount !20 !continuation !21 {
+; LOWERRAYTRACINGPIPELINE-SAME: [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR0:[0-9]+]] !lgc.rt.shaderstage !20 !continuation.registercount !21 !continuation !22 {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_SYSTEMDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_PAYLOAD:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = call [[STRUCT_SYSTEMDATA]] @continuations.getSystemData.s_struct.SystemDatas()
@@ -147,7 +147,7 @@ attributes #3 = { nounwind memory(none) }
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[TMP0]] [[TMP26]], ptr getelementptr ([[STRUCT_PAYLOAD_ATTR_MAX_8_I32S_LAYOUT_6_MISS_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 3), align 1
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP27:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP28:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP27]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    ret [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP28]], !continuation.registercount !20
+; LOWERRAYTRACINGPIPELINE-NEXT:    ret [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP28]], !continuation.registercount !21
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-LABEL: define i32 @_cont_GetLocalRootIndex(

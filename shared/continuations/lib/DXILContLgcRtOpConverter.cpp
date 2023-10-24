@@ -31,7 +31,7 @@
 
 #include "continuations/Continuations.h"
 #include "continuations/ContinuationsUtil.h"
-#include "lgcrt/LgcRtDialect.h"
+#include "lgc/LgcRtDialect.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Instructions.h"
@@ -47,6 +47,8 @@
 #define DEBUG_TYPE "dxil-cont-lgc-rt-op-converter"
 
 namespace {
+
+using namespace llvm;
 
 /// An enum to simplify fetching the attributes from reportHit operations.
 enum class ReportHitAttributeIndex {
@@ -90,6 +92,42 @@ llvm::Value *getEnumArgOperand(llvm::CallInst &CI, T Index) {
   llvm::Value *Arg = CI.getArgOperand(static_cast<unsigned>(Index));
   assert(Arg && "Requested argument should not be nullptr!");
   return Arg;
+}
+
+static void
+analyzeShaderKinds(Module &M,
+                   MapVector<Function *, DXILShaderKind> &ShaderKinds) {
+  auto *EntryPoints = M.getNamedMetadata("dx.entryPoints");
+  if (!EntryPoints)
+    return;
+  for (auto *EntryMD : EntryPoints->operands()) {
+    auto *C = mdconst::extract_or_null<Constant>(EntryMD->getOperand(0));
+    // Strip bitcasts
+    while (auto *Expr = dyn_cast_or_null<ConstantExpr>(C)) {
+      if (Expr->getOpcode() == Instruction::BitCast)
+        C = Expr->getOperand(0);
+      else
+        C = nullptr;
+    }
+    auto *F = extractFunctionOrNull(EntryMD->getOperand(0));
+    if (!F)
+      continue;
+    auto *Props = cast_or_null<MDTuple>(EntryMD->getOperand(4));
+    if (!Props)
+      continue;
+
+    // Iterate through tag-value pairs
+    for (size_t I = 0; I < Props->getNumOperands(); I += 2) {
+      auto Tag =
+          mdconst::extract<ConstantInt>(Props->getOperand(I))->getZExtValue();
+      if (Tag != 8) // kDxilShaderKindTag
+        continue;
+      auto KindI = mdconst::extract<ConstantInt>(Props->getOperand(I + 1))
+                       ->getZExtValue();
+      auto Kind = static_cast<DXILShaderKind>(KindI);
+      ShaderKinds[F] = Kind;
+    }
+  }
 }
 
 } // namespace
@@ -460,12 +498,16 @@ void DXILContLgcRtOpConverterPass::applyPayloadMetadataTypesOnShaders() {
   analyzeShaderKinds(*M, ShaderKinds);
 
   for (auto &[Func, Kind] : ShaderKinds) {
+    auto Stage = DXILContHelper::dxilShaderKindToShaderStage(Kind);
+    lgc::rt::setLgcRtShaderStage(Func, Stage);
+
     switch (Kind) {
     case DXILShaderKind::AnyHit:
     case DXILShaderKind::ClosestHit:
     case DXILShaderKind::Miss:
     case DXILShaderKind::Callable: {
       Type *PayloadTy = getFuncArgPtrElementType(Func, 0);
+      assert(PayloadTy && "Shader must have a payload argument");
       Func->setMetadata(
           DXILContHelper::MDDXILPayloadTyName,
           MDNode::get(Func->getContext(),

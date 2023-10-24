@@ -407,7 +407,8 @@ Value *BuilderImpl::CreateATan(Value *yOverX, const Twine &instName) {
   Value *outsideBound = CreateSelect(CreateFCmpOGT(absX, one), one, zero);
   result = CreateFMul(outsideBound, result);
   result = CreateFAdd(partialResult, result);
-  return CreateFMul(result, CreateFSign(yOverX));
+  result = CreateFMul(result, CreateFSign(yOverX));
+  return CreateSelect(CreateIsNaN(yOverX), ConstantFP::getNaN(yOverX->getType()), result);
 }
 
 // =====================================================================================================================
@@ -452,9 +453,9 @@ Value *BuilderImpl::CreateATan2(Value *y, Value *x, const Twine &instName) {
   Value *result = CreateATan(yOverX);
   Value *addP1 = CreateFAdd(result, p1);
   result = CreateSelect(CreateFCmpOLT(x, zero), addP1, result);
-  result = CreateSelect(CreateFCmpONE(x, zero), result, p0);
+  result = CreateSelect(CreateFCmpUNE(x, zero), result, p0);
   Value *zeroOrPi = CreateSelect(CreateFCmpOGT(x, zero), zero, getPi(x->getType()));
-  result = CreateSelect(CreateFCmpONE(y, zero), result, zeroOrPi, instName);
+  result = CreateSelect(CreateFCmpUNE(y, zero), result, zeroOrPi, instName);
   return result;
 }
 

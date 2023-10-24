@@ -1,4 +1,4 @@
-; RUN: opt --verify-each -passes='dxil-cont-intrinsic-prepare,lint,lower-raytracing-pipeline,lint,inline,lint,dxil-cont-pre-coroutine,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,register-buffer,lint,save-continuation-state,lint,dxil-cont-post-process,lint,remove-types-metadata' -S %s 2>%t1.stderr | FileCheck %s
+; RUN: opt --verify-each -passes='dxil-cont-intrinsic-prepare,lint,lower-raytracing-pipeline,lint,inline,lint,pre-coroutine-lowering,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,register-buffer,lint,save-continuation-state,lint,dxil-cont-post-process,lint,remove-types-metadata' -S %s 2>%t1.stderr | FileCheck %s
 ; RUN: count 0 < %t1.stderr
 
 ; Check that the size of @REGISTERS is as big as the continuation.registercount when there is an intersection shader
@@ -111,7 +111,7 @@ declare !types !35 float @_cont_WorldToObject(%struct.DispatchSystemData* nocapt
 declare !types !36 i32 @_cont_HitKind(%struct.SystemData* nocapture readnone, %struct.HitData*) #1
 
 ; Function Attrs: nounwind
-define void @Intersection() #3 {
+define void @Intersection() #3 !lgc.rt.shaderstage !41 {
   ret void
 }
 
@@ -186,3 +186,4 @@ attributes #4 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 !38 = !{i32 0, %struct.RayPayload poison}
 !39 = !{!"function", !"void", i64 poison, !40}
 !40 = !{i32 0, i8 poison}
+!41 = !{i32 1}

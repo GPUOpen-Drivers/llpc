@@ -30,7 +30,7 @@
 
 #define GET_INCLUDES
 #define GET_DIALECT_DECLS
-#include "lgccps/LgcCpsDialect.h.inc"
+#include "LgcCpsDialect.h.inc"
 
 namespace llvm {
 class Type;
@@ -39,6 +39,17 @@ class DataLayout;
 } // namespace llvm
 
 namespace lgc::cps {
+enum class CpsShaderStage : uint8_t {
+  RayGen = 0,
+  Traversal,
+  Intersection,
+  AnyHit,
+  ClosestHit,
+  Miss,
+  Callable,
+  Count,
+};
+
 enum class CpsLevel : uint8_t {
   RayGen = 0,
   ClosestHit_Miss_Callable,
@@ -60,4 +71,6 @@ getRemainingArgumentDwords(const llvm::DataLayout &DL,
 bool isCpsFunction(const llvm::Function &fn);
 void setCpsFunctionLevel(llvm::Function &fn, CpsLevel level);
 CpsLevel getCpsLevelFromFunction(const llvm::Function &fn);
+CpsLevel getCpsLevelForShaderStage(CpsShaderStage stage);
+uint8_t getPotentialCpsReturnLevels(CpsShaderStage stage);
 } // namespace lgc::cps

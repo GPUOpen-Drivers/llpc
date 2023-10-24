@@ -160,10 +160,11 @@ public:
                               //  descriptor entry, rather than DescriptorBuffer/DescriptorBufferCompact
     BufferFlagNonConst = 8,   // Non-const buffer: Find a DescriptorBuffer/DescriptorBufferCompact descriptor
                               //  entry, rather than DescriptorConstBuffer/DescriptorConstBufferCompact/InlineBuffer
-    BufferFlagShaderResource = 16,  // Flag to find a Descriptor Resource
-    BufferFlagSampler = 32,         // Flag to find Descriptor Sampler
-    BufferFlagAddress = 64,         // Flag to return an i64 address of the descriptor
-    BufferFlagAttachedCounter = 128 // Flag to return the counter buffer descriptor attached to the main buffer.
+    BufferFlagShaderResource = 16,   // Flag to find a Descriptor Resource
+    BufferFlagSampler = 32,          // Flag to find Descriptor Sampler
+    BufferFlagAddress = 64,          // Flag to return an i64 address of the descriptor
+    BufferFlagAttachedCounter = 128, // Flag to return the counter buffer descriptor attached to the main buffer.
+    BufferFlagForceRawView = 256     // Flag to convert the buffer descriptor to raw view.
   };
 
   // Get the type of a built-in -- static edition of the method below, so you can use it without a BuilderDefs object.
@@ -1422,7 +1423,7 @@ public:
   // @param value : The value to read from the chosen rotated lane to all active lanes.
   // @param delta : The delta/offset added to lane id.
   // @param clusterSize : The cluster size if exists.
-  // @param instName : Name to give instruction.
+  // @param instName : Name to give final instruction.
   llvm::Value *CreateSubgroupRotate(llvm::Value *const value, llvm::Value *const delta, llvm::Value *const clusterSize,
                                     const llvm::Twine &instName = "");
 

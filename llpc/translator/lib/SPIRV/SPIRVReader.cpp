@@ -45,13 +45,13 @@
 #include "SPIRVType.h"
 #include "SPIRVUtil.h"
 #include "SPIRVValue.h"
-#include "lgcrt/LgcRtDialect.h"
 #include "llpcCompiler.h"
 #include "llpcContext.h"
 #include "llpcDialect.h"
 #include "llpcPipelineContext.h"
 #include "llpcRayTracingContext.h"
 #include "lgc/LgcDialect.h"
+#include "lgc/LgcRtDialect.h"
 #include "lgc/Pipeline.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -1202,6 +1202,7 @@ FastMathFlags SPIRVToLLVM::getFastMathFlags(SPIRVValue *bv) {
     return {};
 
   FastMathFlags fmf;
+
   fmf.setAllowReciprocal();
   if (!ty->isTypeFloat(64)) {
     // Only do this for half and float, not double, to avoid problems with Vulkan CTS precision_double tests.
@@ -5548,7 +5549,16 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     SPIRVUnary *bc = static_cast<SPIRVUnary *>(bv);
     bool isFine = oc == OpDPdyFine;
     Value *val0 = transValue(bc->getOperand(0), f, bb);
-    return mapValue(bv, getBuilder()->CreateDerivative(val0, /*isY=*/true, isFine));
+    Value *dpdy = getBuilder()->CreateDerivative(val0, /*isY=*/true, isFine);
+
+    auto llpcContext = static_cast<Llpc::Context *>(m_context);
+    if (llpcContext->getPipelineType() == PipelineType::Graphics) {
+      auto buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(llpcContext->getPipelineBuildInfo());
+      if (buildInfo->originUpperLeft)
+        dpdy = getBuilder()->CreateFNeg(dpdy);
+    }
+
+    return mapValue(bv, dpdy);
   }
 
   case OpFwidth:
@@ -7541,7 +7551,6 @@ bool SPIRVToLLVM::transMetadata() {
         execModel == ExecutionModelTaskEXT || execModel == ExecutionModelMeshEXT) {
       // Give the shader modes to middle-end
       if (execModel == ExecutionModelVertex) {
-        // Currently, nothing to set
       } else if (execModel == ExecutionModelTessellationControl || execModel == ExecutionModelTessellationEvaluation) {
         TessellationMode tessellationMode = {};
 

@@ -185,8 +185,6 @@ uint64_t getInlineHitAttrsBytes(Module &M);
 
 /// Extract a function from a constant metadata node, ignoring any bitcasts.
 Function *extractFunctionOrNull(Metadata *N);
-void analyzeShaderKinds(Module &M,
-                        MapVector<Function *, DXILShaderKind> &ShaderKinds);
 
 /// Returns true if a call to the given function should be rematerialized
 /// in a shader of the specified kind.
@@ -368,21 +366,22 @@ public:
   }
 };
 
-class DXILContPreCoroutinePass
-    : public llvm::PassInfoMixin<DXILContPreCoroutinePass> {
+class PreCoroutineLoweringPass
+    : public llvm::PassInfoMixin<PreCoroutineLoweringPass> {
 public:
-  DXILContPreCoroutinePass();
+  PreCoroutineLoweringPass();
   llvm::PreservedAnalyses run(llvm::Module &Module,
                               llvm::ModuleAnalysisManager &AnalysisManager);
 
   static llvm::StringRef name() {
-    return "DXIL continuation pre coroutine preparation";
+    return "Continuation pre coroutine preparation";
   }
 
 private:
   bool splitBB();
   bool removeInlinedIntrinsics();
   bool lowerGetShaderKind();
+  bool lowerGetCurrentFuncAddr();
 
   Module *Mod;
 };
@@ -415,9 +414,6 @@ private:
   bool
   lowerGetResumePointAddr(llvm::Module &M, llvm::IRBuilder<> &B,
                           const MapVector<Function *, FunctionData> &ToProcess);
-
-  bool lowerGetCurrentFuncAddr(llvm::Module &M, llvm::IRBuilder<> &B);
-
   void handleInitialContinuationStackPtr(IRBuilder<> &B, Function &F);
   void handleLgcRtIntrinsic(Function &F);
   void handleRegisterBufferSetPointerBarrier(Function &F,

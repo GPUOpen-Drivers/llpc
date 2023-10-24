@@ -31,12 +31,12 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-i1:32-i8:8-i16:32-i32:32-
 @"\01?myAccelerationStructure@@3URaytracingAccelerationStructure@@A" = external constant %dx.types.Handle, align 4
 @"\01?gOutput@@3V?$RWTexture2D@V?$vector@M$03@@@@A" = external constant %dx.types.Handle, align 4
 
-; CHECK: %struct.MyPayload.attr_max_4_i32s.layout_0_caller_out = type { [6 x i32] }
-; CHECK: %struct.MyPayload.attr_max_8_i32s.layout_0_caller_out = type { [10 x i32] }
-; CHECK: %struct.MyPayload.attr_max_2_i32s.layout_0_caller_out = type { [4 x i32] }
+; CHECK-DAG: %struct.MyPayload.attr_max_2_i32s.layout_0_caller_out = type { [4 x i32] }
+; CHECK-DAG: %struct.MyPayload.attr_max_4_i32s.layout_0_caller_out = type { [6 x i32] }
+; CHECK-DAG: %struct.MyPayload.attr_max_8_i32s.layout_0_caller_out = type { [10 x i32] }
 ; If the app uses only 1 DWord for hit attributes, then the layout does not get smaller.
 ; Instead, one 1 DWord in system data is unused.
-; CHECK: %struct.MyPayload.attr_max_1_i32s.layout_0_caller_out = type { [4 x i32] }
+; CHECK-DAG: %struct.MyPayload.attr_max_1_i32s.layout_0_caller_out = type { [4 x i32] }
 
 ; CHECK-LABEL: define {{.*}} @AnyHit1DWordsMax1DWords(
 ; CHECK:       {{.*}}%struct.MyPayload.attr_max_1_i32s.layout_2_anyhit_out_accept

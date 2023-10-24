@@ -154,15 +154,20 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
           shaderModuleUsage.useGenericBuiltIn = true;
           break;
         }
+        case BuiltInBaryCoordKHR:
+        case BuiltInBaryCoordNoPerspKHR:
+          shaderModuleUsage.useBarycentric = true;
+          break;
         default: {
           break;
         }
         }
-      }
-      if (decoration == DecorationLocation) {
+      } else if (decoration == DecorationLocation) {
         auto location = (opCode == OpDecorate) ? codePos[3] : codePos[4];
         if (location == static_cast<unsigned>(Vkgc::GlCompatibilityInOutLocation::ClipVertex))
           shaderModuleUsage.useClipVertex = true;
+      } else if (decoration == DecorationPerVertexKHR) {
+        shaderModuleUsage.useBarycentric = true;
       }
       break;
     }

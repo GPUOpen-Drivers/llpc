@@ -175,6 +175,22 @@ Value *BuilderImpl::CreateBufferDesc(uint64_t descSet, unsigned binding, Value *
     descPtr = CreateBitCast(descPtr, getDescPtrTy(resType));
     // Load the descriptor.
     desc = CreateLoad(getDescTy(resType), descPtr);
+
+    // Force convert the buffer view to raw view.
+    if (flags & BufferFlagForceRawView) {
+      Value *desc1 = CreateExtractElement(desc, 1);
+      Value *desc2 = CreateExtractElement(desc, 2);
+      Value *desc3 = CreateExtractElement(desc, 3);
+      // stride is 14 bits in dword1[29:16]
+      Value *stride = CreateAnd(CreateLShr(desc1, getInt32(16)), getInt32(0x3fff));
+      stride = CreateBinaryIntrinsic(Intrinsic::smax, stride, getInt32(1));
+      // set srd with new stride = 0 and new num_record = stride * num_record, num_record is dword2[31:0]
+      desc = CreateInsertElement(desc, CreateAnd(desc1, getInt32(0xc000ffff)), 1);
+      desc = CreateInsertElement(desc, CreateMul(stride, desc2), 2);
+      // gfx10 and gfx11 have oob fields with 2 bits in dword3[29:28] here force to set to 3 as OOB_COMPLETE mode.
+      if (getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 10)
+        desc = CreateInsertElement(desc, CreateOr(desc3, getInt32(0x30000000)), 3);
+    }
   }
 
   if (node && (node->concreteType == ResourceNodeType::DescriptorBufferCompact ||
@@ -257,7 +273,8 @@ Value *BuilderImpl::CreateGetDescPtr(ResourceNodeType concreteType, ResourceNode
     // to that. For a simple non-variably-indexed immutable sampler not passed through a function call
     // or phi node, we rely on subsequent LLVM optimizations promoting the value back to a constant.
     StringRef startGlobalName = lgcName::ImmutableSamplerGlobal;
-    std::string globalName = (startGlobalName + Twine(node->set) + "_" + Twine(node->binding)).str();
+    std::string globalName =
+        (startGlobalName + Twine(node->set) + "_" + Twine(node->binding) + "_" + Twine(node->visibility)).str();
     Module *module = GetInsertPoint()->getModule();
     descPtr = module->getGlobalVariable(globalName, /*AllowInternal=*/true);
     if (!descPtr) {

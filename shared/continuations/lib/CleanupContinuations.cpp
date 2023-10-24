@@ -58,7 +58,7 @@
 
 #include "continuations/Continuations.h"
 #include "continuations/ContinuationsDialect.h"
-#include "lgccps/LgcCpsDialect.h"
+#include "lgc/LgcCpsDialect.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -200,18 +200,17 @@ void CleanupContinuationsPass::updateCpsStack(Function *F, Function *NewFunc,
 
   SmallVector<Instruction *> ToBeRemoved;
   Value *OldBase = getContinuationFramePtr(F, IsStart, CpsInfo, ToBeRemoved);
+  OldBase->mutateType(Builder->getPtrTy(cps::stackAddrSpace));
 
   // Traversal through the users and setup the addrspace for the cps stack
   // pointers.
-  // TODO: Investigate whether we can do this through mutateType().
   SmallVector<Value *> Worklist(OldBase->users());
-  DenseMap<Value *, Value *> Replaced;
-  Replaced.insert(std::pair(OldBase, CpsStack));
+  OldBase->replaceAllUsesWith(CpsStack);
 
   while (!Worklist.empty()) {
     Value *Ptr = Worklist.pop_back_val();
-
     Instruction *Inst = cast<Instruction>(Ptr);
+    LLVM_DEBUG(dbgs() << "Visiting " << *Inst << '\n');
     switch (Inst->getOpcode()) {
     default:
       LLVM_DEBUG(Inst->dump());
@@ -230,49 +229,36 @@ void CleanupContinuationsPass::updateCpsStack(Function *F, Function *NewFunc,
     }
     case Instruction::Load:
     case Instruction::Store:
-      Ptr = getLoadStorePointerOperand(Inst);
-      Inst->replaceUsesOfWith(Ptr, Replaced.at(Ptr));
       // No further processing needed for the users.
       continue;
     case Instruction::And:
     case Instruction::Add:
+    case Instruction::PtrToInt:
       break;
     case Instruction::AddrSpaceCast:
-      Replaced.insert(std::pair(Inst, Replaced.at(Inst)));
+      assert(Inst->getOperand(0)->getType()->getPointerAddressSpace() ==
+             cps::stackAddrSpace);
+      // Push the correct users before RAUW.
+      Worklist.append(Ptr->users().begin(), Ptr->users().end());
+      Inst->mutateType(Builder->getPtrTy(cps::stackAddrSpace));
+      Inst->replaceAllUsesWith(Inst->getOperand(0));
       ToBeRemoved.push_back(Inst);
-      break;
-    case Instruction::PtrToInt: {
-      Builder->SetInsertPoint(Inst);
-      auto *NewInst = Builder->CreatePtrToInt(Replaced.at(Inst->getOperand(0)),
-                                              Inst->getType());
-      Replaced.insert(std::pair(Inst, NewInst));
-      ToBeRemoved.push_back(Inst);
-      break;
-    }
-    case Instruction::IntToPtr: {
-      Builder->SetInsertPoint(Inst);
-      auto *NewInst = Builder->CreateIntToPtr(
-          Inst->getOperand(0), Builder->getPtrTy(lgc::cps::stackAddrSpace));
-      Replaced.insert(std::pair(Inst, NewInst));
-      ToBeRemoved.push_back(Inst);
-      break;
-    }
+      continue;
+    case Instruction::IntToPtr:
     case Instruction::GetElementPtr: {
-      GetElementPtrInst *GEP = cast<GetElementPtrInst>(Ptr);
-      Builder->SetInsertPoint(GEP);
-      SmallVector<Value *, 8> Indexes(GEP->idx_begin(), GEP->idx_end());
-
-      Value *NewGEP = nullptr;
-      auto *NewPtr = Replaced.at(GEP->getPointerOperand());
-      auto *ElemTy = GEP->getSourceElementType();
-      if (GEP->isInBounds())
-        NewGEP = Builder->CreateInBoundsGEP(ElemTy, NewPtr, Indexes);
-      else
-        NewGEP = Builder->CreateGEP(ElemTy, NewPtr, Indexes);
-      Replaced.insert(std::pair(GEP, NewGEP));
-      cast<Instruction>(NewGEP)->copyMetadata(*GEP);
-      ToBeRemoved.push_back(GEP);
+      Inst->mutateType(Builder->getPtrTy(cps::stackAddrSpace));
       break;
+    }
+    case Instruction::Select: {
+      // check whether the result type is already what we want
+      auto *OldType = Inst->getType();
+      auto *NewType = Builder->getPtrTy(cps::stackAddrSpace);
+      if (OldType != NewType) {
+        Inst->mutateType(NewType);
+        break;
+      }
+      // No further processing if the type is not changed.
+      continue;
     }
     }
 
@@ -441,7 +427,8 @@ void CleanupContinuationsPass::processContinuations() {
         removeContFreeCall(F, ContFree);
 
       // Create new empty function
-      F->eraseMetadata(FuncData.second.MD->getMetadataID());
+      if (FuncData.second.MD)
+        F->eraseMetadata(FuncData.second.MD->getMetadataID());
       auto &Context = F->getContext();
       auto *NewFuncTy =
           FunctionType::get(Type::getVoidTy(Context), AllArgTypes, false);

@@ -2487,6 +2487,10 @@ void NggPrimShader::loadStreamOutBufferInfo(Value *userData) {
   // Must enable SW emulated stream-out or primitive statistics counting
   assert(m_pipelineState->enableSwXfb() || m_pipelineState->enablePrimStats());
 
+  if (m_pipelineState->enablePrimStats() && !m_pipelineState->enableSwXfb() && m_gfxIp.major <= 11) {
+    return;
+  }
+
   calcStreamOutControlCbOffsets();
 
   // Helper to convert argument index to user data index

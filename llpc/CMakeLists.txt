@@ -127,7 +127,7 @@ if(ICD_BUILD_LLPC)
     endif()
 
     # Always link statically against libLLVMlgc
-    llvm_map_components_to_libnames(extra_llvm_libs LgcRt lgc LgcCps)
+    llvm_map_components_to_libnames(extra_llvm_libs lgc Continuations)
     if(NOT WIN32)
         foreach (lib ${extra_llvm_libs})
             target_compile_options(${lib} PRIVATE "-fno-aligned-new")

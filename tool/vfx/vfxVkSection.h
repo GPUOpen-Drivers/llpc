@@ -283,8 +283,6 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, workaroundStorageImageFormats, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, workaroundInitializeOutputsToZero, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableFMA, MemberTypeBool, false);
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, backwardPropagateNoContract, MemberTypeBool, false);
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forwardPropagateNoContract, MemberTypeBool, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
