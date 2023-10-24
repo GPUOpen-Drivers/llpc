@@ -1238,6 +1238,9 @@ bool PatchResourceCollect::isVertexReuseDisabled() {
   } else if (hasVs)
     useViewportIndex = m_pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs.viewportIndex;
 
+  if (m_pipelineState->getInputAssemblyState().multiView == MultiViewMode::PerView)
+    useViewportIndex = true;
+
   disableVertexReuse |= useViewportIndex;
 
   return disableVertexReuse;
@@ -2353,7 +2356,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
     if (builtInUsage.gs.viewportIndex)
       mapGsBuiltInOutput(BuiltInViewportIndex, 1);
 
-    if (m_pipelineState->getInputAssemblyState().enableMultiView)
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable)
       mapGsBuiltInOutput(BuiltInViewIndex, 1);
 
     if (builtInUsage.gs.primitiveShadingRate)

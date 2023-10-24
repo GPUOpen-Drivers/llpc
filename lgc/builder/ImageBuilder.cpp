@@ -1964,7 +1964,7 @@ Value *BuilderImpl::patchCubeDescriptor(Value *desc, unsigned dim) {
 Value *BuilderImpl::handleFragCoordViewIndex(Value *coord, unsigned flags, unsigned &dim) {
   bool useViewIndex = false;
   if (flags & ImageFlagCheckMultiView) {
-    if (getPipelineState()->getInputAssemblyState().enableMultiView) {
+    if (getPipelineState()->getInputAssemblyState().multiView != MultiViewMode::Disable) {
       useViewIndex = true;
       dim = Dim2DArray;
       unsigned coordCount = cast<FixedVectorType>(coord->getType())->getNumElements();
@@ -2031,9 +2031,11 @@ Value *BuilderImpl::handleFragCoordViewIndex(Value *coord, unsigned flags, unsig
     std::string callName = lgcName::InputImportBuiltIn;
     Type *builtInTy = getInt32Ty();
     addTypeMangling(builtInTy, {}, callName);
-    Value *viewIndex = CreateNamedCall(callName, builtInTy, getInt32(BuiltInViewIndex), {});
-    viewIndex->setName("ViewIndex");
-    coord = CreateInsertElement(coord, viewIndex, 2);
+    Value *rtLayer = CreateNamedCall(callName, builtInTy, getInt32(BuiltInViewIndex), {});
+    if (getPipelineState()->getInputAssemblyState().multiView == MultiViewMode::PerView)
+      rtLayer = CreateLShr(rtLayer, getInt32(8)); // RT layer id is in the high 24 bits of view index.
+    rtLayer->setName("Layer");
+    coord = CreateInsertElement(coord, rtLayer, 2);
   }
 
   return coord;

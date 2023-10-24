@@ -1242,7 +1242,7 @@ void MeshTaskShader::lowerGetMeshBuiltinInput(GetMeshBuiltinInputOp &getMeshBuil
     break;
   }
   case BuiltInViewIndex: {
-    if (m_pipelineState->getInputAssemblyState().enableMultiView) {
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable) {
       auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
       input = getFunctionArgument(entryPoint, entryArgIdxs.viewIndex);
     } else {
@@ -1754,23 +1754,46 @@ void MeshTaskShader::exportPrimitive() {
   if (builtInUsage.layer)
     layer = readMeshBuiltInFromLds(BuiltInLayer);
 
-  Value *viewIndex = nullptr;
-  const bool enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
+  Value *viewportIndex = nullptr;
+  if (builtInUsage.viewportIndex)
+    viewportIndex = readMeshBuiltInFromLds(BuiltInViewportIndex);
+
+  Value *fsLayer = layer;
+  Value *fsViewportIndex = viewportIndex;
+
+  const bool enableMultiView = m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable;
   if (enableMultiView) {
     auto entryPoint = m_builder.GetInsertBlock()->getParent();
     const auto entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
-    viewIndex = getFunctionArgument(entryPoint, entryArgIdxs.viewIndex);
+    Value *viewId = getFunctionArgument(entryPoint, entryArgIdxs.viewIndex);
+
+    // RT layer id is view id in simple mode (view index only).
+    Value *layerFromViewId = viewId;
+    if (m_pipelineState->getInputAssemblyState().multiView == MultiViewMode::PerView) {
+      // RT layer id is in the high 24 bits of view id in per-view mode.
+      layerFromViewId = m_builder.CreateLShr(viewId, m_builder.getInt32(8));
+      if (layer)
+        layerFromViewId = m_builder.CreateAdd(layerFromViewId, layer);
+      // Viewport index is in [7:4] of view id.
+      Value *viewportIndexFromViewId =
+          m_builder.CreateAnd(m_builder.CreateLShr(viewId, m_builder.getInt32(4)), m_builder.getInt32(0xF));
+      if (viewportIndex)
+        viewportIndexFromViewId = m_builder.CreateAdd(viewportIndexFromViewId, viewportIndex);
+      viewportIndex = viewportIndexFromViewId;
+    }
+
+    layer = layerFromViewId;
   }
 
-  if (enableMultiView || builtInUsage.layer) {
+  if (layer) {
     // [19:17] = RT slice index (on GFX11, [12:0] = RT slice index)
     // When multi-view is enabled, the input view index is treated as the output layer.
     Value *layerMaskAndShift = nullptr;
     if (m_gfxIp.major < 11) {
-      layerMaskAndShift = m_builder.CreateAnd(enableMultiView ? viewIndex : layer, 0x7);
+      layerMaskAndShift = m_builder.CreateAnd(layer, 0x7);
       layerMaskAndShift = m_builder.CreateShl(layerMaskAndShift, 17);
     } else {
-      layerMaskAndShift = m_builder.CreateAnd(enableMultiView ? viewIndex : layer, 0x1FFF);
+      layerMaskAndShift = m_builder.CreateAnd(layer, 0x1FFF);
     }
     if (primitivePayload)
       primitivePayload = m_builder.CreateOr(primitivePayload, layerMaskAndShift);
@@ -1778,10 +1801,8 @@ void MeshTaskShader::exportPrimitive() {
       primitivePayload = layerMaskAndShift;
   }
 
-  Value *viewportIndex = nullptr;
-  if (builtInUsage.viewportIndex) {
+  if (viewportIndex) {
     // [23:20] = Viewport index
-    viewportIndex = readMeshBuiltInFromLds(BuiltInViewportIndex);
     auto viewportIndexMaskAndShift = m_builder.CreateAnd(viewportIndex, 0xF);
     viewportIndexMaskAndShift = m_builder.CreateShl(viewportIndexMaskAndShift, 20);
     if (primitivePayload)
@@ -1853,7 +1874,7 @@ void MeshTaskShader::exportPrimitive() {
       if (fsBuiltInUsage.layer) {
         // NOTE: In such case, mesh shader doesn't export layer while fragment shader expects to read it. We
         // export 0 to fragment shader, which is required by the spec.
-        layer = m_builder.getInt32(0);
+        fsLayer = m_builder.getInt32(0);
         exportLayer = true;
       }
     }
@@ -1861,9 +1882,9 @@ void MeshTaskShader::exportPrimitive() {
 
   if (exportLayer) {
     if (inOutUsage.mesh.perPrimitiveBuiltInExportLocs.count(BuiltInLayer) > 0) {
-      assert(layer);
+      assert(fsLayer);
       const unsigned exportLoc = inOutUsage.mesh.perPrimitiveBuiltInExportLocs[BuiltInLayer];
-      primAttrExports.push_back({startLoc + exportLoc, layer});
+      primAttrExports.push_back({startLoc + exportLoc, fsLayer});
       ++inOutUsage.primExpCount;
     }
   }
@@ -1878,7 +1899,7 @@ void MeshTaskShader::exportPrimitive() {
       if (fsBuiltInUsage.viewportIndex) {
         // NOTE: In such case, mesh shader doesn't export viewport index while fragment shader expects to read it. We
         // export 0 to fragment shader, which is required by spec.
-        viewportIndex = m_builder.getInt32(0);
+        fsViewportIndex = m_builder.getInt32(0);
         exportViewportIndex = true;
       }
     }
@@ -1886,9 +1907,9 @@ void MeshTaskShader::exportPrimitive() {
 
   if (exportViewportIndex) {
     if (inOutUsage.mesh.perPrimitiveBuiltInExportLocs.count(BuiltInViewportIndex) > 0) {
-      assert(viewportIndex);
+      assert(fsViewportIndex);
       const unsigned exportLoc = inOutUsage.mesh.perPrimitiveBuiltInExportLocs[BuiltInViewportIndex];
-      primAttrExports.push_back({startLoc + exportLoc, viewportIndex});
+      primAttrExports.push_back({startLoc + exportLoc, fsViewportIndex});
       ++inOutUsage.primExpCount;
     }
   }

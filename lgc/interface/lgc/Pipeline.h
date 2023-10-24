@@ -463,12 +463,20 @@ struct ColorExportState {
   unsigned dynamicDualSourceBlendEnable; // Dynamic dual source blend enable
 };
 
+// MultiView supporting mode
+enum class MultiViewMode : unsigned {
+  Disable = 0, // Disabled
+  Simple = 1,  // Current Vulkan behavior, i.e. RT layer set to view index, viewport index set by shader
+  PerView = 2, // Both RT layer and viewport index set by shader (with shader output defaulting to 0),
+               // offset by a base that's taken from the ViewId userdata
+};
+
 // Struct to pass to SetInputAssemblyState.
 struct InputAssemblyState {
   PrimitiveType primitiveType;       // Primitive type
   unsigned disableVertexReuse;       // Disable reusing vertex shader output for indexed draws
   unsigned switchWinding;            // Whether to reverse vertex ordering for tessellation
-  unsigned enableMultiView;          // Whether to enable multi-view support
+  MultiViewMode multiView;           // MultiView mode
   unsigned useVertexBufferDescArray; // Whether vertex buffer descriptors are in a descriptor array binding instead of
                                      // the VertexBufferTable
 };
