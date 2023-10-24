@@ -2421,9 +2421,10 @@ void SpirvLowerGlobal::addCallInstForXfbOutput(const ShaderInOutMetadata &output
                                                unsigned xfbBufferAdjust, unsigned xfbOffsetAdjust, unsigned locOffset,
                                                lgc::InOutInfo outputInfo) {
   assert(m_shaderStage == m_lastVertexProcessingStage);
-  auto pipelineBuildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
   DenseMap<unsigned, Vkgc::XfbOutInfo> *locXfbMapPtr = outputMeta.IsBuiltIn ? &m_builtInXfbMap : &m_genericXfbMap;
-  if (pipelineBuildInfo->apiXfbOutData.forceDisableStreamOut || (locXfbMapPtr->empty() && !outputMeta.IsXfb))
+  bool hasXfbMetadata = m_entryPoint->getMetadata(lgc::XfbStateMetadataName);
+  bool hasXfbOut = hasXfbMetadata && (!locXfbMapPtr->empty() || outputMeta.IsXfb);
+  if (!hasXfbOut)
     return;
 
   // If the XFB info is specified from API interface so we try to retrieve the info from m_locXfbMap. Otherwise, the XFB
