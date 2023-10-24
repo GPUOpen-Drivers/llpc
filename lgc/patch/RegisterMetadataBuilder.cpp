@@ -563,7 +563,7 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
   if (m_hasMesh) {
     maxVertsPerSubgroup = std::min(meshMode.outputVertices, NggMaxThreadsPerSubgroup);
     threadsPerSubgroup = calcFactor.primAmpFactor;
-    const bool enableMultiView = m_pipelineState->getInputAssemblyState().multiView != MultiViewModeDisable;
+    const bool enableMultiView = m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable;
     bool hasPrimitivePayload = meshBuiltInUsage.layer || meshBuiltInUsage.viewportIndex ||
                                meshBuiltInUsage.primitiveShadingRate || enableMultiView;
     if (m_gfxIp.major < 11)
@@ -1208,9 +1208,9 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
       expCount = resUsage->inOutUsage.expCount;
     }
 
-    useLayer = useLayer || m_pipelineState->getInputAssemblyState().multiView != MultiViewModeDisable;
+    useLayer = useLayer || m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable;
     // useViewportIndex must be set in this mode as API shader may not export viewport index.
-    if (m_pipelineState->getInputAssemblyState().multiView == MultiViewModePerView) {
+    if (m_pipelineState->getInputAssemblyState().multiView == MultiViewMode::PerView) {
       useViewportIndexImplicitly = !useViewportIndex;
       useViewportIndex = true;
     }

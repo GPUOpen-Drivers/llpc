@@ -453,7 +453,7 @@ template <typename T> void ConfigBuilder::buildVsRegConfig(ShaderStage shaderSta
   }
 
   // In this mode, API shader may not export viewport index but LGC does so.
-  if (m_pipelineState->getInputAssemblyState().multiView == MultiViewModePerView)
+  if (m_pipelineState->getInputAssemblyState().multiView == MultiViewMode::PerView)
     useViewportIndex = true;
 
   SET_REG_FIELD(&config->vsRegs, VGT_PRIMITIVEID_EN, PRIMITIVEID_EN, usePrimitiveId);
@@ -476,7 +476,7 @@ template <typename T> void ConfigBuilder::buildVsRegConfig(ShaderStage shaderSta
 
   SET_REG_FIELD(&config->vsRegs, VGT_VERTEX_REUSE_BLOCK_CNTL, VTX_REUSE_DEPTH, 14);
 
-  useLayer = useLayer || m_pipelineState->getInputAssemblyState().multiView != MultiViewModeDisable;
+  useLayer = useLayer || m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable;
 
   bool miscExport = usePointSize || useLayer || useViewportIndex || useEdgeFlag;
   if (miscExport) {

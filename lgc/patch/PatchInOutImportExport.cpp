@@ -1090,7 +1090,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
 
         // NOTE: Implicitly store the value of view index to GS-VS ring buffer for raster stream if multi-view is
         // enabled. Copy shader will read the value from GS-VS ring and export it to vertex position data.
-        if (m_pipelineState->getInputAssemblyState().multiView != MultiViewModeDisable) {
+        if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable) {
           auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
           auto rasterStream = m_pipelineState->getRasterizerState().rasterStream;
 
@@ -1252,7 +1252,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       cullDistanceCount = builtInUsage.cullDistance;
     }
 
-    const auto enableMultiView = m_pipelineState->getInputAssemblyState().multiView != MultiViewModeDisable;
+    const auto enableMultiView = m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable;
     if (enableMultiView) {
       if (m_shaderStage == ShaderStageVertex) {
         auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
@@ -1452,7 +1452,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       BuilderBase builder(*m_context);
       builder.SetInsertPoint(insertPos);
 
-      if (m_pipelineState->getInputAssemblyState().multiView == MultiViewModePerView) {
+      if (m_pipelineState->getInputAssemblyState().multiView == MultiViewMode::PerView) {
         assert(m_viewIndex);
         // Get viewportIndex from viewIndex.
         viewportIndex = builder.CreateAnd(builder.CreateLShr(m_viewIndex, builder.getInt32(4)), builder.getInt32(0xF));
@@ -1460,7 +1460,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
         layer = builder.CreateLShr(m_viewIndex, builder.getInt32(8));
         if (useLayer)
           layer = builder.CreateAdd(m_layer, layer);
-      } else if (m_pipelineState->getInputAssemblyState().multiView == MultiViewModeSimple) {
+      } else if (m_pipelineState->getInputAssemblyState().multiView == MultiViewMode::Simple) {
         assert(m_viewIndex);
         layer = m_viewIndex;
       } else if (useLayer) {
@@ -1497,7 +1497,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
           ConstantInt::get(Type::getInt1Ty(*m_context), false)              // vm
       };
 
-      builder.CreateNamedCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {});
+      builder.CreateIntrinsic(Intrinsic::amdgcn_exp, Type::getFloatTy(*m_context), args, {});
 
       // NOTE: We have to export gl_ViewportIndex via generic outputs as well.
       if (useViewportIndex) {
@@ -2202,7 +2202,7 @@ Value *PatchInOutImportExport::patchTcsBuiltInInputImport(Type *inputTy, unsigne
     break;
   }
   case BuiltInViewIndex: {
-    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewModeDisable)
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable)
       input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
     else
       input = builder.getInt32(0);
@@ -2330,7 +2330,7 @@ Value *PatchInOutImportExport::patchTesBuiltInInputImport(Type *inputTy, unsigne
     break;
   }
   case BuiltInViewIndex: {
-    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewModeDisable)
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable)
       input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
     else
       input = builder.getInt32(0);
@@ -2381,7 +2381,7 @@ Value *PatchInOutImportExport::patchGsBuiltInInputImport(Type *inputTy, unsigned
     break;
   }
   case BuiltInViewIndex: {
-    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewModeDisable)
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable)
       input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
     else
       input = builder.getInt32(0);
@@ -2588,7 +2588,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     break;
   }
   case BuiltInViewIndex: {
-    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewModeDisable)
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable)
       input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
     else
       input = builder.getInt32(0);
@@ -4987,7 +4987,7 @@ void PatchInOutImportExport::addExportInstForBuiltInOutput(Value *output, unsign
 
     // NOTE: Only export gl_Layer when multi-view is disabled. Otherwise, we will export gl_ViewIndex to vertex position
     // data.
-    const auto enableMultiView = m_pipelineState->getInputAssemblyState().multiView != MultiViewModeDisable;
+    const auto enableMultiView = m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable;
     if (!enableMultiView) {
       Value *args[] = {
           ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_POS_1), // tgt

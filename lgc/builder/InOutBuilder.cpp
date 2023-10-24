@@ -1310,7 +1310,7 @@ Value *BuilderImpl::readVsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
   case BuiltInInstanceIndex:
     return ShaderInputs::getInstanceIndex(builder, *getLgcContext());
   case BuiltInViewIndex:
-    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewModeDisable)
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable)
       return ShaderInputs::getSpecialUserData(UserDataMapping::ViewId, builder);
     return builder.getInt32(0);
   case BuiltInVertexId:

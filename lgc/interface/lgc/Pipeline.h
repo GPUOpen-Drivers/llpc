@@ -464,11 +464,11 @@ struct ColorExportState {
 };
 
 // MultiView supporting mode
-enum MultiViewMode : unsigned {
-  MultiViewModeDisable = 0, // Disabled
-  MultiViewModeSimple = 1,  // Current Vulkan behavior, i.e. RT layer set to view index, viewport index set by shader
-  MultiViewModePerView = 2, // Both RT layer and viewport index set by shader (with shader output defaulting to 0),
-                            // offset by a base that's taken from the ViewId userdata
+enum class MultiViewMode : unsigned {
+  Disable = 0, // Disabled
+  Simple = 1,  // Current Vulkan behavior, i.e. RT layer set to view index, viewport index set by shader
+  PerView = 2, // Both RT layer and viewport index set by shader (with shader output defaulting to 0),
+               // offset by a base that's taken from the ViewId userdata
 };
 
 // Struct to pass to SetInputAssemblyState.

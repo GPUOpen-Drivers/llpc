@@ -511,7 +511,7 @@ void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
   if (builtInUsage.viewportIndex)
     builtInPairs.push_back(std::make_pair(BuiltInViewportIndex, builder.getInt32Ty()));
 
-  if (m_pipelineState->getInputAssemblyState().multiView != MultiViewModeDisable)
+  if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable)
     builtInPairs.push_back(std::make_pair(BuiltInViewIndex, builder.getInt32Ty()));
 
   if (builtInUsage.primitiveShadingRate)
