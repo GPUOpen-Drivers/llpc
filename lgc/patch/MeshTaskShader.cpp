@@ -1765,7 +1765,7 @@ void MeshTaskShader::exportPrimitive() {
   if (enableMultiView) {
     auto entryPoint = m_builder.GetInsertBlock()->getParent();
     const auto entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
-    Value *viewId = getFunctionArgument(entryPoint, entryArgIdxs.viewIndex);
+    Value *viewId = getFunctionArgument(entryPoint, entryArgIdxs.viewId);
 
     // RT layer id is view id in simple mode (view index only).
     Value *layerFromViewId = viewId;
