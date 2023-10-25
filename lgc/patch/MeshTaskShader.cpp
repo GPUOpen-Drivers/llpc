@@ -1244,7 +1244,7 @@ void MeshTaskShader::lowerGetMeshBuiltinInput(GetMeshBuiltinInputOp &getMeshBuil
   case BuiltInViewIndex: {
     if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable) {
       auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
-      input = getFunctionArgument(entryPoint, entryArgIdxs.viewIndex);
+      input = getFunctionArgument(entryPoint, entryArgIdxs.viewId);
     } else {
       input = m_builder.getInt32(0);
     }
@@ -1618,7 +1618,7 @@ Function *MeshTaskShader::mutateMeshShaderEntryPoint(Function *entryPoint) {
   // Adjust indices of existing entry-point arguments
   auto &entryArgIdx = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
   entryArgIdx.drawIndex += NumSpecialSgprInputs;
-  entryArgIdx.viewIndex += NumSpecialSgprInputs;
+  entryArgIdx.viewId += NumSpecialSgprInputs;
   entryArgIdx.dispatchDims += NumSpecialSgprInputs;
   entryArgIdx.baseRingEntryIndex += NumSpecialSgprInputs;
   entryArgIdx.pipeStatsBuf += NumSpecialSgprInputs;
