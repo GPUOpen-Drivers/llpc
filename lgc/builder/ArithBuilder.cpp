@@ -236,8 +236,7 @@ Value *BuilderImpl::CreateSMod(Value *dividend, Value *divisor, const Twine &ins
 }
 
 // =====================================================================================================================
-// Create FP modulo operation, where the sign of the result (if not zero) is the same as the sign
-// of the divisor.
+// Create FP modulo operation, where the sign of the result is the same as the sign of the divisor.
 //
 // @param dividend : Dividend value
 // @param divisor : Divisor value
@@ -246,6 +245,28 @@ Value *BuilderImpl::CreateFMod(Value *dividend, Value *divisor, const Twine &ins
   Value *quotient = CreateFMul(CreateFDiv(ConstantFP::get(divisor->getType(), 1.0), divisor), dividend);
   Value *floor = CreateUnaryIntrinsic(Intrinsic::floor, quotient);
   return CreateFSub(dividend, CreateFMul(divisor, floor), instName);
+}
+
+// =====================================================================================================================
+// Create FP modulo operation, where the sign of the result is the same as the sign of the dividend.
+//
+// @param dividend : Dividend value
+// @param divisor : Divisor value
+// @param instName : Name to give instruction(s)
+Value *BuilderImpl::CreateFRem(Value *dividend, Value *divisor, const Twine &instName) {
+  Value *result = IRBuilder::CreateFRem(dividend, divisor);
+  if (!getFastMathFlags().noSignedZeros()) {
+    // NOTE: If the fast math flags might have signed zeros, we should check the special case when dividend is signed
+    // zero. According to SPIR-V spec, the result of FRem must have the same sign of the dividend but we lower FRem to
+    // this: frem(x, y) = x - y * trunc(x/y). When x=-0.0, we get an addition of (-0.0) + 0.0. HW returns +0.0 rather
+    // than -0.0, which violates the spec expectation.
+    Value *zero = Constant::getNullValue(divisor->getType());
+    Value *isZero = CreateFCmpOEQ(dividend, zero);
+    result = canonicalize(CreateSelect(isZero, dividend, result)); // Ensure we flush denorms as expected
+  }
+
+  result->setName(instName);
+  return result;
 }
 
 // =====================================================================================================================

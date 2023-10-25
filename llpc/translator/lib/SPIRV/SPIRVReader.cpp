@@ -5361,6 +5361,12 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
     Value *val1 = transValue(bc->getDivisor(), f, bb);
     return mapValue(bc, getBuilder()->CreateFMod(val0, val1));
   }
+  case OpFRem: {
+    SPIRVBinary *bc = static_cast<SPIRVBinary *>(bv);
+    Value *val0 = transValue(bc->getOperand(0), f, bb);
+    Value *val1 = transValue(bc->getOperand(1), f, bb);
+    return mapValue(bc, getBuilder()->CreateFRem(val0, val1));
+  }
   case OpFNegate: {
     SPIRVUnary *bc = static_cast<SPIRVUnary *>(bv);
     Value *val0 = transValue(bc->getOperand(0), f, bb);
