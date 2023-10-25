@@ -1090,6 +1090,15 @@ Result Compiler::BuildColorExportShader(const GraphicsPipelineBuildInfo *pipelin
 
   MetroHash::Hash cacheHash = {};
   MetroHash::Hash pipelineHash = {};
+  const FragmentOutputs *fsOuts = static_cast<const FragmentOutputs *>(fsOutputMetaData);
+  const uint8 *metaPtr = static_cast<const uint8 *>(fsOutputMetaData);
+  unsigned metaDatatSize = sizeof(FragmentOutputs) + fsOuts->fsOutInfoCount * sizeof(FsOutInfo);
+  MetroHash64 hasher;
+  hasher.Update(metaPtr, metaDatatSize);
+  hasher.Update(pipelineInfo->options);
+  hasher.Update(pipelineInfo->cbState);
+  hasher.Finalize(pipelineHash.bytes);
+
   GraphicsContext graphicsContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
   Context *context = acquireContext();
   context->attachPipelineContext(&graphicsContext);
@@ -1099,9 +1108,6 @@ Result Compiler::BuildColorExportShader(const GraphicsPipelineBuildInfo *pipelin
   auto onExit = make_scope_exit([&] { releaseContext(context); });
 
   SmallVector<ColorExportInfo, 8> exports;
-  const FragmentOutputs *fsOuts = static_cast<const FragmentOutputs *>(fsOutputMetaData);
-
-  const uint8 *metaPtr = static_cast<const uint8 *>(fsOutputMetaData);
   metaPtr = metaPtr + sizeof(FragmentOutputs);
   const FsOutInfo *outInfos = reinterpret_cast<const FsOutInfo *>(metaPtr);
 
