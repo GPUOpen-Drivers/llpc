@@ -485,13 +485,21 @@ public:
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateSMod(llvm::Value *dividend, llvm::Value *divisor, const llvm::Twine &instName = "");
 
-  // Create FP modulo operation, where the sign of the result (if not zero) is the same as
-  // the sign of the divisor. The result is undefined if divisor is zero.
+  // Create FP modulo operation, where the sign of the result is the same as the sign of the divisor. The result
+  // is undefined if divisor is zero.
   //
   // @param dividend : Dividend value
   // @param divisor : Divisor value
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateFMod(llvm::Value *dividend, llvm::Value *divisor, const llvm::Twine &instName = "");
+
+  // Create FP modulo operation, where the sign of the result is the same as the sign of the dividend. The result
+  // is undefined if divisor is zero.
+  //
+  // @param dividend : Dividend value
+  // @param divisor : Divisor value
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateFRem(llvm::Value *dividend, llvm::Value *divisor, const llvm::Twine &instName = "");
 
   // Create scalar/vector float/half fused multiply-and-add, to compute a * b + c
   //

@@ -152,6 +152,7 @@ public:
   // Create signed integer or FP modulo operation.
   llvm::Value *CreateSMod(llvm::Value *dividend, llvm::Value *divisor, const llvm::Twine &instName = "");
   llvm::Value *CreateFMod(llvm::Value *dividend, llvm::Value *divisor, const llvm::Twine &instName = "");
+  llvm::Value *CreateFRem(llvm::Value *dividend, llvm::Value *divisor, const llvm::Twine &instName = "");
 
   // Create scalar/vector float/half fused multiply-and-add, to compute a * b + c
   llvm::Value *CreateFma(llvm::Value *a, llvm::Value *b, llvm::Value *c, const llvm::Twine &instName = "");

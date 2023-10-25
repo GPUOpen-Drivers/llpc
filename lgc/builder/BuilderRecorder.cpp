@@ -82,6 +82,8 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "smod";
   case BuilderOpcode::FMod:
     return "fmod";
+  case BuilderOpcode::FRem:
+    return "frem";
   case BuilderOpcode::Fma:
     return "fma";
   case BuilderOpcode::Tan:
@@ -848,14 +850,23 @@ Value *Builder::CreateSMod(Value *dividend, Value *divisor, const Twine &instNam
 }
 
 // =====================================================================================================================
-// Create FP modulo operation, where the sign of the result (if not zero) is the same as the sign
-// of the divisor.
+// Create FP modulo operation, where the sign of the result is the same as the sign of the divisor.
 //
 // @param dividend : Dividend value
 // @param divisor : Divisor value
 // @param instName : Name to give instruction(s)
 Value *Builder::CreateFMod(Value *dividend, Value *divisor, const Twine &instName) {
   return record(BuilderOpcode::FMod, dividend->getType(), {dividend, divisor}, instName);
+}
+
+// =====================================================================================================================
+// Create FP modulo operation, where the sign of the result is the same as the sign of the dividend.
+//
+// @param dividend : Dividend value
+// @param divisor : Divisor value
+// @param instName : Name to give instruction(s)
+Value *Builder::CreateFRem(Value *dividend, Value *divisor, const Twine &instName) {
+  return record(BuilderOpcode::FRem, dividend->getType(), {dividend, divisor}, instName);
 }
 
 // =====================================================================================================================
@@ -2025,6 +2036,7 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::FMin3:
     case BuilderOpcode::FMix:
     case BuilderOpcode::FMod:
+    case BuilderOpcode::FRem:
     case BuilderOpcode::FSign:
     case BuilderOpcode::FaceForward:
     case BuilderOpcode::FindSMsb:

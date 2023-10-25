@@ -59,6 +59,7 @@ enum BuilderOpcode : unsigned {
   QuantizeToFp16,
   SMod,
   FMod,
+  FRem,
   Fma,
   Tan,
   ASin,

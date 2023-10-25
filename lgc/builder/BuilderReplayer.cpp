@@ -214,6 +214,10 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     return m_builder->CreateFMod(args[0], args[1]);
   }
 
+  case BuilderOpcode::FRem: {
+    return m_builder->CreateFRem(args[0], args[1]);
+  }
+
   case BuilderOpcode::Fma: {
     return m_builder->CreateFma(args[0], args[1], args[2]);
   }

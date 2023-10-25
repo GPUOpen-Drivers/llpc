@@ -236,8 +236,7 @@ Value *BuilderImpl::CreateSMod(Value *dividend, Value *divisor, const Twine &ins
 }
 
 // =====================================================================================================================
-// Create FP modulo operation, where the sign of the result (if not zero) is the same as the sign
-// of the divisor.
+// Create FP modulo operation, where the sign of the result is the same as the sign of the divisor.
 //
 // @param dividend : Dividend value
 // @param divisor : Divisor value
@@ -246,6 +245,28 @@ Value *BuilderImpl::CreateFMod(Value *dividend, Value *divisor, const Twine &ins
   Value *quotient = CreateFMul(CreateFDiv(ConstantFP::get(divisor->getType(), 1.0), divisor), dividend);
   Value *floor = CreateUnaryIntrinsic(Intrinsic::floor, quotient);
   return CreateFSub(dividend, CreateFMul(divisor, floor), instName);
+}
+
+// =====================================================================================================================
+// Create FP modulo operation, where the sign of the result is the same as the sign of the dividend.
+//
+// @param dividend : Dividend value
+// @param divisor : Divisor value
+// @param instName : Name to give instruction(s)
+Value *BuilderImpl::CreateFRem(Value *dividend, Value *divisor, const Twine &instName) {
+  Value *result = IRBuilder::CreateFRem(dividend, divisor);
+  if (!getFastMathFlags().noSignedZeros()) {
+    // NOTE: If the fast math flags might have signed zeros, we should check the special case when dividend is signed
+    // zero. Although SPIR-V spec says nothing about the case when x = 0.0, C fmod function does specify the sign of
+    // the result is the same as that of the dividend even if it is signed zero. We lower FRem to this: frem(x, y) =
+    // x - y * trunc(x/y) on our HW. And when x=-0.0, we get an addition of (-0.0) + 0.0. HW returns +0.0 rather
+    // than -0.0, which is not consistent with the expectation.
+    Value *isNegZero = createIsFPClass(dividend, CmpClass::NegativeZero);
+    result = CreateSelect(isNegZero, dividend, result);
+  }
+
+  result->setName(instName);
+  return result;
 }
 
 // =====================================================================================================================
