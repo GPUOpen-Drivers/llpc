@@ -1096,7 +1096,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
 
           if (emitStream == rasterStream) {
             auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
-            auto viewIndex = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
+            auto viewIndex = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
 
             const auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
             assert(builtInOutLocMap.find(BuiltInViewIndex) != builtInOutLocMap.end());
@@ -1256,10 +1256,10 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
     if (enableMultiView) {
       if (m_shaderStage == ShaderStageVertex) {
         auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
-        m_viewIndex = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
+        m_viewIndex = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
       } else if (m_shaderStage == ShaderStageTessEval) {
         auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageTessEval)->entryArgIdxs.tes;
-        m_viewIndex = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
+        m_viewIndex = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
       } else {
         assert(m_shaderStage == ShaderStageCopyShader);
         assert(m_viewIndex); // Must have been explicitly loaded in copy shader
@@ -2203,7 +2203,7 @@ Value *PatchInOutImportExport::patchTcsBuiltInInputImport(Type *inputTy, unsigne
   }
   case BuiltInViewIndex: {
     if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable)
-      input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
+      input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
     else
       input = builder.getInt32(0);
     break;
@@ -2331,7 +2331,7 @@ Value *PatchInOutImportExport::patchTesBuiltInInputImport(Type *inputTy, unsigne
   }
   case BuiltInViewIndex: {
     if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable)
-      input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
+      input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
     else
       input = builder.getInt32(0);
     break;
@@ -2382,7 +2382,7 @@ Value *PatchInOutImportExport::patchGsBuiltInInputImport(Type *inputTy, unsigned
   }
   case BuiltInViewIndex: {
     if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable)
-      input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
+      input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
     else
       input = builder.getInt32(0);
     break;
@@ -2589,7 +2589,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
   }
   case BuiltInViewIndex: {
     if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable)
-      input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
+      input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
     else
       input = builder.getInt32(0);
     break;

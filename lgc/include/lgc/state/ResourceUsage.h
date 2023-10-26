@@ -542,7 +542,7 @@ struct InterfaceData {
         unsigned relVertexId;        // Relative vertex ID (index of vertex within thread group)
         unsigned instanceId;         // Instance ID
         unsigned primitiveId;        // Primitive ID
-        unsigned viewIndex;          // View Index
+        unsigned viewId;             // View ID
         unsigned vbTablePtr;         // Pointer of vertex buffer table
         unsigned esGsOffset;         // ES-GS ring buffer offset
         StreamOutData streamOutData; // Stream-out Data
@@ -554,7 +554,7 @@ struct InterfaceData {
         unsigned relPatchId;     // Relative patch ID (control point ID included)
         unsigned tfBufferBase;   // Base offset of tessellation factor(TF) buffer
         unsigned offChipLdsBase; // Base offset of off-chip LDS buffer
-        unsigned viewIndex;      // View Index
+        unsigned viewId;         // View ID
       } tcs;
 
       // Tessellation evaluation shader
@@ -565,7 +565,7 @@ struct InterfaceData {
         unsigned patchId;            // Patch ID
         unsigned esGsOffset;         // ES-GS ring buffer offset
         unsigned offChipLdsBase;     // Base offset of off-chip LDS buffer
-        unsigned viewIndex;          // View Index
+        unsigned viewId;             // View ID
         StreamOutData streamOutData; // Stream-out Data
       } tes;
 
@@ -576,14 +576,14 @@ struct InterfaceData {
         unsigned esGsOffsets[MaxEsGsOffsetCount]; // ES -> GS ring offset
         unsigned primitiveId;                     // Primitive ID
         unsigned invocationId;                    // Invocation ID
-        unsigned viewIndex;                       // View Index
+        unsigned viewId;                          // View ID
         StreamOutData streamOutData;              // Stream-out Data
       } gs;
 
       // Mesh shader
       struct {
         unsigned drawIndex;          // Draw index
-        unsigned viewIndex;          // View index
+        unsigned viewId;             // View ID
         unsigned dispatchDims;       // Dispatch dimensions
         unsigned baseRingEntryIndex; // Base entry index (first workgroup) of mesh/task shader ring for current dispatch
         unsigned pipeStatsBuf;       // Pipeline statistics buffer
@@ -593,7 +593,7 @@ struct InterfaceData {
 
       // Fragment shader
       struct {
-        unsigned viewIndex;  // View Index
+        unsigned viewId;     // View ID
         unsigned primMask;   // Primitive mask
         unsigned sampleInfo; // Sample Info: numSample + samplePattern
 

@@ -1244,7 +1244,7 @@ void MeshTaskShader::lowerGetMeshBuiltinInput(GetMeshBuiltinInputOp &getMeshBuil
   case BuiltInViewIndex: {
     if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable) {
       auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
-      input = getFunctionArgument(entryPoint, entryArgIdxs.viewIndex);
+      input = getFunctionArgument(entryPoint, entryArgIdxs.viewId);
     } else {
       input = m_builder.getInt32(0);
     }
@@ -1618,7 +1618,7 @@ Function *MeshTaskShader::mutateMeshShaderEntryPoint(Function *entryPoint) {
   // Adjust indices of existing entry-point arguments
   auto &entryArgIdx = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
   entryArgIdx.drawIndex += NumSpecialSgprInputs;
-  entryArgIdx.viewIndex += NumSpecialSgprInputs;
+  entryArgIdx.viewId += NumSpecialSgprInputs;
   entryArgIdx.dispatchDims += NumSpecialSgprInputs;
   entryArgIdx.baseRingEntryIndex += NumSpecialSgprInputs;
   entryArgIdx.pipeStatsBuf += NumSpecialSgprInputs;
@@ -1765,16 +1765,16 @@ void MeshTaskShader::exportPrimitive() {
   if (enableMultiView) {
     auto entryPoint = m_builder.GetInsertBlock()->getParent();
     const auto entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
-    Value *viewId = getFunctionArgument(entryPoint, entryArgIdxs.viewIndex);
+    Value *viewId = getFunctionArgument(entryPoint, entryArgIdxs.viewId);
 
-    // RT layer id is view id in simple mode (view index only).
+    // RT layer is view ID in simple mode (view index only).
     Value *layerFromViewId = viewId;
     if (m_pipelineState->getInputAssemblyState().multiView == MultiViewMode::PerView) {
-      // RT layer id is in the high 24 bits of view id in per-view mode.
+      // RT layer is in the high 24 bits of view ID in per-view mode.
       layerFromViewId = m_builder.CreateLShr(viewId, m_builder.getInt32(8));
       if (layer)
         layerFromViewId = m_builder.CreateAdd(layerFromViewId, layer);
-      // Viewport index is in [7:4] of view id.
+      // Viewport index is in [7:4] of view ID.
       Value *viewportIndexFromViewId =
           m_builder.CreateAnd(m_builder.CreateLShr(viewId, m_builder.getInt32(4)), m_builder.getInt32(0xF));
       if (viewportIndex)

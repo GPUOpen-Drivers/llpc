@@ -1466,16 +1466,16 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       auto userDataValue = UserDataMapping::ViewId;
       switch (m_shaderStage) {
       case ShaderStageVertex:
-        argIdx = &entryArgIdxs.vs.viewIndex;
+        argIdx = &entryArgIdxs.vs.viewId;
         break;
       case ShaderStageTessControl:
-        argIdx = &entryArgIdxs.tcs.viewIndex;
+        argIdx = &entryArgIdxs.tcs.viewId;
         break;
       case ShaderStageTessEval:
-        argIdx = &entryArgIdxs.tes.viewIndex;
+        argIdx = &entryArgIdxs.tes.viewId;
         break;
       case ShaderStageGeometry:
-        argIdx = &entryArgIdxs.gs.viewIndex;
+        argIdx = &entryArgIdxs.gs.viewId;
         break;
       default:
         llvm_unreachable("Unexpected shader stage");
@@ -1575,7 +1575,7 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
     }
     if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable) {
       specialUserDataArgs.push_back(
-          UserDataArg(builder.getInt32Ty(), "viewId", UserDataMapping::ViewId, &intfData->entryArgIdxs.mesh.viewIndex));
+          UserDataArg(builder.getInt32Ty(), "viewId", UserDataMapping::ViewId, &intfData->entryArgIdxs.mesh.viewId));
     }
     specialUserDataArgs.push_back(UserDataArg(FixedVectorType::get(builder.getInt32Ty(), 3), "meshTaskDispatchDims",
                                               UserDataMapping::MeshTaskDispatchDims,
@@ -1594,7 +1594,7 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       // NOTE: Only add special user data of view index when multi-view is enabled and gl_ViewIndex is used in fragment
       // shader.
       specialUserDataArgs.push_back(
-          UserDataArg(builder.getInt32Ty(), "viewId", UserDataMapping::ViewId, &intfData->entryArgIdxs.fs.viewIndex));
+          UserDataArg(builder.getInt32Ty(), "viewId", UserDataMapping::ViewId, &intfData->entryArgIdxs.fs.viewId));
     }
 
     if (userDataUsage->isSpecialUserDataUsed(UserDataMapping::ColorExportAddr)) {
