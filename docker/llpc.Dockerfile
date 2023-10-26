@@ -46,7 +46,8 @@ RUN source /vulkandriver/env.sh \
 # Run the lit test suite.
 RUN source /vulkandriver/env.sh \
     && cmake --build . --target check-amdllpc check-amdllpc-units -- -v \
-    && cmake --build . --target check-lgc check-lgc-units -- -v
+    && cmake --build . --target check-lgc check-lgc-units -- -v \
+    && cmake --build . --target check-continuations check-continuations-units -- -v
 
 # Generate code coverage report for LLPC.
 RUN if echo "$FEATURES" | grep -q "+coverage" ; then \

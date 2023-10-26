@@ -132,7 +132,8 @@ RUN EXTRA_COMPILER_FLAGS=() \
 # Run the lit test suite.
 RUN source /vulkandriver/env.sh \
     && cmake --build . --target check-amdllpc check-amdllpc-units -- -v \
-    && cmake --build . --target check-lgc check-lgc-units -- -v
+    && cmake --build . --target check-lgc check-lgc-units -- -v \
+    && cmake --build . --target check-continuations check-continuations-units -- -v
 
 # Save build info to /vulkandriver/build_info.txt.
 RUN cd /vulkandriver \
