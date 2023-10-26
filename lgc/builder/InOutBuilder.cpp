@@ -821,7 +821,7 @@ Value *BuilderImpl::CreateReadBuiltInInput(BuiltInKind builtIn, InOutInfo inputI
   assert(isBuiltInInput(builtIn));
   Value *builtInVal = readBuiltIn(false, builtIn, inputInfo, vertexIndex, index, instName);
   if (builtIn == BuiltInViewIndex)
-    // View index can only use bit[3:0] of view id register.
+    // View index can only use bit[3:0] of view ID register.
     builtInVal = CreateAnd(builtInVal, getInt32(0xF));
   return builtInVal;
 }

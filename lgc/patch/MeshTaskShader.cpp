@@ -1767,14 +1767,14 @@ void MeshTaskShader::exportPrimitive() {
     const auto entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
     Value *viewId = getFunctionArgument(entryPoint, entryArgIdxs.viewId);
 
-    // RT layer id is view id in simple mode (view index only).
+    // RT layer is view ID in simple mode (view index only).
     Value *layerFromViewId = viewId;
     if (m_pipelineState->getInputAssemblyState().multiView == MultiViewMode::PerView) {
-      // RT layer id is in the high 24 bits of view id in per-view mode.
+      // RT layer is in the high 24 bits of view ID in per-view mode.
       layerFromViewId = m_builder.CreateLShr(viewId, m_builder.getInt32(8));
       if (layer)
         layerFromViewId = m_builder.CreateAdd(layerFromViewId, layer);
-      // Viewport index is in [7:4] of view id.
+      // Viewport index is in [7:4] of view ID.
       Value *viewportIndexFromViewId =
           m_builder.CreateAnd(m_builder.CreateLShr(viewId, m_builder.getInt32(4)), m_builder.getInt32(0xF));
       if (viewportIndex)
