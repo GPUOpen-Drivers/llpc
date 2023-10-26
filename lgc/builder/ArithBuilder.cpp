@@ -514,6 +514,18 @@ Value *BuilderImpl::CreateTanh(Value *x, const Twine &instName) {
   Value *doubleSinh = CreateFSub(exp, expNeg);
   Value *doubleCosh = CreateFAdd(exp, expNeg);
   Value *result = fDivFast(doubleSinh, doubleCosh);
+
+  if (!getFastMathFlags().noInfs()) {
+    // NOTE: If the fast math flags might have INFs, we should check the special case when the input is +INF or -INF.
+    // According to the limit of tanh(x), we have following definitions:
+    //                  / 1.0, when x -> +INF
+    //   lim(tanh(x)) =
+    //                  \ -1.0, when x -> -INF
+    Value *one = ConstantFP::get(x->getType(), 1.0);
+    Value *isInf = CreateIsInf(x);
+    result = CreateSelect(isInf, CreateCopySign(one, x), result);
+  }
+
   result->setName(instName);
   return result;
 }
