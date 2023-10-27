@@ -256,12 +256,6 @@ Value *BuilderImpl::CreateFMod(Value *dividend, Value *divisor, const Twine &ins
 // @param c : The value to add to the product of A and B
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateFma(Value *a, Value *b, Value *c, const Twine &instName) {
-  if (getPipelineState()->getTargetInfo().getGfxIpVersion().major <= 8) {
-    // Pre-GFX9 version: Use fmul and fadd.
-    Value *fmul = CreateFMul(a, b);
-    return CreateFAdd(fmul, c, instName);
-  }
-
   // GFX9+ version: Use fma.
   return CreateIntrinsic(Intrinsic::fma, a->getType(), {a, b, c}, nullptr, instName);
 }
@@ -935,11 +929,6 @@ Value *BuilderImpl::CreateFClamp(Value *x, Value *minVal, Value *maxVal, const T
     result = min;
   }
 
-  // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
-  // canonicalize the result here.
-  if (getPipelineState()->getTargetInfo().getGfxIpVersion().major < 9)
-    result = canonicalize(result);
-
   result->setName(instName);
   return result;
 }
@@ -957,11 +946,6 @@ Value *BuilderImpl::CreateFMin(Value *value1, Value *value2, const Twine &instNa
   min->setFastMathFlags(getFastMathFlags());
   Value *result = min;
 
-  // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
-  // canonicalize the result here.
-  if (getPipelineState()->getTargetInfo().getGfxIpVersion().major < 9)
-    result = canonicalize(result);
-
   result->setName(instName);
   return result;
 }
@@ -978,11 +962,6 @@ Value *BuilderImpl::CreateFMax(Value *value1, Value *value2, const Twine &instNa
   CallInst *max = CreateMaxNum(value1, value2);
   max->setFastMathFlags(getFastMathFlags());
   Value *result = max;
-
-  // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
-  // canonicalize the result here.
-  if (getPipelineState()->getTargetInfo().getGfxIpVersion().major < 9)
-    result = canonicalize(result);
 
   result->setName(instName);
   return result;
@@ -1004,11 +983,6 @@ Value *BuilderImpl::CreateFMin3(Value *value1, Value *value2, Value *value3, con
   min2->setFastMathFlags(getFastMathFlags());
   Value *result = min2;
 
-  // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
-  // canonicalize the result here.
-  if (getPipelineState()->getTargetInfo().getGfxIpVersion().major < 9)
-    result = canonicalize(result);
-
   result->setName(instName);
   return result;
 }
@@ -1028,11 +1002,6 @@ Value *BuilderImpl::CreateFMax3(Value *value1, Value *value2, Value *value3, con
   CallInst *max2 = CreateMaxNum(max1, value3);
   max2->setFastMathFlags(getFastMathFlags());
   Value *result = max2;
-
-  // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
-  // canonicalize the result here.
-  if (getPipelineState()->getTargetInfo().getGfxIpVersion().major < 9)
-    result = canonicalize(result);
 
   result->setName(instName);
   return result;
@@ -1069,11 +1038,6 @@ Value *BuilderImpl::CreateFMid3(Value *value1, Value *value2, Value *value3, con
     max2->setFastMathFlags(getFastMathFlags());
     result = max2;
   }
-
-  // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
-  // canonicalize the result here.
-  if (getPipelineState()->getTargetInfo().getGfxIpVersion().major < 9)
-    result = canonicalize(result);
 
   result->setName(instName);
   return result;

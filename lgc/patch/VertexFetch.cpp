@@ -121,8 +121,6 @@ private:
 
   bool needPostShuffle(const VertexInputDescription *inputDesc, std::vector<Constant *> &shuffleMask) const;
 
-  bool needPatchA2S(const VertexInputDescription *inputDesc) const;
-
   bool needSecondVertexFetch(const VertexInputDescription *inputDesc) const;
 
   bool needPatch32(const VertexInputDescription *inputDesc) const;
@@ -1205,91 +1203,14 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
   // Do post-processing in certain cases
   std::vector<Constant *> shuffleMask;
   bool postShuffle = needPostShuffle(description, shuffleMask);
-  bool patchA2S = needPatchA2S(description);
   bool patch32 = needPatch32(description);
-  if (postShuffle || patchA2S || patch32) {
+  if (postShuffle || patch32) {
     if (postShuffle) {
       // NOTE: If we are fetching a swizzled format, we have to add an extra "shufflevector" instruction to
       // get the components in the right order.
       assert(shuffleMask.empty() == false);
       vertexFetches[0] =
           new ShuffleVectorInst(vertexFetches[0], vertexFetches[0], ConstantVector::get(shuffleMask), "", insertPos);
-    }
-
-    if (patchA2S) {
-      assert(cast<FixedVectorType>(vertexFetches[0]->getType())->getNumElements() == 4);
-
-      // Extract alpha channel: %a = extractelement %vf0, 3
-      Value *alpha = ExtractElementInst::Create(vertexFetches[0], ConstantInt::get(Type::getInt32Ty(*m_context), 3), "",
-                                                insertPos);
-
-      if (is16bitFetch) {
-        // Extend to 32-bit
-        alpha = new ZExtInst(alpha, Type::getInt32Ty(*m_context), "", insertPos);
-      }
-
-      if (formatInfo.nfmt == BufNumFormatSint) {
-        // NOTE: For format "SINT 10_10_10_2", vertex fetches incorrectly return the alpha channel as
-        // unsigned. We have to manually sign-extend it here by doing a "shl" 30 then an "ashr" 30.
-
-        // %a = shl %a, 30
-        alpha = BinaryOperator::CreateShl(alpha, ConstantInt::get(Type::getInt32Ty(*m_context), 30), "", insertPos);
-
-        // %a = ashr %a, 30
-        alpha = BinaryOperator::CreateAShr(alpha, ConstantInt::get(Type::getInt32Ty(*m_context), 30), "", insertPos);
-      } else if (formatInfo.nfmt == BufNumFormatSnorm) {
-        // NOTE: For format "SNORM 10_10_10_2", vertex fetches incorrectly return the alpha channel
-        // as unsigned. We have to somehow remap the values { 0.0, 0.33, 0.66, 1.00 } to { 0.0, 1.0,
-        // -1.0, -1.0 } respectively.
-
-        // %a = bitcast %a to f32
-        alpha = new BitCastInst(alpha, Type::getFloatTy(*m_context), "", insertPos);
-
-        // %a = mul %a, 3.0f
-        alpha = BinaryOperator::CreateFMul(alpha, ConstantFP::get(Type::getFloatTy(*m_context), 3.0f), "", insertPos);
-
-        // %cond = ugt %a, 1.5f
-        auto cond =
-            new FCmpInst(insertPos, FCmpInst::FCMP_UGT, alpha, ConstantFP::get(Type::getFloatTy(*m_context), 1.5f), "");
-
-        // %a = select %cond, -1.0f, alpha
-        alpha = SelectInst::Create(cond, ConstantFP::get(Type::getFloatTy(*m_context), -1.0f), alpha, "", insertPos);
-
-        // %a = bitcast %a to i32
-        alpha = new BitCastInst(alpha, Type::getInt32Ty(*m_context), "", insertPos);
-      } else if (formatInfo.nfmt == BufNumFormatSscaled) {
-        // NOTE: For format "SSCALED 10_10_10_2", vertex fetches incorrectly return the alpha channel
-        // as unsigned. We have to somehow remap the values { 0.0, 1.0, 2.0, 3.0 } to { 0.0, 1.0,
-        // -2.0, -1.0 } respectively. We can perform the sign extension here by doing a "fptosi", "shl" 30,
-        // "ashr" 30, and finally "sitofp".
-
-        // %a = bitcast %a to float
-        alpha = new BitCastInst(alpha, Type::getFloatTy(*m_context), "", insertPos);
-
-        // %a = fptosi %a to i32
-        alpha = new FPToSIInst(alpha, Type::getInt32Ty(*m_context), "", insertPos);
-
-        // %a = shl %a, 30
-        alpha = BinaryOperator::CreateShl(alpha, ConstantInt::get(Type::getInt32Ty(*m_context), 30), "", insertPos);
-
-        // %a = ashr a, 30
-        alpha = BinaryOperator::CreateAShr(alpha, ConstantInt::get(Type::getInt32Ty(*m_context), 30), "", insertPos);
-
-        // %a = sitofp %a to float
-        alpha = new SIToFPInst(alpha, Type::getFloatTy(*m_context), "", insertPos);
-
-        // %a = bitcast %a to i32
-        alpha = new BitCastInst(alpha, Type::getInt32Ty(*m_context), "", insertPos);
-      } else
-        llvm_unreachable("Should never be called!");
-
-      if (is16bitFetch) {
-        // Trunc to 16-bit
-        alpha = new TruncInst(alpha, Type::getInt16Ty(*m_context), "", insertPos);
-      }
-      // Insert alpha channel: %vf0 = insertelement %vf0, %a, 3
-      vertexFetches[0] = InsertElementInst::Create(vertexFetches[0], alpha,
-                                                   ConstantInt::get(Type::getInt32Ty(*m_context), 3), "", insertPos);
     }
 
     if (patch32) {
@@ -1835,22 +1756,6 @@ bool VertexFetchImpl::needPatch32(const VertexInputDescription *inputDesc) const
     break;
   default:
     break;
-  }
-
-  return needPatch;
-}
-
-// =====================================================================================================================
-// Checks whether patching 2-bit signed alpha channel is required for vertex fetch operation.
-//
-// @param inputDesc : Vertex input description
-bool VertexFetchImpl::needPatchA2S(const VertexInputDescription *inputDesc) const {
-  bool needPatch = false;
-
-  if (inputDesc->dfmt == BufDataFormat2_10_10_10 || inputDesc->dfmt == BufDataFormat2_10_10_10_Bgra) {
-    if (inputDesc->nfmt == BufNumFormatSnorm || inputDesc->nfmt == BufNumFormatSscaled ||
-        inputDesc->nfmt == BufNumFormatSint)
-      needPatch = m_lgcContext->getTargetInfo().getGfxIpVersion().major < 9;
   }
 
   return needPatch;
