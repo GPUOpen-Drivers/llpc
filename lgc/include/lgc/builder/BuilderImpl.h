@@ -231,6 +231,10 @@ public:
   // Create "Masked Sum of Absolute Differences" operation.
   llvm::Value *CreateMsad4(llvm::Value *src, llvm::Value *ref, llvm::Value *accum, const llvm::Twine &instName = "");
 
+  // Create fdot2_f16 + f32 operation.
+  llvm::Value *CreateFDot2(llvm::Value *a, llvm::Value *b, llvm::Value *scalar, llvm::Value *clamp,
+                           const llvm::Twine &instName = "");
+
   // Create "fmix" operation.
   llvm::Value *createFMix(llvm::Value *x, llvm::Value *y, llvm::Value *a, const llvm::Twine &instName = "");
 

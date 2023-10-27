@@ -103,6 +103,7 @@ enum BuilderOpcode : unsigned {
   CountLeadingSignBits,
   FMix,
   Msad4,
+  FDot2,
 
   // Descriptor
   LoadBufferDesc,
