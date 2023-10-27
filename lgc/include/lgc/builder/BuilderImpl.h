@@ -403,13 +403,6 @@ public:
                                           const llvm::Twine &instName = "");
 
 private:
-  // Implement pre-GFX9 integer gather workaround to patch descriptor or coordinate before the gather
-  llvm::Value *preprocessIntegerImageGather(unsigned dim, llvm::Value *&imageDesc, llvm::Value *&coord);
-
-  // Implement pre-GFX9 integer gather workaround to modify result.
-  llvm::Value *postprocessIntegerImageGather(llvm::Value *needDescPatch, unsigned flags, llvm::Value *imageDesc,
-                                             llvm::Type *texelTy, llvm::Value *result);
-
   // Common code to create an image sample or gather.
   llvm::Value *CreateImageSampleGather(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *coord,
                                        llvm::Value *imageDesc, llvm::Value *samplerDesc,

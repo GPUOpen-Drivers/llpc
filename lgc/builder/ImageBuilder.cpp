@@ -41,13 +41,6 @@
 using namespace lgc;
 using namespace llvm;
 
-// Intrinsic ID table for getresinfo
-static const Intrinsic::ID ImageGetResInfoIntrinsicTable[] = {
-    Intrinsic::amdgcn_image_getresinfo_1d,      Intrinsic::amdgcn_image_getresinfo_2d,
-    Intrinsic::amdgcn_image_getresinfo_3d,      Intrinsic::amdgcn_image_getresinfo_cube,
-    Intrinsic::amdgcn_image_getresinfo_1darray, Intrinsic::amdgcn_image_getresinfo_2darray,
-    Intrinsic::amdgcn_image_getresinfo_2dmsaa,  Intrinsic::amdgcn_image_getresinfo_2darraymsaa};
-
 // Intrinsic ID table for getlod
 static const Intrinsic::ID ImageGetLodIntrinsicTable[] = {
     Intrinsic::amdgcn_image_getlod_1d, Intrinsic::amdgcn_image_getlod_2d,
@@ -842,7 +835,6 @@ Value *BuilderImpl::CreateImageGather(Type *resultTy, unsigned dim, unsigned fla
   assert(coord->getType()->getScalarType()->isFloatTy() || coord->getType()->getScalarType()->isHalfTy());
 
   // Check whether we are being asked for integer texel component type.
-  Value *needDescPatch = nullptr;
   Type *texelTy = resultTy;
   if (auto structResultTy = dyn_cast<StructType>(resultTy))
     texelTy = structResultTy->getElementType(0);
@@ -854,9 +846,6 @@ Value *BuilderImpl::CreateImageGather(Type *resultTy, unsigned dim, unsigned fla
     gatherTy = FixedVectorType::get(getFloatTy(), 4);
     if (resultTy != texelTy)
       gatherTy = StructType::get(getContext(), {gatherTy, getInt32Ty()});
-
-    // For integer gather on pre-GFX9, patch descriptor or coordinate.
-    needDescPatch = preprocessIntegerImageGather(dim, imageDesc, coord);
   }
 
   // Only the first 4 dwords are sampler descriptor, we need to extract these values under any condition
@@ -894,11 +883,6 @@ Value *BuilderImpl::CreateImageGather(Type *resultTy, unsigned dim, unsigned fla
     result = CreateImageSampleGather(gatherTy, dim, flags, coord, imageDesc, samplerDesc, address, instName, false);
   }
 
-  if (needDescPatch) {
-    // For integer gather on pre-GFX9, post-process the result.
-    result = postprocessIntegerImageGather(needDescPatch, flags, imageDesc, texelTy, result);
-  }
-
   // Bitcast returned texel from v4f32 to v4i32. (It would be easier to call the gather
   // intrinsic with the right return type, but we do it this way to match the code generated
   // before the image rework.)
@@ -914,138 +898,6 @@ Value *BuilderImpl::CreateImageGather(Type *resultTy, unsigned dim, unsigned fla
     result = cast<Instruction>(CreateBitCast(result, texelTy));
 
   return result;
-}
-
-// =====================================================================================================================
-// Implement pre-GFX9 integer gather workaround to patch descriptor or coordinate, depending on format in descriptor
-// Returns nullptr for GFX9+, or a bool value that is true if the descriptor was patched or false if the
-// coordinate was modified.
-//
-// @param dim : Image dimension
-// @param [in/out] imageDesc : Image descriptor
-// @param [in/out] coord : Coordinate
-Value *BuilderImpl::preprocessIntegerImageGather(unsigned dim, Value *&imageDesc, Value *&coord) {
-  if (getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 9) {
-    // GFX9+: Workaround not needed.
-    return nullptr;
-  }
-
-  if (dim != DimCube && dim != DimCubeArray) {
-    // If not cube/cube array, just add (-0.5/width, -0.5/height) to the x,y coordinates
-    Value *zero = getInt32(0);
-    Value *resInfo =
-        CreateIntrinsic(ImageGetResInfoIntrinsicTable[dim], {FixedVectorType::get(getFloatTy(), 4), getInt32Ty()},
-                        {getInt32(15), zero, imageDesc, zero, zero});
-    resInfo = CreateBitCast(resInfo, FixedVectorType::get(getInt32Ty(), 4));
-
-    Value *widthHeight = CreateShuffleVector(resInfo, resInfo, ArrayRef<int>{0, 1});
-    widthHeight = CreateSIToFP(widthHeight, FixedVectorType::get(getFloatTy(), 2));
-    Value *valueToAdd = CreateFDiv(ConstantFP::get(widthHeight->getType(), -0.5), widthHeight);
-    unsigned coordCount = cast<FixedVectorType>(coord->getType())->getNumElements();
-    if (coordCount > 2) {
-      valueToAdd = CreateShuffleVector(valueToAdd, Constant::getNullValue(valueToAdd->getType()),
-                                       ArrayRef<int>({0, 1, 2, 3}).slice(0, coordCount));
-    }
-    coord = CreateFAdd(coord, valueToAdd);
-
-    return nullptr;
-  }
-
-  // Check whether the descriptor needs patching. It does if it does not have format 32, 32_32 or 32_32_32_32.
-  Value *descDword1 = CreateExtractElement(imageDesc, 1);
-  Value *dataFormat = CreateIntrinsic(Intrinsic::amdgcn_ubfe, getInt32Ty(), {descDword1, getInt32(20), getInt32(6)});
-  Value *isDataFormat32 = CreateICmpEQ(dataFormat, getInt32(IMG_DATA_FORMAT_32));
-  Value *isDataFormat3232 = CreateICmpEQ(dataFormat, getInt32(IMG_DATA_FORMAT_32_32));
-  Value *isDataFormat32323232 = CreateICmpEQ(dataFormat, getInt32(IMG_DATA_FORMAT_32_32_32_32));
-  Value *cond = CreateOr(isDataFormat3232, isDataFormat32);
-  cond = CreateOr(isDataFormat32323232, cond);
-  Value *needDescPatch = CreateNot(cond);
-
-  // Create the if..else..endif, where the condition is whether the descriptor needs patching.
-  InsertPoint savedInsertPoint = saveIP();
-  BranchInst *branch = createIf(needDescPatch, true, "before.int.gather");
-
-  // Inside the "then": patch the descriptor: change NUM_FORMAT from SINT to SSCALE.
-  Value *descDword1A = CreateExtractElement(imageDesc, 1);
-  descDword1A = CreateSub(descDword1A, getInt32(0x08000000));
-  Value *patchedImageDesc = CreateInsertElement(imageDesc, descDword1A, 1);
-
-  // On to the "else": patch the coordinates: add (-0.5/width, -0.5/height) to the x,y coordinates.
-  SetInsertPoint(branch->getSuccessor(1)->getTerminator());
-  Value *zero = getInt32(0);
-  dim = dim == DimCubeArray ? DimCube : dim;
-  Value *resInfo =
-      CreateIntrinsic(ImageGetResInfoIntrinsicTable[dim], {FixedVectorType::get(getFloatTy(), 4), getInt32Ty()},
-                      {getInt32(15), zero, imageDesc, zero, zero});
-  resInfo = CreateBitCast(resInfo, FixedVectorType::get(getInt32Ty(), 4));
-
-  Value *widthHeight = CreateShuffleVector(resInfo, resInfo, ArrayRef<int>{0, 1});
-  widthHeight = CreateSIToFP(widthHeight, FixedVectorType::get(getFloatTy(), 2));
-  Value *valueToAdd = CreateFDiv(ConstantFP::get(widthHeight->getType(), -0.5), widthHeight);
-  unsigned coordCount = cast<FixedVectorType>(coord->getType())->getNumElements();
-  if (coordCount > 2) {
-    valueToAdd = CreateShuffleVector(valueToAdd, Constant::getNullValue(valueToAdd->getType()),
-                                     ArrayRef<int>({0, 1, 2, 3}).slice(0, coordCount));
-  }
-  Value *patchedCoord = CreateFAdd(coord, valueToAdd);
-
-  // Restore insert point to after the if..else..endif, and add the phi nodes.
-  restoreIP(savedInsertPoint);
-  PHINode *imageDescPhi = CreatePHI(imageDesc->getType(), 2);
-  imageDescPhi->addIncoming(patchedImageDesc, branch->getSuccessor(0));
-  imageDescPhi->addIncoming(imageDesc, branch->getSuccessor(1));
-  imageDesc = imageDescPhi;
-
-  PHINode *coordPhi = CreatePHI(coord->getType(), 2);
-  coordPhi->addIncoming(coord, branch->getSuccessor(0));
-  coordPhi->addIncoming(patchedCoord, branch->getSuccessor(1));
-  coord = coordPhi;
-
-  return needDescPatch;
-}
-
-// =====================================================================================================================
-// Implement pre-GFX9 integer gather workaround to modify result.
-// Returns possibly modified result.
-//
-// @param needDescPatch : Bool value that is true if descriptor was patched
-// @param flags : Flags passed to CreateImageGather
-// @param imageDesc : Image descriptor
-// @param texelTy : Type of returned texel
-// @param result : Returned texel value, or struct containing texel and TFE
-Value *BuilderImpl::postprocessIntegerImageGather(Value *needDescPatch, unsigned flags, Value *imageDesc, Type *texelTy,
-                                                  Value *result) {
-  // Post-processing of result for integer return type.
-  // Create the if..endif, where the condition is whether the descriptor was patched. If it was,
-  // then we need to convert the texel from float to i32.
-  InsertPoint savedInsertPoint = saveIP();
-  BranchInst *branch = createIf(needDescPatch, false, "after.int.gather");
-
-  // Process the returned texel.
-  Value *texel = result;
-  bool tfe = isa<StructType>(result->getType());
-  if (tfe) {
-    // TFE: Need to extract texel from the struct, convert it, and re-insert it.
-    texel = CreateExtractValue(result, 0);
-  }
-  if (flags & ImageFlagSignedResult)
-    texel = CreateFPToSI(texel, texelTy);
-  else
-    texel = CreateFPToUI(texel, texelTy);
-  Value *patchedResult = CreateBitCast(texel, FixedVectorType::get(getFloatTy(), 4));
-  if (tfe)
-    patchedResult = CreateInsertValue(result, patchedResult, 0);
-
-  patchedResult = CreateSelect(needDescPatch, patchedResult, result);
-
-  // Restore insert point to after the if..endif, and add the phi node.
-  BasicBlock *thenBlock = GetInsertBlock();
-  restoreIP(savedInsertPoint);
-  PHINode *resultPhi = CreatePHI(result->getType(), 2);
-  resultPhi->addIncoming(patchedResult, thenBlock);
-  resultPhi->addIncoming(result, branch->getParent());
-
-  return resultPhi;
 }
 
 // =====================================================================================================================
@@ -1416,12 +1268,6 @@ Value *BuilderImpl::CreateImageQuerySize(unsigned dim, unsigned flags, Value *im
     // Extract NUM_RECORDS (SQ_BUF_RSRC_WORD2)
     Value *numRecords = CreateExtractElement(imageDesc, 2);
 
-    if (getPipelineState()->getTargetInfo().getGfxIpVersion().major == 8) {
-      // GFX8 only: extract STRIDE (SQ_BUF_RSRC_WORD1 [29:16]) and divide into NUM_RECORDS.
-      Value *stride = CreateIntrinsic(Intrinsic::amdgcn_ubfe, getInt32Ty(),
-                                      {CreateExtractElement(imageDesc, 1), getInt32(16), getInt32(14)});
-      numRecords = CreateUDiv(numRecords, stride);
-    }
     if (!instName.isTriviallyEmpty())
       numRecords->setName(instName);
     return numRecords;
@@ -1461,13 +1307,6 @@ Value *BuilderImpl::CreateImageQuerySize(unsigned dim, unsigned flags, Value *im
       depth = CreateSelect(isSlice, sliceDepth, mipDepth);
     } else {
       depth = mipDepth;
-    }
-  } else {
-    if (getPipelineState()->getTargetInfo().getGfxIpVersion().major < 9) {
-      Value *baseArray = proxySqRsrcRegHelper.getReg(SqRsrcRegs::BaseArray);
-      Value *lastArray = proxySqRsrcRegHelper.getReg(SqRsrcRegs::LastArray);
-      depth = CreateSub(lastArray, baseArray);
-      depth = CreateAdd(depth, getInt32(1));
     }
   }
 

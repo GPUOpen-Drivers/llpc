@@ -322,7 +322,7 @@ void ElfWriter<Elf>::mergeMetaNote(Context *pContext, const ElfNote *pNote1, con
       mergeMapItem(destRegisters, srcRegisters, regNumber);
 
     const unsigned mmSpiShaderUserDataPs0 = 0x2c0c;
-    unsigned psUserDataCount = pContext->getGfxIpVersion().major < 9 ? 16 : 32;
+    unsigned psUserDataCount = 32;
     for (unsigned regNumber = mmSpiShaderUserDataPs0; regNumber != mmSpiShaderUserDataPs0 + psUserDataCount;
          ++regNumber)
       mergeMapItem(destRegisters, srcRegisters, regNumber);

@@ -417,23 +417,7 @@ unsigned PalMetadata::getUserDataReg0(ShaderStage stage) {
   m_userDataRegMapping[ShaderStageTask] = mmCOMPUTE_USER_DATA_0;
   m_userDataRegMapping[ShaderStageMesh] = mmSPI_SHADER_USER_DATA_GS_0;
 
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 9) {
-    // <=GFX8: No merged shaders.
-    m_userDataRegMapping[ShaderStageCopyShader] = mmSPI_SHADER_USER_DATA_VS_0;
-    m_userDataRegMapping[ShaderStageGeometry] = mmSPI_SHADER_USER_DATA_GS_0;
-    if (m_pipelineState->hasShaderStage(ShaderStageGeometry))
-      m_userDataRegMapping[ShaderStageTessEval] = mmSPI_SHADER_USER_DATA_ES_0;
-    else
-      m_userDataRegMapping[ShaderStageTessEval] = mmSPI_SHADER_USER_DATA_VS_0;
-    m_userDataRegMapping[ShaderStageTessControl] = mmSPI_SHADER_USER_DATA_HS_0;
-    if (m_pipelineState->hasShaderStage(ShaderStageTessControl))
-      m_userDataRegMapping[ShaderStageVertex] = mmSPI_SHADER_USER_DATA_LS_0;
-    else if (m_pipelineState->hasShaderStage(ShaderStageGeometry))
-      m_userDataRegMapping[ShaderStageVertex] = mmSPI_SHADER_USER_DATA_ES_0;
-    else
-      m_userDataRegMapping[ShaderStageVertex] = mmSPI_SHADER_USER_DATA_VS_0;
-
-  } else if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 9) {
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 9) {
     // GFX9: Merged shaders, and merged ES-GS user data goes into ES registers.
     m_userDataRegMapping[ShaderStageCopyShader] = mmSPI_SHADER_USER_DATA_VS_0;
     m_userDataRegMapping[ShaderStageGeometry] = mmSPI_SHADER_USER_DATA_ES_0;
