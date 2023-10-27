@@ -1350,7 +1350,7 @@ void LowerRaytracingPipelinePassImpl::processFunctionEnd(
 
     // Restore saved registers. This needs to be done *before* copying
     // back the payload, which depends on the restored memory pointer!
-    restorePayloadRegistersAfterRecursion(B, *EData.SavedRegisterValues);
+    restorePayloadRegistersAfterRecursion(B, EData.SavedRegisterValues);
 
     // Copy local payload into global payload at end of shader
     if (EData.OutgoingSerializationLayout->NumStorageI32s) {
@@ -1652,7 +1652,7 @@ void LowerRaytracingPipelinePassImpl::processFunction(llvm_dialects::Builder &B,
     }
 
     EData.OutgoingSerializationLayout = OutgoingSerializationLayout;
-    EData.SavedRegisterValues = &SavedRegisterValues;
+    EData.SavedRegisterValues = std::move(SavedRegisterValues);
     EData.NewPayload = NewPayload;
     EData.ShaderStage = ShaderStage;
     EData.HitAttrsAlloca = HitAttrsAlloca;

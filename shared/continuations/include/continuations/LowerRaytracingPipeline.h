@@ -174,7 +174,7 @@ private:
   struct FunctionEndData {
     Instruction *Terminator = nullptr;
     const PAQSerializationLayout *OutgoingSerializationLayout = nullptr;
-    SmallVectorImpl<Value *> *SavedRegisterValues = nullptr;
+    SmallVector<Value *> SavedRegisterValues;
     Value *NewPayload = nullptr;
     std::optional<PAQShaderStage> ShaderStage;
     Value *HitAttrsAlloca = nullptr;
