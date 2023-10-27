@@ -274,6 +274,29 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
   // Shader stage specific processing
   auto inOuts = entryPoint->getInOuts();
   if (shaderStage == ShaderStageVertex && autoLayoutDesc) {
+    // clang-format off
+    static const VkFormat LayoutInputFmtInt[][2][4] = {
+      {{VK_FORMAT_R8_UINT, VK_FORMAT_R8G8_UINT, VK_FORMAT_R8G8B8_UINT, VK_FORMAT_R8G8B8A8_UINT},            // VK_FORMAT_*8_UINT
+       {VK_FORMAT_R8_SINT, VK_FORMAT_R8G8_SINT, VK_FORMAT_R8G8B8_SINT, VK_FORMAT_R8G8B8A8_SINT}},           // VK_FORMAT_*8_SINT
+
+      {{VK_FORMAT_R16_UINT, VK_FORMAT_R16G16_UINT, VK_FORMAT_R16G16B16_UINT, VK_FORMAT_R16G16B16A16_UINT},  // VK_FORMAT_*16_UINT
+       {VK_FORMAT_R16_SINT, VK_FORMAT_R16G16_SINT, VK_FORMAT_R16G16B16_SINT, VK_FORMAT_R16G16B16A16_SINT}}, // VK_FORMAT_*16_SINT
+
+      {{VK_FORMAT_R32_UINT, VK_FORMAT_R32G32_UINT, VK_FORMAT_R32G32B32_UINT, VK_FORMAT_R32G32B32A32_UINT},  // VK_FORMAT_*32_UINT
+       {VK_FORMAT_R32_SINT, VK_FORMAT_R32G32_SINT, VK_FORMAT_R32G32B32_SINT, VK_FORMAT_R32G32B32A32_SINT}}, // VK_FORMAT_*32_SINT
+
+      {{VK_FORMAT_R64_UINT, VK_FORMAT_R64G64_UINT, VK_FORMAT_R64G64B64_UINT, VK_FORMAT_R64G64B64A64_UINT},  // VK_FORMAT_*64_UINT
+       {VK_FORMAT_R64_SINT, VK_FORMAT_R64G64_SINT, VK_FORMAT_R64G64B64_SINT, VK_FORMAT_R64G64B64A64_SINT}}, // VK_FORMAT_*64_SINT
+    };
+
+    static const VkFormat LayoutInputFmtFloat[][4] = {
+       {VK_FORMAT_UNDEFINED},
+       {VK_FORMAT_R16_SFLOAT, VK_FORMAT_R16G16_SFLOAT, VK_FORMAT_R16G16B16_SFLOAT, VK_FORMAT_R16G16B16A16_SFLOAT}, // VK_FORMAT_*16_SFLOAT
+       {VK_FORMAT_R32_SFLOAT, VK_FORMAT_R32G32_SFLOAT, VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_R32G32B32A32_SFLOAT}, // VK_FORMAT_*32_SFLOAT
+       {VK_FORMAT_R64_SFLOAT, VK_FORMAT_R64G64_SFLOAT, VK_FORMAT_R64G64B64_SFLOAT, VK_FORMAT_R64G64B64A64_SFLOAT}, // VK_FORMAT_*64_SFLOAT
+    };
+    // clang-format on
+
     // Create dummy vertex info (only if -auto-layout-desc is on).
     auto vertexBindings = new std::vector<VkVertexInputBindingDescription>;
     auto vertexAttribs = new std::vector<VkVertexInputAttributeDescription>;
@@ -290,53 +313,29 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
           if (varElemTy->getOpCode() == OpTypeMatrix)
             varElemTy = varElemTy->getMatrixColumnType();
 
-          if (varElemTy->getOpCode() == OpTypeVector)
+          unsigned numChannel = 1;
+          if (varElemTy->getOpCode() == OpTypeVector) {
+            numChannel = varElemTy->getVectorComponentCount();
             varElemTy = varElemTy->getVectorComponentType();
+          }
 
           VkFormat format = VK_FORMAT_UNDEFINED;
-          switch (varElemTy->getOpCode()) {
-          case OpTypeInt: {
-            bool isSigned = reinterpret_cast<SPIRVTypeInt *>(varElemTy)->isSigned();
-            switch (varElemTy->getIntegerBitWidth()) {
-            case 8:
-              format = isSigned ? VK_FORMAT_R8G8B8A8_SINT : VK_FORMAT_R8G8B8A8_UINT;
-              break;
-            case 16:
-              format = isSigned ? VK_FORMAT_R16G16B16A16_SINT : VK_FORMAT_R16G16B16A16_UINT;
-              break;
-            case 32:
-              format = isSigned ? VK_FORMAT_R32G32B32A32_SINT : VK_FORMAT_R32G32B32A32_UINT;
-              break;
-            case 64:
-              format = isSigned ? VK_FORMAT_R64G64B64A64_SINT : VK_FORMAT_R64G64B64A64_UINT;
-              break;
-            }
-            break;
-          }
-          case OpTypeFloat: {
-            switch (varElemTy->getFloatBitWidth()) {
-            case 16:
-              format = VK_FORMAT_R16G16B16A16_SFLOAT;
-              break;
-            case 32:
-              format = VK_FORMAT_R32G32B32A32_SFLOAT;
-              break;
-            case 64:
-              format = VK_FORMAT_R64G64_SFLOAT;
-              break;
-            }
-            break;
-          }
-          default: {
-            break;
-          }
+          unsigned bitWidth = varElemTy->getBitWidth();
+          auto bitWidthIdx = Log2_32(bitWidth / 8);
+
+          if (varElemTy->getOpCode() == OpTypeInt) {
+            auto idx = reinterpret_cast<SPIRVTypeInt *>(varElemTy)->isSigned() ? 1 : 0;
+            format = LayoutInputFmtInt[bitWidthIdx][idx][numChannel - 1];
+          } else {
+            assert(varElemTy->getOpCode() == OpTypeFloat);
+            format = LayoutInputFmtFloat[bitWidthIdx][numChannel - 1];
           }
           assert(format != VK_FORMAT_UNDEFINED);
 
           VkVertexInputBindingDescription vertexBinding = {};
           vertexBinding.binding = location;
           vertexBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-          vertexBinding.stride = SizeOfVec4;
+          vertexBinding.stride = (bitWidth / 8) * numChannel;
 
           VkVertexInputAttributeDescription vertexAttrib = {};
           vertexAttrib.binding = location;
