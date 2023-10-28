@@ -435,14 +435,25 @@ void PipelineState::clear(Module *module) {
 //
 // @param [in/out] module : Module to record the IR metadata in
 void PipelineState::record(Module *module) {
+  recordExceptPalMetadata(module);
+  if (m_palMetadata)
+    m_palMetadata->record(module);
+}
+
+// =====================================================================================================================
+// Record pipeline state except for PAL metadata into IR metadata of specified module.
+//
+// TODO: This method shouldn't exist. It is a temporary workaround to the fact that the entire main pipeline state
+//       leaks into glue shader compilation, but we mustn't have all associated PAL metadata in the glue shader ELF.
+//
+// @param [in/out] module : Module to record the IR metadata in
+void PipelineState::recordExceptPalMetadata(Module *module) {
   recordOptions(module);
   recordUserDataNodes(module);
   recordDeviceIndex(module);
   recordVertexInputDescriptions(module);
   recordColorExportState(module);
   recordGraphicsState(module);
-  if (m_palMetadata)
-    m_palMetadata->record(module);
 }
 
 // =====================================================================================================================

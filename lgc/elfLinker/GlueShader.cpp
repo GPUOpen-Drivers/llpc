@@ -47,21 +47,8 @@ void GlueShader::compile(raw_pwrite_stream &outStream) {
   // Generate the glue shader IR module.
   std::unique_ptr<Module> module(generate());
 
-  // For explicit color export shader, some registers are required.
-  if (m_pipelineState->getOptions().enableColorExportShader) {
-    m_pipelineState->getPalMetadata()->updateDbShaderControl();
-  }
-
-  // Record pipeline state
-  m_pipelineState->record(&*module);
-
-  // For explicit color export shader, meta data have added some registers.
-  if (!m_pipelineState->getOptions().enableColorExportShader) {
-    // Add empty PAL metadata, to ensure that the back-end writes its PAL metadata in MsgPack format.
-    PalMetadata *palMetadata = new PalMetadata(nullptr, m_pipelineState->useRegisterFieldFormat());
-    palMetadata->record(&*module);
-    delete palMetadata;
-  }
+  // Record pipeline state so that it is available during the subsequent generic IR passes.
+  m_pipelineState->recordExceptPalMetadata(&*module);
 
   // Get the pass managers and run them on the module, generating ELF.
   std::pair<lgc::PassManager &, LegacyPassManager &> passManagers =

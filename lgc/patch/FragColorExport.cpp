@@ -489,7 +489,8 @@ bool LowerFragColorExport::runImpl(Module &module, PipelineShadersResult &pipeli
   FragColorExport fragColorExport(m_context, m_pipelineState);
   bool dummyExport =
       (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10 || m_resUsage->builtInUsage.fs.discard);
-  fragColorExport.generateExportInstructions(m_info, m_exportValues, dummyExport, builder);
+  fragColorExport.generateExportInstructions(m_info, m_exportValues, dummyExport, m_pipelineState->getPalMetadata(),
+                                             builder);
   return !m_info.empty() || dummyExport;
 }
 
@@ -872,9 +873,10 @@ Value *FragColorExport::dualSourceSwizzle(BuilderBase &builder) {
 // @param info : The color export information for each color export in no particular order.
 // @param values : The values that are to be exported.  Indexed by the hw color target.
 // @param exportFormat : The export format for each color target. Indexed by the hw color target.
+// @param [out] palMetadata : The PAL metadata that will be extended with relevant information.
 // @param builder : The builder object that will be used to create new instructions.
 void FragColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info, ArrayRef<Value *> values,
-                                                 bool dummyExport, BuilderBase &builder) {
+                                                 bool dummyExport, PalMetadata *palMetadata, BuilderBase &builder) {
   SmallVector<ExportFormat> finalExportFormats;
   Value *lastExport = nullptr;
 
@@ -928,7 +930,7 @@ void FragColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info,
     else if (depthMask & 0x1)
       depthExpFmt = (depthMask & 0x8) ? EXP_FORMAT_32_AR : EXP_FORMAT_32_R;
 
-    m_pipelineState->getPalMetadata()->setSpiShaderZFormat(depthExpFmt);
+    palMetadata->setSpiShaderZFormat(depthExpFmt);
     info = info.drop_front(1);
   }
 
@@ -965,8 +967,8 @@ void FragColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info,
   if (lastExport)
     FragColorExport::setDoneFlag(lastExport, builder);
 
-  m_pipelineState->getPalMetadata()->updateSpiShaderColFormat(finalExportFormats);
-  m_pipelineState->getPalMetadata()->updateCbShaderMask(info);
+  palMetadata->updateSpiShaderColFormat(finalExportFormats);
+  palMetadata->updateCbShaderMask(info);
 }
 
 // =====================================================================================================================
