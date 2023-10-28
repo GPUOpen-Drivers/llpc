@@ -62,7 +62,7 @@ public:
   FragColorExport(llvm::LLVMContext *context, PipelineState *pipelineState);
 
   void generateExportInstructions(llvm::ArrayRef<lgc::ColorExportInfo> info, llvm::ArrayRef<llvm::Value *> values,
-                                  bool dummyExport, BuilderBase &builder);
+                                  bool dummyExport, PalMetadata *palMetadata, BuilderBase &builder);
   static void setDoneFlag(llvm::Value *exportInst, BuilderBase &builder);
   static llvm::CallInst *addDummyExport(BuilderBase &builder);
   static llvm::Function *generateNullFragmentShader(llvm::Module &module, PipelineState *pipelineState,

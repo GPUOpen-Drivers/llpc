@@ -238,6 +238,8 @@ public:
   // Record pipeline state into IR metadata of specified module.
   void record(llvm::Module *module);
 
+  void recordExceptPalMetadata(llvm::Module *module);
+
   // Print pipeline state
   void print(llvm::raw_ostream &out) const;
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
