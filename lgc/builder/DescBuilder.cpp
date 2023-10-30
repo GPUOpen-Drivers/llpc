@@ -389,11 +389,8 @@ Value *BuilderImpl::getDescPtr(ResourceNodeType concreteType, const ResourceNode
 // @param isNonUniform : Whether value is marked as non-uniform
 Value *BuilderImpl::scalarizeIfUniform(Value *value, bool isNonUniform) {
   assert(value->getType()->isIntegerTy(32));
-  if (!isNonUniform && !isa<Constant>(value)) {
-    // NOTE: GFX6 encounters GPU hang with this optimization enabled. So we should skip it.
-    if (getPipelineState()->getTargetInfo().getGfxIpVersion().major > 6)
-      value = CreateIntrinsic(getInt32Ty(), Intrinsic::amdgcn_readfirstlane, value);
-  }
+  if (!isNonUniform && !isa<Constant>(value))
+    value = CreateIntrinsic(getInt32Ty(), Intrinsic::amdgcn_readfirstlane, value);
   return value;
 }
 
