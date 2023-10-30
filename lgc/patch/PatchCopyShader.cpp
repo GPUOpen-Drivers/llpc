@@ -105,13 +105,14 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
   SmallVector<const char *, 16> argNames;
 
   const auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
+  (void(gfxIp)); // Unused
   if (!m_pipelineState->getNggControl()->enableNgg) {
     // Create type of new function with fixed HW layout:
     //
     //   void copyShader(
     //     i32 inreg globalTable,
-    //     i32 inreg streamOutTable (GFX6-GFX8) / esGsLdsSize (GFX9+),
-    //     i32 inreg esGsLdsSize (GFX6-GFX8) / streamOutTable (GFX9+),
+    //     i32 inreg esGsLdsSize (GFX9+),
+    //     i32 inreg streamOutTable (GFX9+),
     //     i32 inreg streamOutInfo,
     //     i32 inreg streamOutWriteIndex,
     //     i32 inreg streamOutOffset0,

@@ -302,8 +302,7 @@ public:
   void setGsOnChip(bool gsOnChip) { m_gsOnChip = gsOnChip; }
 
   // Checks whether GS on-chip mode is enabled
-  // NOTE: GS on-chip mode has different meaning for GFX6~8 and GFX9: on GFX6~8, GS on-chip mode means ES -> GS ring
-  // and GS -> VS ring are both on-chip; on GFX9, ES -> GS ring is always on-chip, GS on-chip mode means GS -> VS
+  // NOTE: on GFX9, ES -> GS ring is always on-chip, GS on-chip mode means GS -> VS
   // ring is on-chip.
   bool isGsOnChip() const { return m_gsOnChip; }
 
