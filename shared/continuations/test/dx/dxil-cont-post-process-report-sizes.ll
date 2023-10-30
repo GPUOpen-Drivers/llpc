@@ -32,7 +32,7 @@ define void @RayGen.resume.0(i32 %0, %struct.DispatchSystemData %1) !continuatio
 
 ; REPORT-PAYLOAD-SIZES: Incoming and max outgoing payload VGPR size of "CHS" (closesthit): 32 and 36 bytes
 ; REPORT-SYSTEM-DATA-SIZES-DAG: Incoming system data of "CHS" (closesthit) is "struct.CHSSystemData", size: 400 bytes
-define void @CHS(i32 %cspInit, i64 %returnAddr, %struct.CHSSystemData %0) !continuation.registercount !8 !lgc.rt.shaderstage !13 {
+define void @CHS(i32 %cspInit, i64 %returnAddr, %struct.CHSSystemData %0) !continuation !14 !continuation.registercount !8 !lgc.rt.shaderstage !13 {
   call void @continuation.continue(), !continuation.registercount !9
   ret void
 }
@@ -54,3 +54,4 @@ define void @CHS(i32 %cspInit, i64 %returnAddr, %struct.CHSSystemData %0) !conti
 !11 = !{i32 8, i32 10}
 !12 = !{i32 0}
 !13 = !{i32 3}
+!14 = !{ptr @CHS}
