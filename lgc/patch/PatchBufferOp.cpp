@@ -352,8 +352,8 @@ void BufferOpLowering::visitAtomicCmpXchgInst(AtomicCmpXchgInst &atomicCmpXchgIn
   Value *const baseIndex = m_builder.CreatePtrToInt(values[1], m_builder.getInt32Ty());
   copyMetadata(baseIndex, &atomicCmpXchgInst);
 
-  // If our buffer descriptor is divergent or is not a 32-bit integer, need to handle it differently.
-  if (getDescriptorInfo(bufferDesc).divergent.value() || !storeType->isIntegerTy(32)) {
+  // If our buffer descriptor is divergent, need to handle it differently.
+  if (getDescriptorInfo(bufferDesc).divergent.value()) {
     Value *const baseAddr = getBaseAddressFromBufferDesc(bufferDesc);
 
     // The 2nd element in the buffer descriptor is the byte bound, we do this to support robust buffer access.
