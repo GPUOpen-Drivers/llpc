@@ -4758,28 +4758,6 @@ unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(unsigned inVertexC
     patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, offChipTfBufferPatchCountLimit);
   }
 
-  // Adjust the patches-per-thread-group based on hardware workarounds.
-  if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx6.miscLoadBalancePerWatt != 0) {
-    const unsigned waveSize = m_pipelineState->getTargetInfo().getGpuProperty().waveSize;
-    // Load balance per watt is a mechanism which monitors HW utilization (num waves active, instructions issued
-    // per cycle, etc.) to determine if the HW can handle the workload with fewer CUs enabled.  The SPI_LB_CU_MASK
-    // register directs the SPI to stop launching waves to a CU so it will be clock-gated.  There is a bug in the
-    // SPI which where that register setting is applied immediately, which causes any pending LS/HS/CS waves on
-    // that CU to never be launched.
-    //
-    // The workaround is to limit each LS/HS threadgroup to a single wavefront: if there's only one wave, then the
-    // CU can safely be turned off afterwards.  A microcode fix exists for CS but for GFX it was decided that the
-    // cost in power efficiency wasn't worthwhile.
-    //
-    // Clamping to threads-per-wavefront / max(input control points, threads-per-patch) will make the hardware
-    // launch a single LS/HS wave per thread-group.
-    // For vulkan, threads-per-patch is always equal with outVertexCount.
-    const unsigned maxThreadCountPerPatch = std::max(inVertexCount, outVertexCount);
-    const unsigned maxPatchCount = waveSize / maxThreadCountPerPatch;
-
-    patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, maxPatchCount);
-  }
-
   return patchCountPerThreadGroup;
 }
 

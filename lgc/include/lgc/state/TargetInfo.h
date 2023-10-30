@@ -90,28 +90,6 @@ struct GpuProperty {
 struct WorkaroundFlags {
   union {
     struct {
-      unsigned cbNoLt16BitIntClamp : 1;
-      unsigned miscLoadBalancePerWatt : 1;
-      unsigned miscSpiSgprsNum : 1;
-      unsigned shader8b16bLocalWriteCorruption : 1;
-      unsigned shaderCoalesceStore : 1;
-      unsigned shaderEstimateRegisterUsage : 1;
-      unsigned shaderReadlaneSmrd : 1;
-      unsigned shaderSmemBufferAddrClamp : 1;
-      unsigned shaderSpiBarrierMgmt : 1;
-
-      unsigned shaderSpiCsRegAllocFragmentation : 1;
-      unsigned shaderVcczScalarReadBranchFailure : 1;
-      unsigned shaderZExport : 1;
-      // Pre-GFX9 hardware doesn't support min/max denorm flush, we insert extra fmul with 1.0 to flush the denorm value
-      unsigned shaderMinMaxFlushDenorm : 1;
-      unsigned reserved : 19;
-    };
-    unsigned u32All;
-  } gfx6;
-
-  union {
-    struct {
       unsigned fixCacheLineStraddling : 1;
       unsigned fixLsVgprInput : 1;
       unsigned shaderImageGatherInstFix : 1;

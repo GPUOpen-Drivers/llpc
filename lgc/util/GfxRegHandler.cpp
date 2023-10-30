@@ -165,29 +165,6 @@ void SqImgSampRegHandler::setReg(SqSampRegs regId, Value *regValue) {
 }
 
 // =====================================================================================================================
-// SqImgSampReg Bits information look up table (Gfx6,7,8)
-// Refer to imported/chip/gfx6/si_ci_merged_registers.h : SQ_IMG_RSRC_WORD
-static constexpr BitsInfo SqImgRsrcRegBitsGfx6[static_cast<unsigned>(SqRsrcRegs::Count)] = {
-    {0, 0, 32},  // BaseAddress
-    {1, 0, 8},   // BaseAddressHi
-    {1, 20, 6},  // Format
-    {2, 0, 14},  // Width
-    {2, 14, 14}, // Height
-    {3, 0, 12},  // DstSelXYZW
-    {},          // SwizzleMode
-    {4, 0, 13},  // Depth
-    {4, 13, 14}, // Pitch
-    {},          // BcSwizzle
-    {3, 12, 4},  // BaseLevel
-    {3, 16, 4},  // LastLevel
-    {5, 0, 13},  // BaseArray
-    {5, 13, 13}, // LastArray
-    {},          // WidthLo
-    {},          // WidthHi
-    {},          // ArrayPitch
-};
-
-// =====================================================================================================================
 // SqImgSampReg Bits information look up table (Gfx9)
 // Refer to imported/chip/gfx9/gfx9_plus_merged_registers.h : SQ_IMG_RSRC_WORD
 static constexpr BitsInfo SqImgRsrcRegBitsGfx9[static_cast<unsigned>(SqRsrcRegs::Count)] = {
@@ -267,11 +244,6 @@ SqImgRsrcRegHandler::SqImgRsrcRegHandler(IRBuilder<> *builder, Value *reg, GfxIp
   m_gfxIpVersion = gfxIpVersion;
 
   switch (gfxIpVersion->major) {
-  case 6:
-  case 7:
-  case 8:
-    m_bitsInfo = SqImgRsrcRegBitsGfx6;
-    break;
   case 9:
     m_bitsInfo = SqImgRsrcRegBitsGfx9;
     break;

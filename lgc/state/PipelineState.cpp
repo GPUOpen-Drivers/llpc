@@ -1612,7 +1612,6 @@ InterfaceData *PipelineState::getShaderInterfaceData(ShaderStage shaderStage) {
 // @param location : Location
 unsigned PipelineState::computeExportFormat(Type *outputTy, unsigned location) {
   const ColorExportFormat *colorExportFormat = &getColorExportFormat(location);
-  auto gpuWorkarounds = &getTargetInfo().getGpuWorkarounds();
   unsigned outputMask = outputTy->isVectorTy() ? (1 << cast<FixedVectorType>(outputTy)->getNumElements()) - 1 : 1;
   const auto cbState = &getColorExportState();
   // NOTE: Alpha-to-coverage only takes effect for outputs from color target 0.
@@ -1660,10 +1659,7 @@ unsigned PipelineState::computeExportFormat(Type *outputTy, unsigned location) {
   } else if (((isUnormFormat || isSnormFormat) && maxCompBitCount <= 10) || (isFloatFormat && maxCompBitCount <= 16) ||
              (isSrgbFormat && maxCompBitCount == 8))
     expFmt = EXP_FORMAT_FP16_ABGR;
-  else if (isSintFormat &&
-           (maxCompBitCount == 16 ||
-            (!static_cast<bool>(gpuWorkarounds->gfx6.cbNoLt16BitIntClamp) && maxCompBitCount < 16)) &&
-           !enableAlphaToCoverage) {
+  else if (isSintFormat && (maxCompBitCount == 16 || maxCompBitCount < 16) && !enableAlphaToCoverage) {
     // NOTE: On some hardware, the CB will not properly clamp its input if the shader export format is "UINT16"
     // "SINT16" and the CB format is less than 16 bits per channel. On such hardware, the workaround is picking
     // an appropriate 32-bit export format. If this workaround isn't necessary, then we can choose this higher
@@ -1671,10 +1667,7 @@ unsigned PipelineState::computeExportFormat(Type *outputTy, unsigned location) {
     expFmt = EXP_FORMAT_SINT16_ABGR;
   } else if (isSnormFormat && maxCompBitCount == 16 && !blendEnabled)
     expFmt = EXP_FORMAT_SNORM16_ABGR;
-  else if (isUintFormat &&
-           (maxCompBitCount == 16 ||
-            (!static_cast<bool>(gpuWorkarounds->gfx6.cbNoLt16BitIntClamp) && maxCompBitCount < 16)) &&
-           !enableAlphaToCoverage) {
+  else if (isUintFormat && (maxCompBitCount == 16 || maxCompBitCount < 16) && !enableAlphaToCoverage) {
     // NOTE: On some hardware, the CB will not properly clamp its input if the shader export format is "UINT16"
     // "SINT16" and the CB format is less than 16 bits per channel. On such hardware, the workaround is picking
     // an appropriate 32-bit export format. If this workaround isn't necessary, then we can choose this higher

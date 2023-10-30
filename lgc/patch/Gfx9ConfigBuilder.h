@@ -38,7 +38,7 @@ namespace lgc {
 namespace Gfx9 {
 
 // =====================================================================================================================
-// Represents the builder to generate register configurations for GFX6-generation chips.
+// Represents the builder to generate register configurations for GFX9-generation chips.
 class ConfigBuilder : public ConfigBuilderBase {
 public:
   ConfigBuilder(llvm::Module *module, PipelineState *pipelineState) : ConfigBuilderBase(module, pipelineState) {}

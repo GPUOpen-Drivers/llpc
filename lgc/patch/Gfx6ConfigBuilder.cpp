@@ -670,31 +670,6 @@ template <typename T> void ConfigBuilder::buildLsRegConfig(ShaderStage shaderSta
 
   auto gpuWorkarounds = &m_pipelineState->getTargetInfo().getGpuWorkarounds();
 
-  // Override the LDS size based on hardware workarounds.
-  if (gpuWorkarounds->gfx6.shaderSpiBarrierMgmt != 0) {
-    // The SPI has a bug where the VS never checks for or waits on barrier resources, so if all barriers are in-use
-    // on a CU which gets picked for VS work the SPI will overflow the resources and clobber the barrier tracking.
-    // (There are 16 barriers available per CU, if resource reservations have not reduced this.)
-    //
-    // The workaround is to set a minimum LDS allocation size of 4KB for all dependent groups (tessellation, onchip
-    // GS, and CS) threadgroups larger than one wavefront.  This means that any wave type which wants to use a
-    // barrier must allocate >= 1/16th of the available LDS space per CU which will guarantee that the SPI will not
-    // overflow the resource tracking (since LDS will be full).
-
-    // If the HS threadgroup requires more than one wavefront, barriers will be allocated and we need to limit the
-    // number of thread groups in flight.
-    const unsigned outputVertices = m_pipelineState->getShaderModes()->getTessellationMode().outputVertices;
-
-    const unsigned threadGroupSize = calcFactor.patchCountPerThreadGroup * outputVertices;
-    const unsigned waveSize = m_pipelineState->getTargetInfo().getGpuProperty().waveSize;
-    const unsigned wavesPerThreadGroup = (threadGroupSize + waveSize - 1) / waveSize;
-
-    if (wavesPerThreadGroup > 1) {
-      constexpr unsigned minLdsSizeWa = 1024; // 4KB in dwords.
-      ldsSizeInDwords = std::max(ldsSizeInDwords, minLdsSizeWa);
-    }
-  }
-
   const unsigned ldsSizeDwordGranularityShift =
       m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
   const unsigned ldsSizeDwordGranularity = 1u << ldsSizeDwordGranularityShift;
