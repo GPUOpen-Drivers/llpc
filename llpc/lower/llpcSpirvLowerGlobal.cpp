@@ -2424,6 +2424,10 @@ void SpirvLowerGlobal::addCallInstForXfbOutput(const ShaderInOutMetadata &output
   DenseMap<unsigned, Vkgc::XfbOutInfo> *locXfbMapPtr = outputMeta.IsBuiltIn ? &m_builtInXfbMap : &m_genericXfbMap;
   bool hasXfbMetadata = m_entryPoint->getMetadata(lgc::XfbStateMetadataName);
   bool hasXfbOut = hasXfbMetadata && (!locXfbMapPtr->empty() || outputMeta.IsXfb);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 70
+  auto pipelineBuildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+  hasXfbOut &= !pipelineBuildInfo->apiXfbOutData.forceDisableStreamOut;
+#endif
   if (!hasXfbOut)
     return;
 
