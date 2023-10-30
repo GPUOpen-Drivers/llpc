@@ -38,6 +38,7 @@
 #include "llvm-dialects/Dialect/Builder.h"
 #include "llvm-dialects/Dialect/Dialect.h"
 #include "llvm/Passes/PassBuilder.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Transforms/Coroutines/CoroCleanup.h"
 #include "llvm/Transforms/Coroutines/CoroEarly.h"
 #include "llvm/Transforms/Coroutines/CoroElide.h"
@@ -539,9 +540,8 @@ Value *llvm::getDXILSystemData(IRBuilder<> &B, Value *SystemData,
     if (!StructTy) {
       LLVM_DEBUG(dbgs() << "System data struct: "; SystemDataTy->dump());
       LLVM_DEBUG(dbgs() << "Wanted struct type: "; Ty->dump());
-      errs() << "Invalid system data struct: Did not contain the needed struct "
-                "type\n";
-      llvm_unreachable("");
+      report_fatal_error(
+          "Invalid system data struct: Did not contain the needed struct type");
     }
     SystemDataTy = StructTy->getElementType(0);
     Indices.push_back(B.getInt32(0));
