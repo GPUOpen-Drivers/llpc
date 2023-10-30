@@ -809,6 +809,16 @@ DXILContPostProcessPass::run(llvm::Module &M,
     if (!Stage || F.isDeclaration())
       continue;
 
+    // Handle entry functions first
+    if (auto *MD = dyn_cast_or_null<MDTuple>(
+            F.getMetadata(DXILContHelper::MDContinuationName))) {
+      auto *EntryF = extractFunctionOrNull(MD->getOperand(0));
+      if (&F != EntryF)
+        continue;
+    } else {
+      continue;
+    }
+
     DXILShaderKind Kind = DXILContHelper::shaderStageToDxilShaderKind(*Stage);
     switch (Kind) {
     case DXILShaderKind::RayGeneration:
@@ -824,8 +834,9 @@ DXILContPostProcessPass::run(llvm::Module &M,
         assert(SetupRayGen && "Could not find SetupRayGen function");
         Data.SystemDataTy = SetupRayGen->getReturnType();
       } else {
+        assert(F.getFunctionType()->getNumParams() >= 3 &&
+               "Cannot find system data type");
         Data.SystemDataTy = F.getFunctionType()->getParamType(2);
-        assert(Data.SystemDataTy && "Did not find system data type");
       }
       ToProcess[&F] = Data;
       break;
