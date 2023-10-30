@@ -365,9 +365,6 @@ void YCbCrConverter::genImgDescChroma() {
     Value *isBgRgFmt = nullptr;
 
     switch (m_gfxIp->major) {
-    case 6:
-    case 7:
-    case 8:
     case 9: {
       isGbGrFmt = m_builder->CreateICmpEQ(imgDataFmt,
                                           m_builder->getInt32(BuilderImpl::ImgDataFormat::IMG_DATA_FORMAT_BG_RG__CORE));

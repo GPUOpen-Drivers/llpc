@@ -57,9 +57,6 @@ void YCbCrAddressHandler::genBaseAddress(unsigned planeCount) {
   Value *pipeBankXorNone = m_builder->getInt32(0);
 
   switch (m_gfxIp->major) {
-  case 6:
-  case 7:
-  case 8:
   case 9:
   case 11: {
     pipeBankXor1 = pipeBankXorNone;
@@ -142,9 +139,6 @@ void YCbCrAddressHandler::genHeightAndPitch(unsigned bits, unsigned bpp, unsigne
     m_swizzleMode = m_regHandler->getReg(SqRsrcRegs::SwizzleMode);
 
   switch (m_gfxIp->major) {
-  case 6:
-  case 7:
-  case 8:
   case 9: {
     // Height = SqRsrcRegs::Height
     Value *height = m_regHandler->getReg(SqRsrcRegs::Height);
