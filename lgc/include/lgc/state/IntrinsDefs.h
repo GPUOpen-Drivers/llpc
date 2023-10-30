@@ -565,7 +565,7 @@ union SqBufRsrcWord3 {
     unsigned heap : 1;
     unsigned mtype : 3;
     unsigned : 2;
-  } gfx6;
+  } gfx9;
 
   struct {
     unsigned : 12;

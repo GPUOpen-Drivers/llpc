@@ -521,11 +521,11 @@ Value *ShaderSystemValues::setRingBufferDataFormat(Value *bufDesc, unsigned data
   SqBufRsrcWord3 dataFormatClearMask;
   dataFormatClearMask.u32All = UINT32_MAX;
   // TODO: This code needs to be fixed for gfx10; buffer format is handled differently.
-  dataFormatClearMask.gfx6.dataFormat = 0;
+  dataFormatClearMask.gfx9.dataFormat = 0;
   elem3 = builder.CreateAnd(elem3, builder.getInt32(dataFormatClearMask.u32All));
 
   SqBufRsrcWord3 dataFormatSetValue = {};
-  dataFormatSetValue.gfx6.dataFormat = dataFormat;
+  dataFormatSetValue.gfx9.dataFormat = dataFormat;
   elem3 = builder.CreateOr(elem3, builder.getInt32(dataFormatSetValue.u32All));
 
   return builder.CreateInsertElement(bufDesc, elem3, (uint64_t)3);

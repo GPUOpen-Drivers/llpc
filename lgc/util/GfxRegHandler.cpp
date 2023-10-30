@@ -113,9 +113,6 @@ SqImgSampRegHandler::SqImgSampRegHandler(IRBuilder<> *builder, Value *reg, GfxIp
   m_gfxIpVersion = gfxIpVersion;
 
   switch (gfxIpVersion->major) {
-  case 6:
-  case 7:
-  case 8:
   case 9:
   case 10:
   case 11:
@@ -181,7 +178,6 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx9[static_cast<unsigned>(SqRsrcRegs:
     {3, 12, 4},  // BaseLevel
     {3, 16, 4},  // LastLevel
     {5, 0, 13},  // BaseArray
-    {},          // LastArray
     {},          // WidthLo
     {},          // WidthHi
     {},          // ArrayPitch
@@ -204,7 +200,6 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx10[static_cast<unsigned>(SqRsrcRegs
     {3, 12, 4},  // BaseLevel
     {3, 16, 4},  // LastLevel
     {4, 16, 13}, // BaseArray
-    {},          // LastArray
     {1, 30, 2},  // WidthLo
     {2, 0, 12},  // WidthHi
     {5, 0, 4},   // ArrayPitch
@@ -227,7 +222,6 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx11[static_cast<unsigned>(SqRsrcRegs
     {3, 12, 4},  // BaseLevel
     {3, 16, 4},  // LastLevel
     {4, 16, 13}, // BaseArray
-    {},          // LastArray
     {1, 30, 2},  // WidthLo
     {2, 0, 12},  // WidthHi
     {5, 0, 4},   // ArrayPitch
@@ -282,25 +276,12 @@ Value *SqImgRsrcRegHandler::getReg(SqRsrcRegs regId) {
     return m_builder->CreateAdd(getRegCommon(static_cast<unsigned>(regId)), m_one);
   case SqRsrcRegs::Width:
     switch (m_gfxIpVersion->major) {
-    case 6:
-    case 7:
-    case 8:
     case 9:
       return m_builder->CreateAdd(getRegCommon(static_cast<unsigned>(regId)), m_one);
     case 10:
     case 11:
       return m_builder->CreateAdd(
           getRegCombine(static_cast<unsigned>(SqRsrcRegs::WidthLo), static_cast<unsigned>(SqRsrcRegs::WidthHi)), m_one);
-    default:
-      llvm_unreachable("GFX IP is not supported!");
-      break;
-    }
-  case SqRsrcRegs::LastArray:
-    switch (m_gfxIpVersion->major) {
-    case 6:
-    case 7:
-    case 8:
-      return getRegCommon(static_cast<unsigned>(regId));
     default:
       llvm_unreachable("GFX IP is not supported!");
       break;
@@ -334,9 +315,6 @@ void SqImgRsrcRegHandler::setReg(SqRsrcRegs regId, Value *regValue) {
     break;
   case SqRsrcRegs::Width:
     switch (m_gfxIpVersion->major) {
-    case 6:
-    case 7:
-    case 8:
     case 9:
       setRegCommon(static_cast<unsigned>(regId), m_builder->CreateSub(regValue, m_one));
       break;

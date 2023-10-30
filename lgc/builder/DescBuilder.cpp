@@ -443,8 +443,8 @@ Value *BuilderImpl::buildBufferCompactDesc(Value *desc) {
   sqBufRsrcWord3.bits.dstSelZ = BUF_DST_SEL_Z;
   sqBufRsrcWord3.bits.dstSelW = BUF_DST_SEL_W;
   if (gfxIp.major < 10) {
-    sqBufRsrcWord3.gfx6.numFormat = BUF_NUM_FORMAT_UINT;
-    sqBufRsrcWord3.gfx6.dataFormat = BUF_DATA_FORMAT_32;
+    sqBufRsrcWord3.gfx9.numFormat = BUF_NUM_FORMAT_UINT;
+    sqBufRsrcWord3.gfx9.dataFormat = BUF_DATA_FORMAT_32;
     assert(sqBufRsrcWord3.u32All == 0x24FAC);
   } else if (gfxIp.major == 10) {
     sqBufRsrcWord3.gfx10.format = BUF_FORMAT_32_UINT;
