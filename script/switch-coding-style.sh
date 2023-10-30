@@ -144,7 +144,6 @@ do_clang_tidy() {
   mkdir -p $build/fixes/llpc/imported/metrohash/src &&
   mkdir -p $build/fixes/llpc/lower &&
   mkdir -p $build/fixes/lgc/patch &&
-  mkdir -p $build/fixes/lgc/patch/gfx6/chip &&
   mkdir -p $build/fixes/lgc/patch/gfx9 &&
   mkdir -p $build/fixes/lgc/patch/gfx9/chip &&
   mkdir -p $build/fixes/llpc/tool &&

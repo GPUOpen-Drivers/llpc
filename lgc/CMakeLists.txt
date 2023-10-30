@@ -206,8 +206,6 @@ target_sources(LLVMlgc PRIVATE
     patch/ConfigBuilderBase.cpp
     patch/Continufy.cpp
     patch/FragColorExport.cpp
-    patch/Gfx6Chip.cpp
-    patch/Gfx6ConfigBuilder.cpp
     patch/Gfx9Chip.cpp
     patch/Gfx9ConfigBuilder.cpp
     patch/LowerDebugPrintf.cpp

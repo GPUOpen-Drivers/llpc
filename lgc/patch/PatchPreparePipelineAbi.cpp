@@ -29,7 +29,6 @@
 ***********************************************************************************************************************
 */
 #include "lgc/patch/PatchPreparePipelineAbi.h"
-#include "Gfx6ConfigBuilder.h"
 #include "Gfx9ConfigBuilder.h"
 #include "MeshTaskShader.h"
 #include "RegisterMetadataBuilder.h"

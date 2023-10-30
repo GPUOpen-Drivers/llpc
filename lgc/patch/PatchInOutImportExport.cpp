@@ -30,7 +30,6 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/PatchInOutImportExport.h"
-#include "Gfx6Chip.h"
 #include "Gfx9Chip.h"
 #include "lgc/Builder.h"
 #include "lgc/BuiltIns.h"
@@ -4681,8 +4680,7 @@ unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(unsigned inVertexC
                                                               unsigned outVertexCount, unsigned outVertexStride,
                                                               unsigned patchConstCount,
                                                               unsigned tessFactorStride) const {
-  unsigned maxThreadCountPerThreadGroup =
-      m_gfxIp.major >= 9 ? Gfx9::MaxHsThreadsPerSubgroup : Gfx6::MaxHsThreadsPerSubgroup;
+  unsigned maxThreadCountPerThreadGroup = Gfx9::MaxHsThreadsPerSubgroup;
 
   // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
   // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
