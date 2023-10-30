@@ -135,8 +135,7 @@ Value *YCbCrAddressHandler::power2Align(Value *x, unsigned align) {
 // @param xBitCount : Effective channel bits
 // @param planeNum : Number of planes
 void YCbCrAddressHandler::genHeightAndPitch(unsigned bits, unsigned bpp, unsigned xBitCount, unsigned planeNum) {
-  if (m_gfxIp->major > 8)
-    m_swizzleMode = m_regHandler->getReg(SqRsrcRegs::SwizzleMode);
+  m_swizzleMode = m_regHandler->getReg(SqRsrcRegs::SwizzleMode);
 
   switch (m_gfxIp->major) {
   case 9: {

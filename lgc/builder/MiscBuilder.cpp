@@ -173,73 +173,41 @@ Instruction *BuilderImpl::CreateReadClock(bool realtime, const Twine &instName) 
 Value *BuilderImpl::CreateDerivative(Value *value, bool isDirectionY, bool isFine, const Twine &instName) {
   unsigned tableIdx = isDirectionY * 2 + isFine;
   Value *result = nullptr;
-  if (supportDpp()) {
-    // DPP (GFX8+) version.
-    // For quad pixels, quad_perm:[pix0,pix1,pix2,pix3] = [0,1,2,3]
-    // Table of first dpp_ctrl, in order coarseX, fineX, coarseY, fineY
-    static const unsigned FirstDppCtrl[4] = {
-        0x55, // CoarseX: [0,1,2,3] -> [1,1,1,1]
-        0xF5, // FineX:   [0,1,2,3]->[1,1,3,3]
-        0xAA, // CoarseY: [0,1,2,3] -> [2,2,2,2]
-        0xEE, // FineY:   [0,1,2,3]->[2,3,2,3]
-    };
-    // Table of second dpp_ctrl, in order coarseX, fineX, coarseY, fineY
-    static const unsigned SecondDppCtrl[4] = {
-        0x00, // CoarseX: [0,1,2,3]->[0,0,0,0]
-        0xA0, // FineX:   [0,1,2,3]->[0,0,2,2]
-        0x00, // CoarseY: [0,1,2,3]->[0,0,0,0]
-        0x44, // FineY:   [0,1,2,3]->[0,1,0,1]
-    };
-    unsigned perm1 = FirstDppCtrl[tableIdx];
-    unsigned perm2 = SecondDppCtrl[tableIdx];
-    result = scalarize(value, [this, perm1, perm2](Value *value) {
-      Type *valTy = value->getType();
-      value = CreateBitCast(value, getIntNTy(valTy->getPrimitiveSizeInBits()));
-      value = CreateZExtOrTrunc(value, getInt32Ty());
-      Value *firstVal = CreateIntrinsic(Intrinsic::amdgcn_mov_dpp, getInt32Ty(),
-                                        {value, getInt32(perm1), getInt32(15), getInt32(15), getTrue()});
-      firstVal = CreateZExtOrTrunc(firstVal, getIntNTy(valTy->getPrimitiveSizeInBits()));
-      firstVal = CreateBitCast(firstVal, valTy);
-      Value *secondVal = CreateIntrinsic(Intrinsic::amdgcn_mov_dpp, getInt32Ty(),
-                                         {value, getInt32(perm2), getInt32(15), getInt32(15), getTrue()});
-      secondVal = CreateZExtOrTrunc(secondVal, getIntNTy(valTy->getPrimitiveSizeInBits()));
-      secondVal = CreateBitCast(secondVal, valTy);
-      Value *result = CreateFSub(firstVal, secondVal);
-      return CreateUnaryIntrinsic(Intrinsic::amdgcn_wqm, result);
-    });
-  } else {
-    // ds_swizzle (pre-GFX8) version
 
-    // Table of first swizzle control, in order coarseX, fineX, coarseY, fineY
-    static const unsigned FirstSwizzleCtrl[4] = {
-        0x8055, // CoarseX: Broadcast channel 1 to whole quad
-        0x80F5, // FineX: Swizzle channels in quad (1 -> 0, 1 -> 1, 3 -> 2, 3 -> 3)
-        0x80AA, // CoarseY: Broadcast channel 2 to whole quad
-        0x80EE, // FineY: Swizzle channels in quad (2 -> 0, 3 -> 1, 2 -> 2, 3 -> 3)
-    };
-    // Table of second swizzle control, in order coarseX, fineX, coarseY, fineY
-    static const unsigned SecondSwizzleCtrl[4] = {
-        0x8000, // CoarseX: Broadcast channel 0 to whole quad
-        0x80A0, // FineX: Swizzle channels in quad (0 -> 0, 0 -> 1, 2 -> 2, 2 -> 3)
-        0x8000, // CoarseY: Broadcast channel 0 to whole quad
-        0x8044, // FineY: Swizzle channels in quad (0 -> 0, 1 -> 1, 0 -> 2, 1 -> 3)
-    };
-    unsigned perm1 = FirstSwizzleCtrl[tableIdx];
-    unsigned perm2 = SecondSwizzleCtrl[tableIdx];
-    result = scalarize(value, [this, perm1, perm2](Value *value) {
-      Type *valTy = value->getType();
-      value = CreateBitCast(value, getIntNTy(valTy->getPrimitiveSizeInBits()));
-      value = CreateZExtOrTrunc(value, getInt32Ty());
-      Value *firstVal = CreateIntrinsic(Intrinsic::amdgcn_ds_swizzle, {}, {value, getInt32(perm1)});
-      firstVal = CreateZExtOrTrunc(firstVal, getIntNTy(valTy->getPrimitiveSizeInBits()));
-      firstVal = CreateBitCast(firstVal, valTy);
-      Value *secondVal = CreateIntrinsic(Intrinsic::amdgcn_ds_swizzle, {}, {value, getInt32(perm2)});
-      secondVal = CreateZExtOrTrunc(secondVal, getIntNTy(valTy->getPrimitiveSizeInBits()));
-      secondVal = CreateBitCast(secondVal, valTy);
-      Value *result = CreateFSub(firstVal, secondVal);
-      return CreateUnaryIntrinsic(Intrinsic::amdgcn_wqm, result);
-    });
-  }
+  // DPP (GFX9+) version.
+  // For quad pixels, quad_perm:[pix0,pix1,pix2,pix3] = [0,1,2,3]
+  // Table of first dpp_ctrl, in order coarseX, fineX, coarseY, fineY
+  static const unsigned FirstDppCtrl[4] = {
+      0x55, // CoarseX: [0,1,2,3] -> [1,1,1,1]
+      0xF5, // FineX:   [0,1,2,3]->[1,1,3,3]
+      0xAA, // CoarseY: [0,1,2,3] -> [2,2,2,2]
+      0xEE, // FineY:   [0,1,2,3]->[2,3,2,3]
+  };
+  // Table of second dpp_ctrl, in order coarseX, fineX, coarseY, fineY
+  static const unsigned SecondDppCtrl[4] = {
+      0x00, // CoarseX: [0,1,2,3]->[0,0,0,0]
+      0xA0, // FineX:   [0,1,2,3]->[0,0,2,2]
+      0x00, // CoarseY: [0,1,2,3]->[0,0,0,0]
+      0x44, // FineY:   [0,1,2,3]->[0,1,0,1]
+  };
+  unsigned perm1 = FirstDppCtrl[tableIdx];
+  unsigned perm2 = SecondDppCtrl[tableIdx];
+  result = scalarize(value, [this, perm1, perm2](Value *value) {
+    Type *valTy = value->getType();
+    value = CreateBitCast(value, getIntNTy(valTy->getPrimitiveSizeInBits()));
+    value = CreateZExtOrTrunc(value, getInt32Ty());
+    Value *firstVal = CreateIntrinsic(Intrinsic::amdgcn_mov_dpp, getInt32Ty(),
+                                      {value, getInt32(perm1), getInt32(15), getInt32(15), getTrue()});
+    firstVal = CreateZExtOrTrunc(firstVal, getIntNTy(valTy->getPrimitiveSizeInBits()));
+    firstVal = CreateBitCast(firstVal, valTy);
+    Value *secondVal = CreateIntrinsic(Intrinsic::amdgcn_mov_dpp, getInt32Ty(),
+                                       {value, getInt32(perm2), getInt32(15), getInt32(15), getTrue()});
+    secondVal = CreateZExtOrTrunc(secondVal, getIntNTy(valTy->getPrimitiveSizeInBits()));
+    secondVal = CreateBitCast(secondVal, valTy);
+    Value *result = CreateFSub(firstVal, secondVal);
+    return CreateUnaryIntrinsic(Intrinsic::amdgcn_wqm, result);
+  });
+
   result->setName(instName);
   return result;
 }

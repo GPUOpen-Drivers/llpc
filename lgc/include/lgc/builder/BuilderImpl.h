@@ -71,9 +71,6 @@ protected:
   // Get the PipelineState object.
   PipelineState *getPipelineState() const { return m_pipelineState; }
 
-  // Get whether the context we are building in supports DPP operations.
-  bool supportDpp() const;
-
   // Get whether the context we are building in supports DPP ROW_XMASK operations.
   bool supportDppRowXmask() const;
 
