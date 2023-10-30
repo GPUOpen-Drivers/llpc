@@ -29,7 +29,6 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/PatchResourceCollect.h"
-#include "Gfx6Chip.h"
 #include "Gfx9Chip.h"
 #include "MeshTaskShader.h"
 #include "NggPrimShader.h"

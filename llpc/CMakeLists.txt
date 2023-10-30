@@ -376,7 +376,6 @@ target_include_directories(llpc_standalone_compiler PUBLIC
     ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV
     ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV/libSPIRV
     ${PROJECT_SOURCE_DIR}/util
-    ${XGL_PAL_PATH}/src/core/hw/gfxip/gfx6/chip
     ${XGL_PAL_PATH}/src/core/hw/gfxip/gfx9/chip
     ${XGL_PAL_PATH}/inc/core
     ${XGL_PAL_PATH}/inc/util
