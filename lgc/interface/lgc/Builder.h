@@ -837,6 +837,15 @@ public:
   // @param accum : A 32-bit unsigned integer, providing an existing accumulation.
   llvm::Value *CreateMsad4(llvm::Value *src, llvm::Value *ref, llvm::Value *accum, const llvm::Twine &instName = "");
 
+  // Create "fdot2" operation, returning an 32-bit float result of the sum of dot2 of 2 half vec2 and a float scalar.
+  //
+  // @param a : Vector of 2xhalf A.
+  // @param b : Vector of 2xhalf B.
+  // @param scalar : A float scalar.
+  // @param clamp : Whether the accumulation result should be clamped.
+  llvm::Value *CreateFDot2(llvm::Value *a, llvm::Value *b, llvm::Value *scalar, llvm::Value *clamp,
+                           const llvm::Twine &instName = "");
+
   // Create "fmix" operation, returning ( 1 - A ) * X + A * Y. Result would be FP scalar or vector value.
   // Returns scalar, if and only if "pX", "pY" and "pA" are all scalars.
   // Returns vector, if "pX" and "pY" are vector but "pA" is a scalar, under such condition, "pA" will be splatted.

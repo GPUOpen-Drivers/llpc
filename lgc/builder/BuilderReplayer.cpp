@@ -396,6 +396,10 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     return m_builder->CreateMsad4(args[0], args[1], args[2]);
   }
 
+  case BuilderOpcode::FDot2: {
+    return m_builder->CreateFDot2(args[0], args[1], args[2], args[3]);
+  }
+
   // Replayer implementations of DescBuilder methods
   case BuilderOpcode::LoadBufferDesc: {
     return m_builder->CreateLoadBufferDesc(cast<ConstantInt>(args[0])->getZExtValue(),  // descSet

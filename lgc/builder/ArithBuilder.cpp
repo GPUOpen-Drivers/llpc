@@ -1261,6 +1261,23 @@ Value *BuilderImpl::CreateMsad4(Value *src, Value *ref, Value *accum, const Twin
 }
 
 // =====================================================================================================================
+// Create "fdot2" operation, returning a float result of the sum of dot2 of 2 half vec2 and a float scalar.
+//
+// @param a : Vector of 2xhalf A.
+// @param b : Vector of 2xhalf B.
+// @param scalar : A float scalar.
+// @param clamp : Whether the accumulation result should be clamped.
+Value *BuilderImpl::CreateFDot2(Value *a, Value *b, Value *scalar, Value *clamp, const Twine &instName) {
+  assert(a->getType()->getScalarType()->isHalfTy() && b->getType()->getScalarType()->isHalfTy());
+  assert(scalar->getType()->isFloatTy());
+  assert(clamp->getType()->isIntegerTy() && clamp->getType()->getIntegerBitWidth() == 1);
+
+  Value *result = CreateIntrinsic(scalar->getType(), Intrinsic::amdgcn_fdot2, {a, b, scalar, clamp});
+  result->setName(instName);
+  return result;
+}
+
+// =====================================================================================================================
 // Create "fmix" operation, returning ( 1 - A ) * X + A * Y. Result would be FP scalar or vector value.
 // Returns scalar, if and only if "pX", "pY" and "pA" are all scalars.
 // Returns vector, if "pX" and "pY" are vector but "pA" is a scalar, under such condition, "pA" will be splatted.
