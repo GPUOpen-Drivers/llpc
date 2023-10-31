@@ -8767,8 +8767,8 @@ Constant *SPIRVToLLVM::buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecora
 Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
   auto bArgs = extInst->getArguments();
   auto args = transValue(extInst->getValues(bArgs), bb->getParent(), bb);
-  switch (static_cast<GLSLExtOpKind>(extInst->getExtOp())) {
-
+  auto extOp = static_cast<GLSLExtOpKind>(extInst->getExtOp());
+  switch (extOp) {
   case GLSLstd450Round:
   case GLSLstd450RoundEven:
     // Round to whole number
@@ -8903,25 +8903,36 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
     // Inverse of square matrix
     return getBuilder()->CreateMatrixInverse(args[0]);
 
-  case GLSLstd450Modf: {
-    // Split input into fractional and whole number parts.
-    Value *wholeNum = getBuilder()->CreateUnaryIntrinsic(Intrinsic::trunc, args[0]);
-    Value *fract = getBuilder()->CreateFSub(args[0], wholeNum);
-    // Vectors are represented as arrays in memory, so we need to cast the pointer of array to pointer of vector before
-    // storing.
-    if (wholeNum->getType()->isVectorTy()) {
-      assert(args[1]->getType()->isPointerTy());
-      Type *const castType = wholeNum->getType()->getPointerTo(args[1]->getType()->getPointerAddressSpace());
-      args[1] = getBuilder()->CreateBitCast(args[1], castType);
-    }
-    getBuilder()->CreateStore(wholeNum, args[1]);
-    return fract;
-  }
-
+  case GLSLstd450Modf:
   case GLSLstd450ModfStruct: {
-    // Split input into fractional and whole number parts.
+    // Split input into fractional and whole number parts:
+    //   i = trunc(x), y = modf(x) = x - trunc(x) = x - i
     Value *wholeNum = getBuilder()->CreateUnaryIntrinsic(Intrinsic::trunc, args[0]);
     Value *fract = getBuilder()->CreateFSub(args[0], wholeNum);
+
+    if (!getBuilder()->getFastMathFlags().noInfs()) {
+      // NOTE: There is an issue when x=+INF/-INF. According to C modf function, the result of Modf is
+      // 0.0 when x=+INF/-INF. But when we input x=+INF/-INF to above formula, we finally get the computation
+      // of (-INF) + INF or INF - INF. The result is NaN returned by HW. Hence, we have to manually check this
+      // special case when NoInfs fast math flag is not specified.
+      Value *isInf = getBuilder()->CreateIsInf(args[0]);
+      fract = getBuilder()->CreateSelect(isInf, ConstantFP::getNullValue(args[0]->getType()), fract);
+    }
+
+    if (!getBuilder()->getFastMathFlags().noSignedZeros() || !getBuilder()->getFastMathFlags().noInfs()) {
+      // NOTE: There is an issue when x=-0.0. According to SPIR-V spec, the sign of the result of Modf is the
+      // same as the sign of the input. But when we input x=-0.0 to above formula, we finally get the
+      // addition of (-0.0) + 0.0. The result is +0.0 returned by HW. Hence, we have to manually check this
+      // special case when NSZ fast math flag is not specified.
+      fract = getBuilder()->CreateCopySign(fract, args[0]);
+    }
+
+    if (extOp == GLSLstd450Modf) {
+      assert(args[1]->getType()->isPointerTy());
+      getBuilder()->CreateStore(wholeNum, args[1]);
+      return fract;
+    }
+
     Value *result = PoisonValue::get(transType(extInst->getType()));
     result = getBuilder()->CreateInsertValue(result, fract, 0);
     result = getBuilder()->CreateInsertValue(result, wholeNum, 1);
