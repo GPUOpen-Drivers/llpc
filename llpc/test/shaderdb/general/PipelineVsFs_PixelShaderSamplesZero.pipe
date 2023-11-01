@@ -1,0 +1,494 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: define dllexport amdgpu_ps void @_amdgpu_ps_main(
+; SHADERTEST: %[[PerspInterpSample:[^,]*]] = extractelement <2 x float> %PerspInterpSample, i64 1
+; SHADERTEST: %[[PerspInterpSample:[^,]*]] = extractelement <2 x float> %PerspInterpSample, i64 0
+; SHADERTEST: call float @llvm.amdgcn.interp.p1(float %{{[^,]*}}, i32 immarg 0, i32 immarg 0, i32 %PrimMask)
+; SHADERTEST: call float @llvm.amdgcn.interp.p2(float %{{[^,]*}}, float %{{[^,]*}}, i32 immarg 0, i32 immarg 0, i32 %PrimMask)
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+[Version]
+version = 40
+
+[VsSpirv]
+               OpCapability Shader
+               OpCapability SampledCubeArray
+               OpCapability ImageBuffer
+               OpCapability ImageGatherExtended
+               OpCapability ImageQuery
+               OpCapability ClipDistance
+               OpCapability CullDistance
+               OpCapability DrawParameters
+               OpCapability SignedZeroInfNanPreserve
+               OpExtension "SPV_KHR_float_controls"
+         %74 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Vertex %1 "main" %75 %gl_Position %77
+               OpExecutionMode %1 SignedZeroInfNanPreserve 32
+          %2 = OpString "VMware VMGI Translator (shader 0)"
+          %3 = OpString "VERT"
+               OpDecorate %75 Location 0
+               OpDecorate %gl_Position BuiltIn Position
+               OpDecorate %77 Location 1
+       %void = OpTypeVoid
+       %bool = OpTypeBool
+      %float = OpTypeFloat 32
+        %int = OpTypeInt 32 1
+       %uint = OpTypeInt 32 0
+    %v2float = OpTypeVector %float 2
+    %v3float = OpTypeVector %float 3
+    %v4float = OpTypeVector %float 4
+      %v2int = OpTypeVector %int 2
+      %v3int = OpTypeVector %int 3
+      %v4int = OpTypeVector %int 4
+     %v2uint = OpTypeVector %uint 2
+     %v3uint = OpTypeVector %uint 3
+     %v4uint = OpTypeVector %uint 4
+     %v2bool = OpTypeVector %bool 2
+     %v3bool = OpTypeVector %bool 3
+     %v4bool = OpTypeVector %bool 4
+         %41 = OpTypeFunction %void
+         %42 = OpTypeFunction %v4float %v4float
+ %_struct_68 = OpTypeStruct %v4int %v4int
+ %_struct_69 = OpTypeStruct %v4uint %v4uint
+%int_1065353216 = OpConstant %int 1065353216
+      %int_0 = OpConstant %int 0
+         %73 = OpConstantComposite %v4int %int_1065353216 %int_0 %int_0 %int_0
+%_ptr_Private_float = OpTypePointer Private %float
+%_ptr_Private_v2float = OpTypePointer Private %v2float
+%_ptr_Private_v3float = OpTypePointer Private %v3float
+%_ptr_Private_v4float = OpTypePointer Private %v4float
+%_ptr_Private_int = OpTypePointer Private %int
+%_ptr_Private_v2int = OpTypePointer Private %v2int
+%_ptr_Private_v3int = OpTypePointer Private %v3int
+%_ptr_Private_v4int = OpTypePointer Private %v4int
+%_ptr_Private_uint = OpTypePointer Private %uint
+%_ptr_Private_v2uint = OpTypePointer Private %v2uint
+%_ptr_Private_v3uint = OpTypePointer Private %v3uint
+%_ptr_Private_v4uint = OpTypePointer Private %v4uint
+%_ptr_Private_bool = OpTypePointer Private %bool
+%_ptr_Private_v2bool = OpTypePointer Private %v2bool
+%_ptr_Private_v3bool = OpTypePointer Private %v3bool
+%_ptr_Private_v4bool = OpTypePointer Private %v4bool
+%_ptr_Uniform_v4float = OpTypePointer Uniform %v4float
+%_ptr_Uniform_v4int = OpTypePointer Uniform %v4int
+%_ptr_PushConstant_v4float = OpTypePointer PushConstant %v4float
+%_ptr_PushConstant_v4int = OpTypePointer PushConstant %v4int
+%_ptr_Input_float = OpTypePointer Input %float
+%_ptr_Input_v2float = OpTypePointer Input %v2float
+%_ptr_Input_v3float = OpTypePointer Input %v3float
+%_ptr_Input_v4float = OpTypePointer Input %v4float
+%_ptr_Input_int = OpTypePointer Input %int
+%_ptr_Input_v2int = OpTypePointer Input %v2int
+%_ptr_Input_v3int = OpTypePointer Input %v3int
+%_ptr_Input_v4int = OpTypePointer Input %v4int
+%_ptr_Input_uint = OpTypePointer Input %uint
+%_ptr_Input_v2uint = OpTypePointer Input %v2uint
+%_ptr_Input_v3uint = OpTypePointer Input %v3uint
+%_ptr_Input_v4uint = OpTypePointer Input %v4uint
+%_ptr_Input_bool = OpTypePointer Input %bool
+%_ptr_Output_float = OpTypePointer Output %float
+%_ptr_Output_v2float = OpTypePointer Output %v2float
+%_ptr_Output_v3float = OpTypePointer Output %v3float
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+%_ptr_Output_int = OpTypePointer Output %int
+%_ptr_Output_v2int = OpTypePointer Output %v2int
+%_ptr_Output_v3int = OpTypePointer Output %v3int
+%_ptr_Output_v4int = OpTypePointer Output %v4int
+%_ptr_Output_uint = OpTypePointer Output %uint
+%_ptr_Output_v2uint = OpTypePointer Output %v2uint
+%_ptr_Output_v3uint = OpTypePointer Output %v3uint
+%_ptr_Output_v4uint = OpTypePointer Output %v4uint
+         %75 = OpVariable %_ptr_Input_v4float Input
+%gl_Position = OpVariable %_ptr_Output_v4float Output
+         %77 = OpVariable %_ptr_Output_float Output
+          %1 = OpFunction %void None %41
+         %70 = OpLabel
+         %78 = OpLoad %v4float %75
+               OpStore %gl_Position %78
+         %79 = OpBitcast %v4float %73
+         %80 = OpVectorShuffle %v4float %79 %79 0 0 0 0
+         %81 = OpCompositeExtract %float %80 0
+               OpStore %77 %81
+               OpReturn
+               OpFunctionEnd
+
+
+[VsInfo]
+entryPoint = main
+options.trapPresent = 0
+options.debugMode = 0
+options.enablePerformanceData = 0
+options.allowReZ = 0
+options.forceLateZ = 0
+options.vgprLimit = 0
+options.sgprLimit = 0
+options.maxThreadGroupsPerComputeUnit = 0
+options.waveSize = 0
+options.subgroupSize = 0
+options.wgpMode = 0
+options.waveBreakSize = None
+options.forceLoopUnrollCount = 0
+options.useSiScheduler = 0
+options.disableCodeSinking = 0
+options.favorLatencyHiding = 0
+options.allowVaryWaveSize = 0
+options.enableLoadScalarizer = 0
+options.disableLicm = 0
+options.unrollThreshold = 0
+options.scalarThreshold = 0
+options.disableLoopUnroll = 0
+options.fp32DenormalMode = Auto
+options.adjustDepthImportVrs = 0
+options.disableLicmThreshold = 0
+options.unrollHintThreshold = 0
+options.dontUnrollHintThreshold = 0
+options.fastMathFlags = 0
+options.disableFastMathFlags = 0
+options.ldsSpillLimitDwords = 0
+options.scalarizeWaterfallLoads = 0
+options.overrideShaderThreadGroupSizeX = 0
+options.overrideShaderThreadGroupSizeY = 0
+options.overrideShaderThreadGroupSizeZ = 0
+options.nsaThreshold = 0
+options.aggressiveInvariantLoads = Auto
+options.workaroundStorageImageFormats = 0
+options.workaroundInitializeOutputsToZero = 0
+options.disableFMA = 0
+options.backwardPropagateNoContract = 0
+options.forwardPropagateNoContract = 1
+
+[FsSpirv]
+               OpCapability Shader
+               OpCapability SampledCubeArray
+               OpCapability ImageBuffer
+               OpCapability ImageGatherExtended
+               OpCapability ImageQuery
+               OpCapability DerivativeControl
+               OpCapability Geometry
+               OpCapability SampleRateShading
+               OpCapability MultiViewport
+               OpCapability InterpolationFunction
+               OpCapability SignedZeroInfNanPreserve
+               OpExtension "SPV_KHR_float_controls"
+         %75 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %1 "main" %gl_SampleMask %79 %80
+               OpExecutionMode %1 OriginUpperLeft
+               OpExecutionMode %1 SignedZeroInfNanPreserve 32
+          %2 = OpString "VMware VMGI Translator (shader 1)"
+          %3 = OpString "FRAG"
+               OpDecorate %_arr_int_int_1 ArrayStride 4
+               OpDecorate %gl_SampleMask BuiltIn SampleMask
+               OpDecorate %_arr_v4float_int_1 ArrayStride 16
+               OpDecorate %79 Sample
+               OpDecorate %79 Location 1
+               OpDecorate %80 Location 0
+       %void = OpTypeVoid
+       %bool = OpTypeBool
+      %float = OpTypeFloat 32
+        %int = OpTypeInt 32 1
+       %uint = OpTypeInt 32 0
+    %v2float = OpTypeVector %float 2
+    %v3float = OpTypeVector %float 3
+    %v4float = OpTypeVector %float 4
+      %v2int = OpTypeVector %int 2
+      %v3int = OpTypeVector %int 3
+      %v4int = OpTypeVector %int 4
+     %v2uint = OpTypeVector %uint 2
+     %v3uint = OpTypeVector %uint 3
+     %v4uint = OpTypeVector %uint 4
+     %v2bool = OpTypeVector %bool 2
+     %v3bool = OpTypeVector %bool 3
+     %v4bool = OpTypeVector %bool 4
+         %41 = OpTypeFunction %void
+         %42 = OpTypeFunction %v4float %v4float
+ %_struct_68 = OpTypeStruct %v4int %v4int
+ %_struct_69 = OpTypeStruct %v4uint %v4uint
+      %int_1 = OpConstant %int 1
+    %float_0 = OpConstant %float 0
+      %int_0 = OpConstant %int 0
+%_ptr_Private_float = OpTypePointer Private %float
+%_ptr_Private_v2float = OpTypePointer Private %v2float
+%_ptr_Private_v3float = OpTypePointer Private %v3float
+%_ptr_Private_v4float = OpTypePointer Private %v4float
+%_ptr_Private_int = OpTypePointer Private %int
+%_ptr_Private_v2int = OpTypePointer Private %v2int
+%_ptr_Private_v3int = OpTypePointer Private %v3int
+%_ptr_Private_v4int = OpTypePointer Private %v4int
+%_ptr_Private_uint = OpTypePointer Private %uint
+%_ptr_Private_v2uint = OpTypePointer Private %v2uint
+%_ptr_Private_v3uint = OpTypePointer Private %v3uint
+%_ptr_Private_v4uint = OpTypePointer Private %v4uint
+%_ptr_Private_bool = OpTypePointer Private %bool
+%_ptr_Private_v2bool = OpTypePointer Private %v2bool
+%_ptr_Private_v3bool = OpTypePointer Private %v3bool
+%_ptr_Private_v4bool = OpTypePointer Private %v4bool
+%_ptr_Uniform_v4float = OpTypePointer Uniform %v4float
+%_ptr_Uniform_v4int = OpTypePointer Uniform %v4int
+%_ptr_PushConstant_v4float = OpTypePointer PushConstant %v4float
+%_ptr_PushConstant_v4int = OpTypePointer PushConstant %v4int
+%_ptr_Input_float = OpTypePointer Input %float
+%_ptr_Input_v2float = OpTypePointer Input %v2float
+%_ptr_Input_v3float = OpTypePointer Input %v3float
+%_ptr_Input_v4float = OpTypePointer Input %v4float
+%_ptr_Input_int = OpTypePointer Input %int
+%_ptr_Input_v2int = OpTypePointer Input %v2int
+%_ptr_Input_v3int = OpTypePointer Input %v3int
+%_ptr_Input_v4int = OpTypePointer Input %v4int
+%_ptr_Input_uint = OpTypePointer Input %uint
+%_ptr_Input_v2uint = OpTypePointer Input %v2uint
+%_ptr_Input_v3uint = OpTypePointer Input %v3uint
+%_ptr_Input_v4uint = OpTypePointer Input %v4uint
+%_ptr_Input_bool = OpTypePointer Input %bool
+%_ptr_Output_float = OpTypePointer Output %float
+%_ptr_Output_v2float = OpTypePointer Output %v2float
+%_ptr_Output_v3float = OpTypePointer Output %v3float
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+%_ptr_Output_int = OpTypePointer Output %int
+%_ptr_Output_v2int = OpTypePointer Output %v2int
+%_ptr_Output_v3int = OpTypePointer Output %v3int
+%_ptr_Output_v4int = OpTypePointer Output %v4int
+%_ptr_Output_uint = OpTypePointer Output %uint
+%_ptr_Output_v2uint = OpTypePointer Output %v2uint
+%_ptr_Output_v3uint = OpTypePointer Output %v3uint
+%_ptr_Output_v4uint = OpTypePointer Output %v4uint
+%_arr_int_int_1 = OpTypeArray %int %int_1
+%_ptr_Input__arr_int_int_1 = OpTypePointer Input %_arr_int_int_1
+%gl_SampleMask = OpVariable %_ptr_Input__arr_int_int_1 Input
+%_arr_v4float_int_1 = OpTypeArray %v4float %int_1
+%_ptr_Private__arr_v4float_int_1 = OpTypePointer Private %_arr_v4float_int_1
+         %78 = OpVariable %_ptr_Private__arr_v4float_int_1 Private
+         %79 = OpVariable %_ptr_Input_float Input
+         %80 = OpVariable %_ptr_Output_uint Output
+          %1 = OpFunction %void None %41
+         %70 = OpLabel
+         %82 = OpLoad %float %79
+         %83 = OpCompositeConstruct %v4float %82 %82 %82 %82
+         %84 = OpConvertFToU %v4uint %83
+         %85 = OpBitcast %v4float %84
+         %87 = OpAccessChain %_ptr_Private_v4float %78 %int_0
+         %88 = OpCompositeExtract %float %85 0
+         %89 = OpAccessChain %_ptr_Private_float %87 %int_0
+               OpStore %89 %88
+         %90 = OpAccessChain %_ptr_Private_v4float %78 %int_0
+         %91 = OpLoad %v4float %90
+         %92 = OpVectorShuffle %v4float %91 %91 0 0 0 0
+         %93 = OpAccessChain %_ptr_Input_int %gl_SampleMask %int_0
+         %94 = OpLoad %int %93
+         %95 = OpBitcast %float %94
+         %96 = OpCompositeConstruct %v4float %95 %95 %95 %95
+         %97 = OpVectorShuffle %v4float %96 %96 0 0 0 0
+         %98 = OpBitcast %v4int %92
+         %99 = OpBitcast %v4int %97
+        %100 = OpSMulExtended %_struct_68 %98 %99
+        %101 = OpCompositeExtract %v4int %100 0
+        %102 = OpBitcast %v4float %101
+        %103 = OpCompositeExtract %float %102 0
+        %104 = OpBitcast %uint %103
+               OpStore %80 %104
+               OpReturn
+               OpFunctionEnd
+
+
+[FsInfo]
+entryPoint = main
+options.trapPresent = 0
+options.debugMode = 0
+options.enablePerformanceData = 0
+options.allowReZ = 0
+options.forceLateZ = 0
+options.vgprLimit = 0
+options.sgprLimit = 0
+options.maxThreadGroupsPerComputeUnit = 0
+options.waveSize = 0
+options.subgroupSize = 0
+options.wgpMode = 0
+options.waveBreakSize = None
+options.forceLoopUnrollCount = 0
+options.useSiScheduler = 0
+options.disableCodeSinking = 0
+options.favorLatencyHiding = 0
+options.allowVaryWaveSize = 0
+options.enableLoadScalarizer = 0
+options.disableLicm = 0
+options.unrollThreshold = 0
+options.scalarThreshold = 0
+options.disableLoopUnroll = 0
+options.fp32DenormalMode = Auto
+options.adjustDepthImportVrs = 0
+options.disableLicmThreshold = 0
+options.unrollHintThreshold = 0
+options.dontUnrollHintThreshold = 0
+options.fastMathFlags = 0
+options.disableFastMathFlags = 0
+options.ldsSpillLimitDwords = 0
+options.scalarizeWaterfallLoads = 0
+options.overrideShaderThreadGroupSizeX = 0
+options.overrideShaderThreadGroupSizeY = 0
+options.overrideShaderThreadGroupSizeZ = 0
+options.nsaThreshold = 0
+options.aggressiveInvariantLoads = Auto
+options.workaroundStorageImageFormats = 0
+options.workaroundInitializeOutputsToZero = 0
+options.disableFMA = 0
+options.backwardPropagateNoContract = 0
+options.forwardPropagateNoContract = 1
+
+[ResourceMapping]
+userDataNode[0].visibility = 2
+userDataNode[0].type = IndirectUserDataVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].indirectUserDataCount = 4
+userDataNode[1].visibility = 4
+userDataNode[1].type = StreamOutTableVaPtr
+userDataNode[1].offsetInDwords = 1
+userDataNode[1].sizeInDwords = 1
+
+[GraphicsPipelineState]
+topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
+provokingVertexMode = VK_PROVOKING_VERTEX_MODE_FIRST_VERTEX_EXT
+patchControlPoints = 0
+deviceIndex = 0
+disableVertexReuse = 0
+switchWinding = 0
+enableMultiView = 0
+depthClipEnable = 0
+rasterizerDiscardEnable = 0
+perSampleShading = 0
+numSamples = 1
+pixelShaderSamples = 0
+samplePatternIdx = 0
+dynamicSampleInfo = 0
+rasterStream = 0
+usrClipPlaneMask = 0
+alphaToCoverageEnable = 0
+dualSourceBlendEnable = 0
+dualSourceBlendDynamic = 0
+colorBuffer[0].format = VK_FORMAT_R32_UINT
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 0
+nggState.enableNgg = 1
+nggState.enableGsUse = 0
+nggState.forceCullingMode = 0
+nggState.compactVertex = 0
+nggState.enableBackfaceCulling = 1
+nggState.enableFrustumCulling = 0
+nggState.enableBoxFilterCulling = 0
+nggState.enableSphereCulling = 0
+nggState.enableSmallPrimFilter = 1
+nggState.enableCullDistanceCulling = 0
+nggState.backfaceExponent = 0
+nggState.subgroupSizing = Auto
+nggState.primsPerSubgroup = 256
+nggState.vertsPerSubgroup = 256
+dynamicVertexStride = 0
+enableUberFetchShader = 0
+enableEarlyCompile = 0
+enableColorExportShader = 0
+options.includeDisassembly = 0
+options.scalarBlockLayout = 0
+options.resourceLayoutScheme = Compact
+options.includeIr = 0
+options.robustBufferAccess = 1
+options.reconfigWorkgroupLayout = 0
+options.forceCsThreadIdSwizzling = 0
+options.overrideThreadGroupSizeX = 0
+options.overrideThreadGroupSizeY = 0
+options.overrideThreadGroupSizeZ = 0
+options.shadowDescriptorTableUsage = Enable
+options.shadowDescriptorTablePtrHigh = 2
+options.extendedRobustness.robustBufferAccess = 1
+options.extendedRobustness.robustImageAccess = 1
+options.extendedRobustness.nullDescriptor = 1
+options.optimizeTessFactor = 1
+options.optimizationLevel = 2
+options.threadGroupSwizzleMode = Default
+options.reverseThreadGroup = 0
+options.enableImplicitInvariantExports = 1
+options.internalRtShaders = 0
+options.forceNonUniformResourceIndexStageMask = 0
+options.replaceSetWithResourceType = 0
+options.disableSampleMask = 0
+options.buildResourcesDataForShaderModule = 0
+options.disableTruncCoordForGather = 1
+options.vertex64BitsAttribSingleLoc = 0
+options.enablePrimGeneratedQuery = 0
+rtState.bvhResDescSize = 0
+rtState.nodeStrideShift = 0
+rtState.staticPipelineFlags = 0
+rtState.triCompressMode = 0
+rtState.pipelineFlags = 0
+rtState.threadGroupSizeX = 0
+rtState.threadGroupSizeY = 0
+rtState.threadGroupSizeZ = 0
+rtState.boxSortHeuristicMode = 0
+rtState.counterMode = 0
+rtState.counterMask = 0
+rtState.rayQueryCsSwizzle = 0
+rtState.ldsStackSize = 0
+rtState.dispatchRaysThreadGroupSize = 0
+rtState.ldsSizePerThreadGroup = 0
+rtState.outerTileSize = 0
+rtState.dispatchDimSwizzleMode = 0
+rtState.exportConfig.indirectCallingConvention = 0
+rtState.exportConfig.indirectCalleeSavedRegs.raygen = 0
+rtState.exportConfig.indirectCalleeSavedRegs.miss = 0
+rtState.exportConfig.indirectCalleeSavedRegs.closestHit = 0
+rtState.exportConfig.indirectCalleeSavedRegs.anyHit = 0
+rtState.exportConfig.indirectCalleeSavedRegs.intersection = 0
+rtState.exportConfig.indirectCalleeSavedRegs.callable = 0
+rtState.exportConfig.indirectCalleeSavedRegs.traceRays = 0
+rtState.exportConfig.enableUniformNoReturn = 0
+rtState.exportConfig.enableTraceRayArgsInLds = 0
+rtState.exportConfig.readsDispatchRaysIndex = 0
+rtState.exportConfig.enableDynamicLaunch = 0
+rtState.exportConfig.emitRaytracingShaderDataToken = 0
+rtState.enableRayQueryCsSwizzle = 0
+rtState.enableDispatchRaysInnerSwizzle = 0
+rtState.enableDispatchRaysOuterSwizzle = 0
+rtState.forceInvalidAccelStruct = 0
+rtState.enableRayTracingCounters = 0
+rtState.enableRayTracingHwTraversalStack = 0
+rtState.enableOptimalLdsStackSizeForIndirect = 0
+rtState.enableOptimalLdsStackSizeForUnified = 0
+rtState.maxRayLength = 0
+rtState.enablePickClosestLaneResultForAbortRays = 0
+rtState.gpurtFeatureFlags = 0
+rtState.gpurtFuncTable.pFunc[0] = 
+rtState.gpurtFuncTable.pFunc[1] = 
+rtState.gpurtFuncTable.pFunc[2] = 
+rtState.gpurtFuncTable.pFunc[3] = 
+rtState.gpurtFuncTable.pFunc[4] = 
+rtState.gpurtFuncTable.pFunc[5] = 
+rtState.gpurtFuncTable.pFunc[6] = 
+rtState.gpurtFuncTable.pFunc[7] = 
+rtState.gpurtFuncTable.pFunc[8] = 
+rtState.gpurtFuncTable.pFunc[9] = 
+rtState.gpurtFuncTable.pFunc[10] = 
+rtState.gpurtFuncTable.pFunc[11] = 
+rtState.rtIpVersion = 0.0
+rtState.gpurtOverride = 0
+rtState.rtIpOverride = 0
+
+[VertexInputState]
+binding[0].binding = 0
+binding[0].stride = 32
+binding[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+attribute[0].location = 0
+attribute[0].binding = 0
+attribute[0].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[0].offset = 0
+attribute[1].location = 1
+attribute[1].binding = 0
+attribute[1].format = VK_FORMAT_R32G32B32A32_SFLOAT
+attribute[1].offset = 16
+
+[ApiXfbOutInfo]
+forceDisableStreamOut = 0
+forceEnablePrimStats = 0
+
+
