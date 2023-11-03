@@ -142,8 +142,11 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
 
   switch (expFmt) {
   case EXP_FORMAT_32_R:
+    channelWriteMask = 0x1;
   case EXP_FORMAT_32_GR:
+    channelWriteMask = 0x3;
   case EXP_FORMAT_32_ABGR: {
+    channelWriteMask = 15;
     if (expFmt == EXP_FORMAT_32_GR && compCount >= 2)
       compCount = 2;
     else if (expFmt != EXP_FORMAT_32_ABGR)
@@ -159,6 +162,7 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
     break;
   }
   case EXP_FORMAT_32_AR: {
+    channelWriteMask = 0x9;
     if (1 & channelWriteMask) {
       exports[0] = convertToFloat(comps[0], signedness, builder);
       exportMask = 1;
@@ -177,6 +181,7 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
   case EXP_FORMAT_FP16_ABGR: {
     const unsigned compactCompCount = (compCount + 1) / 2;
     exports[0] = exports[1] = undefFloat16x2;
+    exportMask = compCount > 2 ? 0xF : 0x3;
     // convert to half type
     if (bitWidth <= 16) {
       output = convertToHalf(output, signedness, builder);
@@ -184,12 +189,8 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
       // re-pack
       for (unsigned idx = 0; idx < compactCompCount; ++idx) {
         unsigned origIdx = 2 * idx;
-        unsigned compMask = (1 << origIdx) | (1 << (origIdx + 1));
-        if (compMask & channelWriteMask) {
-          exports[idx] = builder.CreateInsertElement(undefFloat16x2, comps[origIdx], builder.getInt32(0));
-          exports[idx] = builder.CreateInsertElement(exports[idx], comps[origIdx + 1], builder.getInt32(1));
-          exportMask |= compMask;
-        }
+        exports[idx] = builder.CreateInsertElement(undefFloat16x2, comps[origIdx], builder.getInt32(0));
+        exports[idx] = builder.CreateInsertElement(exports[idx], comps[origIdx + 1], builder.getInt32(1));
       }
     } else {
       if (outputTy->isIntOrIntVectorTy())
@@ -200,12 +201,8 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
 
       for (unsigned idx = 0; idx < compactCompCount; ++idx) {
         unsigned origIdx = 2 * idx;
-        unsigned compMask = (1 << origIdx) | (1 << (origIdx + 1));
-        if (compMask & channelWriteMask) {
-          exports[idx] = builder.CreateIntrinsic(FixedVectorType::get(builder.getHalfTy(), 2),
-                                                 Intrinsic::amdgcn_cvt_pkrtz, {comps[origIdx], comps[origIdx + 1]});
-          exportMask |= compMask;
-        }
+        exports[idx] = builder.CreateIntrinsic(FixedVectorType::get(builder.getHalfTy(), 2),
+                                               Intrinsic::amdgcn_cvt_pkrtz, {comps[origIdx], comps[origIdx + 1]});
       }
     }
     break;
@@ -229,15 +226,11 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
 
     const unsigned compactCompCount = (compCount + 1) / 2;
     exports[0] = exports[1] = undefFloat16x2;
+    exportMask = compCount > 2 ? 0xF : 0x3;
     for (unsigned idx = 0; idx < compactCompCount; idx++) {
-      unsigned origIdx = 2 * idx;
-      unsigned compMask = (1 << origIdx) | (1 << (origIdx + 1));
-      if (compMask & channelWriteMask) {
-        Value *packedComps = builder.CreateIntrinsic(FixedVectorType::get(builder.getInt16Ty(), 2), cvtIntrinsic,
-                                                     {comps[2 * idx], comps[2 * idx + 1]});
-        exports[idx] = builder.CreateBitCast(packedComps, FixedVectorType::get(builder.getHalfTy(), 2));
-        exportMask |= compMask;
-      }
+      Value *packedComps = builder.CreateIntrinsic(FixedVectorType::get(builder.getInt16Ty(), 2), cvtIntrinsic,
+                                                   {comps[2 * idx], comps[2 * idx + 1]});
+      exports[idx] = builder.CreateBitCast(packedComps, FixedVectorType::get(builder.getHalfTy(), 2));
     }
     break;
   }
@@ -935,8 +928,10 @@ void FragColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info,
     assert(infoIt->hwColorTarget < MaxColorTargets);
 
     auto expFmt = static_cast<ExportFormat>(m_pipelineState->computeExportFormat(infoIt->ty, location));
-    const unsigned channelWriteMask = m_pipelineState->getColorExportFormat(location).channelWriteMask;
-    if (expFmt != EXP_FORMAT_ZERO && channelWriteMask != 0) {
+    unsigned channelWriteMask = m_pipelineState->getColorExportFormat(location).channelWriteMask;
+    bool needExpInst = (expFmt != EXP_FORMAT_ZERO) &&
+                       (channelWriteMask > 0 || m_pipelineState->getColorExportState().alphaToCoverageEnable);
+    if (needExpInst) {
       lastExport = handleColorExportInstructions(values[infoIt->hwColorTarget], hwColorExport, builder, expFmt,
                                                  infoIt->isSigned, channelWriteMask);
       finalExportFormats.push_back(expFmt);
