@@ -790,9 +790,6 @@ void Compiler::buildShaderModuleResourceUsage(
     return;
 
   if (func) {
-    if (shaderStage >= ShaderStageVertex && shaderStage <= ShaderStageGeometry)
-      shaderModuleUsage.enableXfb = func->getExecutionMode(ExecutionModeXfb) != nullptr;
-
     if (auto em = func->getExecutionMode(ExecutionModeLocalSize)) {
       shaderModuleUsage.localSizeX = em->getLiterals()[0];
       shaderModuleUsage.localSizeX = em->getLiterals()[1];
@@ -1441,6 +1438,28 @@ bool Compiler::canUseRelocatableGraphicsShaderElf(const ArrayRef<const PipelineS
                                                   const GraphicsPipelineBuildInfo *pipelineInfo) {
   if (pipelineInfo->iaState.enableMultiView)
     return false;
+
+  // NOTE: On gfx11, Xfb depends on the count of primitive vertex. If UnlinkedStageVertexProcess only contains
+  // VS (no TES and GS), the primitive type might be unknown at compiling VS time, so we have to fall back to full
+  // pipeline.
+  // Currently, We treat Triangle_list as the default value. Therefore, we only disable relocatable compilation
+  // when primitive is point or line.
+  bool hasVs = pipelineInfo->vs.pModuleData != nullptr;
+  bool hasTes = (pipelineInfo->tes.pModuleData != nullptr) || (pipelineInfo->tcs.pModuleData != nullptr);
+  bool hasGs = pipelineInfo->gs.pModuleData != nullptr;
+  if (m_gfxIp.major >= 11 && hasVs && !hasGs && !hasTes &&
+      static_cast<const ShaderModuleData *>(pipelineInfo->vs.pModuleData)->usage.enableXfb) {
+    switch (pipelineInfo->iaState.topology) {
+    case VK_PRIMITIVE_TOPOLOGY_POINT_LIST:
+    case VK_PRIMITIVE_TOPOLOGY_LINE_LIST:
+    case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP:
+    case VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY:
+    case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY:
+      return false;
+    default:
+      break;
+    }
+  }
 
   if (shaderInfos[0]) {
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfos[0]->pModuleData);
