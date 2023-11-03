@@ -113,6 +113,8 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
       case ExecutionModePixelCenterInteger:
         shaderModuleUsage.pixelCenterInteger = true;
         break;
+      case ExecutionModeXfb:
+        shaderModuleUsage.enableXfb = true;
       default: {
         break;
       }
