@@ -417,6 +417,7 @@ Value *BuilderImpl::CreateATan2(Value *y, Value *x, const Twine &instName) {
   //
   // p0 = sgn(y) * PI/2
   // p1 = sgn(y) * PI
+  // p2 = copysign(PI, y)
   // atanyox = atan(yox)
   //
   // if (y != 0.0)
@@ -425,7 +426,7 @@ Value *BuilderImpl::CreateATan2(Value *y, Value *x, const Twine &instName) {
   //     else
   //         atan(y, x) = p0
   // else
-  //     atan(y, x) = (x > 0.0) ? 0 : PI
+  //     atan(y, x) = (x > 0.0) ? 0 : p2
 
   Constant *zero = Constant::getNullValue(y->getType());
   Constant *one = ConstantFP::get(y->getType(), 1.0);
@@ -436,6 +437,15 @@ Value *BuilderImpl::CreateATan2(Value *y, Value *x, const Twine &instName) {
   Value *signY = CreateFSign(y);
   Value *p0 = CreateFMul(signY, getPiByTwo(signY->getType()));
   Value *p1 = CreateFMul(signY, getPi(signY->getType()));
+  Value *p2 = getPi(x->getType());
+  if (!getFastMathFlags().noSignedZeros()) {
+    // NOTE: According to the definition of atan(y, x), we might take the sign of y into consideration and follow such
+    // computation:
+    //                / -PI, when y = -0.0 and x < 0
+    //   atan(y, x) =
+    //                \ PI, when y = 0.0 and x < 0
+    p2 = CreateCopySign(p2, y);
+  }
 
   Value *absXEqualsAbsY = CreateFCmpOEQ(absX, absY);
   // oneIfEqual to (x == y) ? 1.0 : -1.0
@@ -448,7 +458,7 @@ Value *BuilderImpl::CreateATan2(Value *y, Value *x, const Twine &instName) {
   Value *addP1 = CreateFAdd(result, p1);
   result = CreateSelect(CreateFCmpOLT(x, zero), addP1, result);
   result = CreateSelect(CreateFCmpUNE(x, zero), result, p0);
-  Value *zeroOrPi = CreateSelect(CreateFCmpOGT(x, zero), zero, getPi(x->getType()));
+  Value *zeroOrPi = CreateSelect(CreateFCmpOGT(x, zero), zero, p2);
   result = CreateSelect(CreateFCmpUNE(y, zero), result, zeroOrPi, instName);
   return result;
 }
