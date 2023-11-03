@@ -328,7 +328,7 @@ void GraphicsContext::setColorExportState(Pipeline *pipeline, Util::MetroHash64 
   if (state.alphaToCoverageEnable && formats.empty()) {
     // NOTE: We must export alpha channel for alpha to coverage, if there is no color export,
     // we force a dummy color export.
-    formats.push_back({BufDataFormat32, BufNumFormatFloat});
+    formats.push_back({BufDataFormat32, BufNumFormatFloat, 0, 0, 0xF});
   }
 
   pipeline->setColorExportState(formats, state);

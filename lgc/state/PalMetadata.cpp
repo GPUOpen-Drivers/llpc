@@ -1049,10 +1049,11 @@ void PalMetadata::updateCbShaderMask(llvm::ArrayRef<ColorExportInfo> exps) {
   for (auto &exp : exps) {
     if (exp.hwColorTarget == MaxColorTargets)
       continue;
-    const unsigned channelWriteMask = m_pipelineState->getColorExportFormat(exp.location).channelWriteMask;
-    if (m_pipelineState->computeExportFormat(exp.ty, exp.location) != 0 && channelWriteMask != 0) {
-      cbShaderMask |= (channelWriteMask << (4 * exp.location));
-    }
+    unsigned channelWriteMask = m_pipelineState->getColorExportFormat(exp.location).channelWriteMask;
+    bool needUpdateMask = (m_pipelineState->computeExportFormat(exp.ty, exp.location) != 0) &&
+                          (channelWriteMask > 0 || m_pipelineState->getColorExportState().alphaToCoverageEnable);
+    if (needUpdateMask)
+      cbShaderMask |= (0xF << (4 * exp.location));
   }
 
   if (m_pipelineState->useRegisterFieldFormat()) {
