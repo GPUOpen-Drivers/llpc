@@ -2470,22 +2470,31 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
                                             {ancillary, builder.getInt32(8), builder.getInt32(4)});
 
     Value *sampleMaskIn = sampleCoverage;
+
+    // RunAtSampleRate is used to identify whether fragment shader run at sample rate, which will
+    // be set from API side. PixelShaderSamples is used to controls the pixel shader execution rate,
+    // which will be set when compile shader.
+    // There is a special case when vkCreateGraphicsPipelines but not set sampleRate, but compiling shader
+    // will ask to set runAtSampleRate, this case is valid but current code will cause hang.
+    // So in this case, it will not use broadcast sample mask.
     if (m_pipelineState->getRasterizerState().perSampleShading || builtInUsage.runAtSampleRate) {
       unsigned baseMask = 1;
       if (!builtInUsage.sampleId) {
-        // Fix the failure for multisample_shader_builtin.sample_mask cases "gl_SampleMaskIn" should contain one
-        // or multiple covered sample bit.
-        // (1) If the 4 samples is divided into 2 sub invocation groups, broadcast sample mask bit <0, 1>
-        // to sample <2, 3>.
-        // (2) If the 8 samples is divided into 2 sub invocation groups, broadcast sample mask bit <0, 1>
-        // to sample <2, 3>, then re-broadcast sample mask bit <0, 1, 2, 3> to sample <4, 5, 6, 7>.
-        // (3) If the 8 samples is divided into 4 sub invocation groups, patch to broadcast sample mask bit
-        // <0, 1, 2, 3> to sample <4, 5, 6, 7>.
-
-        unsigned baseMaskSamples = m_pipelineState->getRasterizerState().pixelShaderSamples;
-        while (baseMaskSamples < m_pipelineState->getRasterizerState().numSamples) {
-          baseMask |= baseMask << baseMaskSamples;
-          baseMaskSamples *= 2;
+        if (m_pipelineState->getRasterizerState().pixelShaderSamples != 0) {
+          // Only broadcast sample mask when the value has already been set
+          // Fix the failure for multisample_shader_builtin.sample_mask cases "gl_SampleMaskIn" should contain one
+          // or multiple covered sample bit.
+          // (1) If the 4 samples is divided into 2 sub invocation groups, broadcast sample mask bit <0, 1>
+          // to sample <2, 3>.
+          // (2) If the 8 samples is divided into 2 sub invocation groups, broadcast sample mask bit <0, 1>
+          // to sample <2, 3>, then re-broadcast sample mask bit <0, 1, 2, 3> to sample <4, 5, 6, 7>.
+          // (3) If the 8 samples is divided into 4 sub invocation groups, patch to broadcast sample mask bit
+          // <0, 1, 2, 3> to sample <4, 5, 6, 7>.
+          unsigned baseMaskSamples = m_pipelineState->getRasterizerState().pixelShaderSamples;
+          while (baseMaskSamples < m_pipelineState->getRasterizerState().numSamples) {
+            baseMask |= baseMask << baseMaskSamples;
+            baseMaskSamples *= 2;
+          }
         }
       }
 
