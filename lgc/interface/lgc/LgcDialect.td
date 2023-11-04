@@ -322,3 +322,22 @@ def UserDataOp : LgcOp<"user.data", [Memory<[]>, WillReturn]> {
     This operation is used for push constants in Vulkan and in some cases by OpenGL.
   }];
 }
+
+def GroupMemcpyOp : LgcOp<"group.memcpy", [Memory<[]>]> {
+  let arguments = (ins PointerType:$dst, PointerType:$src, AttrI32:$size, AttrI32:$scope);
+  let results = (outs);
+
+  let summary = "copy a memory area cooperatively using the threads of a group";
+  let description = [{
+    Only usable in compute-like shader types (compute, task, mesh).
+
+    Use all threads of a group (workgroup or subgroup aka wave) to copy `size` bytes
+    from `src` to `dst`.
+
+    `dst`, `src`, and `size` must be uniform at the given scope.
+
+    `scope` is 2 for workgroup scope and 3 for subgroup (wave) scope. No other values are allowed.
+
+    This operation must only occur in control flow that is uniform for the relevant scope.
+  }];
+}

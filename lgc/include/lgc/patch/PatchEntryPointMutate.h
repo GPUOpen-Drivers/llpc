@@ -31,6 +31,7 @@
 #pragma once
 
 #include "lgc/LgcCpsDialect.h"
+#include "lgc/LgcDialect.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/PipelineShaders.h"
@@ -160,6 +161,9 @@ private:
   ShaderStage getMergedShaderStage(ShaderStage stage) const;
 
   bool isComputeWithCalls() const;
+
+  void processGroupMemcpy(llvm::Module &module);
+  void lowerGroupMemcpy(GroupMemcpyOp &groupMemcpyOp);
 
   bool m_hasTs;                             // Whether the pipeline has tessllation shader
   bool m_hasGs;                             // Whether the pipeline has geometry shader
