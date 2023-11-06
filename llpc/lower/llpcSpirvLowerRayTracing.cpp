@@ -1990,6 +1990,7 @@ SmallSet<unsigned, 4> SpirvLowerRayTracing::getShaderExtraInputParams(ShaderStag
     params.insert(TraceParam::TCurrent);
     params.insert(TraceParam::Kind);
     params.insert(TraceParam::DuplicateAnyHit);
+    params.insert(TraceParam::RayFlags);
     break;
   default:
     break;
