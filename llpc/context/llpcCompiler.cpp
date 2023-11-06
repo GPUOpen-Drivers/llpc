@@ -2466,8 +2466,12 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
     size_t binaryDataSize = sizeof(BinaryData) * elfBinarys.size();
     size_t elfSize = 0;
 
-    for (auto &elf : elfBinarys)
+    for (auto &elf : elfBinarys) {
+      if (elf.size() % 8 != 0) {
+        elf.resize(alignTo(elf.size(), alignof(BinaryData)));
+      }
       elfSize += elf.size();
+    }
 
     size_t allocSize = elfSize;
     allocSize += binaryDataSize;

@@ -343,6 +343,14 @@ cl::opt<bool> GpuRtUseDumped("gpurt-use-dumped", cl::desc("Use the GPURT shader 
 
 cl::opt<std::string> GpuRtLibrary("gpurt-library", cl::desc("Use the GPURT shader library from the given file"));
 
+cl::opt<LlpcRaytracingMode>
+LlpcRaytracingModeSetting("llpc-raytracing-mode", cl::init(LlpcRaytracingMode::Legacy),
+                          cl::desc("Override the LLPC raytracing mode"),
+                          cl::values(
+                            clEnumValN(LlpcRaytracingMode::Legacy, "legacy", "Legacy mode"),
+                            clEnumValN(LlpcRaytracingMode::Gpurt2, "continufy", "Legacy RT pipeline with continufy"),
+                            clEnumValN(LlpcRaytracingMode::Continuations, "continuations", "Continuations mode")));
+
 // -enable-color-export-shader
 cl::opt<bool> EnableColorExportShader("enable-color-export-shader",
                                       cl::desc("Enable color export shader, only compile each stage of the pipeline without linking"),
@@ -656,6 +664,7 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
   CompileInfo compileInfo = {};
   compileInfo.unlinked = true;
   compileInfo.doAutoLayout = true;
+  std::vector<PipelineShaderInfo> standaloneRtShaders;
 
   // Clean code that gets run automatically before returning.
   auto onExit = make_scope_exit([&compileInfo] { cleanupCompileInfo(&compileInfo); });
@@ -666,16 +675,59 @@ static Error processInputs(ICompiler *compiler, InputSpecGroup &inputSpecs) {
     compileInfo.autoLayoutDesc = false;
     if (Error err = processInputPipeline(compiler, compileInfo, firstInput, Unlinked, IgnoreColorAttachmentFormats))
       return err;
+
+    if (isRayTracingPipeline(compileInfo.stageMask)) {
+      if (LlpcRaytracingModeSetting.getNumOccurrences())
+        compileInfo.rayTracePipelineInfo.mode = LlpcRaytracingModeSetting;
+    }
   } else {
     compileInfo.autoLayoutDesc = true;
     if (Error err = processInputStages(compileInfo, inputSpecs, ValidateSpirv, NumThreads))
       return err;
 
-    compileInfo.pipelineType =
-        isComputePipeline(compileInfo.stageMask) ? VfxPipelineTypeCompute : VfxPipelineTypeGraphics;
-
-    if (isRayTracingPipeline(compileInfo.stageMask))
+    if (isRayTracingPipeline(compileInfo.stageMask)) {
       compileInfo.pipelineType = VfxPipelineTypeRayTracing;
+      compileInfo.rayTracePipelineInfo.indirectStageMask = 0xFFFFFFFF;
+      compileInfo.rayTracePipelineInfo.pipelineLibStageMask = 0xFFFFFFFF;
+      compileInfo.rayTracePipelineInfo.hasPipelineLibrary = true;
+
+      standaloneRtShaders.resize(compileInfo.shaderModuleDatas.size());
+      memset(&standaloneRtShaders[0], 0, sizeof(PipelineShaderInfo) * standaloneRtShaders.size());
+      compileInfo.rayTracePipelineInfo.pShaders = &standaloneRtShaders[0];
+
+      compileInfo.unlinked = true;
+      compileInfo.doAutoLayout = true;
+      compileInfo.autoLayoutDesc = true;
+
+      compileInfo.rayTracePipelineInfo.mode = LlpcRaytracingModeSetting;
+      compileInfo.rayTracePipelineInfo.maxRecursionDepth = 1;
+
+      RtState &state = compileInfo.rayTracePipelineInfo.rtState;
+      state.pipelineFlags = 0;
+      state.nodeStrideShift = 7;
+      state.bvhResDesc.dataSizeInDwords = 4;
+      state.threadGroupSizeX = 8;
+      state.threadGroupSizeY = 4;
+      state.threadGroupSizeZ = 1;
+
+      state.rayQueryCsSwizzle = 1;
+      state.ldsStackSize = 16;
+      state.dispatchRaysThreadGroupSize = 32;
+      state.ldsSizePerThreadGroup = 0xFFFF;
+      state.outerTileSize = 4;
+
+      state.exportConfig.indirectCallingConvention = 1;
+      state.exportConfig.enableUniformNoReturn = true;
+
+      state.enableDispatchRaysInnerSwizzle = true;
+      state.enableDispatchRaysOuterSwizzle = true;
+      state.enableOptimalLdsStackSizeForIndirect = true;
+      state.enableOptimalLdsStackSizeForUnified = true;
+    } else if (isComputePipeline(compileInfo.stageMask)) {
+      compileInfo.pipelineType = VfxPipelineTypeCompute;
+    } else {
+      compileInfo.pipelineType = VfxPipelineTypeGraphics;
+    }
   }
 
   if (AutoLayoutDesc.getNumOccurrences())

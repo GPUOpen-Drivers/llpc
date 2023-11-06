@@ -354,6 +354,7 @@ void SpirvProcessGpuRtLibrary::createConvertF32toF16WithRoundingMode(Function *f
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createIntersectBvh(Function *func) {
   const auto *rtState = m_context->getPipelineContext()->getRayTracingState();
+  assert(rtState->bvhResDesc.dataSizeInDwords != 0);
   if (rtState->bvhResDesc.dataSizeInDwords < 4)
     return;
 
