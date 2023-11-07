@@ -81,7 +81,6 @@
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Utils/Mem2Reg.h"
-#include "llvm/Transforms/Vectorize.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower"
 
