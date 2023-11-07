@@ -55,6 +55,7 @@
 #include "lgc/Pipeline.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/Analysis/VectorUtils.h"
 #include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/IR/CFG.h"
@@ -2011,8 +2012,12 @@ Constant *SPIRVToLLVM::buildConstStoreRecursively(SPIRVType *const spvType, Type
     return ConstantArray::get(cast<ArrayType>(storeType), constElements);
   }
   // If the store was a bool or vector of bool, need to zext the storing value.
-  if (spvType->isTypeBool() || (spvType->isTypeVector() && spvType->getVectorComponentType()->isTypeBool()))
-    constStoreValue = ConstantExpr::getZExtOrBitCast(constStoreValue, storeType);
+  if (spvType->isTypeBool() || (spvType->isTypeVector() && spvType->getVectorComponentType()->isTypeBool())) {
+    if (constStoreValue->getType() != storeType) {
+      constStoreValue = ConstantFoldCastOperand(Instruction::ZExt, constStoreValue, storeType, m_m->getDataLayout());
+      assert(constStoreValue && "constant folding should succeed");
+    }
+  }
 
   // If the LLVM type is a not a vector, we need to change the constant into an array.
   if (spvType->isTypeVector() && !storeType->isVectorTy()) {
@@ -4478,7 +4483,8 @@ Constant *SPIRVToLLVM::transInitializer(SPIRVValue *const spvValue, Type *const 
     // in memory.
     assert(initializer->getType()->isIntOrIntVectorTy(1));
     assert(type->isIntOrIntVectorTy(32));
-    initializer = ConstantExpr::getZExt(initializer, type);
+    initializer = ConstantFoldCastOperand(Instruction::ZExt, initializer, type, m_m->getDataLayout());
+    assert(initializer && "constant folding should not fail on integers");
   }
   return initializer;
 }
