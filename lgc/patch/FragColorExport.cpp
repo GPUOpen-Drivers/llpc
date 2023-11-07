@@ -142,15 +142,17 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
 
   switch (expFmt) {
   case EXP_FORMAT_32_R:
-    channelWriteMask = 0x1;
   case EXP_FORMAT_32_GR:
-    channelWriteMask = 0x3;
   case EXP_FORMAT_32_ABGR: {
-    channelWriteMask = 15;
-    if (expFmt == EXP_FORMAT_32_GR && compCount >= 2)
-      compCount = 2;
-    else if (expFmt != EXP_FORMAT_32_ABGR)
+    if (expFmt == EXP_FORMAT_32_R) {
       compCount = 1;
+      channelWriteMask = 0x1;
+    } else if (expFmt == EXP_FORMAT_32_GR) {
+      compCount = compCount >= 2 ? 2 : 1;
+      channelWriteMask = 0x3;
+    } else {
+      channelWriteMask = 0xF;
+    }
 
     for (unsigned idx = 0; idx < compCount; ++idx) {
       unsigned compMask = 1 << idx;
