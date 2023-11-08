@@ -171,7 +171,7 @@ static void processContinuations(
   //    co.flag = llvm.coro.suspend.retcon
   //       unreachable
   auto &Context = M.getContext();
-  auto *I8Ptr = Type::getInt8PtrTy(Context);
+  auto *I8Ptr = Type::getInt8Ty(Context)->getPointerTo();
   auto *I32 = Type::getInt32Ty(Context);
   auto *I64 = Type::getInt64Ty(Context);
 
