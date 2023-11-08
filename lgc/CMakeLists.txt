@@ -198,7 +198,6 @@ target_sources(LLVMlgc PRIVATE
     elfLinker/FetchShader.cpp
     elfLinker/GlueShader.cpp
     elfLinker/NullFragmentShader.cpp
-    elfLinker/RelocHandler.cpp
 )
 
 # lgc/patch
