@@ -262,12 +262,12 @@ static Value *mergeDwordsIntoVector(IRBuilder<> &builder, ArrayRef<Value *> inpu
 // =====================================================================================================================
 // Lower GroupMemcpyOp
 void PatchEntryPointMutate::processGroupMemcpy(Module &module) {
-  SmallVector<CallInst *> tobeErased;
+  SmallVector<CallInst *> toBeErased;
   struct Payload {
     SmallVectorImpl<CallInst *> &tobeErased;
     PatchEntryPointMutate *self;
   };
-  Payload payload = {tobeErased, this};
+  Payload payload = {toBeErased, this};
 
   static auto visitor = llvm_dialects::VisitorBuilder<Payload>()
                             .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
@@ -325,12 +325,12 @@ void PatchEntryPointMutate::lowerGroupMemcpy(GroupMemcpyOp &groupMemcpyOp) {
       break;
     }
     case ShaderStageMesh: {
-      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageTask)->entryArgIdxs.mesh;
+      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
       argIndex = entryArgIdxs.localInvocationId;
       break;
     }
     case ShaderStageCompute: {
-      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageTask)->entryArgIdxs.cs;
+      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageCompute)->entryArgIdxs.cs;
       argIndex = entryArgIdxs.localInvocationId;
       break;
     }
