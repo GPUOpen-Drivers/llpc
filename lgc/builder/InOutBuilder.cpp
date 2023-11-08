@@ -1088,10 +1088,6 @@ Value *BuilderImpl::readCommonBuiltIn(BuiltInKind builtIn, llvm::Type *resultTy,
     return CreateGetLaneNumber();
 
   case BuiltInDeviceIndex:
-    // DeviceId is a constant from the pipeline state normally, or a reloc to get that constant
-    // at link time for an unlinked shader.
-    if (m_pipelineState->isUnlinked())
-      return CreateRelocationConstant(reloc::DeviceIdx);
     return getInt32(getPipelineState()->getDeviceIndex());
 
   default:
