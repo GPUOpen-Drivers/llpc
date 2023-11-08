@@ -345,6 +345,20 @@ public:
     ImageAtomicFMax = 12, // Atomic operation: fmax
     ImageAtomicFAdd = 13  // Atomic operation: fadd
   };
+
+  // Bits in mask supplied to createIsFPClass
+  enum CmpClass {
+    SignalingNaN = 1,
+    QuietNaN = 2,
+    NegativeInfinity = 4,
+    NegativeNormal = 8,
+    NegativeSubnormal = 0x10,
+    NegativeZero = 0x20,
+    PositiveZero = 0x40,
+    PositiveSubnormal = 0x80,
+    PositiveNormal = 0x100,
+    PositiveInfinity = 0x200
+  };
 };
 
 // =====================================================================================================================
