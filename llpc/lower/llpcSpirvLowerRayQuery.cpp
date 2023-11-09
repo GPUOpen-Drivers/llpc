@@ -1265,7 +1265,7 @@ void SpirvLowerRayQuery::initGlobalVariable() {
 unsigned SpirvLowerRayQuery::generateTraceRayStaticId() {
   Util::MetroHash64 hasher;
   hasher.Update(m_nextTraceRayId++);
-  hasher.Update(m_module->getName());
+  hasher.Update(m_module->getName().bytes_begin(), m_module->getName().size());
 
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
