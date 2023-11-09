@@ -100,6 +100,7 @@
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Scalar/SpeculativeExecution.h"
 #include "llvm/Transforms/Utils.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include "llvm/Transforms/Utils/Mem2Reg.h"
 
 #define DEBUG_TYPE "lgc-patch"
@@ -457,6 +458,70 @@ GlobalVariable *Patch::getLdsVariable(PipelineState *pipelineState, Module *modu
                                 GlobalValue::NotThreadLocal, ADDR_SPACE_LOCAL);
   lds->setAlignment(MaybeAlign(sizeof(unsigned)));
   return lds;
+}
+
+// =====================================================================================================================
+// Common code to be shared to implement GroupMemcpyOp for MeshTaskShader and PatchEntryPointMutate.
+void Patch::commonProcessGroupMemcpy(GroupMemcpyOp &groupMemcpyOp, lgc::BuilderBase &builder, llvm::Value *threadIndex,
+                                     unsigned scopeSize) {
+  auto dst = groupMemcpyOp.getDst();
+  auto src = groupMemcpyOp.getSrc();
+  auto len = groupMemcpyOp.getSize();
+
+  // Copy in 16-bytes if possible
+  unsigned wideDwords = 4;
+  // If either pointer is in LDS, copy in 8-bytes
+  if (src->getType()->getPointerAddressSpace() == ADDR_SPACE_LOCAL ||
+      dst->getType()->getPointerAddressSpace() == ADDR_SPACE_LOCAL)
+    wideDwords = 2;
+
+  unsigned baseOffset = 0;
+
+  auto copyFunc = [&](Type *copyTy, unsigned copySize) {
+    Value *offset =
+        builder.CreateAdd(builder.getInt32(baseOffset), builder.CreateMul(threadIndex, builder.getInt32(copySize)));
+    Value *dstPtr = builder.CreateGEP(builder.getInt8Ty(), dst, offset);
+    Value *srcPtr = builder.CreateGEP(builder.getInt8Ty(), src, offset);
+    Value *data = builder.CreateLoad(copyTy, srcPtr);
+    builder.CreateStore(data, dstPtr);
+  };
+
+  unsigned wideDwordsCopySize = sizeof(unsigned) * wideDwords;
+  Type *wideDwordsTy = ArrayType::get(builder.getInt32Ty(), wideDwords);
+  while (baseOffset + wideDwordsCopySize * scopeSize <= len) {
+    copyFunc(wideDwordsTy, wideDwordsCopySize);
+    baseOffset += wideDwordsCopySize * scopeSize;
+  }
+
+  unsigned dwordCopySize = sizeof(unsigned);
+  Type *dwordTy = builder.getInt32Ty();
+  while (baseOffset + dwordCopySize * scopeSize <= len) {
+    copyFunc(dwordTy, dwordCopySize);
+    baseOffset += dwordCopySize * scopeSize;
+  }
+
+  unsigned remainingBytes = len - baseOffset;
+
+  if (remainingBytes) {
+    assert(remainingBytes % 4 == 0);
+    BasicBlock *afterBlock = groupMemcpyOp.getParent();
+    BasicBlock *beforeBlock = splitBlockBefore(afterBlock, &groupMemcpyOp, nullptr, nullptr, nullptr);
+    beforeBlock->takeName(afterBlock);
+    afterBlock->setName(Twine(beforeBlock->getName()) + ".afterGroupMemcpyTail");
+
+    // Split to create a tail copy block, empty except for an unconditional branch to afterBlock.
+    BasicBlock *copyBlock = splitBlockBefore(afterBlock, &groupMemcpyOp, nullptr, nullptr, nullptr, ".groupMemcpyTail");
+    // Change the branch at the end of beforeBlock to be conditional.
+    beforeBlock->getTerminator()->eraseFromParent();
+    builder.SetInsertPoint(beforeBlock);
+
+    Value *indexInRange = builder.CreateICmpULT(threadIndex, builder.getInt32(remainingBytes / 4));
+
+    builder.CreateCondBr(indexInRange, copyBlock, afterBlock);
+    // Create the copy instructions.
+    builder.SetInsertPoint(copyBlock->getTerminator());
+    copyFunc(dwordTy, dwordCopySize);
+  }
 }
 
 } // namespace lgc

@@ -42,6 +42,8 @@ class PassBuilder;
 
 namespace lgc {
 
+class BuilderBase;
+class GroupMemcpyOp;
 class PipelineState;
 class PassManager;
 
@@ -62,6 +64,9 @@ public:
   static void registerPasses(llvm::PassBuilder &passBuilder);
 
   static llvm::GlobalVariable *getLdsVariable(PipelineState *pipelineState, llvm::Module *module);
+
+  static void commonProcessGroupMemcpy(GroupMemcpyOp &groupMemcpyOp, lgc::BuilderBase &builder,
+                                       llvm::Value *threadIndex, unsigned scopeSize);
 
 protected:
   static void addOptimizationPasses(lgc::PassManager &passMgr, uint32_t optLevel);

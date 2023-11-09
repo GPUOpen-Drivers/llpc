@@ -355,6 +355,7 @@ void MeshTaskShader::processTaskShader(Function *entryPoint) {
 
   static auto visitor = llvm_dialects::VisitorBuilder<MeshTaskShader>()
                             .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+                            .add<GroupMemcpyOp>(&MeshTaskShader::lowerGroupMemcpy)
                             .add<TaskPayloadPtrOp>(&MeshTaskShader::lowerTaskPayloadPtr)
                             .add<EmitMeshTasksOp>(&MeshTaskShader::lowerEmitMeshTasks)
                             .build();
@@ -917,6 +918,44 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
 
     m_builder.CreateRetVoid();
   }
+}
+
+// =====================================================================================================================
+// Lower GroupMemcpyOp - copy memory using all threads in a workgroup.
+void MeshTaskShader::lowerGroupMemcpy(GroupMemcpyOp &groupMemcpyOp) {
+  Function *entryPoint = groupMemcpyOp.getFunction();
+  ShaderStage stage = getShaderStage(entryPoint);
+  m_builder.SetInsertPoint(&groupMemcpyOp);
+
+  unsigned scopeSize = 0;
+  Value *threadIndex = nullptr;
+
+  auto scope = groupMemcpyOp.getScope();
+  if (scope == 2) {
+    unsigned workgroupSize[3] = {};
+    auto shaderModes = m_pipelineState->getShaderModes();
+    if (stage == ShaderStageTask) {
+      Module &module = *groupMemcpyOp.getModule();
+      workgroupSize[0] = shaderModes->getComputeShaderMode(module).workgroupSizeX;
+      workgroupSize[1] = shaderModes->getComputeShaderMode(module).workgroupSizeY;
+      workgroupSize[2] = shaderModes->getComputeShaderMode(module).workgroupSizeZ;
+    } else if (stage == ShaderStageMesh) {
+      workgroupSize[0] = shaderModes->getMeshShaderMode().workgroupSizeX;
+      workgroupSize[1] = shaderModes->getMeshShaderMode().workgroupSizeY;
+      workgroupSize[2] = shaderModes->getMeshShaderMode().workgroupSizeZ;
+    } else {
+      llvm_unreachable("Invalid shade stage!");
+    }
+
+    scopeSize = workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
+    threadIndex = m_waveThreadInfo.threadIdInSubgroup;
+  } else {
+    llvm_unreachable("Unsupported scope!");
+  }
+
+  Patch::commonProcessGroupMemcpy(groupMemcpyOp, m_builder, threadIndex, scopeSize);
+
+  m_callsToRemove.push_back(&groupMemcpyOp);
 }
 
 // =====================================================================================================================
@@ -2422,7 +2461,7 @@ Value *MeshTaskShader::getMeshLocalInvocationId() {
     // The local invocation ID is packed to VGPR0 on GFX11+ with the following layout:
     //
     //   +-----------------------+-----------------------+-----------------------+
-    //   | Local Invocation ID Z | Local Invocation ID Y | Local Invocation ID Z |
+    //   | Local Invocation ID Z | Local Invocation ID Y | Local Invocation ID X |
     //   | [29:20]               | [19:10]               | [9:0]                 |
     //   +-----------------------+-----------------------+-----------------------+
     auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;

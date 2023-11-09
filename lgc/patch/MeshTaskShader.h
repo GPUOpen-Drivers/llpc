@@ -80,6 +80,7 @@ private:
   void processTaskShader(llvm::Function *entryPoint);
   void processMeshShader(llvm::Function *entryPoint);
 
+  void lowerGroupMemcpy(GroupMemcpyOp &groupMemcpyOp);
   void lowerTaskPayloadPtr(TaskPayloadPtrOp &taskPayloadPtrOp);
   void lowerEmitMeshTasks(EmitMeshTasksOp &emitMeshTasksOp);
   void lowerSetMeshOutputs(SetMeshOutputsOp &setMeshOutputsOp);

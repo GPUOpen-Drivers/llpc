@@ -162,8 +162,8 @@ private:
 
   bool isComputeWithCalls() const;
 
-  void processGroupMemcpy(llvm::Module &module);
-  void lowerGroupMemcpy(GroupMemcpyOp &groupMemcpyOp);
+  void processCsGroupMemcpy(llvm::Module &module);
+  void lowerCsGroupMemcpy(GroupMemcpyOp &groupMemcpyOp);
 
   bool m_hasTs;                             // Whether the pipeline has tessllation shader
   bool m_hasGs;                             // Whether the pipeline has geometry shader
