@@ -348,7 +348,11 @@ LlpcRaytracingModeSetting("llpc-raytracing-mode", cl::init(LlpcRaytracingMode::L
                           cl::desc("Override the LLPC raytracing mode"),
                           cl::values(
                             clEnumValN(LlpcRaytracingMode::Legacy, "legacy", "Legacy mode"),
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 69
                             clEnumValN(LlpcRaytracingMode::Gpurt2, "continufy", "Legacy RT pipeline with continufy"),
+#else
+                            clEnumValN(LlpcRaytracingMode::Continufy, "continufy", "Legacy RT pipeline with continufy"),
+#endif
                             clEnumValN(LlpcRaytracingMode::Continuations, "continuations", "Continuations mode")));
 
 // -enable-color-export-shader
