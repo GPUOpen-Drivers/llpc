@@ -391,9 +391,14 @@ void PatchEntryPointMutate::lowerGroupMemcpy(GroupMemcpyOp &groupMemcpyOp) {
 
       // LocalInvocationIndex is
       // (LocalInvocationId.Z * WorkgroupSize.Y + LocalInvocationId.Y) * WorkGroupSize.X + LocalInvocationId.X
-      threadIndex = builder.CreateMul(threadIdComp[2], builder.getInt32(workgroupSize[1]));
-      threadIndex = builder.CreateAdd(threadIndex, threadIdComp[1]);
-      threadIndex = builder.CreateMul(threadIndex, builder.getInt32(workgroupSize[0]));
+      // tidigCompCnt is not always 3 if groupSizeY and/or groupSizeZ are 1. See RegisterMetadataBuilder.cpp.
+      threadIndex = builder.getInt32(0);
+      if (workgroupSize[2] > 1)
+        threadIndex = builder.CreateMul(threadIdComp[2], builder.getInt32(workgroupSize[1]));
+      if (workgroupSize[1] > 1) {
+        threadIndex = builder.CreateAdd(threadIndex, threadIdComp[1]);
+        threadIndex = builder.CreateMul(threadIndex, builder.getInt32(workgroupSize[0]));
+      }
       threadIndex = builder.CreateAdd(threadIndex, threadIdComp[0]);
     }
   } else {
