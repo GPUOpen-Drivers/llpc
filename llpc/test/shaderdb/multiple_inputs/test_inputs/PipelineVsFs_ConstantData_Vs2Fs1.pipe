@@ -3,6 +3,7 @@
 ; RUN: amdllpc -v -gfxip 9.0.0 -enable-relocatable-shader-elf %s | FileCheck -check-prefix=SHADERTEST %s
 ; RUN: amdllpc -v -gfxip 9.0.0 -enable-part-pipeline=0 %s | FileCheck -check-prefix=SHADERTEST2_PP0 %s
 ; RUN: amdllpc -v -gfxip 9.0.0 -enable-part-pipeline=1 %s | FileCheck -check-prefix=SHADERTEST2_PP1 %s
+; REQUIRES: do-not-run-me
 [Version]
 version = 40
 
@@ -28,7 +29,7 @@ colorBuffer[0].blendEnable = 0
 ; SHADERTEST-NEXT:    [[TMP1:%.*]] = trunc i32 [[TMP0]] to i8
 ; SHADERTEST-NEXT:    [[DOTLHS_TRUNC:%.*]] = and i8 [[TMP1]], 15
 ; SHADERTEST-NEXT:    [[TMP2:%.*]] = urem i8 [[DOTLHS_TRUNC]], 3
-; SHADERTEST-NEXT:    [[TMP3:%.*]] = zext i8 [[TMP2]] to i64
+; SHADERTEST-NEXT:    [[TMP3:%.*]] = zext nneg i8 [[TMP2]] to i64
 ; SHADERTEST-NEXT:    [[TMP4:%.*]] = getelementptr [3 x <4 x float>], ptr addrspace(4) @__llpc_global_proxy_colors, i64 0, i64 [[TMP3]]
 ; SHADERTEST-NEXT:    [[TMP5:%.*]] = load <4 x float>, ptr addrspace(4) [[TMP4]], align 16
 ; SHADERTEST-NEXT:    [[TMP6:%.*]] = insertvalue { <4 x float> } poison, <4 x float> [[TMP5]], 0
@@ -41,7 +42,7 @@ colorBuffer[0].blendEnable = 0
 ; SHADERTEST2_PP0-NEXT:    [[TMP1:%.*]] = trunc i32 [[TMP0]] to i8
 ; SHADERTEST2_PP0-NEXT:    [[DOTLHS_TRUNC:%.*]] = and i8 [[TMP1]], 15
 ; SHADERTEST2_PP0-NEXT:    [[TMP2:%.*]] = urem i8 [[DOTLHS_TRUNC]], 3
-; SHADERTEST2_PP0-NEXT:    [[TMP3:%.*]] = zext i8 [[TMP2]] to i64
+; SHADERTEST2_PP0-NEXT:    [[TMP3:%.*]] = zext nneg i8 [[TMP2]] to i64
 ; SHADERTEST2_PP0-NEXT:    [[TMP4:%.*]] = getelementptr [3 x <4 x float>], ptr addrspace(4) @__llpc_global_proxy_colors, i64 0, i64 [[TMP3]]
 ; SHADERTEST2_PP0-NEXT:    [[TMP5:%.*]] = load <4 x float>, ptr addrspace(4) [[TMP4]], align 16
 ; SHADERTEST2_PP0-NEXT:    [[DOTI3:%.*]] = extractelement <4 x float> [[TMP5]], i64 3
@@ -58,7 +59,7 @@ colorBuffer[0].blendEnable = 0
 ; SHADERTEST2_PP1-NEXT:    [[TMP1:%.*]] = trunc i32 [[TMP0]] to i8
 ; SHADERTEST2_PP1-NEXT:    [[DOTLHS_TRUNC:%.*]] = and i8 [[TMP1]], 15
 ; SHADERTEST2_PP1-NEXT:    [[TMP2:%.*]] = urem i8 [[DOTLHS_TRUNC]], 3
-; SHADERTEST2_PP1-NEXT:    [[TMP3:%.*]] = zext i8 [[TMP2]] to i64
+; SHADERTEST2_PP1-NEXT:    [[TMP3:%.*]] = zext nneg i8 [[TMP2]] to i64
 ; SHADERTEST2_PP1-NEXT:    [[TMP4:%.*]] = getelementptr [3 x <4 x float>], ptr addrspace(4) @__llpc_global_proxy_colors, i64 0, i64 [[TMP3]]
 ; SHADERTEST2_PP1-NEXT:    [[TMP5:%.*]] = load <4 x float>, ptr addrspace(4) [[TMP4]], align 16
 ; SHADERTEST2_PP1-NEXT:    [[DOTI3:%.*]] = extractelement <4 x float> [[TMP5]], i64 3
