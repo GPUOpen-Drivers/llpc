@@ -765,6 +765,11 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
     m_builder.SetInsertPoint(dummyAllocReqBlock);
 
     m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, {m_builder.getInt32(GsAllocReq), m_builder.getInt32(0)});
+
+    // We still collect mesh shader statistics in this special case. This is a valid mesh shader usage when the
+    // primitive/vertex count is not specified by SetMeshOutputs (both are treated as zeros).
+    collectMeshStatsInfo(entryPoint, m_builder.getInt32(0));
+
     m_builder.CreateBr(endDummyAllocReqBlock);
   }
 
