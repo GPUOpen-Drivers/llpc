@@ -19,5 +19,5 @@ options.ldsSpillLimitDwords = 1024
 ; CHECK-NEXT:    ret void
 ;
 ;.
-; CHECK: attributes #[[ATTR0:[0-9]+]] = { nounwind memory(readwrite) "amdgpu-flat-work-group-size"="66,66" "amdgpu-lds-spill-limit-dwords"="1024" "amdgpu-memory-bound"="false" "amdgpu-no-workgroup-id-x" "amdgpu-no-workgroup-id-y" "amdgpu-no-workgroup-id-z" "amdgpu-unroll-threshold"="700" "amdgpu-wave-limiter"="false" "amdgpu-work-group-info-arg-no"="1" "denormal-fp-math-f32"="preserve-sign" "target-features"=",+wavefrontsize64,+cumode,+enable-flat-scratch" }
+; CHECK: attributes #[[ATTR0:[0-9]+]] = { nounwind memory(readwrite) "amdgpu-flat-work-group-size"="66,66" "amdgpu-lds-spill-limit-dwords"="1024" "amdgpu-memory-bound"="false" "amdgpu-no-workgroup-id-x" "amdgpu-no-workgroup-id-y" "amdgpu-no-workgroup-id-z" "amdgpu-prealloc-sgpr-spill-vgprs" "amdgpu-unroll-threshold"="700" "amdgpu-wave-limiter"="false" "amdgpu-work-group-info-arg-no"="1" "denormal-fp-math-f32"="preserve-sign" "target-features"=",+wavefrontsize64,+cumode,+enable-flat-scratch" }
 ;.
