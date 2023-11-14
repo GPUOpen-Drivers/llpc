@@ -187,6 +187,10 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
 
     builder.addAttribute("target-features", targetFeatures);
 
+    // Prevent spilling of VGPRs holding SGPR spills as this can have undefined behaviour in callee functions.
+    // Note: this is an intermediate workaround and should be removed when backend support is complete.
+    builder.addAttribute("amdgpu-prealloc-sgpr-spill-vgprs");
+
     func->addFnAttrs(builder);
   }
 }
