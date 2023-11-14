@@ -1754,9 +1754,10 @@ Value *PatchInOutImportExport::performFsParameterLoad(BuilderBase &builder, Valu
     compValue = builder.CreateIntrinsic(Intrinsic::amdgcn_mov_dpp, builder.getInt32Ty(),
                                         {compValue, builder.getInt32(static_cast<unsigned>(dppCtrl)),
                                          builder.getInt32(15), builder.getInt32(15), builder.getTrue()});
-    // NOTE: Make mov_dpp and its source instructions run in WQM to make sure the mov_dpp could fetch
-    // correct data from possible inactive lanes.
-    compValue = builder.CreateIntrinsic(Intrinsic::amdgcn_wqm, builder.getInt32Ty(), compValue);
+    // NOTE: mov_dpp must run in strict WQM to access lanes potentially inactive with normal exec/WQM.
+    // lds_param_load always runs in strict WQM, but exec/WQM may not match this due to discards or divergence.
+    // Ideally we would use the FI bit on the mov_dpp, but there is currently no backend support.
+    compValue = builder.CreateIntrinsic(Intrinsic::amdgcn_strict_wqm, builder.getInt32Ty(), compValue);
     compValue = builder.CreateBitCast(compValue, builder.getFloatTy());
   } else {
     Value *args[] = {
