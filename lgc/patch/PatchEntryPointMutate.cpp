@@ -1449,10 +1449,6 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
   builder.addAttribute("amdgpu-memory-bound", shaderOptions->favorLatencyHiding ? "true" : "false");
   builder.addAttribute("amdgpu-wave-limiter", "false");
 
-  // Prevent spilling of VGPRs holding SGPR spills as this can have undefined behaviour in callee functions.
-  // Note: this is an intermediate workaround and should be removed when backend support is complete.
-  builder.addAttribute("amdgpu-prealloc-sgpr-spill-vgprs");
-
   entryPoint->addFnAttrs(builder);
 
   // NOTE: Remove "readnone" attribute for entry-point. If GS is empty, this attribute will allow

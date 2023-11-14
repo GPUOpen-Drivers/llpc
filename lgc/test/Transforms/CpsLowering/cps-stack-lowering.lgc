@@ -237,7 +237,7 @@ define void @test.2({ ptr addrspace(32) } %state) !lgc.cps !{i32 1} !lgc.shaders
 ;
 ;.
 ; CHECK: attributes #[[ATTR0:[0-9]+]] = { noreturn }
-; CHECK: attributes #[[ATTR1]] = { memory(readwrite) "amdgpu-memory-bound"="false" "amdgpu-prealloc-sgpr-spill-vgprs" "amdgpu-unroll-threshold"="700" "amdgpu-wave-limiter"="false" }
+; CHECK: attributes #[[ATTR1]] = { memory(readwrite) "amdgpu-memory-bound"="false" "amdgpu-unroll-threshold"="700" "amdgpu-wave-limiter"="false" }
 ; CHECK: attributes #[[ATTR2:[0-9]+]] = { convergent nocallback nofree nounwind willreturn memory(none) }
 ; CHECK: attributes #[[ATTR3:[0-9]+]] = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
 ; CHECK: attributes #[[ATTR4:[0-9]+]] = { convergent nocallback nofree nounwind speculatable willreturn memory(none) }
