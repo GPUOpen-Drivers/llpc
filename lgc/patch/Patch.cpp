@@ -86,6 +86,7 @@
 #include "llvm/Transforms/Scalar/EarlyCSE.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Scalar/IndVarSimplify.h"
+#include "llvm/Transforms/Scalar/InferAlignment.h"
 #include "llvm/Transforms/Scalar/InstSimplifyPass.h"
 #include "llvm/Transforms/Scalar/LICM.h"
 #include "llvm/Transforms/Scalar/LoopDeletion.h"
@@ -105,6 +106,10 @@
 #define DEBUG_TYPE "lgc-patch"
 
 using namespace llvm;
+
+namespace llvm {
+extern cl::opt<bool> EnableInferAlignmentPass;
+} // namespace llvm
 
 namespace lgc {
 
@@ -410,6 +415,8 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, uint32_t optLevel) 
   fpm.addPass(SROAPass(SROAOptions::ModifyCFG));
   // uses UniformityAnalysis
   fpm.addPass(PatchReadFirstLane());
+  if (EnableInferAlignmentPass)
+    fpm.addPass(InferAlignmentPass());
   fpm.addPass(InstCombinePass());
   passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
   passMgr.addPass(ConstantMergePass());
