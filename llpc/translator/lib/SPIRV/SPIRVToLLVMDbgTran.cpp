@@ -371,7 +371,15 @@ DINode *SPIRVToLLVMDbgTran::transTypeMember(const SPIRVExtInst *DebugInst) {
     SPIRVValue *ConstVal = BM->get<SPIRVValue>(Ops[ValueIdx]);
     assert(isConstantOpCode(ConstVal->getOpCode()) && "Static member must be a constant");
     llvm::Value *Val = SPIRVReader->transValue(ConstVal, nullptr, nullptr);
-    return Builder.createStaticMemberType(Scope, Name, File, LineNo, BaseType, Flags, cast<llvm::Constant>(Val));
+    return Builder.createStaticMemberType(
+        Scope, Name, File, LineNo, BaseType, Flags,
+        cast<llvm::Constant>(Val)
+#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 480812
+        // New version of the code (also handles unknown version, which we treat as latest)
+        ,
+        llvm::dwarf::DW_TAG_member
+#endif
+    );
   }
   uint64_t Size = getConstant(Ops[SizeIdx]);
   uint64_t Alignment = 0;
