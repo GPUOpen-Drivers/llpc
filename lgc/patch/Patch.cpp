@@ -86,7 +86,12 @@
 #include "llvm/Transforms/Scalar/EarlyCSE.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Scalar/IndVarSimplify.h"
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 475156
+// Old version of the code
+#else
+// New version of the code (also handles unknown version, which we treat as latest)
 #include "llvm/Transforms/Scalar/InferAlignment.h"
+#endif
 #include "llvm/Transforms/Scalar/InstSimplifyPass.h"
 #include "llvm/Transforms/Scalar/LICM.h"
 #include "llvm/Transforms/Scalar/LoopDeletion.h"
@@ -106,10 +111,6 @@
 #define DEBUG_TYPE "lgc-patch"
 
 using namespace llvm;
-
-namespace llvm {
-extern cl::opt<bool> EnableInferAlignmentPass;
-} // namespace llvm
 
 namespace lgc {
 
@@ -415,8 +416,12 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, uint32_t optLevel) 
   fpm.addPass(SROAPass(SROAOptions::ModifyCFG));
   // uses UniformityAnalysis
   fpm.addPass(PatchReadFirstLane());
-  if (EnableInferAlignmentPass)
-    fpm.addPass(InferAlignmentPass());
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 475156
+  // Old version of the code
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  fpm.addPass(InferAlignmentPass());
+#endif
   fpm.addPass(InstCombinePass());
   passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
   passMgr.addPass(ConstantMergePass());
