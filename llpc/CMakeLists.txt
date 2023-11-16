@@ -55,11 +55,8 @@ if(ICD_BUILD_LLPC)
     set(LLVM_INCLUDE_DOCS OFF CACHE BOOL Force)
     set(LLVM_INCLUDE_EXAMPLES OFF CACHE BOOL Force)
     set(LLVM_INCLUDE_GO_TESTS OFF CACHE BOOL Force)
-    if(LLPC_BUILD_TESTS)
-        set(LLVM_INCLUDE_TESTS ON CACHE BOOL Force)
-    else()
-        set(LLVM_INCLUDE_TESTS OFF CACHE BOOL Force)
-    endif()
+    set(CONTINUATIONS_BUILD_TESTS ${LLPC_BUILD_TESTS})
+    set(LLVM_INCLUDE_TESTS ${LLPC_BUILD_TESTS} CACHE BOOL Force)
     set(LLVM_INCLUDE_TOOLS ON CACHE BOOL Force)
     set(LLVM_INCLUDE_UTILS ON CACHE BOOL Force)
     set(LLVM_ENABLE_TERMINFO OFF CACHE BOOL Force)
@@ -228,6 +225,7 @@ if(ICD_BUILD_LLPC)
         lower/LowerGpuRt.cpp
         lower/llpcSpirvLowerInternalLibraryIntrinsicUtil.cpp
         lower/LowerGLCompatibility.cpp
+        lower/llpcSpirvLowerCooperativeMatrix.cpp
     )
 
 # llpc/translator

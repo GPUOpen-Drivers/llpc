@@ -26,7 +26,9 @@ declare i32 @_cont_GetContinuationStackAddr() #0
 
 declare %struct.DispatchSystemData @_cont_SetupRayGen() #0
 
-declare %struct.DispatchSystemData @_AmdAwaitTraversal(i64, %struct.TraversalData) #0
+; To exercise both waiting and non-waiting Await, we use WaitAwait for Traversal,
+; and Await for Callshader. This does not necessarily reflect current choices in GPURT.
+declare %struct.DispatchSystemData @_AmdWaitAwaitTraversal(i64, i64, %struct.TraversalData) #0
 
 declare %struct.DispatchSystemData @_AmdAwaitShader(i64, %struct.DispatchSystemData) #0
 
@@ -80,7 +82,7 @@ define void @_cont_TraceRay(%struct.DispatchSystemData* %data, i64 %0, i32 %1, i
   %trav_data = insertvalue %struct.TraversalData undef, %struct.SystemData %sys_data, 0
   %addr = call i64 @_AmdGetResumePointAddr() #3
   %trav_data2 = insertvalue %struct.TraversalData %trav_data, i64 %addr, 5
-  %newdata = call %struct.DispatchSystemData @_AmdAwaitTraversal(i64 4, %struct.TraversalData %trav_data2)
+  %newdata = call %struct.DispatchSystemData @_AmdWaitAwaitTraversal(i64 4, i64 -1, %struct.TraversalData %trav_data2)
   store %struct.DispatchSystemData %newdata, %struct.DispatchSystemData* %data, align 4
   call void @_AmdRestoreSystemData(%struct.DispatchSystemData* %data)
   ret void
@@ -413,7 +415,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP25:%.*]] = getelementptr i32, ptr [[TMP20]], i64 2
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP26:%.*]] = load i32, ptr [[TMP25]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP26]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP27:%.*]] = call ptr inttoptr (i64 4 to ptr)([[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2]]), !continuation.registercount !35, !continuation.returnedRegistercount !35
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP27:%.*]] = call ptr inttoptr (i64 4 to ptr)(i64 -1, [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2]]), !continuation.registercount !35, !continuation.returnedRegistercount !35, !continuation.wait.await !14
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP28:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @await.struct.DispatchSystemData(ptr [[TMP27]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_RAYPAYLOAD]] poison, ptr [[TMP14]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP29:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP14]], i32 0, i32 0
@@ -445,7 +447,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TRAV_DATA:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA:%.*]] undef, [[STRUCT_SYSTEMDATA]] [[SYS_DATA]], 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[ADDR:%.*]] = call i64 @_AmdGetResumePointAddr() #[[ATTR3]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TRAV_DATA2:%.*]] = insertvalue [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA]], i64 [[ADDR]], 5
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[NEWDATA:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @_AmdAwaitTraversal(i64 4, [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[NEWDATA:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @_AmdWaitAwaitTraversal(i64 4, i64 -1, [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[NEWDATA]], ptr [[DATA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[DATA]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
@@ -1002,7 +1004,7 @@ attributes #6 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP12:%.*]] = bitcast float [[DOTSROA_0_12_VEC_EXTRACT]] to i32
 ; DXILCONTPOSTPROCESS-NEXT:    store i32 [[TMP12]], ptr addrspace(20) addrspacecast (ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i64 9) to ptr addrspace(20)), align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP13:%.*]] = load i32, ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 4, i32 [[TMP13]], [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]]), !continuation.registercount !35, !continuation.returnedRegistercount !35
+; DXILCONTPOSTPROCESS-NEXT:    call void (i64, i64, ...) @continuation.waitContinue(i64 4, i64 -1, i32 [[TMP13]], [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]]), !continuation.registercount !35, !continuation.returnedRegistercount !35
 ; DXILCONTPOSTPROCESS-NEXT:    unreachable
 ;
 ;

@@ -932,15 +932,28 @@ void FragColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info,
     info = info.drop_front(1);
   }
 
+  // Record each color buffer's export info for broadcasting
+  llvm::SmallVector<ColorExportInfo, 8> broadCastInfo;
+  if (m_pipelineState->getOptions().enableFragColor) {
+    auto &expInfo = info[0];
+    assert(expInfo.ty != nullptr);
+
+    for (unsigned location = 0; location < MaxColorTargets; ++location) {
+      if (m_pipelineState->getColorExportFormat(location).dfmt != BufDataFormatInvalid)
+        broadCastInfo.push_back({0, location, expInfo.isSigned, expInfo.ty});
+    }
+  }
+
   // Now do color exports by color buffer.
   unsigned hwColorExport = 0;
+  auto finalExpInfo = m_pipelineState->getOptions().enableFragColor ? ArrayRef<ColorExportInfo>(broadCastInfo) : info;
   for (unsigned location = 0; location < MaxColorTargets; ++location) {
-    auto infoIt = llvm::find_if(info, [&](const ColorExportInfo &info) { return info.location == location; });
-    if (infoIt == info.end())
+    auto infoIt = llvm::find_if(finalExpInfo,
+                                [&](const ColorExportInfo &finalExpInfo) { return finalExpInfo.location == location; });
+    if (infoIt == finalExpInfo.end())
       continue;
 
     assert(infoIt->hwColorTarget < MaxColorTargets);
-
     auto expFmt = static_cast<ExportFormat>(m_pipelineState->computeExportFormat(infoIt->ty, location));
     if (expFmt != EXP_FORMAT_ZERO) {
       lastExport = handleColorExportInstructions(values[infoIt->hwColorTarget], hwColorExport, builder, expFmt,
@@ -966,7 +979,7 @@ void FragColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info,
     FragColorExport::setDoneFlag(lastExport, builder);
 
   m_pipelineState->getPalMetadata()->updateSpiShaderColFormat(finalExportFormats);
-  m_pipelineState->getPalMetadata()->updateCbShaderMask(info);
+  m_pipelineState->getPalMetadata()->updateCbShaderMask(finalExpInfo);
 }
 
 // =====================================================================================================================

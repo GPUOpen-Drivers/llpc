@@ -35,7 +35,6 @@
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
-#include "lgc/util/TypeLowering.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033

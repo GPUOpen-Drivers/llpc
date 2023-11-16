@@ -366,6 +366,7 @@ void GraphicsContext::setVertexInputDescriptions(Pipeline *pipeline, Util::Metro
       break;
     case VK_VERTEX_INPUT_RATE_INSTANCE:
       bindings[idx].inputRate = VertexInputRateInstance;
+      bindings[idx].divisor = 1; // Set default divisor
       break;
     default:
       llvm_unreachable("Should never be called!");
@@ -379,7 +380,7 @@ void GraphicsContext::setVertexInputDescriptions(Pipeline *pipeline, Util::Metro
     for (unsigned i = 0; i < vertexDivisor->vertexBindingDivisorCount; ++i) {
       auto divisor = &vertexDivisor->pVertexBindingDivisors[i];
       if (divisor->binding <= bindings.size())
-        bindings[divisor->binding].inputRate = divisor->divisor;
+        bindings[divisor->binding].divisor = divisor->divisor;
     }
   }
 
@@ -408,6 +409,7 @@ void GraphicsContext::setVertexInputDescriptions(Pipeline *pipeline, Util::Metro
           dfmt,
           nfmt,
           binding->inputRate,
+          binding->divisor,
       });
     }
   }

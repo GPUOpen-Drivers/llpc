@@ -80,29 +80,28 @@ attributes #2 = { nounwind }
 ; PREPARE-NEXT:    [[TMP3:%.*]] = load i32, ptr [[TMP2]], align 4
 ; PREPARE-NEXT:    [[TMP4:%.*]] = icmp eq i32 [[TMP3]], 0
 ; PREPARE-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT_TRAVERSALDATA]], ptr [[TMP1]], i32 0, i32 0
-; PREPARE-NEXT:    br i1 [[TMP4]], label [[TMP13:%.*]], label [[TMP6:%.*]]
+; PREPARE-NEXT:    br i1 [[TMP4]], label [[TMP12:%.*]], label [[TMP6:%.*]]
 ; PREPARE:       6:
-; PREPARE-NEXT:    [[TMP7:%.*]] = call i1 @_AmdContinuationStackIsGlobal()
-; PREPARE-NEXT:    [[TMP8:%.*]] = call i32 @_AmdContPayloadRegistersI32Count()
-; PREPARE-NEXT:    [[TMP9:%.*]] = call i32 @_AmdContPayloadRegistersGetI32(i32 0)
+; PREPARE-NEXT:    [[TMP7:%.*]] = call i32 @_AmdContPayloadRegistersI32Count()
+; PREPARE-NEXT:    [[TMP8:%.*]] = call i32 @_AmdContPayloadRegistersGetI32(i32 0)
 ; PREPARE-NEXT:    call void @_AmdContPayloadRegistersSetI32(i32 0, i32 1)
-; PREPARE-NEXT:    [[TMP10:%.*]] = call i32 @_AmdValueI32CountSomething(ptr [[TMP1]])
-; PREPARE-NEXT:    [[TMP11:%.*]] = call i32 @_AmdValueGetI32Something(ptr [[TMP1]], i32 0)
+; PREPARE-NEXT:    [[TMP9:%.*]] = call i32 @_AmdValueI32CountSomething(ptr [[TMP1]])
+; PREPARE-NEXT:    [[TMP10:%.*]] = call i32 @_AmdValueGetI32Something(ptr [[TMP1]], i32 0)
 ; PREPARE-NEXT:    call void @_AmdValueSetI32Something(ptr [[TMP1]], i32 0, i32 1)
-; PREPARE-NEXT:    [[A0:%.*]] = zext i1 [[TMP7]] to i32
-; PREPARE-NEXT:    [[A1:%.*]] = add i32 [[A0]], [[TMP8]]
-; PREPARE-NEXT:    [[A2:%.*]] = add i32 [[A1]], [[TMP9]]
-; PREPARE-NEXT:    [[A3:%.*]] = add i32 [[A2]], [[TMP10]]
-; PREPARE-NEXT:    [[A4:%.*]] = add i32 [[A3]], [[TMP11]]
+; PREPARE-NEXT:    [[A0:%.*]] = zext i1 false to i32
+; PREPARE-NEXT:    [[A1:%.*]] = add i32 [[A0]], [[TMP7]]
+; PREPARE-NEXT:    [[A2:%.*]] = add i32 [[A1]], [[TMP8]]
+; PREPARE-NEXT:    [[A3:%.*]] = add i32 [[A2]], [[TMP9]]
+; PREPARE-NEXT:    [[A4:%.*]] = add i32 [[A3]], [[TMP10]]
 ; PREPARE-NEXT:    [[ADDR:%.*]] = zext i32 [[A4]] to i64
-; PREPARE-NEXT:    [[TMP12:%.*]] = load [[STRUCT_SYSTEMDATA:%.*]], ptr [[TMP5]], align 4
-; PREPARE-NEXT:    call void (i64, i64, ...) @continuation.waitContinue(i64 [[ADDR]], i64 -1, i32 [[STACKPTR]], i64 ptrtoint (ptr @_AmdTraversal to i64), [[STRUCT_SYSTEMDATA]] [[TMP12]])
-; PREPARE-NEXT:    br label [[TMP15:%.*]]
-; PREPARE:       13:
-; PREPARE-NEXT:    [[TMP14:%.*]] = load [[STRUCT_SYSTEMDATA]], ptr [[TMP5]], align 4
-; PREPARE-NEXT:    call void (i64, i64, ...) @continuation.waitContinue(i64 0, i64 -1, i32 [[STACKPTR]], [[STRUCT_SYSTEMDATA]] [[TMP14]])
-; PREPARE-NEXT:    br label [[TMP15]]
-; PREPARE:       15:
+; PREPARE-NEXT:    [[TMP11:%.*]] = load [[STRUCT_SYSTEMDATA:%.*]], ptr [[TMP5]], align 4
+; PREPARE-NEXT:    call void (i64, i64, ...) @continuation.waitContinue(i64 [[ADDR]], i64 -1, i32 [[STACKPTR]], i64 ptrtoint (ptr @_AmdTraversal to i64), [[STRUCT_SYSTEMDATA]] [[TMP11]])
+; PREPARE-NEXT:    br label [[TMP14:%.*]]
+; PREPARE:       12:
+; PREPARE-NEXT:    [[TMP13:%.*]] = load [[STRUCT_SYSTEMDATA]], ptr [[TMP5]], align 4
+; PREPARE-NEXT:    call void (i64, i64, ...) @continuation.waitContinue(i64 0, i64 -1, i32 [[STACKPTR]], [[STRUCT_SYSTEMDATA]] [[TMP13]])
+; PREPARE-NEXT:    br label [[TMP14]]
+; PREPARE:       14:
 ; PREPARE-NEXT:    ret void
 ;
 ;

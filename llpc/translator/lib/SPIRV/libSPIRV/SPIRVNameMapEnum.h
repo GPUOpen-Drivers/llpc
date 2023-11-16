@@ -499,6 +499,7 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilityWorkgroupMemoryExplicitLayoutKHR, "WorkgroupMemoryExplicitLayoutKHR");
   add(CapabilityWorkgroupMemoryExplicitLayout8BitAccessKHR, "WorkgroupMemoryExplicitLayout8BitAccessKHR");
   add(CapabilityWorkgroupMemoryExplicitLayout16BitAccessKHR, "WorkgroupMemoryExplicitLayout16BitAccessKHR");
+  add(CapabilityCooperativeMatrixKHR, "CooperativeMatrixKHR");
 }
 SPIRV_DEF_NAMEMAP(Capability, SPIRVCapabilityNameMap)
 

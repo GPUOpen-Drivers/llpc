@@ -35,6 +35,7 @@
 #include "llpcSpirvLowerAccessChain.h"
 #include "llpcSpirvLowerCfgMerges.h"
 #include "llpcSpirvLowerConstImmediateStore.h"
+#include "llpcSpirvLowerCooperativeMatrix.h"
 #include "llpcSpirvLowerGlobal.h"
 #include "llpcSpirvLowerInstMetaRemove.h"
 #include "llpcSpirvLowerMath.h"
@@ -201,6 +202,9 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
 
   // Lower SPIR-V terminators
   passMgr.addPass(SpirvLowerTerminator());
+
+  // Lower spirv.cooperative.matrix.proxy to LGC operations. Should run before SROA.
+  passMgr.addPass(SpirvLowerCooperativeMatrix());
 
   // Lower Glsl compatibility variables and operations
   passMgr.addPass(LowerGLCompatibility());

@@ -524,14 +524,23 @@ void LegacyCleanupContinuationsPass::handleSingleContinue(
 
   auto *Csp = B.CreateLoad(CpsType, B.CreateCall(CspFun));
 
-  // Replace this instruction with a call to continuation.continue
+  bool IsWait = DXILContHelper::isWaitAwaitCall(*Call);
+  Function *ContinueFunction = IsWait ? WaitContinue : Continue;
+
+  // Replace this instruction with a call to continuation.[wait]continue
   SmallVector<Value *> Args;
   Args.push_back(B.CreatePointerCast(Call->getCalledOperand(), I64));
+  // The wait mask is the first argument after the function pointer
+  if (IsWait)
+    Args.push_back(*Call->arg_begin());
   Args.push_back(Csp);
   Args.push_back(ReturnAddrInt);
-  Args.append(Call->arg_begin(), Call->arg_end());
-  auto *ContinueCall = B.CreateCall(Continue, Args);
+  Args.append(Call->arg_begin() + (IsWait ? 1 : 0), Call->arg_end());
+  auto *ContinueCall = B.CreateCall(ContinueFunction, Args);
+  // Copy metadata, except for the wait flag, which is no longer needed.
   ContinueCall->copyMetadata(*Call);
+  if (IsWait)
+    DXILContHelper::removeIsWaitAwaitMetadata(*ContinueCall);
   assert(DXILContHelper::tryGetOutgoingRegisterCount(ContinueCall) &&
          "Missing registercount metadata!");
 
@@ -637,6 +646,7 @@ llvm::PreservedAnalyses LegacyCleanupContinuationsPass::run(
     SaveContState = getContinuationSaveContinuationState(Mod);
     RestoreContState = getContinuationRestoreContinuationState(Mod);
     Continue = getContinuationContinue(Mod);
+    WaitContinue = getContinuationWaitContinue(Mod);
     Complete = getContinuationComplete(Mod);
 
     // Add global

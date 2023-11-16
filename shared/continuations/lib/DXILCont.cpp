@@ -649,6 +649,136 @@ CallInst *llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy,
   return NewCall;
 }
 
+/// Transform enqueue intrinsics to continuation intrinsics
+static void replaceEnqueueIntrinsic(Function &F, Function *NewFunc) {
+  for (auto &Use : make_early_inc_range(F.uses())) {
+    if (auto *CInst = dyn_cast<CallInst>(Use.getUser())) {
+      if (CInst->isCallee(&Use)) {
+        IRBuilder<> B(CInst);
+        SmallVector<Value *> Args(CInst->args());
+        bool IsEnqueue = F.getName().contains("Enqueue");
+        // Add the current function as return address to the call.
+        // Used when Traversal calls AnyHit or Intersection.
+        if (IsEnqueue && F.getName().contains("EnqueueCall")) {
+          bool HasWaitMask = F.getName().contains("WaitEnqueue");
+          auto *RetAddr =
+              B.CreatePtrToInt(CInst->getFunction(), B.getInt64Ty());
+          Args.insert(Args.begin() + (HasWaitMask ? 3 : 2), RetAddr);
+        }
+
+        B.CreateCall(NewFunc, Args);
+        CInst->eraseFromParent();
+      }
+    }
+  }
+}
+
+static void handleContinuationStackIsGlobal(Function &Func,
+                                            ContStackAddrspace StackAddrspace) {
+  assert(Func.arg_empty()
+         // bool
+         && Func.getFunctionType()->getReturnType()->isIntegerTy(1));
+
+  auto *IsGlobal = ConstantInt::getBool(
+      Func.getContext(), StackAddrspace == ContStackAddrspace::Global);
+
+  llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
+    CInst.replaceAllUsesWith(IsGlobal);
+    CInst.eraseFromParent();
+  });
+}
+
+static void handleContinuationsGetFlags(Function &Func, uint32_t Flags) {
+  assert(Func.arg_empty()
+         // i32
+         && Func.getFunctionType()->getReturnType()->isIntegerTy(32));
+
+  auto *FlagsConst =
+      ConstantInt::get(IntegerType::get(Func.getContext(), 32), Flags);
+
+  llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
+    CInst.replaceAllUsesWith(FlagsConst);
+    CInst.eraseFromParent();
+  });
+}
+
+static void handleGetRtip(Function &Func, uint32_t RtipLevel) {
+  assert(Func.arg_empty()
+         // i32
+         && Func.getFunctionType()->getReturnType()->isIntegerTy(32));
+
+  auto *RtipConst =
+      ConstantInt::get(IntegerType::get(Func.getContext(), 32), RtipLevel);
+  for (auto &Use : make_early_inc_range(Func.uses())) {
+    if (auto *CInst = dyn_cast<CallInst>(Use.getUser())) {
+      if (CInst->isCallee(&Use)) {
+        CInst->replaceAllUsesWith(RtipConst);
+        CInst->eraseFromParent();
+      }
+    }
+  }
+}
+
+static void handleGetUninitialized(Function &Func) {
+  auto *ArgTy = Func.getReturnType();
+  auto *Poison = PoisonValue::get(ArgTy);
+  llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
+    CInst.replaceAllUsesWith(Poison);
+    CInst.eraseFromParent();
+  });
+}
+
+bool llvm::earlyDriverTransform(Module &M) {
+  // Import StackAddrspace from metadata if set, otherwise from default
+  auto StackAddrspaceMD = DXILContHelper::tryGetStackAddrspace(M);
+  auto StackAddrspace =
+      StackAddrspaceMD.value_or(DXILContHelper::DefaultStackAddrspace);
+
+  // Import from metadata if set
+  auto RtipLevel = DXILContHelper::tryGetRtip(M);
+  auto Flags = DXILContHelper::tryGetFlags(M);
+
+  bool Changed = false;
+  // Replace Enqueue and Complete intrinsics
+  for (auto &F : M) {
+    Function *Replacement = nullptr;
+    auto Name = F.getName();
+    if (Name.contains("WaitEnqueue"))
+      Replacement = getContinuationWaitContinue(M);
+    else if (Name.contains("Enqueue"))
+      Replacement = getContinuationContinue(M);
+    else if (Name.contains("Complete"))
+      Replacement = getContinuationComplete(M);
+
+    if (Replacement) {
+      Changed = true;
+      replaceEnqueueIntrinsic(F, Replacement);
+    }
+
+    if (Name == "_AmdContinuationStackIsGlobal") {
+      Changed = true;
+      handleContinuationStackIsGlobal(F, StackAddrspace);
+    } else if (Name == "_AmdContinuationsGetFlags") {
+      Changed = true;
+      if (!Flags)
+        report_fatal_error("Tried to get continuation flags but it is not "
+                           "available on the module");
+      handleContinuationsGetFlags(F, *Flags);
+    } else if (Name == "_AmdGetRtip") {
+      Changed = true;
+      if (!RtipLevel)
+        report_fatal_error(
+            "Tried to get rtip level but it is not available on the module");
+      handleGetRtip(F, *RtipLevel);
+    } else if (Name.startswith("_AmdGetUninitialized")) {
+      Changed = true;
+      handleGetUninitialized(F);
+    }
+  }
+
+  return Changed;
+}
+
 uint64_t
 llvm::computeNeededStackSizeForRegisterBuffer(uint64_t NumI32s,
                                               uint64_t NumReservedRegisters) {

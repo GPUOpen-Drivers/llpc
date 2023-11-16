@@ -887,10 +887,7 @@ template <typename T> void ConfigBuilder::buildVsRegConfig(ShaderStage shaderSta
   const bool enableXfb = m_pipelineState->enableXfb();
   const bool enablePrimStats = m_pipelineState->enablePrimStats();
   if (shaderStage == ShaderStageCopyShader) {
-    // NOTE: For copy shader, usually we use fixed number of user data registers.
-    // But in some cases, we may change user data registers, we use variable to keep user sgpr count here
-    auto copyShaderUserSgprCount = lgc::CopyShaderUserSgprCount;
-    SET_REG_FIELD(&config->vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, copyShaderUserSgprCount);
+    SET_REG_FIELD(&config->vsRegs, SPI_SHADER_PGM_RSRC2_VS, USER_SGPR, lgc::CopyShaderUserSgprCount);
     setNumAvailSgprs(Util::Abi::HardwareStage::Vs, m_pipelineState->getTargetInfo().getGpuProperty().maxSgprsAvailable);
     setNumAvailVgprs(Util::Abi::HardwareStage::Vs, m_pipelineState->getTargetInfo().getGpuProperty().maxVgprsAvailable);
 
