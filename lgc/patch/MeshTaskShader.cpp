@@ -479,7 +479,7 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   const unsigned flatWorkgroupSize =
       alignTo(m_pipelineState->enableMeshRowExport() ? numMeshThreads : primAmpFactor, waveSize);
   entryPoint->addFnAttr("amdgpu-flat-work-group-size",
-                        std::to_string(primAmpFactor) + std::string(",") + std::to_string(flatWorkgroupSize));
+                        std::to_string(flatWorkgroupSize) + std::string(",") + std::to_string(flatWorkgroupSize));
 
   const unsigned numWaves = flatWorkgroupSize / waveSize;
   const unsigned numMeshWaves = alignTo(numMeshThreads, waveSize) / waveSize;
@@ -555,6 +555,9 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
       m_builder.CreateStore(m_builder.getFalse(), m_barrierToggle);
     }
 
+    if (m_gfxIp.major >= 11)
+      prepareAttribRingAccess();
+
     m_builder.CreateBr(initPrimitiveIndicesHeaderBlock);
   }
 
@@ -572,9 +575,6 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
           m_builder.CreateAdd(m_waveThreadInfo.threadIdInSubgroup,
                               m_builder.CreateMul(loopIndexPhi, m_builder.getInt32(waveSize)), "primitiveIndex");
     }
-
-    if (m_gfxIp.major >= 11)
-      prepareAttribRingAccess();
 
     auto validPrimitive =
         m_builder.CreateICmpULT(m_waveThreadInfo.primOrVertexIndex, m_builder.getInt32(meshMode.outputPrimitives));
@@ -2234,7 +2234,7 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
         }
 
         m_builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_store, valueToStore->getType(),
-                                  {valueToStore, m_attribRingBufDesc, m_waveThreadInfo.threadIdInSubgroup,
+                                  {valueToStore, m_attribRingBufDesc, m_waveThreadInfo.primOrVertexIndex,
                                    locationOffset, m_attribRingBaseOffset, m_builder.getInt32(coherent.u32All)});
       }
     } else {

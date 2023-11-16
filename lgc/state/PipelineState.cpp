@@ -52,7 +52,7 @@ static cl::opt<bool> EnableTessOffChip("enable-tess-offchip", cl::desc("Enable t
 
 // -enable-row-export: enable row export for mesh shader
 static cl::opt<bool> EnableRowExport("enable-row-export", cl::desc("Enable row export for mesh shader"),
-                                     cl::init(false));
+                                     cl::init(true));
 
 cl::opt<bool> UseRegisterFieldFormat("use-register-field-format", cl::desc("Use register field format in pipeline ELF"),
                                      cl::init(true));
