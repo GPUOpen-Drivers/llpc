@@ -642,12 +642,14 @@ void SpirvProcessGpuRtLibrary::createGetStaticId(llvm::Function *func) {
 }
 
 void SpirvProcessGpuRtLibrary::createGetKnownSetRayFlags(llvm::Function *func) {
-  // return 0 to indicate that there is no known set
+  // TODO: currently return 0 to indicate that there is no known set
+  // We will probably need to analyse the traceRay ray flags for actual value
   m_builder->CreateRet(m_builder->getInt32(0));
 }
 
 void SpirvProcessGpuRtLibrary::createGetKnownUnsetRayFlags(llvm::Function *func) {
-  // return 0 to indicate there is no knownUnset bits
+  // TODO: return 0 to indicate there is no knownUnset bits
+  // We will probably need to analyse the traceRay ray flags for actual value
   m_builder->CreateRet(m_builder->getInt32(0));
 }
 
