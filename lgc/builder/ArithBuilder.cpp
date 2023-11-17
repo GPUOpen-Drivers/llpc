@@ -833,13 +833,23 @@ Value *BuilderImpl::CreateNormalizeVector(Value *x, const Twine &instName) {
   Value *dot = CreateDotProduct(x, x);
   Value *sqrt = CreateSqrt(dot);
   Value *rsq = CreateFDiv(ConstantFP::get(sqrt->getType(), 1.0), sqrt);
+  Value *result = nullptr;
   if (x->getType()->getScalarType()->isFloatTy()) {
     // Make sure a FP32 zero vector is normalized to a FP32 zero vector, rather than NaNs.
-    auto zero = ConstantFP::get(getFloatTy(), 0.0);
-    auto isZeroDot = CreateFCmpOEQ(dot, zero);
-    rsq = CreateSelect(isZeroDot, zero, rsq);
+    if (!getFastMathFlags().noSignedZeros()) {
+      // When NSZ is not specified, we avoid using fmul_legacy since the sign of the input is dropped.
+      auto zero = ConstantFP::get(getFloatTy(), 0.0);
+      auto isZeroDot = CreateFCmpOEQ(dot, zero);
+      rsq = CreateSelect(isZeroDot, zero, rsq);
+      result = scalarize(x, [this, rsq](Value *x) -> Value * { return CreateFMul(x, rsq); });
+    } else {
+      result = scalarize(x, [this, rsq](Value *x) -> Value * {
+        return CreateIntrinsic(Intrinsic::amdgcn_fmul_legacy, {}, {x, rsq});
+      });
+    }
+  } else {
+    result = scalarize(x, [this, rsq](Value *x) -> Value * { return CreateFMul(x, rsq); });
   }
-  Value *result = scalarize(x, [this, rsq](Value *x) -> Value * { return CreateFMul(x, rsq); });
   result->setName(instName);
   return result;
 }
