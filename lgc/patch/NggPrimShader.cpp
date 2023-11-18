@@ -3290,7 +3290,7 @@ Value *NggPrimShader::runPartEs(ArrayRef<Argument *> args, Value *position) {
           tessCoordX = createPhi({{newTessCoordX, uncompactVertexBlock}, {tessCoordX, exportVertexBlock}});
 
         if (newTessCoordY)
-          tessCoordX = createPhi({{newTessCoordY, uncompactVertexBlock}, {tessCoordY, exportVertexBlock}});
+          tessCoordY = createPhi({{newTessCoordY, uncompactVertexBlock}, {tessCoordY, exportVertexBlock}});
 
         assert(newRelPatchId);
         relPatchId = createPhi({{newRelPatchId, uncompactVertexBlock}, {relPatchId, exportVertexBlock}});
