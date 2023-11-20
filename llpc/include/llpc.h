@@ -103,6 +103,7 @@ static const char VkIcdName[] = "amdvlk";
 /// Represents per shader module options.
 struct ShaderModuleOptions {
   PipelineOptions pipelineOptions; ///< Pipeline options related with this shader module
+  bool mergeLocationAndBinding;
 };
 
 /// Represents info to build a shader module.

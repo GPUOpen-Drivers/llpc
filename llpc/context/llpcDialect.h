@@ -30,4 +30,8 @@
  */
 #pragma once
 
-namespace LlpcName {} // namespace LlpcName
+namespace LlpcName {
+
+const static char SpirvCooperativeMatrixProxy[] = "spirv.cooperative.matrix.proxy";
+
+} // namespace LlpcName

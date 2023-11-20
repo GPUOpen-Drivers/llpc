@@ -1,7 +1,7 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to deal
@@ -24,51 +24,23 @@
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  CpsStackLowering.h
- * @brief LLPC header file: contains declaration of class lgc::CpsStackLowering.
+ * @file  llpcSpirvLowerCooperativeMatrix.h
+ * @brief LLPC header file: lower SPIR-V specific cooperative matrix operations to LGC
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "lgc/LgcCpsDialect.h"
-#include "lgc/state/IntrinsDefs.h"
-#include "lgc/util/TypeLowering.h"
-#include "llvm/ADT/SmallVector.h"
+#include "llvm/IR/PassManager.h"
 
-namespace lgc {
-constexpr unsigned continuationStackAlignment = 4;
+namespace Llpc {
 
-inline unsigned getLoweredCpsStackAddrSpace() {
-  return ADDR_SPACE_PRIVATE;
-}
-inline unsigned getLoweredCpsStackPointerSize(const llvm::DataLayout &layout) {
-  return layout.getPointerSize(getLoweredCpsStackAddrSpace());
-}
-
-class CpsStackLowering {
+// =====================================================================================================================
+// Pass that lower SPIR-V-specific cooperative matrix operations
+class SpirvLowerCooperativeMatrix : public llvm::PassInfoMixin<SpirvLowerCooperativeMatrix> {
 public:
-  CpsStackLowering(llvm::LLVMContext &context) : m_typeLowering(context) {}
-  void lowerCpsStackOps(llvm::Function &function, llvm::Value *);
-  // Get continuation stack size (in bytes).
-  unsigned getStackSize() { return m_stackSizeInBytes; }
+  llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  TypeLowering m_typeLowering;
-
-private:
-  void visitCpsAlloc(cps::AllocOp &alloc);
-  void visitCpsFree(cps::FreeOp &freeOp);
-  void visitCpsPeek(cps::PeekOp &peekOp);
-  void visitSetVsp(cps::SetVspOp &setVsp);
-  void visitGetVsp(cps::GetVspOp &getVsp);
-  void visitGetElementPtr(llvm::GetElementPtrInst &getElemPtrInst);
-  void visitPtrToIntInst(llvm::PtrToIntInst &ptr2Int);
-  void visitIntToPtrInst(llvm::IntToPtrInst &int2Ptr);
-  void visitLoad(llvm::LoadInst &load);
-  void visitStore(llvm::StoreInst &store);
-
-  llvm::Module *m_module;
-  llvm::Value *m_cpsStackAlloca;
-  unsigned m_stackSizeInBytes = 0;
+  static llvm::StringRef name() { return "spirv-lower-cooperative-matrix"; }
 };
 
-} // namespace lgc
+} // namespace Llpc

@@ -3309,11 +3309,12 @@ void PatchResourceCollect::scalarizeForInOutPacking(Module *module) {
         payload.inputCalls.push_back(&input);
     }
   };
-  static auto visitor = llvm_dialects::VisitorBuilder<Payload>()
-                            .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
-                            .add<InputImportGenericOp>([](auto &payload, auto &op) { visitInput(payload, op); })
-                            .add<InputImportInterpolatedOp>([](auto &payload, auto &op) { visitInput(payload, op); })
-                            .build();
+  static auto visitor =
+      llvm_dialects::VisitorBuilder<Payload>()
+          .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+          .addSet<InputImportGenericOp, InputImportInterpolatedOp>(
+              [](Payload &payload, Instruction &op) { visitInput(payload, cast<GenericLocationOp>(op)); })
+          .build();
   visitor.visit(payload, *module);
 
   for (Function &func : *module) {

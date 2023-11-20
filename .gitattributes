@@ -1,5 +1,0 @@
-# Enable shader syntax highlighting
-*.rahit linguist-language=GLSL
-*.rcall linguist-language=GLSL
-*.rgen linguist-language=GLSL
-*.rint linguist-language=GLSL

@@ -79,6 +79,11 @@ public:
   SPIRVType *getMatrixColumnType() const;
   SPIRVType *getCompositeElementType(size_t) const;
   SPIRVWord getCompositeElementCount() const;
+  SPIRVType *getCooperativeMatrixKHRComponentType() const;
+  uint32_t getCooperativeMatrixKHRScope() const;
+  uint32_t getCooperativeMatrixKHRRows() const;
+  uint32_t getCooperativeMatrixKHRColumns() const;
+  uint32_t getCooperativeMatrixKHRUse() const;
   bool isTypeVoid() const;
   bool isTypeArray() const;
   bool isTypeRuntimeArray() const;
@@ -103,6 +108,7 @@ public:
   bool isTypeVectorOrScalarBool() const;
   bool isTypeAccelerationStructureKHR() const;
   bool isTypeRayQueryKHR() const;
+  bool isTypeCooperativeMatrixKHR() const;
 };
 
 class SPIRVTypeVoid : public SPIRVType {
@@ -636,6 +642,55 @@ public:
 
 protected:
   _SPIRV_DEF_DECODE1(Id)
+};
+
+class SPIRVTypeCooperativeMatrixKHR : public SPIRVType {
+public:
+  // Compile constructor
+  SPIRVTypeCooperativeMatrixKHR(SPIRVModule *M, SPIRVId TheId, SPIRVType *TheCompType, SPIRVId TheScope,
+                                SPIRVId TheRows, SPIRVId TheColumns, SPIRVId TheUse, SPIRVId TheCompIntp)
+      : SPIRVType(M, 7, OpTypeCooperativeMatrixKHR, TheId), CompType(TheCompType), Scope(TheScope), Rows(TheRows),
+        Columns(TheColumns), Use(TheUse), CompIntp(TheCompIntp) {
+    validate();
+  }
+  // Incomplete constructor
+  SPIRVTypeCooperativeMatrixKHR()
+      : SPIRVType(OpTypeCooperativeMatrixKHR), CompType(nullptr), Scope(ScopeSubgroup), Rows(0), Columns(0), Use(0),
+        CompIntp(0) {}
+
+  SPIRVType *getComponentType() const { return CompType; }
+  SPIRVConstant *getScope() const;
+  SPIRVConstant *getRows() const;
+  SPIRVConstant *getColumns() const;
+  SPIRVConstant *getUse() const;
+  SPIRVConstant *getComIntp() const;
+  SPIRVCapVec getRequiredCapability() const override {
+    SPIRVCapVec V(getComponentType()->getRequiredCapability());
+    V.push_back(CapabilityCooperativeMatrixKHR);
+    return V;
+  }
+  std::vector<SPIRVEntry *> getNonLiteralOperands() const override {
+    std::vector<SPIRVEntry *> Operands(6);
+    Operands[0] = CompType;
+    Operands[1] = (SPIRVEntry *)getScope();
+    Operands[2] = (SPIRVEntry *)getRows();
+    Operands[3] = (SPIRVEntry *)getColumns();
+    Operands[4] = (SPIRVEntry *)getUse();
+    Operands[5] = (SPIRVEntry *)getComIntp();
+    return Operands;
+  }
+
+protected:
+  _SPIRV_DCL_DECODE
+  void validate() const override;
+
+private:
+  SPIRVType *CompType; // Component Type
+  SPIRVId Scope;       // The scope all invocations belonging to
+  SPIRVId Rows;        // The matrix row number
+  SPIRVId Columns;     // The matrix column number
+  SPIRVId Use;         // The matrix use: A/B/C
+  SPIRVId CompIntp;    // Specifies how Component Type is interpreted
 };
 
 template <typename T2, typename T1> bool isType(const T1 *Ty, unsigned Bits = 0) {

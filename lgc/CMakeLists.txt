@@ -53,7 +53,8 @@ add_llvm_library(LLVMlgc LINK_COMPONENTS
     Vectorize
 )
 
-target_link_libraries(LLVMlgc PUBLIC LLVMContinuations)
+llvm_map_components_to_libnames(extra_llvm_libs CompilerUtils Continuations)
+target_link_libraries(LLVMlgc PUBLIC ${extra_llvm_libs})
 
 ### Cached Project Options #############################################################################################
 option(LLPC_BUILD_NAVI12 "LLPC support for NAVI12?" ON)
@@ -236,6 +237,8 @@ target_sources(LLVMlgc PRIVATE
     patch/VertexFetch.cpp
     patch/PatchImageOpCollect.cpp
     patch/RegisterMetadataBuilder.cpp
+    patch/CombineCooperativeMatrix.cpp
+    patch/LowerCooperativeMatrix.cpp
 )
 
 # lgc/state
@@ -257,7 +260,6 @@ target_sources(LLVMlgc PRIVATE
 target_sources(LLVMlgc PRIVATE
     util/AddressExtender.cpp
     util/Debug.cpp
-    util/CpsStackLowering.cpp
     util/GfxRegHandlerBase.cpp
     util/GfxRegHandler.cpp
     util/Internal.cpp
@@ -265,7 +267,6 @@ target_sources(LLVMlgc PRIVATE
     util/ModuleBunch.cpp
     util/PassManager.cpp
     util/StartStopTimer.cpp
-    util/TypeLowering.cpp
 )
 
 add_subdirectory(disassembler)

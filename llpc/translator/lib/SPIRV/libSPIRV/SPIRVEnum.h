@@ -210,6 +210,7 @@ template <> inline void SPIRVMap<SPIRVCapabilityKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(CapabilityDotProductInput4x8BitKHR, {CapabilityInt16});
   ADD_VEC_INIT(CapabilityMeshShadingEXT, {CapabilityShader});
   ADD_VEC_INIT(CapabilityFragmentBarycentricKHR, {CapabilityShader});
+  ADD_VEC_INIT(CapabilityCooperativeMatrixKHR, {CapabilityShader});
 }
 
 template <> inline void SPIRVMap<SPIRVExecutionModelKind, SPIRVCapVec>::init() {

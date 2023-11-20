@@ -60,43 +60,49 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
 
-namespace lgc {
-
 class TypeLowering;
 
 /// Given a type, check if it should be replaced.
 ///
-/// Return an empty vector if this function doesn't know how to handle the given type. Subsequent conversion rules will
-/// then be considered.
+/// Return an empty vector if this function doesn't know how to handle the given
+/// type. Subsequent conversion rules will then be considered.
 ///
-/// Otherwise, return a vector with the replacement type(s). If the type is known to remain unchanged, return a
-/// singleton vector containing just the original type.
+/// Otherwise, return a vector with the replacement type(s). If the type is
+/// known to remain unchanged, return a singleton vector containing just the
+/// original type.
 using TypeLoweringFn = llvm::SmallVector<llvm::Type *>(TypeLowering &, llvm::Type *);
 
-/// Given a constant that is known to be meant to be replaced based on its type, attempt to replace it.
+/// Given a constant that is known to be meant to be replaced based on its type,
+/// attempt to replace it.
 ///
 /// Return a non-empty vector if this function was able to handle the constant.
 ///
-/// Otherwise, return an empty vector, and subsequent rules will be applied. Default rules exist for poison, undef,
-/// and "null-like" (zeroinitializer etc.).
+/// Otherwise, return an empty vector, and subsequent rules will be applied.
+/// Default rules exist for poison, undef, and "null-like" (zeroinitializer
+/// etc.).
 using ConstantTypeLoweringFn = llvm::SmallVector<llvm::Constant *>(TypeLowering &, llvm::Constant *,
                                                                    llvm::ArrayRef<llvm::Type *>);
 
 // =====================================================================================================================
-/// Helper for lowerings that need to replace values of one type by one or more values of another type.
+/// Helper for lowerings that need to replace values of one type by one or more
+/// values of another type.
 ///
 /// This helper really has two parts:
 ///
-///  - A type-level part that applies @ref TypeLoweringFn rules and caches the result
-///  - A value-level part that maintains a mapping of replaced values and provides generic handlers for core
+///  - A type-level part that applies @ref TypeLoweringFn rules and caches the
+///  result
+///  - A value-level part that maintains a mapping of replaced values and
+///  provides generic handlers for core
 ///    instructions like phi, select, and alloca
 ///
-/// The type-level part can be reused even as the value-level part is cleared by @ref finishCleanup, assuming that the
-/// type replacements are consistent (which they might not always be, e.g. where the replacement depends on the target
-/// architecture).
+/// The type-level part can be reused even as the value-level part is cleared by
+/// @ref finishCleanup, assuming that the type replacements are consistent
+/// (which they might not always be, e.g. where the replacement depends on the
+/// target architecture).
 ///
-/// The value-level part is meant to be used as a nested @ref llvm_dialects::Visitor client. It requires RPO traversal
-/// order. Its intended use is along the following lines:
+/// The value-level part is meant to be used as a nested @ref
+/// llvm_dialects::Visitor client. It requires RPO traversal order. Its intended
+/// use is along the following lines:
 /// @code
 ///   struct MyPayload {
 ///     TypeLowering lowering;
@@ -108,8 +114,9 @@ using ConstantTypeLoweringFn = llvm::SmallVector<llvm::Constant *>(TypeLowering 
 ///
 ///   MyPayload payload;
 ///
-///   // Reverse post order traversal through functions, replacing instructions with converted types as we go.
-///   static const auto visitor = VisitorBuilder<MyPayload>
+///   // Reverse post order traversal through functions, replacing instructions
+///   with converted types as we go. static const auto visitor =
+///   VisitorBuilder<MyPayload>
 ///       .add(...)
 ///       .nest(&TypeLowering::registerVisitors)
 ///       .build();
@@ -118,42 +125,42 @@ using ConstantTypeLoweringFn = llvm::SmallVector<llvm::Constant *>(TypeLowering 
 ///   // Fixup phi nodes.
 ///   payload.lowering.finishPhis();
 ///
-///   // Erase all instructions that "have been replaced" (by calling replaceInstruction for them).
-///   payload.lowering.finishCleanup();
+///   // Erase all instructions that "have been replaced" (by calling
+///   replaceInstruction for them). payload.lowering.finishCleanup();
 /// @endcode
 class TypeLowering {
 public:
-  TypeLowering(llvm::LLVMContext &context);
+  TypeLowering(llvm::LLVMContext &);
 
   llvm::LLVMContext &getContext() const { return m_builder.getContext(); }
 
-  void addRule(std::function<TypeLoweringFn> rule);
-  void addConstantRule(std::function<ConstantTypeLoweringFn> rule);
+  void addRule(std::function<TypeLoweringFn>);
+  void addConstantRule(std::function<ConstantTypeLoweringFn>);
 
-  llvm::ArrayRef<llvm::Type *> convertType(llvm::Type *type);
+  llvm::ArrayRef<llvm::Type *> convertType(llvm::Type *);
 
-  static void registerVisitors(llvm_dialects::VisitorBuilder<TypeLowering> &builder);
+  static void registerVisitors(llvm_dialects::VisitorBuilder<TypeLowering> &);
 
-  llvm::SmallVector<llvm::Value *> getValue(llvm::Value *value);
-  llvm::SmallVector<llvm::Value *> getValueOptional(llvm::Value *value);
-  void replaceInstruction(llvm::Instruction *inst, llvm::ArrayRef<llvm::Value *> mapping);
-  void eraseInstruction(llvm::Instruction *inst);
+  llvm::SmallVector<llvm::Value *> getValue(llvm::Value *);
+  llvm::SmallVector<llvm::Value *> getValueOptional(llvm::Value *);
+  void replaceInstruction(llvm::Instruction *, llvm::ArrayRef<llvm::Value *>);
+  void eraseInstruction(llvm::Instruction *);
 
-  llvm::Function *lowerFunctionArguments(llvm::Function &fn);
+  llvm::Function *lowerFunctionArguments(llvm::Function &);
   void finishPhis();
   bool finishCleanup();
 
 private:
-  void recordValue(llvm::Value *value, llvm::ArrayRef<llvm::Value *> mapping);
-  void replaceMappingWith(llvm::Value *toReplace, llvm::Value *with);
+  void recordValue(llvm::Value *, llvm::ArrayRef<llvm::Value *>);
+  void replaceMappingWith(llvm::Value *, llvm::Value *);
 
-  void visitAlloca(llvm::AllocaInst &alloca);
-  void visitExtract(llvm::ExtractValueInst &extract);
-  void visitInsert(llvm::InsertValueInst &insert);
-  void visitLoad(llvm::LoadInst &load);
-  void visitPhi(llvm::PHINode &phi);
-  void visitSelect(llvm::SelectInst &select);
-  void visitStore(llvm::StoreInst &store);
+  void visitAlloca(llvm::AllocaInst &);
+  void visitExtract(llvm::ExtractValueInst &);
+  void visitInsert(llvm::InsertValueInst &);
+  void visitLoad(llvm::LoadInst &);
+  void visitPhi(llvm::PHINode &);
+  void visitSelect(llvm::SelectInst &);
+  void visitStore(llvm::StoreInst &);
 
   /// Type conversion rules.
   llvm::SmallVector<std::function<TypeLoweringFn>> m_rules;
@@ -170,18 +177,18 @@ private:
   /// Map original values to type-converted values.
   ///
   /// For 1-1 mappings, this stores a value pointer.
-  /// For 1-N mappings, this stores ((index << 1) | 1), where index is the index into m_convertedValueList at which the
-  /// converted values can be found.
+  /// For 1-N mappings, this stores ((index << 1) | 1), where index is the index
+  /// into m_convertedValueList at which the converted values can be found.
   llvm::DenseMap<llvm::Value *, uintptr_t> m_valueMap;
   std::vector<llvm::Value *> m_convertedValueList;
 
-  /// Reverse map of values that occur as type-converted values to where they occur. The vector elements are either a
-  /// value pointer (for 1-1 mapped values) or ((index << 1) | 1), where index is the index into m_convertedValueList.
+  /// Reverse map of values that occur as type-converted values to where they
+  /// occur. The vector elements are either a value pointer (for 1-1 mapped
+  /// values) or ((index << 1) | 1), where index is the index into
+  /// m_convertedValueList.
   llvm::DenseMap<llvm::Value *, llvm::SmallVector<uintptr_t>> m_valueReverseMap;
 
   std::vector<std::pair<llvm::PHINode *, llvm::SmallVector<llvm::PHINode *>>> m_phis;
   std::vector<llvm::Instruction *> m_instructionsToErase;
-  llvm::SmallVector<llvm::Function *> m_functionToErase;
+  llvm::SmallVector<llvm::Function *> m_functionsToErase;
 };
-
-} // namespace lgc
