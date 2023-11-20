@@ -18,8 +18,26 @@ void main()
 // SHADERTEST-NEXT:    [[TMP1:%.*]] = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 0, i32 0, i32 0, i32 0, i32 16, i32 poison)
 // SHADERTEST-NEXT:    [[TMP2:%.*]] = fptoui <4 x float> [[TMP1]] to <4 x i32>
 // SHADERTEST-NEXT:    [[TMP3:%.*]] = fptoui <4 x float> [[TMP0]] to <4 x i32>
-// SHADERTEST-NEXT:    [[DOTNOT:%.*]] = icmp ugt <4 x i32> [[TMP2]], [[TMP3]]
-// SHADERTEST-NEXT:    [[TMP4:%.*]] = select <4 x i1> [[DOTNOT]], <4 x float> zeroinitializer, <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>
-// SHADERTEST-NEXT:    call void (...) @lgc.create.write.generic.output(<4 x float> [[TMP4]], i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison)
+// SHADERTEST-NEXT:    [[TMP4:%.*]] = extractelement <4 x i32> [[TMP2]], i64 0
+// SHADERTEST-NEXT:    [[TMP5:%.*]] = extractelement <4 x i32> [[TMP3]], i64 0
+// SHADERTEST-NEXT:    [[DOTNOT:%.*]] = icmp ugt i32 [[TMP4]], [[TMP5]]
+// SHADERTEST-NEXT:    [[TMP6:%.*]] = extractelement <4 x i32> [[TMP2]], i64 1
+// SHADERTEST-NEXT:    [[TMP7:%.*]] = extractelement <4 x i32> [[TMP3]], i64 1
+// SHADERTEST-NEXT:    [[DOTNOT1:%.*]] = icmp ugt i32 [[TMP6]], [[TMP7]]
+// SHADERTEST-NEXT:    [[TMP8:%.*]] = extractelement <4 x i32> [[TMP2]], i64 2
+// SHADERTEST-NEXT:    [[TMP9:%.*]] = extractelement <4 x i32> [[TMP3]], i64 2
+// SHADERTEST-NEXT:    [[DOTNOT2:%.*]] = icmp ugt i32 [[TMP8]], [[TMP9]]
+// SHADERTEST-NEXT:    [[TMP10:%.*]] = extractelement <4 x i32> [[TMP2]], i64 3
+// SHADERTEST-NEXT:    [[TMP11:%.*]] = extractelement <4 x i32> [[TMP3]], i64 3
+// SHADERTEST-NEXT:    [[DOTNOT3:%.*]] = icmp ugt i32 [[TMP10]], [[TMP11]]
+// SHADERTEST-NEXT:    [[TMP12:%.*]] = select reassoc nnan nsz arcp contract afn i1 [[DOTNOT]], float 0.000000e+00, float 1.000000e+00
+// SHADERTEST-NEXT:    [[TMP13:%.*]] = insertelement <4 x float> poison, float [[TMP12]], i64 0
+// SHADERTEST-NEXT:    [[TMP14:%.*]] = select reassoc nnan nsz arcp contract afn i1 [[DOTNOT1]], float 0.000000e+00, float 1.000000e+00
+// SHADERTEST-NEXT:    [[TMP15:%.*]] = insertelement <4 x float> [[TMP13]], float [[TMP14]], i64 1
+// SHADERTEST-NEXT:    [[TMP16:%.*]] = select reassoc nnan nsz arcp contract afn i1 [[DOTNOT2]], float 0.000000e+00, float 1.000000e+00
+// SHADERTEST-NEXT:    [[TMP17:%.*]] = insertelement <4 x float> [[TMP15]], float [[TMP16]], i64 2
+// SHADERTEST-NEXT:    [[TMP18:%.*]] = select reassoc nnan nsz arcp contract afn i1 [[DOTNOT3]], float 0.000000e+00, float 1.000000e+00
+// SHADERTEST-NEXT:    [[TMP19:%.*]] = insertelement <4 x float> [[TMP17]], float [[TMP18]], i64 3
+// SHADERTEST-NEXT:    call void (...) @lgc.create.write.generic.output(<4 x float> [[TMP19]], i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison)
 // SHADERTEST-NEXT:    ret void
 //

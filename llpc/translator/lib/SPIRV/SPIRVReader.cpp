@@ -1338,12 +1338,30 @@ Value *SPIRVToLLVM::transShiftLogicalBitwiseInst(SPIRVValue *bv, BasicBlock *bb,
 Value *SPIRVToLLVM::transCmpInst(SPIRVValue *bv, BasicBlock *bb, Function *f) {
   SPIRVCompare *bc = static_cast<SPIRVCompare *>(bv);
   assert(bb && "Invalid BB");
-  auto op = bc->getOpCode();
+  auto spvOp = bc->getOpCode();
 
-  if (isLogicalOpCode(op))
-    op = IntBoolOpMap::rmap(op);
-  return getBuilder()->CreateCmp(CmpMap::rmap(op), transValue(bc->getOperand(0), f, bb),
-                                 transValue(bc->getOperand(1), f, bb));
+  if (isLogicalOpCode(spvOp))
+    spvOp = IntBoolOpMap::rmap(spvOp);
+
+  auto llvmOp = CmpMap::rmap(spvOp);
+  SPIRVType *type = bv->getType();
+  Value *lhs = transValue(bc->getOperand(0), f, bb);
+  Value *rhs = transValue(bc->getOperand(1), f, bb);
+
+  // TODO: Remove scalarization here once LLVM's scalarizer pass has caught up
+  if (type->isTypeVector()) {
+    unsigned numComponents = type->getVectorComponentCount();
+    Value *result = PoisonValue::get(FixedVectorType::get(getBuilder()->getInt1Ty(), numComponents));
+    for (unsigned i = 0, e = type->getVectorComponentCount(); i != e; ++i) {
+      Value *compLhs = getBuilder()->CreateExtractElement(lhs, i);
+      Value *compRhs = getBuilder()->CreateExtractElement(rhs, i);
+      Value *compResult = getBuilder()->CreateCmp(llvmOp, compLhs, compRhs);
+      result = getBuilder()->CreateInsertElement(result, compResult, i);
+    }
+    return result;
+  }
+
+  return getBuilder()->CreateCmp(llvmOp, lhs, rhs);
 }
 
 // =====================================================================================================================
@@ -5459,8 +5477,27 @@ Value *SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Function *f, Bas
 
   case OpSelect: {
     SPIRVSelect *bs = static_cast<SPIRVSelect *>(bv);
-    return mapValue(bv, SelectInst::Create(transValue(bs->getCondition(), f, bb), transValue(bs->getTrueValue(), f, bb),
-                                           transValue(bs->getFalseValue(), f, bb), bv->getName(), bb));
+    Value *cond = transValue(bs->getCondition(), f, bb);
+    Value *lhs = transValue(bs->getTrueValue(), f, bb);
+    Value *rhs = transValue(bs->getFalseValue(), f, bb);
+    Value *result = nullptr;
+
+    // TODO: Remove manual scalarization once LLVM's scalarizer pass has caught up.
+    if (auto vecTy = dyn_cast<FixedVectorType>(cond->getType())) {
+      unsigned numComponents = vecTy->getNumElements();
+      result = PoisonValue::get(lhs->getType());
+      for (unsigned i = 0; i != numComponents; ++i) {
+        Value *compCond = getBuilder()->CreateExtractElement(cond, i);
+        Value *compLhs = getBuilder()->CreateExtractElement(lhs, i);
+        Value *compRhs = getBuilder()->CreateExtractElement(rhs, i);
+        Value *compResult = getBuilder()->CreateSelect(compCond, compLhs, compRhs);
+        result = getBuilder()->CreateInsertElement(result, compResult, i);
+      }
+    } else {
+      result = getBuilder()->CreateSelect(cond, lhs, rhs);
+    }
+
+    return mapValue(bv, result);
   }
 
   case OpLine:

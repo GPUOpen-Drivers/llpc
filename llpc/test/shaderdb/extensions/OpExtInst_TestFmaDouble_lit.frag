@@ -37,7 +37,7 @@ void main()
 // CHECK-NEXT:    [[TMP14:%.*]] = call reassoc nnan nsz arcp contract <3 x double> (...) @lgc.create.fma.v3f64(<3 x double> [[TMP9]], <3 x double> [[TMP11]], <3 x double> [[TMP13]])
 // CHECK-NEXT:    [[D3_0_0_VEC_EXTRACT:%.*]] = extractelement <3 x double> [[TMP14]], i64 0
 // CHECK-NEXT:    [[TMP15:%.*]] = fcmp une double [[D3_0_0_VEC_EXTRACT]], [[TMP7]]
-// CHECK-NEXT:    [[TMP16:%.*]] = select i1 [[TMP15]], <4 x float> zeroinitializer, <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>
+// CHECK-NEXT:    [[TMP16:%.*]] = select reassoc nnan nsz arcp contract afn i1 [[TMP15]], <4 x float> zeroinitializer, <4 x float> <float 1.000000e+00, float 1.000000e+00, float 1.000000e+00, float 1.000000e+00>
 // CHECK-NEXT:    call void (...) @lgc.create.write.generic.output(<4 x float> [[TMP16]], i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison)
 // CHECK-NEXT:    ret void
 //
