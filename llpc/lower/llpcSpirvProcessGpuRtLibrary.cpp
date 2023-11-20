@@ -36,6 +36,7 @@
 #include "lgc/Builder.h"
 #include "lgc/GpurtDialect.h"
 #include "lgc/LgcContext.h"
+#include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower-gpurt-library"
@@ -641,16 +642,93 @@ void SpirvProcessGpuRtLibrary::createGetStaticId(llvm::Function *func) {
   m_builder->CreateRet(m_builder->create<GpurtGetRayStaticIdOp>());
 }
 
+// =====================================================================================================================
+// Create function to get known set ray flags
+//
+// @param func : The function to create
 void SpirvProcessGpuRtLibrary::createGetKnownSetRayFlags(llvm::Function *func) {
   // TODO: currently return 0 to indicate that there is no known set
   // We will probably need to analyse the traceRay ray flags for actual value
   m_builder->CreateRet(m_builder->getInt32(0));
 }
 
+// =====================================================================================================================
+// Create function to get known unset ray flags
+//
+// @param func : The function to create
 void SpirvProcessGpuRtLibrary::createGetKnownUnsetRayFlags(llvm::Function *func) {
   // TODO: return 0 to indicate there is no knownUnset bits
   // We will probably need to analyse the traceRay ray flags for actual value
   m_builder->CreateRet(m_builder->getInt32(0));
+}
+
+// =====================================================================================================================
+// Create function to allocate continuation stack pointer
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createContStackAlloc(llvm::Function *func) {
+  Value *byteSize = nullptr;
+  if (func->arg_size() == 2) {
+    // TODO: Remove this when refactoring is done.
+    // Ignore the first argument.
+    byteSize = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(1));
+  } else {
+    assert(func->arg_size() == 1);
+    byteSize = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(0));
+  }
+  auto stackPtr = m_builder->create<cps::AllocOp>(byteSize);
+  m_builder->CreateRet(m_builder->CreatePtrToInt(stackPtr, m_builder->getInt32Ty()));
+}
+
+// =====================================================================================================================
+// Create function to free continuation stack pointer
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createContStackFree(llvm::Function *func) {
+  Value *byteSize = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(0));
+  m_builder->create<cps::FreeOp>(byteSize);
+  m_builder->CreateRetVoid();
+}
+
+// =====================================================================================================================
+// Create function to get continuation stack pointer
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createContStackGetPtr(llvm::Function *func) {
+  auto stackPtr = m_builder->create<cps::GetVspOp>();
+  m_builder->CreateRet(m_builder->CreatePtrToInt(stackPtr, m_builder->getInt32Ty()));
+}
+
+// =====================================================================================================================
+// Create function to set continuation stack pointer
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createContStackSetPtr(llvm::Function *func) {
+  auto csp = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(0));
+  m_builder->create<cps::SetVspOp>(m_builder->CreateIntToPtr(csp, m_builder->getPtrTy(cps::stackAddrSpace)));
+  m_builder->CreateRetVoid();
+}
+
+// =====================================================================================================================
+// Create function to load an i32 from given continuation stack address
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createContStackLoadI32(llvm::Function *func) {
+  auto addr = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(0));
+  auto ptr = m_builder->CreateIntToPtr(addr, m_builder->getPtrTy(cps::stackAddrSpace));
+  m_builder->CreateRet(m_builder->CreateLoad(m_builder->getInt32Ty(), ptr));
+}
+
+// =====================================================================================================================
+// Create function to store an i32 to given continuation stack address
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createContStackStoreI32(llvm::Function *func) {
+  auto addr = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(0));
+  auto data = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(1));
+  auto ptr = m_builder->CreateIntToPtr(addr, m_builder->getPtrTy(cps::stackAddrSpace));
+  m_builder->CreateStore(data, ptr);
+  m_builder->CreateRetVoid();
 }
 
 } // namespace Llpc

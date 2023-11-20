@@ -86,6 +86,12 @@ private:
   void createGetStaticId(llvm::Function *func);
   void createGetKnownSetRayFlags(llvm::Function *func);
   void createGetKnownUnsetRayFlags(llvm::Function *func);
+  void createContStackAlloc(llvm::Function *func);
+  void createContStackFree(llvm::Function *func);
+  void createContStackGetPtr(llvm::Function *func);
+  void createContStackSetPtr(llvm::Function *func);
+  void createContStackLoadI32(llvm::Function *func);
+  void createContStackStoreI32(llvm::Function *func);
   llvm::Value *createGetBvhSrd(llvm::Value *expansion, llvm::Value *boxSortMode);
 };
 } // namespace Llpc
