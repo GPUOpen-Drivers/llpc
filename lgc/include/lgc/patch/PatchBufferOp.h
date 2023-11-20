@@ -30,6 +30,7 @@
  */
 #pragma once
 
+#include "compilerutils/TypeLowering.h"
 #include "lgc/patch/Patch.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/DenseMap.h"
@@ -53,7 +54,6 @@ class BufferDescToPtrOp;
 class BufferLengthOp;
 class BufferPtrDiffOp;
 class PipelineState;
-class TypeLowering;
 
 // =====================================================================================================================
 // Helper class for lowering buffer operations integrated with a flow based on llvm_dialects::Visitor and TypeLowering.

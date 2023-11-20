@@ -74,15 +74,7 @@ public:
     return MinPayloadRegisterCount;
   }
 
-  ContStackAddrspace getContStackAddrspace() const { return StackAddrspace; };
-
-  bool isGlobalAddressSpace() const {
-    return StackAddrspace == ContStackAddrspace::Global;
-  }
-
-  [[maybe_unused]] bool isScratchAddressSpace() const {
-    return StackAddrspace == ContStackAddrspace::Scratch;
-  }
+  ContStackAddrspace getContStackAddrspace() const { return StackAddrspace; }
 
   void updateModuleMetadata() const;
 
@@ -93,13 +85,11 @@ private:
   static constexpr uint32_t DefaultPayloadRegisterCount = 30;
   /// Maximum allowed number of registers to be used for the payload.
   uint32_t MaxPayloadRegisterCount = 0;
-  //// Minimum required number of payload registers.
+  /// Minimum required number of payload registers.
   uint32_t MinPayloadRegisterCount = 0;
   /// The address space used for the continuations stack.
   /// Either stack or global memory.
-  ContStackAddrspace StackAddrspace = DefaultStackAddrspace;
-  static constexpr ContStackAddrspace DefaultStackAddrspace =
-      ContStackAddrspace::Scratch;
+  ContStackAddrspace StackAddrspace = DXILContHelper::DefaultStackAddrspace;
 };
 
 class CpsMutator final {
@@ -214,8 +204,6 @@ private:
   void replaceShaderIndexCall(IRBuilder<> &B, FunctionData &Data,
                               CallInst *Call);
 
-  void handleContinuationStackIsGlobal(Function &Func);
-
   void handleGetFuncAddr(Function &Func);
 
   void handleAmdInternalFunc(Function &Func);
@@ -223,8 +211,6 @@ private:
   void handleUnrematerializableCandidates();
 
   void collectDriverFunctions();
-
-  void handleGetUninitialized(Function &Func);
 
   // Copy the payload content between global payload and local payload.
   // Excludes the stack pointer or hit attributes which may also reside in

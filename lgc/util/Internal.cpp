@@ -234,16 +234,4 @@ Type *getVgprTy(Type *ty) {
   return ty;
 }
 
-Function *mutateFunctionArguments(Function &fn, Type *retTy, const ArrayRef<Type *> argTys, AttributeList attributes) {
-  FunctionType *newFnTy = FunctionType::get(retTy, argTys, false);
-  auto *newFn = Function::Create(newFnTy, fn.getLinkage());
-  newFn->copyAttributesFrom(&fn);
-  newFn->copyMetadata(&fn, 0);
-  newFn->takeName(&fn);
-  newFn->setAttributes(attributes);
-  newFn->splice(newFn->begin(), &fn);
-  fn.getParent()->getFunctionList().insertAfter(fn.getIterator(), newFn);
-  return newFn;
-}
-
 } // namespace lgc

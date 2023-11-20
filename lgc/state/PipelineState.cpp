@@ -111,6 +111,7 @@ static unsigned getMaxComponentBitCount(BufDataFormat dfmt) {
     return 11;
   case BufDataFormat16:
   case BufDataFormat16_16:
+  case BufDataFormat16_16_16:
   case BufDataFormat16_16_16_16:
     return 16;
   case BufDataFormat32:
@@ -178,6 +179,7 @@ static unsigned getNumChannels(BufDataFormat dfmt) {
   case BufDataFormat8_8_8_Bgr:
   case BufDataFormat10_11_11:
   case BufDataFormat11_11_10:
+  case BufDataFormat16_16_16:
   case BufDataFormat32_32_32:
   case BufDataFormat64_64_64:
   case BufDataFormat5_6_5:

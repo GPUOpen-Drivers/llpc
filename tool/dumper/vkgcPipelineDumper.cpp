@@ -862,6 +862,7 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.disableTruncCoordForGather = " << options->disableTruncCoordForGather << "\n";
   dumpFile << "options.vertex64BitsAttribSingleLoc = " << options->vertex64BitsAttribSingleLoc << "\n";
   dumpFile << "options.enablePrimGeneratedQuery = " << options->enablePrimGeneratedQuery << "\n";
+  dumpFile << "options.enableFragColor = " << options->enableFragColor << "\n";
 }
 
 // =====================================================================================================================
@@ -1017,7 +1018,7 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
 
   dumpFile << "\n[ApiXfbOutInfo]\n";
   dumpFile << "forceDisableStreamOut = " << pipelineInfo->apiXfbOutData.forceDisableStreamOut << "\n";
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 69
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 70
   dumpFile << "forceEnablePrimStats = " << pipelineInfo->apiXfbOutData.forceEnablePrimStats << "\n";
 #endif
   const auto pXfbOutInfos = pipelineInfo->apiXfbOutData.pXfbOutInfos;
@@ -1569,7 +1570,7 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   }
 
   hasher->Update(pipeline->apiXfbOutData.forceDisableStreamOut);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 69
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 70
   hasher->Update(pipeline->apiXfbOutData.forceEnablePrimStats);
 #endif
 }
@@ -1659,6 +1660,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->replaceSetWithResourceType);
   hasher->Update(options->disableTruncCoordForGather);
   hasher->Update(options->enablePrimGeneratedQuery);
+  hasher->Update(options->enableFragColor);
 }
 
 // =====================================================================================================================
@@ -2574,6 +2576,8 @@ std::ostream &operator<<(std::ostream &out, VkFormat format) {
     CASE_ENUM_TO_STRING(VK_FORMAT_PVRTC2_4BPP_SRGB_BLOCK_IMG)
     CASE_ENUM_TO_STRING(VK_FORMAT_A4R4G4B4_UNORM_PACK16_EXT)
     CASE_ENUM_TO_STRING(VK_FORMAT_A4B4G4R4_UNORM_PACK16_EXT)
+    CASE_ENUM_TO_STRING(VK_FORMAT_A1B5G5R5_UNORM_PACK16)
+    CASE_ENUM_TO_STRING(VK_FORMAT_A8_UNORM_KHR)
 
     break;
   default:

@@ -68,7 +68,6 @@
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/AddressExtender.h"
 #include "lgc/util/BuilderBase.h"
-#include "lgc/util/CpsStackLowering.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/Analysis/AliasAnalysis.h" // for MemoryEffects
 #include "llvm/IR/IntrinsicsAMDGPU.h"
@@ -142,6 +141,8 @@ bool PatchEntryPointMutate::runImpl(Module &module, PipelineShadersResult &pipel
   Patch::init(&module);
 
   m_pipelineState = pipelineState;
+
+  stackLowering = std::make_unique<CpsStackLowering>(module.getContext(), ADDR_SPACE_PRIVATE);
 
   const unsigned stageMask = m_pipelineState->getShaderStageMask();
   m_hasTs = (stageMask & (shaderStageToMask(ShaderStageTessControl) | shaderStageToMask(ShaderStageTessEval))) != 0;
@@ -515,7 +516,8 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
   if (!isCpsFunc) {
     IRBuilder<> builder(func->getContext());
     builder.SetInsertPointPastAllocas(func);
-    Value *vspStorage = builder.CreateAlloca(builder.getPtrTy(getLoweredCpsStackAddrSpace()), ADDR_SPACE_PRIVATE);
+    Value *vspStorage =
+        builder.CreateAlloca(builder.getPtrTy(stackLowering->getLoweredCpsStackAddrSpace()), ADDR_SPACE_PRIVATE);
     m_funcCpsStackMap[func] = vspStorage;
   }
 
@@ -554,7 +556,7 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
 
   // Lower returns.
   for (auto *ret : retInstrs) {
-    auto *vspTy = builder.getPtrTy(getLoweredCpsStackAddrSpace());
+    auto *vspTy = builder.getPtrTy(stackLowering->getLoweredCpsStackAddrSpace());
     exitInfos.push_back(CpsExitInfo(ret->getParent(), {builder.getInt32(0), PoisonValue::get(vspTy)}));
     builder.SetInsertPoint(ret);
     builder.CreateBr(tailBlock);
@@ -686,10 +688,9 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
 
   auto funcName = func->getName();
   // Lower cps stack operations
-  CpsStackLowering stackLowering(func->getContext());
-  stackLowering.lowerCpsStackOps(*func, m_funcCpsStackMap[func]);
+  stackLowering->lowerCpsStackOps(*func, m_funcCpsStackMap[func]);
 
-  stackSize += stackLowering.getStackSize();
+  stackSize += stackLowering->getStackSizeInBytes();
   // Set per-function .frontend_stack_size PAL metadata.
   auto &shaderFunctions = m_pipelineState->getPalMetadata()
                               ->getPipelineNode()
@@ -719,7 +720,7 @@ Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type 
   IRBuilder<> builder(func->getContext());
   SmallVector<Type *> newArgTys;
   newArgTys.append(fixedShaderArgTys.begin(), fixedShaderArgTys.end());
-  newArgTys.append({builder.getInt32Ty(), builder.getPtrTy(getLoweredCpsStackAddrSpace())});
+  newArgTys.append({builder.getInt32Ty(), builder.getPtrTy(stackLowering->getLoweredCpsStackAddrSpace())});
   auto remainingArgs = func->getFunctionType()->params().drop_front(1);
   newArgTys.append(remainingArgs.begin(), remainingArgs.end());
   FunctionType *newFuncTy = FunctionType::get(builder.getVoidTy(), newArgTys, false);
@@ -758,7 +759,8 @@ Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type 
   newFunc->splice(newFunc->begin(), func);
 
   builder.SetInsertPointPastAllocas(newFunc);
-  Value *vspStorage = builder.CreateAlloca(builder.getPtrTy(getLoweredCpsStackAddrSpace()), ADDR_SPACE_PRIVATE);
+  Value *vspStorage =
+      builder.CreateAlloca(builder.getPtrTy(stackLowering->getLoweredCpsStackAddrSpace()), ADDR_SPACE_PRIVATE);
   m_funcCpsStackMap[newFunc] = vspStorage;
 
   // Function arguments: {fixed_shader_arguments, vcr, vsp, original_func_arguments_exclude_state}
@@ -766,8 +768,8 @@ Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type 
   if (!state->getType()->isEmptyTy()) {
     // Get stack address of pushed state and load it from continuation stack.
     unsigned stateSize = layout.getTypeStoreSize(state->getType());
-    vsp = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), vsp, -alignTo(stateSize, continuationStackAlignment));
-    Value *newState = builder.CreateAlignedLoad(state->getType(), vsp, Align(continuationStackAlignment), "cps.state");
+    vsp = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), vsp, -alignTo(stateSize, ContinuationStackAlignment));
+    Value *newState = builder.CreateAlignedLoad(state->getType(), vsp, Align(ContinuationStackAlignment), "cps.state");
     state->replaceAllUsesWith(newState);
   }
   builder.CreateStore(vsp, vspStorage);
@@ -816,14 +818,15 @@ unsigned PatchEntryPointMutate::lowerCpsJump(Function *parent, cps::JumpOp *jump
 
   // Pushing state onto stack and get new vsp.
   Value *state = jumpOp->getState();
-  Value *vsp = builder.CreateAlignedLoad(builder.getPtrTy(getLoweredCpsStackAddrSpace()), m_funcCpsStackMap[parent],
-                                         Align(getLoweredCpsStackPointerSize(layout)));
+  Value *vsp =
+      builder.CreateAlignedLoad(builder.getPtrTy(stackLowering->getLoweredCpsStackAddrSpace()),
+                                m_funcCpsStackMap[parent], Align(stackLowering->getLoweredCpsStackPointerSize(layout)));
   unsigned stateSize = 0;
   if (!state->getType()->isEmptyTy()) {
     stateSize = layout.getTypeStoreSize(state->getType());
     builder.CreateStore(state, vsp);
     // Make vsp properly aligned across cps function.
-    stateSize = alignTo(stateSize, continuationStackAlignment);
+    stateSize = alignTo(stateSize, ContinuationStackAlignment);
     vsp = builder.CreateConstGEP1_32(builder.getInt8Ty(), vsp, stateSize);
   }
 

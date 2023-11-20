@@ -1321,7 +1321,6 @@ Value *SpirvLowerRayQuery::createGetInstanceNodeAddr(Value *instNodePtr, Value *
   Value *BvhAddr = PoisonValue::get(FixedVectorType::get(Type::getInt32Ty(*m_context), 2));
   BvhAddr = m_builder->CreateInsertElement(BvhAddr, BvhAddrLo, uint64_t(0));
   BvhAddr = m_builder->CreateInsertElement(BvhAddr, BvhAddrHi, 1);
-
   // Mask out the node offset
   auto nodeOffsetMask = m_builder->getInt32(0xFFFFFFF8u);
   // Shift left by 3 to make it 64B aligned address

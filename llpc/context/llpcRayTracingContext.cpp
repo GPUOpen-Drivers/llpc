@@ -281,6 +281,8 @@ lgc::Options RayTracingContext::computePipelineOptions() const {
     options.rtIndirectMode = lgc::RayTracingIndirectMode::ContinuationsContinufy;
   else if (m_pipelineInfo->mode == Vkgc::LlpcRaytracingMode::Continuations)
     options.rtIndirectMode = lgc::RayTracingIndirectMode::Continuations;
+
+  options.cpsFlags = m_pipelineInfo->cpsFlags;
 #endif
 
   return options;

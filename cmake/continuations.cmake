@@ -25,10 +25,13 @@
 
 set(LLPC_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/..")
 
+include("${LLPC_SOURCE_DIR}/cmake/compilerutils.cmake")
+
 # Macro to add continuations and its dependencies as LLVM external projects.
 # This appends the project names to LLVM_EXTERNAL_PROJECTS and sets each LLVM_EXTERNAL_*_SOURCE_DIR,
 # all in the caller's scope.
 macro(add_continuations_projects)
+  add_compilerutils_projects()
   if (NOT continuations IN_LIST LLVM_EXTERNAL_PROJECTS)
     if (NOT llvm_dialects IN_LIST LLVM_EXTERNAL_PROJECTS)
       list(APPEND LLVM_EXTERNAL_PROJECTS llvm_dialects)

@@ -1,0 +1,20 @@
+#version 450 core
+
+layout (set=0, binding=0) buffer MyBuffer {
+   float n;
+} myBuffer;
+
+layout (set=0, binding=0) uniform sampler mySampler;
+layout (set=0, binding=1) uniform texture2D myTexture;
+
+void main()
+{
+    textureLod(sampler2D(myTexture, mySampler), vec2(0.0, 0.0), 0).x;
+}
+
+// BEGIN_SHADERTEST
+/*
+; RUN: amdllpc -v --auto-layout-desc %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST: AMDLLPC SUCCESS
+*/
+// END_SHADERTEST

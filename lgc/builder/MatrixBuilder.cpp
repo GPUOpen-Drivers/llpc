@@ -342,3 +342,315 @@ Value *BuilderImpl::CreateMatrixInverse(Value *const matrix, const Twine &instNa
   result->setName(instName);
   return result;
 }
+
+// =====================================================================================================================
+// Convert the element type enum into the corresponding LLVM type.
+//
+// @param elemType : The element type enum value
+// @returns the corresponding LLVM type
+Type *BuilderCommon::transCooperativeMatrixElementType(CooperativeMatrixElementType elemType) {
+  switch (elemType) {
+  case BuilderCommon::CooperativeMatrixElementType::Float16:
+    return getHalfTy();
+  case BuilderCommon::CooperativeMatrixElementType::Float32:
+    return getFloatTy();
+  case BuilderCommon::CooperativeMatrixElementType::Int16:
+    return getInt16Ty();
+  case BuilderCommon::CooperativeMatrixElementType::Int32:
+    return getInt32Ty();
+  case BuilderCommon::CooperativeMatrixElementType::Int8:
+    return getInt8Ty();
+  default:
+    llvm_unreachable("The element type is not supported.");
+  }
+}
+
+// =====================================================================================================================
+// Get the LGC type of a cooperative matrix with the given element type and layout.
+//
+// @param elemType : the matrix element type
+// @param layout : the matrix layout
+Type *BuilderCommon::getCooperativeMatrixTy(CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout) {
+  // Note: the layout currently has no influence on the type. In the long run, we should switch to genuinely opaque
+  // types at the LGC level, and parameterize the type using both the element type and the layout.
+
+  Type *wordTy = transCooperativeMatrixElementType(elemType)->isIntOrIntVectorTy() ? getInt32Ty() : getFloatTy();
+  switch (layout) {
+  case CooperativeMatrixLayout::Gfx10Accumulator16bitMatrixLayout:
+  case CooperativeMatrixLayout::Gfx10AccumulatorMatrixLayout:
+  case CooperativeMatrixLayout::AccumulatorMatrixLayout:
+    return FixedVectorType::get(wordTy, 8);
+  case CooperativeMatrixLayout::FactorMatrixLayout:
+    if (elemType == CooperativeMatrixElementType::Int8)
+      return FixedVectorType::get(wordTy, 4);
+    return FixedVectorType::get(wordTy, 8);
+  default:
+    llvm_unreachable("Type is not supported!");
+  }
+}
+
+// =====================================================================================================================
+// Determine the "length" of a cooperative matrix for purposes of extract/insert operations.
+//
+// @param elemType : the matrix element type
+// @param layout : the matrix layout
+// @param instName : name to give instruction(s)
+Value *BuilderCommon::CreateCooperativeMatrixLength(CooperativeMatrixElementType elemType,
+                                                    CooperativeMatrixLayout layout, const Twine &instName) {
+  Type *resultTy = getInt32Ty();
+  Value *args[] = {getInt32(static_cast<unsigned>(elemType)), getInt32(static_cast<unsigned>(layout))};
+  std::string callName(lgcName::CooperativeMatrixLength);
+  addTypeMangling(resultTy, args, callName);
+
+  Value *result =
+      CreateNamedCall(callName, resultTy, args, {Attribute::ReadNone, Attribute::Speculatable, Attribute::WillReturn});
+  result->setName(instName);
+  return result;
+}
+
+// =====================================================================================================================
+// Create an "extractelement"-equivalent operation for a cooperative matrix value.
+//
+// @param matrix : the matrix from which to extract an element
+// @param index : the index from which to extract
+// @param elemType : the matrix element type
+// @param layout : the matrix layout
+// @param instName : name to give instruction(s)
+Value *BuilderCommon::CreateCooperativeMatrixExtract(Value *matrix, Value *index, CooperativeMatrixElementType elemType,
+                                                     CooperativeMatrixLayout layout, const Twine &instName) {
+  assert(matrix->getType() == getCooperativeMatrixTy(elemType, layout));
+
+  Type *resultTy = transCooperativeMatrixElementType(elemType);
+  Value *args[] = {matrix, index, getInt32(static_cast<unsigned>(elemType)), getInt32(static_cast<unsigned>(layout))};
+  std::string callName(lgcName::CooperativeMatrixExtract);
+  addTypeMangling(resultTy, args, callName);
+  Value *result =
+      CreateNamedCall(callName, resultTy, args, {Attribute::ReadNone, Attribute::Speculatable, Attribute::WillReturn});
+  result->setName(instName);
+  return result;
+}
+
+// =====================================================================================================================
+// Create an "insertelement"-equivalent operation for a cooperative matrix value.
+//
+// @param matrix : the matrix from which to extract an element
+// @param index : the index from which to extract
+// @param elemType : the matrix element type
+// @param layout : the matrix layout
+// @param instName : name to give instruction(s)
+Value *BuilderCommon::CreateCooperativeMatrixInsert(Value *matrix, Value *value, Value *index,
+                                                    CooperativeMatrixElementType elemType,
+                                                    CooperativeMatrixLayout layout, const Twine &instName) {
+  assert(matrix->getType() == getCooperativeMatrixTy(elemType, layout));
+  assert(value->getType() == transCooperativeMatrixElementType(elemType));
+  assert(index->getType() == getInt32Ty());
+
+  Type *resultTy = matrix->getType();
+  Value *args[] = {matrix, value, index, getInt32(static_cast<unsigned>(elemType)),
+                   getInt32(static_cast<unsigned>(layout))};
+  std::string callName(lgcName::CooperativeMatrixInsert);
+  addTypeMangling(resultTy, args, callName);
+  Value *result =
+      CreateNamedCall(callName, resultTy, args, {Attribute::ReadNone, Attribute::Speculatable, Attribute::WillReturn});
+  result->setName(instName);
+  return result;
+}
+
+// =====================================================================================================================
+// Create cooperative matrix load.
+// We only allow the size 16x16 size for a cooperative matrix. So 16 lanes are responsible for reading all data from
+// memory. The layout of a cooperative matrix A in the VGPR under wave32 mode is that . Each lane reads a contiguous
+// data from memory as a row (or column) of matrix A into the VGPR (implemented as a vector), where A0_0 in one VGPR if
+// the data format is f32/i32, A0_0/A0_1 would be in the same VGPR if the data format is f16, A0_0/A0_1/A0_2/A0_3 would
+// be in the same VGPR if the data format is i8.
+//
+// @param pointer : The pointer to a data array.
+// @param stride : The number of bytes in memory between the first component of consecutive rows (or columns) in the
+// source data. Must be a multiple of the matrix element size.
+// @param colMaj : Whether the values loaded from memory are arrayed in column-major or row-major.
+// @param elemType : Element type for the matrix.
+// @param layout : Identify whether it's A/B or C/D
+// @param memoryAccess : Parsed from memory operation.
+// @param instName : Name to give instruction(s).
+Value *BuilderCommon::CreateCooperativeMatrixLoad(Value *pointer, Value *stride, bool colMajor,
+                                                  CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout,
+                                                  unsigned memoryAccess, const Twine &instName) {
+  Type *resultTy = getCooperativeMatrixTy(elemType, layout);
+  std::string callName(lgcName::CooperativeMatrixLoad);
+  Value *args[] = {pointer,
+                   stride,
+                   getInt1(colMajor),
+                   getInt32(static_cast<unsigned>(elemType)),
+                   getInt32(static_cast<unsigned>(layout)),
+                   getInt32(memoryAccess)};
+  addTypeMangling(resultTy, args, callName);
+  Value *loadVal = CreateNamedCall(callName, resultTy, args, {Attribute::ReadOnly});
+  loadVal->setName(instName);
+  return loadVal;
+}
+
+// =====================================================================================================================
+// Create cooperative matrix store.
+// We only allow the size 16x16 size for a cooperative matrix. So 16 lanes are responsible for writing matrix elements
+// to memory. The layout of a cooperative matrix A in the VGPR under wave32 mode is that each lane writes a row (or
+// column) of matrix A from the VGPRs (implemented as a vector) to the memory, where the value of one VGPR is written
+// into a memory location if the data format is f32/i32, the value of one VGPR is split into two values to store if
+// the data format is f16, the value of one VGPR is split into four values to store if the data format is i8.
+//
+// @param pointer : The pointer to a data array.
+// @param matrix : The row of cooperative matrix to store.
+// @param stride : The number of bytes in memory between the first components of consecutive rows (or columns) in the
+// destination. Must be a multiple of the element size.
+// @param colMaj : Whether the values loaded from memory are arrayed in column-major or row-major.
+// @param elemType : Element type for the matrix.
+// @param layout : Identify the matrix type(A/B or C).
+// @param memoryAccess : Memoray operands
+// @param instName : Name to give instruction(s).
+Value *BuilderCommon::CreateCooperativeMatrixStore(Value *pointer, Value *matrix, Value *stride, bool colMajor,
+                                                   CooperativeMatrixElementType elemType,
+                                                   CooperativeMatrixLayout layout, unsigned memoryAccess,
+                                                   const Twine &instName) {
+  assert(matrix->getType() == getCooperativeMatrixTy(elemType, layout));
+
+  std::string callName(lgcName::CooperativeMatrixStore);
+  Value *args[] = {pointer,
+                   stride,
+                   getInt1(colMajor),
+                   getInt32(static_cast<unsigned>(elemType)),
+                   getInt32(static_cast<unsigned>(layout)),
+                   getInt32(memoryAccess),
+                   matrix};
+  addTypeMangling(Type::getVoidTy(getContext()), args, callName);
+
+  Value *storeVal =
+      CreateNamedCall(callName, Type::getVoidTy(getContext()), args, {Attribute::WriteOnly, Attribute::WillReturn});
+  storeVal->setName(instName);
+  return nullptr;
+}
+
+// =====================================================================================================================
+// Create cooperative matrix conversion.
+// Element-wise-conversion
+// @param castOp : The cast Opcode.
+// @param source : The source cooperative matrix.
+// @param srcElemTy : Source matrix's element type.
+// @param dstElemTy : Destination matrix's element type.
+// @param srcLayout : Layout for source matrix
+// @param dstLayout : Layout for target matrix
+// @param instName : Name to give instruction(s).
+CallInst *BuilderCommon::CreateCooperativeMatrixConvert(CastInst::CastOps castOp, Value *source,
+                                                        CooperativeMatrixElementType srcElemTy,
+                                                        CooperativeMatrixElementType dstElemTy,
+                                                        CooperativeMatrixLayout srcLayout,
+                                                        CooperativeMatrixLayout dstLayout, const Twine &instName) {
+  assert(source->getType() == getCooperativeMatrixTy(srcElemTy, srcLayout));
+
+  Value *args[] = {getInt32(static_cast<unsigned>(castOp)),    source,
+                   getInt32(static_cast<unsigned>(srcElemTy)), getInt32(static_cast<unsigned>(dstElemTy)),
+                   getInt32(static_cast<unsigned>(srcLayout)), getInt32(static_cast<unsigned>(dstLayout))};
+  Type *resultTy = getCooperativeMatrixTy(dstElemTy, dstLayout);
+  std::string callName(lgcName::CooperativeMatrixConvert);
+  addTypeMangling(resultTy, args, callName);
+
+  CallInst *dstElems = CreateNamedCall(callName, resultTy, args, {Attribute::ReadOnly, Attribute::WillReturn});
+  dstElems->setName(instName);
+  return dstElems;
+}
+// =====================================================================================================================
+// Create cooperative matrix binary operation
+//
+// @param coopMatArithOp : The cooperative matrix arithmetic operation to perform.
+// @param lhs : The first operand and it can be a scalar or a cooperative matrix.
+// @param rhs : The second operand and it should be a cooperative matrix.
+// @param elemType : Element type for the matrix.
+// @param layout : Layout for the matrix.
+// @param instName : Name to give instruction(s).
+Value *BuilderCommon::CreateCooperativeMatrixBinaryOp(CooperativeMatrixArithOp coopMatArithOp, Value *lhs, Value *rhs,
+                                                      CooperativeMatrixElementType elemType,
+                                                      CooperativeMatrixLayout layout, const Twine &instName) {
+  assert(lhs->getType() == getCooperativeMatrixTy(elemType, layout));
+  assert(lhs->getType() == rhs->getType());
+
+  std::string callName(lgcName::CooperativeMatrixBinOp);
+  Value *args[] = {getInt32(static_cast<unsigned>(coopMatArithOp)), lhs, rhs, getInt32(static_cast<unsigned>(elemType)),
+                   getInt32(static_cast<unsigned>(layout))};
+  addTypeMangling(rhs->getType(), args, callName);
+
+  Value *result = CreateNamedCall(callName, rhs->getType(), args, {Attribute::ReadOnly, Attribute::WillReturn});
+  result->setName(instName);
+  return result;
+}
+
+// =====================================================================================================================
+// Create cooperative matrix MatrixTimesScalar operation
+//
+// @param matrix : The first operand and it should be a cooperative matrix.
+// @param scalar : The second operand and it should be a scalar.
+// @param elemType : The component type of the matrix.
+// @param layout : Identify whether it's A/B or C/D
+// @param instName : Name to give instruction(s).
+Value *BuilderCommon::CreateCoopMatrixTimesScalar(Value *matrix, Value *scalar, CooperativeMatrixElementType elemType,
+                                                  CooperativeMatrixLayout layout, const Twine &instName) {
+  assert(matrix->getType() == getCooperativeMatrixTy(elemType, layout));
+  assert(scalar->getType() == transCooperativeMatrixElementType(elemType));
+
+  std::string callName(lgcName::CooperativeMatrixTimesScalar);
+  Value *args[] = {matrix, scalar, getInt32(static_cast<unsigned>(elemType)), getInt32(static_cast<unsigned>(layout))};
+  addTypeMangling(matrix->getType(), args, callName);
+
+  Value *result = CreateNamedCall(callName, matrix->getType(), args, {Attribute::ReadOnly, Attribute::WillReturn});
+  result->setName(instName);
+  return result;
+}
+
+// =====================================================================================================================
+// Create cooperative matrix transpose operation
+//
+// @param matrix : The first operand and it should be a cooperative matrix.
+// @param elemType : The component type of the matrix.
+// @param layout : Identify whether it's A/B or C/D
+// @param instName : Name to give instruction(s).
+CallInst *BuilderCommon::CreateCooperativeMatrixTranspose(llvm::Value *matrix, CooperativeMatrixElementType elemType,
+                                                          CooperativeMatrixLayout layout, const Twine &instName) {
+  assert(matrix->getType() == getCooperativeMatrixTy(elemType, layout));
+
+  std::string callName(lgcName::CooperativeMatrixTranspose);
+  Value *args[] = {matrix, getInt32(static_cast<unsigned>(elemType)), getInt32(static_cast<unsigned>(layout))};
+  addTypeMangling(matrix->getType(), args, callName);
+
+  CallInst *result = CreateNamedCall(callName, matrix->getType(), args, {Attribute::ReadOnly, Attribute::WillReturn});
+  result->setName(instName);
+  return result;
+}
+
+// =====================================================================================================================
+// Create cooperative matrix muladd operation
+//
+// @param matrixA : Factor cooperative matrix.
+// @param matrixB : Factor cooperative matrix.
+// @param matrixC : Accumulator cooperative matrix.
+// @param isSignedA : Identify the signess for matrix A's element type
+// @param isSignedB : Identify the signess for matrix B's element type
+// @param isSat : SaturatingAccumulation for calculation
+// @param accumElemType : The component type of the accumulator matrix.
+// @param factorElemType : The component type of the factor matrix.
+Value *BuilderCommon::CreateCooperativeMatrixMulAdd(llvm::Value *matrixA, llvm::Value *matrixB, llvm::Value *matrixC,
+                                                    bool isSignedA, bool isSignedB, bool isSat,
+                                                    CooperativeMatrixElementType accumElemType,
+                                                    CooperativeMatrixElementType factorElemType,
+                                                    const llvm::Twine &instName) {
+  std::string callName(lgcName::CooperativeMatrixMulAdd);
+  Value *args[] = {matrixA,
+                   matrixB,
+                   matrixC,
+                   getInt1(isSignedA),
+                   getInt1(isSignedB),
+                   getInt1(isSat),
+                   getInt32(static_cast<unsigned>(accumElemType)),
+                   getInt32(static_cast<unsigned>(factorElemType))};
+  addTypeMangling(matrixC->getType(), args, callName);
+
+  Value *result = CreateNamedCall(callName, matrixC->getType(), args, {Attribute::ReadOnly, Attribute::WillReturn});
+  result->setName(instName);
+  return result;
+}
