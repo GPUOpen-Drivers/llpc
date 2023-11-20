@@ -104,6 +104,8 @@ SpirvProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
   m_libFuncPtrs["AmdTraceRaySetParentId"] = &SpirvProcessGpuRtLibrary::createSetParentId;
   m_libFuncPtrs["AmdTraceRayDispatchRaysIndex"] = &SpirvProcessGpuRtLibrary::createDispatchRayIndex;
   m_libFuncPtrs["AmdTraceRayGetStaticId"] = &SpirvProcessGpuRtLibrary::createGetStaticId;
+  m_libFuncPtrs["AmdTraceRayGetKnownSetRayFlags"] = &SpirvProcessGpuRtLibrary::createGetKnownSetRayFlags;
+  m_libFuncPtrs["AmdTraceRayGetKnownUnsetRayFlags"] = &SpirvProcessGpuRtLibrary::createGetKnownUnsetRayFlags;
 }
 
 // =====================================================================================================================
@@ -637,6 +639,18 @@ void SpirvProcessGpuRtLibrary::createDispatchRayIndex(llvm::Function *func) {
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createGetStaticId(llvm::Function *func) {
   m_builder->CreateRet(m_builder->create<GpurtGetRayStaticIdOp>());
+}
+
+void SpirvProcessGpuRtLibrary::createGetKnownSetRayFlags(llvm::Function *func) {
+  // TODO: currently return 0 to indicate that there is no known set
+  // We will probably need to analyse the traceRay ray flags for actual value
+  m_builder->CreateRet(m_builder->getInt32(0));
+}
+
+void SpirvProcessGpuRtLibrary::createGetKnownUnsetRayFlags(llvm::Function *func) {
+  // TODO: return 0 to indicate there is no knownUnset bits
+  // We will probably need to analyse the traceRay ray flags for actual value
+  m_builder->CreateRet(m_builder->getInt32(0));
 }
 
 } // namespace Llpc
