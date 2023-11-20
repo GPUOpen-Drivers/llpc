@@ -9311,42 +9311,9 @@ Value *SPIRVToLLVM::transGLSLExtInst(SPIRVExtInst *extInst, BasicBlock *bb) {
     // Round up to whole number
     return getBuilder()->CreateUnaryIntrinsic(Intrinsic::ceil, args[0]);
 
-  case GLSLstd450Fract: {
+  case GLSLstd450Fract:
     // Get fractional part
-    auto fract = getBuilder()->CreateFract(args[0]);
-
-    // NOTE: Although SPIR-V spec says nothing about such cases: fract(-0.0), fract(+INF), fract(-INF), OpenCL spec does
-    // have following definitions:
-    //
-    //  fract(-0.0) = -0.0
-    //  fract(+INF) = +0.0
-    //  fract(-INF) = -0.0
-    //
-    // When we follow it, we have two issues that are similar to modf(x):
-    //
-    //   1. When we input x=+INF/-INF to above formula, we finally get the computation of (-INF) + INF or INF - INF.
-    //      The result is NaN returned by HW.
-    //   2. When we input x=-0.0 to above formula, we finally get the addition of (-0.0) + 0.0. The result is +0.0
-    //      returned by HW.
-    //
-    // Hence, we have to manually check those special cases:
-    //
-    //   y = fract(x)
-    //   y = x == -0.0 || x == INF ? copysign(0.0, x) : y, when either NSZ or NoInfs is not present
-    unsigned checkFlags = 0;
-    if (!getBuilder()->getFastMathFlags().noSignedZeros())
-      checkFlags |= lgc::Builder::CmpClass::NegativeZero;
-    if (!getBuilder()->getFastMathFlags().noInfs())
-      checkFlags |= (lgc::Builder::CmpClass::NegativeZero | lgc::Builder::CmpClass::NegativeZero);
-
-    if (checkFlags) {
-      Value *isNegZeroOrInf = getBuilder()->createIsFPClass(args[0], checkFlags);
-      Value *signedZero = getBuilder()->CreateCopySign(ConstantFP::getNullValue(args[0]->getType()), args[0]);
-      fract = getBuilder()->CreateSelect(isNegZeroOrInf, signedZero, fract);
-    }
-
-    return fract;
-  }
+    return getBuilder()->CreateFract(args[0]);
 
   case GLSLstd450Radians:
     // Convert from degrees to radians
