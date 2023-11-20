@@ -328,8 +328,11 @@ DICompositeType *SPIRVToLLVMDbgTran::transTypeComposite(const SPIRVExtInst *Debu
   switch (Ops[TagIdx]) {
   case SPIRVDebug::Class:
     CT = Builder.createClassType(ParentScope, Name, File, LineNo, Size, Align, 0, Flags, DerivedFrom,
-                                 DINodeArray() /*elements*/, nullptr /*VTableHolder*/, nullptr /*TemplateParams*/,
-                                 Identifier);
+                                 DINodeArray() /*elements*/,
+#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 480873
+                                 0 /*RunTimeLang*/,
+#endif
+                                 nullptr /*VTableHolder*/, nullptr /*TemplateParams*/, Identifier);
     break;
   case SPIRVDebug::Structure:
     CT = Builder.createStructType(ParentScope, Name, File, LineNo, Size, Align, Flags, DerivedFrom,
@@ -415,6 +418,9 @@ DINode *SPIRVToLLVMDbgTran::transTypeEnum(const SPIRVExtInst *DebugInst) {
   if (!isa<OpTypeVoid>(E))
     UnderlyingType = transDebugInst<DIType>(static_cast<SPIRVExtInst *>(E));
   return Builder.createEnumerationType(Scope, Name, File, LineNo, SizeInBits, AlignInBits, Enumerators, UnderlyingType,
+#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 480873
+                                       0 /*RunTimeLang*/,
+#endif
                                        "", UnderlyingType);
 }
 
