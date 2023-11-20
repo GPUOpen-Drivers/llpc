@@ -45,6 +45,7 @@
 #include "continuations/ContinuationsUtil.h"
 #include "continuations/PayloadAccessQualifiers.h"
 #include "lgc/LgcRtDialect.h"
+#include "llvm-dialects/Dialect/OpSet.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallVector.h"
@@ -236,7 +237,8 @@ ModuleMetadataState::ModuleMetadataState(Module &Module) : Mod{Module} {
 
   // Import StackAddrspace from metadata if set, otherwise from default
   auto StackAddrspaceMD = DXILContHelper::tryGetStackAddrspace(Module);
-  StackAddrspace = StackAddrspaceMD.value_or(DefaultStackAddrspace);
+  StackAddrspace =
+      StackAddrspaceMD.value_or(DXILContHelper::DefaultStackAddrspace);
 }
 
 /// Write the previously derived information about max payload registers and
@@ -331,8 +333,9 @@ bool llvm::isRematerializableLgcRtOp(CallInst &CInst,
     return false;
 
   // Always rematerialize
-  if (DialectUtils::isAnyDialectOpDeclaration<DispatchRaysDimensionsOp,
-                                              DispatchRaysIndexOp>(*Callee))
+  static const OpSet RematerializableDialectOps =
+      OpSet::get<DispatchRaysDimensionsOp, DispatchRaysIndexOp>();
+  if (RematerializableDialectOps.contains(*Callee))
     return true;
 
   // Rematerialize for Intersection that can only call ReportHit, which keeps
@@ -341,11 +344,12 @@ bool llvm::isRematerializableLgcRtOp(CallInst &CInst,
   // information is lost from the system data struct. Also exclude rayTCurrent
   // because ReportHit calls can change that.
   if (!Kind || *Kind == DXILShaderKind::Intersection) {
-    if (DialectUtils::isAnyDialectOpDeclaration<
-            InstanceIdOp, InstanceIndexOp, GeometryIndexOp,
-            ObjectRayDirectionOp, ObjectRayOriginOp, ObjectToWorldOp,
-            PrimitiveIndexOp, RayFlagsOp, RayTminOp, WorldRayDirectionOp,
-            WorldRayOriginOp, WorldToObjectOp>(*Callee))
+    static const OpSet RematerializableIntersectionDialectOps =
+        OpSet::get<InstanceIdOp, InstanceIndexOp, GeometryIndexOp,
+                   ObjectRayDirectionOp, ObjectRayOriginOp, ObjectToWorldOp,
+                   PrimitiveIndexOp, RayFlagsOp, RayTminOp, WorldRayDirectionOp,
+                   WorldRayOriginOp, WorldToObjectOp>();
+    if (RematerializableIntersectionDialectOps.contains(*Callee))
       return true;
   }
 
@@ -792,6 +796,11 @@ void LowerRaytracingPipelinePassImpl::replaceContinuationCall(
                             MetadataState.getMaxPayloadRegisterCount()));
     DXILContHelper::setReturnedRegisterCount(
         Token, ContinuationStateRegisterCount + ReturnedRegisterCount.value());
+
+    // For WaitAwait, add metadata indicating that we wait. After coroutine
+    // passes, we then generate a waitContinue on the awaited function.
+    if (Call->getCalledFunction()->getName().startswith("_AmdWaitAwait"))
+      DXILContHelper::setIsWaitAwaitCall(*Token);
   }
 
   if (PassedPayload) {
@@ -866,21 +875,6 @@ void LowerRaytracingPipelinePassImpl::replaceShaderIndexCall(IRBuilder<> &B,
   Call->eraseFromParent();
 }
 
-void LowerRaytracingPipelinePassImpl::handleContinuationStackIsGlobal(
-    Function &Func) {
-  assert(Func.arg_empty()
-         // bool
-         && Func.getFunctionType()->getReturnType()->isIntegerTy(1));
-
-  auto *IsGlobal =
-      ConstantInt::getBool(*Context, MetadataState.isGlobalAddressSpace());
-
-  llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
-    CInst.replaceAllUsesWith(IsGlobal);
-    CInst.eraseFromParent();
-  });
-}
-
 void LowerRaytracingPipelinePassImpl::handleGetFuncAddr(Function &Func) {
   assert(Func.arg_empty()
          // returns i64 or i32
@@ -900,15 +894,6 @@ void LowerRaytracingPipelinePassImpl::handleGetFuncAddr(Function &Func) {
 
   llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
     CInst.replaceAllUsesWith(Addr);
-    CInst.eraseFromParent();
-  });
-}
-
-void LowerRaytracingPipelinePassImpl::handleGetUninitialized(Function &Func) {
-  auto *ArgTy = Func.getReturnType();
-  auto *Poison = PoisonValue::get(ArgTy);
-  llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
-    CInst.replaceAllUsesWith(Poison);
     CInst.eraseFromParent();
   });
 }
@@ -1863,7 +1848,8 @@ void LowerRaytracingPipelinePassImpl::handleDriverFuncAssertions() {
 void LowerRaytracingPipelinePassImpl::handleAmdInternalFunc(Function &Func) {
   StringRef FuncName = Func.getName();
 
-  if (FuncName.starts_with("_AmdAwait")) {
+  if (FuncName.starts_with("_AmdAwait") ||
+      FuncName.starts_with("_AmdWaitAwait")) {
     Awaits.push_back(&Func);
     assert(!Func.arg_empty()
            // Function address
@@ -1878,16 +1864,8 @@ void LowerRaytracingPipelinePassImpl::handleAmdInternalFunc(Function &Func) {
            && Func.getFunctionType()->getParamType(0)->isPointerTy());
   }
 
-  if (FuncName == "_AmdContinuationStackIsGlobal") {
-    handleContinuationStackIsGlobal(Func);
-  }
-
   if (FuncName.starts_with("_AmdGetFuncAddr")) {
     handleGetFuncAddr(Func);
-  }
-
-  if (FuncName.starts_with("_AmdGetUninitialized")) {
-    handleGetUninitialized(Func);
   }
 }
 
@@ -1897,14 +1875,11 @@ void LowerRaytracingPipelinePassImpl::handleUnrematerializableCandidates() {
     if (!DialectUtils::isLgcRtOp(&Func))
       continue;
 
-    if (DialectUtils::isNoneOfDialectOpDeclaration<TraceRayOp, ReportHitOp,
-                                                   CallCallableShaderOp>(
-            Func)) {
+    static const OpSet NonRematerializableDialectOps =
+        OpSet::get<TraceRayOp, ReportHitOp, CallCallableShaderOp,
+                   ShaderIndexOp>();
+    if (!NonRematerializableDialectOps.contains(Func)) {
       llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
-        // shader.index is handled separately
-        if (isa<ShaderIndexOp>(CInst))
-          return;
-
         auto Data = ToProcess.find(CInst.getFunction());
         if (Data != ToProcess.end()) {
           if (!isRematerializableLgcRtOp(CInst, Data->second.Kind))
@@ -1951,64 +1926,52 @@ bool LowerRaytracingPipelinePassImpl::run() {
   static const auto Visitor =
       llvm_dialects::VisitorBuilder<VisitorState>()
           .setStrategy(llvm_dialects::VisitorStrategy::ByInstruction)
-          .add<TraceRayOp>([](VisitorState &State, TraceRayOp &TraceRay) {
-            auto Data = State.Processables.find(TraceRay.getFunction());
+          .addSet<TraceRayOp, CallCallableShaderOp, ReportHitOp,
+                  ShaderIndexOp>([](VisitorState &State, Instruction &Op) {
+            auto *CInst = cast<CallInst>(&Op);
+            auto Data = State.Processables.find(CInst->getFunction());
             if (Data == State.Processables.end())
               return;
+
+            if (isa<ShaderIndexOp>(Op)) {
+              Data->second.ShaderIndexCalls.push_back(CInst);
+              return;
+            }
 
             Type *PayloadTy =
-                DXILContHelper::getPayloadTypeFromMetadata(TraceRay);
-            PAQPayloadConfig PAQPayload = {
-                PayloadTy, Data->second.FuncConfig.MaxHitAttributeBytes};
-            uint32_t PayloadStorageI32s =
-                State.PAQManager.getMaxPayloadStorageI32sForTraceRayFunc(
-                    PAQPayload);
-            Data->second.MaxOutgoingPayloadI32s = std::max(
-                Data->second.MaxOutgoingPayloadI32s, PayloadStorageI32s);
+                DXILContHelper::getPayloadTypeFromMetadata(*CInst);
 
-            Data->second.TraceRayCalls.push_back(&TraceRay);
-          })
-          .add<CallCallableShaderOp>(
-              [](VisitorState &State,
-                 CallCallableShaderOp &CallCallableShader) {
-                auto Data =
-                    State.Processables.find(CallCallableShader.getFunction());
-                if (Data == State.Processables.end())
-                  return;
+            if (!isa<ReportHitOp>(Op)) {
+              PAQPayloadConfig PAQPayload = {
+                  PayloadTy, Data->second.FuncConfig.MaxHitAttributeBytes};
 
-                Type *PayloadTy = DXILContHelper::getPayloadTypeFromMetadata(
-                    CallCallableShader);
-                PAQPayloadConfig PAQPayload = {
-                    PayloadTy, Data->second.FuncConfig.MaxHitAttributeBytes};
-                uint32_t PayloadStorageI32s =
+              uint32_t PayloadStorageI32s = 0;
+              if (isa<TraceRayOp>(Op)) {
+                PayloadStorageI32s =
+                    State.PAQManager.getMaxPayloadStorageI32sForTraceRayFunc(
+                        PAQPayload);
+
+                Data->second.TraceRayCalls.push_back(CInst);
+              } else if (isa<CallCallableShaderOp>(Op)) {
+                PayloadStorageI32s =
                     State.PAQManager.getMaxPayloadStorageI32sForCallShaderFunc(
                         PAQPayload);
-                Data->second.MaxOutgoingPayloadI32s = std::max(
-                    Data->second.MaxOutgoingPayloadI32s, PayloadStorageI32s);
 
-                Data->second.CallShaderCalls.push_back(&CallCallableShader);
-              })
-          .add<ReportHitOp>([](VisitorState &State, auto &ReportHitOp) {
-            // The converter uses payload type metadata also to indicate hit
-            // attribute types
-            auto HitAttributesTy =
-                DXILContHelper::getPayloadTypeFromMetadata(ReportHitOp);
-            auto Data = State.Processables.find(ReportHitOp.getFunction());
-            if (Data == State.Processables.end())
-              return;
-            assert((!Data->second.HitAttributes ||
-                    Data->second.HitAttributes == HitAttributesTy) &&
-                   "Multiple reportHit calls with different hit attributes");
+                Data->second.CallShaderCalls.push_back(CInst);
+              }
 
-            Data->second.HitAttributes = HitAttributesTy;
-            Data->second.ReportHitCalls.push_back(&ReportHitOp);
-          })
-          .add<ShaderIndexOp>([](VisitorState &State, auto &ShaderIndexOp) {
-            auto Data = State.Processables.find(ShaderIndexOp.getFunction());
-            if (Data == State.Processables.end())
-              return;
+              Data->second.MaxOutgoingPayloadI32s = std::max(
+                  Data->second.MaxOutgoingPayloadI32s, PayloadStorageI32s);
+            } else {
+              // The converter uses payload type metadata also to indicate hit
+              // attribute types
+              assert((!Data->second.HitAttributes ||
+                      Data->second.HitAttributes == PayloadTy) &&
+                     "Multiple reportHit calls with different hit attributes");
+              Data->second.HitAttributes = PayloadTy;
 
-            Data->second.ShaderIndexCalls.push_back(&ShaderIndexOp);
+              Data->second.ReportHitCalls.push_back(CInst);
+            }
           })
           .build();
 
@@ -2043,18 +2006,22 @@ bool LowerRaytracingPipelinePassImpl::run() {
 
   // Handle places after Awaits where system data is restored
   IRBuilder<> B(*Context);
-  llvm::forEachCall(RestoreSystemDatas, [&](llvm::CallInst &CInst) {
-    B.SetInsertPoint(&CInst);
-    handleRestoreSystemData(B, &CInst);
-  });
+  for (llvm::Function *Func : RestoreSystemDatas) {
+    llvm::forEachCall(*Func, [&](llvm::CallInst &CInst) {
+      B.SetInsertPoint(&CInst);
+      handleRestoreSystemData(B, &CInst);
+    });
+  }
 
   // Change specialized functions afterwards, so the payload or hit attributes
   // exist as the last argument
-  llvm::forEachCall(Awaits, [&](llvm::CallInst &CInst) {
-    auto Data = AwaitsToProcess.find(CInst.getFunction());
-    if (Data != AwaitsToProcess.end())
-      Data->second.AwaitCalls.push_back(&CInst);
-  });
+  for (llvm::Function *Func : Awaits) {
+    llvm::forEachCall(*Func, [&](llvm::CallInst &CInst) {
+      auto Data = AwaitsToProcess.find(CInst.getFunction());
+      if (Data != AwaitsToProcess.end())
+        Data->second.AwaitCalls.push_back(&CInst);
+    });
+  }
 
   for (auto &FuncData : AwaitsToProcess) {
     for (auto *Call : FuncData.second.AwaitCalls) {

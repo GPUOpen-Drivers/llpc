@@ -29,7 +29,9 @@
  * This pass translates indirect call into cps.await call, which will be lowered into continuation call.
  ***********************************************************************************************************************
  */
+
 #include "lgc/patch/Continufy.h"
+#include "compilerutils/CompilerUtils.h"
 #include "lgc/Builder.h"
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcDialect.h"
@@ -54,7 +56,7 @@ static Function *insertCpsArguments(Function &fn) {
   auto *fnTy = fn.getFunctionType();
   argTys.append(fnTy->params().begin(), fnTy->params().end());
 
-  auto *newFn = mutateFunctionArguments(fn, Type::getVoidTy(context), argTys, fn.getAttributes());
+  auto *newFn = CompilerUtils::mutateFunctionArguments(fn, Type::getVoidTy(context), argTys, fn.getAttributes());
 
   fn.replaceAllUsesWith(newFn);
   for (unsigned idx = 0; idx < fn.arg_size(); idx++) {

@@ -515,6 +515,49 @@ void Compiler::Destroy() {
 }
 
 // =====================================================================================================================
+// Merge location and binding value, and replace the binding decoration in spirv binary.
+//
+// @param codeBuffer : Spirv binary
+// @param imageSymbolInfo : Image symbol infos
+static void mergeSpirvLocationAndBinding(llvm::MutableArrayRef<unsigned> codeBuffer,
+                                         std::vector<ResourceNodeData> &imageSymbolInfo) {
+  constexpr unsigned wordSize = sizeof(unsigned);
+
+  unsigned *code = codeBuffer.data();
+  unsigned *end = code + codeBuffer.size();
+  unsigned *codePos = code + sizeof(SpirvHeader) / wordSize;
+
+  while (codePos < end) {
+    unsigned opCode = (codePos[0] & OpCodeMask);
+    unsigned wordCount = (codePos[0] >> WordCountShift);
+
+    switch (opCode) {
+    case OpDecorate: {
+      auto decoration = static_cast<Decoration>(codePos[2]);
+
+      if (decoration == DecorationBinding) {
+        uint32_t varId = codePos[1];
+        uint32_t binding = codePos[3];
+        uint32_t location = 0;
+        for (auto it = imageSymbolInfo.begin(); it != imageSymbolInfo.end(); ++it) {
+          if (it->spvId == varId && it->binding == binding) {
+            location = it->location;
+            it->mergedLocationBinding = true;
+          }
+        }
+        uint32_t locationBinding = location << 16 | binding;
+        codePos[3] = locationBinding;
+      }
+    } break;
+    default:
+      break;
+    }
+
+    codePos += wordCount;
+  }
+}
+
+// =====================================================================================================================
 // Builds shader module from the specified info.
 //
 // @param shaderInfo : Info to build this shader module
@@ -563,6 +606,9 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     allocSize += imageSymbolInfo.size() * sizeof(ResourceNodeData);
     allocSize += atomicCounterSymbolInfo.size() * sizeof(ResourceNodeData);
     allocSize += defaultUniformSymbolInfo.size() * sizeof(ResourceNodeData);
+
+    if (imageSymbolInfo.size() && shaderInfo->options.mergeLocationAndBinding)
+      mergeSpirvLocationAndBinding(codeBuffer, imageSymbolInfo);
   }
 
   uint8_t *allocBuf =
@@ -641,12 +687,14 @@ static bool getSymbolInfoFromSpvVariable(const SPIRVVariable *spvVar, ResourceNo
   uint32_t arraySize = 1;
   SPIRVWord location = 0;
   SPIRVWord binding = 0;
+  SPIRVWord varId = 0;
   BasicType basicType = BasicType::Unknown;
 
   SPIRVWord builtIn = false;
   bool isBuiltIn = spvVar->hasDecorate(DecorationBuiltIn, 0, &builtIn);
   spvVar->hasDecorate(DecorationLocation, 0, &location);
   spvVar->hasDecorate(DecorationBinding, 0, &binding);
+  varId = spvVar->getId();
 
   SPIRVType *varElemTy = spvVar->getType()->getPointerElementType();
   while (varElemTy->isTypeArray()) {
@@ -707,6 +755,7 @@ static bool getSymbolInfoFromSpvVariable(const SPIRVVariable *spvVar, ResourceNo
   symbolInfo->location = location;
   symbolInfo->binding = binding;
   symbolInfo->basicType = basicType;
+  symbolInfo->spvId = varId;
 
   return isBuiltIn;
 }

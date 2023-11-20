@@ -32,6 +32,7 @@
 #include "SPIRVInternal.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
+#include "llpcGraphicsContext.h"
 #include "llpcRayTracingContext.h"
 #include "llpcSpirvLowerUtil.h"
 #include "lgc/LgcDialect.h"
@@ -1224,8 +1225,14 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
                                                              Vkgc::GlCompatibilityUniformLocation::FrameBufferSize);
             if (winSize) {
               offset = winSize->offset;
+              assert(m_shaderStage != Vkgc::ShaderStageTask && m_shaderStage != Vkgc::ShaderStageMesh);
+              unsigned constBufferBinding =
+                  Vkgc::ConstantBuffer0Binding + static_cast<GraphicsContext *>(m_context->getPipelineContext())
+                                                     ->getPipelineShaderInfo(m_shaderStage)
+                                                     ->options.constantBufferBindingOffset;
+
               Value *bufferDesc =
-                  m_builder->CreateLoadBufferDesc(Vkgc::InternalDescriptorSetId, Vkgc::ConstantBuffer0Binding,
+                  m_builder->CreateLoadBufferDesc(Vkgc::InternalDescriptorSetId, constBufferBinding,
                                                   m_builder->getInt32(0), lgc::Builder::BufferFlagNonConst);
               // Layout is {width, height}, so the offset of height is added sizeof(float).
               Value *winHeightPtr =

@@ -340,6 +340,7 @@ Options PipelineContext::computePipelineOptions() const {
   options.disableSampleMask = getPipelineOptions()->disableSampleMask;
   options.disableTruncCoordForGather = getPipelineOptions()->disableTruncCoordForGather;
   options.enablePrimGeneratedQuery = getPipelineOptions()->enablePrimGeneratedQuery;
+  options.enableFragColor = getPipelineOptions()->enableFragColor;
 
   return options;
 }
@@ -864,13 +865,13 @@ std::pair<BufDataFormat, BufNumFormat> PipelineContext::mapVkFormat(VkFormat for
       BOTH_FORMAT_ENTRY(VK_FORMAT_R16G16_UINT, BufDataFormat16_16, BufNumFormatUint),
       BOTH_FORMAT_ENTRY(VK_FORMAT_R16G16_SINT, BufDataFormat16_16, BufNumFormatSint),
       BOTH_FORMAT_ENTRY(VK_FORMAT_R16G16_SFLOAT, BufDataFormat16_16, BufNumFormatFloat),
-      INVALID_FORMAT_ENTRY(VK_FORMAT_R16G16B16_UNORM),
-      INVALID_FORMAT_ENTRY(VK_FORMAT_R16G16B16_SNORM),
-      INVALID_FORMAT_ENTRY(VK_FORMAT_R16G16B16_USCALED),
-      INVALID_FORMAT_ENTRY(VK_FORMAT_R16G16B16_SSCALED),
-      INVALID_FORMAT_ENTRY(VK_FORMAT_R16G16B16_UINT),
-      INVALID_FORMAT_ENTRY(VK_FORMAT_R16G16B16_SINT),
-      INVALID_FORMAT_ENTRY(VK_FORMAT_R16G16B16_SFLOAT),
+      BOTH_FORMAT_ENTRY(VK_FORMAT_R16G16B16_UNORM, BufDataFormat16_16_16, BufNumFormatUnorm),
+      BOTH_FORMAT_ENTRY(VK_FORMAT_R16G16B16_SNORM, BufDataFormat16_16_16, BufNumFormatSnorm),
+      BOTH_FORMAT_ENTRY(VK_FORMAT_R16G16B16_USCALED, BufDataFormat16_16_16, BufNumFormatUscaled),
+      BOTH_FORMAT_ENTRY(VK_FORMAT_R16G16B16_SSCALED, BufDataFormat16_16_16, BufNumFormatSscaled),
+      BOTH_FORMAT_ENTRY(VK_FORMAT_R16G16B16_UINT, BufDataFormat16_16_16, BufNumFormatUint),
+      BOTH_FORMAT_ENTRY(VK_FORMAT_R16G16B16_SINT, BufDataFormat16_16_16, BufNumFormatSint),
+      BOTH_FORMAT_ENTRY(VK_FORMAT_R16G16B16_SFLOAT, BufDataFormat16_16_16, BufNumFormatFloat),
       BOTH_FORMAT_ENTRY(VK_FORMAT_R16G16B16A16_UNORM, BufDataFormat16_16_16_16, BufNumFormatUnorm),
       BOTH_FORMAT_ENTRY(VK_FORMAT_R16G16B16A16_SNORM, BufDataFormat16_16_16_16, BufNumFormatSnorm),
       BOTH_FORMAT_ENTRY(VK_FORMAT_R16G16B16A16_USCALED, BufDataFormat16_16_16_16, BufNumFormatUscaled),
@@ -1013,6 +1014,8 @@ std::pair<BufDataFormat, BufNumFormat> PipelineContext::mapVkFormat(VkFormat for
 #endif
       COLOR_FORMAT_ENTRY_EXT(VK_FORMAT_A4R4G4B4_UNORM_PACK16_EXT, BufDataFormat4_4_4_4, BufNumFormatUnorm),
       COLOR_FORMAT_ENTRY_EXT(VK_FORMAT_A4B4G4R4_UNORM_PACK16_EXT, BufDataFormat4_4_4_4, BufNumFormatUnorm),
+      COLOR_FORMAT_ENTRY_EXT(VK_FORMAT_A1B5G5R5_UNORM_PACK16, BufDataFormat1_5_6_5, BufNumFormatUnorm),
+      COLOR_FORMAT_ENTRY_EXT(VK_FORMAT_A8_UNORM_KHR, BufDataFormat8_A, BufNumFormatUnorm),
       /// Currently OGL-only : Internal spv ext vertex attribute format - begin
       EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32_UNORM, BufDataFormat32, BufNumFormatUnorm),
       EXT_VERTEX_FORMAT_ENTRY(VK_FORMAT_EXT_R32G32_UNORM, BufDataFormat32_32, BufNumFormatUnorm),

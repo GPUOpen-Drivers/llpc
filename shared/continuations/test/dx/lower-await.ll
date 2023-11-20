@@ -13,6 +13,7 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-i1:32-i8:8-i16:32-i32:32-
 declare void @await.void(%continuation.token*)
 declare i32 @await.i32(%continuation.token*)
 declare %continuation.token* @async_fun()
+declare %continuation.token* @async_fun_with_waitmask(i64)
 declare %continuation.token* @async_fun_with_arg(i32)
 
 define void @simple_await() !continuation.registercount !1 {
@@ -193,6 +194,55 @@ define i32 @await_with_ret_value() !continuation.registercount !1 {
   %tok = call %continuation.token* @async_fun(), !continuation.registercount !1, !continuation.returnedRegistercount !1
   %res = call i32 @await.i32(%continuation.token* %tok)
   ret i32 %res, !continuation.registercount !1
+}
+
+define void @wait_await() !continuation.registercount !1 {
+; AWAIT-LABEL: define { ptr, ptr } @wait_await(
+; AWAIT-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], ptr [[TMP0:%.*]]) !continuation.registercount !1 !continuation !7 {
+; AWAIT-NEXT:    [[TMP2:%.*]] = call token @llvm.coro.id.retcon(i32 8, i32 4, ptr [[TMP0]], ptr @continuation.prototype.wait_await, ptr @continuation.malloc, ptr @continuation.free)
+; AWAIT-NEXT:    [[TMP3:%.*]] = call ptr @llvm.coro.begin(token [[TMP2]], ptr null)
+; AWAIT-NEXT:    [[TOK:%.*]] = call ptr @async_fun_with_waitmask(i64 -1), !continuation.registercount !1, !continuation.returnedRegistercount !1, !continuation.wait.await !3
+; AWAIT-NEXT:    [[TMP4:%.*]] = call i1 (...) @llvm.coro.suspend.retcon.i1(ptr [[TOK]])
+; AWAIT-NEXT:    call void (...) @continuation.return(i64 [[RETURNADDR]]), !continuation.registercount !1
+; AWAIT-NEXT:    unreachable
+;
+; CORO-LABEL: define { ptr, ptr } @wait_await(
+; CORO-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], ptr [[TMP0:%.*]]) !continuation.registercount !1 !continuation !7 {
+; CORO-NEXT:  AllocaSpillBB:
+; CORO-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[WAIT_AWAIT_FRAME:%.*]], ptr [[TMP0]], i32 0, i32 0
+; CORO-NEXT:    store i64 [[RETURNADDR]], ptr [[RETURNADDR_SPILL_ADDR]], align 4
+; CORO-NEXT:    [[TOK:%.*]] = call ptr @async_fun_with_waitmask(i64 -1), !continuation.registercount !1, !continuation.returnedRegistercount !1, !continuation.wait.await !3
+; CORO-NEXT:    [[TMP1:%.*]] = insertvalue { ptr, ptr } [[UNDEF_OR_POISON:undef|poison]], ptr @wait_await.resume.0, 0
+; CORO-NEXT:    [[TMP2:%.*]] = insertvalue { ptr, ptr } [[TMP1]], ptr [[TOK]], 1
+; CORO-NEXT:    ret { ptr, ptr } [[TMP2]]
+;
+; CLEANED-LABEL: define void @wait_await(
+; CLEANED-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]]) !continuation.registercount !2 !continuation !9 !continuation.state !4 !continuation.stacksize !4 {
+; CLEANED-NEXT:  AllocaSpillBB:
+; CLEANED-NEXT:    [[CONT_STATE:%.*]] = alloca [2 x i32], align 4
+; CLEANED-NEXT:    call void @continuation.save.continuation_state()
+; CLEANED-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[WAIT_AWAIT_FRAME:%.*]], ptr [[CONT_STATE]], i32 0, i32 0
+; CLEANED-NEXT:    store i64 [[RETURNADDR]], ptr [[RETURNADDR_SPILL_ADDR]], align 4
+; CLEANED-NEXT:    [[TMP0:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CLEANED-NEXT:    [[TMP1:%.*]] = load i32, ptr [[TMP0]], align 4
+; CLEANED-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], 8
+; CLEANED-NEXT:    store i32 [[TMP2]], ptr [[TMP0]], align 4
+; CLEANED-NEXT:    [[TMP3:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CLEANED-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @CONTINUATION_STATE, ptr [[TMP3]])
+; CLEANED-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [2 x i32], ptr [[CONT_STATE]], i32 0, i32 0
+; CLEANED-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP4]], align 4
+; CLEANED-NEXT:    store i32 [[TMP5]], ptr @CONTINUATION_STATE, align 4
+; CLEANED-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [2 x i32], ptr [[CONT_STATE]], i32 0, i32 1
+; CLEANED-NEXT:    [[TMP7:%.*]] = load i32, ptr [[TMP6]], align 4
+; CLEANED-NEXT:    store i32 [[TMP7]], ptr getelementptr inbounds ([2 x i32], ptr @CONTINUATION_STATE, i32 0, i32 1), align 4
+; CLEANED-NEXT:    [[TMP8:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CLEANED-NEXT:    [[TMP9:%.*]] = load i32, ptr [[TMP8]], align 4
+; CLEANED-NEXT:    call void (i64, i64, ...) @continuation.waitContinue(i64 ptrtoint (ptr @async_fun_with_waitmask to i64), i64 -1, i32 [[TMP9]], i64 ptrtoint (ptr @wait_await.resume.0 to i64)), !continuation.registercount !2, !continuation.returnedRegistercount !2
+; CLEANED-NEXT:    unreachable
+;
+  %tok = call %continuation.token* @async_fun_with_waitmask(i64 -1), !continuation.wait.await !0, !continuation.registercount !1, !continuation.returnedRegistercount !1
+  call void @await.void(%continuation.token* %tok)
+  ret void, !continuation.registercount !1
 }
 
 !continuation.stackAddrspace = !{!2}

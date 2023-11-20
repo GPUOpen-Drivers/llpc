@@ -282,6 +282,23 @@ private:
     SmallVector<llvm::Instruction *, 1> llvmInstructions;
   };
 
+  lgc::Builder::CooperativeMatrixElementType mapToBasicType(Type *const ltType);
+  lgc::Builder::CooperativeMatrixElementType mapToBasicType(SPIRVType *const spvType);
+  lgc::Builder::CooperativeMatrixLayout getLayout(lgc::Builder::CooperativeMatrixElementType elemTy);
+  lgc::Builder::CooperativeMatrixLayout getCooperativeMatrixKHRLayout(CooperativeMatrixUse use,
+                                                                      lgc::Builder::CooperativeMatrixElementType elemTy,
+                                                                      unsigned rows, unsigned columns);
+
+  enum CooperativeMatrixMemoryAccess {
+    CooperativeMatrixMemoryAccessNone = 0x00,
+    CooperativeMatrixMemoryAccessVolatile = 0x01,
+    CooperativeMatrixMemoryAccessCoherent = 0x02,
+    CooperativeMatrixMemoryAccessTemporal = 0x04,
+  };
+
+  Value *transCooperativeMatrixArithInst(SPIRVValue *spvVal, BasicBlock *bb);
+  Value *transCooperativeMatrixKHRFromConstruct(SPIRVType *spvCoopMatRowTy, const std::vector<Value *> &constituents);
+
   // Stores pointers of LLVM Functions to SPIRV memops to the translated LLVM memop(s) in a MapVector to preserve
   // insertion order of the SPIRV memops and to preserve the function origins, as the bounds checks need to be
   // inserted on a per-function level. To handle dependencies between the LLVM IR memops, e. g. using a load result as

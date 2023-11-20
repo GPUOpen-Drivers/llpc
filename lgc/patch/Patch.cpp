@@ -35,8 +35,10 @@
 #include "lgc/PassManager.h"
 #include "lgc/Pipeline.h"
 #include "lgc/builder/BuilderReplayer.h"
+#include "lgc/patch/CombineCooperativeMatrix.h"
 #include "lgc/patch/Continufy.h"
 #include "lgc/patch/FragColorExport.h"
+#include "lgc/patch/LowerCooperativeMatrix.h"
 #include "lgc/patch/LowerDebugPrintf.h"
 #include "lgc/patch/PatchBufferOp.h"
 #include "lgc/patch/PatchCheckShaderCache.h"
@@ -146,6 +148,10 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
 
   passMgr.addPass(IPSCCPPass());
   passMgr.addPass(LowerDebugPrintf());
+
+  passMgr.addPass(createModuleToFunctionPassAdaptor(CombineCooperativeMatrix()));
+  // Lower the cooperative matrix
+  passMgr.addPass(LowerCooperativeMatrix());
 
   if (pipelineState->hasShaderStage(ShaderStageVertex) && !pipelineState->hasShaderStage(ShaderStageTessControl) &&
       pipelineState->hasShaderStage(ShaderStageTessEval))

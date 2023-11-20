@@ -30,14 +30,16 @@
  */
 #pragma once
 
+#include "compilerutils/TypeLowering.h"
+#include "continuations/CpsStackLowering.h"
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
-#include "lgc/util/TypeLowering.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
+#include <memory>
 
 namespace lgc {
 
@@ -196,6 +198,7 @@ private:
   // Map from a cps function to the alloca where we are holding the latest continuation stack pointer.
   llvm::DenseMap<llvm::Function *, llvm::Value *> m_funcCpsStackMap;
   llvm::Intrinsic::ID m_setInactiveChainArgId;
+  std::unique_ptr<CpsStackLowering> stackLowering;
 };
 
 } // namespace lgc
