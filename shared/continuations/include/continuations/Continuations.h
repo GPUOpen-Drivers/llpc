@@ -205,6 +205,12 @@ CallInst *replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy,
                                Value *SystemData, DXILShaderKind Kind,
                                CallInst *Call);
 
+/// Transformations that run early on the driver/gpurt module.
+///
+/// Replace intrinsics called by gpurt code that can be replaced early.
+/// Returns whether something changed.
+bool earlyDriverTransform(Module &M);
+
 /// Buffered pointers use a fixed number of registers, and fall back to an
 /// allocation if the registers to not suffice to contain the content. Given a
 /// number NumI32s of 4-byte values and the number of reserved registers, return
@@ -298,6 +304,7 @@ private:
   Function *RestoreContState;
   Function *RegisterBufferSetPointerBarrier;
   Function *Continue;
+  Function *WaitContinue;
   Function *Complete;
   GlobalVariable *ContState;
   MapVector<Function *, ContinuationData> ToProcess;

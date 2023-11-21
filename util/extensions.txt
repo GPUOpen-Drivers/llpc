@@ -41,4 +41,8 @@ SPV_KHR_ray_tracing
 SPV_KHR_ray_query
 SPV_KHR_fragment_shader_barycentric
 SPV_KHR_workgroup_memory_explicit_layout
+#if VKI_COOPERATIVE_MATRIX
+SPV_NV_cooperative_matrix
+SPV_KHR_cooperative_matrix
+#endif
 SPV_NV_shader_atomic_float

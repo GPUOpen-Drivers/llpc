@@ -128,6 +128,9 @@ endif()
 
 ### VKGC build LLPC ################################################################
 if(ICD_BUILD_LLPC)
+    include("cmake/compilerutils.cmake")
+    add_compilerutils_projects()
+
     target_include_directories(vkgc
         INTERFACE
             ${PROJECT_SOURCE_DIR}/llpc/include

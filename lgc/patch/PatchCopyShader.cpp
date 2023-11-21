@@ -121,7 +121,9 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
     //     i32 inreg streamOutOffset3,
     //     i32 vertexOffset)
     //
+
     argTys = {int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty};
+
     argInReg = {true, true, true, true, true, true, true, true, true, false};
     // clang-format off
     argNames = {"globalTable",

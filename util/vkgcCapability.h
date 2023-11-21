@@ -159,6 +159,7 @@ static const char *const VkgcSupportedCapabilities[] = {
     "CapabilityRayTraversalPrimitiveCullingProvisionalKHR",
     "CapabilityRayTracingPositionFetchKHR",
     "CapabilityRayQueryPositionFetchKHR",
+    "CapabilityCooperativeMatrixKHR",
 };
 
 }; // namespace Vkgc

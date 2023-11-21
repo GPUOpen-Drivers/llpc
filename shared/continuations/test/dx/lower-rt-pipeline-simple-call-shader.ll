@@ -9,6 +9,9 @@
 ; RUN: count 0 < %t2.stderr
 ; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,lint,remove-types-metadata' -S %s 2>%t3.stderr | FileCheck -check-prefix=LOWERRAYTRACINGPIPELINE-CPS %s
 ; RUN: count 0 < %t3.stderr
+; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,lint,inline,lint,pre-coroutine-lowering,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,cleanup-continuations,lint,remove-types-metadata' \
+; RUN:     -S %s 2>%t4.stderr | FileCheck -check-prefix=CLEANUP-CPS %s
+; RUN: count 0 < %t4.stderr
 
 target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-i1:32-i8:8-i16:32-i32:32-i64:32-f16:32-f32:32-f64:32-v16:32-v32:32-v48:32-v64:32-v80:32-v96:32-v112:32-v128:32-v144:32-v160:32-v176:32-v192:32-v208:32-v224:32-v240:32-v256:32-n8:16:32"
 
@@ -38,7 +41,7 @@ define i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData* %data) !types !1
   ret i32 5
 }
 
-define void @_cont_CallShader(%struct.DispatchSystemData* %data, i32 %0) !types !18 {
+define void @_cont_CallShader(%struct.DispatchSystemData* %data, i32 %0) #1 !types !18 {
   %dis_data = load %struct.DispatchSystemData, %struct.DispatchSystemData* %data, align 4
   %newdata = call %struct.DispatchSystemData @_AmdAwaitShader(i64 2, %struct.DispatchSystemData %dis_data)
   store %struct.DispatchSystemData %newdata, %struct.DispatchSystemData* %data, align 4
@@ -55,6 +58,7 @@ define void @called(%struct.MyParams* %params) !types !19 {
 declare !types !21 void @dx.op.callShader.struct.MyParams(i32, i32, %struct.MyParams*) #0
 
 attributes #0 = { nounwind }
+attributes #1 = { alwaysinline }
 
 !llvm.ident = !{!0}
 !dx.version = !{!1}
@@ -91,7 +95,7 @@ attributes #0 = { nounwind }
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-LABEL: define void @_cont_CallShader.struct.MyParams(
-; LOWERRAYTRACINGPIPELINE-SAME: ptr [[DATA:%.*]], i32 [[TMP0:%.*]], ptr [[TMP1:%.*]]) {
+; LOWERRAYTRACINGPIPELINE-SAME: ptr [[DATA:%.*]], i32 [[TMP0:%.*]], ptr [[TMP1:%.*]]) #[[ATTR0:[0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[DIS_DATA:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[DATA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT_MYPARAMS:%.*]], ptr [[TMP1]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = load i32, ptr [[TMP3]], align 4
@@ -110,7 +114,7 @@ attributes #0 = { nounwind }
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-LABEL: define void @_cont_CallShader(
-; LOWERRAYTRACINGPIPELINE-SAME: ptr [[DATA:%.*]], i32 [[TMP0:%.*]]) {
+; LOWERRAYTRACINGPIPELINE-SAME: ptr [[DATA:%.*]], i32 [[TMP0:%.*]]) #[[ATTR0]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[DIS_DATA:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[DATA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[NEWDATA:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @_AmdAwaitShader(i64 2, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[NEWDATA]], ptr [[DATA]], align 4
@@ -303,7 +307,7 @@ attributes #0 = { nounwind }
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-CPS-LABEL: define void @_cont_CallShader.struct.MyParams(
-; LOWERRAYTRACINGPIPELINE-CPS-SAME: ptr [[DATA:%.*]], i32 [[TMP0:%.*]], ptr [[TMP1:%.*]]) {
+; LOWERRAYTRACINGPIPELINE-CPS-SAME: ptr [[DATA:%.*]], i32 [[TMP0:%.*]], ptr [[TMP1:%.*]]) #[[ATTR0:[0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[DIS_DATA:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[DATA]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT_MYPARAMS:%.*]], ptr [[TMP1]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP4:%.*]] = load i32, ptr [[TMP3]], align 4
@@ -321,7 +325,7 @@ attributes #0 = { nounwind }
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-CPS-LABEL: define void @_cont_CallShader(
-; LOWERRAYTRACINGPIPELINE-CPS-SAME: ptr [[DATA:%.*]], i32 [[TMP0:%.*]]) {
+; LOWERRAYTRACINGPIPELINE-CPS-SAME: ptr [[DATA:%.*]], i32 [[TMP0:%.*]]) #[[ATTR0]] {
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[DIS_DATA:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[DATA]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[NEWDATA:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @_AmdAwaitShader(i64 2, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[NEWDATA]], ptr [[DATA]], align 4
@@ -347,4 +351,42 @@ attributes #0 = { nounwind }
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP6:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 2, {} poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP6]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    unreachable
+;
+;
+; CLEANUP-CPS-LABEL: define i32 @_cont_GetLocalRootIndex(
+; CLEANUP-CPS-SAME: ptr [[DATA:%.*]]) {
+; CLEANUP-CPS-NEXT:    ret i32 5
+;
+;
+; CLEANUP-CPS-LABEL: define void @called(
+; CLEANUP-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURN_ADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage !16 !lgc.cps !17 !continuation !18 {
+; CLEANUP-CPS-NEXT:  AllocaSpillBB:
+; CLEANUP-CPS-NEXT:    [[TMP1:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 8)
+; CLEANUP-CPS-NEXT:    [[RETURN_ADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[CALLED_FRAME:%.*]], ptr addrspace(32) [[TMP1]], i32 0, i32 0
+; CLEANUP-CPS-NEXT:    store i32 [[RETURN_ADDR]], ptr addrspace(32) [[RETURN_ADDR_SPILL_ADDR]], align 4
+; CLEANUP-CPS-NEXT:    [[TMP2:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @continuations.getSystemData.s_struct.DispatchSystemDatas()
+; CLEANUP-CPS-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP2]], 0
+; CLEANUP-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
+; CLEANUP-CPS-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, i32 [[DOTFCA_0_EXTRACT]], 0
+; CLEANUP-CPS-NEXT:    store i32 undef, ptr @PAYLOAD, align 4
+; CLEANUP-CPS-NEXT:    [[TMP3:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @called.resume.0)
+; CLEANUP-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 2, i32 2, {} poison, i32 [[TMP3]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I_FCA_0_INSERT]])
+; CLEANUP-CPS-NEXT:    unreachable
+;
+;
+; CLEANUP-CPS-LABEL: define void @called.resume.0(
+; CLEANUP-CPS-SAME: {} [[TMP0:%.*]], i32 [[TMP1:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP2:%.*]]) !lgc.rt.shaderstage !16 !lgc.cps !17 !continuation !18 {
+; CLEANUP-CPS-NEXT:  entryresume.0:
+; CLEANUP-CPS-NEXT:    [[TMP3:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 8)
+; CLEANUP-CPS-NEXT:    [[TMP4:%.*]] = load i32, ptr @PAYLOAD, align 4
+; CLEANUP-CPS-NEXT:    [[DOTFCA_0_EXTRACT3:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP2]], 0
+; CLEANUP-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
+; CLEANUP-CPS-NEXT:    [[RETURN_ADDR_RELOAD_ADDR:%.*]] = getelementptr inbounds [[CALLED_FRAME:%.*]], ptr addrspace(32) [[TMP3]], i32 0, i32 0
+; CLEANUP-CPS-NEXT:    [[RETURN_ADDR_RELOAD:%.*]] = load i32, ptr addrspace(32) [[RETURN_ADDR_RELOAD_ADDR]], align 4
+; CLEANUP-CPS-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
+; CLEANUP-CPS-NEXT:    store i32 [[TMP4]], ptr @PAYLOAD, align 4
+; CLEANUP-CPS-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, i32 [[DOTFCA_0_EXTRACT3]], 0
+; CLEANUP-CPS-NEXT:    call void @lgc.cps.free(i32 8)
+; CLEANUP-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR_RELOAD]], i32 2, {} poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]])
+; CLEANUP-CPS-NEXT:    unreachable
 ;

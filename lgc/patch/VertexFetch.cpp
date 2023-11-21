@@ -61,7 +61,7 @@ namespace {
 // Map vkgc
 static constexpr unsigned InternalDescriptorSetId = static_cast<unsigned>(-1);
 static constexpr unsigned FetchShaderInternalBufferBinding = 5; // Descriptor binding for uber fetch shader
-static constexpr unsigned CurrentAttributeBufferBinding = 24;   // Descriptor binding for current attribute
+static constexpr unsigned CurrentAttributeBufferBinding = 1;    // Descriptor binding for current attribute
 static constexpr unsigned GenericVertexFetchShaderBinding = 0;  // Descriptor binding for generic vertex fetch shader
 static constexpr unsigned VertexInputBindingCurrent = 64;       // Vertex input binding for current attribute
 
@@ -175,6 +175,23 @@ const VertexCompFormatInfo VertexFetchImpl::m_vertexCompFormatInfo[] = {
     {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormatReserved
     {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat8_8_8_8_Bgra
     {3, 1, 3, BUF_DATA_FORMAT_8},          // BufDataFormat8_8_8
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat8_8_8_Bgr,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat2_10_10_10_Bgra,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat64,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat64_64,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat64_64_64,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat64_64_64_64,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat4_4,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat4_4_4_4,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat4_4_4_4_Bgra,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat5_6_5,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat5_6_5_Bgr,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat5_6_5_1,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat5_6_5_1_Bgra,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat1_5_6_5,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat5_9_9_9,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat8_A,
+    {6, 2, 3, BUF_DATA_FORMAT_16},         // BufDataFormat16_16_16
 };
 
 // clang-format off
@@ -1171,9 +1188,9 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
     }
     vbIndex = m_vertexIndex;
   } else {
-    if (description->inputRate == VertexInputRateNone) {
+    if (description->divisor == 0) {
       vbIndex = ShaderInputs::getSpecialUserData(UserDataMapping::BaseInstance, builder);
-    } else if (description->inputRate == VertexInputRateInstance) {
+    } else if (description->divisor == 1) {
       // Use instance index
       if (!m_instanceIndex) {
         IRBuilder<>::InsertPointGuard guard(builder);
@@ -1184,7 +1201,7 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
     } else {
       // There is a divisor.
       vbIndex = builder.CreateUDiv(ShaderInputs::getInput(ShaderInput::InstanceId, builder, *m_lgcContext),
-                                   builder.getInt32(description->inputRate));
+                                   builder.getInt32(description->divisor));
       vbIndex = builder.CreateAdd(vbIndex, ShaderInputs::getSpecialUserData(UserDataMapping::BaseInstance, builder));
     }
   }
@@ -1475,6 +1492,10 @@ VertexFormatInfo VertexFetchImpl::getVertexFormatInfo(const VertexInputDescripti
     info.dfmt = BufDataFormat8_8_8;
     info.numChannels = 3;
     break;
+  case BufDataFormat16_16_16:
+    info.dfmt = BufDataFormat16_16_16;
+    info.numChannels = 3;
+    break;
   default:
     break;
   }
@@ -1529,13 +1550,16 @@ unsigned VertexFetchImpl::mapVertexFormat(unsigned dfmt, unsigned nfmt) const {
 // @param binding : ID of vertex buffer binding
 // @param builder : Builder with insert point set
 Value *VertexFetchImpl::loadVertexBufferDescriptor(unsigned binding, BuilderImpl &builderImpl) {
+  BuilderBase &builder = BuilderBase::get(builderImpl);
   if (builderImpl.useVertexBufferDescArray()) {
     Value *vtxDesc = nullptr;
     // Create descriptor for current attribute
     if (binding == VertexInputBindingCurrent) {
       if (m_curAttribBufferDescr == nullptr) {
+        IRBuilder<>::InsertPointGuard guard(builder);
+        builder.SetInsertPointPastAllocas(builder.GetInsertBlock()->getParent());
         auto descPtr = builderImpl.CreateBufferDesc(InternalDescriptorSetId, CurrentAttributeBufferBinding,
-                                                    builderImpl.getInt32(0), Builder::BufferFlagAddress);
+                                                    builderImpl.getInt32(0), lgc::Builder::BufferFlagAddress);
         // Create descriptor by a 64-bits pointer
         m_curAttribBufferDescr = builderImpl.buildInlineBufferDesc(descPtr);
       }
@@ -1543,13 +1567,12 @@ Value *VertexFetchImpl::loadVertexBufferDescriptor(unsigned binding, BuilderImpl
     } else {
       // Create descriptor for vertex buffer
       vtxDesc = builderImpl.CreateBufferDesc(InternalDescriptorSetId, GenericVertexFetchShaderBinding,
-                                             builderImpl.getInt32(binding), Builder::BufferFlagNonConst);
+                                             builderImpl.getInt32(binding), lgc::Builder::BufferFlagNonConst);
     }
 
     return vtxDesc;
   }
 
-  BuilderBase &builder = BuilderBase::get(builderImpl);
   // Get the vertex buffer table pointer as pointer to v4i32 descriptor.
   Type *vbDescTy = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
   if (!m_vertexBufTablePtr) {
@@ -1595,7 +1618,7 @@ void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bo
        // NOTE: For the vertex data format 8_8, 8_8_8_8, 16_16, and 16_16_16_16, tbuffer_load has a HW defect when
        // vertex buffer is unaligned. Therefore, we have to split the vertex fetch to component-based ones
        dfmt != BufDataFormat8_8 && dfmt != BufDataFormat8_8_8_8 && dfmt != BufDataFormat16_16 &&
-       dfmt != BufDataFormat16_16_16_16 && dfmt != BufDataFormat8_8_8) ||
+       dfmt != BufDataFormat16_16_16_16 && dfmt != BufDataFormat8_8_8 && dfmt != BufDataFormat16_16_16) ||
       formatInfo->compDfmt == dfmt) {
     // Do vertex fetch
     Value *args[] = {

@@ -381,6 +381,28 @@ SPIRVValue *createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst, uint32_t Ro
 
     return constantCompositeInsert(Composite, Object, Indices);
 
+  } else if (OC == OpCooperativeMatrixLengthKHR) {
+    // TODO: This is subtly broken given different matrix layouts and wave sizes. Can we forbid use of this in a
+    //       specification constant at the spec level?
+    //
+    // We work around this by:
+    //  - producing whatever the maximum length is going to be (based on wave32)
+    //  - adding some masking during lowering if we happen to compile for wave64, so that we don't access vectors
+    //    out of bounds
+    assert(DestTy->isTypeScalar() && Ops.size() == 1);
+    SPIRVType *type = static_cast<SPIRVType *>(BM->getEntry(Ops[0]));
+    assert(type->isTypeCooperativeMatrixKHR());
+    (void)type;
+    unsigned length = 0;
+    CooperativeMatrixUse use = static_cast<CooperativeMatrixUse>(type->getCooperativeMatrixKHRUse());
+    if (use == CooperativeMatrixUse::CooperativeMatrixUseMatrixAKHR ||
+        use == CooperativeMatrixUse::CooperativeMatrixUseMatrixBKHR) {
+      length = 16; // Assume factor layout
+    } else {
+      assert(use == CooperativeMatrixUse::CooperativeMatrixUseMatrixAccumulatorKHR);
+      length = 8; // Assume wave32 accumulation layout
+    }
+    return BM->addConstant(DestTy, length);
   } else {
     assert(DestTy->isTypeVector() || DestTy->isTypeScalar());
 

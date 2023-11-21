@@ -1068,8 +1068,6 @@ void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareS
   unsigned sgprLimits = 0;
   unsigned vgprLimits = 0;
   if (apiStage1 == ShaderStageCopyShader) {
-    // NOTE: For copy shader, usually we use fixed number of user data registers.
-    // But in some cases, we may change user data registers, we use variable to keep user sgpr count here
     userDataCount = lgc::CopyShaderUserSgprCount;
     sgprLimits = m_pipelineState->getTargetInfo().getGpuProperty().maxSgprsAvailable;
     vgprLimits = m_pipelineState->getTargetInfo().getGpuProperty().maxVgprsAvailable;

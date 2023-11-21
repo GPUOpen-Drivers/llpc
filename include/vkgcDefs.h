@@ -46,10 +46,10 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 69
+#define LLPC_INTERFACE_MAJOR_VERSION 70
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 2
+#define LLPC_INTERFACE_MINOR_VERSION 1
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -80,7 +80,8 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
-//  |     69.2 | Add enablePrimGeneratedQuery to PipelineOptions                                                       |
+//  |     70.1 | Add cpsFlags to RayTracingPipelineBuildInfo                                                           |
+//  |     70.0 | Add enablePrimGeneratedQuery to PipelineOptions                                                       |
 //  |     69.1 | Add useBarycentric to ShaderModuleUsage                                                               |
 //  |     69.0 | Enable continuations transform in LLPC                                                                |
 //  |     68.0 | Remove ICache *cache in all PipelineBuildInfo                                                         |
@@ -356,7 +357,7 @@ static_assert((1 << (ShaderStageCount - 1)) == ShaderStageRayTracingCallableBit,
 /// Enumerates the binding ID of internal resource.
 enum InternalBinding : unsigned {
   FetchShaderBinding = 0,                   ///< Binding ID of vertex buffer table
-  ConstantBuffer0Binding = 1,               ///< Binding ID of default uniform block
+  CurrentAttributeBufferBinding = 1,        ///< Binding ID of current attribute
   PushConstantBinding = 2,                  ///< Binding ID of push constant buffer
   ShaderRecordBufferBinding = 3,            ///< Binding ID of ray-tracing shader record buffer
   TaskPayloadBinding = 4,                   ///< Binding ID of payload buffer in task shader
@@ -366,7 +367,8 @@ enum InternalBinding : unsigned {
   RtCaptureReplayInternalBufferBinding = 8, ///< Binding ID of ray-tracing capture replay internal buffer
   SpecConstInternalBufferBindingId = 9,     ///< Binding ID of internal buffer for specialized constant.
   SpecConstInternalBufferBindingIdEnd = SpecConstInternalBufferBindingId + ShaderStageCount,
-  CurrentAttributeBufferBinding = 24, ///< Binding ID of current attribute
+  ConstantBuffer0Binding = 24, ///< Binding ID of default uniform block
+  ConstantBuffer0BindingEnd = ConstantBuffer0Binding + ShaderStageGfxCount,
 };
 
 /// Internal vertex attribute location start from 0.
@@ -606,8 +608,9 @@ struct PipelineOptions {
   bool enableCombinedTexture;             ///< For OGL only, use the 'set' for DescriptorCombinedTexture
                                           ///< for sampled images and samplers
   bool vertex64BitsAttribSingleLoc;       ///< For OGL only, dvec3/dvec4 vertex attrib only consumes 1 location.
-  bool enablePrimGeneratedQuery;          ///< If set, primitive generated query is enabled
+  bool enableFragColor;                   ///< For OGL only, need to do frag color broadcast if it is enabled.
   unsigned reserved20;
+  bool enablePrimGeneratedQuery; ///< If set, primitive generated query is enabled
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.
@@ -625,10 +628,12 @@ enum class BinaryType : unsigned {
 /// Represents resource node data
 struct ResourceNodeData {
   ResourceMappingNodeType type;     ///< Type of this resource mapping node
+  unsigned spvId;                   ///< ID of variable
   unsigned set;                     ///< ID of descriptor set
   unsigned binding;                 ///< ID of descriptor binding
   unsigned arraySize;               ///< Element count for arrayed binding
   unsigned location;                ///< ID of resource location
+  bool mergedLocationBinding;       ///< TRUE if location and binding are merged in spirv binary
   unsigned isTexelBuffer;           ///< TRUE if it is ImageBuffer or TextureBuffer
   unsigned isDefaultUniformSampler; ///< TRUE if it's sampler image in default uniform struct
   BasicType basicType;              ///< Type of the variable or element
@@ -929,6 +934,9 @@ struct PipelineShaderOptions {
 
   /// Application workaround: forward propagate NoContraction decoration to any related FAdd operation.
   bool forwardPropagateNoContract;
+
+  /// Binding ID offset of default uniform block
+  unsigned constantBufferBindingOffset;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor
@@ -1187,6 +1195,12 @@ enum class LlpcRaytracingMode : unsigned {
   Continuations, // Enable continuation in the new raytracing path
 };
 
+// Enumerate feature flags for CPS.
+enum CpsFlag : unsigned {
+  CpsNoFlag = 0,
+  CpsFlagStackInGlobalMem = 1 << 0, // Put stack in global memory instead of scratch.
+};
+
 /// RayTracing state
 struct RtState {
   unsigned nodeStrideShift;               ///< Ray tracing BVH node stride
@@ -1267,7 +1281,7 @@ struct ApiXfbOutData {
   XfbOutInfo *pXfbOutInfos;   ///< An array of XfbOutInfo items
   unsigned numXfbOutInfo;     ///< Count of XfbOutInfo items
   bool forceDisableStreamOut; ///< Force to disable stream out XFB outputs
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 69
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 70
   bool forceEnablePrimStats; ///< Force to enable counting generated primitives
 #endif
 };
@@ -1422,6 +1436,7 @@ struct RayTracingPipelineBuildInfo {
   const void *pClientMetadata;    ///< Pointer to (optional) client-defined data to be
                                   ///  stored inside the ELF
   size_t clientMetadataSize;      ///< Size (in bytes) of the client-defined data
+  unsigned cpsFlags;              ///< Cps feature flags
 };
 
 /// Ray tracing max shader name length

@@ -11,10 +11,13 @@ function(set_compiler_options PROJECT_NAME)
   endif()
 endfunction()
 
+option(CONTINUATIONS_BUILD_TESTS "Build continuation tests")
+
 add_llvm_library(LLVMContinuations
   lib/CleanupContinuations.cpp
   lib/ContinuationsDialect.cpp
   lib/ContinuationsUtil.cpp
+  lib/CpsStackLowering.cpp
   lib/DXILCont.cpp
   lib/DXILContIntrinsicPrepare.cpp
   lib/DXILContLgcRtOpConverter.cpp
@@ -53,11 +56,13 @@ target_include_directories(LLVMContinuations PUBLIC
   $<INSTALL_INTERFACE:include>
 )
 
-target_link_libraries(LLVMContinuations PUBLIC llvm_dialects)
+llvm_map_components_to_libnames(extra_llvm_libs CompilerUtils)
+
+target_link_libraries(LLVMContinuations PUBLIC ${extra_llvm_libs})
 set_compiler_options(LLVMContinuations)
 
 # TableGen for dialects
-set(CONTINUATIONS_TABLEGEN_EXE llvm-dialects-tblgen)
+set(CONTINUATIONS_TABLEGEN_EXE $<TARGET_FILE:llvm-dialects-tblgen>)
 set(CONTINUATIONS_TABLEGEN_TARGET llvm-dialects-tblgen)
 
 macro(cont_tablegen DIALECTNAME FILE OUTPUT_FILENAME)
@@ -82,7 +87,7 @@ target_compile_features(LLVMContinuations PUBLIC cxx_std_17)
 set_target_properties(LLVMContinuations PROPERTIES CXX_EXTENSIONS OFF)
 
 add_subdirectory(plugin)
-add_subdirectory(test)
-if(LLPC_BUILD_TESTS)
+if(CONTINUATIONS_BUILD_TESTS)
+  add_subdirectory(test)
   add_subdirectory(unittests)
 endif()

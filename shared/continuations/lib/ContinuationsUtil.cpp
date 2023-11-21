@@ -31,33 +31,41 @@
 //===----------------------------------------------------------------------===//
 
 #include "continuations/ContinuationsUtil.h"
+#include "lgc/LgcRtDialect.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 
-llvm::StringMap<llvm::GpuRtIntrinsicEntry> llvm::LgcRtGpuRtMap = {
-    {"instance.id", {"InstanceID", true}},
-    {"instance.index", {"InstanceIndex", true}},
-    {"hit.kind", {"HitKind", true}},
-    {"ray.flags", {"RayFlags", false}},
-    {"dispatch.rays.index", {"DispatchRaysIndex3", false}},
-    {"dispatch.rays.dimensions", {"DispatchRaysDimensions3", false}},
-    {"world.ray.origin", {"WorldRayOrigin3", false}},
-    {"world.ray.direction", {"WorldRayDirection3", false}},
-    {"object.ray.origin", {"ObjectRayOrigin3", true}},
-    {"object.ray.direction", {"ObjectRayDirection3", true}},
-    {"object.to.world", {"ObjectToWorld4x3", true}},
-    {"world.to.object", {"WorldToObject4x3", true}},
-    {"ray.tmin", {"RayTMin", false}},
-    {"ray.tcurrent", {"RayTCurrent", true}},
-    {"ignore.hit", {"IgnoreHit", false}},
-    {"accept.hit.and.end.search", {"AcceptHitAndEndSearch", false}},
-    {"trace.ray", {"TraceRay", false}},
-    {"report.hit", {"ReportHit", false}},
-    {"call.callable.shader", {"CallShader", false}},
-    {"primitive.index", {"PrimitiveIndex", true}},
-    {"geometry.index", {"GeometryIndex", true}},
-};
+#define GPURTMAP_ENTRY(Op, GpurtName, AccessesHitData)                         \
+  {                                                                            \
+    OpDescription::get<lgc::rt::Op>(), { GpurtName, AccessesHitData }          \
+  }
+
+const OpMap<llvm::GpuRtIntrinsicEntry> llvm::LgcRtGpuRtMap = {{
+    GPURTMAP_ENTRY(InstanceIdOp, "InstanceID", true),
+    GPURTMAP_ENTRY(InstanceIndexOp, "InstanceIndex", true),
+    GPURTMAP_ENTRY(HitKindOp, "HitKind", true),
+    GPURTMAP_ENTRY(RayFlagsOp, "RayFlags", false),
+    GPURTMAP_ENTRY(DispatchRaysIndexOp, "DispatchRaysIndex3", false),
+    GPURTMAP_ENTRY(DispatchRaysDimensionsOp, "DispatchRaysDimensions3", false),
+    GPURTMAP_ENTRY(WorldRayOriginOp, "WorldRayOrigin3", false),
+    GPURTMAP_ENTRY(WorldRayDirectionOp, "WorldRayDirection3", false),
+    GPURTMAP_ENTRY(ObjectRayOriginOp, "ObjectRayOrigin3", true),
+    GPURTMAP_ENTRY(ObjectRayDirectionOp, "ObjectRayDirection3", true),
+    GPURTMAP_ENTRY(ObjectToWorldOp, "ObjectToWorld4x3", true),
+    GPURTMAP_ENTRY(WorldToObjectOp, "WorldToObject4x3", true),
+    GPURTMAP_ENTRY(RayTminOp, "RayTMin", false),
+    GPURTMAP_ENTRY(RayTcurrentOp, "RayTCurrent", true),
+    GPURTMAP_ENTRY(IgnoreHitOp, "IgnoreHit", false),
+    GPURTMAP_ENTRY(AcceptHitAndEndSearchOp, "AcceptHitAndEndSearch", false),
+    GPURTMAP_ENTRY(TraceRayOp, "TraceRay", false),
+    GPURTMAP_ENTRY(ReportHitOp, "ReportHit", false),
+    GPURTMAP_ENTRY(CallCallableShaderOp, "CallShader", false),
+    GPURTMAP_ENTRY(PrimitiveIndexOp, "PrimitiveIndex", true),
+    GPURTMAP_ENTRY(GeometryIndexOp, "GeometryIndex", true),
+}};
+
+#undef GPURTMAP_ENTRY
 
 llvm::StringRef DialectUtils::getLgcRtDialectOpName(llvm::StringRef FullName) {
   return FullName.substr(std::strlen("lgc.rt."));
@@ -65,31 +73,6 @@ llvm::StringRef DialectUtils::getLgcRtDialectOpName(llvm::StringRef FullName) {
 
 bool DialectUtils::isLgcRtOp(const llvm::Function *F) {
   return F && F->getName().starts_with("lgc.rt");
-}
-
-// A small wrapper around that allows to apply a callback on the users (calls)
-// of a function
-void llvm::forEachCall(Function &F,
-                       const std::function<void(CallInst &)> &Callback) {
-  for (auto &Use : make_early_inc_range(F.uses())) {
-    if (auto *CInst = dyn_cast<CallInst>(Use.getUser()))
-      if (CInst->isCallee(&Use))
-        Callback(*CInst);
-  }
-}
-
-void llvm::forEachCall(Module &M,
-                       const std::function<void(CallInst &)> &Callback) {
-  for (auto &Func : M) {
-    forEachCall(Func, Callback);
-  }
-}
-
-void llvm::forEachCall(ArrayRef<Function *> Funcs,
-                       const std::function<void(CallInst &)> &Callback) {
-  for (auto *Func : Funcs) {
-    forEachCall(*Func, Callback);
-  }
 }
 
 void llvm::moveFunctionBody(Function &OldFunc, Function &NewFunc) {
@@ -105,13 +88,11 @@ llvm::findIntrImplEntryByIntrinsicCall(CallInst *Call) {
   if (!DialectUtils::isLgcRtOp(Call->getCalledFunction()))
     return std::nullopt;
 
-  auto Name = Call->getCalledFunction()->getName();
-  auto ImplEntry =
-      LgcRtGpuRtMap.find(DialectUtils::getLgcRtDialectOpName(Name));
+  auto ImplEntry = LgcRtGpuRtMap.find(*Call);
   if (ImplEntry == LgcRtGpuRtMap.end())
     report_fatal_error("Unhandled lgc.rt op!");
 
-  return ImplEntry->second;
+  return *ImplEntry.val();
 }
 
 bool llvm::removeUnusedFunctionDecls(Module *Mod, bool OnlyIntrinsics) {
