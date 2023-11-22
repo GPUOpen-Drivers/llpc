@@ -107,6 +107,10 @@ SpirvProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
   m_libFuncPtrs["AmdTraceRayGetStaticId"] = &SpirvProcessGpuRtLibrary::createGetStaticId;
   m_libFuncPtrs["AmdTraceRayGetKnownSetRayFlags"] = &SpirvProcessGpuRtLibrary::createGetKnownSetRayFlags;
   m_libFuncPtrs["AmdTraceRayGetKnownUnsetRayFlags"] = &SpirvProcessGpuRtLibrary::createGetKnownUnsetRayFlags;
+  m_libFuncPtrs["_AmdContStackAlloc"] = &SpirvProcessGpuRtLibrary::createContStackAlloc;
+  m_libFuncPtrs["_AmdContStackFree"] = &SpirvProcessGpuRtLibrary::createContStackFree;
+  m_libFuncPtrs["_AmdContStackGetPtr"] = &SpirvProcessGpuRtLibrary::createContStackGetPtr;
+  m_libFuncPtrs["_AmdContStackSetPtr"] = &SpirvProcessGpuRtLibrary::createContStackSetPtr;
 }
 
 // =====================================================================================================================
@@ -149,6 +153,17 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
     func->dropAllReferences();
     func->eraseFromParent();
     func = nullptr;
+    return;
+  }
+
+  // Special handling for _AmdContStackStore* and _AmdContStackLoad* to accept arbitrary type
+  if (funcName.startswith("_AmdContStackStore")) {
+    m_builder->SetInsertPoint(clearBlock(func));
+    createContStackStore(func);
+    return;
+  } else if (funcName.startswith("_AmdContStackLoad")) {
+    m_builder->SetInsertPoint(clearBlock(func));
+    createContStackLoad(func);
     return;
   }
 
@@ -710,22 +725,28 @@ void SpirvProcessGpuRtLibrary::createContStackSetPtr(llvm::Function *func) {
 }
 
 // =====================================================================================================================
-// Fill in function to load an i32 from given continuation stack address
+// Fill in function to load from given continuation stack address
 //
 // @param func : The function to create
-void SpirvProcessGpuRtLibrary::createContStackLoadI32(llvm::Function *func) {
+void SpirvProcessGpuRtLibrary::createContStackLoad(llvm::Function *func) {
+  auto loadTy = func->getReturnType();
   auto addr = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(0));
   auto ptr = m_builder->CreateIntToPtr(addr, m_builder->getPtrTy(cps::stackAddrSpace));
-  m_builder->CreateRet(m_builder->CreateLoad(m_builder->getInt32Ty(), ptr));
+  m_builder->CreateRet(m_builder->CreateLoad(loadTy, ptr));
 }
 
 // =====================================================================================================================
-// Fill in function to store an i32 to given continuation stack address
+// Fill in function to store to given continuation stack address
 //
 // @param func : The function to create
-void SpirvProcessGpuRtLibrary::createContStackStoreI32(llvm::Function *func) {
+void SpirvProcessGpuRtLibrary::createContStackStore(llvm::Function *func) {
+  MDNode *storeTypeMeta = func->getMetadata(gSPIRVMD::ContStackStoreType);
+  assert(storeTypeMeta);
+  const auto constMD = cast<ConstantAsMetadata>(storeTypeMeta->getOperand(0));
+  auto dataType = constMD->getType();
+
   auto addr = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(0));
-  auto data = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(1));
+  auto data = m_builder->CreateLoad(dataType, func->getArg(1));
   auto ptr = m_builder->CreateIntToPtr(addr, m_builder->getPtrTy(cps::stackAddrSpace));
   m_builder->CreateStore(data, ptr);
   m_builder->CreateRetVoid();
