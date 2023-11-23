@@ -3,7 +3,6 @@
 ; This test checks wave32 compute shaders
 
 ; RUN: amdllpc %gfxip -o - -filetype=asm %s | FileCheck -check-prefix=CHECK %s
-; REQUIRES: do-not-run-me
 
 [Version]
 version = 54
