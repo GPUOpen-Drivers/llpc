@@ -1985,14 +1985,16 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
             switch (node->getKind()) {
             case msgpack::Type::Int:
             case msgpack::Type::UInt: {
+              uint64_t data =
+                  (node->getKind() == msgpack::Type::UInt) ? node->getUInt() : static_cast<uint64_t>(node->getInt());
               if (msgIterStatus == MsgPackIteratorMapKey) {
-                unsigned regId = static_cast<unsigned>(node->getUInt());
+                unsigned regId = static_cast<unsigned>(data);
                 const char *regName = PipelineDumper::getRegisterNameString(regId);
 
                 snprintf(formatBuf, sizeof(formatBuf), "%-45s ", regName);
                 out << formatBuf;
               } else {
-                snprintf(formatBuf, sizeof(formatBuf), "0x%016" PRIX64 " ", node->getUInt());
+                snprintf(formatBuf, sizeof(formatBuf), "0x%016" PRIX64 " ", data);
                 out << formatBuf;
               }
               break;
