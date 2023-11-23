@@ -181,6 +181,7 @@ union Options {
     RayTracingIndirectMode rtIndirectMode; // Ray tracing indirect mode
     bool enablePrimGeneratedQuery;         // Whether to enable primitive generated counter
     bool enableFragColor;                  // If enabled, do frag color broadcast
+    bool useVtxBufOffsetMode;              // Use vertex buffer offset mode
     unsigned cpsFlags;                     // CPS feature flags
   };
 };

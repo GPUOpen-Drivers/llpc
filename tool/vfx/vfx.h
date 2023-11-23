@@ -535,6 +535,7 @@ struct GraphicsPipelineState {
   bool enableUberFetchShader;   // Use uber fetch shader
   bool enableEarlyCompile;      // Enable early compile
   bool enableColorExportShader; // Enable color export shader
+  bool useVtxBufOffsetMode;     // Use vertex buffer offset mode
 
   float tessLevelInner[2];
   float tessLevelOuter[4];
