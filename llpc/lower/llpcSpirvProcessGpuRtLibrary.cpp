@@ -36,6 +36,7 @@
 #include "lgc/Builder.h"
 #include "lgc/GpurtDialect.h"
 #include "lgc/LgcContext.h"
+#include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower-gpurt-library"
@@ -106,6 +107,10 @@ SpirvProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
   m_libFuncPtrs["AmdTraceRayGetStaticId"] = &SpirvProcessGpuRtLibrary::createGetStaticId;
   m_libFuncPtrs["AmdTraceRayGetKnownSetRayFlags"] = &SpirvProcessGpuRtLibrary::createGetKnownSetRayFlags;
   m_libFuncPtrs["AmdTraceRayGetKnownUnsetRayFlags"] = &SpirvProcessGpuRtLibrary::createGetKnownUnsetRayFlags;
+  m_libFuncPtrs["_AmdContStackAlloc"] = &SpirvProcessGpuRtLibrary::createContStackAlloc;
+  m_libFuncPtrs["_AmdContStackFree"] = &SpirvProcessGpuRtLibrary::createContStackFree;
+  m_libFuncPtrs["_AmdContStackGetPtr"] = &SpirvProcessGpuRtLibrary::createContStackGetPtr;
+  m_libFuncPtrs["_AmdContStackSetPtr"] = &SpirvProcessGpuRtLibrary::createContStackSetPtr;
 }
 
 // =====================================================================================================================
@@ -151,6 +156,17 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
     return;
   }
 
+  // Special handling for _AmdContStackStore* and _AmdContStackLoad* to accept arbitrary type
+  if (funcName.startswith("_AmdContStackStore")) {
+    m_builder->SetInsertPoint(clearBlock(func));
+    createContStackStore(func);
+    return;
+  } else if (funcName.startswith("_AmdContStackLoad")) {
+    m_builder->SetInsertPoint(clearBlock(func));
+    createContStackLoad(func);
+    return;
+  }
+
   // Create implementation for intrinsic functions.
   auto &gpurtFuncTable = LibraryFunctionTable::get().m_libFuncPtrs;
   auto gpurtFuncIt = gpurtFuncTable.find(funcName);
@@ -171,7 +187,7 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
 }
 
 // =====================================================================================================================
-// Create function to get stack size
+// Fill in function to get stack size
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createGetStackSize(Function *func) {
@@ -179,7 +195,7 @@ void SpirvProcessGpuRtLibrary::createGetStackSize(Function *func) {
 }
 
 // =====================================================================================================================
-// Create function to get stack base
+// Fill in function to get stack base
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createGetStackBase(Function *func) {
@@ -187,7 +203,7 @@ void SpirvProcessGpuRtLibrary::createGetStackBase(Function *func) {
 }
 
 // =====================================================================================================================
-// Create function to write LDS stack
+// Fill in function to write LDS stack
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createLdsWrite(Function *func) {
@@ -199,7 +215,7 @@ void SpirvProcessGpuRtLibrary::createLdsWrite(Function *func) {
 }
 
 // =====================================================================================================================
-// Create function to read LDS stack
+// Fill in function to read LDS stack
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createLdsRead(Function *func) {
@@ -209,7 +225,7 @@ void SpirvProcessGpuRtLibrary::createLdsRead(Function *func) {
 }
 
 // =====================================================================================================================
-// Create function to get stack stride
+// Fill in function to get stack stride
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createGetStackStride(Function *func) {
@@ -217,7 +233,7 @@ void SpirvProcessGpuRtLibrary::createGetStackStride(Function *func) {
 }
 
 // =====================================================================================================================
-// Create function to init stack LDS
+// Fill in function to init stack LDS
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createLdsStackInit(Function *func) {
@@ -225,7 +241,7 @@ void SpirvProcessGpuRtLibrary::createLdsStackInit(Function *func) {
 }
 
 // =====================================================================================================================
-// Create function to store stack LDS
+// Fill in function to store stack LDS
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createLdsStackStore(Function *func) {
@@ -238,7 +254,7 @@ void SpirvProcessGpuRtLibrary::createLdsStackStore(Function *func) {
 }
 
 // =====================================================================================================================
-// Create function to get box sort heuristic mode
+// Fill in function to get box sort heuristic mode
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createGetBoxSortHeuristicMode(Function *func) {
@@ -246,7 +262,7 @@ void SpirvProcessGpuRtLibrary::createGetBoxSortHeuristicMode(Function *func) {
 }
 
 // =====================================================================================================================
-// Create function to get static flags
+// Fill in function to get static flags
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createGetStaticFlags(Function *func) {
@@ -254,7 +270,7 @@ void SpirvProcessGpuRtLibrary::createGetStaticFlags(Function *func) {
 }
 
 // =====================================================================================================================
-// Create function to get triangle compression mode
+// Fill in function to get triangle compression mode
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createGetTriangleCompressionMode(Function *func) {
@@ -262,7 +278,7 @@ void SpirvProcessGpuRtLibrary::createGetTriangleCompressionMode(Function *func) 
 }
 
 // =====================================================================================================================
-// Create function to load 1 dword at given address
+// Fill in function to load 1 dword at given address
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createLoadDwordAtAddr(Function *func) {
@@ -270,7 +286,7 @@ void SpirvProcessGpuRtLibrary::createLoadDwordAtAddr(Function *func) {
 }
 
 // =====================================================================================================================
-// Create function to load 2 dwords at given address
+// Fill in function to load 2 dwords at given address
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createLoadDwordAtAddrx2(Function *func) {
@@ -279,7 +295,7 @@ void SpirvProcessGpuRtLibrary::createLoadDwordAtAddrx2(Function *func) {
 }
 
 // =====================================================================================================================
-// Create function to load 4 dwords at given address
+// Fill in function to load 4 dwords at given address
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createLoadDwordAtAddrx4(Function *func) {
@@ -288,7 +304,7 @@ void SpirvProcessGpuRtLibrary::createLoadDwordAtAddrx4(Function *func) {
 }
 
 // =====================================================================================================================
-// Create function to load dwords at given address based on given type
+// Fill in function to load dwords at given address based on given type
 //
 // @param func : The function to process
 // @param loadTy : Load type
@@ -316,7 +332,7 @@ void SpirvProcessGpuRtLibrary::createLoadDwordAtAddrWithType(Function *func, Typ
 }
 
 // =====================================================================================================================
-// Create function to convert f32 to f16 with rounding toward negative
+// Fill in function to convert f32 to f16 with rounding toward negative
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createConvertF32toF16NegInf(Function *func) {
@@ -324,7 +340,7 @@ void SpirvProcessGpuRtLibrary::createConvertF32toF16NegInf(Function *func) {
 }
 
 // =====================================================================================================================
-// Create function to convert f32 to f16 with rounding toward positive
+// Fill in function to convert f32 to f16 with rounding toward positive
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createConvertF32toF16PosInf(Function *func) {
@@ -332,7 +348,7 @@ void SpirvProcessGpuRtLibrary::createConvertF32toF16PosInf(Function *func) {
 }
 
 // =====================================================================================================================
-// Create function to convert f32 to f16 with given rounding mode
+// Fill in function to convert f32 to f16 with given rounding mode
 //
 // @param func : The function to process
 // @param rm : Rounding mode
@@ -351,7 +367,7 @@ void SpirvProcessGpuRtLibrary::createConvertF32toF16WithRoundingMode(Function *f
 }
 
 // =====================================================================================================================
-// Create function to return bvh node intersection result
+// Fill in function to return bvh node intersection result
 //
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createIntersectBvh(Function *func) {
@@ -463,7 +479,7 @@ Value *SpirvProcessGpuRtLibrary::createGetBvhSrd(llvm::Value *expansion, llvm::V
 }
 
 // =====================================================================================================================
-// Create function to sample gpu timer
+// Fill in function to sample gpu timer
 //
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createSampleGpuTimer(llvm::Function *func) {
@@ -483,7 +499,7 @@ void SpirvProcessGpuRtLibrary::createSampleGpuTimer(llvm::Function *func) {
 }
 
 // =====================================================================================================================
-// Create function to get flattened group thread ID
+// Fill in function to get flattened group thread ID
 //
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createGetFlattenedGroupThreadId(llvm::Function *func) {
@@ -491,7 +507,7 @@ void SpirvProcessGpuRtLibrary::createGetFlattenedGroupThreadId(llvm::Function *f
 }
 
 // =====================================================================================================================
-// Create function to get hit attributes
+// Fill in function to get hit attributes
 //
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createGetHitAttributes(llvm::Function *func) {
@@ -503,7 +519,7 @@ void SpirvProcessGpuRtLibrary::createGetHitAttributes(llvm::Function *func) {
 }
 
 // =====================================================================================================================
-// Create function to set hit attributes
+// Fill in function to set hit attributes
 //
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createSetHitAttributes(llvm::Function *func) {
@@ -521,7 +537,7 @@ void SpirvProcessGpuRtLibrary::createSetHitAttributes(llvm::Function *func) {
 }
 
 // =====================================================================================================================
-// Create function to set trace parameters
+// Fill in function to set trace parameters
 //
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createSetTraceParams(llvm::Function *func) {
@@ -540,7 +556,7 @@ void SpirvProcessGpuRtLibrary::createSetTraceParams(llvm::Function *func) {
 }
 
 // =====================================================================================================================
-// Create function to call closest-hit shader
+// Fill in function to call closest-hit shader
 //
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createCallClosestHitShader(llvm::Function *func) {
@@ -550,7 +566,7 @@ void SpirvProcessGpuRtLibrary::createCallClosestHitShader(llvm::Function *func) 
 }
 
 // =====================================================================================================================
-// Create function to call miss shader
+// Fill in function to call miss shader
 //
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createCallMissShader(llvm::Function *func) {
@@ -560,7 +576,7 @@ void SpirvProcessGpuRtLibrary::createCallMissShader(llvm::Function *func) {
 }
 
 // =====================================================================================================================
-// Create function to call triangle any-hit shader
+// Fill in function to call triangle any-hit shader
 //
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createCallTriangleAnyHitShader(llvm::Function *func) {
@@ -575,7 +591,7 @@ void SpirvProcessGpuRtLibrary::createCallTriangleAnyHitShader(llvm::Function *fu
 }
 
 // =====================================================================================================================
-// Create function to call intersection shader
+// Fill in function to call intersection shader
 //
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createCallIntersectionShader(llvm::Function *func) {
@@ -587,7 +603,7 @@ void SpirvProcessGpuRtLibrary::createCallIntersectionShader(llvm::Function *func
 }
 
 // =====================================================================================================================
-// Create function to set triangle intersection attributes
+// Fill in function to set triangle intersection attributes
 //
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createSetTriangleIntersectionAttributes(llvm::Function *func) {
@@ -597,7 +613,7 @@ void SpirvProcessGpuRtLibrary::createSetTriangleIntersectionAttributes(llvm::Fun
 }
 
 // =====================================================================================================================
-// Create function to set hit triangle node pointer
+// Fill in function to set hit triangle node pointer
 //
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createSetHitTriangleNodePointer(llvm::Function *func) {
@@ -608,7 +624,7 @@ void SpirvProcessGpuRtLibrary::createSetHitTriangleNodePointer(llvm::Function *f
 }
 
 // =====================================================================================================================
-// Create function to get parent ID
+// Fill in function to get parent ID
 //
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createGetParentId(llvm::Function *func) {
@@ -616,7 +632,7 @@ void SpirvProcessGpuRtLibrary::createGetParentId(llvm::Function *func) {
 }
 
 // =====================================================================================================================
-// Create function to get set parent ID
+// Fill in function to get set parent ID
 //
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createSetParentId(llvm::Function *func) {
@@ -626,7 +642,7 @@ void SpirvProcessGpuRtLibrary::createSetParentId(llvm::Function *func) {
 }
 
 // =====================================================================================================================
-// Create function to get dispatch ray index
+// Fill in function to get dispatch ray index
 //
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createDispatchRayIndex(llvm::Function *func) {
@@ -634,23 +650,106 @@ void SpirvProcessGpuRtLibrary::createDispatchRayIndex(llvm::Function *func) {
 }
 
 // =====================================================================================================================
-// Create function to get ray static ID
+// Fill in function to get ray static ID
 //
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createGetStaticId(llvm::Function *func) {
   m_builder->CreateRet(m_builder->create<GpurtGetRayStaticIdOp>());
 }
 
+// =====================================================================================================================
+// Fill in function to get known set ray flags
+//
+// @param func : The function to create
 void SpirvProcessGpuRtLibrary::createGetKnownSetRayFlags(llvm::Function *func) {
   // TODO: currently return 0 to indicate that there is no known set
   // We will probably need to analyse the traceRay ray flags for actual value
   m_builder->CreateRet(m_builder->getInt32(0));
 }
 
+// =====================================================================================================================
+// Fill in function to get known unset ray flags
+//
+// @param func : The function to create
 void SpirvProcessGpuRtLibrary::createGetKnownUnsetRayFlags(llvm::Function *func) {
   // TODO: return 0 to indicate there is no knownUnset bits
   // We will probably need to analyse the traceRay ray flags for actual value
   m_builder->CreateRet(m_builder->getInt32(0));
+}
+
+// =====================================================================================================================
+// Fill in function to allocate continuation stack pointer
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createContStackAlloc(llvm::Function *func) {
+  Value *byteSize = nullptr;
+  if (func->arg_size() == 2) {
+    // TODO: Remove this when refactoring is done.
+    // Ignore the first argument.
+    byteSize = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(1));
+  } else {
+    assert(func->arg_size() == 1);
+    byteSize = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(0));
+  }
+  auto stackPtr = m_builder->create<cps::AllocOp>(byteSize);
+  m_builder->CreateRet(m_builder->CreatePtrToInt(stackPtr, m_builder->getInt32Ty()));
+}
+
+// =====================================================================================================================
+// Fill in function to free continuation stack pointer
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createContStackFree(llvm::Function *func) {
+  Value *byteSize = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(0));
+  m_builder->create<cps::FreeOp>(byteSize);
+  m_builder->CreateRetVoid();
+}
+
+// =====================================================================================================================
+// Fill in function to get continuation stack pointer
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createContStackGetPtr(llvm::Function *func) {
+  auto stackPtr = m_builder->create<cps::GetVspOp>();
+  m_builder->CreateRet(m_builder->CreatePtrToInt(stackPtr, m_builder->getInt32Ty()));
+}
+
+// =====================================================================================================================
+// Fill in function to set continuation stack pointer
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createContStackSetPtr(llvm::Function *func) {
+  auto csp = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(0));
+  m_builder->create<cps::SetVspOp>(m_builder->CreateIntToPtr(csp, m_builder->getPtrTy(cps::stackAddrSpace)));
+  m_builder->CreateRetVoid();
+}
+
+// =====================================================================================================================
+// Fill in function to load from given continuation stack address
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createContStackLoad(llvm::Function *func) {
+  auto loadTy = func->getReturnType();
+  auto addr = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(0));
+  auto ptr = m_builder->CreateIntToPtr(addr, m_builder->getPtrTy(cps::stackAddrSpace));
+  m_builder->CreateRet(m_builder->CreateLoad(loadTy, ptr));
+}
+
+// =====================================================================================================================
+// Fill in function to store to given continuation stack address
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createContStackStore(llvm::Function *func) {
+  MDNode *storeTypeMeta = func->getMetadata(gSPIRVMD::ContStackStoreType);
+  assert(storeTypeMeta);
+  const auto constMD = cast<ConstantAsMetadata>(storeTypeMeta->getOperand(0));
+  auto dataType = constMD->getType();
+
+  auto addr = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(0));
+  auto data = m_builder->CreateLoad(dataType, func->getArg(1));
+  auto ptr = m_builder->CreateIntToPtr(addr, m_builder->getPtrTy(cps::stackAddrSpace));
+  m_builder->CreateStore(data, ptr);
+  m_builder->CreateRetVoid();
 }
 
 } // namespace Llpc

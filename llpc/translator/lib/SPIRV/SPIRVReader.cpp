@@ -6525,6 +6525,14 @@ Function *SPIRVToLLVM::transFunction(SPIRVFunction *bf) {
 
   m_blockPredecessorToCount.clear();
 
+  // Special handling for GPURT intrinsic function _AmdContStackStore* to rescue the stored pointee type
+  if (f->getName().startswith("_AmdContStackStore")) {
+    assert(f->arg_size() == 2);
+    Type *pointeeType = getPointeeType(bf->getArgument(1));
+    Metadata *MD = ConstantAsMetadata::get(PoisonValue::get(pointeeType));
+    f->setMetadata(gSPIRVMD::ContStackStoreType, MDNode::get(*m_context, MD));
+  }
+
   return f;
 }
 
