@@ -3,7 +3,7 @@
 ; RUN: amdllpc -v -gfxip 9.0.0 -enable-relocatable-shader-elf %s | FileCheck -check-prefix=SHADERTEST %s
 ; RUN: amdllpc -v -gfxip 9.0.0 -enable-part-pipeline=0 %s | FileCheck -check-prefix=SHADERTEST2_PP0 %s
 ; RUN: amdllpc -v -gfxip 9.0.0 -enable-part-pipeline=1 %s | FileCheck -check-prefix=SHADERTEST2_PP1 %s
-; REQUIRES: do-not-run-me
+
 [Version]
 version = 40
 
