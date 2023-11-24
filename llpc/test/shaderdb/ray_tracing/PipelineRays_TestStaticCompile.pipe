@@ -6,7 +6,6 @@
 ; SHADERTEST-LABEL: _amdgpu_cs_main:
 ; SHADERTEST: image_bvh64_intersect_ray
 ; SHADERTEST: AMDLLPC SUCCESS
-; REQUIRES: do-not-run-me
 ; END_SHADERTEST
 
 [Version]
