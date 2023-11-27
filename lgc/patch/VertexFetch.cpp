@@ -905,7 +905,7 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, Value *descPtr, 
     wholeVertex = builder.CreateIntrinsic(instId, fetchType, args, {});
     if (is64bitFetch) {
       // If it is 64-bit, we need the second fetch
-      args[offsetIdx] = builder.CreateAdd(args[2], builder.getInt32(SizeOfVec4));
+      args[offsetIdx] = builder.CreateAdd(args[offsetIdx], builder.getInt32(SizeOfVec4));
       auto secondFetch = builder.CreateIntrinsic(instId, fetchType, args, {});
       wholeVertex = builder.CreateShuffleVector(wholeVertex, secondFetch, ArrayRef<int>{0, 1, 2, 3, 4, 5, 6, 7});
     }
