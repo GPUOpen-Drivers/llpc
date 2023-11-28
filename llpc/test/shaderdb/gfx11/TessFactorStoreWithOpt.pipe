@@ -140,7 +140,7 @@
 
 ; SHADERTEST-LABEL: .endTryStoreTf:
 ; SHADERTEST-NEXT: ret void
-  
+
 [Version]
 version = 57
 
