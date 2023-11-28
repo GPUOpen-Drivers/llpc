@@ -590,27 +590,44 @@ void SpirvLowerGlobal::mapGlobalVariableToProxy(GlobalVariable *globalVar) {
   const auto &dataLayout = m_module->getDataLayout();
   Type *globalVarTy = globalVar->getValueType();
 
-  m_builder->SetInsertPointPastAllocas(m_entryPoint);
-
   Value *proxy = nullptr;
-
+  assert(m_entryPoint);
+  removeConstantExpr(m_context, globalVar);
   // Handle special globals, regular allocas will be removed by SROA pass.
-  if (globalVar->getName().startswith(RtName::HitAttribute))
+  if (globalVar->getName().startswith(RtName::HitAttribute)) {
     proxy = m_entryPoint->getArg(1);
-  else if (globalVar->getName().startswith(RtName::IncomingRayPayLoad))
+    globalVar->replaceAllUsesWith(proxy);
+  } else if (globalVar->getName().startswith(RtName::IncomingRayPayLoad)) {
     proxy = m_entryPoint->getArg(0);
-  else if (globalVar->getName().startswith(RtName::IncomingCallableData))
+    globalVar->replaceAllUsesWith(proxy);
+  } else if (globalVar->getName().startswith(RtName::IncomingCallableData)) {
     proxy = m_entryPoint->getArg(0);
-  else
-    proxy = m_builder->CreateAlloca(globalVarTy, dataLayout.getAllocaAddrSpace(), nullptr,
-                                    Twine(LlpcName::GlobalProxyPrefix) + globalVar->getName());
+    globalVar->replaceAllUsesWith(proxy);
+  } else {
+    // Collect used functions
+    SmallSet<Function *, 4> funcs;
+    for (User *user : globalVar->users()) {
+      auto inst = cast<Instruction>(user);
+      funcs.insert(inst->getFunction());
+    }
+    for (Function *func : funcs) {
+      m_builder->SetInsertPointPastAllocas(func);
+      proxy = m_builder->CreateAlloca(globalVarTy, dataLayout.getAllocaAddrSpace(), nullptr,
+                                      Twine(LlpcName::GlobalProxyPrefix) + globalVar->getName());
 
-  if (globalVar->hasInitializer()) {
-    auto initializer = globalVar->getInitializer();
-    m_builder->CreateStore(initializer, proxy);
+      if (globalVar->hasInitializer()) {
+        auto initializer = globalVar->getInitializer();
+        m_builder->CreateStore(initializer, proxy);
+      }
+      globalVar->mutateType(proxy->getType());
+      globalVar->replaceUsesWithIf(proxy, [func](Use &U) {
+        Instruction *userInst = cast<Instruction>(U.getUser());
+        return userInst->getFunction() == func;
+      });
+    }
   }
 
-  m_globalVarProxyMap[globalVar] = proxy;
+  m_globalVarProxy.insert(globalVar);
 }
 
 // =====================================================================================================================
@@ -687,20 +704,17 @@ void SpirvLowerGlobal::mapOutputToProxy(GlobalVariable *output) {
 // =====================================================================================================================
 // Does lowering operations for SPIR-V global variables, replaces global variables with proxy variables.
 void SpirvLowerGlobal::lowerGlobalVar() {
-  if (m_globalVarProxyMap.empty()) {
+  if (m_globalVarProxy.empty()) {
     // Skip lowering if there is no global variable
     return;
   }
 
-  // Replace global variable with proxy variable
-  for (auto globalVarMap : m_globalVarProxyMap) {
-    auto globalVar = cast<GlobalVariable>(globalVarMap.first);
-    auto proxy = globalVarMap.second;
-    globalVar->mutateType(proxy->getType()); // To clear address space for pointer to make replacement valid
-    globalVar->replaceAllUsesWith(proxy);
+  // remove global variables
+  for (auto globalVar : m_globalVarProxy) {
     globalVar->dropAllReferences();
     globalVar->eraseFromParent();
   }
+  m_globalVarProxy.clear();
 }
 
 // =====================================================================================================================
