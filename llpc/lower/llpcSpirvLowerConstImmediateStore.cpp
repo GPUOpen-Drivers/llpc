@@ -59,6 +59,7 @@ PreservedAnalyses SpirvLowerConstImmediateStore::run(Module &module, ModuleAnaly
   // Process "alloca" instructions to see if they can be optimized to a read-only global
   // variable.
   bool changed = false;
+  m_allocToGlobals.clear();
   for (auto &func : module.functions()) {
     if (!func.empty()) {
       if (processAllocaInsts(&func))
@@ -222,10 +223,17 @@ bool SpirvLowerConstImmediateStore::tryProcessAlloca(AllocaInst *allocaInst) {
   }
 
   // Step 3: Create the global variable and replace the alloca
-  auto global = new GlobalVariable(*m_module, allocatedTy,
-                                   true, // isConstant
-                                   GlobalValue::InternalLinkage, initializer, "", nullptr, GlobalValue::NotThreadLocal,
-                                   SPIRAS_Constant);
+  GlobalVariable *global = nullptr;
+  auto iter = m_allocToGlobals.find(initializer);
+  if (iter == m_allocToGlobals.end()) {
+    global = new GlobalVariable(*m_module, allocatedTy,
+                                true, // isConstant
+                                GlobalValue::InternalLinkage, initializer, "", nullptr, GlobalValue::NotThreadLocal,
+                                SPIRAS_Constant);
+    m_allocToGlobals[initializer] = global;
+  } else {
+    global = iter->second;
+  }
   global->takeName(allocaInst);
 
   for (Use &use : llvm::make_early_inc_range(allocaInst->uses()))
