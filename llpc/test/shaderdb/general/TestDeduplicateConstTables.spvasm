@@ -1,0 +1,120 @@
+; BEGIN_SHADERTEST
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
+; SHADERTEST: store [2 x <4 x i32>] [<4 x i32> <i32 1059055552, i32 1057692236, i32 1062465857
+; SHADERTEST: store [2 x <4 x i32>] [<4 x i32> <i32 1059055552, i32 1057692236, i32 1062465857
+; SHADERTEST: store [2 x <4 x i32>] [<4 x i32> <i32 1059055552, i32 1057692236, i32 1062465857
+
+; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
+; SHADERTEST: [[VAR:@.*]] = internal unnamed_addr addrspace(4) constant [2 x <4 x i32>] [<4 x i32> <i32 1059055552, i32 1057692236, i32 1062465857, i32 0
+; SHADERTEST: getelementptr [2 x <4 x i32>], ptr addrspace(4) [[VAR]]
+; SHADERTEST: getelementptr [2 x <4 x i32>], ptr addrspace(4) [[VAR]]
+; SHADERTEST: getelementptr [2 x <4 x i32>], ptr addrspace(4) [[VAR]]
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+
+; SPIR-V
+; Version: 1.6
+; Generator: Khronos Glslang Reference Front End; 11
+; Bound: 70
+; Schema: 0
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %_out %_
+               OpExecutionMode %main OriginUpperLeft
+               OpSource GLSL 460
+               OpName %main "main"
+               OpName %i "i"
+               OpName %_out "_out"
+               OpName %Uniforms "Uniforms"
+               OpMemberName %Uniforms 0 "in1"
+               OpName %_ ""
+               OpDecorate %_out Location 0
+               OpMemberDecorate %Uniforms 0 Offset 0
+               OpDecorate %Uniforms Block
+               OpDecorate %_ DescriptorSet 0
+               OpDecorate %_ Binding 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+       %uint = OpTypeInt 32 0
+%_ptr_Function_uint = OpTypePointer Function %uint
+     %uint_0 = OpConstant %uint 0
+     %uint_2 = OpConstant %uint 2
+       %bool = OpTypeBool
+      %float = OpTypeFloat 32
+    %v4float = OpTypeVector %float 4
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+       %_out = OpVariable %_ptr_Output_v4float Output
+     %v4uint = OpTypeVector %uint 4
+%_arr_v4uint_uint_2 = OpTypeArray %v4uint %uint_2
+%uint_1059055552 = OpConstant %uint 1059055552
+%uint_1057692236 = OpConstant %uint 1057692236
+%uint_1062465857 = OpConstant %uint 1062465857
+         %29 = OpConstantComposite %v4uint %uint_1059055552 %uint_1057692236 %uint_1062465857 %uint_0
+%uint_3188284415 = OpConstant %uint 3188284415
+%uint_3211912104 = OpConstant %uint 3211912104
+%uint_1064587336 = OpConstant %uint 1064587336
+         %33 = OpConstantComposite %v4uint %uint_3188284415 %uint_3211912104 %uint_1064587336 %uint_0
+         %34 = OpConstantComposite %_arr_v4uint_uint_2 %29 %33
+        %int = OpTypeInt 32 1
+   %Uniforms = OpTypeStruct %int
+%_ptr_Uniform_Uniforms = OpTypePointer Uniform %Uniforms
+          %_ = OpVariable %_ptr_Uniform_Uniforms Uniform
+      %int_0 = OpConstant %int 0
+%_ptr_Uniform_int = OpTypePointer Uniform %int
+%_ptr_Function__arr_v4uint_uint_2 = OpTypePointer Function %_arr_v4uint_uint_2
+     %uint_1 = OpConstant %uint 1
+     %v2uint = OpTypeVector %uint 2
+%_ptr_Function_v4uint = OpTypePointer Function %v4uint
+    %v2float = OpTypeVector %float 2
+      %int_1 = OpConstant %int 1
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+          %i = OpVariable %_ptr_Function_uint Function
+  %indexable = OpVariable %_ptr_Function__arr_v4uint_uint_2 Function
+%indexable_0 = OpVariable %_ptr_Function__arr_v4uint_uint_2 Function
+%indexable_1 = OpVariable %_ptr_Function__arr_v4uint_uint_2 Function
+               OpStore %indexable %34
+               OpStore %indexable_0 %34
+               OpStore %indexable_1 %34
+               OpStore %i %uint_0
+               OpBranch %10
+         %10 = OpLabel
+               OpLoopMerge %12 %13 None
+               OpBranch %14
+         %14 = OpLabel
+         %15 = OpLoad %uint %i
+         %18 = OpULessThan %bool %15 %uint_2
+               OpBranchConditional %18 %11 %12
+         %11 = OpLabel
+         %23 = OpLoad %v4float %_out
+         %41 = OpAccessChain %_ptr_Uniform_int %_ %int_0
+         %42 = OpLoad %int %41
+         %45 = OpAccessChain %_ptr_Function_uint %indexable %42 %uint_0
+         %46 = OpLoad %uint %45
+         %47 = OpConvertUToF %float %46
+         %48 = OpLoad %uint %i
+         %51 = OpAccessChain %_ptr_Function_uint %indexable_0 %48 %uint_1
+         %52 = OpLoad %uint %51
+         %53 = OpConvertUToF %float %52
+         %54 = OpLoad %uint %i
+         %58 = OpAccessChain %_ptr_Function_v4uint %indexable_1 %54
+         %59 = OpLoad %v4uint %58
+         %60 = OpVectorShuffle %v2uint %59 %59 3 0
+         %62 = OpConvertUToF %v2float %60
+         %63 = OpCompositeExtract %float %62 0
+         %64 = OpCompositeExtract %float %62 1
+         %65 = OpCompositeConstruct %v4float %47 %53 %63 %64
+         %66 = OpFAdd %v4float %23 %65
+               OpStore %_out %66
+               OpBranch %13
+         %13 = OpLabel
+         %67 = OpLoad %uint %i
+         %69 = OpIAdd %uint %67 %int_1
+               OpStore %i %69
+               OpBranch %10
+         %12 = OpLabel
+               OpReturn
+               OpFunctionEnd
