@@ -2065,7 +2065,7 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
         offset += noteHeaderSize + noteNameSize + alignTo(node->descSize, sizeof(unsigned));
         assert(offset <= section->secHead.sh_size);
       }
-    } else if (strcmp(section->name, RelocName) == 0) {
+    } else if (strcmp(section->name, RelocName) == 0 || strcmp(section->name, RelocAName) == 0) {
       // Output .reloc section
       out << section->name << " (size = " << section->secHead.sh_size << " bytes)\n";
       const unsigned relocCount = reader.getRelocationCount();
@@ -2075,7 +2075,10 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
         ElfSymbol elfSym = {};
         reader.getSymbol(reloc.symIdx, &elfSym);
         snprintf(formatBuf, sizeof(formatBuf), "    %-35s", elfSym.pSymName);
-        out << "#" << i << "    " << formatBuf << "    offset = " << reloc.offset << "\n";
+        out << "#" << i << "    " << formatBuf << "    offset = " << reloc.offset;
+        if (reloc.useExplicitAddend)
+          out << ", addend = " << reloc.addend;
+        out << "\n";
       }
     } else if (strncmp(section->name, AmdGpuConfigName, sizeof(AmdGpuConfigName) - 1) == 0) {
       // Output .AMDGPU.config section

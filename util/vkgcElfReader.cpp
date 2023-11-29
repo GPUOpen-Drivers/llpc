@@ -137,6 +137,8 @@ template <class Elf> Result ElfReader<Elf>::ReadFromBuffer(const void *buffer, s
   // Get section index
   m_symSecIdx = GetSectionIndex(SymTabName);
   m_relocSecIdx = GetSectionIndex(RelocName);
+  if (m_relocSecIdx < 0)
+    m_relocSecIdx = GetSectionIndex(RelocAName);
   m_strtabSecIdx = GetSectionIndex(StrTabName);
   m_textSecIdx = GetSectionIndex(TextName);
 
@@ -210,14 +212,24 @@ template <class Elf> unsigned ElfReader<Elf>::getRelocationCount() const {
 // @param idx : Relocation index
 // @param [out] reloc : Info of the relocation
 template <class Elf> void ElfReader<Elf>::getRelocation(unsigned idx, ElfReloc *reloc) const {
-  auto &section = m_sections[m_relocSecIdx];
+  auto *section = m_sections[m_relocSecIdx];
 
-  auto relocs = reinterpret_cast<const typename Elf::Reloc *>(section->data);
-  reloc->offset = relocs[idx].r_offset;
-  reloc->symIdx = relocs[idx].r_symbol;
-  reloc->type = relocs[idx].r_type;
-  reloc->addend = 0;
-  reloc->useExplicitAddend = false;
+  if (section->secHead.sh_type == SHT_REL) {
+    auto relocs = reinterpret_cast<const typename Elf::Reloc *>(section->data);
+    reloc->offset = relocs[idx].r_offset;
+    reloc->symIdx = relocs[idx].r_symbol;
+    reloc->type = relocs[idx].r_type;
+    reloc->addend = 0;
+    reloc->useExplicitAddend = false;
+  } else {
+    assert(section->secHead.sh_type == SHT_RELA);
+    auto relocs = reinterpret_cast<const typename Elf::RelocA *>(section->data);
+    reloc->offset = relocs[idx].r_offset;
+    reloc->symIdx = relocs[idx].r_symbol;
+    reloc->type = relocs[idx].r_type;
+    reloc->addend = relocs[idx].r_addend;
+    reloc->useExplicitAddend = true;
+  }
 }
 
 // =====================================================================================================================
