@@ -178,10 +178,11 @@ union Options {
     bool fragCoordUsesInterpLoc;  // Determining fragCoord use InterpLoc
     bool disableSampleMask;       // Disable export of sample mask from PS
     unsigned reserved20;
-    RayTracingIndirectMode rtIndirectMode; // Ray tracing indirect mode
-    bool enablePrimGeneratedQuery;         // Whether to enable primitive generated counter
-    bool enableFragColor;                  // If enabled, do frag color broadcast
-    unsigned cpsFlags;                     // CPS feature flags
+    RayTracingIndirectMode rtIndirectMode;   // Ray tracing indirect mode
+    bool enablePrimGeneratedQuery;           // Whether to enable primitive generated counter
+    bool enableFragColor;                    // If enabled, do frag color broadcast
+    bool useSoftwareVertexBufferDescriptors; // Use software vertex buffer descriptors to structure SRD.
+    unsigned cpsFlags;                       // CPS feature flags
   };
 };
 static_assert(sizeof(Options) == sizeof(Options::u32All));

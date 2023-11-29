@@ -249,6 +249,7 @@ Options GraphicsContext::computePipelineOptions() const {
   auto pipelineInfo = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo());
   options.enableUberFetchShader = pipelineInfo->enableUberFetchShader;
   options.enableColorExportShader = pipelineInfo->enableColorExportShader;
+  options.useSoftwareVertexBufferDescriptors = pipelineInfo->useSoftwareVertexBufferDescriptors;
   if (getGfxIpVersion().major >= 10) {
     // Only set NGG options for a GFX10+ graphics pipeline.
     const auto &nggState = pipelineInfo->nggState;

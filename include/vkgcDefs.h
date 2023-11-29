@@ -49,7 +49,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 70
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 1
+#define LLPC_INTERFACE_MINOR_VERSION 2
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -80,6 +80,7 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     70.2 | Add useSoftwareVertexBufferDescriptors to GraphicsPipelineBuildInfo                                   |
 //  |     70.1 | Add cpsFlags to RayTracingPipelineBuildInfo                                                           |
 //  |     70.0 | Add enablePrimGeneratedQuery to PipelineOptions                                                       |
 //  |     69.1 | Add useBarycentric to ShaderModuleUsage                                                               |
@@ -1361,14 +1362,15 @@ struct GraphicsPipelineBuildInfo {
     ColorTarget target[MaxColorTargets]; ///< Per-MRT color target info
   } cbState;                             ///< Color target state
 
-  NggState nggState;            ///< NGG state used for tuning and debugging
-  PipelineOptions options;      ///< Per pipeline tuning/debugging options
-  bool unlinked;                ///< True to build an "unlinked" half-pipeline ELF
-  bool dynamicVertexStride;     ///< Dynamic Vertex input Stride is enabled.
-  bool enableUberFetchShader;   ///< Use uber fetch shader
-  bool enableColorExportShader; ///< Explicitly build color export shader, UnlinkedStageFragment elf will
-                                ///  return extra meta data.
-  bool enableEarlyCompile;      ///< Whether enable early compile
+  NggState nggState;                       ///< NGG state used for tuning and debugging
+  PipelineOptions options;                 ///< Per pipeline tuning/debugging options
+  bool unlinked;                           ///< True to build an "unlinked" half-pipeline ELF
+  bool dynamicVertexStride;                ///< Dynamic Vertex input Stride is enabled.
+  bool enableUberFetchShader;              ///< Use uber fetch shader
+  bool enableColorExportShader;            ///< Explicitly build color export shader, UnlinkedStageFragment elf will
+                                           ///  return extra meta data.
+  bool enableEarlyCompile;                 ///< Whether enable early compile
+  bool useSoftwareVertexBufferDescriptors; ///< Use software vertex buffer descriptors to structure SRD.
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   BinaryData shaderLibrary; ///< SPIR-V library binary data
 #endif

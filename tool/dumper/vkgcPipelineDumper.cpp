@@ -953,6 +953,7 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "enableUberFetchShader = " << pipelineInfo->enableUberFetchShader << "\n";
   dumpFile << "enableEarlyCompile = " << pipelineInfo->enableEarlyCompile << "\n";
   dumpFile << "enableColorExportShader = " << pipelineInfo->enableColorExportShader << "\n";
+  dumpFile << "useSoftwareVertexBufferDescriptors = " << pipelineInfo->useSoftwareVertexBufferDescriptors << "\n";
   dumpPipelineOptions(&pipelineInfo->options, dumpFile);
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
@@ -1573,6 +1574,7 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 70
   hasher->Update(pipeline->apiXfbOutData.forceEnablePrimStats);
 #endif
+  hasher->Update(pipeline->useSoftwareVertexBufferDescriptors);
 }
 
 // =====================================================================================================================
