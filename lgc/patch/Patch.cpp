@@ -40,6 +40,7 @@
 #include "lgc/patch/FragColorExport.h"
 #include "lgc/patch/LowerCooperativeMatrix.h"
 #include "lgc/patch/LowerDebugPrintf.h"
+#include "lgc/patch/LowerGpuRt.h"
 #include "lgc/patch/PatchBufferOp.h"
 #include "lgc/patch/PatchCheckShaderCache.h"
 #include "lgc/patch/PatchCopyShader.h"
@@ -140,6 +141,8 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
                                     "===============================================================================\n"
                                     "// LLPC pipeline before-patching results\n"));
   }
+
+  passMgr.addPass(LowerGpuRt());
 
   const auto indirectMode = pipelineState->getOptions().rtIndirectMode;
   if (indirectMode == RayTracingIndirectMode::ContinuationsContinufy ||

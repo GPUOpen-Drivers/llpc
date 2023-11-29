@@ -25,16 +25,18 @@
 /**
  ***********************************************************************************************************************
  * @file  LowerGpuRt.h
- * @brief LLPC header file: contains declaration of Llpc::LowerGpuRt
+ * @brief LGC header file: contains declaration of lgc::LowerGpuRt
  ***********************************************************************************************************************
  */
 #pragma once
 
-#include "llpcSpirvLower.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/IR/PassManager.h"
 
 namespace lgc {
+class BuilderImpl;
+class PipelineState;
+
 class GpurtGetStackSizeOp;
 class GpurtGetStackBaseOp;
 class GpurtGetStackStrideOp;
@@ -46,16 +48,9 @@ class GpurtGetBoxSortHeuristicModeOp;
 class GpurtGetStaticFlagsOp;
 class GpurtGetTriangleCompressionModeOp;
 class GpurtGetFlattenedGroupThreadIdOp;
-} // namespace lgc
 
-namespace llvm {
-class AllocaInst;
-}
-
-namespace Llpc {
-class LowerGpuRt : public SpirvLower, public llvm::PassInfoMixin<LowerGpuRt> {
+class LowerGpuRt : public llvm::PassInfoMixin<LowerGpuRt> {
 public:
-  LowerGpuRt();
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
 private:
@@ -63,7 +58,7 @@ private:
   const static unsigned MaxLdsStackEntries = 16;
   uint32_t getWorkgroupSize() const;
   llvm::Value *getThreadIdInGroup() const;
-  void createGlobalStack();
+  void createGlobalStack(llvm::Module &module);
   void createRayStaticIdValue();
   void visitGetStackSize(lgc::GpurtGetStackSizeOp &inst);
   void visitGetStackBase(lgc::GpurtGetStackBaseOp &inst);
@@ -76,10 +71,11 @@ private:
   void visitGetStaticFlags(lgc::GpurtGetStaticFlagsOp &inst);
   void visitGetTriangleCompressionMode(lgc::GpurtGetTriangleCompressionModeOp &inst);
   void visitGetFlattenedGroupThreadId(lgc::GpurtGetFlattenedGroupThreadIdOp &inst);
-  llvm::Value *m_stack;                                  // Stack array to hold stack value
-  llvm::Type *m_stackTy;                                 // Stack type
-  bool m_lowerStack;                                     // If it is lowerStack
+  llvm::Value *m_stack = nullptr;                        // Stack array to hold stack value
+  llvm::Type *m_stackTy = nullptr;                       // Stack type
+  PipelineState *m_pipelineState = nullptr;              // Pipeline state
   llvm::SmallVector<llvm::Instruction *> m_callsToLower; // Call instruction to lower
   llvm::SmallSet<llvm::Function *, 4> m_funcsToLower;    // Functions to lower
+  BuilderImpl *m_builder = nullptr;
 };
-} // namespace Llpc
+} // namespace lgc

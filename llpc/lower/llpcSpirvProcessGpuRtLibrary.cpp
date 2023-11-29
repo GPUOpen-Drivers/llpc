@@ -211,7 +211,7 @@ void SpirvProcessGpuRtLibrary::createLdsWrite(Function *func) {
   auto int32ty = m_builder->getInt32Ty();
   Value *stackOffset = m_builder->CreateLoad(int32ty, argIt++);
   Value *stackData = m_builder->CreateLoad(int32ty, argIt);
-  m_builder->CreateRet(m_builder->create<GpurtStackWriteOp>(stackOffset, stackData));
+  m_builder->CreateRet(m_builder->create<GpurtStackWriteOp>(stackOffset, stackData, false));
 }
 
 // =====================================================================================================================
@@ -221,7 +221,7 @@ void SpirvProcessGpuRtLibrary::createLdsWrite(Function *func) {
 void SpirvProcessGpuRtLibrary::createLdsRead(Function *func) {
   Value *stackIndex = func->arg_begin();
   stackIndex = m_builder->CreateLoad(m_builder->getInt32Ty(), stackIndex);
-  m_builder->CreateRet(m_builder->create<GpurtStackReadOp>(stackIndex));
+  m_builder->CreateRet(m_builder->create<GpurtStackReadOp>(stackIndex, false));
 }
 
 // =====================================================================================================================

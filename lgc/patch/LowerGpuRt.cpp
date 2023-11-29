@@ -25,30 +25,27 @@
 /**
  ***********************************************************************************************************************
  * @file  LowerGpuRt.cpp
- * @brief LLPC source file: contains implementation of class Llpc::LowerGpuRt.
+ * @brief LGC source file: contains implementation of class lgc::LowerGpuRt.
  ***********************************************************************************************************************
  */
-#include "LowerGpuRt.h"
-#include "llpcContext.h"
-#include "llpcRayTracingContext.h"
+#include "lgc/patch/LowerGpuRt.h"
 #include "lgc/Builder.h"
 #include "lgc/GpurtDialect.h"
+#include "lgc/LgcContext.h"
+#include "lgc/builder/BuilderImpl.h"
+#include "lgc/state/TargetInfo.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
-#define DEBUG_TYPE "llpc-gpurt"
+#define DEBUG_TYPE "lgc-lower-gpurt"
 using namespace lgc;
 using namespace llvm;
-using namespace Llpc;
 
 namespace RtName {
 static const char *LdsStack = "LdsStack";
 } // namespace RtName
 
-namespace Llpc {
-// =====================================================================================================================
-LowerGpuRt::LowerGpuRt() : m_stack(nullptr), m_stackTy(nullptr), m_lowerStack(false) {
-}
+namespace lgc {
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
 //
@@ -56,12 +53,15 @@ LowerGpuRt::LowerGpuRt() : m_stack(nullptr), m_stackTy(nullptr), m_lowerStack(fa
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses LowerGpuRt::run(Module &module, ModuleAnalysisManager &analysisManager) {
   LLVM_DEBUG(dbgs() << "Run the pass Lower-gpurt\n");
-  SpirvLower::init(&module);
-  auto gfxip = m_context->getPipelineContext()->getGfxIpVersion();
-  // NOTE: rayquery of sect and ahit can reuse lds.
-  m_lowerStack = (m_entryPoint->getName().startswith("_ahit") || m_entryPoint->getName().startswith("_sect")) &&
-                 (gfxip.major < 11);
-  createGlobalStack();
+
+  PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
+  m_pipelineState = pipelineState;
+
+  BuilderImpl builderImpl(pipelineState);
+  m_builder = &builderImpl;
+  m_builder->setShaderStage(ShaderStageCompute);
+
+  createGlobalStack(module);
 
   static auto visitor = llvm_dialects::VisitorBuilder<LowerGpuRt>()
                             .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
@@ -78,7 +78,7 @@ PreservedAnalyses LowerGpuRt::run(Module &module, ModuleAnalysisManager &analysi
                             .add(&LowerGpuRt::visitGetFlattenedGroupThreadId)
                             .build();
 
-  visitor.visit(*this, *m_module);
+  visitor.visit(*this, module);
 
   for (Instruction *call : m_callsToLower) {
     call->dropAllReferences();
@@ -99,14 +99,15 @@ PreservedAnalyses LowerGpuRt::run(Module &module, ModuleAnalysisManager &analysi
 // Get pipeline workgroup size for stack size calculation
 unsigned LowerGpuRt::getWorkgroupSize() const {
   unsigned workgroupSize = 0;
-  if (m_context->getPipelineType() == PipelineType::Graphics) {
-    workgroupSize = m_context->getPipelineContext()->getRayTracingWaveSize();
+  if (m_pipelineState->isGraphics()) {
+    // Force 64 for graphics stages
+    workgroupSize = 64;
   } else {
-    ComputeShaderMode mode = lgc::Pipeline::getComputeShaderMode(*m_module);
+    ComputeShaderMode mode = m_pipelineState->getShaderModes()->getComputeShaderMode();
     workgroupSize = mode.workgroupSizeX * mode.workgroupSizeY * mode.workgroupSizeZ;
   }
   assert(workgroupSize != 0);
-  if (m_context->getPipelineContext()->getGfxIpVersion().major >= 11) {
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
     // Round up to multiple of 32, as the ds_bvh_stack swizzle as 32 threads
     workgroupSize = alignTo(workgroupSize, 32);
   }
@@ -117,26 +118,48 @@ unsigned LowerGpuRt::getWorkgroupSize() const {
 // Get flat thread id in work group/wave
 Value *LowerGpuRt::getThreadIdInGroup() const {
   // Todo: for graphics shader, subgroupId * waveSize + subgroupLocalInvocationId()
-  unsigned builtIn = m_context->getPipelineType() == PipelineType::Graphics ? lgc::BuiltInSubgroupLocalInvocationId
-                                                                            : lgc::BuiltInLocalInvocationIndex;
-  lgc::InOutInfo inputInfo = {};
-  return m_builder->CreateReadBuiltInInput(static_cast<lgc::BuiltInKind>(builtIn), inputInfo, nullptr, nullptr, "");
+  unsigned builtIn = m_pipelineState->isGraphics() ? BuiltInSubgroupLocalInvocationId : BuiltInLocalInvocationIndex;
+  InOutInfo inputInfo = {};
+  return m_builder->CreateReadBuiltInInput(static_cast<BuiltInKind>(builtIn), inputInfo, nullptr, nullptr, "");
 }
 
 // =====================================================================================================================
 // Create global variable for the stack
-void LowerGpuRt::createGlobalStack() {
-  auto ldsStackSize = getWorkgroupSize() * MaxLdsStackEntries;
-  // Double anyhit and intersection shader lds size, these shader use lower part of stack to read/write value
-  if (m_lowerStack)
-    ldsStackSize = ldsStackSize << 1;
+// @param [in/out] module : LLVM module to be run on
+void LowerGpuRt::createGlobalStack(Module &module) {
 
-  m_stackTy = ArrayType::get(m_builder->getInt32Ty(), ldsStackSize);
-  auto ldsStack = new GlobalVariable(*m_module, m_stackTy, false, GlobalValue::ExternalLinkage, nullptr,
-                                     RtName::LdsStack, nullptr, GlobalValue::NotThreadLocal, 3);
+  struct Payload {
+    bool needGlobalStack;
+    bool needExtraStack;
+  };
+  Payload payload = {false, false};
+  static auto visitor = llvm_dialects::VisitorBuilder<Payload>()
+                            .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+                            .add<GpurtStackWriteOp>([](auto &payload, auto &op) {
+                              payload.needGlobalStack = true;
+                              payload.needExtraStack |= op.getUseExtraStack();
+                            })
+                            .add<GpurtStackReadOp>([](auto &payload, auto &op) {
+                              payload.needGlobalStack = true;
+                              payload.needExtraStack |= op.getUseExtraStack();
+                            })
+                            .add<GpurtLdsStackInitOp>([](auto &payload, auto &op) { payload.needGlobalStack = true; })
+                            .build();
+  visitor.visit(payload, module);
 
-  ldsStack->setAlignment(MaybeAlign(4));
-  m_stack = ldsStack;
+  if (payload.needGlobalStack) {
+    auto ldsStackSize = getWorkgroupSize() * MaxLdsStackEntries;
+    // Double LDS size when any operations requires to perform on extra stack.
+    if (payload.needExtraStack)
+      ldsStackSize = ldsStackSize << 1;
+
+    m_stackTy = ArrayType::get(m_builder->getInt32Ty(), ldsStackSize);
+    auto ldsStack = new GlobalVariable(module, m_stackTy, false, GlobalValue::ExternalLinkage, nullptr,
+                                       RtName::LdsStack, nullptr, GlobalValue::NotThreadLocal, 3);
+
+    ldsStack->setAlignment(MaybeAlign(4));
+    m_stack = ldsStack;
+  }
 }
 
 // =====================================================================================================================
@@ -184,7 +207,7 @@ void LowerGpuRt::visitStackRead(GpurtStackReadOp &inst) {
   m_builder->SetInsertPoint(&inst);
   Value *stackIndex = inst.getIndex();
   Type *stackTy = PointerType::get(m_builder->getInt32Ty(), 3);
-  if (m_lowerStack) {
+  if (inst.getUseExtraStack()) {
     auto ldsStackSize = m_builder->getInt32(getWorkgroupSize() * MaxLdsStackEntries);
     stackIndex = m_builder->CreateAdd(stackIndex, ldsStackSize);
   }
@@ -206,7 +229,7 @@ void LowerGpuRt::visitStackWrite(GpurtStackWriteOp &inst) {
   Value *stackIndex = inst.getIndex();
   Value *stackData = inst.getValue();
   Type *stackTy = PointerType::get(m_builder->getInt32Ty(), 3);
-  if (m_lowerStack) {
+  if (inst.getUseExtraStack()) {
     auto ldsStackSize = m_builder->getInt32(getWorkgroupSize() * MaxLdsStackEntries);
     stackIndex = m_builder->CreateAdd(stackIndex, ldsStackSize);
   }
@@ -297,8 +320,7 @@ void LowerGpuRt::visitLdsStackStore(GpurtLdsStackStoreOp &inst) {
 // @param inst : The dialect instruction to process
 void LowerGpuRt::visitGetBoxSortHeuristicMode(GpurtGetBoxSortHeuristicModeOp &inst) {
   m_builder->SetInsertPoint(&inst);
-  auto rtState = m_context->getPipelineContext()->getRayTracingState();
-  Value *boxSortHeuristicMode = m_builder->getInt32(rtState->boxSortHeuristicMode);
+  Value *boxSortHeuristicMode = m_builder->getInt32(m_pipelineState->getOptions().rtBoxSortHeuristicMode);
   inst.replaceAllUsesWith(boxSortHeuristicMode);
   m_callsToLower.push_back(&inst);
   m_funcsToLower.insert(inst.getCalledFunction());
@@ -310,8 +332,7 @@ void LowerGpuRt::visitGetBoxSortHeuristicMode(GpurtGetBoxSortHeuristicModeOp &in
 // @param inst : The dialect instruction to process
 void LowerGpuRt::visitGetStaticFlags(GpurtGetStaticFlagsOp &inst) {
   m_builder->SetInsertPoint(&inst);
-  auto rtState = m_context->getPipelineContext()->getRayTracingState();
-  Value *staticPipelineFlags = m_builder->getInt32(rtState->staticPipelineFlags);
+  Value *staticPipelineFlags = m_builder->getInt32(m_pipelineState->getOptions().rtStaticPipelineFlags);
   inst.replaceAllUsesWith(staticPipelineFlags);
   m_callsToLower.push_back(&inst);
   m_funcsToLower.insert(inst.getCalledFunction());
@@ -323,8 +344,7 @@ void LowerGpuRt::visitGetStaticFlags(GpurtGetStaticFlagsOp &inst) {
 // @param inst : The dialect instruction to process
 void LowerGpuRt::visitGetTriangleCompressionMode(GpurtGetTriangleCompressionModeOp &inst) {
   m_builder->SetInsertPoint(&inst);
-  auto rtState = m_context->getPipelineContext()->getRayTracingState();
-  Value *triCompressMode = m_builder->getInt32(rtState->triCompressMode);
+  Value *triCompressMode = m_builder->getInt32(m_pipelineState->getOptions().rtTriCompressMode);
   inst.replaceAllUsesWith(triCompressMode);
   m_callsToLower.push_back(&inst);
   m_funcsToLower.insert(inst.getCalledFunction());
@@ -341,4 +361,4 @@ void LowerGpuRt::visitGetFlattenedGroupThreadId(GpurtGetFlattenedGroupThreadIdOp
   m_funcsToLower.insert(inst.getCalledFunction());
 }
 
-} // namespace Llpc
+} // namespace lgc
