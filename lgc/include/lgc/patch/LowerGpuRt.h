@@ -34,7 +34,7 @@
 #include "llvm/IR/PassManager.h"
 
 namespace lgc {
-class BuilderImpl;
+class Builder;
 class PipelineState;
 
 class GpurtGetStackSizeOp;
@@ -76,6 +76,6 @@ private:
   PipelineState *m_pipelineState = nullptr;              // Pipeline state
   llvm::SmallVector<llvm::Instruction *> m_callsToLower; // Call instruction to lower
   llvm::SmallSet<llvm::Function *, 4> m_funcsToLower;    // Functions to lower
-  BuilderImpl *m_builder = nullptr;
+  Builder *m_builder = nullptr;
 };
 } // namespace lgc

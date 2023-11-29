@@ -57,9 +57,8 @@ PreservedAnalyses LowerGpuRt::run(Module &module, ModuleAnalysisManager &analysi
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
   m_pipelineState = pipelineState;
 
-  BuilderImpl builderImpl(pipelineState);
+  Builder builderImpl(pipelineState->getContext());
   m_builder = &builderImpl;
-  m_builder->setShaderStage(ShaderStageCompute);
 
   createGlobalStack(module);
 
@@ -127,7 +126,6 @@ Value *LowerGpuRt::getThreadIdInGroup() const {
 // Create global variable for the stack
 // @param [in/out] module : LLVM module to be run on
 void LowerGpuRt::createGlobalStack(Module &module) {
-
   struct Payload {
     bool needGlobalStack;
     bool needExtraStack;

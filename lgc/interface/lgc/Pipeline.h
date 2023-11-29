@@ -186,6 +186,7 @@ union Options {
     unsigned rtBoxSortHeuristicMode;         // Ray tracing box sort heuristic mode
     unsigned rtStaticPipelineFlags;          // Ray tracing static pipeline flags
     unsigned rtTriCompressMode;              // Ray tracing triangle compression mode
+    bool useGpurt;                           // Whether GPURT is used
   };
 };
 static_assert(sizeof(Options) == sizeof(Options::u32All));

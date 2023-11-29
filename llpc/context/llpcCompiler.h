@@ -199,6 +199,8 @@ private:
   Result generatePipeline(Context *context, unsigned moduleIndex, std::unique_ptr<llvm::Module> module,
                           ElfPackage &pipelineElf, lgc::Pipeline *pipeline, TimerProfiler &timerProfiler);
 
+  void setUseGpurt(lgc::Pipeline *pipeline);
+
   std::vector<std::string> m_options;           // Compilation options
   MetroHash::Hash m_optionHash;                 // Hash code of compilation options
   GfxIpVersion m_gfxIp;                         // Graphics IP version info
