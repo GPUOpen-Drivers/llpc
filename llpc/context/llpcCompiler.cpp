@@ -1663,6 +1663,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
     if (numStagesWithRayQuery) {
       std::unique_ptr<Module> gpurtShaderLibrary = createGpurtShaderLibrary(context);
+      setUseGpurt(&*pipeline);
       if (!gpurtShaderLibrary)
         return Result::ErrorInvalidShader;
 
@@ -2678,6 +2679,16 @@ Result Compiler::generatePipeline(Context *context, unsigned moduleIndex, std::u
 }
 
 // =====================================================================================================================
+// Set this pipeline use GPURT library
+//
+// @param pipeline : The pipeline object
+void Compiler::setUseGpurt(lgc::Pipeline *pipeline) {
+  auto options = pipeline->getOptions();
+  options.useGpurt = true;
+  pipeline->setOptions(options);
+}
+
+// =====================================================================================================================
 // Build single ray tracing pipeline ELF package.
 //
 // @param IHelperThreadProvider : The helper thread provider
@@ -2888,6 +2899,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
   std::unique_ptr<Module> gpurtShaderLibrary;
   if (needGpurtShaderLibrary) {
     gpurtShaderLibrary = createGpurtShaderLibrary(mainContext);
+    setUseGpurt(&*pipeline);
     if (!gpurtShaderLibrary)
       return Result::ErrorInvalidShader;
   }

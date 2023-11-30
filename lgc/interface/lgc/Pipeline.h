@@ -127,7 +127,7 @@ static const char SampleShadingMetaName[] = "lgc.sample.shading";
 // The front-end should zero-initialize a struct with "= {}" in case future changes add new fields.
 // Note: new fields must be added to the end of this structure to maintain test compatibility.
 union Options {
-  unsigned u32All[36];
+  unsigned u32All[40];
   struct {
     uint64_t hash[2];                 // Pipeline hash to set in ELF PAL metadata
     unsigned includeDisassembly;      // If set, the disassembly for all compiled shaders will be included
@@ -183,6 +183,10 @@ union Options {
     bool enableFragColor;                    // If enabled, do frag color broadcast
     bool useSoftwareVertexBufferDescriptors; // Use software vertex buffer descriptors to structure SRD.
     unsigned cpsFlags;                       // CPS feature flags
+    unsigned rtBoxSortHeuristicMode;         // Ray tracing box sort heuristic mode
+    unsigned rtStaticPipelineFlags;          // Ray tracing static pipeline flags
+    unsigned rtTriCompressMode;              // Ray tracing triangle compression mode
+    bool useGpurt;                           // Whether GPURT is used
   };
 };
 static_assert(sizeof(Options) == sizeof(Options::u32All));

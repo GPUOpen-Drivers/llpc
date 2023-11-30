@@ -239,6 +239,7 @@ target_sources(LLVMlgc PRIVATE
     patch/RegisterMetadataBuilder.cpp
     patch/CombineCooperativeMatrix.cpp
     patch/LowerCooperativeMatrix.cpp
+    patch/LowerGpuRt.cpp
 )
 
 # lgc/state

@@ -59,7 +59,6 @@
 // New version of the code (also handles unknown version, which we treat as latest)
 #include "llvm/IRPrinter/IRPrintingPasses.h"
 #endif
-#include "LowerGpuRt.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Transforms/AggressiveInstCombine/AggressiveInstCombine.h"
 #include "llvm/Transforms/IPO.h"
@@ -264,8 +263,6 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   passMgr.addPass(SpirvLowerInstMetaRemove());
 
   if (rayTracing || rayQuery || isInternalRtShader) {
-    passMgr.addPass(LowerGpuRt());
-
     FunctionPassManager fpm;
     fpm.addPass(SROAPass(SROAOptions::PreserveCFG));
     fpm.addPass(InstCombinePass(instCombineOpt));

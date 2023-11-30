@@ -48,20 +48,24 @@ def GpurtGetStackSizeOp : GpurtOp<"get.stack.size", [Memory<[]>, WillReturn]> {
 }
 
 def GpurtStackReadOp : GpurtOp<"stack.read", [Memory<[(read)]>, WillReturn]> {
-  let arguments = (ins I32:$index);
+  let arguments = (ins I32:$index, AttrI1:$use_extra_stack);
   let results = (outs I32:$result);
   let summary = "read a dword from stack";
   let description = [{
     Read a dword from lds/(scratch buffer) stack at index position
+
+    Setting use_extra_stack to true means this read will perform on an extra piece of stack to avoid traversal stack conflict.
   }];
 }
 
 def GpurtStackWriteOp : GpurtOp<"stack.write", [Memory<[(write)]>, WillReturn]> {
-  let arguments = (ins I32:$index, I32:$value);
+  let arguments = (ins I32:$index, I32:$value, AttrI1:$use_extra_stack);
   let results = (outs I32:$result);
   let summary = "write a dword to stack";
   let description = [{
     Write a dword to lds/(scratch buffer) stack at index position
+
+    Setting use_extra_stack to true means this write will perform on an extra piece of stack to avoid traversal stack conflict.
   }];
 }
 
