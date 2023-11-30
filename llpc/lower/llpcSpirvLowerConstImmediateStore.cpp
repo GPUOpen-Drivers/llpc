@@ -223,16 +223,12 @@ bool SpirvLowerConstImmediateStore::tryProcessAlloca(AllocaInst *allocaInst) {
   }
 
   // Step 3: Create the global variable and replace the alloca
-  GlobalVariable *global = nullptr;
-  auto iter = m_allocToGlobals.find(initializer);
-  if (iter == m_allocToGlobals.end()) {
+  GlobalVariable *&global = m_allocToGlobals[initializer];
+  if (!global) {
     global = new GlobalVariable(*m_module, allocatedTy,
                                 true, // isConstant
                                 GlobalValue::InternalLinkage, initializer, "", nullptr, GlobalValue::NotThreadLocal,
                                 SPIRAS_Constant);
-    m_allocToGlobals[initializer] = global;
-  } else {
-    global = iter->second;
   }
   global->takeName(allocaInst);
 
