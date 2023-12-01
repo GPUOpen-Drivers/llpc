@@ -60,6 +60,7 @@
 #include "lgc/Builder.h"
 #include "lgc/ElfLinker.h"
 #include "lgc/EnumIterator.h"
+#include "lgc/LgcRtDialect.h"
 #include "lgc/PassManager.h"
 #include "llvm-dialects/Dialect/Dialect.h"
 #include "llvm/ADT/ScopeExit.h"
@@ -71,6 +72,7 @@
 #include "llvm/IR/DiagnosticInfo.h"
 #include "llvm/IR/DiagnosticPrinter.h"
 #include "llvm/IR/IRPrintingPasses.h"
+#include "llvm/Support/ErrorHandling.h"
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 442438
 // Old version of the code
 #else
@@ -513,6 +515,49 @@ void Compiler::Destroy() {
 }
 
 // =====================================================================================================================
+// Merge location and binding value, and replace the binding decoration in spirv binary.
+//
+// @param codeBuffer : Spirv binary
+// @param imageSymbolInfo : Image symbol infos
+static void mergeSpirvLocationAndBinding(llvm::MutableArrayRef<unsigned> codeBuffer,
+                                         std::vector<ResourceNodeData> &imageSymbolInfo) {
+  constexpr unsigned wordSize = sizeof(unsigned);
+
+  unsigned *code = codeBuffer.data();
+  unsigned *end = code + codeBuffer.size();
+  unsigned *codePos = code + sizeof(SpirvHeader) / wordSize;
+
+  while (codePos < end) {
+    unsigned opCode = (codePos[0] & OpCodeMask);
+    unsigned wordCount = (codePos[0] >> WordCountShift);
+
+    switch (opCode) {
+    case OpDecorate: {
+      auto decoration = static_cast<Decoration>(codePos[2]);
+
+      if (decoration == DecorationBinding) {
+        uint32_t varId = codePos[1];
+        uint32_t binding = codePos[3];
+        uint32_t location = 0;
+        for (auto it = imageSymbolInfo.begin(); it != imageSymbolInfo.end(); ++it) {
+          if (it->spvId == varId && it->binding == binding) {
+            location = it->location;
+            it->mergedLocationBinding = true;
+          }
+        }
+        uint32_t locationBinding = location << 16 | binding;
+        codePos[3] = locationBinding;
+      }
+    } break;
+    default:
+      break;
+    }
+
+    codePos += wordCount;
+  }
+}
+
+// =====================================================================================================================
 // Builds shader module from the specified info.
 //
 // @param shaderInfo : Info to build this shader module
@@ -550,7 +595,7 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   if (shaderInfo->options.pipelineOptions.buildResourcesDataForShaderModule) {
     buildShaderModuleResourceUsage(shaderInfo, resourceNodes, inputSymbolInfo, outputSymbolInfo, uniformBufferInfo,
                                    storageBufferInfo, textureSymbolInfo, imageSymbolInfo, atomicCounterSymbolInfo,
-                                   defaultUniformSymbolInfo);
+                                   defaultUniformSymbolInfo, moduleData.usage);
 
     allocSize += sizeof(ResourcesNodes);
     allocSize += inputSymbolInfo.size() * sizeof(ResourceNodeData);
@@ -561,6 +606,9 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     allocSize += imageSymbolInfo.size() * sizeof(ResourceNodeData);
     allocSize += atomicCounterSymbolInfo.size() * sizeof(ResourceNodeData);
     allocSize += defaultUniformSymbolInfo.size() * sizeof(ResourceNodeData);
+
+    if (imageSymbolInfo.size() && shaderInfo->options.mergeLocationAndBinding)
+      mergeSpirvLocationAndBinding(codeBuffer, imageSymbolInfo);
   }
 
   uint8_t *allocBuf =
@@ -639,12 +687,14 @@ static bool getSymbolInfoFromSpvVariable(const SPIRVVariable *spvVar, ResourceNo
   uint32_t arraySize = 1;
   SPIRVWord location = 0;
   SPIRVWord binding = 0;
+  SPIRVWord varId = 0;
   BasicType basicType = BasicType::Unknown;
 
   SPIRVWord builtIn = false;
   bool isBuiltIn = spvVar->hasDecorate(DecorationBuiltIn, 0, &builtIn);
   spvVar->hasDecorate(DecorationLocation, 0, &location);
   spvVar->hasDecorate(DecorationBinding, 0, &binding);
+  varId = spvVar->getId();
 
   SPIRVType *varElemTy = spvVar->getType()->getPointerElementType();
   while (varElemTy->isTypeArray()) {
@@ -705,6 +755,7 @@ static bool getSymbolInfoFromSpvVariable(const SPIRVVariable *spvVar, ResourceNo
   symbolInfo->location = location;
   symbolInfo->binding = binding;
   symbolInfo->basicType = basicType;
+  symbolInfo->spvId = varId;
 
   return isBuiltIn;
 }
@@ -763,7 +814,8 @@ void Compiler::buildShaderModuleResourceUsage(
     std::vector<ResourceNodeData> &inputSymbolInfo, std::vector<ResourceNodeData> &outputSymbolInfo,
     std::vector<ResourceNodeData> &uniformBufferInfo, std::vector<ResourceNodeData> &storageBufferInfo,
     std::vector<ResourceNodeData> &textureSymbolInfo, std::vector<ResourceNodeData> &imageSymbolInfo,
-    std::vector<ResourceNodeData> &atomicCounterSymbolInfo, std::vector<ResourceNodeData> &defaultUniformSymbolInfo) {
+    std::vector<ResourceNodeData> &atomicCounterSymbolInfo, std::vector<ResourceNodeData> &defaultUniformSymbolInfo,
+    ShaderModuleUsage &shaderModuleUsage) {
   // Parse the SPIR-V stream.
   std::string spirvCode(static_cast<const char *>(shaderInfo->shaderBin.pCode), shaderInfo->shaderBin.codeSize);
   std::istringstream spirvStream(spirvCode);
@@ -785,6 +837,14 @@ void Compiler::buildShaderModuleResourceUsage(
   }
   if (!entryPoint)
     return;
+
+  if (func) {
+    if (auto em = func->getExecutionMode(ExecutionModeLocalSize)) {
+      shaderModuleUsage.localSizeX = em->getLiterals()[0];
+      shaderModuleUsage.localSizeX = em->getLiterals()[1];
+      shaderModuleUsage.localSizeX = em->getLiterals()[2];
+    }
+  }
 
   // Process resources
   auto inOuts = entryPoint->getInOuts();
@@ -1076,6 +1136,15 @@ Result Compiler::BuildColorExportShader(const GraphicsPipelineBuildInfo *pipelin
 
   MetroHash::Hash cacheHash = {};
   MetroHash::Hash pipelineHash = {};
+  const FragmentOutputs *fsOuts = static_cast<const FragmentOutputs *>(fsOutputMetaData);
+  const uint8 *metaPtr = static_cast<const uint8 *>(fsOutputMetaData);
+  unsigned metaDatatSize = sizeof(FragmentOutputs) + fsOuts->fsOutInfoCount * sizeof(FsOutInfo);
+  MetroHash64 hasher;
+  hasher.Update(metaPtr, metaDatatSize);
+  hasher.Update(pipelineInfo->options);
+  hasher.Update(pipelineInfo->cbState);
+  hasher.Finalize(pipelineHash.bytes);
+
   GraphicsContext graphicsContext(m_gfxIp, pipelineInfo, &pipelineHash, &cacheHash);
   Context *context = acquireContext();
   context->attachPipelineContext(&graphicsContext);
@@ -1085,9 +1154,6 @@ Result Compiler::BuildColorExportShader(const GraphicsPipelineBuildInfo *pipelin
   auto onExit = make_scope_exit([&] { releaseContext(context); });
 
   SmallVector<ColorExportInfo, 8> exports;
-  const FragmentOutputs *fsOuts = static_cast<const FragmentOutputs *>(fsOutputMetaData);
-
-  const uint8 *metaPtr = static_cast<const uint8 *>(fsOutputMetaData);
   metaPtr = metaPtr + sizeof(FragmentOutputs);
   const FsOutInfo *outInfos = reinterpret_cast<const FsOutInfo *>(metaPtr);
 
@@ -1282,7 +1348,7 @@ Result Compiler::buildUnlinkedShaderInternal(Context *context, ArrayRef<const Pi
     // If fragment use builtIn inputs, return RequireFullPipeline.
     const ShaderModuleData *moduleData =
         static_cast<const ShaderModuleData *>(shaderInfo[ShaderStageFragment]->pModuleData);
-    if (moduleData->usage.useGenericBuiltIn)
+    if (moduleData->usage.useGenericBuiltIn || moduleData->usage.useBarycentric)
       return Result::RequireFullPipeline;
   }
 
@@ -1422,6 +1488,28 @@ bool Compiler::canUseRelocatableGraphicsShaderElf(const ArrayRef<const PipelineS
   if (pipelineInfo->iaState.enableMultiView)
     return false;
 
+  // NOTE: On gfx11, Xfb depends on the count of primitive vertex. If UnlinkedStageVertexProcess only contains
+  // VS (no TES and GS), the primitive type might be unknown at compiling VS time, so we have to fall back to full
+  // pipeline.
+  // Currently, We treat Triangle_list as the default value. Therefore, we only disable relocatable compilation
+  // when primitive is point or line.
+  bool hasVs = pipelineInfo->vs.pModuleData != nullptr;
+  bool hasTes = (pipelineInfo->tes.pModuleData != nullptr) || (pipelineInfo->tcs.pModuleData != nullptr);
+  bool hasGs = pipelineInfo->gs.pModuleData != nullptr;
+  if (m_gfxIp.major >= 11 && hasVs && !hasGs && !hasTes &&
+      static_cast<const ShaderModuleData *>(pipelineInfo->vs.pModuleData)->usage.enableXfb) {
+    switch (pipelineInfo->iaState.topology) {
+    case VK_PRIMITIVE_TOPOLOGY_POINT_LIST:
+    case VK_PRIMITIVE_TOPOLOGY_LINE_LIST:
+    case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP:
+    case VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY:
+    case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY:
+      return false;
+    default:
+      break;
+    }
+  }
+
   if (shaderInfos[0]) {
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfos[0]->pModuleData);
     if (moduleData && moduleData->binType != BinaryType::Spirv)
@@ -1474,7 +1562,6 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
                                        llvm::MutableArrayRef<CacheAccessInfo> stageCacheAccesses) {
   Result result = Result::Success;
   unsigned passIndex = 0;
-  const PipelineShaderInfo *fragmentShaderInfo = nullptr;
   TimerProfiler timerProfiler(context->getPipelineHashCode(), "LLPC", TimerProfiler::PipelineTimerEnableMask);
   bool buildingRelocatableElf = context->getPipelineContext()->isUnlinked();
 
@@ -1531,8 +1618,6 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       const PipelineShaderInfo *shaderInfoEntry = shaderInfo[shaderIndex];
       ShaderStage entryStage = shaderInfoEntry ? shaderInfoEntry->entryStage : ShaderStageInvalid;
 
-      if (entryStage == ShaderStageFragment)
-        fragmentShaderInfo = shaderInfoEntry;
       if (!shaderInfoEntry || !shaderInfoEntry->pModuleData || (stageSkipMask & shaderStageToMask(entryStage)))
         continue;
 
@@ -1578,6 +1663,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
     if (numStagesWithRayQuery) {
       std::unique_ptr<Module> gpurtShaderLibrary = createGpurtShaderLibrary(context);
+      setUseGpurt(&*pipeline);
       if (!gpurtShaderLibrary)
         return Result::ErrorInvalidShader;
 
@@ -2427,8 +2513,12 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
     size_t binaryDataSize = sizeof(BinaryData) * elfBinarys.size();
     size_t elfSize = 0;
 
-    for (auto &elf : elfBinarys)
+    for (auto &elf : elfBinarys) {
+      if (elf.size() % 8 != 0) {
+        elf.resize(alignTo(elf.size(), alignof(BinaryData)));
+      }
       elfSize += elf.size();
+    }
 
     size_t allocSize = elfSize;
     allocSize += binaryDataSize;
@@ -2586,6 +2676,16 @@ Result Compiler::generatePipeline(Context *context, unsigned moduleIndex, std::u
 #endif
 
   return Result::Success;
+}
+
+// =====================================================================================================================
+// Set this pipeline use GPURT library
+//
+// @param pipeline : The pipeline object
+void Compiler::setUseGpurt(lgc::Pipeline *pipeline) {
+  auto options = pipeline->getOptions();
+  options.useGpurt = true;
+  pipeline->setOptions(options);
 }
 
 // =====================================================================================================================
@@ -2799,6 +2899,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
   std::unique_ptr<Module> gpurtShaderLibrary;
   if (needGpurtShaderLibrary) {
     gpurtShaderLibrary = createGpurtShaderLibrary(mainContext);
+    setUseGpurt(&*pipeline);
     if (!gpurtShaderLibrary)
       return Result::ErrorInvalidShader;
   }
@@ -3271,6 +3372,30 @@ bool Compiler::linkRelocatableShaderElf(ElfPackage *shaderElfs, ElfPackage *pipe
     report_fatal_error("Link failed; need full pipeline compile instead: " + pipeline->getLastError());
   }
   return true;
+}
+
+// =====================================================================================================================
+// Convert front-end LLPC shader stage to LGC ray tracing shader stage
+// Returns nullopt if not a raytracing stage.
+//
+// @param stage : Front-end LLPC shader stage
+std::optional<lgc::rt::RayTracingShaderStage> getLgcRtShaderStage(Llpc::ShaderStage stage) {
+  switch (stage) {
+  case ShaderStageRayTracingRayGen:
+    return lgc::rt::RayTracingShaderStage::RayGeneration;
+  case ShaderStageRayTracingIntersect:
+    return lgc::rt::RayTracingShaderStage::Intersection;
+  case ShaderStageRayTracingAnyHit:
+    return lgc::rt::RayTracingShaderStage::AnyHit;
+  case ShaderStageRayTracingClosestHit:
+    return lgc::rt::RayTracingShaderStage::ClosestHit;
+  case ShaderStageRayTracingMiss:
+    return lgc::rt::RayTracingShaderStage::Miss;
+  case ShaderStageRayTracingCallable:
+    return lgc::rt::RayTracingShaderStage::Callable;
+  default:
+    return std::nullopt;
+  }
 }
 
 // =====================================================================================================================

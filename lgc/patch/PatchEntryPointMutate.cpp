@@ -54,8 +54,10 @@
  */
 
 #include "lgc/patch/PatchEntryPointMutate.h"
+#include "ShaderMerger.h"
 #include "lgc/LgcContext.h"
 #include "lgc/LgcDialect.h"
+#include "lgc/builder/BuilderImpl.h"
 #include "lgc/patch/ShaderInputs.h"
 #include "lgc/state/AbiMetadata.h"
 #include "lgc/state/AbiUnlinked.h"
@@ -66,13 +68,13 @@
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/AddressExtender.h"
 #include "lgc/util/BuilderBase.h"
-#include "lgc/util/CpsStackLowering.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/Analysis/AliasAnalysis.h" // for MemoryEffects
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 #include <optional>
 
 #define DEBUG_TYPE "lgc-patch-entry-point-mutate"
@@ -140,6 +142,8 @@ bool PatchEntryPointMutate::runImpl(Module &module, PipelineShadersResult &pipel
 
   m_pipelineState = pipelineState;
 
+  stackLowering = std::make_unique<CpsStackLowering>(module.getContext(), ADDR_SPACE_PRIVATE);
+
   const unsigned stageMask = m_pipelineState->getShaderStageMask();
   m_hasTs = (stageMask & (shaderStageToMask(ShaderStageTessControl) | shaderStageToMask(ShaderStageTessEval))) != 0;
   m_hasGs = (stageMask & shaderStageToMask(ShaderStageGeometry)) != 0;
@@ -176,6 +180,8 @@ bool PatchEntryPointMutate::runImpl(Module &module, PipelineShadersResult &pipel
   shaderInputs.fixupUses(*m_module, m_pipelineState, isComputeWithCalls());
 
   m_cpsShaderInputCache.clear();
+
+  processGroupMemcpy(module);
   return true;
 }
 
@@ -255,16 +261,219 @@ static Value *mergeDwordsIntoVector(IRBuilder<> &builder, ArrayRef<Value *> inpu
 }
 
 // =====================================================================================================================
+// Lower GroupMemcpyOp
+void PatchEntryPointMutate::processGroupMemcpy(Module &module) {
+  SmallVector<CallInst *> toBeErased;
+  struct Payload {
+    SmallVectorImpl<CallInst *> &tobeErased;
+    PatchEntryPointMutate *self;
+  };
+  Payload payload = {toBeErased, this};
+
+  static auto visitor = llvm_dialects::VisitorBuilder<Payload>()
+                            .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+                            .add<GroupMemcpyOp>([](auto &payload, auto &op) {
+                              payload.self->lowerGroupMemcpy(op);
+                              payload.tobeErased.push_back(&op);
+                            })
+                            .build();
+  visitor.visit(payload, module);
+  for (auto call : payload.tobeErased)
+    call->eraseFromParent();
+}
+
+// =====================================================================================================================
+// Lower GroupMemcpyOp - Copy memory using threads in a workgroup (scope=2) or subgroup (scope=3).
+void PatchEntryPointMutate::lowerGroupMemcpy(GroupMemcpyOp &groupMemcpyOp) {
+  BuilderImpl builder(m_pipelineState);
+  Function *entryPoint = groupMemcpyOp.getFunction();
+  ShaderStage stage = getShaderStage(entryPoint);
+  builder.setShaderStage(stage);
+  builder.SetInsertPoint(&groupMemcpyOp);
+
+  auto gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
+
+  auto dst = groupMemcpyOp.getDst();
+  auto src = groupMemcpyOp.getSrc();
+  auto len = groupMemcpyOp.getSize();
+  auto scope = groupMemcpyOp.getScope();
+
+  unsigned scopeSize = 0;
+  Value *threadIndex = nullptr;
+
+  if (scope == 2) {
+    unsigned workgroupSize[3] = {};
+    auto shaderModes = m_pipelineState->getShaderModes();
+    if (stage == ShaderStageTask || stage == ShaderStageCompute) {
+      Module &module = *groupMemcpyOp.getModule();
+      workgroupSize[0] = shaderModes->getComputeShaderMode(module).workgroupSizeX;
+      workgroupSize[1] = shaderModes->getComputeShaderMode(module).workgroupSizeY;
+      workgroupSize[2] = shaderModes->getComputeShaderMode(module).workgroupSizeZ;
+    } else if (stage == ShaderStageMesh) {
+      workgroupSize[0] = shaderModes->getMeshShaderMode().workgroupSizeX;
+      workgroupSize[1] = shaderModes->getMeshShaderMode().workgroupSizeY;
+      workgroupSize[2] = shaderModes->getMeshShaderMode().workgroupSizeZ;
+    } else {
+      llvm_unreachable("Invalid shade stage!");
+    }
+
+    // LocalInvocationId is a function argument now and CreateReadBuiltInInput cannot retrieve it.
+    unsigned argIndex = 0xFFFFFFFF;
+    switch (stage) {
+    case ShaderStageTask: {
+      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageTask)->entryArgIdxs.task;
+      argIndex = entryArgIdxs.localInvocationId;
+      break;
+    }
+    case ShaderStageMesh: {
+      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
+      argIndex = entryArgIdxs.localInvocationId;
+      break;
+    }
+    case ShaderStageCompute: {
+      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageCompute)->entryArgIdxs.cs;
+      argIndex = entryArgIdxs.localInvocationId;
+      break;
+    }
+    default:
+      llvm_unreachable("Invalid shade stage!");
+      break;
+    }
+
+    const unsigned waveSize = m_pipelineState->getShaderWaveSize(stage);
+
+    // For mesh shader the following two ids are required.
+    Value *waveIdInSubgroupMesh = nullptr;
+    Value *threadIdInWaveMesh = nullptr;
+    if (stage == ShaderStageMesh) {
+      builder.CreateIntrinsic(Intrinsic::amdgcn_init_exec, {}, builder.getInt64(-1));
+      // waveId = mergedWaveInfo[27:24]
+      Value *mergedWaveInfo =
+          getFunctionArgument(entryPoint, ShaderMerger::getSpecialSgprInputIndex(gfxIp, EsGs::MergedWaveInfo));
+      waveIdInSubgroupMesh = builder.CreateAnd(builder.CreateLShr(mergedWaveInfo, 24), 0xF, "waveIdInSubgroupMesh");
+
+      threadIdInWaveMesh =
+          builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {builder.getInt32(-1), builder.getInt32(0)});
+      if (waveSize == 64) {
+        threadIdInWaveMesh =
+            builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {builder.getInt32(-1), threadIdInWaveMesh});
+      }
+      threadIdInWaveMesh->setName("threadIdInWaveMesh");
+    }
+
+    unsigned workgroupTotalSize = workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
+
+    scopeSize = workgroupTotalSize;
+
+    // localInvocationId argument for mesh shader is available from GFX11+. But it can be retrieved in anther way.
+    if (stage == ShaderStageMesh) {
+      threadIndex = builder.CreateAdd(builder.CreateMul(waveIdInSubgroupMesh, builder.getInt32(waveSize)),
+                                      threadIdInWaveMesh, "threadIdInSubgroupMesh");
+    } else {
+      Value *threadIdInGroup = getFunctionArgument(entryPoint, argIndex);
+      Value *threadIdComp[3];
+      if (gfxIp.major < 11) {
+        for (unsigned idx = 0; idx < 3; idx++)
+          threadIdComp[idx] = builder.CreateExtractElement(threadIdInGroup, idx);
+      } else {
+        // The local invocation ID is packed to VGPR0 on GFX11+ with the following layout:
+        //
+        //   +-----------------------+-----------------------+-----------------------+
+        //   | Local Invocation ID Z | Local Invocation ID Y | Local Invocation ID X |
+        //   | [29:20]               | [19:10]               | [9:0]                 |
+        //   +-----------------------+-----------------------+-----------------------+
+        // localInvocationIdZ = localInvocationId[29:20]
+        threadIdComp[2] = builder.CreateAnd(builder.CreateLShr(threadIdInGroup, 20), 0x3FF, "localInvocationIdZ");
+        // localInvocationIdY = localInvocationId[19:10]
+        threadIdComp[1] = builder.CreateAnd(builder.CreateLShr(threadIdInGroup, 10), 0x3FF, "localInvocationIdY");
+        // localInvocationIdX = localInvocationId[9:0]
+        threadIdComp[0] = builder.CreateAnd(threadIdInGroup, 0x3FF, "localInvocationIdX");
+      }
+
+      // LocalInvocationIndex is
+      // (LocalInvocationId.Z * WorkgroupSize.Y + LocalInvocationId.Y) * WorkGroupSize.X + LocalInvocationId.X
+      // tidigCompCnt is not always 3 if groupSizeY and/or groupSizeZ are 1. See RegisterMetadataBuilder.cpp.
+      threadIndex = builder.getInt32(0);
+      if (workgroupSize[2] > 1)
+        threadIndex = builder.CreateMul(threadIdComp[2], builder.getInt32(workgroupSize[1]));
+      if (workgroupSize[1] > 1)
+        threadIndex =
+            builder.CreateMul(builder.CreateAdd(threadIndex, threadIdComp[1]), builder.getInt32(workgroupSize[0]));
+      threadIndex = builder.CreateAdd(threadIndex, threadIdComp[0]);
+    }
+  } else {
+    llvm_unreachable("Unsupported scope!");
+  }
+
+  // Copy in 16-bytes if possible
+  unsigned wideDwords = 4;
+  // If either pointer is in LDS, copy in 8-bytes
+  if (src->getType()->getPointerAddressSpace() == ADDR_SPACE_LOCAL ||
+      dst->getType()->getPointerAddressSpace() == ADDR_SPACE_LOCAL)
+    wideDwords = 2;
+
+  unsigned baseOffset = 0;
+
+  auto copyFunc = [&](Type *copyTy, unsigned copySize) {
+    Value *offset =
+        builder.CreateAdd(builder.getInt32(baseOffset), builder.CreateMul(threadIndex, builder.getInt32(copySize)));
+    Value *dstPtr = builder.CreateGEP(builder.getInt8Ty(), dst, offset);
+    Value *srcPtr = builder.CreateGEP(builder.getInt8Ty(), src, offset);
+    Value *data = builder.CreateLoad(copyTy, srcPtr);
+    builder.CreateStore(data, dstPtr);
+  };
+
+  unsigned wideDwordsCopySize = sizeof(unsigned) * wideDwords;
+  Type *wideDwordsTy = ArrayType::get(builder.getInt32Ty(), wideDwords);
+  while (baseOffset + wideDwordsCopySize * scopeSize <= len) {
+    copyFunc(wideDwordsTy, wideDwordsCopySize);
+    baseOffset += wideDwordsCopySize * scopeSize;
+  }
+
+  unsigned dwordCopySize = sizeof(unsigned);
+  Type *dwordTy = builder.getInt32Ty();
+  while (baseOffset + dwordCopySize * scopeSize <= len) {
+    copyFunc(dwordTy, dwordCopySize);
+    baseOffset += dwordCopySize * scopeSize;
+  }
+
+  unsigned remainingBytes = len - baseOffset;
+
+  if (remainingBytes) {
+    assert(remainingBytes % 4 == 0);
+    BasicBlock *afterBlock = groupMemcpyOp.getParent();
+    BasicBlock *beforeBlock = splitBlockBefore(afterBlock, &groupMemcpyOp, nullptr, nullptr, nullptr);
+    beforeBlock->takeName(afterBlock);
+    afterBlock->setName(Twine(beforeBlock->getName()) + ".afterGroupMemcpyTail");
+
+    // Split to create a tail copy block, empty except for an unconditional branch to afterBlock.
+    BasicBlock *copyBlock = splitBlockBefore(afterBlock, &groupMemcpyOp, nullptr, nullptr, nullptr, ".groupMemcpyTail");
+    // Change the branch at the end of beforeBlock to be conditional.
+    beforeBlock->getTerminator()->eraseFromParent();
+    builder.SetInsertPoint(beforeBlock);
+
+    Value *indexInRange = builder.CreateICmpULT(threadIndex, builder.getInt32(remainingBytes / 4));
+
+    builder.CreateCondBr(indexInRange, copyBlock, afterBlock);
+    // Create the copy instructions.
+    builder.SetInsertPoint(copyBlock->getTerminator());
+    copyFunc(dwordTy, dwordCopySize);
+  }
+}
+
+// =====================================================================================================================
 // Lower as.continuation.reference call.
 //
 // @param asCpsReferenceOp: the instruction
 void PatchEntryPointMutate::lowerAsCpsReference(cps::AsContinuationReferenceOp &asCpsReferenceOp) {
   IRBuilder<> builder(&asCpsReferenceOp);
-  auto *ref = builder.CreatePtrToInt(asCpsReferenceOp.getFn(), builder.getInt32Ty());
 
   Function &callee = cast<Function>(*asCpsReferenceOp.getFn());
   auto level = cps::getCpsLevelFromFunction(callee);
-  ref = builder.CreateOr(ref, (uint64_t)level);
+
+  // Use GEP since that is easier for the backend to combine into a relocation fixup.
+  Value *ref = builder.CreateConstGEP1_32(builder.getInt8Ty(), asCpsReferenceOp.getFn(), static_cast<uint32_t>(level));
+  ref = builder.CreatePtrToInt(ref, builder.getInt32Ty());
 
   asCpsReferenceOp.replaceAllUsesWith(ref);
 }
@@ -307,7 +516,8 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
   if (!isCpsFunc) {
     IRBuilder<> builder(func->getContext());
     builder.SetInsertPointPastAllocas(func);
-    Value *vspStorage = builder.CreateAlloca(builder.getPtrTy(getLoweredCpsStackAddrSpace()), ADDR_SPACE_PRIVATE);
+    Value *vspStorage =
+        builder.CreateAlloca(builder.getPtrTy(stackLowering->getLoweredCpsStackAddrSpace()), ADDR_SPACE_PRIVATE);
     m_funcCpsStackMap[func] = vspStorage;
   }
 
@@ -346,7 +556,7 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
 
   // Lower returns.
   for (auto *ret : retInstrs) {
-    auto *vspTy = builder.getPtrTy(getLoweredCpsStackAddrSpace());
+    auto *vspTy = builder.getPtrTy(stackLowering->getLoweredCpsStackAddrSpace());
     exitInfos.push_back(CpsExitInfo(ret->getParent(), {builder.getInt32(0), PoisonValue::get(vspTy)}));
     builder.SetInsertPoint(ret);
     builder.CreateBr(tailBlock);
@@ -402,8 +612,6 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
   //      ret void
   unsigned waveSize = m_pipelineState->getShaderWaveSize(m_shaderStage);
   Type *waveMaskTy = builder.getIntNTy(waveSize);
-  auto *chainBlock = BasicBlock::Create(func->getContext(), "chain.block", func);
-  auto *retBlock = BasicBlock::Create(func->getContext(), "ret.block", func);
   // For continufy based continuation, the vgpr list: LocalInvocationId, vcr, vsp, ...
   unsigned vcrIndexInVgpr = shaderInputs ? 1 : 0;
   auto *vcr = builder.CreateExtractValue(vgprArg, vcrIndexInVgpr);
@@ -437,13 +645,21 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
     execMask = builder.CreateUnaryIntrinsic(Intrinsic::amdgcn_wwm, execMask);
   }
 
-  auto *isNullTarget = builder.CreateICmpEQ(targetVcr, builder.getInt32(0));
-  builder.CreateCondBr(isNullTarget, retBlock, chainBlock);
+  BasicBlock *chainBlock = nullptr;
+  // We only need to insert the return block if there is any return in original function, otherwise we just insert
+  // everything in the tail block.
+  if (!retInstrs.empty()) {
+    chainBlock = BasicBlock::Create(func->getContext(), "chain.block", func);
+    auto *retBlock = BasicBlock::Create(func->getContext(), "ret.block", func);
+    auto *isNullTarget = builder.CreateICmpEQ(targetVcr, builder.getInt32(0));
+    builder.CreateCondBr(isNullTarget, retBlock, chainBlock);
 
-  builder.SetInsertPoint(retBlock);
-  builder.CreateRetVoid();
+    builder.SetInsertPoint(retBlock);
+    builder.CreateRetVoid();
+  }
 
-  builder.SetInsertPoint(chainBlock);
+  if (chainBlock)
+    builder.SetInsertPoint(chainBlock);
   // Mask off metadata bits and setup jump target.
   Value *addr32 = builder.CreateAnd(targetVcr, builder.getInt32(~0x3fu));
   AddressExtender addressExtender(func);
@@ -472,10 +688,9 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
 
   auto funcName = func->getName();
   // Lower cps stack operations
-  CpsStackLowering stackLowering(func->getContext());
-  stackLowering.lowerCpsStackOps(*func, m_funcCpsStackMap[func]);
+  stackLowering->lowerCpsStackOps(*func, m_funcCpsStackMap[func]);
 
-  stackSize += stackLowering.getStackSize();
+  stackSize += stackLowering->getStackSizeInBytes();
   // Set per-function .frontend_stack_size PAL metadata.
   auto &shaderFunctions = m_pipelineState->getPalMetadata()
                               ->getPipelineNode()
@@ -505,7 +720,7 @@ Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type 
   IRBuilder<> builder(func->getContext());
   SmallVector<Type *> newArgTys;
   newArgTys.append(fixedShaderArgTys.begin(), fixedShaderArgTys.end());
-  newArgTys.append({builder.getInt32Ty(), builder.getPtrTy(getLoweredCpsStackAddrSpace())});
+  newArgTys.append({builder.getInt32Ty(), builder.getPtrTy(stackLowering->getLoweredCpsStackAddrSpace())});
   auto remainingArgs = func->getFunctionType()->params().drop_front(1);
   newArgTys.append(remainingArgs.begin(), remainingArgs.end());
   FunctionType *newFuncTy = FunctionType::get(builder.getVoidTy(), newArgTys, false);
@@ -544,7 +759,8 @@ Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type 
   newFunc->splice(newFunc->begin(), func);
 
   builder.SetInsertPointPastAllocas(newFunc);
-  Value *vspStorage = builder.CreateAlloca(builder.getPtrTy(getLoweredCpsStackAddrSpace()), ADDR_SPACE_PRIVATE);
+  Value *vspStorage =
+      builder.CreateAlloca(builder.getPtrTy(stackLowering->getLoweredCpsStackAddrSpace()), ADDR_SPACE_PRIVATE);
   m_funcCpsStackMap[newFunc] = vspStorage;
 
   // Function arguments: {fixed_shader_arguments, vcr, vsp, original_func_arguments_exclude_state}
@@ -552,8 +768,8 @@ Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type 
   if (!state->getType()->isEmptyTy()) {
     // Get stack address of pushed state and load it from continuation stack.
     unsigned stateSize = layout.getTypeStoreSize(state->getType());
-    vsp = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), vsp, -alignTo(stateSize, continuationStackAlignment));
-    Value *newState = builder.CreateAlignedLoad(state->getType(), vsp, Align(continuationStackAlignment), "cps.state");
+    vsp = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), vsp, -alignTo(stateSize, ContinuationStackAlignment));
+    Value *newState = builder.CreateAlignedLoad(state->getType(), vsp, Align(ContinuationStackAlignment), "cps.state");
     state->replaceAllUsesWith(newState);
   }
   builder.CreateStore(vsp, vspStorage);
@@ -602,14 +818,15 @@ unsigned PatchEntryPointMutate::lowerCpsJump(Function *parent, cps::JumpOp *jump
 
   // Pushing state onto stack and get new vsp.
   Value *state = jumpOp->getState();
-  Value *vsp = builder.CreateAlignedLoad(builder.getPtrTy(getLoweredCpsStackAddrSpace()), m_funcCpsStackMap[parent],
-                                         Align(getLoweredCpsStackPointerSize(layout)));
+  Value *vsp =
+      builder.CreateAlignedLoad(builder.getPtrTy(stackLowering->getLoweredCpsStackAddrSpace()),
+                                m_funcCpsStackMap[parent], Align(stackLowering->getLoweredCpsStackPointerSize(layout)));
   unsigned stateSize = 0;
   if (!state->getType()->isEmptyTy()) {
     stateSize = layout.getTypeStoreSize(state->getType());
     builder.CreateStore(state, vsp);
     // Make vsp properly aligned across cps function.
-    stateSize = alignTo(stateSize, continuationStackAlignment);
+    stateSize = alignTo(stateSize, ContinuationStackAlignment);
     vsp = builder.CreateConstGEP1_32(builder.getInt8Ty(), vsp, stateSize);
   }
 
@@ -1030,7 +1247,8 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
     } else {
       inRegMask = generateEntryPointArgTys(shaderInputs, origFunc, shaderInputTys, shaderInputNames,
                                            origType->getNumParams(), true);
-      newFunc = addFunctionArgs(origFunc, origType->getReturnType(), shaderInputTys, shaderInputNames, inRegMask, true);
+      newFunc = addFunctionArgs(origFunc, origType->getReturnType(), shaderInputTys, shaderInputNames, inRegMask,
+                                AddFunctionArgsAppend);
       const bool isEntryPoint = isShaderEntryPoint(newFunc);
       newFunc->setCallingConv(isEntryPoint ? CallingConv::AMDGPU_CS : CallingConv::AMDGPU_Gfx);
     }
@@ -1452,21 +1670,21 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
 
     // NOTE: The user data to emulate gl_ViewIndex is somewhat common. To make it consistent for GFX9
     // merged shader, we place it prior to any other special user data.
-    if (m_pipelineState->getInputAssemblyState().enableMultiView) {
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable) {
       unsigned *argIdx = nullptr;
       auto userDataValue = UserDataMapping::ViewId;
       switch (m_shaderStage) {
       case ShaderStageVertex:
-        argIdx = &entryArgIdxs.vs.viewIndex;
+        argIdx = &entryArgIdxs.vs.viewId;
         break;
       case ShaderStageTessControl:
-        argIdx = &entryArgIdxs.tcs.viewIndex;
+        argIdx = &entryArgIdxs.tcs.viewId;
         break;
       case ShaderStageTessEval:
-        argIdx = &entryArgIdxs.tes.viewIndex;
+        argIdx = &entryArgIdxs.tes.viewId;
         break;
       case ShaderStageGeometry:
-        argIdx = &entryArgIdxs.gs.viewIndex;
+        argIdx = &entryArgIdxs.gs.viewId;
         break;
       default:
         llvm_unreachable("Unexpected shader stage");
@@ -1564,9 +1782,9 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "drawIndex", UserDataMapping::DrawIndex,
                                                 &intfData->entryArgIdxs.mesh.drawIndex));
     }
-    if (m_pipelineState->getInputAssemblyState().enableMultiView) {
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable) {
       specialUserDataArgs.push_back(
-          UserDataArg(builder.getInt32Ty(), "viewId", UserDataMapping::ViewId, &intfData->entryArgIdxs.mesh.viewIndex));
+          UserDataArg(builder.getInt32Ty(), "viewId", UserDataMapping::ViewId, &intfData->entryArgIdxs.mesh.viewId));
     }
     specialUserDataArgs.push_back(UserDataArg(FixedVectorType::get(builder.getInt32Ty(), 3), "meshTaskDispatchDims",
                                               UserDataMapping::MeshTaskDispatchDims,
@@ -1580,12 +1798,12 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
                                                 &intfData->entryArgIdxs.mesh.pipeStatsBuf));
     }
   } else if (m_shaderStage == ShaderStageFragment) {
-    if (m_pipelineState->getInputAssemblyState().enableMultiView &&
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable &&
         m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs.viewIndex) {
       // NOTE: Only add special user data of view index when multi-view is enabled and gl_ViewIndex is used in fragment
       // shader.
       specialUserDataArgs.push_back(
-          UserDataArg(builder.getInt32Ty(), "viewId", UserDataMapping::ViewId, &intfData->entryArgIdxs.fs.viewIndex));
+          UserDataArg(builder.getInt32Ty(), "viewId", UserDataMapping::ViewId, &intfData->entryArgIdxs.fs.viewId));
     }
 
     if (userDataUsage->isSpecialUserDataUsed(UserDataMapping::ColorExportAddr)) {

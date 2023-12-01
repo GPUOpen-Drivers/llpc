@@ -249,6 +249,7 @@ Options GraphicsContext::computePipelineOptions() const {
   auto pipelineInfo = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo());
   options.enableUberFetchShader = pipelineInfo->enableUberFetchShader;
   options.enableColorExportShader = pipelineInfo->enableColorExportShader;
+  options.useSoftwareVertexBufferDescriptors = pipelineInfo->useSoftwareVertexBufferDescriptors;
   if (getGfxIpVersion().major >= 10) {
     // Only set NGG options for a GFX10+ graphics pipeline.
     const auto &nggState = pipelineInfo->nggState;
@@ -321,13 +322,14 @@ void GraphicsContext::setColorExportState(Pipeline *pipeline, Util::MetroHash64 
       formats[targetIndex].nfmt = nfmt;
       formats[targetIndex].blendEnable = cbState.target[targetIndex].blendEnable;
       formats[targetIndex].blendSrcAlphaToColor = cbState.target[targetIndex].blendSrcAlphaToColor;
+      formats[targetIndex].channelWriteMask = cbState.target[targetIndex].channelWriteMask;
     }
   }
 
   if (state.alphaToCoverageEnable && formats.empty()) {
     // NOTE: We must export alpha channel for alpha to coverage, if there is no color export,
     // we force a dummy color export.
-    formats.push_back({BufDataFormat32, BufNumFormatFloat});
+    formats.push_back({BufDataFormat32, BufNumFormatFloat, 0, 0, 0xF});
   }
 
   pipeline->setColorExportState(formats, state);
@@ -366,6 +368,7 @@ void GraphicsContext::setVertexInputDescriptions(Pipeline *pipeline, Util::Metro
       break;
     case VK_VERTEX_INPUT_RATE_INSTANCE:
       bindings[idx].inputRate = VertexInputRateInstance;
+      bindings[idx].divisor = 1; // Set default divisor
       break;
     default:
       llvm_unreachable("Should never be called!");
@@ -379,7 +382,7 @@ void GraphicsContext::setVertexInputDescriptions(Pipeline *pipeline, Util::Metro
     for (unsigned i = 0; i < vertexDivisor->vertexBindingDivisorCount; ++i) {
       auto divisor = &vertexDivisor->pVertexBindingDivisors[i];
       if (divisor->binding <= bindings.size())
-        bindings[divisor->binding].inputRate = divisor->divisor;
+        bindings[divisor->binding].divisor = divisor->divisor;
     }
   }
 
@@ -408,6 +411,7 @@ void GraphicsContext::setVertexInputDescriptions(Pipeline *pipeline, Util::Metro
           dfmt,
           nfmt,
           binding->inputRate,
+          binding->divisor,
       });
     }
   }
@@ -433,7 +437,7 @@ void GraphicsContext::setGraphicsStateInPipeline(Pipeline *pipeline, Util::Metro
   const auto &inputRsState = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->rsState;
 
   InputAssemblyState inputAssemblyState = {};
-  inputAssemblyState.enableMultiView = inputIaState.enableMultiView;
+  inputAssemblyState.multiView = inputIaState.enableMultiView ? MultiViewMode::Simple : MultiViewMode::Disable;
   RasterizerState rasterizerState = {};
 
   if (stageMask & ~shaderStageToMask(ShaderStageFragment)) {

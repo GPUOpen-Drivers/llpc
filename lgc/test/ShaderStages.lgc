@@ -70,17 +70,8 @@ attributes #0 = { nounwind }
 ; ----------------------------------------------------------------------
 ; Extract 3: GS/VS
 
-; RUN: lgc -extract=3 -print-after=lgc-patch-setup-target-features -mcpu=gfx810 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NO-NGG3 %s
 ; RUN: lgc -extract=3 -print-after=lgc-patch-setup-target-features -mcpu=gfx900 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NGG3 %s
 ; RUN: lgc -extract=3 -print-after=lgc-patch-setup-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NGG3 %s
-; CHECK-NO-NGG3: define dllexport amdgpu_es void @_amdgpu_es_main{{.*}} !lgc.shaderstage !6 {
-; CHECK-NO-NGG3: define dllexport amdgpu_gs void @_amdgpu_gs_main{{.*}} !lgc.shaderstage !7 {
-; CHECK-NO-NGG3: define dllexport amdgpu_vs void @_amdgpu_vs_main{{.*}} !lgc.shaderstage !8 {
-; CHECK-NO-NGG3: define dllexport amdgpu_ps void @_amdgpu_ps_main{{.*}} !lgc.shaderstage !9 {
-; CHECK-NO-NGG3: !6 = !{i32 1}
-; CHECK-NO-NGG3: !7 = !{i32 4}
-; CHECK-NO-NGG3: !8 = !{i32 8}
-; CHECK-NO-NGG3: !9 = !{i32 6}
 
 ; _amdgpu_gs_main must be first, so it can be linked with a potential vertex fetch shader.
 ; CHECK-NGG3: define dllexport amdgpu_gs void @_amdgpu_gs_main{{.*}} !lgc.shaderstage [[geom_stage:![0-9]*]] {
@@ -166,15 +157,8 @@ attributes #0 = { nounwind }
 ; ----------------------------------------------------------------------
 ; Extract 4: TCS/TES
 
-; RUN: lgc -extract=4 -print-after=lgc-patch-setup-target-features -mcpu=gfx810 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NO-NGG4 %s
 ; RUN: lgc -extract=4 -print-after=lgc-patch-setup-target-features -mcpu=gfx900 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-GFX94 %s
 ; RUN: lgc -extract=4 -print-after=lgc-patch-setup-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NGG4 %s
-; CHECK-NO-NGG4: define dllexport amdgpu_hs void @_amdgpu_hs_main{{.*}} !lgc.shaderstage !5 {
-; CHECK-NO-NGG4: define dllexport amdgpu_vs void @_amdgpu_vs_main{{.*}} !lgc.shaderstage !6 {
-; CHECK-NO-NGG4: define dllexport amdgpu_ps void @_amdgpu_ps_main{{.*}} !lgc.shaderstage !7 {
-; CHECK-NO-NGG4: !5 = !{i32 2}
-; CHECK-NO-NGG4: !6 = !{i32 3}
-; CHECK-NO-NGG4: !7 = !{i32 6}
 
 ; CHECK-GFX94: define dllexport amdgpu_hs void @_amdgpu_hs_main{{.*}} !lgc.shaderstage !5 {
 ; CHECK-GFX94: define internal{{.*}} amdgpu_hs void @_amdgpu_hs_main.1{{.*}} !lgc.shaderstage !5 {
@@ -253,11 +237,8 @@ attributes #1 = { nounwind readonly }
 ; ----------------------------------------------------------------------
 ; Extract 5: TCS
 
-; RUN: lgc -extract=5 -print-after=lgc-patch-setup-target-features -mcpu=gfx810 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NO-NGG5 %s
 ; RUN: lgc -extract=5 -print-after=lgc-patch-setup-target-features -mcpu=gfx900 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NGG5 %s
 ; RUN: lgc -extract=5 -print-after=lgc-patch-setup-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NGG5 %s
-; CHECK-NO-NGG5: define dllexport amdgpu_hs void @_amdgpu_hs_main{{.*}} !lgc.shaderstage !5 {
-; CHECK-NO-NGG5: !5 = !{i32 2}
 
 ; CHECK-NGG5: define dllexport amdgpu_hs void @_amdgpu_hs_main{{.*}} !lgc.shaderstage !5 {
 ; CHECK-NGG5: !5 = !{i32 2}
@@ -310,13 +291,8 @@ attributes #1 = { nounwind readonly }
 ; ----------------------------------------------------------------------
 ; Extract 6: TES
 
-; RUN: lgc -extract=6 -print-after=lgc-patch-setup-target-features -mcpu=gfx810 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NO-NGG6 %s
 ; RUN: lgc -extract=6 -print-after=lgc-patch-setup-target-features -mcpu=gfx900 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-GFX96 %s
 ; RUN: lgc -extract=6 -print-after=lgc-patch-setup-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NGG6 %s
-; CHECK-NO-NGG6: define dllexport amdgpu_vs void @_amdgpu_vs_main{{.*}} !lgc.shaderstage !5 {
-; CHECK-NO-NGG6: define dllexport amdgpu_ps void @_amdgpu_ps_main{{.*}} !lgc.shaderstage !6 {
-; CHECK-NO-NGG6: !5 = !{i32 3}
-; CHECK-NO-NGG6: !6 = !{i32 6}
 
 ; CHECK-GFX96: define dllexport amdgpu_vs void @_amdgpu_vs_main{{.*}} !lgc.shaderstage !5 {
 ; CHECK-GFX96: define dllexport amdgpu_ps void @_amdgpu_ps_main{{.*}} !lgc.shaderstage !6 {
@@ -375,21 +351,8 @@ attributes #1 = { nounwind readonly }
 ; ----------------------------------------------------------------------
 ; Extract 7: TCS/TES/GS
 
-; RUN: lgc -extract=7 -print-after=lgc-patch-setup-target-features -mcpu=gfx810 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NO-NGG7 %s
 ; RUN: lgc -extract=7 -print-after=lgc-patch-setup-target-features -mcpu=gfx900 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NGG7 %s
 ; RUN: lgc -extract=7 -print-after=lgc-patch-setup-target-features -mcpu=gfx1010 %s -o /dev/null 2>&1 | FileCheck --check-prefixes=CHECK-NGG7 %s
-; CHECK-NO-NGG7: define dllexport amdgpu_hs void @_amdgpu_hs_main{{.*}} !lgc.shaderstage !7 {
-; CHECK-NO-NGG7: define dllexport amdgpu_es void @_amdgpu_es_main{{.*}} !lgc.shaderstage !8 {
-; CHECK-NO-NGG7: define dllexport amdgpu_gs void @_amdgpu_gs_main{{.*}} !lgc.shaderstage !9 {
-; CHECK-NO-NGG7: define dllexport amdgpu_ls void @_amdgpu_ls_main{{.*}} !lgc.shaderstage !10 {
-; CHECK-NO-NGG7: define dllexport amdgpu_vs void @_amdgpu_vs_main{{.*}} !lgc.shaderstage !11 {
-; CHECK-NO-NGG7: define dllexport amdgpu_ps void @_amdgpu_ps_main{{.*}} !lgc.shaderstage !12 {
-; CHECK-NO-NGG7: !7 = !{i32 2}
-; CHECK-NO-NGG7: !8 = !{i32 3}
-; CHECK-NO-NGG7: !9 = !{i32 4}
-; CHECK-NO-NGG7: !10 = !{i32 1}
-; CHECK-NO-NGG7: !11 = !{i32 8}
-; CHECK-NO-NGG7: !12 = !{i32 6}
 
 ; When there is are tes and geom shader, _amdgpu_hs_main must be first, so it can be linked with a potential
 ; vertex fetch shader.

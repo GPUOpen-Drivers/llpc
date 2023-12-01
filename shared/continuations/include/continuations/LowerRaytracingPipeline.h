@@ -35,6 +35,7 @@
 
 #include "continuations/ContinuationsUtil.h"
 #include "continuations/PayloadAccessQualifiers.h"
+#include "lgc/LgcCpsDialect.h"
 #include "llvm-dialects/Dialect/Builder.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/IR/IRBuilder.h"
@@ -51,6 +52,14 @@ class StructType;
 class Type;
 class Value;
 
+namespace {
+enum class ContinuationCallType {
+  Traversal,
+  CallShader,
+  AnyHit,
+};
+} // namespace
+
 class ModuleMetadataState final {
 public:
   ModuleMetadataState(llvm::Module &Module);
@@ -65,15 +74,7 @@ public:
     return MinPayloadRegisterCount;
   }
 
-  ContStackAddrspace getContStackAddrspace() const { return StackAddrspace; };
-
-  bool isGlobalAddressSpace() const {
-    return StackAddrspace == ContStackAddrspace::Global;
-  }
-
-  [[maybe_unused]] bool isScratchAddressSpace() const {
-    return StackAddrspace == ContStackAddrspace::Scratch;
-  }
+  ContStackAddrspace getContStackAddrspace() const { return StackAddrspace; }
 
   void updateModuleMetadata() const;
 
@@ -84,13 +85,29 @@ private:
   static constexpr uint32_t DefaultPayloadRegisterCount = 30;
   /// Maximum allowed number of registers to be used for the payload.
   uint32_t MaxPayloadRegisterCount = 0;
-  //// Minimum required number of payload registers.
+  /// Minimum required number of payload registers.
   uint32_t MinPayloadRegisterCount = 0;
   /// The address space used for the continuations stack.
   /// Either stack or global memory.
-  ContStackAddrspace StackAddrspace = DefaultStackAddrspace;
-  static constexpr ContStackAddrspace DefaultStackAddrspace =
-      ContStackAddrspace::Scratch;
+  ContStackAddrspace StackAddrspace = DXILContHelper::DefaultStackAddrspace;
+};
+
+class CpsMutator final {
+public:
+  explicit CpsMutator(Module &Mod)
+      : Mod{Mod}, IsModuleInCpsMode{DXILContHelper::isLgcCpsModule(Mod)},
+        Builder{std::make_unique<llvm_dialects::Builder>(Mod.getContext())} {}
+
+  Value *insertCpsAwait(Type *ReturnTy, Value *ShaderAddr, Instruction *Call,
+                        ArrayRef<Value *> Args, ContinuationCallType CallType,
+                        lgc::cps::CpsShaderStage ShaderStage);
+
+  bool shouldRun() const { return IsModuleInCpsMode; }
+
+private:
+  Module &Mod;
+  bool IsModuleInCpsMode = false;
+  std::unique_ptr<llvm_dialects::Builder> Builder;
 };
 
 class LowerRaytracingPipelinePassImpl final {
@@ -99,12 +116,6 @@ public:
   bool run();
 
 private:
-  enum class ContinuationCallType {
-    Traversal,
-    CallShader,
-    AnyHit,
-  };
-
   struct FunctionConfig {
     // Maximum allowed size of hit attributes to be used in a TraceRay together
     // with this function, even if this function does not touch hit attributes
@@ -129,10 +140,12 @@ private:
     SmallVector<CallInst *> CallShaderCalls;
     /// Calls to hlsl intrinsics that cannot be rematerialized
     SmallVector<CallInst *> IntrinsicCalls;
+    SmallVector<CallInst *> ShaderIndexCalls;
 
     /// Pointer to the alloca'd system data object in this function
     AllocaInst *SystemData = nullptr;
     StructType *SystemDataTy = nullptr;
+    Type *ReturnTy = nullptr;
     /// Maximum number of I32s required to store the outgoing payload in all
     /// CallShader or TraceRay (maximum over all TraceRay formats) calls
     uint32_t MaxOutgoingPayloadI32s = 0;
@@ -151,7 +164,7 @@ private:
   struct FunctionEndData {
     Instruction *Terminator = nullptr;
     const PAQSerializationLayout *OutgoingSerializationLayout = nullptr;
-    SmallVectorImpl<Value *> *SavedRegisterValues = nullptr;
+    SmallVector<Value *> SavedRegisterValues;
     Value *NewPayload = nullptr;
     std::optional<PAQShaderStage> ShaderStage;
     Value *HitAttrsAlloca = nullptr;
@@ -160,6 +173,7 @@ private:
   };
 
   struct AwaitFunctionData {
+    DXILShaderKind CallerKind = DXILShaderKind::Invalid;
     ContinuationCallType CallType;
     SmallVector<CallInst *> AwaitCalls;
     FunctionConfig FuncConfig = {};
@@ -180,13 +194,15 @@ private:
   void replaceCallShaderCall(IRBuilder<> &B, FunctionData &Data,
                              CallInst *Call);
   void replaceContinuationCall(IRBuilder<> &B, ContinuationCallType CallType,
-                               CallInst *Call,
-                               const FunctionConfig &FuncConfig);
-  void replaceReportHitCall(IRBuilder<> &B, FunctionData &Data, CallInst *Call);
+                               CallInst *Call, const FunctionConfig &FuncConfig,
+                               DXILShaderKind CallerKind);
+  void replaceReportHitCall(llvm_dialects::Builder &B, FunctionData &Data,
+                            CallInst *Call);
 
   void handleReportHit(FunctionData &Data, Function &F);
 
-  void handleContinuationStackIsGlobal(Function &Func);
+  void replaceShaderIndexCall(IRBuilder<> &B, FunctionData &Data,
+                              CallInst *Call);
 
   void handleGetFuncAddr(Function &Func);
 
@@ -195,8 +211,6 @@ private:
   void handleUnrematerializableCandidates();
 
   void collectDriverFunctions();
-
-  void handleGetUninitialized(Function &Func);
 
   // Copy the payload content between global payload and local payload.
   // Excludes the stack pointer or hit attributes which may also reside in
@@ -247,7 +261,7 @@ private:
   void processContinuations();
   void processFunctionEntry(llvm_dialects::Builder &B, Function *F,
                             FunctionData &Data);
-  void processFunctionEnd(IRBuilder<> &B, FunctionData &Data,
+  void processFunctionEnd(llvm_dialects::Builder &B, FunctionData &Data,
                           FunctionEndData &EData);
   void processFunction(llvm_dialects::Builder &B, Function *F,
                        FunctionData &FuncData);
@@ -256,12 +270,19 @@ private:
 
   void handleDriverFuncAssertions();
 
+  constexpr static uint32_t ArgContState = 0;
+  constexpr static uint32_t ArgReturnAddr = 1;
+  constexpr static uint32_t ArgShaderIndex = 2;
+  constexpr static uint32_t ArgSystemData = 3;
+  constexpr static uint32_t ArgHitAttributes = 4;
+
   MapVector<Function *, FunctionData> ToProcess;
   MapVector<Function *, AwaitFunctionData> AwaitsToProcess;
   Module *Mod;
   LLVMContext *Context;
   const DataLayout *DL;
   ModuleMetadataState MetadataState;
+  CpsMutator Mutator;
   PAQSerializationInfoManager PAQManager;
   Type *I32;
   Type *TokenTy;
@@ -288,7 +309,6 @@ private:
 
   Function *RegisterBufferSetPointerBarrier;
 
-  MapVector<Function *, DXILShaderKind> ShaderKinds;
   SmallVector<Function *> Awaits;
   SmallVector<Function *> RestoreSystemDatas;
   SmallVector<Value *> EntriesWithPayloadTypeMetadata;

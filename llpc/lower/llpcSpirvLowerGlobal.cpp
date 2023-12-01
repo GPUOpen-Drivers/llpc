@@ -30,12 +30,13 @@
  */
 #include "llpcSpirvLowerGlobal.h"
 #include "SPIRVInternal.h"
-#include "lgcrt/LgcRtDialect.h"
 #include "llpcContext.h"
 #include "llpcDebug.h"
+#include "llpcGraphicsContext.h"
 #include "llpcRayTracingContext.h"
 #include "llpcSpirvLowerUtil.h"
 #include "lgc/LgcDialect.h"
+#include "lgc/LgcRtDialect.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/IR/Constant.h"
@@ -270,7 +271,6 @@ bool SpirvLowerGlobal::runImpl(Module &module) {
   lowerUniformConstants();
   lowerAliasedVal();
   lowerShaderRecordBuffer();
-
   cleanupReturnBlock();
 
   return true;
@@ -590,27 +590,44 @@ void SpirvLowerGlobal::mapGlobalVariableToProxy(GlobalVariable *globalVar) {
   const auto &dataLayout = m_module->getDataLayout();
   Type *globalVarTy = globalVar->getValueType();
 
-  m_builder->SetInsertPointPastAllocas(m_entryPoint);
-
   Value *proxy = nullptr;
-
+  assert(m_entryPoint);
+  removeConstantExpr(m_context, globalVar);
   // Handle special globals, regular allocas will be removed by SROA pass.
-  if (globalVar->getName().startswith(RtName::HitAttribute))
+  if (globalVar->getName().startswith(RtName::HitAttribute)) {
     proxy = m_entryPoint->getArg(1);
-  else if (globalVar->getName().startswith(RtName::IncomingRayPayLoad))
+    globalVar->replaceAllUsesWith(proxy);
+  } else if (globalVar->getName().startswith(RtName::IncomingRayPayLoad)) {
     proxy = m_entryPoint->getArg(0);
-  else if (globalVar->getName().startswith(RtName::IncomingCallableData))
+    globalVar->replaceAllUsesWith(proxy);
+  } else if (globalVar->getName().startswith(RtName::IncomingCallableData)) {
     proxy = m_entryPoint->getArg(0);
-  else
-    proxy = m_builder->CreateAlloca(globalVarTy, dataLayout.getAllocaAddrSpace(), nullptr,
-                                    Twine(LlpcName::GlobalProxyPrefix) + globalVar->getName());
+    globalVar->replaceAllUsesWith(proxy);
+  } else {
+    // Collect used functions
+    SmallSet<Function *, 4> funcs;
+    for (User *user : globalVar->users()) {
+      auto inst = cast<Instruction>(user);
+      funcs.insert(inst->getFunction());
+    }
+    for (Function *func : funcs) {
+      m_builder->SetInsertPointPastAllocas(func);
+      proxy = m_builder->CreateAlloca(globalVarTy, dataLayout.getAllocaAddrSpace(), nullptr,
+                                      Twine(LlpcName::GlobalProxyPrefix) + globalVar->getName());
 
-  if (globalVar->hasInitializer()) {
-    auto initializer = globalVar->getInitializer();
-    m_builder->CreateStore(initializer, proxy);
+      if (globalVar->hasInitializer()) {
+        auto initializer = globalVar->getInitializer();
+        m_builder->CreateStore(initializer, proxy);
+      }
+      globalVar->mutateType(proxy->getType());
+      globalVar->replaceUsesWithIf(proxy, [func](Use &U) {
+        Instruction *userInst = cast<Instruction>(U.getUser());
+        return userInst->getFunction() == func;
+      });
+    }
   }
 
-  m_globalVarProxyMap[globalVar] = proxy;
+  m_globalVarProxy.insert(globalVar);
 }
 
 // =====================================================================================================================
@@ -687,20 +704,17 @@ void SpirvLowerGlobal::mapOutputToProxy(GlobalVariable *output) {
 // =====================================================================================================================
 // Does lowering operations for SPIR-V global variables, replaces global variables with proxy variables.
 void SpirvLowerGlobal::lowerGlobalVar() {
-  if (m_globalVarProxyMap.empty()) {
+  if (m_globalVarProxy.empty()) {
     // Skip lowering if there is no global variable
     return;
   }
 
-  // Replace global variable with proxy variable
-  for (auto globalVarMap : m_globalVarProxyMap) {
-    auto globalVar = cast<GlobalVariable>(globalVarMap.first);
-    auto proxy = globalVarMap.second;
-    globalVar->mutateType(proxy->getType()); // To clear address space for pointer to make replacement valid
-    globalVar->replaceAllUsesWith(proxy);
+  // remove global variables
+  for (auto globalVar : m_globalVarProxy) {
     globalVar->dropAllReferences();
     globalVar->eraseFromParent();
   }
+  m_globalVarProxy.clear();
 }
 
 // =====================================================================================================================
@@ -1195,6 +1209,7 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
         inOutInfo.setInterpLoc(interpLoc);
 
         if (builtIn == lgc::BuiltInBaryCoord || builtIn == lgc::BuiltInBaryCoordNoPerspKHR) {
+          inOutInfo.setInterpMode(InterpModeCustom);
           if (inOutInfo.getInterpLoc() == InterpLocUnknown)
             inOutInfo.setInterpLoc(inOutMeta.InterpLoc);
           return m_builder->CreateReadBaryCoord(builtIn, inOutInfo, auxInterpValue);
@@ -1224,8 +1239,14 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
                                                              Vkgc::GlCompatibilityUniformLocation::FrameBufferSize);
             if (winSize) {
               offset = winSize->offset;
+              assert(m_shaderStage != Vkgc::ShaderStageTask && m_shaderStage != Vkgc::ShaderStageMesh);
+              unsigned constBufferBinding =
+                  Vkgc::ConstantBuffer0Binding + static_cast<GraphicsContext *>(m_context->getPipelineContext())
+                                                     ->getPipelineShaderInfo(m_shaderStage)
+                                                     ->options.constantBufferBindingOffset;
+
               Value *bufferDesc =
-                  m_builder->CreateLoadBufferDesc(Vkgc::InternalDescriptorSetId, Vkgc::ConstantBuffer0Binding,
+                  m_builder->CreateLoadBufferDesc(Vkgc::InternalDescriptorSetId, constBufferBinding,
                                                   m_builder->getInt32(0), lgc::Builder::BufferFlagNonConst);
               // Layout is {width, height}, so the offset of height is added sizeof(float).
               Value *winHeightPtr =
@@ -1252,6 +1273,8 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
       elemIdx = !elemIdx ? m_builder->getInt32(idx) : m_builder->CreateAdd(elemIdx, m_builder->getInt32(idx));
 
       lgc::InOutInfo inOutInfo;
+      inOutInfo.setComponent(inOutMeta.Component);
+
       if (!locOffset)
         locOffset = m_builder->getInt32(0);
 
@@ -1840,7 +1863,6 @@ void SpirvLowerGlobal::lowerBufferBlock() {
       // Check if our block is an array of blocks.
       if (global.getValueType()->isArrayTy()) {
         Type *const elementType = global.getValueType()->getArrayElementType();
-        Type *const blockType = elementType->getPointerTo(global.getAddressSpace());
 
         // We need to run over the users of the global, find the GEPs, and add a load for each.
         for (User *const user : global.users()) {
@@ -1974,7 +1996,6 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                 bufferFlags |= lgc::Builder::BufferFlagWritten;
 
               Value *bufferDescs[2] = {nullptr};
-              Value *bitCasts[2] = {nullptr};
               unsigned descSets[2] = {descSet, 0};
               unsigned bindings[2] = {binding, 0};
               GlobalVariable *globals[2] = {&global, nullptr};
@@ -2006,11 +2027,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                   auto descPtr = m_builder->CreateGetDescPtr(descTy, descTy, descSet, binding);
                   auto stride = m_builder->CreateGetDescStride(descTy, descTy, descSet, binding);
                   auto index = m_builder->CreateMul(blockIndex, stride);
-                  Value *castDescPtr = m_builder->CreateBitCast(
-                      descPtr,
-                      m_builder->getInt8Ty()->getPointerTo(cast<PointerType>(descPtr->getType())->getAddressSpace()));
-                  Value *indexedDescPtr = m_builder->CreateGEP(m_builder->getInt8Ty(), castDescPtr, index);
-                  bufferDescs[idx] = m_builder->CreateBitCast(indexedDescPtr, descPtr->getType());
+                  bufferDescs[idx] = m_builder->CreateGEP(m_builder->getInt8Ty(), descPtr, index);
                 } else {
                   bufferDescs[idx] =
                       m_builder->CreateLoadBufferDesc(descSets[idx], bindings[idx], blockIndex, bufferFlags);
@@ -2018,15 +2035,13 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                 // If the global variable is a constant, the data it points to is invariant.
                 if (global.isConstant())
                   m_builder->CreateInvariantStart(bufferDescs[idx]);
-
-                bitCasts[idx] = m_builder->CreateBitCast(bufferDescs[idx], blockType);
               }
 
               Value *newSelect = nullptr;
               if (select)
-                newSelect = m_builder->CreateSelect(select->getCondition(), bitCasts[0], bitCasts[1]);
+                newSelect = m_builder->CreateSelect(select->getCondition(), bufferDescs[0], bufferDescs[1]);
 
-              Value *base = newSelect ? newSelect : bitCasts[0];
+              Value *base = newSelect ? newSelect : bufferDescs[0];
               // If zero-index elimination removed leading zeros from OldGEP indices then we need to use OldGEP Source
               // type as a Source type for newGEP. In other cases use global variable array element type.
               Type *newGetElemType = gepsLeadingZerosEliminated ? getElemPtr->getSourceElementType() : elementType;
@@ -2083,8 +2098,6 @@ void SpirvLowerGlobal::lowerBufferBlock() {
         if (global.isConstant())
           m_builder->CreateInvariantStart(bufferDesc);
 
-        Value *const bitCast = m_builder->CreateBitCast(bufferDesc, global.getType());
-
         SmallVector<Instruction *, 8> usesToReplace;
 
         for (User *const user : global.users()) {
@@ -2101,11 +2114,11 @@ void SpirvLowerGlobal::lowerBufferBlock() {
           usesToReplace.push_back(inst);
         }
 
-        Value *newLoadPtr = bitCast;
+        Value *newLoadPtr = bufferDesc;
         if (atomicCounterMD) {
           SmallVector<Value *, 8> indices;
           indices.push_back(m_builder->getInt32(atomicCounterMeta.offset));
-          newLoadPtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bitCast, indices);
+          newLoadPtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, indices);
         }
 
         for (Instruction *const use : usesToReplace)
@@ -2429,9 +2442,14 @@ void SpirvLowerGlobal::addCallInstForXfbOutput(const ShaderInOutMetadata &output
                                                unsigned xfbBufferAdjust, unsigned xfbOffsetAdjust, unsigned locOffset,
                                                lgc::InOutInfo outputInfo) {
   assert(m_shaderStage == m_lastVertexProcessingStage);
-  auto pipelineBuildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
   DenseMap<unsigned, Vkgc::XfbOutInfo> *locXfbMapPtr = outputMeta.IsBuiltIn ? &m_builtInXfbMap : &m_genericXfbMap;
-  if (pipelineBuildInfo->apiXfbOutData.forceDisableStreamOut || (locXfbMapPtr->empty() && !outputMeta.IsXfb))
+  bool hasXfbMetadata = m_entryPoint->getMetadata(lgc::XfbStateMetadataName);
+  bool hasXfbOut = hasXfbMetadata && (!locXfbMapPtr->empty() || outputMeta.IsXfb);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 70
+  auto pipelineBuildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+  hasXfbOut &= !pipelineBuildInfo->apiXfbOutData.forceDisableStreamOut;
+#endif
+  if (!hasXfbOut)
     return;
 
   // If the XFB info is specified from API interface so we try to retrieve the info from m_locXfbMap. Otherwise, the XFB

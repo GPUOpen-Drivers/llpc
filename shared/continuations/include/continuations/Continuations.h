@@ -185,8 +185,6 @@ uint64_t getInlineHitAttrsBytes(Module &M);
 
 /// Extract a function from a constant metadata node, ignoring any bitcasts.
 Function *extractFunctionOrNull(Metadata *N);
-void analyzeShaderKinds(Module &M,
-                        MapVector<Function *, DXILShaderKind> &ShaderKinds);
 
 /// Returns true if a call to the given function should be rematerialized
 /// in a shader of the specified kind.
@@ -206,6 +204,12 @@ Value *getDXILSystemData(IRBuilder<> &B, Value *SystemData, Type *SystemDataTy,
 CallInst *replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy,
                                Value *SystemData, DXILShaderKind Kind,
                                CallInst *Call);
+
+/// Transformations that run early on the driver/gpurt module.
+///
+/// Replace intrinsics called by gpurt code that can be replaced early.
+/// Returns whether something changed.
+bool earlyDriverTransform(Module &M);
 
 /// Buffered pointers use a fixed number of registers, and fall back to an
 /// allocation if the registers to not suffice to contain the content. Given a
@@ -300,6 +304,7 @@ private:
   Function *RestoreContState;
   Function *RegisterBufferSetPointerBarrier;
   Function *Continue;
+  Function *WaitContinue;
   Function *Complete;
   GlobalVariable *ContState;
   MapVector<Function *, ContinuationData> ToProcess;
@@ -368,21 +373,22 @@ public:
   }
 };
 
-class DXILContPreCoroutinePass
-    : public llvm::PassInfoMixin<DXILContPreCoroutinePass> {
+class PreCoroutineLoweringPass
+    : public llvm::PassInfoMixin<PreCoroutineLoweringPass> {
 public:
-  DXILContPreCoroutinePass();
+  PreCoroutineLoweringPass();
   llvm::PreservedAnalyses run(llvm::Module &Module,
                               llvm::ModuleAnalysisManager &AnalysisManager);
 
   static llvm::StringRef name() {
-    return "DXIL continuation pre coroutine preparation";
+    return "Continuation pre coroutine preparation";
   }
 
 private:
   bool splitBB();
   bool removeInlinedIntrinsics();
   bool lowerGetShaderKind();
+  bool lowerGetCurrentFuncAddr();
 
   Module *Mod;
 };
@@ -415,9 +421,6 @@ private:
   bool
   lowerGetResumePointAddr(llvm::Module &M, llvm::IRBuilder<> &B,
                           const MapVector<Function *, FunctionData> &ToProcess);
-
-  bool lowerGetCurrentFuncAddr(llvm::Module &M, llvm::IRBuilder<> &B);
-
   void handleInitialContinuationStackPtr(IRBuilder<> &B, Function &F);
   void handleLgcRtIntrinsic(Function &F);
   void handleRegisterBufferSetPointerBarrier(Function &F,

@@ -79,6 +79,10 @@ LLPC_MODULE_PASS("lgc-vertex-fetch", LowerVertexFetch)
 LLPC_MODULE_PASS("lgc-frag-color-export", LowerFragColorExport)
 LLPC_MODULE_PASS("lgc-lower-debug-printf", LowerDebugPrintf)
 
+LLPC_FUNCTION_PASS("lgc-combine-cooperative-matrix", CombineCooperativeMatrix)
+LLPC_MODULE_PASS("lgc-lower-cooperative-matrix", LowerCooperativeMatrix)
+LLPC_MODULE_PASS("lgc-lower-gpurt", LowerGpuRt)
+
 #undef LLPC_PASS
 #undef LLPC_LOOP_PASS
 #undef LLPC_FUNCTION_PASS

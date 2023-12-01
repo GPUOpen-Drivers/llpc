@@ -473,17 +473,8 @@ struct ResourceUsage {
     } mesh;
 
     struct {
-      // Original shader specified locations before location map (from tightly packed locations to shader
-      // specified locations)
-      //
-      // NOTE: This collected info is used to revise the calculated CB shader channel mask. Hardware requires
-      // the targets of fragment color export (MRTs) to be tightly packed while the CB shader channel masks
-      // should correspond to original shader specified targets.
-      unsigned outputOrigLocs[MaxColorTargets];
-
       std::vector<FsInterpInfo> interpInfo;   // Array of interpolation info
       BasicType outputTypes[MaxColorTargets]; // Array of basic types of fragment outputs
-      unsigned cbShaderMask;                  // CB shader channel mask (correspond to register CB_SHADER_MASK)
       bool isNullFs;                          // Is null FS, so should set final cbShaderMask to 0
     } fs;
   } inOutUsage;
@@ -551,7 +542,7 @@ struct InterfaceData {
         unsigned relVertexId;        // Relative vertex ID (index of vertex within thread group)
         unsigned instanceId;         // Instance ID
         unsigned primitiveId;        // Primitive ID
-        unsigned viewIndex;          // View Index
+        unsigned viewId;             // View ID
         unsigned vbTablePtr;         // Pointer of vertex buffer table
         unsigned esGsOffset;         // ES-GS ring buffer offset
         StreamOutData streamOutData; // Stream-out Data
@@ -563,7 +554,7 @@ struct InterfaceData {
         unsigned relPatchId;     // Relative patch ID (control point ID included)
         unsigned tfBufferBase;   // Base offset of tessellation factor(TF) buffer
         unsigned offChipLdsBase; // Base offset of off-chip LDS buffer
-        unsigned viewIndex;      // View Index
+        unsigned viewId;         // View ID
       } tcs;
 
       // Tessellation evaluation shader
@@ -574,7 +565,7 @@ struct InterfaceData {
         unsigned patchId;            // Patch ID
         unsigned esGsOffset;         // ES-GS ring buffer offset
         unsigned offChipLdsBase;     // Base offset of off-chip LDS buffer
-        unsigned viewIndex;          // View Index
+        unsigned viewId;             // View ID
         StreamOutData streamOutData; // Stream-out Data
       } tes;
 
@@ -585,14 +576,14 @@ struct InterfaceData {
         unsigned esGsOffsets[MaxEsGsOffsetCount]; // ES -> GS ring offset
         unsigned primitiveId;                     // Primitive ID
         unsigned invocationId;                    // Invocation ID
-        unsigned viewIndex;                       // View Index
+        unsigned viewId;                          // View ID
         StreamOutData streamOutData;              // Stream-out Data
       } gs;
 
       // Mesh shader
       struct {
         unsigned drawIndex;          // Draw index
-        unsigned viewIndex;          // View index
+        unsigned viewId;             // View ID
         unsigned dispatchDims;       // Dispatch dimensions
         unsigned baseRingEntryIndex; // Base entry index (first workgroup) of mesh/task shader ring for current dispatch
         unsigned pipeStatsBuf;       // Pipeline statistics buffer
@@ -602,7 +593,7 @@ struct InterfaceData {
 
       // Fragment shader
       struct {
-        unsigned viewIndex;  // View Index
+        unsigned viewId;     // View ID
         unsigned primMask;   // Primitive mask
         unsigned sampleInfo; // Sample Info: numSample + samplePattern
 
@@ -629,9 +620,10 @@ struct InterfaceData {
           unsigned w; // W channel
         } fragCoord;
 
-        unsigned frontFacing;    // FrontFacing
-        unsigned ancillary;      // Ancillary
-        unsigned sampleCoverage; // Sample coverage
+        unsigned frontFacing;      // FrontFacing
+        unsigned ancillary;        // Ancillary
+        unsigned sampleCoverage;   // Sample coverage
+        unsigned provokingVtxInfo; // Provoking vertex info
       } fs;
 
       // Compute shader

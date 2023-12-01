@@ -41,7 +41,9 @@
 #include "llpcCompilationUtils.h"
 #include "llpcDebug.h"
 #include "llpcUtil.h"
+#include "spvgen.h"
 #include "vfx.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/Support/Format.h"
 
 #define DEBUG_TYPE "llpc-auto-layout"
@@ -251,8 +253,29 @@ bool checkPipelineStateCompatible(const ICompiler *compiler, Llpc::GraphicsPipel
 void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipelineBuildInfo *pipelineInfo,
                       PipelineShaderInfo *shaderInfo, ResourceMappingNodeMap &resNodeSets, unsigned &pushConstSize,
                       bool autoLayoutDesc, bool reverseThreadGroup) {
+
+  const void *spvBuf = spirvBin.pCode;
+  unsigned spvBufSize = spirvBin.codeSize;
+
+  // Remove the unused variables.
+  void *optBuf = nullptr;
+  unsigned optBufSize = 0;
+  const char *options[] = {"--remove-unused-interface-variables", "--eliminate-dead-variables"};
+  bool ret = spvOptimizeSpirv(spirvBin.codeSize, spirvBin.pCode, sizeof(options) / sizeof(options[0]), options,
+                              &optBufSize, &optBuf, 0, nullptr);
+  if (ret) {
+    spvBuf = optBuf;
+    spvBufSize = optBufSize;
+  }
+
+  // Release optimized spirv data.
+  auto freeSpvData = make_scope_exit([&] {
+    if (ret)
+      free(optBuf);
+  });
+
   // Read the SPIR-V.
-  std::string spirvCode(static_cast<const char *>(spirvBin.pCode), spirvBin.codeSize);
+  std::string spirvCode(static_cast<const char *>(spvBuf), spvBufSize);
   std::istringstream spirvStream(spirvCode);
   std::unique_ptr<SPIRVModule> module(SPIRVModule::createSPIRVModule());
   spirvStream >> *module;
@@ -274,6 +297,29 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
   // Shader stage specific processing
   auto inOuts = entryPoint->getInOuts();
   if (shaderStage == ShaderStageVertex && autoLayoutDesc) {
+    // clang-format off
+    static const VkFormat LayoutInputFmtInt[][2][4] = {
+      {{VK_FORMAT_R8_UINT, VK_FORMAT_R8G8_UINT, VK_FORMAT_R8G8B8_UINT, VK_FORMAT_R8G8B8A8_UINT},            // VK_FORMAT_*8_UINT
+       {VK_FORMAT_R8_SINT, VK_FORMAT_R8G8_SINT, VK_FORMAT_R8G8B8_SINT, VK_FORMAT_R8G8B8A8_SINT}},           // VK_FORMAT_*8_SINT
+
+      {{VK_FORMAT_R16_UINT, VK_FORMAT_R16G16_UINT, VK_FORMAT_R16G16B16_UINT, VK_FORMAT_R16G16B16A16_UINT},  // VK_FORMAT_*16_UINT
+       {VK_FORMAT_R16_SINT, VK_FORMAT_R16G16_SINT, VK_FORMAT_R16G16B16_SINT, VK_FORMAT_R16G16B16A16_SINT}}, // VK_FORMAT_*16_SINT
+
+      {{VK_FORMAT_R32_UINT, VK_FORMAT_R32G32_UINT, VK_FORMAT_R32G32B32_UINT, VK_FORMAT_R32G32B32A32_UINT},  // VK_FORMAT_*32_UINT
+       {VK_FORMAT_R32_SINT, VK_FORMAT_R32G32_SINT, VK_FORMAT_R32G32B32_SINT, VK_FORMAT_R32G32B32A32_SINT}}, // VK_FORMAT_*32_SINT
+
+      {{VK_FORMAT_R64_UINT, VK_FORMAT_R64G64_UINT, VK_FORMAT_R64G64B64_UINT, VK_FORMAT_R64G64B64A64_UINT},  // VK_FORMAT_*64_UINT
+       {VK_FORMAT_R64_SINT, VK_FORMAT_R64G64_SINT, VK_FORMAT_R64G64B64_SINT, VK_FORMAT_R64G64B64A64_SINT}}, // VK_FORMAT_*64_SINT
+    };
+
+    static const VkFormat LayoutInputFmtFloat[][4] = {
+       {VK_FORMAT_UNDEFINED},
+       {VK_FORMAT_R16_SFLOAT, VK_FORMAT_R16G16_SFLOAT, VK_FORMAT_R16G16B16_SFLOAT, VK_FORMAT_R16G16B16A16_SFLOAT}, // VK_FORMAT_*16_SFLOAT
+       {VK_FORMAT_R32_SFLOAT, VK_FORMAT_R32G32_SFLOAT, VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_R32G32B32A32_SFLOAT}, // VK_FORMAT_*32_SFLOAT
+       {VK_FORMAT_R64_SFLOAT, VK_FORMAT_R64G64_SFLOAT, VK_FORMAT_R64G64B64_SFLOAT, VK_FORMAT_R64G64B64A64_SFLOAT}, // VK_FORMAT_*64_SFLOAT
+    };
+    // clang-format on
+
     // Create dummy vertex info (only if -auto-layout-desc is on).
     auto vertexBindings = new std::vector<VkVertexInputBindingDescription>;
     auto vertexAttribs = new std::vector<VkVertexInputAttributeDescription>;
@@ -290,53 +336,29 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
           if (varElemTy->getOpCode() == OpTypeMatrix)
             varElemTy = varElemTy->getMatrixColumnType();
 
-          if (varElemTy->getOpCode() == OpTypeVector)
+          unsigned numChannel = 1;
+          if (varElemTy->getOpCode() == OpTypeVector) {
+            numChannel = varElemTy->getVectorComponentCount();
             varElemTy = varElemTy->getVectorComponentType();
+          }
 
           VkFormat format = VK_FORMAT_UNDEFINED;
-          switch (varElemTy->getOpCode()) {
-          case OpTypeInt: {
-            bool isSigned = reinterpret_cast<SPIRVTypeInt *>(varElemTy)->isSigned();
-            switch (varElemTy->getIntegerBitWidth()) {
-            case 8:
-              format = isSigned ? VK_FORMAT_R8G8B8A8_SINT : VK_FORMAT_R8G8B8A8_UINT;
-              break;
-            case 16:
-              format = isSigned ? VK_FORMAT_R16G16B16A16_SINT : VK_FORMAT_R16G16B16A16_UINT;
-              break;
-            case 32:
-              format = isSigned ? VK_FORMAT_R32G32B32A32_SINT : VK_FORMAT_R32G32B32A32_UINT;
-              break;
-            case 64:
-              format = isSigned ? VK_FORMAT_R64G64B64A64_SINT : VK_FORMAT_R64G64B64A64_UINT;
-              break;
-            }
-            break;
-          }
-          case OpTypeFloat: {
-            switch (varElemTy->getFloatBitWidth()) {
-            case 16:
-              format = VK_FORMAT_R16G16B16A16_SFLOAT;
-              break;
-            case 32:
-              format = VK_FORMAT_R32G32B32A32_SFLOAT;
-              break;
-            case 64:
-              format = VK_FORMAT_R64G64_SFLOAT;
-              break;
-            }
-            break;
-          }
-          default: {
-            break;
-          }
+          unsigned bitWidth = varElemTy->getBitWidth();
+          auto bitWidthIdx = Log2_32(bitWidth / 8);
+
+          if (varElemTy->getOpCode() == OpTypeInt) {
+            auto idx = reinterpret_cast<SPIRVTypeInt *>(varElemTy)->isSigned() ? 1 : 0;
+            format = LayoutInputFmtInt[bitWidthIdx][idx][numChannel - 1];
+          } else {
+            assert(varElemTy->getOpCode() == OpTypeFloat);
+            format = LayoutInputFmtFloat[bitWidthIdx][numChannel - 1];
           }
           assert(format != VK_FORMAT_UNDEFINED);
 
           VkVertexInputBindingDescription vertexBinding = {};
           vertexBinding.binding = location;
           vertexBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-          vertexBinding.stride = SizeOfVec4;
+          vertexBinding.stride = (bitWidth / 8) * numChannel;
 
           VkVertexInputAttributeDescription vertexAttrib = {};
           vertexAttrib.binding = location;
@@ -681,6 +703,8 @@ void buildTopLevelMapping(unsigned shaderMask, const ResourceMappingNodeMap &res
   unsigned subLevelCount = 0;
   for (const auto &resNodeSet : resNodeSets)
     subLevelCount += resNodeSet.second.nodes.size();
+  if (shaderMask & Vkgc::ShaderStageAllRayTracingBit)
+    subLevelCount += 3; // see handling of ShaderStageAllRayTracingBit below
 
   size_t bufferSize = sizeof(ResourceMappingRootNode) * topLevelCount + sizeof(ResourceMappingNode) * subLevelCount;
   auto rootNodes = static_cast<ResourceMappingRootNode *>(malloc(bufferSize));
@@ -721,6 +745,50 @@ void buildTopLevelMapping(unsigned shaderMask, const ResourceMappingNodeMap &res
     rootNodes->node.offsetInDwords = topLevelOffset;
     topLevelOffset += rootNodes->node.sizeInDwords;
     rootNodes->visibility = xfbStageMask & shaderMask;
+    ++rootNodes;
+  }
+
+  if (shaderMask & Vkgc::ShaderStageAllRayTracingBit) {
+    // Add a node for RT
+    rootNodes->node.type = ResourceMappingNodeType::DescriptorTableVaPtr;
+    rootNodes->node.sizeInDwords = 1;
+    rootNodes->node.offsetInDwords = topLevelOffset;
+    topLevelOffset += rootNodes->node.sizeInDwords;
+    rootNodes->visibility = Vkgc::ShaderStageAllRayTracingBit & shaderMask;
+    rootNodes->node.tablePtr.nodeCount = 0;
+    rootNodes->node.tablePtr.pNext = nullptr;
+    ++rootNodes;
+
+    rootNodes->node.type = ResourceMappingNodeType::DescriptorTableVaPtr;
+    rootNodes->node.sizeInDwords = 1;
+    rootNodes->node.offsetInDwords = topLevelOffset;
+    topLevelOffset += rootNodes->node.sizeInDwords;
+    rootNodes->visibility = Vkgc::ShaderStageAllRayTracingBit & shaderMask;
+
+    rootNodes->node.tablePtr.nodeCount = 3;
+    rootNodes->node.tablePtr.pNext = subNodes;
+
+    subNodes->type = ResourceMappingNodeType::DescriptorConstBufferCompact;
+    subNodes->offsetInDwords = 0;
+    subNodes->sizeInDwords = 2;
+    subNodes->srdRange.set = 0x5D;
+    subNodes->srdRange.binding = 17;
+    ++subNodes;
+
+    subNodes->type = ResourceMappingNodeType::DescriptorConstBuffer;
+    subNodes->offsetInDwords = 2;
+    subNodes->sizeInDwords = 4;
+    subNodes->srdRange.set = 0x5D;
+    subNodes->srdRange.binding = 0;
+    ++subNodes;
+
+    subNodes->type = ResourceMappingNodeType::DescriptorBuffer;
+    subNodes->offsetInDwords = 6;
+    subNodes->sizeInDwords = 4;
+    subNodes->srdRange.set = 0x5D;
+    subNodes->srdRange.binding = 1;
+    ++subNodes;
+
     ++rootNodes;
   }
 

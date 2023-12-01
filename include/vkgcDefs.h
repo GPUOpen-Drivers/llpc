@@ -46,10 +46,10 @@
 #endif
 
 /// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 68
+#define LLPC_INTERFACE_MAJOR_VERSION 70
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 0
+#define LLPC_INTERFACE_MINOR_VERSION 2
 
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
 #error LLPC client version is not defined
@@ -80,6 +80,11 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     70.2 | Add useSoftwareVertexBufferDescriptors to GraphicsPipelineBuildInfo                                   |
+//  |     70.1 | Add cpsFlags to RayTracingPipelineBuildInfo                                                           |
+//  |     70.0 | Add enablePrimGeneratedQuery to PipelineOptions                                                       |
+//  |     69.1 | Add useBarycentric to ShaderModuleUsage                                                               |
+//  |     69.0 | Enable continuations transform in LLPC                                                                |
 //  |     68.0 | Remove ICache *cache in all PipelineBuildInfo                                                         |
 //  |     67.0 | Modify the uber fetch shader. Adds locationMask(64bit) at the beginning of uber fetch shader internal |
 //  |          | buffer which flags whether the related attribute data is valid.                                       |
@@ -353,7 +358,7 @@ static_assert((1 << (ShaderStageCount - 1)) == ShaderStageRayTracingCallableBit,
 /// Enumerates the binding ID of internal resource.
 enum InternalBinding : unsigned {
   FetchShaderBinding = 0,                   ///< Binding ID of vertex buffer table
-  ConstantBuffer0Binding = 1,               ///< Binding ID of default uniform block
+  CurrentAttributeBufferBinding = 1,        ///< Binding ID of current attribute
   PushConstantBinding = 2,                  ///< Binding ID of push constant buffer
   ShaderRecordBufferBinding = 3,            ///< Binding ID of ray-tracing shader record buffer
   TaskPayloadBinding = 4,                   ///< Binding ID of payload buffer in task shader
@@ -363,7 +368,8 @@ enum InternalBinding : unsigned {
   RtCaptureReplayInternalBufferBinding = 8, ///< Binding ID of ray-tracing capture replay internal buffer
   SpecConstInternalBufferBindingId = 9,     ///< Binding ID of internal buffer for specialized constant.
   SpecConstInternalBufferBindingIdEnd = SpecConstInternalBufferBindingId + ShaderStageCount,
-  CurrentAttributeBufferBinding = 24, ///< Binding ID of current attribute
+  ConstantBuffer0Binding = 24, ///< Binding ID of default uniform block
+  ConstantBuffer0BindingEnd = ConstantBuffer0Binding + ShaderStageGfxCount,
 };
 
 /// Internal vertex attribute location start from 0.
@@ -603,7 +609,9 @@ struct PipelineOptions {
   bool enableCombinedTexture;             ///< For OGL only, use the 'set' for DescriptorCombinedTexture
                                           ///< for sampled images and samplers
   bool vertex64BitsAttribSingleLoc;       ///< For OGL only, dvec3/dvec4 vertex attrib only consumes 1 location.
+  bool enableFragColor;                   ///< For OGL only, need to do frag color broadcast if it is enabled.
   unsigned reserved20;
+  bool enablePrimGeneratedQuery; ///< If set, primitive generated query is enabled
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.
@@ -621,10 +629,12 @@ enum class BinaryType : unsigned {
 /// Represents resource node data
 struct ResourceNodeData {
   ResourceMappingNodeType type;     ///< Type of this resource mapping node
+  unsigned spvId;                   ///< ID of variable
   unsigned set;                     ///< ID of descriptor set
   unsigned binding;                 ///< ID of descriptor binding
   unsigned arraySize;               ///< Element count for arrayed binding
   unsigned location;                ///< ID of resource location
+  bool mergedLocationBinding;       ///< TRUE if location and binding are merged in spirv binary
   unsigned isTexelBuffer;           ///< TRUE if it is ImageBuffer or TextureBuffer
   unsigned isDefaultUniformSampler; ///< TRUE if it's sampler image in default uniform struct
   BasicType basicType;              ///< Type of the variable or element
@@ -684,6 +694,11 @@ struct ShaderModuleUsage {
   bool pixelCenterInteger;     ///< Whether pixel coord is Integer
   bool useGenericBuiltIn;      ///< Whether to use builtIn inputs that include gl_PointCoord, gl_PrimitiveId,
                                ///  gl_Layer, gl_ClipDistance or gl_CullDistance.
+  bool enableXfb;              ///< Whether transform feedback is enabled
+  unsigned localSizeX;         ///< Compute shader work-group size in the X dimension
+  unsigned localSizeY;         ///< Compute shader work-group size in the Y dimension
+  unsigned localSizeZ;         ///< Compute shader work-group size in the Z dimension
+  bool useBarycentric;         ///< Whether to use gl_BarycentricXX or pervertexEXT decoration
 };
 
 /// Represents common part of shader module data
@@ -860,7 +875,7 @@ struct PipelineShaderOptions {
   /// Threshold to use for loops with "DontUnroll" hint (0 = use llvm.loop.unroll.disable).
   unsigned dontUnrollHintThreshold;
 
-  /// Whether fastmath contract could be disabled on Dot operations.
+  /// Whether fast math contract could be disabled on Dot operations.
   bool noContractOpDot;
 
   /// The enabled fast math flags (0 = depends on input language).
@@ -920,6 +935,9 @@ struct PipelineShaderOptions {
 
   /// Application workaround: forward propagate NoContraction decoration to any related FAdd operation.
   bool forwardPropagateNoContract;
+
+  /// Binding ID offset of default uniform block
+  unsigned constantBufferBindingOffset;
 };
 
 /// Represents YCbCr sampler meta data in resource descriptor
@@ -1168,10 +1186,20 @@ enum DispatchDimSwizzleMode : unsigned {
 };
 
 enum class LlpcRaytracingMode : unsigned {
-  None = 0,      // Not goto any raytracing compiling path
-  Legacy,        // LLpc Legacy compiling path
-  Gpurt2,        // Raytracing lowering at the end of spirvLower.
+  None = 0, // Not goto any raytracing compiling path
+  Legacy,   // LLpc Legacy compiling path
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 69
+  Gpurt2, // Raytracing lowering at the end of spirvLower.
+#else
+  Continufy, // Enable continuation with the continufy path.
+#endif
   Continuations, // Enable continuation in the new raytracing path
+};
+
+// Enumerate feature flags for CPS.
+enum CpsFlag : unsigned {
+  CpsNoFlag = 0,
+  CpsFlagStackInGlobalMem = 1 << 0, // Put stack in global memory instead of scratch.
 };
 
 /// RayTracing state
@@ -1254,7 +1282,9 @@ struct ApiXfbOutData {
   XfbOutInfo *pXfbOutInfos;   ///< An array of XfbOutInfo items
   unsigned numXfbOutInfo;     ///< Count of XfbOutInfo items
   bool forceDisableStreamOut; ///< Force to disable stream out XFB outputs
-  bool forceEnablePrimStats;  ///< Force to enable counting generated primitives
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 70
+  bool forceEnablePrimStats; ///< Force to enable counting generated primitives
+#endif
 };
 
 /// Represents the tessellation level passed from driver API
@@ -1332,14 +1362,15 @@ struct GraphicsPipelineBuildInfo {
     ColorTarget target[MaxColorTargets]; ///< Per-MRT color target info
   } cbState;                             ///< Color target state
 
-  NggState nggState;            ///< NGG state used for tuning and debugging
-  PipelineOptions options;      ///< Per pipeline tuning/debugging options
-  bool unlinked;                ///< True to build an "unlinked" half-pipeline ELF
-  bool dynamicVertexStride;     ///< Dynamic Vertex input Stride is enabled.
-  bool enableUberFetchShader;   ///< Use uber fetch shader
-  bool enableColorExportShader; ///< Explicitly build color export shader, UnlinkedStageFragment elf will
-                                ///  return extra meta data.
-  bool enableEarlyCompile;      ///< Whether enable early compile
+  NggState nggState;                       ///< NGG state used for tuning and debugging
+  PipelineOptions options;                 ///< Per pipeline tuning/debugging options
+  bool unlinked;                           ///< True to build an "unlinked" half-pipeline ELF
+  bool dynamicVertexStride;                ///< Dynamic Vertex input Stride is enabled.
+  bool enableUberFetchShader;              ///< Use uber fetch shader
+  bool enableColorExportShader;            ///< Explicitly build color export shader, UnlinkedStageFragment elf will
+                                           ///  return extra meta data.
+  bool enableEarlyCompile;                 ///< Whether enable early compile
+  bool useSoftwareVertexBufferDescriptors; ///< Use software vertex buffer descriptors to structure SRD.
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   BinaryData shaderLibrary; ///< SPIR-V library binary data
 #endif
@@ -1407,6 +1438,7 @@ struct RayTracingPipelineBuildInfo {
   const void *pClientMetadata;    ///< Pointer to (optional) client-defined data to be
                                   ///  stored inside the ELF
   size_t clientMetadataSize;      ///< Size (in bytes) of the client-defined data
+  unsigned cpsFlags;              ///< Cps feature flags
 };
 
 /// Ray tracing max shader name length

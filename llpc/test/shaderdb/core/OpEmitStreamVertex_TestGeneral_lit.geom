@@ -23,11 +23,11 @@ void main ( )
 ; SHADERTEST: call {{[a-zA-Z_]+}} void @EmitStreamVertex.i32(i32 1)
 ; SHADERTEST: call void (...) @lgc.create.end.primitive(i32 1)
 ; SHADERTEST-LABEL: {{^// LLPC.*}} patching results
-; SHADERTEST: call void @llvm.amdgcn.s.sendmsg(i32 290, i32 %GsWaveId)
-; SHADERTEST: call void @llvm.amdgcn.s.sendmsg(i32 290, i32 %GsWaveId)
-; SHADERTEST: call void @llvm.amdgcn.s.sendmsg(i32 290, i32 %GsWaveId)
-; SHADERTEST: call void @llvm.amdgcn.s.sendmsg(i32 274, i32 %GsWaveId)
-; SHADERTEST: call void @llvm.amdgcn.s.sendmsg(i32 immarg 3, i32 %GsWaveId)
+; SHADERTEST: call void @llvm.amdgcn.s.sendmsg(i32 290, i32 %gsWaveId)
+; SHADERTEST: call void @llvm.amdgcn.s.sendmsg(i32 290, i32 %gsWaveId)
+; SHADERTEST: call void @llvm.amdgcn.s.sendmsg(i32 290, i32 %gsWaveId)
+; SHADERTEST: call void @llvm.amdgcn.s.sendmsg(i32 274, i32 %gsWaveId)
+; SHADERTEST: call void @llvm.amdgcn.s.sendmsg(i32 immarg 3, i32 %gsWaveId)
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -12,6 +12,7 @@ ANDed = "ANDed"
 UE = "UE"
 OpBuildNDRange = "OpBuildNDRange"
 serDataNode = "serDataNode"
+rcall = "rcall"
 
 [default.extend-words]
 ba = "ba"

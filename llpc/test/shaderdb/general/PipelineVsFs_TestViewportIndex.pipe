@@ -3,7 +3,14 @@
 ; RUN: amdllpc -enable-part-pipeline=0 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; RUN: amdllpc -enable-part-pipeline=1 -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: LLPC final ELF info
-; SHADERTEST: SPI_PS_INPUT_CNTL_0                           0x0000000000000400
+; SHADERTEST: .spi_ps_input_cntl: [ {
+; SHADERTEST:   .attr0_valid: 0x0000000000000000 
+; SHADERTEST:   .attr1_valid: 0x0000000000000000 
+; SHADERTEST:   .flat_shade: 1 
+; SHADERTEST:   .fp16_interp_mode: 0 
+; SHADERTEST:   .offset: 0x0000000000000000 
+; SHADERTEST:   .prim_attr: 0 
+; SHADERTEST:   .pt_sprite_tex: 0 }]
 ; SHADERTEST: AMDLLPC SUCCESS
 
 [Version]

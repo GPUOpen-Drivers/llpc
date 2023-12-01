@@ -6,7 +6,7 @@
 
 ; Check that the llvm-ir gets the push constant values from as a parameter.
 ; SHADERTEST: // LLPC pipeline patching results
-; SHADERTEST: define dllexport amdgpu_ps { <4 x float> } @_amdgpu_ps_main({{.*}}, i32 inreg %userdata3, i32 inreg %userdata4, {{.*}})
+; SHADERTEST: define dllexport amdgpu_ps { <4 x float> } @_amdgpu_ps_main({{.*}}, i32 inreg noundef %userdata3, i32 inreg noundef %userdata4, {{.*}})
 ; SHADERTEST: [[pushConst0:%[.a-zA-Z0-9]+]] = bitcast i32 %userdata3 to float
 ; SHADERTEST: [[pushConst1:%[.a-zA-Z0-9]+]] = bitcast i32 %userdata4 to float
 ; SHADERTEST: @llvm.amdgcn.image.gather4.lz.2d.sl_v4f32i32s.f32({{.*}}, float [[pushConst0]], float [[pushConst1]], {{.*}})

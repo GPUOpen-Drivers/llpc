@@ -32,13 +32,13 @@
 #include "llpcSpirvLowerRayTracing.h"
 #include "SPIRVInternal.h"
 #include "gpurt-compiler.h"
-#include "lgccps/LgcCpsDialect.h"
-#include "lgcrt/LgcRtDialect.h"
 #include "llpcContext.h"
 #include "llpcRayTracingContext.h"
 #include "llpcSpirvLowerUtil.h"
 #include "lgc/Builder.h"
 #include "lgc/GpurtDialect.h"
+#include "lgc/LgcCpsDialect.h"
+#include "lgc/LgcRtDialect.h"
 #include "lgc/Pipeline.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/Analysis/AliasAnalysis.h"
@@ -97,7 +97,8 @@ static unsigned TraceParamsTySize[] = {
     8, // 15, hit attribute
     1, // 16, parentId
     9, // 17, HitTriangleVertexPositions
-    1, // 18, Payload
+    1, // 18, Payload,
+    1, // 19, RayStaticId
 };
 
 // =====================================================================================================================
@@ -115,12 +116,13 @@ void SpirvLowerRayTracing::processTraceRayCall(BaseTraceRayOp *inst) {
 
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
 
+  implCallArgs.push_back(m_traceParams[TraceParam::RayStaticId]);
   implCallArgs.push_back(m_traceParams[TraceParam::ParentRayId]);
   implCallArgs.push_back(m_dispatchRaysInfoDesc);
   m_builder->SetInsertPoint(inst);
 
   // Generate a unique static ID for each trace ray call
-  generateTraceRayStaticId();
+  m_builder->CreateStore(m_builder->getInt32(generateTraceRayStaticId()), m_traceParams[TraceParam::RayStaticId]);
   auto newCall = m_builder->CreateNamedCall(mangledName, inst->getFunctionType()->getReturnType(), implCallArgs,
                                             {Attribute::NoUnwind, Attribute::AlwaysInline});
 
@@ -160,13 +162,17 @@ void SpirvLowerRayTracing::processTraceRayCall(BaseTraceRayOp *inst) {
       args.push_back(func->getArg(i));
 
     Value *parentRayId = func->arg_end() - 2;
+    Value *rayStaticId = func->arg_end() - 3;
 
     // RayGen shaders are non-recursive, initialize parent ray ID to -1 here.
     if (m_shaderStage == ShaderStageRayTracingRayGen)
       m_builder->CreateStore(m_builder->getInt32(InvalidValue), parentRayId);
+
     Value *currentParentRayId = m_builder->CreateLoad(m_builder->getInt32Ty(), parentRayId);
-    args.push_back(currentParentRayId);
-    args.push_back(m_builder->create<lgc::GpurtGetRayStaticIdOp>());
+    if (m_context->getPipelineContext()->getRayTracingState()->enableRayTracingCounters) {
+      args.push_back(currentParentRayId);
+      args.push_back(m_builder->CreateLoad(m_builder->getInt32Ty(), rayStaticId));
+    }
 
     CallInst *result = nullptr;
     auto funcTy = getTraceRayFuncTy();
@@ -574,6 +580,7 @@ PreservedAnalyses SpirvLowerRayTracing::run(Module &module, ModuleAnalysisManage
                               .add(&SpirvLowerRayTracing::visitSetHitTriangleNodePointer)
                               .add(&SpirvLowerRayTracing::visitGetParentId)
                               .add(&SpirvLowerRayTracing::visitSetParentId)
+                              .add(&SpirvLowerRayTracing::visitGetRayStaticId)
                               .add(&SpirvLowerRayTracing::visitDispatchRayIndex)
                               .build();
 
@@ -623,6 +630,8 @@ PreservedAnalyses SpirvLowerRayTracing::run(Module &module, ModuleAnalysisManage
                               .add(&SpirvLowerRayTracing::visitInstanceInclusionMaskOp)
                               .add(&SpirvLowerRayTracing::visitShaderIndexOp)
                               .add(&SpirvLowerRayTracing::visitShaderRecordBufferOp)
+                              .add(&SpirvLowerRayTracing::visitStackReadOp)
+                              .add(&SpirvLowerRayTracing::visitStackWriteOp)
                               .build();
 
     visitor.visit(*this, *m_module);
@@ -1271,7 +1280,11 @@ void SpirvLowerRayTracing::createRayGenEntryFunc() {
   auto rayGenId = getShaderIdentifier(m_shaderStage, m_builder->getInt32(0), m_dispatchRaysInfoDesc);
   auto rayTracingContext = static_cast<RayTracingContext *>(m_context->getPipelineContext());
 
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION > 68
+  if (rayTracingContext->getRaytracingMode() == Vkgc::LlpcRaytracingMode::Continufy) {
+#else
   if (rayTracingContext->getRaytracingMode() == Vkgc::LlpcRaytracingMode::Continuations) {
+#endif
     // Setup continuation stack pointer
     auto offset = offsetof(GpuRt::DispatchRaysConstantData, cpsBackendStackSize);
     auto gep = m_builder->CreateConstGEP1_32(m_builder->getInt8Ty(), m_dispatchRaysInfoDesc, offset);
@@ -1600,10 +1613,12 @@ CallInst *SpirvLowerRayTracing::createTraceRay() {
   m_builder->CreateStore(arg, traceRaysArgs[TraceRayLibFuncParam::TMax]);
 
   // Parent ray ID and static ID for logging feature
-  arg = ++argIt;
-  m_builder->CreateStore(arg, m_traceParams[TraceParam::ParentRayId]);
-  arg = ++argIt;
-  m_builder->create<lgc::GpurtSetRayStaticIdOp>(arg);
+  if (m_context->getPipelineContext()->getRayTracingState()->enableRayTracingCounters) {
+    arg = ++argIt;
+    m_builder->CreateStore(arg, m_traceParams[TraceParam::ParentRayId]);
+    arg = ++argIt;
+    m_builder->CreateStore(arg, m_traceParams[TraceParam::RayStaticId]);
+  }
 
   // Call TraceRay function from traceRays module
   auto call = m_builder->CreateCall(traceRayFunc, traceRaysArgs);
@@ -1663,6 +1678,7 @@ void SpirvLowerRayTracing::initTraceParamsTy(unsigned attributeSize) {
       m_builder->getInt32Ty(),                                        // 16, parentId
       StructType::get(*m_context, {floatx3Ty, floatx3Ty, floatx3Ty}), // 17, HitTriangleVertexPositions
       payloadType,                                                    // 18, Payload
+      m_builder->getInt32Ty(),                                        // 19, rayStaticId
   };
   TraceParamsTySize[TraceParam::HitAttributes] = attributeSize;
   TraceParamsTySize[TraceParam::Payload] = payloadType->getArrayNumElements();
@@ -1892,8 +1908,10 @@ FunctionType *SpirvLowerRayTracing::getTraceRayFuncTy() {
   };
 
   // Add parent ray ID and static ID for logging feature.
-  argsTys.push_back(m_builder->getInt32Ty());
-  argsTys.push_back(m_builder->getInt32Ty());
+  if (m_context->getPipelineContext()->getRayTracingState()->enableRayTracingCounters) {
+    argsTys.push_back(m_builder->getInt32Ty()); // Parent Id
+    argsTys.push_back(m_builder->getInt32Ty()); // Ray Static Id
+  }
 
   auto funcTy = FunctionType::get(retTy, argsTys, false);
   return funcTy;
@@ -1974,6 +1992,7 @@ SmallSet<unsigned, 4> SpirvLowerRayTracing::getShaderExtraInputParams(ShaderStag
     params.insert(TraceParam::TCurrent);
     params.insert(TraceParam::Kind);
     params.insert(TraceParam::DuplicateAnyHit);
+    params.insert(TraceParam::RayFlags);
     break;
   default:
     break;
@@ -2542,6 +2561,42 @@ void SpirvLowerRayTracing::visitSetHitTriangleNodePointer(lgc::GpurtSetHitTriang
 
   m_callsToLower.push_back(&inst);
   m_funcsToLower.insert(inst.getCalledFunction());
+}
+
+// =====================================================================================================================
+// Visits "lgc.gpurt.get.ray.static.id" instructions
+//
+// @param inst : The instruction
+void SpirvLowerRayTracing::visitGetRayStaticId(lgc::GpurtGetRayStaticIdOp &inst) {
+  m_builder->SetInsertPoint(&inst);
+
+  auto rayStaticId = m_builder->CreateLoad(m_builder->getInt32Ty(), m_traceParams[TraceParam::RayStaticId]);
+  inst.replaceAllUsesWith(rayStaticId);
+
+  m_callsToLower.push_back(&inst);
+  m_funcsToLower.insert(inst.getCalledFunction());
+}
+
+// =====================================================================================================================
+// Visits "lgc.gpurt.stack.read" instructions
+//
+// @param inst : The instruction
+void SpirvLowerRayTracing::visitStackReadOp(lgc::GpurtStackReadOp &inst) {
+  // NOTE: If RayQuery is used inside intersection or any-hit shaders, where we already holding a traversal stack for
+  // TraceRay, perform the stack operations for this RayQuery in an extra stack space.
+  if ((m_shaderStage == ShaderStageRayTracingIntersect) || (m_shaderStage == ShaderStageRayTracingAnyHit))
+    inst.setUseExtraStack(true);
+}
+
+// =====================================================================================================================
+// Visits "lgc.gpurt.stack.write" instructions
+//
+// @param inst : The instruction
+void SpirvLowerRayTracing::visitStackWriteOp(lgc::GpurtStackWriteOp &inst) {
+  // NOTE: If RayQuery is used inside intersection or any-hit shaders, where we already holding a traversal stack for
+  // TraceRay, perform the stack operations for this RayQuery in an extra stack space.
+  if ((m_shaderStage == ShaderStageRayTracingIntersect) || (m_shaderStage == ShaderStageRayTracingAnyHit))
+    inst.setUseExtraStack(true);
 }
 
 // =====================================================================================================================

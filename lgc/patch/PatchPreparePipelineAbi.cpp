@@ -29,7 +29,6 @@
 ***********************************************************************************************************************
 */
 #include "lgc/patch/PatchPreparePipelineAbi.h"
-#include "Gfx6ConfigBuilder.h"
 #include "Gfx9ConfigBuilder.h"
 #include "MeshTaskShader.h"
 #include "RegisterMetadataBuilder.h"
@@ -216,13 +215,6 @@ void PatchPreparePipelineAbi::writeTessFactors(PipelineState *pipelineState, Val
   //     TF[3] = outerTF[3]
   //     TF[4] = innerTF[0]
   //     TF[5] = innerTF[1]
-  if (pipelineState->isTessOffChip()) {
-    if (pipelineState->getTargetInfo().getGfxIpVersion().major <= 8) {
-      // NOTE: Additional 4-byte offset is required for tessellation off-chip mode (pre-GFX9).
-      tfBufferBase = builder.CreateAdd(tfBufferBase, builder.getInt32(4));
-    }
-  }
-
   const auto &calcFactor = pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
   Value *tfBufferOffset = builder.CreateMul(relPatchId, builder.getInt32(calcFactor.tessFactorStride * sizeof(float)));
 
@@ -470,17 +462,12 @@ void PatchPreparePipelineAbi::setAbiEntryNames(Module &module) {
 //
 // @param module : LLVM module
 void PatchPreparePipelineAbi::addAbiMetadata(Module &module) {
-  if (m_gfxIp.major <= 8) {
-    Gfx6::ConfigBuilder configBuilder(&module, m_pipelineState);
-    configBuilder.buildPalMetadata();
+  if (m_pipelineState->useRegisterFieldFormat()) {
+    Gfx9::RegisterMetadataBuilder regMetadataBuilder(&module, m_pipelineState, m_pipelineShaders);
+    regMetadataBuilder.buildPalMetadata();
   } else {
-    if (m_pipelineState->useRegisterFieldFormat()) {
-      Gfx9::RegisterMetadataBuilder regMetadataBuilder(&module, m_pipelineState, m_pipelineShaders);
-      regMetadataBuilder.buildPalMetadata();
-    } else {
-      Gfx9::ConfigBuilder configBuilder(&module, m_pipelineState);
-      configBuilder.buildPalMetadata();
-    }
+    Gfx9::ConfigBuilder configBuilder(&module, m_pipelineState);
+    configBuilder.buildPalMetadata();
   }
 }
 

@@ -33,11 +33,12 @@
 #include "continuations/ContinuationsDialect.h"
 #include "continuations/ContinuationsUtil.h"
 #include "continuations/LowerRaytracingPipeline.h"
-#include "lgccps/LgcCpsDialect.h"
-#include "lgcrt/LgcRtDialect.h"
+#include "lgc/LgcCpsDialect.h"
+#include "lgc/LgcRtDialect.h"
 #include "llvm-dialects/Dialect/Builder.h"
 #include "llvm-dialects/Dialect/Dialect.h"
 #include "llvm/Passes/PassBuilder.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Transforms/Coroutines/CoroCleanup.h"
 #include "llvm/Transforms/Coroutines/CoroEarly.h"
 #include "llvm/Transforms/Coroutines/CoroElide.h"
@@ -194,7 +195,7 @@ void DXILContHelper::addContinuationPasses(ModulePassManager &MPM) {
 
   // Splits basic blocks after the systemDataRestored marker and removes already
   // inlined intrinsic implementations
-  MPM.addPass(DXILContPreCoroutinePass());
+  MPM.addPass(PreCoroutineLoweringPass());
 
   // Convert the system data struct to a value, so it isn't stored in the
   // continuation state
@@ -522,41 +523,6 @@ Function *llvm::extractFunctionOrNull(Metadata *N) {
   return dyn_cast_or_null<Function>(C);
 }
 
-void llvm::analyzeShaderKinds(
-    Module &M, MapVector<Function *, DXILShaderKind> &ShaderKinds) {
-  auto *EntryPoints = M.getNamedMetadata("dx.entryPoints");
-  if (!EntryPoints)
-    return;
-  for (auto *EntryMD : EntryPoints->operands()) {
-    auto *C = mdconst::extract_or_null<Constant>(EntryMD->getOperand(0));
-    // Strip bitcasts
-    while (auto *Expr = dyn_cast_or_null<ConstantExpr>(C)) {
-      if (Expr->getOpcode() == Instruction::BitCast)
-        C = Expr->getOperand(0);
-      else
-        C = nullptr;
-    }
-    auto *F = extractFunctionOrNull(EntryMD->getOperand(0));
-    if (!F)
-      continue;
-    auto *Props = cast_or_null<MDTuple>(EntryMD->getOperand(4));
-    if (!Props)
-      continue;
-
-    // Iterate through tag-value pairs
-    for (size_t I = 0; I < Props->getNumOperands(); I += 2) {
-      auto Tag =
-          mdconst::extract<ConstantInt>(Props->getOperand(I))->getZExtValue();
-      if (Tag != 8) // kDxilShaderKindTag
-        continue;
-      auto KindI = mdconst::extract<ConstantInt>(Props->getOperand(I + 1))
-                       ->getZExtValue();
-      auto Kind = static_cast<DXILShaderKind>(KindI);
-      ShaderKinds[F] = Kind;
-    }
-  }
-}
-
 /// Recurse into the first member of the given SystemData to find an object of
 /// the wanted type.
 Value *llvm::getDXILSystemData(IRBuilder<> &B, Value *SystemData,
@@ -574,9 +540,8 @@ Value *llvm::getDXILSystemData(IRBuilder<> &B, Value *SystemData,
     if (!StructTy) {
       LLVM_DEBUG(dbgs() << "System data struct: "; SystemDataTy->dump());
       LLVM_DEBUG(dbgs() << "Wanted struct type: "; Ty->dump());
-      errs() << "Invalid system data struct: Did not contain the needed struct "
-                "type\n";
-      llvm_unreachable("");
+      report_fatal_error(
+          "Invalid system data struct: Did not contain the needed struct type");
     }
     SystemDataTy = StructTy->getElementType(0);
     Indices.push_back(B.getInt32(0));
@@ -684,6 +649,136 @@ CallInst *llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy,
   return NewCall;
 }
 
+/// Transform enqueue intrinsics to continuation intrinsics
+static void replaceEnqueueIntrinsic(Function &F, Function *NewFunc) {
+  for (auto &Use : make_early_inc_range(F.uses())) {
+    if (auto *CInst = dyn_cast<CallInst>(Use.getUser())) {
+      if (CInst->isCallee(&Use)) {
+        IRBuilder<> B(CInst);
+        SmallVector<Value *> Args(CInst->args());
+        bool IsEnqueue = F.getName().contains("Enqueue");
+        // Add the current function as return address to the call.
+        // Used when Traversal calls AnyHit or Intersection.
+        if (IsEnqueue && F.getName().contains("EnqueueCall")) {
+          bool HasWaitMask = F.getName().contains("WaitEnqueue");
+          auto *RetAddr =
+              B.CreatePtrToInt(CInst->getFunction(), B.getInt64Ty());
+          Args.insert(Args.begin() + (HasWaitMask ? 3 : 2), RetAddr);
+        }
+
+        B.CreateCall(NewFunc, Args);
+        CInst->eraseFromParent();
+      }
+    }
+  }
+}
+
+static void handleContinuationStackIsGlobal(Function &Func,
+                                            ContStackAddrspace StackAddrspace) {
+  assert(Func.arg_empty()
+         // bool
+         && Func.getFunctionType()->getReturnType()->isIntegerTy(1));
+
+  auto *IsGlobal = ConstantInt::getBool(
+      Func.getContext(), StackAddrspace == ContStackAddrspace::Global);
+
+  llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
+    CInst.replaceAllUsesWith(IsGlobal);
+    CInst.eraseFromParent();
+  });
+}
+
+static void handleContinuationsGetFlags(Function &Func, uint32_t Flags) {
+  assert(Func.arg_empty()
+         // i32
+         && Func.getFunctionType()->getReturnType()->isIntegerTy(32));
+
+  auto *FlagsConst =
+      ConstantInt::get(IntegerType::get(Func.getContext(), 32), Flags);
+
+  llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
+    CInst.replaceAllUsesWith(FlagsConst);
+    CInst.eraseFromParent();
+  });
+}
+
+static void handleGetRtip(Function &Func, uint32_t RtipLevel) {
+  assert(Func.arg_empty()
+         // i32
+         && Func.getFunctionType()->getReturnType()->isIntegerTy(32));
+
+  auto *RtipConst =
+      ConstantInt::get(IntegerType::get(Func.getContext(), 32), RtipLevel);
+  for (auto &Use : make_early_inc_range(Func.uses())) {
+    if (auto *CInst = dyn_cast<CallInst>(Use.getUser())) {
+      if (CInst->isCallee(&Use)) {
+        CInst->replaceAllUsesWith(RtipConst);
+        CInst->eraseFromParent();
+      }
+    }
+  }
+}
+
+static void handleGetUninitialized(Function &Func) {
+  auto *ArgTy = Func.getReturnType();
+  auto *Poison = PoisonValue::get(ArgTy);
+  llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
+    CInst.replaceAllUsesWith(Poison);
+    CInst.eraseFromParent();
+  });
+}
+
+bool llvm::earlyDriverTransform(Module &M) {
+  // Import StackAddrspace from metadata if set, otherwise from default
+  auto StackAddrspaceMD = DXILContHelper::tryGetStackAddrspace(M);
+  auto StackAddrspace =
+      StackAddrspaceMD.value_or(DXILContHelper::DefaultStackAddrspace);
+
+  // Import from metadata if set
+  auto RtipLevel = DXILContHelper::tryGetRtip(M);
+  auto Flags = DXILContHelper::tryGetFlags(M);
+
+  bool Changed = false;
+  // Replace Enqueue and Complete intrinsics
+  for (auto &F : M) {
+    Function *Replacement = nullptr;
+    auto Name = F.getName();
+    if (Name.contains("WaitEnqueue"))
+      Replacement = getContinuationWaitContinue(M);
+    else if (Name.contains("Enqueue"))
+      Replacement = getContinuationContinue(M);
+    else if (Name.contains("Complete"))
+      Replacement = getContinuationComplete(M);
+
+    if (Replacement) {
+      Changed = true;
+      replaceEnqueueIntrinsic(F, Replacement);
+    }
+
+    if (Name == "_AmdContinuationStackIsGlobal") {
+      Changed = true;
+      handleContinuationStackIsGlobal(F, StackAddrspace);
+    } else if (Name == "_AmdContinuationsGetFlags") {
+      Changed = true;
+      if (!Flags)
+        report_fatal_error("Tried to get continuation flags but it is not "
+                           "available on the module");
+      handleContinuationsGetFlags(F, *Flags);
+    } else if (Name == "_AmdGetRtip") {
+      Changed = true;
+      if (!RtipLevel)
+        report_fatal_error(
+            "Tried to get rtip level but it is not available on the module");
+      handleGetRtip(F, *RtipLevel);
+    } else if (Name.startswith("_AmdGetUninitialized")) {
+      Changed = true;
+      handleGetUninitialized(F);
+    }
+  }
+
+  return Changed;
+}
+
 uint64_t
 llvm::computeNeededStackSizeForRegisterBuffer(uint64_t NumI32s,
                                               uint64_t NumReservedRegisters) {
@@ -762,6 +857,12 @@ bool llvm::LgcMaterializable(Instruction &OrigI) {
 
 namespace llvm {
 void addLgcContinuationTransform(ModulePassManager &MPM) {
+  // Inline TraceRay and similar intrinsic implementations
+  MPM.addPass(AlwaysInlinerPass(/*InsertLifetimeIntrinsics=*/false));
+
+  // Lower GetShaderKind and GetCurrentFuncAddr
+  MPM.addPass(PreCoroutineLoweringPass());
+
   MPM.addPass(LowerAwaitPass());
 
   MPM.addPass(CoroEarlyPass());

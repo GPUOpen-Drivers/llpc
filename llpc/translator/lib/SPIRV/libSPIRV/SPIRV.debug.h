@@ -348,9 +348,8 @@ enum {
   LinkageNameIdx  = 6,
   FlagsIdx        = 7,
   ScopeLineIdx    = 8,
-  FunctionIdIdx   = 9,
-  DeclarationIdx  = 10,
-  MinOperandCount = 10
+  DeclarationIdx  = 9,
+  MinOperandCount = 9
 };
 }
 

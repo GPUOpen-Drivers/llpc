@@ -129,6 +129,8 @@ enum ElfSectionHeaderTypes : uint32_t {
   SHT_HASH = 5,     // Symbol hash table
   SHT_DYNAMIC = 6,  // Information for dynamic linking
   SHT_NOTE = 7,     // Information about the file
+  SHT_NOBITS = 8,   // Data occupies no space in the file
+  SHT_REL = 9,      // Relocation entries; no explicit addends
 };
 
 // Enumerates ELF Section flags.
@@ -150,7 +152,8 @@ static const char ShStrTabName[] = ".shstrtab"; // Name of ".shstrtab" section
 static const char StrTabName[] = ".strtab";     // Name of ".strtab" section
 static const char SymTabName[] = ".symtab";     // Name of ".symtab" section
 static const char NoteName[] = ".note";         // Name of ".note" section
-static const char RelocName[] = ".rel.text";    // Name of ".reloc" section
+static const char RelocName[] = ".rel.text";    // Name of SHT_REL section
+static const char RelocAName[] = ".rela.text";  // Name of SHT_RELA section
 static const char CommentName[] = ".comment";   // Name of ".comment" section
 
 static const uint32_t NT_AMD_AMDGPU_ISA = 11; // Note type of AMDGPU ISA version
@@ -221,7 +224,7 @@ struct Elf32 {
     uint16_t st_shndx; // Which section (header table index) it's defined in
   };
 
-  // ELF relocation entry (without explicit append)
+  // ELF relocation entry (without explicit addend)
   struct Reloc {
     uint32_t r_offset; // Location (file byte offset, or program virtual address)
     union {
@@ -231,6 +234,19 @@ struct Elf32 {
         uint32_t r_symbol : 24; // Index of the symbol in the symbol table
       };
     };
+  };
+
+  // ELF relocation entry with explicit addend
+  struct RelocA {
+    uint32_t r_offset; // Location (file byte offset, or program virtual address)
+    union {
+      uint32_t r_info; // Symbol table index and type of relocation to apply
+      struct {
+        uint32_t r_type : 8;    // Type of relocation
+        uint32_t r_symbol : 24; // Index of the symbol in the symbol table
+      };
+    };
+    uint32_t r_addend; // Compute value for relocatable field by adding this
   };
 
   // ELF program header
@@ -301,7 +317,7 @@ struct Elf64 {
     uint64_t st_size;  // Size of the symbol
   };
 
-  // ELF relocation entry
+  // ELF relocation entry (without explicit addend)
   struct Reloc {
     uint64_t r_offset; // Location (file byte offset, or program virtual address)
     union {
@@ -311,6 +327,19 @@ struct Elf64 {
         uint32_t r_symbol; // Index of the symbol in the symbol table
       };
     };
+  };
+
+  // ELF relocation entry with explicit addend
+  struct RelocA {
+    uint64_t r_offset; // Location (file byte offset, or program virtual address)
+    union {
+      uint64_t r_info; // Symbol table index and type of relocation to apply
+      struct {
+        uint32_t r_type;   // Type of relocation
+        uint32_t r_symbol; // Index of the symbol in the symbol table
+      };
+    };
+    uint64_t r_addend; // Compute value for relocatable field by adding this
   };
 
   // ELF program header

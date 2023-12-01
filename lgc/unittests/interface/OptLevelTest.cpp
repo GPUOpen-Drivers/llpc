@@ -39,7 +39,7 @@ TEST(LgcInterfaceTests, DefaultOptLevel) {
   auto dialectContext = llvm_dialects::DialectContext::make<LgcDialect>(context);
 
   unsigned palAbiVersion = 0xFFFFFFFF;
-  StringRef gpuName = "gfx802";
+  StringRef gpuName = "gfx1010";
 
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 474768
   // Old version of the code

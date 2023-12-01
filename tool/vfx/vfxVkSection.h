@@ -283,8 +283,6 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, workaroundStorageImageFormats, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, workaroundInitializeOutputsToZero, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableFMA, MemberTypeBool, false);
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, backwardPropagateNoContract, MemberTypeBool, false);
-      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, forwardPropagateNoContract, MemberTypeBool, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -501,6 +499,8 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, buildResourcesDataForShaderModule, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, disableTruncCoordForGather, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, vertex64BitsAttribSingleLoc, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enableFragColor, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enablePrimGeneratedQuery, MemberTypeBool, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -811,6 +811,7 @@ public:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableUberFetchShader, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableEarlyCompile, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableColorExportShader, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, useSoftwareVertexBufferDescriptors, MemberTypeBool, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_shaderLibrary, MemberTypeString, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_rtState, MemberTypeRtState, true);
       INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGraphicsState, tessLevelInner, MemberTypeFloat, 2, false);
@@ -1033,7 +1034,9 @@ private:
     static std::vector<StrToMemberAddr> addrTable = []() {
       std::vector<StrToMemberAddr> addrTableInitializer;
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionApiXfbOutput, forceDisableStreamOut, MemberTypeBool, false);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 70
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionApiXfbOutput, forceEnablePrimStats, MemberTypeBool, false);
+#endif
       INIT_MEMBER_DYNARRAY_NAME_TO_ADDR(SectionApiXfbOutput, m_xfbOutInfo, MemberTypeXfbOutInfo, true);
       return addrTableInitializer;
     }();

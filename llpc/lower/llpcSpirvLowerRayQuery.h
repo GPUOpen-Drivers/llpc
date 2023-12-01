@@ -130,7 +130,7 @@ protected:
   void createGlobalLdsUsage();
   void createGlobalRayQueryObj();
   void initGlobalVariable();
-  void generateTraceRayStaticId();
+  unsigned generateTraceRayStaticId();
   llvm::Value *createTransformMatrix(unsigned builtInId, llvm::Value *accelStruct, llvm::Value *instanceId,
                                      llvm::Instruction *insertPos);
   void eraseFunctionBlocks(llvm::Function *func);

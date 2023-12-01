@@ -30,9 +30,9 @@
  */
 
 #include "lgc/util/BuilderBase.h"
+#include "compilerutils/CompilerUtils.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/state/IntrinsDefs.h"
-#include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
@@ -76,44 +76,7 @@ Value *BuilderCommon::CreatePtrDiff(Type *ty, Value *lhs, Value *rhs, const Twin
 // @param instName : Name to give instruction
 CallInst *BuilderCommon::CreateNamedCall(StringRef funcName, Type *retTy, ArrayRef<Value *> args,
                                          ArrayRef<Attribute::AttrKind> attribs, const Twine &instName) {
-  assert(!funcName.empty());
-  Module *module = GetInsertBlock()->getParent()->getParent();
-  Function *func = dyn_cast_or_null<Function>(module->getFunction(funcName));
-  if (!func) {
-    SmallVector<Type *, 8> argTys;
-    argTys.reserve(args.size());
-    for (auto arg : args)
-      argTys.push_back(arg->getType());
-
-    auto funcTy = FunctionType::get(retTy, argTys, false);
-    func = Function::Create(funcTy, GlobalValue::ExternalLinkage, funcName, module);
-
-    func->setCallingConv(CallingConv::C);
-    func->addFnAttr(Attribute::NoUnwind);
-
-    for (auto attrib : attribs) {
-      switch (attrib) {
-      default:
-        func->addFnAttr(attrib);
-        break;
-      case Attribute::ReadNone:
-        func->setDoesNotAccessMemory();
-        break;
-      case Attribute::ReadOnly:
-        func->setOnlyReadsMemory();
-        break;
-      case Attribute::WriteOnly:
-        func->setOnlyWritesMemory();
-        break;
-      }
-    }
-  }
-
-  auto call = CreateCall(func, args, instName);
-  call->setCallingConv(CallingConv::C);
-  call->setAttributes(func->getAttributes());
-
-  return call;
+  return CompilerUtils::createNamedCall(*this, funcName, retTy, args, attribs, instName);
 }
 
 // =====================================================================================================================
@@ -277,22 +240,6 @@ Value *BuilderBase::CreateMapToSimpleType(MapToSimpleTypeFunc mapFunc, ArrayRef<
     return mapFunc(*this, mappedArgs, passthroughArgs);
   llvm_unreachable("Should never be called!");
   return nullptr;
-}
-
-// =====================================================================================================================
-// Create an inline assembly call to cause a side effect (used to work around miscompiles with convergent).
-//
-// @param value : The value to ensure doesn't move in control flow.
-Value *BuilderBase::CreateInlineAsmSideEffect(Value *const value) {
-  auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *>) -> Value * {
-    Value *const value = mappedArgs[0];
-    Type *const type = value->getType();
-    FunctionType *const funcType = FunctionType::get(type, type, false);
-    InlineAsm *const inlineAsm = InlineAsm::get(funcType, "; %1", "=v,0", true);
-    return builder.CreateCall(inlineAsm, value);
-  };
-
-  return CreateMapToSimpleType(mapFunc, value, {});
 }
 
 // =====================================================================================================================

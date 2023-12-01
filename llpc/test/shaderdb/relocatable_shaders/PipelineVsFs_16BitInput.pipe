@@ -7,7 +7,7 @@
 
 ; Make sure the vertex shader truncates the first 16-bits before using the input.
 ; SHADERTEST: // LLPC pipeline patching results
-; SHADERTEST: define dllexport amdgpu_vs void @_amdgpu_vs_main_fetchless({{.*}}, float [[input:%[0-9]*]]) #0 !lgc.shaderstage !1 {
+; SHADERTEST: define dllexport amdgpu_vs void @_amdgpu_vs_main_fetchless({{.*}}, float noundef [[input:%[0-9]*]]) #0 !lgc.shaderstage !1 {
 ; SHADERTEST:  [[cast:%[0-9]+]] = bitcast float [[input]] to <2 x half>
 ; SHADERTEST:  [[value:%[.a-zA-Z0-9]+]] = extractelement <2 x half> [[cast]], i64 0
 

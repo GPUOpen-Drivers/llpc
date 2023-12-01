@@ -466,20 +466,6 @@ enum BufDstSel {
   BUF_DST_SEL_W = 7, // SEL_W (W)
 };
 
-// Bits in mask supplied to v_cmp_class
-enum CmpClass {
-  SignalingNaN = 1,
-  QuietNaN = 2,
-  NegativeInfinity = 4,
-  NegativeNormal = 8,
-  NegativeSubnormal = 0x10,
-  NegativeZero = 0x20,
-  PositiveZero = 0x40,
-  PositiveSubnormal = 0x80,
-  PositiveNormal = 0x100,
-  PositiveInfinity = 0x200
-};
-
 // Represents register fields of SPI_PS_INPUT_ADDR.
 union SpiPsInputAddr {
   struct {
@@ -565,7 +551,7 @@ union SqBufRsrcWord3 {
     unsigned heap : 1;
     unsigned mtype : 3;
     unsigned : 2;
-  } gfx6;
+  } gfx9;
 
   struct {
     unsigned : 12;

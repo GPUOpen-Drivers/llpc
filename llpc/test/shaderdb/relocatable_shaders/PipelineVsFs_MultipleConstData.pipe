@@ -1,6 +1,6 @@
 // This test case checks that the elf linker places symbols for constant data at the correct offset with the correct size.
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx900 -t %t.elf | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s && llvm-objdump --triple=amdgcn --mcpu=gfx1010 -t %t.elf | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: SYMBOL TABLE:
 ; SHADERTEST: 0000000000000020 l O .rodata.cst32 0000000000000020 __unnamed_1.vertex
 ; SHADERTEST: 0000000000000000 l O .rodata.cst32 0000000000000020 __unnamed_2.vertex

@@ -61,7 +61,7 @@ namespace {
 // Map vkgc
 static constexpr unsigned InternalDescriptorSetId = static_cast<unsigned>(-1);
 static constexpr unsigned FetchShaderInternalBufferBinding = 5; // Descriptor binding for uber fetch shader
-static constexpr unsigned CurrentAttributeBufferBinding = 24;   // Descriptor binding for current attribute
+static constexpr unsigned CurrentAttributeBufferBinding = 1;    // Descriptor binding for current attribute
 static constexpr unsigned GenericVertexFetchShaderBinding = 0;  // Descriptor binding for generic vertex fetch shader
 static constexpr unsigned VertexInputBindingCurrent = 64;       // Vertex input binding for current attribute
 
@@ -88,7 +88,7 @@ struct VertexCompFormatInfo {
 // Vertex fetch manager
 class VertexFetchImpl : public VertexFetch {
 public:
-  VertexFetchImpl(LgcContext *lgcContext);
+  VertexFetchImpl(LgcContext *lgcContext, bool useSoftwareVertexBufferDescriptors);
   VertexFetchImpl(const VertexFetchImpl &) = delete;
   VertexFetchImpl &operator=(const VertexFetchImpl &) = delete;
 
@@ -100,8 +100,6 @@ public:
   Value *fetchVertex(InputImportGenericOp *inst, Value *descPtr, Value *locMasks, BuilderBase &builder) override;
 
 private:
-  void initialize(PipelineState *pipelineState);
-
   static VertexFormatInfo getVertexFormatInfo(const VertexInputDescription *description);
 
   // Gets variable corresponding to vertex index
@@ -116,16 +114,17 @@ private:
 
   Value *loadVertexBufferDescriptor(unsigned binding, BuilderImpl &builderImpl);
 
-  void addVertexFetchInst(Value *vbDesc, unsigned numChannels, bool is16bitFetch, Value *vbIndex, unsigned offset,
-                          unsigned stride, unsigned dfmt, unsigned nfmt, Instruction *insertPos, Value **ppFetch) const;
+  void addVertexFetchInst(Value *vbDesc, unsigned numChannels, bool is16bitFetch, Value *vbIndex, Value *srdStride,
+                          unsigned offset, unsigned stride, unsigned dfmt, unsigned nfmt, Instruction *insertPos,
+                          Value **ppFetch) const;
 
   bool needPostShuffle(const VertexInputDescription *inputDesc, std::vector<Constant *> &shuffleMask) const;
-
-  bool needPatchA2S(const VertexInputDescription *inputDesc) const;
 
   bool needSecondVertexFetch(const VertexInputDescription *inputDesc) const;
 
   bool needPatch32(const VertexInputDescription *inputDesc) const;
+
+  std::pair<Value *, Value *> convertSrdToOffsetMode(Value *vbDesc, BuilderBase &builder);
 
   LgcContext *m_lgcContext = nullptr;      // LGC context
   LLVMContext *m_context = nullptr;        // LLVM context
@@ -133,6 +132,8 @@ private:
   Value *m_curAttribBufferDescr = nullptr; // Current attribute buffer descriptor;
   Value *m_vertexIndex = nullptr;          // Vertex index
   Value *m_instanceIndex = nullptr;        // Instance index
+
+  bool m_useSoftwareVertexBufferDescriptors = false; // Use software vertex buffer descriptors to structure SRD.
 
   static const VertexCompFormatInfo m_vertexCompFormatInfo[]; // Info table of vertex component format
   static const unsigned char m_vertexFormatMapGfx10[][9];     // Info table of vertex format mapping for GFX10
@@ -177,6 +178,23 @@ const VertexCompFormatInfo VertexFetchImpl::m_vertexCompFormatInfo[] = {
     {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormatReserved
     {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat8_8_8_8_Bgra
     {3, 1, 3, BUF_DATA_FORMAT_8},          // BufDataFormat8_8_8
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat8_8_8_Bgr,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat2_10_10_10_Bgra,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat64,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat64_64,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat64_64_64,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat64_64_64_64,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat4_4,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat4_4_4_4,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat4_4_4_4_Bgra,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat5_6_5,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat5_6_5_Bgr,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat5_6_5_1,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat5_6_5_1_Bgra,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat1_5_6_5,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat5_9_9_9,
+    {0, 0, 0, BUF_DATA_FORMAT_INVALID},    // BufDataFormat8_A,
+    {6, 2, 3, BUF_DATA_FORMAT_16},         // BufDataFormat16_16_16
 };
 
 // clang-format off
@@ -595,7 +613,8 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
   if (vertexFetches.empty())
     return false;
 
-  std::unique_ptr<VertexFetch> vertexFetch(VertexFetch::create(pipelineState->getLgcContext()));
+  std::unique_ptr<VertexFetch> vertexFetch(VertexFetch::create(
+      pipelineState->getLgcContext(), pipelineState->getOptions().useSoftwareVertexBufferDescriptors));
   BuilderImpl builder(pipelineState);
 
   if (pipelineState->getOptions().enableUberFetchShader) {
@@ -828,8 +847,6 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, Value *descPtr, 
   loadInst->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(loadInst->getContext(), {}));
   loadInst->setAlignment(Align(16));
   Value *vbDesc = loadInst;
-  // Replace buffer format
-  vbDesc = builder.CreateInsertElement(vbDesc, bufferFormat, 3);
 
   auto isPerInstance = builder.CreateICmpNE(perInstance, zero);
 
@@ -853,6 +870,24 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, Value *descPtr, 
   const unsigned bitWidth = basicTy->getScalarSizeInBits();
   assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32 || bitWidth == 64);
 
+  Intrinsic::ID instId = Intrinsic::amdgcn_struct_buffer_load_format;
+  if (m_useSoftwareVertexBufferDescriptors) {
+    instId = Intrinsic::amdgcn_raw_buffer_load_format;
+    auto srdStride = builder.CreateExtractElement(vbDesc, 3);
+    byteOffset = builder.CreateAdd(builder.CreateMul(vbIndex, srdStride), byteOffset);
+  }
+  // Replace buffer format
+  vbDesc = builder.CreateInsertElement(vbDesc, bufferFormat, 3);
+
+  SmallVector<Value *, 5> args;
+  args.push_back(vbDesc);
+  if (!m_useSoftwareVertexBufferDescriptors)
+    args.push_back(vbIndex);
+  unsigned offsetIdx = args.size();
+  args.push_back(byteOffset);
+  args.push_back(builder.getInt32(0));
+  args.push_back(builder.getInt32(0));
+
   // If ispacked is false, we require per-component fetch
   builder.CreateCondBr(isPacked, wholeVertexBlock, comp0Block);
 
@@ -864,22 +899,14 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, Value *descPtr, 
   auto fetch16Type = FixedVectorType::get(Type::getInt16Ty(*m_context), 4);
   auto fetchType = is16bitFetch ? fetch16Type : fetch32Type;
 
-  Value *args[] = {
-      vbDesc,              // rsrc
-      vbIndex,             // vindex
-      byteOffset,          // offset
-      builder.getInt32(0), // soffset
-      builder.getInt32(0)  // glc, slc
-  };
-
   Value *wholeVertex = nullptr;
   {
     builder.SetInsertPoint(wholeVertexBlock);
-    wholeVertex = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetchType, args, {});
+    wholeVertex = builder.CreateIntrinsic(instId, fetchType, args, {});
     if (is64bitFetch) {
       // If it is 64-bit, we need the second fetch
-      args[2] = builder.CreateAdd(args[2], builder.getInt32(SizeOfVec4));
-      auto secondFetch = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetchType, args, {});
+      args[offsetIdx] = builder.CreateAdd(args[offsetIdx], builder.getInt32(SizeOfVec4));
+      auto secondFetch = builder.CreateIntrinsic(instId, fetchType, args, {});
       wholeVertex = builder.CreateShuffleVector(wholeVertex, secondFetch, ArrayRef<int>{0, 1, 2, 3, 4, 5, 6, 7});
     }
     builder.CreateBr(fetchUberEndBlock);
@@ -924,16 +951,16 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, Value *descPtr, 
   {
     builder.SetInsertPoint(comp0Block);
 
-    args[2] = byteOffset;
+    args[offsetIdx] = byteOffset;
     if (is64bitFetch) {
-      Value *comp = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetch64Type, args, {});
+      Value *comp = builder.CreateIntrinsic(instId, fetch64Type, args, {});
       Value *elem = builder.CreateExtractElement(comp, uint64_t(0));
       lastVert = builder.CreateInsertElement(lastVert, elem, uint64_t(0));
       elem = builder.CreateExtractElement(comp, 1);
       lastVert = builder.CreateInsertElement(lastVert, elem, 1);
       comp0 = lastVert;
     } else {
-      comp0 = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, compType, args, {});
+      comp0 = builder.CreateIntrinsic(instId, compType, args, {});
       lastVert = builder.CreateInsertElement(lastVert, comp0, uint64_t(0));
       comp0 = lastVert;
     }
@@ -946,16 +973,16 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, Value *descPtr, 
   {
     builder.SetInsertPoint(comp1Block);
     // Add offset. offset = offset + componentSize
-    args[2] = builder.CreateAdd(args[2], componentSize);
+    args[offsetIdx] = builder.CreateAdd(args[offsetIdx], componentSize);
     if (is64bitFetch) {
-      Value *comp = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetch64Type, args, {});
+      Value *comp = builder.CreateIntrinsic(instId, fetch64Type, args, {});
       Value *elem = builder.CreateExtractElement(comp, uint64_t(0));
       lastVert = builder.CreateInsertElement(lastVert, elem, 2);
       elem = builder.CreateExtractElement(comp, 1);
       lastVert = builder.CreateInsertElement(lastVert, elem, 3);
       comp1 = lastVert;
     } else {
-      comp1 = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, compType, args, {});
+      comp1 = builder.CreateIntrinsic(instId, compType, args, {});
       lastVert = builder.CreateInsertElement(lastVert, comp1, 1);
       comp1 = lastVert;
     }
@@ -966,16 +993,16 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, Value *descPtr, 
   // .comp2Block
   {
     builder.SetInsertPoint(comp2Block);
-    args[2] = builder.CreateAdd(args[2], componentSize);
+    args[offsetIdx] = builder.CreateAdd(args[offsetIdx], componentSize);
     if (is64bitFetch) {
-      Value *comp = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetch64Type, args, {});
+      Value *comp = builder.CreateIntrinsic(instId, fetch64Type, args, {});
       Value *elem = builder.CreateExtractElement(comp, uint64_t(0));
       lastVert = builder.CreateInsertElement(lastVert, elem, 4);
       elem = builder.CreateExtractElement(comp, 1);
       lastVert = builder.CreateInsertElement(lastVert, elem, 5);
       comp2 = lastVert;
     } else {
-      comp2 = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, compType, args, {});
+      comp2 = builder.CreateIntrinsic(instId, compType, args, {});
       lastVert = builder.CreateInsertElement(lastVert, comp2, 2);
       comp2 = lastVert;
     }
@@ -986,16 +1013,16 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, Value *descPtr, 
   // .comp3Block
   {
     builder.SetInsertPoint(comp3Block);
-    args[2] = builder.CreateAdd(args[2], componentSize);
+    args[offsetIdx] = builder.CreateAdd(args[offsetIdx], componentSize);
     if (is64bitFetch) {
-      Value *comp = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, fetch64Type, args, {});
+      Value *comp = builder.CreateIntrinsic(instId, fetch64Type, args, {});
       Value *elem = builder.CreateExtractElement(comp, uint64_t(0));
       lastVert = builder.CreateInsertElement(lastVert, elem, 6);
       elem = builder.CreateExtractElement(comp, 1);
       lastVert = builder.CreateInsertElement(lastVert, elem, 7);
       comp3 = lastVert;
     } else {
-      comp3 = builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_load_format, compType, args, {});
+      comp3 = builder.CreateIntrinsic(instId, compType, args, {});
       lastVert = builder.CreateInsertElement(lastVert, comp3, 3);
       comp3 = lastVert;
     }
@@ -1099,16 +1126,17 @@ Value *VertexFetchImpl::fetchVertex(InputImportGenericOp *inst, Value *descPtr, 
 
 // =====================================================================================================================
 // Create a VertexFetch
-VertexFetch *VertexFetch::create(LgcContext *lgcContext) {
-  return new VertexFetchImpl(lgcContext);
+VertexFetch *VertexFetch::create(LgcContext *lgcContext, bool useSoftwareVertexBufferDescriptors) {
+  return new VertexFetchImpl(lgcContext, useSoftwareVertexBufferDescriptors);
 }
 
 // =====================================================================================================================
 // Constructor
 //
 // @param context : LLVM context
-VertexFetchImpl::VertexFetchImpl(LgcContext *lgcContext)
-    : m_lgcContext(lgcContext), m_context(&lgcContext->getContext()) {
+VertexFetchImpl::VertexFetchImpl(LgcContext *lgcContext, bool useSoftwareVertexBufferDescriptors)
+    : m_lgcContext(lgcContext), m_context(&lgcContext->getContext()),
+      m_useSoftwareVertexBufferDescriptors(useSoftwareVertexBufferDescriptors) {
 
   // Initialize default fetch values
   auto zero = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
@@ -1162,6 +1190,9 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
   BuilderBase &builder = BuilderBase::get(builderImpl);
   Instruction *insertPos = &*builder.GetInsertPoint();
   auto vbDesc = loadVertexBufferDescriptor(description->binding, builderImpl);
+  Value *srdStride = nullptr;
+  if (m_useSoftwareVertexBufferDescriptors)
+    std::tie(vbDesc, srdStride) = convertSrdToOffsetMode(vbDesc, builder);
 
   Value *vbIndex = nullptr;
   if (description->inputRate == VertexInputRateVertex) {
@@ -1173,9 +1204,9 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
     }
     vbIndex = m_vertexIndex;
   } else {
-    if (description->inputRate == VertexInputRateNone) {
+    if (description->divisor == 0) {
       vbIndex = ShaderInputs::getSpecialUserData(UserDataMapping::BaseInstance, builder);
-    } else if (description->inputRate == VertexInputRateInstance) {
+    } else if (description->divisor == 1) {
       // Use instance index
       if (!m_instanceIndex) {
         IRBuilder<>::InsertPointGuard guard(builder);
@@ -1186,7 +1217,7 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
     } else {
       // There is a divisor.
       vbIndex = builder.CreateUDiv(ShaderInputs::getInput(ShaderInput::InstanceId, builder, *m_lgcContext),
-                                   builder.getInt32(description->inputRate));
+                                   builder.getInt32(description->divisor));
       vbIndex = builder.CreateAdd(vbIndex, ShaderInputs::getSpecialUserData(UserDataMapping::BaseInstance, builder));
     }
   }
@@ -1199,97 +1230,20 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
   const bool is16bitFetch = (inputTy->getScalarSizeInBits() <= 16);
 
   // Do the first vertex fetch operation
-  addVertexFetchInst(vbDesc, formatInfo.numChannels, is16bitFetch, vbIndex, description->offset, description->stride,
-                     formatInfo.dfmt, formatInfo.nfmt, insertPos, &vertexFetches[0]);
+  addVertexFetchInst(vbDesc, formatInfo.numChannels, is16bitFetch, vbIndex, srdStride, description->offset,
+                     description->stride, formatInfo.dfmt, formatInfo.nfmt, insertPos, &vertexFetches[0]);
 
   // Do post-processing in certain cases
   std::vector<Constant *> shuffleMask;
   bool postShuffle = needPostShuffle(description, shuffleMask);
-  bool patchA2S = needPatchA2S(description);
   bool patch32 = needPatch32(description);
-  if (postShuffle || patchA2S || patch32) {
+  if (postShuffle || patch32) {
     if (postShuffle) {
       // NOTE: If we are fetching a swizzled format, we have to add an extra "shufflevector" instruction to
       // get the components in the right order.
       assert(shuffleMask.empty() == false);
       vertexFetches[0] =
           new ShuffleVectorInst(vertexFetches[0], vertexFetches[0], ConstantVector::get(shuffleMask), "", insertPos);
-    }
-
-    if (patchA2S) {
-      assert(cast<FixedVectorType>(vertexFetches[0]->getType())->getNumElements() == 4);
-
-      // Extract alpha channel: %a = extractelement %vf0, 3
-      Value *alpha = ExtractElementInst::Create(vertexFetches[0], ConstantInt::get(Type::getInt32Ty(*m_context), 3), "",
-                                                insertPos);
-
-      if (is16bitFetch) {
-        // Extend to 32-bit
-        alpha = new ZExtInst(alpha, Type::getInt32Ty(*m_context), "", insertPos);
-      }
-
-      if (formatInfo.nfmt == BufNumFormatSint) {
-        // NOTE: For format "SINT 10_10_10_2", vertex fetches incorrectly return the alpha channel as
-        // unsigned. We have to manually sign-extend it here by doing a "shl" 30 then an "ashr" 30.
-
-        // %a = shl %a, 30
-        alpha = BinaryOperator::CreateShl(alpha, ConstantInt::get(Type::getInt32Ty(*m_context), 30), "", insertPos);
-
-        // %a = ashr %a, 30
-        alpha = BinaryOperator::CreateAShr(alpha, ConstantInt::get(Type::getInt32Ty(*m_context), 30), "", insertPos);
-      } else if (formatInfo.nfmt == BufNumFormatSnorm) {
-        // NOTE: For format "SNORM 10_10_10_2", vertex fetches incorrectly return the alpha channel
-        // as unsigned. We have to somehow remap the values { 0.0, 0.33, 0.66, 1.00 } to { 0.0, 1.0,
-        // -1.0, -1.0 } respectively.
-
-        // %a = bitcast %a to f32
-        alpha = new BitCastInst(alpha, Type::getFloatTy(*m_context), "", insertPos);
-
-        // %a = mul %a, 3.0f
-        alpha = BinaryOperator::CreateFMul(alpha, ConstantFP::get(Type::getFloatTy(*m_context), 3.0f), "", insertPos);
-
-        // %cond = ugt %a, 1.5f
-        auto cond =
-            new FCmpInst(insertPos, FCmpInst::FCMP_UGT, alpha, ConstantFP::get(Type::getFloatTy(*m_context), 1.5f), "");
-
-        // %a = select %cond, -1.0f, alpha
-        alpha = SelectInst::Create(cond, ConstantFP::get(Type::getFloatTy(*m_context), -1.0f), alpha, "", insertPos);
-
-        // %a = bitcast %a to i32
-        alpha = new BitCastInst(alpha, Type::getInt32Ty(*m_context), "", insertPos);
-      } else if (formatInfo.nfmt == BufNumFormatSscaled) {
-        // NOTE: For format "SSCALED 10_10_10_2", vertex fetches incorrectly return the alpha channel
-        // as unsigned. We have to somehow remap the values { 0.0, 1.0, 2.0, 3.0 } to { 0.0, 1.0,
-        // -2.0, -1.0 } respectively. We can perform the sign extension here by doing a "fptosi", "shl" 30,
-        // "ashr" 30, and finally "sitofp".
-
-        // %a = bitcast %a to float
-        alpha = new BitCastInst(alpha, Type::getFloatTy(*m_context), "", insertPos);
-
-        // %a = fptosi %a to i32
-        alpha = new FPToSIInst(alpha, Type::getInt32Ty(*m_context), "", insertPos);
-
-        // %a = shl %a, 30
-        alpha = BinaryOperator::CreateShl(alpha, ConstantInt::get(Type::getInt32Ty(*m_context), 30), "", insertPos);
-
-        // %a = ashr a, 30
-        alpha = BinaryOperator::CreateAShr(alpha, ConstantInt::get(Type::getInt32Ty(*m_context), 30), "", insertPos);
-
-        // %a = sitofp %a to float
-        alpha = new SIToFPInst(alpha, Type::getFloatTy(*m_context), "", insertPos);
-
-        // %a = bitcast %a to i32
-        alpha = new BitCastInst(alpha, Type::getInt32Ty(*m_context), "", insertPos);
-      } else
-        llvm_unreachable("Should never be called!");
-
-      if (is16bitFetch) {
-        // Trunc to 16-bit
-        alpha = new TruncInst(alpha, Type::getInt16Ty(*m_context), "", insertPos);
-      }
-      // Insert alpha channel: %vf0 = insertelement %vf0, %a, 3
-      vertexFetches[0] = InsertElementInst::Create(vertexFetches[0], alpha,
-                                                   ConstantInt::get(Type::getInt32Ty(*m_context), 3), "", insertPos);
     }
 
     if (patch32) {
@@ -1355,7 +1309,7 @@ Value *VertexFetchImpl::fetchVertex(Type *inputTy, const VertexInputDescription 
       dfmt = BUF_DATA_FORMAT_32_32;
     }
 
-    addVertexFetchInst(vbDesc, numChannels, is16bitFetch, vbIndex, description->offset + SizeOfVec4,
+    addVertexFetchInst(vbDesc, numChannels, is16bitFetch, vbIndex, srdStride, description->offset + SizeOfVec4,
                        description->stride, dfmt, formatInfo.nfmt, insertPos, &vertexFetches[1]);
   }
 
@@ -1554,6 +1508,10 @@ VertexFormatInfo VertexFetchImpl::getVertexFormatInfo(const VertexInputDescripti
     info.dfmt = BufDataFormat8_8_8;
     info.numChannels = 3;
     break;
+  case BufDataFormat16_16_16:
+    info.dfmt = BufDataFormat16_16_16;
+    info.numChannels = 3;
+    break;
   default:
     break;
   }
@@ -1608,13 +1566,16 @@ unsigned VertexFetchImpl::mapVertexFormat(unsigned dfmt, unsigned nfmt) const {
 // @param binding : ID of vertex buffer binding
 // @param builder : Builder with insert point set
 Value *VertexFetchImpl::loadVertexBufferDescriptor(unsigned binding, BuilderImpl &builderImpl) {
+  BuilderBase &builder = BuilderBase::get(builderImpl);
   if (builderImpl.useVertexBufferDescArray()) {
     Value *vtxDesc = nullptr;
     // Create descriptor for current attribute
     if (binding == VertexInputBindingCurrent) {
       if (m_curAttribBufferDescr == nullptr) {
+        IRBuilder<>::InsertPointGuard guard(builder);
+        builder.SetInsertPointPastAllocas(builder.GetInsertBlock()->getParent());
         auto descPtr = builderImpl.CreateBufferDesc(InternalDescriptorSetId, CurrentAttributeBufferBinding,
-                                                    builderImpl.getInt32(0), Builder::BufferFlagAddress);
+                                                    builderImpl.getInt32(0), lgc::Builder::BufferFlagAddress);
         // Create descriptor by a 64-bits pointer
         m_curAttribBufferDescr = builderImpl.buildInlineBufferDesc(descPtr);
       }
@@ -1622,13 +1583,12 @@ Value *VertexFetchImpl::loadVertexBufferDescriptor(unsigned binding, BuilderImpl
     } else {
       // Create descriptor for vertex buffer
       vtxDesc = builderImpl.CreateBufferDesc(InternalDescriptorSetId, GenericVertexFetchShaderBinding,
-                                             builderImpl.getInt32(binding), Builder::BufferFlagNonConst);
+                                             builderImpl.getInt32(binding), lgc::Builder::BufferFlagNonConst);
     }
 
     return vtxDesc;
   }
 
-  BuilderBase &builder = BuilderBase::get(builderImpl);
   // Get the vertex buffer table pointer as pointer to v4i32 descriptor.
   Type *vbDescTy = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
   if (!m_vertexBufTablePtr) {
@@ -1658,15 +1618,26 @@ Value *VertexFetchImpl::loadVertexBufferDescriptor(unsigned binding, BuilderImpl
 // @param is16bitFetch : Whether it is 16-bit vertex fetch
 // @param vbIndex : Index of vertex fetch in buffer
 // @param offset : Vertex attribute offset (in bytes)
+// @param srdStride: Stride from SRD. Only for offset mode.
 // @param stride : Vertex attribute stride (in bytes)
 // @param dfmt : Date format of vertex buffer
 // @param nfmt : Numeric format of vertex buffer
 // @param insertPos : Where to insert instructions
 // @param [out] ppFetch : Destination of vertex fetch
 void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bool is16bitFetch, Value *vbIndex,
-                                         unsigned offset, unsigned stride, unsigned dfmt, unsigned nfmt,
-                                         Instruction *insertPos, Value **ppFetch) const {
+                                         Value *srdStride, unsigned offset, unsigned stride, unsigned dfmt,
+                                         unsigned nfmt, Instruction *insertPos, Value **ppFetch) const {
+
   const VertexCompFormatInfo *formatInfo = getVertexComponentFormatInfo(dfmt);
+
+  Intrinsic::ID instId = Intrinsic::amdgcn_struct_tbuffer_load;
+  BuilderBase builder(insertPos);
+  Value *instOffset = builder.getInt32(offset);
+  if (m_useSoftwareVertexBufferDescriptors) {
+    instId = Intrinsic::amdgcn_raw_tbuffer_load;
+    auto index2Offset = builder.CreateMul(vbIndex, srdStride);
+    instOffset = builder.CreateAdd(index2Offset, instOffset);
+  }
 
   // NOTE: If the vertex attribute offset and stride are aligned on data format boundaries, we can do a vertex fetch
   // operation to read the whole vertex. Otherwise, we have to do vertex per-component fetch operations.
@@ -1674,34 +1645,31 @@ void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bo
        // NOTE: For the vertex data format 8_8, 8_8_8_8, 16_16, and 16_16_16_16, tbuffer_load has a HW defect when
        // vertex buffer is unaligned. Therefore, we have to split the vertex fetch to component-based ones
        dfmt != BufDataFormat8_8 && dfmt != BufDataFormat8_8_8_8 && dfmt != BufDataFormat16_16 &&
-       dfmt != BufDataFormat16_16_16_16 && dfmt != BufDataFormat8_8_8) ||
+       dfmt != BufDataFormat16_16_16_16 && dfmt != BufDataFormat8_8_8 && dfmt != BufDataFormat16_16_16) ||
       formatInfo->compDfmt == dfmt) {
-    // Do vertex fetch
-    Value *args[] = {
-        vbDesc,                                                                      // rsrc
-        vbIndex,                                                                     // vindex
-        ConstantInt::get(Type::getInt32Ty(*m_context), offset),                      // offset
-        ConstantInt::get(Type::getInt32Ty(*m_context), 0),                           // soffset
-        ConstantInt::get(Type::getInt32Ty(*m_context), mapVertexFormat(dfmt, nfmt)), // dfmt, nfmt
-        ConstantInt::get(Type::getInt32Ty(*m_context), 0)                            // glc, slc
-    };
 
-    StringRef suffix = "";
+    SmallVector<Value *, 6> args;
+    args.push_back(vbDesc);
+    if (!m_useSoftwareVertexBufferDescriptors)
+      args.push_back(vbIndex);
+    args.push_back(instOffset);
+    args.push_back(builder.getInt32(0));
+    args.push_back(builder.getInt32(mapVertexFormat(dfmt, nfmt)));
+    args.push_back(builder.getInt32(0));
+
+    // Do vertex fetch
     Type *fetchTy = nullptr;
 
     if (is16bitFetch) {
       switch (numChannels) {
       case 1:
-        suffix = ".f16";
         fetchTy = Type::getHalfTy(*m_context);
         break;
       case 2:
-        suffix = ".v2f16";
         fetchTy = FixedVectorType::get(Type::getHalfTy(*m_context), 2);
         break;
       case 3:
       case 4:
-        suffix = ".v4f16";
         fetchTy = FixedVectorType::get(Type::getHalfTy(*m_context), 4);
         break;
       default:
@@ -1711,16 +1679,13 @@ void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bo
     } else {
       switch (numChannels) {
       case 1:
-        suffix = ".i32";
         fetchTy = Type::getInt32Ty(*m_context);
         break;
       case 2:
-        suffix = ".v2i32";
         fetchTy = FixedVectorType::get(Type::getInt32Ty(*m_context), 2);
         break;
       case 3:
       case 4:
-        suffix = ".v4i32";
         fetchTy = FixedVectorType::get(Type::getInt32Ty(*m_context), 4);
         break;
       default:
@@ -1729,7 +1694,7 @@ void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bo
       }
     }
 
-    Value *fetch = emitCall((Twine("llvm.amdgcn.struct.tbuffer.load") + suffix).str(), fetchTy, args, {}, insertPos);
+    Value *fetch = builder.CreateIntrinsic(instId, fetchTy, args, {});
 
     if (is16bitFetch) {
       // NOTE: The fetch values are represented by <n x i16>, so we will bitcast the float16 values to
@@ -1763,28 +1728,33 @@ void VertexFetchImpl::addVertexFetchInst(Value *vbDesc, unsigned numChannels, bo
                                  : FixedVectorType::get(Type::getInt32Ty(*m_context), numChannels);
     Value *fetch = PoisonValue::get(fetchTy);
 
+    SmallVector<Value *, 6> args;
+    args.push_back(vbDesc);
+    if (!m_useSoftwareVertexBufferDescriptors)
+      args.push_back(vbIndex);
+    unsigned offsetIdx = args.size();
+    args.push_back(instOffset);
+    args.push_back(builder.getInt32(0));
+    args.push_back(builder.getInt32(mapVertexFormat(formatInfo->compDfmt, nfmt)));
+    args.push_back(builder.getInt32(0));
+
     // Do vertex per-component fetches
     for (unsigned i = 0; i < formatInfo->compCount; ++i) {
-      Value *args[] = {
-          vbDesc,                                                                                      // rsrc
-          compVbIndices[i],                                                                            // vindex
-          ConstantInt::get(Type::getInt32Ty(*m_context), compOffsets[i]),                              // offset
-          ConstantInt::get(Type::getInt32Ty(*m_context), 0),                                           // soffset
-          ConstantInt::get(Type::getInt32Ty(*m_context), mapVertexFormat(formatInfo->compDfmt, nfmt)), // dfmt, nfmt
-          ConstantInt::get(Type::getInt32Ty(*m_context), 0)                                            // glc, slc
-      };
+      Value *compOffset = builder.getInt32(compOffsets[i]);
+      if (m_useSoftwareVertexBufferDescriptors)
+        args[offsetIdx] = builder.CreateAdd(instOffset, compOffset);
+      else
+        args[offsetIdx] = compOffset;
 
       Value *compFetch = nullptr;
       if (is16bitFetch) {
-        compFetch = emitCall("llvm.amdgcn.struct.tbuffer.load.f16", Type::getHalfTy(*m_context), args, {}, insertPos);
-
-        compFetch = new BitCastInst(compFetch, Type::getInt16Ty(*m_context), "", insertPos);
+        compFetch = builder.CreateIntrinsic(instId, builder.getHalfTy(), args, {});
+        compFetch = builder.CreateBitCast(compFetch, builder.getInt16Ty());
       } else {
-        compFetch = emitCall("llvm.amdgcn.struct.tbuffer.load.i32", Type::getInt32Ty(*m_context), args, {}, insertPos);
+        compFetch = builder.CreateIntrinsic(instId, builder.getInt32Ty(), args, {});
       }
 
-      fetch =
-          InsertElementInst::Create(fetch, compFetch, ConstantInt::get(Type::getInt32Ty(*m_context), i), "", insertPos);
+      fetch = builder.CreateInsertElement(fetch, compFetch, i);
     }
 
     *ppFetch = fetch;
@@ -1841,25 +1811,46 @@ bool VertexFetchImpl::needPatch32(const VertexInputDescription *inputDesc) const
 }
 
 // =====================================================================================================================
-// Checks whether patching 2-bit signed alpha channel is required for vertex fetch operation.
-//
-// @param inputDesc : Vertex input description
-bool VertexFetchImpl::needPatchA2S(const VertexInputDescription *inputDesc) const {
-  bool needPatch = false;
-
-  if (inputDesc->dfmt == BufDataFormat2_10_10_10 || inputDesc->dfmt == BufDataFormat2_10_10_10_Bgra) {
-    if (inputDesc->nfmt == BufNumFormatSnorm || inputDesc->nfmt == BufNumFormatSscaled ||
-        inputDesc->nfmt == BufNumFormatSint)
-      needPatch = m_lgcContext->getTargetInfo().getGfxIpVersion().major < 9;
-  }
-
-  return needPatch;
-}
-
-// =====================================================================================================================
 // Checks whether the second vertex fetch operation is required (particularly for certain 64-bit typed formats).
 //
 // @param inputDesc : Vertex input description
 bool VertexFetchImpl::needSecondVertexFetch(const VertexInputDescription *inputDesc) const {
   return inputDesc->dfmt == BufDataFormat64_64_64 || inputDesc->dfmt == BufDataFormat64_64_64_64;
+}
+
+// =====================================================================================================================
+// Convert D3D12_VERTEX_BUFFER_VIEW SRD to offset mode. Stride will be used to calculate offset.
+//
+// @param vbDesc : Original SRD
+// @param builder : Builder to use to insert vertex fetch instructions
+// @returns : {New SRD,stride}
+std::pair<Value *, Value *> VertexFetchImpl::convertSrdToOffsetMode(Value *vbDesc, BuilderBase &builder) {
+  assert(m_useSoftwareVertexBufferDescriptors);
+  // NOTE: Vertex buffer SRD is D3D12_VERTEX_BUFFER_VIEW
+  // struct VertexBufferView
+  // {
+  //   gpusize gpuva;
+  //   uint32  sizeInBytes;
+  //   uint32  strideInBytes;
+  // };
+
+  // Stride is from the third DWORD.
+  auto srdStride = builder.CreateExtractElement(vbDesc, 3);
+
+  SqBufRsrcWord3 sqBufRsrcWord3;
+  sqBufRsrcWord3.bits.dstSelX = BUF_DST_SEL_X;
+  sqBufRsrcWord3.bits.dstSelY = BUF_DST_SEL_Y;
+  sqBufRsrcWord3.bits.dstSelZ = BUF_DST_SEL_Z;
+  sqBufRsrcWord3.bits.dstSelW = BUF_DST_SEL_W;
+  GfxIpVersion gfxIp = m_lgcContext->getTargetInfo().getGfxIpVersion();
+  if (gfxIp.major == 10) {
+    sqBufRsrcWord3.gfx10.format = BUF_FORMAT_32_UINT;
+    sqBufRsrcWord3.gfx10.resourceLevel = 1;
+    sqBufRsrcWord3.gfx10.oobSelect = 3;
+  } else if (gfxIp.major >= 11) {
+    sqBufRsrcWord3.gfx11.format = BUF_FORMAT_32_UINT;
+    sqBufRsrcWord3.gfx11.oobSelect = 3;
+  }
+  auto newDesc = builder.CreateInsertElement(vbDesc, builder.getInt32(sqBufRsrcWord3.u32All), 3);
+  return {newDesc, srdStride};
 }

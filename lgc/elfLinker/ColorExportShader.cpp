@@ -46,14 +46,6 @@ ColorExportShader::ColorExportShader(PipelineState *pipelineState, ArrayRef<Colo
     : GlueShader(pipelineState), m_killEnabled(false) {
   m_exports.append(exports.begin(), exports.end());
 
-  memset(m_exportFormat, 0, sizeof(m_exportFormat));
-  for (auto &exp : m_exports) {
-    if (exp.hwColorTarget == MaxColorTargets)
-      continue;
-    m_exportFormat[exp.hwColorTarget] =
-        static_cast<ExportFormat>(pipelineState->computeExportFormat(exp.ty, exp.location));
-  }
-
   if (!pipelineState->getOptions().enableColorExportShader) {
     PalMetadata *metadata = pipelineState->getPalMetadata();
     if (pipelineState->useRegisterFieldFormat()) {
@@ -77,8 +69,8 @@ StringRef ColorExportShader::getString() {
   if (m_shaderString.empty()) {
     constexpr uint32_t estimatedTypeSize = 10;
     uint32_t sizeEstimate = (sizeof(ColorExportInfo) + estimatedTypeSize) * m_exports.size();
-    sizeEstimate += sizeof(m_exportFormat);
     sizeEstimate += sizeof(m_killEnabled);
+    sizeEstimate += sizeof(ColorExportState) + MaxColorTargets * sizeof(ColorExportFormat);
     m_shaderString.reserve(sizeEstimate);
 
     for (ColorExportInfo colorExportInfo : m_exports) {
@@ -90,8 +82,14 @@ StringRef ColorExportShader::getString() {
           StringRef(reinterpret_cast<const char *>(&colorExportInfo.location), sizeof(colorExportInfo.location));
       m_shaderString += getTypeName(colorExportInfo.ty);
     }
-    m_shaderString += StringRef(reinterpret_cast<const char *>(m_exportFormat), sizeof(m_exportFormat)).str();
     m_shaderString += StringRef(reinterpret_cast<const char *>(&m_killEnabled), sizeof(m_killEnabled));
+
+    const ColorExportState *colorExportState = &m_pipelineState->getColorExportState();
+    m_shaderString += StringRef(reinterpret_cast<const char *>(colorExportState), sizeof(*colorExportState));
+    for (unsigned location = 0; location < MaxColorTargets; ++location) {
+      const ColorExportFormat *colorExportFormat = &m_pipelineState->getColorExportFormat(location);
+      m_shaderString += StringRef(reinterpret_cast<const char *>(colorExportFormat), sizeof(*colorExportFormat));
+    }
   }
   return m_shaderString;
 }
@@ -118,14 +116,19 @@ Module *ColorExportShader::generate() {
     values[m_exports[idx].hwColorTarget] = colorExportFunc->getArg(idx);
   }
 
+  PalMetadata palMetadata{m_pipelineState, m_pipelineState->useRegisterFieldFormat()};
+
   bool dummyExport = m_lgcContext->getTargetInfo().getGfxIpVersion().major < 10 || m_killEnabled;
-  fragColorExport.generateExportInstructions(m_exports, values, m_exportFormat, dummyExport, builder);
+  fragColorExport.generateExportInstructions(m_exports, values, dummyExport, &palMetadata, builder);
 
   if (m_pipelineState->getOptions().enableColorExportShader) {
     builder.CreateIntrinsic(Intrinsic::amdgcn_endpgm, {}, {});
     builder.CreateUnreachable();
     ret->eraseFromParent();
   }
+
+  palMetadata.updateDbShaderControl();
+  palMetadata.record(colorExportFunc->getParent());
 
   return colorExportFunc->getParent();
 }
@@ -176,49 +179,4 @@ Function *ColorExportShader::createColorExportFunc() {
 //
 // @param [in/out] outStream : The PAL metadata object in which to update the color format.
 void ColorExportShader::updatePalMetadata(PalMetadata &palMetadata) {
-  SmallVector<ExportFormat> finalExportFormats;
-  bool hasDepthExpFmtZero = true;
-  for (auto &info : m_exports) {
-    if (info.hwColorTarget != MaxColorTargets) {
-      ExportFormat expFmt = m_exportFormat[info.hwColorTarget];
-      if (expFmt != EXP_FORMAT_ZERO)
-        finalExportFormats.push_back(expFmt);
-    } else {
-      hasDepthExpFmtZero = false;
-      unsigned depthMask = info.location;
-      if (!m_killEnabled && m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11 &&
-          m_pipelineState->getColorExportState().alphaToCoverageEnable) {
-        for (auto &curInfo : m_exports) {
-          if (curInfo.hwColorTarget == EXP_TARGET_MRT_0 && (m_exportFormat[EXP_TARGET_MRT_0] > EXP_FORMAT_32_GR)) {
-            // Mrt0 is enabled and its alpha channel is enabled
-            depthMask |= 0x8;
-            break;
-          }
-        }
-      }
-
-      unsigned depthExpFmt = EXP_FORMAT_ZERO;
-      if (depthMask & 0x4)
-        depthExpFmt = EXP_FORMAT_32_ABGR;
-      else if (depthMask & 0x2)
-        depthExpFmt = (depthMask & 0x8) ? EXP_FORMAT_32_ABGR : EXP_FORMAT_32_GR;
-      else if (depthMask & 0x1)
-        depthExpFmt = (depthMask & 0x8) ? EXP_FORMAT_32_AR : EXP_FORMAT_32_R;
-      palMetadata.setSpiShaderZFormat(depthExpFmt);
-    }
-  }
-
-  if (finalExportFormats.size() == 0 && hasDepthExpFmtZero) {
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10 || m_killEnabled) {
-      // NOTE: Hardware requires that fragment shader always exports "something" (color or depth) to the SX.
-      // If both SPI_SHADER_Z_FORMAT and SPI_SHADER_COL_FORMAT are zero, we need to override
-      // SPI_SHADER_COL_FORMAT to export one channel to MRT0. This dummy export format will be masked
-      // off by updateCbShaderMask().
-      finalExportFormats.push_back(EXP_FORMAT_32_R);
-    }
-  }
-
-  palMetadata.updateSpiShaderColFormat(finalExportFormats);
-  palMetadata.updateCbShaderMask(m_exports);
-  palMetadata.updateDbShaderControl();
 }

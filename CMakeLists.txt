@@ -24,7 +24,7 @@
  #######################################################################################################################
 
 
-cmake_minimum_required(VERSION 3.13.4)
+cmake_minimum_required(VERSION 3.21)
 
 project(VKGC LANGUAGES C CXX)
 
@@ -129,6 +129,9 @@ endif()
 
 ### VKGC build LLPC ################################################################
 if(ICD_BUILD_LLPC)
+    include("cmake/compilerutils.cmake")
+    add_compilerutils_projects()
+
     target_include_directories(vkgc
         INTERFACE
             ${PROJECT_SOURCE_DIR}/llpc/include
@@ -207,7 +210,8 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
             endif()
             set_property(TARGET check-amdllpc PROPERTY FOLDER "LLPC Tests")
             set_property(TARGET check-amdllpc-units PROPERTY FOLDER "LLPC Tests")
-            set_property(TARGET check-lgccps-units PROPERTY FOLDER "LgcCps Tests")
+            set_property(TARGET check-continuations PROPERTY FOLDER "Continuations Tests")
+            set_property(TARGET check-continuations-units PROPERTY FOLDER "Continuations Tests")
             set_property(TARGET check-lgc-units PROPERTY FOLDER "LGC Tests")
         endif()
     endif()

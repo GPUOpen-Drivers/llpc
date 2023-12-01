@@ -28,6 +28,7 @@
  * @brief LLPC source file: PipelineState methods that do IR linking and compilation
  ***********************************************************************************************************************
  */
+#include "continuations/Continuations.h"
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
 #include "lgc/patch/Patch.h"
@@ -210,6 +211,9 @@ bool PipelineState::generate(Module *pipelineModule, raw_pwrite_stream &outStrea
   // (The first time PipelineStateWrapper is used, it allocates its own PipelineState and populates
   // it by reading IR metadata.)
   passMgr->registerModuleAnalysis([&] { return PipelineStateWrapper(getLgcContext()); });
+
+  // continuation transform require this.
+  passMgr->registerModuleAnalysis([&] { return DialectContextAnalysis(false); });
 
   if (m_emitLgc) {
     // -emit-lgc: Just write the module.

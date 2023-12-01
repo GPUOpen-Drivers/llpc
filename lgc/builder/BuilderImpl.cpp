@@ -246,12 +246,6 @@ Value *BuilderImpl::CreateIntegerDotProduct(Value *vector1, Value *vector2, Valu
 }
 
 // =====================================================================================================================
-// Get whether the context we are building in supports DPP operations.
-bool BuilderImpl::supportDpp() const {
-  return getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 8;
-}
-
-// =====================================================================================================================
 // Get whether the context we are building in supports DPP ROW_XMASK operations.
 bool BuilderImpl::supportDppRowXmask() const {
   return getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 10;

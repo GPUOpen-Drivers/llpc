@@ -29,9 +29,9 @@
  ***********************************************************************************************************************
  */
 
-#include "lgccps/LgcCpsDialect.h"
 #include "lgc/ElfLinker.h"
 #include "lgc/LgcContext.h"
+#include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/PassManager.h"
 #include "lgc/Pipeline.h"
@@ -239,7 +239,7 @@ int main(int argc, char **argv) {
   auto *mcpuOpt = reinterpret_cast<cl::opt<std::string> *>(mcpu->second);
   StringRef gpuName = *mcpuOpt;
   if (gpuName == "")
-    gpuName = "gfx802";
+    gpuName = "gfx1010";
 
   // Default to reading from stdin and writing to stdout
   if (InFiles.empty())

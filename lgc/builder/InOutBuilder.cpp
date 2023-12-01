@@ -36,6 +36,7 @@
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
 #include "lgc/util/Internal.h"
+#include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/Support/CommandLine.h"
 
 #define DEBUG_TYPE "lgc-builder-impl-inout"
@@ -107,52 +108,28 @@ Value *BuilderImpl::CreateReadPerVertexInput(Type *resultTy, unsigned location, 
                                              PoisonValue::get(getInt32Ty()), InOutInfo::InterpModeCustom, vertexIndex);
   };
 
-  unsigned oddOffset = 0, evenOffset = 0;
-  auto primType = getPipelineState()->getPrimitiveType();
-  auto provokingVertexMode = getPipelineState()->getRasterizerState().provokingVertexMode;
   unsigned vertexIndexInt = cast<ConstantInt>(vertexIndex)->getZExtValue();
   Value *result = nullptr;
 
-  switch (primType) {
-  case PrimitiveType::TriangleList:
-    vertexIndex = getInt32((vertexIndexInt + 2) % 3); // 0->2, 1->0, 2->1
-    LLVM_FALLTHROUGH;
-    // fall through...
-  case PrimitiveType::Point:
-  case PrimitiveType::LineList:
-  case PrimitiveType::LineStrip:
-    // These are the non-parity modes that just read a single input.
+  auto vertexCount = m_pipelineState->getVerticesPerPrimitive();
+  switch (vertexCount) {
+  case 1:
+  case 2:
     result = readInput(vertexIndex);
     break;
+  case 3: { // Triangle
+    Value *isOne = nullptr;
+    Value *isTwo = nullptr;
+    getProvokingVertexInfo(&isOne, &isTwo);
 
+    auto V0 = readInput(getInt32((vertexIndexInt + 0) % 3));
+    auto V1 = readInput(getInt32((vertexIndexInt + 1) % 3));
+    auto V2 = readInput(getInt32((vertexIndexInt + 2) % 3));
+    result = CreateSelect(isOne, V1, CreateSelect(isTwo, V2, V0));
+    break;
+  }
   default:
-    // The remaining modes are the parity modes that read two inputs and select between them.
-    // Fix the order.
-    switch (primType) {
-    case PrimitiveType::TriangleFan:
-      oddOffset = provokingVertexMode == ProvokingVertexLast ? 1 : 2;
-      evenOffset = provokingVertexMode == ProvokingVertexLast ? 2 : 0;
-      break;
-    case PrimitiveType::TriangleStrip:
-    case PrimitiveType::TriangleStripAdjacency:
-      oddOffset = provokingVertexMode == ProvokingVertexLast ? 1 : 2;
-      evenOffset = 0;
-      break;
-    case PrimitiveType::TriangleListAdjacency:
-      oddOffset = 1;
-      evenOffset = 0;
-      break;
-    default:
-      llvm_unreachable("Unable to get vertices per primitive!");
-    }
-
-    // Read the odd and even vertices.
-    Value *oddRes = readInput(getInt32((vertexIndexInt + oddOffset) % 3));
-    Value *evenRes = readInput(getInt32((vertexIndexInt + evenOffset) % 3));
-    // Select between them.
-    Value *primitiveId = readBuiltIn(false, BuiltInPrimitiveId, {}, nullptr, nullptr, "");
-    Value *parity = CreateTrunc(primitiveId, Type::getInt1Ty(getContext()));
-    result = CreateSelect(parity, oddRes, evenRes);
+    llvm_unreachable("Should never be called!");
     break;
   }
 
@@ -811,6 +788,11 @@ Value *BuilderImpl::CreateReadBaryCoord(BuiltInKind builtIn, InOutInfo inputInfo
       inputInfo.getInterpLoc() != InOutInfo::InterpLocCentroid) {
     auxInterpValue = readBuiltIn(false, BuiltInSampleId, {}, nullptr, nullptr, "");
     inputInfo.setInterpLoc(InOutInfo::InterpLocSample);
+  } else if (inputInfo.getInterpLoc() == InOutInfo::InterpLocSample) {
+    // gl_BaryCoord is decorated with 'sample'
+    auto &usage = getPipelineState()->getShaderResourceUsage(m_shaderStage)->builtInUsage;
+    usage.fs.sample = true;
+    usage.fs.runAtSampleRate = true;
   }
 
   inputInfo.setInterpMode(builtIn == lgc::BuiltInBaryCoord ? InOutInfo::InterpModeSmooth
@@ -837,7 +819,11 @@ Value *BuilderImpl::CreateReadBaryCoord(BuiltInKind builtIn, InOutInfo inputInfo
 Value *BuilderImpl::CreateReadBuiltInInput(BuiltInKind builtIn, InOutInfo inputInfo, Value *vertexIndex, Value *index,
                                            const Twine &instName) {
   assert(isBuiltInInput(builtIn));
-  return readBuiltIn(false, builtIn, inputInfo, vertexIndex, index, instName);
+  Value *builtInVal = readBuiltIn(false, builtIn, inputInfo, vertexIndex, index, instName);
+  if (builtIn == BuiltInViewIndex)
+    // View index can only use bit[3:0] of view ID register.
+    builtInVal = CreateAnd(builtInVal, getInt32(0xF));
+  return builtInVal;
 }
 
 // =====================================================================================================================
@@ -955,30 +941,61 @@ Value *BuilderImpl::readBuiltIn(bool isOutput, BuiltInKind builtIn, InOutInfo in
 }
 
 // =====================================================================================================================
+// Get provoking vertex value
+//
+// @param isOne : true if provoking vertex value is 1
+// @param isTwo : true if provoking vertex value is 2
+void BuilderImpl::getProvokingVertexInfo(llvm::Value **isOne, llvm::Value **isTwo) {
+  // Provoking Vertex Info is a PS SGPR, it contains the 2-bit provoking vertex for up to 16 primitives in a PS wave.
+  // quadId = landID / 4;
+  // provokingVertex = provokingVtxInfo[quadId * 2 : quadId * 2 + 2];
+  auto provokingVtxInfo =
+      ShaderInputs::getInput(ShaderInput::ProvokingVtxInfo, BuilderBase::get(*this), *getLgcContext());
+
+  auto laneID = CreateGetLaneNumber();
+  auto quadId = CreateSDiv(laneID, getInt32(4));
+  auto provokingVertex = CreateIntrinsic(Intrinsic::amdgcn_ubfe, getInt32Ty(),
+                                         {provokingVtxInfo, CreateMul(quadId, getInt32(2)), getInt32(2)});
+
+  *isOne = CreateICmpEQ(provokingVertex, getInt32(1));
+  *isTwo = CreateICmpEQ(provokingVertex, getInt32(2));
+
+  // TODO: Here should have a better implementation by staying in "lane mask space" and using the fact that the
+  // provoking vertex info is always either 0, 1, or 2. Unfortunately, S_BITREPLICATE was not exposed.
+  //
+  //  isTwoMask = provoking_vtx_info & 0xaaaaaaaa
+  //  isOneMask = (provoking_vtx_info & 0x55555555) & ~(isTwoMask >> 1)
+  //  isTwoMask = llvm.amdgcn.wqm.vote(S_BITREPLICATE_B64_B32(isTwoMask))
+  //  isOneMask = llvm.amdgcn.wqm.vote(S_BITREPLICATE_B64_B32(isOneMask))
+  //  isTwo = llvm.amdgcn.inverse.ballot(isTwoMask)
+  //  isOne = llvm.amdgcn.inverse.ballot(isOneMask)
+  //
+}
+
+// =====================================================================================================================
 // Reorder and normalize the barycoord
 //
 // @param iJCoord : IJ coordinates provided for the HW interpolation view
 // @returns : gl_Barycoord
 Value *BuilderImpl::normalizeBaryCoord(Value *iJCoord) {
   auto baryType = FixedVectorType::get(getFloatTy(), 3);
-  auto one = ConstantFP::get(getFloatTy(), 1.0);
   auto zero = ConstantFP::get(getFloatTy(), 0.0);
+  auto one = ConstantFP::get(getFloatTy(), 1.0);
 
   Value *hwCoord[3] = {};
   hwCoord[0] = CreateExtractElement(iJCoord, uint64_t(0));
   hwCoord[1] = CreateExtractElement(iJCoord, 1);
   hwCoord[2] = CreateFSub(CreateFSub(one, hwCoord[0]), hwCoord[1]);
 
-  auto primType = m_pipelineState->getPrimitiveType();
-  auto provokingVertexMode = m_pipelineState->getRasterizerState().provokingVertexMode;
   Value *normalized[3] = {zero, zero, zero};
-  switch (primType) {
-  case PrimitiveType::Point: {
+
+  auto vertexCount = m_pipelineState->getVerticesPerPrimitive();
+  switch (vertexCount) {
+  case 1:
+    // Points
     normalized[0] = one;
     break;
-  }
-  case PrimitiveType::LineList:
-  case PrimitiveType::LineStrip: {
+  case 2: {
     // Lines
     // The weight of vertex0 is (1 - i - j), the weight of vertex1 is (i + j).
     auto yCoord = CreateFAdd(hwCoord[0], hwCoord[1]);
@@ -986,49 +1003,21 @@ Value *BuilderImpl::normalizeBaryCoord(Value *iJCoord) {
     normalized[1] = yCoord;
     break;
   }
-  case PrimitiveType::TriangleList: {
-    // Triangles
-    // V0 ==> Attr_indx2
-    // V1 ==> Attr_indx0
-    // V2 ==> Attr_indx1
-    normalized[0] = hwCoord[1];
-    normalized[1] = hwCoord[2];
-    normalized[2] = hwCoord[0];
-    break;
+  case 3: {
+    Value *isOne = nullptr;
+    Value *isTwo = nullptr;
+    getProvokingVertexInfo(&isOne, &isTwo);
+
+    Value *barycoord1 = CreateInsertElement(PoisonValue::get(baryType), hwCoord[0], uint64_t(0));
+    barycoord1 = CreateInsertElement(barycoord1, hwCoord[1], 1);
+    barycoord1 = CreateInsertElement(barycoord1, hwCoord[2], 2);
+
+    Value *barycoord0 = CreateShuffleVector(barycoord1, ArrayRef<int>({2, 0, 1}));
+    Value *barycoord2 = CreateShuffleVector(barycoord1, ArrayRef<int>({1, 2, 0}));
+    return CreateSelect(isOne, barycoord1, CreateSelect(isTwo, barycoord2, barycoord0));
   }
   default: {
-    unsigned oddOffset = 0, evenOffset = 0;
-    switch (primType) {
-    case PrimitiveType::TriangleFan: {
-      oddOffset = provokingVertexMode == ProvokingVertexLast ? 0 : 2;
-      evenOffset = provokingVertexMode == ProvokingVertexLast ? 2 : 1;
-      break;
-    }
-    case PrimitiveType::TriangleStrip:
-    case PrimitiveType::TriangleStripAdjacency: {
-      oddOffset = provokingVertexMode == ProvokingVertexLast ? 0 : 2;
-      evenOffset = 1;
-      break;
-    }
-    case PrimitiveType::TriangleListAdjacency: {
-      oddOffset = 0;
-      evenOffset = 1;
-      break;
-    }
-    default: {
-      llvm_unreachable("Should never be called!");
-      break;
-    }
-    }
-
-    // Select between them.
-    Value *primitiveId = readBuiltIn(false, BuiltInPrimitiveId, {}, nullptr, nullptr, "");
-    Value *parity = CreateTrunc(primitiveId, Type::getInt1Ty(getContext()));
-    for (unsigned i = 0; i < 3; ++i) {
-      Value *odd = hwCoord[(i - oddOffset + 3) % 3];
-      Value *even = hwCoord[(i - evenOffset + 3) % 3];
-      normalized[i] = CreateSelect(parity, odd, even);
-    }
+    llvm_unreachable("Should never be called!");
     break;
   }
   }
@@ -1099,10 +1088,6 @@ Value *BuilderImpl::readCommonBuiltIn(BuiltInKind builtIn, llvm::Type *resultTy,
     return CreateGetLaneNumber();
 
   case BuiltInDeviceIndex:
-    // DeviceId is a constant from the pipeline state normally, or a reloc to get that constant
-    // at link time for an unlinked shader.
-    if (m_pipelineState->isUnlinked())
-      return CreateRelocationConstant(reloc::DeviceIdx);
     return getInt32(getPipelineState()->getDeviceIndex());
 
   default:
@@ -1306,7 +1291,7 @@ Value *BuilderImpl::readVsBuiltIn(BuiltInKind builtIn, const Twine &instName) {
   case BuiltInInstanceIndex:
     return ShaderInputs::getInstanceIndex(builder, *getLgcContext());
   case BuiltInViewIndex:
-    if (m_pipelineState->getInputAssemblyState().enableMultiView)
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable)
       return ShaderInputs::getSpecialUserData(UserDataMapping::ViewId, builder);
     return builder.getInt32(0);
   case BuiltInVertexId:
@@ -1688,11 +1673,9 @@ void BuilderImpl::markBuiltInInputUsage(BuiltInKind &builtIn, unsigned arraySize
       break;
     case BuiltInBaryCoord:
       usage.fs.baryCoord = true;
-      usage.fs.primitiveId = true;
       break;
     case BuiltInBaryCoordNoPerspKHR:
       usage.fs.baryCoordNoPerspKHR = true;
-      usage.fs.primitiveId = true;
       break;
 
     // Internal built-ins.

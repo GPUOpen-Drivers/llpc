@@ -111,6 +111,12 @@ enum class RayTracingIndirectMode : unsigned {
   Continuations = 3,          // Continuations flow that based on LowerRaytracingPipeline pass
 };
 
+// Enumerate feature flags for CPS.
+enum CpsFlag : unsigned {
+  CpsNoFlag = 0,
+  CpsFlagStackInGlobalMem = 1 << 0, // Put stack in global memory instead of scratch.
+};
+
 // Value for shadowDescriptorTable pipeline option.
 static const unsigned ShadowDescriptorTableDisable = ~0U;
 
@@ -121,7 +127,7 @@ static const char SampleShadingMetaName[] = "lgc.sample.shading";
 // The front-end should zero-initialize a struct with "= {}" in case future changes add new fields.
 // Note: new fields must be added to the end of this structure to maintain test compatibility.
 union Options {
-  unsigned u32All[34];
+  unsigned u32All[40];
   struct {
     uint64_t hash[2];                 // Pipeline hash to set in ELF PAL metadata
     unsigned includeDisassembly;      // If set, the disassembly for all compiled shaders will be included
@@ -171,8 +177,16 @@ union Options {
                                   // meta data.
     bool fragCoordUsesInterpLoc;  // Determining fragCoord use InterpLoc
     bool disableSampleMask;       // Disable export of sample mask from PS
-    bool reserved20;
-    RayTracingIndirectMode rtIndirectMode; // Ray tracing indirect mode
+    unsigned reserved20;
+    RayTracingIndirectMode rtIndirectMode;   // Ray tracing indirect mode
+    bool enablePrimGeneratedQuery;           // Whether to enable primitive generated counter
+    bool enableFragColor;                    // If enabled, do frag color broadcast
+    bool useSoftwareVertexBufferDescriptors; // Use software vertex buffer descriptors to structure SRD.
+    unsigned cpsFlags;                       // CPS feature flags
+    unsigned rtBoxSortHeuristicMode;         // Ray tracing box sort heuristic mode
+    unsigned rtStaticPipelineFlags;          // Ray tracing static pipeline flags
+    unsigned rtTriCompressMode;              // Ray tracing triangle compression mode
+    bool useGpurt;                           // Whether GPURT is used
   };
 };
 static_assert(sizeof(Options) == sizeof(Options::u32All));
@@ -184,7 +198,7 @@ enum InvariantLoadsOption : unsigned { Auto = 0, EnableOptimization = 1, Disable
 // Struct with the information for one color export
 struct ColorExportInfo {
   unsigned hwColorTarget;
-  unsigned location;
+  unsigned location; // Overloaded to a bitmask for mrtz exports
   bool isSigned;
   llvm::Type *ty;
 };
@@ -387,7 +401,8 @@ enum BufDataFormat {
   BufDataFormat5_6_5_1_Bgra,
   BufDataFormat1_5_6_5,
   BufDataFormat5_9_9_9,
-  BufDataFormat8_A
+  BufDataFormat8_A,
+  BufDataFormat16_16_16
 };
 
 // Numeric format of vertex buffer entry. These match the GFX9 hardware encoding.
@@ -406,14 +421,10 @@ enum BufNumFormat {
   BufNumFormatOther,
 };
 
-// Rate of vertex input. This encodes both the "rate" (none/vertex/instance), and, for "instance",
-// the divisor that determines how many instances share the same vertex buffer element.
+// Rate of vertex input
 enum VertexInputRate {
-  VertexInputRateVertex = ~0,  // Vertex buffer has one element per vertex
-  VertexInputRateNone = 0,     // Vertex buffer has one element shared between all instances
+  VertexInputRateVertex = 0,   // Vertex buffer has one element per vertex
   VertexInputRateInstance = 1, // Vertex buffer has one element per instance
-                               // Other value N means vertex buffer has one element per N instances;
-                               //  N is the divisor.
 };
 
 // Structure for a vertex input
@@ -428,6 +439,7 @@ struct VertexInputDescription {
   BufDataFormat dfmt; // Data format of input; one of the BufDataFormat* values
   BufNumFormat nfmt;  // Numeric format of input; one of the BufNumFormat* values
   unsigned inputRate; // Vertex input rate for the binding
+  unsigned divisor;   // Instance divisor
 };
 
 // Represents assistant info for each vertex attribute in uber fetch shader
@@ -453,6 +465,7 @@ struct ColorExportFormat {
   unsigned blendEnable;          // Blend will be enabled for this target at draw time
   unsigned blendSrcAlphaToColor; // Whether source alpha is blended to color channels for this target
                                  //  at draw time
+  unsigned channelWriteMask;     // Write mask to specify destination channels
 };
 
 // Struct to pass to SetColorExportState
@@ -462,12 +475,20 @@ struct ColorExportState {
   unsigned dynamicDualSourceBlendEnable; // Dynamic dual source blend enable
 };
 
+// MultiView supporting mode
+enum class MultiViewMode : unsigned {
+  Disable = 0, // Disabled
+  Simple = 1,  // Current Vulkan behavior, i.e. RT layer set to view index, viewport index set by shader
+  PerView = 2, // Both RT layer and viewport index set by shader (with shader output defaulting to 0),
+               // offset by a base that's taken from the ViewId userdata
+};
+
 // Struct to pass to SetInputAssemblyState.
 struct InputAssemblyState {
   PrimitiveType primitiveType;       // Primitive type
   unsigned disableVertexReuse;       // Disable reusing vertex shader output for indexed draws
   unsigned switchWinding;            // Whether to reverse vertex ordering for tessellation
-  unsigned enableMultiView;          // Whether to enable multi-view support
+  MultiViewMode multiView;           // MultiView mode
   unsigned useVertexBufferDescArray; // Whether vertex buffer descriptors are in a descriptor array binding instead of
                                      // the VertexBufferTable
 };
@@ -638,6 +659,7 @@ struct FragmentShaderMode {
   unsigned earlyFragmentTests;
   unsigned postDepthCoverage;
   unsigned earlyAndLatFragmentTests;
+  unsigned innerCoverage;
   ConservativeDepth conservativeDepth;
   ConservativeDepth conservativeStencilFront;
   ConservativeDepth conservativeStencilBack;

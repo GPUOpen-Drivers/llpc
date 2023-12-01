@@ -191,6 +191,31 @@ SPIRVWord SPIRVType::getCompositeElementCount() const {
   return 1;
 }
 
+SPIRVType *SPIRVType::getCooperativeMatrixKHRComponentType() const {
+  assert(OpCode == OpTypeCooperativeMatrixKHR && "Not cooperative matrix type");
+  return static_cast<const SPIRVTypeCooperativeMatrixKHR *const>(this)->getComponentType();
+}
+
+uint32_t SPIRVType::getCooperativeMatrixKHRScope() const {
+  assert(OpCode == OpTypeCooperativeMatrixKHR && "Not cooperative matrix type");
+  return static_cast<const SPIRVTypeCooperativeMatrixKHR *const>(this)->getScope()->getZExtIntValue();
+}
+
+uint32_t SPIRVType::getCooperativeMatrixKHRRows() const {
+  assert(OpCode == OpTypeCooperativeMatrixKHR && "Not cooperative matrix type");
+  return static_cast<const SPIRVTypeCooperativeMatrixKHR *const>(this)->getRows()->getZExtIntValue();
+}
+
+uint32_t SPIRVType::getCooperativeMatrixKHRColumns() const {
+  assert(OpCode == OpTypeCooperativeMatrixKHR && "Not cooperative matrix type");
+  return static_cast<const SPIRVTypeCooperativeMatrixKHR *const>(this)->getColumns()->getZExtIntValue();
+}
+
+uint32_t SPIRVType::getCooperativeMatrixKHRUse() const {
+  assert(OpCode == OpTypeCooperativeMatrixKHR && "Not cooperative matrix type");
+  return static_cast<const SPIRVTypeCooperativeMatrixKHR *const>(this)->getUse()->getZExtIntValue();
+}
+
 bool SPIRVType::isTypeVoid() const {
   return OpCode == OpTypeVoid;
 }
@@ -263,6 +288,10 @@ bool SPIRVType::isTypeRayQueryKHR() const {
   return OpCode == OpTypeRayQueryKHR;
 }
 
+bool SPIRVType::isTypeCooperativeMatrixKHR() const {
+  return OpCode == OpTypeCooperativeMatrixKHR;
+}
+
 bool SPIRVType::isTypeVectorBool() const {
   return isTypeVector() && getVectorComponentType()->isTypeBool();
 }
@@ -328,5 +357,42 @@ void SPIRVTypeForwardPointer::decode(std::istream &I) {
   auto Decoder = getDecoder(I);
   Decoder >> Id >> SC;
 }
+
+void SPIRVTypeCooperativeMatrixKHR::validate() const {
+  SPIRVEntry::validate();
+  CompType->validate();
+  assert(CompType->isTypeInt() || CompType->isTypeFloat());
+  assert(isa<OpConstant>(getValue(Rows)) || isa<OpSpecConstant>(getValue(Rows)));
+  assert(getValue(Rows)->getType()->isTypeInt());
+  assert(isa<OpConstant>(getValue(Columns)) || isa<OpSpecConstant>(getValue(Columns)));
+  assert(getValue(Columns)->getType()->isTypeInt());
+  assert(isa<OpConstant>(getValue(Use)) || isa<OpSpecConstant>(getValue(Use)));
+  assert(getValue(Use)->getType()->isTypeInt());
+  // CompIntp is still under dicussion:
+  // assert(isa<OpConstant>(getValue(CompIntp)) || isa<OpSpecConstant>(getValue(CompIntp)));
+  // assert(getValue(CompIntp)->getType()->isTypeInt());
+}
+
+SPIRVConstant *SPIRVTypeCooperativeMatrixKHR::getScope() const {
+  return get<SPIRVConstant>(Scope);
+}
+
+SPIRVConstant *SPIRVTypeCooperativeMatrixKHR::getRows() const {
+  return get<SPIRVConstant>(Rows);
+}
+
+SPIRVConstant *SPIRVTypeCooperativeMatrixKHR::getColumns() const {
+  return get<SPIRVConstant>(Columns);
+}
+
+SPIRVConstant *SPIRVTypeCooperativeMatrixKHR::getUse() const {
+  return get<SPIRVConstant>(Use);
+}
+
+SPIRVConstant *SPIRVTypeCooperativeMatrixKHR::getComIntp() const {
+  return get<SPIRVConstant>(CompIntp);
+}
+
+_SPIRV_IMP_DECODE6(SPIRVTypeCooperativeMatrixKHR, Id, CompType, Scope, Rows, Columns, Use)
 
 } // namespace SPIRV

@@ -39,7 +39,7 @@ using namespace llvm::CodeGenOpt;
 namespace Llpc {
 namespace {
 
-constexpr GfxIpVersion GfxIp = {9, 0, 0};
+constexpr GfxIpVersion GfxIp = {10, 1, 0};
 
 // cppcheck-suppress syntaxError
 TEST(LlpcContextTests, MatchPipelineOptLevel) {

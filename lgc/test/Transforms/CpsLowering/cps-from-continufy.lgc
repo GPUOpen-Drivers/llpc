@@ -122,7 +122,7 @@ attributes #7 = { nounwind willreturn memory(inaccessiblemem: read) }
 
 !0 = !{i32 8, i32 4, i32 1}
 !1 = !{!"Vulkan"}
-!2 = !{i32 262875531, i32 502344192, i32 854861601, i32 -1595331954, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 -1, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 16777216, i32 0, i32 2}
+!2 = !{i32 262875531, i32 502344192, i32 854861601, i32 -1595331954, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 -1, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 16777216, i32 0, i32 0, i32 2}
 !3 = !{i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 192, i32 0, i32 0, i32 32, i32 64, i32 0, i32 0, i32 3, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 20, i32 1800, i32 0, i32 0, i32 1}
 !4 = !{!"DescriptorTableVaPtr", i32 7, i32 0, i32 0, i32 1, i32 4}
 !5 = !{!"DescriptorBuffer", i32 6, i32 0, i32 0, i32 4, i64 0, i32 0, i32 4}
@@ -253,17 +253,12 @@ attributes #7 = { nounwind willreturn memory(inaccessiblemem: read) }
 ; CHECK-NEXT:    [[TMP100:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP99]])
 ; CHECK-NEXT:    [[TMP101:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP98]])
 ; CHECK-NEXT:    [[TMP102:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP100]])
-; CHECK-NEXT:    [[TMP103:%.*]] = icmp eq i32 [[TMP101]], 0
-; CHECK-NEXT:    br i1 [[TMP103]], label [[RET_BLOCK:%.*]], label [[CHAIN_BLOCK:%.*]]
-; CHECK:       chain.block:
-; CHECK-NEXT:    [[TMP104:%.*]] = and i32 [[TMP101]], -64
-; CHECK-NEXT:    [[TMP105:%.*]] = insertelement <2 x i32> [[TMP7]], i32 [[TMP104]], i64 0
-; CHECK-NEXT:    [[TMP106:%.*]] = bitcast <2 x i32> [[TMP105]] to i64
-; CHECK-NEXT:    [[TMP107:%.*]] = inttoptr i64 [[TMP106]] to ptr
-; CHECK-NEXT:    call void (ptr, i32, <20 x i32>, { <3 x i32>, i32, ptr addrspace(5), i32, i32, i32 }, i32, ...) @llvm.amdgcn.cs.chain.p0.i32.v20i32.sl_v3i32i32p5i32i32i32s(ptr inreg [[TMP107]], i32 inreg [[TMP102]], <20 x i32> inreg [[TMP92]], { <3 x i32>, i32, ptr addrspace(5), i32, i32, i32 } [[TMP65]], i32 0)
+; CHECK-NEXT:    [[TMP103:%.*]] = and i32 [[TMP101]], -64
+; CHECK-NEXT:    [[TMP104:%.*]] = insertelement <2 x i32> [[TMP7]], i32 [[TMP103]], i64 0
+; CHECK-NEXT:    [[TMP105:%.*]] = bitcast <2 x i32> [[TMP104]] to i64
+; CHECK-NEXT:    [[TMP106:%.*]] = inttoptr i64 [[TMP105]] to ptr
+; CHECK-NEXT:    call void (ptr, i32, <20 x i32>, { <3 x i32>, i32, ptr addrspace(5), i32, i32, i32 }, i32, ...) @llvm.amdgcn.cs.chain.p0.i32.v20i32.sl_v3i32i32p5i32i32i32s(ptr inreg [[TMP106]], i32 inreg [[TMP102]], <20 x i32> inreg [[TMP92]], { <3 x i32>, i32, ptr addrspace(5), i32, i32, i32 } [[TMP65]], i32 0)
 ; CHECK-NEXT:    unreachable
-; CHECK:       ret.block:
-; CHECK-NEXT:    ret void
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@_rgen_1.resume.0

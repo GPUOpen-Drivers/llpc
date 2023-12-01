@@ -226,6 +226,7 @@ const static char ExecutionModel[] = "spirv.ExecutionModel";
 const static char NonUniform[] = "spirv.NonUniform";
 const static char AtomicCounter[] = "spirv.AtomicCounter";
 const static char Lds[] = "spirv.Lds";
+const static char ContStackStoreType[] = "spirv.ContStackStoreType";
 } // namespace gSPIRVMD
 
 namespace gSPIRVName {

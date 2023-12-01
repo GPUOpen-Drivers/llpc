@@ -3,7 +3,7 @@
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: call <4 x i64> (...) @lgc.create.image.load.v4i64
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call <2 x i32> @llvm.amdgcn.image.load.2d.v2i32.i32
+; SHADERTEST: call <2 x i32> @llvm.amdgcn.image.load.2d.v2i32.i16(i32 3, i16 3, i16 3, <8 x i32> %{{.*}}, i32 0, i32 0), !invariant.load !10
 ; SHADERTEST: AMDLLPC SUCCESS
 
 ; SPIR-V

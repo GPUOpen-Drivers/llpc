@@ -53,7 +53,8 @@ add_llvm_library(LLVMlgc LINK_COMPONENTS
     Vectorize
 )
 
-target_link_libraries(LLVMlgc PUBLIC llvm_dialects)
+llvm_map_components_to_libnames(extra_llvm_libs CompilerUtils Continuations)
+target_link_libraries(LLVMlgc PUBLIC ${extra_llvm_libs})
 
 ### Cached Project Options #############################################################################################
 option(LLPC_BUILD_NAVI12 "LLPC support for NAVI12?" ON)
@@ -88,14 +89,6 @@ if(NOT EXISTS ${CMAKE_CURRENT_BINARY_DIR}/state)
     file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/state")
 endif()
 tablegen(LGC state/LgcDialect.cpp.inc -gen-dialect-defs --dialect lgc
-    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
-    )
-
-set(LLVM_TARGET_DEFINITIONS interface/lgc/GpurtDialect.td)
-tablegen(LGC interface/lgc/GpurtDialect.h.inc -gen-dialect-decls --dialect lgc.gpurt
-    EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
-    )
-tablegen(LGC state/GpurtDialect.cpp.inc -gen-dialect-defs --dialect lgc.gpurt
     EXTRA_INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/../imported/llvm-dialects/include
     )
 
@@ -206,7 +199,6 @@ target_sources(LLVMlgc PRIVATE
     elfLinker/FetchShader.cpp
     elfLinker/GlueShader.cpp
     elfLinker/NullFragmentShader.cpp
-    elfLinker/RelocHandler.cpp
 )
 
 # lgc/patch
@@ -214,8 +206,6 @@ target_sources(LLVMlgc PRIVATE
     patch/ConfigBuilderBase.cpp
     patch/Continufy.cpp
     patch/FragColorExport.cpp
-    patch/Gfx6Chip.cpp
-    patch/Gfx6ConfigBuilder.cpp
     patch/Gfx9Chip.cpp
     patch/Gfx9ConfigBuilder.cpp
     patch/LowerDebugPrintf.cpp
@@ -247,6 +237,9 @@ target_sources(LLVMlgc PRIVATE
     patch/VertexFetch.cpp
     patch/PatchImageOpCollect.cpp
     patch/RegisterMetadataBuilder.cpp
+    patch/CombineCooperativeMatrix.cpp
+    patch/LowerCooperativeMatrix.cpp
+    patch/LowerGpuRt.cpp
 )
 
 # lgc/state
@@ -254,7 +247,6 @@ target_sources(LLVMlgc PRIVATE
     state/Compiler.cpp
     state/LgcContext.cpp
     state/LgcDialect.cpp
-    state/GpurtDialect.cpp
     state/PalMetadata.cpp
     state/PassManagerCache.cpp
     state/PipelineShaders.cpp
@@ -269,7 +261,6 @@ target_sources(LLVMlgc PRIVATE
 target_sources(LLVMlgc PRIVATE
     util/AddressExtender.cpp
     util/Debug.cpp
-    util/CpsStackLowering.cpp
     util/GfxRegHandlerBase.cpp
     util/GfxRegHandler.cpp
     util/Internal.cpp
@@ -277,7 +268,6 @@ target_sources(LLVMlgc PRIVATE
     util/ModuleBunch.cpp
     util/PassManager.cpp
     util/StartStopTimer.cpp
-    util/TypeLowering.cpp
 )
 
 add_subdirectory(disassembler)
@@ -288,4 +278,4 @@ if (LLPC_BUILD_TESTS)
   add_subdirectory(unittests)
 endif()
 
-target_link_libraries(LLVMlgc PRIVATE LLVMLgcCps LLVMLgcRt)
+target_link_libraries(LLVMlgc PRIVATE LLVMContinuations)

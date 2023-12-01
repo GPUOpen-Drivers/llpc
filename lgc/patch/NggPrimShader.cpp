@@ -564,6 +564,7 @@ Function *NggPrimShader::generate(Function *esMain, Function *gsMain, Function *
     auto argIdx = arg.getArgNo();
     if (inRegMask & (1ull << argIdx))
       arg.addAttr(Attribute::InReg);
+    arg.addAttr(Attribute::NoUndef);
     args.push_back(&arg);
   }
 
@@ -2486,6 +2487,10 @@ void NggPrimShader::loadStreamOutBufferInfo(Value *userData) {
   // Must enable SW emulated stream-out or primitive statistics counting
   assert(m_pipelineState->enableSwXfb() || m_pipelineState->enablePrimStats());
 
+  if (m_pipelineState->enablePrimStats() && !m_pipelineState->enableSwXfb() && m_gfxIp.major <= 11) {
+    return;
+  }
+
   calcStreamOutControlCbOffsets();
 
   // Helper to convert argument index to user data index
@@ -3285,7 +3290,7 @@ Value *NggPrimShader::runPartEs(ArrayRef<Argument *> args, Value *position) {
           tessCoordX = createPhi({{newTessCoordX, uncompactVertexBlock}, {tessCoordX, exportVertexBlock}});
 
         if (newTessCoordY)
-          tessCoordX = createPhi({{newTessCoordY, uncompactVertexBlock}, {tessCoordY, exportVertexBlock}});
+          tessCoordY = createPhi({{newTessCoordY, uncompactVertexBlock}, {tessCoordY, exportVertexBlock}});
 
         assert(newRelPatchId);
         relPatchId = createPhi({{newRelPatchId, uncompactVertexBlock}, {relPatchId, exportVertexBlock}});
@@ -3514,7 +3519,8 @@ void NggPrimShader::splitEs() {
 
   // NOTE: Here, we just mutate original ES to do deferred vertex export. We add vertex position data as an additional
   // argument. This could avoid re-fetching it since we already get the data before NGG culling.
-  auto esVertexExporter = addFunctionArgs(m_esHandlers.main, nullptr, {positionTy}, {"position"});
+  auto esVertexExporter =
+      addFunctionArgs(m_esHandlers.main, nullptr, {positionTy}, {"position"}, 0, AddFunctionArgsMaybeUndef);
   esVertexExporter->setName(NggEsVertexExporter);
 
   position = esVertexExporter->getArg(0); // The first argument is vertex position data
@@ -5762,21 +5768,32 @@ Function *NggPrimShader::createSmallPrimFilterCuller() {
     Value *screenMinY = nullptr;
     Value *screenMaxY = nullptr;
     if (!m_nggControl->enableFrustumCulling) {
+      // The scale can be negative, which causes the orientation of the viewport to be flipped.
+      // Handle both orientations by checking the sign of the viewport scale and negating the offset
+      // if negative.
+      Value *xScalelessThanZero = m_builder.CreateFCmpOLT(xScale, ConstantFP::get(m_builder.getFloatTy(), 0.0));
+      Value *yScalelessThanZero = m_builder.CreateFCmpOLT(yScale, ConstantFP::get(m_builder.getFloatTy(), 0.0));
+      Value *xBoundaryOffset =
+          m_builder.CreateSelect(xScalelessThanZero, ConstantFP::get(m_builder.getFloatTy(), -0.75),
+                                 ConstantFP::get(m_builder.getFloatTy(), 0.75));
+      Value *yBoundaryOffset =
+          m_builder.CreateSelect(yScalelessThanZero, ConstantFP::get(m_builder.getFloatTy(), -0.75),
+                                 ConstantFP::get(m_builder.getFloatTy(), 0.75));
       // screenMinX = -xScale + xOffset - 0.75
       screenMinX = m_builder.CreateFAdd(m_builder.CreateFNeg(xScale), xOffset);
-      screenMinX = m_builder.CreateFAdd(screenMinX, ConstantFP::get(m_builder.getFloatTy(), -0.75));
+      screenMinX = m_builder.CreateFAdd(screenMinX, m_builder.CreateFNeg(xBoundaryOffset));
 
       // screenMaxX = xScale + xOffset + 0.75
       screenMaxX = m_builder.CreateFAdd(xScale, xOffset);
-      screenMaxX = m_builder.CreateFAdd(screenMaxX, ConstantFP::get(m_builder.getFloatTy(), 0.75));
+      screenMaxX = m_builder.CreateFAdd(screenMaxX, xBoundaryOffset);
 
       // screenMinY = -yScale + yOffset - 0.75
       screenMinY = m_builder.CreateFAdd(m_builder.CreateFNeg(yScale), yOffset);
-      screenMinY = m_builder.CreateFAdd(screenMinY, ConstantFP::get(m_builder.getFloatTy(), -0.75));
+      screenMinY = m_builder.CreateFAdd(screenMinY, m_builder.CreateFNeg(yBoundaryOffset));
 
       // screenMaxY = yScale + yOffset + 0.75
       screenMaxY = m_builder.CreateFAdd(yScale, yOffset);
-      screenMaxY = m_builder.CreateFAdd(screenMaxY, ConstantFP::get(m_builder.getFloatTy(), 0.75));
+      screenMaxY = m_builder.CreateFAdd(screenMaxY, yBoundaryOffset);
     }
 
     // screenX0' = x0' * xScale + xOffset

@@ -29,7 +29,6 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/PatchResourceCollect.h"
-#include "Gfx6Chip.h"
 #include "Gfx9Chip.h"
 #include "MeshTaskShader.h"
 #include "NggPrimShader.h"
@@ -502,22 +501,268 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
     }
   }
 
-  if (gfxIp.major <= 8) {
-    unsigned gsPrimsPerSubgroup = m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipDefaultPrimsPerSubgroup;
+  const auto nggControl = m_pipelineState->getNggControl();
 
-    const unsigned esGsRingItemSize = 4 * std::max(1u, gsResUsage->inOutUsage.inputMapLocCount);
-    const unsigned gsInstanceCount = geometryMode.invocations;
+  if (meshPipeline) {
+    assert(gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
+    const auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
+
+    // Make sure we have enough threads to execute mesh shader.
+    const unsigned numMeshThreads = meshMode.workgroupSizeX * meshMode.workgroupSizeY * meshMode.workgroupSizeZ;
+    unsigned primAmpFactor = std::max(numMeshThreads, std::max(meshMode.outputVertices, meshMode.outputPrimitives));
+
+    const unsigned ldsSizeDwordGranularity =
+        1u << m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
+    auto ldsSizeDwords =
+        MeshTaskShader::layoutMeshShaderLds(m_pipelineState, m_pipelineShaders->getEntryPoint(ShaderStageMesh));
+    ldsSizeDwords = alignTo(ldsSizeDwords, ldsSizeDwordGranularity);
+
+    // Make sure we don't allocate more than what can legally be allocated by a single subgroup on the hardware.
+    unsigned maxHwGsLdsSizeDwords = m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipMaxLdsSize;
+    assert(ldsSizeDwords <= maxHwGsLdsSizeDwords);
+    (void(maxHwGsLdsSizeDwords)); // Unused
+
+    gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = 1;
+    gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = 1;
+
+    gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = ldsSizeDwords;
+
+    gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize = 0;
+    gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize = 0;
+
+    gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor = primAmpFactor;
+
+    gsOnChip = true; // For mesh shader, GS is always on-chip
+  } else if (nggControl->enableNgg) {
+    unsigned esGsRingItemSize = NggPrimShader::calcEsGsRingItemSize(m_pipelineState); // In dwords
+
+    const unsigned gsVsRingItemSize =
+        hasGs ? std::max(1u, 4 * gsResUsage->inOutUsage.outputMapLocCount * geometryMode.outputVertices) : 0;
+
+    const auto &ldsGeneralUsage = NggPrimShader::layoutPrimShaderLds(m_pipelineState);
+    const bool needsLds = ldsGeneralUsage.needsLds;
+    const unsigned esExtraLdsSize = ldsGeneralUsage.esExtraLdsSize; // In dwords
+    const unsigned gsExtraLdsSize = ldsGeneralUsage.gsExtraLdsSize; // In dwords
+
+    // NOTE: Primitive amplification factor must be at least 1. And for NGG with API GS, we force number of output
+    // primitives to be equal to that of output vertices regardless of the output primitive type by emitting
+    // invalid primitives. This is to simplify the algorithmic design and improve its efficiency.
+    unsigned primAmpFactor = std::max(1u, geometryMode.outputVertices);
+
+    unsigned esVertsPerSubgroup = 0;
+    unsigned gsPrimsPerSubgroup = 0;
+
+    // The numbers below come from hardware guidance and most likely require further tuning.
+    switch (nggControl->subgroupSizing) {
+    case NggSubgroupSizing::HalfSize:
+      esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
+      gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
+      break;
+    case NggSubgroupSizing::OptimizeForVerts:
+      esVertsPerSubgroup = hasTs ? Gfx9::NggMaxThreadsPerSubgroup / 2 : (Gfx9::NggMaxThreadsPerSubgroup / 2 - 2);
+      gsPrimsPerSubgroup = hasTs || needsLds ? 192 : Gfx9::NggMaxThreadsPerSubgroup;
+      break;
+    case NggSubgroupSizing::OptimizeForPrims:
+      esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
+      gsPrimsPerSubgroup = 128;
+      break;
+    case NggSubgroupSizing::Explicit:
+      esVertsPerSubgroup = nggControl->vertsPerSubgroup;
+      gsPrimsPerSubgroup = nggControl->primsPerSubgroup;
+      break;
+    case NggSubgroupSizing::Auto:
+      if (m_pipelineState->getTargetInfo().getGfxIpVersion().isGfx(10, 1)) {
+        esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2 - 2;
+        gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
+      } else {
+        // Newer hardware performs the decrement on esVertsPerSubgroup for us already.
+        esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
+        gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
+      }
+      break;
+    case NggSubgroupSizing::MaximumSize:
+    default:
+      esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
+      gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
+      break;
+    }
+
+    static const unsigned OptimalVerticesPerPrimitiveForTess = 2;
+    unsigned gsInstanceCount = std::max(1u, geometryMode.invocations);
+    bool enableMaxVertOut = false;
+
+    if (hasGs) {
+      unsigned maxVertOut = geometryMode.outputVertices;
+      assert(maxVertOut >= primAmpFactor);
+      assert(gsInstanceCount >= 1);
+
+      // Each input GS primitive can generate at most maxVertOut vertices. Each output vertex will be emitted
+      // from a different thread. Note that maxVertOut does not account for additional amplification due
+      // to GS instancing.
+      gsPrimsPerSubgroup =
+          std::max(1u, std::min(gsPrimsPerSubgroup, Gfx9::NggMaxThreadsPerSubgroup / (maxVertOut * gsInstanceCount)));
+
+      // NOTE: If one input GS primitive generates too many vertices (consider GS instancing) and they couldn't be
+      // within a NGG subgroup, we enable maximum vertex output per GS instance. This will set the register field
+      // EN_MAX_VERT_OUT_PER_GS_INSTANCE and turn off vertex reuse, restricting 1 input GS input
+      // primitive per subgroup and create 1 subgroup per GS instance.
+      if ((maxVertOut * gsInstanceCount) > Gfx9::NggMaxThreadsPerSubgroup) {
+        enableMaxVertOut = true;
+        gsInstanceCount = 1;
+        gsPrimsPerSubgroup = 1;
+      }
+
+      esVertsPerSubgroup = std::min(gsPrimsPerSubgroup * inVertsPerPrim, Gfx9::NggMaxThreadsPerSubgroup);
+
+      if (hasTs)
+        esVertsPerSubgroup = std::min(esVertsPerSubgroup, OptimalVerticesPerPrimitiveForTess * gsPrimsPerSubgroup);
+
+      // Low values of esVertsPerSubgroup are illegal. These numbers below come from HW restrictions.
+      if (gfxIp.isGfx(10, 3))
+        esVertsPerSubgroup = std::max(29u, esVertsPerSubgroup);
+      else if (gfxIp.isGfx(10, 1))
+        esVertsPerSubgroup = std::max(24u, esVertsPerSubgroup);
+    } else {
+      // If GS is not present, instance count must be 1
+      assert(gsInstanceCount == 1);
+    }
+
+    // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
+    // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
+    // restriction by providing the capability of querying thread ID in the group rather than in wave.
+    unsigned rayQueryLdsStackSize = 0;
+    if (gsResUsage->useRayQueryLdsStack) {
+      gsPrimsPerSubgroup = std::min(MaxRayQueryThreadsPerGroup, gsPrimsPerSubgroup);
+      rayQueryLdsStackSize = MaxRayQueryLdsStackEntries * MaxRayQueryThreadsPerGroup;
+    }
+
+    auto esResUsage = m_pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+    if (esResUsage->useRayQueryLdsStack) {
+      esVertsPerSubgroup = std::min(MaxRayQueryThreadsPerGroup, esVertsPerSubgroup);
+      rayQueryLdsStackSize = MaxRayQueryLdsStackEntries * MaxRayQueryThreadsPerGroup;
+    }
+
+    // Make sure that we have at least one primitive.
+    gsPrimsPerSubgroup = std::max(1u, gsPrimsPerSubgroup);
+
+    unsigned expectedEsLdsSize = esVertsPerSubgroup * esGsRingItemSize + esExtraLdsSize;
+    unsigned expectedGsLdsSize = gsPrimsPerSubgroup * gsInstanceCount * gsVsRingItemSize + gsExtraLdsSize;
+
+    const unsigned ldsSizeDwordGranularity =
+        1u << m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
+    unsigned ldsSizeDwords = alignTo(expectedEsLdsSize + expectedGsLdsSize, ldsSizeDwordGranularity);
+
+    unsigned maxHwGsLdsSizeDwords = m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipMaxLdsSize;
+    maxHwGsLdsSizeDwords -= rayQueryLdsStackSize; // Exclude LDS space used as ray query stack
+
+    // In exceedingly rare circumstances, a NGG subgroup might calculate its LDS space requirements and overallocate.
+    // In those cases we need to scale down our esVertsPerSubgroup/gsPrimsPerSubgroup so that they'll fit in LDS.
+    // In the following NGG calculation, we'll attempt to set esVertsPerSubgroup/gsPrimsPerSubgroup first and
+    // then scale down if we overallocate LDS.
+    if (ldsSizeDwords > maxHwGsLdsSizeDwords) {
+      // For esVertsPerSubgroup, we can instead substitute (esVertToGsPrimRatio * gsPrimsPerSubgroup) for
+      // esVertsPerSubgroup. Then we can rearrange the equation and solve for gsPrimsPerSubgroup.
+      float esVertToGsPrimRatio = esVertsPerSubgroup / (gsPrimsPerSubgroup * 1.0f);
+
+      if (hasTs)
+        esVertToGsPrimRatio = std::min(esVertToGsPrimRatio, OptimalVerticesPerPrimitiveForTess * 1.0f);
+
+      // The equation for required LDS is:
+      // LDS allocation = (esGsRingItemSize * esVertsPerSubgroup) +
+      //                  (gsVsRingItemSize * gsInstanceCount * gsPrimsPerSubgroup) +
+      //                  extraLdsSize
+      gsPrimsPerSubgroup =
+          std::min(gsPrimsPerSubgroup, (maxHwGsLdsSizeDwords - esExtraLdsSize - gsExtraLdsSize) /
+                                           (static_cast<unsigned>(esGsRingItemSize * esVertToGsPrimRatio) +
+                                            gsVsRingItemSize * gsInstanceCount));
+
+      // NOTE: If one input GS primitive generates too many vertices (consider GS instancing) and they couldn't be
+      // within a NGG subgroup, we enable maximum vertex output per GS instance. This will set the register field
+      // EN_MAX_VERT_OUT_PER_GS_INSTANCE and turn off vertex reuse, restricting 1 input GS input
+      // primitive per subgroup and create 1 subgroup per GS instance.
+      if (gsPrimsPerSubgroup < gsInstanceCount) {
+        enableMaxVertOut = true;
+        gsInstanceCount = 1;
+        gsPrimsPerSubgroup = 1;
+      }
+
+      // Make sure that we have at least one primitive.
+      gsPrimsPerSubgroup = std::max(1u, gsPrimsPerSubgroup);
+
+      // inVertsPerPrim is the minimum number of vertices we must have per subgroup.
+      esVertsPerSubgroup =
+          std::max(inVertsPerPrim, std::min(static_cast<unsigned>(gsPrimsPerSubgroup * esVertToGsPrimRatio),
+                                            Gfx9::NggMaxThreadsPerSubgroup));
+
+      // Low values of esVertsPerSubgroup are illegal. These numbers below come from HW restrictions.
+      if (gfxIp.isGfx(10, 3))
+        esVertsPerSubgroup = std::max(29u, esVertsPerSubgroup);
+      else if (gfxIp.isGfx(10, 1))
+        esVertsPerSubgroup = std::max(24u, esVertsPerSubgroup);
+
+      // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
+      // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
+      // restriction by providing the capability of querying thread ID in the group rather than in wave.
+      if (gsResUsage->useRayQueryLdsStack)
+        gsPrimsPerSubgroup = std::min(MaxRayQueryThreadsPerGroup, gsPrimsPerSubgroup);
+      if (esResUsage->useRayQueryLdsStack)
+        esVertsPerSubgroup = std::min(MaxRayQueryThreadsPerGroup, esVertsPerSubgroup);
+
+      // And then recalculate our LDS usage.
+      expectedEsLdsSize = (esVertsPerSubgroup * esGsRingItemSize) + esExtraLdsSize;
+      expectedGsLdsSize = (gsPrimsPerSubgroup * gsInstanceCount * gsVsRingItemSize) + gsExtraLdsSize;
+      ldsSizeDwords = alignTo(expectedEsLdsSize + expectedGsLdsSize, ldsSizeDwordGranularity);
+    }
+
+    // Make sure we don't allocate more than what can legally be allocated by a single subgroup on the hardware.
+    assert(ldsSizeDwords <= maxHwGsLdsSizeDwords);
+
+    // Make sure that we have at least one primitive
+    assert(gsPrimsPerSubgroup >= 1);
+
+    // HW has restriction on NGG + Tessellation where gsPrimsPerSubgroup must be >= 3 unless we enable
+    // EN_MAX_VERT_OUT_PER_GS_INSTANCE.
+    assert(!hasTs || enableMaxVertOut || gsPrimsPerSubgroup >= 3);
+
+    gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = esVertsPerSubgroup;
+    gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = gsPrimsPerSubgroup;
+
+    // EsGsLdsSize is passed in a user data SGPR to the merged shader so that the API GS knows where to start
+    // reading out of LDS. EsGsLdsSize is unnecessary when there is no API GS.
+    gsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize = hasGs ? expectedEsLdsSize : 0;
+    gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = needsLds ? ldsSizeDwords : 0;
+
+    gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize = esGsRingItemSize;
+    gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize = gsVsRingItemSize;
+
+    gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor = primAmpFactor;
+    gsResUsage->inOutUsage.gs.calcFactor.enableMaxVertOut = enableMaxVertOut;
+    gsResUsage->inOutUsage.gs.calcFactor.rayQueryLdsStackSize = rayQueryLdsStackSize;
+
+    gsOnChip = true; // In NGG mode, GS is always on-chip since copy shader is not present.
+  } else {
+    unsigned ldsSizeDwordGranularity =
+        static_cast<unsigned>(1 << m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift);
+
+    // gsPrimsPerSubgroup shouldn't be bigger than wave size.
+    unsigned gsPrimsPerSubgroup =
+        std::min(m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipDefaultPrimsPerSubgroup,
+                 m_pipelineState->getShaderWaveSize(ShaderStageGeometry));
+
+    // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
+    const unsigned esGsRingItemSize = (4 * std::max(1u, gsResUsage->inOutUsage.inputMapLocCount)) | 1;
+
     const unsigned gsVsRingItemSize =
         4 * std::max(1u, (gsResUsage->inOutUsage.outputMapLocCount * geometryMode.outputVertices));
 
-    unsigned esGsRingItemSizeOnChip = esGsRingItemSize;
-    unsigned gsVsRingItemSizeOnChip = gsVsRingItemSize;
+    // NOTE: Make gsVsRingItemSize odd by "| 1", to optimize GS -> VS ring layout for LDS bank conflicts.
+    const unsigned gsVsRingItemSizeOnChip = gsVsRingItemSize | 1;
 
-    // Optimize ES -> GS ring and GS -> VS ring layout for bank conflicts
-    esGsRingItemSizeOnChip |= 1;
-    gsVsRingItemSizeOnChip |= 1;
+    const unsigned gsInstanceCount = geometryMode.invocations;
 
-    unsigned gsVsRingItemSizeOnChipInstanced = gsVsRingItemSizeOnChip * gsInstanceCount;
+    // TODO: Confirm no ES-GS extra LDS space used.
+    const unsigned esGsExtraLdsDwords = 0;
+    const unsigned maxEsVertsPerSubgroup = Gfx9::OnChipGsMaxEsVertsPerSubgroup;
 
     unsigned esMinVertsPerSubgroup = inVertsPerPrim;
 
@@ -525,536 +770,176 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
     if (useAdjacency)
       esMinVertsPerSubgroup >>= 1;
 
+    unsigned maxGsPrimsPerSubgroup = Gfx9::OnChipGsMaxPrimPerSubgroup;
+
     // There is a hardware requirement for gsPrimsPerSubgroup * gsInstanceCount to be capped by
-    // GsOnChipMaxPrimsPerSubgroup for adjacency primitive or when GS instanceing is used.
+    // OnChipGsMaxPrimPerSubgroup for adjacency primitive or when GS instanceing is used.
     if (useAdjacency || gsInstanceCount > 1)
-      gsPrimsPerSubgroup = std::min(gsPrimsPerSubgroup, (Gfx6::GsOnChipMaxPrimsPerSubgroup / gsInstanceCount));
+      maxGsPrimsPerSubgroup = (Gfx9::OnChipGsMaxPrimPerSubgroupAdj / gsInstanceCount);
 
-    // Compute GS-VS LDS size based on target GS primitives per subgroup
-    unsigned gsVsLdsSize = (gsVsRingItemSizeOnChipInstanced * gsPrimsPerSubgroup);
+    gsPrimsPerSubgroup = std::min(gsPrimsPerSubgroup, maxGsPrimsPerSubgroup);
 
-    // Compute ES-GS LDS size based on the worst case number of ES vertices needed to create the target number of
-    // GS primitives per subgroup.
     const unsigned reuseOffMultiplier = isVertexReuseDisabled() ? gsInstanceCount : 1;
-    unsigned worstCaseEsVertsPerSubgroup = esMinVertsPerSubgroup * gsPrimsPerSubgroup * reuseOffMultiplier;
-    unsigned esGsLdsSize = esGsRingItemSizeOnChip * worstCaseEsVertsPerSubgroup;
+    unsigned worstCaseEsVertsPerSubgroup =
+        std::min(esMinVertsPerSubgroup * gsPrimsPerSubgroup * reuseOffMultiplier, maxEsVertsPerSubgroup);
 
-    // Total LDS use per subgroup aligned to the register granularity
-    unsigned gsOnChipLdsSize = alignTo(
-        (esGsLdsSize + gsVsLdsSize),
-        static_cast<unsigned>((1 << m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift)));
+    unsigned esGsLdsSize = (esGsRingItemSize * worstCaseEsVertsPerSubgroup);
 
-    // Use the client-specified amount of LDS space per subgroup. If they specified zero, they want us to choose a
-    // reasonable default. The final amount must be 128-dword aligned.
+    // Total LDS use per subgroup aligned to the register granularity.
+    unsigned gsOnChipLdsSize = alignTo(esGsLdsSize + esGsExtraLdsDwords, ldsSizeDwordGranularity);
 
-    unsigned maxLdsSize = m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipDefaultLdsSizePerSubgroup;
+    // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
+    // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
+    // restriction by providing the capability of querying thread ID in the group rather than in wave.
+    auto esResUsage = m_pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
 
-    // TODO: For BONAIRE A0, GODAVARI and KALINDI, set maxLdsSize to 1024 due to SPI barrier management bug
+    unsigned rayQueryLdsStackSize = 0;
+    if (esResUsage->useRayQueryLdsStack || gsResUsage->useRayQueryLdsStack)
+      rayQueryLdsStackSize = MaxRayQueryLdsStackEntries * MaxRayQueryThreadsPerGroup;
 
-    // If total LDS usage is too big, refactor partitions based on ratio of ES-GS and GS-VS item sizes.
+    // Use the client-specified amount of LDS space per subgroup. If they specified zero, they want us to
+    // choose a reasonable default. The final amount must be 128-dword aligned.
+    // TODO: Accept DefaultLdsSizePerSubgroup from panel setting
+    unsigned maxLdsSize = Gfx9::DefaultLdsSizePerSubgroup;
+    maxLdsSize -= rayQueryLdsStackSize; // Exclude LDS space used as ray query stack
+
+    // If total LDS usage is too big, refactor partitions based on ratio of ES-GS item sizes.
     if (gsOnChipLdsSize > maxLdsSize) {
-      const unsigned esGsItemSizePerPrim = esGsRingItemSizeOnChip * esMinVertsPerSubgroup * reuseOffMultiplier;
-      const unsigned itemSizeTotal = esGsItemSizePerPrim + gsVsRingItemSizeOnChipInstanced;
+      // Our target GS primitives per subgroup was too large
 
-      esGsLdsSize = alignTo((esGsItemSizePerPrim * maxLdsSize) / itemSizeTotal, esGsItemSizePerPrim);
-      gsVsLdsSize = alignDown(maxLdsSize - esGsLdsSize, gsVsRingItemSizeOnChipInstanced);
+      // Calculate the maximum number of GS primitives per subgroup that will fit into LDS, capped
+      // by the maximum that the hardware can support.
+      unsigned availableLdsSize = maxLdsSize - esGsExtraLdsDwords;
+      gsPrimsPerSubgroup =
+          std::min((availableLdsSize / (esGsRingItemSize * esMinVertsPerSubgroup)), maxGsPrimsPerSubgroup);
+      worstCaseEsVertsPerSubgroup =
+          std::min(esMinVertsPerSubgroup * gsPrimsPerSubgroup * reuseOffMultiplier, maxEsVertsPerSubgroup);
 
-      gsOnChipLdsSize = maxLdsSize;
+      assert(gsPrimsPerSubgroup > 0);
+
+      esGsLdsSize = (esGsRingItemSize * worstCaseEsVertsPerSubgroup);
+      gsOnChipLdsSize = alignTo(esGsLdsSize + esGsExtraLdsDwords, ldsSizeDwordGranularity);
+
+      assert(gsOnChipLdsSize <= maxLdsSize);
     }
 
-    // Based on the LDS space, calculate how many GS prims per subgroup and ES vertices per subgroup can be dispatched.
-    gsPrimsPerSubgroup = (gsVsLdsSize / gsVsRingItemSizeOnChipInstanced);
-    unsigned esVertsPerSubgroup = (esGsLdsSize / (esGsRingItemSizeOnChip * reuseOffMultiplier));
+    if (hasTs || DisableGsOnChip)
+      gsOnChip = false;
+    else {
+      // Now let's calculate the onchip GSVS info and determine if it should be on or off chip.
+      unsigned gsVsItemSize = gsVsRingItemSizeOnChip * gsInstanceCount;
+
+      // Compute GSVS LDS size based on target GS prims per subgroup.
+      unsigned gsVsLdsSize = gsVsItemSize * gsPrimsPerSubgroup;
+
+      // Start out with the assumption that our GS prims per subgroup won't change.
+      unsigned onchipGsPrimsPerSubgroup = gsPrimsPerSubgroup;
+
+      // Total LDS use per subgroup aligned to the register granularity to keep ESGS and GSVS data on chip.
+      unsigned onchipEsGsVsLdsSize = alignTo(esGsLdsSize + gsVsLdsSize, ldsSizeDwordGranularity);
+      unsigned onchipEsGsLdsSizeOnchipGsVs = esGsLdsSize;
+
+      if (onchipEsGsVsLdsSize > maxLdsSize) {
+        // TODO: This code only allocates the minimum required LDS to hit the on chip GS prims per subgroup
+        //       threshold. This leaves some LDS space unused. The extra space could potentially be used to
+        //       increase the GS Prims per subgroup.
+
+        // Set the threshold at the minimum to keep things on chip.
+        onchipGsPrimsPerSubgroup = maxGsPrimsPerSubgroup;
+
+        if (onchipGsPrimsPerSubgroup > 0) {
+          worstCaseEsVertsPerSubgroup =
+              std::min(esMinVertsPerSubgroup * onchipGsPrimsPerSubgroup * reuseOffMultiplier, maxEsVertsPerSubgroup);
+
+          // Calculate the LDS sizes required to hit this threshold.
+          onchipEsGsLdsSizeOnchipGsVs =
+              alignTo(esGsRingItemSize * worstCaseEsVertsPerSubgroup, ldsSizeDwordGranularity);
+          gsVsLdsSize = gsVsItemSize * onchipGsPrimsPerSubgroup;
+          onchipEsGsVsLdsSize = onchipEsGsLdsSizeOnchipGsVs + gsVsLdsSize;
+
+          if (onchipEsGsVsLdsSize > maxLdsSize) {
+            // LDS isn't big enough to hit the target GS prim per subgroup count for on chip GSVS.
+            gsOnChip = false;
+          }
+        } else {
+          // With high GS instance counts, it is possible that the number of on chip GS prims
+          // calculated is zero. If this is the case, we can't expect to use on chip GS.
+          gsOnChip = false;
+        }
+      }
+
+      // If on chip GSVS is optimal, update the ESGS parameters with any changes that allowed for GSVS data.
+      if (gsOnChip) {
+        gsOnChipLdsSize = onchipEsGsVsLdsSize;
+        esGsLdsSize = onchipEsGsLdsSizeOnchipGsVs;
+        gsPrimsPerSubgroup = onchipGsPrimsPerSubgroup;
+      }
+    }
+
+    unsigned esVertsPerSubgroup =
+        std::min(esGsLdsSize / (esGsRingItemSize * reuseOffMultiplier), maxEsVertsPerSubgroup);
 
     assert(esVertsPerSubgroup >= esMinVertsPerSubgroup);
 
-    // Vertices for adjacency primitives are not always reused. According to
-    // hardware engineers, we must restore esMinVertsPerSubgroup for ES_VERTS_PER_SUBGRP.
+    // Vertices for adjacency primitives are not always reused (e.g. in the case of shadow volumes). According
+    // to hardware engineers, we must restore esMinVertsPerSubgroup for ES_VERTS_PER_SUBGRP.
     if (useAdjacency)
       esMinVertsPerSubgroup = inVertsPerPrim;
 
-    // For normal primitives, the VGT only checks if they are past the ES verts per subgroup after allocating a full
-    // GS primitive and if they are, kick off a new sub group. But if those additional ES vertices are unique
-    // (e.g. not reused) we need to make sure there is enough LDS space to account for those ES verts beyond
-    // ES_VERTS_PER_SUBGRP.
+    // For normal primitives, the VGT only checks if they are past the ES verts per sub group after allocating
+    // a full GS primitive and if they are, kick off a new sub group.  But if those additional ES verts are
+    // unique (e.g. not reused) we need to make sure there is enough LDS space to account for those ES verts
+    // beyond ES_VERTS_PER_SUBGRP.
     esVertsPerSubgroup -= (esMinVertsPerSubgroup - 1);
 
-    // TODO: Accept GsOffChipDefaultThreshold from panel option
-    // TODO: Value of GsOffChipDefaultThreshold should be 64, due to an issue it's changed to 32 in order to test
-    // on-chip GS code generation before fixing that issue.
-    // The issue is because we only remove unused builtin output till final GS output store generation, when
-    // determining onchip/offchip mode, unused builtin output like PointSize and Clip/CullDistance is factored in
-    // LDS usage and deactivates onchip GS when GsOffChipDefaultThreshold  is 64. To fix this we will probably
-    // need to clear unused builtin output before determining onchip/offchip GS mode.
-    constexpr unsigned gsOffChipDefaultThreshold = 32;
+    // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
+    // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
+    // restriction by providing the capability of querying thread ID in the group rather than in wave.
+    if (esResUsage->useRayQueryLdsStack)
+      esVertsPerSubgroup = std::min(esVertsPerSubgroup, MaxRayQueryThreadsPerGroup);
+    if (gsResUsage->useRayQueryLdsStack)
+      gsPrimsPerSubgroup = std::min(gsPrimsPerSubgroup, MaxRayQueryThreadsPerGroup);
 
-    bool disableGsOnChip = DisableGsOnChip;
-    if (hasTs || m_pipelineState->getTargetInfo().getGfxIpVersion().major == 6) {
-      // GS on-chip is not supported with tessellation, and is not supported on GFX6
-      disableGsOnChip = true;
-    }
+    gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = esVertsPerSubgroup;
+    gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = gsPrimsPerSubgroup;
+    gsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize = esGsLdsSize;
+    gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = gsOnChipLdsSize;
+    gsResUsage->inOutUsage.gs.calcFactor.rayQueryLdsStackSize = rayQueryLdsStackSize;
 
-    if (disableGsOnChip || (gsPrimsPerSubgroup * gsInstanceCount) < gsOffChipDefaultThreshold ||
-        esVertsPerSubgroup == 0) {
-      gsOnChip = false;
-      gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = 0;
-      gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = 0;
-      gsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize = 0;
-      gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = 0;
+    gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize = esGsRingItemSize;
+    gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize = gsOnChip ? gsVsRingItemSizeOnChip : gsVsRingItemSize;
 
-      gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize = esGsRingItemSize;
-      gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize = gsVsRingItemSize;
-    } else {
-      gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = esVertsPerSubgroup;
-      gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = gsPrimsPerSubgroup;
-      gsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize = esGsLdsSize;
-      gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = gsOnChipLdsSize;
+    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10 && hasTs && !gsOnChip) {
+      unsigned esVertsNum = Gfx9::EsVertsOffchipGsOrTess;
+      unsigned onChipGsLdsMagicSize = alignTo(
+          (esVertsNum * esGsRingItemSize) + esGsExtraLdsDwords,
+          static_cast<unsigned>((1 << m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift)));
 
-      gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize = esGsRingItemSizeOnChip;
-      gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize = gsVsRingItemSizeOnChip;
-    }
-  } else {
-    const auto nggControl = m_pipelineState->getNggControl();
-
-    if (meshPipeline) {
-      assert(gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
-      const auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
-
-      // Make sure we have enough threads to execute mesh shader.
-      const unsigned numMeshThreads = meshMode.workgroupSizeX * meshMode.workgroupSizeY * meshMode.workgroupSizeZ;
-      unsigned primAmpFactor = std::max(numMeshThreads, std::max(meshMode.outputVertices, meshMode.outputPrimitives));
-
-      const unsigned ldsSizeDwordGranularity =
-          1u << m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
-      auto ldsSizeDwords =
-          MeshTaskShader::layoutMeshShaderLds(m_pipelineState, m_pipelineShaders->getEntryPoint(ShaderStageMesh));
-      ldsSizeDwords = alignTo(ldsSizeDwords, ldsSizeDwordGranularity);
-
-      // Make sure we don't allocate more than what can legally be allocated by a single subgroup on the hardware.
-      unsigned maxHwGsLdsSizeDwords = m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipMaxLdsSize;
-      assert(ldsSizeDwords <= maxHwGsLdsSizeDwords);
-      (void(maxHwGsLdsSizeDwords)); // Unused
-
-      gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = 1;
-      gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = 1;
-
-      gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = ldsSizeDwords;
-
-      gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize = 0;
-      gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize = 0;
-
-      gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor = primAmpFactor;
-
-      gsOnChip = true; // For mesh shader, GS is always on-chip
-    } else if (nggControl->enableNgg) {
-      unsigned esGsRingItemSize = NggPrimShader::calcEsGsRingItemSize(m_pipelineState); // In dwords
-
-      const unsigned gsVsRingItemSize =
-          hasGs ? std::max(1u, 4 * gsResUsage->inOutUsage.outputMapLocCount * geometryMode.outputVertices) : 0;
-
-      const auto &ldsGeneralUsage = NggPrimShader::layoutPrimShaderLds(m_pipelineState);
-      const bool needsLds = ldsGeneralUsage.needsLds;
-      const unsigned esExtraLdsSize = ldsGeneralUsage.esExtraLdsSize; // In dwords
-      const unsigned gsExtraLdsSize = ldsGeneralUsage.gsExtraLdsSize; // In dwords
-
-      // NOTE: Primitive amplification factor must be at least 1. And for NGG with API GS, we force number of output
-      // primitives to be equal to that of output vertices regardless of the output primitive type by emitting
-      // invalid primitives. This is to simplify the algorithmic design and improve its efficiency.
-      unsigned primAmpFactor = std::max(1u, geometryMode.outputVertices);
-
-      unsigned esVertsPerSubgroup = 0;
-      unsigned gsPrimsPerSubgroup = 0;
-
-      // The numbers below come from hardware guidance and most likely require further tuning.
-      switch (nggControl->subgroupSizing) {
-      case NggSubgroupSizing::HalfSize:
-        esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
-        gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
-        break;
-      case NggSubgroupSizing::OptimizeForVerts:
-        esVertsPerSubgroup = hasTs ? Gfx9::NggMaxThreadsPerSubgroup / 2 : (Gfx9::NggMaxThreadsPerSubgroup / 2 - 2);
-        gsPrimsPerSubgroup = hasTs || needsLds ? 192 : Gfx9::NggMaxThreadsPerSubgroup;
-        break;
-      case NggSubgroupSizing::OptimizeForPrims:
-        esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
-        gsPrimsPerSubgroup = 128;
-        break;
-      case NggSubgroupSizing::Explicit:
-        esVertsPerSubgroup = nggControl->vertsPerSubgroup;
-        gsPrimsPerSubgroup = nggControl->primsPerSubgroup;
-        break;
-      case NggSubgroupSizing::Auto:
-        if (m_pipelineState->getTargetInfo().getGfxIpVersion().isGfx(10, 1)) {
-          esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2 - 2;
-          gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
+      // If the new size is greater than the size we previously set
+      // then we need to either increase the size or decrease the verts
+      if (onChipGsLdsMagicSize > gsOnChipLdsSize) {
+        if (onChipGsLdsMagicSize > maxLdsSize) {
+          // Decrease the verts
+          esVertsNum = (maxLdsSize - esGsExtraLdsDwords) / esGsRingItemSize;
+          gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = maxLdsSize;
         } else {
-          // Newer hardware performs the decrement on esVertsPerSubgroup for us already.
-          esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
-          gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup / 2;
-        }
-        break;
-      case NggSubgroupSizing::MaximumSize:
-      default:
-        esVertsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
-        gsPrimsPerSubgroup = Gfx9::NggMaxThreadsPerSubgroup;
-        break;
-      }
-
-      static const unsigned OptimalVerticesPerPrimitiveForTess = 2;
-      unsigned gsInstanceCount = std::max(1u, geometryMode.invocations);
-      bool enableMaxVertOut = false;
-
-      if (hasGs) {
-        unsigned maxVertOut = geometryMode.outputVertices;
-        assert(maxVertOut >= primAmpFactor);
-        assert(gsInstanceCount >= 1);
-
-        // Each input GS primitive can generate at most maxVertOut vertices. Each output vertex will be emitted
-        // from a different thread. Note that maxVertOut does not account for additional amplification due
-        // to GS instancing.
-        gsPrimsPerSubgroup =
-            std::max(1u, std::min(gsPrimsPerSubgroup, Gfx9::NggMaxThreadsPerSubgroup / (maxVertOut * gsInstanceCount)));
-
-        // NOTE: If one input GS primitive generates too many vertices (consider GS instancing) and they couldn't be
-        // within a NGG subgroup, we enable maximum vertex output per GS instance. This will set the register field
-        // EN_MAX_VERT_OUT_PER_GS_INSTANCE and turn off vertex reuse, restricting 1 input GS input
-        // primitive per subgroup and create 1 subgroup per GS instance.
-        if ((maxVertOut * gsInstanceCount) > Gfx9::NggMaxThreadsPerSubgroup) {
-          enableMaxVertOut = true;
-          gsInstanceCount = 1;
-          gsPrimsPerSubgroup = 1;
-        }
-
-        esVertsPerSubgroup = std::min(gsPrimsPerSubgroup * inVertsPerPrim, Gfx9::NggMaxThreadsPerSubgroup);
-
-        if (hasTs)
-          esVertsPerSubgroup = std::min(esVertsPerSubgroup, OptimalVerticesPerPrimitiveForTess * gsPrimsPerSubgroup);
-
-        // Low values of esVertsPerSubgroup are illegal. These numbers below come from HW restrictions.
-        if (gfxIp.isGfx(10, 3))
-          esVertsPerSubgroup = std::max(29u, esVertsPerSubgroup);
-        else if (gfxIp.isGfx(10, 1))
-          esVertsPerSubgroup = std::max(24u, esVertsPerSubgroup);
-      } else {
-        // If GS is not present, instance count must be 1
-        assert(gsInstanceCount == 1);
-      }
-
-      // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
-      // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
-      // restriction by providing the capability of querying thread ID in the group rather than in wave.
-      unsigned rayQueryLdsStackSize = 0;
-      if (gsResUsage->useRayQueryLdsStack) {
-        gsPrimsPerSubgroup = std::min(MaxRayQueryThreadsPerGroup, gsPrimsPerSubgroup);
-        rayQueryLdsStackSize = MaxRayQueryLdsStackEntries * MaxRayQueryThreadsPerGroup;
-      }
-
-      auto esResUsage = m_pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
-      if (esResUsage->useRayQueryLdsStack) {
-        esVertsPerSubgroup = std::min(MaxRayQueryThreadsPerGroup, esVertsPerSubgroup);
-        rayQueryLdsStackSize = MaxRayQueryLdsStackEntries * MaxRayQueryThreadsPerGroup;
-      }
-
-      // Make sure that we have at least one primitive.
-      gsPrimsPerSubgroup = std::max(1u, gsPrimsPerSubgroup);
-
-      unsigned expectedEsLdsSize = esVertsPerSubgroup * esGsRingItemSize + esExtraLdsSize;
-      unsigned expectedGsLdsSize = gsPrimsPerSubgroup * gsInstanceCount * gsVsRingItemSize + gsExtraLdsSize;
-
-      const unsigned ldsSizeDwordGranularity =
-          1u << m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift;
-      unsigned ldsSizeDwords = alignTo(expectedEsLdsSize + expectedGsLdsSize, ldsSizeDwordGranularity);
-
-      unsigned maxHwGsLdsSizeDwords = m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipMaxLdsSize;
-      maxHwGsLdsSizeDwords -= rayQueryLdsStackSize; // Exclude LDS space used as ray query stack
-
-      // In exceedingly rare circumstances, a NGG subgroup might calculate its LDS space requirements and overallocate.
-      // In those cases we need to scale down our esVertsPerSubgroup/gsPrimsPerSubgroup so that they'll fit in LDS.
-      // In the following NGG calculation, we'll attempt to set esVertsPerSubgroup/gsPrimsPerSubgroup first and
-      // then scale down if we overallocate LDS.
-      if (ldsSizeDwords > maxHwGsLdsSizeDwords) {
-        // For esVertsPerSubgroup, we can instead substitute (esVertToGsPrimRatio * gsPrimsPerSubgroup) for
-        // esVertsPerSubgroup. Then we can rearrange the equation and solve for gsPrimsPerSubgroup.
-        float esVertToGsPrimRatio = esVertsPerSubgroup / (gsPrimsPerSubgroup * 1.0f);
-
-        if (hasTs)
-          esVertToGsPrimRatio = std::min(esVertToGsPrimRatio, OptimalVerticesPerPrimitiveForTess * 1.0f);
-
-        // The equation for required LDS is:
-        // LDS allocation = (esGsRingItemSize * esVertsPerSubgroup) +
-        //                  (gsVsRingItemSize * gsInstanceCount * gsPrimsPerSubgroup) +
-        //                  extraLdsSize
-        gsPrimsPerSubgroup =
-            std::min(gsPrimsPerSubgroup, (maxHwGsLdsSizeDwords - esExtraLdsSize - gsExtraLdsSize) /
-                                             (static_cast<unsigned>(esGsRingItemSize * esVertToGsPrimRatio) +
-                                              gsVsRingItemSize * gsInstanceCount));
-
-        // NOTE: If one input GS primitive generates too many vertices (consider GS instancing) and they couldn't be
-        // within a NGG subgroup, we enable maximum vertex output per GS instance. This will set the register field
-        // EN_MAX_VERT_OUT_PER_GS_INSTANCE and turn off vertex reuse, restricting 1 input GS input
-        // primitive per subgroup and create 1 subgroup per GS instance.
-        if (gsPrimsPerSubgroup < gsInstanceCount) {
-          enableMaxVertOut = true;
-          gsInstanceCount = 1;
-          gsPrimsPerSubgroup = 1;
-        }
-
-        // Make sure that we have at least one primitive.
-        gsPrimsPerSubgroup = std::max(1u, gsPrimsPerSubgroup);
-
-        // inVertsPerPrim is the minimum number of vertices we must have per subgroup.
-        esVertsPerSubgroup =
-            std::max(inVertsPerPrim, std::min(static_cast<unsigned>(gsPrimsPerSubgroup * esVertToGsPrimRatio),
-                                              Gfx9::NggMaxThreadsPerSubgroup));
-
-        // Low values of esVertsPerSubgroup are illegal. These numbers below come from HW restrictions.
-        if (gfxIp.isGfx(10, 3))
-          esVertsPerSubgroup = std::max(29u, esVertsPerSubgroup);
-        else if (gfxIp.isGfx(10, 1))
-          esVertsPerSubgroup = std::max(24u, esVertsPerSubgroup);
-
-        // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
-        // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
-        // restriction by providing the capability of querying thread ID in the group rather than in wave.
-        if (gsResUsage->useRayQueryLdsStack)
-          gsPrimsPerSubgroup = std::min(MaxRayQueryThreadsPerGroup, gsPrimsPerSubgroup);
-        if (esResUsage->useRayQueryLdsStack)
-          esVertsPerSubgroup = std::min(MaxRayQueryThreadsPerGroup, esVertsPerSubgroup);
-
-        // And then recalculate our LDS usage.
-        expectedEsLdsSize = (esVertsPerSubgroup * esGsRingItemSize) + esExtraLdsSize;
-        expectedGsLdsSize = (gsPrimsPerSubgroup * gsInstanceCount * gsVsRingItemSize) + gsExtraLdsSize;
-        ldsSizeDwords = alignTo(expectedEsLdsSize + expectedGsLdsSize, ldsSizeDwordGranularity);
-      }
-
-      // Make sure we don't allocate more than what can legally be allocated by a single subgroup on the hardware.
-      assert(ldsSizeDwords <= maxHwGsLdsSizeDwords);
-
-      // Make sure that we have at least one primitive
-      assert(gsPrimsPerSubgroup >= 1);
-
-      // HW has restriction on NGG + Tessellation where gsPrimsPerSubgroup must be >= 3 unless we enable
-      // EN_MAX_VERT_OUT_PER_GS_INSTANCE.
-      assert(!hasTs || enableMaxVertOut || gsPrimsPerSubgroup >= 3);
-
-      gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = esVertsPerSubgroup;
-      gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = gsPrimsPerSubgroup;
-
-      // EsGsLdsSize is passed in a user data SGPR to the merged shader so that the API GS knows where to start
-      // reading out of LDS. EsGsLdsSize is unnecessary when there is no API GS.
-      gsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize = hasGs ? expectedEsLdsSize : 0;
-      gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = needsLds ? ldsSizeDwords : 0;
-
-      gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize = esGsRingItemSize;
-      gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize = gsVsRingItemSize;
-
-      gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor = primAmpFactor;
-      gsResUsage->inOutUsage.gs.calcFactor.enableMaxVertOut = enableMaxVertOut;
-      gsResUsage->inOutUsage.gs.calcFactor.rayQueryLdsStackSize = rayQueryLdsStackSize;
-
-      gsOnChip = true; // In NGG mode, GS is always on-chip since copy shader is not present.
-    } else {
-      unsigned ldsSizeDwordGranularity =
-          static_cast<unsigned>(1 << m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift);
-
-      // gsPrimsPerSubgroup shouldn't be bigger than wave size.
-      unsigned gsPrimsPerSubgroup =
-          std::min(m_pipelineState->getTargetInfo().getGpuProperty().gsOnChipDefaultPrimsPerSubgroup,
-                   m_pipelineState->getShaderWaveSize(ShaderStageGeometry));
-
-      // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
-      const unsigned esGsRingItemSize = (4 * std::max(1u, gsResUsage->inOutUsage.inputMapLocCount)) | 1;
-
-      const unsigned gsVsRingItemSize =
-          4 * std::max(1u, (gsResUsage->inOutUsage.outputMapLocCount * geometryMode.outputVertices));
-
-      // NOTE: Make gsVsRingItemSize odd by "| 1", to optimize GS -> VS ring layout for LDS bank conflicts.
-      const unsigned gsVsRingItemSizeOnChip = gsVsRingItemSize | 1;
-
-      const unsigned gsInstanceCount = geometryMode.invocations;
-
-      // TODO: Confirm no ES-GS extra LDS space used.
-      const unsigned esGsExtraLdsDwords = 0;
-      const unsigned maxEsVertsPerSubgroup = Gfx9::OnChipGsMaxEsVertsPerSubgroup;
-
-      unsigned esMinVertsPerSubgroup = inVertsPerPrim;
-
-      // If the primitive has adjacency half the number of vertices will be reused in multiple primitives.
-      if (useAdjacency)
-        esMinVertsPerSubgroup >>= 1;
-
-      unsigned maxGsPrimsPerSubgroup = Gfx9::OnChipGsMaxPrimPerSubgroup;
-
-      // There is a hardware requirement for gsPrimsPerSubgroup * gsInstanceCount to be capped by
-      // OnChipGsMaxPrimPerSubgroup for adjacency primitive or when GS instanceing is used.
-      if (useAdjacency || gsInstanceCount > 1)
-        maxGsPrimsPerSubgroup = (Gfx9::OnChipGsMaxPrimPerSubgroupAdj / gsInstanceCount);
-
-      gsPrimsPerSubgroup = std::min(gsPrimsPerSubgroup, maxGsPrimsPerSubgroup);
-
-      const unsigned reuseOffMultiplier = isVertexReuseDisabled() ? gsInstanceCount : 1;
-      unsigned worstCaseEsVertsPerSubgroup =
-          std::min(esMinVertsPerSubgroup * gsPrimsPerSubgroup * reuseOffMultiplier, maxEsVertsPerSubgroup);
-
-      unsigned esGsLdsSize = (esGsRingItemSize * worstCaseEsVertsPerSubgroup);
-
-      // Total LDS use per subgroup aligned to the register granularity.
-      unsigned gsOnChipLdsSize = alignTo(esGsLdsSize + esGsExtraLdsDwords, ldsSizeDwordGranularity);
-
-      // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
-      // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
-      // restriction by providing the capability of querying thread ID in the group rather than in wave.
-      auto esResUsage = m_pipelineState->getShaderResourceUsage(hasTs ? ShaderStageTessEval : ShaderStageVertex);
-
-      unsigned rayQueryLdsStackSize = 0;
-      if (esResUsage->useRayQueryLdsStack || gsResUsage->useRayQueryLdsStack)
-        rayQueryLdsStackSize = MaxRayQueryLdsStackEntries * MaxRayQueryThreadsPerGroup;
-
-      // Use the client-specified amount of LDS space per subgroup. If they specified zero, they want us to
-      // choose a reasonable default. The final amount must be 128-dword aligned.
-      // TODO: Accept DefaultLdsSizePerSubgroup from panel setting
-      unsigned maxLdsSize = Gfx9::DefaultLdsSizePerSubgroup;
-      maxLdsSize -= rayQueryLdsStackSize; // Exclude LDS space used as ray query stack
-
-      // If total LDS usage is too big, refactor partitions based on ratio of ES-GS item sizes.
-      if (gsOnChipLdsSize > maxLdsSize) {
-        // Our target GS primitives per subgroup was too large
-
-        // Calculate the maximum number of GS primitives per subgroup that will fit into LDS, capped
-        // by the maximum that the hardware can support.
-        unsigned availableLdsSize = maxLdsSize - esGsExtraLdsDwords;
-        gsPrimsPerSubgroup =
-            std::min((availableLdsSize / (esGsRingItemSize * esMinVertsPerSubgroup)), maxGsPrimsPerSubgroup);
-        worstCaseEsVertsPerSubgroup =
-            std::min(esMinVertsPerSubgroup * gsPrimsPerSubgroup * reuseOffMultiplier, maxEsVertsPerSubgroup);
-
-        assert(gsPrimsPerSubgroup > 0);
-
-        esGsLdsSize = (esGsRingItemSize * worstCaseEsVertsPerSubgroup);
-        gsOnChipLdsSize = alignTo(esGsLdsSize + esGsExtraLdsDwords, ldsSizeDwordGranularity);
-
-        assert(gsOnChipLdsSize <= maxLdsSize);
-      }
-
-      if (hasTs || DisableGsOnChip)
-        gsOnChip = false;
-      else {
-        // Now let's calculate the onchip GSVS info and determine if it should be on or off chip.
-        unsigned gsVsItemSize = gsVsRingItemSizeOnChip * gsInstanceCount;
-
-        // Compute GSVS LDS size based on target GS prims per subgroup.
-        unsigned gsVsLdsSize = gsVsItemSize * gsPrimsPerSubgroup;
-
-        // Start out with the assumption that our GS prims per subgroup won't change.
-        unsigned onchipGsPrimsPerSubgroup = gsPrimsPerSubgroup;
-
-        // Total LDS use per subgroup aligned to the register granularity to keep ESGS and GSVS data on chip.
-        unsigned onchipEsGsVsLdsSize = alignTo(esGsLdsSize + gsVsLdsSize, ldsSizeDwordGranularity);
-        unsigned onchipEsGsLdsSizeOnchipGsVs = esGsLdsSize;
-
-        if (onchipEsGsVsLdsSize > maxLdsSize) {
-          // TODO: This code only allocates the minimum required LDS to hit the on chip GS prims per subgroup
-          //       threshold. This leaves some LDS space unused. The extra space could potentially be used to
-          //       increase the GS Prims per subgroup.
-
-          // Set the threshold at the minimum to keep things on chip.
-          onchipGsPrimsPerSubgroup = maxGsPrimsPerSubgroup;
-
-          if (onchipGsPrimsPerSubgroup > 0) {
-            worstCaseEsVertsPerSubgroup =
-                std::min(esMinVertsPerSubgroup * onchipGsPrimsPerSubgroup * reuseOffMultiplier, maxEsVertsPerSubgroup);
-
-            // Calculate the LDS sizes required to hit this threshold.
-            onchipEsGsLdsSizeOnchipGsVs =
-                alignTo(esGsRingItemSize * worstCaseEsVertsPerSubgroup, ldsSizeDwordGranularity);
-            gsVsLdsSize = gsVsItemSize * onchipGsPrimsPerSubgroup;
-            onchipEsGsVsLdsSize = onchipEsGsLdsSizeOnchipGsVs + gsVsLdsSize;
-
-            if (onchipEsGsVsLdsSize > maxLdsSize) {
-              // LDS isn't big enough to hit the target GS prim per subgroup count for on chip GSVS.
-              gsOnChip = false;
-            }
-          } else {
-            // With high GS instance counts, it is possible that the number of on chip GS prims
-            // calculated is zero. If this is the case, we can't expect to use on chip GS.
-            gsOnChip = false;
-          }
-        }
-
-        // If on chip GSVS is optimal, update the ESGS parameters with any changes that allowed for GSVS data.
-        if (gsOnChip) {
-          gsOnChipLdsSize = onchipEsGsVsLdsSize;
-          esGsLdsSize = onchipEsGsLdsSizeOnchipGsVs;
-          gsPrimsPerSubgroup = onchipGsPrimsPerSubgroup;
+          // Increase the size
+          gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = onChipGsLdsMagicSize;
         }
       }
-
-      unsigned esVertsPerSubgroup =
-          std::min(esGsLdsSize / (esGsRingItemSize * reuseOffMultiplier), maxEsVertsPerSubgroup);
-
-      assert(esVertsPerSubgroup >= esMinVertsPerSubgroup);
-
-      // Vertices for adjacency primitives are not always reused (e.g. in the case of shadow volumes). According
-      // to hardware engineers, we must restore esMinVertsPerSubgroup for ES_VERTS_PER_SUBGRP.
-      if (useAdjacency)
-        esMinVertsPerSubgroup = inVertsPerPrim;
-
-      // For normal primitives, the VGT only checks if they are past the ES verts per sub group after allocating
-      // a full GS primitive and if they are, kick off a new sub group.  But if those additional ES verts are
-      // unique (e.g. not reused) we need to make sure there is enough LDS space to account for those ES verts
-      // beyond ES_VERTS_PER_SUBGRP.
-      esVertsPerSubgroup -= (esMinVertsPerSubgroup - 1);
+      // Support multiple GS instances
+      unsigned gsPrimsNum = Gfx9::GsPrimsOffchipGsOrTess / gsInstanceCount;
 
       // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
       // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
       // restriction by providing the capability of querying thread ID in the group rather than in wave.
       if (esResUsage->useRayQueryLdsStack)
-        esVertsPerSubgroup = std::min(esVertsPerSubgroup, MaxRayQueryThreadsPerGroup);
+        esVertsNum = std::min(esVertsNum, MaxRayQueryThreadsPerGroup);
       if (gsResUsage->useRayQueryLdsStack)
-        gsPrimsPerSubgroup = std::min(gsPrimsPerSubgroup, MaxRayQueryThreadsPerGroup);
+        gsPrimsNum = std::min(gsPrimsNum, MaxRayQueryThreadsPerGroup);
 
-      gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = esVertsPerSubgroup;
-      gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = gsPrimsPerSubgroup;
-      gsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize = esGsLdsSize;
-      gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = gsOnChipLdsSize;
-      gsResUsage->inOutUsage.gs.calcFactor.rayQueryLdsStackSize = rayQueryLdsStackSize;
-
-      gsResUsage->inOutUsage.gs.calcFactor.esGsRingItemSize = esGsRingItemSize;
-      gsResUsage->inOutUsage.gs.calcFactor.gsVsRingItemSize = gsOnChip ? gsVsRingItemSizeOnChip : gsVsRingItemSize;
-
-      if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10 && hasTs && !gsOnChip) {
-        unsigned esVertsNum = Gfx9::EsVertsOffchipGsOrTess;
-        unsigned onChipGsLdsMagicSize =
-            alignTo((esVertsNum * esGsRingItemSize) + esGsExtraLdsDwords,
-                    static_cast<unsigned>(
-                        (1 << m_pipelineState->getTargetInfo().getGpuProperty().ldsSizeDwordGranularityShift)));
-
-        // If the new size is greater than the size we previously set
-        // then we need to either increase the size or decrease the verts
-        if (onChipGsLdsMagicSize > gsOnChipLdsSize) {
-          if (onChipGsLdsMagicSize > maxLdsSize) {
-            // Decrease the verts
-            esVertsNum = (maxLdsSize - esGsExtraLdsDwords) / esGsRingItemSize;
-            gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = maxLdsSize;
-          } else {
-            // Increase the size
-            gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = onChipGsLdsMagicSize;
-          }
-        }
-        // Support multiple GS instances
-        unsigned gsPrimsNum = Gfx9::GsPrimsOffchipGsOrTess / gsInstanceCount;
-
-        // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
-        // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
-        // restriction by providing the capability of querying thread ID in the group rather than in wave.
-        if (esResUsage->useRayQueryLdsStack)
-          esVertsNum = std::min(esVertsNum, MaxRayQueryThreadsPerGroup);
-        if (gsResUsage->useRayQueryLdsStack)
-          gsPrimsNum = std::min(gsPrimsNum, MaxRayQueryThreadsPerGroup);
-
-        gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = esVertsNum;
-        gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = gsPrimsNum;
-      }
+      gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = esVertsNum;
+      gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = gsPrimsNum;
     }
   }
 
@@ -1237,6 +1122,9 @@ bool PatchResourceCollect::isVertexReuseDisabled() {
     useViewportIndex = m_pipelineState->getShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes.viewportIndex;
   } else if (hasVs)
     useViewportIndex = m_pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs.viewportIndex;
+
+  if (m_pipelineState->getInputAssemblyState().multiView == MultiViewMode::PerView)
+    useViewportIndex = true;
 
   disableVertexReuse |= useViewportIndex;
 
@@ -1645,10 +1533,6 @@ void PatchResourceCollect::matchGenericInOut() {
   }
 
   if (!outLocInfoMap.empty()) {
-    auto &outOrigLocs = inOutUsage.fs.outputOrigLocs;
-    if (m_shaderStage == ShaderStageFragment)
-      memset(&outOrigLocs, InvalidValue, sizeof(inOutUsage.fs.outputOrigLocs));
-
     assert(inOutUsage.outputMapLocCount == 0);
 
     // Update the value of outLocMap for non pack case
@@ -1672,9 +1556,6 @@ void PatchResourceCollect::matchGenericInOut() {
         inOutUsage.outputMapLocCount = std::max(inOutUsage.outputMapLocCount, newLoc + 1);
         LLPC_OUTS("(" << getShaderStageAbbreviation(m_shaderStage) << ") Output: loc = " << origLoc
                       << ", comp = " << origComp << "  =>  Mapped = " << newLoc << ", " << newComp << "\n");
-
-        if (m_shaderStage == ShaderStageFragment)
-          outOrigLocs[newLoc] = origLoc;
       }
     }
     LLPC_OUTS("\n");
@@ -2360,7 +2241,7 @@ void PatchResourceCollect::mapBuiltInToGenericInOut() {
     if (builtInUsage.gs.viewportIndex)
       mapGsBuiltInOutput(BuiltInViewportIndex, 1);
 
-    if (m_pipelineState->getInputAssemblyState().enableMultiView)
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable)
       mapGsBuiltInOutput(BuiltInViewIndex, 1);
 
     if (builtInUsage.gs.primitiveShadingRate)
@@ -3428,11 +3309,12 @@ void PatchResourceCollect::scalarizeForInOutPacking(Module *module) {
         payload.inputCalls.push_back(&input);
     }
   };
-  static auto visitor = llvm_dialects::VisitorBuilder<Payload>()
-                            .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
-                            .add<InputImportGenericOp>([](auto &payload, auto &op) { visitInput(payload, op); })
-                            .add<InputImportInterpolatedOp>([](auto &payload, auto &op) { visitInput(payload, op); })
-                            .build();
+  static auto visitor =
+      llvm_dialects::VisitorBuilder<Payload>()
+          .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+          .addSet<InputImportGenericOp, InputImportInterpolatedOp>(
+              [](Payload &payload, Instruction &op) { visitInput(payload, cast<GenericLocationOp>(op)); })
+          .build();
   visitor.visit(payload, *module);
 
   for (Function &func : *module) {

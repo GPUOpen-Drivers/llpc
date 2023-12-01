@@ -256,12 +256,6 @@ Value *BuilderImpl::CreateFMod(Value *dividend, Value *divisor, const Twine &ins
 // @param c : The value to add to the product of A and B
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateFma(Value *a, Value *b, Value *c, const Twine &instName) {
-  if (getPipelineState()->getTargetInfo().getGfxIpVersion().major <= 8) {
-    // Pre-GFX9 version: Use fmul and fadd.
-    Value *fmul = CreateFMul(a, b);
-    return CreateFAdd(fmul, c, instName);
-  }
-
   // GFX9+ version: Use fma.
   return CreateIntrinsic(Intrinsic::fma, a->getType(), {a, b, c}, nullptr, instName);
 }
@@ -407,7 +401,8 @@ Value *BuilderImpl::CreateATan(Value *yOverX, const Twine &instName) {
   Value *outsideBound = CreateSelect(CreateFCmpOGT(absX, one), one, zero);
   result = CreateFMul(outsideBound, result);
   result = CreateFAdd(partialResult, result);
-  return CreateFMul(result, CreateFSign(yOverX));
+  result = CreateFMul(result, CreateFSign(yOverX));
+  return CreateSelect(CreateIsNaN(yOverX), ConstantFP::getNaN(yOverX->getType()), result);
 }
 
 // =====================================================================================================================
@@ -422,6 +417,7 @@ Value *BuilderImpl::CreateATan2(Value *y, Value *x, const Twine &instName) {
   //
   // p0 = sgn(y) * PI/2
   // p1 = sgn(y) * PI
+  // p2 = copysign(PI, y)
   // atanyox = atan(yox)
   //
   // if (y != 0.0)
@@ -430,7 +426,7 @@ Value *BuilderImpl::CreateATan2(Value *y, Value *x, const Twine &instName) {
   //     else
   //         atan(y, x) = p0
   // else
-  //     atan(y, x) = (x > 0.0) ? 0 : PI
+  //     atan(y, x) = (x > 0.0) ? 0 : p2
 
   Constant *zero = Constant::getNullValue(y->getType());
   Constant *one = ConstantFP::get(y->getType(), 1.0);
@@ -441,6 +437,15 @@ Value *BuilderImpl::CreateATan2(Value *y, Value *x, const Twine &instName) {
   Value *signY = CreateFSign(y);
   Value *p0 = CreateFMul(signY, getPiByTwo(signY->getType()));
   Value *p1 = CreateFMul(signY, getPi(signY->getType()));
+  Value *p2 = getPi(x->getType());
+  if (!getFastMathFlags().noSignedZeros()) {
+    // NOTE: According to the definition of atan(y, x), we might take the sign of y into consideration and follow such
+    // computation:
+    //                / -PI, when y = -0.0 and x < 0
+    //   atan(y, x) =
+    //                \ PI, when y = 0.0 and x < 0
+    p2 = CreateCopySign(p2, y);
+  }
 
   Value *absXEqualsAbsY = CreateFCmpOEQ(absX, absY);
   // oneIfEqual to (x == y) ? 1.0 : -1.0
@@ -452,9 +457,9 @@ Value *BuilderImpl::CreateATan2(Value *y, Value *x, const Twine &instName) {
   Value *result = CreateATan(yOverX);
   Value *addP1 = CreateFAdd(result, p1);
   result = CreateSelect(CreateFCmpOLT(x, zero), addP1, result);
-  result = CreateSelect(CreateFCmpONE(x, zero), result, p0);
-  Value *zeroOrPi = CreateSelect(CreateFCmpOGT(x, zero), zero, getPi(x->getType()));
-  result = CreateSelect(CreateFCmpONE(y, zero), result, zeroOrPi, instName);
+  result = CreateSelect(CreateFCmpUNE(x, zero), result, p0);
+  Value *zeroOrPi = CreateSelect(CreateFCmpOGT(x, zero), zero, p2);
+  result = CreateSelect(CreateFCmpUNE(y, zero), result, zeroOrPi, instName);
   return result;
 }
 
@@ -513,6 +518,18 @@ Value *BuilderImpl::CreateTanh(Value *x, const Twine &instName) {
   Value *doubleSinh = CreateFSub(exp, expNeg);
   Value *doubleCosh = CreateFAdd(exp, expNeg);
   Value *result = fDivFast(doubleSinh, doubleCosh);
+
+  if (!getFastMathFlags().noInfs()) {
+    // NOTE: If the fast math flags might have INFs, we should check the special case when the input is +INF or -INF.
+    // According to the limit of tanh(x), we have following definitions:
+    //                  / 1.0, when x -> +INF
+    //   lim(tanh(x)) =
+    //                  \ -1.0, when x -> -INF
+    Value *one = ConstantFP::get(x->getType(), 1.0);
+    Value *isInf = CreateIsInf(x);
+    result = CreateSelect(isInf, CreateCopySign(one, x), result);
+  }
+
   result->setName(instName);
   return result;
 }
@@ -816,13 +833,23 @@ Value *BuilderImpl::CreateNormalizeVector(Value *x, const Twine &instName) {
   Value *dot = CreateDotProduct(x, x);
   Value *sqrt = CreateSqrt(dot);
   Value *rsq = CreateFDiv(ConstantFP::get(sqrt->getType(), 1.0), sqrt);
-  // We use fmul.legacy for float so that a zero vector is normalized to a zero vector,
-  // rather than NaNs. We must scalarize it ourselves.
-  Value *result = scalarize(x, [this, rsq](Value *x) -> Value * {
-    if (rsq->getType()->isFloatTy())
-      return CreateIntrinsic(Intrinsic::amdgcn_fmul_legacy, {}, {x, rsq});
-    return CreateFMul(x, rsq);
-  });
+  Value *result = nullptr;
+  if (x->getType()->getScalarType()->isFloatTy()) {
+    // Make sure a FP32 zero vector is normalized to a FP32 zero vector, rather than NaNs.
+    if (!getFastMathFlags().noSignedZeros()) {
+      // When NSZ is not specified, we avoid using fmul_legacy since the sign of the input is dropped.
+      auto zero = ConstantFP::get(getFloatTy(), 0.0);
+      auto isZeroDot = CreateFCmpOEQ(dot, zero);
+      rsq = CreateSelect(isZeroDot, zero, rsq);
+      result = scalarize(x, [this, rsq](Value *x) -> Value * { return CreateFMul(x, rsq); });
+    } else {
+      result = scalarize(x, [this, rsq](Value *x) -> Value * {
+        return CreateIntrinsic(Intrinsic::amdgcn_fmul_legacy, {}, {x, rsq});
+      });
+    }
+  } else {
+    result = scalarize(x, [this, rsq](Value *x) -> Value * { return CreateFMul(x, rsq); });
+  }
   result->setName(instName);
   return result;
 }
@@ -922,11 +949,6 @@ Value *BuilderImpl::CreateFClamp(Value *x, Value *minVal, Value *maxVal, const T
     result = min;
   }
 
-  // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
-  // canonicalize the result here.
-  if (getPipelineState()->getTargetInfo().getGfxIpVersion().major < 9)
-    result = canonicalize(result);
-
   result->setName(instName);
   return result;
 }
@@ -944,11 +966,6 @@ Value *BuilderImpl::CreateFMin(Value *value1, Value *value2, const Twine &instNa
   min->setFastMathFlags(getFastMathFlags());
   Value *result = min;
 
-  // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
-  // canonicalize the result here.
-  if (getPipelineState()->getTargetInfo().getGfxIpVersion().major < 9)
-    result = canonicalize(result);
-
   result->setName(instName);
   return result;
 }
@@ -965,11 +982,6 @@ Value *BuilderImpl::CreateFMax(Value *value1, Value *value2, const Twine &instNa
   CallInst *max = CreateMaxNum(value1, value2);
   max->setFastMathFlags(getFastMathFlags());
   Value *result = max;
-
-  // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
-  // canonicalize the result here.
-  if (getPipelineState()->getTargetInfo().getGfxIpVersion().major < 9)
-    result = canonicalize(result);
 
   result->setName(instName);
   return result;
@@ -991,11 +1003,6 @@ Value *BuilderImpl::CreateFMin3(Value *value1, Value *value2, Value *value3, con
   min2->setFastMathFlags(getFastMathFlags());
   Value *result = min2;
 
-  // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
-  // canonicalize the result here.
-  if (getPipelineState()->getTargetInfo().getGfxIpVersion().major < 9)
-    result = canonicalize(result);
-
   result->setName(instName);
   return result;
 }
@@ -1015,11 +1022,6 @@ Value *BuilderImpl::CreateFMax3(Value *value1, Value *value2, Value *value3, con
   CallInst *max2 = CreateMaxNum(max1, value3);
   max2->setFastMathFlags(getFastMathFlags());
   Value *result = max2;
-
-  // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
-  // canonicalize the result here.
-  if (getPipelineState()->getTargetInfo().getGfxIpVersion().major < 9)
-    result = canonicalize(result);
 
   result->setName(instName);
   return result;
@@ -1056,11 +1058,6 @@ Value *BuilderImpl::CreateFMid3(Value *value1, Value *value2, Value *value3, con
     max2->setFastMathFlags(getFastMathFlags());
     result = max2;
   }
-
-  // Before GFX9, fmed/fmin/fmax do not honor the hardware FP mode wanting flush denorms. So we need to
-  // canonicalize the result here.
-  if (getPipelineState()->getTargetInfo().getGfxIpVersion().major < 9)
-    result = canonicalize(result);
 
   result->setName(instName);
   return result;
@@ -1227,6 +1224,39 @@ Value *BuilderImpl::CreateCountLeadingSignBits(Value *value, const Twine &instNa
 
   Value *result =
       scalarize(value, [this](Value *value) { return CreateUnaryIntrinsic(Intrinsic::amdgcn_sffbh, value); });
+  result->setName(instName);
+  return result;
+}
+
+// =====================================================================================================================
+// Create "msad" (Masked Sum of Absolute Differences) operation , returning an 32-bit integer of msad result.
+//
+// @param src : Contains 4 packed 8-bit unsigned integers in 32 bits.
+// @param ref : Contains 4 packed 8-bit unsigned integers in 32 bits.
+// @param accum : A 32-bit unsigned integer, providing an existing accumulation.
+Value *BuilderImpl::CreateMsad4(Value *src, Value *ref, Value *accum, const Twine &instName) {
+  assert(ref->getType()->getScalarType()->isIntegerTy(32));
+
+  Value *result = scalarize(src, ref, accum, [this](Value *src, Value *ref, Value *accum) {
+    return CreateIntrinsic(src->getType(), Intrinsic::amdgcn_msad_u8, {src, ref, accum});
+  });
+  result->setName(instName);
+  return result;
+}
+
+// =====================================================================================================================
+// Create "fdot2" operation, returning a float result of the sum of dot2 of 2 half vec2 and a float scalar.
+//
+// @param a : Vector of 2xhalf A.
+// @param b : Vector of 2xhalf B.
+// @param scalar : A float scalar.
+// @param clamp : Whether the accumulation result should be clamped.
+Value *BuilderImpl::CreateFDot2(Value *a, Value *b, Value *scalar, Value *clamp, const Twine &instName) {
+  assert(a->getType()->getScalarType()->isHalfTy() && b->getType()->getScalarType()->isHalfTy());
+  assert(scalar->getType()->isFloatTy());
+  assert(clamp->getType()->isIntegerTy() && clamp->getType()->getIntegerBitWidth() == 1);
+
+  Value *result = CreateIntrinsic(scalar->getType(), Intrinsic::amdgcn_fdot2, {a, b, scalar, clamp});
   result->setName(instName);
   return result;
 }

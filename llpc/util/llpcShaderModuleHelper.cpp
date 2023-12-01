@@ -113,6 +113,8 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
       case ExecutionModePixelCenterInteger:
         shaderModuleUsage.pixelCenterInteger = true;
         break;
+      case ExecutionModeXfb:
+        shaderModuleUsage.enableXfb = true;
       default: {
         break;
       }
@@ -154,15 +156,20 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
           shaderModuleUsage.useGenericBuiltIn = true;
           break;
         }
+        case BuiltInBaryCoordKHR:
+        case BuiltInBaryCoordNoPerspKHR:
+          shaderModuleUsage.useBarycentric = true;
+          break;
         default: {
           break;
         }
         }
-      }
-      if (decoration == DecorationLocation) {
+      } else if (decoration == DecorationLocation) {
         auto location = (opCode == OpDecorate) ? codePos[3] : codePos[4];
         if (location == static_cast<unsigned>(Vkgc::GlCompatibilityInOutLocation::ClipVertex))
           shaderModuleUsage.useClipVertex = true;
+      } else if (decoration == DecorationPerVertexKHR) {
+        shaderModuleUsage.useBarycentric = true;
       }
       break;
     }
@@ -247,10 +254,13 @@ unsigned ShaderModuleHelper::trimSpirvDebugInfo(const BinaryData *spvBin, llvm::
     codeBuffer = codeBuffer.drop_front(sizeof(Vkgc::SpirvHeader) / wordSize);
   }
 
+  unsigned nonSemanticShaderDebug = ~0;
+
   // Copy SPIR-V instructions
   while (codePos < end) {
     unsigned opCode = (codePos[0] & OpCodeMask);
     unsigned wordCount = (codePos[0] >> WordCountShift);
+    bool skip = false;
     switch (opCode) {
     case OpSource:
     case OpSourceContinued:
@@ -259,12 +269,29 @@ unsigned ShaderModuleHelper::trimSpirvDebugInfo(const BinaryData *spvBin, llvm::
     case OpLine:
     case OpNop:
     case OpNoLine:
-    case OpModuleProcessed: {
-      // Skip debug instructions
+    case OpModuleProcessed:
+      skip = true;
+      break;
+    case OpExtInstImport: {
+      unsigned id = codePos[1];
+      const char *name = reinterpret_cast<const char *>(&codePos[2]);
+      if (!strcmp(name, "NonSemantic.Shader.DebugInfo.100")) {
+        nonSemanticShaderDebug = id;
+        skip = true;
+      }
       break;
     }
-    default: {
-      // Copy other instructions
+    case OpExtInst: {
+      unsigned set = codePos[3];
+      if (set == nonSemanticShaderDebug)
+        skip = true;
+      break;
+    }
+    default:
+      break;
+    }
+
+    if (!skip) {
       if (writeCode) {
         assert(codePos + wordCount <= end);
         assert(wordCount <= codeBuffer.size());
@@ -272,8 +299,6 @@ unsigned ShaderModuleHelper::trimSpirvDebugInfo(const BinaryData *spvBin, llvm::
         codeBuffer = codeBuffer.drop_front(wordCount);
       }
       totalSizeInWords += wordCount;
-      break;
-    }
     }
 
     codePos += wordCount;

@@ -1,7 +1,7 @@
 // gl_BaryCoordNoPerspEXT requires different interpolant mode. This tests interpolateAtCentroid(gl_BaryCoordNoPerspEXT)
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v -gfxip=10.3 %s | FileCheck -check-prefix=SHADERTEST %s
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST: @[[BaryCoord:[^ ]*]] = external addrspace(64) global <3 x float>
@@ -9,7 +9,7 @@
 
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; The second argument (i32 32) respects that interpLoc is InterpLocCentroid.
-; SHADERTEST: call <3 x float> (...) @lgc.create.read.bary.coord.v3f32(i32 5287, i32 32,
+; SHADERTEST: call <3 x float> (...) @lgc.create.read.bary.coord.v3f32(i32 5287, i32 35,
 
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: %[[InterpCenter0:[^ ]*]] = extractelement <2 x float> %LinearInterpCenter, i64 0

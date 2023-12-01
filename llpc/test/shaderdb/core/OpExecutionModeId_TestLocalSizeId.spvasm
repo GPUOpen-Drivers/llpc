@@ -3,9 +3,9 @@
 ; SHADERTEST-LABEL: {{^// LLPC}} final ELF info
 ; The workgroup sizes will be set to the values in the LocalSizeId instruction.  In this case,
 ; we should use the default values for the spec constants %7, %8, and %9.
-; SHADERTEST: COMPUTE_NUM_THREAD_X 0x0000000000000002
-; SHADERTEST: COMPUTE_NUM_THREAD_Y 0x0000000000000008
-; SHADERTEST: COMPUTE_NUM_THREAD_Z 0x0000000000000020
+; SHADERTEST:     .hardware_stages:
+; SHADERTEST:       .cs:
+; SHADERTEST:         .threadgroup_dimensions: [ 0x0000000000000002 0x0000000000000008 0x0000000000000020 ]
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

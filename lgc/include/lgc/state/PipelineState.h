@@ -238,6 +238,8 @@ public:
   // Record pipeline state into IR metadata of specified module.
   void record(llvm::Module *module);
 
+  void recordExceptPalMetadata(llvm::Module *module);
+
   // Print pipeline state
   void print(llvm::raw_ostream &out) const;
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
@@ -300,8 +302,7 @@ public:
   void setGsOnChip(bool gsOnChip) { m_gsOnChip = gsOnChip; }
 
   // Checks whether GS on-chip mode is enabled
-  // NOTE: GS on-chip mode has different meaning for GFX6~8 and GFX9: on GFX6~8, GS on-chip mode means ES -> GS ring
-  // and GS -> VS ring are both on-chip; on GFX9, ES -> GS ring is always on-chip, GS on-chip mode means GS -> VS
+  // NOTE: on GFX9, ES -> GS ring is always on-chip, GS on-chip mode means GS -> VS
   // ring is on-chip.
   bool isGsOnChip() const { return m_gsOnChip; }
 
@@ -396,8 +397,9 @@ public:
   // Check if transform feedback is active
   bool enableXfb() const { return m_xfbStateMetadata.enableXfb; }
 
-  // Check if we need primitive statistics counting
-  bool enablePrimStats() const { return m_xfbStateMetadata.enablePrimStats; }
+  // Check if we need count primitives if XFB is disabled
+  // NOTE: The old interface m_xfbStateMetadata.enablePrimStats will be removed later
+  bool enablePrimStats() const { return m_options.enablePrimGeneratedQuery || m_xfbStateMetadata.enablePrimStats; }
 
   // Get transform feedback strides
   const std::array<unsigned, MaxTransformFeedbackBuffers> &getXfbBufferStrides() const {
@@ -612,7 +614,6 @@ private:
   bool m_outputPackState[ShaderStageGfxCount] = {}; // The output packable state per shader stage
   XfbStateMetadata m_xfbStateMetadata = {};         // Transform feedback state metadata
   llvm::SmallVector<unsigned, 32> m_userDataMaps[ShaderStageCountInternal]; // The user data per-shader
-  bool m_useMrt0AToMrtzA = false;                                           // Whether to copy mrt0.a to mrz.a
 
   struct {
     float inner[2]; // default tessellation inner level

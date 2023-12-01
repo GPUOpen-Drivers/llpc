@@ -187,7 +187,7 @@ void RegisterMetadataBuilder::buildPalMetadata() {
         for (auto locInfoPair : outputLocInfoMap) {
           auto preRasterOutputSemanticElem = preRasterOutputSemanticNode[elemIdx].getMap(true);
           preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Semantic] =
-              MaxBuiltIn + locInfoPair.first.getLocation();
+              MaxBuiltInSemantic + locInfoPair.first.getLocation();
           preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Index] =
               locInfoPair.second.getLocation();
           ++elemIdx;
@@ -196,6 +196,7 @@ void RegisterMetadataBuilder::buildPalMetadata() {
         for (auto locPair : builtInOutputLocMap) {
           if (locPair.first == BuiltInClipDistance || locPair.first == BuiltInCullDistance ||
               locPair.first == BuiltInLayer || locPair.first == BuiltInViewportIndex) {
+            assert(locPair.first < MaxBuiltInSemantic);
             auto preRasterOutputSemanticElem = preRasterOutputSemanticNode[elemIdx].getMap(true);
             preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Semantic] = locPair.first;
             preRasterOutputSemanticElem[Util::Abi::PrerasterOutputSemanticMetadataKey::Index] = locPair.second;
@@ -562,7 +563,7 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
   if (m_hasMesh) {
     maxVertsPerSubgroup = std::min(meshMode.outputVertices, NggMaxThreadsPerSubgroup);
     threadsPerSubgroup = calcFactor.primAmpFactor;
-    const bool enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
+    const bool enableMultiView = m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable;
     bool hasPrimitivePayload = meshBuiltInUsage.layer || meshBuiltInUsage.viewportIndex ||
                                meshBuiltInUsage.primitiveShadingRate || enableMultiView;
     if (m_gfxIp.major < 11)
@@ -774,6 +775,12 @@ void RegisterMetadataBuilder::buildPsRegisters() {
     spiBarycCntl[Util::Abi::SpiBarycCntlMetadataKey::PosFloatLocation] = 0;
   }
 
+  // Provoking vtx
+  if (m_pipelineState->getShaderInterfaceData(shaderStage)->entryArgIdxs.fs.provokingVtxInfo != 0) {
+    assert(m_gfxIp >= GfxIpVersion({10, 3}));
+    getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::PsLoadProvokingVtx] = true;
+  }
+
   // PA_SC_MODE_CNTL_1
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::PsIterSample] =
       m_pipelineState->getShaderResourceUsage(shaderStage)->builtInUsage.fs.runAtSampleRate > 0;
@@ -954,13 +961,14 @@ void RegisterMetadataBuilder::buildPsRegisters() {
       for (auto locInfoPair : inputLocInfoMap) {
         auto psInputSemanticElem = psInputSemanticNode[elemIdx].getMap(true);
         psInputSemanticElem[Util::Abi::PsInputSemanticMetadataKey::Semantic] =
-            MaxBuiltIn + locInfoPair.first.getLocation();
+            MaxBuiltInSemantic + locInfoPair.first.getLocation();
         ++elemIdx;
       }
 
       for (auto locPair : builtInInputLocMap) {
         if (locPair.first == BuiltInClipDistance || locPair.first == BuiltInCullDistance ||
             locPair.first == BuiltInLayer || locPair.first == BuiltInViewportIndex) {
+          assert(locPair.first < MaxBuiltInSemantic);
           auto psInputSemanticElem = psInputSemanticNode[elemIdx].getMap(true);
           psInputSemanticElem[Util::Abi::PsInputSemanticMetadataKey::Semantic] = locPair.first;
           ++elemIdx;
@@ -1060,8 +1068,6 @@ void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareS
   unsigned sgprLimits = 0;
   unsigned vgprLimits = 0;
   if (apiStage1 == ShaderStageCopyShader) {
-    // NOTE: For copy shader, usually we use fixed number of user data registers.
-    // But in some cases, we may change user data registers, we use variable to keep user sgpr count here
     userDataCount = lgc::CopyShaderUserSgprCount;
     sgprLimits = m_pipelineState->getTargetInfo().getGpuProperty().maxSgprsAvailable;
     vgprLimits = m_pipelineState->getTargetInfo().getGpuProperty().maxVgprsAvailable;
@@ -1131,6 +1137,7 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
   bool usePointSize = false;
   bool useLayer = false;
   bool useViewportIndex = false;
+  bool useViewportIndexImplicitly = false;
   bool useShadingRate = false;
   unsigned clipDistanceCount = 0;
   unsigned cullDistanceCount = 0;
@@ -1205,7 +1212,12 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
       expCount = resUsage->inOutUsage.expCount;
     }
 
-    useLayer = useLayer || m_pipelineState->getInputAssemblyState().enableMultiView;
+    useLayer = useLayer || m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable;
+    // useViewportIndex must be set in this mode as API shader may not export viewport index.
+    if (m_pipelineState->getInputAssemblyState().multiView == MultiViewMode::PerView) {
+      useViewportIndexImplicitly = !useViewportIndex;
+      useViewportIndex = true;
+    }
 
     if (usePrimitiveId) {
       getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtPrimitiveIdEn] = true;
@@ -1236,7 +1248,8 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
   // VGT_REUSE_OFF
   bool disableVertexReuse = m_pipelineState->getInputAssemblyState().disableVertexReuse;
   disableVertexReuse |= meshPipeline; // Mesh pipeline always disable vertex reuse
-  if (useViewportIndex)
+  // If viewport index is implicitly set by multiview, then it must be uniform and reuse should be allowed.
+  if (useViewportIndex && !useViewportIndexImplicitly)
     disableVertexReuse = true;
 
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtReuseOff] =

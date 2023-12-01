@@ -36,7 +36,7 @@
 
 #include "continuations/Continuations.h"
 #include "continuations/ContinuationsDialect.h"
-#include "lgccps/LgcCpsDialect.h"
+#include "lgc/LgcCpsDialect.h"
 #include "llvm-dialects/Dialect/Builder.h"
 #include "llvm-dialects/Dialect/Dialect.h"
 #include "llvm-dialects/Dialect/Visitor.h"
@@ -171,7 +171,7 @@ static void processContinuations(
   //    co.flag = llvm.coro.suspend.retcon
   //       unreachable
   auto &Context = M.getContext();
-  auto *I8Ptr = Type::getInt8PtrTy(Context);
+  auto *I8Ptr = Type::getInt8Ty(Context)->getPointerTo();
   auto *I32 = Type::getInt32Ty(Context);
   auto *I64 = Type::getInt64Ty(Context);
 

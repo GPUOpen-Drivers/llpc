@@ -35,6 +35,7 @@
 #include "llpcSpirvLowerAccessChain.h"
 #include "llpcSpirvLowerCfgMerges.h"
 #include "llpcSpirvLowerConstImmediateStore.h"
+#include "llpcSpirvLowerCooperativeMatrix.h"
 #include "llpcSpirvLowerGlobal.h"
 #include "llpcSpirvLowerInstMetaRemove.h"
 #include "llpcSpirvLowerMath.h"
@@ -58,7 +59,6 @@
 // New version of the code (also handles unknown version, which we treat as latest)
 #include "llvm/IRPrinter/IRPrintingPasses.h"
 #endif
-#include "LowerGpuRt.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Transforms/AggressiveInstCombine/AggressiveInstCombine.h"
 #include "llvm/Transforms/IPO.h"
@@ -81,7 +81,6 @@
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Utils.h"
 #include "llvm/Transforms/Utils/Mem2Reg.h"
-#include "llvm/Transforms/Vectorize.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower"
 
@@ -202,6 +201,9 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   // Lower SPIR-V terminators
   passMgr.addPass(SpirvLowerTerminator());
 
+  // Lower spirv.cooperative.matrix.proxy to LGC operations. Should run before SROA.
+  passMgr.addPass(SpirvLowerCooperativeMatrix());
+
   // Lower Glsl compatibility variables and operations
   passMgr.addPass(LowerGLCompatibility());
 
@@ -261,14 +263,11 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   passMgr.addPass(SpirvLowerInstMetaRemove());
 
   if (rayTracing || rayQuery || isInternalRtShader) {
-    passMgr.addPass(LowerGpuRt());
-    passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass(instCombineOpt)));
+    FunctionPassManager fpm;
+    fpm.addPass(SROAPass(SROAOptions::PreserveCFG));
+    fpm.addPass(InstCombinePass(instCombineOpt));
+    passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
   }
-
-  FunctionPassManager fpm;
-  fpm.addPass(SROAPass(SROAOptions::PreserveCFG));
-  fpm.addPass(InstCombinePass(instCombineOpt));
-  passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
 
   // Stop timer for lowering passes.
   if (lowerTimer)

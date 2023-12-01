@@ -328,8 +328,11 @@ DICompositeType *SPIRVToLLVMDbgTran::transTypeComposite(const SPIRVExtInst *Debu
   switch (Ops[TagIdx]) {
   case SPIRVDebug::Class:
     CT = Builder.createClassType(ParentScope, Name, File, LineNo, Size, Align, 0, Flags, DerivedFrom,
-                                 DINodeArray() /*elements*/, nullptr /*VTableHolder*/, nullptr /*TemplateParams*/,
-                                 Identifier);
+                                 DINodeArray() /*elements*/,
+#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 480873
+                                 0 /*RunTimeLang*/,
+#endif
+                                 nullptr /*VTableHolder*/, nullptr /*TemplateParams*/, Identifier);
     break;
   case SPIRVDebug::Structure:
     CT = Builder.createStructType(ParentScope, Name, File, LineNo, Size, Align, Flags, DerivedFrom,
@@ -371,7 +374,15 @@ DINode *SPIRVToLLVMDbgTran::transTypeMember(const SPIRVExtInst *DebugInst) {
     SPIRVValue *ConstVal = BM->get<SPIRVValue>(Ops[ValueIdx]);
     assert(isConstantOpCode(ConstVal->getOpCode()) && "Static member must be a constant");
     llvm::Value *Val = SPIRVReader->transValue(ConstVal, nullptr, nullptr);
-    return Builder.createStaticMemberType(Scope, Name, File, LineNo, BaseType, Flags, cast<llvm::Constant>(Val));
+    return Builder.createStaticMemberType(
+        Scope, Name, File, LineNo, BaseType, Flags,
+        cast<llvm::Constant>(Val)
+#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 480812
+        // New version of the code (also handles unknown version, which we treat as latest)
+        ,
+        llvm::dwarf::DW_TAG_member
+#endif
+    );
   }
   uint64_t Size = getConstant(Ops[SizeIdx]);
   uint64_t Alignment = 0;
@@ -407,6 +418,9 @@ DINode *SPIRVToLLVMDbgTran::transTypeEnum(const SPIRVExtInst *DebugInst) {
   if (!isa<OpTypeVoid>(E))
     UnderlyingType = transDebugInst<DIType>(static_cast<SPIRVExtInst *>(E));
   return Builder.createEnumerationType(Scope, Name, File, LineNo, SizeInBits, AlignInBits, Enumerators, UnderlyingType,
+#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 480873
+                                       0 /*RunTimeLang*/,
+#endif
                                        "", UnderlyingType);
 }
 
@@ -477,15 +491,11 @@ DINode *SPIRVToLLVMDbgTran::transFunction(const SPIRVExtInst *DebugInst) {
 
   SPIRVWord SPIRVDebugFlags = getConstant(Ops[FlagsIdx]);
   DINode::DIFlags Flags = mapToDIFlags(SPIRVDebugFlags);
-  // TODO: IsDefinition is always true for DebugFunction, but should be false
-  // for DebugFunctionDeclaration.
-  const bool IsDefinition = true;
-
   bool IsOptimized = SPIRVDebugFlags & SPIRVDebug::FlagIsOptimized;
   bool IsLocal = SPIRVDebugFlags & SPIRVDebug::FlagIsLocal;
-  bool IsMainSubprogram = BM->getEntryPoint(Ops[FunctionIdIdx]) != nullptr;
   DISubprogram::DISPFlags SPFlags =
-      DISubprogram::toSPFlags(IsLocal, IsDefinition, IsOptimized, DISubprogram::SPFlagNonvirtual, IsMainSubprogram);
+      DISubprogram::toSPFlags(IsLocal, /*IsDefinition*/ true, IsOptimized, DISubprogram::SPFlagNonvirtual,
+                              /*IsMainSubprogram*/ false);
 
   unsigned ScopeLine = getConstant(Ops[ScopeLineIdx]);
 
@@ -504,26 +514,9 @@ DINode *SPIRVToLLVMDbgTran::transFunction(const SPIRVExtInst *DebugInst) {
   DINodeArray TParams = Builder.getOrCreateArray(Elts);
   llvm::DITemplateParameterArray TParamsArray = TParams.get();
 
-  DISubprogram *DIS = nullptr;
-  if ((isa<DICompositeType>(Scope) || isa<DINamespace>(Scope)) && !IsDefinition)
-    DIS = Builder.createMethod(Scope, Name, LinkageName, File, LineNo, Ty, 0, 0, nullptr, Flags, SPFlags, TParamsArray);
-  else
-    DIS =
-        Builder.createFunction(Scope, Name, LinkageName, File, LineNo, Ty, ScopeLine, Flags, SPFlags, TParamsArray, FD);
+  DISubprogram *DIS =
+      Builder.createFunction(Scope, Name, LinkageName, File, LineNo, Ty, ScopeLine, Flags, SPFlags, TParamsArray, FD);
   DebugInstCache[DebugInst] = DIS;
-  SPIRVId RealFuncId = Ops[FunctionIdIdx];
-  FuncMap[RealFuncId] = DIS;
-
-  // Function.
-  SPIRVEntry *E = BM->getEntry(Ops[FunctionIdIdx]);
-  if (E->getOpCode() == OpFunction) {
-    SPIRVFunction *BF = static_cast<SPIRVFunction *>(E);
-    llvm::Function *F = SPIRVReader->transFunction(BF);
-    assert(F && "Translation of function failed!");
-    if (!F->hasMetadata())
-      F->setMetadata("dbg", DIS);
-    F->setSubprogram(DIS);
-  }
   return DIS;
 }
 
@@ -887,12 +880,15 @@ Instruction *SPIRVToLLVMDbgTran::transDebugIntrinsic(const SPIRVExtInst *DebugIn
   case SPIRVDebug::NoScope:
     return nullptr;
   case SPIRVDebug::FunctionDefinition: {
-    using namespace SPIRVDebug::Operand::Function;
-    SPIRVExtInst *funcExt = BM->get<SPIRVExtInst>(Ops[0]);
-    std::vector<SPIRVWord> &args = funcExt->getArguments();
-    assert(args.size() > FunctionIdIdx);
-    args[FunctionIdIdx] = Ops[1];
-    transDebugInst<DISubprogram>(funcExt);
+    SPIRVExtInst *dbgDef = BM->get<SPIRVExtInst>(Ops[0]);
+    SPIRVFunction *opDef = BM->get<SPIRVFunction>(Ops[1]);
+    DISubprogram *DIS = transDebugInst<DISubprogram>(dbgDef);
+
+    FuncMap[opDef->getId()] = DIS;
+
+    llvm::Function *F = SPIRVReader->transFunction(opDef);
+    assert(F && "Translation of function failed!");
+    F->setSubprogram(DIS);
     return nullptr;
   }
 

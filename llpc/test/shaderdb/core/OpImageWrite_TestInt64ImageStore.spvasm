@@ -3,7 +3,7 @@
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: call void (...) @lgc.create.image.store(<4 x i64>
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call void @llvm.amdgcn.image.store.2d.v2f32.i32(<2 x float>
+; SHADERTEST:  call void @llvm.amdgcn.image.store.2d.v2f32.i16(<2 x float> %{{.*}}, i32 3, i16 3, i16 3, <8 x i32> %{{.*}}, i32 0, i32 0)
 ; SHADERTEST: AMDLLPC SUCCESS
 
 ; SPIR-V

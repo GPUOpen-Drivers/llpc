@@ -78,21 +78,36 @@ Expected<SmallVector<BinaryData>> RayTracingPipelineBuilder::buildRayTracingPipe
   RayTracingPipelineBuildInfo *pipelineInfo = &compileInfo.rayTracePipelineInfo;
   RayTracingPipelineBuildOut *pipelineOut = &compileInfo.rayTracingPipelineOut;
 
+  ResourceMappingNodeMap nodeSets;
+  unsigned pushConstSize = 0;
   for (unsigned i = 0; i < compileInfo.shaderModuleDatas.size(); ++i) {
+    auto &moduleData = compileInfo.shaderModuleDatas[i];
+    const ShaderStage stage = moduleData.shaderStage;
     PipelineShaderInfo *shaderInfo = &pipelineInfo->pShaders[i];
-    const ShaderModuleBuildOut *shaderOut = &(compileInfo.shaderModuleDatas[i].shaderOut);
+    const ShaderModuleBuildOut *shaderOut = &(moduleData.shaderOut);
+
+    // If entry target is not specified, use the one from command line option
+    if (!shaderInfo->pEntryTarget)
+      shaderInfo->pEntryTarget = moduleData.entryPoint.c_str();
+
     shaderInfo->pModuleData = shaderOut->pModuleData;
-    if (!shaderInfo->pEntryTarget) {
-      // If entry target is not specified, use the one from command line option
-      shaderInfo->pEntryTarget = compileInfo.shaderModuleDatas[i].entryPoint.c_str();
-    }
+    shaderInfo->entryStage = stage;
+
+    if (compileInfo.doAutoLayout)
+      doAutoLayoutDesc(stage, moduleData.spirvBin, nullptr, shaderInfo, nodeSets, pushConstSize,
+                       /*autoLayoutDesc = */ compileInfo.autoLayoutDesc, false);
   }
+
+  if (compileInfo.doAutoLayout)
+    buildTopLevelMapping(compileInfo.stageMask, nodeSets, pushConstSize, &pipelineInfo->resourceMapping,
+                         compileInfo.autoLayoutDesc);
 
   pipelineInfo->pInstance = nullptr; // Dummy, unused
   pipelineInfo->pUserData = &compileInfo.pipelineBuf;
   pipelineInfo->pfnOutputAlloc = allocateBuffer;
   pipelineInfo->options.robustBufferAccess = compileInfo.robustBufferAccess;
   pipelineInfo->rtState.nodeStrideShift = Log2_32(compileInfo.bvhNodeStride);
+  pipelineInfo->shaderCount = compileInfo.shaderModuleDatas.size();
 
   PipelineBuildInfo localPipelineInfo = {};
   localPipelineInfo.pRayTracingInfo = pipelineInfo;

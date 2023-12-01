@@ -183,7 +183,7 @@ void ShaderModes::setComputeShaderMode(Module &module, const ComputeShaderMode &
   mode.workgroupSizeZ = std::max(1U, mode.workgroupSizeZ);
   assert(mode.workgroupSizeX <= MaxComputeWorkgroupSize && mode.workgroupSizeY <= MaxComputeWorkgroupSize &&
          mode.workgroupSizeZ <= MaxComputeWorkgroupSize);
-  PipelineState::setNamedMetadataToArrayOfInt32(&module, inMode, ComputeShaderModeMetadataName);
+  PipelineState::setNamedMetadataToArrayOfInt32(&module, mode, ComputeShaderModeMetadataName);
 }
 
 // =====================================================================================================================

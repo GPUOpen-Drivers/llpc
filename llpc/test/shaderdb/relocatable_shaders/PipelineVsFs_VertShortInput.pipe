@@ -2,10 +2,10 @@
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-relocatable-shader-elf -o %t.elf %gfxip %s
-; RUN: llvm-objdump --triple=amdgcn --mcpu=gfx900 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
+; RUN: llvm-objdump --triple=amdgcn --mcpu=gfx1010 -d %t.elf | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: <_amdgpu_vs_main>:
-; SHADERTEST: tbuffer_load_format_d16_x {{v[0-9]*}}, [[vert_offset:v[0-9]*]], [[vert_base:s\[.*\]]], 0 format:[BUF_DATA_FORMAT_16,BUF_NUM_FORMAT_SINT] idxen
-; SHADERTEST: tbuffer_load_format_d16_x {{v[0-9]*}}, [[vert_offset]], [[vert_base]], 0 format:[BUF_DATA_FORMAT_16,BUF_NUM_FORMAT_SINT] idxen offset:2
+; SHADERTEST: tbuffer_load_format_d16_x {{v[0-9]*}}, [[vert_offset:v[0-9]*]], [[vert_base:s\[.*\]]], 0 format:[BUF_FMT_16_SINT] idxen
+; SHADERTEST: tbuffer_load_format_d16_x {{v[0-9]*}}, [[vert_offset]], [[vert_base]], 0 format:[BUF_FMT_16_SINT] idxen offset:2
 ; SHADERTEST-LABEL: <_amdgpu_vs_main_fetchless>:
 ; END_SHADERTEST
 

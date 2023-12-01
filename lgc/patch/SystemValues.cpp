@@ -83,8 +83,8 @@ Value *ShaderSystemValues::getEsGsRingBufDesc() {
     // Ensure we have got the global table pointer first, and insert new code after that.
     BuilderBase builder(getInternalGlobalTablePtr()->getNextNode());
     m_esGsRingBufDesc = loadDescFromDriverTable(tableOffset, builder);
-    if (m_shaderStage != ShaderStageGeometry && m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 8) {
-      // NOTE: For GFX8+, we have to explicitly set DATA_FORMAT for GS-VS ring buffer descriptor for
+    if (m_shaderStage != ShaderStageGeometry) {
+      // NOTE: For GFX9+, we have to explicitly set DATA_FORMAT for GS-VS ring buffer descriptor for
       // VS/TES output.
       m_esGsRingBufDesc = setRingBufferDataFormat(m_esGsRingBufDesc, BUF_DATA_FORMAT_32, builder);
     }
@@ -302,10 +302,8 @@ Value *ShaderSystemValues::getGsVsRingBufDesc(unsigned streamId) {
 
       desc = builder.CreateInsertElement(desc, gsVsRingBufDescElem1, (uint64_t)1);
 
-      if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 8) {
-        // NOTE: For GFX8+, we have to explicitly set DATA_FORMAT for GS-VS ring buffer descriptor.
-        desc = setRingBufferDataFormat(desc, BUF_DATA_FORMAT_32, builder);
-      }
+      // NOTE: For GFX9+, we have to explicitly set DATA_FORMAT for GS-VS ring buffer descriptor.
+      desc = setRingBufferDataFormat(desc, BUF_DATA_FORMAT_32, builder);
 
       m_gsVsRingBufDescs[streamId] = desc;
     } else {
@@ -521,11 +519,11 @@ Value *ShaderSystemValues::setRingBufferDataFormat(Value *bufDesc, unsigned data
   SqBufRsrcWord3 dataFormatClearMask;
   dataFormatClearMask.u32All = UINT32_MAX;
   // TODO: This code needs to be fixed for gfx10; buffer format is handled differently.
-  dataFormatClearMask.gfx6.dataFormat = 0;
+  dataFormatClearMask.gfx9.dataFormat = 0;
   elem3 = builder.CreateAnd(elem3, builder.getInt32(dataFormatClearMask.u32All));
 
   SqBufRsrcWord3 dataFormatSetValue = {};
-  dataFormatSetValue.gfx6.dataFormat = dataFormat;
+  dataFormatSetValue.gfx9.dataFormat = dataFormat;
   elem3 = builder.CreateOr(elem3, builder.getInt32(dataFormatSetValue.u32All));
 
   return builder.CreateInsertElement(bufDesc, elem3, (uint64_t)3);

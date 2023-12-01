@@ -68,58 +68,51 @@ define void @test.2({ ptr addrspace(32) } %state) !lgc.cps !{i32 1} !lgc.shaders
 ; CHECK-NEXT:    store i8 99, ptr addrspace(5) [[TMP12]], align 1
 ; CHECK-NEXT:    [[Q1:%.*]] = ptrtoint ptr addrspace(5) [[TMP11]] to i32
 ; CHECK-NEXT:    [[STATE:%.*]] = insertvalue { ptr addrspace(5) } poison, ptr addrspace(5) [[TMP12]], 0
-; CHECK-NEXT:    [[TMP13:%.*]] = or i32 ptrtoint (ptr @test.1 to i32), 1
-; CHECK-NEXT:    [[TMP14:%.*]] = load ptr addrspace(5), ptr addrspace(5) [[TMP1]], align 4
-; CHECK-NEXT:    store { ptr addrspace(5) } [[STATE]], ptr addrspace(5) [[TMP14]], align 4
-; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr i8, ptr addrspace(5) [[TMP14]], i32 4
-; CHECK-NEXT:    [[TMP16:%.*]] = ptrtoint ptr addrspace(5) [[TMP12]] to i32
+; CHECK-NEXT:    [[TMP13:%.*]] = load ptr addrspace(5), ptr addrspace(5) [[TMP1]], align 4
+; CHECK-NEXT:    store { ptr addrspace(5) } [[STATE]], ptr addrspace(5) [[TMP13]], align 4
+; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr i8, ptr addrspace(5) [[TMP13]], i32 4
+; CHECK-NEXT:    [[TMP15:%.*]] = ptrtoint ptr addrspace(5) [[TMP12]] to i32
 ; CHECK-NEXT:    br label [[TAIL_BLOCK:%.*]]
 ; CHECK:       tail.block:
-; CHECK-NEXT:    [[TMP17:%.*]] = insertvalue { i32, ptr addrspace(5), i32, i32 } poison, i32 [[TMP13]], 0
-; CHECK-NEXT:    [[TMP18:%.*]] = insertvalue { i32, ptr addrspace(5), i32, i32 } [[TMP17]], ptr addrspace(5) [[TMP15]], 1
-; CHECK-NEXT:    [[TMP19:%.*]] = insertvalue { i32, ptr addrspace(5), i32, i32 } [[TMP18]], i32 [[TMP16]], 2
-; CHECK-NEXT:    [[TMP20:%.*]] = insertvalue { i32, ptr addrspace(5), i32, i32 } [[TMP19]], i32 [[Q1]], 3
-; CHECK-NEXT:    [[TMP21:%.*]] = ptrtoint ptr addrspace(4) [[NUMWORKGROUPSPTR]] to i64
-; CHECK-NEXT:    [[TMP22:%.*]] = bitcast i64 [[TMP21]] to <2 x i32>
-; CHECK-NEXT:    [[TMP23:%.*]] = extractelement <2 x i32> [[TMP22]], i64 0
-; CHECK-NEXT:    [[TMP24:%.*]] = extractelement <2 x i32> [[TMP22]], i64 1
-; CHECK-NEXT:    [[TMP25:%.*]] = insertelement <16 x i32> poison, i32 [[GLOBALTABLE]], i64 0
-; CHECK-NEXT:    [[TMP26:%.*]] = insertelement <16 x i32> [[TMP25]], i32 [[TMP23]], i64 1
-; CHECK-NEXT:    [[TMP27:%.*]] = insertelement <16 x i32> [[TMP26]], i32 [[TMP24]], i64 2
-; CHECK-NEXT:    [[TMP28:%.*]] = insertelement <16 x i32> [[TMP27]], i32 [[PAD0]], i64 3
-; CHECK-NEXT:    [[TMP29:%.*]] = insertelement <16 x i32> [[TMP28]], i32 [[PAD1]], i64 4
-; CHECK-NEXT:    [[TMP30:%.*]] = insertelement <16 x i32> [[TMP29]], i32 [[PAD2]], i64 5
-; CHECK-NEXT:    [[TMP31:%.*]] = insertelement <16 x i32> [[TMP30]], i32 [[PAD3]], i64 6
-; CHECK-NEXT:    [[TMP32:%.*]] = insertelement <16 x i32> [[TMP31]], i32 [[PAD4]], i64 7
-; CHECK-NEXT:    [[TMP33:%.*]] = insertelement <16 x i32> [[TMP32]], i32 [[PAD5]], i64 8
-; CHECK-NEXT:    [[TMP34:%.*]] = insertelement <16 x i32> [[TMP33]], i32 [[PAD6]], i64 9
-; CHECK-NEXT:    [[TMP35:%.*]] = insertelement <16 x i32> [[TMP34]], i32 [[PAD7]], i64 10
-; CHECK-NEXT:    [[TMP36:%.*]] = insertelement <16 x i32> [[TMP35]], i32 [[PAD8]], i64 11
-; CHECK-NEXT:    [[TMP37:%.*]] = insertelement <16 x i32> [[TMP36]], i32 [[PAD9]], i64 12
-; CHECK-NEXT:    [[TMP38:%.*]] = insertelement <16 x i32> [[TMP37]], i32 [[PAD10]], i64 13
-; CHECK-NEXT:    [[TMP39:%.*]] = insertelement <16 x i32> [[TMP38]], i32 [[PAD11]], i64 14
-; CHECK-NEXT:    [[TMP40:%.*]] = insertelement <16 x i32> [[TMP39]], i32 [[SPILLTABLE]], i64 15
-; CHECK-NEXT:    [[TMP41:%.*]] = extractvalue { i32, ptr addrspace(5), i32, i32 } [[TMP20]], 0
-; CHECK-NEXT:    [[TMP42:%.*]] = call i32 @llvm.amdgcn.set.inactive.{{(chain.arg.)?}}i32(i32 [[TMP41]], i32 [[VCR]])
-; CHECK-NEXT:    [[TMP43:%.*]] = icmp ne i32 [[TMP42]], 0
-; CHECK-NEXT:    [[TMP44:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP43]])
-; CHECK-NEXT:    [[TMP45:%.*]] = call i32 @llvm.cttz.i32(i32 [[TMP44]], i1 true)
-; CHECK-NEXT:    [[TMP46:%.*]] = call i32 @llvm.amdgcn.readlane(i32 [[TMP42]], i32 [[TMP45]])
-; CHECK-NEXT:    [[TMP47:%.*]] = icmp eq i32 [[TMP42]], [[TMP46]]
-; CHECK-NEXT:    [[TMP48:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP47]])
-; CHECK-NEXT:    [[TMP49:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP46]])
-; CHECK-NEXT:    [[TMP50:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP48]])
-; CHECK-NEXT:    [[TMP51:%.*]] = icmp eq i32 [[TMP49]], 0
-; CHECK-NEXT:    br i1 [[TMP51]], label [[RET_BLOCK:%.*]], label [[CHAIN_BLOCK:%.*]]
-; CHECK:       chain.block:
-; CHECK-NEXT:    [[TMP52:%.*]] = and i32 [[TMP49]], -64
-; CHECK-NEXT:    [[TMP53:%.*]] = insertelement <2 x i32> [[TMP8]], i32 [[TMP52]], i64 0
-; CHECK-NEXT:    [[TMP54:%.*]] = bitcast <2 x i32> [[TMP53]] to i64
-; CHECK-NEXT:    [[TMP55:%.*]] = inttoptr i64 [[TMP54]] to ptr
-; CHECK-NEXT:    call void (ptr, i32, <16 x i32>, { i32, ptr addrspace(5), i32, i32 }, i32, ...) @llvm.amdgcn.cs.chain.p0.i32.v16i32.sl_i32p5i32i32s(ptr inreg [[TMP55]], i32 inreg [[TMP50]], <16 x i32> inreg [[TMP40]], { i32, ptr addrspace(5), i32, i32 } [[TMP20]], i32 0)
+; CHECK-NEXT:    [[TMP16:%.*]] = insertvalue { i32, ptr addrspace(5), i32, i32 } { i32 ptrtoint (ptr getelementptr (i8, ptr @test.1, i32 1) to i32), ptr addrspace(5) poison, i32 poison, i32 poison }, ptr addrspace(5) [[TMP14]], 1
+; CHECK-NEXT:    [[TMP17:%.*]] = insertvalue { i32, ptr addrspace(5), i32, i32 } [[TMP16]], i32 [[TMP15]], 2
+; CHECK-NEXT:    [[TMP18:%.*]] = insertvalue { i32, ptr addrspace(5), i32, i32 } [[TMP17]], i32 [[Q1]], 3
+; CHECK-NEXT:    [[TMP19:%.*]] = ptrtoint ptr addrspace(4) [[NUMWORKGROUPSPTR]] to i64
+; CHECK-NEXT:    [[TMP20:%.*]] = bitcast i64 [[TMP19]] to <2 x i32>
+; CHECK-NEXT:    [[TMP21:%.*]] = extractelement <2 x i32> [[TMP20]], i64 0
+; CHECK-NEXT:    [[TMP22:%.*]] = extractelement <2 x i32> [[TMP20]], i64 1
+; CHECK-NEXT:    [[TMP23:%.*]] = insertelement <16 x i32> poison, i32 [[GLOBALTABLE]], i64 0
+; CHECK-NEXT:    [[TMP24:%.*]] = insertelement <16 x i32> [[TMP23]], i32 [[TMP21]], i64 1
+; CHECK-NEXT:    [[TMP25:%.*]] = insertelement <16 x i32> [[TMP24]], i32 [[TMP22]], i64 2
+; CHECK-NEXT:    [[TMP26:%.*]] = insertelement <16 x i32> [[TMP25]], i32 [[PAD0]], i64 3
+; CHECK-NEXT:    [[TMP27:%.*]] = insertelement <16 x i32> [[TMP26]], i32 [[PAD1]], i64 4
+; CHECK-NEXT:    [[TMP28:%.*]] = insertelement <16 x i32> [[TMP27]], i32 [[PAD2]], i64 5
+; CHECK-NEXT:    [[TMP29:%.*]] = insertelement <16 x i32> [[TMP28]], i32 [[PAD3]], i64 6
+; CHECK-NEXT:    [[TMP30:%.*]] = insertelement <16 x i32> [[TMP29]], i32 [[PAD4]], i64 7
+; CHECK-NEXT:    [[TMP31:%.*]] = insertelement <16 x i32> [[TMP30]], i32 [[PAD5]], i64 8
+; CHECK-NEXT:    [[TMP32:%.*]] = insertelement <16 x i32> [[TMP31]], i32 [[PAD6]], i64 9
+; CHECK-NEXT:    [[TMP33:%.*]] = insertelement <16 x i32> [[TMP32]], i32 [[PAD7]], i64 10
+; CHECK-NEXT:    [[TMP34:%.*]] = insertelement <16 x i32> [[TMP33]], i32 [[PAD8]], i64 11
+; CHECK-NEXT:    [[TMP35:%.*]] = insertelement <16 x i32> [[TMP34]], i32 [[PAD9]], i64 12
+; CHECK-NEXT:    [[TMP36:%.*]] = insertelement <16 x i32> [[TMP35]], i32 [[PAD10]], i64 13
+; CHECK-NEXT:    [[TMP37:%.*]] = insertelement <16 x i32> [[TMP36]], i32 [[PAD11]], i64 14
+; CHECK-NEXT:    [[TMP38:%.*]] = insertelement <16 x i32> [[TMP37]], i32 [[SPILLTABLE]], i64 15
+; CHECK-NEXT:    [[TMP39:%.*]] = extractvalue { i32, ptr addrspace(5), i32, i32 } [[TMP18]], 0
+; CHECK-NEXT:    [[TMP40:%.*]] = call i32 @llvm.amdgcn.set.inactive.{{(chain.arg.)?}}i32(i32 [[TMP39]], i32 [[VCR]])
+; CHECK-NEXT:    [[TMP41:%.*]] = icmp ne i32 [[TMP40]], 0
+; CHECK-NEXT:    [[TMP42:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP41]])
+; CHECK-NEXT:    [[TMP43:%.*]] = call i32 @llvm.cttz.i32(i32 [[TMP42]], i1 true)
+; CHECK-NEXT:    [[TMP44:%.*]] = call i32 @llvm.amdgcn.readlane(i32 [[TMP40]], i32 [[TMP43]])
+; CHECK-NEXT:    [[TMP45:%.*]] = icmp eq i32 [[TMP40]], [[TMP44]]
+; CHECK-NEXT:    [[TMP46:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP45]])
+; CHECK-NEXT:    [[TMP47:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP44]])
+; CHECK-NEXT:    [[TMP48:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP46]])
+; CHECK-NEXT:    [[TMP49:%.*]] = and i32 [[TMP47]], -64
+; CHECK-NEXT:    [[TMP50:%.*]] = insertelement <2 x i32> [[TMP8]], i32 [[TMP49]], i64 0
+; CHECK-NEXT:    [[TMP51:%.*]] = bitcast <2 x i32> [[TMP50]] to i64
+; CHECK-NEXT:    [[TMP52:%.*]] = inttoptr i64 [[TMP51]] to ptr
+; CHECK-NEXT:    call void (ptr, i32, <16 x i32>, { i32, ptr addrspace(5), i32, i32 }, i32, ...) @llvm.amdgcn.cs.chain.p0.i32.v16i32.sl_i32p5i32i32s(ptr inreg [[TMP52]], i32 inreg [[TMP48]], <16 x i32> inreg [[TMP38]], { i32, ptr addrspace(5), i32, i32 } [[TMP18]], i32 0)
 ; CHECK-NEXT:    unreachable
-; CHECK:       ret.block:
-; CHECK-NEXT:    ret void
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@test.1
@@ -136,53 +129,46 @@ define void @test.2({ ptr addrspace(32) } %state) !lgc.cps !{i32 1} !lgc.shaders
 ; CHECK-NEXT:    [[TMP9:%.*]] = inttoptr i32 [[Q1]] to ptr addrspace(5)
 ; CHECK-NEXT:    [[N111:%.*]] = load i32, ptr addrspace(5) [[TMP9]], align 4
 ; CHECK-NEXT:    [[N99:%.*]] = load i8, ptr addrspace(5) [[P2]], align 1
-; CHECK-NEXT:    [[TMP10:%.*]] = or i32 ptrtoint (ptr @test.2 to i32), 1
-; CHECK-NEXT:    [[TMP11:%.*]] = load ptr addrspace(5), ptr addrspace(5) [[TMP1]], align 4
+; CHECK-NEXT:    [[TMP10:%.*]] = load ptr addrspace(5), ptr addrspace(5) [[TMP1]], align 4
 ; CHECK-NEXT:    br label [[TAIL_BLOCK:%.*]]
 ; CHECK:       tail.block:
-; CHECK-NEXT:    [[TMP12:%.*]] = insertvalue { i32, ptr addrspace(5) } poison, i32 [[TMP10]], 0
-; CHECK-NEXT:    [[TMP13:%.*]] = insertvalue { i32, ptr addrspace(5) } [[TMP12]], ptr addrspace(5) [[TMP11]], 1
-; CHECK-NEXT:    [[TMP14:%.*]] = ptrtoint ptr addrspace(4) [[NUMWORKGROUPSPTR]] to i64
-; CHECK-NEXT:    [[TMP15:%.*]] = bitcast i64 [[TMP14]] to <2 x i32>
-; CHECK-NEXT:    [[TMP16:%.*]] = extractelement <2 x i32> [[TMP15]], i64 0
-; CHECK-NEXT:    [[TMP17:%.*]] = extractelement <2 x i32> [[TMP15]], i64 1
-; CHECK-NEXT:    [[TMP18:%.*]] = insertelement <16 x i32> poison, i32 [[GLOBALTABLE]], i64 0
-; CHECK-NEXT:    [[TMP19:%.*]] = insertelement <16 x i32> [[TMP18]], i32 [[TMP16]], i64 1
-; CHECK-NEXT:    [[TMP20:%.*]] = insertelement <16 x i32> [[TMP19]], i32 [[TMP17]], i64 2
-; CHECK-NEXT:    [[TMP21:%.*]] = insertelement <16 x i32> [[TMP20]], i32 [[PAD0]], i64 3
-; CHECK-NEXT:    [[TMP22:%.*]] = insertelement <16 x i32> [[TMP21]], i32 [[PAD1]], i64 4
-; CHECK-NEXT:    [[TMP23:%.*]] = insertelement <16 x i32> [[TMP22]], i32 [[PAD2]], i64 5
-; CHECK-NEXT:    [[TMP24:%.*]] = insertelement <16 x i32> [[TMP23]], i32 [[PAD3]], i64 6
-; CHECK-NEXT:    [[TMP25:%.*]] = insertelement <16 x i32> [[TMP24]], i32 [[PAD4]], i64 7
-; CHECK-NEXT:    [[TMP26:%.*]] = insertelement <16 x i32> [[TMP25]], i32 [[PAD5]], i64 8
-; CHECK-NEXT:    [[TMP27:%.*]] = insertelement <16 x i32> [[TMP26]], i32 [[PAD6]], i64 9
-; CHECK-NEXT:    [[TMP28:%.*]] = insertelement <16 x i32> [[TMP27]], i32 [[PAD7]], i64 10
-; CHECK-NEXT:    [[TMP29:%.*]] = insertelement <16 x i32> [[TMP28]], i32 [[PAD8]], i64 11
-; CHECK-NEXT:    [[TMP30:%.*]] = insertelement <16 x i32> [[TMP29]], i32 [[PAD9]], i64 12
-; CHECK-NEXT:    [[TMP31:%.*]] = insertelement <16 x i32> [[TMP30]], i32 [[PAD10]], i64 13
-; CHECK-NEXT:    [[TMP32:%.*]] = insertelement <16 x i32> [[TMP31]], i32 [[PAD11]], i64 14
-; CHECK-NEXT:    [[TMP33:%.*]] = insertelement <16 x i32> [[TMP32]], i32 [[SPILLTABLE]], i64 15
-; CHECK-NEXT:    [[TMP34:%.*]] = extractvalue { i32, ptr addrspace(5) } [[TMP13]], 0
-; CHECK-NEXT:    [[TMP35:%.*]] = call i32 @llvm.amdgcn.set.inactive.{{(chain.arg.)?}}i32(i32 [[TMP34]], i32 [[VCR]])
-; CHECK-NEXT:    [[TMP36:%.*]] = icmp ne i32 [[TMP35]], 0
-; CHECK-NEXT:    [[TMP37:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP36]])
-; CHECK-NEXT:    [[TMP38:%.*]] = call i32 @llvm.cttz.i32(i32 [[TMP37]], i1 true)
-; CHECK-NEXT:    [[TMP39:%.*]] = call i32 @llvm.amdgcn.readlane(i32 [[TMP35]], i32 [[TMP38]])
-; CHECK-NEXT:    [[TMP40:%.*]] = icmp eq i32 [[TMP35]], [[TMP39]]
-; CHECK-NEXT:    [[TMP41:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP40]])
-; CHECK-NEXT:    [[TMP42:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP39]])
-; CHECK-NEXT:    [[TMP43:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP41]])
-; CHECK-NEXT:    [[TMP44:%.*]] = icmp eq i32 [[TMP42]], 0
-; CHECK-NEXT:    br i1 [[TMP44]], label [[RET_BLOCK:%.*]], label [[CHAIN_BLOCK:%.*]]
-; CHECK:       chain.block:
-; CHECK-NEXT:    [[TMP45:%.*]] = and i32 [[TMP42]], -64
-; CHECK-NEXT:    [[TMP46:%.*]] = insertelement <2 x i32> [[TMP8]], i32 [[TMP45]], i64 0
-; CHECK-NEXT:    [[TMP47:%.*]] = bitcast <2 x i32> [[TMP46]] to i64
-; CHECK-NEXT:    [[TMP48:%.*]] = inttoptr i64 [[TMP47]] to ptr
-; CHECK-NEXT:    call void (ptr, i32, <16 x i32>, { i32, ptr addrspace(5) }, i32, ...) @llvm.amdgcn.cs.chain.p0.i32.v16i32.sl_i32p5s(ptr inreg [[TMP48]], i32 inreg [[TMP43]], <16 x i32> inreg [[TMP33]], { i32, ptr addrspace(5) } [[TMP13]], i32 0)
+; CHECK-NEXT:    [[TMP11:%.*]] = insertvalue { i32, ptr addrspace(5) } { i32 ptrtoint (ptr getelementptr (i8, ptr @test.2, i32 1) to i32), ptr addrspace(5) poison }, ptr addrspace(5) [[TMP10]], 1
+; CHECK-NEXT:    [[TMP12:%.*]] = ptrtoint ptr addrspace(4) [[NUMWORKGROUPSPTR]] to i64
+; CHECK-NEXT:    [[TMP13:%.*]] = bitcast i64 [[TMP12]] to <2 x i32>
+; CHECK-NEXT:    [[TMP14:%.*]] = extractelement <2 x i32> [[TMP13]], i64 0
+; CHECK-NEXT:    [[TMP15:%.*]] = extractelement <2 x i32> [[TMP13]], i64 1
+; CHECK-NEXT:    [[TMP16:%.*]] = insertelement <16 x i32> poison, i32 [[GLOBALTABLE]], i64 0
+; CHECK-NEXT:    [[TMP17:%.*]] = insertelement <16 x i32> [[TMP16]], i32 [[TMP14]], i64 1
+; CHECK-NEXT:    [[TMP18:%.*]] = insertelement <16 x i32> [[TMP17]], i32 [[TMP15]], i64 2
+; CHECK-NEXT:    [[TMP19:%.*]] = insertelement <16 x i32> [[TMP18]], i32 [[PAD0]], i64 3
+; CHECK-NEXT:    [[TMP20:%.*]] = insertelement <16 x i32> [[TMP19]], i32 [[PAD1]], i64 4
+; CHECK-NEXT:    [[TMP21:%.*]] = insertelement <16 x i32> [[TMP20]], i32 [[PAD2]], i64 5
+; CHECK-NEXT:    [[TMP22:%.*]] = insertelement <16 x i32> [[TMP21]], i32 [[PAD3]], i64 6
+; CHECK-NEXT:    [[TMP23:%.*]] = insertelement <16 x i32> [[TMP22]], i32 [[PAD4]], i64 7
+; CHECK-NEXT:    [[TMP24:%.*]] = insertelement <16 x i32> [[TMP23]], i32 [[PAD5]], i64 8
+; CHECK-NEXT:    [[TMP25:%.*]] = insertelement <16 x i32> [[TMP24]], i32 [[PAD6]], i64 9
+; CHECK-NEXT:    [[TMP26:%.*]] = insertelement <16 x i32> [[TMP25]], i32 [[PAD7]], i64 10
+; CHECK-NEXT:    [[TMP27:%.*]] = insertelement <16 x i32> [[TMP26]], i32 [[PAD8]], i64 11
+; CHECK-NEXT:    [[TMP28:%.*]] = insertelement <16 x i32> [[TMP27]], i32 [[PAD9]], i64 12
+; CHECK-NEXT:    [[TMP29:%.*]] = insertelement <16 x i32> [[TMP28]], i32 [[PAD10]], i64 13
+; CHECK-NEXT:    [[TMP30:%.*]] = insertelement <16 x i32> [[TMP29]], i32 [[PAD11]], i64 14
+; CHECK-NEXT:    [[TMP31:%.*]] = insertelement <16 x i32> [[TMP30]], i32 [[SPILLTABLE]], i64 15
+; CHECK-NEXT:    [[TMP32:%.*]] = extractvalue { i32, ptr addrspace(5) } [[TMP11]], 0
+; CHECK-NEXT:    [[TMP33:%.*]] = call i32 @llvm.amdgcn.set.inactive.{{(chain.arg.)?}}i32(i32 [[TMP32]], i32 [[VCR]])
+; CHECK-NEXT:    [[TMP34:%.*]] = icmp ne i32 [[TMP33]], 0
+; CHECK-NEXT:    [[TMP35:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP34]])
+; CHECK-NEXT:    [[TMP36:%.*]] = call i32 @llvm.cttz.i32(i32 [[TMP35]], i1 true)
+; CHECK-NEXT:    [[TMP37:%.*]] = call i32 @llvm.amdgcn.readlane(i32 [[TMP33]], i32 [[TMP36]])
+; CHECK-NEXT:    [[TMP38:%.*]] = icmp eq i32 [[TMP33]], [[TMP37]]
+; CHECK-NEXT:    [[TMP39:%.*]] = call i32 @llvm.amdgcn.ballot.i32(i1 [[TMP38]])
+; CHECK-NEXT:    [[TMP40:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP37]])
+; CHECK-NEXT:    [[TMP41:%.*]] = call i32 @llvm.amdgcn.wwm.i32(i32 [[TMP39]])
+; CHECK-NEXT:    [[TMP42:%.*]] = and i32 [[TMP40]], -64
+; CHECK-NEXT:    [[TMP43:%.*]] = insertelement <2 x i32> [[TMP8]], i32 [[TMP42]], i64 0
+; CHECK-NEXT:    [[TMP44:%.*]] = bitcast <2 x i32> [[TMP43]] to i64
+; CHECK-NEXT:    [[TMP45:%.*]] = inttoptr i64 [[TMP44]] to ptr
+; CHECK-NEXT:    call void (ptr, i32, <16 x i32>, { i32, ptr addrspace(5) }, i32, ...) @llvm.amdgcn.cs.chain.p0.i32.v16i32.sl_i32p5s(ptr inreg [[TMP45]], i32 inreg [[TMP41]], <16 x i32> inreg [[TMP31]], { i32, ptr addrspace(5) } [[TMP11]], i32 0)
 ; CHECK-NEXT:    unreachable
-; CHECK:       ret.block:
-; CHECK-NEXT:    ret void
 ;
 ;
 ; CHECK-LABEL: define {{[^@]+}}@test.2

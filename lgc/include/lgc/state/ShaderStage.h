@@ -77,6 +77,11 @@ bool isShaderEntryPoint(const llvm::Function *func);
 // Gets name string of the abbreviation for the specified shader stage
 const char *getShaderStageAbbreviation(ShaderStage shaderStage);
 
+enum AddFunctionArgsFlag : unsigned {
+  AddFunctionArgsAppend = 0x1,
+  AddFunctionArgsMaybeUndef = 0x2,
+};
+
 // Add args to a function. This creates a new function with the added args, then moves everything from the old function
 // across to it.
 // If this changes the return type, then all the return instructions will be invalid.
@@ -89,7 +94,7 @@ const char *getShaderStageAbbreviation(ShaderStage shaderStage);
 // @param append : Append new arguments if true, prepend new arguments if false
 // @returns : The new function
 llvm::Function *addFunctionArgs(llvm::Function *oldFunc, llvm::Type *retTy, llvm::ArrayRef<llvm::Type *> argTys,
-                                llvm::ArrayRef<std::string> argNames, uint64_t inRegMask = 0, bool append = false);
+                                llvm::ArrayRef<std::string> argNames, uint64_t inRegMask = 0, unsigned flags = 0);
 
 // Get the ABI-mandated entry-point name for a shader stage
 //

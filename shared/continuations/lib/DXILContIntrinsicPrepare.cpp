@@ -258,30 +258,6 @@ static Function *transformFunction(Function &F) {
   return NewFunc;
 }
 
-/// Transform enqueue intrinsics to continuation intrinsics
-static void replaceIntrinsic(Function &F, Function *NewFunc) {
-  for (auto &Use : make_early_inc_range(F.uses())) {
-    if (auto *CInst = dyn_cast<CallInst>(Use.getUser())) {
-      if (CInst->isCallee(&Use)) {
-        IRBuilder<> B(CInst);
-        SmallVector<Value *> Args(CInst->args());
-        bool IsEnqueue = F.getName().contains("Enqueue");
-        // Add the current function as return address to the call.
-        // Used when Traversal calls AnyHit or Intersection.
-        if (IsEnqueue && F.getName().contains("EnqueueCall")) {
-          bool HasWaitMask = F.getName().contains("WaitEnqueue");
-          auto *RetAddr =
-              B.CreatePtrToInt(CInst->getFunction(), B.getInt64Ty());
-          Args.insert(Args.begin() + (HasWaitMask ? 3 : 2), RetAddr);
-        }
-
-        B.CreateCall(NewFunc, Args);
-        CInst->eraseFromParent();
-      }
-    }
-  }
-}
-
 static bool isGpuRtFuncName(StringRef Name) {
   for (const auto &Intr : LgcRtGpuRtMap) {
     if (Name.contains(Intr.second.Name))
@@ -308,6 +284,7 @@ static bool isUtilFunction(StringRef Name) {
       "GetFuncAddr",
       "GetLocalRootIndex",
       "GetResumePointAddr",
+      "GetRtip",
       "GetShaderKind",
       "GetTriangleHitAttributes",
       "GetUninitialized",
@@ -343,22 +320,9 @@ llvm::PreservedAnalyses DXILContIntrinsicPreparePass::run(
       transformFunction(*F);
   }
 
-  // Recollect functions as they may have been replaced
-  for (auto &F : M.functions()) {
-    Function *Replacement = nullptr;
-    auto Name = F.getName();
-    if (Name.contains("WaitEnqueue"))
-      Replacement = getContinuationWaitContinue(M);
-    else if (Name.contains("Enqueue"))
-      Replacement = getContinuationContinue(M);
-    else if (Name.contains("Complete"))
-      Replacement = getContinuationComplete(M);
-
-    if (Replacement)
-      replaceIntrinsic(F, Replacement);
-  }
-
   fixupDxilMetadata(M);
+
+  earlyDriverTransform(M);
 
   return PreservedAnalyses::none();
 }

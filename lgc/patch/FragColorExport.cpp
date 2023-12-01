@@ -70,7 +70,7 @@ LowerFragColorExport::LowerFragColorExport() : m_exportValues(MaxColorTargets + 
 // @param input : The value we want to extract elements from
 // @param builder : The IR builder for inserting instructions
 // @param [out] results : The returned elements
-static void extractElements(Value *input, BuilderBase &builder, SmallVectorImpl<Value *> &results) {
+static void extractElements(Value *input, BuilderBase &builder, std::array<Value *, 4> &results) {
   Type *valueTy = input->getType();
   unsigned compCount = valueTy->isVectorTy() ? cast<FixedVectorType>(valueTy)->getNumElements() : 1;
   assert(compCount <= 4 && "At-most four elements allowed\n");
@@ -94,8 +94,10 @@ static void extractElements(Value *input, BuilderBase &builder, SmallVectorImpl<
 // @param builder : The IR builder for inserting instructions
 // @param expFmt: The format for the given render target
 // @param signedness: If output should be interpreted as a signed integer
+// @param channelWriteMask: Write mask to specify destination channels
 Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hwColorExport, BuilderBase &builder,
-                                                      ExportFormat expFmt, const bool signedness) {
+                                                      ExportFormat expFmt, const bool signedness,
+                                                      unsigned channelWriteMask) {
   assert(expFmt != EXP_FORMAT_ZERO);
 
   Type *outputTy = output->getType();
@@ -116,9 +118,17 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
       floatTy, //  EXP_FORMAT_32_ABGR = 9,
   };
 
-  SmallVector<Value *, 4> comps(4);
+  const auto undefFloat = PoisonValue::get(builder.getFloatTy());
+  const auto undefFloat16x2 = PoisonValue::get(FixedVectorType::get(builder.getHalfTy(), 2));
+
+  std::array<Value *, 4> comps;
+  std::array<Value *, 4> exports{undefFloat, undefFloat, undefFloat, undefFloat};
+  unsigned exportMask = 0;
 
   Type *exportTy = exportTypeMapping[expFmt];
+
+  const bool dualSourceBlendedEnable = m_pipelineState->getColorExportState().dualSourceBlendEnable ||
+                                       m_pipelineState->getColorExportState().dynamicDualSourceBlendEnable;
 
   // For 32bit output, we always to scalarize, but for 16bit output we may just operate on vector.
   if (exportTy->isFloatTy()) {
@@ -130,56 +140,59 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
     }
   }
 
-  const auto undefFloat = PoisonValue::get(builder.getFloatTy());
-  const auto undefFloat16x2 = PoisonValue::get(FixedVectorType::get(builder.getHalfTy(), 2));
-
   switch (expFmt) {
-  case EXP_FORMAT_32_R: {
-    compCount = 1;
-    comps[0] = convertToFloat(comps[0], signedness, builder);
-    break;
-  }
-  case EXP_FORMAT_32_GR: {
-    if (compCount >= 2) {
-      compCount = 2;
-      comps[0] = convertToFloat(comps[0], signedness, builder);
-      comps[1] = convertToFloat(comps[1], signedness, builder);
-    } else {
+  case EXP_FORMAT_32_R:
+  case EXP_FORMAT_32_GR:
+  case EXP_FORMAT_32_ABGR: {
+    if (expFmt == EXP_FORMAT_32_R) {
       compCount = 1;
-      comps[0] = convertToFloat(comps[0], signedness, builder);
+      channelWriteMask = 0x1;
+    } else if (expFmt == EXP_FORMAT_32_GR) {
+      compCount = compCount >= 2 ? 2 : 1;
+      channelWriteMask = 0x3;
+    } else {
+      channelWriteMask = 0xF;
+    }
+
+    for (unsigned idx = 0; idx < compCount; ++idx) {
+      unsigned compMask = 1 << idx;
+      if (compMask & channelWriteMask) {
+        exports[idx] = convertToFloat(comps[idx], signedness, builder);
+        exportMask |= compMask;
+      }
     }
     break;
   }
   case EXP_FORMAT_32_AR: {
+    channelWriteMask = 0x9;
+    if (1 & channelWriteMask) {
+      exports[0] = convertToFloat(comps[0], signedness, builder);
+      exportMask = 1;
+    }
     if (compCount == 4) {
+      if (0x8 & channelWriteMask) {
+        exports[1] = convertToFloat(comps[3], signedness, builder);
+        exportMask |= 0x2;
+      }
       compCount = 2;
-      comps[0] = convertToFloat(comps[0], signedness, builder);
-      comps[1] = convertToFloat(comps[3], signedness, builder);
     } else {
       compCount = 1;
-      comps[0] = convertToFloat(comps[0], signedness, builder);
     }
     break;
   }
-  case EXP_FORMAT_32_ABGR: {
-    for (unsigned i = 0; i < compCount; ++i)
-      comps[i] = convertToFloat(comps[i], signedness, builder);
-
-    for (unsigned i = compCount; i < 4; ++i)
-      comps[i] = undefFloat;
-    break;
-  }
   case EXP_FORMAT_FP16_ABGR: {
+    const unsigned compactCompCount = (compCount + 1) / 2;
+    exports[0] = exports[1] = undefFloat16x2;
+    exportMask = compCount > 2 ? 0xF : 0x3;
     // convert to half type
     if (bitWidth <= 16) {
       output = convertToHalf(output, signedness, builder);
       extractElements(output, builder, comps);
       // re-pack
-      comps[0] = builder.CreateInsertElement(undefFloat16x2, comps[0], builder.getInt32(0));
-      comps[0] = builder.CreateInsertElement(comps[0], comps[1], builder.getInt32(1));
-      if (compCount > 2) {
-        comps[1] = builder.CreateInsertElement(undefFloat16x2, comps[2], builder.getInt32(0));
-        comps[1] = builder.CreateInsertElement(comps[1], comps[3], builder.getInt32(1));
+      for (unsigned idx = 0; idx < compactCompCount; ++idx) {
+        unsigned origIdx = 2 * idx;
+        exports[idx] = builder.CreateInsertElement(undefFloat16x2, comps[origIdx], builder.getInt32(0));
+        exports[idx] = builder.CreateInsertElement(exports[idx], comps[origIdx + 1], builder.getInt32(1));
       }
     } else {
       if (outputTy->isIntOrIntVectorTy())
@@ -188,47 +201,39 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
                                                                  : builder.getFloatTy());
       extractElements(output, builder, comps);
 
-      Attribute::AttrKind attribs[] = {Attribute::ReadNone};
-      comps[0] = builder.CreateNamedCall("llvm.amdgcn.cvt.pkrtz", FixedVectorType::get(builder.getHalfTy(), 2),
-                                         {comps[0], comps[1]}, attribs);
-      if (compCount > 2)
-        comps[1] = builder.CreateNamedCall("llvm.amdgcn.cvt.pkrtz", FixedVectorType::get(builder.getHalfTy(), 2),
-                                           {comps[2], comps[3]}, attribs);
+      for (unsigned idx = 0; idx < compactCompCount; ++idx) {
+        unsigned origIdx = 2 * idx;
+        exports[idx] = builder.CreateIntrinsic(FixedVectorType::get(builder.getHalfTy(), 2),
+                                               Intrinsic::amdgcn_cvt_pkrtz, {comps[origIdx], comps[origIdx + 1]});
+      }
     }
     break;
   }
   case EXP_FORMAT_UNORM16_ABGR:
-  case EXP_FORMAT_SNORM16_ABGR: {
-    output = convertToFloat(output, signedness, builder);
-    extractElements(output, builder, comps);
-
-    StringRef funcName =
-        expFmt == EXP_FORMAT_SNORM16_ABGR ? "llvm.amdgcn.cvt.pknorm.i16" : "llvm.amdgcn.cvt.pknorm.u16";
-
-    for (unsigned idx = 0; idx < (compCount + 1) / 2; idx++) {
-      Value *packedComps = builder.CreateNamedCall(funcName, FixedVectorType::get(builder.getInt16Ty(), 2),
-                                                   {comps[2 * idx], comps[2 * idx + 1]}, {});
-
-      comps[idx] = builder.CreateBitCast(packedComps, FixedVectorType::get(builder.getHalfTy(), 2));
-    }
-
-    break;
-  }
+  case EXP_FORMAT_SNORM16_ABGR:
   case EXP_FORMAT_UINT16_ABGR:
   case EXP_FORMAT_SINT16_ABGR: {
     assert(compCount <= 4);
-    output = convertToInt(output, signedness, builder);
+
+    unsigned cvtIntrinsic;
+    if (expFmt == EXP_FORMAT_SNORM16_ABGR || expFmt == EXP_FORMAT_UNORM16_ABGR) {
+      output = convertToFloat(output, signedness, builder);
+      cvtIntrinsic =
+          expFmt == EXP_FORMAT_SNORM16_ABGR ? Intrinsic::amdgcn_cvt_pknorm_i16 : Intrinsic::amdgcn_cvt_pknorm_u16;
+    } else {
+      output = convertToInt(output, signedness, builder);
+      cvtIntrinsic = expFmt == EXP_FORMAT_SINT16_ABGR ? Intrinsic::amdgcn_cvt_pk_i16 : Intrinsic::amdgcn_cvt_pk_u16;
+    }
     extractElements(output, builder, comps);
 
-    StringRef funcName = expFmt == EXP_FORMAT_SINT16_ABGR ? "llvm.amdgcn.cvt.pk.i16" : "llvm.amdgcn.cvt.pk.u16";
-
-    for (unsigned idx = 0; idx < (compCount + 1) / 2; idx++) {
-      Value *packedComps = builder.CreateNamedCall(funcName, FixedVectorType::get(builder.getInt16Ty(), 2),
-                                                   {comps[2 * idx], comps[2 * idx + 1]}, {});
-
-      comps[idx] = builder.CreateBitCast(packedComps, FixedVectorType::get(builder.getHalfTy(), 2));
+    const unsigned compactCompCount = (compCount + 1) / 2;
+    exports[0] = exports[1] = undefFloat16x2;
+    exportMask = compCount > 2 ? 0xF : 0x3;
+    for (unsigned idx = 0; idx < compactCompCount; idx++) {
+      Value *packedComps = builder.CreateIntrinsic(FixedVectorType::get(builder.getInt16Ty(), 2), cvtIntrinsic,
+                                                   {comps[2 * idx], comps[2 * idx + 1]});
+      exports[idx] = builder.CreateBitCast(packedComps, FixedVectorType::get(builder.getHalfTy(), 2));
     }
-
     break;
   }
   default: {
@@ -237,67 +242,48 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
   }
   }
 
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11 &&
-      (m_pipelineState->getColorExportState().dualSourceBlendEnable ||
-       m_pipelineState->getColorExportState().dynamicDualSourceBlendEnable)) {
-    // Save them for later dual-source-swizzle
-    m_blendSourceChannels = exportTy->isHalfTy() ? (compCount + 1) / 2 : compCount;
-    assert(hwColorExport <= 1);
-    m_blendSources[hwColorExport].append(comps.begin(), comps.end());
-    return nullptr;
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
+    if (dualSourceBlendedEnable) {
+      // Save them for later dual-source-swizzle
+      m_blendSourceChannels = exportTy->isHalfTy() ? (compCount + 1) / 2 : compCount;
+      assert(hwColorExport <= 1);
+      m_blendSources[hwColorExport].append(exports.begin(), exports.end());
+      return nullptr;
+    } else if (exportTy->isHalfTy()) {
+      // GFX11 removes compressed export, simply use 32bit-data export.
+      exportMask = 0;
+      const unsigned compactCompCount = (compCount + 1) / 2;
+      for (unsigned idx = 0; idx < compactCompCount; ++idx) {
+        exports[idx] = builder.CreateBitCast(exports[idx], builder.getFloatTy());
+        exportMask |= 1 << idx;
+      }
+      for (unsigned idx = compactCompCount; idx < 4; ++idx)
+        exports[idx] = undefFloat;
+    }
   }
 
   Value *exportCall = nullptr;
 
-  if (exportTy->isHalfTy()) {
-    // GFX11 removes compressed export, simply use 32bit-data export.
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
-      // Translate compCount into the number of 32bit data.
-      compCount = (compCount + 1) / 2;
-      for (unsigned i = 0; i < compCount; i++)
-        comps[i] = builder.CreateBitCast(comps[i], builder.getFloatTy());
-      for (unsigned i = compCount; i < 4; i++)
-        comps[i] = undefFloat;
-
-      Value *args[] = {
-          builder.getInt32(EXP_TARGET_MRT_0 + hwColorExport), // tgt
-          builder.getInt32((1 << compCount) - 1),             // en
-          comps[0],                                           // src0
-          comps[1],                                           // src1
-          comps[2],                                           // src2
-          comps[3],                                           // src3
-          builder.getFalse(),                                 // done
-          builder.getTrue()                                   // vm
-      };
-
-      return builder.CreateNamedCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {});
-    }
-
+  if (exportTy->isHalfTy() && m_pipelineState->getTargetInfo().getGfxIpVersion().major < 11) {
     // 16-bit export (compressed)
-    if (compCount <= 2)
-      comps[1] = undefFloat16x2;
     Value *args[] = {
         builder.getInt32(EXP_TARGET_MRT_0 + hwColorExport), // tgt
-        builder.getInt32(compCount > 2 ? 0xF : 0x3),        // en
-        comps[0],                                           // src0
-        comps[1],                                           // src1
+        builder.getInt32(exportMask),                       // en
+        exports[0],                                         // src0
+        exports[1],                                         // src1
         builder.getFalse(),                                 // done
         builder.getTrue()                                   // vm
     };
 
     exportCall = builder.CreateNamedCall("llvm.amdgcn.exp.compr.v2f16", Type::getVoidTy(*m_context), args, {});
   } else {
-    // 32-bit export
-    for (unsigned i = compCount; i < 4; i++)
-      comps[i] = undefFloat;
-
     Value *args[] = {
         builder.getInt32(EXP_TARGET_MRT_0 + hwColorExport), // tgt
-        builder.getInt32((1 << compCount) - 1),             // en
-        comps[0],                                           // src0
-        comps[1],                                           // src1
-        comps[2],                                           // src2
-        comps[3],                                           // src3
+        builder.getInt32(exportMask),                       // en
+        exports[0],                                         // src0
+        exports[1],                                         // src1
+        exports[2],                                         // src2
+        exports[3],                                         // src3
         builder.getFalse(),                                 // done
         builder.getTrue()                                   // vm
     };
@@ -482,22 +468,15 @@ bool LowerFragColorExport::runImpl(Module &module, PipelineShadersResult &pipeli
 
   bool willGenerateColorExportShader = m_pipelineState->isUnlinked() && !m_pipelineState->hasColorExportFormats();
   if (willGenerateColorExportShader && !m_info.empty()) {
-    if (m_pipelineState->getOptions().enableColorExportShader)
-      jumpColorExport(fragEntryPoint, builder);
-    else
-      generateReturn(fragEntryPoint, builder);
+    createTailJump(fragEntryPoint, builder);
     return true;
   }
 
   FragColorExport fragColorExport(m_context, m_pipelineState);
-  SmallVector<ExportFormat, 8> exportFormat(MaxColorTargets + 1, EXP_FORMAT_ZERO);
-  for (auto &exp : m_info) {
-    exportFormat[exp.hwColorTarget] =
-        static_cast<ExportFormat>(m_pipelineState->computeExportFormat(exp.ty, exp.location));
-  }
   bool dummyExport =
       (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10 || m_resUsage->builtInUsage.fs.discard);
-  fragColorExport.generateExportInstructions(m_info, m_exportValues, exportFormat, dummyExport, builder);
+  fragColorExport.generateExportInstructions(m_info, m_exportValues, dummyExport, m_pipelineState->getPalMetadata(),
+                                             builder);
   return !m_info.empty() || dummyExport;
 }
 
@@ -505,21 +484,15 @@ bool LowerFragColorExport::runImpl(Module &module, PipelineShadersResult &pipeli
 // Updates the value in the entry in expFragColors that callInst is writing to.
 //
 // @param callInst : An call to the generic output export builtin in a fragment shader.
-// @param [in/out] expFragColors : An array with the current color export information for each hw color target.
-void LowerFragColorExport::updateFragColors(CallInst *callInst, ColorExportValueInfo expFragColors[],
+// @param [in/out] outFragColors : An array with the current color output information for each color output location.
+// @param builder : builder to use
+void LowerFragColorExport::updateFragColors(CallInst *callInst, MutableArrayRef<ColorOutputValueInfo> outFragColors,
                                             BuilderBase &builder) {
   const unsigned location = cast<ConstantInt>(callInst->getOperand(0))->getZExtValue();
   const unsigned component = cast<ConstantInt>(callInst->getOperand(1))->getZExtValue();
   Value *output = callInst->getOperand(2);
   assert(output->getType()->getScalarSizeInBits() <= 32); // 64-bit output is not allowed
-
-  InOutLocationInfo origLocInfo;
-  origLocInfo.setLocation(location);
-  origLocInfo.setComponent(component);
-  auto locInfoMapIt = m_resUsage->inOutUsage.outputLocInfoMap.find(origLocInfo);
-  if (locInfoMapIt == m_resUsage->inOutUsage.outputLocInfoMap.end())
-    return;
-  unsigned hwColorTarget = locInfoMapIt->second.getLocation();
+  assert(component < 4);
 
   Type *outputTy = output->getType();
 
@@ -527,68 +500,18 @@ void LowerFragColorExport::updateFragColors(CallInst *callInst, ColorExportValue
   assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32);
   (void(bitWidth)); // unused
 
-  auto compTy = outputTy->isVectorTy() ? cast<VectorType>(outputTy)->getElementType() : outputTy;
-  unsigned compCount = outputTy->isVectorTy() ? cast<FixedVectorType>(outputTy)->getNumElements() : 1;
+  auto &expFragColor = outFragColors[location];
 
-  std::vector<Value *> outputComps;
-  for (unsigned i = 0; i < compCount; ++i) {
-    Value *outputComp = nullptr;
-    if (compCount == 1)
-      outputComp = output;
-    else {
-      outputComp = builder.CreateExtractElement(output, i);
-    }
-    outputComps.push_back(outputComp);
+  if (auto *vecTy = dyn_cast<FixedVectorType>(outputTy)) {
+    assert(component + vecTy->getNumElements() <= 4);
+    for (unsigned i = 0; i < vecTy->getNumElements(); ++i)
+      expFragColor.value[component + i] = builder.CreateExtractElement(output, i);
+  } else {
+    expFragColor.value[component] = output;
   }
-
-  assert(hwColorTarget < MaxColorTargets);
-  auto &expFragColor = expFragColors[hwColorTarget];
-
-  while (component + compCount > expFragColor.value.size())
-    expFragColor.value.push_back(PoisonValue::get(compTy));
-
-  for (unsigned i = 0; i < compCount; ++i)
-    expFragColor.value[component + i] = outputComps[i];
-
-  expFragColor.location = location;
   BasicType outputType = m_resUsage->inOutUsage.fs.outputTypes[location];
   expFragColor.isSigned =
       (outputType == BasicType::Int8 || outputType == BasicType::Int16 || outputType == BasicType::Int);
-}
-
-// =====================================================================================================================
-// Returns a value that is a combination of the values in expFragColor into a single value.  Returns a nullptr if no
-// value needs to be exported.
-//
-// @param expFragColor : The array of values that will be exported in each component.
-// @param location : The location of this color export.
-// @param builder : The builder object that will be used to create new instructions.
-Value *LowerFragColorExport::getOutputValue(ArrayRef<Value *> expFragColor, unsigned int location,
-                                            BuilderBase &builder) {
-  if (expFragColor.empty())
-    return nullptr;
-
-  Value *output = nullptr;
-  unsigned compCount = expFragColor.size();
-  assert(compCount <= 4);
-
-  // Set CB shader mask
-  const unsigned channelMask = ((1 << compCount) - 1);
-  m_resUsage->inOutUsage.fs.cbShaderMask |= (channelMask << (4 * location));
-
-  // Construct exported fragment colors
-  if (compCount == 1)
-    output = expFragColor[0];
-  else {
-    const auto compTy = expFragColor[0]->getType();
-
-    output = PoisonValue::get(FixedVectorType::get(compTy, compCount));
-    for (unsigned i = 0; i < compCount; ++i) {
-      assert(expFragColor[i]->getType() == compTy);
-      output = builder.CreateInsertElement(output, expFragColor[i], i);
-    }
-  }
-  return output;
 }
 
 // =====================================================================================================================
@@ -616,57 +539,67 @@ void LowerFragColorExport::collectExportInfoForGenericOutputs(Function *fragEntr
     return;
 
   // Collect all of the values that need to be exported for each hardware color target.
-  auto originalInsPos = builder.GetInsertPoint();
-  ColorExportValueInfo expFragColors[MaxColorTargets] = {};
-  for (CallInst *callInst : colorExports) {
-    builder.SetInsertPoint(callInst);
-    updateFragColors(callInst, expFragColors, builder);
-    callInst->eraseFromParent();
+  ColorOutputValueInfo outFragColors[MaxColorTargets] = {};
+  {
+    IRBuilderBase::InsertPointGuard ipg(builder);
+    for (CallInst *callInst : colorExports) {
+      builder.SetInsertPoint(callInst);
+      updateFragColors(callInst, outFragColors, builder);
+      callInst->eraseFromParent();
+    }
   }
 
-  // This insertion point should be the return instruction, so we know we can dereference the iterator.
-  builder.SetInsertPoint(&*originalInsPos);
-
-  // Recombine the values being exported for each hw color target.
-  for (unsigned hwColorTarget = 0; hwColorTarget < MaxColorTargets; ++hwColorTarget) {
-    unsigned location = m_resUsage->inOutUsage.fs.outputOrigLocs[hwColorTarget];
-    if (location == InvalidValue)
-      m_exportValues[hwColorTarget] = nullptr;
-    else
-      m_exportValues[hwColorTarget] = getOutputValue(expFragColors[hwColorTarget].value, location, builder);
-  }
-
-  // Add the color export information to the palmetadata.
-  for (unsigned hwColorTarget = 0; hwColorTarget < MaxColorTargets; ++hwColorTarget) {
-    Value *output = m_exportValues[hwColorTarget];
-    if (!output)
+  // Recombine the vectors and pack them.
+  unsigned exportIndex = 0;
+  for (const auto &[location, info] : llvm::enumerate(ArrayRef(outFragColors))) {
+    Type *compTy = nullptr;
+    unsigned numComponents = 0;
+    for (const auto &[i, value] : llvm::enumerate(info.value)) {
+      if (value) {
+        numComponents = i + 1;
+        compTy = value->getType();
+      }
+    }
+    if (!numComponents)
       continue;
-    const ColorExportValueInfo &colorExportInfo = expFragColors[hwColorTarget];
-    m_info.push_back({hwColorTarget, colorExportInfo.location, colorExportInfo.isSigned, output->getType()});
+
+    // Construct exported fragment colors
+    Value *value = nullptr;
+    if (numComponents == 1) {
+      value = info.value[0];
+    } else {
+      value = PoisonValue::get(FixedVectorType::get(compTy, numComponents));
+      for (unsigned i = 0; i < numComponents; ++i) {
+        if (info.value[i])
+          value = builder.CreateInsertElement(value, info.value[i], i);
+      }
+    }
+
+    m_exportValues[exportIndex] = value;
+    m_info.push_back({exportIndex, (unsigned)location, info.isSigned, value->getType()});
+    ++exportIndex;
   }
 }
 
 // =====================================================================================================================
-// Generates a return instruction that will make all of the values for the exports available to the color export shader.
-// The color export information is added to the pal metadata, so that everything needed to generate the color export
-// shader is available.
+// Generates a return instruction or a tail call that will make all of the values for the exports available to the
+// color export shader. The color export information is added to the pal metadata, so that everything needed to
+// generate the color export shader is available.
 //
 // @param fragEntryPoint : The fragment shader to which we should add the export instructions.
 // @param builder : The builder object that will be used to create new instructions.
-Value *LowerFragColorExport::generateReturn(Function *fragEntryPoint, BuilderBase &builder) {
+void LowerFragColorExport::createTailJump(Function *fragEntryPoint, BuilderBase &builder) {
   // Add the export info to be used when linking shaders to generate the color export shader and compute the spi shader
   // color format in the metadata.
   m_pipelineState->getPalMetadata()->addColorExportInfo(m_info);
+  m_pipelineState->getPalMetadata()->setDiscardState(m_resUsage->builtInUsage.fs.discard);
 
-  ReturnInst *retInst = cast<ReturnInst>(builder.GetInsertPoint()->getParent()->getTerminator());
-
-  // First build the return type for the fragment shader.
+  // First build the type for passing outputs to the color export shader.
   SmallVector<Type *, 8> outputTypes;
   for (const ColorExportInfo &info : m_info) {
     outputTypes.push_back(getVgprTy(info.ty));
   }
   Type *retTy = StructType::get(*m_context, outputTypes);
-  addFunctionArgs(fragEntryPoint, retTy, {}, {});
 
   // Now build the return value.
   Value *retVal = PoisonValue::get(retTy);
@@ -682,60 +615,29 @@ Value *LowerFragColorExport::generateReturn(Function *fragEntryPoint, BuilderBas
     retVal = builder.CreateInsertValue(retVal, output, returnLocation);
     ++returnLocation;
   }
-  retVal = builder.CreateRet(retVal);
-  retInst->eraseFromParent();
-  return retVal;
-}
 
-// =====================================================================================================================
-// Jump to color export shader if explicitly build color export shader
-//
-// @param fragEntryPoint : The fragment shader to which we should add the export instructions.
-// @param builder : The builder object that will be used to create new instructions.
-llvm::Value *LowerFragColorExport::jumpColorExport(llvm::Function *fragEntryPoint, BuilderBase &builder) {
+  if (m_pipelineState->getOptions().enableColorExportShader) {
+    // Build color export function type
+    auto funcTy = FunctionType::get(builder.getVoidTy(), {retTy}, false);
 
-  // Add the export info to be used when linking shaders to generate the color export shader and compute the spi shader
-  // color format in the metadata.
-  m_pipelineState->getPalMetadata()->addColorExportInfo(m_info);
-  m_pipelineState->getPalMetadata()->setDiscardState(m_resUsage->builtInUsage.fs.discard);
+    // Convert color export shader address to function pointer
+    auto funcTyPtr = funcTy->getPointerTo(ADDR_SPACE_CONST);
+    auto colorShaderAddr = ShaderInputs::getSpecialUserData(UserDataMapping::ColorExportAddr, builder);
+    AddressExtender addrExt(builder.GetInsertPoint()->getParent()->getParent());
+    auto funcPtr = addrExt.extendWithPc(colorShaderAddr, funcTyPtr, builder);
 
-  // First build the argument type for the fragment shader.
-  SmallVector<Type *, 8> outputTypes;
-  for (const ColorExportInfo &info : m_info) {
-    outputTypes.push_back(getVgprTy(info.ty));
+    // Jump
+    auto callInst = builder.CreateCall(funcTy, funcPtr, retVal);
+    callInst->setCallingConv(CallingConv::AMDGPU_Gfx);
+    callInst->setDoesNotReturn();
+    callInst->setOnlyWritesMemory();
+  } else {
+    addFunctionArgs(fragEntryPoint, retTy, {}, {});
+
+    auto *retInst = builder.GetInsertPoint()->getParent()->getTerminator();
+    retVal = builder.CreateRet(retVal);
+    retInst->eraseFromParent();
   }
-  Type *argTy = StructType::get(*m_context, outputTypes);
-
-  // Now build the argument value.
-  Value *argVal = PoisonValue::get(argTy);
-  unsigned returnLocation = 0;
-  for (unsigned idx = 0; idx < m_info.size(); ++idx) {
-    const ColorExportInfo &info = m_info[idx];
-    unsigned hwColorTarget = info.hwColorTarget;
-    Value *output = m_exportValues[hwColorTarget];
-    if (!output)
-      continue;
-    if (output->getType() != outputTypes[idx])
-      output = generateValueForOutput(output, outputTypes[idx], builder);
-    argVal = builder.CreateInsertValue(argVal, output, returnLocation);
-    ++returnLocation;
-  }
-
-  // Build color export function type
-  auto funcTy = FunctionType::get(Type::getVoidTy(*m_context), {argTy}, false);
-
-  // Convert color export shader address to function pointer
-  auto funcTyPtr = funcTy->getPointerTo(ADDR_SPACE_CONST);
-  auto colorShaderAddr = ShaderInputs::getSpecialUserData(UserDataMapping::ColorExportAddr, builder);
-  AddressExtender addrExt(builder.GetInsertPoint()->getParent()->getParent());
-  auto funcPtr = addrExt.extendWithPc(colorShaderAddr, funcTyPtr, builder);
-
-  // Jump
-  auto callInst = builder.CreateCall(funcTy, funcPtr, argVal);
-  callInst->setCallingConv(CallingConv::AMDGPU_Gfx);
-  callInst->setDoesNotReturn();
-  callInst->setOnlyWritesMemory();
-  return callInst;
 }
 
 // =====================================================================================================================
@@ -957,69 +859,103 @@ Value *FragColorExport::dualSourceSwizzle(BuilderBase &builder) {
 // @param info : The color export information for each color export in no particular order.
 // @param values : The values that are to be exported.  Indexed by the hw color target.
 // @param exportFormat : The export format for each color target. Indexed by the hw color target.
+// @param [out] palMetadata : The PAL metadata that will be extended with relevant information.
 // @param builder : The builder object that will be used to create new instructions.
-void FragColorExport::generateExportInstructions(ArrayRef<lgc::ColorExportInfo> info, ArrayRef<llvm::Value *> values,
-                                                 ArrayRef<ExportFormat> exportFormat, bool dummyExport,
-                                                 BuilderBase &builder) {
+void FragColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info, ArrayRef<Value *> values,
+                                                 bool dummyExport, PalMetadata *palMetadata, BuilderBase &builder) {
   SmallVector<ExportFormat> finalExportFormats;
   Value *lastExport = nullptr;
-  unsigned hwColorExport = 0;
-  for (const ColorExportInfo &exp : info) {
-    Value *output = values[exp.hwColorTarget];
-    if (exp.hwColorTarget != MaxColorTargets) {
-      ExportFormat expFmt = exportFormat[exp.hwColorTarget];
-      if (expFmt != EXP_FORMAT_ZERO) {
-        lastExport = handleColorExportInstructions(output, hwColorExport, builder, expFmt, exp.isSigned);
-        finalExportFormats.push_back(expFmt);
-        ++hwColorExport;
-      }
-    } else {
-      // Depth export alpha comes from MRT0.a if there is MRT0.a and A2C is enable on GFX11+
-      Value *alpha = PoisonValue::get(Type::getFloatTy(*m_context));
-      unsigned depthMask = exp.location;
-      if (!dummyExport && m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11 &&
-          m_pipelineState->getColorExportState().alphaToCoverageEnable) {
-        bool canCopyAlpha = false;
-        for (auto &curInfo : info) {
-          if (curInfo.hwColorTarget == EXP_TARGET_MRT_0 && (exportFormat[EXP_TARGET_MRT_0] > EXP_FORMAT_32_GR)) {
-            // Mrt0 is enabled and its alpha channel is enabled
-            canCopyAlpha = true;
-            break;
-          }
-        }
-        if (canCopyAlpha) {
-          // Update Mrtz.a and its mask
-          alpha = builder.CreateExtractElement(values[EXP_TARGET_MRT_0], 3);
-          depthMask |= 0x8;
-        }
-      }
-      Value *fragDepth = builder.CreateExtractElement(output, static_cast<uint64_t>(0));
-      Value *fragStencilRef = builder.CreateExtractElement(output, 1);
-      Value *sampleMask = builder.CreateExtractElement(output, 2);
-      Value *args[] = {
-          builder.getInt32(EXP_TARGET_Z), // tgt
-          builder.getInt32(depthMask),    // en
-          fragDepth,                      // src0
-          fragStencilRef,                 // src1
-          sampleMask,                     // src2
-          alpha,                          // src3
-          builder.getFalse(),             // done
-          builder.getTrue()               // vm
-      };
-      lastExport = builder.CreateIntrinsic(Intrinsic::amdgcn_exp, builder.getFloatTy(), args);
 
-      unsigned depthExpFmt = EXP_FORMAT_ZERO;
-      if (depthMask & 0x4)
-        depthExpFmt = EXP_FORMAT_32_ABGR;
-      else if (depthMask & 0x2)
-        depthExpFmt = (depthMask & 0x8) ? EXP_FORMAT_32_ABGR : EXP_FORMAT_32_GR;
-      else if (depthMask & 0x1)
-        depthExpFmt = (depthMask & 0x8) ? EXP_FORMAT_32_AR : EXP_FORMAT_32_R;
+  // MRTZ export comes first if it exists (this is a HW requirement on gfx11+ and an optional good idea on earlier HW).
+  // We make the assume here that it is also first in the info list.
+  if (!info.empty() && info[0].hwColorTarget == MaxColorTargets) {
+    unsigned depthMask = info[0].location;
 
-      m_pipelineState->getPalMetadata()->setSpiShaderZFormat(depthExpFmt);
+    // Depth export alpha comes from MRT0.a if there is MRT0.a and A2C is enabled on GFX11+
+    Value *alpha = PoisonValue::get(Type::getFloatTy(*m_context));
+    if (!dummyExport && m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11 &&
+        m_pipelineState->getColorExportState().alphaToCoverageEnable) {
+      for (auto &curInfo : info) {
+        if (curInfo.location != 0)
+          continue;
+
+        auto *vecTy = dyn_cast<FixedVectorType>(values[curInfo.hwColorTarget]->getType());
+        if (!vecTy || vecTy->getNumElements() < 4)
+          break;
+
+        // Mrt0 is enabled and its alpha channel is enabled
+        alpha = builder.CreateExtractElement(values[curInfo.hwColorTarget], 3);
+        if (alpha->getType()->isIntegerTy())
+          alpha = builder.CreateBitCast(alpha, builder.getFloatTy());
+        depthMask |= 0x8;
+        break;
+      }
+    }
+
+    Value *output = values[MaxColorTargets];
+    Value *fragDepth = builder.CreateExtractElement(output, static_cast<uint64_t>(0));
+    Value *fragStencilRef = builder.CreateExtractElement(output, 1);
+    Value *sampleMask = builder.CreateExtractElement(output, 2);
+    Value *args[] = {
+        builder.getInt32(EXP_TARGET_Z), // tgt
+        builder.getInt32(depthMask),    // en
+        fragDepth,                      // src0
+        fragStencilRef,                 // src1
+        sampleMask,                     // src2
+        alpha,                          // src3
+        builder.getFalse(),             // done
+        builder.getTrue()               // vm
+    };
+    lastExport = builder.CreateIntrinsic(Intrinsic::amdgcn_exp, builder.getFloatTy(), args);
+
+    unsigned depthExpFmt = EXP_FORMAT_ZERO;
+    if (depthMask & 0x4)
+      depthExpFmt = EXP_FORMAT_32_ABGR;
+    else if (depthMask & 0x2)
+      depthExpFmt = (depthMask & 0x8) ? EXP_FORMAT_32_ABGR : EXP_FORMAT_32_GR;
+    else if (depthMask & 0x1)
+      depthExpFmt = (depthMask & 0x8) ? EXP_FORMAT_32_AR : EXP_FORMAT_32_R;
+
+    palMetadata->setSpiShaderZFormat(depthExpFmt);
+    info = info.drop_front(1);
+  }
+
+  // Record each color buffer's export info for broadcasting
+  llvm::SmallVector<ColorExportInfo, 8> broadCastInfo;
+  if (m_pipelineState->getOptions().enableFragColor) {
+    auto &expInfo = info[0];
+    assert(expInfo.ty != nullptr);
+
+    for (unsigned location = 0; location < MaxColorTargets; ++location) {
+      if (m_pipelineState->getColorExportFormat(location).dfmt != BufDataFormatInvalid)
+        broadCastInfo.push_back({0, location, expInfo.isSigned, expInfo.ty});
     }
   }
 
+  // Now do color exports by color buffer.
+  unsigned hwColorExport = 0;
+  auto finalExpInfo = m_pipelineState->getOptions().enableFragColor ? ArrayRef<ColorExportInfo>(broadCastInfo) : info;
+  for (unsigned location = 0; location < MaxColorTargets; ++location) {
+    auto infoIt = llvm::find_if(finalExpInfo,
+                                [&](const ColorExportInfo &finalExpInfo) { return finalExpInfo.location == location; });
+    if (infoIt == finalExpInfo.end())
+      continue;
+
+    assert(infoIt->hwColorTarget < MaxColorTargets);
+    auto expFmt = static_cast<ExportFormat>(m_pipelineState->computeExportFormat(infoIt->ty, location));
+    unsigned channelWriteMask = m_pipelineState->getColorExportFormat(location).channelWriteMask;
+    bool needExpInst = (expFmt != EXP_FORMAT_ZERO) &&
+                       (channelWriteMask > 0 || m_pipelineState->getColorExportState().alphaToCoverageEnable);
+    if (needExpInst) {
+      lastExport = handleColorExportInstructions(values[infoIt->hwColorTarget], hwColorExport, builder, expFmt,
+                                                 infoIt->isSigned, channelWriteMask);
+      finalExportFormats.push_back(expFmt);
+      ++hwColorExport;
+    }
+  }
+
+  // Special case of color exports: dual swizzle on gfx11+. They are implicitly captured above, and this case implies
+  // no other color exports. (TODO: Cleanup the implicit capture; we should just check this up-front.)
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11 &&
       (m_pipelineState->getColorExportState().dualSourceBlendEnable ||
        m_pipelineState->getColorExportState().dynamicDualSourceBlendEnable))
@@ -1033,8 +969,8 @@ void FragColorExport::generateExportInstructions(ArrayRef<lgc::ColorExportInfo> 
   if (lastExport)
     FragColorExport::setDoneFlag(lastExport, builder);
 
-  m_pipelineState->getPalMetadata()->updateSpiShaderColFormat(finalExportFormats);
-  m_pipelineState->getPalMetadata()->updateCbShaderMask(info);
+  palMetadata->updateSpiShaderColFormat(finalExportFormats);
+  palMetadata->updateCbShaderMask(info);
 }
 
 // =====================================================================================================================

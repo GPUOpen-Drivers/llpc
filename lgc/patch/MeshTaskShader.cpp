@@ -479,7 +479,7 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   const unsigned flatWorkgroupSize =
       alignTo(m_pipelineState->enableMeshRowExport() ? numMeshThreads : primAmpFactor, waveSize);
   entryPoint->addFnAttr("amdgpu-flat-work-group-size",
-                        std::to_string(primAmpFactor) + std::string(",") + std::to_string(flatWorkgroupSize));
+                        std::to_string(flatWorkgroupSize) + std::string(",") + std::to_string(flatWorkgroupSize));
 
   const unsigned numWaves = flatWorkgroupSize / waveSize;
   const unsigned numMeshWaves = alignTo(numMeshThreads, waveSize) / waveSize;
@@ -555,6 +555,9 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
       m_builder.CreateStore(m_builder.getFalse(), m_barrierToggle);
     }
 
+    if (m_gfxIp.major >= 11)
+      prepareAttribRingAccess();
+
     m_builder.CreateBr(initPrimitiveIndicesHeaderBlock);
   }
 
@@ -572,9 +575,6 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
           m_builder.CreateAdd(m_waveThreadInfo.threadIdInSubgroup,
                               m_builder.CreateMul(loopIndexPhi, m_builder.getInt32(waveSize)), "primitiveIndex");
     }
-
-    if (m_gfxIp.major >= 11)
-      prepareAttribRingAccess();
 
     auto validPrimitive =
         m_builder.CreateICmpULT(m_waveThreadInfo.primOrVertexIndex, m_builder.getInt32(meshMode.outputPrimitives));
@@ -765,6 +765,11 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
     m_builder.SetInsertPoint(dummyAllocReqBlock);
 
     m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_sendmsg, {}, {m_builder.getInt32(GsAllocReq), m_builder.getInt32(0)});
+
+    // We still collect mesh shader statistics in this special case. This is a valid mesh shader usage when the
+    // primitive/vertex count is not specified by SetMeshOutputs (both are treated as zeros).
+    collectMeshStatsInfo(entryPoint, m_builder.getInt32(0));
+
     m_builder.CreateBr(endDummyAllocReqBlock);
   }
 
@@ -1242,9 +1247,9 @@ void MeshTaskShader::lowerGetMeshBuiltinInput(GetMeshBuiltinInputOp &getMeshBuil
     break;
   }
   case BuiltInViewIndex: {
-    if (m_pipelineState->getInputAssemblyState().enableMultiView) {
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable) {
       auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
-      input = getFunctionArgument(entryPoint, entryArgIdxs.viewIndex);
+      input = getFunctionArgument(entryPoint, entryArgIdxs.viewId);
     } else {
       input = m_builder.getInt32(0);
     }
@@ -1618,7 +1623,7 @@ Function *MeshTaskShader::mutateMeshShaderEntryPoint(Function *entryPoint) {
   // Adjust indices of existing entry-point arguments
   auto &entryArgIdx = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
   entryArgIdx.drawIndex += NumSpecialSgprInputs;
-  entryArgIdx.viewIndex += NumSpecialSgprInputs;
+  entryArgIdx.viewId += NumSpecialSgprInputs;
   entryArgIdx.dispatchDims += NumSpecialSgprInputs;
   entryArgIdx.baseRingEntryIndex += NumSpecialSgprInputs;
   entryArgIdx.pipeStatsBuf += NumSpecialSgprInputs;
@@ -1632,7 +1637,7 @@ Function *MeshTaskShader::mutateMeshShaderEntryPoint(Function *entryPoint) {
 
     entryPoint = newEntryPoint;
     newEntryPoint = addFunctionArgs(entryPoint, nullptr, {int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty},
-                                    VgprInputNames, 0, true);
+                                    VgprInputNames, 0, AddFunctionArgsAppend);
 
     assert(entryPoint->use_empty());
     entryPoint->eraseFromParent();
@@ -1649,7 +1654,7 @@ Function *MeshTaskShader::mutateMeshShaderEntryPoint(Function *entryPoint) {
   //   +-----------------------+-----------------------+-----------------------+
   if (m_gfxIp.major >= 11) {
     entryPoint = newEntryPoint;
-    newEntryPoint = addFunctionArgs(entryPoint, nullptr, int32Ty, {"localInvocationId"}, 0, true);
+    newEntryPoint = addFunctionArgs(entryPoint, nullptr, int32Ty, {"localInvocationId"}, 0, AddFunctionArgsAppend);
 
     assert(entryPoint->use_empty());
     entryPoint->eraseFromParent();
@@ -1754,23 +1759,46 @@ void MeshTaskShader::exportPrimitive() {
   if (builtInUsage.layer)
     layer = readMeshBuiltInFromLds(BuiltInLayer);
 
-  Value *viewIndex = nullptr;
-  const bool enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
+  Value *viewportIndex = nullptr;
+  if (builtInUsage.viewportIndex)
+    viewportIndex = readMeshBuiltInFromLds(BuiltInViewportIndex);
+
+  Value *fsLayer = layer;
+  Value *fsViewportIndex = viewportIndex;
+
+  const bool enableMultiView = m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable;
   if (enableMultiView) {
     auto entryPoint = m_builder.GetInsertBlock()->getParent();
     const auto entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
-    viewIndex = getFunctionArgument(entryPoint, entryArgIdxs.viewIndex);
+    Value *viewId = getFunctionArgument(entryPoint, entryArgIdxs.viewId);
+
+    // RT layer is view ID in simple mode (view index only).
+    Value *layerFromViewId = viewId;
+    if (m_pipelineState->getInputAssemblyState().multiView == MultiViewMode::PerView) {
+      // RT layer is in the high 24 bits of view ID in per-view mode.
+      layerFromViewId = m_builder.CreateLShr(viewId, m_builder.getInt32(8));
+      if (layer)
+        layerFromViewId = m_builder.CreateAdd(layerFromViewId, layer);
+      // Viewport index is in [7:4] of view ID.
+      Value *viewportIndexFromViewId =
+          m_builder.CreateAnd(m_builder.CreateLShr(viewId, m_builder.getInt32(4)), m_builder.getInt32(0xF));
+      if (viewportIndex)
+        viewportIndexFromViewId = m_builder.CreateAdd(viewportIndexFromViewId, viewportIndex);
+      viewportIndex = viewportIndexFromViewId;
+    }
+
+    layer = layerFromViewId;
   }
 
-  if (enableMultiView || builtInUsage.layer) {
+  if (layer) {
     // [19:17] = RT slice index (on GFX11, [12:0] = RT slice index)
     // When multi-view is enabled, the input view index is treated as the output layer.
     Value *layerMaskAndShift = nullptr;
     if (m_gfxIp.major < 11) {
-      layerMaskAndShift = m_builder.CreateAnd(enableMultiView ? viewIndex : layer, 0x7);
+      layerMaskAndShift = m_builder.CreateAnd(layer, 0x7);
       layerMaskAndShift = m_builder.CreateShl(layerMaskAndShift, 17);
     } else {
-      layerMaskAndShift = m_builder.CreateAnd(enableMultiView ? viewIndex : layer, 0x1FFF);
+      layerMaskAndShift = m_builder.CreateAnd(layer, 0x1FFF);
     }
     if (primitivePayload)
       primitivePayload = m_builder.CreateOr(primitivePayload, layerMaskAndShift);
@@ -1778,10 +1806,8 @@ void MeshTaskShader::exportPrimitive() {
       primitivePayload = layerMaskAndShift;
   }
 
-  Value *viewportIndex = nullptr;
-  if (builtInUsage.viewportIndex) {
+  if (viewportIndex) {
     // [23:20] = Viewport index
-    viewportIndex = readMeshBuiltInFromLds(BuiltInViewportIndex);
     auto viewportIndexMaskAndShift = m_builder.CreateAnd(viewportIndex, 0xF);
     viewportIndexMaskAndShift = m_builder.CreateShl(viewportIndexMaskAndShift, 20);
     if (primitivePayload)
@@ -1853,7 +1879,7 @@ void MeshTaskShader::exportPrimitive() {
       if (fsBuiltInUsage.layer) {
         // NOTE: In such case, mesh shader doesn't export layer while fragment shader expects to read it. We
         // export 0 to fragment shader, which is required by the spec.
-        layer = m_builder.getInt32(0);
+        fsLayer = m_builder.getInt32(0);
         exportLayer = true;
       }
     }
@@ -1861,9 +1887,9 @@ void MeshTaskShader::exportPrimitive() {
 
   if (exportLayer) {
     if (inOutUsage.mesh.perPrimitiveBuiltInExportLocs.count(BuiltInLayer) > 0) {
-      assert(layer);
+      assert(fsLayer);
       const unsigned exportLoc = inOutUsage.mesh.perPrimitiveBuiltInExportLocs[BuiltInLayer];
-      primAttrExports.push_back({startLoc + exportLoc, layer});
+      primAttrExports.push_back({startLoc + exportLoc, fsLayer});
       ++inOutUsage.primExpCount;
     }
   }
@@ -1878,7 +1904,7 @@ void MeshTaskShader::exportPrimitive() {
       if (fsBuiltInUsage.viewportIndex) {
         // NOTE: In such case, mesh shader doesn't export viewport index while fragment shader expects to read it. We
         // export 0 to fragment shader, which is required by spec.
-        viewportIndex = m_builder.getInt32(0);
+        fsViewportIndex = m_builder.getInt32(0);
         exportViewportIndex = true;
       }
     }
@@ -1886,9 +1912,9 @@ void MeshTaskShader::exportPrimitive() {
 
   if (exportViewportIndex) {
     if (inOutUsage.mesh.perPrimitiveBuiltInExportLocs.count(BuiltInViewportIndex) > 0) {
-      assert(viewportIndex);
+      assert(fsViewportIndex);
       const unsigned exportLoc = inOutUsage.mesh.perPrimitiveBuiltInExportLocs[BuiltInViewportIndex];
-      primAttrExports.push_back({startLoc + exportLoc, viewportIndex});
+      primAttrExports.push_back({startLoc + exportLoc, fsViewportIndex});
       ++inOutUsage.primExpCount;
     }
   }
@@ -2208,7 +2234,7 @@ void MeshTaskShader::doExport(ExportKind kind, ArrayRef<ExportInfo> exports) {
         }
 
         m_builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_store, valueToStore->getType(),
-                                  {valueToStore, m_attribRingBufDesc, m_waveThreadInfo.threadIdInSubgroup,
+                                  {valueToStore, m_attribRingBufDesc, m_waveThreadInfo.primOrVertexIndex,
                                    locationOffset, m_attribRingBaseOffset, m_builder.getInt32(coherent.u32All)});
       }
     } else {

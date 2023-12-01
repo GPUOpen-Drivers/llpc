@@ -4,7 +4,7 @@
 ; RUN: amdllpc -v --gfxip=10.1.0 %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: @[[LDS:[^ ]*]] = external addrspace(3) global [{{[0-9]*}} x i32], align 4
-; SHADERTEST: define dllexport amdgpu_gs void @_amdgpu_gs_main({{.*}}, i32 %esGsOffsets01, i32 %esGsOffsets23, i32 %primitiveId,
+; SHADERTEST: define dllexport amdgpu_gs void @_amdgpu_gs_main({{.*}}, i32 noundef %esGsOffsets01, i32 noundef %esGsOffsets23, i32 noundef %primitiveId,
 ; Extract bits 0 to 8 from %esGsOffsets01. These bit encode the thread ID in sub-group which will be used to
 ; calculate the address at which to store the provoking vertex.
 ; SHADERTEST: [[offset:%[0-9]*]] = and i32 %esGsOffsets01, 511

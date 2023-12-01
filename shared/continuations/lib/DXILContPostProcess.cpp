@@ -99,9 +99,7 @@ static void collectContinueCalls(const Module &M,
   }
 }
 
-static void
-reportContStateSizes(Module &M,
-                     const MapVector<Function *, DXILShaderKind> ShaderKinds) {
+static void reportContStateSizes(Module &M) {
   // Determine the set of entry functions which have a continuation function
   // We cannot rely on the state size for this, because functions without a
   // continuation (e.g. a non-recursive CHS) have a state size of 0 in metadata.
@@ -116,23 +114,28 @@ reportContStateSizes(Module &M,
         EntriesWithContinuationFunctions.insert(EntryF);
     }
   }
-  for (auto [F, ShaderKind] : ShaderKinds) {
-    if (!EntriesWithContinuationFunctions.contains(F))
+  for (auto &F : M) {
+    auto Stage = lgc::rt::getLgcRtShaderStage(&F);
+    if (!Stage || F.isDeclaration())
       continue;
-    auto OptStateSize = DXILContHelper::tryGetContinuationStateByteCount(*F);
+
+    if (!EntriesWithContinuationFunctions.contains(&F))
+      continue;
+
+    auto OptStateSize = DXILContHelper::tryGetContinuationStateByteCount(F);
     if (!OptStateSize.has_value())
       continue;
 
-    dbgs() << "Continuation state size of \"" << F->getName() << "\" ("
+    DXILShaderKind ShaderKind =
+        DXILContHelper::shaderStageToDxilShaderKind(*Stage);
+    dbgs() << "Continuation state size of \"" << F.getName() << "\" ("
            << ShaderKind << "): " << OptStateSize.value() << " bytes\n";
   }
 }
 
 // For every function with incoming or outgoing (or both) payload registers,
 // report the incoming size and the max outgoing size in bytes.
-static void
-reportPayloadSizes(Module &M,
-                   const MapVector<Function *, DXILShaderKind> &ShaderKinds) {
+static void reportPayloadSizes(Module &M) {
 
   // For every function with continue calls, determine the max number of
   // outgoing registers
@@ -146,18 +149,25 @@ reportPayloadSizes(Module &M,
     MaxOutgoingRegisterCounts[CallInst->getFunction()] =
         std::max(MaxOutgoingRegisterCounts[CallInst->getFunction()], RegCount);
   }
-  for (auto [F, ShaderKind] : ShaderKinds) {
+
+  for (auto &F : M) {
+    auto Stage = lgc::rt::getLgcRtShaderStage(&F);
+    if (!Stage || F.isDeclaration())
+      continue;
+
+    DXILShaderKind ShaderKind =
+        DXILContHelper::shaderStageToDxilShaderKind(*Stage);
     auto OptIncomingPayloadRegisterCount =
-        DXILContHelper::tryGetIncomingRegisterCount(F);
+        DXILContHelper::tryGetIncomingRegisterCount(&F);
     bool HasIncomingPayload = OptIncomingPayloadRegisterCount.has_value();
-    auto It = MaxOutgoingRegisterCounts.find(F);
+    auto It = MaxOutgoingRegisterCounts.find(&F);
     bool HasOutgoingPayload = (It != MaxOutgoingRegisterCounts.end());
 
     if (!HasIncomingPayload && !HasOutgoingPayload)
       continue;
 
-    dbgs() << "Incoming and max outgoing payload VGPR size of \""
-           << F->getName() << "\" (" << ShaderKind << "): ";
+    dbgs() << "Incoming and max outgoing payload VGPR size of \"" << F.getName()
+           << "\" (" << ShaderKind << "): ";
     if (HasIncomingPayload) {
       dbgs() << OptIncomingPayloadRegisterCount.value() * RegisterBytes;
     } else {
@@ -528,41 +538,6 @@ bool DXILContPostProcessPass::lowerGetResumePointAddr(
   return true;
 }
 
-bool DXILContPostProcessPass::lowerGetCurrentFuncAddr(llvm::Module &M,
-                                                      llvm::IRBuilder<> &B) {
-  auto *GetCurrentFuncAddr = M.getFunction("_AmdGetCurrentFuncAddr");
-
-  if (!GetCurrentFuncAddr)
-    return false;
-
-  assert(GetCurrentFuncAddr->getReturnType()->isIntegerTy(64) &&
-         GetCurrentFuncAddr->arg_size() == 0);
-
-  for (auto &Use : make_early_inc_range(GetCurrentFuncAddr->uses())) {
-    auto *CInst = dyn_cast<CallInst>(Use.getUser());
-
-    if (!CInst || !CInst->isCallee(&Use)) {
-      // Non-call use. This will likely result in a remaining non-lowered use
-      // reported as error at the end of this function.
-      continue;
-    }
-
-    auto *FuncPtrToInt = B.CreatePtrToInt(CInst->getFunction(),
-                                          GetCurrentFuncAddr->getReturnType());
-    CInst->replaceAllUsesWith(FuncPtrToInt);
-    CInst->eraseFromParent();
-  }
-
-  if (!GetCurrentFuncAddr->use_empty())
-    report_fatal_error("Unknown uses of GetCurrentFuncAddr remain!");
-
-  // Delete the declaration of the intrinsic after lowering, as future calls to
-  // it are invalid.
-  GetCurrentFuncAddr->eraseFromParent();
-
-  return true;
-}
-
 void DXILContPostProcessPass::handleInitialContinuationStackPtr(IRBuilder<> &B,
                                                                 Function &F) {
   auto *InitFun = Mod->getFunction("_cont_GetContinuationStackAddr");
@@ -827,11 +802,25 @@ DXILContPostProcessPass::run(llvm::Module &M,
   Mod = &M;
   bool Changed = false;
   ToProcess.clear();
-  MapVector<Function *, DXILShaderKind> ShaderKinds;
-  analyzeShaderKinds(M, ShaderKinds);
   auto *SetupRayGen = M.getFunction("_cont_SetupRayGen");
-  for (auto &Entry : ShaderKinds) {
-    switch (Entry.second) {
+
+  for (Function &F : M) {
+    auto Stage = lgc::rt::getLgcRtShaderStage(&F);
+    if (!Stage || F.isDeclaration())
+      continue;
+
+    // Handle entry functions first
+    if (auto *MD = dyn_cast_or_null<MDTuple>(
+            F.getMetadata(DXILContHelper::MDContinuationName))) {
+      auto *EntryF = extractFunctionOrNull(MD->getOperand(0));
+      if (&F != EntryF)
+        continue;
+    } else {
+      continue;
+    }
+
+    DXILShaderKind Kind = DXILContHelper::shaderStageToDxilShaderKind(*Stage);
+    switch (Kind) {
     case DXILShaderKind::RayGeneration:
     case DXILShaderKind::Intersection:
     case DXILShaderKind::AnyHit:
@@ -840,14 +829,16 @@ DXILContPostProcessPass::run(llvm::Module &M,
     case DXILShaderKind::Callable: {
       Changed = true;
       FunctionData Data;
-      Data.Kind = Entry.second;
+      Data.Kind = Kind;
       if (Data.Kind == DXILShaderKind::RayGeneration) {
         assert(SetupRayGen && "Could not find SetupRayGen function");
         Data.SystemDataTy = SetupRayGen->getReturnType();
       } else {
-        Data.SystemDataTy = Entry.first->getFunctionType()->getParamType(2);
+        assert(F.getFunctionType()->getNumParams() >= 3 &&
+               "Cannot find system data type");
+        Data.SystemDataTy = F.getFunctionType()->getParamType(2);
       }
-      ToProcess[Entry.first] = Data;
+      ToProcess[&F] = Data;
       break;
     }
     default:
@@ -856,15 +847,15 @@ DXILContPostProcessPass::run(llvm::Module &M,
   }
 
   // Also find continuation parts of the functions
-  for (auto &F : M.functions()) {
+  for (auto &F : M) {
     if (F.isDeclaration())
       continue;
     if (auto *MD = dyn_cast_or_null<MDTuple>(
             F.getMetadata(DXILContHelper::MDContinuationName))) {
       auto *EntryF = extractFunctionOrNull(MD->getOperand(0));
-      auto Entry = ShaderKinds.find(EntryF);
-      if (Entry != ShaderKinds.end() && &F != Entry->first) {
-        FunctionData Data = ToProcess[Entry->first];
+      auto Stage = lgc::rt::getLgcRtShaderStage(EntryF);
+      if (Stage && &F != EntryF) {
+        FunctionData Data = ToProcess[EntryF];
         Data.IsStart = false;
         Data.SystemDataTy = F.getArg(1)->getType();
         ToProcess[&F] = Data;
@@ -943,7 +934,6 @@ DXILContPostProcessPass::run(llvm::Module &M,
   }
 
   Changed |= lowerGetResumePointAddr(M, B, ToProcess);
-  Changed |= lowerGetCurrentFuncAddr(M, B);
 
   // Replace register globals with indices into a bigger global
   const auto &DL = M.getDataLayout();
@@ -1028,9 +1018,9 @@ DXILContPostProcessPass::run(llvm::Module &M,
 #endif
 
   if (ReportContStateSizes || ReportAllSizes)
-    reportContStateSizes(M, ShaderKinds);
+    reportContStateSizes(M);
   if (ReportPayloadRegisterSizes || ReportAllSizes)
-    reportPayloadSizes(M, ShaderKinds);
+    reportPayloadSizes(M);
   if (ReportSystemDataSizes || ReportAllSizes)
     reportSystemDataSizes(M, ToProcess);
 

@@ -30,7 +30,7 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-i1:32-i8:8-i16:32-i32:32-
 ; Function Attrs: nounwind
 define void @Miss(%struct.OuterPayload* noalias nocapture %outerPayload) #0 !types !23 {
 ; LOWERRAYTRACINGPIPELINE-LABEL: define %struct.DispatchSystemData @Miss(
-; LOWERRAYTRACINGPIPELINE-SAME: [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR0:[0-9]+]] !continuation.registercount !24 !continuation !26 {
+; LOWERRAYTRACINGPIPELINE-SAME: [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR0:[0-9]+]] !lgc.rt.shaderstage !26 !continuation.registercount !24 !continuation !27 {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_SYSTEMDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_OUTERPAYLOAD:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = call [[STRUCT_SYSTEMDATA]] @continuations.getSystemData.s_struct.SystemDatas()
@@ -100,16 +100,16 @@ define void @Miss(%struct.OuterPayload* noalias nocapture %outerPayload) #0 !typ
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP48:%.*]] = bitcast ptr [[TMP47]] to ptr
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @llvm.lifetime.start.p0(i64 4, ptr [[TMP48]]) #[[ATTR0]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP49:%.*]] = getelementptr inbounds [[STRUCT_OUTERPAYLOAD]], ptr [[TMP2]], i32 0, i32 0, i32 14
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP50:%.*]] = load float, ptr [[TMP49]], align 4, !tbaa [[TBAA27:![0-9]+]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP50:%.*]] = load float, ptr [[TMP49]], align 4, !tbaa [[TBAA28:![0-9]+]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP51:%.*]] = getelementptr inbounds [[STRUCT_INNERPAYLOAD]], ptr [[TMP47]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP50]], ptr [[TMP51]], align 4, !tbaa [[TBAA27]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP50]], ptr [[TMP51]], align 4, !tbaa [[TBAA28]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP52:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.createHandleForLib.dx.types.Handle(i32 160, [[DX_TYPES_HANDLE]] [[TMP46]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP53:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.annotateHandle(i32 216, [[DX_TYPES_HANDLE]] [[TMP52]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP54:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[TMP53]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP55:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @_cont_TraceRay.struct.InnerPayload.attr_max_32_bytes(ptr [[TMP55]], i64 [[TMP54]], i32 0, i32 0, i32 0, i32 0, i32 0, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 1.000000e+00, ptr [[TMP47]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP56:%.*]] = load float, ptr [[TMP51]], align 4, !tbaa [[TBAA27]]
-; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP56]], ptr [[TMP49]], align 4, !tbaa [[TBAA27]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP56:%.*]] = load float, ptr [[TMP51]], align 4, !tbaa [[TBAA28]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP56]], ptr [[TMP49]], align 4, !tbaa [[TBAA28]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @llvm.lifetime.end.p0(i64 4, ptr [[TMP48]]) #[[ATTR0]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP37]], ptr @PAYLOAD, align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP38]], ptr getelementptr inbounds ([37 x i32], ptr @PAYLOAD, i32 0, i32 22), align 4
@@ -192,7 +192,7 @@ define void @Miss(%struct.OuterPayload* noalias nocapture %outerPayload) #0 !typ
 ; Function Attrs: nounwind
 define void @Callable(%struct.OuterPayload* noalias %outerPayload) #0 !types !23 {
 ; LOWERRAYTRACINGPIPELINE-LABEL: define %struct.DispatchSystemData @Callable(
-; LOWERRAYTRACINGPIPELINE-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR0]] !continuation.registercount !24 !continuation !31 {
+; LOWERRAYTRACINGPIPELINE-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR0]] !lgc.rt.shaderstage !32 !continuation.registercount !24 !continuation !33 {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_OUTERPAYLOAD:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = alloca [[STRUCT_OUTERPAYLOAD]], align 8

@@ -30,12 +30,17 @@
  */
 #include "lgc/patch/Patch.h"
 #include "PatchNullFragShader.h"
+#include "continuations/Continuations.h"
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
+#include "lgc/Pipeline.h"
 #include "lgc/builder/BuilderReplayer.h"
+#include "lgc/patch/CombineCooperativeMatrix.h"
 #include "lgc/patch/Continufy.h"
 #include "lgc/patch/FragColorExport.h"
+#include "lgc/patch/LowerCooperativeMatrix.h"
 #include "lgc/patch/LowerDebugPrintf.h"
+#include "lgc/patch/LowerGpuRt.h"
 #include "lgc/patch/PatchBufferOp.h"
 #include "lgc/patch/PatchCheckShaderCache.h"
 #include "lgc/patch/PatchCopyShader.h"
@@ -84,6 +89,12 @@
 #include "llvm/Transforms/Scalar/EarlyCSE.h"
 #include "llvm/Transforms/Scalar/GVN.h"
 #include "llvm/Transforms/Scalar/IndVarSimplify.h"
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 475156
+// Old version of the code
+#else
+// New version of the code (also handles unknown version, which we treat as latest)
+#include "llvm/Transforms/Scalar/InferAlignment.h"
+#endif
 #include "llvm/Transforms/Scalar/InstSimplifyPass.h"
 #include "llvm/Transforms/Scalar/LICM.h"
 #include "llvm/Transforms/Scalar/LoopDeletion.h"
@@ -122,6 +133,14 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   if (patchTimer)
     LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
 
+  if (pipelineState->getOptions().useGpurt) {
+    // NOTE: Lower GPURT operations and run InstCombinePass before builder replayer, because some Op are going to be
+    // turned into constant value, so that we can eliminate unused `@lgc.create.load.buffer.desc` before getting into
+    // replayer. Otherwise, unnecessary `writes_uavs` and `uses_uav` may be set.
+    passMgr.addPass(LowerGpuRt());
+    passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass()));
+  }
+
   // We're using BuilderRecorder; replay the Builder calls now
   passMgr.addPass(BuilderReplayer());
 
@@ -131,8 +150,23 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
                                     "// LLPC pipeline before-patching results\n"));
   }
 
+  const auto indirectMode = pipelineState->getOptions().rtIndirectMode;
+  if (indirectMode == RayTracingIndirectMode::ContinuationsContinufy ||
+      indirectMode == RayTracingIndirectMode::Continuations) {
+    if (indirectMode == RayTracingIndirectMode::ContinuationsContinufy)
+      passMgr.addPass(Continufy());
+    else
+      passMgr.addPass(LowerRaytracingPipelinePass());
+
+    addLgcContinuationTransform(passMgr);
+  }
+
   passMgr.addPass(IPSCCPPass());
   passMgr.addPass(LowerDebugPrintf());
+
+  passMgr.addPass(createModuleToFunctionPassAdaptor(CombineCooperativeMatrix()));
+  // Lower the cooperative matrix
+  passMgr.addPass(LowerCooperativeMatrix());
 
   if (pipelineState->hasShaderStage(ShaderStageVertex) && !pipelineState->hasShaderStage(ShaderStageTessControl) &&
       pipelineState->hasShaderStage(ShaderStageTessEval))
@@ -397,6 +431,12 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, uint32_t optLevel) 
   fpm.addPass(SROAPass(SROAOptions::ModifyCFG));
   // uses UniformityAnalysis
   fpm.addPass(PatchReadFirstLane());
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 475156
+  // Old version of the code
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  fpm.addPass(InferAlignmentPass());
+#endif
   fpm.addPass(InstCombinePass());
   passMgr.addPass(createModuleToFunctionPassAdaptor(std::move(fpm)));
   passMgr.addPass(ConstantMergePass());

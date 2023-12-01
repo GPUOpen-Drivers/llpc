@@ -649,6 +649,9 @@ protected:
       Op1Ty = getValueType(Op1)->getVectorComponentType();
     } else if (getValueType(Op1)->isTypeMatrix()) {
       Op1Ty = getValueType(Op1)->getMatrixColumnType()->getVectorComponentType();
+    } else if (getValueType(Op1)->isTypeCooperativeMatrixKHR()) {
+      assert((OpCode >= OpIAdd && OpCode <= OpFMod) || (OpCode == OpMatrixTimesScalar));
+      Op1Ty = getValueType(Op1)->getCooperativeMatrixKHRComponentType();
     } else {
       Op1Ty = getValueType(Op1);
     }
@@ -657,6 +660,9 @@ protected:
       Op2Ty = getValueType(Op2)->getVectorComponentType();
     } else if (getValueType(Op2)->isTypeMatrix()) {
       Op2Ty = getValueType(Op2)->getMatrixColumnType()->getVectorComponentType();
+    } else if (getValueType(Op2)->isTypeCooperativeMatrixKHR()) {
+      assert(OpCode >= OpIAdd && OpCode <= OpFMod);
+      Op2Ty = getValueType(Op2)->getCooperativeMatrixKHRComponentType();
     } else {
       Op2Ty = getValueType(Op2);
     }
@@ -911,7 +917,7 @@ public:
     assert(WordCount == Pairs.size() + FixedWordCount);
     assert(OpCode == OC);
     assert(Pairs.size() % 2 == 0);
-    foreachPair([=, this](SPIRVValue *IncomingV, SPIRVBasicBlock *IncomingBB) {
+    foreachPair([&](SPIRVValue *IncomingV, SPIRVBasicBlock *IncomingBB) {
       assert(IncomingV->isForward() || IncomingV->getType() == Type);
       assert(IncomingBB->isBasicBlock() || IncomingBB->isForward());
     });
@@ -1302,7 +1308,12 @@ protected:
     if (isGenericNegateOpCode(OpCode)) {
       SPIRVType *ResTy = nullptr;
       SPIRVType *OpTy = nullptr;
-      {
+
+      if (Type->isTypeCooperativeMatrixKHR() &&
+          (static_cast<unsigned>(OpCode) == OpSNegate || static_cast<unsigned>(OpCode) == OpFNegate)) {
+        ResTy = Type->getCooperativeMatrixKHRComponentType();
+        OpTy = getValueType(Op)->getCooperativeMatrixKHRComponentType();
+      } else {
         ResTy = Type->isTypeVector() ? Type->getVectorComponentType() : Type;
         OpTy = Type->isTypeVector() ? getValueType(Op)->getVectorComponentType() : getValueType(Op);
       }
@@ -1315,6 +1326,15 @@ protected:
       assert((Type->isTypeVector() ? (Type->getVectorComponentCount() == getValueType(Op)->getVectorComponentCount())
                                    : 1) &&
              "Invalid vector component Width for Generic Negate instruction");
+    }
+    if (Type->isTypeCooperativeMatrixKHR() && static_cast<unsigned>(OpCode) >= OpConvertFToU &&
+        static_cast<unsigned>(OpCode) <= OpFConvert) {
+      SPIRVType *OpTy = getValueType(Op);
+      assert(OpTy->isTypeCooperativeMatrixKHR() &&
+             Type->getCooperativeMatrixKHRScope() == OpTy->getCooperativeMatrixKHRScope() &&
+             Type->getCooperativeMatrixKHRRows() == OpTy->getCooperativeMatrixKHRRows() &&
+             Type->getCooperativeMatrixKHRColumns() == OpTy->getCooperativeMatrixKHRColumns());
+      (void)OpTy;
     }
   }
 };
@@ -1560,11 +1580,6 @@ public:
         SPIRVLine *line = Module->add(new SPIRVLine(Module, Args[0], dbgLn, dbgCol));
         Module->setCurrentLine(line);
       }
-      // NonSemanticShaderDebugInfo100DebugFunction has one less argument than
-      // OpenCL.DebugInfo.100 DebugFunction
-      else if (ExtOpDebug == NonSemanticShaderDebugInfo100DebugFunction) {
-        Args.push_back(0);
-      }
     }
   }
   void validate() const override {
@@ -1654,7 +1669,8 @@ protected:
   void validate() const override {
     SPIRVInstruction::validate();
     assert(getValueType(Composite)->isTypeArray() || getValueType(Composite)->isTypeStruct() ||
-           getValueType(Composite)->isTypeVector() || getValueType(Composite)->isTypeMatrix());
+           getValueType(Composite)->isTypeVector() || getValueType(Composite)->isTypeMatrix() ||
+           getValueType(Composite)->isTypeCooperativeMatrixKHR());
   }
   SPIRVId Composite;
   std::vector<SPIRVWord> Indices;
@@ -2437,6 +2453,226 @@ _SPIRV_OP(SUDotAccSatKHR, true, 6, true, 3)
 SPIRVSpecConstantOp *createSpecConstantOpInst(SPIRVInstruction *Inst);
 SPIRVInstruction *createInstFromSpecConstantOp(SPIRVSpecConstantOp *C);
 SPIRVValue *createValueFromSpecConstantOp(SPIRVSpecConstantOp *Inst, uint32_t RoundingTypeMask);
+
+// For KHR extension
+class SPIRVCooperativeMatrixLoadKHR : public SPIRVInstruction, public SPIRVMemoryAccess {
+public:
+  const static SPIRVWord FixedWords = 6; // To update when the stride is optional.
+  // Complete constructor
+  SPIRVCooperativeMatrixLoadKHR(SPIRVId TheId, SPIRVId PointerId, SPIRVId MemLayout, SPIRVId TheStrideId,
+                                const std::vector<SPIRVWord> &TheMemoryAccess, SPIRVBasicBlock *TheBB)
+      : SPIRVInstruction(FixedWords + TheMemoryAccess.size(), OpCooperativeMatrixLoadKHR,
+                         TheBB->getValueType(PointerId)->getPointerElementType(), TheId, TheBB),
+        SPIRVMemoryAccess(TheMemoryAccess), PtrId(PointerId), ColMajorId(MemLayout), StrideId(TheStrideId),
+        MemoryAccess(TheMemoryAccess) {
+    validate();
+    assert(TheBB && "Invalid BB");
+  }
+  // Incomplete constructor
+  SPIRVCooperativeMatrixLoadKHR()
+      : SPIRVInstruction(OpCooperativeMatrixLoadKHR), SPIRVMemoryAccess(), PtrId(SPIRVID_INVALID),
+        ColMajorId(SPIRVID_INVALID), StrideId(SPIRVID_INVALID) {}
+
+  SPIRVCapVec getRequiredCapability() const override { return getVec(CapabilityCooperativeMatrixKHR); }
+
+  SPIRVValue *getSrc() const { return Module->get<SPIRVValue>(PtrId); }
+  SPIRVValue *getColMajor() const { return Module->get<SPIRVValue>(ColMajorId); }
+  SPIRVValue *getStride() const { return Module->get<SPIRVValue>(StrideId); }
+
+protected:
+  void setWordCount(SPIRVWord TheWordCount) override {
+    SPIRVEntry::setWordCount(TheWordCount);
+    MemoryAccess.resize(TheWordCount - FixedWords);
+  }
+
+  void decode(std::istream &I) override {
+    getDecoder(I) >> Type >> Id >> PtrId >> ColMajorId >> StrideId >> MemoryAccess;
+    memoryAccessUpdate(MemoryAccess);
+  }
+
+  void validate() const override {
+    SPIRVInstruction::validate();
+    assert(Type->isTypeCooperativeMatrixKHR() && "Invalid type");
+    assert((getValueType(PtrId)->getPointerElementType()->isTypeScalar() ||
+            getValueType(PtrId)->getPointerElementType()->isTypeVector()) &&
+           "Invalid pointer type");
+    assert((getValueType(PtrId)->getPointerStorageClass() == StorageClassWorkgroup ||
+            getValueType(PtrId)->getPointerStorageClass() == StorageClassStorageBuffer ||
+            getValueType(PtrId)->getPointerStorageClass() == StorageClassPhysicalStorageBuffer) &&
+           "Invalid storage class of Pointer");
+    assert(getValueType(StrideId)->isTypeInt() && "Invalid stride type");
+    assert((getValue(ColMajorId)->getOpCode() == OpConstant) && "Invalid colmajor type");
+  }
+
+private:
+  SPIRVId PtrId;
+  SPIRVId ColMajorId;
+  SPIRVId StrideId;
+  std::vector<SPIRVWord> MemoryAccess;
+};
+
+class SPIRVCooperativeMatrixStoreKHR : public SPIRVInstruction, public SPIRVMemoryAccess {
+public:
+  const static SPIRVWord FixedWords = 5; // To update when the stride is optional.
+  // Complete constructor
+  SPIRVCooperativeMatrixStoreKHR(SPIRVId PointerId, SPIRVId ValueId, SPIRVId TheStrideId, SPIRVId ColumnMajorId,
+                                 const std::vector<SPIRVWord> &TheMemoryAccess, SPIRVBasicBlock *TheBB)
+      : SPIRVInstruction(FixedWords + TheMemoryAccess.size(), OpCooperativeMatrixStoreKHR, TheBB),
+        SPIRVMemoryAccess(TheMemoryAccess), PtrId(PointerId), ObjectId(ValueId), ColMajorId(ColumnMajorId),
+        StrideId(TheStrideId), MemoryAccess(TheMemoryAccess) {
+    setAttr();
+    validate();
+    assert(TheBB && "Invalid BB");
+  }
+  // Incomplete constructor
+  SPIRVCooperativeMatrixStoreKHR()
+      : SPIRVInstruction(OpCooperativeMatrixStoreKHR), SPIRVMemoryAccess(), PtrId(SPIRVID_INVALID),
+        ObjectId(SPIRVID_INVALID), ColMajorId(SPIRVID_INVALID), StrideId(SPIRVID_INVALID) {
+    setAttr();
+  }
+
+  SPIRVCapVec getRequiredCapability() const override { return getVec(CapabilityCooperativeMatrixKHR); }
+  SPIRVValue *getDest() const { return Module->get<SPIRVValue>(PtrId); }
+  SPIRVValue *getObject() const { return Module->get<SPIRVValue>(ObjectId); }
+  SPIRVValue *getColMajor() const { return Module->get<SPIRVValue>(ColMajorId); }
+  SPIRVValue *getStride() const { return Module->get<SPIRVValue>(StrideId); }
+
+protected:
+  void setAttr() {
+    setHasNoType();
+    setHasNoId();
+  }
+
+  void setWordCount(SPIRVWord TheWordCount) override {
+    SPIRVEntry::setWordCount(TheWordCount);
+    MemoryAccess.resize(TheWordCount - FixedWords);
+  }
+
+  void decode(std::istream &I) override {
+    getDecoder(I) >> PtrId >> ObjectId >> ColMajorId >> StrideId >> MemoryAccess;
+    memoryAccessUpdate(MemoryAccess);
+  }
+
+  void validate() const override {
+    SPIRVInstruction::validate();
+    assert(getValueType(ObjectId)->isTypeCooperativeMatrixKHR() && "Invalid object type");
+    assert((getValueType(PtrId)->getPointerElementType()->isTypeScalar() ||
+            getValueType(PtrId)->getPointerElementType()->isTypeVector()) &&
+           "Invalid pointer type");
+    assert((getValueType(PtrId)->getPointerStorageClass() == StorageClassWorkgroup ||
+            getValueType(PtrId)->getPointerStorageClass() == StorageClassStorageBuffer ||
+            getValueType(PtrId)->getPointerStorageClass() == StorageClassPhysicalStorageBuffer) &&
+           "Invalid storage class of Pointer");
+    assert(getValueType(StrideId)->isTypeInt() && "Invalid stride type");
+    assert((getValue(ColMajorId)->getOpCode() == OpConstant) && "Invalid colmajor type");
+  }
+
+private:
+  SPIRVId PtrId;
+  SPIRVId ObjectId;
+  SPIRVId ColMajorId;
+  SPIRVId StrideId;
+  std::vector<SPIRVWord> MemoryAccess;
+};
+
+class SPIRVCooperativeMatrixLengthKHR : public SPIRVInstruction {
+public:
+  const static SPIRVWord FixedWords = 4;
+  // Complete constructor
+  SPIRVCooperativeMatrixLengthKHR(SPIRVId TypeId, SPIRVId TheId, SPIRVId TheMatrixTypeId, SPIRVBasicBlock *TheBB)
+      : SPIRVInstruction(FixedWords, OpCooperativeMatrixLengthKHR, TheBB->get<SPIRVType>(TypeId), TheId, TheBB),
+        MatrixTypeId(TheMatrixTypeId) {
+    validate();
+    assert(TheBB && "Invalid BB");
+  }
+  // Incomplete constructor
+  SPIRVCooperativeMatrixLengthKHR() : SPIRVInstruction(OpCooperativeMatrixLengthKHR), MatrixTypeId(SPIRVID_INVALID) {}
+
+  SPIRVCapVec getRequiredCapability() const override { return getVec(CapabilityCooperativeMatrixKHR); }
+  SPIRVType *getMatrixType() const { return Module->get<SPIRVType>(MatrixTypeId); }
+
+protected:
+  void decode(std::istream &I) override { getDecoder(I) >> Type >> Id >> MatrixTypeId; }
+
+  void validate() const override {
+    SPIRVInstruction::validate();
+    assert(getMatrixType()->isTypeCooperativeMatrixKHR() && "Invalid type");
+    assert(Type->isTypeInt() && Type->getBitWidth() == 32 && !static_cast<SPIRVTypeInt *>(Type)->isSigned() &&
+           "Invalid result type");
+  }
+
+private:
+  SPIRVId MatrixTypeId;
+};
+
+class SPIRVCooperativeMatrixKHRInstBase : public SPIRVInstTemplateBase {
+public:
+  SPIRVCapVec getRequiredCapability() const override { return getVec(CapabilityCooperativeMatrixKHR); }
+
+  SPIRVWord getMatrixASigned() const {
+    if (WordCount == 7) {
+      return Ops[3] & CooperativeMatrixOperandsMatrixASignedComponentsKHRMask;
+    } else {
+      return 0;
+    }
+  }
+
+  SPIRVWord getMatrixBSigned() const {
+    if (WordCount == 7) {
+      return Ops[3] & CooperativeMatrixOperandsMatrixBSignedComponentsKHRMask;
+    } else {
+      return 0;
+    }
+  }
+
+  SPIRVWord getMatrixCSigned() const {
+    if (WordCount == 7) {
+      return Ops[3] & CooperativeMatrixOperandsMatrixCSignedComponentsKHRMask;
+    } else {
+      return 0;
+    }
+  }
+
+  SPIRVWord getMatrixResultSigned() const {
+    if (WordCount == 7) {
+      return Ops[3] & CooperativeMatrixOperandsMatrixResultSignedComponentsKHRMask;
+    } else {
+      return 0;
+    }
+  }
+
+  SPIRVWord getMatrixSatAccumulation() const {
+    if (WordCount == 7) {
+      return Ops[3] & CooperativeMatrixOperandsSaturatingAccumulationKHRMask;
+    } else {
+      return 0;
+    }
+  }
+
+protected:
+  void validate() const override {
+    assert(getOpCode() == OpCooperativeMatrixMulAddKHR);
+    SPIRVType *AType = getValueType(Ops[0]);
+    SPIRVType *BType = getValueType(Ops[1]);
+    SPIRVType *CType = getValueType(Ops[2]);
+    assert(Type->getCooperativeMatrixKHRRows() == CType->getCooperativeMatrixKHRRows() &&
+           Type->getCooperativeMatrixKHRColumns() == CType->getCooperativeMatrixKHRColumns() &&
+           Type->getCooperativeMatrixKHRRows() == AType->getCooperativeMatrixKHRRows() &&
+           Type->getCooperativeMatrixKHRColumns() == BType->getCooperativeMatrixKHRColumns() &&
+           AType->getCooperativeMatrixKHRColumns() == BType->getCooperativeMatrixKHRRows() && "Inconsistent MxKxN");
+    assert(Type->isTypeCooperativeMatrixKHR() && AType->isTypeCooperativeMatrixKHR() &&
+           BType->isTypeCooperativeMatrixKHR() && CType->isTypeCooperativeMatrixKHR() && "Invalid A/B/C/D type");
+    assert(Type->getCooperativeMatrixKHRScope() == AType->getCooperativeMatrixKHRScope() &&
+           Type->getCooperativeMatrixKHRScope() == BType->getCooperativeMatrixKHRScope() &&
+           Type->getCooperativeMatrixKHRScope() == CType->getCooperativeMatrixKHRScope() && "Inconsistent scope");
+    (void)AType;
+    (void)BType;
+    (void)CType;
+  }
+};
+#define _SPIRV_OP(x, ...) typedef SPIRVInstTemplate<SPIRVCooperativeMatrixKHRInstBase, Op##x, __VA_ARGS__> SPIRV##x;
+_SPIRV_OP(CooperativeMatrixMulAddKHR, true, 6, true, 3)
+#undef _SPIRV_OP
 
 } // namespace SPIRV
 

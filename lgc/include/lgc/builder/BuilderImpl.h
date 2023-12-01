@@ -71,9 +71,6 @@ protected:
   // Get the PipelineState object.
   PipelineState *getPipelineState() const { return m_pipelineState; }
 
-  // Get whether the context we are building in supports DPP operations.
-  bool supportDpp() const;
-
   // Get whether the context we are building in supports DPP ROW_XMASK operations.
   bool supportDppRowXmask() const;
 
@@ -227,6 +224,13 @@ public:
 
   // Create "count leading sign bits" operation for a (vector of) signed int.
   llvm::Value *CreateCountLeadingSignBits(llvm::Value *value, const llvm::Twine &instName = "");
+
+  // Create "Masked Sum of Absolute Differences" operation.
+  llvm::Value *CreateMsad4(llvm::Value *src, llvm::Value *ref, llvm::Value *accum, const llvm::Twine &instName = "");
+
+  // Create fdot2_f16 + f32 operation.
+  llvm::Value *CreateFDot2(llvm::Value *a, llvm::Value *b, llvm::Value *scalar, llvm::Value *clamp,
+                           const llvm::Twine &instName = "");
 
   // Create "fmix" operation.
   llvm::Value *createFMix(llvm::Value *x, llvm::Value *y, llvm::Value *a, const llvm::Twine &instName = "");
@@ -400,13 +404,6 @@ public:
                                           const llvm::Twine &instName = "");
 
 private:
-  // Implement pre-GFX9 integer gather workaround to patch descriptor or coordinate before the gather
-  llvm::Value *preprocessIntegerImageGather(unsigned dim, llvm::Value *&imageDesc, llvm::Value *&coord);
-
-  // Implement pre-GFX9 integer gather workaround to modify result.
-  llvm::Value *postprocessIntegerImageGather(llvm::Value *needDescPatch, unsigned flags, llvm::Value *imageDesc,
-                                             llvm::Type *texelTy, llvm::Value *result);
-
   // Common code to create an image sample or gather.
   llvm::Value *CreateImageSampleGather(llvm::Type *resultTy, unsigned dim, unsigned flags, llvm::Value *coord,
                                        llvm::Value *imageDesc, llvm::Value *samplerDesc,
@@ -539,6 +536,9 @@ private:
 
   // Reorder the barycoord
   llvm::Value *normalizeBaryCoord(llvm::Value *ijCoord);
+
+  // Get provoking vertex value
+  void getProvokingVertexInfo(llvm::Value **isOne, llvm::Value **isTwo);
 
   // Read and directly handle certain built-ins that are common between shader stages
   llvm::Value *readCommonBuiltIn(BuiltInKind builtIn, llvm::Type *resultTy, const llvm::Twine &instName = "");

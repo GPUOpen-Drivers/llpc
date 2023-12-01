@@ -37,6 +37,7 @@
 #include "vkgcElfReader.h"
 #include "vkgcMetroHash.h"
 #include "lgc/CommonDefs.h"
+#include "lgc/LgcRtDialect.h"
 #include "llvm/Support/Mutex.h"
 #include <condition_variable>
 #include <optional>
@@ -198,6 +199,8 @@ private:
   Result generatePipeline(Context *context, unsigned moduleIndex, std::unique_ptr<llvm::Module> module,
                           ElfPackage &pipelineElf, lgc::Pipeline *pipeline, TimerProfiler &timerProfiler);
 
+  void setUseGpurt(lgc::Pipeline *pipeline);
+
   std::vector<std::string> m_options;           // Compilation options
   MetroHash::Hash m_optionHash;                 // Hash code of compilation options
   GfxIpVersion m_gfxIp;                         // Graphics IP version info
@@ -216,11 +219,16 @@ private:
       std::vector<ResourceNodeData> &inputSymbolInfo, std::vector<ResourceNodeData> &outputSymbolInfo,
       std::vector<ResourceNodeData> &uniformBufferInfo, std::vector<ResourceNodeData> &storageBufferInfo,
       std::vector<ResourceNodeData> &textureSymbolInfo, std::vector<ResourceNodeData> &imageSymbolInfo,
-      std::vector<ResourceNodeData> &atomicCounterSymbolInfo, std::vector<ResourceNodeData> &defaultUniformSymbolInfo);
+      std::vector<ResourceNodeData> &atomicCounterSymbolInfo, std::vector<ResourceNodeData> &defaultUniformSymbolInfo,
+      ShaderModuleUsage &shaderModuleUsage);
 };
 
 // Convert front-end LLPC shader stage to middle-end LGC shader stage
 lgc::ShaderStage getLgcShaderStage(ShaderStage stage);
+
+// Convert front-end LLPC shader stage to middle-end LGC rt shader stage.
+// Returns std::nullopt if not a raytracing stage.
+std::optional<lgc::rt::RayTracingShaderStage> getLgcRtShaderStage(ShaderStage stage);
 
 // Convert front-end LLPC shader stage to middle-end LGC shader stage mask
 unsigned getLgcShaderStageMask(ShaderStage stage);

@@ -55,11 +55,8 @@ if(ICD_BUILD_LLPC)
     set(LLVM_INCLUDE_DOCS OFF CACHE BOOL Force)
     set(LLVM_INCLUDE_EXAMPLES OFF CACHE BOOL Force)
     set(LLVM_INCLUDE_GO_TESTS OFF CACHE BOOL Force)
-    if(LLPC_BUILD_TESTS)
-        set(LLVM_INCLUDE_TESTS ON CACHE BOOL Force)
-    else()
-        set(LLVM_INCLUDE_TESTS OFF CACHE BOOL Force)
-    endif()
+    set(CONTINUATIONS_BUILD_TESTS ${LLPC_BUILD_TESTS})
+    set(LLVM_INCLUDE_TESTS ${LLPC_BUILD_TESTS} CACHE BOOL Force)
     set(LLVM_INCLUDE_TOOLS ON CACHE BOOL Force)
     set(LLVM_INCLUDE_UTILS ON CACHE BOOL Force)
     set(LLVM_ENABLE_TERMINFO OFF CACHE BOOL Force)
@@ -127,7 +124,7 @@ if(ICD_BUILD_LLPC)
     endif()
 
     # Always link statically against libLLVMlgc
-    llvm_map_components_to_libnames(extra_llvm_libs LgcRt lgc LgcCps)
+    llvm_map_components_to_libnames(extra_llvm_libs lgc Continuations)
     if(NOT WIN32)
         foreach (lib ${extra_llvm_libs})
             target_compile_options(${lib} PRIVATE "-fno-aligned-new")
@@ -225,9 +222,9 @@ if(ICD_BUILD_LLPC)
         lower/llpcSpirvLowerTranslator.cpp
         lower/llpcSpirvLowerUtil.cpp
         lower/llpcSpirvProcessGpuRtLibrary.cpp
-        lower/LowerGpuRt.cpp
         lower/llpcSpirvLowerInternalLibraryIntrinsicUtil.cpp
         lower/LowerGLCompatibility.cpp
+        lower/llpcSpirvLowerCooperativeMatrix.cpp
     )
 
 # llpc/translator
@@ -376,7 +373,6 @@ target_include_directories(llpc_standalone_compiler PUBLIC
     ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV
     ${PROJECT_SOURCE_DIR}/translator/lib/SPIRV/libSPIRV
     ${PROJECT_SOURCE_DIR}/util
-    ${XGL_PAL_PATH}/src/core/hw/gfxip/gfx6/chip
     ${XGL_PAL_PATH}/src/core/hw/gfxip/gfx9/chip
     ${XGL_PAL_PATH}/inc/core
     ${XGL_PAL_PATH}/inc/util

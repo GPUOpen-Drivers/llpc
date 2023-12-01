@@ -32,8 +32,9 @@
 #ifndef CONTINUATIONS_CONTINUATIONS_UTIL_H
 #define CONTINUATIONS_CONTINUATIONS_UTIL_H
 
-#include "llvm-dialects/Dialect/OpDescription.h"
-#include "llvm-dialects/TableGen/Operations.h"
+#include "lgc/LgcCpsDialect.h"
+#include "lgc/LgcRtDialect.h"
+#include "llvm-dialects/Dialect/OpMap.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -41,10 +42,12 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <cstdint>
 #include <functional>
 #include <limits>
 #include <optional>
+#include <type_traits>
 
 namespace DialectUtils {
 
@@ -52,21 +55,6 @@ llvm::StringRef getLgcRtDialectOpName(llvm::StringRef FullName);
 
 bool isLgcRtOp(const llvm::Function *F);
 
-template <typename OpT> bool isDialectOpDeclaration(llvm::Function &F) {
-  static llvm_dialects::OpDescription Desc =
-      llvm_dialects::OpDescription::get<OpT>();
-  return Desc.matchDeclaration(F);
-}
-
-template <typename... OpTypes>
-bool isAnyDialectOpDeclaration(llvm::Function &F) {
-  return (isDialectOpDeclaration<OpTypes>(F) || ...);
-}
-
-template <typename... OpTypes>
-bool isNoneOfDialectOpDeclaration(llvm::Function &F) {
-  return (!isDialectOpDeclaration<OpTypes>(F) && ...);
-}
 } // namespace DialectUtils
 
 namespace llvm {
@@ -118,7 +106,7 @@ struct GpuRtIntrinsicEntry {
   bool AccessesHitData = false;
 };
 
-extern StringMap<GpuRtIntrinsicEntry> LgcRtGpuRtMap;
+extern const OpMap<GpuRtIntrinsicEntry> LgcRtGpuRtMap;
 
 // This must match DXIL::ShaderKind from DxilConstants.h, and also
 // DXILShaderKind in a matching definition in GPURT, because it is used
@@ -266,8 +254,18 @@ private:
   // limit, we spill to the continuation stack.
   static constexpr const char *MDMaxPayloadRegisterCountName =
       "continuation.maxPayloadRegisterCount";
+  // The address space used to store the continuations stack.
+  // The possible values for this metadata are the values of ContStackAddrspace.
   static constexpr const char *MDStackAddrspaceName =
       "continuation.stackAddrspace";
+  // The raytracing ip level that is available on the target architecture.
+  // This is exposed to gpurt code via the GetRtip intrinsic.
+  static constexpr const char *MDRtipName = "continuation.rtip";
+  // Flags set for continuations.
+  // This is exposed to gpurt code via the ContinuationsGetFlags intrinsic.
+  static constexpr const char *MDFlagsName = "continuation.flags";
+  // Marks an await as a waiting one with a wait mask.
+  static constexpr const char *MDIsWaitAwaitName = "continuation.wait.await";
 
   // Function-scope metadata for payload and hit attribute size limits,
   // referring to the app-defined structs only.
@@ -316,11 +314,14 @@ public:
   static constexpr const char *MDTypesFunctionName = "function";
   static constexpr const char *MDTypesVoidName = "void";
   static constexpr const char *MDDXILPayloadTyName = "dxil.payload.type";
+  static constexpr const char *MDLgcCpsModule = "lgc.cps.module";
 
   // Global variable names
   static constexpr const char *GlobalPayloadName = "PAYLOAD";
   static constexpr const char *GlobalContStateName = "CONTINUATION_STATE";
   static constexpr const char *GlobalRegistersName = "REGISTERS";
+  static constexpr ContStackAddrspace DefaultStackAddrspace =
+      ContStackAddrspace::Scratch;
 
   static void RegisterPasses(llvm::PassBuilder &PB, bool NeedDialectContext);
 
@@ -485,6 +486,32 @@ public:
                                     static_cast<uint32_t>(StackAddrspace)));
   }
 
+  static std::optional<uint32_t> tryGetRtip(const Module &M) {
+    auto *MD = M.getNamedMetadata(MDRtipName);
+    if (!MD)
+      return {};
+    return extractZExtI32Constant(MD->getOperand(0));
+  };
+
+  static void setRtip(Module &M, uint32_t RtipLevel) {
+    auto *MD = M.getOrInsertNamedMetadata(MDRtipName);
+    MD->clearOperands();
+    MD->addOperand(getI32MDConstant(M.getContext(), RtipLevel));
+  }
+
+  static std::optional<uint32_t> tryGetFlags(const Module &M) {
+    auto *MD = M.getNamedMetadata(MDFlagsName);
+    if (!MD)
+      return {};
+    return extractZExtI32Constant(MD->getOperand(0));
+  };
+
+  static void setFlags(Module &M, uint32_t Flags) {
+    auto *MD = M.getOrInsertNamedMetadata(MDFlagsName);
+    MD->clearOperands();
+    MD->addOperand(getI32MDConstant(M.getContext(), Flags));
+  }
+
   static void setContinuationStateByteCount(Function &F, uint32_t ByteCount) {
     F.setMetadata(MDStateName, getI32MDConstant(F.getContext(), ByteCount));
   }
@@ -515,22 +542,83 @@ public:
     report_fatal_error(Twine(MDDXILPayloadTyName) +
                        " metadata not found on CallInst!");
   }
+
+  static bool isLgcCpsModule(Module &Mod) {
+    return Mod.getNamedMetadata(MDLgcCpsModule) != nullptr;
+  }
+
+  // Specifies that an awaited call should wait on a wait mask.
+  static void setIsWaitAwaitCall(CallInst &CI) {
+    CI.setMetadata(DXILContHelper::MDIsWaitAwaitName,
+                   MDTuple::get(CI.getContext(), {}));
+  }
+
+  // Queries whether an awaited call should wait on a wait mask.
+  static bool isWaitAwaitCall(const CallInst &CI) {
+    return CI.getMetadata(MDIsWaitAwaitName) != nullptr;
+  }
+
+  static void removeIsWaitAwaitMetadata(CallInst &CI) {
+    CI.setMetadata(DXILContHelper::MDIsWaitAwaitName, nullptr);
+  }
+
+  static DXILShaderKind
+  shaderStageToDxilShaderKind(lgc::rt::RayTracingShaderStage Stage) {
+    switch (Stage) {
+    case lgc::rt::RayTracingShaderStage::RayGeneration:
+      return DXILShaderKind::RayGeneration;
+    case lgc::rt::RayTracingShaderStage::Intersection:
+      return DXILShaderKind::Intersection;
+    case lgc::rt::RayTracingShaderStage::AnyHit:
+      return DXILShaderKind::AnyHit;
+    case lgc::rt::RayTracingShaderStage::ClosestHit:
+      return DXILShaderKind::ClosestHit;
+    case lgc::rt::RayTracingShaderStage::Miss:
+      return DXILShaderKind::Miss;
+    case lgc::rt::RayTracingShaderStage::Callable:
+      return DXILShaderKind::Callable;
+    case lgc::rt::RayTracingShaderStage::Traversal:
+      return DXILShaderKind::Compute;
+    }
+  }
+
+  static lgc::rt::RayTracingShaderStage
+  dxilShaderKindToShaderStage(DXILShaderKind Kind) {
+    switch (Kind) {
+    case DXILShaderKind::RayGeneration:
+      return lgc::rt::RayTracingShaderStage::RayGeneration;
+    case DXILShaderKind::Intersection:
+      return lgc::rt::RayTracingShaderStage::Intersection;
+    case DXILShaderKind::AnyHit:
+      return lgc::rt::RayTracingShaderStage::AnyHit;
+    case DXILShaderKind::ClosestHit:
+      return lgc::rt::RayTracingShaderStage::ClosestHit;
+    case DXILShaderKind::Miss:
+      return lgc::rt::RayTracingShaderStage::Miss;
+    case DXILShaderKind::Callable:
+      return lgc::rt::RayTracingShaderStage::Callable;
+    default:
+      report_fatal_error(Twine("Cannot convert DXILShaderKind ") +
+                         Twine(static_cast<uint32_t>(Kind)) +
+                         " to RayTracingShaderStage");
+    }
+  }
 };
 
 /// Free-standing helpers.
 
-// A little helper function that allows to apply a callback on the users (calls)
-// of a function.
-void forEachCall(Function &F, const std::function<void(CallInst &)> &Callback);
-
-// A little helper function that allows to apply a callback on the users (calls)
-// of a set of functions given by iterating over a module.
-void forEachCall(Module &M, const std::function<void(CallInst &)> &Callback);
-
-// A little helper function that allows to apply a callback on the users (calls)
-// of a set of functions.
-void forEachCall(ArrayRef<Function *> Funcs,
-                 const std::function<void(CallInst &)> &Callback);
+// Helper to visit all calls of a function.
+// Expected type for Callback:
+//  void(CallInst &)
+template <typename CallbackTy>
+void forEachCall(Function &F, CallbackTy Callback) {
+  static_assert(std::is_invocable_v<CallbackTy, CallInst &>);
+  for (auto &Use : make_early_inc_range(F.uses())) {
+    if (auto *CInst = dyn_cast<CallInst>(Use.getUser()))
+      if (CInst->isCallee(&Use))
+        Callback(*CInst);
+  }
+}
 
 // Move all basic blocks of OldFunc to NewFunc.
 void moveFunctionBody(Function &OldFunc, Function &NewFunc);

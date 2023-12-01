@@ -31,6 +31,7 @@
 #include "lgc/patch/PatchReadFirstLane.h"
 #include "lgc/patch/Patch.h"
 #include "lgc/state/PipelineState.h"
+#include "lgc/util/BuilderBase.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
 // Old version of the code
@@ -52,6 +53,48 @@
 
 using namespace lgc;
 using namespace llvm;
+
+namespace {
+
+class ReadFirstLaneOptimizer {
+public:
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
+  // Old version of the code
+  using UniformityInfo = llvm::DivergenceInfo;
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  using UniformityInfo = llvm::UniformityInfo;
+#endif
+
+  ReadFirstLaneOptimizer(UniformityInfo &uniformityInfo, TargetTransformInfo &targetTransformInfo)
+      : m_uniformityInfo(uniformityInfo), m_targetTransformInfo(targetTransformInfo) {}
+
+  bool run(Function &function);
+
+private:
+  bool promoteEqualUniformOps(Function &function);
+  bool liftReadFirstLane(Function &function);
+  void collectAssumeUniforms(BasicBlock *block, const SmallVectorImpl<Instruction *> &initialReadFirstLanes);
+  void findBestInsertLocation(const SmallVectorImpl<Instruction *> &initialReadFirstLanes);
+  bool isAllUsersAssumedUniform(Instruction *inst);
+  void applyReadFirstLane(Instruction *inst, BuilderBase &builder);
+
+  // We only support to apply amdgcn_readfirstlane on float or int type
+  // TODO: Support various types when backend work is ready
+  bool isSupportedType(Instruction *inst) { return inst->getType()->isFloatTy() || inst->getType()->isIntegerTy(32); }
+
+  UniformityInfo &m_uniformityInfo;
+  TargetTransformInfo &m_targetTransformInfo;
+
+  // The map key is an instruction `I` that can be assumed uniform. That is, we can apply readfirstlane to the result
+  // of `I` and remain correct. If the map value vector is non-empty, it contains a list of instructions that we can
+  // apply readfirstlane on to achieve the same effect as a readfirstlane on `I`. An empty vector means that it is not
+  // possible to lift a readfirstlane beyond `I`.
+  DenseMap<Instruction *, SmallVector<Instruction *, 2>> m_uniformDivergentUsesMap;
+  DenseSet<Instruction *> m_insertLocations; // The insert locations of readfirstlane
+};
+
+} // anonymous namespace
 
 // =====================================================================================================================
 // Returns true if all users of the given instruction defined in the given block.
@@ -83,8 +126,7 @@ static bool areAllUserReadFirstLane(Instruction *inst) {
 }
 
 // =====================================================================================================================
-PatchReadFirstLane::PatchReadFirstLane() : m_targetTransformInfo(nullptr) {
-}
+PatchReadFirstLane::PatchReadFirstLane() = default;
 
 // =====================================================================================================================
 // Executes this LLVM pass on the specified LLVM function.
@@ -93,35 +135,27 @@ PatchReadFirstLane::PatchReadFirstLane() : m_targetTransformInfo(nullptr) {
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
 PreservedAnalyses PatchReadFirstLane::run(Function &function, FunctionAnalysisManager &analysisManager) {
-  TargetTransformInfo &targetTransformInfo = analysisManager.getResult<TargetIRAnalysis>(function);
+  auto &targetTransformInfo = analysisManager.getResult<TargetIRAnalysis>(function);
 
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
   // Old version of the code
-  DivergenceInfo &uniformityInfo = analysisManager.getResult<DivergenceAnalysis>(function);
+  auto &uniformityInfo = analysisManager.getResult<DivergenceAnalysis>(function);
 #else
   // New version of the code (also handles unknown version, which we treat as latest)
-  UniformityInfo &uniformityInfo = analysisManager.getResult<UniformityInfoAnalysis>(function);
+  auto &uniformityInfo = analysisManager.getResult<UniformityInfoAnalysis>(function);
 #endif
-  auto isDivergentUse = [&](const Use &use) { return uniformityInfo.isDivergentUse(use); };
-  if (runImpl(function, isDivergentUse, &targetTransformInfo))
-    return PreservedAnalyses::none();
-  return PreservedAnalyses::all();
+
+  ReadFirstLaneOptimizer rflo(uniformityInfo, targetTransformInfo);
+  bool changed = rflo.run(function);
+  return changed ? PreservedAnalyses::allInSet<CFGAnalyses>() : PreservedAnalyses::all();
 }
 
 // =====================================================================================================================
-// Executes this LLVM pass on the specified LLVM function.
+// Optimize readfirstlanes in the given function.
 //
-// @param [in,out] function : LLVM function to be run on.
-// @param isDivergentUse : Function returning true if the given use is divergent.
-// @param targetTransformInfo : The TTI to use for this pass.
-// @returns : True if the module was modified by the transformation and false otherwise
-bool PatchReadFirstLane::runImpl(Function &function, std::function<bool(const Use &)> isDivergentUse,
-                                 TargetTransformInfo *targetTransformInfo) {
-  LLVM_DEBUG(dbgs() << "Run the pass Patch-Read-First-Lane\n");
-
-  m_isDivergentUse = std::move(isDivergentUse);
-  m_targetTransformInfo = targetTransformInfo;
-
+// @param function : function in which to look for readfirstlanes
+// @return true if any change was made
+bool ReadFirstLaneOptimizer::run(Function &function) {
   bool changed = promoteEqualUniformOps(function);
   changed |= liftReadFirstLane(function);
   return changed;
@@ -146,7 +180,7 @@ bool PatchReadFirstLane::runImpl(Function &function, std::function<bool(const Us
 // %use = zext i32 %divergent to i64 ; can use %uniform
 //
 // @param [in,out] function : LLVM function to be run for the optimization.
-bool PatchReadFirstLane::promoteEqualUniformOps(Function &function) {
+bool ReadFirstLaneOptimizer::promoteEqualUniformOps(Function &function) {
 
   bool changed = false;
   for (auto &bb : function) {
@@ -181,7 +215,7 @@ bool PatchReadFirstLane::promoteEqualUniformOps(Function &function) {
     Value *divergentVal = nullptr, *uniformVal = nullptr;
     for (int i = 0; i < 2; ++i) {
       const Use &cmpArg = cmpInst->getOperandUse(i);
-      if (m_isDivergentUse(cmpArg))
+      if (m_uniformityInfo.isDivergentUse(cmpArg))
         divergentVal = cmpArg.get();
       else
         uniformVal = cmpArg.get();
@@ -212,7 +246,7 @@ bool PatchReadFirstLane::promoteEqualUniformOps(Function &function) {
 // possible.
 //
 // @param [in,out] function : LLVM function to be run for readfirstlane optimization.
-bool PatchReadFirstLane::liftReadFirstLane(Function &function) {
+bool ReadFirstLaneOptimizer::liftReadFirstLane(Function &function) {
   // Collect the basic blocks with amdgcn_readfirstlane
   // Build the map between initial readfirstlanes and their corresponding blocks
   DenseMap<BasicBlock *, SmallVector<Instruction *, 2>> blockInitialReadFirstLanesMap;
@@ -269,8 +303,8 @@ bool PatchReadFirstLane::liftReadFirstLane(Function &function) {
 //
 // @param block : The processing basic block
 // @param initialReadFirstLanes : The initial amdgcn_readfirstlane vector
-void PatchReadFirstLane::collectAssumeUniforms(BasicBlock *block,
-                                               const SmallVectorImpl<Instruction *> &initialReadFirstLanes) {
+void ReadFirstLaneOptimizer::collectAssumeUniforms(BasicBlock *block,
+                                                   const SmallVectorImpl<Instruction *> &initialReadFirstLanes) {
   auto instructionOrder = [](Instruction *lhs, Instruction *rhs) { return lhs->comesBefore(rhs); };
   SmallVector<Instruction *, 16> candidates;
 
@@ -285,13 +319,12 @@ void PatchReadFirstLane::collectAssumeUniforms(BasicBlock *block,
   //  1. Records this fact and
   //  2. Determines whether the assumption of a uniform result could be propagated to the candidate's operands.
   auto tryPropagate = [&](Instruction *candidate, bool isInitialReadFirstLane) {
-    bool cannotPropagate = m_targetTransformInfo->isSourceOfDivergence(candidate) || isa<PHINode>(candidate) ||
-                           (!isInitialReadFirstLane && isa<CallInst>(candidate));
+    bool cannotPropagate = m_targetTransformInfo.isSourceOfDivergence(candidate) || isa<PHINode>(candidate);
 
     SmallVector<Instruction *, 3> operandInsts;
     if (!cannotPropagate) {
       for (Use &use : candidate->operands()) {
-        if (!m_isDivergentUse(use))
+        if (!m_uniformityInfo.isDivergentUse(use))
           continue; // already known to be uniform -- no need to consider this operand
 
         auto operandInst = dyn_cast<Instruction>(use.get());
@@ -342,7 +375,7 @@ void PatchReadFirstLane::collectAssumeUniforms(BasicBlock *block,
 // then we can just insert the readfirstlane there (or propagate).
 //
 // @param readFirstLaneCount : The initial amdgcn_readfirstlane vector
-void PatchReadFirstLane::findBestInsertLocation(const SmallVectorImpl<Instruction *> &initialReadFirstLanes) {
+void ReadFirstLaneOptimizer::findBestInsertLocation(const SmallVectorImpl<Instruction *> &initialReadFirstLanes) {
   // Set of instructions from m_uniformDivergentUsesMap which will be forced to become uniform by the
   // instructions we already plan to insert so far. Allows us to break out of searches that would be redundant.
   DenseSet<Instruction *> enforcedUniform;
@@ -363,9 +396,7 @@ void PatchReadFirstLane::findBestInsertLocation(const SmallVectorImpl<Instructio
 
     for (;;) {
       const auto &mapIt = m_uniformDivergentUsesMap.find(current);
-      if (mapIt == m_uniformDivergentUsesMap.end())
-        break; // no further propagation possible
-
+      assert(mapIt != m_uniformDivergentUsesMap.end());
       const auto &divergentOperands = mapIt->second;
       if (divergentOperands.empty())
         break; // no further propagation possible
@@ -438,6 +469,9 @@ void PatchReadFirstLane::findBestInsertLocation(const SmallVectorImpl<Instructio
         current = queue[0]; // move to the found bottleneck
       }
 
+      if (!m_uniformDivergentUsesMap.count(current))
+        break;
+
       if (enforcedUniform.count(current)) {
         // Already enforced to be uniform, no need to continue the search or even consider inserting a new
         // readfirstlane.
@@ -469,7 +503,7 @@ void PatchReadFirstLane::findBestInsertLocation(const SmallVectorImpl<Instructio
 // Return true if all users of the given instruction are "assumed uniform"
 //
 // @param inst : The instruction to be checked
-bool PatchReadFirstLane::isAllUsersAssumedUniform(Instruction *inst) {
+bool ReadFirstLaneOptimizer::isAllUsersAssumedUniform(Instruction *inst) {
   for (auto user : inst->users()) {
     auto userInst = dyn_cast<Instruction>(user);
     if (m_uniformDivergentUsesMap.count(userInst) == 0)
@@ -483,7 +517,7 @@ bool PatchReadFirstLane::isAllUsersAssumedUniform(Instruction *inst) {
 //
 // @param inst : The instruction to be applied readfirstlane on
 // @param builder : BuildBase to use
-void PatchReadFirstLane::applyReadFirstLane(Instruction *inst, BuilderBase &builder) {
+void ReadFirstLaneOptimizer::applyReadFirstLane(Instruction *inst, BuilderBase &builder) {
   // Guarantee the insert position is behind all PhiNodes
   Instruction *insertPos = inst->getNextNonDebugInstruction();
   while (isa<PHINode>(insertPos))

@@ -24,7 +24,7 @@
 ;
 ; RUN: amdllpc -enable-relocatable-shader-elf %gfxip %s,main_vs %s,main_gs \
 ; RUN:   --num-threads=2 -o %t.mt.elf
-; RUN: llvm-objdump --arch=amdgcn --mcpu=gfx900 -d %t.mt.elf \
+; RUN: llvm-objdump --arch=amdgcn --mcpu=gfx1010 -d %t.mt.elf \
 ; RUN:   | FileCheck -check-prefix=SHADERTEST_MT %s
 ;
 ; SHADERTEST_MT-LABEL: <_amdgpu_gs_main>:

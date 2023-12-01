@@ -30,7 +30,6 @@
  ***********************************************************************************************************************
  */
 #include "lgc/patch/PatchInOutImportExport.h"
-#include "Gfx6Chip.h"
 #include "Gfx9Chip.h"
 #include "lgc/Builder.h"
 #include "lgc/BuiltIns.h"
@@ -1090,13 +1089,13 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
 
         // NOTE: Implicitly store the value of view index to GS-VS ring buffer for raster stream if multi-view is
         // enabled. Copy shader will read the value from GS-VS ring and export it to vertex position data.
-        if (m_pipelineState->getInputAssemblyState().enableMultiView) {
+        if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable) {
           auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
           auto rasterStream = m_pipelineState->getRasterizerState().rasterStream;
 
           if (emitStream == rasterStream) {
             auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
-            auto viewIndex = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
+            auto viewIndex = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
 
             const auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
             assert(builtInOutLocMap.find(BuiltInViewIndex) != builtInOutLocMap.end());
@@ -1252,14 +1251,14 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       cullDistanceCount = builtInUsage.cullDistance;
     }
 
-    const auto enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
+    const auto enableMultiView = m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable;
     if (enableMultiView) {
       if (m_shaderStage == ShaderStageVertex) {
         auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs;
-        m_viewIndex = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
+        m_viewIndex = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
       } else if (m_shaderStage == ShaderStageTessEval) {
         auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageTessEval)->entryArgIdxs.tes;
-        m_viewIndex = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
+        m_viewIndex = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
       } else {
         assert(m_shaderStage == ShaderStageCopyShader);
         assert(m_viewIndex); // Must have been explicitly loaded in copy shader
@@ -1431,37 +1430,48 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       addExportInstForBuiltInOutput(m_edgeFlag, BuiltInEdgeFlag, insertPos);
     }
 
-    if (m_gfxIp.major <= 8 && (useLayer || enableMultiView)) {
-      if (enableMultiView) {
-        assert(m_viewIndex);
-        addExportInstForBuiltInOutput(m_viewIndex, BuiltInViewIndex, insertPos);
-      }
-
-      if (useLayer) {
-        assert(m_layer);
-        addExportInstForBuiltInOutput(m_layer, BuiltInLayer, insertPos);
-      }
-    }
-
     // Export gl_Layer and gl_ViewportIndex before entry-point returns
     if (m_gfxIp.major >= 9 && (useLayer || useViewportIndex || enableMultiView)) {
+      Value *viewportIndex = nullptr;
+      Value *layer = nullptr;
       Value *viewportIndexAndLayer = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
+
+      BuilderBase builder(*m_context);
+      builder.SetInsertPoint(insertPos);
+
+      if (m_pipelineState->getInputAssemblyState().multiView == MultiViewMode::PerView) {
+        assert(m_viewIndex);
+        // Get viewportIndex from viewIndex.
+        viewportIndex = builder.CreateAnd(builder.CreateLShr(m_viewIndex, builder.getInt32(4)), builder.getInt32(0xF));
+        // Get layer from viewIndex
+        layer = builder.CreateLShr(m_viewIndex, builder.getInt32(8));
+        if (useLayer)
+          layer = builder.CreateAdd(m_layer, layer);
+      } else if (m_pipelineState->getInputAssemblyState().multiView == MultiViewMode::Simple) {
+        assert(m_viewIndex);
+        layer = m_viewIndex;
+      } else if (useLayer) {
+        assert(!enableMultiView && m_layer);
+        layer = m_layer;
+      }
 
       if (useViewportIndex) {
         assert(m_viewportIndex);
-        viewportIndexAndLayer = BinaryOperator::CreateShl(
-            m_viewportIndex, ConstantInt::get(Type::getInt32Ty(*m_context), 16), "", insertPos);
+        if (viewportIndex)
+          viewportIndex = builder.CreateAdd(m_viewportIndex, viewportIndex);
+        else
+          viewportIndex = m_viewportIndex;
       }
 
-      if (enableMultiView) {
-        assert(m_viewIndex);
-        viewportIndexAndLayer = BinaryOperator::CreateOr(viewportIndexAndLayer, m_viewIndex, "", insertPos);
-      } else if (useLayer) {
-        assert(m_layer);
-        viewportIndexAndLayer = BinaryOperator::CreateOr(viewportIndexAndLayer, m_layer, "", insertPos);
+      if (viewportIndex) {
+        viewportIndexAndLayer = builder.CreateShl(viewportIndex, builder.getInt32(16));
       }
 
-      viewportIndexAndLayer = new BitCastInst(viewportIndexAndLayer, Type::getFloatTy(*m_context), "", insertPos);
+      if (layer) {
+        viewportIndexAndLayer = builder.CreateOr(viewportIndexAndLayer, layer);
+      }
+
+      viewportIndexAndLayer = builder.CreateBitCast(viewportIndexAndLayer, Type::getFloatTy(*m_context));
 
       Value *args[] = {
           ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_POS_1), // tgt
@@ -1474,7 +1484,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
           ConstantInt::get(Type::getInt1Ty(*m_context), false)              // vm
       };
 
-      emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
+      builder.CreateIntrinsic(Intrinsic::amdgcn_exp, Type::getFloatTy(*m_context), args, {});
 
       // NOTE: We have to export gl_ViewportIndex via generic outputs as well.
       if (useViewportIndex) {
@@ -1489,7 +1499,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
           assert(builtInOutLocs.find(BuiltInViewportIndex) != builtInOutLocs.end());
           const unsigned loc = builtInOutLocs.find(BuiltInViewportIndex)->second;
 
-          Value *viewportIndex = new BitCastInst(m_viewportIndex, Type::getFloatTy(*m_context), "", insertPos);
+          Value *viewportIndex = builder.CreateBitCast(m_viewportIndex, Type::getFloatTy(*m_context));
 
           recordVertexAttribExport(loc, {viewportIndex, poison, poison, poison});
         }
@@ -1508,7 +1518,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
           assert(builtInOutLocs.find(BuiltInLayer) != builtInOutLocs.end());
           const unsigned loc = builtInOutLocs.find(BuiltInLayer)->second;
 
-          Value *layer = new BitCastInst(m_layer, Type::getFloatTy(*m_context), "", insertPos);
+          Value *layer = builder.CreateBitCast(m_layer, Type::getFloatTy(*m_context));
 
           recordVertexAttribExport(loc, {layer, poison, poison, poison});
         }
@@ -1744,9 +1754,10 @@ Value *PatchInOutImportExport::performFsParameterLoad(BuilderBase &builder, Valu
     compValue = builder.CreateIntrinsic(Intrinsic::amdgcn_mov_dpp, builder.getInt32Ty(),
                                         {compValue, builder.getInt32(static_cast<unsigned>(dppCtrl)),
                                          builder.getInt32(15), builder.getInt32(15), builder.getTrue()});
-    // NOTE: Make mov_dpp and its source instructions run in WQM to make sure the mov_dpp could fetch
-    // correct data from possible inactive lanes.
-    compValue = builder.CreateIntrinsic(Intrinsic::amdgcn_wqm, builder.getInt32Ty(), compValue);
+    // NOTE: mov_dpp must run in strict WQM to access lanes potentially inactive with normal exec/WQM.
+    // lds_param_load always runs in strict WQM, but exec/WQM may not match this due to discards or divergence.
+    // Ideally we would use the FI bit on the mov_dpp, but there is currently no backend support.
+    compValue = builder.CreateIntrinsic(Intrinsic::amdgcn_strict_wqm, builder.getInt32Ty(), compValue);
     compValue = builder.CreateBitCast(compValue, builder.getFloatTy());
   } else {
     Value *args[] = {
@@ -2179,8 +2190,8 @@ Value *PatchInOutImportExport::patchTcsBuiltInInputImport(Type *inputTy, unsigne
     break;
   }
   case BuiltInViewIndex: {
-    if (m_pipelineState->getInputAssemblyState().enableMultiView)
-      input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable)
+      input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
     else
       input = builder.getInt32(0);
     break;
@@ -2307,8 +2318,8 @@ Value *PatchInOutImportExport::patchTesBuiltInInputImport(Type *inputTy, unsigne
     break;
   }
   case BuiltInViewIndex: {
-    if (m_pipelineState->getInputAssemblyState().enableMultiView)
-      input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable)
+      input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
     else
       input = builder.getInt32(0);
     break;
@@ -2358,8 +2369,8 @@ Value *PatchInOutImportExport::patchGsBuiltInInputImport(Type *inputTy, unsigned
     break;
   }
   case BuiltInViewIndex: {
-    if (m_pipelineState->getInputAssemblyState().enableMultiView)
-      input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable)
+      input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
     else
       input = builder.getInt32(0);
     break;
@@ -2460,22 +2471,31 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
                                             {ancillary, builder.getInt32(8), builder.getInt32(4)});
 
     Value *sampleMaskIn = sampleCoverage;
+
+    // RunAtSampleRate is used to identify whether fragment shader run at sample rate, which will
+    // be set from API side. PixelShaderSamples is used to controls the pixel shader execution rate,
+    // which will be set when compile shader.
+    // There is a special case when vkCreateGraphicsPipelines but not set sampleRate, but compiling shader
+    // will ask to set runAtSampleRate, this case is valid but current code will cause hang.
+    // So in this case, it will not use broadcast sample mask.
     if (m_pipelineState->getRasterizerState().perSampleShading || builtInUsage.runAtSampleRate) {
       unsigned baseMask = 1;
       if (!builtInUsage.sampleId) {
-        // Fix the failure for multisample_shader_builtin.sample_mask cases "gl_SampleMaskIn" should contain one
-        // or multiple covered sample bit.
-        // (1) If the 4 samples is divided into 2 sub invocation groups, broadcast sample mask bit <0, 1>
-        // to sample <2, 3>.
-        // (2) If the 8 samples is divided into 2 sub invocation groups, broadcast sample mask bit <0, 1>
-        // to sample <2, 3>, then re-broadcast sample mask bit <0, 1, 2, 3> to sample <4, 5, 6, 7>.
-        // (3) If the 8 samples is divided into 4 sub invocation groups, patch to broadcast sample mask bit
-        // <0, 1, 2, 3> to sample <4, 5, 6, 7>.
-
-        unsigned baseMaskSamples = m_pipelineState->getRasterizerState().pixelShaderSamples;
-        while (baseMaskSamples < m_pipelineState->getRasterizerState().numSamples) {
-          baseMask |= baseMask << baseMaskSamples;
-          baseMaskSamples *= 2;
+        if (m_pipelineState->getRasterizerState().pixelShaderSamples != 0) {
+          // Only broadcast sample mask when the value has already been set
+          // Fix the failure for multisample_shader_builtin.sample_mask cases "gl_SampleMaskIn" should contain one
+          // or multiple covered sample bit.
+          // (1) If the 4 samples is divided into 2 sub invocation groups, broadcast sample mask bit <0, 1>
+          // to sample <2, 3>.
+          // (2) If the 8 samples is divided into 2 sub invocation groups, broadcast sample mask bit <0, 1>
+          // to sample <2, 3>, then re-broadcast sample mask bit <0, 1, 2, 3> to sample <4, 5, 6, 7>.
+          // (3) If the 8 samples is divided into 4 sub invocation groups, patch to broadcast sample mask bit
+          // <0, 1, 2, 3> to sample <4, 5, 6, 7>.
+          unsigned baseMaskSamples = m_pipelineState->getRasterizerState().pixelShaderSamples;
+          while (baseMaskSamples < m_pipelineState->getRasterizerState().numSamples) {
+            baseMask |= baseMask << baseMaskSamples;
+            baseMaskSamples *= 2;
+          }
         }
       }
 
@@ -2565,8 +2585,8 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     break;
   }
   case BuiltInViewIndex: {
-    if (m_pipelineState->getInputAssemblyState().enableMultiView)
-      input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewIndex);
+    if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable)
+      input = getFunctionArgument(m_entryPoint, entryArgIdxs.viewId);
     else
       input = builder.getInt32(0);
     break;
@@ -3004,12 +3024,8 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
 
     // NOTE: Only last vertex processing shader stage has to export the value of gl_ViewportIndex.
     if (!m_hasTs && !m_hasGs) {
-      if (m_gfxIp.major <= 8)
-        addExportInstForBuiltInOutput(output, builtInId, insertPos);
-      else {
-        // NOTE: The export of gl_ViewportIndex is delayed and is done before entry-point returns.
-        m_viewportIndex = output;
-      }
+      // NOTE: The export of gl_ViewportIndex is delayed and is done before entry-point returns.
+      m_viewportIndex = output;
     } else if (m_hasTs) {
       assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
       unsigned loc = builtInOutLocMap.find(builtInId)->second;
@@ -3262,12 +3278,8 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned
 
     // NOTE: Only last vertex processing shader stage has to export the value of gl_ViewportIndex.
     if (!m_hasGs) {
-      if (m_gfxIp.major <= 8)
-        addExportInstForBuiltInOutput(output, builtInId, insertPos);
-      else {
-        // NOTE: The export of gl_ViewportIndex is delayed and is done before entry-point returns.
-        m_viewportIndex = output;
-      }
+      // NOTE: The export of gl_ViewportIndex is delayed and is done before entry-point returns.
+      m_viewportIndex = output;
     } else {
       assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
       unsigned loc = builtInOutLocMap.find(builtInId)->second;
@@ -3521,13 +3533,8 @@ void PatchInOutImportExport::patchCopyShaderBuiltInOutputExport(Value *output, u
     break;
   }
   case BuiltInViewportIndex: {
-    if (m_gfxIp.major <= 8)
-      addExportInstForBuiltInOutput(output, builtInId, insertPos);
-    else {
-      // NOTE: The export of gl_ViewportIndex is delayed and is done before entry-point returns.
-      m_viewportIndex = output;
-    }
-
+    // NOTE: The export of gl_ViewportIndex is delayed and is done before entry-point returns.
+    m_viewportIndex = output;
     break;
   }
   case BuiltInPrimitiveShadingRate: {
@@ -3632,10 +3639,6 @@ unsigned PatchInOutImportExport::combineBufferStore(const std::vector<Value *> &
   // Start from 4-component combination
   unsigned compCount = 4;
   for (; compCount > 0; compCount--) {
-    // GFX6 does not support 3-component combination
-    if (m_gfxIp.major == 6 && compCount == 3)
-      continue;
-
     if (startIdx + compCount <= storeValues.size()) {
       funcName += getTypeName(storeTys[compCount - 1]);
       Value *storeValue = nullptr;
@@ -3693,10 +3696,6 @@ unsigned PatchInOutImportExport::combineBufferLoad(std::vector<Value *> &loadVal
   // 4-component combination
   unsigned compCount = 4;
   for (; compCount > 0; compCount--) {
-    // GFX6 does not support 3-component combination
-    if (m_gfxIp.major == 6 && compCount == 3)
-      continue;
-
     if (startIdx + compCount <= loadValues.size()) {
       funcName += getTypeName(loadTyps[compCount - 1]);
 
@@ -3749,6 +3748,9 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsi
     return;
   }
 
+  // NOTE: SW XFB must have been handled. Here we only handle HW XFB on pre-GFX11 generations.
+  assert(m_gfxIp.major < 11);
+
   auto storeTy = storeValue->getType();
 
   unsigned compCount = storeTy->isVectorTy() ? cast<FixedVectorType>(storeTy)->getNumElements() : 1;
@@ -3795,28 +3797,36 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsi
 
     streamInfo = getFunctionArgument(m_entryPoint, CopyShaderEntryArgIdxStreamInfo);
     writeIndex = getFunctionArgument(m_entryPoint, CopyShaderEntryArgIdxWriteIndex);
-    streamOffset = getFunctionArgument(m_entryPoint, CopyShaderEntryArgIdxStreamOffset + xfbBuffer);
+
+    const auto &xfbStrides = m_pipelineState->getXfbBufferStrides();
+    assert(xfbStrides[xfbBuffer] > 0);
+
+    // NOTE: The correct mapping between xfbBuffer[X] and streamOffset[X] must be determined according to the enablement
+    // of previous streamOffsets. This is controlled by the register field SO_BASEX_EN.
+    unsigned entryArgIdx = CopyShaderEntryArgIdxStreamOffset;
+    if (xfbBuffer > 0) {
+      for (unsigned i = 0; i < xfbBuffer; ++i) {
+        if (xfbStrides[i] > 0)
+          ++entryArgIdx;
+      }
+    }
+    streamOffset = getFunctionArgument(m_entryPoint, entryArgIdx);
   }
 
-  // vertexCount = streamInfo[22:16]
-  Value *vertexCount = builder.CreateAnd(builder.CreateLShr(streamInfo, 16), 0x7F);
-
-  // writeIndex += threadIdInWave
-  if (m_gfxIp.major >= 9)
-    writeIndex = builder.CreateAdd(writeIndex, m_threadId);
+  // streamOutVertexCount = streamInfo[22:16]
+  Value *streamOutVertexCount = builder.CreateAnd(builder.CreateLShr(streamInfo, 16), 0x7F);
 
   // The stream offset provided by GE is dword-based. Convert it to byte-based.
   streamOffset = builder.CreateShl(streamOffset, 2);
 
-  // GPU will drop stream-out buffer store when the thread ID is invalid.
-  unsigned outOfRangeWriteIndex = 0xFFFFFFFF;
-  if (m_gfxIp.major == 8) {
-    // Divide outofRangeValue by xfbStride only for GFX8.
-    outOfRangeWriteIndex /= xfbStride;
-  }
-  outOfRangeWriteIndex -= (m_pipelineState->getShaderWaveSize(m_shaderStage) - 1);
-  auto validVertex = builder.CreateICmpULT(m_threadId, vertexCount);
-  writeIndex = builder.CreateSelect(validVertex, writeIndex, builder.getInt32(outOfRangeWriteIndex));
+  // GPU will drop stream-out buffer store when the thread ID is invalid (OOB_select is set to SQ_OOB_INDEX_ONLY).
+  const unsigned outOfRangeWriteIndex = InvalidValue - (m_pipelineState->getShaderWaveSize(m_shaderStage) - 1);
+  // validStreamOutVertex = threadId < streamOutVertexCount
+  auto validStreamOutVertex = builder.CreateICmpULT(m_threadId, streamOutVertexCount);
+  // writeIndex = validStreamOutVertex ? writeIndex : outOfRangeWriteIndex
+  writeIndex = builder.CreateSelect(validStreamOutVertex, writeIndex, builder.getInt32(outOfRangeWriteIndex));
+  // writeIndex += threadId
+  writeIndex = builder.CreateAdd(writeIndex, m_threadId);
 
   unsigned format = 0;
   switch (m_gfxIp.major) {
@@ -3843,23 +3853,11 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsi
     format = formatTable[compCount - 1][bitWidth == 32];
     break;
   }
-  case 11: {
-    static unsigned char formatTable[4][2] = {
-        {BUF_FORMAT_16_FLOAT, BUF_FORMAT_32_FLOAT},
-        {BUF_FORMAT_16_16_FLOAT, BUF_FORMAT_32_32_FLOAT_GFX11},
-        {},
-        {BUF_FORMAT_16_16_16_16_FLOAT_GFX11, BUF_FORMAT_32_32_32_32_FLOAT_GFX11},
-    };
-    format = formatTable[compCount - 1][bitWidth == 32];
-    break;
-  }
   }
 
   CoherentFlag coherent = {};
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
-    coherent.bits.glc = true;
-    coherent.bits.slc = true;
-  }
+  coherent.bits.glc = true;
+  coherent.bits.slc = true;
 
   builder.CreateIntrinsic(Intrinsic::amdgcn_struct_tbuffer_store, storeTy,
                           {storeValue, m_pipelineSysValues.get(m_entryPoint)->getStreamOutBufDesc(xfbBuffer),
@@ -4080,6 +4078,9 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
     return;
   }
 
+  // NOTE: NGG with GS must have been handled. Here we only handle pre-GFX11 generations.
+  assert(m_pipelineState->getTargetInfo().getGfxIpVersion().major < 11);
+
   if (storeTy->isArrayTy() || storeTy->isVectorTy()) {
     const unsigned elemCount = storeTy->isArrayTy() ? cast<ArrayType>(storeTy)->getNumElements()
                                                     : cast<FixedVectorType>(storeTy)->getNumElements();
@@ -4141,11 +4142,10 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
       }
 
       CoherentFlag coherent = {};
-      if (m_gfxIp.major <= 11) {
-        coherent.bits.glc = true;
-        coherent.bits.slc = true;
-        coherent.bits.swz = true;
-      }
+      coherent.bits.glc = true;
+      coherent.bits.slc = true;
+      coherent.bits.swz = true;
+
       Value *args[] = {
           storeValue,                                                          // vdata
           m_pipelineSysValues.get(m_entryPoint)->getGsVsRingBufDesc(streamId), // rsrc
@@ -4690,8 +4690,7 @@ unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(unsigned inVertexC
                                                               unsigned outVertexCount, unsigned outVertexStride,
                                                               unsigned patchConstCount,
                                                               unsigned tessFactorStride) const {
-  unsigned maxThreadCountPerThreadGroup =
-      m_gfxIp.major >= 9 ? Gfx9::MaxHsThreadsPerSubgroup : Gfx6::MaxHsThreadsPerSubgroup;
+  unsigned maxThreadCountPerThreadGroup = Gfx9::MaxHsThreadsPerSubgroup;
 
   // NOTE: If ray query uses LDS stack, the expected max thread count in the group is 64. And we force wave size
   // to be 64 in order to keep all threads in the same wave. In the future, we could consider to get rid of this
@@ -4765,28 +4764,6 @@ unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(unsigned inVertexC
     const unsigned offChipTfBufferPatchCountLimit =
         (tfBufferSizeInBytes - (patchCountPerThreadGroup * sizeof(unsigned))) / (tessFactorStride * sizeof(unsigned));
     patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, offChipTfBufferPatchCountLimit);
-  }
-
-  // Adjust the patches-per-thread-group based on hardware workarounds.
-  if (m_pipelineState->getTargetInfo().getGpuWorkarounds().gfx6.miscLoadBalancePerWatt != 0) {
-    const unsigned waveSize = m_pipelineState->getTargetInfo().getGpuProperty().waveSize;
-    // Load balance per watt is a mechanism which monitors HW utilization (num waves active, instructions issued
-    // per cycle, etc.) to determine if the HW can handle the workload with fewer CUs enabled.  The SPI_LB_CU_MASK
-    // register directs the SPI to stop launching waves to a CU so it will be clock-gated.  There is a bug in the
-    // SPI which where that register setting is applied immediately, which causes any pending LS/HS/CS waves on
-    // that CU to never be launched.
-    //
-    // The workaround is to limit each LS/HS threadgroup to a single wavefront: if there's only one wave, then the
-    // CU can safely be turned off afterwards.  A microcode fix exists for CS but for GFX it was decided that the
-    // cost in power efficiency wasn't worthwhile.
-    //
-    // Clamping to threads-per-wavefront / max(input control points, threads-per-patch) will make the hardware
-    // launch a single LS/HS wave per thread-group.
-    // For vulkan, threads-per-patch is always equal with outVertexCount.
-    const unsigned maxThreadCountPerPatch = std::max(inVertexCount, outVertexCount);
-    const unsigned maxPatchCount = waveSize / maxThreadCountPerPatch;
-
-    patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, maxPatchCount);
   }
 
   return patchCountPerThreadGroup;
@@ -4898,18 +4875,6 @@ void PatchInOutImportExport::addExportInstForGenericOutput(Value *output, unsign
 // @param builtInId : ID of the built-in variable
 // @param insertPos : Where to insert the "exp" instruction
 void PatchInOutImportExport::addExportInstForBuiltInOutput(Value *output, unsigned builtInId, Instruction *insertPos) {
-  // Check if the shader stage is valid to use "exp" instruction to export output
-  const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
-  const bool useExpInst = ((m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
-                            m_shaderStage == ShaderStageCopyShader) &&
-                           (nextStage == ShaderStageFragment || nextStage == ShaderStageInvalid));
-  assert(useExpInst);
-  (void(useExpInst)); // unused
-
-  const auto &inOutUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage;
-  const auto &builtInOutLocs =
-      m_shaderStage == ShaderStageCopyShader ? inOutUsage.gs.builtInOutLocs : inOutUsage.builtInOutputLocMap;
-
   const auto poison = PoisonValue::get(Type::getFloatTy(*m_context));
 
   switch (builtInId) {
@@ -4947,99 +4912,6 @@ void PatchInOutImportExport::addExportInstForBuiltInOutput(Value *output, unsign
         ConstantInt::get(Type::getInt1Ty(*m_context), false)              // vm
     };
     emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
-    break;
-  }
-  case BuiltInLayer: {
-    assert(m_gfxIp.major <= 8); // For GFX9, gl_ViewportIndex and gl_Layer are packed
-
-    Value *layer = new BitCastInst(output, Type::getFloatTy(*m_context), "", insertPos);
-
-    // NOTE: Only export gl_Layer when multi-view is disabled. Otherwise, we will export gl_ViewIndex to vertex position
-    // data.
-    const auto enableMultiView = m_pipelineState->getInputAssemblyState().enableMultiView;
-    if (!enableMultiView) {
-      Value *args[] = {
-          ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_POS_1), // tgt
-          ConstantInt::get(Type::getInt32Ty(*m_context), 0x4),              // en
-          poison,                                                           // src0
-          poison,                                                           // src1
-          layer,                                                            // src2
-          poison,                                                           // src3
-          ConstantInt::get(Type::getInt1Ty(*m_context), false),             // done
-          ConstantInt::get(Type::getInt1Ty(*m_context), false)              // vm
-      };
-      emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
-    }
-
-    // NOTE: We have to export gl_Layer via generic outputs as well.
-    bool hasLayerExport = true;
-    if (nextStage == ShaderStageFragment) {
-      const auto &nextBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
-      hasLayerExport = nextBuiltInUsage.layer;
-    } else if (nextStage == ShaderStageInvalid) {
-      hasLayerExport = false;
-    }
-
-    if (hasLayerExport) {
-      assert(builtInOutLocs.find(BuiltInLayer) != builtInOutLocs.end());
-      const unsigned loc = builtInOutLocs.find(BuiltInLayer)->second;
-
-      recordVertexAttribExport(loc, {layer, poison, poison, poison});
-    }
-
-    break;
-  }
-  case BuiltInViewportIndex: {
-    assert(m_gfxIp.major <= 8); // For GFX9, gl_ViewportIndex and gl_Layer are packed
-    Value *viewportIndex = new BitCastInst(output, Type::getFloatTy(*m_context), "", insertPos);
-
-    Value *args[] = {
-        ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_POS_1), // tgt
-        ConstantInt::get(Type::getInt32Ty(*m_context), 0x8),              // en
-        poison,                                                           // src0
-        poison,                                                           // src1
-        poison,                                                           // src2
-        viewportIndex,                                                    // src3
-        ConstantInt::get(Type::getInt1Ty(*m_context), false),             // done
-        ConstantInt::get(Type::getInt1Ty(*m_context), false)              // vm
-    };
-    emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
-
-    // NOTE: We have to export gl_ViewportIndex via generic outputs as well.
-    bool hasViewportIndexExport = true;
-    if (nextStage == ShaderStageFragment) {
-      const auto &nextBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
-      hasViewportIndexExport = nextBuiltInUsage.viewportIndex;
-    } else if (nextStage == ShaderStageInvalid) {
-      hasViewportIndexExport = false;
-    }
-
-    if (hasViewportIndexExport) {
-      assert(builtInOutLocs.find(BuiltInViewportIndex) != builtInOutLocs.end());
-      const unsigned loc = builtInOutLocs.find(BuiltInViewportIndex)->second;
-
-      recordVertexAttribExport(loc, {viewportIndex, poison, poison, poison});
-    }
-
-    break;
-  }
-  case BuiltInViewIndex: {
-    assert(m_gfxIp.major <= 8); // For GFX9, gl_ViewportIndex and gl_ViewIndex are packed
-
-    Value *viewIndex = new BitCastInst(output, Type::getFloatTy(*m_context), "", insertPos);
-
-    Value *args[] = {
-        ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_POS_1), // tgt
-        ConstantInt::get(Type::getInt32Ty(*m_context), 0x4),              // en
-        poison,                                                           // src0
-        poison,                                                           // src1
-        viewIndex,                                                        // src2
-        poison,                                                           // src3
-        ConstantInt::get(Type::getInt1Ty(*m_context), false),             // done
-        ConstantInt::get(Type::getInt1Ty(*m_context), false)              // vm
-    };
-    emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
-
     break;
   }
   case BuiltInPrimitiveShadingRate: {

@@ -168,6 +168,10 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "count.leading.sign.bits";
   case BuilderOpcode::FMix:
     return "fmix";
+  case BuilderOpcode::Msad4:
+    return "msad4";
+  case BuilderOpcode::FDot2:
+    return "fdot2";
   case BuilderOpcode::LoadBufferDesc:
     return "load.buffer.desc";
   case BuilderOpcode::GetDescStride:
@@ -1028,6 +1032,27 @@ Value *Builder::CreateCountLeadingSignBits(Value *value, const Twine &instName) 
 }
 
 // =====================================================================================================================
+// Create "msad" (Masked Sum of Absolute Differences) operation , returning an 32-bit integer of msad result.
+//
+// @param ref : Contains 4 packed 8-bit unsigned integers in 32 bits.
+// @param src : Contains 4 packed 8-bit unsigned integers in 32 bits.
+// @param accum : A 32-bit unsigned integer, providing an existing accumulation.
+Value *Builder::CreateMsad4(Value *src, Value *ref, Value *accum, const Twine &instName) {
+  return record(BuilderOpcode::Msad4, src->getType(), {src, ref, accum}, instName);
+}
+
+// =====================================================================================================================
+// Create "fdot2" operation, returning an 32-bit float result of the sum of dot2 of 2 half vec2 and a float scalar.
+//
+// @param a : Vector of 2xhalf A.
+// @param b : Vector of 2xhalf B.
+// @param scalar : A float scalar.
+// @param clamp : Whether the accumulation result should be clamped.
+Value *Builder::CreateFDot2(Value *a, Value *b, Value *scalar, Value *clamp, const Twine &instName) {
+  return record(BuilderOpcode::FDot2, scalar->getType(), {a, b, scalar, clamp}, instName);
+}
+
+// =====================================================================================================================
 // Create a load of a buffer descriptor.
 //
 // @param descSet : Descriptor set
@@ -1802,7 +1827,7 @@ Value *Builder::CreateSubgroupShuffleDown(Value *const value, Value *const offse
 // @param value : The value to read from the chosen rotated lane to all active lanes.
 // @param delta : The delta/offset added to lane id.
 // @param clusterSize : The cluster size if exists.
-// @param instName : Name to give instruction.
+// @param instName : Name to give final instruction.
 Value *Builder::CreateSubgroupRotate(Value *const value, Value *const delta, Value *const clusterSize,
                                      const Twine &instName) {
   return record(BuilderOpcode::SubgroupRotate, value->getType(), {value, delta, clusterSize}, instName);
@@ -2004,6 +2029,8 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::FaceForward:
     case BuilderOpcode::FindSMsb:
     case BuilderOpcode::CountLeadingSignBits:
+    case BuilderOpcode::Msad4:
+    case BuilderOpcode::FDot2:
     case BuilderOpcode::Fma:
     case BuilderOpcode::FpTruncWithRounding:
     case BuilderOpcode::Fract:

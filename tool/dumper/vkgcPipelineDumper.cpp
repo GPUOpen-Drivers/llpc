@@ -861,6 +861,8 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.buildResourcesDataForShaderModule = " << options->buildResourcesDataForShaderModule << "\n";
   dumpFile << "options.disableTruncCoordForGather = " << options->disableTruncCoordForGather << "\n";
   dumpFile << "options.vertex64BitsAttribSingleLoc = " << options->vertex64BitsAttribSingleLoc << "\n";
+  dumpFile << "options.enablePrimGeneratedQuery = " << options->enablePrimGeneratedQuery << "\n";
+  dumpFile << "options.enableFragColor = " << options->enableFragColor << "\n";
 }
 
 // =====================================================================================================================
@@ -951,6 +953,7 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "enableUberFetchShader = " << pipelineInfo->enableUberFetchShader << "\n";
   dumpFile << "enableEarlyCompile = " << pipelineInfo->enableEarlyCompile << "\n";
   dumpFile << "enableColorExportShader = " << pipelineInfo->enableColorExportShader << "\n";
+  dumpFile << "useSoftwareVertexBufferDescriptors = " << pipelineInfo->useSoftwareVertexBufferDescriptors << "\n";
   dumpPipelineOptions(&pipelineInfo->options, dumpFile);
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
@@ -1016,7 +1019,9 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
 
   dumpFile << "\n[ApiXfbOutInfo]\n";
   dumpFile << "forceDisableStreamOut = " << pipelineInfo->apiXfbOutData.forceDisableStreamOut << "\n";
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 70
   dumpFile << "forceEnablePrimStats = " << pipelineInfo->apiXfbOutData.forceEnablePrimStats << "\n";
+#endif
   const auto pXfbOutInfos = pipelineInfo->apiXfbOutData.pXfbOutInfos;
   for (unsigned idx = 0; idx < pipelineInfo->apiXfbOutData.numXfbOutInfo; ++idx) {
     dumpFile << "xfbOutInfo[" << idx << "].isBuiltIn = " << pXfbOutInfos[idx].isBuiltIn << "\n";
@@ -1566,7 +1571,10 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   }
 
   hasher->Update(pipeline->apiXfbOutData.forceDisableStreamOut);
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 70
   hasher->Update(pipeline->apiXfbOutData.forceEnablePrimStats);
+#endif
+  hasher->Update(pipeline->useSoftwareVertexBufferDescriptors);
 }
 
 // =====================================================================================================================
@@ -1653,6 +1661,8 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->forceNonUniformResourceIndexStageMask);
   hasher->Update(options->replaceSetWithResourceType);
   hasher->Update(options->disableTruncCoordForGather);
+  hasher->Update(options->enablePrimGeneratedQuery);
+  hasher->Update(options->enableFragColor);
 }
 
 // =====================================================================================================================
@@ -1977,14 +1987,16 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
             switch (node->getKind()) {
             case msgpack::Type::Int:
             case msgpack::Type::UInt: {
+              uint64_t data =
+                  (node->getKind() == msgpack::Type::UInt) ? node->getUInt() : static_cast<uint64_t>(node->getInt());
               if (msgIterStatus == MsgPackIteratorMapKey) {
-                unsigned regId = static_cast<unsigned>(node->getUInt());
+                unsigned regId = static_cast<unsigned>(data);
                 const char *regName = PipelineDumper::getRegisterNameString(regId);
 
                 snprintf(formatBuf, sizeof(formatBuf), "%-45s ", regName);
                 out << formatBuf;
               } else {
-                snprintf(formatBuf, sizeof(formatBuf), "0x%016" PRIX64 " ", node->getUInt());
+                snprintf(formatBuf, sizeof(formatBuf), "0x%016" PRIX64 " ", data);
                 out << formatBuf;
               }
               break;
@@ -2053,7 +2065,7 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
         offset += noteHeaderSize + noteNameSize + alignTo(node->descSize, sizeof(unsigned));
         assert(offset <= section->secHead.sh_size);
       }
-    } else if (strcmp(section->name, RelocName) == 0) {
+    } else if (strcmp(section->name, RelocName) == 0 || strcmp(section->name, RelocAName) == 0) {
       // Output .reloc section
       out << section->name << " (size = " << section->secHead.sh_size << " bytes)\n";
       const unsigned relocCount = reader.getRelocationCount();
@@ -2063,7 +2075,10 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
         ElfSymbol elfSym = {};
         reader.getSymbol(reloc.symIdx, &elfSym);
         snprintf(formatBuf, sizeof(formatBuf), "    %-35s", elfSym.pSymName);
-        out << "#" << i << "    " << formatBuf << "    offset = " << reloc.offset << "\n";
+        out << "#" << i << "    " << formatBuf << "    offset = " << reloc.offset;
+        if (reloc.useExplicitAddend)
+          out << ", addend = " << reloc.addend;
+        out << "\n";
       }
     } else if (strncmp(section->name, AmdGpuConfigName, sizeof(AmdGpuConfigName) - 1) == 0) {
       // Output .AMDGPU.config section
@@ -2568,6 +2583,8 @@ std::ostream &operator<<(std::ostream &out, VkFormat format) {
     CASE_ENUM_TO_STRING(VK_FORMAT_PVRTC2_4BPP_SRGB_BLOCK_IMG)
     CASE_ENUM_TO_STRING(VK_FORMAT_A4R4G4B4_UNORM_PACK16_EXT)
     CASE_ENUM_TO_STRING(VK_FORMAT_A4B4G4R4_UNORM_PACK16_EXT)
+    CASE_ENUM_TO_STRING(VK_FORMAT_A1B5G5R5_UNORM_PACK16)
+    CASE_ENUM_TO_STRING(VK_FORMAT_A8_UNORM_KHR)
 
     break;
   default:

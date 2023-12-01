@@ -62,7 +62,7 @@ public:
   FragColorExport(llvm::LLVMContext *context, PipelineState *pipelineState);
 
   void generateExportInstructions(llvm::ArrayRef<lgc::ColorExportInfo> info, llvm::ArrayRef<llvm::Value *> values,
-                                  llvm::ArrayRef<ExportFormat> exportFormat, bool dummyExport, BuilderBase &builder);
+                                  bool dummyExport, PalMetadata *palMetadata, BuilderBase &builder);
   static void setDoneFlag(llvm::Value *exportInst, BuilderBase &builder);
   static llvm::CallInst *addDummyExport(BuilderBase &builder);
   static llvm::Function *generateNullFragmentShader(llvm::Module &module, PipelineState *pipelineState,
@@ -77,7 +77,7 @@ private:
   FragColorExport &operator=(const FragColorExport &) = delete;
 
   llvm::Value *handleColorExportInstructions(llvm::Value *output, unsigned int hwColorExport, BuilderBase &builder,
-                                             ExportFormat expFmt, const bool signedness);
+                                             ExportFormat expFmt, const bool signedness, unsigned channelWriteMask);
 
   llvm::Value *convertToHalf(llvm::Value *value, bool signedness, BuilderBase &builder) const;
   llvm::Value *convertToFloat(llvm::Value *value, bool signedness, BuilderBase &builder) const;
@@ -95,10 +95,9 @@ private:
 };
 
 // The information needed for an export to a hardware color target.
-struct ColorExportValueInfo {
-  std::vector<llvm::Value *> value; // The value of each component to be exported.
-  unsigned location;                // The location that corresponds to the hardware color target.
-  bool isSigned;                    // True if the values should be interpreted as signed integers.
+struct ColorOutputValueInfo {
+  std::array<llvm::Value *, 4> value; // The value of each component to be exported.
+  bool isSigned;                      // True if the values should be interpreted as signed integers.
 };
 
 // =====================================================================================================================
@@ -113,13 +112,12 @@ public:
   static llvm::StringRef name() { return "Lower fragment color export calls"; }
 
 private:
-  void updateFragColors(llvm::CallInst *callInst, ColorExportValueInfo expFragColors[], BuilderBase &builder);
-  llvm::Value *getOutputValue(llvm::ArrayRef<llvm::Value *> expFragColor, unsigned int location, BuilderBase &builder);
+  void updateFragColors(llvm::CallInst *callInst, llvm::MutableArrayRef<ColorOutputValueInfo> outFragColors,
+                        BuilderBase &builder);
   void collectExportInfoForGenericOutputs(llvm::Function *fragEntryPoint, BuilderBase &builder);
   void collectExportInfoForBuiltinOutput(llvm::Function *module, BuilderBase &builder);
   llvm::Value *generateValueForOutput(llvm::Value *value, llvm::Type *outputTy, BuilderBase &builder);
-  llvm::Value *generateReturn(llvm::Function *fragEntryPoint, BuilderBase &builder);
-  llvm::Value *jumpColorExport(llvm::Function *fragEntryPoint, BuilderBase &builder);
+  void createTailJump(llvm::Function *fragEntryPoint, BuilderBase &builder);
 
   llvm::LLVMContext *m_context;                        // The context the pass is being run in.
   PipelineState *m_pipelineState;                      // The pipeline state

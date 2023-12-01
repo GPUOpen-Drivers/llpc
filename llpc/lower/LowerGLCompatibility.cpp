@@ -282,10 +282,16 @@ void LowerGLCompatibility::createClipPlane() {
   auto locationFound =
       getUniformConstantEntryByLocation(m_context, m_shaderStage, Vkgc::GlCompatibilityUniformLocation::ClipPlane);
   auto clipPlaneBaseOffset = locationFound != nullptr ? locationFound->offset : 0;
+  assert(m_shaderStage != ShaderStageTask && m_shaderStage != ShaderStageMesh);
+  unsigned constBufferBinding =
+      Vkgc::ConstantBuffer0Binding + static_cast<GraphicsContext *>(m_context->getPipelineContext())
+                                         ->getPipelineShaderInfo(m_shaderStage)
+                                         ->options.constantBufferBindingOffset;
+
   std::vector<Metadata *> mDs;
   auto int32Ty = Type::getInt32Ty(*m_context);
   mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, Vkgc::InternalDescriptorSetId)));
-  mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, Vkgc::ConstantBuffer0Binding)));
+  mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, constBufferBinding)));
   mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, clipPlaneBaseOffset)));
   mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, Vkgc::GlCompatibilityUniformLocation::ClipPlane)));
   auto mdNode = MDNode::get(*m_context, mDs);
