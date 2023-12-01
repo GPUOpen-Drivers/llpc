@@ -575,7 +575,11 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     return Result::ErrorInvalidPointer;
   }
 
-  unsigned codeSize = ShaderModuleHelper::getCodeSize(shaderInfo);
+  auto codeSizeOrErr = ShaderModuleHelper::getCodeSize(shaderInfo);
+  if (Error err = codeSizeOrErr.takeError())
+    return errorToResult(std::move(err));
+
+  const unsigned codeSize = *codeSizeOrErr;
   size_t allocSize = sizeof(ShaderModuleData) + codeSize;
 
   ShaderModuleData moduleData = {};

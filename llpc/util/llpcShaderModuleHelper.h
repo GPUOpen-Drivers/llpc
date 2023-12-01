@@ -32,6 +32,7 @@
 #pragma once
 #include "llpc.h"
 #include <llvm/ADT/ArrayRef.h>
+#include <llvm/Support/Error.h>
 #include <vector>
 
 namespace Llpc {
@@ -56,7 +57,8 @@ class ShaderModuleHelper {
 public:
   static ShaderModuleUsage getShaderModuleUsageInfo(const BinaryData *spvBinCode);
 
-  static unsigned trimSpirvDebugInfo(const BinaryData *spvBin, llvm::MutableArrayRef<unsigned> codeBuffer);
+  static llvm::Expected<unsigned> trimSpirvDebugInfo(const BinaryData *spvBin,
+                                                     llvm::MutableArrayRef<unsigned> codeBuffer);
 
   static Result optimizeSpirv(const BinaryData *spirvBinIn, BinaryData *spirvBinOut);
 
@@ -70,9 +72,9 @@ public:
   static Result getShaderBinaryType(BinaryData shaderBinary, BinaryType &binaryType);
   static Result getModuleData(const ShaderModuleBuildInfo *shaderInfo, llvm::MutableArrayRef<unsigned> codeBuffer,
                               Vkgc::ShaderModuleData &moduleData);
-  static unsigned getCodeSize(const ShaderModuleBuildInfo *shaderInfo);
-  static BinaryData getShaderCode(const ShaderModuleBuildInfo *shaderInfo,
-                                  llvm::MutableArrayRef<unsigned int> &codeBuffer);
+  static llvm::Expected<unsigned> getCodeSize(const ShaderModuleBuildInfo *shaderInfo);
+  static llvm::Expected<BinaryData> getShaderCode(const ShaderModuleBuildInfo *shaderInfo,
+                                                  llvm::MutableArrayRef<unsigned int> &codeBuffer);
 };
 
 } // namespace Llpc
