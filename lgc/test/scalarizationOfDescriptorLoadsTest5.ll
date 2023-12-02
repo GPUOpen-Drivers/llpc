@@ -106,13 +106,19 @@ attributes #3 = { nounwind memory(write) }
 ; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP7]], i64 [[TMP13]]
 ; CHECK-NEXT:    [[TMP15:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP14]], align 16, !invariant.load !16
 ; CHECK-NEXT:    [[TMP16:%.*]] = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 0, i32 [[TMP12]])
-; CHECK-NEXT:    [[TMP17:%.*]] = call <4 x i32> @llvm.amdgcn.waterfall.readfirstlane.v4i32.v4i32(i32 [[TMP16]], <4 x i32> [[TMP15]])
-; CHECK-NEXT:    [[TMP18:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.struct.buffer.load.format.v4f32(<4 x i32> [[TMP17]], i32 0, i32 0, i32 0, i32 0)
-; CHECK-NEXT:    [[TMP19:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.waterfall.end.v4f32(i32 [[TMP16]], <4 x float> [[TMP18]])
-; CHECK-NEXT:    [[TMP20:%.*]] = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 0, i32 [[TMP8]])
-; CHECK-NEXT:    [[TMP21:%.*]] = call <4 x i32> @llvm.amdgcn.waterfall.readfirstlane.v4i32.v4i32(i32 [[TMP20]], <4 x i32> [[TMP11]])
-; CHECK-NEXT:    [[TMP22:%.*]] = call <4 x i32> @llvm.amdgcn.waterfall.last.use.v4i32(i32 [[TMP20]], <4 x i32> [[TMP21]])
-; CHECK-NEXT:    call void @llvm.amdgcn.struct.buffer.store.format.v4f32(<4 x float> [[TMP19]], <4 x i32> [[TMP22]], i32 1, i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP17:%.*]] = call i32 @llvm.amdgcn.waterfall.readfirstlane.i32.i32(i32 [[TMP16]], i32 [[TMP12]])
+; CHECK-NEXT:    [[TMP18:%.*]] = sext i32 [[TMP17]] to i64
+; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP7]], i64 [[TMP18]]
+; CHECK-NEXT:    [[TMP20:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP19]], align 16, !invariant.load !16
+; CHECK-NEXT:    [[TMP21:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.struct.buffer.load.format.v4f32(<4 x i32> [[TMP20]], i32 0, i32 0, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP22:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.waterfall.end.v4f32(i32 [[TMP16]], <4 x float> [[TMP21]])
+; CHECK-NEXT:    [[TMP23:%.*]] = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 0, i32 [[TMP8]])
+; CHECK-NEXT:    [[TMP24:%.*]] = call i32 @llvm.amdgcn.waterfall.readfirstlane.i32.i32(i32 [[TMP23]], i32 [[TMP8]])
+; CHECK-NEXT:    [[TMP25:%.*]] = sext i32 [[TMP24]] to i64
+; CHECK-NEXT:    [[TMP26:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP7]], i64 [[TMP25]]
+; CHECK-NEXT:    [[TMP27:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP26]], align 16, !invariant.load !16
+; CHECK-NEXT:    [[TMP28:%.*]] = call <4 x i32> @llvm.amdgcn.waterfall.last.use.v4i32(i32 [[TMP23]], <4 x i32> [[TMP27]])
+; CHECK-NEXT:    call void @llvm.amdgcn.struct.buffer.store.format.v4f32(<4 x float> [[TMP22]], <4 x i32> [[TMP28]], i32 1, i32 0, i32 0, i32 0)
 ; CHECK-NEXT:    br label [[RET]]
 ; CHECK:       ret:
 ; CHECK-NEXT:    ret void

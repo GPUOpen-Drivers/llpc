@@ -125,14 +125,14 @@ attributes #2 = { nounwind memory(none) }
 ; CHECK-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(4) [[TMP6]], align 4
 ; CHECK-NEXT:    br label [[TMP9:%.*]]
 ; CHECK:       9:
-; CHECK-NEXT:    [[DOT010:%.*]] = phi <4 x float> [ zeroinitializer, [[DOTENTRY:%.*]] ], [ [[TMP58:%.*]], [[TMP13:%.*]] ]
-; CHECK-NEXT:    [[DOT09:%.*]] = phi <4 x float> [ zeroinitializer, [[DOTENTRY]] ], [ [[TMP56:%.*]], [[TMP13]] ]
-; CHECK-NEXT:    [[DOT0:%.*]] = phi i32 [ [[TMP8]], [[DOTENTRY]] ], [ [[TMP59:%.*]], [[TMP13]] ]
+; CHECK-NEXT:    [[DOT010:%.*]] = phi <4 x float> [ zeroinitializer, [[DOTENTRY:%.*]] ], [ [[TMP67:%.*]], [[TMP13:%.*]] ]
+; CHECK-NEXT:    [[DOT09:%.*]] = phi <4 x float> [ zeroinitializer, [[DOTENTRY]] ], [ [[TMP65:%.*]], [[TMP13]] ]
+; CHECK-NEXT:    [[DOT0:%.*]] = phi i32 [ [[TMP8]], [[DOTENTRY]] ], [ [[TMP68:%.*]], [[TMP13]] ]
 ; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds <{ i32, i32 }>, ptr addrspace(4) [[TMP6]], i64 0, i32 1
 ; CHECK-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(4) [[TMP10]], align 4
 ; CHECK-NEXT:    [[TMP12:%.*]] = icmp slt i32 [[DOT0]], [[TMP11]]
 ; CHECK-NEXT:    [[COND_FREEZE:%.*]] = freeze i1 [[TMP12]]
-; CHECK-NEXT:    br i1 [[COND_FREEZE]], label [[TMP13]], label [[TMP60:%.*]]
+; CHECK-NEXT:    br i1 [[COND_FREEZE]], label [[TMP13]], label [[TMP69:%.*]]
 ; CHECK:       13:
 ; CHECK-NEXT:    [[TMP14:%.*]] = call i32 @lgc.load.user.data.i32(i32 40)
 ; CHECK-NEXT:    [[TMP15:%.*]] = insertelement <2 x i32> [[TMP5]], i32 [[TMP14]], i64 0
@@ -158,29 +158,38 @@ attributes #2 = { nounwind memory(none) }
 ; CHECK-NEXT:    [[TMP35:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP34]], i32 0
 ; CHECK-NEXT:    [[TMP36:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP35]], align 16, !invariant.load !24
 ; CHECK-NEXT:    [[TMP37:%.*]] = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 0, i32 [[TMP27]])
-; CHECK-NEXT:    [[TMP38:%.*]] = call <8 x i32> @llvm.amdgcn.waterfall.readfirstlane.v8i32.v8i32(i32 [[TMP37]], <8 x i32> [[TMP30]])
-; CHECK-NEXT:    [[TMP39:%.*]] = call <4 x i32> @llvm.amdgcn.waterfall.readfirstlane.v4i32.v4i32(i32 [[TMP37]], <4 x i32> [[TMP36]])
-; CHECK-NEXT:    [[TMP40:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[TMP38]], <4 x i32> [[TMP39]], i1 false, i32 0, i32 0)
-; CHECK-NEXT:    [[TMP41:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.waterfall.end.v4f32(i32 [[TMP37]], <4 x float> [[TMP40]])
-; CHECK-NEXT:    [[TMP42:%.*]] = mul i32 [[TMP7]], 32
-; CHECK-NEXT:    [[TMP43:%.*]] = sext i32 [[TMP42]] to i64
-; CHECK-NEXT:    [[TMP44:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP26]], i64 [[TMP43]]
-; CHECK-NEXT:    [[TMP45:%.*]] = load <8 x i32>, ptr addrspace(4) [[TMP44]], align 32, !invariant.load !24
-; CHECK-NEXT:    [[TMP46:%.*]] = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 0, i32 [[TMP42]])
-; CHECK-NEXT:    [[TMP47:%.*]] = call <8 x i32> @llvm.amdgcn.waterfall.readfirstlane.v8i32.v8i32(i32 [[TMP46]], <8 x i32> [[TMP45]])
-; CHECK-NEXT:    [[TMP48:%.*]] = call <4 x i32> @llvm.amdgcn.waterfall.readfirstlane.v4i32.v4i32(i32 [[TMP46]], <4 x i32> [[TMP36]])
-; CHECK-NEXT:    [[TMP49:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[TMP47]], <4 x i32> [[TMP48]], i1 false, i32 0, i32 0)
-; CHECK-NEXT:    [[TMP50:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.waterfall.end.v4f32(i32 [[TMP46]], <4 x float> [[TMP49]])
-; CHECK-NEXT:    [[TMP51:%.*]] = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 0, i32 [[TMP27]])
-; CHECK-NEXT:    [[TMP52:%.*]] = call <8 x i32> @llvm.amdgcn.waterfall.readfirstlane.v8i32.v8i32(i32 [[TMP51]], <8 x i32> [[TMP30]])
-; CHECK-NEXT:    [[TMP53:%.*]] = call <4 x i32> @llvm.amdgcn.waterfall.readfirstlane.v4i32.v4i32(i32 [[TMP51]], <4 x i32> [[TMP36]])
-; CHECK-NEXT:    [[TMP54:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[TMP52]], <4 x i32> [[TMP53]], i1 false, i32 0, i32 0)
-; CHECK-NEXT:    [[TMP55:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.waterfall.end.v4f32(i32 [[TMP51]], <4 x float> [[TMP54]])
-; CHECK-NEXT:    [[TMP56]] = fadd reassoc nnan nsz arcp contract afn <4 x float> [[DOT09]], [[TMP55]]
-; CHECK-NEXT:    [[TMP57:%.*]] = fadd reassoc nnan nsz arcp contract afn <4 x float> [[TMP41]], [[TMP50]]
-; CHECK-NEXT:    [[TMP58]] = fadd reassoc nnan nsz arcp contract afn <4 x float> [[DOT010]], [[TMP57]]
-; CHECK-NEXT:    [[TMP59]] = add i32 [[DOT0]], 1
+; CHECK-NEXT:    [[TMP38:%.*]] = call i32 @llvm.amdgcn.waterfall.readfirstlane.i32.i32(i32 [[TMP37]], i32 [[TMP27]])
+; CHECK-NEXT:    [[TMP39:%.*]] = sext i32 [[TMP38]] to i64
+; CHECK-NEXT:    [[TMP40:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP26]], i64 [[TMP39]]
+; CHECK-NEXT:    [[TMP41:%.*]] = load <8 x i32>, ptr addrspace(4) [[TMP40]], align 32, !invariant.load !24
+; CHECK-NEXT:    [[TMP42:%.*]] = call <4 x i32> @llvm.amdgcn.waterfall.readfirstlane.v4i32.v4i32(i32 [[TMP37]], <4 x i32> [[TMP36]])
+; CHECK-NEXT:    [[TMP43:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[TMP41]], <4 x i32> [[TMP42]], i1 false, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP44:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.waterfall.end.v4f32(i32 [[TMP37]], <4 x float> [[TMP43]])
+; CHECK-NEXT:    [[TMP45:%.*]] = mul i32 [[TMP7]], 32
+; CHECK-NEXT:    [[TMP46:%.*]] = sext i32 [[TMP45]] to i64
+; CHECK-NEXT:    [[TMP47:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP26]], i64 [[TMP46]]
+; CHECK-NEXT:    [[TMP48:%.*]] = load <8 x i32>, ptr addrspace(4) [[TMP47]], align 32, !invariant.load !24
+; CHECK-NEXT:    [[TMP49:%.*]] = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 0, i32 [[TMP45]])
+; CHECK-NEXT:    [[TMP50:%.*]] = call i32 @llvm.amdgcn.waterfall.readfirstlane.i32.i32(i32 [[TMP49]], i32 [[TMP45]])
+; CHECK-NEXT:    [[TMP51:%.*]] = sext i32 [[TMP50]] to i64
+; CHECK-NEXT:    [[TMP52:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP26]], i64 [[TMP51]]
+; CHECK-NEXT:    [[TMP53:%.*]] = load <8 x i32>, ptr addrspace(4) [[TMP52]], align 32, !invariant.load !24
+; CHECK-NEXT:    [[TMP54:%.*]] = call <4 x i32> @llvm.amdgcn.waterfall.readfirstlane.v4i32.v4i32(i32 [[TMP49]], <4 x i32> [[TMP36]])
+; CHECK-NEXT:    [[TMP55:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[TMP53]], <4 x i32> [[TMP54]], i1 false, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP56:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.waterfall.end.v4f32(i32 [[TMP49]], <4 x float> [[TMP55]])
+; CHECK-NEXT:    [[TMP57:%.*]] = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 0, i32 [[TMP27]])
+; CHECK-NEXT:    [[TMP58:%.*]] = call i32 @llvm.amdgcn.waterfall.readfirstlane.i32.i32(i32 [[TMP57]], i32 [[TMP27]])
+; CHECK-NEXT:    [[TMP59:%.*]] = sext i32 [[TMP58]] to i64
+; CHECK-NEXT:    [[TMP60:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP26]], i64 [[TMP59]]
+; CHECK-NEXT:    [[TMP61:%.*]] = load <8 x i32>, ptr addrspace(4) [[TMP60]], align 32, !invariant.load !24
+; CHECK-NEXT:    [[TMP62:%.*]] = call <4 x i32> @llvm.amdgcn.waterfall.readfirstlane.v4i32.v4i32(i32 [[TMP57]], <4 x i32> [[TMP36]])
+; CHECK-NEXT:    [[TMP63:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[TMP61]], <4 x i32> [[TMP62]], i1 false, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP64:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.waterfall.end.v4f32(i32 [[TMP57]], <4 x float> [[TMP63]])
+; CHECK-NEXT:    [[TMP65]] = fadd reassoc nnan nsz arcp contract afn <4 x float> [[DOT09]], [[TMP64]]
+; CHECK-NEXT:    [[TMP66:%.*]] = fadd reassoc nnan nsz arcp contract afn <4 x float> [[TMP44]], [[TMP56]]
+; CHECK-NEXT:    [[TMP67]] = fadd reassoc nnan nsz arcp contract afn <4 x float> [[DOT010]], [[TMP66]]
+; CHECK-NEXT:    [[TMP68]] = add i32 [[DOT0]], 1
 ; CHECK-NEXT:    br label [[TMP9]], !llvm.loop [[LOOP25:![0-9]+]]
-; CHECK:       60:
+; CHECK:       69:
 ; CHECK-NEXT:    ret void
 ;

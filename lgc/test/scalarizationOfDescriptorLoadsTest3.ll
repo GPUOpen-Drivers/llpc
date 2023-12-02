@@ -107,9 +107,12 @@ attributes #2 = { nounwind memory(none) }
 ; CHECK-NEXT:    [[TMP22:%.*]] = load <8 x i32>, ptr addrspace(4) [[TMP21]], align 32, !invariant.load !24
 ; CHECK-NEXT:    [[TMP23:%.*]] = call i32 @llvm.amdgcn.waterfall.begin.i32(i32 0, i32 [[TMP19]])
 ; CHECK-NEXT:    [[TMP24:%.*]] = call i32 @llvm.amdgcn.waterfall.begin.v4i32(i32 [[TMP23]], <4 x i32> <i32 42, i32 42, i32 42, i32 42>)
-; CHECK-NEXT:    [[TMP25:%.*]] = call <8 x i32> @llvm.amdgcn.waterfall.readfirstlane.v8i32.v8i32(i32 [[TMP24]], <8 x i32> [[TMP22]])
-; CHECK-NEXT:    [[TMP26:%.*]] = call <4 x i32> @llvm.amdgcn.waterfall.readfirstlane.v4i32.v4i32(i32 [[TMP24]], <4 x i32> <i32 42, i32 42, i32 42, i32 42>)
-; CHECK-NEXT:    [[TMP27:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[TMP25]], <4 x i32> [[TMP26]], i1 false, i32 0, i32 0)
-; CHECK-NEXT:    [[TMP28:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.waterfall.end.v4f32(i32 [[TMP24]], <4 x float> [[TMP27]])
+; CHECK-NEXT:    [[TMP25:%.*]] = call i32 @llvm.amdgcn.waterfall.readfirstlane.i32.i32(i32 [[TMP24]], i32 [[TMP19]])
+; CHECK-NEXT:    [[TMP26:%.*]] = sext i32 [[TMP25]] to i64
+; CHECK-NEXT:    [[TMP27:%.*]] = getelementptr i8, ptr addrspace(4) [[TMP18]], i64 [[TMP26]]
+; CHECK-NEXT:    [[TMP28:%.*]] = load <8 x i32>, ptr addrspace(4) [[TMP27]], align 32, !invariant.load !24
+; CHECK-NEXT:    [[TMP29:%.*]] = call <4 x i32> @llvm.amdgcn.waterfall.readfirstlane.v4i32.v4i32(i32 [[TMP24]], <4 x i32> <i32 42, i32 42, i32 42, i32 42>)
+; CHECK-NEXT:    [[TMP30:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float 0.000000e+00, float 0.000000e+00, <8 x i32> [[TMP28]], <4 x i32> [[TMP29]], i1 false, i32 0, i32 0)
+; CHECK-NEXT:    [[TMP31:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.waterfall.end.v4f32(i32 [[TMP24]], <4 x float> [[TMP30]])
 ; CHECK-NEXT:    ret void
 ;
