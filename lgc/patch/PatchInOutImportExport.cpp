@@ -371,18 +371,11 @@ void PatchInOutImportExport::processShader() {
       calcFactor.outPatchSize = outPatchSize;
       calcFactor.inPatchSize = inPatchSize;
 
-      // NOTE: Tess factors are always stored to on-chip LDS first. Then, they are store to TF buffer and on-chip LDS
-      // or off-chip LDS buffer (which will be loaded by TES).
-      if (m_pipelineState->isTessOffChip()) {
-        calcFactor.offChip.outPatchStart = 0;
-        calcFactor.offChip.patchConstStart = calcFactor.offChip.outPatchStart + outPatchTotalSize;
-
-        calcFactor.onChip.tessFactorStart = inPatchTotalSize;
-      } else {
-        calcFactor.onChip.outPatchStart = inPatchTotalSize;
-        calcFactor.onChip.patchConstStart = calcFactor.onChip.outPatchStart + outPatchTotalSize;
-        calcFactor.onChip.tessFactorStart = calcFactor.onChip.patchConstStart + patchConstTotalSize;
-      }
+      // NOTE: Tess factors are always stored to on-chip LDS first. Then, they are store to TF buffer and off-chip
+      // LDS buffer (which will be loaded by TES).
+      calcFactor.offChip.outPatchStart = 0;
+      calcFactor.offChip.patchConstStart = calcFactor.offChip.outPatchStart + outPatchTotalSize;
+      calcFactor.onChip.tessFactorStart = inPatchTotalSize;
 
       calcFactor.tessFactorStride = tessFactorStride;
       calcFactor.tessOnChipLdsSize = calcFactor.onChip.tessFactorStart + tessFactorTotalSize;
@@ -430,16 +423,12 @@ void PatchInOutImportExport::processShader() {
       LLPC_OUTS("Output vertex count: " << outVertexCount << "\n");
       LLPC_OUTS("Output vertex stride: " << calcFactor.outVertexStride << "\n");
       LLPC_OUTS("Output patch size (in dwords): " << outPatchSize << "\n");
-      LLPC_OUTS("Output patch start: " << (m_pipelineState->isTessOffChip() ? calcFactor.offChip.outPatchStart
-                                                                            : calcFactor.onChip.outPatchStart)
-                                       << (m_pipelineState->isTessOffChip() ? " (LDS buffer)" : "(LDS)") << "\n");
+      LLPC_OUTS("Output patch start: " << calcFactor.offChip.outPatchStart << " (LDS buffer)\n");
       LLPC_OUTS("Output patch total size (in dwords): " << outPatchTotalSize << "\n");
       LLPC_OUTS("\n");
       LLPC_OUTS("Patch constant count: " << patchConstCount << "\n");
       LLPC_OUTS("Patch constant size (in dwords): " << calcFactor.patchConstSize << "\n");
-      LLPC_OUTS("Patch constant start: " << (m_pipelineState->isTessOffChip() ? calcFactor.offChip.patchConstStart
-                                                                              : calcFactor.onChip.patchConstStart)
-                                         << (m_pipelineState->isTessOffChip() ? " (LDS buffer)" : "(LDS)") << "\n");
+      LLPC_OUTS("Patch constant start: " << calcFactor.offChip.patchConstStart << " (LDS buffer)\n");
       LLPC_OUTS("Patch constant total size (in dwords): " << patchConstTotalSize << "\n");
       LLPC_OUTS("\n");
       LLPC_OUTS("Tess factor start: " << calcFactor.onChip.tessFactorStart << " (LDS)\n");
@@ -1606,7 +1595,7 @@ Value *PatchInOutImportExport::patchTesGenericInputImport(Type *inputTy, unsigne
   assert(compIdx);
 
   auto ldsOffset = calcLdsOffsetForTesInput(inputTy, location, locOffset, compIdx, vertexIdx, builder);
-  return readValueFromLds(m_pipelineState->isTessOffChip(), inputTy, ldsOffset, builder);
+  return readValueFromLds(true, inputTy, ldsOffset, builder);
 }
 
 // =====================================================================================================================
@@ -1963,7 +1952,7 @@ Value *PatchInOutImportExport::patchTcsGenericOutputImport(Type *outputTy, unsig
                                                            Value *compIdx, Value *vertexIdx, BuilderBase &builder) {
   assert(compIdx);
   auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, location, locOffset, compIdx, vertexIdx, builder);
-  return readValueFromLds(m_pipelineState->isTessOffChip(), outputTy, ldsOffset, builder);
+  return readValueFromLds(true, outputTy, ldsOffset, builder);
 }
 
 // =====================================================================================================================
@@ -2016,7 +2005,7 @@ void PatchInOutImportExport::patchTcsGenericOutputExport(Value *output, unsigned
   assert(compIdx);
   Type *outputTy = output->getType();
   auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, location, locOffset, compIdx, vertexIdx, builder);
-  writeValueToLds(m_pipelineState->isTessOffChip(), output, ldsOffset, builder);
+  writeValueToLds(true, output, ldsOffset, builder);
 }
 
 // =====================================================================================================================
@@ -2230,7 +2219,7 @@ Value *PatchInOutImportExport::patchTesBuiltInInputImport(Type *inputTy, unsigne
     const unsigned loc = builtInInLocMap.find(builtInId)->second;
 
     auto ldsOffset = calcLdsOffsetForTesInput(inputTy, loc, nullptr, elemIdx, vertexIdx, builder);
-    input = readValueFromLds(m_pipelineState->isTessOffChip(), inputTy, ldsOffset, builder);
+    input = readValueFromLds(true, inputTy, ldsOffset, builder);
 
     break;
   }
@@ -2242,7 +2231,7 @@ Value *PatchInOutImportExport::patchTesBuiltInInputImport(Type *inputTy, unsigne
     const unsigned loc = builtInInLocMap.find(builtInId)->second;
 
     auto ldsOffset = calcLdsOffsetForTesInput(inputTy, loc, nullptr, nullptr, vertexIdx, builder);
-    input = readValueFromLds(m_pipelineState->isTessOffChip(), inputTy, ldsOffset, builder);
+    input = readValueFromLds(true, inputTy, ldsOffset, builder);
 
     break;
   }
@@ -2259,12 +2248,12 @@ Value *PatchInOutImportExport::patchTesBuiltInInputImport(Type *inputTy, unsigne
       for (unsigned i = 0; i < inputTy->getArrayNumElements(); ++i) {
         auto elemIdx = builder.getInt32(i);
         auto ldsOffset = calcLdsOffsetForTesInput(elemTy, loc, nullptr, elemIdx, vertexIdx, builder);
-        auto elem = readValueFromLds(m_pipelineState->isTessOffChip(), elemTy, ldsOffset, builder);
+        auto elem = readValueFromLds(true, elemTy, ldsOffset, builder);
         input = builder.CreateInsertValue(input, elem, {i});
       }
     } else {
       auto ldsOffset = calcLdsOffsetForTesInput(inputTy, loc, nullptr, elemIdx, vertexIdx, builder);
-      input = readValueFromLds(m_pipelineState->isTessOffChip(), inputTy, ldsOffset, builder);
+      input = readValueFromLds(true, inputTy, ldsOffset, builder);
     }
 
     break;
@@ -2307,12 +2296,12 @@ Value *PatchInOutImportExport::patchTesBuiltInInputImport(Type *inputTy, unsigne
       for (unsigned i = 0; i < inputTy->getArrayNumElements(); ++i) {
         auto elemIdx = builder.getInt32(i);
         auto ldsOffset = calcLdsOffsetForTesInput(elemTy, loc, nullptr, elemIdx, vertexIdx, builder);
-        auto elem = readValueFromLds(m_pipelineState->isTessOffChip(), elemTy, ldsOffset, builder);
+        auto elem = readValueFromLds(true, elemTy, ldsOffset, builder);
         input = builder.CreateInsertValue(input, elem, {i});
       }
     } else {
       auto ldsOffset = calcLdsOffsetForTesInput(inputTy, loc, nullptr, elemIdx, vertexIdx, builder);
-      input = readValueFromLds(m_pipelineState->isTessOffChip(), inputTy, ldsOffset, builder);
+      input = readValueFromLds(true, inputTy, ldsOffset, builder);
     }
 
     break;
@@ -2825,7 +2814,7 @@ Value *PatchInOutImportExport::patchTcsBuiltInOutputImport(Type *outputTy, unsig
     unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
     auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, elemIdx, vertexIdx, builder);
-    output = readValueFromLds(m_pipelineState->isTessOffChip(), outputTy, ldsOffset, builder);
+    output = readValueFromLds(true, outputTy, ldsOffset, builder);
 
     break;
   }
@@ -2851,12 +2840,12 @@ Value *PatchInOutImportExport::patchTcsBuiltInOutputImport(Type *outputTy, unsig
       for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
         auto elemIdx = builder.getInt32(i);
         auto ldsOffset = calcLdsOffsetForTcsOutput(elemTy, loc, nullptr, elemIdx, vertexIdx, builder);
-        auto elem = readValueFromLds(m_pipelineState->isTessOffChip(), elemTy, ldsOffset, builder);
+        auto elem = readValueFromLds(true, elemTy, ldsOffset, builder);
         output = builder.CreateInsertValue(output, elem, {i});
       }
     } else {
       auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, elemIdx, vertexIdx, builder);
-      output = readValueFromLds(m_pipelineState->isTessOffChip(), outputTy, ldsOffset, builder);
+      output = readValueFromLds(true, outputTy, ldsOffset, builder);
     }
 
     break;
@@ -3102,7 +3091,7 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
     unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
     auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, elemIdx, vertexIdx, builder);
-    writeValueToLds(m_pipelineState->isTessOffChip(), output, ldsOffset, builder);
+    writeValueToLds(true, output, ldsOffset, builder);
 
     break;
   }
@@ -3123,11 +3112,11 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
         auto elem = ExtractValueInst::Create(output, {i}, "", insertPos);
         auto elemIdx = ConstantInt::get(Type::getInt32Ty(*m_context), i);
         auto ldsOffset = calcLdsOffsetForTcsOutput(elem->getType(), loc, nullptr, elemIdx, vertexIdx, builder);
-        writeValueToLds(m_pipelineState->isTessOffChip(), elem, ldsOffset, builder);
+        writeValueToLds(true, elem, ldsOffset, builder);
       }
     } else {
       auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, elemIdx, vertexIdx, builder);
-      writeValueToLds(m_pipelineState->isTessOffChip(), output, ldsOffset, builder);
+      writeValueToLds(true, output, ldsOffset, builder);
     }
 
     break;
@@ -3168,12 +3157,12 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
         for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
           auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, builder.getInt32(i), nullptr, builder);
           auto elem = builder.CreateExtractValue(output, {i});
-          writeValueToLds(m_pipelineState->isTessOffChip(), elem, ldsOffset, builder);
+          writeValueToLds(true, elem, ldsOffset, builder);
         }
       } else {
         // Handle a single element of tessLevelOuter array
         auto ldsOffset = calcLdsOffsetForTcsOutput(outputTy, loc, nullptr, elemIdx, nullptr, builder);
-        writeValueToLds(m_pipelineState->isTessOffChip(), output, ldsOffset, builder);
+        writeValueToLds(true, output, ldsOffset, builder);
       }
     }
 
@@ -4545,11 +4534,8 @@ Value *PatchInOutImportExport::calcLdsOffsetForTcsOutput(Type *outputTy, unsigne
   const auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs;
   const auto &calcFactor = inOutUsage.calcFactor;
 
-  auto outPatchStart =
-      m_pipelineState->isTessOffChip() ? calcFactor.offChip.outPatchStart : calcFactor.onChip.outPatchStart;
-
-  auto patchConstStart =
-      m_pipelineState->isTessOffChip() ? calcFactor.offChip.patchConstStart : calcFactor.onChip.patchConstStart;
+  auto outPatchStart = calcFactor.offChip.outPatchStart;
+  auto patchConstStart = calcFactor.offChip.patchConstStart;
 
   // attribOffset = (location + locOffset) * 4 + compIdx * bitWidth / 32
   Value *attribOffset = builder.getInt32(location);
@@ -4617,11 +4603,8 @@ Value *PatchInOutImportExport::calcLdsOffsetForTesInput(Type *inputTy, unsigned 
 
   const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
 
-  auto outPatchStart =
-      m_pipelineState->isTessOffChip() ? calcFactor.offChip.outPatchStart : calcFactor.onChip.outPatchStart;
-
-  auto patchConstStart =
-      m_pipelineState->isTessOffChip() ? calcFactor.offChip.patchConstStart : calcFactor.onChip.patchConstStart;
+  auto outPatchStart = calcFactor.offChip.outPatchStart;
+  auto patchConstStart = calcFactor.offChip.patchConstStart;
 
   const auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(m_shaderStage)->entryArgIdxs.tes;
 
@@ -4735,12 +4718,10 @@ unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(unsigned inVertexC
 
   patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, optimalPatchCountPerThreadGroup);
 
-  if (m_pipelineState->isTessOffChip()) {
-    auto outPatchLdsBufferSize = (outPatchSize + patchConstSize) * 4;
-    auto tessOffChipPatchCountPerThreadGroup =
-        m_pipelineState->getTargetInfo().getGpuProperty().tessOffChipLdsBufferSize / outPatchLdsBufferSize;
-    patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, tessOffChipPatchCountPerThreadGroup);
-  }
+  auto outPatchLdsBufferSize = (outPatchSize + patchConstSize) * 4;
+  auto tessOffChipPatchCountPerThreadGroup =
+      m_pipelineState->getTargetInfo().getGpuProperty().tessOffChipLdsBufferSize / outPatchLdsBufferSize;
+  patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, tessOffChipPatchCountPerThreadGroup);
 
   // TF-Buffer-based limit for Patchers per Thread Group:
   // ---------------------------------------------------------------------------------------------
@@ -4758,13 +4739,11 @@ unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(unsigned inVertexC
 
   patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, tfBufferPatchCountLimit);
 
-  if (m_pipelineState->isTessOffChip()) {
-    // For all-offchip tessellation, we need to write an additional 4-byte TCS control word to the TF buffer whenever
-    // the patch-ID is zero.
-    const unsigned offChipTfBufferPatchCountLimit =
-        (tfBufferSizeInBytes - (patchCountPerThreadGroup * sizeof(unsigned))) / (tessFactorStride * sizeof(unsigned));
-    patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, offChipTfBufferPatchCountLimit);
-  }
+  // For all-offchip tessellation, we need to write an additional 4-byte TCS control word to the TF buffer whenever
+  // the patch-ID is zero.
+  const unsigned offChipTfBufferPatchCountLimit =
+      (tfBufferSizeInBytes - (patchCountPerThreadGroup * sizeof(unsigned))) / (tessFactorStride * sizeof(unsigned));
+  patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, offChipTfBufferPatchCountLimit);
 
   return patchCountPerThreadGroup;
 }

@@ -3117,11 +3117,9 @@ void NggPrimShader::runEs(ArrayRef<Argument *> args) {
 
   if (m_hasTes) {
     // Set up system value SGPRs
-    if (m_pipelineState->isTessOffChip()) {
-      Value *isOffChip = PoisonValue::get(m_builder.getInt32Ty()); // Unused
-      esArgs.push_back(m_hasGs ? offChipLdsBase : isOffChip);
-      esArgs.push_back(m_hasGs ? isOffChip : offChipLdsBase);
-    }
+    Value *isOffChip = PoisonValue::get(m_builder.getInt32Ty()); // Unused
+    esArgs.push_back(m_hasGs ? offChipLdsBase : isOffChip);
+    esArgs.push_back(m_hasGs ? isOffChip : offChipLdsBase);
 
     if (m_hasGs)
       esArgs.push_back(esGsOffset);
@@ -3335,11 +3333,9 @@ Value *NggPrimShader::runPartEs(ArrayRef<Argument *> args, Value *position) {
 
   if (m_hasTes) {
     // Set up system value SGPRs
-    if (m_pipelineState->isTessOffChip()) {
-      Value *isOffChip = PoisonValue::get(m_builder.getInt32Ty()); // Unused
-      partEsArgs.push_back(isOffChip);
-      partEsArgs.push_back(offChipLdsBase);
-    }
+    Value *isOffChip = PoisonValue::get(m_builder.getInt32Ty()); // Unused
+    partEsArgs.push_back(isOffChip);
+    partEsArgs.push_back(offChipLdsBase);
 
     // Set up system value VGPRs
     partEsArgs.push_back(tessCoordX);
@@ -7510,11 +7506,9 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
 
   if (m_hasTes) {
     // Set up system value SGPRs
-    if (m_pipelineState->isTessOffChip()) {
-      Value *isOffChip = PoisonValue::get(m_builder.getInt32Ty()); // Unused
-      xfbFetcherArgs.push_back(isOffChip);
-      xfbFetcherArgs.push_back(offChipLdsBase);
-    }
+    Value *isOffChip = PoisonValue::get(m_builder.getInt32Ty()); // Unused
+    xfbFetcherArgs.push_back(isOffChip);
+    xfbFetcherArgs.push_back(offChipLdsBase);
 
     // Set up system value VGPRs
     xfbFetcherArgs.push_back(tessCoordX);
