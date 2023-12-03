@@ -609,23 +609,20 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
     }
     break;
   case ShaderStageTessControl:
-    if (pipelineState->isTessOffChip()) {
-      // LDS buffer base for off-chip
-      getShaderInputUsage(shaderStage, ShaderInput::OffChipLdsBase)->enable();
-    }
+    // LDS buffer base for off-chip
+    getShaderInputUsage(shaderStage, ShaderInput::OffChipLdsBase)->enable();
     break;
   case ShaderStageTessEval:
-    if (pipelineState->isTessOffChip()) {
-      // LDS buffer base for off-chip
-      getShaderInputUsage(shaderStage, ShaderInput::OffChipLdsBase)->enable();
-      // is_off_chip register. Enabling it here only has an effect when TES is hardware ES.
-      getShaderInputUsage(shaderStage, ShaderInput::IsOffChip)->enable();
-    }
+    // LDS buffer base for off-chip
+    getShaderInputUsage(shaderStage, ShaderInput::OffChipLdsBase)->enable();
+    // is_off_chip register. Enabling it here only has an effect when TES is hardware ES.
+    getShaderInputUsage(shaderStage, ShaderInput::IsOffChip)->enable();
+
     if (!hasGs) {
       // TES as hardware VS: handle HW stream-out. StreamOutInfo is required for off-chip even if there is no
       // stream-out.
-      if (pipelineState->isTessOffChip() || enableHwXfb)
-        getShaderInputUsage(shaderStage, ShaderInput::StreamOutInfo)->enable();
+      getShaderInputUsage(shaderStage, ShaderInput::StreamOutInfo)->enable();
+
       if (enableHwXfb) {
         getShaderInputUsage(shaderStage, ShaderInput::StreamOutWriteIndex)->enable();
         for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {

@@ -523,8 +523,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
     appendUserData(builder, hsArgs, hsEntryPoint, 0, userData, intfData->userDataCount, substitutions);
 
     // Set up system value SGPRs
-    if (m_pipelineState->isTessOffChip())
-      hsArgs.push_back(offChipLdsBase);
+    hsArgs.push_back(offChipLdsBase);
     hsArgs.push_back(tfBufferBase);
 
     // Set up system value VGPRs
@@ -799,10 +798,8 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
 
     if (hasTs) {
       // Set up system value SGPRs
-      if (m_pipelineState->isTessOffChip()) {
-        esArgs.push_back(offChipLdsBase);
-        esArgs.push_back(offChipLdsBase);
-      }
+      esArgs.push_back(offChipLdsBase);
+      esArgs.push_back(offChipLdsBase);
       esArgs.push_back(esGsOffset);
 
       // Set up system value VGPRs

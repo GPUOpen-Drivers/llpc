@@ -295,9 +295,6 @@ public:
   const RasterizerState &getRasterizerState() const { return m_rasterizerState; }
   const DepthStencilState &getDepthStencilState() const { return m_depthStencilState; }
 
-  // Determine whether to use off-chip tessellation mode
-  bool isTessOffChip();
-
   // Set GS on-chip mode
   void setGsOnChip(bool gsOnChip) { m_gsOnChip = gsOnChip; }
 

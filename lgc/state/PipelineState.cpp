@@ -1334,13 +1334,6 @@ unsigned PipelineState::getNumPatchControlPoints() const {
 }
 
 // =====================================================================================================================
-// Determine whether to use off-chip tessellation mode
-bool PipelineState::isTessOffChip() {
-  // For GFX9+, always enable tessellation off-chip mode
-  return EnableTessOffChip || getLgcContext()->getTargetInfo().getGfxIpVersion().major >= 9;
-}
-
-// =====================================================================================================================
 // Gets wave size for the specified shader stage
 //
 // NOTE: Need to be called after PatchResourceCollect pass, so usage of subgroupSize is confirmed.
