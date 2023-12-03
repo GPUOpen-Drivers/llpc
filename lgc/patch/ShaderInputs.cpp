@@ -228,8 +228,6 @@ const char *ShaderInputs::getInputName(ShaderInput inputKind) {
     return "GsVsOffset";
   case ShaderInput::GsWaveId:
     return "GsWaveId";
-  case ShaderInput::IsOffChip:
-    return "IsOffChip";
   case ShaderInput::EsGsOffset:
     return "EsGsOffset";
   case ShaderInput::TfBufferBase:
@@ -458,8 +456,7 @@ static const ShaderInputDesc VsAsVsSgprInputs[] = {
 
 // SGPRs: TES as hardware ES
 static const ShaderInputDesc TesAsEsSgprInputs[] = {
-    {ShaderInput::OffChipLdsBase, offsetof(InterfaceData, entryArgIdxs.tes.offChipLdsBase)},
-    {ShaderInput::IsOffChip, 0},
+    {ShaderInput::OffChipLdsBase, offsetof(InterfaceData, entryArgIdxs.tes.offChipLdsBase), true},
     {ShaderInput::EsGsOffset, offsetof(InterfaceData, entryArgIdxs.tes.esGsOffset), true},
 };
 
@@ -471,12 +468,12 @@ static const ShaderInputDesc TesAsVsSgprInputs[] = {
     {ShaderInput::StreamOutOffset1, offsetof(InterfaceData, entryArgIdxs.tes.streamOutData.streamOffsets[1])},
     {ShaderInput::StreamOutOffset2, offsetof(InterfaceData, entryArgIdxs.tes.streamOutData.streamOffsets[2])},
     {ShaderInput::StreamOutOffset3, offsetof(InterfaceData, entryArgIdxs.tes.streamOutData.streamOffsets[3])},
-    {ShaderInput::OffChipLdsBase, offsetof(InterfaceData, entryArgIdxs.tes.offChipLdsBase)},
+    {ShaderInput::OffChipLdsBase, offsetof(InterfaceData, entryArgIdxs.tes.offChipLdsBase), true},
 };
 
 // SGPRs: TCS
 static const ShaderInputDesc TcsSgprInputs[] = {
-    {ShaderInput::OffChipLdsBase, offsetof(InterfaceData, entryArgIdxs.tcs.offChipLdsBase)},
+    {ShaderInput::OffChipLdsBase, offsetof(InterfaceData, entryArgIdxs.tcs.offChipLdsBase), true},
     {ShaderInput::TfBufferBase, offsetof(InterfaceData, entryArgIdxs.tcs.tfBufferBase), true},
 };
 
@@ -608,22 +605,11 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
       getShaderInputUsage(shaderStage, ShaderInput::InstanceId)->enable();
     }
     break;
-  case ShaderStageTessControl:
-    // LDS buffer base for off-chip
-    getShaderInputUsage(shaderStage, ShaderInput::OffChipLdsBase)->enable();
-    break;
   case ShaderStageTessEval:
-    // LDS buffer base for off-chip
-    getShaderInputUsage(shaderStage, ShaderInput::OffChipLdsBase)->enable();
-    // is_off_chip register. Enabling it here only has an effect when TES is hardware ES.
-    getShaderInputUsage(shaderStage, ShaderInput::IsOffChip)->enable();
-
     if (!hasGs) {
-      // TES as hardware VS: handle HW stream-out. StreamOutInfo is required for off-chip even if there is no
-      // stream-out.
-      getShaderInputUsage(shaderStage, ShaderInput::StreamOutInfo)->enable();
-
+      // TES as hardware VS: handle HW stream-out.
       if (enableHwXfb) {
+        getShaderInputUsage(shaderStage, ShaderInput::StreamOutInfo)->enable();
         getShaderInputUsage(shaderStage, ShaderInput::StreamOutWriteIndex)->enable();
         for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
           if (xfbStrides[i] > 0)

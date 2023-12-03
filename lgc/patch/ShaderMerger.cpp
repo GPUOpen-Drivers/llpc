@@ -799,7 +799,6 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
     if (hasTs) {
       // Set up system value SGPRs
       esArgs.push_back(offChipLdsBase);
-      esArgs.push_back(offChipLdsBase);
       esArgs.push_back(esGsOffset);
 
       // Set up system value VGPRs

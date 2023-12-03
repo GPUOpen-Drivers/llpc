@@ -86,7 +86,6 @@ enum class ShaderInput : unsigned {
   GsWaveId,   // GS wave ID
 
   // Unmerged hardware ES SGPRs
-  IsOffChip,  // is_off_chip
   EsGsOffset, // ES to GS offset
 
   // Unmerged hardware HS SGPRs
