@@ -836,8 +836,8 @@ Value *BuilderImpl::CreateNormalizeVector(Value *x, const Twine &instName) {
   Value *result = nullptr;
   if (x->getType()->getScalarType()->isFloatTy()) {
     // Make sure a FP32 zero vector is normalized to a FP32 zero vector, rather than NaNs.
-    if (!getFastMathFlags().noSignedZeros()) {
-      // When NSZ is not specified, we avoid using fmul_legacy since the sign of the input is dropped.
+    if (!getFastMathFlags().noSignedZeros() || !getFastMathFlags().noInfs() || !getFastMathFlags().noNaNs()) {
+      // When NSZ, NoInfs, or NoNaNs is not specified, we avoid using fmul_legacy since it is not IEEE compliant.
       auto zero = ConstantFP::get(getFloatTy(), 0.0);
       auto isZeroDot = CreateFCmpOEQ(dot, zero);
       rsq = CreateSelect(isZeroDot, zero, rsq);
