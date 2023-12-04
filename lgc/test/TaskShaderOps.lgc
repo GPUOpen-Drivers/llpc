@@ -39,7 +39,7 @@
 ; CHECK-NEXT: [[newBaseAddrHi32:%[0-9]*]] = trunc i64 [[newBaseAddrHi64]] to i32
 ; CHECK-NEXT: [[newBaseAddrHi:%[0-9]*]] = and i32 [[newBaseAddrHi32]], 65535
 ; CHECK-NEXT: [[newDescWord1Tmp:%[0-9]*]] = and i32 [[descWord1]], -65536
-; CHECK-NEXT: [[newDescWord1:%[0-9]*]] = or i32 [[newDescWord1Tmp]], [[newBaseAddrHi]]
+; CHECK-NEXT: [[newDescWord1:%[0-9]*]] = or {{(disjoint )?}}i32 [[newDescWord1Tmp]], [[newBaseAddrHi]]
 ; CHECK-NEXT: [[newPayloadRingDescTmp:%[0-9]*]] = insertelement <4 x i32> [[payloadRingDesc]], i32 [[newDescWord0]], i64 0
 ; CHECK-NEXT: [[newPayloadRingDesc:%[0-9]*]] = insertelement <4 x i32> [[newPayloadRingDescTmp]], i32 [[newDescWord1]], i64 1
 ; CHECK: %{{[0-9]*}} = call i32 @llvm.amdgcn.raw.atomic.buffer.load.i32(<4 x i32> [[newPayloadRingDesc]], i32 %{{.*}}, i32 0, i32 5)
