@@ -311,7 +311,8 @@ Value *llvm::continuationStackOffsetToPtr(IRBuilder<> &B, Value *Offset) {
   // Stack lives in global memory, so add the base address
   assert(*StackAddrspace == ContStackAddrspace::Global &&
          "Unexpected address space of the continuation stack");
-  auto *PtrTy = B.getInt8PtrTy(static_cast<uint32_t>(*StackAddrspace));
+  auto *PtrTy =
+      B.getInt8Ty()->getPointerTo(static_cast<uint32_t>(*StackAddrspace));
   Value *BaseAddr = B.CreateCall(getContinuationStackGlobalMemBase(*M));
   BaseAddr = B.CreateIntToPtr(BaseAddr, PtrTy);
 
