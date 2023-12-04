@@ -173,6 +173,8 @@ public:
   llvm::sys::Mutex &getHelperThreadMutex() { return m_helperThreadMutex; }
   std::condition_variable_any &getHelperThreadConditionVariable() { return m_helperThreadConditionVariable; }
 
+  void setUseGpurt(lgc::Pipeline *pipeline);
+
 private:
   Compiler() = delete;
   Compiler(const Compiler &) = delete;
@@ -198,8 +200,6 @@ private:
   void dumpCompilerOptions(void *pipelineDumpFile);
   Result generatePipeline(Context *context, unsigned moduleIndex, std::unique_ptr<llvm::Module> module,
                           ElfPackage &pipelineElf, lgc::Pipeline *pipeline, TimerProfiler &timerProfiler);
-
-  void setUseGpurt(lgc::Pipeline *pipeline);
 
   std::vector<std::string> m_options;           // Compilation options
   MetroHash::Hash m_optionHash;                 // Hash code of compilation options
