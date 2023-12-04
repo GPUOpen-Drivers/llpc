@@ -235,6 +235,7 @@ struct HelperThreadBuildRayTracingPipelineElfPayload {
   Compiler *compiler;                                 // The compiler instance
   std::atomic<bool> helperThreadJoined;               // Whether helper thread has joined
   std::atomic<bool> mainThreadSwitchedContext;        // Whether main thread has finished switching context
+  const bool useGpurt;                                // Whether any shader in the pipeline uses GPURT
 };
 
 sys::Mutex Compiler::m_helperThreadMutex;
@@ -2718,6 +2719,9 @@ void helperThreadBuildRayTracingPipelineElf(IHelperThreadProvider *helperThreadP
   helperThreadPayload->rayTracingContext->setPipelineState(&*pipeline, /*hasher=*/nullptr, false);
   context->setBuilder(builderContext->createBuilder(&*pipeline));
 
+  if (helperThreadPayload->useGpurt)
+    helperThreadPayload->compiler->setUseGpurt(&*pipeline);
+
   TimerProfiler timerProfiler(context->getPipelineHashCode(), "LLPC", TimerProfiler::PipelineTimerEnableMask);
 
   {
@@ -3002,7 +3006,8 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     for (const auto &module : newModules)
       modulePointers.push_back(module.get());
     HelperThreadBuildRayTracingPipelineElfPayload helperThreadPayload = {
-        modulePointers, pipelineElfs, shaderProps, moduleCallsTraceRay, results, &rtContext, this, false, false};
+        modulePointers, pipelineElfs, shaderProps, moduleCallsTraceRay,   results, &rtContext,
+        this,           false,        false,       needGpurtShaderLibrary};
     helperThreadProvider->SetTasks(&helperThreadBuildRayTracingPipelineElf, newModules.size(),
                                    static_cast<void *>(&helperThreadPayload));
 
