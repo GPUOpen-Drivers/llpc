@@ -85,7 +85,7 @@ attribute[0].offset = 0
 ; SHADERTEST-NEXT:    [[DOTI1:%.*]] = fptosi float [[TMP19]] to i32
 ; SHADERTEST-NEXT:    [[TMP12:%.*]] = and i64 [[TMP11]], -4294967296
 ; SHADERTEST-NEXT:    [[TMP13:%.*]] = zext i32 [[DESCTABLE0:%.*]] to i64
-; SHADERTEST-NEXT:    [[TMP14:%.*]] = or i64 [[TMP12]], [[TMP13]]
+; SHADERTEST-NEXT:    [[TMP14:%.*]] = or {{(disjoint )?}}i64 [[TMP12]], [[TMP13]]
 ; SHADERTEST-NEXT:    [[TMP15:%.*]] = inttoptr i64 [[TMP14]] to ptr addrspace(4)
 ; SHADERTEST-NEXT:    [[TMP20:%.*]] = load <8 x i32>, ptr addrspace(4) [[TMP15]], align 32, !invariant.load !10
 ; SHADERTEST-NEXT:    [[TMP21:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP15]], align 16, !invariant.load !10
@@ -94,7 +94,7 @@ attribute[0].offset = 0
 ; SHADERTEST-NEXT:    [[TMP23:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float [[DOTI01]], float [[DOTI12]], <8 x i32> [[TMP20]], <4 x i32> [[TMP21]], i1 false, i32 0, i32 0)
 ; SHADERTEST-NEXT:    [[TMP24:%.*]] = insertvalue { <4 x float> } poison, <4 x float> [[TMP23]], 0
 ; SHADERTEST-NEXT:    [[TMP25:%.*]] = zext i32 [[COLOREXPADDR:%.*]] to i64
-; SHADERTEST-NEXT:    [[TMP26:%.*]] = or i64 [[TMP12]], [[TMP25]]
+; SHADERTEST-NEXT:    [[TMP26:%.*]] = or {{(disjoint )?}}i64 [[TMP12]], [[TMP25]]
 ; SHADERTEST-NEXT:    [[TMP27:%.*]] = inttoptr i64 [[TMP26]] to ptr addrspace(4)
 ; SHADERTEST-NEXT:    call amdgpu_gfx addrspace(4) void [[TMP27]]({ <4 x float> } [[TMP24]])
 ; SHADERTEST-NEXT:    unreachable

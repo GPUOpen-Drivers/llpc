@@ -21,7 +21,7 @@ void main()
 // CHECK-NEXT:    [[TMP0:%.*]] = call i64 @llvm.amdgcn.s.getpc()
 // CHECK-NEXT:    [[TMP1:%.*]] = and i64 [[TMP0]], -4294967296
 // CHECK-NEXT:    [[TMP2:%.*]] = zext i32 [[USERDATA0]] to i64
-// CHECK-NEXT:    [[TMP3:%.*]] = or i64 [[TMP1]], [[TMP2]]
+// CHECK-NEXT:    [[TMP3:%.*]] = or {{(disjoint )?}}i64 [[TMP1]], [[TMP2]]
 // CHECK-NEXT:    [[TMP4:%.*]] = inttoptr i64 [[TMP3]] to ptr addrspace(4)
 // CHECK-NEXT:    [[TMP5:%.*]] = load <4 x i32>, ptr addrspace(4) [[TMP4]], align 16
 // CHECK-NEXT:    call void @llvm.amdgcn.raw.buffer.store.i32(i32 [[WORKGROUPID1]], <4 x i32> [[TMP5]], i32 0, i32 0, i32 0)

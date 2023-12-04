@@ -18,7 +18,7 @@
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST: define dllexport amdgpu_ps void @_amdgpu_ps_main(i32 inreg noundef %{{[^,]*}}, i32 inreg noundef %userdata1,
 ; SHADERTEST: [[Addr0:%[0-9]*]] = zext i32 %userdata1 to i64
-; SHADERTEST: [[Addr1:%[0-9]*]] = or i64 %{{[0-9]*}}, [[Addr0]]
+; SHADERTEST: [[Addr1:%[0-9]*]] = or {{(disjoint )?}}i64 %{{[0-9]*}}, [[Addr0]]
 ; SHADERTEST: [[Addr2:%[0-9]*]] = inttoptr i64 [[Addr1]] to ptr addrspace(4)
 ; SHADERTEST: [[Value:%[0-9]*]] = load <4 x float>, ptr addrspace(4) [[Addr2]], align 16
 ; SHADERTEST: [[Value3:%[.a-zA-Z0-9]+]] = extractelement <4 x float> [[Value]], i64 3
