@@ -1424,7 +1424,21 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
       std::min(resUsage->numSgprsAvailable, m_pipelineState->getTargetInfo().getGpuProperty().maxSgprsAvailable);
 
   if (shaderOptions->maxThreadGroupsPerComputeUnit != 0) {
-    std::string wavesPerEu = std::string("1,") + std::to_string(shaderOptions->maxThreadGroupsPerComputeUnit);
+    unsigned tgSize;
+    if (m_shaderStage == ShaderStageCompute || m_shaderStage == ShaderStageTask) {
+      const auto &mode = m_pipelineState->getShaderModes()->getComputeShaderMode();
+      tgSize = std::max(1u, mode.workgroupSizeX * mode.workgroupSizeY * mode.workgroupSizeZ);
+    } else if (m_shaderStage == ShaderStageMesh) {
+      const auto &mode = m_pipelineState->getShaderModes()->getMeshShaderMode();
+      tgSize = std::max(1u, mode.workgroupSizeX * mode.workgroupSizeY * mode.workgroupSizeZ);
+    } else {
+      // Graphics shader stages don't have thread groups at an API level
+      tgSize = 1;
+    }
+    unsigned numWavesPerTg = divideCeil(tgSize, m_pipelineState->getShaderWaveSize(m_shaderStage));
+    unsigned maxWavesPerCu = numWavesPerTg * shaderOptions->maxThreadGroupsPerComputeUnit;
+    unsigned maxWavesPerSimd = divideCeil(maxWavesPerCu, 2);
+    std::string wavesPerEu = std::string("1,") + std::to_string(maxWavesPerSimd);
     builder.addAttribute("amdgpu-waves-per-eu", wavesPerEu);
   }
 
