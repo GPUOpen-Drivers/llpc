@@ -1912,6 +1912,19 @@ LowerRaytracingPipelinePassImpl::LowerRaytracingPipelinePassImpl(
       PAQManager{Mod, MetadataState.getMaxPayloadRegisterCount()} {}
 
 bool LowerRaytracingPipelinePassImpl::run() {
+  if (Mod->empty()) {
+    auto FuncTy = FunctionType::get(Builder.getVoidTy(), {}, false);
+    // GpurtLibrary is not defined in the gpuopen, use Mod in place of
+    // GpurtLibrary
+    Function *ConKernel = Mod->getFunction("_cont_KernelEntry");
+    Function *EntryFunc =
+        Function::Create(FuncTy, GlobalValue::ExternalLinkage, "main", *Mod);
+    EntryFunc->setCallingConv(CallingConv::C);
+    moveFunctionBody(*ConKernel, *EntryFunc);
+    setLgcRtShaderStage(EntryFunc, RayTracingShaderStage::RayGeneration);
+
+    return true;
+  }
   MetadataState.updateModuleMetadata();
 
   collectDriverFunctions();

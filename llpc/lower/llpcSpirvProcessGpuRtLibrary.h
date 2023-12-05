@@ -92,6 +92,7 @@ private:
   void createContStackSetPtr(llvm::Function *func);
   void createContStackLoad(llvm::Function *func);
   void createContStackStore(llvm::Function *func);
+  void createEnqueueRayGen(llvm::Function *func);
   llvm::Value *createGetBvhSrd(llvm::Value *expansion, llvm::Value *boxSortMode);
 };
 } // namespace Llpc

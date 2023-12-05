@@ -111,6 +111,7 @@ SpirvProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
   m_libFuncPtrs["_AmdContStackFree"] = &SpirvProcessGpuRtLibrary::createContStackFree;
   m_libFuncPtrs["_AmdContStackGetPtr"] = &SpirvProcessGpuRtLibrary::createContStackGetPtr;
   m_libFuncPtrs["_AmdContStackSetPtr"] = &SpirvProcessGpuRtLibrary::createContStackSetPtr;
+  m_libFuncPtrs["_AmdEnqueueRayGen"] = &SpirvProcessGpuRtLibrary::createEnqueueRayGen;
 }
 
 // =====================================================================================================================
@@ -749,6 +750,19 @@ void SpirvProcessGpuRtLibrary::createContStackStore(llvm::Function *func) {
   auto data = m_builder->CreateLoad(dataType, func->getArg(1));
   auto ptr = m_builder->CreateIntToPtr(addr, m_builder->getPtrTy(cps::stackAddrSpace));
   m_builder->CreateStore(data, ptr);
+  m_builder->CreateRetVoid();
+}
+
+// =====================================================================================================================
+// Fill in function to execute raygen shader with given address
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createEnqueueRayGen(llvm::Function *func) {
+  auto addr = m_builder->CreateLoad(m_builder->getInt64Ty(), func->getArg(0));
+  auto dispatchData = func->getArg(1);
+  auto funcPtr = m_builder->CreateIntToPtr(addr, m_builder->getPtrTy(SPIRAS_Global));
+  auto funcTy = FunctionType::get(m_builder->getVoidTy(), {dispatchData->getType()}, false);
+  m_builder->CreateCall(funcTy, funcPtr, {dispatchData});
   m_builder->CreateRetVoid();
 }
 
