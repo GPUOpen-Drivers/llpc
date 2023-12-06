@@ -181,7 +181,7 @@ Value *BuilderImpl::readGenericInputOutput(bool isOutput, Type *resultTy, unsign
   assert(isOutput == false || m_shaderStage == ShaderStageTessControl);
 
   // Fold constant locationOffset into location. (Currently a variable locationOffset is only supported in
-  // TCS, TES, and FS custom interpolation.)
+  // TCS, TES, mesh shader, and FS custom interpolation.)
   bool isDynLocOffset = true;
   if (auto constLocOffset = dyn_cast<ConstantInt>(locationOffset)) {
     location += constLocOffset->getZExtValue();
@@ -409,7 +409,10 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
         origLocationInfo.setLocation(i);
         origLocationInfo.setComponent(inOutInfo.getComponent());
         auto &newLocationInfo = (*inOutLocInfoMap)[origLocationInfo];
-        newLocationInfo.setData(isDynLocOffset ? i : InvalidValue);
+        if (isDynLocOffset)
+          newLocationInfo.setLocation(i);
+        else
+          newLocationInfo.setData(InvalidValue);
       }
     }
     if (perPatchInOutLocMap) {
