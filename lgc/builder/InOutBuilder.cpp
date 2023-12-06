@@ -181,7 +181,7 @@ Value *BuilderImpl::readGenericInputOutput(bool isOutput, Type *resultTy, unsign
   assert(isOutput == false || m_shaderStage == ShaderStageTessControl);
 
   // Fold constant locationOffset into location. (Currently a variable locationOffset is only supported in
-  // TCS, TES, and FS custom interpolation.)
+  // TCS, TES, mesh shader, and FS custom interpolation.)
   bool isDynLocOffset = true;
   if (auto constLocOffset = dyn_cast<ConstantInt>(locationOffset)) {
     location += constLocOffset->getZExtValue();
@@ -267,8 +267,8 @@ Instruction *BuilderImpl::CreateWriteGenericOutput(Value *valueToWrite, unsigned
                                                    Value *vertexOrPrimitiveIndex) {
   assert(valueToWrite->getType()->isAggregateType() == false);
 
-  // Fold constant locationOffset into location. (Currently a variable locationOffset is only supported in
-  // TCS.)
+  // Fold constant locationOffset into location (Currently a variable locationOffset is only supported in
+  // TCS or mesh shader).
   bool isDynLocOffset = true;
   if (auto constLocOffset = dyn_cast<ConstantInt>(locationOffset)) {
     location += constLocOffset->getZExtValue();
@@ -346,7 +346,7 @@ Instruction *BuilderImpl::CreateWriteGenericOutput(Value *valueToWrite, unsigned
 //
 // @param isOutput : False for input, true for output
 // @param location : Input/output base location
-// @param locationCount : Count of locations taken by the input
+// @param locationCount : Count of locations taken by the input/output
 // @param inOutInfo : Extra input/output information
 // @param vertexOrPrimIndex : For TCS/TES/GS/mesh shader per-vertex input/output: vertex index;
 //                            for mesh shader per-primitive output: primitive index;
@@ -389,44 +389,92 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
     }
   }
 
-  if (!isOutput || m_shaderStage != ShaderStageGeometry) {
+  if (!(m_shaderStage == ShaderStageGeometry && isOutput)) {
+    // Not GS output
     bool keepAllLocations = false;
     if (getPipelineState()->isUnlinked()) {
-      if (isOutput && m_shaderStage != ShaderStageFragment) {
-        ShaderStage nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
-        keepAllLocations = nextStage == ShaderStageFragment || nextStage == ShaderStageInvalid;
+      if (isOutput) {
+        // Keep all locations if the next stage of the output is fragment shader or is unspecified
+        if (m_shaderStage != ShaderStageFragment) {
+          ShaderStage nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
+          keepAllLocations = nextStage == ShaderStageFragment || nextStage == ShaderStageInvalid;
+        }
+      } else {
+        // Keep all locations if it is the input of fragment shader
+        keepAllLocations = m_shaderStage == ShaderStageFragment;
       }
-      if (m_shaderStage == ShaderStageFragment && !isOutput)
-        keepAllLocations = true;
     }
-    unsigned startLocation = (keepAllLocations ? 0 : location);
-    // NOTE: The non-invalid value as initial new Location info or new location is used to identify the dynamic indexing
-    // location.
-    // Non-GS-output case.
+
     if (inOutLocInfoMap) {
-      for (unsigned i = startLocation; i < location + locationCount; ++i) {
+      // Handle per-vertex input/output
+      if (keepAllLocations) {
+        // If keeping all locations, add location map entries whose locations are before this input/output
+        for (unsigned i = 0; i < location; ++i) {
+          InOutLocationInfo origLocationInfo;
+          origLocationInfo.setLocation(i);
+          if (inOutLocInfoMap->count(origLocationInfo) == 0) {
+            // Add this location map entry only if it doesn't exist
+            auto &newLocationInfo = (*inOutLocInfoMap)[origLocationInfo];
+            newLocationInfo.setData(InvalidValue);
+          }
+        }
+      }
+
+      // Add location map entries for this input/output
+      for (unsigned i = 0; i < locationCount; ++i) {
         InOutLocationInfo origLocationInfo;
-        origLocationInfo.setLocation(i);
+        origLocationInfo.setLocation(location + i);
         origLocationInfo.setComponent(inOutInfo.getComponent());
         auto &newLocationInfo = (*inOutLocInfoMap)[origLocationInfo];
-        newLocationInfo.setData(isDynLocOffset ? i : InvalidValue);
+        if (isDynLocOffset) {
+          // When dynamic indexing, map the location directly
+          newLocationInfo.setLocation(location + i);
+          newLocationInfo.setComponent(inOutInfo.getComponent());
+        } else
+          newLocationInfo.setData(InvalidValue);
       }
     }
+
     if (perPatchInOutLocMap) {
-      for (unsigned i = startLocation; i < location + locationCount; ++i)
-        (*perPatchInOutLocMap)[i] = isDynLocOffset ? i : InvalidValue;
+      // Handle per-patch input/output
+      if (keepAllLocations) {
+        // If keeping all locations, add location map entries whose locations are before this input/output
+        for (unsigned i = 0; i < location; ++i) {
+          // Add this location map entry only if it doesn't exist
+          if (perPatchInOutLocMap->count(i) == 0)
+            (*perPatchInOutLocMap)[i] = InvalidValue;
+        }
+      }
+
+      // Add location map entries for this input/output
+      for (unsigned i = 0; i < locationCount; ++i)
+        (*perPatchInOutLocMap)[location + i] =
+            isDynLocOffset ? location + i : InvalidValue; // When dynamic indexing, map the location
     }
+
     if (perPrimitiveInOutLocMap) {
-      for (unsigned i = startLocation; i < location + locationCount; ++i)
-        (*perPrimitiveInOutLocMap)[i] = isDynLocOffset ? i : InvalidValue;
+      // Handle per-primitive input/output
+      if (keepAllLocations) {
+        // If keeping all locations, add location map entries whose locations are before this input/output
+        for (unsigned i = 0; i < location; ++i) {
+          // Add this location map entry only if it doesn't exist
+          if (perPrimitiveInOutLocMap->count(i) == 0)
+            (*perPrimitiveInOutLocMap)[i] = InvalidValue;
+        }
+      }
+
+      // Add location map entries for this input/output
+      for (unsigned i = 0; i < locationCount; ++i)
+        (*perPrimitiveInOutLocMap)[location + i] =
+            isDynLocOffset ? location + i : InvalidValue; // When dynamic indexing, map the location
     }
   } else {
-    // GS output. We include the stream ID with the location in the map key.
+    // GS output
     for (unsigned i = 0; i < locationCount; ++i) {
       InOutLocationInfo outLocationInfo;
       outLocationInfo.setLocation(location + i);
       outLocationInfo.setComponent(inOutInfo.getComponent());
-      outLocationInfo.setStreamId(inOutInfo.getStreamId());
+      outLocationInfo.setStreamId(inOutInfo.getStreamId()); // Include the stream ID in the map key.
       auto &newLocationInfo = (*inOutLocInfoMap)[outLocationInfo];
       newLocationInfo.setData(InvalidValue);
     }
