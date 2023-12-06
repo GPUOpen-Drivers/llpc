@@ -2907,68 +2907,124 @@ void PatchResourceCollect::updateOutputLocInfoMapWithUnpack() {
 
   // Update the value of outputLocInfoMap
   if (!outputLocInfoMap.empty()) {
-    unsigned nextMapLoc[MaxGsStreams] = {};
-    DenseMap<unsigned, unsigned> alreadyMappedLocs[MaxGsStreams]; // Map from original location to new location
+    unsigned nextAvailableLoc[MaxGsStreams] = {};
+    DenseMap<unsigned, unsigned> locMap[MaxGsStreams]; // Map from original location to new location
+    DenseSet<unsigned> occupiedLocs[MaxGsStreams];     // Collection of already-occupied locations in location mapping
 
+    // Collect all mapped locations before we do location mapping for those unmapped
+    for (auto &locInfoPair : outputLocInfoMap) {
+      const auto &locationInfo = locInfoPair.first;
+      auto &newLocationInfo = locInfoPair.second;
+
+      const unsigned streamId = m_shaderStage == ShaderStageGeometry ? locationInfo.getStreamId() : 0;
+
+      if (!newLocationInfo.isInvalid()) {
+        // Record mapped locations
+        const unsigned locAlreadyMapped = locationInfo.getLocation();
+        const unsigned newLocMappedTo = newLocationInfo.getLocation();
+        assert(newLocMappedTo != InvalidValue);
+
+        locMap[streamId][locAlreadyMapped] = newLocMappedTo;
+        occupiedLocs[streamId].insert(newLocMappedTo);
+      }
+    }
+
+    // Do location mapping
     for (auto &locInfoPair : outputLocInfoMap) {
       const auto &locationInfo = locInfoPair.first;
       auto &newLocationInfo = locInfoPair.second;
 
       if (!newLocationInfo.isInvalid())
-        continue; // Skip any location that is mapped
+        continue; // Skip mapped locations
+
+      const unsigned streamId = m_shaderStage == ShaderStageGeometry ? locationInfo.getStreamId() : 0;
 
       newLocationInfo.setData(0);
       newLocationInfo.setComponent(locationInfo.getComponent());
-      const unsigned streamId = m_shaderStage == ShaderStageGeometry ? locationInfo.getStreamId() : 0;
       newLocationInfo.setStreamId(streamId);
 
       const unsigned locToBeMapped = locationInfo.getLocation();
-      unsigned mappedLoc = InvalidValue;
+      unsigned newLocMappedTo = InvalidValue;
       const bool keepLocation = m_shaderStage == ShaderStageGeometry && !canChangeOutputLocationsForGs();
       if (keepLocation) {
         // Keep location unchanged
-        mappedLoc = locToBeMapped;
+        newLocMappedTo = locToBeMapped;
       } else {
         // Map to new location
-        if (alreadyMappedLocs[streamId].count(locToBeMapped) > 0) {
-          mappedLoc = alreadyMappedLocs[streamId][locToBeMapped];
+        if (locMap[streamId].count(locToBeMapped) > 0) {
+          newLocMappedTo = locMap[streamId][locToBeMapped];
         } else {
-          mappedLoc = nextMapLoc[streamId]++;
+          do {
+            // Try to find a new location that has not been occupied
+            newLocMappedTo = nextAvailableLoc[streamId]++;
+          } while (occupiedLocs[streamId].count(newLocMappedTo) > 0);
+
           // NOTE: Record the map because we are handling multiple pairs of <location, component>. Some pairs have the
           // same location while the components are different.
-          alreadyMappedLocs[streamId][locToBeMapped] = mappedLoc;
+          locMap[streamId][locToBeMapped] = newLocMappedTo;
+          occupiedLocs[streamId].insert(newLocMappedTo);
         }
       }
 
-      assert(mappedLoc != InvalidValue);
-      newLocationInfo.setLocation(mappedLoc);
+      assert(newLocMappedTo != InvalidValue);
+      newLocationInfo.setLocation(newLocMappedTo);
 
       if (m_shaderStage == ShaderStageGeometry)
-        inOutUsage.gs.outLocCount[streamId] = std::max(inOutUsage.gs.outLocCount[streamId], mappedLoc + 1);
+        inOutUsage.gs.outLocCount[streamId] = std::max(inOutUsage.gs.outLocCount[streamId], newLocMappedTo + 1);
     }
   }
 
   // Update the value of perPatchOutputLocMap
   if (!perPatchOutputLocMap.empty()) {
-    unsigned nextMapLoc = 0;
+    assert(m_shaderStage == ShaderStageTessControl);
+
+    unsigned nextAvailableLoc = 0;
+    DenseSet<unsigned> occupiedLocs; // Collection of already-occupied locations in location mapping
+
+    // Collect all mapped locations before we do location mapping for those unmapped
     for (auto &locPair : perPatchOutputLocMap) {
-      if (locPair.second == InvalidValue) {
-        // Only do location mapping if the per-patch output has not been mapped
-        locPair.second = nextMapLoc++;
-      } else
-        assert(m_shaderStage == ShaderStageTessControl);
+      if (locPair.second != InvalidValue)
+        occupiedLocs.insert(locPair.second); // Record mapped locations
+    }
+
+    // Do location mapping
+    for (auto &locPair : perPatchOutputLocMap) {
+      if (locPair.second != InvalidValue)
+        continue; // Skip mapped locations
+
+      unsigned newLocMappedTo = InvalidValue;
+      do {
+        // Try to find a new location that has not been occupied
+        newLocMappedTo = nextAvailableLoc++;
+      } while (occupiedLocs.count(newLocMappedTo) > 0);
+      locPair.second = newLocMappedTo;
     }
   }
 
   // Update the value of perPrimitiveOutputLocMap
   if (!perPrimitiveOutputLocMap.empty()) {
-    unsigned nextMapLoc = 0;
+    assert(m_shaderStage == ShaderStageMesh);
+
+    unsigned nextAvailableLoc = 0;
+    DenseSet<unsigned> occupiedLocs; // Collection of already-occupied locations in location mapping
+
+    // Collect all mapped locations before we do location mapping for those unmapped
     for (auto &locPair : perPrimitiveOutputLocMap) {
-      if (locPair.second == InvalidValue) {
-        // Only do location mapping if the per-primitive output has not been mapped
-        locPair.second = nextMapLoc++;
-      } else
-        assert(m_shaderStage == ShaderStageMesh);
+      if (locPair.second != InvalidValue)
+        occupiedLocs.insert(locPair.second); // Record mapped locations
+    }
+
+    // Do location mapping
+    for (auto &locPair : perPrimitiveOutputLocMap) {
+      if (locPair.second != InvalidValue)
+        continue; // Skip mapped locations
+
+      unsigned newLocMappedTo = InvalidValue;
+      do {
+        // Try to find a new location that has not been occupied
+        newLocMappedTo = nextAvailableLoc++;
+      } while (occupiedLocs.count(newLocMappedTo) > 0);
+      locPair.second = newLocMappedTo;
     }
   }
 
