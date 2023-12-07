@@ -110,3 +110,14 @@ bool llvm::removeUnusedFunctionDecls(Module *Mod, bool OnlyIntrinsics) {
 
   return DidChange;
 }
+
+PointerType *llvm::getWithSamePointeeType(PointerType *PtrTy,
+                                          unsigned AddressSpace) {
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 482880
+  return PointerType::getWithSamePointeeType(PtrTy, AddressSpace);
+#else
+  // New version of the code (also handles unknown version, which we treat as
+  // latest)
+  return PointerType::get(PtrTy->getContext(), AddressSpace);
+#endif
+}
