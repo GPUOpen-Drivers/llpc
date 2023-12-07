@@ -637,6 +637,11 @@ findIntrImplEntryByIntrinsicCall(CallInst *Call);
 // during DXILContPostProcess, so we cannot remove all unused declarations right
 // at the end of LowerRaytracingPipeline.
 bool removeUnusedFunctionDecls(Module *Mod, bool OnlyIntrinsics = true);
+
+// Replacement for PointerType::getWithSamePointeeType that works with new LLVM.
+// Returns a typed pointer type if the pointer type is typed.
+PointerType *getWithSamePointeeType(PointerType *PtrTy, unsigned AddressSpace);
+
 } // namespace llvm
 
 #endif
