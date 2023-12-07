@@ -97,7 +97,7 @@ PreservedAnalyses PatchBufferOp::run(Function &function, FunctionAnalysisManager
 #endif
 
   PatchBufferOpImpl impl(function.getContext(), *pipelineState, uniformityInfo);
-  if (!impl.run(function))
+  if (impl.run(function))
     return PreservedAnalyses::none();
   return PreservedAnalyses::all();
 }
