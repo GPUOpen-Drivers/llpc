@@ -129,8 +129,6 @@ struct PayloadCopyHelper {
     // Pointer to the node field in the local payload
     auto *LocalFieldPtr =
         B.CreateInBoundsGEP(&PayloadTy, LocalPayload, PayloadIdxList);
-    assert(cast<PointerType>(LocalFieldPtr->getType())
-               ->isOpaqueOrPointeeTypeMatches(FieldTy));
 
     // If the field is serialized in multiple intervals in the global,
     // we perform a manual bytewise copy using i32 and i8.
@@ -952,11 +950,6 @@ void LowerRaytracingPipelinePassImpl::copyPayload(
   Value *PayloadSerialization = B.CreateBitCast(
       Payload,
       Layout.SerializationTy->getPointerTo(Payload->getAddressSpace()));
-
-  assert(cast<PointerType>(PayloadSerialization->getType())
-             ->isOpaqueOrPointeeTypeMatches(Layout.SerializationTy));
-  assert(cast<PointerType>(LocalPayload->getType())
-             ->isOpaqueOrPointeeTypeMatches(&PayloadTy));
 
   PayloadCopyHelper Helper{
       *Mod,
