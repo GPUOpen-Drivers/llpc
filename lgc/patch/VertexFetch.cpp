@@ -627,11 +627,10 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
 
     auto descPtr = builder.CreateIntToPtr(desc, builder.getPtrTy(ADDR_SPACE_CONST));
 
-    Value *locationMasks = builder.getInt64(~0);
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION >= 67
-    locationMasks = builder.CreateLoad(builder.getInt64Ty(), descPtr);
+    // 64 bit location masks.
+    Value *locationMasks = builder.CreateLoad(builder.getInt64Ty(), descPtr);
     descPtr = builder.CreateGEP(builder.getInt64Ty(), descPtr, {builder.getInt32(1)});
-#endif
+
     for (InputImportGenericOp *inst : vertexFetches) {
       builder.SetInsertPoint(inst);
       Value *vertex = vertexFetch->fetchVertex(inst, descPtr, locationMasks, BuilderBase::get(builder));
