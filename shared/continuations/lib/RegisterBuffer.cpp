@@ -192,18 +192,15 @@ Value *RegisterBufferPass::computeMemAddr(IRBuilder<> &Builder,
   } else if (auto *Inst = dyn_cast<CastInst>(Address)) {
     auto *Src = Inst->getOperand(0);
     Value *MemSrc = computeMemAddr(Builder, Src);
-    New = Builder.CreateCast(
-        Inst->getOpcode(), MemSrc,
-        PointerType::getWithSamePointeeType(
-            cast<PointerType>(Inst->getDestTy()), Data.Addrspace));
+    New = Builder.CreateCast(Inst->getOpcode(), MemSrc,
+                             PointerType::get(Inst->getType(), Data.Addrspace));
   } else if (auto *Inst = dyn_cast<ConstantExpr>(Address)) {
     if (Inst->isCast()) {
       auto *Src = Inst->getOperand(0);
       Value *MemSrc = computeMemAddr(Builder, Src);
       New = Builder.CreateCast(
           static_cast<Instruction::CastOps>(Inst->getOpcode()), MemSrc,
-          PointerType::getWithSamePointeeType(
-              cast<PointerType>(Inst->getType()), Data.Addrspace));
+          PointerType::get(Inst->getType(), Data.Addrspace));
     } else {
       LLVM_DEBUG(Address->dump());
       llvm_unreachable(
@@ -242,8 +239,7 @@ Value *RegisterBufferPass::handleSingleLoadStore(
   // Change load/store to use addrspace(20)
   auto *AddressType = cast<PointerType>(Address->getType());
   Address = Builder.CreateAddrSpaceCast(
-      Address, PointerType::getWithSamePointeeType(AddressType,
-                                                   GlobalRegisterAddrspace));
+      Address, PointerType::get(AddressType, GlobalRegisterAddrspace));
 
   // If only registers are accessed, emit a simple load/store
   if (TotalElementCount <= Data.RegisterCount)
