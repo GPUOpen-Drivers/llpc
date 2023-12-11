@@ -172,7 +172,7 @@ public:
   void setCurrentLine(const SPIRVLine *Line) override;
   void addCapability(SPIRVCapabilityKind) override;
   void addCapabilityInternal(SPIRVCapabilityKind) override;
-  const SPIRVDecorateGeneric *addDecorate(const SPIRVDecorateGeneric *) override;
+  const SPIRVDecorateGeneric *addDecorate(SPIRVDecorateGeneric *) override;
   SPIRVDecorationGroup *addDecorationGroup() override;
   SPIRVDecorationGroup *addDecorationGroup(SPIRVDecorationGroup *Group) override;
   SPIRVGroupDecorate *addGroupDecorate(SPIRVDecorationGroup *Group, const std::vector<SPIRVEntry *> &Targets) override;
@@ -322,7 +322,7 @@ private:
   SPIRVStringVec StringVec;
   SPIRVMemberNameVec MemberNameVec;
   const SPIRVLine *CurrentLine;
-  SPIRVDecorateSet DecorateSet;
+  SPIRVDecorateVec DecorateVec;
   SPIRVDecGroupVec DecGroupVec;
   SPIRVGroupDecVec GroupDecVec;
   SPIRVEnetryPointVec EntryPointVec;
@@ -702,12 +702,12 @@ SPIRVBasicBlock *SPIRVModuleImpl::addBasicBlock(SPIRVFunction *Func, SPIRVId Id)
   return Func->addBasicBlock(new SPIRVBasicBlock(getId(Id), Func));
 }
 
-const SPIRVDecorateGeneric *SPIRVModuleImpl::addDecorate(const SPIRVDecorateGeneric *Dec) {
+const SPIRVDecorateGeneric *SPIRVModuleImpl::addDecorate(SPIRVDecorateGeneric *Dec) {
   SPIRVEntry *Target = nullptr;
   assert(exist(Dec->getTargetId(), &Target) && "Decorate target does not exist");
   (void)Target;
   if (!Dec->getOwner())
-    DecorateSet.insert(Dec);
+    DecorateVec.push_back(Dec);
   addCapabilities(Dec->getRequiredCapability());
   return Dec;
 }
@@ -999,12 +999,6 @@ SPIRVInstruction *SPIRVModuleImpl::addVariable(SPIRVType *Type, bool IsConstant,
   return Variable;
 }
 
-template <class T, class B> spv_ostream &operator<<(spv_ostream &O, const std::multiset<T *, B> &V) {
-  for (auto &I : V)
-    O << *I;
-  return O;
-}
-
 template <class T> void SPIRVModuleImpl::addTo(std::vector<T *> &V, SPIRVEntry *E) {
   V.push_back(static_cast<T *>(E));
 }
@@ -1018,7 +1012,7 @@ SPIRVDecorationGroup *SPIRVModuleImpl::addDecorationGroup() {
 
 SPIRVDecorationGroup *SPIRVModuleImpl::addDecorationGroup(SPIRVDecorationGroup *Group) {
   add(Group);
-  Group->takeDecorates(DecorateSet);
+  Group->takeDecorates(DecorateVec);
   DecGroupVec.push_back(Group);
   return Group;
 }

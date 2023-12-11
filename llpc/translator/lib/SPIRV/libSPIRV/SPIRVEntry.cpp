@@ -201,7 +201,7 @@ void SPIRVEntry::validateBuiltin(SPIRVWord TheSet, SPIRVWord Index) const {
   assert(TheSet != SPIRVWORD_MAX && Index != SPIRVWORD_MAX && "Invalid builtin");
 }
 
-void SPIRVEntry::addDecorate(const SPIRVDecorate *Dec) {
+void SPIRVEntry::addDecorate(SPIRVDecorate *Dec) {
   auto Kind = Dec->getDecorateKind();
   Decorates.insert(std::make_pair(Dec->getDecorateKind(), Dec));
   Module->addDecorate(Dec);
@@ -232,7 +232,7 @@ void SPIRVEntry::setLine(const SPIRVLine *L) {
   Line = L;
 }
 
-void SPIRVEntry::addMemberDecorate(const SPIRVMemberDecorate *Dec) {
+void SPIRVEntry::addMemberDecorate(SPIRVMemberDecorate *Dec) {
   assert(Dec);
   assert(canHaveMemberDecorates());
   MemberDecorates[Dec->getPair()] = Dec;

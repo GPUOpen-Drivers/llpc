@@ -167,7 +167,7 @@ public:
   virtual void addUnknownStructField(SPIRVTypeStruct *, unsigned Idx, SPIRVId Id) = 0;
   virtual const SPIRVLine *getCurrentLine() const = 0;
   virtual void setCurrentLine(const SPIRVLine *) = 0;
-  virtual const SPIRVDecorateGeneric *addDecorate(const SPIRVDecorateGeneric *) = 0;
+  virtual const SPIRVDecorateGeneric *addDecorate(SPIRVDecorateGeneric *) = 0;
   virtual SPIRVDecorationGroup *addDecorationGroup() = 0;
   virtual SPIRVDecorationGroup *addDecorationGroup(SPIRVDecorationGroup *Group) = 0;
   virtual SPIRVGroupDecorate *addGroupDecorate(SPIRVDecorationGroup *Group,
