@@ -328,6 +328,7 @@ Options PipelineContext::computePipelineOptions() const {
   }
 
   options.allowNullDescriptor = getPipelineOptions()->extendedRobustness.nullDescriptor;
+  options.enableExtendedRobustBufferAccess = getPipelineOptions()->extendedRobustness.robustBufferAccess;
   options.disableImageResourceCheck = getPipelineOptions()->disableImageResourceCheck;
   options.optimizeTessFactor = getPipelineOptions()->optimizeTessFactor;
   options.enableInterpModePatch = getPipelineOptions()->enableInterpModePatch;
