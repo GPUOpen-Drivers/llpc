@@ -145,7 +145,6 @@ public:
   virtual void setSourceLanguage(SourceLanguage, SPIRVWord) = 0;
   virtual void setSourceFile(SPIRVId) = 0;
   virtual SPIRVString *getSourceFile(uint32_t FileId) const = 0;
-  virtual void optimizeDecorates() = 0;
   virtual void setAutoAddCapability(bool E) { AutoAddCapability = E; }
   virtual void setValidateCapability(bool E) { ValidateCapability = E; }
   virtual void setGeneratorId(unsigned short) = 0;
