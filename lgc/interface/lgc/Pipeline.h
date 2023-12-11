@@ -187,6 +187,7 @@ union Options {
     unsigned rtStaticPipelineFlags;          // Ray tracing static pipeline flags
     unsigned rtTriCompressMode;              // Ray tracing triangle compression mode
     bool useGpurt;                           // Whether GPURT is used
+    bool enableExtendedRobustBufferAccess;   // Enable the extended robust buffer access
   };
 };
 static_assert(sizeof(Options) == sizeof(Options::u32All));

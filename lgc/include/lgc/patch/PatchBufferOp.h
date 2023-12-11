@@ -118,6 +118,8 @@ private:
   llvm::Value *replaceLoadStore(llvm::Instruction &inst);
   llvm::Instruction *makeLoop(llvm::Value *const loopStart, llvm::Value *const loopEnd, llvm::Value *const loopStride,
                               llvm::Instruction *const insertPos);
+  Value *createGlobalPointerAccess(llvm::Value *const bufferDesc, llvm::Value *const offset, llvm::Type *const type,
+                                   llvm::Instruction &inst, const llvm::function_ref<Value *(Value *)> callback);
 
   TypeLowering &m_typeLowering;
   llvm::IRBuilder<> m_builder;
