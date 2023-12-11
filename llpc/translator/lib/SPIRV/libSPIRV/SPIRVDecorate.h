@@ -66,12 +66,6 @@ public:
   }
   Decoration getDecorateKind() const;
   size_t getLiteralCount() const;
-  /// Compare for kind and literal only.
-  struct Comparator {
-    bool operator()(const SPIRVDecorateGeneric *A, const SPIRVDecorateGeneric *B) const;
-  };
-  /// Compare kind, literals and target.
-  friend bool operator==(const SPIRVDecorateGeneric &A, const SPIRVDecorateGeneric &B);
 
   SPIRVDecorationGroup *getOwner() const { return Owner; }
 
@@ -96,18 +90,7 @@ protected:
   SPIRVDecorationGroup *Owner; // Owning decorate group
 };
 
-class SPIRVDecorateSet : public std::multiset<const SPIRVDecorateGeneric *, SPIRVDecorateGeneric::Comparator> {
-public:
-  typedef std::multiset<const SPIRVDecorateGeneric *, SPIRVDecorateGeneric::Comparator> BaseType;
-  iterator insert(const value_type &Dec) {
-    auto ER = BaseType::equal_range(Dec);
-    for (auto I = ER.first, E = ER.second; I != E; ++I) {
-      if (**I == *Dec)
-        return I;
-    }
-    return BaseType::insert(Dec);
-  }
-};
+typedef std::vector<SPIRVDecorateGeneric *> SPIRVDecorateVec;
 
 class SPIRVDecorate : public SPIRVDecorateGeneric {
 public:
@@ -205,23 +188,17 @@ public:
   SPIRVDecorationGroup() : SPIRVEntry(OC) {}
   _SPIRV_DCL_DECODE
   // Move the given decorates to the decoration group
-  void takeDecorates(SPIRVDecorateSet &Decs) {
-    for (auto &I : Decs) {
-      // Insert decorates whose target ID is this decoration group
-      if (I->getTargetId() == Id) {
-        const_cast<SPIRVDecorateGeneric *>(I)->setOwner(this);
-        Decorations.insert(I);
-      }
-    }
-    // Remove those inserted decorates from original set
+  void takeDecorates(SPIRVDecorateVec &Decs) {
+    Decorations = std::move(Decs);
     for (auto &I : Decorations)
-      Decs.erase(I);
+      const_cast<SPIRVDecorateGeneric *>(I)->setOwner(this);
+    Decs.clear();
   }
 
-  SPIRVDecorateSet &getDecorations() { return Decorations; }
+  SPIRVDecorateVec &getDecorations() { return Decorations; }
 
 protected:
-  SPIRVDecorateSet Decorations;
+  SPIRVDecorateVec Decorations;
   void validate() const override {
     assert(OpCode == OC);
     assert(WordCount == WC);

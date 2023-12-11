@@ -119,7 +119,7 @@ void SPIRVGroupDecorate::decorateTargets() {
     auto Target = getOrCreate(I);
     for (auto &Dec : DecorationGroup->getDecorations()) {
       assert(Dec->isDecorate());
-      Target->addDecorate(static_cast<const SPIRVDecorate *const>(Dec));
+      Target->addDecorate(static_cast<SPIRVDecorate *const>(Dec));
     }
   }
 }
@@ -164,49 +164,4 @@ void SPIRVDecorateId::decode(std::istream &I) {
   getOrCreateTarget()->addDecorate(this);
 }
 
-bool SPIRVDecorateGeneric::Comparator::operator()(const SPIRVDecorateGeneric *A, const SPIRVDecorateGeneric *B) const {
-  auto Action = [=]() {
-    if (A->getOpCode() < B->getOpCode())
-      return true;
-    if (A->getOpCode() > B->getOpCode())
-      return false;
-    if (A->getDecorateKind() < B->getDecorateKind())
-      return true;
-    if (A->getDecorateKind() > B->getDecorateKind())
-      return false;
-    if (A->getLiteralCount() < B->getLiteralCount())
-      return true;
-    if (A->getLiteralCount() > B->getLiteralCount())
-      return false;
-    for (size_t I = 0, E = A->getLiteralCount(); I != E; ++I) {
-      auto EA = A->getLiteral(I);
-      auto EB = B->getLiteral(I);
-      if (EA < EB)
-        return true;
-      if (EA > EB)
-        return false;
-    }
-    return false;
-  };
-  auto Res = Action();
-  return Res;
-}
-
-bool operator==(const SPIRVDecorateGeneric &A, const SPIRVDecorateGeneric &B) {
-  if (A.getTargetId() != B.getTargetId())
-    return false;
-  if (A.getOpCode() != B.getOpCode())
-    return false;
-  if (A.getDecorateKind() != B.getDecorateKind())
-    return false;
-  if (A.getLiteralCount() != B.getLiteralCount())
-    return false;
-  for (size_t I = 0, E = A.getLiteralCount(); I != E; ++I) {
-    auto EA = A.getLiteral(I);
-    auto EB = B.getLiteral(I);
-    if (EA != EB)
-      return false;
-  }
-  return true;
-}
 } // namespace SPIRV
