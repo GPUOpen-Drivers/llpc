@@ -146,7 +146,6 @@ public:
   // Module changing functions
   bool importBuiltinSet(const std::string &, SPIRVId *) override;
   bool importBuiltinSetWithId(const std::string &, SPIRVId) override;
-  void optimizeDecorates() override;
   void setAddressingModel(SPIRVAddressingModelKind AM) override { AddrModel = AM; }
   void postProcessExecutionModeId();
   void setMemoryModel(SPIRVMemoryModelKind MM) override { MemoryModel = MM; }
@@ -355,44 +354,6 @@ const SPIRVLine *SPIRVModuleImpl::getCurrentLine() const {
 
 void SPIRVModuleImpl::setCurrentLine(const SPIRVLine *Line) {
   CurrentLine = Line;
-}
-
-// Creates decoration group and group decorates from decorates shared by
-// multiple targets.
-void SPIRVModuleImpl::optimizeDecorates() {
-  for (auto I = DecorateSet.begin(), E = DecorateSet.end(); I != E;) {
-    auto D = *I;
-    if (D->getOpCode() == OpMemberDecorate) {
-      ++I;
-      continue;
-    }
-    auto ER = DecorateSet.equal_range(D);
-    if (std::distance(ER.first, ER.second) < 2) {
-      I = ER.second;
-      continue;
-    }
-    auto G = add(new SPIRVDecorationGroup(this, getId()));
-    std::vector<SPIRVId> Targets;
-    Targets.push_back(D->getTargetId());
-    const_cast<SPIRVDecorateGeneric *>(D)->setTargetId(G->getId());
-    G->getDecorations().insert(D);
-    for (I = ER.first; I != ER.second; ++I) {
-      auto E = *I;
-      if (*E == *D)
-        continue;
-      Targets.push_back(E->getTargetId());
-    }
-
-    // WordCount is only 16 bits.  We can only have 65535 - FixedWC targets per
-    // group.
-    // For now, just skip using a group if the number of targets to too big
-    if (Targets.size() < 65530) {
-      DecorateSet.erase(ER.first, ER.second);
-      auto GD = add(new SPIRVGroupDecorate(G, Targets));
-      DecGroupVec.push_back(G);
-      GroupDecVec.push_back(GD);
-    }
-  }
 }
 
 void SPIRVModuleImpl::postProcessExecutionModeId() {
@@ -1127,7 +1088,6 @@ std::istream &operator>>(std::istream &I, SPIRVModule &M) {
     Decoder.getEntry();
 
   MI.postProcessExecutionModeId();
-  MI.optimizeDecorates();
   MI.resolveUnknownStructFields();
   MI.createForwardPointers();
   return I;
