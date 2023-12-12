@@ -777,6 +777,9 @@ void BufferOpLowering::visitLoadInst(LoadInst &loadInst) {
 void BufferOpLowering::postVisitLoadInst(LoadInst &loadInst) {
   Value *const newLoad = replaceLoadStore(loadInst);
 
+  if (newLoad == nullptr)
+    return;
+
   // Record the load instruction so we remember to delete it later.
   m_typeLowering.eraseInstruction(&loadInst);
 
@@ -1503,10 +1506,22 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
     assert(newInst);
 
     if (type->isPointerTy()) {
-      newInst = m_builder.CreateBitCast(newInst, m_builder.getIntNTy(bytesToHandle * 8));
-      copyMetadata(newInst, &inst);
-      newInst = m_builder.CreateIntToPtr(newInst, type);
-      copyMetadata(newInst, &inst);
+      if (type->getPointerAddressSpace() == ADDR_SPACE_BUFFER_FAT_POINTER) {
+        assert(cast<FixedVectorType>(newInst->getType())->getNumElements() == 5);
+        Value *bufferDesc = m_builder.CreateShuffleVector(newInst, {0, 1, 2, 3});
+        Value *baseIndex = m_builder.CreateExtractElement(newInst, 4);
+        baseIndex = m_builder.CreateIntToPtr(baseIndex, PointerType::get(type->getContext(), ADDR_SPACE_CONST_32BIT));
+
+        SmallVector<Value *> newFatPointer = {bufferDesc, baseIndex};
+        copyMetadata(baseIndex, &inst);
+        m_typeLowering.replaceInstruction(&inst, newFatPointer);
+        return nullptr;
+      } else {
+        newInst = m_builder.CreateBitCast(newInst, m_builder.getIntNTy(bytesToHandle * 8));
+        copyMetadata(newInst, &inst);
+        newInst = m_builder.CreateIntToPtr(newInst, type);
+        copyMetadata(newInst, &inst);
+      }
     } else {
       newInst = m_builder.CreateBitCast(newInst, type);
       copyMetadata(newInst, &inst);

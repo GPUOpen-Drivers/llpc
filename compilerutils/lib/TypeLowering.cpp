@@ -560,6 +560,12 @@ void TypeLowering::visitInsert(llvm::InsertValueInst &insert) {
 //
 // @param load : the instruction
 void TypeLowering::visitLoad(LoadInst &load) {
+  // For the pointerOperand which address space is ADDR_SPACE_BUFFER_FAT_POINTER, it will be lowered
+  // on postVisitLoad. But this maybe have impacts on other pass like CPS which doesn't have postVisitLoad
+  if (load.getPointerAddressSpace() == 7) {
+    return;
+  }
+
   auto types = convertType(load.getType());
   if (types.size() == 1 && types[0] == load.getType())
     return;
