@@ -106,7 +106,7 @@ struct GpuRtIntrinsicEntry {
   bool AccessesHitData = false;
 };
 
-extern const OpMap<GpuRtIntrinsicEntry> LgcRtGpuRtMap;
+extern const llvm_dialects::OpMap<GpuRtIntrinsicEntry> LgcRtGpuRtMap;
 
 // This must match DXIL::ShaderKind from DxilConstants.h, and also
 // DXILShaderKind in a matching definition in GPURT, because it is used
