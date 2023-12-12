@@ -398,21 +398,13 @@ class TraceNonUniformIndex {
   // Maps non-uniform operands with the scalarization option.
   bool scalarizeDescriptorLoads;
   unsigned upperLimit;
+  unsigned cnt = 0;
+  void init(Instruction *);
   void insertNewValueInInstrDeps(Value *, Instruction *);
 
 public:
   TraceNonUniformIndex(Instruction *nonUniformInst, bool scalarizeDescriptorLoads = false, unsigned upperLimit = 64)
-      : scalarizeDescriptorLoads(scalarizeDescriptorLoads), upperLimit(upperLimit) {
-    // Initialization of instrToIndex and indexToInstr.
-    if (scalarizeDescriptorLoads) {
-      unsigned cnt = 0;
-      for (Instruction *I = nonUniformInst->getPrevNode(); I != nullptr && cnt < upperLimit;
-           I = I->getPrevNode(), ++cnt) {
-        indexToInstr.push_back(I);
-        instrToIndex[I] = cnt;
-      }
-    }
-  }
+      : scalarizeDescriptorLoads(scalarizeDescriptorLoads), upperLimit(upperLimit) {}
 
   Value *run(Value *);
 
@@ -421,6 +413,12 @@ public:
   const TinyInstructionSet::IndexToInstructionVec &getIndexToInstr() const { return indexToInstr; }
 };
 
+void TraceNonUniformIndex::init(Instruction *instr) {
+  indexToInstr.push_back(instr);
+  instrToIndex[instr] = cnt;
+  cnt++;
+}
+
 // Adds newValue in instrDeps map. The dependencies of the newValue are the currentVisitedInstr and its dependencies.
 // @param newValue : the new value to be added in instrDeps map
 // @param currentVisitedInstr : the value from where we copy the dependencies for newValue
@@ -428,8 +426,8 @@ void TraceNonUniformIndex::insertNewValueInInstrDeps(Value *newValue, Instructio
   if (!instrToIndex.contains(currentVisitedInstr))
     // The instruction is either outside of 64 limit or in a different basic block. So, we bail-out scalarization.
     return;
-
   assert(instrDeps.contains(currentVisitedInstr) && "The current visited instruction should have been in the map.");
+  init(cast<Instruction>(newValue));
   auto it1 = instrDeps.try_emplace(newValue, upperLimit).first;
   auto &setOfInstrs = it1->second;
   auto it2 = instrDeps.find(currentVisitedInstr);
@@ -457,6 +455,7 @@ void TraceNonUniformIndex::insertNewValueInInstrDeps(Value *newValue, Instructio
 Value *TraceNonUniformIndex::run(Value *nonUniformVal) {
   auto load = dyn_cast<LoadInst>(nonUniformVal);
   if (scalarizeDescriptorLoads && load) {
+    init(load);
     instrDeps.try_emplace(load, upperLimit);
   } else if (!load) {
     // Workarounds that modify image descriptor can be peeped through, i.e.
@@ -468,8 +467,10 @@ Value *TraceNonUniformIndex::run(Value *nonUniformVal) {
     if (!insert)
       return nonUniformVal;
 
-    if (scalarizeDescriptorLoads)
+    if (scalarizeDescriptorLoads) {
+      init(insert);
       instrDeps.try_emplace(insert, upperLimit);
+    }
 
     load = dyn_cast<LoadInst>(insert->getOperand(0));
     if (!load)
@@ -659,7 +660,7 @@ static bool instructionsEqual(Instruction *lhs, Instruction *rhs) {
 }
 
 // =====================================================================================================================
-// Exttract the 32-bit value of the non-uniform index.
+// Extract the 32-bit value of the non-uniform index.
 // @param nonUniformIndex : the non-uniform index of the non-uniform operand of the image call
 // @return : the 32-bit value of the nonUniformIndex
 Value *get32BitNonUniformIndex(Value *nonUniformIndex) {
@@ -698,14 +699,13 @@ Value *getSharedIndex(ArrayRef<Value *> nonUniformIndices, DenseMap<Value *, Val
     const DenseMap<Value *, TinyInstructionSet> &instrDeps = traceNonUniformIndex.getInstrDeps();
     auto it = instrDeps.find(nonUniformIndex);
     bool hasDependencies = it != instrDeps.end();
-    if (!nonUniformInstr ||
-        (firstIndexInst && (!instructionsEqual(nonUniformInstr, firstIndexInst) ||
-                            nonUniformInstr->getParent() != firstIndexInst->getParent())) ||
+    if (!nonUniformInstr || (firstIndexInst && !instructionsEqual(nonUniformInstr, firstIndexInst)) ||
         !hasDependencies) {
       identicalIndexes = false;
       return nullptr;
     }
-    if (!firstIndexInst || nonUniformInstr->comesBefore(firstIndexInst))
+    if (!firstIndexInst || (firstIndexInst && nonUniformInstr->getParent() == firstIndexInst->getParent() &&
+                            nonUniformInstr->comesBefore(firstIndexInst)))
       firstIndexInst = nonUniformInstr;
   }
   return firstIndexInst;
@@ -808,7 +808,7 @@ Instruction *BuilderImpl::createWaterfallLoop(Instruction *nonUniformInst, Array
     auto itDep = instrDeps.find(nonUniformIndex);
 
     // Move the non-uniform loads inside the loop.
-    if (scalarizeDescriptorLoads && nonUniformIndex != nonUniformImageCallOperand && itDep != instrDeps.end()) {
+    if (scalarizeDescriptorLoads && itDep != instrDeps.end()) {
       Value *nonUniformIndex32Bit =
           nonUniformIndex->getType()->isIntegerTy(64) ? nonUniformIndex32BitVal[nonUniformIndex] : nonUniformIndex;
 
