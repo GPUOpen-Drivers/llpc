@@ -1868,9 +1868,9 @@ void LowerRaytracingPipelinePassImpl::handleUnrematerializableCandidates() {
     if (!DialectUtils::isLgcRtOp(&Func))
       continue;
 
-    static const OpSet NonRematerializableDialectOps =
-        OpSet::get<TraceRayOp, ReportHitOp, CallCallableShaderOp,
-                   ShaderIndexOp>();
+    static const llvm_dialects::OpSet NonRematerializableDialectOps =
+        llvm_dialects::OpSet::get<TraceRayOp, ReportHitOp, CallCallableShaderOp,
+                                  ShaderIndexOp>();
     if (!NonRematerializableDialectOps.contains(Func)) {
       llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
         auto Data = ToProcess.find(CInst.getFunction());
