@@ -607,9 +607,16 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
     break;
   case ShaderStageTessEval:
     if (!hasGs) {
-      // TES as hardware VS: handle HW stream-out.
-      if (enableHwXfb) {
+      // TES as hardware VS
+      if (!pipelineState->getNggControl()->enableNgg) {
+        // NOTE: The SGPR corresponding to streamOutInfo is shared with isOffChip for off-chip tessellation. It is
+        // controlled by SPI_SHADER_PGM_RSRC2_VS.SO_EN or SPI_SHADER_PGM_RSRC2_VS.OC_LDS_EN. Since we are always in
+        // off-chip tessellation mode, it must be present even if there is no stream-out.
         getShaderInputUsage(shaderStage, ShaderInput::StreamOutInfo)->enable();
+      }
+
+      // Handle HW stream-out.
+      if (enableHwXfb) {
         getShaderInputUsage(shaderStage, ShaderInput::StreamOutWriteIndex)->enable();
         for (unsigned i = 0; i < MaxTransformFeedbackBuffers; ++i) {
           if (xfbStrides[i] > 0)
