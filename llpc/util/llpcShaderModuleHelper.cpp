@@ -30,6 +30,7 @@
 */
 #include "llpcShaderModuleHelper.h"
 #include "llpcDebug.h"
+#include "llpcError.h"
 #include "llpcUtil.h"
 #include "spirvExt.h"
 #include "vkgcUtil.h"
@@ -233,8 +234,9 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
 //
 // @param spvBin : SPIR-V binary code
 // @param codeBuffer : The buffer in which to copy the shader code.
-// @returns : The number of bytes written to trimSpvBin
-unsigned ShaderModuleHelper::trimSpirvDebugInfo(const BinaryData *spvBin, llvm::MutableArrayRef<unsigned> codeBuffer) {
+// @returns : The number of bytes written to trimSpvBin or an error if invalid data was encountered
+Expected<unsigned> ShaderModuleHelper::trimSpirvDebugInfo(const BinaryData *spvBin,
+                                                          llvm::MutableArrayRef<unsigned> codeBuffer) {
   bool writeCode = !codeBuffer.empty();
   assert(codeBuffer.empty() || codeBuffer.size() > sizeof(SpirvHeader));
 
@@ -260,6 +262,12 @@ unsigned ShaderModuleHelper::trimSpirvDebugInfo(const BinaryData *spvBin, llvm::
   while (codePos < end) {
     unsigned opCode = (codePos[0] & OpCodeMask);
     unsigned wordCount = (codePos[0] >> WordCountShift);
+
+    if (wordCount == 0 || codePos + wordCount > end) {
+      LLPC_ERRS("Invalid SPIR-V binary\n");
+      return createResultError(Result::ErrorInvalidShader);
+    }
+
     bool skip = false;
     switch (opCode) {
     case OpSource:
@@ -496,8 +504,12 @@ Result ShaderModuleHelper::getModuleData(const ShaderModuleBuildInfo *shaderInfo
 
   if (moduleData.binType == BinaryType::Spirv) {
     moduleData.usage = ShaderModuleHelper::getShaderModuleUsageInfo(&shaderBinary);
-    moduleData.binCode = getShaderCode(shaderInfo, codeBuffer);
     moduleData.usage.isInternalRtShader = shaderInfo->options.pipelineOptions.internalRtShaders;
+    auto codeOrErr = getShaderCode(shaderInfo, codeBuffer);
+    if (Error err = codeOrErr.takeError())
+      return errorToResult(std::move(err));
+
+    moduleData.binCode = *codeOrErr;
 
     // Calculate SPIR-V cache hash
     Hash cacheHash = {};
@@ -520,13 +532,16 @@ Result ShaderModuleHelper::getModuleData(const ShaderModuleBuildInfo *shaderInfo
 // @param shaderInfo : Shader module build info
 // @param codeBuffer [out] : A buffer to hold the shader code.
 // @return : The BinaryData for the shaderCode written to codeBuffer.
-BinaryData ShaderModuleHelper::getShaderCode(const ShaderModuleBuildInfo *shaderInfo,
-                                             MutableArrayRef<unsigned int> &codeBuffer) {
+Expected<BinaryData> ShaderModuleHelper::getShaderCode(const ShaderModuleBuildInfo *shaderInfo,
+                                                       MutableArrayRef<unsigned int> &codeBuffer) {
   BinaryData code;
   const BinaryData &shaderBinary = shaderInfo->shaderBin;
   bool trimDebugInfo = cl::TrimDebugInfo && !(shaderInfo->options.pipelineOptions.internalRtShaders);
   if (trimDebugInfo) {
-    code.codeSize = trimSpirvDebugInfo(&shaderBinary, codeBuffer);
+    auto sizeOrErr = trimSpirvDebugInfo(&shaderBinary, codeBuffer);
+    if (Error err = sizeOrErr.takeError())
+      return err;
+    code.codeSize = *sizeOrErr;
   } else {
     assert(shaderBinary.codeSize <= codeBuffer.size() * sizeof(codeBuffer.front()));
     memcpy(codeBuffer.data(), shaderBinary.pCode, shaderBinary.codeSize);
@@ -539,7 +554,7 @@ BinaryData ShaderModuleHelper::getShaderCode(const ShaderModuleBuildInfo *shader
 // =====================================================================================================================
 // @param shaderInfo : Shader module build info
 // @return : The number of bytes need to hold the code for this shader module.
-unsigned ShaderModuleHelper::getCodeSize(const ShaderModuleBuildInfo *shaderInfo) {
+Expected<unsigned> ShaderModuleHelper::getCodeSize(const ShaderModuleBuildInfo *shaderInfo) {
   const BinaryData &shaderBinary = shaderInfo->shaderBin;
   bool trimDebugInfo = cl::TrimDebugInfo && !(shaderInfo->options.pipelineOptions.internalRtShaders);
   if (!trimDebugInfo)

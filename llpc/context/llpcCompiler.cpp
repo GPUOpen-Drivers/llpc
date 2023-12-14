@@ -575,7 +575,11 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     return Result::ErrorInvalidPointer;
   }
 
-  unsigned codeSize = ShaderModuleHelper::getCodeSize(shaderInfo);
+  auto codeSizeOrErr = ShaderModuleHelper::getCodeSize(shaderInfo);
+  if (Error err = codeSizeOrErr.takeError())
+    return errorToResult(std::move(err));
+
+  const unsigned codeSize = *codeSizeOrErr;
   size_t allocSize = sizeof(ShaderModuleData) + codeSize;
 
   ShaderModuleData moduleData = {};
@@ -2289,13 +2293,15 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
   const bool buildUsingRelocatableElf = relocatableElfRequested && canUseRelocatableComputeShaderElf(pipelineInfo);
 
   Result result = validatePipelineShaderInfo(&pipelineInfo->cs);
+  if (result != Result::Success)
+    return result;
 
   MetroHash::Hash cacheHash = {};
   MetroHash::Hash pipelineHash = {};
   cacheHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, true);
   pipelineHash = PipelineDumper::generateHashForComputePipeline(pipelineInfo, false);
 
-  if (result == Result::Success && EnableOuts()) {
+  if (EnableOuts()) {
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(pipelineInfo->cs.pModuleData);
     auto moduleHash = reinterpret_cast<const MetroHash::Hash *>(&moduleData->hash[0]);
     LLPC_OUTS("\n===============================================================================\n");
@@ -2310,8 +2316,7 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
     LLPC_OUTS("\n");
   }
 
-  if (result == Result::Success)
-    dumpCompilerOptions(pipelineDumpFile);
+  dumpCompilerOptions(pipelineDumpFile);
 
   std::optional<CacheAccessor> cacheAccessor;
   if (cl::CacheFullPipelines) {
@@ -2325,40 +2330,39 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
     result = buildComputePipelineInternal(&computeContext, pipelineInfo, buildUsingRelocatableElf, &candidateElf,
                                           &pipelineOut->stageCacheAccess);
 
-    if (result == Result::Success) {
-      elfBin.codeSize = candidateElf.size();
-      elfBin.pCode = candidateElf.data();
-    }
     if (cacheAccessor && pipelineOut->pipelineCacheAccess == CacheAccessInfo::CacheNotChecked)
       pipelineOut->pipelineCacheAccess = CacheAccessInfo::CacheMiss;
+
+    if (result != Result::Success) {
+      return result;
+    }
+    elfBin.codeSize = candidateElf.size();
+    elfBin.pCode = candidateElf.data();
   } else {
     LLPC_OUTS("Cache hit for compute pipeline.\n");
     elfBin = cacheAccessor->getElfFromCache();
     pipelineOut->pipelineCacheAccess = CacheAccessInfo::InternalCacheHit;
   }
 
-  if (result == Result::Success) {
-    void *allocBuf = nullptr;
-    if (pipelineInfo->pfnOutputAlloc) {
-      allocBuf = pipelineInfo->pfnOutputAlloc(pipelineInfo->pInstance, pipelineInfo->pUserData, elfBin.codeSize);
-      if (allocBuf) {
-        uint8_t *code = static_cast<uint8_t *>(allocBuf);
-        memcpy(code, elfBin.pCode, elfBin.codeSize);
+  if (!pipelineInfo->pfnOutputAlloc) // Allocator is not specified
+    return Result::ErrorInvalidPointer;
 
-        pipelineOut->pipelineBin.codeSize = elfBin.codeSize;
-        pipelineOut->pipelineBin.pCode = code;
-      } else
-        result = Result::ErrorOutOfMemory;
-    } else {
-      // Allocator is not specified
-      result = Result::ErrorInvalidPointer;
-    }
-  }
+  void *const allocBuf =
+      pipelineInfo->pfnOutputAlloc(pipelineInfo->pInstance, pipelineInfo->pUserData, elfBin.codeSize);
+  if (!allocBuf)
+    return Result::ErrorOutOfMemory;
 
-  if (cacheAccessor && !cacheAccessor->isInCache() && result == Result::Success) {
+  uint8_t *code = static_cast<uint8_t *>(allocBuf);
+  memcpy(code, elfBin.pCode, elfBin.codeSize);
+
+  pipelineOut->pipelineBin.codeSize = elfBin.codeSize;
+  pipelineOut->pipelineBin.pCode = code;
+
+  if (cacheAccessor && !cacheAccessor->isInCache()) {
     cacheAccessor->setElfInCache(elfBin);
   }
-  return result;
+
+  return Result::Success;
 }
 
 // =====================================================================================================================
