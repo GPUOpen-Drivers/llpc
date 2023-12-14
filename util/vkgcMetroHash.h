@@ -86,6 +86,13 @@ inline bool operator!=(const Hash &lhs, const Hash &rhs) {
 namespace std {
 template <> struct hash<MetroHash::Hash> {
   // Returns `hash` compacted to `size_t`. Returns zero for value-initialized hashes.
-  size_t operator()(const MetroHash::Hash &hash) const { return static_cast<size_t>(MetroHash::compact64(&hash)); }
+  size_t operator()(const MetroHash::Hash &hash) const {
+    static_assert(sizeof(size_t) == 8 || sizeof(size_t) == 4, "unexpected architecture");
+    if constexpr (sizeof(size_t) == 8) {
+      return static_cast<size_t>(MetroHash::compact64(&hash));
+    } else {
+      return static_cast<size_t>(MetroHash::compact32(&hash));
+    }
+  }
 };
 } // namespace std
