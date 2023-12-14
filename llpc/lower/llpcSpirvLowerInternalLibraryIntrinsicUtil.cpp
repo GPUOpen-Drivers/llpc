@@ -45,8 +45,7 @@ namespace Llpc {
 // @param func : The function to process
 // @param builder : The IR builder
 static void createLaneIndex(Function *func, Builder *builder) {
-  builder->CreateRet(builder->CreateReadBuiltInInput(static_cast<lgc::BuiltInKind>(BuiltInSubgroupLocalInvocationId),
-                                                     {}, nullptr, nullptr, ""));
+  builder->CreateRet(builder->CreateReadBuiltInInput(static_cast<lgc::BuiltInKind>(BuiltInSubgroupLocalInvocationId)));
 }
 
 // =====================================================================================================================

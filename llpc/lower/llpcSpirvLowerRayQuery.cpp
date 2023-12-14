@@ -500,17 +500,16 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryInitializeKHR>
 Value *SpirvLowerRayQuery::getDispatchId() {
   Value *zero = m_builder->getInt32(0);
   Value *dispatchId = nullptr;
-  lgc::InOutInfo inputInfo = {};
   // Local thread ID for graphics shader Stage, global thread ID for compute/raytracing shader stage
   if (m_shaderStage < ShaderStageCompute) {
-    auto subThreadId =
-        m_builder->CreateReadBuiltInInput(lgc::BuiltInSubgroupLocalInvocationId, inputInfo, nullptr, nullptr, "");
+    auto subThreadId = m_builder->CreateReadBuiltInInput(lgc::BuiltInSubgroupLocalInvocationId);
     dispatchId = PoisonValue::get(FixedVectorType::get(m_builder->getInt32Ty(), 3));
     dispatchId = m_builder->CreateInsertElement(dispatchId, subThreadId, uint64_t(0));
     dispatchId = m_builder->CreateInsertElement(dispatchId, zero, 1);
     dispatchId = m_builder->CreateInsertElement(dispatchId, zero, 2);
-  } else
-    dispatchId = m_builder->CreateReadBuiltInInput(lgc::BuiltInGlobalInvocationId, inputInfo, nullptr, nullptr, "");
+  } else {
+    dispatchId = m_builder->CreateReadBuiltInInput(lgc::BuiltInGlobalInvocationId);
+  }
 
   return dispatchId;
 }
@@ -1421,8 +1420,7 @@ Value *SpirvLowerRayQuery::getThreadIdInGroup() const {
   // Todo: for graphics shader, subgroupId * waveSize + subgroupLocalInvocationId()
   unsigned builtIn = m_context->getPipelineType() == PipelineType::Graphics ? BuiltInSubgroupLocalInvocationId
                                                                             : BuiltInLocalInvocationIndex;
-  lgc::InOutInfo inputInfo = {};
-  return m_builder->CreateReadBuiltInInput(static_cast<lgc::BuiltInKind>(builtIn), inputInfo, nullptr, nullptr, "");
+  return m_builder->CreateReadBuiltInInput(static_cast<lgc::BuiltInKind>(builtIn));
 }
 
 } // namespace Llpc

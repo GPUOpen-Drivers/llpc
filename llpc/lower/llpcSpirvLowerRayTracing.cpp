@@ -1260,8 +1260,7 @@ void SpirvLowerRayTracing::createRayGenEntryFunc() {
   createDispatchRaysInfoDesc();
   Value *launchSize = loadShaderTableVariable(ShaderTable::LaunchSize, m_dispatchRaysInfoDesc);
   auto builtIn = lgc::BuiltInGlobalInvocationId;
-  lgc::InOutInfo inputInfo = {};
-  auto launchlId = m_builder->CreateReadBuiltInInput(builtIn, inputInfo, nullptr, nullptr, "");
+  auto launchlId = m_builder->CreateReadBuiltInInput(builtIn);
   auto launchSizeX = m_builder->CreateExtractElement(launchSize, uint64_t(0));
   auto launchSizeY = m_builder->CreateExtractElement(launchSize, 1);
   auto launchIdX = m_builder->CreateExtractElement(launchlId, uint64_t(0));
@@ -2633,7 +2632,7 @@ void SpirvLowerRayTracing::visitSetParentId(lgc::GpurtSetParentIdOp &inst) {
 void SpirvLowerRayTracing::visitDispatchRayIndex(lgc::rt::DispatchRaysIndexOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
-  auto dispatchRayIndex = m_builder->CreateReadBuiltInInput(lgc::BuiltInGlobalInvocationId, {}, nullptr, nullptr, "");
+  auto dispatchRayIndex = m_builder->CreateReadBuiltInInput(lgc::BuiltInGlobalInvocationId);
   inst.replaceAllUsesWith(dispatchRayIndex);
 
   m_callsToLower.push_back(&inst);
