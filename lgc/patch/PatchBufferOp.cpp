@@ -1503,6 +1503,7 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
     assert(newInst);
 
     if (type->isPointerTy()) {
+      assert(type->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER);
       newInst = m_builder.CreateBitCast(newInst, m_builder.getIntNTy(bytesToHandle * 8));
       copyMetadata(newInst, &inst);
       newInst = m_builder.CreateIntToPtr(newInst, type);
