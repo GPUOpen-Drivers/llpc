@@ -1261,8 +1261,8 @@ public:
   // @param vertexIndex : For TCS/TES/GS per-vertex input: vertex index, else nullptr
   // @param index : Array or vector index to access part of an input, else nullptr
   // @param instName : Name to give instruction(s)
-  llvm::Value *CreateReadBuiltInInput(BuiltInKind builtIn, InOutInfo inputInfo, llvm::Value *vertexIndex,
-                                      llvm::Value *index, const llvm::Twine &instName = "");
+  llvm::Value *CreateReadBuiltInInput(BuiltInKind builtIn, InOutInfo inputInfo = {}, llvm::Value *vertexIndex = nullptr,
+                                      llvm::Value *index = nullptr, const llvm::Twine &instName = "");
 
   // Create a read of (part of) a built-in output value.
   // The type of the returned value is the fixed type of the specified built-in (see BuiltInDefs.h),

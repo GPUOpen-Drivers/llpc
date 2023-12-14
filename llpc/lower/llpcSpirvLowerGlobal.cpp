@@ -1125,8 +1125,8 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
           inOutInfo.setInterpLoc(interpLoc);
           assert(!inOutMeta.PerPrimitive); // No per-primitive arrayed built-in
           if (addrSpace == SPIRAS_Input) {
-            inOutValue = m_builder->CreateReadBuiltInInput(static_cast<lgc::BuiltInKind>(inOutMeta.Value), inOutInfo,
-                                                           vertexIdx, nullptr);
+            inOutValue =
+                m_builder->CreateReadBuiltInInput(static_cast<lgc::BuiltInKind>(inOutMeta.Value), inOutInfo, vertexIdx);
           } else {
             inOutValue = m_builder->CreateReadBuiltInOutput(static_cast<lgc::BuiltInKind>(inOutMeta.Value), inOutInfo,
                                                             vertexIdx, nullptr);
