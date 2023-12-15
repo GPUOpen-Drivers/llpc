@@ -402,7 +402,6 @@ void RegisterMetadataBuilder::buildEsGsRegisters() {
 
   auto hwShaderNode = getHwShaderNode(Util::Abi::HardwareStage::Gs);
   hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = calcLdsSize(ldsSizeInDwords);
-  setEsGsLdsSize(calcFactor.esGsLdsSize * 4);
 }
 
 // =====================================================================================================================
@@ -673,8 +672,6 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
 
   auto hwShaderNode = getHwShaderNode(Util::Abi::HardwareStage::Gs);
   hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = calcLdsSize(ldsSizeInDwords);
-  if (!m_hasMesh)
-    setEsGsLdsSize(calcFactor.esGsLdsSize * 4);
 }
 
 // =====================================================================================================================

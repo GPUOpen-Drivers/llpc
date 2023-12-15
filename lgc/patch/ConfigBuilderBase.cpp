@@ -209,14 +209,6 @@ void ConfigBuilderBase::setPsSampleMask(bool value) {
 }
 
 // =====================================================================================================================
-// Set ES_GS_LDS_BYTE_SIZE
-//
-// @param value : Value to set
-void ConfigBuilderBase::setEsGsLdsByteSize(unsigned value) {
-  m_pipelineNode[Util::Abi::PipelineMetadataKey::EsGsLdsSize] = value;
-}
-
-// =====================================================================================================================
 // Set hardware stage wavefront
 //
 // @param hwStage : Hardware shader stage
@@ -287,17 +279,6 @@ void ConfigBuilderBase::setLdsSizeByteSize(Util::Abi::HardwareStage hwStage, uns
 
   auto hwShaderNode = getHwShaderNode(hwStage);
   hwShaderNode[Util::Abi::HardwareStageMetadataKey::LdsSize] = value;
-}
-
-// =====================================================================================================================
-// Set ES-GS LDS byte size
-//
-// @param value : Value to set
-void ConfigBuilderBase::setEsGsLdsSize(unsigned value) {
-  if (value == 0)
-    return; // Optional
-
-  m_pipelineNode[Util::Abi::PipelineMetadataKey::EsGsLdsSize] = value;
 }
 
 // =====================================================================================================================

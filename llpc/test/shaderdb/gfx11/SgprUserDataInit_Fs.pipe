@@ -302,12 +302,11 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:         .offchip_lds_en: false
 ; CHECK-NEXT:         .scratch_en:     false
 ; CHECK-NEXT:         .scratch_memory_size: 0
-; CHECK-NEXT:         .sgpr_count:     0xc
+; CHECK-NEXT:         .sgpr_count:     0xb
 ; CHECK-NEXT:         .sgpr_limit:     0x6a
 ; CHECK-NEXT:         .trap_present:   0
 ; CHECK-NEXT:         .user_data_reg_map:
 ; CHECK-NEXT:           - 0x10000000
-; CHECK-NEXT:           - 0x1000000a
 ; CHECK-NEXT:           - 0x10000003
 ; CHECK-NEXT:           - 0x10000004
 ; CHECK-NEXT:           - 0xffffffff
@@ -338,7 +337,8 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:           - 0xffffffff
 ; CHECK-NEXT:           - 0xffffffff
 ; CHECK-NEXT:           - 0xffffffff
-; CHECK-NEXT:         .user_sgprs:     0x4
+; CHECK-NEXT:           - 0xffffffff
+; CHECK-NEXT:         .user_sgprs:     0x3
 ; CHECK-NEXT:         .vgpr_count:     0x9
 ; CHECK-NEXT:         .vgpr_limit:     0x100
 ; CHECK-NEXT:         .wavefront_size: 0x40

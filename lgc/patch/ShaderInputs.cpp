@@ -57,8 +57,6 @@ const char *ShaderInputs::getSpecialUserDataName(UserDataMapping kind) {
     return "DrawIndex";
   case UserDataMapping::Workgroup:
     return "Workgroup";
-  case UserDataMapping::EsGsLdsSize:
-    return "EsGsLdsSize";
   case UserDataMapping::ViewId:
     return "ViewId";
   case UserDataMapping::StreamOutTable:

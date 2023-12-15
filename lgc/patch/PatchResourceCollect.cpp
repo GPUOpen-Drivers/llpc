@@ -727,8 +727,7 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
     gsResUsage->inOutUsage.gs.calcFactor.esVertsPerSubgroup = esVertsPerSubgroup;
     gsResUsage->inOutUsage.gs.calcFactor.gsPrimsPerSubgroup = gsPrimsPerSubgroup;
 
-    // EsGsLdsSize is passed in a user data SGPR to the merged shader so that the API GS knows where to start
-    // reading out of LDS. EsGsLdsSize is unnecessary when there is no API GS.
+    // EsGsLdsSize is unnecessary when there is no API GS.
     gsResUsage->inOutUsage.gs.calcFactor.esGsLdsSize = hasGs ? expectedEsLdsSize : 0;
     gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize = needsLds ? ldsSizeDwords : 0;
 
