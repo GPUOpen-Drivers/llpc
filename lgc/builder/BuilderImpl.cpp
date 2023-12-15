@@ -330,6 +330,7 @@ BranchInst *BuilderImpl::createIf(Value *condition, bool wantElse, const Twine &
 }
 
 #if defined(LLVM_HAVE_BRANCH_AMD_GFX)
+// =====================================================================================================================
 // A simple memory efficient container that holds up to 64 instructions in a bit vector. It needs two helper data
 // structures: 1. instrToIndex that maps an instruction to its index in the bit vector and 2. indexToInstr that maps an
 // index back to an instruction.
@@ -386,6 +387,7 @@ public:
   bool empty() const { return bits.empty(); }
 };
 
+// =====================================================================================================================
 class TraceNonUniformIndex {
   // Maps the instruction to its index in the bit vector.
   TinyInstructionSet::InstrToIndexMap instrToIndex;
@@ -393,43 +395,58 @@ class TraceNonUniformIndex {
   TinyInstructionSet::IndexToInstructionVec indexToInstr;
   // Maps an instruction to its dependencies.
   DenseMap<Value *, TinyInstructionSet> instrDeps;
+  Instruction *nonUniformInst;
+  SmallVector<unsigned> operandIdxs;
   bool scalarizeDescriptorLoads;
   unsigned upperLimit;
+  unsigned cnt = 0;
+  SmallVector<Value *, 2> nonUniformIndices;
+  DenseMap<unsigned, Value *> operandIdxNonUniformIndex;
+  DenseMap<Value *, Value *> nonUniformIndex32BitVal;
+  Value *sharedIndex = nullptr;
+  void init(Instruction *);
   void insertNewValueInInstrDeps(Value *, Instruction *);
+  Value *calculateNonUniformIndex(Value *);
+  void calculate32BitValForNonUniformIndex(Value *);
+  void calculateSharedIndex();
 
 public:
-  TraceNonUniformIndex(Instruction *nonUniformInst, bool scalarizeDescriptorLoads = false, unsigned upperLimit = 64)
-      : scalarizeDescriptorLoads(scalarizeDescriptorLoads), upperLimit(upperLimit) {
-    // Initialization of instrToIndex and indexToInstr.
-    if (scalarizeDescriptorLoads) {
-      unsigned cnt = 0;
-      for (Instruction *I = nonUniformInst->getPrevNode(); I != nullptr && cnt < upperLimit;
-           I = I->getPrevNode(), ++cnt) {
-        indexToInstr.push_back(I);
-        instrToIndex[I] = cnt;
-      }
-    }
-  }
+  TraceNonUniformIndex(Instruction *nonUniformInst, ArrayRef<unsigned> operandIdxs,
+                       bool scalarizeDescriptorLoads = false, unsigned upperLimit = 64)
+      : nonUniformInst(nonUniformInst), operandIdxs(operandIdxs), scalarizeDescriptorLoads(scalarizeDescriptorLoads),
+        upperLimit(upperLimit) {}
 
-  Value *run(Value *);
+  void run();
 
   const DenseMap<Value *, TinyInstructionSet> &getInstrDeps() const { return instrDeps; }
 
   const TinyInstructionSet::IndexToInstructionVec &getIndexToInstr() const { return indexToInstr; }
 
-  bool foundDependencies() const { return scalarizeDescriptorLoads; }
+  const SmallVector<Value *, 2> &getNonUniformIndices() const { return nonUniformIndices; }
+
+  Value *getNonUniformIndex(unsigned operandIdx) { return operandIdxNonUniformIndex[operandIdx]; }
+
+  Value *getSharedIndex() { return sharedIndex; }
+
+  Value *getnonUniformIndex32BitVal(Value *nonUniformIndex) { return nonUniformIndex32BitVal[nonUniformIndex]; }
 };
+
+// Initialize the TinyInstructionSet data structures.
+void TraceNonUniformIndex::init(Instruction *instr) {
+  indexToInstr.push_back(instr);
+  instrToIndex[instr] = cnt;
+  cnt++;
+}
 
 // Adds newValue in instrDeps map. The dependencies of the newValue are the currentVisitedInstr and its dependencies.
 // @param newValue : the new value to be added in instrDeps map
 // @param currentVisitedInstr : the value from where we copy the dependencies for newValue
 void TraceNonUniformIndex::insertNewValueInInstrDeps(Value *newValue, Instruction *currentVisitedInstr) {
-  if (!instrToIndex.contains(currentVisitedInstr)) {
+  if (!instrToIndex.contains(currentVisitedInstr))
     // The instruction is either outside of 64 limit or in a different basic block. So, we bail-out scalarization.
-    scalarizeDescriptorLoads = false;
     return;
-  }
   assert(instrDeps.contains(currentVisitedInstr) && "The current visited instruction should have been in the map.");
+  init(cast<Instruction>(newValue));
   auto it1 = instrDeps.try_emplace(newValue, upperLimit).first;
   auto &setOfInstrs = it1->second;
   auto it2 = instrDeps.find(currentVisitedInstr);
@@ -441,7 +458,6 @@ void TraceNonUniformIndex::insertNewValueInInstrDeps(Value *newValue, Instructio
   setOfInstrs.insert(currentVisitedInstr, instrToIndex);
 }
 
-// =====================================================================================================================
 // For a non-uniform input, try and trace back through a descriptor load to
 // find the non-uniform index used in it. If that fails, we just use the
 // operand value as the index.
@@ -455,9 +471,10 @@ void TraceNonUniformIndex::insertNewValueInInstrDeps(Value *newValue, Instructio
 //
 // @param nonUniformVal : Value representing non-uniform descriptor
 // @return : Value representing the non-uniform index, or null if nonUniformVal could be proven to be uniform
-Value *TraceNonUniformIndex::run(Value *nonUniformVal) {
+Value *TraceNonUniformIndex::calculateNonUniformIndex(Value *nonUniformVal) {
   auto load = dyn_cast<LoadInst>(nonUniformVal);
   if (scalarizeDescriptorLoads && load) {
+    init(load);
     instrDeps.try_emplace(load, upperLimit);
   } else if (!load) {
     // Workarounds that modify image descriptor can be peeped through, i.e.
@@ -469,8 +486,10 @@ Value *TraceNonUniformIndex::run(Value *nonUniformVal) {
     if (!insert)
       return nonUniformVal;
 
-    if (scalarizeDescriptorLoads)
+    if (scalarizeDescriptorLoads) {
+      init(insert);
       instrDeps.try_emplace(insert, upperLimit);
+    }
 
     load = dyn_cast<LoadInst>(insert->getOperand(0));
     if (!load)
@@ -630,6 +649,23 @@ Value *TraceNonUniformIndex::run(Value *nonUniformVal) {
   return candidateIndex;
 }
 
+// Iterate over the operands of the non-uniform instruction and calculate the non-uniform index for each one of them.
+void TraceNonUniformIndex::run() {
+  for (unsigned operandIdx : operandIdxs) {
+    Value *nonUniformInstOperand = nonUniformInst->getOperand(operandIdx);
+    Value *nonUniformIndex = calculateNonUniformIndex(nonUniformInstOperand);
+    if (nonUniformIndex) {
+      nonUniformIndices.push_back(nonUniformIndex);
+      operandIdxNonUniformIndex[operandIdx] = nonUniformIndex;
+      // For any index that is 64 bit, change it back to 32 bit for comparison at the top of the waterfall loop.
+      if (nonUniformIndex->getType()->isIntegerTy(64))
+        calculate32BitValForNonUniformIndex(nonUniformIndex);
+    }
+  }
+  if (scalarizeDescriptorLoads)
+    calculateSharedIndex();
+}
+
 // =====================================================================================================================
 // Test whether two instructions are identical
 // or are the same operation on identical operands.
@@ -658,7 +694,131 @@ static bool instructionsEqual(Instruction *lhs, Instruction *rhs) {
 
   return true;
 }
-#endif
+
+// =====================================================================================================================
+// Extract the 32-bit value of the non-uniform index.
+// @param nonUniformIndex : the non-uniform index for the corresponding operand of the non-uniform instruction
+// @return : the 32-bit value of the nonUniformIndex
+void TraceNonUniformIndex::calculate32BitValForNonUniformIndex(Value *nonUniformIndex) {
+  if (nonUniformIndex->getType()->isIntegerTy(64)) {
+    auto sExt = dyn_cast<SExtInst>(nonUniformIndex);
+    if (sExt && sExt->getOperand(0)->getType()->isIntegerTy(32))
+      nonUniformIndex32BitVal[nonUniformIndex] = sExt->getOperand(0);
+    else {
+      Type *Int32Ty = Type::getInt32Ty(nonUniformIndex->getType()->getContext());
+      IRBuilder<> Builder(cast<Instruction>(nonUniformIndex)->getNextNode());
+      auto *truncateNonUniformIndex = Builder.CreateTrunc(nonUniformIndex, Int32Ty);
+      nonUniformIndex32BitVal[nonUniformIndex] = truncateNonUniformIndex;
+    }
+  } else
+    nonUniformIndex32BitVal[nonUniformIndex] = nonUniformIndex;
+}
+
+// =====================================================================================================================
+// Checks if all the operands of the non-uniform instruction have the same non-uniform index.
+void TraceNonUniformIndex::calculateSharedIndex() {
+
+  if (nonUniformIndices.size() != operandIdxs.size()) {
+    sharedIndex = nullptr;
+    return;
+  }
+
+  Instruction *firstIndexInst = nullptr;
+  // FIXME: these do not actually need to be identical if we introduce multiple waterfall
+  // begin and readlane intrinsics for these.
+  Instruction *nonUniformIndex = nullptr;
+  for (Value *index : nonUniformIndices) {
+    Value *nonUniformIndex32Bit = index->getType()->isIntegerTy(64) ? getnonUniformIndex32BitVal(index) : index;
+    nonUniformIndex = dyn_cast<Instruction>(nonUniformIndex32Bit);
+    auto it = instrDeps.find(index);
+    bool hasDependencies = it != instrDeps.end();
+    if (!nonUniformIndex || (firstIndexInst && !instructionsEqual(nonUniformIndex, firstIndexInst)) ||
+        !hasDependencies) {
+      sharedIndex = nullptr;
+      return;
+    }
+    if (!firstIndexInst || (firstIndexInst && nonUniformIndex->getParent() == firstIndexInst->getParent() &&
+                            nonUniformIndex->comesBefore(firstIndexInst)))
+      firstIndexInst = nonUniformIndex;
+  }
+  sharedIndex = firstIndexInst;
+}
+
+// Move the loads inside the waterfall loop.
+// @param nonUniformInstOperand: the non-uniform operand of the non-uniform instruction
+// @param nonUniformIndex : the non-uniform index of the nonUniformInstOperand
+// @param readFirstLane : the amdgcn.waterfall.readfirstlane intrinsic
+// @param waterfallBegin : the amdgcn.waterfall.begin intrinsic
+// @param nonUniformInst : the non-uniform instruction
+// @param operandIdx : the operand number of the nonUniformInstOperand
+// @param traceNonUniformIndex : get information that is related to non-uniform index
+// @param nonUniformInstOperandLastUseMap : Map the nonUniformInstOperand to the last use. This map is filled in
+// scalarizeLoads and it is used in createWaterfallLoop().
+void scalarizeLoads(Value *nonUniformInstOperand, Value *nonUniformIndex, Value *readFirstLane, Value *waterfallBegin,
+                    Instruction *nonUniformInst, unsigned operandIdx, TraceNonUniformIndex &traceNonUniformIndex,
+                    DenseMap<Value *, Value *> &nonUniformInstOperandLastUseMap) {
+  // Get the instruction chain of the first non-uniform index.
+  const DenseMap<Value *, TinyInstructionSet> &instrDeps = traceNonUniformIndex.getInstrDeps();
+  auto itDep = instrDeps.find(nonUniformIndex);
+  auto &instrsToClone = itDep->second;
+  assert(!instrsToClone.empty() && "There are not any instructions to clone.");
+
+  // Clone the instructions that we want to push inside the waterfall loop.
+  std::map<Instruction *, Instruction *> origClonedValuesMap;
+  Instruction *prevInst = nonUniformInst;
+  const TinyInstructionSet::IndexToInstructionVec &indexToInstr = traceNonUniformIndex.getIndexToInstr();
+  for (auto iti = instrsToClone.begin(indexToInstr), ite = instrsToClone.end(indexToInstr); iti != ite; ++iti) {
+    auto *origInst = *iti;
+    auto *newInst = origInst->clone();
+    newInst->insertBefore(prevInst);
+    origClonedValuesMap[origInst] = newInst;
+    prevInst = newInst;
+    if (nonUniformInstOperand == origInst) {
+      //  Get the value that should be added in amdgcn.waterfall.last.use intrinsic.
+      if (nonUniformInst->getType()->isVoidTy())
+        nonUniformInstOperandLastUseMap[nonUniformInstOperand] = newInst;
+      else
+        // Otherwise update the non-uniform operand with its cloned equivalent.
+        nonUniformInst->setOperand(operandIdx, newInst);
+    }
+  }
+
+  // Finally, clone the nonUniformIndex.
+  auto *origInst = cast<Instruction>(nonUniformIndex);
+  auto *newInst = origInst->clone();
+  newInst->insertBefore(prevInst);
+  origClonedValuesMap[origInst] = newInst;
+
+  // Update the operands of the cloned instructions.
+  for (auto [origInst, newInst] : origClonedValuesMap) {
+    for (Use &use : newInst->operands()) {
+      Value *op = use.get();
+      if (auto *opI = dyn_cast<Instruction>(op)) {
+        auto it = origClonedValuesMap.find(opI);
+        if (it == origClonedValuesMap.end())
+          continue;
+        Instruction *clonedI = it->second;
+        use.set(clonedI);
+      }
+    }
+  }
+
+  // Replace all references to shared index within the waterfall loop with scalarized index.
+  // (Note: this includes the non-uniform instruction itself.)
+  // Loads using scalarized index will become scalar loads.
+  Value *nonUniformIndex32Bit = nonUniformIndex->getType()->isIntegerTy(64)
+                                    ? traceNonUniformIndex.getnonUniformIndex32BitVal(nonUniformIndex)
+                                    : nonUniformIndex;
+  nonUniformIndex32Bit->replaceUsesWithIf(readFirstLane, [readFirstLane, waterfallBegin, nonUniformInst](Use &U) {
+    Instruction *userInst = cast<Instruction>(U.getUser());
+    return userInst != waterfallBegin && userInst != readFirstLane &&
+           userInst->getParent() == nonUniformInst->getParent() &&
+           (userInst == nonUniformInst || userInst->comesBefore(nonUniformInst)) &&
+           !userInst->comesBefore(cast<Instruction>(waterfallBegin));
+  });
+}
+
+#endif // defined(LLVM_HAVE_BRANCH_AMD_GFX)
 
 // =====================================================================================================================
 // Create a waterfall loop containing the specified instruction.
@@ -673,7 +833,7 @@ static bool instructionsEqual(Instruction *lhs, Instruction *rhs) {
 // @param nonUniformInst : The instruction to put in a waterfall loop
 // @param operandIdxs : The operand index/indices for non-uniform inputs that need to be uniform
 // @param scalarizeDescriptorLoads : Attempt to scalarize descriptor loads
-// @param useVgprForOperands : Non-uniform inputs should be put in VGPRs
+// @param useVgprForOperands : Operands should be put in VGPRs even though they are uniform inside of the waterfall loop
 // @param instName : Name to give instruction(s)
 Instruction *BuilderImpl::createWaterfallLoop(Instruction *nonUniformInst, ArrayRef<unsigned> operandIdxs,
                                               bool scalarizeDescriptorLoads, bool useVgprForOperands,
@@ -685,194 +845,111 @@ Instruction *BuilderImpl::createWaterfallLoop(Instruction *nonUniformInst, Array
 #else
   assert(operandIdxs.empty() == false);
 
-  SmallVector<Value *, 2> nonUniformIndices;
-  // Maps the nonUniformIndex that is returned by traceNonUniformIndex() to the nonUniformInst.
-  DenseMap<Value *, std::pair<Value *, unsigned>> nonUniformIndexImageCallOperand;
-  TraceNonUniformIndex traceNonUniformIndex(nonUniformInst, scalarizeDescriptorLoads, 64);
+  TraceNonUniformIndex traceNonUniformIndex(nonUniformInst, operandIdxs, scalarizeDescriptorLoads);
+  // Find the nonUniformIndex for each operand of the nonUniformInst.
+  traceNonUniformIndex.run();
 
-  for (unsigned operandIdx : operandIdxs) {
-    Value *nonUniformImageCallOperand = nonUniformInst->getOperand(operandIdx);
-    Value *nonUniformIndex = traceNonUniformIndex.run(nonUniformImageCallOperand);
-    scalarizeDescriptorLoads = traceNonUniformIndex.foundDependencies();
-    if (nonUniformIndex) {
-      nonUniformIndices.push_back(nonUniformIndex);
-
-      if (scalarizeDescriptorLoads)
-        nonUniformIndexImageCallOperand[nonUniformIndex] = std::make_pair(nonUniformImageCallOperand, operandIdx);
-    }
-  }
-
+  SmallVector<Value *, 2> nonUniformIndices = traceNonUniformIndex.getNonUniformIndices();
   if (nonUniformIndices.empty())
     return nonUniformInst;
 
-  // For any index that is 64 bit, change it back to 32 bit for comparison at the top of the waterfall loop.
-  // At this point the nonUniformVal of nonUniformIndices might change. We also need the original non uniform values for
-  // the scalarization of the descriptor loads.
-  DenseMap<Value *, Value *> newOrigNonUniformVal;
-  for (Value *&nonUniformVal : nonUniformIndices) {
-    if (nonUniformVal->getType()->isIntegerTy(64)) {
-      auto sExt = dyn_cast<SExtInst>(nonUniformVal);
-      Value *origNonUniformVal = nonUniformVal;
-      // 64-bit index may already be formed from extension of 32-bit value.
-      if (sExt && sExt->getOperand(0)->getType()->isIntegerTy(32)) {
-        nonUniformVal = sExt->getOperand(0);
-        newOrigNonUniformVal[nonUniformVal] = origNonUniformVal;
-      } else {
-        nonUniformVal = CreateTrunc(nonUniformVal, getInt32Ty());
-        newOrigNonUniformVal[nonUniformVal] = origNonUniformVal;
-      }
-    }
-  }
-
-  // Find first index instruction and check if index instructions are identical.
-  Instruction *firstIndexInst = nullptr;
-  if (scalarizeDescriptorLoads) {
-    // FIXME: these do not actually need to be identical if we introduce multiple waterfall
-    // begin and readlane intrinsics for these.
-    bool identicalIndexes = true;
-    for (Value *nonUniformVal : nonUniformIndices) {
-      Instruction *nuInst = dyn_cast<Instruction>(nonUniformVal);
-      // Note: parent check here guards use of comesBefore below
-      if (!nuInst || (firstIndexInst && !instructionsEqual(nuInst, firstIndexInst)) ||
-          (firstIndexInst && nuInst->getParent() != firstIndexInst->getParent())) {
-        identicalIndexes = false;
-        break;
-      }
-      if (!firstIndexInst || nuInst->comesBefore(firstIndexInst))
-        firstIndexInst = nuInst;
-    }
-
-    // Ensure we do not create a waterfall across blocks.
-    // FIXME: we could use dominator check to allow scalarizing descriptor loads on multi-block spans;
-    // however, this also requires backend support for multi-block waterfalls to be implemented.
-    if (!identicalIndexes || !firstIndexInst ||
-        (firstIndexInst && firstIndexInst->getParent() != nonUniformInst->getParent()))
-      scalarizeDescriptorLoads = false;
-  }
-
   // Save Builder's insert point
   IRBuilder<>::InsertPointGuard guard(*this);
+  // Insert new code just before nonUniformInst.
+  SetInsertPoint(nonUniformInst);
 
-  Value *waterfallBegin;
-  if (scalarizeDescriptorLoads) {
-    SetInsertPoint(nonUniformInst);
-    auto descTy = firstIndexInst->getType();
-    // Create waterfall.begin and waterfall.readfirstlane intrinsics.
-    waterfallBegin = ConstantInt::get(getInt32Ty(), 0);
-    waterfallBegin =
-        CreateIntrinsic(Intrinsic::amdgcn_waterfall_begin, descTy, {waterfallBegin, firstIndexInst}, nullptr, instName);
-
-    // Scalarize shared index.
-    Value *readFirstLane = CreateIntrinsic(Intrinsic::amdgcn_waterfall_readfirstlane, {descTy, descTy},
-                                           {waterfallBegin, firstIndexInst}, nullptr, instName);
-
-    for (auto *nonUniformVal : nonUniformIndices) {
-      // Get the first non uniform instruction of the chain.
-      auto it1 = newOrigNonUniformVal.find(nonUniformVal);
-      Value *origNonUniformVal = nonUniformVal;
-      if (it1 != newOrigNonUniformVal.end())
-        origNonUniformVal = it1->second;
-
-      auto [nonUniformImageCallOperand, operandIdx] = nonUniformIndexImageCallOperand[origNonUniformVal];
-
-      if (origNonUniformVal == nonUniformImageCallOperand)
-        continue;
-
-      // Get the instruction chain of the first non uniform instruction.
-      const DenseMap<Value *, TinyInstructionSet> &instrDeps = traceNonUniformIndex.getInstrDeps();
-      auto it2 = instrDeps.find(origNonUniformVal);
-      assert(it2 != instrDeps.end() && "The non-uniform index should be in instrDep map.");
-      auto &instrsToClone = it2->second;
-      assert(!instrsToClone.empty() && "There are not any instructions to clone.");
-
-      // Clone and emit the instructions that we want to push inside the waterfall loop.
-      std::map<Instruction *, Instruction *> origClonedValuesMap;
-      Instruction *prevInst = nonUniformInst;
-      const TinyInstructionSet::IndexToInstructionVec &indexToInstr = traceNonUniformIndex.getIndexToInstr();
-      for (auto it3 = instrsToClone.begin(indexToInstr), ite = instrsToClone.end(indexToInstr); it3 != ite; ++it3) {
-        auto *origInst = *it3;
-        auto *newInst = origInst->clone();
-        newInst->insertBefore(prevInst);
-        origClonedValuesMap[origInst] = newInst;
-        prevInst = newInst;
-        // Update the non-uniform operand of the image call with the new non-uniform operand.
-        if (nonUniformImageCallOperand == origInst) {
-          if (nonUniformInst->getType()->isVoidTy())
-            newInst = CreateIntrinsic(Intrinsic::amdgcn_waterfall_last_use, newInst->getType(),
-                                      {waterfallBegin, newInst}, nullptr, instName);
-          nonUniformInst->setOperand(operandIdx, newInst);
-        }
-      }
-      // Finally, clone the first non uniform instruction.
-      auto *origInst = cast<Instruction>(origNonUniformVal);
-      auto *newInst = origInst->clone();
-      newInst->insertBefore(prevInst);
-      origClonedValuesMap[origInst] = newInst;
-
-      // Update the operands of the cloned instructions.
-      for (auto [origInst, newInst] : origClonedValuesMap) {
-        for (Use &use : newInst->operands()) {
-          Value *op = use.get();
-          if (auto *opI = dyn_cast<Instruction>(op)) {
-            auto it = origClonedValuesMap.find(opI);
-            if (it == origClonedValuesMap.end())
-              continue;
-            Instruction *clonedI = it->second;
-            use.set(clonedI);
-          }
-        }
-      }
-
-      // Replace all references to shared index within the waterfall loop with scalarized index.
-      // (Note: this includes the non-uniform instruction itself.)
-      // Loads using scalarized index will become scalar loads.
-      nonUniformVal->replaceUsesWithIf(readFirstLane, [readFirstLane, waterfallBegin, nonUniformInst](Use &U) {
-        Instruction *userInst = cast<Instruction>(U.getUser());
-        return userInst != waterfallBegin && userInst != readFirstLane &&
-               userInst->getParent() == nonUniformInst->getParent() &&
-               (userInst == nonUniformInst || userInst->comesBefore(nonUniformInst)) &&
-               !userInst->comesBefore(cast<Instruction>(waterfallBegin));
-      });
-    }
+  // Emit amdgcn.waterfall.begin intrinsics. The first begin contains a null token for the previous token argument.
+  Value *waterfallBegin = ConstantInt::get(getInt32Ty(), 0);
+  Value *readFirstLane = nullptr;
+  Value *sharedIndex = traceNonUniformIndex.getSharedIndex();
+  if (sharedIndex) {
+    // If all the operands share the same non-uniform index, then we emit just one amdgcn.waterfall.begin intrinsic.
+    auto sharedIndexTy = sharedIndex->getType();
+    waterfallBegin = CreateIntrinsic(Intrinsic::amdgcn_waterfall_begin, sharedIndexTy, {waterfallBegin, sharedIndex},
+                                     nullptr, instName);
   } else {
-    // Insert new code just before nonUniformInst.
-    SetInsertPoint(nonUniformInst);
-
-    // The first begin contains a null token for the previous token argument
-    waterfallBegin = ConstantInt::get(getInt32Ty(), 0);
-    for (auto nonUniformVal : nonUniformIndices) {
-      // Start the waterfall loop using the waterfall index.
-      waterfallBegin = CreateIntrinsic(Intrinsic::amdgcn_waterfall_begin, nonUniformVal->getType(),
-                                       {waterfallBegin, nonUniformVal}, nullptr, instName);
+    // We emit one amdgcn.waterfall.begin intrinsic for each non-uniform index.
+    for (auto nonUniformIndex : nonUniformIndices) {
+      Value *nonUniformIndex32Bit = nonUniformIndex->getType()->isIntegerTy(64)
+                                        ? traceNonUniformIndex.getnonUniformIndex32BitVal(nonUniformIndex)
+                                        : nonUniformIndex;
+      waterfallBegin = CreateIntrinsic(Intrinsic::amdgcn_waterfall_begin, nonUniformIndex32Bit->getType(),
+                                       {waterfallBegin, nonUniformIndex32Bit}, nullptr, instName);
     }
+  }
 
-    // Scalarize each non-uniform operand of the instruction.
-    for (unsigned operandIdx : operandIdxs) {
-      Value *desc = nonUniformInst->getOperand(operandIdx);
-      auto descTy = desc->getType();
+  for (unsigned operandIdx : operandIdxs) {
+    Value *nonUniformInstOperand = nonUniformInst->getOperand(operandIdx);
+    auto nonUniformInstOperandTy = nonUniformInstOperand->getType();
+    Value *nonUniformIndex = traceNonUniformIndex.getNonUniformIndex(operandIdx);
+    const DenseMap<Value *, TinyInstructionSet> &instrDeps = traceNonUniformIndex.getInstrDeps();
+    bool hasDependencies = false;
+    if (nonUniformIndex && scalarizeDescriptorLoads) {
+      auto itDep = instrDeps.find(nonUniformIndex);
+      hasDependencies = itDep != instrDeps.end();
+    }
+    // Emit amdgcn.waterfall.readfirstlane intrinsic for each of the operands. There are four cases:
+    // 1. For the older versions of the code, we do not emit any intrinsic.
+    // 2. In case of scalarization, if the operand is not uniform, then the index of amdgcn.waterfall.readfirstlane is
+    // the non-uniform index. If the operand is uniform, then the amdgcn.waterfall.readfirstlane is emitted in case 4.
+    // 3. In case of scalarization, if all the operands share the same non-uniform index, then we emit just one read
+    // amdgcn.waterfall.readfirstlane. The index of the amdgcn.waterfall.readfirstlane is the shared index.
+    // 4. If the operand is uniform or if the scalarization is disabled, then the index of the
+    // amdgcn.waterfall.readfirstlane is the operand of the non uniform instruction.
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 463892
+    // Old version of the code
+#else
+    if (scalarizeDescriptorLoads && hasDependencies && !sharedIndex) {
+      Value *nonUniformIndex32Bit = nonUniformIndex->getType()->isIntegerTy(64)
+                                        ? traceNonUniformIndex.getnonUniformIndex32BitVal(nonUniformIndex)
+                                        : nonUniformIndex;
+      auto nonUniformIndex32BitTy = nonUniformIndex32Bit->getType();
+      readFirstLane =
+          CreateIntrinsic(Intrinsic::amdgcn_waterfall_readfirstlane, {nonUniformIndex32BitTy, nonUniformIndex32BitTy},
+                          {waterfallBegin, nonUniformIndex32Bit}, nullptr, instName);
+    } else if (sharedIndex && !readFirstLane) {
+      auto sharedIndexTy = sharedIndex->getType();
+      readFirstLane = CreateIntrinsic(Intrinsic::amdgcn_waterfall_readfirstlane, {sharedIndexTy, sharedIndexTy},
+                                      {waterfallBegin, sharedIndex}, nullptr, instName);
+    } else if (!useVgprForOperands && !sharedIndex)
+      // When the non-uniform use is in a VGPR, we can save a v_mov by not inserting the amdgcn.waterfall.readfirstlane
+      readFirstLane =
+          CreateIntrinsic(Intrinsic::amdgcn_waterfall_readfirstlane, {nonUniformInstOperandTy, nonUniformInstOperandTy},
+                          {waterfallBegin, nonUniformInstOperand}, nullptr, instName);
+
+    // Move the non-uniform loads inside the loop.
+    DenseMap<Value *, Value *> nonUniformInstOperandLastUseMap;
+    if (scalarizeDescriptorLoads && hasDependencies)
+      scalarizeLoads(nonUniformInstOperand, nonUniformIndex, readFirstLane, waterfallBegin, nonUniformInst, operandIdx,
+                     traceNonUniformIndex, nonUniformInstOperandLastUseMap);
+
+#endif
+
+    // Emit amdgcn.waterfall.last.use intrinsic for store intrinsics.
+    Value *lastUse = nullptr;
+    if (nonUniformInst->getType()->isVoidTy()) {
+      // The buffer/image operation we are waterfalling is a store with no return value. Use
+      // llvm.amdgcn.waterfall.last.use on the descriptor.
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 463892
       // Old version of the code
+      lastUse = CreateIntrinsic(Intrinsic::amdgcn_waterfall_last_use, nonUniformInstOperandTy,
+                                {waterfallBegin, nonUniformInstOperand}, nullptr, instName);
 #else
-      // When the non-uniform use is in a VGPR, we can save a v_mov by not inserting the amdgcn_waterfall_readfirstlane
-      if (!useVgprForOperands)
+      Value *index = scalarizeDescriptorLoads && hasDependencies
+                         ? nonUniformInstOperandLastUseMap[nonUniformInstOperand]
+                         : readFirstLane;
+      lastUse = CreateIntrinsic(useVgprForOperands ? Intrinsic::amdgcn_waterfall_last_use_vgpr
+                                                   : Intrinsic::amdgcn_waterfall_last_use,
+                                nonUniformInstOperandTy, {waterfallBegin, index}, nullptr, instName);
 #endif
-      desc = CreateIntrinsic(Intrinsic::amdgcn_waterfall_readfirstlane, {descTy, descTy}, {waterfallBegin, desc},
-                             nullptr, instName);
-      if (nonUniformInst->getType()->isVoidTy()) {
-        // The buffer/image operation we are waterfalling is a store with no return value. Use
-        // llvm.amdgcn.waterfall.last.use on the descriptor.
-#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 463892
-        // Old version of the code
-        desc = CreateIntrinsic(Intrinsic::amdgcn_waterfall_last_use, descTy, {waterfallBegin, desc}, nullptr, instName);
-#else
-        desc = CreateIntrinsic(useVgprForOperands ? Intrinsic::amdgcn_waterfall_last_use_vgpr
-                                                  : Intrinsic::amdgcn_waterfall_last_use,
-                               descTy, {waterfallBegin, desc}, nullptr, instName);
-#endif
-      }
-      // Replace the descriptor operand in the buffer/image operation.
-      nonUniformInst->setOperand(operandIdx, desc);
     }
+    // Replace the descriptor operand in the buffer/image operation.
+    if (lastUse)
+      nonUniformInst->setOperand(operandIdx, lastUse);
+    else if (readFirstLane && (!scalarizeDescriptorLoads || scalarizeDescriptorLoads && !hasDependencies))
+      // In case of scalarization, we move the non-uniform operands inside the waterfall loop. Hence, we do not have to
+      // update the operand with the amdgcn.waterfall.readfirstlane.
+      nonUniformInst->setOperand(operandIdx, readFirstLane);
   }
 
   if (nonUniformInst->getType()->isVoidTy())
