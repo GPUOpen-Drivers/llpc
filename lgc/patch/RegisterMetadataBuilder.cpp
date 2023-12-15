@@ -1459,8 +1459,6 @@ void RegisterMetadataBuilder::setVgtShaderStagesEn(unsigned hwStageMask) {
 // =====================================================================================================================
 // Set up the metadata for register IA_MULT_VGT_PARAM
 void RegisterMetadataBuilder::setIaMultVgtParam() {
-  bool isIaMultVgtParamPiped = m_isNggMode || (m_gfxIp.major == 10 && !m_isNggMode);
-
   if (m_hasTcs || m_hasTes) {
     // With tessellation, SWITCH_ON_EOI and PARTIAL_ES_WAVE_ON must be set if primitive ID is used by either the TCS,
     // TES, or GS.
@@ -1477,19 +1475,15 @@ void RegisterMetadataBuilder::setIaMultVgtParam() {
       usePrimitiveId = gsBuiltInUsage.primitiveId;
     }
 
-    if (isIaMultVgtParamPiped) {
-      auto iaMultVgtParamPiped =
-          getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::IaMultiVgtParamPiped].getMap(true);
-      iaMultVgtParamPiped[Util::Abi::IaMultiVgtParamPipedMetadataKey::SwitchOnEoi] = usePrimitiveId;
+    auto iaMultVgtParam = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::IaMultiVgtParam].getMap(true);
+    iaMultVgtParam[Util::Abi::IaMultiVgtParamMetadataKey::SwitchOnEoi] = usePrimitiveId;
+    if (m_isNggMode || (m_gfxIp.major == 10 && !m_isNggMode)) {
       if (needWaveOnField)
-        iaMultVgtParamPiped[Util::Abi::IaMultiVgtParamPipedMetadataKey::PartialEsWaveOn] = usePrimitiveId;
+        iaMultVgtParam[Util::Abi::IaMultiVgtParamMetadataKey::PartialEsWaveOn] = usePrimitiveId;
     } else {
-      auto iaMultVgtParam = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::IaMultiVgtParam].getMap(true);
-      iaMultVgtParam[Util::Abi::IaMultiVgtParamMetadataKey::SwitchOnEoi] = usePrimitiveId;
       if (needWaveOnField)
         iaMultVgtParam[Util::Abi::IaMultiVgtParamMetadataKey::PrimgroupSize] = usePrimitiveId;
     }
-
   } else {
     unsigned primGroupSize = 128;
     if (!m_hasGs && !m_hasMesh) {
@@ -1499,15 +1493,8 @@ void RegisterMetadataBuilder::setIaMultVgtParam() {
       if (numShaderEngines > 2)
         primGroupSize = alignTo(primGroupSize, 2);
     }
-
-    if (isIaMultVgtParamPiped || m_hasMesh) {
-      auto iaMultVgtParamPiped =
-          getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::IaMultiVgtParamPiped].getMap(true);
-      iaMultVgtParamPiped[Util::Abi::IaMultiVgtParamPipedMetadataKey::PrimgroupSize] = primGroupSize - 1;
-    } else {
-      auto iaMultVgtParam = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::IaMultiVgtParam].getMap(true);
-      iaMultVgtParam[Util::Abi::IaMultiVgtParamMetadataKey::PrimgroupSize] = primGroupSize - 1;
-    }
+    auto iaMultVgtParam = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::IaMultiVgtParam].getMap(true);
+    iaMultVgtParam[Util::Abi::IaMultiVgtParamMetadataKey::PrimgroupSize] = primGroupSize - 1;
   }
 }
 

@@ -176,7 +176,7 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:         .prim_amp_factor: 0x1
 ; CHECK-NEXT:         .threads_per_subgroup: 0x100
 ; CHECK-NEXT:       .gs_vgpr_comp_cnt: 0x1
-; CHECK-NEXT:       .ia_multi_vgt_param_piped:
+; CHECK-NEXT:       .ia_multi_vgt_param:
 ; CHECK-NEXT:         .primgroup_size: 0x7f
 ; CHECK-NEXT:       .max_verts_per_subgroup: 0x80
 ; CHECK-NEXT:       .pa_cl_clip_cntl:

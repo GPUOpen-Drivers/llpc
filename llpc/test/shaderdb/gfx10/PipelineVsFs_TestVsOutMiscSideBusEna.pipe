@@ -59,7 +59,7 @@ entryPoint = main
 ; SHADERTEST-NEXT:         .stencil_test_val_export_enable: 0
 ; SHADERTEST-NEXT:         .z_export_enable: 0
 ; SHADERTEST-NEXT:         .z_order:        0x1
-; SHADERTEST-NEXT:       .ia_multi_vgt_param_piped:
+; SHADERTEST-NEXT:       .ia_multi_vgt_param:
 ; SHADERTEST-NEXT:         .primgroup_size: 0x7f
 ; SHADERTEST-NEXT:       .pa_cl_clip_cntl:
 ; SHADERTEST-NEXT:         .dx_linear_attr_clip_ena: true
