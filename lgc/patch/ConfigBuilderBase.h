@@ -95,7 +95,6 @@ protected:
   void appendConfig(unsigned key, unsigned value);
 
   bool usesViewportArrayIndex();
-  void setupPrintfStrings();
 
   template <typename T> void invalidRegConfig(T &config) {
     static_assert(sizeof(T) % sizeof(PalMetadataNoteEntry) == 0,
