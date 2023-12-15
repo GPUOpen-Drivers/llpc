@@ -230,7 +230,6 @@ static constexpr char VgtGsMode[] = ".vgt_gs_mode";
 static constexpr char VgtTfParam[] = ".vgt_tf_param";
 static constexpr char VgtLsHsConfig[] = ".vgt_ls_hs_config";
 static constexpr char IaMultiVgtParam[] = ".ia_multi_vgt_param";
-static constexpr char IaMultiVgtParamPiped[] = ".ia_multi_vgt_param_piped";
 static constexpr char SpiInterpControl[] = ".spi_interp_control";
 static constexpr char SpiPsInputCntl[] = ".spi_ps_input_cntl";
 static constexpr char VgtHosMinTessLevel[] = ".vgt_hos_min_tess_level";
@@ -330,12 +329,6 @@ static constexpr char PrimgroupSize[] = ".primgroup_size";
 static constexpr char SwitchOnEoi[] = ".switch_on_eoi";
 static constexpr char PartialEsWaveOn[] = ".partial_es_wave_on";
 }; // namespace IaMultiVgtParamMetadataKey
-
-namespace IaMultiVgtParamPipedMetadataKey {
-static constexpr char PrimgroupSize[] = ".primgroup_size";
-static constexpr char SwitchOnEoi[] = ".switch_on_eoi";
-static constexpr char PartialEsWaveOn[] = ".partial_es_wave_on";
-}; // namespace IaMultiVgtParamPipedMetadataKey
 
 namespace VgtGsModeMetadataKey {
 static constexpr char Mode[] = ".mode";
