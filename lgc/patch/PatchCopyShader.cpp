@@ -45,14 +45,6 @@
 
 #define DEBUG_TYPE "lgc-patch-copy-shader"
 
-namespace llvm {
-namespace cl {
-
-extern opt<bool> InRegEsGsLdsSize;
-
-} // namespace cl
-} // namespace llvm
-
 using namespace lgc;
 using namespace llvm;
 
@@ -111,7 +103,6 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
     //
     //   void copyShader(
     //     i32 inreg globalTable,
-    //     i32 inreg esGsLdsSize (GFX9+),
     //     i32 inreg streamOutTable (GFX9+),
     //     i32 inreg streamOutInfo,
     //     i32 inreg streamOutWriteIndex,
@@ -122,12 +113,11 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
     //     i32 vertexOffset)
     //
 
-    argTys = {int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty};
+    argTys = {int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty};
 
-    argInReg = {true, true, true, true, true, true, true, true, true, false};
+    argInReg = {true, true, true, true, true, true, true, true, false};
     // clang-format off
     argNames = {"globalTable",
-                "esGsLdsSize",
                 "streamOutTable",
                 "streamOutInfo",
                 "streamOutWriteIndex",
@@ -149,15 +139,15 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
     // GFX11+:
     //   void copyShader(
     //     i32 inreg globalTable,
-    //     i32 vertexId)
+    //     i32 vertexIndex)
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major <= 10) {
       argTys = {int32Ty};
       argInReg = {false};
-      argNames = {"vertexId"};
+      argNames = {"vertexIndex"};
     } else {
       argTys = {int32Ty, int32Ty};
       argInReg = {true, false};
-      argNames = {"globalTable", "vertexId"};
+      argNames = {"globalTable", "vertexIndex"};
     }
   }
 
@@ -201,12 +191,9 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
   auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageCopyShader);
 
   if (!m_pipelineState->getNggControl()->enableNgg) {
-    // For GFX9+, streamOutTable SGPR index value should be greater than esGsLdsSize
-    intfData->userDataUsage.gs.copyShaderEsGsLdsSize = 1;
-    intfData->userDataUsage.gs.copyShaderStreamOutTable = 2;
+    intfData->userDataUsage.gs.copyShaderStreamOutTable = 1;
   } else {
-    // If NGG, both esGsLdsSize and streamOutTable are not used
-    intfData->userDataUsage.gs.copyShaderEsGsLdsSize = InvalidValue;
+    // If NGG, streamOutTable is not used
     intfData->userDataUsage.gs.copyShaderStreamOutTable = InvalidValue;
   }
 
@@ -221,9 +208,6 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
       if (m_pipelineState->enableXfb())
         userData[intfData->userDataUsage.gs.copyShaderStreamOutTable] =
             static_cast<unsigned>(UserDataMapping::StreamOutTable);
-      if (cl::InRegEsGsLdsSize && m_pipelineState->isGsOnChip())
-        userData[intfData->userDataUsage.gs.copyShaderEsGsLdsSize] =
-            static_cast<unsigned>(UserDataMapping::EsGsLdsSize);
       m_pipelineState->setUserDataMap(ShaderStageCopyShader, userData);
     } else {
       m_pipelineState->getPalMetadata()->setUserDataEntry(ShaderStageCopyShader, 0, UserDataMapping::GlobalTable);
@@ -231,10 +215,6 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
         m_pipelineState->getPalMetadata()->setUserDataEntry(ShaderStageCopyShader,
                                                             intfData->userDataUsage.gs.copyShaderStreamOutTable,
                                                             UserDataMapping::StreamOutTable);
-      }
-      if (cl::InRegEsGsLdsSize && m_pipelineState->isGsOnChip()) {
-        m_pipelineState->getPalMetadata()->setUserDataEntry(
-            ShaderStageCopyShader, intfData->userDataUsage.gs.copyShaderEsGsLdsSize, UserDataMapping::EsGsLdsSize);
       }
     }
   }

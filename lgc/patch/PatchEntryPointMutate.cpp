@@ -82,16 +82,6 @@
 using namespace llvm;
 using namespace lgc;
 
-namespace llvm {
-namespace cl {
-
-// -inreg-esgs-lds-size: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent with PAL's
-// GS on-chip behavior. In the future, if PAL allows hardcoded ES-GS LDS size, this option could be deprecated.
-opt<bool> InRegEsGsLdsSize("inreg-esgs-lds-size", desc("For GS on-chip, add esGsLdsSize in user data"), init(true));
-
-} // namespace cl
-} // namespace llvm
-
 // =====================================================================================================================
 PatchEntryPointMutate::PatchEntryPointMutate()
     : m_hasTs(false), m_hasGs(false),
@@ -1704,34 +1694,6 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
         llvm_unreachable("Unexpected shader stage");
       }
       specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "viewId", userDataValue, argIdx));
-    }
-
-    // NOTE: Add a dummy "inreg" argument for ES-GS LDS size, this is to keep consistent
-    // with PAL's GS on-chip behavior (VS is in NGG primitive shader).
-    bool wantEsGsLdsSize = false;
-    switch (getMergedShaderStage(m_shaderStage)) {
-    case ShaderStageVertex:
-      wantEsGsLdsSize = enableNgg;
-      break;
-    case ShaderStageTessControl:
-      wantEsGsLdsSize = false;
-      break;
-    case ShaderStageTessEval:
-      wantEsGsLdsSize = enableNgg;
-      break;
-    case ShaderStageGeometry:
-      wantEsGsLdsSize = (m_pipelineState->isGsOnChip() && cl::InRegEsGsLdsSize) || enableNgg;
-      break;
-    default:
-      llvm_unreachable("Unexpected shader stage");
-    }
-    if (wantEsGsLdsSize) {
-      auto userDataValue = UserDataMapping::EsGsLdsSize;
-      // For a standalone TCS (which can only happen in unit testing, not in a real pipeline), don't add
-      // the PAL metadata for it, for consistency with the old code.
-      if (m_shaderStage == ShaderStageVertex && !m_pipelineState->hasShaderStage(ShaderStageVertex))
-        userDataValue = UserDataMapping::Invalid;
-      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "esGsLdsSize", userDataValue));
     }
 
     if (getMergedShaderStage(m_shaderStage) == getMergedShaderStage(ShaderStageVertex)) {

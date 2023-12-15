@@ -80,12 +80,10 @@ protected:
   void setPsWritesUavs(bool value);
   void setPsWritesDepth(bool value);
   void setPsSampleMask(bool value);
-  void setEsGsLdsByteSize(unsigned value);
   void setWaveFrontSize(Util::Abi::HardwareStage hwStage, unsigned value);
   void setApiName(const char *value);
   void setPipelineType(Util::Abi::PipelineType value);
   void setLdsSizeByteSize(Util::Abi::HardwareStage hwStage, unsigned value);
-  void setEsGsLdsSize(unsigned value);
   void setNggSubgroupSize(unsigned value);
   void setThreadgroupDimensions(llvm::ArrayRef<unsigned> values);
   void setStreamOutVertexStrides(llvm::ArrayRef<unsigned> values);

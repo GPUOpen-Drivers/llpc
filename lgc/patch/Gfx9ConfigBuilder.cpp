@@ -1151,7 +1151,6 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
   SET_REG_FIELD(&config->esGsRegs, SPI_SHADER_PGM_RSRC2_GS, LDS_SIZE, ldsSize);
 
   setLdsSizeByteSize(Util::Abi::HardwareStage::Gs, ldsSizeInDwords * 4);
-  setEsGsLdsSize(calcFactor.esGsLdsSize * 4);
 
   unsigned maxVertOut = std::max(1u, static_cast<unsigned>(geometryMode.outputVertices));
   SET_REG_FIELD(&config->esGsRegs, VGT_GS_MAX_VERT_OUT, MAX_VERT_OUT, maxVertOut);
@@ -1163,8 +1162,6 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStage shaderStage1, ShaderStage sha
     SET_REG_FIELD(&config->esGsRegs, VGT_GS_MODE, ONCHIP, VGT_GS_MODE_ONCHIP_ON);
     SET_REG_FIELD(&config->esGsRegs, VGT_GS_MODE, ES_WRITE_OPTIMIZE, false);
     SET_REG_FIELD(&config->esGsRegs, VGT_GS_MODE, GS_WRITE_OPTIMIZE, false);
-
-    setEsGsLdsByteSize(calcFactor.esGsLdsSize * 4);
   } else {
     SET_REG_FIELD(&config->esGsRegs, VGT_GS_MODE, ONCHIP, VGT_GS_MODE_ONCHIP_OFF);
     SET_REG_FIELD(&config->esGsRegs, VGT_GS_MODE, ES_WRITE_OPTIMIZE, false);
@@ -1366,7 +1363,6 @@ void ConfigBuilder::buildPrimShaderRegConfig(ShaderStage shaderStage1, ShaderSta
   const unsigned ldsSize = ldsSizeInDwords >> ldsSizeDwordGranularityShift;
   SET_REG_FIELD(&config->primShaderRegs, SPI_SHADER_PGM_RSRC2_GS, LDS_SIZE, ldsSize);
   setLdsSizeByteSize(Util::Abi::HardwareStage::Gs, ldsSizeInDwords * 4);
-  setEsGsLdsSize(calcFactor.esGsLdsSize * 4);
 
   if (m_gfxIp.major >= 11) {
     // Pixel wait sync+
