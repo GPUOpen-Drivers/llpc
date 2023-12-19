@@ -540,7 +540,7 @@ Expected<BinaryData> ShaderModuleHelper::getShaderCode(const ShaderModuleBuildIn
   if (trimDebugInfo) {
     auto sizeOrErr = trimSpirvDebugInfo(&shaderBinary, codeBuffer);
     if (Error err = sizeOrErr.takeError())
-      return err;
+      return std::move(err);
     code.codeSize = *sizeOrErr;
   } else {
     assert(shaderBinary.codeSize <= codeBuffer.size() * sizeof(codeBuffer.front()));
