@@ -560,6 +560,8 @@ inline bool isValid(spv::Capability V) {
   case CapabilityWorkgroupMemoryExplicitLayoutKHR:
   case CapabilityWorkgroupMemoryExplicitLayout8BitAccessKHR:
   case CapabilityWorkgroupMemoryExplicitLayout16BitAccessKHR:
+  case CapabilityComputeDerivativeGroupLinearNV:
+  case CapabilityComputeDerivativeGroupQuadsNV:
     return true;
   default:
     return false;

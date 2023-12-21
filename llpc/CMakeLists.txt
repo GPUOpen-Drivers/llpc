@@ -222,7 +222,6 @@ if(ICD_BUILD_LLPC)
         lower/llpcSpirvLowerTranslator.cpp
         lower/llpcSpirvLowerUtil.cpp
         lower/llpcSpirvProcessGpuRtLibrary.cpp
-        lower/LowerGpuRt.cpp
         lower/llpcSpirvLowerInternalLibraryIntrinsicUtil.cpp
         lower/LowerGLCompatibility.cpp
         lower/llpcSpirvLowerCooperativeMatrix.cpp

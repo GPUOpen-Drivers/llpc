@@ -115,8 +115,8 @@ private:
   void addCallInstForXfbOutput(const ShaderInOutMetadata &outputMeta, Value *outputValue, unsigned xfbBufferAdjust,
                                unsigned xfbOffsetAdjust, unsigned locOffset, lgc::InOutInfo outputInfo);
 
-  std::unordered_map<llvm::Value *, llvm::Value *> m_globalVarProxyMap; // Proxy map for lowering global variables
-  std::unordered_map<llvm::Value *, llvm::Value *> m_inputProxyMap;     // Proxy map for lowering inputs
+  std::unordered_set<llvm::GlobalVariable *> m_globalVarProxy;      // The unordered_set for lowering global variables
+  std::unordered_map<llvm::Value *, llvm::Value *> m_inputProxyMap; // Proxy map for lowering inputs
 
   // NOTE: Here we use list to store pairs of output proxy mappings. This is because we want output patching to be
   // "ordered" (resulting LLVM IR for the patching always be consistent).

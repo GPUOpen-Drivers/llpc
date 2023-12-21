@@ -38,15 +38,6 @@
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/IRBuilder.h"
 
-namespace llvm {
-
-class CallInst;
-class Function;
-class Type;
-class Value;
-
-} // namespace llvm
-
 namespace CompilerUtils {
 
 // Create an LLVM function call to the named function. The callee is built
@@ -65,6 +56,56 @@ llvm::CallInst *createNamedCall(llvm::IRBuilder<> &, llvm::StringRef, llvm::Type
 // replaceAllUsesWith() for the function and arguments afterwards.
 llvm::Function *mutateFunctionArguments(llvm::Function &, llvm::Type *, const llvm::ArrayRef<llvm::Type *>,
                                         llvm::AttributeList);
+
+// Create a new function based on another function, copying attributes and
+// other properties.
+// Specify targetModule to create the function in a different module than f.
+llvm::Function *cloneFunctionHeader(llvm::Function &f, llvm::FunctionType *newType, llvm::AttributeList attributes,
+                                    llvm::Module *targetModule = nullptr);
+
+// Overload of cloneFunctionHeader that takes the new attributes for arguments and preserves the rest.
+llvm::Function *cloneFunctionHeader(llvm::Function &f, llvm::FunctionType *newType,
+                                    llvm::ArrayRef<llvm::AttributeSet> argAttrs, llvm::Module *targetModule = nullptr);
+
+struct CrossModuleInlinerResult {
+  llvm::Value *returnValue;
+  llvm::iterator_range<llvm::Function::iterator> newBBs;
+};
+
+// The class caches already mapped constants. Reusing an instance of this class is more efficient than creating a new
+// instance every time but it does not have an impact on the generated code.
+// One CrossModuleInliner instance must only be used for a single target module, otherwise things can go wrong.
+class CrossModuleInliner {
+public:
+  CrossModuleInliner() = default;
+
+  // Inline a call to a function even if the called function is in a different module.
+  // If the result of that function call should be used, a use must exist before calling this function.
+  // Returns the new created basic blocks. These blocks may also contain instructions that were already
+  // there before, if the function got inlined into an existing block.
+  //
+  // The insertion point of existing IRBuilders may have their insertion point invalidated because this
+  // function splits basic blocks.
+  // They can be made functional again with b.SetInsertPoint(&*b.GetInsertPoint()).
+  llvm::iterator_range<llvm::Function::iterator> inlineCall(llvm::CallBase &cb);
+
+  // Inline a call to a function even if the called function is in a different module.
+  // Returns the result of the call and new created basic blocks. These blocks may also contain instructions that were
+  // already there before, if the function got inlined into an existing block.
+  //
+  // This is a convenience wrapper around inlineCall(CallBase&). As users of the callee's return value are not known
+  // while inlining, using this function can result in slightly less folding in the IR.
+  CrossModuleInlinerResult inlineCall(llvm::IRBuilder<> &b, llvm::Function *callee,
+                                      llvm::ArrayRef<llvm::Value *> args = std::nullopt);
+
+  // Find a global value (function or variable) that was copied by the cross-module inliner.
+  // Arguments are the global from the source module and the target module. Returns the corresponding global from the
+  // target module.
+  llvm::GlobalValue *findCopiedGlobal(llvm::GlobalValue &sourceGv, llvm::Module &targetModule);
+
+private:
+  llvm::SmallDenseMap<llvm::GlobalValue *, llvm::GlobalValue *> mappedGlobals;
+};
 
 } // namespace CompilerUtils
 

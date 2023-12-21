@@ -54,19 +54,9 @@ add_llvm_library(LLVMlgc LINK_COMPONENTS
 )
 
 llvm_map_components_to_libnames(extra_llvm_libs CompilerUtils Continuations)
-target_link_libraries(LLVMlgc PUBLIC ${extra_llvm_libs})
+target_link_libraries(LLVMlgc PUBLIC llvm_dialects ${extra_llvm_libs} llpc_version)
 
 ### Cached Project Options #############################################################################################
-option(LLPC_BUILD_NAVI12 "LLPC support for NAVI12?" ON)
-#if VKI_BUILD_NAVI32
-option(LLPC_BUILD_NAVI32 "LLPC support for NAVI32?" ON)
-#endif
-option(LLPC_BUILD_REMBRANDT "LLPC support for REMBRANDT?" ON)
-option(LLPC_BUILD_RAPHAEL "LLPC support for RAPHAEL?" ON)
-option(LLPC_BUILD_MENDOCINO "LLPC support for MENDOCINO?" ON)
-#if VKI_BUILD_PHOENIX1
-option(LLPC_BUILD_PHOENIX1 "LLPC support for PHOENIX1?" ON)
-#endif
 option(LLPC_ENABLE_WERROR "Build LLPC with more errors" OFF)
 
 ### Compiler Options ###################################################################################################
@@ -97,64 +87,6 @@ add_public_tablegen_target(LgcDialectTableGen)
 add_dependencies(LLVMlgc LgcDialectTableGen)
 
 ### Defines/Includes/Sources ###########################################################################################
-target_compile_definitions(LLVMlgc PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
-if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
-    target_compile_definitions(LLVMlgc PRIVATE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION})
-endif()
-target_compile_definitions(LLVMlgc PRIVATE
-        LITTLEENDIAN_CPU
-        CHIP_HDR_NAVI14
-        CHIP_HDR_NAVI21
-        CHIP_HDR_NAVI22
-        CHIP_HDR_NAVI23
-        CHIP_HDR_NAVI24
-        CHIP_HDR_NAVI31
-        CHIP_HDR_NAVI33
-        )
-
-target_compile_definitions(LLVMlgc PRIVATE CHIP_HDR_RENOIR)
-
-  if(LLPC_BUILD_NAVI12)
-    target_compile_definitions(LLVMlgc PRIVATE
-        LLPC_BUILD_NAVI12
-        CHIP_HDR_NAVI12
-    )
-  endif()
-#if VKI_BUILD_NAVI32
-  if(LLPC_BUILD_NAVI32)
-    target_compile_definitions(LLVMlgc PRIVATE
-        LLPC_BUILD_NAVI32
-        CHIP_HDR_NAVI32
-    )
-  endif()
-#endif
-  if(LLPC_BUILD_REMBRANDT)
-    target_compile_definitions(LLVMlgc PRIVATE
-        LLPC_BUILD_REMBRANDT
-        CHIP_HDR_REMBRANDT
-    )
-  endif()
-  if(LLPC_BUILD_RAPHAEL)
-    target_compile_definitions(LLVMlgc PRIVATE
-        LLPC_BUILD_RAPHAEL
-        CHIP_HDR_RAPHAEL
-    )
-  endif()
-  if(LLPC_BUILD_MENDOCINO)
-    target_compile_definitions(LLVMlgc PRIVATE
-        LLPC_BUILD_MENDOCINO
-        CHIP_HDR_MENDOCINO
-    )
-  endif()
-#if VKI_BUILD_PHOENIX1
-  if(LLPC_BUILD_PHOENIX1)
-    target_compile_definitions(LLVMlgc PRIVATE
-        LLPC_BUILD_PHOENIX1
-        CHIP_HDR_PHOENIX1
-    )
-  endif()
-#endif
-
 if(WIN32)
     target_compile_definitions(LLVMlgc PRIVATE
         NOMINMAX    # windows.h defines min/max which conflicts with the use of std::min / max
@@ -239,6 +171,7 @@ target_sources(LLVMlgc PRIVATE
     patch/RegisterMetadataBuilder.cpp
     patch/CombineCooperativeMatrix.cpp
     patch/LowerCooperativeMatrix.cpp
+    patch/LowerGpuRt.cpp
 )
 
 # lgc/state

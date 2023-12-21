@@ -11,7 +11,7 @@ declare i32 @continuation.initialContinuationStackPtr()
 declare i32 @_cont_GetContinuationStackAddr()
 declare i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 declare %struct.DispatchSystemData @_cont_SetupRayGen()
-declare void @continuation.continue()
+declare void @continuation.continue(i64, ...)
 
 ; REPORT-CONT-SIZES: Continuation state size of "RayGen" (raygeneration): 108 bytes
 ; REPORT-PAYLOAD-SIZES: Incoming and max outgoing payload VGPR size of "RayGen" (raygeneration): 28 and 24 bytes
@@ -19,7 +19,7 @@ define void @RayGen() !continuation.entry !0 !continuation !3 !continuation.stat
   %csp = alloca i32, align 4
   %cspInit = call i32 @continuation.initialContinuationStackPtr()
   store i32 %cspInit, i32* %csp
-  call void @continuation.continue(), !continuation.registercount !6
+  call void (i64, ...) @continuation.continue(i64 2), !continuation.registercount !6
   ret void
 }
 
@@ -33,7 +33,7 @@ define void @RayGen.resume.0(i32 %0, %struct.DispatchSystemData %1) !continuatio
 ; REPORT-PAYLOAD-SIZES: Incoming and max outgoing payload VGPR size of "CHS" (closesthit): 32 and 36 bytes
 ; REPORT-SYSTEM-DATA-SIZES-DAG: Incoming system data of "CHS" (closesthit) is "struct.CHSSystemData", size: 400 bytes
 define void @CHS(i32 %cspInit, i64 %returnAddr, %struct.CHSSystemData %0) !continuation !14 !continuation.registercount !8 !lgc.rt.shaderstage !13 {
-  call void @continuation.continue(), !continuation.registercount !9
+  call void (i64, ...) @continuation.continue(i64 2), !continuation.registercount !9
   ret void
 }
 

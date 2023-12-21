@@ -95,12 +95,13 @@ public:
   };
 
   enum CooperativeMatrixElementType {
-    Unknown = 0, // Unknown
-    Float16,     // 16-bit floating-point
-    Float32,     // 32-bit floating-point
-    Int8,        // 8-bit integer
-    Int16,       // 16-bit integer
-    Int32        // 32 bit integer
+    Unknown = 0,   // Unknown
+    Float16,       // 16-bit floating-point
+    Float32,       // 32-bit floating-point
+    Int8,          // 8-bit integer
+    Int16,         // 16-bit integer
+    Int32,         // 32 bit integer
+    Float16Packed, // packed 16-bit floating-point
   };
 
   // Layout is virtual concept, eg: 16bit and 32bit for matrixC will share the same layout initially.
@@ -204,7 +205,8 @@ public:
   // Create cooperative MatrixTimesScalar binary operation
   //
   // @param matrix : It should be cooperative matrix.
-  // @param scalar : It should be scalar type.
+  // @param scalar : It should be scalar type. If the matrix is a packed
+  // accumulator matrix, the scalar has to be a <2 x half> vector.
   // @param elemType : Name to give instruction(s).
   // @param layout : Identify A/B matrices or C/D matrices.
   llvm::Value *CreateCoopMatrixTimesScalar(llvm::Value *matrix, llvm::Value *scalar,
@@ -226,14 +228,34 @@ public:
   // @param coopMatrixc : Accumulator cooperative matrix.
   // @param isSignedA : Identify the signess for matrix A's element type
   // @param isSignedB : Identify the signess for matrix B's element type
-  // @param isSat : SaturatingAccumulation for calculation
+  // @param isSatOrOpsel : SaturatingAccumulation for calculation. In the
+  // case of 16-bit floating point matrices, this bit acts as an opsel bit. If
+  // it is set to false, we store the result in the lower half of the registers.
+  // If it is true, we store it in the upper half.
+  // @param isTied : If true, the output matrix has to be the same as the
+  // input accumulator (i.e., D has to be C)
   // @param accumElemType : The component type of the matrix c
   // @param factorElemType : The component type of the matrix a
   llvm::Value *CreateCooperativeMatrixMulAdd(llvm::Value *coopMatrixa, llvm::Value *coopMatrixb,
-                                             llvm::Value *coopMatrixc, bool isSignedA, bool isSignedB, bool isSat,
-                                             CooperativeMatrixElementType accumElemType,
+                                             llvm::Value *coopMatrixc, bool isSignedA, bool isSignedB,
+                                             bool isSatOrOpsel, bool isTied, CooperativeMatrixElementType accumElemType,
                                              CooperativeMatrixElementType factorElemType,
                                              const llvm::Twine &instName = "");
+
+  // =====================================================================================================================
+  // Create cooperative matrix pack operation
+  //
+  // @param matrixCLo : Lower Accumulator cooperative matrix.
+  // @param matrixCHi : Upper Accumulator cooperative matrix.
+  llvm::Value *CreateCooperativeMatrixPack(llvm::Value *matrixCLo, llvm::Value *matrixCHi,
+                                           const llvm::Twine &instName = "");
+
+  // =====================================================================================================================
+  // Create cooperative matrix unpack operation
+  //
+  // @param packedMatrix : Packed Accumulator cooperative matrices.
+  // @param high: Whether to get the matrix stored in the upper half of the registers.
+  llvm::Value *CreateCooperativeMatrixUnpack(llvm::Value *packedMatrix, bool high, const llvm::Twine &instName = "");
 };
 
 } // namespace lgc

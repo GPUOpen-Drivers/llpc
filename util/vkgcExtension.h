@@ -80,6 +80,7 @@ enum Extension : unsigned {
   KHR_RAY_TRACING,
   KHR_RAY_QUERY,
   NV_SHADER_ATOMIC_FLOAT,
+  NV_COMPUTE_SHADER_DERIVATIVES,
   ExtensionCount,
 };
 

@@ -953,6 +953,7 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "enableUberFetchShader = " << pipelineInfo->enableUberFetchShader << "\n";
   dumpFile << "enableEarlyCompile = " << pipelineInfo->enableEarlyCompile << "\n";
   dumpFile << "enableColorExportShader = " << pipelineInfo->enableColorExportShader << "\n";
+  dumpFile << "useSoftwareVertexBufferDescriptors = " << pipelineInfo->useSoftwareVertexBufferDescriptors << "\n";
   dumpPipelineOptions(&pipelineInfo->options, dumpFile);
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
@@ -1573,6 +1574,7 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 70
   hasher->Update(pipeline->apiXfbOutData.forceEnablePrimStats);
 #endif
+  hasher->Update(pipeline->useSoftwareVertexBufferDescriptors);
 }
 
 // =====================================================================================================================
@@ -1584,7 +1586,6 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
 void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo *pipeline, MetroHash64 *hasher) {
   auto rsState = &pipeline->rsState;
   hasher->Update(rsState->perSampleShading);
-  hasher->Update(rsState->provokingVertexMode);
   hasher->Update(rsState->pixelShaderSamples);
 
   // Topology is required when BaryCoord is used
@@ -2063,7 +2064,7 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
         offset += noteHeaderSize + noteNameSize + alignTo(node->descSize, sizeof(unsigned));
         assert(offset <= section->secHead.sh_size);
       }
-    } else if (strcmp(section->name, RelocName) == 0) {
+    } else if (strcmp(section->name, RelocName) == 0 || strcmp(section->name, RelocAName) == 0) {
       // Output .reloc section
       out << section->name << " (size = " << section->secHead.sh_size << " bytes)\n";
       const unsigned relocCount = reader.getRelocationCount();
@@ -2073,7 +2074,10 @@ OStream &operator<<(OStream &out, ElfReader<Elf> &reader) {
         ElfSymbol elfSym = {};
         reader.getSymbol(reloc.symIdx, &elfSym);
         snprintf(formatBuf, sizeof(formatBuf), "    %-35s", elfSym.pSymName);
-        out << "#" << i << "    " << formatBuf << "    offset = " << reloc.offset << "\n";
+        out << "#" << i << "    " << formatBuf << "    offset = " << reloc.offset;
+        if (reloc.useExplicitAddend)
+          out << ", addend = " << reloc.addend;
+        out << "\n";
       }
     } else if (strncmp(section->name, AmdGpuConfigName, sizeof(AmdGpuConfigName) - 1) == 0) {
       // Output .AMDGPU.config section

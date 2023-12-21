@@ -51,10 +51,6 @@ namespace cl {
 // -verify-ir : verify the IR after each pass
 static cl::opt<bool> VerifyIr("verify-ir", cl::desc("Verify IR after each pass"), cl::init(false));
 
-// -dump-cfg-after : dump CFG as .dot files after specified pass
-static cl::opt<std::string> DumpCfgAfter("dump-cfg-after", cl::desc("Dump CFG as .dot files after specified pass"),
-                                         cl::init(""));
-
 // -dump-pass-name : dump executed pass name
 static cl::opt<bool> DumpPassName("dump-pass-name", cl::desc("Dump executed pass name"), cl::init(false));
 
@@ -91,10 +87,9 @@ public:
   void stop() override;
 
 private:
-  bool m_stopped = false;              // Whether we have already stopped adding new passes.
-  AnalysisID m_dumpCfgAfter = nullptr; // -dump-cfg-after pass id
-  AnalysisID m_printModule = nullptr;  // Pass id of dump pass "Print Module IR"
-  unsigned *m_passIndex = nullptr;     // Pass Index
+  bool m_stopped = false;             // Whether we have already stopped adding new passes.
+  AnalysisID m_printModule = nullptr; // Pass id of dump pass "Print Module IR"
+  unsigned *m_passIndex = nullptr;    // Pass Index
 };
 
 // =====================================================================================================================
@@ -200,9 +195,6 @@ std::unique_ptr<lgc::MbPassManager> lgc::MbPassManager::Create(TargetMachine *ta
 
 // =====================================================================================================================
 LegacyPassManagerImpl::LegacyPassManagerImpl() : LegacyPassManager() {
-  if (!cl::DumpCfgAfter.empty())
-    m_dumpCfgAfter = getPassIdFromName(cl::DumpCfgAfter);
-
   m_printModule = getPassIdFromName("print-module");
 }
 
@@ -216,8 +208,6 @@ PassManagerImpl::PassManagerImpl(TargetMachine *targetMachine, LLVMContext &cont
 #endif
           cl::DebugPassManager, cl::DebugPassManager || cl::VerifyIr,
           /*PrintPassOpts=*/{true, false, true}) {
-  if (!cl::DumpCfgAfter.empty())
-    report_fatal_error("The --dump-cfg-after option is not supported with the new pass manager.");
 
   auto &options = cl::getRegisteredOptions();
 
@@ -238,9 +228,6 @@ MbPassManagerImpl::MbPassManagerImpl(TargetMachine *targetMachine)
     : MbPassManager(), m_targetMachine(targetMachine),
       m_instrumentationStandard(cl::DebugPassManager, cl::DebugPassManager || cl::VerifyIr,
                                 /*PrintPassOpts=*/{true, false, true}) {
-  if (!cl::DumpCfgAfter.empty())
-    report_fatal_error("The --dump-cfg-after option is not supported with the new pass manager.");
-
   auto &options = cl::getRegisteredOptions();
 
   auto it = options.find("stop-after");
@@ -409,11 +396,6 @@ void LegacyPassManagerImpl::add(Pass *pass) {
   if (cl::VerifyIr) {
     // Add a verify pass after it.
     legacy::PassManager::add(createVerifierPass(true)); // FatalErrors=true
-  }
-
-  if (passId == m_dumpCfgAfter) {
-    // Add a CFG printer pass after it.
-    legacy::PassManager::add(createCFGPrinterLegacyPassPass());
   }
 }
 

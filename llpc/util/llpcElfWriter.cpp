@@ -341,6 +341,7 @@ void ElfWriter<Elf>::mergeMetaNote(Context *pContext, const ElfNote *pNote1, con
         PalAbi::GraphicsRegisterMetadataKey::DbShaderControl,
         PalAbi::GraphicsRegisterMetadataKey::CbShaderMask,
         PalAbi::GraphicsRegisterMetadataKey::AaCoverageToShaderSelect,
+        PalAbi::GraphicsRegisterMetadataKey::PsLoadProvokingVtx,
     };
     auto destRegisters = destPipeline.getMap(true)[PalAbi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
     auto srcRegisters = srcPipeline.getMap(true)[PalAbi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
@@ -351,7 +352,7 @@ void ElfWriter<Elf>::mergeMetaNote(Context *pContext, const ElfNote *pNote1, con
   std::string destBlob;
   destDocument.writeToBlob(destBlob);
   *pNewNote = *pNote1;
-  auto data = new uint8_t[destBlob.size() + 4]; // 4 is for additional alignment spece
+  auto data = new uint8_t[destBlob.size() + 4]; // 4 is for additional alignment space
   memcpy(data, destBlob.data(), destBlob.size());
   pNewNote->hdr.descSize = destBlob.size();
   pNewNote->data = data;

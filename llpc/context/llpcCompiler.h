@@ -173,6 +173,8 @@ public:
   llvm::sys::Mutex &getHelperThreadMutex() { return m_helperThreadMutex; }
   std::condition_variable_any &getHelperThreadConditionVariable() { return m_helperThreadConditionVariable; }
 
+  void setUseGpurt(lgc::Pipeline *pipeline);
+
 private:
   Compiler() = delete;
   Compiler(const Compiler &) = delete;

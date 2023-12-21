@@ -73,6 +73,7 @@
 #ifndef CONTINUATIONS_CONTINUATIONS_H
 #define CONTINUATIONS_CONTINUATIONS_H
 
+#include "compilerutils/CompilerUtils.h"
 #include "continuations/ContinuationsUtil.h"
 #include "continuations/PayloadAccessQualifiers.h"
 #include "llvm-dialects/Dialect/Builder.h"
@@ -117,12 +118,9 @@ std::pair<LoadInst *, Value *> moveContinuationStackOffset(IRBuilder<> &B,
 
 /// Convert an offset to the continuation stack to a pointer into the memory
 /// where the continuation stack lives.
-Value *continuationStackOffsetToPtr(IRBuilder<> &B, Value *Offset);
-
-/// Create a new function based on another function, copying attributes and
-/// other properties.
-Function *cloneFunctionHeader(Function &F, FunctionType *NewType,
-                              ArrayRef<AttributeSet> ArgAttrs);
+Value *continuationStackOffsetToPtr(IRBuilder<> &B, Value *Offset,
+                                    Module &GpurtLibrary,
+                                    CompilerUtils::CrossModuleInliner &Inliner);
 
 /// Create a new function, as cloneFunctionHeader, but include types metadata.
 Function *cloneFunctionHeaderWithTypes(Function &F, DXILContFuncTy &NewType,
@@ -150,10 +148,6 @@ Function *getSetLocalRootIndex(Module &M);
 /// Get intrinsic to convert a dx handle to an acceleration struct address.
 Function *getAccelStructAddr(Module &M, Type *HandleTy);
 
-/// Get intrinsic to save the continuation state.
-Function *getContinuationSaveContinuationState(Module &M);
-/// Get intrinsic to restore the continuation state.
-Function *getContinuationRestoreContinuationState(Module &M);
 /// Get the continuation.continue intrinsic.
 Function *getContinuationContinue(Module &M);
 /// Get the continuation.waitContinue intrinsic.
@@ -186,13 +180,6 @@ uint64_t getInlineHitAttrsBytes(Module &M);
 /// Extract a function from a constant metadata node, ignoring any bitcasts.
 Function *extractFunctionOrNull(Metadata *N);
 
-/// Returns true if a call to the given function should be rematerialized
-/// in a shader of the specified kind.
-///
-/// If no shader kind is specified,
-bool isRematerializableLgcRtOp(
-    CallInst &CInst, std::optional<DXILShaderKind> Kind = std::nullopt);
-
 /// Recurse into the first member of the given SystemData to find an object of
 /// the wanted type.
 /// See also the system data documentation at the top of Continuations.h.
@@ -203,7 +190,8 @@ Value *getDXILSystemData(IRBuilder<> &B, Value *SystemData, Type *SystemDataTy,
 /// implementation (_cont_*).
 CallInst *replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy,
                                Value *SystemData, DXILShaderKind Kind,
-                               CallInst *Call);
+                               CallInst *Call, Module *GpurtLibrary,
+                               CompilerUtils::CrossModuleInliner &Inliner);
 
 /// Transformations that run early on the driver/gpurt module.
 ///
@@ -264,51 +252,15 @@ private:
 class LegacyCleanupContinuationsPass
     : public llvm::PassInfoMixin<LegacyCleanupContinuationsPass> {
 public:
-  LegacyCleanupContinuationsPass();
+  LegacyCleanupContinuationsPass(llvm::Module *GpurtLibrary = nullptr)
+      : GpurtLibrary(GpurtLibrary) {}
   llvm::PreservedAnalyses run(llvm::Module &Module,
                               llvm::ModuleAnalysisManager &AnalysisManager);
 
   static llvm::StringRef name() { return "legacy continuation cleanup"; }
 
 private:
-  struct ContinuationData {
-    /// All functions belonging to this continuation, the entry function is the
-    /// first one
-    SmallVector<Function *> Functions;
-    /// Size of the continuation state in byte
-    uint32_t ContStateBytes = 0;
-    CallInst *MallocCall = nullptr;
-    MDNode *MD = nullptr;
-    AllocaInst *NewContState = nullptr;
-    SmallVector<Function *> NewFunctions;
-    SmallVector<CallInst *> NewReturnContinues;
-    /// Cleaned entry function, used to replace metadata
-    Function *NewStart = nullptr;
-  };
-
-  void analyzeContinuation(Function &F, MDNode *MD);
-  void processContinuations();
-  void handleFunctionEntry(IRBuilder<> &B, ContinuationData &Data, Function *F,
-                           bool IsEntry);
-  void handleContinue(IRBuilder<> &B, ContinuationData &Data, Instruction *Ret);
-  void handleSingleContinue(IRBuilder<> &B, ContinuationData &Data,
-                            CallInst *Call, Value *ResumeFun);
-  void handleReturn(IRBuilder<> &B, ContinuationData &Data, CallInst *ContRet);
-
-  Module *M;
-  Type *I32;
-  Type *I64;
-  Function *ContMalloc;
-  Function *ContFree;
-  Function *SaveContState;
-  Function *RestoreContState;
-  Function *RegisterBufferSetPointerBarrier;
-  Function *Continue;
-  Function *WaitContinue;
-  Function *Complete;
-  GlobalVariable *ContState;
-  MapVector<Function *, ContinuationData> ToProcess;
-  uint32_t MaxContStateBytes;
+  Module *GpurtLibrary;
 };
 
 class CleanupContinuationsPass
@@ -354,11 +306,15 @@ private:
 class LowerRaytracingPipelinePass
     : public llvm::PassInfoMixin<LowerRaytracingPipelinePass> {
 public:
-  LowerRaytracingPipelinePass() = default;
+  LowerRaytracingPipelinePass(llvm::Module *GpurtLibrary = nullptr)
+      : GpurtLibrary(GpurtLibrary) {}
   llvm::PreservedAnalyses run(llvm::Module &Module,
                               llvm::ModuleAnalysisManager &AnalysisManager);
 
   static llvm::StringRef name() { return "Lower raytracing pipeline pass"; }
+
+private:
+  Module *GpurtLibrary;
 };
 
 class DXILContIntrinsicPreparePass
@@ -373,73 +329,18 @@ public:
   }
 };
 
-class PreCoroutineLoweringPass
-    : public llvm::PassInfoMixin<PreCoroutineLoweringPass> {
-public:
-  PreCoroutineLoweringPass();
-  llvm::PreservedAnalyses run(llvm::Module &Module,
-                              llvm::ModuleAnalysisManager &AnalysisManager);
-
-  static llvm::StringRef name() {
-    return "Continuation pre coroutine preparation";
-  }
-
-private:
-  bool splitBB();
-  bool removeInlinedIntrinsics();
-  bool lowerGetShaderKind();
-  bool lowerGetCurrentFuncAddr();
-
-  Module *Mod;
-};
-
 class DXILContPostProcessPass
     : public llvm::PassInfoMixin<DXILContPostProcessPass> {
 public:
-  DXILContPostProcessPass();
+  DXILContPostProcessPass(llvm::Module *GpurtLibrary = nullptr)
+      : GpurtLibrary(GpurtLibrary) {}
   llvm::PreservedAnalyses run(llvm::Module &Module,
                               llvm::ModuleAnalysisManager &AnalysisManager);
 
   static llvm::StringRef name() { return "DXIL continuation post processing"; }
 
-  struct FunctionData {
-    DXILShaderKind Kind = DXILShaderKind::Invalid;
-    /// Calls to hlsl intrinsics
-    SmallVector<CallInst *> IntrinsicCalls;
-    /// Calls to get the system data pointer
-    SmallVector<continuations::GetSystemDataOp *> GetSystemDataCalls;
-
-    /// If this is the start function part of a split function
-    bool IsStart = true;
-    /// Pointer to the alloca'd system data object in this function
-    Value *SystemData = nullptr;
-    Type *SystemDataTy = nullptr;
-  };
-
 private:
-  // Returns whether changes were made
-  bool
-  lowerGetResumePointAddr(llvm::Module &M, llvm::IRBuilder<> &B,
-                          const MapVector<Function *, FunctionData> &ToProcess);
-  void handleInitialContinuationStackPtr(IRBuilder<> &B, Function &F);
-  void handleLgcRtIntrinsic(Function &F);
-  void handleRegisterBufferSetPointerBarrier(Function &F,
-                                             GlobalVariable *Payload);
-  void handleRegisterBufferGetPointer(IRBuilder<> &B, Function &F,
-                                      GlobalVariable *Payload);
-  void handleValueI32Count(IRBuilder<> &B, Function &F);
-  void handleValueGetI32(IRBuilder<> &B, Function &F);
-  void handleValueSetI32(IRBuilder<> &B, Function &F);
-
-  void handleContPayloadRegisterI32Count(Function &F);
-  void handleContPayloadRegistersGetI32(IRBuilder<> &B, Function &F);
-  void handleContPayloadRegistersSetI32(IRBuilder<> &B, Function &F);
-  void handleContStackAlloc(FunctionAnalysisManager &FAM, IRBuilder<> &B,
-                            Function &F);
-
-  Module *Mod;
-  GlobalVariable *Registers;
-  MapVector<Function *, FunctionData> ToProcess;
+  Module *GpurtLibrary;
 };
 
 class LowerAwaitPass : public llvm::PassInfoMixin<LowerAwaitPass> {
@@ -486,23 +387,18 @@ private:
 class SaveContinuationStatePass
     : public llvm::PassInfoMixin<SaveContinuationStatePass> {
 public:
-  SaveContinuationStatePass();
+  SaveContinuationStatePass() = default;
   llvm::PreservedAnalyses run(llvm::Module &Module,
                               llvm::ModuleAnalysisManager &AnalysisManager);
 
   static llvm::StringRef name() { return "save continuation state"; }
 
 private:
-  /// Returns true if something changed.
-  bool lowerCalls(Function *Intr, bool IsSave);
-  bool lowerContStateGetPointer();
-
   void lowerCsp(Function *GetCsp);
 
   Type *I32;
   IRBuilder<> *B;
   Module *Mod;
-  GlobalVariable *ContState;
 };
 
 // No-op pass running before the DXIL continuations pipeline, e.g. for usage

@@ -173,10 +173,8 @@ void CpsStackLowering::visitCpsAlloc(lgc::cps::AllocOp &AllocOp) {
   IRBuilder<> Builder(&AllocOp);
 
   Value *Size = AllocOp.getSize();
-  const DataLayout &Layout = Mod->getDataLayout();
-  Value *VSP = Builder.CreateAlignedLoad(
-      Builder.getPtrTy(LoweredCpsStackAddrSpace), CpsStackAlloca,
-      Align(getLoweredCpsStackPointerSize(Layout)));
+  Value *VSP = Builder.CreateLoad(Builder.getPtrTy(LoweredCpsStackAddrSpace),
+                                  CpsStackAlloca);
   unsigned AlignedSize = alignTo(cast<ConstantInt>(Size)->getZExtValue(),
                                  ContinuationStackAlignment);
   StackSizeInBytes += AlignedSize;
@@ -184,8 +182,7 @@ void CpsStackLowering::visitCpsAlloc(lgc::cps::AllocOp &AllocOp) {
   // update stack pointer
   Value *Ptr =
       Builder.CreateConstGEP1_32(Builder.getInt8Ty(), VSP, AlignedSize);
-  Builder.CreateAlignedStore(Ptr, CpsStackAlloca,
-                             Align(getLoweredCpsStackPointerSize(Layout)));
+  Builder.CreateStore(Ptr, CpsStackAlloca);
 
   TypeLower.replaceInstruction(&AllocOp, {VSP});
 }
@@ -196,19 +193,16 @@ void CpsStackLowering::visitCpsAlloc(lgc::cps::AllocOp &AllocOp) {
 // @param function : the instruction
 void CpsStackLowering::visitCpsFree(lgc::cps::FreeOp &FreeOp) {
   IRBuilder<> Builder(&FreeOp);
-  const DataLayout &Layout = Mod->getDataLayout();
 
-  Value *VSP = Builder.CreateAlignedLoad(
-      Builder.getPtrTy(LoweredCpsStackAddrSpace), CpsStackAlloca,
-      Align(getLoweredCpsStackPointerSize(Layout)));
+  Value *VSP = Builder.CreateLoad(Builder.getPtrTy(LoweredCpsStackAddrSpace),
+                                  CpsStackAlloca);
   Value *Size = FreeOp.getSize();
   unsigned AlignedSize = alignTo(cast<ConstantInt>(Size)->getZExtValue(),
                                  ContinuationStackAlignment);
   Value *Ptr =
       Builder.CreateConstGEP1_32(Builder.getInt8Ty(), VSP, -AlignedSize);
   // Assuming continuation stack grows upward.
-  Builder.CreateAlignedStore(Ptr, CpsStackAlloca,
-                             Align(getLoweredCpsStackPointerSize(Layout)));
+  Builder.CreateStore(Ptr, CpsStackAlloca);
   TypeLower.replaceInstruction(&FreeOp, {});
 }
 
@@ -218,11 +212,9 @@ void CpsStackLowering::visitCpsFree(lgc::cps::FreeOp &FreeOp) {
 // @param function : the instruction
 void CpsStackLowering::visitCpsPeek(lgc::cps::PeekOp &PeekOp) {
   IRBuilder<> Builder(&PeekOp);
-  const DataLayout &Layout = Mod->getDataLayout();
 
-  auto *Ptr = Builder.CreateAlignedLoad(
-      Builder.getPtrTy(LoweredCpsStackAddrSpace), CpsStackAlloca,
-      Align(getLoweredCpsStackPointerSize(Layout)));
+  auto *Ptr = Builder.CreateLoad(Builder.getPtrTy(LoweredCpsStackAddrSpace),
+                                 CpsStackAlloca);
   auto *Size = PeekOp.getSize();
   unsigned ImmSize = cast<ConstantInt>(Size)->getZExtValue();
   ImmSize = alignTo(ImmSize, ContinuationStackAlignment);
@@ -238,12 +230,10 @@ void CpsStackLowering::visitCpsPeek(lgc::cps::PeekOp &PeekOp) {
 // @param function : the instruction
 void CpsStackLowering::visitSetVsp(lgc::cps::SetVspOp &SetVsp) {
   IRBuilder<> B(&SetVsp);
-  const DataLayout &Layout = Mod->getDataLayout();
 
   auto *Ptr = SetVsp.getPtr();
   auto Converted = TypeLower.getValue(Ptr);
-  B.CreateAlignedStore(Converted[0], CpsStackAlloca,
-                       Align(getLoweredCpsStackPointerSize(Layout)));
+  B.CreateStore(Converted[0], CpsStackAlloca);
   TypeLower.replaceInstruction(&SetVsp, {});
 }
 
@@ -253,10 +243,8 @@ void CpsStackLowering::visitSetVsp(lgc::cps::SetVspOp &SetVsp) {
 // @param function : the instruction
 void CpsStackLowering::visitGetVsp(lgc::cps::GetVspOp &GetVsp) {
   IRBuilder<> B(&GetVsp);
-  const DataLayout &Layout = Mod->getDataLayout();
 
   auto *Ptr =
-      B.CreateAlignedLoad(B.getPtrTy(LoweredCpsStackAddrSpace), CpsStackAlloca,
-                          Align(getLoweredCpsStackPointerSize(Layout)));
+      B.CreateLoad(B.getPtrTy(LoweredCpsStackAddrSpace), CpsStackAlloca);
   TypeLower.replaceInstruction(&GetVsp, {Ptr});
 }

@@ -499,6 +499,11 @@ void DXILContLgcRtOpConverterPass::applyPayloadMetadataTypesOnShaders() {
 
   for (auto &[Func, Kind] : ShaderKinds) {
     auto Stage = DXILContHelper::dxilShaderKindToShaderStage(Kind);
+
+    // Ignore non-raytracing shader stages
+    if (!Stage.has_value())
+      continue;
+
     lgc::rt::setLgcRtShaderStage(Func, Stage);
 
     switch (Kind) {

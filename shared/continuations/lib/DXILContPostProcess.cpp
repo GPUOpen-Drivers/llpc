@@ -36,10 +36,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "compilerutils/CompilerUtils.h"
 #include "continuations/Continuations.h"
 #include "continuations/ContinuationsDialect.h"
 #include "continuations/ContinuationsUtil.h"
 #include "llvm-dialects/Dialect/Visitor.h"
+#include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/AssumptionCache.h"
@@ -48,6 +51,7 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/IR/Type.h"
 #include "llvm/InitializePasses.h"
 #include <cassert>
@@ -75,17 +79,56 @@ static cl::opt<bool> ReportAllSizes(
     cl::desc("Report continuation state, payload and system data sizes."),
     cl::init(false));
 
-// Collects all calls to the given function, and appends them to CallInsts.
-static void collectFunctionCalls(const Function &Func,
-                                 SmallVectorImpl<CallInst *> &CallInsts) {
-  for (const auto &Use : Func.uses()) {
-    if (auto *CInst = dyn_cast<CallInst>(Use.getUser())) {
-      if (CInst->isCallee(&Use)) {
-        CallInsts.push_back(CInst);
-      }
-    }
-  }
-}
+namespace {
+class DXILContPostProcessPassImpl final {
+public:
+  DXILContPostProcessPassImpl(Module &M, Module &GpurtLibrary);
+  bool run(llvm::ModuleAnalysisManager &AnalysisManager);
+
+  struct FunctionData {
+    DXILShaderKind Kind = DXILShaderKind::Invalid;
+    /// Calls to hlsl intrinsics
+    SmallVector<CallInst *> IntrinsicCalls;
+    /// Calls to get the system data pointer
+    SmallVector<continuations::GetSystemDataOp *> GetSystemDataCalls;
+
+    /// If this is the start function part of a split function
+    bool IsStart = true;
+    /// Pointer to the alloca'd system data object in this function
+    Value *SystemData = nullptr;
+    Type *SystemDataTy = nullptr;
+  };
+
+private:
+  void lowerGetResumePointAddr(Function &F);
+  void handleInitialContinuationStackPtr(Function &F);
+  void handleLgcRtIntrinsic(Function &F);
+  void handleRegisterBufferSetPointerBarrier(Function &F,
+                                             GlobalVariable *Payload);
+  void handleRegisterBufferGetPointer(Function &F, GlobalVariable *Payload);
+  void handleValueI32Count(Function &F);
+  void handleValueGetI32(Function &F);
+  void handleValueSetI32(Function &F);
+
+  void handleContPayloadRegisterI32Count(Function &F);
+  void handleContPayloadRegistersGetI32(Function &F);
+  void handleContPayloadRegistersSetI32(Function &F);
+  void handleContStackAlloc(FunctionAnalysisManager &FAM, Function &F);
+
+  void collectProcessableFunctions();
+  bool handleIntrinsicCalls();
+  bool handleGetSystemDataCalls();
+  bool unfoldGlobals();
+  bool handleAmdInternals(llvm::ModuleAnalysisManager &AnalysisManager);
+
+  Module *Mod;
+  Module *GpurtLibrary;
+  GlobalVariable *Registers;
+  MapVector<Function *, FunctionData> ToProcess;
+  Function *SetupRayGen;
+  IRBuilder<> Builder;
+  CompilerUtils::CrossModuleInliner CrossInliner;
+};
 
 // Collects all calls to continuation.[wait]continue
 static void collectContinueCalls(const Module &M,
@@ -95,7 +138,9 @@ static void collectContinueCalls(const Module &M,
     auto *Func = M.getFunction(Name);
     if (!Func)
       continue;
-    collectFunctionCalls(*Func, CallInsts);
+
+    llvm::forEachCall(*Func,
+                      [&](CallInst &CInst) { CallInsts.push_back(&CInst); });
   }
 }
 
@@ -136,7 +181,6 @@ static void reportContStateSizes(Module &M) {
 // For every function with incoming or outgoing (or both) payload registers,
 // report the incoming size and the max outgoing size in bytes.
 static void reportPayloadSizes(Module &M) {
-
   // For every function with continue calls, determine the max number of
   // outgoing registers
   DenseMap<Function *, unsigned> MaxOutgoingRegisterCounts;
@@ -185,7 +229,7 @@ static void reportPayloadSizes(Module &M) {
 
 static void reportSystemDataSizes(
     Module &M,
-    const MapVector<Function *, DXILContPostProcessPass::FunctionData>
+    const MapVector<Function *, DXILContPostProcessPassImpl::FunctionData>
         &FunctionData) {
   for (const auto &[F, FuncData] : FunctionData) {
     if (FuncData.SystemDataTy == nullptr)
@@ -199,8 +243,6 @@ static void reportSystemDataSizes(
            << "\", size:  " << SystemDataBytes << " bytes\n";
   }
 }
-
-DXILContPostProcessPass::DXILContPostProcessPass() {}
 
 static Function *getContinuationGetAddrAndMD(Module &M) {
   auto *Name = "continuation.getAddrAndMD";
@@ -328,20 +370,16 @@ static bool addGetAddrAndMDIntrinsicCalls(Module &M) {
   }
 
   // Check that every function has at most one setLocalRootIndex call.
-  if (const auto *SetF = M.getFunction("amd.dx.setLocalRootIndex")) {
+  if (auto *SetF = M.getFunction("amd.dx.setLocalRootIndex")) {
     SmallDenseSet<Function *> HasSetF;
 
-    for (const auto &Use : SetF->uses()) {
-      if (auto *CInst = dyn_cast<CallInst>(Use.getUser())) {
-        if (CInst->isCallee(&Use)) {
-          // Returns true if it is a new value
-          auto Inserted = HasSetF.insert(CInst->getFunction());
-          if (!Inserted.second)
-            report_fatal_error(
-                "Found a function with more than one setLocalRootIndex");
-        }
-      }
-    }
+    llvm::forEachCall(*SetF, [&](CallInst &CInst) {
+      // Returns true if it is a new value
+      auto Inserted = HasSetF.insert(CInst.getFunction());
+      if (!Inserted.second)
+        report_fatal_error(
+            "Found a function with more than one setLocalRootIndex");
+    });
   }
 }
 
@@ -432,13 +470,8 @@ static std::optional<CallInst *> findContinueCall(CallInst *GetResPointAddr) {
   return Candidate;
 }
 
-bool DXILContPostProcessPass::lowerGetResumePointAddr(
-    llvm::Module &M, llvm::IRBuilder<> &B,
-    const MapVector<Function *, FunctionData> &ToProcess) {
-  auto *GetResumePointAddr = M.getFunction("_AmdGetResumePointAddr");
-
-  if (!GetResumePointAddr)
-    return false;
+void DXILContPostProcessPassImpl::lowerGetResumePointAddr(Function &F) {
+  auto *GetResumePointAddr = &F;
 
   assert(GetResumePointAddr->getReturnType()->isIntegerTy(64) &&
          GetResumePointAddr->arg_size() == 0);
@@ -487,7 +520,7 @@ bool DXILContPostProcessPass::lowerGetResumePointAddr(
     unsigned ReturnAddrArgNum = HasWaitMask ? 3 : 2;
     // Move up computation of the resume address
     auto *ReturnAddr = ContinueCall->getArgOperand(ReturnAddrArgNum);
-    assert((ReturnAddr->getType() == B.getInt64Ty()) &&
+    assert((ReturnAddr->getType() == Builder.getInt64Ty()) &&
            "Unexpected return addr type!");
 
     SmallVector<Instruction *> MoveInstrs;
@@ -516,8 +549,8 @@ bool DXILContPostProcessPass::lowerGetResumePointAddr(
         Args.push_back(ContinueCall->getArgOperand(I));
     }
 
-    B.SetInsertPoint(ContinueCall);
-    auto *NewCall = B.CreateCall(ContinueCall->getCalledFunction(), Args);
+    Builder.SetInsertPoint(ContinueCall);
+    auto *NewCall = Builder.CreateCall(ContinueCall->getCalledFunction(), Args);
     // Copy metadata
     SmallVector<std::pair<unsigned int, MDNode *>> MDs;
     ContinueCall->getAllMetadata(MDs);
@@ -534,28 +567,24 @@ bool DXILContPostProcessPass::lowerGetResumePointAddr(
   // Delete the declaration of the intrinsic after lowering, as future calls to
   // it are invalid.
   GetResumePointAddr->eraseFromParent();
-
-  return true;
 }
 
-void DXILContPostProcessPass::handleInitialContinuationStackPtr(IRBuilder<> &B,
-                                                                Function &F) {
-  auto *InitFun = Mod->getFunction("_cont_GetContinuationStackAddr");
+void DXILContPostProcessPassImpl::handleInitialContinuationStackPtr(
+    Function &F) {
+  auto *InitFun = GpurtLibrary->getFunction("_cont_GetContinuationStackAddr");
   assert(InitFun && "GetContinuationStackAddr not found");
   assert(InitFun->arg_size() == 0 && InitFun->getReturnType()->isIntegerTy(32));
-  for (auto &Use : make_early_inc_range(F.uses())) {
-    if (auto *CInst = dyn_cast<CallInst>(Use.getUser())) {
-      if (CInst->isCallee(&Use)) {
-        B.SetInsertPoint(CInst);
-        auto *Init = B.CreateCall(InitFun);
-        CInst->replaceAllUsesWith(Init);
-        CInst->eraseFromParent();
-      }
-    }
-  }
+  llvm::forEachCall(F, [&](CallInst &CInst) {
+    Builder.SetInsertPoint(&CInst);
+    auto *Init = Builder.CreateCall(InitFun);
+    CInst.replaceAllUsesWith(Init);
+    CrossInliner.inlineCall(*Init);
+    Builder.SetInsertPoint(&*Builder.GetInsertPoint());
+    CInst.eraseFromParent();
+  });
 }
 
-void DXILContPostProcessPass::handleLgcRtIntrinsic(Function &F) {
+void DXILContPostProcessPassImpl::handleLgcRtIntrinsic(Function &F) {
   // Look for known HLSL intrinsics
   llvm::forEachCall(F, [&](CallInst &CInst) {
     auto Data = ToProcess.find(CInst.getFunction());
@@ -569,47 +598,38 @@ void DXILContPostProcessPass::handleLgcRtIntrinsic(Function &F) {
   });
 }
 
-void DXILContPostProcessPass::handleRegisterBufferSetPointerBarrier(
+void DXILContPostProcessPassImpl::handleRegisterBufferSetPointerBarrier(
     Function &F, GlobalVariable *Payload) {
   // Remove setpointerbarrier instructions related to payload
-  for (auto &Use : make_early_inc_range(F.uses())) {
-    if (auto *CInst = dyn_cast<CallInst>(Use.getUser())) {
-      if (CInst->isCallee(&Use)) {
-        if (!isCastGlobal(Payload, CInst->getOperand(0)))
-          continue;
-        CInst->eraseFromParent();
-      }
-    }
-  }
+  llvm::forEachCall(F, [&](CallInst &CInst) {
+    if (isCastGlobal(Payload, CInst.getOperand(0)))
+      CInst.eraseFromParent();
+  });
 }
 
-void DXILContPostProcessPass::handleRegisterBufferGetPointer(
-    IRBuilder<> &B, Function &F, GlobalVariable *Payload) {
+void DXILContPostProcessPassImpl::handleRegisterBufferGetPointer(
+    Function &F, GlobalVariable *Payload) {
   // Check calls that take the payload as argument
-  for (auto &Use : make_early_inc_range(F.uses())) {
-    if (auto *CInst = dyn_cast<CallInst>(Use.getUser())) {
-      if (CInst->isCallee(&Use)) {
-        if (!isCastGlobal(Payload, CInst->getOperand(0)))
-          continue;
-
-        // Replace call with first part of payload
-        static_assert(FirstPayloadMemoryPointerRegister == 0,
-                      "Need to adjust offset here");
-        B.SetInsertPoint(CInst);
-        auto *StackOffsetTy = getContinuationStackOffsetType(F.getContext());
-        auto *CastPayload = B.CreateBitOrPointerCast(
-            Payload, StackOffsetTy->getPointerTo(Payload->getAddressSpace()));
-        auto *Offset = B.CreateLoad(StackOffsetTy, CastPayload);
-        auto *Ptr = continuationStackOffsetToPtr(B, Offset);
-        Ptr = B.CreateBitCast(Ptr, CInst->getType());
-        CInst->replaceAllUsesWith(Ptr);
-        CInst->eraseFromParent();
-      }
+  llvm::forEachCall(F, [&](CallInst &CInst) {
+    if (isCastGlobal(Payload, CInst.getOperand(0))) {
+      // Replace call with first part of payload
+      static_assert(FirstPayloadMemoryPointerRegister == 0,
+                    "Need to adjust offset here");
+      Builder.SetInsertPoint(&CInst);
+      auto *StackOffsetTy = getContinuationStackOffsetType(F.getContext());
+      auto *CastPayload = Builder.CreateBitOrPointerCast(
+          Payload, StackOffsetTy->getPointerTo(Payload->getAddressSpace()));
+      auto *Offset = Builder.CreateLoad(StackOffsetTy, CastPayload);
+      auto *Ptr = continuationStackOffsetToPtr(Builder, Offset, *GpurtLibrary,
+                                               CrossInliner);
+      Ptr = Builder.CreateBitCast(Ptr, CInst.getType());
+      CInst.replaceAllUsesWith(Ptr);
+      CInst.eraseFromParent();
     }
-  }
+  });
 }
 
-void DXILContPostProcessPass::handleValueI32Count(IRBuilder<> &B, Function &F) {
+void DXILContPostProcessPassImpl::handleValueI32Count(Function &F) {
   assert(F.arg_size() == 1
          // i32 count
          && F.getFunctionType()->getReturnType()->isIntegerTy(32)
@@ -617,19 +637,15 @@ void DXILContPostProcessPass::handleValueI32Count(IRBuilder<> &B, Function &F) {
          && F.getFunctionType()->getParamType(0)->isPointerTy());
 
   auto *Ty = getFuncArgPtrElementType(&F, 0);
-  auto *Size =
-      B.getInt32(Mod->getDataLayout().getTypeStoreSize(Ty).getFixedValue() / 4);
-  for (auto &Use : make_early_inc_range(F.uses())) {
-    if (auto *CInst = dyn_cast<CallInst>(Use.getUser())) {
-      if (CInst->isCallee(&Use)) {
-        CInst->replaceAllUsesWith(Size);
-        CInst->eraseFromParent();
-      }
-    }
-  }
+  auto *Size = Builder.getInt32(
+      Mod->getDataLayout().getTypeStoreSize(Ty).getFixedValue() / 4);
+  llvm::forEachCall(F, [&](CallInst &CInst) {
+    CInst.replaceAllUsesWith(Size);
+    CInst.eraseFromParent();
+  });
 }
 
-void DXILContPostProcessPass::handleValueGetI32(IRBuilder<> &B, Function &F) {
+void DXILContPostProcessPassImpl::handleValueGetI32(Function &F) {
   assert(F.arg_size() == 2
          // value
          && F.getFunctionType()->getReturnType()->isIntegerTy(32)
@@ -638,23 +654,19 @@ void DXILContPostProcessPass::handleValueGetI32(IRBuilder<> &B, Function &F) {
          // index
          && F.getFunctionType()->getParamType(1)->isIntegerTy(32));
 
-  auto *I32 = B.getInt32Ty();
-  for (auto &Use : make_early_inc_range(F.uses())) {
-    if (auto *CInst = dyn_cast<CallInst>(Use.getUser())) {
-      if (CInst->isCallee(&Use)) {
-        B.SetInsertPoint(CInst);
-        Value *Addr =
-            B.CreateBitCast(CInst->getArgOperand(0), I32->getPointerTo());
-        Addr = B.CreateGEP(I32, Addr, CInst->getArgOperand(1));
-        auto *Load = B.CreateLoad(I32, Addr);
-        CInst->replaceAllUsesWith(Load);
-        CInst->eraseFromParent();
-      }
-    }
-  }
+  auto *I32 = Builder.getInt32Ty();
+  llvm::forEachCall(F, [&](CallInst &CInst) {
+    Builder.SetInsertPoint(&CInst);
+    Value *Addr =
+        Builder.CreateBitCast(CInst.getArgOperand(0), I32->getPointerTo());
+    Addr = Builder.CreateGEP(I32, Addr, CInst.getArgOperand(1));
+    auto *Load = Builder.CreateLoad(I32, Addr);
+    CInst.replaceAllUsesWith(Load);
+    CInst.eraseFromParent();
+  });
 }
 
-void DXILContPostProcessPass::handleValueSetI32(IRBuilder<> &B, Function &F) {
+void DXILContPostProcessPassImpl::handleValueSetI32(Function &F) {
   assert(F.arg_size() == 3 &&
          F.getFunctionType()->getReturnType()->isVoidTy()
          // Pointer to a struct
@@ -664,22 +676,19 @@ void DXILContPostProcessPass::handleValueSetI32(IRBuilder<> &B, Function &F) {
          // value
          && F.getFunctionType()->getParamType(2)->isIntegerTy(32));
 
-  auto *I32 = B.getInt32Ty();
-  for (auto &Use : make_early_inc_range(F.uses())) {
-    if (auto *CInst = dyn_cast<CallInst>(Use.getUser())) {
-      if (CInst->isCallee(&Use)) {
-        B.SetInsertPoint(CInst);
-        Value *Addr =
-            B.CreateBitCast(CInst->getArgOperand(0), I32->getPointerTo());
-        Addr = B.CreateGEP(I32, Addr, CInst->getArgOperand(1));
-        B.CreateStore(CInst->getArgOperand(2), Addr);
-        CInst->eraseFromParent();
-      }
-    }
-  }
+  auto *I32 = Builder.getInt32Ty();
+  llvm::forEachCall(F, [&](CallInst &CInst) {
+    Builder.SetInsertPoint(&CInst);
+    Value *Addr =
+        Builder.CreateBitCast(CInst.getArgOperand(0), I32->getPointerTo());
+    Addr = Builder.CreateGEP(I32, Addr, CInst.getArgOperand(1));
+    Builder.CreateStore(CInst.getArgOperand(2), Addr);
+    CInst.eraseFromParent();
+  });
 }
 
-void DXILContPostProcessPass::handleContPayloadRegisterI32Count(Function &F) {
+void DXILContPostProcessPassImpl::handleContPayloadRegisterI32Count(
+    Function &F) {
   assert(F.arg_size() == 0
          // register count
          && F.getFunctionType()->getReturnType()->isIntegerTy(32));
@@ -687,39 +696,32 @@ void DXILContPostProcessPass::handleContPayloadRegisterI32Count(Function &F) {
   auto *RegCount =
       ConstantInt::get(IntegerType::get(F.getContext(), 32),
                        Registers->getValueType()->getArrayNumElements());
-  for (auto &Use : make_early_inc_range(F.uses())) {
-    if (auto *CInst = dyn_cast<CallInst>(Use.getUser())) {
-      if (CInst->isCallee(&Use)) {
-        CInst->replaceAllUsesWith(RegCount);
-        CInst->eraseFromParent();
-      }
-    }
-  }
+  llvm::forEachCall(F, [&](CallInst &CInst) {
+    CInst.replaceAllUsesWith(RegCount);
+    CInst.eraseFromParent();
+  });
 }
 
-void DXILContPostProcessPass::handleContPayloadRegistersGetI32(IRBuilder<> &B,
-                                                               Function &F) {
+void DXILContPostProcessPassImpl::handleContPayloadRegistersGetI32(
+    Function &F) {
   assert(F.getReturnType()->isIntegerTy(32) &&
          F.arg_size() == 1
          // index
          && F.getFunctionType()->getParamType(0)->isIntegerTy(32));
 
-  for (auto &Use : make_early_inc_range(F.uses())) {
-    if (auto *CInst = dyn_cast<CallInst>(Use.getUser())) {
-      if (CInst->isCallee(&Use)) {
-        B.SetInsertPoint(CInst);
-        auto *Addr = B.CreateGEP(Registers->getValueType(), Registers,
-                                 {B.getInt32(0), CInst->getArgOperand(0)});
-        auto *Load = B.CreateLoad(B.getInt32Ty(), Addr);
-        CInst->replaceAllUsesWith(Load);
-        CInst->eraseFromParent();
-      }
-    }
-  }
+  llvm::forEachCall(F, [&](CallInst &CInst) {
+    Builder.SetInsertPoint(&CInst);
+    auto *Addr =
+        Builder.CreateGEP(Registers->getValueType(), Registers,
+                          {Builder.getInt32(0), CInst.getArgOperand(0)});
+    auto *Load = Builder.CreateLoad(Builder.getInt32Ty(), Addr);
+    CInst.replaceAllUsesWith(Load);
+    CInst.eraseFromParent();
+  });
 }
 
-void DXILContPostProcessPass::handleContPayloadRegistersSetI32(IRBuilder<> &B,
-                                                               Function &F) {
+void DXILContPostProcessPassImpl::handleContPayloadRegistersSetI32(
+    Function &F) {
   assert(F.getReturnType()->isVoidTy() &&
          F.arg_size() == 2
          // index
@@ -727,22 +729,18 @@ void DXILContPostProcessPass::handleContPayloadRegistersSetI32(IRBuilder<> &B,
          // value
          && F.getFunctionType()->getParamType(1)->isIntegerTy(32));
 
-  for (auto &Use : make_early_inc_range(F.uses())) {
-    if (auto *CInst = dyn_cast<CallInst>(Use.getUser())) {
-      if (CInst->isCallee(&Use)) {
-        B.SetInsertPoint(CInst);
-        auto *Addr = B.CreateGEP(Registers->getValueType(), Registers,
-                                 {B.getInt32(0), CInst->getArgOperand(0)});
-        B.CreateStore(CInst->getOperand(1), Addr);
-        CInst->eraseFromParent();
-      }
-    }
-  }
+  llvm::forEachCall(F, [&](CallInst &CInst) {
+    Builder.SetInsertPoint(&CInst);
+    auto *Addr =
+        Builder.CreateGEP(Registers->getValueType(), Registers,
+                          {Builder.getInt32(0), CInst.getArgOperand(0)});
+    Builder.CreateStore(CInst.getOperand(1), Addr);
+    CInst.eraseFromParent();
+  });
 }
 
-void DXILContPostProcessPass::handleContStackAlloc(FunctionAnalysisManager &FAM,
-                                                   IRBuilder<> &B,
-                                                   Function &F) {
+void DXILContPostProcessPassImpl::handleContStackAlloc(
+    FunctionAnalysisManager &FAM, Function &F) {
   assert(F.getReturnType()->isIntegerTy(32) &&
          F.arg_size() == 2
          // csp
@@ -750,63 +748,53 @@ void DXILContPostProcessPass::handleContStackAlloc(FunctionAnalysisManager &FAM,
          // size
          && F.getFunctionType()->getParamType(1)->isIntegerTy(32));
 
-  for (auto &Use : make_early_inc_range(F.uses())) {
-    if (auto *CInst = dyn_cast<CallInst>(Use.getUser())) {
-      if (CInst->isCallee(&Use)) {
-        B.SetInsertPoint(CInst);
-        auto *Func = CInst->getFunction();
-        Value *SizeArg = CInst->getArgOperand(1);
-        uint32_t Size;
+  llvm::forEachCall(F, [&](CallInst &CInst) {
+    Builder.SetInsertPoint(&CInst);
+    auto *Func = CInst.getFunction();
+    Value *SizeArg = CInst.getArgOperand(1);
+    uint32_t Size;
 
-        if (auto *I = dyn_cast<Instruction>(SizeArg)) {
-          // Do some basic constant-propagation
-          // This is needed because this pass just replaced the ValueI32Count
-          // and ContPayloadRegistersI32Count intrinsics and the allocated size
-          // usually depends on these values.
-          auto &DT = FAM.getResult<DominatorTreeAnalysis>(*Func);
-          auto &TLI = FAM.getResult<TargetLibraryAnalysis>(*Func);
-          auto &AC = FAM.getResult<AssumptionAnalysis>(*Func);
-          const SimplifyQuery SQ(Func->getParent()->getDataLayout(), &TLI, &DT,
-                                 &AC);
+    if (auto *I = dyn_cast<Instruction>(SizeArg)) {
+      // Do some basic constant-propagation
+      // This is needed because this pass just replaced the ValueI32Count
+      // and ContPayloadRegistersI32Count intrinsics and the allocated size
+      // usually depends on these values.
+      auto &DT = FAM.getResult<DominatorTreeAnalysis>(*Func);
+      auto &TLI = FAM.getResult<TargetLibraryAnalysis>(*Func);
+      auto &AC = FAM.getResult<AssumptionAnalysis>(*Func);
+      const SimplifyQuery SQ(Func->getParent()->getDataLayout(), &TLI, &DT,
+                             &AC);
 
-          if (auto *NewSize = simplifyInstruction(I, SQ))
-            SizeArg = NewSize;
-        }
-
-        if (auto *C = dyn_cast<ConstantInt>(SizeArg))
-          Size = C->getZExtValue();
-        else
-          report_fatal_error("ContStackAlloc must be called with a constant "
-                             "that can be computed at compile time");
-
-        auto *OrigVal = B.CreateLoad(B.getInt32Ty(), CInst->getArgOperand(0));
-
-        auto *NewVal = B.CreateAdd(OrigVal, B.getInt32(Size));
-        B.CreateStore(NewVal, CInst->getArgOperand(0));
-        CInst->replaceAllUsesWith(OrigVal);
-        CInst->eraseFromParent();
-
-        // Add allocation to the stack size of this function
-        DXILContHelper::addStackSize(Func, Size);
-      }
+      if (auto *NewSize = simplifyInstruction(I, SQ))
+        SizeArg = NewSize;
     }
-  }
+
+    if (auto *C = dyn_cast<ConstantInt>(SizeArg))
+      Size = C->getZExtValue();
+    else
+      report_fatal_error("ContStackAlloc must be called with a constant "
+                         "that can be computed at compile time");
+
+    auto *OrigVal =
+        Builder.CreateLoad(Builder.getInt32Ty(), CInst.getArgOperand(0));
+
+    auto *NewVal = Builder.CreateAdd(OrigVal, Builder.getInt32(Size));
+    Builder.CreateStore(NewVal, CInst.getArgOperand(0));
+    CInst.replaceAllUsesWith(OrigVal);
+    CInst.eraseFromParent();
+
+    // Add allocation to the stack size of this function
+    DXILContHelper::addStackSize(Func, Size);
+  });
 }
 
-llvm::PreservedAnalyses
-DXILContPostProcessPass::run(llvm::Module &M,
-                             llvm::ModuleAnalysisManager &AnalysisManager) {
-  LLVM_DEBUG(dbgs() << "Run the dxil-cont-post-process pass\n");
-  AnalysisManager.getResult<DialectContextAnalysis>(M);
+void DXILContPostProcessPassImpl::collectProcessableFunctions() {
+  for (Function &F : *Mod) {
+    if (F.isDeclaration())
+      continue;
 
-  Mod = &M;
-  bool Changed = false;
-  ToProcess.clear();
-  auto *SetupRayGen = M.getFunction("_cont_SetupRayGen");
-
-  for (Function &F : M) {
     auto Stage = lgc::rt::getLgcRtShaderStage(&F);
-    if (!Stage || F.isDeclaration())
+    if (!Stage)
       continue;
 
     // Handle entry functions first
@@ -827,15 +815,12 @@ DXILContPostProcessPass::run(llvm::Module &M,
     case DXILShaderKind::ClosestHit:
     case DXILShaderKind::Miss:
     case DXILShaderKind::Callable: {
-      Changed = true;
       FunctionData Data;
       Data.Kind = Kind;
       if (Data.Kind == DXILShaderKind::RayGeneration) {
         assert(SetupRayGen && "Could not find SetupRayGen function");
         Data.SystemDataTy = SetupRayGen->getReturnType();
       } else {
-        assert(F.getFunctionType()->getNumParams() >= 3 &&
-               "Cannot find system data type");
         Data.SystemDataTy = F.getFunctionType()->getParamType(2);
       }
       ToProcess[&F] = Data;
@@ -847,7 +832,7 @@ DXILContPostProcessPass::run(llvm::Module &M,
   }
 
   // Also find continuation parts of the functions
-  for (auto &F : M) {
+  for (auto &F : *Mod) {
     if (F.isDeclaration())
       continue;
     if (auto *MD = dyn_cast_or_null<MDTuple>(
@@ -862,14 +847,18 @@ DXILContPostProcessPass::run(llvm::Module &M,
       }
     }
   }
+}
 
-  IRBuilder<> B(M.getContext());
-  auto *Payload = M.getGlobalVariable(DXILContHelper::GlobalPayloadName);
-  for (auto &F : M.functions()) {
+bool DXILContPostProcessPassImpl::handleIntrinsicCalls() {
+  bool Changed = false;
+  auto *Payload = Mod->getGlobalVariable(DXILContHelper::GlobalPayloadName);
+
+  // TODO: Dialectify.
+  for (auto &F : Mod->functions()) {
     auto Name = F.getName();
     if (Name == "continuation.initialContinuationStackPtr") {
       Changed = true;
-      handleInitialContinuationStackPtr(B, F);
+      handleInitialContinuationStackPtr(F);
     } else if (Name.startswith("lgc.rt")) {
       Changed = true;
       handleLgcRtIntrinsic(F);
@@ -878,10 +867,14 @@ DXILContPostProcessPass::run(llvm::Module &M,
       handleRegisterBufferSetPointerBarrier(F, Payload);
     } else if (Name.startswith("registerbuffer.getpointer")) {
       Changed = true;
-      handleRegisterBufferGetPointer(B, F, Payload);
+      handleRegisterBufferGetPointer(F, Payload);
     }
   }
 
+  return Changed;
+}
+
+bool DXILContPostProcessPassImpl::handleGetSystemDataCalls() {
   const static auto Visitor =
       llvm_dialects::VisitorBuilder<MapVector<Function *, FunctionData>>()
           .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
@@ -894,139 +887,182 @@ DXILContPostProcessPass::run(llvm::Module &M,
           })
           .build();
 
-  Visitor.visit(ToProcess, M);
+  Visitor.visit(ToProcess, *Mod);
 
   for (auto &FuncData : ToProcess) {
     auto &Data = FuncData.second;
     // Transform SystemData to alloca and load on every use
-    B.SetInsertPoint(FuncData.first->getEntryBlock().getFirstNonPHI());
-    Data.SystemData = B.CreateAlloca(Data.SystemDataTy);
+    Builder.SetInsertPoint(FuncData.first->getEntryBlock().getFirstNonPHI());
+    Data.SystemData = Builder.CreateAlloca(Data.SystemDataTy);
 
     // Replace intrinsic calls
     for (auto *Call : Data.IntrinsicCalls)
-      replaceIntrinsicCall(B, Data.SystemDataTy, Data.SystemData, Data.Kind,
-                           Call);
+      replaceIntrinsicCall(Builder, Data.SystemDataTy, Data.SystemData,
+                           Data.Kind, Call, GpurtLibrary, CrossInliner);
 
     // Replace calls to getSystemData
     for (auto *Call : Data.GetSystemDataCalls) {
-      B.SetInsertPoint(Call);
+      Builder.SetInsertPoint(Call);
       auto *SystemDataTy = Call->getFunctionType()->getReturnType();
-      auto *SystemDataPtr = getDXILSystemData(B, Data.SystemData,
+      auto *SystemDataPtr = getDXILSystemData(Builder, Data.SystemData,
                                               Data.SystemDataTy, SystemDataTy);
-      auto *SystemData = B.CreateLoad(SystemDataTy, SystemDataPtr);
+      auto *SystemData = Builder.CreateLoad(SystemDataTy, SystemDataPtr);
       Call->replaceAllUsesWith(SystemData);
       Call->eraseFromParent();
     }
 
-    B.SetInsertPoint(
+    Builder.SetInsertPoint(
         &*FuncData.first->getEntryBlock().getFirstNonPHIOrDbgOrAlloca());
     if (FuncData.first->hasMetadata(DXILContHelper::MDEntryName)) {
       // Initialize system data for the start part of the entry shader
-      auto *TmpSystemData = B.CreateCall(SetupRayGen);
-      B.CreateStore(TmpSystemData, Data.SystemData);
+      auto *TmpSystemData = Builder.CreateCall(SetupRayGen);
+      Builder.CreateStore(TmpSystemData, Data.SystemData);
+      CrossInliner.inlineCall(*TmpSystemData);
+      Builder.SetInsertPoint(&*Builder.GetInsertPoint());
     } else {
       // Initialize the new system data alloca with the passed argument.
-      B.CreateStore(FuncData.first->getArg(Data.IsStart ? 2 : 1),
-                    Data.SystemData);
+      Builder.CreateStore(FuncData.first->getArg(Data.IsStart ? 2 : 1),
+                          Data.SystemData);
     }
 
     Data.SystemData->setName("system.data");
   }
 
-  Changed |= lowerGetResumePointAddr(M, B, ToProcess);
+  return !ToProcess.empty();
+}
 
+bool DXILContPostProcessPassImpl::unfoldGlobals() {
   // Replace register globals with indices into a bigger global
-  const auto &DL = M.getDataLayout();
+  const auto &DL = Mod->getDataLayout();
   GlobalVariable *PayloadGlobal =
-      M.getGlobalVariable(DXILContHelper::GlobalPayloadName);
-  GlobalVariable *ContStateGlobal =
-      M.getGlobalVariable(DXILContHelper::GlobalContStateName);
+      Mod->getGlobalVariable(DXILContHelper::GlobalPayloadName);
 
-  if (PayloadGlobal || ContStateGlobal) {
-    Changed = true;
-
+  if (PayloadGlobal) {
     // We use the maximum size for the continuation state and the actual size
     // for the payload, so that the offset of the payload stays the same, but
     // the global is only as big as necessary.
     uint32_t RequiredSize =
-        (PayloadGlobal->getValueType()->getArrayNumElements() +
-         ContinuationStateRegisterCount) *
-        RegisterBytes;
+        PayloadGlobal->getValueType()->getArrayNumElements() * RegisterBytes;
 
     // Put continuation state first, it's callee save so we need to have it
     // full in all cases. Payload can be truncated, so the backend is free to
-    // use registers that are unused in a function
-
-    auto *I32 = Type::getInt32Ty(M.getContext());
+    // use registers that are unused in a function.
+    auto *I32 = Type::getInt32Ty(Mod->getContext());
     auto *RegistersTy = ArrayType::get(I32, RequiredSize / RegisterBytes);
-    Registers = cast<GlobalVariable>(M.getOrInsertGlobal(
+    Registers = cast<GlobalVariable>(Mod->getOrInsertGlobal(
         DXILContHelper::GlobalRegistersName, RegistersTy, [&] {
           return new GlobalVariable(
-              M, RegistersTy, false, GlobalVariable::ExternalLinkage, nullptr,
-              DXILContHelper::GlobalRegistersName, nullptr,
+              *Mod, RegistersTy, false, GlobalVariable::ExternalLinkage,
+              nullptr, DXILContHelper::GlobalRegistersName, nullptr,
               GlobalVariable::NotThreadLocal, GlobalRegisterAddrspace);
         }));
 
-    if (ContStateGlobal)
-      replaceGlobal(DL, Registers, ContStateGlobal, 0);
-    if (PayloadGlobal)
-      replaceGlobal(DL, Registers, PayloadGlobal,
-                    ContinuationStateRegisterCount * RegisterBytes);
+    replaceGlobal(DL, Registers, PayloadGlobal, 0);
+
+    return true;
   }
 
-  Function *ContStackAlloc = nullptr;
+  return false;
+}
 
-  for (auto &F : M.functions()) {
+bool DXILContPostProcessPassImpl::handleAmdInternals(
+    llvm::ModuleAnalysisManager &AnalysisManager) {
+  bool Changed = false;
+  SmallVector<Function *> ContStackAllocs;
+
+  for (auto &F : Mod->functions()) {
     auto Name = F.getName();
     if (Name.startswith("_AmdValueI32Count")) {
       Changed = true;
-      handleValueI32Count(B, F);
+      handleValueI32Count(F);
     } else if (Name.startswith("_AmdValueGetI32")) {
       Changed = true;
-      handleValueGetI32(B, F);
+      handleValueGetI32(F);
     } else if (Name.startswith("_AmdValueSetI32")) {
       Changed = true;
-      handleValueSetI32(B, F);
-    } else if (Name == "_AmdContPayloadRegistersI32Count") {
+      handleValueSetI32(F);
+    } else if (Name.starts_with("_AmdContPayloadRegistersI32Count")) {
       Changed = true;
       handleContPayloadRegisterI32Count(F);
-    } else if (Name == "_AmdContPayloadRegistersGetI32") {
+    } else if (Name.starts_with("_AmdContPayloadRegistersGetI32")) {
       Changed = true;
-      handleContPayloadRegistersGetI32(B, F);
-    } else if (Name == "_AmdContPayloadRegistersSetI32") {
+      handleContPayloadRegistersGetI32(F);
+    } else if (Name.starts_with("_AmdContPayloadRegistersSetI32")) {
       Changed = true;
-      handleContPayloadRegistersSetI32(B, F);
-    } else if (Name == "_AmdContStackAlloc") {
+      handleContPayloadRegistersSetI32(F);
+    } else if (Name.starts_with("_AmdContStackAlloc")) {
       Changed = true;
-      ContStackAlloc = &F;
+      ContStackAllocs.push_back(&F);
     }
   }
 
-  if (ContStackAlloc) {
-    auto &FAM = AnalysisManager.getResult<FunctionAnalysisManagerModuleProxy>(M)
-                    .getManager();
-    handleContStackAlloc(FAM, B, *ContStackAlloc);
+  if (!ContStackAllocs.empty()) {
+    auto &FAM =
+        AnalysisManager.getResult<FunctionAnalysisManagerModuleProxy>(*Mod)
+            .getManager();
+    for (auto *F : ContStackAllocs)
+      handleContStackAlloc(FAM, *F);
   }
 
-  Changed |= fixupDxilMetadata(M);
+  return Changed;
+}
+
+DXILContPostProcessPassImpl::DXILContPostProcessPassImpl(Module &M,
+                                                         Module &GpurtLibrary)
+    : Mod{&M}, GpurtLibrary{&GpurtLibrary},
+      SetupRayGen{GpurtLibrary.getFunction("_cont_SetupRayGen")},
+      Builder{Mod->getContext()} {}
+
+bool DXILContPostProcessPassImpl::run(
+    llvm::ModuleAnalysisManager &AnalysisManager) {
+  bool Changed = false;
+
+  collectProcessableFunctions();
+
+  Changed |= handleIntrinsicCalls();
+  Changed |= handleGetSystemDataCalls();
+  for (auto &F : make_early_inc_range(*Mod)) {
+    if (F.getName().starts_with("_AmdGetResumePointAddr")) {
+      Changed = true;
+      lowerGetResumePointAddr(F);
+    }
+  }
+  Changed |= unfoldGlobals();
+  Changed |= handleAmdInternals(AnalysisManager);
+
+  Changed |= fixupDxilMetadata(*Mod);
 
   // Change function pointer accesses to include metadata
-  Changed |= addGetAddrAndMDIntrinsicCalls(M);
+  Changed |= addGetAddrAndMDIntrinsicCalls(*Mod);
 
 #ifndef NDEBUG
-  checkContinuationsModule(M);
+  checkContinuationsModule(*Mod);
 #endif
 
   if (ReportContStateSizes || ReportAllSizes)
-    reportContStateSizes(M);
+    reportContStateSizes(*Mod);
+
   if (ReportPayloadRegisterSizes || ReportAllSizes)
-    reportPayloadSizes(M);
+    reportPayloadSizes(*Mod);
+
   if (ReportSystemDataSizes || ReportAllSizes)
-    reportSystemDataSizes(M, ToProcess);
+    reportSystemDataSizes(*Mod, ToProcess);
 
-  Changed |= llvm::removeUnusedFunctionDecls(&M, false);
+  Changed |= llvm::removeUnusedFunctionDecls(Mod, false);
 
-  if (Changed)
-    return PreservedAnalyses::none();
-  return PreservedAnalyses::all();
+  return Changed;
+}
+} // anonymous namespace
+
+llvm::PreservedAnalyses
+DXILContPostProcessPass::run(llvm::Module &Module,
+                             llvm::ModuleAnalysisManager &AnalysisManager) {
+  LLVM_DEBUG(dbgs() << "Run the pass dxil-cont-post-process\n");
+  AnalysisManager.getResult<DialectContextAnalysis>(Module);
+
+  DXILContPostProcessPassImpl Impl{Module,
+                                   GpurtLibrary ? *GpurtLibrary : Module};
+  bool Changed = Impl.run(AnalysisManager);
+
+  return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }

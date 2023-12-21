@@ -4,32 +4,32 @@
 
 ; SHADERTEST_PP0: define {{.*}} @_amdgpu_ls_main
 ; SHADERTEST_PP0: [[VERTEX_BASE:%[0-9a-zA-Z.]+]] = mul i32 %RelVertexId,
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 44
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 45
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 46
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 47
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 1
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 4
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 5
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 8
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 9
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 10
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 12
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 16
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 20
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 24
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 28
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 29
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 30
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 31
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 32
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 33
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 36
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 37
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 38
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 39
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 40
-; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 41
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 44
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 45
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 46
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 47
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 1
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 4
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 5
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 8
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 9
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 10
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 12
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 16
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 20
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 24
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 28
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 29
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 30
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 31
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 32
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 33
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 36
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 37
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 38
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 39
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 40
+; SHADERTEST_PP0: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 41
 ; SHADERTEST_PP0: call void @llvm.amdgcn.exp.f32(i32 {{.*}}32, i32 {{.*}}15, float %{{[^,]*}}, float %{{[^,]*}}, float %{{[^,]*}}, float %{{[^,]*}}, i1 {{.*}}false, i1 {{.*}}false)
 ; SHADERTEST_PP0: call void @llvm.amdgcn.exp.f32(i32 {{.*}}33, i32 {{.*}}3, float %{{[^,]*}}, float %{{[^,]*}}, float poison, float poison, i1 {{.*}}false, i1 {{.*}}false)
 ; SHADERTEST_PP0: call float @llvm.amdgcn.interp.p1(float %{{[^,]*}}, i32 immarg 1, i32 immarg 1, i32 %PrimMask)
@@ -55,32 +55,32 @@
 ; SHADERTEST_PP1-LABEL: {{^// LLPC}} pipeline patching results
 ; SHADERTEST_PP1: define {{.*}} @_amdgpu_ls_main
 ; SHADERTEST_PP1: [[VERTEX_BASE:%[0-9a-zA-Z.]+]] = mul i32 %RelVertexId,
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 44
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 45
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 46
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 47
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 1
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 4
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 5
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 8
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 9
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 10
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 12
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 16
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 20
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 24
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 28
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 29
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 30
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 31
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 32
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 33
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 36
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 37
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 38
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 39
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 40
-; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} i32 [[VERTEX_BASE]], 41
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 44
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 45
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 46
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 47
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 1
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 4
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 5
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 8
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 9
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 10
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 12
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 16
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 20
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 24
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 28
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 29
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 30
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 31
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 32
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 33
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 36
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 37
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 38
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 39
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 40
+; SHADERTEST_PP1: %{{[0-9]*}} = {{add|or}} {{.*}}i32 [[VERTEX_BASE]], 41
 ; SHADERTEST_PP1: call void @llvm.amdgcn.exp.f32(i32 {{.*}}32, i32 {{.*}}15, float %{{[^,]*}}, float %{{[^,]*}}, float %{{[^,]*}}, float %{{[^,]*}}, i1 {{.*}}false, i1 {{.*}}false)
 ; SHADERTEST_PP1: call void @llvm.amdgcn.exp.f32(i32 {{.*}}33, i32 {{.*}}3, float %{{[^,]*}}, float %{{[^,]*}}, float poison, float poison, i1 {{.*}}false, i1 {{.*}}false)
 ; SHADERTEST_PP1: AMDLLPC SUCCESS

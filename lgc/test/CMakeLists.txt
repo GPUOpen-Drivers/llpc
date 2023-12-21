@@ -32,7 +32,16 @@ set(LGC_TEST_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 # required by configure_lit_site_cfg
 set(LLVM_LIT_OUTPUT_DIR ${LLVM_TOOLS_BINARY_DIR})
-get_target_property(LIT_DEFINITIONS LLVMlgc INTERFACE_COMPILE_DEFINITIONS)
+
+# When cross-compiling (or compiling a release tablegen), external llvm projects are defined but other projects are not.
+# We expect that tests are not run in a cmake configuration where llpc_version does not exist, so we only use its
+# definitions when it is available.
+if (TARGET llpc_version)
+  get_target_property(LGC_LIT_DEFINITIONS LLVMlgc COMPILE_DEFINITIONS)
+  get_target_property(LIT_DEFINITIONS llpc_version INTERFACE_COMPILE_DEFINITIONS)
+  list(APPEND LIT_DEFINITIONS ${LGC_LIT_DEFINITIONS})
+endif()
+
 configure_lit_site_cfg(
   ${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.py.in
   ${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg.py

@@ -127,7 +127,7 @@ static const char SampleShadingMetaName[] = "lgc.sample.shading";
 // The front-end should zero-initialize a struct with "= {}" in case future changes add new fields.
 // Note: new fields must be added to the end of this structure to maintain test compatibility.
 union Options {
-  unsigned u32All[36];
+  unsigned u32All[40];
   struct {
     uint64_t hash[2];                 // Pipeline hash to set in ELF PAL metadata
     unsigned includeDisassembly;      // If set, the disassembly for all compiled shaders will be included
@@ -178,10 +178,15 @@ union Options {
     bool fragCoordUsesInterpLoc;  // Determining fragCoord use InterpLoc
     bool disableSampleMask;       // Disable export of sample mask from PS
     unsigned reserved20;
-    RayTracingIndirectMode rtIndirectMode; // Ray tracing indirect mode
-    bool enablePrimGeneratedQuery;         // Whether to enable primitive generated counter
-    bool enableFragColor;                  // If enabled, do frag color broadcast
-    unsigned cpsFlags;                     // CPS feature flags
+    RayTracingIndirectMode rtIndirectMode;   // Ray tracing indirect mode
+    bool enablePrimGeneratedQuery;           // Whether to enable primitive generated counter
+    bool enableFragColor;                    // If enabled, do frag color broadcast
+    bool useSoftwareVertexBufferDescriptors; // Use software vertex buffer descriptors to structure SRD.
+    unsigned cpsFlags;                       // CPS feature flags
+    unsigned rtBoxSortHeuristicMode;         // Ray tracing box sort heuristic mode
+    unsigned rtStaticPipelineFlags;          // Ray tracing static pipeline flags
+    unsigned rtTriCompressMode;              // Ray tracing triangle compression mode
+    bool useGpurt;                           // Whether GPURT is used
   };
 };
 static_assert(sizeof(Options) == sizeof(Options::u32All));
@@ -467,7 +472,7 @@ struct ColorExportFormat {
 struct ColorExportState {
   unsigned alphaToCoverageEnable;        // Enable alpha to coverage
   unsigned dualSourceBlendEnable;        // Blend state bound at draw time will use a dual source blend mode
-  unsigned dynamicDualSourceBlendEnable; // Dynamic dual source blend enable
+  unsigned dualSourceBlendDynamicEnable; // Dual source blend mode is dynamically set
 };
 
 // MultiView supporting mode
@@ -655,6 +660,7 @@ struct FragmentShaderMode {
   unsigned postDepthCoverage;
   unsigned earlyAndLatFragmentTests;
   unsigned innerCoverage;
+  unsigned waveOpsExcludeHelperLanes;
   ConservativeDepth conservativeDepth;
   ConservativeDepth conservativeStencilFront;
   ConservativeDepth conservativeStencilBack;
@@ -948,7 +954,7 @@ public:
   // Compute the ExportFormat (as an opaque int) of the specified color export location with the specified output
   // type. Only the number of elements of the type is significant.
   // This is not used in a normal compile; it is only used by amdllpc's -check-auto-layout-compatible option.
-  virtual unsigned computeExportFormat(llvm::Type *outputTy, unsigned location) = 0;
+  virtual unsigned computeExportFormat(llvm::Type *outputTy, unsigned location, bool isDynamicDsBlend = false) = 0;
 
 private:
   LgcContext *m_builderContext; // Builder context

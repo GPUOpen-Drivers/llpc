@@ -78,7 +78,7 @@
 ; SHADERTEST-LABEL: .handleMultiWave:
 ; SHADERTEST-NEXT: %hsPatchWaveCount = lshr i32 %[[HS_PATCH_COUNT_ADJUST]], 6
 ; SHADERTEST-NEXT: %[[WAVE_ID_OFFSET:[^ ,]*]] = shl nuw nsw i32 %waveIdInGroup, 1
-; SHADERTEST-NEXT: %[[ALL_ONES_OFFSET:[^ ,]*]] = or i32 %[[WAVE_ID_OFFSET]], 641
+; SHADERTEST-NEXT: %[[ALL_ONES_OFFSET:[^ ,]*]] = or {{.*}}i32 %[[WAVE_ID_OFFSET]], 641
 ; SHADERTEST-NEXT: %[[IS_ALL_ONES_TF:[^ ,]*]] = zext i1 %isAllOnesTfInWave to i32
 ; SHADERTEST-NEXT: %[[ALL_ONES_PTR:[^ ,]*]] = getelementptr [16384 x i32], ptr addrspace(3) @Lds, i32 0, i32 %[[ALL_ONES_OFFSET]]
 ; SHADERTEST-NEXT: store i32 %[[IS_ALL_ONES_TF]], ptr addrspace(3) %[[ALL_ONES_PTR]], align 4
@@ -140,7 +140,7 @@
 
 ; SHADERTEST-LABEL: .endTryStoreTf:
 ; SHADERTEST-NEXT: ret void
-  
+
 [Version]
 version = 57
 

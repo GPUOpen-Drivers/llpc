@@ -342,6 +342,10 @@ Options PipelineContext::computePipelineOptions() const {
   options.enablePrimGeneratedQuery = getPipelineOptions()->enablePrimGeneratedQuery;
   options.enableFragColor = getPipelineOptions()->enableFragColor;
 
+  options.rtBoxSortHeuristicMode = m_rtState.boxSortHeuristicMode;
+  options.rtStaticPipelineFlags = m_rtState.staticPipelineFlags;
+  options.rtTriCompressMode = m_rtState.triCompressMode;
+
   return options;
 }
 

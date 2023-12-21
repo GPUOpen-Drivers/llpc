@@ -47,14 +47,15 @@
 CONT_MODULE_ANALYSIS("dialect-context-analysis",
                      DialectContextAnalysis(NeedDialectContext))
 
-CONT_MODULE_PASS("legacy-cleanup-continuations", LegacyCleanupContinuationsPass())
+CONT_MODULE_PASS("legacy-cleanup-continuations",
+                 LegacyCleanupContinuationsPass())
 CONT_MODULE_PASS("cleanup-continuations", CleanupContinuationsPass())
 CONT_MODULE_PASS("lower-raytracing-pipeline", LowerRaytracingPipelinePass())
 CONT_MODULE_PASS("dxil-cont-intrinsic-prepare", DXILContIntrinsicPreparePass())
-CONT_MODULE_PASS("dxil-cont-lgc-rt-op-converter", DXILContLgcRtOpConverterPass())
+CONT_MODULE_PASS("dxil-cont-lgc-rt-op-converter",
+                 DXILContLgcRtOpConverterPass())
 CONT_MODULE_PASS("dxil-cont-post-process", DXILContPostProcessPass())
 CONT_MODULE_PASS("dxil-cont-post-hook", DXILContPostHookPass())
-CONT_MODULE_PASS("pre-coroutine-lowering", PreCoroutineLoweringPass())
 CONT_MODULE_PASS("dxil-cont-pre-hook", DXILContPreHookPass())
 CONT_MODULE_PASS("lower-await", LowerAwaitPass())
 CONT_MODULE_PASS("register-buffer", RegisterBufferPass())

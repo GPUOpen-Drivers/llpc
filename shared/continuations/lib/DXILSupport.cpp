@@ -179,7 +179,7 @@ bool llvm::DXILMaterializable(Instruction &OrigI) {
       // be rematerialized are replaced by their implementation, so that the
       // necessary values can be put into the coroutine frame. Therefore, we
       // can assume all left-over intrinsics can be rematerialized.
-      if (isRematerializableLgcRtOp(*CInst))
+      if (DXILContHelper::isRematerializableLgcRtOp(*CInst))
         return true;
 
       auto CalledName = CalledFunc->getName();

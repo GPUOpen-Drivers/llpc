@@ -46,7 +46,7 @@ public:
   virtual ~VertexFetch() {}
 
   // Create a VertexFetch
-  static VertexFetch *create(LgcContext *lgcContext);
+  static VertexFetch *create(LgcContext *lgcContext, bool useSoftwareVertexBufferDescriptors);
 
   // Generate code to fetch a vertex value
   virtual llvm::Value *fetchVertex(llvm::Type *inputTy, const VertexInputDescription *description, unsigned location,

@@ -53,6 +53,7 @@
 
 #pragma once
 
+#include "compilerutils/LoweringPointerTupleMap.h"
 #include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
@@ -166,27 +167,13 @@ private:
   llvm::SmallVector<std::function<TypeLoweringFn>> m_rules;
   llvm::SmallVector<std::function<ConstantTypeLoweringFn>> m_constantRules;
 
-  /// Cache 1-1 mappings of types (including no-op mappings).
-  llvm::DenseMap<llvm::Type *, llvm::Type *> m_unaryTypeConversions;
-
-  /// Cache 1-N mappings of types.
-  llvm::DenseMap<llvm::Type *, llvm::SmallVector<llvm::Type *, 2>> m_multiTypeConversions;
+  /// Cache mappings of types (including no-op mappings).
+  compilerutils::LoweringPointerTupleMap<llvm::Type *, llvm::Type *, false> m_typeConversions;
 
   llvm::IRBuilder<> m_builder;
 
   /// Map original values to type-converted values.
-  ///
-  /// For 1-1 mappings, this stores a value pointer.
-  /// For 1-N mappings, this stores ((index << 1) | 1), where index is the index
-  /// into m_convertedValueList at which the converted values can be found.
-  llvm::DenseMap<llvm::Value *, uintptr_t> m_valueMap;
-  std::vector<llvm::Value *> m_convertedValueList;
-
-  /// Reverse map of values that occur as type-converted values to where they
-  /// occur. The vector elements are either a value pointer (for 1-1 mapped
-  /// values) or ((index << 1) | 1), where index is the index into
-  /// m_convertedValueList.
-  llvm::DenseMap<llvm::Value *, llvm::SmallVector<uintptr_t>> m_valueReverseMap;
+  compilerutils::LoweringPointerTupleMap<llvm::Value *, llvm::Value *, true> m_valueMap;
 
   std::vector<std::pair<llvm::PHINode *, llvm::SmallVector<llvm::PHINode *>>> m_phis;
   std::vector<llvm::Instruction *> m_instructionsToErase;

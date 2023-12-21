@@ -191,23 +191,16 @@ void TypeLowering::addConstantRule(std::function<ConstantTypeLoweringFn> rule) {
 //
 // @param ty : the type
 ArrayRef<Type *> TypeLowering::convertType(Type *ty) {
-  auto unaryIt = m_unaryTypeConversions.find(ty);
-  if (unaryIt != m_unaryTypeConversions.end())
-    return ArrayRef(unaryIt->second);
-
-  auto multiIt = m_multiTypeConversions.find(ty);
-  if (multiIt != m_multiTypeConversions.end())
-    return multiIt->second;
+  auto conversion = m_typeConversions.lookup(ty);
+  if (!conversion.empty())
+    return conversion;
 
   for (const auto &rule : reverse(m_rules)) {
     SmallVector<Type *> types = rule(*this, ty);
     if (types.empty())
       continue;
 
-    if (types.size() == 1)
-      return ArrayRef(m_unaryTypeConversions.try_emplace(ty, types[0]).first->second);
-
-    return m_multiTypeConversions.try_emplace(ty, std::move(types)).first->second;
+    return m_typeConversions.set(ty, types);
   }
 
   llvm_unreachable("core/fallback rule should prevent us from reaching this point");
@@ -252,8 +245,8 @@ SmallVector<Value *> TypeLowering::getValue(Value *val) {
 //
 // @param val : the value
 SmallVector<Value *> TypeLowering::getValueOptional(Value *val) {
-  auto valueIt = m_valueMap.find(val);
-  if (valueIt == m_valueMap.end()) {
+  auto mapping = m_valueMap.lookup(val);
+  if (mapping.empty()) {
     auto *constant = dyn_cast<Constant>(val);
     if (!constant)
       return {};
@@ -278,19 +271,10 @@ SmallVector<Value *> TypeLowering::getValueOptional(Value *val) {
 
     recordValue(val, converted);
 
-    valueIt = m_valueMap.find(val);
-    assert(valueIt != m_valueMap.end());
+    mapping = m_valueMap.lookup(val);
   }
 
-  if ((valueIt->second & 1) == 0) {
-    return SmallVector<Value *>(ArrayRef(reinterpret_cast<Value *>(valueIt->second)));
-  }
-
-  size_t begin = valueIt->second >> 1;
-  auto typeIt = m_multiTypeConversions.find(val->getType());
-  assert(typeIt != m_multiTypeConversions.end());
-  size_t count = typeIt->second.size();
-  return SmallVector<Value *>(ArrayRef(&m_convertedValueList[begin], count));
+  return SmallVector<Value *>(mapping);
 }
 
 // =====================================================================================================================
@@ -317,29 +301,12 @@ void TypeLowering::replaceInstruction(Instruction *inst, ArrayRef<Value *> mappi
 // @param val : the value for which a mapping is recorded
 // @param mapping : the mapping that is recorded for the value
 void TypeLowering::recordValue(Value *val, ArrayRef<Value *> mapping) {
-  assert(!m_valueMap.count(val));
+  assert(m_valueMap.lookup(val).empty());
 
-  if (mapping.size() == 1) {
-    m_valueMap.try_emplace(val, reinterpret_cast<uintptr_t>(mapping[0]));
-#ifndef NDEBUG
-    auto types = convertType(val->getType());
-    assert(types.size() == 1);
-    assert(types[0] == mapping[0]->getType());
-#endif
-    m_valueReverseMap[mapping[0]].emplace_back(reinterpret_cast<uintptr_t>(val));
-    return;
-  }
+  (void)m_valueMap.set(val, mapping);
 
-  uintptr_t index = m_convertedValueList.size();
-  uintptr_t code = (index << 1) | 1;
-  m_convertedValueList.insert(m_convertedValueList.end(), mapping.begin(), mapping.end());
-  m_valueMap.try_emplace(val, code);
-  for (auto e : llvm::enumerate(mapping)) {
-    m_valueReverseMap[e.value()].emplace_back(((index + e.index()) << 1) | 1);
-  }
-
-  // Unconditionally perform the conversion to ensure that it is available in
-  // getValue.
+  // Unconditionally perform the type conversion to ensure that it is available
+  // in getValue.
   auto types = convertType(val->getType());
   assert(types.size() == mapping.size());
   for (size_t idx = 0; idx < types.size(); ++idx) {
@@ -370,30 +337,7 @@ void TypeLowering::eraseInstruction(llvm::Instruction *inst) {
 // @param with : the new value to replace it with in all mappings in which
 // it appears
 void TypeLowering::replaceMappingWith(Value *toReplace, Value *with) {
-  if (toReplace == with)
-    return;
-
-  auto toReplaceIt = m_valueReverseMap.find(toReplace);
-  if (toReplaceIt == m_valueReverseMap.end())
-    return;
-
-  SmallVector<uintptr_t> occurrences = std::move(toReplaceIt->second);
-  m_valueReverseMap.erase(toReplaceIt);
-
-  for (uintptr_t occurrence : occurrences) {
-    if (occurrence & 1) {
-      m_convertedValueList[occurrence >> 1] = with;
-    } else {
-      m_valueMap.find(reinterpret_cast<Value *>(occurrence))->second = reinterpret_cast<uintptr_t>(with);
-    }
-  }
-
-  auto withIt = m_valueReverseMap.find(with);
-  if (withIt != m_valueReverseMap.end()) {
-    withIt->second.append(occurrences);
-  } else {
-    m_valueReverseMap.try_emplace(with, std::move(occurrences));
-  }
+  m_valueMap.replaceAllUsesOfWith(toReplace, with);
 }
 
 // =====================================================================================================================
@@ -472,8 +416,6 @@ bool TypeLowering::finishCleanup() {
   m_functionsToErase.clear();
 
   m_valueMap.clear();
-  m_convertedValueList.clear();
-  m_valueReverseMap.clear();
 
   return changed;
 }

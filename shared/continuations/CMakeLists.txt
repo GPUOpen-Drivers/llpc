@@ -22,7 +22,6 @@ add_llvm_library(LLVMContinuations
   lib/DXILContIntrinsicPrepare.cpp
   lib/DXILContLgcRtOpConverter.cpp
   lib/DXILContPostProcess.cpp
-  lib/PreCoroutineLowering.cpp
   lib/DXILMetadata.cpp
   lib/DXILSupport.cpp
   lib/GpurtDialect.cpp
@@ -58,7 +57,7 @@ target_include_directories(LLVMContinuations PUBLIC
 
 llvm_map_components_to_libnames(extra_llvm_libs CompilerUtils)
 
-target_link_libraries(LLVMContinuations PUBLIC ${extra_llvm_libs})
+target_link_libraries(LLVMContinuations PUBLIC llvm_dialects ${extra_llvm_libs} llpc_version)
 set_compiler_options(LLVMContinuations)
 
 # TableGen for dialects

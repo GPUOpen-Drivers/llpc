@@ -77,6 +77,8 @@ const char *ShaderInputs::getSpecialUserDataName(UserDataMapping kind) {
     return "StreamOutControlBuf";
   case UserDataMapping::ColorExportAddr:
     return "ColorExportAddr";
+  case UserDataMapping::DynamicDualSrcBlendInfo:
+    return "DualSourceBlendUpdateInfo";
   default:
     return "";
   }

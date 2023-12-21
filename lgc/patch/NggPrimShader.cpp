@@ -7490,7 +7490,7 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
 
   // If we don't clone the target function, we are going to run it and handle vertex attribute through memory here.
   if (dontClone) {
-    // Setup attribute ring base and relative vertx index in subgroup as two additional arguments to export vertex
+    // Setup attribute ring base and relative vertex index in subgroup as two additional arguments to export vertex
     // attributes through memory
     if (m_gfxIp.major >= 11 && !m_hasGs) { // For GS, vertex attribute exports are in copy shader
       const auto attribCount =

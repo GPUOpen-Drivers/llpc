@@ -125,18 +125,9 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
     argTys = {int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty};
 
     argInReg = {true, true, true, true, true, true, true, true, true, false};
-    // clang-format off
-    argNames = {"globalTable",
-                "esGsLdsSize",
-                "streamOutTable",
-                "streamOutInfo",
-                "streamOutWriteIndex",
-                "streamOutOffset0",
-                "streamOutOffset1",
-                "streamOutOffset2",
-                "streamOutOffset3",
-                "vertexOffset"};
-    // clang-format on
+
+    argNames = {"globalTable",      "esGsLdsSize",      "streamOutTable",   "streamOutInfo",    "streamOutWriteIndex",
+                "streamOutOffset0", "streamOutOffset1", "streamOutOffset2", "streamOutOffset3", "vertexOffset"};
   } else {
     // If NGG, the copy shader is not a real HW VS and will be incorporated into NGG primitive shader finally. Thus,
     // the argument definitions are decided by compiler not by HW. We could have such variable layout (not fixed with

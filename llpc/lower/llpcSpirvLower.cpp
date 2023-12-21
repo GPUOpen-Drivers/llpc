@@ -59,7 +59,6 @@
 // New version of the code (also handles unknown version, which we treat as latest)
 #include "llvm/IRPrinter/IRPrintingPasses.h"
 #endif
-#include "LowerGpuRt.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Transforms/AggressiveInstCombine/AggressiveInstCombine.h"
 #include "llvm/Transforms/IPO.h"
@@ -211,14 +210,6 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   // Lower SPIR-V global variables, inputs, and outputs
   passMgr.addPass(SpirvLowerGlobal());
 
-  // Lower SPIR-V ray tracing related stuff, including entry point generation, lgc.rt dialect handling, some of
-  // lgc.gpurt dialect handling.
-  // And do inlining after SpirvLowerRayTracing as it will produce some extra functions.
-  if (rayTracing) {
-    passMgr.addPass(SpirvLowerRayTracing());
-    passMgr.addPass(AlwaysInlinerPass());
-  }
-
   // Lower SPIR-V constant immediate store.
   passMgr.addPass(SpirvLowerConstImmediateStore());
 
@@ -263,9 +254,19 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   // Lower SPIR-V instruction metadata remove
   passMgr.addPass(SpirvLowerInstMetaRemove());
 
-  if (rayTracing || rayQuery || isInternalRtShader) {
-    passMgr.addPass(LowerGpuRt());
+  // Lower SPIR-V ray tracing related stuff, including entry point generation, lgc.rt dialect handling, some of
+  // lgc.gpurt dialect handling.
+  // And do inlining after SpirvLowerRayTracing as it will produce some extra functions.
+  if (rayTracing) {
+    assert(context->getPipelineType() == PipelineType::RayTracing);
+    auto *pipelineInfo = static_cast<const RayTracingPipelineBuildInfo *>(context->getPipelineBuildInfo());
+    if (pipelineInfo->mode != Vkgc::LlpcRaytracingMode::Continuations) {
+      passMgr.addPass(SpirvLowerRayTracing());
+      passMgr.addPass(AlwaysInlinerPass());
+    }
+  }
 
+  if (rayTracing || rayQuery || isInternalRtShader) {
     FunctionPassManager fpm;
     fpm.addPass(SROAPass(SROAOptions::PreserveCFG));
     fpm.addPass(InstCombinePass(instCombineOpt));
@@ -323,12 +324,14 @@ void SpirvLower::replaceGlobal(Context *context, GlobalVariable *original, Globa
 void SpirvLower::init(Module *module) {
   m_module = module;
   m_context = static_cast<Context *>(&m_module->getContext());
-  if (m_module->empty()) {
+  SmallVector<Function *> entries;
+  getEntryPoints(module, entries);
+  if (entries.size() != 1) {
     m_shaderStage = ShaderStageInvalid;
     m_entryPoint = nullptr;
   } else {
-    m_shaderStage = getShaderStageFromModule(m_module);
-    m_entryPoint = getEntryPoint(m_module);
+    m_entryPoint = entries[0];
+    m_shaderStage = getShaderStageFromFunction(m_entryPoint);
     if (m_shaderStage == ShaderStageInvalid) {
       // There might be cases we fail to get shader stage from a module that is not directly converted from SPIR-V, for
       // example, unified ray tracing pipeline shader, or entry for indirect ray tracing pipeline. In such case, clamp

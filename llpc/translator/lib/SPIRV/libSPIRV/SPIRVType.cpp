@@ -64,7 +64,7 @@ SPIRVWord SPIRVType::getBitWidth() const {
   if (isTypeMatrix())
     return getMatrixColumnType()->getBitWidth();
   if (isTypeBool())
-    return 1;
+    return 32;
   return isTypeInt() ? getIntegerBitWidth() : getFloatBitWidth();
 }
 
@@ -76,7 +76,7 @@ SPIRVWord SPIRVType::getFloatBitWidth() const {
 SPIRVWord SPIRVType::getIntegerBitWidth() const {
   assert((OpCode == OpTypeInt || OpCode == OpTypeBool) && "Not an integer type");
   if (isTypeBool())
-    return 1;
+    return 32;
   return static_cast<const SPIRVTypeInt *const>(this)->getBitWidth();
 }
 

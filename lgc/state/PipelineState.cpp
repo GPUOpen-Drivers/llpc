@@ -1199,8 +1199,9 @@ void PipelineState::setColorExportState(ArrayRef<ColorExportFormat> formats, con
 // Get format for one color export
 //
 // @param location : Export location
-const ColorExportFormat &PipelineState::getColorExportFormat(unsigned location) {
-  if (getColorExportState().dualSourceBlendEnable || getColorExportState().dynamicDualSourceBlendEnable)
+// @param dsBlendUpdate: The new value for the dynamicDualSourceBlend
+const ColorExportFormat &PipelineState::getColorExportFormat(unsigned location, bool isDynamicDualSourceBlend) {
+  if (getColorExportState().dualSourceBlendEnable || isDynamicDualSourceBlend)
     location = 0;
 
   if (location >= m_colorExportFormats.size()) {
@@ -1623,8 +1624,9 @@ InterfaceData *PipelineState::getShaderInterfaceData(ShaderStage shaderStage) {
 //
 // @param outputTy : Color output type
 // @param location : Location
-unsigned PipelineState::computeExportFormat(Type *outputTy, unsigned location) {
-  const ColorExportFormat *colorExportFormat = &getColorExportFormat(location);
+// @param isDynamicDualSrcBlend: Identify whether do dualSourceBlend
+unsigned PipelineState::computeExportFormat(Type *outputTy, unsigned location, bool isDynamicDualSrcBlend) {
+  const ColorExportFormat *colorExportFormat = &getColorExportFormat(location, isDynamicDualSrcBlend);
   unsigned outputMask = outputTy->isVectorTy() ? (1 << cast<FixedVectorType>(outputTy)->getNumElements()) - 1 : 1;
   const auto cbState = &getColorExportState();
   // NOTE: Alpha-to-coverage only takes effect for outputs from color target 0.
@@ -1632,8 +1634,7 @@ unsigned PipelineState::computeExportFormat(Type *outputTy, unsigned location) {
   // format.
   const bool enableAlphaToCoverage =
       (cbState->alphaToCoverageEnable &&
-       ((location == 0) ||
-        ((location == 1) && (cbState->dualSourceBlendEnable || cbState->dynamicDualSourceBlendEnable))));
+       ((location == 0) || ((location == 1) && (cbState->dualSourceBlendEnable || isDynamicDualSrcBlend))));
 
   const bool blendEnabled = colorExportFormat->blendEnable;
 

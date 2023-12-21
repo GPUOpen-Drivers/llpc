@@ -81,13 +81,29 @@ const char *getShaderStageAbbreviation(ShaderStage shaderStage, bool upper) {
 }
 
 // =====================================================================================================================
+// Wrapper around thread-safe versions of strtok
+static char *safeStrtok(char *s, const char *delim, char **savePtr) {
+  // strtok* and friends are a mess:
+  // * strtok is not thread-safe in standard C
+  // * POSIX defined thread-safe strtok_r long ago
+  // * Microsoft added strtok_s with the same signature and semantics but different name
+  // * C11 added strtok_s with a different signature from Microsoft's strtok_s
+#if defined(_WIN32)
+  return strtok_s(s, delim, savePtr);
+#else
+  return strtok_r(s, delim, savePtr);
+#endif
+}
+
+// =====================================================================================================================
 // Create directory recursively.
 //
 // @param dir : The path of directory
 bool createDirectory(const char *dir) {
   namespace fs = std::filesystem;
   char *dirdup = strdup(dir);
-  char *token = strtok(dirdup, "/");
+  char *saveptr = nullptr;
+  char *token = safeStrtok(dirdup, "/", &saveptr);
 
   bool result = false;
 
@@ -109,7 +125,7 @@ bool createDirectory(const char *dir) {
       }
     }
 
-    token = strtok(NULL, "/");
+    token = safeStrtok(NULL, "/", &saveptr);
     tmp += "/";
   }
 
