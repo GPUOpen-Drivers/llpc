@@ -80,7 +80,7 @@ declare void @lgc.cps.jump(...)
 ; CHECK-NEXT:    unreachable
 ;
 ;
-; CHECK-LABEL: define void @raygen.resume.0(
+; CHECK-LABEL: define dso_local void @raygen.resume.0(
 ; CHECK-SAME: {} [[TMP0:%.*]], i32 [[TMP1:%.*]], [2 x i32] [[TMP2:%.*]]) !lgc.shaderstage !0 !lgc.cps !1 !continuation !2 {
 ; CHECK-NEXT:  entryresume.0:
 ; CHECK-NEXT:    [[PUSHCONST3:%.*]] = call ptr addrspace(4) @lgc.user.data(i32 0)
@@ -94,24 +94,24 @@ declare void @lgc.cps.jump(...)
 ; CHECK-SAME: {} [[STATE:%.*]], i32 [[RCR:%.*]], i32 [[X:%.*]]) !lgc.shaderstage !0 !lgc.cps !3 !continuation !4 {
 ; CHECK-NEXT:  AllocaSpillBB:
 ; CHECK-NEXT:    [[TMP0:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 8)
-; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [[CHS_FRAME:%.*]], ptr addrspace(32) [[TMP0]], i32 0, i32 0
-; CHECK-NEXT:    store i32 [[RCR]], ptr addrspace(32) [[TMP1]], align 4
+; CHECK-NEXT:    [[RCR_SPILL_ADDR:%.*]] = getelementptr inbounds [[CHS_FRAME:%.*]], ptr addrspace(32) [[TMP0]], i32 0, i32 0
+; CHECK-NEXT:    store i32 [[RCR]], ptr addrspace(32) [[RCR_SPILL_ADDR]], align 4
 ; CHECK-NEXT:    [[PUSHCONST:%.*]] = call ptr addrspace(4) @lgc.user.data(i32 24)
 ; CHECK-NEXT:    [[FN:%.*]] = load ptr, ptr addrspace(4) [[PUSHCONST]], align 8
 ; CHECK-NEXT:    [[CR_0:%.*]] = ptrtoint ptr [[FN]] to i32
 ; CHECK-NEXT:    [[CR_1:%.*]] = or i32 [[CR_0]], 1
-; CHECK-NEXT:    [[TMP2:%.*]] = inttoptr i32 [[CR_1]] to ptr
-; CHECK-NEXT:    [[TMP3:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @chs.resume.0)
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR_1]], i32 2, {} poison, i32 [[TMP3]], i32 [[X]])
+; CHECK-NEXT:    [[TMP1:%.*]] = inttoptr i32 [[CR_1]] to ptr
+; CHECK-NEXT:    [[TMP2:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @chs.resume.0)
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR_1]], i32 2, {} poison, i32 [[TMP2]], i32 [[X]])
 ; CHECK-NEXT:    unreachable
 ;
 ;
-; CHECK-LABEL: define void @chs.resume.0(
+; CHECK-LABEL: define dso_local void @chs.resume.0(
 ; CHECK-SAME: {} [[TMP0:%.*]], i32 [[TMP1:%.*]], i32 [[TMP2:%.*]]) !lgc.shaderstage !0 !lgc.cps !3 !continuation !4 {
 ; CHECK-NEXT:  entryresume.0:
 ; CHECK-NEXT:    [[TMP3:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 8)
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[CHS_FRAME:%.*]], ptr addrspace(32) [[TMP3]], i32 0, i32 0
-; CHECK-NEXT:    [[RCR_RELOAD:%.*]] = load i32, ptr addrspace(32) [[TMP4]], align 4
+; CHECK-NEXT:    [[RCR_RELOAD_ADDR:%.*]] = getelementptr inbounds [[CHS_FRAME:%.*]], ptr addrspace(32) [[TMP3]], i32 0, i32 0
+; CHECK-NEXT:    [[RCR_RELOAD:%.*]] = load i32, ptr addrspace(32) [[RCR_RELOAD_ADDR]], align 4
 ; CHECK-NEXT:    call void @lgc.cps.free(i32 8)
 ; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RCR_RELOAD]], i32 5, i32 [[TMP2]])
 ; CHECK-NEXT:    unreachable

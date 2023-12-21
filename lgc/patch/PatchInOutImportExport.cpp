@@ -35,6 +35,7 @@
 #include "lgc/BuiltIns.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/state/AbiUnlinked.h"
+#include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/util/Debug.h"
 #include "llvm/IR/InlineAsm.h"
@@ -493,12 +494,14 @@ void PatchInOutImportExport::processShader() {
         while (!func.use_empty()) {
           CallInst *reconfigCall = cast<CallInst>(*func.user_begin());
           Value *localInvocationId = reconfigCall->getArgOperand(0);
-          bool isHwLocalInvocationId = dyn_cast<ConstantInt>(reconfigCall->getArgOperand(1))->getZExtValue();
-          if ((layout.microLayout == WorkgroupLayout::Quads) ||
-              (layout.macroLayout == WorkgroupLayout::SexagintiQuads)) {
-            localInvocationId =
-                reconfigWorkgroupLayout(localInvocationId, layout.macroLayout, layout.microLayout, workgroupSizeX,
-                                        workgroupSizeY, workgroupSizeZ, isHwLocalInvocationId, reconfigCall);
+          if (m_gfxIp.major <= 11) {
+            bool isHwLocalInvocationId = cast<ConstantInt>(reconfigCall->getArgOperand(1))->getZExtValue();
+            if ((layout.microLayout == WorkgroupLayout::Quads) ||
+                (layout.macroLayout == WorkgroupLayout::SexagintiQuads)) {
+              localInvocationId =
+                  reconfigWorkgroupLayout(localInvocationId, layout.macroLayout, layout.microLayout, workgroupSizeX,
+                                          workgroupSizeY, workgroupSizeZ, isHwLocalInvocationId, reconfigCall);
+            }
           }
           reconfigCall->replaceAllUsesWith(localInvocationId);
           reconfigCall->eraseFromParent();

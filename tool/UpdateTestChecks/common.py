@@ -639,7 +639,7 @@ class FunctionTestBuilder:
           else:
             # An earlier RUN line used this check prefixes but didn't produce
             # a body for this function. This happens in Clang tests that use
-            # preprocesser directives to exclude individual functions from some
+            # preprocessor directives to exclude individual functions from some
             # RUN lines.
             self._func_dict[prefix][func] = None
 

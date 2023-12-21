@@ -40,6 +40,7 @@
 #include "lgc/patch/FragColorExport.h"
 #include "lgc/patch/LowerCooperativeMatrix.h"
 #include "lgc/patch/LowerDebugPrintf.h"
+#include "lgc/patch/LowerGpuRt.h"
 #include "lgc/patch/PatchBufferOp.h"
 #include "lgc/patch/PatchCheckShaderCache.h"
 #include "lgc/patch/PatchCopyShader.h"
@@ -131,6 +132,14 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   // Start timer for patching passes.
   if (patchTimer)
     LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
+
+  if (pipelineState->getOptions().useGpurt) {
+    // NOTE: Lower GPURT operations and run InstCombinePass before builder replayer, because some Op are going to be
+    // turned into constant value, so that we can eliminate unused `@lgc.create.load.buffer.desc` before getting into
+    // replayer. Otherwise, unnecessary `writes_uavs` and `uses_uav` may be set.
+    passMgr.addPass(LowerGpuRt());
+    passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass()));
+  }
 
   // We're using BuilderRecorder; replay the Builder calls now
   passMgr.addPass(BuilderReplayer());

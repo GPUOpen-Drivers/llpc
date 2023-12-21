@@ -98,6 +98,7 @@ const ExtensionNamePair ExtensionNameTable[ExtensionCount] = {
     DeclExtensionName(KHR_RAY_TRACING),
     DeclExtensionName(KHR_RAY_QUERY),
     DeclExtensionName(NV_SHADER_ATOMIC_FLOAT),
+    DeclExtensionName(NV_COMPUTE_SHADER_DERIVATIVES),
 };
 
 // =====================================================================================================================

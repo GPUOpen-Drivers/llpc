@@ -1,4 +1,4 @@
-; RUN: opt --verify-each -passes='dxil-cont-intrinsic-prepare,lint,lower-raytracing-pipeline,lint,inline,lint,pre-coroutine-lowering,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,register-buffer,lint,save-continuation-state,lint,dxil-cont-post-process,lint,remove-types-metadata' -S %s 2>%t1.stderr | FileCheck %s
+; RUN: opt --verify-each -passes='dxil-cont-intrinsic-prepare,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,register-buffer,lint,save-continuation-state,lint,dxil-cont-post-process,lint,remove-types-metadata' -S %s 2> %t1.stderr | FileCheck %s
 ; RUN: count 0 < %t1.stderr
 
 ; Check that the size of @REGISTERS is as big as the continuation.registercount when there is an intersection shader

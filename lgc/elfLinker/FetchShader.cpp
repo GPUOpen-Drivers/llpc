@@ -101,7 +101,8 @@ Module *FetchShader::generate() {
 //
 // @param [in/out] fetchFunc : The function for the fetch shader.
 void FetchShader::generateFetchShaderBody(Function *fetchFunc) { // Process each vertex input.
-  std::unique_ptr<VertexFetch> vertexFetch(VertexFetch::create(m_lgcContext));
+  std::unique_ptr<VertexFetch> vertexFetch(
+      VertexFetch::create(m_lgcContext, m_pipelineState->getOptions().useSoftwareVertexBufferDescriptors));
   auto ret = cast<ReturnInst>(fetchFunc->back().getTerminator());
   BuilderImpl builder(m_pipelineState);
   builder.SetInsertPoint(ret);

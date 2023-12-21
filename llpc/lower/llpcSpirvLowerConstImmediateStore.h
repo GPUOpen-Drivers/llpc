@@ -51,6 +51,8 @@ public:
 private:
   bool processAllocaInsts(llvm::Function *func);
   bool tryProcessAlloca(llvm::AllocaInst *allocaInst);
+
+  llvm::DenseMap<llvm::Value *, llvm::GlobalVariable *> m_allocToGlobals;
 };
 
 } // namespace Llpc

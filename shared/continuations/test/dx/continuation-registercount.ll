@@ -1,14 +1,14 @@
 ; RUN: grep -v SKIP_LINE_BY_DEFAULT %s | \
-; RUN:    opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,lint,inline,lint,pre-coroutine-lowering,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,register-buffer,lint,save-continuation-state,lint,dxil-cont-post-process,lint,remove-types-metadata' -S 2>%t0.stderr | \
+; RUN:    opt --verify-each -passes='dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,register-buffer,lint,save-continuation-state,lint,dxil-cont-post-process,lint,remove-types-metadata' -S 2> %t0.stderr | \
 ; RUN:    FileCheck -check-prefix=POSTPROCESS-REGCOUNT %s
 ; RUN: count 0 < %t0.stderr
 ;
 ; RUN: grep -v SKIP_LINE_BY_DEFAULT %s | \
-; RUN:    opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,lint,inline,lint,pre-coroutine-lowering,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,register-buffer,lint,save-continuation-state,lint,dxil-cont-post-process,lint,remove-types-metadata' -S 2>%t1.stderr | \
+; RUN:    opt --verify-each -passes='dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,register-buffer,lint,save-continuation-state,lint,dxil-cont-post-process,lint,remove-types-metadata' -S 2> %t1.stderr | \
 ; RUN:    FileCheck -check-prefix=POSTPROCESS-REGCOUNT2 %s
 ; RUN: count 0 < %t1.stderr
 ;
-; RUN: opt --verify-each -passes='dxil-cont-lgc-rt-op-converter,lint,lower-raytracing-pipeline,lint,inline,lint,pre-coroutine-lowering,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,register-buffer,lint,save-continuation-state,lint,dxil-cont-post-process,lint,remove-types-metadata' -S %s 2>%t2.stderr | \
+; RUN: opt --verify-each -passes='dxil-cont-intrinsic-prepare,lint,dxil-cont-lgc-rt-op-converter,lint,inline,lint,lower-raytracing-pipeline,lint,sroa,lint,lower-await,lint,coro-early,dxil-coro-split,coro-cleanup,lint,legacy-cleanup-continuations,lint,register-buffer,lint,save-continuation-state,lint,dxil-cont-post-process,lint,remove-types-metadata' -S %s 2> %t2.stderr | \
 ; RUN:    FileCheck -check-prefix=POSTPROCESS-REGCOUNT-FEWREGS %s
 ; RUN: count 0 < %t2.stderr
 
@@ -145,14 +145,14 @@ define void @mainTrace() {
 }
 
 ; POSTPROCESS-REGCOUNT-DAG: define void @called({{.*}}%struct.DispatchSystemData %0){{.*}} !continuation.registercount ![[called_registercount:[0-9]+]]
-; POSTPROCESS-REGCOUNT-DAG: define void @called.resume.0({{.*}}%struct.DispatchSystemData %1){{.*}} !continuation.registercount ![[called_resume_registercount:[0-9]+]]
+; POSTPROCESS-REGCOUNT-DAG: define dso_local void @called.resume.0({{.*}}%struct.DispatchSystemData %1){{.*}} !continuation.registercount ![[called_resume_registercount:[0-9]+]]
 ; POSTPROCESS-REGCOUNT-DAG: ![[called_registercount]] = !{i32 26}
 ; POSTPROCESS-REGCOUNT-DAG: ![[called_resume_registercount]] = !{i32 27}
 
 ; If we set maxPayloadRegisterCount to 10, both functions use only 10 payload registers.
 ; Note that due to metadata uniquing, both use the same metadata node.
 ; POSTPROCESS-REGCOUNT-FEWREGS-DAG: define void @called({{.*}}%struct.DispatchSystemData %0){{.*}} !continuation.registercount ![[registercount:[0-9]+]]
-; POSTPROCESS-REGCOUNT-FEWREGS-DAG: define void @called.resume.0({{.*}}%struct.DispatchSystemData %1){{.*}} !continuation.registercount ![[registercount]]
+; POSTPROCESS-REGCOUNT-FEWREGS-DAG: define dso_local void @called.resume.0({{.*}}%struct.DispatchSystemData %1){{.*}} !continuation.registercount ![[registercount]]
 ; POSTPROCESS-REGCOUNT-FEWREGS-DAG: ![[registercount]] = !{i32 10}
 
 define void @called(%struct.MyParams* %arg) !types !39 {
@@ -162,7 +162,7 @@ define void @called(%struct.MyParams* %arg) !types !39 {
 }
 
 ; POSTPROCESS-REGCOUNT-DAG: define void @Intersection({{.*}}%struct.AnyHitTraversalData %0){{.*}} !continuation.registercount ![[intersection_registercount:[0-9]+]]
-; POSTPROCESS-REGCOUNT-DAG: define void @Intersection.resume.0({{.*}}%struct.AnyHitTraversalData %1){{.*}} !continuation.registercount ![[intersection_registercount]]
+; POSTPROCESS-REGCOUNT-DAG: define dso_local void @Intersection.resume.0({{.*}}%struct.AnyHitTraversalData %1){{.*}} !continuation.registercount ![[intersection_registercount]]
 ; POSTPROCESS-REGCOUNT-DAG: call void (i64, ...) @continuation.continue(i64 3, {{.*}} float 4.000000e+00, i32 0, %struct.BuiltInTriangleIntersectionAttributes {{.*}}), !continuation.registercount ![[intersection_registercount]]
 ; POSTPROCESS-REGCOUNT-DAG: ![[intersection_registercount]] = !{i32 30}
 
@@ -189,14 +189,14 @@ define void @ClosestHit(%struct.RayPayload* noalias nocapture %payload, %struct.
 
 declare void @continuation.continue(i64, ...)
 
-; POSTPROCESS-REGCOUNT-FEWREGS-DAG: define void @TraversalImpl1_1({{.*}} !continuation.registercount ![[registercount]]
+; POSTPROCESS-REGCOUNT-FEWREGS-DAG: define {{.*}} @_cont_Traversal({{.*}} !continuation.registercount ![[registercount]]
 ;                                                                                                       ^--- this MD node has value 10
 ; POSTPROCESS-REGCOUNT-FEWREGS-DAG: call {{.*}} @continuation.continue({{.*}} !continuation.registercount ![[registercount]]
-; POSTPROCESS-REGCOUNT-DAG: define void @TraversalImpl1_1({{.*}} !continuation.registercount ![[intersection_registercount]]
+; POSTPROCESS-REGCOUNT-DAG: define {{.*}} @_cont_Traversal({{.*}} !continuation.registercount ![[intersection_registercount]]
 ;                                                                                               ^--- this MD node has value 30
 ; POSTPROCESS-REGCOUNT-DAG: call {{.*}} @continuation.continue({{.*}} !continuation.registercount ![[intersection_registercount]]
 
-define void @TraversalImpl1_1(%struct._AmdTraversalResultData* noalias nocapture sret(%struct._AmdTraversalResultData) %agg.result, i32 %csp, %struct._AmdSystemData* noalias %data) !types !44 {
+define void @_cont_Traversal(%struct._AmdTraversalResultData* noalias nocapture sret(%struct._AmdTraversalResultData) %agg.result, i32 %csp, %struct._AmdSystemData* noalias %data) !types !44 {
   call void (i64, ...) @continuation.continue(i64 0, i8 addrspace(21)* undef)
   ret void
 }

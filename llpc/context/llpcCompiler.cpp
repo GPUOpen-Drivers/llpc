@@ -235,6 +235,7 @@ struct HelperThreadBuildRayTracingPipelineElfPayload {
   Compiler *compiler;                                 // The compiler instance
   std::atomic<bool> helperThreadJoined;               // Whether helper thread has joined
   std::atomic<bool> mainThreadSwitchedContext;        // Whether main thread has finished switching context
+  const bool useGpurt;                                // Whether any shader in the pipeline uses GPURT
 };
 
 sys::Mutex Compiler::m_helperThreadMutex;
@@ -519,7 +520,7 @@ void Compiler::Destroy() {
 //
 // @param codeBuffer : Spirv binary
 // @param imageSymbolInfo : Image symbol infos
-static void mergeSpirvLocationAndBinding(llvm::MutableArrayRef<unsigned> codeBuffer,
+static void mergeSpirvLocationAndBinding(MutableArrayRef<unsigned> codeBuffer,
                                          std::vector<ResourceNodeData> &imageSymbolInfo) {
   constexpr unsigned wordSize = sizeof(unsigned);
 
@@ -547,6 +548,61 @@ static void mergeSpirvLocationAndBinding(llvm::MutableArrayRef<unsigned> codeBuf
         }
         uint32_t locationBinding = location << 16 | binding;
         codePos[3] = locationBinding;
+      }
+    } break;
+    default:
+      break;
+    }
+
+    codePos += wordCount;
+  }
+}
+
+// =====================================================================================================================
+// Recalculate resource binding for separate shader object
+//
+// @param codeBuffer : Spirv binary
+// @param resourceBindingOffset : resource binding offset
+// @param symbolInfo : resource symbol infos
+static void recalcResourceBinding(MutableArrayRef<unsigned> codeBuffer, unsigned resourceBindingOffset,
+                                  std::vector<ResourceNodeData> &uniformBufferInfo,
+                                  std::vector<ResourceNodeData> &storageBufferInfo,
+                                  std::vector<ResourceNodeData> &textureSymbolInfo,
+                                  std::vector<ResourceNodeData> &imageSymbolInfo,
+                                  std::vector<ResourceNodeData> &atomicCounterSymbolInfo) {
+  constexpr unsigned wordSize = sizeof(unsigned);
+
+  unsigned *code = codeBuffer.data();
+  unsigned *end = code + codeBuffer.size();
+  unsigned *codePos = code + sizeof(SpirvHeader) / wordSize;
+
+  auto updateResourceBinding = [resourceBindingOffset](uint32_t varId, uint32_t binding,
+                                                       std::vector<ResourceNodeData> &symbolInfo) {
+    for (auto it = symbolInfo.begin(); it != symbolInfo.end(); ++it) {
+      if (it->spvId == varId && it->binding == binding) {
+        it->binding = resourceBindingOffset << 16 | binding;
+      }
+    }
+  };
+
+  while (codePos < end) {
+    unsigned opCode = (codePos[0] & OpCodeMask);
+    unsigned wordCount = (codePos[0] >> WordCountShift);
+
+    switch (opCode) {
+    case OpDecorate: {
+      auto decoration = static_cast<Decoration>(codePos[2]);
+
+      if (decoration == DecorationBinding) {
+        uint32_t varId = codePos[1];
+        uint32_t binding = codePos[3];
+
+        updateResourceBinding(varId, binding, uniformBufferInfo);
+        updateResourceBinding(varId, binding, storageBufferInfo);
+        updateResourceBinding(varId, binding, textureSymbolInfo);
+        updateResourceBinding(varId, binding, imageSymbolInfo);
+        updateResourceBinding(varId, binding, atomicCounterSymbolInfo);
+        codePos[3] = resourceBindingOffset << 16 | binding;
       }
     } break;
     default:
@@ -607,7 +663,13 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
     allocSize += atomicCounterSymbolInfo.size() * sizeof(ResourceNodeData);
     allocSize += defaultUniformSymbolInfo.size() * sizeof(ResourceNodeData);
 
-    if (imageSymbolInfo.size() && shaderInfo->options.mergeLocationAndBinding)
+    // Solve binding conflictions for separate shader object
+    if (shaderInfo->options.resourceBindingOffset > 0) {
+      recalcResourceBinding(codeBuffer, shaderInfo->options.resourceBindingOffset, uniformBufferInfo, storageBufferInfo,
+                            textureSymbolInfo, imageSymbolInfo, atomicCounterSymbolInfo);
+    } else if (imageSymbolInfo.size() && shaderInfo->options.mergeLocationAndBinding)
+      // Merge location and binding if image binding doesn't exist, the issue only exist on spirv binary cases,
+      // separate shader object doesn't support spirv binary, so it doesn't have such issue
       mergeSpirvLocationAndBinding(codeBuffer, imageSymbolInfo);
   }
 
@@ -1663,6 +1725,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
     if (numStagesWithRayQuery) {
       std::unique_ptr<Module> gpurtShaderLibrary = createGpurtShaderLibrary(context);
+      setUseGpurt(&*pipeline);
       if (!gpurtShaderLibrary)
         return Result::ErrorInvalidShader;
 
@@ -2678,6 +2741,16 @@ Result Compiler::generatePipeline(Context *context, unsigned moduleIndex, std::u
 }
 
 // =====================================================================================================================
+// Set this pipeline use GPURT library
+//
+// @param pipeline : The pipeline object
+void Compiler::setUseGpurt(lgc::Pipeline *pipeline) {
+  auto options = pipeline->getOptions();
+  options.useGpurt = true;
+  pipeline->setOptions(options);
+}
+
+// =====================================================================================================================
 // Build single ray tracing pipeline ELF package.
 //
 // @param IHelperThreadProvider : The helper thread provider
@@ -2706,6 +2779,9 @@ void helperThreadBuildRayTracingPipelineElf(IHelperThreadProvider *helperThreadP
   std::unique_ptr<Pipeline> pipeline(builderContext->createPipeline());
   helperThreadPayload->rayTracingContext->setPipelineState(&*pipeline, /*hasher=*/nullptr, false);
   context->setBuilder(builderContext->createBuilder(&*pipeline));
+
+  if (helperThreadPayload->useGpurt)
+    helperThreadPayload->compiler->setUseGpurt(&*pipeline);
 
   TimerProfiler timerProfiler(context->getPipelineHashCode(), "LLPC", TimerProfiler::PipelineTimerEnableMask);
 
@@ -2837,6 +2913,9 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
   bool needGpurtShaderLibrary = false;
   std::vector<std::unique_ptr<Module>> modules(shaderInfo.size());
   mainContext->setBuilder(builderContext->createBuilder(&*pipeline));
+  const bool needGpurtForContinuations = (pipelineInfo->mode == Vkgc::LlpcRaytracingMode::Continuations);
+  if (needGpurtForContinuations)
+    needGpurtShaderLibrary = true;
 
   // Create empty modules and set target machine in each.
   for (unsigned shaderIndex = 0; shaderIndex < shaderInfo.size(); ++shaderIndex) {
@@ -2888,6 +2967,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
   std::unique_ptr<Module> gpurtShaderLibrary;
   if (needGpurtShaderLibrary) {
     gpurtShaderLibrary = createGpurtShaderLibrary(mainContext);
+    setUseGpurt(&*pipeline);
     if (!gpurtShaderLibrary)
       return Result::ErrorInvalidShader;
   }
@@ -2910,7 +2990,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfoEntry->pModuleData);
     auto shaderModule = std::move(modules[shaderIndex]);
 
-    if (moduleData->usage.enableRayQuery) {
+    if (moduleData->usage.enableRayQuery || needGpurtForContinuations) {
       Linker linker(*shaderModule);
       if (linker.linkInModule(CloneModule(*gpurtShaderLibrary)))
         return Result::ErrorInvalidShader;
@@ -2921,20 +3001,28 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     moduleUsesRayQuery.push_back(moduleData->usage.enableRayQuery);
   }
 
+  // TODO: For continuations, we only need to compile the GpuRt module separately if there are TraceRay usages
+  //       to compile the Traversal shader. For callable shaders, it is not required.
   if (gpurtShaderLibrary) {
     StringRef traceRayFuncName = mainContext->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_TRACE_RAY);
     StringRef fetchTrianglePosFunc = mainContext->getPipelineContext()->getRayTracingFunctionName(
         Vkgc::RT_ENTRY_FETCH_HIT_TRIANGLE_FROM_NODE_POINTER);
 
-    // NOTE: The GPURT shader library generated by DXC will contain some global constant value (0, 1, 2, etc.) shared
-    // across different functions. SpirvLowerGlobal pass cannot handle such case, so we drop all unneeded functions.
+    // Prepare GpuRt module to be compiled separately
     for (auto funcIt = gpurtShaderLibrary->begin(), funcEnd = gpurtShaderLibrary->end(); funcIt != funcEnd;) {
       Function *func = &*funcIt++;
-      if (func->getLinkage() == GlobalValue::ExternalLinkage && !func->empty()) {
-        if (!func->getName().startswith(traceRayFuncName) && !func->getName().startswith(fetchTrianglePosFunc)) {
-          func->dropAllReferences();
-          func->eraseFromParent();
-        }
+      if (func->getName().startswith(traceRayFuncName)) {
+        // We assigned GpuRt functions weak linkage prior to linking into app modules to not confuse the entry
+        // point determination mechanism. Undo that on TraceRay to make it the entry of the module.
+        func->setLinkage(GlobalValue::ExternalLinkage);
+        lgc::rt::setLgcRtShaderStage(func, lgc::rt::RayTracingShaderStage::Traversal);
+      } else if (func->getLinkage() == GlobalValue::WeakAnyLinkage &&
+                 !func->getName().startswith(fetchTrianglePosFunc) && !func->empty()) {
+        // Preserve fetchTrianglePosFunc because we need to inline it into Traversal later on.
+        // Remove other function definitions both for compile speed, and to work around an
+        // issue with private globals used in multiple functions in GpuRt which confuses SpirvLowerGlobal.
+        func->dropAllReferences();
+        func->eraseFromParent();
       }
     }
 
@@ -2990,7 +3078,8 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     for (const auto &module : newModules)
       modulePointers.push_back(module.get());
     HelperThreadBuildRayTracingPipelineElfPayload helperThreadPayload = {
-        modulePointers, pipelineElfs, shaderProps, moduleCallsTraceRay, results, &rtContext, this, false, false};
+        modulePointers, pipelineElfs, shaderProps, moduleCallsTraceRay,   results, &rtContext,
+        this,           false,        false,       needGpurtShaderLibrary};
     helperThreadProvider->SetTasks(&helperThreadBuildRayTracingPipelineElf, newModules.size(),
                                    static_cast<void *>(&helperThreadPayload));
 

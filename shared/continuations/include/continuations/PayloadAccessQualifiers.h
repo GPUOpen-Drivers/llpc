@@ -878,7 +878,8 @@ struct PAQCallShaderSerializationInfo : public PAQSerializationInfoBase {
 // and caching already seen serialization infos.
 class PAQSerializationInfoManager {
 public:
-  PAQSerializationInfoManager(Module *M, uint32_t MaxPayloadRegisterCount);
+  PAQSerializationInfoManager(Module *M, Module *GpurtLibrary,
+                              uint32_t MaxPayloadRegisterCount);
   PAQSerializationInfoManager(const PAQSerializationInfoManager &) = delete;
   PAQSerializationInfoManager(PAQSerializationInfoManager &&) = default;
 
@@ -950,6 +951,7 @@ public:
 
 private:
   Module *Mod = {};
+  Module *GpurtLibrary = {};
   uint32_t MaxPayloadRegisterCount = {};
 
   // Stores per-payload-type data

@@ -33,13 +33,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "continuations/Continuations.h"
+#include "continuations/ContinuationsUtil.h"
+#include "lgc/LgcRtDialect.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/InitializePasses.h"
-#include <array>
 #include <cassert>
 #include <cctype>
 
@@ -57,6 +58,7 @@ static Function *transformFunction(Function &F) {
   auto Name = F.getName();
   LLVM_DEBUG(dbgs() << "Transforming function " << Name << "\n");
   std::string NewName = Name.str();
+
   // Unmangle declarations because they cannot be renamed in the dx api
   if (Name.contains('@')) {
     // Extract unmangled name
@@ -64,10 +66,9 @@ static Function *transformFunction(Function &F) {
     auto End = Name.find('@', Start);
     if (Start == 0 || End == StringRef::npos || Start > Name.size() ||
         End > Name.size()) {
-      cantFail(make_error<StringError>(
+      report_fatal_error(
           Twine("Failed to unmangle function name: Failed to extract from '") +
-              Name + "' (start: " + Twine(Start) + ", end: " + Twine(End) + ")",
-          inconvertibleErrorCode()));
+          Name + "' (start: " + Twine(Start) + ", end: " + Twine(End) + ")");
     }
 
     // Copy name, otherwise it will be deleted before it's set
@@ -84,54 +85,67 @@ static Function *transformFunction(Function &F) {
   // Unpack the inner type of @class.matrix types
   bool UnpackMatrixTy = false;
 
-  static const std::array<StringRef, 2> FuncsReturningMatrices = {
-      "ObjectToWorld4x3", "WorldToObject4x3"};
-
   if (NewRetTy->isStructTy() && NewRetTy->getStructNumElements() == 1) {
-    StringRef FuncName = F.getName();
-    for (auto FuncCandidate : FuncsReturningMatrices) {
-      if (FuncName.contains(FuncCandidate)) {
-        NewRetTy = NewRetTy->getStructElementType(0);
-        UnpackMatrixTy = true;
-        break;
-      }
+    if (Name.contains("ObjectToWorld4x3") ||
+        Name.contains("WorldToObject4x3")) {
+      NewRetTy = NewRetTy->getStructElementType(0);
+      UnpackMatrixTy = true;
     }
   }
+
+  // TODO Remove old name when possible
+  if (NewName == "_cont_Traversal" || Name == "amd.dx.TraversalImpl")
+    lgc::rt::setLgcRtShaderStage(&F, lgc::rt::RayTracingShaderStage::Traversal);
 
   Argument *RetArg = nullptr;
   AttributeList FAttrs = F.getAttributes();
   SmallVector<AttributeSet> ParamAttrs;
+
   unsigned ArgNo = 0;
   for (auto &Arg : F.args()) {
     DXILContArgTy ArgTy = DXILContArgTy::get(&F, &Arg);
+
+    bool DidHandleArg = false;
+
     if (Arg.hasStructRetAttr()) {
       NewRetTy = Arg.getParamStructRetType();
       RetArg = &Arg;
-    } else if (Arg.getType()->isPointerTy() &&
-               (StringRef(NewName).contains("Await") ||
-                StringRef(NewName).contains("Enqueue") ||
-                StringRef(NewName).contains("Traversal") ||
-                (NewName == "_cont_SetTriangleHitAttributes" &&
-                 &Arg != F.getArg(0)))) {
-      // Pass argument data as struct instead of as pointer
-      Type *ElemType = ArgTy.getPointerElementType();
-      assert(ElemType && "unable to resolve pointer type for argument");
-      AllArgTypes.emplace_back(ElemType);
-      ParamAttrs.push_back({});
-    } else {
+
+      DidHandleArg = true;
+    } else if (Arg.getType()->isPointerTy()) {
+      StringRef NameRef{NewName};
+      if (NameRef.contains("Await") || NameRef.contains("Enqueue") ||
+          NameRef.contains("Traversal") ||
+          (NewName == "_cont_SetTriangleHitAttributes" &&
+           &Arg != F.getArg(0))) {
+        // Pass argument data as struct instead of as pointer
+        Type *ElemType = ArgTy.getPointerElementType();
+        assert(ElemType && "Unable to resolve pointer type for argument");
+        AllArgTypes.emplace_back(ElemType);
+        ParamAttrs.push_back({});
+
+        DidHandleArg = true;
+      }
+    }
+
+    // Simply add the argument and its type.
+    if (!DidHandleArg) {
       AllArgTypes.push_back(ArgTy);
       ParamAttrs.push_back(FAttrs.getParamAttrs(ArgNo));
     }
+
     ArgNo++;
   }
 
   // Create new empty function
   DXILContFuncTy NewFuncTy(NewRetTy, AllArgTypes);
   Function *NewFunc = cloneFunctionHeaderWithTypes(F, NewFuncTy, ParamAttrs);
+
   // Remove old name for the case that the new name is the same
   F.setName("");
   NewFunc->setName(NewName);
   NewFunc->addFnAttr(Attribute::AlwaysInline);
+
   // Set external linkage, so the functions don't get removed, even if they are
   // never referenced at this point
   NewFunc->setLinkage(GlobalValue::LinkageTypes::ExternalLinkage);
@@ -141,21 +155,23 @@ static Function *transformFunction(Function &F) {
 
   // Do not insert code on function declarations
   std::optional<IRBuilder<>> B;
-  if (!NewFunc->empty())
+  bool IsDeclaration = NewFunc->empty();
+
+  if (!IsDeclaration) {
     B.emplace(&*NewFunc->getEntryBlock().getFirstNonPHIOrDbgOrAlloca());
 
-  if (B && UnpackMatrixTy) {
-    // Move values of @class.matrix.x.y into return value of unpacked type
-    // Replace the return instruction with a new one, returning the unpacked
-    // value
-    for (auto &BB : *NewFunc) {
-      auto *I = BB.getTerminator();
-      if (I->getOpcode() == Instruction::Ret) {
-        B->SetInsertPoint(I);
-        Value *UnpackedVal = B->CreateExtractValue(I->getOperand(0), {0});
-        B->CreateRet(UnpackedVal);
-        I->eraseFromParent();
-      }
+    if (UnpackMatrixTy) {
+      // Move values of @class.matrix.x.y into return value of unpacked type
+      // Replace the return instruction with a new one, returning the unpacked
+      // value
+      llvm::forEachTerminator(
+          NewFunc, {Instruction::Ret}, [&](Instruction &Terminator) {
+            B->SetInsertPoint(&Terminator);
+            Value *RetExtractVal =
+                B->CreateExtractValue(Terminator.getOperand(0), {0});
+            B->CreateRet(RetExtractVal);
+            Terminator.eraseFromParent();
+          });
     }
   }
 
@@ -174,7 +190,8 @@ static Function *transformFunction(Function &F) {
 
     Argument *Arg = NewFunc->getArg(NewIdx);
     Arg->setName(OldArg->getName());
-    if (B) {
+
+    if (!IsDeclaration) {
       if (Arg->getType() != OldArg->getType()) {
         // Replace pointer argument with alloca
         auto *Ty = Arg->getType();
@@ -195,32 +212,25 @@ static Function *transformFunction(Function &F) {
       Arg->removeAttr(Attribute::AttrKind::InReg);
   }
 
-  if (RetArg && B) {
+  if (RetArg && !IsDeclaration) {
     // Replace sret argument with real return value
     B->SetInsertPoint(&*NewFunc->getEntryBlock().getFirstNonPHIOrDbgOrAlloca());
     auto *RetAlloca = B->CreateAlloca(NewRetTy);
     RetArg->replaceAllUsesWith(RetAlloca);
 
     // Replace returns with return value
-    for (auto &BB : *NewFunc) {
-      auto *I = BB.getTerminator();
-      if (I->getOpcode() == Instruction::Ret) {
-        B->SetInsertPoint(I);
-        auto *RetLoad = B->CreateLoad(NewRetTy, RetAlloca);
-        B->CreateRet(RetLoad);
-        I->eraseFromParent();
-      }
-    }
+    llvm::forEachTerminator(
+        NewFunc, {Instruction::Ret}, [&](Instruction &Terminator) {
+          B->SetInsertPoint(&Terminator);
+          Value *RetLoad = B->CreateLoad(NewRetTy, RetAlloca);
+          B->CreateRet(RetLoad);
+          Terminator.eraseFromParent();
+        });
   }
 
   // Replace all calls
   SmallVector<CallInst *> Uses;
-  for (auto &Use : F.uses()) {
-    if (auto *CInst = dyn_cast<CallInst>(Use.getUser())) {
-      if (CInst->isCallee(&Use))
-        Uses.push_back(CInst);
-    }
-  }
+  llvm::forEachCall(F, [&](CallInst &CInst) { Uses.push_back(&CInst); });
 
   for (auto *CInst : Uses) {
     if (!B)
@@ -303,6 +313,7 @@ static bool isUtilFunction(StringRef Name) {
     if (Name.contains(UtilName))
       return true;
   }
+
   return false;
 }
 
@@ -311,12 +322,22 @@ llvm::PreservedAnalyses DXILContIntrinsicPreparePass::run(
   LLVM_DEBUG(dbgs() << "Run the dxil-cont-intrinsic-prepare pass\n");
 
   SmallVector<Function *> Funcs(make_pointer_range(M.functions()));
+
   for (auto *F : Funcs) {
     auto Name = F->getName();
     bool IsContImpl = Name.contains("_cont_") || Name.contains("amd.dx.");
-    bool IsAmdIntr = Name.contains("_Amd");
-    if ((IsContImpl && isGpuRtFuncName(Name)) ||
-        ((IsContImpl || IsAmdIntr) && isUtilFunction(Name)))
+    bool ShouldTransform = false;
+
+    if (IsContImpl) {
+      if (isGpuRtFuncName(Name))
+        ShouldTransform = true;
+      else if (isUtilFunction(Name))
+        ShouldTransform = true;
+    } else if (Name.contains("_Amd") && isUtilFunction(Name)) {
+      ShouldTransform = true;
+    }
+
+    if (ShouldTransform)
       transformFunction(*F);
   }
 

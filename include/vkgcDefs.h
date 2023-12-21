@@ -30,6 +30,7 @@
  */
 #pragma once
 
+#include "llpcVersion.h"
 #include "vkgcBase.h"
 #include "vulkan.h"
 #include <cassert>
@@ -43,20 +44,6 @@
 #undef DestroyAll
 #undef Status
 #undef Bool
-#endif
-
-/// LLPC major interface version.
-#define LLPC_INTERFACE_MAJOR_VERSION 70
-
-/// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 1
-
-#ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION
-#error LLPC client version is not defined
-#endif
-
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 60
-#error LLPC client version is too old
 #endif
 
 /// LLPC_NODISCARD - Warns when function return value is discarded.
@@ -74,133 +61,6 @@
 #define LLPC_NODISCARD
 #endif
 
-//
-// -------------------------------------------------------------------------------------------------------------------
-//  @page VersionHistory
-//  %Version History
-//  | %Version | Change Description                                                                                    |
-//  | -------- | ----------------------------------------------------------------------------------------------------- |
-//  |     70.1 | Add cpsFlags to RayTracingPipelineBuildInfo                                                           |
-//  |     70.0 | Add enablePrimGeneratedQuery to PipelineOptions                                                       |
-//  |     69.1 | Add useBarycentric to ShaderModuleUsage                                                               |
-//  |     69.0 | Enable continuations transform in LLPC                                                                |
-//  |     68.0 | Remove ICache *cache in all PipelineBuildInfo                                                         |
-//  |     67.0 | Modify the uber fetch shader. Adds locationMask(64bit) at the beginning of uber fetch shader internal |
-//  |          | buffer which flags whether the related attribute data is valid.                                       |
-//  |     66.1 | Add forwardPropagateNoContract and backwardPropagateNoContract to PipelineShaderOptions               |
-//  |     66.0 | Remove shader cache in LLPC                                                                           |
-//  |     65.6 | Add Result::RequireFullPipeline, returned if unlink shader fails.                                     |
-//  |     65.5 | Rename noContract in PipelineShaderOptions to noContractOpDot                                         |
-//  |     65.4 | Add disableSampleMask to PipelineOptions                                                              |
-//  |     65.3 | Add originUpperLeft to GraphicsPipelineBuildInfo                                                      |
-//  |     65.2 | Support SPIRV extended vertex attribute formats during vertex fetch module.                           |
-//  |     65.0 | Remove updateDescInElf                                                                                |
-//  |     64.2 | Add dynamicSampleInfo to GraphicsPipelineBuildInfo::rsState                                           |
-//  |     64.1 | Add disableTruncCoordForGather to PipelineOptions.                                                    |
-//  |     64.0 | Add enableColorExportShader to GraphicsPipelineBuildInfo.                                             |
-//  |     63.3 | Add TessellationLevel to iaState                                                                      |
-//  |     63.2 | Add vertex64BitsAttribSingleLoc to PipelineOptions                                                    |
-//  |     63.1 | Add forceDisableStreamOut and forceEnablePrimStats to ApiXfbOutData                                   |
-//  |     63.0 | Add Atomic Counter, its default descriptor and map its concreteType to Buffer.                        |
-//  |     62.1 | Add ApiXfbOutData GraphicsPipelineBuildInfo                                                           |
-//  |     62.0 | Default to the compiler getting the GPURT library directly, and move shader library info into RtState |
-//  |     61.16| Add replaceSetWithResourceType to PipelineOptions                                                     |
-//  |     61.15| Add disableReadFirstLaneWorkaround to PipelineShaderOptions                                           |
-//  |     61.14| Add rasterStream to rsState
-//  |     61.13| Add dualSourceBlendDynamic to cbState                                                                 |
-//  |     61.12| Add mode to RayTracingPipelineBuildInfo                                                               |
-//  |     61.11| Add UniformConstantMap and related structures                                                         |
-//  |     61.10| Add useShadingRate and useSampleInfo to ShaderModuleUsage                                             |
-//  |     61.8 | Add enableImplicitInvariantExports to PipelineOptions                                                 |
-//  |     61.7 | Add disableFMA to PipelineShaderOptions                                                               |
-//  |     61.6 | Add workaroundInitializeOutputsToZero to PipelineShaderOptions                                        |
-//  |     61.5 | Add RtIpVersion (including its checkers) to represent RT IP                                           |
-//  |     61.4 | Add workaroundStorageImageFormats to PipelineShaderOptions                                            |
-//  |     61.2 | Add pClientMetadata and clientMetadataSize to all PipelineBuildInfos                                  |
-//  |     61.1 | Add IPipelineDumper::GetGraphicsShaderBinaryHash                                                      |
-//  |     61.0 | Add DescriptorMutable type and ResourceMappingNode::strideInDwords to support mutable descriptors     |
-//  |     60.0 | Simplify the enum NggCompactMode to a boolean flag                                                    |
-//  |     59.0 | Remove the option enableVertexReuse from NggState                                                     |
-//  |     57.2 | Move all internal resource binding id to enum InternalBinding.                                        |
-//  |     57.1 | Add forceNonUniformResourceIndexStageMask to PipelineOptions                                          |
-//  |     57.0 | Merge aggressiveInvariantLoads and disableInvariantLoads to an enumerated option                      |
-//  |     56.2 | Add aggressiveInvariantLoads and disableInvariantLoads to PipelineShaderOptions                       |
-//  |     56.1 | Add struct UberFetchShaderAttribInfo                                                                  |
-//  |     56.0 | Move maxRayLength to RtState                                                                          |
-//  |     55.2 | Add pipeline layout API hash to all PipelineBuildInfos                                                |
-//  |     55.1 | Add nsaThreshold to PipelineShaderOptions                                                             |
-//  |     55.0 | Remove isInternalRtShader from module options                                                         |
-//  |     54.9 | Add internalRtShaders to PipelineOptions to allow for dumping this data                               |
-//  |     54.6 | Add reverseThreadGroup to PipelineOptions                                                             |
-//  |     54.5 | Add forceLateZ to PipelineShaderOptions                                                               |
-//  |     54.4 | Add isReplay to RayTracingPipelineBuildInfo for ray tracing capture replay feature                    |
-//  |     54.3 | Add usePointSize to ShaderModuleUsage                                                                 |
-//  |     54.2 | Add subgroupSize to PipelineShaderOptions                                                             |
-//  |     54.1 | Add overrideForceThreadIdSwizzling overrideShaderThreadGroupSizeX, overrideShaderThreadGroupSizeY     |
-//  |          | and overrideShaderThreadGroupSizeZ  to PipelineShaderOptions                                          |
-//  |     54.0 | Add overrideThreadGroupSizeX, overrideThreadGroupSizeY and overrideThreadGroupSizeZ to PipelineOptions|
-//  |     53.7 | Add threadGroupSwizzleMode to PipelineOptions                                                         |
-//  |     53.6 | Add scalarizeWaterfallLoads to PipelineShaderOptions                                                  |
-//  |     53.5 | Add forceCsThreadIdSwizzling for thread id swizzle in 8*4                                             |
-//  |     53.4 | Add ldsSpillLimitDwords shader option                                                                 |
-//  |     53.3 | Add disableFastMathFlags shader option, plus support for this and fastMathFlags in pipeline files     |
-//  |     53.2 | Add resourceLayoutScheme to PipelineOptions                                                           |
-//  |     53.1 | Add PartPipelineStage enum for part-pipeline mode                                                     |
-//  |     53.0 | Add optimizationLevel to PipelineOptions                                                              |
-//  |     52.3 | Add fastMathFlags to PipelineShaderOptions                                                            |
-//  |     52.2 | Add provokingVertexMode to rsState                                                                    |
-//  |     52.1 | Add pageMigrationEnabled to PipelineOptions                                                           |
-//  |     52.0 | Add the member word4 and word5 to SamplerYCbCrConversionMetaData                                      |
-//  |     51.2 | Added new pipeline shader info to support mesh shader                                                 |
-//  |     51.0 | Added new shader stage enumerates to support mesh shader                                              |
-//  |     50.2 | Add the member dsState to GraphicsPipelineBuildInfo                                                   |
-//  |     50.1 | Disclose ResourceMappingNodeType::InlineBuffer                                                        |
-//  |     50.0 | Removed the member 'enableOpt' of ShaderModuleOptions                                                 |
-//  |     49.1 | Added enableEarlyCompile to GraphicsPipelineBuildInfo                                                 |
-//  |     49.0 | Added DescriptorConstBuffer, DescriptorConstBufferCompact, DescriptorImage, DescriptorConstTexelBuffer|
-//  |          | to ResourceMappingNodeType                                                                            |
-//  |     48.1 | Added enableUberFetchShader to GraphicsPipelineBuildInfo                                              |
-//  |     48.0 | Removed the member 'polygonMode' of rsState                                                           |
-//  |     47.0 | Always get culling controls from primitive shader table                                               |
-//  |     46.3 | Added enableInterpModePatch to PipelineOptions                                                        |
-//  |     46.2 | Added optimizeTessFactor to PipelineOptions                                                           |
-//  |     46.1 | Added dynamicVertexStride to GraphicsPipelineBuildInfo                                                |
-//  |     46.0 | Removed the member 'depthBiasEnable' of rsState                                                       |
-//  |     45.5 | Added new enum type ThreadGroupSwizzleMode for thread group swizzling for compute shaders             |
-//  |     45.4 | Added disableLicmThreshold, unrollHintThreshold, and dontUnrollHintThreshold to PipelineShaderOptions |
-//  |     45.3 | Add pipelinedump function to enable BeginPipelineDump and GetPipelineName                             |
-//  |     45.2 | Add GFX IP plus checker to GfxIpVersion                                                               |
-//  |     45.1 | Add pipelineCacheAccess, stageCacheAccess(es) to GraphicsPipelineBuildOut/ComputePipelineBuildOut     |
-//  |     45.0 | Remove the member 'enableFastLaunch' of NGG state                                                     |
-//  |     44.0 | Rename the member 'forceNonPassthrough' of NGG state to 'forceCullingMode'                            |
-//  |     43.1 | Add disableImageResourceCheck in PipelineOptions                                                      |
-//  |     43.0 | Removed the enumerate WaveBreakSize::DrawTime                                                         |
-//  |     42.0 | Removed tileOptimal flag from SamplerYcbcrConversion metadata struct                                  |
-//  |     41.0 | Moved resource mapping from ShaderPipeline-level to Pipeline-level                                    |
-//  |     40.4 | Added fp32DenormalMode in PipelineShaderOptions to allow overriding SPIR-V denormal settings          |
-//  |     40.3 | Added ICache interface                                                                                |
-//  |     40.2 | Added extendedRobustness in PipelineOptions to support VK_EXT_robustness2                             |
-//  |     40.1 | Added disableLoopUnroll to PipelineShaderOptions                                                      |
-//  |     40.0 | Added DescriptorReserved12, which moves DescriptorYCbCrSampler down to 13                             |
-//  |     39.0 | Non-LLPC-specific XGL code should #include vkgcDefs.h instead of llpc.h                               |
-//  |     38.3 | Added shadowDescriptorTableUsage and shadowDescriptorTablePtrHigh to PipelineOptions                  |
-//  |     38.2 | Added scalarThreshold to PipelineShaderOptions                                                        |
-//  |     38.1 | Added unrollThreshold to PipelineShaderOptions                                                        |
-//  |     38.0 | Removed CreateShaderCache in ICompiler and pShaderCache in pipeline build info                        |
-//  |     37.0 | Removed the -enable-dynamic-loop-unroll option                                                        |
-//  |     36.0 | Add 128 bit hash as clientHash in PipelineShaderOptions                                               |
-//  |     35.0 | Added disableLicm to PipelineShaderOptions                                                            |
-//  |     33.0 | Add enableLoadScalarizer option into PipelineShaderOptions.                                           |
-//  |     32.0 | Add ShaderModuleOptions in ShaderModuleBuildInfo                                                      |
-//  |     31.0 | Add PipelineShaderOptions::allowVaryWaveSize                                                          |
-//  |     30.0 | Removed PipelineOptions::autoLayoutDesc                                                               |
-//  |     28.0 | Added reconfigWorkgroupLayout to PipelineOptions and useSiScheduler to PipelineShaderOptions          |
-//  |     27.0 | Remove the includeIrBinary option from PipelineOptions as only IR disassembly is now dumped           |
-//  |     25.0 | Add includeIrBinary option into PipelineOptions for including IR binaries into ELF files.             |
-//  |     24.0 | Add forceLoopUnrollCount option into PipelineShaderOptions.                                           |
-//  |     23.0 | Add flag robustBufferAccess in PipelineOptions to check out of bounds of private array.               |
-//  |     22.0 | Internal revision.                                                                                    |
-//  |     21.0 | Add stage in Pipeline shader info and struct PipelineBuildInfo to simplify pipeline dump interface.   |
 //
 //  IMPORTANT NOTE: All structures defined in this file that are passed as input into LLPC must be zero-initialized
 //  with code such as the following before filling in the structure's fields:
@@ -609,6 +469,8 @@ struct PipelineOptions {
                                           ///< for sampled images and samplers
   bool vertex64BitsAttribSingleLoc;       ///< For OGL only, dvec3/dvec4 vertex attrib only consumes 1 location.
   bool enableFragColor;                   ///< For OGL only, need to do frag color broadcast if it is enabled.
+  bool disableBaseVertex;                 ///< For OGL only, force the BaseVertex builtin to 0 instead of
+                                          ///  loading it from userdata
   unsigned reserved20;
   bool enablePrimGeneratedQuery; ///< If set, primitive generated query is enabled
 };
@@ -1361,14 +1223,15 @@ struct GraphicsPipelineBuildInfo {
     ColorTarget target[MaxColorTargets]; ///< Per-MRT color target info
   } cbState;                             ///< Color target state
 
-  NggState nggState;            ///< NGG state used for tuning and debugging
-  PipelineOptions options;      ///< Per pipeline tuning/debugging options
-  bool unlinked;                ///< True to build an "unlinked" half-pipeline ELF
-  bool dynamicVertexStride;     ///< Dynamic Vertex input Stride is enabled.
-  bool enableUberFetchShader;   ///< Use uber fetch shader
-  bool enableColorExportShader; ///< Explicitly build color export shader, UnlinkedStageFragment elf will
-                                ///  return extra meta data.
-  bool enableEarlyCompile;      ///< Whether enable early compile
+  NggState nggState;                       ///< NGG state used for tuning and debugging
+  PipelineOptions options;                 ///< Per pipeline tuning/debugging options
+  bool unlinked;                           ///< True to build an "unlinked" half-pipeline ELF
+  bool dynamicVertexStride;                ///< Dynamic Vertex input Stride is enabled.
+  bool enableUberFetchShader;              ///< Use uber fetch shader
+  bool enableColorExportShader;            ///< Explicitly build color export shader, UnlinkedStageFragment elf will
+                                           ///  return extra meta data.
+  bool enableEarlyCompile;                 ///< Whether enable early compile
+  bool useSoftwareVertexBufferDescriptors; ///< Use software vertex buffer descriptors to structure SRD.
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   BinaryData shaderLibrary; ///< SPIR-V library binary data
 #endif

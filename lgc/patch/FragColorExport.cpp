@@ -95,9 +95,10 @@ static void extractElements(Value *input, BuilderBase &builder, std::array<Value
 // @param expFmt: The format for the given render target
 // @param signedness: If output should be interpreted as a signed integer
 // @param channelWriteMask: Write mask to specify destination channels
+// @param isDualSource: If it's under dualSourceBlend, it should be true
 Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hwColorExport, BuilderBase &builder,
                                                       ExportFormat expFmt, const bool signedness,
-                                                      unsigned channelWriteMask) {
+                                                      unsigned channelWriteMask, const bool isDualSource) {
   assert(expFmt != EXP_FORMAT_ZERO);
 
   Type *outputTy = output->getType();
@@ -126,9 +127,6 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
   unsigned exportMask = 0;
 
   Type *exportTy = exportTypeMapping[expFmt];
-
-  const bool dualSourceBlendedEnable = m_pipelineState->getColorExportState().dualSourceBlendEnable ||
-                                       m_pipelineState->getColorExportState().dynamicDualSourceBlendEnable;
 
   // For 32bit output, we always to scalarize, but for 16bit output we may just operate on vector.
   if (exportTy->isFloatTy()) {
@@ -243,7 +241,7 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
   }
 
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
-    if (dualSourceBlendedEnable) {
+    if (isDualSource) {
       // Save them for later dual-source-swizzle
       m_blendSourceChannels = exportTy->isHalfTy() ? (compCount + 1) / 2 : compCount;
       assert(hwColorExport <= 1);
@@ -466,9 +464,21 @@ bool LowerFragColorExport::runImpl(Module &module, PipelineShadersResult &pipeli
   collectExportInfoForBuiltinOutput(fragEntryPoint, builder);
   collectExportInfoForGenericOutputs(fragEntryPoint, builder);
 
+  // Now do color exports by color buffer.
+  // Read the dynamicDualSourceBlend value from user data and jump to different branch basing on the value
+  // 1. For dynamic pipeline, as the colorblendequation may be dynamic state, so there is a case like this:
+  // Create blendEquation(only use srcColor) -> bindDynamicPipeline -> setBlendEquation(use srcColor1).
+  // As a result, it needs switch the export instruction from normal export into dual exports.
+  // 2. For static pipeline which will not use the usedata and identify whether do dualSourceBlend
+  // Just according to the dualSourceBlendEnable flag.
+  Value *dynamicIsDualSource = builder.getInt32(0);
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) {
+    dynamicIsDualSource = ShaderInputs::getSpecialUserData(UserDataMapping::DynamicDualSrcBlendInfo, builder);
+  }
+
   bool willGenerateColorExportShader = m_pipelineState->isUnlinked() && !m_pipelineState->hasColorExportFormats();
   if (willGenerateColorExportShader && !m_info.empty()) {
-    createTailJump(fragEntryPoint, builder);
+    createTailJump(fragEntryPoint, builder, dynamicIsDualSource);
     return true;
   }
 
@@ -476,7 +486,7 @@ bool LowerFragColorExport::runImpl(Module &module, PipelineShadersResult &pipeli
   bool dummyExport =
       (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10 || m_resUsage->builtInUsage.fs.discard);
   fragColorExport.generateExportInstructions(m_info, m_exportValues, dummyExport, m_pipelineState->getPalMetadata(),
-                                             builder);
+                                             builder, dynamicIsDualSource);
   return !m_info.empty() || dummyExport;
 }
 
@@ -588,7 +598,7 @@ void LowerFragColorExport::collectExportInfoForGenericOutputs(Function *fragEntr
 //
 // @param fragEntryPoint : The fragment shader to which we should add the export instructions.
 // @param builder : The builder object that will be used to create new instructions.
-void LowerFragColorExport::createTailJump(Function *fragEntryPoint, BuilderBase &builder) {
+void LowerFragColorExport::createTailJump(Function *fragEntryPoint, BuilderBase &builder, Value *isDualSource) {
   // Add the export info to be used when linking shaders to generate the color export shader and compute the spi shader
   // color format in the metadata.
   m_pipelineState->getPalMetadata()->addColorExportInfo(m_info);
@@ -599,10 +609,11 @@ void LowerFragColorExport::createTailJump(Function *fragEntryPoint, BuilderBase 
   for (const ColorExportInfo &info : m_info) {
     outputTypes.push_back(getVgprTy(info.ty));
   }
-  Type *retTy = StructType::get(*m_context, outputTypes);
+  outputTypes.push_back(builder.getInt32Ty());
 
   // Now build the return value.
-  Value *retVal = PoisonValue::get(retTy);
+  SmallVector<Value *, 8> cesArgs;
+
   unsigned returnLocation = 0;
   for (unsigned idx = 0; idx < m_info.size(); ++idx) {
     const ColorExportInfo &info = m_info[idx];
@@ -612,14 +623,14 @@ void LowerFragColorExport::createTailJump(Function *fragEntryPoint, BuilderBase 
       continue;
     if (output->getType() != outputTypes[idx])
       output = generateValueForOutput(output, outputTypes[idx], builder);
-    retVal = builder.CreateInsertValue(retVal, output, returnLocation);
+    cesArgs.push_back(output);
     ++returnLocation;
   }
+  cesArgs.push_back(isDualSource);
 
   if (m_pipelineState->getOptions().enableColorExportShader) {
     // Build color export function type
-    auto funcTy = FunctionType::get(builder.getVoidTy(), {retTy}, false);
-
+    auto funcTy = FunctionType::get(builder.getVoidTy(), outputTypes, false);
     // Convert color export shader address to function pointer
     auto funcTyPtr = funcTy->getPointerTo(ADDR_SPACE_CONST);
     auto colorShaderAddr = ShaderInputs::getSpecialUserData(UserDataMapping::ColorExportAddr, builder);
@@ -627,15 +638,20 @@ void LowerFragColorExport::createTailJump(Function *fragEntryPoint, BuilderBase 
     auto funcPtr = addrExt.extendWithPc(colorShaderAddr, funcTyPtr, builder);
 
     // Jump
-    auto callInst = builder.CreateCall(funcTy, funcPtr, retVal);
+    auto callInst = builder.CreateCall(funcTy, funcPtr, cesArgs);
     callInst->setCallingConv(CallingConv::AMDGPU_Gfx);
+    callInst->addParamAttr(returnLocation, Attribute::InReg);
     callInst->setDoesNotReturn();
     callInst->setOnlyWritesMemory();
   } else {
+    Type *retTy = StructType::get(*m_context, outputTypes);
     addFunctionArgs(fragEntryPoint, retTy, {}, {});
-
-    auto *retInst = builder.GetInsertPoint()->getParent()->getTerminator();
+    Value *retVal = PoisonValue::get(retTy);
+    for (int idx = 0; idx < cesArgs.size(); ++idx) {
+      retVal = builder.CreateInsertValue(retVal, cesArgs[idx], idx);
+    }
     retVal = builder.CreateRet(retVal);
+    auto *retInst = builder.GetInsertPoint()->getParent()->getTerminator();
     retInst->eraseFromParent();
   }
 }
@@ -854,17 +870,61 @@ Value *FragColorExport::dualSourceSwizzle(BuilderBase &builder) {
 }
 
 // =====================================================================================================================
-// Generates the export instructions based on the given color export information.
+// Update the color export information when enableFragColor is set.
+//
+// @param originExpinfo : The original color export information for each color export in no particular order.
+// @param pCbShaderMask: The cbShaderMask after update color export information
+// @param [out] outExpinfo : The updated color export information when enableFragColor is true.
+void FragColorExport::updateColorExportInfoWithBroadCastInfo(ArrayRef<ColorExportInfo> originExpinfo,
+                                                             SmallVector<ColorExportInfo> &outExpinfo,
+                                                             unsigned *pCbShaderMask) {
+  // As enableFragColor will only be enabled by OGL, so it will not consider on the dualSource cases.
+  SmallVector<ColorExportInfo> broadCastInfo;
+  if (m_pipelineState->getOptions().enableFragColor) {
+    auto &expInfo = originExpinfo[0];
+    assert(expInfo.ty != nullptr);
+    for (unsigned location = 0; location < MaxColorTargets; ++location) {
+      if (m_pipelineState->getColorExportFormat(location).dfmt != BufDataFormatInvalid)
+        broadCastInfo.push_back({0, location, expInfo.isSigned, expInfo.ty});
+    }
+  }
+  outExpinfo =
+      m_pipelineState->getOptions().enableFragColor ? broadCastInfo : SmallVector<ColorExportInfo>(originExpinfo);
+  for (auto &exp : outExpinfo) {
+    if (exp.hwColorTarget == MaxColorTargets)
+      continue;
+    const unsigned channelWriteMask = m_pipelineState->getColorExportFormat(exp.location).channelWriteMask;
+    unsigned gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion().major;
+    bool needUpdateMask = false;
+    if (exp.location == 0 || gfxIp > 10) {
+      needUpdateMask = (m_pipelineState->computeExportFormat(exp.ty, exp.location) != 0) &&
+                       (channelWriteMask > 0 || m_pipelineState->getColorExportState().alphaToCoverageEnable);
+    } else {
+      needUpdateMask = (m_pipelineState->computeExportFormat(exp.ty, exp.location) != 0) && (channelWriteMask > 0);
+    }
+    if (needUpdateMask) {
+      // For dualSource, the cbShaderMask will only be valid for location=0, other locations setting will be
+      // redundant. ToDo: this point can be optimized when use different ShaderMaskMetaKey or compile different
+      // shaders.
+      *pCbShaderMask |= (0xF << (4 * exp.location));
+    }
+  }
+}
+
+// =====================================================================================================================
+// Generates the export instructions based on the given color export information in dynamic state
 //
 // @param info : The color export information for each color export in no particular order.
 // @param values : The values that are to be exported.  Indexed by the hw color target.
 // @param exportFormat : The export format for each color target. Indexed by the hw color target.
 // @param [out] palMetadata : The PAL metadata that will be extended with relevant information.
 // @param builder : The builder object that will be used to create new instructions.
+// @param dynamicIsDualSource: Identify whether it's in dynamicDualSourceBlend state
 void FragColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info, ArrayRef<Value *> values,
-                                                 bool dummyExport, PalMetadata *palMetadata, BuilderBase &builder) {
-  SmallVector<ExportFormat> finalExportFormats;
+                                                 bool dummyExport, PalMetadata *palMetadata, BuilderBase &builder,
+                                                 Value *dynamicIsDualSource) {
   Value *lastExport = nullptr;
+  unsigned gfxip = m_pipelineState->getTargetInfo().getGfxIpVersion().major;
 
   // MRTZ export comes first if it exists (this is a HW requirement on gfx11+ and an optional good idea on earlier HW).
   // We make the assume here that it is also first in the info list.
@@ -873,8 +933,7 @@ void FragColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info,
 
     // Depth export alpha comes from MRT0.a if there is MRT0.a and A2C is enabled on GFX11+
     Value *alpha = PoisonValue::get(Type::getFloatTy(*m_context));
-    if (!dummyExport && m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11 &&
-        m_pipelineState->getColorExportState().alphaToCoverageEnable) {
+    if (!dummyExport && gfxip >= 11 && m_pipelineState->getColorExportState().alphaToCoverageEnable) {
       for (auto &curInfo : info) {
         if (curInfo.location != 0)
           continue;
@@ -920,57 +979,106 @@ void FragColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info,
     info = info.drop_front(1);
   }
 
-  // Record each color buffer's export info for broadcasting
-  llvm::SmallVector<ColorExportInfo, 8> broadCastInfo;
-  if (m_pipelineState->getOptions().enableFragColor) {
-    auto &expInfo = info[0];
-    assert(expInfo.ty != nullptr);
+  SmallVector<ExportFormat> finalExportFormats;
+  SmallVector<ColorExportInfo> finalExpInfo;
+  unsigned cbShaderMask = 0;
 
+  ReturnInst *retInst = cast<ReturnInst>(builder.GetInsertPoint()->getParent()->getTerminator());
+  Function *originFunc = builder.GetInsertPoint()->getParent()->getParent();
+  BasicBlock *dualSourceBlock = nullptr;
+  BasicBlock *normalExportBlock = nullptr;
+
+  updateColorExportInfoWithBroadCastInfo(info, finalExpInfo, &cbShaderMask);
+
+  if (m_pipelineState->getColorExportState().dualSourceBlendDynamicEnable && (gfxip >= 11)) {
+    // For dynamiceState, whether do dualSourceBlend will depend on the user data.
+    dualSourceBlock = BasicBlock::Create(*m_context, "dualSourceSwizzle", originFunc);
+    normalExportBlock = BasicBlock::Create(*m_context, "normalExport", originFunc);
+    Value *staticDualEnable = builder.getInt32(m_pipelineState->getColorExportState().dualSourceBlendEnable);
+    Value *isDualSource = builder.CreateOr(dynamicIsDualSource,
+                                           builder.CreateAnd(staticDualEnable, builder.CreateNot(dynamicIsDualSource)));
+    isDualSource = builder.CreateICmpNE(dynamicIsDualSource, builder.getInt32(0));
+    builder.CreateCondBr(isDualSource, dualSourceBlock, normalExportBlock);
+  } else {
+    if (retInst) {
+      retInst->eraseFromParent();
+      retInst = nullptr;
+    }
+    if (m_pipelineState->getColorExportState().dualSourceBlendEnable && (gfxip >= 11))
+      // For only-static case, it will depend on dualSourceBlendEnable flag to do dualSourceBlend.
+      dualSourceBlock = builder.GetInsertBlock();
+    else
+      // Both staticDualSourceBlend flag and dynamicDualSourceBlend flag are 0, don't export in dualSourceBlend.
+      normalExportBlock = builder.GetInsertBlock();
+  }
+
+  // Construct ".dualSourceSwizzle" Block, only construct when the dynamicEnable is on and staticValue is true.
+  if ((m_pipelineState->getColorExportState().dualSourceBlendDynamicEnable ||
+       m_pipelineState->getColorExportState().dualSourceBlendEnable) &&
+      (gfxip >= 11)) {
+    builder.SetInsertPoint(dualSourceBlock);
+    unsigned hwColorExport = 0;
     for (unsigned location = 0; location < MaxColorTargets; ++location) {
-      if (m_pipelineState->getColorExportFormat(location).dfmt != BufDataFormatInvalid)
-        broadCastInfo.push_back({0, location, expInfo.isSigned, expInfo.ty});
+      auto infoIt = llvm::find_if(
+          finalExpInfo, [&](const ColorExportInfo &finalExpInfo) { return finalExpInfo.location == location; });
+      if (infoIt == finalExpInfo.end())
+        continue;
+      assert(infoIt->hwColorTarget < MaxColorTargets);
+      auto expFmt = static_cast<ExportFormat>(m_pipelineState->computeExportFormat(infoIt->ty, location, true));
+      const unsigned channelWriteMask = m_pipelineState->getColorExportFormat(location, true).channelWriteMask;
+      bool needExpInst = (expFmt != EXP_FORMAT_ZERO) &&
+                         (channelWriteMask > 0 || m_pipelineState->getColorExportState().alphaToCoverageEnable);
+      if (needExpInst) {
+        // Collect info for dualSourceBlend and save then in m_blendSources, so set the last parameter=true;
+        handleColorExportInstructions(values[infoIt->hwColorTarget], hwColorExport, builder, expFmt, infoIt->isSigned,
+                                      channelWriteMask, true);
+        finalExportFormats.push_back(expFmt);
+        ++hwColorExport;
+      }
     }
-  }
-
-  // Now do color exports by color buffer.
-  unsigned hwColorExport = 0;
-  auto finalExpInfo = m_pipelineState->getOptions().enableFragColor ? ArrayRef<ColorExportInfo>(broadCastInfo) : info;
-  for (unsigned location = 0; location < MaxColorTargets; ++location) {
-    auto infoIt = llvm::find_if(finalExpInfo,
-                                [&](const ColorExportInfo &finalExpInfo) { return finalExpInfo.location == location; });
-    if (infoIt == finalExpInfo.end())
-      continue;
-
-    assert(infoIt->hwColorTarget < MaxColorTargets);
-    auto expFmt = static_cast<ExportFormat>(m_pipelineState->computeExportFormat(infoIt->ty, location));
-    unsigned channelWriteMask = m_pipelineState->getColorExportFormat(location).channelWriteMask;
-    bool needExpInst = (expFmt != EXP_FORMAT_ZERO) &&
-                       (channelWriteMask > 0 || m_pipelineState->getColorExportState().alphaToCoverageEnable);
-    if (needExpInst) {
-      lastExport = handleColorExportInstructions(values[infoIt->hwColorTarget], hwColorExport, builder, expFmt,
-                                                 infoIt->isSigned, channelWriteMask);
-      finalExportFormats.push_back(expFmt);
-      ++hwColorExport;
-    }
-  }
-
-  // Special case of color exports: dual swizzle on gfx11+. They are implicitly captured above, and this case implies
-  // no other color exports. (TODO: Cleanup the implicit capture; we should just check this up-front.)
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11 &&
-      (m_pipelineState->getColorExportState().dualSourceBlendEnable ||
-       m_pipelineState->getColorExportState().dynamicDualSourceBlendEnable))
     lastExport = dualSourceSwizzle(builder);
-
-  if (!lastExport && dummyExport) {
-    lastExport = FragColorExport::addDummyExport(builder);
-    finalExportFormats.push_back(EXP_FORMAT_32_R);
+    FragColorExport::setDoneFlag(lastExport, builder);
+    builder.CreateRetVoid();
   }
 
-  if (lastExport)
-    FragColorExport::setDoneFlag(lastExport, builder);
+  // Construct ".normalExport" Block
+  if (m_pipelineState->getColorExportState().dualSourceBlendDynamicEnable ||
+      !m_pipelineState->getColorExportState().dualSourceBlendEnable || (gfxip < 11)) {
+    builder.SetInsertPoint(normalExportBlock);
+    unsigned hwColorExport = 0;
+    for (unsigned location = 0; location < MaxColorTargets; ++location) {
+      auto infoIt = llvm::find_if(
+          finalExpInfo, [&](const ColorExportInfo &finalExpInfo) { return finalExpInfo.location == location; });
+      if (infoIt == finalExpInfo.end())
+        continue;
+      assert(infoIt->hwColorTarget < MaxColorTargets);
+      const unsigned channelWriteMask = m_pipelineState->getColorExportFormat(location).channelWriteMask;
+      auto expFmt = static_cast<ExportFormat>(m_pipelineState->computeExportFormat(infoIt->ty, location));
+      bool needExpInst = (expFmt != EXP_FORMAT_ZERO) &&
+                         (channelWriteMask > 0 || m_pipelineState->getColorExportState().alphaToCoverageEnable);
+      if (needExpInst) {
+        // Don't collect info for dualSourceBlend just do normal color export, so set the last parameter=false;
+        lastExport = handleColorExportInstructions(values[infoIt->hwColorTarget], hwColorExport, builder, expFmt,
+                                                   infoIt->isSigned, channelWriteMask, false);
+        finalExportFormats.push_back(expFmt);
+        ++hwColorExport;
+      }
+    }
+    if (!lastExport && dummyExport) {
+      lastExport = FragColorExport::addDummyExport(builder);
+      finalExportFormats.push_back(EXP_FORMAT_32_R);
+    }
+    if (lastExport)
+      FragColorExport::setDoneFlag(lastExport, builder);
+    builder.CreateRetVoid();
+  }
+
+  if (retInst) {
+    retInst->eraseFromParent();
+  }
 
   palMetadata->updateSpiShaderColFormat(finalExportFormats);
-  palMetadata->updateCbShaderMask(info);
+  palMetadata->updateCbShaderMask(cbShaderMask);
 }
 
 // =====================================================================================================================

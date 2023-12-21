@@ -308,6 +308,8 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "subgroup.clustered.inclusive";
   case BuilderOpcode::SubgroupClusteredExclusive:
     return "subgroup.clustered.exclusive";
+  case BuilderOpcode::SubgroupClusteredMultiExclusive:
+    return "subgroup.clustered.multi.exclusive";
   case BuilderOpcode::SubgroupQuadBroadcast:
     return "subgroup.quad.broadcast";
   case BuilderOpcode::SubgroupQuadSwapHorizontal:
@@ -324,6 +326,8 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "subgroup.write.invocation";
   case BuilderOpcode::SubgroupMbcnt:
     return "subgroup.mbcnt";
+  case BuilderOpcode::SubgroupPartition:
+    return "subgroup.partition";
   case BuilderOpcode::Count:
     break;
   }
@@ -1873,6 +1877,19 @@ Value *Builder::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, Valu
 }
 
 // =====================================================================================================================
+// Create a subgroup clustered multi exclusive scan.
+//
+// @param groupArithOp : The group operation to perform
+// @param value : The value to perform on
+// @param mask : The mask of each exclusive
+// @param instName : Name to give instruction(s)
+Value *Builder::CreateSubgroupClusteredMultiExclusive(GroupArithOp groupArithOp, Value *const value, Value *const mask,
+                                                      const Twine &instName) {
+  return record(BuilderOpcode::SubgroupClusteredMultiExclusive, value->getType(), {getInt32(groupArithOp), value, mask},
+                instName);
+}
+
+// =====================================================================================================================
 // Create a subgroup quad broadcast.
 //
 // @param value : The value to broadcast
@@ -1950,6 +1967,15 @@ Value *Builder::CreateSubgroupWriteInvocation(Value *const inputValue, Value *co
 // @param instName : Name to give instruction(s)
 Value *Builder::CreateSubgroupMbcnt(Value *const mask, const Twine &instName) {
   return record(BuilderOpcode::SubgroupMbcnt, getInt32Ty(), mask, instName);
+}
+
+// =====================================================================================================================
+// Create a subgroup partition.
+//
+// @param value : The value to contribute
+// @param instName : Name to give instruction(s)
+Value *Builder::CreateSubgroupPartition(Value *const value, const Twine &instName) {
+  return record(BuilderOpcode::SubgroupPartition, FixedVectorType::get(getInt32Ty(), 4), value, instName);
 }
 
 // =====================================================================================================================
@@ -2105,11 +2131,13 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::SubgroupBroadcastWaterfall:
     case BuilderOpcode::SubgroupBroadcastFirst:
     case BuilderOpcode::SubgroupClusteredExclusive:
+    case BuilderOpcode::SubgroupClusteredMultiExclusive:
     case BuilderOpcode::SubgroupClusteredInclusive:
     case BuilderOpcode::SubgroupClusteredReduction:
     case BuilderOpcode::SubgroupElect:
     case BuilderOpcode::SubgroupInverseBallot:
     case BuilderOpcode::SubgroupMbcnt:
+    case BuilderOpcode::SubgroupPartition:
     case BuilderOpcode::SubgroupQuadBroadcast:
     case BuilderOpcode::SubgroupQuadSwapDiagonal:
     case BuilderOpcode::SubgroupQuadSwapHorizontal:

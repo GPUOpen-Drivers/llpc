@@ -34,49 +34,49 @@ declare void @lgc.cps.jump(...)
 ; CHECK-SAME: {} [[STATE:%.*]], i32 [[RCR:%.*]], float [[ARG:%.*]]) !lgc.cps !0 !continuation !1 {
 ; CHECK-NEXT:  AllocaSpillBB:
 ; CHECK-NEXT:    [[TMP0:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 8)
-; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr inbounds [[TEST_FRAME:%.*]], ptr addrspace(32) [[TMP0]], i32 0, i32 1
-; CHECK-NEXT:    store float [[ARG]], ptr addrspace(32) [[TMP1]], align 4
-; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[TEST_FRAME]], ptr addrspace(32) [[TMP0]], i32 0, i32 0
-; CHECK-NEXT:    store i32 [[RCR]], ptr addrspace(32) [[TMP2]], align 4
+; CHECK-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[TEST_FRAME:%.*]], ptr addrspace(32) [[TMP0]], i32 0, i32 1
+; CHECK-NEXT:    store float [[ARG]], ptr addrspace(32) [[ARG_SPILL_ADDR]], align 4
+; CHECK-NEXT:    [[RCR_SPILL_ADDR:%.*]] = getelementptr inbounds [[TEST_FRAME]], ptr addrspace(32) [[TMP0]], i32 0, i32 0
+; CHECK-NEXT:    store i32 [[RCR]], ptr addrspace(32) [[RCR_SPILL_ADDR]], align 4
 ; CHECK-NEXT:    [[T0:%.*]] = fadd float [[ARG]], 1.000000e+00
 ; CHECK-NEXT:    [[CR:%.*]] = call i32 @lgc.cps.as.continuation.reference(ptr @callee)
 ; CHECK-NEXT:    [[CR2:%.*]] = call i32 @lgc.cps.as.continuation.reference(ptr @callee2)
 ; CHECK-NEXT:    [[COND:%.*]] = fcmp olt float [[T0]], 1.000000e+00
 ; CHECK-NEXT:    br i1 [[COND]], label [[BB1:%.*]], label [[BB2:%.*]]
 ; CHECK:       bb1:
-; CHECK-NEXT:    [[TMP3:%.*]] = inttoptr i32 [[CR]] to ptr
-; CHECK-NEXT:    [[TMP4:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @test.resume.0)
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR]], i32 2, {} poison, i32 [[TMP4]], float [[ARG]])
+; CHECK-NEXT:    [[TMP1:%.*]] = inttoptr i32 [[CR]] to ptr
+; CHECK-NEXT:    [[TMP2:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @test.resume.0)
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR]], i32 2, {} poison, i32 [[TMP2]], float [[ARG]])
 ; CHECK-NEXT:    unreachable
 ; CHECK:       bb2:
-; CHECK-NEXT:    [[TMP5:%.*]] = inttoptr i32 [[CR2]] to ptr
-; CHECK-NEXT:    [[TMP6:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @test.resume.1)
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR2]], i32 2, {} poison, i32 [[TMP6]], float [[T0]])
+; CHECK-NEXT:    [[TMP3:%.*]] = inttoptr i32 [[CR2]] to ptr
+; CHECK-NEXT:    [[TMP4:%.*]] = call i32 (...) @lgc.cps.as.continuation.reference(ptr @test.resume.1)
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[CR2]], i32 2, {} poison, i32 [[TMP4]], float [[T0]])
 ; CHECK-NEXT:    unreachable
 ;
 ;
-; CHECK-LABEL: define void @test.resume.0(
+; CHECK-LABEL: define dso_local void @test.resume.0(
 ; CHECK-SAME: {} [[TMP0:%.*]], i32 [[TMP1:%.*]], float [[TMP2:%.*]]) !lgc.cps !0 !continuation !1 {
 ; CHECK-NEXT:  entryresume.0:
 ; CHECK-NEXT:    [[TMP3:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 8)
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[TEST_FRAME:%.*]], ptr addrspace(32) [[TMP3]], i32 0, i32 1
-; CHECK-NEXT:    [[ARG_RELOAD:%.*]] = load float, ptr addrspace(32) [[TMP4]], align 4
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[TEST_FRAME]], ptr addrspace(32) [[TMP3]], i32 0, i32 0
-; CHECK-NEXT:    [[RCR_RELOAD:%.*]] = load i32, ptr addrspace(32) [[TMP5]], align 4
+; CHECK-NEXT:    [[ARG_RELOAD_ADDR:%.*]] = getelementptr inbounds [[TEST_FRAME:%.*]], ptr addrspace(32) [[TMP3]], i32 0, i32 1
+; CHECK-NEXT:    [[ARG_RELOAD:%.*]] = load float, ptr addrspace(32) [[ARG_RELOAD_ADDR]], align 4
+; CHECK-NEXT:    [[RCR_RELOAD_ADDR:%.*]] = getelementptr inbounds [[TEST_FRAME]], ptr addrspace(32) [[TMP3]], i32 0, i32 0
+; CHECK-NEXT:    [[RCR_RELOAD:%.*]] = load i32, ptr addrspace(32) [[RCR_RELOAD_ADDR]], align 4
 ; CHECK-NEXT:    [[RETURNVALUE:%.*]] = fmul float [[TMP2]], [[ARG_RELOAD]]
 ; CHECK-NEXT:    call void @lgc.cps.free(i32 8)
 ; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RCR_RELOAD]], i32 2, {} poison, i32 poison, float [[RETURNVALUE]])
 ; CHECK-NEXT:    unreachable
 ;
 ;
-; CHECK-LABEL: define void @test.resume.1(
+; CHECK-LABEL: define dso_local void @test.resume.1(
 ; CHECK-SAME: {} [[TMP0:%.*]], i32 [[TMP1:%.*]], float [[TMP2:%.*]]) !lgc.cps !0 !continuation !1 {
 ; CHECK-NEXT:  entryresume.1:
 ; CHECK-NEXT:    [[TMP3:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 8)
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[TEST_FRAME:%.*]], ptr addrspace(32) [[TMP3]], i32 0, i32 1
-; CHECK-NEXT:    [[ARG_RELOAD:%.*]] = load float, ptr addrspace(32) [[TMP4]], align 4
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[TEST_FRAME]], ptr addrspace(32) [[TMP3]], i32 0, i32 0
-; CHECK-NEXT:    [[RCR_RELOAD:%.*]] = load i32, ptr addrspace(32) [[TMP5]], align 4
+; CHECK-NEXT:    [[ARG_RELOAD_ADDR:%.*]] = getelementptr inbounds [[TEST_FRAME:%.*]], ptr addrspace(32) [[TMP3]], i32 0, i32 1
+; CHECK-NEXT:    [[ARG_RELOAD:%.*]] = load float, ptr addrspace(32) [[ARG_RELOAD_ADDR]], align 4
+; CHECK-NEXT:    [[RCR_RELOAD_ADDR:%.*]] = getelementptr inbounds [[TEST_FRAME]], ptr addrspace(32) [[TMP3]], i32 0, i32 0
+; CHECK-NEXT:    [[RCR_RELOAD:%.*]] = load i32, ptr addrspace(32) [[RCR_RELOAD_ADDR]], align 4
 ; CHECK-NEXT:    [[RETURNVALUE:%.*]] = fmul float [[TMP2]], [[ARG_RELOAD]]
 ; CHECK-NEXT:    call void @lgc.cps.free(i32 8)
 ; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RCR_RELOAD]], i32 2, {} poison, i32 poison, float [[RETURNVALUE]])

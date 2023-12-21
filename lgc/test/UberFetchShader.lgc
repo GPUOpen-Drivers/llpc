@@ -1,13 +1,16 @@
 ; RUN: lgc -mcpu=gfx1030 -o - -passes=lgc-vertex-fetch %s | FileCheck --check-prefixes=CHECK %s
-; REQUIRES: do-not-run-me
 
 ; CHECK-LABEL: define dllexport spir_func void @lgc.shader.VS.main()
 ; Get the descriptor of Uber Fetch Shader buffer
 ; CHECK: [[Desc:%[0-9]*]] = call i64 @lgc.load.user.data.i64(i32 4)
 
 ; CHECK: [[DESCPTR:%[0-9]*]] = inttoptr i64 [[Desc]] to ptr addrspace(4)
-; CHECK: [[UBERINFOPTR:%[0-9]*]] = getelementptr <4 x i32>, ptr addrspace(4) [[DESCPTR]], i32 0
-; CHECK: [[UBERINFO:%[0-9]*]] = load <4 x i32>, ptr addrspace(4) [[UBERINFOPTR]], align 16
+; location mask
+; CHECK: load i64, ptr addrspace(4) [[DESCPTR]], align 8
+
+; CHECK: [[UBERINFOPTR:%[0-9]*]] = getelementptr i64, ptr addrspace(4) [[DESCPTR]], i32 1
+; CHECK: [[CURUBERINFOPTR:%[0-9]*]] = getelementptr <4 x i32>, ptr addrspace(4) [[UBERINFOPTR]], i32 0
+; CHECK: [[UBERINFO:%[0-9]*]] = load <4 x i32>, ptr addrspace(4) [[CURUBERINFOPTR]], align 16
 
 ; Read the first dword: vertex attribute
 ; CHECK: [[attr:%[0-9]*]] = extractelement <4 x i32> [[UBERINFO]], i64 0
