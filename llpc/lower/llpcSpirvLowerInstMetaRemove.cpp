@@ -70,7 +70,7 @@ bool SpirvLowerInstMetaRemove::runImpl(Module &module) {
   // Remove calls to functions whose names start with "spirv.NonUniform".
   SmallVector<CallInst *, 8> callsToRemove;
   for (auto &func : *m_module) {
-    if (func.getName().startswith(gSPIRVName::NonUniform)) {
+    if (func.getName().starts_with(gSPIRVName::NonUniform)) {
       for (auto &use : func.uses()) {
         if (auto *callInst = dyn_cast<CallInst>(use.getUser())) {
           if (callInst->isCallee(&use))
@@ -88,7 +88,7 @@ bool SpirvLowerInstMetaRemove::runImpl(Module &module) {
   // Remove any named metadata in the module that starts "spirv.".
   SmallVector<NamedMDNode *, 8> nodesToRemove;
   for (auto &namedMdNode : m_module->named_metadata()) {
-    if (namedMdNode.getName().startswith(gSPIRVMD::Prefix))
+    if (namedMdNode.getName().starts_with(gSPIRVMD::Prefix))
       nodesToRemove.push_back(&namedMdNode);
   }
   for (NamedMDNode *namedMdNode : nodesToRemove) {

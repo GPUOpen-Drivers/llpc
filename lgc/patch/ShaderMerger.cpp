@@ -178,7 +178,7 @@ void ShaderMerger::gatherTuningAttributes(AttrBuilder &tuningAttrs, const Functi
       continue;
 
     auto attrKind = srcAttr.getKindAsString();
-    if (!(attrKind.startswith("amdgpu") || attrKind.startswith("disable")))
+    if (!(attrKind.starts_with("amdgpu") || attrKind.starts_with("disable")))
       continue;
 
     // Note: this doesn't mean attribute values match

@@ -83,8 +83,8 @@ static unsigned findAddressSpaceAccess(const Instruction *inst) {
       auto func = ci->getCalledFunction();
       if (func) {
         // Treat these as buffer address space as they do not overlap with private.
-        if (func->getName().startswith("llvm.amdgcn.image") || func->getName().startswith("llvm.amdgcn.raw") ||
-            func->getName().startswith("llvm.amdgcn.struct"))
+        if (func->getName().starts_with("llvm.amdgcn.image") || func->getName().starts_with("llvm.amdgcn.raw") ||
+            func->getName().starts_with("llvm.amdgcn.struct"))
           return ADDR_SPACE_BUFFER_FAT_POINTER;
       }
     }
@@ -179,7 +179,7 @@ bool PatchInvariantLoads::runImpl(Function &function, PipelineState *pipelineSta
           }
         } else if (CallInst *ci = dyn_cast<CallInst>(&inst)) {
           auto func = ci->getCalledFunction();
-          if (func && func->getName().startswith("lgc.ngg."))
+          if (func && func->getName().starts_with("lgc.ngg."))
             continue;
         }
         unsigned addrSpace = findAddressSpaceAccess(&inst);

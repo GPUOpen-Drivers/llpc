@@ -71,7 +71,7 @@ PreservedAnalyses LowerCooperativeMatrix::run() {
   bool changed = false;
 
   for (Function &function : m_module.functions()) {
-    if (function.isDeclaration() && function.getName().startswith(LlpcName::SpirvCooperativeMatrixProxy)) {
+    if (function.isDeclaration() && function.getName().starts_with(LlpcName::SpirvCooperativeMatrixProxy)) {
       for (User *user : function.users()) {
         if (auto *call = dyn_cast<CallInst>(user)) {
           assert(call->getCalledOperand() == &function);

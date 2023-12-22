@@ -341,30 +341,30 @@ void SpirvLowerGlobal::handleCallInst(bool checkEmitCall, bool checkInterpCall) 
       assert(isa<CallInst>(user) && "We should only have CallInst instructions here.");
       CallInst *callInst = cast<CallInst>(user);
       if (checkEmitCall) {
-        if (mangledName.startswith(gSPIRVName::EmitVertex) || mangledName.startswith(gSPIRVName::EmitStreamVertex))
+        if (mangledName.starts_with(gSPIRVName::EmitVertex) || mangledName.starts_with(gSPIRVName::EmitStreamVertex))
           m_emitCalls.insert(callInst);
       } else {
         assert(checkInterpCall);
 
-        if (mangledName.startswith(gSPIRVName::InterpolateAtCentroid) ||
-            mangledName.startswith(gSPIRVName::InterpolateAtSample) ||
-            mangledName.startswith(gSPIRVName::InterpolateAtOffset) ||
-            mangledName.startswith(gSPIRVName::InterpolateAtVertexAMD)) {
+        if (mangledName.starts_with(gSPIRVName::InterpolateAtCentroid) ||
+            mangledName.starts_with(gSPIRVName::InterpolateAtSample) ||
+            mangledName.starts_with(gSPIRVName::InterpolateAtOffset) ||
+            mangledName.starts_with(gSPIRVName::InterpolateAtVertexAMD)) {
           // Translate interpolation functions to LLPC intrinsic calls
           auto loadSrc = callInst->getArgOperand(0);
           unsigned interpLoc = InterpLocUnknown;
           Value *auxInterpValue = nullptr;
 
-          if (mangledName.startswith(gSPIRVName::InterpolateAtCentroid))
+          if (mangledName.starts_with(gSPIRVName::InterpolateAtCentroid))
             interpLoc = InterpLocCentroid;
-          else if (mangledName.startswith(gSPIRVName::InterpolateAtSample)) {
+          else if (mangledName.starts_with(gSPIRVName::InterpolateAtSample)) {
             interpLoc = InterpLocSample;
             auxInterpValue = callInst->getArgOperand(1); // Sample ID
-          } else if (mangledName.startswith(gSPIRVName::InterpolateAtOffset)) {
+          } else if (mangledName.starts_with(gSPIRVName::InterpolateAtOffset)) {
             interpLoc = InterpLocCenter;
             auxInterpValue = callInst->getArgOperand(1); // Offset from pixel center
           } else {
-            assert(mangledName.startswith(gSPIRVName::InterpolateAtVertexAMD));
+            assert(mangledName.starts_with(gSPIRVName::InterpolateAtVertexAMD));
             interpLoc = InterpLocCustom;
             auxInterpValue = callInst->getArgOperand(1); // Vertex no.
           }
@@ -594,13 +594,13 @@ void SpirvLowerGlobal::mapGlobalVariableToProxy(GlobalVariable *globalVar) {
   assert(m_entryPoint);
   removeConstantExpr(m_context, globalVar);
   // Handle special globals, regular allocas will be removed by SROA pass.
-  if (globalVar->getName().startswith(RtName::HitAttribute)) {
+  if (globalVar->getName().starts_with(RtName::HitAttribute)) {
     proxy = m_entryPoint->getArg(1);
     globalVar->replaceAllUsesWith(proxy);
-  } else if (globalVar->getName().startswith(RtName::IncomingRayPayLoad)) {
+  } else if (globalVar->getName().starts_with(RtName::IncomingRayPayLoad)) {
     proxy = m_entryPoint->getArg(0);
     globalVar->replaceAllUsesWith(proxy);
-  } else if (globalVar->getName().startswith(RtName::IncomingCallableData)) {
+  } else if (globalVar->getName().starts_with(RtName::IncomingCallableData)) {
     proxy = m_entryPoint->getArg(0);
     globalVar->replaceAllUsesWith(proxy);
   } else {
@@ -846,10 +846,10 @@ void SpirvLowerGlobal::lowerOutput() {
         m_builder->SetInsertPoint(emitCall);
 
         auto mangledName = emitCall->getCalledFunction()->getName();
-        if (mangledName.startswith(gSPIRVName::EmitStreamVertex))
+        if (mangledName.starts_with(gSPIRVName::EmitStreamVertex))
           emitStreamId = cast<ConstantInt>(emitCall->getOperand(0))->getZExtValue();
         else
-          assert(mangledName.startswith(gSPIRVName::EmitVertex));
+          assert(mangledName.starts_with(gSPIRVName::EmitVertex));
 
         Value *outputValue = m_builder->CreateLoad(proxyTy, proxy);
         addCallInstForOutputExport(outputValue, meta, nullptr, 0, 0, 0, nullptr, nullptr, emitStreamId);
@@ -1958,7 +1958,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                   if (!callee)
                     continue;
                   // If the call is our non uniform decoration, record we are non uniform.
-                  isNonUniform = callee->getName().startswith(gSPIRVName::NonUniform);
+                  isNonUniform = callee->getName().starts_with(gSPIRVName::NonUniform);
                   break;
                 }
               }
@@ -1972,7 +1972,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                     continue;
                   // If the call is our non uniform decoration, record we are non uniform.
                   auto callee = call->getCalledFunction();
-                  if (callee && callee->getName().startswith(gSPIRVName::NonUniform)) {
+                  if (callee && callee->getName().starts_with(gSPIRVName::NonUniform)) {
                     isNonUniform = true;
                     break;
                   }
@@ -2515,7 +2515,7 @@ void SpirvLowerGlobal::lowerShaderRecordBuffer() {
 
   static const char *ShaderRecordBuffer = "ShaderRecordBuffer";
   for (GlobalVariable &global : m_module->globals()) {
-    if (!global.getName().startswith(ShaderRecordBuffer))
+    if (!global.getName().starts_with(ShaderRecordBuffer))
       continue;
 
     removeConstantExpr(m_context, &global);

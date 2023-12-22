@@ -2161,13 +2161,13 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
 // @param name : Name of function declaration
 // @returns : Opcode
 BuilderOpcode BuilderRecorder::getOpcodeFromName(StringRef name) {
-  assert(name.startswith(BuilderCallPrefix));
+  assert(name.starts_with(BuilderCallPrefix));
   name = name.drop_front(strlen(BuilderCallPrefix));
   unsigned bestOpcode = 0;
   unsigned bestLength = 0;
   for (unsigned opcode = 0; opcode != BuilderOpcode::Count; ++opcode) {
     StringRef opcodeName = getCallName(static_cast<BuilderOpcode>(opcode));
-    if (name.startswith(opcodeName)) {
+    if (name.starts_with(opcodeName)) {
       if (opcodeName.size() > bestLength) {
         bestLength = opcodeName.size();
         bestOpcode = opcode;

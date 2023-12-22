@@ -95,13 +95,13 @@ bool BuilderReplayer::runImpl(Module &module, PipelineState *pipelineState) {
     if (const MDNode *funcMeta = func.getMetadata(opcodeMetaKindId)) {
       const ConstantAsMetadata *metaConst = cast<ConstantAsMetadata>(funcMeta->getOperand(0));
       opcode = cast<ConstantInt>(metaConst->getValue())->getZExtValue();
-      assert(func.getName().startswith(BuilderCallPrefix));
+      assert(func.getName().starts_with(BuilderCallPrefix));
       assert(func.getName()
                  .slice(strlen(BuilderCallPrefix), StringRef::npos)
-                 .startswith(BuilderRecorder::getCallName(static_cast<BuilderOpcode>(opcode))) &&
+                 .starts_with(BuilderRecorder::getCallName(static_cast<BuilderOpcode>(opcode))) &&
              "lgc.create.* mismatch!");
     } else {
-      if (!func.getName().startswith(BuilderCallPrefix))
+      if (!func.getName().starts_with(BuilderCallPrefix))
         continue; // Not lgc.create.* call
       opcode = BuilderRecorder::getOpcodeFromName(func.getName());
     }

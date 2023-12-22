@@ -118,9 +118,9 @@ bool PatchInOutImportExport::runImpl(Module &module, PipelineShadersResult &pipe
   SmallVector<Function *, 16> inputCallees, otherCallees;
   for (auto &func : module.functions()) {
     auto name = func.getName();
-    if (name.startswith("lgc.input"))
+    if (name.starts_with("lgc.input"))
       inputCallees.push_back(&func);
-    else if (name.startswith("lgc.output") || name == "llvm.amdgcn.s.sendmsg")
+    else if (name.starts_with("lgc.output") || name == "llvm.amdgcn.s.sendmsg")
       otherCallees.push_back(&func);
   }
 
@@ -474,7 +474,7 @@ void PatchInOutImportExport::processShader() {
       // Different with above, this will force the threadID swizzle which will rearrange thread ID within a group into
       // blocks of 8*4, not to reconfig workgroup automatically and will support to be swizzled in 8*4 block
       // split.
-      if (func.isDeclaration() && func.getName().startswith(lgcName::ReconfigureLocalInvocationId)) {
+      if (func.isDeclaration() && func.getName().starts_with(lgcName::ReconfigureLocalInvocationId)) {
         unsigned workgroupSizeX = mode.workgroupSizeX;
         unsigned workgroupSizeY = mode.workgroupSizeY;
         unsigned workgroupSizeZ = mode.workgroupSizeZ;
@@ -494,7 +494,7 @@ void PatchInOutImportExport::processShader() {
         }
       }
 
-      if (func.isDeclaration() && func.getName().startswith(lgcName::SwizzleWorkgroupId)) {
+      if (func.isDeclaration() && func.getName().starts_with(lgcName::SwizzleWorkgroupId)) {
         createSwizzleThreadGroupFunction();
       }
     }
@@ -544,10 +544,10 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
   auto importBuiltInOutput = lgcName::OutputImportBuiltIn;
 
   const bool isGenericInputImport = isa<InputImportGenericOp>(callInst);
-  const bool isBuiltInInputImport = mangledName.startswith(importBuiltInInput);
+  const bool isBuiltInInputImport = mangledName.starts_with(importBuiltInInput);
   const bool isInterpolatedInputImport = isa<InputImportInterpolatedOp>(callInst);
   const bool isGenericOutputImport = isa<OutputImportGenericOp>(callInst);
-  const bool isBuiltInOutputImport = mangledName.startswith(importBuiltInOutput);
+  const bool isBuiltInOutputImport = mangledName.starts_with(importBuiltInOutput);
 
   const bool isImport = (isGenericInputImport || isBuiltInInputImport || isInterpolatedInputImport ||
                          isGenericOutputImport || isBuiltInOutputImport);
@@ -556,9 +556,9 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
   auto exportBuiltInOutput = lgcName::OutputExportBuiltIn;
   auto exportXfbOutput = lgcName::OutputExportXfb;
 
-  const bool isGenericOutputExport = mangledName.startswith(exportGenericOutput);
-  const bool isBuiltInOutputExport = mangledName.startswith(exportBuiltInOutput);
-  const bool isXfbOutputExport = mangledName.startswith(exportXfbOutput);
+  const bool isGenericOutputExport = mangledName.starts_with(exportGenericOutput);
+  const bool isBuiltInOutputExport = mangledName.starts_with(exportBuiltInOutput);
+  const bool isXfbOutputExport = mangledName.starts_with(exportXfbOutput);
 
   const bool isExport = (isGenericOutputExport || isBuiltInOutputExport || isXfbOutputExport);
 

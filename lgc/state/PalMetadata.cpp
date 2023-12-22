@@ -213,9 +213,9 @@ void PalMetadata::mergeFromBlob(llvm::StringRef blob, bool isGlueCode) {
     if (destNode->isString() && srcNode.isString()) {
       if (destNode->getString() == srcNode.getString())
         return 0;
-      if (srcNode.getString().endswith("_fetchless"))
+      if (srcNode.getString().ends_with("_fetchless"))
         return 0;
-      if (destNode->getString().endswith("_fetchless")) {
+      if (destNode->getString().ends_with("_fetchless")) {
         *destNode = srcNode;
         return 0;
       }
@@ -307,9 +307,9 @@ void PalMetadata::mergeFromBlob(llvm::StringRef blob, bool isGlueCode) {
     if (destNode->isString() && srcNode.isString()) {
       if (destNode->getString() == srcNode.getString())
         return 0;
-      if (srcNode.getString().endswith("_fetchless"))
+      if (srcNode.getString().ends_with("_fetchless"))
         return 0;
-      if (destNode->getString().endswith("_fetchless")) {
+      if (destNode->getString().ends_with("_fetchless")) {
         *destNode = srcNode;
         return 0;
       }

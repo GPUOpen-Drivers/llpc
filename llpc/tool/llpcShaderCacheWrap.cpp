@@ -81,8 +81,8 @@ ShaderCacheWrap *ShaderCacheWrap::Create(unsigned optionCount, const char *const
 
     StringRef option = options[i] + 1; // Skip '-' in options
 
-    if (option.startswith(cl::ShaderCacheMode.ArgStr) || option.startswith(cl::ShaderCacheFileDir.ArgStr) ||
-        option.startswith(cl::ExecutableName.ArgStr)) {
+    if (option.starts_with(cl::ShaderCacheMode.ArgStr) || option.starts_with(cl::ShaderCacheFileDir.ArgStr) ||
+        option.starts_with(cl::ExecutableName.ArgStr)) {
       createDummyCompiler = true;
       break;
     }

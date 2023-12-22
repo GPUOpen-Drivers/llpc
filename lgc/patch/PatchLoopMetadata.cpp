@@ -66,7 +66,7 @@ MDNode *PatchLoopMetadata::updateMetadata(MDNode *loopId, ArrayRef<StringRef> pr
     if (MDNode *mdNode = dyn_cast<MDNode>(op)) {
       if (const MDString *mdString = dyn_cast<MDString>(mdNode->getOperand(0))) {
         if (any_of(prefixesToRemove,
-                   [mdString](StringRef prefix) -> bool { return mdString->getString().startswith(prefix); }))
+                   [mdString](StringRef prefix) -> bool { return mdString->getString().starts_with(prefix); }))
           found = true;
         else
           mds.push_back(op);
@@ -169,7 +169,7 @@ bool PatchLoopMetadata::runImpl(Loop &loop, PipelineState *pipelineState) {
       Metadata *op = loopMetaNode->getOperand(i);
       if (MDNode *mdNode = dyn_cast<MDNode>(op)) {
         if (const MDString *mdString = dyn_cast<MDString>(mdNode->getOperand(0))) {
-          if (m_dontUnrollHintThreshold > 0 && mdString->getString().startswith("llvm.loop.unroll.disable")) {
+          if (m_dontUnrollHintThreshold > 0 && mdString->getString().starts_with("llvm.loop.unroll.disable")) {
             LLVM_DEBUG(dbgs() << "  relaxing llvm.loop.unroll.disable to amdgpu.loop.unroll.threshold "
                               << m_dontUnrollHintThreshold << "\n");
             Metadata *thresholdMeta[] = {
@@ -181,7 +181,7 @@ bool PatchLoopMetadata::runImpl(Loop &loop, PipelineState *pipelineState) {
             changed = true;
             break;
           }
-          if (m_unrollHintThreshold > 0 && mdString->getString().startswith("llvm.loop.unroll.full")) {
+          if (m_unrollHintThreshold > 0 && mdString->getString().starts_with("llvm.loop.unroll.full")) {
             LLVM_DEBUG(dbgs() << "  relaxing llvm.loop.unroll.full to amdgpu.loop.unroll.threshold "
                               << m_unrollHintThreshold << "\n");
             Metadata *thresholdMeta[] = {

@@ -121,7 +121,7 @@ void redirectLogOutput(bool restoreToDefault, unsigned optionCount, const char *
       bool needDebugOut = ::llvm::DebugFlag;
       for (unsigned i = 1; !needDebugOut && i < optionCount; ++i) {
         StringRef option = options[i];
-        if (option.startswith("-debug") || option.startswith("-print"))
+        if (option.starts_with("-debug") || option.starts_with("-print"))
           needDebugOut = true;
       }
 

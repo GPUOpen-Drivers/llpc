@@ -526,7 +526,7 @@ void LowerFragColorExport::collectExportInfoForGenericOutputs(Function *fragEntr
 
   // Collect all of the exports in the fragment shader
   for (auto &func : *fragEntryPoint->getParent()) {
-    if (!func.isDeclaration() || !func.getName().startswith(lgcName::OutputExportGeneric))
+    if (!func.isDeclaration() || !func.getName().starts_with(lgcName::OutputExportGeneric))
       continue;
     for (auto user : func.users()) {
       auto callInst = cast<CallInst>(user);
@@ -652,7 +652,7 @@ void LowerFragColorExport::collectExportInfoForBuiltinOutput(Function *module, B
   Value *m_fragStencilRef = nullptr;
   Value *m_sampleMask = nullptr;
   for (auto &func : *module->getParent()) {
-    if (!func.isDeclaration() || !func.getName().startswith(lgcName::OutputExportBuiltIn))
+    if (!func.isDeclaration() || !func.getName().starts_with(lgcName::OutputExportBuiltIn))
       continue;
     for (auto user : func.users()) {
       auto callInst = cast<CallInst>(user);

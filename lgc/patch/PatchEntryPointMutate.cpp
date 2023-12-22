@@ -864,7 +864,7 @@ void PatchEntryPointMutate::setupComputeWithCalls(Module *module) {
   // functions and intrinsics).
   for (Function &func : *module) {
     if (func.isDeclaration() && func.getIntrinsicID() == Intrinsic::not_intrinsic &&
-        !func.getName().startswith(lgcName::InternalCallPrefix) && !func.user_empty()) {
+        !func.getName().starts_with(lgcName::InternalCallPrefix) && !func.user_empty()) {
       m_computeWithCalls = true;
       return;
     }
@@ -972,7 +972,7 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
     if (!func.isDeclaration())
       continue;
 
-    if (func.getName().startswith(lgcName::SpecialUserData)) {
+    if (func.getName().starts_with(lgcName::SpecialUserData)) {
       for (User *user : func.users()) {
         CallInst *call = cast<CallInst>(user);
         ShaderStage stage = getShaderStage(call->getFunction());
@@ -986,7 +986,7 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
       continue;
     }
 
-    if ((func.getName().startswith(lgcName::OutputExportXfb) && !func.use_empty()) || m_pipelineState->enableSwXfb()) {
+    if ((func.getName().starts_with(lgcName::OutputExportXfb) && !func.use_empty()) || m_pipelineState->enableSwXfb()) {
       // NOTE: For GFX11+, SW emulated stream-out will always use stream-out buffer descriptors and stream-out buffer
       // offsets to calculate numbers of written primitives/dwords and update the counters.  auto lastVertexStage =
       auto lastVertexStage = m_pipelineState->getLastVertexProcessingStage();
@@ -1205,7 +1205,7 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
   SmallVector<Function *, 4> origFuncs;
   for (Function &func : module) {
     if (func.isDeclaration()) {
-      if (!func.isIntrinsic() && !func.getName().startswith(lgcName::InternalCallPrefix)) {
+      if (!func.isIntrinsic() && !func.getName().starts_with(lgcName::InternalCallPrefix)) {
         // This is the declaration of a callable function that is defined in a different module.
         func.setCallingConv(CallingConv::AMDGPU_Gfx);
       }
@@ -1280,7 +1280,7 @@ void PatchEntryPointMutate::processCalls(Function &func, SmallVectorImpl<Type *>
       Value *calledVal = call->getCalledOperand();
       Function *calledFunc = dyn_cast<Function>(calledVal);
       if (calledFunc) {
-        if (calledFunc->isIntrinsic() || calledFunc->getName().startswith(lgcName::InternalCallPrefix))
+        if (calledFunc->isIntrinsic() || calledFunc->getName().starts_with(lgcName::InternalCallPrefix))
           continue;
       } else if (call->isInlineAsm()) {
         continue;

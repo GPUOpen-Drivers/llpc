@@ -127,7 +127,7 @@ static bool isIsaText(StringRef data) {
   // This is called by the lgc standalone tool to help distinguish between its three output types of ELF binary,
   // LLVM IR assembler and ISA assembler. Here we use the fact that ISA assembler is the only one that starts
   // with a tab character.
-  return data.startswith("\t");
+  return data.starts_with("\t");
 }
 
 // =====================================================================================================================
@@ -325,8 +325,8 @@ int main(int argc, char **argv) {
       if (notSpacePos != StringRef::npos) {
         if (remaining[notSpacePos] == '!')
           hadMetadata = true;
-        else if (hadMetadata && (remaining.drop_front(notSpacePos).startswith("target") ||
-                                 remaining.drop_front(notSpacePos).startswith("define"))) {
+        else if (hadMetadata && (remaining.drop_front(notSpacePos).starts_with("target") ||
+                                 remaining.drop_front(notSpacePos).starts_with("define"))) {
           // End the current split module and go on to the next one.
           separatedAsms.back() = separatedAsms.back().slice(0, remaining.data() - separatedAsms.back().data());
           separatedAsms.push_back(remaining);

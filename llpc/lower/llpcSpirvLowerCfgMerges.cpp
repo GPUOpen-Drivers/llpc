@@ -286,7 +286,7 @@ void SpirvLowerCfgMerges::mapConvergentValues(Module &module) {
     Function *func = worklist.pop_back_val();
     if (visited.count(func))
       continue;
-    if (func->getName().startswith("spirv.loop."))
+    if (func->getName().starts_with("spirv.loop."))
       continue;
 
     // Record each convergent call block and function

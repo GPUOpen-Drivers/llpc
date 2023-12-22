@@ -139,17 +139,17 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
   assert(!fetchTrianglePositionFromRayQueryFuncName.empty());
 
   // Set external linkage for library entry functions
-  if (funcName.startswith(traceRayFuncName) || funcName.startswith(rayQueryInitializeFuncName) ||
-      funcName.startswith(rayQueryProceedFuncName) ||
-      funcName.startswith(fetchTrianglePositionFromNodePointerFuncName) ||
-      funcName.startswith(fetchTrianglePositionFromRayQueryFuncName)) {
+  if (funcName.starts_with(traceRayFuncName) || funcName.starts_with(rayQueryInitializeFuncName) ||
+      funcName.starts_with(rayQueryProceedFuncName) ||
+      funcName.starts_with(fetchTrianglePositionFromNodePointerFuncName) ||
+      funcName.starts_with(fetchTrianglePositionFromRayQueryFuncName)) {
     func->setLinkage(GlobalValue::ExternalLinkage);
     return;
   }
 
   // Drop dummy entry function.
   static const char *LibraryEntryFuncName = "libraryEntry";
-  if (funcName.startswith(LibraryEntryFuncName)) {
+  if (funcName.starts_with(LibraryEntryFuncName)) {
     func->dropAllReferences();
     func->eraseFromParent();
     func = nullptr;
@@ -157,11 +157,11 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
   }
 
   // Special handling for _AmdContStackStore* and _AmdContStackLoad* to accept arbitrary type
-  if (funcName.startswith("_AmdContStackStore")) {
+  if (funcName.starts_with("_AmdContStackStore")) {
     m_builder->SetInsertPoint(clearBlock(func));
     createContStackStore(func);
     return;
-  } else if (funcName.startswith("_AmdContStackLoad")) {
+  } else if (funcName.starts_with("_AmdContStackLoad")) {
     m_builder->SetInsertPoint(clearBlock(func));
     createContStackLoad(func);
     return;

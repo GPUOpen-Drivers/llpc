@@ -558,7 +558,7 @@ bool SPIRVModuleImpl::importBuiltinSet(const std::string &BuiltinSetName, SPIRVI
 }
 
 bool SPIRVModuleImpl::isNonSemanticInfoInstSet(llvm::StringRef setName) const {
-  return setName.startswith("NonSemantic.");
+  return setName.starts_with("NonSemantic.");
 }
 
 bool SPIRVModuleImpl::importBuiltinSetWithId(const std::string &BuiltinSetName, SPIRVId BuiltinSetId) {

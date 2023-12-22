@@ -58,7 +58,7 @@ PreservedAnalyses PatchImageDerivatives::run(Module &module, ModuleAnalysisManag
 }
 
 static bool usesImplicitDerivatives(StringRef name) {
-  if (!(name.startswith("llvm.amdgcn.image.sample") || name.startswith("llvm.amdgcn.image.gather")))
+  if (!(name.starts_with("llvm.amdgcn.image.sample") || name.starts_with("llvm.amdgcn.image.gather")))
     return false;
   if (name.find(".l.") != std::string::npos || name.find(".d.") != std::string::npos)
     return false;

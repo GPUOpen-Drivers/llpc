@@ -295,7 +295,7 @@ Value *SPIRVToLLVM::mapValue(SPIRVValue *bv, Value *v) {
       return v;
     auto ld = dyn_cast<LoadInst>(loc->second);
     auto placeholder = cast<GlobalVariable>(ld->getPointerOperand());
-    assert(ld && placeholder->getName().startswith(KPlaceholderPrefix) && "A value is translated twice");
+    assert(ld && placeholder->getName().starts_with(KPlaceholderPrefix) && "A value is translated twice");
     // Replaces placeholders for PHI nodes
     ld->replaceAllUsesWith(v);
     ld->eraseFromParent();
@@ -1429,7 +1429,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
   SmallVector<Function *> functionsToRemove;
 
   for (Function &func : m_m->functions()) {
-    if (!func.getName().startswith(SpirvLaunderRowMajor))
+    if (!func.getName().starts_with(SpirvLaunderRowMajor))
       continue;
 
     // Remember to remove the function later.
@@ -1644,7 +1644,7 @@ bool SPIRVToLLVM::postProcessRowMajorMatrix() {
           // don't add users to worklist
           continue;
         } else if (auto *const callInst = dyn_cast<CallInst>(inst)) {
-          if (callInst->getCalledFunction()->getName().startswith(gSPIRVMD::NonUniform)) {
+          if (callInst->getCalledFunction()->getName().starts_with(gSPIRVMD::NonUniform)) {
             // don't add users to worklist
             continue;
           }
@@ -6526,7 +6526,7 @@ Function *SPIRVToLLVM::transFunction(SPIRVFunction *bf) {
   m_blockPredecessorToCount.clear();
 
   // Special handling for GPURT intrinsic function _AmdContStackStore* to rescue the stored pointee type
-  if (f->getName().startswith("_AmdContStackStore")) {
+  if (f->getName().starts_with("_AmdContStackStore")) {
     assert(f->arg_size() == 2);
     Type *pointeeType = getPointeeType(bf->getArgument(1));
     Metadata *MD = ConstantAsMetadata::get(PoisonValue::get(pointeeType));

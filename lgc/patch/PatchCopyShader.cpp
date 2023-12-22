@@ -319,7 +319,7 @@ void PatchCopyShader::collectGsGenericOutputInfo(Function *gsEntryPoint) {
 
   // Collect the byte sizes of the output value at each mapped location
   for (auto &func : *gsEntryPoint->getParent()) {
-    if (func.getName().startswith(lgcName::OutputExportGeneric)) {
+    if (func.getName().starts_with(lgcName::OutputExportGeneric)) {
       for (auto user : func.users()) {
         auto callInst = dyn_cast<CallInst>(user);
         if (!callInst || callInst->getParent()->getParent() != gsEntryPoint)

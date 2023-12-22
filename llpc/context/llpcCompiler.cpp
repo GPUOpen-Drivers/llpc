@@ -2087,7 +2087,7 @@ Result Compiler::buildGraphicsPipelineWithPartPipelines(Context *context,
 
       // If the "ELF" does not look like ELF, then it must be textual output from -emit-lgc, -emit-llvm, -filetype=asm.
       // We can't link that, so just concatenate it on to the output.
-      if (partPipelineElf.size() < 4 || !partPipelineElf.startswith("\177ELF")) {
+      if (partPipelineElf.size() < 4 || !partPipelineElf.starts_with("\177ELF")) {
         const unsigned char magic[] = {'B', 'C', 0xC0, 0xDE};
         if (partPipelineElf.size() > 4 && memcmp(partPipelineElf.data(), magic, sizeof(magic)) == 0)
           report_fatal_error("Cannot emit llvm bitcode with part pipeline compilation.");
@@ -2951,7 +2951,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     for (auto funcIt = gpurtShaderLibrary->begin(), funcEnd = gpurtShaderLibrary->end(); funcIt != funcEnd;) {
       Function *func = &*funcIt++;
       if (func->getLinkage() == GlobalValue::ExternalLinkage && !func->empty()) {
-        if (!func->getName().startswith(traceRayFuncName) && !func->getName().startswith(fetchTrianglePosFunc)) {
+        if (!func->getName().starts_with(traceRayFuncName) && !func->getName().starts_with(fetchTrianglePosFunc)) {
           func->dropAllReferences();
           func->eraseFromParent();
         }
@@ -3160,7 +3160,7 @@ MetroHash::Hash Compiler::generateHashForCompileOptions(unsigned optionCount, co
     StringRef option = options[i] + 1; // Skip '-' in options
     bool ignore = false;
     for (unsigned j = 0; j < sizeof(IgnoredOptions) / sizeof(IgnoredOptions[0]); ++j) {
-      if (option.startswith(IgnoredOptions[j])) {
+      if (option.starts_with(IgnoredOptions[j])) {
         ignore = true;
         break;
       }

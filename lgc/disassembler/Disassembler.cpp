@@ -603,7 +603,7 @@ static InstOp parseInstOp(StringRef op) {
     return res;
   }
 
-  if (op.startswith("s")) {
+  if (op.starts_with("s")) {
     StringRef s = op.drop_front(1);
     s.consume_front("[");
     unsigned n;

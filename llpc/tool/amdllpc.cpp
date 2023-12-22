@@ -428,9 +428,9 @@ static Result init(int argc, char *argv[], ICompiler *&compiler, ShaderCacheWrap
   // Before we get to LLVM command-line option parsing, we need to find the -gfxip option value.
   for (int i = 1; i != argc; ++i) {
     StringRef arg = argv[i];
-    if (arg.startswith("--gfxip"))
+    if (arg.starts_with("--gfxip"))
       arg = arg.drop_front(1);
-    if (!arg.startswith("-gfxip"))
+    if (!arg.starts_with("-gfxip"))
       continue;
     StringRef gfxipStr;
     arg = arg.slice(strlen("-gfxip"), StringRef::npos);
@@ -443,9 +443,9 @@ static Result init(int argc, char *argv[], ICompiler *&compiler, ShaderCacheWrap
     if (!gfxipStr.consumeInteger(10, ParsedGfxIp.major)) {
       ParsedGfxIp.minor = 0;
       ParsedGfxIp.stepping = 0;
-      if (gfxipStr.startswith(".")) {
+      if (gfxipStr.starts_with(".")) {
         gfxipStr = gfxipStr.slice(1, StringRef::npos);
-        if (!gfxipStr.consumeInteger(10, ParsedGfxIp.minor) && gfxipStr.startswith(".")) {
+        if (!gfxipStr.consumeInteger(10, ParsedGfxIp.minor) && gfxipStr.starts_with(".")) {
           gfxipStr = gfxipStr.slice(1, StringRef::npos);
           gfxipStr.consumeInteger(10, ParsedGfxIp.stepping);
         }

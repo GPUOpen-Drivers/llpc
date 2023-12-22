@@ -309,7 +309,7 @@ const char *ShaderInputs::getInputName(ShaderInput inputKind) {
 // @param module : IR module
 void ShaderInputs::gatherUsage(Module &module) {
   for (auto &func : module) {
-    if (!func.isDeclaration() || !func.getName().startswith(lgcName::ShaderInput))
+    if (!func.isDeclaration() || !func.getName().starts_with(lgcName::ShaderInput))
       continue;
     for (User *user : func.users()) {
       CallInst *call = cast<CallInst>(user);

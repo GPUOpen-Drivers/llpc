@@ -166,7 +166,7 @@ void LowerGLCompatibility::collectEmitInst() {
     auto mangledName = function.getName();
     // We get all users before iterating because the iterator can be invalidated
     // by interpolateInputElement
-    if (mangledName.startswith(gSPIRVName::EmitVertex) || mangledName.startswith(gSPIRVName::EmitStreamVertex)) {
+    if (mangledName.starts_with(gSPIRVName::EmitVertex) || mangledName.starts_with(gSPIRVName::EmitStreamVertex)) {
       SmallVector<User *> users(function.users());
       for (User *user : users) {
         assert(isa<CallInst>(user) && "We should only have CallInst instructions here.");

@@ -66,7 +66,7 @@ bool PatchImageOpCollect::runImpl(llvm::Module &module, PipelineState *pipelineS
   for (Function &func : module) {
     if (!func.isIntrinsic())
       continue;
-    if (func.getName().startswith("llvm.amdgcn.image")) {
+    if (func.getName().starts_with("llvm.amdgcn.image")) {
       for (User *user : func.users()) {
         CallInst *call = cast<CallInst>(user);
         ShaderStage stage = getShaderStage(call->getFunction());

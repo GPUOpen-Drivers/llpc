@@ -82,7 +82,7 @@ bool LowerCooperativeMatrix::runImpl(Module &module, PipelineShadersResult &pipe
   SmallVector<Function *, 16> lowerCoopMatrixCallees;
   for (auto &func : module) {
     auto name = func.getName();
-    if (name.startswith(lgcName::CooperativeMatrix))
+    if (name.starts_with(lgcName::CooperativeMatrix))
       lowerCoopMatrixCallees.push_back(&func);
   }
   if (lowerCoopMatrixCallees.empty())
@@ -127,11 +127,11 @@ void LowerCooperativeMatrix::visitCallInst(CallInst &callInst) {
   builder.SetInsertPoint(&callInst);
 
   auto mangledName = callee->getName();
-  if (mangledName.startswith(lgcName::CooperativeMatrixLength)) {
+  if (mangledName.starts_with(lgcName::CooperativeMatrixLength)) {
     auto layout =
         static_cast<Builder::CooperativeMatrixLayout>(cast<ConstantInt>(callInst.getOperand(1))->getZExtValue());
     callInst.replaceAllUsesWith(builder.getInt32(getLength(layout)));
-  } else if (mangledName.startswith(lgcName::CooperativeMatrixExtract)) {
+  } else if (mangledName.starts_with(lgcName::CooperativeMatrixExtract)) {
     Value *matrix = callInst.getOperand(0);
     Value *index = callInst.getOperand(1);
     auto elemType =
@@ -141,7 +141,7 @@ void LowerCooperativeMatrix::visitCallInst(CallInst &callInst) {
     Value *result = cooperativeMatrixExtract(builder, matrix, index, elemType, layout);
     result->takeName(&callInst);
     callInst.replaceAllUsesWith(result);
-  } else if (mangledName.startswith(lgcName::CooperativeMatrixInsert)) {
+  } else if (mangledName.starts_with(lgcName::CooperativeMatrixInsert)) {
     Value *matrix = callInst.getOperand(0);
     Value *value = callInst.getOperand(1);
     Value *index = callInst.getOperand(2);
@@ -152,7 +152,7 @@ void LowerCooperativeMatrix::visitCallInst(CallInst &callInst) {
     Value *result = cooperativeMatrixInsert(builder, matrix, value, index, elemType, layout);
     result->takeName(&callInst);
     callInst.replaceAllUsesWith(result);
-  } else if (mangledName.startswith(lgcName::CooperativeMatrixLoad)) {
+  } else if (mangledName.starts_with(lgcName::CooperativeMatrixLoad)) {
     Value *dataPtr = callInst.getOperand(0);
     Value *stride = callInst.getOperand(1);
     bool colMajor = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
@@ -166,7 +166,7 @@ void LowerCooperativeMatrix::visitCallInst(CallInst &callInst) {
                                                    callInst.getName(), &callInst);
     callInst.replaceAllUsesWith(loadVal);
 
-  } else if (mangledName.startswith(lgcName::CooperativeMatrixStore)) {
+  } else if (mangledName.starts_with(lgcName::CooperativeMatrixStore)) {
     Value *dataPtr = callInst.getOperand(0);
     Value *stride = callInst.getOperand(1);
     bool colMajor = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
@@ -180,7 +180,7 @@ void LowerCooperativeMatrix::visitCallInst(CallInst &callInst) {
     cooperativeMatrixStoreInternal(dataPtr, stride, colMajor, elemType, layout, memoryAccess, vecVal,
                                    callInst.getName(), &callInst);
 
-  } else if (mangledName.startswith(lgcName::CooperativeMatrixConvert)) {
+  } else if (mangledName.starts_with(lgcName::CooperativeMatrixConvert)) {
     CastInst::CastOps castOp =
         static_cast<CastInst::CastOps>(cast<ConstantInt>(callInst.getOperand(0))->getZExtValue());
     Value *source = callInst.getOperand(1);
@@ -204,7 +204,7 @@ void LowerCooperativeMatrix::visitCallInst(CallInst &callInst) {
     }
     callInst.replaceAllUsesWith(resultVal);
 
-  } else if (mangledName.startswith(lgcName::CooperativeMatrixTranspose)) {
+  } else if (mangledName.starts_with(lgcName::CooperativeMatrixTranspose)) {
     Value *matrix = callInst.getOperand(0);
     Builder::CooperativeMatrixElementType elemType =
         static_cast<Builder::CooperativeMatrixElementType>(cast<ConstantInt>(callInst.getOperand(1))->getZExtValue());
@@ -214,7 +214,7 @@ void LowerCooperativeMatrix::visitCallInst(CallInst &callInst) {
     Value *resultVal = cooperativeMatrixTranspose(matrix, elemType, srcLayout, callInst.getName(), &callInst);
     callInst.replaceAllUsesWith(resultVal);
 
-  } else if (mangledName.startswith(lgcName::CooperativeMatrixBinOp)) {
+  } else if (mangledName.starts_with(lgcName::CooperativeMatrixBinOp)) {
     Builder::CooperativeMatrixArithOp coopMatArithOp =
         static_cast<Builder::CooperativeMatrixArithOp>(cast<ConstantInt>(callInst.getOperand(0))->getZExtValue());
     Value *lhs = callInst.getOperand(1);
@@ -228,7 +228,7 @@ void LowerCooperativeMatrix::visitCallInst(CallInst &callInst) {
         cooperativeMatrixBinaryOp(coopMatArithOp, lhs, rhs, elemType, srcLayout, callInst.getName(), &callInst);
     callInst.replaceAllUsesWith(resultVal);
 
-  } else if (mangledName.startswith(lgcName::CooperativeMatrixTimesScalar)) {
+  } else if (mangledName.starts_with(lgcName::CooperativeMatrixTimesScalar)) {
     Value *matrix = callInst.getOperand(0);
     Value *scalar = callInst.getOperand(1);
     Builder::CooperativeMatrixElementType elemType =
@@ -239,7 +239,7 @@ void LowerCooperativeMatrix::visitCallInst(CallInst &callInst) {
     Value *resultVal = coopMatrixTimesScalar(matrix, scalar, elemType, srcLayout, callInst.getName(), &callInst);
     callInst.replaceAllUsesWith(resultVal);
 
-  } else if (mangledName.startswith(lgcName::CooperativeMatrixMulAdd)) {
+  } else if (mangledName.starts_with(lgcName::CooperativeMatrixMulAdd)) {
     Value *matrixA = callInst.getOperand(0);
     Value *matrixB = callInst.getOperand(1);
     Value *matrixC = callInst.getOperand(2);

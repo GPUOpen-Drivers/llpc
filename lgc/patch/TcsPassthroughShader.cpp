@@ -189,7 +189,7 @@ void TcsPassthroughShader::generateTcsPassthroughShaderBody(Module &module, Pipe
   // copy vs generic output and built-in output to tcs output
   Function *vsEntryPoint = pipelineShaders.getEntryPoint(ShaderStageVertex);
   for (Function &func : *vsEntryPoint->getParent()) {
-    if (func.getName().startswith(lgcName::OutputExportGeneric)) {
+    if (func.getName().starts_with(lgcName::OutputExportGeneric)) {
       for (auto user : func.users()) {
         CallInst *callInst = dyn_cast<CallInst>(user);
         if (!callInst || callInst->getParent()->getParent() != vsEntryPoint)
@@ -228,7 +228,7 @@ void TcsPassthroughShader::generateTcsPassthroughShaderBody(Module &module, Pipe
         tcsInputLocInfoMap[origLocInfo].setData(InvalidValue);
         tcsOutputLocInfoMap[origLocInfo].setData(InvalidValue);
       }
-    } else if (func.getName().startswith(lgcName::OutputExportBuiltIn)) {
+    } else if (func.getName().starts_with(lgcName::OutputExportBuiltIn)) {
       for (auto user : func.users()) {
         CallInst *callInst = dyn_cast<CallInst>(user);
         if (!callInst || callInst->getParent()->getParent() != vsEntryPoint)

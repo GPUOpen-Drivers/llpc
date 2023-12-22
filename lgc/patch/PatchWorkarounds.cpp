@@ -103,7 +103,7 @@ void PatchWorkarounds::applyImageDescWorkaround(void) {
     SmallVector<CallInst *, 8> useWorkListImage;
 
     for (const Function &func : m_module->getFunctionList()) {
-      bool isImage = func.getName().startswith("llvm.amdgcn.image");
+      bool isImage = func.getName().starts_with("llvm.amdgcn.image");
 #if !defined(LLVM_HAVE_BRANCH_AMD_GFX)
       bool isLastUse = false;
 #else
@@ -166,7 +166,7 @@ void PatchWorkarounds::processImageDescWorkaround(CallInst &callInst, bool isLas
           bool requiresWorkaround = false;
           for (auto &use : callInst.uses()) {
             if (auto *useCallInst = dyn_cast<CallInst>(use.getUser())) {
-              if (useCallInst->getCalledFunction()->getName().startswith("llvm.amdgcn.image")) {
+              if (useCallInst->getCalledFunction()->getName().starts_with("llvm.amdgcn.image")) {
                 // We need to process this intrinsic
                 requiresWorkaround = true;
                 break;

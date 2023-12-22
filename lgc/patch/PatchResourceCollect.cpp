@@ -383,7 +383,7 @@ bool PatchResourceCollect::canUseNggCulling(Module *module) {
 
   CallInst *posCall = nullptr;
   for (Function &func : *module) {
-    if (func.getName().startswith(posCallName)) {
+    if (func.getName().starts_with(posCallName)) {
       for (User *user : func.users()) {
         auto call = cast<CallInst>(user);
         if (m_pipelineShaders->getShaderStage(call->getFunction()) == callStage) {
@@ -1169,7 +1169,7 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
       m_deadCalls.push_back(&callInst);
     else
       m_inputCalls.push_back(cast<GenericLocationOp>(&callInst));
-  } else if (mangledName.startswith(lgcName::InputImportBuiltIn)) {
+  } else if (mangledName.starts_with(lgcName::InputImportBuiltIn)) {
     // Built-in input import
     if (isDeadCall)
       m_deadCalls.push_back(&callInst);
@@ -1184,14 +1184,14 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
     assert(outputTy->isSingleValueType());
     (void)(outputTy);
     m_importedOutputCalls.push_back(outputImport);
-  } else if (mangledName.startswith(lgcName::OutputImportBuiltIn)) {
+  } else if (mangledName.starts_with(lgcName::OutputImportBuiltIn)) {
     // Built-in output import
     assert(m_shaderStage == ShaderStageTessControl);
     unsigned builtInId = cast<ConstantInt>(callInst.getOperand(0))->getZExtValue();
     m_importedOutputBuiltIns.insert(builtInId);
-  } else if (mangledName.startswith(lgcName::OutputExportGeneric)) {
+  } else if (mangledName.starts_with(lgcName::OutputExportGeneric)) {
     m_outputCalls.push_back(&callInst);
-  } else if (mangledName.startswith(lgcName::OutputExportBuiltIn)) {
+  } else if (mangledName.starts_with(lgcName::OutputExportBuiltIn)) {
     // NOTE: If an output value is unspecified, we can safely drop it and remove the output export call.
     // Currently, do this for geometry shader.
     if (m_shaderStage == ShaderStageGeometry) {
@@ -1203,7 +1203,7 @@ void PatchResourceCollect::visitCallInst(CallInst &callInst) {
         m_activeOutputBuiltIns.insert(builtInId);
       }
     }
-  } else if (mangledName.startswith(lgcName::OutputExportXfb)) {
+  } else if (mangledName.starts_with(lgcName::OutputExportXfb)) {
     auto outputValue = callInst.getArgOperand(callInst.arg_size() - 1);
     if (isa<UndefValue>(outputValue) || isa<PoisonValue>(outputValue)) {
       // NOTE: If an output value is unspecified, we can safely drop it and remove the transform feedback export call.
@@ -3373,7 +3373,7 @@ void PatchResourceCollect::scalarizeForInOutPacking(Module *module) {
   visitor.visit(payload, *module);
 
   for (Function &func : *module) {
-    if (func.getName().startswith(lgcName::OutputExportGeneric)) {
+    if (func.getName().starts_with(lgcName::OutputExportGeneric)) {
       // This is a generic output. Find its uses in VS/TES/GS.
       for (User *user : func.users()) {
         auto call = cast<CallInst>(user);
@@ -3763,7 +3763,7 @@ void InOutLocationInfoMapManager::addSpan(CallInst *call, ShaderStage shaderStag
     elemIdx = cast<ConstantInt>(call->getOperand(compIdxArgIdx))->getZExtValue();
 
     if (shaderStage == ShaderStageGeometry &&
-        call->getCalledFunction()->getName().startswith(lgcName::OutputExportGeneric)) {
+        call->getCalledFunction()->getName().starts_with(lgcName::OutputExportGeneric)) {
       // Set streamId and output bitWidth of a GS output export for copy shader use
       streamId = cast<ConstantInt>(call->getOperand(2))->getZExtValue();
       bitWidth = call->getOperand(3)->getType()->getScalarSizeInBits();

@@ -151,7 +151,7 @@ void FetchShader::replaceShaderInputBuiltInFunctions(Function *fetchFunc) const 
   for (Function &func : *fetchFunc->getParent()) {
     if (!func.isDeclaration())
       continue;
-    if (func.getName().startswith(lgcName::SpecialUserData) || func.getName().startswith(lgcName::ShaderInput)) {
+    if (func.getName().starts_with(lgcName::SpecialUserData) || func.getName().starts_with(lgcName::ShaderInput)) {
       while (!func.use_empty()) {
         auto call = cast<CallInst>(func.use_begin()->getUser());
         Value *replacement = nullptr;

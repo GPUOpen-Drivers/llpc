@@ -110,7 +110,7 @@ void clearNonEntryFunctions(Module *module, StringRef entryName) {
   for (auto funcIt = module->begin(), funcEnd = module->end(); funcIt != funcEnd;) {
     Function *func = &*funcIt++;
     if (func->getLinkage() == GlobalValue::ExternalLinkage && !func->empty()) {
-      if (!func->getName().startswith(entryName)) {
+      if (!func->getName().starts_with(entryName)) {
         func->dropAllReferences();
         func->eraseFromParent();
       }

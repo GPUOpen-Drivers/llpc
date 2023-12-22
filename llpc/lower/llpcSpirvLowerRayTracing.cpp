@@ -658,7 +658,7 @@ PreservedAnalyses SpirvLowerRayTracing::run(Module &module, ModuleAnalysisManage
   for (auto funcIt = module.begin(), funcEnd = module.end(); funcIt != funcEnd;) {
     Function *func = &*funcIt++;
     if (func->getLinkage() == GlobalValue::ExternalLinkage && !func->empty()) {
-      if (!func->getName().startswith(module.getName())) {
+      if (!func->getName().starts_with(module.getName())) {
         func->setLinkage(GlobalValue::InternalLinkage);
       }
     }

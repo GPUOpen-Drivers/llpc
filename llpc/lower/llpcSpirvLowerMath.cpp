@@ -284,9 +284,9 @@ bool SpirvLowerMathPrecision::adjustExports(Module &module) {
     // We need to find a neater way to do it.
     auto funcName = func.getName();
     bool isExport;
-    if (funcName.startswith("lgc.output.export.builtin."))
+    if (funcName.starts_with("lgc.output.export.builtin."))
       isExport = true;
-    else if (funcName.startswith("lgc.create.write.builtin"))
+    else if (funcName.starts_with("lgc.create.write.builtin"))
       isExport = false;
     else
       continue;
