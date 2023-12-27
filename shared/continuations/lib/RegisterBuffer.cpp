@@ -275,43 +275,53 @@ Value *RegisterBufferPass::handleSingleLoadStore(
   LLVM_DEBUG(dbgs() << "register buffer: Found dynamic offset\n");
 
   // Add a dynamic switch based on the address
-  auto *GlobalInt = Builder.CreatePtrToInt(Global, Builder.getInt32Ty());
-  auto *AddressInt = Builder.CreatePtrToInt(Address, Builder.getInt32Ty());
-  auto *Difference = Builder.CreateSub(AddressInt, GlobalInt);
   uint64_t RegistersByteCount =
       DL.getTypeStoreSize(Global->getValueType()).getFixedValue();
 
-  Instruction *InsertI = &*Builder.GetInsertPoint();
-  auto ResetInsertPoint = make_scope_exit(
-      [InsertI, &Builder]() { Builder.SetInsertPoint(InsertI); });
+  if (RegistersByteCount > 0) {
+    LLVM_DEBUG(dbgs() << "register buffer: Add dynamic switch\n");
+    auto *GlobalInt = Builder.CreatePtrToInt(Global, Builder.getInt32Ty());
+    auto *AddressInt = Builder.CreatePtrToInt(Address, Builder.getInt32Ty());
+    auto *Difference = Builder.CreateSub(AddressInt, GlobalInt);
+    Instruction *InsertI = &*Builder.GetInsertPoint();
+    auto ResetInsertPoint = make_scope_exit(
+        [InsertI, &Builder]() { Builder.SetInsertPoint(InsertI); });
 
-  Instruction *Then;
-  Instruction *Else;
-  auto *Cond =
-      Builder.CreateICmpULT(Difference, Builder.getInt32(RegistersByteCount));
-  SplitBlockAndInsertIfThenElse(Cond, InsertI, &Then, &Else);
-  BasicBlock *TailBB = InsertI->getParent();
-  BasicBlock *ThenBB = Then->getParent();
+    Instruction *Then;
+    Instruction *Else;
+    auto *Cond =
+        Builder.CreateICmpULT(Difference, Builder.getInt32(RegistersByteCount));
+    SplitBlockAndInsertIfThenElse(Cond, InsertI, &Then, &Else);
+    BasicBlock *TailBB = InsertI->getParent();
+    BasicBlock *ThenBB = Then->getParent();
 
-  // Access goes into the register part
-  Builder.SetInsertPoint(Then);
-  Instruction *ThenLoadStore = createLoadStore(Builder, Ty, StoreVal, Address,
-                                               Alignment, AATags, IsLoad);
+    // Access goes into the register part
+    Builder.SetInsertPoint(Then);
+    Instruction *ThenLoadStore = createLoadStore(Builder, Ty, StoreVal, Address,
+                                                 Alignment, AATags, IsLoad);
 
-  // Not in the register range
-  auto *Addr = computeMemAddr(Builder, Address);
-  Builder.SetInsertPoint(Else);
+    // Not in the register range
+    auto *Addr = computeMemAddr(Builder, Address);
+    Builder.SetInsertPoint(Else);
 
-  Instruction *ElseLoadStore =
-      createLoadStore(Builder, Ty, StoreVal, Addr, Alignment, AATags, IsLoad);
-  if (IsLoad) {
-    Builder.SetInsertPoint(&*TailBB->getFirstInsertionPt());
-    auto *PHI = Builder.CreatePHI(Ty, 2);
-    PHI->addIncoming(ThenLoadStore, ThenBB);
-    PHI->addIncoming(ElseLoadStore, ElseLoadStore->getParent());
-    return PHI;
+    Instruction *ElseLoadStore =
+        createLoadStore(Builder, Ty, StoreVal, Addr, Alignment, AATags, IsLoad);
+    if (IsLoad) {
+      Builder.SetInsertPoint(&*TailBB->getFirstInsertionPt());
+      auto *PHI = Builder.CreatePHI(Ty, 2);
+      PHI->addIncoming(ThenLoadStore, ThenBB);
+      PHI->addIncoming(ElseLoadStore, ElseLoadStore->getParent());
+      return PHI;
+    }
+    return ElseLoadStore;
   }
-  return ElseLoadStore;
+  LLVM_DEBUG(
+      dbgs() << "register buffer: register-part is empty, always use memory\n");
+  // RegistersByteCount is zero, so we know that the access goes into the memory
+  // part
+  auto *Addr = computeMemAddr(Builder, Address);
+  return createLoadStore(Builder, Ty, StoreVal, Addr, Alignment, AATags,
+                         IsLoad);
 }
 
 namespace {

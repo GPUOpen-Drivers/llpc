@@ -32,9 +32,12 @@
 
 #include "continuations/ContinuationsUtil.h"
 #include "lgc/LgcRtDialect.h"
+#include "llvm-dialects/Dialect/OpSet.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
+
+#define DEBUG_TYPE "continuations-util"
 
 #define GPURTMAP_ENTRY(Op, GpurtName, AccessesHitData)                         \
   {                                                                            \
@@ -109,6 +112,137 @@ bool llvm::removeUnusedFunctionDecls(Module *Mod, bool OnlyIntrinsics) {
   }
 
   return DidChange;
+}
+
+bool DXILContHelper::isRematerializableLgcRtOp(
+    CallInst &CInst, std::optional<DXILShaderKind> Kind) {
+  using namespace lgc::rt;
+  Function *Callee = CInst.getCalledFunction();
+  if (!DialectUtils::isLgcRtOp(Callee))
+    return false;
+
+  // Always rematerialize
+  static const OpSet RematerializableDialectOps =
+      OpSet::get<DispatchRaysDimensionsOp, DispatchRaysIndexOp>();
+  if (RematerializableDialectOps.contains(*Callee))
+    return true;
+
+  // Rematerialize for Intersection that can only call ReportHit, which keeps
+  // the largest system data struct. These cannot be rematerialized in
+  // ClosestHit, because if ClosestHit calls TraceRay or CallShader, that
+  // information is lost from the system data struct. Also exclude rayTCurrent
+  // because ReportHit calls can change that.
+  if (!Kind || *Kind == DXILShaderKind::Intersection) {
+    static const OpSet RematerializableIntersectionDialectOps =
+        OpSet::get<InstanceIdOp, InstanceIndexOp, GeometryIndexOp,
+                   ObjectRayDirectionOp, ObjectRayOriginOp, ObjectToWorldOp,
+                   PrimitiveIndexOp, RayFlagsOp, RayTminOp, WorldRayDirectionOp,
+                   WorldRayOriginOp, WorldToObjectOp>();
+    if (RematerializableIntersectionDialectOps.contains(*Callee))
+      return true;
+  }
+
+  return false;
+}
+
+void llvm::replaceAllPointerUses(IRBuilder<> *Builder, Value *OldPointerValue,
+                                 Value *NewPointerValue,
+                                 SmallVectorImpl<Instruction *> &ToBeRemoved) {
+  // Note: The implementation explicitly supports typed pointers, which
+  //       complicates some of the code below.
+
+  // Assert that both types are pointers that only differ in the address space.
+  PointerType *OldPtrTy = cast<PointerType>(OldPointerValue->getType());
+  PointerType *NewPtrTy = cast<PointerType>(NewPointerValue->getType());
+  unsigned NewAS = NewPtrTy->getAddressSpace();
+  assert(NewAS != OldPtrTy->getAddressSpace());
+  assert(PointerType::getWithSamePointeeType(OldPtrTy, NewAS) == NewPtrTy);
+
+  OldPointerValue->mutateType(NewPtrTy);
+
+  // Traverse through the users and setup the addrspace
+  SmallVector<Value *> Worklist(OldPointerValue->users());
+  OldPointerValue->replaceAllUsesWith(NewPointerValue);
+
+  // Given a pointer type, get a pointer with the same pointee type (possibly
+  // opaque) as the given type that uses the NewAS address space.
+  auto GetMutatedPtrTy = [NewAS](Type *Ty) {
+    PointerType *PtrTy = cast<PointerType>(Ty);
+    // Support typed pointers:
+    return PointerType::getWithSamePointeeType(PtrTy, NewAS);
+  };
+
+  while (!Worklist.empty()) {
+    Value *Ptr = Worklist.pop_back_val();
+    Instruction *Inst = cast<Instruction>(Ptr);
+    LLVM_DEBUG(dbgs() << "Visiting " << *Inst << '\n');
+    // In the switch below, "break" means to continue with replacing
+    // the users of the current value, while "continue" means to stop at
+    // the current value, and proceed with next one from the work list.
+    switch (Inst->getOpcode()) {
+    default:
+      LLVM_DEBUG(Inst->dump());
+      llvm_unreachable("Unhandled instruction\n");
+      break;
+    case Instruction::Call: {
+      if (Inst->isLifetimeStartOrEnd()) {
+        // The lifetime marker is not useful anymore.
+        Inst->eraseFromParent();
+      } else {
+        LLVM_DEBUG(Inst->dump());
+        llvm_unreachable("Unhandled call instruction\n");
+      }
+      // No further processing needed for the users.
+      continue;
+    }
+    case Instruction::Load:
+    case Instruction::Store:
+      // No further processing needed for the users.
+      continue;
+    case Instruction::And:
+    case Instruction::Add:
+    case Instruction::PtrToInt:
+      break;
+    case Instruction::BitCast: {
+      // This can happen with typed pointers
+      auto *BC = cast<BitCastOperator>(Inst);
+      assert(cast<BitCastOperator>(Inst)->getSrcTy()->isPointerTy() &&
+             BC->getDestTy()->isPointerTy());
+      Inst->mutateType(GetMutatedPtrTy(Inst->getType()));
+      break;
+    }
+    case Instruction::AddrSpaceCast:
+      // Check that the pointer operand has already been fixed
+      assert(Inst->getOperand(0)->getType()->getPointerAddressSpace() == NewAS);
+      // Push the correct users before RAUW.
+      Worklist.append(Ptr->users().begin(), Ptr->users().end());
+      Inst->mutateType(GetMutatedPtrTy(Inst->getType()));
+      // Since we are mutating the address spaces of users as well,
+      // we can just use the (already mutated) cast operand.
+      Inst->replaceAllUsesWith(Inst->getOperand(0));
+      ToBeRemoved.push_back(Inst);
+      continue;
+    case Instruction::IntToPtr:
+    case Instruction::GetElementPtr: {
+      Inst->mutateType(GetMutatedPtrTy(Inst->getType()));
+      break;
+    }
+    case Instruction::Select: {
+      auto *OldType = Inst->getType();
+      if (OldType->isPointerTy()) {
+        Type *NewType = GetMutatedPtrTy(OldType);
+        // No further processing if the type has the correct pointer type
+        if (NewType == OldType)
+          continue;
+
+        Inst->mutateType(NewType);
+      }
+      break;
+    }
+    }
+
+    Worklist.append(Ptr->users().begin(), Ptr->users().end());
+  }
 }
 
 PointerType *llvm::getWithSamePointeeType(PointerType *PtrTy,

@@ -133,14 +133,6 @@ public:
   // Sets the mask of active shader stages bound to this pipeline
   virtual void setShaderStageMask(unsigned mask) = 0;
 
-  // Sets whether dual source blend is used in fragment shader
-  // NOTE: Only applicable in the part pipeline compilation mode.
-  virtual void setUseDualSourceBlend(bool useDualSourceBlend) { llvm_unreachable("Should never be called!"); }
-
-  // Gets whether dual source blend is used in fragment shader
-  // NOTE: Only applicable in the part pipeline compilation mode.
-  virtual bool getUseDualSourceBlend() const { return false; }
-
   // Sets whether pre-rasterization part has a geometry shader.
   // NOTE: Only applicable in the part pipeline compilation mode.
   virtual void setPreRasterHasGs(bool preRasterHasGs) { llvm_unreachable("Should never be called!"); }

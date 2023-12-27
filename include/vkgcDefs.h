@@ -30,6 +30,7 @@
  */
 #pragma once
 
+#include "llpcVersion.h"
 #include "vkgcBase.h"
 #include "vulkan.h"
 #include <cassert>
@@ -610,6 +611,8 @@ struct PipelineOptions {
                                           ///< for sampled images and samplers
   bool vertex64BitsAttribSingleLoc;       ///< For OGL only, dvec3/dvec4 vertex attrib only consumes 1 location.
   bool enableFragColor;                   ///< For OGL only, need to do frag color broadcast if it is enabled.
+  bool disableBaseVertex;                 ///< For OGL only, force the BaseVertex builtin to 0 instead of
+                                          ///  loading it from userdata
   unsigned reserved20;
   bool enablePrimGeneratedQuery; ///< If set, primitive generated query is enabled
 };

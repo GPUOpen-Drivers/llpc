@@ -142,8 +142,8 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
   if (funcName.startswith(traceRayFuncName) || funcName.startswith(rayQueryInitializeFuncName) ||
       funcName.startswith(rayQueryProceedFuncName) ||
       funcName.startswith(fetchTrianglePositionFromNodePointerFuncName) ||
-      funcName.startswith(fetchTrianglePositionFromRayQueryFuncName)) {
-    func->setLinkage(GlobalValue::ExternalLinkage);
+      funcName.startswith(fetchTrianglePositionFromRayQueryFuncName) || funcName.startswith("_cont_")) {
+    func->setLinkage(GlobalValue::WeakAnyLinkage);
     return;
   }
 

@@ -60,7 +60,7 @@ static cl::opt<bool> DisableColorExportShader("disable-color-export-shader", cl:
 GraphicsContext::GraphicsContext(GfxIpVersion gfxIp, const GraphicsPipelineBuildInfo *pipelineInfo,
                                  MetroHash::Hash *pipelineHash, MetroHash::Hash *cacheHash)
     : PipelineContext(gfxIp, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo), m_stageMask(0),
-      m_preRasterHasGs(false), m_useDualSourceBlend(false), m_activeStageCount(0) {
+      m_preRasterHasGs(false), m_activeStageCount(0) {
   const Vkgc::BinaryData *gpurtShaderLibrary = nullptr;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   gpurtShaderLibrary = &pipelineInfo->shaderLibrary;
@@ -311,6 +311,7 @@ void GraphicsContext::setColorExportState(Pipeline *pipeline, Util::MetroHash64 
 
   state.alphaToCoverageEnable = cbState.alphaToCoverageEnable;
   state.dualSourceBlendEnable = cbState.dualSourceBlendEnable;
+  state.dualSourceBlendDynamicEnable = cbState.dualSourceBlendDynamic;
 
   for (unsigned targetIndex = 0; targetIndex < MaxColorTargets; ++targetIndex) {
     if (cbState.target[targetIndex].format != VK_FORMAT_UNDEFINED) {

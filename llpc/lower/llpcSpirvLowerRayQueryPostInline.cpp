@@ -71,7 +71,8 @@ bool SpirvLowerRayQueryPostInline::runImpl(Module &module) {
 
   for (auto funcIt = module.begin(), funcEnd = module.end(); funcIt != funcEnd;) {
     Function *func = &*funcIt++;
-    if (func->getLinkage() == GlobalValue::ExternalLinkage && !func->empty()) {
+    if ((func->getLinkage() == GlobalValue::ExternalLinkage || func->getLinkage() == GlobalValue::WeakAnyLinkage) &&
+        !func->empty()) {
       if (!func->getName().startswith(m_entryPoint->getName())) {
         func->dropAllReferences();
         func->eraseFromParent();

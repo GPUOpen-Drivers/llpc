@@ -62,7 +62,8 @@ public:
   FragColorExport(llvm::LLVMContext *context, PipelineState *pipelineState);
 
   void generateExportInstructions(llvm::ArrayRef<lgc::ColorExportInfo> info, llvm::ArrayRef<llvm::Value *> values,
-                                  bool dummyExport, PalMetadata *palMetadata, BuilderBase &builder);
+                                  bool dummyExport, PalMetadata *palMetadata, BuilderBase &builder,
+                                  llvm::Value *dynamicIsDualSource);
   static void setDoneFlag(llvm::Value *exportInst, BuilderBase &builder);
   static llvm::CallInst *addDummyExport(BuilderBase &builder);
   static llvm::Function *generateNullFragmentShader(llvm::Module &module, PipelineState *pipelineState,
@@ -75,10 +76,11 @@ private:
   FragColorExport() = delete;
   FragColorExport(const FragColorExport &) = delete;
   FragColorExport &operator=(const FragColorExport &) = delete;
-
+  void updateColorExportInfoWithBroadCastInfo(llvm::ArrayRef<ColorExportInfo> originExpinfo,
+                                              llvm::SmallVector<ColorExportInfo> &outExpinfo, unsigned *pCbShaderMask);
   llvm::Value *handleColorExportInstructions(llvm::Value *output, unsigned int hwColorExport, BuilderBase &builder,
-                                             ExportFormat expFmt, const bool signedness, unsigned channelWriteMask);
-
+                                             ExportFormat expFmt, const bool signedness, unsigned channelWriteMask,
+                                             const bool isDualSourceBlend);
   llvm::Value *convertToHalf(llvm::Value *value, bool signedness, BuilderBase &builder) const;
   llvm::Value *convertToFloat(llvm::Value *value, bool signedness, BuilderBase &builder) const;
   llvm::Value *convertToInt(llvm::Value *value, bool signedness, BuilderBase &builder) const;
@@ -117,7 +119,7 @@ private:
   void collectExportInfoForGenericOutputs(llvm::Function *fragEntryPoint, BuilderBase &builder);
   void collectExportInfoForBuiltinOutput(llvm::Function *module, BuilderBase &builder);
   llvm::Value *generateValueForOutput(llvm::Value *value, llvm::Type *outputTy, BuilderBase &builder);
-  void createTailJump(llvm::Function *fragEntryPoint, BuilderBase &builder);
+  void createTailJump(llvm::Function *fragEntryPoint, BuilderBase &builder, llvm::Value *isDualSource);
 
   llvm::LLVMContext *m_context;                        // The context the pass is being run in.
   PipelineState *m_pipelineState;                      // The pipeline state

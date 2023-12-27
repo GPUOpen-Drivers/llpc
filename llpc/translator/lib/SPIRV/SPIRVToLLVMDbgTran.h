@@ -65,7 +65,7 @@ public:
 
   SPIRVToLLVMDbgTran(SPIRVModule *TBM, Module *TM, SPIRVToLLVM *Reader);
   void createCompilationUnit();
-  void recordsValue(SPIRVValue *SV, Value *V);
+  void recordsValue(SPIRVValue *SV, ArrayRef<Value *> V);
   void applyDelayedDbgInfo();
   template <typename T = MDNode> T *transDebugInst(const SPIRVExtInst *DebugInst) {
     assert((DebugInst->getExtSetKind() == SPIRVEIS_Debug ||

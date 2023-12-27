@@ -118,7 +118,8 @@ unsigned LowerGpuRt::getWorkgroupSize() const {
 Value *LowerGpuRt::getThreadIdInGroup() const {
   // Todo: for graphics shader, subgroupId * waveSize + subgroupLocalInvocationId()
   unsigned builtIn = m_pipelineState->isGraphics() ? BuiltInSubgroupLocalInvocationId : BuiltInLocalInvocationIndex;
-  return m_builder->CreateReadBuiltInInput(static_cast<BuiltInKind>(builtIn));
+  InOutInfo inputInfo = {};
+  return m_builder->CreateReadBuiltInInput(static_cast<BuiltInKind>(builtIn), inputInfo, nullptr, nullptr, "");
 }
 
 // =====================================================================================================================

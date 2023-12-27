@@ -359,7 +359,7 @@ colorBuffer[0].blendSrcAlphaToColor = 0
 ; CHECK-NEXT:         .user_data_reg_map:
 ; CHECK-NEXT:           - 0x10000000
 ; CHECK-NEXT:           - 0x12
-; CHECK-NEXT:           - 0xffffffff
+; CHECK-NEXT:           - 0x10000022
 ; CHECK-NEXT:           - 0xffffffff
 ; CHECK-NEXT:           - 0xffffffff
 ; CHECK-NEXT:           - 0xffffffff

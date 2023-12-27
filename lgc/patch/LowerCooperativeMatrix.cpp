@@ -245,13 +245,24 @@ void LowerCooperativeMatrix::visitCallInst(CallInst &callInst) {
     Value *matrixC = callInst.getOperand(2);
     bool isSignedA = cast<ConstantInt>(callInst.getOperand(3))->getZExtValue();
     bool isSignedB = cast<ConstantInt>(callInst.getOperand(4))->getZExtValue();
-    bool isSat = cast<ConstantInt>(callInst.getOperand(5))->getZExtValue();
+    bool isSatOrOpsel = cast<ConstantInt>(callInst.getOperand(5))->getZExtValue();
+    bool isTied = cast<ConstantInt>(callInst.getOperand(6))->getZExtValue();
     Builder::CooperativeMatrixElementType accumElemType =
-        static_cast<Builder::CooperativeMatrixElementType>(cast<ConstantInt>(callInst.getOperand(6))->getZExtValue());
-    Builder::CooperativeMatrixElementType factorElemType =
         static_cast<Builder::CooperativeMatrixElementType>(cast<ConstantInt>(callInst.getOperand(7))->getZExtValue());
-    Value *resultVal = cooperativeMatrixMulAdd(matrixA, matrixB, matrixC, isSignedA, isSignedB, isSat, accumElemType,
-                                               factorElemType, callInst.getName(), &callInst);
+    Builder::CooperativeMatrixElementType factorElemType =
+        static_cast<Builder::CooperativeMatrixElementType>(cast<ConstantInt>(callInst.getOperand(8))->getZExtValue());
+    Value *resultVal = cooperativeMatrixMulAdd(matrixA, matrixB, matrixC, isSignedA, isSignedB, isSatOrOpsel, isTied,
+                                               accumElemType, factorElemType, callInst.getName(), &callInst);
+    callInst.replaceAllUsesWith(resultVal);
+  } else if (mangledName.startswith(lgcName::CooperativeMatrixPack)) {
+    Value *matrixA = callInst.getOperand(0);
+    Value *matrixB = callInst.getOperand(1);
+    Value *resultVal = cooperativeMatrixPack(matrixA, matrixB, callInst.getName(), &callInst);
+    callInst.replaceAllUsesWith(resultVal);
+  } else if (mangledName.startswith(lgcName::CooperativeMatrixUnpack)) {
+    Value *packedMatrix = callInst.getOperand(0);
+    bool high = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
+    Value *resultVal = cooperativeMatrixUnpack(packedMatrix, high, callInst.getName(), &callInst);
     callInst.replaceAllUsesWith(resultVal);
 
   } else {
@@ -299,6 +310,7 @@ LowerCooperativeMatrix::getTypeProperties(Builder::CooperativeMatrixElementType 
     props.numMatrixWords = 8;
     break;
   case Builder::CooperativeMatrixElementType::Float16:
+  case Builder::CooperativeMatrixElementType::Float16Packed:
   case Builder::CooperativeMatrixElementType::Int16:
     props.numMatrixElements = 16;
     props.numMatrixWords = 8;
@@ -317,10 +329,14 @@ LowerCooperativeMatrix::getTypeProperties(Builder::CooperativeMatrixElementType 
            elemType != Builder::CooperativeMatrixElementType::Int32);
     props.numFlatElements = 16;
   } else if (layout == Builder::CooperativeMatrixLayout::AccumulatorMatrixLayout) {
-    props.numFlatElements = waveSize == 32 ? 8 : 4;
     if (elemType == Builder::CooperativeMatrixElementType::Float16 ||
         elemType == Builder::CooperativeMatrixElementType::Int16) {
       props.matrixElementStride = 2;
+    }
+    if (elemType == Builder::CooperativeMatrixElementType::Float16Packed) {
+      props.numFlatElements = waveSize == 32 ? 16 : 8;
+    } else {
+      props.numFlatElements = waveSize == 32 ? 8 : 4;
     }
   } else if (layout == Builder::CooperativeMatrixLayout::Gfx10AccumulatorMatrixLayout ||
              layout == Builder::CooperativeMatrixLayout::Gfx10Accumulator16bitMatrixLayout) {
@@ -776,7 +792,8 @@ Value *LowerCooperativeMatrix::cooperativeMatrixBinaryOp(Builder::CooperativeMat
 // Create cooperative matrix MatrixTimesScalar operation
 //
 // @param matrix : The first operand and it should be a cooperative matrix.
-// @param scalar : The second operand and it should be a scalar.
+// @param scalar : The second operand and it should be a scalar. If the matrix
+// is a packed accumulator matrix, the scalar has to be a <2 x half> vector.
 // @param elemType : The component type of the matrix.
 // @param layout : Identify whether it's A/B or C/D
 // @param instName : Name to give instruction(s).
@@ -791,10 +808,15 @@ Value *LowerCooperativeMatrix::coopMatrixTimesScalar(Value *matrix, Value *scala
 
   Value *vcFlat = convCoopMatrixVecToFlatVec(builder, matrix, elemType, layout);
   const unsigned numElems = cast<FixedVectorType>(vcFlat->getType())->getNumElements();
-  auto splat = builder.CreateVectorSplat(numElems, scalar);
+  const bool packedScalarVec = scalar->getType()->isVectorTy();
+  const auto shuffleIndices = numElems == 16 ? SmallVector<int>({0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1})
+                                             : SmallVector<int>({0, 1, 0, 1, 0, 1, 0, 1});
+  auto splat = packedScalarVec ? builder.CreateShuffleVector(scalar, shuffleIndices)
+                               : builder.CreateVectorSplat(numElems, scalar);
   Value *vcFlatResult;
   if ((elemType == Builder::CooperativeMatrixElementType::Float16) ||
-      (elemType == Builder::CooperativeMatrixElementType::Float32)) {
+      (elemType == Builder::CooperativeMatrixElementType::Float32) ||
+      (elemType == Builder::CooperativeMatrixElementType::Float16Packed)) {
     vcFlatResult = builder.CreateFMul(vcFlat, splat);
   } else {
     vcFlatResult = builder.CreateMul(vcFlat, splat);
@@ -1490,7 +1512,7 @@ Value *LowerCooperativeMatrix::transposeCooperativeMatrixRecursively(llvm::Value
 // @param instName : Name to give instruction(s).
 // @param insertPos : Where to insert the instruction
 Value *LowerCooperativeMatrix::cooperativeMatrixMulAdd(llvm::Value *matrixA, llvm::Value *matrixB, llvm::Value *matrixC,
-                                                       bool isSignedA, bool isSignedB, bool isSat,
+                                                       bool isSignedA, bool isSignedB, bool isSatOrOpsel, bool isTied,
                                                        Builder::CooperativeMatrixElementType accumElemType,
                                                        Builder::CooperativeMatrixElementType factorElemType,
                                                        const Twine &instName, Instruction *insertPos) {
@@ -1555,17 +1577,24 @@ Value *LowerCooperativeMatrix::cooperativeMatrixMulAdd(llvm::Value *matrixA, llv
 
     } else if (factorElemType == Builder::CooperativeMatrixElementType::Int8 &&
                accumElemType == Builder::CooperativeMatrixElementType::Int32) {
-      matrixD = builder.CreateIntrinsic(
-          matrixC->getType(), Intrinsic::amdgcn_wmma_i32_16x16x16_iu8,
-          {builder.getInt1(isSignedA), matrixA, builder.getInt1(isSignedB), matrixB, matrixC, builder.getInt1(isSat)},
-          nullptr, instName);
+      matrixD = builder.CreateIntrinsic(matrixC->getType(), Intrinsic::amdgcn_wmma_i32_16x16x16_iu8,
+                                        {builder.getInt1(isSignedA), matrixA, builder.getInt1(isSignedB), matrixB,
+                                         matrixC, builder.getInt1(isSatOrOpsel)},
+                                        nullptr, instName);
 
     } else if (factorElemType == Builder::CooperativeMatrixElementType::Float16 &&
                accumElemType == Builder::CooperativeMatrixElementType::Float16) {
       // Matrix convert to match intrinsic arguments: Wave32: float32*v8->half*v16
       // Wave64: float32*v4->half*v8
-      matrixD = builder.CreateIntrinsic(matrixC->getType(), Intrinsic::amdgcn_wmma_f16_16x16x16_f16,
-                                        {matrixA, matrixB, matrixC, builder.getInt1(isSat)}, nullptr, instName);
+      auto intrinsic = Intrinsic::amdgcn_wmma_f16_16x16x16_f16;
+      if (isTied)
+#if defined(LLVM_MAIN_REVISION) && LLVM_MAIN_REVISION < 479080
+        llvm_unreachable("Tied intrinsics not implemented");
+#else
+        intrinsic = Intrinsic::amdgcn_wmma_f16_16x16x16_f16_tied;
+#endif
+      matrixD = builder.CreateIntrinsic(matrixC->getType(), intrinsic,
+                                        {matrixA, matrixB, matrixC, builder.getInt1(isSatOrOpsel)}, nullptr, instName);
     } else {
       llvm_unreachable("The accumulator type is not supported.");
     }
@@ -1618,11 +1647,13 @@ Value *LowerCooperativeMatrix::cooperativeMatrixMulAdd(llvm::Value *matrixA, llv
         Value *mulAB;
         Value *initAccumulator = builder.CreateExtractElement(matrixC, idxc);
         if (factorElemType == Builder::CooperativeMatrixElementType::Float16) {
-          mulAB = createDotProductFp16Fp32(rowData, matrixB, initAccumulator, isSat, instName, insertPos);
+          mulAB = createDotProductFp16Fp32(rowData, matrixB, initAccumulator, isSatOrOpsel, instName, insertPos);
         } else if (factorElemType == Builder::CooperativeMatrixElementType::Int16) {
-          mulAB = createDotProductInt16Int32(rowData, matrixB, initAccumulator, flags, isSat, instName, insertPos);
+          mulAB =
+              createDotProductInt16Int32(rowData, matrixB, initAccumulator, flags, isSatOrOpsel, instName, insertPos);
         } else if (factorElemType == Builder::CooperativeMatrixElementType::Int8) {
-          mulAB = createDotProductInt8Int32(rowData, matrixB, initAccumulator, flags, isSat, instName, insertPos);
+          mulAB =
+              createDotProductInt8Int32(rowData, matrixB, initAccumulator, flags, isSatOrOpsel, instName, insertPos);
         } else {
           llvm_unreachable("Unsupported element type!");
         }
@@ -1658,11 +1689,13 @@ Value *LowerCooperativeMatrix::cooperativeMatrixMulAdd(llvm::Value *matrixA, llv
         Value *accumulator2 = builder.CreateExtractElement(matrixC, accIdx + 1);
 
         if (accumElemType == Builder::CooperativeMatrixElementType::Float16) {
-          mulAB1 = createDotProductFp16Fp16(rowData1, colData, accumulator1, isSat, instName, insertPos);
-          mulAB2 = createDotProductFp16Fp16(rowData2, colData, accumulator2, isSat, instName, insertPos);
+          mulAB1 = createDotProductFp16Fp16(rowData1, colData, accumulator1, isSatOrOpsel, instName, insertPos);
+          mulAB2 = createDotProductFp16Fp16(rowData2, colData, accumulator2, isSatOrOpsel, instName, insertPos);
         } else {
-          mulAB1 = createDotProductInt16Int16(rowData1, colData, accumulator1, flags, isSat, instName, insertPos);
-          mulAB2 = createDotProductInt16Int16(rowData2, colData, accumulator2, flags, isSat, instName, insertPos);
+          mulAB1 =
+              createDotProductInt16Int16(rowData1, colData, accumulator1, flags, isSatOrOpsel, instName, insertPos);
+          mulAB2 =
+              createDotProductInt16Int16(rowData2, colData, accumulator2, flags, isSatOrOpsel, instName, insertPos);
         }
         dotProductValue = builder.CreateInsertElement(dotProductValue, mulAB1, accIdx);
         dotProductValue = builder.CreateInsertElement(dotProductValue, mulAB2, accIdx + 1);
@@ -1882,6 +1915,52 @@ Value *LowerCooperativeMatrix::createDotProductInt16Int16(Value *vector1, Value 
 
   scalar->setName(instName);
   return scalar;
+}
+
+// =====================================================================================================================
+// Create code to pack two accumulator matrices into one set of registers
+//
+// @param matrixCLo : The lower accumulator
+// @param matrixCHi : The higher accumulator
+// @param instName : Name to give instruction(s)
+// @param insertPos : Where to insert the instruction
+Value *LowerCooperativeMatrix::cooperativeMatrixPack(llvm::Value *matrixCLo, llvm::Value *matrixCHi,
+                                                     const Twine &instName, Instruction *insertPos) {
+  BuilderBase builder(*m_context);
+  builder.SetInsertPoint(insertPos);
+
+  static const int shuffleIndices[] = {0, 16, 2, 18, 4, 20, 6, 22, 8, 24, 10, 26, 12, 28, 14, 30};
+
+  const auto halfVecTy = FixedVectorType::get(builder.getHalfTy(), 16);
+  matrixCLo = builder.CreateBitCast(matrixCLo, halfVecTy);
+  matrixCHi = builder.CreateBitCast(matrixCHi, halfVecTy);
+
+  auto result = builder.CreateShuffleVector(matrixCLo, matrixCHi, shuffleIndices);
+
+  return builder.CreateBitCast(result, FixedVectorType::get(builder.getFloatTy(), 8));
+}
+
+// =====================================================================================================================
+// Create code to unpack one packed accumulator matrix into two separate set of
+// registers
+//
+// @param packedMatrix : The packed accumulator matrix
+// @param: high: Whether to get the matrix in the upper half of the registers
+// @param instName : Name to give instruction(s)
+// @param insertPos : Where to insert the instruction
+Value *LowerCooperativeMatrix::cooperativeMatrixUnpack(llvm::Value *packedMatrix, bool high, const Twine &instName,
+                                                       Instruction *insertPos) {
+  BuilderBase builder(*m_context);
+  builder.SetInsertPoint(insertPos);
+
+  static const int shuffleIndicesLo[] = {0, -1, 2, -1, 4, -1, 6, -1, 8, -1, 10, -1, 12, -1, 14, -1};
+  static const int shuffleIndicesHi[] = {1, -1, 3, -1, 5, -1, 7, -1, 9, -1, 11, -1, 13, -1, 15, -1};
+
+  const auto halfVecTy = FixedVectorType::get(builder.getHalfTy(), 16);
+  auto matrixPackedCast = builder.CreateBitCast(packedMatrix, halfVecTy);
+  auto matrixUnpacked = builder.CreateShuffleVector(matrixPackedCast, high ? shuffleIndicesHi : shuffleIndicesLo);
+
+  return builder.CreateBitCast(matrixUnpacked, FixedVectorType::get(builder.getFloatTy(), 8));
 }
 
 // =====================================================================================================================

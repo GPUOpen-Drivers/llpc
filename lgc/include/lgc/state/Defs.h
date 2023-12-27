@@ -84,6 +84,8 @@ const static char CooperativeMatrixBinOp[] = "lgc.cooperative.matrix.binop";
 const static char CooperativeMatrixTimesScalar[] = "lgc.cooperative.matrix.times.scalar";
 const static char CooperativeMatrixTranspose[] = "lgc.cooperative.matrix.transpose";
 const static char CooperativeMatrixMulAdd[] = "lgc.cooperative.matrix.muladd";
+const static char CooperativeMatrixPack[] = "lgc.cooperative.matrix.pack";
+const static char CooperativeMatrixUnpack[] = "lgc.cooperative.matrix.unpack";
 
 } // namespace lgcName
 

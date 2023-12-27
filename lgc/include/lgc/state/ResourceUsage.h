@@ -592,9 +592,10 @@ struct InterfaceData {
 
       // Fragment shader
       struct {
-        unsigned viewId;     // View ID
-        unsigned primMask;   // Primitive mask
-        unsigned sampleInfo; // Sample Info: numSample + samplePattern
+        unsigned viewId;                  // View ID
+        unsigned primMask;                // Primitive mask
+        unsigned sampleInfo;              // Sample Info: numSample + samplePattern
+        unsigned dynamicDualSrcBlendInfo; // dualSrcBlendDynamicValue
 
         // Perspective interpolation (I/J)
         struct {

@@ -654,13 +654,15 @@ PreservedAnalyses SpirvLowerRayTracing::run(Module &module, ModuleAnalysisManage
     func->eraseFromParent();
   }
 
-  // Newly generated implementation functions are external linkage, fix that.
   for (auto funcIt = module.begin(), funcEnd = module.end(); funcIt != funcEnd;) {
     Function *func = &*funcIt++;
-    if (func->getLinkage() == GlobalValue::ExternalLinkage && !func->empty()) {
-      if (!func->getName().startswith(module.getName())) {
-        func->setLinkage(GlobalValue::InternalLinkage);
-      }
+    if (!func->empty() && !func->getName().startswith(module.getName()) &&
+        ((func->getLinkage() == GlobalValue::ExternalLinkage) || (func->getLinkage() == GlobalValue::WeakAnyLinkage))) {
+      // Newly generated implementation functions have external linkage, but should have internal linkage.
+      // Weak-linkage functions are GpuRt functions that we just added calls to, and which are no longer required apart
+      // from these calls, so assign internal linkage to them as well.
+      // In both cases, these functions are removed after inlining.
+      func->setLinkage(GlobalValue::InternalLinkage);
     }
   }
 

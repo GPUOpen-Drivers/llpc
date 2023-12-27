@@ -41,21 +41,41 @@ using namespace llvm;
 namespace Llpc {
 
 // =====================================================================================================================
-// Gets the entry point (valid for AMD GPU) of a LLVM module.
+// Gets all entry points of a LLVM module.
+//
+// @param module : LLVM module
+// @param result : Vector that all entries are appended to.
+void getEntryPoints(Module *module, SmallVectorImpl<Function *> &result) {
+  for (auto func = module->begin(), end = module->end(); func != end; ++func) {
+    if (!func->empty() && func->getLinkage() == GlobalValue::ExternalLinkage) {
+      result.push_back(&*func);
+    }
+  }
+}
+
+// =====================================================================================================================
+// Gets the unique entry point (valid for AMD GPU) of a LLVM module.
 //
 // @param module : LLVM module
 Function *getEntryPoint(Module *module) {
-  Function *entryPoint = nullptr;
+  SmallVector<Function *, 1> entries;
+  getEntryPoints(module, entries);
+  assert(entries.size() == 1);
+  return entries[0];
+}
 
-  for (auto func = module->begin(), end = module->end(); func != end; ++func) {
-    if (!func->empty() && func->getLinkage() == GlobalValue::ExternalLinkage) {
-      entryPoint = &*func;
-      break;
-    }
-  }
+// =====================================================================================================================
+// Gets the shader stage from the specified single-shader LLVM function.
+//
+// @param module : LLVM module
+ShaderStage getShaderStageFromFunction(Function *function) {
+  // Check for the execution model metadata that is added by the SPIR-V reader.
+  MDNode *execModelNode = function->getMetadata(gSPIRVMD::ExecutionModel);
+  if (!execModelNode)
+    return ShaderStageInvalid;
 
-  assert(entryPoint);
-  return entryPoint;
+  auto execModel = mdconst::dyn_extract<ConstantInt>(execModelNode->getOperand(0))->getZExtValue();
+  return convertToShaderStage(execModel);
 }
 
 // =====================================================================================================================
@@ -63,14 +83,22 @@ Function *getEntryPoint(Module *module) {
 //
 // @param module : LLVM module
 ShaderStage getShaderStageFromModule(Module *module) {
-  Function *func = getEntryPoint(module);
+  // When processing the GpuRt module, there can initially be multiple entries,
+  // so we can't use getEntryPoint.
+  SmallVector<Function *> entries;
+  getEntryPoints(module, entries);
 
-  // Check for the execution model metadata that is added by the SPIR-V reader.
-  MDNode *execModelNode = func->getMetadata(gSPIRVMD::ExecutionModel);
-  if (!execModelNode)
-    return ShaderStageInvalid;
-  auto execModel = mdconst::dyn_extract<ConstantInt>(execModelNode->getOperand(0))->getZExtValue();
-  return convertToShaderStage(execModel);
+  std::optional<ShaderStage> result;
+
+  for (Function *func : entries) {
+    ShaderStage funcStage = getShaderStageFromFunction(func);
+    assert(funcStage == result.value_or(funcStage));
+    result = funcStage;
+#ifdef NDEBUG
+    break;
+#endif
+  }
+  return result.value();
 }
 
 // =====================================================================================================================
@@ -109,7 +137,8 @@ BasicBlock *clearBlock(Function *func) {
 void clearNonEntryFunctions(Module *module, StringRef entryName) {
   for (auto funcIt = module->begin(), funcEnd = module->end(); funcIt != funcEnd;) {
     Function *func = &*funcIt++;
-    if (func->getLinkage() == GlobalValue::ExternalLinkage && !func->empty()) {
+    if ((func->getLinkage() == GlobalValue::ExternalLinkage || func->getLinkage() == GlobalValue::WeakAnyLinkage) &&
+        !func->empty()) {
       if (!func->getName().startswith(entryName)) {
         func->dropAllReferences();
         func->eraseFromParent();

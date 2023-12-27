@@ -19,7 +19,7 @@ OpMemoryModel Logical GLSL450
 OpEntryPoint Vertex %main "main"
 
 %src = OpString "simple.hlsl"
-%code = OpString "typdef float Foo;
+%code = OpString "typedef float Foo;
 main() {
   Foo foo;
 }"

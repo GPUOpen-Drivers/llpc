@@ -167,7 +167,7 @@ public:
   void updateSpiShaderColFormat(llvm::ArrayRef<ExportFormat> expFormats);
 
   // Updates the CB shader mask information that depends on the exports.
-  void updateCbShaderMask(llvm::ArrayRef<ColorExportInfo> exps);
+  void updateCbShaderMask(unsigned cbShaderMask);
 
   // Updates the DB shader control that depends on the CB state.
   void updateDbShaderControl();
