@@ -46,7 +46,7 @@ namespace Llpc {
 
 // =====================================================================================================================
 LowerGLCompatibility::LowerGLCompatibility()
-    : m_retInst(nullptr), m_clipVertex(nullptr), m_clipDistance(nullptr), m_clipPlane(nullptr) {
+    : m_retInst(nullptr), m_out(nullptr), m_clipVertex(nullptr), m_clipDistance(nullptr), m_clipPlane(nullptr) {
 }
 
 // =====================================================================================================================
@@ -96,6 +96,52 @@ unsigned LowerGLCompatibility::getUniformLocation(llvm::GlobalVariable *var) {
   assert(var->getType()->getAddressSpace() == SPIRAS_Uniform && var->hasMetadata(gSPIRVMD::UniformConstant));
   MDNode *metaNode = var->getMetadata(gSPIRVMD::UniformConstant);
   return mdconst::dyn_extract<ConstantInt>(metaNode->getOperand(3))->getZExtValue();
+}
+
+// =====================================================================================================================
+// Get in/out meta data by indices from from aggregate type.
+//
+// @param [in]  valueTy : The metadata's embellish type.
+// @param [in]  mds     : The metadata constant of InOut Global variable to be decode.
+// @param [in]  index   : The the index of the metadata in the embellish type.
+// @param [out] out     : Use to output the element's metadatas of the InOut Global variable.
+void LowerGLCompatibility::decodeInOutMetaRecursivelyByIndex(llvm::Type *valueTy, llvm::Constant *mds,
+                                                             ArrayRef<Value *> index,
+                                                             llvm::SmallVector<ShaderInOutMetadata> &out) {
+  auto currentType = valueTy;
+  auto currentMds = mds;
+  if (!index.empty()) {
+    if (valueTy->isSingleValueType()) {
+      // Single type's metadata:{uint64, uint64}
+      assert(mds->getType() == StructType::get(*m_context, {m_builder->getInt64Ty(), m_builder->getInt64Ty()}));
+      ShaderInOutMetadata md = {};
+      md.U64All[0] = cast<ConstantInt>(mds->getOperand(0))->getZExtValue();
+      md.U64All[1] = cast<ConstantInt>(mds->getOperand(1))->getZExtValue();
+      out.push_back(md);
+    } else if (valueTy->isArrayTy()) {
+      assert(mds->getType()->getStructNumElements() == 4);
+      currentType = valueTy->getArrayElementType();
+      currentMds = cast<Constant>(mds->getOperand(1));
+      index = index.drop_front();
+      if (index.empty())
+        decodeInOutMetaRecursively(currentType, currentMds, out);
+      else {
+        decodeInOutMetaRecursivelyByIndex(currentType, currentMds, index, out);
+      }
+    } else if (valueTy->isStructTy()) {
+      // Structure type's metadata:[{element metadata type}, ...]
+      assert(valueTy->getStructNumElements() == mds->getType()->getStructNumElements());
+      auto opIdx = cast<ConstantInt>(index[0])->getZExtValue();
+      currentType = valueTy->getStructElementType(opIdx);
+      currentMds = cast<Constant>(mds->getOperand(opIdx));
+      index = index.drop_front();
+      if (index.empty())
+        decodeInOutMetaRecursively(currentType, currentMds, out);
+      else {
+        decodeInOutMetaRecursivelyByIndex(currentType, currentMds, index, out);
+      }
+    }
+  }
 }
 
 // =====================================================================================================================
@@ -194,13 +240,65 @@ void LowerGLCompatibility::collectEmulationResource() {
       MDNode *metaNode = global.getMetadata(gSPIRVMD::InOut);
       assert(metaNode);
       auto inOutMetaConst = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
-      decodeInOutMetaRecursively(global.getValueType(), inOutMetaConst, mds);
+      auto valueType = global.getValueType();
+      bool isStructureOrArrayOfStructure =
+          (valueType->isStructTy() || (valueType->isArrayTy() && valueType->getArrayElementType()->isStructTy()));
+      decodeInOutMetaRecursively(valueType, inOutMetaConst, mds);
       for (auto md : mds) {
         if (md.IsLoc) {
-          if (md.Value == Vkgc::GlCompatibilityInOutLocation::ClipVertex)
-            m_clipVertex = &global;
+          if (md.Value == Vkgc::GlCompatibilityInOutLocation::ClipVertex) {
+            if (isStructureOrArrayOfStructure)
+              m_out = &global;
+            else
+              m_clipVertex = &global;
+          }
         } else if (md.IsBuiltIn && md.Value == spv::BuiltInClipDistance) {
-          m_clipDistance = &global;
+          if (isStructureOrArrayOfStructure)
+            m_out = &global;
+          else
+            m_clipDistance = &global;
+        }
+      }
+    }
+  }
+
+  // If gl_in/gl_out used in shader, then the Gl deprecated builtin variable will be pack in the structure:
+  // gl_PerVertex. We need traversal the user of m_out to get the usage information Gl deprecated builtin variable.
+  if (m_out != nullptr) {
+    assert((m_clipVertex == nullptr) && (m_clipDistance == nullptr));
+    llvm::SmallVector<ShaderInOutMetadata> mds;
+    auto glOut = cast<GlobalVariable>(m_out);
+    MDNode *metaNode = glOut->getMetadata(gSPIRVMD::InOut);
+    assert(metaNode);
+    auto inOutMetaConst = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
+    for (User *user : m_out->users()) {
+      if (GetElementPtrInst *gep = dyn_cast<GetElementPtrInst>(user)) {
+        // The user is a GEP
+        // Check to see if the value has been stored.
+        bool beenModified = false;
+        for (User *gepUser : gep->users()) {
+          assert(!isa<GetElementPtrInst>(gepUser));
+          beenModified |= isa<StoreInst>(gepUser);
+        }
+
+        // We shouldn't have any chained GEPs here, they are coalesced by the LowerAccessChain pass.
+        SmallVector<Value *> indexOperands;
+        for (auto index = gep->idx_begin(); index != gep->idx_end(); index++) {
+          // Skip the first indices, it should be 0 in most of time.
+          if (index == gep->idx_begin()) {
+            assert(cast<ConstantInt>(gep->idx_begin())->isZero() && "Non-zero GEP first index\n");
+            continue;
+          }
+          indexOperands.push_back(m_builder->CreateZExtOrTrunc(index->get(), m_builder->getInt32Ty()));
+        }
+        decodeInOutMetaRecursivelyByIndex(glOut->getValueType(), inOutMetaConst, indexOperands, mds);
+        for (auto md : mds) {
+          if (md.IsLoc) {
+            if (beenModified && (md.Value == Vkgc::GlCompatibilityInOutLocation::ClipVertex))
+              m_clipVertex = gep;
+          } else if (md.IsBuiltIn && md.Value == spv::BuiltInClipDistance) {
+            m_clipDistance = gep;
+          }
         }
       }
     }
@@ -226,13 +324,18 @@ bool LowerGLCompatibility::needLowerClipVertex() {
 // Create the SPIR-V output builtin variable "ClipDistance".
 void LowerGLCompatibility::createClipDistance() {
   assert(m_clipDistance == nullptr);
+  auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+  uint32_t indexOfLastClipPlane = 0;
+  Util::BitMaskScanReverse(&indexOfLastClipPlane, buildInfo->rsState.usrClipPlaneMask);
+
   auto floatType = m_builder->getFloatTy();
   auto int32Type = m_builder->getInt32Ty();
   auto int64Type = m_builder->getInt64Ty();
 
-  auto clipDistanceType = ArrayType::get(floatType, 8);
-  m_clipDistance = new GlobalVariable(*m_module, clipDistanceType, false, GlobalValue::ExternalLinkage, nullptr,
-                                      "gl_ClipDistance", nullptr, GlobalVariable::NotThreadLocal, SPIRV::SPIRAS_Output);
+  auto clipDistanceType = ArrayType::get(floatType, indexOfLastClipPlane + 1);
+  auto clipDistance =
+      new GlobalVariable(*m_module, clipDistanceType, false, GlobalValue::ExternalLinkage, nullptr, "gl_ClipDistance",
+                         nullptr, GlobalVariable::NotThreadLocal, SPIRV::SPIRAS_Output);
 
   ShaderInOutMetadata inOutMd = {};
   inOutMd.IsBuiltIn = true;
@@ -267,7 +370,8 @@ void LowerGLCompatibility::createClipDistance() {
   std::vector<Metadata *> mDs;
   mDs.push_back(ConstantAsMetadata::get(mdVariable));
   auto mdNode = MDNode::get(*m_context, mDs);
-  m_clipDistance->addMetadata(gSPIRVMD::InOut, *mdNode);
+  clipDistance->addMetadata(gSPIRVMD::InOut, *mdNode);
+  m_clipDistance = clipDistance;
 }
 
 // =====================================================================================================================
@@ -276,7 +380,7 @@ void LowerGLCompatibility::createClipPlane() {
   auto floatType = m_builder->getFloatTy();
   auto vec4Type = FixedVectorType::get(floatType, 4);
   auto clipPlaneType = ArrayType::get(vec4Type, 8);
-  m_clipPlane =
+  auto clipPlane =
       new GlobalVariable(*m_module, clipPlaneType, false, GlobalValue::ExternalLinkage, nullptr, "gl_ClipPlaneInternal",
                          nullptr, GlobalVariable::NotThreadLocal, SPIRV::SPIRAS_Uniform);
   auto locationFound =
@@ -295,7 +399,8 @@ void LowerGLCompatibility::createClipPlane() {
   mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, clipPlaneBaseOffset)));
   mDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, Vkgc::GlCompatibilityUniformLocation::ClipPlane)));
   auto mdNode = MDNode::get(*m_context, mDs);
-  m_clipPlane->addMetadata(gSPIRVMD::UniformConstant, *mdNode);
+  clipPlane->addMetadata(gSPIRVMD::UniformConstant, *mdNode);
+  m_clipPlane = clipPlane;
 }
 
 // =====================================================================================================================
@@ -304,7 +409,7 @@ void LowerGLCompatibility::emulateStoreClipVertex() {
   auto floatType = m_builder->getFloatTy();
   Type *vec4Type = VectorType::get(floatType, 4, false);
   // Load clipVertex
-  auto clipVertex = m_builder->CreateLoad(m_clipVertex->getValueType(), m_clipVertex);
+  Value *clipVertex = m_builder->CreateLoad(vec4Type, m_clipVertex);
   // Create a new intermediate result variable
   assert(m_context->getPipelineType() == PipelineType::Graphics);
   auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
@@ -312,16 +417,14 @@ void LowerGLCompatibility::emulateStoreClipVertex() {
   for (uint32_t clipPlaneIdx = 0; clipPlaneIdx < Vkgc::GlCompatibilityLimits::MaxClipPlanes; ++clipPlaneIdx) {
     if (clipPlaneMask & (1 << clipPlaneIdx)) {
       // gl_ClipPlane are Emulate by uniform constant, so the resource descriptor are same with uniform constant.
-      auto clipPlaneElement = m_builder->CreateConstInBoundsGEP1_32(m_clipPlane->getValueType()->getArrayElementType(),
-                                                                    m_clipPlane, clipPlaneIdx);
+      auto clipPlaneElement = m_builder->CreateConstInBoundsGEP1_32(vec4Type, m_clipPlane, clipPlaneIdx);
       auto clipPlaneLoad = m_builder->CreateLoad(vec4Type, clipPlaneElement);
 
       // Dot ClipPlane and ClipVertex
       auto dot = m_builder->CreateDotProduct(clipVertex, clipPlaneLoad);
 
       // Store result to ClipDistance
-      auto clipDistanceElement = m_builder->CreateConstInBoundsGEP1_32(
-          m_clipDistance->getValueType()->getArrayElementType(), m_clipDistance, clipPlaneIdx);
+      auto clipDistanceElement = m_builder->CreateConstInBoundsGEP1_32(floatType, m_clipDistance, clipPlaneIdx);
       m_builder->CreateStore(dot, clipDistanceElement);
     }
   }

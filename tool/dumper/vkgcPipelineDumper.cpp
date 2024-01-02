@@ -1586,7 +1586,6 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
 void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo *pipeline, MetroHash64 *hasher) {
   auto rsState = &pipeline->rsState;
   hasher->Update(rsState->perSampleShading);
-  hasher->Update(rsState->provokingVertexMode);
   hasher->Update(rsState->pixelShaderSamples);
 
   // Topology is required when BaryCoord is used

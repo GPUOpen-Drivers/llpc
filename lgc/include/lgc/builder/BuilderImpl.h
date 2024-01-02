@@ -728,6 +728,10 @@ public:
   llvm::Value *CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, llvm::Value *const value,
                                                 llvm::Value *const clusterSize, const llvm::Twine &instName = "");
 
+  // Create a subgroup clustered multi exclusive scan.
+  llvm::Value *CreateSubgroupClusteredMultiExclusive(GroupArithOp groupArithOp, llvm::Value *const value,
+                                                     llvm::Value *const mask, const llvm::Twine &instName = "");
+
   // Create a quad broadcast.
   llvm::Value *CreateSubgroupQuadBroadcast(llvm::Value *const value, llvm::Value *const index, bool inWQM = true,
                                            const llvm::Twine &instName = "");
@@ -756,6 +760,9 @@ public:
   // Create a subgroup mbcnt.
   llvm::Value *CreateSubgroupMbcnt(llvm::Value *const mask, const llvm::Twine &instName = "");
 
+  // Create a subgroup partition.
+  llvm::Value *CreateSubgroupPartition(llvm::Value *const value, const llvm::Twine &instName = "");
+
 private:
   unsigned getShaderSubgroupSize();
   unsigned getShaderWaveSize();
@@ -781,6 +788,7 @@ private:
   uint16_t getDsSwizzleBitMode(uint8_t xorMask, uint8_t orMask, uint8_t andMask);
   uint16_t getDsSwizzleQuadMode(uint8_t lane0, uint8_t lane1, uint8_t lane2, uint8_t lane3);
   llvm::Value *createGroupBallot(llvm::Value *const value);
+  llvm::Value *createFindMsb(llvm::Value *const mask);
 };
 
 } // namespace lgc

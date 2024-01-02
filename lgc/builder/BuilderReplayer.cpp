@@ -807,6 +807,10 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
     Builder::GroupArithOp groupArithOp = static_cast<Builder::GroupArithOp>(cast<ConstantInt>(args[0])->getZExtValue());
     return m_builder->CreateSubgroupClusteredExclusive(groupArithOp, args[1], args[2]);
   }
+  case BuilderOpcode::SubgroupClusteredMultiExclusive: {
+    Builder::GroupArithOp groupArithOp = static_cast<Builder::GroupArithOp>(cast<ConstantInt>(args[0])->getZExtValue());
+    return m_builder->CreateSubgroupClusteredMultiExclusive(groupArithOp, args[1], args[2]);
+  }
   case BuilderOpcode::SubgroupQuadBroadcast: {
     return m_builder->CreateSubgroupQuadBroadcast(args[0], args[1], cast<ConstantInt>(args[2])->getZExtValue());
   }
@@ -830,6 +834,9 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   }
   case BuilderOpcode::SubgroupMbcnt: {
     return m_builder->CreateSubgroupMbcnt(args[0]);
+  }
+  case BuilderOpcode::SubgroupPartition: {
+    return m_builder->CreateSubgroupPartition(args[0]);
   }
   }
 }

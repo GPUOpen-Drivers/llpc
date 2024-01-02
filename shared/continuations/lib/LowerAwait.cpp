@@ -34,6 +34,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "compilerutils/CompilerUtils.h"
 #include "continuations/Continuations.h"
 #include "continuations/ContinuationsDialect.h"
 #include "lgc/LgcCpsDialect.h"
@@ -51,32 +52,6 @@
 using namespace llvm;
 
 #define DEBUG_TYPE "lower-await"
-
-Function *llvm::getContinuationSaveContinuationState(Module &M) {
-  auto *Name = "continuation.save.continuation_state";
-  if (auto *F = M.getFunction(Name))
-    return F;
-  auto &C = M.getContext();
-  auto *Void = Type::getVoidTy(C);
-  AttributeList AL = AttributeList::get(
-      C, AttributeList::FunctionIndex,
-      {Attribute::NoFree, Attribute::NoRecurse, Attribute::NoSync,
-       Attribute::NoUnwind, Attribute::WillReturn});
-  return cast<Function>(M.getOrInsertFunction(Name, AL, Void).getCallee());
-}
-
-Function *llvm::getContinuationRestoreContinuationState(Module &M) {
-  auto *Name = "continuation.restore.continuation_state";
-  if (auto *F = M.getFunction(Name))
-    return F;
-  auto &C = M.getContext();
-  auto *Void = Type::getVoidTy(C);
-  AttributeList AL = AttributeList::get(
-      C, AttributeList::FunctionIndex,
-      {Attribute::NoFree, Attribute::NoRecurse, Attribute::NoSync,
-       Attribute::NoUnwind, Attribute::WillReturn});
-  return cast<Function>(M.getOrInsertFunction(Name, AL, Void).getCallee());
-}
 
 Function *llvm::getContinuationContinue(Module &M) {
   auto *Name = "continuation.continue";
@@ -211,7 +186,8 @@ static void processContinuations(
 
     // Create new empty function
     auto *NewFuncTy = FunctionType::get(NewRetTy, AllArgTypes, false);
-    Function *NewFunc = cloneFunctionHeader(*F, NewFuncTy, {});
+    Function *NewFunc = CompilerUtils::cloneFunctionHeader(
+        *F, NewFuncTy, ArrayRef<AttributeSet>{});
     NewFunc->takeName(F);
 
     // Transfer code from old function to new function

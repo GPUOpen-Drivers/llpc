@@ -184,6 +184,7 @@ enum BuilderOpcode : unsigned {
   SubgroupClusteredReduction,
   SubgroupClusteredInclusive,
   SubgroupClusteredExclusive,
+  SubgroupClusteredMultiExclusive,
   SubgroupQuadBroadcast,
   SubgroupQuadSwapHorizontal,
   SubgroupQuadSwapVertical,
@@ -192,6 +193,7 @@ enum BuilderOpcode : unsigned {
   SubgroupSwizzleMask,
   SubgroupWriteInvocation,
   SubgroupMbcnt,
+  SubgroupPartition,
   // Total count of opcodes
   Count
 };

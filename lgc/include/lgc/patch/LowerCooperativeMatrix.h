@@ -194,10 +194,15 @@ private:
 
   // Create cooperative matrix muladd operation
   llvm::Value *cooperativeMatrixMulAdd(llvm::Value *copMatrixa, llvm::Value *copMatrixb, llvm::Value *copMatrixc,
-                                       bool isSignedA, bool isSignedB, bool isSat,
+                                       bool isSignedA, bool isSignedB, bool isSatOrOpsel, bool isTied,
                                        Builder::CooperativeMatrixElementType accumElemType,
                                        Builder::CooperativeMatrixElementType factorElemType,
                                        const llvm::Twine &instName, llvm::Instruction *insertPos);
+
+  llvm::Value *cooperativeMatrixPack(llvm::Value *matrixCLo, llvm::Value *matrixCHi, const llvm::Twine &instName,
+                                     llvm::Instruction *insertPos);
+  llvm::Value *cooperativeMatrixUnpack(llvm::Value *matrixPacked, bool getUpperHalf, const llvm::Twine &instName,
+                                       llvm::Instruction *insertPos);
 
   // Simulating for WMMA
   llvm::Value *createDotProductFp16Fp16(llvm::Value *const vector1, llvm::Value *const vector2,

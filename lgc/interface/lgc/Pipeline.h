@@ -473,7 +473,7 @@ struct ColorExportFormat {
 struct ColorExportState {
   unsigned alphaToCoverageEnable;        // Enable alpha to coverage
   unsigned dualSourceBlendEnable;        // Blend state bound at draw time will use a dual source blend mode
-  unsigned dynamicDualSourceBlendEnable; // Dynamic dual source blend enable
+  unsigned dualSourceBlendDynamicEnable; // Dual source blend mode is dynamically set
 };
 
 // MultiView supporting mode
@@ -661,6 +661,7 @@ struct FragmentShaderMode {
   unsigned postDepthCoverage;
   unsigned earlyAndLatFragmentTests;
   unsigned innerCoverage;
+  unsigned waveOpsExcludeHelperLanes;
   ConservativeDepth conservativeDepth;
   ConservativeDepth conservativeStencilFront;
   ConservativeDepth conservativeStencilBack;
@@ -954,7 +955,7 @@ public:
   // Compute the ExportFormat (as an opaque int) of the specified color export location with the specified output
   // type. Only the number of elements of the type is significant.
   // This is not used in a normal compile; it is only used by amdllpc's -check-auto-layout-compatible option.
-  virtual unsigned computeExportFormat(llvm::Type *outputTy, unsigned location) = 0;
+  virtual unsigned computeExportFormat(llvm::Type *outputTy, unsigned location, bool isDynamicDsBlend = false) = 0;
 
 private:
   LgcContext *m_builderContext; // Builder context

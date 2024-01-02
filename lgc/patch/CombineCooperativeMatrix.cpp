@@ -35,6 +35,9 @@
 #include "lgc/patch/CombineCooperativeMatrix.h"
 #include "lgc/Builder.h"
 #include "lgc/state/Defs.h"
+#include "lgc/state/PipelineState.h"
+#include "lgc/state/TargetInfo.h"
+#include "llvm/ADT/SmallVector.h"
 #include <optional>
 
 #define DEBUG_TYPE "lgc-combine-cooperative-matrix"
@@ -59,14 +62,20 @@ struct Shape {
 // networks of phi nodes.
 struct DataFlowComponent {
   SmallVector<Value *> inputs;
-  SmallVector<PHINode *> phis;
+  // need to track in- and outputs of these nodes
+  struct {
+    SmallVector<PHINode *> phis;
+    SmallVector<CallInst *> timesScalars;
+    SmallVector<CallInst *> binOps;
+  } inner;
   SmallVector<Use *> outputs;
   std::optional<Shape> shape;
 };
 
 class CooperativeMatrixCombiner {
 public:
-  CooperativeMatrixCombiner(Function &function) : m_function(function), b(function.getContext()) {}
+  CooperativeMatrixCombiner(Function &function, GfxIpVersion gfxIpVersion)
+      : m_function(function), b(function.getContext()), m_gfxIpVersion(gfxIpVersion) {}
 
   bool run();
 
@@ -75,9 +84,13 @@ private:
   void foldTo(Value *from, Value *to);
   bool tryFold(CallInst *op);
   bool tryFoldComponentContaining(Value *start);
+  Instruction *findFirstUser(Instruction *instruction);
+  Value *tryFoldTimesScalar(CallInst *timesScalarLo, CallInst *timesScalarHi, Value *packedMatrix);
+  bool tryFoldMuladd(SmallVector<CallInst *> muladds);
 
   Function &m_function;
   BuilderCommon b;
+  GfxIpVersion m_gfxIpVersion;
   std::vector<Instruction *> m_eraseList;
 };
 
@@ -92,8 +105,9 @@ bool CooperativeMatrixCombiner::run() {
 
   bool changed = false;
 
-  // Step 1: Collect transposes and converts
+  // Step 1: Collect transposes, converts and muladds
   std::vector<WeakVH> ops;
+  MapVector<BasicBlock *, SmallVector<CallInst *>> muladds;
 
   for (Function &fn : m_function.getParent()->functions()) {
     if (!fn.isDeclaration())
@@ -113,6 +127,20 @@ bool CooperativeMatrixCombiner::run() {
             ops.push_back(call);
         }
       }
+#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 479080
+      // wmma packing on gfx11 only possible with new wmma_f16_tied intrinsic
+    } else if (m_gfxIpVersion.major == 11 && fn.getName().startswith(lgcName::CooperativeMatrixMulAdd)) {
+      for (User *user : fn.users()) {
+        if (auto *call = dyn_cast<CallInst>(user)) {
+          Builder::CooperativeMatrixElementType accumElemType = static_cast<Builder::CooperativeMatrixElementType>(
+              cast<ConstantInt>(call->getOperand(7))->getZExtValue());
+          bool isPackable = accumElemType == Builder::CooperativeMatrixElementType::Float16;
+          if (call->getFunction() == &m_function && isPackable) {
+            muladds[call->getParent()].push_back(call);
+          }
+        }
+      }
+#endif
     }
   }
 
@@ -132,6 +160,21 @@ bool CooperativeMatrixCombiner::run() {
       m_eraseList.clear();
     }
   }
+#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 479080
+  // wmma packing on gfx11 only possible with new wmma_f16_tied intrinsic
+  for (auto muladdsPerBB : muladds) {
+    changed |= tryFoldMuladd(std::move(muladdsPerBB.second));
+
+    for (Instruction *inst : llvm::reverse(m_eraseList)) {
+      if (inst->use_empty())
+        inst->eraseFromParent();
+    }
+    m_eraseList.clear();
+  }
+
+  muladds.clear();
+#endif
+
   ops.clear();
 
   return changed;
@@ -162,8 +205,9 @@ Shape CooperativeMatrixCombiner::getShapeOfTranspose(CallInst *transpose) {
 void CooperativeMatrixCombiner::foldTo(Value *from, Value *to) {
   from->replaceAllUsesWith(to);
 
-  if (auto *fromInst = dyn_cast<Instruction>(from))
+  if (auto *fromInst = dyn_cast<Instruction>(from)) {
     m_eraseList.push_back(fromInst);
+  }
 }
 
 // =====================================================================================================================
@@ -236,48 +280,74 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
 
   // Step 1: Discover the component
   DataFlowComponent component;
-  SmallVector<Value *> worklist;
+  SmallVector<Value *> worklistForward;
+  SmallVector<Value *> worklistBackward;
 
-  if (auto *phi = dyn_cast<PHINode>(start))
-    component.phis.push_back(phi);
-  else
+  auto foundInner = [&](Value *val) {
+    if (auto *phi = dyn_cast<PHINode>(val)) {
+      if (is_contained(component.inner.phis, phi))
+        return true;
+
+      component.inner.phis.push_back(phi);
+      worklistForward.push_back(phi);
+      for (Value *incoming : phi->incoming_values()) {
+        worklistBackward.push_back(incoming);
+      }
+      return true;
+    }
+    if (auto *call = dyn_cast<CallInst>(val)) {
+      if (auto *callee = call->getCalledFunction()) {
+        if (callee->getName().starts_with(lgcName::CooperativeMatrixTimesScalar)) {
+          if (is_contained(component.inner.timesScalars, call))
+            return true;
+
+          component.inner.timesScalars.push_back(call);
+          worklistForward.push_back(call);
+          worklistBackward.push_back(call->getArgOperand(0));
+          return true;
+        }
+        if (callee->getName().starts_with(lgcName::CooperativeMatrixBinOp)) {
+          if (is_contained(component.inner.binOps, call))
+            return true;
+
+          component.inner.binOps.push_back(call);
+          worklistForward.push_back(call);
+          worklistBackward.push_back(call->getArgOperand(1));
+          worklistBackward.push_back(call->getArgOperand(2));
+          return true;
+        }
+        return false;
+      }
+    }
+    return false;
+  };
+
+  if (!foundInner(start)) {
     component.inputs.push_back(start);
-  worklist.push_back(start);
+    worklistForward.push_back(start);
+  }
 
   do {
-    Value *current = worklist.pop_back_val();
-
-    auto foundPhi = [&](PHINode *phi) {
-      if (llvm::any_of(component.phis, [=](auto elem) { return elem == phi; }))
-        return;
-      component.phis.push_back(phi);
-      worklist.push_back(phi);
-    };
+    Value *current = worklistForward.pop_back_val();
 
     for (Use &use : current->uses()) {
-      if (auto *phi = dyn_cast<PHINode>(use.getUser())) {
-        foundPhi(phi);
+      if (!foundInner(use.getUser())) {
+        component.outputs.push_back(&use);
+      }
+    }
+
+    while (!worklistBackward.empty()) {
+      Value *incoming = worklistBackward.pop_back_val();
+      if (is_contained(component.inputs, incoming))
         continue;
-      }
-
-      component.outputs.push_back(&use);
-    }
-
-    if (auto *phi = dyn_cast<PHINode>(current)) {
-      for (Value *incoming : phi->incoming_values()) {
-        if (auto *parentPhi = dyn_cast<PHINode>(incoming)) {
-          foundPhi(parentPhi);
-        } else {
-          if (llvm::any_of(component.inputs, [=](auto elem) { return elem == incoming; }))
-            continue;
-          if (!isa<Constant>(incoming)) {
-            component.inputs.push_back(incoming);
-            worklist.push_back(incoming);
-          }
-        }
+      if (foundInner(incoming))
+        continue;
+      if (!isa<Constant>(incoming)) {
+        component.inputs.push_back(incoming);
+        worklistForward.push_back(incoming);
       }
     }
-  } while (!worklist.empty());
+  } while (!worklistForward.empty());
 
   // Step 2: Analyze the inputs and outputs.
   std::optional<Builder::CooperativeMatrixLayout> otherLayout;
@@ -452,7 +522,7 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
       // Handle generic outputs that need to be transposed explicitly.
       Value *&transposed = outTransposed[use->get()];
       if (!transposed) {
-        if (auto *phi = cast<PHINode>(use->get())) {
+        if (auto *phi = dyn_cast<PHINode>(use->get())) {
           b.SetInsertPoint(phi->getParent(), phi->getParent()->getFirstInsertionPt());
         } else {
           auto *def = cast<Instruction>(use->get());
@@ -479,9 +549,9 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
     // Cache for newly inserted relayout convert operations.
     DenseMap<Value *, Value *> outRelayouted;
 
-    // Force-override phi types if necessary
-    if (!component.phis.empty() && component.phis[0]->getType() != otherType) {
-      for (PHINode *phi : component.phis) {
+    // Force-override inner nodes if necessary
+    if (!component.inner.phis.empty() && component.inner.phis[0]->getType() != otherType) {
+      for (PHINode *phi : component.inner.phis) {
         phi->mutateType(otherType);
 
         for (Use &use : phi->incoming_values()) {
@@ -499,6 +569,18 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
           }
         }
       }
+    }
+
+    for (CallInst *timesScalar : component.inner.timesScalars) {
+      timesScalar->mutateType(otherType);
+      timesScalar->setArgOperand(3, b.getInt32((unsigned)*otherLayout));
+      continue;
+    }
+
+    for (CallInst *binOp : component.inner.binOps) {
+      binOp->mutateType(otherType);
+      binOp->setArgOperand(4, b.getInt32((unsigned)*otherLayout));
+      continue;
     }
 
     for (Value *input : component.inputs) {
@@ -577,7 +659,7 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
       // Handle generic outputs that need a new convert operation inserted.
       Value *&relayouted = outRelayouted[use->get()];
       if (!relayouted) {
-        if (auto *phi = cast<PHINode>(use->get())) {
+        if (auto *phi = dyn_cast<PHINode>(use->get())) {
           b.SetInsertPoint(phi->getParent(), phi->getParent()->getFirstInsertionPt());
         } else {
           auto *def = cast<Instruction>(use->get());
@@ -598,6 +680,251 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
   return false;
 }
 
+Instruction *CooperativeMatrixCombiner::findFirstUser(Instruction *instruction) {
+  Instruction *earliestUser = nullptr;
+  for (auto *user : instruction->users()) {
+    auto *userInst = dyn_cast<Instruction>(user);
+    // We only pack instructions inside the same basic block.
+    // Therefore, users outside the BB don't interfere
+    if (instruction->getParent() != userInst->getParent())
+      continue;
+
+    if (dyn_cast<PHINode>(userInst))
+      continue;
+
+    if (!earliestUser || userInst->comesBefore(earliestUser))
+      earliestUser = userInst;
+  }
+  return earliestUser;
+}
+
+bool CooperativeMatrixCombiner::tryFoldMuladd(SmallVector<CallInst *> muladds) {
+  bool changed = false;
+
+  auto cmp = [](CallInst *a, CallInst *b) { return b->comesBefore(a); };
+  stable_sort(muladds, cmp);
+
+  do {
+    auto *muladdLo = muladds.pop_back_val();
+    auto *packInsertPoint = cast<Instruction>(muladdLo);
+
+    struct PackingComponents {
+      Value *matrixLo;
+      Value *matrixHi;
+      Value *packedAccum;
+    };
+    SmallVector<PackingComponents> worklist;
+    SmallVector<std::pair<Use &, bool>> unpackedUses;
+    SmallVector<CallInst *> muladdChain;
+
+    auto *matCLo = muladdLo->getArgOperand(2);
+
+    muladdChain.push_back(muladdLo);
+    muladdLo->setArgOperand(5, b.getInt1(false));
+    while (muladdLo->hasOneUse()) {
+      auto *next = dyn_cast<CallInst>(*muladdLo->users().begin());
+
+      if (!is_contained(muladds, next))
+        break;
+
+      next->setArgOperand(5, b.getInt1(false));
+      muladdChain.push_back(next);
+      muladdLo = next;
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 478769
+      llvm::erase_value(muladds, muladdLo);
+#else
+      llvm::erase(muladds, muladdLo);
+#endif
+    }
+
+    Instruction *firstLoUser = findFirstUser(muladdLo);
+
+    CallInst *muladdHi = nullptr;
+    for (auto *candidate : llvm::reverse(muladds)) {
+      if (firstLoUser && firstLoUser->comesBefore(candidate))
+        continue;
+
+      if (auto *matCHi = dyn_cast<Instruction>(candidate->getArgOperand(2))) {
+        if (matCHi->getParent() == muladdLo->getParent() && packInsertPoint->comesBefore(matCHi)) {
+          continue;
+        }
+      }
+
+      muladdHi = candidate;
+      break;
+    }
+
+    if (!muladdHi)
+      continue;
+
+    auto *matCHi = muladdHi->getArgOperand(2);
+
+    muladdChain.push_back(muladdHi);
+    muladdHi->setArgOperand(5, b.getInt1(true));
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 478769
+    llvm::erase_value(muladds, muladdLo);
+#else
+    llvm::erase(muladds, muladdHi);
+#endif
+    while (muladdHi->hasOneUse()) {
+      auto *next = dyn_cast<CallInst>(*muladdHi->users().begin());
+      if (!is_contained(muladds, next)) {
+        break;
+      }
+
+      if (firstLoUser && firstLoUser->comesBefore(next)) {
+        break;
+      }
+      next->setArgOperand(5, b.getInt1(true));
+      muladdChain.push_back(next);
+      muladdHi = next;
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 478769
+      llvm::erase_value(muladds, muladdLo);
+#else
+      llvm::erase(muladds, next);
+#endif
+    }
+
+    auto cmp = [&](CallInst *a, CallInst *b) { return a->comesBefore(b); };
+    stable_sort(muladdChain, cmp);
+
+    // if we have a loop, then the accumulator matrices come from the phi nodes.
+    // in that case, we need to pack in the predecessor blocks, so all the
+    // incoming values are packed accumulators.
+    PHINode *const phiLo = dyn_cast<PHINode>(matCLo);
+    PHINode *const phiHi = dyn_cast<PHINode>(matCHi);
+    Value *curAccum = nullptr;
+    if (phiLo && phiHi && phiLo->getParent() == phiHi->getParent()) {
+      for (BasicBlock *incoming : phiLo->blocks()) {
+        b.SetInsertPoint(incoming->getTerminator());
+        auto *matCLo = phiLo->getIncomingValueForBlock(incoming);
+        auto *matCHi = phiHi->getIncomingValueForBlock(incoming);
+        auto *packed = b.CreateCooperativeMatrixPack(matCLo, matCHi);
+        phiLo->setIncomingValueForBlock(incoming, packed);
+        phiHi->setIncomingValueForBlock(incoming, packed);
+      }
+      curAccum = phiHi;
+      worklist.push_back({phiLo, phiHi, phiHi});
+    } else {
+      // otherwise, we pack just before the first muladd
+      b.SetInsertPoint(packInsertPoint);
+      curAccum = b.CreateCooperativeMatrixPack(matCLo, matCHi);
+    }
+
+    for (auto *next : muladdChain) {
+      next->setArgOperand(2, curAccum);
+      next->setArgOperand(6, b.getInt1(true));
+      curAccum = next;
+    }
+
+    worklist.push_back({muladdLo, muladdHi, curAccum});
+    while (!worklist.empty()) {
+      auto current = worklist.pop_back_val();
+
+      for (Use &use : current.matrixLo->uses()) {
+        if (is_contained(muladdChain, use.getUser()))
+          continue;
+
+        unpackedUses.push_back({use, false});
+      }
+      for (Use &use : current.matrixHi->uses()) {
+        if (is_contained(muladdChain, use.getUser()))
+          continue;
+
+        if (auto *call = dyn_cast<CallInst>(use.getUser())) {
+          if (auto *callee = call->getCalledFunction()) {
+            if (callee->getName().starts_with(lgcName::CooperativeMatrixTimesScalar)) {
+              auto *candidate = llvm::find_if(unpackedUses, [&](auto pair) {
+                if (auto *call = dyn_cast<CallInst>(pair.first.getUser())) {
+                  if (auto *callee = call->getCalledFunction()) {
+                    if (callee->getName().startswith(lgcName::CooperativeMatrixTimesScalar) &&
+                        call->getArgOperand(0) == current.matrixLo) {
+                      return true;
+                    }
+                  }
+                }
+                return false;
+              });
+
+              if (candidate == unpackedUses.end()) {
+                unpackedUses.push_back({use, true});
+                continue;
+              }
+
+              auto *timesScalarLo = cast<CallInst>(candidate->first.getUser());
+              auto *timesScalarHi = call;
+              auto *timesScalarPacked = tryFoldTimesScalar(timesScalarLo, timesScalarHi, current.packedAccum);
+
+              if (timesScalarPacked) {
+                worklist.push_back({timesScalarLo, timesScalarHi, timesScalarPacked});
+                continue;
+              }
+            }
+          }
+        }
+
+        unpackedUses.push_back({use, true});
+      }
+
+      for (auto use : unpackedUses) {
+        if (is_contained(m_eraseList, use.first.getUser()))
+          continue;
+
+        if (auto *call = dyn_cast<CallInst>(use.first.getUser())) {
+          if (call->getCalledFunction()->getName().startswith(lgcName::CooperativeMatrixPack) &&
+              call->getArgOperand(0) == current.matrixLo && call->getArgOperand(1) == current.matrixHi) {
+            foldTo(call, current.packedAccum);
+            continue;
+          }
+        }
+
+        if (auto *phi = dyn_cast<PHINode>(use.first.getUser())) {
+          auto *predecessor = phi->getIncomingBlock(use.first);
+          b.SetInsertPoint(predecessor->getTerminator());
+        } else {
+          b.SetInsertPoint(cast<Instruction>(use.first.getUser()));
+        }
+        auto unpacked = b.CreateCooperativeMatrixUnpack(current.packedAccum, use.second);
+        use.first.set(unpacked);
+      }
+      unpackedUses.clear();
+    }
+    if (phiLo && phiHi)
+      foldTo(phiLo, phiHi);
+
+    changed = true;
+  } while (!muladds.empty());
+
+  return changed;
+}
+
+Value *CooperativeMatrixCombiner::tryFoldTimesScalar(CallInst *timesScalarLo, CallInst *timesScalarHi,
+                                                     Value *packedMatrix) {
+  if (timesScalarLo->getParent() != timesScalarHi->getParent()) {
+    return nullptr;
+  }
+
+  auto *earlierInst = timesScalarLo->comesBefore(timesScalarHi) ? timesScalarLo : timesScalarHi;
+  auto *laterInst = earlierInst == timesScalarLo ? timesScalarHi : timesScalarLo;
+  auto *earliestUser = findFirstUser(earlierInst);
+
+  if (earliestUser && earliestUser->comesBefore(laterInst)) {
+    return nullptr;
+  }
+
+  b.SetInsertPoint(laterInst);
+
+  auto *scalarVec = b.CreateVectorSplat(2, PoisonValue::get(b.getHalfTy()));
+  scalarVec = b.CreateInsertElement(scalarVec, timesScalarLo->getArgOperand(1), b.getInt32(0));
+  scalarVec = b.CreateInsertElement(scalarVec, timesScalarHi->getArgOperand(1), b.getInt32(1));
+  auto *timesScalarPacked =
+      b.CreateCoopMatrixTimesScalar(packedMatrix, scalarVec, Builder::CooperativeMatrixElementType::Float16Packed,
+                                    Builder::CooperativeMatrixLayout::AccumulatorMatrixLayout);
+  m_eraseList.push_back(timesScalarLo);
+  m_eraseList.push_back(timesScalarHi);
+  return timesScalarPacked;
+}
+
 // =====================================================================================================================
 // Run the pass on a function.
 //
@@ -605,7 +932,10 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 // @returns : The preserved analyses (The Analyses that are still valid after this pass)
 PreservedAnalyses CombineCooperativeMatrix::run(Function &function, FunctionAnalysisManager &analysisManager) {
-  CooperativeMatrixCombiner combiner{function};
+  const auto &moduleAnalysisManager = analysisManager.getResult<ModuleAnalysisManagerFunctionProxy>(function);
+  PipelineState *pipelineState =
+      moduleAnalysisManager.getCachedResult<PipelineStateWrapper>(*function.getParent())->getPipelineState();
+  CooperativeMatrixCombiner combiner{function, pipelineState->getTargetInfo().getGfxIpVersion()};
 
   if (combiner.run()) {
     PreservedAnalyses PA;

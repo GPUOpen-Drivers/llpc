@@ -1356,7 +1356,7 @@ void ShaderMerger::storeTessFactorsWithOpt(Value *threadIdInWave, IRBuilder<> &b
 
     auto userData = getFunctionArgument(entryPoint, NumSpecialSgprInputs);
     auto globalTable = builder.CreateExtractElement(
-        userData, static_cast<uint64_t>(0)); // The first element of user data argument is always internal global tabl
+        userData, static_cast<uint64_t>(0)); // The first element of user data argument is always internal global table
 
     Value *pc = builder.CreateIntrinsic(Intrinsic::amdgcn_s_getpc, {}, {});
     pc = builder.CreateBitCast(pc, FixedVectorType::get(builder.getInt32Ty(), 2));

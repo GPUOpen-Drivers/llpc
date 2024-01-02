@@ -112,20 +112,42 @@ Module *ColorExportShader::generate() {
   BuilderBase builder(ret);
 
   SmallVector<Value *, 8> values(MaxColorTargets + 1, nullptr);
-  for (unsigned idx = 0; idx != m_exports.size(); ++idx) {
+  unsigned exportSize = m_exports.size();
+  unsigned lastIndex = 0;
+  for (unsigned idx = 0; idx != exportSize; ++idx) {
     values[m_exports[idx].hwColorTarget] = colorExportFunc->getArg(idx);
+    ++lastIndex;
   }
 
   PalMetadata palMetadata{m_pipelineState, m_pipelineState->useRegisterFieldFormat()};
 
   bool dummyExport = m_lgcContext->getTargetInfo().getGfxIpVersion().major < 10 || m_killEnabled;
-  fragColorExport.generateExportInstructions(m_exports, values, dummyExport, &palMetadata, builder);
+  Value *dynamicIsDualSource = colorExportFunc->getArg(lastIndex);
+  fragColorExport.generateExportInstructions(m_exports, values, dummyExport, &palMetadata, builder,
+                                             dynamicIsDualSource);
 
+  // Handle on the dualSourceBlend case which may have two blocks with two returnInsts
+  SmallVector<ReturnInst *, 8> retInsts;
   if (m_pipelineState->getOptions().enableColorExportShader) {
+    for (auto &block : llvm::reverse(*colorExportFunc)) {
+      if (auto ret = dyn_cast<ReturnInst>(block.getTerminator())) {
+        retInsts.push_back(ret);
+      }
+    }
+  }
+  for (ReturnInst *inst : llvm::reverse(retInsts)) {
+    builder.SetInsertPoint(inst);
     builder.CreateIntrinsic(Intrinsic::amdgcn_endpgm, {}, {});
     builder.CreateUnreachable();
-    ret->eraseFromParent();
+    inst->eraseFromParent();
   }
+
+  // Set pipeline hash.
+  auto internalPipelineHash =
+      palMetadata.getPipelineNode()[Util::Abi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
+  const auto &options = m_pipelineState->getOptions();
+  internalPipelineHash[0] = options.hash[0];
+  internalPipelineHash[1] = options.hash[1];
 
   palMetadata.updateDbShaderControl();
   palMetadata.record(colorExportFunc->getParent());
@@ -147,6 +169,7 @@ Function *ColorExportShader::createColorExportFunc() {
   SmallVector<Type *, 16> entryTys;
   for (const auto &exp : m_exports)
     entryTys.push_back(exp.ty);
+  entryTys.push_back(Type::getInt32Ty(getContext()));
   auto funcTy = FunctionType::get(Type::getVoidTy(getContext()), entryTys, false);
 
   // Create the function. Mark SGPR inputs as "inreg".
@@ -155,6 +178,9 @@ Function *ColorExportShader::createColorExportFunc() {
     func->setCallingConv(CallingConv::AMDGPU_Gfx);
   else
     func->setCallingConv(CallingConv::AMDGPU_PS);
+
+  unsigned inRegIndex = m_exports.size();
+  func->addParamAttr(inRegIndex, Attribute::InReg);
 
   func->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
   setShaderStage(func, ShaderStageFragment);

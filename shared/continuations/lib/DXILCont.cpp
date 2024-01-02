@@ -29,14 +29,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "compilerutils/CompilerUtils.h"
 #include "continuations/Continuations.h"
 #include "continuations/ContinuationsDialect.h"
 #include "continuations/ContinuationsUtil.h"
-#include "continuations/LowerRaytracingPipeline.h"
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
 #include "llvm-dialects/Dialect/Builder.h"
 #include "llvm-dialects/Dialect/Dialect.h"
+#include "llvm/IR/PassManager.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Transforms/Coroutines/CoroCleanup.h"
@@ -44,6 +45,7 @@
 #include "llvm/Transforms/Coroutines/CoroElide.h"
 #include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/Scalar/ADCE.h"
+#include "llvm/Transforms/Scalar/InstSimplifyPass.h"
 #include "llvm/Transforms/Scalar/SROA.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Utils/FixIrreducible.h"
@@ -187,15 +189,12 @@ void DXILContHelper::RegisterPasses(PassBuilder &PB, bool NeedDialectContext) {
   }
 }
 
-void DXILContHelper::addContinuationPasses(ModulePassManager &MPM) {
-  MPM.addPass(LowerRaytracingPipelinePass());
-
-  // Inline TraceRay and similar intrinsic implementations
+void DXILContHelper::addContinuationPasses(ModulePassManager &MPM,
+                                           Module *GpurtLibrary) {
+  // Inline functions into shaders, so everything is in a shader
   MPM.addPass(AlwaysInlinerPass(/*InsertLifetimeIntrinsics=*/false));
 
-  // Splits basic blocks after the systemDataRestored marker and removes already
-  // inlined intrinsic implementations
-  MPM.addPass(PreCoroutineLoweringPass());
+  MPM.addPass(LowerRaytracingPipelinePass(GpurtLibrary));
 
   // Convert the system data struct to a value, so it isn't stored in the
   // continuation state
@@ -204,16 +203,14 @@ void DXILContHelper::addContinuationPasses(ModulePassManager &MPM) {
   MPM.addPass(LowerAwaitPass());
 
   MPM.addPass(CoroEarlyPass());
-  CGSCCPassManager CGPM;
-  CGPM.addPass(DXILCoroSplitPass());
-  MPM.addPass(createModuleToPostOrderCGSCCPassAdaptor(std::move(CGPM)));
+  MPM.addPass(createModuleToPostOrderCGSCCPassAdaptor(DXILCoroSplitPass()));
   MPM.addPass(createModuleToFunctionPassAdaptor(CoroElidePass()));
   MPM.addPass(CoroCleanupPass());
 
-  MPM.addPass(LegacyCleanupContinuationsPass());
+  MPM.addPass(LegacyCleanupContinuationsPass(GpurtLibrary));
   MPM.addPass(RegisterBufferPass());
   MPM.addPass(SaveContinuationStatePass());
-  MPM.addPass(DXILContPostProcessPass());
+  MPM.addPass(DXILContPostProcessPass(GpurtLibrary));
 
   MPM.addPass(RemoveTypesMetadataPass());
 
@@ -225,19 +222,17 @@ void DXILContHelper::addContinuationPasses(ModulePassManager &MPM) {
   // pass can still change the module in its preprocessing, lowering switches to
   // chained ifs.
   MPM.addPass(createModuleToFunctionPassAdaptor(FixIrreduciblePass()));
-
-  // Inline remaining intrinsic implementations
-  MPM.addPass(AlwaysInlinerPass(/*InsertLifetimeIntrinsics=*/false));
 }
 
-void DXILContHelper::addDxilContinuationPasses(ModulePassManager &MPM) {
+void DXILContHelper::addDxilContinuationPasses(ModulePassManager &MPM,
+                                               Module *GpurtLibrary) {
   MPM.addPass(DXILContPreHookPass());
 
   // Translate dx.op intrinsic calls to lgc.rt dialect intrinsic calls
   MPM.addPass(DXILContLgcRtOpConverterPass());
 
   // Add the generic continuations pipeline
-  addContinuationPasses(MPM);
+  addContinuationPasses(MPM, GpurtLibrary);
 
   // Remove dead instructions using the continuation token, which the translator
   // can't translate
@@ -247,6 +242,20 @@ void DXILContHelper::addDxilContinuationPasses(ModulePassManager &MPM) {
   MPM.addPass(createModuleToFunctionPassAdaptor(llvm::SimplifyCFGPass()));
 
   MPM.addPass(DXILContPostHookPass());
+}
+
+void DXILContHelper::addDxilGpurtLibraryPasses(ModulePassManager &MPM) {
+  MPM.addPass(llvm::DXILContIntrinsicPreparePass());
+  MPM.addPass(AlwaysInlinerPass(/*InsertLifetimeIntrinsics=*/false));
+
+  // Run some light optimizations to remove code guarded by intrinsics that were
+  // replaced in the prepare pass.
+  FunctionPassManager FPM;
+  FPM.addPass(SROAPass(SROAOptions::ModifyCFG));
+  FPM.addPass(InstSimplifyPass());
+  FPM.addPass(SimplifyCFGPass());
+  FPM.addPass(ADCEPass());
+  MPM.addPass(createModuleToFunctionPassAdaptor(std::move(FPM)));
 }
 
 AnalysisKey DialectContextAnalysis::Key;
@@ -267,18 +276,6 @@ DialectContextAnalysis::run(llvm::Module &M,
   return DialectContextAnalysis::Result();
 }
 
-llvm::PreservedAnalyses
-LowerRaytracingPipelinePass::run(llvm::Module &M,
-                                 llvm::ModuleAnalysisManager &AnalysisManager) {
-  LLVM_DEBUG(dbgs() << "Run the pass lower-raytracing-pipeline\n");
-  AnalysisManager.getResult<DialectContextAnalysis>(M);
-
-  LowerRaytracingPipelinePassImpl Impl(M);
-  bool Changed = Impl.run();
-
-  return Changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
-}
-
 std::pair<LoadInst *, Value *> llvm::moveContinuationStackOffset(IRBuilder<> &B,
                                                                  int32_t I) {
   // %cont.frame.mem = load i32, i32* %csp
@@ -295,7 +292,10 @@ std::pair<LoadInst *, Value *> llvm::moveContinuationStackOffset(IRBuilder<> &B,
   return std::make_pair(OldCsp, NewCsp);
 }
 
-Value *llvm::continuationStackOffsetToPtr(IRBuilder<> &B, Value *Offset) {
+Value *
+llvm::continuationStackOffsetToPtr(IRBuilder<> &B, Value *Offset,
+                                   Module &GpurtLibrary,
+                                   CompilerUtils::CrossModuleInliner &Inliner) {
   assert(Offset->getType()->isIntegerTy(32) &&
          "Stack offset is expected to be an i32");
   Module *M = B.GetInsertPoint()->getModule();
@@ -313,35 +313,19 @@ Value *llvm::continuationStackOffsetToPtr(IRBuilder<> &B, Value *Offset) {
          "Unexpected address space of the continuation stack");
   auto *PtrTy =
       B.getInt8Ty()->getPointerTo(static_cast<uint32_t>(*StackAddrspace));
-  Value *BaseAddr = B.CreateCall(getContinuationStackGlobalMemBase(*M));
-  BaseAddr = B.CreateIntToPtr(BaseAddr, PtrTy);
+  auto *BaseAddr =
+      Inliner.inlineCall(B, getContinuationStackGlobalMemBase(GpurtLibrary))
+          .returnValue;
+  auto *BaseAddrPtr = B.CreateIntToPtr(BaseAddr, PtrTy);
 
-  return B.CreateGEP(B.getInt8Ty(), BaseAddr, Offset);
-}
-
-Function *llvm::cloneFunctionHeader(Function &F, FunctionType *NewType,
-                                    ArrayRef<AttributeSet> ArgAttrs) {
-  LLVM_DEBUG(dbgs() << "Cloning function " << F.getName() << " with new type "
-                    << *NewType << "\n");
-  AttributeList FAttrs = F.getAttributes();
-  AttributeList Attributes = AttributeList::get(
-      F.getContext(), FAttrs.getFnAttrs(), FAttrs.getRetAttrs(), ArgAttrs);
-  Function *NewFunc = Function::Create(NewType, F.getLinkage(), "");
-  // Insert new function before F to facilitate writing tests
-  F.getParent()->getFunctionList().insert(F.getIterator(), NewFunc);
-  NewFunc->setCallingConv(F.getCallingConv());
-  NewFunc->setSubprogram(F.getSubprogram());
-  NewFunc->setDLLStorageClass(F.getDLLStorageClass());
-  NewFunc->setAttributes(Attributes);
-  NewFunc->copyMetadata(&F, 0);
-  return NewFunc;
+  return B.CreateGEP(B.getInt8Ty(), BaseAddrPtr, Offset);
 }
 
 Function *llvm::cloneFunctionHeaderWithTypes(Function &F,
                                              DXILContFuncTy &NewType,
                                              ArrayRef<AttributeSet> ArgAttrs) {
   FunctionType *FuncTy = NewType.asFunctionType(F.getContext());
-  Function *NewFunc = cloneFunctionHeader(F, FuncTy, ArgAttrs);
+  Function *NewFunc = CompilerUtils::cloneFunctionHeader(F, FuncTy, ArgAttrs);
   NewType.writeMetadata(NewFunc);
   return NewFunc;
 }
@@ -552,10 +536,11 @@ Value *llvm::getDXILSystemData(IRBuilder<> &B, Value *SystemData,
   return B.CreateInBoundsGEP(OrigSystemDataTy, SystemData, Indices);
 }
 
-CallInst *llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy,
-                                     Value *SystemData, DXILShaderKind Kind,
-                                     CallInst *Call) {
-  auto &M = *Call->getModule();
+CallInst *
+llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy,
+                           Value *SystemData, DXILShaderKind Kind,
+                           CallInst *Call, Module *GpurtLibrary,
+                           CompilerUtils::CrossModuleInliner &Inliner) {
   B.SetInsertPoint(Call);
 
   auto IntrImplEntry = findIntrImplEntryByIntrinsicCall(Call);
@@ -563,11 +548,10 @@ CallInst *llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy,
     return nullptr;
 
   std::string Name = ("_cont_" + IntrImplEntry->Name).str();
-  auto *IntrImpl = M.getFunction(Name);
+  auto *IntrImpl = GpurtLibrary->getFunction(Name);
   if (!IntrImpl)
-    cantFail(make_error<StringError>(Twine("Intrinsic implementation '") +
-                                         Name + "' not found",
-                                     inconvertibleErrorCode()));
+    report_fatal_error(Twine("Intrinsic implementation '") + Name +
+                       "' not found");
 
   SmallVector<Value *> Arguments;
   // Add the right system data type
@@ -580,7 +564,8 @@ CallInst *llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy,
     Function *GetHitData;
     if (Kind == DXILShaderKind::AnyHit ||
         Kind == DXILShaderKind::Intersection) {
-      auto *GetCandidateState = M.getFunction("_cont_GetCandidateState");
+      auto *GetCandidateState =
+          GpurtLibrary->getFunction("_cont_GetCandidateState");
       assert(GetCandidateState && "Could not find GetCandidateState function");
       assert(
           GetCandidateState->getReturnType()->isStructTy() &&
@@ -590,7 +575,8 @@ CallInst *llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy,
           GetCandidateState->getFunctionType()->getParamType(0)->isPointerTy());
       GetHitData = GetCandidateState;
     } else {
-      auto *GetCommittedState = M.getFunction("_cont_GetCommittedState");
+      auto *GetCommittedState =
+          GpurtLibrary->getFunction("_cont_GetCommittedState");
       assert(GetCommittedState && "Could not find GetCommittedState function");
       assert(
           GetCommittedState->getReturnType()->isStructTy() &&
@@ -605,10 +591,13 @@ CallInst *llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy,
     B.SetInsertPoint(&*Call->getFunction()->begin()->begin());
     auto *HitDataAlloca = B.CreateAlloca(GetHitData->getReturnType());
     B.restoreIP(IP);
-    auto *HitData = B.CreateCall(
-        GetHitData,
-        {getDXILSystemData(B, SystemData, SystemDataTy,
-                           getFuncArgPtrElementType(GetHitData, 0))});
+    auto *HitData =
+        Inliner
+            .inlineCall(
+                B, GetHitData,
+                {getDXILSystemData(B, SystemData, SystemDataTy,
+                                   getFuncArgPtrElementType(GetHitData, 0))})
+            .returnValue;
     B.CreateStore(HitData, HitDataAlloca);
     Arguments.push_back(HitDataAlloca);
   }
@@ -634,10 +623,8 @@ CallInst *llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy,
       raw_string_ostream ToStream(To);
       ArgType->print(FromStream, true);
       NewType->print(ToStream, true);
-      cantFail(make_error<StringError>(Twine("Can't convert ") + From + " to " +
-                                           To + " for intrinsic '" +
-                                           IntrImplEntry->Name + "'",
-                                       inconvertibleErrorCode()));
+      report_fatal_error(Twine("Can't convert ") + From + " to " + To +
+                         " for intrinsic '" + IntrImplEntry->Name + "'");
     }
   }
 
@@ -646,6 +633,8 @@ CallInst *llvm::replaceIntrinsicCall(IRBuilder<> &B, Type *SystemDataTy,
   LLVM_DEBUG(dbgs() << "Replacing " << *Call << " by " << *NewCall << "\n");
   if (!Call->getType()->isVoidTy())
     Call->replaceAllUsesWith(NewCall);
+  Inliner.inlineCall(*NewCall);
+  B.SetInsertPoint(&*B.GetInsertPoint());
   Call->eraseFromParent();
   return NewCall;
 }
@@ -756,16 +745,16 @@ bool llvm::earlyDriverTransform(Module &M) {
       replaceEnqueueIntrinsic(F, Replacement);
     }
 
-    if (Name == "_AmdContinuationStackIsGlobal") {
+    if (Name.starts_with("_AmdContinuationStackIsGlobal")) {
       Changed = true;
       handleContinuationStackIsGlobal(F, StackAddrspace);
-    } else if (Name == "_AmdContinuationsGetFlags") {
+    } else if (Name.starts_with("_AmdContinuationsGetFlags")) {
       Changed = true;
       if (!Flags)
         report_fatal_error("Tried to get continuation flags but it is not "
                            "available on the module");
       handleContinuationsGetFlags(F, *Flags);
-    } else if (Name == "_AmdGetRtip") {
+    } else if (Name.starts_with("_AmdGetRtip")) {
       Changed = true;
       if (!RtipLevel)
         report_fatal_error(
@@ -842,7 +831,7 @@ bool llvm::LgcMaterializable(Instruction &OrigI) {
       // be rematerialized are replaced by their implementation, so that the
       // necessary values can be put into the coroutine frame. Therefore, we
       // can assume all left-over intrinsics can be rematerialized.
-      if (isRematerializableLgcRtOp(*CInst))
+      if (DXILContHelper::isRematerializableLgcRtOp(*CInst))
         return true;
 
       auto CalledName = CalledFunc->getName();
@@ -858,11 +847,7 @@ bool llvm::LgcMaterializable(Instruction &OrigI) {
 
 namespace llvm {
 void addLgcContinuationTransform(ModulePassManager &MPM) {
-  // Inline TraceRay and similar intrinsic implementations
   MPM.addPass(AlwaysInlinerPass(/*InsertLifetimeIntrinsics=*/false));
-
-  // Lower GetShaderKind and GetCurrentFuncAddr
-  MPM.addPass(PreCoroutineLoweringPass());
 
   MPM.addPass(LowerAwaitPass());
 

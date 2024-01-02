@@ -47,6 +47,8 @@ public:
 private:
   bool needRun();
   unsigned getUniformLocation(llvm::GlobalVariable *var);
+  void decodeInOutMetaRecursivelyByIndex(llvm::Type *valueTy, llvm::Constant *mds, ArrayRef<Value *> index,
+                                         llvm::SmallVector<ShaderInOutMetadata> &out);
   void decodeInOutMetaRecursively(llvm::Type *valueTy, llvm::Constant *mds,
                                   llvm::SmallVector<ShaderInOutMetadata> &out);
   void unifyFunctionReturn(Function *func);
@@ -65,9 +67,10 @@ private:
   llvm::ReturnInst *m_retInst;                     // "Return" of the entry point.
 
   // The resource use to lower gl_ClipVertex
-  llvm::GlobalVariable *m_clipVertex;   // The global variable of gl_ClipVertex
-  llvm::GlobalVariable *m_clipDistance; // The global variable of gl_ClipDistance
-  llvm::GlobalVariable *m_clipPlane;    // The global variable of gl_ClipPlane
+  llvm::User *m_out;          // The global variable of gl_out[]
+  llvm::User *m_clipVertex;   // The global variable of gl_ClipVertex
+  llvm::User *m_clipDistance; // The global variable of gl_ClipDistance
+  llvm::User *m_clipPlane;    // The global variable of gl_ClipPlane
 };
 
 } // namespace Llpc

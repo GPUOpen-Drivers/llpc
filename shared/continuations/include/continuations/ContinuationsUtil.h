@@ -39,6 +39,7 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
@@ -70,10 +71,6 @@ class Type;
 const unsigned RegisterBytes = 4;
 /// Address space used for globals that should be put into registers.
 const unsigned GlobalRegisterAddrspace = 20;
-/// Amount of registers reserved for the continuation state.
-/// Spill everything into memory. No explicit memory address needed, which is
-/// instead derived from the CSP.
-const unsigned ContinuationStateRegisterCount = 0;
 /// The (first) register used for the memory pointer in payload registers.
 /// Currently, it is only a single register for the 32-bit pointer.
 const unsigned FirstPayloadMemoryPointerRegister = 0;
@@ -314,11 +311,10 @@ public:
   static constexpr const char *MDTypesFunctionName = "function";
   static constexpr const char *MDTypesVoidName = "void";
   static constexpr const char *MDDXILPayloadTyName = "dxil.payload.type";
-  static constexpr const char *MDLgcCpsModule = "lgc.cps.module";
+  static constexpr const char *MDLgcCpsModuleName = "lgc.cps.module";
 
   // Global variable names
   static constexpr const char *GlobalPayloadName = "PAYLOAD";
-  static constexpr const char *GlobalContStateName = "CONTINUATION_STATE";
   static constexpr const char *GlobalRegistersName = "REGISTERS";
   static constexpr ContStackAddrspace DefaultStackAddrspace =
       ContStackAddrspace::Scratch;
@@ -326,11 +322,19 @@ public:
   static void RegisterPasses(llvm::PassBuilder &PB, bool NeedDialectContext);
 
   // Registers the generic Continuation pipeline to a LLVM Module Pass manager.
-  static void addContinuationPasses(llvm::ModulePassManager &MPM);
+  static void addContinuationPasses(llvm::ModulePassManager &MPM,
+                                    llvm::Module *GpurtLibrary);
 
   // Registers the DXIL-specific Continuation pipeline to a LLVM Module Pass
   // manager.
-  static void addDxilContinuationPasses(llvm::ModulePassManager &MPM);
+  static void addDxilContinuationPasses(llvm::ModulePassManager &MPM,
+                                        llvm::Module *GpurtLibrary = nullptr);
+
+  // Registers the DXIL-specific pipeline for the driver library module to a
+  // LLVM Module Pass manager. These passes preprocess the driver library into a
+  // form that can be used for the later continuation passes that are run on app
+  // modules.
+  static void addDxilGpurtLibraryPasses(llvm::ModulePassManager &MPM);
 
   // Set metadata specifying the number of outgoing payload registers.
   static void setOutgoingRegisterCount(Instruction *I, uint32_t RegisterCount) {
@@ -412,11 +416,8 @@ public:
     auto *Registers = M.getGlobalVariable(GlobalRegistersName);
     if (!Registers)
       return {};
-    const uint32_t NumRegistersI32s =
-        Registers->getValueType()->getArrayNumElements();
-    assert(NumRegistersI32s >= ContinuationStateRegisterCount);
     const uint32_t NumPayloadRegistersI32s =
-        NumRegistersI32s - ContinuationStateRegisterCount;
+        Registers->getValueType()->getArrayNumElements();
     assert(NumPayloadRegistersI32s >=
            tryGetMinPayloadRegisterCount(M).value_or(NumPayloadRegistersI32s));
     assert(NumPayloadRegistersI32s <=
@@ -521,11 +522,6 @@ public:
     return extractZExtI32Constant(F.getMetadata(MDStateName));
   }
 
-  static bool isTraversal(Function &F) {
-    // TODO: Make this more robust somehow, restricting to library functions.
-    return F.getName().contains("Traversal");
-  }
-
   static Type *getPayloadTypeFromMetadata(const Function &Func) {
     if (MDNode *Node = Func.getMetadata(MDDXILPayloadTyName))
       return getPayloadTypeFromMetadata(Node);
@@ -544,7 +540,7 @@ public:
   }
 
   static bool isLgcCpsModule(Module &Mod) {
-    return Mod.getNamedMetadata(MDLgcCpsModule) != nullptr;
+    return Mod.getNamedMetadata(MDLgcCpsModuleName) != nullptr;
   }
 
   // Specifies that an awaited call should wait on a wait mask.
@@ -582,7 +578,7 @@ public:
     }
   }
 
-  static lgc::rt::RayTracingShaderStage
+  static std::optional<lgc::rt::RayTracingShaderStage>
   dxilShaderKindToShaderStage(DXILShaderKind Kind) {
     switch (Kind) {
     case DXILShaderKind::RayGeneration:
@@ -598,11 +594,17 @@ public:
     case DXILShaderKind::Callable:
       return lgc::rt::RayTracingShaderStage::Callable;
     default:
-      report_fatal_error(Twine("Cannot convert DXILShaderKind ") +
-                         Twine(static_cast<uint32_t>(Kind)) +
-                         " to RayTracingShaderStage");
+      return std::nullopt;
     }
   }
+
+  /// Returns true if a call to the given function should be rematerialized
+  /// in a shader of the specified kind.
+  ///
+  /// If no shader kind is specified, return false.
+  static bool
+  isRematerializableLgcRtOp(CallInst &CInst,
+                            std::optional<DXILShaderKind> Kind = std::nullopt);
 };
 
 /// Free-standing helpers.
@@ -637,6 +639,26 @@ findIntrImplEntryByIntrinsicCall(CallInst *Call);
 // during DXILContPostProcess, so we cannot remove all unused declarations right
 // at the end of LowerRaytracingPipeline.
 bool removeUnusedFunctionDecls(Module *Mod, bool OnlyIntrinsics = true);
+
+// For each basic block in Func, find the terminator. If it is contained in
+// TerminatorOpcodes, then apply the callback on the terminator.
+template <typename CallbackTy, typename = std::enable_if<std::is_invocable_v<
+                                   CallbackTy, llvm::Instruction &>>>
+void forEachTerminator(Function *Func, ArrayRef<unsigned> TerminatorOpcodes,
+                       CallbackTy Callback) {
+  for (auto &BB : *Func) {
+    auto *Terminator = BB.getTerminator();
+    if (llvm::find(TerminatorOpcodes, Terminator->getOpcode()) !=
+        TerminatorOpcodes.end())
+      Callback(*Terminator);
+  }
+}
+
+// Essentially RAUW for pointers for the case that these use different address
+// spaces, rewriting all derived pointers to also use the new address space.
+void replaceAllPointerUses(IRBuilder<> *Builder, Value *OldPointerValue,
+                           Value *NewPointerValue,
+                           SmallVectorImpl<Instruction *> &ToBeRemoved);
 
 // Replacement for PointerType::getWithSamePointeeType that works with new LLVM.
 // Returns a typed pointer type if the pointer type is typed.

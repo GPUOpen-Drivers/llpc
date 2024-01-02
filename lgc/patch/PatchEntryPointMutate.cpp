@@ -1793,6 +1793,12 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "sampleInfo", UserDataMapping::SampleInfo,
                                                 &intfData->entryArgIdxs.fs.sampleInfo));
     }
+
+    if (userDataUsage->isSpecialUserDataUsed(UserDataMapping::DynamicDualSrcBlendInfo)) {
+      specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "dualSourceBlendUpdateInfo",
+                                                UserDataMapping::DynamicDualSrcBlendInfo,
+                                                &intfData->entryArgIdxs.fs.dynamicDualSrcBlendInfo));
+    }
   }
 
   // Allocate register for stream-out buffer table, to go before the user data node args (unlike all the ones

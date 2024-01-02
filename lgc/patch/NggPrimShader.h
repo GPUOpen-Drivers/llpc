@@ -224,7 +224,7 @@ private:
   void loadStreamOutBufferInfo(llvm::Value *userData);
   void distributePrimitiveId(llvm::Value *primitiveId);
 
-  llvm::Value *cullPrimitive(llvm::Value *vertxIndex0, llvm::Value *vertxIndex1, llvm::Value *vertxIndex2);
+  llvm::Value *cullPrimitive(llvm::Value *vertexIndex0, llvm::Value *vertexIndex1, llvm::Value *vertexIndex2);
   void sendGsAllocReqMessage();
   void exportPassthroughPrimitive();
   void exportPrimitive(llvm::Value *primitiveCulled);
@@ -289,9 +289,9 @@ private:
 
   llvm::Value *ballot(llvm::Value *value);
 
-  llvm::Value *fetchVertexPositionData(llvm::Value *vertxIndex);
-  llvm::Value *fetchCullDistanceSignMask(llvm::Value *vertxIndex);
-  llvm::Value *calcVertexItemOffset(unsigned streamId, llvm::Value *vertxIndex);
+  llvm::Value *fetchVertexPositionData(llvm::Value *vertexIndex);
+  llvm::Value *fetchCullDistanceSignMask(llvm::Value *vertexIndex);
+  llvm::Value *calcVertexItemOffset(unsigned streamId, llvm::Value *vertexIndex);
 
   void processVertexAttribExport(llvm::Function *&target);
 
@@ -300,8 +300,8 @@ private:
   llvm::Value *fetchXfbOutput(llvm::Function *target, llvm::ArrayRef<llvm::Argument *> args,
                               llvm::SmallVector<XfbOutputExport, 32> &xfbOutputExports);
 
-  llvm::Value *readXfbOutputFromLds(llvm::Type *readDataTy, llvm::Value *vertxIndex, unsigned outputIndex);
-  void writeXfbOutputToLds(llvm::Value *writeData, llvm::Value *vertxIndex, unsigned outputIndex);
+  llvm::Value *readXfbOutputFromLds(llvm::Type *readDataTy, llvm::Value *vertexIndex, unsigned outputIndex);
+  void writeXfbOutputToLds(llvm::Value *writeData, llvm::Value *vertexIndex, unsigned outputIndex);
 
   // Checks if NGG culling operations are enabled
   bool enableCulling() const {

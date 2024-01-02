@@ -176,7 +176,7 @@ public:
 
   // Compute the ExportFormat (as an opaque int) of the specified color export location with the specified output
   // type. Only the number of elements of the type is significant.
-  unsigned computeExportFormat(llvm::Type *outputTy, unsigned location) override final;
+  unsigned computeExportFormat(llvm::Type *outputTy, unsigned location, bool isDynamicDsBlend = false) override final;
 
   // Set entire pipeline state from metadata in an IR module. This is used by the lgc command-line utility
   // for its link option.
@@ -284,9 +284,9 @@ public:
   const VertexInputDescription *findVertexInputDescription(unsigned location) const;
 
   // Accessors for color export state
-  const ColorExportFormat &getColorExportFormat(unsigned location);
+  const ColorExportFormat &getColorExportFormat(unsigned location, bool isDynamicDsBlend = false);
   const bool hasColorExportFormats() { return !m_colorExportFormats.empty(); }
-  ColorExportState &getColorExportState() { return m_colorExportState; }
+  const ColorExportState &getColorExportState() { return m_colorExportState; }
 
   // Accessors for pipeline state
   unsigned getDeviceIndex() const { return m_deviceIndex; }

@@ -590,6 +590,7 @@ void SpirvLowerGlobal::mapGlobalVariableToProxy(GlobalVariable *globalVar) {
   const auto &dataLayout = m_module->getDataLayout();
   Type *globalVarTy = globalVar->getValueType();
 
+  assert(m_entryPoint);
   Value *proxy = nullptr;
   assert(m_entryPoint);
   removeConstantExpr(m_context, globalVar);
@@ -1216,11 +1217,16 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
         }
 
         inOutInfo.setPerPrimitive(inOutMeta.PerPrimitive);
-        if (addrSpace == SPIRAS_Input)
-          inOutValue = m_builder->CreateReadBuiltInInput(builtIn, inOutInfo, vertexIdx, elemIdx);
-        else
+        if (addrSpace == SPIRAS_Input) {
+          // In the case where the command has no baseVertex parameter, force the value of gl_BaseVertex to zero
+          if (builtIn == lgc::BuiltInBaseVertex &&
+              m_context->getPipelineContext()->getPipelineOptions()->disableBaseVertex)
+            inOutValue = m_builder->getInt32(0);
+          else
+            inOutValue = m_builder->CreateReadBuiltInInput(builtIn, inOutInfo, vertexIdx, elemIdx);
+        } else {
           inOutValue = m_builder->CreateReadBuiltInOutput(builtIn, inOutInfo, vertexIdx, elemIdx);
-
+        }
         if ((builtIn == lgc::BuiltInSubgroupEqMask || builtIn == lgc::BuiltInSubgroupGeMask ||
              builtIn == lgc::BuiltInSubgroupGtMask || builtIn == lgc::BuiltInSubgroupLeMask ||
              builtIn == lgc::BuiltInSubgroupLtMask) &&
@@ -1469,9 +1475,6 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
                               cast<ConstantInt>(locOffset)->getZExtValue(), outputInfo);
     }
 
-    if (m_context->getPipelineContext()->getUseDualSourceBlend()) {
-      outputInfo.setDualSourceBlendDynamic(true);
-    }
     m_builder->CreateWriteGenericOutput(outputValue, location, locOffset, elemIdx, maxLocOffset, outputInfo,
                                         vertexOrPrimitiveIdx);
   }

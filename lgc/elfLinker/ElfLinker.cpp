@@ -370,14 +370,6 @@ StringRef ElfLinkerImpl::buildColorExportShader(ArrayRef<ColorExportInfo> export
   if (enableKill)
     copyColorShader->enableKill();
 
-  PalMetadata *metadata = m_pipelineState->getPalMetadata();
-  // Set pipeline hash.
-  auto internalPipelineHash =
-      metadata->getPipelineNode()[Util::Abi::PipelineMetadataKey::InternalPipelineHash].getArray(true);
-  const auto &options = m_pipelineState->getOptions();
-  internalPipelineHash[0] = options.hash[0];
-  internalPipelineHash[1] = options.hash[1];
-
   return copyColorShader->getElfBlob();
 }
 

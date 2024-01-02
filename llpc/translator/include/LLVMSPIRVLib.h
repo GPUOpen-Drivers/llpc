@@ -53,8 +53,8 @@ class SPIRVModule;
 
 /// \brief Represents one entry in specialization constant map.
 struct SPIRVSpecConstEntry {
-  uint32_t DataSize; // Data size of specilization constant (in bytes)
-  const void *Data;  // Data of specilization constant
+  uint32_t DataSize; // Data size of specialization constant (in bytes)
+  const void *Data;  // Data of specialization constant
 };
 
 /// \brief Represents the map from SpecId to specialization constant data.

@@ -819,7 +819,7 @@ Value *YCbCrConverter::convertColor(Type *resultTy, SamplerYCbCrModelConversion 
   case SamplerYCbCrModelConversion::YCbCr601:
   case SamplerYCbCrModelConversion::YCbCr709:
   case SamplerYCbCrModelConversion::YCbCr2020: {
-    // inputVec = RangeExpaned(C'_rgba)
+    // inputVec = RangeExpand(C'_rgba)
     Value *inputVec = m_builder->CreateFClamp(rangeExpand(range, channelBits, subImage), minVec, maxVec);
 
     Value *inputCr = m_builder->CreateExtractElement(inputVec, m_builder->getInt64(0));
