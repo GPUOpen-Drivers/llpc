@@ -169,7 +169,7 @@ void llvm::replaceAllPointerUses(IRBuilder<> *Builder, Value *OldPointerValue,
   auto GetMutatedPtrTy = [NewAS](Type *Ty) {
     PointerType *PtrTy = cast<PointerType>(Ty);
     // Support typed pointers:
-    return PointerType::getWithSamePointeeType(PtrTy, NewAS);
+    return getWithSamePointeeType(PtrTy, NewAS);
   };
 
   while (!Worklist.empty()) {
