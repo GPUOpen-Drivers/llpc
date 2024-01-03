@@ -156,7 +156,7 @@ void llvm::replaceAllPointerUses(IRBuilder<> *Builder, Value *OldPointerValue,
   PointerType *NewPtrTy = cast<PointerType>(NewPointerValue->getType());
   unsigned NewAS = NewPtrTy->getAddressSpace();
   assert(NewAS != OldPtrTy->getAddressSpace());
-  assert(PointerType::getWithSamePointeeType(OldPtrTy, NewAS) == NewPtrTy);
+  assert(getWithSamePointeeType(OldPtrTy, NewAS) == NewPtrTy);
 
   OldPointerValue->mutateType(NewPtrTy);
 
