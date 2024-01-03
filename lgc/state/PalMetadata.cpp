@@ -1044,18 +1044,7 @@ void PalMetadata::updateSpiShaderColFormat(ArrayRef<ExportFormat> expFormats) {
 // =====================================================================================================================
 // Updates the CB_SHADER_MASK entry.
 //
-void PalMetadata::updateCbShaderMask(llvm::ArrayRef<ColorExportInfo> exps) {
-  unsigned cbShaderMask = 0;
-  for (auto &exp : exps) {
-    if (exp.hwColorTarget == MaxColorTargets)
-      continue;
-    unsigned channelWriteMask = m_pipelineState->getColorExportFormat(exp.location).channelWriteMask;
-    bool needUpdateMask = (m_pipelineState->computeExportFormat(exp.ty, exp.location) != 0) &&
-                          (channelWriteMask > 0 || m_pipelineState->getColorExportState().alphaToCoverageEnable);
-    if (needUpdateMask)
-      cbShaderMask |= (0xF << (4 * exp.location));
-  }
-
+void PalMetadata::updateCbShaderMask(unsigned cbShaderMask) {
   if (m_pipelineState->useRegisterFieldFormat()) {
     auto cbShaderMaskNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
                                 .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::CbShaderMask]

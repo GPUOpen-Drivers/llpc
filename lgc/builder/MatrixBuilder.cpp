@@ -87,7 +87,8 @@ Value *BuilderImpl::CreateTransposeMatrix(Value *const matrix, const Twine &inst
 // Create matrix from matrix Times scalar
 //
 // @param matrix : The column major matrix, n x <n x float>
-// @param scalar : The float scalar
+// @param scalar : The float scalar. If the matrix is a packed accumulator
+// matrix, the scalar has to be a <2 x half> vector.
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateMatrixTimesScalar(Value *const matrix, Value *const scalar, const Twine &instName) {
   Type *const matrixTy = matrix->getType();
@@ -351,6 +352,7 @@ Value *BuilderImpl::CreateMatrixInverse(Value *const matrix, const Twine &instNa
 Type *BuilderCommon::transCooperativeMatrixElementType(CooperativeMatrixElementType elemType) {
   switch (elemType) {
   case BuilderCommon::CooperativeMatrixElementType::Float16:
+  case BuilderCommon::CooperativeMatrixElementType::Float16Packed:
     return getHalfTy();
   case BuilderCommon::CooperativeMatrixElementType::Float32:
     return getFloatTy();
@@ -585,14 +587,17 @@ Value *BuilderCommon::CreateCooperativeMatrixBinaryOp(CooperativeMatrixArithOp c
 // Create cooperative matrix MatrixTimesScalar operation
 //
 // @param matrix : The first operand and it should be a cooperative matrix.
-// @param scalar : The second operand and it should be a scalar.
+// @param scalar : The second operand and it should be a scalar. If the matrix is a packed accumulator matrix, the
+// scalar has to be a <2 x half> vector.
 // @param elemType : The component type of the matrix.
 // @param layout : Identify whether it's A/B or C/D
 // @param instName : Name to give instruction(s).
 Value *BuilderCommon::CreateCoopMatrixTimesScalar(Value *matrix, Value *scalar, CooperativeMatrixElementType elemType,
                                                   CooperativeMatrixLayout layout, const Twine &instName) {
   assert(matrix->getType() == getCooperativeMatrixTy(elemType, layout));
-  assert(scalar->getType() == transCooperativeMatrixElementType(elemType));
+  assert(scalar->getType() == (elemType == CooperativeMatrixElementType::Float16Packed
+                                   ? FixedVectorType::get(getHalfTy(), 2)
+                                   : transCooperativeMatrixElementType(elemType)));
 
   std::string callName(lgcName::CooperativeMatrixTimesScalar);
   Value *args[] = {matrix, scalar, getInt32(static_cast<unsigned>(elemType)), getInt32(static_cast<unsigned>(layout))};
@@ -631,11 +636,14 @@ CallInst *BuilderCommon::CreateCooperativeMatrixTranspose(llvm::Value *matrix, C
 // @param matrixC : Accumulator cooperative matrix.
 // @param isSignedA : Identify the signess for matrix A's element type
 // @param isSignedB : Identify the signess for matrix B's element type
-// @param isSat : SaturatingAccumulation for calculation
+// @param isSatOrOpsel : SaturatingAccumulation for calculation. In the case of 16-bit floating point
+// matrices, this bit acts as an opsel bit. If it is set to false, we store the result in the lower half of
+// the registers. If it is true, we store it in the upper half.
+// @param isTied : If true, the output matrix has to be the same as the input accumulator (i.e., D has to be C)
 // @param accumElemType : The component type of the accumulator matrix.
 // @param factorElemType : The component type of the factor matrix.
 Value *BuilderCommon::CreateCooperativeMatrixMulAdd(llvm::Value *matrixA, llvm::Value *matrixB, llvm::Value *matrixC,
-                                                    bool isSignedA, bool isSignedB, bool isSat,
+                                                    bool isSignedA, bool isSignedB, bool isSatOrOpsel, bool isTied,
                                                     CooperativeMatrixElementType accumElemType,
                                                     CooperativeMatrixElementType factorElemType,
                                                     const llvm::Twine &instName) {
@@ -645,12 +653,49 @@ Value *BuilderCommon::CreateCooperativeMatrixMulAdd(llvm::Value *matrixA, llvm::
                    matrixC,
                    getInt1(isSignedA),
                    getInt1(isSignedB),
-                   getInt1(isSat),
+                   getInt1(isSatOrOpsel),
+                   getInt1(isTied),
                    getInt32(static_cast<unsigned>(accumElemType)),
                    getInt32(static_cast<unsigned>(factorElemType))};
   addTypeMangling(matrixC->getType(), args, callName);
 
   Value *result = CreateNamedCall(callName, matrixC->getType(), args, {Attribute::ReadOnly, Attribute::WillReturn});
+  result->setName(instName);
+  return result;
+}
+
+// =====================================================================================================================
+// Create cooperative matrix pack operation
+//
+// @param matrixCLo : Lower Accumulator cooperative matrix.
+// @param matrixCHi : Upper Accumulator cooperative matrix.
+Value *BuilderCommon::CreateCooperativeMatrixPack(llvm::Value *matrixCLo, llvm::Value *matrixCHi,
+                                                  const llvm::Twine &instName) {
+
+  std::string callName(lgcName::CooperativeMatrixPack);
+  Value *args[] = {matrixCLo, matrixCHi};
+
+  Type *retTy = matrixCLo->getType();
+  addTypeMangling(retTy, args, callName);
+
+  Value *result = CreateNamedCall(callName, retTy, args, {Attribute::ReadNone, Attribute::WillReturn});
+  result->setName(instName);
+  return result;
+}
+
+// =====================================================================================================================
+// Create cooperative matrix unpack operation
+//
+// @param packedMatrix : Packed Accumulator cooperative matrix.
+// @param high: Whether to get the matrix stored in the upper half of the registers.
+Value *BuilderCommon::CreateCooperativeMatrixUnpack(llvm::Value *packedMatrix, bool high, const llvm::Twine &instName) {
+
+  std::string callName(lgcName::CooperativeMatrixUnpack);
+  Value *args[] = {packedMatrix, getInt1(high)};
+  Type *retTy = packedMatrix->getType();
+  addTypeMangling(retTy, args, callName);
+
+  Value *result = CreateNamedCall(callName, retTy, args, {Attribute::ReadNone, Attribute::WillReturn});
   result->setName(instName);
   return result;
 }

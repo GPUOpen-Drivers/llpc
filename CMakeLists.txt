@@ -33,22 +33,21 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     set(LLPC_IS_STANDALONE ON)
 endif()
 
+### Version info ###
+include(cmake/llpc_version.cmake)
+add_llpc_version_projects()
+
 ### Top-level VKGC Interface ###
 add_library(vkgc INTERFACE)
 
 ### VKGC header-only library ###
 add_library(vkgc_headers INTERFACE)
 
+target_link_libraries(vkgc_headers INTERFACE llpc_version)
+
 ### Cached Project Options #############################################################################################
 option(LLPC_BUILD_TOOLS "LLPC build all tools" OFF)
-
 ### Options that affect the headers ####################################################################################
-if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
-    target_compile_definitions(vkgc_headers INTERFACE LLPC_CLIENT_INTERFACE_MAJOR_VERSION=${LLPC_CLIENT_INTERFACE_MAJOR_VERSION})
-else()
-    message(FATAL_ERROR "Client of LLPC must set LLPC_CLIENT_INTERFACE_MAJOR_VERSION")
-endif()
-
 #if VKI_BUILD_GFX11
 if(LLPC_BUILD_GFX11)
     target_compile_definitions(vkgc_headers INTERFACE VKI_BUILD_GFX11)

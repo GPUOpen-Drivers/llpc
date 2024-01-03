@@ -33,6 +33,7 @@
 #include "lgc/util/Internal.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
+#include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
 #define DEBUG_TYPE "lgc-builder-impl-subgroup"
 
@@ -89,7 +90,8 @@ Value *BuilderImpl::CreateSubgroupAll(Value *const value, const Twine &instName)
   result = CreateSelect(CreateUnaryIntrinsic(Intrinsic::is_constant, value), value, result);
 
   // Helper invocations of whole quad mode should be included in the subgroup vote execution
-  if (m_shaderStage == ShaderStageFragment) {
+  const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
+  if (m_shaderStage == ShaderStageFragment && !fragmentMode.waveOpsExcludeHelperLanes) {
     result = CreateZExt(result, getInt32Ty());
     result = CreateIntrinsic(Intrinsic::amdgcn_softwqm, {getInt32Ty()}, {result});
     result = CreateTrunc(result, getInt1Ty());
@@ -107,7 +109,8 @@ Value *BuilderImpl::CreateSubgroupAny(Value *const value, const Twine &instName)
   result = CreateSelect(CreateUnaryIntrinsic(Intrinsic::is_constant, value), value, result);
 
   // Helper invocations of whole quad mode should be included in the subgroup vote execution
-  if (m_shaderStage == ShaderStageFragment) {
+  const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
+  if (m_shaderStage == ShaderStageFragment && !fragmentMode.waveOpsExcludeHelperLanes) {
     result = CreateZExt(result, getInt32Ty());
     result = CreateIntrinsic(Intrinsic::amdgcn_softwqm, {getInt32Ty()}, {result});
     result = CreateTrunc(result, getInt1Ty());
@@ -203,6 +206,22 @@ Value *BuilderImpl::CreateSubgroupBroadcastWaterfall(Value *const value, Value *
 // @param value : The value to read from the first active lane into all other active lanes.
 // @param instName : Name to give final instruction.
 Value *BuilderImpl::CreateSubgroupBroadcastFirst(Value *const value, const Twine &instName) {
+  const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
+  // For waveOpsExcludeHelperLanes mode, we need filter out the helperlane and use readlane instead.
+  if (m_shaderStage == ShaderStageFragment && fragmentMode.waveOpsExcludeHelperLanes) {
+    Value *ballot = createGroupBallot(getTrue());
+    Value *firstlane = CreateIntrinsic(Intrinsic::cttz, getInt64Ty(), {ballot, getTrue()});
+    firstlane = CreateTrunc(firstlane, getInt32Ty());
+
+    auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
+                      ArrayRef<Value *> passthroughArgs) -> Value * {
+      return builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_readlane,
+                                     {mappedArgs[0], passthroughArgs[0]});
+    };
+
+    return CreateMapToSimpleType(mapFunc, value, firstlane);
+  }
+
   auto mapFunc = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs, ArrayRef<Value *> passthroughArgs) -> Value * {
     return builder.CreateIntrinsic(builder.getInt32Ty(), Intrinsic::amdgcn_readfirstlane, mappedArgs[0]);
   };
@@ -535,6 +554,13 @@ Value *BuilderImpl::CreateSubgroupClusteredReduction(GroupArithOp groupArithOp, 
   Value *const identity = createGroupArithmeticIdentity(groupArithOp, value->getType());
   Value *result = BuilderBase::get(*this).CreateSetInactive(value, identity);
 
+  // For waveOpsExcludeHelperLanes mode, we need mask away the helperlane.
+  const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
+  if (m_shaderStage == ShaderStageFragment && fragmentMode.waveOpsExcludeHelperLanes) {
+    auto isLive = CreateIntrinsic(Intrinsic::amdgcn_live_mask, {}, {}, nullptr, {});
+    result = CreateSelect(isLive, result, identity);
+  }
+
   // Perform The group arithmetic operation between adjacent lanes in the subgroup, with all masks and rows enabled
   // (0xF).
   result = CreateSelect(
@@ -726,7 +752,14 @@ Value *BuilderImpl::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, 
   Value *const identity = createGroupArithmeticIdentity(groupArithOp, value->getType());
 
   // Start the WWM section by setting the inactive invocations.
-  Value *const setInactive = BuilderBase::get(*this).CreateSetInactive(value, identity);
+  Value *setInactive = BuilderBase::get(*this).CreateSetInactive(value, identity);
+
+  // For waveOpsExcludeHelperLanes mode, we need mask away the helperlane.
+  const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
+  if (m_shaderStage == ShaderStageFragment && fragmentMode.waveOpsExcludeHelperLanes) {
+    auto isLive = CreateIntrinsic(Intrinsic::amdgcn_live_mask, {}, {}, nullptr, {});
+    setInactive = CreateSelect(isLive, setInactive, identity);
+  }
 
   Value *shiftRight = nullptr;
 
@@ -834,6 +867,77 @@ Value *BuilderImpl::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, 
 }
 
 // =====================================================================================================================
+// Create a subgroup clustered exclusive scan.
+//
+// @param groupArithOp : The group arithmetic operation.
+// @param value : An LLVM value.
+// @param mask : Mask of the cluster. Must be <4 x i32> type.
+// @param instName : Name to give final instruction.
+Value *BuilderImpl::CreateSubgroupClusteredMultiExclusive(GroupArithOp groupArithOp, Value *const value,
+                                                          Value *const mask, const Twine &instName) {
+  Value *const identity = createGroupArithmeticIdentity(groupArithOp, value->getType());
+
+  Value *laneIndex = CreateGetLaneNumber();
+  Value *clusterMask =
+      (getShaderSubgroupSize() <= 32)
+          ? CreateExtractElement(mask, getInt32(0))
+          : CreateBitCast(CreateShuffleVector(mask, PoisonValue::get(mask->getType()), ArrayRef<int>{0, 1}),
+                          getInt64Ty());
+
+  Value *result = value;
+
+  // For waveOpsExcludeHelperLanes mode, we need mask away the helperlane.
+  const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
+  if (m_shaderStage == ShaderStageFragment && fragmentMode.waveOpsExcludeHelperLanes) {
+    auto isLive = CreateIntrinsic(Intrinsic::amdgcn_live_mask, {}, {}, nullptr, {});
+    result = CreateSelect(isLive, result, identity);
+  }
+
+  Value *constOne = ConstantInt::get(clusterMask->getType(), 1);
+  Value *constZero = ConstantInt::get(clusterMask->getType(), 0);
+
+  // Move current lane to next lane according to the mask = (1 << laneIndex) -1.
+  Value *preLaneMask = CreateSub(CreateShl(constOne, CreateZExtOrTrunc(laneIndex, clusterMask->getType())), constOne);
+  Value *checkMask = CreateAnd(preLaneMask, clusterMask);
+
+  Value *preLaneValue = CreateSubgroupShuffle(result, createFindMsb(checkMask), instName);
+  result = CreateSelect(CreateICmpNE(checkMask, constZero), preLaneValue, identity);
+
+  for (unsigned log2ClusterSize = 0; (1 << log2ClusterSize) < getShaderWaveSize(); log2ClusterSize++) {
+    unsigned clusterSize = 1 << log2ClusterSize;
+    // Generate the mask of previous cluster before the current lane. Zero for overflow index shift left.
+    // mask = ((1 << clusterSize) - 1) << ((laneIndex - clusterSize) & ~(clusterSize - 1)).
+    Value *laneIndexOfCluster = CreateAnd(CreateSub(laneIndex, getInt32(clusterSize)), getInt32(~(clusterSize - 1)));
+    Value *preClusterMask = CreateShl(ConstantInt::get(clusterMask->getType(), (1ull << clusterSize) - 1),
+                                      CreateZExtOrTrunc(laneIndexOfCluster, clusterMask->getType()));
+    preClusterMask = CreateAnd(preClusterMask, clusterMask);
+
+    Value *isPreviousLaneValid = CreateICmpNE(preClusterMask, constZero);
+    Value *previousLaneIndex = createFindMsb(preClusterMask);
+    Value *previousLaneValue = CreateSubgroupShuffle(result, previousLaneIndex, instName);
+
+    // Don't accumulate if there is no valid lane found in previous cluster or current lane is no need for accumulate.
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 479645
+    Value *isAccumulateLane = CreateICmpNE(CreateAnd(laneIndex, getInt32(clusterSize)), getInt32(0));
+#else
+    // TODO: Check amdgcn_inverse_ballot version.
+    const unsigned long long halfMasks[] = {
+        0x5555555555555555ull, 0x3333333333333333ull, 0x0f0f0f0f0f0f0f0full,
+        0x00ff00ff00ff00ffull, 0x0000ffff0000ffffull, 0x00000000ffffffffull,
+    };
+
+    Value *isAccumulateLane = CreateIntrinsic(getInt1Ty(), Intrinsic::amdgcn_inverse_ballot,
+                                              ConstantInt::get(clusterMask->getType(), ~halfMasks[log2ClusterSize]));
+#endif
+
+    previousLaneValue = CreateSelect(CreateAnd(isAccumulateLane, isPreviousLaneValid), previousLaneValue, identity);
+    result = createGroupArithmeticOperation(groupArithOp, result, previousLaneValue);
+  }
+
+  return result;
+}
+
+// =====================================================================================================================
 // Create a quad broadcast call.
 //
 // @param value : The value to broadcast across the quad.
@@ -845,18 +949,19 @@ Value *BuilderImpl::CreateSubgroupQuadBroadcast(Value *const value, Value *const
   Value *result = PoisonValue::get(value->getType());
 
   const unsigned indexBits = index->getType()->getPrimitiveSizeInBits();
+  {
+    Value *compare = CreateICmpEQ(index, getIntN(indexBits, 0));
+    result = CreateSelect(compare, createDppMov(value, DppCtrl::DppQuadPerm0000, 0xF, 0xF, true), result);
 
-  Value *compare = CreateICmpEQ(index, getIntN(indexBits, 0));
-  result = CreateSelect(compare, createDppMov(value, DppCtrl::DppQuadPerm0000, 0xF, 0xF, true), result);
+    compare = CreateICmpEQ(index, getIntN(indexBits, 1));
+    result = CreateSelect(compare, createDppMov(value, DppCtrl::DppQuadPerm1111, 0xF, 0xF, true), result);
 
-  compare = CreateICmpEQ(index, getIntN(indexBits, 1));
-  result = CreateSelect(compare, createDppMov(value, DppCtrl::DppQuadPerm1111, 0xF, 0xF, true), result);
+    compare = CreateICmpEQ(index, getIntN(indexBits, 2));
+    result = CreateSelect(compare, createDppMov(value, DppCtrl::DppQuadPerm2222, 0xF, 0xF, true), result);
 
-  compare = CreateICmpEQ(index, getIntN(indexBits, 2));
-  result = CreateSelect(compare, createDppMov(value, DppCtrl::DppQuadPerm2222, 0xF, 0xF, true), result);
-
-  compare = CreateICmpEQ(index, getIntN(indexBits, 3));
-  result = CreateSelect(compare, createDppMov(value, DppCtrl::DppQuadPerm3333, 0xF, 0xF, true), result);
+    compare = CreateICmpEQ(index, getIntN(indexBits, 3));
+    result = CreateSelect(compare, createDppMov(value, DppCtrl::DppQuadPerm3333, 0xF, 0xF, true), result);
+  }
 
   if (inWqm)
     result = createWqm(result);
@@ -961,6 +1066,50 @@ Value *BuilderImpl::CreateSubgroupMbcnt(Value *const mask, const Twine &instName
   if (getShaderSubgroupSize() <= 32)
     return mbcntLo;
   return CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {maskHigh, mbcntLo});
+}
+
+// =====================================================================================================================
+// Create a subgroup partition.
+//
+// @param value : The value to partition with.
+// @param instName : Name to give instruction(s)
+Value *BuilderImpl::CreateSubgroupPartition(llvm::Value *const value, const Twine &instName) {
+  BasicBlock *currentBlock = GetInsertBlock();
+  auto insertPoint = GetInsertPoint();
+
+  BasicBlock *beforeBlock =
+      splitBlockBefore(currentBlock, &*insertPoint, nullptr, nullptr, nullptr, currentBlock->getName());
+  BasicBlock *loopBlock = splitBlockBefore(currentBlock, &*insertPoint, nullptr, nullptr, nullptr, "loop.body");
+  BasicBlock *loopEndBlock = currentBlock;
+
+  // Handle before Block
+  SetInsertPoint(beforeBlock->getTerminator());
+  // bitcase float to uint.
+  Value *targetValue = value;
+  if (targetValue->getType() == getFloatTy())
+    targetValue = CreateBitCast(targetValue, getInt32Ty());
+  else if (targetValue->getType() == getDoubleTy())
+    targetValue = CreateBitCast(targetValue, getInt64Ty());
+  else
+    assert(targetValue->getType()->isIntegerTy());
+
+  // Handle Loop Condition Block
+  // remove the default br generated by splitBlockBefore.
+  loopBlock->getTerminator()->eraseFromParent();
+  SetInsertPoint(loopBlock);
+  Value *laneValue = CreateSubgroupBroadcastFirst(targetValue);
+  Value *isEqual = CreateICmpEQ(laneValue, targetValue);
+  Value *mask = createGroupBallot(isEqual);
+  CreateCondBr(isEqual, loopEndBlock, loopBlock);
+
+  // Handle Loop End
+  SetInsertPoint(&*loopEndBlock->begin());
+  // Match expects a <4 x i32> return, so we need to turn the i64 into that.
+  Value *finalResult = CreateBitCast(mask, FixedVectorType::get(getInt32Ty(), 2));
+
+  ElementCount elementCount = cast<VectorType>(finalResult->getType())->getElementCount();
+  return CreateShuffleVector(finalResult, ConstantVector::getSplat(elementCount, getInt32(0)),
+                             ArrayRef<int>{0, 1, 2, 3});
 }
 
 // =====================================================================================================================
@@ -1276,12 +1425,36 @@ Value *BuilderImpl::createGroupBallot(Value *const value) {
   // Check the type is definitely an boolean.
   assert(value->getType()->isIntegerTy(1));
 
+  Value *result = value;
+
+  // For waveOpsExcludeHelperLanes mode, we need mask away the helperlane.
+  const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
+  if (m_shaderStage == ShaderStageFragment && fragmentMode.waveOpsExcludeHelperLanes) {
+    auto isLive = CreateIntrinsic(Intrinsic::amdgcn_live_mask, {}, {}, nullptr, {});
+    result = CreateAnd(isLive, result);
+  }
+
   unsigned waveSize = getShaderWaveSize();
-  Value *result = CreateIntrinsic(getIntNTy(waveSize), Intrinsic::amdgcn_ballot, value);
+  result = CreateIntrinsic(getIntNTy(waveSize), Intrinsic::amdgcn_ballot, result);
 
   // If we have a 32-bit subgroup size, we need to turn the 32-bit ballot result into a 64-bit result.
   if (waveSize <= 32)
     result = CreateZExt(result, getInt64Ty());
 
   return result;
+}
+
+// =====================================================================================================================
+// Search the MSB index of the mask, not handle zero.
+//
+// @param mask : The lane mask.
+Value *BuilderImpl::createFindMsb(Value *const mask) {
+  // counts the number of leading zeros.
+  Value *result = CreateBinaryIntrinsic(Intrinsic::ctlz, mask, getTrue());
+
+  if (getShaderSubgroupSize() == 64)
+    result = CreateTrunc(result, getInt32Ty());
+
+  // reverse the count from the bottom.
+  return CreateSub(getInt32((getShaderSubgroupSize() == 64) ? 63 : 31), result);
 }

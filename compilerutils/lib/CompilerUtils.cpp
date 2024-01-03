@@ -24,11 +24,19 @@
  **********************************************************************************************************************/
 
 #include "compilerutils/CompilerUtils.h"
+#include "llvm/ADT/StringExtras.h"
+#include "llvm/ADT/iterator_range.h"
+#include "llvm/IR/Attributes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Value.h"
+#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Transforms/Utils/Cloning.h"
+#include "llvm/Transforms/Utils/ValueMapper.h"
+
+#define DEBUG_TYPE "compilerutils"
 
 using namespace llvm;
 
@@ -89,12 +97,226 @@ CallInst *CompilerUtils::createNamedCall(IRBuilder<> &builder, StringRef funcNam
 Function *CompilerUtils::mutateFunctionArguments(Function &fn, Type *retTy, const ArrayRef<Type *> argTys,
                                                  AttributeList attributes) {
   FunctionType *newFnTy = FunctionType::get(retTy, argTys, false);
-  auto *newFn = Function::Create(newFnTy, fn.getLinkage());
-  newFn->copyAttributesFrom(&fn);
-  newFn->copyMetadata(&fn, 0);
+  auto *newFn = cloneFunctionHeader(fn, newFnTy, attributes);
   newFn->takeName(&fn);
-  newFn->setAttributes(attributes);
   newFn->splice(newFn->begin(), &fn);
-  fn.getParent()->getFunctionList().insertAfter(fn.getIterator(), newFn);
   return newFn;
+}
+
+Function *CompilerUtils::cloneFunctionHeader(Function &f, FunctionType *newType, AttributeList attributes,
+                                             Module *targetModule) {
+  LLVM_DEBUG(dbgs() << "Cloning function " << f.getName() << " with new type " << *newType << "\n");
+  Function *newFunc = Function::Create(newType, f.getLinkage(), "", targetModule);
+
+  if (targetModule) {
+    assert(targetModule != f.getParent() && "targetModule cannot be the same as the current module");
+    newFunc->setName(f.getName());
+  } else {
+    // Insert new function before f to facilitate writing tests
+    f.getParent()->getFunctionList().insert(f.getIterator(), newFunc);
+  }
+
+  newFunc->copyAttributesFrom(&f);
+  newFunc->setSubprogram(f.getSubprogram());
+  newFunc->setAttributes(attributes);
+  newFunc->copyMetadata(&f, 0);
+  return newFunc;
+}
+
+Function *CompilerUtils::cloneFunctionHeader(Function &f, FunctionType *newType, ArrayRef<AttributeSet> argAttrs,
+                                             Module *targetModule) {
+  const AttributeList fAttrs = f.getAttributes();
+  const AttributeList attributes =
+      AttributeList::get(f.getContext(), fAttrs.getFnAttrs(), fAttrs.getRetAttrs(), argAttrs);
+  return cloneFunctionHeader(f, newType, attributes, targetModule);
+}
+
+namespace {
+
+// Get the name of a global that is copied to a different module for inlining.
+std::string getCrossModuleName(GlobalValue &gv) {
+  return (Twine(gv.getName()) + ".cloned." + gv.getParent()->getName()).str();
+}
+
+class CrossModuleValueMaterializer : public ValueMaterializer {
+public:
+  CrossModuleValueMaterializer(Module *targetMod, CompilerUtils::CrossModuleInliner &inliner,
+                               SmallDenseMap<GlobalValue *, GlobalValue *> &mapped)
+      : targetMod(targetMod), inliner(&inliner), mapped(&mapped) {}
+  virtual ~CrossModuleValueMaterializer() = default;
+
+  void setMapper(ValueMapper *mapper) { this->mapper = mapper; }
+
+  virtual Value *materialize(Value *v) override {
+    if (auto *gv = dyn_cast<GlobalValue>(v)) {
+      if (gv->getParent() == targetMod)
+        return nullptr;
+
+      auto *newGv = moveGlobalValueToNewModule(gv);
+      return newGv;
+    }
+    return nullptr;
+  }
+
+private:
+  GlobalValue *moveGlobalValueToNewModule(GlobalValue *gv) {
+    if (auto *existing = inliner->findCopiedGlobal(*gv, *targetMod))
+      return existing;
+
+    auto newName = getCrossModuleName(*gv);
+    if (auto *callee = dyn_cast<Function>(gv)) {
+      if (!callee->isDeclaration()) {
+        report_fatal_error(
+            Twine("Cross module inlining does not support functions with calls to functions with a body. "
+                  "Run the inliner before trying to inline across modules (trying to call '") +
+            callee->getName() + "')");
+      }
+
+      // Create a function declaration
+      auto *newGv =
+          CompilerUtils::cloneFunctionHeader(*callee, callee->getFunctionType(), callee->getAttributes(), targetMod);
+      newGv->setName(newName);
+
+      (*mapped)[gv] = newGv;
+      return newGv;
+    }
+
+    if (auto *gVar = dyn_cast<GlobalVariable>(gv)) {
+      // Create a global with the correct type
+      auto *newGv = new GlobalVariable(*targetMod, gVar->getValueType(), gVar->isConstant(), gVar->getLinkage(),
+                                       nullptr, newName, nullptr, gVar->getThreadLocalMode(), gVar->getAddressSpace());
+      newGv->copyAttributesFrom(gVar);
+      if (gVar->hasInitializer()) {
+        // Recursively map initializer
+        auto *newInit = mapper->mapConstant(*gVar->getInitializer());
+        newGv->setInitializer(newInit);
+      }
+
+      (*mapped)[gv] = newGv;
+      return newGv;
+    }
+
+    report_fatal_error("Encountered unknown global object while inlining");
+  }
+
+  Module *targetMod;
+  CompilerUtils::CrossModuleInliner *inliner;
+  SmallDenseMap<GlobalValue *, GlobalValue *> *mapped;
+  ValueMapper *mapper;
+};
+
+} // anonymous namespace
+
+iterator_range<Function::iterator> CompilerUtils::CrossModuleInliner::inlineCall(CallBase &cb) {
+  auto *calleeFunc = cb.getCalledFunction();
+  assert(calleeFunc && "Cannot find called function");
+  LLVM_DEBUG(dbgs() << "Inlining '" << calleeFunc->getName() << "' across modules\n");
+
+  Function *targetFunc = cb.getFunction();
+  auto *targetMod = targetFunc->getParent();
+  auto callBb = cb.getParent()->getIterator();
+  auto callBbSuccessor = callBb;
+  ++callBbSuccessor;
+  const bool callBbHasSuccessor = callBbSuccessor != targetFunc->end();
+  const size_t bbCount = targetFunc->size();
+  // Save uses of the return value
+  SmallVector<Value *> users(cb.users());
+
+  const bool hasInstBefore = cb.getIterator() != callBb->begin();
+  auto instBefore = hasInstBefore ? --cb.getIterator() : cb.getIterator();
+  auto instAfter = ++cb.getIterator();
+  const bool hasInstAfter = instAfter != callBb->end();
+
+  if (calleeFunc->isDeclaration()) {
+    // We cannot inline declarations, but declarations are useful for testing
+    // purposes, so we allow declarations if we are not cross-module.
+    assert(calleeFunc->getParent() == targetMod && "Cannot inline declarations cross-module");
+    return make_range(callBb, callBb);
+  }
+
+  // Copy code
+  InlineFunctionInfo ifi;
+  auto res = InlineFunction(cb, ifi);
+  if (!res.isSuccess())
+    report_fatal_error(Twine("Failed to inline ") + calleeFunc->getName() + ": " + res.getFailureReason());
+
+  // The first block of the inlined function gets concatenated into the calling BB,
+  // the rest of the inlined function follows the calling BB.
+  auto firstNewBb = callBb;
+  auto lastNewBb = callBbHasSuccessor ? callBbSuccessor : targetFunc->end();
+
+  // Check that the number of basic blocks is as expected
+  assert(bbCount + static_cast<size_t>(std::distance(firstNewBb, lastNewBb)) - 1 == targetFunc->size() &&
+         "Did not find all inlined blocks");
+
+  if (calleeFunc->getParent() != targetMod) {
+    // The name is important because it is used for copying and re-finding globals
+    assert(!calleeFunc->getParent()->getName().empty() && "Can only inline from modules that have a name");
+
+    // Look for references to global values and replace them with global values in the new module
+    CrossModuleValueMaterializer materializer{targetMod, *this, mappedGlobals};
+    ValueToValueMapTy map;
+    ValueMapper mapper{map, RF_IgnoreMissingLocals, nullptr, &materializer};
+    materializer.setMapper(&mapper);
+    for (auto bb = firstNewBb; bb != lastNewBb; bb++) {
+      bool skipBeforeInsts = hasInstBefore && bb == firstNewBb;
+      for (auto &i : *bb) {
+        // Skip instructions before and after the original call
+        if (skipBeforeInsts) {
+          if (&i == &*instBefore)
+            skipBeforeInsts = false;
+          continue;
+        }
+        if (hasInstAfter && &i == &*instAfter)
+          break;
+
+        mapper.remapInstruction(i);
+      }
+      assert((bb != firstNewBb || !hasInstBefore || !skipBeforeInsts) && "Did not find first instruction");
+    }
+
+    // If the inlined function returned a constant, that gets inlined into the users of the original value. Iterate over
+    // these to catch all global values
+    for (auto *u : users)
+      mapper.remapInstruction(*cast<Instruction>(u));
+  }
+
+  return make_range(firstNewBb, lastNewBb);
+}
+
+CompilerUtils::CrossModuleInlinerResult
+CompilerUtils::CrossModuleInliner::inlineCall(IRBuilder<> &b, llvm::Function *callee,
+                                              llvm::ArrayRef<llvm::Value *> args) {
+  auto *call = b.CreateCall(callee, args);
+  // Create a fake use, so we can get the result of the inlined function.
+  FreezeInst *fakeUse = nullptr;
+  if (!callee->getReturnType()->isVoidTy())
+    fakeUse = cast<FreezeInst>(b.CreateFreeze(call));
+
+  auto newBBs = inlineCall(*call);
+
+  Value *result = nullptr;
+  if (fakeUse) {
+    result = fakeUse->getOperand(0);
+    fakeUse->eraseFromParent();
+  }
+  b.SetInsertPoint(&*b.GetInsertPoint());
+  return {result, newBBs};
+}
+
+GlobalValue *CompilerUtils::CrossModuleInliner::findCopiedGlobal(GlobalValue &sourceGv, Module &targetModule) {
+  assert(sourceGv.getParent() != &targetModule && "This function only finds copies across modules");
+  assert(sourceGv.hasName() && "Cannot find a global value that does not have a name");
+
+  if (auto found = mappedGlobals.find(&sourceGv); found != mappedGlobals.end()) {
+    assert(found->second->getParent() == &targetModule &&
+           "The CrossModuleInliner can only be used with a single target module");
+    return found->second;
+  }
+
+  auto *gv =
+      targetModule.getNamedValue((Twine(sourceGv.getName()) + ".cloned." + sourceGv.getParent()->getName()).str());
+  if (gv)
+    assert(gv->getValueType() == sourceGv.getValueType());
+  return gv;
 }

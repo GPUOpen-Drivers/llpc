@@ -43,6 +43,7 @@
 #include "SPIRVInternal.h"
 #include "SPIRVModule.h"
 #include "SPIRVToLLVMDbgTran.h"
+#include "compilerutils/LoweringPointerTupleMap.h"
 #include "vkgcDefs.h"
 #include "lgc/Builder.h"
 
@@ -91,8 +92,10 @@ public:
   bool translate(ExecutionModel entryExecModel, const char *entryName);
   bool transAddressingModel();
 
+  SmallVector<Value *> transValueMulti(SPIRVValue *, Function *f, BasicBlock *bb, bool createPlaceHolder = true);
   Value *transValue(SPIRVValue *, Function *f, BasicBlock *, bool createPlaceHolder = true);
-  Value *transValueWithoutDecoration(SPIRVValue *, Function *f, BasicBlock *, bool createPlaceHolder = true);
+  SmallVector<Value *> transValueWithoutDecoration(SPIRVValue *, Function *f, BasicBlock *,
+                                                   bool createPlaceHolder = true);
   Value *transAtomicRMW(SPIRVValue *, const AtomicRMWInst::BinOp);
   Constant *transInitializer(SPIRVValue *, Type *);
   template <spv::Op> Value *transValueWithOpcode(SPIRVValue *);
@@ -105,8 +108,7 @@ public:
   Value *indexDescPtr(Type *elementTy, Value *base, Value *index);
   Value *transGroupArithOp(lgc::Builder::GroupArithOp, SPIRVValue *);
 
-  bool transDecoration(SPIRVValue *, Value *);
-  bool transShaderDecoration(SPIRVValue *, Value *);
+  bool transDecoration(SPIRVValue *, ArrayRef<Value *>);
   bool checkContains64BitType(SPIRVType *bt);
   Constant *buildShaderInOutMetadata(SPIRVType *bt, ShaderInOutDecorate &inOutDec, Type *&metaTy, bool vs64bitsAttrib);
   Constant *buildShaderBlockMetadata(SPIRVType *bt, ShaderBlockDecorate &blockDec, Type *&mdTy,
@@ -199,6 +201,7 @@ public:
 
   // Post-process translated LLVM module to undo row major matrices.
   bool postProcessRowMajorMatrix();
+  SmallVector<Value *> getTranslatedValues(SPIRVValue *bv);
   Value *getTranslatedValue(SPIRVValue *bv);
 
   // Create !lgc.xfb.state metadata
@@ -225,7 +228,7 @@ private:
 
   typedef DenseMap<SPIRVTypeContext::TupleType, Type *> SPIRVToLLVMFullTypeMap;
   typedef DenseMap<SPIRVType *, Type *> SPIRVToLLVMTypeMap;
-  typedef DenseMap<SPIRVValue *, Value *> SPIRVToLLVMValueMap;
+  typedef compilerutils::LoweringPointerTupleMap<SPIRVValue *, Value *, true> SPIRVToLLVMValueMap;
   typedef DenseMap<SPIRVValue *, Value *> SPIRVBlockToLLVMStructMap;
   typedef DenseMap<SPIRVFunction *, Function *> SPIRVToLLVMFunctionMap;
   typedef DenseMap<GlobalVariable *, SPIRVBuiltinVariableKind> BuiltinVarMap;
@@ -359,7 +362,8 @@ private:
   // If a value is mapped twice, the existing mapped value is a placeholder,
   // which must be a load instruction of a global variable whose name starts
   // with kPlaceholderPrefix.
-  Value *mapValue(SPIRVValue *bv, Value *v);
+  SmallVector<Value *> mapValue(SPIRVValue *bv, ArrayRef<Value *> values);
+  SmallVector<Value *> mapValue(SPIRVValue *bv, Value *values);
   // Keep track of the spirvEntry
   Value *mapEntry(const SPIRVEntry *be, Value *v);
 
@@ -400,7 +404,7 @@ private:
   llvm::Value *transShiftLogicalBitwiseInst(SPIRVValue *bv, BasicBlock *bb, Function *f);
   llvm::Value *transCmpInst(SPIRVValue *bv, BasicBlock *bb, Function *f);
 
-  void setName(llvm::Value *v, SPIRVValue *bv);
+  void setName(ArrayRef<Value *> values, SPIRVValue *bv);
   void setLLVMLoopMetadata(SPIRVLoopMerge *lm, BranchInst *bi);
   template <class Source, class Func> bool foreachFuncCtlMask(Source, Func);
   llvm::GlobalValue::LinkageTypes transLinkageType(const SPIRVValue *v);

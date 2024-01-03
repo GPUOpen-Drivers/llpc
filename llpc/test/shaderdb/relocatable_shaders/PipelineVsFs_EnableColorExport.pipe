@@ -92,11 +92,10 @@ attribute[0].offset = 0
 ; SHADERTEST-NEXT:    [[DOTI01:%.*]] = sitofp i32 [[DOTI0]] to float
 ; SHADERTEST-NEXT:    [[DOTI12:%.*]] = sitofp i32 [[DOTI1]] to float
 ; SHADERTEST-NEXT:    [[TMP23:%.*]] = call reassoc nnan nsz arcp contract afn <4 x float> @llvm.amdgcn.image.sample.2d.v4f32.f32(i32 15, float [[DOTI01]], float [[DOTI12]], <8 x i32> [[TMP20]], <4 x i32> [[TMP21]], i1 false, i32 0, i32 0)
-; SHADERTEST-NEXT:    [[TMP24:%.*]] = insertvalue { <4 x float> } poison, <4 x float> [[TMP23]], 0
 ; SHADERTEST-NEXT:    [[TMP25:%.*]] = zext i32 [[COLOREXPADDR:%.*]] to i64
 ; SHADERTEST-NEXT:    [[TMP26:%.*]] = or {{(disjoint )?}}i64 [[TMP12]], [[TMP25]]
 ; SHADERTEST-NEXT:    [[TMP27:%.*]] = inttoptr i64 [[TMP26]] to ptr addrspace(4)
-; SHADERTEST-NEXT:    call amdgpu_gfx addrspace(4) void [[TMP27]]({ <4 x float> } [[TMP24]])
+; SHADERTEST-NEXT:    call amdgpu_gfx addrspace(4) void [[TMP27]](<4 x float> [[TMP23]], i32 inreg 0) #[[ATTR1:[0-9]+]]
 ; SHADERTEST-NEXT:    unreachable
 ;
 ;
@@ -130,6 +129,7 @@ attribute[0].offset = 0
 ; SHADERTEST-NEXT:    v_cvt_f32_i32_e32 v1, v2
 ; SHADERTEST-NEXT:    s_waitcnt lgkmcnt(0)
 ; SHADERTEST-NEXT:    image_sample v[0:3], v[0:1], s[4:11], s[12:15] dmask:0xf dim:SQ_RSRC_IMG_2D
+; SHADERTEST-NEXT:    s_mov_b32 s4, 0
 ; SHADERTEST-NEXT:    s_swappc_b64 s[30:31], s[2:3]
 ;
 ;

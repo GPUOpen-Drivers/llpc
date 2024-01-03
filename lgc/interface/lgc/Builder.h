@@ -110,11 +110,6 @@ public:
     m_data.bits.component = component;
   }
 
-  bool isDualSourceBlendDynamic() const { return m_data.bits.dualSourceBlendDynamic; }
-  void setDualSourceBlendDynamic(bool dualSourceBlendDynamic = true) {
-    m_data.bits.dualSourceBlendDynamic = dualSourceBlendDynamic;
-  }
-
 private:
   union {
     struct {
@@ -130,7 +125,6 @@ private:
                                  //    whole array or of an element with a variable index.
       unsigned perPrimitive : 1; // Mesh shader output: whether it is a per-primitive output
       unsigned component : 2;    // Component offset, specifying which components within a location is consumed
-      unsigned dualSourceBlendDynamic : 1; // Fs output: whether it's dynamic dual source blend output
     } bits;
     unsigned u32All;
   } m_data;
@@ -1581,6 +1575,15 @@ public:
   llvm::Value *CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, llvm::Value *const value,
                                                 llvm::Value *const clusterSize, const llvm::Twine &instName = "");
 
+  // Create a subgroup clustered multi exclusive scan.
+  //
+  // @param groupArithOp : The group arithmetic operation to perform
+  // @param value : The value to perform on
+  // @param mask : The mask of cluster. Must be <4 x i32> type.
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateSubgroupClusteredMultiExclusive(GroupArithOp groupArithOp, llvm::Value *const value,
+                                                     llvm::Value *const mask, const llvm::Twine &instName = "");
+
   // Create a quad broadcast.
   //
   // @param value : The value to broadcast
@@ -1638,6 +1641,12 @@ public:
   // @param mask : The mask to mbcnt with.
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateSubgroupMbcnt(llvm::Value *const mask, const llvm::Twine &instName = "");
+
+  // Create a subgroup partition.
+  //
+  // @param value : The value to contribute
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateSubgroupPartition(llvm::Value *const value, const llvm::Twine &instName = "");
 
 private:
   Builder() = delete;

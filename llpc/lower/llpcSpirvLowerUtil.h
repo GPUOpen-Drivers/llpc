@@ -37,6 +37,7 @@ namespace llvm {
 class Function;
 class Module;
 class BasicBlock;
+template <typename T> class SmallVectorImpl;
 class StringRef;
 
 } // namespace llvm
@@ -52,14 +53,24 @@ const static char OutputProxyPrefix[] = "__llpc_output_proxy_";
 
 } // namespace LlpcName
 
+// Gets the shader stage from the specified LLVM function.
+ShaderStage getShaderStageFromFunction(llvm::Function *function);
+
 // Gets the shader stage from the specified LLVM module.
 ShaderStage getShaderStageFromModule(llvm::Module *module);
 
 // Set the shader stage to the specified LLVM module.
 void setShaderStageToModule(llvm::Module *module, ShaderStage shaderStage);
 
-// Gets the entry point (valid for AMD GPU) of a LLVM module.
+// Gets the unique entry point (valid for AMD GPU) of a LLVM module.
+// Asserts that there is only one.
+// Entry points are determined as functions with external linkage.
 llvm::Function *getEntryPoint(llvm::Module *module);
+
+// Gets all entry points in a module. Usually in LLPC we have only a single
+// entry per module, but there are cases (e.g. after having imported the gpurt module)
+// where this is not guaranteed.
+void getEntryPoints(llvm::Module *module, llvm::SmallVectorImpl<llvm::Function *> &result);
 
 // Clears the empty block
 llvm::BasicBlock *clearBlock(llvm::Function *func);

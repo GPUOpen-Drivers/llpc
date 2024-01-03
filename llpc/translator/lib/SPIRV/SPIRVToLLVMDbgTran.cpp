@@ -111,17 +111,19 @@ unsigned SPIRVToLLVMDbgTran::getConstant(const SPIRVId id) {
 
 // =====================================================================================================================
 // Record spirv/llvm variables for later debug info processing
-void SPIRVToLLVMDbgTran::recordsValue(SPIRVValue *SV, Value *V) {
-  if (!Enable || !SV->hasLine())
+void SPIRVToLLVMDbgTran::recordsValue(SPIRVValue *sv, ArrayRef<Value *> values) {
+  if (!Enable || !sv->hasLine())
     return;
   // A constant sampler does not have a corresponding SPIRVInstruction.
-  if (SV->getOpCode() == OpConstantSampler)
+  if (sv->getOpCode() == OpConstantSampler)
     return;
 
-  if (Instruction *I = dyn_cast<Instruction>(V)) {
-    SPIRVInstruction *SI = static_cast<SPIRVInstruction *>(SV);
-    if (RecordedInstructions.find(I) == RecordedInstructions.end()) {
-      RecordedInstructions[I] = SI;
+  for (Value *value : values) {
+    if (Instruction *inst = dyn_cast<Instruction>(value)) {
+      SPIRVInstruction *si = static_cast<SPIRVInstruction *>(sv);
+      if (RecordedInstructions.find(inst) == RecordedInstructions.end()) {
+        RecordedInstructions[inst] = si;
+      }
     }
   }
 }

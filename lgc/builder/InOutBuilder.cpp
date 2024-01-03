@@ -484,10 +484,6 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
     // Mark usage for interpolation info.
     markInterpolationInfo(inOutInfo);
   }
-
-  if (isOutput && m_shaderStage == ShaderStageFragment && inOutInfo.isDualSourceBlendDynamic()) {
-    m_pipelineState->getColorExportState().dynamicDualSourceBlendEnable = true;
-  }
 }
 
 // =====================================================================================================================
@@ -1000,6 +996,7 @@ void BuilderImpl::getProvokingVertexInfo(llvm::Value **isOne, llvm::Value **isTw
   auto provokingVtxInfo =
       ShaderInputs::getInput(ShaderInput::ProvokingVtxInfo, BuilderBase::get(*this), *getLgcContext());
 
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 479645
   auto laneID = CreateGetLaneNumber();
   auto quadId = CreateSDiv(laneID, getInt32(4));
   auto provokingVertex = CreateIntrinsic(Intrinsic::amdgcn_ubfe, getInt32Ty(),
@@ -1008,16 +1005,18 @@ void BuilderImpl::getProvokingVertexInfo(llvm::Value **isOne, llvm::Value **isTw
   *isOne = CreateICmpEQ(provokingVertex, getInt32(1));
   *isTwo = CreateICmpEQ(provokingVertex, getInt32(2));
 
-  // TODO: Here should have a better implementation by staying in "lane mask space" and using the fact that the
-  // provoking vertex info is always either 0, 1, or 2. Unfortunately, S_BITREPLICATE was not exposed.
-  //
-  //  isTwoMask = provoking_vtx_info & 0xaaaaaaaa
-  //  isOneMask = (provoking_vtx_info & 0x55555555) & ~(isTwoMask >> 1)
-  //  isTwoMask = llvm.amdgcn.wqm.vote(S_BITREPLICATE_B64_B32(isTwoMask))
-  //  isOneMask = llvm.amdgcn.wqm.vote(S_BITREPLICATE_B64_B32(isOneMask))
-  //  isTwo = llvm.amdgcn.inverse.ballot(isTwoMask)
-  //  isOne = llvm.amdgcn.inverse.ballot(isOneMask)
-  //
+#else
+  // Extract 2-bit vertex index from provokingVtxInfo
+  auto isTwoMask = CreateAnd(provokingVtxInfo, getInt32(0xAAAAAAAA));
+  auto isOneMask =
+      CreateAnd(CreateAnd(provokingVtxInfo, getInt32(0x55555555)), CreateLShr(CreateNot(isTwoMask), getInt32(1)));
+  isTwoMask = CreateIntrinsic(Intrinsic::amdgcn_s_bitreplicate, {}, isTwoMask);
+  isOneMask = CreateIntrinsic(Intrinsic::amdgcn_s_bitreplicate, {}, isOneMask);
+  isTwoMask = CreateIntrinsic(getInt64Ty(), Intrinsic::amdgcn_s_wqm, isTwoMask);
+  isOneMask = CreateIntrinsic(getInt64Ty(), Intrinsic::amdgcn_s_wqm, isOneMask);
+  *isTwo = CreateIntrinsic(getInt1Ty(), Intrinsic::amdgcn_inverse_ballot, isTwoMask);
+  *isOne = CreateIntrinsic(getInt1Ty(), Intrinsic::amdgcn_inverse_ballot, isOneMask);
+#endif
 }
 
 // =====================================================================================================================

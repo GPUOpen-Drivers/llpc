@@ -1852,8 +1852,9 @@ PAQCallShaderSerializationInfo::create(Module &M,
 }
 
 PAQSerializationInfoManager::PAQSerializationInfoManager(
-    Module *M, uint32_t MaxPayloadRegCount)
-    : Mod{M}, MaxPayloadRegisterCount(MaxPayloadRegCount) {
+    Module *M, Module *GpurtLibrary, uint32_t MaxPayloadRegCount)
+    : Mod{M}, GpurtLibrary{GpurtLibrary},
+      MaxPayloadRegisterCount(MaxPayloadRegCount) {
   TraceRayCache.PAQRootNodes = importModulePayloadPAQNodes(*M);
 }
 
@@ -1879,7 +1880,7 @@ PAQTraceRaySerializationInfo &
 PAQSerializationInfoManager::getOrCreateTraceRaySerializationInfo(
     const PAQPayloadConfig &PAQConfig) {
   return TraceRayCache.getOrCreateSerializationInfo(
-      *Mod, MaxPayloadRegisterCount, PAQConfig);
+      *GpurtLibrary, MaxPayloadRegisterCount, PAQConfig);
 }
 
 PAQCallShaderSerializationInfo &
@@ -1889,7 +1890,7 @@ PAQSerializationInfoManager::getOrCreateCallShaderSerializationInfo(
   PAQPayloadConfig PAQConfigWithRelevantData = PAQConfig;
   PAQConfigWithRelevantData.MaxHitAttributeByteCount = 0;
   return CallShaderCache.getOrCreateSerializationInfo(
-      *Mod, MaxPayloadRegisterCount, PAQConfigWithRelevantData);
+      *GpurtLibrary, MaxPayloadRegisterCount, PAQConfigWithRelevantData);
 }
 
 template <typename SerializationInfoT>
@@ -1965,7 +1966,7 @@ PAQSerializationInfoManager::getOrCreateTraceRayLayout(
       Mod->getDataLayout().getTypeStoreSize(HitAttributesTy).getFixedValue();
   if (AttrsBytes > TraceRayInfo.PAQConfig.MaxHitAttributeByteCount)
     report_fatal_error("Hit attributes are too large!");
-  uint64_t InlineHitAttrsBytes = getInlineHitAttrsBytes(*Mod);
+  uint64_t InlineHitAttrsBytes = getInlineHitAttrsBytes(*GpurtLibrary);
   uint64_t AttrsInPayloadBytes =
       AttrsBytes > InlineHitAttrsBytes ? AttrsBytes - InlineHitAttrsBytes : 0;
 

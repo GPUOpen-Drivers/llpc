@@ -288,7 +288,7 @@ std::optional<std::vector<PassBuilder::PipelineElement>> MbPassBuilder::parsePip
   }
 
   if (PipelineStack.size() > 1)
-    // Unbalanced paretheses.
+    // Unbalanced parentheses.
     return std::nullopt;
 
   assert(PipelineStack.back() == &ResultPipeline && "Wrong pipeline at the bottom of the stack!");

@@ -56,6 +56,7 @@
 // 4. Allocating/freeing cps stack space as needed.
 //===----------------------------------------------------------------------===//
 
+#include "compilerutils/CompilerUtils.h"
 #include "continuations/Continuations.h"
 #include "continuations/ContinuationsDialect.h"
 #include "lgc/LgcCpsDialect.h"
@@ -200,70 +201,9 @@ void CleanupContinuationsPass::updateCpsStack(Function *F, Function *NewFunc,
 
   SmallVector<Instruction *> ToBeRemoved;
   Value *OldBase = getContinuationFramePtr(F, IsStart, CpsInfo, ToBeRemoved);
-  OldBase->mutateType(Builder->getPtrTy(cps::stackAddrSpace));
 
-  // Traversal through the users and setup the addrspace for the cps stack
-  // pointers.
-  SmallVector<Value *> Worklist(OldBase->users());
-  OldBase->replaceAllUsesWith(CpsStack);
+  replaceAllPointerUses(Builder, OldBase, CpsStack, ToBeRemoved);
 
-  while (!Worklist.empty()) {
-    Value *Ptr = Worklist.pop_back_val();
-    Instruction *Inst = cast<Instruction>(Ptr);
-    LLVM_DEBUG(dbgs() << "Visiting " << *Inst << '\n');
-    switch (Inst->getOpcode()) {
-    default:
-      LLVM_DEBUG(Inst->dump());
-      llvm_unreachable("Unhandled instruction\n");
-      break;
-    case Instruction::Call: {
-      if (Inst->isLifetimeStartOrEnd()) {
-        // The lifetime marker is not useful anymore.
-        Inst->eraseFromParent();
-      } else {
-        LLVM_DEBUG(Inst->dump());
-        llvm_unreachable("Unhandled call instruction\n");
-      }
-      // No further processing needed for the users.
-      continue;
-    }
-    case Instruction::Load:
-    case Instruction::Store:
-      // No further processing needed for the users.
-      continue;
-    case Instruction::And:
-    case Instruction::Add:
-    case Instruction::PtrToInt:
-      break;
-    case Instruction::AddrSpaceCast:
-      assert(Inst->getOperand(0)->getType()->getPointerAddressSpace() ==
-             cps::stackAddrSpace);
-      // Push the correct users before RAUW.
-      Worklist.append(Ptr->users().begin(), Ptr->users().end());
-      Inst->mutateType(Builder->getPtrTy(cps::stackAddrSpace));
-      Inst->replaceAllUsesWith(Inst->getOperand(0));
-      ToBeRemoved.push_back(Inst);
-      continue;
-    case Instruction::IntToPtr:
-    case Instruction::GetElementPtr: {
-      Inst->mutateType(Builder->getPtrTy(cps::stackAddrSpace));
-      break;
-    }
-    case Instruction::Select: {
-      // check whether the result type is already what we want
-      auto *OldType = Inst->getType();
-      auto *NewType = Builder->getPtrTy(cps::stackAddrSpace);
-      if (OldType != NewType) {
-        Inst->mutateType(NewType);
-        break;
-      }
-      // No further processing if the type is not changed.
-      continue;
-    }
-    }
-
-    Worklist.append(Ptr->users().begin(), Ptr->users().end());
-  }
   for (auto *I : reverse(ToBeRemoved))
     I->eraseFromParent();
 }
@@ -432,7 +372,8 @@ void CleanupContinuationsPass::processContinuations() {
       auto &Context = F->getContext();
       auto *NewFuncTy =
           FunctionType::get(Type::getVoidTy(Context), AllArgTypes, false);
-      Function *NewFunc = cloneFunctionHeader(*F, NewFuncTy, ParamAttrs);
+      Function *NewFunc =
+          CompilerUtils::cloneFunctionHeader(*F, NewFuncTy, ParamAttrs);
       NewFunc->takeName(F);
       FuncData.second.NewFunctions.push_back(NewFunc);
 
