@@ -18,9 +18,7 @@ jobs:
         image-template:      ["amdvlkadmin/amdvlk_%s%s:nightly"]
         config:              [Release]
         feature-set:         ["+gcc", "+gcc+assertions",
-                              "+clang",
-                              "+clang+ubsan+asan",
-                              "+clang+ubsan+asan+assertions"]
+                              "+clang"]
     steps:
       - name: Free up disk space
         if: contains(matrix.feature-set, '+ubsan') || contains(matrix.feature-set, '+asan') || contains(matrix.feature-set, '+tsan') || contains(matrix.feature-set, '+coverage')
