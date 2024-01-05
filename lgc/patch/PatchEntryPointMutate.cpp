@@ -676,7 +676,8 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
 #endif
   builder.CreateUnreachable();
 
-  auto funcName = func->getName();
+  auto *doc = m_pipelineState->getPalMetadata()->getDocument();
+  auto funcName = doc->getNode(func->getName(), /*copy=*/true);
   // Lower cps stack operations
   stackLowering->lowerCpsStackOps(*func, m_funcCpsStackMap[func]);
 
