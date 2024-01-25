@@ -33,7 +33,7 @@ void main() {
 // CHECK-LABEL:  @lgc.shader.CS.main(
 // CHECK-LABEL:  .entry:
 // CHECK-NEXT:    [[TMP0:%.*]] = call ptr addrspace(4) (...) @lgc.create.load.push.constants.ptr.p4()
-// CHECK-NEXT:    [[TMP1:%.*]] = call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i64 0, i32 0, i32 0, i32 2)
+// CHECK-NEXT:    [[TMP1:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 2)
 // CHECK-NEXT:    [[TMP2:%.*]] = call <8 x float> @lgc.cooperative.matrix.load.v8f32.p7.i32.i1.i32.i32.i32(ptr addrspace(7) [[TMP1]], i32 32, i1 true, i32 1, i32 0, i32 0) #[[ATTR1:[0-9]+]]
 // CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds <{ [4294967295 x [4 x i32]] }>, ptr addrspace(7) [[TMP1]], i32 0, i32 0, i32 32
 // CHECK-NEXT:    [[TMP4:%.*]] = call <8 x float> @lgc.cooperative.matrix.load.v8f32.p7.i32.i1.i32.i32.i32(ptr addrspace(7) [[TMP3]], i32 32, i1 true, i32 1, i32 0, i32 0) #[[ATTR1]]

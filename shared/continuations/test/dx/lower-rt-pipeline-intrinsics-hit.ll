@@ -181,23 +181,18 @@ declare !types !46 [4 x <3 x float>] @_cont_WorldToObject4x3(%struct.DispatchSys
 ; Function Attrs: nounwind
 define void @RayGen() #3 {
 ; LOWERRAYTRACINGPIPELINE-LABEL: define void @RayGen(
-; LOWERRAYTRACINGPIPELINE-SAME: ) #[[ATTR5:[0-9]+]] !lgc.rt.shaderstage [[META19:![0-9]+]] !continuation [[META29:![0-9]+]] !continuation.entry [[META14:![0-9]+]] !continuation.registercount [[META19]] {
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA:%.*]], align 8
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP1:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @continuations.getSystemData.s_struct.DispatchSystemDatas()
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
+; LOWERRAYTRACINGPIPELINE-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR5:[0-9]+]] !lgc.rt.shaderstage [[META19:![0-9]+]] !continuation [[META29:![0-9]+]] !continuation.entry [[META14:![0-9]+]] !continuation.registercount [[META19]] {
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    ret void, !continuation.registercount [[META26:![0-9]+]]
 ;
 ; DXILCONTPOSTPROCESS-LABEL: define void @RayGen(
 ; DXILCONTPOSTPROCESS-SAME: ) #[[ATTR5:[0-9]+]] !lgc.rt.shaderstage [[META18:![0-9]+]] !continuation [[META27:![0-9]+]] !continuation.entry [[META13:![0-9]+]] !continuation.registercount [[META18]] !continuation.state [[META18]] {
 ; DXILCONTPOSTPROCESS-NEXT:  AllocaSpillBB:
-; DXILCONTPOSTPROCESS-NEXT:    [[SYSTEM_DATA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA:%.*]], align 8
-; DXILCONTPOSTPROCESS-NEXT:    [[CONT_STATE:%.*]] = alloca [0 x i32], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP0:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @_cont_SetupRayGen()
-; DXILCONTPOSTPROCESS-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP1:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], 0
-; DXILCONTPOSTPROCESS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
+; DXILCONTPOSTPROCESS-NEXT:    [[SYSTEM_DATA:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA:%.*]] @_cont_SetupRayGen()
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[SYSTEM_DATA]], 0
+; DXILCONTPOSTPROCESS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; DXILCONTPOSTPROCESS-NEXT:    call void @continuation.complete()
 ; DXILCONTPOSTPROCESS-NEXT:    unreachable
 ;
@@ -211,75 +206,75 @@ define void @Intersection() #3 {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_HITDATA:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = alloca [[STRUCT_HITDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_ANYHITTRAVERSALDATA]], align 8
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = call [[STRUCT_ANYHITTRAVERSALDATA]] @continuations.getSystemData.s_struct.AnyHitTraversalDatas()
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP4]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP6:%.*]] = call float @lgc.rt.ray.tmin()
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[RESPTR_I:%.*]] = getelementptr [[STRUCT_TRAVERSALDATA:%.*]], ptr [[TMP8]], i32 0, i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP5:%.*]] = call float @lgc.rt.ray.tmin()
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[RESPTR_I:%.*]] = getelementptr [[STRUCT_TRAVERSALDATA:%.*]], ptr [[TMP7]], i32 0, i32 1
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[RES_I:%.*]] = load [[STRUCT_HITDATA]], ptr [[RESPTR_I]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_HITDATA]] [[RES_I]], ptr [[TMP3]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[RES_I1:%.*]] = load float, ptr [[TMP3]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP9:%.*]] = call i32 @lgc.rt.instance.id()
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[RESPTR_I2:%.*]] = getelementptr [[STRUCT_TRAVERSALDATA]], ptr [[TMP11]], i32 0, i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP8:%.*]] = call i32 @lgc.rt.instance.id()
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[RESPTR_I2:%.*]] = getelementptr [[STRUCT_TRAVERSALDATA]], ptr [[TMP10]], i32 0, i32 1
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[RES_I3:%.*]] = load [[STRUCT_HITDATA]], ptr [[RESPTR_I2]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_HITDATA]] [[RES_I3]], ptr [[TMP2]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[RESPTR_I4:%.*]] = getelementptr [[STRUCT_SYSTEMDATA:%.*]], ptr [[TMP10]], i32 0, i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[RESPTR_I4:%.*]] = getelementptr [[STRUCT_SYSTEMDATA:%.*]], ptr [[TMP9]], i32 0, i32 1
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[RES_I5:%.*]] = load i32, ptr [[RESPTR_I4]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP12:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP11:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TRAV_DATA_I:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP13:%.*]] = load [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[TMP12]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = call ptr inttoptr (i64 3 to ptr)([[STRUCT_ANYHITTRAVERSALDATA]] [[TRAV_DATA_I]], float 4.000000e+00, i32 0, [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP13]]), !continuation.registercount [[META26]], !continuation.returnedRegistercount !26
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP15:%.*]] = call [[STRUCT_ANYHITTRAVERSALDATA]] @await.struct.AnyHitTraversalData(ptr [[TMP14]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP15]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP16:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP12:%.*]] = load [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[TMP11]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP13:%.*]] = call ptr inttoptr (i64 3 to ptr)([[STRUCT_ANYHITTRAVERSALDATA]] [[TRAV_DATA_I]], float 4.000000e+00, i32 0, [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP12]]), !continuation.registercount [[META26]], !continuation.returnedRegistercount !26
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = call [[STRUCT_ANYHITTRAVERSALDATA]] @await.struct.AnyHitTraversalData(ptr [[TMP13]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP14]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP15:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[ISEND_I:%.*]] = call i1 @opaqueIsEnd()
-; LOWERRAYTRACINGPIPELINE-NEXT:    br i1 [[ISEND_I]], label [[TMP17:%.*]], label [[TMP19:%.*]]
-; LOWERRAYTRACINGPIPELINE:       17:
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP18:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    ret [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP18]], !continuation.registercount [[META26]]
-; LOWERRAYTRACINGPIPELINE:       19:
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP20:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    ret [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP20]], !continuation.registercount [[META26]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    br i1 [[ISEND_I]], label [[TMP16:%.*]], label [[TMP18:%.*]]
+; LOWERRAYTRACINGPIPELINE:       16:
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP17:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    ret [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP17]], !continuation.registercount [[META26]]
+; LOWERRAYTRACINGPIPELINE:       18:
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP19:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    ret [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP19]], !continuation.registercount [[META26]]
 ;
 ; DXILCONTPOSTPROCESS-LABEL: define void @Intersection(
 ; DXILCONTPOSTPROCESS-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], [[STRUCT_ANYHITTRAVERSALDATA:%.*]] [[TMP0:%.*]]) #[[ATTR5]] !lgc.rt.shaderstage [[META28:![0-9]+]] !continuation [[META29:![0-9]+]] !continuation.registercount [[META25:![0-9]+]] !continuation.state [[META30:![0-9]+]] !continuation.stacksize [[META30]] {
 ; DXILCONTPOSTPROCESS-NEXT:  AllocaSpillBB:
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP1:%.*]] = alloca [[STRUCT_HITDATA:%.*]], align 8
-; DXILCONTPOSTPROCESS-NEXT:    [[SYSTEM_DATA:%.*]] = alloca [[STRUCT_ANYHITTRAVERSALDATA]], align 8
-; DXILCONTPOSTPROCESS-NEXT:    [[CONT_STATE:%.*]] = alloca [2 x i32], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[CSP:%.*]] = alloca i32, align 4
-; DXILCONTPOSTPROCESS-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], ptr [[SYSTEM_DATA]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_ANYHITTRAVERSALDATA]], align 8
+; DXILCONTPOSTPROCESS-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[INTERSECTION_FRAME:%.*]], ptr [[CONT_STATE]], i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    store i64 [[RETURNADDR]], ptr [[RETURNADDR_SPILL_ADDR]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP2:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_0_0_0_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP2]], 0, 0, 0, 0
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_0_1_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP2]], 0, 0, 1
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_1_0_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP2]], 0, 1, 0
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_1_1_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP2]], 0, 1, 1
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_2_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP2]], 0, 2
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_3_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP2]], 0, 3
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_4_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP2]], 0, 4
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_0_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP2]], 1, 0
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_1_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP2]], 1, 1
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP2:%.*]] = load i32, ptr [[CSP]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP3:%.*]] = inttoptr i32 [[TMP2]] to ptr addrspace(21)
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP3]], i64 0
+; DXILCONTPOSTPROCESS-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[INTERSECTION_FRAME:%.*]], ptr addrspace(21) [[TMP4]], i32 0, i32 0
+; DXILCONTPOSTPROCESS-NEXT:    store i64 [[RETURNADDR]], ptr addrspace(21) [[RETURNADDR_SPILL_ADDR]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_0_0_0_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], 0, 0, 0, 0
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_0_1_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], 0, 0, 1
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_1_0_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], 0, 1, 0
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_1_1_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], 0, 1, 1
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_2_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], 0, 2
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_3_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], 0, 3
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_4_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], 0, 4
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_0_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], 1, 0
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_1_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], 1, 1
 ; DXILCONTPOSTPROCESS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA]], i32 0, i32 0, i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP4:%.*]] = call float @_cont_RayTMin(ptr [[TMP3]])
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP6:%.*]] = call float @_cont_RayTMin(ptr [[TMP5]])
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_HITDATA]] poison, float [[DOTFCA_0_1_0_EXTRACT]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I_FCA_1_INSERT:%.*]] = insertvalue [[STRUCT_HITDATA]] [[RES_I_FCA_0_INSERT]], i32 [[DOTFCA_0_1_1_EXTRACT]], 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I_FCA_1_INSERT_FCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_HITDATA]] [[RES_I_FCA_1_INSERT]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I_FCA_1_INSERT_FCA_1_EXTRACT:%.*]] = extractvalue [[STRUCT_HITDATA]] [[RES_I_FCA_1_INSERT]], 1
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA]], i32 0, i32 0, i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA]], i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[RESPTR_I:%.*]] = getelementptr [[STRUCT_TRAVERSALDATA:%.*]], ptr [[TMP6]], i32 0, i32 1
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[RESPTR_I:%.*]] = getelementptr [[STRUCT_TRAVERSALDATA:%.*]], ptr [[TMP8]], i32 0, i32 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I:%.*]] = load [[STRUCT_HITDATA]], ptr [[RESPTR_I]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    store [[STRUCT_HITDATA]] [[RES_I]], ptr [[TMP1]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP7:%.*]] = call i32 @_cont_InstanceID(ptr [[TMP5]], ptr [[TMP1]])
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP9:%.*]] = call i32 @_cont_InstanceID(ptr [[TMP7]], ptr [[TMP1]])
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I3_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_HITDATA]] poison, float [[DOTFCA_0_1_0_EXTRACT]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I3_FCA_1_INSERT:%.*]] = insertvalue [[STRUCT_HITDATA]] [[RES_I3_FCA_0_INSERT]], i32 [[DOTFCA_0_1_1_EXTRACT]], 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I3_FCA_1_INSERT_FCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_HITDATA]] [[RES_I3_FCA_1_INSERT]], 0
@@ -294,21 +289,12 @@ define void @Intersection() #3 {
 ; DXILCONTPOSTPROCESS-NEXT:    [[TRAV_DATA_I_FCA_1_0_INSERT:%.*]] = insertvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TRAV_DATA_I_FCA_0_4_INSERT]], float [[DOTFCA_1_0_EXTRACT]], 1, 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[TRAV_DATA_I_FCA_1_1_INSERT:%.*]] = insertvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TRAV_DATA_I_FCA_1_0_INSERT]], i32 [[DOTFCA_1_1_EXTRACT]], 1, 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] poison, <2 x float> undef, 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP8:%.*]] = load i32, ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP9:%.*]] = add i32 [[TMP8]], 8
-; DXILCONTPOSTPROCESS-NEXT:    store i32 [[TMP9]], ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP10:%.*]] = inttoptr i32 [[TMP8]] to ptr addrspace(21)
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [2 x i32], ptr [[CONT_STATE]], i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [2 x i32], ptr addrspace(21) [[TMP10]], i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP13:%.*]] = load i32, ptr [[TMP11]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    store i32 [[TMP13]], ptr addrspace(21) [[TMP12]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [2 x i32], ptr [[CONT_STATE]], i32 0, i32 1
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP15:%.*]] = getelementptr inbounds [2 x i32], ptr addrspace(21) [[TMP10]], i32 0, i32 1
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP16:%.*]] = load i32, ptr [[TMP14]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    store i32 [[TMP16]], ptr addrspace(21) [[TMP15]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP17:%.*]] = load i32, ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP18:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @Intersection.resume.0 to i64))
-; DXILCONTPOSTPROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 3, i32 [[TMP17]], i64 [[TMP18]], [[STRUCT_ANYHITTRAVERSALDATA]] [[TRAV_DATA_I_FCA_1_1_INSERT]], float 4.000000e+00, i32 0, [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META25]], !continuation.returnedRegistercount !25
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP10:%.*]] = load i32, ptr [[CSP]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP11:%.*]] = add i32 [[TMP10]], 8
+; DXILCONTPOSTPROCESS-NEXT:    store i32 [[TMP11]], ptr [[CSP]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP12:%.*]] = load i32, ptr [[CSP]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP13:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @Intersection.resume.0 to i64))
+; DXILCONTPOSTPROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 3, i32 [[TMP12]], i64 [[TMP13]], [[STRUCT_ANYHITTRAVERSALDATA]] [[TRAV_DATA_I_FCA_1_1_INSERT]], float 4.000000e+00, i32 0, [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META25]], !continuation.returnedRegistercount !25
 ; DXILCONTPOSTPROCESS-NEXT:    unreachable
 ;
   %1 = call float @dx.op.rayTMin.f32(i32 153)
@@ -333,146 +319,141 @@ define void @AnyHit(%struct.RayPayload* noalias nocapture %payload, %struct.Buil
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP8:%.*]] = alloca [[STRUCT_RAYPAYLOAD:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[ORIGHITATTRS:%.*]] = alloca [8 x i32], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[HITATTRSALLOCA:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], align 8
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP9:%.*]] = call [[STRUCT_ANYHITTRAVERSALDATA]] @continuations.getSystemData.s_struct.AnyHitTraversalDatas()
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP9]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP8]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP12:%.*]] = load float, ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP12]], ptr [[TMP11]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP8]], i32 0, i32 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = load float, ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP14]], ptr [[TMP13]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP15:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP8]], i32 0, i32 2
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP16:%.*]] = load i32, ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i32 8), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP16]], ptr [[TMP15]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP17:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP8]], i32 0, i32 3
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP18:%.*]] = load i32, ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i32 9), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP18]], ptr [[TMP17]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP8]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP11:%.*]] = load float, ptr @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP11]], ptr [[TMP10]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP8]], i32 0, i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP13:%.*]] = load float, ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP13]], ptr [[TMP12]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP8]], i32 0, i32 2
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP15:%.*]] = load i32, ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i32 8), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP15]], ptr [[TMP14]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP16:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP8]], i32 0, i32 3
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP17:%.*]] = load i32, ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i32 9), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP17]], ptr [[TMP16]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP19:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP20:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @_cont_GetTriangleHitAttributes(ptr [[TMP19]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP20]], ptr [[TMP7]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP21:%.*]] = getelementptr inbounds i32, ptr [[ORIGHITATTRS]], i64 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP22:%.*]] = getelementptr inbounds i32, ptr [[TMP7]], i64 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP23:%.*]] = load i32, ptr [[TMP22]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP23]], ptr [[TMP21]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP24:%.*]] = getelementptr inbounds i32, ptr [[ORIGHITATTRS]], i64 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP25:%.*]] = getelementptr inbounds i32, ptr [[TMP7]], i64 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP26:%.*]] = load i32, ptr [[TMP25]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP26]], ptr [[TMP24]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP18:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP19:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @_cont_GetTriangleHitAttributes(ptr [[TMP18]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP19]], ptr [[TMP7]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP20:%.*]] = getelementptr inbounds i32, ptr [[ORIGHITATTRS]], i64 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP21:%.*]] = getelementptr inbounds i32, ptr [[TMP7]], i64 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP22:%.*]] = load i32, ptr [[TMP21]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP22]], ptr [[TMP20]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP23:%.*]] = getelementptr inbounds i32, ptr [[ORIGHITATTRS]], i64 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP24:%.*]] = getelementptr inbounds i32, ptr [[TMP7]], i64 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP25:%.*]] = load i32, ptr [[TMP24]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP25]], ptr [[TMP23]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP1]], ptr [[HITATTRSALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP27:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP28:%.*]] = call float @_cont_RayTMin(ptr [[TMP27]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP29:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP30:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[RESPTR_I:%.*]] = getelementptr [[STRUCT_TRAVERSALDATA:%.*]], ptr [[TMP30]], i32 0, i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP26:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP27:%.*]] = call float @_cont_RayTMin(ptr [[TMP26]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP28:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP29:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[RESPTR_I:%.*]] = getelementptr [[STRUCT_TRAVERSALDATA:%.*]], ptr [[TMP29]], i32 0, i32 1
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[RES_I:%.*]] = load [[STRUCT_HITDATA]], ptr [[RESPTR_I]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_HITDATA]] [[RES_I]], ptr [[TMP5]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[RES_I1:%.*]] = load float, ptr [[TMP5]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP31:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP32:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[RESPTR_I6:%.*]] = getelementptr [[STRUCT_TRAVERSALDATA]], ptr [[TMP32]], i32 0, i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP30:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP31:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[RESPTR_I6:%.*]] = getelementptr [[STRUCT_TRAVERSALDATA]], ptr [[TMP31]], i32 0, i32 1
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[RES_I7:%.*]] = load [[STRUCT_HITDATA]], ptr [[RESPTR_I6]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_HITDATA]] [[RES_I7]], ptr [[TMP3]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP33:%.*]] = call i32 @_cont_InstanceID(ptr [[TMP31]], ptr [[TMP3]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP34:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP35:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[RESPTR_I2:%.*]] = getelementptr [[STRUCT_TRAVERSALDATA]], ptr [[TMP35]], i32 0, i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP32:%.*]] = call i32 @_cont_InstanceID(ptr [[TMP30]], ptr [[TMP3]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP33:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP34:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[RESPTR_I2:%.*]] = getelementptr [[STRUCT_TRAVERSALDATA]], ptr [[TMP34]], i32 0, i32 1
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[RES_I3:%.*]] = load [[STRUCT_HITDATA]], ptr [[RESPTR_I2]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_HITDATA]] [[RES_I3]], ptr [[TMP4]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[RESPTR_I4:%.*]] = getelementptr [[STRUCT_SYSTEMDATA:%.*]], ptr [[TMP34]], i32 0, i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[RESPTR_I4:%.*]] = getelementptr [[STRUCT_SYSTEMDATA:%.*]], ptr [[TMP33]], i32 0, i32 1
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[RES_I5:%.*]] = load i32, ptr [[RESPTR_I4]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP36:%.*]] = insertvalue [[STRUCT_RAYPAYLOAD]] undef, float [[TMP28]], 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP37:%.*]] = insertvalue [[STRUCT_RAYPAYLOAD]] [[TMP36]], float [[RES_I1]], 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP38:%.*]] = insertvalue [[STRUCT_RAYPAYLOAD]] [[TMP37]], i32 [[TMP33]], 2
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP39:%.*]] = insertvalue [[STRUCT_RAYPAYLOAD]] [[TMP38]], i32 [[RES_I5]], 3
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_RAYPAYLOAD]] [[TMP39]], ptr [[TMP8]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP35:%.*]] = insertvalue [[STRUCT_RAYPAYLOAD]] undef, float [[TMP27]], 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP36:%.*]] = insertvalue [[STRUCT_RAYPAYLOAD]] [[TMP35]], float [[RES_I1]], 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP37:%.*]] = insertvalue [[STRUCT_RAYPAYLOAD]] [[TMP36]], i32 [[TMP32]], 2
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP38:%.*]] = insertvalue [[STRUCT_RAYPAYLOAD]] [[TMP37]], i32 [[RES_I5]], 3
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_RAYPAYLOAD]] [[TMP38]], ptr [[TMP8]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @_cont_AcceptHit(ptr [[SYSTEM_DATA_ALLOCA]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP40:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP8]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP41:%.*]] = load float, ptr [[TMP40]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP41]], ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP42:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP8]], i32 0, i32 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP43:%.*]] = load float, ptr [[TMP42]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP43]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP44:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP8]], i32 0, i32 2
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP45:%.*]] = load i32, ptr [[TMP44]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP45]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i32 8), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP46:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP8]], i32 0, i32 3
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP47:%.*]] = load i32, ptr [[TMP46]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP47]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i32 9), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP48:%.*]] = getelementptr inbounds i32, ptr [[HITATTRSALLOCA]], i64 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP49:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i64 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP50:%.*]] = load i32, ptr [[TMP48]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP50]], ptr [[TMP49]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP51:%.*]] = getelementptr inbounds i32, ptr [[HITATTRSALLOCA]], i64 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP52:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i64 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP53:%.*]] = load i32, ptr [[TMP51]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP53]], ptr [[TMP52]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP54:%.*]] = load [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[TMP6]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP55:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP55]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP54]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP56:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    ret [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP56]], !continuation.registercount [[META34]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP39:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP8]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP40:%.*]] = load float, ptr [[TMP39]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP40]], ptr @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP41:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP8]], i32 0, i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP42:%.*]] = load float, ptr [[TMP41]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP42]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP43:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP8]], i32 0, i32 2
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP44:%.*]] = load i32, ptr [[TMP43]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP44]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i32 8), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP45:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP8]], i32 0, i32 3
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP46:%.*]] = load i32, ptr [[TMP45]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP46]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i32 9), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP47:%.*]] = getelementptr inbounds i32, ptr [[HITATTRSALLOCA]], i64 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP48:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i64 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP49:%.*]] = load i32, ptr [[TMP47]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP49]], ptr [[TMP48]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP50:%.*]] = getelementptr inbounds i32, ptr [[HITATTRSALLOCA]], i64 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP51:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i64 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP52:%.*]] = load i32, ptr [[TMP50]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP52]], ptr [[TMP51]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP53:%.*]] = load [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[TMP6]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP54:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP54]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP53]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP55:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    ret [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP55]], !continuation.registercount [[META34]]
 ;
 ; DXILCONTPOSTPROCESS-LABEL: define void @AnyHit(
 ; DXILCONTPOSTPROCESS-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], [[STRUCT_ANYHITTRAVERSALDATA:%.*]] [[TMP0:%.*]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] [[TMP1:%.*]]) #[[ATTR5]] !lgc.rt.shaderstage [[META31:![0-9]+]] !continuation [[META32:![0-9]+]] !continuation.registercount [[META33:![0-9]+]] !continuation.state [[META18]] {
 ; DXILCONTPOSTPROCESS-NEXT:  AllocaSpillBB:
-; DXILCONTPOSTPROCESS-NEXT:    [[SYSTEM_DATA:%.*]] = alloca [[STRUCT_ANYHITTRAVERSALDATA]], align 8
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_HITDATA:%.*]], align 8
 ; DXILCONTPOSTPROCESS-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_ANYHITTRAVERSALDATA]], align 8
-; DXILCONTPOSTPROCESS-NEXT:    [[CONT_STATE:%.*]] = alloca [0 x i32], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[CSP:%.*]] = alloca i32, align 4
-; DXILCONTPOSTPROCESS-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], ptr [[SYSTEM_DATA]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP3:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_0_0_0_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP3]], 0, 0, 0, 0
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_0_0_0_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], 0, 0, 0, 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_0_0_0_GEP:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    store <3 x i32> [[DOTFCA_0_0_0_0_EXTRACT]], ptr [[DOTFCA_0_0_0_0_GEP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_0_1_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP3]], 0, 0, 1
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_0_1_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], 0, 0, 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_0_1_GEP:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 1
 ; DXILCONTPOSTPROCESS-NEXT:    store i32 [[DOTFCA_0_0_1_EXTRACT]], ptr [[DOTFCA_0_0_1_GEP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_1_0_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP3]], 0, 1, 0
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_1_0_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], 0, 1, 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_1_0_GEP:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 1, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    store float [[DOTFCA_0_1_0_EXTRACT]], ptr [[DOTFCA_0_1_0_GEP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_1_1_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP3]], 0, 1, 1
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_1_1_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], 0, 1, 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_1_1_GEP:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 1, i32 1
 ; DXILCONTPOSTPROCESS-NEXT:    store i32 [[DOTFCA_0_1_1_EXTRACT]], ptr [[DOTFCA_0_1_1_GEP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_2_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP3]], 0, 2
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_2_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], 0, 2
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_2_GEP:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 2
 ; DXILCONTPOSTPROCESS-NEXT:    store <3 x float> [[DOTFCA_0_2_EXTRACT]], ptr [[DOTFCA_0_2_GEP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_3_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP3]], 0, 3
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_3_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], 0, 3
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_3_GEP:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 3
 ; DXILCONTPOSTPROCESS-NEXT:    store <3 x float> [[DOTFCA_0_3_EXTRACT]], ptr [[DOTFCA_0_3_GEP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_4_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP3]], 0, 4
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_4_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], 0, 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_4_GEP:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 4
 ; DXILCONTPOSTPROCESS-NEXT:    store float [[DOTFCA_0_4_EXTRACT]], ptr [[DOTFCA_0_4_GEP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_0_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP3]], 1, 0
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_0_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], 1, 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_0_GEP:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 1, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    store float [[DOTFCA_1_0_EXTRACT]], ptr [[DOTFCA_1_0_GEP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_1_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP3]], 1, 1
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_1_EXTRACT:%.*]] = extractvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], 1, 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_1_GEP:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 1, i32 1
 ; DXILCONTPOSTPROCESS-NEXT:    store i32 [[DOTFCA_1_1_EXTRACT]], ptr [[DOTFCA_1_1_GEP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP5:%.*]] = load float, ptr addrspace(20) @REGISTERS, align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP6:%.*]] = load float, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 7) to ptr addrspace(20)), align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 8) to ptr addrspace(20)), align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 9) to ptr addrspace(20)), align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP10:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @_cont_GetTriangleHitAttributes(ptr [[TMP9]])
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT18:%.*]] = extractvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP10]], 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP4:%.*]] = load float, ptr addrspace(20) @REGISTERS, align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP5:%.*]] = load float, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 7) to ptr addrspace(20)), align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 8) to ptr addrspace(20)), align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 9) to ptr addrspace(20)), align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP9:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @_cont_GetTriangleHitAttributes(ptr [[TMP8]])
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT18:%.*]] = extractvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP9]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTSROA_019_0_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[DOTFCA_0_EXTRACT18]], i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP11:%.*]] = bitcast float [[DOTSROA_019_0_VEC_EXTRACT]] to i32
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP10:%.*]] = bitcast float [[DOTSROA_019_0_VEC_EXTRACT]] to i32
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTSROA_019_4_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[DOTFCA_0_EXTRACT18]], i32 1
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP12:%.*]] = bitcast float [[DOTSROA_019_4_VEC_EXTRACT]] to i32
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP11:%.*]] = bitcast float [[DOTSROA_019_4_VEC_EXTRACT]] to i32
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP1]], 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP14:%.*]] = call float @_cont_RayTMin(ptr [[TMP13]])
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP15:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP16:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[RESPTR_I:%.*]] = getelementptr [[STRUCT_TRAVERSALDATA:%.*]], ptr [[TMP16]], i32 0, i32 1
+; DXILCONTPOSTPROCESS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP13:%.*]] = call float @_cont_RayTMin(ptr [[TMP12]])
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP15:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[RESPTR_I:%.*]] = getelementptr [[STRUCT_TRAVERSALDATA:%.*]], ptr [[TMP15]], i32 0, i32 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I_FCA_0_GEP:%.*]] = getelementptr inbounds [[STRUCT_HITDATA]], ptr [[RESPTR_I]], i32 0, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I_FCA_0_LOAD:%.*]] = load float, ptr [[RES_I_FCA_0_GEP]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_HITDATA]] poison, float [[RES_I_FCA_0_LOAD]], 0
@@ -481,9 +462,9 @@ define void @AnyHit(%struct.RayPayload* noalias nocapture %payload, %struct.Buil
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I_FCA_1_INSERT:%.*]] = insertvalue [[STRUCT_HITDATA]] [[RES_I_FCA_0_INSERT]], i32 [[RES_I_FCA_1_LOAD]], 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I_FCA_1_INSERT_FCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_HITDATA]] [[RES_I_FCA_1_INSERT]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I_FCA_1_INSERT_FCA_1_EXTRACT:%.*]] = extractvalue [[STRUCT_HITDATA]] [[RES_I_FCA_1_INSERT]], 1
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP17:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP18:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[RESPTR_I6:%.*]] = getelementptr [[STRUCT_TRAVERSALDATA]], ptr [[TMP18]], i32 0, i32 1
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP16:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP17:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[RESPTR_I6:%.*]] = getelementptr [[STRUCT_TRAVERSALDATA]], ptr [[TMP17]], i32 0, i32 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I7_FCA_0_GEP:%.*]] = getelementptr inbounds [[STRUCT_HITDATA]], ptr [[RESPTR_I6]], i32 0, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I7_FCA_0_LOAD:%.*]] = load float, ptr [[RES_I7_FCA_0_GEP]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I7_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_HITDATA]] poison, float [[RES_I7_FCA_0_LOAD]], 0
@@ -496,10 +477,10 @@ define void @AnyHit(%struct.RayPayload* noalias nocapture %payload, %struct.Buil
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I7_FCA_1_INSERT_FCA_1_EXTRACT:%.*]] = extractvalue [[STRUCT_HITDATA]] [[RES_I7_FCA_1_INSERT]], 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I7_FCA_1_INSERT_FCA_1_GEP:%.*]] = getelementptr inbounds [[STRUCT_HITDATA]], ptr [[TMP2]], i32 0, i32 1
 ; DXILCONTPOSTPROCESS-NEXT:    store i32 [[RES_I7_FCA_1_INSERT_FCA_1_EXTRACT]], ptr [[RES_I7_FCA_1_INSERT_FCA_1_GEP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP19:%.*]] = call i32 @_cont_InstanceID(ptr [[TMP17]], ptr [[TMP2]])
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP20:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP21:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[RESPTR_I2:%.*]] = getelementptr [[STRUCT_TRAVERSALDATA]], ptr [[TMP21]], i32 0, i32 1
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP18:%.*]] = call i32 @_cont_InstanceID(ptr [[TMP16]], ptr [[TMP2]])
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP19:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP20:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[RESPTR_I2:%.*]] = getelementptr [[STRUCT_TRAVERSALDATA]], ptr [[TMP20]], i32 0, i32 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I3_FCA_0_GEP:%.*]] = getelementptr inbounds [[STRUCT_HITDATA]], ptr [[RESPTR_I2]], i32 0, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I3_FCA_0_LOAD:%.*]] = load float, ptr [[RES_I3_FCA_0_GEP]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I3_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_HITDATA]] poison, float [[RES_I3_FCA_0_LOAD]], 0
@@ -508,32 +489,32 @@ define void @AnyHit(%struct.RayPayload* noalias nocapture %payload, %struct.Buil
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I3_FCA_1_INSERT:%.*]] = insertvalue [[STRUCT_HITDATA]] [[RES_I3_FCA_0_INSERT]], i32 [[RES_I3_FCA_1_LOAD]], 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I3_FCA_1_INSERT_FCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_HITDATA]] [[RES_I3_FCA_1_INSERT]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I3_FCA_1_INSERT_FCA_1_EXTRACT:%.*]] = extractvalue [[STRUCT_HITDATA]] [[RES_I3_FCA_1_INSERT]], 1
-; DXILCONTPOSTPROCESS-NEXT:    [[RESPTR_I4:%.*]] = getelementptr [[STRUCT_SYSTEMDATA:%.*]], ptr [[TMP20]], i32 0, i32 1
+; DXILCONTPOSTPROCESS-NEXT:    [[RESPTR_I4:%.*]] = getelementptr [[STRUCT_SYSTEMDATA:%.*]], ptr [[TMP19]], i32 0, i32 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I5:%.*]] = load i32, ptr [[RESPTR_I4]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP22:%.*]] = insertvalue [[STRUCT_RAYPAYLOAD:%.*]] undef, float [[TMP14]], 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP23:%.*]] = insertvalue [[STRUCT_RAYPAYLOAD]] [[TMP22]], float [[RES_I_FCA_1_INSERT_FCA_0_EXTRACT]], 1
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP24:%.*]] = insertvalue [[STRUCT_RAYPAYLOAD]] [[TMP23]], i32 [[TMP19]], 2
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP25:%.*]] = insertvalue [[STRUCT_RAYPAYLOAD]] [[TMP24]], i32 [[RES_I5]], 3
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT8:%.*]] = extractvalue [[STRUCT_RAYPAYLOAD]] [[TMP25]], 0
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_EXTRACT:%.*]] = extractvalue [[STRUCT_RAYPAYLOAD]] [[TMP25]], 1
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_2_EXTRACT:%.*]] = extractvalue [[STRUCT_RAYPAYLOAD]] [[TMP25]], 2
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_3_EXTRACT:%.*]] = extractvalue [[STRUCT_RAYPAYLOAD]] [[TMP25]], 3
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP21:%.*]] = insertvalue [[STRUCT_RAYPAYLOAD:%.*]] undef, float [[TMP13]], 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP22:%.*]] = insertvalue [[STRUCT_RAYPAYLOAD]] [[TMP21]], float [[RES_I_FCA_1_INSERT_FCA_0_EXTRACT]], 1
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP23:%.*]] = insertvalue [[STRUCT_RAYPAYLOAD]] [[TMP22]], i32 [[TMP18]], 2
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP24:%.*]] = insertvalue [[STRUCT_RAYPAYLOAD]] [[TMP23]], i32 [[RES_I5]], 3
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT8:%.*]] = extractvalue [[STRUCT_RAYPAYLOAD]] [[TMP24]], 0
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_EXTRACT:%.*]] = extractvalue [[STRUCT_RAYPAYLOAD]] [[TMP24]], 1
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_2_EXTRACT:%.*]] = extractvalue [[STRUCT_RAYPAYLOAD]] [[TMP24]], 2
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_3_EXTRACT:%.*]] = extractvalue [[STRUCT_RAYPAYLOAD]] [[TMP24]], 3
 ; DXILCONTPOSTPROCESS-NEXT:    call void @_cont_AcceptHit(ptr [[SYSTEM_DATA_ALLOCA]])
 ; DXILCONTPOSTPROCESS-NEXT:    store float [[DOTFCA_0_EXTRACT8]], ptr addrspace(20) @REGISTERS, align 4
 ; DXILCONTPOSTPROCESS-NEXT:    store float [[DOTFCA_1_EXTRACT]], ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 7) to ptr addrspace(20)), align 4
 ; DXILCONTPOSTPROCESS-NEXT:    store i32 [[DOTFCA_2_EXTRACT]], ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 8) to ptr addrspace(20)), align 4
 ; DXILCONTPOSTPROCESS-NEXT:    store i32 [[DOTFCA_3_EXTRACT]], ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 9) to ptr addrspace(20)), align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[HITATTRSALLOCA_SROA_0_0_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[DOTFCA_0_EXTRACT]], i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP26:%.*]] = bitcast float [[HITATTRSALLOCA_SROA_0_0_VEC_EXTRACT]] to i32
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP27:%.*]] = bitcast i32 [[TMP26]] to float
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTSROA_020_0_VEC_INSERT:%.*]] = insertelement <2 x float> undef, float [[TMP27]], i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP25:%.*]] = bitcast float [[HITATTRSALLOCA_SROA_0_0_VEC_EXTRACT]] to i32
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP26:%.*]] = bitcast i32 [[TMP25]] to float
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTSROA_020_0_VEC_INSERT:%.*]] = insertelement <2 x float> undef, float [[TMP26]], i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[HITATTRSALLOCA_SROA_0_4_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[DOTFCA_0_EXTRACT]], i32 1
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP28:%.*]] = bitcast float [[HITATTRSALLOCA_SROA_0_4_VEC_EXTRACT]] to i32
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP29:%.*]] = bitcast i32 [[TMP28]] to float
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTSROA_020_4_VEC_INSERT:%.*]] = insertelement <2 x float> [[DOTSROA_020_0_VEC_INSERT]], float [[TMP29]], i32 1
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP27:%.*]] = bitcast float [[HITATTRSALLOCA_SROA_0_4_VEC_EXTRACT]] to i32
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP28:%.*]] = bitcast i32 [[TMP27]] to float
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTSROA_020_4_VEC_INSERT:%.*]] = insertelement <2 x float> [[DOTSROA_020_0_VEC_INSERT]], float [[TMP28]], i32 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] poison, <2 x float> [[DOTSROA_020_4_VEC_INSERT]], 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP30:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP30]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[DOTFCA_0_INSERT]])
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP29:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
+; DXILCONTPOSTPROCESS-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP29]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[DOTFCA_0_INSERT]])
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_0_0_0_GEP9:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_0_0_0_LOAD:%.*]] = load <3 x i32>, ptr [[DOTFCA_0_0_0_0_GEP9]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_0_0_0_INSERT:%.*]] = insertvalue [[STRUCT_ANYHITTRAVERSALDATA]] poison, <3 x i32> [[DOTFCA_0_0_0_0_LOAD]], 0, 0, 0, 0
@@ -561,8 +542,8 @@ define void @AnyHit(%struct.RayPayload* noalias nocapture %payload, %struct.Buil
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_1_GEP17:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 1, i32 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_1_LOAD:%.*]] = load i32, ptr [[DOTFCA_1_1_GEP17]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_1_INSERT:%.*]] = insertvalue [[STRUCT_ANYHITTRAVERSALDATA]] [[DOTFCA_1_0_INSERT]], i32 [[DOTFCA_1_1_LOAD]], 1, 1
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP31:%.*]] = load i32, ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR]], i32 [[TMP31]], [[STRUCT_ANYHITTRAVERSALDATA]] [[DOTFCA_1_1_INSERT]]), !continuation.registercount [[META33]]
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP30:%.*]] = load i32, ptr [[CSP]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR]], i32 [[TMP30]], [[STRUCT_ANYHITTRAVERSALDATA]] [[DOTFCA_1_1_INSERT]]), !continuation.registercount [[META33]]
 ; DXILCONTPOSTPROCESS-NEXT:    unreachable
 ;
   %1 = call float @dx.op.rayTMin.f32(i32 153)
@@ -588,123 +569,118 @@ define void @ClosestHit(%struct.RayPayload* noalias nocapture %payload, %struct.
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_SYSTEMDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP6:%.*]] = alloca [[STRUCT_RAYPAYLOAD:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[HITATTRS:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], align 8
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP7:%.*]] = call [[STRUCT_SYSTEMDATA]] @continuations.getSystemData.s_struct.SystemDatas()
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_SYSTEMDATA]] [[TMP7]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP6]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP10:%.*]] = load float, ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP10]], ptr [[TMP9]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP6]], i32 0, i32 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP12:%.*]] = load float, ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP12]], ptr [[TMP11]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP6]], i32 0, i32 2
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = load i32, ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i32 8), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP14]], ptr [[TMP13]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP15:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP6]], i32 0, i32 3
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP16:%.*]] = load i32, ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i32 9), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP16]], ptr [[TMP15]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_SYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP6]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP9:%.*]] = load float, ptr @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP9]], ptr [[TMP8]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP6]], i32 0, i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP11:%.*]] = load float, ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP11]], ptr [[TMP10]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP6]], i32 0, i32 2
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP13:%.*]] = load i32, ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i32 8), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP13]], ptr [[TMP12]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP6]], i32 0, i32 3
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP15:%.*]] = load i32, ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i32 9), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP15]], ptr [[TMP14]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP17:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @_cont_GetTriangleHitAttributes(ptr [[SYSTEM_DATA_ALLOCA]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP17]], ptr [[TMP5]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i32, ptr [[HITATTRS]], i64 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP19:%.*]] = getelementptr inbounds i32, ptr [[TMP5]], i64 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP20:%.*]] = load i32, ptr [[TMP19]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP20]], ptr [[TMP18]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP21:%.*]] = getelementptr inbounds i32, ptr [[HITATTRS]], i64 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP22:%.*]] = getelementptr inbounds i32, ptr [[TMP5]], i64 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP23:%.*]] = load i32, ptr [[TMP22]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP23]], ptr [[TMP21]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP24:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP25:%.*]] = call float @_cont_RayTMin(ptr [[TMP24]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP26:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP27:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCommittedState(ptr [[SYSTEM_DATA_ALLOCA]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_HITDATA]] [[TMP27]], ptr [[TMP4]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP16:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @_cont_GetTriangleHitAttributes(ptr [[SYSTEM_DATA_ALLOCA]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP16]], ptr [[TMP5]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP17:%.*]] = getelementptr inbounds i32, ptr [[HITATTRS]], i64 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i32, ptr [[TMP5]], i64 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP19:%.*]] = load i32, ptr [[TMP18]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP19]], ptr [[TMP17]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP20:%.*]] = getelementptr inbounds i32, ptr [[HITATTRS]], i64 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP21:%.*]] = getelementptr inbounds i32, ptr [[TMP5]], i64 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP22:%.*]] = load i32, ptr [[TMP21]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP22]], ptr [[TMP20]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP23:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP24:%.*]] = call float @_cont_RayTMin(ptr [[TMP23]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP25:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP26:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCommittedState(ptr [[SYSTEM_DATA_ALLOCA]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_HITDATA]] [[TMP26]], ptr [[TMP4]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[RES_I:%.*]] = load float, ptr [[TMP4]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP28:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP29:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCommittedState(ptr [[SYSTEM_DATA_ALLOCA]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_HITDATA]] [[TMP29]], ptr [[TMP2]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP30:%.*]] = call i32 @_cont_InstanceID(ptr [[TMP28]], ptr [[TMP2]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP31:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCommittedState(ptr [[SYSTEM_DATA_ALLOCA]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_HITDATA]] [[TMP31]], ptr [[TMP3]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP27:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP28:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCommittedState(ptr [[SYSTEM_DATA_ALLOCA]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_HITDATA]] [[TMP28]], ptr [[TMP2]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP29:%.*]] = call i32 @_cont_InstanceID(ptr [[TMP27]], ptr [[TMP2]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP30:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCommittedState(ptr [[SYSTEM_DATA_ALLOCA]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_HITDATA]] [[TMP30]], ptr [[TMP3]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[RESPTR_I:%.*]] = getelementptr [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 1
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[RES_I1:%.*]] = load i32, ptr [[RESPTR_I]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP32:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP6]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP33:%.*]] = load float, ptr [[TMP32]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP33]], ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP34:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP6]], i32 0, i32 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP35:%.*]] = load float, ptr [[TMP34]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP35]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP36:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP6]], i32 0, i32 2
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP37:%.*]] = load i32, ptr [[TMP36]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP37]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i32 8), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP38:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP6]], i32 0, i32 3
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP39:%.*]] = load i32, ptr [[TMP38]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP39]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i32 9), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP40:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP41:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP40]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    ret [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP41]], !continuation.registercount [[META34]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP31:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP6]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP32:%.*]] = load float, ptr [[TMP31]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP32]], ptr @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP33:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP6]], i32 0, i32 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP34:%.*]] = load float, ptr [[TMP33]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store float [[TMP34]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP35:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP6]], i32 0, i32 2
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP36:%.*]] = load i32, ptr [[TMP35]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP36]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i32 8), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP37:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP6]], i32 0, i32 3
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP38:%.*]] = load i32, ptr [[TMP37]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP38]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i32 9), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP39:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP40:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP39]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    ret [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP40]], !continuation.registercount [[META34]]
 ;
 ; DXILCONTPOSTPROCESS-LABEL: define void @ClosestHit(
 ; DXILCONTPOSTPROCESS-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR5]] !lgc.rt.shaderstage [[META34:![0-9]+]] !continuation [[META35:![0-9]+]] !continuation.registercount [[META33]] !continuation.state [[META18]] {
 ; DXILCONTPOSTPROCESS-NEXT:  AllocaSpillBB:
-; DXILCONTPOSTPROCESS-NEXT:    [[SYSTEM_DATA:%.*]] = alloca [[STRUCT_SYSTEMDATA]], align 8
 ; DXILCONTPOSTPROCESS-NEXT:    [[TMP1:%.*]] = alloca [[STRUCT_HITDATA:%.*]], align 8
 ; DXILCONTPOSTPROCESS-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_SYSTEMDATA]], align 8
-; DXILCONTPOSTPROCESS-NEXT:    [[CONT_STATE:%.*]] = alloca [0 x i32], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[CSP:%.*]] = alloca i32, align 4
-; DXILCONTPOSTPROCESS-NEXT:    store [[STRUCT_SYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP2:%.*]] = load [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_0_EXTRACT:%.*]] = extractvalue [[STRUCT_SYSTEMDATA]] [[TMP2]], 0, 0
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_0_EXTRACT:%.*]] = extractvalue [[STRUCT_SYSTEMDATA]] [[TMP0]], 0, 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_0_GEP:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    store <3 x i32> [[DOTFCA_0_0_EXTRACT]], ptr [[DOTFCA_0_0_GEP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_EXTRACT:%.*]] = extractvalue [[STRUCT_SYSTEMDATA]] [[TMP2]], 1
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_EXTRACT:%.*]] = extractvalue [[STRUCT_SYSTEMDATA]] [[TMP0]], 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_GEP:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 1
 ; DXILCONTPOSTPROCESS-NEXT:    store i32 [[DOTFCA_1_EXTRACT]], ptr [[DOTFCA_1_GEP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP4:%.*]] = load float, ptr addrspace(20) @REGISTERS, align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP5:%.*]] = load float, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 7) to ptr addrspace(20)), align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 8) to ptr addrspace(20)), align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 9) to ptr addrspace(20)), align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP8:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] @_cont_GetTriangleHitAttributes(ptr [[SYSTEM_DATA_ALLOCA]])
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP8]], 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP3:%.*]] = load float, ptr addrspace(20) @REGISTERS, align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP4:%.*]] = load float, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 7) to ptr addrspace(20)), align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP5:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 8) to ptr addrspace(20)), align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 9) to ptr addrspace(20)), align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP7:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] @_cont_GetTriangleHitAttributes(ptr [[SYSTEM_DATA_ALLOCA]])
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP7]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTSROA_03_0_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[DOTFCA_0_EXTRACT]], i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP9:%.*]] = bitcast float [[DOTSROA_03_0_VEC_EXTRACT]] to i32
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP8:%.*]] = bitcast float [[DOTSROA_03_0_VEC_EXTRACT]] to i32
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTSROA_03_4_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[DOTFCA_0_EXTRACT]], i32 1
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP10:%.*]] = bitcast float [[DOTSROA_03_4_VEC_EXTRACT]] to i32
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP12:%.*]] = call float @_cont_RayTMin(ptr [[TMP11]])
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP14:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCommittedState(ptr [[SYSTEM_DATA_ALLOCA]])
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT4:%.*]] = extractvalue [[STRUCT_HITDATA]] [[TMP14]], 0
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_EXTRACT6:%.*]] = extractvalue [[STRUCT_HITDATA]] [[TMP14]], 1
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP15:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP16:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCommittedState(ptr [[SYSTEM_DATA_ALLOCA]])
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT15:%.*]] = extractvalue [[STRUCT_HITDATA]] [[TMP16]], 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP9:%.*]] = bitcast float [[DOTSROA_03_4_VEC_EXTRACT]] to i32
+; DXILCONTPOSTPROCESS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP11:%.*]] = call float @_cont_RayTMin(ptr [[TMP10]])
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP13:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCommittedState(ptr [[SYSTEM_DATA_ALLOCA]])
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT4:%.*]] = extractvalue [[STRUCT_HITDATA]] [[TMP13]], 0
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_EXTRACT6:%.*]] = extractvalue [[STRUCT_HITDATA]] [[TMP13]], 1
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP15:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCommittedState(ptr [[SYSTEM_DATA_ALLOCA]])
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT15:%.*]] = extractvalue [[STRUCT_HITDATA]] [[TMP15]], 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_GEP16:%.*]] = getelementptr inbounds [[STRUCT_HITDATA]], ptr [[TMP1]], i32 0, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    store float [[DOTFCA_0_EXTRACT15]], ptr [[DOTFCA_0_GEP16]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_EXTRACT17:%.*]] = extractvalue [[STRUCT_HITDATA]] [[TMP16]], 1
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_EXTRACT17:%.*]] = extractvalue [[STRUCT_HITDATA]] [[TMP15]], 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_GEP18:%.*]] = getelementptr inbounds [[STRUCT_HITDATA]], ptr [[TMP1]], i32 0, i32 1
 ; DXILCONTPOSTPROCESS-NEXT:    store i32 [[DOTFCA_1_EXTRACT17]], ptr [[DOTFCA_1_GEP18]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP17:%.*]] = call i32 @_cont_InstanceID(ptr [[TMP15]], ptr [[TMP1]])
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP18:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCommittedState(ptr [[SYSTEM_DATA_ALLOCA]])
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT10:%.*]] = extractvalue [[STRUCT_HITDATA]] [[TMP18]], 0
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_EXTRACT12:%.*]] = extractvalue [[STRUCT_HITDATA]] [[TMP18]], 1
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP16:%.*]] = call i32 @_cont_InstanceID(ptr [[TMP14]], ptr [[TMP1]])
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP17:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCommittedState(ptr [[SYSTEM_DATA_ALLOCA]])
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_EXTRACT10:%.*]] = extractvalue [[STRUCT_HITDATA]] [[TMP17]], 0
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_1_EXTRACT12:%.*]] = extractvalue [[STRUCT_HITDATA]] [[TMP17]], 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[RESPTR_I:%.*]] = getelementptr [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 1
 ; DXILCONTPOSTPROCESS-NEXT:    [[RES_I1:%.*]] = load i32, ptr [[RESPTR_I]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    store float [[TMP4]], ptr addrspace(20) @REGISTERS, align 4
-; DXILCONTPOSTPROCESS-NEXT:    store float [[TMP5]], ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 7) to ptr addrspace(20)), align 4
-; DXILCONTPOSTPROCESS-NEXT:    store i32 [[TMP6]], ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 8) to ptr addrspace(20)), align 4
-; DXILCONTPOSTPROCESS-NEXT:    store i32 [[TMP7]], ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 9) to ptr addrspace(20)), align 4
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP19:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_GEP:%.*]] = getelementptr inbounds [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP19]], i32 0, i32 0
+; DXILCONTPOSTPROCESS-NEXT:    store float [[TMP3]], ptr addrspace(20) @REGISTERS, align 4
+; DXILCONTPOSTPROCESS-NEXT:    store float [[TMP4]], ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 7) to ptr addrspace(20)), align 4
+; DXILCONTPOSTPROCESS-NEXT:    store i32 [[TMP5]], ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 8) to ptr addrspace(20)), align 4
+; DXILCONTPOSTPROCESS-NEXT:    store i32 [[TMP6]], ptr addrspace(20) addrspacecast (ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspacecast (ptr addrspace(20) @REGISTERS to ptr), i32 0, i32 0, i32 9) to ptr addrspace(20)), align 4
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP18:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_GEP:%.*]] = getelementptr inbounds [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP18]], i32 0, i32 0
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_LOAD:%.*]] = load <3 x i32>, ptr [[DOTFCA_0_GEP]], align 4
 ; DXILCONTPOSTPROCESS-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, <3 x i32> [[DOTFCA_0_LOAD]], 0
-; DXILCONTPOSTPROCESS-NEXT:    [[TMP20:%.*]] = load i32, ptr [[CSP]], align 4
-; DXILCONTPOSTPROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR]], i32 [[TMP20]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META33]]
+; DXILCONTPOSTPROCESS-NEXT:    [[TMP19:%.*]] = load i32, ptr [[CSP]], align 4
+; DXILCONTPOSTPROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR]], i32 [[TMP19]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META33]]
 ; DXILCONTPOSTPROCESS-NEXT:    unreachable
 ;
   %1 = call float @dx.op.rayTMin.f32(i32 153)

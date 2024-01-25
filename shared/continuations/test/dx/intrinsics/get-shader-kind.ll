@@ -32,14 +32,13 @@ define void @MyMiss(%struct.Payload* %payload) !types !1 !lgc.rt.shaderstage !16
 ; CHECK-SAME: ([[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !types [[META12:![0-9]+]] !lgc.rt.shaderstage [[META14:![0-9]+]] !continuation.registercount [[META15:![0-9]+]] !continuation [[META16:![0-9]+]] {
 ; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
 ; CHECK-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_PAYLOAD:%.*]], align 8
-; CHECK-NEXT:    [[TMP3:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @continuations.getSystemData.s_struct.DispatchSystemDatas()
-; CHECK-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP3]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; CHECK-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[SYSTEM_DATA_ALLOCA]])
-; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
+; CHECK-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; CHECK-NEXT:    [[TMP3:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[SYSTEM_DATA_ALLOCA]])
 ; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT_PAYLOAD]], ptr [[TMP2]], i32 0, i32 0
 ; CHECK-NEXT:    [[TMP5:%.*]] = load i32, ptr @PAYLOAD, align 4
 ; CHECK-NEXT:    store i32 [[TMP5]], ptr [[TMP4]], align 4
 ; CHECK-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
+; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[TMP3]])
 ; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT_PAYLOAD]], ptr [[TMP2]], i32 0, i32 0
 ; CHECK-NEXT:    store i32 11, ptr [[TMP6]], align 4
 ; CHECK-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)

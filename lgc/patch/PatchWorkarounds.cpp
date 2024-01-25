@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -103,7 +103,7 @@ void PatchWorkarounds::applyImageDescWorkaround(void) {
     SmallVector<CallInst *, 8> useWorkListImage;
 
     for (const Function &func : m_module->getFunctionList()) {
-      bool isImage = func.getName().startswith("llvm.amdgcn.image");
+      bool isImage = func.getName().starts_with("llvm.amdgcn.image");
 #if !defined(LLVM_HAVE_BRANCH_AMD_GFX)
       bool isLastUse = false;
 #else
@@ -166,7 +166,7 @@ void PatchWorkarounds::processImageDescWorkaround(CallInst &callInst, bool isLas
           bool requiresWorkaround = false;
           for (auto &use : callInst.uses()) {
             if (auto *useCallInst = dyn_cast<CallInst>(use.getUser())) {
-              if (useCallInst->getCalledFunction()->getName().startswith("llvm.amdgcn.image")) {
+              if (useCallInst->getCalledFunction()->getName().starts_with("llvm.amdgcn.image")) {
                 // We need to process this intrinsic
                 requiresWorkaround = true;
                 break;

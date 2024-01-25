@@ -1,7 +1,7 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
-; SHADERTEST: call <3 x i32> @lgc.shader.input.WorkgroupId(i32 0) #1
+; SHADERTEST: call <3 x i32> @lgc.shader.input.WorkgroupId(i32 0) #{{[0-9]*}}
 ; SHADERTEST: %{{[0-9]*}} = mul <3 x i32> %{{[0-9]*}}, <i32 1, i32 1, i32 1>
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST

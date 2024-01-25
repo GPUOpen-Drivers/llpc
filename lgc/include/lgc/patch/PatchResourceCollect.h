@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -137,8 +137,8 @@ class InOutLocationInfoMapManager {
 public:
   InOutLocationInfoMapManager() {}
 
-  void createMap(llvm::ArrayRef<GenericLocationOp *> calls, ShaderStage shaderStage, bool requireDword);
-  void createMap(const std::vector<InOutLocationInfo> &locInfos, ShaderStage shaderStage);
+  void createMap(llvm::ArrayRef<GenericLocationOp *> calls, ShaderStageEnum shaderStage, bool requireDword);
+  void createMap(const std::vector<InOutLocationInfo> &locInfos, ShaderStageEnum shaderStage);
   void deserializeMap(llvm::ArrayRef<std::pair<unsigned, unsigned>> serializedMap);
   bool findMap(const InOutLocationInfo &origLocInfo, InOutLocationInfoMap::const_iterator &mapIt);
   InOutLocationInfoMap &getMap() { return m_locationInfoMap; }
@@ -160,12 +160,12 @@ private:
   InOutLocationInfoMapManager(const InOutLocationInfoMapManager &) = delete;
   InOutLocationInfoMapManager &operator=(const InOutLocationInfoMapManager &) = delete;
 
-  void addSpan(llvm::CallInst *call, ShaderStage shaderStage, bool requireDword);
-  void buildMap(ShaderStage shaderStage);
+  void addSpan(llvm::CallInst *call, ShaderStageEnum shaderStage, bool requireDword);
+  void buildMap(ShaderStageEnum shaderStage);
 
-  bool isCompatible(const LocationSpan &rSpan, const LocationSpan &lSpan, ShaderStage shaderStage) const {
+  bool isCompatible(const LocationSpan &rSpan, const LocationSpan &lSpan, ShaderStageEnum shaderStage) const {
     bool isCompatible = rSpan.getCompatibilityKey() == lSpan.getCompatibilityKey();
-    if (isCompatible && shaderStage == ShaderStageGeometry) {
+    if (isCompatible && shaderStage == ShaderStage::Geometry) {
       // Outputs with the same stream id are packed together
       isCompatible &= rSpan.firstLocationInfo.getStreamId() == lSpan.firstLocationInfo.getStreamId();
     }

@@ -16,12 +16,13 @@
 ; SHADERTEST:  [[f0:%.*]] = call i32 @llvm.amdgcn.struct.tbuffer.load.i32(<4 x i32> [[addr:%[0-9]*]], i32 %VertexIndex, i32 0, i32 0, i32 22, i32 0)
 ; SHADERTEST:  [[f1:%.*]] = call i32 @llvm.amdgcn.struct.tbuffer.load.i32(<4 x i32> [[addr:%[0-9]*]], i32 %VertexIndex, i32 4, i32 0, i32 22, i32 0)
 ; SHADERTEST:  [[f2:%.*]] = call i32 @llvm.amdgcn.struct.tbuffer.load.i32(<4 x i32> [[addr:%[0-9]*]], i32 %VertexIndex, i32 8, i32 0, i32 22, i32 0)
-; SHADERTEST:  [[vectmp0:%.*]] = insertelement <4 x i32> <i32 {{undef|poison}}, i32 {{undef|poison}}, i32 {{undef|poison}}, i32 1065353216>, i32 [[f0]], i{{32|64}} 0
+; SHADERTEST:  [[vectmp0:%.*]] = insertelement <4 x i32> poison, i32 [[f0]], i{{32|64}} 0
 ; SHADERTEST:  [[vectmp1:%.*]] = insertelement <4 x i32> [[vectmp0]], i32 [[f1]], i{{32|64}} 1
 ; SHADERTEST:  [[vecf:%.*]] = insertelement <4 x i32> [[vectmp1]], i32 [[f2]], i{{32|64}} 2
 ; Check that the attribute is cast to float so that it will be placed in a VGPR
-; SHADERTEST:  %vertex0.0 = bitcast <4 x i32> [[vecf]] to <4 x float>
+; SHADERTEST:  [[vecCast:%.*]] = bitcast <4 x i32> [[vecf]] to <4 x float>
 ; Check that the attribute is inserted into the return value, and returned.
+; SHADERTEST:  %vertex0.0 = insertelement <4 x float> [[vecCast]], float 1.000000e+00, i64 3
 ; SHADERTEST:  [[retval:%.*]] = insertvalue {{.*}}, <4 x float> %vertex0.0
 ; SHADERTEST:  ret {{.*}} [[retval]]
 ; END_SHADERTEST

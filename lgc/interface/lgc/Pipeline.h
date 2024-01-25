@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -127,7 +127,7 @@ static const char SampleShadingMetaName[] = "lgc.sample.shading";
 // The front-end should zero-initialize a struct with "= {}" in case future changes add new fields.
 // Note: new fields must be added to the end of this structure to maintain test compatibility.
 union Options {
-  unsigned u32All[40];
+  unsigned u32All[42];
   struct {
     uint64_t hash[2];                 // Pipeline hash to set in ELF PAL metadata
     unsigned includeDisassembly;      // If set, the disassembly for all compiled shaders will be included
@@ -187,7 +187,11 @@ union Options {
     unsigned rtStaticPipelineFlags;          // Ray tracing static pipeline flags
     unsigned rtTriCompressMode;              // Ray tracing triangle compression mode
     bool useGpurt;                           // Whether GPURT is used
-    bool enableExtendedRobustBufferAccess;   // Enable the extended robust buffer access
+    bool reserved21;
+    bool disablePerCompFetch;              // Disable per component fetch in uber fetch shader.
+    bool maskOffNullDescriptorTypeField;   // If true, mask off the type field of word3 from a null descriptor.
+    bool vbAddressLowBitsKnown;            // Use vertex buffer offset low bits from driver.
+    bool enableExtendedRobustBufferAccess; // Enable the extended robust buffer access
   };
 };
 static_assert(sizeof(Options) == sizeof(Options::u32All));
@@ -319,7 +323,7 @@ struct ResourceNode {
 
   ResourceNodeType concreteType; // Underlying actual type of this node
   ResourceNodeType abstractType; // Node type for resource node matching
-  unsigned visibility;           // Visibility bitmap: bit N set means entry is visible to ShaderStage(N); value 0
+  unsigned visibility;           // Visibility bitmap: bit N set means entry is visible to ShaderStageEnum(N); value 0
                                  //  means visible to all shader stages
   unsigned sizeInDwords;         // Size in dwords
   unsigned offsetInDwords;       // Offset in dwords
@@ -367,7 +371,7 @@ enum class PrimitiveType : unsigned {
 
 // Data format of vertex buffer entry. For ones that exist in GFX9 hardware, these match the hardware
 // encoding. But this also includes extra formats.
-enum BufDataFormat {
+enum BufDataFormat : unsigned {
   BufDataFormatInvalid = 0,
   BufDataFormat8 = 1,
   BufDataFormat16 = 2,
@@ -407,7 +411,7 @@ enum BufDataFormat {
 };
 
 // Numeric format of vertex buffer entry. These match the GFX9 hardware encoding.
-enum BufNumFormat {
+enum BufNumFormat : unsigned {
   BufNumFormatUnorm = 0,
   BufNumFormatSnorm = 1,
   BufNumFormatUscaled = 2,
@@ -429,19 +433,24 @@ enum VertexInputRate {
 };
 
 // Structure for a vertex input
-struct VertexInputDescription {
-  unsigned location;  // Location of input, as provided to CreateReadGenericInput
-  unsigned binding;   // Index of the vertex buffer descriptor in the vertex buffer table
-  unsigned offset;    // Byte offset of the input in the binding's vertex buffer
-  unsigned stride;    // Byte stride of per-vertex/per-instance elements in the vertex buffer, 0 if unknown.
-                      // The stride is passed only to ensure that a valid load is used, not to actually calculate
-                      // the load address. Instead, we use the index as the index in a structured tbuffer load
-                      // instruction, and rely on the driver setting up the descriptor with the correct stride.
-  BufDataFormat dfmt; // Data format of input; one of the BufDataFormat* values
-  BufNumFormat nfmt;  // Numeric format of input; one of the BufNumFormat* values
-  unsigned inputRate; // Vertex input rate for the binding
-  unsigned divisor;   // Instance divisor
+union VertexInputDescription {
+  unsigned u32All[9];
+  struct {
+    unsigned location;     // Location of input, as provided to CreateReadGenericInput
+    unsigned binding;      // Index of the vertex buffer descriptor in the vertex buffer table
+    unsigned offset;       // Byte offset of the input in the binding's vertex buffer
+    unsigned stride;       // Byte stride of per-vertex/per-instance elements in the vertex buffer, 0 if unknown.
+                           // The stride is passed only to ensure that a valid load is used, not to actually calculate
+                           // the load address. Instead, we use the index as the index in a structured tbuffer load
+                           // instruction, and rely on the driver setting up the descriptor with the correct stride.
+    BufDataFormat dfmt;    // Data format of input; one of the BufDataFormat* values
+    BufNumFormat nfmt;     // Numeric format of input; one of the BufNumFormat* values
+    unsigned inputRate;    // Vertex input rate for the binding
+    unsigned divisor;      // Instance divisor
+    uint8_t vbAddrLowBits; // Lowest two bits of vertex inputs offsets.
+  };
 };
+static_assert(sizeof(VertexInputDescription) == sizeof(VertexInputDescription::u32All));
 
 // Represents assistant info for each vertex attribute in uber fetch shader
 struct UberFetchShaderAttribInfo {
@@ -662,6 +671,7 @@ struct FragmentShaderMode {
   unsigned earlyAndLatFragmentTests;
   unsigned innerCoverage;
   unsigned waveOpsExcludeHelperLanes;
+  unsigned noReciprocalFragCoordW;
   ConservativeDepth conservativeDepth;
   ConservativeDepth conservativeStencilFront;
   ConservativeDepth conservativeStencilBack;
@@ -678,11 +688,12 @@ enum class DerivativeMode : unsigned { None, Linear, Quads };
 // All fields are unsigned, even those that could be bool, because the way the state is written to and read
 // from IR metadata relies on that.
 struct ComputeShaderMode {
-  unsigned workgroupSizeX;    // X dimension of workgroup size. 0 is taken to be 1
-  unsigned workgroupSizeY;    // Y dimension of workgroup size. 0 is taken to be 1
-  unsigned workgroupSizeZ;    // Z dimension of workgroup size. 0 is taken to be 1
-  unsigned subgroupSize;      // Override for the wave size if it is non-zero
-  DerivativeMode derivatives; // derivativeMode for computeShader
+  unsigned workgroupSizeX;             // X dimension of workgroup size. 0 is taken to be 1
+  unsigned workgroupSizeY;             // Y dimension of workgroup size. 0 is taken to be 1
+  unsigned workgroupSizeZ;             // Z dimension of workgroup size. 0 is taken to be 1
+  unsigned subgroupSize;               // Override for the wave size if it is non-zero
+  DerivativeMode derivatives;          // derivativeMode for computeShader
+  unsigned noLocalInvocationIdInCalls; // For compute with calls, assume local invocation ID is never used in callees
 };
 
 // Enum passed to Pipeline::irLink to give information on whether this is a whole or part pipeline.
@@ -729,22 +740,22 @@ public:
   // Set the common shader mode for the given shader stage, containing hardware FP round and denorm modes.
   // The client should always zero-initialize the struct before setting it up, in case future versions
   // add more fields. A local struct variable can be zero-initialized with " = {}".
-  static void setCommonShaderMode(llvm::Module &module, ShaderStage shaderStage,
+  static void setCommonShaderMode(llvm::Module &module, ShaderStageEnum shaderStage,
                                   const CommonShaderMode &commonShaderMode);
 
   // Get the common shader mode for the given shader stage.
-  static CommonShaderMode getCommonShaderMode(llvm::Module &module, ShaderStage shaderStage);
+  static CommonShaderMode getCommonShaderMode(llvm::Module &module, ShaderStageEnum shaderStage);
 
   // Set the tessellation mode. This can be called in multiple shaders, and the values are merged
   // together -- a zero value in one call is overridden by a non-zero value in another call. LLPC needs
   // that because SPIR-V allows some of these execution mode items to appear in either the TCS or TES.
   // The client should always zero-initialize the struct before setting it up, in case future versions
   // add more fields. A local struct variable can be zero-initialized with " = {}".
-  static void setTessellationMode(llvm::Module &module, ShaderStage shaderStage,
+  static void setTessellationMode(llvm::Module &module, ShaderStageEnum shaderStage,
                                   const TessellationMode &tessellationMode);
 
   // Get the tessellation mode for the given shader stage.
-  static TessellationMode getTessellationMode(llvm::Module &module, ShaderStage shaderStage);
+  static TessellationMode getTessellationMode(llvm::Module &module, ShaderStageEnum shaderStage);
 
   // Set the geometry shader state.
   // The client should always zero-initialize the struct before setting it up, in case future versions
@@ -767,7 +778,7 @@ public:
   static void setComputeShaderMode(llvm::Module &module, const ComputeShaderMode &computeShaderMode);
 
   // Set subgroup size usage.
-  static void setSubgroupSizeUsage(llvm::Module &module, ShaderStage stage, bool usage);
+  static void setSubgroupSizeUsage(llvm::Module &module, ShaderStageEnum stage, bool usage);
 
   // Get the compute shader mode (workgroup size)
   static ComputeShaderMode getComputeShaderMode(llvm::Module &module);
@@ -787,7 +798,7 @@ public:
   virtual const Options &getOptions() const = 0;
 
   // Set per-shader options
-  virtual void setShaderOptions(ShaderStage stage, const ShaderOptions &options) = 0;
+  virtual void setShaderOptions(ShaderStageEnum stage, const ShaderOptions &options) = 0;
 
   // Set the resource mapping nodes for the pipeline. "nodes" describes the user data
   // supplied to the shader as a hierarchical table (max two levels) of descriptors.
@@ -858,14 +869,24 @@ public:
   // in the front-end before a shader is associated with a pipeline.
   //
   // @param func : Function to mark
-  // @param stage : Shader stage, or ShaderStageInvalid if none
-  static void markShaderEntryPoint(llvm::Function *func, ShaderStage stage);
+  // @param stage : Shader stage, or ShaderStage::Invalid if none
+  static void markShaderEntryPoint(llvm::Function *func, ShaderStageEnum stage);
 
   // Get a function's shader stage.
   //
   // @param func : Function to check
-  // @returns stage : Shader stage, or ShaderStageInvalid if none
-  static ShaderStage getShaderStage(llvm::Function *func);
+  // @returns stage : Shader stage, or nullopt if none
+  static std::optional<ShaderStageEnum> getShaderStage(llvm::Function *func);
+
+  // Find the shader entry-point from shader module, and set pipeline stage.
+  //
+  // @param module : Shader module to attach
+  virtual void attachModule(llvm::Module *modules) = 0;
+
+  // Record pipeline state into IR metadata of specified module.
+  //
+  // @param [in/out] module : Module to record the IR metadata in
+  virtual void record(llvm::Module *module) = 0;
 
   // Link the individual shader modules into a single pipeline module. The front-end must have
   // finished calling Builder::Create* methods and finished building the IR. In the case that
@@ -886,7 +907,8 @@ public:
   //
   // @param modules : Array of modules
   // @param pipelineLink : Enum saying whether this is a pipeline, unlinked or part-pipeline compile.
-  virtual llvm::Module *irLink(llvm::ArrayRef<llvm::Module *> modules, PipelineLink pipelineLink) = 0;
+  virtual std::unique_ptr<llvm::Module> irLink(llvm::MutableArrayRef<std::unique_ptr<llvm::Module>> modules,
+                                               PipelineLink pipelineLink) = 0;
 
   // Typedef of function passed in to Generate to check the shader cache.
   // Returns the updated shader stage mask, allowing the client to decide not to compile shader stages
@@ -895,8 +917,8 @@ public:
   //    @param stageMask : Shader stage mask
   //    @param stageHashes : Per-stage hash of in/out usage
   //    @returns : Stage mask of stages not found in cache
-  using CheckShaderCacheFunc = std::function<unsigned(const llvm::Module *module, unsigned stageMask,
-                                                      llvm::ArrayRef<llvm::ArrayRef<uint8_t>> stageHashes)>;
+  using CheckShaderCacheFunc = std::function<ShaderStageMask(const llvm::Module *module, ShaderStageMask stageMask,
+                                                             llvm::ArrayRef<llvm::ArrayRef<uint8_t>> stageHashes)>;
 
   // Do an early check for ability to use unlinked shader compilation then ELF linking.
   // Intended to be used when doing unlinked shader compilation with pipeline state already available.

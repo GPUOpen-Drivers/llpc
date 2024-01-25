@@ -40,19 +40,19 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-i1:32-i8:8-i16:32-i32:32-
 
 ; CHECK-LABEL: define {{.*}} @AnyHit1DWordsMax1DWords(
 ; CHECK:       {{.*}}%struct.MyPayload.attr_max_1_i32s.layout_2_anyhit_out_accept
-define void @AnyHit1DWordsMax1DWords(%struct.MyPayload* %payload, %struct.Attributes1DWords* %attrs) !continuation.maxHitAttributeBytes !49 !types !60 {
+define void @AnyHit1DWordsMax1DWords(%struct.MyPayload* %payload, %struct.Attributes1DWords* %attrs) !lgc.rt.attribute.size !49 !types !60 {
   ret void
 }
 
 ; CHECK-LABEL: define {{.*}} @AnyHit1DWordsMax2DWords(
 ; CHECK:       {{.*}}%struct.MyPayload.attr_max_2_i32s.layout_2_anyhit_out_accept
-define void @AnyHit1DWordsMax2DWords(%struct.MyPayload* %payload, %struct.Attributes1DWords* %attrs) !continuation.maxHitAttributeBytes !22 !types !60 {
+define void @AnyHit1DWordsMax2DWords(%struct.MyPayload* %payload, %struct.Attributes1DWords* %attrs) !lgc.rt.attribute.size !22 !types !60 {
   ret void
 }
 
 ; CHECK-LABEL: define {{.*}} @AnyHit1DWordsMax8DWords(
 ; CHECK:       {{.*}}%struct.MyPayload.attr_max_8_i32s.layout_2_anyhit_out_accept.payload_attr_0_i32s
-define void @AnyHit1DWordsMax8DWords(%struct.MyPayload* %payload, %struct.Attributes1DWords* %attrs) !continuation.maxHitAttributeBytes !27 !types !60 {
+define void @AnyHit1DWordsMax8DWords(%struct.MyPayload* %payload, %struct.Attributes1DWords* %attrs) !lgc.rt.attribute.size !27 !types !60 {
   ret void
 }
 
@@ -60,7 +60,7 @@ define void @AnyHit1DWordsMax8DWords(%struct.MyPayload* %payload, %struct.Attrib
 ; is not specialized, thus no payload_attr_N_i32s suffix.
 ; CHECK-LABEL: define {{.*}} @AnyHit2DWordsMax2DWords(
 ; CHECK:       {{.*}}%struct.MyPayload.attr_max_2_i32s.layout_2_anyhit_out_accept
-define void @AnyHit2DWordsMax2DWords(%struct.MyPayload* %payload, %struct.Attributes2DWords* %attrs) !continuation.maxHitAttributeBytes !22 !types !23 {
+define void @AnyHit2DWordsMax2DWords(%struct.MyPayload* %payload, %struct.Attributes2DWords* %attrs) !lgc.rt.attribute.size !22 !types !23 {
   ret void
 }
 
@@ -68,13 +68,13 @@ define void @AnyHit2DWordsMax2DWords(%struct.MyPayload* %payload, %struct.Attrib
 ; There are 2 unused DWords in the layout.
 ; CHECK-LABEL: define {{.*}} @AnyHit2DWordsMax4DWords(
 ; CHECK:       {{.*}}%struct.MyPayload.attr_max_4_i32s.layout_2_anyhit_out_accept.payload_attr_0_i32s
-define void @AnyHit2DWordsMax4DWords(%struct.MyPayload* %payload, %struct.Attributes2DWords* %attrs) !continuation.maxHitAttributeBytes !26 !types !23 {
+define void @AnyHit2DWordsMax4DWords(%struct.MyPayload* %payload, %struct.Attributes2DWords* %attrs) !lgc.rt.attribute.size !26 !types !23 {
   ret void
 }
 
 ; CHECK-LABEL: define {{.*}} @AnyHit2DWordsMax8DWords(
 ; CHECK:       {{.*}}%struct.MyPayload.attr_max_8_i32s.layout_2_anyhit_out_accept.payload_attr_0_i32s
-define void @AnyHit2DWordsMax8DWords(%struct.MyPayload* %payload, %struct.Attributes2DWords* %attrs) !continuation.maxHitAttributeBytes !27 !types !23 {
+define void @AnyHit2DWordsMax8DWords(%struct.MyPayload* %payload, %struct.Attributes2DWords* %attrs) !lgc.rt.attribute.size !27 !types !23 {
   ret void
 }
 
@@ -86,13 +86,13 @@ define void @AnyHit2DWordsNoLimit(%struct.MyPayload* %payload, %struct.Attribute
 
 ; CHECK-LABEL: define {{.*}} @AnyHit4DWordsMax4DWords(
 ; CHECK:       {{.*}}%struct.MyPayload.attr_max_4_i32s.layout_2_anyhit_out_accept
-define void @AnyHit4DWordsMax4DWords(%struct.MyPayload* %payload, %struct.Attributes4DWords* %attrs) !continuation.maxHitAttributeBytes !26 !types !28 {
+define void @AnyHit4DWordsMax4DWords(%struct.MyPayload* %payload, %struct.Attributes4DWords* %attrs) !lgc.rt.attribute.size !26 !types !28 {
   ret void
 }
 
 ; CHECK-LABEL: define {{.*}} @AnyHit4DWordsMax8DWords(
 ; CHECK:       {{.*}}%struct.MyPayload.attr_max_8_i32s.layout_2_anyhit_out_accept.payload_attr_2_i32s
-define void @AnyHit4DWordsMax8DWords(%struct.MyPayload* %payload, %struct.Attributes4DWords* %attrs) !continuation.maxHitAttributeBytes !27 !types !28 {
+define void @AnyHit4DWordsMax8DWords(%struct.MyPayload* %payload, %struct.Attributes4DWords* %attrs) !lgc.rt.attribute.size !27 !types !28 {
   ret void
 }
 
@@ -103,7 +103,7 @@ define void @AnyHit4DWordsNoLimit(%struct.MyPayload* %payload, %struct.Attribute
 }
 
 ; The following one violates the limit and should crash:
-define void @AnyHit4DWordsMax2DWords(%struct.MyPayload* %payload, %struct.Attributes4DWords* %attrs) !continuation.maxHitAttributeBytes !22 !types !28 {
+define void @AnyHit4DWordsMax2DWords(%struct.MyPayload* %payload, %struct.Attributes4DWords* %attrs) !lgc.rt.attribute.size !22 !types !28 {
   ret void
 }
 

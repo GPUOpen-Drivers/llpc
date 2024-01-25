@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2018-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2018-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -74,7 +74,7 @@ bool PatchNullFragShader::runImpl(Module &module, PipelineState *pipelineState) 
     return false;
 
   // If a fragment shader is not needed, then do not generate one.
-  const bool hasFs = pipelineState->hasShaderStage(ShaderStageFragment);
+  const bool hasFs = pipelineState->hasShaderStage(ShaderStage::Fragment);
   if (hasFs || !pipelineState->isGraphics())
     return false;
 
@@ -88,8 +88,8 @@ bool PatchNullFragShader::runImpl(Module &module, PipelineState *pipelineState) 
 //
 // @param [in/out] module : The LLVM module in which to add the shader.
 void PatchNullFragShader::updatePipelineState(PipelineState *pipelineState) const {
-  auto resUsage = pipelineState->getShaderResourceUsage(ShaderStageFragment);
-  pipelineState->setShaderStageMask(pipelineState->getShaderStageMask() | shaderStageToMask(ShaderStageFragment));
+  auto resUsage = pipelineState->getShaderResourceUsage(ShaderStage::Fragment);
+  pipelineState->setShaderStageMask(pipelineState->getShaderStageMask() | ShaderStageMask(ShaderStage::Fragment));
 
   // Add usage info for dummy output
   resUsage->inOutUsage.fs.isNullFs = true;

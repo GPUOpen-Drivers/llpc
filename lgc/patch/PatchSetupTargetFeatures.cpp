@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2018-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2018-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -86,15 +86,15 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
     std::string targetFeatures(globalFeatures);
     AttrBuilder builder(module->getContext());
 
-    ShaderStage shaderStage = lgc::getShaderStage(&*func);
+    auto shaderStage = lgc::getShaderStage(&*func);
 
-    if (shaderStage == ShaderStage::ShaderStageInvalid) {
+    if (!shaderStage) {
       errs() << "Invalid shader stage for function " << func->getName() << "\n";
       report_fatal_error("Got invalid shader stage when setting up features for function");
     }
 
     if (isShaderEntryPoint(&*func)) {
-      bool useSiScheduler = m_pipelineState->getShaderOptions(shaderStage).useSiScheduler;
+      bool useSiScheduler = m_pipelineState->getShaderOptions(shaderStage.value()).useSiScheduler;
       if (useSiScheduler) {
         // It was found that enabling both SIScheduler and SIFormClauses was bad on one particular
         // game. So we disable the latter here. That only affects XNACK targets.
@@ -143,7 +143,7 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
       if (func->hasFnAttribute("target-features"))
         targetFeatures += func->getFnAttribute("target-features").getValueAsString();
 
-      if (m_pipelineState->getShaderWgpMode(shaderStage))
+      if (m_pipelineState->getShaderWgpMode(shaderStage.value()))
         targetFeatures += ",-cumode";
       else
         targetFeatures += ",+cumode";
@@ -166,8 +166,8 @@ void PatchSetupTargetFeatures::setupTargetFeatures(Module *module) {
     // In the backend, f32 denormals are handled by default, so request denormal flushing behavior.
     builder.addAttribute("denormal-fp-math-f32", "preserve-sign");
 
-    if (shaderStage != ShaderStageCopyShader) {
-      const auto &shaderMode = m_pipelineState->getShaderModes()->getCommonShaderMode(shaderStage);
+    if (shaderStage != ShaderStage::CopyShader) {
+      const auto &shaderMode = m_pipelineState->getShaderModes()->getCommonShaderMode(shaderStage.value());
       if (shaderMode.fp16DenormMode == FpDenormMode::FlushNone || shaderMode.fp16DenormMode == FpDenormMode::FlushIn ||
           shaderMode.fp64DenormMode == FpDenormMode::FlushNone || shaderMode.fp64DenormMode == FpDenormMode::FlushIn) {
         builder.addAttribute("denormal-fp-math", "ieee");

@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -60,6 +60,9 @@ unsigned PipelineDocument::getMaxSectionCount(SectionType type) {
     break;
   case SectionTypeRayTracingState:
     maxSectionCount = 1;
+    break;
+  case SectionTypeRayTracingLibrarySummary:
+    maxSectionCount = UINT32_MAX;
     break;
   case SectionTypeVertexInputState:
     maxSectionCount = 1;
@@ -156,6 +159,7 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
     gfxPipelineInfo->enableEarlyCompile = graphicState.enableEarlyCompile;
     gfxPipelineInfo->enableColorExportShader = graphicState.enableColorExportShader;
     gfxPipelineInfo->useSoftwareVertexBufferDescriptors = graphicState.useSoftwareVertexBufferDescriptors;
+    gfxPipelineInfo->vbAddressLowBitsKnown = graphicState.vbAddressLowBitsKnown;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
     gfxPipelineInfo->shaderLibrary = graphicState.shaderLibrary;
 #endif
@@ -225,6 +229,8 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
   if (m_sections[SectionTypeVertexInputState].size() > 0) {
     reinterpret_cast<SectionVertexInput *>(m_sections[SectionTypeVertexInputState][0])->getSubState(m_vertexInputState);
     m_pipelineState.gfxPipelineInfo.pVertexInput = &m_vertexInputState;
+    reinterpret_cast<SectionVertexInput *>(m_sections[SectionTypeVertexInputState][0])
+        ->getvbAddressLowBits(m_pipelineState.gfxPipelineInfo.vbAddressLowBits);
   }
 
   if (m_pipelineState.pipelineType == VfxPipelineTypeGraphics ||
@@ -288,6 +294,14 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
       mapIt.second.second->getSubState(m_descriptorRangeValues);
       stageIndex++;
     }
+
+    for (Section *section : m_sections[SectionTypeRayTracingLibrarySummary]) {
+      auto *summarySection = static_cast<SectionRayTracingLibrarySummary *>(section);
+      m_librarySummaries.push_back(summarySection->getSubState());
+    }
+
+    m_pipelineState.rayPipelineInfo.libraryCount = m_librarySummaries.size();
+    m_pipelineState.rayPipelineInfo.pLibrarySummaries = m_librarySummaries.data();
   } else {
     VFX_NEVER_CALLED();
   }
@@ -426,6 +440,9 @@ Section *PipelineDocument::createSection(const char *sectionName) {
     break;
   case SectionTypeRtState:
     section = new SectionRtState();
+    break;
+  case SectionTypeRayTracingLibrarySummary:
+    section = new SectionRayTracingLibrarySummary;
     break;
   case SectionTypeVertexInputState:
     section = new SectionVertexInput();

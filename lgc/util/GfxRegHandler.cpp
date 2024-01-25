@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -172,6 +172,7 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx9[static_cast<unsigned>(SqRsrcRegs:
     {2, 14, 14}, // Height
     {3, 0, 12},  // DstSelXYZW
     {3, 20, 5},  // SwizzleMode
+    {3, 28, 4},  // Type
     {4, 0, 13},  // Depth
     {4, 13, 12}, // Pitch
     {4, 29, 3},  // BcSwizzle
@@ -194,6 +195,7 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx10[static_cast<unsigned>(SqRsrcRegs
     {2, 14, 14}, // Height
     {3, 0, 12},  // DstSelXYZW
     {3, 20, 5},  // SwizzleMode
+    {3, 28, 4},  // Type
     {4, 0, 13},  // Depth
     {},          // Pitch
     {3, 25, 3},  // BcSwizzle
@@ -216,6 +218,7 @@ static constexpr BitsInfo SqImgRsrcRegBitsGfx11[static_cast<unsigned>(SqRsrcRegs
     {2, 14, 14}, // Height
     {3, 0, 12},  // DstSelXYZW
     {3, 20, 5},  // SwizzleMode
+    {3, 28, 4},  // Type
     {4, 0, 13},  // Depth
     {},          // Pitch
     {3, 25, 3},  // BcSwizzle
@@ -264,6 +267,7 @@ Value *SqImgRsrcRegHandler::getReg(SqRsrcRegs regId) {
   case SqRsrcRegs::Format:
   case SqRsrcRegs::DstSelXYZW:
   case SqRsrcRegs::SwizzleMode:
+  case SqRsrcRegs::Type:
   case SqRsrcRegs::BcSwizzle:
   case SqRsrcRegs::BaseLevel:
   case SqRsrcRegs::LastLevel:
@@ -305,6 +309,7 @@ void SqImgRsrcRegHandler::setReg(SqRsrcRegs regId, Value *regValue) {
   case SqRsrcRegs::Format:
   case SqRsrcRegs::DstSelXYZW:
   case SqRsrcRegs::SwizzleMode:
+  case SqRsrcRegs::Type:
   case SqRsrcRegs::Depth:
   case SqRsrcRegs::BcSwizzle:
     setRegCommon(static_cast<unsigned>(regId), regValue);
@@ -332,4 +337,13 @@ void SqImgRsrcRegHandler::setReg(SqRsrcRegs regId, Value *regValue) {
     llvm_unreachable("Bad SqImgRsrcRegHandler::SetReg!");
     break;
   }
+}
+
+// =====================================================================================================================
+// Get the bitmask that covers the hardware register
+//
+// @param regId : Register ID
+unsigned SqImgRsrcRegHandler::getRegMask(SqRsrcRegs regId) {
+  const auto &bitsInfo = m_bitsInfo[static_cast<unsigned>(regId)];
+  return ((1ULL << bitsInfo.count) - 1) << bitsInfo.offset;
 }

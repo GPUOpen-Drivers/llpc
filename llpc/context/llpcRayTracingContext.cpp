@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -49,9 +49,7 @@ RayTracingContext::RayTracingContext(GfxIpVersion gfxIP, const RayTracingPipelin
                                      const PipelineShaderInfo *representativeShaderInfo, MetroHash::Hash *pipelineHash,
                                      MetroHash::Hash *cacheHash, unsigned indirectStageMask)
     : PipelineContext(gfxIP, pipelineHash, cacheHash), m_pipelineInfo(pipelineInfo), m_representativeShaderInfo(),
-      m_linked(false), m_indirectStageMask(indirectStageMask), m_entryName(""),
-      m_payloadMaxSize(pipelineInfo->payloadSizeMaxInLib), m_callableDataMaxSize(0),
-      m_attributeDataMaxSize(pipelineInfo->attributeSizeMaxInLib) {
+      m_linked(false), m_indirectStageMask(indirectStageMask), m_entryName(""), m_callableDataMaxSize(0) {
   const Vkgc::BinaryData *gpurtShaderLibrary = nullptr;
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   gpurtShaderLibrary = &pipelineInfo->shaderTraceRay;
@@ -104,7 +102,7 @@ void RayTracingContext::collectBuiltIn(unsigned builtIn) {
 // @param dataLayout : Payload module data layout
 void RayTracingContext::collectPayloadSize(llvm::Type *type, const DataLayout &dataLayout) {
   unsigned payloadTypeSize = alignTo(dataLayout.getTypeAllocSize(type), 4);
-  m_payloadMaxSize = std::max(m_payloadMaxSize, payloadTypeSize);
+  m_rtLibSummary.maxRayPayloadSize = std::max(m_rtLibSummary.maxRayPayloadSize, payloadTypeSize);
 }
 
 // =====================================================================================================================
@@ -124,14 +122,14 @@ void RayTracingContext::collectCallableDataSize(llvm::Type *type, const DataLayo
 // @param dataLayout : module data layout
 void RayTracingContext::collectAttributeDataSize(llvm::Type *type, const DataLayout &dataLayout) {
   unsigned dataTypeSize = alignTo(dataLayout.getTypeAllocSize(type), 4);
-  m_attributeDataMaxSize = std::max(m_attributeDataMaxSize, dataTypeSize);
+  m_rtLibSummary.maxHitAttributeSize = std::max(m_rtLibSummary.maxHitAttributeSize, dataTypeSize);
 }
 // =====================================================================================================================
 // Get payload information
 //
 // @param builder : LGC builder
 llvm::Type *RayTracingContext::getPayloadType(lgc::Builder *builder) {
-  return ArrayType::get(builder->getInt32Ty(), m_payloadMaxSize / 4);
+  return ArrayType::get(builder->getInt32Ty(), divideCeil(m_rtLibSummary.maxRayPayloadSize, 4));
 }
 
 // =====================================================================================================================
@@ -139,7 +137,7 @@ llvm::Type *RayTracingContext::getPayloadType(lgc::Builder *builder) {
 //
 // @param builder : LGC builder
 llvm::Type *RayTracingContext::getCallableDataType(lgc::Builder *builder) {
-  return ArrayType::get(builder->getInt32Ty(), m_callableDataMaxSize / 4);
+  return ArrayType::get(builder->getInt32Ty(), divideCeil(m_callableDataMaxSize, 4));
 }
 
 // =====================================================================================================================
@@ -147,7 +145,7 @@ llvm::Type *RayTracingContext::getCallableDataType(lgc::Builder *builder) {
 //
 // @param builder : LGC builder
 unsigned RayTracingContext::getAttributeDataSize() {
-  return m_attributeDataMaxSize / 4;
+  return divideCeil(m_rtLibSummary.maxHitAttributeSize, 4);
 }
 
 // =====================================================================================================================
@@ -261,7 +259,7 @@ void RayTracingContext::setPipelineState(lgc::Pipeline *pipeline, Util::MetroHas
   }
 
   if (!hasRayTracingShaderStage(stageMask)) {
-    unsigned deviceIndex = static_cast<const ComputePipelineBuildInfo *>(getPipelineBuildInfo())->deviceIndex;
+    unsigned deviceIndex = getRayTracingPipelineBuildInfo()->deviceIndex;
     if (pipeline)
       pipeline->setDeviceIndex(deviceIndex);
     if (hasher)
@@ -283,6 +281,7 @@ lgc::Options RayTracingContext::computePipelineOptions() const {
     options.rtIndirectMode = lgc::RayTracingIndirectMode::Continuations;
 
   options.cpsFlags = m_pipelineInfo->cpsFlags;
+
 #endif
 
   return options;

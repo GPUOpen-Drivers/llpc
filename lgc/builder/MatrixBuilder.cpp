@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -451,6 +451,25 @@ Value *BuilderCommon::CreateCooperativeMatrixInsert(Value *matrix, Value *value,
   Value *args[] = {matrix, value, index, getInt32(static_cast<unsigned>(elemType)),
                    getInt32(static_cast<unsigned>(layout))};
   std::string callName(lgcName::CooperativeMatrixInsert);
+  addTypeMangling(resultTy, args, callName);
+  Value *result =
+      CreateNamedCall(callName, resultTy, args, {Attribute::ReadNone, Attribute::Speculatable, Attribute::WillReturn});
+  result->setName(instName);
+  return result;
+}
+
+// =====================================================================================================================
+// Create an "fill"-equivalent operation for a cooperative matrix value.
+//
+// @param value : the value to fill the cooperative matrix
+// @param elemType : the matrix element type
+// @param layout : the matrix layout
+// @param instName : name to give instruction(s)
+Value *BuilderCommon::CreateCooperativeMatrixFill(Value *value, CooperativeMatrixElementType elemType,
+                                                  CooperativeMatrixLayout layout, const Twine &instName) {
+  Type *resultTy = getCooperativeMatrixTy(elemType, layout);
+  Value *args[] = {value, getInt32(static_cast<unsigned>(elemType)), getInt32(static_cast<unsigned>(layout))};
+  std::string callName(lgcName::CooperativeMatrixFill);
   addTypeMangling(resultTy, args, callName);
   Value *result =
       CreateNamedCall(callName, resultTy, args, {Attribute::ReadNone, Attribute::Speculatable, Attribute::WillReturn});

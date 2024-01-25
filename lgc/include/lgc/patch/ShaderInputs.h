@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -201,7 +201,7 @@ public:
   void fixupUses(llvm::Module &module, PipelineState *pipelineState, bool computeWithIndirectCall);
 
   // Get argument types for shader inputs
-  uint64_t getShaderArgTys(PipelineState *pipelineState, ShaderStage shaderStage, llvm::Function *origFunc,
+  uint64_t getShaderArgTys(PipelineState *pipelineState, ShaderStageEnum shaderStage, llvm::Function *origFunc,
                            bool isComputeWithCalls, llvm::SmallVectorImpl<llvm::Type *> &argTys,
                            llvm::SmallVectorImpl<std::string> &argNames, unsigned argOffset);
 
@@ -219,19 +219,19 @@ private:
   };
 
   // Get ShaderInputsUsage struct for the given shader stage
-  ShaderInputsUsage *getShaderInputsUsage(ShaderStage stage);
+  ShaderInputsUsage *getShaderInputsUsage(ShaderStageEnum stage);
 
   // Get (create if necessary) ShaderInputUsage struct for the given system shader input in the given shader stage
-  ShaderInputUsage *getShaderInputUsage(ShaderStage stage, ShaderInput inputKind) {
+  ShaderInputUsage *getShaderInputUsage(ShaderStageEnum stage, ShaderInput inputKind) {
     return getShaderInputUsage(stage, static_cast<unsigned>(inputKind));
   }
-  ShaderInputUsage *getShaderInputUsage(ShaderStage stage, unsigned inputKind);
+  ShaderInputUsage *getShaderInputUsage(ShaderStageEnum stage, unsigned inputKind);
 
   // Try to optimize to use the accurate workgroupID arguments and set the function attribute for corresponding
   // amdgpu-no-workgroup-id-*
-  void tryOptimizeWorkgroupId(PipelineState *pipelineState, ShaderStage shaderStage, llvm::Function *origFunc);
+  void tryOptimizeWorkgroupId(PipelineState *pipelineState, ShaderStageEnum shaderStage, llvm::Function *origFunc);
 
-  llvm::SmallVector<ShaderInputsUsage, ShaderStageCountInternal> m_shaderInputsUsage;
+  llvm::SmallVector<ShaderInputsUsage, ShaderStage::CountInternal> m_shaderInputsUsage;
 };
 
 } // namespace lgc

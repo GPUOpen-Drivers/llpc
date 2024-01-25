@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -885,19 +885,6 @@ public:
   //    ways). This API is formulated to allow the front-end to implement that. Step (c) can be
   //    performed without needing to see the resource node used in (a).
 
-  // Create a load of a buffer descriptor.
-  //
-  // If descSet = -1, this is an internal user data, which is a plain 64-bit pointer, flags must be 'BufferFlagAddress'
-  // i64 address is returned.
-  //
-  // @param descSet : Descriptor set
-  // @param binding : Descriptor binding
-  // @param descIndex : Descriptor index
-  // @param flags : BufferFlag* bit settings
-  // @param instName : Name to give instruction(s)
-  llvm::Value *CreateLoadBufferDesc(uint64_t descSet, unsigned binding, llvm::Value *descIndex, unsigned flags,
-                                    const llvm::Twine &instName = "");
-
   // Get address space of constant memory.
   static unsigned getAddrSpaceConst();
 
@@ -1647,6 +1634,20 @@ public:
   // @param value : The value to contribute
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateSubgroupPartition(llvm::Value *const value, const llvm::Twine &instName = "");
+
+  // Create a quad all.
+  //
+  // @param value : The value to compare
+  // @param requireFullQuads: Identify whether help invocations will be spawned in fs.
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateQuadAll(llvm::Value *const value, bool requireFullQuads, const llvm::Twine &instName = "");
+
+  // Create a quad any.
+  //
+  // @param value : The value to compare
+  // @param requireFullQuads: Identify whether help invocations will be spawned in fs.
+  // @param instName : Name to give instruction(s)
+  llvm::Value *CreateQuadAny(llvm::Value *const value, bool requireFullQuads, const llvm::Twine &instName = "");
 
 private:
   Builder() = delete;

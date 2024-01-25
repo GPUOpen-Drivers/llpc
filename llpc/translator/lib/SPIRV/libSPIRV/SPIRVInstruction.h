@@ -413,20 +413,20 @@ protected:
   } MemoryAccess[2]; // [0]:destination, [1]:source
 };
 
-class SPIRVVariable : public SPIRVInstruction {
+class SPIRVBaseVariable : public SPIRVInstruction {
 public:
   // Complete constructor for integer constant
-  SPIRVVariable(SPIRVType *TheType, SPIRVId TheId, SPIRVValue *TheInitializer, const std::string &TheName,
-                SPIRVStorageClassKind TheStorageClass, SPIRVBasicBlock *TheBB, SPIRVModule *TheM)
-      : SPIRVInstruction(TheInitializer ? 5 : 4, OpVariable, TheType, TheId, TheBB, TheM),
-        StorageClass(TheStorageClass) {
+  SPIRVBaseVariable(Op OC, SPIRVWord FixedWordCount, SPIRVType *TheType, SPIRVId TheId, SPIRVValue *TheInitializer,
+                    const std::string &TheName, SPIRVStorageClassKind TheStorageClass, SPIRVId TheMemObjId,
+                    SPIRVBasicBlock *TheBB, SPIRVModule *TheM)
+      : SPIRVInstruction(TheInitializer ? (FixedWordCount + 1) : FixedWordCount, OC, TheType, TheId, TheBB, TheM),
+        StorageClass(TheStorageClass), MemObjId(TheMemObjId) {
     if (TheInitializer)
       Initializer.push_back(TheInitializer->getId());
     Name = TheName;
-    validate();
   }
   // Incomplete constructor
-  SPIRVVariable() : SPIRVInstruction(OpVariable), StorageClass(StorageClassFunction) {}
+  SPIRVBaseVariable(Op OC) : SPIRVInstruction(OC), StorageClass(StorageClassFunction) {}
 
   SPIRVStorageClassKind getStorageClass() const { return StorageClass; }
   SPIRVValue *getInitializer() const {
@@ -435,6 +435,7 @@ public:
     assert(Initializer.size() == 1);
     return getValue(Initializer[0]);
   }
+
   bool isBuiltin(SPIRVBuiltinVariableKind *BuiltinKind = nullptr) const {
     SPIRVWord Kind;
     bool Found = hasDecorate(DecorationBuiltIn, 0, &Kind);
@@ -454,8 +455,39 @@ public:
     return std::vector<SPIRVEntry *>();
   }
 
+  virtual void validate() const {};
+  SPIRVType *getMemObjType() const {
+    SPIRVType *spvMemType = nullptr;
+    if (getOpCode() == OpVariable) {
+      spvMemType = getType()->getPointerElementType();
+    }
+    return spvMemType;
+  }
+
 protected:
-  void validate() const override {
+  SPIRVStorageClassKind StorageClass;
+  std::vector<SPIRVId> Initializer;
+  SPIRVId MemObjId;
+};
+
+class SPIRVVariable : public SPIRVBaseVariable {
+  const static Op OC = OpVariable;
+  const static SPIRVWord FixedWords = 4;
+
+public:
+  // Complete constructor for integer constant
+  SPIRVVariable(SPIRVType *TheType, SPIRVId TheId, SPIRVValue *TheInitializer, const std::string &TheName,
+                SPIRVStorageClassKind TheStorageClass, SPIRVBasicBlock *TheBB, SPIRVModule *TheM)
+      : SPIRVBaseVariable(OC, FixedWords, TheType, TheId, TheInitializer, TheName, TheStorageClass, SPIRVID_INVALID,
+                          TheBB, TheM) {
+    validate();
+  };
+
+  // Incomplete constructor
+  SPIRVVariable() : SPIRVBaseVariable(OC){};
+
+protected:
+  virtual void validate() const override {
     SPIRVValue::validate();
     assert(isValid(StorageClass));
     assert(Initializer.size() == 1 || Initializer.empty());
@@ -466,9 +498,6 @@ protected:
     Initializer.resize(WordCount - 4);
   }
   _SPIRV_DEF_DECODE4(Type, Id, StorageClass, Initializer)
-
-  SPIRVStorageClassKind StorageClass;
-  std::vector<SPIRVId> Initializer;
 };
 
 class SPIRVImageTexelPointer : public SPIRVInstruction {
@@ -688,9 +717,11 @@ protected:
       assert((Op1Ty->getBitWidth() == Op2Ty->getBitWidth()) && "Inconsistent BitWidth");
     } else if (OpCode == OpPtrDiff) {
       assert(Op1Ty->isTypePointer() && Op2Ty->isTypePointer() && "Invalid type for ptr diff instruction");
-      Op1Ty = Op1Ty->getPointerElementType();
-      Op2Ty = Op2Ty->getPointerElementType();
-      assert(Op1Ty == Op2Ty && "Inconsistent type");
+      if (Op1Ty->isTypePointer() && Op2Ty->isTypePointer()) {
+        Op1Ty = Op1Ty->getPointerElementType();
+        Op2Ty = Op2Ty->getPointerElementType();
+        assert(Op1Ty == Op2Ty && "Inconsistent type");
+      }
     } else {
       assert(0 && "Invalid op code!");
     }

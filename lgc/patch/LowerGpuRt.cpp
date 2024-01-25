@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -75,6 +75,7 @@ PreservedAnalyses LowerGpuRt::run(Module &module, ModuleAnalysisManager &analysi
                             .add(&LowerGpuRt::visitGetStaticFlags)
                             .add(&LowerGpuRt::visitGetTriangleCompressionMode)
                             .add(&LowerGpuRt::visitGetFlattenedGroupThreadId)
+                            .add(&LowerGpuRt::visitFloatWithRoundMode)
                             .build();
 
   visitor.visit(*this, module);
@@ -116,9 +117,15 @@ unsigned LowerGpuRt::getWorkgroupSize() const {
 // =====================================================================================================================
 // Get flat thread id in work group/wave
 Value *LowerGpuRt::getThreadIdInGroup() const {
-  // Todo: for graphics shader, subgroupId * waveSize + subgroupLocalInvocationId()
-  unsigned builtIn = m_pipelineState->isGraphics() ? BuiltInSubgroupLocalInvocationId : BuiltInLocalInvocationIndex;
-  return m_builder->CreateReadBuiltInInput(static_cast<BuiltInKind>(builtIn));
+  auto stage = getShaderStage(m_builder->GetInsertBlock()->getParent());
+
+  Value *laneId = m_builder->CreateReadBuiltInInput(BuiltInSubgroupLocalInvocationId, {}, nullptr, nullptr);
+  if (stage != ShaderStage::Compute && stage != ShaderStage::Task && stage != ShaderStage::Mesh)
+    return laneId;
+
+  Value *waveId = m_builder->CreateReadBuiltInInput(BuiltInSubgroupId, {}, nullptr, nullptr);
+  Value *tmp = m_builder->CreateMul(waveId, m_builder->getInt32(m_pipelineState->getShaderWaveSize(stage.value())));
+  return m_builder->CreateAdd(tmp, laneId);
 }
 
 // =====================================================================================================================
@@ -279,6 +286,53 @@ void LowerGpuRt::visitLdsStackInit(GpurtLdsStackInitOp &inst) {
   inst.replaceAllUsesWith(stackAddr);
   m_callsToLower.push_back(&inst);
   m_funcsToLower.insert(inst.getCalledFunction());
+}
+
+// =====================================================================================================================
+// Visit "GpurtFloatWithRoundModeOp" instruction
+//
+// @param inst : The dialect instruction to process
+void LowerGpuRt::visitFloatWithRoundMode(lgc::GpurtFloatWithRoundModeOp &inst) {
+  m_builder->SetInsertPoint(&inst);
+
+  // Use setReg to set SQ_WAVE_MODE.
+  // hwRegId : SQ related register index.
+  // Offset : register field offset.
+  // Width  : field width.
+  // hwReg : (hwRegId | (Offset << 6) | ((Width - 1) << 11)
+  constexpr uint32_t sqHwRegMode = 1;
+  constexpr uint32_t width = 2;
+  constexpr uint32_t offset = 0;
+  uint32_t hwReg = ((sqHwRegMode) | (offset << 6) | ((width - 1) << 11));
+
+  enum OperationType : uint32_t { Add = 0, Sub, Mul };
+  auto func = inst.getCalledFunction();
+  auto retType = cast<FixedVectorType>(func->getReturnType());
+  Value *src0 = inst.getSrc0();
+  Value *src1 = inst.getSrc1();
+  uint32_t rm = cast<ConstantInt>(inst.getRoundMode())->getZExtValue();
+  uint32_t op = cast<ConstantInt>(inst.getOperation())->getZExtValue();
+
+  // WARNING: This isn't supported robustly by the IR semantics and the backend, but it's the best we can do for now.
+  m_builder->CreateIntrinsic(m_builder->getVoidTy(), Intrinsic::amdgcn_s_setreg,
+                             {m_builder->getInt32(hwReg), m_builder->getInt32(rm)});
+
+  Value *result = PoisonValue::get(retType);
+  if (op == OperationType::Add)
+    result = m_builder->CreateFAdd(src0, src1);
+  else if (op == OperationType::Sub)
+    result = m_builder->CreateFSub(src0, src1);
+  else
+    result = m_builder->CreateFMul(src0, src1);
+
+  // set back to RoundTiesToEven.
+  uint32_t roundTiesToEven = 1;
+  m_builder->CreateIntrinsic(m_builder->getVoidTy(), Intrinsic::amdgcn_s_setreg,
+                             {m_builder->getInt32(hwReg), m_builder->getInt32(roundTiesToEven)});
+
+  inst.replaceAllUsesWith(result);
+  m_callsToLower.push_back(&inst);
+  m_funcsToLower.insert(func);
 }
 
 // =====================================================================================================================

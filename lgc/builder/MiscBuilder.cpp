@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -44,7 +44,7 @@ using namespace llvm;
 //
 // @param streamId : Stream number, 0 if only one stream is present
 Instruction *BuilderImpl::CreateEmitVertex(unsigned streamId) {
-  assert(m_shaderStage == ShaderStageGeometry);
+  assert(m_shaderStage == ShaderStage::Geometry);
 
   // Mark this vertex stream as active if transform feedback is enabled, or primitive statistics counting is enabled,
   // or this is the rasterization stream.
@@ -68,7 +68,7 @@ Instruction *BuilderImpl::CreateEmitVertex(unsigned streamId) {
 //
 // @param streamId : Stream number, 0 if only one stream is present
 Instruction *BuilderImpl::CreateEndPrimitive(unsigned streamId) {
-  assert(m_shaderStage == ShaderStageGeometry);
+  assert(m_shaderStage == ShaderStage::Geometry);
 
   // Mark this vertex stream as active if transform feedback is enabled, or primitive statistics counting is enabled,
   // or this is the rasterization stream.
@@ -102,7 +102,7 @@ Instruction *BuilderImpl::CreateKill(const Twine &instName) {
   // This tells the config builder to set KILL_ENABLE in DB_SHADER_CONTROL.
   // Doing it here is suboptimal, as it does not allow for subsequent middle-end optimizations removing the
   // section of code containing the kill.
-  auto resUsage = getPipelineState()->getShaderResourceUsage(ShaderStageFragment);
+  auto resUsage = getPipelineState()->getShaderResourceUsage(ShaderStage::Fragment);
   resUsage->builtInUsage.fs.discard = true;
 
   return CreateIntrinsic(Intrinsic::amdgcn_kill, {}, getFalse(), nullptr, instName);
@@ -122,7 +122,7 @@ Instruction *BuilderImpl::CreateDebugBreak(const Twine &instName) {
 // @param instName : Name to give instruction(s)
 Instruction *BuilderImpl::CreateDemoteToHelperInvocation(const Twine &instName) {
   // Treat a demote as a kill for the purposes of disabling middle-end optimizations.
-  auto resUsage = getPipelineState()->getShaderResourceUsage(ShaderStageFragment);
+  auto resUsage = getPipelineState()->getShaderResourceUsage(ShaderStage::Fragment);
   resUsage->builtInUsage.fs.discard = true;
 
   return CreateIntrinsic(Intrinsic::amdgcn_wqm_demote, {}, getFalse(), nullptr, instName);

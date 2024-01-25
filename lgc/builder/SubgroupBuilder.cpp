@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -61,7 +61,8 @@ Value *BuilderImpl::CreateGetSubgroupSize(const Twine &instName) {
 //
 // @returns : Subgroup size of current shader stage
 unsigned BuilderImpl::getShaderSubgroupSize() {
-  return getPipelineState()->getShaderSubgroupSize(getShaderStage(GetInsertBlock()->getParent()));
+  auto shaderStage = getShaderStage(GetInsertBlock()->getParent());
+  return getPipelineState()->getShaderSubgroupSize(shaderStage.value());
 }
 
 // =====================================================================================================================
@@ -69,7 +70,8 @@ unsigned BuilderImpl::getShaderSubgroupSize() {
 //
 // @returns : Wave size of current shader stage
 unsigned BuilderImpl::getShaderWaveSize() {
-  return getPipelineState()->getShaderWaveSize(getShaderStage(GetInsertBlock()->getParent()));
+  auto shaderStage = getShaderStage(GetInsertBlock()->getParent());
+  return getPipelineState()->getShaderWaveSize(shaderStage.value());
 }
 
 // =====================================================================================================================
@@ -91,7 +93,7 @@ Value *BuilderImpl::CreateSubgroupAll(Value *const value, const Twine &instName)
 
   // Helper invocations of whole quad mode should be included in the subgroup vote execution
   const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
-  if (m_shaderStage == ShaderStageFragment && !fragmentMode.waveOpsExcludeHelperLanes) {
+  if (m_shaderStage == ShaderStage::Fragment && !fragmentMode.waveOpsExcludeHelperLanes) {
     result = CreateZExt(result, getInt32Ty());
     result = CreateIntrinsic(Intrinsic::amdgcn_softwqm, {getInt32Ty()}, {result});
     result = CreateTrunc(result, getInt1Ty());
@@ -110,7 +112,7 @@ Value *BuilderImpl::CreateSubgroupAny(Value *const value, const Twine &instName)
 
   // Helper invocations of whole quad mode should be included in the subgroup vote execution
   const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
-  if (m_shaderStage == ShaderStageFragment && !fragmentMode.waveOpsExcludeHelperLanes) {
+  if (m_shaderStage == ShaderStage::Fragment && !fragmentMode.waveOpsExcludeHelperLanes) {
     result = CreateZExt(result, getInt32Ty());
     result = CreateIntrinsic(Intrinsic::amdgcn_softwqm, {getInt32Ty()}, {result});
     result = CreateTrunc(result, getInt1Ty());
@@ -208,7 +210,7 @@ Value *BuilderImpl::CreateSubgroupBroadcastWaterfall(Value *const value, Value *
 Value *BuilderImpl::CreateSubgroupBroadcastFirst(Value *const value, const Twine &instName) {
   const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
   // For waveOpsExcludeHelperLanes mode, we need filter out the helperlane and use readlane instead.
-  if (m_shaderStage == ShaderStageFragment && fragmentMode.waveOpsExcludeHelperLanes) {
+  if (m_shaderStage == ShaderStage::Fragment && fragmentMode.waveOpsExcludeHelperLanes) {
     Value *ballot = createGroupBallot(getTrue());
     Value *firstlane = CreateIntrinsic(Intrinsic::cttz, getInt64Ty(), {ballot, getTrue()});
     firstlane = CreateTrunc(firstlane, getInt32Ty());
@@ -556,7 +558,7 @@ Value *BuilderImpl::CreateSubgroupClusteredReduction(GroupArithOp groupArithOp, 
 
   // For waveOpsExcludeHelperLanes mode, we need mask away the helperlane.
   const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
-  if (m_shaderStage == ShaderStageFragment && fragmentMode.waveOpsExcludeHelperLanes) {
+  if (m_shaderStage == ShaderStage::Fragment && fragmentMode.waveOpsExcludeHelperLanes) {
     auto isLive = CreateIntrinsic(Intrinsic::amdgcn_live_mask, {}, {}, nullptr, {});
     result = CreateSelect(isLive, result, identity);
   }
@@ -756,7 +758,7 @@ Value *BuilderImpl::CreateSubgroupClusteredExclusive(GroupArithOp groupArithOp, 
 
   // For waveOpsExcludeHelperLanes mode, we need mask away the helperlane.
   const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
-  if (m_shaderStage == ShaderStageFragment && fragmentMode.waveOpsExcludeHelperLanes) {
+  if (m_shaderStage == ShaderStage::Fragment && fragmentMode.waveOpsExcludeHelperLanes) {
     auto isLive = CreateIntrinsic(Intrinsic::amdgcn_live_mask, {}, {}, nullptr, {});
     setInactive = CreateSelect(isLive, setInactive, identity);
   }
@@ -888,7 +890,7 @@ Value *BuilderImpl::CreateSubgroupClusteredMultiExclusive(GroupArithOp groupArit
 
   // For waveOpsExcludeHelperLanes mode, we need mask away the helperlane.
   const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
-  if (m_shaderStage == ShaderStageFragment && fragmentMode.waveOpsExcludeHelperLanes) {
+  if (m_shaderStage == ShaderStage::Fragment && fragmentMode.waveOpsExcludeHelperLanes) {
     auto isLive = CreateIntrinsic(Intrinsic::amdgcn_live_mask, {}, {}, nullptr, {});
     result = CreateSelect(isLive, result, identity);
   }
@@ -901,6 +903,7 @@ Value *BuilderImpl::CreateSubgroupClusteredMultiExclusive(GroupArithOp groupArit
   Value *checkMask = CreateAnd(preLaneMask, clusterMask);
 
   Value *preLaneValue = CreateSubgroupShuffle(result, createFindMsb(checkMask), instName);
+
   result = CreateSelect(CreateICmpNE(checkMask, constZero), preLaneValue, identity);
 
   for (unsigned log2ClusterSize = 0; (1 << log2ClusterSize) < getShaderWaveSize(); log2ClusterSize++) {
@@ -914,7 +917,8 @@ Value *BuilderImpl::CreateSubgroupClusteredMultiExclusive(GroupArithOp groupArit
 
     Value *isPreviousLaneValid = CreateICmpNE(preClusterMask, constZero);
     Value *previousLaneIndex = createFindMsb(preClusterMask);
-    Value *previousLaneValue = CreateSubgroupShuffle(result, previousLaneIndex, instName);
+    Value *previousLaneValue = nullptr;
+    { previousLaneValue = CreateSubgroupShuffle(result, previousLaneIndex, instName); }
 
     // Don't accumulate if there is no valid lane found in previous cluster or current lane is no need for accumulate.
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 479645
@@ -1361,7 +1365,7 @@ Value *BuilderImpl::createWqm(Value *const value) {
     return builder.CreateUnaryIntrinsic(Intrinsic::amdgcn_wqm, mappedArgs[0]);
   };
 
-  if (m_shaderStage == ShaderStageFragment)
+  if (m_shaderStage == ShaderStage::Fragment)
     return CreateMapToSimpleType(mapFunc, value, {});
 
   return value;
@@ -1429,7 +1433,7 @@ Value *BuilderImpl::createGroupBallot(Value *const value) {
 
   // For waveOpsExcludeHelperLanes mode, we need mask away the helperlane.
   const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
-  if (m_shaderStage == ShaderStageFragment && fragmentMode.waveOpsExcludeHelperLanes) {
+  if (m_shaderStage == ShaderStage::Fragment && fragmentMode.waveOpsExcludeHelperLanes) {
     auto isLive = CreateIntrinsic(Intrinsic::amdgcn_live_mask, {}, {}, nullptr, {});
     result = CreateAnd(isLive, result);
   }
@@ -1457,4 +1461,71 @@ Value *BuilderImpl::createFindMsb(Value *const mask) {
 
   // reverse the count from the bottom.
   return CreateSub(getInt32((getShaderSubgroupSize() == 64) ? 63 : 31), result);
+}
+
+// =====================================================================================================================
+// Create a Quad ballot call.
+//
+// @param value : The value to ballot across the Quad. Must be an integer type.
+// @param requireFullQuads : Identify whether it's in wqm.
+// @param instName : Name to give final instruction.
+Value *BuilderImpl::CreateQuadBallot(Value *const value, bool requireFullQuads, const Twine &instName) {
+  Value *ballotValue = createGroupBallot(value);
+
+  // Get the 1st thread_id in the quad
+  Value *threadId = CreateSubgroupMbcnt(getInt64(UINT64_MAX), "");
+
+  // FirstThreadIdInQuad = threadId & (~0x3)
+  Value *threadIdforFirstQuadIndex = CreateAnd(threadId, CreateNot(getInt32(0x3)));
+
+  threadIdforFirstQuadIndex = CreateZExt(threadIdforFirstQuadIndex, getInt64Ty());
+
+  // Get the Quad ballot value for the quad of the thread id: shr(ballotValue, firstThreadidInQuad) & 0xF
+  Value *quadBallotValue = CreateAnd(CreateLShr(ballotValue, threadIdforFirstQuadIndex), getInt64(0xF));
+
+  // Ballot expects a <4 x i32> return, so we need to turn the i64 into that.
+  quadBallotValue = CreateBitCast(quadBallotValue, FixedVectorType::get(getInt32Ty(), 2));
+
+  ElementCount elementCount = cast<VectorType>(quadBallotValue->getType())->getElementCount();
+  quadBallotValue = CreateShuffleVector(quadBallotValue, ConstantVector::getSplat(elementCount, getInt32(0)),
+                                        ArrayRef<int>{0, 1, 2, 3});
+
+  // Helper invocations of whole quad mode should be included in the quad vote execution
+  if (requireFullQuads)
+    quadBallotValue = createWqm(quadBallotValue);
+  return quadBallotValue;
+}
+
+// =====================================================================================================================
+// Create a quad all call.
+//
+// @param value : The value to compare across the quad. Must be an i1 type.
+// @param requireFullQuads :  Identify whether it's in wqm.
+// @param instName : Name to give final instruction.
+Value *BuilderImpl::CreateQuadAll(Value *const value, bool requireFullQuads, const Twine &instName) {
+  // QuadAll(value) = !QuadAny(!value)
+  Value *result = CreateNot(value, instName);
+  result = CreateNot(CreateQuadAny(result, requireFullQuads, instName), instName);
+  return result;
+}
+
+// =====================================================================================================================
+// Create a quad any call.
+//
+// @param value : The value to compare across the quad. Must be an i1 type.
+// @param requireFullQuads : Identify whether it's in wqm.
+// @param instName : Name to give final instruction.
+Value *BuilderImpl::CreateQuadAny(Value *const value, bool requireFullQuads, const Twine &instName) {
+  Value *quadBallotValue = CreateQuadBallot(value, requireFullQuads, instName);
+
+  Value *quadValidValue = CreateAnd(CreateExtractElement(quadBallotValue, getInt32(0)), getInt32(0xF));
+
+  Value *result = CreateICmpNE(quadValidValue, getInt32(0));
+
+  result = CreateSelect(CreateUnaryIntrinsic(Intrinsic::is_constant, value), value, result);
+
+  // Helper invocations of whole quad mode should be included in the quad vote execution
+  if (requireFullQuads)
+    result = createWqm(result);
+  return result;
 }

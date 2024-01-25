@@ -1,11 +1,11 @@
 ; Test that LLPC can handle multiple inline buffer in the root table.
 
 ; BEGIN_SHADERTEST
-; RUN: amdllpc -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -o %t.elf %gfxip %s -v --print-after=lgc-lower-desc 2>&1 | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^//}} LLPC SPIR-V lowering result
 ; SHADERTEST: define dllexport spir_func void @main()
-; SHADERTEST-DAG: call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i64 0, i32 0, i32 0, i32 0)
-; SHADERTEST-DAG: call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i64 0, i32 1, i32 0, i32 0)
+; SHADERTEST-DAG: call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 0)
+; SHADERTEST-DAG: call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 1, i32 0, i32 0)
 ; SHADERTEST: ret void
 ; SHADERTEST-LABEL: {{^//}} LLPC pipeline before-patching results
 ; SHADERTEST: define dllexport spir_func void @lgc.shader.CS.main()

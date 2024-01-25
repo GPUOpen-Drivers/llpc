@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
- *deal in the Software without restriction, including without limitation the
- *rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- *sell copies of the Software, and to permit persons to whom the Software is
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in
@@ -18,25 +18,31 @@
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- *FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- *IN THE SOFTWARE.
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 
-//===- DXILCont.cpp - Insert await calls and prepare DXIL -----------------===//
+//===- Continuations.cpp - Continuations utilities ------------------------===//
 //
-// This file serves as a caller for the LowerRaytracingPipelineImpl.
-//
+// This file defines implementations for helper functions for continuation
+// passes.
 //===----------------------------------------------------------------------===//
 
-#include "compilerutils/CompilerUtils.h"
 #include "continuations/Continuations.h"
+#include "compilerutils/CompilerUtils.h"
 #include "continuations/ContinuationsDialect.h"
 #include "continuations/ContinuationsUtil.h"
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
 #include "llvm-dialects/Dialect/Builder.h"
 #include "llvm-dialects/Dialect/Dialect.h"
+#include "llvm-dialects/Dialect/OpSet.h"
+#include "llvm/ADT/IntervalTree.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/IR/PassManager.h"
 #include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -49,10 +55,388 @@
 #include "llvm/Transforms/Scalar/SROA.h"
 #include "llvm/Transforms/Scalar/SimplifyCFG.h"
 #include "llvm/Transforms/Utils/FixIrreducible.h"
+#include "llvm/Transforms/Utils/LowerSwitch.h"
 
-#define DEBUG_TYPE "lower-raytracing-pipeline"
+#define DEBUG_TYPE "continuations"
 
 using namespace llvm;
+
+#define GPURTMAP_ENTRY(Op, GpurtName, AccessesHitData)                         \
+  {                                                                            \
+    llvm_dialects::OpDescription::get<lgc::rt::Op>(), {                        \
+      GpurtName, AccessesHitData                                               \
+    }                                                                          \
+  }
+
+const llvm_dialects::OpMap<llvm::GpuRtIntrinsicEntry> llvm::LgcRtGpuRtMap = {{
+    GPURTMAP_ENTRY(InstanceIdOp, "InstanceID", true),
+    GPURTMAP_ENTRY(InstanceIndexOp, "InstanceIndex", true),
+    GPURTMAP_ENTRY(HitKindOp, "HitKind", true),
+    GPURTMAP_ENTRY(RayFlagsOp, "RayFlags", false),
+    GPURTMAP_ENTRY(DispatchRaysIndexOp, "DispatchRaysIndex3", false),
+    GPURTMAP_ENTRY(DispatchRaysDimensionsOp, "DispatchRaysDimensions3", false),
+    GPURTMAP_ENTRY(WorldRayOriginOp, "WorldRayOrigin3", false),
+    GPURTMAP_ENTRY(WorldRayDirectionOp, "WorldRayDirection3", false),
+    GPURTMAP_ENTRY(ObjectRayOriginOp, "ObjectRayOrigin3", true),
+    GPURTMAP_ENTRY(ObjectRayDirectionOp, "ObjectRayDirection3", true),
+    GPURTMAP_ENTRY(ObjectToWorldOp, "ObjectToWorld4x3", true),
+    GPURTMAP_ENTRY(WorldToObjectOp, "WorldToObject4x3", true),
+    GPURTMAP_ENTRY(RayTminOp, "RayTMin", false),
+    GPURTMAP_ENTRY(RayTcurrentOp, "RayTCurrent", true),
+    GPURTMAP_ENTRY(IgnoreHitOp, "IgnoreHit", false),
+    GPURTMAP_ENTRY(AcceptHitAndEndSearchOp, "AcceptHitAndEndSearch", false),
+    GPURTMAP_ENTRY(TraceRayOp, "TraceRay", false),
+    GPURTMAP_ENTRY(ReportHitOp, "ReportHit", false),
+    GPURTMAP_ENTRY(CallCallableShaderOp, "CallShader", false),
+    GPURTMAP_ENTRY(PrimitiveIndexOp, "PrimitiveIndex", true),
+    GPURTMAP_ENTRY(GeometryIndexOp, "GeometryIndex", true),
+}};
+
+#undef GPURTMAP_ENTRY
+
+bool llvm::isLgcRtOp(const llvm::Function *F) {
+  return F && F->getName().starts_with("lgc.rt");
+}
+
+void llvm::moveFunctionBody(Function &OldFunc, Function &NewFunc) {
+  while (!OldFunc.empty()) {
+    BasicBlock *BB = &OldFunc.front();
+    BB->removeFromParent();
+    BB->insertInto(&NewFunc);
+  }
+}
+
+std::optional<llvm::GpuRtIntrinsicEntry>
+llvm::findIntrImplEntryByIntrinsicCall(CallInst *Call) {
+  if (!isLgcRtOp(Call->getCalledFunction()))
+    return std::nullopt;
+
+  auto ImplEntry = LgcRtGpuRtMap.find(*Call);
+  if (ImplEntry == LgcRtGpuRtMap.end())
+    report_fatal_error("Unhandled lgc.rt op!");
+
+  return *ImplEntry.val();
+}
+
+bool llvm::removeUnusedFunctionDecls(Module *Mod, bool OnlyIntrinsics) {
+  bool DidChange = false;
+
+  for (Function &F : make_early_inc_range(*Mod)) {
+    if (F.isDeclaration() && F.user_empty()) {
+      if (!OnlyIntrinsics ||
+          (isLgcRtOp(&F) || F.getName().starts_with("dx.op."))) {
+        F.eraseFromParent();
+        DidChange = true;
+      }
+    }
+  }
+
+  return DidChange;
+}
+
+bool ContHelper::isRematerializableLgcRtOp(CallInst &CInst,
+                                           std::optional<DXILShaderKind> Kind) {
+  using namespace lgc::rt;
+  Function *Callee = CInst.getCalledFunction();
+  if (!llvm::isLgcRtOp(Callee))
+    return false;
+
+  // Always rematerialize
+  static const llvm_dialects::OpSet RematerializableDialectOps =
+      llvm_dialects::OpSet::get<DispatchRaysDimensionsOp,
+                                DispatchRaysIndexOp>();
+  if (RematerializableDialectOps.contains(*Callee))
+    return true;
+
+  // Rematerialize for Intersection that can only call ReportHit, which keeps
+  // the largest system data struct. These cannot be rematerialized in
+  // ClosestHit, because if ClosestHit calls TraceRay or CallShader, that
+  // information is lost from the system data struct. Also exclude rayTCurrent
+  // because ReportHit calls can change that.
+  if (!Kind || *Kind == DXILShaderKind::Intersection) {
+    static const llvm_dialects::OpSet RematerializableIntersectionDialectOps =
+        llvm_dialects::OpSet::get<
+            InstanceIdOp, InstanceIndexOp, GeometryIndexOp,
+            ObjectRayDirectionOp, ObjectRayOriginOp, ObjectToWorldOp,
+            PrimitiveIndexOp, RayFlagsOp, RayTminOp, WorldRayDirectionOp,
+            WorldRayOriginOp, WorldToObjectOp>();
+    if (RematerializableIntersectionDialectOps.contains(*Callee))
+      return true;
+  }
+
+  return false;
+}
+
+void llvm::replaceAllPointerUses(IRBuilder<> *Builder, Value *OldPointerValue,
+                                 Value *NewPointerValue,
+                                 SmallVectorImpl<Instruction *> &ToBeRemoved) {
+  // Note: The implementation explicitly supports typed pointers, which
+  //       complicates some of the code below.
+
+  // Assert that both types are pointers that only differ in the address space.
+  PointerType *OldPtrTy = cast<PointerType>(OldPointerValue->getType());
+  PointerType *NewPtrTy = cast<PointerType>(NewPointerValue->getType());
+  unsigned NewAS = NewPtrTy->getAddressSpace();
+  assert(NewAS != OldPtrTy->getAddressSpace());
+  assert(getWithSamePointeeType(OldPtrTy, NewAS) == NewPtrTy);
+
+  OldPointerValue->mutateType(NewPtrTy);
+
+  // Traverse through the users and setup the addrspace
+  SmallVector<Value *> Worklist(OldPointerValue->users());
+  OldPointerValue->replaceAllUsesWith(NewPointerValue);
+
+  // Given a pointer type, get a pointer with the same pointee type (possibly
+  // opaque) as the given type that uses the NewAS address space.
+  auto GetMutatedPtrTy = [NewAS](Type *Ty) {
+    PointerType *PtrTy = cast<PointerType>(Ty);
+    // Support typed pointers:
+    return getWithSamePointeeType(PtrTy, NewAS);
+  };
+
+  while (!Worklist.empty()) {
+    Value *Ptr = Worklist.pop_back_val();
+    Instruction *Inst = cast<Instruction>(Ptr);
+    LLVM_DEBUG(dbgs() << "Visiting " << *Inst << '\n');
+    // In the switch below, "break" means to continue with replacing
+    // the users of the current value, while "continue" means to stop at
+    // the current value, and proceed with next one from the work list.
+    switch (Inst->getOpcode()) {
+    default:
+      LLVM_DEBUG(Inst->dump());
+      llvm_unreachable("Unhandled instruction\n");
+      break;
+    case Instruction::Call: {
+      if (Inst->isLifetimeStartOrEnd()) {
+        // The lifetime marker is not useful anymore.
+        Inst->eraseFromParent();
+      } else {
+        LLVM_DEBUG(Inst->dump());
+        llvm_unreachable("Unhandled call instruction\n");
+      }
+      // No further processing needed for the users.
+      continue;
+    }
+    case Instruction::Load:
+    case Instruction::Store:
+      // No further processing needed for the users.
+      continue;
+    case Instruction::And:
+    case Instruction::Add:
+    case Instruction::PtrToInt:
+      break;
+    case Instruction::BitCast: {
+      // This can happen with typed pointers
+      auto *BC = cast<BitCastOperator>(Inst);
+      assert(cast<BitCastOperator>(Inst)->getSrcTy()->isPointerTy() &&
+             BC->getDestTy()->isPointerTy());
+      Inst->mutateType(GetMutatedPtrTy(Inst->getType()));
+      break;
+    }
+    case Instruction::AddrSpaceCast:
+      // Check that the pointer operand has already been fixed
+      assert(Inst->getOperand(0)->getType()->getPointerAddressSpace() == NewAS);
+      // Push the correct users before RAUW.
+      Worklist.append(Ptr->users().begin(), Ptr->users().end());
+      Inst->mutateType(GetMutatedPtrTy(Inst->getType()));
+      // Since we are mutating the address spaces of users as well,
+      // we can just use the (already mutated) cast operand.
+      Inst->replaceAllUsesWith(Inst->getOperand(0));
+      ToBeRemoved.push_back(Inst);
+      continue;
+    case Instruction::IntToPtr:
+    case Instruction::GetElementPtr: {
+      Inst->mutateType(GetMutatedPtrTy(Inst->getType()));
+      break;
+    }
+    case Instruction::Select: {
+      auto *OldType = Inst->getType();
+      if (OldType->isPointerTy()) {
+        Type *NewType = GetMutatedPtrTy(OldType);
+        // No further processing if the type has the correct pointer type
+        if (NewType == OldType)
+          continue;
+
+        Inst->mutateType(NewType);
+      }
+      break;
+    }
+    }
+
+    Worklist.append(Ptr->users().begin(), Ptr->users().end());
+  }
+}
+
+void llvm::forwardContinuationFrameStoreToLoad(DominatorTree &DT,
+                                               Value *FramePtr) {
+  assert(FramePtr);
+
+  DenseMap<int64_t, SmallVector<LoadInst *>> OffsetLoadMap;
+  using StoreIntervalTree = IntervalTree<int64_t, StoreInst *>;
+  using IntervalTreeData = StoreIntervalTree::DataType;
+  StoreIntervalTree::Allocator Allocator;
+  StoreIntervalTree StoreIntervals(Allocator);
+  // While IntervalTree is efficient at answering which store would write to
+  // memory that fully cover the memory range that will be loaded [load_begin,
+  // load_end] by detecting the intervals that have intersection with both
+  // `load_begin` and `load_end`, but it is not good at answering whether there
+  // are stores that are strictly within the range (load_begin, load_end). So
+  // we introduce a sorted array to help detecting if there is conflicting
+  // store within the range (load_begin, load_end).
+  struct OffsetStorePair {
+    OffsetStorePair(int64_t Offset, StoreInst *Store)
+        : Offset(Offset), Store(Store) {}
+    int64_t Offset;
+    StoreInst *Store;
+  };
+  SmallVector<OffsetStorePair> SortedStores;
+
+  struct PointerUse {
+    PointerUse(Use *P, int64_t O) : Ptr(P), Offset(O) {}
+    // The Use of a particular pointer to be visited.
+    Use *Ptr;
+    // The byte offset to the base pointer.
+    int64_t Offset;
+  };
+  SmallVector<PointerUse> Worklist;
+  for (auto &U : FramePtr->uses())
+    Worklist.push_back(PointerUse(&U, 0));
+
+  while (!Worklist.empty()) {
+    PointerUse PtrUse = Worklist.pop_back_val();
+    User *U = PtrUse.Ptr->getUser();
+    switch (cast<Instruction>(U)->getOpcode()) {
+    case Instruction::GetElementPtr: {
+      auto *Gep = cast<GetElementPtrInst>(U);
+      const DataLayout &DL = Gep->getModule()->getDataLayout();
+      unsigned OffsetBitWidth = DL.getIndexSizeInBits(Gep->getAddressSpace());
+      APInt Offset(OffsetBitWidth, 0);
+      bool ConstantOffset = Gep->accumulateConstantOffset(
+          Gep->getModule()->getDataLayout(), Offset);
+      // Give up on dynamic indexes for simplicity.
+      if (!ConstantOffset)
+        return;
+
+      for (auto &UU : Gep->uses())
+        Worklist.push_back(
+            PointerUse(&UU, Offset.getSExtValue() + PtrUse.Offset));
+      break;
+    }
+    case Instruction::Load: {
+      auto *Load = cast<LoadInst>(U);
+      if (!Load->isSimple())
+        return;
+      SmallVector<LoadInst *> &Instrs = OffsetLoadMap[PtrUse.Offset];
+      Instrs.push_back(cast<LoadInst>(U));
+      break;
+    }
+    case Instruction::Store: {
+      auto *Store = cast<StoreInst>(U);
+      if (!Store->isSimple() || Store->getValueOperand() == PtrUse.Ptr->get())
+        return;
+
+      assert(Store->getPointerOperand() == PtrUse.Ptr->get());
+      const DataLayout &DL = Store->getModule()->getDataLayout();
+      unsigned StoredBytes =
+          DL.getTypeStoreSize(Store->getValueOperand()->getType());
+
+      SortedStores.push_back(OffsetStorePair(PtrUse.Offset, Store));
+      StoreIntervals.insert(PtrUse.Offset, PtrUse.Offset + StoredBytes - 1,
+                            Store);
+      break;
+    }
+    case Instruction::BitCast:
+    case Instruction::AddrSpaceCast: {
+      for (auto &UU : cast<Instruction>(U)->uses())
+        Worklist.push_back(PointerUse(&UU, PtrUse.Offset));
+      break;
+    }
+    default:
+      LLVM_DEBUG(dbgs() << "Unhandled user of continuation frame pointer: "
+                        << *U << '\n');
+      return;
+    }
+  }
+
+  StoreIntervals.create();
+  llvm::sort(SortedStores,
+             [](const OffsetStorePair &Left, const OffsetStorePair &Right) {
+               return Left.Offset < Right.Offset;
+             });
+
+  // Nothing to do if there is no store.
+  if (StoreIntervals.empty())
+    return;
+
+  for (const auto &[Offset, Loads] : OffsetLoadMap) {
+    assert(!Loads.empty());
+    auto IntersectionsLeft = StoreIntervals.getContaining(Offset);
+    // Nothing to do if there is no store or more than one store.
+    if (IntersectionsLeft.size() != 1)
+      continue;
+
+    const IntervalTreeData &StoreInfo = *IntersectionsLeft.front();
+    // The load and store are at different addresses, abort. This can be
+    // improved later.
+    if (Offset != StoreInfo.left())
+      continue;
+
+    for (auto *Load : Loads) {
+      const DataLayout &DL = Load->getModule()->getDataLayout();
+      unsigned LoadBytes = DL.getTypeStoreSize(Load->getType());
+      auto IntersectionsRight =
+          StoreIntervals.getContaining(Offset + LoadBytes - 1);
+      assert(!IntersectionsRight.empty());
+      // Make sure the store we found fully covers the loaded range and is the
+      // only one.
+      if (IntersectionsRight.size() != 1 ||
+          IntersectionsRight.front()->value() != StoreInfo.value())
+        continue;
+
+      StoreInst *Store = StoreInfo.value();
+      // Get the first iterator pointing to a value that is strictly greater
+      // than Offset.
+      auto *MaybeConflict = llvm::upper_bound(
+          SortedStores, Offset, [](int64_t V, const OffsetStorePair &Elem) {
+            return V < Elem.Offset;
+          });
+      // Abort if there is another store which write to the memory region
+      // strictly within the loaded region.
+      if (MaybeConflict != SortedStores.end() &&
+          MaybeConflict->Offset < StoreInfo.right())
+        continue;
+
+      // Currently we only forward if the value types are the same. This can
+      // be improved.
+      Type *StoredTy = Store->getValueOperand()->getType();
+      if (Load->getType() != StoredTy)
+        continue;
+      if (!DT.dominates(Store, Load))
+        continue;
+
+      auto *LoadPtr = Load->getPointerOperand();
+      Load->replaceAllUsesWith(Store->getValueOperand());
+      Load->eraseFromParent();
+
+      // Erase the possibly dead instruction which defines the pointer.
+      if (!LoadPtr->use_empty())
+        continue;
+      if (auto *PtrInstr = dyn_cast<Instruction>(LoadPtr))
+        PtrInstr->eraseFromParent();
+    }
+  }
+}
+
+PointerType *llvm::getWithSamePointeeType(PointerType *PtrTy,
+                                          unsigned AddressSpace) {
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 482880
+  return PointerType::getWithSamePointeeType(PtrTy, AddressSpace);
+#else
+  // New version of the code (also handles unknown version, which we treat as
+  // latest)
+  return PointerType::get(PtrTy->getContext(), AddressSpace);
+#endif
+}
 
 static const char *toString(DXILShaderKind ShaderKind) {
   switch (ShaderKind) {
@@ -100,7 +484,7 @@ llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &Str,
   return Str;
 }
 
-void DXILContHelper::RegisterPasses(PassBuilder &PB, bool NeedDialectContext) {
+void ContHelper::RegisterPasses(PassBuilder &PB, bool NeedDialectContext) {
 #define HANDLE_PASS(NAME, CREATE_PASS)                                         \
   if (innerPipeline.empty() && name == NAME) {                                 \
     passMgr.addPass(CREATE_PASS);                                              \
@@ -189,8 +573,8 @@ void DXILContHelper::RegisterPasses(PassBuilder &PB, bool NeedDialectContext) {
   }
 }
 
-void DXILContHelper::addContinuationPasses(ModulePassManager &MPM,
-                                           Module *GpurtLibrary) {
+void ContHelper::addContinuationPasses(ModulePassManager &MPM,
+                                       Module *GpurtLibrary) {
   // Inline functions into shaders, so everything is in a shader
   MPM.addPass(AlwaysInlinerPass(/*InsertLifetimeIntrinsics=*/false));
 
@@ -214,6 +598,10 @@ void DXILContHelper::addContinuationPasses(ModulePassManager &MPM,
 
   MPM.addPass(RemoveTypesMetadataPass());
 
+  // The FixIrreducible pass does not cope with switch instructions, so lower
+  // them before.
+  MPM.addPass(createModuleToFunctionPassAdaptor(LowerSwitchPass()));
+
   // Splitting functions as part of LLVM's coroutine transformation can lead
   // to irreducible resume functions in some cases. Use the FixIrreduciblePass
   // to resolve the irreducibility with a dynamic dispatch block. In the future
@@ -224,8 +612,8 @@ void DXILContHelper::addContinuationPasses(ModulePassManager &MPM,
   MPM.addPass(createModuleToFunctionPassAdaptor(FixIrreduciblePass()));
 }
 
-void DXILContHelper::addDxilContinuationPasses(ModulePassManager &MPM,
-                                               Module *GpurtLibrary) {
+void ContHelper::addDxilContinuationPasses(ModulePassManager &MPM,
+                                           Module *GpurtLibrary) {
   MPM.addPass(DXILContPreHookPass());
 
   // Translate dx.op intrinsic calls to lgc.rt dialect intrinsic calls
@@ -244,7 +632,7 @@ void DXILContHelper::addDxilContinuationPasses(ModulePassManager &MPM,
   MPM.addPass(DXILContPostHookPass());
 }
 
-void DXILContHelper::addDxilGpurtLibraryPasses(ModulePassManager &MPM) {
+void ContHelper::addDxilGpurtLibraryPasses(ModulePassManager &MPM) {
   MPM.addPass(llvm::DXILContIntrinsicPreparePass());
   MPM.addPass(AlwaysInlinerPass(/*InsertLifetimeIntrinsics=*/false));
 
@@ -300,7 +688,7 @@ llvm::continuationStackOffsetToPtr(IRBuilder<> &B, Value *Offset,
          "Stack offset is expected to be an i32");
   Module *M = B.GetInsertPoint()->getModule();
   std::optional<ContStackAddrspace> StackAddrspace =
-      DXILContHelper::tryGetStackAddrspace(*M);
+      ContHelper::tryGetStackAddrspace(*M);
   if (!StackAddrspace)
     report_fatal_error("Missing stack addrspace metadata!");
   if (*StackAddrspace == ContStackAddrspace::Scratch)
@@ -321,8 +709,7 @@ llvm::continuationStackOffsetToPtr(IRBuilder<> &B, Value *Offset,
   return B.CreateGEP(B.getInt8Ty(), BaseAddrPtr, Offset);
 }
 
-Function *llvm::cloneFunctionHeaderWithTypes(Function &F,
-                                             DXILContFuncTy &NewType,
+Function *llvm::cloneFunctionHeaderWithTypes(Function &F, ContFuncTy &NewType,
                                              ArrayRef<AttributeSet> ArgAttrs) {
   FunctionType *FuncTy = NewType.asFunctionType(F.getContext());
   Function *NewFunc = CompilerUtils::cloneFunctionHeader(F, FuncTy, ArgAttrs);
@@ -370,9 +757,14 @@ bool llvm::fixupDxilMetadata(Module &M) {
   }
 
   for (auto &F : M.functions()) {
-    if (auto *MD = F.getMetadata(DXILContHelper::MDContinuationName)) {
+    if (auto *MD = F.getMetadata(ContHelper::MDContinuationName)) {
       if (auto *MDTup = dyn_cast_or_null<MDTuple>(MD))
         Changed |= stripMDCasts(MDTup);
+    }
+
+    if (F.hasMetadata(ContHelper::MDContPayloadTyName)) {
+      F.setMetadata(ContHelper::MDContPayloadTyName, nullptr);
+      Changed = true;
     }
   }
 
@@ -720,13 +1112,13 @@ static void handleGetUninitialized(Function &Func) {
 
 bool llvm::earlyDriverTransform(Module &M) {
   // Import StackAddrspace from metadata if set, otherwise from default
-  auto StackAddrspaceMD = DXILContHelper::tryGetStackAddrspace(M);
+  auto StackAddrspaceMD = ContHelper::tryGetStackAddrspace(M);
   auto StackAddrspace =
-      StackAddrspaceMD.value_or(DXILContHelper::DefaultStackAddrspace);
+      StackAddrspaceMD.value_or(ContHelper::DefaultStackAddrspace);
 
   // Import from metadata if set
-  auto RtipLevel = DXILContHelper::tryGetRtip(M);
-  auto Flags = DXILContHelper::tryGetFlags(M);
+  auto RtipLevel = ContHelper::tryGetRtip(M);
+  auto Flags = ContHelper::tryGetFlags(M);
 
   bool Changed = false;
   // Replace Enqueue and Complete intrinsics
@@ -760,7 +1152,7 @@ bool llvm::earlyDriverTransform(Module &M) {
         report_fatal_error(
             "Tried to get rtip level but it is not available on the module");
       handleGetRtip(F, *RtipLevel);
-    } else if (Name.startswith("_AmdGetUninitialized")) {
+    } else if (Name.starts_with("_AmdGetUninitialized")) {
       Changed = true;
       handleGetUninitialized(F);
     }
@@ -779,16 +1171,16 @@ llvm::computeNeededStackSizeForRegisterBuffer(uint64_t NumI32s,
   return NumStackI32s * RegisterBytes;
 }
 
-Type *llvm::getFuncArgPtrElementType(const Function *F, const Argument *Arg) {
+Type *llvm::getFuncArgPtrElementType(const Argument *Arg) {
   auto *ArgTy = Arg->getType();
   if (!ArgTy->isPointerTy())
     return nullptr;
 
-  return DXILContArgTy::get(F, Arg).getPointerElementType();
+  return ContArgTy::get(Arg->getParent(), Arg).getPointerElementType();
 }
 
 Type *llvm::getFuncArgPtrElementType(const Function *F, int ArgNo) {
-  return getFuncArgPtrElementType(F, F->getArg(ArgNo));
+  return getFuncArgPtrElementType(F->getArg(ArgNo));
 }
 
 namespace llvm {
@@ -819,6 +1211,12 @@ bool llvm::LgcMaterializable(Instruction &OrigI) {
   if (coro::defaultMaterializable(*V))
     return true;
 
+  // Insert into constant.
+  if (isa<InsertElementInst, InsertValueInst>(V) &&
+      isa<Constant>(V->getOperand(0))) {
+    return true;
+  }
+
   if (auto *LI = dyn_cast<LoadInst>(V)) {
     // load from constant address space
     if (LI->getPointerAddressSpace() == 4)
@@ -831,13 +1229,26 @@ bool llvm::LgcMaterializable(Instruction &OrigI) {
       // be rematerialized are replaced by their implementation, so that the
       // necessary values can be put into the coroutine frame. Therefore, we
       // can assume all left-over intrinsics can be rematerialized.
-      if (DXILContHelper::isRematerializableLgcRtOp(*CInst))
+      if (ContHelper::isRematerializableLgcRtOp(*CInst))
         return true;
+
+      if (auto *Intrinsic = dyn_cast<IntrinsicInst>(CInst)) {
+        switch (Intrinsic->getIntrinsicID()) {
+        // Note: s_getpc will return a different value if rematerialized into a
+        // different place, but assuming we only care about the high 32bit for
+        // all the use cases we have now, it should be ok to do so.
+        case Intrinsic::amdgcn_s_getpc:
+          return true;
+        default:
+          break;
+        }
+      }
 
       auto CalledName = CalledFunc->getName();
       // FIXME: switch to dialectOp check.
-      if (CalledName.startswith("lgc.user.data") ||
-          CalledName.startswith("lgc.load.user.data"))
+      if (CalledName.starts_with("lgc.user.data") ||
+          CalledName.starts_with("lgc.shader.input") ||
+          CalledName.starts_with("lgc.load.user.data"))
         return true;
     }
   }

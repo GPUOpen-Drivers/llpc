@@ -346,12 +346,10 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-LABEL: define void @MyRayGen(
-; LOWERRAYTRACINGPIPELINE-SAME: ) #[[ATTR2:[0-9]+]] !lgc.rt.shaderstage [[META15:![0-9]+]] !continuation.entry [[META20:![0-9]+]] !continuation.registercount [[META15]] !continuation [[META21:![0-9]+]] {
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[TMP0:%.*]], align 8
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP1:%.*]] = call [[TMP0]] @continuations.getSystemData.s_s()
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[TMP0]] [[TMP1]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[SYSTEM_DATA_ALLOCA]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
+; LOWERRAYTRACINGPIPELINE-SAME: [[TMP0:%.*]] [[TMP0]]) #[[ATTR2:[0-9]+]] !lgc.rt.shaderstage [[META15:![0-9]+]] !continuation.entry [[META20:![0-9]+]] !continuation.registercount [[META15]] !continuation [[META21:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[TMP0]], align 8
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[TMP0]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = load [[DX_TYPES_HANDLE]], ptr @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = alloca [[STRUCT_RAYPAYLOAD:%.*]], align 4
@@ -364,7 +362,7 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP9:%.*]] = call i64 @amd.dx.getAccelStructAddr([[DX_TYPES_HANDLE]] [[TMP8]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[DIS_DATA_I:%.*]] = load [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYS_DATA_I:%.*]] = insertvalue [[TMP2]] undef, [[TMP0]] [[DIS_DATA_I]], 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TRAV_DATA_I:%.*]] = insertvalue [[TMP1]] undef, [[TMP2]] [[SYS_DATA_I]], 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TRAV_DATA_I:%.*]] = insertvalue [[TMP1:%.*]] undef, [[TMP2]] [[SYS_DATA_I]], 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[ADDR_I:%.*]] = call i64 @_AmdGetResumePointAddr() #[[ATTR3:[0-9]+]]
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TRAV_DATA2_I:%.*]] = insertvalue [[TMP1]] [[TRAV_DATA_I]], i64 [[ADDR_I]], 5
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP4]], i32 0, i32 0
@@ -401,8 +399,7 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP33:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP33]], ptr [[TMP32]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[TMP0]] [[TMP22]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[LOCAL_ROOT_INDEX1:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[SYSTEM_DATA_ALLOCA]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX1]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    br label [[DOTSPLIT:%.*]]
 ; LOWERRAYTRACINGPIPELINE:       .split:
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP34:%.*]] = load <4 x float>, ptr [[TMP6]], align 4, !tbaa [[TBAA22]]
@@ -427,11 +424,9 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[TMP2]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = alloca [[STRUCT_RAYPAYLOAD:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[HITATTRS:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], align 8
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = call [[TMP2]] @continuations.getSystemData.s_s_0()
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[TMP2]] [[TMP4]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[TMP2]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP5]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[TMP2]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[TMP2]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP5:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP4]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP3]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP7:%.*]] = getelementptr i32, ptr [[TMP6]], i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP8:%.*]] = getelementptr i32, ptr [[TMP7]], i64 0
@@ -458,6 +453,7 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP22:%.*]] = getelementptr inbounds i32, ptr [[TMP2]], i64 1
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP23:%.*]] = load i32, ptr [[TMP22]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP23]], ptr [[TMP21]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[TMP5]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP24:%.*]] = getelementptr inbounds [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[HITATTRS]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP25:%.*]] = load <2 x float>, ptr [[TMP24]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP26:%.*]] = extractelement <2 x float> [[TMP25]], i32 0

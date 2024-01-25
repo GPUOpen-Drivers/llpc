@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -40,6 +40,7 @@
 #include "lgc/patch/FragColorExport.h"
 #include "lgc/patch/LowerCooperativeMatrix.h"
 #include "lgc/patch/LowerDebugPrintf.h"
+#include "lgc/patch/LowerDesc.h"
 #include "lgc/patch/LowerGpuRt.h"
 #include "lgc/patch/PatchBufferOp.h"
 #include "lgc/patch/PatchCheckShaderCache.h"
@@ -135,7 +136,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
 
   if (pipelineState->getOptions().useGpurt) {
     // NOTE: Lower GPURT operations and run InstCombinePass before builder replayer, because some Op are going to be
-    // turned into constant value, so that we can eliminate unused `@lgc.create.load.buffer.desc` before getting into
+    // turned into constant value, so that we can eliminate unused `@lgc.load.buffer.desc` before getting into
     // replayer. Otherwise, unnecessary `writes_uavs` and `uses_uav` may be set.
     passMgr.addPass(LowerGpuRt());
     passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass()));
@@ -168,8 +169,8 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   // Lower the cooperative matrix
   passMgr.addPass(LowerCooperativeMatrix());
 
-  if (pipelineState->hasShaderStage(ShaderStageVertex) && !pipelineState->hasShaderStage(ShaderStageTessControl) &&
-      pipelineState->hasShaderStage(ShaderStageTessEval))
+  if (pipelineState->hasShaderStage(ShaderStage::Vertex) && !pipelineState->hasShaderStage(ShaderStage::TessControl) &&
+      pipelineState->hasShaderStage(ShaderStage::TessEval))
     passMgr.addPass(TcsPassthroughShader());
 
   passMgr.addPass(PatchNullFragShader());
@@ -183,14 +184,10 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   passMgr.addPass(PatchCopyShader());
   passMgr.addPass(LowerVertexFetch());
   passMgr.addPass(LowerFragColorExport());
+  passMgr.addPass(LowerDesc());
   passMgr.addPass(PatchEntryPointMutate());
   passMgr.addPass(PatchInitializeWorkgroupMemory());
   passMgr.addPass(PatchInOutImportExport());
-
-  // Prior to general optimization, do function inlining and dead function removal to remove helper functions that
-  // were introduced during lowering (e.g. streamout stores).
-  passMgr.addPass(AlwaysInlinerPass());
-  passMgr.addPass(GlobalDCEPass());
 
   // Patch invariant load and loop metadata.
   passMgr.addPass(createModuleToFunctionPassAdaptor(PatchInvariantLoads()));
@@ -215,6 +212,10 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   // Second part of lowering to "AMDGCN-style"
   passMgr.addPass(PatchPreparePipelineAbi());
 
+  // Do inlining and global DCE to inline subfunctions that were introduced during preparing pipeline ABI.
+  passMgr.addPass(AlwaysInlinerPass());
+  passMgr.addPass(GlobalDCEPass());
+
   const bool canUseNgg = pipelineState->isGraphics() &&
                          ((pipelineState->getTargetInfo().getGfxIpVersion().major == 10 &&
                            (pipelineState->getOptions().nggFlags & NggFlagDisable) == 0) ||
@@ -226,8 +227,6 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
     }
 
     // Extra optimizations after NGG primitive shader creation
-    passMgr.addPass(AlwaysInlinerPass());
-    passMgr.addPass(GlobalDCEPass());
     FunctionPassManager fpm;
     fpm.addPass(PromotePass());
     fpm.addPass(ADCEPass());
@@ -455,7 +454,7 @@ void Patch::addOptimizationPasses(lgc::PassManager &passMgr, uint32_t optLevel) 
 void Patch::init(Module *module) {
   m_module = module;
   m_context = &m_module->getContext();
-  m_shaderStage = ShaderStageInvalid;
+  m_shaderStage = ShaderStage::Invalid;
   m_entryPoint = nullptr;
 }
 

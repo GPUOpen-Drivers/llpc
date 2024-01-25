@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2016-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2016-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -217,9 +217,9 @@ void GraphicsContext::setTcsInputVertices(Module *tcsModule) {
   const auto &inputIaState = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->iaState;
   if (inputIaState.patchControlPoints == 0)
     return;
-  TessellationMode tessellationMode = lgc::Pipeline::getTessellationMode(*tcsModule, lgc::ShaderStageTessControl);
+  TessellationMode tessellationMode = lgc::Pipeline::getTessellationMode(*tcsModule, lgc::ShaderStage::TessControl);
   tessellationMode.inputVertices = inputIaState.patchControlPoints;
-  lgc::Pipeline::setTessellationMode(*tcsModule, lgc::ShaderStageTessControl, tessellationMode);
+  lgc::Pipeline::setTessellationMode(*tcsModule, lgc::ShaderStage::TessControl, tessellationMode);
 }
 
 // =====================================================================================================================
@@ -250,6 +250,7 @@ Options GraphicsContext::computePipelineOptions() const {
   options.enableUberFetchShader = pipelineInfo->enableUberFetchShader;
   options.enableColorExportShader = pipelineInfo->enableColorExportShader;
   options.useSoftwareVertexBufferDescriptors = pipelineInfo->useSoftwareVertexBufferDescriptors;
+  options.vbAddressLowBitsKnown = pipelineInfo->vbAddressLowBitsKnown;
   if (getGfxIpVersion().major >= 10) {
     // Only set NGG options for a GFX10+ graphics pipeline.
     const auto &nggState = pipelineInfo->nggState;
@@ -389,6 +390,9 @@ void GraphicsContext::setVertexInputDescriptions(Pipeline *pipeline, Util::Metro
 
   // Gather the vertex inputs.
   SmallVector<VertexInputDescription, 8> descriptions;
+  auto vbLowBits = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->vbAddressLowBits;
+  auto vbAddressLowBitsKnown =
+      static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->vbAddressLowBitsKnown;
   for (unsigned i = 0; i < vertexInput->vertexAttributeDescriptionCount; ++i) {
     auto attrib = &vertexInput->pVertexAttributeDescriptions[i];
     if (attrib->binding >= bindings.size())
@@ -400,20 +404,15 @@ void GraphicsContext::setVertexInputDescriptions(Pipeline *pipeline, Util::Metro
     auto dfmt = BufDataFormatInvalid;
     auto nfmt = BufNumFormatUnorm;
     std::tie(dfmt, nfmt) = mapVkFormat(attrib->format, /*isColorExport=*/false);
+    const uint8_t vbOffsetLowBits = vbAddressLowBitsKnown ? vbLowBits[attrib->binding] : 0;
 
     if (dfmt != BufDataFormatInvalid) {
-      descriptions.push_back({
-          attrib->location,
-          attrib->binding,
-          attrib->offset,
-          (static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->dynamicVertexStride
-               ? 0
-               : binding->stride),
-          dfmt,
-          nfmt,
-          binding->inputRate,
-          binding->divisor,
-      });
+      descriptions.push_back(
+          {attrib->location, attrib->binding, attrib->offset,
+           (static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->dynamicVertexStride
+                ? 0
+                : binding->stride),
+           dfmt, nfmt, binding->inputRate, binding->divisor, vbOffsetLowBits});
     }
   }
 

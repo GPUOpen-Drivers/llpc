@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -52,7 +52,6 @@ public:
   bool runImpl(llvm::Module &module);
 
   void handleCallInst(bool checkEmitCall, bool checkInterpCall);
-  void handleReturnInst();
 
   void handleLoadInst();
   void handleLoadInstGEP(GlobalVariable *inOut, ArrayRef<Value *> indexOperands, LoadInst &loadInst);
@@ -67,6 +66,8 @@ private:
   void mapInputToProxy(llvm::GlobalVariable *input);
   void mapOutputToProxy(llvm::GlobalVariable *input);
 
+  llvm::ReturnInst *ensureUnifiedReturn();
+
   void lowerGlobalVar();
   void lowerInput();
   void lowerOutput();
@@ -78,7 +79,6 @@ private:
   void lowerAliasedVal();
   void lowerEdgeFlag();
   void lowerShaderRecordBuffer();
-  void cleanupReturnBlock();
 
   void handleVolatileInput(llvm::GlobalVariable *input, llvm::Value *proxy);
 
@@ -122,19 +122,15 @@ private:
   // "ordered" (resulting LLVM IR for the patching always be consistent).
   std::list<std::pair<llvm::Value *, llvm::AllocaInst *>> m_outputProxyMap; // Proxy list for lowering outputs
 
-  llvm::BasicBlock *m_retBlock; // The return block of entry point
-
   bool m_lowerInputInPlace;  // Whether to lower input inplace
   bool m_lowerOutputInPlace; // Whether to lower output inplace
 
-  std::unordered_set<llvm::ReturnInst *> m_retInsts;     // "Return" instructions to be removed
-  std::unordered_set<llvm::CallInst *> m_emitCalls;      // "Call" instructions to emit vertex (geometry shader)
-  std::unordered_set<llvm::LoadInst *> m_loadInsts;      // "Load" instructions to be removed
-  std::unordered_set<llvm::StoreInst *> m_storeInsts;    // "Store" instructions to be removed
-  std::unordered_set<llvm::Instruction *> m_atomicInsts; // "Atomicrwm" or "cmpxchg" instructions to be removed
-  std::unordered_set<llvm::CallInst *> m_interpCalls;    // "Call" instruction to do input interpolation
-                                                         // (fragment shader)
-  ShaderStage m_lastVertexProcessingStage;               // The last vertex processing stage
+  std::unordered_set<llvm::CallInst *> m_emitCalls;   // "Call" instructions to emit vertex (geometry shader)
+  std::unordered_set<llvm::LoadInst *> m_loadInsts;   // "Load" instructions to be removed
+  std::unordered_set<llvm::StoreInst *> m_storeInsts; // "Store" instructions to be removed
+  std::unordered_set<llvm::CallInst *> m_interpCalls; // "Call" instruction to do input interpolation
+                                                      // (fragment shader)
+  ShaderStage m_lastVertexProcessingStage;            // The last vertex processing stage
   llvm::DenseMap<unsigned, Vkgc::XfbOutInfo>
       m_builtInXfbMap; // Map built-in to XFB output info specified by API interface
   llvm::DenseMap<unsigned, Vkgc::XfbOutInfo>

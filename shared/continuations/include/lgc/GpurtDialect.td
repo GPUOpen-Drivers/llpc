@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2023-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 
@@ -94,6 +94,12 @@ def GpurtLdsStackStoreOp : GpurtOp<"lds.stack.store", [Memory<[(write)]>, WillRe
   let description = [{
     this pushes $data and pops a dword from the stack, and data and positions are interpreted according to the ds_bvh_stack_rtn instruction.
   }];
+}
+
+def GpurtFloatWithRoundModeOp : GpurtOp<"rt.floatop.roundmode", [Memory<[]>, WillReturn]> {
+  let arguments = (ins I32:$roundMode, I32:$operation, (ScalarOrFixedVector F32):$src0, (eq $src0):$src1);
+  let results = (outs (eq $src0):$result);
+  let summary = "return result of floatOp with roundmode";
 }
 
 def GpurtGetBoxSortHeuristicModeOp : GpurtOp<"get.box.sort.heuristic.mode", [Memory<[]>, WillReturn]> {

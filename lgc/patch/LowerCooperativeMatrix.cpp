@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -76,13 +76,13 @@ bool LowerCooperativeMatrix::runImpl(Module &module, PipelineShadersResult &pipe
   Patch::init(&module);
   m_pipelineState = pipelineState;
   m_pipelineShaders = &pipelineShaders;
-  m_shaderStage = ShaderStageCompute;
+  m_shaderStage = ShaderStage::Compute;
   m_gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
   SmallVector<Function *, 16> lowerCoopMatrixCallees;
   for (auto &func : module) {
     auto name = func.getName();
-    if (name.startswith(lgcName::CooperativeMatrix))
+    if (name.starts_with(lgcName::CooperativeMatrix))
       lowerCoopMatrixCallees.push_back(&func);
   }
   if (lowerCoopMatrixCallees.empty())
@@ -127,11 +127,11 @@ void LowerCooperativeMatrix::visitCallInst(CallInst &callInst) {
   builder.SetInsertPoint(&callInst);
 
   auto mangledName = callee->getName();
-  if (mangledName.startswith(lgcName::CooperativeMatrixLength)) {
+  if (mangledName.starts_with(lgcName::CooperativeMatrixLength)) {
     auto layout =
         static_cast<Builder::CooperativeMatrixLayout>(cast<ConstantInt>(callInst.getOperand(1))->getZExtValue());
     callInst.replaceAllUsesWith(builder.getInt32(getLength(layout)));
-  } else if (mangledName.startswith(lgcName::CooperativeMatrixExtract)) {
+  } else if (mangledName.starts_with(lgcName::CooperativeMatrixExtract)) {
     Value *matrix = callInst.getOperand(0);
     Value *index = callInst.getOperand(1);
     auto elemType =
@@ -141,7 +141,7 @@ void LowerCooperativeMatrix::visitCallInst(CallInst &callInst) {
     Value *result = cooperativeMatrixExtract(builder, matrix, index, elemType, layout);
     result->takeName(&callInst);
     callInst.replaceAllUsesWith(result);
-  } else if (mangledName.startswith(lgcName::CooperativeMatrixInsert)) {
+  } else if (mangledName.starts_with(lgcName::CooperativeMatrixInsert)) {
     Value *matrix = callInst.getOperand(0);
     Value *value = callInst.getOperand(1);
     Value *index = callInst.getOperand(2);
@@ -152,7 +152,16 @@ void LowerCooperativeMatrix::visitCallInst(CallInst &callInst) {
     Value *result = cooperativeMatrixInsert(builder, matrix, value, index, elemType, layout);
     result->takeName(&callInst);
     callInst.replaceAllUsesWith(result);
-  } else if (mangledName.startswith(lgcName::CooperativeMatrixLoad)) {
+  } else if (mangledName.starts_with(lgcName::CooperativeMatrixFill)) {
+    Value *value = callInst.getOperand(0);
+    auto elemType =
+        static_cast<Builder::CooperativeMatrixElementType>(cast<ConstantInt>(callInst.getOperand(1))->getZExtValue());
+    auto layout =
+        static_cast<Builder::CooperativeMatrixLayout>(cast<ConstantInt>(callInst.getOperand(2))->getZExtValue());
+    Value *result = cooperativeMatrixFill(builder, value, elemType, layout);
+    result->takeName(&callInst);
+    callInst.replaceAllUsesWith(result);
+  } else if (mangledName.starts_with(lgcName::CooperativeMatrixLoad)) {
     Value *dataPtr = callInst.getOperand(0);
     Value *stride = callInst.getOperand(1);
     bool colMajor = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
@@ -166,7 +175,7 @@ void LowerCooperativeMatrix::visitCallInst(CallInst &callInst) {
                                                    callInst.getName(), &callInst);
     callInst.replaceAllUsesWith(loadVal);
 
-  } else if (mangledName.startswith(lgcName::CooperativeMatrixStore)) {
+  } else if (mangledName.starts_with(lgcName::CooperativeMatrixStore)) {
     Value *dataPtr = callInst.getOperand(0);
     Value *stride = callInst.getOperand(1);
     bool colMajor = cast<ConstantInt>(callInst.getOperand(2))->getZExtValue();
@@ -180,7 +189,7 @@ void LowerCooperativeMatrix::visitCallInst(CallInst &callInst) {
     cooperativeMatrixStoreInternal(dataPtr, stride, colMajor, elemType, layout, memoryAccess, vecVal,
                                    callInst.getName(), &callInst);
 
-  } else if (mangledName.startswith(lgcName::CooperativeMatrixConvert)) {
+  } else if (mangledName.starts_with(lgcName::CooperativeMatrixConvert)) {
     CastInst::CastOps castOp =
         static_cast<CastInst::CastOps>(cast<ConstantInt>(callInst.getOperand(0))->getZExtValue());
     Value *source = callInst.getOperand(1);
@@ -204,7 +213,7 @@ void LowerCooperativeMatrix::visitCallInst(CallInst &callInst) {
     }
     callInst.replaceAllUsesWith(resultVal);
 
-  } else if (mangledName.startswith(lgcName::CooperativeMatrixTranspose)) {
+  } else if (mangledName.starts_with(lgcName::CooperativeMatrixTranspose)) {
     Value *matrix = callInst.getOperand(0);
     Builder::CooperativeMatrixElementType elemType =
         static_cast<Builder::CooperativeMatrixElementType>(cast<ConstantInt>(callInst.getOperand(1))->getZExtValue());
@@ -214,7 +223,7 @@ void LowerCooperativeMatrix::visitCallInst(CallInst &callInst) {
     Value *resultVal = cooperativeMatrixTranspose(matrix, elemType, srcLayout, callInst.getName(), &callInst);
     callInst.replaceAllUsesWith(resultVal);
 
-  } else if (mangledName.startswith(lgcName::CooperativeMatrixBinOp)) {
+  } else if (mangledName.starts_with(lgcName::CooperativeMatrixBinOp)) {
     Builder::CooperativeMatrixArithOp coopMatArithOp =
         static_cast<Builder::CooperativeMatrixArithOp>(cast<ConstantInt>(callInst.getOperand(0))->getZExtValue());
     Value *lhs = callInst.getOperand(1);
@@ -228,7 +237,7 @@ void LowerCooperativeMatrix::visitCallInst(CallInst &callInst) {
         cooperativeMatrixBinaryOp(coopMatArithOp, lhs, rhs, elemType, srcLayout, callInst.getName(), &callInst);
     callInst.replaceAllUsesWith(resultVal);
 
-  } else if (mangledName.startswith(lgcName::CooperativeMatrixTimesScalar)) {
+  } else if (mangledName.starts_with(lgcName::CooperativeMatrixTimesScalar)) {
     Value *matrix = callInst.getOperand(0);
     Value *scalar = callInst.getOperand(1);
     Builder::CooperativeMatrixElementType elemType =
@@ -239,7 +248,7 @@ void LowerCooperativeMatrix::visitCallInst(CallInst &callInst) {
     Value *resultVal = coopMatrixTimesScalar(matrix, scalar, elemType, srcLayout, callInst.getName(), &callInst);
     callInst.replaceAllUsesWith(resultVal);
 
-  } else if (mangledName.startswith(lgcName::CooperativeMatrixMulAdd)) {
+  } else if (mangledName.starts_with(lgcName::CooperativeMatrixMulAdd)) {
     Value *matrixA = callInst.getOperand(0);
     Value *matrixB = callInst.getOperand(1);
     Value *matrixC = callInst.getOperand(2);
@@ -254,12 +263,12 @@ void LowerCooperativeMatrix::visitCallInst(CallInst &callInst) {
     Value *resultVal = cooperativeMatrixMulAdd(matrixA, matrixB, matrixC, isSignedA, isSignedB, isSatOrOpsel, isTied,
                                                accumElemType, factorElemType, callInst.getName(), &callInst);
     callInst.replaceAllUsesWith(resultVal);
-  } else if (mangledName.startswith(lgcName::CooperativeMatrixPack)) {
+  } else if (mangledName.starts_with(lgcName::CooperativeMatrixPack)) {
     Value *matrixA = callInst.getOperand(0);
     Value *matrixB = callInst.getOperand(1);
     Value *resultVal = cooperativeMatrixPack(matrixA, matrixB, callInst.getName(), &callInst);
     callInst.replaceAllUsesWith(resultVal);
-  } else if (mangledName.startswith(lgcName::CooperativeMatrixUnpack)) {
+  } else if (mangledName.starts_with(lgcName::CooperativeMatrixUnpack)) {
     Value *packedMatrix = callInst.getOperand(0);
     bool high = cast<ConstantInt>(callInst.getOperand(1))->getZExtValue();
     Value *resultVal = cooperativeMatrixUnpack(packedMatrix, high, callInst.getName(), &callInst);
@@ -476,7 +485,8 @@ Value *LowerCooperativeMatrix::cooperativeMatrixLoadInternal(Value *dataPtr, Val
   BuilderBase builder(*m_context);
   builder.SetInsertPoint(insertPos);
 
-  auto waveSize = m_pipelineState->getShaderWaveSize(getShaderStage(builder.GetInsertBlock()->getParent()));
+  auto shaderStage = getShaderStage(builder.GetInsertBlock()->getParent());
+  auto waveSize = m_pipelineState->getShaderWaveSize(shaderStage.value());
   assert(waveSize == 32 || waveSize == 64);
 
   // Calc element offset in memory
@@ -538,7 +548,8 @@ void LowerCooperativeMatrix::cooperativeMatrixStoreInternal(Value *dataPtr, Valu
   BuilderBase builder(*m_context);
   builder.SetInsertPoint(insertPos);
 
-  auto waveSize = m_pipelineState->getShaderWaveSize(getShaderStage(builder.GetInsertBlock()->getParent()));
+  auto shaderStage = getShaderStage(builder.GetInsertBlock()->getParent());
+  auto waveSize = m_pipelineState->getShaderWaveSize(shaderStage.value());
   assert(waveSize == 32 || waveSize == 64);
 
   // Calc element offset in memory
@@ -627,6 +638,26 @@ Value *LowerCooperativeMatrix::cooperativeMatrixInsert(BuilderCommon &builder, V
   } else {
     vec = builder.CreateInsertElement(vec, value, index);
   }
+
+  return convFlatVecToCoopMatrixVec(builder, vec, elemType, layout);
+}
+
+// =====================================================================================================================
+// Open-code cooperative matrix fill operation
+//
+// @param builder : builder to use
+// @param value : the value to fill the cooperative matrix
+// @param elemType : the matrix element type
+// @param layout : the matrix layout type
+Value *LowerCooperativeMatrix::cooperativeMatrixFill(BuilderCommon &builder, Value *value,
+                                                     Builder::CooperativeMatrixElementType elemType,
+                                                     Builder::CooperativeMatrixLayout layout) {
+  auto props = getTypeProperties(elemType, layout);
+  Type *flatType = FixedVectorType::get(builder.transCooperativeMatrixElementType(elemType), props.numMatrixElements);
+
+  Value *vec = PoisonValue::get(flatType);
+  for (unsigned idx = 0; idx < props.numMatrixElements; idx++)
+    vec = builder.CreateInsertElement(vec, value, idx);
 
   return convFlatVecToCoopMatrixVec(builder, vec, elemType, layout);
 }

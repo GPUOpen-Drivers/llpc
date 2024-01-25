@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -72,10 +72,10 @@ MeshTaskShader::~MeshTaskShader() {
 // @param ldsLayout : Mesh shader LDS layout (could be null)
 unsigned MeshTaskShader::layoutMeshShaderLds(PipelineState *pipelineState, Function *entryPoint,
                                              MeshLdsLayout *ldsLayout) {
-  if (!pipelineState->hasShaderStage(ShaderStageMesh))
+  if (!pipelineState->hasShaderStage(ShaderStage::Mesh))
     return 0; // Mesh shader absent (standalone compiler tries to compile a single task shader)
 
-  assert(getShaderStage(entryPoint) == ShaderStageMesh); // Must be mesh shader
+  assert(getShaderStage(entryPoint) == ShaderStage::Mesh); // Must be mesh shader
 
   auto gfxIp = pipelineState->getTargetInfo().getGfxIpVersion();
   assert(gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
@@ -104,7 +104,7 @@ unsigned MeshTaskShader::layoutMeshShaderLds(PipelineState *pipelineState, Funct
   assert(meshMode.outputVertices <= Gfx9::NggMaxThreadsPerSubgroup);
   assert(meshMode.outputPrimitives <= Gfx9::NggMaxThreadsPerSubgroup);
 
-  const auto resUsage = pipelineState->getShaderResourceUsage(ShaderStageMesh);
+  const auto resUsage = pipelineState->getShaderResourceUsage(ShaderStage::Mesh);
 
   unsigned meshLdsSizeInDwords = 0;
   unsigned ldsOffsetInDwords = 0;
@@ -322,7 +322,7 @@ unsigned MeshTaskShader::useFlatWorkgroupId(PipelineState *pipelineState) {
   if (pipelineState->getTargetInfo().getGfxIpVersion().major >= 11)
     return false;
 
-  const auto &builtInUsage = pipelineState->getShaderResourceUsage(ShaderStageMesh)->builtInUsage.mesh;
+  const auto &builtInUsage = pipelineState->getShaderResourceUsage(ShaderStage::Mesh)->builtInUsage.mesh;
   return builtInUsage.workgroupId || builtInUsage.globalInvocationId;
 }
 
@@ -331,7 +331,7 @@ unsigned MeshTaskShader::useFlatWorkgroupId(PipelineState *pipelineState) {
 //
 // @param entryPoint : Entry-point of task shader
 void MeshTaskShader::processTaskShader(Function *entryPoint) {
-  assert(getShaderStage(entryPoint) == ShaderStageTask);
+  assert(getShaderStage(entryPoint) == ShaderStage::Task);
 
   //
   // NOTE: The processing is something like this:
@@ -373,7 +373,7 @@ void MeshTaskShader::processTaskShader(Function *entryPoint) {
 //
 // @param entryPoint : Entry-point of mesh shader
 void MeshTaskShader::processMeshShader(Function *entryPoint) {
-  assert(getShaderStage(entryPoint) == ShaderStageMesh);
+  assert(getShaderStage(entryPoint) == ShaderStage::Mesh);
 
   //
   // NOTE: The processing is something like this:
@@ -461,7 +461,7 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   m_needBarrierFlag = checkNeedBarrierFlag(entryPoint);
 
   auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
-  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageMesh);
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Mesh);
 
   // Setup LDS layout
   layoutMeshShaderLds(m_pipelineState, entryPoint, &m_ldsLayout);
@@ -473,7 +473,7 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
   // Force s_barrier to be present if necessary (ignore optimization)
   const unsigned numMeshThreads = meshMode.workgroupSizeX * meshMode.workgroupSizeY * meshMode.workgroupSizeZ;
   auto primAmpFactor =
-      m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.primAmpFactor;
+      m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor.primAmpFactor;
   // If we enable row export, the actual thread group size is determined by work group size provided from API mesh
   // shader.
   const unsigned flatWorkgroupSize =
@@ -639,7 +639,7 @@ void MeshTaskShader::processMeshShader(Function *entryPoint) {
     // Write flat workgroup ID to LDS if it is required. Otherwise, skip it.
     if (useFlatWorkgroupId(m_pipelineState)) {
       auto ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::FlatWorkgroupId));
-      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
+      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Mesh)->entryArgIdxs.mesh;
       auto flatWorkgroupId = getFunctionArgument(entryPoint, entryArgIdxs.flatWorkgroupId);
       writeValueToLds(flatWorkgroupId, ldsOffset);
     }
@@ -964,7 +964,7 @@ void MeshTaskShader::lowerTaskPayloadPtr(TaskPayloadPtrOp &taskPayloadPtrOp) {
   auto taskPayloadPtr = m_builder.create<BufferDescToPtrOp>(payloadRingBufDesc);
   taskPayloadPtrOp.replaceAllUsesWith(taskPayloadPtr);
 
-  if (getShaderStage(entryPoint) == ShaderStageTask)
+  if (getShaderStage(entryPoint) == ShaderStage::Task)
     m_accessTaskPayload = true; // Mark this flag if task shader accesses task payload
 
   m_callsToRemove.push_back(&taskPayloadPtrOp);
@@ -979,7 +979,7 @@ void MeshTaskShader::lowerEmitMeshTasks(EmitMeshTasksOp &emitMeshTasksOp) {
   m_builder.SetInsertPoint(&emitMeshTasksOp);
 
   auto entryPoint = emitMeshTasksOp.getFunction();
-  assert(getShaderStage(entryPoint) == ShaderStageTask); // Must be task shader
+  assert(getShaderStage(entryPoint) == ShaderStage::Task); // Must be task shader
 
   auto groupCountX = emitMeshTasksOp.getGroupCountX();
   auto groupCountY = emitMeshTasksOp.getGroupCountY();
@@ -989,7 +989,7 @@ void MeshTaskShader::lowerEmitMeshTasks(EmitMeshTasksOp &emitMeshTasksOp) {
   if (isa<ConstantInt>(groupCountY) && isa<ConstantInt>(groupCountZ)) {
     const unsigned constGroupCountY = cast<ConstantInt>(groupCountY)->getZExtValue();
     const unsigned constGroupCountZ = cast<ConstantInt>(groupCountZ)->getZExtValue();
-    m_pipelineState->getShaderResourceUsage(ShaderStageTask)->builtInUsage.task.meshLinearDispatch =
+    m_pipelineState->getShaderResourceUsage(ShaderStage::Task)->builtInUsage.task.meshLinearDispatch =
         constGroupCountY == 1 && constGroupCountZ == 1;
   }
 
@@ -1098,7 +1098,7 @@ void MeshTaskShader::lowerEmitMeshTasks(EmitMeshTasksOp &emitMeshTasksOp) {
 void MeshTaskShader::lowerSetMeshOutputs(SetMeshOutputsOp &setMeshOutputsOp) {
   m_builder.SetInsertPoint(&setMeshOutputsOp);
 
-  assert(getShaderStage(setMeshOutputsOp.getFunction()) == ShaderStageMesh);
+  assert(getShaderStage(setMeshOutputsOp.getFunction()) == ShaderStage::Mesh);
 
   auto vertexCount = setMeshOutputsOp.getVertexCount();
   auto primitiveCount = setMeshOutputsOp.getPrimitiveCount();
@@ -1170,7 +1170,7 @@ void MeshTaskShader::lowerSetMeshOutputs(SetMeshOutputsOp &setMeshOutputsOp) {
 void MeshTaskShader::lowerSetMeshPrimitiveIndices(SetMeshPrimitiveIndicesOp &setMeshPrimitiveIndicesOp) {
   m_builder.SetInsertPoint(&setMeshPrimitiveIndicesOp);
 
-  assert(getShaderStage(setMeshPrimitiveIndicesOp.getFunction()) == ShaderStageMesh);
+  assert(getShaderStage(setMeshPrimitiveIndicesOp.getFunction()) == ShaderStage::Mesh);
 
   auto primitiveIndex = setMeshPrimitiveIndicesOp.getPrimitiveIndex();
   auto primitiveIndices = setMeshPrimitiveIndicesOp.getPrimitiveIndices();
@@ -1236,19 +1236,19 @@ void MeshTaskShader::lowerGetMeshBuiltinInput(GetMeshBuiltinInputOp &getMeshBuil
   m_builder.SetInsertPoint(&getMeshBuiltinInputOp);
 
   auto entryPoint = getMeshBuiltinInputOp.getFunction();
-  assert(getShaderStage(entryPoint) == ShaderStageMesh);
+  assert(getShaderStage(entryPoint) == ShaderStage::Mesh);
 
   Value *input = PoisonValue::get(getMeshBuiltinInputOp.getType());
   auto builtin = getMeshBuiltinInputOp.getBuiltin();
   switch (builtin) {
   case BuiltInDrawIndex: {
-    auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
+    auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Mesh)->entryArgIdxs.mesh;
     input = getFunctionArgument(entryPoint, entryArgIdxs.drawIndex);
     break;
   }
   case BuiltInViewIndex: {
     if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable) {
-      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
+      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Mesh)->entryArgIdxs.mesh;
       input = getFunctionArgument(entryPoint, entryArgIdxs.viewId);
     } else {
       input = m_builder.getInt32(0);
@@ -1278,7 +1278,7 @@ void MeshTaskShader::lowerGetMeshBuiltinInput(GetMeshBuiltinInputOp &getMeshBuil
   case BuiltInSubgroupId: {
     // subgroupId = localInvocationIndex / subgroupSize
     auto localInvocationIndex = getMeshLocalInvocationIndex();
-    unsigned subgroupSize = m_pipelineState->getShaderSubgroupSize(ShaderStageMesh);
+    unsigned subgroupSize = m_pipelineState->getShaderSubgroupSize(ShaderStage::Mesh);
     assert(subgroupSize > 0 && subgroupSize % 32 == 0);
     input = m_builder.CreateLShr(localInvocationIndex, m_builder.getInt32(Log2_32(subgroupSize)));
     break;
@@ -1287,7 +1287,7 @@ void MeshTaskShader::lowerGetMeshBuiltinInput(GetMeshBuiltinInputOp &getMeshBuil
     // numSubgroups = numMeshThreads / subgroupSize
     const auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
     const unsigned numMeshThreads = meshMode.workgroupSizeX * meshMode.workgroupSizeY * meshMode.workgroupSizeZ;
-    unsigned subgroupSize = m_pipelineState->getShaderSubgroupSize(ShaderStageMesh);
+    unsigned subgroupSize = m_pipelineState->getShaderSubgroupSize(ShaderStage::Mesh);
     assert(subgroupSize > 0 && subgroupSize % 32 == 0);
     const unsigned numSubgroups = alignTo(numMeshThreads, subgroupSize) / subgroupSize;
     input = m_builder.getInt32(numSubgroups);
@@ -1312,7 +1312,7 @@ void MeshTaskShader::lowerGetMeshBuiltinInput(GetMeshBuiltinInputOp &getMeshBuil
 void MeshTaskShader::lowerSetMeshPrimitiveCulled(SetMeshPrimitiveCulledOp &setMeshPrimitiveCulledOp) {
   m_builder.SetInsertPoint(&setMeshPrimitiveCulledOp);
 
-  assert(getShaderStage(setMeshPrimitiveCulledOp.getFunction()) == ShaderStageMesh);
+  assert(getShaderStage(setMeshPrimitiveCulledOp.getFunction()) == ShaderStage::Mesh);
 
   auto primitiveIndex = setMeshPrimitiveCulledOp.getPrimitiveIndex();
   auto isCulled = setMeshPrimitiveCulledOp.getIsCulled();
@@ -1348,13 +1348,13 @@ void MeshTaskShader::lowerSetMeshPrimitiveCulled(SetMeshPrimitiveCulledOp &setMe
 void MeshTaskShader::lowerWriteMeshVertexOutput(WriteMeshVertexOutputOp &writeMeshVertexOutputOp) {
   m_builder.SetInsertPoint(&writeMeshVertexOutputOp);
 
-  assert(getShaderStage(writeMeshVertexOutputOp.getFunction()) == ShaderStageMesh);
+  assert(getShaderStage(writeMeshVertexOutputOp.getFunction()) == ShaderStage::Mesh);
 
   auto outputOffset = writeMeshVertexOutputOp.getOutputOffset();
   auto vertexIndex = writeMeshVertexOutputOp.getVertexIndex();
   auto outputValue = writeMeshVertexOutputOp.getOutputValue();
 
-  const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh);
+  const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh);
   const unsigned vertexStride = 4 * resUsage->inOutUsage.outputMapLocCount; // Corresponds to vec4 output
 
   Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::VertexOutput));
@@ -1374,13 +1374,13 @@ void MeshTaskShader::lowerWriteMeshVertexOutput(WriteMeshVertexOutputOp &writeMe
 void MeshTaskShader::lowerWriteMeshPrimitiveOutput(WriteMeshPrimitiveOutputOp &writeMeshPrimitiveOutputOp) {
   m_builder.SetInsertPoint(&writeMeshPrimitiveOutputOp);
 
-  assert(getShaderStage(writeMeshPrimitiveOutputOp.getFunction()) == ShaderStageMesh);
+  assert(getShaderStage(writeMeshPrimitiveOutputOp.getFunction()) == ShaderStage::Mesh);
 
   auto outputOffset = writeMeshPrimitiveOutputOp.getOutputOffset();
   auto primitiveIndex = writeMeshPrimitiveOutputOp.getPrimitiveIndex();
   auto outputValue = writeMeshPrimitiveOutputOp.getOutputValue();
 
-  const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh);
+  const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh);
   const unsigned primitiveStride = 4 * resUsage->inOutUsage.perPrimitiveOutputMapLocCount; // Corresponds to vec4 output
 
   Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveOutput));
@@ -1400,9 +1400,9 @@ void MeshTaskShader::lowerWriteMeshPrimitiveOutput(WriteMeshPrimitiveOutputOp &w
 void MeshTaskShader::initWaveThreadInfo(Function *entryPoint) {
   m_waveThreadInfo = {}; // Reset it
 
-  if (getShaderStage(entryPoint) == ShaderStageTask) {
+  if (getShaderStage(entryPoint) == ShaderStage::Task) {
     // Task shader
-    auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageTask)->entryArgIdxs.task;
+    auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Task)->entryArgIdxs.task;
 
     {
       // waveId = dispatchInfo[24:20]
@@ -1410,7 +1410,7 @@ void MeshTaskShader::initWaveThreadInfo(Function *entryPoint) {
           m_builder.CreateAnd(m_builder.CreateLShr(getFunctionArgument(entryPoint, entryArgIdxs.multiDispatchInfo), 20),
                               0x1F, "waveIdInSubgroup");
     }
-    const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageTask);
+    const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Task);
 
     m_waveThreadInfo.threadIdInWave =
         m_builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {m_builder.getInt32(-1), m_builder.getInt32(0)});
@@ -1425,7 +1425,7 @@ void MeshTaskShader::initWaveThreadInfo(Function *entryPoint) {
                             m_waveThreadInfo.threadIdInWave, "threadIdInSubgroup");
   } else {
     // Mesh shader
-    assert(getShaderStage(entryPoint) == ShaderStageMesh);
+    assert(getShaderStage(entryPoint) == ShaderStage::Mesh);
 
     m_builder.CreateIntrinsic(Intrinsic::amdgcn_init_exec, {}, m_builder.getInt64(-1));
 
@@ -1435,7 +1435,7 @@ void MeshTaskShader::initWaveThreadInfo(Function *entryPoint) {
     m_waveThreadInfo.waveIdInSubgroup =
         m_builder.CreateAnd(m_builder.CreateLShr(mergedWaveInfo, 24), 0xF, "waveIdInSubgroup");
 
-    const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageMesh);
+    const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Mesh);
 
     m_waveThreadInfo.threadIdInWave =
         m_builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {m_builder.getInt32(-1), m_builder.getInt32(0)});
@@ -1464,13 +1464,13 @@ void MeshTaskShader::initWaveThreadInfo(Function *entryPoint) {
 // @returns : The shader ring entry index of current workgroup
 Value *MeshTaskShader::getShaderRingEntryIndex(Function *entryPoint) {
   if (!m_shaderRingEntryIndex) {
-    if (getShaderStage(entryPoint) == ShaderStageTask) {
+    if (getShaderStage(entryPoint) == ShaderStage::Task) {
       // NOTE: The calculation of shader ring entry index should be done at the beginning of the entry block. And the
       // value could be reused in subsequent operations.
       IRBuilder<>::InsertPointGuard guard(m_builder);
       m_builder.SetInsertPointPastAllocas(entryPoint);
 
-      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageTask)->entryArgIdxs.task;
+      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Task)->entryArgIdxs.task;
 
       Value *workgroupIds[3] = {};
       if (m_gfxIp.major <= 11) {
@@ -1495,9 +1495,9 @@ Value *MeshTaskShader::getShaderRingEntryIndex(Function *entryPoint) {
       auto baseRingEntryIndex = getFunctionArgument(entryPoint, entryArgIdxs.baseRingEntryIndex);
       m_shaderRingEntryIndex = m_builder.CreateAdd(baseRingEntryIndex, flatWorkgroupId);
     } else {
-      assert(getShaderStage(entryPoint) == ShaderStageMesh);
+      assert(getShaderStage(entryPoint) == ShaderStage::Mesh);
 
-      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
+      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Mesh)->entryArgIdxs.mesh;
       m_shaderRingEntryIndex = getFunctionArgument(entryPoint, entryArgIdxs.baseRingEntryIndex);
     }
   }
@@ -1538,7 +1538,7 @@ Value *MeshTaskShader::getPayloadRingEntryOffset(Function *entryPoint) {
 // @param entryPoint : Entry-point of task shader
 // @returns : The draw data ring entry offset of current workgroup
 Value *MeshTaskShader::getDrawDataRingEntryOffset(Function *entryPoint) {
-  assert(getShaderStage(entryPoint) == ShaderStageTask); // Must be task shader
+  assert(getShaderStage(entryPoint) == ShaderStage::Task); // Must be task shader
 
   Value *ringEntryIndex = getShaderRingEntryIndex(entryPoint);
   Value *drawDataRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskDrawDataRingBufDesc();
@@ -1558,7 +1558,7 @@ Value *MeshTaskShader::getDrawDataRingEntryOffset(Function *entryPoint) {
 // @param entryPoint : Entry-point of task shader
 // @returns : Flag (i1 typed) indicating whether the draw data is ready for command processor (CP) to fetch.
 Value *MeshTaskShader::getDrawDataReadyBit(Function *entryPoint) {
-  assert(getShaderStage(entryPoint) == ShaderStageTask); // Must be task shader
+  assert(getShaderStage(entryPoint) == ShaderStage::Task); // Must be task shader
 
   Value *ringEntryIndex = getShaderRingEntryIndex(entryPoint);
   Value *drawDataRingBufDesc = m_pipelineSysValues.get(entryPoint)->getTaskDrawDataRingBufDesc();
@@ -1589,7 +1589,7 @@ Value *MeshTaskShader::convertToDivergent(Value *value) {
 // @param entryPoint : Entry-point of mesh shader
 // @returns : New entry-point of mesh shader after mutation
 Function *MeshTaskShader::mutateMeshShaderEntryPoint(Function *entryPoint) {
-  assert(getShaderStage(entryPoint) == ShaderStageMesh); // Must be mesh shader
+  assert(getShaderStage(entryPoint) == ShaderStage::Mesh); // Must be mesh shader
 
   // GFX10 special SGPR input names
   static const SmallVector<std::string, NumSpecialSgprInputs> SpecialSgprInputNamesGfx10 = {
@@ -1621,7 +1621,7 @@ Function *MeshTaskShader::mutateMeshShaderEntryPoint(Function *entryPoint) {
   entryPoint->eraseFromParent();
 
   // Adjust indices of existing entry-point arguments
-  auto &entryArgIdx = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
+  auto &entryArgIdx = m_pipelineState->getShaderInterfaceData(ShaderStage::Mesh)->entryArgIdxs.mesh;
   entryArgIdx.drawIndex += NumSpecialSgprInputs;
   entryArgIdx.viewId += NumSpecialSgprInputs;
   entryArgIdx.dispatchDims += NumSpecialSgprInputs;
@@ -1672,7 +1672,7 @@ Function *MeshTaskShader::mutateMeshShaderEntryPoint(Function *entryPoint) {
 // @param apiMeshExitBlock : API mesh shader exit block (before any mutation)`
 void MeshTaskShader::lowerMeshShaderBody(BasicBlock *apiMeshEntryBlock, BasicBlock *apiMeshExitBlock) {
   auto entryPoint = apiMeshEntryBlock->getParent();
-  assert(getShaderStage(entryPoint) == ShaderStageMesh);
+  assert(getShaderStage(entryPoint) == ShaderStage::Mesh);
 
   // Handle API mesh shader barrier
   if (m_needBarrierFlag) {
@@ -1719,8 +1719,8 @@ void MeshTaskShader::lowerMeshShaderBody(BasicBlock *apiMeshEntryBlock, BasicBlo
 // =====================================================================================================================
 // Export primitive (primitive connectivity data, primitive payload, and primitive attributes).
 void MeshTaskShader::exportPrimitive() {
-  const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh)->builtInUsage.mesh;
-  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh)->inOutUsage;
+  const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh)->builtInUsage.mesh;
+  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh)->inOutUsage;
 
   Value *ldsStart = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::PrimitiveIndices));
   Value *ldsOffset = m_builder.CreateAdd(ldsStart, m_waveThreadInfo.primOrVertexIndex);
@@ -1769,7 +1769,7 @@ void MeshTaskShader::exportPrimitive() {
   const bool enableMultiView = m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable;
   if (enableMultiView) {
     auto entryPoint = m_builder.GetInsertBlock()->getParent();
-    const auto entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
+    const auto entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Mesh)->entryArgIdxs.mesh;
     Value *viewId = getFunctionArgument(entryPoint, entryArgIdxs.viewId);
 
     // RT layer is view ID in simple mode (view index only).
@@ -1873,9 +1873,9 @@ void MeshTaskShader::exportPrimitive() {
   if (builtInUsage.layer) {
     exportLayer = true;
   } else {
-    const auto nextStage = m_pipelineState->getNextShaderStage(ShaderStageMesh);
-    if (nextStage == ShaderStageFragment) {
-      const auto &fsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
+    const auto nextStage = m_pipelineState->getNextShaderStage(ShaderStage::Mesh);
+    if (nextStage == ShaderStage::Fragment) {
+      const auto &fsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Fragment)->builtInUsage.fs;
       if (fsBuiltInUsage.layer) {
         // NOTE: In such case, mesh shader doesn't export layer while fragment shader expects to read it. We
         // export 0 to fragment shader, which is required by the spec.
@@ -1898,9 +1898,9 @@ void MeshTaskShader::exportPrimitive() {
   if (builtInUsage.viewportIndex) {
     exportViewportIndex = true;
   } else {
-    const auto nextStage = m_pipelineState->getNextShaderStage(ShaderStageMesh);
-    if (nextStage == ShaderStageFragment) {
-      const auto &fsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
+    const auto nextStage = m_pipelineState->getNextShaderStage(ShaderStage::Mesh);
+    if (nextStage == ShaderStage::Fragment) {
+      const auto &fsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Fragment)->builtInUsage.fs;
       if (fsBuiltInUsage.viewportIndex) {
         // NOTE: In such case, mesh shader doesn't export viewport index while fragment shader expects to read it. We
         // export 0 to fragment shader, which is required by spec.
@@ -1925,8 +1925,8 @@ void MeshTaskShader::exportPrimitive() {
 // =====================================================================================================================
 // Export vertex (vertex position data and vertex attributes).
 void MeshTaskShader::exportVertex() {
-  const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh)->builtInUsage.mesh;
-  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh)->inOutUsage;
+  const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh)->builtInUsage.mesh;
+  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh)->inOutUsage;
 
   // Export vertex position data
   SmallVector<ExportInfo, 8> posExports;
@@ -2023,9 +2023,9 @@ void MeshTaskShader::exportVertex() {
   if (builtInUsage.clipDistance > 0 || builtInUsage.cullDistance > 0) {
     bool exportClipCullDistance = true;
 
-    auto nextStage = m_pipelineState->getNextShaderStage(ShaderStageMesh);
-    if (nextStage == ShaderStageFragment) {
-      const auto &fsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
+    auto nextStage = m_pipelineState->getNextShaderStage(ShaderStage::Mesh);
+    if (nextStage == ShaderStage::Fragment) {
+      const auto &fsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Fragment)->builtInUsage.fs;
 
       exportClipCullDistance = fsBuiltInUsage.clipDistance > 0 || fsBuiltInUsage.cullDistance > 0;
       if (exportClipCullDistance) {
@@ -2264,7 +2264,7 @@ void MeshTaskShader::prepareAttribRingAccess() {
   //   2. Vertex attributes mapped from vertex builtins
   //   3. Generic primitive attributes
   //   4. Primitive attributes mapped from primitive builtins
-  const auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh)->inOutUsage.mesh;
+  const auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh)->inOutUsage.mesh;
   unsigned vertAttribCount = inOutUsage.genericOutputMapLocCount;
   for (auto &builtInExport : inOutUsage.builtInExportLocs) {
     const unsigned exportLoc = builtInExport.second;
@@ -2319,7 +2319,7 @@ void MeshTaskShader::prepareAttribRingAccess() {
 //
 // @returns : Value of flat workgroup ID
 Value *MeshTaskShader::getMeshFlatWorkgroupId() {
-  assert(getShaderStage(m_builder.GetInsertBlock()->getParent()) == ShaderStageMesh); // Must be mesh shader
+  assert(getShaderStage(m_builder.GetInsertBlock()->getParent()) == ShaderStage::Mesh); // Must be mesh shader
 
   auto ldsOffset = m_builder.getInt32(getMeshShaderLdsRegionStart(MeshLdsRegion::FlatWorkgroupId));
   auto flatWorkgroupId = readValueFromLds(m_builder.getInt32Ty(), ldsOffset);
@@ -2336,9 +2336,9 @@ Value *MeshTaskShader::getMeshFlatWorkgroupId() {
 // @returns : Value of the built-in numWorkgroups
 Value *MeshTaskShader::getMeshNumWorkgroups() {
   auto entryPoint = m_builder.GetInsertBlock()->getParent();
-  assert(getShaderStage(entryPoint) == ShaderStageMesh); // Must be mesh shader
+  assert(getShaderStage(entryPoint) == ShaderStage::Mesh); // Must be mesh shader
 
-  auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
+  auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Mesh)->entryArgIdxs.mesh;
   return getFunctionArgument(entryPoint, entryArgIdxs.dispatchDims);
 }
 
@@ -2348,7 +2348,7 @@ Value *MeshTaskShader::getMeshNumWorkgroups() {
 // @returns : Value of the built-in WorkgroupId
 Value *MeshTaskShader::getMeshWorkgroupId() {
   auto entryPoint = m_builder.GetInsertBlock()->getParent();
-  assert(getShaderStage(entryPoint) == ShaderStageMesh); // Must be mesh shader
+  assert(getShaderStage(entryPoint) == ShaderStage::Mesh); // Must be mesh shader
 
   Value *workgroupIdX = nullptr;
   Value *workgroupIdY = nullptr;
@@ -2376,7 +2376,7 @@ Value *MeshTaskShader::getMeshWorkgroupId() {
     //                 dispatchDims.x * workgroupId.y
     auto flatWorkgroupId = getMeshFlatWorkgroupId();
 
-    auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
+    auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Mesh)->entryArgIdxs.mesh;
 
     auto dispatchDims = getFunctionArgument(entryPoint, entryArgIdxs.dispatchDims);
     auto dispatchDimX = m_builder.CreateExtractElement(dispatchDims, static_cast<uint64_t>(0));
@@ -2417,7 +2417,7 @@ Value *MeshTaskShader::getMeshWorkgroupId() {
 // @returns : Value of the built-in LocalInvocationId
 Value *MeshTaskShader::getMeshLocalInvocationId() {
   auto entryPoint = m_builder.GetInsertBlock()->getParent();
-  assert(getShaderStage(entryPoint) == ShaderStageMesh); // Must be mesh shader
+  assert(getShaderStage(entryPoint) == ShaderStage::Mesh); // Must be mesh shader
 
   Value *localInvocationIdX = nullptr;
   Value *localInvocationIdY = nullptr;
@@ -2430,7 +2430,7 @@ Value *MeshTaskShader::getMeshLocalInvocationId() {
     //   | Local Invocation ID Z | Local Invocation ID Y | Local Invocation ID Z |
     //   | [29:20]               | [19:10]               | [9:0]                 |
     //   +-----------------------+-----------------------+-----------------------+
-    auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
+    auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Mesh)->entryArgIdxs.mesh;
 
     Value *localInvocationId = getFunctionArgument(entryPoint, entryArgIdxs.localInvocationId);
     // localInvocationIdZ = localInvocationId[29:20]
@@ -2478,7 +2478,7 @@ Value *MeshTaskShader::getMeshLocalInvocationId() {
 //
 // @returns : Value of the built-in LocalInvocationIndex
 Value *MeshTaskShader::getMeshLocalInvocationIndex() {
-  assert(getShaderStage(m_builder.GetInsertBlock()->getParent()) == ShaderStageMesh); // Must be mesh shader
+  assert(getShaderStage(m_builder.GetInsertBlock()->getParent()) == ShaderStage::Mesh); // Must be mesh shader
   return m_waveThreadInfo.threadIdInSubgroup;
 }
 
@@ -2487,7 +2487,7 @@ Value *MeshTaskShader::getMeshLocalInvocationIndex() {
 //
 // @returns : Value of the built-in GlobalInvocationId
 Value *MeshTaskShader::getMeshGlobalInvocationId() {
-  assert(getShaderStage(m_builder.GetInsertBlock()->getParent()) == ShaderStageMesh); // Must be mesh shader
+  assert(getShaderStage(m_builder.GetInsertBlock()->getParent()) == ShaderStage::Mesh); // Must be mesh shader
 
   // globalInvocationId = workgroupId * workgroupSize + localInvocationId
   auto workgourpId = getMeshWorkgroupId();
@@ -2510,8 +2510,8 @@ Value *MeshTaskShader::getMeshGlobalInvocationId() {
 // @param builtIn : Mesh shader built-in
 // @returns : The built-in value from LDS
 Value *MeshTaskShader::readMeshBuiltInFromLds(BuiltInKind builtIn) {
-  const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh)->builtInUsage.mesh;
-  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh)->inOutUsage;
+  const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh)->builtInUsage.mesh;
+  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh)->inOutUsage;
 
   bool isPerPrimitive = (builtIn == BuiltInPrimitiveId || builtIn == BuiltInViewportIndex || builtIn == BuiltInLayer ||
                          builtIn == BuiltInPrimitiveShadingRate);
@@ -2741,16 +2741,16 @@ bool MeshTaskShader::checkNeedBarrierFlag(Function *entryPoint) {
   const auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
   const unsigned numMeshThreads = meshMode.workgroupSizeX * meshMode.workgroupSizeY * meshMode.workgroupSizeZ;
   const unsigned numThreads =
-      m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.primAmpFactor;
+      m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor.primAmpFactor;
   assert(numThreads >= numMeshThreads);
 
-  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageMesh);
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Mesh);
   const unsigned numMeshWaves = alignTo(numMeshThreads, waveSize) / waveSize;
   const unsigned numWaves = alignTo(numThreads, waveSize) / waveSize;
   if (numWaves == numMeshWaves)
     return false; // Wave number to run API mesh shader is equal to actual wave number to run HW mesh shader (HW GS)
 
-  assert(getShaderStage(entryPoint) == ShaderStageMesh);
+  assert(getShaderStage(entryPoint) == ShaderStage::Mesh);
   auto module = entryPoint->getParent();
   for (auto &func : module->functions()) {
     if (func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_s_barrier) {

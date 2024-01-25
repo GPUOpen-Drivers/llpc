@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2018-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2018-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -93,16 +93,16 @@ bool PatchPreparePipelineAbi::runImpl(Module &module, PipelineShadersResult &pip
   m_pipelineShaders = &pipelineShaders;
   m_analysisHandlers = &analysisHandlers;
 
-  m_hasVs = m_pipelineState->hasShaderStage(ShaderStageVertex);
-  m_hasTcs = m_pipelineState->hasShaderStage(ShaderStageTessControl);
-  m_hasTes = m_pipelineState->hasShaderStage(ShaderStageTessEval);
-  m_hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
-  m_hasTask = m_pipelineState->hasShaderStage(ShaderStageTask);
-  m_hasMesh = m_pipelineState->hasShaderStage(ShaderStageMesh);
+  m_hasVs = m_pipelineState->hasShaderStage(ShaderStage::Vertex);
+  m_hasTcs = m_pipelineState->hasShaderStage(ShaderStage::TessControl);
+  m_hasTes = m_pipelineState->hasShaderStage(ShaderStage::TessEval);
+  m_hasGs = m_pipelineState->hasShaderStage(ShaderStage::Geometry);
+  m_hasTask = m_pipelineState->hasShaderStage(ShaderStage::Task);
+  m_hasMesh = m_pipelineState->hasShaderStage(ShaderStage::Mesh);
 
   m_gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
-  if (auto hsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTessControl))
+  if (auto hsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStage::TessControl))
     storeTessFactors(hsEntryPoint);
 
   if (m_gfxIp.major >= 9)
@@ -160,7 +160,7 @@ std::pair<Value *, Value *> PatchPreparePipelineAbi::readTessFactors(PipelineSta
   }
 
   const auto tessFactorStart =
-      pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor.onChip.tessFactorStart;
+      pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.calcFactor.onChip.tessFactorStart;
 
   assert(numOuterTfs >= 2 && numOuterTfs <= 4);
   // ldsOffset = tessFactorStart + relativeId * MaxTessFactorsPerPatch
@@ -215,7 +215,7 @@ void PatchPreparePipelineAbi::writeTessFactors(PipelineState *pipelineState, Val
   //     TF[3] = outerTF[3]
   //     TF[4] = innerTF[0]
   //     TF[5] = innerTF[1]
-  const auto &calcFactor = pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
+  const auto &calcFactor = pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.calcFactor;
   Value *tfBufferOffset = builder.CreateMul(relPatchId, builder.getInt32(calcFactor.tessFactorStride * sizeof(float)));
 
   CoherentFlag coherent = {};
@@ -301,8 +301,8 @@ void PatchPreparePipelineAbi::mergeShader(Module &module) {
 
   if (m_pipelineState->isGraphics()) {
     if (m_hasTask || m_hasMesh) {
-      auto taskEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTask);
-      auto meshEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageMesh);
+      auto taskEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStage::Task);
+      auto meshEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStage::Mesh);
       MeshTaskShader meshTaskShader(m_pipelineState, m_analysisHandlers);
       meshTaskShader.process(taskEntryPoint, meshEntryPoint);
       return;
@@ -313,104 +313,104 @@ void PatchPreparePipelineAbi::mergeShader(Module &module) {
 
     if (hasTs && m_hasGs) {
       // TS-GS pipeline
-      auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTessEval);
-      auto gsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageGeometry);
+      auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStage::TessEval);
+      auto gsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStage::Geometry);
 
       if (enableNgg) {
         if (gsEntryPoint) {
           if (esEntryPoint)
-            lgc::setShaderStage(esEntryPoint, ShaderStageGeometry);
-          auto copyShaderEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageCopyShader);
+            lgc::setShaderStage(esEntryPoint, ShaderStage::Geometry);
+          auto copyShaderEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStage::CopyShader);
           if (copyShaderEntryPoint)
-            lgc::setShaderStage(copyShaderEntryPoint, ShaderStageGeometry);
+            lgc::setShaderStage(copyShaderEntryPoint, ShaderStage::Geometry);
           auto primShaderEntryPoint = shaderMerger.buildPrimShader(esEntryPoint, gsEntryPoint, copyShaderEntryPoint);
           primShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
-          lgc::setShaderStage(primShaderEntryPoint, ShaderStageGeometry);
+          lgc::setShaderStage(primShaderEntryPoint, ShaderStage::Geometry);
         }
       } else {
         if (gsEntryPoint) {
           if (esEntryPoint)
-            lgc::setShaderStage(esEntryPoint, ShaderStageGeometry);
+            lgc::setShaderStage(esEntryPoint, ShaderStage::Geometry);
           auto esGsEntryPoint = shaderMerger.generateEsGsEntryPoint(esEntryPoint, gsEntryPoint);
           esGsEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
-          lgc::setShaderStage(esGsEntryPoint, ShaderStageGeometry);
+          lgc::setShaderStage(esGsEntryPoint, ShaderStage::Geometry);
         }
       }
 
       // This must be done after generating the EsGs entry point because it must appear first in the module.
       if (m_hasTcs) {
-        auto lsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageVertex);
-        auto hsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTessControl);
+        auto lsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStage::Vertex);
+        auto hsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStage::TessControl);
 
         if (hsEntryPoint) {
           if (lsEntryPoint)
-            lgc::setShaderStage(lsEntryPoint, ShaderStageTessControl);
+            lgc::setShaderStage(lsEntryPoint, ShaderStage::TessControl);
           auto lsHsEntryPoint = shaderMerger.generateLsHsEntryPoint(lsEntryPoint, hsEntryPoint);
           lsHsEntryPoint->setCallingConv(CallingConv::AMDGPU_HS);
-          lgc::setShaderStage(lsHsEntryPoint, ShaderStageTessControl);
+          lgc::setShaderStage(lsHsEntryPoint, ShaderStage::TessControl);
         }
       }
     } else if (hasTs) {
       // TS-only pipeline
       if (m_hasTcs) {
-        auto lsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageVertex);
-        auto hsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTessControl);
+        auto lsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStage::Vertex);
+        auto hsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStage::TessControl);
 
         if (hsEntryPoint) {
           if (lsEntryPoint)
-            lgc::setShaderStage(lsEntryPoint, ShaderStageTessControl);
+            lgc::setShaderStage(lsEntryPoint, ShaderStage::TessControl);
           auto lsHsEntryPoint = shaderMerger.generateLsHsEntryPoint(lsEntryPoint, hsEntryPoint);
           lsHsEntryPoint->setCallingConv(CallingConv::AMDGPU_HS);
-          lgc::setShaderStage(lsHsEntryPoint, ShaderStageTessControl);
+          lgc::setShaderStage(lsHsEntryPoint, ShaderStage::TessControl);
         }
       }
 
       if (enableNgg) {
         // If NGG is enabled, ES-GS merged shader should be present even if GS is absent
-        auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageTessEval);
+        auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStage::TessEval);
 
         if (esEntryPoint) {
-          lgc::setShaderStage(esEntryPoint, ShaderStageTessEval);
+          lgc::setShaderStage(esEntryPoint, ShaderStage::TessEval);
           auto primShaderEntryPoint = shaderMerger.buildPrimShader(esEntryPoint, nullptr, nullptr);
           primShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
-          lgc::setShaderStage(primShaderEntryPoint, ShaderStageTessEval);
+          lgc::setShaderStage(primShaderEntryPoint, ShaderStage::TessEval);
         }
       }
     } else if (m_hasGs) {
       // GS-only pipeline
-      auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageVertex);
-      auto gsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageGeometry);
+      auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStage::Vertex);
+      auto gsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStage::Geometry);
 
       if (enableNgg) {
         if (gsEntryPoint) {
           if (esEntryPoint)
-            lgc::setShaderStage(esEntryPoint, ShaderStageGeometry);
-          auto copyShaderEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageCopyShader);
+            lgc::setShaderStage(esEntryPoint, ShaderStage::Geometry);
+          auto copyShaderEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStage::CopyShader);
           if (copyShaderEntryPoint)
-            lgc::setShaderStage(copyShaderEntryPoint, ShaderStageGeometry);
+            lgc::setShaderStage(copyShaderEntryPoint, ShaderStage::Geometry);
           auto primShaderEntryPoint = shaderMerger.buildPrimShader(esEntryPoint, gsEntryPoint, copyShaderEntryPoint);
           primShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
-          lgc::setShaderStage(primShaderEntryPoint, ShaderStageGeometry);
+          lgc::setShaderStage(primShaderEntryPoint, ShaderStage::Geometry);
         }
       } else {
         if (gsEntryPoint) {
           if (esEntryPoint)
-            lgc::setShaderStage(esEntryPoint, ShaderStageGeometry);
+            lgc::setShaderStage(esEntryPoint, ShaderStage::Geometry);
           auto esGsEntryPoint = shaderMerger.generateEsGsEntryPoint(esEntryPoint, gsEntryPoint);
           esGsEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
-          lgc::setShaderStage(esGsEntryPoint, ShaderStageGeometry);
+          lgc::setShaderStage(esGsEntryPoint, ShaderStage::Geometry);
         }
       }
     } else if (m_hasVs) {
       // VS_FS pipeline
       if (enableNgg) {
         // If NGG is enabled, ES-GS merged shader should be present even if GS is absent
-        auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStageVertex);
+        auto esEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStage::Vertex);
         if (esEntryPoint) {
-          lgc::setShaderStage(esEntryPoint, ShaderStageVertex);
+          lgc::setShaderStage(esEntryPoint, ShaderStage::Vertex);
           auto primShaderEntryPoint = shaderMerger.buildPrimShader(esEntryPoint, nullptr, nullptr);
           primShaderEntryPoint->setCallingConv(CallingConv::AMDGPU_GS);
-          lgc::setShaderStage(primShaderEntryPoint, ShaderStageVertex);
+          lgc::setShaderStage(primShaderEntryPoint, ShaderStage::Vertex);
         }
       }
     }
@@ -476,7 +476,7 @@ void PatchPreparePipelineAbi::addAbiMetadata(Module &module) {
 //
 // @param entryPoint : Entry-point of tessellation control shader
 void PatchPreparePipelineAbi::storeTessFactors(Function *entryPoint) {
-  assert(getShaderStage(entryPoint) == ShaderStageTessControl); // Must be tessellation control shader
+  assert(getShaderStage(entryPoint) == ShaderStage::TessControl); // Must be tessellation control shader
 
   if (m_pipelineState->canOptimizeTessFactor())
     return; // If TF store is to be optimized, skip further processing
@@ -499,7 +499,7 @@ void PatchPreparePipelineAbi::storeTessFactors(Function *entryPoint) {
   pipelineSysValues.initialize(m_pipelineState);
 
   const auto tfBufferDesc = pipelineSysValues.get(entryPoint)->getTessFactorBufDesc();
-  const auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageTessControl)->entryArgIdxs.tcs;
+  const auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::TessControl)->entryArgIdxs.tcs;
   const auto tfBufferBase = getFunctionArgument(entryPoint, entryArgIdxs.tfBufferBase);
   const auto relPatchId = pipelineSysValues.get(entryPoint)->getRelativeId();
 

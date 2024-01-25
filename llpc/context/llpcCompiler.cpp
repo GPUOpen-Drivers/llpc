@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2016-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2016-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -65,6 +65,7 @@
 #include "llvm-dialects/Dialect/Dialect.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/AsmParser/Parser.h"
 #include "llvm/BinaryFormat/MsgPackDocument.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
@@ -652,7 +653,8 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   std::vector<ResourceNodeData> imageSymbolInfo;
   std::vector<ResourceNodeData> atomicCounterSymbolInfo;
   std::vector<ResourceNodeData> defaultUniformSymbolInfo;
-  if (shaderInfo->options.pipelineOptions.buildResourcesDataForShaderModule) {
+  if (shaderInfo->options.pipelineOptions.buildResourcesDataForShaderModule &&
+      moduleData.binType == BinaryType::Spirv) {
     buildShaderModuleResourceUsage(shaderInfo, resourceNodes, inputSymbolInfo, outputSymbolInfo, uniformBufferInfo,
                                    storageBufferInfo, textureSymbolInfo, imageSymbolInfo, atomicCounterSymbolInfo,
                                    defaultUniformSymbolInfo, moduleData.usage);
@@ -694,7 +696,8 @@ Result Compiler::BuildShaderModule(const ShaderModuleBuildInfo *shaderInfo, Shad
   pShaderModuleData->binCode.pCode = bufferWritePtr;
   bufferWritePtr += codeBuffer.size() * sizeof(unsigned);
 
-  if (shaderInfo->options.pipelineOptions.buildResourcesDataForShaderModule) {
+  if (shaderInfo->options.pipelineOptions.buildResourcesDataForShaderModule &&
+      moduleData.binType == BinaryType::Spirv) {
     memcpy(bufferWritePtr, &resourceNodes, sizeof(ResourcesNodes));
     pResourcesNodes = reinterpret_cast<ResourcesNodes *>(bufferWritePtr);
     pShaderModuleData->usage.pResources = pResourcesNodes;
@@ -755,6 +758,7 @@ static bool getSymbolInfoFromSpvVariable(const SPIRVVariable *spvVar, ResourceNo
   SPIRVWord binding = 0;
   SPIRVWord varId = 0;
   BasicType basicType = BasicType::Unknown;
+  symbolInfo->columnCount = 1;
 
   SPIRVWord builtIn = false;
   bool isBuiltIn = spvVar->hasDecorate(DecorationBuiltIn, 0, &builtIn);
@@ -764,7 +768,7 @@ static bool getSymbolInfoFromSpvVariable(const SPIRVVariable *spvVar, ResourceNo
 
   SPIRVType *varElemTy = spvVar->getType()->getPointerElementType();
   while (varElemTy->isTypeArray()) {
-    arraySize = varElemTy->getArrayLength();
+    arraySize *= varElemTy->getArrayLength();
     varElemTy = varElemTy->getArrayElementType();
   }
   if (varElemTy->getOpCode() == OpTypeStruct) {
@@ -774,8 +778,10 @@ static bool getSymbolInfoFromSpvVariable(const SPIRVVariable *spvVar, ResourceNo
       isBuiltIn = varElemTy->hasMemberDecorate(i, DecorationBuiltIn, 0, &builtIn);
     }
   }
-  if (varElemTy->getOpCode() == OpTypeMatrix)
+  if (varElemTy->getOpCode() == OpTypeMatrix) {
+    symbolInfo->columnCount = varElemTy->getMatrixColumnCount();
     varElemTy = varElemTy->getMatrixColumnType();
+  }
   if (varElemTy->getOpCode() == OpTypeVector)
     varElemTy = varElemTy->getVectorComponentType();
 
@@ -854,7 +860,7 @@ static unsigned getSamplerArraySizeInSpvStruct(const SPIRVType *spvStruct) {
         samplerArraySize += (arraySize * getSamplerArraySizeInSpvStruct(memberTy));
       }
     } else if (memberTy->isTypeStruct()) {
-      samplerArraySize *= getSamplerArraySizeInSpvStruct(memberTy);
+      samplerArraySize += getSamplerArraySizeInSpvStruct(memberTy);
     }
   }
 
@@ -931,16 +937,19 @@ void Compiler::buildShaderModuleResourceUsage(
     }
   }
 
+  // Spirv Reader will expand matrix to vector arrays.
+  // Add more rsrc node here to avoid poison value in vtxFetch.
   if (shaderInfo->entryStage == ShaderStage::ShaderStageVertex) {
     size_t inputSymbolSize = inputSymbolWithArrayInfo.size();
     for (size_t i = 0; i < inputSymbolSize; i++) {
       auto symbol = inputSymbolWithArrayInfo[i];
-      inputSymbolInfo.push_back(symbol);
+      int baseLocation = symbol.location;
 
-      for (uint32_t ite = 1; ite < symbol.arraySize; ite++) {
+      for (uint32_t ite = 0; ite < symbol.arraySize * symbol.columnCount; ite++) {
         ResourceNodeData elemSymbolInfo = symbol;
-        elemSymbolInfo.location = symbol.location + ite;
         inputSymbolInfo.push_back(elemSymbolInfo);
+        inputSymbolInfo.back().location = baseLocation;
+        baseLocation++;
       }
     }
   }
@@ -994,7 +1003,8 @@ void Compiler::buildShaderModuleResourceUsage(
           textureSymbol.location = defaultUniformSymbol.location;
           textureSymbol.arraySize = getSamplerArraySizeInSpvStruct(varElemTy) * defaultUniformSymbol.arraySize;
           textureSymbol.isDefaultUniformSampler = true;
-          textureSymbolInfo.push_back(textureSymbol);
+          if (textureSymbol.arraySize > 0)
+            textureSymbolInfo.push_back(textureSymbol);
         }
       }
     } break;
@@ -1416,6 +1426,15 @@ Result Compiler::buildUnlinkedShaderInternal(Context *context, ArrayRef<const Pi
         static_cast<const ShaderModuleData *>(shaderInfo[ShaderStageFragment]->pModuleData);
     if (moduleData->usage.useGenericBuiltIn || moduleData->usage.useBarycentric)
       return Result::RequireFullPipeline;
+  } else if (stage == UnlinkedStageVertexProcess) {
+    bool hasVs = shaderInfo[ShaderStageVertex]->pModuleData != nullptr;
+    bool hasTes = (shaderInfo[ShaderStageTessControl]->pModuleData != nullptr) ||
+                  (shaderInfo[ShaderStageTessControlBit]->pModuleData != nullptr);
+    bool hasGs = shaderInfo[ShaderStageGeometry]->pModuleData != nullptr;
+    if (m_gfxIp.major >= 11 && hasVs && !hasGs && !hasTes &&
+        static_cast<const ShaderModuleData *>(shaderInfo[ShaderStageVertex]->pModuleData)->usage.enableXfb) {
+      return Result::RequireFullPipeline;
+    }
   }
 
   unsigned originalShaderStageMask = context->getPipelineContext()->getShaderStageMask();
@@ -1554,28 +1573,6 @@ bool Compiler::canUseRelocatableGraphicsShaderElf(const ArrayRef<const PipelineS
   if (pipelineInfo->iaState.enableMultiView)
     return false;
 
-  // NOTE: On gfx11, Xfb depends on the count of primitive vertex. If UnlinkedStageVertexProcess only contains
-  // VS (no TES and GS), the primitive type might be unknown at compiling VS time, so we have to fall back to full
-  // pipeline.
-  // Currently, We treat Triangle_list as the default value. Therefore, we only disable relocatable compilation
-  // when primitive is point or line.
-  bool hasVs = pipelineInfo->vs.pModuleData != nullptr;
-  bool hasTes = (pipelineInfo->tes.pModuleData != nullptr) || (pipelineInfo->tcs.pModuleData != nullptr);
-  bool hasGs = pipelineInfo->gs.pModuleData != nullptr;
-  if (m_gfxIp.major >= 11 && hasVs && !hasGs && !hasTes &&
-      static_cast<const ShaderModuleData *>(pipelineInfo->vs.pModuleData)->usage.enableXfb) {
-    switch (pipelineInfo->iaState.topology) {
-    case VK_PRIMITIVE_TOPOLOGY_POINT_LIST:
-    case VK_PRIMITIVE_TOPOLOGY_LINE_LIST:
-    case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP:
-    case VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY:
-    case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY:
-      return false;
-    default:
-      break;
-    }
-  }
-
   if (shaderInfos[0]) {
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfos[0]->pModuleData);
     if (moduleData && moduleData->binType != BinaryType::Spirv)
@@ -1642,6 +1639,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
   context->setBuilder(builderContext->createBuilder(&*pipeline));
 
   std::unique_ptr<Module> pipelineModule;
+  bool needLowerGpurt = false;
 
   // NOTE: If input is LLVM IR, read it now. There is now only ever one IR module representing the
   // whole pipeline.
@@ -1656,40 +1654,50 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
   // into a single pipeline module.
   if (!pipelineModule) {
     // Create empty modules and set target machine in each.
-    std::vector<Module *> modules(shaderInfo.size());
+    SmallVector<std::unique_ptr<Module>> modules(shaderInfo.size());
     unsigned stageSkipMask = 0;
+    unsigned numStagesWithRayQuery = 0;
+
     for (unsigned shaderIndex = 0; shaderIndex < shaderInfo.size() && result == Result::Success; ++shaderIndex) {
       const PipelineShaderInfo *shaderInfoEntry = shaderInfo[shaderIndex];
       if (!shaderInfoEntry || !shaderInfoEntry->pModuleData)
         continue;
 
-      const ShaderModuleData *moduleDataEx = reinterpret_cast<const ShaderModuleData *>(shaderInfoEntry->pModuleData);
+      ShaderStage entryStage = shaderInfoEntry ? shaderInfoEntry->entryStage : ShaderStageInvalid;
+      if (stageSkipMask & shaderStageToMask(entryStage))
+        continue;
 
-      Module *module = nullptr;
-      if (moduleDataEx->binType == BinaryType::MultiLlvmBc) {
+      const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfoEntry->pModuleData);
+
+      if (moduleData->binType == BinaryType::MultiLlvmBc) {
         result = Result::ErrorInvalidShader;
-      } else {
-        module = new Module((Twine("llpc") + "_" + getShaderStageName(shaderInfoEntry->entryStage)).str() + "_" +
-                                std::to_string(getModuleIdByIndex(shaderIndex)),
-                            *context);
+        continue;
       }
 
-      modules[shaderIndex] = module;
-      context->setModuleTargetMachine(module);
-    }
+      modules[shaderIndex].reset(
+          new Module((Twine("llpc") + "_" + getShaderStageName(shaderInfoEntry->entryStage)).str() + "_" +
+                         std::to_string(getModuleIdByIndex(shaderIndex)),
+                     *context));
 
-    unsigned numStagesWithRayQuery = 0;
+      context->setModuleTargetMachine(modules[shaderIndex].get());
 
-    for (unsigned shaderIndex = 0; shaderIndex < shaderInfo.size() && result == Result::Success; ++shaderIndex) {
-      const PipelineShaderInfo *shaderInfoEntry = shaderInfo[shaderIndex];
-      ShaderStage entryStage = shaderInfoEntry ? shaderInfoEntry->entryStage : ShaderStageInvalid;
+      // If input shader module is llvm bc, skip spirv to llvm translation
+      if (moduleData->binType == BinaryType::LlvmBc) {
+        llvm::SMDiagnostic errDiag;
+        llvm::StringRef bcStringRef(static_cast<const char *>(moduleData->binCode.pCode), moduleData->binCode.codeSize);
+        llvm::MemoryBufferRef bcBufferRef(bcStringRef, "");
 
-      if (!shaderInfoEntry || !shaderInfoEntry->pModuleData || (stageSkipMask & shaderStageToMask(entryStage)))
-        continue;
+        Expected<std::unique_ptr<Module>> MOrErr = llvm::parseBitcodeFile(bcBufferRef, *context);
+        if (!MOrErr) {
+          report_fatal_error("Failed to read bitcode");
+          continue;
+        }
+        modules[shaderIndex] = std::move(*MOrErr);
+      }
 
       std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(context->getLgcContext()));
       lowerPassMgr->setPassIndex(&passIndex);
-      SpirvLower::registerPasses(*lowerPassMgr);
+      SpirvLower::registerTranslationPasses(*lowerPassMgr);
 
       // Start timer for translate.
       timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, true);
@@ -1703,19 +1711,24 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
                                     "// LLPC SPIRV-to-LLVM translation results\n"));
       }
 
-      const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfoEntry->pModuleData);
       if (moduleData->usage.enableRayQuery) {
         assert(!moduleData->usage.rayQueryLibrary);
         lowerPassMgr->addPass(SpirvLowerRayQuery(false));
         ++numStagesWithRayQuery;
       }
 
+      if (moduleData->usage.isInternalRtShader)
+        setUseGpurt(&*pipeline);
+
       assert(!moduleData->usage.isInternalRtShader || entryStage == ShaderStageCompute);
+
+      if (moduleData->usage.isInternalRtShader || moduleData->usage.enableRayQuery)
+        needLowerGpurt |= true;
 
       // Stop timer for translate.
       timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, false);
 
-      bool success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
+      bool success = runPasses(&*lowerPassMgr, modules[shaderIndex].get());
       if (!success) {
         LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
         result = Result::ErrorInvalidShader;
@@ -1724,12 +1737,14 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       // If this is TCS, set inputVertices from patchControlPoints in the pipeline state.
       if (entryStage == ShaderStageTessControl ||
           (entryStage == ShaderStageTessEval && shaderInfo[ShaderStageTessControl]->pModuleData == nullptr))
-        context->getPipelineContext()->setTcsInputVertices(modules[shaderIndex]);
+        context->getPipelineContext()->setTcsInputVertices(modules[shaderIndex].get());
     }
+
+    if (needLowerGpurt)
+      setUseGpurt(&*pipeline);
 
     if (numStagesWithRayQuery) {
       std::unique_ptr<Module> gpurtShaderLibrary = createGpurtShaderLibrary(context);
-      setUseGpurt(&*pipeline);
       if (!gpurtShaderLibrary)
         return Result::ErrorInvalidShader;
 
@@ -1758,7 +1773,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       }
     }
 
-    SmallVector<Module *, ShaderStageGfxCount> modulesToLink;
+    SmallVector<std::unique_ptr<Module>, ShaderStageGfxCount> modulesToLink;
     for (unsigned shaderIndex = 0; shaderIndex < shaderInfo.size() && result == Result::Success; ++shaderIndex) {
       // Per-shader SPIR-V lowering passes.
       const PipelineShaderInfo *shaderInfoEntry = shaderInfo[shaderIndex];
@@ -1768,13 +1783,13 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       if (stageSkipMask & shaderStageToMask(entryStage)) {
         // Do not run SPIR-V translator and lowering passes on this shader; we were given it as IR ready
         // to link into pipeline module.
-        modulesToLink.push_back(modules[shaderIndex]);
+        modulesToLink.push_back(std::move(modules[shaderIndex]));
         continue;
       }
 
       std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(context->getLgcContext()));
       lowerPassMgr->setPassIndex(&passIndex);
-      SpirvLower::registerPasses(*lowerPassMgr);
+      SpirvLower::registerLoweringPasses(*lowerPassMgr);
 
       const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfoEntry->pModuleData);
 
@@ -1782,14 +1797,14 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
                             /*rayTracing=*/false, moduleData->usage.enableRayQuery,
                             moduleData->usage.isInternalRtShader);
       // Run the passes.
-      bool success = runPasses(&*lowerPassMgr, modules[shaderIndex]);
+      bool success = runPasses(&*lowerPassMgr, modules[shaderIndex].get());
       if (!success) {
         LLPC_ERRS("Failed to translate SPIR-V or run per-shader passes\n");
         result = Result::ErrorInvalidShader;
       }
 
       // Add the shader module to the list for the pipeline.
-      modulesToLink.push_back(modules[shaderIndex]);
+      modulesToLink.push_back(std::move(modules[shaderIndex]));
     }
 
     // If this is a part-pipeline compile of the pre-rasterization stages, give the "other" pipeline object
@@ -1798,8 +1813,8 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       pipeline->setOtherPartPipeline(*otherPartPipeline);
 
     // Link the shader modules into a single pipeline module.
-    pipelineModule.reset(pipeline->irLink(
-        modulesToLink, context->getPipelineContext()->isUnlinked() ? PipelineLink::Unlinked : pipelineLink));
+    pipelineModule = pipeline->irLink(
+        modulesToLink, context->getPipelineContext()->isUnlinked() ? PipelineLink::Unlinked : pipelineLink);
     if (!pipelineModule) {
       LLPC_ERRS("Failed to link shader modules into pipeline module\n");
       result = Result::ErrorInvalidShader;
@@ -1814,9 +1829,11 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       // @param stageMask : Shader stage mask
       // @param stageHashes : Per-stage hash of in/out usage
       // @returns : Stage mask of stages not found in cache
-      [&graphicsShaderCacheChecker, stageCacheAccesses](const Module *module, unsigned stageMask,
+      [&graphicsShaderCacheChecker, stageCacheAccesses](const Module *module, ShaderStageMask stageMask,
                                                         ArrayRef<ArrayRef<uint8_t>> stageHashes) {
-        return graphicsShaderCacheChecker.check(module, stageMask, stageHashes, stageCacheAccesses);
+        ShaderStageMask result;
+        result.m_value = graphicsShaderCacheChecker.check(module, stageMask.m_value, stageHashes, stageCacheAccesses);
+        return result;
       };
 
   // Only enable per stage cache for full graphics pipeline (traditional pipeline or mesh pipeline)
@@ -2148,7 +2165,7 @@ Result Compiler::buildGraphicsPipelineWithPartPipelines(Context *context,
 
       // If the "ELF" does not look like ELF, then it must be textual output from -emit-lgc, -emit-llvm, -filetype=asm.
       // We can't link that, so just concatenate it on to the output.
-      if (partPipelineElf.size() < 4 || !partPipelineElf.startswith("\177ELF")) {
+      if (partPipelineElf.size() < 4 || !partPipelineElf.starts_with("\177ELF")) {
         const unsigned char magic[] = {'B', 'C', 0xC0, 0xDE};
         if (partPipelineElf.size() > 4 && memcmp(partPipelineElf.data(), magic, sizeof(magic)) == 0)
           report_fatal_error("Cannot emit llvm bitcode with part pipeline compilation.");
@@ -2247,8 +2264,7 @@ Result Compiler::BuildGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline
     LLPC_OUTS("\n");
   }
 
-  if (result == Result::Success)
-    dumpCompilerOptions(pipelineDumpFile);
+  dumpCompilerOptions(pipelineDumpFile);
 
   std::optional<CacheAccessor> cacheAccessor;
   if (cl::CacheFullPipelines) {
@@ -2377,7 +2393,8 @@ Result Compiler::BuildComputePipeline(const ComputePipelineBuildInfo *pipelineIn
     LLPC_OUTS("\n");
   }
 
-  dumpCompilerOptions(pipelineDumpFile);
+  if (result == Result::Success)
+    dumpCompilerOptions(pipelineDumpFile);
 
   std::optional<CacheAccessor> cacheAccessor;
   if (cl::CacheFullPipelines) {
@@ -2455,7 +2472,7 @@ std::unique_ptr<Module> Compiler::createGpurtShaderLibrary(Context *context) {
 
   TimerProfiler timerProfiler(context->getPipelineHashCode(), "LLPC", TimerProfiler::PipelineTimerEnableMask);
   std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(context->getLgcContext()));
-  SpirvLower::registerPasses(*lowerPassMgr);
+  SpirvLower::registerTranslationPasses(*lowerPassMgr);
 
   timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, true);
 
@@ -2539,6 +2556,20 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
 
   RayTracingContext rayTracingContext(m_gfxIp, pipelineInfo, representativeShaderInfo, &pipelineHash, &cacheHash,
                                       pipelineInfo->indirectStageMask);
+  auto &summary = rayTracingContext.getRayTracingLibrarySummary();
+  summary.knownSetRayFlags = ~0;
+  summary.knownUnsetRayFlags = ~0;
+
+  // Note: These values are provided by the application via the ABI.
+  summary.maxRayPayloadSize = pipelineInfo->payloadSizeMaxInLib;
+  summary.maxHitAttributeSize = pipelineInfo->attributeSizeMaxInLib;
+
+  for (unsigned i = 0; i < pipelineInfo->libraryCount; ++i) {
+    const BinaryData &data = pipelineInfo->pLibrarySummaries[i];
+    auto rls = cantFail(
+        lgc::RayTracingLibrarySummary::decodeMsgpack(StringRef(static_cast<const char *>(data.pCode), data.codeSize)));
+    summary.merge(rls);
+  }
 
   pipelineOut->hasTraceRay = false;
   for (unsigned i = 0; i < pipelineInfo->shaderCount; ++i) {
@@ -2546,6 +2577,12 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
     const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo.pModuleData);
     if (moduleData->usage.hasTraceRay) {
       pipelineOut->hasTraceRay = true;
+
+      summary.usesTraceRay = true;
+
+      // TODO: Leverage static analysis (could be moved to *after* the compilation of shaders?)
+      summary.knownSetRayFlags = 0;
+      summary.knownUnsetRayFlags = 0;
       break;
     }
   }
@@ -2574,6 +2611,7 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
                                            helperThreadProvider);
 
   if (result == Result::Success) {
+    std::string summaryMsgpack = summary.encodeMsgpack();
     void *allocBuf = nullptr;
     size_t shaderGroupHandleSize = pipelineInfo->shaderGroupCount * sizeof(RayTracingShaderIdentifier);
     size_t binaryDataSize = sizeof(BinaryData) * elfBinarys.size();
@@ -2593,6 +2631,8 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
     allocSize += shaderPropsSize;
 
     allocSize += shaderGroupHandleSize;
+
+    allocSize += alignTo(summaryMsgpack.size(), 8);
 
     if (pipelineInfo->pfnOutputAlloc)
       allocBuf = pipelineInfo->pfnOutputAlloc(pipelineInfo->pInstance, pipelineInfo->pUserData, allocSize);
@@ -2626,6 +2666,7 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
 
     // Get to the address of shaderGroupHandles pass elfCode size
     RayTracingShaderIdentifier *shaderHandles = reinterpret_cast<RayTracingShaderIdentifier *>(allocBuf);
+    allocBuf = voidPtrInc(allocBuf, shaderGroupHandleSize);
     memset(shaderHandles, 0, shaderGroupHandleSize);
     pipelineOut->shaderGroupHandle.shaderHandles = shaderHandles;
     pipelineOut->shaderGroupHandle.shaderHandleCount = pipelineInfo->shaderGroupCount;
@@ -2647,6 +2688,12 @@ Result Compiler::BuildRayTracingPipeline(const RayTracingPipelineBuildInfo *pipe
           shaderHandles[i].intersectionId = getModuleIdByIndex(shaderGroup->intersectionShader);
       }
     }
+
+    void *summaryOut = allocBuf;
+    allocBuf = voidPtrInc(allocBuf, alignTo(summaryMsgpack.size(), 8));
+    pipelineOut->librarySummary.pCode = summaryOut;
+    pipelineOut->librarySummary.codeSize = summaryMsgpack.size();
+    memcpy(summaryOut, summaryMsgpack.data(), summaryMsgpack.size());
   }
 
   return result;
@@ -2713,9 +2760,8 @@ Result Compiler::generatePipeline(Context *context, unsigned moduleIndex, std::u
   // Generate pipeline.
   std::unique_ptr<Module> pipelineModule;
 
-  pipelineModule.reset(pipeline->irLink(module.release(), context->getPipelineContext()->isUnlinked()
-                                                              ? PipelineLink::Unlinked
-                                                              : PipelineLink::WholePipeline));
+  pipelineModule = pipeline->irLink(module, context->getPipelineContext()->isUnlinked() ? PipelineLink::Unlinked
+                                                                                        : PipelineLink::WholePipeline);
   if (!pipelineModule) {
     LLPC_ERRS("Failed to link shader modules into pipeline module\n");
     return Result::ErrorInvalidShader;
@@ -2945,7 +2991,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
 
     std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(builderContext));
     lowerPassMgr->setPassIndex(&passIndex);
-    SpirvLower::registerPasses(*lowerPassMgr);
+    SpirvLower::registerTranslationPasses(*lowerPassMgr);
 
     // SPIR-V translation, then dump the result.
     lowerPassMgr->addPass(SpirvLowerTranslator(shaderInfoEntry->entryStage, shaderInfoEntry));
@@ -3015,13 +3061,13 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
     // Prepare GpuRt module to be compiled separately
     for (auto funcIt = gpurtShaderLibrary->begin(), funcEnd = gpurtShaderLibrary->end(); funcIt != funcEnd;) {
       Function *func = &*funcIt++;
-      if (func->getName().startswith(traceRayFuncName)) {
+      if (func->getName().starts_with(traceRayFuncName)) {
         // We assigned GpuRt functions weak linkage prior to linking into app modules to not confuse the entry
         // point determination mechanism. Undo that on TraceRay to make it the entry of the module.
         func->setLinkage(GlobalValue::ExternalLinkage);
         lgc::rt::setLgcRtShaderStage(func, lgc::rt::RayTracingShaderStage::Traversal);
       } else if (func->getLinkage() == GlobalValue::WeakAnyLinkage &&
-                 !func->getName().startswith(fetchTrianglePosFunc) && !func->empty()) {
+                 !func->getName().starts_with(fetchTrianglePosFunc) && !func->empty()) {
         // Preserve fetchTrianglePosFunc because we need to inline it into Traversal later on.
         // Remove other function definitions both for compile speed, and to work around an
         // issue with private globals used in multiple functions in GpuRt which confuses SpirvLowerGlobal.
@@ -3041,7 +3087,7 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
   for (unsigned i = 0; i < newModules.size(); i++) {
     auto module = (newModules[i].get());
     std::unique_ptr<lgc::PassManager> passMgr(lgc::PassManager::Create(builderContext));
-    SpirvLower::registerPasses(*passMgr);
+    SpirvLower::registerLoweringPasses(*passMgr);
     SpirvLower::addPasses(mainContext, ShaderStageCompute, *passMgr, timerProfiler.getTimer(TimerLower), true,
                           moduleUsesRayQuery[i], false);
     bool success = runPasses(&*passMgr, module);
@@ -3232,7 +3278,7 @@ MetroHash::Hash Compiler::generateHashForCompileOptions(unsigned optionCount, co
     StringRef option = options[i] + 1; // Skip '-' in options
     bool ignore = false;
     for (unsigned j = 0; j < sizeof(IgnoredOptions) / sizeof(IgnoredOptions[0]); ++j) {
-      if (option.startswith(IgnoredOptions[j])) {
+      if (option.starts_with(IgnoredOptions[j])) {
         ignore = true;
         break;
       }
@@ -3483,36 +3529,36 @@ std::optional<lgc::rt::RayTracingShaderStage> getLgcRtShaderStage(Llpc::ShaderSt
 // Convert front-end LLPC shader stage to middle-end LGC shader type
 //
 // @param stage : Front-end LLPC shader stage
-lgc::ShaderStage getLgcShaderStage(Llpc::ShaderStage stage) {
+lgc::ShaderStageEnum getLgcShaderStage(Llpc::ShaderStage stage) {
   switch (stage) {
   case ShaderStageTask:
-    return lgc::ShaderStageTask;
+    return lgc::ShaderStage::Task;
   case ShaderStageCompute:
-    return lgc::ShaderStageCompute;
+    return lgc::ShaderStage::Compute;
   case ShaderStageVertex:
-    return lgc::ShaderStageVertex;
+    return lgc::ShaderStage::Vertex;
   case ShaderStageTessControl:
-    return lgc::ShaderStageTessControl;
+    return lgc::ShaderStage::TessControl;
   case ShaderStageTessEval:
-    return lgc::ShaderStageTessEval;
+    return lgc::ShaderStage::TessEval;
   case ShaderStageGeometry:
-    return lgc::ShaderStageGeometry;
+    return lgc::ShaderStage::Geometry;
   case ShaderStageMesh:
-    return lgc::ShaderStageMesh;
+    return lgc::ShaderStage::Mesh;
   case ShaderStageFragment:
-    return lgc::ShaderStageFragment;
+    return lgc::ShaderStage::Fragment;
   case ShaderStageCopyShader:
-    return lgc::ShaderStageCopyShader;
+    return lgc::ShaderStage::CopyShader;
   case ShaderStageRayTracingRayGen:
   case ShaderStageRayTracingIntersect:
   case ShaderStageRayTracingAnyHit:
   case ShaderStageRayTracingClosestHit:
   case ShaderStageRayTracingMiss:
   case ShaderStageRayTracingCallable:
-    return lgc::ShaderStageCompute;
+    return lgc::ShaderStage::Compute;
   default:
     llvm_unreachable("");
-    return lgc::ShaderStageInvalid;
+    return lgc::ShaderStage::Invalid;
   }
 }
 

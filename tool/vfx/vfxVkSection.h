@@ -271,6 +271,7 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableLicmThreshold, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, unrollHintThreshold, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, dontUnrollHintThreshold, MemberTypeInt, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, noContractOpDot, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, fastMathFlags, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableFastMathFlags, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, ldsSpillLimitDwords, MemberTypeInt, false);
@@ -283,6 +284,7 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, workaroundStorageImageFormats, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, workaroundInitializeOutputsToZero, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, disableFMA, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionShaderOption, constantBufferBindingOffset, MemberTypeInt, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -500,7 +502,9 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, disableTruncCoordForGather, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, vertex64BitsAttribSingleLoc, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enableFragColor, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, disableBaseVertex, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, enablePrimGeneratedQuery, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionPipelineOption, disablePerCompFetch, MemberTypeBool, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
@@ -680,6 +684,21 @@ private:
 };
 
 // =====================================================================================================================
+// Represents a raytracing library summary
+class SectionRayTracingLibrarySummary : public Section {
+public:
+  SectionRayTracingLibrarySummary() : Section({}, SectionTypeRayTracingLibrarySummary, "RayTracingLibrarySummary") {}
+
+  virtual void addLine(const char *line) { m_yaml += line; }
+
+  Vkgc::BinaryData getSubState();
+
+private:
+  std::string m_yaml;
+  std::string m_msgpack;
+};
+
+// =====================================================================================================================
 // Represents the sub section RtState state
 class SectionRtState : public Section {
 public:
@@ -812,6 +831,7 @@ public:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableEarlyCompile, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, enableColorExportShader, MemberTypeBool, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, useSoftwareVertexBufferDescriptors, MemberTypeBool, false);
+      INIT_STATE_MEMBER_NAME_TO_ADDR(SectionGraphicsState, vbAddressLowBitsKnown, MemberTypeBool, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_shaderLibrary, MemberTypeString, false);
       INIT_MEMBER_NAME_TO_ADDR(SectionGraphicsState, m_rtState, MemberTypeRtState, true);
       INIT_MEMBER_ARRAY_NAME_TO_ADDR(SectionGraphicsState, tessLevelInner, MemberTypeFloat, 2, false);

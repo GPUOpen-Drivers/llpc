@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2023-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -50,9 +50,10 @@ namespace lgc {
 using RtStage = rt::RayTracingShaderStage;
 
 static Function *insertCpsArguments(Function &fn) {
-  // Mutate function arguments, add ({} %state, %rcr).
+  // Mutate function arguments, add ({} %state, %rcr, %shader-index).
   LLVMContext &context = fn.getContext();
-  SmallVector<Type *> argTys = {StructType::get(context, {}), IntegerType::get(context, 32)};
+  SmallVector<Type *> argTys = {StructType::get(context, {}), IntegerType::get(context, 32),
+                                IntegerType::get(context, 32)};
   auto *fnTy = fn.getFunctionType();
   argTys.append(fnTy->params().begin(), fnTy->params().end());
 
@@ -61,12 +62,13 @@ static Function *insertCpsArguments(Function &fn) {
   fn.replaceAllUsesWith(newFn);
   for (unsigned idx = 0; idx < fn.arg_size(); idx++) {
     Value *oldArg = fn.getArg(idx);
-    Value *newArg = newFn->getArg(idx + 2);
+    Value *newArg = newFn->getArg(idx + 3);
     newArg->setName(oldArg->getName());
     oldArg->replaceAllUsesWith(newArg);
   }
   newFn->getArg(0)->setName("state");
   newFn->getArg(1)->setName("rcr");
+  newFn->getArg(2)->setName("shader-index");
   return newFn;
 }
 
@@ -169,8 +171,10 @@ PreservedAnalyses Continufy::run(Module &module, ModuleAnalysisManager &analysis
         if (calleeLevel != CpsLevel::RayGen)
           continuationRef = builder.CreateOr(continuationRef, builder.getInt32((uint32_t)calleeLevel));
 
-        SmallVector<Value *> callArgs(call.args());
-        auto *newCall = builder.create<AwaitOp>(call.getType(), continuationRef, 1u << (unsigned)calleeLevel, callArgs);
+        // Always put a shader-index.
+        SmallVector<Value *> tailArgs = {PoisonValue::get(builder.getInt32Ty())};
+        tailArgs.append(call.arg_begin(), call.arg_end());
+        auto *newCall = builder.create<AwaitOp>(call.getType(), continuationRef, 1u << (unsigned)calleeLevel, tailArgs);
         call.replaceAllUsesWith(newCall);
         tobeErased.push_back(&call);
       }
@@ -185,8 +189,9 @@ PreservedAnalyses Continufy::run(Module &module, ModuleAnalysisManager &analysis
       if (auto *retInst = dyn_cast<ReturnInst>(term)) {
         builder.SetInsertPoint(term);
         auto *retValue = retInst->getReturnValue();
-        // %rcr
-        SmallVector<Value *> tailArgs = {PoisonValue::get(builder.getInt32Ty())};
+        // %rcr, %shader-index
+        SmallVector<Value *> tailArgs = {PoisonValue::get(builder.getInt32Ty()),
+                                         PoisonValue::get(builder.getInt32Ty())};
         // return value
         if (retValue)
           tailArgs.push_back(retValue);

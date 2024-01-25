@@ -1,8 +1,10 @@
 #include "vfxEnumsConverter.h"
+#include "vfxError.h"
 #include "vfxSection.h"
 
 #if VFX_SUPPORT_VK_PIPELINE
 #include "vfxVkSection.h"
+#include "llvm/BinaryFormat/MsgPackDocument.h"
 
 using namespace Vkgc;
 
@@ -20,6 +22,7 @@ public:
     INIT_SECTION_INFO("ComputePipelineState", SectionTypeComputeState, 0)
     INIT_SECTION_INFO("RayTracingPipelineState", SectionTypeRayTracingState, 0)
     INIT_SECTION_INFO("RtState", SectionTypeRtState, 0)
+    INIT_SECTION_INFO("RayTracingLibrarySummary", SectionTypeRayTracingLibrarySummary, 0)
     INIT_SECTION_INFO("VertexInputState", SectionTypeVertexInputState, 0)
     INIT_SECTION_INFO("TaskInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageTask)
     INIT_SECTION_INFO("VsInfo", SectionTypeShaderInfo, ShaderStage::ShaderStageVertex)
@@ -103,6 +106,21 @@ public:
 // Initialize VK pipeline special sections.
 void initVkSections() {
   static VkSectionParserInit init;
+}
+
+// =====================================================================================================================
+// Convert the raytracing library summary from YAML to msgpack
+Vkgc::BinaryData SectionRayTracingLibrarySummary::getSubState() {
+  std::string errorMsgTmp;
+  llvm::msgpack::Document doc;
+  if (!doc.fromYAML(m_yaml))
+    PARSE_ERROR(errorMsgTmp, getLineNum(), "Failed to parse YAML for raytracing library summary");
+  doc.writeToBlob(m_msgpack);
+
+  Vkgc::BinaryData data;
+  data.pCode = m_msgpack.data();
+  data.codeSize = m_msgpack.size();
+  return data;
 }
 
 // =====================================================================================================================

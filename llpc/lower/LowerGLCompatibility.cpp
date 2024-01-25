@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -46,7 +46,8 @@ namespace Llpc {
 
 // =====================================================================================================================
 LowerGLCompatibility::LowerGLCompatibility()
-    : m_retInst(nullptr), m_out(nullptr), m_clipVertex(nullptr), m_clipDistance(nullptr), m_clipPlane(nullptr) {
+    : m_retInst(nullptr), m_out(nullptr), m_clipVertex(nullptr), m_clipDistance(nullptr), m_clipPlane(nullptr),
+      m_frontColor(nullptr), m_backColor(nullptr), m_frontSecondaryColor(nullptr), m_backSecondaryColor(nullptr) {
 }
 
 // =====================================================================================================================
@@ -63,13 +64,26 @@ PreservedAnalyses LowerGLCompatibility::run(Module &module, ModuleAnalysisManage
 
   collectEmulationResource();
 
-  if (!needLowerClipVertex())
+  if (!needLowerClipVertex() && !needLowerFrontColor() && !needLowerBackColor() && !needLowerFrontSecondaryColor() &&
+      !needLowerBackSecondaryColor())
     return PreservedAnalyses::all();
 
   buildPatchPositionInfo();
 
   if (needLowerClipVertex())
     lowerClipVertex();
+
+  if (needLowerFrontColor())
+    lowerFrontColor();
+
+  if (needLowerBackColor())
+    lowerBackColor();
+
+  if (needLowerFrontSecondaryColor())
+    lowerFrontSecondaryColor();
+
+  if (needLowerBackSecondaryColor())
+    lowerBackSecondaryColor();
 
   return PreservedAnalyses::none();
 }
@@ -84,6 +98,10 @@ bool LowerGLCompatibility::needRun() {
                                                   ->getPipelineShaderInfo(m_shaderStage)
                                                   ->pModuleData);
     result |= moduleData->usage.useClipVertex;
+    result |= moduleData->usage.useFrontColor;
+    result |= moduleData->usage.useBackColor;
+    result |= moduleData->usage.useFrontSecondaryColor;
+    result |= moduleData->usage.useBackSecondaryColor;
   }
   return result;
 }
@@ -212,7 +230,7 @@ void LowerGLCompatibility::collectEmitInst() {
     auto mangledName = function.getName();
     // We get all users before iterating because the iterator can be invalidated
     // by interpolateInputElement
-    if (mangledName.startswith(gSPIRVName::EmitVertex) || mangledName.startswith(gSPIRVName::EmitStreamVertex)) {
+    if (mangledName.starts_with(gSPIRVName::EmitVertex) || mangledName.starts_with(gSPIRVName::EmitStreamVertex)) {
       SmallVector<User *> users(function.users());
       for (User *user : users) {
         assert(isa<CallInst>(user) && "We should only have CallInst instructions here.");
@@ -252,6 +270,30 @@ void LowerGLCompatibility::collectEmulationResource() {
             else
               m_clipVertex = &global;
           }
+          if (md.Value == Vkgc::GlCompatibilityInOutLocation::FrontColor) {
+            if (isStructureOrArrayOfStructure)
+              m_out = &global;
+            else
+              m_frontColor = &global;
+          }
+          if (md.Value == Vkgc::GlCompatibilityInOutLocation::BackColor) {
+            if (isStructureOrArrayOfStructure)
+              m_out = &global;
+            else
+              m_backColor = &global;
+          }
+          if (md.Value == Vkgc::GlCompatibilityInOutLocation::FrontSecondaryColor) {
+            if (isStructureOrArrayOfStructure)
+              m_out = &global;
+            else
+              m_frontSecondaryColor = &global;
+          }
+          if (md.Value == Vkgc::GlCompatibilityInOutLocation::BackSecondaryColor) {
+            if (isStructureOrArrayOfStructure)
+              m_out = &global;
+            else
+              m_backSecondaryColor = &global;
+          }
         } else if (md.IsBuiltIn && md.Value == spv::BuiltInClipDistance) {
           if (isStructureOrArrayOfStructure)
             m_out = &global;
@@ -272,30 +314,51 @@ void LowerGLCompatibility::collectEmulationResource() {
     assert(metaNode);
     auto inOutMetaConst = mdconst::dyn_extract<Constant>(metaNode->getOperand(0));
     for (User *user : m_out->users()) {
-      if (GetElementPtrInst *gep = dyn_cast<GetElementPtrInst>(user)) {
-        // The user is a GEP
-        // Check to see if the value has been stored.
-        bool beenModified = false;
-        for (User *gepUser : gep->users()) {
-          assert(!isa<GetElementPtrInst>(gepUser));
-          beenModified |= isa<StoreInst>(gepUser);
+      SmallVector<Value *> indexOperands;
+      // The user is a GEP
+      // Check to see if the value has been stored.
+      bool beenModified = false;
+      User *gep = nullptr;
+      if (auto *gepConst = dyn_cast<ConstantExpr>(user)) {
+        auto operandsCount = gepConst->getNumOperands();
+        // Skip the first indices, and the access chain target.
+        for (size_t index = 2; index < operandsCount; index++) {
+          auto *pIndex = dyn_cast<ConstantInt>(gepConst->getOperand(index));
+          if (pIndex) {
+            indexOperands.push_back(pIndex);
+          }
         }
-
+        gep = gepConst;
+      } else if (auto *gepInst = dyn_cast<GetElementPtrInst>(user)) {
         // We shouldn't have any chained GEPs here, they are coalesced by the LowerAccessChain pass.
-        SmallVector<Value *> indexOperands;
-        for (auto index = gep->idx_begin(); index != gep->idx_end(); index++) {
+        for (auto index = gepInst->idx_begin(); index != gepInst->idx_end(); index++) {
           // Skip the first indices, it should be 0 in most of time.
-          if (index == gep->idx_begin()) {
-            assert(cast<ConstantInt>(gep->idx_begin())->isZero() && "Non-zero GEP first index\n");
+          if (index == gepInst->idx_begin()) {
+            assert(cast<ConstantInt>(gepInst->idx_begin())->isZero() && "Non-zero GEP first index\n");
             continue;
           }
           indexOperands.push_back(m_builder->CreateZExtOrTrunc(index->get(), m_builder->getInt32Ty()));
+        }
+        gep = gepInst;
+      }
+      if (gep != nullptr) {
+        for (User *gepUser : gep->users()) {
+          assert(!isa<GetElementPtrInst>(gepUser));
+          beenModified |= isa<StoreInst>(gepUser);
         }
         decodeInOutMetaRecursivelyByIndex(glOut->getValueType(), inOutMetaConst, indexOperands, mds);
         for (auto md : mds) {
           if (md.IsLoc) {
             if (beenModified && (md.Value == Vkgc::GlCompatibilityInOutLocation::ClipVertex))
               m_clipVertex = gep;
+            if (beenModified && (md.Value == Vkgc::GlCompatibilityInOutLocation::FrontColor))
+              m_frontColor = gep;
+            if (beenModified && (md.Value == Vkgc::GlCompatibilityInOutLocation::BackColor))
+              m_backColor = gep;
+            if (beenModified && (md.Value == Vkgc::GlCompatibilityInOutLocation::FrontSecondaryColor))
+              m_frontSecondaryColor = gep;
+            if (beenModified && (md.Value == Vkgc::GlCompatibilityInOutLocation::BackSecondaryColor))
+              m_backSecondaryColor = gep;
           } else if (md.IsBuiltIn && md.Value == spv::BuiltInClipDistance) {
             m_clipDistance = gep;
           }
@@ -318,6 +381,30 @@ void LowerGLCompatibility::buildPatchPositionInfo() {
 // Check whether need do lower for ClipVertex.
 bool LowerGLCompatibility::needLowerClipVertex() {
   return (m_clipVertex != nullptr && !m_clipVertex->user_empty());
+}
+
+// =====================================================================================================================
+// Check whether need do lower for FrontColor.
+bool LowerGLCompatibility::needLowerFrontColor() {
+  return (m_frontColor != nullptr && !m_frontColor->user_empty());
+}
+
+// =====================================================================================================================
+// Check whether need do lower for FrontColor.
+bool LowerGLCompatibility::needLowerBackColor() {
+  return (m_backColor != nullptr && !m_backColor->user_empty());
+}
+
+// =====================================================================================================================
+// Check whether need do lower for FrontColor.
+bool LowerGLCompatibility::needLowerFrontSecondaryColor() {
+  return (m_frontSecondaryColor != nullptr && !m_frontSecondaryColor->user_empty());
+}
+
+// =====================================================================================================================
+// Check whether need do lower for FrontColor.
+bool LowerGLCompatibility::needLowerBackSecondaryColor() {
+  return (m_backSecondaryColor != nullptr && !m_backSecondaryColor->user_empty());
 }
 
 // =====================================================================================================================
@@ -431,6 +518,19 @@ void LowerGLCompatibility::emulateStoreClipVertex() {
 }
 
 // =====================================================================================================================
+// Inline the emulation instruction of front/back/front secondary/back secondary color.
+void LowerGLCompatibility::emulationOutputColor(llvm::User *color) {
+  auto floatType = m_builder->getFloatTy();
+  Type *vec4Type = VectorType::get(floatType, 4, false);
+  // Load frontColor
+  Value *colorOperand = m_builder->CreateLoad(vec4Type, color);
+  Value *clampedColor =
+      m_builder->CreateFClamp(colorOperand, ConstantFP::get(vec4Type, 0.0), ConstantFP::get(vec4Type, 1.0));
+  // Store frontColor
+  m_builder->CreateStore(clampedColor, color);
+}
+
+// =====================================================================================================================
 // Does lowering operations for GLSL variable "gl_ClipVertex".
 void LowerGLCompatibility::lowerClipVertex() {
   if (m_clipPlane == nullptr)
@@ -449,6 +549,47 @@ void LowerGLCompatibility::lowerClipVertex() {
       emulateStoreClipVertex();
     }
   }
+}
+
+// =====================================================================================================================
+// Does lowering operations for GLSL variable "gl_FrontColor" or "gl_BackColor" or "gl_FrontSecondaryColor" or
+// "gl_BackSecondaryColor".
+void LowerGLCompatibility::lowerColor(llvm::User *color) {
+  if (m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessControl ||
+      m_shaderStage == ShaderStageTessEval) {
+    assert(m_retInst != nullptr);
+    m_builder->SetInsertPoint(m_retInst);
+    emulationOutputColor(color);
+  } else if (m_shaderStage == ShaderStageGeometry) {
+    for (auto emitCall : m_emitCalls) {
+      m_builder->SetInsertPoint(emitCall);
+      emulationOutputColor(color);
+    }
+  }
+}
+
+// =====================================================================================================================
+// Does lowering operations for GLSL variable "gl_FrontColor".
+void LowerGLCompatibility::lowerFrontColor() {
+  lowerColor(m_frontColor);
+}
+
+// =====================================================================================================================
+// Does lowering operations for GLSL variable "gl_BackColor".
+void LowerGLCompatibility::lowerBackColor() {
+  lowerColor(m_backColor);
+}
+
+// =====================================================================================================================
+// Does lowering operations for GLSL variable "gl_FrontSecondaryColor".
+void LowerGLCompatibility::lowerFrontSecondaryColor() {
+  lowerColor(m_frontSecondaryColor);
+}
+
+// =====================================================================================================================
+// Does lowering operations for GLSL variable "gl_BackSecondaryColor".
+void LowerGLCompatibility::lowerBackSecondaryColor() {
+  lowerColor(m_backSecondaryColor);
 }
 
 } // namespace Llpc

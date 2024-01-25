@@ -1,34 +1,34 @@
 
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL:  LLPC location input/output mapping results (TES shader)
+; SHADERTEST-LABEL:  LLPC location input/output mapping results (TES)
 
-; SHADERTEST: (TES) Input:  loc = 2, comp = 0 =>  Mapped = 0, 0
+; SHADERTEST: (TES) Input:  [location, component] = [2, 0]  =>  Mapped = [0, 0]
 
-; SHADERTEST: (TES) Input (per-patch):  loc = 3  =>  Mapped = 0
-; SHADERTEST: (TES) Input (per-patch):  loc = 4  =>  Mapped = 1
-; SHADERTEST: (TES) Input (per-patch):  loc = 5  =>  Mapped = 2
-
-; SHADERTEST-LABEL: LLPC location count results (after input/output matching) 
-
-; SHADERTEST: (TES) Input:  loc count = 1
-; SHADERTEST: (TES) Output: loc count = 0
-; SHADERTEST: (TES) Input (per-patch):  loc count = 3
-
-; SHADERTEST-LABEL: LLPC location input/output mapping results (TCS shader)
-
-; SHADERTEST: (TCS) Output: loc = 1, comp = 0  =>  Mapped = 1, 0
-; SHADERTEST: (TCS) Output: loc = 2, comp = 0  =>  Mapped = 0, 0
-
-; SHADERTEST: (TCS) Output (per-patch): loc = 3  =>  Mapped = 0
-; SHADERTEST: (TCS) Output (per-patch): loc = 4  =>  Mapped = 1
-; SHADERTEST: (TCS) Output (per-patch): loc = 5  =>  Mapped = 2
+; SHADERTEST: (TES) Input (per-patch):  location = 3  =>  Mapped = 0
+; SHADERTEST: (TES) Input (per-patch):  location = 4  =>  Mapped = 1
+; SHADERTEST: (TES) Input (per-patch):  location = 5  =>  Mapped = 2
 
 ; SHADERTEST-LABEL: LLPC location count results (after input/output matching) 
 
-; SHADERTEST: (TCS) Input:  loc count = 0
-; SHADERTEST: (TCS) Output: loc count = 2
-; SHADERTEST: (TCS) Output (per-patch): loc count = 3
+; SHADERTEST: (TES) Input:  locations = 1
+; SHADERTEST: (TES) Output: locations = 0
+; SHADERTEST: (TES) Input (per-patch):  locations = 3
+
+; SHADERTEST-LABEL: LLPC location input/output mapping results (TCS)
+
+; SHADERTEST: (TCS) Output: [location, component] = [1, 0]  =>  Mapped = [1, 0]
+; SHADERTEST: (TCS) Output: [location, component] = [2, 0]  =>  Mapped = [0, 0]
+
+; SHADERTEST: (TCS) Output (per-patch): location = 3  =>  Mapped = 0
+; SHADERTEST: (TCS) Output (per-patch): location = 4  =>  Mapped = 1
+; SHADERTEST: (TCS) Output (per-patch): location = 5  =>  Mapped = 2
+
+; SHADERTEST-LABEL: LLPC location count results (after input/output matching) 
+
+; SHADERTEST: (TCS) Input:  locations = 0
+; SHADERTEST: (TCS) Output: locations = 2
+; SHADERTEST: (TCS) Output (per-patch): locations = 3
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST
 

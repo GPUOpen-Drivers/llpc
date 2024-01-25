@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -113,8 +113,8 @@ public:
   llvm::msgpack::Document *getDocument() { return m_document; }
 
   // Set the PAL metadata SPI register for one user data entry
-  void setUserDataEntry(ShaderStage stage, unsigned userDataIndex, unsigned userDataValue, unsigned dwordCount = 1);
-  void setUserDataEntry(ShaderStage stage, unsigned userDataIndex, UserDataMapping userDataValue,
+  void setUserDataEntry(ShaderStageEnum stage, unsigned userDataIndex, unsigned userDataValue, unsigned dwordCount = 1);
+  void setUserDataEntry(ShaderStageEnum stage, unsigned userDataIndex, UserDataMapping userDataValue,
                         unsigned dwordCount = 1) {
     setUserDataEntry(stage, userDataIndex, static_cast<unsigned>(userDataValue), dwordCount);
   }
@@ -208,7 +208,7 @@ public:
   unsigned getFragmentShaderBuiltInLoc(unsigned builtIn);
 
   // Get shader stage mask (only called for a link-only pipeline whose shader stage mask has not been set yet).
-  unsigned getShaderStageMask();
+  ShaderStageMask getShaderStageMask();
 
   // Serialize Util::Abi::CoverageToShaderSel to a string
   llvm::StringRef serializeEnum(Util::Abi::CoverageToShaderSel value);
@@ -230,7 +230,7 @@ private:
   void initialize();
 
   // Get the first user data register number for the given shader stage.
-  unsigned getUserDataReg0(ShaderStage stage);
+  unsigned getUserDataReg0(ShaderStageEnum stage);
 
   // Get the llvm type that corresponds to tyName.  Returns nullptr if no such type exists.
   llvm::Type *getLlvmType(llvm::StringRef tyName) const;
@@ -272,8 +272,8 @@ private:
   llvm::msgpack::MapDocNode m_registers;      // MsgPack map node for amdpal.pipelines[0].registers
   llvm::msgpack::ArrayDocNode m_vertexInputs; // MsgPack map node for amdpal.pipelines[0].vertexInputs
   llvm::msgpack::DocNode m_colorExports;      // MsgPack map node for amdpal.pipelines[0].colorExports
-  // Mapping from ShaderStage to SPI user data register start, allowing for merged shaders and NGG.
-  unsigned m_userDataRegMapping[ShaderStageCountInternal] = {};
+  // Mapping from ShaderStageEnum to SPI user data register start, allowing for merged shaders and NGG.
+  unsigned m_userDataRegMapping[ShaderStage::CountInternal] = {};
   llvm::msgpack::DocNode *m_userDataLimit;    // Maximum so far number of user data dwords used
   llvm::msgpack::DocNode *m_spillThreshold;   // Minimum so far dword offset used in user data spill table
   llvm::SmallString<0> m_fsInputMappingsBlob; // Buffer for returning FS input mappings blob to LGC client

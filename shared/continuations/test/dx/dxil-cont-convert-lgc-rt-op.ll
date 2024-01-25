@@ -19,46 +19,48 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-i1:32-i8:8-i16:32-i32:32-
 ; Function Attrs: nounwind
 define void @ClosestHit(%struct.RayPayload*, %struct.BuiltInTriangleIntersectionAttributes*) #0 !types !31 {
 ; CHECK-LABEL: define void @ClosestHit(
-; CHECK-SAME: ptr [[TMP0:%.*]], ptr [[TMP1:%.*]]) #[[ATTR0:[0-9]+]] !lgc.rt.shaderstage !19 !dxil.payload.type !20 {
+; CHECK-SAME: ptr [[TMP0:%.*]], ptr [[TMP1:%.*]]) #[[ATTR0:[0-9]+]] !cont.payload.type [[META19:![0-9]+]] !lgc.rt.shaderstage [[META20:![0-9]+]] {
 ; CHECK-NEXT:    [[TMP3:%.*]] = alloca [4 x <3 x float>], align 4
 ; CHECK-NEXT:    [[TMP4:%.*]] = alloca [4 x <3 x float>], align 4
 ; CHECK-NEXT:    [[TMP5:%.*]] = alloca [4 x <3 x float>], align 4
 ; CHECK-NEXT:    [[TMP6:%.*]] = alloca [4 x <3 x float>], align 4
-; CHECK-NEXT:    [[TMP7:%.*]] = call <3 x i32> @lgc.rt.dispatch.rays.index()
-; CHECK-NEXT:    [[A:%.*]] = extractelement <3 x i32> [[TMP7]], i8 0
-; CHECK-NEXT:    [[TMP8:%.*]] = call <3 x i32> @lgc.rt.dispatch.rays.dimensions()
-; CHECK-NEXT:    [[B:%.*]] = extractelement <3 x i32> [[TMP8]], i8 0
-; CHECK-NEXT:    [[TMP9:%.*]] = call <3 x float> @lgc.rt.world.ray.origin()
-; CHECK-NEXT:    [[C:%.*]] = extractelement <3 x float> [[TMP9]], i8 0
-; CHECK-NEXT:    [[TMP10:%.*]] = call <3 x float> @lgc.rt.world.ray.direction()
-; CHECK-NEXT:    [[D:%.*]] = extractelement <3 x float> [[TMP10]], i8 0
+; CHECK-NEXT:    [[TMP7:%.*]] = call i32 @lgc.rt.shader.index()
+; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[TMP7]])
+; CHECK-NEXT:    [[TMP8:%.*]] = call <3 x i32> @lgc.rt.dispatch.rays.index()
+; CHECK-NEXT:    [[A:%.*]] = extractelement <3 x i32> [[TMP8]], i8 0
+; CHECK-NEXT:    [[TMP9:%.*]] = call <3 x i32> @lgc.rt.dispatch.rays.dimensions()
+; CHECK-NEXT:    [[B:%.*]] = extractelement <3 x i32> [[TMP9]], i8 0
+; CHECK-NEXT:    [[TMP10:%.*]] = call <3 x float> @lgc.rt.world.ray.origin()
+; CHECK-NEXT:    [[C:%.*]] = extractelement <3 x float> [[TMP10]], i8 0
+; CHECK-NEXT:    [[TMP11:%.*]] = call <3 x float> @lgc.rt.world.ray.direction()
+; CHECK-NEXT:    [[D:%.*]] = extractelement <3 x float> [[TMP11]], i8 0
 ; CHECK-NEXT:    [[E:%.*]] = call float @lgc.rt.ray.tmin()
 ; CHECK-NEXT:    [[F:%.*]] = call float @lgc.rt.ray.tcurrent()
 ; CHECK-NEXT:    [[G:%.*]] = call i32 @lgc.rt.ray.flags()
 ; CHECK-NEXT:    [[H:%.*]] = call i32 @lgc.rt.instance.index()
 ; CHECK-NEXT:    [[I:%.*]] = call i32 @lgc.rt.instance.id()
 ; CHECK-NEXT:    [[J:%.*]] = call i32 @lgc.rt.primitive.index()
-; CHECK-NEXT:    [[TMP11:%.*]] = call <3 x float> @lgc.rt.object.ray.origin()
-; CHECK-NEXT:    [[K:%.*]] = extractelement <3 x float> [[TMP11]], i8 0
-; CHECK-NEXT:    [[TMP12:%.*]] = call <3 x float> @lgc.rt.object.ray.direction()
-; CHECK-NEXT:    [[L:%.*]] = extractelement <3 x float> [[TMP12]], i8 0
-; CHECK-NEXT:    [[TMP13:%.*]] = call [4 x <3 x float>] @lgc.rt.object.to.world()
-; CHECK-NEXT:    store [4 x <3 x float>] [[TMP13]], ptr [[TMP4]], align 4
+; CHECK-NEXT:    [[TMP12:%.*]] = call <3 x float> @lgc.rt.object.ray.origin()
+; CHECK-NEXT:    [[K:%.*]] = extractelement <3 x float> [[TMP12]], i8 0
+; CHECK-NEXT:    [[TMP13:%.*]] = call <3 x float> @lgc.rt.object.ray.direction()
+; CHECK-NEXT:    [[L:%.*]] = extractelement <3 x float> [[TMP13]], i8 0
+; CHECK-NEXT:    [[TMP14:%.*]] = call [4 x <3 x float>] @lgc.rt.object.to.world()
+; CHECK-NEXT:    store [4 x <3 x float>] [[TMP14]], ptr [[TMP4]], align 4
 ; CHECK-NEXT:    [[COL_GEP1:%.*]] = getelementptr [4 x <3 x float>], ptr [[TMP4]], i32 0, i8 0
 ; CHECK-NEXT:    [[COL_GEP_LOAD2:%.*]] = load <3 x float>, ptr [[COL_GEP1]], align 4
 ; CHECK-NEXT:    [[M:%.*]] = extractelement <3 x float> [[COL_GEP_LOAD2]], i32 0
-; CHECK-NEXT:    [[TMP14:%.*]] = call [4 x <3 x float>] @lgc.rt.world.to.object()
-; CHECK-NEXT:    store [4 x <3 x float>] [[TMP14]], ptr [[TMP3]], align 4
+; CHECK-NEXT:    [[TMP15:%.*]] = call [4 x <3 x float>] @lgc.rt.world.to.object()
+; CHECK-NEXT:    store [4 x <3 x float>] [[TMP15]], ptr [[TMP3]], align 4
 ; CHECK-NEXT:    [[COL_GEP:%.*]] = getelementptr [4 x <3 x float>], ptr [[TMP3]], i32 0, i8 0
 ; CHECK-NEXT:    [[COL_GEP_LOAD:%.*]] = load <3 x float>, ptr [[COL_GEP]], align 4
 ; CHECK-NEXT:    [[N:%.*]] = extractelement <3 x float> [[COL_GEP_LOAD]], i32 0
-; CHECK-NEXT:    [[TMP15:%.*]] = call [4 x <3 x float>] @lgc.rt.object.to.world()
-; CHECK-NEXT:    store [4 x <3 x float>] [[TMP15]], ptr [[TMP5]], align 4
+; CHECK-NEXT:    [[TMP16:%.*]] = call [4 x <3 x float>] @lgc.rt.object.to.world()
+; CHECK-NEXT:    store [4 x <3 x float>] [[TMP16]], ptr [[TMP5]], align 4
 ; CHECK-NEXT:    [[COL_GEP3:%.*]] = getelementptr [4 x <3 x float>], ptr [[TMP5]], i32 0, i8 3
 ; CHECK-NEXT:    [[COL_GEP_LOAD4:%.*]] = load <3 x float>, ptr [[COL_GEP3]], align 4
 ; CHECK-NEXT:    [[O:%.*]] = extractelement <3 x float> [[COL_GEP_LOAD4]], i32 0
-; CHECK-NEXT:    [[TMP16:%.*]] = call [4 x <3 x float>] @lgc.rt.object.to.world()
-; CHECK-NEXT:    store [4 x <3 x float>] [[TMP16]], ptr [[TMP6]], align 4
+; CHECK-NEXT:    [[TMP17:%.*]] = call [4 x <3 x float>] @lgc.rt.object.to.world()
+; CHECK-NEXT:    store [4 x <3 x float>] [[TMP17]], ptr [[TMP6]], align 4
 ; CHECK-NEXT:    [[COL_GEP5:%.*]] = getelementptr [4 x <3 x float>], ptr [[TMP6]], i32 0, i8 3
 ; CHECK-NEXT:    [[COL_GEP_LOAD6:%.*]] = load <3 x float>, ptr [[COL_GEP5]], align 4
 ; CHECK-NEXT:    [[P:%.*]] = extractelement <3 x float> [[COL_GEP_LOAD6]], i32 2

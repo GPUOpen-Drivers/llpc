@@ -31,11 +31,10 @@ target datalayout = "e-m:e-p:64:32-p20:32:32-p21:32:32-i1:32-i8:8-i16:32-i32:32-
 ; Function Attrs: nounwind
 define void @RayGen() #0 {
 ; LOWERRAYTRACINGPIPELINE-LABEL: define void @RayGen(
-; LOWERRAYTRACINGPIPELINE-SAME: ) #[[ATTR0:[0-9]+]] !lgc.rt.shaderstage [[META24:![0-9]+]] !continuation.entry [[META14:![0-9]+]] !continuation.registercount [[META24]] !continuation [[META27:![0-9]+]] {
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA:%.*]], align 8
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP1:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @continuations.getSystemData.s_struct.DispatchSystemDatas()
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
+; LOWERRAYTRACINGPIPELINE-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR0:[0-9]+]] !lgc.rt.shaderstage [[META24:![0-9]+]] !continuation.entry [[META14:![0-9]+]] !continuation.registercount [[META24]] !continuation [[META27:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?myAccelerationStructure@@3URaytracingAccelerationStructure@@A", align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = load [[DX_TYPES_HANDLE]], ptr @"\01?gOutput@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = alloca [[STRUCT_MYPAYLOAD:%.*]], align 8
@@ -70,7 +69,7 @@ define void @RayGen() #0 {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP23:%.*]] = load i32, ptr getelementptr ([[STRUCT_MYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_6_MISS_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 2), align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP23]], ptr [[TMP22]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP13]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    br label [[DOTSPLIT:%.*]]
 ; LOWERRAYTRACINGPIPELINE:       .split:
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP24:%.*]] = load float, ptr [[TMP6]], align 8, !tbaa [[TBAA28]]

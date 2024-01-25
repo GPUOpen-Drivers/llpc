@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -58,7 +58,7 @@ PreservedAnalyses PatchImageDerivatives::run(Module &module, ModuleAnalysisManag
 }
 
 static bool usesImplicitDerivatives(StringRef name) {
-  if (!(name.startswith("llvm.amdgcn.image.sample") || name.startswith("llvm.amdgcn.image.gather")))
+  if (!(name.starts_with("llvm.amdgcn.image.sample") || name.starts_with("llvm.amdgcn.image.gather")))
     return false;
   if (name.find(".l.") != std::string::npos || name.find(".d.") != std::string::npos)
     return false;
@@ -74,9 +74,9 @@ static bool usesImplicitDerivatives(StringRef name) {
 bool PatchImageDerivatives::runImpl(llvm::Module &module, PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Image-Derivatives\n");
 
-  if (!pipelineState->hasShaderStage(ShaderStageFragment))
+  if (!pipelineState->hasShaderStage(ShaderStage::Fragment))
     return false;
-  ResourceUsage *resUsage = pipelineState->getShaderResourceUsage(ShaderStageFragment);
+  ResourceUsage *resUsage = pipelineState->getShaderResourceUsage(ShaderStage::Fragment);
   if (!resUsage->builtInUsage.fs.discard)
     return false;
 
@@ -95,7 +95,7 @@ bool PatchImageDerivatives::runImpl(llvm::Module &module, PipelineState *pipelin
     for (User *user : func.users()) {
       CallInst *call = cast<CallInst>(user);
       // Only record blocks for fragment shader
-      if (getShaderStage(call->getFunction()) != ShaderStageFragment)
+      if (getShaderStage(call->getFunction()) != ShaderStage::Fragment)
         continue;
 
       if (isKill) {

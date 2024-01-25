@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -172,8 +172,6 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "msad4";
   case BuilderOpcode::FDot2:
     return "fdot2";
-  case BuilderOpcode::LoadBufferDesc:
-    return "load.buffer.desc";
   case BuilderOpcode::GetDescStride:
     return "get.desc.stride";
   case BuilderOpcode::GetDescPtr:
@@ -328,6 +326,10 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "subgroup.mbcnt";
   case BuilderOpcode::SubgroupPartition:
     return "subgroup.partition";
+  case BuilderOpcode::QuadAll:
+    return "quad.all";
+  case BuilderOpcode::QuadAny:
+    return "quad.any";
   case BuilderOpcode::Count:
     break;
   }
@@ -1054,26 +1056,6 @@ Value *Builder::CreateMsad4(Value *src, Value *ref, Value *accum, const Twine &i
 // @param clamp : Whether the accumulation result should be clamped.
 Value *Builder::CreateFDot2(Value *a, Value *b, Value *scalar, Value *clamp, const Twine &instName) {
   return record(BuilderOpcode::FDot2, scalar->getType(), {a, b, scalar, clamp}, instName);
-}
-
-// =====================================================================================================================
-// Create a load of a buffer descriptor.
-//
-// @param descSet : Descriptor set
-// @param binding : Descriptor binding
-// @param descIndex : Descriptor index
-// @param flags : BufferFlag* bit settings
-// @param instName : Name to give instruction(s)
-Value *Builder::CreateLoadBufferDesc(uint64_t descSet, unsigned binding, Value *descIndex, unsigned flags,
-                                     const Twine &instName) {
-  return record(BuilderOpcode::LoadBufferDesc, getBufferDescTy(),
-                {
-                    getInt64(descSet),
-                    getInt32(binding),
-                    descIndex,
-                    getInt32(flags),
-                },
-                instName);
 }
 
 // =====================================================================================================================
@@ -1979,6 +1961,26 @@ Value *Builder::CreateSubgroupPartition(Value *const value, const Twine &instNam
 }
 
 // =====================================================================================================================
+// Create a Quad all.
+//
+// @param value : The value to contribute
+// @param requireFullQuads: whether it requires full quads.
+// @param instName : Name to give instruction(s)
+Value *Builder::CreateQuadAll(Value *const value, bool requireFullQuads, const Twine &instName) {
+  return record(BuilderOpcode::QuadAll, getInt1Ty(), {value, getInt1(requireFullQuads)}, instName);
+}
+
+// =====================================================================================================================
+// Create a Quad any.
+//
+// @param value : The value to contribute
+// @param requireFullQuads: whether it requires full quads.
+// @param instName : Name to give instruction(s)
+Value *Builder::CreateQuadAny(Value *const value, bool requireFullQuads, const llvm::Twine &instName) {
+  return record(BuilderOpcode::QuadAny, getInt1Ty(), {value, getInt1(requireFullQuads)}, instName);
+}
+
+// =====================================================================================================================
 // Record one Builder call
 //
 // @param opcode : Opcode of Builder method call being recorded
@@ -2100,7 +2102,6 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::ImageLoadWithFmask:
     case BuilderOpcode::ImageSample:
     case BuilderOpcode::ImageSampleConvert:
-    case BuilderOpcode::LoadBufferDesc:
     case BuilderOpcode::LoadPushConstantsPtr:
     case BuilderOpcode::ReadBaryCoord:
     case BuilderOpcode::ReadBuiltInInput:
@@ -2149,6 +2150,8 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::SubgroupSwizzleMask:
     case BuilderOpcode::SubgroupSwizzleQuad:
     case BuilderOpcode::Barrier:
+    case BuilderOpcode::QuadAll:
+    case BuilderOpcode::QuadAny:
       // TODO: we should mark these functions 'ReadNone' in theory, but that need to wait until we fix all convergent
       // issues in LLVM optimizations.
       func->addFnAttr(Attribute::Convergent);
@@ -2189,13 +2192,13 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
 // @param name : Name of function declaration
 // @returns : Opcode
 BuilderOpcode BuilderRecorder::getOpcodeFromName(StringRef name) {
-  assert(name.startswith(BuilderCallPrefix));
+  assert(name.starts_with(BuilderCallPrefix));
   name = name.drop_front(strlen(BuilderCallPrefix));
   unsigned bestOpcode = 0;
   unsigned bestLength = 0;
   for (unsigned opcode = 0; opcode != BuilderOpcode::Count; ++opcode) {
     StringRef opcodeName = getCallName(static_cast<BuilderOpcode>(opcode));
-    if (name.startswith(opcodeName)) {
+    if (name.starts_with(opcodeName)) {
       if (opcodeName.size() > bestLength) {
         bestLength = opcodeName.size();
         bestOpcode = opcode;

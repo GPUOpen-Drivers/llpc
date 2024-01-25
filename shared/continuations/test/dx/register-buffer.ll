@@ -15,8 +15,8 @@ declare void @llvm.lifetime.start.p0i8(i64 immarg, i8* nocapture)
 declare void @llvm.lifetime.end.p0i8(i64 immarg, i8* nocapture)
 
 ;.
-; CHECK: @[[GLOBAL:[a-zA-Z0-9_$"\\.-]+]] = external addrspace(20) global [15 x i32]
-; CHECK: @[[GLOBAL_NO_REGS:[a-zA-Z0-9_$"\\.-]+]] = external addrspace(20) global [0 x i32]
+; CHECK: @GLOBAL = external addrspace(20) global [15 x i32]
+; CHECK: @GLOBAL_NO_REGS = external addrspace(20) global [0 x i32]
 ;.
 define i32 @load_i32_reg() {
 ; CHECK-LABEL: define i32 @load_i32_reg() {

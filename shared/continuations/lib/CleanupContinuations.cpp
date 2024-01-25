@@ -3,13 +3,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
- *deal in the Software without restriction, including without limitation the
- *rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- *sell copies of the Software, and to permit persons to whom the Software is
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in
@@ -20,8 +20,8 @@
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- *FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- *IN THE SOFTWARE.
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 //
@@ -64,6 +64,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/IR/Dominators.h"
 #include "llvm/IR/InstIterator.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Type.h"
@@ -75,8 +76,6 @@ using namespace llvm;
 using namespace lgc;
 
 #define DEBUG_TYPE "cleanup-continuations"
-
-CleanupContinuationsPass::CleanupContinuationsPass() {}
 
 /// Find the original call that created the continuation token and the matching
 /// resume function for a return value.
@@ -200,8 +199,7 @@ void CleanupContinuationsPass::updateCpsStack(Function *F, Function *NewFunc,
   }
 
   SmallVector<Instruction *> ToBeRemoved;
-  Value *OldBase = getContinuationFramePtr(F, IsStart, CpsInfo, ToBeRemoved);
-
+  Value *OldBase = getContinuationFramePtr(F, IsStart, CpsInfo, &ToBeRemoved);
   replaceAllPointerUses(Builder, OldBase, CpsStack, ToBeRemoved);
 
   for (auto *I : reverse(ToBeRemoved))
@@ -243,9 +241,12 @@ static void buildCpsArgInfos(Function *F, bool IsStart,
       ArgNo++;
     }
   } else {
-    //  Add extra arguments ({} %state, i32 %rcr) for resume part. But for now,
-    //  we always use continuation stack to pass continuation state.
+    //  Add extra arguments ({} %state, i32 %rcr, i32 %shader-index) for resume
+    //  part. But for now, we always use continuation stack to pass continuation
+    //  state.
     AllArgTypes.push_back(StructType::get(Context, {}));
+    AllArgValues.push_back(nullptr);
+    AllArgTypes.push_back(IntegerType::get(Context, 32));
     AllArgValues.push_back(nullptr);
     AllArgTypes.push_back(IntegerType::get(Context, 32));
     AllArgValues.push_back(nullptr);
@@ -265,23 +266,20 @@ static void buildCpsArgInfos(Function *F, bool IsStart,
 /// given as an argument
 Value *CleanupContinuationsPass::getContinuationFramePtr(
     Function *F, bool IsStart, const ContinuationData &ContinuationInfo,
-    SmallVector<Instruction *> &InstsToRemove) {
+    SmallVector<Instruction *> *InstsToRemove) {
   if (!ContinuationInfo.MallocCall)
     return IsStart ? F->getArg(F->arg_size() - 1) : F->getArg(0);
 
   if (IsStart) {
-    InstsToRemove.push_back(ContinuationInfo.MallocCall);
-
-    auto *BufferArg = F->getArg(F->arg_size() - 1);
-    auto *Store = cast<Instruction>(BufferArg->getUniqueUndroppableUser());
-    // Erase immediately to make later continuation stack setup easy.
-    Store->eraseFromParent();
+    if (InstsToRemove)
+      InstsToRemove->push_back(ContinuationInfo.MallocCall);
     return ContinuationInfo.MallocCall;
   }
   // Look for the load of the allocated pointer
   Instruction *Load =
       cast<Instruction>(F->getArg(0)->getUniqueUndroppableUser());
-  InstsToRemove.push_back(Load); // Load needs to be eliminated
+  if (InstsToRemove)
+    InstsToRemove->push_back(Load); // Load needs to be eliminated
   return Load;
 }
 
@@ -331,7 +329,7 @@ void CleanupContinuationsPass::processContinuations() {
   //    b.) change the address space for cps stack to 32.
   // 2. prepare arguments passed to cps.jump and insert the call at the exit of
   //    start part.
-  // 3. Edit resume signature to add the state/rcr/returnvalues.
+  // 3. Edit resume signature to add the state/rcr/shader-indxe/returnvalues.
   for (auto &FuncData : ToProcess) {
     LLVM_DEBUG(dbgs() << "Processing function: " << FuncData.first->getName()
                       << "\n");
@@ -414,6 +412,9 @@ void CleanupContinuationsPass::processContinuations() {
 
       // Replace the old function with the new one.
       F->replaceAllUsesWith(NewFunc);
+      // Update the `ToProcess` for later processing.
+      if (IsStart)
+        FuncData.first = NewFunc;
     }
   }
 
@@ -507,11 +508,61 @@ void CleanupContinuationsPass::handleSingleContinue(ContinuationData &Data,
   }
 }
 
+/// Lower lgc.rt calls inside cps functions.
+void CleanupContinuationsPass::lowerIntrinsicCall(Module &Mod) {
+  DenseMap<Function *, SmallVector<CallInst *>> CpsIntrinsicCalls;
+
+  // We only care about lgc.rt here.
+  for (auto &F : Mod.functions()) {
+    auto Name = F.getName();
+    if (!Name.starts_with("lgc.rt"))
+      continue;
+
+    llvm::forEachCall(F, [&](CallInst &CInst) {
+      auto IntrImplEntry = llvm::findIntrImplEntryByIntrinsicCall(&CInst);
+      if (IntrImplEntry == std::nullopt)
+        return;
+
+      auto *Caller = CInst.getFunction();
+      CpsIntrinsicCalls[Caller].push_back(&CInst);
+    });
+  }
+
+  CompilerUtils::CrossModuleInliner CrossInliner;
+  for (const auto &[Caller, IntrinsicCalls] : CpsIntrinsicCalls) {
+    // No need to insert system data alloca if no intrinsic call.
+    if (IntrinsicCalls.empty())
+      continue;
+
+    auto Stage = lgc::rt::getLgcRtShaderStage(Caller);
+    if (!Stage)
+      continue;
+    DXILShaderKind ShaderKind =
+        ShaderStageHelper::shaderStageToDxilShaderKind(*Stage);
+
+    // Signature of cps function: { state, rcr, shader-index, system-data}
+    auto *SystemDataArg = Caller->getArg(CpsArgIdxSystemData);
+    assert(SystemDataArg->getType()->isStructTy() &&
+           "SystemData should be struct type");
+    auto *AllocaInsertPt =
+        &*Caller->getEntryBlock().getFirstNonPHIOrDbgOrAlloca();
+    Builder->SetInsertPoint(AllocaInsertPt);
+    auto *SystemData = Builder->CreateAlloca(SystemDataArg->getType());
+    Builder->CreateStore(SystemDataArg, SystemData);
+    for (auto *Call : IntrinsicCalls)
+      replaceIntrinsicCall(*Builder, SystemDataArg->getType(), SystemData,
+                           ShaderKind, Call, GpurtLibrary ? GpurtLibrary : &Mod,
+                           CrossInliner);
+  }
+}
+
 llvm::PreservedAnalyses
 CleanupContinuationsPass::run(llvm::Module &Mod,
                               llvm::ModuleAnalysisManager &AnalysisManager) {
   LLVM_DEBUG(dbgs() << "Run the lgc-cleanup-continuations pass\n");
   AnalysisManager.getResult<DialectContextAnalysis>(Mod);
+  auto &FAM = AnalysisManager.getResult<FunctionAnalysisManagerModuleProxy>(Mod)
+                  .getManager();
 
   ToProcess.clear();
   MaxContStateBytes = 0;
@@ -524,7 +575,7 @@ CleanupContinuationsPass::run(llvm::Module &Mod,
   for (auto &F : Mod.functions()) {
     if (F.empty())
       continue;
-    if (auto *MD = F.getMetadata(DXILContHelper::MDContinuationName))
+    if (auto *MD = F.getMetadata(ContHelper::MDContinuationName))
       analyzeContinuation(F, MD);
   }
 
@@ -548,8 +599,33 @@ CleanupContinuationsPass::run(llvm::Module &Mod,
     }
   }
 
+  // Erase store coroutine frame to make later continuation stack traversal
+  // easy.
+  for (auto &FuncData : ToProcess) {
+    if (!FuncData.second.MallocCall)
+      continue;
+    auto *StartF = FuncData.first;
+    auto *BufferArg = StartF->getArg(StartF->arg_size() - 1);
+    auto *Store = cast<Instruction>(BufferArg->getUniqueUndroppableUser());
+    Store->eraseFromParent();
+  }
+
+  // Try to do store->load forwarding here.
+  for (auto &FuncData : ToProcess) {
+    for (auto *F : FuncData.second.Functions) {
+      auto &DT = FAM.getResult<DominatorTreeAnalysis>(*F);
+      // If this is the continuation start part.
+      bool IsStart = (F == FuncData.first);
+      Value *ContFrame = getContinuationFramePtr(F, IsStart, FuncData.second);
+      // Traversal the users to forward store to load instruction.
+      forwardContinuationFrameStoreToLoad(DT, ContFrame);
+    }
+  }
+
   if (!ToProcess.empty()) {
     processContinuations();
+    // Lower lgc.rt intrinsics
+    lowerIntrinsicCall(Mod);
     return PreservedAnalyses::none();
   }
   return PreservedAnalyses::all();

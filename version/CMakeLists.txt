@@ -1,13 +1,13 @@
 ##
  #######################################################################################################################
  #
- #  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ #  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  #
  #  Permission is hereby granted, free of charge, to any person obtaining a copy
- #  of this software and associated documentation files (the "Software"), to deal
- #  in the Software without restriction, including without limitation the rights
- #  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- #  copies of the Software, and to permit persons to whom the Software is
+ #  of this software and associated documentation files (the "Software"), to
+ #  deal in the Software without restriction, including without limitation the
+ #  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ #  sell copies of the Software, and to permit persons to whom the Software is
  #  furnished to do so, subject to the following conditions:
  #
  #  The above copyright notice and this permission notice shall be included in all
@@ -17,17 +17,20 @@
  #  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  #  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  #  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- #  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- #  SOFTWARE.
+ #  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ #  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ #  IN THE SOFTWARE.
  #
  #######################################################################################################################
+
+include(GNUInstallDirs)
 
 ### llpc_version library ###############################################################################################
 add_library(llpc_version INTERFACE)
 
 target_include_directories(llpc_version INTERFACE
-  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>)
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
 
 configure_file(include/llpcVersion.h.in include/llpcVersion.h)
 
@@ -66,9 +69,11 @@ target_compile_definitions(llpc_version INTERFACE
 # but then that would create a footgun if any of the version definitions are
 # used in header files. Better to have this weird hack and have everybody link
 # against llpc_version PUBLICly.
-install(TARGETS llpc_version EXPORT llpc_version-targets)
-install(EXPORT llpc_version-targets DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake) # installed version
-export(TARGETS llpc_version FILE llpc_version.cmake) # build-tree version
+if (NOT DISABLE_LLPC_VERSION_USES_LLVM)
+  install(TARGETS llpc_version EXPORT llpc_version-targets)
+  install(EXPORT llpc_version-targets DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake) # installed version
+  export(TARGETS llpc_version FILE llpc_version.cmake) # build-tree version
+endif()
 
 ### Cached Config-related Options ######################################################################################
 option(LLPC_BUILD_NAVI12 "LLPC support for NAVI12?" ON)

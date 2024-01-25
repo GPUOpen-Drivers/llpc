@@ -13,12 +13,13 @@ void main()
 }
 
 // BEGIN_REVERSETEST
-// RUN: amdllpc -v %gfxip %s --reverse-thread-group=1 | FileCheck -check-prefix=REVERSETEST %s
+// RUN: amdllpc -v %gfxip %s --reverse-thread-group=1 --print-after=lgc-lower-desc 2>&1 | FileCheck -check-prefix=REVERSETEST %s
 // REVERSETEST-LABEL: {{^// LLPC}} pipeline before-patching results
 // There should be a calls to:
 //  - get the descriptor table containing the buffer descriptor
 //  - get the gl_NumWorkGroups
 //  - get the internal descriptor table
+// Note that `@lgc.load.user.data` is generated after lowering of `@lgc.load.buffer.desc` (lgc-lower-desc pass).
 // REVERSETEST-DAG: %{{[0-9]+}} = call i32 @lgc.load.user.data.i32(i32 0)
 // REVERSETEST-DAG: %{{[0-9]+}} = call ptr addrspace(4) @lgc.special.user.data.Workgroup(i32 268435462)
 // REVERSETEST-DAG: %{{[0-9]+}} = call i32 @lgc.load.user.data.i32(i32 4)

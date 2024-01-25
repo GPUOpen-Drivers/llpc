@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -113,14 +113,14 @@ bool CooperativeMatrixCombiner::run() {
     if (!fn.isDeclaration())
       continue;
 
-    if (fn.getName().startswith(lgcName::CooperativeMatrixTranspose)) {
+    if (fn.getName().starts_with(lgcName::CooperativeMatrixTranspose)) {
       for (User *user : fn.users()) {
         if (auto *call = dyn_cast<CallInst>(user)) {
           if (call->getFunction() == &m_function)
             ops.push_back(call);
         }
       }
-    } else if (fn.getName().startswith(lgcName::CooperativeMatrixConvert)) {
+    } else if (fn.getName().starts_with(lgcName::CooperativeMatrixConvert)) {
       for (User *user : fn.users()) {
         if (auto *call = dyn_cast<CallInst>(user)) {
           if (call->getFunction() == &m_function)
@@ -129,7 +129,7 @@ bool CooperativeMatrixCombiner::run() {
       }
 #if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 479080
       // wmma packing on gfx11 only possible with new wmma_f16_tied intrinsic
-    } else if (m_gfxIpVersion.major == 11 && fn.getName().startswith(lgcName::CooperativeMatrixMulAdd)) {
+    } else if (m_gfxIpVersion.major == 11 && fn.getName().starts_with(lgcName::CooperativeMatrixMulAdd)) {
       for (User *user : fn.users()) {
         if (auto *call = dyn_cast<CallInst>(user)) {
           Builder::CooperativeMatrixElementType accumElemType = static_cast<Builder::CooperativeMatrixElementType>(
@@ -218,11 +218,11 @@ void CooperativeMatrixCombiner::foldTo(Value *from, Value *to) {
 bool CooperativeMatrixCombiner::tryFold(CallInst *op) {
   Value *src;
   bool isConvert = false;
-  if (op->getCalledFunction()->getName().startswith(lgcName::CooperativeMatrixConvert)) {
+  if (op->getCalledFunction()->getName().starts_with(lgcName::CooperativeMatrixConvert)) {
     src = op->getArgOperand(1);
     isConvert = true;
   } else {
-    assert(op->getCalledFunction()->getName().startswith(lgcName::CooperativeMatrixTranspose));
+    assert(op->getCalledFunction()->getName().starts_with(lgcName::CooperativeMatrixTranspose));
     src = op->getArgOperand(0);
   }
 
@@ -390,14 +390,14 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
 
     if (auto *call = dyn_cast<CallInst>(input)) {
       if (auto *callee = call->getCalledFunction()) {
-        if (callee->getName().startswith(lgcName::CooperativeMatrixLoad))
+        if (callee->getName().starts_with(lgcName::CooperativeMatrixLoad))
           continue; // loads can be adjusted at zero cost
-        if (callee->getName().startswith(lgcName::CooperativeMatrixTranspose)) {
+        if (callee->getName().starts_with(lgcName::CooperativeMatrixTranspose)) {
           foundComponentShape(getShapeOfTranspose(call));
           ++numTransposeInputs;
           continue;
         }
-        if (callee->getName().startswith(lgcName::CooperativeMatrixConvert)) {
+        if (callee->getName().starts_with(lgcName::CooperativeMatrixConvert)) {
           auto srcElemType =
               (Builder::CooperativeMatrixElementType)cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
           auto dstElemType =
@@ -427,14 +427,14 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
   for (Use *use : component.outputs) {
     if (auto *call = dyn_cast<CallInst>(use->getUser())) {
       if (auto *callee = call->getCalledFunction()) {
-        if (callee->getName().startswith(lgcName::CooperativeMatrixStore))
+        if (callee->getName().starts_with(lgcName::CooperativeMatrixStore))
           continue; // stores can be adapted at zero cost
-        if (callee->getName().startswith(lgcName::CooperativeMatrixTranspose)) {
+        if (callee->getName().starts_with(lgcName::CooperativeMatrixTranspose)) {
           foundComponentShape(getShapeOfTranspose(call));
           transposeOutputs.insert(use->get());
           continue;
         }
-        if (callee->getName().startswith(lgcName::CooperativeMatrixConvert)) {
+        if (callee->getName().starts_with(lgcName::CooperativeMatrixConvert)) {
           auto srcElemType =
               (Builder::CooperativeMatrixElementType)cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
           auto dstElemType =
@@ -473,7 +473,7 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
       // Handle inputs that can be folded away / absorbed.
       if (auto *call = dyn_cast<CallInst>(input)) {
         if (auto *callee = call->getCalledFunction()) {
-          if (callee->getName().startswith(lgcName::CooperativeMatrixTranspose)) {
+          if (callee->getName().starts_with(lgcName::CooperativeMatrixTranspose)) {
             Value *src = call->getArgOperand(0);
             foldTo(input, src);
 
@@ -481,7 +481,7 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
             outTransposed.try_emplace(src, input);
             continue;
           }
-          if (callee->getName().startswith(lgcName::CooperativeMatrixLoad)) {
+          if (callee->getName().starts_with(lgcName::CooperativeMatrixLoad)) {
             bool colMajor = cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
             call->setArgOperand(2, b.getInt1(!colMajor));
             continue;
@@ -507,11 +507,11 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
       // Handle outputs that can be folded away / absorbed.
       if (auto *call = dyn_cast<CallInst>(use->getUser())) {
         if (auto *callee = call->getCalledFunction()) {
-          if (callee->getName().startswith(lgcName::CooperativeMatrixTranspose)) {
+          if (callee->getName().starts_with(lgcName::CooperativeMatrixTranspose)) {
             foldTo(call, use->get());
             continue;
           }
-          if (callee->getName().startswith(lgcName::CooperativeMatrixStore)) {
+          if (callee->getName().starts_with(lgcName::CooperativeMatrixStore)) {
             bool colMajor = cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
             call->setArgOperand(2, b.getInt1(!colMajor));
             continue;
@@ -587,7 +587,7 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
       // Handle inputs for which the relayout can be folded or absorbed.
       if (auto *call = dyn_cast<CallInst>(input)) {
         if (auto *callee = call->getCalledFunction()) {
-          if (callee->getName().startswith(lgcName::CooperativeMatrixConvert)) {
+          if (callee->getName().starts_with(lgcName::CooperativeMatrixConvert)) {
             unsigned srcElemType = cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
             unsigned dstElemType = cast<ConstantInt>(call->getArgOperand(3))->getZExtValue();
 
@@ -609,7 +609,7 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
             call->setArgOperand(5, b.getInt32((unsigned)*otherLayout));
             continue;
           }
-          if (callee->getName().startswith(lgcName::CooperativeMatrixLoad)) {
+          if (callee->getName().starts_with(lgcName::CooperativeMatrixLoad)) {
             call->setArgOperand(4, b.getInt32((unsigned)*otherLayout));
             continue;
           }
@@ -635,7 +635,7 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
       // Handle outputs for which the relayout can be folded or absorbed.
       if (auto *call = dyn_cast<CallInst>(use->getUser())) {
         if (auto *callee = call->getCalledFunction()) {
-          if (callee->getName().startswith(lgcName::CooperativeMatrixConvert)) {
+          if (callee->getName().starts_with(lgcName::CooperativeMatrixConvert)) {
             unsigned srcElemType = cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
             unsigned dstElemType = cast<ConstantInt>(call->getArgOperand(3))->getZExtValue();
 
@@ -649,7 +649,7 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
               continue;
             }
           }
-          if (callee->getName().startswith(lgcName::CooperativeMatrixStore)) {
+          if (callee->getName().starts_with(lgcName::CooperativeMatrixStore)) {
             call->setArgOperand(4, b.getInt32((unsigned)*otherLayout));
             continue;
           }
@@ -837,7 +837,7 @@ bool CooperativeMatrixCombiner::tryFoldMuladd(SmallVector<CallInst *> muladds) {
               auto *candidate = llvm::find_if(unpackedUses, [&](auto pair) {
                 if (auto *call = dyn_cast<CallInst>(pair.first.getUser())) {
                   if (auto *callee = call->getCalledFunction()) {
-                    if (callee->getName().startswith(lgcName::CooperativeMatrixTimesScalar) &&
+                    if (callee->getName().starts_with(lgcName::CooperativeMatrixTimesScalar) &&
                         call->getArgOperand(0) == current.matrixLo) {
                       return true;
                     }
@@ -871,7 +871,7 @@ bool CooperativeMatrixCombiner::tryFoldMuladd(SmallVector<CallInst *> muladds) {
           continue;
 
         if (auto *call = dyn_cast<CallInst>(use.first.getUser())) {
-          if (call->getCalledFunction()->getName().startswith(lgcName::CooperativeMatrixPack) &&
+          if (call->getCalledFunction()->getName().starts_with(lgcName::CooperativeMatrixPack) &&
               call->getArgOperand(0) == current.matrixLo && call->getArgOperand(1) == current.matrixHi) {
             foldTo(call, current.packedAccum);
             continue;

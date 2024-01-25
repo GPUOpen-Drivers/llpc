@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -78,9 +78,9 @@ bool BuilderReplayer::runImpl(Module &module, PipelineState *pipelineState) {
       if (pipelineState->getTargetInfo().getGfxIpVersion().major >= 10) {
         // NOTE: The sub-attribute 'wavefrontsize' of 'target-features' is set in advance to let optimization
         // pass know we are in which wavesize mode.
-        ShaderStage shaderStage = lgc::getShaderStage(&func);
-        if (shaderStage != ShaderStageInvalid) {
-          unsigned waveSize = pipelineState->getShaderWaveSize(shaderStage);
+        auto shaderStage = lgc::getShaderStage(&func);
+        if (shaderStage) {
+          unsigned waveSize = pipelineState->getShaderWaveSize(shaderStage.value());
           func.addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize));
         }
       }
@@ -95,13 +95,13 @@ bool BuilderReplayer::runImpl(Module &module, PipelineState *pipelineState) {
     if (const MDNode *funcMeta = func.getMetadata(opcodeMetaKindId)) {
       const ConstantAsMetadata *metaConst = cast<ConstantAsMetadata>(funcMeta->getOperand(0));
       opcode = cast<ConstantInt>(metaConst->getValue())->getZExtValue();
-      assert(func.getName().startswith(BuilderCallPrefix));
+      assert(func.getName().starts_with(BuilderCallPrefix));
       assert(func.getName()
                  .slice(strlen(BuilderCallPrefix), StringRef::npos)
-                 .startswith(BuilderRecorder::getCallName(static_cast<BuilderOpcode>(opcode))) &&
+                 .starts_with(BuilderRecorder::getCallName(static_cast<BuilderOpcode>(opcode))) &&
              "lgc.create.* mismatch!");
     } else {
-      if (!func.getName().startswith(BuilderCallPrefix))
+      if (!func.getName().starts_with(BuilderCallPrefix))
         continue; // Not lgc.create.* call
       opcode = BuilderRecorder::getOpcodeFromName(func.getName());
     }
@@ -136,12 +136,13 @@ void BuilderReplayer::replayCall(unsigned opcode, CallInst *call) {
     m_enclosingFunc = enclosingFunc;
 
     auto mapIt = m_shaderStageMap.find(enclosingFunc);
-    ShaderStage stage = ShaderStageInvalid;
+    std::optional<ShaderStageEnum> stage;
     if (mapIt == m_shaderStageMap.end()) {
       stage = getShaderStage(enclosingFunc);
-      m_shaderStageMap[enclosingFunc] = stage;
-    } else
+      m_shaderStageMap[enclosingFunc] = stage.value();
+    } else {
       stage = mapIt->second;
+    }
     m_builder->setShaderStage(stage);
   }
 
@@ -398,14 +399,6 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
 
   case BuilderOpcode::FDot2: {
     return m_builder->CreateFDot2(args[0], args[1], args[2], args[3]);
-  }
-
-  // Replayer implementations of DescBuilder methods
-  case BuilderOpcode::LoadBufferDesc: {
-    return m_builder->CreateLoadBufferDesc(cast<ConstantInt>(args[0])->getZExtValue(),  // descSet
-                                           cast<ConstantInt>(args[1])->getZExtValue(),  // binding
-                                           args[2],                                     // descIndex
-                                           cast<ConstantInt>(args[3])->getZExtValue()); // flags
   }
 
   case BuilderOpcode::GetDescStride:
@@ -837,6 +830,12 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   }
   case BuilderOpcode::SubgroupPartition: {
     return m_builder->CreateSubgroupPartition(args[0]);
+  }
+  case BuilderOpcode::QuadAll: {
+    return m_builder->CreateQuadAll(args[0], cast<ConstantInt>(args[1])->getZExtValue());
+  }
+  case BuilderOpcode::QuadAny: {
+    return m_builder->CreateQuadAny(args[0], cast<ConstantInt>(args[1])->getZExtValue());
   }
   }
 }

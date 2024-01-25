@@ -17,17 +17,17 @@ target triple = "amdgcn--amdpal"
 ; Function Attrs: nounwind
 define spir_func void @func() local_unnamed_addr #0 !lgc.shaderstage !7 {
 .entry:
-  %0 = call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i32 0, i32 2, i32 0, i32 2)
-  %1 = call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i32 0, i32 0, i32 0, i32 2)
-  %2 = call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i32 0, i32 1, i32 0, i32 2)
+  %0 = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 2, i32 0, i32 2)
+  %1 = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 2)
+  %2 = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 1, i32 0, i32 2)
   %3 = load <4 x i32>, ptr addrspace(7) %2, align 16
-  %4 = call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i32 0, i32 1, i32 1, i32 2)
+  %4 = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 1, i32 1, i32 2)
   %5 = load <4 x i32>, ptr addrspace(7) %4, align 16
   %6 = add <4 x i32> %3, %5
-  %7 = call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i32 0, i32 1, i32 2, i32 2)
+  %7 = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 1, i32 2, i32 2)
   %8 = load <4 x i32>, ptr addrspace(7) %7, align 16
   %9 = add <4 x i32> %6, %8
-  %10 = call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i32 0, i32 1, i32 3, i32 2)
+  %10 = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 1, i32 3, i32 2)
   %11 = load <4 x i32>, ptr addrspace(7) %10, align 16
   %12 = add <4 x i32> %9, %11
   %13 = load <4 x i32>, ptr addrspace(7) %0, align 16
@@ -37,7 +37,7 @@ define spir_func void @func() local_unnamed_addr #0 !lgc.shaderstage !7 {
 }
 
 ; Function Attrs: nounwind readonly
-declare ptr addrspace(7) @lgc.create.load.buffer.desc.p7(...) local_unnamed_addr #1
+declare ptr addrspace(7) @lgc.load.buffer.desc(i64, i32, i32, i32) local_unnamed_addr #1
 
 attributes #0 = { nounwind }
 attributes #1 = { nounwind readonly }

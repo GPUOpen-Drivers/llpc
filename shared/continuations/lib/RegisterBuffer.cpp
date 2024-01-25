@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
- *deal in the Software without restriction, including without limitation the
- *rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- *sell copies of the Software, and to permit persons to whom the Software is
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in
@@ -18,8 +18,8 @@
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- *FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- *IN THE SOFTWARE.
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 
@@ -719,8 +719,7 @@ RegisterBufferPass::run(llvm::Module &M,
                           OpCode == Instruction::AddrSpaceCast;
       }
 
-      if (isa<GetElementPtrInst>(Use) || isa<BitCastInst>(Use) ||
-          IsConstExprCast) {
+      if (isa<GetElementPtrInst, BitCastInst>(Use) || IsConstExprCast) {
         for (auto *U : Use->users()) {
           if (!UseList.count(U)) {
             UseList.insert(U);
@@ -729,8 +728,7 @@ RegisterBufferPass::run(llvm::Module &M,
             LLVM_DEBUG(dbgs() << "Already there " << *U << "\n");
           }
         }
-      } else if (isa<LoadInst>(Use) || isa<StoreInst>(Use) ||
-                 isa<CallInst>(Use)) {
+      } else if (isa<LoadInst, StoreInst, CallInst>(Use)) {
         Uses.push_back(Use);
       } else {
         LLVM_DEBUG(dbgs() << "Failed to handle use of global: " << *Use
@@ -753,10 +751,10 @@ RegisterBufferPass::run(llvm::Module &M,
           auto Name = Intr->getName();
           // Ignore registerbuffer.setpointerbarrier barriers but leave them in
           // the code
-          if (Name.startswith("registerbuffer.setpointerbarrier"))
+          if (Name.starts_with("registerbuffer.setpointerbarrier"))
             continue;
 
-          if (Name.startswith("llvm.lifetime.")) {
+          if (Name.starts_with("llvm.lifetime.")) {
             // Remove lifetime intrinsics, these are an optimization only
           } else {
             LLVM_DEBUG(dbgs() << "Failed to handle call taking global address: "

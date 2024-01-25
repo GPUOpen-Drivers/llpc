@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2018-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2018-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -48,12 +48,12 @@ using namespace llvm;
 void ShaderSystemValues::initialize(PipelineState *pipelineState, Function *entryPoint) {
   if (!m_entryPoint) {
     m_entryPoint = entryPoint;
-    m_shaderStage = getShaderStage(entryPoint);
+    auto shaderStage = getShaderStage(entryPoint);
+    m_shaderStage = shaderStage.value();
     m_context = &entryPoint->getParent()->getContext();
     m_pipelineState = pipelineState;
 
-    assert(m_shaderStage != ShaderStageInvalid);
-    if (m_shaderStage != ShaderStageCopyShader) {
+    if (m_shaderStage != ShaderStage::CopyShader) {
       // NOTE: For shader stages other than copy shader, make sure their entry-points are mutated with proper arguments.
       // For copy shader, we don't need such check because entry-point mutation is not applied to copy shader. Copy
       // shader is completely generated.
@@ -68,11 +68,11 @@ Value *ShaderSystemValues::getEsGsRingBufDesc() {
   if (!m_esGsRingBufDesc) {
     unsigned tableOffset = 0;
     switch (m_shaderStage) {
-    case ShaderStageVertex:
-    case ShaderStageTessEval:
+    case ShaderStage::Vertex:
+    case ShaderStage::TessEval:
       tableOffset = SiDrvTableEsRingOutOffs;
       break;
-    case ShaderStageGeometry:
+    case ShaderStage::Geometry:
       tableOffset = SiDrvTableGsRingInOffs;
       break;
     default:
@@ -83,7 +83,7 @@ Value *ShaderSystemValues::getEsGsRingBufDesc() {
     // Ensure we have got the global table pointer first, and insert new code after that.
     BuilderBase builder(getInternalGlobalTablePtr()->getNextNode());
     m_esGsRingBufDesc = loadDescFromDriverTable(tableOffset, builder);
-    if (m_shaderStage != ShaderStageGeometry) {
+    if (m_shaderStage != ShaderStage::Geometry) {
       // NOTE: For GFX9+, we have to explicitly set DATA_FORMAT for GS-VS ring buffer descriptor for
       // VS/TES output.
       m_esGsRingBufDesc = setRingBufferDataFormat(m_esGsRingBufDesc, BUF_DATA_FORMAT_32, builder);
@@ -95,7 +95,7 @@ Value *ShaderSystemValues::getEsGsRingBufDesc() {
 // =====================================================================================================================
 // Get the descriptor for tessellation factor (TF) buffer (TCS output)
 Value *ShaderSystemValues::getTessFactorBufDesc() {
-  assert(m_shaderStage == ShaderStageTessControl);
+  assert(m_shaderStage == ShaderStage::TessControl);
   if (!m_tfBufDesc) {
     // Ensure we have got the global table pointer first, and insert new code after that.
     BuilderBase builder(getInternalGlobalTablePtr()->getNextNode());
@@ -109,8 +109,8 @@ Value *ShaderSystemValues::getTessFactorBufDesc() {
 Value *ShaderSystemValues::getAttribRingBufDesc() {
   // Vertex attributes through memory is for GFX11+
   assert(m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 11);
-  assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
-         m_shaderStage == ShaderStageCopyShader || m_shaderStage == ShaderStageMesh);
+  assert(m_shaderStage == ShaderStage::Vertex || m_shaderStage == ShaderStage::TessEval ||
+         m_shaderStage == ShaderStage::CopyShader || m_shaderStage == ShaderStage::Mesh);
   if (!m_attribRingBufDesc) {
     // Ensure we have got the global table pointer first, and insert new code after that.
     BuilderBase builder(getInternalGlobalTablePtr()->getNextNode());
@@ -123,7 +123,7 @@ Value *ShaderSystemValues::getAttribRingBufDesc() {
 // Get the descriptor for task payload ring buffer (for task and mesh shader)
 Value *ShaderSystemValues::getTaskPayloadRingBufDesc() {
   assert(m_pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3})); // Must be GFX10.3+
-  assert(m_shaderStage == ShaderStageTask || m_shaderStage == ShaderStageMesh);
+  assert(m_shaderStage == ShaderStage::Task || m_shaderStage == ShaderStage::Mesh);
   if (!m_taskPayloadRingBufDesc) {
     // Ensure we have got the global table pointer first, and insert new code after that.
     BuilderBase builder(getInternalGlobalTablePtr()->getNextNode());
@@ -136,7 +136,7 @@ Value *ShaderSystemValues::getTaskPayloadRingBufDesc() {
 // Get the descriptor for task draw data ring buffer (for task shader)
 Value *ShaderSystemValues::getTaskDrawDataRingBufDesc() {
   assert(m_pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3})); // Must be GFX10.3+
-  assert(m_shaderStage == ShaderStageTask);
+  assert(m_shaderStage == ShaderStage::Task);
   if (!m_taskDrawDataRingBufDesc) {
     // Ensure we have got the global table pointer first, and insert new code after that.
     BuilderBase builder(getInternalGlobalTablePtr()->getNextNode());
@@ -148,7 +148,7 @@ Value *ShaderSystemValues::getTaskDrawDataRingBufDesc() {
 // =====================================================================================================================
 // Extract value of primitive ID (TCS)
 Value *ShaderSystemValues::getPrimitiveId() {
-  assert(m_shaderStage == ShaderStageTessControl);
+  assert(m_shaderStage == ShaderStage::TessControl);
   if (!m_primitiveId) {
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
     m_primitiveId = getFunctionArgument(m_entryPoint, intfData->entryArgIdxs.tcs.patchId, "patchId");
@@ -159,7 +159,7 @@ Value *ShaderSystemValues::getPrimitiveId() {
 // =====================================================================================================================
 // Get invocation ID (TCS)
 Value *ShaderSystemValues::getInvocationId() {
-  assert(m_shaderStage == ShaderStageTessControl);
+  assert(m_shaderStage == ShaderStage::TessControl);
   if (!m_invocationId) {
     auto insertPos = &*m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
@@ -177,7 +177,7 @@ Value *ShaderSystemValues::getInvocationId() {
 // =====================================================================================================================
 // Get relative patchId (TCS)
 Value *ShaderSystemValues::getRelativeId() {
-  assert(m_shaderStage == ShaderStageTessControl);
+  assert(m_shaderStage == ShaderStage::TessControl);
   if (!m_relativeId) {
     auto insertPos = &*m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
@@ -193,7 +193,7 @@ Value *ShaderSystemValues::getRelativeId() {
 // =====================================================================================================================
 // Get offchip LDS descriptor (TCS and TES)
 Value *ShaderSystemValues::getOffChipLdsDesc() {
-  assert(m_shaderStage == ShaderStageTessControl || m_shaderStage == ShaderStageTessEval);
+  assert(m_shaderStage == ShaderStage::TessControl || m_shaderStage == ShaderStage::TessEval);
   if (!m_offChipLdsDesc) {
     // Ensure we have got the global table pointer first, and insert new code after that.
     BuilderBase builder(getInternalGlobalTablePtr()->getNextNode());
@@ -205,7 +205,7 @@ Value *ShaderSystemValues::getOffChipLdsDesc() {
 // =====================================================================================================================
 // Get tessellated coordinate (TES)
 Value *ShaderSystemValues::getTessCoord() {
-  assert(m_shaderStage == ShaderStageTessEval);
+  assert(m_shaderStage == ShaderStage::TessEval);
   if (!m_tessCoord) {
     auto insertPos = &*m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
@@ -235,7 +235,7 @@ Value *ShaderSystemValues::getTessCoord() {
 // =====================================================================================================================
 // Get ES -> GS offsets (GS in)
 Value *ShaderSystemValues::getEsGsOffsets() {
-  assert(m_shaderStage == ShaderStageGeometry);
+  assert(m_shaderStage == ShaderStage::Geometry);
   if (!m_esGsOffsets) {
     auto insertPos = &*m_entryPoint->front().getFirstNonPHIOrDbgOrAlloca();
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
@@ -256,14 +256,14 @@ Value *ShaderSystemValues::getEsGsOffsets() {
 //
 // @param streamId : Stream ID, always 0 for copy shader
 Value *ShaderSystemValues::getGsVsRingBufDesc(unsigned streamId) {
-  assert(m_shaderStage == ShaderStageGeometry || m_shaderStage == ShaderStageCopyShader);
+  assert(m_shaderStage == ShaderStage::Geometry || m_shaderStage == ShaderStage::CopyShader);
   if (m_gsVsRingBufDescs.size() <= streamId)
     m_gsVsRingBufDescs.resize(streamId + 1);
   if (!m_gsVsRingBufDescs[streamId]) {
     // Ensure we have got the global table pointer first, and insert new code after that.
     BuilderBase builder(getInternalGlobalTablePtr()->getNextNode());
 
-    if (m_shaderStage == ShaderStageGeometry) {
+    if (m_shaderStage == ShaderStage::Geometry) {
       const auto resUsage = m_pipelineState->getShaderResourceUsage(m_shaderStage);
 
       // Geometry shader, using GS-VS ring for output.
@@ -317,7 +317,7 @@ Value *ShaderSystemValues::getGsVsRingBufDesc(unsigned streamId) {
 // =====================================================================================================================
 // Get pointers to emit counters (GS)
 std::pair<Type *, ArrayRef<Value *>> ShaderSystemValues::getEmitCounterPtr() {
-  assert(m_shaderStage == ShaderStageGeometry);
+  assert(m_shaderStage == ShaderStage::Geometry);
   auto *emitCounterTy = Type::getInt32Ty(*m_context);
   if (m_emitCounterPtrs.empty()) {
     // TODO: We should only insert those offsets required by the specified input primitive.
@@ -342,7 +342,7 @@ Instruction *ShaderSystemValues::getInternalGlobalTablePtr() {
     // Global table is always the first function argument (separate shader) or the eighth function argument (merged
     // shader). And mesh shader is actually mapped to ES-GS merged shader.
     m_internalGlobalTablePtr = makePointer(
-        getFunctionArgument(m_entryPoint, getShaderStage(m_entryPoint) == ShaderStageMesh ? NumSpecialSgprInputs : 0,
+        getFunctionArgument(m_entryPoint, getShaderStage(m_entryPoint) == ShaderStage::Mesh ? NumSpecialSgprInputs : 0,
                             "globalTable"),
         ptrTy, InvalidValue);
   }
@@ -353,17 +353,17 @@ Instruction *ShaderSystemValues::getInternalGlobalTablePtr() {
 // Get the mesh pipeline statistics buffer pointer as pointer to i8
 Value *ShaderSystemValues::getMeshPipeStatsBufPtr() {
   assert(m_pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3})); // Must be GFX10.3+
-  assert(m_shaderStage == ShaderStageTask || m_shaderStage == ShaderStageMesh);
+  assert(m_shaderStage == ShaderStage::Task || m_shaderStage == ShaderStage::Mesh);
   if (!m_meshPipeStatsBufPtr) {
     auto intfData = m_pipelineState->getShaderInterfaceData(m_shaderStage);
     unsigned entryArgIdx = 0;
 
     // Get the SGPR number of the mesh pipeline statistics buffer pointer.
     switch (m_shaderStage) {
-    case ShaderStageTask:
+    case ShaderStage::Task:
       entryArgIdx = intfData->entryArgIdxs.task.pipeStatsBuf;
       break;
-    case ShaderStageMesh:
+    case ShaderStage::Mesh:
       entryArgIdx = intfData->entryArgIdxs.mesh.pipeStatsBuf;
       break;
     default:
@@ -412,8 +412,8 @@ Value *ShaderSystemValues::getStreamOutBufDesc(unsigned xfbBuffer) {
 // =====================================================================================================================
 // Get stream-out buffer table pointer
 std::pair<Type *, Instruction *> ShaderSystemValues::getStreamOutTablePtr() {
-  assert(m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessEval ||
-         m_shaderStage == ShaderStageCopyShader);
+  assert(m_shaderStage == ShaderStage::Vertex || m_shaderStage == ShaderStage::TessEval ||
+         m_shaderStage == ShaderStage::CopyShader);
 
   auto *streamOutTableTy =
       ArrayType::get(FixedVectorType::get(Type::getInt32Ty(*m_context), 4), MaxTransformFeedbackBuffers);
@@ -423,13 +423,13 @@ std::pair<Type *, Instruction *> ShaderSystemValues::getStreamOutTablePtr() {
 
     // Get the SGPR number of the stream-out table pointer.
     switch (m_shaderStage) {
-    case ShaderStageVertex:
+    case ShaderStage::Vertex:
       entryArgIdx = intfData->entryArgIdxs.vs.streamOutData.tablePtr;
       break;
-    case ShaderStageTessEval:
+    case ShaderStage::TessEval:
       entryArgIdx = intfData->entryArgIdxs.tes.streamOutData.tablePtr;
       break;
-    case ShaderStageCopyShader:
+    case ShaderStage::CopyShader:
       entryArgIdx = intfData->userDataUsage.gs.copyShaderStreamOutTable;
       break;
     default:

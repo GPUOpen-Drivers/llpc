@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -49,22 +49,23 @@ namespace lgc {
 class ShaderModes {
 public:
   // Set the common shader mode (FP modes) for the given shader stage
-  static void setCommonShaderMode(llvm::Module &module, ShaderStage stage, const CommonShaderMode &commonShaderMode);
+  static void setCommonShaderMode(llvm::Module &module, ShaderStageEnum stage,
+                                  const CommonShaderMode &commonShaderMode);
 
   // Get the common shader modes for the given shader stage: static edition that reads directly from IR.
-  static CommonShaderMode getCommonShaderMode(llvm::Module &module, ShaderStage stage);
+  static CommonShaderMode getCommonShaderMode(llvm::Module &module, ShaderStageEnum stage);
 
   // Get the common shader modes for the given shader stage
-  const CommonShaderMode &getCommonShaderMode(ShaderStage stage) const;
+  const CommonShaderMode &getCommonShaderMode(ShaderStageEnum stage) const;
 
   // Check if any shader stage has useSubgroupSize set
   bool getAnyUseSubgroupSize() const;
 
   // Set the tessellation mode for the given shader stage (TCS or TES).
-  static void setTessellationMode(llvm::Module &module, ShaderStage stage, const TessellationMode &inMode);
+  static void setTessellationMode(llvm::Module &module, ShaderStageEnum stage, const TessellationMode &inMode);
 
   // Get the tessellation mode for the given shader stage (TCS or TES): static edition that reads directly from IR.
-  static TessellationMode getTessellationMode(llvm::Module &module, ShaderStage shaderStage);
+  static TessellationMode getTessellationMode(llvm::Module &module, ShaderStageEnum shaderStage);
 
   // Get the tessellation state.
   const TessellationMode &getTessellationMode() const;
@@ -97,7 +98,7 @@ public:
   const ComputeShaderMode &getComputeShaderMode() const;
 
   // Set subgroup size usage.
-  static void setSubgroupSizeUsage(llvm::Module &module, ShaderStage stage, bool usage);
+  static void setSubgroupSizeUsage(llvm::Module &module, ShaderStageEnum stage, bool usage);
 
   // Clear all modes
   void clear();
@@ -106,12 +107,12 @@ public:
   void readModesFromPipeline(llvm::Module *module);
 
 private:
-  CommonShaderMode m_commonShaderModes[ShaderStageCompute + 1] = {}; // Per-shader FP modes
-  TessellationMode m_tessellationMode = {};                          // Tessellation mode
-  GeometryShaderMode m_geometryShaderMode = {};                      // Geometry shader mode
-  MeshShaderMode m_meshShaderMode = {};                              // Mesh shader mode
-  FragmentShaderMode m_fragmentShaderMode = {};                      // Fragment shader mode
-  ComputeShaderMode m_computeShaderMode = {};                        // Compute shader mode (workgroup size)
+  CommonShaderMode m_commonShaderModes[ShaderStage::Compute + 1] = {}; // Per-shader FP modes
+  TessellationMode m_tessellationMode = {};                            // Tessellation mode
+  GeometryShaderMode m_geometryShaderMode = {};                        // Geometry shader mode
+  MeshShaderMode m_meshShaderMode = {};                                // Mesh shader mode
+  FragmentShaderMode m_fragmentShaderMode = {};                        // Fragment shader mode
+  ComputeShaderMode m_computeShaderMode = {};                          // Compute shader mode (workgroup size)
 };
 
 } // namespace lgc

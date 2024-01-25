@@ -11,14 +11,13 @@ declare i32 @_cont_GetContinuationStackAddr()
 declare i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 declare %struct.DispatchSystemData @_cont_SetupRayGen()
 
-define void @RayGen() !lgc.rt.shaderstage !5 !continuation.entry !0 !continuation !3 {
-; CHECK-LABEL: define void @RayGen() !lgc.rt.shaderstage !3 !continuation.entry !4 !continuation !5 {
-; CHECK-NEXT:    [[SYSTEM_DATA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA:%.*]], align 8
+define void @RayGen(%struct.DispatchSystemData %0) !lgc.rt.shaderstage !5 !continuation.entry !0 !continuation !3 {
+; CHECK-LABEL: define void @RayGen(
+; CHECK-SAME: ) !lgc.rt.shaderstage [[META3:![0-9]+]] !continuation.entry [[META4:![0-9]+]] !continuation [[META5:![0-9]+]] {
 ; CHECK-NEXT:    [[CSP:%.*]] = alloca i32, align 4
-; CHECK-NEXT:    [[TMP1:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @_cont_SetupRayGen()
-; CHECK-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], ptr [[SYSTEM_DATA]], align 4
-; CHECK-NEXT:    [[TMP2:%.*]] = call i32 @_cont_GetContinuationStackAddr()
-; CHECK-NEXT:    store i32 [[TMP2]], ptr [[CSP]], align 4
+; CHECK-NEXT:    [[SYSTEM_DATA:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA:%.*]] @_cont_SetupRayGen()
+; CHECK-NEXT:    [[TMP1:%.*]] = call i32 @_cont_GetContinuationStackAddr()
+; CHECK-NEXT:    store i32 [[TMP1]], ptr [[CSP]], align 4
 ; CHECK-NEXT:    ret void
 ;
   %csp = alloca i32, align 4
@@ -29,9 +28,7 @@ define void @RayGen() !lgc.rt.shaderstage !5 !continuation.entry !0 !continuatio
 
 define void @RayGen.resume.0(i32 %0, %struct.DispatchSystemData %1) !lgc.rt.shaderstage !5 !continuation !3 {
 ; CHECK-LABEL: define void @RayGen.resume.0(
-; CHECK-SAME: i32 [[TMP0:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP1:%.*]]) !lgc.rt.shaderstage !3 !continuation !5 {
-; CHECK-NEXT:    [[SYSTEM_DATA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
-; CHECK-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], ptr [[SYSTEM_DATA]], align 4
+; CHECK-SAME: i32 [[TMP0:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP1:%.*]]) !lgc.rt.shaderstage [[META3]] !continuation [[META5]] {
 ; CHECK-NEXT:    ret void
 ;
   ret void

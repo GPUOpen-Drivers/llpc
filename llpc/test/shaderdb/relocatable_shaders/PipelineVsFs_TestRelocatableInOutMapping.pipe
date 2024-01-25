@@ -4,23 +4,23 @@
 ; BEGIN_SHADERTEST
 ; RUN: amdllpc -enable-relocatable-shader-elf -auto-layout-desc -v %gfxip %s \
 ; RUN:   | FileCheck -check-prefix=SHADERTEST %s
-; SHADERTEST-LABEL: {{^//}} LLPC location input/output mapping results (VS shader){{$}}
+; SHADERTEST-LABEL: {{^//}} LLPC location input/output mapping results (VS){{$}}
 ;
-; SHADERTEST:       (VS) Output: loc = 0, comp = 0  =>  Mapped = [[loc0:[0-9]+]], 0
-; SHADERTEST-NEXT:  (VS) Output: loc = 1, comp = 0  =>  Mapped = [[loc1:[0-9]+]], 0
-; SHADERTEST-NEXT:  (VS) Output: loc = 2, comp = 0  =>  Mapped = [[loc2:[0-9]+]], 0
-; SHADERTEST-NEXT:  (VS) Output: loc = 3, comp = 0  =>  Mapped = [[loc3:[0-9]+]], 0
-; SHADERTEST-NEXT:  (VS) Output: loc = 4, comp = 0  =>  Mapped = [[loc4:[0-9]+]], 0
+; SHADERTEST:       (VS) Output: [location, component] = [0, 0]  =>  Mapped = [[[loc0:[0-9]+]], 0]
+; SHADERTEST-NEXT:  (VS) Output: [location, component] = [1, 0]  =>  Mapped = [[[loc1:[0-9]+]], 0]
+; SHADERTEST-NEXT:  (VS) Output: [location, component] = [2, 0]  =>  Mapped = [[[loc2:[0-9]+]], 0]
+; SHADERTEST-NEXT:  (VS) Output: [location, component] = [3, 0]  =>  Mapped = [[[loc3:[0-9]+]], 0]
+; SHADERTEST-NEXT:  (VS) Output: [location, component] = [4, 0]  =>  Mapped = [[[loc4:[0-9]+]], 0]
 ;
-; SHADERTEST-LABEL: {{^//}} LLPC location input/output mapping results (FS shader){{$}}
+; SHADERTEST-LABEL: {{^//}} LLPC location input/output mapping results (FS){{$}}
 ;
-; SHADERTEST:       (FS) Input: loc = 0, comp = 0  =>  Mapped = [[loc0]], 0
-; SHADERTEST-NEXT:  (FS) Input: loc = 1, comp = 0  =>  Mapped = [[loc1]], 0
-; SHADERTEST-NEXT:  (FS) Input: loc = 2, comp = 0  =>  Mapped = [[loc2]], 0
-; SHADERTEST-NEXT:  (FS) Input: loc = 3, comp = 0  =>  Mapped = [[loc3]], 0
-; SHADERTEST-NEXT:  (FS) Input: loc = 4, comp = 0  =>  Mapped = [[loc4]], 0
+; SHADERTEST:       (FS) Input:  [location, component] = [0, 0]  =>  Mapped = [[[loc0]], 0]
+; SHADERTEST-NEXT:  (FS) Input:  [location, component] = [1, 0]  =>  Mapped = [[[loc1]], 0]
+; SHADERTEST-NEXT:  (FS) Input:  [location, component] = [2, 0]  =>  Mapped = [[[loc2]], 0]
+; SHADERTEST-NEXT:  (FS) Input:  [location, component] = [3, 0]  =>  Mapped = [[[loc3]], 0]
+; SHADERTEST-NEXT:  (FS) Input:  [location, component] = [4, 0]  =>  Mapped = [[[loc4]], 0]
 ;
-; SHADERTEST:       (FS) Output: loc = 0, comp = 0  =>  Mapped = 0, 0
+; SHADERTEST:       (FS) Output: [location, component] = [0, 0]  =>  Mapped = [0, 0]
 ;
 ; SHADERTEST: AMDLLPC SUCCESS
 ; END_SHADERTEST

@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -229,7 +229,8 @@ static CompSetting computeCompSetting(BufDataFormat dfmt) {
 // @param module : Module to record in
 // @param shaderStage : Shader stage to set modes for
 // @param commonShaderMode : FP round and denorm modes
-void Pipeline::setCommonShaderMode(Module &module, ShaderStage shaderStage, const CommonShaderMode &commonShaderMode) {
+void Pipeline::setCommonShaderMode(Module &module, ShaderStageEnum shaderStage,
+                                   const CommonShaderMode &commonShaderMode) {
   ShaderModes::setCommonShaderMode(module, shaderStage, commonShaderMode);
 }
 
@@ -239,7 +240,7 @@ void Pipeline::setCommonShaderMode(Module &module, ShaderStage shaderStage, cons
 //
 // @param module : Module to read from
 // @param shaderStage : Shader stage to get modes for
-CommonShaderMode Pipeline::getCommonShaderMode(Module &module, ShaderStage shaderStage) {
+CommonShaderMode Pipeline::getCommonShaderMode(Module &module, ShaderStageEnum shaderStage) {
   return ShaderModes::getCommonShaderMode(module, shaderStage);
 }
 
@@ -251,14 +252,15 @@ CommonShaderMode Pipeline::getCommonShaderMode(Module &module, ShaderStage shade
 // @param module : Module to record in
 // @param shaderStage : Shader stage to set modes for (TCS or TES)
 // @param tessellationMode : Tessellation mode
-void Pipeline::setTessellationMode(Module &module, ShaderStage shaderStage, const TessellationMode &tessellationMode) {
+void Pipeline::setTessellationMode(Module &module, ShaderStageEnum shaderStage,
+                                   const TessellationMode &tessellationMode) {
   ShaderModes::setTessellationMode(module, shaderStage, tessellationMode);
 }
 
 // =====================================================================================================================
 // Get the tessellation mode for the given shader stage.
 // This reads the mode from IR metadata in the given module.
-TessellationMode Pipeline::getTessellationMode(Module &module, ShaderStage shaderStage) {
+TessellationMode Pipeline::getTessellationMode(Module &module, ShaderStageEnum shaderStage) {
   return ShaderModes::getTessellationMode(module, shaderStage);
 }
 
@@ -309,7 +311,7 @@ void Pipeline::setComputeShaderMode(Module &module, const ComputeShaderMode &com
 // @param module : Module to record in
 // @param stage : Shader stage
 // @param usage : Subgroup size usage
-void Pipeline::setSubgroupSizeUsage(Module &module, ShaderStage stage, bool usage) {
+void Pipeline::setSubgroupSizeUsage(Module &module, ShaderStageEnum stage, bool usage) {
   ShaderModes::setSubgroupSizeUsage(module, stage, usage);
 }
 
@@ -482,54 +484,54 @@ void PipelineState::readState(Module *module) {
 //
 // @param module : LLVM module
 void PipelineState::readShaderStageMask(Module *module) {
-  m_stageMask = 0;
+  m_stageMask = {};
   for (auto &func : *module) {
     if (isShaderEntryPoint(&func)) {
       auto shaderStage = getShaderStage(&func);
-      if (shaderStage != ShaderStageInvalid)
-        m_stageMask |= 1 << shaderStage;
+      if (shaderStage)
+        m_stageMask |= ShaderStageMask(shaderStage.value());
     }
   }
-  if (m_stageMask == 0) {
-    m_stageMask = 1 << ShaderStageCompute;
+  if (m_stageMask.empty()) {
+    m_stageMask = ShaderStageMask(ShaderStage::Compute);
     m_computeLibrary = true;
   }
 }
 
 // =====================================================================================================================
-// Get the last vertex processing shader stage in this pipeline, or ShaderStageInvalid if none.
-ShaderStage PipelineState::getLastVertexProcessingStage() const {
-  if (m_stageMask & shaderStageToMask(ShaderStageCopyShader))
-    return ShaderStageCopyShader;
-  if (m_stageMask & shaderStageToMask(ShaderStageGeometry))
-    return ShaderStageGeometry;
-  if (m_stageMask & shaderStageToMask(ShaderStageTessEval))
-    return ShaderStageTessEval;
-  if (m_stageMask & shaderStageToMask(ShaderStageVertex))
-    return ShaderStageVertex;
-  return ShaderStageInvalid;
+// Get the last vertex processing shader stage in this pipeline, or ShaderStage::Invalid if none.
+ShaderStageEnum PipelineState::getLastVertexProcessingStage() const {
+  if (m_stageMask.contains(ShaderStage::CopyShader))
+    return ShaderStage::CopyShader;
+  if (m_stageMask.contains(ShaderStage::Geometry))
+    return ShaderStage::Geometry;
+  if (m_stageMask.contains(ShaderStage::TessEval))
+    return ShaderStage::TessEval;
+  if (m_stageMask.contains(ShaderStage::Vertex))
+    return ShaderStage::Vertex;
+  return ShaderStage::Invalid;
 }
 
 // =====================================================================================================================
 // Gets the previous active shader stage in this pipeline
 //
 // @param shaderStage : Current shader stage
-ShaderStage PipelineState::getPrevShaderStage(ShaderStage shaderStage) const {
-  if (shaderStage == ShaderStageCompute)
-    return ShaderStageInvalid;
+ShaderStageEnum PipelineState::getPrevShaderStage(ShaderStageEnum shaderStage) const {
+  if (shaderStage == ShaderStage::Compute)
+    return ShaderStage::Invalid;
 
-  if (shaderStage == ShaderStageCopyShader) {
+  if (shaderStage == ShaderStage::CopyShader) {
     // Treat copy shader as part of geometry shader
-    shaderStage = ShaderStageGeometry;
+    shaderStage = ShaderStage::Geometry;
   }
 
-  assert(shaderStage < ShaderStageGfxCount);
+  assert(shaderStage < ShaderStage::GfxCount);
 
-  ShaderStage prevStage = ShaderStageInvalid;
+  ShaderStageEnum prevStage = ShaderStage::Invalid;
 
   for (int stage = shaderStage - 1; stage >= 0; --stage) {
-    if ((m_stageMask & shaderStageToMask(static_cast<ShaderStage>(stage))) != 0) {
-      prevStage = static_cast<ShaderStage>(stage);
+    if (m_stageMask.contains(static_cast<ShaderStageEnum>(stage))) {
+      prevStage = static_cast<ShaderStageEnum>(stage);
       break;
     }
   }
@@ -541,25 +543,25 @@ ShaderStage PipelineState::getPrevShaderStage(ShaderStage shaderStage) const {
 // Gets the next active shader stage in this pipeline
 //
 // @param shaderStage : Current shader stage
-ShaderStage PipelineState::getNextShaderStage(ShaderStage shaderStage) const {
-  if (shaderStage == ShaderStageCompute)
-    return ShaderStageInvalid;
+ShaderStageEnum PipelineState::getNextShaderStage(ShaderStageEnum shaderStage) const {
+  if (shaderStage == ShaderStage::Compute)
+    return ShaderStage::Invalid;
 
-  if (shaderStage == ShaderStageCopyShader) {
+  if (shaderStage == ShaderStage::CopyShader) {
     // Treat copy shader as part of geometry shader
-    shaderStage = ShaderStageGeometry;
+    shaderStage = ShaderStage::Geometry;
   }
 
-  assert(shaderStage < ShaderStageGfxCount);
+  assert(shaderStage < ShaderStage::GfxCount);
 
-  ShaderStage nextStage = ShaderStageInvalid;
-  unsigned stageMask = m_stageMask;
+  ShaderStageEnum nextStage = ShaderStage::Invalid;
+  auto stageMask = m_stageMask;
   if (isPartPipeline())
-    stageMask |= shaderStageToMask(ShaderStageFragment);
+    stageMask |= ShaderStageMask(ShaderStage::Fragment);
 
-  for (unsigned stage = shaderStage + 1; stage < ShaderStageGfxCount; ++stage) {
-    if ((stageMask & shaderStageToMask(static_cast<ShaderStage>(stage))) != 0) {
-      nextStage = static_cast<ShaderStage>(stage);
+  for (unsigned stage = shaderStage + 1; stage < ShaderStage::GfxCount; ++stage) {
+    if (stageMask.contains(static_cast<ShaderStageEnum>(stage))) {
+      nextStage = static_cast<ShaderStageEnum>(stage);
       break;
     }
   }
@@ -569,8 +571,8 @@ ShaderStage PipelineState::getNextShaderStage(ShaderStage shaderStage) const {
 
 // =====================================================================================================================
 // Get the shader stage mask.
-unsigned PipelineState::getShaderStageMask() {
-  if (!m_stageMask && !m_computeLibrary) {
+ShaderStageMask PipelineState::getShaderStageMask() {
+  if (m_stageMask.empty() && !m_computeLibrary) {
     // No shader stage mask set (and it isn't a compute library). We must be in ElfLinker; get the shader stage
     // mask from PAL metadata.
     m_stageMask = getPalMetadata()->getShaderStageMask();
@@ -581,9 +583,9 @@ unsigned PipelineState::getShaderStageMask() {
 // =====================================================================================================================
 // Check whether the pipeline is a graphics pipeline
 bool PipelineState::isGraphics() {
-  return (getShaderStageMask() & ((1U << ShaderStageTask) | (1U << ShaderStageVertex) | (1U << ShaderStageTessControl) |
-                                  (1U << ShaderStageTessEval) | (1U << ShaderStageGeometry) | (1U << ShaderStageMesh) |
-                                  (1U << ShaderStageFragment))) != 0;
+  return getShaderStageMask().contains_any({ShaderStage::Task, ShaderStage::Vertex, ShaderStage::TessControl,
+                                            ShaderStage::TessEval, ShaderStage::Geometry, ShaderStage::Mesh,
+                                            ShaderStage::Fragment});
 }
 
 // =====================================================================================================================
@@ -591,7 +593,7 @@ bool PipelineState::isGraphics() {
 //
 // @param stage : Shader stage
 // @param options : Shader options
-void PipelineState::setShaderOptions(ShaderStage stage, const ShaderOptions &options) {
+void PipelineState::setShaderOptions(ShaderStageEnum stage, const ShaderOptions &options) {
   if (m_shaderOptions.size() <= stage)
     m_shaderOptions.resize(stage + 1);
   m_shaderOptions[stage] = options;
@@ -601,7 +603,7 @@ void PipelineState::setShaderOptions(ShaderStage stage, const ShaderOptions &opt
 // Get per-shader options
 //
 // @param stage : Shader stage
-const ShaderOptions &PipelineState::getShaderOptions(ShaderStage stage) {
+const ShaderOptions &PipelineState::getShaderOptions(ShaderStageEnum stage) {
   if (m_shaderOptions.size() <= stage)
     m_shaderOptions.resize(stage + 1);
   return m_shaderOptions[stage];
@@ -626,7 +628,7 @@ void PipelineState::recordOptions(Module *module) {
   setNamedMetadataToArrayOfInt32(module, m_options, OptionsMetadataName);
   for (unsigned stage = 0; stage != m_shaderOptions.size(); ++stage) {
     std::string metadataName =
-        (Twine(OptionsMetadataName) + "." + getShaderStageAbbreviation(static_cast<ShaderStage>(stage))).str();
+        (Twine(OptionsMetadataName) + "." + getShaderStageAbbreviation(static_cast<ShaderStageEnum>(stage))).str();
     setNamedMetadataToArrayOfInt32(module, m_shaderOptions[stage], metadataName);
   }
 }
@@ -656,9 +658,9 @@ void PipelineState::readOptions(Module *module) {
   m_preRasterHasGs = preRasterHasGsAsInt;
 
   readNamedMetadataArrayOfInt32(module, OptionsMetadataName, m_options);
-  for (unsigned stage = 0; stage != ShaderStageCompute + 1; ++stage) {
+  for (unsigned stage = 0; stage != ShaderStage::Compute + 1; ++stage) {
     std::string metadataName =
-        (Twine(OptionsMetadataName) + "." + getShaderStageAbbreviation(static_cast<ShaderStage>(stage))).str();
+        (Twine(OptionsMetadataName) + "." + getShaderStageAbbreviation(static_cast<ShaderStageEnum>(stage))).str();
     auto namedMetaNode = module->getNamedMetadata(metadataName);
     if (!namedMetaNode || namedMetaNode->getNumOperands() == 0)
       continue;
@@ -890,11 +892,11 @@ void PipelineState::readUserDataNodes(Module *module) {
 // =====================================================================================================================
 // Returns the resource node for the push constant.
 //
-// @param stage : Shader stage to check against nodes' visibility field, or ShaderStageInvalid for any
-const ResourceNode *PipelineState::findPushConstantResourceNode(ShaderStage stage) const {
+// @param stage : Shader stage to check against nodes' visibility field, or ShaderStage::Invalid for any
+const ResourceNode *PipelineState::findPushConstantResourceNode(std::optional<ShaderStageEnum> stage) const {
   unsigned visibilityMask = UINT_MAX;
-  if (stage != ShaderStageInvalid)
-    visibilityMask = 1 << std::min(unsigned(stage), unsigned(ShaderStageCompute));
+  if (stage)
+    visibilityMask = 1 << std::min(unsigned(stage.value()), unsigned(ShaderStage::Compute));
 
   for (const ResourceNode &node : getUserDataNodes()) {
     if (node.visibility != 0 && (node.visibility & visibilityMask) == 0)
@@ -1014,17 +1016,19 @@ bool PipelineState::matchResourceNode(const ResourceNode &node, ResourceNodeType
 // If the node is not found and nodeType == Fmask, then a search will be done for a DescriptorResource at the given
 // descriptor set and binding.
 //
+// If pipeline option useResourceBindingRange is set, then a node matches a range of bindings of size
+// sizeInDwords/stride.
+//
 // @param nodeType : Type of the resource mapping node
 // @param descSet : ID of descriptor set
 // @param binding : ID of descriptor binding
-// @param stage : Shader stage to check against nodes' visibility field, or ShaderStageInvalid for any
-std::pair<const ResourceNode *, const ResourceNode *> PipelineState::findResourceNode(ResourceNodeType nodeType,
-                                                                                      uint64_t descSet,
-                                                                                      unsigned binding,
-                                                                                      ShaderStage stage) const {
+// @param stage : Shader stage to check against nodes' visibility field, or ShaderStage::Invalid for any
+std::pair<const ResourceNode *, const ResourceNode *>
+PipelineState::findResourceNode(ResourceNodeType nodeType, uint64_t descSet, unsigned binding,
+                                std::optional<ShaderStageEnum> stage) const {
   unsigned visibilityMask = UINT_MAX;
-  if (stage != ShaderStageInvalid)
-    visibilityMask = 1 << std::min(unsigned(stage), unsigned(ShaderStageCompute));
+  if (stage)
+    visibilityMask = 1 << std::min(unsigned(stage.value()), unsigned(ShaderStage::Compute));
 
   for (const ResourceNode &node : getUserDataNodes()) {
     if (!nodeTypeHasBinding(node.concreteType))
@@ -1070,11 +1074,11 @@ std::pair<const ResourceNode *, const ResourceNode *> PipelineState::findResourc
 // Find the single root resource node of the given type
 //
 // @param nodeType : Type of the resource mapping node
-// @param stage : Shader stage to check against nodes' visibility field, or ShaderStageInvalid for any
-const ResourceNode *PipelineState::findSingleRootResourceNode(ResourceNodeType nodeType, ShaderStage stage) const {
+// @param stage : Shader stage to check against nodes' visibility field, or ShaderStage::Invalid for any
+const ResourceNode *PipelineState::findSingleRootResourceNode(ResourceNodeType nodeType, ShaderStageEnum stage) const {
   unsigned visibilityMask = UINT_MAX;
-  if (stage != ShaderStageInvalid)
-    visibilityMask = 1 << std::min(unsigned(stage), unsigned(ShaderStageCompute));
+  if (stage != ShaderStage::Invalid)
+    visibilityMask = 1 << std::min(unsigned(stage), unsigned(ShaderStage::Compute));
 
   for (const ResourceNode &node : getUserDataNodes()) {
     if (node.visibility != 0 && (node.visibility & visibilityMask) == 0)
@@ -1340,13 +1344,13 @@ unsigned PipelineState::getNumPatchControlPoints() const {
 // NOTE: Need to be called after PatchResourceCollect pass, so usage of subgroupSize is confirmed.
 //
 // @param stage : Shader stage
-unsigned PipelineState::getShaderWaveSize(ShaderStage stage) {
-  if (stage == ShaderStageCopyShader) {
+unsigned PipelineState::getShaderWaveSize(ShaderStageEnum stage) {
+  if (stage == ShaderStage::CopyShader) {
     // Treat copy shader as part of geometry shader
-    stage = ShaderStageGeometry;
+    stage = ShaderStage::Geometry;
   }
 
-  assert(stage <= ShaderStageCompute);
+  assert(stage <= ShaderStage::Compute);
   if (!m_waveSize[stage])
     setShaderDefaultWaveSize(stage);
 
@@ -1363,7 +1367,7 @@ unsigned PipelineState::getShaderWaveSize(ShaderStage stage) {
 // NOTE: For GFX9+, two shaders are merged as a shader pair. The wave size is determined by the larger one.
 //
 // @param stage : Shader stage
-unsigned PipelineState::getMergedShaderWaveSize(ShaderStage stage) {
+unsigned PipelineState::getMergedShaderWaveSize(ShaderStageEnum stage) {
   assert(getTargetInfo().getGfxIpVersion().major >= 9);
   unsigned waveSize = m_waveSize[stage];
 
@@ -1374,34 +1378,34 @@ unsigned PipelineState::getMergedShaderWaveSize(ShaderStage stage) {
   // - TES + GS -> HW GS
   // - VS/TES -> HW GS (NGG, no geometry)
   switch (stage) {
-  case ShaderStageVertex:
-    if (hasShaderStage(ShaderStageTessControl)) {
-      return std::max(waveSize, m_waveSize[ShaderStageTessControl]);
+  case ShaderStage::Vertex:
+    if (hasShaderStage(ShaderStage::TessControl)) {
+      return std::max(waveSize, m_waveSize[ShaderStage::TessControl]);
     }
-    if (hasShaderStage(ShaderStageGeometry)) {
-      return std::max(waveSize, m_waveSize[ShaderStageGeometry]);
-    }
-    return waveSize;
-
-  case ShaderStageTessControl:
-    return std::max(waveSize, m_waveSize[ShaderStageVertex]);
-
-  case ShaderStageTessEval:
-    if (hasShaderStage(ShaderStageGeometry)) {
-      return std::max(waveSize, m_waveSize[ShaderStageGeometry]);
+    if (hasShaderStage(ShaderStage::Geometry)) {
+      return std::max(waveSize, m_waveSize[ShaderStage::Geometry]);
     }
     return waveSize;
 
-  case ShaderStageGeometry:
-    if (!hasShaderStage(ShaderStageGeometry)) {
+  case ShaderStage::TessControl:
+    return std::max(waveSize, m_waveSize[ShaderStage::Vertex]);
+
+  case ShaderStage::TessEval:
+    if (hasShaderStage(ShaderStage::Geometry)) {
+      return std::max(waveSize, m_waveSize[ShaderStage::Geometry]);
+    }
+    return waveSize;
+
+  case ShaderStage::Geometry:
+    if (!hasShaderStage(ShaderStage::Geometry)) {
       // NGG, no geometry
       return std::max(waveSize,
-                      m_waveSize[hasShaderStage(ShaderStageTessEval) ? ShaderStageTessEval : ShaderStageVertex]);
+                      m_waveSize[hasShaderStage(ShaderStage::TessEval) ? ShaderStage::TessEval : ShaderStage::Vertex]);
     }
-    if (hasShaderStage(ShaderStageTessEval)) {
-      return std::max(waveSize, m_waveSize[ShaderStageTessEval]);
+    if (hasShaderStage(ShaderStage::TessEval)) {
+      return std::max(waveSize, m_waveSize[ShaderStage::TessEval]);
     }
-    return std::max(waveSize, m_waveSize[ShaderStageVertex]);
+    return std::max(waveSize, m_waveSize[ShaderStage::Vertex]);
 
   default:
     return waveSize;
@@ -1413,13 +1417,13 @@ unsigned PipelineState::getMergedShaderWaveSize(ShaderStage stage) {
 //
 // @param stage : Shader stage
 // @returns : Subgroup size of the specified shader stage
-unsigned PipelineState::getShaderSubgroupSize(ShaderStage stage) {
-  if (stage == ShaderStageCopyShader) {
+unsigned PipelineState::getShaderSubgroupSize(ShaderStageEnum stage) {
+  if (stage == ShaderStage::CopyShader) {
     // Treat copy shader as part of geometry shader
-    stage = ShaderStageGeometry;
+    stage = ShaderStage::Geometry;
   }
 
-  assert(stage <= ShaderStageCompute);
+  assert(stage <= ShaderStage::Compute);
   if (!m_subgroupSize[stage])
     setShaderDefaultWaveSize(stage);
 
@@ -1430,16 +1434,16 @@ unsigned PipelineState::getShaderSubgroupSize(ShaderStage stage) {
 // Set the default wave size for the specified shader stage
 //
 // @param stage : Shader stage
-void PipelineState::setShaderDefaultWaveSize(ShaderStage stage) {
-  ShaderStage checkingStage = stage;
+void PipelineState::setShaderDefaultWaveSize(ShaderStageEnum stage) {
+  ShaderStageEnum checkingStage = stage;
   const bool isGfx10Plus = getTargetInfo().getGfxIpVersion().major >= 10;
-  if (isGfx10Plus && stage == ShaderStageGeometry && !hasShaderStage(ShaderStageGeometry)) {
+  if (isGfx10Plus && stage == ShaderStage::Geometry && !hasShaderStage(ShaderStage::Geometry)) {
     // NOTE: For NGG, GS could be absent and VS/TES acts as part of it in the merged shader.
     // In such cases, we check the property of VS or TES.
-    checkingStage = hasShaderStage(ShaderStageTessEval) ? ShaderStageTessEval : ShaderStageVertex;
+    checkingStage = hasShaderStage(ShaderStage::TessEval) ? ShaderStage::TessEval : ShaderStage::Vertex;
   }
 
-  if (checkingStage == ShaderStageCompute)
+  if (checkingStage == ShaderStage::Compute)
     m_waveSize[checkingStage] = m_shaderModes.getComputeShaderMode().subgroupSize;
 
   if (!m_waveSize[checkingStage]) {
@@ -1454,10 +1458,10 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStage stage) {
       //  4) If gl_SubgroupSize is not used in the (mesh/task/compute) shader, and the workgroup size is
       //     not larger than 32, use wave size 32.
 
-      if (checkingStage == ShaderStageFragment) {
+      if (checkingStage == ShaderStage::Fragment) {
         // Per programming guide, it's recommended to use wave64 for fragment shader.
         waveSize = 64;
-      } else if (hasShaderStage(ShaderStageGeometry)) {
+      } else if (hasShaderStage(ShaderStage::Geometry)) {
         // Legacy (non-NGG) hardware path for GS does not support wave32.
         waveSize = 64;
         if (getTargetInfo().getGfxIpVersion().major >= 11)
@@ -1466,7 +1470,7 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStage stage) {
 
       // Experimental data from performance tuning show that wave64 is more efficient than wave32 in most cases for CS
       // on post-GFX10.3. Hence, set the wave size to wave64 by default.
-      if (getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3}) && stage == ShaderStageCompute)
+      if (getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3}) && stage == ShaderStage::Compute)
         waveSize = 64;
 
       // Prefer wave64 on GFX11+
@@ -1479,13 +1483,14 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStage stage) {
 
       // Note: the conditions below override the tuning option.
       // If workgroup size is not larger than 32, use wave size 32.
-      if (checkingStage == ShaderStageMesh || checkingStage == ShaderStageTask || checkingStage == ShaderStageCompute) {
+      if (checkingStage == ShaderStage::Mesh || checkingStage == ShaderStage::Task ||
+          checkingStage == ShaderStage::Compute) {
         unsigned workGroupSize;
-        if (checkingStage == ShaderStageMesh) {
+        if (checkingStage == ShaderStage::Mesh) {
           auto &mode = m_shaderModes.getMeshShaderMode();
           workGroupSize = mode.workgroupSizeX * mode.workgroupSizeY * mode.workgroupSizeZ;
         } else {
-          assert(checkingStage == ShaderStageTask || checkingStage == ShaderStageCompute);
+          assert(checkingStage == ShaderStage::Task || checkingStage == ShaderStage::Compute);
           auto &mode = m_shaderModes.getComputeShaderMode();
           workGroupSize = mode.workgroupSizeX * mode.workgroupSizeY * mode.workgroupSizeZ;
         }
@@ -1528,13 +1533,13 @@ void PipelineState::setShaderDefaultWaveSize(ShaderStage stage) {
 // Whether WGP mode is enabled for the given shader stage
 //
 // @param stage : Shader stage
-bool PipelineState::getShaderWgpMode(ShaderStage stage) const {
-  if (stage == ShaderStageCopyShader) {
+bool PipelineState::getShaderWgpMode(ShaderStageEnum stage) const {
+  if (stage == ShaderStage::CopyShader) {
     // Treat copy shader as part of geometry shader
-    stage = ShaderStageGeometry;
+    stage = ShaderStage::Geometry;
   }
 
-  assert(stage <= ShaderStageCompute);
+  assert(stage <= ShaderStage::Compute);
   assert(stage < m_shaderOptions.size());
 
   return m_shaderOptions[stage].wgpMode;
@@ -1567,13 +1572,13 @@ bool PipelineState::enableSwXfb() {
     return false;
 
   // Mesh pipeline doesn't support stream-out
-  if (hasShaderStage(ShaderStageTask) || hasShaderStage(ShaderStageMesh))
+  if (hasShaderStage(ShaderStage::Task) || hasShaderStage(ShaderStage::Mesh))
     return false;
 
   auto lastVertexStage = getLastVertexProcessingStage();
-  lastVertexStage = lastVertexStage == ShaderStageCopyShader ? ShaderStageGeometry : lastVertexStage;
+  lastVertexStage = lastVertexStage == ShaderStage::CopyShader ? ShaderStage::Geometry : lastVertexStage;
 
-  if (lastVertexStage == ShaderStageInvalid) {
+  if (lastVertexStage == ShaderStage::Invalid) {
     assert(isUnlinked()); // Unlinked pipeline only having fragment shader.
     return false;
   }
@@ -1585,9 +1590,9 @@ bool PipelineState::enableSwXfb() {
 // Gets resource usage of the specified shader stage
 //
 // @param shaderStage : Shader stage
-ResourceUsage *PipelineState::getShaderResourceUsage(ShaderStage shaderStage) {
-  if (shaderStage == ShaderStageCopyShader)
-    shaderStage = ShaderStageGeometry;
+ResourceUsage *PipelineState::getShaderResourceUsage(ShaderStageEnum shaderStage) {
+  if (shaderStage == ShaderStage::CopyShader)
+    shaderStage = ShaderStage::Geometry;
 
   auto &resUsage = MutableArrayRef<std::unique_ptr<ResourceUsage>>(m_resourceUsage)[shaderStage];
   if (!resUsage) {
@@ -1600,9 +1605,9 @@ ResourceUsage *PipelineState::getShaderResourceUsage(ShaderStage shaderStage) {
 // Gets interface data of the specified shader stage
 //
 // @param shaderStage : Shader stage
-InterfaceData *PipelineState::getShaderInterfaceData(ShaderStage shaderStage) {
-  if (shaderStage == ShaderStageCopyShader)
-    shaderStage = ShaderStageGeometry;
+InterfaceData *PipelineState::getShaderInterfaceData(ShaderStageEnum shaderStage) {
+  if (shaderStage == ShaderStage::CopyShader)
+    shaderStage = ShaderStage::Geometry;
 
   auto &intfData = MutableArrayRef<std::unique_ptr<InterfaceData>>(m_interfaceData)[shaderStage];
   if (!intfData) {
@@ -1760,7 +1765,7 @@ StringRef PipelineState::getBuiltInName(BuiltInKind builtIn) {
 bool PipelineState::canOptimizeTessFactor() {
   if (getTargetInfo().getGfxIpVersion().major < 11)
     return false;
-  auto resUsage = getShaderResourceUsage(ShaderStageTessControl);
+  auto resUsage = getShaderResourceUsage(ShaderStage::TessControl);
   auto &perPatchBuiltInOutLocMap = resUsage->inOutUsage.perPatchBuiltInOutputLocMap;
   // Disable tessellation factor optimization if TFs are read in TES or TCS
   if (perPatchBuiltInOutLocMap.count(BuiltInTessLevelOuter) || perPatchBuiltInOutLocMap.count(BuiltInTessLevelInner))
@@ -1775,33 +1780,33 @@ void PipelineState::initializeInOutPackState() {
   // If the pipeline is not unlinked, the state of input/output pack in specified shader stages is enabled
   if (!isUnlinked()) {
     // The generic input imports of {TCS, GS, FS} are packed by default
-    m_inputPackState[ShaderStageTessControl] = true;
-    m_inputPackState[ShaderStageGeometry] = true;
-    m_inputPackState[ShaderStageFragment] = true;
+    m_inputPackState[ShaderStage::TessControl] = true;
+    m_inputPackState[ShaderStage::Geometry] = true;
+    m_inputPackState[ShaderStage::Fragment] = true;
     // The generic output exports of {VS, TES, GS} are packed by default
-    m_outputPackState[ShaderStageVertex] = true;
-    m_outputPackState[ShaderStageTessEval] = true;
-    m_outputPackState[ShaderStageGeometry] = true;
+    m_outputPackState[ShaderStage::Vertex] = true;
+    m_outputPackState[ShaderStage::TessEval] = true;
+    m_outputPackState[ShaderStage::Geometry] = true;
 
     // NOTE: For mesh shader, we don't do in-out packing currently in that mesh shader could emit per-vertex outputs
     // and per-primitive outputs, which introduces additional complexity and this complexity increases with the
     // involvement of dynamic indexing.
-    if (hasShaderStage(ShaderStageMesh)) {
-      m_outputPackState[ShaderStageMesh] = false;
-      m_inputPackState[ShaderStageFragment] = false;
+    if (hasShaderStage(ShaderStage::Mesh)) {
+      m_outputPackState[ShaderStage::Mesh] = false;
+      m_inputPackState[ShaderStage::Fragment] = false;
     }
   } else {
     // For unlinked shaders, we can do in-out packing if the pipeline has two adjacent shaders.
     // We are assuming that if any of the vertex processing, then the vertex processing stages are complete.  For
     // example, if we see a vertex shader and geometry shader with no tessellation shaders, then we will assume we can
     // pack the vertex outputs and geometry inputs because no tessellation shader will be added later.
-    for (ShaderStage stage : lgc::enumRange(ShaderStage::ShaderStageGfxCount)) {
-      if ((m_stageMask & shaderStageToMask(stage)) == 0)
+    for (ShaderStageEnum stage : lgc::enumRange(ShaderStage::GfxCount)) {
+      if (!m_stageMask.contains(stage))
         continue;
-      if (stage == ShaderStageTessEval)
+      if (stage == ShaderStage::TessEval)
         continue;
-      ShaderStage preStage = getPrevShaderStage(stage);
-      if (preStage == ShaderStageInvalid)
+      ShaderStageEnum preStage = getPrevShaderStage(stage);
+      if (preStage == ShaderStage::Invalid)
         continue;
       m_inputPackState[stage] = true;
       m_outputPackState[preStage] = true;
@@ -1813,12 +1818,12 @@ void PipelineState::initializeInOutPackState() {
 // Get whether the input locations of the specified shader stage can be packed
 //
 // @param shaderStage : The given shader stage
-bool PipelineState::canPackInput(ShaderStage shaderStage) {
-  ShaderStage preStage = getPrevShaderStage(shaderStage);
+bool PipelineState::canPackInput(ShaderStageEnum shaderStage) {
+  ShaderStageEnum preStage = getPrevShaderStage(shaderStage);
   // The input packable state of the current stage should match the output packable state of the previous stage, except
   // that the current stage has no previous and it is a null FS.
-  if (preStage != ShaderStageInvalid &&
-      !(shaderStage == ShaderStageFragment && getShaderResourceUsage(shaderStage)->inOutUsage.fs.isNullFs))
+  if (preStage != ShaderStage::Invalid &&
+      !(shaderStage == ShaderStage::Fragment && getShaderResourceUsage(shaderStage)->inOutUsage.fs.isNullFs))
     assert(m_inputPackState[shaderStage] == m_outputPackState[preStage]);
   return m_inputPackState[shaderStage];
 }
@@ -1827,12 +1832,12 @@ bool PipelineState::canPackInput(ShaderStage shaderStage) {
 // Get whether the output locations of the specified shader stage can be packed
 //
 // @param shaderStage : The given shader stage
-bool PipelineState::canPackOutput(ShaderStage shaderStage) {
-  ShaderStage nextStage = getNextShaderStage(shaderStage);
+bool PipelineState::canPackOutput(ShaderStageEnum shaderStage) {
+  ShaderStageEnum nextStage = getNextShaderStage(shaderStage);
   // The output packable state of the current stage should match the input packable state of the next stage, except that
   // the current stage has no next stage or a null FS.
-  if (nextStage != ShaderStageInvalid &&
-      !(nextStage == ShaderStageFragment && getShaderResourceUsage(nextStage)->inOutUsage.fs.isNullFs))
+  if (nextStage != ShaderStage::Invalid &&
+      !(nextStage == ShaderStage::Fragment && getShaderResourceUsage(nextStage)->inOutUsage.fs.isNullFs))
     assert(m_outputPackState[shaderStage] == m_inputPackState[nextStage]);
   return m_outputPackState[shaderStage];
 }
@@ -1840,7 +1845,7 @@ bool PipelineState::canPackOutput(ShaderStage shaderStage) {
 // =====================================================================================================================
 // Get the count of vertices per primitive. For GS, the count is for output primitive.
 unsigned PipelineState::getVerticesPerPrimitive() {
-  if (hasShaderStage(ShaderStageGeometry)) {
+  if (hasShaderStage(ShaderStage::Geometry)) {
     const auto &geometryMode = getShaderModes()->getGeometryShaderMode();
     switch (geometryMode.outputPrimitive) {
     case OutputPrimitives::Points:
@@ -1853,7 +1858,7 @@ unsigned PipelineState::getVerticesPerPrimitive() {
       llvm_unreachable("Unexpected output primitive type!");
       return 0;
     }
-  } else if (hasShaderStage(ShaderStageTessControl) || hasShaderStage(ShaderStageTessEval)) {
+  } else if (hasShaderStage(ShaderStage::TessControl) || hasShaderStage(ShaderStage::TessEval)) {
     assert(getInputAssemblyState().primitiveType == PrimitiveType::Patch);
     const auto &tessMode = getShaderModes()->getTessellationMode();
     if (tessMode.pointMode)
@@ -1888,7 +1893,7 @@ unsigned PipelineState::getVerticesPerPrimitive() {
 // =====================================================================================================================
 // Get the primitive type. For GS, the type is for output primitive.
 PrimitiveType PipelineState::getPrimitiveType() {
-  if (hasShaderStage(ShaderStageGeometry)) {
+  if (hasShaderStage(ShaderStage::Geometry)) {
     const auto &geometryMode = getShaderModes()->getGeometryShaderMode();
     switch (geometryMode.outputPrimitive) {
     case OutputPrimitives::Points:
@@ -1900,7 +1905,7 @@ PrimitiveType PipelineState::getPrimitiveType() {
     default:
       llvm_unreachable("Unexpected output primitive type!");
     }
-  } else if (hasShaderStage(ShaderStageTessControl) || hasShaderStage(ShaderStageTessEval)) {
+  } else if (hasShaderStage(ShaderStage::TessControl) || hasShaderStage(ShaderStage::TessEval)) {
     assert(getInputAssemblyState().primitiveType == PrimitiveType::Patch);
     const auto &tessMode = getShaderModes()->getTessellationMode();
     if (tessMode.pointMode)

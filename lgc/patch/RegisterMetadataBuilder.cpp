@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2023-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -64,28 +64,28 @@ void RegisterMetadataBuilder::buildPalMetadata() {
     if (m_hasTask || m_hasMesh) {
       assert(m_pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion({10, 3}));
       if (m_hasMesh) {
-        apiHwShaderMap[ShaderStageMesh] = Util::Abi::HwShaderGs;
+        apiHwShaderMap[ShaderStage::Mesh] = Util::Abi::HwShaderGs;
         pipelineType = Util::Abi::PipelineType::Mesh;
       }
       if (m_hasTask) {
-        apiHwShaderMap[ShaderStageTask] = Util::Abi::HwShaderCs;
+        apiHwShaderMap[ShaderStage::Task] = Util::Abi::HwShaderCs;
         pipelineType = Util::Abi::PipelineType::TaskMesh;
       }
     } else {
       if (m_hasGs) {
-        auto preGsStage = m_pipelineState->getPrevShaderStage(ShaderStageGeometry);
-        if (preGsStage != ShaderStageInvalid)
+        auto preGsStage = m_pipelineState->getPrevShaderStage(ShaderStage::Geometry);
+        if (preGsStage != ShaderStage::Invalid)
           apiHwShaderMap[preGsStage] = Util::Abi::HwShaderGs;
       }
       if (m_hasTcs) {
-        apiHwShaderMap[ShaderStageTessControl] = Util::Abi::HwShaderHs;
+        apiHwShaderMap[ShaderStage::TessControl] = Util::Abi::HwShaderHs;
         if (m_hasVs)
-          apiHwShaderMap[ShaderStageVertex] = Util::Abi::HwShaderHs;
+          apiHwShaderMap[ShaderStage::Vertex] = Util::Abi::HwShaderHs;
       }
 
-      if (lastVertexProcessingStage != ShaderStageInvalid) {
-        if (lastVertexProcessingStage == ShaderStageCopyShader)
-          lastVertexProcessingStage = ShaderStageGeometry;
+      if (lastVertexProcessingStage != ShaderStage::Invalid) {
+        if (lastVertexProcessingStage == ShaderStage::CopyShader)
+          lastVertexProcessingStage = ShaderStage::Geometry;
         if (m_isNggMode) {
           apiHwShaderMap[lastVertexProcessingStage] = Util::Abi::HwShaderGs;
           pipelineType = hasTs ? Util::Abi::PipelineType::NggTess : Util::Abi::PipelineType::Ngg;
@@ -105,21 +105,21 @@ void RegisterMetadataBuilder::buildPalMetadata() {
         }
       }
     }
-    if (m_pipelineState->hasShaderStage(ShaderStageFragment))
-      apiHwShaderMap[ShaderStageFragment] = Util::Abi::HwShaderPs;
+    if (m_pipelineState->hasShaderStage(ShaderStage::Fragment))
+      apiHwShaderMap[ShaderStage::Fragment] = Util::Abi::HwShaderPs;
 
     // Set the mapping between api shader stage and hardware stage
     unsigned hwStageMask = 0;
     for (const auto &entry : apiHwShaderMap) {
-      const auto apiStage = static_cast<ShaderStage>(entry.first);
+      const auto apiStage = static_cast<ShaderStageEnum>(entry.first);
       hwStageMask |= entry.second;
       addApiHwShaderMapping(apiStage, entry.second);
     }
 
     if (hwStageMask & Util::Abi::HwShaderHs) {
       buildLsHsRegisters();
-      ShaderStage apiStage1 = m_hasVs ? ShaderStageVertex : ShaderStageInvalid;
-      ShaderStage apiStage2 = m_hasTcs ? ShaderStageTessControl : ShaderStageInvalid;
+      ShaderStageEnum apiStage1 = m_hasVs ? ShaderStage::Vertex : ShaderStage::Invalid;
+      ShaderStageEnum apiStage2 = m_hasTcs ? ShaderStage::TessControl : ShaderStage::Invalid;
       buildShaderExecutionRegisters(Util::Abi::HardwareStage::Hs, apiStage1, apiStage2);
     }
     if (hwStageMask & Util::Abi::HwShaderGs) {
@@ -128,39 +128,39 @@ void RegisterMetadataBuilder::buildPalMetadata() {
       else
         buildEsGsRegisters();
 
-      ShaderStage apiStage1 = ShaderStageInvalid;
-      ShaderStage apiStage2 = ShaderStageInvalid;
+      ShaderStageEnum apiStage1 = ShaderStage::Invalid;
+      ShaderStageEnum apiStage2 = ShaderStage::Invalid;
       if (m_hasMesh) {
-        apiStage1 = ShaderStageMesh;
+        apiStage1 = ShaderStage::Mesh;
       } else if (m_hasGs) {
-        apiStage2 = ShaderStageGeometry;
+        apiStage2 = ShaderStage::Geometry;
         if (m_hasTes)
-          apiStage1 = ShaderStageTessEval;
+          apiStage1 = ShaderStage::TessEval;
         else if (m_hasVs)
-          apiStage1 = ShaderStageVertex;
+          apiStage1 = ShaderStage::Vertex;
       } else if (m_hasTes) {
-        apiStage1 = ShaderStageTessEval;
+        apiStage1 = ShaderStage::TessEval;
       } else {
-        apiStage1 = ShaderStageVertex;
+        apiStage1 = ShaderStage::Vertex;
       }
       buildShaderExecutionRegisters(Util::Abi::HardwareStage::Gs, apiStage1, apiStage2);
     }
     if (!m_isNggMode && (hwStageMask & Util::Abi::HwShaderVs)) {
       buildHwVsRegisters();
-      ShaderStage apiStage1 = ShaderStageVertex;
-      if (m_pipelineState->hasShaderStage(ShaderStageCopyShader))
-        apiStage1 = ShaderStageCopyShader;
+      ShaderStageEnum apiStage1 = ShaderStage::Vertex;
+      if (m_pipelineState->hasShaderStage(ShaderStage::CopyShader))
+        apiStage1 = ShaderStage::CopyShader;
       else if (m_hasTes)
-        apiStage1 = ShaderStageTessEval;
-      buildShaderExecutionRegisters(Util::Abi::HardwareStage::Vs, apiStage1, ShaderStageInvalid);
+        apiStage1 = ShaderStage::TessEval;
+      buildShaderExecutionRegisters(Util::Abi::HardwareStage::Vs, apiStage1, ShaderStage::Invalid);
     }
     if (hwStageMask & Util::Abi::HwShaderPs) {
       buildPsRegisters();
-      buildShaderExecutionRegisters(Util::Abi::HardwareStage::Ps, ShaderStageFragment, ShaderStageInvalid);
+      buildShaderExecutionRegisters(Util::Abi::HardwareStage::Ps, ShaderStage::Fragment, ShaderStage::Invalid);
     }
     if (hwStageMask & Util::Abi::HwShaderCs) {
-      buildCsRegisters(ShaderStageTask);
-      buildShaderExecutionRegisters(Util::Abi::HardwareStage::Cs, ShaderStageTask, ShaderStageInvalid);
+      buildCsRegisters(ShaderStage::Task);
+      buildShaderExecutionRegisters(Util::Abi::HardwareStage::Cs, ShaderStage::Task, ShaderStage::Invalid);
     }
 
     // Set other registers if it is not a single PS or CS
@@ -173,7 +173,7 @@ void RegisterMetadataBuilder::buildPalMetadata() {
     if (hwStageMask & (Util::Abi::HwShaderGs | Util::Abi::HwShaderVs))
       buildPaSpecificRegisters();
 
-    if (lastVertexProcessingStage != ShaderStageInvalid && m_pipelineState->isUnlinked()) {
+    if (lastVertexProcessingStage != ShaderStage::Invalid && m_pipelineState->isUnlinked()) {
       // Fill ".preraster_output_semantic"
       auto resUsage = m_pipelineState->getShaderResourceUsage(lastVertexProcessingStage);
       auto &outputLocInfoMap = resUsage->inOutUsage.outputLocInfoMap;
@@ -207,10 +207,10 @@ void RegisterMetadataBuilder::buildPalMetadata() {
     }
 
   } else {
-    addApiHwShaderMapping(ShaderStageCompute, Util::Abi::HwShaderCs);
+    addApiHwShaderMapping(ShaderStage::Compute, Util::Abi::HwShaderCs);
     setPipelineType(Util::Abi::PipelineType::Cs);
-    buildCsRegisters(ShaderStageCompute);
-    buildShaderExecutionRegisters(Util::Abi::HardwareStage::Cs, ShaderStageCompute, ShaderStageInvalid);
+    buildCsRegisters(ShaderStage::Compute);
+    buildShaderExecutionRegisters(Util::Abi::HardwareStage::Cs, ShaderStage::Compute, ShaderStage::Invalid);
   }
 }
 
@@ -226,7 +226,7 @@ void RegisterMetadataBuilder::buildLsHsRegisters() {
   getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtHosMaxTessLevel] = maxTessFactor;
 
   // VGT_LS_HS_CONFIG
-  const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
+  const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.calcFactor;
   auto vgtLsHsConfig = getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VgtLsHsConfig].getMap(true);
   vgtLsHsConfig[Util::Abi::VgtLsHsConfigMetadataKey::NumPatches] = calcFactor.patchCountPerThreadGroup;
   vgtLsHsConfig[Util::Abi::VgtLsHsConfigMetadataKey::HsNumInputCp] = m_pipelineState->getNumPatchControlPoints();
@@ -237,7 +237,7 @@ void RegisterMetadataBuilder::buildLsHsRegisters() {
   setVgtTfParam();
 
   // LS_VGPR_COMP_CNT in SPI_SHADER_PGM_RSRC1_HS
-  const auto &vsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
+  const auto &vsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Vertex)->builtInUsage.vs;
   unsigned lsVgprCompCnt = 0;
   if (m_gfxIp.major <= 11) {
     if (vsBuiltInUsage.instanceIndex)
@@ -265,13 +265,13 @@ void RegisterMetadataBuilder::buildLsHsRegisters() {
 // =====================================================================================================================
 // Builds register configuration for hardware export-geometry merged shader.
 void RegisterMetadataBuilder::buildEsGsRegisters() {
-  const auto vsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
+  const auto vsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Vertex);
   const auto &vsBuiltInUsage = vsResUsage->builtInUsage.vs;
-  const auto gsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
+  const auto gsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry);
   const auto &gsBuiltInUsage = gsResUsage->builtInUsage.gs;
   const auto &gsInOutUsage = gsResUsage->inOutUsage;
   const auto &calcFactor = gsInOutUsage.gs.calcFactor;
-  const auto tesResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessEval);
+  const auto tesResUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessEval);
   const auto &tesBuiltInUsage = tesResUsage->builtInUsage.tes;
   const bool hasTs = m_hasTcs || m_hasTes;
 
@@ -408,16 +408,16 @@ void RegisterMetadataBuilder::buildEsGsRegisters() {
 // Builds register configuration for hardware primitive shader.
 void RegisterMetadataBuilder::buildPrimShaderRegisters() {
   assert(m_gfxIp.major >= 10 || (m_hasMesh && m_gfxIp >= GfxIpVersion({10, 3})));
-  const auto vsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
+  const auto vsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Vertex);
   const auto &vsBuiltInUsage = vsResUsage->builtInUsage.vs;
-  const auto tesResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessEval);
+  const auto tesResUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessEval);
   const auto &tesBuiltInUsage = tesResUsage->builtInUsage.tes;
-  const auto gsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
+  const auto gsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry);
   const auto &gsBuiltInUsage = gsResUsage->builtInUsage.gs;
   const auto &geometryMode = m_pipelineState->getShaderModes()->getGeometryShaderMode();
   const auto &gsInOutUsage = gsResUsage->inOutUsage;
   const auto &calcFactor = gsInOutUsage.gs.calcFactor;
-  const auto meshResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh);
+  const auto meshResUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh);
   const auto &meshBuiltInUsage = meshResUsage->builtInUsage.mesh;
   const auto &meshMode = m_pipelineState->getShaderModes()->getMeshShaderMode();
   const bool hasTs = m_hasTcs || m_hasTes;
@@ -575,7 +575,7 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
     bool meshLinearDispatchFromTask = false;
     if (m_hasTask) {
       meshLinearDispatchFromTask =
-          m_pipelineState->getShaderResourceUsage(ShaderStageTask)->builtInUsage.task.meshLinearDispatch;
+          m_pipelineState->getShaderResourceUsage(ShaderStage::Task)->builtInUsage.task.meshLinearDispatch;
     }
     getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::MeshLinearDispatchFromTask] =
         meshLinearDispatchFromTask;
@@ -677,13 +677,13 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
 // =====================================================================================================================
 // Builds register configuration for hardware vertex shader.
 void RegisterMetadataBuilder::buildHwVsRegisters() {
-  assert(m_hasVs || m_hasTes || m_pipelineState->hasShaderStage(ShaderStageCopyShader));
+  assert(m_hasVs || m_hasTes || m_pipelineState->hasShaderStage(ShaderStage::CopyShader));
   assert(m_gfxIp.major <= 10);
-  ShaderStage shaderStage = ShaderStageVertex;
-  if (m_pipelineState->hasShaderStage(ShaderStageCopyShader))
-    shaderStage = ShaderStageCopyShader;
+  ShaderStageEnum shaderStage = ShaderStage::Vertex;
+  if (m_pipelineState->hasShaderStage(ShaderStage::CopyShader))
+    shaderStage = ShaderStage::CopyShader;
   else if (m_hasTes)
-    shaderStage = ShaderStageTessEval;
+    shaderStage = ShaderStage::TessEval;
 
   const auto resUsage = m_pipelineState->getShaderResourceUsage(shaderStage);
   const auto &builtInUsage = resUsage->builtInUsage;
@@ -699,7 +699,7 @@ void RegisterMetadataBuilder::buildHwVsRegisters() {
   vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::Streamout_1En] = enablePrimStats || streamXfbBuffers[1] > 0;
   vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::Streamout_2En] = enablePrimStats || streamXfbBuffers[2] > 0;
   vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::Streamout_3En] = enablePrimStats || streamXfbBuffers[3] > 0;
-  if (shaderStage == ShaderStageCopyShader)
+  if (shaderStage == ShaderStage::CopyShader)
     vgtStrmoutConfig[Util::Abi::VgtStrmoutConfigMetadataKey::RastStream] =
         m_pipelineState->getRasterizerState().rasterStream;
 
@@ -728,12 +728,12 @@ void RegisterMetadataBuilder::buildHwVsRegisters() {
   vgtStrmoutBufferConfig[Util::Abi::VgtStrmoutBufferConfigMetadataKey::Stream_3BufferEn] = streamXfbBuffers[3];
 
   // VGPR_COMP_CNT
-  if (shaderStage == ShaderStageVertex) {
+  if (shaderStage == ShaderStage::Vertex) {
     if (builtInUsage.vs.instanceIndex)
       getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VsVgprCompCnt] = 3; // 3: Enable instance ID
     else if (builtInUsage.vs.primitiveId)
       getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VsVgprCompCnt] = 2;
-  } else if (shaderStage == ShaderStageTessEval) {
+  } else if (shaderStage == ShaderStage::TessEval) {
     if (builtInUsage.tes.primitiveId)
       getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::VsVgprCompCnt] = 3; // 3: Enable primitive ID
     else
@@ -746,7 +746,7 @@ void RegisterMetadataBuilder::buildHwVsRegisters() {
 // =====================================================================================================================
 // Builds register configuration for hardware pixel shader.
 void RegisterMetadataBuilder::buildPsRegisters() {
-  ShaderStage shaderStage = ShaderStageFragment;
+  ShaderStageEnum shaderStage = ShaderStage::Fragment;
   const auto &options = m_pipelineState->getOptions();
   const auto &shaderOptions = m_pipelineState->getShaderOptions(shaderStage);
   const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
@@ -867,7 +867,7 @@ void RegisterMetadataBuilder::buildPsRegisters() {
       // PRIM_EXPORT_COUNT. When VS_EXPORT_COUNT = 0, HW assumes there is still a vertex attribute exported even
       // though this is not what we want. Hence, we should reserve param0 as a dummy vertex attribute and all
       // primitive attributes are moved after it.
-      bool hasNoVertexAttrib = m_pipelineState->getShaderResourceUsage(ShaderStageMesh)->inOutUsage.expCount == 0;
+      bool hasNoVertexAttrib = m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh)->inOutUsage.expCount == 0;
       if (hasNoVertexAttrib)
         ++spiPsInputCntlInfo.offset;
       spiPsInputCntlInfo.primAttr = true;
@@ -975,9 +975,9 @@ void RegisterMetadataBuilder::buildPsRegisters() {
 
 // =====================================================================================================================
 // Builds register configuration for compute/task shader.
-void RegisterMetadataBuilder::buildCsRegisters(ShaderStage shaderStage) {
-  assert(shaderStage == ShaderStageCompute || shaderStage == ShaderStageTask);
-  if (shaderStage == ShaderStageCompute) {
+void RegisterMetadataBuilder::buildCsRegisters(ShaderStageEnum shaderStage) {
+  assert(shaderStage == ShaderStage::Compute || shaderStage == ShaderStage::Task);
+  if (shaderStage == ShaderStage::Compute) {
     Function *entryFunc = nullptr;
     for (Function &func : *m_module) {
       // Only entrypoint compute shader may have the function attribute for workgroup id optimization.
@@ -1003,7 +1003,7 @@ void RegisterMetadataBuilder::buildCsRegisters(ShaderStage shaderStage) {
   const auto &computeMode = m_pipelineState->getShaderModes()->getComputeShaderMode();
 
   unsigned workgroupSizes[3] = {};
-  if (shaderStage == ShaderStageCompute) {
+  if (shaderStage == ShaderStage::Compute) {
     const auto &builtInUsage = resUsage->builtInUsage.cs;
     if (builtInUsage.foldWorkgroupXY) {
       workgroupSizes[0] = computeMode.workgroupSizeX * computeMode.workgroupSizeY;
@@ -1015,7 +1015,7 @@ void RegisterMetadataBuilder::buildCsRegisters(ShaderStage shaderStage) {
       workgroupSizes[2] = computeMode.workgroupSizeZ;
     }
   } else {
-    assert(shaderStage == ShaderStageTask);
+    assert(shaderStage == ShaderStage::Task);
     workgroupSizes[0] = computeMode.workgroupSizeX;
     workgroupSizes[1] = computeMode.workgroupSizeY;
     workgroupSizes[2] = computeMode.workgroupSizeZ;
@@ -1038,11 +1038,11 @@ void RegisterMetadataBuilder::buildCsRegisters(ShaderStage shaderStage) {
 // @param hwStage: The hardware shader stage
 // @param apiStage1: The first api shader stage
 // @param apiStage2: The second api shader stage
-void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareStage hwStage, ShaderStage apiStage1,
-                                                            ShaderStage apiStage2) {
+void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareStage hwStage, ShaderStageEnum apiStage1,
+                                                            ShaderStageEnum apiStage2) {
   // Set hardware stage metadata
   auto hwShaderNode = getHwShaderNode(hwStage);
-  ShaderStage apiStage = apiStage2 != ShaderStageInvalid ? apiStage2 : apiStage1;
+  ShaderStageEnum apiStage = apiStage2 != ShaderStage::Invalid ? apiStage2 : apiStage1;
 
   if (m_isNggMode || m_gfxIp.major >= 10) {
     const unsigned waveSize = m_pipelineState->getShaderWaveSize(apiStage);
@@ -1050,9 +1050,9 @@ void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareS
   }
 
   unsigned checksum = 0;
-  if (apiStage1 != ShaderStageInvalid && apiStage1 != ShaderStageCopyShader)
+  if (apiStage1 != ShaderStage::Invalid && apiStage1 != ShaderStage::CopyShader)
     checksum = setShaderHash(apiStage1);
-  if (apiStage2 != ShaderStageInvalid)
+  if (apiStage2 != ShaderStage::Invalid)
     checksum ^= setShaderHash(apiStage2);
   if (m_pipelineState->getTargetInfo().getGpuProperty().supportShaderPowerProfiling)
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::ChecksumValue] = checksum;
@@ -1062,15 +1062,15 @@ void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareS
   unsigned userDataCount = 0;
   unsigned sgprLimits = 0;
   unsigned vgprLimits = 0;
-  if (apiStage1 == ShaderStageCopyShader) {
+  if (apiStage1 == ShaderStage::CopyShader) {
     userDataCount = lgc::CopyShaderUserSgprCount;
     sgprLimits = m_pipelineState->getTargetInfo().getGpuProperty().maxSgprsAvailable;
     vgprLimits = m_pipelineState->getTargetInfo().getGpuProperty().maxVgprsAvailable;
   } else {
     userDataCount = 0;
-    if (apiStage1 != ShaderStageInvalid)
+    if (apiStage1 != ShaderStage::Invalid)
       userDataCount = m_pipelineState->getShaderInterfaceData(apiStage1)->userDataCount;
-    if (apiStage2 != ShaderStageInvalid) {
+    if (apiStage2 != ShaderStage::Invalid) {
       userDataCount = std::max(userDataCount, m_pipelineState->getShaderInterfaceData(apiStage2)->userDataCount);
     }
 
@@ -1087,9 +1087,9 @@ void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareS
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::MemOrdered] = true;
     if (hwStage == Util::Abi::HardwareStage::Hs || hwStage == Util::Abi::HardwareStage::Gs) {
       bool wgpMode = false;
-      if (apiStage1 != ShaderStageInvalid)
+      if (apiStage1 != ShaderStage::Invalid)
         wgpMode = m_pipelineState->getShaderWgpMode(apiStage1);
-      if (apiStage2 != ShaderStageInvalid)
+      if (apiStage2 != ShaderStage::Invalid)
         wgpMode = wgpMode || m_pipelineState->getShaderWgpMode(apiStage2);
       hwShaderNode[Util::Abi::HardwareStageMetadataKey::WgpMode] = wgpMode;
     }
@@ -1100,9 +1100,9 @@ void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareS
 
   if (m_gfxIp.major >= 11 && hwStage != Util::Abi::HardwareStage::Vs) {
     bool useImageOp = false;
-    if (apiStage1 != ShaderStageInvalid)
+    if (apiStage1 != ShaderStage::Invalid)
       useImageOp = m_pipelineState->getShaderResourceUsage(apiStage1)->useImageOp;
-    if (apiStage2 != ShaderStageInvalid)
+    if (apiStage2 != ShaderStage::Invalid)
       useImageOp |= m_pipelineState->getShaderResourceUsage(apiStage2)->useImageOp;
     hwShaderNode[Util::Abi::HardwareStageMetadataKey::ImageOp] = useImageOp;
   }
@@ -1122,10 +1122,10 @@ void RegisterMetadataBuilder::buildShaderExecutionRegisters(Util::Abi::HardwareS
 // =====================================================================================================================
 // Build PA-specific (primitive assembler) registers.
 void RegisterMetadataBuilder::buildPaSpecificRegisters() {
-  const bool hasTs =
-      m_pipelineState->hasShaderStage(ShaderStageTessControl) || m_pipelineState->hasShaderStage(ShaderStageTessEval);
+  const bool hasTs = m_pipelineState->hasShaderStage(ShaderStage::TessControl) ||
+                     m_pipelineState->hasShaderStage(ShaderStage::TessEval);
   const bool meshPipeline =
-      m_pipelineState->hasShaderStage(ShaderStageTask) || m_pipelineState->hasShaderStage(ShaderStageMesh);
+      m_pipelineState->hasShaderStage(ShaderStage::Task) || m_pipelineState->hasShaderStage(ShaderStage::Mesh);
 
   // VGT_PRIMITIVEID_EN
   // Stage-specific processing
@@ -1144,7 +1144,7 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
     // Mesh pipeline
     assert(m_gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
 
-    const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageMesh);
+    const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh);
     const auto &builtInUsage = resUsage->builtInUsage.mesh;
 
     usePointSize = builtInUsage.pointSize;
@@ -1160,7 +1160,7 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
     bool usePrimitiveId = false;
 
     if (m_hasGs) {
-      const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
+      const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry);
       const auto &builtInUsage = resUsage->builtInUsage.gs;
 
       usePointSize = builtInUsage.pointSize;
@@ -1175,14 +1175,14 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
 
       // NOTE: For ES-GS merged shader, the actual use of primitive ID should take both ES and GS into consideration.
       if (hasTs) {
-        const auto &tesBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes;
+        const auto &tesBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessEval)->builtInUsage.tes;
         usePrimitiveId = usePrimitiveId || tesBuiltInUsage.primitiveId;
       } else {
-        const auto &vsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
+        const auto &vsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Vertex)->builtInUsage.vs;
         usePrimitiveId = usePrimitiveId || vsBuiltInUsage.primitiveId;
       }
     } else if (hasTs) {
-      const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessEval);
+      const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessEval);
       const auto &builtInUsage = resUsage->builtInUsage.tes;
 
       usePointSize = builtInUsage.pointSize;
@@ -1193,7 +1193,7 @@ void RegisterMetadataBuilder::buildPaSpecificRegisters() {
 
       expCount = resUsage->inOutUsage.expCount;
     } else {
-      const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
+      const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Vertex);
       const auto &builtInUsage = resUsage->builtInUsage.vs;
 
       usePointSize = builtInUsage.pointSize;
@@ -1410,13 +1410,13 @@ void RegisterMetadataBuilder::setVgtShaderStagesEn(unsigned hwStageMask) {
 
   if (hwStageMask & Util::Abi::HwShaderVs) {
     assert(m_gfxIp.major < 11);
-    ShaderStage apiStage = ShaderStageVertex;
+    ShaderStageEnum apiStage = ShaderStage::Vertex;
     unsigned vsStageEn = VS_STAGE_REAL;
-    if (m_pipelineState->hasShaderStage(ShaderStageCopyShader)) {
-      apiStage = ShaderStageCopyShader;
+    if (m_pipelineState->hasShaderStage(ShaderStage::CopyShader)) {
+      apiStage = ShaderStage::CopyShader;
       vsStageEn = VS_STAGE_COPY_SHADER;
     } else if (m_hasTes) {
-      apiStage = ShaderStageTessEval;
+      apiStage = ShaderStage::TessEval;
       vsStageEn = VS_STAGE_DS;
     }
     const auto waveSize = m_pipelineState->getShaderWaveSize(apiStage);
@@ -1426,12 +1426,12 @@ void RegisterMetadataBuilder::setVgtShaderStagesEn(unsigned hwStageMask) {
   }
 
   if (hwStageMask & Util::Abi::HwShaderGs) {
-    ShaderStage apiStage = ShaderStageVertex;
+    ShaderStageEnum apiStage = ShaderStage::Vertex;
     if (m_hasGs || m_hasMesh) {
-      apiStage = m_hasGs ? ShaderStageGeometry : ShaderStageMesh;
+      apiStage = m_hasGs ? ShaderStage::Geometry : ShaderStage::Mesh;
       vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::GsStageEn] = GS_STAGE_ON;
     } else if (m_hasTes) {
-      apiStage = ShaderStageTessEval;
+      apiStage = ShaderStage::TessEval;
     }
     const auto waveSize = m_pipelineState->getShaderWaveSize(apiStage);
     vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::GsW32En] = (waveSize == 32);
@@ -1444,7 +1444,7 @@ void RegisterMetadataBuilder::setVgtShaderStagesEn(unsigned hwStageMask) {
   }
 
   if (hwStageMask & Util::Abi::HwShaderHs) {
-    const auto waveSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
+    const auto waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::TessControl);
     vgtShaderStagesEn[Util::Abi::VgtShaderStagesEnMetadataKey::HsW32En] = (waveSize == 32);
 
     if (m_gfxIp.major <= 11)
@@ -1459,16 +1459,16 @@ void RegisterMetadataBuilder::setIaMultVgtParam() {
   if (m_hasTcs || m_hasTes) {
     // With tessellation, SWITCH_ON_EOI and PARTIAL_ES_WAVE_ON must be set if primitive ID is used by either the TCS,
     // TES, or GS.
-    const auto &tcsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->builtInUsage.tcs;
+    const auto &tcsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->builtInUsage.tcs;
     bool usePrimitiveId = tcsBuiltInUsage.primitiveId;
     bool needWaveOnField = false;
     if (m_hasTes && !m_isNggMode) {
-      const auto &tesBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes;
+      const auto &tesBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessEval)->builtInUsage.tes;
       usePrimitiveId = tesBuiltInUsage.primitiveId;
       needWaveOnField = true;
     }
     if (m_hasGs) {
-      const auto &gsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
+      const auto &gsBuiltInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->builtInUsage.gs;
       usePrimitiveId = gsBuiltInUsage.primitiveId;
     }
 

@@ -41,7 +41,7 @@ void main()
 
 // SHADERTEST-LABEL: @lgc.shader.FS.main(
 // SHADERTEST-NEXT:  .entry:
-// SHADERTEST-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i64 0, i32 0, i32 0, i32 2)
+// SHADERTEST-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 2)
 // SHADERTEST-NEXT:    [[TMP1:%.*]] = load <4 x float>, ptr addrspace(7) [[TMP0]], align 16
 // SHADERTEST-NEXT:    [[TMP2:%.*]] = shufflevector <4 x float> [[TMP1]], <4 x float> poison, <2 x i32> <i32 0, i32 poison>
 // SHADERTEST-NEXT:    [[TMP3:%.*]] = fptrunc <2 x float> [[TMP2]] to <2 x half>

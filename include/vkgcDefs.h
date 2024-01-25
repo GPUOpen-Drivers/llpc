@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -78,6 +78,7 @@ namespace Vkgc {
 static const unsigned Version = LLPC_INTERFACE_MAJOR_VERSION;
 static const unsigned InternalDescriptorSetId = static_cast<unsigned>(-1);
 static const unsigned MaxVertexAttribs = 64;
+static const unsigned MaxVertexBindings = 64;
 static const unsigned MaxColorTargets = 8;
 static const unsigned MaxFetchShaderInternalBufferSize = 16 * MaxVertexAttribs;
 
@@ -473,6 +474,7 @@ struct PipelineOptions {
                                           ///  loading it from userdata
   unsigned reserved20;
   bool enablePrimGeneratedQuery; ///< If set, primitive generated query is enabled
+  bool disablePerCompFetch;      ///< Disable per component fetch in uber fetch shader.
 };
 
 /// Prototype of allocator for output data buffer, used in shader-specific operations.
@@ -498,6 +500,7 @@ struct ResourceNodeData {
   bool mergedLocationBinding;       ///< TRUE if location and binding are merged in spirv binary
   unsigned isTexelBuffer;           ///< TRUE if it is ImageBuffer or TextureBuffer
   unsigned isDefaultUniformSampler; ///< TRUE if it's sampler image in default uniform struct
+  unsigned columnCount;             ///< Column count if this is a matrix variable.
   BasicType basicType;              ///< Type of the variable or element
 };
 
@@ -548,7 +551,11 @@ struct ShaderModuleUsage {
   bool usePointSize;           ///< Whether gl_PointSize is used in output
   bool useShadingRate;         ///< Whether shading rate is used
   bool useSampleInfo;          ///< Whether gl_SamplePosition or InterpolateAtSample are used
-  bool useClipVertex;          ///< Whether gl_useClipVertex is used
+  bool useClipVertex;          ///< Whether gl_ClipVertex is used
+  bool useFrontColor;          ///< Whether gl_FrontColor is used
+  bool useBackColor;           ///< Whether gl_BackColor is used
+  bool useFrontSecondaryColor; ///< Whether gl_FrontSecondaryColor is used
+  bool useBackSecondaryColor;  ///< Whether gl_BackSecondaryColor is used
   ResourcesNodes *pResources;  ///< Resource node for buffers and opaque types
   bool useFragCoord;           ///< Whether gl_FragCoord is used
   bool originUpperLeft;        ///< Whether pixel origin is upper-left
@@ -1063,6 +1070,12 @@ enum CpsFlag : unsigned {
   CpsFlagStackInGlobalMem = 1 << 0, // Put stack in global memory instead of scratch.
 };
 
+enum class LibraryMode : unsigned {
+  Any,      //< Compiler output can be used as both a pipeline and a library
+  Pipeline, //< Compiler output can be used only as a completed pipeline
+  Library,  //< Compiler output can only be used as a library
+};
+
 /// RayTracing state
 struct RtState {
   unsigned nodeStrideShift;               ///< Ray tracing BVH node stride
@@ -1242,6 +1255,8 @@ struct GraphicsPipelineBuildInfo {
   unsigned numUniformConstantMaps;    ///< Number of uniform constant maps
   UniformConstantMap **ppUniformMaps; ///< Pointers to array of pointers for the uniform constant map.
   ApiXfbOutData apiXfbOutData;        ///< Transform feedback data specified by API interface.
+  bool vbAddressLowBitsKnown;         ///< Whether vbAddressLowBits is valid
+  uint8_t vbAddressLowBits[MaxVertexBindings]; ///< Lowest two bits of vertex buffer addresses
 };
 
 /// Represents info to build a compute pipeline.
@@ -1283,18 +1298,25 @@ struct RayTracingPipelineBuildInfo {
   uint64_t pipelineLayoutApiHash;                            ///< Pipeline Layout Api Hash
   unsigned shaderGroupCount;                                 ///< Count of shader group
   const VkRayTracingShaderGroupCreateInfoKHR *pShaderGroups; ///< An array of shader group
+  LibraryMode libraryMode;                                   ///< Whether to compile as pipeline or library or both
+  unsigned libraryCount;                                     ///< Count of libraries linked into this build
+  const BinaryData *pLibrarySummaries;                       ///< MsgPack summaries of libraries linked into this build
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   BinaryData shaderTraceRay; ///< Trace-ray SPIR-V binary data
 #endif
-  PipelineOptions options;        ///< Per pipeline tuning options
-  unsigned maxRecursionDepth;     ///< Ray tracing max recursion depth
-  unsigned indirectStageMask;     ///< Ray tracing indirect stage mask
-  LlpcRaytracingMode mode;        ///< Ray tracing compiling mode
-  RtState rtState;                ///< Ray tracing state
+  PipelineOptions options;    ///< Per pipeline tuning options
+  unsigned maxRecursionDepth; ///< Ray tracing max recursion depth
+  unsigned indirectStageMask; ///< Ray tracing indirect stage mask
+  LlpcRaytracingMode mode;    ///< Ray tracing compiling mode
+  RtState rtState;            ///< Ray tracing state
+  // These pipeline library fields are superseded by the pLibrarySummaries when available.
+  //@{
+  bool hasPipelineLibrary;       ///< Whether include pipeline library
+  unsigned pipelineLibStageMask; ///< Pipeline library stage mask
+  //@}
+
   unsigned payloadSizeMaxInLib;   ///< Pipeline library maxPayloadSize
   unsigned attributeSizeMaxInLib; ///< Pipeline library maxAttributeSize
-  bool hasPipelineLibrary;        ///< Whether include pipeline library
-  unsigned pipelineLibStageMask;  ///< Pipeline library stage mask
   bool isReplay;                  ///< Pipeline is created for replaying
   const void *pClientMetadata;    ///< Pointer to (optional) client-defined data to be
                                   ///  stored inside the ELF
@@ -1501,6 +1523,12 @@ public:
   /// @param [in]  dumpFile      The handle of pipeline dump file
   /// @param [in]  pipelineMeta   Ray tracing pipeline metadata binary
   static void VKAPI_CALL DumpRayTracingPipelineMetadata(void *dumpFile, BinaryData *pipelineMeta);
+
+  /// Dumps ray tracing library summary.
+  ///
+  /// @param [in]  dumpFile       The handle of pipeline dump file
+  /// @param [in]  librarySummary Ray tracing library summary binary
+  static void VKAPI_CALL DumpRayTracingLibrarySummary(void *dumpFile, BinaryData *librarySummary);
 };
 
 // =====================================================================================================================

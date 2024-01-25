@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -102,7 +102,8 @@ Module *FetchShader::generate() {
 // @param [in/out] fetchFunc : The function for the fetch shader.
 void FetchShader::generateFetchShaderBody(Function *fetchFunc) { // Process each vertex input.
   std::unique_ptr<VertexFetch> vertexFetch(
-      VertexFetch::create(m_lgcContext, m_pipelineState->getOptions().useSoftwareVertexBufferDescriptors));
+      VertexFetch::create(m_lgcContext, m_pipelineState->getOptions().useSoftwareVertexBufferDescriptors,
+                          m_pipelineState->getOptions().vbAddressLowBitsKnown));
   auto ret = cast<ReturnInst>(fetchFunc->back().getTerminator());
   BuilderImpl builder(m_pipelineState);
   builder.SetInsertPoint(ret);
@@ -151,7 +152,7 @@ void FetchShader::replaceShaderInputBuiltInFunctions(Function *fetchFunc) const 
   for (Function &func : *fetchFunc->getParent()) {
     if (!func.isDeclaration())
       continue;
-    if (func.getName().startswith(lgcName::SpecialUserData) || func.getName().startswith(lgcName::ShaderInput)) {
+    if (func.getName().starts_with(lgcName::SpecialUserData) || func.getName().starts_with(lgcName::ShaderInput)) {
       while (!func.use_empty()) {
         auto call = cast<CallInst>(func.use_begin()->getUser());
         Value *replacement = nullptr;
@@ -313,7 +314,7 @@ Function *FetchShader::createFetchFunc() {
   func->getArg(m_vsEntryRegInfo.sgprCount + m_vsEntryRegInfo.vertexId)->setName("VertexId");
   func->getArg(m_vsEntryRegInfo.sgprCount + m_vsEntryRegInfo.instanceId)->setName("InstanceId");
 
-  setShaderStage(func, ShaderStageVertex);
+  setShaderStage(func, ShaderStage::Vertex);
 
   BasicBlock *block = BasicBlock::Create(func->getContext(), "", func);
   BuilderBase builder(block);
@@ -336,7 +337,7 @@ Function *FetchShader::createFetchFunc() {
 
   AttrBuilder attribBuilder(func->getContext());
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10) {
-    const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageVertex);
+    const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Vertex);
     attribBuilder.addAttribute("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
   }
   func->addFnAttrs(attribBuilder);

@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -169,6 +169,9 @@ enum RayHitStatus : unsigned {
   AcceptAndEndSearch = 2, // Accept hit and end traversal
 };
 
+constexpr unsigned SqttWellKnownTypeFunctionCallCompact = 0x11;
+constexpr unsigned SqttWellKnownTypeFunctionReturn = 0x10;
+
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering ray tracing.
 class SpirvLowerRayTracing : public SpirvLowerRayQuery {
@@ -196,25 +199,23 @@ private:
   void createSetTriangleInsection(llvm::Function *func);
   void createShaderSelection(llvm::Function *func, llvm::BasicBlock *entryBlock, llvm::BasicBlock *endBlock,
                              llvm::Value *shaderId, unsigned intersectId, ShaderStage stage,
-                             const llvm::SmallVector<llvm::Value *, 8> &args, llvm::Value *result,
-                             llvm::Type *inResultTy);
+                             llvm::ArrayRef<llvm::Value *> args, llvm::Value *result, llvm::Type *inResultTy);
   llvm::Value *loadShaderTableVariable(ShaderTable tableKind, llvm::Value *bufferDesc);
   llvm::Value *getShaderIdentifier(ShaderStage stage, llvm::Value *shaderRecordIndex, llvm::Value *bufferDesc);
   void createDbgInfo(llvm::Module &module, llvm::Function *func);
   void processTerminalFunc(llvm::Function *func, llvm::CallInst *inst, RayHitStatus hitStatus);
-  void processPostReportIntersection(llvm::Function *func, llvm::Instruction *inst);
   void initTraceParamsTy(unsigned attributeSize);
   void initShaderBuiltIns();
   void inlineTraceRay(llvm::CallInst *callInst, ModuleAnalysisManager &analysisManager);
   llvm::Instruction *createEntryFunc(llvm::Function *func);
   void createEntryTerminator(llvm::Function *func);
-  llvm::FunctionType *getShaderEntryFuncTy(ShaderStage stage);
-  llvm::FunctionType *getCallableShaderEntryFuncTy();
+  llvm::FunctionType *getShaderEntryFuncTy(ShaderStage stage, llvm::SmallVectorImpl<llvm::StringRef> &argNames);
+  llvm::FunctionType *getCallableShaderEntryFuncTy(llvm::SmallVectorImpl<llvm::StringRef> &argNames);
   llvm::FunctionType *getTraceRayFuncTy();
   void createDispatchRaysInfoDesc();
   llvm::Instruction *createCallableShaderEntryFunc(llvm::Function *func);
   void createCallableShaderEntryTerminator(llvm::Function *func);
-  void getFuncRets(llvm::Function *func, llvm::SmallVector<llvm::Instruction *, 4> &rets);
+  llvm::SmallVector<llvm::Instruction *> getFuncRets(llvm::Function *func) const;
   llvm::SmallSet<unsigned, 4> getShaderExtraInputParams(ShaderStage stage);
   llvm::SmallSet<unsigned, 4> getShaderExtraRets(ShaderStage stage);
   llvm::Type *getShaderReturnTy(ShaderStage stage);
@@ -270,11 +271,15 @@ private:
   void visitShaderIndexOp(lgc::rt::ShaderIndexOp &inst);
   void visitShaderRecordBufferOp(lgc::rt::ShaderRecordBufferOp &inst);
 
+  void createSqttCallCompactToken(ShaderStage stage);
+  void createSqttFunctionReturnToken();
+
   llvm::Value *createLoadInstNodeAddr();
 
   lgc::rt::RayTracingShaderStage mapStageToLgcRtShaderStage(ShaderStage stage);
 
-  llvm::Value *m_traceParams[TraceParam::Count];           // Trace ray set parameters
+  llvm::Value *m_traceParams[TraceParam::Count]; // Trace ray set parameters
+  llvm::StringRef m_traceParamNames[TraceParam::Count];
   llvm::Value *m_worldToObjMatrix = nullptr;               // World to Object matrix
   llvm::AllocaInst *m_callableData = nullptr;              // Callable data variable for current callable shader
   std::set<unsigned, std::less<unsigned>> m_builtInParams; // Indirect max builtins;

@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2018-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2018-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -98,9 +98,9 @@ enum {
 // @param pipelineState : Pipeline state
 NggPrimShader::NggPrimShader(PipelineState *pipelineState)
     : m_pipelineState(pipelineState), m_gfxIp(pipelineState->getTargetInfo().getGfxIpVersion()),
-      m_nggControl(m_pipelineState->getNggControl()), m_hasVs(pipelineState->hasShaderStage(ShaderStageVertex)),
-      m_hasTes(pipelineState->hasShaderStage(ShaderStageTessEval)),
-      m_hasGs(pipelineState->hasShaderStage(ShaderStageGeometry)), m_builder(pipelineState->getContext()) {
+      m_nggControl(m_pipelineState->getNggControl()), m_hasVs(pipelineState->hasShaderStage(ShaderStage::Vertex)),
+      m_hasTes(pipelineState->hasShaderStage(ShaderStage::TessEval)),
+      m_hasGs(pipelineState->hasShaderStage(ShaderStage::Geometry)), m_builder(pipelineState->getContext()) {
   assert(m_nggControl->enableNgg);
 
   // Always allow approximation, to change fdiv(1.0, x) to rcp(x)
@@ -115,7 +115,7 @@ NggPrimShader::NggPrimShader(PipelineState *pipelineState)
   // the base offset of each vertex streams and record them. See 'writeGsOutput' for detail.
   if (m_hasGs) {
     unsigned vertexItemSizes[MaxGsStreams] = {};
-    auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry);
+    auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry);
     for (unsigned i = 0; i < MaxGsStreams; ++i)
       vertexItemSizes[i] = 4 * resUsage->inOutUsage.gs.outLocCount[i];
 
@@ -146,8 +146,8 @@ unsigned NggPrimShader::calcEsGsRingItemSize(PipelineState *pipelineState) {
   assert(pipelineState->getNggControl()->enableNgg); // Must enable NGG
 
   // API GS is present
-  if (pipelineState->hasShaderStage(ShaderStageGeometry)) {
-    auto resUsage = pipelineState->getShaderResourceUsage(ShaderStageGeometry);
+  if (pipelineState->hasShaderStage(ShaderStage::Geometry)) {
+    auto resUsage = pipelineState->getShaderResourceUsage(ShaderStage::Geometry);
     // NOTE: Make esGsRingItemSize odd by "| 1", to optimize ES -> GS ring layout for LDS bank conflicts.
     return (4 * std::max(1u, resUsage->inOutUsage.inputMapLocCount)) | 1;
   }
@@ -157,8 +157,8 @@ unsigned NggPrimShader::calcEsGsRingItemSize(PipelineState *pipelineState) {
     unsigned esGsRingItemSize = 1;
 
     if (pipelineState->enableSwXfb()) {
-      const bool hasTes = pipelineState->hasShaderStage(ShaderStageTessEval);
-      auto resUsage = pipelineState->getShaderResourceUsage(hasTes ? ShaderStageTessEval : ShaderStageVertex);
+      const bool hasTes = pipelineState->hasShaderStage(ShaderStage::TessEval);
+      auto resUsage = pipelineState->getShaderResourceUsage(hasTes ? ShaderStage::TessEval : ShaderStage::Vertex);
 
       // NOTE: For GFX11+, transform feedback outputs (each output is <4 x dword>) are stored as a ES-GS ring item.
       assert(resUsage->inOutUsage.xfbExpCount > 0);
@@ -187,7 +187,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
                                                           PrimShaderLdsLayout *ldsLayout) {
   assert(pipelineState->getNggControl()->enableNgg); // Must enable NGG
 
-  const auto &calcFactor = pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
+  const auto &calcFactor = pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor;
 
   unsigned ldsOffset = 0;     // In dwords
   unsigned ldsRegionSize = 0; // In dwords
@@ -207,7 +207,7 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
   //
   // API GS is present
   //
-  if (pipelineState->hasShaderStage(ShaderStageGeometry)) {
+  if (pipelineState->hasShaderStage(ShaderStage::Geometry)) {
     PrimShaderLdsUsageInfo ldsUsageInfo = {};
     ldsUsageInfo.needsLds = true;
 
@@ -340,9 +340,9 @@ PrimShaderLdsUsageInfo NggPrimShader::layoutPrimShaderLds(PipelineState *pipelin
     return ldsUsageInfo;
   }
 
-  const bool hasTes = pipelineState->hasShaderStage(ShaderStageTessEval);
+  const bool hasTes = pipelineState->hasShaderStage(ShaderStage::TessEval);
   const bool distributePrimitiveId =
-      !hasTes && pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs.primitiveId;
+      !hasTes && pipelineState->getShaderResourceUsage(ShaderStage::Vertex)->builtInUsage.vs.primitiveId;
 
   //
   // Passthrough mode is enabled (API GS is not present)
@@ -552,7 +552,7 @@ Function *NggPrimShader::generate(Function *esMain, Function *gsMain, Function *
 
   Function *primShader = Function::Create(primShaderTy, GlobalValue::ExternalLinkage, lgcName::NggPrimShaderEntryPoint);
   primShader->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
-  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Geometry);
   primShader->addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
   primShader->addFnAttr("amdgpu-flat-work-group-size",
                         "128,128"); // Force s_barrier to be present (ignore optimization)
@@ -630,7 +630,7 @@ unsigned NggPrimShader::calcVertexCullInfoSizeAndOffsets(PipelineState *pipeline
   vertCullInfoOffsets = {};
 
   // Only for NGG culling mode without API GS
-  const bool hasGs = pipelineState->hasShaderStage(ShaderStageGeometry);
+  const bool hasGs = pipelineState->hasShaderStage(ShaderStage::Geometry);
   if (hasGs || nggControl->passthroughMode)
     return 0;
 
@@ -639,8 +639,8 @@ unsigned NggPrimShader::calcVertexCullInfoSizeAndOffsets(PipelineState *pipeline
   unsigned itemSize = 0;
 
   if (pipelineState->enableSwXfb()) {
-    const bool hasTes = pipelineState->hasShaderStage(ShaderStageTessEval);
-    auto resUsage = pipelineState->getShaderResourceUsage(hasTes ? ShaderStageTessEval : ShaderStageVertex);
+    const bool hasTes = pipelineState->hasShaderStage(ShaderStage::TessEval);
+    auto resUsage = pipelineState->getShaderResourceUsage(hasTes ? ShaderStage::TessEval : ShaderStage::Vertex);
 
     // NOTE: Each transform feedback output is <4 x dword>.
     const unsigned xfbOutputCount = resUsage->inOutUsage.xfbExpCount;
@@ -668,9 +668,9 @@ unsigned NggPrimShader::calcVertexCullInfoSizeAndOffsets(PipelineState *pipeline
     vertCullInfoOffsets.compactedVertexIndex = cullInfoOffset;
     cullInfoOffset += itemSize;
 
-    const bool hasTes = pipelineState->hasShaderStage(ShaderStageTessEval);
+    const bool hasTes = pipelineState->hasShaderStage(ShaderStage::TessEval);
     if (hasTes) {
-      auto builtInUsage = pipelineState->getShaderResourceUsage(ShaderStageTessEval)->builtInUsage.tes;
+      auto builtInUsage = pipelineState->getShaderResourceUsage(ShaderStage::TessEval)->builtInUsage.tes;
       if (builtInUsage.tessCoord) {
         itemSize = sizeof(VertexCullInfo::tes.tessCoordX) / sizeof(unsigned);
         cullInfoSize += itemSize;
@@ -695,7 +695,7 @@ unsigned NggPrimShader::calcVertexCullInfoSizeAndOffsets(PipelineState *pipeline
         cullInfoOffset += itemSize;
       }
     } else {
-      auto builtInUsage = pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs;
+      auto builtInUsage = pipelineState->getShaderResourceUsage(ShaderStage::Vertex)->builtInUsage.vs;
       if (builtInUsage.vertexIndex) {
         itemSize = sizeof(VertexCullInfo::vs.vertexId) / sizeof(unsigned);
         cullInfoSize += itemSize;
@@ -738,9 +738,9 @@ FunctionType *NggPrimShader::getPrimShaderType(uint64_t &inRegMask) {
   // User data (SGPRs)
   unsigned userDataCount = 0;
 
-  const auto gsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry);
-  const auto tesIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageTessEval);
-  const auto vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
+  const auto gsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStage::Geometry);
+  const auto tesIntfData = m_pipelineState->getShaderInterfaceData(ShaderStage::TessEval);
+  const auto vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStage::Vertex);
 
   if (m_hasGs) {
     // GS is present in primitive shader (ES-GS merged shader)
@@ -1087,7 +1087,7 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
   assert(!m_nggControl->passthroughMode); // Make sure NGG passthrough mode is not enabled
   assert(!m_hasGs);                       // Make sure API GS is not present
 
-  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Geometry);
   assert(waveSize == 32 || waveSize == 64);
 
   const unsigned waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
@@ -1230,7 +1230,7 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
   const unsigned dummyExportCount = waNggCullingNoEmptySubgroups ? 1 : 0;
 
   const unsigned esGsRingItemSize =
-      m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
+      m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
 
   // NOTE: Make sure vertex position data is 4-dword alignment because we will use 128-bit LDS read/write for it.
   assert(getLdsRegionStart(PrimShaderLdsRegion::VertexPosition) % 4U == 0);
@@ -1585,7 +1585,8 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
       // Write compacted vertex index
       writeVertexCullInfoToLds(compactedVertexIndex, vertexItemOffset, m_vertCullInfoOffsets.compactedVertexIndex);
 
-      const auto resUsage = m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStageTessEval : ShaderStageVertex);
+      const auto resUsage =
+          m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex);
       if (m_hasTes) {
         // Write X/Y of tessCoord (U/V)
         if (resUsage->builtInUsage.tes.tessCoord) {
@@ -1845,7 +1846,7 @@ void NggPrimShader::buildPrimShader(Function *primShader) {
 void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
   assert(m_hasGs); // Make sure API GS is present
 
-  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Geometry);
   assert(waveSize == 32 || waveSize == 64);
 
   if (!m_nggControl->compactVertex)
@@ -2436,7 +2437,7 @@ void NggPrimShader::buildPrimShaderWithGs(Function *primShader) {
 // @param mergedGroupInfo : Merged group info
 // @param mergedWaveInfo : Merged wave info
 void NggPrimShader::initWaveThreadInfo(Value *mergedGroupInfo, Value *mergedWaveInfo) {
-  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Geometry);
   assert(waveSize == 32 || waveSize == 64);
 
   m_builder.CreateIntrinsic(Intrinsic::amdgcn_init_exec, {}, m_builder.getInt64(-1));
@@ -2525,11 +2526,11 @@ void NggPrimShader::loadStreamOutBufferInfo(Value *userData) {
   const auto gsOrEsMain = m_hasGs ? m_gsHandlers.main : m_esHandlers.main;
   StreamOutData streamOutData = {};
   if (m_hasGs)
-    streamOutData = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs.streamOutData;
+    streamOutData = m_pipelineState->getShaderInterfaceData(ShaderStage::Geometry)->entryArgIdxs.gs.streamOutData;
   else if (m_hasTes)
-    streamOutData = m_pipelineState->getShaderInterfaceData(ShaderStageTessEval)->entryArgIdxs.tes.streamOutData;
+    streamOutData = m_pipelineState->getShaderInterfaceData(ShaderStage::TessEval)->entryArgIdxs.tes.streamOutData;
   else
-    streamOutData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex)->entryArgIdxs.vs.streamOutData;
+    streamOutData = m_pipelineState->getShaderInterfaceData(ShaderStage::Vertex)->entryArgIdxs.vs.streamOutData;
 
   assert(userData->getType()->isVectorTy());
   const auto constBufferPtrTy = PointerType::get(m_builder.getContext(), ADDR_SPACE_CONST);
@@ -2578,7 +2579,7 @@ void NggPrimShader::distributePrimitiveId(Value *primitiveId) {
   if (m_hasGs || m_hasTes)
     return; // Not VS-PS pipeline
 
-  if (!m_pipelineState->getShaderResourceUsage(ShaderStageVertex)->builtInUsage.vs.primitiveId)
+  if (!m_pipelineState->getShaderResourceUsage(ShaderStage::Vertex)->builtInUsage.vs.primitiveId)
     return; // Primitive ID not used in VS
 
   //
@@ -2785,7 +2786,7 @@ void NggPrimShader::exportPrimitive(Value *primitiveCulled) {
       m_builder.SetInsertPoint(compactVertexIndexBlock);
 
       const unsigned esGsRingItemSize =
-          m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
+          m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
 
       auto vertexItemOffset0 = m_builder.CreateMul(m_nggInputs.vertexIndex0, m_builder.getInt32(esGsRingItemSize));
       auto vertexItemOffset1 = m_builder.CreateMul(m_nggInputs.vertexIndex1, m_builder.getInt32(esGsRingItemSize));
@@ -2994,7 +2995,7 @@ void NggPrimShader::earlyExitWithDummyExport() {
     // Determine how many dummy position exports we need
     unsigned posExpCount = 1;
     if (m_hasGs) {
-      const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
+      const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->builtInUsage.gs;
 
       bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
       miscExport |= builtInUsage.primitiveShadingRate;
@@ -3003,7 +3004,7 @@ void NggPrimShader::earlyExitWithDummyExport() {
 
       posExpCount += (builtInUsage.clipDistance + builtInUsage.cullDistance) / 4;
     } else if (m_hasTes) {
-      const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.tes;
+      const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->builtInUsage.tes;
 
       bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
       if (miscExport)
@@ -3011,7 +3012,7 @@ void NggPrimShader::earlyExitWithDummyExport() {
 
       posExpCount += (builtInUsage.clipDistance + builtInUsage.cullDistance) / 4;
     } else {
-      const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.vs;
+      const auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->builtInUsage.vs;
 
       bool miscExport = builtInUsage.pointSize || builtInUsage.layer || builtInUsage.viewportIndex;
       miscExport |= builtInUsage.primitiveShadingRate;
@@ -3059,8 +3060,8 @@ void NggPrimShader::runEs(ArrayRef<Argument *> args) {
 
   Value *esGsOffset = nullptr;
   if (m_hasGs) {
-    auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
-    unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
+    auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor;
+    unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Geometry);
     unsigned esGsBytesPerWave = waveSize * sizeof(unsigned) * calcFactor.esGsRingItemSize;
     esGsOffset = m_builder.CreateMul(m_nggInputs.waveIdInSubgroup, m_builder.getInt32(esGsBytesPerWave));
   }
@@ -3102,8 +3103,9 @@ void NggPrimShader::runEs(ArrayRef<Argument *> args) {
   // Setup attribute ring base and relative vertex index in subgroup as two additional arguments to export vertex
   // attributes through memory
   if (m_gfxIp.major >= 11 && !m_hasGs) { // For GS, vertex attribute exports are in copy shader
-    const auto attribCount = m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStageTessEval : ShaderStageVertex)
-                                 ->inOutUsage.expCount;
+    const auto attribCount =
+        m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex)
+            ->inOutUsage.expCount;
     if (attribCount > 0) {
       esArgs.push_back(m_nggInputs.attribRingBase);
       esArgs.push_back(m_nggInputs.threadIdInSubgroup);
@@ -3112,7 +3114,7 @@ void NggPrimShader::runEs(ArrayRef<Argument *> args) {
 
   // Set up user data SGPRs
   const unsigned userDataCount =
-      m_pipelineState->getShaderInterfaceData(m_hasTes ? ShaderStageTessEval : ShaderStageVertex)->userDataCount;
+      m_pipelineState->getShaderInterfaceData(m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex)->userDataCount;
   appendUserData(esArgs, m_esHandlers.main, userData, userDataCount);
 
   if (m_hasTes) {
@@ -3227,7 +3229,7 @@ Value *NggPrimShader::runPartEs(ArrayRef<Argument *> args, Value *position) {
       m_builder.SetInsertPoint(uncompactVertexBlock);
 
       const unsigned esGsRingItemSize =
-          m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
+          m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
 
       auto uncompactedVertexIndex = readPerThreadDataFromLds(m_builder.getInt32Ty(), m_nggInputs.threadIdInSubgroup,
                                                              PrimShaderLdsRegion::VertexIndexMap);
@@ -3238,7 +3240,8 @@ Value *NggPrimShader::runPartEs(ArrayRef<Argument *> args, Value *position) {
 
       // NOTE: For deferred vertex export, some system values could be from vertex compaction info rather than from
       // VGPRs (caused by NGG culling and vertex compaction)
-      const auto resUsage = m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStageTessEval : ShaderStageVertex);
+      const auto resUsage =
+          m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex);
       if (m_hasTes) {
         if (resUsage->builtInUsage.tes.tessCoord) {
           newTessCoordX =
@@ -3313,8 +3316,9 @@ Value *NggPrimShader::runPartEs(ArrayRef<Argument *> args, Value *position) {
   // Setup attribute ring base and relative vertex index in subgroup as two additional arguments to export vertex
   // attributes through memory
   if (m_gfxIp.major >= 11 && deferredVertexExport) {
-    const auto attribCount = m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStageTessEval : ShaderStageVertex)
-                                 ->inOutUsage.expCount;
+    const auto attribCount =
+        m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex)
+            ->inOutUsage.expCount;
     if (attribCount > 0) {
       partEsArgs.push_back(m_nggInputs.attribRingBase);
       partEsArgs.push_back(m_nggInputs.threadIdInSubgroup);
@@ -3326,7 +3330,7 @@ Value *NggPrimShader::runPartEs(ArrayRef<Argument *> args, Value *position) {
 
   // Set up user data SGPRs
   const unsigned userDataCount =
-      m_pipelineState->getShaderInterfaceData(m_hasTes ? ShaderStageTessEval : ShaderStageVertex)->userDataCount;
+      m_pipelineState->getShaderInterfaceData(m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex)->userDataCount;
   appendUserData(partEsArgs, partEs, userData, userDataCount);
 
   if (m_hasTes) {
@@ -3369,7 +3373,7 @@ void NggPrimShader::splitEs() {
     if (func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_exp)
       expFuncs.push_back(&func);
     else if (m_gfxIp.major >= 11) {
-      if (func.getName().startswith(lgcName::NggAttribExport) || func.getName().startswith(lgcName::NggXfbExport))
+      if (func.getName().starts_with(lgcName::NggAttribExport) || func.getName().starts_with(lgcName::NggXfbExport))
         expFuncs.push_back(&func);
     }
   }
@@ -3382,7 +3386,8 @@ void NggPrimShader::splitEs() {
   unsigned cullDistanceCount = 0;
 
   if (m_nggControl->enableCullDistanceCulling) {
-    const auto &resUsage = m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStageTessEval : ShaderStageVertex);
+    const auto &resUsage =
+        m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex);
 
     if (m_hasTes) {
       const auto &builtInUsage = resUsage->builtInUsage.tes;
@@ -3607,7 +3612,7 @@ void NggPrimShader::runGs(ArrayRef<Argument *> args) {
   SmallVector<Value *, 32> gsArgs;
 
   // Set up user data SGPRs
-  const unsigned userDataCount = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry)->userDataCount;
+  const unsigned userDataCount = m_pipelineState->getShaderInterfaceData(ShaderStage::Geometry)->userDataCount;
   appendUserData(gsArgs, m_gsHandlers.main, userData, userDataCount);
 
   // Set up system value SGPRs
@@ -3665,7 +3670,7 @@ void NggPrimShader::mutateGs() {
   }
 
   // Initialize thread ID in wave
-  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Geometry);
   assert(waveSize == 32 || waveSize == 64);
 
   auto threadIdInWave =
@@ -3677,7 +3682,7 @@ void NggPrimShader::mutateGs() {
   }
 
   // Initialize thread ID in subgroup
-  auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry)->entryArgIdxs.gs;
+  auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Geometry)->entryArgIdxs.gs;
   auto waveId = getFunctionArgument(m_gsHandlers.main, entryArgIdxs.gsWaveId);
 
   auto threadIdInSubgroup = m_builder.CreateMul(waveId, m_builder.getInt32(waveSize));
@@ -3685,7 +3690,7 @@ void NggPrimShader::mutateGs() {
 
   // Handle GS message and GS output export
   for (auto &func : m_gsHandlers.main->getParent()->functions()) {
-    if (func.getName().startswith(lgcName::NggWriteGsOutput)) {
+    if (func.getName().starts_with(lgcName::NggWriteGsOutput)) {
       // Export GS outputs to GS-VS ring
       for (auto user : func.users()) {
         CallInst *const call = cast<CallInst>(user);
@@ -3710,7 +3715,7 @@ void NggPrimShader::mutateGs() {
         CallInst *const call = cast<CallInst>(user);
         m_builder.SetInsertPoint(call);
 
-        if (getShaderStage(call->getParent()->getParent()) != ShaderStageGeometry)
+        if (getShaderStage(call->getParent()->getParent()) != ShaderStage::Geometry)
           continue; // Not belong to GS messages
 
         uint64_t message = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
@@ -3800,7 +3805,7 @@ void NggPrimShader::runCopyShader(ArrayRef<Argument *> args) {
   if (m_gfxIp.major >= 11) {
     // Setup attribute ring base and relative vertex index in subgroup as two additional arguments to export vertex
     // attributes through memory
-    const auto attribCount = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.expCount;
+    const auto attribCount = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.expCount;
     if (attribCount > 0) {
       copyShaderArgs.push_back(m_nggInputs.attribRingBase);
       copyShaderArgs.push_back(m_nggInputs.threadIdInSubgroup);
@@ -3835,7 +3840,7 @@ void NggPrimShader::mutateCopyShader() {
   SmallVector<Instruction *, 32> removedCalls;
 
   for (auto &func : m_gsHandlers.copyShader->getParent()->functions()) {
-    if (func.getName().startswith(lgcName::NggReadGsOutput)) {
+    if (func.getName().starts_with(lgcName::NggReadGsOutput)) {
       // Import GS outputs from GS-VS ring
       for (auto user : func.users()) {
         CallInst *const call = cast<CallInst>(user);
@@ -6039,7 +6044,7 @@ Function *NggPrimShader::createFetchCullingRegister() {
 Value *NggPrimShader::ballot(Value *value) {
   assert(value->getType()->isIntegerTy(1)); // Should be i1
 
-  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Geometry);
   assert(waveSize == 32 || waveSize == 64);
 
   Value *result = m_builder.CreateIntrinsic(Intrinsic::amdgcn_ballot, m_builder.getIntNTy(waveSize), value);
@@ -6059,7 +6064,8 @@ Value *NggPrimShader::ballot(Value *value) {
 void NggPrimShader::processVertexAttribExport(Function *&target) {
   assert(m_gfxIp.major >= 11); // For GFX11+
 
-  ShaderStage shaderStage = m_hasGs ? ShaderStageGeometry : (m_hasTes ? ShaderStageTessEval : ShaderStageVertex);
+  ShaderStageEnum shaderStage =
+      m_hasGs ? ShaderStage::Geometry : (m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex);
   const unsigned attribCount = m_pipelineState->getShaderResourceUsage(shaderStage)->inOutUsage.expCount;
   if (attribCount == 0)
     return; // No vertex attribute exports
@@ -6101,7 +6107,7 @@ void NggPrimShader::processVertexAttribExport(Function *&target) {
   SmallVector<CallInst *, 8> removedCalls;
 
   for (auto &func : target->getParent()->functions()) {
-    if (func.getName().startswith(lgcName::NggAttribExport)) {
+    if (func.getName().starts_with(lgcName::NggAttribExport)) {
       for (auto user : func.users()) {
         CallInst *const call = dyn_cast<CallInst>(user);
         assert(call);
@@ -6589,7 +6595,7 @@ void NggPrimShader::processSwXfbWithGs(ArrayRef<Argument *> args) {
   assert(m_pipelineState->enableSwXfb());
   assert(m_hasGs); // GS is present
 
-  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Geometry);
   assert(waveSize == 32 || waveSize == 64);
   const unsigned waveCountInSubgroup = Gfx9::NggMaxThreadsPerSubgroup / waveSize;
 
@@ -7247,7 +7253,8 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
 
   const unsigned xfbOutputCount =
       m_pipelineState
-          ->getShaderResourceUsage(m_hasGs ? ShaderStageGeometry : (m_hasTes ? ShaderStageTessEval : ShaderStageVertex))
+          ->getShaderResourceUsage(m_hasGs ? ShaderStage::Geometry
+                                           : (m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex))
           ->inOutUsage.xfbExpCount;
 
   // Skip following handling if transform feedback output is empty
@@ -7265,11 +7272,11 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
   SmallVector<Function *, 8> expFuncs;
   for (auto &func : target->getParent()->functions()) {
     if (dontClone) {
-      if (func.getName().startswith(lgcName::NggXfbExport))
+      if (func.getName().starts_with(lgcName::NggXfbExport))
         expFuncs.push_back(&func);
     } else {
       if ((func.isIntrinsic() && func.getIntrinsicID() == Intrinsic::amdgcn_exp) ||
-          func.getName().startswith(lgcName::NggAttribExport) || func.getName().startswith(lgcName::NggXfbExport))
+          func.getName().starts_with(lgcName::NggAttribExport) || func.getName().starts_with(lgcName::NggXfbExport))
         expFuncs.push_back(&func);
     }
   }
@@ -7338,7 +7345,7 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
       if (!dontClone) {
         // Remove transform feedback export calls from the target function. No need of doing this if we
         // just mutate it without cloning.
-        if (call->getFunction() == target && func->getName().startswith(lgcName::NggXfbExport)) {
+        if (call->getFunction() == target && func->getName().starts_with(lgcName::NggXfbExport)) {
           removedCalls.push_back(call);
           continue;
         }
@@ -7349,7 +7356,7 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
 
       assert(call->getParent() == retBlock); // Must in return block
 
-      if (func->getName().startswith(lgcName::NggXfbExport)) {
+      if (func->getName().starts_with(lgcName::NggXfbExport)) {
         // Lower transform feedback export calls
         auto xfbBuffer = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue();
         auto xfbOffset = cast<ConstantInt>(call->getArgOperand(1))->getZExtValue();
@@ -7367,7 +7374,7 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
         if (m_hasGs) {
           // NOTE: For GS, the output value must be loaded by GS read output call. This is generated by copy shader.
           CallInst *readCall = dyn_cast<CallInst>(outputValue);
-          assert(readCall && readCall->getCalledFunction()->getName().startswith(lgcName::NggReadGsOutput));
+          assert(readCall && readCall->getCalledFunction()->getName().starts_with(lgcName::NggReadGsOutput));
           streamId = cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
           assert(streamId == cast<ConstantInt>(readCall->getArgOperand(2))->getZExtValue()); // Stream ID must match
           location = cast<ConstantInt>(readCall->getArgOperand(0))->getZExtValue();
@@ -7486,7 +7493,7 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
     // attributes through memory
     if (m_gfxIp.major >= 11 && !m_hasGs) { // For GS, vertex attribute exports are in copy shader
       const auto attribCount =
-          m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStageTessEval : ShaderStageVertex)
+          m_pipelineState->getShaderResourceUsage(m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex)
               ->inOutUsage.expCount;
       if (attribCount > 0) {
         xfbFetcherArgs.push_back(m_nggInputs.attribRingBase);
@@ -7497,7 +7504,7 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
 
   // Set up user data SGPRs
   const unsigned userDataCount =
-      m_pipelineState->getShaderInterfaceData(m_hasTes ? ShaderStageTessEval : ShaderStageVertex)->userDataCount;
+      m_pipelineState->getShaderInterfaceData(m_hasTes ? ShaderStage::TessEval : ShaderStage::Vertex)->userDataCount;
   appendUserData(xfbFetcherArgs, xfbFetcher, userData, userDataCount);
 
   if (m_hasTes) {
@@ -7789,7 +7796,7 @@ Value *NggPrimShader::readXfbOutputFromLds(Type *readDataTy, Value *vertexIndex,
   assert(!m_hasGs);
 
   const unsigned esGsRingItemSize =
-      m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
+      m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
   auto vertexItemOffset = m_builder.CreateMul(vertexIndex, m_builder.getInt32(esGsRingItemSize));
 
   if (m_nggControl->passthroughMode) {
@@ -7818,7 +7825,7 @@ void NggPrimShader::writeXfbOutputToLds(Value *writeData, Value *vertexIndex, un
   assert(!m_hasGs);
 
   const unsigned esGsRingItemSize =
-      m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
+      m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
   auto vertexItemOffset = m_builder.CreateMul(vertexIndex, m_builder.getInt32(esGsRingItemSize));
 
   if (m_nggControl->passthroughMode) {
@@ -7849,7 +7856,7 @@ Value *NggPrimShader::fetchVertexPositionData(Value *vertexIndex) {
   }
 
   // ES-GS
-  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage;
+  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage;
   assert(inOutUsage.builtInOutputLocMap.find(BuiltInPosition) != inOutUsage.builtInOutputLocMap.end());
   const unsigned loc = inOutUsage.builtInOutputLocMap[BuiltInPosition];
   const unsigned rasterStream = m_pipelineState->getRasterizerState().rasterStream;
@@ -7868,20 +7875,20 @@ Value *NggPrimShader::fetchCullDistanceSignMask(Value *vertexIndex) {
   if (!m_hasGs) {
     // ES-only
     const unsigned esGsRingItemSize =
-        m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
+        m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor.esGsRingItemSize;
     auto vertexItemOffset = m_builder.CreateMul(vertexIndex, m_builder.getInt32(esGsRingItemSize));
     return readVertexCullInfoFromLds(m_builder.getInt32Ty(), vertexItemOffset,
                                      m_vertCullInfoOffsets.cullDistanceSignMask);
   }
 
   // ES-GS
-  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage;
+  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage;
   assert(inOutUsage.builtInOutputLocMap.find(BuiltInCullDistance) != inOutUsage.builtInOutputLocMap.end());
   const unsigned loc = inOutUsage.builtInOutputLocMap[BuiltInCullDistance];
   const unsigned rasterStream = m_pipelineState->getRasterizerState().rasterStream;
   auto vertexOffset = calcVertexItemOffset(rasterStream, vertexIndex);
 
-  auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->builtInUsage.gs;
+  auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->builtInUsage.gs;
   auto cullDistances = readGsOutput(ArrayType::get(m_builder.getFloatTy(), builtInUsage.cullDistance), loc, 0,
                                     rasterStream, vertexOffset);
 
@@ -7907,7 +7914,7 @@ Value *NggPrimShader::fetchCullDistanceSignMask(Value *vertexIndex) {
 Value *NggPrimShader::calcVertexItemOffset(unsigned streamId, Value *vertexIndex) {
   assert(m_hasGs); // GS must be present
 
-  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage;
+  auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage;
 
   // vertexOffset = gsVsRingStart + streamBases[stream] + vertexIndex * vertexItemSize (in dwords)
   const unsigned vertexItemSize = 4 * inOutUsage.gs.outLocCount[streamId];

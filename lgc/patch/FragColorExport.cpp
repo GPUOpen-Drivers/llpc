@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -439,9 +439,9 @@ bool LowerFragColorExport::runImpl(Module &module, PipelineShadersResult &pipeli
                                    PipelineState *pipelineState) {
   m_context = &module.getContext();
   m_pipelineState = pipelineState;
-  m_resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment);
+  m_resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Fragment);
 
-  Function *fragEntryPoint = pipelineShaders.getEntryPoint(ShaderStageFragment);
+  Function *fragEntryPoint = pipelineShaders.getEntryPoint(ShaderStage::Fragment);
   if (!fragEntryPoint)
     return false;
 
@@ -536,7 +536,7 @@ void LowerFragColorExport::collectExportInfoForGenericOutputs(Function *fragEntr
 
   // Collect all of the exports in the fragment shader
   for (auto &func : *fragEntryPoint->getParent()) {
-    if (!func.isDeclaration() || !func.getName().startswith(lgcName::OutputExportGeneric))
+    if (!func.isDeclaration() || !func.getName().starts_with(lgcName::OutputExportGeneric))
       continue;
     for (auto user : func.users()) {
       auto callInst = cast<CallInst>(user);
@@ -668,7 +668,7 @@ void LowerFragColorExport::collectExportInfoForBuiltinOutput(Function *module, B
   Value *m_fragStencilRef = nullptr;
   Value *m_sampleMask = nullptr;
   for (auto &func : *module->getParent()) {
-    if (!func.isDeclaration() || !func.getName().startswith(lgcName::OutputExportBuiltIn))
+    if (!func.isDeclaration() || !func.getName().starts_with(lgcName::OutputExportBuiltIn))
       continue;
     for (auto user : func.users()) {
       auto callInst = cast<CallInst>(user);
@@ -797,7 +797,7 @@ void FragColorExport::setDoneFlag(Value *exportInst, BuilderBase &builder) {
 // @param builder : The builder object that will be used to create new instructions.
 Value *FragColorExport::dualSourceSwizzle(BuilderBase &builder) {
   Value *result0[4], *result1[4];
-  unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageFragment);
+  unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Fragment);
   auto undefFloat = PoisonValue::get(builder.getFloatTy());
 
   Value *threadId =
@@ -1129,10 +1129,10 @@ Function *FragColorExport::generateNullFragmentEntryPoint(Module &module, Pipeli
   FunctionType *entryPointTy = FunctionType::get(Type::getVoidTy(module.getContext()), ArrayRef<Type *>(), false);
   Function *entryPoint = Function::Create(entryPointTy, GlobalValue::ExternalLinkage, entryPointName, &module);
   entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
-  setShaderStage(entryPoint, ShaderStageFragment);
+  setShaderStage(entryPoint, ShaderStage::Fragment);
   entryPoint->setCallingConv(CallingConv::AMDGPU_PS);
   if (pipelineState->getTargetInfo().getGfxIpVersion().major >= 10) {
-    const unsigned waveSize = pipelineState->getShaderWaveSize(ShaderStageFragment);
+    const unsigned waveSize = pipelineState->getShaderWaveSize(ShaderStage::Fragment);
     entryPoint->addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
   }
   return entryPoint;

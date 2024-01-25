@@ -27,7 +27,7 @@ void main()
 
 // SHADERTEST-LABEL: @lgc.shader.FS.main(
 // SHADERTEST-NEXT:  .entry:
-// SHADERTEST-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i64 0, i32 0, i32 0, i32 2)
+// SHADERTEST-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 2)
 // SHADERTEST-NEXT:    [[TMP1:%.*]] = load i32, ptr addrspace(7) [[TMP0]], align 4
 // SHADERTEST-NEXT:    [[TMP2:%.*]] = getelementptr inbounds <{ i32, [4 x i8], [2 x i32] }>, ptr addrspace(7) [[TMP0]], i32 0, i32 2, i32 0
 // SHADERTEST-NEXT:    [[TMP3:%.*]] = load i32, ptr addrspace(7) [[TMP2]], align 4

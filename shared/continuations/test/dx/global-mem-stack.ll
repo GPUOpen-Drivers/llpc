@@ -142,109 +142,105 @@ define void @MyClosestHitShader(%struct.RayPayload* noalias nocapture %payload, 
 ;
 ;
 ; CHECK-LABEL: define void @MyClosestHitShader(
-; CHECK-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage !9 !continuation.registercount !8 !continuation !10 !continuation.state !6 {
+; CHECK-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META9:![0-9]+]] !continuation.registercount [[META8:![0-9]+]] !continuation [[META10:![0-9]+]] !continuation.state [[META6:![0-9]+]] {
 ; CHECK-NEXT:  AllocaSpillBB:
-; CHECK-NEXT:    [[SYSTEM_DATA:%.*]] = alloca [[STRUCT_SYSTEMDATA]], align 8
-; CHECK-NEXT:    [[CONT_STATE:%.*]] = alloca [0 x i32], align 4
 ; CHECK-NEXT:    [[CSP:%.*]] = alloca i32, align 4
-; CHECK-NEXT:    store [[STRUCT_SYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA]], align 4
 ; CHECK-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
-; CHECK-NEXT:    [[TMP1:%.*]] = load [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA]], align 4
-; CHECK-NEXT:    [[DOTFCA_0_0_EXTRACT:%.*]] = extractvalue [[STRUCT_SYSTEMDATA]] [[TMP1]], 0, 0
-; CHECK-NEXT:    [[DOTFCA_1_0_EXTRACT:%.*]] = extractvalue [[STRUCT_SYSTEMDATA]] [[TMP1]], 1, 0
-; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
-; CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; CHECK-NEXT:    [[TMP3:%.*]] = call i64 @_cont_GetContinuationStackGlobalMemBase()
-; CHECK-NEXT:    [[TMP4:%.*]] = inttoptr i64 [[TMP3]] to ptr addrspace(22)
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP4]], i32 [[TMP2]]
-; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr i32, ptr addrspace(22) [[TMP5]], i32 -2
-; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr [[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S:%.*]], ptr addrspace(22) [[TMP6]], i32 0, i32 0, i32 7
-; CHECK-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(22) [[TMP7]], align 4
-; CHECK-NEXT:    [[TMP9:%.*]] = bitcast i32 [[TMP8]] to float
-; CHECK-NEXT:    [[DOTSROA_0_0_VEC_INSERT:%.*]] = insertelement <4 x float> undef, float [[TMP9]], i32 0
-; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; CHECK-NEXT:    [[TMP11:%.*]] = call i64 @_cont_GetContinuationStackGlobalMemBase()
-; CHECK-NEXT:    [[TMP12:%.*]] = inttoptr i64 [[TMP11]] to ptr addrspace(22)
-; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP12]], i32 [[TMP10]]
-; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr i32, ptr addrspace(22) [[TMP13]], i32 -2
-; CHECK-NEXT:    [[TMP15:%.*]] = getelementptr [[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspace(22) [[TMP14]], i32 0, i32 0, i64 8
-; CHECK-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(22) [[TMP15]], align 4
-; CHECK-NEXT:    [[TMP17:%.*]] = bitcast i32 [[TMP16]] to float
-; CHECK-NEXT:    [[DOTSROA_0_4_VEC_INSERT:%.*]] = insertelement <4 x float> [[DOTSROA_0_0_VEC_INSERT]], float [[TMP17]], i32 1
-; CHECK-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; CHECK-NEXT:    [[TMP19:%.*]] = call i64 @_cont_GetContinuationStackGlobalMemBase()
-; CHECK-NEXT:    [[TMP20:%.*]] = inttoptr i64 [[TMP19]] to ptr addrspace(22)
-; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP20]], i32 [[TMP18]]
-; CHECK-NEXT:    [[TMP22:%.*]] = getelementptr i32, ptr addrspace(22) [[TMP21]], i32 -2
-; CHECK-NEXT:    [[TMP23:%.*]] = getelementptr [[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspace(22) [[TMP22]], i32 0, i32 0, i64 9
-; CHECK-NEXT:    [[TMP24:%.*]] = load i32, ptr addrspace(22) [[TMP23]], align 4
-; CHECK-NEXT:    [[TMP25:%.*]] = bitcast i32 [[TMP24]] to float
-; CHECK-NEXT:    [[DOTSROA_0_8_VEC_INSERT:%.*]] = insertelement <4 x float> [[DOTSROA_0_4_VEC_INSERT]], float [[TMP25]], i32 2
-; CHECK-NEXT:    [[TMP26:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; CHECK-NEXT:    [[TMP27:%.*]] = call i64 @_cont_GetContinuationStackGlobalMemBase()
-; CHECK-NEXT:    [[TMP28:%.*]] = inttoptr i64 [[TMP27]] to ptr addrspace(22)
-; CHECK-NEXT:    [[TMP29:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP28]], i32 [[TMP26]]
-; CHECK-NEXT:    [[TMP30:%.*]] = getelementptr i32, ptr addrspace(22) [[TMP29]], i32 -2
-; CHECK-NEXT:    [[TMP31:%.*]] = getelementptr [[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspace(22) [[TMP30]], i32 0, i32 0, i64 10
-; CHECK-NEXT:    [[TMP32:%.*]] = load i32, ptr addrspace(22) [[TMP31]], align 4
-; CHECK-NEXT:    [[TMP33:%.*]] = bitcast i32 [[TMP32]] to float
-; CHECK-NEXT:    [[DOTSROA_0_12_VEC_INSERT:%.*]] = insertelement <4 x float> [[DOTSROA_0_8_VEC_INSERT]], float [[TMP33]], i32 3
+; CHECK-NEXT:    [[DOTFCA_0_0_EXTRACT:%.*]] = extractvalue [[STRUCT_SYSTEMDATA]] [[TMP0]], 0, 0
+; CHECK-NEXT:    [[DOTFCA_1_0_EXTRACT:%.*]] = extractvalue [[STRUCT_SYSTEMDATA]] [[TMP0]], 1, 0
+; CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; CHECK-NEXT:    [[TMP2:%.*]] = call i64 @_cont_GetContinuationStackGlobalMemBase()
+; CHECK-NEXT:    [[TMP3:%.*]] = inttoptr i64 [[TMP2]] to ptr addrspace(22)
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP3]], i32 [[TMP1]]
+; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i32, ptr addrspace(22) [[TMP4]], i32 -2
+; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr [[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S:%.*]], ptr addrspace(22) [[TMP5]], i32 0, i32 0, i32 7
+; CHECK-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(22) [[TMP6]], align 4
+; CHECK-NEXT:    [[TMP8:%.*]] = bitcast i32 [[TMP7]] to float
+; CHECK-NEXT:    [[DOTSROA_0_0_VEC_INSERT:%.*]] = insertelement <4 x float> undef, float [[TMP8]], i32 0
+; CHECK-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; CHECK-NEXT:    [[TMP10:%.*]] = call i64 @_cont_GetContinuationStackGlobalMemBase()
+; CHECK-NEXT:    [[TMP11:%.*]] = inttoptr i64 [[TMP10]] to ptr addrspace(22)
+; CHECK-NEXT:    [[TMP12:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP11]], i32 [[TMP9]]
+; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr i32, ptr addrspace(22) [[TMP12]], i32 -2
+; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr [[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspace(22) [[TMP13]], i32 0, i32 0, i64 8
+; CHECK-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(22) [[TMP14]], align 4
+; CHECK-NEXT:    [[TMP16:%.*]] = bitcast i32 [[TMP15]] to float
+; CHECK-NEXT:    [[DOTSROA_0_4_VEC_INSERT:%.*]] = insertelement <4 x float> [[DOTSROA_0_0_VEC_INSERT]], float [[TMP16]], i32 1
+; CHECK-NEXT:    [[TMP17:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; CHECK-NEXT:    [[TMP18:%.*]] = call i64 @_cont_GetContinuationStackGlobalMemBase()
+; CHECK-NEXT:    [[TMP19:%.*]] = inttoptr i64 [[TMP18]] to ptr addrspace(22)
+; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP19]], i32 [[TMP17]]
+; CHECK-NEXT:    [[TMP21:%.*]] = getelementptr i32, ptr addrspace(22) [[TMP20]], i32 -2
+; CHECK-NEXT:    [[TMP22:%.*]] = getelementptr [[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspace(22) [[TMP21]], i32 0, i32 0, i64 9
+; CHECK-NEXT:    [[TMP23:%.*]] = load i32, ptr addrspace(22) [[TMP22]], align 4
+; CHECK-NEXT:    [[TMP24:%.*]] = bitcast i32 [[TMP23]] to float
+; CHECK-NEXT:    [[DOTSROA_0_8_VEC_INSERT:%.*]] = insertelement <4 x float> [[DOTSROA_0_4_VEC_INSERT]], float [[TMP24]], i32 2
+; CHECK-NEXT:    [[TMP25:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; CHECK-NEXT:    [[TMP26:%.*]] = call i64 @_cont_GetContinuationStackGlobalMemBase()
+; CHECK-NEXT:    [[TMP27:%.*]] = inttoptr i64 [[TMP26]] to ptr addrspace(22)
+; CHECK-NEXT:    [[TMP28:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP27]], i32 [[TMP25]]
+; CHECK-NEXT:    [[TMP29:%.*]] = getelementptr i32, ptr addrspace(22) [[TMP28]], i32 -2
+; CHECK-NEXT:    [[TMP30:%.*]] = getelementptr [[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr addrspace(22) [[TMP29]], i32 0, i32 0, i64 10
+; CHECK-NEXT:    [[TMP31:%.*]] = load i32, ptr addrspace(22) [[TMP30]], align 4
+; CHECK-NEXT:    [[TMP32:%.*]] = bitcast i32 [[TMP31]] to float
+; CHECK-NEXT:    [[DOTSROA_0_12_VEC_INSERT:%.*]] = insertelement <4 x float> [[DOTSROA_0_8_VEC_INSERT]], float [[TMP32]], i32 3
 ; CHECK-NEXT:    [[VAL_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]] poison, <2 x float> [[DOTFCA_1_0_EXTRACT]], 0
 ; CHECK-NEXT:    [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[VAL_I_FCA_0_INSERT]], 0
 ; CHECK-NEXT:    [[DOTSROA_06_0_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT]], i32 0
-; CHECK-NEXT:    [[TMP34:%.*]] = bitcast float [[DOTSROA_06_0_VEC_EXTRACT]] to i32
-; CHECK-NEXT:    [[TMP35:%.*]] = bitcast i32 [[TMP34]] to float
-; CHECK-NEXT:    [[HITATTRS_SROA_0_0_VEC_INSERT:%.*]] = insertelement <2 x float> undef, float [[TMP35]], i32 0
+; CHECK-NEXT:    [[TMP33:%.*]] = bitcast float [[DOTSROA_06_0_VEC_EXTRACT]] to i32
+; CHECK-NEXT:    [[TMP34:%.*]] = bitcast i32 [[TMP33]] to float
+; CHECK-NEXT:    [[HITATTRS_SROA_0_0_VEC_INSERT:%.*]] = insertelement <2 x float> undef, float [[TMP34]], i32 0
 ; CHECK-NEXT:    [[DOTSROA_06_4_VEC_EXTRACT:%.*]] = extractelement <2 x float> [[VAL_I_FCA_0_INSERT_FCA_0_EXTRACT]], i32 1
-; CHECK-NEXT:    [[TMP36:%.*]] = bitcast float [[DOTSROA_06_4_VEC_EXTRACT]] to i32
-; CHECK-NEXT:    [[TMP37:%.*]] = bitcast i32 [[TMP36]] to float
-; CHECK-NEXT:    [[HITATTRS_SROA_0_4_VEC_INSERT:%.*]] = insertelement <2 x float> [[HITATTRS_SROA_0_0_VEC_INSERT]], float [[TMP37]], i32 1
-; CHECK-NEXT:    [[TMP38:%.*]] = extractelement <2 x float> [[HITATTRS_SROA_0_4_VEC_INSERT]], i32 0
-; CHECK-NEXT:    [[TMP39:%.*]] = fsub fast float 1.000000e+00, [[TMP38]]
-; CHECK-NEXT:    [[TMP40:%.*]] = extractelement <2 x float> [[HITATTRS_SROA_0_4_VEC_INSERT]], i32 1
-; CHECK-NEXT:    [[TMP41:%.*]] = fsub fast float [[TMP39]], [[TMP40]]
-; CHECK-NEXT:    [[TMP42:%.*]] = insertelement <4 x float> undef, float [[TMP41]], i64 0
-; CHECK-NEXT:    [[TMP43:%.*]] = insertelement <4 x float> [[TMP42]], float [[TMP38]], i64 1
-; CHECK-NEXT:    [[TMP44:%.*]] = insertelement <4 x float> [[TMP43]], float [[TMP40]], i64 2
-; CHECK-NEXT:    [[TMP45:%.*]] = insertelement <4 x float> [[TMP44]], float 1.000000e+00, i64 3
-; CHECK-NEXT:    [[DOTSROA_0_0_VEC_EXTRACT:%.*]] = extractelement <4 x float> [[TMP45]], i32 0
-; CHECK-NEXT:    [[TMP46:%.*]] = bitcast float [[DOTSROA_0_0_VEC_EXTRACT]] to i32
-; CHECK-NEXT:    [[TMP47:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; CHECK-NEXT:    [[TMP48:%.*]] = call i64 @_cont_GetContinuationStackGlobalMemBase()
-; CHECK-NEXT:    [[TMP49:%.*]] = inttoptr i64 [[TMP48]] to ptr addrspace(22)
-; CHECK-NEXT:    [[TMP50:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP49]], i32 [[TMP47]]
-; CHECK-NEXT:    [[TMP51:%.*]] = getelementptr i32, ptr addrspace(22) [[TMP50]], i32 -2
-; CHECK-NEXT:    [[TMP52:%.*]] = getelementptr [[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr addrspace(22) [[TMP51]], i32 0, i32 0, i32 7
-; CHECK-NEXT:    store i32 [[TMP46]], ptr addrspace(22) [[TMP52]], align 4
-; CHECK-NEXT:    [[DOTSROA_0_4_VEC_EXTRACT:%.*]] = extractelement <4 x float> [[TMP45]], i32 1
-; CHECK-NEXT:    [[TMP53:%.*]] = bitcast float [[DOTSROA_0_4_VEC_EXTRACT]] to i32
-; CHECK-NEXT:    [[TMP54:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; CHECK-NEXT:    [[TMP55:%.*]] = call i64 @_cont_GetContinuationStackGlobalMemBase()
-; CHECK-NEXT:    [[TMP56:%.*]] = inttoptr i64 [[TMP55]] to ptr addrspace(22)
-; CHECK-NEXT:    [[TMP57:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP56]], i32 [[TMP54]]
-; CHECK-NEXT:    [[TMP58:%.*]] = getelementptr i32, ptr addrspace(22) [[TMP57]], i32 -2
-; CHECK-NEXT:    [[TMP59:%.*]] = getelementptr [[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspace(22) [[TMP58]], i32 0, i32 0, i64 8
-; CHECK-NEXT:    store i32 [[TMP53]], ptr addrspace(22) [[TMP59]], align 4
-; CHECK-NEXT:    [[DOTSROA_0_8_VEC_EXTRACT:%.*]] = extractelement <4 x float> [[TMP45]], i32 2
-; CHECK-NEXT:    [[TMP60:%.*]] = bitcast float [[DOTSROA_0_8_VEC_EXTRACT]] to i32
-; CHECK-NEXT:    [[TMP61:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; CHECK-NEXT:    [[TMP62:%.*]] = call i64 @_cont_GetContinuationStackGlobalMemBase()
-; CHECK-NEXT:    [[TMP63:%.*]] = inttoptr i64 [[TMP62]] to ptr addrspace(22)
-; CHECK-NEXT:    [[TMP64:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP63]], i32 [[TMP61]]
-; CHECK-NEXT:    [[TMP65:%.*]] = getelementptr i32, ptr addrspace(22) [[TMP64]], i32 -2
-; CHECK-NEXT:    [[TMP66:%.*]] = getelementptr [[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspace(22) [[TMP65]], i32 0, i32 0, i64 9
-; CHECK-NEXT:    store i32 [[TMP60]], ptr addrspace(22) [[TMP66]], align 4
-; CHECK-NEXT:    [[DOTSROA_0_12_VEC_EXTRACT:%.*]] = extractelement <4 x float> [[TMP45]], i32 3
-; CHECK-NEXT:    [[TMP67:%.*]] = bitcast float [[DOTSROA_0_12_VEC_EXTRACT]] to i32
-; CHECK-NEXT:    [[TMP68:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; CHECK-NEXT:    [[TMP69:%.*]] = call i64 @_cont_GetContinuationStackGlobalMemBase()
-; CHECK-NEXT:    [[TMP70:%.*]] = inttoptr i64 [[TMP69]] to ptr addrspace(22)
-; CHECK-NEXT:    [[TMP71:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP70]], i32 [[TMP68]]
-; CHECK-NEXT:    [[TMP72:%.*]] = getelementptr i32, ptr addrspace(22) [[TMP71]], i32 -2
-; CHECK-NEXT:    [[TMP73:%.*]] = getelementptr [[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspace(22) [[TMP72]], i32 0, i32 0, i64 10
-; CHECK-NEXT:    store i32 [[TMP67]], ptr addrspace(22) [[TMP73]], align 4
+; CHECK-NEXT:    [[TMP35:%.*]] = bitcast float [[DOTSROA_06_4_VEC_EXTRACT]] to i32
+; CHECK-NEXT:    [[TMP36:%.*]] = bitcast i32 [[TMP35]] to float
+; CHECK-NEXT:    [[HITATTRS_SROA_0_4_VEC_INSERT:%.*]] = insertelement <2 x float> [[HITATTRS_SROA_0_0_VEC_INSERT]], float [[TMP36]], i32 1
+; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
+; CHECK-NEXT:    [[TMP37:%.*]] = extractelement <2 x float> [[HITATTRS_SROA_0_4_VEC_INSERT]], i32 0
+; CHECK-NEXT:    [[TMP38:%.*]] = fsub fast float 1.000000e+00, [[TMP37]]
+; CHECK-NEXT:    [[TMP39:%.*]] = extractelement <2 x float> [[HITATTRS_SROA_0_4_VEC_INSERT]], i32 1
+; CHECK-NEXT:    [[TMP40:%.*]] = fsub fast float [[TMP38]], [[TMP39]]
+; CHECK-NEXT:    [[TMP41:%.*]] = insertelement <4 x float> undef, float [[TMP40]], i64 0
+; CHECK-NEXT:    [[TMP42:%.*]] = insertelement <4 x float> [[TMP41]], float [[TMP37]], i64 1
+; CHECK-NEXT:    [[TMP43:%.*]] = insertelement <4 x float> [[TMP42]], float [[TMP39]], i64 2
+; CHECK-NEXT:    [[TMP44:%.*]] = insertelement <4 x float> [[TMP43]], float 1.000000e+00, i64 3
+; CHECK-NEXT:    [[DOTSROA_0_0_VEC_EXTRACT:%.*]] = extractelement <4 x float> [[TMP44]], i32 0
+; CHECK-NEXT:    [[TMP45:%.*]] = bitcast float [[DOTSROA_0_0_VEC_EXTRACT]] to i32
+; CHECK-NEXT:    [[TMP46:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; CHECK-NEXT:    [[TMP47:%.*]] = call i64 @_cont_GetContinuationStackGlobalMemBase()
+; CHECK-NEXT:    [[TMP48:%.*]] = inttoptr i64 [[TMP47]] to ptr addrspace(22)
+; CHECK-NEXT:    [[TMP49:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP48]], i32 [[TMP46]]
+; CHECK-NEXT:    [[TMP50:%.*]] = getelementptr i32, ptr addrspace(22) [[TMP49]], i32 -2
+; CHECK-NEXT:    [[TMP51:%.*]] = getelementptr [[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr addrspace(22) [[TMP50]], i32 0, i32 0, i32 7
+; CHECK-NEXT:    store i32 [[TMP45]], ptr addrspace(22) [[TMP51]], align 4
+; CHECK-NEXT:    [[DOTSROA_0_4_VEC_EXTRACT:%.*]] = extractelement <4 x float> [[TMP44]], i32 1
+; CHECK-NEXT:    [[TMP52:%.*]] = bitcast float [[DOTSROA_0_4_VEC_EXTRACT]] to i32
+; CHECK-NEXT:    [[TMP53:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; CHECK-NEXT:    [[TMP54:%.*]] = call i64 @_cont_GetContinuationStackGlobalMemBase()
+; CHECK-NEXT:    [[TMP55:%.*]] = inttoptr i64 [[TMP54]] to ptr addrspace(22)
+; CHECK-NEXT:    [[TMP56:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP55]], i32 [[TMP53]]
+; CHECK-NEXT:    [[TMP57:%.*]] = getelementptr i32, ptr addrspace(22) [[TMP56]], i32 -2
+; CHECK-NEXT:    [[TMP58:%.*]] = getelementptr [[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspace(22) [[TMP57]], i32 0, i32 0, i64 8
+; CHECK-NEXT:    store i32 [[TMP52]], ptr addrspace(22) [[TMP58]], align 4
+; CHECK-NEXT:    [[DOTSROA_0_8_VEC_EXTRACT:%.*]] = extractelement <4 x float> [[TMP44]], i32 2
+; CHECK-NEXT:    [[TMP59:%.*]] = bitcast float [[DOTSROA_0_8_VEC_EXTRACT]] to i32
+; CHECK-NEXT:    [[TMP60:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; CHECK-NEXT:    [[TMP61:%.*]] = call i64 @_cont_GetContinuationStackGlobalMemBase()
+; CHECK-NEXT:    [[TMP62:%.*]] = inttoptr i64 [[TMP61]] to ptr addrspace(22)
+; CHECK-NEXT:    [[TMP63:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP62]], i32 [[TMP60]]
+; CHECK-NEXT:    [[TMP64:%.*]] = getelementptr i32, ptr addrspace(22) [[TMP63]], i32 -2
+; CHECK-NEXT:    [[TMP65:%.*]] = getelementptr [[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspace(22) [[TMP64]], i32 0, i32 0, i64 9
+; CHECK-NEXT:    store i32 [[TMP59]], ptr addrspace(22) [[TMP65]], align 4
+; CHECK-NEXT:    [[DOTSROA_0_12_VEC_EXTRACT:%.*]] = extractelement <4 x float> [[TMP44]], i32 3
+; CHECK-NEXT:    [[TMP66:%.*]] = bitcast float [[DOTSROA_0_12_VEC_EXTRACT]] to i32
+; CHECK-NEXT:    [[TMP67:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; CHECK-NEXT:    [[TMP68:%.*]] = call i64 @_cont_GetContinuationStackGlobalMemBase()
+; CHECK-NEXT:    [[TMP69:%.*]] = inttoptr i64 [[TMP68]] to ptr addrspace(22)
+; CHECK-NEXT:    [[TMP70:%.*]] = getelementptr i8, ptr addrspace(22) [[TMP69]], i32 [[TMP67]]
+; CHECK-NEXT:    [[TMP71:%.*]] = getelementptr i32, ptr addrspace(22) [[TMP70]], i32 -2
+; CHECK-NEXT:    [[TMP72:%.*]] = getelementptr [[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr addrspace(22) [[TMP71]], i32 0, i32 0, i64 10
+; CHECK-NEXT:    store i32 [[TMP66]], ptr addrspace(22) [[TMP72]], align 4
 ; CHECK-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA:%.*]] poison, <3 x i32> [[DOTFCA_0_0_EXTRACT]], 0
-; CHECK-NEXT:    [[TMP74:%.*]] = load i32, ptr [[CSP]], align 4
-; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR]], i32 [[TMP74]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]]), !continuation.registercount !8
+; CHECK-NEXT:    [[TMP73:%.*]] = load i32, ptr [[CSP]], align 4
+; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR]], i32 [[TMP73]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META8]]
 ; CHECK-NEXT:    unreachable
 ;

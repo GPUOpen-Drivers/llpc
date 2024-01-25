@@ -75,13 +75,11 @@ attributes #0 = { nounwind }
 !19 = !{!"function", !"void", i32 poison, i32 poison, !20}
 !20 = !{i32 0, %struct.TheirParams poison}
 ; LOWERRAYTRACINGPIPELINE-LABEL: define void @main(
-; LOWERRAYTRACINGPIPELINE-SAME: ) !lgc.rt.shaderstage [[META9:![0-9]+]] !continuation.entry [[META16:![0-9]+]] !continuation.registercount [[META9]] !continuation [[META17:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META9:![0-9]+]] !continuation.entry [[META16:![0-9]+]] !continuation.registercount [[META9]] !continuation [[META17:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[PARAMS:%.*]] = alloca [[STRUCT_THEIRPARAMS:%.*]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA:%.*]], align 8
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP1:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @continuations.getSystemData.s_struct.DispatchSystemDatas()
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[SYSTEM_DATA_ALLOCA]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[DIS_DATA_I:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT_THEIRPARAMS]], ptr [[PARAMS]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = load i32, ptr [[TMP2]], align 4
@@ -93,30 +91,27 @@ attributes #0 = { nounwind }
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP7:%.*]] = load i32, ptr @PAYLOAD, align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP7]], ptr [[TMP6]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP5]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[LOCAL_ROOT_INDEX1:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[SYSTEM_DATA_ALLOCA]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX1]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    ret void, !continuation.registercount [[META14:![0-9]+]]
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-CPS-LABEL: define void @main(
-; LOWERRAYTRACINGPIPELINE-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURN_ADDR:%.*]], i32 [[SHADER_INDEX:%.*]]) !lgc.rt.shaderstage [[META9:![0-9]+]] !lgc.cps [[META9]] !continuation [[META16:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURN_ADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META9:![0-9]+]] !lgc.cps [[META9]] !continuation [[META16:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[PARAMS:%.*]] = alloca [[STRUCT_THEIRPARAMS:%.*]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA:%.*]], align 8
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP1:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @continuations.getSystemData.s_struct.DispatchSystemDatas()
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[SYSTEM_DATA_ALLOCA]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[DIS_DATA_I:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT_THEIRPARAMS]], ptr [[PARAMS]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP3:%.*]] = load i32, ptr [[TMP2]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP3]], ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP4:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] (...) @lgc.cps.await.s_struct.DispatchSystemDatas(i32 2, i32 2, [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP4:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[SYSTEM_DATA_ALLOCA]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP5:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] (...) @lgc.cps.await.s_struct.DispatchSystemDatas(i32 2, i32 2, i32 [[TMP4]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_THEIRPARAMS]] poison, ptr [[PARAMS]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT_THEIRPARAMS]], ptr [[PARAMS]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP6:%.*]] = load i32, ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP6]], ptr [[TMP5]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP4]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[LOCAL_ROOT_INDEX1:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[SYSTEM_DATA_ALLOCA]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX1]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT_THEIRPARAMS]], ptr [[PARAMS]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP7:%.*]] = load i32, ptr @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP7]], ptr [[TMP6]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP5]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    ret void
 ;

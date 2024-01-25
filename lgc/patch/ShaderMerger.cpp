@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -59,10 +59,10 @@ ShaderMerger::ShaderMerger(PipelineState *pipelineState, PipelineShadersResult *
   assert(m_gfxIp.major >= 9);
   assert(m_pipelineState->isGraphics());
 
-  m_hasVs = m_pipelineState->hasShaderStage(ShaderStageVertex);
-  m_hasTcs = m_pipelineState->hasShaderStage(ShaderStageTessControl);
-  m_hasTes = m_pipelineState->hasShaderStage(ShaderStageTessEval);
-  m_hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
+  m_hasVs = m_pipelineState->hasShaderStage(ShaderStage::Vertex);
+  m_hasTcs = m_pipelineState->hasShaderStage(ShaderStage::TessControl);
+  m_hasTes = m_pipelineState->hasShaderStage(ShaderStage::TessEval);
+  m_hasGs = m_pipelineState->hasShaderStage(ShaderStage::Geometry);
 }
 
 // =====================================================================================================================
@@ -178,7 +178,7 @@ void ShaderMerger::gatherTuningAttributes(AttrBuilder &tuningAttrs, const Functi
       continue;
 
     auto attrKind = srcAttr.getKindAsString();
-    if (!(attrKind.startswith("amdgpu") || attrKind.startswith("disable")))
+    if (!(attrKind.starts_with("amdgpu") || attrKind.starts_with("disable")))
       continue;
 
     // Note: this doesn't mean attribute values match
@@ -247,18 +247,18 @@ FunctionType *ShaderMerger::generateLsHsEntryPointType(uint64_t *inRegMask) cons
   // User data (SGPRs)
   unsigned userDataCount = 0;
   if (m_hasVs) {
-    const auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
+    const auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStage::Vertex);
     userDataCount = std::max(intfData->userDataCount, userDataCount);
   }
 
   if (m_hasTcs) {
-    const auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageTessControl);
+    const auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStage::TessControl);
     userDataCount = std::max(intfData->userDataCount, userDataCount);
   }
 
   if (m_hasTcs && m_hasVs) {
-    auto vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
-    auto tcsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageTessControl);
+    auto vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStage::Vertex);
+    auto tcsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStage::TessControl);
 
     if (vsIntfData->spillTable.sizeInDwords == 0 && tcsIntfData->spillTable.sizeInDwords > 0) {
       vsIntfData->userDataUsage.spillTable = userDataCount;
@@ -323,7 +323,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
 
   entryPoint->addFnAttr("amdgpu-flat-work-group-size",
                         "128,128"); // Force s_barrier to be present (ignore optimization)
-  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageTessControl);
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::TessControl);
   if (m_gfxIp.major >= 10)
     entryPoint->addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
   applyTuningAttributes(entryPoint, tuningAttrs);
@@ -442,7 +442,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   if (m_hasVs) {
     // Call LS main function
     SmallVector<Value *> lsArgs;
-    auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
+    auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStage::Vertex);
 
     const auto lsArgCount = lsEntryPoint->arg_size();
 
@@ -488,7 +488,7 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
     // it through the group.
     Value *hasPatchCount = builder.CreateLShr(mergeWaveInfo, 16); // hsWaveCount = mergedWaveInfo[24:16]
     hasPatchCount = builder.CreateAnd(hasPatchCount, 0xFF);
-    const auto hsPatchCountStart = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)
+    const auto hsPatchCountStart = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)
                                        ->inOutUsage.tcs.calcFactor.onChip.hsPatchCountStart;
     writeValueToLds(hasPatchCount, builder.getInt32(hsPatchCountStart), builder);
     builder.CreateBr(endDistribHsPatchCountBlock);
@@ -512,11 +512,11 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
     // Call HS main function
     SmallVector<Value *> hsArgs;
 
-    auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageTessControl);
+    auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStage::TessControl);
 
     SmallVector<std::pair<unsigned, unsigned>> substitutions;
     if (intfData->spillTable.sizeInDwords > 0 && m_hasVs) {
-      auto vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
+      auto vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStage::Vertex);
       assert(vsIntfData->userDataUsage.spillTable > 0);
       substitutions.emplace_back(intfData->userDataUsage.spillTable, vsIntfData->userDataUsage.spillTable);
     }
@@ -566,22 +566,22 @@ FunctionType *ShaderMerger::generateEsGsEntryPointType(uint64_t *inRegMask) cons
   bool hasTs = (m_hasTcs || m_hasTes);
   if (hasTs) {
     if (m_hasTes) {
-      const auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageTessEval);
+      const auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStage::TessEval);
       userDataCount = std::max(intfData->userDataCount, userDataCount);
     }
   } else {
     if (m_hasVs) {
-      const auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
+      const auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStage::Vertex);
       userDataCount = std::max(intfData->userDataCount, userDataCount);
     }
   }
 
-  const auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry);
+  const auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStage::Geometry);
   userDataCount = std::max(intfData->userDataCount, userDataCount);
 
   if (hasTs) {
     if (m_hasTes) {
-      const auto tesIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageTessEval);
+      const auto tesIntfData = m_pipelineState->getShaderInterfaceData(ShaderStage::TessEval);
       if (intfData->spillTable.sizeInDwords > 0 && tesIntfData->spillTable.sizeInDwords == 0) {
         tesIntfData->userDataUsage.spillTable = userDataCount;
         ++userDataCount;
@@ -590,7 +590,7 @@ FunctionType *ShaderMerger::generateEsGsEntryPointType(uint64_t *inRegMask) cons
     }
   } else {
     if (m_hasVs) {
-      const auto vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
+      const auto vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStage::Vertex);
       if (intfData->spillTable.sizeInDwords > 0 && vsIntfData->spillTable.sizeInDwords == 0) {
         vsIntfData->userDataUsage.spillTable = userDataCount;
         ++userDataCount;
@@ -666,7 +666,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
 
   entryPoint->addFnAttr("amdgpu-flat-work-group-size",
                         "128,128"); // Force s_barrier to be present (ignore optimization)
-  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageGeometry);
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Geometry);
   if (m_gfxIp.major >= 10)
     entryPoint->addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
   applyTuningAttributes(entryPoint, tuningAttrs);
@@ -693,7 +693,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   //     Run GS
   // }
   //
-  const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
+  const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor;
 
   SmallVector<Argument *, 32> args;
   for (auto &arg : entryPoint->args())
@@ -789,7 +789,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   if ((hasTs && m_hasTes) || (!hasTs && m_hasVs)) {
     // Call ES main function
     SmallVector<Value *> esArgs;
-    auto intfData = m_pipelineState->getShaderInterfaceData(hasTs ? ShaderStageTessEval : ShaderStageVertex);
+    auto intfData = m_pipelineState->getShaderInterfaceData(hasTs ? ShaderStage::TessEval : ShaderStage::Vertex);
     spillTableIdx = intfData->userDataUsage.spillTable;
 
     const unsigned esArgCount = esEntryPoint->arg_size();
@@ -860,7 +860,7 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
 
     // Call GS main function
     SmallVector<llvm::Value *> gsArgs;
-    auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageGeometry);
+    auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStage::Geometry);
 
     SmallVector<std::pair<unsigned, unsigned>> substitutions;
     if (intfData->spillTable.sizeInDwords > 0 && spillTableIdx > 0)
@@ -1000,19 +1000,19 @@ void ShaderMerger::processRayQueryLdsStack(Function *entryPoint1, Function *entr
   if (ldsStack) {
     unsigned ldsStackBase = 0;
 
-    ShaderStage shaderStage2 = ShaderStageInvalid;
+    std::optional<ShaderStageEnum> shaderStage2;
     if (entryPoint2)
       shaderStage2 = lgc::getShaderStage(entryPoint2);
 
-    if (shaderStage2 == ShaderStageTessControl) {
+    if (shaderStage2 == ShaderStage::TessControl) {
       // Must be LS-HS merged shader
       const auto &calcFactor =
-          m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
+          m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.calcFactor;
       if (calcFactor.rayQueryLdsStackSize > 0)
         ldsStackBase = calcFactor.tessOnChipLdsSize;
     } else {
       // Must be ES-GS merged shader or NGG primitive shader
-      const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageGeometry)->inOutUsage.gs.calcFactor;
+      const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor;
       if (calcFactor.rayQueryLdsStackSize > 0)
         ldsStackBase = calcFactor.gsOnChipLdsSize;
     }
@@ -1089,8 +1089,8 @@ void ShaderMerger::storeTessFactorsWithOpt(Value *threadIdInWave, IRBuilder<> &b
   auto entryPoint = insertBlock->getParent();
   assert(entryPoint->getName() == lgcName::LsHsEntryPoint); // Must be LS-HS merged shader
 
-  const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStageTessControl)->inOutUsage.tcs.calcFactor;
-  const unsigned waveSize = m_pipelineState->getMergedShaderWaveSize(ShaderStageTessControl);
+  const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl)->inOutUsage.tcs.calcFactor;
+  const unsigned waveSize = m_pipelineState->getMergedShaderWaveSize(ShaderStage::TessControl);
   assert(waveSize == 32 || waveSize == 64);
 
   // Helper to create a basic block

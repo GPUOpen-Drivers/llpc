@@ -99,9 +99,10 @@ public:
   Value *transAtomicRMW(SPIRVValue *, const AtomicRMWInst::BinOp);
   Constant *transInitializer(SPIRVValue *, Type *);
   template <spv::Op> Value *transValueWithOpcode(SPIRVValue *);
+  template <spv::Op> SmallVector<Value *> transValueMultiWithOpcode(SPIRVValue *);
   Value *transLoadImage(SPIRVValue *spvImageLoadPtr);
   Value *loadImageSampler(Type *elementTy, Value *base);
-  Value *transImagePointer(SPIRVValue *spvImagePtr);
+  Value *transImagePointer(SPIRVValue *spvImagePtr, SPIRVType *elementTy = nullptr);
   Value *getDescPointerAndStride(lgc::ResourceNodeType resType, unsigned descriptorSet, unsigned binding,
                                  lgc::ResourceNodeType searchType);
   Value *transOpAccessChainForImage(SPIRVAccessChainBase *spvAccessChain);
@@ -128,7 +129,9 @@ public:
   Instruction *transBarrierFence(SPIRVInstruction *bi, BasicBlock *bb);
   Value *transString(const SPIRVString *spvValue);
   Value *transDebugPrintf(SPIRVInstruction *bi, const ArrayRef<SPIRVValue *> spvValues, Function *func, BasicBlock *bb);
-
+  Value *transVariable(SPIRVValue *const spvValue);
+  SmallVector<Value *> transAccessChain(SPIRVValue *const spvValue);
+  Value *transArrayLength(SPIRVValue *const spvValue);
   // Struct used to pass information in and out of getImageDesc.
   struct ExtractedImageInfo {
     BasicBlock *bb;
@@ -253,6 +256,7 @@ private:
   llvm::ArrayRef<ConvertingSampler> m_convertingSamplers;
   SPIRVToLLVMTypeMap m_typeMap;
   SPIRVToLLVMFullTypeMap m_fullTypeMap;
+  SPIRVToLLVMFullTypeMap m_imageTypeMap; // Map to store struct/array with sampler type
   SPIRVToLLVMValueMap m_valueMap;
   SPIRVToLLVMEntryMap m_entryMap;
   SPIRVToLLVMFunctionMap m_funcMap;
@@ -381,7 +385,6 @@ private:
 
   // Change this if it is no longer true.
   bool isFuncNoUnwind() const { return true; }
-  bool isSPIRVCmpInstTransToLLVMInst(SPIRVInstruction *bi) const;
 
   Value *mapFunction(SPIRVFunction *bf, Function *f) {
     m_funcMap[bf] = f;
@@ -401,7 +404,7 @@ private:
   FastMathFlags getFastMathFlags(SPIRVValue *bv);
   void setFastMathFlags(SPIRVValue *bv);
   void setFastMathFlags(Value *val);
-  llvm::Value *transShiftLogicalBitwiseInst(SPIRVValue *bv, BasicBlock *bb, Function *f);
+  llvm::Value *transBinaryShiftBitwiseInst(SPIRVValue *bv, BasicBlock *bb, Function *f);
   llvm::Value *transCmpInst(SPIRVValue *bv, BasicBlock *bb, Function *f);
 
   void setName(ArrayRef<Value *> values, SPIRVValue *bv);

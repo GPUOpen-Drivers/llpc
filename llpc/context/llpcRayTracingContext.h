@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -31,6 +31,7 @@
 #pragma once
 
 #include "llpcPipelineContext.h"
+#include "lgc/RayTracingLibrarySummary.h"
 #include <set>
 
 namespace lgc {
@@ -53,6 +54,7 @@ public:
 
   // Gets pipeline build info
   virtual const void *getPipelineBuildInfo() const override { return m_pipelineInfo; }
+  const Vkgc::RayTracingPipelineBuildInfo *getRayTracingPipelineBuildInfo() const { return m_pipelineInfo; }
 
   // Gets the mask of active shader stages bound to this pipeline
   virtual unsigned getShaderStageMask() const override;
@@ -86,6 +88,8 @@ public:
   // Set the Context linked state
   void setLinked(bool linked) { m_linked = linked; }
 
+  lgc::RayTracingLibrarySummary &getRayTracingLibrarySummary() { return m_rtLibSummary; }
+
   // Get the raytracing indirect mask
   const unsigned getIndirectStageMask() const { return m_indirectStageMask; }
 
@@ -104,11 +108,11 @@ public:
   llvm::Type *getCallableDataType(lgc::Builder *builder);
   unsigned getCallableDataSizeInBytes() { return m_callableDataMaxSize; }
   unsigned getAttributeDataSize();
-  unsigned getAttributeDataSizeInBytes() { return m_attributeDataMaxSize; };
+  unsigned getAttributeDataSizeInBytes() { return m_rtLibSummary.maxHitAttributeSize; };
   std::set<unsigned, std::less<unsigned>> &getBuiltIns() { return m_builtIns; }
-  bool getHitAttribute() { return m_attributeDataMaxSize > 0; }
-  unsigned getPayloadSizeInDword() { return m_payloadMaxSize / 4; }
-  unsigned getPayloadSizeInBytes() { return m_payloadMaxSize; }
+  bool getHitAttribute() { return m_rtLibSummary.maxHitAttributeSize > 0; }
+  unsigned getPayloadSizeInDword() { return llvm::divideCeil(m_rtLibSummary.maxRayPayloadSize, 4); }
+  unsigned getPayloadSizeInBytes() { return m_rtLibSummary.maxRayPayloadSize; }
   bool hasPipelineLibrary() { return m_pipelineInfo->hasPipelineLibrary; }
   unsigned hasLibraryStage(unsigned stageMask) { return m_pipelineInfo->pipelineLibStageMask & stageMask; }
   bool isReplay() { return m_pipelineInfo->isReplay; }
@@ -133,10 +137,9 @@ private:
   bool m_linked;                                      // Whether the context is linked or not
   unsigned m_indirectStageMask;                       // Which stages enable indirect call for ray tracing
   std::string m_entryName;                            // Entry function of the raytracing module
-  unsigned m_payloadMaxSize;                          // Payloads maximum size
   unsigned m_callableDataMaxSize;                     // Callable maximum size
-  unsigned m_attributeDataMaxSize;                    // Attribute maximum size
   std::set<unsigned, std::less<unsigned>> m_builtIns; // Collected raytracing
+  lgc::RayTracingLibrarySummary m_rtLibSummary = {};
 };
 
 } // namespace Llpc

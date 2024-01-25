@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2023-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -74,7 +74,7 @@ static void createHalt(Function *func, Builder *builder) {
 // @param func : The function to process
 // @param builder : The IR builder
 static void createNumWavesCompute(Function *func, Builder *builder) {
-  Value *workgroupSize = builder->CreateReadBuiltInInput(lgc::BuiltInWorkgroupSize, {}, nullptr, nullptr, "");
+  Value *workgroupSize = builder->CreateReadBuiltInInput(lgc::BuiltInWorkgroupSize);
   Value *workgroupSizeX = builder->CreateExtractElement(workgroupSize, uint64_t(0));
   Value *workgroupSizeY = builder->CreateExtractElement(workgroupSize, 1);
   Value *workgroupSizeZ = builder->CreateExtractElement(workgroupSize, 2);
@@ -93,11 +93,8 @@ static void createNumWavesCompute(Function *func, Builder *builder) {
 // @param func : The function to process
 // @param builder : The IR builder
 static void createWaveIndexCompute(Function *func, Builder *builder) {
-  // return (gl_LocalInvocationIndex / WaveSize)
-  Value *flattenedThreadId =
-      builder->CreateReadBuiltInInput(lgc::BuiltInLocalInvocationIndex, {}, nullptr, nullptr, "");
-  Value *waveSize = builder->CreateGetWaveSize();
-  builder->CreateRet(builder->CreateUDiv(flattenedThreadId, waveSize));
+  Value *waveId = builder->CreateReadBuiltInInput(lgc::BuiltInSubgroupId, {}, nullptr, nullptr, "");
+  builder->CreateRet(waveId);
 }
 
 // =====================================================================================================================
@@ -106,7 +103,7 @@ static void createWaveIndexCompute(Function *func, Builder *builder) {
 // @param func : The function to process
 // @param builder : The IR builder
 static void createGroupIdCompute(Function *func, Builder *builder) {
-  Value *workGroupId = builder->CreateReadBuiltInInput(lgc::BuiltInWorkgroupId, {}, nullptr, nullptr, "");
+  Value *workGroupId = builder->CreateReadBuiltInInput(lgc::BuiltInWorkgroupId);
   builder->CreateRet(workGroupId);
 }
 
@@ -116,7 +113,7 @@ static void createGroupIdCompute(Function *func, Builder *builder) {
 // @param func : The function to process
 // @param builder : The IR builder
 static void createGroupDimCompute(Function *func, Builder *builder) {
-  Value *workGroupSize = builder->CreateReadBuiltInInput(lgc::BuiltInWorkgroupSize, {}, nullptr, nullptr, "");
+  Value *workGroupSize = builder->CreateReadBuiltInInput(lgc::BuiltInWorkgroupSize);
   builder->CreateRet(workGroupSize);
 }
 
@@ -126,7 +123,7 @@ static void createGroupDimCompute(Function *func, Builder *builder) {
 // @param func : The function to process
 // @param builder : The IR builder
 static void createThreadIdInGroupCompute(Function *func, Builder *builder) {
-  Value *threadId = builder->CreateReadBuiltInInput(lgc::BuiltInLocalInvocationId, {}, nullptr, nullptr, "");
+  Value *threadId = builder->CreateReadBuiltInInput(lgc::BuiltInLocalInvocationId);
   builder->CreateRet(threadId);
 }
 
@@ -136,7 +133,7 @@ static void createThreadIdInGroupCompute(Function *func, Builder *builder) {
 // @param func : The function to process
 // @param builder : The IR builder
 static void createFlattenedThreadIdInGroupCompute(Function *func, Builder *builder) {
-  Value *threadId = builder->CreateReadBuiltInInput(lgc::BuiltInLocalInvocationIndex, {}, nullptr, nullptr, "");
+  Value *threadId = builder->CreateReadBuiltInInput(lgc::BuiltInLocalInvocationIndex);
   builder->CreateRet(threadId);
 }
 

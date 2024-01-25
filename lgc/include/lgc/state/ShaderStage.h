@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -41,41 +41,20 @@ class Type;
 
 namespace lgc {
 
-// Translates shader stage to corresponding stage mask.
-constexpr unsigned shaderStageToMask() {
-  return 0; // To end the recursive call
-}
-
-template <typename Stage, typename... Stages>
-constexpr unsigned shaderStageToMask(Stage theStage, Stages... otherStages) {
-  static_assert(std::is_enum<Stage>::value, "Can only be used with ShaderStage enums");
-  return (1U << static_cast<unsigned>(theStage)) | shaderStageToMask(otherStages...);
-}
-
-// Return true iff `stage` is present in the `stageMask`.
-//
-// @param stage : Shader stage to look for
-// @param stageMask : Stage mask to check
-// @returns : True iff `stageMask` contains `stage`
-inline bool isShaderStageInMask(ShaderStage stage, unsigned stageMask) {
-  assert(stage != ShaderStageInvalid);
-  return (shaderStageToMask(stage) & stageMask) != 0;
-}
-
 // Set shader stage metadata on every defined function in a module
-void setShaderStage(llvm::Module *module, ShaderStage stage);
+void setShaderStage(llvm::Module *module, std::optional<ShaderStageEnum> stage);
 
 // Set shader stage metadata on a function
-void setShaderStage(llvm::Function *func, ShaderStage stage);
+void setShaderStage(llvm::Function *func, std::optional<ShaderStageEnum> stage);
 
 // Gets the shader stage from the specified LLVM function.
-ShaderStage getShaderStage(const llvm::Function *func);
+std::optional<ShaderStageEnum> getShaderStage(const llvm::Function *func);
 
 // Determine whether the function is a shader entry-point.
 bool isShaderEntryPoint(const llvm::Function *func);
 
 // Gets name string of the abbreviation for the specified shader stage
-const char *getShaderStageAbbreviation(ShaderStage shaderStage);
+const char *getShaderStageAbbreviation(ShaderStageEnum shaderStage);
 
 enum AddFunctionArgsFlag : unsigned {
   AddFunctionArgsAppend = 0x1,

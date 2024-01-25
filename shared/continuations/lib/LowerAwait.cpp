@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
- *deal in the Software without restriction, including without limitation the
- *rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- *sell copies of the Software, and to permit persons to whom the Software is
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in
@@ -18,8 +18,8 @@
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- *FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- *IN THE SOFTWARE.
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 
@@ -170,7 +170,7 @@ static void processContinuations(
     // Lgc.cps dialect will handle stack pointer and return address in other
     // places.
     bool IsLegacyNonEntry =
-        !F->hasMetadata(DXILContHelper::MDEntryName) && !LowerLgcAwait;
+        !F->hasMetadata(ContHelper::MDEntryName) && !LowerLgcAwait;
     // Add continuation stack pointer and passed return address.
     if (IsLegacyNonEntry) {
       AllArgTypes.push_back(getContinuationStackOffsetType(Context));
@@ -230,8 +230,8 @@ static void processContinuations(
     // Add metadata, marking it as a continuation function
     MDTuple *ContMDTuple =
         MDTuple::get(Context, {ValueAsMetadata::get(NewFunc)});
-    NewFunc->setMetadata(DXILContHelper::MDContinuationName, ContMDTuple);
-    ContProtoFunc->setMetadata(DXILContHelper::MDContinuationName, ContMDTuple);
+    NewFunc->setMetadata(ContHelper::MDContinuationName, ContMDTuple);
+    ContProtoFunc->setMetadata(ContHelper::MDContinuationName, ContMDTuple);
 
     auto *ContProtoFuncPtr = ConstantExpr::getBitCast(ContProtoFunc, I8Ptr);
 
@@ -347,10 +347,10 @@ LowerAwaitPass::run(llvm::Module &M,
   bool LowerLgcAwait = !ToProcess.empty();
   if (!LowerLgcAwait) {
     for (auto &F : M.functions()) {
-      if (!F.getName().startswith("await.")) {
+      if (!F.getName().starts_with("await.")) {
         // Force processing annotated functions, even if they don't have await
         // calls
-        if (F.hasMetadata(DXILContHelper::MDContinuationName))
+        if (F.hasMetadata(ContHelper::MDContinuationName))
           ToProcess[&F].size();
         continue;
       }

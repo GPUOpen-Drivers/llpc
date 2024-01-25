@@ -34,7 +34,7 @@ void main()
 
 // SHADERTEST-LABEL: @lgc.shader.FS.main(
 // SHADERTEST-NEXT:  .entry:
-// SHADERTEST-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i64 0, i32 0, i32 0, i32 0)
+// SHADERTEST-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 0)
 // SHADERTEST-NEXT:    [[TMP1:%.*]] = call ptr @llvm.invariant.start.p7(i64 -1, ptr addrspace(7) [[TMP0]])
 // SHADERTEST-NEXT:    [[TMP2:%.*]] = getelementptr inbounds <{ i64, i64, [16 x i8], [3 x i64], [8 x i8], [3 x i64] }>, ptr addrspace(7) [[TMP0]], i32 0, i32 3
 // SHADERTEST-NEXT:    [[TMP3:%.*]] = load <3 x i64>, ptr addrspace(7) [[TMP2]], align 32

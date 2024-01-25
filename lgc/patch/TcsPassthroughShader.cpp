@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2018-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2018-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -74,17 +74,17 @@ PreservedAnalyses TcsPassthroughShader::run(Module &module, ModuleAnalysisManage
 // @param module : LLVM module to be run on
 // @param pipelineState : The pipeline state read from module.
 void TcsPassthroughShader::updatePipelineState(Module &module, PipelineState *pipelineState) const {
-  pipelineState->setShaderStageMask(pipelineState->getShaderStageMask() | shaderStageToMask(ShaderStageTessControl));
+  pipelineState->setShaderStageMask(pipelineState->getShaderStageMask() | ShaderStageMask(ShaderStage::TessControl));
 
   TessellationMode tessellationMode = pipelineState->getShaderModes()->getTessellationMode();
   tessellationMode.outputVertices = tessellationMode.inputVertices;
-  pipelineState->setTessellationMode(module, ShaderStageTessControl, tessellationMode);
+  pipelineState->setTessellationMode(module, ShaderStage::TessControl, tessellationMode);
   pipelineState->readState(&module);
 
-  ShaderOptions options = pipelineState->getShaderOptions(ShaderStageTessControl);
+  ShaderOptions options = pipelineState->getShaderOptions(ShaderStage::TessControl);
   options.hash[0] = (uint64_t)-1;
   options.hash[1] = (uint64_t)-1;
-  pipelineState->setShaderOptions(ShaderStageTessControl, options);
+  pipelineState->setShaderOptions(ShaderStage::TessControl, options);
 }
 
 // =====================================================================================================================
@@ -112,7 +112,7 @@ Function *TcsPassthroughShader::generateTcsPassthroughEntryPoint(Module &module,
   Function *entryPoint =
       Function::Create(entryPointTy, GlobalValue::ExternalLinkage, lgcName::TcsPassthroughEntryPoint, &module);
   entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
-  setShaderStage(entryPoint, ShaderStageTessControl);
+  setShaderStage(entryPoint, ShaderStage::TessControl);
   entryPoint->setCallingConv(CallingConv::SPIR_FUNC);
   return entryPoint;
 }
@@ -131,7 +131,7 @@ void TcsPassthroughShader::generateTcsPassthroughShaderBody(Module &module, Pipe
   BuilderBase builder(module.getContext());
   builder.SetInsertPoint(block);
 
-  ResourceUsage *tcsResourceUsage = pipelineState->getShaderResourceUsage(ShaderStageTessControl);
+  ResourceUsage *tcsResourceUsage = pipelineState->getShaderResourceUsage(ShaderStage::TessControl);
   auto &tcsInputLocInfoMap = tcsResourceUsage->inOutUsage.inputLocInfoMap;
   auto &tcsOutputLocInfoMap = tcsResourceUsage->inOutUsage.outputLocInfoMap;
   auto &tcsBuiltInInfo = tcsResourceUsage->builtInUsage.tcs;
@@ -187,9 +187,9 @@ void TcsPassthroughShader::generateTcsPassthroughShaderBody(Module &module, Pipe
 
   // ---------------------------------------------------------------------------------------------
   // copy vs generic output and built-in output to tcs output
-  Function *vsEntryPoint = pipelineShaders.getEntryPoint(ShaderStageVertex);
+  Function *vsEntryPoint = pipelineShaders.getEntryPoint(ShaderStage::Vertex);
   for (Function &func : *vsEntryPoint->getParent()) {
-    if (func.getName().startswith(lgcName::OutputExportGeneric)) {
+    if (func.getName().starts_with(lgcName::OutputExportGeneric)) {
       for (auto user : func.users()) {
         CallInst *callInst = dyn_cast<CallInst>(user);
         if (!callInst || callInst->getParent()->getParent() != vsEntryPoint)
@@ -228,7 +228,7 @@ void TcsPassthroughShader::generateTcsPassthroughShaderBody(Module &module, Pipe
         tcsInputLocInfoMap[origLocInfo].setData(InvalidValue);
         tcsOutputLocInfoMap[origLocInfo].setData(InvalidValue);
       }
-    } else if (func.getName().startswith(lgcName::OutputExportBuiltIn)) {
+    } else if (func.getName().starts_with(lgcName::OutputExportBuiltIn)) {
       for (auto user : func.users()) {
         CallInst *callInst = dyn_cast<CallInst>(user);
         if (!callInst || callInst->getParent()->getParent() != vsEntryPoint)
