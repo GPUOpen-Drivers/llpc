@@ -48,7 +48,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
 
 # Update the VulkanSDK 1.3.216 or higher, install the shader compiler tools for gpurt.
 RUN wget -qO /etc/apt/trusted.gpg.d/lunarg.asc https://packages.lunarg.com/lunarg-signing-key-pub.asc \
-    && wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list \
+    && wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list https://packages.lunarg.com/vulkan/1.3.268/lunarg-vulkan-1.3.268-jammy.list \
     && apt-get update \
     && apt-get install -yqq --no-install-recommends dxc glslang-tools \
     && rm -rf /var/lib/apt/lists/* \
