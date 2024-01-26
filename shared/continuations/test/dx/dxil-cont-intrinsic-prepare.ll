@@ -84,7 +84,7 @@ attributes #4 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; CHECK-LABEL: define %struct.DispatchSystemData @_cont_SetupRayGen(
-; CHECK-SAME: ) #[[ATTR1:[0-9]+]] !types !0 {
+; CHECK-SAME: ) #[[ATTR1:[0-9]+]] !types [[META0:![0-9]+]] {
 ; CHECK-NEXT:    [[TMP1:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA:%.*]], align 8
 ; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[TMP1]], i32 0, i32 0
 ; CHECK-NEXT:    store i32 2, ptr [[TMP2]], align 4
@@ -100,7 +100,7 @@ attributes #4 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; CHECK-LABEL: define %struct.DispatchSystemData @_cont_TraceRay(
-; CHECK-SAME: ptr nocapture readonly [[DATA:%.*]], i64 [[ACCELSTRUCT:%.*]], i32 [[RAYFLAGS:%.*]], i32 [[INSTANCEINCLUSIOMASK:%.*]], i32 [[RAYCONTRIBUTIONTOHITGROUPINDEX:%.*]], i32 [[MULTIPLIERFORGEOMETRYCONTRIBUTIONTOSHADERINDEX:%.*]], i32 [[MISSSHADERINDEX:%.*]], float [[ORIGINX:%.*]], float [[ORIGINY:%.*]], float [[ORIGINZ:%.*]], float [[TMIN:%.*]], float [[DIRX:%.*]], float [[DIRY:%.*]], float [[DIRZ:%.*]], float [[TMAX:%.*]]) #[[ATTR1]] !types !2 {
+; CHECK-SAME: ptr nocapture readonly [[DATA:%.*]], i64 [[ACCELSTRUCT:%.*]], i32 [[RAYFLAGS:%.*]], i32 [[INSTANCEINCLUSIOMASK:%.*]], i32 [[RAYCONTRIBUTIONTOHITGROUPINDEX:%.*]], i32 [[MULTIPLIERFORGEOMETRYCONTRIBUTIONTOSHADERINDEX:%.*]], i32 [[MISSSHADERINDEX:%.*]], float [[ORIGINX:%.*]], float [[ORIGINY:%.*]], float [[ORIGINZ:%.*]], float [[TMIN:%.*]], float [[DIRX:%.*]], float [[DIRY:%.*]], float [[DIRZ:%.*]], float [[TMAX:%.*]]) #[[ATTR1]] !types [[META2:![0-9]+]] {
 ; CHECK-NEXT:    [[TMP1:%.*]] = alloca [[STRUCT_TRAVERSALDATA:%.*]], align 4
 ; CHECK-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA:%.*]], align 4
 ; CHECK-NEXT:    [[TMP3:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8

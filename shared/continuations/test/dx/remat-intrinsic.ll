@@ -124,86 +124,69 @@ attributes #1 = { nounwind }
 ;
 ;
 ; SAVESTATE-LABEL: define void @called(
-; SAVESTATE-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !continuation !15 !lgc.rt.shaderstage !16 !continuation.registercount !17 !continuation.state !18 !continuation.stacksize !18 {
+; SAVESTATE-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !continuation [[META15:![0-9]+]] !lgc.rt.shaderstage [[META16:![0-9]+]] !continuation.registercount [[META17:![0-9]+]] !continuation.state [[META18:![0-9]+]] !continuation.stacksize [[META18]] {
 ; SAVESTATE-NEXT:  AllocaSpillBB:
-; SAVESTATE-NEXT:    [[SYSTEM_DATA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
-; SAVESTATE-NEXT:    [[CONT_STATE:%.*]] = alloca [2 x i32], align 4
 ; SAVESTATE-NEXT:    [[CSP:%.*]] = alloca i32, align 4
-; SAVESTATE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA]], align 4
+; SAVESTATE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
+; SAVESTATE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; SAVESTATE-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
-; SAVESTATE-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[CALLED_FRAME:%.*]], ptr [[CONT_STATE]], i32 0, i32 0
-; SAVESTATE-NEXT:    store i64 [[RETURNADDR]], ptr [[RETURNADDR_SPILL_ADDR]], align 4
-; SAVESTATE-NEXT:    [[TMP1:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA]], align 4
-; SAVESTATE-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], 0
+; SAVESTATE-NEXT:    [[TMP1:%.*]] = load i32, ptr [[CSP]], align 4
+; SAVESTATE-NEXT:    [[TMP2:%.*]] = inttoptr i32 [[TMP1]] to ptr addrspace(21)
+; SAVESTATE-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP2]], i64 0
+; SAVESTATE-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[CALLED_FRAME:%.*]], ptr addrspace(21) [[TMP3]], i32 0, i32 0
+; SAVESTATE-NEXT:    store i64 [[RETURNADDR]], ptr addrspace(21) [[RETURNADDR_SPILL_ADDR]], align 4
+; SAVESTATE-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
+; SAVESTATE-NEXT:    [[TMP4:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
 ; SAVESTATE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
-; SAVESTATE-NEXT:    [[TMP2:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
-; SAVESTATE-NEXT:    [[TMP3:%.*]] = call <3 x i32> @_cont_DispatchRaysIndex3(ptr [[SYSTEM_DATA]])
-; SAVESTATE-NEXT:    [[I:%.*]] = extractelement <3 x i32> [[TMP3]], i8 0
+; SAVESTATE-NEXT:    [[TMP5:%.*]] = call <3 x i32> @_cont_DispatchRaysIndex3(ptr [[SYSTEM_DATA_ALLOCA]])
+; SAVESTATE-NEXT:    [[I:%.*]] = extractelement <3 x i32> [[TMP5]], i8 0
 ; SAVESTATE-NEXT:    [[UNPACKED:%.*]] = call [[DX_TYPES_FOURI32:%.*]] @dx.op.unpack4x8.i32(i32 219, i8 1, i32 [[I]])
 ; SAVESTATE-NEXT:    [[HANDLE0:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
 ; SAVESTATE-NEXT:    [[HANDLE1:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.createHandleForLib.dx.types.Handle(i32 160, [[DX_TYPES_HANDLE]] [[HANDLE0]])
 ; SAVESTATE-NEXT:    [[HANDLE2:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.annotateHandle(i32 216, [[DX_TYPES_HANDLE]] [[HANDLE1]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
 ; SAVESTATE-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, i32 [[DOTFCA_0_EXTRACT]], 0
-; SAVESTATE-NEXT:    store i32 [[TMP2]], ptr addrspace(20) @REGISTERS, align 4
-; SAVESTATE-NEXT:    [[TMP4:%.*]] = load i32, ptr [[CSP]], align 4
-; SAVESTATE-NEXT:    [[TMP5:%.*]] = add i32 [[TMP4]], 8
-; SAVESTATE-NEXT:    store i32 [[TMP5]], ptr [[CSP]], align 4
-; SAVESTATE-NEXT:    [[TMP6:%.*]] = inttoptr i32 [[TMP4]] to ptr addrspace(21)
-; SAVESTATE-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [2 x i32], ptr [[CONT_STATE]], i32 0, i32 0
-; SAVESTATE-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [2 x i32], ptr addrspace(21) [[TMP6]], i32 0, i32 0
-; SAVESTATE-NEXT:    [[TMP9:%.*]] = load i32, ptr [[TMP7]], align 4
-; SAVESTATE-NEXT:    store i32 [[TMP9]], ptr addrspace(21) [[TMP8]], align 4
-; SAVESTATE-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [2 x i32], ptr [[CONT_STATE]], i32 0, i32 1
-; SAVESTATE-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [2 x i32], ptr addrspace(21) [[TMP6]], i32 0, i32 1
-; SAVESTATE-NEXT:    [[TMP12:%.*]] = load i32, ptr [[TMP10]], align 4
-; SAVESTATE-NEXT:    store i32 [[TMP12]], ptr addrspace(21) [[TMP11]], align 4
-; SAVESTATE-NEXT:    [[TMP13:%.*]] = load i32, ptr [[CSP]], align 4
-; SAVESTATE-NEXT:    [[TMP14:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @called.resume.0 to i64))
-; SAVESTATE-NEXT:    call void (i64, ...) @continuation.continue(i64 2, i32 [[TMP13]], i64 [[TMP14]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I_FCA_0_INSERT]]), !continuation.registercount !17, !continuation.returnedRegistercount !17
+; SAVESTATE-NEXT:    store i32 [[TMP4]], ptr addrspace(20) @REGISTERS, align 4
+; SAVESTATE-NEXT:    [[TMP6:%.*]] = load i32, ptr [[CSP]], align 4
+; SAVESTATE-NEXT:    [[TMP7:%.*]] = add i32 [[TMP6]], 8
+; SAVESTATE-NEXT:    store i32 [[TMP7]], ptr [[CSP]], align 4
+; SAVESTATE-NEXT:    [[TMP8:%.*]] = load i32, ptr [[CSP]], align 4
+; SAVESTATE-NEXT:    [[TMP9:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @called.resume.0 to i64))
+; SAVESTATE-NEXT:    call void (i64, ...) @continuation.continue(i64 2, i32 [[TMP8]], i64 [[TMP9]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DIS_DATA_I_FCA_0_INSERT]]), !continuation.registercount [[META17]], !continuation.returnedRegistercount !17
 ; SAVESTATE-NEXT:    unreachable
 ;
 ;
 ; SAVESTATE-LABEL: define dso_local void @called.resume.0(
-; SAVESTATE-SAME: i32 [[TMP0:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP1:%.*]]) !continuation !15 !lgc.rt.shaderstage !16 !continuation.registercount !17 {
+; SAVESTATE-SAME: i32 [[TMP0:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP1:%.*]]) !continuation [[META15]] !lgc.rt.shaderstage [[META16]] !continuation.registercount [[META17]] {
 ; SAVESTATE-NEXT:  entryresume.0:
-; SAVESTATE-NEXT:    [[SYSTEM_DATA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
-; SAVESTATE-NEXT:    [[CONT_STATE:%.*]] = alloca [2 x i32], align 4
 ; SAVESTATE-NEXT:    [[CSP:%.*]] = alloca i32, align 4
-; SAVESTATE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], ptr [[SYSTEM_DATA]], align 4
+; SAVESTATE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
+; SAVESTATE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; SAVESTATE-NEXT:    store i32 [[TMP0]], ptr [[CSP]], align 4
 ; SAVESTATE-NEXT:    [[TMP2:%.*]] = load i32, ptr [[CSP]], align 4
-; SAVESTATE-NEXT:    [[TMP3:%.*]] = inttoptr i32 [[TMP2]] to ptr addrspace(21)
-; SAVESTATE-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP3]], i64 -8
-; SAVESTATE-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [2 x i32], ptr addrspace(21) [[TMP4]], i32 0, i32 0
-; SAVESTATE-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [2 x i32], ptr [[CONT_STATE]], i32 0, i32 0
-; SAVESTATE-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(21) [[TMP5]], align 4
-; SAVESTATE-NEXT:    store i32 [[TMP7]], ptr [[TMP6]], align 4
-; SAVESTATE-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [2 x i32], ptr addrspace(21) [[TMP4]], i32 0, i32 1
-; SAVESTATE-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [2 x i32], ptr [[CONT_STATE]], i32 0, i32 1
-; SAVESTATE-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(21) [[TMP8]], align 4
-; SAVESTATE-NEXT:    store i32 [[TMP10]], ptr [[TMP9]], align 4
-; SAVESTATE-NEXT:    [[TMP11:%.*]] = load i32, ptr [[CSP]], align 4
-; SAVESTATE-NEXT:    [[TMP12:%.*]] = add i32 [[TMP11]], -8
-; SAVESTATE-NEXT:    store i32 [[TMP12]], ptr [[CSP]], align 4
-; SAVESTATE-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
+; SAVESTATE-NEXT:    [[TMP3:%.*]] = add i32 [[TMP2]], -8
+; SAVESTATE-NEXT:    store i32 [[TMP3]], ptr [[CSP]], align 4
+; SAVESTATE-NEXT:    [[TMP4:%.*]] = load i32, ptr [[CSP]], align 4
+; SAVESTATE-NEXT:    [[TMP5:%.*]] = inttoptr i32 [[TMP4]] to ptr addrspace(21)
+; SAVESTATE-NEXT:    [[TMP6:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP5]], i64 0
+; SAVESTATE-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(20) @REGISTERS, align 4
 ; SAVESTATE-NEXT:    [[DOTFCA_0_EXTRACT3:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], 0
 ; SAVESTATE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
-; SAVESTATE-NEXT:    [[RETURNADDR_RELOAD_ADDR:%.*]] = getelementptr inbounds [[CALLED_FRAME:%.*]], ptr [[CONT_STATE]], i32 0, i32 0
-; SAVESTATE-NEXT:    [[RETURNADDR_RELOAD:%.*]] = load i64, ptr [[RETURNADDR_RELOAD_ADDR]], align 4
+; SAVESTATE-NEXT:    [[RETURNADDR_RELOAD_ADDR:%.*]] = getelementptr inbounds [[CALLED_FRAME:%.*]], ptr addrspace(21) [[TMP6]], i32 0, i32 0
+; SAVESTATE-NEXT:    [[RETURNADDR_RELOAD:%.*]] = load i64, ptr addrspace(21) [[RETURNADDR_RELOAD_ADDR]], align 4
 ; SAVESTATE-NEXT:    [[HANDLE011:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
 ; SAVESTATE-NEXT:    [[HANDLE110:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.createHandleForLib.dx.types.Handle(i32 160, [[DX_TYPES_HANDLE]] [[HANDLE011]])
 ; SAVESTATE-NEXT:    [[HANDLE29:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.annotateHandle(i32 216, [[DX_TYPES_HANDLE]] [[HANDLE110]], [[DX_TYPES_RESOURCEPROPERTIES:%.*]] { i32 16, i32 0 })
-; SAVESTATE-NEXT:    [[TMP14:%.*]] = call <3 x i32> @_cont_DispatchRaysIndex3(ptr [[SYSTEM_DATA]])
-; SAVESTATE-NEXT:    [[I8:%.*]] = extractelement <3 x i32> [[TMP14]], i8 0
+; SAVESTATE-NEXT:    [[TMP8:%.*]] = call <3 x i32> @_cont_DispatchRaysIndex3(ptr [[SYSTEM_DATA_ALLOCA]])
+; SAVESTATE-NEXT:    [[I8:%.*]] = extractelement <3 x i32> [[TMP8]], i8 0
 ; SAVESTATE-NEXT:    [[UNPACKED7:%.*]] = call [[DX_TYPES_FOURI32:%.*]] @dx.op.unpack4x8.i32(i32 219, i8 1, i32 [[I8]])
-; SAVESTATE-NEXT:    [[TMP15:%.*]] = call <3 x i32> @_cont_DispatchRaysIndex3(ptr [[SYSTEM_DATA]])
-; SAVESTATE-NEXT:    [[I6:%.*]] = extractelement <3 x i32> [[TMP15]], i8 0
+; SAVESTATE-NEXT:    [[TMP9:%.*]] = call <3 x i32> @_cont_DispatchRaysIndex3(ptr [[SYSTEM_DATA_ALLOCA]])
+; SAVESTATE-NEXT:    [[I6:%.*]] = extractelement <3 x i32> [[TMP9]], i8 0
 ; SAVESTATE-NEXT:    [[UNPACKED5:%.*]] = call [[DX_TYPES_FOURI32]] @dx.op.unpack4x8.i32(i32 219, i8 1, i32 [[I6]])
-; SAVESTATE-NEXT:    [[TMP16:%.*]] = call <3 x i32> @_cont_DispatchRaysIndex3(ptr [[SYSTEM_DATA]])
-; SAVESTATE-NEXT:    [[I4:%.*]] = extractelement <3 x i32> [[TMP16]], i8 0
+; SAVESTATE-NEXT:    [[TMP10:%.*]] = call <3 x i32> @_cont_DispatchRaysIndex3(ptr [[SYSTEM_DATA_ALLOCA]])
+; SAVESTATE-NEXT:    [[I4:%.*]] = extractelement <3 x i32> [[TMP10]], i8 0
 ; SAVESTATE-NEXT:    [[UNPACKED3:%.*]] = call [[DX_TYPES_FOURI32]] @dx.op.unpack4x8.i32(i32 219, i8 1, i32 [[I4]])
-; SAVESTATE-NEXT:    [[TMP17:%.*]] = call <3 x i32> @_cont_DispatchRaysIndex3(ptr [[SYSTEM_DATA]])
-; SAVESTATE-NEXT:    [[I2:%.*]] = extractelement <3 x i32> [[TMP17]], i8 0
+; SAVESTATE-NEXT:    [[TMP11:%.*]] = call <3 x i32> @_cont_DispatchRaysIndex3(ptr [[SYSTEM_DATA_ALLOCA]])
+; SAVESTATE-NEXT:    [[I2:%.*]] = extractelement <3 x i32> [[TMP11]], i8 0
 ; SAVESTATE-NEXT:    [[UNPACKED1:%.*]] = call [[DX_TYPES_FOURI32]] @dx.op.unpack4x8.i32(i32 219, i8 1, i32 [[I2]])
 ; SAVESTATE-NEXT:    [[A:%.*]] = extractvalue [[DX_TYPES_FOURI32]] [[UNPACKED7]], 0
 ; SAVESTATE-NEXT:    [[B:%.*]] = extractvalue [[DX_TYPES_FOURI32]] [[UNPACKED5]], 1
@@ -213,7 +196,7 @@ attributes #1 = { nounwind }
 ; SAVESTATE-NEXT:    call void @dx.op.textureStore.f32(i32 67, [[DX_TYPES_HANDLE]] [[HANDLE29]], i32 0, i32 0, i32 undef, float 1.000000e+00, float 2.000000e+00, float 3.000000e+00, float 1.000000e+00, i8 15)
 ; SAVESTATE-NEXT:    store i32 [[PACKED]], ptr addrspace(20) @REGISTERS, align 4
 ; SAVESTATE-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, i32 [[DOTFCA_0_EXTRACT3]], 0
-; SAVESTATE-NEXT:    [[TMP18:%.*]] = load i32, ptr [[CSP]], align 4
-; SAVESTATE-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR_RELOAD]], i32 [[TMP18]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]]), !continuation.registercount !17
+; SAVESTATE-NEXT:    [[TMP12:%.*]] = load i32, ptr [[CSP]], align 4
+; SAVESTATE-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR_RELOAD]], i32 [[TMP12]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META17]]
 ; SAVESTATE-NEXT:    unreachable
 ;

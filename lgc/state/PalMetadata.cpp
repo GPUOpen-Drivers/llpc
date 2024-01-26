@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -213,9 +213,9 @@ void PalMetadata::mergeFromBlob(llvm::StringRef blob, bool isGlueCode) {
     if (destNode->isString() && srcNode.isString()) {
       if (destNode->getString() == srcNode.getString())
         return 0;
-      if (srcNode.getString().endswith("_fetchless"))
+      if (srcNode.getString().ends_with("_fetchless"))
         return 0;
-      if (destNode->getString().endswith("_fetchless")) {
+      if (destNode->getString().ends_with("_fetchless")) {
         *destNode = srcNode;
         return 0;
       }
@@ -307,9 +307,9 @@ void PalMetadata::mergeFromBlob(llvm::StringRef blob, bool isGlueCode) {
     if (destNode->isString() && srcNode.isString()) {
       if (destNode->getString() == srcNode.getString())
         return 0;
-      if (srcNode.getString().endswith("_fetchless"))
+      if (srcNode.getString().ends_with("_fetchless"))
         return 0;
-      if (destNode->getString().endswith("_fetchless")) {
+      if (destNode->getString().ends_with("_fetchless")) {
         *destNode = srcNode;
         return 0;
       }
@@ -404,60 +404,60 @@ void PalMetadata::mergeFromBlob(llvm::StringRef blob, bool isGlueCode) {
 // stages are present in the pipeline, and whether NGG is enabled. The first time this is called must be
 // after PatchResourceCollect has run.
 //
-// @param stage : ShaderStage
-unsigned PalMetadata::getUserDataReg0(ShaderStage stage) {
+// @param stage : ShaderStageEnum
+unsigned PalMetadata::getUserDataReg0(ShaderStageEnum stage) {
   assert(!m_useRegisterFieldFormat);
   if (m_userDataRegMapping[stage] != 0)
     return m_userDataRegMapping[stage];
 
   // Mapping not yet initialized.
-  // Set up ShaderStage -> user data register mapping.
-  m_userDataRegMapping[ShaderStageCompute] = mmCOMPUTE_USER_DATA_0;
-  m_userDataRegMapping[ShaderStageFragment] = mmSPI_SHADER_USER_DATA_PS_0;
-  m_userDataRegMapping[ShaderStageTask] = mmCOMPUTE_USER_DATA_0;
-  m_userDataRegMapping[ShaderStageMesh] = mmSPI_SHADER_USER_DATA_GS_0;
+  // Set up ShaderStageEnum -> user data register mapping.
+  m_userDataRegMapping[ShaderStage::Compute] = mmCOMPUTE_USER_DATA_0;
+  m_userDataRegMapping[ShaderStage::Fragment] = mmSPI_SHADER_USER_DATA_PS_0;
+  m_userDataRegMapping[ShaderStage::Task] = mmCOMPUTE_USER_DATA_0;
+  m_userDataRegMapping[ShaderStage::Mesh] = mmSPI_SHADER_USER_DATA_GS_0;
 
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 9) {
     // GFX9: Merged shaders, and merged ES-GS user data goes into ES registers.
-    m_userDataRegMapping[ShaderStageCopyShader] = mmSPI_SHADER_USER_DATA_VS_0;
-    m_userDataRegMapping[ShaderStageGeometry] = mmSPI_SHADER_USER_DATA_ES_0;
-    if (m_pipelineState->hasShaderStage(ShaderStageGeometry))
-      m_userDataRegMapping[ShaderStageTessEval] = m_userDataRegMapping[ShaderStageGeometry];
+    m_userDataRegMapping[ShaderStage::CopyShader] = mmSPI_SHADER_USER_DATA_VS_0;
+    m_userDataRegMapping[ShaderStage::Geometry] = mmSPI_SHADER_USER_DATA_ES_0;
+    if (m_pipelineState->hasShaderStage(ShaderStage::Geometry))
+      m_userDataRegMapping[ShaderStage::TessEval] = m_userDataRegMapping[ShaderStage::Geometry];
     else
-      m_userDataRegMapping[ShaderStageTessEval] = mmSPI_SHADER_USER_DATA_VS_0;
-    m_userDataRegMapping[ShaderStageTessControl] = mmSPI_SHADER_USER_DATA_HS_0;
-    if (m_pipelineState->hasShaderStage(ShaderStageTessControl))
-      m_userDataRegMapping[ShaderStageVertex] = m_userDataRegMapping[ShaderStageTessControl];
-    else if (m_pipelineState->hasShaderStage(ShaderStageGeometry))
-      m_userDataRegMapping[ShaderStageVertex] = m_userDataRegMapping[ShaderStageGeometry];
+      m_userDataRegMapping[ShaderStage::TessEval] = mmSPI_SHADER_USER_DATA_VS_0;
+    m_userDataRegMapping[ShaderStage::TessControl] = mmSPI_SHADER_USER_DATA_HS_0;
+    if (m_pipelineState->hasShaderStage(ShaderStage::TessControl))
+      m_userDataRegMapping[ShaderStage::Vertex] = m_userDataRegMapping[ShaderStage::TessControl];
+    else if (m_pipelineState->hasShaderStage(ShaderStage::Geometry))
+      m_userDataRegMapping[ShaderStage::Vertex] = m_userDataRegMapping[ShaderStage::Geometry];
     else
-      m_userDataRegMapping[ShaderStageVertex] = mmSPI_SHADER_USER_DATA_VS_0;
+      m_userDataRegMapping[ShaderStage::Vertex] = mmSPI_SHADER_USER_DATA_VS_0;
 
   } else if (!m_pipelineState->getNggControl()->enableNgg) {
     // GFX10+ not NGG: Same as GFX9, except ES-GS user data goes into GS registers.
-    m_userDataRegMapping[ShaderStageCopyShader] = mmSPI_SHADER_USER_DATA_VS_0;
-    m_userDataRegMapping[ShaderStageGeometry] = mmSPI_SHADER_USER_DATA_GS_0;
-    if (m_pipelineState->hasShaderStage(ShaderStageGeometry))
-      m_userDataRegMapping[ShaderStageTessEval] = m_userDataRegMapping[ShaderStageGeometry];
+    m_userDataRegMapping[ShaderStage::CopyShader] = mmSPI_SHADER_USER_DATA_VS_0;
+    m_userDataRegMapping[ShaderStage::Geometry] = mmSPI_SHADER_USER_DATA_GS_0;
+    if (m_pipelineState->hasShaderStage(ShaderStage::Geometry))
+      m_userDataRegMapping[ShaderStage::TessEval] = m_userDataRegMapping[ShaderStage::Geometry];
     else
-      m_userDataRegMapping[ShaderStageTessEval] = mmSPI_SHADER_USER_DATA_VS_0;
-    m_userDataRegMapping[ShaderStageTessControl] = mmSPI_SHADER_USER_DATA_HS_0;
-    if (m_pipelineState->hasShaderStage(ShaderStageTessControl))
-      m_userDataRegMapping[ShaderStageVertex] = m_userDataRegMapping[ShaderStageTessControl];
-    else if (m_pipelineState->hasShaderStage(ShaderStageGeometry))
-      m_userDataRegMapping[ShaderStageVertex] = m_userDataRegMapping[ShaderStageGeometry];
+      m_userDataRegMapping[ShaderStage::TessEval] = mmSPI_SHADER_USER_DATA_VS_0;
+    m_userDataRegMapping[ShaderStage::TessControl] = mmSPI_SHADER_USER_DATA_HS_0;
+    if (m_pipelineState->hasShaderStage(ShaderStage::TessControl))
+      m_userDataRegMapping[ShaderStage::Vertex] = m_userDataRegMapping[ShaderStage::TessControl];
+    else if (m_pipelineState->hasShaderStage(ShaderStage::Geometry))
+      m_userDataRegMapping[ShaderStage::Vertex] = m_userDataRegMapping[ShaderStage::Geometry];
     else
-      m_userDataRegMapping[ShaderStageVertex] = mmSPI_SHADER_USER_DATA_VS_0;
+      m_userDataRegMapping[ShaderStage::Vertex] = mmSPI_SHADER_USER_DATA_VS_0;
 
   } else {
     // GFX10+ NGG
-    m_userDataRegMapping[ShaderStageGeometry] = mmSPI_SHADER_USER_DATA_GS_0;
-    m_userDataRegMapping[ShaderStageTessEval] = m_userDataRegMapping[ShaderStageGeometry];
-    m_userDataRegMapping[ShaderStageTessControl] = mmSPI_SHADER_USER_DATA_HS_0;
-    if (m_pipelineState->hasShaderStage(ShaderStageTessControl))
-      m_userDataRegMapping[ShaderStageVertex] = m_userDataRegMapping[ShaderStageTessControl];
+    m_userDataRegMapping[ShaderStage::Geometry] = mmSPI_SHADER_USER_DATA_GS_0;
+    m_userDataRegMapping[ShaderStage::TessEval] = m_userDataRegMapping[ShaderStage::Geometry];
+    m_userDataRegMapping[ShaderStage::TessControl] = mmSPI_SHADER_USER_DATA_HS_0;
+    if (m_pipelineState->hasShaderStage(ShaderStage::TessControl))
+      m_userDataRegMapping[ShaderStage::Vertex] = m_userDataRegMapping[ShaderStage::TessControl];
     else
-      m_userDataRegMapping[ShaderStageVertex] = m_userDataRegMapping[ShaderStageGeometry];
+      m_userDataRegMapping[ShaderStage::Vertex] = m_userDataRegMapping[ShaderStage::Geometry];
   }
 
   return m_userDataRegMapping[stage];
@@ -466,13 +466,13 @@ unsigned PalMetadata::getUserDataReg0(ShaderStage stage) {
 // =====================================================================================================================
 // Set the PAL metadata SPI register for a number of consecutive user data entries
 //
-// @param stage : ShaderStage
+// @param stage : ShaderStageEnum
 // @param userDataIndex : User data index 0-15 or 0-31 depending on HW and shader stage
 // @param userDataValue : Value to store in that entry, one of:
 //                        - a 0-based integer for the root user data dword offset
 //                        - one of the UserDataMapping values, e.g. UserDataMapping::GlobalTable
 // @param dwordCount : Number of user data entries to set
-void PalMetadata::setUserDataEntry(ShaderStage stage, unsigned userDataIndex, unsigned userDataValue,
+void PalMetadata::setUserDataEntry(ShaderStageEnum stage, unsigned userDataIndex, unsigned userDataValue,
                                    unsigned dwordCount) {
   assert(!m_useRegisterFieldFormat);
   // Get the start register number of SPI user data registers for this shader stage.
@@ -480,8 +480,8 @@ void PalMetadata::setUserDataEntry(ShaderStage stage, unsigned userDataIndex, un
 
   // Assert that the supplied user data index is not too big.
   bool inRange = userDataIndex + dwordCount <= 16;
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 && stage != ShaderStageCompute &&
-      stage != ShaderStageTask)
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 && stage != ShaderStage::Compute &&
+      stage != ShaderStage::Task)
     inRange = userDataIndex + dwordCount <= 32;
   assert(inRange && "Out of range user data index");
   (void(inRange)); // Unused
@@ -515,10 +515,10 @@ void PalMetadata::fixUpRegisters() {
   // If pipeline includes GS or TS, the type is from shader, we don't need to fix it. We only must fix a case
   // which includes VS + FS + NGG.
   if (m_pipelineState->isGraphics()) {
-    const bool hasTs =
-        m_pipelineState->hasShaderStage(ShaderStageTessControl) || m_pipelineState->hasShaderStage(ShaderStageTessEval);
-    const bool hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
-    const bool hasMesh = m_pipelineState->hasShaderStage(ShaderStageMesh);
+    const bool hasTs = m_pipelineState->hasShaderStage(ShaderStage::TessControl) ||
+                       m_pipelineState->hasShaderStage(ShaderStage::TessEval);
+    const bool hasGs = m_pipelineState->hasShaderStage(ShaderStage::Geometry);
+    const bool hasMesh = m_pipelineState->hasShaderStage(ShaderStage::Mesh);
     if (!hasTs && !hasGs && !hasMesh) {
       auto getPrimType = [&]() {
         const auto primType = m_pipelineState->getInputAssemblyState().primitiveType;
@@ -573,24 +573,24 @@ void PalMetadata::fixUpRegisters() {
 
 // =====================================================================================================================
 // Get shader stage mask (only called for a link-only pipeline whose shader stage mask has not been set yet).
-unsigned PalMetadata::getShaderStageMask() {
+ShaderStageMask PalMetadata::getShaderStageMask() {
   msgpack::MapDocNode shaderStages = m_pipelineNode[Util::Abi::PipelineMetadataKey::Shaders].getMap(true);
   static const struct TableEntry {
     const char *key;
-    unsigned maskBit;
-  } table[] = {{".compute", 1U << ShaderStageCompute}, {".pixel", 1U << ShaderStageFragment},
-               {".mesh", 1U << ShaderStageMesh},       {".geometry", 1U << ShaderStageGeometry},
-               {".domain", 1U << ShaderStageTessEval}, {".hull", 1U << ShaderStageTessControl},
-               {".vertex", 1U << ShaderStageVertex},   {".task", 1U << ShaderStageTask}};
-  unsigned stageMask = 0;
+    ShaderStageEnum stage;
+  } table[] = {{".compute", ShaderStage::Compute}, {".pixel", ShaderStage::Fragment},
+               {".mesh", ShaderStage::Mesh},       {".geometry", ShaderStage::Geometry},
+               {".domain", ShaderStage::TessEval}, {".hull", ShaderStage::TessControl},
+               {".vertex", ShaderStage::Vertex},   {".task", ShaderStage::Task}};
+  ShaderStageMask stageMask;
   for (const auto &entry : ArrayRef<TableEntry>(table)) {
     if (shaderStages.find(m_document->getNode(entry.key)) != shaderStages.end()) {
       msgpack::MapDocNode stageNode = shaderStages[entry.key].getMap(true);
       if (stageNode.find(m_document->getNode(Util::Abi::ShaderMetadataKey::ApiShaderHash)) != stageNode.end())
-        stageMask |= entry.maskBit;
+        stageMask |= ShaderStageMask(entry.stage);
     }
   }
-  assert(stageMask != 0);
+  assert(!stageMask.empty());
   return stageMask;
 }
 
@@ -627,7 +627,7 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
     }
 
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10) {
-      WaveBreak waveBreakSize = m_pipelineState->getShaderOptions(ShaderStageFragment).waveBreakSize;
+      WaveBreak waveBreakSize = m_pipelineState->getShaderOptions(ShaderStage::Fragment).waveBreakSize;
       auto paScShaderControl = graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::PaScShaderControl].getMap(true);
       paScShaderControl[Util::Abi::PaScShaderControlMetadataKey::WaveBreakRegionSize] =
           static_cast<unsigned>(waveBreakSize);
@@ -660,7 +660,7 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
     }
 
     if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 10) {
-      WaveBreak waveBreakSize = m_pipelineState->getShaderOptions(ShaderStageFragment).waveBreakSize;
+      WaveBreak waveBreakSize = m_pipelineState->getShaderOptions(ShaderStage::Fragment).waveBreakSize;
       PA_SC_SHADER_CONTROL paScShaderControl = {};
       paScShaderControl.gfx10.WAVE_BREAK_REGION_SIZE = static_cast<unsigned>(waveBreakSize);
       setRegister(mmPA_SC_SHADER_CONTROL, paScShaderControl.u32All);
@@ -683,11 +683,12 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
 //
 // Adjust the value if gl_ViewportIndex is not used in the pre-rasterizer stages.
 void PalMetadata::finalizeInputControlRegisterSetting() {
-  assert(isShaderStageInMask(ShaderStageFragment, m_pipelineState->getShaderStageMask()));
+  assert(m_pipelineState->getShaderStageMask().contains(ShaderStage::Fragment));
 
   unsigned viewportIndexLoc = getFragmentShaderBuiltInLoc(BuiltInViewportIndex);
   if (viewportIndexLoc == InvalidValue) {
-    auto &builtInInLocMap = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->inOutUsage.builtInInputLocMap;
+    auto &builtInInLocMap =
+        m_pipelineState->getShaderResourceUsage(ShaderStage::Fragment)->inOutUsage.builtInInputLocMap;
     auto builtInInputLocMapIt = builtInInLocMap.find(BuiltInViewportIndex);
     if (builtInInputLocMapIt == builtInInLocMap.end())
       return;
@@ -752,7 +753,7 @@ void PalMetadata::finalizePipeline(bool isWholePipeline) {
     return;
 
   // In the part-pipeline compilation only at ELF link stage do we know how gl_ViewportIndex was used in all stages.
-  if (isShaderStageInMask(ShaderStageFragment, m_pipelineState->getShaderStageMask()))
+  if (m_pipelineState->getShaderStageMask().contains(ShaderStage::Fragment))
     finalizeInputControlRegisterSetting();
 
   // Erase the PAL metadata for FS input mappings.

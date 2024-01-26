@@ -19,13 +19,11 @@ define i1 @_cont_ReportHit(%struct.DispatchSystemData* %data, float %t, i32 %hit
 
 define void @main() !lgc.rt.shaderstage !24 {
 ; CHECK-LABEL: define void @main(
-; CHECK-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURN_ADDR:%.*]], i32 [[SHADER_INDEX:%.*]]) !lgc.rt.shaderstage [[META13:![0-9]+]] !lgc.cps [[META13]] !continuation [[META14:![0-9]+]] {
+; CHECK-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURN_ADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META13:![0-9]+]] !lgc.cps [[META13]] !continuation [[META14:![0-9]+]] {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA:%.*]], align 8
-; CHECK-NEXT:    [[TMP0:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @continuations.getSystemData.s_struct.DispatchSystemDatas()
+; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
 ; CHECK-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; CHECK-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[SYSTEM_DATA_ALLOCA]])
-; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
+; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; CHECK-NEXT:    store i32 0, ptr @debug_global, align 4
 ; CHECK-NEXT:    ret void
 ;
@@ -41,17 +39,15 @@ define void @callable(%struct.Payload* %payload) !types !22 !lgc.rt.shaderstage 
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
 ; CHECK-NEXT:    [[TMP1:%.*]] = alloca [[STRUCT_PAYLOAD:%.*]], align 8
-; CHECK-NEXT:    [[TMP2:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @continuations.getSystemData.s_struct.DispatchSystemDatas()
-; CHECK-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP2]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; CHECK-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[SYSTEM_DATA_ALLOCA]])
-; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
+; CHECK-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[SHADER_INDEX]])
 ; CHECK-NEXT:    store i32 [[SHADER_INDEX]], ptr @debug_global, align 4
 ; CHECK-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT_PAYLOAD]], ptr [[TMP1]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP4:%.*]] = load i32, ptr [[TMP3]], align 4
-; CHECK-NEXT:    store i32 [[TMP4]], ptr @PAYLOAD, align 4
-; CHECK-NEXT:    [[TMP5:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 2, {} poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP5]])
+; CHECK-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT_PAYLOAD]], ptr [[TMP1]], i32 0, i32 0
+; CHECK-NEXT:    [[TMP3:%.*]] = load i32, ptr [[TMP2]], align 4
+; CHECK-NEXT:    store i32 [[TMP3]], ptr @PAYLOAD, align 4
+; CHECK-NEXT:    [[TMP4:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 2, {} poison, i32 poison, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP4]])
 ; CHECK-NEXT:    unreachable
 ;
 entry:

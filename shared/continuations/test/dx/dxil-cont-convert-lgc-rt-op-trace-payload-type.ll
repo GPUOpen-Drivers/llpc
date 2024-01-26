@@ -45,16 +45,16 @@ declare !types !42 i1 @dx.op.reportHit.struct.BuiltInTriangleIntersectionAttribu
 
 define void @main() {
 ; PAYLOADTYPE-LABEL: define void @main
-; PAYLOADTYPE:    call void (...) @lgc.rt.call.callable.shader(i32 1, %struct.TheirParams* %{{.*}}, i32 256), !dxil.payload.type ![[call_callable_shader_payload_type:[0-9]+]]
-; PAYLOADTYPE-NEXT:    call void (...) @lgc.rt.call.callable.shader(i32 1, %struct.TheirParams* %{{.*}}, i32 256), !dxil.payload.type ![[call_callable_shader_payload_type]]
-; PAYLOADTYPE-NEXT:    call void (...) @lgc.rt.call.callable.shader(i32 2, %struct.TheirParams2* %{{.*}}, i32 260), !dxil.payload.type ![[call_callable_shader_payload_type2:[0-9]+]]
+; PAYLOADTYPE:    call void (...) @lgc.rt.call.callable.shader(i32 1, %struct.TheirParams* %{{.*}}, i32 256), !cont.payload.type ![[call_callable_shader_payload_type:[0-9]+]]
+; PAYLOADTYPE-NEXT:    call void (...) @lgc.rt.call.callable.shader(i32 1, %struct.TheirParams* %{{.*}}, i32 256), !cont.payload.type ![[call_callable_shader_payload_type]]
+; PAYLOADTYPE-NEXT:    call void (...) @lgc.rt.call.callable.shader(i32 2, %struct.TheirParams2* %{{.*}}, i32 260), !cont.payload.type ![[call_callable_shader_payload_type2:[0-9]+]]
 ; PAYLOADTYPE: ![[call_callable_shader_payload_type]] = !{%struct.TheirParams poison}
 ; PAYLOADTYPE: ![[call_callable_shader_payload_type2]] = !{%struct.TheirParams2 poison}
 
 ; PAYLOADTYPE-OPAQUE-LABEL: define void @main
-; PAYLOADTYPE-OPAQUE:    call void (...) @lgc.rt.call.callable.shader(i32 1, ptr %{{.*}}, i32 256), !dxil.payload.type ![[call_callable_shader_payload_type:[0-9]+]]
-; PAYLOADTYPE-OPAQUE-NEXT:    call void (...) @lgc.rt.call.callable.shader(i32 1, ptr %{{.*}}, i32 256), !dxil.payload.type ![[call_callable_shader_payload_type]]
-; PAYLOADTYPE-OPAQUE-NEXT:    call void (...) @lgc.rt.call.callable.shader(i32 2, ptr %{{.*}}, i32 260), !dxil.payload.type ![[call_callable_shader_payload_type2:[0-9]+]]
+; PAYLOADTYPE-OPAQUE:    call void (...) @lgc.rt.call.callable.shader(i32 1, ptr %{{.*}}, i32 256), !cont.payload.type ![[call_callable_shader_payload_type:[0-9]+]]
+; PAYLOADTYPE-OPAQUE-NEXT:    call void (...) @lgc.rt.call.callable.shader(i32 1, ptr %{{.*}}, i32 256), !cont.payload.type ![[call_callable_shader_payload_type]]
+; PAYLOADTYPE-OPAQUE-NEXT:    call void (...) @lgc.rt.call.callable.shader(i32 2, ptr %{{.*}}, i32 260), !cont.payload.type ![[call_callable_shader_payload_type2:[0-9]+]]
 ; PAYLOADTYPE-OPAQUE: ![[call_callable_shader_payload_type]] = !{%struct.TheirParams poison}
 ; PAYLOADTYPE-OPAQUE: ![[call_callable_shader_payload_type2]] = !{%struct.TheirParams2 poison}
 ;
@@ -68,14 +68,14 @@ define void @main() {
 
 define void @mainTrace() {
 ; PAYLOADTYPE2-LABEL: define void @mainTrace
-; PAYLOADTYPE2:    call void (...) @lgc.rt.trace.ray(i64 %{{.*}}, i32 16, i32 -1, i32 0, i32 1, i32 0, <3 x float> zeroinitializer, float 0x3F50624DE0000000, <3 x float> <float 1.000000e+00, float 0.000000e+00, float 0.000000e+00>, float 1.000000e+04, %struct.RayPayload* %{{.*}}, [1 x i32] [i32 272]), !dxil.payload.type ![[traceray_payload_type:[0-9]+]]
-; PAYLOADTYPE2:    call void (...) @lgc.rt.trace.ray(i64 %{{.*}}, i32 16, i32 -1, i32 0, i32 1, i32 0, <3 x float> zeroinitializer, float 0x3F50624DE0000000, <3 x float> <float 1.000000e+00, float 0.000000e+00, float 0.000000e+00>, float 1.000000e+04, %struct.RayPayload2* %{{.*}}, [1 x i32] [i32 256]), !dxil.payload.type ![[traceray_payload_type2:[0-9]+]]
+; PAYLOADTYPE2:    call void (...) @lgc.rt.trace.ray(i64 %{{.*}}, i32 16, i32 -1, i32 0, i32 1, i32 0, <3 x float> zeroinitializer, float 0x3F50624DE0000000, <3 x float> <float 1.000000e+00, float 0.000000e+00, float 0.000000e+00>, float 1.000000e+04, %struct.RayPayload* %{{.*}}, [1 x i32] [i32 272]), !cont.payload.type ![[traceray_payload_type:[0-9]+]]
+; PAYLOADTYPE2:    call void (...) @lgc.rt.trace.ray(i64 %{{.*}}, i32 16, i32 -1, i32 0, i32 1, i32 0, <3 x float> zeroinitializer, float 0x3F50624DE0000000, <3 x float> <float 1.000000e+00, float 0.000000e+00, float 0.000000e+00>, float 1.000000e+04, %struct.RayPayload2* %{{.*}}, [1 x i32] [i32 256]), !cont.payload.type ![[traceray_payload_type2:[0-9]+]]
 ; PAYLOADTYPE2: ![[traceray_payload_type]] = !{%struct.RayPayload poison}
 ; PAYLOADTYPE2: ![[traceray_payload_type2]] = !{%struct.RayPayload2 poison}
 
 ; PAYLOADTYPE2-OPAQUE-LABEL: define void @mainTrace
-; PAYLOADTYPE2-OPAQUE:    call void (...) @lgc.rt.trace.ray(i64 %{{.*}}, i32 16, i32 -1, i32 0, i32 1, i32 0, <3 x float> zeroinitializer, float 0x3F50624DE0000000, <3 x float> <float 1.000000e+00, float 0.000000e+00, float 0.000000e+00>, float 1.000000e+04, ptr %{{.*}}, [1 x i32] [i32 272]), !dxil.payload.type ![[traceray_payload_type:[0-9]+]]
-; PAYLOADTYPE2-OPAQUE:    call void (...) @lgc.rt.trace.ray(i64 %{{.*}}, i32 16, i32 -1, i32 0, i32 1, i32 0, <3 x float> zeroinitializer, float 0x3F50624DE0000000, <3 x float> <float 1.000000e+00, float 0.000000e+00, float 0.000000e+00>, float 1.000000e+04, ptr %{{.*}}, [1 x i32] [i32 256]), !dxil.payload.type ![[traceray_payload_type2:[0-9]+]]
+; PAYLOADTYPE2-OPAQUE:    call void (...) @lgc.rt.trace.ray(i64 %{{.*}}, i32 16, i32 -1, i32 0, i32 1, i32 0, <3 x float> zeroinitializer, float 0x3F50624DE0000000, <3 x float> <float 1.000000e+00, float 0.000000e+00, float 0.000000e+00>, float 1.000000e+04, ptr %{{.*}}, [1 x i32] [i32 272]), !cont.payload.type ![[traceray_payload_type:[0-9]+]]
+; PAYLOADTYPE2-OPAQUE:    call void (...) @lgc.rt.trace.ray(i64 %{{.*}}, i32 16, i32 -1, i32 0, i32 1, i32 0, <3 x float> zeroinitializer, float 0x3F50624DE0000000, <3 x float> <float 1.000000e+00, float 0.000000e+00, float 0.000000e+00>, float 1.000000e+04, ptr %{{.*}}, [1 x i32] [i32 256]), !cont.payload.type ![[traceray_payload_type2:[0-9]+]]
 ; PAYLOADTYPE2-OPAQUE: ![[traceray_payload_type]] = !{%struct.RayPayload poison}
 ; PAYLOADTYPE2-OPAQUE: ![[traceray_payload_type2]] = !{%struct.RayPayload2 poison}
 ;
@@ -94,10 +94,10 @@ define void @mainTrace() {
 
 define void @called(%struct.MyParams* %arg) !types !38 {
 ; PAYLOADTYPE3-LABEL: define void @called
-; PAYLOADTYPE3:    call void (...) @lgc.rt.call.callable.shader(i32 2, %struct.TheirParams2* %{{.*}}, i32 260), !dxil.payload.type ![[call_callable_shader_payload_type:[0-9]+]]
+; PAYLOADTYPE3:    call void (...) @lgc.rt.call.callable.shader(i32 2, %struct.TheirParams2* %{{.*}}, i32 260), !cont.payload.type ![[call_callable_shader_payload_type:[0-9]+]]
 ; PAYLOADTYPE3: ![[call_callable_shader_payload_type]] = !{%struct.TheirParams2 poison}
 ; PAYLOADTYPE3-OPAQUE-LABEL: define void @called
-; PAYLOADTYPE3-OPAQUE:    call void (...) @lgc.rt.call.callable.shader(i32 2, ptr %{{.*}}, i32 260), !dxil.payload.type ![[call_callable_shader_payload_type:[0-9]+]]
+; PAYLOADTYPE3-OPAQUE:    call void (...) @lgc.rt.call.callable.shader(i32 2, ptr %{{.*}}, i32 260), !cont.payload.type ![[call_callable_shader_payload_type:[0-9]+]]
 ; PAYLOADTYPE3-OPAQUE: ![[call_callable_shader_payload_type]] = !{%struct.TheirParams2 poison}
 ;
   %params = alloca %struct.TheirParams2, align 4

@@ -64,7 +64,7 @@ target triple = "amdgcn--amdpal"
 
 define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !lgc.shaderstage !5 {
 .entry:
-  %0 = call i8 addrspace(7)* (...) @lgc.create.load.buffer.desc.p7i8(i32 0, i32 0, i32 0, i32 0)
+  %0 = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 0)
   %1 = call {}* @llvm.invariant.start.p7i8(i64 -1, i8 addrspace(7)* %0)
   %2 = call <4 x float> (...) @lgc.create.read.generic.input.v4f32(i32 0, i32 0, i32 0, i32 0, i32 0, i32 poison)
   %3 = bitcast i8 addrspace(7)* %0 to <4 x float> addrspace(7)*
@@ -98,7 +98,7 @@ declare <4 x float> @lgc.create.read.generic.input.v4f32(...) local_unnamed_addr
 declare void @lgc.create.write.builtin.output(...) local_unnamed_addr #0
 
 ; Function Attrs: nounwind
-declare i8 addrspace(7)* @lgc.create.load.buffer.desc.p7i8(...) local_unnamed_addr #0
+declare ptr addrspace(7) @lgc.load.buffer.desc(i64, i32, i32, i32) local_unnamed_addr #0
 
 ; Function Attrs: argmemonly nounwind willreturn
 declare {}* @llvm.invariant.start.p7i8(i64 immarg, i8 addrspace(7)* nocapture) #2

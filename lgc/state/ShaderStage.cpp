@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,14 +17,14 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
  ***********************************************************************************************************************
- * @file  ShaderStage.cpp
+ * @file  ShaderStageEnum.cpp
  * @brief LLPC source file: utility functions for shader stage
  ***********************************************************************************************************************
  */
@@ -50,13 +50,16 @@ const static char ShaderStageMetadata[] = "lgc.shaderstage";
 //
 // @param [in/out] module : Module to set shader stage on
 // @param stage : Shader stage to set
-void lgc::setShaderStage(Module *module, ShaderStage stage) {
+void lgc::setShaderStage(Module *module, std::optional<ShaderStageEnum> stage) {
   unsigned mdKindId = module->getContext().getMDKindID(ShaderStageMetadata);
-  auto stageMetaNode = MDNode::get(
-      module->getContext(), {ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(module->getContext()), stage))});
+  auto stageMetaNode =
+      stage ? MDNode::get(
+                  module->getContext(),
+                  {ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(module->getContext()), stage.value()))})
+            : nullptr;
   for (Function &func : *module) {
     if (!func.isDeclaration()) {
-      if (stage != ShaderStageInvalid)
+      if (stage)
         func.setMetadata(mdKindId, stageMetaNode);
       else
         func.eraseMetadata(mdKindId);
@@ -68,27 +71,28 @@ void lgc::setShaderStage(Module *module, ShaderStage stage) {
 // Set shader stage metadata on a function
 //
 // @param [in/out] func : Function to set shader stage on
-// @param stage : Shader stage to set or ShaderStageInvalid
-void lgc::setShaderStage(Function *func, ShaderStage stage) {
+// @param stage : Shader stage to set or ShaderStage::Invalid
+void lgc::setShaderStage(Function *func, std::optional<ShaderStageEnum> stage) {
   unsigned mdKindId = func->getContext().getMDKindID(ShaderStageMetadata);
-  if (stage != ShaderStageInvalid) {
-    auto stageMetaNode = MDNode::get(
-        func->getContext(), {ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(func->getContext()), stage))});
+  if (stage) {
+    auto stageMetaNode =
+        MDNode::get(func->getContext(),
+                    {ConstantAsMetadata::get(ConstantInt::get(Type::getInt32Ty(func->getContext()), stage.value()))});
     func->setMetadata(mdKindId, stageMetaNode);
   } else
     func->eraseMetadata(mdKindId);
 }
 
 // =====================================================================================================================
-// Gets the shader stage from the specified LLVM function. Returns ShaderStageInvalid if metadata not found.
+// Gets the shader stage from the specified LLVM function. Returns ShaderStage::Invalid if metadata not found.
 //
 // @param func : LLVM function
-ShaderStage lgc::getShaderStage(const Function *func) {
+std::optional<ShaderStageEnum> lgc::getShaderStage(const Function *func) {
   // Check for the metadata that is added by PipelineState::link.
   MDNode *stageMetaNode = func->getMetadata(ShaderStageMetadata);
   if (stageMetaNode)
-    return ShaderStage(mdconst::dyn_extract<ConstantInt>(stageMetaNode->getOperand(0))->getZExtValue());
-  return ShaderStageInvalid;
+    return ShaderStageEnum(mdconst::dyn_extract<ConstantInt>(stageMetaNode->getOperand(0))->getZExtValue());
+  return std::nullopt;
 }
 
 // =====================================================================================================================
@@ -105,10 +109,10 @@ bool lgc::isShaderEntryPoint(const Function *func) {
 // Gets name string of the abbreviation for the specified shader stage
 //
 // @param shaderStage : Shader stage
-const char *lgc::getShaderStageAbbreviation(ShaderStage shaderStage) {
-  if (shaderStage == ShaderStageCopyShader)
+const char *lgc::getShaderStageAbbreviation(ShaderStageEnum shaderStage) {
+  if (shaderStage == ShaderStage::CopyShader)
     return "COPY";
-  if (shaderStage > ShaderStageCompute)
+  if (shaderStage > ShaderStage::Compute)
     return "Bad";
 
   static const char *ShaderStageAbbrs[] = {"TASK", "VS", "TCS", "TES", "GS", "MESH", "FS", "CS"};

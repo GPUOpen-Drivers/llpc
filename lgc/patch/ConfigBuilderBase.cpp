@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -47,12 +47,12 @@ ConfigBuilderBase::ConfigBuilderBase(Module *module, PipelineState *pipelineStat
     : m_module(module), m_pipelineState(pipelineState) {
   m_context = &module->getContext();
 
-  m_hasVs = m_pipelineState->hasShaderStage(ShaderStageVertex);
-  m_hasTcs = m_pipelineState->hasShaderStage(ShaderStageTessControl);
-  m_hasTes = m_pipelineState->hasShaderStage(ShaderStageTessEval);
-  m_hasGs = m_pipelineState->hasShaderStage(ShaderStageGeometry);
-  m_hasTask = m_pipelineState->hasShaderStage(ShaderStageTask);
-  m_hasMesh = m_pipelineState->hasShaderStage(ShaderStageMesh);
+  m_hasVs = m_pipelineState->hasShaderStage(ShaderStage::Vertex);
+  m_hasTcs = m_pipelineState->hasShaderStage(ShaderStage::TessControl);
+  m_hasTes = m_pipelineState->hasShaderStage(ShaderStage::TessEval);
+  m_hasGs = m_pipelineState->hasShaderStage(ShaderStage::Geometry);
+  m_hasTask = m_pipelineState->hasShaderStage(ShaderStage::Task);
+  m_hasMesh = m_pipelineState->hasShaderStage(ShaderStage::Mesh);
 
   m_gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
 
@@ -70,7 +70,7 @@ ConfigBuilderBase::ConfigBuilderBase(Module *module, PipelineState *pipelineStat
     if (m_pipelineState->isGraphics())
       m_graphicsRegistersNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
 
-    if (m_pipelineState->hasShaderStage(ShaderStageCompute) || m_pipelineState->hasShaderStage(ShaderStageTask))
+    if (m_pipelineState->hasShaderStage(ShaderStage::Compute) || m_pipelineState->hasShaderStage(ShaderStage::Task))
       m_computeRegistersNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::ComputeRegisters].getMap(true);
   }
 
@@ -87,7 +87,7 @@ ConfigBuilderBase::~ConfigBuilderBase() {
 /// @param [in] apiStage : The API shader stage
 /// @param [in] hwStages : The HW stage(s) that the API shader is mapped to, as a combination of
 ///                      @ref Util::Abi::HardwareStageFlagBits.
-void ConfigBuilderBase::addApiHwShaderMapping(ShaderStage apiStage, unsigned hwStages) {
+void ConfigBuilderBase::addApiHwShaderMapping(ShaderStageEnum apiStage, unsigned hwStages) {
   auto hwMappingNode = getApiShaderNode(apiStage)[Util::Abi::ShaderMetadataKey::HardwareMapping].getArray(true);
   for (unsigned hwStage = 0; hwStage < unsigned(Util::Abi::HardwareStage::Count); ++hwStage) {
     if (hwStages & (1 << hwStage))
@@ -125,7 +125,7 @@ msgpack::MapDocNode ConfigBuilderBase::getHwShaderNode(Util::Abi::HardwareStage 
 // a shader checksum for performance profiling where applicable.
 //
 // @param apiStage : API shader stage
-unsigned ConfigBuilderBase::setShaderHash(ShaderStage apiStage) {
+unsigned ConfigBuilderBase::setShaderHash(ShaderStageEnum apiStage) {
   const ShaderOptions &shaderOptions = m_pipelineState->getShaderOptions(apiStage);
   auto hashNode = getApiShaderNode(unsigned(apiStage))[Util::Abi::ShaderMetadataKey::ApiShaderHash].getArray(true);
   hashNode[0] = shaderOptions.hash[0];
@@ -377,10 +377,10 @@ void ConfigBuilderBase::writePalMetadata() {
 // Sets up floating point mode from the specified floating point control flags.
 //
 // @param shaderStage : Shader stage
-unsigned ConfigBuilderBase::setupFloatingPointMode(ShaderStage shaderStage) {
+unsigned ConfigBuilderBase::setupFloatingPointMode(ShaderStageEnum shaderStage) {
   FloatMode floatMode = {};
   floatMode.bits.fp16fp64DenormMode = FP_DENORM_FLUSH_NONE;
-  if (shaderStage != ShaderStageCopyShader) {
+  if (shaderStage != ShaderStage::CopyShader) {
     const auto &shaderMode = m_pipelineState->getShaderModes()->getCommonShaderMode(shaderStage);
 
     // The HW rounding mode values happen to be one less than the FpRoundMode value, other than

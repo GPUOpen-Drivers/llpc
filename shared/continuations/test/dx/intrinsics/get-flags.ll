@@ -7,7 +7,8 @@ declare i32 @_AmdContinuationsGetFlags()
 @debug_global = external global i32
 
 define void @main() !lgc.rt.shaderstage !1 {
-; CHECK-LABEL: define void @main() !lgc.rt.shaderstage !1 {
+; CHECK-LABEL: define void @main(
+; CHECK-SAME: ) !lgc.rt.shaderstage [[META1:![0-9]+]] {
 ; CHECK-NEXT:  entry:
 ; CHECK-NEXT:    store i32 3, ptr @debug_global, align 4
 ; CHECK-NEXT:    ret void

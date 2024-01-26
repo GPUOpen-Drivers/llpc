@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2023-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
- *deal in the Software without restriction, including without limitation the
- *rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- *sell copies of the Software, and to permit persons to whom the Software is
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in
@@ -18,12 +18,12 @@
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- *FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- *IN THE SOFTWARE.
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 
-//===- DXILMetadata.cpp - Generators, decoders and wrappers for metadata --===//
+//===- TypesMetadata.cpp - Generators, decoders and wrappers for metadata --==//
 //
 // This file implements metadata functions for the DXIL continuations
 //
@@ -33,28 +33,28 @@
 
 namespace llvm {
 
-DXILContArgTy::DXILContArgTy(Type *Arg) {
+ContArgTy::ContArgTy(Type *Arg) {
   assert(!Arg->isPointerTy() &&
          "pointers are not supported by this constructor");
   ArgTy = Arg;
   ElemTy = nullptr;
 }
 
-DXILContArgTy DXILContArgTy::get(const Function *F, const Argument *Arg) {
+ContArgTy ContArgTy::get(const Function *F, const Argument *Arg) {
   // only consult metadata for pointer types
   Type *ArgTy = Arg->getType();
   if (!ArgTy->isPointerTy())
-    return DXILContArgTy(ArgTy, nullptr);
+    return ContArgTy(ArgTy, nullptr);
 
   // types metadata of the form { !"function", <return-type>,
   // <argument-0-type>, ... }
-  auto *TypesMD = F->getMetadata(DXILContHelper::MDTypesName);
+  auto *TypesMD = F->getMetadata(ContHelper::MDTypesName);
   if (TypesMD) {
     unsigned ArgNo = Arg->getArgNo() + 2;
     assert(ArgNo < TypesMD->getNumOperands() &&
            "insufficient operands in types metadata");
 
-    DXILContArgTy Result = get(&*TypesMD->getOperand(ArgNo), F->getContext());
+    ContArgTy Result = get(&*TypesMD->getOperand(ArgNo), F->getContext());
 
     return Result;
   }
@@ -62,18 +62,18 @@ DXILContArgTy DXILContArgTy::get(const Function *F, const Argument *Arg) {
   report_fatal_error("Missing metadata for pointer type!");
 }
 
-DXILContArgTy DXILContArgTy::get(const Function *F, const unsigned ArgNo) {
+ContArgTy ContArgTy::get(const Function *F, const unsigned ArgNo) {
   return get(F, F->getArg(ArgNo));
 }
 
-DXILContArgTy DXILContArgTy::get(const Metadata *MD, LLVMContext &Context) {
+ContArgTy ContArgTy::get(const Metadata *MD, LLVMContext &Context) {
   if (const auto *ConstantMD = dyn_cast<ConstantAsMetadata>(MD)) {
-    return DXILContArgTy(ConstantMD->getType(), nullptr);
+    return ContArgTy(ConstantMD->getType(), nullptr);
   }
   if (const auto *StringMD = dyn_cast<MDString>(MD)) {
-    assert(StringMD->getString() == DXILContHelper::MDTypesVoidName &&
+    assert(StringMD->getString() == ContHelper::MDTypesVoidName &&
            "unknown string in types metadata");
-    return DXILContArgTy(Type::getVoidTy(Context));
+    return ContArgTy(Type::getVoidTy(Context));
   }
   if (const auto *PointerMD = dyn_cast<MDNode>(MD)) {
     assert(PointerMD && PointerMD->getNumOperands() == 2 &&
@@ -90,28 +90,28 @@ DXILContArgTy DXILContArgTy::get(const Metadata *MD, LLVMContext &Context) {
       Type *ElemTy = ValueMD->getType();
       Type *PtrTy =
           ElemTy->getPointerTo((unsigned)AddressSpace->getZExtValue());
-      return DXILContArgTy(PtrTy, ElemTy);
+      return ContArgTy(PtrTy, ElemTy);
     }
   }
 
   assert(false && "unknown node type in types metadata");
-  return DXILContArgTy(Type::getVoidTy(Context));
+  return ContArgTy(Type::getVoidTy(Context));
 }
 
-Type *DXILContArgTy::asType(LLVMContext &Context) { return ArgTy; }
+Type *ContArgTy::asType(LLVMContext &Context) { return ArgTy; }
 
-Type *DXILContArgTy::getPointerElementType() const {
+Type *ContArgTy::getPointerElementType() const {
   assert(ElemTy && "cannot get element type of non-pointer");
   return ElemTy;
 }
 
-bool DXILContArgTy::isPointerTy() const { return !!ElemTy; }
+bool ContArgTy::isPointerTy() const { return !!ElemTy; }
 
-bool DXILContArgTy::isVoidTy() const { return (!ArgTy || ArgTy->isVoidTy()); }
+bool ContArgTy::isVoidTy() const { return (!ArgTy || ArgTy->isVoidTy()); }
 
-Metadata *DXILContArgTy::getTypeMetadata(LLVMContext &Context) {
+Metadata *ContArgTy::getTypeMetadata(LLVMContext &Context) {
   if (isVoidTy())
-    return MDString::get(Context, DXILContHelper::MDTypesVoidName);
+    return MDString::get(Context, ContHelper::MDTypesVoidName);
 
   if (!ElemTy) {
     assert(ArgTy && !ArgTy->isPointerTy());
@@ -128,14 +128,14 @@ Metadata *DXILContArgTy::getTypeMetadata(LLVMContext &Context) {
   return MDTuple::get(Context, MD);
 }
 
-DXILContFuncTy DXILContFuncTy::get(const Function *F) {
-  auto *TypesMD = F->getMetadata(DXILContHelper::MDTypesName);
+ContFuncTy ContFuncTy::get(const Function *F) {
+  auto *TypesMD = F->getMetadata(ContHelper::MDTypesName);
   assert(TypesMD);
 
   return get(TypesMD, F->getContext());
 }
 
-DXILContFuncTy DXILContFuncTy::get(const Metadata *MD, LLVMContext &Context) {
+ContFuncTy ContFuncTy::get(const Metadata *MD, LLVMContext &Context) {
   // Decode types metadata of the form { !"function", <return-type>,
   // <argument-0-type>, ... }
   const MDNode *TypesMD = dyn_cast<MDNode>(MD);
@@ -145,13 +145,13 @@ DXILContFuncTy DXILContFuncTy::get(const Metadata *MD, LLVMContext &Context) {
   assert(TypesMD->getNumOperands() >= 2 && "invalid function metadata");
   assert(isa<MDString>(TypesMD->getOperand(0)) &&
          dyn_cast<MDString>(TypesMD->getOperand(0))->getString() ==
-             DXILContHelper::MDTypesFunctionName &&
+             ContHelper::MDTypesFunctionName &&
          "metadata is not a function type");
 
-  DXILContFuncTy FuncTy;
+  ContFuncTy FuncTy;
   for (unsigned OpNo = 1; OpNo < TypesMD->getNumOperands(); ++OpNo) {
     Metadata *Arg = TypesMD->getOperand(OpNo);
-    FuncTy.ArgTys.push_back(DXILContArgTy::get(Arg, Context));
+    FuncTy.ArgTys.push_back(ContArgTy::get(Arg, Context));
   }
   // FIXME: do something more efficient
   assert(FuncTy.ArgTys.size() >= 1);
@@ -160,18 +160,18 @@ DXILContFuncTy DXILContFuncTy::get(const Metadata *MD, LLVMContext &Context) {
   return FuncTy;
 }
 
-FunctionType *DXILContFuncTy::asFunctionType(LLVMContext &Context) {
+FunctionType *ContFuncTy::asFunctionType(LLVMContext &Context) {
   SmallVector<Type *> FuncArgTys;
   for (auto Arg : ArgTys)
     FuncArgTys.push_back(Arg.asType(Context));
   return FunctionType::get(ReturnTy.asType(Context), FuncArgTys, false);
 }
 
-void DXILContFuncTy::writeMetadata(Function *F) {
+void ContFuncTy::writeMetadata(Function *F) {
   // Don't generate metadata if there are no pointers
   if (!ReturnTy.isPointerTy() &&
       llvm::none_of(ArgTys,
-                    [](const DXILContArgTy &Arg) { return Arg.isPointerTy(); }))
+                    [](const ContArgTy &Arg) { return Arg.isPointerTy(); }))
     return;
 
   LLVMContext &Context = F->getContext();
@@ -180,14 +180,13 @@ void DXILContFuncTy::writeMetadata(Function *F) {
   // Encode types metadata of the form { !"function", <return-type>,
   // <argument-0-type>, ... }
   SignatureMD.push_back(
-      MDString::get(Context, DXILContHelper::MDTypesFunctionName));
+      MDString::get(Context, ContHelper::MDTypesFunctionName));
   SignatureMD.push_back(ReturnTy.getTypeMetadata(Context));
   for (auto ArgTy : ArgTys)
     SignatureMD.push_back(ArgTy.getTypeMetadata(Context));
 
   assert(SignatureMD.size() >= 2 && "return type must be specified");
-  F->setMetadata(DXILContHelper::MDTypesName,
-                 MDTuple::get(Context, SignatureMD));
+  F->setMetadata(ContHelper::MDTypesName, MDTuple::get(Context, SignatureMD));
 }
 
 static Metadata *getTypeMetadataEntry(unsigned TypeID, LLVMContext &Context,
@@ -214,11 +213,11 @@ getTypeMetadataEntryImpl(Type *Ty, unsigned TypeID, LLVMContext &Context,
     // Save the function signature as metadata
     SmallVector<Metadata *> SignatureMD;
     SignatureMD.push_back(
-        MDString::get(Context, DXILContHelper::MDTypesFunctionName));
+        MDString::get(Context, ContHelper::MDTypesFunctionName));
     // Return type
     if (FTy->getReturnType()->isVoidTy()) {
       SignatureMD.push_back(
-          MDString::get(Context, DXILContHelper::MDTypesVoidName));
+          MDString::get(Context, ContHelper::MDTypesVoidName));
     } else {
       SignatureMD.push_back(getTypeMetadataEntry(GetContainedTypeID(TypeID, 0),
                                                  Context, GetTypeByID,
@@ -257,9 +256,9 @@ static Metadata *getTypeMetadataEntry(unsigned TypeID, LLVMContext &Context,
     return nullptr;
 
   assert(((Ty->isFunctionTy() &&
-           DXILContFuncTy::get(MD, Context).asFunctionType(Context) == Ty) ||
+           ContFuncTy::get(MD, Context).asFunctionType(Context) == Ty) ||
           (!Ty->isFunctionTy() &&
-           DXILContArgTy::get(MD, Context).asType(Context) == Ty)) &&
+           ContArgTy::get(MD, Context).asType(Context) == Ty)) &&
          "MD Type mismatch");
   return MD;
 }
@@ -271,7 +270,7 @@ void DXILValueTypeMetadataCallback(Value *V, unsigned TypeID,
     auto *MD = getTypeMetadataEntry(TypeID, F->getContext(), GetTypeByID,
                                     GetContainedTypeID);
     if (MD)
-      F->setMetadata(DXILContHelper::MDTypesName, llvm::cast<llvm::MDNode>(MD));
+      F->setMetadata(ContHelper::MDTypesName, llvm::cast<llvm::MDNode>(MD));
   }
 }
 

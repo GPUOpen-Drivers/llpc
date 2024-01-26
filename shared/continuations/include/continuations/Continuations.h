@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
- *deal in the Software without restriction, including without limitation the
- *rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- *sell copies of the Software, and to permit persons to whom the Software is
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in
@@ -18,8 +18,8 @@
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- *FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- *IN THE SOFTWARE.
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 
@@ -66,9 +66,9 @@
 // argument. All these intrinsics cannot modify system data, otherwise we could
 // not rematerialize them.
 //
-// At the start of a function, the alloca is initialized from
-// getSystemData, which is itself initialized from either an argument or
-// SetupRayGen.
+// At the start of a function, the alloca is initialized from an argument. In
+// the case of RayGen, this argument is removed and replaced with a proper call
+// to SetupRayGen in the DXILContPostProcess pass.
 
 #ifndef CONTINUATIONS_CONTINUATIONS_H
 #define CONTINUATIONS_CONTINUATIONS_H
@@ -96,10 +96,6 @@ class Builder;
 class DialectContext;
 } // namespace llvm_dialects
 
-namespace continuations {
-class GetSystemDataOp;
-} // namespace continuations
-
 namespace llvm {
 
 class PassBuilder;
@@ -123,10 +119,11 @@ Value *continuationStackOffsetToPtr(IRBuilder<> &B, Value *Offset,
                                     CompilerUtils::CrossModuleInliner &Inliner);
 
 /// Create a new function, as cloneFunctionHeader, but include types metadata.
-Function *cloneFunctionHeaderWithTypes(Function &F, DXILContFuncTy &NewType,
+Function *cloneFunctionHeaderWithTypes(Function &F, ContFuncTy &NewType,
                                        ArrayRef<AttributeSet> ArgAttrs);
 
 /// Remove bitcasts of function pointers in metadata.
+/// This also removes the DXIL payload metadata from functions.
 /// Returns true if something changed.
 bool fixupDxilMetadata(Module &M);
 
@@ -212,16 +209,6 @@ uint64_t computeNeededStackSizeForRegisterBuffer(uint64_t NumI32s,
 // of individual bytes at the end if NumBytes is not a multiple of 4.
 void copyBytes(IRBuilder<> &B, Value *Dst, Value *Src, uint64_t NumBytes);
 
-/// Return element type of a function argument resolving opaque pointers
-/// via !types metadata where appropriate.
-/// Returns nullptr for non-pointers.
-Type *getFuncArgPtrElementType(const Function *F, const Argument *Arg);
-
-/// Return element type of a function argument resolving opaque pointers
-/// via !types metadata where appropriate.
-/// Returns nullptr for non-pointers.
-Type *getFuncArgPtrElementType(const Function *F, int ArgNo);
-
 class DialectContextAnalysisResult {
 public:
   DialectContextAnalysisResult() {}
@@ -266,7 +253,8 @@ private:
 class CleanupContinuationsPass
     : public llvm::PassInfoMixin<CleanupContinuationsPass> {
 public:
-  CleanupContinuationsPass();
+  CleanupContinuationsPass(llvm::Module *GpurtLibrary = nullptr)
+      : GpurtLibrary(GpurtLibrary) {}
   llvm::PreservedAnalyses run(llvm::Module &Module,
                               llvm::ModuleAnalysisManager &AnalysisManager);
 
@@ -285,9 +273,10 @@ private:
   };
 
   void removeContFreeCall(Function *F, Function *ContFree);
-  Value *getContinuationFramePtr(Function *F, bool IsStart,
-                                 const ContinuationData &ContinuationInfo,
-                                 SmallVector<Instruction *> &InstsToRemove);
+  Value *
+  getContinuationFramePtr(Function *F, bool IsStart,
+                          const ContinuationData &ContinuationInfo,
+                          SmallVector<Instruction *> *InstsToRemove = nullptr);
   void freeCpsStack(Function *F, ContinuationData &CpsInfo);
   void updateCpsStack(Function *F, Function *NewFunc, bool IsStart,
                       ContinuationData &CpsInfo);
@@ -296,12 +285,14 @@ private:
   void handleContinue(ContinuationData &Data, Instruction *Ret);
   void handleSingleContinue(ContinuationData &Data, CallInst *Call,
                             Value *ResumeFun);
+  void lowerIntrinsicCall(Module &Mod);
 
   llvm_dialects::Builder *Builder;
   Function *ContMalloc;
   Function *ContFree;
   MapVector<Function *, ContinuationData> ToProcess;
   uint32_t MaxContStateBytes;
+  llvm::Module *GpurtLibrary;
 };
 class LowerRaytracingPipelinePass
     : public llvm::PassInfoMixin<LowerRaytracingPipelinePass> {
@@ -481,7 +472,7 @@ private:
   Module *M = nullptr;
   const llvm::DataLayout *DL = nullptr;
 
-  bool processFunction(llvm::Function &Func);
+  bool convertDxOp(llvm::Function &Func);
   using OpCallbackType = std::function<llvm::Value *(
       llvm::CallInst &, DXILContLgcRtOpConverterPass *)>;
   std::optional<OpCallbackType> getCallbackByOpName(StringRef OpName);
@@ -496,7 +487,8 @@ private:
   Value *handleMatrixResult(CallInst &CI);
   Value *createVec3(Value *X, Value *Y, Value *Z);
   void addDXILPayloadTypeToCall(Function &DXILFunc, CallInst &CI);
-  void applyPayloadMetadataTypesOnShaders();
+  bool prepareEntryPointShaders();
+  void setupLocalRootIndex(Function *F);
 };
 
 /// Add necessary continuation transform passes for LGC.

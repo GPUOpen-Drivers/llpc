@@ -18,7 +18,7 @@ declare i32 @lgc.cps.as.continuation.reference(...) memory(none)
 declare float @lgc.cps.await.f32(...)
 declare void @lgc.cps.jump(...)
 ; CHECK-LABEL: define void @test(
-; CHECK-SAME: {} [[STATE:%.*]], i32 [[RCR:%.*]], float [[ARG:%.*]]) !lgc.cps !0 !continuation !1 {
+; CHECK-SAME: {} [[STATE:%.*]], i32 [[RCR:%.*]], float [[ARG:%.*]]) !lgc.cps [[META0:![0-9]+]] !continuation [[META1:![0-9]+]] {
 ; CHECK-NEXT:  AllocaSpillBB:
 ; CHECK-NEXT:    [[TMP0:%.*]] = call ptr addrspace(32) @lgc.cps.alloc(i32 8)
 ; CHECK-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[TEST_FRAME:%.*]], ptr addrspace(32) [[TMP0]], i32 0, i32 1
@@ -34,21 +34,21 @@ declare void @lgc.cps.jump(...)
 ;
 ;
 ; CHECK-LABEL: define dso_local void @test.resume.0(
-; CHECK-SAME: {} [[TMP0:%.*]], i32 [[TMP1:%.*]], float [[TMP2:%.*]]) !lgc.cps !0 !continuation !1 {
+; CHECK-SAME: {} [[TMP0:%.*]], i32 [[TMP1:%.*]], i32 [[TMP2:%.*]], float [[TMP3:%.*]]) !lgc.cps [[META0]] !continuation [[META1]] {
 ; CHECK-NEXT:  entryresume.0:
-; CHECK-NEXT:    [[TMP3:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 8)
-; CHECK-NEXT:    [[ARG_RELOAD_ADDR:%.*]] = getelementptr inbounds [[TEST_FRAME:%.*]], ptr addrspace(32) [[TMP3]], i32 0, i32 1
+; CHECK-NEXT:    [[TMP4:%.*]] = call ptr addrspace(32) @lgc.cps.peek(i32 8)
+; CHECK-NEXT:    [[ARG_RELOAD_ADDR:%.*]] = getelementptr inbounds [[TEST_FRAME:%.*]], ptr addrspace(32) [[TMP4]], i32 0, i32 1
 ; CHECK-NEXT:    [[ARG_RELOAD:%.*]] = load float, ptr addrspace(32) [[ARG_RELOAD_ADDR]], align 4
-; CHECK-NEXT:    [[RCR_RELOAD_ADDR:%.*]] = getelementptr inbounds [[TEST_FRAME]], ptr addrspace(32) [[TMP3]], i32 0, i32 0
+; CHECK-NEXT:    [[RCR_RELOAD_ADDR:%.*]] = getelementptr inbounds [[TEST_FRAME]], ptr addrspace(32) [[TMP4]], i32 0, i32 0
 ; CHECK-NEXT:    [[RCR_RELOAD:%.*]] = load i32, ptr addrspace(32) [[RCR_RELOAD_ADDR]], align 4
-; CHECK-NEXT:    [[RETURNVALUE:%.*]] = fmul float [[TMP2]], [[ARG_RELOAD]]
+; CHECK-NEXT:    [[RETURNVALUE:%.*]] = fmul float [[TMP3]], [[ARG_RELOAD]]
 ; CHECK-NEXT:    call void @lgc.cps.free(i32 8)
 ; CHECK-NEXT:    call void (...) @lgc.cps.jump(i32 [[RCR_RELOAD]], i32 2, {} poison, i32 poison, float [[RETURNVALUE]])
 ; CHECK-NEXT:    unreachable
 ;
 ;
 ; LOWER-AWAIT-LABEL: define { ptr, ptr } @test(
-; LOWER-AWAIT-SAME: {} [[STATE:%.*]], i32 [[RCR:%.*]], float [[ARG:%.*]], ptr [[TMP0:%.*]]) !lgc.cps !0 !continuation !1 {
+; LOWER-AWAIT-SAME: {} [[STATE:%.*]], i32 [[RCR:%.*]], float [[ARG:%.*]], ptr [[TMP0:%.*]]) !lgc.cps [[META0:![0-9]+]] !continuation [[META1:![0-9]+]] {
 ; LOWER-AWAIT-NEXT:    [[TMP2:%.*]] = call token @llvm.coro.id.retcon(i32 8, i32 4, ptr [[TMP0]], ptr @continuation.prototype.test, ptr @continuation.malloc, ptr @continuation.free)
 ; LOWER-AWAIT-NEXT:    [[TMP3:%.*]] = call ptr @llvm.coro.begin(token [[TMP2]], ptr null)
 ; LOWER-AWAIT-NEXT:    [[T0:%.*]] = fadd float [[ARG]], 1.000000e+00

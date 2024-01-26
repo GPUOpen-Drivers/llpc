@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -47,6 +47,8 @@ public:
 
     m_pipelineState.gfxPipelineInfo.options.optimizationLevel = 2;
     m_pipelineState.compPipelineInfo.options.optimizationLevel = 2;
+    memset(&m_pipelineState.gfxPipelineInfo.vbAddressLowBits, 0,
+           sizeof(m_pipelineState.gfxPipelineInfo.vbAddressLowBits));
 
     memset(&m_vertexInputState, 0, sizeof(m_vertexInputState));
   };
@@ -69,6 +71,7 @@ private:
   VkPipelineVertexInputStateCreateInfo m_vertexInputState;
   std::vector<Vfx::ShaderSource> m_shaderSources;
   std::vector<Vkgc::PipelineShaderInfo> m_shaderInfos;
+  std::vector<Vkgc::BinaryData> m_librarySummaries;
 
   // Used for backward compatibility with Version 1 .pipe files
   std::vector<Vkgc::ResourceMappingRootNode> m_resourceMappingNodes;

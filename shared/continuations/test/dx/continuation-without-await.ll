@@ -127,12 +127,11 @@ attributes #2 = { nounwind }
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-LABEL: define void @main(
-; LOWERRAYTRACINGPIPELINE-SAME: ) !lgc.rt.shaderstage [[META9:![0-9]+]] !continuation.entry [[META19:![0-9]+]] !continuation.registercount [[META9]] !continuation [[META20:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META9:![0-9]+]] !continuation.entry [[META19:![0-9]+]] !continuation.registercount [[META9]] !continuation [[META20:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[PARAMS:%.*]] = alloca [[STRUCT_THEIRPARAMS:%.*]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA:%.*]], align 8
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP1:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @continuations.getSystemData.s_struct.DispatchSystemDatas()
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_THEIRPARAMS]] zeroinitializer, ptr [[PARAMS]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[DIS_DATA_I:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = getelementptr inbounds [[STRUCT_THEIRPARAMS]], ptr [[PARAMS]], i32 0, i32 0
@@ -145,16 +144,15 @@ attributes #2 = { nounwind }
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP7:%.*]] = load [1 x i32], ptr @PAYLOAD, align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [1 x i32] [[TMP7]], ptr [[TMP6]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP5]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    ret void, !continuation.registercount [[META17:![0-9]+]]
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-LABEL: define void @main_no_call(
-; LOWERRAYTRACINGPIPELINE-SAME: ) !lgc.rt.shaderstage [[META9]] !continuation.entry [[META19]] !continuation.registercount [[META9]] !continuation [[META22:![0-9]+]] {
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA:%.*]], align 8
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP1:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @continuations.getSystemData.s_struct.DispatchSystemDatas()
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
+; LOWERRAYTRACINGPIPELINE-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META9]] !continuation.entry [[META19]] !continuation.registercount [[META9]] !continuation [[META22:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    ret void, !continuation.registercount [[META17]]
 ;
 ;
@@ -162,35 +160,34 @@ attributes #2 = { nounwind }
 ; LOWERRAYTRACINGPIPELINE-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META23:![0-9]+]] !continuation.registercount [[META24:![0-9]+]] !continuation [[META25:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_MYPARAMS:%.*]], align 8
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @continuations.getSystemData.s_struct.DispatchSystemDatas()
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP3]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT_MYPARAMS]], ptr [[TMP2]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = getelementptr i32, ptr [[TMP3]], i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP5:%.*]] = getelementptr i32, ptr [[TMP4]], i64 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP6:%.*]] = load i32, ptr @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP6]], ptr [[TMP5]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP7:%.*]] = getelementptr i32, ptr [[TMP4]], i64 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP8:%.*]] = load i32, ptr getelementptr (i32, ptr @PAYLOAD, i64 1), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP8]], ptr [[TMP7]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP9:%.*]] = getelementptr i32, ptr [[TMP4]], i64 2
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP10:%.*]] = load i32, ptr getelementptr (i32, ptr @PAYLOAD, i64 2), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP10]], ptr [[TMP9]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT_MYPARAMS]], ptr [[TMP2]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP5:%.*]] = getelementptr i32, ptr [[TMP4]], i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP6:%.*]] = getelementptr i32, ptr [[TMP5]], i64 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP7:%.*]] = load i32, ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP7]], ptr [[TMP6]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP8:%.*]] = getelementptr i32, ptr [[TMP5]], i64 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP9:%.*]] = load i32, ptr getelementptr (i32, ptr @PAYLOAD, i64 1), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP9]], ptr [[TMP8]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP10:%.*]] = getelementptr i32, ptr [[TMP5]], i64 2
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP11:%.*]] = load i32, ptr getelementptr (i32, ptr @PAYLOAD, i64 2), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP11]], ptr [[TMP10]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [[STRUCT_MYPARAMS]], ptr [[TMP2]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP13:%.*]] = getelementptr i32, ptr [[TMP12]], i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = getelementptr i32, ptr [[TMP13]], i64 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP15:%.*]] = load i32, ptr [[TMP14]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP15]], ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP16:%.*]] = getelementptr i32, ptr [[TMP13]], i64 1
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP17:%.*]] = load i32, ptr [[TMP16]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP17]], ptr getelementptr (i32, ptr @PAYLOAD, i64 1), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP18:%.*]] = getelementptr i32, ptr [[TMP13]], i64 2
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP19:%.*]] = load i32, ptr [[TMP18]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP19]], ptr getelementptr (i32, ptr @PAYLOAD, i64 2), align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP20:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    ret [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP20]], !continuation.registercount [[META24]]
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [[STRUCT_MYPARAMS]], ptr [[TMP2]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP12:%.*]] = getelementptr i32, ptr [[TMP11]], i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP13:%.*]] = getelementptr i32, ptr [[TMP12]], i64 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = load i32, ptr [[TMP13]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP14]], ptr @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP15:%.*]] = getelementptr i32, ptr [[TMP12]], i64 1
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP16:%.*]] = load i32, ptr [[TMP15]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP16]], ptr getelementptr (i32, ptr @PAYLOAD, i64 1), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP17:%.*]] = getelementptr i32, ptr [[TMP12]], i64 2
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP18:%.*]] = load i32, ptr [[TMP17]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP18]], ptr getelementptr (i32, ptr @PAYLOAD, i64 2), align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP19:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    ret [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP19]], !continuation.registercount [[META24]]
 ;
 ;
 ; CLEANUP-LABEL: define i32 @_cont_GetLocalRootIndex(
@@ -199,12 +196,10 @@ attributes #2 = { nounwind }
 ;
 ;
 ; CLEANUP-LABEL: define void @main(
-; CLEANUP-SAME: ) !lgc.rt.shaderstage [[META9:![0-9]+]] !continuation.entry [[META19:![0-9]+]] !continuation.registercount [[META9]] !continuation [[META20:![0-9]+]] !continuation.state [[META9]] {
+; CLEANUP-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META9:![0-9]+]] !continuation.entry [[META19:![0-9]+]] !continuation.registercount [[META9]] !continuation [[META20:![0-9]+]] !continuation.state [[META9]] {
 ; CLEANUP-NEXT:  AllocaSpillBB:
-; CLEANUP-NEXT:    [[CONT_STATE:%.*]] = alloca [0 x i32], align 4
-; CLEANUP-NEXT:    [[TMP0:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA:%.*]] @continuations.getSystemData.s_struct.DispatchSystemDatas()
 ; CLEANUP-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
-; CLEANUP-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
+; CLEANUP-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; CLEANUP-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, i32 [[DOTFCA_0_EXTRACT]], 0
 ; CLEANUP-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [1 x i32] poison, i32 0, 0
 ; CLEANUP-NEXT:    store [1 x i32] [[DOTFCA_0_INSERT]], ptr @PAYLOAD, align 4
@@ -217,22 +212,19 @@ attributes #2 = { nounwind }
 ; CLEANUP-LABEL: define dso_local void @main.resume.0(
 ; CLEANUP-SAME: i32 [[TMP0:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP1:%.*]]) !lgc.rt.shaderstage [[META9]] !continuation.registercount [[META21]] !continuation [[META20]] {
 ; CLEANUP-NEXT:  entryresume.0:
-; CLEANUP-NEXT:    [[CONT_STATE:%.*]] = alloca [0 x i32], align 4
 ; CLEANUP-NEXT:    [[TMP2:%.*]] = load [1 x i32], ptr @PAYLOAD, align 4
 ; CLEANUP-NEXT:    [[DOTFCA_0_EXTRACT4:%.*]] = extractvalue [1 x i32] [[TMP2]], 0
 ; CLEANUP-NEXT:    [[DOTFCA_0_EXTRACT1:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], 0
-; CLEANUP-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
+; CLEANUP-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; CLEANUP-NEXT:    call void @continuation.complete()
 ; CLEANUP-NEXT:    unreachable
 ;
 ;
 ; CLEANUP-LABEL: define void @main_no_call(
-; CLEANUP-SAME: ) !lgc.rt.shaderstage [[META9]] !continuation.entry [[META19]] !continuation.registercount [[META9]] !continuation [[META22:![0-9]+]] !continuation.state [[META9]] {
+; CLEANUP-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META9]] !continuation.entry [[META19]] !continuation.registercount [[META9]] !continuation [[META22:![0-9]+]] !continuation.state [[META9]] {
 ; CLEANUP-NEXT:  AllocaSpillBB:
-; CLEANUP-NEXT:    [[CONT_STATE:%.*]] = alloca [0 x i32], align 4
-; CLEANUP-NEXT:    [[TMP0:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA:%.*]] @continuations.getSystemData.s_struct.DispatchSystemDatas()
 ; CLEANUP-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
-; CLEANUP-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
+; CLEANUP-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; CLEANUP-NEXT:    call void @continuation.complete()
 ; CLEANUP-NEXT:    unreachable
 ;
@@ -240,22 +232,20 @@ attributes #2 = { nounwind }
 ; CLEANUP-LABEL: define void @called(
 ; CLEANUP-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META23:![0-9]+]] !continuation.registercount [[META24:![0-9]+]] !continuation [[META25:![0-9]+]] !continuation.state [[META9]] {
 ; CLEANUP-NEXT:  AllocaSpillBB:
-; CLEANUP-NEXT:    [[CONT_STATE:%.*]] = alloca [0 x i32], align 4
-; CLEANUP-NEXT:    [[TMP1:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @continuations.getSystemData.s_struct.DispatchSystemDatas()
-; CLEANUP-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], 0
+; CLEANUP-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
+; CLEANUP-NEXT:    [[TMP1:%.*]] = load i32, ptr @PAYLOAD, align 4
+; CLEANUP-NEXT:    [[TMP2:%.*]] = load i32, ptr getelementptr (i32, ptr @PAYLOAD, i64 1), align 4
+; CLEANUP-NEXT:    [[TMP3:%.*]] = load i32, ptr getelementptr (i32, ptr @PAYLOAD, i64 2), align 4
+; CLEANUP-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
 ; CLEANUP-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
-; CLEANUP-NEXT:    [[TMP2:%.*]] = load i32, ptr @PAYLOAD, align 4
-; CLEANUP-NEXT:    [[TMP3:%.*]] = load i32, ptr getelementptr (i32, ptr @PAYLOAD, i64 1), align 4
-; CLEANUP-NEXT:    [[TMP4:%.*]] = load i32, ptr getelementptr (i32, ptr @PAYLOAD, i64 2), align 4
 ; CLEANUP-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; CLEANUP-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; CLEANUP-NEXT:    store i32 [[TMP2]], ptr @PAYLOAD, align 4
-; CLEANUP-NEXT:    store i32 [[TMP3]], ptr getelementptr (i32, ptr @PAYLOAD, i64 1), align 4
-; CLEANUP-NEXT:    store i32 [[TMP4]], ptr getelementptr (i32, ptr @PAYLOAD, i64 2), align 4
+; CLEANUP-NEXT:    store i32 [[TMP1]], ptr @PAYLOAD, align 4
+; CLEANUP-NEXT:    store i32 [[TMP2]], ptr getelementptr (i32, ptr @PAYLOAD, i64 1), align 4
+; CLEANUP-NEXT:    store i32 [[TMP3]], ptr getelementptr (i32, ptr @PAYLOAD, i64 2), align 4
 ; CLEANUP-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, i32 [[DOTFCA_0_EXTRACT]], 0
-; CLEANUP-NEXT:    [[TMP5:%.*]] = call ptr @continuation.getContinuationStackOffset()
-; CLEANUP-NEXT:    [[TMP6:%.*]] = load i32, ptr [[TMP5]], align 4
-; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR]], i32 [[TMP6]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META24]]
+; CLEANUP-NEXT:    [[TMP4:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CLEANUP-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP4]], align 4
+; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR]], i32 [[TMP5]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META24]]
 ; CLEANUP-NEXT:    unreachable
 ;
 ;
@@ -265,15 +255,13 @@ attributes #2 = { nounwind }
 ;
 ;
 ; SAVESTATE-LABEL: define void @main(
-; SAVESTATE-SAME: ) !lgc.rt.shaderstage [[META8:![0-9]+]] !continuation.entry [[META18:![0-9]+]] !continuation.registercount [[META8]] !continuation [[META19:![0-9]+]] !continuation.state [[META8]] {
+; SAVESTATE-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META8:![0-9]+]] !continuation.entry [[META18:![0-9]+]] !continuation.registercount [[META8]] !continuation [[META19:![0-9]+]] !continuation.state [[META8]] {
 ; SAVESTATE-NEXT:  AllocaSpillBB:
-; SAVESTATE-NEXT:    [[CONT_STATE:%.*]] = alloca [0 x i32], align 4
 ; SAVESTATE-NEXT:    [[CSP:%.*]] = alloca i32, align 4
-; SAVESTATE-NEXT:    [[TMP0:%.*]] = call i32 @continuation.initialContinuationStackPtr()
-; SAVESTATE-NEXT:    store i32 [[TMP0]], ptr [[CSP]], align 4
-; SAVESTATE-NEXT:    [[TMP1:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA:%.*]] @continuations.getSystemData.s_struct.DispatchSystemDatas()
-; SAVESTATE-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], 0
-; SAVESTATE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
+; SAVESTATE-NEXT:    [[TMP1:%.*]] = call i32 @continuation.initialContinuationStackPtr()
+; SAVESTATE-NEXT:    store i32 [[TMP1]], ptr [[CSP]], align 4
+; SAVESTATE-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
+; SAVESTATE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; SAVESTATE-NEXT:    [[DIS_DATA_I_FCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, i32 [[DOTFCA_0_EXTRACT]], 0
 ; SAVESTATE-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [1 x i32] poison, i32 0, 0
 ; SAVESTATE-NEXT:    [[DOTFCA_0_INSERT_FCA_0_EXTRACT:%.*]] = extractvalue [1 x i32] [[DOTFCA_0_INSERT]], 0
@@ -286,23 +274,20 @@ attributes #2 = { nounwind }
 ; SAVESTATE-LABEL: define dso_local void @main.resume.0(
 ; SAVESTATE-SAME: i32 [[TMP0:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP1:%.*]]) !lgc.rt.shaderstage [[META8]] !continuation.registercount [[META20]] !continuation [[META19]] {
 ; SAVESTATE-NEXT:  entryresume.0:
-; SAVESTATE-NEXT:    [[CONT_STATE:%.*]] = alloca [0 x i32], align 4
 ; SAVESTATE-NEXT:    [[TMP2:%.*]] = load i32, ptr addrspace(20) @PAYLOAD, align 4
 ; SAVESTATE-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [1 x i32] poison, i32 [[TMP2]], 0
 ; SAVESTATE-NEXT:    [[DOTFCA_0_EXTRACT4:%.*]] = extractvalue [1 x i32] [[DOTFCA_0_INSERT]], 0
 ; SAVESTATE-NEXT:    [[DOTFCA_0_EXTRACT1:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], 0
-; SAVESTATE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
+; SAVESTATE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; SAVESTATE-NEXT:    call void @continuation.complete()
 ; SAVESTATE-NEXT:    unreachable
 ;
 ;
 ; SAVESTATE-LABEL: define void @main_no_call(
-; SAVESTATE-SAME: ) !lgc.rt.shaderstage [[META8]] !continuation.entry [[META18]] !continuation.registercount [[META8]] !continuation [[META21:![0-9]+]] !continuation.state [[META8]] {
+; SAVESTATE-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META8]] !continuation.entry [[META18]] !continuation.registercount [[META8]] !continuation [[META21:![0-9]+]] !continuation.state [[META8]] {
 ; SAVESTATE-NEXT:  AllocaSpillBB:
-; SAVESTATE-NEXT:    [[CONT_STATE:%.*]] = alloca [0 x i32], align 4
-; SAVESTATE-NEXT:    [[TMP0:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA:%.*]] @continuations.getSystemData.s_struct.DispatchSystemDatas()
 ; SAVESTATE-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
-; SAVESTATE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
+; SAVESTATE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; SAVESTATE-NEXT:    call void @continuation.complete()
 ; SAVESTATE-NEXT:    unreachable
 ;
@@ -310,22 +295,20 @@ attributes #2 = { nounwind }
 ; SAVESTATE-LABEL: define void @called(
 ; SAVESTATE-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META22:![0-9]+]] !continuation.registercount [[META23:![0-9]+]] !continuation [[META24:![0-9]+]] !continuation.state [[META8]] {
 ; SAVESTATE-NEXT:  AllocaSpillBB:
-; SAVESTATE-NEXT:    [[CONT_STATE:%.*]] = alloca [0 x i32], align 4
 ; SAVESTATE-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; SAVESTATE-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
-; SAVESTATE-NEXT:    [[TMP1:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @continuations.getSystemData.s_struct.DispatchSystemDatas()
-; SAVESTATE-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], 0
+; SAVESTATE-NEXT:    [[DOTFCA_0_EXTRACT:%.*]] = extractvalue [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], 0
+; SAVESTATE-NEXT:    [[TMP1:%.*]] = load i32, ptr addrspace(20) @PAYLOAD, align 4
+; SAVESTATE-NEXT:    [[TMP2:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr (i32, ptr addrspacecast (ptr addrspace(20) @PAYLOAD to ptr), i64 1) to ptr addrspace(20)), align 4
+; SAVESTATE-NEXT:    [[TMP3:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr (i32, ptr addrspacecast (ptr addrspace(20) @PAYLOAD to ptr), i64 2) to ptr addrspace(20)), align 4
+; SAVESTATE-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr addrspacecast (ptr addrspace(20) @PAYLOAD to ptr))
 ; SAVESTATE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 5)
-; SAVESTATE-NEXT:    [[TMP2:%.*]] = load i32, ptr addrspace(20) @PAYLOAD, align 4
-; SAVESTATE-NEXT:    [[TMP3:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr (i32, ptr addrspacecast (ptr addrspace(20) @PAYLOAD to ptr), i64 1) to ptr addrspace(20)), align 4
-; SAVESTATE-NEXT:    [[TMP4:%.*]] = load i32, ptr addrspace(20) addrspacecast (ptr getelementptr (i32, ptr addrspacecast (ptr addrspace(20) @PAYLOAD to ptr), i64 2) to ptr addrspace(20)), align 4
 ; SAVESTATE-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr addrspacecast (ptr addrspace(20) @PAYLOAD to ptr))
-; SAVESTATE-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr addrspacecast (ptr addrspace(20) @PAYLOAD to ptr))
-; SAVESTATE-NEXT:    store i32 [[TMP2]], ptr addrspace(20) @PAYLOAD, align 4
-; SAVESTATE-NEXT:    store i32 [[TMP3]], ptr addrspace(20) addrspacecast (ptr getelementptr (i32, ptr addrspacecast (ptr addrspace(20) @PAYLOAD to ptr), i64 1) to ptr addrspace(20)), align 4
-; SAVESTATE-NEXT:    store i32 [[TMP4]], ptr addrspace(20) addrspacecast (ptr getelementptr (i32, ptr addrspacecast (ptr addrspace(20) @PAYLOAD to ptr), i64 2) to ptr addrspace(20)), align 4
+; SAVESTATE-NEXT:    store i32 [[TMP1]], ptr addrspace(20) @PAYLOAD, align 4
+; SAVESTATE-NEXT:    store i32 [[TMP2]], ptr addrspace(20) addrspacecast (ptr getelementptr (i32, ptr addrspacecast (ptr addrspace(20) @PAYLOAD to ptr), i64 1) to ptr addrspace(20)), align 4
+; SAVESTATE-NEXT:    store i32 [[TMP3]], ptr addrspace(20) addrspacecast (ptr getelementptr (i32, ptr addrspacecast (ptr addrspace(20) @PAYLOAD to ptr), i64 2) to ptr addrspace(20)), align 4
 ; SAVESTATE-NEXT:    [[DOTFCA_0_INSERT:%.*]] = insertvalue [[STRUCT_DISPATCHSYSTEMDATA]] poison, i32 [[DOTFCA_0_EXTRACT]], 0
-; SAVESTATE-NEXT:    [[TMP5:%.*]] = load i32, ptr [[CSP]], align 4
-; SAVESTATE-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR]], i32 [[TMP5]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META23]]
+; SAVESTATE-NEXT:    [[TMP4:%.*]] = load i32, ptr [[CSP]], align 4
+; SAVESTATE-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR]], i32 [[TMP4]], [[STRUCT_DISPATCHSYSTEMDATA]] [[DOTFCA_0_INSERT]]), !continuation.registercount [[META23]]
 ; SAVESTATE-NEXT:    unreachable
 ;

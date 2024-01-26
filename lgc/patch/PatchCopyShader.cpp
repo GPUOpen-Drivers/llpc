@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -77,14 +77,14 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
   m_pipelineState = pipelineState;
   m_pipelineSysValues.initialize(m_pipelineState);
 
-  auto gsEntryPoint = pipelineShaders.getEntryPoint(ShaderStageGeometry);
+  auto gsEntryPoint = pipelineShaders.getEntryPoint(ShaderStage::Geometry);
   if (!gsEntryPoint) {
     // Skip copy shader generation if GS is absent
     return false;
   }
 
   // Tell pipeline state there is a copy shader.
-  m_pipelineState->setShaderStageMask(m_pipelineState->getShaderStageMask() | (1U << ShaderStageCopyShader));
+  m_pipelineState->setShaderStageMask(m_pipelineState->getShaderStageMask() | ShaderStageMask(ShaderStage::CopyShader));
 
   // Gather GS generic export details.
   collectGsGenericOutputInfo(gsEntryPoint);
@@ -116,17 +116,9 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
     argTys = {int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty, int32Ty};
 
     argInReg = {true, true, true, true, true, true, true, true, false};
-    // clang-format off
-    argNames = {"globalTable",
-                "streamOutTable",
-                "streamOutInfo",
-                "streamOutWriteIndex",
-                "streamOutOffset0",
-                "streamOutOffset1",
-                "streamOutOffset2",
-                "streamOutOffset3",
-                "vertexOffset"};
-    // clang-format on
+
+    argNames = {"globalTable",      "streamOutTable",   "streamOutInfo",    "streamOutWriteIndex", "streamOutOffset0",
+                "streamOutOffset1", "streamOutOffset2", "streamOutOffset3", "vertexOffset"};
   } else {
     // If NGG, the copy shader is not a real HW VS and will be incorporated into NGG primitive shader finally. Thus,
     // the argument definitions are decided by compiler not by HW. We could have such variable layout (not fixed with
@@ -159,10 +151,10 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
   entryPoint->setCallingConv(CallingConv::AMDGPU_VS);
 
   // Set the shader stage on the new function.
-  setShaderStage(entryPoint, ShaderStageCopyShader);
+  setShaderStage(entryPoint, ShaderStage::CopyShader);
 
   auto insertPos = module.getFunctionList().end();
-  auto fsEntryPoint = pipelineShaders.getEntryPoint(ShaderStageFragment);
+  auto fsEntryPoint = pipelineShaders.getEntryPoint(ShaderStage::Fragment);
   if (fsEntryPoint)
     insertPos = fsEntryPoint->getIterator();
   module.getFunctionList().insert(insertPos, entryPoint);
@@ -175,7 +167,7 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
   }
 
   // Set wavefront size
-  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStageCopyShader);
+  const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::CopyShader);
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10)
     entryPoint->addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize));
 
@@ -188,7 +180,7 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
   auto entryBlock = BasicBlock::Create(*m_context, "", entryPoint, endBlock);
   builder.SetInsertPoint(entryBlock);
 
-  auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStageCopyShader);
+  auto intfData = m_pipelineState->getShaderInterfaceData(ShaderStage::CopyShader);
 
   if (!m_pipelineState->getNggControl()->enableNgg) {
     intfData->userDataUsage.gs.copyShaderStreamOutTable = 1;
@@ -208,11 +200,11 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
       if (m_pipelineState->enableXfb())
         userData[intfData->userDataUsage.gs.copyShaderStreamOutTable] =
             static_cast<unsigned>(UserDataMapping::StreamOutTable);
-      m_pipelineState->setUserDataMap(ShaderStageCopyShader, userData);
+      m_pipelineState->setUserDataMap(ShaderStage::CopyShader, userData);
     } else {
-      m_pipelineState->getPalMetadata()->setUserDataEntry(ShaderStageCopyShader, 0, UserDataMapping::GlobalTable);
+      m_pipelineState->getPalMetadata()->setUserDataEntry(ShaderStage::CopyShader, 0, UserDataMapping::GlobalTable);
       if (m_pipelineState->enableXfb()) {
-        m_pipelineState->getPalMetadata()->setUserDataEntry(ShaderStageCopyShader,
+        m_pipelineState->getPalMetadata()->setUserDataEntry(ShaderStage::CopyShader,
                                                             intfData->userDataUsage.gs.copyShaderStreamOutTable,
                                                             UserDataMapping::StreamOutTable);
       }
@@ -313,13 +305,13 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
 //
 // @param gsEntryPoint : Geometry shader entrypoint
 void PatchCopyShader::collectGsGenericOutputInfo(Function *gsEntryPoint) {
-  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
+  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::CopyShader);
   const auto &outputLocInfoMap = resUsage->inOutUsage.outputLocInfoMap;
   std::set<InOutLocationInfo> visitedLocInfos;
 
   // Collect the byte sizes of the output value at each mapped location
   for (auto &func : *gsEntryPoint->getParent()) {
-    if (func.getName().startswith(lgcName::OutputExportGeneric)) {
+    if (func.getName().starts_with(lgcName::OutputExportGeneric)) {
       for (auto user : func.users()) {
         auto callInst = dyn_cast<CallInst>(user);
         if (!callInst || callInst->getParent()->getParent() != gsEntryPoint)
@@ -343,7 +335,7 @@ void PatchCopyShader::collectGsGenericOutputInfo(Function *gsEntryPoint) {
         visitedLocInfos.insert(origLocInfo);
 
         unsigned dwordSize = 1; // Each output call is scalarized and exports 1 dword for packing
-        if (!m_pipelineState->canPackOutput(ShaderStageGeometry)) {
+        if (!m_pipelineState->canPackOutput(ShaderStage::Geometry)) {
           unsigned compCount = 1;
           auto compTy = outputTy;
           auto outputVecTy = dyn_cast<FixedVectorType>(outputTy);
@@ -381,7 +373,7 @@ void PatchCopyShader::collectGsGenericOutputInfo(Function *gsEntryPoint) {
 // @param streamId : Export output of this stream
 // @param builder : BuilderBase to use for instruction constructing
 void PatchCopyShader::exportOutput(unsigned streamId, BuilderBase &builder) {
-  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
+  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::CopyShader);
   auto &builtInUsage = resUsage->builtInUsage.gs;
   auto &locInfoXfbOutInfoMap = resUsage->inOutUsage.locInfoXfbOutInfoMap;
   auto &outputLocInfoMap = resUsage->inOutUsage.outputLocInfoMap;
@@ -520,7 +512,7 @@ Value *PatchCopyShader::calcGsVsRingOffsetForInput(unsigned location, unsigned c
   auto entryPoint = builder.GetInsertBlock()->getParent();
   Value *vertexOffset = getFunctionArgument(entryPoint, CopyShaderEntryArgIdxVertexOffset);
 
-  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
+  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::CopyShader);
 
   Value *ringOffset = nullptr;
   if (m_pipelineState->isGsOnChip()) {
@@ -666,7 +658,7 @@ void PatchCopyShader::exportXfbOutput(Value *outputValue, const XfbOutInfo &xfbO
 
   // Collect transform feedback export calls, used in SW-emulated stream-out.
   if (m_pipelineState->enableSwXfb()) {
-    auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader)->inOutUsage;
+    auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::CopyShader)->inOutUsage;
     // A transform feedback export call is expected to be <4 x dword> at most
     inOutUsage.xfbExpCount += outputValue->getType()->getPrimitiveSizeInBits() > 128 ? 2 : 1;
   }
@@ -688,7 +680,7 @@ void PatchCopyShader::exportXfbOutput(Value *outputValue, const XfbOutInfo &xfbO
 // @param builder : BuilderBase to use for instruction constructing
 void PatchCopyShader::exportBuiltInOutput(Value *outputValue, BuiltInKind builtInId, unsigned streamId,
                                           BuilderBase &builder) {
-  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader);
+  auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::CopyShader);
 
   if (m_pipelineState->enableXfb()) {
     InOutLocationInfo outLocInfo;
@@ -701,7 +693,7 @@ void PatchCopyShader::exportBuiltInOutput(Value *outputValue, BuiltInKind builtI
     if (locInfoXfbOutInfoMapIt != locInfoXfbOutInfoMap.end()) {
       // Collect transform feedback export calls, used in SW-emulated stream-out.
       if (m_pipelineState->enableSwXfb()) {
-        auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStageCopyShader)->inOutUsage;
+        auto &inOutUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::CopyShader)->inOutUsage;
         // A transform feedback export call is expected to be <4 x dword> at most
         inOutUsage.xfbExpCount += outputValue->getType()->getPrimitiveSizeInBits() > 128 ? 2 : 1;
       }

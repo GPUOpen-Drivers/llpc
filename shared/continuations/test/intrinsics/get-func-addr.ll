@@ -12,16 +12,15 @@ declare %struct.DispatchSystemData @_cont_SetupRayGen()
 declare !types !8 i32 @_cont_GetLocalRootIndex(%struct.DispatchSystemData*)
 
 define { i64, i32 } @main() !lgc.rt.shaderstage !10 {
-; CHECK-LABEL: define void @main() !lgc.rt.shaderstage !6 !continuation.entry !12 !continuation.registercount !6 !continuation !13 {
+; CHECK-LABEL: define void @main
+; CHECK-SAME: ([[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) !lgc.rt.shaderstage [[META6:![0-9]+]] !continuation.entry [[META12:![0-9]+]] !continuation.registercount [[META6]] !continuation [[META13:![0-9]+]] {
 ; CHECK-NEXT:  entry:
-; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA:%.*]], align 8
-; CHECK-NEXT:    [[TMP0:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @continuations.getSystemData.s_struct.DispatchSystemDatas()
+; CHECK-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
 ; CHECK-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; CHECK-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[SYSTEM_DATA_ALLOCA]])
-; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
+; CHECK-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; CHECK-NEXT:    [[V0:%.*]] = insertvalue { i64, i32 } undef, i64 ptrtoint (ptr @MyFunc to i64), 0
 ; CHECK-NEXT:    [[V1:%.*]] = insertvalue { i64, i32 } undef, i32 ptrtoint (ptr @MyFunc2 to i32), 1
-; CHECK-NEXT:    ret void, !continuation.registercount !9
+; CHECK-NEXT:    ret void, !continuation.registercount [[META9:![0-9]+]]
 ;
 entry:
   %val = call i64 @_AmdGetFuncAddrMyFunc()

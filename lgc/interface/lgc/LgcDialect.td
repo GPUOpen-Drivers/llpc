@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 
@@ -33,6 +33,7 @@ def LgcDialect : Dialect {
 def ConstantPointer : TgConstant<(PointerType 4)>, Type;
 def PrivatePointer : TgConstant<(PointerType 5)>, Type;
 def BufferPointer : TgConstant<(PointerType 7)>, Type;
+def BufferStridedPointer : TgConstant<(PointerType 9)>, Type;
 def TaskPayloadPointer : TgConstant<(PointerType 7)>, Type;
 
 def V4I32 : TgConstant<(FixedVectorType I32, 4)>, Type;
@@ -50,6 +51,37 @@ def BufferDescToPtrOp : LgcOp<"buffer.desc.to.ptr", [Memory<[]>, WillReturn]> {
 
     The descriptor must be a null descriptor or a valid descriptor for a storage buffer aka raw buffer, i.e. a buffer
     for which the indexing feature of BUFFER_LOAD_* instructions is never used.
+  }];
+}
+
+def StridedBufferDescToPtrOp : LgcOp<"strided.buffer.desc.to.ptr", [Memory<[]>, WillReturn]> {
+  let arguments = (ins V4I32:$desc);
+  let results = (outs BufferStridedPointer:$result);
+
+  let summary = "convert a buffer descriptor into a strided buffer pointer";
+  let description = [{
+    Given a buffer descriptor for a storage buffer, returns an indexed buffer pointer to the start of the buffer.
+  }];
+}
+
+def StridedBufferAddrAndStrideToPtrOp : LgcOp<"strided.buffer.addr.and.stride.to.ptr", [Memory<[]>, WillReturn]> {
+  let arguments = (ins I64:$address, I32:$stride);
+  let results = (outs BufferStridedPointer:$result);
+
+  let summary = "convert a buffer address and a stride into a strided buffer pointer";
+  let description = [{
+    Given a buffer address and stride, returns an indexed buffer pointer to the start of the buffer.
+  }];
+}
+
+def StridedIndexAddOp : LgcOp<"strided.index.add", [Memory<[]>, WillReturn]> {
+  let arguments = (ins BufferStridedPointer:$ptr, I32:$delta_idx);
+  let results = (outs BufferStridedPointer:$result);
+
+  let summary = "add to the index of a strided buffer pointer";
+  let description = [{
+    Given a strided buffer pointer and a delta index, adds the delta index to the current index
+    and returns a pointer to the location pointed to by the new index.
   }];
 }
 
@@ -80,6 +112,19 @@ def BufferPtrDiffOp : LgcOp<"buffer.ptr.diff", [Memory<[]>, WillReturn]> {
     If `lhs` and `rhs` have different pointer provenance, the result is poison.
 
     If `lhs` and `rhs` are both null, the result is 0.
+  }];
+}
+
+def LoadBufferDescOp : LgcOp<"load.buffer.desc", [Memory<[]>, WillReturn]> {
+  let arguments = (ins AttrI64:$desc_set, AttrI32:$binding, I32:$desc_index,
+      AttrI32:$flags);
+  let results = (outs BufferPointer:$result);
+
+  let summary = "create a load of a buffer descriptor";
+  let description = [{
+    Return the buffer descriptor pointer.
+
+    `flags` must not contain `BufferFlagAddress` for this Op.
   }];
 }
 

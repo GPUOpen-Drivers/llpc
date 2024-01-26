@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -31,6 +31,7 @@
 #include "vkgcPipelineDumper.h"
 #include "vkgcElfReader.h"
 #include "vkgcUtil.h"
+#include "llvm/BinaryFormat/MsgPackDocument.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/raw_ostream.h"
 #include <fstream>
@@ -333,6 +334,15 @@ void VKAPI_CALL IPipelineDumper::DumpRayTracingPipelineMetadata(void *dumpFile, 
 }
 
 // =====================================================================================================================
+/// Dumps ray tracing library summary.
+///
+/// @param [in]  dumpFile       The handle of pipeline dump file
+/// @param [in]  librarySummary Ray tracing library summary binary
+void VKAPI_CALL IPipelineDumper::DumpRayTracingLibrarySummary(void *dumpFile, BinaryData *librarySummary) {
+  PipelineDumper::dumpRayTracingLibrarySummary(reinterpret_cast<PipelineDumpFile *>(dumpFile), librarySummary);
+}
+
+// =====================================================================================================================
 // Gets the file name of SPIR-V binary according the specified shader hash.
 //
 // @param hash : Shader hash code
@@ -371,8 +381,10 @@ std::string PipelineDumper::getPipelineInfoFileName(PipelineBuildInfo pipelineIn
         fileNamePrefix = "PipelineLibGs";
       else if (pipelineInfo.pGraphicsInfo->mesh.pModuleData)
         fileNamePrefix = "PipelineLibMesh";
-      else
+      else if (pipelineInfo.pGraphicsInfo->fs.pModuleData)
         fileNamePrefix = "PipelineLibFs";
+      else
+        fileNamePrefix = "PipelineLibCes";
     } else if (pipelineInfo.pGraphicsInfo->tes.pModuleData && pipelineInfo.pGraphicsInfo->gs.pModuleData)
       fileNamePrefix = "PipelineGsTess";
     else if (pipelineInfo.pGraphicsInfo->gs.pModuleData)
@@ -644,6 +656,7 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.disableLicmThreshold = " << shaderInfo->options.disableLicmThreshold << "\n";
   dumpFile << "options.unrollHintThreshold = " << shaderInfo->options.unrollHintThreshold << "\n";
   dumpFile << "options.dontUnrollHintThreshold = " << shaderInfo->options.dontUnrollHintThreshold << "\n";
+  dumpFile << "options.noContractOpDot = " << shaderInfo->options.noContractOpDot << "\n";
   dumpFile << "options.fastMathFlags = " << shaderInfo->options.fastMathFlags << "\n";
   dumpFile << "options.disableFastMathFlags = " << shaderInfo->options.disableFastMathFlags << "\n";
   dumpFile << "options.ldsSpillLimitDwords = " << shaderInfo->options.ldsSpillLimitDwords << "\n";
@@ -656,6 +669,7 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.workaroundStorageImageFormats = " << shaderInfo->options.workaroundStorageImageFormats << "\n";
   dumpFile << "options.workaroundInitializeOutputsToZero = " << shaderInfo->options.workaroundInitializeOutputsToZero << "\n";
   dumpFile << "options.disableFMA = " << shaderInfo->options.disableFMA << "\n";
+  dumpFile << "options.constantBufferBindingOffset = " << shaderInfo->options.constantBufferBindingOffset << "\n";
   dumpFile << "options.backwardPropagateNoContract = " << shaderInfo->options.backwardPropagateNoContract << "\n";
   dumpFile << "options.forwardPropagateNoContract = " << shaderInfo->options.forwardPropagateNoContract << "\n";
   dumpFile << "\n";
@@ -860,9 +874,12 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.disableSampleMask = " << options->disableSampleMask << "\n";
   dumpFile << "options.buildResourcesDataForShaderModule = " << options->buildResourcesDataForShaderModule << "\n";
   dumpFile << "options.disableTruncCoordForGather = " << options->disableTruncCoordForGather << "\n";
+  dumpFile << "options.enableCombinedTexture = " << options->enableCombinedTexture << "\n";
   dumpFile << "options.vertex64BitsAttribSingleLoc = " << options->vertex64BitsAttribSingleLoc << "\n";
-  dumpFile << "options.enablePrimGeneratedQuery = " << options->enablePrimGeneratedQuery << "\n";
   dumpFile << "options.enableFragColor = " << options->enableFragColor << "\n";
+  dumpFile << "options.disableBaseVertex = " << options->disableBaseVertex << "\n";
+  dumpFile << "options.enablePrimGeneratedQuery = " << options->enablePrimGeneratedQuery << "\n";
+  dumpFile << "options.disablePerCompFetch = " << options->disablePerCompFetch << "\n";
 }
 
 // =====================================================================================================================
@@ -954,6 +971,7 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "enableEarlyCompile = " << pipelineInfo->enableEarlyCompile << "\n";
   dumpFile << "enableColorExportShader = " << pipelineInfo->enableColorExportShader << "\n";
   dumpFile << "useSoftwareVertexBufferDescriptors = " << pipelineInfo->useSoftwareVertexBufferDescriptors << "\n";
+  dumpFile << "vbAddressLowBitsKnown = " << pipelineInfo->vbAddressLowBitsKnown << "\n";
   dumpPipelineOptions(&pipelineInfo->options, dumpFile);
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
@@ -988,6 +1006,9 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
       dumpFile << "attribute[" << i << "].binding = " << attrib->binding << "\n";
       dumpFile << "attribute[" << i << "].format = " << attrib->format << "\n";
       dumpFile << "attribute[" << i << "].offset = " << attrib->offset << "\n";
+      dumpFile << "attribute[" << i
+               << "].vbAddressLowBits = " << static_cast<unsigned>((pipelineInfo->vbAddressLowBits[attrib->binding]))
+               << "\n";
     }
 
     auto divisorState = findVkStructInChain<VkPipelineVertexInputDivisorStateCreateInfoEXT>(
@@ -1086,6 +1107,20 @@ void PipelineDumper::dumpRayTracingPipelineInfo(std::ostream *dumpFile, const ch
     dumpPipelineShaderInfo(shaderInfo, *dumpFile);
   }
 
+  for (unsigned i = 0; i < pipelineInfo->libraryCount; ++i) {
+    *dumpFile << "[RayTracingLibrarySummary]\n";
+
+    const BinaryData &summary = pipelineInfo->pLibrarySummaries[i];
+    msgpack::Document doc;
+    doc.readFromBlob(StringRef(static_cast<const char *>(summary.pCode), summary.codeSize), false);
+
+    std::string yaml;
+    raw_string_ostream outs(yaml);
+    doc.toYAML(outs);
+    *dumpFile << yaml;
+    *dumpFile << "\n\n";
+  }
+
   dumpResourceMappingInfo(&pipelineInfo->resourceMapping, *dumpFile);
 
   dumpRayTracingStateInfo(pipelineInfo, dumpDir, *dumpFile);
@@ -1131,6 +1166,7 @@ void PipelineDumper::dumpRayTracingStateInfo(const RayTracingPipelineBuildInfo *
 
   dumpFile << "maxRecursionDepth = " << pipelineInfo->maxRecursionDepth << "\n";
   dumpFile << "indirectStageMask = " << pipelineInfo->indirectStageMask << "\n";
+  dumpFile << "libraryMode = " << static_cast<unsigned>(pipelineInfo->libraryMode) << "\n";
   dumpFile << "mode = " << static_cast<unsigned>(pipelineInfo->mode) << "\n";
   dumpRayTracingRtState(&pipelineInfo->rtState, dumpDir, dumpFile);
   dumpFile << "payloadSizeMaxInLib = " << pipelineInfo->payloadSizeMaxInLib << "\n";
@@ -1242,6 +1278,33 @@ void PipelineDumper::dumpRayTracingPipelineMetadata(PipelineDumpFile *dumpFile, 
   if (!dumpFile->binaryFile.bad()) {
     dumpFile->binaryFile.write(reinterpret_cast<const char *>(pipelineMeta->pCode), pipelineMeta->codeSize);
     dumpFile->binaryFile.close();
+  }
+}
+
+// =====================================================================================================================
+/// Dumps ray tracing library summary.
+///
+/// @param [in]  dumpFile       The pointer of pipeline dump file
+/// @param [in]  librarySummary Ray tracing library summary
+void PipelineDumper::dumpRayTracingLibrarySummary(PipelineDumpFile *dumpFile, const BinaryData *librarySummary) {
+  if (!dumpFile)
+    return;
+
+  if (!librarySummary->pCode || librarySummary->codeSize == 0)
+    return;
+
+  // Replace the suffix (which in practice is always going to be .pipe) by .summary
+  auto extPos = dumpFile->binaryFileName.rfind('.');
+  assert(extPos != std::string::npos);
+  std::string metaFileName = dumpFile->binaryFileName.substr(0, extPos) + ".summary";
+
+  // Write the summary as human-readable YAML if possible, using the YAML support in LLVM.
+  std::error_code ec;
+  raw_fd_ostream outfile(metaFileName, ec);
+  if (!ec) {
+    msgpack::Document doc;
+    doc.readFromBlob(StringRef(static_cast<const char *>(librarySummary->pCode), librarySummary->codeSize), false);
+    doc.toYAML(outfile);
   }
 }
 
@@ -1364,13 +1427,16 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
   // Relocatable shaders force an unlinked compilation.
   hasher.Update(pipeline->unlinked);
   hasher.Update(pipeline->enableEarlyCompile);
-  if (unlinkedShaderType == UnlinkedStageFragment)
+  if (unlinkedShaderType == UnlinkedStageFragment && isCacheHash)
     hasher.Update(pipeline->enableColorExportShader);
   updateHashForPipelineOptions(&pipeline->options, &hasher, isCacheHash, unlinkedShaderType);
 
   if (unlinkedShaderType != UnlinkedStageFragment) {
-    if (!pipeline->enableUberFetchShader)
+    if (!pipeline->enableUberFetchShader) {
       updateHashForVertexInputState(pipeline->pVertexInput, pipeline->dynamicVertexStride, &hasher);
+      hasher.Update(pipeline->vbAddressLowBits);
+    }
+    hasher.Update(pipeline->vbAddressLowBitsKnown);
     updateHashForNonFragmentState(pipeline, isCacheHash, &hasher);
   }
 
@@ -1451,6 +1517,14 @@ MetroHash::Hash PipelineDumper::generateHashForRayTracingPipeline(const RayTraci
   hasher.Update(pipeline->indirectStageMask);
   hasher.Update(pipeline->mode);
   updateHashForRtState(&pipeline->rtState, &hasher, isCacheHash);
+
+  hasher.Update(pipeline->libraryMode);
+  hasher.Update(pipeline->libraryCount);
+  for (unsigned i = 0; i < pipeline->libraryCount; ++i) {
+    hasher.Update(pipeline->pLibrarySummaries->codeSize);
+    hasher.Update(static_cast<const uint8_t *>(pipeline->pLibrarySummaries->pCode),
+                  pipeline->pLibrarySummaries->codeSize);
+  }
 
   hasher.Update(pipeline->payloadSizeMaxInLib);
   hasher.Update(pipeline->attributeSizeMaxInLib);
@@ -1538,6 +1612,9 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
 
   hasher->Update(pipeline->dynamicVertexStride);
   hasher->Update(pipeline->enableUberFetchShader);
+  if (pipeline->enableUberFetchShader) {
+    hasher->Update(pipeline->options.disablePerCompFetch);
+  }
 
   bool passthroughMode = !nggState->enableBackfaceCulling && !nggState->enableFrustumCulling &&
                          !nggState->enableBoxFilterCulling && !nggState->enableSphereCulling &&
@@ -1575,6 +1652,7 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
   hasher->Update(pipeline->apiXfbOutData.forceEnablePrimStats);
 #endif
   hasher->Update(pipeline->useSoftwareVertexBufferDescriptors);
+  hasher->Update(pipeline->vbAddressLowBitsKnown);
 }
 
 // =====================================================================================================================
@@ -1659,9 +1737,13 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->internalRtShaders);
   hasher->Update(options->forceNonUniformResourceIndexStageMask);
   hasher->Update(options->replaceSetWithResourceType);
+  hasher->Update(options->buildResourcesDataForShaderModule);
   hasher->Update(options->disableTruncCoordForGather);
-  hasher->Update(options->enablePrimGeneratedQuery);
+  hasher->Update(options->enableCombinedTexture);
+  hasher->Update(options->vertex64BitsAttribSingleLoc);
   hasher->Update(options->enableFragColor);
+  hasher->Update(options->disableBaseVertex);
+  hasher->Update(options->enablePrimGeneratedQuery);
 }
 
 // =====================================================================================================================
@@ -1730,6 +1812,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.disableLicmThreshold);
       hasher->Update(options.unrollHintThreshold);
       hasher->Update(options.dontUnrollHintThreshold);
+      hasher->Update(options.noContractOpDot);
       hasher->Update(options.fastMathFlags);
       hasher->Update(options.disableFastMathFlags);
       hasher->Update(options.ldsSpillLimitDwords);
@@ -1742,6 +1825,7 @@ void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const Pi
       hasher->Update(options.workaroundStorageImageFormats);
       hasher->Update(options.workaroundInitializeOutputsToZero);
       hasher->Update(options.disableFMA);
+      hasher->Update(options.constantBufferBindingOffset);
       hasher->Update(options.backwardPropagateNoContract);
       hasher->Update(options.forwardPropagateNoContract);
     }
@@ -2584,6 +2668,26 @@ std::ostream &operator<<(std::ostream &out, VkFormat format) {
     CASE_ENUM_TO_STRING(VK_FORMAT_A4B4G4R4_UNORM_PACK16_EXT)
     CASE_ENUM_TO_STRING(VK_FORMAT_A1B5G5R5_UNORM_PACK16)
     CASE_ENUM_TO_STRING(VK_FORMAT_A8_UNORM_KHR)
+    CASE_ENUM_TO_STRING(VK_FORMAT_EXT_R32_UNORM)
+    CASE_ENUM_TO_STRING(VK_FORMAT_EXT_R32_SNORM)
+    CASE_ENUM_TO_STRING(VK_FORMAT_EXT_R32G32_UNORM)
+    CASE_ENUM_TO_STRING(VK_FORMAT_EXT_R32G32_SNORM)
+    CASE_ENUM_TO_STRING(VK_FORMAT_EXT_R32G32B32_UNORM)
+    CASE_ENUM_TO_STRING(VK_FORMAT_EXT_R32G32B32_SNORM)
+    CASE_ENUM_TO_STRING(VK_FORMAT_EXT_R32G32B32A32_UNORM)
+    CASE_ENUM_TO_STRING(VK_FORMAT_EXT_R32G32B32A32_SNORM)
+    CASE_ENUM_TO_STRING(VK_FORMAT_EXT_R32_FIXED)
+    CASE_ENUM_TO_STRING(VK_FORMAT_EXT_R32G32_FIXED)
+    CASE_ENUM_TO_STRING(VK_FORMAT_EXT_R32G32B32_FIXED)
+    CASE_ENUM_TO_STRING(VK_FORMAT_EXT_R32G32B32A32_FIXED)
+    CASE_ENUM_TO_STRING(VK_FORMAT_EXT_R32_USCALED)
+    CASE_ENUM_TO_STRING(VK_FORMAT_EXT_R32_SSCALED)
+    CASE_ENUM_TO_STRING(VK_FORMAT_EXT_R32G32_USCALED)
+    CASE_ENUM_TO_STRING(VK_FORMAT_EXT_R32G32_SSCALED)
+    CASE_ENUM_TO_STRING(VK_FORMAT_EXT_R32G32B32_USCALED)
+    CASE_ENUM_TO_STRING(VK_FORMAT_EXT_R32G32B32_SSCALED)
+    CASE_ENUM_TO_STRING(VK_FORMAT_EXT_R32G32B32A32_USCALED)
+    CASE_ENUM_TO_STRING(VK_FORMAT_EXT_R32G32B32A32_SSCALED)
 
     break;
   default:

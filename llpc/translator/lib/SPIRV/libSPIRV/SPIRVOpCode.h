@@ -75,7 +75,7 @@ inline bool isBitwiseOpCode(Op OpCode) {
   return (unsigned)OpCode >= OpBitwiseOr && (unsigned)OpCode <= OpBitwiseAnd;
 }
 
-inline bool isBinaryShiftLogicalBitwiseOpCode(Op OpCode) {
+inline bool isBinaryShiftBitwiseOpCode(Op OpCode) {
   return (((unsigned)OpCode >= OpShiftRightLogical && (unsigned)OpCode <= OpBitwiseAnd) || isBinaryOpCode(OpCode));
 }
 
@@ -102,6 +102,10 @@ inline bool isGenericNegateOpCode(Op OpCode) {
 
 inline bool isAccessChainOpCode(Op OpCode) {
   return OpCode == OpAccessChain || OpCode == OpInBoundsAccessChain;
+}
+
+inline bool isPtrAccessChainOpCode(Op OpCode) {
+  return OpCode == OpPtrAccessChain || OpCode == OpInBoundsPtrAccessChain;
 }
 
 inline bool hasExecScope(Op OpCode) {

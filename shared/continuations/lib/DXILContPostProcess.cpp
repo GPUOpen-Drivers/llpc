@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
- *deal in the Software without restriction, including without limitation the
- *rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- *sell copies of the Software, and to permit persons to whom the Software is
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in
@@ -18,8 +18,8 @@
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- *FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- *IN THE SOFTWARE.
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 
@@ -85,18 +85,19 @@ public:
   DXILContPostProcessPassImpl(Module &M, Module &GpurtLibrary);
   bool run(llvm::ModuleAnalysisManager &AnalysisManager);
 
+  static constexpr unsigned SystemDataArgumentIndexStart = 2;
+  static constexpr unsigned SystemDataArgumentIndexContinuation = 1;
+  static constexpr unsigned SystemDataArgumentIndexRayGen = 0;
+
   struct FunctionData {
     DXILShaderKind Kind = DXILShaderKind::Invalid;
     /// Calls to hlsl intrinsics
     SmallVector<CallInst *> IntrinsicCalls;
-    /// Calls to get the system data pointer
-    SmallVector<continuations::GetSystemDataOp *> GetSystemDataCalls;
 
     /// If this is the start function part of a split function
     bool IsStart = true;
-    /// Pointer to the alloca'd system data object in this function
-    Value *SystemData = nullptr;
     Type *SystemDataTy = nullptr;
+    unsigned SystemDataArgumentIndex = std::numeric_limits<unsigned>::max();
   };
 
 private:
@@ -115,9 +116,13 @@ private:
   void handleContPayloadRegistersSetI32(Function &F);
   void handleContStackAlloc(FunctionAnalysisManager &FAM, Function &F);
 
+  bool replaceIntrinsicCalls(Function &F, const FunctionData &Data);
+  [[nodiscard]] std::pair<bool, Function *>
+  insertSetupRayGen(Function &F, const FunctionData &Data);
+
   void collectProcessableFunctions();
   bool handleIntrinsicCalls();
-  bool handleGetSystemDataCalls();
+  bool replaceIntrinsicCallsAndSetupRayGen();
   bool unfoldGlobals();
   bool handleAmdInternals(llvm::ModuleAnalysisManager &AnalysisManager);
 
@@ -153,7 +158,7 @@ static void reportContStateSizes(Module &M) {
     if (F.isDeclaration())
       continue;
     if (auto *MD = dyn_cast_or_null<MDTuple>(
-            F.getMetadata(DXILContHelper::MDContinuationName))) {
+            F.getMetadata(ContHelper::MDContinuationName))) {
       auto *EntryF = extractFunctionOrNull(MD->getOperand(0));
       if (EntryF != &F)
         EntriesWithContinuationFunctions.insert(EntryF);
@@ -167,12 +172,12 @@ static void reportContStateSizes(Module &M) {
     if (!EntriesWithContinuationFunctions.contains(&F))
       continue;
 
-    auto OptStateSize = DXILContHelper::tryGetContinuationStateByteCount(F);
+    auto OptStateSize = ContHelper::tryGetContinuationStateByteCount(F);
     if (!OptStateSize.has_value())
       continue;
 
     DXILShaderKind ShaderKind =
-        DXILContHelper::shaderStageToDxilShaderKind(*Stage);
+        ShaderStageHelper::shaderStageToDxilShaderKind(*Stage);
     dbgs() << "Continuation state size of \"" << F.getName() << "\" ("
            << ShaderKind << "): " << OptStateSize.value() << " bytes\n";
   }
@@ -188,8 +193,7 @@ static void reportPayloadSizes(Module &M) {
   collectContinueCalls(M, ContinueCalls);
 
   for (auto *CallInst : ContinueCalls) {
-    auto RegCount =
-        DXILContHelper::tryGetOutgoingRegisterCount(CallInst).value();
+    auto RegCount = ContHelper::tryGetOutgoingRegisterCount(CallInst).value();
     MaxOutgoingRegisterCounts[CallInst->getFunction()] =
         std::max(MaxOutgoingRegisterCounts[CallInst->getFunction()], RegCount);
   }
@@ -200,9 +204,9 @@ static void reportPayloadSizes(Module &M) {
       continue;
 
     DXILShaderKind ShaderKind =
-        DXILContHelper::shaderStageToDxilShaderKind(*Stage);
+        ShaderStageHelper::shaderStageToDxilShaderKind(*Stage);
     auto OptIncomingPayloadRegisterCount =
-        DXILContHelper::tryGetIncomingRegisterCount(&F);
+        ContHelper::tryGetIncomingRegisterCount(&F);
     bool HasIncomingPayload = OptIncomingPayloadRegisterCount.has_value();
     auto It = MaxOutgoingRegisterCounts.find(&F);
     bool HasOutgoingPayload = (It != MaxOutgoingRegisterCounts.end());
@@ -313,7 +317,7 @@ static bool addGetAddrAndMDIntrinsicCalls(Module &M) {
 
     while (!CEWorkList.empty()) {
       auto *CE = CEWorkList.pop_back_val();
-      assert((isa<BitCastOperator>(CE) || isa<PtrToIntOperator>(CE)) &&
+      assert((isa<BitCastOperator, PtrToIntOperator>(CE)) &&
              "Unexpected use of function!");
 
       // Copy the users of CE into a local SmallVector before traversing it,
@@ -365,7 +369,7 @@ static bool addGetAddrAndMDIntrinsicCalls(Module &M) {
   SmallVector<CallInst *> CallInsts;
   collectContinueCalls(M, CallInsts);
   for (auto *CallInst : CallInsts) {
-    if (!DXILContHelper::tryGetOutgoingRegisterCount(CallInst))
+    if (!ContHelper::tryGetOutgoingRegisterCount(CallInst))
       report_fatal_error("Missing registercount metadata on continue call!");
   }
 
@@ -520,7 +524,7 @@ void DXILContPostProcessPassImpl::lowerGetResumePointAddr(Function &F) {
     unsigned ReturnAddrArgNum = HasWaitMask ? 3 : 2;
     // Move up computation of the resume address
     auto *ReturnAddr = ContinueCall->getArgOperand(ReturnAddrArgNum);
-    assert((ReturnAddr->getType() == Builder.getInt64Ty()) &&
+    assert(ReturnAddr->getType() == Builder.getInt64Ty() &&
            "Unexpected return addr type!");
 
     SmallVector<Instruction *> MoveInstrs;
@@ -784,7 +788,7 @@ void DXILContPostProcessPassImpl::handleContStackAlloc(
     CInst.eraseFromParent();
 
     // Add allocation to the stack size of this function
-    DXILContHelper::addStackSize(Func, Size);
+    ContHelper::addStackSize(Func, Size);
   });
 }
 
@@ -799,7 +803,7 @@ void DXILContPostProcessPassImpl::collectProcessableFunctions() {
 
     // Handle entry functions first
     if (auto *MD = dyn_cast_or_null<MDTuple>(
-            F.getMetadata(DXILContHelper::MDContinuationName))) {
+            F.getMetadata(ContHelper::MDContinuationName))) {
       auto *EntryF = extractFunctionOrNull(MD->getOperand(0));
       if (&F != EntryF)
         continue;
@@ -807,9 +811,20 @@ void DXILContPostProcessPassImpl::collectProcessableFunctions() {
       continue;
     }
 
-    DXILShaderKind Kind = DXILContHelper::shaderStageToDxilShaderKind(*Stage);
+    DXILShaderKind Kind =
+        ShaderStageHelper::shaderStageToDxilShaderKind(*Stage);
     switch (Kind) {
-    case DXILShaderKind::RayGeneration:
+    case DXILShaderKind::RayGeneration: {
+      FunctionData Data;
+      Data.Kind = Kind;
+      Data.SystemDataArgumentIndex = SystemDataArgumentIndexRayGen;
+      Data.SystemDataTy =
+          F.getFunctionType()->getParamType(SystemDataArgumentIndexRayGen);
+      [[maybe_unused]] bool DidInsert =
+          ToProcess.insert({&F, std::move(Data)}).second;
+      assert(DidInsert);
+      break;
+    }
     case DXILShaderKind::Intersection:
     case DXILShaderKind::AnyHit:
     case DXILShaderKind::ClosestHit:
@@ -817,13 +832,12 @@ void DXILContPostProcessPassImpl::collectProcessableFunctions() {
     case DXILShaderKind::Callable: {
       FunctionData Data;
       Data.Kind = Kind;
-      if (Data.Kind == DXILShaderKind::RayGeneration) {
-        assert(SetupRayGen && "Could not find SetupRayGen function");
-        Data.SystemDataTy = SetupRayGen->getReturnType();
-      } else {
-        Data.SystemDataTy = F.getFunctionType()->getParamType(2);
-      }
-      ToProcess[&F] = Data;
+      Data.SystemDataArgumentIndex = SystemDataArgumentIndexStart;
+      Data.SystemDataTy =
+          F.getFunctionType()->getParamType(SystemDataArgumentIndexStart);
+      [[maybe_unused]] bool DidInsert =
+          ToProcess.insert({&F, std::move(Data)}).second;
+      assert(DidInsert);
       break;
     }
     default:
@@ -836,14 +850,18 @@ void DXILContPostProcessPassImpl::collectProcessableFunctions() {
     if (F.isDeclaration())
       continue;
     if (auto *MD = dyn_cast_or_null<MDTuple>(
-            F.getMetadata(DXILContHelper::MDContinuationName))) {
+            F.getMetadata(ContHelper::MDContinuationName))) {
       auto *EntryF = extractFunctionOrNull(MD->getOperand(0));
       auto Stage = lgc::rt::getLgcRtShaderStage(EntryF);
       if (Stage && &F != EntryF) {
         FunctionData Data = ToProcess[EntryF];
         Data.IsStart = false;
-        Data.SystemDataTy = F.getArg(1)->getType();
-        ToProcess[&F] = Data;
+        Data.SystemDataArgumentIndex = SystemDataArgumentIndexContinuation;
+        Data.SystemDataTy =
+            F.getArg(SystemDataArgumentIndexContinuation)->getType();
+        [[maybe_unused]] bool DidInsert =
+            ToProcess.insert({&F, std::move(Data)}).second;
+        assert(DidInsert);
       }
     }
   }
@@ -851,7 +869,7 @@ void DXILContPostProcessPassImpl::collectProcessableFunctions() {
 
 bool DXILContPostProcessPassImpl::handleIntrinsicCalls() {
   bool Changed = false;
-  auto *Payload = Mod->getGlobalVariable(DXILContHelper::GlobalPayloadName);
+  auto *Payload = Mod->getGlobalVariable(ContHelper::GlobalPayloadName);
 
   // TODO: Dialectify.
   for (auto &F : Mod->functions()) {
@@ -859,13 +877,13 @@ bool DXILContPostProcessPassImpl::handleIntrinsicCalls() {
     if (Name == "continuation.initialContinuationStackPtr") {
       Changed = true;
       handleInitialContinuationStackPtr(F);
-    } else if (Name.startswith("lgc.rt")) {
+    } else if (Name.starts_with("lgc.rt")) {
       Changed = true;
       handleLgcRtIntrinsic(F);
-    } else if (Name.startswith("registerbuffer.setpointerbarrier")) {
+    } else if (Name.starts_with("registerbuffer.setpointerbarrier")) {
       Changed = true;
       handleRegisterBufferSetPointerBarrier(F, Payload);
-    } else if (Name.startswith("registerbuffer.getpointer")) {
+    } else if (Name.starts_with("registerbuffer.getpointer")) {
       Changed = true;
       handleRegisterBufferGetPointer(F, Payload);
     }
@@ -874,68 +892,101 @@ bool DXILContPostProcessPassImpl::handleIntrinsicCalls() {
   return Changed;
 }
 
-bool DXILContPostProcessPassImpl::handleGetSystemDataCalls() {
-  const static auto Visitor =
-      llvm_dialects::VisitorBuilder<MapVector<Function *, FunctionData>>()
-          .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
-          .add<continuations::GetSystemDataOp>([](auto &ToProcess, auto &Op) {
-            // See also the system data documentation at the top of
-            // Continuations.h.
-            auto Data = ToProcess.find(Op.getFunction());
-            if (Data != ToProcess.end())
-              Data->second.GetSystemDataCalls.push_back(&Op);
-          })
-          .build();
+bool DXILContPostProcessPassImpl::replaceIntrinsicCalls(
+    Function &F, const FunctionData &Data) {
+  if (Data.IntrinsicCalls.empty())
+    return false;
 
-  Visitor.visit(ToProcess, *Mod);
+  auto *FuncTy = F.getFunctionType();
 
-  for (auto &FuncData : ToProcess) {
-    auto &Data = FuncData.second;
-    // Transform SystemData to alloca and load on every use
-    Builder.SetInsertPoint(FuncData.first->getEntryBlock().getFirstNonPHI());
-    Data.SystemData = Builder.CreateAlloca(Data.SystemDataTy);
+  assert(FuncTy->getNumParams() > Data.SystemDataArgumentIndex &&
+         "Missing system data argument");
+  Builder.SetInsertPointPastAllocas(&F);
 
-    // Replace intrinsic calls
-    for (auto *Call : Data.IntrinsicCalls)
-      replaceIntrinsicCall(Builder, Data.SystemDataTy, Data.SystemData,
-                           Data.Kind, Call, GpurtLibrary, CrossInliner);
+  // Intrinsics need a pointer, so allocate and store the system data argument
+  Argument *SystemDataArgument = F.getArg(Data.SystemDataArgumentIndex);
+  Value *SystemDataPtr = Builder.CreateAlloca(Data.SystemDataTy);
+  SystemDataPtr->setName("system.data.alloca");
+  Builder.CreateStore(SystemDataArgument, SystemDataPtr);
 
-    // Replace calls to getSystemData
-    for (auto *Call : Data.GetSystemDataCalls) {
-      Builder.SetInsertPoint(Call);
-      auto *SystemDataTy = Call->getFunctionType()->getReturnType();
-      auto *SystemDataPtr = getDXILSystemData(Builder, Data.SystemData,
-                                              Data.SystemDataTy, SystemDataTy);
-      auto *SystemData = Builder.CreateLoad(SystemDataTy, SystemDataPtr);
-      Call->replaceAllUsesWith(SystemData);
-      Call->eraseFromParent();
-    }
+  for (auto *Call : Data.IntrinsicCalls)
+    replaceIntrinsicCall(Builder, Data.SystemDataTy, SystemDataPtr, Data.Kind,
+                         Call, GpurtLibrary, CrossInliner);
 
-    Builder.SetInsertPoint(
-        &*FuncData.first->getEntryBlock().getFirstNonPHIOrDbgOrAlloca());
-    if (FuncData.first->hasMetadata(DXILContHelper::MDEntryName)) {
-      // Initialize system data for the start part of the entry shader
-      auto *TmpSystemData = Builder.CreateCall(SetupRayGen);
-      Builder.CreateStore(TmpSystemData, Data.SystemData);
-      CrossInliner.inlineCall(*TmpSystemData);
-      Builder.SetInsertPoint(&*Builder.GetInsertPoint());
-    } else {
-      // Initialize the new system data alloca with the passed argument.
-      Builder.CreateStore(FuncData.first->getArg(Data.IsStart ? 2 : 1),
-                          Data.SystemData);
-    }
+  return true;
+}
 
-    Data.SystemData->setName("system.data");
+std::pair<bool, Function *>
+DXILContPostProcessPassImpl::insertSetupRayGen(Function &F,
+                                               const FunctionData &Data) {
+  // The start part of the RayGen shader is the only occurrence where we need to
+  // call SetupRayGen
+  if (Data.Kind != DXILShaderKind::RayGeneration || !Data.IsStart)
+    return {false, &F};
+
+  auto *FuncTy = F.getFunctionType();
+  assert(FuncTy->getNumParams() > Data.SystemDataArgumentIndex &&
+         "Missing system data argument");
+
+  Argument *const SystemDataArgument = F.getArg(Data.SystemDataArgumentIndex);
+
+  // Replace usages of the system data argument with the result of SetupRayGen
+  Builder.SetInsertPointPastAllocas(&F);
+
+  auto *SystemDataInit = Builder.CreateCall(SetupRayGen);
+  assert(SystemDataInit->getType() == Data.SystemDataTy &&
+         "SetupRayGen return type does not match system data type");
+  SystemDataInit->setName("system.data");
+  SystemDataArgument->replaceAllUsesWith(SystemDataInit);
+  CrossInliner.inlineCall(*SystemDataInit);
+
+  // Change function signature to remove the system data argument
+  SmallVector<Type *> ArgTypes;
+  ArgTypes.append(FuncTy->param_begin(),
+                  FuncTy->param_begin() + Data.SystemDataArgumentIndex);
+  ArgTypes.append(FuncTy->param_begin() + (Data.SystemDataArgumentIndex + 1),
+                  FuncTy->param_end());
+  auto *NewFuncTy = FunctionType::get(FuncTy->getReturnType(), ArgTypes, false);
+
+  Function *NewFunc = CompilerUtils::cloneFunctionHeader(
+      F, NewFuncTy, ArrayRef<AttributeSet>{});
+  NewFunc->takeName(&F);
+
+  llvm::moveFunctionBody(F, *NewFunc);
+
+  F.replaceAllUsesWith(ConstantExpr::getBitCast(NewFunc, F.getType()));
+  F.eraseFromParent();
+
+  return {true, NewFunc};
+}
+
+bool DXILContPostProcessPassImpl::replaceIntrinsicCallsAndSetupRayGen() {
+  bool Changed = false;
+
+  // We will change some function signatures and populate a new MapVector as we
+  // go, to then replace ToProcess
+  MapVector<Function *, FunctionData> ToProcessNew;
+  ToProcessNew.reserve(ToProcess.size());
+
+  for (auto &[Func, Data] : ToProcess) {
+    Changed |= replaceIntrinsicCalls(*Func, Data);
+
+    auto const [DidInsert, NewFunc] = insertSetupRayGen(*Func, Data);
+    Changed |= DidInsert;
+
+    // Func could have been changed, but Data is the same
+    ToProcessNew.insert({NewFunc, std::move(Data)});
   }
 
-  return !ToProcess.empty();
+  ToProcess = std::move(ToProcessNew);
+  return Changed;
 }
 
 bool DXILContPostProcessPassImpl::unfoldGlobals() {
   // Replace register globals with indices into a bigger global
   const auto &DL = Mod->getDataLayout();
   GlobalVariable *PayloadGlobal =
-      Mod->getGlobalVariable(DXILContHelper::GlobalPayloadName);
+      Mod->getGlobalVariable(ContHelper::GlobalPayloadName);
 
   if (PayloadGlobal) {
     // We use the maximum size for the continuation state and the actual size
@@ -950,10 +1001,10 @@ bool DXILContPostProcessPassImpl::unfoldGlobals() {
     auto *I32 = Type::getInt32Ty(Mod->getContext());
     auto *RegistersTy = ArrayType::get(I32, RequiredSize / RegisterBytes);
     Registers = cast<GlobalVariable>(Mod->getOrInsertGlobal(
-        DXILContHelper::GlobalRegistersName, RegistersTy, [&] {
+        ContHelper::GlobalRegistersName, RegistersTy, [&] {
           return new GlobalVariable(
               *Mod, RegistersTy, false, GlobalVariable::ExternalLinkage,
-              nullptr, DXILContHelper::GlobalRegistersName, nullptr,
+              nullptr, ContHelper::GlobalRegistersName, nullptr,
               GlobalVariable::NotThreadLocal, GlobalRegisterAddrspace);
         }));
 
@@ -972,13 +1023,13 @@ bool DXILContPostProcessPassImpl::handleAmdInternals(
 
   for (auto &F : Mod->functions()) {
     auto Name = F.getName();
-    if (Name.startswith("_AmdValueI32Count")) {
+    if (Name.starts_with("_AmdValueI32Count")) {
       Changed = true;
       handleValueI32Count(F);
-    } else if (Name.startswith("_AmdValueGetI32")) {
+    } else if (Name.starts_with("_AmdValueGetI32")) {
       Changed = true;
       handleValueGetI32(F);
-    } else if (Name.startswith("_AmdValueSetI32")) {
+    } else if (Name.starts_with("_AmdValueSetI32")) {
       Changed = true;
       handleValueSetI32(F);
     } else if (Name.starts_with("_AmdContPayloadRegistersI32Count")) {
@@ -1020,7 +1071,7 @@ bool DXILContPostProcessPassImpl::run(
   collectProcessableFunctions();
 
   Changed |= handleIntrinsicCalls();
-  Changed |= handleGetSystemDataCalls();
+  Changed |= replaceIntrinsicCallsAndSetupRayGen();
   for (auto &F : make_early_inc_range(*Mod)) {
     if (F.getName().starts_with("_AmdGetResumePointAddr")) {
       Changed = true;

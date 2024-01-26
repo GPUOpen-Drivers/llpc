@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2023-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -58,19 +58,33 @@ private:
 
   // The function use to lower gl_ClipVertex
   bool needLowerClipVertex();
+  bool needLowerFrontColor();
+  bool needLowerBackColor();
+  bool needLowerFrontSecondaryColor();
+  bool needLowerBackSecondaryColor();
   void createClipDistance();
   void createClipPlane();
   void emulateStoreClipVertex();
+  void emulationOutputColor(llvm::User *color);
   void lowerClipVertex();
+  void lowerColor(llvm::User *color);
+  void lowerFrontColor();
+  void lowerBackColor();
+  void lowerFrontSecondaryColor();
+  void lowerBackSecondaryColor();
 
   llvm::SmallVector<llvm::CallInst *> m_emitCalls; // "Call" instructions to emit vertex (geometry shader).
   llvm::ReturnInst *m_retInst;                     // "Return" of the entry point.
 
   // The resource use to lower gl_ClipVertex
-  llvm::User *m_out;          // The global variable of gl_out[]
-  llvm::User *m_clipVertex;   // The global variable of gl_ClipVertex
-  llvm::User *m_clipDistance; // The global variable of gl_ClipDistance
-  llvm::User *m_clipPlane;    // The global variable of gl_ClipPlane
+  llvm::User *m_out;                 // The global variable of gl_out[]
+  llvm::User *m_clipVertex;          // The global variable of gl_ClipVertex
+  llvm::User *m_clipDistance;        // The global variable of gl_ClipDistance
+  llvm::User *m_clipPlane;           // The global variable of gl_ClipPlane
+  llvm::User *m_frontColor;          // The global variable of gl_FrontColor
+  llvm::User *m_backColor;           // The global variable of gl_BackColor
+  llvm::User *m_frontSecondaryColor; // The global variable of gl_FrontSecondaryColor
+  llvm::User *m_backSecondaryColor;  // The global variable of gl_BackSecondaryColor
 };
 
 } // namespace Llpc

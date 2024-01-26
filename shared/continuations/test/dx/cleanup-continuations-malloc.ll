@@ -11,45 +11,23 @@ declare %continuation.token* @async_fun()
 
 define <4 x i32> @simple_await(<4 x i32> %arg) !continuation.registercount !1 {
 ; CHECK-LABEL: define void @simple_await(
-; CHECK-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], <4 x i32> [[ARG:%.*]]) !continuation.registercount !1 !continuation !2 !continuation.state !3 !continuation.stacksize !3 {
+; CHECK-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], <4 x i32> [[ARG:%.*]]) !continuation.registercount [[META1:![0-9]+]] !continuation [[META2:![0-9]+]] !continuation.state [[META3:![0-9]+]] !continuation.stacksize [[META3]] {
 ; CHECK-NEXT:  AllocaSpillBB:
-; CHECK-NEXT:    [[CONT_STATE:%.*]] = alloca [6 x i32], align 4
-; CHECK-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr [[CONT_STATE]], i32 0, i32 0
-; CHECK-NEXT:    store <4 x i32> [[ARG]], ptr [[ARG_SPILL_ADDR]], align 4
-; CHECK-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr [[CONT_STATE]], i32 0, i32 1
-; CHECK-NEXT:    store i64 [[RETURNADDR]], ptr [[RETURNADDR_SPILL_ADDR]], align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = call ptr @continuation.getContinuationStackOffset()
 ; CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr [[TMP0]], align 4
-; CHECK-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], 24
-; CHECK-NEXT:    store i32 [[TMP2]], ptr [[TMP0]], align 4
-; CHECK-NEXT:    [[TMP3:%.*]] = inttoptr i32 [[TMP1]] to ptr addrspace(21)
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP6:%.*]] = load i32, ptr [[TMP4]], align 4
-; CHECK-NEXT:    store i32 [[TMP6]], ptr addrspace(21) [[TMP5]], align 4
-; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 1
-; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 1
-; CHECK-NEXT:    [[TMP9:%.*]] = load i32, ptr [[TMP7]], align 4
-; CHECK-NEXT:    store i32 [[TMP9]], ptr addrspace(21) [[TMP8]], align 4
-; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 2
-; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 2
-; CHECK-NEXT:    [[TMP12:%.*]] = load i32, ptr [[TMP10]], align 4
-; CHECK-NEXT:    store i32 [[TMP12]], ptr addrspace(21) [[TMP11]], align 4
-; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 3
-; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 3
-; CHECK-NEXT:    [[TMP15:%.*]] = load i32, ptr [[TMP13]], align 4
-; CHECK-NEXT:    store i32 [[TMP15]], ptr addrspace(21) [[TMP14]], align 4
-; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 4
-; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 4
-; CHECK-NEXT:    [[TMP18:%.*]] = load i32, ptr [[TMP16]], align 4
-; CHECK-NEXT:    store i32 [[TMP18]], ptr addrspace(21) [[TMP17]], align 4
-; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 5
-; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 5
-; CHECK-NEXT:    [[TMP21:%.*]] = load i32, ptr [[TMP19]], align 4
-; CHECK-NEXT:    store i32 [[TMP21]], ptr addrspace(21) [[TMP20]], align 4
-; CHECK-NEXT:    [[TMP22:%.*]] = call ptr @continuation.getContinuationStackOffset()
-; CHECK-NEXT:    [[TMP23:%.*]] = load i32, ptr [[TMP22]], align 4
-; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i32 [[TMP23]], i64 ptrtoint (ptr @simple_await.resume.0 to i64)), !continuation.registercount !1, !continuation.returnedRegistercount !1
+; CHECK-NEXT:    [[TMP2:%.*]] = inttoptr i32 [[TMP1]] to ptr addrspace(21)
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP2]], i64 0
+; CHECK-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr addrspace(21) [[TMP3]], i32 0, i32 0
+; CHECK-NEXT:    store <4 x i32> [[ARG]], ptr addrspace(21) [[ARG_SPILL_ADDR]], align 4
+; CHECK-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr addrspace(21) [[TMP3]], i32 0, i32 1
+; CHECK-NEXT:    store i64 [[RETURNADDR]], ptr addrspace(21) [[RETURNADDR_SPILL_ADDR]], align 4
+; CHECK-NEXT:    [[TMP4:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CHECK-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP4]], align 4
+; CHECK-NEXT:    [[TMP6:%.*]] = add i32 [[TMP5]], 24
+; CHECK-NEXT:    store i32 [[TMP6]], ptr [[TMP4]], align 4
+; CHECK-NEXT:    [[TMP7:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CHECK-NEXT:    [[TMP8:%.*]] = load i32, ptr [[TMP7]], align 4
+; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i32 [[TMP8]], i64 ptrtoint (ptr @simple_await.resume.0 to i64)), !continuation.registercount [[META1]], !continuation.returnedRegistercount !1
 ; CHECK-NEXT:    unreachable
 ;
   %tok = call %continuation.token* @async_fun(), !continuation.registercount !1, !continuation.returnedRegistercount !1
@@ -59,45 +37,23 @@ define <4 x i32> @simple_await(<4 x i32> %arg) !continuation.registercount !1 {
 
 define void @simple_await_entry(<4 x i32> %arg, <4 x i32> addrspace(1)* %mem) !continuation.entry !0 !continuation.registercount !1 {
 ; CHECK-LABEL: define void @simple_await_entry(
-; CHECK-SAME: <4 x i32> [[ARG:%.*]], ptr addrspace(1) [[MEM:%.*]]) !continuation.registercount !1 !continuation.entry !4 !continuation !5 !continuation.state !3 !continuation.stacksize !3 {
+; CHECK-SAME: <4 x i32> [[ARG:%.*]], ptr addrspace(1) [[MEM:%.*]]) !continuation.registercount [[META1]] !continuation.entry [[META4:![0-9]+]] !continuation [[META5:![0-9]+]] !continuation.state [[META3]] !continuation.stacksize [[META3]] {
 ; CHECK-NEXT:  AllocaSpillBB:
-; CHECK-NEXT:    [[CONT_STATE:%.*]] = alloca [6 x i32], align 4
-; CHECK-NEXT:    [[MEM_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME:%.*]], ptr [[CONT_STATE]], i32 0, i32 1
-; CHECK-NEXT:    store ptr addrspace(1) [[MEM]], ptr [[MEM_SPILL_ADDR]], align 4
-; CHECK-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME]], ptr [[CONT_STATE]], i32 0, i32 0
-; CHECK-NEXT:    store <4 x i32> [[ARG]], ptr [[ARG_SPILL_ADDR]], align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = call ptr @continuation.getContinuationStackOffset()
 ; CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr [[TMP0]], align 4
-; CHECK-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], 24
-; CHECK-NEXT:    store i32 [[TMP2]], ptr [[TMP0]], align 4
-; CHECK-NEXT:    [[TMP3:%.*]] = inttoptr i32 [[TMP1]] to ptr addrspace(21)
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP6:%.*]] = load i32, ptr [[TMP4]], align 4
-; CHECK-NEXT:    store i32 [[TMP6]], ptr addrspace(21) [[TMP5]], align 4
-; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 1
-; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 1
-; CHECK-NEXT:    [[TMP9:%.*]] = load i32, ptr [[TMP7]], align 4
-; CHECK-NEXT:    store i32 [[TMP9]], ptr addrspace(21) [[TMP8]], align 4
-; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 2
-; CHECK-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 2
-; CHECK-NEXT:    [[TMP12:%.*]] = load i32, ptr [[TMP10]], align 4
-; CHECK-NEXT:    store i32 [[TMP12]], ptr addrspace(21) [[TMP11]], align 4
-; CHECK-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 3
-; CHECK-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 3
-; CHECK-NEXT:    [[TMP15:%.*]] = load i32, ptr [[TMP13]], align 4
-; CHECK-NEXT:    store i32 [[TMP15]], ptr addrspace(21) [[TMP14]], align 4
-; CHECK-NEXT:    [[TMP16:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 4
-; CHECK-NEXT:    [[TMP17:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 4
-; CHECK-NEXT:    [[TMP18:%.*]] = load i32, ptr [[TMP16]], align 4
-; CHECK-NEXT:    store i32 [[TMP18]], ptr addrspace(21) [[TMP17]], align 4
-; CHECK-NEXT:    [[TMP19:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 5
-; CHECK-NEXT:    [[TMP20:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 5
-; CHECK-NEXT:    [[TMP21:%.*]] = load i32, ptr [[TMP19]], align 4
-; CHECK-NEXT:    store i32 [[TMP21]], ptr addrspace(21) [[TMP20]], align 4
-; CHECK-NEXT:    [[TMP22:%.*]] = call ptr @continuation.getContinuationStackOffset()
-; CHECK-NEXT:    [[TMP23:%.*]] = load i32, ptr [[TMP22]], align 4
-; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i32 [[TMP23]], i64 ptrtoint (ptr @simple_await_entry.resume.0 to i64)), !continuation.registercount !1, !continuation.returnedRegistercount !1
+; CHECK-NEXT:    [[TMP2:%.*]] = inttoptr i32 [[TMP1]] to ptr addrspace(21)
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP2]], i64 0
+; CHECK-NEXT:    [[MEM_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME:%.*]], ptr addrspace(21) [[TMP3]], i32 0, i32 1
+; CHECK-NEXT:    store ptr addrspace(1) [[MEM]], ptr addrspace(21) [[MEM_SPILL_ADDR]], align 4
+; CHECK-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME]], ptr addrspace(21) [[TMP3]], i32 0, i32 0
+; CHECK-NEXT:    store <4 x i32> [[ARG]], ptr addrspace(21) [[ARG_SPILL_ADDR]], align 4
+; CHECK-NEXT:    [[TMP4:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CHECK-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP4]], align 4
+; CHECK-NEXT:    [[TMP6:%.*]] = add i32 [[TMP5]], 24
+; CHECK-NEXT:    store i32 [[TMP6]], ptr [[TMP4]], align 4
+; CHECK-NEXT:    [[TMP7:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CHECK-NEXT:    [[TMP8:%.*]] = load i32, ptr [[TMP7]], align 4
+; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i32 [[TMP8]], i64 ptrtoint (ptr @simple_await_entry.resume.0 to i64)), !continuation.registercount [[META1]], !continuation.returnedRegistercount !1
 ; CHECK-NEXT:    unreachable
 ;
   %tok = call %continuation.token* @async_fun(), !continuation.registercount !1, !continuation.returnedRegistercount !1

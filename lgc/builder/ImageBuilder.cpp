@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -424,8 +424,8 @@ Value *BuilderImpl::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags
                                     Value *mipLevel, const Twine &instName) {
   imageDesc = fixImageDescForRead(imageDesc);
   // Mark usage of images, to allow the compute workgroup reconfiguration optimization.
-  getPipelineState()->getShaderResourceUsage(m_shaderStage)->useImages = true;
-  getPipelineState()->getShaderResourceUsage(m_shaderStage)->resourceRead = true;
+  getPipelineState()->getShaderResourceUsage(m_shaderStage.value())->useImages = true;
+  getPipelineState()->getShaderResourceUsage(m_shaderStage.value())->resourceRead = true;
   assert(coord->getType()->getScalarType()->isIntegerTy(32));
   imageDesc = patchCubeDescriptor(imageDesc, dim);
   coord = handleFragCoordViewIndex(coord, flags, dim);
@@ -509,7 +509,7 @@ Value *BuilderImpl::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags
   Value *result = imageInst;
   if (flags & ImageFlagNonUniformImage)
     result = createWaterfallLoop(imageInst, imageDescArgIndex,
-                                 getPipelineState()->getShaderOptions(m_shaderStage).scalarizeWaterfallLoads);
+                                 getPipelineState()->getShaderOptions(m_shaderStage.value()).scalarizeWaterfallLoads);
   else if (flags & ImageFlagEnforceReadFirstLaneImage)
     enforceReadFirstLane(imageInst, imageDescArgIndex);
 
@@ -529,6 +529,13 @@ Value *BuilderImpl::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags
       if (m_pipelineState->getOptions().allowNullDescriptor) {
         // Check dword3 against 0 for a null descriptor
         Value *descWord3 = CreateExtractElement(imageDesc, 3);
+        if (m_pipelineState->getOptions().maskOffNullDescriptorTypeField) {
+          GfxIpVersion gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion();
+          SqImgRsrcRegHandler proxySqRsrcRegHelper(this, imageDesc, &gfxIp);
+          unsigned typeMask = proxySqRsrcRegHelper.getRegMask(SqRsrcRegs::Type);
+          // Mask off the type bits for the null descriptor
+          descWord3 = CreateAnd(descWord3, getInt32(~typeMask));
+        }
         Value *isNullDesc = CreateICmpEQ(descWord3, getInt32(0));
         defaults[2] = CreateSelect(isNullDesc, getInt64(0), getInt64(1));
       }
@@ -621,8 +628,7 @@ Value *BuilderImpl::CreateImageLoadWithFmask(Type *resultTy, unsigned dim, unsig
 Value *BuilderImpl::CreateImageStore(Value *texel, unsigned dim, unsigned flags, Value *imageDesc, Value *coord,
                                      Value *mipLevel, const Twine &instName) {
   // Mark usage of images, to allow the compute workgroup reconfiguration optimization.
-  getPipelineState()->getShaderResourceUsage(m_shaderStage)->useImages = true;
-  getPipelineState()->getShaderResourceUsage(m_shaderStage)->resourceWrite = true;
+  getPipelineState()->getShaderResourceUsage(m_shaderStage.value())->resourceWrite = true;
   assert(coord->getType()->getScalarType()->isIntegerTy(32));
   imageDesc = patchCubeDescriptor(imageDesc, dim);
   coord = handleFragCoordViewIndex(coord, flags, dim);
@@ -708,7 +714,7 @@ Value *BuilderImpl::CreateImageStore(Value *texel, unsigned dim, unsigned flags,
   // Add a waterfall loop if needed.
   if (flags & ImageFlagNonUniformImage)
     createWaterfallLoop(imageStore, imageDescArgIndex,
-                        getPipelineState()->getShaderOptions(m_shaderStage).scalarizeWaterfallLoads);
+                        getPipelineState()->getShaderOptions(m_shaderStage.value()).scalarizeWaterfallLoads);
   else if (flags & ImageFlagEnforceReadFirstLaneImage)
     enforceReadFirstLane(imageStore, imageDescArgIndex);
 
@@ -768,7 +774,7 @@ Value *BuilderImpl::CreateImageSampleConvertYCbCr(Type *resultTy, unsigned dim, 
                                                   Value *convertingSamplerDesc, ArrayRef<Value *> address,
                                                   const Twine &instName) {
   // Mark usage of images, to allow the compute workgroup reconfiguration optimization.
-  getPipelineState()->getShaderResourceUsage(m_shaderStage)->useImages = true;
+  getPipelineState()->getShaderResourceUsage(m_shaderStage.value())->useImages = true;
   Value *result = nullptr;
 
   // Helper function to extract YCbCr meta data from ycbcrSamplerDesc
@@ -843,7 +849,8 @@ Value *BuilderImpl::CreateImageGather(Type *resultTy, unsigned dim, unsigned fla
 
   if (texelComponentTy->isIntegerTy()) {
     // Handle integer texel component type.
-    gatherTy = FixedVectorType::get(getFloatTy(), 4);
+    Type *replacedTy = texelComponentTy->getIntegerBitWidth() == 16 ? getHalfTy() : getFloatTy();
+    gatherTy = FixedVectorType::get(replacedTy, 4);
     if (resultTy != texelTy)
       gatherTy = StructType::get(getContext(), {gatherTy, getInt32Ty()});
   }
@@ -919,7 +926,7 @@ Value *BuilderImpl::CreateImageSampleGather(Type *resultTy, unsigned dim, unsign
                                             const Twine &instName, bool isSample) {
   imageDesc = fixImageDescForRead(imageDesc);
   // Mark usage of images, to allow the compute workgroup reconfiguration optimization.
-  getPipelineState()->getShaderResourceUsage(m_shaderStage)->useImages = true;
+  getPipelineState()->getShaderResourceUsage(m_shaderStage.value())->useImages = true;
   // Set up the mask of address components provided, for use in searching the intrinsic ID table
   unsigned addressMask = 0;
   for (unsigned i = 0; i != ImageAddressCount; ++i) {
@@ -1058,7 +1065,7 @@ Value *BuilderImpl::CreateImageSampleGather(Type *resultTy, unsigned dim, unsign
 
   if (!nonUniformArgIndexes.empty())
     imageOp = createWaterfallLoop(imageOp, nonUniformArgIndexes,
-                                  getPipelineState()->getShaderOptions(m_shaderStage).scalarizeWaterfallLoads);
+                                  getPipelineState()->getShaderOptions(m_shaderStage.value()).scalarizeWaterfallLoads);
   return imageOp;
 }
 
@@ -1111,7 +1118,7 @@ Value *BuilderImpl::CreateImageAtomicCompareSwap(unsigned dim, unsigned flags, A
 Value *BuilderImpl::CreateImageAtomicCommon(unsigned atomicOp, unsigned dim, unsigned flags, AtomicOrdering ordering,
                                             Value *imageDesc, Value *coord, Value *inputValue, Value *comparatorValue,
                                             const Twine &instName) {
-  getPipelineState()->getShaderResourceUsage(m_shaderStage)->resourceWrite = true;
+  getPipelineState()->getShaderResourceUsage(m_shaderStage.value())->resourceWrite = true;
   assert(coord->getType()->getScalarType()->isIntegerTy(32));
   coord = handleFragCoordViewIndex(coord, flags, dim);
 
@@ -1166,8 +1173,9 @@ Value *BuilderImpl::CreateImageAtomicCommon(unsigned atomicOp, unsigned dim, uns
         CreateIntrinsic(StructBufferAtomicIntrinsicTable[atomicOp], inputValue->getType(), args, nullptr, instName);
   }
   if (flags & ImageFlagNonUniformImage)
-    atomicInst = createWaterfallLoop(atomicInst, imageDescArgIndex,
-                                     getPipelineState()->getShaderOptions(m_shaderStage).scalarizeWaterfallLoads);
+    atomicInst =
+        createWaterfallLoop(atomicInst, imageDescArgIndex,
+                            getPipelineState()->getShaderOptions(m_shaderStage.value()).scalarizeWaterfallLoads);
   else if (flags & ImageFlagEnforceReadFirstLaneImage)
     enforceReadFirstLane(atomicInst, imageDescArgIndex);
 
@@ -1195,11 +1203,11 @@ Value *BuilderImpl::CreateImageQueryLevels(unsigned dim, unsigned flags, Value *
   dim = dim == DimCubeArray ? DimCube : dim;
 
   Value *numMipLevel = nullptr;
+  GfxIpVersion gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion();
+  SqImgRsrcRegHandler proxySqRsrcRegHelper(this, imageDesc, &gfxIp);
   if (dim == Dim2DMsaa || dim == Dim2DArrayMsaa)
     numMipLevel = getInt32(1);
   else {
-    GfxIpVersion gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion();
-    SqImgRsrcRegHandler proxySqRsrcRegHelper(this, imageDesc, &gfxIp);
     Value *lastLevel = proxySqRsrcRegHelper.getReg(SqRsrcRegs::LastLevel);
     Value *baseLevel = proxySqRsrcRegHelper.getReg(SqRsrcRegs::BaseLevel);
     numMipLevel = CreateSub(lastLevel, baseLevel);
@@ -1210,6 +1218,11 @@ Value *BuilderImpl::CreateImageQueryLevels(unsigned dim, unsigned flags, Value *
   if (m_pipelineState->getOptions().allowNullDescriptor) {
     // Check dword3 against 0 for a null descriptor
     Value *descWord3 = CreateExtractElement(imageDesc, 3);
+    if (m_pipelineState->getOptions().maskOffNullDescriptorTypeField) {
+      // Mask off the type bits for the null descriptor
+      unsigned typeMask = proxySqRsrcRegHelper.getRegMask(SqRsrcRegs::Type);
+      descWord3 = CreateAnd(descWord3, getInt32(~typeMask));
+    }
     Value *isNullDesc = CreateICmpEQ(descWord3, getInt32(0));
     numMipLevel = CreateSelect(isNullDesc, getInt32(0), numMipLevel);
   }
@@ -1245,6 +1258,13 @@ Value *BuilderImpl::CreateImageQuerySamples(unsigned dim, unsigned flags, Value 
 
   // The sampler number is clamped 0 if allowNullDescriptor is on and image descriptor is a null descriptor
   if (m_pipelineState->getOptions().allowNullDescriptor) {
+    if (m_pipelineState->getOptions().maskOffNullDescriptorTypeField) {
+      GfxIpVersion gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion();
+      SqImgRsrcRegHandler proxySqRsrcRegHelper(this, imageDesc, &gfxIp);
+      unsigned typeMask = proxySqRsrcRegHelper.getRegMask(SqRsrcRegs::Type);
+      // Mask off the type bits for the null descriptor
+      descWord3 = CreateAnd(descWord3, getInt32(~typeMask));
+    }
     // Check dword3 against 0 for a null descriptor
     Value *isNullDesc = CreateICmpEQ(descWord3, getInt32(0));
     sampleNumber = CreateSelect(isNullDesc, getInt32(0), sampleNumber);
@@ -1314,6 +1334,11 @@ Value *BuilderImpl::CreateImageQuerySize(unsigned dim, unsigned flags, Value *im
   if (m_pipelineState->getOptions().allowNullDescriptor) {
     // Check dword3 against 0 for a null descriptor
     Value *descWord3 = CreateExtractElement(imageDesc, 3);
+    if (m_pipelineState->getOptions().maskOffNullDescriptorTypeField) {
+      // Mask off the type bits for the null descriptor
+      unsigned typeMask = proxySqRsrcRegHelper.getRegMask(SqRsrcRegs::Type);
+      descWord3 = CreateAnd(descWord3, getInt32(~typeMask));
+    }
     Value *isNullDesc = CreateICmpEQ(descWord3, getInt32(0));
     width = CreateSelect(isNullDesc, getInt32(0), width);
     height = CreateSelect(isNullDesc, getInt32(0), height);
@@ -1410,7 +1435,7 @@ Value *BuilderImpl::CreateImageGetLod(unsigned dim, unsigned flags, Value *image
 
   if (!nonUniformArgIndexes.empty())
     result = createWaterfallLoop(result, nonUniformArgIndexes,
-                                 getPipelineState()->getShaderOptions(m_shaderStage).scalarizeWaterfallLoads);
+                                 getPipelineState()->getShaderOptions(m_shaderStage.value()).scalarizeWaterfallLoads);
 
   return result;
 }
@@ -1781,6 +1806,13 @@ Value *BuilderImpl::patchCubeDescriptor(Value *desc, unsigned dim) {
 
   // If allowNullDescriptor is on and image descriptor is a null descriptor, keep elem3 and elem4 be zero
   if (m_pipelineState->getOptions().allowNullDescriptor) {
+    if (m_pipelineState->getOptions().maskOffNullDescriptorTypeField) {
+      GfxIpVersion gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion();
+      SqImgRsrcRegHandler proxySqRsrcRegHelper(this, desc, &gfxIp);
+      unsigned typeMask = proxySqRsrcRegHelper.getRegMask(SqRsrcRegs::Type);
+      // Mask off the type bits for the null descriptor
+      originalElem3 = CreateAnd(originalElem3, getInt32(~typeMask));
+    }
     // Check dword3 against 0 for a null descriptor
     Value *zero = getInt32(0);
     Value *isNullDesc = CreateICmpEQ(originalElem3, zero);
@@ -1818,7 +1850,7 @@ Value *BuilderImpl::handleFragCoordViewIndex(Value *coord, unsigned flags, unsig
     // Get FragCoord, convert to signed i32, and add its x,y to the coordinate.
     // For now, this just generates a call to lgc.input.import.builtin. A future commit will
     // change it to use a Builder call to read the built-in.
-    getPipelineState()->getShaderResourceUsage(m_shaderStage)->builtInUsage.fs.fragCoord = true;
+    getPipelineState()->getShaderResourceUsage(m_shaderStage.value())->builtInUsage.fs.fragCoord = true;
 
     const static unsigned BuiltInFragCoord = 15;
     std::string callName = lgcName::InputImportBuiltIn;
@@ -1841,24 +1873,24 @@ Value *BuilderImpl::handleFragCoordViewIndex(Value *coord, unsigned flags, unsig
     // Get ViewIndex and use it as the z coordinate.
     // For now, this just generates a call to lgc.input.import.builtin. A future commit will
     // change it to use a Builder call to read the built-in.
-    auto &builtInUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage)->builtInUsage;
-    switch (m_shaderStage) {
-    case ShaderStageVertex:
+    auto &builtInUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage.value())->builtInUsage;
+    switch (m_shaderStage.value()) {
+    case ShaderStage::Vertex:
       builtInUsage.vs.viewIndex = true;
       break;
-    case ShaderStageTessControl:
+    case ShaderStage::TessControl:
       builtInUsage.tcs.viewIndex = true;
       break;
-    case ShaderStageTessEval:
+    case ShaderStage::TessEval:
       builtInUsage.tes.viewIndex = true;
       break;
-    case ShaderStageGeometry:
+    case ShaderStage::Geometry:
       builtInUsage.gs.viewIndex = true;
       break;
-    case ShaderStageMesh:
+    case ShaderStage::Mesh:
       builtInUsage.mesh.viewIndex = true;
       break;
-    case ShaderStageFragment:
+    case ShaderStage::Fragment:
       builtInUsage.fs.viewIndex = true;
       break;
     default:

@@ -15,14 +15,12 @@ option(CONTINUATIONS_BUILD_TESTS "Build continuation tests")
 
 add_llvm_library(LLVMContinuations
   lib/CleanupContinuations.cpp
+  lib/Continuations.cpp
   lib/ContinuationsDialect.cpp
-  lib/ContinuationsUtil.cpp
   lib/CpsStackLowering.cpp
-  lib/DXILCont.cpp
   lib/DXILContIntrinsicPrepare.cpp
   lib/DXILContLgcRtOpConverter.cpp
   lib/DXILContPostProcess.cpp
-  lib/DXILMetadata.cpp
   lib/DXILSupport.cpp
   lib/GpurtDialect.cpp
   lib/LegacyCleanupContinuations.cpp
@@ -35,6 +33,7 @@ add_llvm_library(LLVMContinuations
   lib/RegisterBuffer.cpp
   lib/RemoveTypesMetadata.cpp
   lib/SaveContinuationState.cpp
+  lib/TypesMetadata.cpp
 
   DEPENDS
   intrinsics_gen

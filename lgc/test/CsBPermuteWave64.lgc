@@ -9,7 +9,7 @@ define spir_func float @fn(float %value, i32 %index) !lgc.shaderstage !0 {
 
 declare float @lgc.create.subgroup.shuffle.f32(...)
 
-; ShaderStageCompute
+; ShaderStage::Compute
 !0 = !{i32 7}
 
 ; Setting Threadgroup Dimensions to 64 x 1 x 1

@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -45,32 +45,6 @@ using namespace lgc;
 using namespace llvm;
 
 // =====================================================================================================================
-// Create a load of a buffer descriptor.
-//
-// If descSet = InternalDescriptorSetId (0xFFFFFFFF), this is an internal user data, which is a plain 64-bit pointer,
-// flags must be 'BufferFlagAddress' i64 address is returned.
-//
-// @param descSet : Descriptor set
-// @param binding : Descriptor binding
-// @param descIndex : Descriptor index
-// @param flags : BufferFlag* bit settings
-// @param instName : Name to give instruction(s)
-Value *BuilderImpl::CreateLoadBufferDesc(uint64_t descSet, unsigned binding, Value *descIndex, unsigned flags,
-                                         const Twine &instName) {
-  Value *desc = nullptr;
-  bool return64Address = false;
-  if (flags & BufferFlagAddress)
-    return64Address = true;
-
-  desc = CreateBufferDesc(descSet, binding, descIndex, flags, instName);
-  if (return64Address || isa<PoisonValue>(desc))
-    return desc;
-
-  // Convert to fat pointer.
-  return create<BufferDescToPtrOp>(desc);
-}
-
-// =====================================================================================================================
 // Create a buffer descriptor, not convert to a fat pointer
 //
 // If descSet = -1, this is an internal user data, which is a plain 64-bit pointer, flags must be 'BufferFlagAddress'
@@ -87,12 +61,7 @@ Value *BuilderImpl::CreateBufferDesc(uint64_t descSet, unsigned binding, Value *
   bool return64Address = false;
   descIndex = scalarizeIfUniform(descIndex, flags & BufferFlagNonUniform);
 
-  // Mark the shader as reading and writing (if applicable) a resource.
-  auto resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage);
-  resUsage->resourceRead = true;
-  if (flags & BufferFlagWritten)
-    resUsage->resourceWrite = true;
-  else if (flags & BufferFlagAddress)
+  if (flags & BufferFlagAddress)
     return64Address = true;
 
   // Find the descriptor node.
@@ -133,14 +102,10 @@ Value *BuilderImpl::CreateBufferDesc(uint64_t descSet, unsigned binding, Value *
 
     unsigned dwordSize = descTy->getPrimitiveSizeInBits() / 32;
     unsigned dwordOffset = cast<ConstantInt>(descIndex)->getZExtValue() * dwordSize;
-    if (dwordOffset + dwordSize > node->sizeInDwords) {
-      // Index out of range
-      desc = PoisonValue::get(descTy);
-    } else {
-      dwordOffset += node->offsetInDwords;
-      dwordOffset += (binding - node->binding) * node->stride;
-      desc = create<LoadUserDataOp>(descTy, dwordOffset * 4);
-    }
+    assert((dwordOffset + dwordSize <= node->sizeInDwords) && "Resource index out of range");
+    dwordOffset += node->offsetInDwords;
+    dwordOffset += (binding - node->binding) * node->stride;
+    desc = create<LoadUserDataOp>(descTy, dwordOffset * 4);
     if (return64Address)
       return desc;
   } else if (node->concreteType == ResourceNodeType::InlineBuffer) {

@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -169,6 +169,14 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
         auto location = (opCode == OpDecorate) ? codePos[3] : codePos[4];
         if (location == static_cast<unsigned>(Vkgc::GlCompatibilityInOutLocation::ClipVertex))
           shaderModuleUsage.useClipVertex = true;
+        if (location == static_cast<unsigned>(Vkgc::GlCompatibilityInOutLocation::FrontColor))
+          shaderModuleUsage.useFrontColor = true;
+        if (location == static_cast<unsigned>(Vkgc::GlCompatibilityInOutLocation::BackColor))
+          shaderModuleUsage.useBackColor = true;
+        if (location == static_cast<unsigned>(Vkgc::GlCompatibilityInOutLocation::FrontSecondaryColor))
+          shaderModuleUsage.useFrontSecondaryColor = true;
+        if (location == static_cast<unsigned>(Vkgc::GlCompatibilityInOutLocation::BackSecondaryColor))
+          shaderModuleUsage.useBackSecondaryColor = true;
       } else if (decoration == DecorationPerVertexKHR) {
         shaderModuleUsage.useBarycentric = true;
       }
@@ -520,6 +528,7 @@ Result ShaderModuleHelper::getModuleData(const ShaderModuleBuildInfo *shaderInfo
     memcpy(moduleData.cacheHash, cacheHash.dwords, sizeof(cacheHash));
   } else {
     moduleData.binCode = shaderBinary;
+    memcpy(codeBuffer.data(), shaderBinary.pCode, shaderBinary.codeSize);
   }
 
   return Result::Success;
@@ -556,7 +565,14 @@ Expected<BinaryData> ShaderModuleHelper::getShaderCode(const ShaderModuleBuildIn
 // @return : The number of bytes need to hold the code for this shader module.
 Expected<unsigned> ShaderModuleHelper::getCodeSize(const ShaderModuleBuildInfo *shaderInfo) {
   const BinaryData &shaderBinary = shaderInfo->shaderBin;
-  bool trimDebugInfo = cl::TrimDebugInfo && !(shaderInfo->options.pipelineOptions.internalRtShaders);
+  BinaryType binaryType;
+  Result result = ShaderModuleHelper::getShaderBinaryType(shaderBinary, binaryType);
+  if (result != Result::Success)
+    return createResultError(Result::ErrorInvalidShader);
+
+  bool trimDebugInfo =
+      binaryType != BinaryType::LlvmBc && cl::TrimDebugInfo && !(shaderInfo->options.pipelineOptions.internalRtShaders);
+
   if (!trimDebugInfo)
     return shaderBinary.codeSize;
   return ShaderModuleHelper::trimSpirvDebugInfo(&shaderBinary, {});

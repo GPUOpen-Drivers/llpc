@@ -1,16 +1,16 @@
 ; Change inttoptr ( add x, const ) -> gep ( inttoptr x, const )
 
-; RUN: lgc -mcpu=gfx900 -print-after=lgc-patch-peephole-opt -o /dev/null 2>&1 - <%s | FileCheck --check-prefixes=CHECK %s
+; RUN: lgc -mcpu=gfx1010 -print-after=lgc-patch-peephole-opt -o - 2>&1 - <%s | FileCheck --check-prefixes=CHECK %s
 
 target datalayout = "e-p:64:64-p1:64:64-p2:32:32-p3:32:32-p4:64:64-p5:32:32-p6:32:32-i64:64-v16:16-v24:32-v32:32-v48:64-v96:128-v192:256-v256:256-v512:512-v1024:1024-v2048:2048-n32:64-S32-A5-ni:7"
 target triple = "amdgcn--amdpal"
 
 ; Function Attrs: nounwind
-define dllexport spir_func void @lgc.shader.VS.main(i64 %0, <4 x i32> addrspace(1)* %1) local_unnamed_addr #0 !lgc.shaderstage !10 {
+define dllexport spir_func void @lgc.shader.CS.main(i64 %0, <4 x i32> addrspace(1)* %1) local_unnamed_addr #0 !lgc.shaderstage !10 {
 ; CHECK: IR Dump After Patch LLVM for peephole optimizations
 ; CHECK: [[INTTOPTR:%[0-9]+]] = inttoptr i64 %[[#]] to ptr addrspace(1)
 ; CHECK: [[LOAD:%[0-9]+]] = load i32, ptr addrspace(1) [[INTTOPTR]], align 4
-; CHECK: [[INSERTELEMENT:%[0-9]+]] = insertelement <4 x i32> undef, i32 [[LOAD]], i{{32|64}} 0
+; CHECK: [[INSERTELEMENT:%[0-9]+]] = insertelement <4 x i32> {{poison|undef}}, i32 [[LOAD]], i{{32|64}} 0
 
 ; CHECK: [[INTTOPTR1:%[0-9]+]] = inttoptr i64 %[[#]] to ptr addrspace(1)
 ; CHECK: [[GEP1:%[0-9]+]] = getelementptr i32, ptr addrspace(1) [[INTTOPTR1]], i64 1
@@ -62,8 +62,8 @@ attributes #1 = { nounwind readonly }
 
 !lgc.unlinked = !{!10}
 !lgc.options = !{!0}
-!lgc.options.VS = !{!1}
+!lgc.options.CS = !{!1}
 
 !0 = !{i32 739459867, i32 836497279, i32 -1935591037, i32 -652075177, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 2}
 !1 = !{i32 801932830, i32 600683540, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 0, i32 64, i32 0, i32 15, i32 3}
-!10 = !{i32 1}
+!10 = !{i32 7}

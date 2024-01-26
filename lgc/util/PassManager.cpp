@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2018-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2018-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -60,6 +60,10 @@ static cl::list<unsigned> DisablePassIndices("disable-pass-indices", cl::ZeroOrM
 
 static cl::opt<bool> DebugPassManager("debug-pass-manager", cl::desc("Print pass management debugging information"),
                                       cl::Hidden, cl::init(false));
+
+static cl::opt<std::string> StartLowerAfterOpt("start-lower-after",
+                                               cl::desc("Resume compilation after a specific lower pass"), cl::init(""),
+                                               cl::Hidden);
 
 } // namespace cl
 
@@ -115,7 +119,10 @@ private:
   unsigned *m_passIndex = nullptr;                         // Pass Index.
   bool m_initialized = false;                              // Whether the pass manager is initialized or not
   bool m_stopped = false;
+  bool m_start = false; // Whether the pass manager will execute the following passes
   std::string m_stopAfter;
+  std::string m_startAfter; // Specify the pass name to start from
+  StringMap<std::string> m_passToClassName;
 };
 
 // =====================================================================================================================
@@ -215,6 +222,12 @@ PassManagerImpl::PassManagerImpl(TargetMachine *targetMachine, LLVMContext &cont
   assert(it != options.end());
   m_stopAfter = static_cast<cl::opt<std::string> *>(it->second)->getValue();
 
+  // Find the pass name to start from
+  it = options.find("start-lower-after");
+  m_startAfter = static_cast<cl::opt<std::string> *>(it->second)->getValue();
+  if (m_startAfter.empty())
+    m_start = true;
+
   // Setup custom instrumentation callbacks and register LLVM's default module
   // analyses to the analysis manager.
   registerCallbacks();
@@ -249,6 +262,8 @@ MbPassManagerImpl::MbPassManagerImpl(TargetMachine *targetMachine)
 // @param className : Full pass name
 void PassManagerImpl::registerPass(StringRef passName, StringRef className) {
   m_instrumentationCallbacks.addClassToPassName(className, passName);
+  assert(!m_passToClassName.count(passName)); // Passes shouldn't be registered twice
+  m_passToClassName[passName] = className.str();
 }
 
 // =====================================================================================================================
@@ -277,6 +292,14 @@ void PassManagerImpl::run(Module &module) {
                                      m_moduleAnalysisManager);
     m_loopAnalysisManager.registerPass([&] { return ModuleAnalysisManagerLoopProxy(m_moduleAnalysisManager); });
     m_initialized = true;
+  }
+
+  // If couldn't find the 'start-after' pass name from the registered passes, execute all passes
+  if (!m_startAfter.empty()) {
+    if (!m_passToClassName.count(m_startAfter)) {
+      m_startAfter.clear();
+      m_start = true;
+    }
   }
   ModulePassManager::run(module, m_moduleAnalysisManager);
 }
@@ -343,6 +366,15 @@ void PassManagerImpl::registerCallbacks() {
     if (!m_stopAfter.empty() && passName == m_stopAfter) {
       // This particular pass still gets to run, but we skip everything afterwards.
       m_stopped = true;
+    }
+    // If find the 'start-after' pass name, inform the pass manager to start the following passes
+    // But not execute current pass
+    if (!m_startAfter.empty()) {
+      if (!m_start && passName == m_startAfter) {
+        m_start = true;
+        return false;
+      }
+      return m_start;
     }
     return true;
   });

@@ -76,17 +76,17 @@ define void @_cont_CallShader(%struct.DispatchSystemData* %data, i32 %0) #0 !typ
   ret void
 }
 
-; LOWERRAYTRACINGPIPELINE-STACKSIZE-DAG: define void @main(){{.*}} !continuation.stacksize ![[main_stacksize:[0-9]+]]
+; LOWERRAYTRACINGPIPELINE-STACKSIZE-DAG: define void @main(%struct.DispatchSystemData %0){{.*}} !continuation.stacksize ![[main_stacksize:[0-9]+]]
 ; LOWERRAYTRACINGPIPELINE-STACKSIZE-DAG: ![[main_stacksize]] = !{i32 140}
 
-; CLEANUP-STACKSIZE-DAG: define void @main(){{.*}} !continuation.stacksize ![[main_stacksize:[0-9]+]]
+; CLEANUP-STACKSIZE-DAG: define void @main(%struct.DispatchSystemData %0){{.*}} !continuation.stacksize ![[main_stacksize:[0-9]+]]
 ; CLEANUP-STACKSIZE-DAG: ![[main_stacksize]] = !{i32 140}
-; CLEANUP-STATESIZE-DAG: define void @main(){{.*}} !continuation.state ![[main_state:[0-9]+]]
+; CLEANUP-STATESIZE-DAG: define void @main(%struct.DispatchSystemData %0){{.*}} !continuation.state ![[main_state:[0-9]+]]
 ; CLEANUP-STATESIZE-DAG: ![[main_state]] = !{i32 0}
 
-; SAVESTATE-STACKSIZE-DAG: define void @main(){{.*}} !continuation.stacksize ![[main_stacksize:[0-9]+]]
+; SAVESTATE-STACKSIZE-DAG: define void @main(%struct.DispatchSystemData %0){{.*}} !continuation.stacksize ![[main_stacksize:[0-9]+]]
 ; SAVESTATE-STACKSIZE-DAG: ![[main_stacksize]] = !{i32 140}
-; SAVESTATE-STATESIZE-DAG: define void @main(){{.*}} !continuation.state ![[main_state:[0-9]+]]
+; SAVESTATE-STATESIZE-DAG: define void @main(%struct.DispatchSystemData %0){{.*}} !continuation.state ![[main_state:[0-9]+]]
 ; SAVESTATE-STATESIZE-DAG: ![[main_state]] = !{i32 0}
 
 define void @main() {
@@ -95,16 +95,16 @@ define void @main() {
   ret void
 }
 
-; LOWERRAYTRACINGPIPELINE-STACKSIZE-DAG: define void @mainTrace(){{.*}} !continuation.stacksize ![[maintrace_stacksize:[0-9]+]]
+; LOWERRAYTRACINGPIPELINE-STACKSIZE-DAG: define void @mainTrace(%struct.DispatchSystemData %0){{.*}} !continuation.stacksize ![[maintrace_stacksize:[0-9]+]]
 ; LOWERRAYTRACINGPIPELINE-STACKSIZE-DAG: ![[maintrace_stacksize]] = !{i32 180}
 
-; CLEANUP-STACKSIZE-DAG: define void @mainTrace(){{.*}} !continuation.stacksize ![[maintrace_stacksize:[0-9]+]]
+; CLEANUP-STACKSIZE-DAG: define void @mainTrace(%struct.DispatchSystemData %0){{.*}} !continuation.stacksize ![[maintrace_stacksize:[0-9]+]]
 ; CLEANUP-STACKSIZE-DAG: ![[maintrace_stacksize]] = !{i32 180}
-; CLEANUP-STATESIZE-DAG: define void @mainTrace(){{.*}} !continuation.state ![[main_state]]
+; CLEANUP-STATESIZE-DAG: define void @mainTrace(%struct.DispatchSystemData %0){{.*}} !continuation.state ![[main_state]]
 
-; SAVESTATE-STACKSIZE-DAG: define void @mainTrace(){{.*}} !continuation.stacksize ![[maintrace_stacksize:[0-9]+]]
+; SAVESTATE-STACKSIZE-DAG: define void @mainTrace(%struct.DispatchSystemData %0){{.*}} !continuation.stacksize ![[maintrace_stacksize:[0-9]+]]
 ; SAVESTATE-STACKSIZE-DAG: ![[maintrace_stacksize]] = !{i32 180}
-; SAVESTATE-STATESIZE-DAG: define void @mainTrace(){{.*}} !continuation.state ![[main_state]]
+; SAVESTATE-STATESIZE-DAG: define void @mainTrace(%struct.DispatchSystemData %0){{.*}} !continuation.state ![[main_state]]
 
 define void @mainTrace() {
   %1 = load %dx.types.Handle, %dx.types.Handle* @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4

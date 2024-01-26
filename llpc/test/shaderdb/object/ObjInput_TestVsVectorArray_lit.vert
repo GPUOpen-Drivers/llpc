@@ -18,7 +18,7 @@ void main()
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST-COUNT-2: call <4 x float> @lgc.input.import.generic.v4f32{{.*}}
 ; SHADERTEST-LABEL: {{^// LLPC}} pipeline patching results
-; SHADERTEST: call <4 x i32> @llvm.amdgcn.struct.tbuffer.load.v4i32
+; SHADERTEST-COUNT-4: call i32 @llvm.amdgcn.struct.tbuffer.load.i32
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

@@ -4,10 +4,10 @@
 ; RUN:         -enable-relocatable-shader-elf \
 ; RUN:         -o %t.elf %gfxip %s -v | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST: {{^}}Building pipeline with relocatable shader elf.
-; SHADERTEST-LABEL: {{^}}// LLPC location input/output mapping results (TES shader)
-; SHADERTEST: {{^}}(TES) Input:  loc = 2, comp = 0 =>  Mapped = 0, 0
-; SHADERTEST-LABEL: {{^}}// LLPC location input/output mapping results (TCS shader)
-; SHADERTEST: {{^}}(TCS) Output: loc = 2, comp = 0  =>  Mapped = 0, 0
+; SHADERTEST-LABEL: {{^}}// LLPC location input/output mapping results (TES)
+; SHADERTEST: {{^}}(TES) Input:  [location, component] = [2, 0]  =>  Mapped = [0, 0]
+; SHADERTEST-LABEL: {{^}}// LLPC location input/output mapping results (TCS)
+; SHADERTEST: {{^}}(TCS) Output: [location, component] = [2, 0]  =>  Mapped = [0, 0]
 ; END_SHADERTEST
 
 [Version]

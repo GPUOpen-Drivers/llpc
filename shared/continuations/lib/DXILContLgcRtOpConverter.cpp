@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2023-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
- *deal in the Software without restriction, including without limitation the
- *rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- *sell copies of the Software, and to permit persons to whom the Software is
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in
@@ -18,8 +18,8 @@
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- *FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- *IN THE SOFTWARE.
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 
@@ -441,16 +441,16 @@ void DXILContLgcRtOpConverterPass::addDXILPayloadTypeToCall(Function &DXILFunc,
 
   auto *PayloadPtr = DXILFunc.getArg(DXILFunc.arg_size() - 1);
   auto *PayloadPtrTy =
-      DXILContArgTy::get(&DXILFunc, PayloadPtr).getPointerElementType();
+      ContArgTy::get(&DXILFunc, PayloadPtr).getPointerElementType();
 
   // Store a poison value as metadata with the given type.
   CI.setMetadata(
-      DXILContHelper::MDDXILPayloadTyName,
+      ContHelper::MDContPayloadTyName,
       MDNode::get(CI.getContext(),
                   {ConstantAsMetadata::get(PoisonValue::get(PayloadPtrTy))}));
 }
 
-bool DXILContLgcRtOpConverterPass::processFunction(Function &Func) {
+bool DXILContLgcRtOpConverterPass::convertDxOp(Function &Func) {
   auto FuncName = Func.getName();
   constexpr const char CalleePrefix[] = "dx.op.";
   if (!FuncName.starts_with(CalleePrefix))
@@ -493,19 +493,32 @@ bool DXILContLgcRtOpConverterPass::processFunction(Function &Func) {
   return Changed;
 }
 
-void DXILContLgcRtOpConverterPass::applyPayloadMetadataTypesOnShaders() {
+void DXILContLgcRtOpConverterPass::setupLocalRootIndex(Function *F) {
+  Builder->SetInsertPointPastAllocas(F);
+  auto *LocalIndex = Builder->create<lgc::rt::ShaderIndexOp>();
+  auto *SetLocalRootIndex = llvm::getSetLocalRootIndex(*F->getParent());
+  Builder->CreateCall(SetLocalRootIndex, LocalIndex);
+}
+
+// Do preparation transformations to entry-point shaders.
+bool DXILContLgcRtOpConverterPass::prepareEntryPointShaders() {
+  bool Changed = false;
   MapVector<Function *, DXILShaderKind> ShaderKinds;
   analyzeShaderKinds(*M, ShaderKinds);
 
   for (auto &[Func, Kind] : ShaderKinds) {
-    auto Stage = DXILContHelper::dxilShaderKindToShaderStage(Kind);
+    auto Stage = ShaderStageHelper::dxilShaderKindToShaderStage(Kind);
 
     // Ignore non-raytracing shader stages
     if (!Stage.has_value())
       continue;
 
+    Changed = true;
+    // Set lgc.rt shader stage metadata.
     lgc::rt::setLgcRtShaderStage(Func, Stage);
-
+    // Set local root index in entry block.
+    setupLocalRootIndex(Func);
+    // Set payload type metadata.
     switch (Kind) {
     case DXILShaderKind::AnyHit:
     case DXILShaderKind::ClosestHit:
@@ -514,7 +527,7 @@ void DXILContLgcRtOpConverterPass::applyPayloadMetadataTypesOnShaders() {
       Type *PayloadTy = getFuncArgPtrElementType(Func, 0);
       assert(PayloadTy && "Shader must have a payload argument");
       Func->setMetadata(
-          DXILContHelper::MDDXILPayloadTyName,
+          ContHelper::MDContPayloadTyName,
           MDNode::get(Func->getContext(),
                       {ConstantAsMetadata::get(PoisonValue::get(PayloadTy))}));
       break;
@@ -523,6 +536,7 @@ void DXILContLgcRtOpConverterPass::applyPayloadMetadataTypesOnShaders() {
       break;
     }
   }
+  return Changed;
 }
 
 PreservedAnalyses
@@ -536,13 +550,13 @@ DXILContLgcRtOpConverterPass::run(Module &Module,
   M = &Module;
   DL = &M->getDataLayout();
 
-  applyPayloadMetadataTypesOnShaders();
+  Changed |= prepareEntryPointShaders();
 
   for (Function &F : Module.functions()) {
     if (!F.isDeclaration())
       continue;
 
-    Changed |= processFunction(F);
+    Changed |= convertDxOp(F);
   }
 
   return Changed ? PreservedAnalyses::all() : PreservedAnalyses::none();

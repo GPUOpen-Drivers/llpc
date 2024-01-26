@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
- *deal in the Software without restriction, including without limitation the
- *rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- *sell copies of the Software, and to permit persons to whom the Software is
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in
@@ -18,8 +18,8 @@
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- *FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- *IN THE SOFTWARE.
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 
@@ -91,7 +91,7 @@ static bool isRematerializableDxilLoad(CallInst *CInst, StringRef CalledName) {
 
   bool IsLoad = false;
   for (const auto *LoadFunc : LoadFunctions) {
-    if (CalledName.startswith(LoadFunc)) {
+    if (CalledName.starts_with(LoadFunc)) {
       IsLoad = true;
       break;
     }
@@ -104,9 +104,9 @@ static bool isRematerializableDxilLoad(CallInst *CInst, StringRef CalledName) {
   // Unwrap dx.op.annotateHandle and dx.op.createHandleForLib calls.
   while (auto *Call = dyn_cast<CallInst>(Handle)) {
     assert(
-        Call->getCalledFunction()->getName().startswith(
+        Call->getCalledFunction()->getName().starts_with(
             "dx.op.annotateHandle") ||
-        Call->getCalledFunction()->getName().startswith("dx.op.createHandle"));
+        Call->getCalledFunction()->getName().starts_with("dx.op.createHandle"));
     Handle = Call->getArgOperand(1);
   }
 
@@ -159,12 +159,18 @@ bool llvm::DXILMaterializable(Instruction &OrigI) {
   if (coro::defaultMaterializable(*V))
     return true;
 
+  // Insert into constant.
+  if (isa<InsertElementInst, InsertValueInst>(V) &&
+      isa<Constant>(V->getOperand(0))) {
+    return true;
+  }
+
   // Loads associated with dx.op.createHandle calls
   if (auto *LI = dyn_cast<LoadInst>(V)) {
     for (auto *LIUse : LI->users()) {
       if (auto *CallI = dyn_cast<CallInst>(LIUse)) {
         auto *CalledF = CallI->getCalledFunction();
-        if (!CalledF || !CalledF->getName().startswith("dx.op.createHandle"))
+        if (!CalledF || !CalledF->getName().starts_with("dx.op.createHandle"))
           return false;
       } else {
         return false;
@@ -179,13 +185,13 @@ bool llvm::DXILMaterializable(Instruction &OrigI) {
       // be rematerialized are replaced by their implementation, so that the
       // necessary values can be put into the coroutine frame. Therefore, we
       // can assume all left-over intrinsics can be rematerialized.
-      if (DXILContHelper::isRematerializableLgcRtOp(*CInst))
+      if (ContHelper::isRematerializableLgcRtOp(*CInst))
         return true;
 
       auto CalledName = CalledFunc->getName();
-      if (CalledName.startswith("dx.op.")) {
+      if (CalledName.starts_with("dx.op.")) {
         // createHandle and createHandleForLib
-        if (CalledName.startswith("dx.op.createHandle"))
+        if (CalledName.starts_with("dx.op.createHandle"))
           return true;
 
         // Match by id

@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -30,6 +30,7 @@
  */
 #include "llpcSpirvProcessGpuRtLibrary.h"
 #include "SPIRVInternal.h"
+#include "continuations/ContinuationsUtil.h"
 #include "llpcContext.h"
 #include "llpcSpirvLowerInternalLibraryIntrinsicUtil.h"
 #include "llpcSpirvLowerUtil.h"
@@ -80,6 +81,12 @@ SpirvProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_LoadDwordAtAddr"] = &SpirvProcessGpuRtLibrary::createLoadDwordAtAddr;
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_LoadDwordAtAddrx2"] = &SpirvProcessGpuRtLibrary::createLoadDwordAtAddrx2;
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_LoadDwordAtAddrx4"] = &SpirvProcessGpuRtLibrary::createLoadDwordAtAddrx4;
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_ConstantLoadDwordAtAddr"] =
+      &SpirvProcessGpuRtLibrary::createConstantLoadDwordAtAddr;
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_ConstantLoadDwordAtAddrx2"] =
+      &SpirvProcessGpuRtLibrary::createConstantLoadDwordAtAddrx2;
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_ConstantLoadDwordAtAddrx4"] =
+      &SpirvProcessGpuRtLibrary::createConstantLoadDwordAtAddrx4;
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_ConvertF32toF16NegInf"] =
       &SpirvProcessGpuRtLibrary::createConvertF32toF16NegInf;
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_ConvertF32toF16PosInf"] =
@@ -89,6 +96,8 @@ SpirvProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
 #else
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_IntersectInternal"] = &SpirvProcessGpuRtLibrary::createIntersectBvh;
 #endif
+  m_libFuncPtrs["AmdExtD3DShaderIntrinsics_FloatOpWithRoundMode"] =
+      &SpirvProcessGpuRtLibrary::createFloatOpWithRoundMode;
   m_libFuncPtrs["AmdTraceRaySampleGpuTimer"] = &SpirvProcessGpuRtLibrary::createSampleGpuTimer;
   m_libFuncPtrs["AmdTraceRayGetFlattenedGroupThreadId"] = &SpirvProcessGpuRtLibrary::createGetFlattenedGroupThreadId;
   m_libFuncPtrs["AmdTraceRayGetHitAttributes"] = &SpirvProcessGpuRtLibrary::createGetHitAttributes;
@@ -139,17 +148,17 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
   assert(!fetchTrianglePositionFromRayQueryFuncName.empty());
 
   // Set external linkage for library entry functions
-  if (funcName.startswith(traceRayFuncName) || funcName.startswith(rayQueryInitializeFuncName) ||
-      funcName.startswith(rayQueryProceedFuncName) ||
-      funcName.startswith(fetchTrianglePositionFromNodePointerFuncName) ||
-      funcName.startswith(fetchTrianglePositionFromRayQueryFuncName) || funcName.startswith("_cont_")) {
+  if (funcName.starts_with(traceRayFuncName) || funcName.starts_with(rayQueryInitializeFuncName) ||
+      funcName.starts_with(rayQueryProceedFuncName) ||
+      funcName.starts_with(fetchTrianglePositionFromNodePointerFuncName) ||
+      funcName.starts_with(fetchTrianglePositionFromRayQueryFuncName) || funcName.starts_with("_cont_")) {
     func->setLinkage(GlobalValue::WeakAnyLinkage);
     return;
   }
 
   // Drop dummy entry function.
   static const char *LibraryEntryFuncName = "libraryEntry";
-  if (funcName.startswith(LibraryEntryFuncName)) {
+  if (funcName.starts_with(LibraryEntryFuncName)) {
     func->dropAllReferences();
     func->eraseFromParent();
     func = nullptr;
@@ -157,11 +166,11 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
   }
 
   // Special handling for _AmdContStackStore* and _AmdContStackLoad* to accept arbitrary type
-  if (funcName.startswith("_AmdContStackStore")) {
+  if (funcName.starts_with("_AmdContStackStore")) {
     m_builder->SetInsertPoint(clearBlock(func));
     createContStackStore(func);
     return;
-  } else if (funcName.startswith("_AmdContStackLoad")) {
+  } else if (funcName.starts_with("_AmdContStackLoad")) {
     m_builder->SetInsertPoint(clearBlock(func));
     createContStackLoad(func);
     return;
@@ -241,6 +250,18 @@ void SpirvProcessGpuRtLibrary::createLdsStackInit(Function *func) {
 }
 
 // =====================================================================================================================
+void SpirvProcessGpuRtLibrary::createFloatOpWithRoundMode(llvm::Function *func) {
+  auto argIt = func->arg_begin();
+  auto retType = cast<FixedVectorType>(func->getReturnType());
+  auto int32Ty = m_builder->getInt32Ty();
+  Value *roundMode = m_builder->CreateLoad(int32Ty, argIt++);
+  Value *operation = m_builder->CreateLoad(int32Ty, argIt++);
+  Value *src0 = m_builder->CreateLoad(retType, argIt++);
+  Value *src1 = m_builder->CreateLoad(retType, argIt);
+  m_builder->CreateRet(m_builder->create<GpurtFloatWithRoundModeOp>(roundMode, operation, src0, src1));
+}
+
+// =====================================================================================================================
 // Fill in function to store stack LDS
 //
 // @param func : The function to process
@@ -278,29 +299,55 @@ void SpirvProcessGpuRtLibrary::createGetTriangleCompressionMode(Function *func) 
 }
 
 // =====================================================================================================================
-// Fill in function to load 1 dword at given address
+// Fill in function to global load 1 dword at given address
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createLoadDwordAtAddr(Function *func) {
-  createLoadDwordAtAddrWithType(func, m_builder->getInt32Ty());
+  createLoadDwordAtAddrWithType(func, m_builder->getInt32Ty(), SPIRAS_Global);
 }
 
 // =====================================================================================================================
-// Fill in function to load 2 dwords at given address
+// Fill in function to global load 2 dwords at given address
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createLoadDwordAtAddrx2(Function *func) {
   auto int32x2Ty = FixedVectorType::get(m_builder->getInt32Ty(), 2);
-  createLoadDwordAtAddrWithType(func, int32x2Ty);
+  createLoadDwordAtAddrWithType(func, int32x2Ty, SPIRAS_Global);
 }
 
 // =====================================================================================================================
-// Fill in function to load 4 dwords at given address
+// Fill in function to global load 4 dwords at given address
 //
 // @param func : The function to process
 void SpirvProcessGpuRtLibrary::createLoadDwordAtAddrx4(Function *func) {
   auto int32x4Ty = FixedVectorType::get(m_builder->getInt32Ty(), 4);
-  createLoadDwordAtAddrWithType(func, int32x4Ty);
+  createLoadDwordAtAddrWithType(func, int32x4Ty, SPIRAS_Global);
+}
+
+// =====================================================================================================================
+// Fill in function to constant load 1 dword at given address
+//
+// @param func : The function to process
+void SpirvProcessGpuRtLibrary::createConstantLoadDwordAtAddr(Function *func) {
+  createLoadDwordAtAddrWithType(func, m_builder->getInt32Ty(), SPIRAS_Constant);
+}
+
+// =====================================================================================================================
+// Fill in function to constant load 2 dwords at given address
+//
+// @param func : The function to process
+void SpirvProcessGpuRtLibrary::createConstantLoadDwordAtAddrx2(Function *func) {
+  auto int32x2Ty = FixedVectorType::get(m_builder->getInt32Ty(), 2);
+  createLoadDwordAtAddrWithType(func, int32x2Ty, SPIRAS_Constant);
+}
+
+// =====================================================================================================================
+// Fill in function to constant load 4 dwords at given address
+//
+// @param func : The function to process
+void SpirvProcessGpuRtLibrary::createConstantLoadDwordAtAddrx4(Function *func) {
+  auto int32x4Ty = FixedVectorType::get(m_builder->getInt32Ty(), 4);
+  createLoadDwordAtAddrWithType(func, int32x4Ty, SPIRAS_Constant);
 }
 
 // =====================================================================================================================
@@ -308,7 +355,8 @@ void SpirvProcessGpuRtLibrary::createLoadDwordAtAddrx4(Function *func) {
 //
 // @param func : The function to process
 // @param loadTy : Load type
-void SpirvProcessGpuRtLibrary::createLoadDwordAtAddrWithType(Function *func, Type *loadTy) {
+void SpirvProcessGpuRtLibrary::createLoadDwordAtAddrWithType(Function *func, Type *loadTy,
+                                                             SPIRAddressSpace addressSpace) {
   auto argIt = func->arg_begin();
 
   Value *gpuLowAddr = m_builder->CreateLoad(m_builder->getInt32Ty(), argIt++);
@@ -321,7 +369,7 @@ void SpirvProcessGpuRtLibrary::createLoadDwordAtAddrWithType(Function *func, Typ
   gpuHighAddr = m_builder->CreateShl(gpuHighAddr, m_builder->getInt64(32));
   Value *gpuAddr = m_builder->CreateOr(gpuLowAddr, gpuHighAddr);
 
-  Type *gpuAddrAsPtrTy = PointerType::get(m_builder->getContext(), SPIRAS_Global);
+  Type *gpuAddrAsPtrTy = PointerType::get(m_builder->getContext(), addressSpace);
   auto gpuAddrAsPtr = m_builder->CreateIntToPtr(gpuAddr, gpuAddrAsPtrTy);
 
   // Create GEP to get the byte address with byte offset
@@ -740,10 +788,8 @@ void SpirvProcessGpuRtLibrary::createContStackLoad(llvm::Function *func) {
 //
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createContStackStore(llvm::Function *func) {
-  MDNode *storeTypeMeta = func->getMetadata(gSPIRVMD::ContStackStoreType);
-  assert(storeTypeMeta);
-  const auto constMD = cast<ConstantAsMetadata>(storeTypeMeta->getOperand(0));
-  auto dataType = constMD->getType();
+  unsigned dataArgIndex = func->arg_size() - 1;
+  Type *dataType = getFuncArgPtrElementType(func, dataArgIndex);
 
   auto addr = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(0));
   auto data = m_builder->CreateLoad(dataType, func->getArg(1));

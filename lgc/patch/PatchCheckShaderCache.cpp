@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -90,13 +90,13 @@ bool PatchCheckShaderCache::runImpl(Module &module, PipelineState *pipelineState
 
   Patch::init(&module);
 
-  std::string inOutUsageStreams[ShaderStageGfxCount];
-  ArrayRef<uint8_t> inOutUsageValues[ShaderStageGfxCount];
+  std::string inOutUsageStreams[ShaderStage::GfxCount];
+  ArrayRef<uint8_t> inOutUsageValues[ShaderStage::GfxCount];
   auto stageMask = pipelineState->getShaderStageMask();
 
   // Build input/output layout hash per shader stage
-  for (const ShaderStage stage : enumRange(ShaderStageGfxCount)) {
-    if ((stageMask & shaderStageToMask(stage)) == 0)
+  for (const ShaderStageEnum stage : enumRange(ShaderStage::GfxCount)) {
+    if (!stageMask.contains(stage))
       continue;
 
     auto resUsage = pipelineState->getShaderResourceUsage(stage);
@@ -116,11 +116,11 @@ bool PatchCheckShaderCache::runImpl(Module &module, PipelineState *pipelineState
     streamMapEntries(resUsage->inOutUsage.perPrimitiveBuiltInInputLocMap, stream);
     streamMapEntries(resUsage->inOutUsage.perPrimitiveBuiltInOutputLocMap, stream);
 
-    if (stage == ShaderStageGeometry) {
+    if (stage == ShaderStage::Geometry) {
       // NOTE: For geometry shader, copy shader will use this special map info (from built-in outputs to
       // locations of generic outputs). We have to add it to shader hash calculation.
       streamMapEntries(resUsage->inOutUsage.gs.builtInOutLocs, stream);
-    } else if (stage == ShaderStageMesh) {
+    } else if (stage == ShaderStage::Mesh) {
       // NOTE: For mesh shader, those two special map info (from built-in IDs to export locations of vertex/primitive
       // attributes) is used to export vertex/primitive attributes.
       streamMapEntries(resUsage->inOutUsage.mesh.builtInExportLocs, stream);
@@ -134,7 +134,7 @@ bool PatchCheckShaderCache::runImpl(Module &module, PipelineState *pipelineState
   }
 
   // Ask callback function if it wants to remove any shader stages.
-  unsigned stagesLeftToCompile = m_callbackFunc(&module, stageMask, inOutUsageValues);
+  auto stagesLeftToCompile = m_callbackFunc(&module, stageMask, inOutUsageValues);
   if (stagesLeftToCompile == stageMask)
     return false;
 
@@ -144,7 +144,7 @@ bool PatchCheckShaderCache::runImpl(Module &module, PipelineState *pipelineState
   for (auto &func : module) {
     if (isShaderEntryPoint(&func)) {
       auto stage = getShaderStage(&func);
-      if (stage != ShaderStageInvalid && (shaderStageToMask(stage) & ~stagesLeftToCompile) != 0) {
+      if (stage && !stagesLeftToCompile.contains(stage.value())) {
         func.deleteBody();
         func.setDLLStorageClass(GlobalValue::DefaultStorageClass);
       }

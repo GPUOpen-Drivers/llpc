@@ -12,7 +12,7 @@ declare !types !3 void @_AmdValueSetI32(%struct.Payload*, i32, i32)
 
 define i32 @count(%struct.Payload* %pl) !types !0 {
 ; CHECK-LABEL: define i32 @count
-; CHECK-SAME: (ptr [[PL:%.*]]) !types !0 {
+; CHECK-SAME: (ptr [[PL:%.*]]) !types [[META0:![0-9]+]] {
 ; CHECK-NEXT:    ret i32 5
 ;
   %val = call i32 @_AmdValueI32Count(%struct.Payload* %pl)
@@ -21,7 +21,7 @@ define i32 @count(%struct.Payload* %pl) !types !0 {
 
 define i32 @get(%struct.Payload* %pl) !types !0 {
 ; CHECK-LABEL: define i32 @get
-; CHECK-SAME: (ptr [[PL:%.*]]) !types !0 {
+; CHECK-SAME: (ptr [[PL:%.*]]) !types [[META0]] {
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i32, ptr [[PL]], i32 2
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr [[TMP1]], align 4
 ; CHECK-NEXT:    ret i32 [[TMP2]]
@@ -32,7 +32,7 @@ define i32 @get(%struct.Payload* %pl) !types !0 {
 
 define void @set(%struct.Payload* %pl, i32 %val) !types !4 {
 ; CHECK-LABEL: define void @set
-; CHECK-SAME: (ptr [[PL:%.*]], i32 [[VAL:%.*]]) !types !2 {
+; CHECK-SAME: (ptr [[PL:%.*]], i32 [[VAL:%.*]]) !types [[META2:![0-9]+]] {
 ; CHECK-NEXT:    [[TMP1:%.*]] = getelementptr i32, ptr [[PL]], i32 2
 ; CHECK-NEXT:    store i32 [[VAL]], ptr [[TMP1]], align 4
 ; CHECK-NEXT:    ret void

@@ -927,6 +927,11 @@ inline bool isValid(spv::Op V) {
   case OpRayQueryGetIntersectionObjectToWorldKHR:
   case OpRayQueryGetIntersectionWorldToObjectKHR:
   case OpRayQueryGetIntersectionTriangleVertexPositionsKHR:
+  case OpTypeCooperativeMatrixKHR:
+  case OpCooperativeMatrixLoadKHR:
+  case OpCooperativeMatrixStoreKHR:
+  case OpCooperativeMatrixMulAddKHR:
+  case OpCooperativeMatrixLengthKHR:
     return true;
   default:
     return false;

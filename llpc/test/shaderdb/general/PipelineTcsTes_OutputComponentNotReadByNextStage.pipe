@@ -1,0 +1,78 @@
+; This test is to check location/component mapping of a TCS output which is not used by TES but is treated as active
+; and is kept since it is read by TCS itself.
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+
+; SHADERTEST-LABEL: LLPC location input/output mapping results (TES)
+; SHADERTEST: (TES) Input:  [location, component] = [0, 0]  =>  Mapped = [0, 0]
+; SHADERTEST: (TES) Input:  [location, component] = [1, 0]  =>  Mapped = [1, 0]
+; SHADERTEST: (TES) Input:  [location, component] = [2, 1]  =>  Mapped = [2, 1]
+; SHADERTEST: (TES) Input:  locations = 3
+
+; SHADERTEST-LABEL: LLPC location input/output mapping results (TCS)
+; SHADERTEST: (TCS) Output: [location, component] = [0, 0]  =>  Mapped = [0, 0]
+; SHADERTEST: (TCS) Output: [location, component] = [1, 0]  =>  Mapped = [1, 0]
+; SHADERTEST: (TCS) Output: [location, component] = [2, 0]  =>  Mapped = [2, 0]
+; SHADERTEST: (TCS) Output: [location, component] = [2, 1]  =>  Mapped = [2, 1]
+; SHADERTEST: (TCS) Output: locations = 3
+
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+[TcsGlsl]
+#version 450 core
+
+layout(vertices = 3) out;
+
+layout(location = 0) out vec4 f0[];
+layout(location = 1) out vec4 f1[];
+layout(location = 2, component = 0) out float f2_0[]; // f2_0 is treated as active even if it is not read by TES
+layout(location = 2, component = 1) out float f2_1[];
+
+void main (void)
+{
+    f0[gl_InvocationID] = vec4(0.0);
+    f1[gl_InvocationID] = vec4(1.0);
+
+    f2_0[gl_InvocationID] = 2.0;
+    f2_1[gl_InvocationID] = 3.0;
+
+    barrier();
+
+    f2_0[gl_InvocationID] += f2_0[gl_InvocationID + 1]; // f2_0 is read by TCS
+
+    gl_TessLevelInner[0] = 1.0;
+    gl_TessLevelInner[1] = 1.0;
+    gl_TessLevelOuter[0] = 1.0;
+    gl_TessLevelOuter[1] = 1.0;
+    gl_TessLevelOuter[2] = 1.0;
+    gl_TessLevelOuter[3] = 2.0;
+}
+
+[TcsInfo]
+entryPoint = main
+
+[TesGlsl]
+#version 450 core
+
+layout(triangles) in;
+
+layout(location = 0) in vec4 f0[];
+layout(location = 1) in vec4 f1[];
+layout(location = 2, component = 1) in float f2_1[];
+
+layout(location = 0) out vec4 outColor;
+
+void main()
+{
+    outColor = f0[0];
+    outColor += f1[1];
+    outColor.x += f2_1[2];
+}
+
+[TesInfo]
+entryPoint = main
+
+[GraphicsPipelineState]
+patchControlPoints = 3

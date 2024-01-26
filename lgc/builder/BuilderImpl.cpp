@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -256,7 +256,8 @@ bool BuilderImpl::supportDppRowXmask() const {
 bool BuilderImpl::supportWaveWideBPermute() const {
   auto gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion().major;
   auto supportBPermute = gfxIp == 8 || gfxIp == 9;
-  auto waveSize = getPipelineState()->getShaderWaveSize(getShaderStage(GetInsertBlock()->getParent()));
+  auto shaderStage = getShaderStage(GetInsertBlock()->getParent());
+  auto waveSize = getPipelineState()->getShaderWaveSize(shaderStage.value());
   supportBPermute = supportBPermute || (gfxIp >= 10 && waveSize == 32);
   return supportBPermute;
 }
@@ -271,7 +272,8 @@ bool BuilderImpl::supportPermLaneDpp() const {
 // Get whether the context we are building in supports permute lane 64 DPP operations.
 bool BuilderImpl::supportPermLane64Dpp() const {
   auto gfxip = getPipelineState()->getTargetInfo().getGfxIpVersion().major;
-  auto waveSize = getPipelineState()->getShaderWaveSize(getShaderStage(GetInsertBlock()->getParent()));
+  auto shaderStage = getShaderStage(GetInsertBlock()->getParent());
+  auto waveSize = getPipelineState()->getShaderWaveSize(shaderStage.value());
   return gfxip >= 11 && waveSize == 64;
 }
 
@@ -793,7 +795,7 @@ Value *BuilderImpl::scalarize(Value *value0, Value *value1, Value *value2,
 // and thus on the shader stage it is used from.
 Value *BuilderImpl::CreateGetLaneNumber() {
   Value *result = CreateIntrinsic(Intrinsic::amdgcn_mbcnt_lo, {}, {getInt32(-1), getInt32(0)});
-  if (getPipelineState()->getShaderWaveSize(m_shaderStage) == 64)
+  if (getPipelineState()->getShaderWaveSize(m_shaderStage.value()) == 64)
     result = CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {getInt32(-1), result});
   return result;
 }

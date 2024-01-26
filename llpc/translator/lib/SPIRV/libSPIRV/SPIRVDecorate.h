@@ -189,10 +189,15 @@ public:
   _SPIRV_DCL_DECODE
   // Move the given decorates to the decoration group
   void takeDecorates(SPIRVDecorateVec &Decs) {
-    Decorations = std::move(Decs);
-    for (auto &I : Decorations)
-      const_cast<SPIRVDecorateGeneric *>(I)->setOwner(this);
-    Decs.clear();
+    for (SPIRVDecorateVec::const_iterator Dec = Decs.begin(); Dec != Decs.end();) {
+      if ((*Dec)->getTargetId() == Id) {
+        (*Dec)->setOwner(this);
+        Decorations.push_back(*Dec);
+        Dec = Decs.erase(Dec); // Remove the decoration from original collection
+      } else {
+        ++Dec;
+      }
+    }
   }
 
   SPIRVDecorateVec &getDecorations() { return Decorations; }

@@ -36,358 +36,168 @@ define void @simple_await_entry(<4 x i32> %arg, <4 x i32> addrspace(1)* %mem) !c
 !2 = !{i32 30}
 !3 = !{i32 21}
 ; CLEANUP-LABEL: define void @simple_await(
-; CLEANUP-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], <4 x i32> [[ARG:%.*]]) !continuation.registercount !2 !continuation !3 !continuation.state !4 !continuation.stacksize !4 {
+; CLEANUP-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], <4 x i32> [[ARG:%.*]]) !continuation.registercount [[META2:![0-9]+]] !continuation [[META3:![0-9]+]] !continuation.state [[META4:![0-9]+]] !continuation.stacksize [[META4]] {
 ; CLEANUP-NEXT:  AllocaSpillBB:
-; CLEANUP-NEXT:    [[CONT_STATE:%.*]] = alloca [6 x i32], align 4
-; CLEANUP-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr [[CONT_STATE]], i32 0, i32 0
-; CLEANUP-NEXT:    store <4 x i32> [[ARG]], ptr [[ARG_SPILL_ADDR]], align 4
-; CLEANUP-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr [[CONT_STATE]], i32 0, i32 1
-; CLEANUP-NEXT:    store i64 [[RETURNADDR]], ptr [[RETURNADDR_SPILL_ADDR]], align 4
 ; CLEANUP-NEXT:    [[TMP0:%.*]] = call ptr @continuation.getContinuationStackOffset()
 ; CLEANUP-NEXT:    [[TMP1:%.*]] = load i32, ptr [[TMP0]], align 4
-; CLEANUP-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], 24
-; CLEANUP-NEXT:    store i32 [[TMP2]], ptr [[TMP0]], align 4
-; CLEANUP-NEXT:    [[TMP3:%.*]] = inttoptr i32 [[TMP1]] to ptr addrspace(21)
-; CLEANUP-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 0
-; CLEANUP-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 0
-; CLEANUP-NEXT:    [[TMP6:%.*]] = load i32, ptr [[TMP4]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP6]], ptr addrspace(21) [[TMP5]], align 4
-; CLEANUP-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 1
-; CLEANUP-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 1
-; CLEANUP-NEXT:    [[TMP9:%.*]] = load i32, ptr [[TMP7]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP9]], ptr addrspace(21) [[TMP8]], align 4
-; CLEANUP-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 2
-; CLEANUP-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 2
-; CLEANUP-NEXT:    [[TMP12:%.*]] = load i32, ptr [[TMP10]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP12]], ptr addrspace(21) [[TMP11]], align 4
-; CLEANUP-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 3
-; CLEANUP-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 3
-; CLEANUP-NEXT:    [[TMP15:%.*]] = load i32, ptr [[TMP13]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP15]], ptr addrspace(21) [[TMP14]], align 4
-; CLEANUP-NEXT:    [[TMP16:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 4
-; CLEANUP-NEXT:    [[TMP17:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 4
-; CLEANUP-NEXT:    [[TMP18:%.*]] = load i32, ptr [[TMP16]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP18]], ptr addrspace(21) [[TMP17]], align 4
-; CLEANUP-NEXT:    [[TMP19:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 5
-; CLEANUP-NEXT:    [[TMP20:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 5
-; CLEANUP-NEXT:    [[TMP21:%.*]] = load i32, ptr [[TMP19]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP21]], ptr addrspace(21) [[TMP20]], align 4
-; CLEANUP-NEXT:    [[TMP22:%.*]] = call ptr @continuation.getContinuationStackOffset()
-; CLEANUP-NEXT:    [[TMP23:%.*]] = load i32, ptr [[TMP22]], align 4
-; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i32 [[TMP23]], i64 ptrtoint (ptr @simple_await.resume.0 to i64)), !continuation.registercount !2, !continuation.returnedRegistercount !2
+; CLEANUP-NEXT:    [[TMP2:%.*]] = inttoptr i32 [[TMP1]] to ptr addrspace(21)
+; CLEANUP-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP2]], i64 0
+; CLEANUP-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr addrspace(21) [[TMP3]], i32 0, i32 0
+; CLEANUP-NEXT:    store <4 x i32> [[ARG]], ptr addrspace(21) [[ARG_SPILL_ADDR]], align 4
+; CLEANUP-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr addrspace(21) [[TMP3]], i32 0, i32 1
+; CLEANUP-NEXT:    store i64 [[RETURNADDR]], ptr addrspace(21) [[RETURNADDR_SPILL_ADDR]], align 4
+; CLEANUP-NEXT:    [[TMP4:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CLEANUP-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP4]], align 4
+; CLEANUP-NEXT:    [[TMP6:%.*]] = add i32 [[TMP5]], 24
+; CLEANUP-NEXT:    store i32 [[TMP6]], ptr [[TMP4]], align 4
+; CLEANUP-NEXT:    [[TMP7:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CLEANUP-NEXT:    [[TMP8:%.*]] = load i32, ptr [[TMP7]], align 4
+; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i32 [[TMP8]], i64 ptrtoint (ptr @simple_await.resume.0 to i64)), !continuation.registercount [[META2]], !continuation.returnedRegistercount !2
 ; CLEANUP-NEXT:    unreachable
 ;
 ;
 ; CLEANUP-LABEL: define dso_local void @simple_await.resume.0(
-; CLEANUP-SAME: i32 [[TMP0:%.*]]) !continuation.registercount !2 !continuation !3 {
+; CLEANUP-SAME: i32 [[TMP0:%.*]]) !continuation.registercount [[META2]] !continuation [[META3]] {
 ; CLEANUP-NEXT:  entryresume.0:
-; CLEANUP-NEXT:    [[CONT_STATE:%.*]] = alloca [6 x i32], align 4
 ; CLEANUP-NEXT:    [[TMP1:%.*]] = call ptr @continuation.getContinuationStackOffset()
 ; CLEANUP-NEXT:    [[TMP2:%.*]] = load i32, ptr [[TMP1]], align 4
-; CLEANUP-NEXT:    [[TMP3:%.*]] = inttoptr i32 [[TMP2]] to ptr addrspace(21)
-; CLEANUP-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP3]], i64 -24
-; CLEANUP-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP4]], i32 0, i32 0
-; CLEANUP-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 0
-; CLEANUP-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(21) [[TMP5]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP7]], ptr [[TMP6]], align 4
-; CLEANUP-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP4]], i32 0, i32 1
-; CLEANUP-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 1
-; CLEANUP-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(21) [[TMP8]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP10]], ptr [[TMP9]], align 4
-; CLEANUP-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP4]], i32 0, i32 2
-; CLEANUP-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 2
-; CLEANUP-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(21) [[TMP11]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP13]], ptr [[TMP12]], align 4
-; CLEANUP-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP4]], i32 0, i32 3
-; CLEANUP-NEXT:    [[TMP15:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 3
-; CLEANUP-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(21) [[TMP14]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP16]], ptr [[TMP15]], align 4
-; CLEANUP-NEXT:    [[TMP17:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP4]], i32 0, i32 4
-; CLEANUP-NEXT:    [[TMP18:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 4
-; CLEANUP-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(21) [[TMP17]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP19]], ptr [[TMP18]], align 4
-; CLEANUP-NEXT:    [[TMP20:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP4]], i32 0, i32 5
-; CLEANUP-NEXT:    [[TMP21:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 5
-; CLEANUP-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(21) [[TMP20]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP22]], ptr [[TMP21]], align 4
-; CLEANUP-NEXT:    [[TMP23:%.*]] = call ptr @continuation.getContinuationStackOffset()
-; CLEANUP-NEXT:    [[TMP24:%.*]] = load i32, ptr [[TMP23]], align 4
-; CLEANUP-NEXT:    [[TMP25:%.*]] = add i32 [[TMP24]], -24
-; CLEANUP-NEXT:    store i32 [[TMP25]], ptr [[TMP23]], align 4
-; CLEANUP-NEXT:    [[ARG_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr [[CONT_STATE]], i32 0, i32 0
-; CLEANUP-NEXT:    [[ARG_RELOAD:%.*]] = load <4 x i32>, ptr [[ARG_RELOAD_ADDR]], align 4
-; CLEANUP-NEXT:    [[RETURNADDR_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr [[CONT_STATE]], i32 0, i32 1
-; CLEANUP-NEXT:    [[RETURNADDR_RELOAD:%.*]] = load i64, ptr [[RETURNADDR_RELOAD_ADDR]], align 4
-; CLEANUP-NEXT:    [[TMP26:%.*]] = call ptr @continuation.getContinuationStackOffset()
-; CLEANUP-NEXT:    [[TMP27:%.*]] = load i32, ptr [[TMP26]], align 4
-; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR_RELOAD]], i32 [[TMP27]], <4 x i32> [[ARG_RELOAD]]), !continuation.registercount !2
+; CLEANUP-NEXT:    [[TMP3:%.*]] = add i32 [[TMP2]], -24
+; CLEANUP-NEXT:    store i32 [[TMP3]], ptr [[TMP1]], align 4
+; CLEANUP-NEXT:    [[TMP4:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CLEANUP-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP4]], align 4
+; CLEANUP-NEXT:    [[TMP6:%.*]] = inttoptr i32 [[TMP5]] to ptr addrspace(21)
+; CLEANUP-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP6]], i64 0
+; CLEANUP-NEXT:    [[ARG_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr addrspace(21) [[TMP7]], i32 0, i32 0
+; CLEANUP-NEXT:    [[ARG_RELOAD:%.*]] = load <4 x i32>, ptr addrspace(21) [[ARG_RELOAD_ADDR]], align 4
+; CLEANUP-NEXT:    [[RETURNADDR_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr addrspace(21) [[TMP7]], i32 0, i32 1
+; CLEANUP-NEXT:    [[RETURNADDR_RELOAD:%.*]] = load i64, ptr addrspace(21) [[RETURNADDR_RELOAD_ADDR]], align 4
+; CLEANUP-NEXT:    [[TMP8:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CLEANUP-NEXT:    [[TMP9:%.*]] = load i32, ptr [[TMP8]], align 4
+; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR_RELOAD]], i32 [[TMP9]], <4 x i32> [[ARG_RELOAD]]), !continuation.registercount [[META2]]
 ; CLEANUP-NEXT:    unreachable
 ;
 ;
 ; CLEANUP-LABEL: define void @simple_await_entry(
-; CLEANUP-SAME: <4 x i32> [[ARG:%.*]], ptr addrspace(1) [[MEM:%.*]]) !continuation.registercount !2 !continuation.entry !5 !continuation !6 !continuation.state !4 !continuation.stacksize !4 {
+; CLEANUP-SAME: <4 x i32> [[ARG:%.*]], ptr addrspace(1) [[MEM:%.*]]) !continuation.registercount [[META2]] !continuation.entry [[META5:![0-9]+]] !continuation [[META6:![0-9]+]] !continuation.state [[META4]] !continuation.stacksize [[META4]] {
 ; CLEANUP-NEXT:  AllocaSpillBB:
-; CLEANUP-NEXT:    [[CONT_STATE:%.*]] = alloca [6 x i32], align 4
-; CLEANUP-NEXT:    [[MEM_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME:%.*]], ptr [[CONT_STATE]], i32 0, i32 1
-; CLEANUP-NEXT:    store ptr addrspace(1) [[MEM]], ptr [[MEM_SPILL_ADDR]], align 4
-; CLEANUP-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME]], ptr [[CONT_STATE]], i32 0, i32 0
-; CLEANUP-NEXT:    store <4 x i32> [[ARG]], ptr [[ARG_SPILL_ADDR]], align 4
 ; CLEANUP-NEXT:    [[TMP0:%.*]] = call ptr @continuation.getContinuationStackOffset()
 ; CLEANUP-NEXT:    [[TMP1:%.*]] = load i32, ptr [[TMP0]], align 4
-; CLEANUP-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], 24
-; CLEANUP-NEXT:    store i32 [[TMP2]], ptr [[TMP0]], align 4
-; CLEANUP-NEXT:    [[TMP3:%.*]] = inttoptr i32 [[TMP1]] to ptr addrspace(21)
-; CLEANUP-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 0
-; CLEANUP-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 0
-; CLEANUP-NEXT:    [[TMP6:%.*]] = load i32, ptr [[TMP4]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP6]], ptr addrspace(21) [[TMP5]], align 4
-; CLEANUP-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 1
-; CLEANUP-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 1
-; CLEANUP-NEXT:    [[TMP9:%.*]] = load i32, ptr [[TMP7]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP9]], ptr addrspace(21) [[TMP8]], align 4
-; CLEANUP-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 2
-; CLEANUP-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 2
-; CLEANUP-NEXT:    [[TMP12:%.*]] = load i32, ptr [[TMP10]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP12]], ptr addrspace(21) [[TMP11]], align 4
-; CLEANUP-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 3
-; CLEANUP-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 3
-; CLEANUP-NEXT:    [[TMP15:%.*]] = load i32, ptr [[TMP13]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP15]], ptr addrspace(21) [[TMP14]], align 4
-; CLEANUP-NEXT:    [[TMP16:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 4
-; CLEANUP-NEXT:    [[TMP17:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 4
-; CLEANUP-NEXT:    [[TMP18:%.*]] = load i32, ptr [[TMP16]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP18]], ptr addrspace(21) [[TMP17]], align 4
-; CLEANUP-NEXT:    [[TMP19:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 5
-; CLEANUP-NEXT:    [[TMP20:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 5
-; CLEANUP-NEXT:    [[TMP21:%.*]] = load i32, ptr [[TMP19]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP21]], ptr addrspace(21) [[TMP20]], align 4
-; CLEANUP-NEXT:    [[TMP22:%.*]] = call ptr @continuation.getContinuationStackOffset()
-; CLEANUP-NEXT:    [[TMP23:%.*]] = load i32, ptr [[TMP22]], align 4
-; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i32 [[TMP23]], i64 ptrtoint (ptr @simple_await_entry.resume.0 to i64)), !continuation.registercount !2, !continuation.returnedRegistercount !2
+; CLEANUP-NEXT:    [[TMP2:%.*]] = inttoptr i32 [[TMP1]] to ptr addrspace(21)
+; CLEANUP-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP2]], i64 0
+; CLEANUP-NEXT:    [[MEM_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME:%.*]], ptr addrspace(21) [[TMP3]], i32 0, i32 1
+; CLEANUP-NEXT:    store ptr addrspace(1) [[MEM]], ptr addrspace(21) [[MEM_SPILL_ADDR]], align 4
+; CLEANUP-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME]], ptr addrspace(21) [[TMP3]], i32 0, i32 0
+; CLEANUP-NEXT:    store <4 x i32> [[ARG]], ptr addrspace(21) [[ARG_SPILL_ADDR]], align 4
+; CLEANUP-NEXT:    [[TMP4:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CLEANUP-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP4]], align 4
+; CLEANUP-NEXT:    [[TMP6:%.*]] = add i32 [[TMP5]], 24
+; CLEANUP-NEXT:    store i32 [[TMP6]], ptr [[TMP4]], align 4
+; CLEANUP-NEXT:    [[TMP7:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CLEANUP-NEXT:    [[TMP8:%.*]] = load i32, ptr [[TMP7]], align 4
+; CLEANUP-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i32 [[TMP8]], i64 ptrtoint (ptr @simple_await_entry.resume.0 to i64)), !continuation.registercount [[META2]], !continuation.returnedRegistercount !2
 ; CLEANUP-NEXT:    unreachable
 ;
 ;
 ; CLEANUP-LABEL: define dso_local void @simple_await_entry.resume.0(
-; CLEANUP-SAME: i32 [[TMP0:%.*]]) !continuation.registercount !2 !continuation !6 {
+; CLEANUP-SAME: i32 [[TMP0:%.*]]) !continuation.registercount [[META2]] !continuation [[META6]] {
 ; CLEANUP-NEXT:  entryresume.0:
-; CLEANUP-NEXT:    [[CONT_STATE:%.*]] = alloca [6 x i32], align 4
 ; CLEANUP-NEXT:    [[TMP1:%.*]] = call ptr @continuation.getContinuationStackOffset()
 ; CLEANUP-NEXT:    [[TMP2:%.*]] = load i32, ptr [[TMP1]], align 4
-; CLEANUP-NEXT:    [[TMP3:%.*]] = inttoptr i32 [[TMP2]] to ptr addrspace(21)
-; CLEANUP-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP3]], i64 -24
-; CLEANUP-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP4]], i32 0, i32 0
-; CLEANUP-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 0
-; CLEANUP-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(21) [[TMP5]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP7]], ptr [[TMP6]], align 4
-; CLEANUP-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP4]], i32 0, i32 1
-; CLEANUP-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 1
-; CLEANUP-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(21) [[TMP8]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP10]], ptr [[TMP9]], align 4
-; CLEANUP-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP4]], i32 0, i32 2
-; CLEANUP-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 2
-; CLEANUP-NEXT:    [[TMP13:%.*]] = load i32, ptr addrspace(21) [[TMP11]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP13]], ptr [[TMP12]], align 4
-; CLEANUP-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP4]], i32 0, i32 3
-; CLEANUP-NEXT:    [[TMP15:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 3
-; CLEANUP-NEXT:    [[TMP16:%.*]] = load i32, ptr addrspace(21) [[TMP14]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP16]], ptr [[TMP15]], align 4
-; CLEANUP-NEXT:    [[TMP17:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP4]], i32 0, i32 4
-; CLEANUP-NEXT:    [[TMP18:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 4
-; CLEANUP-NEXT:    [[TMP19:%.*]] = load i32, ptr addrspace(21) [[TMP17]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP19]], ptr [[TMP18]], align 4
-; CLEANUP-NEXT:    [[TMP20:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP4]], i32 0, i32 5
-; CLEANUP-NEXT:    [[TMP21:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 5
-; CLEANUP-NEXT:    [[TMP22:%.*]] = load i32, ptr addrspace(21) [[TMP20]], align 4
-; CLEANUP-NEXT:    store i32 [[TMP22]], ptr [[TMP21]], align 4
-; CLEANUP-NEXT:    [[TMP23:%.*]] = call ptr @continuation.getContinuationStackOffset()
-; CLEANUP-NEXT:    [[TMP24:%.*]] = load i32, ptr [[TMP23]], align 4
-; CLEANUP-NEXT:    [[TMP25:%.*]] = add i32 [[TMP24]], -24
-; CLEANUP-NEXT:    store i32 [[TMP25]], ptr [[TMP23]], align 4
-; CLEANUP-NEXT:    [[MEM_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME:%.*]], ptr [[CONT_STATE]], i32 0, i32 1
-; CLEANUP-NEXT:    [[MEM_RELOAD:%.*]] = load ptr addrspace(1), ptr [[MEM_RELOAD_ADDR]], align 4
-; CLEANUP-NEXT:    [[ARG_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME]], ptr [[CONT_STATE]], i32 0, i32 0
-; CLEANUP-NEXT:    [[ARG_RELOAD:%.*]] = load <4 x i32>, ptr [[ARG_RELOAD_ADDR]], align 4
+; CLEANUP-NEXT:    [[TMP3:%.*]] = add i32 [[TMP2]], -24
+; CLEANUP-NEXT:    store i32 [[TMP3]], ptr [[TMP1]], align 4
+; CLEANUP-NEXT:    [[TMP4:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CLEANUP-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP4]], align 4
+; CLEANUP-NEXT:    [[TMP6:%.*]] = inttoptr i32 [[TMP5]] to ptr addrspace(21)
+; CLEANUP-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP6]], i64 0
+; CLEANUP-NEXT:    [[MEM_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME:%.*]], ptr addrspace(21) [[TMP7]], i32 0, i32 1
+; CLEANUP-NEXT:    [[MEM_RELOAD:%.*]] = load ptr addrspace(1), ptr addrspace(21) [[MEM_RELOAD_ADDR]], align 4
+; CLEANUP-NEXT:    [[ARG_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME]], ptr addrspace(21) [[TMP7]], i32 0, i32 0
+; CLEANUP-NEXT:    [[ARG_RELOAD:%.*]] = load <4 x i32>, ptr addrspace(21) [[ARG_RELOAD_ADDR]], align 4
 ; CLEANUP-NEXT:    store <4 x i32> [[ARG_RELOAD]], ptr addrspace(1) [[MEM_RELOAD]], align 4
 ; CLEANUP-NEXT:    call void @continuation.complete()
 ; CLEANUP-NEXT:    unreachable
 ;
 ;
 ; POST-PROCESS-LABEL: define void @simple_await(
-; POST-PROCESS-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], <4 x i32> [[ARG:%.*]]) !continuation.registercount !2 !continuation !3 !continuation.state !4 !continuation.stacksize !4 {
+; POST-PROCESS-SAME: i32 [[CSPINIT:%.*]], i64 [[RETURNADDR:%.*]], <4 x i32> [[ARG:%.*]]) !continuation.registercount [[META2:![0-9]+]] !continuation [[META3:![0-9]+]] !continuation.state [[META4:![0-9]+]] !continuation.stacksize [[META4]] {
 ; POST-PROCESS-NEXT:  AllocaSpillBB:
-; POST-PROCESS-NEXT:    [[CONT_STATE:%.*]] = alloca [6 x i32], align 4
 ; POST-PROCESS-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; POST-PROCESS-NEXT:    store i32 [[CSPINIT]], ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr [[CONT_STATE]], i32 0, i32 0
-; POST-PROCESS-NEXT:    store <4 x i32> [[ARG]], ptr [[ARG_SPILL_ADDR]], align 4
-; POST-PROCESS-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr [[CONT_STATE]], i32 0, i32 1
-; POST-PROCESS-NEXT:    store i64 [[RETURNADDR]], ptr [[RETURNADDR_SPILL_ADDR]], align 4
 ; POST-PROCESS-NEXT:    [[TMP0:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[TMP1:%.*]] = add i32 [[TMP0]], 24
-; POST-PROCESS-NEXT:    store i32 [[TMP1]], ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[TMP2:%.*]] = inttoptr i32 [[TMP0]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 0
-; POST-PROCESS-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP2]], i32 0, i32 0
-; POST-PROCESS-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP3]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP5]], ptr addrspace(21) [[TMP4]], align 4
-; POST-PROCESS-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 1
-; POST-PROCESS-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP2]], i32 0, i32 1
-; POST-PROCESS-NEXT:    [[TMP8:%.*]] = load i32, ptr [[TMP6]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP8]], ptr addrspace(21) [[TMP7]], align 4
-; POST-PROCESS-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 2
-; POST-PROCESS-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP2]], i32 0, i32 2
-; POST-PROCESS-NEXT:    [[TMP11:%.*]] = load i32, ptr [[TMP9]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP11]], ptr addrspace(21) [[TMP10]], align 4
-; POST-PROCESS-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 3
-; POST-PROCESS-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP2]], i32 0, i32 3
-; POST-PROCESS-NEXT:    [[TMP14:%.*]] = load i32, ptr [[TMP12]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP14]], ptr addrspace(21) [[TMP13]], align 4
-; POST-PROCESS-NEXT:    [[TMP15:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 4
-; POST-PROCESS-NEXT:    [[TMP16:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP2]], i32 0, i32 4
-; POST-PROCESS-NEXT:    [[TMP17:%.*]] = load i32, ptr [[TMP15]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP17]], ptr addrspace(21) [[TMP16]], align 4
-; POST-PROCESS-NEXT:    [[TMP18:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 5
-; POST-PROCESS-NEXT:    [[TMP19:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP2]], i32 0, i32 5
-; POST-PROCESS-NEXT:    [[TMP20:%.*]] = load i32, ptr [[TMP18]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP20]], ptr addrspace(21) [[TMP19]], align 4
-; POST-PROCESS-NEXT:    [[TMP21:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[TMP22:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @async_fun to i64))
-; POST-PROCESS-NEXT:    [[TMP23:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @simple_await.resume.0 to i64))
-; POST-PROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 [[TMP22]], i32 [[TMP21]], i64 [[TMP23]]), !continuation.registercount !2, !continuation.returnedRegistercount !2
+; POST-PROCESS-NEXT:    [[TMP1:%.*]] = inttoptr i32 [[TMP0]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP2:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP1]], i64 0
+; POST-PROCESS-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr addrspace(21) [[TMP2]], i32 0, i32 0
+; POST-PROCESS-NEXT:    store <4 x i32> [[ARG]], ptr addrspace(21) [[ARG_SPILL_ADDR]], align 4
+; POST-PROCESS-NEXT:    [[RETURNADDR_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr addrspace(21) [[TMP2]], i32 0, i32 1
+; POST-PROCESS-NEXT:    store i64 [[RETURNADDR]], ptr addrspace(21) [[RETURNADDR_SPILL_ADDR]], align 4
+; POST-PROCESS-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CSP]], align 4
+; POST-PROCESS-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], 24
+; POST-PROCESS-NEXT:    store i32 [[TMP4]], ptr [[CSP]], align 4
+; POST-PROCESS-NEXT:    [[TMP5:%.*]] = load i32, ptr [[CSP]], align 4
+; POST-PROCESS-NEXT:    [[TMP6:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @async_fun to i64))
+; POST-PROCESS-NEXT:    [[TMP7:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @simple_await.resume.0 to i64))
+; POST-PROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 [[TMP6]], i32 [[TMP5]], i64 [[TMP7]]), !continuation.registercount [[META2]], !continuation.returnedRegistercount !2
 ; POST-PROCESS-NEXT:    unreachable
 ;
 ;
 ; POST-PROCESS-LABEL: define dso_local void @simple_await.resume.0(
-; POST-PROCESS-SAME: i32 [[TMP0:%.*]]) !continuation.registercount !2 !continuation !3 {
+; POST-PROCESS-SAME: i32 [[TMP0:%.*]]) !continuation.registercount [[META2]] !continuation [[META3]] {
 ; POST-PROCESS-NEXT:  entryresume.0:
-; POST-PROCESS-NEXT:    [[CONT_STATE:%.*]] = alloca [6 x i32], align 4
 ; POST-PROCESS-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; POST-PROCESS-NEXT:    store i32 [[TMP0]], ptr [[CSP]], align 4
 ; POST-PROCESS-NEXT:    [[TMP1:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[TMP2:%.*]] = inttoptr i32 [[TMP1]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP2]], i64 -24
-; POST-PROCESS-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 0
-; POST-PROCESS-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 0
-; POST-PROCESS-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(21) [[TMP4]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP6]], ptr [[TMP5]], align 4
-; POST-PROCESS-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 1
-; POST-PROCESS-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 1
-; POST-PROCESS-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(21) [[TMP7]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP9]], ptr [[TMP8]], align 4
-; POST-PROCESS-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 2
-; POST-PROCESS-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 2
-; POST-PROCESS-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(21) [[TMP10]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP12]], ptr [[TMP11]], align 4
-; POST-PROCESS-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 3
-; POST-PROCESS-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 3
-; POST-PROCESS-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(21) [[TMP13]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP15]], ptr [[TMP14]], align 4
-; POST-PROCESS-NEXT:    [[TMP16:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 4
-; POST-PROCESS-NEXT:    [[TMP17:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 4
-; POST-PROCESS-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(21) [[TMP16]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP18]], ptr [[TMP17]], align 4
-; POST-PROCESS-NEXT:    [[TMP19:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 5
-; POST-PROCESS-NEXT:    [[TMP20:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 5
-; POST-PROCESS-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(21) [[TMP19]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP21]], ptr [[TMP20]], align 4
-; POST-PROCESS-NEXT:    [[TMP22:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[TMP23:%.*]] = add i32 [[TMP22]], -24
-; POST-PROCESS-NEXT:    store i32 [[TMP23]], ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[ARG_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr [[CONT_STATE]], i32 0, i32 0
-; POST-PROCESS-NEXT:    [[ARG_RELOAD:%.*]] = load <4 x i32>, ptr [[ARG_RELOAD_ADDR]], align 4
-; POST-PROCESS-NEXT:    [[RETURNADDR_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr [[CONT_STATE]], i32 0, i32 1
-; POST-PROCESS-NEXT:    [[RETURNADDR_RELOAD:%.*]] = load i64, ptr [[RETURNADDR_RELOAD_ADDR]], align 4
-; POST-PROCESS-NEXT:    [[TMP24:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR_RELOAD]], i32 [[TMP24]], <4 x i32> [[ARG_RELOAD]]), !continuation.registercount !2
+; POST-PROCESS-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], -24
+; POST-PROCESS-NEXT:    store i32 [[TMP2]], ptr [[CSP]], align 4
+; POST-PROCESS-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CSP]], align 4
+; POST-PROCESS-NEXT:    [[TMP4:%.*]] = inttoptr i32 [[TMP3]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP4]], i64 0
+; POST-PROCESS-NEXT:    [[ARG_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr addrspace(21) [[TMP5]], i32 0, i32 0
+; POST-PROCESS-NEXT:    [[ARG_RELOAD:%.*]] = load <4 x i32>, ptr addrspace(21) [[ARG_RELOAD_ADDR]], align 4
+; POST-PROCESS-NEXT:    [[RETURNADDR_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME]], ptr addrspace(21) [[TMP5]], i32 0, i32 1
+; POST-PROCESS-NEXT:    [[RETURNADDR_RELOAD:%.*]] = load i64, ptr addrspace(21) [[RETURNADDR_RELOAD_ADDR]], align 4
+; POST-PROCESS-NEXT:    [[TMP6:%.*]] = load i32, ptr [[CSP]], align 4
+; POST-PROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 [[RETURNADDR_RELOAD]], i32 [[TMP6]], <4 x i32> [[ARG_RELOAD]]), !continuation.registercount [[META2]]
 ; POST-PROCESS-NEXT:    unreachable
 ;
 ;
 ; POST-PROCESS-LABEL: define void @simple_await_entry(
-; POST-PROCESS-SAME: <4 x i32> [[ARG:%.*]], ptr addrspace(1) [[MEM:%.*]]) !continuation.registercount !2 !continuation.entry !5 !continuation !6 !continuation.state !4 !continuation.stacksize !4 {
+; POST-PROCESS-SAME: <4 x i32> [[ARG:%.*]], ptr addrspace(1) [[MEM:%.*]]) !continuation.registercount [[META2]] !continuation.entry [[META5:![0-9]+]] !continuation [[META6:![0-9]+]] !continuation.state [[META4]] !continuation.stacksize [[META4]] {
 ; POST-PROCESS-NEXT:  AllocaSpillBB:
-; POST-PROCESS-NEXT:    [[CONT_STATE:%.*]] = alloca [6 x i32], align 4
 ; POST-PROCESS-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; POST-PROCESS-NEXT:    [[TMP0:%.*]] = call i32 @_cont_GetContinuationStackAddr()
 ; POST-PROCESS-NEXT:    store i32 [[TMP0]], ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[MEM_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME:%.*]], ptr [[CONT_STATE]], i32 0, i32 1
-; POST-PROCESS-NEXT:    store ptr addrspace(1) [[MEM]], ptr [[MEM_SPILL_ADDR]], align 4
-; POST-PROCESS-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME]], ptr [[CONT_STATE]], i32 0, i32 0
-; POST-PROCESS-NEXT:    store <4 x i32> [[ARG]], ptr [[ARG_SPILL_ADDR]], align 4
 ; POST-PROCESS-NEXT:    [[TMP1:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], 24
-; POST-PROCESS-NEXT:    store i32 [[TMP2]], ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[TMP3:%.*]] = inttoptr i32 [[TMP1]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 0
-; POST-PROCESS-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 0
-; POST-PROCESS-NEXT:    [[TMP6:%.*]] = load i32, ptr [[TMP4]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP6]], ptr addrspace(21) [[TMP5]], align 4
-; POST-PROCESS-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 1
-; POST-PROCESS-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 1
-; POST-PROCESS-NEXT:    [[TMP9:%.*]] = load i32, ptr [[TMP7]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP9]], ptr addrspace(21) [[TMP8]], align 4
-; POST-PROCESS-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 2
-; POST-PROCESS-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 2
-; POST-PROCESS-NEXT:    [[TMP12:%.*]] = load i32, ptr [[TMP10]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP12]], ptr addrspace(21) [[TMP11]], align 4
-; POST-PROCESS-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 3
-; POST-PROCESS-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 3
-; POST-PROCESS-NEXT:    [[TMP15:%.*]] = load i32, ptr [[TMP13]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP15]], ptr addrspace(21) [[TMP14]], align 4
-; POST-PROCESS-NEXT:    [[TMP16:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 4
-; POST-PROCESS-NEXT:    [[TMP17:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 4
-; POST-PROCESS-NEXT:    [[TMP18:%.*]] = load i32, ptr [[TMP16]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP18]], ptr addrspace(21) [[TMP17]], align 4
-; POST-PROCESS-NEXT:    [[TMP19:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 5
-; POST-PROCESS-NEXT:    [[TMP20:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 5
-; POST-PROCESS-NEXT:    [[TMP21:%.*]] = load i32, ptr [[TMP19]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP21]], ptr addrspace(21) [[TMP20]], align 4
-; POST-PROCESS-NEXT:    [[TMP22:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[TMP23:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @async_fun to i64))
-; POST-PROCESS-NEXT:    [[TMP24:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @simple_await_entry.resume.0 to i64))
-; POST-PROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 [[TMP23]], i32 [[TMP22]], i64 [[TMP24]]), !continuation.registercount !2, !continuation.returnedRegistercount !2
+; POST-PROCESS-NEXT:    [[TMP2:%.*]] = inttoptr i32 [[TMP1]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP2]], i64 0
+; POST-PROCESS-NEXT:    [[MEM_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME:%.*]], ptr addrspace(21) [[TMP3]], i32 0, i32 1
+; POST-PROCESS-NEXT:    store ptr addrspace(1) [[MEM]], ptr addrspace(21) [[MEM_SPILL_ADDR]], align 4
+; POST-PROCESS-NEXT:    [[ARG_SPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME]], ptr addrspace(21) [[TMP3]], i32 0, i32 0
+; POST-PROCESS-NEXT:    store <4 x i32> [[ARG]], ptr addrspace(21) [[ARG_SPILL_ADDR]], align 4
+; POST-PROCESS-NEXT:    [[TMP4:%.*]] = load i32, ptr [[CSP]], align 4
+; POST-PROCESS-NEXT:    [[TMP5:%.*]] = add i32 [[TMP4]], 24
+; POST-PROCESS-NEXT:    store i32 [[TMP5]], ptr [[CSP]], align 4
+; POST-PROCESS-NEXT:    [[TMP6:%.*]] = load i32, ptr [[CSP]], align 4
+; POST-PROCESS-NEXT:    [[TMP7:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @async_fun to i64))
+; POST-PROCESS-NEXT:    [[TMP8:%.*]] = call i64 @continuation.getAddrAndMD(i64 ptrtoint (ptr @simple_await_entry.resume.0 to i64))
+; POST-PROCESS-NEXT:    call void (i64, ...) @continuation.continue(i64 [[TMP7]], i32 [[TMP6]], i64 [[TMP8]]), !continuation.registercount [[META2]], !continuation.returnedRegistercount !2
 ; POST-PROCESS-NEXT:    unreachable
 ;
 ;
 ; POST-PROCESS-LABEL: define dso_local void @simple_await_entry.resume.0(
-; POST-PROCESS-SAME: i32 [[TMP0:%.*]]) !continuation.registercount !2 !continuation !6 {
+; POST-PROCESS-SAME: i32 [[TMP0:%.*]]) !continuation.registercount [[META2]] !continuation [[META6]] {
 ; POST-PROCESS-NEXT:  entryresume.0:
-; POST-PROCESS-NEXT:    [[CONT_STATE:%.*]] = alloca [6 x i32], align 4
 ; POST-PROCESS-NEXT:    [[CSP:%.*]] = alloca i32, align 4
 ; POST-PROCESS-NEXT:    store i32 [[TMP0]], ptr [[CSP]], align 4
 ; POST-PROCESS-NEXT:    [[TMP1:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[TMP2:%.*]] = inttoptr i32 [[TMP1]] to ptr addrspace(21)
-; POST-PROCESS-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP2]], i64 -24
-; POST-PROCESS-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 0
-; POST-PROCESS-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 0
-; POST-PROCESS-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(21) [[TMP4]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP6]], ptr [[TMP5]], align 4
-; POST-PROCESS-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 1
-; POST-PROCESS-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 1
-; POST-PROCESS-NEXT:    [[TMP9:%.*]] = load i32, ptr addrspace(21) [[TMP7]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP9]], ptr [[TMP8]], align 4
-; POST-PROCESS-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 2
-; POST-PROCESS-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 2
-; POST-PROCESS-NEXT:    [[TMP12:%.*]] = load i32, ptr addrspace(21) [[TMP10]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP12]], ptr [[TMP11]], align 4
-; POST-PROCESS-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 3
-; POST-PROCESS-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 3
-; POST-PROCESS-NEXT:    [[TMP15:%.*]] = load i32, ptr addrspace(21) [[TMP13]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP15]], ptr [[TMP14]], align 4
-; POST-PROCESS-NEXT:    [[TMP16:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 4
-; POST-PROCESS-NEXT:    [[TMP17:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 4
-; POST-PROCESS-NEXT:    [[TMP18:%.*]] = load i32, ptr addrspace(21) [[TMP16]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP18]], ptr [[TMP17]], align 4
-; POST-PROCESS-NEXT:    [[TMP19:%.*]] = getelementptr inbounds [6 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 5
-; POST-PROCESS-NEXT:    [[TMP20:%.*]] = getelementptr inbounds [6 x i32], ptr [[CONT_STATE]], i32 0, i32 5
-; POST-PROCESS-NEXT:    [[TMP21:%.*]] = load i32, ptr addrspace(21) [[TMP19]], align 4
-; POST-PROCESS-NEXT:    store i32 [[TMP21]], ptr [[TMP20]], align 4
-; POST-PROCESS-NEXT:    [[TMP22:%.*]] = load i32, ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[TMP23:%.*]] = add i32 [[TMP22]], -24
-; POST-PROCESS-NEXT:    store i32 [[TMP23]], ptr [[CSP]], align 4
-; POST-PROCESS-NEXT:    [[MEM_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME:%.*]], ptr [[CONT_STATE]], i32 0, i32 1
-; POST-PROCESS-NEXT:    [[MEM_RELOAD:%.*]] = load ptr addrspace(1), ptr [[MEM_RELOAD_ADDR]], align 4
-; POST-PROCESS-NEXT:    [[ARG_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME]], ptr [[CONT_STATE]], i32 0, i32 0
-; POST-PROCESS-NEXT:    [[ARG_RELOAD:%.*]] = load <4 x i32>, ptr [[ARG_RELOAD_ADDR]], align 4
+; POST-PROCESS-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], -24
+; POST-PROCESS-NEXT:    store i32 [[TMP2]], ptr [[CSP]], align 4
+; POST-PROCESS-NEXT:    [[TMP3:%.*]] = load i32, ptr [[CSP]], align 4
+; POST-PROCESS-NEXT:    [[TMP4:%.*]] = inttoptr i32 [[TMP3]] to ptr addrspace(21)
+; POST-PROCESS-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP4]], i64 0
+; POST-PROCESS-NEXT:    [[MEM_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME:%.*]], ptr addrspace(21) [[TMP5]], i32 0, i32 1
+; POST-PROCESS-NEXT:    [[MEM_RELOAD:%.*]] = load ptr addrspace(1), ptr addrspace(21) [[MEM_RELOAD_ADDR]], align 4
+; POST-PROCESS-NEXT:    [[ARG_RELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_ENTRY_FRAME]], ptr addrspace(21) [[TMP5]], i32 0, i32 0
+; POST-PROCESS-NEXT:    [[ARG_RELOAD:%.*]] = load <4 x i32>, ptr addrspace(21) [[ARG_RELOAD_ADDR]], align 4
 ; POST-PROCESS-NEXT:    store <4 x i32> [[ARG_RELOAD]], ptr addrspace(1) [[MEM_RELOAD]], align 4
 ; POST-PROCESS-NEXT:    call void @continuation.complete()
 ; POST-PROCESS-NEXT:    unreachable

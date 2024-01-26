@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -70,9 +70,9 @@ public:
   llvm::msgpack::MapDocNode getHwShaderNode(Util::Abi::HardwareStage hwStage);
 
 protected:
-  void addApiHwShaderMapping(ShaderStage apiStage, unsigned hwStages);
+  void addApiHwShaderMapping(ShaderStageEnum apiStage, unsigned hwStages);
 
-  unsigned setShaderHash(ShaderStage apiStage);
+  unsigned setShaderHash(ShaderStageEnum apiStage);
   void setNumAvailSgprs(Util::Abi::HardwareStage hwStage, unsigned value);
   void setNumAvailVgprs(Util::Abi::HardwareStage hwStage, unsigned value);
   void setUsesViewportArrayIndex(bool useViewportIndex);
@@ -87,7 +87,7 @@ protected:
   void setNggSubgroupSize(unsigned value);
   void setThreadgroupDimensions(llvm::ArrayRef<unsigned> values);
   void setStreamOutVertexStrides(llvm::ArrayRef<unsigned> values);
-  unsigned setupFloatingPointMode(ShaderStage shaderStage);
+  unsigned setupFloatingPointMode(ShaderStageEnum shaderStage);
 
   void appendConfig(llvm::ArrayRef<PalMetadataNoteEntry> config);
   void appendConfig(unsigned key, unsigned value);
@@ -130,7 +130,7 @@ private:
 
   llvm::msgpack::Document *m_document;      // The MsgPack document
   llvm::msgpack::MapDocNode m_pipelineNode; // MsgPack map node for amdpal.pipelines[0]
-  llvm::msgpack::MapDocNode m_apiShaderNodes[ShaderStageNativeStageCount];
+  llvm::msgpack::MapDocNode m_apiShaderNodes[ShaderStage::NativeStageCount];
   // MsgPack map node for each API shader's node in
   //  ".shaders"
   llvm::msgpack::MapDocNode m_hwShaderNodes[unsigned(Util::Abi::HardwareStage::Count)];

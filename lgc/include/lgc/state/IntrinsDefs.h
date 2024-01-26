@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -78,19 +78,6 @@ static const unsigned CopyShaderEntryArgIdxStreamOffset = 4;
 
 // Entry-point argument index for the LDS offset of current vertices in GS-VS ring
 static const unsigned CopyShaderEntryArgIdxVertexOffset = 8;
-
-// Enumerates address spaces valid for AMD GPU (similar to LLVM header AMDGPU.h)
-enum AddrSpace {
-  ADDR_SPACE_FLAT = 0,               // Flat memory
-  ADDR_SPACE_GLOBAL = 1,             // Global memory
-  ADDR_SPACE_REGION = 2,             // GDS memory
-  ADDR_SPACE_LOCAL = 3,              // Local memory
-  ADDR_SPACE_CONST = 4,              // Constant memory
-  ADDR_SPACE_PRIVATE = 5,            // Private memory
-  ADDR_SPACE_CONST_32BIT = 6,        // Constant 32-bit memory
-  ADDR_SPACE_BUFFER_FAT_POINTER = 7, // Buffer fat-pointer memory
-  ADDR_SPACE_MAX = ADDR_SPACE_BUFFER_FAT_POINTER
-};
 
 // Enumerates the target for "export" instruction.
 enum ExportTarget {

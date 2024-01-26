@@ -447,12 +447,10 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-LABEL: define void @MyRayGen(
-; LOWERRAYTRACINGPIPELINE-SAME: ) #[[ATTR2:[0-9]+]] !lgc.rt.shaderstage [[META23:![0-9]+]] !continuation.entry [[META14:![0-9]+]] !continuation.registercount [[META23]] !continuation [[META35:![0-9]+]] {
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA:%.*]], align 8
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP1:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @continuations.getSystemData.s_struct.DispatchSystemDatas()
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[SYSTEM_DATA_ALLOCA]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
+; LOWERRAYTRACINGPIPELINE-SAME: [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR2:[0-9]+]] !lgc.rt.shaderstage [[META23:![0-9]+]] !continuation.entry [[META14:![0-9]+]] !continuation.registercount [[META23]] !continuation [[META35:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = load [[DX_TYPES_HANDLE]], ptr @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = alloca [[STRUCT_RAYPAYLOAD:%.*]], align 4
@@ -502,8 +500,7 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP33:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP33]], ptr [[TMP32]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP22]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[LOCAL_ROOT_INDEX1:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[SYSTEM_DATA_ALLOCA]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX1]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; LOWERRAYTRACINGPIPELINE-NEXT:    br label [[DOTSPLIT:%.*]]
 ; LOWERRAYTRACINGPIPELINE:       .split:
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP34:%.*]] = load <4 x float>, ptr [[TMP6]], align 4, !tbaa [[TBAA36]]
@@ -528,11 +525,9 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_SYSTEMDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = alloca [[STRUCT_RAYPAYLOAD:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[HITATTRS:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], align 8
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = call [[STRUCT_SYSTEMDATA]] @continuations.getSystemData.s_struct.SystemDatas()
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_SYSTEMDATA]] [[TMP4]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP5]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_SYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP5:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP4]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP3]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP7:%.*]] = getelementptr i32, ptr [[TMP6]], i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP8:%.*]] = getelementptr i32, ptr [[TMP7]], i64 0
@@ -559,6 +554,7 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP22:%.*]] = getelementptr inbounds i32, ptr [[TMP2]], i64 1
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP23:%.*]] = load i32, ptr [[TMP22]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP23]], ptr [[TMP21]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[TMP5]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP24:%.*]] = getelementptr inbounds [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[HITATTRS]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP25:%.*]] = load <2 x float>, ptr [[TMP24]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP26:%.*]] = extractelement <2 x float> [[TMP25]], i32 0
@@ -607,11 +603,9 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP12:%.*]] = alloca [[STRUCT_RAYPAYLOAD:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[ORIGHITATTRS:%.*]] = alloca [8 x i32], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[HITATTRSALLOCA:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], align 8
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP13:%.*]] = call [[STRUCT_ANYHITTRAVERSALDATA]] @continuations.getSystemData.s_struct.AnyHitTraversalDatas()
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP13]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP14]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP13]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP15:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP12]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP16:%.*]] = getelementptr i32, ptr [[TMP15]], i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP17:%.*]] = getelementptr i32, ptr [[TMP16]], i64 0
@@ -640,6 +634,7 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP33:%.*]] = load i32, ptr [[TMP32]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP33]], ptr [[TMP31]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP1]], ptr [[HITATTRSALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[TMP14]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP34:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP12]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP35:%.*]] = load <4 x float>, ptr [[TMP34]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP36:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
@@ -853,11 +848,10 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_ANYHITTRAVERSALDATA]], align 8
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP5:%.*]] = call [[STRUCT_ANYHITTRAVERSALDATA]] @continuations.getSystemData.s_struct.AnyHitTraversalDatas()
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP5]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP6]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP6:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP5]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[TMP6]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP8:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCandidateState(ptr [[SYSTEM_DATA_ALLOCA]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_HITDATA]] [[TMP8]], ptr [[TMP2]], align 4
@@ -876,8 +870,8 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP12:%.*]] = call [[STRUCT_ANYHITTRAVERSALDATA]] @await.struct.AnyHitTraversalData(ptr [[TMP11]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP12]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[LOCAL_ROOT_INDEX1:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP13]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX1]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP13]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    br label [[_CONT_REPORTHIT_EXIT:%.*]]
 ; LOWERRAYTRACINGPIPELINE:       isEnd.i:
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i32, ptr [[TMP4]], i64 0
@@ -911,11 +905,10 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES2:%.*]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_ANYHITTRAVERSALDATA]], align 8
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP5:%.*]] = call [[STRUCT_ANYHITTRAVERSALDATA]] @continuations.getSystemData.s_struct.AnyHitTraversalDatas()
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP5]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP6]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP6:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP5]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[TMP6]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP8:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCandidateState(ptr [[SYSTEM_DATA_ALLOCA]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_HITDATA]] [[TMP8]], ptr [[TMP2]], align 4
@@ -934,8 +927,8 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP12:%.*]] = call [[STRUCT_ANYHITTRAVERSALDATA]] @await.struct.AnyHitTraversalData(ptr [[TMP11]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP12]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[LOCAL_ROOT_INDEX1:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP13]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX1]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP13]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    br label [[_CONT_REPORTHIT_EXIT:%.*]]
 ; LOWERRAYTRACINGPIPELINE:       isEnd.i:
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP14:%.*]] = getelementptr inbounds i32, ptr [[TMP4]], i64 0
@@ -967,11 +960,9 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-SAME: [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR2]] !lgc.rt.shaderstage [[META47:![0-9]+]] !continuation.registercount [[META39]] !continuation [[META48:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_SYSTEMDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_RAYPAYLOAD:%.*]], align 8
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = call [[STRUCT_SYSTEMDATA]] @continuations.getSystemData.s_struct.SystemDatas()
-; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_SYSTEMDATA]] [[TMP3]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP4]])
-; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
+; LOWERRAYTRACINGPIPELINE-NEXT:    store [[STRUCT_SYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP4:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP3]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP2]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP6:%.*]] = getelementptr i32, ptr [[TMP5]], i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP7:%.*]] = getelementptr i32, ptr [[TMP6]], i64 0
@@ -988,6 +979,7 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP15:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_4_MISS_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store i32 [[TMP15]], ptr [[TMP14]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
+; LOWERRAYTRACINGPIPELINE-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[TMP4]])
 ; LOWERRAYTRACINGPIPELINE-NEXT:    [[TMP16:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP2]], i32 0, i32 0
 ; LOWERRAYTRACINGPIPELINE-NEXT:    store <4 x float> <float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 1.000000e+00>, ptr [[TMP16]], align 4
 ; LOWERRAYTRACINGPIPELINE-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
@@ -1061,12 +1053,10 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ;
 ;
 ; LOWERRAYTRACINGPIPELINE-CPS-LABEL: define void @MyRayGen(
-; LOWERRAYTRACINGPIPELINE-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURN_ADDR:%.*]], i32 [[SHADER_INDEX:%.*]]) #[[ATTR2:[0-9]+]] !lgc.rt.shaderstage [[META23:![0-9]+]] !lgc.cps [[META23]] !continuation [[META35:![0-9]+]] {
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA:%.*]], align 8
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP1:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] @continuations.getSystemData.s_struct.DispatchSystemDatas()
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP1]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[SYSTEM_DATA_ALLOCA]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
+; LOWERRAYTRACINGPIPELINE-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURN_ADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_DISPATCHSYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR2:[0-9]+]] !lgc.rt.shaderstage [[META23:![0-9]+]] !lgc.cps [[META23]] !continuation [[META35:![0-9]+]] {
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_DISPATCHSYSTEMDATA]], align 8
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP2:%.*]] = load [[DX_TYPES_HANDLE:%.*]], ptr @"\01?Scene@@3URaytracingAccelerationStructure@@A", align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP3:%.*]] = load [[DX_TYPES_HANDLE]], ptr @"\01?RenderTarget@@3V?$RWTexture2D@V?$vector@M$03@@@@A", align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP4:%.*]] = alloca [[STRUCT_RAYPAYLOAD:%.*]], align 4
@@ -1097,40 +1087,40 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP19:%.*]] = getelementptr i32, ptr [[TMP14]], i64 2
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP20:%.*]] = load i32, ptr [[TMP19]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP20]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_0_CALLER_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP21:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] (...) @lgc.cps.await.s_struct.DispatchSystemDatas(i32 4, i32 4, [[STRUCT_TRAVERSALDATA]] [[TRAV_DATA2_I]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP21:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[SYSTEM_DATA_ALLOCA]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP22:%.*]] = call [[STRUCT_DISPATCHSYSTEMDATA]] (...) @lgc.cps.await.s_struct.DispatchSystemDatas(i32 4, i32 4, i32 [[TMP21]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_RAYPAYLOAD]] poison, ptr [[TMP4]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP22:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP4]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP23:%.*]] = getelementptr i32, ptr [[TMP22]], i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP24:%.*]] = getelementptr i32, ptr [[TMP23]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP25:%.*]] = load i32, ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP25]], ptr [[TMP24]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP26:%.*]] = getelementptr i32, ptr [[TMP22]], i32 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP27:%.*]] = getelementptr i32, ptr [[TMP26]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP28:%.*]] = load i32, ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP28]], ptr [[TMP27]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP29:%.*]] = getelementptr i32, ptr [[TMP26]], i64 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP30:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP30]], ptr [[TMP29]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP31:%.*]] = getelementptr i32, ptr [[TMP26]], i64 2
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP32:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP32]], ptr [[TMP31]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP21]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[LOCAL_ROOT_INDEX1:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[SYSTEM_DATA_ALLOCA]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX1]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP23:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP4]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP24:%.*]] = getelementptr i32, ptr [[TMP23]], i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP25:%.*]] = getelementptr i32, ptr [[TMP24]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP26:%.*]] = load i32, ptr @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP26]], ptr [[TMP25]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP27:%.*]] = getelementptr i32, ptr [[TMP23]], i32 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP28:%.*]] = getelementptr i32, ptr [[TMP27]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP29:%.*]] = load i32, ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP29]], ptr [[TMP28]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP30:%.*]] = getelementptr i32, ptr [[TMP27]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP31:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP31]], ptr [[TMP30]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP32:%.*]] = getelementptr i32, ptr [[TMP27]], i64 2
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP33:%.*]] = load i32, ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP33]], ptr [[TMP32]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP22]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 0)
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    br label [[DOTSPLIT:%.*]]
 ; LOWERRAYTRACINGPIPELINE-CPS:       .split:
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP33:%.*]] = load <4 x float>, ptr [[TMP6]], align 4, !tbaa [[TBAA36]]
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP34:%.*]] = call <3 x i32> @lgc.rt.dispatch.rays.index()
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[EXTRACT:%.*]] = extractelement <3 x i32> [[TMP34]], i8 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP34:%.*]] = load <4 x float>, ptr [[TMP6]], align 4, !tbaa [[TBAA36]]
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP35:%.*]] = call <3 x i32> @lgc.rt.dispatch.rays.index()
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[EXTRACT1:%.*]] = extractelement <3 x i32> [[TMP35]], i8 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP36:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.createHandleForLib.dx.types.Handle(i32 160, [[DX_TYPES_HANDLE]] [[TMP3]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP37:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.annotateHandle(i32 216, [[DX_TYPES_HANDLE]] [[TMP36]], [[DX_TYPES_RESOURCEPROPERTIES]] { i32 4098, i32 1033 })
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP38:%.*]] = extractelement <4 x float> [[TMP33]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP39:%.*]] = extractelement <4 x float> [[TMP33]], i64 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP40:%.*]] = extractelement <4 x float> [[TMP33]], i64 2
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP41:%.*]] = extractelement <4 x float> [[TMP33]], i64 3
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @dx.op.textureStore.f32(i32 67, [[DX_TYPES_HANDLE]] [[TMP37]], i32 [[EXTRACT]], i32 [[EXTRACT1]], i32 undef, float [[TMP38]], float [[TMP39]], float [[TMP40]], float [[TMP41]], i8 15)
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[EXTRACT:%.*]] = extractelement <3 x i32> [[TMP35]], i8 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP36:%.*]] = call <3 x i32> @lgc.rt.dispatch.rays.index()
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[EXTRACT1:%.*]] = extractelement <3 x i32> [[TMP36]], i8 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP37:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.createHandleForLib.dx.types.Handle(i32 160, [[DX_TYPES_HANDLE]] [[TMP3]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP38:%.*]] = call [[DX_TYPES_HANDLE]] @dx.op.annotateHandle(i32 216, [[DX_TYPES_HANDLE]] [[TMP37]], [[DX_TYPES_RESOURCEPROPERTIES]] { i32 4098, i32 1033 })
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP39:%.*]] = extractelement <4 x float> [[TMP34]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP40:%.*]] = extractelement <4 x float> [[TMP34]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP41:%.*]] = extractelement <4 x float> [[TMP34]], i64 2
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP42:%.*]] = extractelement <4 x float> [[TMP34]], i64 3
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @dx.op.textureStore.f32(i32 67, [[DX_TYPES_HANDLE]] [[TMP38]], i32 [[EXTRACT]], i32 [[EXTRACT1]], i32 undef, float [[TMP39]], float [[TMP40]], float [[TMP41]], float [[TMP42]], i8 15)
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @llvm.lifetime.end.p0(i64 16, ptr [[TMP5]]) #[[ATTR1]]
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    ret void
 ;
@@ -1141,52 +1131,49 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_SYSTEMDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP3:%.*]] = alloca [[STRUCT_RAYPAYLOAD:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[HITATTRS:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], align 8
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP4:%.*]] = call [[STRUCT_SYSTEMDATA]] @continuations.getSystemData.s_struct.SystemDatas()
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_SYSTEMDATA]] [[TMP4]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP5]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP6:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @_cont_GetTriangleHitAttributes(ptr [[SYSTEM_DATA_ALLOCA]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP6]], ptr [[TMP2]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP7:%.*]] = getelementptr inbounds i32, ptr [[HITATTRS]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i32, ptr [[TMP2]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP9:%.*]] = load i32, ptr [[TMP8]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP9]], ptr [[TMP7]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP10:%.*]] = getelementptr inbounds i32, ptr [[HITATTRS]], i64 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP11:%.*]] = getelementptr inbounds i32, ptr [[TMP2]], i64 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP12:%.*]] = load i32, ptr [[TMP11]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP12]], ptr [[TMP10]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[HITATTRS]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP14:%.*]] = load <2 x float>, ptr [[TMP13]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP15:%.*]] = extractelement <2 x float> [[TMP14]], i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP16:%.*]] = fsub fast float 1.000000e+00, [[TMP15]]
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP17:%.*]] = extractelement <2 x float> [[TMP14]], i32 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP18:%.*]] = fsub fast float [[TMP16]], [[TMP17]]
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP19:%.*]] = insertelement <4 x float> undef, float [[TMP18]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP20:%.*]] = insertelement <4 x float> [[TMP19]], float [[TMP15]], i64 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP21:%.*]] = insertelement <4 x float> [[TMP20]], float [[TMP17]], i64 2
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP22:%.*]] = insertelement <4 x float> [[TMP21]], float 1.000000e+00, i64 3
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP23:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP3]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store <4 x float> [[TMP22]], ptr [[TMP23]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_SYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP4:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @_cont_GetTriangleHitAttributes(ptr [[SYSTEM_DATA_ALLOCA]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP4]], ptr [[TMP2]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP5:%.*]] = getelementptr inbounds i32, ptr [[HITATTRS]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP6:%.*]] = getelementptr inbounds i32, ptr [[TMP2]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP7:%.*]] = load i32, ptr [[TMP6]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP7]], ptr [[TMP5]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP8:%.*]] = getelementptr inbounds i32, ptr [[HITATTRS]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP9:%.*]] = getelementptr inbounds i32, ptr [[TMP2]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP10:%.*]] = load i32, ptr [[TMP9]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP10]], ptr [[TMP8]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[SHADER_INDEX]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP11:%.*]] = getelementptr inbounds [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[HITATTRS]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP12:%.*]] = load <2 x float>, ptr [[TMP11]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP13:%.*]] = extractelement <2 x float> [[TMP12]], i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP14:%.*]] = fsub fast float 1.000000e+00, [[TMP13]]
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP15:%.*]] = extractelement <2 x float> [[TMP12]], i32 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP16:%.*]] = fsub fast float [[TMP14]], [[TMP15]]
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP17:%.*]] = insertelement <4 x float> undef, float [[TMP16]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP18:%.*]] = insertelement <4 x float> [[TMP17]], float [[TMP13]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP19:%.*]] = insertelement <4 x float> [[TMP18]], float [[TMP15]], i64 2
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP20:%.*]] = insertelement <4 x float> [[TMP19]], float 1.000000e+00, i64 3
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP21:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP3]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store <4 x float> [[TMP20]], ptr [[TMP21]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP24:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP3]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP25:%.*]] = getelementptr i32, ptr [[TMP24]], i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP26:%.*]] = getelementptr i32, ptr [[TMP25]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP27:%.*]] = load i32, ptr [[TMP26]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP27]], ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP28:%.*]] = getelementptr i32, ptr [[TMP24]], i32 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP29:%.*]] = getelementptr i32, ptr [[TMP28]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP22:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP3]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP23:%.*]] = getelementptr i32, ptr [[TMP22]], i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP24:%.*]] = getelementptr i32, ptr [[TMP23]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP25:%.*]] = load i32, ptr [[TMP24]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP25]], ptr @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP26:%.*]] = getelementptr i32, ptr [[TMP22]], i32 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP27:%.*]] = getelementptr i32, ptr [[TMP26]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP28:%.*]] = load i32, ptr [[TMP27]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP28]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP29:%.*]] = getelementptr i32, ptr [[TMP26]], i64 1
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP30:%.*]] = load i32, ptr [[TMP29]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP30]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP31:%.*]] = getelementptr i32, ptr [[TMP28]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP30]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP31:%.*]] = getelementptr i32, ptr [[TMP26]], i64 2
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP32:%.*]] = load i32, ptr [[TMP31]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP32]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP33:%.*]] = getelementptr i32, ptr [[TMP28]], i64 2
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP34:%.*]] = load i32, ptr [[TMP33]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP34]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP35:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP36:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP35]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 6, {} poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP36]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP32]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_5_CLOSESTHIT_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP33:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP34:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP33]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 6, {} poison, i32 poison, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP34]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    unreachable
 ;
 ;
@@ -1205,28 +1192,25 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP12:%.*]] = alloca [[STRUCT_RAYPAYLOAD:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[ORIGHITATTRS:%.*]] = alloca [8 x i32], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[HITATTRSALLOCA:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], align 8
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP13:%.*]] = call [[STRUCT_ANYHITTRAVERSALDATA]] @continuations.getSystemData.s_struct.AnyHitTraversalDatas()
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP13]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP14:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP14]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP15:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP16:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @_cont_GetTriangleHitAttributes(ptr [[TMP15]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP16]], ptr [[TMP11]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP17:%.*]] = getelementptr inbounds i32, ptr [[ORIGHITATTRS]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i32, ptr [[TMP11]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP19:%.*]] = load i32, ptr [[TMP18]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP19]], ptr [[TMP17]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP20:%.*]] = getelementptr inbounds i32, ptr [[ORIGHITATTRS]], i64 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP21:%.*]] = getelementptr inbounds i32, ptr [[TMP11]], i64 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP22:%.*]] = load i32, ptr [[TMP21]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP22]], ptr [[TMP20]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP13:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP14:%.*]] = call [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] @_cont_GetTriangleHitAttributes(ptr [[TMP13]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP14]], ptr [[TMP11]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP15:%.*]] = getelementptr inbounds i32, ptr [[ORIGHITATTRS]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP16:%.*]] = getelementptr inbounds i32, ptr [[TMP11]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP17:%.*]] = load i32, ptr [[TMP16]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP17]], ptr [[TMP15]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP18:%.*]] = getelementptr inbounds i32, ptr [[ORIGHITATTRS]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP19:%.*]] = getelementptr inbounds i32, ptr [[TMP11]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP20:%.*]] = load i32, ptr [[TMP19]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP20]], ptr [[TMP18]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP1]], ptr [[HITATTRSALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP23:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP12]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP24:%.*]] = load <4 x float>, ptr [[TMP23]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP25:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP26:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCandidateState(ptr [[SYSTEM_DATA_ALLOCA]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_HITDATA]] [[TMP26]], ptr [[TMP4]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[SHADER_INDEX]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP21:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP12]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP22:%.*]] = load <4 x float>, ptr [[TMP21]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP23:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP24:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCandidateState(ptr [[SYSTEM_DATA_ALLOCA]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_HITDATA]] [[TMP24]], ptr [[TMP4]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[RES_1_I1:%.*]] = load float, ptr [[TMP4]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[RESPTR_2_I2:%.*]] = getelementptr [[STRUCT_HITDATA]], ptr [[TMP4]], i32 0, i32 0, i32 1
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[RES_2_I3:%.*]] = load float, ptr [[RESPTR_2_I2]], align 4
@@ -1236,9 +1220,9 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[VAL_1_I7:%.*]] = insertelement <3 x float> [[VAL_0_I6]], float [[RES_2_I3]], i32 1
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[VAL_2_I8:%.*]] = insertelement <3 x float> [[VAL_1_I7]], float [[RES_3_I5]], i32 2
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[EXTRACT1:%.*]] = extractelement <3 x float> [[VAL_2_I8]], i8 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP27:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP28:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCandidateState(ptr [[SYSTEM_DATA_ALLOCA]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_HITDATA]] [[TMP28]], ptr [[TMP5]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP25:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP26:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCandidateState(ptr [[SYSTEM_DATA_ALLOCA]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_HITDATA]] [[TMP26]], ptr [[TMP5]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[RESPTR_1_I:%.*]] = getelementptr [[STRUCT_HITDATA]], ptr [[TMP5]], i32 0, i32 1, i32 0
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[RES_1_I:%.*]] = load float, ptr [[RESPTR_1_I]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[RESPTR_2_I:%.*]] = getelementptr [[STRUCT_HITDATA]], ptr [[TMP5]], i32 0, i32 1, i32 1
@@ -1249,188 +1233,188 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[VAL_1_I:%.*]] = insertelement <3 x float> [[VAL_0_I]], float [[RES_2_I]], i32 1
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[VAL_2_I:%.*]] = insertelement <3 x float> [[VAL_1_I]], float [[RES_3_I]], i32 2
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[EXTRACT:%.*]] = extractelement <3 x float> [[VAL_2_I]], i8 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP29:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP30:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCandidateState(ptr [[SYSTEM_DATA_ALLOCA]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_HITDATA]] [[TMP30]], ptr [[TMP3]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP27:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP28:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCandidateState(ptr [[SYSTEM_DATA_ALLOCA]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_HITDATA]] [[TMP28]], ptr [[TMP3]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[RESPTR_I:%.*]] = getelementptr [[STRUCT_HITDATA]], ptr [[TMP3]], i32 0, i32 2
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[RES_I:%.*]] = load float, ptr [[RESPTR_I]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP31:%.*]] = fmul fast float [[RES_I]], [[EXTRACT]]
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP32:%.*]] = fadd fast float [[TMP31]], [[EXTRACT1]]
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP33:%.*]] = fcmp fast ogt float [[TMP32]], 0.000000e+00
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP34:%.*]] = fcmp fast ogt float [[TMP32]], 1.000000e+00
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP35:%.*]] = fcmp fast ogt float [[TMP32]], -1.000000e+00
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    br i1 [[TMP33]], label [[TMP36:%.*]], label [[TMP81:%.*]]
-; LOWERRAYTRACINGPIPELINE-CPS:       36:
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store <4 x float> [[TMP24]], ptr [[TMP23]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    br i1 [[TMP34]], label [[TMP37:%.*]], label [[TMP59:%.*]]
-; LOWERRAYTRACINGPIPELINE-CPS:       37:
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP38:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @_cont_AcceptHitAndEndSearch(ptr [[TMP38]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP29:%.*]] = fmul fast float [[RES_I]], [[EXTRACT]]
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP30:%.*]] = fadd fast float [[TMP29]], [[EXTRACT1]]
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP31:%.*]] = fcmp fast ogt float [[TMP30]], 0.000000e+00
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP32:%.*]] = fcmp fast ogt float [[TMP30]], 1.000000e+00
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP33:%.*]] = fcmp fast ogt float [[TMP30]], -1.000000e+00
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    br i1 [[TMP31]], label [[TMP34:%.*]], label [[TMP79:%.*]]
+; LOWERRAYTRACINGPIPELINE-CPS:       34:
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store <4 x float> [[TMP22]], ptr [[TMP21]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    br i1 [[TMP32]], label [[TMP35:%.*]], label [[TMP57:%.*]]
+; LOWERRAYTRACINGPIPELINE-CPS:       35:
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP36:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @_cont_AcceptHitAndEndSearch(ptr [[TMP36]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP39:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP12]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP40:%.*]] = getelementptr i32, ptr [[TMP39]], i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP41:%.*]] = getelementptr i32, ptr [[TMP40]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP42:%.*]] = load i32, ptr [[TMP41]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP42]], ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP43:%.*]] = getelementptr i32, ptr [[TMP39]], i32 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP44:%.*]] = getelementptr i32, ptr [[TMP43]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP37:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP12]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP38:%.*]] = getelementptr i32, ptr [[TMP37]], i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP39:%.*]] = getelementptr i32, ptr [[TMP38]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP40:%.*]] = load i32, ptr [[TMP39]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP40]], ptr @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP41:%.*]] = getelementptr i32, ptr [[TMP37]], i32 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP42:%.*]] = getelementptr i32, ptr [[TMP41]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP43:%.*]] = load i32, ptr [[TMP42]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP43]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP44:%.*]] = getelementptr i32, ptr [[TMP41]], i64 1
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP45:%.*]] = load i32, ptr [[TMP44]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP45]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP46:%.*]] = getelementptr i32, ptr [[TMP43]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP45]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP46:%.*]] = getelementptr i32, ptr [[TMP41]], i64 2
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP47:%.*]] = load i32, ptr [[TMP46]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP47]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP48:%.*]] = getelementptr i32, ptr [[TMP43]], i64 2
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP49:%.*]] = load i32, ptr [[TMP48]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP49]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP50:%.*]] = getelementptr inbounds i32, ptr [[HITATTRSALLOCA]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP51:%.*]] = getelementptr inbounds i32, ptr [[TMP10]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP52:%.*]] = load i32, ptr [[TMP50]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP52]], ptr [[TMP51]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP53:%.*]] = getelementptr inbounds i32, ptr [[HITATTRSALLOCA]], i64 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP54:%.*]] = getelementptr inbounds i32, ptr [[TMP10]], i64 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP55:%.*]] = load i32, ptr [[TMP53]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP55]], ptr [[TMP54]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP56:%.*]] = load [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[TMP10]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP57:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP57]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP56]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP58:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 18, {} poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP58]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP47]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP48:%.*]] = getelementptr inbounds i32, ptr [[HITATTRSALLOCA]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP49:%.*]] = getelementptr inbounds i32, ptr [[TMP10]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP50:%.*]] = load i32, ptr [[TMP48]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP50]], ptr [[TMP49]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP51:%.*]] = getelementptr inbounds i32, ptr [[HITATTRSALLOCA]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP52:%.*]] = getelementptr inbounds i32, ptr [[TMP10]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP53:%.*]] = load i32, ptr [[TMP51]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP53]], ptr [[TMP52]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP54:%.*]] = load [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[TMP10]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP55:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP55]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP54]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP56:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 18, {} poison, i32 poison, i32 poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP56]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    unreachable
-; LOWERRAYTRACINGPIPELINE-CPS:       59:
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP60:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @_cont_AcceptHitAndEndSearch(ptr [[TMP60]])
+; LOWERRAYTRACINGPIPELINE-CPS:       57:
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP58:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @_cont_AcceptHitAndEndSearch(ptr [[TMP58]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP61:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP12]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP62:%.*]] = getelementptr i32, ptr [[TMP61]], i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP63:%.*]] = getelementptr i32, ptr [[TMP62]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP64:%.*]] = load i32, ptr [[TMP63]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP64]], ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP65:%.*]] = getelementptr i32, ptr [[TMP61]], i32 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP66:%.*]] = getelementptr i32, ptr [[TMP65]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP59:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP12]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP60:%.*]] = getelementptr i32, ptr [[TMP59]], i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP61:%.*]] = getelementptr i32, ptr [[TMP60]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP62:%.*]] = load i32, ptr [[TMP61]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP62]], ptr @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP63:%.*]] = getelementptr i32, ptr [[TMP59]], i32 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP64:%.*]] = getelementptr i32, ptr [[TMP63]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP65:%.*]] = load i32, ptr [[TMP64]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP65]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP66:%.*]] = getelementptr i32, ptr [[TMP63]], i64 1
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP67:%.*]] = load i32, ptr [[TMP66]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP67]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP68:%.*]] = getelementptr i32, ptr [[TMP65]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP67]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP68:%.*]] = getelementptr i32, ptr [[TMP63]], i64 2
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP69:%.*]] = load i32, ptr [[TMP68]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP69]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP70:%.*]] = getelementptr i32, ptr [[TMP65]], i64 2
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP71:%.*]] = load i32, ptr [[TMP70]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP71]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP72:%.*]] = getelementptr inbounds i32, ptr [[HITATTRSALLOCA]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP73:%.*]] = getelementptr inbounds i32, ptr [[TMP9]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP74:%.*]] = load i32, ptr [[TMP72]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP74]], ptr [[TMP73]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP75:%.*]] = getelementptr inbounds i32, ptr [[HITATTRSALLOCA]], i64 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP76:%.*]] = getelementptr inbounds i32, ptr [[TMP9]], i64 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP77:%.*]] = load i32, ptr [[TMP75]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP77]], ptr [[TMP76]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP78:%.*]] = load [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[TMP9]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP79:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP79]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP78]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP80:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 18, {} poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP80]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP69]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_3_CLOSESTHIT_IN_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP70:%.*]] = getelementptr inbounds i32, ptr [[HITATTRSALLOCA]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP71:%.*]] = getelementptr inbounds i32, ptr [[TMP9]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP72:%.*]] = load i32, ptr [[TMP70]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP72]], ptr [[TMP71]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP73:%.*]] = getelementptr inbounds i32, ptr [[HITATTRSALLOCA]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP74:%.*]] = getelementptr inbounds i32, ptr [[TMP9]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP75:%.*]] = load i32, ptr [[TMP73]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP75]], ptr [[TMP74]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP76:%.*]] = load [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[TMP9]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP77:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP77]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP76]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP78:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 18, {} poison, i32 poison, i32 poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP78]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    unreachable
+; LOWERRAYTRACINGPIPELINE-CPS:       79:
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    br i1 [[TMP33]], label [[TMP80:%.*]], label [[TMP125:%.*]]
+; LOWERRAYTRACINGPIPELINE-CPS:       80:
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    br i1 [[TMP32]], label [[TMP81:%.*]], label [[TMP103:%.*]]
 ; LOWERRAYTRACINGPIPELINE-CPS:       81:
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    br i1 [[TMP35]], label [[TMP82:%.*]], label [[TMP127:%.*]]
-; LOWERRAYTRACINGPIPELINE-CPS:       82:
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    br i1 [[TMP34]], label [[TMP83:%.*]], label [[TMP105:%.*]]
-; LOWERRAYTRACINGPIPELINE-CPS:       83:
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP84:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @_cont_IgnoreHit(ptr [[TMP84]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP82:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @_cont_IgnoreHit(ptr [[TMP82]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP85:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP12]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP86:%.*]] = getelementptr i32, ptr [[TMP85]], i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP87:%.*]] = getelementptr i32, ptr [[TMP86]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP88:%.*]] = load i32, ptr [[TMP87]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP88]], ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP89:%.*]] = getelementptr i32, ptr [[TMP85]], i32 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP90:%.*]] = getelementptr i32, ptr [[TMP89]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP83:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP12]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP84:%.*]] = getelementptr i32, ptr [[TMP83]], i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP85:%.*]] = getelementptr i32, ptr [[TMP84]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP86:%.*]] = load i32, ptr [[TMP85]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP86]], ptr @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP87:%.*]] = getelementptr i32, ptr [[TMP83]], i32 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP88:%.*]] = getelementptr i32, ptr [[TMP87]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP89:%.*]] = load i32, ptr [[TMP88]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP89]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP90:%.*]] = getelementptr i32, ptr [[TMP87]], i64 1
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP91:%.*]] = load i32, ptr [[TMP90]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP91]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP92:%.*]] = getelementptr i32, ptr [[TMP89]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP91]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP92:%.*]] = getelementptr i32, ptr [[TMP87]], i64 2
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP93:%.*]] = load i32, ptr [[TMP92]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP93]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP94:%.*]] = getelementptr i32, ptr [[TMP89]], i64 2
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP95:%.*]] = load i32, ptr [[TMP94]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP95]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP96:%.*]] = getelementptr inbounds i32, ptr [[ORIGHITATTRS]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP97:%.*]] = getelementptr inbounds i32, ptr [[TMP8]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP98:%.*]] = load i32, ptr [[TMP96]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP98]], ptr [[TMP97]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP99:%.*]] = getelementptr inbounds i32, ptr [[ORIGHITATTRS]], i64 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP100:%.*]] = getelementptr inbounds i32, ptr [[TMP8]], i64 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP101:%.*]] = load i32, ptr [[TMP99]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP101]], ptr [[TMP100]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP102:%.*]] = load [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[TMP8]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP103:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP103]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP102]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP104:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 18, {} poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP104]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP93]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP94:%.*]] = getelementptr inbounds i32, ptr [[ORIGHITATTRS]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP95:%.*]] = getelementptr inbounds i32, ptr [[TMP8]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP96:%.*]] = load i32, ptr [[TMP94]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP96]], ptr [[TMP95]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP97:%.*]] = getelementptr inbounds i32, ptr [[ORIGHITATTRS]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP98:%.*]] = getelementptr inbounds i32, ptr [[TMP8]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP99:%.*]] = load i32, ptr [[TMP97]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP99]], ptr [[TMP98]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP100:%.*]] = load [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[TMP8]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP101:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP101]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP100]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP102:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 18, {} poison, i32 poison, i32 poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP102]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    unreachable
-; LOWERRAYTRACINGPIPELINE-CPS:       105:
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP106:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @_cont_IgnoreHit(ptr [[TMP106]])
+; LOWERRAYTRACINGPIPELINE-CPS:       103:
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP104:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @_cont_IgnoreHit(ptr [[TMP104]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP107:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP12]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP108:%.*]] = getelementptr i32, ptr [[TMP107]], i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP109:%.*]] = getelementptr i32, ptr [[TMP108]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP110:%.*]] = load i32, ptr [[TMP109]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP110]], ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP111:%.*]] = getelementptr i32, ptr [[TMP107]], i32 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP112:%.*]] = getelementptr i32, ptr [[TMP111]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP105:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP12]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP106:%.*]] = getelementptr i32, ptr [[TMP105]], i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP107:%.*]] = getelementptr i32, ptr [[TMP106]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP108:%.*]] = load i32, ptr [[TMP107]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP108]], ptr @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP109:%.*]] = getelementptr i32, ptr [[TMP105]], i32 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP110:%.*]] = getelementptr i32, ptr [[TMP109]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP111:%.*]] = load i32, ptr [[TMP110]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP111]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP112:%.*]] = getelementptr i32, ptr [[TMP109]], i64 1
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP113:%.*]] = load i32, ptr [[TMP112]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP113]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP114:%.*]] = getelementptr i32, ptr [[TMP111]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP113]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP114:%.*]] = getelementptr i32, ptr [[TMP109]], i64 2
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP115:%.*]] = load i32, ptr [[TMP114]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP115]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP116:%.*]] = getelementptr i32, ptr [[TMP111]], i64 2
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP117:%.*]] = load i32, ptr [[TMP116]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP117]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP118:%.*]] = getelementptr inbounds i32, ptr [[ORIGHITATTRS]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP119:%.*]] = getelementptr inbounds i32, ptr [[TMP7]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP120:%.*]] = load i32, ptr [[TMP118]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP120]], ptr [[TMP119]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP121:%.*]] = getelementptr inbounds i32, ptr [[ORIGHITATTRS]], i64 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP122:%.*]] = getelementptr inbounds i32, ptr [[TMP7]], i64 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP123:%.*]] = load i32, ptr [[TMP121]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP123]], ptr [[TMP122]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP124:%.*]] = load [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[TMP7]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP125:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP125]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP124]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP126:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 18, {} poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP126]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP115]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_1_ANYHIT_IN]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP116:%.*]] = getelementptr inbounds i32, ptr [[ORIGHITATTRS]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP117:%.*]] = getelementptr inbounds i32, ptr [[TMP7]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP118:%.*]] = load i32, ptr [[TMP116]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP118]], ptr [[TMP117]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP119:%.*]] = getelementptr inbounds i32, ptr [[ORIGHITATTRS]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP120:%.*]] = getelementptr inbounds i32, ptr [[TMP7]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP121:%.*]] = load i32, ptr [[TMP119]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP121]], ptr [[TMP120]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP122:%.*]] = load [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[TMP7]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP123:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP123]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP122]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP124:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 18, {} poison, i32 poison, i32 poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP124]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    unreachable
-; LOWERRAYTRACINGPIPELINE-CPS:       127:
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store <4 x float> [[TMP24]], ptr [[TMP23]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS:       125:
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store <4 x float> [[TMP22]], ptr [[TMP21]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @_cont_AcceptHit(ptr [[SYSTEM_DATA_ALLOCA]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP128:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP12]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP129:%.*]] = getelementptr i32, ptr [[TMP128]], i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP130:%.*]] = getelementptr i32, ptr [[TMP129]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP131:%.*]] = load i32, ptr [[TMP130]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP131]], ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP132:%.*]] = getelementptr i32, ptr [[TMP128]], i32 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP133:%.*]] = getelementptr i32, ptr [[TMP132]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP126:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP12]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP127:%.*]] = getelementptr i32, ptr [[TMP126]], i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP128:%.*]] = getelementptr i32, ptr [[TMP127]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP129:%.*]] = load i32, ptr [[TMP128]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP129]], ptr @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP130:%.*]] = getelementptr i32, ptr [[TMP126]], i32 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP131:%.*]] = getelementptr i32, ptr [[TMP130]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP132:%.*]] = load i32, ptr [[TMP131]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP132]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP133:%.*]] = getelementptr i32, ptr [[TMP130]], i64 1
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP134:%.*]] = load i32, ptr [[TMP133]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP134]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP135:%.*]] = getelementptr i32, ptr [[TMP132]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP134]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP135:%.*]] = getelementptr i32, ptr [[TMP130]], i64 2
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP136:%.*]] = load i32, ptr [[TMP135]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP136]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP137:%.*]] = getelementptr i32, ptr [[TMP132]], i64 2
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP138:%.*]] = load i32, ptr [[TMP137]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP138]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP139:%.*]] = getelementptr inbounds i32, ptr [[HITATTRSALLOCA]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP140:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP141:%.*]] = load i32, ptr [[TMP139]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP141]], ptr [[TMP140]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP142:%.*]] = getelementptr inbounds i32, ptr [[HITATTRSALLOCA]], i64 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP143:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i64 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP144:%.*]] = load i32, ptr [[TMP142]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP144]], ptr [[TMP143]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP145:%.*]] = load [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[TMP6]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP146:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP146]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP145]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP147:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 18, {} poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP147]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP136]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_2_ANYHIT_OUT_ACCEPT_PAYLOAD_ATTR_0_I32S]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP137:%.*]] = getelementptr inbounds i32, ptr [[HITATTRSALLOCA]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP138:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP139:%.*]] = load i32, ptr [[TMP137]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP139]], ptr [[TMP138]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP140:%.*]] = getelementptr inbounds i32, ptr [[HITATTRSALLOCA]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP141:%.*]] = getelementptr inbounds i32, ptr [[TMP6]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP142:%.*]] = load i32, ptr [[TMP140]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP142]], ptr [[TMP141]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP143:%.*]] = load [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[TMP6]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP144:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @_cont_SetTriangleHitAttributes(ptr [[TMP144]], [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP143]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP145:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 18, {} poison, i32 poison, i32 poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP145]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    unreachable
 ;
 ;
@@ -1440,30 +1424,29 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP3:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP4:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_ANYHITTRAVERSALDATA]], align 8
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP5:%.*]] = call [[STRUCT_ANYHITTRAVERSALDATA]] @continuations.getSystemData.s_struct.AnyHitTraversalDatas()
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP5]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP6]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP8:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCandidateState(ptr [[SYSTEM_DATA_ALLOCA]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_HITDATA]] [[TMP8]], ptr [[TMP2]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[SHADER_INDEX]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP6:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCandidateState(ptr [[SYSTEM_DATA_ALLOCA]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_HITDATA]] [[TMP6]], ptr [[TMP2]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[RESPTR_I:%.*]] = getelementptr [[STRUCT_HITDATA]], ptr [[TMP2]], i32 0, i32 2
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[RES_I:%.*]] = load float, ptr [[RESPTR_I]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP9:%.*]] = bitcast ptr [[TMP4]] to ptr
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP9]]) #[[ATTR1]]
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP7:%.*]] = bitcast ptr [[TMP4]] to ptr
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP7]]) #[[ATTR1]]
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[ORIGTPTR_I:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[ORIGT_I:%.*]] = load float, ptr [[ORIGTPTR_I]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[ISNOHIT_I:%.*]] = fcmp fast uge float [[RES_I]], [[ORIGT_I]]
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    br i1 [[ISNOHIT_I]], label [[ISEND_I:%.*]], label [[CALLAHIT_I:%.*]]
 ; LOWERRAYTRACINGPIPELINE-CPS:       callAHit.i:
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TRAV_DATA_I:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP9:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP8]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP10:%.*]] = load [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]], ptr [[TMP4]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP11:%.*]] = call [[STRUCT_ANYHITTRAVERSALDATA]] (...) @lgc.cps.await.s_struct.AnyHitTraversalDatas(i32 3, i32 8, [[STRUCT_ANYHITTRAVERSALDATA]] [[TRAV_DATA_I]], float [[RES_I]], i32 0, [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP10]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP11:%.*]] = call [[STRUCT_ANYHITTRAVERSALDATA]] (...) @lgc.cps.await.s_struct.AnyHitTraversalDatas(i32 3, i32 8, i32 [[TMP9]], float [[RES_I]], i32 0, [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES]] [[TMP10]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP11]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[LOCAL_ROOT_INDEX1:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP12]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX1]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP12]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    br label [[_CONT_REPORTHIT_EXIT:%.*]]
 ; LOWERRAYTRACINGPIPELINE-CPS:       isEnd.i:
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i32, ptr [[TMP4]], i64 0
@@ -1484,12 +1467,12 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    br i1 [[TMP22]], label [[TMP23:%.*]], label [[TMP25:%.*]]
 ; LOWERRAYTRACINGPIPELINE-CPS:       23:
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP24:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 10, {} poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP24]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 10, {} poison, i32 poison, i32 poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP24]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    unreachable
 ; LOWERRAYTRACINGPIPELINE-CPS:       25:
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP9]]) #[[ATTR1]]
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP7]]) #[[ATTR1]]
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP26:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 10, {} poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP26]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 10, {} poison, i32 poison, i32 poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP26]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    unreachable
 ;
 ;
@@ -1499,30 +1482,29 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP3:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES:%.*]], align 8
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP4:%.*]] = alloca [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES2:%.*]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_ANYHITTRAVERSALDATA]], align 8
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP5:%.*]] = call [[STRUCT_ANYHITTRAVERSALDATA]] @continuations.getSystemData.s_struct.AnyHitTraversalDatas()
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP5]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP6]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP8:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCandidateState(ptr [[SYSTEM_DATA_ALLOCA]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_HITDATA]] [[TMP8]], ptr [[TMP2]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[SHADER_INDEX]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP6:%.*]] = call [[STRUCT_HITDATA]] @_cont_GetCandidateState(ptr [[SYSTEM_DATA_ALLOCA]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_HITDATA]] [[TMP6]], ptr [[TMP2]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[RESPTR_I:%.*]] = getelementptr [[STRUCT_HITDATA]], ptr [[TMP2]], i32 0, i32 2
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[RES_I:%.*]] = load float, ptr [[RESPTR_I]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP9:%.*]] = bitcast ptr [[TMP4]] to ptr
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP9]]) #[[ATTR1]]
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP7:%.*]] = bitcast ptr [[TMP4]] to ptr
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @llvm.lifetime.start.p0(i64 8, ptr [[TMP7]]) #[[ATTR1]]
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[ORIGTPTR_I:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[ORIGT_I:%.*]] = load float, ptr [[ORIGTPTR_I]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[ISNOHIT_I:%.*]] = fcmp fast uge float [[RES_I]], [[ORIGT_I]]
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    br i1 [[ISNOHIT_I]], label [[ISEND_I:%.*]], label [[CALLAHIT_I:%.*]]
 ; LOWERRAYTRACINGPIPELINE-CPS:       callAHit.i:
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TRAV_DATA_I:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP9:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP8]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP10:%.*]] = load [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES2]], ptr [[TMP4]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP11:%.*]] = call [[STRUCT_ANYHITTRAVERSALDATA]] (...) @lgc.cps.await.s_struct.AnyHitTraversalDatas(i32 3, i32 8, [[STRUCT_ANYHITTRAVERSALDATA]] [[TRAV_DATA_I]], float [[RES_I]], i32 0, [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES2]] [[TMP10]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP11:%.*]] = call [[STRUCT_ANYHITTRAVERSALDATA]] (...) @lgc.cps.await.s_struct.AnyHitTraversalDatas(i32 3, i32 8, i32 [[TMP9]], float [[RES_I]], i32 0, [[STRUCT_BUILTINTRIANGLEINTERSECTIONATTRIBUTES2]] [[TMP10]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP11]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP12:%.*]] = getelementptr inbounds [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0, i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[LOCAL_ROOT_INDEX1:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP12]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX1]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP12]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    br label [[_CONT_REPORTHIT_EXIT:%.*]]
 ; LOWERRAYTRACINGPIPELINE-CPS:       isEnd.i:
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP13:%.*]] = getelementptr inbounds i32, ptr [[TMP4]], i64 0
@@ -1543,12 +1525,12 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    br i1 [[TMP22]], label [[TMP23:%.*]], label [[TMP25:%.*]]
 ; LOWERRAYTRACINGPIPELINE-CPS:       23:
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP24:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 10, {} poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP24]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 10, {} poison, i32 poison, i32 poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP24]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    unreachable
 ; LOWERRAYTRACINGPIPELINE-CPS:       25:
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP9]]) #[[ATTR1]]
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @llvm.lifetime.end.p0(i64 8, ptr [[TMP7]]) #[[ATTR1]]
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP26:%.*]] = load [[STRUCT_ANYHITTRAVERSALDATA]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 10, {} poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP26]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 10, {} poison, i32 poison, i32 poison, [[STRUCT_ANYHITTRAVERSALDATA]] [[TMP26]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    unreachable
 ;
 ;
@@ -1556,31 +1538,28 @@ attributes #5 = { nocallback nofree nosync nounwind willreturn memory(argmem: re
 ; LOWERRAYTRACINGPIPELINE-CPS-SAME: {} [[CONT_STATE:%.*]], i32 [[RETURN_ADDR:%.*]], i32 [[SHADER_INDEX:%.*]], [[STRUCT_SYSTEMDATA:%.*]] [[TMP0:%.*]]) #[[ATTR2]] !lgc.rt.shaderstage [[META44]] !lgc.cps [[META40]] !continuation [[META47:![0-9]+]] {
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[SYSTEM_DATA_ALLOCA:%.*]] = alloca [[STRUCT_SYSTEMDATA]], align 8
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP2:%.*]] = alloca [[STRUCT_RAYPAYLOAD:%.*]], align 8
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP3:%.*]] = call [[STRUCT_SYSTEMDATA]] @continuations.getSystemData.s_struct.SystemDatas()
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_SYSTEMDATA]] [[TMP3]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[LOCAL_ROOT_INDEX:%.*]] = call i32 @_cont_GetLocalRootIndex(ptr [[TMP4]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[LOCAL_ROOT_INDEX]])
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP2]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store <4 x float> <float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 1.000000e+00>, ptr [[TMP5]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store [[STRUCT_SYSTEMDATA]] [[TMP0]], ptr [[SYSTEM_DATA_ALLOCA]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void @amd.dx.setLocalRootIndex(i32 [[SHADER_INDEX]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP3:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP2]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store <4 x float> <float 0.000000e+00, float 0.000000e+00, float 0.000000e+00, float 1.000000e+00>, ptr [[TMP3]], align 4
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @registerbuffer.setpointerbarrier(ptr @PAYLOAD)
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP2]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP7:%.*]] = getelementptr i32, ptr [[TMP6]], i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP8:%.*]] = getelementptr i32, ptr [[TMP7]], i64 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP9:%.*]] = load i32, ptr [[TMP8]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP9]], ptr @PAYLOAD, align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP10:%.*]] = getelementptr i32, ptr [[TMP6]], i32 1
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP11:%.*]] = getelementptr i32, ptr [[TMP10]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [[STRUCT_RAYPAYLOAD]], ptr [[TMP2]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP5:%.*]] = getelementptr i32, ptr [[TMP4]], i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP6:%.*]] = getelementptr i32, ptr [[TMP5]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP7:%.*]] = load i32, ptr [[TMP6]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP7]], ptr @PAYLOAD, align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP8:%.*]] = getelementptr i32, ptr [[TMP4]], i32 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP9:%.*]] = getelementptr i32, ptr [[TMP8]], i64 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP10:%.*]] = load i32, ptr [[TMP9]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP10]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_6_MISS_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP11:%.*]] = getelementptr i32, ptr [[TMP8]], i64 1
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP12:%.*]] = load i32, ptr [[TMP11]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP12]], ptr getelementptr inbounds ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_6_MISS_OUT:%.*]], ptr @PAYLOAD, i32 0, i32 0, i32 7), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP13:%.*]] = getelementptr i32, ptr [[TMP10]], i64 1
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP12]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_6_MISS_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP13:%.*]] = getelementptr i32, ptr [[TMP8]], i64 2
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP14:%.*]] = load i32, ptr [[TMP13]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP14]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_6_MISS_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 8), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP15:%.*]] = getelementptr i32, ptr [[TMP10]], i64 2
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP16:%.*]] = load i32, ptr [[TMP15]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP16]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_6_MISS_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP17:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP18:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP17]], align 4
-; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 6, {} poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP18]])
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    store i32 [[TMP14]], ptr getelementptr ([[STRUCT_RAYPAYLOAD_ATTR_MAX_8_I32S_LAYOUT_6_MISS_OUT]], ptr @PAYLOAD, i32 0, i32 0, i64 9), align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP15:%.*]] = getelementptr inbounds [[STRUCT_SYSTEMDATA]], ptr [[SYSTEM_DATA_ALLOCA]], i32 0, i32 0
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    [[TMP16:%.*]] = load [[STRUCT_DISPATCHSYSTEMDATA:%.*]], ptr [[TMP15]], align 4
+; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    call void (...) @lgc.cps.jump(i32 [[RETURN_ADDR]], i32 6, {} poison, i32 poison, i32 poison, [[STRUCT_DISPATCHSYSTEMDATA]] [[TMP16]])
 ; LOWERRAYTRACINGPIPELINE-CPS-NEXT:    unreachable
 ;

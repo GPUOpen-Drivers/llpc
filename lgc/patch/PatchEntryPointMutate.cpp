@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -134,9 +134,9 @@ bool PatchEntryPointMutate::runImpl(Module &module, PipelineShadersResult &pipel
 
   stackLowering = std::make_unique<CpsStackLowering>(module.getContext(), ADDR_SPACE_PRIVATE);
 
-  const unsigned stageMask = m_pipelineState->getShaderStageMask();
-  m_hasTs = (stageMask & (shaderStageToMask(ShaderStageTessControl) | shaderStageToMask(ShaderStageTessEval))) != 0;
-  m_hasGs = (stageMask & shaderStageToMask(ShaderStageGeometry)) != 0;
+  const auto stageMask = m_pipelineState->getShaderStageMask();
+  m_hasTs = stageMask.contains_any({ShaderStage::TessControl, ShaderStage::TessEval});
+  m_hasGs = stageMask.contains(ShaderStage::Geometry);
 
   // Gather user data usage.
   gatherUserDataUsage(&module);
@@ -148,13 +148,13 @@ bool PatchEntryPointMutate::runImpl(Module &module, PipelineShadersResult &pipel
 
   if (m_pipelineState->isGraphics()) {
     // Process each shader in turn, but not the copy shader.
-    for (unsigned shaderStage = 0; shaderStage < ShaderStageNativeStageCount; ++shaderStage) {
-      m_entryPoint = pipelineShaders.getEntryPoint(static_cast<ShaderStage>(shaderStage));
+    for (unsigned shaderStage = 0; shaderStage < ShaderStage::NativeStageCount; ++shaderStage) {
+      m_entryPoint = pipelineShaders.getEntryPoint(static_cast<ShaderStageEnum>(shaderStage));
       if (m_entryPoint) {
         // ToDo: This should always be skipped since we don't implement CPS metadata yet.
         assert(!lgc::cps::isCpsFunction(*m_entryPoint) && "CPS support not implemented yet");
 
-        m_shaderStage = static_cast<ShaderStage>(shaderStage);
+        m_shaderStage = static_cast<ShaderStageEnum>(shaderStage);
         processShader(&shaderInputs);
       }
     }
@@ -277,7 +277,7 @@ void PatchEntryPointMutate::processGroupMemcpy(Module &module) {
 void PatchEntryPointMutate::lowerGroupMemcpy(GroupMemcpyOp &groupMemcpyOp) {
   BuilderImpl builder(m_pipelineState);
   Function *entryPoint = groupMemcpyOp.getFunction();
-  ShaderStage stage = getShaderStage(entryPoint);
+  auto stage = getShaderStage(entryPoint);
   builder.setShaderStage(stage);
   builder.SetInsertPoint(&groupMemcpyOp);
 
@@ -294,12 +294,12 @@ void PatchEntryPointMutate::lowerGroupMemcpy(GroupMemcpyOp &groupMemcpyOp) {
   if (scope == 2) {
     unsigned workgroupSize[3] = {};
     auto shaderModes = m_pipelineState->getShaderModes();
-    if (stage == ShaderStageTask || stage == ShaderStageCompute) {
+    if (stage == ShaderStage::Task || stage == ShaderStage::Compute) {
       Module &module = *groupMemcpyOp.getModule();
       workgroupSize[0] = shaderModes->getComputeShaderMode(module).workgroupSizeX;
       workgroupSize[1] = shaderModes->getComputeShaderMode(module).workgroupSizeY;
       workgroupSize[2] = shaderModes->getComputeShaderMode(module).workgroupSizeZ;
-    } else if (stage == ShaderStageMesh) {
+    } else if (stage == ShaderStage::Mesh) {
       workgroupSize[0] = shaderModes->getMeshShaderMode().workgroupSizeX;
       workgroupSize[1] = shaderModes->getMeshShaderMode().workgroupSizeY;
       workgroupSize[2] = shaderModes->getMeshShaderMode().workgroupSizeZ;
@@ -309,19 +309,19 @@ void PatchEntryPointMutate::lowerGroupMemcpy(GroupMemcpyOp &groupMemcpyOp) {
 
     // LocalInvocationId is a function argument now and CreateReadBuiltInInput cannot retrieve it.
     unsigned argIndex = 0xFFFFFFFF;
-    switch (stage) {
-    case ShaderStageTask: {
-      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageTask)->entryArgIdxs.task;
+    switch (stage.value()) {
+    case ShaderStage::Task: {
+      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Task)->entryArgIdxs.task;
       argIndex = entryArgIdxs.localInvocationId;
       break;
     }
-    case ShaderStageMesh: {
-      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageMesh)->entryArgIdxs.mesh;
+    case ShaderStage::Mesh: {
+      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Mesh)->entryArgIdxs.mesh;
       argIndex = entryArgIdxs.localInvocationId;
       break;
     }
-    case ShaderStageCompute: {
-      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStageCompute)->entryArgIdxs.cs;
+    case ShaderStage::Compute: {
+      auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Compute)->entryArgIdxs.cs;
       argIndex = entryArgIdxs.localInvocationId;
       break;
     }
@@ -330,12 +330,12 @@ void PatchEntryPointMutate::lowerGroupMemcpy(GroupMemcpyOp &groupMemcpyOp) {
       break;
     }
 
-    const unsigned waveSize = m_pipelineState->getShaderWaveSize(stage);
+    const unsigned waveSize = m_pipelineState->getShaderWaveSize(stage.value());
 
     // For mesh shader the following two ids are required.
     Value *waveIdInSubgroupMesh = nullptr;
     Value *threadIdInWaveMesh = nullptr;
-    if (stage == ShaderStageMesh) {
+    if (stage == ShaderStage::Mesh) {
       builder.CreateIntrinsic(Intrinsic::amdgcn_init_exec, {}, builder.getInt64(-1));
       // waveId = mergedWaveInfo[27:24]
       Value *mergedWaveInfo =
@@ -356,7 +356,7 @@ void PatchEntryPointMutate::lowerGroupMemcpy(GroupMemcpyOp &groupMemcpyOp) {
     scopeSize = workgroupTotalSize;
 
     // localInvocationId argument for mesh shader is available from GFX11+. But it can be retrieved in anther way.
-    if (stage == ShaderStageMesh) {
+    if (stage == ShaderStage::Mesh) {
       threadIndex = builder.CreateAdd(builder.CreateMul(waveIdInSubgroupMesh, builder.getInt32(waveSize)),
                                       threadIdInWaveMesh, "threadIdInSubgroupMesh");
     } else {
@@ -456,14 +456,14 @@ void PatchEntryPointMutate::lowerGroupMemcpy(GroupMemcpyOp &groupMemcpyOp) {
 //
 // @param asCpsReferenceOp: the instruction
 void PatchEntryPointMutate::lowerAsCpsReference(cps::AsContinuationReferenceOp &asCpsReferenceOp) {
-  IRBuilder<> builder(&asCpsReferenceOp);
+  BuilderBase builder(&asCpsReferenceOp);
 
+  Value *ref = nullptr;
   Function &callee = cast<Function>(*asCpsReferenceOp.getFn());
   auto level = cps::getCpsLevelFromFunction(callee);
 
-  // Use GEP since that is easier for the backend to combine into a relocation fixup.
-  Value *ref = builder.CreateConstGEP1_32(builder.getInt8Ty(), asCpsReferenceOp.getFn(), static_cast<uint32_t>(level));
-  ref = builder.CreatePtrToInt(ref, builder.getInt32Ty());
+  { ref = builder.CreatePtrToInt(&callee, builder.getInt32Ty()); }
+  ref = builder.CreateAdd(ref, builder.getInt32(static_cast<uint32_t>(level)));
 
   asCpsReferenceOp.replaceAllUsesWith(ref);
 }
@@ -506,25 +506,27 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
   if (!isCpsFunc) {
     IRBuilder<> builder(func->getContext());
     builder.SetInsertPointPastAllocas(func);
-    Value *vspStorage =
-        builder.CreateAlloca(builder.getPtrTy(stackLowering->getLoweredCpsStackAddrSpace()), ADDR_SPACE_PRIVATE);
+    Value *vspStorage = builder.CreateAlloca(builder.getInt32Ty());
     m_funcCpsStackMap[func] = vspStorage;
   }
 
   // Get the number of user-data arguments.
+  const auto &mode = m_pipelineState->getShaderModes()->getComputeShaderMode();
+  bool haveLocalInvocationId = !mode.noLocalInvocationIdInCalls;
   unsigned numShaderArg;
+  unsigned numUserdata;
   if (!isCpsFunc) {
     SmallVector<Type *, 8> argTys;
     SmallVector<std::string, 8> argNames;
     generateEntryPointArgTys(shaderInputs, nullptr, argTys, argNames, 0);
-    numShaderArg = argTys.size();
-    assert(!shaderInputs || argNames.back() == "LocalInvocationId");
+    assert(argNames.back() == "LocalInvocationId");
+    numShaderArg = haveLocalInvocationId ? argTys.size() - 1 : argTys.size();
+    numUserdata = argTys.size() - 1;
   } else {
     numShaderArg = m_cpsShaderInputCache.getTypes().size();
+    assert(haveLocalInvocationId == (m_cpsShaderInputCache.getNames().back() == "LocalInvocationId"));
+    numUserdata = haveLocalInvocationId ? numShaderArg - 1 : numShaderArg;
   }
-
-  // Exclude LocalInvocationId if shaderInputs is non-null (for Continufy based continuation).
-  unsigned numUserdata = shaderInputs ? numShaderArg - 1 : numShaderArg;
 
   // Get all the return instructions.
   SmallVector<ReturnInst *> retInstrs;
@@ -559,7 +561,7 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
 
   SmallVector<Value *> newVgpr;
   // Put LocalInvocationId before {vcr, vsp}.
-  if (shaderInputs)
+  if (haveLocalInvocationId)
     newVgpr.push_back(func->getArg(numUserdata));
 
   builder.SetInsertPoint(tailBlock);
@@ -588,10 +590,6 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
   for (unsigned idx = 0; idx != numUserdata; ++idx)
     userData.push_back(func->getArg(idx));
 
-  const DataLayout &layout = func->getParent()->getDataLayout();
-  SmallVector<Value *> userDataI32;
-  splitIntoI32(layout, builder, userData, userDataI32);
-  Value *userDataVec = mergeDwordsIntoVector(builder, userDataI32);
   //    tail:
   //      Merge vgpr values from different exits.
   //      Check if we have pending cps call
@@ -602,8 +600,8 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
   //      ret void
   unsigned waveSize = m_pipelineState->getShaderWaveSize(m_shaderStage);
   Type *waveMaskTy = builder.getIntNTy(waveSize);
-  // For continufy based continuation, the vgpr list: LocalInvocationId, vcr, vsp, ...
-  unsigned vcrIndexInVgpr = shaderInputs ? 1 : 0;
+  // For continufy based continuation, the vgpr list: LocalInvocationId(optional), vcr, vsp, ...
+  unsigned vcrIndexInVgpr = haveLocalInvocationId ? 1 : 0;
   auto *vcr = builder.CreateExtractValue(vgprArg, vcrIndexInVgpr);
   auto *vcrTy = vcr->getType();
 
@@ -655,12 +653,23 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
   AddressExtender addressExtender(func);
   Value *jumpTarget = addressExtender.extend(addr32, builder.getInt32(HighAddrPc), builder.getPtrTy(), builder);
 
-  Value *chainArgs[] = {jumpTarget, execMask, userDataVec, vgprArg, builder.getInt32(0)};
+  const DataLayout &layout = func->getParent()->getDataLayout();
+  SmallVector<Value *> userDataI32;
+  splitIntoI32(layout, builder, userData, userDataI32);
+  Value *userDataVec = mergeDwordsIntoVector(builder, userDataI32);
+
+  SmallVector<Value *> chainArgs = {jumpTarget, execMask, userDataVec, vgprArg};
+
+  {
+    // No flags
+    chainArgs.push_back(builder.getInt32(0));
+  }
 
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 465197
   // Old version of the code
-  Type *chainArgTys[] = {builder.getPtrTy(), builder.getIntNTy(waveSize), userDataVec->getType(), vgprArg->getType(),
-                         builder.getInt32Ty()};
+  SmallVector<Type *> chainArgTys = {builder.getPtrTy(), builder.getIntNTy(waveSize), userDataVec->getType(),
+                                     vgprArg->getType(), builder.getInt32Ty()};
+
   FunctionType *chainFuncTy = FunctionType::get(builder.getVoidTy(), chainArgTys, true);
   auto chainFunc =
       Function::Create(chainFuncTy, GlobalValue::ExternalLinkage, "llvm.amdgcn.cs.chain", func->getParent());
@@ -703,9 +712,8 @@ bool PatchEntryPointMutate::lowerCpsOps(Function *func, ShaderInputs *shaderInpu
 // @param func : the cps function to be mutated
 // @param fixedShaderArgTys : the types of the fixed shader arguments(userdata + possibly shader inputs)
 // @param argNames : the name string of the fixed shader arguments
-// @param isContinufy : whether the function is output of Continufy pass.
 Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type *> fixedShaderArgTys,
-                                                  ArrayRef<std::string> argNames, bool isContinufy) {
+                                                  ArrayRef<std::string> argNames) {
   Value *state = func->getArg(0);
   const DataLayout &layout = func->getParent()->getDataLayout();
   IRBuilder<> builder(func->getContext());
@@ -726,15 +734,17 @@ Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type 
   AttributeSet emptyAttrSet;
   AttributeSet inRegAttrSet = emptyAttrSet.addAttribute(func->getContext(), Attribute::InReg);
 
+  bool haveLocalInvocationId = !m_pipelineState->getShaderModes()->getComputeShaderMode().noLocalInvocationIdInCalls;
+  assert(haveLocalInvocationId == (argNames.back() == "LocalInvocationId"));
+
   AttributeList oldAttrs = func->getAttributes();
   SmallVector<AttributeSet, 8> argAttrs;
-  assert(!isContinufy || argNames.back() == "LocalInvocationId");
-  unsigned numUserdataArg = isContinufy ? fixedShaderArgTys.size() - 1 : fixedShaderArgTys.size();
+  unsigned numUserdataArg = haveLocalInvocationId ? fixedShaderArgTys.size() - 1 : fixedShaderArgTys.size();
   for (unsigned idx = 0; idx != numUserdataArg; ++idx)
     argAttrs.push_back(inRegAttrSet);
 
-  // %LocalInvocationId for Continufy path.
-  if (isContinufy)
+  // %LocalInvocationId when required
+  if (haveLocalInvocationId)
     argAttrs.push_back(emptyAttrSet);
 
   // %vcr attribute
@@ -750,8 +760,7 @@ Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type 
   newFunc->splice(newFunc->begin(), func);
 
   builder.SetInsertPointPastAllocas(newFunc);
-  Value *vspStorage =
-      builder.CreateAlloca(builder.getPtrTy(stackLowering->getLoweredCpsStackAddrSpace()), ADDR_SPACE_PRIVATE);
+  Value *vspStorage = builder.CreateAlloca(builder.getInt32Ty());
   m_funcCpsStackMap[newFunc] = vspStorage;
 
   // Function arguments: {fixed_shader_arguments, vcr, vsp, original_func_arguments_exclude_state}
@@ -760,9 +769,10 @@ Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type 
     // Get stack address of pushed state and load it from continuation stack.
     unsigned stateSize = layout.getTypeStoreSize(state->getType());
     vsp = builder.CreateConstInBoundsGEP1_32(builder.getInt8Ty(), vsp, -alignTo(stateSize, ContinuationStackAlignment));
-    Value *newState = builder.CreateAlignedLoad(state->getType(), vsp, Align(ContinuationStackAlignment), "cps.state");
+    Value *newState = builder.CreateLoad(state->getType(), vsp, "cps.state");
     state->replaceAllUsesWith(newState);
   }
+  vsp = builder.CreatePtrToInt(vsp, builder.getInt32Ty());
   builder.CreateStore(vsp, vspStorage);
 
   // Set name string for arguments.
@@ -809,9 +819,8 @@ unsigned PatchEntryPointMutate::lowerCpsJump(Function *parent, cps::JumpOp *jump
 
   // Pushing state onto stack and get new vsp.
   Value *state = jumpOp->getState();
-  Value *vsp =
-      builder.CreateAlignedLoad(builder.getPtrTy(stackLowering->getLoweredCpsStackAddrSpace()),
-                                m_funcCpsStackMap[parent], Align(stackLowering->getLoweredCpsStackPointerSize(layout)));
+  Value *vsp = builder.CreateLoad(builder.getInt32Ty(), m_funcCpsStackMap[parent]);
+  vsp = builder.CreateIntToPtr(vsp, builder.getPtrTy(stackLowering->getLoweredCpsStackAddrSpace()));
   unsigned stateSize = 0;
   if (!state->getType()->isEmptyTy()) {
     stateSize = layout.getTypeStoreSize(state->getType());
@@ -865,7 +874,7 @@ void PatchEntryPointMutate::setupComputeWithCalls(Module *module) {
   // functions and intrinsics).
   for (Function &func : *module) {
     if (func.isDeclaration() && func.getIntrinsicID() == Intrinsic::not_intrinsic &&
-        !func.getName().startswith(lgcName::InternalCallPrefix) && !func.user_empty()) {
+        !func.getName().starts_with(lgcName::InternalCallPrefix) && !func.user_empty()) {
       m_computeWithCalls = true;
       return;
     }
@@ -893,9 +902,9 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
   static const auto visitor =
       llvm_dialects::VisitorBuilder<PatchEntryPointMutate>()
           .add<UserDataOp>([](PatchEntryPointMutate &self, UserDataOp &op) {
-            ShaderStage stage = getShaderStage(op.getFunction());
-            assert(stage != ShaderStageCopyShader);
-            auto userDataUsage = self.getUserDataUsage(stage);
+            auto stage = getShaderStage(op.getFunction());
+            assert(stage != ShaderStage::CopyShader);
+            auto userDataUsage = self.getUserDataUsage(stage.value());
             userDataUsage->userDataOps.push_back(&op);
 
             // Attempt to find all loads with a constant dword-aligned offset and push into
@@ -953,9 +962,9 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
             }
           })
           .add<LoadUserDataOp>([](PatchEntryPointMutate &self, LoadUserDataOp &op) {
-            ShaderStage stage = getShaderStage(op.getFunction());
-            assert(stage != ShaderStageCopyShader);
-            auto *userDataUsage = self.getUserDataUsage(stage);
+            auto stage = getShaderStage(op.getFunction());
+            assert(stage != ShaderStage::CopyShader);
+            auto *userDataUsage = self.getUserDataUsage(stage.value());
 
             UserDataLoad load;
             load.load = &op;
@@ -973,12 +982,12 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
     if (!func.isDeclaration())
       continue;
 
-    if (func.getName().startswith(lgcName::SpecialUserData)) {
+    if (func.getName().starts_with(lgcName::SpecialUserData)) {
       for (User *user : func.users()) {
         CallInst *call = cast<CallInst>(user);
-        ShaderStage stage = getShaderStage(call->getFunction());
-        assert(stage != ShaderStageCopyShader);
-        auto &specialUserData = getUserDataUsage(stage)->specialUserData;
+        auto stage = getShaderStage(call->getFunction());
+        assert(stage != ShaderStage::CopyShader);
+        auto &specialUserData = getUserDataUsage(stage.value())->specialUserData;
         unsigned index = cast<ConstantInt>(call->getArgOperand(0))->getZExtValue() -
                          static_cast<unsigned>(UserDataMapping::GlobalTable);
         specialUserData.resize(std::max(specialUserData.size(), size_t(index + 1)));
@@ -987,11 +996,11 @@ void PatchEntryPointMutate::gatherUserDataUsage(Module *module) {
       continue;
     }
 
-    if ((func.getName().startswith(lgcName::OutputExportXfb) && !func.use_empty()) || m_pipelineState->enableSwXfb()) {
+    if ((func.getName().starts_with(lgcName::OutputExportXfb) && !func.use_empty()) || m_pipelineState->enableSwXfb()) {
       // NOTE: For GFX11+, SW emulated stream-out will always use stream-out buffer descriptors and stream-out buffer
       // offsets to calculate numbers of written primitives/dwords and update the counters.  auto lastVertexStage =
       auto lastVertexStage = m_pipelineState->getLastVertexProcessingStage();
-      lastVertexStage = lastVertexStage == ShaderStageCopyShader ? ShaderStageGeometry : lastVertexStage;
+      lastVertexStage = lastVertexStage == ShaderStage::CopyShader ? ShaderStage::Geometry : lastVertexStage;
       getUserDataUsage(lastVertexStage)->usesStreamOutTable = true;
     }
   }
@@ -1059,8 +1068,12 @@ void PatchEntryPointMutate::fixupUserDataUses(Module &module) {
     if (func.isDeclaration())
       continue;
 
-    ShaderStage stage = getShaderStage(&func);
-    auto userDataUsage = getUserDataUsage(stage);
+    auto stage = getShaderStage(&func);
+
+    if (!stage)
+      continue;
+
+    auto userDataUsage = getUserDataUsage(stage.value());
 
     // If needed, generate code for the spill table pointer (as pointer to i8) at the start of the function.
     Instruction *spillTable = nullptr;
@@ -1150,33 +1163,33 @@ void PatchEntryPointMutate::processShader(ShaderInputs *shaderInputs) {
 
   // We always deal with pre-merge functions here, so set the fitting pre-merge calling conventions.
   switch (m_shaderStage) {
-  case ShaderStageTask:
+  case ShaderStage::Task:
     entryPoint->setCallingConv(CallingConv::AMDGPU_CS);
     break;
-  case ShaderStageMesh:
+  case ShaderStage::Mesh:
     entryPoint->setCallingConv(CallingConv::AMDGPU_GS);
     break;
-  case ShaderStageVertex:
-    if (m_pipelineState->hasShaderStage(ShaderStageTessControl))
+  case ShaderStage::Vertex:
+    if (m_pipelineState->hasShaderStage(ShaderStage::TessControl))
       entryPoint->setCallingConv(CallingConv::AMDGPU_LS);
-    else if (m_pipelineState->hasShaderStage(ShaderStageGeometry))
+    else if (m_pipelineState->hasShaderStage(ShaderStage::Geometry))
       entryPoint->setCallingConv(CallingConv::AMDGPU_ES);
     else
       entryPoint->setCallingConv(CallingConv::AMDGPU_VS);
     break;
-  case ShaderStageTessControl:
+  case ShaderStage::TessControl:
     entryPoint->setCallingConv(CallingConv::AMDGPU_HS);
     break;
-  case ShaderStageTessEval:
-    if (m_pipelineState->hasShaderStage(ShaderStageGeometry))
+  case ShaderStage::TessEval:
+    if (m_pipelineState->hasShaderStage(ShaderStage::Geometry))
       entryPoint->setCallingConv(CallingConv::AMDGPU_ES);
     else
       entryPoint->setCallingConv(CallingConv::AMDGPU_VS);
     break;
-  case ShaderStageGeometry:
+  case ShaderStage::Geometry:
     entryPoint->setCallingConv(CallingConv::AMDGPU_GS);
     break;
-  case ShaderStageFragment:
+  case ShaderStage::Fragment:
     entryPoint->setCallingConv(CallingConv::AMDGPU_PS);
     break;
   default:
@@ -1196,7 +1209,7 @@ void PatchEntryPointMutate::processShader(ShaderInputs *shaderInputs) {
 // @param shaderInputs : ShaderInputs object representing hardware-provided shader inputs
 // @param [in/out] module : Module
 void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Module &module) {
-  m_shaderStage = ShaderStageCompute;
+  m_shaderStage = ShaderStage::Compute;
 
   // We no longer support compute shader fixed layout required before PAL interface version 624.
   if (m_pipelineState->getLgcContext()->getPalAbiVersion() < 624)
@@ -1206,7 +1219,7 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
   SmallVector<Function *, 4> origFuncs;
   for (Function &func : module) {
     if (func.isDeclaration()) {
-      if (!func.isIntrinsic() && !func.getName().startswith(lgcName::InternalCallPrefix)) {
+      if (!func.isIntrinsic() && !func.getName().starts_with(lgcName::InternalCallPrefix)) {
         // This is the declaration of a callable function that is defined in a different module.
         func.setCallingConv(CallingConv::AMDGPU_Gfx);
       }
@@ -1215,32 +1228,50 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
     }
   }
 
+  SmallVector<Type *, 20> shaderInputTys;
+  SmallVector<std::string, 20> shaderInputNames;
+  ArrayRef<Type *> calleeArgTys;
+  ArrayRef<std::string> calleeArgNames;
+  uint64_t inRegMask;
+
   for (Function *origFunc : origFuncs) {
     auto *origType = origFunc->getFunctionType();
-    // Determine what args need to be added on to all functions.
-    SmallVector<Type *, 20> shaderInputTys;
-    SmallVector<std::string, 20> shaderInputNames;
-    uint64_t inRegMask;
 
     // Create the new function and transfer code and attributes to it.
     Function *newFunc = nullptr;
     // For continufy based ray-tracing, we still need to add shader inputs like workgroupId and LocalInvocationId.
-    bool isContinufy = m_pipelineState->getOptions().rtIndirectMode == RayTracingIndirectMode::ContinuationsContinufy;
-    ShaderInputs *cpsShaderInputs = isContinufy ? shaderInputs : nullptr;
+    bool haveLocalInvocationIdInCalls =
+        !m_pipelineState->getShaderModes()->getComputeShaderMode().noLocalInvocationIdInCalls;
     if (cps::isCpsFunction(*origFunc)) {
       assert(origType->getReturnType()->isVoidTy());
       if (!m_cpsShaderInputCache.isAvailable()) {
-        generateEntryPointArgTys(cpsShaderInputs, nullptr, shaderInputTys, shaderInputNames, 0);
+        generateEntryPointArgTys(shaderInputs, nullptr, shaderInputTys, shaderInputNames, 0, false);
+        assert(shaderInputNames.back() == "LocalInvocationId");
+        if (!haveLocalInvocationIdInCalls) {
+          shaderInputTys.pop_back();
+          shaderInputNames.pop_back();
+        }
         m_cpsShaderInputCache.set(shaderInputTys, shaderInputNames);
       }
-      newFunc =
-          lowerCpsFunction(origFunc, m_cpsShaderInputCache.getTypes(), m_cpsShaderInputCache.getNames(), isContinufy);
+      newFunc = lowerCpsFunction(origFunc, m_cpsShaderInputCache.getTypes(), m_cpsShaderInputCache.getNames());
     } else {
-      inRegMask = generateEntryPointArgTys(shaderInputs, origFunc, shaderInputTys, shaderInputNames,
-                                           origType->getNumParams(), true);
-      newFunc = addFunctionArgs(origFunc, origType->getReturnType(), shaderInputTys, shaderInputNames, inRegMask,
-                                AddFunctionArgsAppend);
-      const bool isEntryPoint = isShaderEntryPoint(newFunc);
+      if (shaderInputTys.empty()) {
+        inRegMask = generateEntryPointArgTys(shaderInputs, origFunc, shaderInputTys, shaderInputNames,
+                                             origType->getNumParams(), true);
+        calleeArgTys = ArrayRef(shaderInputTys);
+        calleeArgNames = ArrayRef(shaderInputNames);
+        const bool isEntryPoint = isShaderEntryPoint(origFunc);
+        if (!isEntryPoint && m_pipelineState->getShaderModes()->getComputeShaderMode().noLocalInvocationIdInCalls) {
+          assert(calleeArgNames.back() == "LocalInvocationId");
+          calleeArgTys = calleeArgTys.drop_back();
+          calleeArgNames = calleeArgNames.drop_back();
+        }
+      }
+
+      const bool isEntryPoint = isShaderEntryPoint(origFunc);
+      newFunc =
+          addFunctionArgs(origFunc, origType->getReturnType(), isEntryPoint ? ArrayRef(shaderInputTys) : calleeArgTys,
+                          isEntryPoint ? ArrayRef(shaderInputNames) : calleeArgNames, inRegMask, AddFunctionArgsAppend);
       newFunc->setCallingConv(isEntryPoint ? CallingConv::AMDGPU_CS : CallingConv::AMDGPU_Gfx);
     }
     // Set Attributes on new function.
@@ -1250,20 +1281,20 @@ void PatchEntryPointMutate::processComputeFuncs(ShaderInputs *shaderInputs, Modu
     // Remove original function.
     origFunc->eraseFromParent();
 
-    if (lowerCpsOps(newFunc, cpsShaderInputs))
+    if (lowerCpsOps(newFunc, shaderInputs))
       continue;
 
     int argOffset = origType->getNumParams();
     if (isComputeWithCalls())
-      processCalls(*newFunc, shaderInputTys, shaderInputNames, inRegMask, argOffset);
+      processCalls(*newFunc, calleeArgTys, calleeArgNames, inRegMask, argOffset);
   }
 }
 // =====================================================================================================================
 // Process all real function calls and passes arguments to them.
 //
 // @param [in/out] module : Module
-void PatchEntryPointMutate::processCalls(Function &func, SmallVectorImpl<Type *> &shaderInputTys,
-                                         SmallVectorImpl<std::string> &shaderInputNames, uint64_t inRegMask,
+void PatchEntryPointMutate::processCalls(Function &func, ArrayRef<Type *> shaderInputTys,
+                                         ArrayRef<std::string> shaderInputNames, uint64_t inRegMask,
                                          unsigned argOffset) {
   // This is one of:
   // - a compute pipeline with non-inlined functions;
@@ -1281,7 +1312,7 @@ void PatchEntryPointMutate::processCalls(Function &func, SmallVectorImpl<Type *>
       Value *calledVal = call->getCalledOperand();
       Function *calledFunc = dyn_cast<Function>(calledVal);
       if (calledFunc) {
-        if (calledFunc->isIntrinsic() || calledFunc->getName().startswith(lgcName::InternalCallPrefix))
+        if (calledFunc->isIntrinsic() || calledFunc->getName().starts_with(lgcName::InternalCallPrefix))
           continue;
       } else if (call->isInlineAsm()) {
         continue;
@@ -1303,15 +1334,7 @@ void PatchEntryPointMutate::processCalls(Function &func, SmallVectorImpl<Type *>
       // If the old called value was a function declaration, we did not insert a bitcast
       FunctionType *calledTy = FunctionType::get(call->getType(), argTys, false);
       builder.SetInsertPoint(call);
-      Type *calledPtrTy = calledTy->getPointerTo(calledVal->getType()->getPointerAddressSpace());
-      auto bitCast = dyn_cast<BitCastOperator>(calledVal);
-      Value *newCalledVal = nullptr;
-      if (bitCast && bitCast->getOperand(0)->getType() == calledPtrTy)
-        newCalledVal = bitCast->getOperand(0);
-      else
-        newCalledVal = builder.CreateBitCast(calledVal, calledPtrTy);
-      // Create the call.
-      CallInst *newCall = builder.CreateCall(calledTy, newCalledVal, args);
+      CallInst *newCall = builder.CreateCall(calledTy, calledVal, args);
       newCall->setCallingConv(CallingConv::AMDGPU_Gfx);
 
       // Mark sgpr arguments as inreg
@@ -1331,8 +1354,8 @@ void PatchEntryPointMutate::processCalls(Function &func, SmallVectorImpl<Type *>
 // Set Attributes on new function
 void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
   AttrBuilder builder(entryPoint->getContext());
-  if (m_shaderStage == ShaderStageFragment) {
-    auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs;
+  if (m_shaderStage == ShaderStage::Fragment) {
+    auto &builtInUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Fragment)->builtInUsage.fs;
     SpiPsInputAddr spiPsInputAddr = {};
 
     spiPsInputAddr.bits.perspSampleEna =
@@ -1416,10 +1439,10 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
 
   if (shaderOptions->maxThreadGroupsPerComputeUnit != 0) {
     unsigned tgSize;
-    if (m_shaderStage == ShaderStageCompute || m_shaderStage == ShaderStageTask) {
+    if (m_shaderStage == ShaderStage::Compute || m_shaderStage == ShaderStage::Task) {
       const auto &mode = m_pipelineState->getShaderModes()->getComputeShaderMode();
       tgSize = std::max(1u, mode.workgroupSizeX * mode.workgroupSizeY * mode.workgroupSizeZ);
-    } else if (m_shaderStage == ShaderStageMesh) {
+    } else if (m_shaderStage == ShaderStage::Mesh) {
       const auto &mode = m_pipelineState->getShaderModes()->getMeshShaderMode();
       tgSize = std::max(1u, mode.workgroupSizeX * mode.workgroupSizeY * mode.workgroupSizeZ);
     } else {
@@ -1442,7 +1465,7 @@ void PatchEntryPointMutate::setFuncAttrs(Function *entryPoint) {
 
   if (shaderOptions->ldsSpillLimitDwords != 0) {
     // Sanity check: LDS spilling is only supported in Fragment and Compute.
-    if (m_shaderStage == ShaderStageFragment || m_shaderStage == ShaderStageCompute)
+    if (m_shaderStage == ShaderStage::Fragment || m_shaderStage == ShaderStage::Compute)
       builder.addAttribute("amdgpu-lds-spill-limit-dwords", std::to_string(shaderOptions->ldsSpillLimitDwords));
   }
 
@@ -1572,9 +1595,9 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
     // Only applies to wave32
     // TODO: Can we further exclude PS if LDS_GROUP_SIZE == 0
     if (m_pipelineState->getShaderWaveSize(m_shaderStage) == 32 &&
-        (m_shaderStage == ShaderStageCompute || m_shaderStage == ShaderStageFragment ||
-         m_shaderStage == ShaderStageMesh)) {
-      unsigned userDataLimit = m_shaderStage == ShaderStageMesh ? 8 : 16;
+        (m_shaderStage == ShaderStage::Compute || m_shaderStage == ShaderStage::Fragment ||
+         m_shaderStage == ShaderStage::Mesh)) {
+      unsigned userDataLimit = m_shaderStage == ShaderStage::Mesh ? 8 : 16;
 
       while (userDataIdx < userDataLimit) {
         argTys.push_back(builder.getInt32Ty());
@@ -1588,7 +1611,7 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
   // the SGPR corresponding to scratch offset (s2) of PS is incorrectly initialized. This leads to invalid scratch
   // memory access, causing GPU hang. Thus, we detect such case and add a dummy user SGPR in order not to map scratch
   // offset to s2.
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 9 && m_shaderStage == ShaderStageFragment) {
+  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 9 && m_shaderStage == ShaderStage::Fragment) {
     if (userDataIdx == 1) {
       argTys.push_back(builder.getInt32Ty());
       argNames.push_back("dummyInit");
@@ -1667,8 +1690,8 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
   auto &entryArgIdxs = intfData->entryArgIdxs;
   bool enableNgg = m_pipelineState->isGraphics() ? m_pipelineState->getNggControl()->enableNgg : false;
 
-  if (m_shaderStage == ShaderStageVertex || m_shaderStage == ShaderStageTessControl ||
-      m_shaderStage == ShaderStageTessEval || m_shaderStage == ShaderStageGeometry) {
+  if (m_shaderStage == ShaderStage::Vertex || m_shaderStage == ShaderStage::TessControl ||
+      m_shaderStage == ShaderStage::TessEval || m_shaderStage == ShaderStage::Geometry) {
     // Shader stage in the vertex-processing half of a graphics pipeline.
     // We need to ensure that the layout is the same between two shader stages that will be merged on GFX9+,
     // that is, VS-TCS, VS-GS (if no tessellation), TES-GS.
@@ -1679,16 +1702,16 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       unsigned *argIdx = nullptr;
       auto userDataValue = UserDataMapping::ViewId;
       switch (m_shaderStage) {
-      case ShaderStageVertex:
+      case ShaderStage::Vertex:
         argIdx = &entryArgIdxs.vs.viewId;
         break;
-      case ShaderStageTessControl:
+      case ShaderStage::TessControl:
         argIdx = &entryArgIdxs.tcs.viewId;
         break;
-      case ShaderStageTessEval:
+      case ShaderStage::TessEval:
         argIdx = &entryArgIdxs.tes.viewId;
         break;
-      case ShaderStageGeometry:
+      case ShaderStage::Geometry:
         argIdx = &entryArgIdxs.gs.viewId;
         break;
       default:
@@ -1697,10 +1720,10 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "viewId", userDataValue, argIdx));
     }
 
-    if (getMergedShaderStage(m_shaderStage) == getMergedShaderStage(ShaderStageVertex)) {
+    if (getMergedShaderStage(m_shaderStage) == getMergedShaderStage(ShaderStage::Vertex)) {
       // This is the VS, or the shader that VS is merged into on GFX9+.
-      auto vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStageVertex);
-      auto vsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStageVertex);
+      auto vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStage::Vertex);
+      auto vsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Vertex);
 
       // Detect whether this is an unlinked compile that will need a fetch shader. If so, we need to
       // add the vertex buffer table and base vertex and base instance, even if they appear unused here.
@@ -1728,7 +1751,7 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
         specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "drawIndex", UserDataMapping::DrawIndex));
     }
 
-  } else if (m_shaderStage == ShaderStageCompute) {
+  } else if (m_shaderStage == ShaderStage::Compute) {
     // Pass the gl_NumWorkgroups pointer in user data registers.
     // Always enable this, even if unused, if compute library is in use.
     // Unlike all the special user data values above, which go after the user data node args, this goes before.
@@ -1738,7 +1761,7 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       auto numWorkgroupsPtrTy = PointerType::get(FixedVectorType::get(builder.getInt32Ty(), 3), ADDR_SPACE_CONST);
       userDataArgs.push_back(UserDataArg(numWorkgroupsPtrTy, "numWorkgroupsPtr", UserDataMapping::Workgroup, nullptr));
     }
-  } else if (m_shaderStage == ShaderStageTask) {
+  } else if (m_shaderStage == ShaderStage::Task) {
     // Draw index.
     if (userDataUsage->isSpecialUserDataUsed(UserDataMapping::DrawIndex))
       specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "drawIndex", UserDataMapping::DrawIndex));
@@ -1754,8 +1777,8 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
                                                 UserDataMapping::MeshPipeStatsBuf,
                                                 &intfData->entryArgIdxs.task.pipeStatsBuf));
     }
-  } else if (m_shaderStage == ShaderStageMesh) {
-    if (m_pipelineState->getShaderResourceUsage(ShaderStageMesh)->builtInUsage.mesh.drawIndex) {
+  } else if (m_shaderStage == ShaderStage::Mesh) {
+    if (m_pipelineState->getShaderResourceUsage(ShaderStage::Mesh)->builtInUsage.mesh.drawIndex) {
       specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "drawIndex", UserDataMapping::DrawIndex,
                                                 &intfData->entryArgIdxs.mesh.drawIndex));
     }
@@ -1774,9 +1797,9 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
                                                 UserDataMapping::MeshPipeStatsBuf,
                                                 &intfData->entryArgIdxs.mesh.pipeStatsBuf));
     }
-  } else if (m_shaderStage == ShaderStageFragment) {
+  } else if (m_shaderStage == ShaderStage::Fragment) {
     if (m_pipelineState->getInputAssemblyState().multiView != MultiViewMode::Disable &&
-        m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs.viewIndex) {
+        m_pipelineState->getShaderResourceUsage(ShaderStage::Fragment)->builtInUsage.fs.viewIndex) {
       // NOTE: Only add special user data of view index when multi-view is enabled and gl_ViewIndex is used in fragment
       // shader.
       specialUserDataArgs.push_back(
@@ -1789,7 +1812,7 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
           UserDataArg(builder.getInt32Ty(), "colorExpAddr", UserDataMapping::ColorExportAddr));
     }
 
-    if (m_pipelineState->getShaderResourceUsage(ShaderStageFragment)->builtInUsage.fs.runAtSampleRate &&
+    if (m_pipelineState->getShaderResourceUsage(ShaderStage::Fragment)->builtInUsage.fs.runAtSampleRate &&
         (m_pipelineState->isUnlinked() || m_pipelineState->getRasterizerState().dynamicSampleInfo)) {
       specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "sampleInfo", UserDataMapping::SampleInfo,
                                                 &intfData->entryArgIdxs.fs.sampleInfo));
@@ -1805,18 +1828,18 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
   // Allocate register for stream-out buffer table, to go before the user data node args (unlike all the ones
   // above, which go after the user data node args).
   if (userDataUsage->usesStreamOutTable || userDataUsage->isSpecialUserDataUsed(UserDataMapping::StreamOutTable)) {
-    if (enableNgg || !m_pipelineState->hasShaderStage(ShaderStageCopyShader) && m_pipelineState->enableXfb()) {
+    if (enableNgg || !m_pipelineState->hasShaderStage(ShaderStage::CopyShader) && m_pipelineState->enableXfb()) {
       // If no NGG, stream out table will be set to copy shader's user data entry, we should not set it duplicately.
       unsigned *tablePtr = nullptr;
 
       switch (m_shaderStage) {
-      case ShaderStageVertex:
+      case ShaderStage::Vertex:
         tablePtr = &intfData->entryArgIdxs.vs.streamOutData.tablePtr;
         break;
-      case ShaderStageTessEval:
+      case ShaderStage::TessEval:
         tablePtr = &intfData->entryArgIdxs.tes.streamOutData.tablePtr;
         break;
-      case ShaderStageGeometry:
+      case ShaderStage::Geometry:
         if (m_pipelineState->enableSwXfb()) {
           tablePtr = &intfData->entryArgIdxs.gs.streamOutData.tablePtr;
         } else {
@@ -1844,13 +1867,13 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
     unsigned *controlBufPtr = nullptr;
 
     switch (m_shaderStage) {
-    case ShaderStageVertex:
+    case ShaderStage::Vertex:
       controlBufPtr = &intfData->entryArgIdxs.vs.streamOutData.controlBufPtr;
       break;
-    case ShaderStageTessEval:
+    case ShaderStage::TessEval:
       controlBufPtr = &intfData->entryArgIdxs.tes.streamOutData.controlBufPtr;
       break;
-    case ShaderStageGeometry:
+    case ShaderStage::Geometry:
       controlBufPtr = &intfData->entryArgIdxs.gs.streamOutData.controlBufPtr;
       break;
     default:
@@ -1885,7 +1908,7 @@ void PatchEntryPointMutate::finalizeUserDataArgs(SmallVectorImpl<UserDataArg> &u
   // Figure out how many sgprs we have available for userDataArgs.
   // We have s0-s31 (s0-s15 for <=GFX8, or for a compute/task shader on any chip) for everything, so take off the number
   // of registers used by specialUserDataArgs.
-  unsigned userDataAvailable = (m_shaderStage == ShaderStageCompute || m_shaderStage == ShaderStageTask)
+  unsigned userDataAvailable = (m_shaderStage == ShaderStage::Compute || m_shaderStage == ShaderStage::Task)
                                    ? InterfaceData::MaxCsUserDataCount
                                    : m_pipelineState->getTargetInfo().getGpuProperty().maxUserDataCount;
 
@@ -2001,7 +2024,7 @@ void PatchEntryPointMutate::finalizeUserDataArgs(SmallVectorImpl<UserDataArg> &u
 // Get UserDataUsage struct for the merged shader stage that contains the given shader stage
 //
 // @param stage : Shader stage
-PatchEntryPointMutate::UserDataUsage *PatchEntryPointMutate::getUserDataUsage(ShaderStage stage) {
+PatchEntryPointMutate::UserDataUsage *PatchEntryPointMutate::getUserDataUsage(ShaderStageEnum stage) {
   stage = getMergedShaderStage(stage);
   m_userDataUsage.resize(std::max(m_userDataUsage.size(), static_cast<size_t>(stage) + 1));
   if (!m_userDataUsage[stage])
@@ -2017,16 +2040,16 @@ PatchEntryPointMutate::UserDataUsage *PatchEntryPointMutate::getUserDataUsage(Sh
 // TES -> GS (if it exists)
 //
 // @param stage : Shader stage
-ShaderStage PatchEntryPointMutate::getMergedShaderStage(ShaderStage stage) const {
+ShaderStageEnum PatchEntryPointMutate::getMergedShaderStage(ShaderStageEnum stage) const {
   if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) {
     switch (stage) {
-    case ShaderStageVertex:
-      if (m_pipelineState->hasShaderStage(ShaderStageTessControl))
-        return ShaderStageTessControl;
+    case ShaderStage::Vertex:
+      if (m_pipelineState->hasShaderStage(ShaderStage::TessControl))
+        return ShaderStage::TessControl;
       LLVM_FALLTHROUGH;
-    case ShaderStageTessEval:
-      if (m_pipelineState->hasShaderStage(ShaderStageGeometry))
-        return ShaderStageGeometry;
+    case ShaderStage::TessEval:
+      if (m_pipelineState->hasShaderStage(ShaderStage::Geometry))
+        return ShaderStage::Geometry;
       break;
     default:
       break;

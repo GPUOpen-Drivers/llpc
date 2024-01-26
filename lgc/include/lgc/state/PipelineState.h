@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -134,7 +134,7 @@ public:
   const Options &getOptions() const override final { return m_options; }
 
   // Set per-shader options
-  void setShaderOptions(ShaderStage stage, const ShaderOptions &options) override final;
+  void setShaderOptions(ShaderStageEnum stage, const ShaderOptions &options) override final;
 
   // Set device index
   void setDeviceIndex(unsigned deviceIndex) override final { m_deviceIndex = deviceIndex; }
@@ -155,8 +155,15 @@ public:
   // Set the finalized 128-bit cache hash that is used to find this pipeline in the cache for the given version of LLPC.
   void set128BitCacheHash(const Hash128 &finalizedCacheHash, const llvm::VersionTuple &version) override final;
 
+  // Find the shader entry-point from shader module, and set pipeline stage.
+  void attachModule(llvm::Module *modules) override final;
+
+  // Record pipeline state into IR metadata of specified module.
+  void record(llvm::Module *module) override final;
+
   // Link the individual shader IR modules into a single pipeline module
-  llvm::Module *irLink(llvm::ArrayRef<llvm::Module *> modules, PipelineLink pipelineLink) override final;
+  std::unique_ptr<llvm::Module> irLink(llvm::MutableArrayRef<std::unique_ptr<llvm::Module>> modules,
+                                       PipelineLink pipelineLink) override final;
 
   // Generate pipeline module
   bool generate(std::unique_ptr<llvm::Module> pipelineModule, llvm::raw_pwrite_stream &outStream,
@@ -213,7 +220,7 @@ public:
   // Other methods
 
   // Set shader stage mask
-  void setShaderStageMask(unsigned mask) { m_stageMask = mask; }
+  void setShaderStageMask(ShaderStageMask mask) { m_stageMask = mask; }
 
   // Get the embedded ShaderModes object
   const ShaderModes *getShaderModes() const { return &m_shaderModes; }
@@ -235,9 +242,6 @@ public:
   // Clear the pipeline state IR metadata.
   void clear(llvm::Module *module);
 
-  // Record pipeline state into IR metadata of specified module.
-  void record(llvm::Module *module);
-
   void recordExceptPalMetadata(llvm::Module *module);
 
   // Print pipeline state
@@ -247,20 +251,20 @@ public:
 #endif
 
   // Accessors for shader stage mask
-  unsigned getShaderStageMask();
+  ShaderStageMask getShaderStageMask();
   bool getPreRasterHasGs() const { return m_preRasterHasGs; }
-  bool hasShaderStage(ShaderStage stage) { return (getShaderStageMask() >> stage) & 1; }
+  bool hasShaderStage(ShaderStageEnum stage) { return getShaderStageMask().contains(stage); }
   bool isGraphics();
   bool isComputeLibrary() const { return m_computeLibrary; }
-  ShaderStage getLastVertexProcessingStage() const;
-  ShaderStage getPrevShaderStage(ShaderStage shaderStage) const;
-  ShaderStage getNextShaderStage(ShaderStage shaderStage) const;
+  ShaderStageEnum getLastVertexProcessingStage() const;
+  ShaderStageEnum getPrevShaderStage(ShaderStageEnum shaderStage) const;
+  ShaderStageEnum getNextShaderStage(ShaderStageEnum shaderStage) const;
 
   // Get client name
   const char *getClient() const { return m_client.c_str(); }
 
   // Get per-shader options
-  const ShaderOptions &getShaderOptions(ShaderStage stage);
+  const ShaderOptions &getShaderOptions(ShaderStageEnum stage);
 
   // Set up the pipeline state from the pipeline module.
   void readState(llvm::Module *module);
@@ -269,15 +273,15 @@ public:
   llvm::ArrayRef<ResourceNode> getUserDataNodes() const { return m_userDataNodes; }
 
   // Find the push constant resource node
-  const ResourceNode *findPushConstantResourceNode(ShaderStage shaderStage = ShaderStageInvalid) const;
+  const ResourceNode *findPushConstantResourceNode(std::optional<ShaderStageEnum> shaderStage = std::nullopt) const;
 
   // Find the resource node for the given set,binding
   std::pair<const ResourceNode *, const ResourceNode *>
   findResourceNode(ResourceNodeType nodeType, uint64_t descSet, unsigned binding,
-                   ShaderStage shaderStage = ShaderStageInvalid) const;
+                   std::optional<ShaderStageEnum> shaderStage = std::nullopt) const;
 
   // Find the single root resource node of the given type
-  const ResourceNode *findSingleRootResourceNode(ResourceNodeType nodeType, ShaderStage shaderStage) const;
+  const ResourceNode *findSingleRootResourceNode(ResourceNodeType nodeType, ShaderStageEnum shaderStage) const;
 
   // Accessors for vertex input descriptions.
   llvm::ArrayRef<VertexInputDescription> getVertexInputDescriptions() const { return m_vertexInputDescriptions; }
@@ -307,23 +311,23 @@ public:
   bool canOptimizeTessFactor();
 
   // Gets wave size for the specified shader stage
-  unsigned getShaderWaveSize(ShaderStage stage);
+  unsigned getShaderWaveSize(ShaderStageEnum stage);
   // Gets wave size for the merged shader stage
-  unsigned getMergedShaderWaveSize(ShaderStage stage);
+  unsigned getMergedShaderWaveSize(ShaderStageEnum stage);
   // Gets subgroup size for the specified shader stage
-  unsigned getShaderSubgroupSize(ShaderStage stage);
+  unsigned getShaderSubgroupSize(ShaderStageEnum stage);
 
   // Set the default wave size for the specified shader stage
-  void setShaderDefaultWaveSize(ShaderStage stage);
+  void setShaderDefaultWaveSize(ShaderStageEnum stage);
 
   // Set the wave size for the specified shader stage
-  void setShaderWaveSize(ShaderStage stage, unsigned waveSize) {
+  void setShaderWaveSize(ShaderStageEnum stage, unsigned waveSize) {
     assert(waveSize == 32 || waveSize == 64);
     m_waveSize[stage] = waveSize;
   }
 
   // Whether WGP mode is enabled for the given shader stage
-  bool getShaderWgpMode(ShaderStage stage) const;
+  bool getShaderWgpMode(ShaderStageEnum stage) const;
 
   // Get NGG control settings
   NggControl *getNggControl() { return &m_nggControl; }
@@ -341,10 +345,10 @@ public:
   bool enableSwXfb();
 
   // Gets resource usage of the specified shader stage
-  ResourceUsage *getShaderResourceUsage(ShaderStage shaderStage);
+  ResourceUsage *getShaderResourceUsage(ShaderStageEnum shaderStage);
 
   // Gets interface data of the specified shader stage
-  InterfaceData *getShaderInterfaceData(ShaderStage shaderStage);
+  InterfaceData *getShaderInterfaceData(ShaderStageEnum shaderStage);
 
   // Accessor for PAL metadata
   PalMetadata *getPalMetadata();
@@ -362,16 +366,16 @@ public:
   void initializeInOutPackState();
 
   // Get whether the input locations of the specified shader stage can be packed
-  bool canPackInput(ShaderStage shaderStage);
+  bool canPackInput(ShaderStageEnum shaderStage);
 
   // Get whether the output locations of the specified shader stage can be packed
-  bool canPackOutput(ShaderStage shaderStage);
+  bool canPackOutput(ShaderStageEnum shaderStage);
 
   // Set the flag to pack the input locations of the specified shader stage
-  void setPackInput(ShaderStage shaderStage, bool pack) { m_inputPackState[shaderStage] = pack; }
+  void setPackInput(ShaderStageEnum shaderStage, bool pack) { m_inputPackState[shaderStage] = pack; }
 
   // Set the flag to pack the output locations of the specified shader stage
-  void setPackOutput(ShaderStage shaderStage, bool pack) { m_outputPackState[shaderStage] = pack; }
+  void setPackOutput(ShaderStageEnum shaderStage, bool pack) { m_outputPackState[shaderStage] = pack; }
 
   // Get the count of vertices per primitive
   unsigned getVerticesPerPrimitive();
@@ -423,13 +427,13 @@ public:
   }
 
   // Set user data for a specific shader stage
-  void setUserDataMap(ShaderStage shaderStage, llvm::ArrayRef<unsigned> userDataValues) {
+  void setUserDataMap(ShaderStageEnum shaderStage, llvm::ArrayRef<unsigned> userDataValues) {
     m_userDataMaps[shaderStage].clear();
     m_userDataMaps[shaderStage].append(userDataValues.begin(), userDataValues.end());
   }
 
   // Get user data for a specific shader stage
-  llvm::ArrayRef<unsigned> getUserDataMap(ShaderStage shaderStage) const { return m_userDataMaps[shaderStage]; }
+  llvm::ArrayRef<unsigned> getUserDataMap(ShaderStageEnum shaderStage) const { return m_userDataMaps[shaderStage]; }
 
   // -----------------------------------------------------------------------------------------------------------------
   // Utility method templates to read and write IR metadata, used by PipelineState and ShaderModes
@@ -577,7 +581,7 @@ private:
   bool m_emitLgc = false;  // Whether -emit-lgc is on
   // Whether generating pipeline or unlinked part-pipeline
   PipelineLink m_pipelineLink = PipelineLink::WholePipeline;
-  unsigned m_stageMask = 0;                             // Mask of active shader stages
+  ShaderStageMask m_stageMask;                          // Mask of active shader stages
   bool m_preRasterHasGs = false;                        // Whether pre-rasterization part has a geometry shader
   bool m_computeLibrary = false;                        // Whether pipeline is in fact a compute library
   std::string m_client;                                 // Client name for PAL metadata
@@ -590,27 +594,27 @@ private:
   // Allocated buffers for immutable sampler data
   llvm::SmallVector<std::unique_ptr<uint32_t[]>, 4> m_immutableValueAllocs;
 
-  bool m_gsOnChip = false;                                                     // Whether to use GS on-chip mode
-  bool m_meshRowExport = false;                                                // Enable mesh shader row export or not
-  bool m_registerFieldFormat = false;                                          // Use register field format
-  NggControl m_nggControl = {};                                                // NGG control settings
-  ShaderModes m_shaderModes;                                                   // Shader modes for this pipeline
-  unsigned m_deviceIndex = 0;                                                  // Device index
-  std::vector<VertexInputDescription> m_vertexInputDescriptions;               // Vertex input descriptions
-  llvm::SmallVector<ColorExportFormat, 8> m_colorExportFormats;                // Color export formats
-  ColorExportState m_colorExportState = {};                                    // Color export state
-  InputAssemblyState m_inputAssemblyState = {};                                // Input-assembly state
-  RasterizerState m_rasterizerState = {};                                      // Rasterizer state
-  DepthStencilState m_depthStencilState = {};                                  // Depth/stencil state
-  std::unique_ptr<ResourceUsage> m_resourceUsage[ShaderStageCompute + 1] = {}; // Per-shader ResourceUsage
-  std::unique_ptr<InterfaceData> m_interfaceData[ShaderStageCompute + 1] = {}; // Per-shader InterfaceData
-  PalMetadata *m_palMetadata = nullptr;                                        // PAL metadata object
-  unsigned m_waveSize[ShaderStageCountInternal] = {};                          // Per-shader wave size
-  unsigned m_subgroupSize[ShaderStageCountInternal] = {};                      // Per-shader subgroup size
-  bool m_inputPackState[ShaderStageGfxCount] = {};  // The input packable state per shader stage
-  bool m_outputPackState[ShaderStageGfxCount] = {}; // The output packable state per shader stage
-  XfbStateMetadata m_xfbStateMetadata = {};         // Transform feedback state metadata
-  llvm::SmallVector<unsigned, 32> m_userDataMaps[ShaderStageCountInternal]; // The user data per-shader
+  bool m_gsOnChip = false;                                                       // Whether to use GS on-chip mode
+  bool m_meshRowExport = false;                                                  // Enable mesh shader row export or not
+  bool m_registerFieldFormat = false;                                            // Use register field format
+  NggControl m_nggControl = {};                                                  // NGG control settings
+  ShaderModes m_shaderModes;                                                     // Shader modes for this pipeline
+  unsigned m_deviceIndex = 0;                                                    // Device index
+  std::vector<VertexInputDescription> m_vertexInputDescriptions;                 // Vertex input descriptions
+  llvm::SmallVector<ColorExportFormat, 8> m_colorExportFormats;                  // Color export formats
+  ColorExportState m_colorExportState = {};                                      // Color export state
+  InputAssemblyState m_inputAssemblyState = {};                                  // Input-assembly state
+  RasterizerState m_rasterizerState = {};                                        // Rasterizer state
+  DepthStencilState m_depthStencilState = {};                                    // Depth/stencil state
+  std::unique_ptr<ResourceUsage> m_resourceUsage[ShaderStage::Compute + 1] = {}; // Per-shader ResourceUsage
+  std::unique_ptr<InterfaceData> m_interfaceData[ShaderStage::Compute + 1] = {}; // Per-shader InterfaceData
+  PalMetadata *m_palMetadata = nullptr;                                          // PAL metadata object
+  unsigned m_waveSize[ShaderStage::CountInternal] = {};                          // Per-shader wave size
+  unsigned m_subgroupSize[ShaderStage::CountInternal] = {};                      // Per-shader subgroup size
+  bool m_inputPackState[ShaderStage::GfxCount] = {};  // The input packable state per shader stage
+  bool m_outputPackState[ShaderStage::GfxCount] = {}; // The output packable state per shader stage
+  XfbStateMetadata m_xfbStateMetadata = {};           // Transform feedback state metadata
+  llvm::SmallVector<unsigned, 32> m_userDataMaps[ShaderStage::CountInternal]; // The user data per-shader
 
   struct {
     float inner[2]; // default tessellation inner level

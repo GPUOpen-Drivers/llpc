@@ -214,6 +214,7 @@ public:
   const char *getDecorateString(Decoration kind) const;
   bool hasMemberDecorate(SPIRVWord MemberIndex, Decoration Kind, size_t Index = 0, SPIRVWord *Result = 0) const;
   std::set<SPIRVWord> getDecorate(Decoration Kind, size_t Index = 0) const;
+
   bool hasId() const { return !(Attrib & SPIRVEA_NOID); }
   bool hasLine() const { return Line != nullptr; }
   bool hasLinkageType() const;
@@ -230,6 +231,7 @@ public:
   bool isControlBarrier() const { return OpCode == OpControlBarrier; }
   bool isMemoryBarrier() const { return OpCode == OpMemoryBarrier; }
   bool isVariable() const { return OpCode == OpVariable; }
+
   bool isEndOfBlock() const;
   virtual bool isInst() const { return false; }
   virtual bool isOperandLiteral(unsigned Index) const {

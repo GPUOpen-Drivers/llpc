@@ -20,7 +20,7 @@ void main()
 }
 // CHECK-LABEL: @lgc.shader.FS.main(
 // CHECK-NEXT:  .entry:
-// CHECK-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) (...) @lgc.create.load.buffer.desc.p7(i64 0, i32 0, i32 0, i32 0)
+// CHECK-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 0)
 // CHECK-NEXT:    [[TMP1:%.*]] = call ptr @llvm.invariant.start.p7(i64 -1, ptr addrspace(7) [[TMP0]])
 // CHECK-NEXT:    [[TMP2:%.*]] = load float, ptr addrspace(7) [[TMP0]], align 4
 // CHECK-NEXT:    [[TMP3:%.*]] = getelementptr inbounds <{ float, float, float, [4 x i8], [3 x float], [4 x i8], [3 x float], [4 x i8], [3 x float] }>, ptr addrspace(7) [[TMP0]], i32 0, i32 1

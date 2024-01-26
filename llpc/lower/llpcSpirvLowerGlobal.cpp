@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -194,8 +194,7 @@ static_assert(lgc::ShadingRateHorizontal4Pixels ==
 
 // =====================================================================================================================
 SpirvLowerGlobal::SpirvLowerGlobal()
-    : m_retBlock(nullptr), m_lowerInputInPlace(false), m_lowerOutputInPlace(false),
-      m_lastVertexProcessingStage(ShaderStageInvalid) {
+    : m_lowerInputInPlace(false), m_lowerOutputInPlace(false), m_lastVertexProcessingStage(ShaderStageInvalid) {
 }
 
 // =====================================================================================================================
@@ -271,7 +270,6 @@ bool SpirvLowerGlobal::runImpl(Module &module) {
   lowerUniformConstants();
   lowerAliasedVal();
   lowerShaderRecordBuffer();
-  cleanupReturnBlock();
 
   return true;
 }
@@ -307,21 +305,31 @@ void SpirvLowerGlobal::lowerEdgeFlag() {
 
 // =====================================================================================================================
 // Handle "return" instructions.
-void SpirvLowerGlobal::handleReturnInst() {
-  for (Function &function : m_module->functions()) {
-    // We only handle the "return" in entry point
-    if (function.getLinkage() == GlobalValue::InternalLinkage)
-      continue;
-    for (BasicBlock &block : function) {
-      Instruction *terminator = block.getTerminator();
-      if (!terminator || terminator->getOpcode() != Instruction::Ret)
-        continue;
-      ReturnInst *returnInst = cast<ReturnInst>(terminator);
-      assert(m_retBlock);
-      BranchInst::Create(m_retBlock, &block);
-      m_retInsts.insert(returnInst);
-    }
+ReturnInst *SpirvLowerGlobal::ensureUnifiedReturn() {
+  SmallVector<ReturnInst *> retInsts;
+
+  for (BasicBlock &block : *m_entryPoint) {
+    if (auto *retInst = dyn_cast<ReturnInst>(block.getTerminator()))
+      retInsts.push_back(retInst);
   }
+
+  if (retInsts.size() == 1)
+    return retInsts[0];
+
+  // There are more than 2 returns; create a unified return block.
+  //
+  // Also create a "unified return block" if there are no returns at all. Such a shader will surely hang or otherwise
+  // trigger UB if it is ever executed, but we still need to compile it correctly in case it never runs.
+  BasicBlock *retBlock = BasicBlock::Create(*m_context, "", m_entryPoint);
+
+  for (ReturnInst *retInst : retInsts) {
+    m_builder->SetInsertPoint(retInst);
+    m_builder->CreateBr(retBlock);
+    retInst->eraseFromParent();
+  }
+
+  m_builder->SetInsertPoint(retBlock);
+  return m_builder->CreateRetVoid();
 }
 
 // =====================================================================================================================
@@ -341,30 +349,30 @@ void SpirvLowerGlobal::handleCallInst(bool checkEmitCall, bool checkInterpCall) 
       assert(isa<CallInst>(user) && "We should only have CallInst instructions here.");
       CallInst *callInst = cast<CallInst>(user);
       if (checkEmitCall) {
-        if (mangledName.startswith(gSPIRVName::EmitVertex) || mangledName.startswith(gSPIRVName::EmitStreamVertex))
+        if (mangledName.starts_with(gSPIRVName::EmitVertex) || mangledName.starts_with(gSPIRVName::EmitStreamVertex))
           m_emitCalls.insert(callInst);
       } else {
         assert(checkInterpCall);
 
-        if (mangledName.startswith(gSPIRVName::InterpolateAtCentroid) ||
-            mangledName.startswith(gSPIRVName::InterpolateAtSample) ||
-            mangledName.startswith(gSPIRVName::InterpolateAtOffset) ||
-            mangledName.startswith(gSPIRVName::InterpolateAtVertexAMD)) {
+        if (mangledName.starts_with(gSPIRVName::InterpolateAtCentroid) ||
+            mangledName.starts_with(gSPIRVName::InterpolateAtSample) ||
+            mangledName.starts_with(gSPIRVName::InterpolateAtOffset) ||
+            mangledName.starts_with(gSPIRVName::InterpolateAtVertexAMD)) {
           // Translate interpolation functions to LLPC intrinsic calls
           auto loadSrc = callInst->getArgOperand(0);
           unsigned interpLoc = InterpLocUnknown;
           Value *auxInterpValue = nullptr;
 
-          if (mangledName.startswith(gSPIRVName::InterpolateAtCentroid))
+          if (mangledName.starts_with(gSPIRVName::InterpolateAtCentroid))
             interpLoc = InterpLocCentroid;
-          else if (mangledName.startswith(gSPIRVName::InterpolateAtSample)) {
+          else if (mangledName.starts_with(gSPIRVName::InterpolateAtSample)) {
             interpLoc = InterpLocSample;
             auxInterpValue = callInst->getArgOperand(1); // Sample ID
-          } else if (mangledName.startswith(gSPIRVName::InterpolateAtOffset)) {
+          } else if (mangledName.starts_with(gSPIRVName::InterpolateAtOffset)) {
             interpLoc = InterpLocCenter;
             auxInterpValue = callInst->getArgOperand(1); // Offset from pixel center
           } else {
-            assert(mangledName.startswith(gSPIRVName::InterpolateAtVertexAMD));
+            assert(mangledName.starts_with(gSPIRVName::InterpolateAtVertexAMD));
             interpLoc = InterpLocCustom;
             auxInterpValue = callInst->getArgOperand(1); // Vertex no.
           }
@@ -595,13 +603,13 @@ void SpirvLowerGlobal::mapGlobalVariableToProxy(GlobalVariable *globalVar) {
   assert(m_entryPoint);
   removeConstantExpr(m_context, globalVar);
   // Handle special globals, regular allocas will be removed by SROA pass.
-  if (globalVar->getName().startswith(RtName::HitAttribute)) {
+  if (globalVar->getName().starts_with(RtName::HitAttribute)) {
     proxy = m_entryPoint->getArg(1);
     globalVar->replaceAllUsesWith(proxy);
-  } else if (globalVar->getName().startswith(RtName::IncomingRayPayLoad)) {
+  } else if (globalVar->getName().starts_with(RtName::IncomingRayPayLoad)) {
     proxy = m_entryPoint->getArg(0);
     globalVar->replaceAllUsesWith(proxy);
-  } else if (globalVar->getName().startswith(RtName::IncomingCallableData)) {
+  } else if (globalVar->getName().starts_with(RtName::IncomingCallableData)) {
     proxy = m_entryPoint->getArg(0);
     globalVar->replaceAllUsesWith(proxy);
   } else {
@@ -786,27 +794,17 @@ void SpirvLowerGlobal::lowerInput() {
 // =====================================================================================================================
 // Does lowering operations for SPIR-V outputs, replaces outputs with proxy variables.
 void SpirvLowerGlobal::lowerOutput() {
-  // Note: indirect raytracing does not have output to lower and must return payload value
-  if (m_context->getPipelineType() == PipelineType::RayTracing)
-    return;
-
-  m_retBlock = BasicBlock::Create(*m_context, "", m_entryPoint);
-  // Invoke handling of "return" instructions or "emit" calls
-  if (m_shaderStage == ShaderStageGeometry)
-    handleCallInst(true, false);
-  handleReturnInst();
-
-  auto retInst = ReturnInst::Create(*m_context, m_retBlock);
-
-  for (auto retInst : m_retInsts) {
-    retInst->dropAllReferences();
-    retInst->eraseFromParent();
-  }
-
   if (m_outputProxyMap.empty() && m_shaderStage != ShaderStageGeometry) {
     // Skip lowering if there is no output for non-geometry shader
     return;
   }
+
+  // Collect "emit" calls
+  if (m_shaderStage == ShaderStageGeometry)
+    handleCallInst(true, false);
+
+  // Create unified return block in which to place all the outputs from proxy variables
+  ReturnInst *retInst = ensureUnifiedReturn();
 
   // NOTE: For tessellation control shader, we invoke handling of "load"/"store" instructions and replace all those
   // instructions with import/export calls in-place.
@@ -847,10 +845,10 @@ void SpirvLowerGlobal::lowerOutput() {
         m_builder->SetInsertPoint(emitCall);
 
         auto mangledName = emitCall->getCalledFunction()->getName();
-        if (mangledName.startswith(gSPIRVName::EmitStreamVertex))
+        if (mangledName.starts_with(gSPIRVName::EmitStreamVertex))
           emitStreamId = cast<ConstantInt>(emitCall->getOperand(0))->getZExtValue();
         else
-          assert(mangledName.startswith(gSPIRVName::EmitVertex));
+          assert(mangledName.starts_with(gSPIRVName::EmitVertex));
 
         Value *outputValue = m_builder->CreateLoad(proxyTy, proxy);
         addCallInstForOutputExport(outputValue, meta, nullptr, 0, 0, 0, nullptr, nullptr, emitStreamId);
@@ -867,20 +865,29 @@ void SpirvLowerGlobal::lowerOutput() {
     emitCall->eraseFromParent();
   }
 
+  // NOTE: "Getelementptr" will propagate the address space of pointer value (output variable)
+  // to the element pointer value (destination). We have to clear the address space of this element pointer
+  // value. The original pointer value has been lowered and therefore the address space is invalid now.
   for (auto outputMap : m_outputProxyMap) {
     auto output = cast<GlobalVariable>(outputMap.first);
 
-    for (auto user = output->user_begin(), end = output->user_end(); user != end; ++user) {
-      // NOTE: "Getelementptr" and "bitCast" will propagate the address space of pointer value (output variable)
-      // to the element pointer value (destination). We have to clear the address space of this element pointer
-      // value. The original pointer value has been lowered and therefore the address space is invalid now.
-      Instruction *inst = dyn_cast<Instruction>(*user);
-      if (inst) {
-        Type *instTy = inst->getType();
-        if (isa<PointerType>(instTy) && instTy->getPointerAddressSpace() == SPIRAS_Output) {
-          assert(isa<GetElementPtrInst>(inst) || isa<BitCastInst>(inst));
-          Type *newInstTy = PointerType::get(*m_context, SPIRAS_Private);
-          inst->mutateType(newInstTy);
+    SmallVector<Value *> propagationWorklist;
+    propagationWorklist.push_back(output);
+
+    while (!propagationWorklist.empty()) {
+      Value *current = propagationWorklist.pop_back_val();
+
+      for (User *user : current->users()) {
+        Instruction *inst = dyn_cast<Instruction>(user);
+        if (inst) {
+          Type *instTy = inst->getType();
+          if (isa<PointerType>(instTy) && instTy->getPointerAddressSpace() == SPIRAS_Output) {
+            assert(isa<GetElementPtrInst>(inst));
+            Type *newInstTy = PointerType::get(*m_context, SPIRAS_Private);
+            inst->mutateType(newInstTy);
+
+            propagationWorklist.push_back(user);
+          }
         }
       }
     }
@@ -931,27 +938,6 @@ void SpirvLowerGlobal::lowerInOutInPlace() {
   }
 
   m_storeInsts.clear();
-
-  // Remove unnecessary "atomicrmw" or "cmpxchg" instructions
-  for (auto atomicInst : m_atomicInsts) {
-    Value *pointer = nullptr;
-    if (auto atomicRmw = dyn_cast<AtomicRMWInst>(atomicInst)) {
-      pointer = atomicRmw->getPointerOperand();
-    } else {
-      auto cmpXchg = dyn_cast<AtomicCmpXchgInst>(atomicInst);
-      assert(cmpXchg);
-      pointer = cmpXchg->getPointerOperand();
-    }
-    GetElementPtrInst *const getElemPtr = dyn_cast<GetElementPtrInst>(pointer);
-    if (getElemPtr)
-      getElemInsts.insert(getElemPtr);
-
-    assert(atomicInst->use_empty());
-    atomicInst->dropAllReferences();
-    atomicInst->eraseFromParent();
-  }
-
-  m_atomicInsts.clear();
 
   // Remove unnecessary "getelementptr" instructions
   while (!getElemInsts.empty()) {
@@ -1252,8 +1238,8 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
                                                      ->options.constantBufferBindingOffset;
 
               Value *bufferDesc =
-                  m_builder->CreateLoadBufferDesc(Vkgc::InternalDescriptorSetId, constBufferBinding,
-                                                  m_builder->getInt32(0), lgc::Builder::BufferFlagNonConst);
+                  m_builder->create<lgc::LoadBufferDescOp>(Vkgc::InternalDescriptorSetId, constBufferBinding,
+                                                           m_builder->getInt32(0), lgc::Builder::BufferFlagNonConst);
               // Layout is {width, height}, so the offset of height is added sizeof(float).
               Value *winHeightPtr =
                   m_builder->CreateConstInBoundsGEP1_32(m_builder->getInt8Ty(), bufferDesc, offset + sizeof(float));
@@ -1864,7 +1850,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
     SmallVector<ReplaceInstsInfo> instructionsToReplace;
     for (Function *const func : funcsUsedIn) {
       // Check if our block is an array of blocks.
-      if (global.getValueType()->isArrayTy()) {
+      if (!atomicCounterMD && global.getValueType()->isArrayTy()) {
         Type *const elementType = global.getValueType()->getArrayElementType();
 
         // We need to run over the users of the global, find the GEPs, and add a load for each.
@@ -1908,20 +1894,13 @@ void SpirvLowerGlobal::lowerBufferBlock() {
             Value *const bufferDesc =
                 isAccelerationStructure
                     ? m_builder->CreateGetDescPtr(descTy, descTy, descSet, binding)
-                    : m_builder->CreateLoadBufferDesc(descSet, binding, m_builder->getInt32(0), bufferFlags);
+                    : m_builder->create<lgc::LoadBufferDescOp>(descSet, binding, m_builder->getInt32(0), bufferFlags);
 
             // If the global variable is a constant, the data it points to is invariant.
             if (global.isConstant())
               m_builder->CreateInvariantStart(bufferDesc);
 
-            Value *newDescPtr = bufferDesc;
-            if (atomicCounterMD) {
-              SmallVector<Value *, 8> indices;
-              indices.push_back(m_builder->getInt32(atomicCounterMeta.offset));
-              newDescPtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, indices);
-            }
-
-            replaceInstsInfo.otherInst->replaceUsesOfWith(&global, newDescPtr);
+            replaceInstsInfo.otherInst->replaceUsesOfWith(&global, bufferDesc);
           } else {
             assert(!replaceInstsInfo.getElemPtrInsts.empty());
 
@@ -1944,7 +1923,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                      (isa<ConstantInt>(indices[0]) && cast<ConstantInt>(indices[0])->getZExtValue() == 0));
 
               // Get block index from the second gep index, if it is not zero.
-              Value *const blockIndex = (isBlockIndexZero || atomicCounterMD) ? m_builder->getInt32(0) : indices[1];
+              Value *const blockIndex = isBlockIndexZero ? m_builder->getInt32(0) : indices[1];
 
               bool isNonUniform = isShaderStageInMask(
                   m_shaderStage,
@@ -1961,7 +1940,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                   if (!callee)
                     continue;
                   // If the call is our non uniform decoration, record we are non uniform.
-                  isNonUniform = callee->getName().startswith(gSPIRVName::NonUniform);
+                  isNonUniform = callee->getName().starts_with(gSPIRVName::NonUniform);
                   break;
                 }
               }
@@ -1975,7 +1954,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                     continue;
                   // If the call is our non uniform decoration, record we are non uniform.
                   auto callee = call->getCalledFunction();
-                  if (callee && callee->getName().startswith(gSPIRVName::NonUniform)) {
+                  if (callee && callee->getName().starts_with(gSPIRVName::NonUniform)) {
                     isNonUniform = true;
                     break;
                   }
@@ -2033,7 +2012,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                   bufferDescs[idx] = m_builder->CreateGEP(m_builder->getInt8Ty(), descPtr, index);
                 } else {
                   bufferDescs[idx] =
-                      m_builder->CreateLoadBufferDesc(descSets[idx], bindings[idx], blockIndex, bufferFlags);
+                      m_builder->create<lgc::LoadBufferDescOp>(descSets[idx], bindings[idx], blockIndex, bufferFlags);
                 }
                 // If the global variable is a constant, the data it points to is invariant.
                 if (global.isConstant())
@@ -2045,22 +2024,6 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                 newSelect = m_builder->CreateSelect(select->getCondition(), bufferDescs[0], bufferDescs[1]);
 
               Value *base = newSelect ? newSelect : bufferDescs[0];
-              // If zero-index elimination removed leading zeros from OldGEP indices then we need to use OldGEP Source
-              // type as a Source type for newGEP. In other cases use global variable array element type.
-              Type *newGetElemType = gepsLeadingZerosEliminated ? getElemPtr->getSourceElementType() : elementType;
-              if (atomicCounterMD) {
-                // indices[1] store the array index, but may not be a constant
-                if (isa<ConstantInt>(indices[1])) {
-                  indices[0] =
-                      m_builder->getInt32(atomicCounterMeta.offset + cast<ConstantInt>(indices[1])->getZExtValue() * 4);
-                } else {
-                  auto atomicCounterElemOffset = m_builder->CreateMul(m_builder->getInt32(4), indices[1]);
-                  indices[0] =
-                      m_builder->CreateAdd(atomicCounterElemOffset, m_builder->getInt32(atomicCounterMeta.offset));
-                }
-                newGetElemType = m_builder->getInt8Ty();
-              }
-
               // We need to remove the block index from the original GEP indices so that we can use them, but first we
               // have to check if it was not removed already by zero-index elimination.
               if (!gepsLeadingZerosEliminated)
@@ -2073,6 +2036,9 @@ void SpirvLowerGlobal::lowerBufferBlock() {
                 newIndices = newIndices.drop_front(1);
 
               Value *newGetElemPtr = nullptr;
+              // If zero-index elimination removed leading zeros from OldGEP indices then we need to use OldGEP Source
+              // type as a Source type for newGEP. In other cases use global variable array element type.
+              Type *newGetElemType = gepsLeadingZerosEliminated ? getElemPtr->getSourceElementType() : elementType;
 
               if (getElemPtr->isInBounds())
                 newGetElemPtr = m_builder->CreateInBoundsGEP(newGetElemType, base, newIndices);
@@ -2095,7 +2061,7 @@ void SpirvLowerGlobal::lowerBufferBlock() {
         Value *const bufferDesc =
             isAccelerationStructure
                 ? m_builder->CreateGetDescPtr(descTy, descTy, descSet, binding)
-                : m_builder->CreateLoadBufferDesc(descSet, binding, m_builder->getInt32(0), bufferFlags);
+                : m_builder->create<lgc::LoadBufferDescOp>(descSet, binding, m_builder->getInt32(0), bufferFlags);
 
         // If the global variable is a constant, the data it points to is invariant.
         if (global.isConstant())
@@ -2120,8 +2086,8 @@ void SpirvLowerGlobal::lowerBufferBlock() {
         Value *newLoadPtr = bufferDesc;
         if (atomicCounterMD) {
           SmallVector<Value *, 8> indices;
-          indices.push_back(m_builder->getInt32(atomicCounterMeta.offset));
-          newLoadPtr = m_builder->CreateInBoundsGEP(m_builder->getInt8Ty(), bufferDesc, indices);
+          indices.push_back(m_builder->getInt32(atomicCounterMeta.offset / 4));
+          newLoadPtr = m_builder->CreateInBoundsGEP(m_builder->getInt32Ty(), bufferDesc, indices);
         }
 
         for (Instruction *const use : usesToReplace)
@@ -2321,8 +2287,8 @@ void SpirvLowerGlobal::lowerUniformConstants() {
       auto uniformConstantsOffset = mdconst::dyn_extract<ConstantInt>(metaNode->getOperand(2))->getZExtValue();
 
       m_builder->SetInsertPointPastAllocas(eachFunc.first);
-      Value *bufferDesc = m_builder->CreateLoadBufferDesc(uniformConstantsSet, uniformConstantsBinding,
-                                                          m_builder->getInt32(0), lgc::Builder::BufferFlagNonConst);
+      Value *bufferDesc = m_builder->create<lgc::LoadBufferDescOp>(
+          uniformConstantsSet, uniformConstantsBinding, m_builder->getInt32(0), lgc::Builder::BufferFlagNonConst);
       Value *newPtr = m_builder->CreateConstInBoundsGEP1_32(m_builder->getInt8Ty(), bufferDesc, uniformConstantsOffset);
       for (auto *inst : eachFunc.second)
         inst->replaceUsesOfWith(&global, newPtr);
@@ -2335,17 +2301,6 @@ void SpirvLowerGlobal::lowerUniformConstants() {
     global->dropAllReferences();
     global->eraseFromParent();
   }
-}
-
-// =====================================================================================================================
-// Removes the created return block if it has a single predecessor. This is to avoid
-// scheduling future heavy-weight cleanup passes if we can trivially simplify the CFG here.
-void SpirvLowerGlobal::cleanupReturnBlock() {
-  if (!m_retBlock)
-    return;
-
-  if (MergeBlockIntoPredecessor(m_retBlock))
-    m_retBlock = nullptr;
 }
 
 // =====================================================================================================================
@@ -2518,7 +2473,7 @@ void SpirvLowerGlobal::lowerShaderRecordBuffer() {
 
   static const char *ShaderRecordBuffer = "ShaderRecordBuffer";
   for (GlobalVariable &global : m_module->globals()) {
-    if (!global.getName().startswith(ShaderRecordBuffer))
+    if (!global.getName().starts_with(ShaderRecordBuffer))
       continue;
 
     removeConstantExpr(m_context, &global);

@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
- *deal in the Software without restriction, including without limitation the
- *rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- *sell copies of the Software, and to permit persons to whom the Software is
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in
@@ -18,8 +18,8 @@
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- *FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- *IN THE SOFTWARE.
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 
@@ -34,11 +34,13 @@
 
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
+#include "llpc/GpurtEnums.h"
 #include "llvm-dialects/Dialect/OpMap.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/Dominators.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
@@ -49,14 +51,6 @@
 #include <limits>
 #include <optional>
 #include <type_traits>
-
-namespace DialectUtils {
-
-llvm::StringRef getLgcRtDialectOpName(llvm::StringRef FullName);
-
-bool isLgcRtOp(const llvm::Function *F);
-
-} // namespace DialectUtils
 
 namespace llvm {
 
@@ -93,6 +87,12 @@ const unsigned GlobalMaxHitAttributeBytes = 32;
 ///       this pessimism.
 const unsigned MinimumContinuationStateBytes = 8;
 
+constexpr uint32_t CpsArgIdxContState = 0;
+constexpr uint32_t CpsArgIdxReturnAddr = 1;
+constexpr uint32_t CpsArgIdxShaderIndex = 2;
+constexpr uint32_t CpsArgIdxSystemData = 3;
+constexpr uint32_t CpsArgIdxHitAttributes = 4;
+
 struct DxRayIntrinsic {
   unsigned int Id;
   StringRef Name;
@@ -104,29 +104,6 @@ struct GpuRtIntrinsicEntry {
 };
 
 extern const llvm_dialects::OpMap<GpuRtIntrinsicEntry> LgcRtGpuRtMap;
-
-// This must match DXIL::ShaderKind from DxilConstants.h, and also
-// DXILShaderKind in a matching definition in GPURT, because it is used
-// as return type of an intrinsic.
-enum class DXILShaderKind : uint32_t {
-  Pixel = 0,
-  Vertex,
-  Geometry,
-  Hull,
-  Domain,
-  Compute,
-  Library,
-  RayGeneration,
-  Intersection,
-  AnyHit,
-  ClosestHit,
-  Miss,
-  Callable,
-  Mesh,
-  Amplification,
-  Node,
-  Invalid
-};
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &, DXILShaderKind);
 
@@ -151,19 +128,19 @@ struct RegisterBufferMD {
 // Helper class to abstract over function argument types.
 // Derives types from custom metadata when available, allowing pointer
 // element types to be derives even with opaque pointers.
-class DXILContArgTy {
+class ContArgTy {
 private:
   Type *ArgTy;
   Type *ElemTy;
 
 public:
-  DXILContArgTy() : ArgTy(nullptr), ElemTy(nullptr) {}
-  DXILContArgTy(Type *Arg, Type *Elem) : ArgTy(Arg), ElemTy(Elem) {}
-  DXILContArgTy(Type *Arg);
+  ContArgTy() : ArgTy(nullptr), ElemTy(nullptr) {}
+  ContArgTy(Type *Arg, Type *Elem) : ArgTy(Arg), ElemTy(Elem) {}
+  ContArgTy(Type *Arg);
 
-  static DXILContArgTy get(const Function *F, const Argument *Arg);
-  static DXILContArgTy get(const Function *F, const unsigned ArgNo);
-  static DXILContArgTy get(const Metadata *MD, LLVMContext &Context);
+  static ContArgTy get(const Function *F, const Argument *Arg);
+  static ContArgTy get(const Function *F, const unsigned ArgNo);
+  static ContArgTy get(const Metadata *MD, LLVMContext &Context);
 
   Type *asType(LLVMContext &Context);
   Type *getPointerElementType() const;
@@ -172,33 +149,43 @@ public:
   bool isVoidTy() const;
   Metadata *getTypeMetadata(LLVMContext &Context);
 
-  bool operator==(const DXILContArgTy &RHS) const {
+  bool operator==(const ContArgTy &RHS) const {
     return (ArgTy == RHS.ArgTy) && (ElemTy == RHS.ElemTy);
   }
 };
 
 // Helper class to abstract over function types.
-// Uses DXILContArgTy to derive types from and encode types to custom metadata.
-class DXILContFuncTy {
+// Uses ContArgTy to derive types from and encode types to custom metadata.
+class ContFuncTy {
 public:
-  DXILContFuncTy() {}
-  DXILContFuncTy(DXILContArgTy Return) : ReturnTy(Return) {}
-  DXILContFuncTy(DXILContArgTy Return, ArrayRef<DXILContArgTy> Args)
+  ContFuncTy() {}
+  ContFuncTy(ContArgTy Return) : ReturnTy(Return) {}
+  ContFuncTy(ContArgTy Return, ArrayRef<ContArgTy> Args)
       : ReturnTy(Return), ArgTys(Args) {}
 
-  DXILContArgTy ReturnTy;
-  SmallVector<DXILContArgTy> ArgTys;
+  ContArgTy ReturnTy;
+  SmallVector<ContArgTy> ArgTys;
 
-  static DXILContFuncTy get(const Function *F);
-  static DXILContFuncTy get(const Metadata *MD, LLVMContext &Context);
+  static ContFuncTy get(const Function *F);
+  static ContFuncTy get(const Metadata *MD, LLVMContext &Context);
 
   FunctionType *asFunctionType(LLVMContext &Context);
   void writeMetadata(Function *F);
 };
 
-// Helper class to access data specific to DXIL continuation passes, e.g.
+/// Return element type of a function argument resolving opaque pointers
+/// via !types metadata where appropriate.
+/// Returns nullptr for non-pointers.
+Type *getFuncArgPtrElementType(const Argument *Arg);
+
+/// Return element type of a function argument resolving opaque pointers
+/// via !types metadata where appropriate.
+/// Returns nullptr for non-pointers.
+Type *getFuncArgPtrElementType(const Function *F, int ArgNo);
+
+// Helper class to access data specific to continuation passes, e.g.
 // metadata or globals.
-class DXILContHelper {
+class ContHelper {
 private:
   // Private metadata node names
   // These are private because we provide dedicated utilities to get and set
@@ -310,7 +297,7 @@ public:
   static constexpr const char *MDTypesName = "types";
   static constexpr const char *MDTypesFunctionName = "function";
   static constexpr const char *MDTypesVoidName = "void";
-  static constexpr const char *MDDXILPayloadTyName = "dxil.payload.type";
+  static constexpr const char *MDContPayloadTyName = "cont.payload.type";
   static constexpr const char *MDLgcCpsModuleName = "lgc.cps.module";
 
   // Global variable names
@@ -425,15 +412,10 @@ public:
     return NumPayloadRegistersI32s;
   }
 
+  // TODO: Remove this once dxcp calls the lgc::rt function directly.
   static void setMaxHitAttributeByteCount(Function &F,
                                           uint32_t MaxHitAttributeByteCount) {
-    F.setMetadata(MDMaxHitAttributeBytesName,
-                  getI32MDConstant(F.getContext(), MaxHitAttributeByteCount));
-  }
-
-  static std::optional<uint32_t>
-  tryGetMaxHitAttributeByteCount(const Function &F) {
-    return extractZExtI32Constant(F.getMetadata(MDMaxHitAttributeBytesName));
+    lgc::rt::setShaderHitAttributeSize(&F, MaxHitAttributeByteCount);
   }
 
   static void setMaxPayloadByteCount(Function &F,
@@ -523,19 +505,19 @@ public:
   }
 
   static Type *getPayloadTypeFromMetadata(const Function &Func) {
-    if (MDNode *Node = Func.getMetadata(MDDXILPayloadTyName))
+    if (MDNode *Node = Func.getMetadata(MDContPayloadTyName))
       return getPayloadTypeFromMetadata(Node);
 
-    report_fatal_error(Twine(MDDXILPayloadTyName) +
+    report_fatal_error(Twine(MDContPayloadTyName) +
                        " metadata not found on function " + Func.getName() +
                        "!");
   }
 
   static Type *getPayloadTypeFromMetadata(const CallInst &CI) {
-    if (MDNode *Node = CI.getMetadata(MDDXILPayloadTyName))
+    if (MDNode *Node = CI.getMetadata(MDContPayloadTyName))
       return getPayloadTypeFromMetadata(Node);
 
-    report_fatal_error(Twine(MDDXILPayloadTyName) +
+    report_fatal_error(Twine(MDContPayloadTyName) +
                        " metadata not found on CallInst!");
   }
 
@@ -545,7 +527,7 @@ public:
 
   // Specifies that an awaited call should wait on a wait mask.
   static void setIsWaitAwaitCall(CallInst &CI) {
-    CI.setMetadata(DXILContHelper::MDIsWaitAwaitName,
+    CI.setMetadata(ContHelper::MDIsWaitAwaitName,
                    MDTuple::get(CI.getContext(), {}));
   }
 
@@ -555,9 +537,20 @@ public:
   }
 
   static void removeIsWaitAwaitMetadata(CallInst &CI) {
-    CI.setMetadata(DXILContHelper::MDIsWaitAwaitName, nullptr);
+    CI.setMetadata(ContHelper::MDIsWaitAwaitName, nullptr);
   }
 
+  /// Returns true if a call to the given function should be rematerialized
+  /// in a shader of the specified kind.
+  ///
+  /// If no shader kind is specified, return false.
+  static bool
+  isRematerializableLgcRtOp(CallInst &CInst,
+                            std::optional<DXILShaderKind> Kind = std::nullopt);
+};
+
+class ShaderStageHelper final {
+public:
   static DXILShaderKind
   shaderStageToDxilShaderKind(lgc::rt::RayTracingShaderStage Stage) {
     switch (Stage) {
@@ -573,9 +566,15 @@ public:
       return DXILShaderKind::Miss;
     case lgc::rt::RayTracingShaderStage::Callable:
       return DXILShaderKind::Callable;
+    case lgc::rt::RayTracingShaderStage::KernelEntry:
     case lgc::rt::RayTracingShaderStage::Traversal:
+      // TODO: Migrate to an enum shared by GpuRt HLSL and the compiler C++
+      //       source that explicitly supports KernelEntry and Traversal,
+      //       eliminate most uses of DXILShaderKind except for initial
+      //       conversions to the shared enum.
       return DXILShaderKind::Compute;
     }
+    llvm_unreachable("invalid stage!");
   }
 
   static std::optional<lgc::rt::RayTracingShaderStage>
@@ -597,15 +596,10 @@ public:
       return std::nullopt;
     }
   }
-
-  /// Returns true if a call to the given function should be rematerialized
-  /// in a shader of the specified kind.
-  ///
-  /// If no shader kind is specified, return false.
-  static bool
-  isRematerializableLgcRtOp(CallInst &CInst,
-                            std::optional<DXILShaderKind> Kind = std::nullopt);
 };
+
+// Until all users have been migrated, provide old name as well:
+class DXILContHelper : public ContHelper {};
 
 /// Free-standing helpers.
 
@@ -621,6 +615,8 @@ void forEachCall(Function &F, CallbackTy Callback) {
         Callback(*CInst);
   }
 }
+
+bool isLgcRtOp(const llvm::Function *F);
 
 // Move all basic blocks of OldFunc to NewFunc.
 void moveFunctionBody(Function &OldFunc, Function &NewFunc);
@@ -656,9 +652,19 @@ void forEachTerminator(Function *Func, ArrayRef<unsigned> TerminatorOpcodes,
 
 // Essentially RAUW for pointers for the case that these use different address
 // spaces, rewriting all derived pointers to also use the new address space.
+// Writes instructions which are redundant after the replacement into
+// the given ToBeRemoved vector.
+// The caller has to handle the erasure afterwards.
 void replaceAllPointerUses(IRBuilder<> *Builder, Value *OldPointerValue,
                            Value *NewPointerValue,
                            SmallVectorImpl<Instruction *> &ToBeRemoved);
+
+// Do store-to-load forwarding for memory access to continuation stack.  This is
+// helpful to mitigate the issue that coroutine passes in some cases still load
+// state from the in-memory continuation state when it is still available in SSA
+// variables. The implementation is assuming there is no other pointers in the
+// program that may alias the pointer argument.
+void forwardContinuationFrameStoreToLoad(DominatorTree &DT, Value *FramePtr);
 
 // Replacement for PointerType::getWithSamePointeeType that works with new LLVM.
 // Returns a typed pointer type if the pointer type is typed.

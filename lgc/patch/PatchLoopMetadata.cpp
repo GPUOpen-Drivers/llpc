@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2018-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2018-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -66,7 +66,7 @@ MDNode *PatchLoopMetadata::updateMetadata(MDNode *loopId, ArrayRef<StringRef> pr
     if (MDNode *mdNode = dyn_cast<MDNode>(op)) {
       if (const MDString *mdString = dyn_cast<MDString>(mdNode->getOperand(0))) {
         if (any_of(prefixesToRemove,
-                   [mdString](StringRef prefix) -> bool { return mdString->getString().startswith(prefix); }))
+                   [mdString](StringRef prefix) -> bool { return mdString->getString().starts_with(prefix); }))
           found = true;
         else
           mds.push_back(op);
@@ -122,10 +122,10 @@ bool PatchLoopMetadata::runImpl(Loop &loop, PipelineState *pipelineState) {
   m_gfxIp = mPipelineState->getTargetInfo().getGfxIpVersion();
   bool changed = false;
 
-  ShaderStage stage = getShaderStage(func);
-  if (stage == ShaderStageInvalid)
+  auto stage = getShaderStage(func);
+  if (!stage)
     return false;
-  if (auto shaderOptions = &mPipelineState->getShaderOptions(stage)) {
+  if (auto shaderOptions = &mPipelineState->getShaderOptions(stage.value())) {
     m_disableLoopUnroll = shaderOptions->disableLoopUnroll;
     m_forceLoopUnrollCount = shaderOptions->forceLoopUnrollCount;
     m_disableLicmThreshold = shaderOptions->disableLicmThreshold;
@@ -169,7 +169,7 @@ bool PatchLoopMetadata::runImpl(Loop &loop, PipelineState *pipelineState) {
       Metadata *op = loopMetaNode->getOperand(i);
       if (MDNode *mdNode = dyn_cast<MDNode>(op)) {
         if (const MDString *mdString = dyn_cast<MDString>(mdNode->getOperand(0))) {
-          if (m_dontUnrollHintThreshold > 0 && mdString->getString().startswith("llvm.loop.unroll.disable")) {
+          if (m_dontUnrollHintThreshold > 0 && mdString->getString().starts_with("llvm.loop.unroll.disable")) {
             LLVM_DEBUG(dbgs() << "  relaxing llvm.loop.unroll.disable to amdgpu.loop.unroll.threshold "
                               << m_dontUnrollHintThreshold << "\n");
             Metadata *thresholdMeta[] = {
@@ -181,7 +181,7 @@ bool PatchLoopMetadata::runImpl(Loop &loop, PipelineState *pipelineState) {
             changed = true;
             break;
           }
-          if (m_unrollHintThreshold > 0 && mdString->getString().startswith("llvm.loop.unroll.full")) {
+          if (m_unrollHintThreshold > 0 && mdString->getString().starts_with("llvm.loop.unroll.full")) {
             LLVM_DEBUG(dbgs() << "  relaxing llvm.loop.unroll.full to amdgpu.loop.unroll.threshold "
                               << m_unrollHintThreshold << "\n");
             Metadata *thresholdMeta[] = {

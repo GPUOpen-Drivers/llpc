@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -57,10 +57,11 @@ enum SectionType : unsigned {
   SectionTypeImageView,   // Image view section
   SectionTypeSampler,     // Sampler section
   // VKGC pipeline
-  SectionTypeGraphicsState,           // Graphics state section
-  SectionTypeComputeState,            // Compute state section
-  SectionTypeRayTracingState,         // Ray tracing state section
-  SectionTypeRtState,                 // Ray tracing rtState section
+  SectionTypeGraphicsState,   // Graphics state section
+  SectionTypeComputeState,    // Compute state section
+  SectionTypeRayTracingState, // Ray tracing state section
+  SectionTypeRtState,         // Ray tracing rtState section
+  SectionTypeRayTracingLibrarySummary,
   SectionTypeVertexInputState,        // Vertex input state section
   SectionTypeShaderInfo,              // Shader info section
   SectionTypeResourceMapping,         // Resource mapping section
@@ -687,6 +688,7 @@ public:
   }
 
   void getSubState(SubState &state) { state = m_state; };
+  void getVbAddressLowBits(uint8_t &lowBits) { lowBits = m_vbAddressLowBits; };
   SubState &getSubStateRef() { return m_state; };
 
 private:
@@ -697,12 +699,14 @@ private:
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputAttribute, binding, MemberTypeInt, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputAttribute, format, MemberTypeEnum, false);
       INIT_STATE_MEMBER_NAME_TO_ADDR(SectionVertexInputAttribute, offset, MemberTypeInt, false);
+      INIT_MEMBER_NAME_TO_ADDR(SectionVertexInputAttribute, m_vbAddressLowBits, MemberTypeInt, false);
       return addrTableInitializer;
     }();
     return {addrTable.data(), addrTable.size()};
   }
 
   SubState m_state;
+  uint8_t m_vbAddressLowBits;
 };
 
 // =====================================================================================================================
@@ -742,14 +746,17 @@ public:
     memset(&m_vkDivisorState, 0, sizeof(m_vkDivisorState));
     m_vkDivisorState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO_EXT;
   }
-
+  void getvbAddressLowBits(uint8_t *vbAddrLowBits) { memcpy(vbAddrLowBits, &m_vbAddressLowBits[0], 64); }
   void getSubState(SubState &state) {
     m_vkBindings.resize(m_binding.size());
     m_vkAttributes.resize(m_attribute.size());
     m_vkDivisors.resize(m_divisor.size());
+    m_vbAddressLowBits.resize(64);
 
-    for (unsigned i = 0; i < m_attribute.size(); ++i)
+    for (unsigned i = 0; i < m_attribute.size(); ++i) {
       m_attribute[i].getSubState(m_vkAttributes[i]);
+      m_attribute[i].getVbAddressLowBits(m_vbAddressLowBits[m_vkAttributes[i].binding]);
+    }
 
     for (unsigned i = 0; i < m_binding.size(); ++i)
       m_binding[i].getSubState(m_vkBindings[i]);
@@ -787,6 +794,7 @@ private:
   std::vector<VkVertexInputAttributeDescription> m_vkAttributes;       // Vulkan vertex input attribute
   std::vector<VkVertexInputBindingDivisorDescriptionEXT> m_vkDivisors; // Vulkan vertex input divisor
   VkPipelineVertexInputDivisorStateCreateInfoEXT m_vkDivisorState;     // Vulkan vertex input divisor state
+  std::vector<uint8_t> m_vbAddressLowBits;                             // Lowest two bits of vertex inputs offsets.
 };
 
 // =====================================================================================================================

@@ -14,28 +14,23 @@ declare i32 @continuations.getReturnValue.i32() #0
 declare void @continuation.return(i64, ...)
 
 define { i8*, %continuation.token* } @simple_await(i8* %0) !continuation !0 !continuation.registercount !4 {
-; CHECK-LABEL: define void @simple_await() !continuation !1 !continuation.registercount !2 !continuation.state !3 !continuation.stacksize !3 {
+; CHECK-LABEL: define void @simple_await(
+; CHECK-SAME: ) !continuation [[META1:![0-9]+]] !continuation.registercount [[META2:![0-9]+]] !continuation.state [[META3:![0-9]+]] !continuation.stacksize [[META3]] {
 ; CHECK-NEXT:  AllocaSpillBB:
-; CHECK-NEXT:    [[CONT_STATE:%.*]] = alloca [2 x i32], align 4
-; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr [[CONT_STATE]] to ptr
-; CHECK-NEXT:    [[DOTSPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr [[FRAMEPTR]], i32 0, i32 0
-; CHECK-NEXT:    store i64 -1, ptr [[DOTSPILL_ADDR]], align 4
 ; CHECK-NEXT:    [[TMP0:%.*]] = call ptr @continuation.getContinuationStackOffset()
 ; CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr [[TMP0]], align 4
-; CHECK-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], 8
-; CHECK-NEXT:    store i32 [[TMP2]], ptr [[TMP0]], align 4
-; CHECK-NEXT:    [[TMP3:%.*]] = inttoptr i32 [[TMP1]] to ptr addrspace(21)
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [2 x i32], ptr [[CONT_STATE]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [2 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP6:%.*]] = load i32, ptr [[TMP4]], align 4
-; CHECK-NEXT:    store i32 [[TMP6]], ptr addrspace(21) [[TMP5]], align 4
-; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [2 x i32], ptr [[CONT_STATE]], i32 0, i32 1
-; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [2 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 1
-; CHECK-NEXT:    [[TMP9:%.*]] = load i32, ptr [[TMP7]], align 4
-; CHECK-NEXT:    store i32 [[TMP9]], ptr addrspace(21) [[TMP8]], align 4
-; CHECK-NEXT:    [[TMP10:%.*]] = call ptr @continuation.getContinuationStackOffset()
-; CHECK-NEXT:    [[TMP11:%.*]] = load i32, ptr [[TMP10]], align 4
-; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i32 [[TMP11]], i64 ptrtoint (ptr @simple_await.resume.0 to i64)), !continuation.registercount !2, !continuation.returnedRegistercount !2
+; CHECK-NEXT:    [[TMP2:%.*]] = inttoptr i32 [[TMP1]] to ptr addrspace(21)
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP2]], i64 0
+; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr addrspace(21) [[TMP3]] to ptr addrspace(21)
+; CHECK-NEXT:    [[DOTSPILL_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr addrspace(21) [[FRAMEPTR]], i32 0, i32 0
+; CHECK-NEXT:    store i64 -1, ptr addrspace(21) [[DOTSPILL_ADDR]], align 4
+; CHECK-NEXT:    [[TMP4:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CHECK-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP4]], align 4
+; CHECK-NEXT:    [[TMP6:%.*]] = add i32 [[TMP5]], 8
+; CHECK-NEXT:    store i32 [[TMP6]], ptr [[TMP4]], align 4
+; CHECK-NEXT:    [[TMP7:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CHECK-NEXT:    [[TMP8:%.*]] = load i32, ptr [[TMP7]], align 4
+; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i32 [[TMP8]], i64 ptrtoint (ptr @simple_await.resume.0 to i64)), !continuation.registercount [[META2]], !continuation.returnedRegistercount !2
 ; CHECK-NEXT:    unreachable
 ;
 AllocaSpillBB:
@@ -49,32 +44,23 @@ AllocaSpillBB:
 
 define internal { i8*, %continuation.token* } @simple_await.resume.0(i8* noalias nonnull align 16 dereferenceable(8) %0, i1 %1) !continuation !0 {
 ; CHECK-LABEL: define dso_local void @simple_await.resume.0(
-; CHECK-SAME: i32 [[TMP0:%.*]]) !continuation !1 !continuation.registercount !2 {
+; CHECK-SAME: i32 [[TMP0:%.*]]) !continuation [[META1]] !continuation.registercount [[META2]] {
 ; CHECK-NEXT:  entryresume.0:
-; CHECK-NEXT:    [[CONT_STATE:%.*]] = alloca [2 x i32], align 4
 ; CHECK-NEXT:    [[TMP1:%.*]] = call ptr @continuation.getContinuationStackOffset()
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr [[TMP1]], align 4
-; CHECK-NEXT:    [[TMP3:%.*]] = inttoptr i32 [[TMP2]] to ptr addrspace(21)
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP3]], i64 -8
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [2 x i32], ptr addrspace(21) [[TMP4]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [2 x i32], ptr [[CONT_STATE]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(21) [[TMP5]], align 4
-; CHECK-NEXT:    store i32 [[TMP7]], ptr [[TMP6]], align 4
-; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [2 x i32], ptr addrspace(21) [[TMP4]], i32 0, i32 1
-; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [2 x i32], ptr [[CONT_STATE]], i32 0, i32 1
-; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(21) [[TMP8]], align 4
-; CHECK-NEXT:    store i32 [[TMP10]], ptr [[TMP9]], align 4
-; CHECK-NEXT:    [[TMP11:%.*]] = call ptr @continuation.getContinuationStackOffset()
-; CHECK-NEXT:    [[TMP12:%.*]] = load i32, ptr [[TMP11]], align 4
-; CHECK-NEXT:    [[TMP13:%.*]] = add i32 [[TMP12]], -8
-; CHECK-NEXT:    store i32 [[TMP13]], ptr [[TMP11]], align 4
-; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr [[CONT_STATE]] to ptr
-; CHECK-NEXT:    [[VFRAME:%.*]] = bitcast ptr [[FRAMEPTR]] to ptr
-; CHECK-NEXT:    [[DOTRELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr [[FRAMEPTR]], i32 0, i32 0
-; CHECK-NEXT:    [[DOTRELOAD:%.*]] = load i64, ptr [[DOTRELOAD_ADDR]], align 4
-; CHECK-NEXT:    [[TMP14:%.*]] = call ptr @continuation.getContinuationStackOffset()
-; CHECK-NEXT:    [[TMP15:%.*]] = load i32, ptr [[TMP14]], align 4
-; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 [[DOTRELOAD]], i32 [[TMP15]]), !continuation.registercount !2
+; CHECK-NEXT:    [[TMP3:%.*]] = add i32 [[TMP2]], -8
+; CHECK-NEXT:    store i32 [[TMP3]], ptr [[TMP1]], align 4
+; CHECK-NEXT:    [[TMP4:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CHECK-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP4]], align 4
+; CHECK-NEXT:    [[TMP6:%.*]] = inttoptr i32 [[TMP5]] to ptr addrspace(21)
+; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP6]], i64 0
+; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr addrspace(21) [[TMP7]] to ptr addrspace(21)
+; CHECK-NEXT:    [[VFRAME:%.*]] = bitcast ptr addrspace(21) [[FRAMEPTR]] to ptr addrspace(21)
+; CHECK-NEXT:    [[DOTRELOAD_ADDR:%.*]] = getelementptr inbounds [[SIMPLE_AWAIT_FRAME:%.*]], ptr addrspace(21) [[FRAMEPTR]], i32 0, i32 0
+; CHECK-NEXT:    [[DOTRELOAD:%.*]] = load i64, ptr addrspace(21) [[DOTRELOAD_ADDR]], align 4
+; CHECK-NEXT:    [[TMP8:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CHECK-NEXT:    [[TMP9:%.*]] = load i32, ptr [[TMP8]], align 4
+; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 [[DOTRELOAD]], i32 [[TMP9]]), !continuation.registercount [[META2]]
 ; CHECK-NEXT:    unreachable
 ;
 entryresume.0:
@@ -87,26 +73,21 @@ entryresume.0:
 }
 
 define { i8*, %continuation.token* } @simple_await_entry(i8* %0) !continuation.entry !2 !continuation !3 !continuation.registercount !4 {
-; CHECK-LABEL: define void @simple_await_entry() !continuation !4 !continuation.registercount !2 !continuation.entry !5 !continuation.state !3 !continuation.stacksize !3 {
+; CHECK-LABEL: define void @simple_await_entry(
+; CHECK-SAME: ) !continuation [[META4:![0-9]+]] !continuation.registercount [[META2]] !continuation.entry [[META5:![0-9]+]] !continuation.state [[META3]] !continuation.stacksize [[META3]] {
 ; CHECK-NEXT:  AllocaSpillBB:
-; CHECK-NEXT:    [[CONT_STATE:%.*]] = alloca [2 x i32], align 4
-; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr [[CONT_STATE]] to ptr
 ; CHECK-NEXT:    [[TMP0:%.*]] = call ptr @continuation.getContinuationStackOffset()
 ; CHECK-NEXT:    [[TMP1:%.*]] = load i32, ptr [[TMP0]], align 4
-; CHECK-NEXT:    [[TMP2:%.*]] = add i32 [[TMP1]], 8
-; CHECK-NEXT:    store i32 [[TMP2]], ptr [[TMP0]], align 4
-; CHECK-NEXT:    [[TMP3:%.*]] = inttoptr i32 [[TMP1]] to ptr addrspace(21)
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr inbounds [2 x i32], ptr [[CONT_STATE]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [2 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP6:%.*]] = load i32, ptr [[TMP4]], align 4
-; CHECK-NEXT:    store i32 [[TMP6]], ptr addrspace(21) [[TMP5]], align 4
-; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [2 x i32], ptr [[CONT_STATE]], i32 0, i32 1
-; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [2 x i32], ptr addrspace(21) [[TMP3]], i32 0, i32 1
-; CHECK-NEXT:    [[TMP9:%.*]] = load i32, ptr [[TMP7]], align 4
-; CHECK-NEXT:    store i32 [[TMP9]], ptr addrspace(21) [[TMP8]], align 4
-; CHECK-NEXT:    [[TMP10:%.*]] = call ptr @continuation.getContinuationStackOffset()
-; CHECK-NEXT:    [[TMP11:%.*]] = load i32, ptr [[TMP10]], align 4
-; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i32 [[TMP11]], i64 ptrtoint (ptr @simple_await_entry.resume.0 to i64)), !continuation.registercount !2, !continuation.returnedRegistercount !2
+; CHECK-NEXT:    [[TMP2:%.*]] = inttoptr i32 [[TMP1]] to ptr addrspace(21)
+; CHECK-NEXT:    [[TMP3:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP2]], i64 0
+; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr addrspace(21) [[TMP3]] to ptr addrspace(21)
+; CHECK-NEXT:    [[TMP4:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CHECK-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP4]], align 4
+; CHECK-NEXT:    [[TMP6:%.*]] = add i32 [[TMP5]], 8
+; CHECK-NEXT:    store i32 [[TMP6]], ptr [[TMP4]], align 4
+; CHECK-NEXT:    [[TMP7:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CHECK-NEXT:    [[TMP8:%.*]] = load i32, ptr [[TMP7]], align 4
+; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i32 [[TMP8]], i64 ptrtoint (ptr @simple_await_entry.resume.0 to i64)), !continuation.registercount [[META2]], !continuation.returnedRegistercount !2
 ; CHECK-NEXT:    unreachable
 ;
 AllocaSpillBB:
@@ -120,27 +101,18 @@ AllocaSpillBB:
 
 define internal { i8*, %continuation.token* } @simple_await_entry.resume.0(i8* noalias nonnull align 16 dereferenceable(8) %0, i1 %1) !continuation.entry !2 !continuation !3 {
 ; CHECK-LABEL: define dso_local void @simple_await_entry.resume.0(
-; CHECK-SAME: i32 [[TMP0:%.*]]) !continuation !4 !continuation.registercount !2 {
+; CHECK-SAME: i32 [[TMP0:%.*]]) !continuation [[META4]] !continuation.registercount [[META2]] {
 ; CHECK-NEXT:  entryresume.0:
-; CHECK-NEXT:    [[CONT_STATE:%.*]] = alloca [2 x i32], align 4
 ; CHECK-NEXT:    [[TMP1:%.*]] = call ptr @continuation.getContinuationStackOffset()
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr [[TMP1]], align 4
-; CHECK-NEXT:    [[TMP3:%.*]] = inttoptr i32 [[TMP2]] to ptr addrspace(21)
-; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP3]], i64 -8
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [2 x i32], ptr addrspace(21) [[TMP4]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [2 x i32], ptr [[CONT_STATE]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP7:%.*]] = load i32, ptr addrspace(21) [[TMP5]], align 4
-; CHECK-NEXT:    store i32 [[TMP7]], ptr [[TMP6]], align 4
-; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [2 x i32], ptr addrspace(21) [[TMP4]], i32 0, i32 1
-; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [2 x i32], ptr [[CONT_STATE]], i32 0, i32 1
-; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr addrspace(21) [[TMP8]], align 4
-; CHECK-NEXT:    store i32 [[TMP10]], ptr [[TMP9]], align 4
-; CHECK-NEXT:    [[TMP11:%.*]] = call ptr @continuation.getContinuationStackOffset()
-; CHECK-NEXT:    [[TMP12:%.*]] = load i32, ptr [[TMP11]], align 4
-; CHECK-NEXT:    [[TMP13:%.*]] = add i32 [[TMP12]], -8
-; CHECK-NEXT:    store i32 [[TMP13]], ptr [[TMP11]], align 4
-; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr [[CONT_STATE]] to ptr
-; CHECK-NEXT:    [[VFRAME:%.*]] = bitcast ptr [[FRAMEPTR]] to ptr
+; CHECK-NEXT:    [[TMP3:%.*]] = add i32 [[TMP2]], -8
+; CHECK-NEXT:    store i32 [[TMP3]], ptr [[TMP1]], align 4
+; CHECK-NEXT:    [[TMP4:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CHECK-NEXT:    [[TMP5:%.*]] = load i32, ptr [[TMP4]], align 4
+; CHECK-NEXT:    [[TMP6:%.*]] = inttoptr i32 [[TMP5]] to ptr addrspace(21)
+; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP6]], i64 0
+; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr addrspace(21) [[TMP7]] to ptr addrspace(21)
+; CHECK-NEXT:    [[VFRAME:%.*]] = bitcast ptr addrspace(21) [[FRAMEPTR]] to ptr addrspace(21)
 ; CHECK-NEXT:    call void @continuation.complete()
 ; CHECK-NEXT:    unreachable
 ;
@@ -152,27 +124,22 @@ entryresume.0:
 }
 
 define { i8*, %continuation.token* } @await_with_ret_value(i8* %0) !continuation !1 !continuation.registercount !4 {
-; CHECK-LABEL: define void @await_with_ret_value() !continuation !6 !continuation.registercount !2 !continuation.state !3 !continuation.stacksize !3 {
-; CHECK-NEXT:    [[CONT_STATE:%.*]] = alloca [2 x i32], align 4
-; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr [[CONT_STATE]] to ptr
-; CHECK-NEXT:    [[DOTSPILL_ADDR:%.*]] = getelementptr inbounds [[AWAIT_WITH_RET_VALUE_FRAME:%.*]], ptr [[FRAMEPTR]], i32 0, i32 0
-; CHECK-NEXT:    store i64 -1, ptr [[DOTSPILL_ADDR]], align 4
+; CHECK-LABEL: define void @await_with_ret_value(
+; CHECK-SAME: ) !continuation [[META6:![0-9]+]] !continuation.registercount [[META2]] !continuation.state [[META3]] !continuation.stacksize [[META3]] {
 ; CHECK-NEXT:    [[TMP1:%.*]] = call ptr @continuation.getContinuationStackOffset()
 ; CHECK-NEXT:    [[TMP2:%.*]] = load i32, ptr [[TMP1]], align 4
-; CHECK-NEXT:    [[TMP3:%.*]] = add i32 [[TMP2]], 8
-; CHECK-NEXT:    store i32 [[TMP3]], ptr [[TMP1]], align 4
-; CHECK-NEXT:    [[TMP4:%.*]] = inttoptr i32 [[TMP2]] to ptr addrspace(21)
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr inbounds [2 x i32], ptr [[CONT_STATE]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [2 x i32], ptr addrspace(21) [[TMP4]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP7:%.*]] = load i32, ptr [[TMP5]], align 4
-; CHECK-NEXT:    store i32 [[TMP7]], ptr addrspace(21) [[TMP6]], align 4
-; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr inbounds [2 x i32], ptr [[CONT_STATE]], i32 0, i32 1
-; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [2 x i32], ptr addrspace(21) [[TMP4]], i32 0, i32 1
-; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr [[TMP8]], align 4
-; CHECK-NEXT:    store i32 [[TMP10]], ptr addrspace(21) [[TMP9]], align 4
-; CHECK-NEXT:    [[TMP11:%.*]] = call ptr @continuation.getContinuationStackOffset()
-; CHECK-NEXT:    [[TMP12:%.*]] = load i32, ptr [[TMP11]], align 4
-; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i32 [[TMP12]], i64 ptrtoint (ptr @await_with_ret_value.resume.0 to i64)), !continuation.registercount !2, !continuation.returnedRegistercount !2
+; CHECK-NEXT:    [[TMP3:%.*]] = inttoptr i32 [[TMP2]] to ptr addrspace(21)
+; CHECK-NEXT:    [[TMP4:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP3]], i64 0
+; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr addrspace(21) [[TMP4]] to ptr addrspace(21)
+; CHECK-NEXT:    [[DOTSPILL_ADDR:%.*]] = getelementptr inbounds [[AWAIT_WITH_RET_VALUE_FRAME:%.*]], ptr addrspace(21) [[FRAMEPTR]], i32 0, i32 0
+; CHECK-NEXT:    store i64 -1, ptr addrspace(21) [[DOTSPILL_ADDR]], align 4
+; CHECK-NEXT:    [[TMP5:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CHECK-NEXT:    [[TMP6:%.*]] = load i32, ptr [[TMP5]], align 4
+; CHECK-NEXT:    [[TMP7:%.*]] = add i32 [[TMP6]], 8
+; CHECK-NEXT:    store i32 [[TMP7]], ptr [[TMP5]], align 4
+; CHECK-NEXT:    [[TMP8:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CHECK-NEXT:    [[TMP9:%.*]] = load i32, ptr [[TMP8]], align 4
+; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 ptrtoint (ptr @async_fun to i64), i32 [[TMP9]], i64 ptrtoint (ptr @await_with_ret_value.resume.0 to i64)), !continuation.registercount [[META2]], !continuation.returnedRegistercount !2
 ; CHECK-NEXT:    unreachable
 ;
   %FramePtr = bitcast i8* %0 to %await_with_ret_value.Frame*
@@ -185,31 +152,22 @@ define { i8*, %continuation.token* } @await_with_ret_value(i8* %0) !continuation
 
 define internal { i8*, %continuation.token* } @await_with_ret_value.resume.0(i8* noalias nonnull align 16 dereferenceable(8) %0, i1 %1) !continuation !1 {
 ; CHECK-LABEL: define dso_local void @await_with_ret_value.resume.0(
-; CHECK-SAME: i32 [[TMP0:%.*]], i32 [[RES1:%.*]]) !continuation !6 !continuation.registercount !2 {
-; CHECK-NEXT:    [[CONT_STATE:%.*]] = alloca [2 x i32], align 4
+; CHECK-SAME: i32 [[TMP0:%.*]], i32 [[RES1:%.*]]) !continuation [[META6]] !continuation.registercount [[META2]] {
 ; CHECK-NEXT:    [[TMP2:%.*]] = call ptr @continuation.getContinuationStackOffset()
 ; CHECK-NEXT:    [[TMP3:%.*]] = load i32, ptr [[TMP2]], align 4
-; CHECK-NEXT:    [[TMP4:%.*]] = inttoptr i32 [[TMP3]] to ptr addrspace(21)
-; CHECK-NEXT:    [[TMP5:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP4]], i64 -8
-; CHECK-NEXT:    [[TMP6:%.*]] = getelementptr inbounds [2 x i32], ptr addrspace(21) [[TMP5]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP7:%.*]] = getelementptr inbounds [2 x i32], ptr [[CONT_STATE]], i32 0, i32 0
-; CHECK-NEXT:    [[TMP8:%.*]] = load i32, ptr addrspace(21) [[TMP6]], align 4
-; CHECK-NEXT:    store i32 [[TMP8]], ptr [[TMP7]], align 4
-; CHECK-NEXT:    [[TMP9:%.*]] = getelementptr inbounds [2 x i32], ptr addrspace(21) [[TMP5]], i32 0, i32 1
-; CHECK-NEXT:    [[TMP10:%.*]] = getelementptr inbounds [2 x i32], ptr [[CONT_STATE]], i32 0, i32 1
-; CHECK-NEXT:    [[TMP11:%.*]] = load i32, ptr addrspace(21) [[TMP9]], align 4
-; CHECK-NEXT:    store i32 [[TMP11]], ptr [[TMP10]], align 4
-; CHECK-NEXT:    [[TMP12:%.*]] = call ptr @continuation.getContinuationStackOffset()
-; CHECK-NEXT:    [[TMP13:%.*]] = load i32, ptr [[TMP12]], align 4
-; CHECK-NEXT:    [[TMP14:%.*]] = add i32 [[TMP13]], -8
-; CHECK-NEXT:    store i32 [[TMP14]], ptr [[TMP12]], align 4
-; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr [[CONT_STATE]] to ptr
-; CHECK-NEXT:    [[VFRAME:%.*]] = bitcast ptr [[FRAMEPTR]] to ptr
-; CHECK-NEXT:    [[DOTRELOAD_ADDR:%.*]] = getelementptr inbounds [[AWAIT_WITH_RET_VALUE_FRAME:%.*]], ptr [[FRAMEPTR]], i32 0, i32 0
-; CHECK-NEXT:    [[DOTRELOAD:%.*]] = load i64, ptr [[DOTRELOAD_ADDR]], align 4
-; CHECK-NEXT:    [[TMP15:%.*]] = call ptr @continuation.getContinuationStackOffset()
-; CHECK-NEXT:    [[TMP16:%.*]] = load i32, ptr [[TMP15]], align 4
-; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 [[DOTRELOAD]], i32 [[TMP16]], i32 [[RES1]]), !continuation.registercount !2
+; CHECK-NEXT:    [[TMP4:%.*]] = add i32 [[TMP3]], -8
+; CHECK-NEXT:    store i32 [[TMP4]], ptr [[TMP2]], align 4
+; CHECK-NEXT:    [[TMP5:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CHECK-NEXT:    [[TMP6:%.*]] = load i32, ptr [[TMP5]], align 4
+; CHECK-NEXT:    [[TMP7:%.*]] = inttoptr i32 [[TMP6]] to ptr addrspace(21)
+; CHECK-NEXT:    [[TMP8:%.*]] = getelementptr i8, ptr addrspace(21) [[TMP7]], i64 0
+; CHECK-NEXT:    [[FRAMEPTR:%.*]] = bitcast ptr addrspace(21) [[TMP8]] to ptr addrspace(21)
+; CHECK-NEXT:    [[VFRAME:%.*]] = bitcast ptr addrspace(21) [[FRAMEPTR]] to ptr addrspace(21)
+; CHECK-NEXT:    [[DOTRELOAD_ADDR:%.*]] = getelementptr inbounds [[AWAIT_WITH_RET_VALUE_FRAME:%.*]], ptr addrspace(21) [[FRAMEPTR]], i32 0, i32 0
+; CHECK-NEXT:    [[DOTRELOAD:%.*]] = load i64, ptr addrspace(21) [[DOTRELOAD_ADDR]], align 4
+; CHECK-NEXT:    [[TMP9:%.*]] = call ptr @continuation.getContinuationStackOffset()
+; CHECK-NEXT:    [[TMP10:%.*]] = load i32, ptr [[TMP9]], align 4
+; CHECK-NEXT:    call void (i64, ...) @continuation.continue(i64 [[DOTRELOAD]], i32 [[TMP10]], i32 [[RES1]]), !continuation.registercount [[META2]]
 ; CHECK-NEXT:    unreachable
 ;
   %FramePtr = bitcast i8* %0 to %await_with_ret_value.Frame*
@@ -237,10 +195,10 @@ attributes #0 = { nounwind }
 ; CHECK: attributes #[[ATTR2:[0-9]+]] = { nofree norecurse nosync nounwind speculatable willreturn memory(none) }
 ;.
 ; CHECK: [[META0:![0-9]+]] = !{i32 21}
-; CHECK: [[META1:![0-9]+]] = !{ptr @simple_await}
-; CHECK: [[META2:![0-9]+]] = !{i32 0}
-; CHECK: [[META3:![0-9]+]] = !{i32 8}
-; CHECK: [[META4:![0-9]+]] = !{ptr @simple_await_entry}
-; CHECK: [[META5:![0-9]+]] = !{}
-; CHECK: [[META6:![0-9]+]] = !{ptr @await_with_ret_value}
+; CHECK: [[META1]] = !{ptr @simple_await}
+; CHECK: [[META2]] = !{i32 0}
+; CHECK: [[META3]] = !{i32 8}
+; CHECK: [[META4]] = !{ptr @simple_await_entry}
+; CHECK: [[META5]] = !{}
+; CHECK: [[META6]] = !{ptr @await_with_ret_value}
 ;.

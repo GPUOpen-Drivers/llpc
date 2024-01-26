@@ -1,7 +1,7 @@
 # For information about the config format, see https://github.com/crate-ci/typos
 
 [files]
-extend-exclude = ["imported/"]
+extend-exclude = ["imported/", "*.pipe"]
 
 [default.extend-identifiers]
 # Needs to be fixed in xgl first
@@ -24,4 +24,5 @@ USCALED = "USCALED"
 Datas = "Datas"
 HSA = "HSA"
 VALU = "VALU"
+offen = "offen"
 Derivate = "Derivate"

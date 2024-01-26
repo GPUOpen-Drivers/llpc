@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2019-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2019-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -60,18 +60,18 @@ void ShaderModes::clear() {
 // @param module : Module to record in
 // @param stage : Shader stage
 // @param commonShaderMode : Common shader mode
-void ShaderModes::setCommonShaderMode(Module &module, ShaderStage stage, const CommonShaderMode &commonShaderMode) {
+void ShaderModes::setCommonShaderMode(Module &module, ShaderStageEnum stage, const CommonShaderMode &commonShaderMode) {
   SmallString<64> metadataName(CommonShaderModeMetadataPrefix);
-  metadataName += getShaderStageAbbreviation(static_cast<ShaderStage>(stage));
+  metadataName += getShaderStageAbbreviation(static_cast<ShaderStageEnum>(stage));
   // Or the mode into any existing recorded mode, in case the front-end has already called setSubgroupSizeUsage.
   PipelineState::orNamedMetadataToArrayOfInt32(&module, commonShaderMode, metadataName);
 }
 
 // =====================================================================================================================
 // Get the common shader modes for the given shader stage: static edition that reads directly from IR.
-CommonShaderMode ShaderModes::getCommonShaderMode(Module &module, ShaderStage stage) {
+CommonShaderMode ShaderModes::getCommonShaderMode(Module &module, ShaderStageEnum stage) {
   SmallString<64> metadataName(CommonShaderModeMetadataPrefix);
-  metadataName += getShaderStageAbbreviation(static_cast<ShaderStage>(stage));
+  metadataName += getShaderStageAbbreviation(static_cast<ShaderStageEnum>(stage));
   CommonShaderMode mode = {};
   PipelineState::readNamedMetadataArrayOfInt32(&module, metadataName, mode);
   return mode;
@@ -81,7 +81,7 @@ CommonShaderMode ShaderModes::getCommonShaderMode(Module &module, ShaderStage st
 // Get the common shader mode (FP mode) for the given shader stage
 //
 // @param stage : Shader stage
-const CommonShaderMode &ShaderModes::getCommonShaderMode(ShaderStage stage) const {
+const CommonShaderMode &ShaderModes::getCommonShaderMode(ShaderStageEnum stage) const {
   return ArrayRef<CommonShaderMode>(m_commonShaderModes)[stage];
 }
 
@@ -103,19 +103,19 @@ bool ShaderModes::getAnyUseSubgroupSize() const {
 // @param module : Module to record in
 // @param stage : Shader stage
 // @param inMode : Tessellation mode
-void ShaderModes::setTessellationMode(Module &module, ShaderStage stage, const TessellationMode &inMode) {
-  assert(stage == ShaderStageTessControl || stage == ShaderStageTessEval);
+void ShaderModes::setTessellationMode(Module &module, ShaderStageEnum stage, const TessellationMode &inMode) {
+  assert(stage == ShaderStage::TessControl || stage == ShaderStage::TessEval);
   PipelineState::setNamedMetadataToArrayOfInt32(
-      &module, inMode, stage == ShaderStageTessControl ? TcsModeMetadataName : TesModeMetadataName);
+      &module, inMode, stage == ShaderStage::TessControl ? TcsModeMetadataName : TesModeMetadataName);
 }
 
 // =====================================================================================================================
 // Get the tessellation mode for the given shader stage (TCS or TES): static edition that reads directly from IR.
-TessellationMode ShaderModes::getTessellationMode(Module &module, ShaderStage stage) {
-  assert(stage == ShaderStageTessControl || stage == ShaderStageTessEval);
+TessellationMode ShaderModes::getTessellationMode(Module &module, ShaderStageEnum stage) {
+  assert(stage == ShaderStage::TessControl || stage == ShaderStage::TessEval);
   TessellationMode mode = {};
   PipelineState::readNamedMetadataArrayOfInt32(
-      &module, stage == ShaderStageTessControl ? TcsModeMetadataName : TesModeMetadataName, mode);
+      &module, stage == ShaderStage::TessControl ? TcsModeMetadataName : TesModeMetadataName, mode);
   return mode;
 }
 
@@ -207,11 +207,11 @@ const ComputeShaderMode &ShaderModes::getComputeShaderMode() const {
 // @param module : Module to record in
 // @param stage : Shader stage
 // @param usage : Subgroup size usage
-void ShaderModes::setSubgroupSizeUsage(Module &module, ShaderStage stage, bool usage) {
+void ShaderModes::setSubgroupSizeUsage(Module &module, ShaderStageEnum stage, bool usage) {
   CommonShaderMode mode = {};
   mode.useSubgroupSize = usage;
   SmallString<64> metadataName(CommonShaderModeMetadataPrefix);
-  metadataName += getShaderStageAbbreviation(static_cast<ShaderStage>(stage));
+  metadataName += getShaderStageAbbreviation(static_cast<ShaderStageEnum>(stage));
   // Or the mode into any existing recorded mode, in case the front-end has already called setCommonShaderMode.
   PipelineState::orNamedMetadataToArrayOfInt32(&module, mode, metadataName);
 }
@@ -223,7 +223,7 @@ void ShaderModes::setSubgroupSizeUsage(Module &module, ShaderStage stage, bool u
 void ShaderModes::readModesFromPipeline(Module *module) {
   // First the common state.
   for (unsigned stage = 0; stage < ArrayRef<CommonShaderMode>(m_commonShaderModes).size(); ++stage)
-    m_commonShaderModes[stage] = getCommonShaderMode(*module, ShaderStage(stage));
+    m_commonShaderModes[stage] = getCommonShaderMode(*module, ShaderStageEnum(stage));
 
   // Then the specific shader modes except tessellation.
   PipelineState::readNamedMetadataArrayOfInt32(module, GeometryShaderModeMetadataName, m_geometryShaderMode);

@@ -15,7 +15,7 @@ declare void @continuation.continue(i64, ...)
 
 ; REPORT-CONT-SIZES: Continuation state size of "RayGen" (raygeneration): 108 bytes
 ; REPORT-PAYLOAD-SIZES: Incoming and max outgoing payload VGPR size of "RayGen" (raygeneration): 28 and 24 bytes
-define void @RayGen() !continuation.entry !0 !continuation !3 !continuation.state !5 !continuation.registercount !7 !lgc.rt.shaderstage !12 {
+define void @RayGen(%struct.DispatchSystemData %0) !continuation.entry !0 !continuation !3 !continuation.state !5 !continuation.registercount !7 !lgc.rt.shaderstage !12 {
   %csp = alloca i32, align 4
   %cspInit = call i32 @continuation.initialContinuationStackPtr()
   store i32 %cspInit, i32* %csp

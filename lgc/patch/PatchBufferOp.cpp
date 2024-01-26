@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2017-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2017-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -145,9 +145,19 @@ static SmallVector<Type *> convertBufferPointer(TypeLowering &typeLowering, Type
   SmallVector<Type *> types;
 
   if (auto *pointerType = dyn_cast<PointerType>(type)) {
-    if (pointerType->getAddressSpace() == ADDR_SPACE_BUFFER_FAT_POINTER) {
-      types.push_back(FixedVectorType::get(Type::getInt32Ty(type->getContext()), 4));
-      types.push_back(PointerType::get(type->getContext(), ADDR_SPACE_CONST_32BIT));
+    auto &context = type->getContext();
+    switch (pointerType->getAddressSpace()) {
+    case ADDR_SPACE_BUFFER_FAT_POINTER:
+      types.push_back(FixedVectorType::get(Type::getInt32Ty(context), 4));
+      types.push_back(PointerType::get(context, ADDR_SPACE_CONST_32BIT));
+      break;
+    case ADDR_SPACE_BUFFER_STRIDED_POINTER:
+      types.push_back(FixedVectorType::get(Type::getInt32Ty(context), 4));
+      types.push_back(PointerType::get(context, ADDR_SPACE_CONST_32BIT));
+      types.push_back(Type::getInt32Ty(context));
+      break;
+    default:
+      break;
     }
   }
 
@@ -186,6 +196,9 @@ void BufferOpLowering::registerVisitors(llvm_dialects::VisitorBuilder<BufferOpLo
   builder.add(&BufferOpLowering::visitAtomicRMWInst);
   builder.add(&BufferOpLowering::visitBitCastInst);
   builder.add(&BufferOpLowering::visitBufferDescToPtr);
+  builder.add(&BufferOpLowering::visitStridedBufferDescToPtr);
+  builder.add(&BufferOpLowering::visitStridedBufferAddrAndStrideToPtr);
+  builder.add(&BufferOpLowering::visitStridedIndexAdd);
   builder.add(&BufferOpLowering::visitBufferLength);
   builder.add(&BufferOpLowering::visitBufferPtrDiff);
   builder.add(&BufferOpLowering::visitGetElementPtrInst);
@@ -331,12 +344,22 @@ BufferOpLowering::DescriptorInfo BufferOpLowering::getDescriptorInfo(Value *desc
 }
 
 // =====================================================================================================================
+// Determine if a value is a buffer pointer. A buffer pointer is either a BUFFER_FAT_POINTER or
+// a BUFFER_STRIDED_POINTER
+//
+// @param value : The value to check
+bool BufferOpLowering::isAnyBufferPointer(const Value *const value) {
+  return value->getType() == m_builder.getPtrTy(ADDR_SPACE_BUFFER_FAT_POINTER) ||
+         value->getType() == m_builder.getPtrTy(ADDR_SPACE_BUFFER_STRIDED_POINTER);
+}
+
+// =====================================================================================================================
 // Visits "cmpxchg" instruction.
 //
 // @param atomicCmpXchgInst : The instruction
 void BufferOpLowering::visitAtomicCmpXchgInst(AtomicCmpXchgInst &atomicCmpXchgInst) {
-  // If the type we are doing an atomic operation on is not a fat pointer, bail.
-  if (atomicCmpXchgInst.getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
+  // If the type we are doing an atomic operation on is not a buffer pointer, bail.
+  if (!isAnyBufferPointer(atomicCmpXchgInst.getPointerOperand()))
     return;
 
   m_builder.SetInsertPoint(&atomicCmpXchgInst);
@@ -437,7 +460,7 @@ void BufferOpLowering::visitAtomicCmpXchgInst(AtomicCmpXchgInst &atomicCmpXchgIn
 //
 // @param atomicRmwInst : The instruction
 void BufferOpLowering::visitAtomicRMWInst(AtomicRMWInst &atomicRmwInst) {
-  if (atomicRmwInst.getPointerAddressSpace() == ADDR_SPACE_BUFFER_FAT_POINTER) {
+  if (isAnyBufferPointer(atomicRmwInst.getPointerOperand())) {
     m_builder.SetInsertPoint(&atomicRmwInst);
 
     auto values = m_typeLowering.getValue(atomicRmwInst.getPointerOperand());
@@ -623,14 +646,8 @@ void BufferOpLowering::visitAtomicRMWInst(AtomicRMWInst &atomicRmwInst) {
 //
 // @param bitCastInst : The instruction
 void BufferOpLowering::visitBitCastInst(BitCastInst &bitCastInst) {
-  Type *const destType = bitCastInst.getType();
-
-  // If the type is not a pointer type, bail.
-  if (!destType->isPointerTy())
-    return;
-
-  // If the pointer is not a fat pointer, bail.
-  if (destType->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
+  // If the pointer is not a buffer pointer, bail.
+  if (!isAnyBufferPointer(&bitCastInst))
     return;
 
   m_typeLowering.replaceInstruction(&bitCastInst, m_typeLowering.getValue(bitCastInst.getOperand(0)));
@@ -643,18 +660,123 @@ void BufferOpLowering::visitBitCastInst(BitCastInst &bitCastInst) {
 void BufferOpLowering::visitBufferDescToPtr(BufferDescToPtrOp &descToPtr) {
   m_builder.SetInsertPoint(&descToPtr);
 
-  Constant *const nullPointer = ConstantPointerNull::get(m_offsetType);
-  m_typeLowering.replaceInstruction(&descToPtr, {descToPtr.getDesc(), nullPointer});
+  auto *descriptor = descToPtr.getDesc();
+  m_typeLowering.replaceInstruction(&descToPtr, {descriptor, ConstantPointerNull::get(m_offsetType)});
 
-  auto &di = m_descriptors[descToPtr.getDesc()];
+  auto &di = m_descriptors[descriptor];
 
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
   // Old version of the code
-  di.divergent = m_uniformityInfo.isDivergent(*descToPtr.getDesc());
+  di.divergent = m_uniformityInfo.isDivergent(*descriptor);
 #else
   // New version of the code (also handles unknown version, which we treat as latest)
-  di.divergent = m_uniformityInfo.isDivergent(descToPtr.getDesc());
+  di.divergent = m_uniformityInfo.isDivergent(descriptor);
 #endif
+}
+
+// =====================================================================================================================
+// Visits "strided.buffer.desc.to.ptr" instruction.
+//
+// @param descToPtr : The instruction
+void BufferOpLowering::visitStridedBufferDescToPtr(StridedBufferDescToPtrOp &descToPtr) {
+  m_builder.SetInsertPoint(&descToPtr);
+
+  auto *descriptor = descToPtr.getDesc();
+  m_typeLowering.replaceInstruction(&descToPtr,
+                                    {descriptor, ConstantPointerNull::get(m_offsetType), m_builder.getInt32(0)});
+
+  auto &di = m_descriptors[descriptor];
+
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
+  // Old version of the code
+  di.divergent = m_uniformityInfo.isDivergent(*descriptor);
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  di.divergent = m_uniformityInfo.isDivergent(descriptor);
+#endif
+}
+
+// =====================================================================================================================
+// Visits "strided.buffer.addr.and.stride.to.ptr" instruction.
+//
+// @param addrAndStrideToPtr : The instruction
+void BufferOpLowering::visitStridedBufferAddrAndStrideToPtr(StridedBufferAddrAndStrideToPtrOp &addrAndStrideToPtr) {
+  m_builder.SetInsertPoint(&addrAndStrideToPtr);
+
+  auto *addrLo = m_builder.CreateTrunc(addrAndStrideToPtr.getAddress(), m_builder.getInt32Ty());
+
+  // Build normal buffer descriptor
+  // Dword 0
+  Value *bufDesc = PoisonValue::get(FixedVectorType::get(m_builder.getInt32Ty(), 4));
+  bufDesc = m_builder.CreateInsertElement(bufDesc, addrLo, uint64_t(0));
+
+  // Dword 1
+  auto *addrHi =
+      m_builder.CreateTrunc(m_builder.CreateLShr(addrAndStrideToPtr.getAddress(), 32), m_builder.getInt32Ty());
+  auto *stride = m_builder.CreateShl(addrAndStrideToPtr.getStride(), 16);
+  addrHi = m_builder.CreateOr(addrHi, stride);
+  bufDesc = m_builder.CreateInsertElement(bufDesc, addrHi, 1);
+
+  // Dword 2
+  SqBufRsrcWord2 sqBufRsrcWord2{};
+  sqBufRsrcWord2.bits.numRecords = UINT32_MAX;
+  bufDesc = m_builder.CreateInsertElement(bufDesc, m_builder.getInt32(sqBufRsrcWord2.u32All), 2);
+
+  // Dword 3
+  SqBufRsrcWord3 sqBufRsrcWord3{};
+  sqBufRsrcWord3.bits.dstSelX = BUF_DST_SEL_X;
+  sqBufRsrcWord3.bits.dstSelY = BUF_DST_SEL_Y;
+  sqBufRsrcWord3.bits.dstSelZ = BUF_DST_SEL_Z;
+  sqBufRsrcWord3.bits.dstSelW = BUF_DST_SEL_W;
+
+  auto gfxIp = m_pipelineState.getTargetInfo().getGfxIpVersion();
+  if (gfxIp.major == 10) {
+    sqBufRsrcWord3.gfx10.format = BUF_FORMAT_32_UINT;
+    sqBufRsrcWord3.gfx10.resourceLevel = 1;
+    sqBufRsrcWord3.gfx10.oobSelect = 2;
+    assert(sqBufRsrcWord3.u32All == 0x21014FAC);
+  } else if (gfxIp.major >= 11) {
+    sqBufRsrcWord3.gfx11.format = BUF_FORMAT_32_UINT;
+    sqBufRsrcWord3.gfx11.oobSelect = 2;
+    assert(sqBufRsrcWord3.u32All == 0x20014FAC);
+  } else {
+    llvm_unreachable("Not implemented!");
+  }
+  bufDesc = m_builder.CreateInsertElement(bufDesc, m_builder.getInt32(sqBufRsrcWord3.u32All), 3);
+
+  Constant *const nullPointerOff = ConstantPointerNull::get(m_offsetType);
+  m_typeLowering.replaceInstruction(&addrAndStrideToPtr, {bufDesc, nullPointerOff, m_builder.getInt32(0)});
+
+  auto &di = m_descriptors[bufDesc];
+
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
+  // Old version of the code
+  di.divergent = m_uniformityInfo.isDivergent(*bufDesc);
+#else
+  // New version of the code (also handles unknown version, which we treat as latest)
+  di.divergent = m_uniformityInfo.isDivergent(bufDesc);
+#endif
+}
+
+// =====================================================================================================================
+// Visits "strided.index.add" instruction.
+//
+// @param indexAdd : The instruction
+void BufferOpLowering::visitStridedIndexAdd(StridedIndexAddOp &indexAdd) {
+  auto values = m_typeLowering.getValue(indexAdd.getPtr());
+  auto deltaIndex = indexAdd.getDeltaIdx();
+
+  if (auto deltaIndexInt = dyn_cast<ConstantInt>(deltaIndex); deltaIndexInt && deltaIndexInt->isZero()) {
+    m_typeLowering.replaceInstruction(&indexAdd, values);
+    return;
+  }
+
+  // If the old index zero, we can skip the addition and just take the delta index
+  // Otherwise, we need to add the delta index to the old one.
+  if (auto oldIndexInt = dyn_cast<ConstantInt>(values[2]); !oldIndexInt || !(oldIndexInt->isZero()))
+    deltaIndex = m_builder.CreateAdd(values[2], deltaIndex);
+
+  m_typeLowering.replaceInstruction(&indexAdd, {values[0], values[1], deltaIndex});
 }
 
 // =====================================================================================================================
@@ -718,8 +840,8 @@ void BufferOpLowering::visitBufferPtrDiff(BufferPtrDiffOp &ptrDiff) {
 //
 // @param getElemPtrInst : The instruction
 void BufferOpLowering::visitGetElementPtrInst(GetElementPtrInst &getElemPtrInst) {
-  // If the type we are GEPing into is not a fat pointer, bail.
-  if (getElemPtrInst.getAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
+  // If the type we are GEPing into is not a fat or strided pointer, bail.
+  if (!isAnyBufferPointer(getElemPtrInst.getPointerOperand()))
     return;
 
   m_builder.SetInsertPoint(&getElemPtrInst);
@@ -739,7 +861,10 @@ void BufferOpLowering::visitGetElementPtrInst(GetElementPtrInst &getElemPtrInst)
 
   copyMetadata(newGetElemPtr, &getElemPtrInst);
 
-  m_typeLowering.replaceInstruction(&getElemPtrInst, {values[0], newGetElemPtr});
+  if (getElemPtrInst.getAddressSpace() == ADDR_SPACE_BUFFER_STRIDED_POINTER)
+    m_typeLowering.replaceInstruction(&getElemPtrInst, {values[0], newGetElemPtr, values[2]});
+  else
+    m_typeLowering.replaceInstruction(&getElemPtrInst, {values[0], newGetElemPtr});
 }
 
 // =====================================================================================================================
@@ -747,9 +872,9 @@ void BufferOpLowering::visitGetElementPtrInst(GetElementPtrInst &getElemPtrInst)
 //
 // @param loadInst : The instruction
 void BufferOpLowering::visitLoadInst(LoadInst &loadInst) {
-  const unsigned addrSpace = loadInst.getPointerAddressSpace();
+  const auto pointerOperand = loadInst.getPointerOperand();
 
-  if (addrSpace != ADDR_SPACE_BUFFER_FAT_POINTER)
+  if (!isAnyBufferPointer(pointerOperand))
     return;
 
   m_postVisitInsts.push_back(&loadInst);
@@ -776,11 +901,8 @@ void BufferOpLowering::visitMemCpyInst(MemCpyInst &memCpyInst) {
   Value *const dest = memCpyInst.getArgOperand(0);
   Value *const src = memCpyInst.getArgOperand(1);
 
-  const unsigned destAddrSpace = dest->getType()->getPointerAddressSpace();
-  const unsigned srcAddrSpace = src->getType()->getPointerAddressSpace();
-
-  // If either of the address spaces are fat pointers.
-  if (destAddrSpace == ADDR_SPACE_BUFFER_FAT_POINTER || srcAddrSpace == ADDR_SPACE_BUFFER_FAT_POINTER) {
+  // If either of the address spaces are buffer pointers.
+  if (isAnyBufferPointer(src) || isAnyBufferPointer(dest)) {
     // Handling memcpy requires us to modify the CFG, so we need to do it after the initial visit pass.
     m_postVisitInsts.push_back(&memCpyInst);
   }
@@ -794,11 +916,8 @@ void BufferOpLowering::visitMemMoveInst(MemMoveInst &memMoveInst) {
   Value *const dest = memMoveInst.getArgOperand(0);
   Value *const src = memMoveInst.getArgOperand(1);
 
-  const unsigned destAddrSpace = dest->getType()->getPointerAddressSpace();
-  const unsigned srcAddrSpace = src->getType()->getPointerAddressSpace();
-
-  // If either of the address spaces are not fat pointers, bail.
-  if (destAddrSpace != ADDR_SPACE_BUFFER_FAT_POINTER && srcAddrSpace != ADDR_SPACE_BUFFER_FAT_POINTER)
+  // If either of the address spaces are not buffer pointers, bail.
+  if (!isAnyBufferPointer(dest) || !isAnyBufferPointer(src))
     return;
 
   m_builder.SetInsertPoint(&memMoveInst);
@@ -833,10 +952,8 @@ void BufferOpLowering::visitMemMoveInst(MemMoveInst &memMoveInst) {
 void BufferOpLowering::visitMemSetInst(MemSetInst &memSetInst) {
   Value *const dest = memSetInst.getArgOperand(0);
 
-  const unsigned destAddrSpace = dest->getType()->getPointerAddressSpace();
-
-  // If the address spaces is a fat pointer.
-  if (destAddrSpace == ADDR_SPACE_BUFFER_FAT_POINTER) {
+  // If the address spaces is a buffer pointer.
+  if (isAnyBufferPointer(dest)) {
     // Handling memset requires us to modify the CFG, so we need to do it after the initial visit pass.
     m_postVisitInsts.push_back(&memSetInst);
   }
@@ -850,14 +967,15 @@ void BufferOpLowering::visitMemSetInst(MemSetInst &memSetInst) {
 //
 // We do this because:
 //
-//  - phi nodes of fat pointers are very often divergent, but the descriptor part is actually uniform; only the offset
+//  - phi nodes of buffer pointers are very often divergent, but the descriptor part is actually uniform; only the
+//  offset
 //    part that is divergent. So we do our own mini-divergence analysis on the descriptor values after the first visitor
 //    pass.
 //  - TypeLowering helps us by automatically eliminating descriptor phi nodes in typical cases where they're redundant.
 //
 // @param phi : The instruction
 void BufferOpLowering::visitPhiInst(llvm::PHINode &phi) {
-  if (!phi.getType()->isPointerTy() || phi.getType()->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
+  if (!isAnyBufferPointer(&phi))
     return;
 
 #if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 458033
@@ -875,8 +993,8 @@ void BufferOpLowering::visitPhiInst(llvm::PHINode &phi) {
 //
 // @param storeInst : The instruction
 void BufferOpLowering::visitStoreInst(StoreInst &storeInst) {
-  // If the address space of the store pointer is not a buffer fat pointer, bail.
-  if (storeInst.getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
+  // If the address space of the store pointer is not a buffer pointer, bail.
+  if (!isAnyBufferPointer(storeInst.getPointerOperand()))
     return;
 
   m_postVisitInsts.push_back(&storeInst);
@@ -899,14 +1017,10 @@ void BufferOpLowering::postVisitStoreInst(StoreInst &storeInst) {
 //
 // @param icmpInst : The instruction
 void BufferOpLowering::visitICmpInst(ICmpInst &icmpInst) {
-  Type *const type = icmpInst.getOperand(0)->getType();
-
-  // If the type is not a pointer type, bail.
-  if (!type->isPointerTy())
-    return;
+  Value *const pointer = icmpInst.getOperand(0);
 
   // If the pointer is not a fat pointer, bail.
-  if (type->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
+  if (!isAnyBufferPointer(pointer))
     return;
 
   m_builder.SetInsertPoint(&icmpInst);
@@ -950,7 +1064,7 @@ void BufferOpLowering::visitICmpInst(ICmpInst &icmpInst) {
 // @param intrinsic : The intrinsic
 void BufferOpLowering::visitInvariantStart(llvm::IntrinsicInst &intrinsic) {
   Value *ptr = intrinsic.getArgOperand(1);
-  if (ptr->getType()->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER)
+  if (!isAnyBufferPointer(ptr))
     return;
 
   auto values = m_typeLowering.getValue(ptr);
@@ -1038,9 +1152,9 @@ void BufferOpLowering::postVisitMemCpyInst(MemCpyInst &memCpyInst) {
     if (GetElementPtrInst *const getElemPtr = dyn_cast<GetElementPtrInst>(destPtr))
       visitGetElementPtrInst(*getElemPtr);
 
-    if (srcPtr->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_FAT_POINTER)
+    if (isAnyBufferPointer(srcPtr))
       postVisitLoadInst(*srcLoad);
-    if (destPtr->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_FAT_POINTER)
+    if (isAnyBufferPointer(destPtr))
       postVisitStoreInst(*destStore);
   } else {
     // Get an vector type that is the length of the memcpy.
@@ -1052,9 +1166,9 @@ void BufferOpLowering::postVisitMemCpyInst(MemCpyInst &memCpyInst) {
     StoreInst *const destStore = m_builder.CreateAlignedStore(srcLoad, dest, destAlignment);
     copyMetadata(destStore, &memCpyInst);
 
-    if (src->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_FAT_POINTER)
+    if (isAnyBufferPointer(src))
       postVisitLoadInst(*srcLoad);
-    if (dest->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_FAT_POINTER)
+    if (isAnyBufferPointer(dest))
       postVisitStoreInst(*destStore);
   }
 
@@ -1408,7 +1522,13 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
         // TODO For stores?
         coherent.bits.dlc = isDlc;
       }
-      if (isInvariant && accessSize >= 4) {
+      if (pointerOperand->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_STRIDED_POINTER) {
+        CallInst *call = m_builder.CreateIntrinsic(
+            Intrinsic::amdgcn_struct_buffer_load, intAccessType,
+            {bufferDesc, pointerValues[2], offsetVal, m_builder.getInt32(0), m_builder.getInt32(coherent.u32All)});
+        copyMetadata(call, &inst);
+        part = call;
+      } else if (isInvariant && accessSize >= 4) {
         CallInst *call = m_builder.CreateIntrinsic(Intrinsic::amdgcn_s_buffer_load, intAccessType,
                                                    {bufferDesc, offsetVal, m_builder.getInt32(coherent.u32All)});
         call->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(m_builder.getContext(), {}));
@@ -1436,9 +1556,15 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
       }
       part = m_builder.CreateBitCast(part, intAccessType);
       copyMetadata(part, &inst);
-      part = m_builder.CreateIntrinsic(
-          Intrinsic::amdgcn_raw_buffer_store, intAccessType,
-          {part, bufferDesc, offsetVal, m_builder.getInt32(0), m_builder.getInt32(coherent.u32All)});
+      if (pointerOperand->getType()->getPointerAddressSpace() == ADDR_SPACE_BUFFER_STRIDED_POINTER) {
+        part = m_builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_store, intAccessType,
+                                         {part, bufferDesc, pointerValues[2], offsetVal, m_builder.getInt32(0),
+                                          m_builder.getInt32(coherent.u32All)});
+      } else {
+        part = m_builder.CreateIntrinsic(
+            Intrinsic::amdgcn_raw_buffer_store, intAccessType,
+            {part, bufferDesc, offsetVal, m_builder.getInt32(0), m_builder.getInt32(coherent.u32All)});
+      }
     }
 
     copyMetadata(part, &inst);
@@ -1480,7 +1606,7 @@ Value *BufferOpLowering::replaceLoadStore(Instruction &inst) {
     assert(newInst);
 
     if (type->isPointerTy()) {
-      assert(type->getPointerAddressSpace() != ADDR_SPACE_BUFFER_FAT_POINTER);
+      assert(!isAnyBufferPointer(&inst));
       newInst = m_builder.CreateBitCast(newInst, m_builder.getIntNTy(bytesToHandle * 8));
       copyMetadata(newInst, &inst);
       newInst = m_builder.CreateIntToPtr(newInst, type);
@@ -1584,19 +1710,30 @@ Value *BufferOpLowering::createGlobalPointerAccess(Value *const bufferDesc, Valu
   // Global pointer access
   m_builder.SetInsertPoint(terminator);
   Value *baseAddr = getBaseAddressFromBufferDesc(bufferDesc);
-  // NOTE: The offset of out-of-bound overridden as 0 may causes unexpected result when the extended robustness access
-  // is disabled.
-  Value *newOffset = m_builder.CreateSelect(inBound, offset, m_builder.getInt32(0));
+  Value *newOffset = nullptr;
+  if (m_pipelineState.getOptions().enableExtendedRobustBufferAccess) {
+    // No need to check out-of-bind if the extended robustness check is already done
+    newOffset = offset;
+  } else {
+    // NOTE: The offset of out-of-bound overridden as 0 may causes unexpected result when the extended robustness access
+    // is disabled.
+    newOffset = m_builder.CreateSelect(inBound, offset, m_builder.getInt32(0));
+  }
+
   // Add on the index to the address.
   Value *pointer = m_builder.CreateGEP(m_builder.getInt8Ty(), baseAddr, newOffset);
   pointer = m_builder.CreateBitCast(pointer, type->getPointerTo(ADDR_SPACE_GLOBAL));
   Value *newValue = callback(pointer);
 
-  m_builder.SetInsertPoint(&inst);
-  assert(!type->isVoidTy());
-  auto phi = m_builder.CreatePHI(type, 2, "newValue");
-  phi->addIncoming(Constant::getNullValue(type), origBlock);
-  phi->addIncoming(newValue, terminator->getParent());
+  // Store inst doesn't need return a value from a phi node
+  if (!dyn_cast<StoreInst>(&inst)) {
+    m_builder.SetInsertPoint(&inst);
+    assert(!type->isVoidTy());
+    auto phi = m_builder.CreatePHI(type, 2, "newValue");
+    phi->addIncoming(Constant::getNullValue(type), origBlock);
+    phi->addIncoming(newValue, terminator->getParent());
 
-  return phi;
+    return phi;
+  }
+  return nullptr;
 }

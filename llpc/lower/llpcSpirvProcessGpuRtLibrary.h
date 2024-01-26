@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2023-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -29,7 +29,7 @@
  ***********************************************************************************************************************
  */
 #pragma once
-
+#include "SPIRVInternal.h"
 #include "llpcSpirvLower.h"
 #include "llvm/ADT/FloatingPointMode.h"
 #include "llvm/IR/PassManager.h"
@@ -64,7 +64,10 @@ private:
   void createLoadDwordAtAddr(llvm::Function *func);
   void createLoadDwordAtAddrx2(llvm::Function *func);
   void createLoadDwordAtAddrx4(llvm::Function *func);
-  void createLoadDwordAtAddrWithType(llvm::Function *func, llvm::Type *loadTy);
+  void createConstantLoadDwordAtAddr(llvm::Function *func);
+  void createConstantLoadDwordAtAddrx2(llvm::Function *func);
+  void createConstantLoadDwordAtAddrx4(llvm::Function *func);
+  void createLoadDwordAtAddrWithType(llvm::Function *func, llvm::Type *loadTy, SPIRV::SPIRAddressSpace addressSpace);
   void createConvertF32toF16NegInf(llvm::Function *func);
   void createConvertF32toF16PosInf(llvm::Function *func);
   void createConvertF32toF16WithRoundingMode(llvm::Function *func, llvm::RoundingMode rm);
@@ -92,6 +95,7 @@ private:
   void createContStackSetPtr(llvm::Function *func);
   void createContStackLoad(llvm::Function *func);
   void createContStackStore(llvm::Function *func);
+  void createFloatOpWithRoundMode(llvm::Function *func);
   llvm::Value *createGetBvhSrd(llvm::Value *expansion, llvm::Value *boxSortMode);
 };
 } // namespace Llpc

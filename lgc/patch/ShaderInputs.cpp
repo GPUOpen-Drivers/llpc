@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -311,13 +311,14 @@ const char *ShaderInputs::getInputName(ShaderInput inputKind) {
 // @param module : IR module
 void ShaderInputs::gatherUsage(Module &module) {
   for (auto &func : module) {
-    if (!func.isDeclaration() || !func.getName().startswith(lgcName::ShaderInput))
+    if (!func.isDeclaration() || !func.getName().starts_with(lgcName::ShaderInput))
       continue;
     for (User *user : func.users()) {
       CallInst *call = cast<CallInst>(user);
-      ShaderStage stage = getShaderStage(call->getFunction());
-      assert(stage != ShaderStageCopyShader);
-      getShaderInputUsage(stage, static_cast<ShaderInput>(cast<ConstantInt>(call->getArgOperand(0))->getZExtValue()))
+      auto stage = getShaderStage(call->getFunction());
+      assert(stage != ShaderStage::CopyShader);
+      getShaderInputUsage(stage.value(),
+                          static_cast<ShaderInput>(cast<ConstantInt>(call->getArgOperand(0))->getZExtValue()))
           ->users.push_back(call);
     }
   }
@@ -334,8 +335,12 @@ void ShaderInputs::fixupUses(Module &module, PipelineState *pipelineState, bool 
     if (func.isDeclaration())
       continue;
 
-    ShaderStage stage = getShaderStage(&func);
-    ShaderInputsUsage *inputsUsage = getShaderInputsUsage(stage);
+    auto stage = getShaderStage(&func);
+
+    if (!stage)
+      continue;
+
+    ShaderInputsUsage *inputsUsage = getShaderInputsUsage(stage.value());
 
     // Use for compute shader
     bool useWorkgroupIds[3] = {false};
@@ -346,6 +351,12 @@ void ShaderInputs::fixupUses(Module &module, PipelineState *pipelineState, bool 
       ShaderInputUsage *inputUsage = inputsUsage->inputs[kind].get();
       if (!inputUsage)
         continue;
+
+      if (kind == static_cast<unsigned>(ShaderInput::LocalInvocationId) && computeWithIndirectCall &&
+          pipelineState->getShaderModes()->getComputeShaderMode().noLocalInvocationIdInCalls &&
+          !isShaderEntryPoint(&func))
+        continue;
+
       Value *value = nullptr;
       {
         if (inputUsage->entryArgIdx != 0)
@@ -391,9 +402,9 @@ void ShaderInputs::fixupUses(Module &module, PipelineState *pipelineState, bool 
       // (both run later on) to tell that the input is in use. For those cases, we must keep the builtInUsage
       // field, and set it here.
       // Add code here as built-ins are moved from PatchInOutImportExport to InOutBuilder.
-      auto &builtInUsage = pipelineState->getShaderResourceUsage(stage)->builtInUsage;
-      switch (stage) {
-      case ShaderStageVertex:
+      auto &builtInUsage = pipelineState->getShaderResourceUsage(stage.value())->builtInUsage;
+      switch (stage.value()) {
+      case ShaderStage::Vertex:
         switch (static_cast<ShaderInput>(kind)) {
         case ShaderInput::VertexId:
           // Tell NggPrimShader to copy VertexId through LDS.
@@ -571,12 +582,12 @@ static const ShaderInputDesc CsVgprInputs[] = {
 // @param [in/out] argTys : Argument types vector to add to
 // @param [in/out] argNames : Argument names vector to add to
 // @returns : Bitmap with bits set for SGPR arguments so caller can set "inreg" attribute on the args
-uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage shaderStage, Function *origFunc,
+uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStageEnum shaderStage, Function *origFunc,
                                        bool isComputeWithCalls, SmallVectorImpl<Type *> &argTys,
                                        SmallVectorImpl<std::string> &argNames, unsigned argOffset) {
 
-  bool hasTs = pipelineState->hasShaderStage(ShaderStageTessControl);
-  bool hasGs = pipelineState->hasShaderStage(ShaderStageGeometry);
+  bool hasTs = pipelineState->hasShaderStage(ShaderStage::TessControl);
+  bool hasGs = pipelineState->hasShaderStage(ShaderStage::Geometry);
 
   uint64_t inRegMask = 0;
   auto intfData = pipelineState->getShaderInterfaceData(shaderStage);
@@ -588,7 +599,7 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
 
   // Enable optional shader inputs as required.
   switch (shaderStage) {
-  case ShaderStageVertex:
+  case ShaderStage::Vertex:
     if (enableHwXfb && (!hasGs && !hasTs)) {
       // HW stream-out in VS as hardware VS
       getShaderInputUsage(shaderStage, ShaderInput::StreamOutInfo)->enable();
@@ -605,7 +616,7 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
       getShaderInputUsage(shaderStage, ShaderInput::InstanceId)->enable();
     }
     break;
-  case ShaderStageTessEval:
+  case ShaderStage::TessEval:
     if (!hasGs) {
       // TES as hardware VS
       if (!pipelineState->getNggControl()->enableNgg) {
@@ -631,7 +642,7 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
 
   const unsigned id = static_cast<unsigned>(ShaderInput::WorkgroupId);
   CsSgprInputs[id].always = true;
-  if (shaderStage == ShaderStageCompute && !isComputeWithCalls && origFunc &&
+  if (shaderStage == ShaderStage::Compute && !isComputeWithCalls && origFunc &&
       pipelineState->getTargetInfo().getGfxIpVersion().major <= 11) {
     CsSgprInputs[id].always = false;
     tryOptimizeWorkgroupId(pipelineState, shaderStage, origFunc);
@@ -642,11 +653,11 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
   ArrayRef<ShaderInputDesc> vgprInputDescs;
 
   switch (shaderStage) {
-  case ShaderStageTask:
+  case ShaderStage::Task:
     sgprInputDescs = TaskSgprInputs;
     vgprInputDescs = TaskVgprInputs;
     break;
-  case ShaderStageVertex:
+  case ShaderStage::Vertex:
     if (!hasTs) {
       if (hasGs)
         sgprInputDescs = VsAsEsSgprInputs;
@@ -655,30 +666,30 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
     }
     vgprInputDescs = VsVgprInputs;
     break;
-  case ShaderStageTessControl:
+  case ShaderStage::TessControl:
     sgprInputDescs = TcsSgprInputs;
     vgprInputDescs = TcsVgprInputs;
     break;
-  case ShaderStageTessEval:
+  case ShaderStage::TessEval:
     if (hasGs)
       sgprInputDescs = TesAsEsSgprInputs;
     else
       sgprInputDescs = TesAsVsSgprInputs;
     vgprInputDescs = TesVgprInputs;
     break;
-  case ShaderStageGeometry:
+  case ShaderStage::Geometry:
     sgprInputDescs = GsSgprInputs;
     vgprInputDescs = GsVgprInputs;
     break;
-  case ShaderStageMesh:
+  case ShaderStage::Mesh:
     // NOTE: Mesh shader is finally mapped to HW GS in fast launch mode. Therefore, we don't add SGPR and VGPR inputs
     // here. Instead, this is deferred to mesh shader lowering in later phase.
     break;
-  case ShaderStageFragment:
+  case ShaderStage::Fragment:
     sgprInputDescs = FsSgprInputs;
     vgprInputDescs = FsVgprInputs;
     break;
-  case ShaderStageCompute:
+  case ShaderStage::Compute:
     sgprInputDescs = CsSgprInputs;
     vgprInputDescs = CsVgprInputs;
     break;
@@ -721,7 +732,7 @@ uint64_t ShaderInputs::getShaderArgTys(PipelineState *pipelineState, ShaderStage
 // Get ShaderInputsUsage struct for the given shader stage
 //
 // @param stage : Shader stage
-ShaderInputs::ShaderInputsUsage *ShaderInputs::getShaderInputsUsage(ShaderStage stage) {
+ShaderInputs::ShaderInputsUsage *ShaderInputs::getShaderInputsUsage(ShaderStageEnum stage) {
   m_shaderInputsUsage.resize(std::max(m_shaderInputsUsage.size(), static_cast<size_t>(stage) + 1));
   return &m_shaderInputsUsage[stage];
 }
@@ -731,7 +742,7 @@ ShaderInputs::ShaderInputsUsage *ShaderInputs::getShaderInputsUsage(ShaderStage 
 //
 // @param stage : Shader stage
 // @param inputKind : ShaderInput enum value for the shader input
-ShaderInputs::ShaderInputUsage *ShaderInputs::getShaderInputUsage(ShaderStage stage, unsigned inputKind) {
+ShaderInputs::ShaderInputUsage *ShaderInputs::getShaderInputUsage(ShaderStageEnum stage, unsigned inputKind) {
   ShaderInputsUsage *inputsUsage = getShaderInputsUsage(stage);
   if (!inputsUsage->inputs[inputKind])
     inputsUsage->inputs[inputKind] = std::make_unique<ShaderInputUsage>();
@@ -748,8 +759,9 @@ ShaderInputs::ShaderInputUsage *ShaderInputs::getShaderInputUsage(ShaderStage st
 // @param pipelineState : Pipeline state
 // @param shaderStage : Shader stage
 // @param origFunc : The original entry point function
-void ShaderInputs::tryOptimizeWorkgroupId(PipelineState *pipelineState, ShaderStage shaderStage, Function *origFunc) {
-  assert(shaderStage == ShaderStageCompute);
+void ShaderInputs::tryOptimizeWorkgroupId(PipelineState *pipelineState, ShaderStageEnum shaderStage,
+                                          Function *origFunc) {
+  assert(shaderStage == ShaderStage::Compute);
   bool useWholeWorkgroupId = false;
   SmallVector<Instruction *> extractVec3[3];
   SmallVector<Instruction *> workgroupIdCallInsts;

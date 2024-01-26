@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
- *deal in the Software without restriction, including without limitation the
- *rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- *sell copies of the Software, and to permit persons to whom the Software is
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in
@@ -18,8 +18,8 @@
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- *FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- *IN THE SOFTWARE.
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 
@@ -78,7 +78,7 @@ static Function *transformFunction(Function &F) {
   LLVM_DEBUG(dbgs() << "  Set new name " << NewName << "\n");
 
   // Change the return type and arguments
-  SmallVector<DXILContArgTy> AllArgTypes;
+  SmallVector<ContArgTy> AllArgTypes;
 
   Type *NewRetTy = F.getReturnType();
 
@@ -93,9 +93,11 @@ static Function *transformFunction(Function &F) {
     }
   }
 
-  // TODO Remove old name when possible
-  if (NewName == "_cont_Traversal" || Name == "amd.dx.TraversalImpl")
+  if (NewName == "_cont_Traversal")
     lgc::rt::setLgcRtShaderStage(&F, lgc::rt::RayTracingShaderStage::Traversal);
+  else if (NewName == "_cont_KernelEntry")
+    lgc::rt::setLgcRtShaderStage(&F,
+                                 lgc::rt::RayTracingShaderStage::KernelEntry);
 
   Argument *RetArg = nullptr;
   AttributeList FAttrs = F.getAttributes();
@@ -103,7 +105,7 @@ static Function *transformFunction(Function &F) {
 
   unsigned ArgNo = 0;
   for (auto &Arg : F.args()) {
-    DXILContArgTy ArgTy = DXILContArgTy::get(&F, &Arg);
+    ContArgTy ArgTy = ContArgTy::get(&F, &Arg);
 
     bool DidHandleArg = false;
 
@@ -138,7 +140,7 @@ static Function *transformFunction(Function &F) {
   }
 
   // Create new empty function
-  DXILContFuncTy NewFuncTy(NewRetTy, AllArgTypes);
+  ContFuncTy NewFuncTy(NewRetTy, AllArgTypes);
   Function *NewFunc = cloneFunctionHeaderWithTypes(F, NewFuncTy, ParamAttrs);
 
   // Remove old name for the case that the new name is the same
@@ -300,6 +302,7 @@ static bool isUtilFunction(StringRef Name) {
       "GetUninitialized",
       "I32Count",
       "IsEndSearch",
+      "KernelEntry",
       "ReportHit",
       "RestoreSystemData",
       "SetI32",
@@ -325,7 +328,7 @@ llvm::PreservedAnalyses DXILContIntrinsicPreparePass::run(
 
   for (auto *F : Funcs) {
     auto Name = F->getName();
-    bool IsContImpl = Name.contains("_cont_") || Name.contains("amd.dx.");
+    bool IsContImpl = Name.contains("_cont_");
     bool ShouldTransform = false;
 
     if (IsContImpl) {

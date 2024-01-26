@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -64,13 +64,13 @@ ElfLinker *createElfLinkerImpl(PipelineState *pipelineState, llvm::ArrayRef<llvm
 // in the front-end before a shader is associated with a pipeline.
 //
 // @param func : Shader entry-point function
-// @param stage : Shader stage or ShaderStageInvalid
-void Pipeline::markShaderEntryPoint(Function *func, ShaderStage stage) {
+// @param stage : Shader stage or ShaderStage::Invalid
+void Pipeline::markShaderEntryPoint(Function *func, ShaderStageEnum stage) {
   // We mark the shader entry-point function by
   // 1. marking it external linkage and DLLExportStorageClass; and
   // 2. adding the shader stage metadata.
   // The shader stage metadata for any other non-inlined functions in the module is added in irLink().
-  if (stage != ShaderStageInvalid) {
+  if (stage != ShaderStage::Invalid) {
     func->setLinkage(GlobalValue::ExternalLinkage);
     func->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
   } else
@@ -82,79 +82,89 @@ void Pipeline::markShaderEntryPoint(Function *func, ShaderStage stage) {
 // Get a function's shader stage.
 //
 // @param func : Function to check
-// @returns stage : Shader stage, or ShaderStageInvalid if none
-ShaderStage Pipeline::getShaderStage(llvm::Function *func) {
+// @returns stage : Shader stage, or nullopt if none
+std::optional<ShaderStageEnum> Pipeline::getShaderStage(llvm::Function *func) {
   return lgc::getShaderStage(func);
+}
+
+// =====================================================================================================================
+// Find the shader entry-point from shader module, and set pipeline stage.
+//
+// @param module : Shader module to attach
+void PipelineState::attachModule(llvm::Module *module) {
+  if (!module)
+    return;
+
+  // Find the shader entry-point (marked with irLink()), and get the shader stage from that.
+  std::optional<ShaderStageEnum> stage;
+  for (Function &func : *module) {
+    if (!isShaderEntryPoint(&func))
+      continue;
+    // We have the entry-point (marked as DLLExportStorageClass).
+    stage = getShaderStage(&func);
+    m_stageMask |= ShaderStageMask(stage.value());
+
+    // Rename the entry-point to ensure there is no clash on linking.
+    func.setName(Twine(lgcName::EntryPointPrefix) + getShaderStageAbbreviation(stage.value()) + "." + func.getName());
+  }
+
+  // Check if this is a compute library with no shader entry-point; if so, mark functions as compute.
+  if (!stage) {
+    stage = ShaderStage::Compute;
+    m_computeLibrary = true;
+  }
+
+  // Mark all other function definitions in the module with the same shader stage.
+  for (Function &func : *module) {
+    if (!func.isDeclaration() && !isShaderEntryPoint(&func))
+      setShaderStage(&func, stage);
+  }
 }
 
 // =====================================================================================================================
 // Link shader IR modules into a pipeline module.
 //
-// @param modules : Array of modules. Modules are freed
+// @param modules : Array of modules unique pointers. Modules are freed
 // @param pipelineLink : Enum saying whether this is a pipeline, unlinked or part-pipeline compile.
-Module *PipelineState::irLink(ArrayRef<Module *> modules, PipelineLink pipelineLink) {
+std::unique_ptr<Module> PipelineState::irLink(MutableArrayRef<std::unique_ptr<Module>> modules,
+                                              PipelineLink pipelineLink) {
   m_pipelineLink = pipelineLink;
 
   // Processing for each shader module before linking.
   IRBuilder<> builder(getContext());
-  for (Module *module : modules) {
+  for (auto &module : modules) {
     if (!module)
       continue;
 
-    // Find the shader entry-point (marked with irLink()), and get the shader stage from that.
-    ShaderStage stage = ShaderStageInvalid;
-    for (Function &func : *module) {
-      if (!isShaderEntryPoint(&func))
-        continue;
-      // We have the entry-point (marked as DLLExportStorageClass).
-      stage = getShaderStage(&func);
-      m_stageMask |= 1U << stage;
-
-      // Rename the entry-point to ensure there is no clash on linking.
-      func.setName(Twine(lgcName::EntryPointPrefix) + getShaderStageAbbreviation(static_cast<ShaderStage>(stage)) +
-                   "." + func.getName());
-    }
-
-    // Check if this is a compute library with no shader entry-point; if so, mark functions as compute.
-    if (stage == ShaderStageInvalid) {
-      stage = ShaderStageCompute;
-      m_computeLibrary = true;
-    }
-
-    // Mark all other function definitions in the module with the same shader stage.
-    for (Function &func : *module) {
-      if (!func.isDeclaration() && !isShaderEntryPoint(&func))
-        setShaderStage(&func, stage);
-    }
+    attachModule(module.get());
   }
 
   // The front-end was using a BuilderRecorder; record pipeline state into IR metadata.
-  record(modules[0]);
+  record(modules[0].get());
 
   // If there is only one shader, just change the name on its module and return it.
-  Module *pipelineModule = nullptr;
+  std::unique_ptr<Module> pipelineModule;
   if (modules.size() == 1) {
-    pipelineModule = modules[0];
+    pipelineModule = std::move(modules[0]);
     pipelineModule->setModuleIdentifier("lgcPipeline");
   } else {
     // Create an empty module then link each shader module into it.
     bool result = true;
-    pipelineModule = new Module("lgcPipeline", getContext());
+    pipelineModule = std::unique_ptr<Module>(new Module("lgcPipeline", getContext()));
     TargetMachine *targetMachine = getLgcContext()->getTargetMachine();
     pipelineModule->setTargetTriple(targetMachine->getTargetTriple().getTriple());
     pipelineModule->setDataLayout(modules.front()->getDataLayout());
 
     Linker linker(*pipelineModule);
-    for (Module *module : modules) {
+    for (auto &module : modules) {
       // NOTE: We use unique_ptr here. The shader module will be destroyed after it is
       // linked into pipeline module.
-      if (linker.linkInModule(std::unique_ptr<Module>(module)))
+      if (linker.linkInModule(std::move(module)))
         result = false;
     }
 
     if (!result) {
-      delete pipelineModule;
-      pipelineModule = nullptr;
+      pipelineModule.release();
     }
   }
   return pipelineModule;

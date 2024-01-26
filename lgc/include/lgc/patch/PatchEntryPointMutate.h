@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2021-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2021-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -122,8 +122,8 @@ private:
 
   void processShader(ShaderInputs *shaderInputs);
   void processComputeFuncs(ShaderInputs *shaderInputs, llvm::Module &module);
-  void processCalls(llvm::Function &func, llvm::SmallVectorImpl<llvm::Type *> &shaderInputTys,
-                    llvm::SmallVectorImpl<std::string> &shaderInputNames, uint64_t inRegMask, unsigned argOffset);
+  void processCalls(llvm::Function &func, llvm::ArrayRef<llvm::Type *> shaderInputTys,
+                    llvm::ArrayRef<std::string> shaderInputNames, uint64_t inRegMask, unsigned argOffset);
   void setFuncAttrs(llvm::Function *entryPoint);
 
   uint64_t generateEntryPointArgTys(ShaderInputs *shaderInputs, llvm::Function *origFunc,
@@ -151,16 +151,16 @@ private:
 
   bool lowerCpsOps(llvm::Function *func, ShaderInputs *shaderInputs);
   llvm::Function *lowerCpsFunction(llvm::Function *func, llvm::ArrayRef<llvm::Type *> fixedShaderArgTys,
-                                   llvm::ArrayRef<std::string> argNames, bool isContinufy);
+                                   llvm::ArrayRef<std::string> argNames);
   unsigned lowerCpsJump(llvm::Function *parent, cps::JumpOp *jumpOp, llvm::BasicBlock *tailBlock,
                         llvm::SmallVectorImpl<CpsExitInfo> &exitInfos);
   void lowerAsCpsReference(cps::AsContinuationReferenceOp &asCpsReferenceOp);
 
   // Get UserDataUsage struct for the merged shader stage that contains the given shader stage
-  UserDataUsage *getUserDataUsage(ShaderStage stage);
+  UserDataUsage *getUserDataUsage(ShaderStageEnum stage);
 
   // Get the shader stage that the given shader stage is merged into.
-  ShaderStage getMergedShaderStage(ShaderStage stage) const;
+  ShaderStageEnum getMergedShaderStage(ShaderStageEnum stage) const;
 
   bool isComputeWithCalls() const;
 
@@ -172,7 +172,7 @@ private:
   PipelineState *m_pipelineState = nullptr; // Pipeline state from PipelineStateWrapper pass
   bool m_computeWithCalls = false;          // Whether this is compute pipeline with calls or compute library
   // Per-HW-shader-stage gathered user data usage information.
-  llvm::SmallVector<std::unique_ptr<UserDataUsage>, ShaderStageCount> m_userDataUsage;
+  llvm::SmallVector<std::unique_ptr<UserDataUsage>, ShaderStage::Count> m_userDataUsage;
 
   class CpsShaderInputCache {
   public:

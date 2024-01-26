@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 
@@ -135,6 +135,12 @@ namespace {
 
 // Get the name of a global that is copied to a different module for inlining.
 std::string getCrossModuleName(GlobalValue &gv) {
+  if (auto *fn = dyn_cast<Function>(&gv)) {
+    // Intrinsics should not be renamed since the IR verifier insists on a "correct" name mangling based on any
+    // overloaded types.
+    if (fn->isIntrinsic())
+      return fn->getName().str();
+  }
   return (Twine(gv.getName()) + ".cloned." + gv.getParent()->getName()).str();
 }
 
@@ -314,8 +320,7 @@ GlobalValue *CompilerUtils::CrossModuleInliner::findCopiedGlobal(GlobalValue &so
     return found->second;
   }
 
-  auto *gv =
-      targetModule.getNamedValue((Twine(sourceGv.getName()) + ".cloned." + sourceGv.getParent()->getName()).str());
+  GlobalValue *gv = targetModule.getNamedValue(getCrossModuleName(sourceGv));
   if (gv)
     assert(gv->getValueType() == sourceGv.getValueType());
   return gv;

@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2020-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2020-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
- *  of this software and associated documentation files (the "Software"), to deal
- *  in the Software without restriction, including without limitation the rights
- *  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- *  copies of the Software, and to permit persons to whom the Software is
+ *  of this software and associated documentation files (the "Software"), to
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in all
@@ -17,9 +17,9 @@
  *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- *  SOFTWARE.
+ *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 /**
@@ -40,28 +40,116 @@ namespace lgc {
 using Hash128 = std::array<uint64_t, 2>;
 
 /// Enumerates LGC shader stages.
+namespace ShaderStage {
 enum ShaderStage : unsigned {
-  ShaderStageTask = 0,                                  ///< Task shader
-  ShaderStageVertex,                                    ///< Vertex shader
-  ShaderStageTessControl,                               ///< Tessellation control shader
-  ShaderStageTessEval,                                  ///< Tessellation evaluation shader
-  ShaderStageGeometry,                                  ///< Geometry shader
-  ShaderStageMesh,                                      ///< Mesh shader
-  ShaderStageFragment,                                  ///< Fragment shader
-  ShaderStageCompute,                                   ///< Compute shader
-  ShaderStageCount,                                     ///< Count of shader stages
-  ShaderStageInvalid = ~0u,                             ///< Invalid shader stage
-  ShaderStageNativeStageCount = ShaderStageCompute + 1, ///< Native supported shader stage count
-  ShaderStageGfxCount = ShaderStageFragment + 1,        ///< Count of shader stages for graphics pipeline
+  Task = 0,                       ///< Task shader
+  Vertex,                         ///< Vertex shader
+  TessControl,                    ///< Tessellation control shader
+  TessEval,                       ///< Tessellation evaluation shader
+  Geometry,                       ///< Geometry shader
+  Mesh,                           ///< Mesh shader
+  Fragment,                       ///< Fragment shader
+  Compute,                        ///< Compute shader
+  Count,                          ///< Count of shader stages
+  Invalid = ~0u,                  ///< Invalid shader stage
+  NativeStageCount = Compute + 1, ///< Native supported shader stage count
+  GfxCount = Fragment + 1,        ///< Count of shader stages for graphics pipeline
 
-  ShaderStageCopyShader = ShaderStageCount, ///< Copy shader (internal-use)
-  ShaderStageCountInternal,                 ///< Count of shader stages (internal-use)
+  CopyShader = Count, ///< Copy shader (internal-use)
+  CountInternal,      ///< Count of shader stages (internal-use)
+};
+} // namespace ShaderStage
+
+// TODO Temporary definition until ShaderStage is converted to a class enum.
+using ShaderStageEnum = ShaderStage::ShaderStage;
+
+class ShaderStageMask {
+public:
+  constexpr ShaderStageMask() {}
+
+  constexpr explicit ShaderStageMask(ShaderStageEnum stage) {
+    assert(static_cast<uint32_t>(stage) < 32 && "ShaderStage mask overflowed");
+    m_value = 1U << static_cast<uint32_t>(stage);
+  };
+
+  constexpr explicit ShaderStageMask(std::initializer_list<ShaderStageEnum> stages) {
+    for (auto stage : stages)
+      *this |= ShaderStageMask(stage);
+  };
+
+  constexpr static ShaderStageMask fromRaw(uint32_t mask) {
+    ShaderStageMask result;
+    result.m_value = mask;
+    return result;
+  }
+  constexpr uint32_t toRaw() const { return m_value; }
+
+  constexpr bool operator==(const ShaderStageMask &other) const { return m_value == other.m_value; }
+
+  constexpr bool operator!=(const ShaderStageMask &other) const { return !(*this == other); }
+
+  constexpr ShaderStageMask &operator|=(const ShaderStageMask &other);
+  constexpr ShaderStageMask &operator&=(const ShaderStageMask &other);
+  constexpr ShaderStageMask operator~() const {
+    ShaderStageMask result;
+    result.m_value = ~m_value;
+    return result;
+  }
+
+  constexpr bool contains(ShaderStageEnum stage) const;
+  constexpr bool contains_any(std::initializer_list<ShaderStageEnum> stages) const;
+  constexpr bool empty() const { return m_value == 0; }
+
+  uint32_t m_value = 0;
+};
+
+constexpr ShaderStageMask operator|(const ShaderStageMask &lhs, const ShaderStageMask &rhs) {
+  ShaderStageMask result;
+  result.m_value = lhs.m_value | rhs.m_value;
+  return result;
+}
+
+constexpr ShaderStageMask operator&(const ShaderStageMask &lhs, const ShaderStageMask &rhs) {
+  ShaderStageMask result;
+  result.m_value = lhs.m_value & rhs.m_value;
+  return result;
+}
+
+constexpr ShaderStageMask &ShaderStageMask::operator|=(const ShaderStageMask &other) {
+  *this = *this | other;
+  return *this;
+}
+
+constexpr ShaderStageMask &ShaderStageMask::operator&=(const ShaderStageMask &other) {
+  *this = *this & other;
+  return *this;
+}
+
+constexpr bool ShaderStageMask::contains(ShaderStageEnum stage) const {
+  return (*this & ShaderStageMask(stage)).m_value != 0;
+}
+
+constexpr bool ShaderStageMask::contains_any(std::initializer_list<ShaderStageEnum> stages) const {
+  return (*this & ShaderStageMask(stages)).m_value != 0;
+}
+
+enum AddrSpace {
+  ADDR_SPACE_FLAT = 0,                   // Flat memory
+  ADDR_SPACE_GLOBAL = 1,                 // Global memory
+  ADDR_SPACE_REGION = 2,                 // GDS memory
+  ADDR_SPACE_LOCAL = 3,                  // Local memory
+  ADDR_SPACE_CONST = 4,                  // Constant memory
+  ADDR_SPACE_PRIVATE = 5,                // Private memory
+  ADDR_SPACE_CONST_32BIT = 6,            // Constant 32-bit memory
+  ADDR_SPACE_BUFFER_FAT_POINTER = 7,     // Buffer fat-pointer memory
+  ADDR_SPACE_BUFFER_STRIDED_POINTER = 9, // Strided Buffer pointer memory
+  ADDR_SPACE_MAX = ADDR_SPACE_BUFFER_STRIDED_POINTER
 };
 
 } // namespace lgc
 namespace llvm {
-// Enable iteration over shader stages with `lgc::enumRange<lgc::ShaderStage>()`.
-LGC_DEFINE_ZERO_BASED_ITERABLE_ENUM(lgc::ShaderStage, lgc::ShaderStage::ShaderStageCountInternal);
+// Enable iteration over shader stages with `lgc::enumRange<lgc::ShaderStageEnum>()`.
+LGC_DEFINE_ZERO_BASED_ITERABLE_ENUM(lgc::ShaderStageEnum, lgc::ShaderStage::CountInternal);
 } // namespace llvm
 
 namespace lgc {

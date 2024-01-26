@@ -1,13 +1,13 @@
 /*
  ***********************************************************************************************************************
  *
- *  Copyright (c) 2022-2023 Advanced Micro Devices, Inc. All Rights Reserved.
+ *  Copyright (c) 2022-2024 Advanced Micro Devices, Inc. All Rights Reserved.
  *
  *  Permission is hereby granted, free of charge, to any person obtaining a copy
  *  of this software and associated documentation files (the "Software"), to
- *deal in the Software without restriction, including without limitation the
- *rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- *sell copies of the Software, and to permit persons to whom the Software is
+ *  deal in the Software without restriction, including without limitation the
+ *  rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ *  sell copies of the Software, and to permit persons to whom the Software is
  *  furnished to do so, subject to the following conditions:
  *
  *  The above copyright notice and this permission notice shall be included in
@@ -18,8 +18,8 @@
  *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  *  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- *FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- *IN THE SOFTWARE.
+ *  FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ *  IN THE SOFTWARE.
  *
  **********************************************************************************************************************/
 
@@ -73,7 +73,8 @@ private:
     uint32_t ContStateBytes = 0;
     CallInst *MallocCall = nullptr;
     MDNode *MD = nullptr;
-    AllocaInst *NewContState = nullptr;
+    // The continuation state on the CPS stack
+    Value *NewContState = nullptr;
     SmallVector<CallInst *> NewReturnContinues;
     /// Cleaned entry function, used to replace metadata
     Function *NewStart = nullptr;
@@ -98,6 +99,7 @@ private:
 
   Module &M;
   LLVMContext &Context;
+  llvm::FunctionAnalysisManager &FAM;
   IRBuilder<> B;
   Type *I32 = nullptr;
   Type *I64 = nullptr;
@@ -184,17 +186,6 @@ findTokenOrigin(BasicBlock *BB, Value *V,
   return Result;
 }
 
-/// Create a memcopy of an array, which the translator understands
-void createCopy(IRBuilder<> &B, Value *Dst, Value *Src, Type *Ty) {
-  assert(Ty->isArrayTy() && "Can only copy arrays");
-  for (unsigned I = 0; I < Ty->getArrayNumElements(); I++) {
-    auto *SrcGep = B.CreateConstInBoundsGEP2_32(Ty, Src, 0, I);
-    auto *DstGep = B.CreateConstInBoundsGEP2_32(Ty, Dst, 0, I);
-    auto *Load = B.CreateLoad(Ty->getArrayElementType(), SrcGep);
-    B.CreateStore(Load, DstGep);
-  }
-}
-
 void LegacyCleanupContinuationsPassImpl::analyzeContinuation(Function &F,
                                                              MDNode *MD) {
   // Only analyze main continuation
@@ -271,7 +262,7 @@ uint32_t getIncomingRegisterCount(Function *ResumeFunc) {
     assert(isa<CallInst>(U) &&
            "User of a resume function should be a call to continue");
     auto *Inst = cast<CallInst>(U);
-    if (auto Count = DXILContHelper::tryGetReturnedRegisterCount(Inst)) {
+    if (auto Count = ContHelper::tryGetReturnedRegisterCount(Inst)) {
       assert((!RegCount || *RegCount == *Count) &&
              "Got different returned registercounts in continues to "
              "the same resume function");
@@ -330,7 +321,7 @@ void LegacyCleanupContinuationsPassImpl::processContinuation(
     Function *StartFunc, ContinuationData &FuncData) {
   auto *Void = Type::getVoidTy(Context);
   LLVM_DEBUG(dbgs() << "Processing function: " << StartFunc->getName() << "\n");
-  bool IsEntry = StartFunc->hasMetadata(DXILContHelper::MDEntryName);
+  bool IsEntry = StartFunc->hasMetadata(ContHelper::MDEntryName);
   // The start function must come first to setup FuncData.NewStart and
   // ContMDTuple which is used by processing the resume functions.
   assert(StartFunc == FuncData.Functions[0]);
@@ -346,9 +337,9 @@ void LegacyCleanupContinuationsPassImpl::processContinuation(
   for (auto *F : FuncData.Functions) {
     if (F != StartFunc) {
       // Entry marker should only be on the start and not on resume functions
-      F->eraseMetadata(Context.getMDKindID(DXILContHelper::MDEntryName));
+      F->eraseMetadata(Context.getMDKindID(ContHelper::MDEntryName));
       // Same for stacksize
-      F->eraseMetadata(Context.getMDKindID(DXILContHelper::MDStackSizeName));
+      F->eraseMetadata(Context.getMDKindID(ContHelper::MDStackSizeName));
       // Set same linkage as for start function
       F->setLinkage(StartFunc->getLinkage());
     }
@@ -405,6 +396,14 @@ void LegacyCleanupContinuationsPassImpl::processContinuation(
     Value *ContFrame =
         getContFrame(FuncData.MallocCall, F, IsStart, InstsToRemove);
 
+    // Try to eliminate unnecessary continuation state accesses
+    // of values that are still available as SSA values by a simple
+    // store-to-load forwarding routine.
+    // Ideally, LLVM coro passes should do better and not emit these
+    // loads to begin with.
+    auto &DT = FAM.getResult<DominatorTreeAnalysis>(*F);
+    forwardContinuationFrameStoreToLoad(DT, ContFrame);
+
     // Create new empty function
     F->eraseMetadata(FuncData.MD->getMetadataID());
     auto *NewFuncTy = FunctionType::get(Void, AllArgTypes, false);
@@ -444,9 +443,24 @@ void LegacyCleanupContinuationsPassImpl::processContinuation(
     handleFunctionEntry(FuncData, NewFunc, IsEntry);
 
     // Handle the function body
-    // Use the global continuation state
-    ContFrame->replaceAllUsesWith(
-        B.CreateBitOrPointerCast(FuncData.NewContState, ContFrame->getType()));
+
+    if (FuncData.NewContState) {
+      // Bitcast new cont state to the pointer type used by coro passes, but
+      // preserve the address space. Uses of the pointer are then fixed to also
+      // use the correct address space.
+      PointerType *UsedContFrameTy = cast<PointerType>(ContFrame->getType());
+      Value *CastNewContState = B.CreateBitCast(
+          FuncData.NewContState,
+          getWithSamePointeeType(
+              UsedContFrameTy,
+              FuncData.NewContState->getType()->getPointerAddressSpace()));
+      replaceAllPointerUses(&B, ContFrame, CastNewContState, InstsToRemove);
+    } else {
+      // If there is no continuation state, replace it with a poison
+      // value instead of a zero-sized stack allocation.
+      // This leads to nicer tests.
+      ContFrame->replaceAllUsesWith(PoisonValue::get(ContFrame->getType()));
+    }
 
     // Handle the function returns
     for (auto &BB : make_early_inc_range(*NewFunc)) {
@@ -472,7 +486,7 @@ void LegacyCleanupContinuationsPassImpl::processContinuation(
 
     // Update metadata
     assert(ContMDTuple != nullptr);
-    NewFunc->setMetadata(DXILContHelper::MDContinuationName, ContMDTuple);
+    NewFunc->setMetadata(ContHelper::MDContinuationName, ContMDTuple);
   }
 
   // Register count analysis needs to wait until all functions have been
@@ -480,7 +494,7 @@ void LegacyCleanupContinuationsPassImpl::processContinuation(
   for (auto [NewFunc, IsStart] : NewFuncs) {
     if (!IsStart) {
       uint32_t IncomingRegisterCount = getIncomingRegisterCount(NewFunc);
-      DXILContHelper::setIncomingRegisterCount(NewFunc, IncomingRegisterCount);
+      ContHelper::setIncomingRegisterCount(NewFunc, IncomingRegisterCount);
     }
   }
 
@@ -490,46 +504,53 @@ void LegacyCleanupContinuationsPassImpl::processContinuation(
 
 void LegacyCleanupContinuationsPassImpl::handleFunctionEntry(
     ContinuationData &Data, Function *F, bool IsEntry) {
+  uint64_t NeededStackSize = Data.getContStateStackBytes();
   bool IsStart = F == Data.NewStart;
 
-  // Create alloca to keep the continuation state
-  uint64_t ContStateNumI32s = divideCeil(Data.ContStateBytes, RegisterBytes);
-  uint64_t NeededStackSize = Data.getContStateStackBytes();
-  auto *ContStateTy = ArrayType::get(I32, ContStateNumI32s);
-  Data.NewContState = B.CreateAlloca(ContStateTy, nullptr, "cont.state");
+  // We allocate continuation state on top of the payload.
+  // We plan to change this, but until we have done that,
+  // we need to "reverse peek" on top of the payload allocation
+  // that is going to be allocated later (also on function entry).
+  int64_t StackOffsetForPayloadSpill = 0;
 
   if (IsStart) {
     // Add function metadata that stores how big the continuation state is in
     // bytes
-    DXILContHelper::setContinuationStateByteCount(*F, Data.ContStateBytes);
+    ContHelper::setContinuationStateByteCount(*F, Data.ContStateBytes);
+    // At this point, stack size is exactly the payload spill size.
+    StackOffsetForPayloadSpill = ContHelper::tryGetStackSize(F).value_or(0);
     if (NeededStackSize) {
       // Add to continuation stack size metadata
-      DXILContHelper::addStackSize(F, NeededStackSize);
+      ContHelper::addStackSize(F, NeededStackSize);
     }
-  } else if (NeededStackSize) {
+  } else {
+    // Deallocate
+    if (NeededStackSize)
+      moveContinuationStackOffset(B, -NeededStackSize);
+  }
+
+  if (NeededStackSize) {
+    uint64_t ContStateNumI32s = divideCeil(Data.ContStateBytes, RegisterBytes);
+    auto *ContStateTy = ArrayType::get(I32, ContStateNumI32s);
+
+    // Peek into CSP stack to obtain continuation state.
+    // This can be handled in the same way for start and resume functions,
+    // because for start functions we already allocated space above.
+    //
     // Obtain current CSP
     auto *CspOffsetPtr = B.CreateCall(getContinuationStackOffset(M));
     auto *CspType = getContinuationStackOffsetType(M.getContext());
-    auto *Offset = B.CreateLoad(CspType, CspOffsetPtr);
-    auto *Ptr = continuationStackOffsetToPtr(
-        B, Offset, *(GpurtLibrary ? GpurtLibrary : &M), CrossInliner);
+    auto *CspAsOffset = B.CreateLoad(CspType, CspOffsetPtr);
+    auto *CspAsPtr = continuationStackOffsetToPtr(
+        B, CspAsOffset, *(GpurtLibrary ? GpurtLibrary : &M), CrossInliner);
+    Value *ContStateOnStack = B.CreateGEP(
+        B.getInt8Ty(), CspAsPtr, B.getInt64(StackOffsetForPayloadSpill));
 
-    // Obtain ptr to continuation state on stack,
-    // and copy continuation state from global into local variable
-    Value *ContStateOnStack =
-        B.CreateGEP(B.getInt8Ty(), Ptr, B.getInt64(-NeededStackSize));
-    createCopy(
-        B, Data.NewContState,
-        B.CreateBitOrPointerCast(ContStateOnStack,
-                                 ContStateTy->getPointerTo(
-                                     Ptr->getType()->getPointerAddressSpace())),
-        ContStateTy);
-
-    // Deallocate continuation stack space.
-    // The generated IR is partially redundant with the above,
-    // as the new CSP is just ContStateOnStack from above.
-    // However, we need to do the copy first and only then deallocate.
-    moveContinuationStackOffset(B, -NeededStackSize);
+    Data.NewContState = B.CreateBitOrPointerCast(
+        ContStateOnStack,
+        ContStateTy->getPointerTo(
+            ContStateOnStack->getType()->getPointerAddressSpace()),
+        "cont.state");
   }
 }
 
@@ -580,34 +601,18 @@ void LegacyCleanupContinuationsPassImpl::handleSingleContinue(
     ContinuationData &Data, CallInst *Call, Value *ResumeFun) {
   // Pass resume address as argument
   B.SetInsertPoint(Call);
+  // Allocate CSP storage
+  uint64_t NeededStackSize = Data.getContStateStackBytes();
+  if (NeededStackSize)
+    moveContinuationStackOffset(B, NeededStackSize);
   auto *ReturnAddrInt = B.CreatePtrToInt(ResumeFun, I64);
 
   auto *CpsType = getContinuationStackOffsetType(Call->getContext());
   auto *CspFun = getContinuationStackOffset(*Call->getModule());
 
-  // Write local continuation state to stack and registers
-  uint64_t NeededStackSize = Data.getContStateStackBytes();
-  if (NeededStackSize) {
-    // Allocate continuation stack space
-    Value *ContStateOnStackOffset =
-        moveContinuationStackOffset(B, NeededStackSize).first;
-    auto *ContStateOnStackPtr = continuationStackOffsetToPtr(
-        B, ContStateOnStackOffset, *(GpurtLibrary ? GpurtLibrary : &M),
-        CrossInliner);
-    // Copy continuation state from local variable into global
-    auto *ContStateTy = Data.NewContState->getAllocatedType();
-    createCopy(
-        B,
-        B.CreateBitOrPointerCast(
-            ContStateOnStackPtr,
-            ContStateTy->getPointerTo(
-                ContStateOnStackPtr->getType()->getPointerAddressSpace())),
-        Data.NewContState, ContStateTy);
-  }
-
   auto *Csp = B.CreateLoad(CpsType, B.CreateCall(CspFun));
 
-  bool IsWait = DXILContHelper::isWaitAwaitCall(*Call);
+  bool IsWait = ContHelper::isWaitAwaitCall(*Call);
   Function *ContinueFunction = IsWait ? WaitContinue : Continue;
 
   // Replace this instruction with a call to continuation.[wait]continue
@@ -623,8 +628,8 @@ void LegacyCleanupContinuationsPassImpl::handleSingleContinue(
   // Copy metadata, except for the wait flag, which is no longer needed.
   ContinueCall->copyMetadata(*Call);
   if (IsWait)
-    DXILContHelper::removeIsWaitAwaitMetadata(*ContinueCall);
-  assert(DXILContHelper::tryGetOutgoingRegisterCount(ContinueCall) &&
+    ContHelper::removeIsWaitAwaitMetadata(*ContinueCall);
+  assert(ContHelper::tryGetOutgoingRegisterCount(ContinueCall) &&
          "Missing registercount metadata!");
 
   // Remove instructions at the end of the block
@@ -665,7 +670,7 @@ void LegacyCleanupContinuationsPassImpl::handleReturn(ContinuationData &Data,
     Data.NewReturnContinues.push_back(ContinueCall);
 
     ContinueCall->copyMetadata(*ContRet);
-    assert(DXILContHelper::tryGetOutgoingRegisterCount(ContinueCall) &&
+    assert(ContHelper::tryGetOutgoingRegisterCount(ContinueCall) &&
            "Missing registercount metadata!");
   }
 
@@ -675,7 +680,10 @@ void LegacyCleanupContinuationsPassImpl::handleReturn(ContinuationData &Data,
 LegacyCleanupContinuationsPassImpl::LegacyCleanupContinuationsPassImpl(
     llvm::Module &Mod, llvm::Module *GpurtLibrary,
     llvm::ModuleAnalysisManager &AnalysisManager)
-    : M{Mod}, Context{M.getContext()}, B{Context}, GpurtLibrary{GpurtLibrary} {
+    : M{Mod}, Context{M.getContext()},
+      FAM{AnalysisManager.getResult<FunctionAnalysisManagerModuleProxy>(Mod)
+              .getManager()},
+      B{Context}, GpurtLibrary{GpurtLibrary} {
   AnalysisManager.getResult<DialectContextAnalysis>(M);
   ContMalloc = M.getFunction("continuation.malloc");
   ContFree = M.getFunction("continuation.free");
@@ -689,16 +697,16 @@ llvm::PreservedAnalyses LegacyCleanupContinuationsPassImpl::run() {
     if (F.empty())
       continue;
 
-    if (auto *MD = F.getMetadata(DXILContHelper::MDContinuationName)) {
+    if (auto *MD = F.getMetadata(ContHelper::MDContinuationName)) {
       analyzeContinuation(F, MD);
-    } else if (auto Stage = lgc::rt::getLgcRtShaderStage(&F);
-               Stage && *Stage == lgc::rt::RayTracingShaderStage::Traversal) {
+    } else if (lgc::rt::getLgcRtShaderStage(&F) ==
+               lgc::rt::RayTracingShaderStage::Traversal) {
       Changed = true;
       // Add !continuation metadata to Traversal after coroutine passes.
       // The traversal loop is written as like the coroutine passes were applied
       // manually.
       MDTuple *ContMDTuple = MDTuple::get(Context, {ValueAsMetadata::get(&F)});
-      F.setMetadata(DXILContHelper::MDContinuationName, ContMDTuple);
+      F.setMetadata(ContHelper::MDContinuationName, ContMDTuple);
     }
   }
 
