@@ -47,8 +47,6 @@ public:
 
   llvm::PreservedAnalyses run(llvm::Function &function, llvm::FunctionAnalysisManager &analysisManager);
 
-  bool runImpl(llvm::Function &function, PipelineState *pipelineState);
-
   static llvm::StringRef name() { return "Patch LLVM for load scalarizer optimization"; }
 
   void visitLoadInst(llvm::LoadInst &loadInst);

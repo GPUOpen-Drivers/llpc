@@ -1175,6 +1175,8 @@ struct GraphicsPipelineBuildInfo {
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 68
   ICache *cache; ///< ICache, used to search for the compiled shader data
 #endif
+  uint64_t pipelineApiHash; ///< Pipeline hash. If non-zero, this will be used directly as stable hash
+
   PipelineShaderInfo task; ///< Task shader
   PipelineShaderInfo vs;   ///< Vertex shader
   PipelineShaderInfo tcs;  ///< Tessellation control shader
@@ -1267,6 +1269,7 @@ struct ComputePipelineBuildInfo {
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 68
   ICache *cache; ///< ICache, used to search for the compiled shader data
 #endif
+  uint64_t pipelineApiHash;            ///< Pipeline hash. If non-zero, this will be used directly as stable hash
   unsigned deviceIndex;                ///< Device index for device group
   PipelineShaderInfo cs;               ///< Compute shader
   ResourceMappingData resourceMapping; ///< Resource mapping graph and static descriptor values
@@ -1290,13 +1293,14 @@ struct RayTracingPipelineBuildInfo {
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 68
   ICache *cache; ///< ICache, used to search for the compiled shader data
 #endif
-  unsigned deviceIndex;                                      ///< Device index for device group
-  unsigned deviceCount;                                      ///< Device count for device group
-  unsigned shaderCount;                                      ///< Count of shader info
-  PipelineShaderInfo *pShaders;                              ///< An array of shader info
-  ResourceMappingData resourceMapping;                       ///< Resource mapping graph and static descriptor values
-  uint64_t pipelineLayoutApiHash;                            ///< Pipeline Layout Api Hash
-  unsigned shaderGroupCount;                                 ///< Count of shader group
+  uint64_t pipelineApiHash;            ///< Pipeline hash. If non-zero, this will be used directly as stable hash
+  unsigned deviceIndex;                ///< Device index for device group
+  unsigned deviceCount;                ///< Device count for device group
+  unsigned shaderCount;                ///< Count of shader info
+  PipelineShaderInfo *pShaders;        ///< An array of shader info
+  ResourceMappingData resourceMapping; ///< Resource mapping graph and static descriptor values
+  uint64_t pipelineLayoutApiHash;      ///< Pipeline Layout Api Hash
+  unsigned shaderGroupCount;           ///< Count of shader group
   const VkRayTracingShaderGroupCreateInfoKHR *pShaderGroups; ///< An array of shader group
   LibraryMode libraryMode;                                   ///< Whether to compile as pipeline or library or both
   unsigned libraryCount;                                     ///< Count of libraries linked into this build

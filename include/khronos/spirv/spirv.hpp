@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2020 The Khronos Group Inc.
+// Copyright (c) 2014-2024 The Khronos Group Inc.
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and/or associated documentation files (the "Materials"),
@@ -73,6 +73,7 @@ enum SourceLanguage {
     SourceLanguageNZSL = 9,
     SourceLanguageWGSL = 10,
     SourceLanguageSlang = 11,
+    SourceLanguageZig = 12,
     SourceLanguageMax = 0x7fffffff,
 };
 
@@ -183,6 +184,8 @@ enum ExecutionMode {
     ExecutionModeStencilRefUnchangedBackAMD = 5082,
     ExecutionModeStencilRefGreaterBackAMD = 5083,
     ExecutionModeStencilRefLessBackAMD = 5084,
+    ExecutionModeQuadDerivativesKHR = 5088,
+    ExecutionModeRequireFullQuadsKHR = 5089,
     ExecutionModeOutputLinesEXT = 5269,
     ExecutionModeOutputLinesNV = 5269,
     ExecutionModeOutputPrimitivesEXT = 5270,
@@ -207,6 +210,8 @@ enum ExecutionMode {
     ExecutionModeNoGlobalOffsetINTEL = 5895,
     ExecutionModeNumSIMDWorkitemsINTEL = 5896,
     ExecutionModeSchedulerTargetFmaxMhzINTEL = 5903,
+    ExecutionModeMaximallyReconvergesKHR = 6023,
+    ExecutionModeFPFastMathDefault = 6028,
     ExecutionModeStreamingInterfaceINTEL = 6154,
     ExecutionModeRegisterMapInterfaceINTEL = 6160,
     ExecutionModeNamedBarrierCountINTEL = 6417,
@@ -426,8 +431,11 @@ enum FPFastMathModeShift {
     FPFastMathModeNSZShift = 2,
     FPFastMathModeAllowRecipShift = 3,
     FPFastMathModeFastShift = 4,
+    FPFastMathModeAllowContractShift = 16,
     FPFastMathModeAllowContractFastINTELShift = 16,
+    FPFastMathModeAllowReassocShift = 17,
     FPFastMathModeAllowReassocINTELShift = 17,
+    FPFastMathModeAllowTransformShift = 18,
     FPFastMathModeMax = 0x7fffffff,
 };
 
@@ -438,8 +446,11 @@ enum FPFastMathModeMask {
     FPFastMathModeNSZMask = 0x00000004,
     FPFastMathModeAllowRecipMask = 0x00000008,
     FPFastMathModeFastMask = 0x00000010,
+    FPFastMathModeAllowContractMask = 0x00010000,
     FPFastMathModeAllowContractFastINTELMask = 0x00010000,
+    FPFastMathModeAllowReassocMask = 0x00020000,
     FPFastMathModeAllowReassocINTELMask = 0x00020000,
+    FPFastMathModeAllowTransformMask = 0x00040000,
 };
 
 enum FPRoundingMode {
@@ -583,6 +594,9 @@ enum Decoration {
     DecorationMergeINTEL = 5834,
     DecorationBankBitsINTEL = 5835,
     DecorationForcePow2DepthINTEL = 5836,
+    DecorationStridesizeINTEL = 5883,
+    DecorationWordsizeINTEL = 5884,
+    DecorationTrueDualPortINTEL = 5885,
     DecorationBurstCoalesceINTEL = 5899,
     DecorationCacheSizeINTEL = 5900,
     DecorationDontStaticallyCoalesceINTEL = 5901,
@@ -601,9 +615,7 @@ enum Decoration {
     DecorationSingleElementVectorINTEL = 6085,
     DecorationVectorComputeCallableFunctionINTEL = 6087,
     DecorationMediaBlockIOINTEL = 6140,
-    DecorationInitModeINTEL = 6147,
-    DecorationImplementInRegisterMapINTEL = 6148,
-    DecorationHostAccessINTEL = 6168,
+    DecorationStallFreeINTEL = 6151,
     DecorationFPMaxErrorDecorationINTEL = 6170,
     DecorationLatencyControlLabelINTEL = 6172,
     DecorationLatencyControlConstraintINTEL = 6173,
@@ -616,6 +628,9 @@ enum Decoration {
     DecorationMMHostInterfaceMaxBurstINTEL = 6181,
     DecorationMMHostInterfaceWaitRequestINTEL = 6182,
     DecorationStableKernelArgumentINTEL = 6183,
+    DecorationHostAccessINTEL = 6188,
+    DecorationInitModeINTEL = 6190,
+    DecorationImplementInRegisterMapINTEL = 6191,
     DecorationCacheControlLoadINTEL = 6442,
     DecorationCacheControlStoreINTEL = 6443,
     DecorationMax = 0x7fffffff,
@@ -1068,6 +1083,7 @@ enum Capability {
     CapabilityInt64ImageEXT = 5016,
     CapabilityShaderClockKHR = 5055,
     CapabilityShaderEnqueueAMDX = 5067,
+    CapabilityQuadControlKHR = 5087,
     CapabilitySampleMaskOverrideCoverageNV = 5249,
     CapabilityGeometryShaderPassthroughNV = 5251,
     CapabilityShaderViewportIndexLayerEXT = 5254,
@@ -1187,21 +1203,24 @@ enum Capability {
     CapabilityCooperativeMatrixKHR = 6022,
     CapabilityBitInstructions = 6025,
     CapabilityGroupNonUniformRotateKHR = 6026,
+    CapabilityFloatControls2 = 6029,
     CapabilityAtomicFloat32AddEXT = 6033,
     CapabilityAtomicFloat64AddEXT = 6034,
-    CapabilityLongConstantCompositeINTEL = 6089,
+    CapabilityLongCompositesINTEL = 6089,
     CapabilityOptNoneINTEL = 6094,
     CapabilityAtomicFloat16AddEXT = 6095,
     CapabilityDebugInfoModuleINTEL = 6114,
     CapabilityBFloat16ConversionINTEL = 6115,
     CapabilitySplitBarrierINTEL = 6141,
-    CapabilityGlobalVariableFPGADecorationsINTEL = 6146,
+    CapabilityFPGAClusterAttributesV2INTEL = 6150,
     CapabilityFPGAKernelAttributesv2INTEL = 6161,
-    CapabilityGlobalVariableHostAccessINTEL = 6167,
     CapabilityFPMaxErrorINTEL = 6169,
     CapabilityFPGALatencyControlINTEL = 6171,
     CapabilityFPGAArgumentInterfacesINTEL = 6174,
+    CapabilityGlobalVariableHostAccessINTEL = 6187,
+    CapabilityGlobalVariableFPGADecorationsINTEL = 6189,
     CapabilityGroupUniformArithmeticKHR = 6400,
+    CapabilityMaskedGatherScatterINTEL = 6427,
     CapabilityCacheControlsINTEL = 6441,
     CapabilityMax = 0x7fffffff,
 };
@@ -1774,6 +1793,8 @@ enum Op {
     OpFinalizeNodePayloadsAMDX = 5075,
     OpFinishWritingNodePayloadAMDX = 5078,
     OpInitializeNodePayloadsAMDX = 5090,
+    OpGroupNonUniformQuadAllKHR = 5110,
+    OpGroupNonUniformQuadAnyKHR = 5111,
     OpHitObjectRecordHitMotionNV = 5249,
     OpHitObjectRecordHitWithIndexMotionNV = 5250,
     OpHitObjectRecordMissMotionNV = 5251,
@@ -2083,6 +2104,7 @@ enum Op {
     OpTypeStructContinuedINTEL = 6090,
     OpConstantCompositeContinuedINTEL = 6091,
     OpSpecConstantCompositeContinuedINTEL = 6092,
+    OpCompositeConstructContinuedINTEL = 6096,
     OpConvertFToBF16INTEL = 6116,
     OpConvertBF16ToFINTEL = 6117,
     OpControlBarrierArriveINTEL = 6142,
@@ -2095,6 +2117,8 @@ enum Op {
     OpGroupLogicalAndKHR = 6406,
     OpGroupLogicalOrKHR = 6407,
     OpGroupLogicalXorKHR = 6408,
+    OpMaskedGatherINTEL = 6428,
+    OpMaskedScatterINTEL = 6429,
     OpMax = 0x7fffffff,
 };
 
@@ -2502,6 +2526,8 @@ inline void HasResultAndType(Op opcode, bool *hasResult, bool *hasResultType) {
     case OpFinalizeNodePayloadsAMDX: *hasResult = false; *hasResultType = false; break;
     case OpFinishWritingNodePayloadAMDX: *hasResult = true; *hasResultType = true; break;
     case OpInitializeNodePayloadsAMDX: *hasResult = false; *hasResultType = false; break;
+    case OpGroupNonUniformQuadAllKHR: *hasResult = true; *hasResultType = true; break;
+    case OpGroupNonUniformQuadAnyKHR: *hasResult = true; *hasResultType = true; break;
     case OpHitObjectRecordHitMotionNV: *hasResult = false; *hasResultType = false; break;
     case OpHitObjectRecordHitWithIndexMotionNV: *hasResult = false; *hasResultType = false; break;
     case OpHitObjectRecordMissMotionNV: *hasResult = false; *hasResultType = false; break;
@@ -2806,6 +2832,7 @@ inline void HasResultAndType(Op opcode, bool *hasResult, bool *hasResultType) {
     case OpTypeStructContinuedINTEL: *hasResult = false; *hasResultType = false; break;
     case OpConstantCompositeContinuedINTEL: *hasResult = false; *hasResultType = false; break;
     case OpSpecConstantCompositeContinuedINTEL: *hasResult = false; *hasResultType = false; break;
+    case OpCompositeConstructContinuedINTEL: *hasResult = true; *hasResultType = true; break;
     case OpConvertFToBF16INTEL: *hasResult = true; *hasResultType = true; break;
     case OpConvertBF16ToFINTEL: *hasResult = true; *hasResultType = true; break;
     case OpControlBarrierArriveINTEL: *hasResult = false; *hasResultType = false; break;
@@ -2818,6 +2845,8 @@ inline void HasResultAndType(Op opcode, bool *hasResult, bool *hasResultType) {
     case OpGroupLogicalAndKHR: *hasResult = true; *hasResultType = true; break;
     case OpGroupLogicalOrKHR: *hasResult = true; *hasResultType = true; break;
     case OpGroupLogicalXorKHR: *hasResult = true; *hasResultType = true; break;
+    case OpMaskedGatherINTEL: *hasResult = true; *hasResultType = true; break;
+    case OpMaskedScatterINTEL: *hasResult = false; *hasResultType = false; break;
     }
 }
 #endif /* SPV_ENABLE_UTILITY_CODE */

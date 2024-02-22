@@ -47,37 +47,23 @@ attributes #1 = { nounwind readonly }
 !2 = !{!"PushConst", i32 9, i32 0, i32 0, i32 18, i32 0, i32 0, i32 0}
 !10 = !{i32 1}
 
-; VS-ISA-LABEL: amdgpu_gs_main_fetchless:
+; VS-ISA-LABEL: amdgpu_gs_main:
 ; VS-ISA:         s_mov_b32 exec_lo, -1
-; VS-ISA-NEXT:    s_bfe_u32 s3, s3, 0x40018
-; VS-ISA-NEXT:    s_bfe_u32 s1, s2, 0x90016
-; VS-ISA-NEXT:    s_bfe_u32 s0, s2, 0x9000c
-; VS-ISA-NEXT:    s_cmp_lg_u32 s3, 0
+; VS-ISA-NEXT:    s_bfe_u32 s1, s3, 0x40018
+; VS-ISA-NEXT:    s_bfe_u32 s0, s2, 0x90016
+; VS-ISA-NEXT:    s_cmp_lg_u32 s1, 0
 ; VS-ISA-NEXT:    s_barrier
 ; VS-ISA-NEXT:    s_cbranch_scc1 .LBB0_2
-; VS-ISA-NEXT:    s_lshl_b32 s2, s1, 12
-; VS-ISA-NEXT:    s_or_b32 m0, s2, s0
+; VS-ISA-NEXT:    s_bfe_u32 s2, s2, 0x9000c
+; VS-ISA-NEXT:    s_lshl_b32 s3, s0, 12
+; VS-ISA-NEXT:    s_or_b32 m0, s3, s2
 ; VS-ISA-NEXT:    s_sendmsg sendmsg(MSG_GS_ALLOC_REQ)
 ; VS-ISA-NEXT:  .LBB0_2:
 ; VS-ISA-NEXT:    v_mbcnt_lo_u32_b32 v1, -1, 0
-; VS-ISA-NEXT:    v_lshl_or_b32 v1, s3, 5, v1
-; VS-ISA-NEXT:    v_cmp_gt_u32_e32 vcc_lo, s1, v1
-; VS-ISA-NEXT:    s_and_saveexec_b32 s1, vcc_lo
+; VS-ISA-NEXT:    v_lshl_or_b32 v1, s1, 5, v1
+; VS-ISA-NEXT:    v_cmp_gt_u32_e32 vcc_lo, s0, v1
+; VS-ISA-NEXT:    s_and_saveexec_b32 s0, vcc_lo
 ; VS-ISA-NEXT:    s_cbranch_execz .LBB0_4
 ; VS-ISA-NEXT:    exp prim v0, off, off, off done
 ; VS-ISA-NEXT:  .LBB0_4:
-; VS-ISA-NEXT:    s_waitcnt expcnt(0)
-; VS-ISA-NEXT:    s_or_b32 exec_lo, exec_lo, s1
-; VS-ISA-NEXT:    v_cmp_gt_u32_e32 vcc_lo, s0, v1
-; VS-ISA-NEXT:    s_and_saveexec_b32 s0, vcc_lo
-; VS-ISA-NEXT:    s_cbranch_execz .LBB0_6
-; VS-ISA-NEXT:    v_mov_b32_e32 v0, 1.0
-; VS-ISA-NEXT:    v_mov_b32_e32 v1, 0
-; VS-ISA-NEXT:    v_cmp_eq_f32_e32 vcc_lo, 1.0, v9
-; VS-ISA-NEXT:    exp pos0 v1, v1, v1, v0 done
-; VS-ISA-NEXT:    v_cndmask_b32_e64 v2, v9, s9, vcc_lo
-; VS-ISA-NEXT:    v_cndmask_b32_e64 v3, v10, s10, vcc_lo
-; VS-ISA-NEXT:    v_cndmask_b32_e64 v4, v11, s11, vcc_lo
-; VS-ISA-NEXT:    exp param1 v2, v3, v4, off
-; VS-ISA-NEXT:  .LBB0_6:
 ; VS-ISA-NEXT:    s_endpgm

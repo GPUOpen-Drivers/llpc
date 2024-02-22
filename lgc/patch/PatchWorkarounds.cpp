@@ -54,18 +54,7 @@ namespace lgc {
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
 PreservedAnalyses PatchWorkarounds::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
-  if (runImpl(module, pipelineState))
-    return PreservedAnalyses::none();
-  return PreservedAnalyses::all();
-}
 
-// =====================================================================================================================
-// Executes this LLVM pass on the specified LLVM function.
-//
-// @param [in/out] module : Module that we will add workarounds in
-// @param pipelineState : Pipeline state
-// @returns : True if the module was modified by the transformation and false otherwise
-bool PatchWorkarounds::runImpl(Module &module, PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Workarounds\n");
 
   Patch::init(&module);
@@ -79,7 +68,7 @@ bool PatchWorkarounds::runImpl(Module &module, PipelineState *pipelineState) {
   // Patch image resource descriptor when app provides wrong type
   applyImageDescWorkaround();
 
-  return m_changed;
+  return m_changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }
 
 // =====================================================================================================================

@@ -22,6 +22,7 @@ add_llvm_library(LLVMContinuations
   lib/DXILContLgcRtOpConverter.cpp
   lib/DXILContPostProcess.cpp
   lib/DXILSupport.cpp
+  lib/GpurtContext.cpp
   lib/GpurtDialect.cpp
   lib/LegacyCleanupContinuations.cpp
   lib/LgcCpsDialect.cpp

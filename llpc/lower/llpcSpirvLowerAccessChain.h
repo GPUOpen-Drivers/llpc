@@ -48,8 +48,6 @@ public:
   virtual void visitLoadInst(llvm::LoadInst &loadInst);
   virtual void visitStoreInst(llvm::StoreInst &storeInst);
 
-  bool runImpl(llvm::Module &module);
-
   static llvm::StringRef name() { return "Lower SPIR-V access chain"; }
 
 private:

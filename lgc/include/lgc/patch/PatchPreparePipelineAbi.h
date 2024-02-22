@@ -55,9 +55,6 @@ public:
 
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  bool runImpl(llvm::Module &module, PipelineShadersResult &pipelineShaders, PipelineState *pipelineState,
-               FunctionAnalysisHandlers &analysisHandlers);
-
   static llvm::StringRef name() { return "Patch LLVM for preparing pipeline ABI"; }
 
   static std::pair<llvm::Value *, llvm::Value *> readTessFactors(PipelineState *pipelineState, llvm::Value *relPatchId,

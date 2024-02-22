@@ -44,21 +44,8 @@ using namespace llvm;
 // @returns : The module containing the null fragment shader.
 Module *NullFragmentShader::generate() {
   Module *module = generateEmptyModule();
-  Function *entryPoint = FragColorExport::generateNullFragmentShader(*module, m_pipelineState, getGlueShaderName());
-  addDummyExportIfNecessary(entryPoint);
+  FragColorExport::generateNullFragmentShader(*module, m_pipelineState, getGlueShaderName());
   return module;
-}
-
-// =====================================================================================================================
-// Adds a dummy export to the entry point if it is needed.
-//
-// @param [in/out] entryPoint : The function in which to add the dummy export.
-void NullFragmentShader::addDummyExportIfNecessary(Function *entryPoint) const {
-  if (m_lgcContext->getTargetInfo().getGfxIpVersion().major < 10) {
-    auto ret = cast<ReturnInst>(entryPoint->back().getTerminator());
-    BuilderBase builder(ret);
-    FragColorExport::addDummyExport(builder);
-  }
 }
 
 // =====================================================================================================================

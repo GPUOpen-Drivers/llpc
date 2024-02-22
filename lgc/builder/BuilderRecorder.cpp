@@ -260,12 +260,8 @@ StringRef BuilderRecorder::getCallName(BuilderOpcode opcode) {
     return "get.wave.size";
   case BuilderOpcode::GetSubgroupSize:
     return "get.subgroup.size";
-  case BuilderOpcode::SubgroupElect:
-    return "subgroup.elect";
   case BuilderOpcode::SubgroupAll:
     return "subgroup.all";
-  case BuilderOpcode::SubgroupAny:
-    return "subgroup.any";
   case BuilderOpcode::SubgroupAllEqual:
     return "subgroup.all.equal";
   case BuilderOpcode::SubgroupRotate:
@@ -1621,29 +1617,12 @@ Value *Builder::CreateGetSubgroupSize(const Twine &instName) {
 }
 
 // =====================================================================================================================
-// Create a subgroup elect.
-//
-// @param instName : Name to give instruction(s)
-Value *Builder::CreateSubgroupElect(const Twine &instName) {
-  return record(BuilderOpcode::SubgroupElect, getInt1Ty(), {}, instName);
-}
-
-// =====================================================================================================================
 // Create a subgroup all.
 //
 // @param value : The value to compare
 // @param instName : Name to give instruction(s)
 Value *Builder::CreateSubgroupAll(Value *const value, const Twine &instName) {
   return record(BuilderOpcode::SubgroupAll, getInt1Ty(), {value}, instName);
-}
-
-// =====================================================================================================================
-// Create a subgroup any
-//
-// @param value : The value to compare
-// @param instName : Name to give instruction(s)
-Value *Builder::CreateSubgroupAny(Value *const value, const Twine &instName) {
-  return record(BuilderOpcode::SubgroupAny, getInt1Ty(), {value}, instName);
 }
 
 // =====================================================================================================================
@@ -2126,7 +2105,6 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::SubgroupAll:
     case BuilderOpcode::SubgroupAllEqual:
     case BuilderOpcode::SubgroupRotate:
-    case BuilderOpcode::SubgroupAny:
     case BuilderOpcode::SubgroupBallot:
     case BuilderOpcode::SubgroupBroadcast:
     case BuilderOpcode::SubgroupBroadcastWaterfall:
@@ -2135,7 +2113,6 @@ Instruction *Builder::record(BuilderOpcode opcode, Type *resultTy, ArrayRef<Valu
     case BuilderOpcode::SubgroupClusteredMultiExclusive:
     case BuilderOpcode::SubgroupClusteredInclusive:
     case BuilderOpcode::SubgroupClusteredReduction:
-    case BuilderOpcode::SubgroupElect:
     case BuilderOpcode::SubgroupInverseBallot:
     case BuilderOpcode::SubgroupMbcnt:
     case BuilderOpcode::SubgroupPartition:

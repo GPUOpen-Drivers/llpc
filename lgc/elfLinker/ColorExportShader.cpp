@@ -59,6 +59,7 @@ ColorExportShader::ColorExportShader(PipelineState *pipelineState, ArrayRef<Colo
       m_killEnabled = shaderControl.bits.KILL_ENABLE;
     }
   }
+  m_key = FragColorExport::computeKey(exports, pipelineState);
 }
 
 // =====================================================================================================================
@@ -69,8 +70,16 @@ StringRef ColorExportShader::getString() {
   if (m_shaderString.empty()) {
     constexpr uint32_t estimatedTypeSize = 10;
     uint32_t sizeEstimate = (sizeof(ColorExportInfo) + estimatedTypeSize) * m_exports.size();
+    // gfxIP.major
+    sizeEstimate += sizeof(unsigned);
     sizeEstimate += sizeof(m_killEnabled);
-    sizeEstimate += sizeof(ColorExportState) + MaxColorTargets * sizeof(ColorExportFormat);
+    sizeEstimate += sizeof(m_pipelineState->getOptions().enableColorExportShader);
+
+    // ColorExportState + MaxColorTargets * (expfmt + writeMask)
+    sizeEstimate += sizeof(ColorExportState) + MaxColorTargets * (sizeof(unsigned) * 2);
+    if (m_key.colorExportState.dualSourceBlendDynamicEnable || m_key.colorExportState.dualSourceBlendEnable) {
+      sizeEstimate += sizeof(m_key.waveSize);
+    }
     m_shaderString.reserve(sizeEstimate);
 
     for (ColorExportInfo colorExportInfo : m_exports) {
@@ -82,13 +91,24 @@ StringRef ColorExportShader::getString() {
           StringRef(reinterpret_cast<const char *>(&colorExportInfo.location), sizeof(colorExportInfo.location));
       m_shaderString += getTypeName(colorExportInfo.ty);
     }
+    unsigned gfxip = m_lgcContext->getTargetInfo().getGfxIpVersion().major;
+    m_shaderString += StringRef(reinterpret_cast<const char *>(&gfxip), sizeof(unsigned));
     m_shaderString += StringRef(reinterpret_cast<const char *>(&m_killEnabled), sizeof(m_killEnabled));
+    m_shaderString += StringRef(reinterpret_cast<const char *>(&m_pipelineState->getOptions().enableColorExportShader),
+                                sizeof(m_pipelineState->getOptions().enableColorExportShader));
 
-    const ColorExportState *colorExportState = &m_pipelineState->getColorExportState();
+    const ColorExportState *colorExportState = &m_key.colorExportState;
     m_shaderString += StringRef(reinterpret_cast<const char *>(colorExportState), sizeof(*colorExportState));
     for (unsigned location = 0; location < MaxColorTargets; ++location) {
-      const ColorExportFormat *colorExportFormat = &m_pipelineState->getColorExportFormat(location);
-      m_shaderString += StringRef(reinterpret_cast<const char *>(colorExportFormat), sizeof(*colorExportFormat));
+      unsigned expFmt = m_key.expFmt[location];
+      unsigned writeMask = m_key.channelWriteMask[location];
+      m_shaderString += StringRef(reinterpret_cast<const char *>(&expFmt), sizeof(expFmt));
+      m_shaderString += StringRef(reinterpret_cast<const char *>(&writeMask), sizeof(writeMask));
+    }
+
+    if (m_key.colorExportState.dualSourceBlendDynamicEnable || m_key.colorExportState.dualSourceBlendEnable) {
+      unsigned waveSize = m_key.waveSize;
+      m_shaderString += StringRef(reinterpret_cast<const char *>(&waveSize), sizeof(waveSize));
     }
   }
   return m_shaderString;
@@ -107,7 +127,7 @@ Module *ColorExportShader::generate() {
   Function *colorExportFunc = createColorExportFunc();
 
   // Process each fragment output.
-  FragColorExport fragColorExport(&getContext(), m_pipelineState);
+  FragColorExport fragColorExport(m_lgcContext);
   auto ret = cast<ReturnInst>(colorExportFunc->back().getTerminator());
   BuilderBase builder(ret);
 
@@ -121,10 +141,9 @@ Module *ColorExportShader::generate() {
 
   PalMetadata palMetadata{m_pipelineState, m_pipelineState->useRegisterFieldFormat()};
 
-  bool dummyExport = m_lgcContext->getTargetInfo().getGfxIpVersion().major < 10 || m_killEnabled;
   Value *dynamicIsDualSource = colorExportFunc->getArg(lastIndex);
-  fragColorExport.generateExportInstructions(m_exports, values, dummyExport, &palMetadata, builder,
-                                             dynamicIsDualSource);
+  fragColorExport.generateExportInstructions(m_exports, values, m_killEnabled, &palMetadata, builder,
+                                             dynamicIsDualSource, m_key);
 
   // Handle on the dualSourceBlend case which may have two blocks with two returnInsts
   SmallVector<ReturnInst *, 8> retInsts;

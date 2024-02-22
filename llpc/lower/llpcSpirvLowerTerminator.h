@@ -43,7 +43,6 @@ class SpirvLowerTerminator : public SpirvLower,
                              public llvm::InstVisitor<SpirvLowerTerminator> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
-  bool runImpl(llvm::Module &module);
 
   static llvm::StringRef name() { return "Lower SPIR-V terminator"; }
 

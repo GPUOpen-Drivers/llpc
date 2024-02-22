@@ -45,10 +45,6 @@ class GlueShader {
 public:
   virtual ~GlueShader() {}
 
-  // Create a fetch shader
-  static std::unique_ptr<GlueShader> createFetchShader(PipelineState *pipelineState,
-                                                       llvm::ArrayRef<VertexFetchInfo> fetches,
-                                                       const VsEntryRegInfo &vsEntryRegInfo);
   // Create a color export shader
   static std::unique_ptr<GlueShader> createColorExportShader(PipelineState *pipelineState,
                                                              llvm::ArrayRef<ColorExportInfo> exports);

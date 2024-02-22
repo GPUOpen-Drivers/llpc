@@ -270,6 +270,12 @@ SPIRVToLLVM::SPIRVToLLVM(Module *llvmModule, SPIRVModule *theSpirvModule, const 
   m_spirvOpMetaKindId = m_context->getMDKindID(MetaNameSpirvOp);
   m_scratchBoundsChecksEnabled = scratchBoundsChecksEnabled();
 
+  // We initialize FP fast math defaults to SPIRVWORD_MAX rather than zero. This is because zero means there is not FP
+  // fast math flags (corresponds to FPFastMathModeMaskNone).
+  m_fpFastMathDefault.Fp16 = SPIRVWORD_MAX;
+  m_fpFastMathDefault.Fp32 = SPIRVWORD_MAX;
+  m_fpFastMathDefault.Fp64 = SPIRVWORD_MAX;
+
   m_workaroundStorageImageFormats = shaderOptions->workaroundStorageImageFormats;
   if (SpirvOverrideWorkaroundStorageImageFormats.getNumOccurrences() > 0)
     m_workaroundStorageImageFormats = SpirvOverrideWorkaroundStorageImageFormats.getValue();
@@ -1374,6 +1380,79 @@ FastMathFlags SPIRVToLLVM::getFastMathFlags(SPIRVValue *bv) {
 
   FastMathFlags fmf;
 
+  SPIRVWord fastMathMode = SPIRVWORD_MAX;
+  if (bv->hasDecorate(DecorationFPFastMathMode, 0, &fastMathMode)) {
+    // If we find the decoration FPFastMathMode for this value, use it and ignore the defaults.
+  } else {
+    // Try to use fast math defaults if it is specified for this type.
+    switch (ty->getFloatBitWidth()) {
+    case 16:
+      if (m_fpFastMathDefault.Fp16 != SPIRVWORD_MAX)
+        fastMathMode = m_fpFastMathDefault.Fp16;
+      break;
+    case 32:
+      if (m_fpFastMathDefault.Fp32 != SPIRVWORD_MAX)
+        fastMathMode = m_fpFastMathDefault.Fp32;
+      break;
+    case 64:
+      if (m_fpFastMathDefault.Fp64 != SPIRVWORD_MAX)
+        fastMathMode = m_fpFastMathDefault.Fp64;
+      break;
+    default:
+      llvm_unreachable("Unexpected bit width!");
+      break;
+    }
+  }
+
+  // Once we find FP fast math modes are specified explicitly, we respect them.
+  if (fastMathMode != SPIRVWORD_MAX) {
+    // Fast flag is deprecated by the extension SPV_KHR_float_controls2, must not be used.
+    assert((fastMathMode & FPFastMathModeFastMask) == 0);
+
+    if (fastMathMode & FPFastMathModeNotNaNMask)
+      fmf.setNoNaNs();
+
+    if (fastMathMode & FPFastMathModeNotInfMask)
+      fmf.setNoInfs();
+
+    if (fastMathMode & FPFastMathModeNSZMask)
+      fmf.setNoSignedZeros();
+
+    if (fastMathMode & FPFastMathModeAllowRecipMask)
+      fmf.setAllowReciprocal();
+
+    if (fastMathMode & FPFastMathModeAllowContractMask)
+      fmf.setAllowContract();
+
+    if (fastMathMode & FPFastMathModeAllowReassocMask)
+      fmf.setAllowReassoc();
+
+    if (fastMathMode & FPFastMathModeAllowTransformMask) {
+      // NOTE: AllowTransform is a superset of AllowContract and AllowReassoc. The flags AllowContract and AllowReassoc
+      // must be set as well according to the spec. AllowTransform allows a floating-point operation and any
+      // operation(s) producing its operands to be transformed according to real-number rules so we treat it as
+      // combination of AllowRecip, AllowContract and AllowReassoc.
+      assert(fastMathMode & FPFastMathModeAllowContractMask);
+      assert(fastMathMode & FPFastMathModeAllowReassocMask);
+      fmf.setAllowReciprocal();
+      fmf.setAllowContract();
+      fmf.setAllowReassoc();
+    }
+
+    if (!fmf.noNaNs() || !fmf.noInfs() || !fmf.noSignedZeros()) {
+      // NOTE: Disallow reassociation if any flag of NotNaN, NotInf, or NSZ is missing. This is because
+      // reassociation can lead to unexpected results. Consider this:
+      //
+      //   X - X * 0.0
+      //
+      // If we apply reassociation X * (1.0 - 0.0) = X, the result becomes the value of X. However, if X is INF, NaN
+      // is expected by performing INF - INF * 0.0.
+      fmf.setAllowReassoc(false);
+    }
+
+    return fmf;
+  }
+
   fmf.setAllowReciprocal();
   if (!ty->isTypeFloat(64)) {
     // Only do this for half and float, not double, to avoid problems with Vulkan CTS precision_double tests.
@@ -1892,8 +1971,9 @@ Value *SPIRVToLLVM::addLoadInstRecursively(SPIRVType *const spvType, Value *load
 
   Constant *const zero = getBuilder()->getInt32(0);
   if (loadType->isStructTy() && !spvType->isTypeSampledImage() && !spvType->isTypeImage() &&
-      !spvType->isTypeSampler() && spvType->getOpCode() != OpTypeRayQueryKHR) {
-    // Rewrite this condition to keep consistent with the assert on getStructMemberCount later
+      !spvType->isTypeSampler() && spvType->getOpCode() != OpTypeRayQueryKHR
+      // Rewrite this condition to keep consistent with the assert on getStructMemberCount later
+  ) {
     // For structs we lookup the mapping of the elements and use it to reverse map the values.
     const bool needsPad = isTypeWithPad(loadType);
 
@@ -3686,7 +3766,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupAny>(SPIRVValue *con
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const predicate = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupAny(predicate);
+  return getBuilder()->create<SubgroupAnyOp>(predicate);
 }
 
 // =====================================================================================================================
@@ -3774,7 +3854,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupFMax>(SPIRVValue *co
 //
 // @param spvValue : A SPIR-V value.
 template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformElect>(SPIRVValue *const spvValue) {
-  return getBuilder()->CreateSubgroupElect();
+  return getBuilder()->create<SubgroupElectOp>();
 }
 
 // =====================================================================================================================
@@ -3802,7 +3882,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAny>(SPIRV
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const predicate = transValue(spvOperands[1], func, block);
-  return getBuilder()->CreateSubgroupAny(predicate);
+  return getBuilder()->create<SubgroupAnyOp>(predicate);
 }
 
 // =====================================================================================================================
@@ -3817,6 +3897,24 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformAllEqual>(
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const value = transValue(spvOperands[1], func, block);
   return getBuilder()->CreateSubgroupAllEqual(value);
+}
+
+// =====================================================================================================================
+// Handle OpGroupNonUniformRotateKHR.
+//
+// @param spvValue : A SPIR-V value.
+template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformRotateKHR>(SPIRVValue *const spvValue) {
+  SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
+  std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
+  assert(static_cast<SPIRVConstant *>(spvOperands[0])->getZExtIntValue() == ScopeSubgroup);
+
+  BasicBlock *const block = getBuilder()->GetInsertBlock();
+  Function *const func = getBuilder()->GetInsertBlock()->getParent();
+  Value *const value = transValue(spvOperands[1], func, block);
+  Value *const delta = transValue(spvOperands[2], func, block);
+  Value *const clusterSize =
+      spvOperands.size() > 3 ? transValue(spvOperands[3], func, block) : PoisonValue::get(Type::getInt32Ty(*m_context));
+  return getBuilder()->CreateSubgroupRotate(value, delta, clusterSize);
 }
 
 // =====================================================================================================================
@@ -4003,6 +4101,32 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformShuffleDow
   Value *const value = transValue(spvOperands[1], func, block);
   Value *const delta = transValue(spvOperands[2], func, block);
   return getBuilder()->CreateSubgroupShuffleDown(value, delta);
+}
+
+// =====================================================================================================================
+// Handle OpGroupNonUniformQuadAllKHR.
+//
+// @param spvValue : A SPIR-V value.
+template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformQuadAllKHR>(SPIRVValue *const spvValue) {
+  SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
+  std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
+  BasicBlock *const block = getBuilder()->GetInsertBlock();
+  Function *const func = getBuilder()->GetInsertBlock()->getParent();
+  Value *const predicate = transValue(spvOperands[0], func, block);
+  return getBuilder()->CreateQuadAll(predicate, m_requireFullQuads);
+}
+
+// =====================================================================================================================
+// Handle OpGroupNonUniformQuadAnyKHR.
+//
+// @param spvValue : A SPIR-V value.
+template <> Value *SPIRVToLLVM::transValueWithOpcode<OpGroupNonUniformQuadAnyKHR>(SPIRVValue *const spvValue) {
+  SPIRVInstruction *const spvInst = static_cast<SPIRVInstruction *>(spvValue);
+  std::vector<SPIRVValue *> spvOperands = spvInst->getOperands();
+  BasicBlock *const block = getBuilder()->GetInsertBlock();
+  Function *const func = getBuilder()->GetInsertBlock()->getParent();
+  Value *const predicate = transValue(spvOperands[0], func, block);
+  return getBuilder()->CreateQuadAny(predicate, m_requireFullQuads);
 }
 
 // =====================================================================================================================
@@ -4408,7 +4532,7 @@ template <> Value *SPIRVToLLVM::transValueWithOpcode<OpSubgroupAnyKHR>(SPIRVValu
   BasicBlock *const block = getBuilder()->GetInsertBlock();
   Function *const func = getBuilder()->GetInsertBlock()->getParent();
   Value *const predicate = transValue(spvOperands[0], func, block);
-  return getBuilder()->CreateSubgroupAny(predicate);
+  return getBuilder()->create<SubgroupAnyOp>(predicate);
 }
 
 // =====================================================================================================================
@@ -4886,6 +5010,14 @@ Value *SPIRVToLLVM::transVariable(SPIRVValue *const spvValue) {
       storageClass == StorageClassRayPayloadKHR || storageClass == StorageClassHitAttributeKHR ||
       storageClass == StorageClassIncomingRayPayloadKHR)
     globalVar->setAlignment(MaybeAlign(4));
+
+  if (!m_globalVarPrefix.empty()) {
+    if (globalVar->hasName()) {
+      globalVar->setName(Twine(m_globalVarPrefix) + globalVar->getName());
+    } else {
+      globalVar->setName(Twine(m_globalVarPrefix) + "spv" + Twine(spvVar->getId()));
+    }
+  }
 
   SPIRVBuiltinVariableKind builtinKind;
   if (spvVar->isBuiltin(&builtinKind))
@@ -5623,6 +5755,20 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
     }
 
     return mapValue(bv, result);
+  }
+
+  case OpAssumeTrueKHR: {
+    SPIRVInstTemplateBase *assume = static_cast<SPIRVInstTemplateBase *>(bv);
+    Value *cond = transValue(assume->getOperand(0), f, bb);
+    return mapValue(bv, getBuilder()->CreateIntrinsic(Intrinsic::assume, {}, {cond}));
+  }
+
+  case OpExpectKHR: {
+    SPIRVInstTemplateBase *expect = static_cast<SPIRVInstTemplateBase *>(bv);
+    Value *val0 = transValue(expect->getOperand(0), f, bb);
+    Value *val1 = transValue(expect->getOperand(1), f, bb);
+    auto instType = transType(expect->getType());
+    return mapValue(bv, getBuilder()->CreateIntrinsic(Intrinsic::expect, instType, {val0, val1}));
   }
 
   case OpLine:
@@ -6450,6 +6596,12 @@ SmallVector<Value *> SPIRVToLLVM::transValueWithoutDecoration(SPIRVValue *bv, Fu
     return mapValue(bv, transValueWithOpcode<OpSubgroupAnyKHR>(bv));
   case OpSubgroupAllEqualKHR:
     return mapValue(bv, transValueWithOpcode<OpSubgroupAllEqualKHR>(bv));
+  case OpGroupNonUniformRotateKHR:
+    return mapValue(bv, transValueWithOpcode<OpGroupNonUniformRotateKHR>(bv));
+  case OpGroupNonUniformQuadAllKHR:
+    return mapValue(bv, transValueWithOpcode<OpGroupNonUniformQuadAllKHR>(bv));
+  case OpGroupNonUniformQuadAnyKHR:
+    return mapValue(bv, transValueWithOpcode<OpGroupNonUniformQuadAnyKHR>(bv));
   case OpSubgroupReadInvocationKHR:
     return mapValue(bv, transValueWithOpcode<OpSubgroupReadInvocationKHR>(bv));
   case OpGroupIAddNonUniformAMD:
@@ -6592,6 +6744,10 @@ Function *SPIRVToLLVM::transFunction(SPIRVFunction *bf) {
       execModelMDs.push_back(ConstantAsMetadata::get(ConstantInt::get(int32Ty, execModel)));
       auto execModelMdNode = MDNode::get(*m_context, execModelMDs);
       f->addMetadata(gSPIRVMD::ExecutionModel, *execModelMdNode);
+      if (m_maximallyReconverges) {
+        auto trueValue = ConstantAsMetadata::get(ConstantInt::getTrue(*m_context));
+        f->addMetadata(gSPIRVMD::MaximallyReconverges, *MDNode::get(*m_context, {trueValue}));
+      }
     }
     f->setCallingConv(CallingConv::SPIR_FUNC);
 
@@ -7979,9 +8135,20 @@ bool SPIRVToLLVM::translate(ExecutionModel entryExecModel, const char *entryName
     if (auto em = m_entryTarget->getExecutionMode(ExecutionModeRoundingModeRTZ))
       m_fpControlFlags.RoundingModeRTZ = em->getLiterals()[0] >> 3;
 
+    if (auto em = m_entryTarget->getExecutionMode(ExecutionModeFPFastMathDefault)) {
+      assert(em->getLiterals().size() == 3); // 3 words to hold FP16/FP32/FP64 defaults
+      m_fpFastMathDefault.Fp16 = em->getLiterals()[0];
+      m_fpFastMathDefault.Fp32 = em->getLiterals()[1];
+      m_fpFastMathDefault.Fp64 = em->getLiterals()[2];
+    }
+
     if (m_execModule >= ExecutionModelVertex && m_execModule <= ExecutionModelGeometry)
       hasXfbOuts = m_entryTarget->getExecutionMode(ExecutionModeXfb) != nullptr;
 
+    if (m_execModule == ExecutionModelFragment)
+      m_requireFullQuads = m_entryTarget->getExecutionMode(ExecutionModeRequireFullQuadsKHR) != nullptr;
+
+    m_maximallyReconverges = m_entryTarget->getExecutionMode(ExecutionModeMaximallyReconvergesKHR) != nullptr;
   } else {
     createLibraryEntryFunc();
   }
@@ -8426,6 +8593,10 @@ bool SPIRVToLLVM::transMetadata() {
           computeMode.derivatives = DerivativeMode::Linear;
         else
           computeMode.derivatives = DerivativeMode::None;
+
+        if (bf->getExecutionMode(ExecutionModeQuadDerivativesKHR))
+          computeMode.derivatives = DerivativeMode::Quads;
+
         unsigned overrideShaderGroupSizeX = m_shaderOptions->overrideShaderThreadGroupSizeX;
         unsigned overrideShaderGroupSizeY = m_shaderOptions->overrideShaderThreadGroupSizeY;
         unsigned overrideShaderGroupSizeZ = m_shaderOptions->overrideShaderThreadGroupSizeZ;
@@ -10648,8 +10819,8 @@ Value *SPIRVToLLVM::transCooperativeMatrixKHRFromConstruct(SPIRVType *spvCoopMat
 
 bool llvm::readSpirv(Builder *builder, const ShaderModuleUsage *shaderInfo, const PipelineShaderOptions *shaderOptions,
                      std::istream &is, spv::ExecutionModel entryExecModel, const char *entryName,
-                     const SPIRVSpecConstMap &specConstMap, ArrayRef<ConvertingSampler> convertingSamplers, Module *m,
-                     std::string &errMsg) {
+                     const SPIRVSpecConstMap &specConstMap, ArrayRef<ConvertingSampler> convertingSamplers,
+                     StringRef globalVarPrefix, Module *m, std::string &errMsg) {
   assert(entryExecModel != ExecutionModelKernel && "Not support ExecutionModelKernel");
 
   std::unique_ptr<SPIRVModule> bm(SPIRVModule::createSPIRVModule());
@@ -10657,6 +10828,7 @@ bool llvm::readSpirv(Builder *builder, const ShaderModuleUsage *shaderInfo, cons
   is >> *bm;
 
   SPIRVToLLVM btl(m, bm.get(), specConstMap, convertingSamplers, builder, shaderInfo, shaderOptions);
+  btl.setGlobalVarPrefix(globalVarPrefix);
   bool succeed = true;
   if (!btl.translate(entryExecModel, entryName)) {
     bm->getError(errMsg);

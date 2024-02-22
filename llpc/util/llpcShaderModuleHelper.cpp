@@ -220,15 +220,17 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
     shaderModuleUsage.enableRayQuery = true;
 
   if ((!shaderModuleUsage.useSubgroupSize) &&
-      ((capabilities.count(CapabilityGroupNonUniform) > 0) || (capabilities.count(CapabilityGroupNonUniformVote) > 0) ||
-       (capabilities.count(CapabilityGroupNonUniformArithmetic) > 0) ||
-       (capabilities.count(CapabilityGroupNonUniformBallot) > 0) ||
-       (capabilities.count(CapabilityGroupNonUniformShuffle) > 0) ||
-       (capabilities.count(CapabilityGroupNonUniformShuffleRelative) > 0) ||
-       (capabilities.count(CapabilityGroupNonUniformClustered) > 0) ||
-       (capabilities.count(CapabilityGroupNonUniformQuad) > 0) ||
-       (capabilities.count(CapabilitySubgroupBallotKHR) > 0) || (capabilities.count(CapabilitySubgroupVoteKHR) > 0) ||
-       (capabilities.count(CapabilityGroups) > 0))) {
+          ((capabilities.count(CapabilityGroupNonUniform) > 0) ||
+           (capabilities.count(CapabilityGroupNonUniformVote) > 0) ||
+           (capabilities.count(CapabilityGroupNonUniformArithmetic) > 0) ||
+           (capabilities.count(CapabilityGroupNonUniformBallot) > 0) ||
+           (capabilities.count(CapabilityGroupNonUniformShuffle) > 0) ||
+           (capabilities.count(CapabilityGroupNonUniformShuffleRelative) > 0) ||
+           (capabilities.count(CapabilityGroupNonUniformClustered) > 0) ||
+           (capabilities.count(CapabilityGroupNonUniformQuad) > 0) ||
+           (capabilities.count(CapabilitySubgroupBallotKHR) > 0) ||
+           (capabilities.count(CapabilitySubgroupVoteKHR) > 0) || (capabilities.count(CapabilityGroups) > 0)) ||
+      (capabilities.count(CapabilityGroupNonUniformRotateKHR) > 0)) {
     shaderModuleUsage.useSubgroupSize = true;
   }
 

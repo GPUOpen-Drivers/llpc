@@ -227,6 +227,7 @@ const static char NonUniform[] = "spirv.NonUniform";
 const static char AtomicCounter[] = "spirv.AtomicCounter";
 const static char Lds[] = "spirv.Lds";
 const static char ContStackStoreType[] = "spirv.ContStackStoreType";
+const static char MaximallyReconverges[] = "spirv.MaximallyReconverges";
 } // namespace gSPIRVMD
 
 namespace gSPIRVName {
@@ -495,6 +496,13 @@ union ShaderFloatControlFlags {
     unsigned Unused : 12;
   };
   unsigned U32All;
+};
+
+/// Defaults used for floating-point fast math (corresponds to FPFastMathModeMask)
+struct ShaderFloatFastMathDefault {
+  unsigned Fp16; // FP16 fast math default
+  unsigned Fp32; // FP32 fast math default
+  unsigned Fp64; // FP64 fast math default
 };
 
 } // namespace SPIRV

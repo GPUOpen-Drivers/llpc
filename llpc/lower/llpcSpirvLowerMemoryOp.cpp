@@ -50,15 +50,6 @@ namespace Llpc {
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses SpirvLowerMemoryOp::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  runImpl(module);
-  return PreservedAnalyses::none();
-}
-
-// =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-bool SpirvLowerMemoryOp::runImpl(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Memory-Op\n");
 
   SpirvLower::init(&module);
@@ -88,7 +79,7 @@ bool SpirvLowerMemoryOp::runImpl(Module &module) {
 
   LLVM_DEBUG(dbgs() << "After the pass Spirv-Lower-Memory-Op " << module);
 
-  return true;
+  return PreservedAnalyses::none();
 }
 
 // =====================================================================================================================

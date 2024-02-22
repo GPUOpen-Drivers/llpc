@@ -109,8 +109,6 @@ public:
 
   unsigned getActiveShaderStageCount() const { return m_pipelineContext->getActiveShaderStageCount(); }
 
-  const char *getGpuNameAbbreviation() const { return PipelineContext::getGpuNameAbbreviation(m_gfxIp); }
-
   GfxIpVersion getGfxIpVersion() const { return m_gfxIp; }
 
   uint64_t getPipelineHashCode() const { return m_pipelineContext->getPipelineHashCode(); }
@@ -123,6 +121,8 @@ public:
 
   // Sets triple and data layout in specified module from the context's target machine.
   void setModuleTargetMachine(llvm::Module *module);
+
+  void ensureGpurtLibrary();
 
 private:
   Context() = delete;
@@ -147,6 +147,18 @@ private:
   std::unique_ptr<llvm_dialects::DialectContext> m_dialectContext;
 
   unsigned m_useCount = 0; // Number of times this context is used.
+
+  struct GpurtKey {
+    unsigned gpurtFeatureFlags;
+    bool hwIntersectRay;
+
+    bool operator==(const GpurtKey &other) const {
+      return gpurtFeatureFlags == other.gpurtFeatureFlags && hwIntersectRay == other.hwIntersectRay;
+    }
+    bool operator!=(const GpurtKey &other) const { return !(*this == other); }
+  };
+
+  GpurtKey m_currentGpurtKey;
 };
 
 } // namespace Llpc

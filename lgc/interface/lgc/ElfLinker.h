@@ -80,7 +80,8 @@ public:
   //
   // @param exports : Fragment export info
   // @param enableKill : Whether this fragment shader has kill enabled.
-  virtual llvm::StringRef buildColorExportShader(llvm::ArrayRef<ColorExportInfo> exports, bool enableKill) = 0;
+  // @returns hash string for color export shader, it will be used to cache key.
+  virtual llvm::StringRef createColorExportShader(llvm::ArrayRef<ColorExportInfo> exports, bool enableKill) = 0;
 
   // Add a blob for a particular chunk of glue code, typically retrieved from a cache. The blob is not copied,
   // and remains in use until the first of the link completing or the ElfLinker's parent Pipeline being destroyed.

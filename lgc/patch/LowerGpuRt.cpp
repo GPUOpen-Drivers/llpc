@@ -76,6 +76,7 @@ PreservedAnalyses LowerGpuRt::run(Module &module, ModuleAnalysisManager &analysi
                             .add(&LowerGpuRt::visitGetTriangleCompressionMode)
                             .add(&LowerGpuRt::visitGetFlattenedGroupThreadId)
                             .add(&LowerGpuRt::visitFloatWithRoundMode)
+                            .add(&LowerGpuRt::visitGpurtDispatchThreadIdFlatOp)
                             .build();
 
   visitor.visit(*this, module);
@@ -408,6 +409,37 @@ void LowerGpuRt::visitGetTriangleCompressionMode(GpurtGetTriangleCompressionMode
 void LowerGpuRt::visitGetFlattenedGroupThreadId(GpurtGetFlattenedGroupThreadIdOp &inst) {
   m_builder->SetInsertPoint(&inst);
   inst.replaceAllUsesWith(getThreadIdInGroup());
+  m_callsToLower.push_back(&inst);
+  m_funcsToLower.insert(inst.getCalledFunction());
+}
+
+// =====================================================================================================================
+// Visit "GpurtDispatchThreadIdFlatOp" instruction
+//
+// @param inst : The dialect instruction to process
+void LowerGpuRt::visitGpurtDispatchThreadIdFlatOp(GpurtDispatchThreadIdFlatOp &inst) {
+  m_builder->SetInsertPoint(&inst);
+  auto stage = getShaderStage(m_builder->GetInsertBlock()->getParent());
+  Value *flatDispatchId = nullptr;
+  if (stage == ShaderStage::Compute) {
+    auto numGroup = m_builder->CreateReadBuiltInInput(lgc::BuiltInNumWorkgroups);
+    auto groupSize = m_builder->CreateReadBuiltInInput(lgc::BuiltInWorkgroupSize);
+    auto dispatchSize = m_builder->CreateMul(numGroup, groupSize);
+    auto sizeX = m_builder->CreateExtractElement(dispatchSize, uint64_t(0));
+    auto sizeY = m_builder->CreateExtractElement(dispatchSize, 1);
+    auto sizeXY = m_builder->CreateMul(sizeX, sizeY);
+    auto dispatchId = m_builder->CreateReadBuiltInInput(lgc::BuiltInGlobalInvocationId);
+    auto dispatchX = m_builder->CreateExtractElement(dispatchId, uint64_t(0));
+    auto dispatchY = m_builder->CreateExtractElement(dispatchId, 1);
+    auto dispatchZ = m_builder->CreateExtractElement(dispatchId, 2);
+    flatDispatchId = m_builder->CreateMul(dispatchZ, sizeXY);
+    flatDispatchId = m_builder->CreateAdd(flatDispatchId, m_builder->CreateMul(dispatchY, sizeX));
+    flatDispatchId = m_builder->CreateAdd(flatDispatchId, dispatchX);
+  } else {
+    flatDispatchId = getThreadIdInGroup();
+  }
+
+  inst.replaceAllUsesWith(flatDispatchId);
   m_callsToLower.push_back(&inst);
   m_funcsToLower.insert(inst.getCalledFunction());
 }

@@ -48,20 +48,9 @@ namespace lgc {
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
 PreservedAnalyses PatchLlvmIrInclusion::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
-  if (pipelineState->getOptions().includeIr)
-    runImpl(module);
-  return PreservedAnalyses::none();
-}
+  if (!pipelineState->getOptions().includeIr)
+    return PreservedAnalyses::all();
 
-// =====================================================================================================================
-// Executes this patching pass on the specified LLVM module.
-//
-// This pass includes LLVM IR as a separate section in the ELF binary by inserting a new global variable with explicit
-// section.
-//
-// @param [in/out] module : LLVM module to be run on
-// @returns : True if the module was modified by the transformation and false otherwise
-bool PatchLlvmIrInclusion::runImpl(Module &module) {
   Patch::init(&module);
 
   std::string moduleStr;
@@ -78,7 +67,7 @@ bool PatchLlvmIrInclusion::runImpl(Module &module) {
   std::string namePrefix = Util::Abi::AmdGpuCommentName;
   global->setSection(namePrefix + "llvmir");
 
-  return true;
+  return PreservedAnalyses::none();
 }
 
 } // namespace lgc

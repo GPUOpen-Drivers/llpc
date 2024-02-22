@@ -64,8 +64,6 @@ class LowerVertexFetch : public llvm::PassInfoMixin<LowerVertexFetch> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  bool runImpl(llvm::Module &module, PipelineState *pipelineState);
-
   static llvm::StringRef name() { return "Lower vertex fetch calls"; }
 };
 

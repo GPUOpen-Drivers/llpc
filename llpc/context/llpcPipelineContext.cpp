@@ -149,33 +149,6 @@ PipelineContext::~PipelineContext() {
 }
 
 // =====================================================================================================================
-// Gets the name string of the abbreviation for GPU target according to graphics IP version info.
-//
-// @param gfxIp : Graphics IP version info
-const char *PipelineContext::getGpuNameAbbreviation(GfxIpVersion gfxIp) {
-  const char *nameAbbr = nullptr;
-  switch (gfxIp.major) {
-  case 6:
-    nameAbbr = "SI";
-    break;
-  case 7:
-    nameAbbr = "CI";
-    break;
-  case 8:
-    nameAbbr = "VI";
-    break;
-  case 9:
-    nameAbbr = "GFX9";
-    break;
-  default:
-    nameAbbr = "UNKNOWN";
-    break;
-  }
-
-  return nameAbbr;
-}
-
-// =====================================================================================================================
 // Gets the hash code of input shader with specified shader stage.
 //
 // @param stage : Shader stage
@@ -740,6 +713,14 @@ ShaderOptions PipelineContext::computeShaderOptions(const PipelineShaderInfo &sh
       static_cast<InvariantLoadsOption>(shaderInfo.options.aggressiveInvariantLoads);
 
   return shaderOptions;
+}
+
+// =====================================================================================================================
+// Gets pipeline hash code. If pipeline api hash is non-zero, this will be used directly as the "stable" hash.
+uint64_t PipelineContext::getPipelineHashCode() const {
+  if (m_pipelineApiHash != 0)
+    return m_pipelineApiHash;
+  return MetroHash::compact64(&m_pipelineHash);
 }
 
 // =====================================================================================================================

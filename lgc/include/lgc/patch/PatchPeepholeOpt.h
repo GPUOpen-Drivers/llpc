@@ -50,8 +50,6 @@ class PatchPeepholeOpt final : public llvm::InstVisitor<PatchPeepholeOpt>,
 public:
   llvm::PreservedAnalyses run(llvm::Function &function, llvm::FunctionAnalysisManager &analysisManager);
 
-  bool runImpl(llvm::Function &function);
-
   static llvm::StringRef name() { return "Patch LLVM for peephole optimizations"; }
 
   void visitIntToPtr(llvm::IntToPtrInst &intToPtr);

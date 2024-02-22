@@ -162,6 +162,9 @@ inline bool isValid(spv::ExecutionMode V) {
   case ExecutionModeStencilRefUnchangedBackAMD:
   case ExecutionModeStencilRefGreaterBackAMD:
   case ExecutionModeStencilRefLessBackAMD:
+  case ExecutionModeQuadDerivativesKHR:
+  case ExecutionModeRequireFullQuadsKHR:
+  case ExecutionModeFPFastMathDefault:
     return true;
   default:
     return false;
@@ -562,6 +565,10 @@ inline bool isValid(spv::Capability V) {
   case CapabilityWorkgroupMemoryExplicitLayout16BitAccessKHR:
   case CapabilityComputeDerivativeGroupLinearNV:
   case CapabilityComputeDerivativeGroupQuadsNV:
+  case CapabilityExpectAssumeKHR:
+  case CapabilityGroupNonUniformRotateKHR:
+  case CapabilityQuadControlKHR:
+  case CapabilityFloatControls2:
     return true;
   default:
     return false;
@@ -821,6 +828,7 @@ inline bool isValid(spv::Op V) {
   case OpGroupNonUniformAll:
   case OpGroupNonUniformAny:
   case OpGroupNonUniformAllEqual:
+  case OpGroupNonUniformRotateKHR:
   case OpGroupNonUniformBroadcast:
   case OpGroupNonUniformBroadcastFirst:
   case OpGroupNonUniformBallot:
@@ -851,6 +859,8 @@ inline bool isValid(spv::Op V) {
   case OpGroupNonUniformLogicalXor:
   case OpGroupNonUniformQuadBroadcast:
   case OpGroupNonUniformQuadSwap:
+  case OpGroupNonUniformQuadAllKHR:
+  case OpGroupNonUniformQuadAnyKHR:
   case OpCopyLogical:
   case OpPtrEqual:
   case OpPtrNotEqual:
@@ -927,6 +937,8 @@ inline bool isValid(spv::Op V) {
   case OpRayQueryGetIntersectionObjectToWorldKHR:
   case OpRayQueryGetIntersectionWorldToObjectKHR:
   case OpRayQueryGetIntersectionTriangleVertexPositionsKHR:
+  case OpExpectKHR:
+  case OpAssumeTrueKHR:
   case OpTypeCooperativeMatrixKHR:
   case OpCooperativeMatrixLoadKHR:
   case OpCooperativeMatrixStoreKHR:
@@ -975,6 +987,9 @@ inline bool isValidFPFastMathModeMask(SPIRVWord Mask) {
   ValidMask |= FPFastMathModeNSZMask;
   ValidMask |= FPFastMathModeAllowRecipMask;
   ValidMask |= FPFastMathModeFastMask;
+  ValidMask |= FPFastMathModeAllowContractMask;
+  ValidMask |= FPFastMathModeAllowReassocMask;
+  ValidMask |= FPFastMathModeAllowTransformMask;
 
   return (Mask & ~ValidMask) == 0;
 }

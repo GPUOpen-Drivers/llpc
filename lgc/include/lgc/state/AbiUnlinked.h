@@ -57,7 +57,6 @@ static constexpr char FetchlessLsEntryName[] = "_amdgpu_ls_main_fetchless";
 // Metadata names of extra entries in .pipeline for an unlinked shader/part-pipeline
 namespace PipelineMetadataKey {
 
-static const char VertexInputs[] = ".vertexInputs";
 static const char ColorExports[] = ".colorExports";
 static const char FragInputMapping1[] = ".fragInputs";
 static const char FragInputMapping2[] = ".fragBuiltInInputs";

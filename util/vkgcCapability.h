@@ -162,6 +162,9 @@ static const char *const VkgcSupportedCapabilities[] = {
     "CapabilityCooperativeMatrixKHR",
     "CapabilityComputeDerivativeGroupLinearNV",
     "CapabilityComputeDerivativeGroupQuadsNV",
+    "CapabilityExpectAssumeKHR",
+    "CapabilityQuadControl",
+    "CapabilityGroupNonUniformRotateKHR",
 };
 
 }; // namespace Vkgc

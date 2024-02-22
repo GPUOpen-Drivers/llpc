@@ -44,8 +44,6 @@ class PatchCopyShader : public Patch, public llvm::PassInfoMixin<PatchCopyShader
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  bool runImpl(llvm::Module &module, PipelineShadersResult &pipelineShaders, PipelineState *pipelineState);
-
   static llvm::StringRef name() { return "Patch LLVM for copy shader generation"; }
 
 private:

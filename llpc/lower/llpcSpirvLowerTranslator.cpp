@@ -47,15 +47,6 @@ using namespace Llpc;
 // @param [in/out] module : LLVM module to be run on (empty on entry)
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 llvm::PreservedAnalyses SpirvLowerTranslator::run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager) {
-  runImpl(module);
-  return llvm::PreservedAnalyses::none();
-}
-
-// =====================================================================================================================
-// Run the pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on (empty on entry)
-bool SpirvLowerTranslator::runImpl(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Translator\n");
 
   SpirvLower::init(&module);
@@ -68,7 +59,7 @@ bool SpirvLowerTranslator::runImpl(Module &module) {
 
   // Translate SPIR-V binary to machine-independent LLVM module
   translateSpirvToLlvm(m_shaderInfo, &module);
-  return true;
+  return PreservedAnalyses::none();
 }
 
 // =====================================================================================================================
@@ -116,8 +107,8 @@ void SpirvLowerTranslator::translateSpirvToLlvm(const PipelineShaderInfo *shader
   }
 
   if (!readSpirv(context->getBuilder(), &(moduleData->usage), &(shaderInfo->options), spirvStream,
-                 convertToExecModel(entryStage), shaderInfo->pEntryTarget, specConstMap, convertingSamplers, module,
-                 errMsg)) {
+                 convertToExecModel(entryStage), shaderInfo->pEntryTarget, specConstMap, convertingSamplers,
+                 m_globalVarPrefix, module, errMsg)) {
     report_fatal_error(Twine("Failed to translate SPIR-V to LLVM (") +
                            getShaderStageName(static_cast<ShaderStage>(entryStage)) + " shader): " + errMsg,
                        false);

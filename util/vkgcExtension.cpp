@@ -99,6 +99,10 @@ const ExtensionNamePair ExtensionNameTable[ExtensionCount] = {
     DeclExtensionName(KHR_RAY_QUERY),
     DeclExtensionName(NV_SHADER_ATOMIC_FLOAT),
     DeclExtensionName(NV_COMPUTE_SHADER_DERIVATIVES),
+    DeclExtensionName(KHR_MAXIMAL_RECONVERGENCE),
+    DeclExtensionName(KHR_EXPECT_ASSUME),
+    DeclExtensionName(KHR_SHADER_QUAD_CONTROL),
+    DeclExtensionName(KHR_SUBGROUP_ROTATE),
 };
 
 // =====================================================================================================================

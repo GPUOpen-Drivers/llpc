@@ -42,6 +42,7 @@
 #include "lgc/patch/LowerDebugPrintf.h"
 #include "lgc/patch/LowerDesc.h"
 #include "lgc/patch/LowerGpuRt.h"
+#include "lgc/patch/LowerSubgroupOps.h"
 #include "lgc/patch/PatchBufferOp.h"
 #include "lgc/patch/PatchCheckShaderCache.h"
 #include "lgc/patch/PatchCopyShader.h"
@@ -144,6 +145,7 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
 
   // We're using BuilderRecorder; replay the Builder calls now
   passMgr.addPass(BuilderReplayer());
+  passMgr.addPass(LowerSubgroupOps());
 
   if (raw_ostream *outs = getLgcOuts()) {
     passMgr.addPass(PrintModulePass(*outs,

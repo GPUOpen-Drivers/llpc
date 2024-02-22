@@ -104,6 +104,9 @@ public:
   bool isPerPrimitive() const { return m_data.bits.perPrimitive; }
   void setPerPrimitive(bool perPrimitive = true) { m_data.bits.perPrimitive = perPrimitive; }
 
+  bool isProvokingVertexModeDisabled() const { return m_data.bits.disableProvokingVertexMode; }
+  void disableProvokingVertexMode(bool disable = true) { m_data.bits.disableProvokingVertexMode = disable; }
+
   unsigned getComponent() const { return m_data.bits.component; }
   void setComponent(unsigned component) {
     assert(component < 4); // Valid component offsets are 0~3
@@ -125,6 +128,7 @@ private:
                                  //    whole array or of an element with a variable index.
       unsigned perPrimitive : 1; // Mesh shader output: whether it is a per-primitive output
       unsigned component : 2;    // Component offset, specifying which components within a location is consumed
+      unsigned disableProvokingVertexMode : 1; // Disable the provoking vertex mode
     } bits;
     unsigned u32All;
   } m_data;
@@ -1399,22 +1403,11 @@ public:
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateGetSubgroupSize(const llvm::Twine &instName = "");
 
-  // Create a subgroup elect.
-  //
-  // @param instName : Name to give instruction(s)
-  llvm::Value *CreateSubgroupElect(const llvm::Twine &instName = "");
-
   // Create a subgroup all.
   //
   // @param value : The value to compare
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateSubgroupAll(llvm::Value *const value, const llvm::Twine &instName = "");
-
-  // Create a subgroup any
-  //
-  // @param value : The value to compare
-  // @param instName : Name to give instruction(s)
-  llvm::Value *CreateSubgroupAny(llvm::Value *const value, const llvm::Twine &instName = "");
 
   // Create a subgroup all equal.
   //

@@ -432,8 +432,10 @@ public:
   SPIRVString(SPIRVModule *M, SPIRVId TheId, const std::string &TheStr)
       : SPIRVEntry(M, FixedWC + getSizeInWords(TheStr), OC, TheId), Str(TheStr) {}
   SPIRVString() : SPIRVEntry(OC) {}
+  SPIRVString(Op OpCode) : SPIRVEntry(OpCode) {}
   _SPIRV_DCL_DECODE
   const std::string &getStr() const { return Str; }
+  void updateString(const char *str, unsigned len);
 
 protected:
   std::string Str;
@@ -484,7 +486,7 @@ typedef SPIRVEntryOpCodeOnly<OpNoLine> SPIRVNoLine;
 
 class SPIRVExecutionMode : public SPIRVAnnotation<OpExecutionMode> {
 public:
-  // Complete constructor for LocalSize
+  // Complete constructor for LocalSize and FPFastMathDefault
   SPIRVExecutionMode(SPIRVEntry *TheTarget, SPIRVExecutionModeKind TheExecMode, SPIRVWord Word0, SPIRVWord Word1,
                      SPIRVWord Word2)
       : SPIRVAnnotation(TheTarget, 6), ExecMode(TheExecMode) {

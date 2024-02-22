@@ -61,11 +61,6 @@ class SpirvLowerMathConstFolding : public SpirvLowerMath, public llvm::PassInfoM
 
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
-  // NOTE: We use a function parameter here to get the TargetLibraryInfo object. This is
-  // needed because the passes for the legacy and new pass managers use different ways to
-  // retrieve it. That also ensures the object is retrieved once the passes are properly
-  // initialized. This can be removed once the switch to the new pass manager is completed.
-  bool runImpl(llvm::Module &module, const std::function<llvm::TargetLibraryInfo &()> &getTargetLibraryInfo);
 
   static llvm::StringRef name() { return "Lower SPIR-V math constant folding"; }
 
@@ -80,7 +75,6 @@ class SpirvLowerMathPrecision : public SpirvLower, public llvm::PassInfoMixin<Sp
 
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
-  bool runImpl(llvm::Module &module);
 
   static llvm::StringRef name() { return "Lower SPIR-V for precision (fast math flags)"; }
 
@@ -95,7 +89,6 @@ class SpirvLowerMathFloatOp : public SpirvLowerMath,
                               public llvm::InstVisitor<SpirvLowerMathFloatOp> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
-  bool runImpl(llvm::Module &module);
 
   virtual void visitBinaryOperator(llvm::BinaryOperator &binaryOp);
   virtual void visitCallInst(llvm::CallInst &callInst);

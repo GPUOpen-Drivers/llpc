@@ -113,19 +113,7 @@ PatchEntryPointMutate::UserDataArg::UserDataArg(llvm::Type *argTy, const llvm::T
 PreservedAnalyses PatchEntryPointMutate::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
   PipelineShadersResult &pipelineShaders = analysisManager.getResult<PipelineShaders>(module);
-  runImpl(module, pipelineShaders, pipelineState);
-  return PreservedAnalyses::none();
-}
 
-// =====================================================================================================================
-// Executes this LLVM patching pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @param pipelineShaders : Pipeline shaders analysis result
-// @param pipelineState : Pipeline state
-// @returns : True if the module was modified by the transformation and false otherwise
-bool PatchEntryPointMutate::runImpl(Module &module, PipelineShadersResult &pipelineShaders,
-                                    PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Entry-Point-Mutate\n");
 
   Patch::init(&module);
@@ -172,7 +160,7 @@ bool PatchEntryPointMutate::runImpl(Module &module, PipelineShadersResult &pipel
   m_cpsShaderInputCache.clear();
 
   processGroupMemcpy(module);
-  return true;
+  return PreservedAnalyses::none();
 }
 
 // =====================================================================================================================
@@ -1725,19 +1713,15 @@ void PatchEntryPointMutate::addSpecialUserDataArgs(SmallVectorImpl<UserDataArg> 
       auto vsIntfData = m_pipelineState->getShaderInterfaceData(ShaderStage::Vertex);
       auto vsResUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Vertex);
 
-      // Detect whether this is an unlinked compile that will need a fetch shader. If so, we need to
-      // add the vertex buffer table and base vertex and base instance, even if they appear unused here.
-      bool willHaveFetchShader = m_pipelineState->getPalMetadata()->getVertexFetchCount() != 0;
-
       // Vertex buffer table.
-      if (willHaveFetchShader || userDataUsage->isSpecialUserDataUsed(UserDataMapping::VertexBufferTable)) {
+      if (userDataUsage->isSpecialUserDataUsed(UserDataMapping::VertexBufferTable)) {
         specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "vertexBufferTable",
                                                   UserDataMapping::VertexBufferTable,
                                                   &vsIntfData->entryArgIdxs.vs.vbTablePtr));
       }
 
       // Base vertex and base instance.
-      if (willHaveFetchShader || vsResUsage->builtInUsage.vs.baseVertex || vsResUsage->builtInUsage.vs.baseInstance ||
+      if (vsResUsage->builtInUsage.vs.baseVertex || vsResUsage->builtInUsage.vs.baseInstance ||
           userDataUsage->isSpecialUserDataUsed(UserDataMapping::BaseVertex) ||
           userDataUsage->isSpecialUserDataUsed(UserDataMapping::BaseInstance)) {
         specialUserDataArgs.push_back(UserDataArg(builder.getInt32Ty(), "baseVertex", UserDataMapping::BaseVertex,

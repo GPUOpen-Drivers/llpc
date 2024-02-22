@@ -138,6 +138,10 @@ template <> inline void SPIRVMap<ExecutionMode, std::string>::init() {
   add(ExecutionModeStencilRefUnchangedBackAMD, "StencilRefUnchangedBackAMD");
   add(ExecutionModeStencilRefGreaterBackAMD, "StencilRefGreaterBackAMD");
   add(ExecutionModeStencilRefLessBackAMD, "StencilRefLessBackAMD");
+  add(ExecutionModeQuadDerivativesKHR, "QuadDerivativesKHR");
+  add(ExecutionModeRequireFullQuadsKHR, "RequireFullQuadsKHR");
+  add(ExecutionModeFPFastMathDefault, "FPFastMathDefault");
+  add(ExecutionModeMaximallyReconvergesKHR, "MaximallyReconvergesKHR");
 }
 SPIRV_DEF_NAMEMAP(ExecutionMode, SPIRVExecutionModeNameMap)
 
@@ -502,6 +506,10 @@ template <> inline void SPIRVMap<Capability, std::string>::init() {
   add(CapabilityCooperativeMatrixKHR, "CooperativeMatrixKHR");
   add(CapabilityComputeDerivativeGroupLinearNV, "ComputeDerivativeGroupLinearNV");
   add(CapabilityComputeDerivativeGroupQuadsNV, "ComputeDerivativeGroupQuadsNV");
+  add(CapabilityExpectAssumeKHR, "ExpectAssumeKHR");
+  add(CapabilityGroupNonUniformRotateKHR, "GroupNonUniformRotateKHR");
+  add(CapabilityQuadControlKHR, "QuadControlKHR");
+  add(CapabilityFloatControls2, "FloatControls2");
 }
 SPIRV_DEF_NAMEMAP(Capability, SPIRVCapabilityNameMap)
 
