@@ -66,7 +66,9 @@
 #include "llpcSpirvLowerUtil.h"
 #include "llpcThreading.h"
 #include "llpcUtil.h"
+#ifndef LLPC_DISABLE_SPVGEN
 #include "spvgen.h"
+#endif
 #include "vfx.h"
 #include "vkgcElfReader.h"
 #include "llvm/ADT/ScopeExit.h"
@@ -123,6 +125,7 @@ void cleanupCompileInfo(CompileInfo *compileInfo) {
     Vfx::vfxCloseDoc(compileInfo->pipelineInfoFile);
 }
 
+#ifndef LLPC_DISABLE_SPVGEN
 // =====================================================================================================================
 // Translates GLSL source language to corresponding shader stage.
 //
@@ -257,6 +260,7 @@ Expected<BinaryData> compileGlsl(const std::string &inFilename, ShaderStage *sta
 
   return BinaryData{static_cast<size_t>(binSize), bin};
 }
+#endif
 
 // =====================================================================================================================
 // SPIR-V assembler, converts SPIR-V assembly text file (input) to SPIR-V binary file (output).
@@ -264,6 +268,7 @@ Expected<BinaryData> compileGlsl(const std::string &inFilename, ShaderStage *sta
 // @param inFilename : Input filename, SPIR-V assembly text
 // @returns : BinaryData object of the assembled SPIR-V on success, `ResultError` on failure.
 Expected<BinaryData> assembleSpirv(const std::string &inFilename) {
+#ifndef LLPC_DISABLE_SPVGEN
   if (!InitSpvGen())
     return createResultError(Result::ErrorUnavailable,
                              "Failed to load SPVGEN -- cannot assemble SPIR-V assembler source");
@@ -301,6 +306,10 @@ Expected<BinaryData> assembleSpirv(const std::string &inFilename) {
   LLPC_OUTS("\n\n");
 
   return BinaryData{static_cast<size_t>(binSize), bin};
+#else
+  return createResultError(Result::ErrorUnavailable,
+                           "SPVGEN isn't available -- cannot assemble SPIR-V assembler source");
+#endif
 }
 
 // =====================================================================================================================
@@ -395,10 +404,10 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
         compileInfo.gfxPipelineInfo.cbState.target[target].format = VK_FORMAT_R8G8B8A8_SRGB;
     }
   }
-
+#ifndef LLPC_DISABLE_SPVGEN
   if (EnableOuts() && !InitSpvGen())
     LLPC_OUTS("Failed to load SPVGEN -- cannot disassemble and validate SPIR-V\n");
-
+#endif
   for (unsigned stage = 0; stage < pipelineState->numStages; ++stage) {
     if (pipelineState->stages[stage].dataSize > 0) {
       StandaloneCompiler::ShaderModuleData shaderModuleData = {};
@@ -408,9 +417,11 @@ Error processInputPipeline(ICompiler *compiler, CompileInfo &compileInfo, const 
 
       compileInfo.shaderModuleDatas.push_back(shaderModuleData);
       compileInfo.stageMask |= shaderStageToMask(pipelineState->stages[stage].stage);
+#ifndef LLPC_DISABLE_SPVGEN
       if (EnableOuts())
         disassembleSpirv(pipelineState->stages[stage].dataSize, shaderModuleData.spirvBin.pCode,
                          Twine(getShaderStageName(pipelineState->stages[stage].stage)) + " shader module");
+#endif
     }
   }
 
@@ -465,6 +476,7 @@ static Expected<ShaderModuleData> processInputSpirvStage(const InputSpec &spirvI
     spvBin = *spvBinOrErr;
   }
 
+#ifndef LLPC_DISABLE_SPVGEN
   const bool isSpvGenLoaded = InitSpvGen();
   if (!isSpvGenLoaded) {
     LLPC_OUTS("Failed to load SPVGEN -- no SPIR-V disassembler available\n");
@@ -482,6 +494,7 @@ static Expected<ShaderModuleData> processInputSpirvStage(const InputSpec &spirvI
         return createResultError(Result::ErrorInvalidShader, Twine("Failed to validate SPIR-V:\n") + log);
     }
   }
+#endif
 
   // NOTE: If the entry target is not specified, we set it to the one gotten from SPIR-V binary.
   std::string entryPoint = spirvInput.entryPoint;
@@ -590,8 +603,10 @@ static Expected<ShaderModuleData> processInputStage(const InputSpec &inputSpec, 
   if (isLlvmIrFile(inFile))
     return processInputLlvmIrStage(inputSpec);
 
+#ifndef LLPC_DISABLE_SPVGEN
   if (isGlslShaderTextFile(inFile))
     return processInputGlslStage(inputSpec);
+#endif
 
   return createResultError(Result::ErrorInvalidShader,
                            Twine("File ") + inFile +

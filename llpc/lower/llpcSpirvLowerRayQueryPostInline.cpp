@@ -49,15 +49,6 @@ namespace Llpc {
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses SpirvLowerRayQueryPostInline::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  runImpl(module);
-  return PreservedAnalyses::none();
-}
-
-// =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in,out] module : LLVM module to be run on
-bool SpirvLowerRayQueryPostInline::runImpl(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-ray-query-post-inline\n");
 
   for (Function &func : module) {
@@ -79,7 +70,7 @@ bool SpirvLowerRayQueryPostInline::runImpl(Module &module) {
       }
     }
   }
-  return true;
+  return PreservedAnalyses::none();
 }
 
 } // namespace Llpc

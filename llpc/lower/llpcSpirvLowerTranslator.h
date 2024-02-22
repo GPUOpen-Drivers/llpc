@@ -44,10 +44,10 @@ public:
   //
   // @param stage : Shader stage
   // @param shaderInfo : Shader info for this shader
-  SpirvLowerTranslator(ShaderStage stage, const PipelineShaderInfo *shaderInfo) : m_shaderInfo(shaderInfo) {}
+  SpirvLowerTranslator(ShaderStage stage, const PipelineShaderInfo *shaderInfo, llvm::StringRef globalVarPrefix = {})
+      : m_shaderInfo(shaderInfo), m_globalVarPrefix(globalVarPrefix) {}
 
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
-  bool runImpl(llvm::Module &module);
 
   static llvm::StringRef name() { return "LLPC translate SPIR-V binary to LLVM IR"; }
 
@@ -57,6 +57,7 @@ private:
   // -----------------------------------------------------------------------------------------------------------------
 
   const PipelineShaderInfo *m_shaderInfo; // Input shader info
+  std::string m_globalVarPrefix;
 };
 
 } // namespace Llpc

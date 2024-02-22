@@ -69,23 +69,12 @@ PatchCheckShaderCache::PatchCheckShaderCache(Pipeline::CheckShaderCacheFunc call
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
 PreservedAnalyses PatchCheckShaderCache::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
-  if (runImpl(module, pipelineState))
-    return PreservedAnalyses::none();
-  return PreservedAnalyses::all();
-}
 
-// =====================================================================================================================
-// Executes this LLVM patching pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @param [in/out] pipelineState : Pipeline state object to use for this pass
-// @returns : True if the module was modified by the transformation and false otherwise
-bool PatchCheckShaderCache::runImpl(Module &module, PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Check-Shader-Cache\n");
 
   if (m_callbackFunc == nullptr) {
     // No shader cache in use.
-    return false;
+    return PreservedAnalyses::all();
   }
 
   Patch::init(&module);
@@ -136,7 +125,7 @@ bool PatchCheckShaderCache::runImpl(Module &module, PipelineState *pipelineState
   // Ask callback function if it wants to remove any shader stages.
   auto stagesLeftToCompile = m_callbackFunc(&module, stageMask, inOutUsageValues);
   if (stagesLeftToCompile == stageMask)
-    return false;
+    return PreservedAnalyses::all();
 
   // "Remove" a shader stage by making its entry-point function an external but not DLLExport declaration, so further
   // passes no longer treat it as an entry point (based on the DLL storage class) and don't attempt to compile any code
@@ -150,5 +139,5 @@ bool PatchCheckShaderCache::runImpl(Module &module, PipelineState *pipelineState
       }
     }
   }
-  return true;
+  return PreservedAnalyses::none();
 }

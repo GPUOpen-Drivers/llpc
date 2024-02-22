@@ -36,6 +36,7 @@ endif()
 option(LLPC_BUILD_TESTS      "LLPC build all tests"        OFF)
 option(LLPC_BUILD_LLVM_TOOLS "Build LLVM tools"            OFF)
 option(LLPC_ENABLE_WERROR    "Build LLPC with more errors" OFF)
+option(LLPC_DISABLE_SPVGEN   "Build LLPC tools without SPVGEN" OFF)
 
 if(ICD_BUILD_LLPC)
     set(AMDLLPC_DIR ${CMAKE_CURRENT_BINARY_DIR})
@@ -225,6 +226,7 @@ if(ICD_BUILD_LLPC)
         lower/llpcSpirvLowerInternalLibraryIntrinsicUtil.cpp
         lower/LowerGLCompatibility.cpp
         lower/llpcSpirvLowerCooperativeMatrix.cpp
+        lower/PrepareContinuations.cpp
     )
 
 # llpc/translator
@@ -357,6 +359,11 @@ target_compile_definitions(llpc_standalone_compiler PUBLIC
     ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU
     _SPIRV_LLVM_API
 )
+
+if (LLPC_DISABLE_SPVGEN)
+  target_compile_definitions(llpc_standalone_compiler PUBLIC LLPC_DISABLE_SPVGEN)
+endif()
+
 if (LLPC_CLIENT_INTERFACE_MAJOR_VERSION)
     target_compile_definitions(llpc_standalone_compiler PUBLIC
         PAL_CLIENT_INTERFACE_MAJOR_VERSION=${PAL_CLIENT_INTERFACE_MAJOR_VERSION}
@@ -383,12 +390,15 @@ target_link_libraries(llpc_standalone_compiler PUBLIC
     cwpack
     llpc
     metrohash
-    spvgen_static
     vfx
     vkgc_headers
     vkgc_util
     ${CMAKE_DL_LIBS}
 )
+
+if (NOT LLPC_DISABLE_SPVGEN)
+    target_link_libraries(llpc_standalone_compiler PUBLIC spvgen_static)
+endif()
 
 if (NOT LLVM_LINK_LLVM_DYLIB)
     llvm_map_components_to_libnames(llvm_libs

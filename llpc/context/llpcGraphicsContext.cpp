@@ -44,9 +44,6 @@ using namespace Vkgc;
 
 namespace Llpc {
 
-// -disable-fetch-shader: disable the fetch shader when doing unlinked shaders.
-static cl::opt<bool> DisableFetchShader("disable-fetch-shader", cl::desc("Disable fetch shaders"), cl::init(false));
-
 // -disable-color-export-shader: disable the color export shader when doing unlinked shaders.
 static cl::opt<bool> DisableColorExportShader("disable-color-export-shader", cl::desc("Disable color export shaders"),
                                               cl::init(false));
@@ -88,6 +85,7 @@ GraphicsContext::GraphicsContext(GfxIpVersion gfxIp, const GraphicsPipelineBuild
 
   m_resourceMapping = pipelineInfo->resourceMapping;
   m_pipelineLayoutApiHash = pipelineInfo->pipelineLayoutApiHash;
+  m_pipelineApiHash = pipelineInfo->pipelineApiHash;
 }
 
 // =====================================================================================================================
@@ -192,7 +190,7 @@ void GraphicsContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
     }
   }
 
-  if ((stageMask & ~shaderStageToMask(ShaderStageFragment)) && (!unlinked || DisableFetchShader)) {
+  if ((stageMask & ~shaderStageToMask(ShaderStageFragment))) {
     // Set vertex input descriptions to the middle-end.
     setVertexInputDescriptions(pipeline, hasher);
   }

@@ -32,6 +32,7 @@
 #pragma once
 
 #include "GlueShader.h"
+#include "lgc/patch/FragColorExport.h"
 #include "lgc/state/PalMetadata.h"
 #include "lgc/state/PipelineState.h"
 
@@ -82,6 +83,7 @@ private:
   // The encoded or hashed (in some way) single string version of the above.
   std::string m_shaderString;
   bool m_killEnabled; // True if this fragment shader has kill enabled.
+  FragColorExport::Key m_key;
 };
 
 } // namespace lgc

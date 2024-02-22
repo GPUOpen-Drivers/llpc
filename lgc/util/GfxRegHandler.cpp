@@ -113,7 +113,6 @@ SqImgSampRegHandler::SqImgSampRegHandler(IRBuilder<> *builder, Value *reg, GfxIp
   m_gfxIpVersion = gfxIpVersion;
 
   switch (gfxIpVersion->major) {
-  case 9:
   case 10:
   case 11:
     m_bitsInfo = SqImgSampRegBitsGfx9;
@@ -160,29 +159,6 @@ void SqImgSampRegHandler::setReg(SqSampRegs regId, Value *regValue) {
     break;
   }
 }
-
-// =====================================================================================================================
-// SqImgSampReg Bits information look up table (Gfx9)
-// Refer to imported/chip/gfx9/gfx9_plus_merged_registers.h : SQ_IMG_RSRC_WORD
-static constexpr BitsInfo SqImgRsrcRegBitsGfx9[static_cast<unsigned>(SqRsrcRegs::Count)] = {
-    {0, 0, 32},  // BaseAddress
-    {1, 0, 8},   // BaseAddressHi
-    {1, 20, 9},  // Format
-    {2, 0, 14},  // Width
-    {2, 14, 14}, // Height
-    {3, 0, 12},  // DstSelXYZW
-    {3, 20, 5},  // SwizzleMode
-    {3, 28, 4},  // Type
-    {4, 0, 13},  // Depth
-    {4, 13, 12}, // Pitch
-    {4, 29, 3},  // BcSwizzle
-    {3, 12, 4},  // BaseLevel
-    {3, 16, 4},  // LastLevel
-    {5, 0, 13},  // BaseArray
-    {},          // WidthLo
-    {},          // WidthHi
-    {},          // ArrayPitch
-};
 
 // =====================================================================================================================
 // SqImgSampReg Bits information look up table (Gfx10)
@@ -241,9 +217,6 @@ SqImgRsrcRegHandler::SqImgRsrcRegHandler(IRBuilder<> *builder, Value *reg, GfxIp
   m_gfxIpVersion = gfxIpVersion;
 
   switch (gfxIpVersion->major) {
-  case 9:
-    m_bitsInfo = SqImgRsrcRegBitsGfx9;
-    break;
   case 10:
     m_bitsInfo = SqImgRsrcRegBitsGfx10;
     break;
@@ -280,8 +253,6 @@ Value *SqImgRsrcRegHandler::getReg(SqRsrcRegs regId) {
     return m_builder->CreateAdd(getRegCommon(static_cast<unsigned>(regId)), m_one);
   case SqRsrcRegs::Width:
     switch (m_gfxIpVersion->major) {
-    case 9:
-      return m_builder->CreateAdd(getRegCommon(static_cast<unsigned>(regId)), m_one);
     case 10:
     case 11:
       return m_builder->CreateAdd(
@@ -320,9 +291,6 @@ void SqImgRsrcRegHandler::setReg(SqRsrcRegs regId, Value *regValue) {
     break;
   case SqRsrcRegs::Width:
     switch (m_gfxIpVersion->major) {
-    case 9:
-      setRegCommon(static_cast<unsigned>(regId), m_builder->CreateSub(regValue, m_one));
-      break;
     case 10:
     case 11:
       setRegCombine(static_cast<unsigned>(SqRsrcRegs::WidthLo), static_cast<unsigned>(SqRsrcRegs::WidthHi),

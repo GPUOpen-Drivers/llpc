@@ -41,8 +41,6 @@ class PatchNullFragShader : public Patch, public llvm::PassInfoMixin<PatchNullFr
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  bool runImpl(llvm::Module &module, PipelineState *pipelineState);
-
   static llvm::StringRef name() { return "Patch LLVM for null fragment shader generation"; }
   void updatePipelineState(PipelineState *pipelineState) const;
 };

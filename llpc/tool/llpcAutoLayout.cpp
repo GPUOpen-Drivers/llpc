@@ -41,7 +41,9 @@
 #include "llpcCompilationUtils.h"
 #include "llpcDebug.h"
 #include "llpcUtil.h"
+#ifndef LLPC_DISABLE_SPVGEN
 #include "spvgen.h"
+#endif
 #include "vfx.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/Support/Format.h"
@@ -260,13 +262,16 @@ void doAutoLayoutDesc(ShaderStage shaderStage, BinaryData spirvBin, GraphicsPipe
   // Remove the unused variables.
   void *optBuf = nullptr;
   unsigned optBufSize = 0;
+  bool ret = false;
+#ifndef LLPC_DISABLE_SPVGEN
   const char *options[] = {"--remove-unused-interface-variables", "--eliminate-dead-variables"};
-  bool ret = spvOptimizeSpirv(spirvBin.codeSize, spirvBin.pCode, sizeof(options) / sizeof(options[0]), options,
-                              &optBufSize, &optBuf, 0, nullptr);
+  ret = spvOptimizeSpirv(spirvBin.codeSize, spirvBin.pCode, sizeof(options) / sizeof(options[0]), options, &optBufSize,
+                         &optBuf, 0, nullptr);
   if (ret) {
     spvBuf = optBuf;
     spvBufSize = optBufSize;
   }
+#endif
 
   // Release optimized spirv data.
   auto freeSpvData = make_scope_exit([&] {

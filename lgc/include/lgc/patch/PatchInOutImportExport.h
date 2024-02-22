@@ -49,9 +49,6 @@ public:
 
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  bool runImpl(llvm::Module &module, PipelineShadersResult &pipelineShaders, PipelineState *pipelineState,
-               const std::function<llvm::PostDominatorTree &(llvm::Function &)> &getPostDominatorTree);
-
   static llvm::StringRef name() { return "Patch LLVM for input import and output export operations"; }
 
   void visitCallInst(llvm::CallInst &callInst);

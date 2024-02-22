@@ -49,18 +49,7 @@ namespace lgc {
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
 PreservedAnalyses PatchImageOpCollect::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
-  if (runImpl(module, pipelineState))
-    return PreservedAnalyses::none();
-  return PreservedAnalyses::all();
-}
 
-// =====================================================================================================================
-// Executes this LLVM patching pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @param pipelineState : Pipeline state
-// @returns : True if the module was modified by the transformation and false otherwise
-bool PatchImageOpCollect::runImpl(llvm::Module &module, PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Image-Op-Collect\n");
 
   for (Function &func : module) {
@@ -75,7 +64,7 @@ bool PatchImageOpCollect::runImpl(llvm::Module &module, PipelineState *pipelineS
       }
     }
   }
-  return false;
+  return PreservedAnalyses::all(); // we don't actually invalidate anything
 }
 
 } // namespace lgc

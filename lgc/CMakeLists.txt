@@ -128,7 +128,6 @@ target_sources(LLVMlgc PRIVATE
 target_sources(LLVMlgc PRIVATE
     elfLinker/ColorExportShader.cpp
     elfLinker/ElfLinker.cpp
-    elfLinker/FetchShader.cpp
     elfLinker/GlueShader.cpp
     elfLinker/NullFragmentShader.cpp
 )
@@ -142,6 +141,7 @@ target_sources(LLVMlgc PRIVATE
     patch/Gfx9ConfigBuilder.cpp
     patch/LowerDebugPrintf.cpp
     patch/LowerDesc.cpp
+    patch/LowerSubgroupOps.cpp
     patch/MeshTaskShader.cpp
     patch/NggPrimShader.cpp
     patch/Patch.cpp

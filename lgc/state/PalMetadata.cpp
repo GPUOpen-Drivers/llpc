@@ -801,54 +801,6 @@ void PalMetadata::setUserDataLimit() {
 }
 
 // =====================================================================================================================
-// Store the vertex fetch information in PAL metadata for a fetchless vertex shader with shader compilation.
-//
-// @param info : Array of VertexFetchInfo structs
-void PalMetadata::addVertexFetchInfo(ArrayRef<VertexFetchInfo> fetches) {
-  // Each vertex fetch is an array containing {location,component,type}.
-  // .vertexInputs is an array containing the vertex fetches.
-  m_vertexInputs = m_pipelineNode[PipelineMetadataKey::VertexInputs].getArray(true);
-  for (const VertexFetchInfo &fetch : fetches) {
-    msgpack::ArrayDocNode fetchNode = m_document->getArrayNode();
-    fetchNode.push_back(m_document->getNode(fetch.location));
-    fetchNode.push_back(m_document->getNode(fetch.component));
-    fetchNode.push_back(m_document->getNode(getTypeName(fetch.ty), /*copy=*/true));
-    m_vertexInputs.push_back(fetchNode);
-  }
-}
-
-// =====================================================================================================================
-// Get the count of vertex fetches for a fetchless vertex shader with shader compilation (or 0 otherwise).
-unsigned PalMetadata::getVertexFetchCount() {
-  if (m_vertexInputs.isEmpty())
-    return 0;
-  return m_vertexInputs.size();
-}
-
-// =====================================================================================================================
-// Get the vertex fetch information out of PAL metadata. Used by the linker to generate the fetch shader.
-// Also removes the vertex fetch information, so it does not appear in the final linked ELF.
-//
-// @param [out] fetches : Vector to store info of each fetch
-void PalMetadata::getVertexFetchInfo(SmallVectorImpl<VertexFetchInfo> &fetches) {
-  if (m_vertexInputs.isEmpty()) {
-    auto it = m_pipelineNode.find(m_document->getNode(PipelineMetadataKey::VertexInputs));
-    if (it == m_pipelineNode.end() || !it->second.isArray())
-      return;
-    m_vertexInputs = it->second.getArray();
-  }
-  for (unsigned i = 0, e = m_vertexInputs.size(); i != e; ++i) {
-    msgpack::ArrayDocNode fetchNode = m_vertexInputs[i].getArray();
-    unsigned location = fetchNode[0].getUInt();
-    unsigned component = fetchNode[1].getUInt();
-    StringRef tyName = fetchNode[2].getString();
-    Type *ty = getLlvmType(tyName);
-    fetches.push_back({location, component, ty});
-  }
-  m_pipelineNode.erase(m_document->getNode(PipelineMetadataKey::VertexInputs));
-}
-
-// =====================================================================================================================
 // Store the color export information in PAL metadata for an exportless fragment shader with shader compilation.
 //
 // @param info : Array of ColorExportInfo structs
@@ -1439,8 +1391,7 @@ unsigned PalMetadata::getVgprCount(unsigned callingConv) {
 //
 // @param callingConv : The calling convention of the shader stage
 bool PalMetadata::isWave32(unsigned callingConv) {
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10)
-    return false;
+  assert(m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10);
 
   if (m_useRegisterFieldFormat) {
     auto vgtShaderStagesEn = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]

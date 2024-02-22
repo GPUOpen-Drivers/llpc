@@ -272,15 +272,19 @@ void TcsPassthroughShader::generateTcsPassthroughShaderBody(Module &module, Pipe
         switch (builtIn) {
         case BuiltInPointSize:
           tcsBuiltInInfo.pointSizeIn = true;
+          tcsBuiltInInfo.pointSize = true;
           break;
         case BuiltInPosition:
           tcsBuiltInInfo.positionIn = true;
+          tcsBuiltInInfo.position = true;
           break;
         case BuiltInClipDistance:
           tcsBuiltInInfo.clipDistanceIn = arraySize;
+          tcsBuiltInInfo.clipDistance = arraySize;
           break;
         case BuiltInCullDistance:
           tcsBuiltInInfo.cullDistanceIn = arraySize;
+          tcsBuiltInInfo.cullDistance = arraySize;
           break;
         case BuiltInPatchVertices:
           tcsBuiltInInfo.patchVertices = true;

@@ -286,6 +286,7 @@ private:
     /// Calls to hlsl intrinsics that cannot be rematerialized
     SmallVector<CallInst *> IntrinsicCalls;
     SmallVector<CallInst *> ShaderIndexCalls;
+    SmallVector<CallInst *> ShaderRecordBufferCalls;
 
     /// Pointer to the alloca'd system data object in this function
     AllocaInst *SystemData = nullptr;
@@ -331,6 +332,7 @@ private:
   void replaceReportHitCall(FunctionData &Data, CallInst *Call);
 
   void replaceShaderIndexCall(FunctionData &Data, CallInst *Call);
+  void replaceShaderRecordBufferCall(FunctionData &Data, CallInst *Call);
 
   void handleGetFuncAddr(Function &Func);
   void handleGetShaderKind(Function &Func);
@@ -433,6 +435,8 @@ private:
   Function *CallShader;
   Function *ReportHit;
   Function *AcceptHit;
+  Function *GetSbtAddress;
+  Function *GetSbtStride;
 
   Function *RegisterBufferSetPointerBarrier;
 };
@@ -966,6 +970,43 @@ void LowerRaytracingPipelinePassImpl::replaceShaderIndexCall(FunctionData &Data,
     }
     Call->replaceAllUsesWith(ShaderIndex);
   }
+  Call->eraseFromParent();
+}
+
+/// Replace a call to lgc.rt.shader.record.buffer with loading the resource.
+void LowerRaytracingPipelinePassImpl::replaceShaderRecordBufferCall(
+    FunctionData &Data, CallInst *Call) {
+  auto shaderRecordBufferOp = cast<ShaderRecordBufferOp>(Call);
+  auto tableIndex = shaderRecordBufferOp->getShaderIndex();
+
+  assert(GetSbtAddress && "Could not find GetSbtAddress function");
+  assert(GetSbtStride && "Could not find GetSbtStride function");
+
+  Value *tableAddr =
+      CrossInliner.inlineCall(Builder, GetSbtAddress).returnValue;
+  Value *tableStride =
+      CrossInliner.inlineCall(Builder, GetSbtStride).returnValue;
+
+  // SBT starts with shader group handle (aka shader identifier), which is 32
+  // bytes, then the data for shader record buffer.
+  constexpr unsigned ShaderIdEntrySizeInBytes = 32;
+  Value *shaderIdsSizeVal = Builder.getInt32(ShaderIdEntrySizeInBytes);
+
+  // Byte offset = (tableStride * tableIndex) + shaderIdsSize
+  Value *offset = Builder.CreateMul(tableIndex, tableStride);
+  offset = Builder.CreateAdd(offset, shaderIdsSizeVal);
+
+  // Zero-extend offset value to 64 bit
+  offset = Builder.CreateZExt(offset, Builder.getInt64Ty());
+
+  // Final addr
+  tableAddr = Builder.CreateAdd(tableAddr, offset);
+
+  Type *gpuAddrAsPtrTy =
+      PointerType::get(Builder.getContext(), 1 /* ADDR_SPACE_GLOBAL */);
+  tableAddr = Builder.CreateIntToPtr(tableAddr, gpuAddrAsPtrTy);
+
+  Call->replaceAllUsesWith(tableAddr);
   Call->eraseFromParent();
 }
 
@@ -1840,6 +1881,12 @@ void LowerRaytracingPipelinePassImpl::processFunction(Function *F,
   for (auto *Call : Data.ShaderIndexCalls)
     replaceShaderIndexCall(Data, Call);
 
+  // Replace ShaderRecordBufferOp calls
+  for (auto *Call : Data.ShaderRecordBufferCalls) {
+    Builder.SetInsertPoint(&*++Call->getIterator());
+    replaceShaderRecordBufferCall(Data, Call);
+  }
+
   // Replace non-rematerializable intrinsic calls
   for (auto *Call : Data.IntrinsicCalls)
     replaceIntrinsicCall(Builder, Data.SystemDataTy, Data.SystemData, Data.Kind,
@@ -1977,7 +2024,7 @@ void LowerRaytracingPipelinePassImpl::handleUnrematerializableCandidates() {
 
     static const llvm_dialects::OpSet NonRematerializableDialectOps =
         llvm_dialects::OpSet::get<TraceRayOp, ReportHitOp, CallCallableShaderOp,
-                                  ShaderIndexOp>();
+                                  ShaderIndexOp, ShaderRecordBufferOp>();
     if (!NonRematerializableDialectOps.contains(Func)) {
       llvm::forEachCall(Func, [&](llvm::CallInst &CInst) {
         auto Data = ToProcess.find(CInst.getFunction());
@@ -2071,6 +2118,15 @@ void LowerRaytracingPipelinePassImpl::collectGpuRtFunctions() {
            AcceptHit->arg_size() == 1
            // Traversal data
            && AcceptHit->getFunctionType()->getParamType(0)->isPointerTy());
+
+  GetSbtAddress = GpurtLibrary->getFunction("_cont_GetSbtAddress");
+  if (GetSbtAddress)
+    assert(GetSbtAddress->getReturnType()->isIntegerTy(64) &&
+           GetSbtAddress->arg_empty());
+  GetSbtStride = GpurtLibrary->getFunction("_cont_GetSbtStride");
+  if (GetSbtStride)
+    assert(GetSbtStride->getReturnType()->isIntegerTy(32) &&
+           GetSbtStride->arg_empty());
 }
 
 LowerRaytracingPipelinePassImpl::LowerRaytracingPipelinePassImpl(
@@ -2095,8 +2151,9 @@ bool LowerRaytracingPipelinePassImpl::run() {
   static const auto Visitor =
       llvm_dialects::VisitorBuilder<VisitorState>()
           .setStrategy(llvm_dialects::VisitorStrategy::ByInstruction)
-          .addSet<TraceRayOp, CallCallableShaderOp, ReportHitOp,
-                  ShaderIndexOp>([](VisitorState &State, Instruction &Op) {
+          .addSet<TraceRayOp, CallCallableShaderOp, ReportHitOp, ShaderIndexOp,
+                  ShaderRecordBufferOp>([](VisitorState &State,
+                                           Instruction &Op) {
             auto *CInst = cast<CallInst>(&Op);
             auto Data = State.Processables.find(CInst->getFunction());
             if (Data == State.Processables.end())
@@ -2104,6 +2161,11 @@ bool LowerRaytracingPipelinePassImpl::run() {
 
             if (isa<ShaderIndexOp>(Op)) {
               Data->second.ShaderIndexCalls.push_back(CInst);
+              return;
+            }
+
+            if (isa<ShaderRecordBufferOp>(Op)) {
+              Data->second.ShaderRecordBufferCalls.push_back(CInst);
               return;
             }
 

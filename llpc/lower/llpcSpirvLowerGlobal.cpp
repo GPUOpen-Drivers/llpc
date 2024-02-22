@@ -203,15 +203,6 @@ SpirvLowerGlobal::SpirvLowerGlobal()
 // @param [in/out] module : LLVM module to be run on (empty on entry)
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses SpirvLowerGlobal::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  runImpl(module);
-  return PreservedAnalyses::none();
-}
-
-// =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-bool SpirvLowerGlobal::runImpl(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Global\n");
 
   SpirvLower::init(&module);
@@ -271,7 +262,7 @@ bool SpirvLowerGlobal::runImpl(Module &module) {
   lowerAliasedVal();
   lowerShaderRecordBuffer();
 
-  return true;
+  return PreservedAnalyses::none();
 }
 
 // =====================================================================================================================
@@ -598,9 +589,7 @@ void SpirvLowerGlobal::mapGlobalVariableToProxy(GlobalVariable *globalVar) {
   const auto &dataLayout = m_module->getDataLayout();
   Type *globalVarTy = globalVar->getValueType();
 
-  assert(m_entryPoint);
   Value *proxy = nullptr;
-  assert(m_entryPoint);
   removeConstantExpr(m_context, globalVar);
   // Handle special globals, regular allocas will be removed by SROA pass.
   if (globalVar->getName().starts_with(RtName::HitAttribute)) {

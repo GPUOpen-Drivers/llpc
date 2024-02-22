@@ -53,14 +53,6 @@ namespace lgc {
 class PipelineState;
 
 // =====================================================================================================================
-// Struct with the information for one vertex fetch
-struct VertexFetchInfo {
-  unsigned location;
-  unsigned component;
-  llvm::Type *ty;
-};
-
-// =====================================================================================================================
 // Struct with information on wave dispatch SGPRs and VGPRs for VS, written by getVsEntryRegInfo
 struct VsEntryRegInfo {
   unsigned callingConv;       // Which hardware shader the VS is in (as CallingConv::ID)
@@ -132,15 +124,6 @@ public:
 
   // Set a register value in PAL metadata. If the register has a value set already, it gets overwritten.
   void setRegister(unsigned regNum, unsigned value);
-
-  // Store the vertex fetch in PAL metadata for a fetchless vertex shader with shader compilation.
-  void addVertexFetchInfo(llvm::ArrayRef<VertexFetchInfo> fetches);
-
-  // Get the count of vertex fetches for a fetchless vertex shader with shader compilation (or 0 otherwise).
-  unsigned getVertexFetchCount();
-
-  // Get the vertex fetch information out of PAL metadata
-  void getVertexFetchInfo(llvm::SmallVectorImpl<VertexFetchInfo> &fetches);
 
   // Get the VS entry register info. Used by the linker to generate the fetch shader.
   void getVsEntryRegInfo(VsEntryRegInfo &regInfo);
@@ -266,12 +249,11 @@ private:
   unsigned getVgprCount(unsigned callingConv);
   bool isWave32(unsigned callingConv);
 
-  PipelineState *m_pipelineState;             // PipelineState
-  llvm::msgpack::Document *m_document;        // The MsgPack document
-  llvm::msgpack::MapDocNode m_pipelineNode;   // MsgPack map node for amdpal.pipelines[0]
-  llvm::msgpack::MapDocNode m_registers;      // MsgPack map node for amdpal.pipelines[0].registers
-  llvm::msgpack::ArrayDocNode m_vertexInputs; // MsgPack map node for amdpal.pipelines[0].vertexInputs
-  llvm::msgpack::DocNode m_colorExports;      // MsgPack map node for amdpal.pipelines[0].colorExports
+  PipelineState *m_pipelineState;           // PipelineState
+  llvm::msgpack::Document *m_document;      // The MsgPack document
+  llvm::msgpack::MapDocNode m_pipelineNode; // MsgPack map node for amdpal.pipelines[0]
+  llvm::msgpack::MapDocNode m_registers;    // MsgPack map node for amdpal.pipelines[0].registers
+  llvm::msgpack::DocNode m_colorExports;    // MsgPack map node for amdpal.pipelines[0].colorExports
   // Mapping from ShaderStageEnum to SPI user data register start, allowing for merged shaders and NGG.
   unsigned m_userDataRegMapping[ShaderStage::CountInternal] = {};
   llvm::msgpack::DocNode *m_userDataLimit;    // Maximum so far number of user data dwords used

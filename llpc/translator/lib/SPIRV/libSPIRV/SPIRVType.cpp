@@ -48,9 +48,15 @@
 namespace SPIRV {
 
 SPIRVType *SPIRVType::getArrayElementType() const {
-  assert((OpCode == OpTypeArray || OpCode == OpTypeRuntimeArray) && "Not array type");
-  return (OpCode == OpTypeArray) ? static_cast<const SPIRVTypeArray *const>(this)->getElementType()
-                                 : static_cast<const SPIRVTypeRuntimeArray *const>(this)->getElementType();
+  switch (OpCode) {
+  case OpTypeArray:
+    return static_cast<const SPIRVTypeArray *const>(this)->getElementType();
+  case OpTypeRuntimeArray:
+    return static_cast<const SPIRVTypeRuntimeArray *const>(this)->getElementType();
+  default:
+    assert(!"Not array type");
+  };
+  return nullptr;
 }
 
 uint64_t SPIRVType::getArrayLength() const {

@@ -1859,7 +1859,6 @@ unsigned PipelineState::getVerticesPerPrimitive() {
       return 0;
     }
   } else if (hasShaderStage(ShaderStage::TessControl) || hasShaderStage(ShaderStage::TessEval)) {
-    assert(getInputAssemblyState().primitiveType == PrimitiveType::Patch);
     const auto &tessMode = getShaderModes()->getTessellationMode();
     if (tessMode.pointMode)
       return 1;
@@ -1989,19 +1988,8 @@ PipelineStateWrapper::Result PipelineStateWrapper::run(Module &module, ModuleAna
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
 PreservedAnalyses PipelineStateClearer::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
-  runImpl(module, pipelineState);
-  return PreservedAnalyses::none();
-}
-
-// =====================================================================================================================
-// Run PipelineStateClearer pass to clear the pipeline state out of the IR
-//
-// @param [in/out] module : IR module
-// @param : PipelineState object to clear
-// @returns : True if the module was modified by the transformation and false otherwise
-bool PipelineStateClearer::runImpl(Module &module, PipelineState *pipelineState) {
   pipelineState->clear(&module);
-  return true;
+  return PreservedAnalyses::none();
 }
 
 // =====================================================================================================================

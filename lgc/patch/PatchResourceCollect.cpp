@@ -72,19 +72,7 @@ PatchResourceCollect::PatchResourceCollect() : m_resUsage(nullptr) {
 PreservedAnalyses PatchResourceCollect::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineShadersResult &pipelineShaders = analysisManager.getResult<PipelineShaders>(module);
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
-  runImpl(module, pipelineShaders, pipelineState);
-  return PreservedAnalyses::none();
-}
 
-// =====================================================================================================================
-// Executes this LLVM patching pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @param pipelineShaders : Pipeline shaders analysis result
-// @param pipelineState : Pipeline state
-// @returns : True if the module was modified by the transformation and false otherwise
-bool PatchResourceCollect::runImpl(Module &module, PipelineShadersResult &pipelineShaders,
-                                   PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Resource-Collect\n");
 
   Patch::init(&module);
@@ -153,7 +141,7 @@ bool PatchResourceCollect::runImpl(Module &module, PipelineShadersResult &pipeli
     }
   }
 
-  return true;
+  return PreservedAnalyses::none();
 }
 
 // =====================================================================================================================
@@ -162,11 +150,7 @@ bool PatchResourceCollect::runImpl(Module &module, PipelineShadersResult &pipeli
 // @param [in/out] module : Module
 void PatchResourceCollect::setNggControl(Module *module) {
   assert(m_pipelineState->isGraphics());
-
-  // For GFX10+, initialize NGG control settings
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10)
-    return;
-
+  assert(m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10);
   // If mesh pipeline, skip NGG control settings
   const bool meshPipeline =
       m_pipelineState->hasShaderStage(ShaderStage::Task) || m_pipelineState->hasShaderStage(ShaderStage::Mesh);
@@ -425,8 +409,7 @@ bool PatchResourceCollect::canUseNggCulling(Module *module) {
     }
     return false;
   };
-  bool hasVertexFetch = m_pipelineState->getPalMetadata()->getVertexFetchCount() != 0;
-  if (!hasGs && !hasVertexFetch && !hasPositionFetch())
+  if (!hasGs && !hasPositionFetch())
     return false;
 
   // We can safely enable NGG culling here
@@ -1136,19 +1119,26 @@ bool PatchResourceCollect::isVertexReuseDisabled() {
 //
 // @param module : LLVM module
 void PatchResourceCollect::checkRayQueryLdsStackUsage(Module *module) {
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major < 10)
-    return; // Must be GFX10+
-
+  assert(m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 10);
   auto ldsStack = module->getNamedGlobal(RayQueryLdsStackName);
   if (ldsStack) {
-    for (auto user : ldsStack->users()) {
-      auto inst = cast<Instruction>(user);
-      assert(inst);
+    SmallVector<Constant *> worklist;
+    worklist.push_back(ldsStack);
+    do {
+      Constant *current = worklist.pop_back_val();
+      for (auto user : current->users()) {
+        if (auto *constUser = dyn_cast<Constant>(user)) {
+          worklist.push_back(constUser);
+          continue;
+        }
 
-      auto shaderStage = lgc::getShaderStage(inst->getFunction());
-      if (shaderStage)
-        m_pipelineState->getShaderResourceUsage(shaderStage.value())->useRayQueryLdsStack = true;
-    }
+        auto inst = cast<Instruction>(user);
+
+        auto shaderStage = lgc::getShaderStage(inst->getFunction());
+        if (shaderStage)
+          m_pipelineState->getShaderResourceUsage(shaderStage.value())->useRayQueryLdsStack = true;
+      }
+    } while (!worklist.empty());
   }
 }
 

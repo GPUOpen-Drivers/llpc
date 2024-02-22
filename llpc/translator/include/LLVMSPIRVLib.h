@@ -95,7 +95,8 @@ bool writeSpirv(llvm::Module *M, llvm::raw_ostream &OS, std::string &ErrMsg);
 bool readSpirv(lgc::Builder *Builder, const Vkgc::ShaderModuleUsage *ModuleData,
                const Vkgc::PipelineShaderOptions *ShaderOptions, std::istream &IS, spv::ExecutionModel EntryExecModel,
                const char *EntryName, const SPIRV::SPIRVSpecConstMap &SpecConstMap,
-               llvm::ArrayRef<SPIRV::ConvertingSampler> ConvertingSamplers, llvm::Module *M, std::string &ErrMsg);
+               llvm::ArrayRef<SPIRV::ConvertingSampler> ConvertingSamplers, llvm::StringRef globalVarPrefix,
+               llvm::Module *M, std::string &ErrMsg);
 
 /// \brief Regularize LLVM module by removing entities not representable by
 /// SPIRV.

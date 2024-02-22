@@ -47,3 +47,9 @@ SPV_KHR_cooperative_matrix
 #endif
 SPV_NV_shader_atomic_float
 SPV_NV_compute_shader_derivatives
+SPV_KHR_maximal_reconvergence
+SPV_KHR_expect_assume
+#if VKI_KHR_SHADER_QUAD_CONTROL
+SPV_KHR_shader_quad_control
+#endif
+SPV_KHR_subgroup_rotate

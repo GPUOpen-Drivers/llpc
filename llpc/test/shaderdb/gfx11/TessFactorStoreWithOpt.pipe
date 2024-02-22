@@ -130,7 +130,7 @@
 ; SHADERTEST-NEXT: br label %.endTryStoreTf
 
 ; SHADERTEST-LABEL: .storeTf:
-; SHADERTEST: %tfBufferDescPtr = getelementptr <4 x i32>, ptr addrspace(4) %globalTablePtr, i64 9
+; SHADERTEST: %tfBufferDescPtr = getelementptr {{i8|<4 x i32>}}, ptr addrspace(4) %globalTablePtr, i64 {{144|9}}
 ; SHADERTEST-NEXT: %tfBufferDesc = load <4 x i32>, ptr addrspace(4) %tfBufferDescPtr, align 16
 ; SHADERTEST-NEXT: %[[OUTER_TF_OFFSET:[^ ,]*]] = mul i32 %threadIdInGroup, 24
 ; SHADERTEST-NEXT: call void @llvm.amdgcn.raw.tbuffer.store.v4f32(<4 x float> %outerTf, <4 x i32> %tfBufferDesc, i32 %[[OUTER_TF_OFFSET]], i32 %tfBufferBase, i32 63, i32 1)

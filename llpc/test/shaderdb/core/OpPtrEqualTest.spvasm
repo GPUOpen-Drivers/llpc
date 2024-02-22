@@ -89,11 +89,11 @@
 ; SHADERTEST-NEXT:  .entry:
 ; SHADERTEST-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 2, i32 0, i32 2)
 ; SHADERTEST-NEXT:    store i32 1, ptr addrspace(7) [[TMP0]], align 4
-; SHADERTEST-NEXT:    [[TMP1:%.*]] = getelementptr <{ [4294967295 x i32] }>, ptr addrspace(7) [[TMP0]], i32 0, i32 0, i32 1
+; SHADERTEST-NEXT:    [[TMP1:%.*]] = getelementptr {{i8|<{ [[]4294967295 x i32] }>}}, ptr addrspace(7) [[TMP0]], i32 {{4|0, i32 0, i32 1}}
 ; SHADERTEST-NEXT:    store i32 1, ptr addrspace(7) [[TMP1]], align 4
-; SHADERTEST-NEXT:    [[TMP2:%.*]] = getelementptr <{ [4294967295 x i32] }>, ptr addrspace(7) [[TMP0]], i32 0, i32 0, i32 2
+; SHADERTEST-NEXT:    [[TMP2:%.*]] = getelementptr {{i8|<{ [[]4294967295 x i32] }>}}, ptr addrspace(7) [[TMP0]], i32 {{8|0, i32 0, i32 2}}
 ; SHADERTEST-NEXT:    store i32 1, ptr addrspace(7) [[TMP2]], align 4
-; SHADERTEST-NEXT:    [[TMP3:%.*]] = getelementptr <{ [4294967295 x i32] }>, ptr addrspace(7) [[TMP0]], i32 0, i32 0, i32 3
+; SHADERTEST-NEXT:    [[TMP3:%.*]] = getelementptr {{i8|<{ [[]4294967295 x i32] }>}}, ptr addrspace(7) [[TMP0]], i32 {{12|0, i32 0, i32 3}}
 ; SHADERTEST-NEXT:    store i32 0, ptr addrspace(7) [[TMP3]], align 4
 ; SHADERTEST-NEXT:    ret void
 ;

@@ -56,6 +56,7 @@ ComputeContext::ComputeContext(GfxIpVersion gfxIp, const ComputePipelineBuildInf
   setUnlinked(pipelineInfo->unlinked);
   m_resourceMapping = pipelineInfo->resourceMapping;
   m_pipelineLayoutApiHash = pipelineInfo->pipelineLayoutApiHash;
+  m_pipelineApiHash = pipelineInfo->pipelineApiHash;
 }
 
 // =====================================================================================================================

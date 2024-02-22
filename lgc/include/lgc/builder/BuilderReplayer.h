@@ -45,8 +45,6 @@ class BuilderReplayer final : public llvm::PassInfoMixin<BuilderReplayer> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  bool runImpl(llvm::Module &module, PipelineState *pipelineState);
-
   static llvm::StringRef name() { return "Replay LLPC builder calls"; }
 
 private:

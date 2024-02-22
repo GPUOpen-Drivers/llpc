@@ -79,6 +79,8 @@ public:
               llvm::ArrayRef<ConvertingSampler> convertingSamplers, lgc::Builder *builder,
               const Vkgc::ShaderModuleUsage *moduleUsage, const Vkgc::PipelineShaderOptions *shaderOptions);
 
+  void setGlobalVarPrefix(llvm::StringRef globalVarPrefix) { m_globalVarPrefix = globalVarPrefix; }
+
   DebugLoc getDebugLoc(SPIRVInstruction *bi, Function *f);
 
   void updateDebugLoc(SPIRVValue *bv, Function *f);
@@ -249,8 +251,10 @@ private:
   LLVMContext *m_context;
   lgc::Builder *m_builder;
   SPIRVModule *m_bm;
+  std::string m_globalVarPrefix;
   bool m_enableGatherLodNz;
   ShaderFloatControlFlags m_fpControlFlags;
+  ShaderFloatFastMathDefault m_fpFastMathDefault;
   SPIRVFunction *m_entryTarget;
   const SPIRVSpecConstMap &m_specConstMap;
   llvm::ArrayRef<ConvertingSampler> m_convertingSamplers;
@@ -281,6 +285,10 @@ private:
   unsigned m_spirvOpMetaKindId;
   unsigned m_execModule;
   bool m_scratchBoundsChecksEnabled;
+
+  bool m_requireFullQuads;
+
+  bool m_maximallyReconverges = false;
 
   enum class LlvmMemOpType : uint8_t { IS_LOAD, IS_STORE };
   struct ScratchBoundsCheckData {

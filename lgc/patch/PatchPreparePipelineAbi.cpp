@@ -71,20 +71,6 @@ PreservedAnalyses PatchPreparePipelineAbi::run(Module &module, ModuleAnalysisMan
   analysisHandlers.getPostDomTree = getPostDomTree;
   analysisHandlers.getCycleInfo = getCycleInfo;
 
-  runImpl(module, pipelineShaders, pipelineState, analysisHandlers);
-  return PreservedAnalyses::none();
-}
-
-// =====================================================================================================================
-// Run the pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @param [in/out] pipelineShaders : Pipeline shaders result object to use for this pass
-// @param [in/out] pipelineState : Pipeline state object to use for this pass
-// @param analysisHandlers : A collection of handler functions to get the analysis info of the given function
-// @returns : True if the module was modified by the transformation and false otherwise
-bool PatchPreparePipelineAbi::runImpl(Module &module, PipelineShadersResult &pipelineShaders,
-                                      PipelineState *pipelineState, FunctionAnalysisHandlers &analysisHandlers) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Prepare-Pipeline-Abi\n");
 
   Patch::init(&module);
@@ -114,7 +100,7 @@ bool PatchPreparePipelineAbi::runImpl(Module &module, PipelineShadersResult &pip
 
   m_pipelineState->getPalMetadata()->finalizePipeline(m_pipelineState->isWholePipeline());
 
-  return true; // Modified the module.
+  return PreservedAnalyses::none();
 }
 
 // =====================================================================================================================
@@ -422,35 +408,11 @@ void PatchPreparePipelineAbi::mergeShader(Module &module) {
 //
 // @param module : LLVM module
 void PatchPreparePipelineAbi::setAbiEntryNames(Module &module) {
-  bool hasTs = m_hasTcs || m_hasTes;
-  bool isFetchless = m_pipelineState->getPalMetadata()->getVertexFetchCount() != 0;
 
   for (auto &func : module) {
     if (!func.empty()) {
       auto callingConv = func.getCallingConv();
-      bool isFetchlessVs = false;
-      if (isFetchless) {
-        switch (callingConv) {
-        case CallingConv::AMDGPU_VS:
-          isFetchlessVs = !m_hasGs && !hasTs;
-          break;
-        case CallingConv::AMDGPU_GS:
-          isFetchlessVs = m_gfxIp.major >= 9 && !hasTs;
-          break;
-        case CallingConv::AMDGPU_ES:
-          isFetchlessVs = !hasTs;
-          break;
-        case CallingConv::AMDGPU_HS:
-          isFetchlessVs = m_gfxIp.major >= 9;
-          break;
-        case CallingConv::AMDGPU_LS:
-          isFetchlessVs = true;
-          break;
-        default:
-          break;
-        }
-      }
-      StringRef entryName = getEntryPointName(callingConv, isFetchlessVs);
+      StringRef entryName = getEntryPointName(callingConv, false);
       if (entryName != "")
         func.setName(entryName);
     }

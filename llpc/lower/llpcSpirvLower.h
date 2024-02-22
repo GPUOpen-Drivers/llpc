@@ -52,6 +52,16 @@ namespace Llpc {
 
 class Context;
 
+union LowerFlag {
+  struct {
+    unsigned isRayTracing : 1;       // Whether we are lowering a ray tracing pipeline shader
+    unsigned isRayQuery : 1;         // Whether we are lowering a ray query library
+    unsigned isInternalRtShader : 1; // Whether we are lowering an internal ray tracing shader
+    unsigned reserved : 29;
+  };
+  unsigned u32All;
+};
+
 // =====================================================================================================================
 // Represents the pass of SPIR-V lowering operations, as the base class.
 class SpirvLower {
@@ -60,7 +70,7 @@ public:
 
   // Add per-shader lowering passes to pass manager
   static void addPasses(Context *context, ShaderStage stage, lgc::PassManager &passMgr, llvm::Timer *lowerTimer,
-                        bool rayTracing, bool rayQuery, bool isInternalRtShader);
+                        LowerFlag lowerFlag);
   // Register all the translation passes into the given pass manager
   static void registerTranslationPasses(lgc::PassManager &passMgr);
   // Register all the lowering passes into the given pass manager

@@ -90,17 +90,6 @@ struct GpuProperty {
 struct WorkaroundFlags {
   union {
     struct {
-      unsigned fixCacheLineStraddling : 1;
-      unsigned fixLsVgprInput : 1;
-      unsigned shaderImageGatherInstFix : 1;
-      unsigned treat1dImagesAs2d : 1;
-      unsigned reserved : 28;
-    };
-    unsigned u32All;
-  } gfx9;
-
-  union {
-    struct {
       unsigned waTessFactorBufferSizeLimitGeUtcl1Underflow : 1;
       unsigned waTessIncorrectRelativeIndex : 1;
       unsigned waShaderInstPrefetch123 : 1;

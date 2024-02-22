@@ -172,16 +172,14 @@ void SpirvLower::removeConstantExpr(Context *context, GlobalVariable *global) {
 // @param stage : Shader stage
 // @param [in/out] passMgr : Pass manager to add passes to
 // @param lowerTimer : Timer to time lower passes with, nullptr if not timing
-// @param rayTracing : Whether we are lowering a ray tracing pipeline shader
-// @param rayQuery : Whether we are lowering a ray query library
-// @param isInternalRtShader : Whether we are lowering an internal ray tracing shader
+// @param lowerFlag : Add the required pass based on the flag
 void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager &passMgr, Timer *lowerTimer,
-                           bool rayTracing, bool rayQuery, bool isInternalRtShader) {
+                           LowerFlag lowerFlag) {
   // Start timer for lowering passes.
   if (lowerTimer)
     LgcContext::createAndAddStartStopTimer(passMgr, lowerTimer, true);
 
-  if (isInternalRtShader)
+  if (lowerFlag.isInternalRtShader)
     passMgr.addPass(SpirvProcessGpuRtLibrary());
 
   // Lower SPIR-V CFG merges before inlining
@@ -195,7 +193,7 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   // Lower SPIR-V access chain
   passMgr.addPass(SpirvLowerAccessChain());
 
-  if (rayQuery)
+  if (lowerFlag.isRayQuery)
     passMgr.addPass(SpirvLowerRayQueryPostInline());
 
   // Lower SPIR-V terminators
@@ -257,7 +255,7 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
   // Lower SPIR-V ray tracing related stuff, including entry point generation, lgc.rt dialect handling, some of
   // lgc.gpurt dialect handling.
   // And do inlining after SpirvLowerRayTracing as it will produce some extra functions.
-  if (rayTracing) {
+  if (lowerFlag.isRayTracing) {
     assert(context->getPipelineType() == PipelineType::RayTracing);
     auto *pipelineInfo = static_cast<const RayTracingPipelineBuildInfo *>(context->getPipelineBuildInfo());
     if (pipelineInfo->mode != Vkgc::LlpcRaytracingMode::Continuations) {
@@ -266,7 +264,7 @@ void SpirvLower::addPasses(Context *context, ShaderStage stage, lgc::PassManager
     }
   }
 
-  if (rayTracing || rayQuery || isInternalRtShader) {
+  if (lowerFlag.isRayTracing || lowerFlag.isRayQuery || lowerFlag.isInternalRtShader) {
     FunctionPassManager fpm;
     fpm.addPass(SROAPass(SROAOptions::PreserveCFG));
     fpm.addPass(InstCombinePass(instCombineOpt));

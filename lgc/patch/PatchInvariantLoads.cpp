@@ -44,21 +44,6 @@ using namespace lgc;
 
 namespace lgc {
 
-// =====================================================================================================================
-// Executes this LLVM pass on the specified LLVM function.
-//
-// @param [in/out] function : Function that we will patch.
-// @param [in/out] analysisManager : Analysis manager to use for this transformation
-// @returns : The preserved analyses (The analyses that are still valid after this pass)
-PreservedAnalyses PatchInvariantLoads::run(Function &function, FunctionAnalysisManager &analysisManager) {
-  const auto &moduleAnalysisManager = analysisManager.getResult<ModuleAnalysisManagerFunctionProxy>(function);
-  PipelineState *pipelineState =
-      moduleAnalysisManager.getCachedResult<PipelineStateWrapper>(*function.getParent())->getPipelineState();
-  if (runImpl(function, pipelineState))
-    return PreservedAnalyses::none();
-  return PreservedAnalyses::all();
-}
-
 static const unsigned UNKNOWN_ADDRESS_SPACE = ADDR_SPACE_MAX + 1;
 
 enum AddrSpaceBit {
@@ -96,14 +81,18 @@ static unsigned findAddressSpaceAccess(const Instruction *inst) {
 // Executes this LLVM pass on the specified LLVM function.
 //
 // @param [in/out] function : Function that we will patch.
-// @param [in/out] pipelineState : Pipeline state object to use for this pass
-// @returns : True if the function was modified by the transformation and false otherwise
-bool PatchInvariantLoads::runImpl(Function &function, PipelineState *pipelineState) {
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The analyses that are still valid after this pass)
+PreservedAnalyses PatchInvariantLoads::run(Function &function, FunctionAnalysisManager &analysisManager) {
+  const auto &moduleAnalysisManager = analysisManager.getResult<ModuleAnalysisManagerFunctionProxy>(function);
+  PipelineState *pipelineState =
+      moduleAnalysisManager.getCachedResult<PipelineStateWrapper>(*function.getParent())->getPipelineState();
+
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Invariant-Loads\n");
 
   auto shaderStage = lgc::getShaderStage(&function);
   if (!shaderStage)
-    return false;
+    return PreservedAnalyses::all();
 
   auto &options = pipelineState->getShaderOptions(shaderStage.value());
   bool clearInvariants = options.aggressiveInvariantLoads == ClearInvariants;
@@ -124,7 +113,7 @@ bool PatchInvariantLoads::runImpl(Function &function, PipelineState *pipelineSta
   }
 
   if (!(clearInvariants || aggressiveInvariants))
-    return false;
+    return PreservedAnalyses::all();
 
   LLVM_DEBUG(dbgs() << (clearInvariants ? "Removing invariant load flags"
                                         : "Attempting aggressive invariant load optimization")
@@ -185,7 +174,7 @@ bool PatchInvariantLoads::runImpl(Function &function, PipelineState *pipelineSta
         unsigned addrSpace = findAddressSpaceAccess(&inst);
         if (addrSpace == UNKNOWN_ADDRESS_SPACE) {
           LLVM_DEBUG(dbgs() << "Write to unknown memory found, aborting aggressive invariant load optimization\n");
-          return false;
+          return PreservedAnalyses::all();
         }
         writtenAddrSpaces |= aliasMatrix[addrSpace];
       } else if (inst.mayReadFromMemory()) {
@@ -196,11 +185,11 @@ bool PatchInvariantLoads::runImpl(Function &function, PipelineState *pipelineSta
 
   if (loads.empty()) {
     LLVM_DEBUG(dbgs() << "Shader has no memory loads\n");
-    return false;
+    return PreservedAnalyses::all();
   }
 
+  bool changed = false;
   if (clearInvariants) {
-    bool changed = false;
     for (Instruction *inst : loads) {
       if (!inst->hasMetadata(LLVMContext::MD_invariant_load))
         continue;
@@ -209,23 +198,21 @@ bool PatchInvariantLoads::runImpl(Function &function, PipelineState *pipelineSta
       inst->setMetadata(LLVMContext::MD_invariant_load, nullptr);
       changed = true;
     }
-    return changed;
+  } else {
+    auto &context = function.getContext();
+    for (Instruction *inst : loads) {
+      if (inst->hasMetadata(LLVMContext::MD_invariant_load))
+        continue;
+      if (writtenAddrSpaces && (writtenAddrSpaces & (1 << findAddressSpaceAccess(inst))))
+        continue;
+
+      LLVM_DEBUG(dbgs() << "Marking load invariant: " << *inst << "\n");
+      inst->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(context, {}));
+      changed = true;
+    }
   }
 
-  auto &context = function.getContext();
-  bool changed = false;
-  for (Instruction *inst : loads) {
-    if (inst->hasMetadata(LLVMContext::MD_invariant_load))
-      continue;
-    if (writtenAddrSpaces && (writtenAddrSpaces & (1 << findAddressSpaceAccess(inst))))
-      continue;
-
-    LLVM_DEBUG(dbgs() << "Marking load invariant: " << *inst << "\n");
-    inst->setMetadata(LLVMContext::MD_invariant_load, MDNode::get(context, {}));
-    changed = true;
-  }
-
-  return changed;
+  return changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }
 
 } // namespace lgc

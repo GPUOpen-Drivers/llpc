@@ -86,6 +86,7 @@ private:
   void createGetParentId(llvm::Function *func);
   void createSetParentId(llvm::Function *func);
   void createDispatchRayIndex(llvm::Function *func);
+  void createDispatchThreadIdFlat(llvm::Function *func);
   void createGetStaticId(llvm::Function *func);
   void createGetKnownSetRayFlags(llvm::Function *func);
   void createGetKnownUnsetRayFlags(llvm::Function *func);
@@ -96,6 +97,7 @@ private:
   void createContStackLoad(llvm::Function *func);
   void createContStackStore(llvm::Function *func);
   void createFloatOpWithRoundMode(llvm::Function *func);
+  void createEnqueue(llvm::Function *func);
   llvm::Value *createGetBvhSrd(llvm::Value *expansion, llvm::Value *boxSortMode);
 };
 } // namespace Llpc

@@ -358,6 +358,7 @@ public:
   // Incomplete constructor
   SPIRVTypeRuntimeArray() : SPIRVType(OpTypeRuntimeArray), ElemType(nullptr) {}
 
+  SPIRVTypeRuntimeArray(Op OC) : SPIRVType(OC), ElemType(nullptr) {}
   SPIRVType *getElementType() const { return ElemType; }
   SPIRVCapVec getRequiredCapability() const override { return getElementType()->getRequiredCapability(); }
   virtual std::vector<SPIRVEntry *> getNonLiteralOperands() const override {

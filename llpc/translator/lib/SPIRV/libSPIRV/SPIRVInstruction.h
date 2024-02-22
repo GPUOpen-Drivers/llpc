@@ -2141,6 +2141,7 @@ _SPIRV_OP(GroupNonUniformElect, true, 4)
 _SPIRV_OP(GroupNonUniformAll, true, 5)
 _SPIRV_OP(GroupNonUniformAny, true, 5)
 _SPIRV_OP(GroupNonUniformAllEqual, true, 5)
+_SPIRV_OP(GroupNonUniformRotateKHR, true, 6)
 _SPIRV_OP(GroupNonUniformBroadcast, true, 6)
 _SPIRV_OP(GroupNonUniformBroadcastFirst, true, 5)
 _SPIRV_OP(GroupNonUniformBallot, true, 5)
@@ -2179,6 +2180,16 @@ _SPIRV_OP(GroupSMinNonUniformAMD, true, 6, true, 1)
 _SPIRV_OP(GroupFMaxNonUniformAMD, true, 6, true, 1)
 _SPIRV_OP(GroupUMaxNonUniformAMD, true, 6, true, 1)
 _SPIRV_OP(GroupSMaxNonUniformAMD, true, 6, true, 1)
+#undef _SPIRV_OP
+
+class SPIRVQuadControlInstBase : public SPIRVInstTemplateBase {
+public:
+  SPIRVCapVec getRequiredCapability() const override { return getVec(CapabilityQuadControlKHR); }
+};
+#define _SPIRV_OP(x, ...) typedef SPIRVInstTemplate<SPIRVQuadControlInstBase, Op##x, __VA_ARGS__> SPIRV##x;
+// Group instructions
+_SPIRV_OP(GroupNonUniformQuadAllKHR, true, 4)
+_SPIRV_OP(GroupNonUniformQuadAnyKHR, true, 4)
 #undef _SPIRV_OP
 
 class SPIRVAtomicInstBase : public SPIRVInstTemplateBase {
@@ -2703,6 +2714,31 @@ protected:
 };
 #define _SPIRV_OP(x, ...) typedef SPIRVInstTemplate<SPIRVCooperativeMatrixKHRInstBase, Op##x, __VA_ARGS__> SPIRV##x;
 _SPIRV_OP(CooperativeMatrixMulAddKHR, true, 6, true, 3)
+#undef _SPIRV_OP
+
+class SPIRVExpectAssumeInstBase : public SPIRVInstTemplateBase {
+public:
+  SPIRVCapVec getRequiredCapability() const override { return {CapabilityExpectAssumeKHR}; }
+
+protected:
+  void validate() const override {
+    SPIRVInstruction::validate();
+    if (OpAssumeTrueKHR == OpCode) {
+      auto type = getValueType(Ops[0]);
+      assert(type->isTypeBool() && type->isTypeScalar());
+      (void(type)); // unused
+    } else {
+      assert(OpExpectKHR == OpCode);
+      auto type = getValueType(Ops[0]);
+      assert(type->isTypeVectorOrScalarInt() || type->isTypeVectorOrScalarBool());
+      (void(type)); // unused
+    }
+  }
+};
+
+#define _SPIRV_OP(x, ...) typedef SPIRVInstTemplate<SPIRVExpectAssumeInstBase, Op##x, __VA_ARGS__> SPIRV##x;
+_SPIRV_OP(AssumeTrueKHR, false, 2, false)
+_SPIRV_OP(ExpectKHR, true, 5, false)
 #undef _SPIRV_OP
 
 } // namespace SPIRV

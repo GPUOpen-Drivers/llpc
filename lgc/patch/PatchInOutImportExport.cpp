@@ -84,26 +84,11 @@ void PatchInOutImportExport::initPerShader() {
 PreservedAnalyses PatchInOutImportExport::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
   PipelineShadersResult &pipelineShaders = analysisManager.getResult<PipelineShaders>(module);
-  auto getPDT = [&](Function &f) -> PostDominatorTree & {
+  auto getPostDominatorTree = [&](Function &f) -> PostDominatorTree & {
     auto &fam = analysisManager.getResult<FunctionAnalysisManagerModuleProxy>(module).getManager();
     return fam.getResult<PostDominatorTreeAnalysis>(f);
   };
-  if (runImpl(module, pipelineShaders, pipelineState, getPDT))
-    return PreservedAnalyses::none();
-  return PreservedAnalyses::all();
-}
 
-// =====================================================================================================================
-// Executes this LLVM patching pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @param pipelineShaders : Pipeline shaders analysis result
-// @param pipelineState : Pipeline state
-// @param getPostDominatorTree : Function to get the PostDominatorTree of the given Function object
-// @returns : True if the module was modified by the transformation and false otherwise
-bool PatchInOutImportExport::runImpl(Module &module, PipelineShadersResult &pipelineShaders,
-                                     PipelineState *pipelineState,
-                                     const std::function<PostDominatorTree &(Function &)> &getPostDominatorTree) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-In-Out-Import-Export\n");
 
   Patch::init(&module);
@@ -131,12 +116,6 @@ bool PatchInOutImportExport::runImpl(Module &module, PipelineShadersResult &pipe
     m_lds = Patch::getLdsVariable(m_pipelineState, m_module);
 
   // Set buffer formats based on specific GFX
-  static const std::array<unsigned char, 4> BufferFormatsGfx9 = {
-      BUF_NUM_FORMAT_FLOAT << 4 | BUF_DATA_FORMAT_32,
-      BUF_NUM_FORMAT_FLOAT << 4 | BUF_DATA_FORMAT_32_32,
-      BUF_NUM_FORMAT_FLOAT << 4 | BUF_DATA_FORMAT_32_32_32,
-      BUF_NUM_FORMAT_FLOAT << 4 | BUF_DATA_FORMAT_32_32_32_32,
-  };
   static const std::array<unsigned char, 4> BufferFormatsGfx10 = {
       BUF_FORMAT_32_FLOAT,
       BUF_FORMAT_32_32_FLOAT_GFX10,
@@ -151,14 +130,14 @@ bool PatchInOutImportExport::runImpl(Module &module, PipelineShadersResult &pipe
   };
 
   switch (m_gfxIp.major) {
-  default:
-    m_buffFormats = &BufferFormatsGfx9;
-    break;
   case 10:
     m_buffFormats = &BufferFormatsGfx10;
     break;
   case 11:
     m_buffFormats = &BufferFormatsGfx11;
+    break;
+  default:
+    llvm_unreachable("unsupported GFX IP");
     break;
   }
 
@@ -196,7 +175,7 @@ bool PatchInOutImportExport::runImpl(Module &module, PipelineShadersResult &pipe
 
   m_pipelineSysValues.clear();
 
-  return true;
+  return PreservedAnalyses::none();
 }
 
 void PatchInOutImportExport::processFunction(
@@ -3744,7 +3723,7 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsi
   }
 
   // NOTE: SW XFB must have been handled. Here we only handle HW XFB on pre-GFX11 generations.
-  assert(m_gfxIp.major < 11);
+  assert(m_gfxIp.major == 10);
 
   auto storeTy = storeValue->getType();
 
@@ -3823,32 +3802,13 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsi
   // writeIndex += threadId
   writeIndex = builder.CreateAdd(writeIndex, m_threadId);
 
-  unsigned format = 0;
-  switch (m_gfxIp.major) {
-  default: {
-    CombineFormat combineFormat = {};
-    combineFormat.bits.nfmt = BUF_NUM_FORMAT_FLOAT;
-    static const unsigned char dfmtTable[4][2] = {
-        {BUF_DATA_FORMAT_16, BUF_DATA_FORMAT_32},
-        {BUF_DATA_FORMAT_16_16, BUF_DATA_FORMAT_32_32},
-        {BUF_DATA_FORMAT_INVALID, BUF_DATA_FORMAT_32_32_32},
-        {BUF_DATA_FORMAT_16_16_16_16, BUF_DATA_FORMAT_32_32_32_32},
-    };
-    combineFormat.bits.dfmt = dfmtTable[compCount - 1][bitWidth == 32];
-    format = combineFormat.u32All;
-    break;
-  }
-  case 10: {
-    static unsigned char formatTable[4][2] = {
-        {BUF_FORMAT_16_FLOAT, BUF_FORMAT_32_FLOAT},
-        {BUF_FORMAT_16_16_FLOAT, BUF_FORMAT_32_32_FLOAT_GFX10},
-        {BUF_FORMAT_INVALID, BUF_FORMAT_32_32_32_FLOAT_GFX10},
-        {BUF_FORMAT_16_16_16_16_FLOAT_GFX10, BUF_FORMAT_32_32_32_32_FLOAT_GFX10},
-    };
-    format = formatTable[compCount - 1][bitWidth == 32];
-    break;
-  }
-  }
+  static unsigned char formatTable[4][2] = {
+      {BUF_FORMAT_16_FLOAT, BUF_FORMAT_32_FLOAT},
+      {BUF_FORMAT_16_16_FLOAT, BUF_FORMAT_32_32_FLOAT_GFX10},
+      {BUF_FORMAT_INVALID, BUF_FORMAT_32_32_32_FLOAT_GFX10},
+      {BUF_FORMAT_16_16_16_16_FLOAT_GFX10, BUF_FORMAT_32_32_32_32_FLOAT_GFX10},
+  };
+  unsigned format = formatTable[compCount - 1][bitWidth == 32];
 
   CoherentFlag coherent = {};
   coherent.bits.glc = true;

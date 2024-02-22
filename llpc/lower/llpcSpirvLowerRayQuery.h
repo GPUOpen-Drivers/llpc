@@ -117,7 +117,6 @@ public:
   SpirvLowerRayQuery();
   SpirvLowerRayQuery(bool rayQueryLibrary);
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
-  bool runImpl(llvm::Module &module);
   llvm::Value *getThreadIdInGroup() const;
 
   static llvm::StringRef name() { return "Lower SPIR-V RayQuery operations"; }

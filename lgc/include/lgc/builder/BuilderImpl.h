@@ -413,9 +413,6 @@ private:
                                        llvm::Value *imageDesc, llvm::Value *coord, llvm::Value *inputValue,
                                        llvm::Value *comparatorValue, const llvm::Twine &instName = "");
 
-  // Change 1D or 1DArray dimension to 2D or 2DArray if needed as a workaround on GFX9+
-  unsigned change1DTo2DIfNeeded(unsigned dim);
-
   // Prepare coordinate and explicit derivatives, pushing the separate components into the supplied vectors, and
   // modifying if necessary.
   // Returns possibly modified image dimension.
@@ -516,7 +513,7 @@ private:
 
   // Mark usage for a generic (user) input or output
   void markGenericInputOutputUsage(bool isOutput, unsigned location, unsigned locationCount, InOutInfo &inOutInfo,
-                                   llvm::Value *vertexOrPrimIndex, bool isDynLocOffset = false);
+                                   bool hasVertexOrPrimIndex, bool directlyMapLocations = false);
 
   // Mark interpolation info for FS input.
   void markInterpolationInfo(InOutInfo &interpInfo);
@@ -533,7 +530,7 @@ private:
                            llvm::Value *index, const llvm::Twine &instName = "");
 
   // Reorder the barycoord
-  llvm::Value *normalizeBaryCoord(llvm::Value *ijCoord);
+  llvm::Value *normalizeBaryCoord(InOutInfo inputInfo, llvm::Value *ijCoord);
 
   // Get provoking vertex value
   void getProvokingVertexInfo(llvm::Value **isOne, llvm::Value **isTwo);
@@ -647,14 +644,8 @@ public:
   // Create a get subgroup size query.
   llvm::Value *CreateGetSubgroupSize(const llvm::Twine &instName = "");
 
-  // Create a subgroup elect.
-  llvm::Value *CreateSubgroupElect(const llvm::Twine &instName = "");
-
   // Create a subgroup all.
   llvm::Value *CreateSubgroupAll(llvm::Value *const value, const llvm::Twine &instName = "");
-
-  // Create a subgroup any
-  llvm::Value *CreateSubgroupAny(llvm::Value *const value, const llvm::Twine &instName = "");
 
   // Create a subgroup all equal.
   llvm::Value *CreateSubgroupAllEqual(llvm::Value *const value, const llvm::Twine &instName = "");
@@ -794,6 +785,8 @@ private:
                                         llvm::Value *const value2);
   uint16_t getDsSwizzleBitMode(uint8_t xorMask, uint8_t orMask, uint8_t andMask);
   uint16_t getDsSwizzleQuadMode(uint8_t lane0, uint8_t lane1, uint8_t lane2, uint8_t lane3);
+
+protected:
   llvm::Value *createGroupBallot(llvm::Value *const value);
   llvm::Value *createFindMsb(llvm::Value *const mask);
 };

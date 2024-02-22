@@ -291,15 +291,6 @@ SpirvLowerRayQuery::SpirvLowerRayQuery(bool rayQueryLibrary)
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses SpirvLowerRayQuery::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  runImpl(module);
-  return PreservedAnalyses::none();
-}
-
-// =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in,out] module : LLVM module to be run on
-bool SpirvLowerRayQuery::runImpl(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-ray-query\n");
   SpirvLower::init(&module);
   createGlobalRayQueryObj();
@@ -314,7 +305,7 @@ bool SpirvLowerRayQuery::runImpl(Module &module) {
       processShaderFunction(func, getFuncOpcode(func));
     }
   }
-  return true;
+  return PreservedAnalyses::none();
 }
 
 // =====================================================================================================================

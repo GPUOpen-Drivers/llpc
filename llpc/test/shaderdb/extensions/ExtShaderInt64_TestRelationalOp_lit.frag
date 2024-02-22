@@ -36,9 +36,9 @@ void main()
 // SHADERTEST-NEXT:  .entry:
 // SHADERTEST-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 0)
 // SHADERTEST-NEXT:    [[TMP1:%.*]] = call ptr @llvm.invariant.start.p7(i64 -1, ptr addrspace(7) [[TMP0]])
-// SHADERTEST-NEXT:    [[TMP2:%.*]] = getelementptr inbounds <{ i64, i64, [16 x i8], [3 x i64], [8 x i8], [3 x i64] }>, ptr addrspace(7) [[TMP0]], i32 0, i32 3
+// SHADERTEST-NEXT:    [[TMP2:%.*]] = getelementptr inbounds {{i8|<{ i64, i64, [[]16 x i8], [[]3 x i64], [[]8 x i8], [[]3 x i64] }>}}, ptr addrspace(7) [[TMP0]], i32 {{32|0, i32 3}}
 // SHADERTEST-NEXT:    [[TMP3:%.*]] = load <3 x i64>, ptr addrspace(7) [[TMP2]], align 32
-// SHADERTEST-NEXT:    [[TMP4:%.*]] = getelementptr inbounds <{ i64, i64, [16 x i8], [3 x i64], [8 x i8], [3 x i64] }>, ptr addrspace(7) [[TMP0]], i32 0, i32 5
+// SHADERTEST-NEXT:    [[TMP4:%.*]] = getelementptr inbounds {{i8|<{ i64, i64, [[]16 x i8], [[]3 x i64], [[]8 x i8], [[]3 x i64] }>}}, ptr addrspace(7) [[TMP0]], i32 {{64|0, i32 5}}
 // SHADERTEST-NEXT:    [[TMP5:%.*]] = load <3 x i64>, ptr addrspace(7) [[TMP4]], align 32
 // SHADERTEST-NEXT:    [[TMP6:%.*]] = extractelement <3 x i64> [[TMP3]], i64 0
 // SHADERTEST-NEXT:    [[TMP7:%.*]] = extractelement <3 x i64> [[TMP5]], i64 0
@@ -114,7 +114,7 @@ void main()
 // SHADERTEST:       66:
 // SHADERTEST-NEXT:    [[DOT022_IN:%.*]] = phi <3 x i1> [ [[TMP50]], [[TMP36]] ], [ [[TMP65]], [[TMP51]] ]
 // SHADERTEST-NEXT:    [[TMP67:%.*]] = load i64, ptr addrspace(7) [[TMP0]], align 8
-// SHADERTEST-NEXT:    [[TMP68:%.*]] = getelementptr inbounds <{ i64, i64, [16 x i8], [3 x i64], [8 x i8], [3 x i64] }>, ptr addrspace(7) [[TMP0]], i32 0, i32 1
+// SHADERTEST-NEXT:    [[TMP68:%.*]] = getelementptr inbounds {{i8|<{ i64, i64, [[]16 x i8], [[]3 x i64], [[]8 x i8], [[]3 x i64] }>}}, ptr addrspace(7) [[TMP0]], i32 {{8|0, i32 1}}
 // SHADERTEST-NEXT:    [[TMP69:%.*]] = load i64, ptr addrspace(7) [[TMP68]], align 8
 // SHADERTEST-NEXT:    [[TMP70:%.*]] = icmp ne i64 [[TMP67]], [[TMP69]]
 // SHADERTEST-NEXT:    [[COND_FREEZE4:%.*]] = freeze i1 [[TMP70]]

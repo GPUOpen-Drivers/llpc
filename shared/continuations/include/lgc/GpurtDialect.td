@@ -97,7 +97,7 @@ def GpurtLdsStackStoreOp : GpurtOp<"lds.stack.store", [Memory<[(write)]>, WillRe
 }
 
 def GpurtFloatWithRoundModeOp : GpurtOp<"rt.floatop.roundmode", [Memory<[]>, WillReturn]> {
-  let arguments = (ins I32:$roundMode, I32:$operation, (ScalarOrFixedVector F32):$src0, (eq $src0):$src1);
+  let arguments = (ins I32:$round_mode, I32:$operation, (ScalarOrFixedVector F32):$src0, (eq $src0):$src1);
   let results = (outs (eq $src0):$result);
   let summary = "return result of floatOp with roundmode";
 }
@@ -126,8 +126,14 @@ def GpurtGetFlattenedGroupThreadIdOp : GpurtOp<"get.flattened.group.thread.id", 
   let summary = "return the flattened group thread ID";
 }
 
+def GpurtDispatchThreadIdFlatOp : GpurtOp<"dispatch.thread.id.flat", [Memory<[]>, WillReturn]> {
+  let arguments = (ins);
+  let results = (outs I32:$result);
+  let summary = "return the flat dispatch threadID";
+}
+
 def GpurtSetHitAttributesOp : GpurtOp<"set.hit.attributes", [Memory<[(write InaccessibleMem)]>, WillReturn]> {
-  let arguments =  (ins F32:$tCurrent, I32:$kind, I32:$status, I32:$instNodeAddrLo, I32:$instNodeAddrHi,
+  let arguments =  (ins F32:$t_current, I32:$kind, I32:$status, I32:$inst_node_addr_lo, I32:$inst_node_addr_hi,
       I32:$primitiveIndex, I32:$anyHitCallType, I32:$geometryIndex);
   let results = (outs);
 
@@ -135,15 +141,15 @@ def GpurtSetHitAttributesOp : GpurtOp<"set.hit.attributes", [Memory<[(write Inac
   let description = [{
     Compiler notification of hit attributes.
 
-    - tCurrent: Current parametric hit distance relative to TMin.
+    - t_current: Current parametric hit distance relative to TMin.
 
     - kind: Intersection hit kind.
 
     - status: Hit status.
 
-    - instNodeAddrLo: Current instance node address lo bits.
+    - inst_node_addr_lo: Current instance node address lo bits.
 
-    - instNodeAddrHi: Current instance node address hi bits.
+    - inst_node_addr_hi: Current instance node address hi bits.
 
     - anyHitCallType: Indication of calling behavior on any hit shader.
 
@@ -153,111 +159,111 @@ def GpurtSetHitAttributesOp : GpurtOp<"set.hit.attributes", [Memory<[(write Inac
 
 def GpurtGetHitAttributesOp
     : GpurtOp<"get.hit.attributes", [Memory<[(write ArgMem), (read InaccessibleMem)]>, WillReturn]> {
-  let arguments =  (ins PointerType:$tCurrentPtr, PointerType:$kindPtr, PointerType:$statusPtr);
+  let arguments =  (ins PointerType:$t_current_ptr, PointerType:$kind_ptr, PointerType:$status_ptr);
   let results = (outs);
 
   let summary = "Get hit attributes";
   let description = [{
     Get hit attributes from compiler.
 
-    - tCurrentPtr: Pointer to store current parametric hit distance relative to TMin.
+    - t_current_ptr: Pointer to store current parametric hit distance relative to TMin.
 
-    - kindPtr: Pointer to store intersection hit kind.
+    - kind_ptr: Pointer to store intersection hit kind.
 
-    - statusPtr: Pointer to store hit status.
+    - status_ptr: Pointer to store hit status.
   }];
 }
 
 def GpurtSetTraceParamsOp : GpurtOp<"set.trace.params", [Memory<[(write InaccessibleMem)]>, WillReturn]> {
-  let arguments =  (ins I32:$rayFlags, I32:$instanceInclusionMask, F32:$originX, F32:$originY, F32:$originZ,
-      F32:$tMin, F32:$dirX, F32:$dirY, F32:$dirZ);
+  let arguments =  (ins I32:$ray_flags, I32:$instance_inclusion_mask, F32:$origin_x, F32:$origin_y, F32:$origin_z,
+      F32:$t_min, F32:$dir_x, F32:$dir_y, F32:$dir_z);
   let results = (outs);
 
   let summary = "Set trace parameters";
   let description = [{
     Compiler notification of trace input parameters.
 
-    - rayFlags: Ray flags.
+    - ray_flags: Ray flags.
 
-    - instanceInclusionMask: Instance inclusion mask.
+    - instance_inclusion_mask: Instance inclusion mask.
 
-    - originX: Ray origin X.
+    - origin_x: Ray origin X.
 
-    - originY: Ray origin Y.
+    - origin_y: Ray origin Y.
 
-    - originZ: Ray origin Z.
+    - origin_z: Ray origin Z.
 
-    - tMin: T Min.
+    - t_min: T Min.
 
-    - dirX: World ray direction X.
+    - dir_x: World ray direction X.
 
-    - dirY: World ray direction Y.
+    - dir_y: World ray direction Y.
 
-    - dirZ: World ray direction Z.
+    - dir_z: World ray direction Z.
   }];
 }
 
 def GpurtCallClosestHitShaderOp : GpurtOp<"call.closest.hit.shader", [Memory<[(readwrite InaccessibleMem)]>, WillReturn]> {
-  let arguments =  (ins V2I32:$shaderId, I32:$tableIndex);
+  let arguments =  (ins V2I32:$shader_id, I32:$table_index);
   let results = (outs I1:$result);
 
   let summary = " Call closest hit shader";
   let description = [{
     Compiler closest hit shader inlining patch function.
 
-    - shaderId: Closest hit shader identifier.
+    - shader_id: Closest hit shader identifier.
 
-    - tableIndex: Hit group shader record table index.
+    - table_index: Hit group shader record table index.
 
     Returns true if the call was inlined.
   }];
 }
 
 def GpurtCallMissShaderOp : GpurtOp<"call.miss.shader", [Memory<[(readwrite InaccessibleMem)]>, WillReturn]> {
-  let arguments =  (ins V2I32:$shaderId, I32:$tableIndex);
+  let arguments =  (ins V2I32:$shader_id, I32:$table_index);
   let results = (outs I1:$result);
 
   let summary = " Call miss shader";
   let description = [{
     Compiler miss shader inlining patch function.
 
-    - shaderId: Miss shader identifier.
+    - shader_id: Miss shader identifier.
 
-    - tableIndex: Miss shader record table index.
+    - table_index: Miss shader record table index.
 
     Returns true if the call was inlined.
   }];
 }
 
 def GpurtCallTriangleAnyHitShaderOp : GpurtOp<"call.triangle.any.hit.shader", [Memory<[(readwrite InaccessibleMem)]>, WillReturn]> {
-  let arguments =  (ins V2I32:$shaderId, I32:$tableIndex, V2F32:$attr);
+  let arguments =  (ins V2I32:$shader_id, I32:$table_index, V2F32:$attr);
   let results = (outs);
 
   let summary = " Call any hit shader";
   let description = [{
     Compiler any hit shader inlining patch function.
 
-    - shaderId: AnyHit shader identifier.
+    - shader_id: AnyHit shader identifier.
 
-    - tableIndex: Hit group shader record index.
+    - table_index: Hit group shader record index.
 
     - attr: Triangle barycentrics.
   }];
 }
 
 def GpurtCallIntersectionShaderOp : GpurtOp<"call.intersection.shader", [Memory<[(readwrite InaccessibleMem)]>, WillReturn]> {
-  let arguments =  (ins V2I32:$shaderId, V2I32:$anyHitShaderId, I32:$tableIndex);
+  let arguments =  (ins V2I32:$shader_id, V2I32:$any_hit_shader_id, I32:$table_index);
   let results = (outs);
 
   let summary = " Call intersection shader";
   let description = [{
     Compiler intersection shader inlining patch function.
 
-    - shaderId: Programmable intersection shader identifier.
+    - shader_id: Programmable intersection shader identifier.
 
-    - anyHitShaderId: AnyHit shader identifier.
+    - any_hit_shader_id: AnyHit shader identifier.
 
-    - tableIndex: Hit group shader record index.
+    - table_index: Hit group shader record index.
   }];
 }
 
@@ -276,16 +282,16 @@ def GpurtSetTriangleIntersectionAttributesOp
 
 def GpurtSetHitTriangleNodePointerOp
     : GpurtOp<"set.hit.triangle.node.pointer", [Memory<[(write InaccessibleMem)]>, WillReturn]> {
-  let arguments =  (ins I64:$bvhAddress, I32:$nodePointer);
+  let arguments =  (ins I64:$bvh_address, I32:$node_pointer);
   let results = (outs);
 
   let summary = "Set hit triangle node pointer";
   let description = [{
     Compiler notification of hit triangle node pointer.
 
-    - bvhAddress: The BVH address.
+    - bvh_address: The BVH address.
 
-    - nodePointer: Node pointer of hit triangle.
+    - node_pointer: Node pointer of hit triangle.
   }];
 }
 

@@ -44,19 +44,6 @@ using namespace lgc;
 
 namespace lgc {
 
-// =====================================================================================================================
-// Executes this LLVM patching pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @param [in/out] analysisManager : Analysis manager to use for this transformation
-// @returns : The preserved analyses (The analyses that are still valid after this pass)
-PreservedAnalyses PatchImageDerivatives::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
-  if (runImpl(module, pipelineState))
-    return PreservedAnalyses::all(); // Note: this patching never invalidates analysis data
-  return PreservedAnalyses::all();
-}
-
 static bool usesImplicitDerivatives(StringRef name) {
   if (!(name.starts_with("llvm.amdgcn.image.sample") || name.starts_with("llvm.amdgcn.image.gather")))
     return false;
@@ -69,16 +56,18 @@ static bool usesImplicitDerivatives(StringRef name) {
 // Executes this LLVM patching pass on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
-// @param pipelineState : Pipeline state
-// @returns : True if the module was modified by the transformation and false otherwise
-bool PatchImageDerivatives::runImpl(llvm::Module &module, PipelineState *pipelineState) {
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+// @returns : The preserved analyses (The analyses that are still valid after this pass)
+PreservedAnalyses PatchImageDerivatives::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
+
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Image-Derivatives\n");
 
   if (!pipelineState->hasShaderStage(ShaderStage::Fragment))
-    return false;
+    return PreservedAnalyses::all();
   ResourceUsage *resUsage = pipelineState->getShaderResourceUsage(ShaderStage::Fragment);
   if (!resUsage->builtInUsage.fs.discard)
-    return false;
+    return PreservedAnalyses::all();
 
   SmallSet<BasicBlock *, 4> killBlocks;
   DenseSet<BasicBlock *> derivativeBlocks;
@@ -108,7 +97,7 @@ bool PatchImageDerivatives::runImpl(llvm::Module &module, PipelineState *pipelin
 
   // Note: in theory killBlocks should not be empty here, but it is cheap to check.
   if (killBlocks.empty() || derivativeBlocks.empty())
-    return false;
+    return PreservedAnalyses::all();
 
   DenseSet<BasicBlock *> visitedBlocks;
   SmallVector<BasicBlock *> roots;
@@ -152,14 +141,14 @@ bool PatchImageDerivatives::runImpl(llvm::Module &module, PipelineState *pipelin
       LLVM_DEBUG(dbgs() << "Detected implicit derivatives used after kill.\n");
       Function *fsFunc = testBlock->getParent();
       fsFunc->addFnAttr("amdgpu-transform-discard-to-demote");
-      return true;
+      return PreservedAnalyses::all(); // we don't actually invalidate anything
     }
 
     append_range(worklist, successors(testBlock));
   }
 
   // No paths from kills to derivatives exist.
-  return false;
+  return PreservedAnalyses::all();
 }
 
 } // namespace lgc

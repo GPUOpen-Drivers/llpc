@@ -213,6 +213,7 @@ template <> inline void SPIRVMap<SPIRVCapabilityKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(CapabilityCooperativeMatrixKHR, {CapabilityShader});
   ADD_VEC_INIT(CapabilityComputeDerivativeGroupLinearNV, {CapabilityShader});
   ADD_VEC_INIT(CapabilityComputeDerivativeGroupQuadsNV, {CapabilityShader});
+  ADD_VEC_INIT(CapabilityQuadControlKHR, {CapabilityShader});
 }
 
 template <> inline void SPIRVMap<SPIRVExecutionModelKind, SPIRVCapVec>::init() {
@@ -270,6 +271,8 @@ template <> inline void SPIRVMap<SPIRVExecutionModeKind, SPIRVCapVec>::init() {
   ADD_VEC_INIT(ExecutionModeStencilRefUnchangedBackAMD, {CapabilityStencilExportEXT});
   ADD_VEC_INIT(ExecutionModeStencilRefGreaterBackAMD, {CapabilityStencilExportEXT});
   ADD_VEC_INIT(ExecutionModeStencilRefLessBackAMD, {CapabilityStencilExportEXT});
+  ADD_VEC_INIT(ExecutionModeRequireFullQuadsKHR, {CapabilityQuadControlKHR});
+  ADD_VEC_INIT(ExecutionModeQuadDerivativesKHR, {CapabilityQuadControlKHR});
 }
 
 template <> inline void SPIRVMap<SPIRVMemoryModelKind, SPIRVCapVec>::init() {

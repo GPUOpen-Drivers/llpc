@@ -31,9 +31,18 @@
 #include "llpcContext.h"
 #include "SPIRVInternal.h"
 #include "continuations/ContinuationsDialect.h"
+#include "continuations/GpurtContext.h"
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
 #include "llpcPipelineContext.h"
+#include "llpcSpirvLower.h"
+#include "llpcSpirvLowerAccessChain.h"
+#include "llpcSpirvLowerCfgMerges.h"
+#include "llpcSpirvLowerGlobal.h"
+#include "llpcSpirvLowerRayQuery.h"
+#include "llpcSpirvLowerTranslator.h"
+#include "llpcSpirvProcessGpuRtLibrary.h"
+#include "llpcTimerProfiler.h"
 #include "vkgcMetroHash.h"
 #include "lgc/Builder.h"
 #include "lgc/GpurtDialect.h"
@@ -41,18 +50,22 @@
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/LgcRtDialect.h"
+#include "lgc/PassManager.h"
 #include "llvm/Bitcode/BitcodeReader.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Bitstream/BitstreamReader.h"
 #include "llvm/Bitstream/BitstreamWriter.h"
 #include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IRPrinter/IRPrintingPasses.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/IPO.h"
+#include "llvm/Transforms/IPO/AlwaysInliner.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Utils/Cloning.h"
 
@@ -99,6 +112,7 @@ LgcContext *Context::getLgcContext() {
     if (!m_targetMachine)
       report_fatal_error(Twine("Unknown target '") + Twine(gpuName) + Twine("'"));
     m_builderContext.reset(LgcContext::create(&*m_targetMachine, *this, PAL_CLIENT_INTERFACE_MAJOR_VERSION));
+    lgc::GpurtContext::get(*this).theModule.reset();
 
     // Pass the state of LLPC_OUTS on to LGC.
     LgcContext::setLlpcOuts(EnableOuts() ? &outs() : nullptr);
@@ -193,6 +207,70 @@ void Context::setModuleTargetMachine(Module *module) {
   // continuation stack address space.
   dataLayoutStr = dataLayoutStr + "-p" + std::to_string(cps::stackAddrSpace) + ":32:32";
   module->setDataLayout(dataLayoutStr);
+}
+
+// =====================================================================================================================
+// Ensure that a compatible GPURT library module is attached to this context via GpurtContext.
+void Context::ensureGpurtLibrary() {
+  // Check whether we already have a GPURT library module that can be used
+  const Vkgc::RtState *rtState = getPipelineContext()->getRayTracingState();
+  auto &gpurtContext = lgc::GpurtContext::get(*this);
+  GpurtKey key = {};
+  key.gpurtFeatureFlags = rtState->gpurtFeatureFlags; // gpurtFeatureFlags affect which GPURT library we're using
+  key.hwIntersectRay = rtState->bvhResDesc.dataSizeInDwords > 0;
+
+  if (gpurtContext.theModule && key != m_currentGpurtKey)
+    gpurtContext.theModule.reset();
+
+  if (gpurtContext.theModule)
+    return;
+
+  // Create the GPURT library module
+  m_currentGpurtKey = key;
+
+  ShaderModuleData moduleData = {};
+  moduleData.binCode = rtState->gpurtShaderLibrary;
+  moduleData.binType = BinaryType::Spirv;
+  moduleData.usage.keepUnusedFunctions = true;
+  moduleData.usage.rayQueryLibrary = true;
+  moduleData.usage.enableRayQuery = true;
+
+  PipelineShaderInfo shaderInfo = {};
+  shaderInfo.entryStage = ShaderStageCompute;
+  shaderInfo.pEntryTarget = Vkgc::getEntryPointNameFromSpirvBinary(&rtState->gpurtShaderLibrary);
+  shaderInfo.pModuleData = &moduleData;
+
+  // Disable fast math contract on OpDot when there is no hardware intersectRay
+  shaderInfo.options.noContractOpDot = !key.hwIntersectRay;
+
+  auto gpurt = std::make_unique<Module>("_cs_", *this);
+  setModuleTargetMachine(gpurt.get());
+
+  TimerProfiler timerProfiler(getPipelineHashCode(), "LLPC GPURT", TimerProfiler::PipelineTimerEnableMask);
+  std::unique_ptr<lgc::PassManager> lowerPassMgr(lgc::PassManager::Create(getLgcContext()));
+  SpirvLower::registerTranslationPasses(*lowerPassMgr);
+
+  timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, true);
+
+  lowerPassMgr->addPass(SpirvLowerTranslator(ShaderStageCompute, &shaderInfo, "_gpurtvar_"));
+  if (EnableOuts()) {
+    lowerPassMgr->addPass(
+        PrintModulePass(outs(), "\n"
+                                "===============================================================================\n"
+                                "// LLPC SPIRV-to-LLVM translation results\n"));
+  }
+
+  lowerPassMgr->addPass(SpirvLowerCfgMerges());
+  lowerPassMgr->addPass(SpirvProcessGpuRtLibrary());
+  lowerPassMgr->addPass(SpirvLowerRayQuery(true));
+  lowerPassMgr->addPass(AlwaysInlinerPass());
+  lowerPassMgr->addPass(SpirvLowerAccessChain());
+  lowerPassMgr->addPass(SpirvLowerGlobal());
+  timerProfiler.addTimerStartStopPass(*lowerPassMgr, TimerTranslate, false);
+
+  lowerPassMgr->run(*gpurt);
+
+  gpurtContext.theModule = std::move(gpurt);
 }
 
 } // namespace Llpc

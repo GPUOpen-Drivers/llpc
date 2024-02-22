@@ -42,8 +42,6 @@ class PatchInvariantLoads : public llvm::PassInfoMixin<PatchInvariantLoads> {
 public:
   llvm::PreservedAnalyses run(llvm::Function &function, llvm::FunctionAnalysisManager &analysisManager);
 
-  bool runImpl(llvm::Function &function, PipelineState *pipelineState);
-
   static llvm::StringRef name() { return "Patch metadata for invariant loads"; }
 };
 

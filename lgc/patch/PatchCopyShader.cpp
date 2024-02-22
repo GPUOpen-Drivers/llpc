@@ -57,19 +57,7 @@ using namespace llvm;
 PreservedAnalyses PatchCopyShader::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
   PipelineShadersResult &pipelineShaders = analysisManager.getResult<PipelineShaders>(module);
-  if (runImpl(module, pipelineShaders, pipelineState))
-    return PreservedAnalyses::none();
-  return PreservedAnalyses::all();
-}
 
-// =====================================================================================================================
-// Run the pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @param pipelineShaders : Pipeline shaders analysis result
-// @param pipelineState : Pipeline state
-// @returns : True if the module was modified by the transformation and false otherwise
-bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineShaders, PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Copy-Shader\n");
 
   Patch::init(&module);
@@ -80,7 +68,7 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
   auto gsEntryPoint = pipelineShaders.getEntryPoint(ShaderStage::Geometry);
   if (!gsEntryPoint) {
     // Skip copy shader generation if GS is absent
-    return false;
+    return PreservedAnalyses::all();
   }
 
   // Tell pipeline state there is a copy shader.
@@ -297,7 +285,7 @@ bool PatchCopyShader::runImpl(Module &module, PipelineShadersResult &pipelineSha
     builder.CreateBr(endBlock);
   }
 
-  return true;
+  return PreservedAnalyses::none();
 }
 
 // =====================================================================================================================
