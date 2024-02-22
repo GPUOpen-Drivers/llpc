@@ -299,14 +299,32 @@ CompilerUtils::CrossModuleInliner::inlineCall(IRBuilder<> &b, llvm::Function *ca
   if (!callee->getReturnType()->isVoidTy())
     fakeUse = cast<FreezeInst>(b.CreateFreeze(call));
 
+  // If the builder is at the end of the basic block then we don't have complete IR yet. We need some placeholder to
+  // know where to reset the insert point to.
+  Instruction *insertPointMarker = nullptr;
+  if (b.GetInsertPoint() == b.GetInsertBlock()->end()) {
+    assert(!b.GetInsertBlock()->getTerminator());
+    if (fakeUse)
+      insertPointMarker = fakeUse;
+    else
+      insertPointMarker = b.CreateUnreachable();
+  }
+
   auto newBBs = inlineCall(*call);
+
+  if (insertPointMarker) {
+    b.SetInsertPoint(insertPointMarker->getParent());
+    if (insertPointMarker != fakeUse)
+      insertPointMarker->eraseFromParent();
+  } else {
+    b.SetInsertPoint(&*b.GetInsertPoint());
+  }
 
   Value *result = nullptr;
   if (fakeUse) {
     result = fakeUse->getOperand(0);
     fakeUse->eraseFromParent();
   }
-  b.SetInsertPoint(&*b.GetInsertPoint());
   return {result, newBBs};
 }
 

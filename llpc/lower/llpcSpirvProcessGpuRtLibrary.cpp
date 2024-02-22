@@ -98,6 +98,7 @@ SpirvProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
 #endif
   m_libFuncPtrs["AmdExtD3DShaderIntrinsics_FloatOpWithRoundMode"] =
       &SpirvProcessGpuRtLibrary::createFloatOpWithRoundMode;
+  m_libFuncPtrs["AmdExtDispatchThreadIdFlat"] = &SpirvProcessGpuRtLibrary::createDispatchThreadIdFlat;
   m_libFuncPtrs["AmdTraceRaySampleGpuTimer"] = &SpirvProcessGpuRtLibrary::createSampleGpuTimer;
   m_libFuncPtrs["AmdTraceRayGetFlattenedGroupThreadId"] = &SpirvProcessGpuRtLibrary::createGetFlattenedGroupThreadId;
   m_libFuncPtrs["AmdTraceRayGetHitAttributes"] = &SpirvProcessGpuRtLibrary::createGetHitAttributes;
@@ -173,6 +174,10 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
   } else if (funcName.starts_with("_AmdContStackLoad")) {
     m_builder->SetInsertPoint(clearBlock(func));
     createContStackLoad(func);
+    return;
+  } else if (funcName.starts_with("_AmdEnqueue") || funcName.starts_with("_AmdWaitEnqueue")) {
+    m_builder->SetInsertPoint(clearBlock(func));
+    createEnqueue(func);
     return;
   }
 
@@ -726,6 +731,13 @@ void SpirvProcessGpuRtLibrary::createGetKnownUnsetRayFlags(llvm::Function *func)
 }
 
 // =====================================================================================================================
+// Fill in function of AmdExtDispatchThreadIdFlat
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createDispatchThreadIdFlat(llvm::Function *func) {
+  m_builder->CreateRet(m_builder->create<GpurtDispatchThreadIdFlatOp>());
+}
+// =====================================================================================================================
 // Fill in function to allocate continuation stack pointer
 //
 // @param func : The function to create
@@ -796,6 +808,42 @@ void SpirvProcessGpuRtLibrary::createContStackStore(llvm::Function *func) {
   auto ptr = m_builder->CreateIntToPtr(addr, m_builder->getPtrTy(cps::stackAddrSpace));
   m_builder->CreateStore(data, ptr);
   m_builder->CreateRetVoid();
+}
+
+// =====================================================================================================================
+// Fill in function to enqueue shader
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createEnqueue(Function *func) {
+  auto funcName = func->getName();
+
+  Value *addr = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(0));
+
+  SmallVector<Value *> tailArgs;
+  // _AmdEnqueueTraversal and _AmdWaitEnqueueRayGen do not have return-address.
+  bool hasRetAddrArg = !funcName.contains("RayGen") && !funcName.contains("Traversal");
+  bool hasWaitMaskArg = funcName.contains("Wait");
+  if (hasRetAddrArg) {
+    // Skip csp and waitMask
+    unsigned retAddrArgIdx = hasWaitMaskArg ? 3 : 2;
+    tailArgs.push_back(m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(retAddrArgIdx)));
+  } else {
+    tailArgs.push_back(PoisonValue::get(m_builder->getInt32Ty()));
+  }
+  // Get shader-index from system-data.
+  unsigned systemDataArgIdx = 2 + (hasRetAddrArg ? 1 : 0) + (hasWaitMaskArg ? 1 : 0);
+  tailArgs.push_back(m_builder->CreateNamedCall("_cont_GetLocalRootIndex", m_builder->getInt32Ty(),
+                                                {func->getArg(systemDataArgIdx)}, {}));
+  // Process system-data and arguments after.
+  unsigned argIdx = systemDataArgIdx;
+  while (argIdx < func->arg_size()) {
+    tailArgs.push_back(m_builder->CreateLoad(getFuncArgPtrElementType(func, argIdx), func->getArg(argIdx)));
+    argIdx++;
+  }
+
+  // TODO: pass the levelMask correctly.
+  m_builder->create<cps::JumpOp>(addr, -1, PoisonValue::get(StructType::get(*m_context, {})), tailArgs);
+  m_builder->CreateUnreachable();
 }
 
 } // namespace Llpc

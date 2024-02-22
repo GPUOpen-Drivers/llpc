@@ -57,26 +57,13 @@ namespace lgc {
 PreservedAnalyses PatchInitializeWorkgroupMemory::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
   PipelineShadersResult &pipelineShaders = analysisManager.getResult<PipelineShaders>(module);
-  if (runImpl(module, pipelineShaders, pipelineState))
-    return PreservedAnalyses::none();
-  return PreservedAnalyses::all();
-}
 
-// =====================================================================================================================
-// Executes this LLVM patching pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @param pipelineShaders : Pipeline shaders analysis result
-// @param pipelineState : Pipeline state
-// @returns : True if the module was modified by the transformation and false otherwise
-bool PatchInitializeWorkgroupMemory::runImpl(Module &module, PipelineShadersResult &pipelineShaders,
-                                             PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Initialize-Workgroup-Memory\n");
 
   m_pipelineState = pipelineState;
   // This pass works on compute shader.
   if (!m_pipelineState->hasShaderStage(ShaderStage::Compute))
-    return false;
+    return PreservedAnalyses::all();
 
   SmallVector<GlobalVariable *> workgroupGlobals;
   for (GlobalVariable &global : module.globals()) {
@@ -88,7 +75,7 @@ bool PatchInitializeWorkgroupMemory::runImpl(Module &module, PipelineShadersResu
   }
 
   if (workgroupGlobals.empty())
-    return false;
+    return PreservedAnalyses::all();
 
   Patch::init(&module);
   m_shaderStage = ShaderStage::Compute;
@@ -125,7 +112,7 @@ bool PatchInitializeWorkgroupMemory::runImpl(Module &module, PipelineShadersResu
 
   initializeWithZero(lds, builder);
 
-  return true;
+  return PreservedAnalyses::none();
 }
 
 // =====================================================================================================================

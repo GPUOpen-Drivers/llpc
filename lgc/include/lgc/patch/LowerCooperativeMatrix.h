@@ -38,13 +38,17 @@
 #include "llvm/IR/Function.h"
 
 namespace lgc {
+
+class CooperativeRowAccLoadOp;
+class CooperativeRowAccStoreOp;
+class CooperativeRowAccFinalizeModeOp;
+class CooperativeRowAccAccumulateModeOp;
+
 // =====================================================================================================================
 // Pass to lower coopMatrix calls
 class LowerCooperativeMatrix : public Patch, public llvm::PassInfoMixin<LowerCooperativeMatrix> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
-
-  bool runImpl(llvm::Module &module, PipelineShadersResult &pipelineShaders, PipelineState *pipelineState);
 
   static llvm::StringRef name() { return "Patch cooperative matrix calls"; }
 
@@ -228,7 +232,33 @@ private:
 
   llvm::Value *getLaneNumber(BuilderBase &builder);
 
+  // Cooperative row acc operations.
+  // Cooperative row acc data have two state: accumulate mode and finalize mode.
+  // accumulate mode is matching the hardware accumulate matrix which benefit for accumulate operate.
+  // finalize mode is general layout which benefit for load/store/splat operate.
+
+  // load the row acc from memory. The return row acc data is in finalize mode.
+  void visitCooperativeRowAccLoadOp(CooperativeRowAccLoadOp &load);
+  // store the row acc to memory. The input row acc data must be in finalize mode.
+  void visitCooperativeRowAccStoreOp(CooperativeRowAccStoreOp &store);
+
+  // change row acc data from accumulate mode to finalize mode.
+  void visitCooperativeRowAccFinalizeModeOp(CooperativeRowAccFinalizeModeOp &finalizeMode);
+  // change row acc data from finalize mode to accumulate mode.
+  void visitCooperativeRowAccAccumulateModeOp(CooperativeRowAccAccumulateModeOp &accumulateMode);
+
+  // Helper functions for row acc operstions.
+  llvm::Value *cooperativeRowAccConvertToAccumulateMode(BuilderBase &builder, llvm::Value *rowAccVal,
+                                                        llvm::Value *threadId,
+                                                        Builder::CooperativeMatrixElementType elemType);
+  llvm::Value *cooperativeRowAccConvertToFinalizeMode(BuilderBase &builder, llvm::Value *rowAccVal,
+                                                      Builder::CooperativeMatrixElementType elemType);
+
+  // process cooperative row acc operations.
+  void processCoopRowAccFunction(llvm::Module &module);
+
   llvm::SmallVector<llvm::CallInst *, 8> m_coopMatrixCalls;
+  llvm::SmallVector<llvm::CallInst *, 8> m_coopRowAccCalls;
   PipelineState *m_pipelineState = nullptr;
   PipelineShadersResult *m_pipelineShaders = nullptr;
   GfxIpVersion m_gfxIp;

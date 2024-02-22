@@ -188,30 +188,18 @@ static void disableFastMath(Value *value) {
 // @param [in/out] module : LLVM module to be run on (empty on entry)
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses SpirvLowerMathConstFolding::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  runImpl(module, [&]() -> TargetLibraryInfo & {
-    FunctionAnalysisManager &functionAnalysisManager =
-        analysisManager.getResult<FunctionAnalysisManagerModuleProxy>(module).getManager();
-    return functionAnalysisManager.getResult<TargetLibraryAnalysis>(*m_entryPoint);
-  });
-  return PreservedAnalyses::none();
-}
-
-// =====================================================================================================================
-// Executes constant folding SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-bool SpirvLowerMathConstFolding::runImpl(Module &module,
-                                         const std::function<TargetLibraryInfo &()> &getTargetLibraryInfo) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Math-Const-Folding\n");
 
   SpirvLowerMath::init(module);
 
   if (m_shaderStage == ShaderStageInvalid)
-    return false;
+    return PreservedAnalyses::all();
 
   if (m_fp16DenormFlush || m_fp32DenormFlush || m_fp64DenormFlush) {
     // Do constant folding if we need flush denorm to zero.
-    auto &targetLibInfo = getTargetLibraryInfo();
+    FunctionAnalysisManager &functionAnalysisManager =
+        analysisManager.getResult<FunctionAnalysisManagerModuleProxy>(module).getManager();
+    auto &targetLibInfo = functionAnalysisManager.getResult<TargetLibraryAnalysis>(*m_entryPoint);
     auto &dataLayout = m_module->getDataLayout();
 
     for (auto &block : *m_entryPoint) {
@@ -253,7 +241,7 @@ bool SpirvLowerMathConstFolding::runImpl(Module &module,
     }
   }
 
-  return m_changed;
+  return m_changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }
 
 // =====================================================================================================================
@@ -264,17 +252,6 @@ Function *SpirvLowerMathConstFolding::getEntryPoint() {
 
 #undef DEBUG_TYPE // DEBUG_TYPE_CONST_FOLDING
 #define DEBUG_TYPE DEBUG_TYPE_PRECISION
-
-// =====================================================================================================================
-// Run precision (fast math flag) adjustment SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on (empty on entry)
-// @param [in/out] analysisManager : Analysis manager to use for this transformation
-PreservedAnalyses SpirvLowerMathPrecision::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  if (runImpl(module))
-    return PreservedAnalyses::none();
-  return PreservedAnalyses::all();
-}
 
 bool SpirvLowerMathPrecision::adjustExports(Module &module) {
   bool changed = false;
@@ -393,13 +370,14 @@ bool SpirvLowerMathPrecision::propagateNoContract(Module &module, bool forward, 
 // =====================================================================================================================
 // Run precision (fast math flag) adjustment SPIR-V lowering pass on the specified LLVM module.
 //
-// @param [in/out] module : LLVM module to be run on
-bool SpirvLowerMathPrecision::runImpl(Module &module) {
+// @param [in/out] module : LLVM module to be run on (empty on entry)
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+PreservedAnalyses SpirvLowerMathPrecision::run(Module &module, ModuleAnalysisManager &analysisManager) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Math-Precision\n");
 
   SpirvLower::init(&module);
   if (m_shaderStage == ShaderStageInvalid)
-    return false;
+    return PreservedAnalyses::all();
 
   bool forwardPropagate = false;
   bool backwardPropagate = false;
@@ -446,7 +424,7 @@ bool SpirvLowerMathPrecision::runImpl(Module &module) {
   if (forwardPropagate || backwardPropagate)
     propagatedNoContract = propagateNoContract(module, forwardPropagate, backwardPropagate);
 
-  return adjustedExports || propagatedNoContract;
+  return (adjustedExports || propagatedNoContract) ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }
 
 #undef DEBUG_TYPE // DEBUG_TYPE_PRECISION
@@ -458,21 +436,12 @@ bool SpirvLowerMathPrecision::runImpl(Module &module) {
 // @param [in/out] module : LLVM module to be run on (empty on entry)
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses SpirvLowerMathFloatOp::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  runImpl(module);
-  return PreservedAnalyses::none();
-}
-
-// =====================================================================================================================
-// Executes floating point optimisation SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-bool SpirvLowerMathFloatOp::runImpl(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Math-Float-Op\n");
 
   SpirvLowerMath::init(module);
   visit(m_module);
 
-  return m_changed;
+  return m_changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }
 
 // =====================================================================================================================

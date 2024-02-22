@@ -39,7 +39,6 @@ namespace Llpc {
 class SpirvLowerRayQueryPostInline : public SpirvLower, public llvm::PassInfoMixin<SpirvLowerRayQueryPostInline> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
-  virtual bool runImpl(llvm::Module &module);
 
   static llvm::StringRef name() { return "Lower SPIR-V RayQueryPostInline operations"; }
 };

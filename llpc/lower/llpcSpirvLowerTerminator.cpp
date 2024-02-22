@@ -56,22 +56,13 @@ namespace Llpc {
 // @param [in/out] module : LLVM module to be run on (empty on entry)
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses SpirvLowerTerminator::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  runImpl(module);
-  return PreservedAnalyses::none();
-}
-
-// =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-bool SpirvLowerTerminator::runImpl(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Terminator\n");
 
   SpirvLower::init(&module);
 
   // Kills are only valid in fragment shader model.
   if (m_shaderStage != ShaderStageFragment)
-    return false;
+    return PreservedAnalyses::all();
 
   // Invoke handling of "kill" instructions.
   visit(m_module);
@@ -86,7 +77,7 @@ bool SpirvLowerTerminator::runImpl(Module &module) {
   }
   m_instsForRemoval.clear();
 
-  return changed;
+  return changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }
 
 // =====================================================================================================================

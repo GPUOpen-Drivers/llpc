@@ -53,17 +53,6 @@ namespace lgc {
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
 PreservedAnalyses PatchPeepholeOpt::run(Function &function, FunctionAnalysisManager &analysisManager) {
-  if (runImpl(function))
-    return PreservedAnalyses::none();
-  return PreservedAnalyses::all();
-}
-
-// =====================================================================================================================
-// Executes this LLVM pass on the specified LLVM function.
-//
-// @param [in/out] function : Function that we will peephole optimize.
-// @returns : True if the module was modified by the transformation and false otherwise
-bool PatchPeepholeOpt::runImpl(Function &function) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Peephole-Opt\n");
 
   m_changed = false;
@@ -78,7 +67,7 @@ bool PatchPeepholeOpt::runImpl(Function &function) {
   }
   m_instsToErase.clear();
 
-  return changed;
+  return changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }
 
 // =====================================================================================================================

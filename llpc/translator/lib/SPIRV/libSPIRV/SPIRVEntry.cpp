@@ -409,6 +409,9 @@ void SPIRVExecutionModeId::decode(std::istream &I) {
   case ExecutionModeLocalSizeId:
     Operands.resize(3);
     break;
+  case ExecutionModeFPFastMathDefault:
+    Operands.resize(2);
+    break;
   default:
     // Do nothing. Keep this to avoid VS2013 warning.
     break;
@@ -436,6 +439,10 @@ void SPIRVName::decode(std::istream &I) {
 
 void SPIRVName::validate() const {
   assert(WordCount == getSizeInWords(Str) + 2 && "Incorrect word count");
+}
+
+void SPIRVString::updateString(const char *str, unsigned len) {
+  Str = std::string(str, len);
 }
 
 _SPIRV_IMP_ENCDEC2(SPIRVString, Id, Str)

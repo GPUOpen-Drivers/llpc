@@ -166,13 +166,11 @@ public:
   virtual void collectAttributeDataSize(llvm::Type *type, const llvm::DataLayout &dataLayout) {}
   virtual void collectBuiltIn(unsigned builtIn) {}
 
-  static const char *getGpuNameAbbreviation(GfxIpVersion gfxIp);
-
   // Gets graphics IP version info
   GfxIpVersion getGfxIpVersion() const { return m_gfxIp; }
 
-  // Gets pipeline hash code compacted to 64-bits.
-  uint64_t getPipelineHashCode() const { return MetroHash::compact64(&m_pipelineHash); }
+  // Gets pipeline hash code.
+  uint64_t getPipelineHashCode() const;
 
   // Gets cache hash code compacted to 64-bits.
   uint64_t get64BitCacheHashCode() const { return MetroHash::compact64(&m_cacheHash); }
@@ -250,6 +248,7 @@ protected:
   MetroHash::Hash m_cacheHash;           // Cache hash code
   ResourceMappingData m_resourceMapping; // Contains resource mapping nodes and static descriptor values
   uint64_t m_pipelineLayoutApiHash;      // Pipeline Layout Api Hash
+  uint64_t m_pipelineApiHash;            // Pipeline Api Hash.
 
 private:
   PipelineContext() = delete;

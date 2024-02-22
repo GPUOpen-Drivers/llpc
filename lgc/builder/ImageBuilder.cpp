@@ -1294,7 +1294,7 @@ Value *BuilderImpl::CreateImageQuerySize(unsigned dim, unsigned flags, Value *im
   }
 
   // Proper image.
-  unsigned modifiedDim = dim == DimCubeArray ? DimCube : change1DTo2DIfNeeded(dim);
+  unsigned modifiedDim = dim == DimCubeArray ? DimCube : dim;
   Value *resInfo = nullptr;
 
   GfxIpVersion gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion();
@@ -1466,24 +1466,6 @@ Value *BuilderImpl::CreateImageBvhIntersectRay(Value *nodePtr, Value *extent, Va
 }
 
 // =====================================================================================================================
-// Change 1D or 1DArray dimension to 2D or 2DArray if needed as a workaround on GFX9+
-//
-// @param dim : Image dimension
-unsigned BuilderImpl::change1DTo2DIfNeeded(unsigned dim) {
-  if (getPipelineState()->getTargetInfo().getGpuWorkarounds().gfx9.treat1dImagesAs2d) {
-    switch (dim) {
-    case Dim1D:
-      return Dim2D;
-    case Dim1DArray:
-      return Dim2DArray;
-    default:
-      break;
-    }
-  }
-  return dim;
-}
-
-// =====================================================================================================================
 // Prepare coordinate and explicit derivatives, pushing the separate components into the supplied vectors, and
 // modifying if necessary.
 // Returns possibly modified image dimension.
@@ -1517,25 +1499,6 @@ unsigned BuilderImpl::prepareCoordinate(unsigned dim, Value *coord, Value *proje
   if (projective) {
     for (unsigned i = 0; i != outCoords.size(); ++i)
       outCoords[i] = CreateFMul(outCoords[i], projective);
-  }
-
-  // For 1D or 1DArray on GFX9+, change to 2D or 2DArray and add the extra component. The
-  // extra component is 0 for int or 0.5 for FP.
-  unsigned origDim = dim;
-  bool needExtraDerivativeDim = false;
-  dim = change1DTo2DIfNeeded(dim);
-  if (dim != origDim) {
-    Value *extraComponent = getInt32(0);
-    needExtraDerivativeDim = true;
-    if (!coordScalarTy->isIntegerTy())
-      extraComponent = ConstantFP::get(coordScalarTy, 0.5);
-
-    if (dim == Dim2D)
-      outCoords.push_back(extraComponent);
-    else {
-      outCoords.push_back(outCoords.back());
-      outCoords[1] = extraComponent;
-    }
   }
 
   if (coordScalarTy->isIntegerTy()) {
@@ -1602,22 +1565,12 @@ unsigned BuilderImpl::prepareCoordinate(unsigned dim, Value *coord, Value *proje
     } else
       outDerivatives.push_back(derivativeX);
 
-    if (needExtraDerivativeDim) {
-      // GFX9+ 1D -> 2D: need extra derivative too.
-      outDerivatives.push_back(Constant::getNullValue(outDerivatives[0]->getType()));
-    }
-
     // Derivatives by Y
     if (auto vectorDerivativeYTy = dyn_cast<FixedVectorType>(derivativeY->getType())) {
       for (unsigned i = 0; i != vectorDerivativeYTy->getNumElements(); ++i)
         outDerivatives.push_back(CreateExtractElement(derivativeY, i));
     } else
       outDerivatives.push_back(derivativeY);
-
-    if (needExtraDerivativeDim) {
-      // GFX9+ 1D -> 2D: need extra derivative too.
-      outDerivatives.push_back(Constant::getNullValue(outDerivatives[0]->getType()));
-    }
   }
   if (outDerivatives.empty() || dim != DimCube)
     return dim;

@@ -290,7 +290,7 @@ public:
   // Accessors for color export state
   const ColorExportFormat &getColorExportFormat(unsigned location, bool isDynamicDsBlend = false);
   const bool hasColorExportFormats() { return !m_colorExportFormats.empty(); }
-  const ColorExportState &getColorExportState() { return m_colorExportState; }
+  const ColorExportState &getColorExportState() const { return m_colorExportState; }
 
   // Accessors for pipeline state
   unsigned getDeviceIndex() const { return m_deviceIndex; }
@@ -658,7 +658,6 @@ private:
 class PipelineStateClearer : public llvm::PassInfoMixin<PipelineStateClearer> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
-  bool runImpl(llvm::Module &module, PipelineState *pipelineState);
 
   static llvm::StringRef name() { return "LLPC pipeline state clearer"; }
 };

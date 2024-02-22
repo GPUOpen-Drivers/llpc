@@ -54,33 +54,23 @@ using namespace llvm;
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
 PreservedAnalyses PatchNullFragShader::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
-  if (runImpl(module, pipelineState))
-    return PreservedAnalyses::none();
-  return PreservedAnalyses::all();
-}
 
-// =====================================================================================================================
-// Run the pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @returns : True if the module was modified by the transformation and false otherwise
-bool PatchNullFragShader::runImpl(Module &module, PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Null-Frag-Shader\n");
 
   Patch::init(&module);
 
   // Do not add a null fragment shader if not generating a whole pipeline.
   if (!pipelineState->isWholePipeline())
-    return false;
+    return PreservedAnalyses::all();
 
   // If a fragment shader is not needed, then do not generate one.
   const bool hasFs = pipelineState->hasShaderStage(ShaderStage::Fragment);
   if (hasFs || !pipelineState->isGraphics())
-    return false;
+    return PreservedAnalyses::all();
 
   FragColorExport::generateNullFragmentShader(module, pipelineState, lgcName::NullFsEntryPoint);
   updatePipelineState(pipelineState);
-  return true;
+  return PreservedAnalyses::none();
 }
 
 // =====================================================================================================================

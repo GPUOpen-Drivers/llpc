@@ -3,7 +3,7 @@
 
 // BEGIN_SHADERTEST
 /*
-; RUN: amdllpc -v %gfxip %s -enable-scratch-bounds-checks | FileCheck -check-prefix=SHADERTEST %s
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
 ; SHADERTEST-LABEL: {{^// LLPC}} final pipeline module info
 ; SHADERTEST: define dllexport amdgpu_ps {{.*}} @_amdgpu_ps_main
 ; SHADERTEST-NOT: phi

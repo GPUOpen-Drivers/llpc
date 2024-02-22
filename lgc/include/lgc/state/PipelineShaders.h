@@ -56,7 +56,6 @@ class PipelineShaders : public llvm::AnalysisInfoMixin<PipelineShaders> {
 public:
   using Result = PipelineShadersResult;
   PipelineShadersResult run(llvm::Module &module, llvm::ModuleAnalysisManager &);
-  PipelineShadersResult runImpl(llvm::Module &module);
   static llvm::AnalysisKey Key;
 };
 

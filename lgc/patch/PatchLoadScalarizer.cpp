@@ -58,18 +58,7 @@ PreservedAnalyses PatchLoadScalarizer::run(Function &function, FunctionAnalysisM
   const auto &moduleAnalysisManager = analysisManager.getResult<ModuleAnalysisManagerFunctionProxy>(function);
   PipelineState *pipelineState =
       moduleAnalysisManager.getCachedResult<PipelineStateWrapper>(*function.getParent())->getPipelineState();
-  if (runImpl(function, pipelineState))
-    return PreservedAnalyses::none();
-  return PreservedAnalyses::all();
-}
 
-// =====================================================================================================================
-// Executes this LLVM pass on the specified LLVM function.
-//
-// @param [in/out] function : Function that will run this optimization.
-// @param [in/out] pipelineState : Pipeline state object to use for this pass
-// @returns : True if the module was modified by the transformation and false otherwise
-bool PatchLoadScalarizer::runImpl(Function &function, PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Load-Scalarizer-Opt\n");
 
   auto shaderStage = lgc::getShaderStage(&function);
@@ -79,7 +68,7 @@ bool PatchLoadScalarizer::runImpl(Function &function, PipelineState *pipelineSta
   if (shaderStage)
     m_scalarThreshold = pipelineState->getShaderOptions(shaderStage.value()).loadScalarizerThreshold;
   if (m_scalarThreshold == 0)
-    return false;
+    return PreservedAnalyses::all();
 
   m_builder = std::make_unique<IRBuilder<>>(function.getContext());
 
@@ -93,7 +82,7 @@ bool PatchLoadScalarizer::runImpl(Function &function, PipelineState *pipelineSta
   }
   m_instsToErase.clear();
 
-  return changed;
+  return changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }
 
 // =====================================================================================================================

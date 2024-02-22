@@ -49,7 +49,6 @@ class SpirvLowerGlobal : public SpirvLower, public llvm::PassInfoMixin<SpirvLowe
 public:
   SpirvLowerGlobal();
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
-  bool runImpl(llvm::Module &module);
 
   void handleCallInst(bool checkEmitCall, bool checkInterpCall);
 

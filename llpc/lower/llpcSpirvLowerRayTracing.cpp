@@ -32,6 +32,7 @@
 #include "llpcSpirvLowerRayTracing.h"
 #include "SPIRVInternal.h"
 #include "continuations/ContinuationsUtil.h"
+#include "continuations/GpurtContext.h"
 #include "gpurt-compiler.h"
 #include "llpcContext.h"
 #include "llpcRayTracingContext.h"

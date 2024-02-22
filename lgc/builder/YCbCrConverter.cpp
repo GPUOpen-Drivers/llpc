@@ -365,17 +365,6 @@ void YCbCrConverter::genImgDescChroma() {
     Value *isBgRgFmt = nullptr;
 
     switch (m_gfxIp->major) {
-    case 9: {
-      isGbGrFmt = m_builder->CreateICmpEQ(imgDataFmt,
-                                          m_builder->getInt32(BuilderImpl::ImgDataFormat::IMG_DATA_FORMAT_BG_RG__CORE));
-
-      isBgRgFmt = m_builder->CreateICmpEQ(imgDataFmt,
-                                          m_builder->getInt32(BuilderImpl::ImgDataFormat::IMG_DATA_FORMAT_GB_GR__CORE));
-
-      proxySqRsrcRegHelper.setReg(SqRsrcRegs::Format,
-                                  m_builder->getInt32(BuilderImpl::ImgDataFormat::IMG_DATA_FORMAT_8_8_8_8));
-      break;
-    }
     case 10: {
       isGbGrFmt = m_builder->CreateICmpEQ(
           imgDataFmt, m_builder->getInt32(BuilderImpl::ImgFmtGfx10::IMG_FMT_BG_RG_UNORM__GFX10CORE));

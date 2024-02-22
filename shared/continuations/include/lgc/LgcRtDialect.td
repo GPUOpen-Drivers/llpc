@@ -85,13 +85,13 @@ def AcceptHitAndEndSearchOp : LgcRtOp<"accept.hit.and.end.search", [Memory<[(wri
 
 // =========================================================================================================
 def CallCallableShaderOp : LgcRtOp<"call.callable.shader", [Memory<[(readwrite InaccessibleMem), (readwrite ArgMem)]>, WillReturn]> {
-  let arguments = (ins I32:$shaderIndex, PointerType:$param, AttrI32:$paramDataSizeBytes);
+  let arguments = (ins I32:$shader_index, PointerType:$param, AttrI32:$param_data_size_bytes);
   let results = (outs);
 
   let summary = "Call a ray-tracing callable shader";
   let description = [{
     Call the ray-tracing callable shader at the specified index in the callable shader table,
-    passing the parameter in and out. $paramDataSizeBytes refers to the size of the data
+    passing the parameter in and out. $param_data_size_bytes refers to the size of the data
     pointed to by $param, given in bytes.
   }];
 }
@@ -256,7 +256,7 @@ def RayTminOp : LgcRtOp<"ray.tmin", [Memory<[]>, WillReturn]> {
 
 // =========================================================================================================
 def ReportHitOp : LgcRtOp<"report.hit", [Memory<[(write InaccessibleMem), (read ArgMem)]>]> {
-  let arguments = (ins F32:$thit, I32:$hitKind, PointerType:$attributes, AttrI32:$size);
+  let arguments = (ins F32:$thit, I32:$hit_kind, PointerType:$attributes, AttrI32:$size);
   let results = (outs I1:$result);
 
   let summary = "Report a hit in an intersection shader";
@@ -266,7 +266,7 @@ def ReportHitOp : LgcRtOp<"report.hit", [Memory<[(write InaccessibleMem), (read 
 
     - thit: Parametric distance of the intersection.
 
-    - hitKind: User-specified hit kind in the range 0-127, visible to anyHit and closestHit shaders using
+    - hit_kind: User-specified hit kind in the range 0-127, visible to anyHit and closestHit shaders using
       HitKindOp.
 
     - attributes: User-defined intersection attributes.
@@ -291,14 +291,14 @@ def ShaderIndexOp : LgcRtOp<"shader.index", [Memory<[]>, WillReturn]> {
 
 // =========================================================================================================
 def ShaderRecordBufferOp : LgcRtOp<"shader.record.buffer", [Memory<[]>, WillReturn]> {
-  let arguments = (ins I32:$shaderIndex);
+  let arguments = (ins I32:$shader_index);
   let results = (outs GlobalPointer:$ptr);
 
   let summary = "Return the pointer to shader record buffer";
   let description = [{
     Return the pointer to shader record buffer.
 
-    - shaderIndex: The value used to index into the shader binding table.
+    - shader_index: The value used to index into the shader binding table.
   }];
 }
 

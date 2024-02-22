@@ -41,8 +41,6 @@ class PatchLlvmIrInclusion : public Patch, public llvm::PassInfoMixin<PatchLlvmI
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  bool runImpl(llvm::Module &module);
-
   static llvm::StringRef name() { return "Include LLVM IR as a separate section in the ELF binary"; }
 };
 

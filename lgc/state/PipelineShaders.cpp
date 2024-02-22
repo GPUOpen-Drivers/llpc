@@ -49,24 +49,12 @@ PipelineShadersResult::PipelineShadersResult() {
 }
 
 // =====================================================================================================================
-// Run the pass on the specified LLVM module.
+// Run the analysis on the specified LLVM module.
 //
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 // @returns : Result object of the PipelineShaders pass
 PipelineShadersResult PipelineShaders::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  return runImpl(module);
-}
-
-// =====================================================================================================================
-// Run the pass on the specified LLVM module.
-//
-// This populates the shader array. In the pipeline module, a shader entrypoint is a non-internal function definition,
-// and it has metadata giving the SPIR-V execution model.
-//
-// @param [in/out] module : LLVM module to be run on
-// @returns : Result object of the PipelineShaders pass
-PipelineShadersResult PipelineShaders::runImpl(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Pipeline-Shaders\n");
 
   PipelineShadersResult result;

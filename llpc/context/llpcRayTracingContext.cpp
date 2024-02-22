@@ -58,6 +58,7 @@ RayTracingContext::RayTracingContext(GfxIpVersion gfxIP, const RayTracingPipelin
 
   m_resourceMapping = pipelineInfo->resourceMapping;
   m_pipelineLayoutApiHash = pipelineInfo->pipelineLayoutApiHash;
+  m_pipelineApiHash = pipelineInfo->pipelineApiHash;
 
   if (representativeShaderInfo)
     m_representativeShaderInfo.options = representativeShaderInfo->options;

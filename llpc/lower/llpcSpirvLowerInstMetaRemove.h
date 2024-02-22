@@ -42,7 +42,6 @@ public:
   SpirvLowerInstMetaRemove();
 
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
-  bool runImpl(llvm::Module &module);
 
   static llvm::StringRef name() { return "Lower SPIR-V instruction metadata by removing those targeted"; }
 

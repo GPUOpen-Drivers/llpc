@@ -57,7 +57,6 @@ void YCbCrAddressHandler::genBaseAddress(unsigned planeCount) {
   Value *pipeBankXorNone = m_builder->getInt32(0);
 
   switch (m_gfxIp->major) {
-  case 9:
   case 11: {
     pipeBankXor1 = pipeBankXorNone;
     pipeBankXor2 = pipeBankXorNone;
@@ -138,28 +137,6 @@ void YCbCrAddressHandler::genHeightAndPitch(unsigned bits, unsigned bpp, unsigne
   m_swizzleMode = m_regHandler->getReg(SqRsrcRegs::SwizzleMode);
 
   switch (m_gfxIp->major) {
-  case 9: {
-    // Height = SqRsrcRegs::Height
-    Value *height = m_regHandler->getReg(SqRsrcRegs::Height);
-    // HeightHalf = Height * 0.5
-    Value *heightHalf = m_builder->CreateLShr(height, m_one);
-
-    m_heightY = height;
-    m_heightCb = heightHalf;
-
-    // Pitch = SqRsrcRegs::Pitch
-    Value *pitch = m_regHandler->getReg(SqRsrcRegs::Pitch);
-    // PitchHalf = Pitch * 0.5
-    Value *pitchHalf = m_builder->CreateLShr(pitch, m_one);
-
-    // PitchY * (xBitCount >> 3)
-    m_pitchY = m_builder->CreateMul(pitch, m_builder->CreateLShr(m_builder->getInt32(xBitCount), 3));
-
-    // PitchCb = PitchCb * (xBitCount >> 3)
-    m_pitchCb = m_builder->CreateMul(pitchHalf, m_builder->CreateLShr(m_builder->getInt32(xBitCount), 3));
-
-    break;
-  }
   case 10:
   case 11: {
     const unsigned elementBytes = bpp >> 3;

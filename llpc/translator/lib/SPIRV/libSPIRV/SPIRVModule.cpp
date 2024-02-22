@@ -368,6 +368,54 @@ void SPIRVModuleImpl::postProcessExecutionModeId() {
       execMode = add(new SPIRVExecutionMode(getEntry(tid), ExecutionModeLocalSizeId, ops[0], ops[1], ops[2]));
       break;
     }
+    case ExecutionModeFPFastMathDefault: {
+      assert(ops.size() == 2); // Must have 2 words
+      auto targetType = static_cast<SPIRVType *>(getEntry(ops[0]));
+      assert(targetType && targetType->isTypeFloat()); // Must be a scalar floating-point type
+      const SPIRVWord fastMathMode = static_cast<SPIRVConstant *>(getEntry(ops[1]))->getZExtIntValue();
+
+      // Try to find if we have already added this execution mode because FPFastMathDefault can appear for multiple
+      // times in SPIR-V binary to specify different fast math defaults for different FP types.
+      auto fpFastMathDefault =
+          static_cast<SPIRVFunction *>(getEntry(tid))->getExecutionMode(ExecutionModeFPFastMathDefault);
+      if (fpFastMathDefault) {
+        switch (targetType->getBitWidth()) {
+        case 16:
+          fpFastMathDefault->updateLiteral(0, fastMathMode);
+          break;
+        case 32:
+          fpFastMathDefault->updateLiteral(1, fastMathMode);
+          break;
+        case 64:
+          fpFastMathDefault->updateLiteral(2, fastMathMode);
+          break;
+        default:
+          llvm_unreachable("Unexpected bit width!");
+          break;
+        }
+      } else {
+        // Not found, create a new one with initialized values.
+        SPIRVWord fpDefault[3] = {SPIRVWORD_MAX, SPIRVWORD_MAX, SPIRVWORD_MAX};
+        switch (targetType->getBitWidth()) {
+        case 16:
+          fpDefault[0] = fastMathMode;
+          break;
+        case 32:
+          fpDefault[1] = fastMathMode;
+          break;
+        case 64:
+          fpDefault[2] = fastMathMode;
+          break;
+        default:
+          llvm_unreachable("Unexpected bit width!");
+          break;
+        }
+        fpFastMathDefault = add(new SPIRVExecutionMode(getEntry(tid), ExecutionModeFPFastMathDefault, fpDefault[0],
+                                                       fpDefault[1], fpDefault[2]));
+        execMode = fpFastMathDefault;
+      }
+      break;
+    }
     default:
       break;
     }

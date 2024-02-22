@@ -31,7 +31,6 @@
  */
 #include "GlueShader.h"
 #include "ColorExportShader.h"
-#include "FetchShader.h"
 #include "NullFragmentShader.h"
 #include "lgc/state/PassManagerCache.h"
 #include "llvm-dialects/Dialect/Dialect.h"
@@ -59,14 +58,6 @@ void GlueShader::compile(raw_pwrite_stream &outStream) {
   passManagers.second.run(*module);
 
   m_lgcContext->getPassManagerCache()->resetStream();
-}
-
-// =====================================================================================================================
-// Create a fetch shader object
-std::unique_ptr<GlueShader> GlueShader::createFetchShader(PipelineState *pipelineState,
-                                                          ArrayRef<VertexFetchInfo> fetches,
-                                                          const VsEntryRegInfo &vsEntryRegInfo) {
-  return std::make_unique<FetchShader>(pipelineState, fetches, vsEntryRegInfo);
 }
 
 // =====================================================================================================================

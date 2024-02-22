@@ -80,6 +80,10 @@ Value *BuilderImpl::CreateBufferDesc(uint64_t descSet, unsigned binding, Value *
   const ResourceNode *topNode = nullptr;
   const ResourceNode *node = nullptr;
   std::tie(topNode, node) = m_pipelineState->findResourceNode(abstractType, descSet, binding, m_shaderStage);
+  if (!node && (flags & BufferFlagAddress)) {
+    std::tie(topNode, node) =
+        m_pipelineState->findResourceNode(ResourceNodeType::InlineBuffer, descSet, binding, m_shaderStage);
+  }
   if (!node) {
     // If we can't find the node, assume mutable descriptor and search for any node.
     std::tie(topNode, node) =
@@ -111,6 +115,8 @@ Value *BuilderImpl::CreateBufferDesc(uint64_t descSet, unsigned binding, Value *
   } else if (node->concreteType == ResourceNodeType::InlineBuffer) {
     // Handle an inline buffer specially. Get a pointer to it, then expand to a descriptor.
     Value *descPtr = getDescPtr(node->concreteType, topNode, node, binding);
+    if (return64Address)
+      return descPtr;
     desc = buildInlineBufferDesc(descPtr);
   } else {
     ResourceNodeType resType = node->concreteType;
@@ -404,11 +410,7 @@ Value *BuilderImpl::buildBufferCompactDesc(Value *desc) {
   sqBufRsrcWord3.bits.dstSelY = BUF_DST_SEL_Y;
   sqBufRsrcWord3.bits.dstSelZ = BUF_DST_SEL_Z;
   sqBufRsrcWord3.bits.dstSelW = BUF_DST_SEL_W;
-  if (gfxIp.major < 10) {
-    sqBufRsrcWord3.gfx9.numFormat = BUF_NUM_FORMAT_UINT;
-    sqBufRsrcWord3.gfx9.dataFormat = BUF_DATA_FORMAT_32;
-    assert(sqBufRsrcWord3.u32All == 0x24FAC);
-  } else if (gfxIp.major == 10) {
+  if (gfxIp.major == 10) {
     sqBufRsrcWord3.gfx10.format = BUF_FORMAT_32_UINT;
     sqBufRsrcWord3.gfx10.resourceLevel = 1;
     sqBufRsrcWord3.gfx10.oobSelect = 2;

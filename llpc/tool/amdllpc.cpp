@@ -43,7 +43,9 @@
 #include "llpcShaderCacheWrap.h"
 #include "llpcThreading.h"
 #include "llpcUtil.h"
+#ifndef LLPC_DISABLE_SPVGEN
 #include "spvgen.h"
+#endif
 #include "vkgcCapability.h"
 #include "vkgcExtension.h"
 #include "lgc/LgcContext.h"
@@ -504,10 +506,12 @@ static Result init(int argc, char *argv[], ICompiler *&compiler, ShaderCacheWrap
     *static_cast<cl::opt<std::string> *>(opt) = ".";
   }
 
+#ifndef LLPC_DISABLE_SPVGEN
   if (!InitSpvGen(nullptr)) {
     LLPC_ERRS("Failed to initialize SPVGEN\n");
     return Result::ErrorUnavailable;
   }
+#endif
 
   // Check to see that the ParsedGfxIp is valid
   std::string gfxIpName = lgc::LgcContext::getGpuNameString(ParsedGfxIp.major, ParsedGfxIp.minor, ParsedGfxIp.stepping);
@@ -849,7 +853,9 @@ int main(int argc, char *argv[]) {
 
   // Cleanup code that gets run automatically before returning.
   auto onExit = make_scope_exit([compiler, cache, &result] {
+#ifndef LLPC_DISABLE_SPVGEN
     FinalizeSpvgen();
+#endif
 
     if (compiler)
       compiler->Destroy();

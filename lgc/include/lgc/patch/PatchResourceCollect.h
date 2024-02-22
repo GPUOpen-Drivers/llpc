@@ -56,8 +56,6 @@ public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
   virtual void visitCallInst(llvm::CallInst &callInst);
 
-  bool runImpl(llvm::Module &module, PipelineShadersResult &pipelineShaders, PipelineState *pipelineState);
-
   static llvm::StringRef name() { return "Patch LLVM for resource collecting"; }
 
 private:

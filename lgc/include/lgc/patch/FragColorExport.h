@@ -59,11 +59,21 @@ enum class CompSetting : unsigned {
 // Represents the manager of fragment color export operations.
 class FragColorExport {
 public:
-  FragColorExport(llvm::LLVMContext *context, PipelineState *pipelineState);
+  // Color export Info
+  struct Key {
+    ColorExportState colorExportState;          // Color export state
+    unsigned channelWriteMask[MaxColorTargets]; // Write mask to specify destination channels
+    unsigned expFmt[MaxColorTargets];           // Export format used for "export" instruction.
+    unsigned dualExpFmt[2]; // Dual source blend export format. valid if dual source blend is enabled.
+    unsigned waveSize;      // The wave size for fragment.
+    bool enableFragColor;   // Whether to broadcast frag color. Only for OGLP
+  };
+
+  FragColorExport(LgcContext *context);
 
   void generateExportInstructions(llvm::ArrayRef<lgc::ColorExportInfo> info, llvm::ArrayRef<llvm::Value *> values,
                                   bool dummyExport, PalMetadata *palMetadata, BuilderBase &builder,
-                                  llvm::Value *dynamicIsDualSource);
+                                  llvm::Value *dynamicIsDualSource, const Key &key);
   static void setDoneFlag(llvm::Value *exportInst, BuilderBase &builder);
   static llvm::CallInst *addDummyExport(BuilderBase &builder);
   static llvm::Function *generateNullFragmentShader(llvm::Module &module, PipelineState *pipelineState,
@@ -72,11 +82,13 @@ public:
                                                         llvm::StringRef entryPointName);
   static void generateNullFragmentShaderBody(llvm::Function *entryPoint);
 
+  static Key computeKey(llvm::ArrayRef<ColorExportInfo> info, PipelineState *pipelineState);
+
 private:
   FragColorExport() = delete;
   FragColorExport(const FragColorExport &) = delete;
   FragColorExport &operator=(const FragColorExport &) = delete;
-  void updateColorExportInfoWithBroadCastInfo(llvm::ArrayRef<ColorExportInfo> originExpinfo,
+  void updateColorExportInfoWithBroadCastInfo(const Key &key, llvm::ArrayRef<ColorExportInfo> originExpinfo,
                                               llvm::SmallVector<ColorExportInfo> &outExpinfo, unsigned *pCbShaderMask);
   llvm::Value *handleColorExportInstructions(llvm::Value *output, unsigned int hwColorExport, BuilderBase &builder,
                                              ExportFormat expFmt, const bool signedness, unsigned channelWriteMask,
@@ -85,15 +97,14 @@ private:
   llvm::Value *convertToFloat(llvm::Value *value, bool signedness, BuilderBase &builder) const;
   llvm::Value *convertToInt(llvm::Value *value, bool signedness, BuilderBase &builder) const;
 
-  llvm::Value *dualSourceSwizzle(BuilderBase &builder);
+  llvm::Value *dualSourceSwizzle(unsigned waveSize, BuilderBase &builder);
 
   // Colors to be exported for dual-source-blend
   llvm::SmallVector<llvm::Value *, 4> m_blendSources[2];
   // Number of color channels for dual-source-blend
   unsigned m_blendSourceChannels;
 
-  llvm::LLVMContext *m_context;   // LLVM context
-  PipelineState *m_pipelineState; // The pipeline state
+  LgcContext *m_lgcContext;
 };
 
 // The information needed for an export to a hardware color target.
@@ -108,8 +119,6 @@ class LowerFragColorExport : public llvm::PassInfoMixin<LowerFragColorExport> {
 public:
   LowerFragColorExport();
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
-
-  bool runImpl(llvm::Module &module, PipelineShadersResult &pipelineShaders, PipelineState *pipelineState);
 
   static llvm::StringRef name() { return "Lower fragment color export calls"; }
 

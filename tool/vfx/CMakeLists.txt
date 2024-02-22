@@ -33,6 +33,10 @@ option(VFX_ENABLE_WERROR "Build ${PROJECT_NAME} with more errors" OFF)
 
 target_compile_definitions(vfx PRIVATE ${TARGET_ARCHITECTURE_ENDIANESS}ENDIAN_CPU)
 
+if (LLPC_DISABLE_SPVGEN)
+  target_compile_definitions(vfx PRIVATE VFX_DISABLE_SPVGEN=1)
+endif()
+
 target_sources(vfx PRIVATE
     vfxParser.cpp
     vfxPipelineDoc.cpp
@@ -45,7 +49,10 @@ target_compile_definitions(vfx PRIVATE VFX_SUPPORT_VK_PIPELINE SH_EXPORTING)
 
 target_include_directories(vfx PUBLIC ${PROJECT_SOURCE_DIR})
 
-target_link_libraries(vfx PRIVATE spvgen_static vkgc_headers khronos_vulkan_interface khronos_spirv_interface)
+target_link_libraries(vfx PRIVATE vkgc_headers khronos_vulkan_interface khronos_spirv_interface)
+if (NOT LLPC_DISABLE_SPVGEN)
+    target_link_libraries(vfx PRIVATE spvgen_static)
+endif()
 
 if(ICD_BUILD_LLPC)
     target_compile_definitions(vfx PRIVATE ICD_BUILD_LLPC)

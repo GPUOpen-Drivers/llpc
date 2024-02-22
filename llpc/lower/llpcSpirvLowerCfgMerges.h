@@ -40,7 +40,6 @@ namespace Llpc {
 class SpirvLowerCfgMerges : public SpirvLower, public llvm::PassInfoMixin<SpirvLowerCfgMerges> {
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
-  bool runImpl(llvm::Module &module);
 
   void mapConvergentValues(llvm::Module &module);
 

@@ -93,14 +93,13 @@ Value *BuilderImpl::CreateReadPerVertexInput(Type *resultTy, unsigned location, 
   assert(m_shaderStage == ShaderStage::Fragment);
 
   // Fold constant locationOffset into location.
-  if (auto constLocOffset = dyn_cast<ConstantInt>(locationOffset)) {
-    location += constLocOffset->getZExtValue();
-    locationOffset = getInt32(0);
-    locationCount = divideCeil(resultTy->getPrimitiveSizeInBits(), 128);
-  }
+  assert(isa<ConstantInt>(locationOffset));
+  location += cast<ConstantInt>(locationOffset)->getZExtValue();
+  locationOffset = getInt32(0);
+  locationCount = divideCeil(resultTy->getPrimitiveSizeInBits(), 128);
 
   // Mark the usage of the input/output.
-  markGenericInputOutputUsage(false, location, locationCount, inputInfo, vertexIndex);
+  markGenericInputOutputUsage(false, location, locationCount, inputInfo, vertexIndex != nullptr);
 
   // Lambda to do the actual input read.
   auto readInput = [&](Value *vertexIndex) {
@@ -182,16 +181,17 @@ Value *BuilderImpl::readGenericInputOutput(bool isOutput, Type *resultTy, unsign
 
   // Fold constant locationOffset into location. (Currently a variable locationOffset is only supported in
   // TCS, TES, mesh shader, and FS custom interpolation.)
-  bool isDynLocOffset = true;
+  bool directlyMapLocations = true;
   if (auto constLocOffset = dyn_cast<ConstantInt>(locationOffset)) {
     location += constLocOffset->getZExtValue();
     locationOffset = getInt32(0);
     locationCount = (resultTy->getPrimitiveSizeInBits() + 127U) / 128U;
-    isDynLocOffset = false;
+    directlyMapLocations = false; // Reset this flag if dynamic location indexing is avoided
   }
 
   // Mark the usage of the input/output.
-  markGenericInputOutputUsage(isOutput, location, locationCount, inOutInfo, vertexIndex, isDynLocOffset);
+  markGenericInputOutputUsage(isOutput, location, locationCount, inOutInfo, vertexIndex != nullptr,
+                              directlyMapLocations);
 
   // Generate LLPC call for reading the input/output.
   Value *result = nullptr;
@@ -269,17 +269,17 @@ Instruction *BuilderImpl::CreateWriteGenericOutput(Value *valueToWrite, unsigned
 
   // Fold constant locationOffset into location (Currently a variable locationOffset is only supported in
   // TCS or mesh shader).
-  bool isDynLocOffset = true;
+  bool directlyMapLocations = true;
   if (auto constLocOffset = dyn_cast<ConstantInt>(locationOffset)) {
     location += constLocOffset->getZExtValue();
     locationOffset = getInt32(0);
     locationCount = (valueToWrite->getType()->getPrimitiveSizeInBits() + 127U) / 128U;
-    isDynLocOffset = false;
+    directlyMapLocations = false; // Reset this flag if dynamic location indexing is avoided
   }
 
   // Mark the usage of the output.
-  markGenericInputOutputUsage(/*isOutput=*/true, location, locationCount, outputInfo, vertexOrPrimitiveIndex,
-                              isDynLocOffset);
+  markGenericInputOutputUsage(/*isOutput=*/true, location, locationCount, outputInfo, vertexOrPrimitiveIndex != nullptr,
+                              directlyMapLocations);
 
   // Set up the args for the llpc call.
   SmallVector<Value *, 6> args;
@@ -348,13 +348,16 @@ Instruction *BuilderImpl::CreateWriteGenericOutput(Value *valueToWrite, unsigned
 // @param location : Input/output base location
 // @param locationCount : Count of locations taken by the input/output
 // @param inOutInfo : Extra input/output information
-// @param vertexOrPrimIndex : For TCS/TES/GS/mesh shader per-vertex input/output: vertex index;
-//                            for mesh shader per-primitive output: primitive index;
-//                            for FS custom-interpolated input: auxiliary value;
-//                            else nullptr.
-// @param isDynLocOffset : Whether the location offset is dynamic indexing
+// @param hasVertexOrPrimIndex : Whether this input or output takes a vertex or primitive index. For TCS/TES/GS/mesh
+//                               shader, this is the vertex index for per-vertex input/output; for mesh shader, this
+//                               is the primitive index for per-primitive output; for FS custom-interpolated input,
+//                               this is the auxiliary value.
+// @param directlyMapLocations : Directly map locations to new ones with trivial map (keep location/component
+//                               unchanged). This is for dynamic indexing for arrayed input/output when locations of
+//                               their elements are dynamic indexed.
 void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, unsigned locationCount,
-                                              InOutInfo &inOutInfo, Value *vertexOrPrimIndex, bool isDynLocOffset) {
+                                              InOutInfo &inOutInfo, bool hasVertexOrPrimIndex,
+                                              bool directlyMapLocations) {
   auto resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage.value());
 
   // Mark the input or output locations as in use.
@@ -366,7 +369,7 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
       // Per-primitive input
       assert(m_shaderStage == ShaderStage::Fragment); // Must be FS
       perPrimitiveInOutLocMap = &resUsage->inOutUsage.perPrimitiveInputLocMap;
-    } else if (m_shaderStage != ShaderStage::TessEval || vertexOrPrimIndex) {
+    } else if (m_shaderStage != ShaderStage::TessEval || hasVertexOrPrimIndex) {
       // Per-vertex input
       inOutLocInfoMap = &resUsage->inOutUsage.inputLocInfoMap;
     } else {
@@ -379,7 +382,7 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
       // Per-primitive output
       assert(m_shaderStage == ShaderStage::Mesh); // Must be mesh shader
       perPrimitiveInOutLocMap = &resUsage->inOutUsage.perPrimitiveOutputLocMap;
-    } else if (m_shaderStage != ShaderStage::TessControl || vertexOrPrimIndex) {
+    } else if (m_shaderStage != ShaderStage::TessControl || hasVertexOrPrimIndex) {
       // Per-vertex output
       inOutLocInfoMap = &resUsage->inOutUsage.outputLocInfoMap;
     } else {
@@ -426,8 +429,8 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
         origLocationInfo.setLocation(location + i);
         origLocationInfo.setComponent(inOutInfo.getComponent());
         auto &newLocationInfo = (*inOutLocInfoMap)[origLocationInfo];
-        if (isDynLocOffset) {
-          // When dynamic indexing, map the location directly
+        if (directlyMapLocations) {
+          // Directly map the locations (trivial map) without further calculation
           newLocationInfo.setLocation(location + i);
           newLocationInfo.setComponent(inOutInfo.getComponent());
         } else
@@ -449,7 +452,8 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
       // Add location map entries for this input/output
       for (unsigned i = 0; i < locationCount; ++i)
         (*perPatchInOutLocMap)[location + i] =
-            isDynLocOffset ? location + i : InvalidValue; // When dynamic indexing, map the location
+            directlyMapLocations ? location + i
+                                 : InvalidValue; // Directly map the locations (trivial map) without further calculation
     }
 
     if (perPrimitiveInOutLocMap) {
@@ -466,7 +470,8 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
       // Add location map entries for this input/output
       for (unsigned i = 0; i < locationCount; ++i)
         (*perPrimitiveInOutLocMap)[location + i] =
-            isDynLocOffset ? location + i : InvalidValue; // When dynamic indexing, map the location
+            directlyMapLocations ? location + i
+                                 : InvalidValue; // Directly map the locations (trivial map) without further calculation
     }
   } else {
     // GS output
@@ -848,7 +853,7 @@ Value *BuilderImpl::CreateReadBaryCoord(BuiltInKind builtIn, InOutInfo inputInfo
   assert(interpMode == InOutInfo::InterpModeSmooth);
   (void)interpMode;
 
-  return normalizeBaryCoord(interpValue);
+  return normalizeBaryCoord(inputInfo, interpValue);
 }
 
 // =====================================================================================================================
@@ -1026,7 +1031,7 @@ void BuilderImpl::getProvokingVertexInfo(llvm::Value **isOne, llvm::Value **isTw
 //
 // @param iJCoord : IJ coordinates provided for the HW interpolation view
 // @returns : gl_Barycoord
-Value *BuilderImpl::normalizeBaryCoord(Value *iJCoord) {
+Value *BuilderImpl::normalizeBaryCoord(InOutInfo inputInfo, Value *iJCoord) {
   auto baryType = FixedVectorType::get(getFloatTy(), 3);
   auto zero = ConstantFP::get(getFloatTy(), 0.0);
   auto one = ConstantFP::get(getFloatTy(), 1.0);
@@ -1060,6 +1065,11 @@ Value *BuilderImpl::normalizeBaryCoord(Value *iJCoord) {
     Value *barycoord1 = CreateInsertElement(PoisonValue::get(baryType), hwCoord[0], uint64_t(0));
     barycoord1 = CreateInsertElement(barycoord1, hwCoord[1], 1);
     barycoord1 = CreateInsertElement(barycoord1, hwCoord[2], 2);
+
+    if (inputInfo.isProvokingVertexModeDisabled()) {
+      // return the original i,j,k w/o any adjustment
+      return barycoord1;
+    }
 
     Value *barycoord0 = CreateShuffleVector(barycoord1, ArrayRef<int>({2, 0, 1}));
     Value *barycoord2 = CreateShuffleVector(barycoord1, ArrayRef<int>({1, 2, 0}));

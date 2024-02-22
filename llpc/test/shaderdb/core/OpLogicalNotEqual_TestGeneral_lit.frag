@@ -29,10 +29,10 @@ void main()
 // SHADERTEST-NEXT:  .entry:
 // SHADERTEST-NEXT:    [[TMP0:%.*]] = call ptr addrspace(7) @lgc.load.buffer.desc(i64 0, i32 0, i32 0, i32 2)
 // SHADERTEST-NEXT:    [[TMP1:%.*]] = load i32, ptr addrspace(7) [[TMP0]], align 4
-// SHADERTEST-NEXT:    [[TMP2:%.*]] = getelementptr inbounds <{ i32, [4 x i8], [2 x i32] }>, ptr addrspace(7) [[TMP0]], i32 0, i32 2, i32 0
+// SHADERTEST-NEXT:    [[TMP2:%.*]] = getelementptr inbounds {{i8|<{ i32, [[]4 x i8], [[]2 x i32] }>}}, ptr addrspace(7) [[TMP0]], i32 {{8|0, i32 2, i32 0}}
 // SHADERTEST-NEXT:    [[TMP3:%.*]] = load i32, ptr addrspace(7) [[TMP2]], align 4
 // SHADERTEST-NEXT:    [[TMP4:%.*]] = icmp eq i32 [[TMP1]], [[TMP3]]
-// SHADERTEST-NEXT:    [[TMP5:%.*]] = getelementptr inbounds <{ i32, [4 x i8], [2 x i32] }>, ptr addrspace(7) [[TMP0]], i32 0, i32 2, i32 1
+// SHADERTEST-NEXT:    [[TMP5:%.*]] = getelementptr inbounds {{i8|<{ i32, [[]4 x i8], [[]2 x i32] }>}}, ptr addrspace(7) [[TMP0]], i32 {{12|0, i32 2, i32 1}}
 // SHADERTEST-NEXT:    [[TMP6:%.*]] = load i32, ptr addrspace(7) [[TMP5]], align 4
 // SHADERTEST-NEXT:    [[TMP7:%.*]] = icmp ne i32 [[TMP1]], [[TMP6]]
 // SHADERTEST-NEXT:    [[TMP8:%.*]] = and i1 [[TMP4]], [[TMP7]]

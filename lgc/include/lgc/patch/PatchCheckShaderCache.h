@@ -46,8 +46,6 @@ public:
 
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  bool runImpl(llvm::Module &module, PipelineState *pipelineState);
-
   static llvm::StringRef name() { return "Patch LLVM for checking shader cache"; }
 
   // Set the callback function that this pass uses to ask the front-end whether it wants to remove

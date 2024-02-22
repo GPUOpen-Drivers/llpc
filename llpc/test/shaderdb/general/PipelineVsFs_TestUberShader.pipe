@@ -9,7 +9,7 @@
 ; SHADERTEST: [[PTR1:%[.a-z0-9]+]] = insertelement <2 x i32> [[PTR0]], i32 %userdata3, i64 1
 ; SHADERTEST: [[PTR2:%[.a-z0-9]+]] = bitcast <2 x i32> [[PTR1]] to i64
 ; SHADERTEST: [[INTDESCPTR:%[0-9]+]] = inttoptr i64 [[PTR2]] to ptr addrspace(4)
-; SHADERTEST: [[CURDESCPTR:%[0-9]+]] = getelementptr i64, ptr addrspace(4) [[INTDESCPTR]], i64 1
+; SHADERTEST: [[CURDESCPTR:%[0-9]+]] = getelementptr {{i8|i64}}, ptr addrspace(4) [[INTDESCPTR]], i64 {{8|1}}
 ; SHADERTEST: [[UBERINFO:%[0-9]*]] = load <4 x i32>, ptr addrspace(4) [[CURDESCPTR]], align 16
 
 ; Load vertex

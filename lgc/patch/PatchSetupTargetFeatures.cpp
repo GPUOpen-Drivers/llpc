@@ -48,17 +48,7 @@ using namespace lgc;
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
 PreservedAnalyses PatchSetupTargetFeatures::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
-  runImpl(module, pipelineState);
-  return PreservedAnalyses::none();
-}
 
-// =====================================================================================================================
-// Run the pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-// @param pipelineState : Pipeline state
-// @returns : True if the module was modified by the transformation and false otherwise
-bool PatchSetupTargetFeatures::runImpl(Module &module, PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Setup-Target-Features\n");
 
   Patch::init(&module);
@@ -66,7 +56,7 @@ bool PatchSetupTargetFeatures::runImpl(Module &module, PipelineState *pipelineSt
   m_pipelineState = pipelineState;
   setupTargetFeatures(&module);
 
-  return true; // Modified the module.
+  return PreservedAnalyses::none();
 }
 
 // =====================================================================================================================

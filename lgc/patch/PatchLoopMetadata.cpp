@@ -101,18 +101,7 @@ PreservedAnalyses PatchLoopMetadata::run(Loop &loop, LoopAnalysisManager &analys
   Module *module = loop.getHeader()->getModule();
   const auto &mamProxy = analysisManager.getResult<ModuleAnalysisManagerLoopProxy>(loop, loopAnalysisResults);
   PipelineState *pipelineState = mamProxy.getCachedResult<PipelineStateWrapper>(*module)->getPipelineState();
-  if (runImpl(loop, pipelineState))
-    return PreservedAnalyses::none();
-  return PreservedAnalyses::all();
-}
 
-// =====================================================================================================================
-// Executes this LLVM patching pass on the specified LLVM module.
-//
-// @param [in/out] loop : LLVM loop to be run on
-// @param pipelineState : Pipeline state
-// @returns : True if the loop was modified by the transformation and false otherwise
-bool PatchLoopMetadata::runImpl(Loop &loop, PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Run the pass lgc-patch-loop-metadata\n");
 
   Function *func = loop.getHeader()->getFirstNonPHI()->getFunction();
@@ -124,7 +113,7 @@ bool PatchLoopMetadata::runImpl(Loop &loop, PipelineState *pipelineState) {
 
   auto stage = getShaderStage(func);
   if (!stage)
-    return false;
+    return PreservedAnalyses::all();
   if (auto shaderOptions = &mPipelineState->getShaderOptions(stage.value())) {
     m_disableLoopUnroll = shaderOptions->disableLoopUnroll;
     m_forceLoopUnrollCount = shaderOptions->forceLoopUnrollCount;
@@ -135,7 +124,7 @@ bool PatchLoopMetadata::runImpl(Loop &loop, PipelineState *pipelineState) {
 
   MDNode *loopMetaNode = loop.getLoopID();
   if (!loopMetaNode || loopMetaNode->getOperand(0) != loopMetaNode)
-    return false;
+    return PreservedAnalyses::all();
 
   LLVM_DEBUG(dbgs() << "loop in " << func->getName() << " at depth " << loop.getLoopDepth() << " has "
                     << loop.getNumBlocks() << " blocks\n");
@@ -209,5 +198,5 @@ bool PatchLoopMetadata::runImpl(Loop &loop, PipelineState *pipelineState) {
     loop.setLoopID(loopMetaNode);
   }
 
-  return changed;
+  return changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }

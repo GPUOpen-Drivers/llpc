@@ -42,10 +42,10 @@ static cl::opt<int> NativeWaveSize("native-wave-size", cl::desc("Overrides hardw
 // =====================================================================================================================
 // Functions to set up TargetInfo for the various targets
 
-// gfx9+
+// gfx10+
 //
 // @param [in/out] targetInfo : Target info
-static void setGfx9BaseInfo(TargetInfo *targetInfo) {
+static void setGfx10BaseInfo(TargetInfo *targetInfo) {
   // Initial settings (could be adjusted later according to graphics IP version info)
   targetInfo->getGpuProperty().waveSize = 64;
 
@@ -80,63 +80,11 @@ static void setGfx9BaseInfo(TargetInfo *targetInfo) {
   targetInfo->getGpuProperty().numShaderEngines = 4;
 }
 
-// gfx9
-//
-// @param [in/out] targetInfo : Target info
-static void setGfx9Info(TargetInfo *targetInfo) {
-  setGfx9BaseInfo(targetInfo);
-
-  targetInfo->getGpuProperty().supportsXnack = 1;
-
-  // TODO: Clean up code for all 1d texture patch
-  targetInfo->getGpuWorkarounds().gfx9.treat1dImagesAs2d = 1;
-
-  targetInfo->getGpuWorkarounds().gfx9.shaderImageGatherInstFix = 1;
-
-  targetInfo->getGpuWorkarounds().gfx9.fixCacheLineStraddling = 1;
-}
-
-// gfx900
-//
-// @param [in/out] targetInfo : Target info
-static void setGfx900Info(TargetInfo *targetInfo) {
-  setGfx9Info(targetInfo);
-  targetInfo->getGpuWorkarounds().gfx9.fixLsVgprInput = 1;
-}
-
-// gfx902
-//
-// @param [in/out] targetInfo : Target info
-static void setGfx902Info(TargetInfo *targetInfo) {
-  setGfx900Info(targetInfo);
-  targetInfo->getGpuProperty().supportsRbPlus = 1;
-}
-
-// gfx904
-//
-// @param [in/out] targetInfo : Target info
-static void setGfx904Info(TargetInfo *targetInfo) {
-  setGfx9Info(targetInfo);
-  targetInfo->getGpuProperty().supportsRbPlus = 1;
-}
-
-// gfx906
-//
-// @param [in/out] targetInfo : Target info
-static void setGfx906Info(TargetInfo *targetInfo) {
-  setGfx9Info(targetInfo);
-
-  targetInfo->getGpuProperty().supportIntegerDotFlag.compBitwidth16 = true;
-  targetInfo->getGpuProperty().supportIntegerDotFlag.compBitwidth8 = true;
-  targetInfo->getGpuProperty().supportIntegerDotFlag.compBitwidth4 = true;
-  targetInfo->getGpuProperty().supportIntegerDotFlag.sameSignedness = true;
-}
-
 // gfx10
 //
 // @param [in/out] targetInfo : Target info
 static void setGfx10Info(TargetInfo *targetInfo) {
-  setGfx9BaseInfo(targetInfo);
+  setGfx10BaseInfo(targetInfo);
   targetInfo->getGpuProperty().maxSgprsAvailable = 106;
 
   targetInfo->getGpuProperty().supportsPermLane16 = true;
@@ -382,14 +330,6 @@ bool TargetInfo::setTargetInfo(StringRef gpuName) {
   };
 
   static const GpuNameStringMap GpuNameMap[] = {
-    {"gfx900", &setGfx900Info},   // gfx900
-    {"gfx901", &setGfx9Info},     // gfx901
-    {"gfx902", &setGfx902Info},   // gfx902
-    {"gfx903", &setGfx9Info},     // gfx903
-    {"gfx904", &setGfx904Info},   // gfx904, vega12
-    {"gfx906", &setGfx906Info},   // gfx906, vega20
-    {"gfx909", &setGfx904Info},   // gfx909, raven2
-    {"gfx90c", &setGfx9Info},     // gfx90c
     {"gfx1010", &setGfx1010Info}, // gfx1010
     {"gfx1011", &setGfx1011Info}, // gfx1011, navi12
     {"gfx1012", &setGfx1012Info}, // gfx1012, navi14

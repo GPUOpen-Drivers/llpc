@@ -154,7 +154,7 @@ def TaskPayloadPtrOp : LgcOp<"task.payload.ptr", [Memory<[]>, WillReturn]> {
 }
 
 def EmitMeshTasksOp : LgcOp<"emit.mesh.tasks", [Memory<[]>]> {
-  let arguments = (ins I32:$groupCountX, I32:$groupCountY, I32:$groupCountZ);
+  let arguments = (ins I32:$group_count_x, I32:$group_count_y, I32:$group_count_z);
   let results = (outs);
 
   let summary = "emit the current values of all per-task output variables to the current task output";
@@ -162,14 +162,14 @@ def EmitMeshTasksOp : LgcOp<"emit.mesh.tasks", [Memory<[]>]> {
     In the task shader, emit the current values of all per-task output variables to the current task output by
     specifying the group count XYZ of the launched child mesh tasks.
 
-    `groupCountX` is X dimension of the launched child mesh tasks.
-    `groupCountY` is Y dimension of the launched child mesh tasks.
-    `groupCountZ` is Z dimension of the launched child mesh tasks.
+    `group_count_x` is X dimension of the launched child mesh tasks.
+    `group_count_y` is Y dimension of the launched child mesh tasks.
+    `group_count_z` is Z dimension of the launched child mesh tasks.
   }];
 }
 
 def SetMeshOutputsOp : LgcOp<"set.mesh.outputs", [Memory<[]>]> {
-  let arguments = (ins I32:$vertexCount, I32:$primitiveCount);
+  let arguments = (ins I32:$vertex_count, I32:$primitive_count);
   let results = (outs);
 
   let summary = "set the actual output size of the primitives and vertices that the mesh shader workgroup will emit";
@@ -177,34 +177,34 @@ def SetMeshOutputsOp : LgcOp<"set.mesh.outputs", [Memory<[]>]> {
     In the mesh shader, set the actual output size of the primitives and vertices that the mesh shader workgroup will
     emit upon completion.
 
-    `vertexCount` is the actual output size of the vertices.
-    `primitiveCount` is the actual output size of the primitives.
+    `vertex_count` is the actual output size of the vertices.
+    `primitive_count` is the actual output size of the primitives.
   }];
 }
 
 def SetMeshPrimitiveIndicesOp : LgcOp<"set.mesh.primitive.indices", [Memory<[]>]> {
-  let arguments = (ins I32:$primitiveIndex, (ScalarOrFixedVector I32):$primitiveIndices);
+  let arguments = (ins I32:$primitive_index, (ScalarOrFixedVector I32):$primitive_indices);
   let results = (outs);
 
   let summary = "set primitive indices for mesh shader";
   let description = [{
     In the mesh shader, set primitive indices by forming primitive connectivity data and writing it to LDS.
 
-    `primitiveIndex` is the primitive index specifying which primitive to set.
-    `primitiveIndices` are all vertex index values that are used to form this primitive.
+    `primitive_index` is the primitive index specifying which primitive to set.
+    `primitive_indices` are all vertex index values that are used to form this primitive.
   }];
 }
 
 def SetMeshPrimitiveCulledOp : LgcOp<"set.mesh.primitive.culled", [Memory<[]>]> {
-  let arguments = (ins I32:$primitiveIndex, I1:$isCulled);
+  let arguments = (ins I32:$primitive_index, I1:$is_culled);
   let results = (outs);
 
   let summary = "set primitive culled state for mesh shader";
   let description = [{
     In the mesh shader, set primitive culled state by writing the null primitive flag to LDS.
 
-    `primitiveIndex` is the primitive index specifying which primitive to set.
-    `isCulled` is a boolean flag indicating whether this primitive is culled.
+    `primitive_index` is the primitive index specifying which primitive to set.
+    `is_culled` is a boolean flag indicating whether this primitive is culled.
   }];
 }
 
@@ -223,41 +223,41 @@ def GetMeshBuiltinInputOp : LgcOp<"get.mesh.builtin.input", [Memory<[]>, WillRet
 }
 
 def WriteMeshVertexOutputOp : LgcOp<"write.mesh.vertex.output", [Memory<[]>]> {
-  let arguments = (ins I32:$outputOffset, I32:$vertexIndex, value:$outputValue);
+  let arguments = (ins I32:$output_offset, I32:$vertex_index, value:$output_value);
   let results = (outs);
 
   let summary = "Write mesh shader vertex outputs";
   let description = [{
     In the mesh shader, write mesh shader vertex outputs to LDS.
 
-    `outputOffset` is the relative offset of this output (in dwords) within all outputs of the indexed vertex.
-    `vertexIndex` is the vertex index specifying which vertex to write.
-    `outputValue` is the output value to write.
+    `output_offset` is the relative offset of this output (in dwords) within all outputs of the indexed vertex.
+    `vertex_index` is the vertex index specifying which vertex to write.
+    `output_value` is the output value to write.
   }];
 }
 
 def WriteMeshPrimitiveOutputOp : LgcOp<"write.mesh.primitive.output", [Memory<[]>]> {
-  let arguments = (ins I32:$outputOffset, I32:$primitiveIndex, value:$outputValue);
+  let arguments = (ins I32:$output_offset, I32:$primitive_index, value:$output_value);
   let results = (outs);
 
   let summary = "Write mesh shader primitive outputs";
   let description = [{
     In the mesh shader, write mesh shader primitive outputs to LDS.
 
-    `outputOffset` is the relative offset of this output (in dwords) within all outputs of the indexed primitive.
-    `primitiveIndex` is the primitive index specifying which primitive to write.
-    `outputValue` is the output value to write.
+    `output_offset` is the relative offset of this output (in dwords) within all outputs of the indexed primitive.
+    `primitive_index` is the primitive index specifying which primitive to write.
+    `output_value` is the output value to write.
   }];
 }
 
 def GenericLocationOp : OpClass<LgcDialect> {
-  let arguments = (ins AttrI1:$perPrimitive, AttrI32:$location, I32:$locOffset, I32:$elemIdx, I32:$arrayIndex);
+  let arguments = (ins AttrI1:$per_primitive, AttrI32:$location, I32:$loc_offset, I32:$elem_idx, I32:$array_index);
 
   let summary = "family of operations that reference generic shader I/O locations";
   let description = [{
     Generic (graphics) shader I/O interfaces are addressed in terms of locations. Locations are 4-element vectors with
-    32-bit elements. Within an interface, the location vectors are indexed by `location + locOffset`. The elements of
-    the vector are indexed by `elemIdx`.
+    32-bit elements. Within an interface, the location vectors are indexed by `location + loc_offset`. The elements of
+    the vector are indexed by `elem_idx`.
 
     For some shader stages, the interface is inherently an array. For example, GS inputs are an array of per-vertex
     inputs, where the size of the array depends on the input primitive type (1 for points, 2 for lines, etc.).
@@ -265,8 +265,8 @@ def GenericLocationOp : OpClass<LgcDialect> {
     Some shader stages have both array and non-array interfaces. Specifically, TCS outputs and TES inputs have per-patch
     locations (non-array) and per-control-point locations (array with one entry per control point).
 
-    For array interfaces, `arrayIndex` is used to index into the array, e.g. arrayIndex is the control point index (in
-    TCS outputs and TES inputs) or the vertex index (in GS inputs). For non-array interfaces, `arrayIndex` is ignored
+    For array interfaces, `array_index` is used to index into the array, e.g. array_index is the control point index (in
+    TCS outputs and TES inputs) or the vertex index (in GS inputs). For non-array interfaces, `array_index` is ignored
     entirely and is recommended to be set to `poison`.
 
     Some shader stages have a notion of inputs or outputs that are "per primitive":
@@ -276,7 +276,7 @@ def GenericLocationOp : OpClass<LgcDialect> {
     - PS inputs: per-primitive vs. per-vertex/interpolated (note: old-school flat-interpolated inputs are considered
       to be interpolated)
 
-    TODO: Tease out the exact rules for when `locOffset` is allowed to be non-0. For inputs, this is originally only
+    TODO: Tease out the exact rules for when `loc_offset` is allowed to be non-0. For inputs, this is originally only
     TCS, TES, and PS in special cases.
   }];
 }
@@ -317,7 +317,7 @@ def OutputImportGenericOp : LgcOp<"output.import.generic", [Memory<[(read)]>, Wi
 def InputImportInterpolatedOp : LgcOp<"input.import.interpolated", [Memory<[]>, WillReturn]> {
   let superclass = GenericLocationOp;
 
-  let arguments = (ins GenericLocationOp, AttrI32:$interpMode, value:$interpValue);
+  let arguments = (ins GenericLocationOp, AttrI32:$interp_mode, value:$interp_value);
   let results = (outs value:$result);
 
   let defaultBuilderHasExplicitResultType = true;
@@ -326,11 +326,11 @@ def InputImportInterpolatedOp : LgcOp<"input.import.interpolated", [Memory<[]>, 
   let description = [{
     Only used in PS for per-vertex/interpolated inputs. Use `input.import.generic` for per-primitive inputs.
 
-    `interpMode` is one of:
+    `interp_mode` is one of:
 
-    - InterpModeSmooth for interpolation using the `<2 x float>` barycentrics in `interpValue`
-    - InterpModeFlat for flat shading; `interpValue` is ignored and is recommended to be `poison`
-    - InterpModeCustom to retrieve the attribute of the vertex with the `i32` index `interpValue` (which must be 0, 1,
+    - InterpModeSmooth for interpolation using the `<2 x float>` barycentrics in `interp_value`
+    - InterpModeFlat for flat shading; `interp_value` is ignored and is recommended to be `poison`
+    - InterpModeCustom to retrieve the attribute of the vertex with the `i32` index `interp_value` (which must be 0, 1,
       or 2). The raw HW vertex index is used, which may be different from the API vertex index; it is up to the user of
       this operation to map between HW and API.
   }];
@@ -384,5 +384,102 @@ def GroupMemcpyOp : LgcOp<"group.memcpy", [Memory<[]>]> {
     `scope` is 2 for workgroup scope and 3 for subgroup (wave) scope. No other values are allowed.
 
     This operation must only occur in control flow that is uniform for the relevant scope.
+  }];
+}
+
+def SubgroupElectOp : LgcOp<"subgroup.elect", [NoUnwind, Convergent]> {
+  let arguments = (ins);
+  let results = (outs I1:$result);
+
+  let summary = "subgroupElect";
+  let description = [{
+    This is true only in the active invocation with the lowest id in the group,
+    otherwise `result` is false.
+
+    This is used to implement OpGroupNonUniformElect in the SPIR-V reference,
+    see there for details.
+  }];
+}
+
+def SubgroupAnyOp : LgcOp<"subgroup.any", [NoUnwind, Convergent]> {
+  let arguments = (ins I1:$value);
+  let results = (outs I1:$result);
+
+  let summary = "subgroupAny";
+  let description = [{
+    Evaluates `value` for all invocations in the group. `result` will be true if
+    and only if it evaluates to true for any invocation in the group.
+
+    This is used to implement OpGroupAny and OpGroupNonUniformAny in the SPIR-V
+    reference, see there for details.
+  }];
+}
+
+def CooperativeRowAccLoadOp : LgcOp<"cooperative.rowacc.load", [Memory<[]>, WillReturn]> {
+  let arguments = (ins value:$pointer, I32:$stride, AttrI32:$elemType, AttrI32:$memoryAccess);
+  let results = (outs value:$result);
+
+  let defaultBuilderHasExplicitResultType = true;
+
+  let summary = "load cooperative rowacc from memory";
+  let description = [{
+    Load contiguous elements from the specified location of the memory.
+
+    Return acc row data in finalized mode.
+
+    'stride' is the stride in bytes in memory between the first elements in the source data.
+    'elemType' is the element type for the row acc.
+    'memoryAccess' is the memory operands which provide:isVolatile/isTemporal/isCoherent additional operands,
+    maybe volatile/Aligned/Nontemporal/MakePointerAvailable
+  }];
+}
+
+def CooperativeRowAccStoreOp : LgcOp<"cooperative.rowacc.store", [Memory<[]>]> {
+  let arguments = (ins value:$pointer, I32:$stride, AttrI32:$elemType, value:$value, AttrI32:$memoryAccess);
+  let results = (outs);
+
+  let summary = "store cooperative rowacc to memory";
+  let description = [{
+    Store a contiguous elements from the specified location of the memory.
+
+    'stride' is the stride in bytes in memory between the first elements in the source data.
+    'elemType' is the element type for the row acc.
+    'value' is data of row acc, Must be in finalized mode.
+    'memoryAccess' is the memory operands which provide:isVolatile/isTemporal/isCoherent additional operands,
+    maybe volatile/Aligned/Nontemporal/MakePointerAvailable
+  }];
+}
+
+def CooperativeRowAccAccumulateModeOp : LgcOp<"cooperative.rowacc.accumulatemode", [Memory<[]>, WillReturn]> {
+  let arguments = (ins value:$rowAccValue, AttrI32:$elemType);
+  let results = (outs value:$result);
+
+  let defaultBuilderHasExplicitResultType = true;
+
+  let summary = "change cooperative row acc date mode from finalize mode to accumulate mode";
+  let description = [{
+    convert the row acc data from finalize mode to accumulate mode.
+
+    Return acc row data in accumulate mode.
+
+    'rowAccValue' is the input row acc data, must be in finalize mode.
+    'elemType' is the element type for the row acc.
+  }];
+}
+
+def CooperativeRowAccFinalizeModeOp : LgcOp<"cooperative.rowacc.finalizemode", [Memory<[]>, WillReturn]> {
+  let arguments = (ins value:$rowAccValue, AttrI32:$elemType);
+  let results = (outs value:$result);
+
+  let defaultBuilderHasExplicitResultType = true;
+
+  let summary = "change cooperative rowacc date mode from accumulate state to finalize state";
+  let description = [{
+    convert the row acc data from accumulate mode to finalize mode.
+
+    Return acc row data in finalized mode.
+
+    'rowAccValue' is the input row acc data, must be in accumulate mode.
+    'elemType' is the element type for the row acc.
   }];
 }

@@ -795,20 +795,6 @@ FunctionType *NggPrimShader::getPrimShaderType(uint64_t &inRegMask) {
     llvm_unreachable("Not implemented!");
   }
 
-  // If the ES is the API VS, and it is a fetchless VS, then we need to add args for the vertex fetches.
-  if (!m_hasTes) {
-    unsigned vertexFetchCount = m_pipelineState->getPalMetadata()->getVertexFetchCount();
-    if (vertexFetchCount != 0) {
-      // TODO: This will not work with non-GS culling.
-      if (!m_hasGs && !m_nggControl->passthroughMode)
-        m_pipelineState->setError("Fetchless VS in NGG culling mode (without API GS) not supported");
-      // The final vertexFetchCount args of the ES (API VS) are the vertex fetches.
-      unsigned esArgSize = m_esHandlers.main->arg_size();
-      for (unsigned idx = esArgSize - vertexFetchCount; idx != esArgSize; ++idx)
-        argTys.push_back(m_esHandlers.main->getArg(idx)->getType());
-    }
-  }
-
   return FunctionType::get(m_builder.getVoidTy(), argTys, false);
 }
 
@@ -3139,20 +3125,6 @@ void NggPrimShader::runEs(ArrayRef<Argument *> args) {
     esArgs.push_back(relVertexId);
     esArgs.push_back(vsPrimitiveId);
     esArgs.push_back(instanceId);
-
-    // When tessellation is not enabled, the ES is actually a fetchless VS. Then, we need to add arguments for the
-    // vertex fetches. Also set the name of each vertex fetch primitive shader argument while we're here.
-    unsigned vertexFetchCount = m_pipelineState->getPalMetadata()->getVertexFetchCount();
-    if (vertexFetchCount > 0) {
-      ArrayRef<Argument *> vertexFetches = vgprArgs.drop_front(m_gfxIp.major <= 11 ? 9 : 5);
-      assert(vertexFetches.size() == vertexFetchCount);
-
-      for (unsigned i = 0; i < vertexFetchCount; ++i) {
-        vertexFetches[i]->setName(m_esHandlers.main->getArg(m_esHandlers.main->arg_size() - vertexFetchCount + i)
-                                      ->getName()); // Copy argument name
-        esArgs.push_back(vertexFetches[i]);
-      }
-    }
   }
 
   assert(esArgs.size() == m_esHandlers.main->arg_size()); // Must have visit all arguments of ES entry point
@@ -7522,23 +7494,6 @@ Value *NggPrimShader::fetchXfbOutput(Function *target, ArrayRef<Argument *> args
     xfbFetcherArgs.push_back(relVertexId);
     xfbFetcherArgs.push_back(vsPrimitiveId);
     xfbFetcherArgs.push_back(instanceId);
-
-    if (m_nggControl->passthroughMode) {
-      // When tessellation is not enabled, the transform feedback fetch function is actually a fetchless VS. Then, we
-      // need to add arguments for the vertex fetches. Also set the name of each vertex fetch primitive shader argument
-      // while we're here.
-      unsigned vertexFetchCount = m_pipelineState->getPalMetadata()->getVertexFetchCount();
-      if (vertexFetchCount > 0) {
-        ArrayRef<Argument *> vertexFetches = vgprArgs.drop_front(m_gfxIp.major <= 11 ? 9 : 5);
-        assert(vertexFetches.size() == vertexFetchCount);
-
-        for (unsigned i = 0; i < vertexFetchCount; ++i) {
-          vertexFetches[i]->setName(
-              xfbFetcher->getArg(xfbFetcher->arg_size() - vertexFetchCount + i)->getName()); // Copy argument name
-          xfbFetcherArgs.push_back(vertexFetches[i]);
-        }
-      }
-    }
   }
 
   assert(xfbFetcherArgs.size() == xfbFetcher->arg_size()); // Must have visit all arguments

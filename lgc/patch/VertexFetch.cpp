@@ -613,18 +613,7 @@ const unsigned char VertexFetchImpl::m_vertexFormatMapGfx11[][9] = {
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
 PreservedAnalyses LowerVertexFetch::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
-  if (runImpl(module, pipelineState))
-    return PreservedAnalyses::none();
-  return PreservedAnalyses::all();
-}
 
-// =====================================================================================================================
-// Run the lower vertex fetch pass on a module
-//
-// @param [in/out] module : Module
-// @param pipelineState : Pipeline state
-// @returns : True if the module was modified by the transformation and false otherwise
-bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
   // Gather vertex fetch calls. We can assume they're all in one function, the vertex shader.
   // We can assume that multiple fetches of the same location, component and type have been CSEd.
   SmallVector<InputImportGenericOp *, 8> vertexFetches;
@@ -637,7 +626,7 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
                                        .build();
   fetchVisitor.visit(vertexFetches, module);
   if (vertexFetches.empty())
-    return false;
+    return PreservedAnalyses::all();
 
   std::unique_ptr<VertexFetch> vertexFetch(VertexFetch::create(
       pipelineState->getLgcContext(), pipelineState->getOptions().useSoftwareVertexBufferDescriptors,
@@ -666,101 +655,39 @@ bool LowerVertexFetch::runImpl(Module &module, PipelineState *pipelineState) {
       inst->replaceAllUsesWith(vertex);
       inst->eraseFromParent();
     }
-    return true;
+    return PreservedAnalyses::none();
   }
 
-  if (!pipelineState->isUnlinked() || !pipelineState->getVertexInputDescriptions().empty()) {
-    // Whole-pipeline compilation (or shader compilation where we were given the vertex input descriptions).
-    // Lower each vertex fetch.
-    for (InputImportGenericOp *fetch : vertexFetches) {
-      Value *vertex = nullptr;
-
-      // Find the vertex input description.
-      unsigned location = fetch->getLocation();
-      unsigned component = cast<ConstantInt>(fetch->getElemIdx())->getZExtValue();
-
-      assert(!fetch->getPerPrimitive());
-      assert(cast<ConstantInt>(fetch->getLocOffset())->isZero());
-
-      const VertexInputDescription *description = pipelineState->findVertexInputDescription(location);
-
-      if (!description) {
-        // If we could not find vertex input info matching this location, just return undefined value.
-        vertex = PoisonValue::get(fetch->getType());
-      } else {
-        // Fetch the vertex.
-        builder.SetInsertPoint(fetch);
-        builder.setShaderStage(ShaderStage::Vertex);
-        vertex = vertexFetch->fetchVertex(fetch->getType(), description, location, component, builder);
-      }
-
-      // Replace and erase this call.
-      fetch->replaceAllUsesWith(vertex);
-      fetch->eraseFromParent();
-    }
-
-    return true;
-  }
-
-  // Unlinked shader compilation; the linker will add a fetch shader. Here we need to
-  // 1. add metadata giving the location, component, type of each vertex fetch;
-  // 2. add an input arg for each vertex fetch.
-  //
-  // First add the metadata and mutate the vertex shader function.
-  SmallVector<VertexFetchInfo, 8> info;
-  SmallVector<Type *, 8> argTys;
-  SmallVector<std::string, 8> argNames;
+  // Whole-pipeline compilation (or shader compilation where we were given the vertex input descriptions).
+  // Lower each vertex fetch.
   for (InputImportGenericOp *fetch : vertexFetches) {
+    Value *vertex = nullptr;
+
+    // Find the vertex input description.
     unsigned location = fetch->getLocation();
     unsigned component = cast<ConstantInt>(fetch->getElemIdx())->getZExtValue();
 
     assert(!fetch->getPerPrimitive());
     assert(cast<ConstantInt>(fetch->getLocOffset())->isZero());
 
-    info.push_back({location, component, fetch->getType()});
+    const VertexInputDescription *description = pipelineState->findVertexInputDescription(location);
 
-    Type *ty = fetch->getType();
-    // The return value from the fetch shader needs to use all floats, as the back-end maps an int in the
-    // return value as an SGPR rather than a VGPR. For symmetry, we also use all floats here, in the input
-    // args to the fetchless vertex shader.
-    ty = getVgprTy(ty);
-    argTys.push_back(ty);
-    argNames.push_back("");
-  }
-  pipelineState->getPalMetadata()->addVertexFetchInfo(info);
-
-  // Mutate the vertex shader function to add the new args.
-  Function *newFunc = addFunctionArgs(vertexFetches[0]->getFunction(), nullptr, argTys, argNames);
-
-  // Hook up each vertex fetch to the corresponding arg.
-  for (unsigned idx = 0; idx != vertexFetches.size(); ++idx) {
-    InputImportGenericOp *fetch = vertexFetches[idx];
-    Value *vertex = newFunc->getArg(idx);
-    if (fetch->getType() != vertex->getType()) {
-      // We changed to an all-float type above.
+    if (!description) {
+      // If we could not find vertex input info matching this location, just return undefined value.
+      vertex = PoisonValue::get(fetch->getType());
+    } else {
+      // Fetch the vertex.
       builder.SetInsertPoint(fetch);
-      Type *elementTy = fetch->getType()->getScalarType();
-      unsigned numElements = vertex->getType()->getPrimitiveSizeInBits() / elementTy->getPrimitiveSizeInBits();
-      vertex =
-          builder.CreateBitCast(vertex, numElements == 1 ? elementTy : FixedVectorType::get(elementTy, numElements));
-      if (fetch->getType() != vertex->getType()) {
-        // The types are now vectors of the same element type but different element counts, or fetch->getType()
-        // is scalar.
-        if (auto vecTy = dyn_cast<FixedVectorType>(fetch->getType())) {
-          int indices[] = {0, 1, 2, 3};
-          vertex =
-              builder.CreateShuffleVector(vertex, vertex, ArrayRef<int>(indices).slice(0, vecTy->getNumElements()));
-        } else {
-          vertex = builder.CreateExtractElement(vertex, uint64_t(0));
-        }
-      }
+      builder.setShaderStage(ShaderStage::Vertex);
+      vertex = vertexFetch->fetchVertex(fetch->getType(), description, location, component, builder);
     }
-    vertex->setName("vertex" + Twine(info[idx].location) + "." + Twine(info[idx].component));
+
+    // Replace and erase this call.
     fetch->replaceAllUsesWith(vertex);
     fetch->eraseFromParent();
   }
 
-  return true;
+  return PreservedAnalyses::none();
 }
 
 // =====================================================================================================================
@@ -1433,13 +1360,6 @@ unsigned VertexFetchImpl::mapVertexFormat(unsigned dfmt, unsigned nfmt) const {
 
   GfxIpVersion gfxIp = m_lgcContext->getTargetInfo().getGfxIpVersion();
   switch (gfxIp.major) {
-  default: {
-    CombineFormat formatOprd = {};
-    formatOprd.bits.dfmt = dfmt;
-    formatOprd.bits.nfmt = nfmt;
-    format = formatOprd.u32All;
-    break;
-  }
   case 10:
     assert(dfmt < sizeof(m_vertexFormatMapGfx10) / sizeof(m_vertexFormatMapGfx10[0]));
     assert(nfmt < sizeof(m_vertexFormatMapGfx10[0]) / sizeof(m_vertexFormatMapGfx10[0][0]));
@@ -1449,6 +1369,9 @@ unsigned VertexFetchImpl::mapVertexFormat(unsigned dfmt, unsigned nfmt) const {
     assert(dfmt < sizeof(m_vertexFormatMapGfx11) / sizeof(m_vertexFormatMapGfx11[0]));
     assert(nfmt < sizeof(m_vertexFormatMapGfx11[0]) / sizeof(m_vertexFormatMapGfx11[0][0]));
     format = m_vertexFormatMapGfx11[dfmt][nfmt];
+    break;
+  default:
+    llvm_unreachable("unsupported GFX IP");
     break;
   }
   return format;

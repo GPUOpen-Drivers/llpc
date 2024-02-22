@@ -161,7 +161,7 @@ public:
   llvm::ArrayRef<StringRef> getGlueInfo() override final;
 
   // Explicitly build color export shader
-  StringRef buildColorExportShader(ArrayRef<ColorExportInfo> exports, bool enableKill) override final;
+  StringRef createColorExportShader(ArrayRef<ColorExportInfo> exports, bool enableKill) override final;
 
   // Add a blob for a particular chunk of glue code, typically retrieved from a cache
   void addGlue(unsigned glueIndex, StringRef blob) override final;
@@ -311,15 +311,6 @@ void ElfLinkerImpl::doneInputs() {
 // Create a GlueShader object for each glue shader needed for this link. This does not actually create
 // the glue shaders themselves, just the GlueShader objects that represent them.
 void ElfLinkerImpl::createGlueShaders() {
-  // Create a fetch shader object if we need one.
-  SmallVector<VertexFetchInfo, 8> fetches;
-  m_pipelineState->getPalMetadata()->getVertexFetchInfo(fetches);
-  if (!fetches.empty()) {
-    VsEntryRegInfo vsEntryRegInfo = {};
-    m_pipelineState->getPalMetadata()->getVsEntryRegInfo(vsEntryRegInfo);
-    m_glueShaders.push_back(GlueShader::createFetchShader(m_pipelineState, fetches, vsEntryRegInfo));
-  }
-
   if (m_pipelineState->isGraphics() && !this->m_pipelineState->getShaderStageMask().contains(ShaderStage::Fragment)) {
     m_glueShaders.push_back(GlueShader::createNullFragmentShader(m_pipelineState));
   }
@@ -357,19 +348,20 @@ ArrayRef<StringRef> ElfLinkerImpl::getGlueInfo() {
 }
 
 // =====================================================================================================================
-// Build color export shader
+// Create color export shader
 //
 // @param exports : Fragment export info
 // @param enableKill : Whether this fragment shader has kill enabled.
 // @param zFmt : depth-export-format
-StringRef ElfLinkerImpl::buildColorExportShader(ArrayRef<ColorExportInfo> exports, bool enableKill) {
+StringRef ElfLinkerImpl::createColorExportShader(ArrayRef<ColorExportInfo> exports, bool enableKill) {
   assert(m_glueShaders.empty());
   m_glueShaders.push_back(GlueShader::createColorExportShader(m_pipelineState, exports));
   ColorExportShader *copyColorShader = static_cast<ColorExportShader *>(m_glueShaders[0].get());
   if (enableKill)
     copyColorShader->enableKill();
+  m_doneInputs = true;
 
-  return copyColorShader->getElfBlob();
+  return copyColorShader->getString();
 }
 
 // =====================================================================================================================

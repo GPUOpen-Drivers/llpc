@@ -42,6 +42,7 @@
 #include "llpcSpirvLower.h"
 #include "llpcSpirvLowerUtil.h"
 #include "lgc/Builder.h"
+#include "lgc/LgcDialect.h"
 #include "llvm/ADT/DepthFirstIterator.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
@@ -64,21 +65,11 @@ using namespace SPIRV;
 using namespace Llpc;
 
 // -enable-loop-reconvergence: force enable loop reconvergence transform
-static cl::opt<bool> EnableLoopReconvergence("enable-loop-reconvergence",
-                                             cl::desc("Force enable loop reconvergence transform"), cl::init(false));
+static cl::opt<bool> ForceEnableLoopReconvergence("enable-loop-reconvergence",
+                                                  cl::desc("Force enable loop reconvergence transform"),
+                                                  cl::init(false));
 
 namespace Llpc {
-
-// =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on (empty on entry)
-// @param [in/out] analysisManager : Analysis manager to use for this transformation
-PreservedAnalyses SpirvLowerCfgMerges::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  bool changed = runImpl(module);
-  // In practice there are unlikely to be any analyses this early, but report accurate status anyway.
-  return changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
-}
 
 /// Defines helper for print block and function identifiers during debugging
 class OpPrinter {
@@ -311,8 +302,9 @@ void SpirvLowerCfgMerges::mapConvergentValues(Module &module) {
 // =====================================================================================================================
 // Executes this SPIR-V lowering pass on the specified LLVM module.
 //
-// @param [in/out] module : LLVM module to be run on
-bool SpirvLowerCfgMerges::runImpl(Module &module) {
+// @param [in/out] module : LLVM module to be run on (empty on entry)
+// @param [in/out] analysisManager : Analysis manager to use for this transformation
+PreservedAnalyses SpirvLowerCfgMerges::run(Module &module, ModuleAnalysisManager &analysisManager) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-CfgMerges\n");
   LLVM_DEBUG(dbgs() << "Processing module: " << module);
 
@@ -321,7 +313,24 @@ bool SpirvLowerCfgMerges::runImpl(Module &module) {
   // Check for loops
   Function *loopMergeFunc = module.getFunction("spirv.loop.merge");
   if (!loopMergeFunc)
-    return false;
+    return PreservedAnalyses::all();
+
+  bool requiresReconvergence = ForceEnableLoopReconvergence;
+
+  // Enable transform if any function uses maximally reconverges SPIRV.
+  // Ideally we might restrict this to only applicable functions; however,
+  // as this runs pre-inliner it would require computing the whole call graph.
+  // Regardless the transform is only ever applied to loops with convergent operations.
+  for (Function &F : module) {
+    MDNode *metaNode = F.getMetadata(gSPIRVMD::MaximallyReconverges);
+    if (!metaNode)
+      continue;
+    auto flagValue = mdconst::dyn_extract<ConstantInt>(metaNode->getOperand(0));
+    if (flagValue == ConstantInt::getTrue(*m_context)) {
+      requiresReconvergence = true;
+      break;
+    }
+  }
 
   // Map convergent values
   m_convergentValues.clear();
@@ -342,7 +351,7 @@ bool SpirvLowerCfgMerges::runImpl(Module &module) {
   // Note: this visit blocks deterministically and loop headers from outer loops before inner ones
   bool hasConvergentLoops = false;
   bool changed = false;
-  bool valid = EnableLoopReconvergence && !m_convergentValues.empty();
+  bool valid = requiresReconvergence && !m_convergentValues.empty();
 
   for (Function &F : module) {
     if (F.empty())
@@ -376,7 +385,7 @@ bool SpirvLowerCfgMerges::runImpl(Module &module) {
 
   if (!changed || !valid || !hasConvergentLoops) {
     m_convergentValues.clear();
-    return changed;
+    return changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
   }
 
   // Output debug information before changing IR structure
@@ -582,7 +591,7 @@ bool SpirvLowerCfgMerges::runImpl(Module &module) {
       // Determine if any lanes continue
       Value *notBreakPhi = BinaryOperator::CreateNot(breakPhi, "", loop->sigmaBlock);
       m_builder->SetInsertPoint(loop->sigmaBlock);
-      Value *anyContinue = m_builder->CreateSubgroupAny(notBreakPhi);
+      Value *anyContinue = m_builder->create<lgc::SubgroupAnyOp>(notBreakPhi);
 
       // Connect sigma block to wave header
       BranchInst *loopEnd = BranchInst::Create(waveHeader, postSigmaBlock, anyContinue, loop->sigmaBlock);
@@ -644,7 +653,7 @@ bool SpirvLowerCfgMerges::runImpl(Module &module) {
   }
 
   m_convergentValues.clear();
-  return true;
+  return PreservedAnalyses::none();
 }
 
 } // namespace Llpc

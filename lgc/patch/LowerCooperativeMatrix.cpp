@@ -31,9 +31,11 @@
 #include "lgc/patch/LowerCooperativeMatrix.h"
 #include "lgc/Builder.h"
 #include "lgc/LgcContext.h"
+#include "lgc/LgcDialect.h"
 #include "lgc/state/IntrinsDefs.h"
 #include "lgc/state/PipelineShaders.h"
 #include "lgc/state/PipelineState.h"
+#include "llvm-dialects/Dialect/Visitor.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/IR/Module.h"
@@ -56,28 +58,14 @@ PreservedAnalyses LowerCooperativeMatrix::run(Module &module, ModuleAnalysisMana
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
   PipelineShadersResult &pipelineShaders = analysisManager.getResult<PipelineShaders>(module);
 
-  if (runImpl(module, pipelineShaders, pipelineState)) {
-    PreservedAnalyses PA;
-    PA.preserveSet<CFGAnalyses>();
-    return PA;
-  }
-  return PreservedAnalyses::all();
-}
-
-// =====================================================================================================================
-// Run the on a module
-//
-// @param [in/out] module : LLVM module to be run on
-// @param pipelineState : Pipeline state
-// @returns : True if the module was modified by the transformation and false otherwise
-bool LowerCooperativeMatrix::runImpl(Module &module, PipelineShadersResult &pipelineShaders,
-                                     PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Run the pass Patch-Cooperative-Matrix\n");
   Patch::init(&module);
   m_pipelineState = pipelineState;
   m_pipelineShaders = &pipelineShaders;
   m_shaderStage = ShaderStage::Compute;
   m_gfxIp = m_pipelineState->getTargetInfo().getGfxIpVersion();
+
+  processCoopRowAccFunction(module);
 
   SmallVector<Function *, 16> lowerCoopMatrixCallees;
   for (auto &func : module) {
@@ -86,7 +74,7 @@ bool LowerCooperativeMatrix::runImpl(Module &module, PipelineShadersResult &pipe
       lowerCoopMatrixCallees.push_back(&func);
   }
   if (lowerCoopMatrixCallees.empty())
-    return false;
+    return PreservedAnalyses::all();
 
   processCoopMatrixFunction(lowerCoopMatrixCallees);
 
@@ -95,7 +83,10 @@ bool LowerCooperativeMatrix::runImpl(Module &module, PipelineShadersResult &pipe
     callInst->eraseFromParent();
   }
   m_coopMatrixCalls.clear();
-  return true;
+
+  PreservedAnalyses PA;
+  PA.preserveSet<CFGAnalyses>();
+  return PA;
 }
 
 // =====================================================================================================================
@@ -2002,6 +1993,237 @@ Value *LowerCooperativeMatrix::getLaneNumber(BuilderBase &builder) {
   if (m_pipelineState->getShaderWaveSize(m_shaderStage) == 64)
     result = builder.CreateIntrinsic(Intrinsic::amdgcn_mbcnt_hi, {}, {builder.getInt32(-1), result});
   return result;
+}
+
+// =====================================================================================================================
+// Visit "CooperativeRowAccLoadOp" instruction
+//
+// @param inst : The dialect instruction to process
+void LowerCooperativeMatrix::visitCooperativeRowAccLoadOp(CooperativeRowAccLoadOp &load) {
+  BuilderBase builder(*m_context);
+  builder.SetInsertPoint(&load);
+
+  auto dataPtr = load.getPointer();
+  auto stride = load.getStride();
+  auto elemType = static_cast<Builder::CooperativeMatrixElementType>(load.getElemType());
+  auto memoryAccess = load.getMemoryAccess();
+
+  assert(builder.transCooperativeMatrixElementType(elemType) == load.getType());
+
+  // Calc element offset in memory
+  Type *elemTy = builder.transCooperativeMatrixElementType(elemType);
+  const unsigned dataBitwidth = elemTy->getScalarSizeInBits();
+  const unsigned addrSpace = dataPtr->getType()->getPointerAddressSpace();
+  assert(addrSpace == ADDR_SPACE_LOCAL || addrSpace == ADDR_SPACE_BUFFER_FAT_POINTER || addrSpace == ADDR_SPACE_GLOBAL);
+
+  stride = builder.CreateExactSDiv(stride, builder.getInt32(dataBitwidth / 8));
+
+  // calc memoryAccess
+  bool isVolatile = memoryAccess & Builder::MemoryAccessVolatileMask;
+  bool isCoherent = memoryAccess & Builder::MemoryAccessCoherentMask;
+  bool isTemporal = memoryAccess & Builder::MemoryAccessTemporalMask;
+
+  Value *threadId = getLaneNumber(builder);
+  Value *colOffsetPerLane = builder.CreateSRem(threadId, builder.getInt32(16));
+  Value *offset = builder.CreateMul(colOffsetPerLane, stride);
+
+  Value *elemPtr = builder.CreateGEP(elemTy, dataPtr, offset);
+  Value *elemVal = builder.CreateLoad(elemTy, elemPtr, isVolatile);
+  if (isCoherent && !(addrSpace == ADDR_SPACE_LOCAL && dataBitwidth < 32))
+    cast<LoadInst>(elemVal)->setAtomic(AtomicOrdering::Unordered);
+  if (isTemporal)
+    cast<LoadInst>(elemVal)->setMetadata(LLVMContext::MD_nontemporal, MDNode::get(builder.getContext(), {}));
+
+  m_coopRowAccCalls.push_back(&load);
+  load.replaceAllUsesWith(elemVal);
+}
+
+// =====================================================================================================================
+// Visit "CooperativeRowAccStoreOp" instruction
+//
+// @param inst : The dialect instruction to process
+void LowerCooperativeMatrix::visitCooperativeRowAccStoreOp(CooperativeRowAccStoreOp &store) {
+  BuilderBase builder(*m_context);
+  builder.SetInsertPoint(&store);
+
+  auto dataPtr = store.getPointer();
+  auto stride = store.getStride();
+  auto elemType = static_cast<Builder::CooperativeMatrixElementType>(store.getElemType());
+  auto memoryAccess = store.getMemoryAccess();
+  auto val = store.getValue();
+
+  assert(builder.transCooperativeMatrixElementType(elemType) == val->getType());
+
+  // Calc element offset in memory
+  Type *elemTy = builder.transCooperativeMatrixElementType(elemType);
+  const unsigned dataBitwidth = elemTy->getScalarSizeInBits();
+  const unsigned addrSpace = dataPtr->getType()->getPointerAddressSpace();
+  assert(addrSpace == ADDR_SPACE_LOCAL || addrSpace == ADDR_SPACE_BUFFER_FAT_POINTER || addrSpace == ADDR_SPACE_GLOBAL);
+
+  stride = builder.CreateExactSDiv(stride, builder.getInt32(dataBitwidth / 8));
+
+  // calc memoryAccess
+  bool isVolatile = memoryAccess & Builder::MemoryAccessVolatileMask;
+  bool isCoherent = memoryAccess & Builder::MemoryAccessCoherentMask;
+  bool isTemporal = memoryAccess & Builder::MemoryAccessTemporalMask;
+
+  Value *threadId = getLaneNumber(builder);
+  Value *colOffsetPerLane = builder.CreateSRem(threadId, builder.getInt32(16));
+  Value *offset = builder.CreateMul(colOffsetPerLane, stride);
+
+  Value *elemPtr = builder.CreateGEP(elemTy, dataPtr, offset);
+  Value *elemVal = builder.CreateStore(val, elemPtr, isVolatile);
+  if (isCoherent && !(addrSpace == ADDR_SPACE_LOCAL && dataBitwidth < 32))
+    cast<LoadInst>(elemVal)->setAtomic(AtomicOrdering::Unordered);
+  if (isTemporal)
+    cast<LoadInst>(elemVal)->setMetadata(LLVMContext::MD_nontemporal, MDNode::get(builder.getContext(), {}));
+
+  m_coopRowAccCalls.push_back(&store);
+}
+
+// =====================================================================================================================
+// Visit "CooperativeRowAccAccumulateModeOp" instruction
+//
+// @param inst : The dialect instruction to process
+void LowerCooperativeMatrix::visitCooperativeRowAccAccumulateModeOp(CooperativeRowAccAccumulateModeOp &accumulateMode) {
+  BuilderBase builder(*m_context);
+  builder.SetInsertPoint(&accumulateMode);
+
+  Value *rowAccValue = accumulateMode.getRowAccValue();
+  auto elemType = static_cast<Builder::CooperativeMatrixElementType>(accumulateMode.getElemType());
+
+  assert(builder.transCooperativeMatrixElementType(elemType) == accumulateMode.getType());
+  assert(accumulateMode.getType() == rowAccValue->getType());
+
+  if (m_gfxIp.major >= 12) {
+    rowAccValue = cooperativeRowAccConvertToAccumulateMode(builder, getLaneNumber(builder), rowAccValue, elemType);
+  }
+
+  accumulateMode.replaceAllUsesWith(rowAccValue);
+  m_coopRowAccCalls.push_back(&accumulateMode);
+}
+
+// =====================================================================================================================
+// Visit "CooperativeRowAccFinalizeModeOp" instruction
+//
+// @param inst : The dialect instruction to process
+void LowerCooperativeMatrix::visitCooperativeRowAccFinalizeModeOp(CooperativeRowAccFinalizeModeOp &finalize) {
+  BuilderBase builder(*m_context);
+  builder.SetInsertPoint(&finalize);
+
+  Value *rowAccValue = finalize.getRowAccValue();
+  auto elemType = static_cast<Builder::CooperativeMatrixElementType>(finalize.getElemType());
+
+  assert(builder.transCooperativeMatrixElementType(elemType) == finalize.getType());
+  assert(finalize.getType() == rowAccValue->getType());
+
+  if (m_gfxIp.major >= 12)
+    rowAccValue = cooperativeRowAccConvertToFinalizeMode(builder, rowAccValue, elemType);
+
+  finalize.replaceAllUsesWith(rowAccValue);
+  m_coopRowAccCalls.push_back(&finalize);
+}
+
+// =====================================================================================================================
+// Convert row acc to finalize mode by adding the interleave 16 lanes.
+//
+// @param builder : The IR builder to create and insert IR instruction
+// @param rowAccVal : The cooperative rowAcc value
+// @param elemType : The component type of the rowAcc value
+Value *LowerCooperativeMatrix::cooperativeRowAccConvertToFinalizeMode(BuilderBase &builder, llvm::Value *rowAccVal,
+                                                                      Builder::CooperativeMatrixElementType elemType) {
+  unsigned LaneSelBits[2] = {0x76543210, 0xfedcba98};
+  auto mapFuncX16 = [](BuilderBase &builder, ArrayRef<Value *> mappedArgs,
+                       ArrayRef<Value *> passthroughArgs) -> Value * {
+    Type *const int32Ty = builder.getInt32Ty();
+
+    return builder.CreateIntrinsic(
+        int32Ty, Intrinsic::amdgcn_permlanex16,
+        {mappedArgs[0], mappedArgs[1], passthroughArgs[0], passthroughArgs[1], passthroughArgs[2], passthroughArgs[3]});
+  };
+
+  Value *swapped = builder.CreateMapToSimpleType(
+      mapFuncX16,
+      {
+          rowAccVal,
+          rowAccVal,
+      },
+      {builder.getInt32(LaneSelBits[0]), builder.getInt32(LaneSelBits[1]), builder.getFalse(), builder.getFalse()});
+
+  switch (elemType) {
+  case Builder::CooperativeMatrixElementType::Float32:
+  case Builder::CooperativeMatrixElementType::Float16:
+    rowAccVal = builder.CreateFAdd(rowAccVal, swapped);
+    break;
+  case Builder::CooperativeMatrixElementType::Int32:
+    rowAccVal = builder.CreateAdd(rowAccVal, swapped);
+    break;
+  case Builder::CooperativeMatrixElementType::Int8:
+  case Builder::CooperativeMatrixElementType::Int16:
+  case Builder::CooperativeMatrixElementType::Float16Packed:
+    llvm_unreachable("not supported element type for row acc");
+  default:
+    llvm_unreachable("unknown element type");
+  }
+
+  return rowAccVal;
+}
+
+// =====================================================================================================================
+// Convert row acc to accumulate mode by force set zero on the duplicated lanes in each 32 waves.
+//
+// @param builder : The IR builder to create and insert IR instruction
+// @param rowAccVal : The cooperative rowAcc value
+// @param threadId : The current lane index
+// @param elemType : The component type of the rowAcc value
+Value *
+LowerCooperativeMatrix::cooperativeRowAccConvertToAccumulateMode(BuilderBase &builder, llvm::Value *rowAccVal,
+                                                                 llvm::Value *threadId,
+                                                                 Builder::CooperativeMatrixElementType elemType) {
+  Value *zero = nullptr;
+  switch (elemType) {
+  case Builder::CooperativeMatrixElementType::Float32:
+    zero = builder.getFpConstant(builder.getFloatTy(), APFloat(0.0));
+    break;
+  case Builder::CooperativeMatrixElementType::Float16:
+    zero = builder.getFpConstant(builder.getHalfTy(), APFloat(0.0));
+    break;
+  case Builder::CooperativeMatrixElementType::Int32:
+    zero = builder.getInt32(0);
+    break;
+  case Builder::CooperativeMatrixElementType::Int8:
+  case Builder::CooperativeMatrixElementType::Int16:
+  case Builder::CooperativeMatrixElementType::Float16Packed:
+    llvm_unreachable("not supported element type for cooperative row acc");
+  default:
+    llvm_unreachable("unknown element type");
+  }
+
+  Value *laneGroupIdx = builder.CreateUDiv(threadId, builder.getInt32(16));
+  Value *isEvenGroup = builder.CreateICmpEQ(builder.CreateAnd(laneGroupIdx, builder.getInt32(1)), builder.getInt32(0));
+  return builder.CreateSelect(isEvenGroup, rowAccVal, zero);
+}
+
+// =====================================================================================================================
+// Process all the cooperative row acc operations on module
+//
+// @param [in/out] module :  LLVM module to be run on
+void LowerCooperativeMatrix::processCoopRowAccFunction(Module &module) {
+  static auto visitor = llvm_dialects::VisitorBuilder<LowerCooperativeMatrix>()
+                            .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)
+                            .add(&LowerCooperativeMatrix::visitCooperativeRowAccLoadOp)
+                            .add(&LowerCooperativeMatrix::visitCooperativeRowAccStoreOp)
+                            .add(&LowerCooperativeMatrix::visitCooperativeRowAccAccumulateModeOp)
+                            .add(&LowerCooperativeMatrix::visitCooperativeRowAccFinalizeModeOp)
+                            .build();
+
+  visitor.visit(*this, module);
+
+  for (auto callInst : m_coopRowAccCalls) {
+    callInst->dropAllReferences();
+    callInst->eraseFromParent();
+  }
+  m_coopRowAccCalls.clear();
 }
 
 } // namespace lgc

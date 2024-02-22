@@ -283,9 +283,6 @@ FunctionType *ShaderMerger::generateLsHsEntryPointType(uint64_t *inRegMask) cons
   }
   argTys.push_back(Type::getInt32Ty(*m_context)); // Instance ID
 
-  // Vertex fetch VGPRs
-  appendVertexFetchTypes(argTys);
-
   return FunctionType::get(Type::getVoidTy(*m_context), argTys, false);
 }
 
@@ -420,18 +417,6 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   auto hsVertCount = builder.CreateIntrinsic(Intrinsic::amdgcn_ubfe, {builder.getInt32Ty()},
                                              {mergeWaveInfo, builder.getInt32(8), builder.getInt32(8)});
   hsVertCount->setName("hsVertCount");
-
-  // NOTE: For GFX9, hardware has an issue of initializing LS VGPRs. When HS is null, v0~v3 are initialized as LS
-  // VGPRs rather than expected v2~v4.
-  auto gpuWorkarounds = &m_pipelineState->getTargetInfo().getGpuWorkarounds();
-  if (gpuWorkarounds->gfx9.fixLsVgprInput) {
-    auto nullHs = builder.CreateICmpEQ(hsVertCount, builder.getInt32(0));
-
-    vertexId = builder.CreateSelect(nullHs, vgprArgs[0], vgprArgs[2]);
-    relVertexId = builder.CreateSelect(nullHs, vgprArgs[1], vgprArgs[3]);
-    stepRate = builder.CreateSelect(nullHs, vgprArgs[2], vgprArgs[4]);
-    instanceId = builder.CreateSelect(nullHs, vgprArgs[3], vgprArgs[5]);
-  }
 
   auto validLsVert = builder.CreateICmpULT(threadIdInWave, lsVertCount, "validLsVert");
   builder.CreateCondBr(validLsVert, beginLsBlock, endLsBlock);
@@ -622,9 +607,6 @@ FunctionType *ShaderMerger::generateEsGsEntryPointType(uint64_t *inRegMask) cons
     argTys.push_back(Type::getInt32Ty(*m_context)); // Relative vertex ID (auto index)
     argTys.push_back(Type::getInt32Ty(*m_context)); // Primitive ID (VS)
     argTys.push_back(Type::getInt32Ty(*m_context)); // Instance ID
-
-    // Vertex fetch VGPRs
-    appendVertexFetchTypes(argTys);
   }
 
   return FunctionType::get(Type::getVoidTy(*m_context), argTys, false);
@@ -954,21 +936,6 @@ void ShaderMerger::appendUserData(BuilderBase &builder, SmallVectorImpl<Value *>
 }
 
 // =====================================================================================================================
-// Appends the type for each of the vertex fetches found in the PAL metadata.
-//
-// @param [in/out] argTys : The vector to which the type will be appended.
-void ShaderMerger::appendVertexFetchTypes(std::vector<Type *> &argTys) const {
-  if (m_pipelineState->getPalMetadata()->getVertexFetchCount() != 0) {
-    SmallVector<VertexFetchInfo> fetches;
-    m_pipelineState->getPalMetadata()->getVertexFetchInfo(fetches);
-    m_pipelineState->getPalMetadata()->addVertexFetchInfo(fetches);
-    for (const auto &fetchInfo : fetches) {
-      argTys.push_back(getVgprTy(fetchInfo.ty));
-    }
-  }
-}
-
-// =====================================================================================================================
 // Appends the arguments in the range [begin,end) to the vector.
 //
 // @param [in/out] args : The vector to which the arguments will be appends.
@@ -986,8 +953,7 @@ void ShaderMerger::appendArguments(SmallVectorImpl<Value *> &args, ArrayRef<Argu
 // @param entryPoint1 : The first entry-point of the shader pair (could be LS or ES)
 // @param entryPoint2 : The second entry-point of the shader pair (could be HS or GS)
 void ShaderMerger::processRayQueryLdsStack(Function *entryPoint1, Function *entryPoint2) const {
-  if (m_gfxIp.major < 10)
-    return; // Must be GFX10+
+  assert(m_gfxIp.major >= 10);
 
   Module *module = nullptr;
   if (entryPoint1)

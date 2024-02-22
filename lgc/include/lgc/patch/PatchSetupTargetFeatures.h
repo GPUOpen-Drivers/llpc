@@ -43,8 +43,6 @@ class PatchSetupTargetFeatures : public Patch, public llvm::PassInfoMixin<PatchS
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  bool runImpl(llvm::Module &module, PipelineState *pipelineState);
-
   static llvm::StringRef name() { return "Patch LLVM to set up target features"; }
 
 private:

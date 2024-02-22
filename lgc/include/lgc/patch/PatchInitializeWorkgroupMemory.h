@@ -43,8 +43,6 @@ class PatchInitializeWorkgroupMemory final : public Patch, public llvm::PassInfo
 public:
   llvm::PreservedAnalyses run(llvm::Module &module, llvm::ModuleAnalysisManager &analysisManager);
 
-  bool runImpl(llvm::Module &module, PipelineShadersResult &pipelineShaders, PipelineState *pipelineState);
-
   static llvm::StringRef name() { return "Patch for initialize workgroup memory"; }
 
 private:

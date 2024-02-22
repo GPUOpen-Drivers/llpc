@@ -69,7 +69,6 @@ public:
 protected:
   llvm::Module *generate() override;
   llvm::Module *generateEmptyModule() const;
-  void addDummyExportIfNecessary(llvm::Function *entryPoint) const;
 };
 
 } // namespace lgc

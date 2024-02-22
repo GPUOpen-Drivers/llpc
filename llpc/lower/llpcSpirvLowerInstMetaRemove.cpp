@@ -52,16 +52,6 @@ SpirvLowerInstMetaRemove::SpirvLowerInstMetaRemove() : m_changed(false) {
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses SpirvLowerInstMetaRemove::run(Module &module, ModuleAnalysisManager &analysisManager) {
-  if (runImpl(module))
-    return PreservedAnalyses::none();
-  return PreservedAnalyses::all();
-}
-
-// =====================================================================================================================
-// Executes this SPIR-V lowering pass on the specified LLVM module.
-//
-// @param [in/out] module : LLVM module to be run on
-bool SpirvLowerInstMetaRemove::runImpl(Module &module) {
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-Inst-Meta-Remove\n");
 
   SpirvLower::init(&module);
@@ -96,7 +86,7 @@ bool SpirvLowerInstMetaRemove::runImpl(Module &module) {
     m_changed = true;
   }
 
-  return m_changed;
+  return m_changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
 }
 
 } // namespace Llpc

@@ -45,8 +45,6 @@ public:
   llvm::PreservedAnalyses run(llvm::Loop &loop, llvm::LoopAnalysisManager &analysisManager,
                               llvm::LoopStandardAnalysisResults &loopAnalysisResults, llvm::LPMUpdater &);
 
-  bool runImpl(llvm::Loop &loop, PipelineState *pipelineState);
-
   static llvm::StringRef name() { return "Set or amend metadata to control loop unrolling"; }
 
   llvm::MDNode *updateMetadata(llvm::MDNode *loopId, llvm::ArrayRef<llvm::StringRef> prefixesToRemove,

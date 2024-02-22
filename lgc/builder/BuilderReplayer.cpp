@@ -50,16 +50,7 @@ using namespace llvm;
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
 PreservedAnalyses BuilderReplayer::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
-  runImpl(module, pipelineState);
-  return PreservedAnalyses::none();
-}
 
-// =====================================================================================================================
-// Run the BuilderReplayer pass on a module
-//
-// @param module : Module to run this pass on
-// @returns : True if the module was modified by the transformation and false otherwise
-bool BuilderReplayer::runImpl(Module &module, PipelineState *pipelineState) {
   LLVM_DEBUG(dbgs() << "Running the pass of replaying LLPC builder calls\n");
 
   // Set up the pipeline state from the specified linked IR module.
@@ -121,7 +112,7 @@ bool BuilderReplayer::runImpl(Module &module, PipelineState *pipelineState) {
     func->eraseFromParent();
   m_builder = nullptr;
 
-  return true;
+  return PreservedAnalyses::none();
 }
 
 // =====================================================================================================================
@@ -728,14 +719,8 @@ Value *BuilderReplayer::processCall(unsigned opcode, CallInst *call) {
   case BuilderOpcode::GetSubgroupSize: {
     return m_builder->CreateGetSubgroupSize();
   }
-  case BuilderOpcode::SubgroupElect: {
-    return m_builder->CreateSubgroupElect();
-  }
   case BuilderOpcode::SubgroupAll: {
     return m_builder->CreateSubgroupAll(args[0]);
-  }
-  case BuilderOpcode::SubgroupAny: {
-    return m_builder->CreateSubgroupAny(args[0]);
   }
   case BuilderOpcode::SubgroupAllEqual: {
     return m_builder->CreateSubgroupAllEqual(args[0]);
