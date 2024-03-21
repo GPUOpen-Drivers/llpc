@@ -99,6 +99,7 @@ void gpurt::getFuncTable(RtIpVersion rtIpVersion, GpurtFuncTable &table) {
   unmangleDxilName(table.pFunc[RT_ENTRY_TRACE_RAY_INLINE], gpurtTable.rayQuery.pTraceRayInline);
   unmangleDxilName(table.pFunc[RT_ENTRY_TRACE_RAY_HIT_TOKEN], gpurtTable.traceRay.pTraceRayUsingHitToken);
   unmangleDxilName(table.pFunc[RT_ENTRY_RAY_QUERY_PROCEED], gpurtTable.rayQuery.pProceed);
+  unmangleDxilName(table.pFunc[RT_ENTRY_GET_INSTANCE_NODE], gpurtTable.rayQuery.pGet64BitInstanceNodePtr);
   unmangleDxilName(table.pFunc[RT_ENTRY_INSTANCE_INDEX], gpurtTable.intrinsic.pGetInstanceIndex);
   unmangleDxilName(table.pFunc[RT_ENTRY_INSTANCE_ID], gpurtTable.intrinsic.pGetInstanceID);
   unmangleDxilName(table.pFunc[RT_ENTRY_OBJECT_TO_WORLD_TRANSFORM], gpurtTable.intrinsic.pGetObjectToWorldTransform);

@@ -331,7 +331,7 @@ ComputeShaderMode Pipeline::getComputeShaderMode(Module &module) {
 // @param emitLgc : Whether the option -emit-lgc is on
 PipelineState::PipelineState(LgcContext *builderContext, bool emitLgc)
     : Pipeline(builderContext), m_emitLgc(emitLgc), m_meshRowExport(EnableRowExport) {
-  m_registerFieldFormat = getTargetInfo().getGfxIpVersion().major >= 9 && UseRegisterFieldFormat;
+  m_registerFieldFormat = UseRegisterFieldFormat;
   m_tessLevel.inner[0] = -1.0f;
   m_tessLevel.inner[1] = -1.0f;
   m_tessLevel.outer[0] = -1.0f;
@@ -1354,11 +1354,7 @@ unsigned PipelineState::getShaderWaveSize(ShaderStageEnum stage) {
   if (!m_waveSize[stage])
     setShaderDefaultWaveSize(stage);
 
-  if (getTargetInfo().getGfxIpVersion().major >= 9) {
-    return getMergedShaderWaveSize(stage);
-  }
-
-  return m_waveSize[stage];
+  return getMergedShaderWaveSize(stage);
 }
 
 // =====================================================================================================================
@@ -1368,7 +1364,7 @@ unsigned PipelineState::getShaderWaveSize(ShaderStageEnum stage) {
 //
 // @param stage : Shader stage
 unsigned PipelineState::getMergedShaderWaveSize(ShaderStageEnum stage) {
-  assert(getTargetInfo().getGfxIpVersion().major >= 9);
+  assert(getTargetInfo().getGfxIpVersion().major >= 10);
   unsigned waveSize = m_waveSize[stage];
 
   // NOTE: For GFX9+, two shaders are merged as a shader pair. The wave size is determined by the larger one. That is
@@ -1880,6 +1876,8 @@ unsigned PipelineState::getVerticesPerPrimitive() {
     case lgc::PrimitiveType::TriangleListAdjacency:
     case lgc::PrimitiveType::TriangleStripAdjacency:
       return 3;
+    case lgc::PrimitiveType::Patch:
+      return 1;
     default:
       break;
     }

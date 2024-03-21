@@ -1693,6 +1693,8 @@ Value *BufferOpLowering::createGlobalPointerAccess(Value *const bufferDesc, Valu
   // If null descriptor or extended robust buffer access is allowed, we will create a branch to perform normal global
   // access based on the valid check.
   Value *isValidAccess = m_builder.getTrue();
+  BasicBlock *const origBlock = inst.getParent();
+  Instruction *terminator = nullptr;
   if (m_pipelineState.getOptions().allowNullDescriptor ||
       m_pipelineState.getOptions().enableExtendedRobustBufferAccess) {
     Value *isNonNullDesc = m_builder.getTrue();
@@ -1702,13 +1704,11 @@ Value *BufferOpLowering::createGlobalPointerAccess(Value *const bufferDesc, Valu
     }
     Value *isInBound = m_pipelineState.getOptions().enableExtendedRobustBufferAccess ? inBound : m_builder.getTrue();
     isValidAccess = m_builder.CreateAnd(isNonNullDesc, isInBound);
+
+    terminator = SplitBlockAndInsertIfThen(isValidAccess, &inst, false);
+    m_builder.SetInsertPoint(terminator);
   }
-
-  BasicBlock *const origBlock = inst.getParent();
-  Instruction *const terminator = SplitBlockAndInsertIfThen(isValidAccess, &inst, false);
-
   // Global pointer access
-  m_builder.SetInsertPoint(terminator);
   Value *baseAddr = getBaseAddressFromBufferDesc(bufferDesc);
   Value *newOffset = nullptr;
   if (m_pipelineState.getOptions().enableExtendedRobustBufferAccess) {
@@ -1727,12 +1727,15 @@ Value *BufferOpLowering::createGlobalPointerAccess(Value *const bufferDesc, Valu
 
   // Store inst doesn't need return a value from a phi node
   if (!dyn_cast<StoreInst>(&inst)) {
+    // Return early if the block is not split
+    if (!terminator)
+      return newValue;
+
     m_builder.SetInsertPoint(&inst);
     assert(!type->isVoidTy());
     auto phi = m_builder.CreatePHI(type, 2, "newValue");
     phi->addIncoming(Constant::getNullValue(type), origBlock);
     phi->addIncoming(newValue, terminator->getParent());
-
     return phi;
   }
   return nullptr;

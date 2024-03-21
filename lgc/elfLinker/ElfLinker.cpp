@@ -30,6 +30,7 @@
  */
 #include "lgc/ElfLinker.h"
 #include "ColorExportShader.h"
+#include "ElfLinkerImpl.h"
 #include "GlueShader.h"
 #include "lgc/state/AbiMetadata.h"
 #include "lgc/state/PalMetadata.h"
@@ -45,210 +46,17 @@
 
 #define DEBUG_TYPE "lgc-elf-linker"
 
-using namespace lgc;
 using namespace llvm;
 
-namespace {
-
-class ElfLinkerImpl;
-
-// =====================================================================================================================
-// An ELF input to the linker
-struct ElfInput {
-  std::unique_ptr<object::ObjectFile> objectFile;
-  SmallVector<std::pair<unsigned, unsigned>, 4> sectionMap;
-  StringRef reduceAlign; // If non-empty, the name of a text section to reduce the alignment to 0x40
-};
-
-// =====================================================================================================================
-// A single input section
-struct InputSection {
-  InputSection(object::SectionRef sectionRef) : sectionRef(sectionRef), size(sectionRef.getSize()) {}
-  object::SectionRef sectionRef; // Section from the input ELF
-  size_t offset = 0;             // Offset within the output ELF section
-  uint64_t size;                 // Size, possibly after removing s_end_code padding
-};
-
-// =====================================================================================================================
-// A single output section
-class OutputSection {
-public:
-  // Constructor given name and optional SHT_* section type
-  OutputSection(ElfLinkerImpl *linker, StringRef name = "", unsigned type = 0)
-      : m_linker(linker), m_name(name), m_type(type) {}
-
-  // Add an input section
-  void addInputSection(ElfInput &elfInput, object::SectionRef inputSection, bool reduceAlign = false);
-
-  // Get name of output section
-  StringRef getName();
-
-  // Get the section index in the output file
-  unsigned getIndex();
-
-  // Set the layout of this output section, allowing for alignment required by input sections.
-  void layout();
-
-  // Add a symbol to the output symbol table
-  void addSymbol(const object::ELFSymbolRef &elfSymRef, unsigned inputSectIdx);
-
-  // Add a relocation to the output elf
-  void addRelocation(object::ELFRelocationRef relocRef, StringRef id, unsigned int relocSectionOffset,
-                     unsigned int targetSectionOffset, unsigned sectType);
-
-  // Get the output file offset of a particular input section in the output section
-  uint64_t getOutputOffset(unsigned inputIdx) { return m_offset + m_inputSections[inputIdx].offset; }
-
-  // Get the overall alignment requirement, after calling layout().
-  Align getAlignment() const { return m_alignment; }
-
-  // Write the output section
-  void write(raw_pwrite_stream &outStream, ELF::Elf64_Shdr *shdr);
-
-private:
-  // Flag that we want to reduce alignment on the given input section, for gluing code together.
-  void setReduceAlign(const InputSection &inputSection) {
-    m_reduceAlign |= 1ULL << (&inputSection - &m_inputSections[0]);
-  }
-
-  // See if the given input section has the reduce align flag set.
-  bool getReduceAlign(const InputSection &inputSection) const {
-    return (m_reduceAlign >> (&inputSection - &m_inputSections[0])) & 1;
-  }
-
-  // Get alignment for an input section. This takes into account the reduceAlign flag.
-  Align getAlignment(const InputSection &inputSection);
-
-  ElfLinkerImpl *m_linker;
-  StringRef m_name;                             // Section name
-  unsigned m_type;                              // Section type (SHT_* value)
-  uint64_t m_offset = 0;                        // File offset of this output section
-  SmallVector<InputSection, 4> m_inputSections; // Input sections contributing to this output section
-  Align m_alignment;                            // Overall alignment required for the section
-  unsigned m_reduceAlign = 0;                   // Bitmap of input sections to reduce alignment for
-};
-
-// =====================================================================================================================
-// Internal implementation of the LGC interface for ELF linking.
-class ElfLinkerImpl final : public ElfLinker {
-public:
-  // Constructor given PipelineState and ELFs to link
-  ElfLinkerImpl(PipelineState *pipelineState, ArrayRef<MemoryBufferRef> elfs);
-
-  // Destructor
-  ~ElfLinkerImpl() override final;
-
-  // -----------------------------------------------------------------------------------------------------------------
-  // Implementations of ElfLinker methods exposed to the front-end
-
-  // Add another input ELF to the link, in addition to the ones that were added when the ElfLinker was constructed.
-  // The default behavior of adding extra ones at the start of the list instead of the end is just so you
-  // get the same order of code (VS then FS) when doing a part-pipeline compile as when doing a whole pipeline
-  // compile, to make it easier to test by diff.
-  void addInputElf(MemoryBufferRef inputElf) override final { addInputElf(inputElf, /*addAtStart=*/true); }
-  void addInputElf(MemoryBufferRef inputElf, bool addAtStart);
-
-  // Check whether we have FS input mappings, and thus whether we're doing part-pipeline compilation of the
-  // pre-FS part of the pipeline.
-  bool haveFsInputMappings() override final;
-
-  // Get a representation of the fragment shader input mappings from the PAL metadata of ELF input(s) added so far.
-  // This is used by the caller in a part-pipeline compilation scheme to include the FS input mappings in the
-  // hash for the non-FS part of the pipeline.
-  StringRef getFsInputMappings() override final;
-
-  // Get information on the glue code that will be needed for the link
-  llvm::ArrayRef<StringRef> getGlueInfo() override final;
-
-  // Explicitly build color export shader
-  StringRef createColorExportShader(ArrayRef<ColorExportInfo> exports, bool enableKill) override final;
-
-  // Add a blob for a particular chunk of glue code, typically retrieved from a cache
-  void addGlue(unsigned glueIndex, StringRef blob) override final;
-
-  // Compile a particular chunk of glue code and retrieve its blob
-  StringRef compileGlue(unsigned glueIndex) override final;
-
-  // Link the unlinked shader/part-pipeline ELFs and the compiled glue code into a pipeline ELF
-  bool link(raw_pwrite_stream &outStream) override final;
-
-  // -----------------------------------------------------------------------------------------------------------------
-  // Accessors
-
-  PipelineState *getPipelineState() const { return m_pipelineState; }
-  ArrayRef<OutputSection> getOutputSections() { return m_outputSections; }
-  StringRef getStrings() { return m_strings; }
-  SmallVectorImpl<ELF::Elf64_Sym> &getSymbols() { return m_symbols; }
-  SmallVectorImpl<ELF::Elf64_Rel> &getRelocations() { return m_relocations; }
-  SmallVectorImpl<ELF::Elf64_Rela> &getRelocationsA() { return m_relocationsA; }
-  void setStringTableIndex(unsigned index) { m_ehdr.e_shstrndx = index; }
-  StringRef getNotes() { return m_notes; }
-
-  // Get string index in output ELF, adding to string table if necessary
-  unsigned getStringIndex(StringRef string);
-
-  // Get string index in output ELF.  Returns 0 if not found.
-  unsigned findStringIndex(StringRef string);
-
-  // Find symbol in output ELF. Returns 0 if not found.
-  unsigned findSymbol(unsigned nameIndex);
-  unsigned findSymbol(StringRef name);
-
-private:
-  // Processing when all inputs are done.
-  void doneInputs();
-
-  // Find where an input section contributes to an output section
-  std::pair<unsigned, unsigned> findInputSection(ElfInput &elfInput, object::SectionRef section);
-
-  // Read PAL metadata from an ELF file and merge it in to the PAL metadata that we already have
-  void mergePalMetadataFromElf(object::ObjectFile &objectFile, bool isGlueCode);
-
-  // Read ISA name string from an ELF file if not already done
-  void readIsaName(object::ObjectFile &objectFile);
-
-  // Write ISA name into the .note section.
-  void writeIsaName(Align align);
-
-  // Write the PAL metadata out into the .note section.
-  void writePalMetadata(Align align);
-
-  // Create a GlueShader object for each glue shader needed for this link.
-  void createGlueShaders();
-
-  // Insert glue shaders (if any).
-  bool insertGlueShaders();
-
-  // Returns true of the given elf contains just 1 shader.
-  bool containsASingleShader(ElfInput &elf);
-
-  PipelineState *m_pipelineState;                            // PipelineState object
-  SmallVector<ElfInput, 5> m_elfInputs;                      // ELF objects to link
-  SmallVector<std::unique_ptr<GlueShader>, 4> m_glueShaders; // Glue shaders needed for link
-  SmallVector<StringRef, 5> m_glueStrings;                   // Strings to return for glue shader cache keys
-  ELF::Elf64_Ehdr m_ehdr;                                    // Output ELF header, copied from first input
-  SmallVector<OutputSection, 4> m_outputSections;            // Output sections
-  SmallVector<ELF::Elf64_Sym, 8> m_symbols;                  // Symbol table
-  SmallVector<ELF::Elf64_Rel, 8> m_relocations;              // Relocations
-  SmallVector<ELF::Elf64_Rela, 8> m_relocationsA;            // Relocations with explicit addend
-  StringMap<unsigned> m_symbolMap;                           // Map from name to symbol index
-  std::string m_strings;                                     // Strings for string table
-  StringMap<unsigned> m_stringMap;                           // Map from string to string table index
-  std::string m_notes;                                       // Notes to go in .note section
-  bool m_doneInputs = false;                                 // Set when caller has done adding inputs
-  StringRef m_isaName;                                       // ISA name to include in the .note section
-};
-
-} // anonymous namespace
-
 namespace lgc {
+
+using namespace Util;
+
 // =====================================================================================================================
 // Create ELF linker given PipelineState and ELFs to link
 ElfLinker *createElfLinkerImpl(PipelineState *pipelineState, ArrayRef<MemoryBufferRef> elfs) {
   return new ElfLinkerImpl(pipelineState, elfs);
 }
-
-} // namespace lgc
 
 // =====================================================================================================================
 // Constructor given PipelineState and ELFs to link
@@ -280,7 +88,7 @@ void ElfLinkerImpl::addInputElf(MemoryBufferRef inputElf, bool addAtStart) {
   // Add the ELF.
   readIsaName(*elfInput.objectFile);
   mergePalMetadataFromElf(*elfInput.objectFile, false);
-  m_elfInputs.insert(addAtStart ? m_elfInputs.begin() : m_elfInputs.end(), std::move(elfInput));
+  m_currentElfInput = m_elfInputs.insert(addAtStart ? m_elfInputs.begin() : m_elfInputs.end(), std::move(elfInput));
 }
 
 // =====================================================================================================================
@@ -851,17 +659,20 @@ bool ElfLinkerImpl::containsASingleShader(ElfInput &elf) {
 // Add an input section to this output section
 //
 // @param elfInput : ELF input that the section comes from
-// @param inputSection : Input section to add to this output section
+// @param inputSectionRef : Input section to add to this output section
 // @param reduceAlign : Reduce the alignment of the section (for gluing code together)
-void OutputSection::addInputSection(ElfInput &elfInput, object::SectionRef inputSection, bool reduceAlign) {
+void OutputSection::addInputSection(ElfInput &elfInput, object::SectionRef inputSectionRef, bool reduceAlign) {
   // Add the input section.
+  InputSection inputSection(inputSectionRef);
+
   m_inputSections.push_back(inputSection);
+
   // Remember reduceAlign request.
   if (reduceAlign)
     setReduceAlign(m_inputSections.back());
   // Add an entry to the ElfInput's sectionMap, so we can get from an input section to where it contributes
   // to an output section.
-  unsigned idx = inputSection.getIndex();
+  unsigned idx = inputSectionRef.getIndex();
   if (idx >= elfInput.sectionMap.size())
     elfInput.sectionMap.resize(idx + 1, {UINT_MAX, UINT_MAX});
   elfInput.sectionMap[idx] = {getIndex(), m_inputSections.size() - 1};
@@ -1081,8 +892,9 @@ void OutputSection::write(raw_pwrite_stream &outStream, ELF::Elf64_Shdr *shdr) {
 
     // Write the input section
     StringRef contents = cantFail(inputSection.sectionRef.getContents());
-    outStream << contents.slice(0, inputSection.size);
-    size += inputSection.size;
+    uint64_t contentSize = inputSection.size;
+    outStream << contents.slice(0, contentSize);
+    size += contentSize;
   }
 
   if (endPadding) {
@@ -1104,3 +916,5 @@ void OutputSection::write(raw_pwrite_stream &outStream, ELF::Elf64_Shdr *shdr) {
   shdr->sh_size = size;
   shdr->sh_addralign = m_alignment.value();
 }
+
+} // namespace lgc

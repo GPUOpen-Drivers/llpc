@@ -836,8 +836,8 @@ Value *BuilderImpl::CreateNormalizeVector(Value *x, const Twine &instName) {
   Value *result = nullptr;
   if (x->getType()->getScalarType()->isFloatTy()) {
     // Make sure a FP32 zero vector is normalized to a FP32 zero vector, rather than NaNs.
-    if (!getFastMathFlags().noSignedZeros() || !getFastMathFlags().noInfs() || !getFastMathFlags().noNaNs()) {
-      // When NSZ, NoInfs, or NoNaNs is not specified, we avoid using fmul_legacy since it is not IEEE compliant.
+    if (!getFastMathFlags().noSignedZeros() || !getFastMathFlags().noNaNs()) {
+      // When NSZ or NoNaNs is not specified, we avoid using fmul_legacy since it is not IEEE compliant.
       auto zero = ConstantFP::get(getFloatTy(), 0.0);
       auto isZeroDot = CreateFCmpOEQ(dot, zero);
       rsq = CreateSelect(isZeroDot, zero, rsq);
@@ -930,18 +930,17 @@ Value *BuilderImpl::CreateRefract(Value *i, Value *n, Value *eta, const Twine &i
 // @param maxVal : Maximum of clamp range
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateFClamp(Value *x, Value *minVal, Value *maxVal, const Twine &instName) {
-  // For float, and for half on GFX9+, we can use the fmed3 instruction.
+  // For float and half, we can use the fmed3 instruction.
   // But we can only do this if we do not need NaN preservation.
   Value *result = nullptr;
-  if (getFastMathFlags().noNaNs() && (x->getType()->getScalarType()->isFloatTy() ||
-                                      (getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 9 &&
-                                       x->getType()->getScalarType()->isHalfTy()))) {
+  if (getFastMathFlags().noNaNs() &&
+      (x->getType()->getScalarType()->isFloatTy() || x->getType()->getScalarType()->isHalfTy())) {
     result = scalarize(x, minVal, maxVal, [this](Value *x, Value *minVal, Value *maxVal) {
       return CreateIntrinsic(Intrinsic::amdgcn_fmed3, x->getType(), {x, minVal, maxVal});
     });
     result->setName(instName);
   } else {
-    // For half on GFX8 or earlier, or for double, use a combination of fmin and fmax.
+    // For double, use a combination of fmin and fmax.
     CallInst *max = CreateMaxNum(x, minVal);
     max->setFastMathFlags(getFastMathFlags());
     CallInst *min = CreateMinNum(max, maxVal, instName);
@@ -1037,17 +1036,16 @@ Value *BuilderImpl::CreateFMax3(Value *value1, Value *value2, Value *value3, con
 // @param value3 : Third value
 // @param instName : Name to give instruction(s)
 Value *BuilderImpl::CreateFMid3(Value *value1, Value *value2, Value *value3, const Twine &instName) {
-  // For float, and for half on GFX9+, we can use the fmed3 instruction.
+  // For float and half, we can use the fmed3 instruction.
   // But we can only do this if we do not need NaN preservation.
   Value *result = nullptr;
-  if (getFastMathFlags().noNaNs() && (value1->getType()->getScalarType()->isFloatTy() ||
-                                      (getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 9 &&
-                                       value1->getType()->getScalarType()->isHalfTy()))) {
+  if (getFastMathFlags().noNaNs() &&
+      (value1->getType()->getScalarType()->isFloatTy() || value1->getType()->getScalarType()->isHalfTy())) {
     result = scalarize(value1, value2, value3, [this](Value *value1, Value *value2, Value *value3) {
       return CreateIntrinsic(Intrinsic::amdgcn_fmed3, value1->getType(), {value1, value2, value3});
     });
   } else {
-    // For half on GFX8 or earlier, use a combination of fmin and fmax.
+    // For double, use a combination of fmin and fmax.
     CallInst *min1 = CreateMinNum(value1, value2);
     min1->setFastMathFlags(getFastMathFlags());
     CallInst *max1 = CreateMaxNum(value1, value2);

@@ -93,11 +93,10 @@ static void extractElements(Value *input, BuilderBase &builder, std::array<Value
 // @param builder : The IR builder for inserting instructions
 // @param expFmt: The format for the given render target
 // @param signedness: If output should be interpreted as a signed integer
-// @param channelWriteMask: Write mask to specify destination channels
 // @param isDualSource: If it's under dualSourceBlend, it should be true
 Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hwColorExport, BuilderBase &builder,
                                                       ExportFormat expFmt, const bool signedness,
-                                                      unsigned channelWriteMask, const bool isDualSource) {
+                                                      const bool isDualSource) {
   assert(expFmt != EXP_FORMAT_ZERO);
 
   Type *outputTy = output->getType();
@@ -120,8 +119,9 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
 
   const auto undefFloat = PoisonValue::get(builder.getFloatTy());
   const auto undefFloat16x2 = PoisonValue::get(FixedVectorType::get(builder.getHalfTy(), 2));
+  const auto undefHalf = PoisonValue::get(halfTy);
 
-  std::array<Value *, 4> comps;
+  std::array<Value *, 4> comps{};
   std::array<Value *, 4> exports{undefFloat, undefFloat, undefFloat, undefFloat};
   unsigned exportMask = 0;
 
@@ -141,36 +141,24 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
   case EXP_FORMAT_32_R:
   case EXP_FORMAT_32_GR:
   case EXP_FORMAT_32_ABGR: {
-    if (expFmt == EXP_FORMAT_32_R) {
+    if (expFmt == EXP_FORMAT_32_R)
       compCount = 1;
-      channelWriteMask = 0x1;
-    } else if (expFmt == EXP_FORMAT_32_GR) {
+    else if (expFmt == EXP_FORMAT_32_GR)
       compCount = compCount >= 2 ? 2 : 1;
-      channelWriteMask = 0x3;
-    } else {
-      channelWriteMask = 0xF;
-    }
 
     for (unsigned idx = 0; idx < compCount; ++idx) {
       unsigned compMask = 1 << idx;
-      if (compMask & channelWriteMask) {
-        exports[idx] = convertToFloat(comps[idx], signedness, builder);
-        exportMask |= compMask;
-      }
+      exports[idx] = convertToFloat(comps[idx], signedness, builder);
+      exportMask |= compMask;
     }
     break;
   }
   case EXP_FORMAT_32_AR: {
-    channelWriteMask = 0x9;
-    if (1 & channelWriteMask) {
-      exports[0] = convertToFloat(comps[0], signedness, builder);
-      exportMask = 1;
-    }
+    exports[0] = convertToFloat(comps[0], signedness, builder);
+    exportMask = 1;
     if (compCount == 4) {
-      if (0x8 & channelWriteMask) {
-        exports[1] = convertToFloat(comps[3], signedness, builder);
-        exportMask |= 0x2;
-      }
+      exports[1] = convertToFloat(comps[3], signedness, builder);
+      exportMask |= 0x2;
       compCount = 2;
     } else {
       compCount = 1;
@@ -187,9 +175,12 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
       extractElements(output, builder, comps);
       // re-pack
       for (unsigned idx = 0; idx < compactCompCount; ++idx) {
-        unsigned origIdx = 2 * idx;
-        exports[idx] = builder.CreateInsertElement(undefFloat16x2, comps[origIdx], builder.getInt32(0));
-        exports[idx] = builder.CreateInsertElement(exports[idx], comps[origIdx + 1], builder.getInt32(1));
+        unsigned compId1 = 2 * idx;
+        unsigned compId2 = compId1 + 1;
+        exports[idx] = builder.CreateInsertElement(undefFloat16x2, comps[compId1], builder.getInt32(0));
+        if (!comps[compId2])
+          comps[compId2] = undefHalf;
+        exports[idx] = builder.CreateInsertElement(exports[idx], comps[compId2], builder.getInt32(1));
       }
     } else {
       if (outputTy->isIntOrIntVectorTy())
@@ -199,9 +190,12 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
       extractElements(output, builder, comps);
 
       for (unsigned idx = 0; idx < compactCompCount; ++idx) {
-        unsigned origIdx = 2 * idx;
+        unsigned compId1 = 2 * idx;
+        unsigned compId2 = compId1 + 1;
+        if (!comps[compId2])
+          comps[compId2] = undefHalf;
         exports[idx] = builder.CreateIntrinsic(FixedVectorType::get(builder.getHalfTy(), 2),
-                                               Intrinsic::amdgcn_cvt_pkrtz, {comps[origIdx], comps[origIdx + 1]});
+                                               Intrinsic::amdgcn_cvt_pkrtz, {comps[compId1], comps[compId2]});
       }
     }
     break;
@@ -227,8 +221,12 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
     exports[0] = exports[1] = undefFloat16x2;
     exportMask = compCount > 2 ? 0xF : 0x3;
     for (unsigned idx = 0; idx < compactCompCount; idx++) {
+      unsigned compId1 = 2 * idx;
+      unsigned compId2 = compId1 + 1;
+      if (!comps[compId2])
+        comps[compId2] = undefHalf;
       Value *packedComps = builder.CreateIntrinsic(FixedVectorType::get(builder.getInt16Ty(), 2), cvtIntrinsic,
-                                                   {comps[2 * idx], comps[2 * idx + 1]});
+                                                   {comps[compId1], comps[compId2]});
       exports[idx] = builder.CreateBitCast(packedComps, FixedVectorType::get(builder.getHalfTy(), 2));
     }
     break;
@@ -239,24 +237,25 @@ Value *FragColorExport::handleColorExportInstructions(Value *output, unsigned hw
   }
   }
 
-  if (m_lgcContext->getTargetInfo().getGfxIpVersion().major >= 11) {
-    if (isDualSource) {
-      // Save them for later dual-source-swizzle
-      m_blendSourceChannels = exportTy->isHalfTy() ? (compCount + 1) / 2 : compCount;
-      assert(hwColorExport <= 1);
-      m_blendSources[hwColorExport].append(exports.begin(), exports.end());
-      return nullptr;
-    } else if (exportTy->isHalfTy()) {
-      // GFX11 removes compressed export, simply use 32bit-data export.
-      exportMask = 0;
-      const unsigned compactCompCount = (compCount + 1) / 2;
-      for (unsigned idx = 0; idx < compactCompCount; ++idx) {
-        exports[idx] = builder.CreateBitCast(exports[idx], builder.getFloatTy());
-        exportMask |= 1 << idx;
-      }
-      for (unsigned idx = compactCompCount; idx < 4; ++idx)
-        exports[idx] = undefFloat;
+  if (isDualSource) {
+    assert(m_lgcContext->getTargetInfo().getGfxIpVersion().major >= 11);
+    // Save them for later dual-source-swizzle
+    m_blendSourceChannels = exportTy->isHalfTy() ? (compCount + 1) / 2 : compCount;
+    assert(hwColorExport <= 1);
+    m_blendSources[hwColorExport].append(exports.begin(), exports.end());
+    return nullptr;
+  }
+
+  if (m_lgcContext->getTargetInfo().getGfxIpVersion().major >= 11 && exportTy->isHalfTy()) {
+    // GFX11 removes compressed export, simply use 32bit-data export.
+    exportMask = 0;
+    const unsigned compactCompCount = (compCount + 1) / 2;
+    for (unsigned idx = 0; idx < compactCompCount; ++idx) {
+      exports[idx] = builder.CreateBitCast(exports[idx], builder.getFloatTy());
+      exportMask |= 1 << idx;
     }
+    for (unsigned idx = compactCompCount; idx < 4; ++idx)
+      exports[idx] = undefFloat;
   }
 
   Value *exportCall = nullptr;
@@ -858,11 +857,12 @@ Value *FragColorExport::dualSourceSwizzle(unsigned waveSize, BuilderBase &builde
 // Update the color export information when enableFragColor is set.
 //
 // @param key : Color export info.
-// @param originExpinfo : The original color export information for each color export in no particular order.//
+// @param originExpinfo : The original color export information for each color export in no particular order.
+// @param needMrt0a: The flag to tell MRT0.a is required.
 // @param pCbShaderMask: The cbShaderMask after update color export information
 // @param [out] outExpinfo : The updated color export information when enableFragColor is true.
 void FragColorExport::updateColorExportInfoWithBroadCastInfo(const Key &key, ArrayRef<ColorExportInfo> originExpinfo,
-                                                             SmallVector<ColorExportInfo> &outExpinfo,
+                                                             bool needMrt0a, SmallVector<ColorExportInfo> &outExpinfo,
                                                              unsigned *pCbShaderMask) {
   // As enableFragColor will only be enabled by OGL, so it will not consider on the dualSource cases.
   SmallVector<ColorExportInfo> broadCastInfo;
@@ -879,14 +879,8 @@ void FragColorExport::updateColorExportInfoWithBroadCastInfo(const Key &key, Arr
     if (exp.hwColorTarget == MaxColorTargets)
       continue;
     const unsigned channelWriteMask = key.channelWriteMask[exp.location];
-    unsigned gfxIp = m_lgcContext->getTargetInfo().getGfxIpVersion().major;
-    bool needUpdateMask = false;
-    if (exp.location == 0 || gfxIp > 10) {
-      needUpdateMask =
-          (key.expFmt[exp.location] != 0) && (channelWriteMask > 0 || key.colorExportState.alphaToCoverageEnable);
-    } else {
-      needUpdateMask = (key.expFmt[exp.location] != 0) && (channelWriteMask > 0);
-    }
+    unsigned expFormat = key.expFmt[exp.location];
+    bool needUpdateMask = expFormat != 0 && (channelWriteMask > 0 || (exp.location == 0 && needMrt0a));
     if (needUpdateMask) {
       // For dualSource, the cbShaderMask will only be valid for location=0, other locations setting will be
       // redundant. ToDo: this point can be optimized when use different ShaderMaskMetaKey or compile different
@@ -914,6 +908,7 @@ void FragColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info,
 
   // MRTZ export comes first if it exists (this is a HW requirement on gfx11+ and an optional good idea on earlier HW).
   // We make the assume here that it is also first in the info list.
+  bool needMrt0a = key.colorExportState.alphaToCoverageEnable;
   if (!info.empty() && info[0].hwColorTarget == MaxColorTargets) {
     unsigned depthMask = info[0].location;
 
@@ -933,6 +928,7 @@ void FragColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info,
         if (alpha->getType()->isIntegerTy())
           alpha = builder.CreateBitCast(alpha, builder.getFloatTy());
         depthMask |= 0x8;
+        needMrt0a = false;
         break;
       }
     }
@@ -974,7 +970,7 @@ void FragColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info,
   BasicBlock *dualSourceBlock = nullptr;
   BasicBlock *normalExportBlock = nullptr;
 
-  updateColorExportInfoWithBroadCastInfo(key, info, finalExpInfo, &cbShaderMask);
+  updateColorExportInfoWithBroadCastInfo(key, info, needMrt0a, finalExpInfo, &cbShaderMask);
 
   if (key.colorExportState.dualSourceBlendDynamicEnable && (gfxip >= 11)) {
     // For dynamiceState, whether do dualSourceBlend will depend on the user data.
@@ -1003,21 +999,21 @@ void FragColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info,
     for (unsigned idx = 0; idx < 2; idx++) {
       auto infoIt = llvm::find_if(finalExpInfo, [&](const ColorExportInfo &info) { return info.location == idx; });
       if (infoIt != finalExpInfo.end()) {
-        auto dualExpFmt = static_cast<ExportFormat>(key.dualExpFmt[idx]);
+        auto dualExpFmt = static_cast<ExportFormat>(key.expFmt[idx]);
         const unsigned channelWriteMask = key.channelWriteMask[0];
-        bool needExpInst =
-            (dualExpFmt != EXP_FORMAT_ZERO) && (channelWriteMask > 0 || key.colorExportState.alphaToCoverageEnable);
-        if (needExpInst) {
+        if (dualExpFmt != EXP_FORMAT_ZERO && (channelWriteMask > 0 || (infoIt->location == 0 && needMrt0a))) {
           // Collect info for dualSourceBlend and save then in m_blendSources, so set the last parameter=true;
           handleColorExportInstructions(values[infoIt->hwColorTarget], idx, builder, dualExpFmt, infoIt->isSigned,
-                                        channelWriteMask, true);
+                                        true);
           finalExportFormats.push_back(dualExpFmt);
         }
       }
     }
 
-    lastExport = dualSourceSwizzle(key.waveSize, builder);
-    FragColorExport::setDoneFlag(lastExport, builder);
+    if (m_blendSourceChannels > 0) {
+      lastExport = dualSourceSwizzle(key.waveSize, builder);
+      FragColorExport::setDoneFlag(lastExport, builder);
+    }
     builder.CreateRetVoid();
   }
 
@@ -1034,12 +1030,11 @@ void FragColorExport::generateExportInstructions(ArrayRef<ColorExportInfo> info,
       assert(infoIt->hwColorTarget < MaxColorTargets);
       const unsigned channelWriteMask = key.channelWriteMask[location];
       auto expFmt = static_cast<ExportFormat>(key.expFmt[location]);
-      bool needExpInst =
-          (expFmt != EXP_FORMAT_ZERO) && (channelWriteMask > 0 || key.colorExportState.alphaToCoverageEnable);
+      bool needExpInst = (expFmt != 0) && (channelWriteMask > 0 || (location == 0 && needMrt0a));
       if (needExpInst) {
         // Don't collect info for dualSourceBlend just do normal color export, so set the last parameter=false;
         lastExport = handleColorExportInstructions(values[infoIt->hwColorTarget], hwColorExport, builder, expFmt,
-                                                   infoIt->isSigned, channelWriteMask, false);
+                                                   infoIt->isSigned, false);
         finalExportFormats.push_back(expFmt);
         ++hwColorExport;
       }
@@ -1144,30 +1139,29 @@ FragColorExport::Key FragColorExport::computeKey(ArrayRef<ColorExportInfo> infos
     infos = infos.drop_front(1);
   }
 
+  // DualSourceBlendDynamicEnable has been concluded from driver and compiler sides.
+  // 1. Driver set dualSourceBlendDynamicEnable = true when dynamicDualSourceState
+  //    feature is enable
+  // 2. With Decoration "location=0, index=0(or 1)" in Shader.
+  // Only in this way, the DualSourceBlendDynamicEnable can be set true finally.
+  bool isDynamicDualSource = key.colorExportState.dualSourceBlendDynamicEnable;
+
   if (key.enableFragColor) {
     auto &expInfo = infos[0];
     assert(expInfo.ty != nullptr);
     for (unsigned location = 0; location < MaxColorTargets; ++location) {
-      if (pipelineState->getColorExportFormat(location).dfmt != BufDataFormatInvalid) {
-        key.expFmt[location] = pipelineState->computeExportFormat(expInfo.ty, location);
-        key.channelWriteMask[location] = pipelineState->getColorExportFormat(location).channelWriteMask;
+      if (pipelineState->getColorExportFormat(location, isDynamicDualSource).dfmt != BufDataFormatInvalid) {
+        key.expFmt[location] = pipelineState->computeExportFormat(expInfo.ty, location, isDynamicDualSource);
+        key.channelWriteMask[location] =
+            pipelineState->getColorExportFormat(location, isDynamicDualSource).channelWriteMask;
       }
     }
   } else {
     for (auto &info : infos) {
-      key.expFmt[info.location] = pipelineState->computeExportFormat(info.ty, info.location);
-      key.channelWriteMask[info.location] = pipelineState->getColorExportFormat(info.location).channelWriteMask;
+      key.expFmt[info.location] = pipelineState->computeExportFormat(info.ty, info.location, isDynamicDualSource);
+      key.channelWriteMask[info.location] =
+          pipelineState->getColorExportFormat(info.location, isDynamicDualSource).channelWriteMask;
     }
-  }
-
-  if ((pipelineState->getTargetInfo().getGfxIpVersion().major >= 11) &&
-      (key.colorExportState.dualSourceBlendEnable || key.colorExportState.dualSourceBlendDynamicEnable)) {
-    auto info0It = llvm::find_if(infos, [&](const ColorExportInfo &info) { return info.location == 0; });
-    assert(info0It != infos.end());
-    key.dualExpFmt[0] = pipelineState->computeExportFormat(info0It->ty, 0, true);
-    auto info1It = llvm::find_if(infos, [&](const ColorExportInfo &info) { return info.location == 1; });
-    if (info1It != infos.end())
-      key.dualExpFmt[1] = pipelineState->computeExportFormat(info1It->ty, 1, true);
   }
 
   return key;

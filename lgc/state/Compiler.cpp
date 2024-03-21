@@ -28,7 +28,7 @@
  * @brief LLPC source file: PipelineState methods that do IR linking and compilation
  ***********************************************************************************************************************
  */
-#include "continuations/Continuations.h"
+#include "llvmraytracing/Continuations.h"
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
 #include "lgc/patch/Patch.h"

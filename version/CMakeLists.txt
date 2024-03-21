@@ -47,10 +47,10 @@ target_compile_definitions(llpc_version INTERFACE
   CHIP_HDR_NAVI22
   CHIP_HDR_NAVI23
   CHIP_HDR_NAVI24
-#if LLPC_BUILD_NAVI31
+#if VKI_BUILD_NAVI31
   CHIP_HDR_NAVI31
 #endif
-#if LLPC_BUILD_NAVI33
+#if VKI_BUILD_NAVI33
   CHIP_HDR_NAVI33
 #endif
   CHIP_HDR_RENOIR)
@@ -80,7 +80,7 @@ option(LLPC_BUILD_NAVI12 "LLPC support for NAVI12?" ON)
 if (LLPC_BUILD_NAVI12)
   target_compile_definitions(llpc_version INTERFACE LLPC_BUILD_NAVI12 CHIP_HDR_NAVI12)
 endif()
-#if LLPC_BUILD_NAVI32
+#if VKI_BUILD_NAVI32
 option(LLPC_BUILD_NAVI32 "LLPC support for NAVI32?" ON)
 if (LLPC_BUILD_NAVI32)
   target_compile_definitions(llpc_version INTERFACE LLPC_BUILD_NAVI32 CHIP_HDR_NAVI32)
@@ -98,7 +98,7 @@ option(LLPC_BUILD_MENDOCINO "LLPC support for MENDOCINO?" ON)
 if (LLPC_BUILD_MENDOCINO)
   target_compile_definitions(llpc_version INTERFACE LLPC_BUILD_MENDOCINO CHIP_HDR_MENDOCINO)
 endif()
-#if LLPC_BUILD_PHOENIX1
+#if VKI_BUILD_PHOENIX1
 option(LLPC_BUILD_PHOENIX1 "LLPC support for PHOENIX1?" ON)
 if (LLPC_BUILD_PHOENIX1)
   target_compile_definitions(llpc_version INTERFACE LLPC_BUILD_PHOENIX1 CHIP_HDR_PHOENIX1)

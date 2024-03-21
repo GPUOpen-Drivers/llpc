@@ -66,7 +66,7 @@ bool parseFVec4(char *str, unsigned lineNum, IUFValue *output);
 bool parseF16Vec4(char *str, unsigned lineNum, IUFValue *output);
 bool parseDVec2(char *str, unsigned lineNum, IUFValue *output);
 
-bool parseIArray(char *str, unsigned lineNum, bool isSign, std::vector<uint8_t> &bufMem);
+bool parseIArray(char *str, unsigned lineNum, MemberType type, std::vector<uint8_t> &bufMem);
 bool parseI64Array(char *str, unsigned lineNum, bool isSign, std::vector<uint8_t> &bufMem);
 bool parseFArray(char *str, unsigned lineNum, std::vector<uint8_t> &bufMem);
 bool parseF16Array(char *str, unsigned lineNum, std::vector<uint8_t> &bufMem);
@@ -503,11 +503,12 @@ bool Document::parseKeyValue(char *key, char *valueStr, unsigned lineNum, Sectio
         result = accessedSectionObject->set(lineNum, memberName, arrayIndex, &value);
         break;
       }
+      case MemberTypeU8Array:
       case MemberTypeIArray:
       case MemberTypeUArray: {
         std::vector<uint8_t> **ppIntData = nullptr;
         accessedSectionObject->getPtrOf(lineNum, memberName, true, arrayIndex, &ppIntData, &m_errorMsg);
-        result = parseIArray(valueStr, lineNum, valueType == MemberTypeIArray, **ppIntData);
+        result = parseIArray(valueStr, lineNum, valueType, **ppIntData);
         break;
       }
       case MemberTypeI64Array:
@@ -963,10 +964,12 @@ bool parseDVec2(char *str, unsigned lineNum, IUFValue *output) {
 //
 // @param str : Input string
 // @param lineNum : Current line number
-// @param isSign : True if it is signed integer
+// @param type : Member type
 // @param [in/out] bufMem : Buffer data
-bool parseIArray(char *str, unsigned lineNum, bool isSign, std::vector<uint8_t> &bufMem) {
+bool parseIArray(char *str, unsigned lineNum, MemberType type, std::vector<uint8_t> &bufMem) {
   bool result = true;
+  bool isSign = type == MemberTypeIArray;
+  bool isByte = type == MemberTypeU8Array;
   std::vector<char *> numbers = split(str, ", ");
 
   for (char *number : numbers) {
@@ -989,7 +992,7 @@ bool parseIArray(char *str, unsigned lineNum, bool isSign, std::vector<uint8_t> 
     else
       iVal = strtol(number, nullptr, 0);
 
-    for (unsigned i = 0; i < sizeof(val); ++i)
+    for (unsigned i = 0; i < (isByte ? 1 : sizeof(val)); ++i)
       bufMem.push_back(val[i]);
   }
 

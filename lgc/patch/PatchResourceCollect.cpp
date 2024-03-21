@@ -479,6 +479,9 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
     case PrimitiveType::TriangleStripAdjacency:
       inVertsPerPrim = 3;
       break;
+    case PrimitiveType::Patch:
+      inVertsPerPrim = 1;
+      break;
     default:
       llvm_unreachable("Unexpected primitive type!");
       break;
@@ -961,28 +964,25 @@ bool PatchResourceCollect::checkGsOnChipValidity() {
     LLPC_OUTS("\n");
   }
 
-  if (gsOnChip || m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) {
-    if (gsResUsage->inOutUsage.gs.calcFactor.rayQueryLdsStackSize > 0) {
-      LLPC_OUTS("Ray query LDS stack size (in dwords): "
-                << gsResUsage->inOutUsage.gs.calcFactor.rayQueryLdsStackSize
-                << " (start = " << gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize << ")\n\n");
-    }
+  if (gsResUsage->inOutUsage.gs.calcFactor.rayQueryLdsStackSize > 0) {
+    LLPC_OUTS("Ray query LDS stack size (in dwords): "
+              << gsResUsage->inOutUsage.gs.calcFactor.rayQueryLdsStackSize
+              << " (start = " << gsResUsage->inOutUsage.gs.calcFactor.gsOnChipLdsSize << ")\n\n");
+  }
 
-    if (meshPipeline) {
-      LLPC_OUTS("GS primitive amplification factor: " << gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor << "\n");
-      LLPC_OUTS("\n");
-      LLPC_OUTS("GS is on-chip (Mesh)\n");
-    } else if (m_pipelineState->getNggControl()->enableNgg) {
-      LLPC_OUTS("GS primitive amplification factor: " << gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor << "\n");
-      LLPC_OUTS("GS enable max output vertices per instance: "
-                << (gsResUsage->inOutUsage.gs.calcFactor.enableMaxVertOut ? "true" : "false") << "\n");
-      LLPC_OUTS("\n");
-      LLPC_OUTS("GS is on-chip (NGG)\n");
-    } else {
-      LLPC_OUTS("GS is " << (gsOnChip ? "on-chip" : "off-chip") << "\n");
-    }
-  } else
-    LLPC_OUTS("GS is off-chip\n");
+  if (meshPipeline) {
+    LLPC_OUTS("GS primitive amplification factor: " << gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor << "\n");
+    LLPC_OUTS("\n");
+    LLPC_OUTS("GS is on-chip (Mesh)\n");
+  } else if (m_pipelineState->getNggControl()->enableNgg) {
+    LLPC_OUTS("GS primitive amplification factor: " << gsResUsage->inOutUsage.gs.calcFactor.primAmpFactor << "\n");
+    LLPC_OUTS("GS enable max output vertices per instance: "
+              << (gsResUsage->inOutUsage.gs.calcFactor.enableMaxVertOut ? "true" : "false") << "\n");
+    LLPC_OUTS("\n");
+    LLPC_OUTS("GS is on-chip (NGG)\n");
+  } else {
+    LLPC_OUTS("GS is " << (gsOnChip ? "on-chip" : "off-chip") << "\n");
+  }
   LLPC_OUTS("\n");
 
   return gsOnChip;

@@ -134,7 +134,8 @@ PreservedAnalyses PatchCopyShader::run(Module &module, ModuleAnalysisManager &an
   auto entryPointTy = FunctionType::get(builder.getVoidTy(), argTys, false);
 
   // Create function for the copy shader entrypoint, and insert it before the FS (if there is one).
-  auto entryPoint = Function::Create(entryPointTy, GlobalValue::ExternalLinkage, lgcName::CopyShaderEntryPoint);
+  auto entryPoint =
+      createFunctionHelper(entryPointTy, GlobalValue::ExternalLinkage, &module, lgcName::CopyShaderEntryPoint);
   entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
   entryPoint->setCallingConv(CallingConv::AMDGPU_VS);
 

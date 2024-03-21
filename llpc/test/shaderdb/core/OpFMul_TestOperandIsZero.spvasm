@@ -1,0 +1,58 @@
+; Test on ((b==0.0 ? 0.0 : a) * (a==0.0 ? 0.0 : b))
+
+; BEGIN_SHADERTEST
+; RUN: amdllpc -v %gfxip %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST-LABEL: {{^// LLPC}} pipeline before-patching results
+; SHADERTEST: call reassoc nnan nsz arcp contract afn float @llvm.amdgcn.fmul.legacy(float %{{.*}}, float %{{.*}})
+; SHADERTEST: AMDLLPC SUCCESS
+; END_SHADERTEST
+
+; SPIR-V
+; Version: 1.6
+; Generator: Khronos Glslang Reference Front End; 11
+; Bound: 28
+; Schema: 0
+               OpCapability Shader
+          %1 = OpExtInstImport "GLSL.std.450"
+               OpMemoryModel Logical GLSL450
+               OpEntryPoint Fragment %main "main" %b %a %fragColor
+               OpExecutionMode %main OriginUpperLeft
+               OpSource GLSL 450
+               OpName %main "main"
+               OpName %c "c"
+               OpName %b "b"
+               OpName %a "a"
+               OpName %fragColor "fragColor"
+               OpDecorate %b Location 1
+               OpDecorate %a Location 0
+               OpDecorate %fragColor Location 0
+       %void = OpTypeVoid
+          %3 = OpTypeFunction %void
+      %float = OpTypeFloat 32
+%_ptr_Function_float = OpTypePointer Function %float
+%_ptr_Input_float = OpTypePointer Input %float
+          %b = OpVariable %_ptr_Input_float Input
+    %float_0 = OpConstant %float 0
+       %bool = OpTypeBool
+          %a = OpVariable %_ptr_Input_float Input
+    %v4float = OpTypeVector %float 4
+%_ptr_Output_v4float = OpTypePointer Output %v4float
+  %fragColor = OpVariable %_ptr_Output_v4float Output
+       %main = OpFunction %void None %3
+          %5 = OpLabel
+          %c = OpVariable %_ptr_Function_float Function
+         %11 = OpLoad %float %b
+         %14 = OpFOrdEqual %bool %11 %float_0
+         %16 = OpLoad %float %a
+         %17 = OpSelect %float %14 %float_0 %16
+         %18 = OpLoad %float %a
+         %19 = OpFOrdEqual %bool %18 %float_0
+         %20 = OpLoad %float %b
+         %21 = OpSelect %float %19 %float_0 %20
+         %22 = OpFMul %float %17 %21
+               OpStore %c %22
+         %26 = OpLoad %float %c
+         %27 = OpCompositeConstruct %v4float %26 %26 %26 %26
+               OpStore %fragColor %27
+               OpReturn
+               OpFunctionEnd

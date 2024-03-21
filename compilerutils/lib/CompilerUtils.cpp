@@ -114,6 +114,10 @@ Function *CompilerUtils::cloneFunctionHeader(Function &f, FunctionType *newType,
   } else {
     // Insert new function before f to facilitate writing tests
     f.getParent()->getFunctionList().insert(f.getIterator(), newFunc);
+#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 489715
+    // If targetModule is null then take flag from original function.
+    newFunc->setIsNewDbgInfoFormat(f.IsNewDbgInfoFormat);
+#endif
   }
 
   newFunc->copyAttributesFrom(&f);
@@ -137,8 +141,8 @@ namespace {
 std::string getCrossModuleName(GlobalValue &gv) {
   if (auto *fn = dyn_cast<Function>(&gv)) {
     // Intrinsics should not be renamed since the IR verifier insists on a "correct" name mangling based on any
-    // overloaded types.
-    if (fn->isIntrinsic())
+    // overloaded types. Lgc dialects also require exact name for similar reason.
+    if (fn->isIntrinsic() || fn->getName().starts_with("lgc."))
       return fn->getName().str();
   }
   return (Twine(gv.getName()) + ".cloned." + gv.getParent()->getName()).str();
@@ -242,7 +246,17 @@ iterator_range<Function::iterator> CompilerUtils::CrossModuleInliner::inlineCall
 
   // Copy code
   InlineFunctionInfo ifi;
+#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 489715
+  // calleeFunc is not from targetMod, check if we need to convert it.
+  bool shouldConvert = !calleeFunc->IsNewDbgInfoFormat && targetMod->IsNewDbgInfoFormat;
+  if (shouldConvert)
+    calleeFunc->convertToNewDbgValues();
+#endif
   auto res = InlineFunction(cb, ifi);
+#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 489715
+  if (shouldConvert)
+    calleeFunc->convertFromNewDbgValues();
+#endif
   if (!res.isSuccess())
     report_fatal_error(Twine("Failed to inline ") + calleeFunc->getName() + ": " + res.getFailureReason());
 
@@ -325,6 +339,7 @@ CompilerUtils::CrossModuleInliner::inlineCall(IRBuilder<> &b, llvm::Function *ca
     result = fakeUse->getOperand(0);
     fakeUse->eraseFromParent();
   }
+
   return {result, newBBs};
 }
 

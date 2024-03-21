@@ -205,8 +205,7 @@ static void splitIntoI32(const DataLayout &layout, IRBuilder<> &builder, ArrayRe
         Value *vecDword = builder.CreateBitCast(x, FixedVectorType::get(builder.getInt32Ty(), size / 32));
         splitIntoI32(layout, builder, vecDword, output);
       } else {
-        if (!xType->isIntegerTy())
-          x = builder.CreateBitCast(x, builder.getInt32Ty());
+        x = builder.CreateZExtOrBitCast(x, builder.getInt32Ty());
         output.push_back(x);
       }
     }
@@ -711,7 +710,7 @@ Function *PatchEntryPointMutate::lowerCpsFunction(Function *func, ArrayRef<Type 
   auto remainingArgs = func->getFunctionType()->params().drop_front(1);
   newArgTys.append(remainingArgs.begin(), remainingArgs.end());
   FunctionType *newFuncTy = FunctionType::get(builder.getVoidTy(), newArgTys, false);
-  auto newFunc = Function::Create(newFuncTy, func->getLinkage());
+  auto newFunc = createFunctionHelper(newFuncTy, func->getLinkage(), func->getParent());
   newFunc->copyAttributesFrom(func);
   newFunc->copyMetadata(func, 0);
   newFunc->takeName(func);
@@ -1595,18 +1594,6 @@ uint64_t PatchEntryPointMutate::generateEntryPointArgTys(ShaderInputs *shaderInp
     }
   }
 
-  // NOTE: We encounter a HW defect on GFX9. When there is only one user SGPR (corresponds to global table, s0),
-  // the SGPR corresponding to scratch offset (s2) of PS is incorrectly initialized. This leads to invalid scratch
-  // memory access, causing GPU hang. Thus, we detect such case and add a dummy user SGPR in order not to map scratch
-  // offset to s2.
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 9 && m_shaderStage == ShaderStage::Fragment) {
-    if (userDataIdx == 1) {
-      argTys.push_back(builder.getInt32Ty());
-      argNames.push_back("dummyInit");
-      userDataIdx += 1;
-    }
-  }
-
   intfData->userDataCount = userDataIdx;
   inRegMask = (1ull << argTys.size()) - 1;
 
@@ -2025,19 +2012,17 @@ PatchEntryPointMutate::UserDataUsage *PatchEntryPointMutate::getUserDataUsage(Sh
 //
 // @param stage : Shader stage
 ShaderStageEnum PatchEntryPointMutate::getMergedShaderStage(ShaderStageEnum stage) const {
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) {
-    switch (stage) {
-    case ShaderStage::Vertex:
-      if (m_pipelineState->hasShaderStage(ShaderStage::TessControl))
-        return ShaderStage::TessControl;
-      LLVM_FALLTHROUGH;
-    case ShaderStage::TessEval:
-      if (m_pipelineState->hasShaderStage(ShaderStage::Geometry))
-        return ShaderStage::Geometry;
-      break;
-    default:
-      break;
-    }
+  switch (stage) {
+  case ShaderStage::Vertex:
+    if (m_pipelineState->hasShaderStage(ShaderStage::TessControl))
+      return ShaderStage::TessControl;
+    LLVM_FALLTHROUGH;
+  case ShaderStage::TessEval:
+    if (m_pipelineState->hasShaderStage(ShaderStage::Geometry))
+      return ShaderStage::Geometry;
+    break;
+  default:
+    break;
   }
   return stage;
 }

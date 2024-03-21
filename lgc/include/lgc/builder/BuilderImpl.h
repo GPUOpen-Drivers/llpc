@@ -423,9 +423,6 @@ private:
   // For a cubearray with integer coordinates, combine the face and slice into a single component.
   void combineCubeArrayFaceAndSlice(llvm::Value *coord, llvm::SmallVectorImpl<llvm::Value *> &coords);
 
-  // Patch descriptor with cube dimension for image call
-  llvm::Value *patchCubeDescriptor(llvm::Value *desc, unsigned dim);
-
   // Handle cases where we need to add the FragCoord x,y to the coordinate, and use ViewIndex as the z coordinate.
   llvm::Value *handleFragCoordViewIndex(llvm::Value *coord, unsigned flags, unsigned &dim);
 
@@ -520,6 +517,10 @@ private:
 
   // Mark fragment output type
   void markFsOutputType(llvm::Type *outputTy, unsigned location, InOutInfo outputInfo);
+
+  // Try to fold constant location offset if possible.
+  bool foldConstantLocationOffset(llvm::Type *inOutTy, unsigned &location, llvm::Value *&locationOffset,
+                                  llvm::Value *elemIdx, unsigned &locationCount, InOutInfo &inOutInfo);
 
   std::tuple<unsigned, llvm::Value *> getInterpModeAndValue(InOutInfo inputInfo, llvm::Value *auxInterpValue);
   llvm::Value *evalIjOffsetSmooth(llvm::Value *offset);

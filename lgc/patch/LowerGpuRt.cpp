@@ -77,6 +77,7 @@ PreservedAnalyses LowerGpuRt::run(Module &module, ModuleAnalysisManager &analysi
                             .add(&LowerGpuRt::visitGetFlattenedGroupThreadId)
                             .add(&LowerGpuRt::visitFloatWithRoundMode)
                             .add(&LowerGpuRt::visitGpurtDispatchThreadIdFlatOp)
+                            .add(&LowerGpuRt::visitContinuationStackIsGlobalOp)
                             .build();
 
   visitor.visit(*this, module);
@@ -440,6 +441,18 @@ void LowerGpuRt::visitGpurtDispatchThreadIdFlatOp(GpurtDispatchThreadIdFlatOp &i
   }
 
   inst.replaceAllUsesWith(flatDispatchId);
+  m_callsToLower.push_back(&inst);
+  m_funcsToLower.insert(inst.getCalledFunction());
+}
+
+// =====================================================================================================================
+// Visit "GpurtContinuationStackIsGlobalOp" instruction
+//
+// @param inst : The dialect instruction to process
+void LowerGpuRt::visitContinuationStackIsGlobalOp(GpurtContinuationStackIsGlobalOp &inst) {
+  m_builder->SetInsertPoint(&inst);
+  bool isGlobal = m_pipelineState->getOptions().cpsFlags & CpsFlagStackInGlobalMem;
+  inst.replaceAllUsesWith(m_builder->getInt1(isGlobal));
   m_callsToLower.push_back(&inst);
   m_funcsToLower.insert(inst.getCalledFunction());
 }

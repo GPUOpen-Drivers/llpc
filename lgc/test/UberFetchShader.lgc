@@ -2,7 +2,7 @@
 
 ; CHECK-LABEL: define dllexport spir_func void @lgc.shader.VS.main()
 ; Get the descriptor of Uber Fetch Shader buffer
-; CHECK: [[Desc:%[0-9]*]] = call i64 @lgc.load.user.data.i64(i32 4)
+; CHECK: [[Desc:%[0-9]*]] = call i64 @lgc.load.user.data__i64(i32 4)
 
 ; CHECK: [[DESCPTR:%[0-9]*]] = inttoptr i64 [[Desc]] to ptr addrspace(4)
 ; location mask
@@ -54,12 +54,12 @@
 
 define dllexport spir_func void @lgc.shader.VS.main() local_unnamed_addr #0 !spirv.ExecutionModel !10 !lgc.shaderstage !11 {
 .entry:
-  %0 = call <4 x float> @lgc.input.import.generic.v4f32(i1 false, i32 0, i32 0, i32 0, i32 poison) #1
+  %0 = call <4 x float> @lgc.input.import.generic__v4f32(i1 false, i32 0, i32 0, i32 0, i32 poison) #1
   ret void
 }
 
 ; Function Attrs: nounwind readonly willreturn
-declare <4 x float> @lgc.input.import.generic.v4f32(i1, i32, i32, i32, i32) #1
+declare <4 x float> @lgc.input.import.generic__v4f32(i1, i32, i32, i32, i32) #1
 
 ; Function Attrs: nounwind
 declare void @lgc.output.export.builtin.CullDistance.i32.a1f32(i32, [1 x float]) #0

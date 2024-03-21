@@ -20,9 +20,9 @@ void main()
 //  - get the gl_NumWorkGroups
 //  - get the internal descriptor table
 // Note that `@lgc.load.user.data` is generated after lowering of `@lgc.load.buffer.desc` (lgc-lower-desc pass).
-// REVERSETEST-DAG: %{{[0-9]+}} = call i32 @lgc.load.user.data.i32(i32 0)
+// REVERSETEST-DAG: %{{[0-9]+}} = call i32 @lgc.load.user.data__i32(i32 0)
 // REVERSETEST-DAG: %{{[0-9]+}} = call ptr addrspace(4) @lgc.special.user.data.Workgroup(i32 268435462)
-// REVERSETEST-DAG: %{{[0-9]+}} = call i32 @lgc.load.user.data.i32(i32 4)
+// REVERSETEST-DAG: %{{[0-9]+}} = call i32 @lgc.load.user.data__i32(i32 4)
 // There should be a select between the reversed thread group ID and original thread group ID
 // REVERSETEST: %{{[0-9]+}} = select i1 %{{[0-9]+}}, <3 x i32> %{{[0-9]+}}, <3 x i32> %{{[0-9]+}}
 // REVERSETEST: AMDLLPC SUCCESS

@@ -62,6 +62,8 @@
 #endif
 #endif
 
+#define CONTINUATIONS_LGC_STACK_LOWERING 1
+
 //=====================================================================================================================
 // Continuation intrinsics
 //
@@ -103,9 +105,9 @@
 // Enqueue
 // -------
 // Enqueue just jumps to the function at the given address. Enqueue is noreturn, and following code is unreachable.
-// _AmdEnqueue*(uint64_t addr, uint32_t csp, ...)
+// _AmdEnqueue*(uint64_t addr, ...)
 #define DECLARE_ENQUEUE(Suffix, ...) GPURT_DECL \
-  void _AmdEnqueue##Suffix(uint64_t addr, uint32_t csp, __VA_ARGS__) DUMMY_VOID_FUNC
+  void _AmdEnqueue##Suffix(uint64_t addr, __VA_ARGS__) DUMMY_VOID_FUNC
 //
 // WaitEnqueue
 // -----------
@@ -113,7 +115,7 @@
 // Generic function arguments start with the third argument.
 // _AmdWaitEnqueue*(uint64_t addr, uint64_t waitMask, uint32_t csp, ...)
 #define DECLARE_WAIT_ENQUEUE(Suffix, ...) GPURT_DECL \
-  void _AmdWaitEnqueue##Suffix(uint64_t addr, uint64_t waitMask, uint32_t csp, __VA_ARGS__) DUMMY_VOID_FUNC
+  void _AmdWaitEnqueue##Suffix(uint64_t addr, uint64_t waitMask, __VA_ARGS__) DUMMY_VOID_FUNC
 //
 // Complete
 // --------
@@ -164,7 +166,7 @@ GPURT_DECL DXILShaderKind _AmdGetShaderKind() DUMMY_GENERIC_FUNC(DXILShaderKind:
 //=====================================================================================================================
 // ContStackAlloc
 // Allocate space on the continuation stack.
-// Arguments are the current stack pointer and the size of the allocation.
+// Argument is the size of the allocation.
 // Returns the address of the allocation.
 //
 // This is equivalent to
@@ -173,7 +175,7 @@ GPURT_DECL DXILShaderKind _AmdGetShaderKind() DUMMY_GENERIC_FUNC(DXILShaderKind:
 //
 // In addition, it tells the compiler and driver about this allocation, so they can reserve enough memory for the
 // stack.
-GPURT_DECL uint32_t _AmdContStackAlloc(GPURT_INOUT uint32_t csp, uint32_t byteSize) DUMMY_GENERIC_FUNC(0)
+GPURT_DECL uint32_t _AmdContStackAlloc(uint32_t byteSize) DUMMY_GENERIC_FUNC(0)
 
 //=====================================================================================================================
 // Free the current continuation stack
@@ -191,6 +193,11 @@ GPURT_DECL uint32_t _AmdContStackGetPtr() DUMMY_GENERIC_FUNC(0)
 // Load data from a given continuation stack address
 #define DECLARE_CONT_STACK_LOAD(Suffix, ReturnTy) GPURT_DECL \
   ReturnTy _AmdContStackLoad##Suffix(uint32_t addr) DUMMY_GENERIC_FUNC((ReturnTy)0)
+
+//=====================================================================================================================
+// Load data from a given continuation stack address, mark the load as last use
+#define DECLARE_CONT_STACK_LOAD_LAST_USE(Suffix, ReturnTy) GPURT_DECL \
+  ReturnTy _AmdContStackLoadLastUse##Suffix(uint32_t addr) DUMMY_GENERIC_FUNC((ReturnTy)0)
 
 //=====================================================================================================================
 // Store data to a given continuation stack address

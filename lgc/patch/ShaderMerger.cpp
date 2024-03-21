@@ -56,7 +56,7 @@ using namespace lgc;
 ShaderMerger::ShaderMerger(PipelineState *pipelineState, PipelineShadersResult *pipelineShaders)
     : m_pipelineState(pipelineState), m_context(&pipelineState->getContext()),
       m_gfxIp(pipelineState->getTargetInfo().getGfxIpVersion()) {
-  assert(m_gfxIp.major >= 9);
+  assert(m_gfxIp.major >= 10);
   assert(m_pipelineState->isGraphics());
 
   m_hasVs = m_pipelineState->hasShaderStage(ShaderStage::Vertex);
@@ -93,7 +93,7 @@ unsigned ShaderMerger::getSpecialSgprInputIndex(GfxIpVersion gfxIp, LsHs::Specia
       {LsHs::waveIdInGroup, 5},    // s5
   };
 
-  assert(gfxIp.major >= 9); // Must be GFX9+
+  assert(gfxIp.major >= 10); // Must be GFX10+
 
   if (gfxIp.major >= 11) {
     assert(LsHsSpecialSgprInputMapGfx11.count(sgprInput) > 0);
@@ -145,7 +145,7 @@ unsigned ShaderMerger::getSpecialSgprInputIndex(GfxIpVersion gfxIp, EsGs::Specia
       {EsGs::FlatScratchHigh, 7},  // s7
   };
 
-  assert(gfxIp.major >= 9); // Must be GFX9+
+  assert(gfxIp.major >= 10); // Must be GFX10+
 
   if (gfxIp.major >= 11) {
     assert(EsGsSpecialSgprInputMapGfx11.count(sgprInput) > 0);
@@ -309,7 +309,8 @@ Function *ShaderMerger::generateLsHsEntryPoint(Function *lsEntryPoint, Function 
   // Create the entrypoint for the merged shader, and insert it at the start.  This has to be done for unlinked shaders
   // because the vertex fetch shader will be prepended to this module and expect the fall through into the merged
   // shader.
-  Function *entryPoint = Function::Create(entryPointTy, GlobalValue::ExternalLinkage, lgcName::LsHsEntryPoint);
+  Function *entryPoint = createFunctionHelper(entryPointTy, GlobalValue::ExternalLinkage, hsEntryPoint->getParent(),
+                                              lgcName::LsHsEntryPoint);
   entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
   auto module = hsEntryPoint->getParent();
   module->getFunctionList().push_front(entryPoint);
@@ -638,7 +639,8 @@ Function *ShaderMerger::generateEsGsEntryPoint(Function *esEntryPoint, Function 
   // Create the entrypoint for the merged shader, and insert it at the start.  This has to be done for unlinked shaders
   // because the vertex fetch shader will be prepended to this module and expect the fall through into the merged
   // shader.
-  Function *entryPoint = Function::Create(entryPointTy, GlobalValue::ExternalLinkage, lgcName::EsGsEntryPoint);
+  Function *entryPoint =
+      createFunctionHelper(entryPointTy, GlobalValue::ExternalLinkage, module, lgcName::EsGsEntryPoint);
   entryPoint->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
   module->getFunctionList().push_front(entryPoint);
 

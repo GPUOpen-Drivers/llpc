@@ -26,14 +26,14 @@
 set(LLPC_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/..")
 
 include("${LLPC_SOURCE_DIR}/cmake/llpc_version.cmake")
-include("${LLPC_SOURCE_DIR}/cmake/continuations.cmake")
+include("${LLPC_SOURCE_DIR}/cmake/llvmraytracing.cmake")
 
 # Macro to add LGC and its dependencies as LLVM external projects.
 # This appends the project names to LLVM_EXTERNAL_PROJECTS and sets each LLVM_EXTERNAL_*_SOURCE_DIR,
 # all in the caller's scope.
 macro(add_lgc_projects)
     add_llpc_version_projects()
-    add_continuations_projects()
+    add_llvmraytracing_projects()
     if (NOT lgc IN_LIST LLVM_EXTERNAL_PROJECTS)
         if (NOT llvm_dialects IN_LIST LLVM_EXTERNAL_PROJECTS)
             list(APPEND LLVM_EXTERNAL_PROJECTS llvm_dialects)

@@ -50,6 +50,7 @@ class GpurtGetTriangleCompressionModeOp;
 class GpurtGetFlattenedGroupThreadIdOp;
 class GpurtFloatWithRoundModeOp;
 class GpurtDispatchThreadIdFlatOp;
+class GpurtContinuationStackIsGlobalOp;
 
 class LowerGpuRt : public llvm::PassInfoMixin<LowerGpuRt> {
 public:
@@ -75,6 +76,7 @@ private:
   void visitGetFlattenedGroupThreadId(lgc::GpurtGetFlattenedGroupThreadIdOp &inst);
   void visitFloatWithRoundMode(lgc::GpurtFloatWithRoundModeOp &inst);
   void visitGpurtDispatchThreadIdFlatOp(lgc::GpurtDispatchThreadIdFlatOp &inst);
+  void visitContinuationStackIsGlobalOp(lgc::GpurtContinuationStackIsGlobalOp &inst);
   llvm::Value *m_stack = nullptr;                        // Stack array to hold stack value
   llvm::Type *m_stackTy = nullptr;                       // Stack type
   PipelineState *m_pipelineState = nullptr;              // Pipeline state

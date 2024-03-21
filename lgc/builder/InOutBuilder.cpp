@@ -93,10 +93,9 @@ Value *BuilderImpl::CreateReadPerVertexInput(Type *resultTy, unsigned location, 
   assert(m_shaderStage == ShaderStage::Fragment);
 
   // Fold constant locationOffset into location.
-  assert(isa<ConstantInt>(locationOffset));
-  location += cast<ConstantInt>(locationOffset)->getZExtValue();
-  locationOffset = getInt32(0);
-  locationCount = divideCeil(resultTy->getPrimitiveSizeInBits(), 128);
+  bool canFold = foldConstantLocationOffset(resultTy, location, locationOffset, elemIdx, locationCount, inputInfo);
+  assert(canFold);
+  (void(canFold)); // Unused
 
   // Mark the usage of the input/output.
   markGenericInputOutputUsage(false, location, locationCount, inputInfo, vertexIndex != nullptr);
@@ -179,21 +178,15 @@ Value *BuilderImpl::readGenericInputOutput(bool isOutput, Type *resultTy, unsign
   assert(resultTy->isAggregateType() == false);
   assert(isOutput == false || m_shaderStage == ShaderStage::TessControl);
 
-  // Fold constant locationOffset into location. (Currently a variable locationOffset is only supported in
-  // TCS, TES, mesh shader, and FS custom interpolation.)
-  bool directlyMapLocations = true;
-  if (auto constLocOffset = dyn_cast<ConstantInt>(locationOffset)) {
-    location += constLocOffset->getZExtValue();
-    locationOffset = getInt32(0);
-    locationCount = (resultTy->getPrimitiveSizeInBits() + 127U) / 128U;
-    directlyMapLocations = false; // Reset this flag if dynamic location indexing is avoided
-  }
+  // Fold constant locationOffset into location.
+  bool directlyMapLocations =
+      !foldConstantLocationOffset(resultTy, location, locationOffset, elemIdx, locationCount, inOutInfo);
 
   // Mark the usage of the input/output.
   markGenericInputOutputUsage(isOutput, location, locationCount, inOutInfo, vertexIndex != nullptr,
                               directlyMapLocations);
 
-  // Generate LLPC call for reading the input/output.
+  // Generate the call for reading the input/output.
   Value *result = nullptr;
   switch (m_shaderStage.value()) {
   case ShaderStage::Vertex: {
@@ -267,21 +260,15 @@ Instruction *BuilderImpl::CreateWriteGenericOutput(Value *valueToWrite, unsigned
                                                    Value *vertexOrPrimitiveIndex) {
   assert(valueToWrite->getType()->isAggregateType() == false);
 
-  // Fold constant locationOffset into location (Currently a variable locationOffset is only supported in
-  // TCS or mesh shader).
-  bool directlyMapLocations = true;
-  if (auto constLocOffset = dyn_cast<ConstantInt>(locationOffset)) {
-    location += constLocOffset->getZExtValue();
-    locationOffset = getInt32(0);
-    locationCount = (valueToWrite->getType()->getPrimitiveSizeInBits() + 127U) / 128U;
-    directlyMapLocations = false; // Reset this flag if dynamic location indexing is avoided
-  }
+  // Fold constant locationOffset into location.
+  bool directlyMapLocations = !foldConstantLocationOffset(valueToWrite->getType(), location, locationOffset, elemIdx,
+                                                          locationCount, outputInfo);
 
   // Mark the usage of the output.
   markGenericInputOutputUsage(/*isOutput=*/true, location, locationCount, outputInfo, vertexOrPrimitiveIndex != nullptr,
                               directlyMapLocations);
 
-  // Set up the args for the llpc call.
+  // Set up the args for the call writing the output.
   SmallVector<Value *, 6> args;
   switch (m_shaderStage.value()) {
   case ShaderStage::Vertex:
@@ -424,17 +411,54 @@ void BuilderImpl::markGenericInputOutputUsage(bool isOutput, unsigned location, 
       }
 
       // Add location map entries for this input/output
+
+      // NOTE: For TCS input/output, TES input, and mesh shader output, their components could be separately indexed.
+      // We have to reserve all components in the location map and mark all of them as active. Otherwise, this might
+      // lead to failed searching when we try to find the location map info for this input/output.
+      bool reserveAllComponents = m_shaderStage == ShaderStage::TessControl ||
+                                  (m_shaderStage == ShaderStage::TessEval && !isOutput) ||
+                                  (m_shaderStage == ShaderStage::Mesh && isOutput);
+
       for (unsigned i = 0; i < locationCount; ++i) {
-        InOutLocationInfo origLocationInfo;
-        origLocationInfo.setLocation(location + i);
-        origLocationInfo.setComponent(inOutInfo.getComponent());
-        auto &newLocationInfo = (*inOutLocInfoMap)[origLocationInfo];
-        if (directlyMapLocations) {
-          // Directly map the locations (trivial map) without further calculation
-          newLocationInfo.setLocation(location + i);
-          newLocationInfo.setComponent(inOutInfo.getComponent());
-        } else
-          newLocationInfo.setData(InvalidValue);
+        if (reserveAllComponents) {
+          unsigned numComponents = 0;
+          if (inOutInfo.getNumComponents() > 4) {
+            assert(locationCount % 2 == 0);        // Must have even number of locations for 64-bit data type
+            assert(inOutInfo.getComponent() == 0); // Start component must be 0 in this case
+            if (i % 2 == 0)
+              numComponents = 4;
+            else
+              numComponents = inOutInfo.getNumComponents() - 4;
+          } else {
+            numComponents = inOutInfo.getComponent() + inOutInfo.getNumComponents();
+          }
+          assert(numComponents >= 1 && numComponents <= 4); // Valid number of components for a location is 1~4
+
+          for (unsigned j = 0; j < numComponents; ++j) {
+            InOutLocationInfo origLocationInfo;
+            origLocationInfo.setLocation(location + i);
+            origLocationInfo.setComponent(j);
+
+            auto &newLocationInfo = (*inOutLocInfoMap)[origLocationInfo];
+            if (directlyMapLocations) {
+              // Force to map the location trivially
+              newLocationInfo.setLocation(location + i);
+              newLocationInfo.setComponent(j);
+            } else
+              newLocationInfo.setData(InvalidValue);
+          }
+        } else {
+          InOutLocationInfo origLocationInfo;
+          origLocationInfo.setLocation(location + i);
+          origLocationInfo.setComponent(inOutInfo.getComponent());
+          auto &newLocationInfo = (*inOutLocInfoMap)[origLocationInfo];
+          if (directlyMapLocations) {
+            // Directly map the locations (trivial map) without further calculation
+            newLocationInfo.setLocation(location + i);
+            newLocationInfo.setComponent(inOutInfo.getComponent());
+          } else
+            newLocationInfo.setData(InvalidValue);
+        }
       }
     }
 
@@ -581,6 +605,59 @@ void BuilderImpl::markFsOutputType(Type *outputTy, unsigned location, InOutInfo 
 
   auto resUsage = getPipelineState()->getShaderResourceUsage(m_shaderStage.value());
   resUsage->inOutUsage.fs.outputTypes[location] = basicTy;
+}
+
+// =====================================================================================================================
+// Try to fold constant location offset if possible. This function also updates the field 'numComponents' of 'inOutInfo'
+// if it is not specified by computing an appropriate value.
+//
+// @param inOutTy : Type of this input/output
+// @param [in/out] location : Base location of this input/output
+// @param [in/out] locationOffset : Variable location offset; must be within locationCount
+// @param elemIdx : Element index in vector. (This is the SPIR-V "component", except that it is half the component for
+//                  64-bit elements.)
+// @param [out] locationCount : Count of locations taken by this input/output
+// @param [in/out] inOutInfo : Extra input/output info
+// @returns : True if we can successfully fold the constant location offset.
+bool BuilderImpl::foldConstantLocationOffset(Type *inOutTy, unsigned &location, Value *&locationOffset, Value *elemIdx,
+                                             unsigned &locationCount, InOutInfo &inOutInfo) {
+  // First, compute 'numComponents' if not specified
+  if (inOutInfo.getNumComponents() == 0) {
+    // Get the initial value from the type of this input/output.
+    unsigned numComponents = inOutTy->isVectorTy() ? cast<FixedVectorType>(inOutTy)->getNumElements() : 1;
+
+    // Then consider component indexing like this vecN[i].
+    assert(isa<ConstantInt>(elemIdx)); // For dynamic component indexing, NumComponents must be specified by frontend.
+    unsigned componentIndex = cast<ConstantInt>(elemIdx)->getZExtValue();
+    // Take component offset into account. The provided component index actually includes this value. We must subtract
+    // it to get real component index.
+    if (inOutTy->getScalarSizeInBits() == 64) {
+      assert(inOutInfo.getComponent() % 2 == 0); // Must be even
+      componentIndex -= inOutInfo.getComponent() / 2;
+    } else {
+      componentIndex -= inOutInfo.getComponent();
+    }
+    numComponents = std::max(numComponents, componentIndex + 1);
+
+    // For 64-bit data types, vector element or scalar is considered to occupy two components. Revise it.
+    if (inOutTy->getScalarSizeInBits() == 64)
+      numComponents *= 2;
+
+    inOutInfo.setNumComponents(numComponents);
+  }
+
+  // Then, try to fold constant locationOffset into location. Currently, a variable locationOffset is only supported in
+  // TCS, TES, mesh shader, and FS custom interpolation.
+  if (!isa<ConstantInt>(locationOffset))
+    return false;
+
+  const unsigned constantLocationOffset = cast<ConstantInt>(locationOffset)->getZExtValue();
+  location += constantLocationOffset;
+  locationOffset = getInt32(0);
+  assert(inOutInfo.getNumComponents() >= 1);
+  locationCount = divideCeil(inOutInfo.getNumComponents(), 4);
+
+  return true;
 }
 
 // =====================================================================================================================

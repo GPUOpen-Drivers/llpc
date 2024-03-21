@@ -67,8 +67,6 @@ enum SectionType : unsigned {
   SectionTypeResourceMapping,         // Resource mapping section
   SectionTypeUniformConstantMapEntry, // UniformConstantMapEntry section
   SectionTypeUniformConstantMap,      // UniformConstantMap section
-  SectionTypeUniformConstant,         // UniformConstant section
-  SectionTypeApiXfbOutput,            // ApiXfbOutput section
   // GL pipeline
   SectionTypeGlProgramParameter, // GL program parameter section
   SectionTypeGlGraphicsState,    // GL graphic pipeline state section
@@ -92,6 +90,7 @@ enum MemberType : unsigned {
   MemberTypeFVec4,                        // VFX member type: float vec4
   MemberTypeF16Vec4,                      // VFX member type: float16 vec4
   MemberTypeDVec2,                        // VFX member type: double vec2
+  MemberTypeU8Array,                      // VFX member type: byte vector (dynamic array)
   MemberTypeIArray,                       // VFX member type: int vector (dynamic array)
   MemberTypeUArray,                       // VFX member type: uint vector (dynamic array)
   MemberTypeI64Array,                     // VFX member type: int64 vector (dynamic array)
@@ -161,11 +160,32 @@ template <typename T, typename R, R(T::*member)> struct GetMemberHelper<R(T::*),
   }
 };
 
+// =====================================================================================================================
+template <typename T1, typename SubT, T1, SubT> struct GetSubMemberHelper;
+template <typename T, typename R, typename SubR, R(T::*member1), SubR(R::*member2)>
+struct GetSubMemberHelper<R(T::*), SubR(R::*), member1, member2> {
+  static void *getMemberPtr(void *obj) {
+    T *t = static_cast<T *>(obj);
+    return &(t->*member1.*member2);
+  }
+};
+
+// =====================================================================================================================
 template <typename T2, typename T, T> struct GetSubStateMemberHelper;
 template <typename T2, typename T, typename R, R(T::*member)> struct GetSubStateMemberHelper<T2, R(T::*), member> {
   static void *getMemberPtr(void *obj) {
     T2 *t = static_cast<T2 *>(obj);
     return &(t->getSubStateRef().*member);
+  }
+};
+
+// =====================================================================================================================
+template <typename T2, typename T, typename SubT, T, SubT> struct GetSubStateSubMemberHelper;
+template <typename T2, typename T, typename R, typename SubR, R(T::*member1), SubR(R::*member2)>
+struct GetSubStateSubMemberHelper<T2, R(T::*), SubR(R::*), member1, member2> {
+  static void *getMemberPtr(void *obj) {
+    T2 *t = static_cast<T2 *>(obj);
+    return &(t->getSubStateRef().*member1.*member2);
   }
 };
 
@@ -224,6 +244,23 @@ inline SectionInfo initSectionItemInfo(SectionType type, uint16_t propertyLo, ui
     if (!strncmp(tableItem.memberName, "m_", 2))                                                                       \
       tableItem.memberName += 2;                                                                                       \
     tableItem.getMember = GetSubStateMemberHelper<T, decltype(&SubState::name), &SubState::name>::getMemberPtr;        \
+    tableItem.memberType = type;                                                                                       \
+    tableItem.arrayMaxSize = 1;                                                                                        \
+    tableItem.isSection = _isObject;                                                                                   \
+  } while (false)
+
+// =====================================================================================================================
+// Initiates a state's member to address table
+#define INIT_STATE_SUB_MEMBER_NAME_TO_ADDR(T, name, submember, type, _isObject)                                        \
+  do {                                                                                                                 \
+    addrTableInitializer.push_back(StrToMemberAddr());                                                                 \
+    StrToMemberAddr &tableItem = addrTableInitializer.back();                                                          \
+    tableItem.memberName = STRING(submember);                                                                          \
+    if (!strncmp(tableItem.memberName, "m_", 2))                                                                       \
+      tableItem.memberName += 2;                                                                                       \
+    tableItem.getMember =                                                                                              \
+        GetSubStateSubMemberHelper<T, decltype(&SubState::name), decltype(&decltype(SubState::name)::submember),       \
+                                   &SubState::name, &decltype(SubState::name)::submember>::getMemberPtr;               \
     tableItem.memberType = type;                                                                                       \
     tableItem.arrayMaxSize = 1;                                                                                        \
     tableItem.isSection = _isObject;                                                                                   \
@@ -443,8 +480,12 @@ bool Section::set(unsigned lineNum, const char *memberName, unsigned arrayIndex,
   std::string dummyMsg;
   result = getPtrOf(lineNum, memberName, true, arrayIndex, &memberPtr, &dummyMsg);
   VFX_ASSERT(result == true);
-  if (result)
+  if (result) {
+    if (sizeof(TValue) == 4) {
+      VFX_ASSERT((reinterpret_cast<uint64_t>(memberPtr) & 0x3) == 0);
+    }
     *memberPtr = *value;
+  }
 
   return result;
 };
@@ -746,16 +787,20 @@ public:
     memset(&m_vkDivisorState, 0, sizeof(m_vkDivisorState));
     m_vkDivisorState.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_DIVISOR_STATE_CREATE_INFO_EXT;
   }
-  void getvbAddressLowBits(uint8_t *vbAddrLowBits) { memcpy(vbAddrLowBits, &m_vbAddressLowBits[0], 64); }
+  void getvbAddressLowBits(uint8_t *vbAddrLowBits) {
+    memcpy(vbAddrLowBits, &m_vbAddressLowBits[0], MaxInternalVertexBufferBindingCount);
+  }
   void getSubState(SubState &state) {
     m_vkBindings.resize(m_binding.size());
     m_vkAttributes.resize(m_attribute.size());
     m_vkDivisors.resize(m_divisor.size());
-    m_vbAddressLowBits.resize(64);
+    m_vbAddressLowBits.resize(MaxInternalVertexBufferBindingCount);
 
     for (unsigned i = 0; i < m_attribute.size(); ++i) {
       m_attribute[i].getSubState(m_vkAttributes[i]);
-      m_attribute[i].getVbAddressLowBits(m_vbAddressLowBits[m_vkAttributes[i].binding]);
+      if (m_vkAttributes[i].binding < 64) {
+        m_attribute[i].getVbAddressLowBits(m_vbAddressLowBits[m_vkAttributes[i].binding]);
+      }
     }
 
     for (unsigned i = 0; i < m_binding.size(); ++i)

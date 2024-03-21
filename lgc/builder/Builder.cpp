@@ -208,6 +208,16 @@ Constant *BuilderCommon::getFpConstant(Type *ty, APFloat value) {
 }
 
 // =====================================================================================================================
+// Create alloca for given input type.
+//
+// @param ty : pointer type.
+Value *BuilderCommon::CreateAllocaAtFuncEntry(Type *ty) {
+  IRBuilderBase::InsertPointGuard ipg(*this);
+  SetInsertPointPastAllocas(GetInsertBlock()->getParent());
+  return CreateAlloca(ty);
+}
+
+// =====================================================================================================================
 // Get a constant of FP or vector of FP type for the value PI/180, for converting radians to degrees.
 //
 // @param ty : FP scalar or vector type

@@ -126,7 +126,8 @@ private:
 
   bool needPatch32(const VertexInputDescription *inputDesc) const;
 
-  bool needPackFormatEmulation(const VertexInputDescription *inputDesc, std::vector<unsigned> &extractMask) const;
+  bool needPackFormatEmulation(const VertexInputDescription *inputDesc, const VertexNumFormatInfo *numFormatInfo,
+                               std::vector<unsigned> &extractMask, std::vector<float> &normalizationFactors) const;
 
   void postFetchEmulation(const VertexInputDescription *description, bool fetchInByte, unsigned inputCompBytes,
                           unsigned numChannels, const VertexNumFormatInfo *numFormatInfo,
@@ -1383,7 +1384,9 @@ unsigned VertexFetchImpl::mapVertexFormat(unsigned dfmt, unsigned nfmt) const {
 // @param inputDesc : Vertex input description.
 // @param [out] extractMask : Bits extract mask.
 bool VertexFetchImpl::needPackFormatEmulation(const VertexInputDescription *inputDesc,
-                                              std::vector<unsigned> &extractMask) const {
+                                              const VertexNumFormatInfo *numFormatInfo,
+                                              std::vector<unsigned> &extractMask,
+                                              std::vector<float> &normalizationFactors) const {
   switch (inputDesc->dfmt) {
   case BufDataFormat10_11_11:
     extractMask.push_back(11);
@@ -1400,12 +1403,38 @@ bool VertexFetchImpl::needPackFormatEmulation(const VertexInputDescription *inpu
     extractMask.push_back(10);
     extractMask.push_back(10);
     extractMask.push_back(10);
+    if (numFormatInfo->isNorm) {
+      if (numFormatInfo->isSigned) {
+        normalizationFactors.push_back(1.0f);
+        normalizationFactors.push_back(1 / 512.0f);
+        normalizationFactors.push_back(1 / 512.0f);
+        normalizationFactors.push_back(1 / 512.0f);
+      } else {
+        normalizationFactors.push_back(1 / 3.0f);
+        normalizationFactors.push_back(1 / 1023.0f);
+        normalizationFactors.push_back(1 / 1023.0f);
+        normalizationFactors.push_back(1 / 1023.0f);
+      }
+    }
     return true;
   case BufDataFormat2_10_10_10:
     extractMask.push_back(10);
     extractMask.push_back(10);
     extractMask.push_back(10);
     extractMask.push_back(2);
+    if (numFormatInfo->isNorm) {
+      if (numFormatInfo->isSigned) {
+        normalizationFactors.push_back(1 / 512.0f);
+        normalizationFactors.push_back(1 / 512.0f);
+        normalizationFactors.push_back(1 / 512.0f);
+        normalizationFactors.push_back(1.0f);
+      } else {
+        normalizationFactors.push_back(1 / 1023.0f);
+        normalizationFactors.push_back(1 / 1023.0f);
+        normalizationFactors.push_back(1 / 1023.0f);
+        normalizationFactors.push_back(1 / 3.0f);
+      }
+    }
     return true;
   default:
     break;
@@ -1480,8 +1509,10 @@ void VertexFetchImpl::postFetchEmulation(const VertexInputDescription *descripti
   // Do post-processing in certain cases
   std::vector<Constant *> shuffleMask;
   std::vector<unsigned> extractMask;
+  std::vector<float> normalizationFactors;
+  bool isPacked = needPackFormatEmulation(description, numFormatInfo, extractMask, normalizationFactors);
   // Emulation for packed formats.
-  if (fetchInByte && needPackFormatEmulation(description, extractMask)) {
+  if (fetchInByte && isPacked) {
     // Must be 8 bit fetch in Byte.
     Value *packedVertex =
         PoisonValue::get(FixedVectorType::get(builderImpl.getInt8Ty(), descFormatInfo->vertexByteSize));
@@ -1512,7 +1543,8 @@ void VertexFetchImpl::postFetchEmulation(const VertexInputDescription *descripti
     assert(shuffleMask.empty() == false);
     *ppFetch = builderImpl.CreateShuffleVector(*ppFetch, *ppFetch, ConstantVector::get(shuffleMask));
   }
-  if (fetchInByte || needPatch32(description)) {
+  bool isPatch32 = needPatch32(description);
+  if (fetchInByte || isPatch32) {
     Type *compFloatTy = getVertexFetchType(true, inputCompBytes, builderImpl);
     for (unsigned i = 0; i < numChannels; ++i) {
       Value *elemInstr = nullptr;
@@ -1522,18 +1554,22 @@ void VertexFetchImpl::postFetchEmulation(const VertexInputDescription *descripti
         elemInstr = builderImpl.CreateExtractElement(*ppFetch, builderImpl.getInt32(i));
       if (numFormatInfo->isNorm || numFormatInfo->isScaled) {
         // A constant divisor for normalization emulation.
-        float normDiv = 2.14748365e+09f;
+        float normDiv = isPatch32 ? 2.14748365e+09f : 32767.0f;
         if (numFormatInfo->isSigned) {
           // Signed int to float
           elemInstr = builderImpl.CreateSIToFP(elemInstr, compFloatTy);
         } else {
           // Unsigned int to float
           elemInstr = builderImpl.CreateUIToFP(elemInstr, compFloatTy);
-          normDiv = 4.29496730e+09f;
+          normDiv = isPatch32 ? 4.29496730e+09f : 65535.0f;
         }
         if (numFormatInfo->isNorm) {
           // Normalization emulation.
-          elemInstr = builderImpl.CreateFDiv(elemInstr, ConstantFP::get(compFloatTy, normDiv));
+          if (isPacked) {
+            elemInstr = builderImpl.CreateFMul(elemInstr, ConstantFP::get(compFloatTy, normalizationFactors[i]));
+          } else {
+            elemInstr = builderImpl.CreateFDiv(elemInstr, ConstantFP::get(compFloatTy, normDiv));
+          }
         }
       } else if (description->nfmt == BufNumFormatFixed) {
         // A constant divisor to translate loaded float bits to fixed point format.

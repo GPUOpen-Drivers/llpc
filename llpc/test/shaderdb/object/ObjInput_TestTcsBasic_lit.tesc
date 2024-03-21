@@ -17,9 +17,9 @@ void main (void)
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: call i32 @lgc.input.import.builtin.InvocationId{{.*}}
-; SHADERTEST: call float @lgc.input.import.generic.f32{{.*}}
+; SHADERTEST: call float @lgc.input.import.generic__f32{{.*}}
 ; SHADERTEST: call i32 @lgc.input.import.builtin.InvocationId{{.*}}
-; SHADERTEST: call double @lgc.input.import.generic.f64{{.*}}
+; SHADERTEST: call double @lgc.input.import.generic__f64{{.*}}
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

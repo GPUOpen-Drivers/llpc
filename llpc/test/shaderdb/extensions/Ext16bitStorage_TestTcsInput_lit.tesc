@@ -31,10 +31,10 @@ void main(void)
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIRV-to-LLVM translation results
 ; SHADERTEST-LABEL: {{^// LLPC}} SPIR-V lowering results
 ; SHADERTEST: call i32 @lgc.input.import.builtin.InvocationId{{.*}}
-; SHADERTEST: call half @lgc.input.import.generic.f16{{.*}}
-; SHADERTEST: call <3 x half> @lgc.input.import.generic.v3f16{{.*}}
-; SHADERTEST: call i16 @lgc.input.import.generic.i16{{.*}}
-; SHADERTEST: call <3 x i16> @lgc.input.import.generic.v3i16{{.*}}
+; SHADERTEST: call half @lgc.input.import.generic__f16{{.*}}
+; SHADERTEST: call <3 x half> @lgc.input.import.generic__v3f16{{.*}}
+; SHADERTEST: call i16 @lgc.input.import.generic__i16{{.*}}
+; SHADERTEST: call <3 x i16> @lgc.input.import.generic__v3i16{{.*}}
 ; SHADERTEST: AMDLLPC SUCCESS
 */
 // END_SHADERTEST

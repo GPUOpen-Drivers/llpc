@@ -28,7 +28,7 @@
  * @brief LLPC source file: implementation of subgroup Builder methods
  ***********************************************************************************************************************
  */
-#include "lgc/builder/BuilderImpl.h"
+#include "lgc/builder/SubgroupBuilder.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/util/Internal.h"
 #include "llvm/IR/Intrinsics.h"
@@ -75,12 +75,39 @@ unsigned BuilderImpl::getShaderWaveSize() {
 }
 
 // =====================================================================================================================
+// Create a subgroup elect call.
+//
+// @param instName : Name to give final instruction.
+Value *SubgroupBuilder::CreateSubgroupElect(const Twine &instName) {
+  return CreateICmpEQ(CreateSubgroupMbcnt(createGroupBallot(getTrue()), ""), getInt32(0));
+}
+
+// =====================================================================================================================
 // Create a subgroup all call.
 //
 // @param value : The value to compare across the subgroup. Must be an integer type.
 // @param instName : Name to give final instruction.
 Value *BuilderImpl::CreateSubgroupAll(Value *const value, const Twine &instName) {
   Value *result = CreateICmpEQ(createGroupBallot(value), createGroupBallot(getTrue()));
+  result = CreateSelect(CreateUnaryIntrinsic(Intrinsic::is_constant, value), value, result);
+
+  // Helper invocations of whole quad mode should be included in the subgroup vote execution
+  const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
+  if (m_shaderStage == ShaderStage::Fragment && !fragmentMode.waveOpsExcludeHelperLanes) {
+    result = CreateZExt(result, getInt32Ty());
+    result = CreateIntrinsic(Intrinsic::amdgcn_softwqm, {getInt32Ty()}, {result});
+    result = CreateTrunc(result, getInt1Ty());
+  }
+  return result;
+}
+
+// =====================================================================================================================
+// Create a subgroup any call.
+//
+// @param value : The value to compare across the subgroup. Must be an integer type.
+// @param instName : Name to give final instruction.
+Value *SubgroupBuilder::CreateSubgroupAny(Value *const value, const Twine &instName) {
+  Value *result = CreateICmpNE(createGroupBallot(value), getInt64(0));
   result = CreateSelect(CreateUnaryIntrinsic(Intrinsic::is_constant, value), value, result);
 
   // Helper invocations of whole quad mode should be included in the subgroup vote execution

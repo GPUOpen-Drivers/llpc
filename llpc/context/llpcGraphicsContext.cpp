@@ -177,6 +177,7 @@ unsigned GraphicsContext::getSubgroupSizeUsage() const {
 void GraphicsContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *hasher, bool unlinked) const {
   PipelineContext::setPipelineState(pipeline, hasher, unlinked);
   const unsigned stageMask = getShaderStageMask();
+  bool disableDualSourceBlend = false;
 
   if (pipeline) {
     // Give the shader options (including the hash) to the middle-end.
@@ -187,6 +188,10 @@ void GraphicsContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
       assert(shaderInfo);
 
       pipeline->setShaderOptions(getLgcShaderStage(static_cast<ShaderStage>(stage)), computeShaderOptions(*shaderInfo));
+
+      const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
+      if (stage == ShaderStageFragment && moduleData && moduleData->usage.disableDualSource)
+        disableDualSourceBlend = true;
     }
   }
 
@@ -198,7 +203,7 @@ void GraphicsContext::setPipelineState(Pipeline *pipeline, Util::MetroHash64 *ha
   if ((isShaderStageInMask(ShaderStageFragment, stageMask) && (!unlinked || DisableColorExportShader)) ||
       (stageMask == 0)) {
     // Give the color export state to the middle-end. Empty stage mask indicates color export shader.
-    setColorExportState(pipeline, hasher);
+    setColorExportState(pipeline, hasher, disableDualSourceBlend);
   }
 
   // Give the graphics pipeline state to the middle-end.
@@ -248,7 +253,7 @@ Options GraphicsContext::computePipelineOptions() const {
   options.enableUberFetchShader = pipelineInfo->enableUberFetchShader;
   options.enableColorExportShader = pipelineInfo->enableColorExportShader;
   options.useSoftwareVertexBufferDescriptors = pipelineInfo->useSoftwareVertexBufferDescriptors;
-  options.vbAddressLowBitsKnown = pipelineInfo->vbAddressLowBitsKnown;
+  options.vbAddressLowBitsKnown = pipelineInfo->getGlState().vbAddressLowBitsKnown;
   if (getGfxIpVersion().major >= 10) {
     // Only set NGG options for a GFX10+ graphics pipeline.
     const auto &nggState = pipelineInfo->nggState;
@@ -296,7 +301,8 @@ Options GraphicsContext::computePipelineOptions() const {
 //
 // @param [in/out] pipeline : Middle-end pipeline object; nullptr if only hashing
 // @param [in/out] hasher : Hasher object; nullptr if only setting LGC pipeline state
-void GraphicsContext::setColorExportState(Pipeline *pipeline, Util::MetroHash64 *hasher) const {
+void GraphicsContext::setColorExportState(Pipeline *pipeline, Util::MetroHash64 *hasher,
+                                          bool disableDualSourceBlend) const {
   auto pipelineInfo = reinterpret_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo());
   const auto &cbState = pipelineInfo->cbState;
 
@@ -311,6 +317,10 @@ void GraphicsContext::setColorExportState(Pipeline *pipeline, Util::MetroHash64 
   state.alphaToCoverageEnable = cbState.alphaToCoverageEnable;
   state.dualSourceBlendEnable = cbState.dualSourceBlendEnable;
   state.dualSourceBlendDynamicEnable = cbState.dualSourceBlendDynamic;
+
+  // Update enable flag according to Shader Decoration
+  if (cbState.dualSourceBlendDynamic && disableDualSourceBlend)
+    state.dualSourceBlendDynamicEnable = false;
 
   for (unsigned targetIndex = 0; targetIndex < MaxColorTargets; ++targetIndex) {
     if (cbState.target[targetIndex].format != VK_FORMAT_UNDEFINED) {
@@ -388,9 +398,10 @@ void GraphicsContext::setVertexInputDescriptions(Pipeline *pipeline, Util::Metro
 
   // Gather the vertex inputs.
   SmallVector<VertexInputDescription, 8> descriptions;
-  auto vbLowBits = static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->vbAddressLowBits;
+  auto vbLowBits =
+      static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->getGlState().vbAddressLowBits;
   auto vbAddressLowBitsKnown =
-      static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->vbAddressLowBitsKnown;
+      static_cast<const GraphicsPipelineBuildInfo *>(getPipelineBuildInfo())->getGlState().vbAddressLowBitsKnown;
   for (unsigned i = 0; i < vertexInput->vertexAttributeDescriptionCount; ++i) {
     auto attrib = &vertexInput->pVertexAttributeDescriptions[i];
     if (attrib->binding >= bindings.size())

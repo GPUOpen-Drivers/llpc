@@ -67,7 +67,6 @@ private:
 
   llvm::ReturnInst *ensureUnifiedReturn();
 
-  void lowerGlobalVar();
   void lowerInput();
   void lowerOutput();
   void lowerInOutInPlace();
@@ -114,7 +113,7 @@ private:
   void addCallInstForXfbOutput(const ShaderInOutMetadata &outputMeta, Value *outputValue, unsigned xfbBufferAdjust,
                                unsigned xfbOffsetAdjust, unsigned locOffset, lgc::InOutInfo outputInfo);
 
-  std::unordered_set<llvm::GlobalVariable *> m_globalVarProxy;      // The unordered_set for lowering global variables
+  llvm::SmallVector<llvm::GlobalVariable *> m_globalsToErase;
   std::unordered_map<llvm::Value *, llvm::Value *> m_inputProxyMap; // Proxy map for lowering inputs
 
   // NOTE: Here we use list to store pairs of output proxy mappings. This is because we want output patching to be

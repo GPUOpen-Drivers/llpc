@@ -629,30 +629,33 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
 
   // Output pipeline shader options
   // clang-format off
+  char clientHashHexValue[64] = {};
+  snprintf(clientHashHexValue, 64, "0x%" PRIX64 ", 0x%" PRIX64,
+    shaderInfo->options.clientHash.lower, shaderInfo->options.clientHash.upper);
+  dumpFile << "options.clientHash = " << clientHashHexValue << "\n";
   dumpFile << "options.trapPresent = " << shaderInfo->options.trapPresent << "\n";
   dumpFile << "options.debugMode = " << shaderInfo->options.debugMode << "\n";
   dumpFile << "options.enablePerformanceData = " << shaderInfo->options.enablePerformanceData << "\n";
   dumpFile << "options.allowReZ = " << shaderInfo->options.allowReZ << "\n";
-  dumpFile << "options.forceLateZ = " << shaderInfo->options.forceLateZ << "\n";
   dumpFile << "options.vgprLimit = " << shaderInfo->options.vgprLimit << "\n";
   dumpFile << "options.sgprLimit = " << shaderInfo->options.sgprLimit << "\n";
   dumpFile << "options.maxThreadGroupsPerComputeUnit = " << shaderInfo->options.maxThreadGroupsPerComputeUnit << "\n";
-  dumpFile << "options.waveSize = " << shaderInfo->options.waveSize << "\n";
   dumpFile << "options.subgroupSize = " << shaderInfo->options.subgroupSize << "\n";
+  dumpFile << "options.waveSize = " << shaderInfo->options.waveSize << "\n";
   dumpFile << "options.wgpMode = " << shaderInfo->options.wgpMode << "\n";
   dumpFile << "options.waveBreakSize = " << shaderInfo->options.waveBreakSize << "\n";
   dumpFile << "options.forceLoopUnrollCount = " << shaderInfo->options.forceLoopUnrollCount << "\n";
+  dumpFile << "options.enableLoadScalarizer = " << shaderInfo->options.enableLoadScalarizer << "\n";
+  dumpFile << "options.allowVaryWaveSize = " << shaderInfo->options.allowVaryWaveSize << "\n";
   dumpFile << "options.useSiScheduler = " << shaderInfo->options.useSiScheduler << "\n";
   dumpFile << "options.disableCodeSinking = " << shaderInfo->options.disableCodeSinking << "\n";
   dumpFile << "options.favorLatencyHiding = " << shaderInfo->options.favorLatencyHiding << "\n";
-  dumpFile << "options.allowVaryWaveSize = " << shaderInfo->options.allowVaryWaveSize << "\n";
-  dumpFile << "options.enableLoadScalarizer = " << shaderInfo->options.enableLoadScalarizer << "\n";
   dumpFile << "options.disableLicm = " << shaderInfo->options.disableLicm << "\n";
   dumpFile << "options.unrollThreshold = " << shaderInfo->options.unrollThreshold << "\n";
   dumpFile << "options.scalarThreshold = " << shaderInfo->options.scalarThreshold << "\n";
   dumpFile << "options.disableLoopUnroll = " << shaderInfo->options.disableLoopUnroll << "\n";
-  dumpFile << "options.fp32DenormalMode = " << shaderInfo->options.fp32DenormalMode << "\n";
   dumpFile << "options.adjustDepthImportVrs = " << shaderInfo->options.adjustDepthImportVrs << "\n";
+  dumpFile << "options.fp32DenormalMode = " << shaderInfo->options.fp32DenormalMode << "\n";
   dumpFile << "options.disableLicmThreshold = " << shaderInfo->options.disableLicmThreshold << "\n";
   dumpFile << "options.unrollHintThreshold = " << shaderInfo->options.unrollHintThreshold << "\n";
   dumpFile << "options.dontUnrollHintThreshold = " << shaderInfo->options.dontUnrollHintThreshold << "\n";
@@ -661,17 +664,20 @@ void PipelineDumper::dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo
   dumpFile << "options.disableFastMathFlags = " << shaderInfo->options.disableFastMathFlags << "\n";
   dumpFile << "options.ldsSpillLimitDwords = " << shaderInfo->options.ldsSpillLimitDwords << "\n";
   dumpFile << "options.scalarizeWaterfallLoads = " << shaderInfo->options.scalarizeWaterfallLoads << "\n";
+  dumpFile << "options.overrideForceThreadIdSwizzling = " << shaderInfo->options.overrideForceThreadIdSwizzling << "\n";
   dumpFile << "options.overrideShaderThreadGroupSizeX = " << shaderInfo->options.overrideShaderThreadGroupSizeX << "\n";
   dumpFile << "options.overrideShaderThreadGroupSizeY = " << shaderInfo->options.overrideShaderThreadGroupSizeY << "\n";
   dumpFile << "options.overrideShaderThreadGroupSizeZ = " << shaderInfo->options.overrideShaderThreadGroupSizeZ << "\n";
+  dumpFile << "options.forceLateZ = " << shaderInfo->options.forceLateZ << "\n";
   dumpFile << "options.nsaThreshold = " << shaderInfo->options.nsaThreshold << "\n";
   dumpFile << "options.aggressiveInvariantLoads = " << shaderInfo->options.aggressiveInvariantLoads << "\n";
   dumpFile << "options.workaroundStorageImageFormats = " << shaderInfo->options.workaroundStorageImageFormats << "\n";
   dumpFile << "options.workaroundInitializeOutputsToZero = " << shaderInfo->options.workaroundInitializeOutputsToZero << "\n";
   dumpFile << "options.disableFMA = " << shaderInfo->options.disableFMA << "\n";
-  dumpFile << "options.constantBufferBindingOffset = " << shaderInfo->options.constantBufferBindingOffset << "\n";
+  dumpFile << "options.disableReadFirstLaneWorkaround = " << shaderInfo->options.disableReadFirstLaneWorkaround << "\n";
   dumpFile << "options.backwardPropagateNoContract = " << shaderInfo->options.backwardPropagateNoContract << "\n";
   dumpFile << "options.forwardPropagateNoContract = " << shaderInfo->options.forwardPropagateNoContract << "\n";
+  dumpFile << "options.constantBufferBindingOffset = " << shaderInfo->options.constantBufferBindingOffset << "\n";
   dumpFile << "\n";
   // clang-format on
 }
@@ -827,7 +833,6 @@ void PipelineDumper::dumpComputeStateInfo(const ComputePipelineBuildInfo *pipeli
   dumpRayTracingRtState(&pipelineInfo->rtState, dumpDir, dumpFile);
 
   if (pipelineInfo->pUniformMap) {
-    dumpFile << "\n[UniformConstant]\n";
     dumpFile << "uniformConstantMaps[0].visibility = " << pipelineInfo->pUniformMap->visibility << "\n";
     UniformConstantMapEntry *locationOffsetMap = pipelineInfo->pUniformMap->pUniforms;
     for (unsigned i = 0; i < pipelineInfo->pUniformMap->numUniformConstants; i++) {
@@ -847,14 +852,14 @@ void PipelineDumper::dumpComputeStateInfo(const ComputePipelineBuildInfo *pipeli
 void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::ostream &dumpFile) {
   dumpFile << "options.includeDisassembly = " << options->includeDisassembly << "\n";
   dumpFile << "options.scalarBlockLayout = " << options->scalarBlockLayout << "\n";
-  dumpFile << "options.resourceLayoutScheme = " << options->resourceLayoutScheme << "\n";
-  dumpFile << "options.includeIr = " << options->includeIr << "\n";
-  dumpFile << "options.robustBufferAccess = " << options->robustBufferAccess << "\n";
   dumpFile << "options.reconfigWorkgroupLayout = " << options->reconfigWorkgroupLayout << "\n";
   dumpFile << "options.forceCsThreadIdSwizzling = " << options->forceCsThreadIdSwizzling << "\n";
-  dumpFile << "options.overrideThreadGroupSizeX = " << options->overrideThreadGroupSizeX << "\n";
-  dumpFile << "options.overrideThreadGroupSizeY = " << options->overrideThreadGroupSizeY << "\n";
-  dumpFile << "options.overrideThreadGroupSizeZ = " << options->overrideThreadGroupSizeZ << "\n";
+  dumpFile << "options.includeIr = " << options->includeIr << "\n";
+  dumpFile << "options.robustBufferAccess = " << options->robustBufferAccess << "\n";
+  dumpFile << "options.enableRelocatableShaderElf = " << options->enableRelocatableShaderElf << "\n";
+  dumpFile << "options.disableImageResourceCheck = " << options->disableImageResourceCheck << "\n";
+  dumpFile << "options.enableScratchAccessBoundsChecks = " << options->enableScratchAccessBoundsChecks << "\n";
+  dumpFile << "options.enableImplicitInvariantExports = " << options->enableImplicitInvariantExports << "\n";
   dumpFile << "options.shadowDescriptorTableUsage = " << options->shadowDescriptorTableUsage << "\n";
   dumpFile << "options.shadowDescriptorTablePtrHigh = " << options->shadowDescriptorTablePtrHigh << "\n";
   dumpFile << "options.extendedRobustness.robustBufferAccess = " << options->extendedRobustness.robustBufferAccess
@@ -862,11 +867,17 @@ void PipelineDumper::dumpPipelineOptions(const PipelineOptions *options, std::os
   dumpFile << "options.extendedRobustness.robustImageAccess = " << options->extendedRobustness.robustImageAccess
            << "\n";
   dumpFile << "options.extendedRobustness.nullDescriptor = " << options->extendedRobustness.nullDescriptor << "\n";
+  dumpFile << "options.enableRayQuery = " << options->enableRayQuery << "\n";
   dumpFile << "options.optimizeTessFactor = " << options->optimizeTessFactor << "\n";
+  dumpFile << "options.enableInterpModePatch = " << options->enableInterpModePatch << "\n";
+  dumpFile << "options.pageMigrationEnabled = " << options->pageMigrationEnabled << "\n";
   dumpFile << "options.optimizationLevel = " << options->optimizationLevel << "\n";
+  dumpFile << "options.overrideThreadGroupSizeX = " << options->overrideThreadGroupSizeX << "\n";
+  dumpFile << "options.overrideThreadGroupSizeY = " << options->overrideThreadGroupSizeY << "\n";
+  dumpFile << "options.overrideThreadGroupSizeZ = " << options->overrideThreadGroupSizeZ << "\n";
+  dumpFile << "options.resourceLayoutScheme = " << options->resourceLayoutScheme << "\n";
   dumpFile << "options.threadGroupSwizzleMode = " << options->threadGroupSwizzleMode << "\n";
   dumpFile << "options.reverseThreadGroup = " << options->reverseThreadGroup << "\n";
-  dumpFile << "options.enableImplicitInvariantExports = " << options->enableImplicitInvariantExports << "\n";
   dumpFile << "options.internalRtShaders = " << options->internalRtShaders << "\n";
   dumpFile << "options.forceNonUniformResourceIndexStageMask = " << options->forceNonUniformResourceIndexStageMask
            << "\n";
@@ -919,6 +930,7 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "disableVertexReuse = " << pipelineInfo->iaState.disableVertexReuse << "\n";
   dumpFile << "switchWinding = " << pipelineInfo->iaState.switchWinding << "\n";
   dumpFile << "enableMultiView = " << pipelineInfo->iaState.enableMultiView << "\n";
+  dumpFile << "useVertexBufferDescArray = " << pipelineInfo->iaState.useVertexBufferDescArray << "\n";
   if (pipelineInfo->iaState.tessLevel) {
     dumpFile << "tessLevelInner[0] = " << pipelineInfo->iaState.tessLevel->inner[0] << "\n";
     dumpFile << "tessLevelInner[1] = " << pipelineInfo->iaState.tessLevel->inner[1] << "\n";
@@ -930,6 +942,7 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "depthClipEnable = " << pipelineInfo->vpState.depthClipEnable << "\n";
 
   dumpFile << "rasterizerDiscardEnable = " << pipelineInfo->rsState.rasterizerDiscardEnable << "\n";
+  dumpFile << "innerCoverage = " << pipelineInfo->rsState.innerCoverage << "\n";
   dumpFile << "perSampleShading = " << pipelineInfo->rsState.perSampleShading << "\n";
   dumpFile << "numSamples = " << pipelineInfo->rsState.numSamples << "\n";
   dumpFile << "pixelShaderSamples = " << pipelineInfo->rsState.pixelShaderSamples << "\n";
@@ -966,12 +979,53 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
   dumpFile << "nggState.subgroupSizing = " << pipelineInfo->nggState.subgroupSizing << "\n";
   dumpFile << "nggState.primsPerSubgroup = " << pipelineInfo->nggState.primsPerSubgroup << "\n";
   dumpFile << "nggState.vertsPerSubgroup = " << pipelineInfo->nggState.vertsPerSubgroup << "\n";
+  dumpFile << "unlinked = " << pipelineInfo->unlinked << "\n";
   dumpFile << "dynamicVertexStride = " << pipelineInfo->dynamicVertexStride << "\n";
   dumpFile << "enableUberFetchShader = " << pipelineInfo->enableUberFetchShader << "\n";
   dumpFile << "enableEarlyCompile = " << pipelineInfo->enableEarlyCompile << "\n";
   dumpFile << "enableColorExportShader = " << pipelineInfo->enableColorExportShader << "\n";
   dumpFile << "useSoftwareVertexBufferDescriptors = " << pipelineInfo->useSoftwareVertexBufferDescriptors << "\n";
-  dumpFile << "vbAddressLowBitsKnown = " << pipelineInfo->vbAddressLowBitsKnown << "\n";
+
+  dumpFile << "originUpperLeft = " << pipelineInfo->getGlState().originUpperLeft << "\n";
+  if (pipelineInfo->clientMetadataSize > 0) {
+    dumpFile << "clientMetadata = ";
+    const uint8_t *pClientMetadata = reinterpret_cast<const uint8_t *>(pipelineInfo->pClientMetadata);
+    for (unsigned i = 0; i < pipelineInfo->clientMetadataSize - 1; i++)
+      dumpFile << pClientMetadata[i] << ",";
+    dumpFile << pClientMetadata[pipelineInfo->clientMetadataSize - 1] << "\n";
+  }
+
+  if (pipelineInfo->getGlState().numUniformConstantMaps != 0) {
+    for (unsigned s = 0; s < pipelineInfo->getGlState().numUniformConstantMaps; s++) {
+      if (!pipelineInfo->getGlState().ppUniformMaps[s])
+        continue;
+      dumpFile << "uniformConstantMaps[" << s
+               << "].visibility = " << pipelineInfo->getGlState().ppUniformMaps[s]->visibility << "\n";
+      UniformConstantMapEntry *locationOffsetMap = pipelineInfo->getGlState().ppUniformMaps[s]->pUniforms;
+      for (unsigned i = 0; i < pipelineInfo->getGlState().ppUniformMaps[s]->numUniformConstants; i++) {
+        dumpFile << "uniformConstantMaps[" << s << "].uniformConstants[" << i
+                 << "].location = " << locationOffsetMap[i].location << "\n";
+        dumpFile << "uniformConstantMaps[" << s << "].uniformConstants[" << i
+                 << "].offset = " << locationOffsetMap[i].offset << "\n";
+      }
+    }
+  }
+
+  dumpFile << "forceDisableStreamOut = " << pipelineInfo->getGlState().apiXfbOutData.forceDisableStreamOut << "\n";
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 70
+  dumpFile << "forceEnablePrimStats = " << pipelineInfo->apiXfbOutData.forceEnablePrimStats << "\n";
+#endif
+  const auto pXfbOutInfos = pipelineInfo->getGlState().apiXfbOutData.pXfbOutInfos;
+  for (unsigned idx = 0; idx < pipelineInfo->getGlState().apiXfbOutData.numXfbOutInfo; ++idx) {
+    dumpFile << "xfbOutInfo[" << idx << "].isBuiltIn = " << pXfbOutInfos[idx].isBuiltIn << "\n";
+    dumpFile << "xfbOutInfo[" << idx << "].location = " << pXfbOutInfos[idx].location << "\n";
+    dumpFile << "xfbOutInfo[" << idx << "].component = " << pXfbOutInfos[idx].component << "\n";
+    dumpFile << "xfbOutInfo[" << idx << "].xfbBuffer = " << pXfbOutInfos[idx].xfbBuffer << "\n";
+    dumpFile << "xfbOutInfo[" << idx << "].xfbOffset = " << pXfbOutInfos[idx].xfbOffset << "\n";
+    dumpFile << "xfbOutInfo[" << idx << "].xfbStride = " << pXfbOutInfos[idx].xfbStride << "\n";
+    dumpFile << "xfbOutInfo[" << idx << "].streamId = " << pXfbOutInfos[idx].streamId << "\n";
+  }
+  dumpFile << "vbAddressLowBitsKnown = " << pipelineInfo->getGlState().vbAddressLowBitsKnown << "\n";
   dumpPipelineOptions(&pipelineInfo->options, dumpFile);
 
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
@@ -1006,9 +1060,8 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
       dumpFile << "attribute[" << i << "].binding = " << attrib->binding << "\n";
       dumpFile << "attribute[" << i << "].format = " << attrib->format << "\n";
       dumpFile << "attribute[" << i << "].offset = " << attrib->offset << "\n";
-      dumpFile << "attribute[" << i
-               << "].vbAddressLowBits = " << static_cast<unsigned>((pipelineInfo->vbAddressLowBits[attrib->binding]))
-               << "\n";
+      dumpFile << "attribute[" << i << "].vbAddressLowBits = "
+               << static_cast<unsigned>((pipelineInfo->getGlState().vbAddressLowBits[attrib->binding])) << "\n";
     }
 
     auto divisorState = findVkStructInChain<VkPipelineVertexInputDivisorStateCreateInfoEXT>(
@@ -1019,39 +1072,6 @@ void PipelineDumper::dumpGraphicsStateInfo(const GraphicsPipelineBuildInfo *pipe
       dumpFile << "divisor[" << i << "].binding = " << divisor->binding << "\n";
       dumpFile << "divisor[" << i << "].divisor = " << divisor->divisor << "\n";
     }
-  }
-
-  if (pipelineInfo->numUniformConstantMaps != 0) {
-    dumpFile << "\n[UniformConstant]\n";
-    for (unsigned s = 0; s < pipelineInfo->numUniformConstantMaps; s++) {
-      if (!pipelineInfo->ppUniformMaps[s])
-        continue;
-      dumpFile << "uniformConstantMaps[" << s << "].visibility = " << pipelineInfo->ppUniformMaps[s]->visibility
-               << "\n";
-      UniformConstantMapEntry *locationOffsetMap = pipelineInfo->ppUniformMaps[s]->pUniforms;
-      for (unsigned i = 0; i < pipelineInfo->ppUniformMaps[s]->numUniformConstants; i++) {
-        dumpFile << "uniformConstantMaps[" << s << "].uniformConstants[" << i
-                 << "].location = " << locationOffsetMap[i].location << "\n";
-        dumpFile << "uniformConstantMaps[" << s << "].uniformConstants[" << i
-                 << "].offset = " << locationOffsetMap[i].offset << "\n";
-      }
-    }
-  }
-
-  dumpFile << "\n[ApiXfbOutInfo]\n";
-  dumpFile << "forceDisableStreamOut = " << pipelineInfo->apiXfbOutData.forceDisableStreamOut << "\n";
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 70
-  dumpFile << "forceEnablePrimStats = " << pipelineInfo->apiXfbOutData.forceEnablePrimStats << "\n";
-#endif
-  const auto pXfbOutInfos = pipelineInfo->apiXfbOutData.pXfbOutInfos;
-  for (unsigned idx = 0; idx < pipelineInfo->apiXfbOutData.numXfbOutInfo; ++idx) {
-    dumpFile << "xfbOutInfo[" << idx << "].isBuiltIn = " << pXfbOutInfos[idx].isBuiltIn << "\n";
-    dumpFile << "xfbOutInfo[" << idx << "].location = " << pXfbOutInfos[idx].location << "\n";
-    dumpFile << "xfbOutInfo[" << idx << "].component = " << pXfbOutInfos[idx].component << "\n";
-    dumpFile << "xfbOutInfo[" << idx << "].xfbBuffer = " << pXfbOutInfos[idx].xfbBuffer << "\n";
-    dumpFile << "xfbOutInfo[" << idx << "].xfbOffset = " << pXfbOutInfos[idx].xfbOffset << "\n";
-    dumpFile << "xfbOutInfo[" << idx << "].xfbStride = " << pXfbOutInfos[idx].xfbStride << "\n";
-    dumpFile << "xfbOutInfo[" << idx << "].streamId = " << pXfbOutInfos[idx].streamId << "\n";
   }
 }
 
@@ -1182,20 +1202,19 @@ void PipelineDumper::dumpRayTracingStateInfo(const RayTracingPipelineBuildInfo *
 // @param dumpDir : Directory of pipeline dump
 // @param dumpFile : Pipeline dump file
 void PipelineDumper::dumpRayTracingRtState(const RtState *rtState, const char *dumpDir, std::ostream &dumpStream) {
+  dumpStream << "rtState.nodeStrideShift = " << rtState->nodeStrideShift << "\n";
   dumpStream << "rtState.bvhResDescSize = " << rtState->bvhResDesc.dataSizeInDwords << "\n";
   for (unsigned i = 0; i < rtState->bvhResDesc.dataSizeInDwords; ++i)
     dumpStream << "rtState.bvhResDesc[" << i << "] = " << rtState->bvhResDesc.descriptorData[i] << "\n";
-
-  dumpStream << "rtState.nodeStrideShift = " << rtState->nodeStrideShift << "\n";
   dumpStream << "rtState.staticPipelineFlags = " << rtState->staticPipelineFlags << "\n";
   dumpStream << "rtState.triCompressMode = " << rtState->triCompressMode << "\n";
+  dumpStream << "rtState.boxSortHeuristicMode = " << rtState->boxSortHeuristicMode << "\n";
   dumpStream << "rtState.pipelineFlags = " << rtState->pipelineFlags << "\n";
+  dumpStream << "rtState.counterMode = " << rtState->counterMode << "\n";
+  dumpStream << "rtState.counterMask = " << rtState->counterMask << "\n";
   dumpStream << "rtState.threadGroupSizeX = " << rtState->threadGroupSizeX << "\n";
   dumpStream << "rtState.threadGroupSizeY = " << rtState->threadGroupSizeY << "\n";
   dumpStream << "rtState.threadGroupSizeZ = " << rtState->threadGroupSizeZ << "\n";
-  dumpStream << "rtState.boxSortHeuristicMode = " << rtState->boxSortHeuristicMode << "\n";
-  dumpStream << "rtState.counterMode = " << rtState->counterMode << "\n";
-  dumpStream << "rtState.counterMask = " << rtState->counterMask << "\n";
   dumpStream << "rtState.rayQueryCsSwizzle = " << rtState->rayQueryCsSwizzle << "\n";
   dumpStream << "rtState.ldsStackSize = " << rtState->ldsStackSize << "\n";
   dumpStream << "rtState.dispatchRaysThreadGroupSize = " << rtState->dispatchRaysThreadGroupSize << "\n";
@@ -1220,6 +1239,8 @@ void PipelineDumper::dumpRayTracingRtState(const RtState *rtState, const char *d
              << rtState->exportConfig.indirectCalleeSavedRegs.traceRays << "\n";
   dumpStream << "rtState.exportConfig.enableUniformNoReturn = " << rtState->exportConfig.enableUniformNoReturn << "\n";
   dumpStream << "rtState.exportConfig.enableTraceRayArgsInLds = " << rtState->exportConfig.enableTraceRayArgsInLds
+             << "\n";
+  dumpStream << "rtState.exportConfig.enableReducedLinkageOpt = " << rtState->exportConfig.enableReducedLinkageOpt
              << "\n";
   dumpStream << "rtState.exportConfig.readsDispatchRaysIndex = " << rtState->exportConfig.readsDispatchRaysIndex
              << "\n";
@@ -1312,19 +1333,21 @@ void PipelineDumper::dumpRayTracingLibrarySummary(PipelineDumpFile *dumpFile, co
 // Update hash code for the pipeline rtstate
 //
 // @param rtState : Pipeline rtstate
-// @param [in,out] hasher : Haher to generate hash code
+// @param [in,out] hasher : Hasher to generate hash code
 // @param isCacheHash : TRUE if hash is used by the shader cache
 void PipelineDumper::updateHashForRtState(const RtState *rtState, MetroHash64 *hasher, bool isCacheHash) {
   hasher->Update(rtState->nodeStrideShift);
+  for (unsigned i = 0; i < rtState->bvhResDesc.dataSizeInDwords; ++i)
+    hasher->Update(rtState->bvhResDesc.descriptorData[i]);
   hasher->Update(rtState->staticPipelineFlags);
   hasher->Update(rtState->triCompressMode);
+  hasher->Update(rtState->boxSortHeuristicMode);
+  hasher->Update(rtState->pipelineFlags);
+  hasher->Update(rtState->counterMode);
+  hasher->Update(rtState->counterMask);
   hasher->Update(rtState->threadGroupSizeX);
   hasher->Update(rtState->threadGroupSizeY);
   hasher->Update(rtState->threadGroupSizeZ);
-  for (unsigned i = 0; i < rtState->bvhResDesc.dataSizeInDwords; ++i)
-    hasher->Update(rtState->bvhResDesc.descriptorData[i]);
-
-  hasher->Update(rtState->counterMask);
   hasher->Update(rtState->rayQueryCsSwizzle);
   hasher->Update(rtState->ldsStackSize);
   hasher->Update(rtState->dispatchRaysThreadGroupSize);
@@ -1341,6 +1364,7 @@ void PipelineDumper::updateHashForRtState(const RtState *rtState, MetroHash64 *h
   hasher->Update(rtState->exportConfig.indirectCalleeSavedRegs.traceRays);
   hasher->Update(rtState->exportConfig.enableUniformNoReturn);
   hasher->Update(rtState->exportConfig.enableTraceRayArgsInLds);
+  hasher->Update(rtState->exportConfig.enableReducedLinkageOpt);
   hasher->Update(rtState->exportConfig.readsDispatchRaysIndex);
   hasher->Update(rtState->exportConfig.enableDynamicLaunch);
   hasher->Update(rtState->exportConfig.emitRaytracingShaderDataToken);
@@ -1381,13 +1405,27 @@ void PipelineDumper::updateHashForRtState(const RtState *rtState, MetroHash64 *h
 }
 
 // =====================================================================================================================
+// Update hash code for the UniformConstantMap
+//
+// @param pUniformConstantMap : Pipeline uniform constant map
+// @param [in,out] hasher : Hasher to generate hash code
+void PipelineDumper::updateHashForUniformConstantMap(const UniformConstantMap *pUniformConstantMap,
+                                                     MetroHash64 *hasher) {
+  static_assert(sizeof(UniformConstantMapEntry) == sizeof(unsigned) * 2, "");
+  if (pUniformConstantMap->numUniformConstants > 0) {
+    hasher->Update(pUniformConstantMap->visibility);
+    hasher->Update(reinterpret_cast<const uint8_t *>(pUniformConstantMap->pUniforms),
+                   sizeof(UniformConstantMapEntry) * pUniformConstantMap->numUniformConstants);
+  }
+}
+
+// =====================================================================================================================
 // Builds hash code from graphics pipeline build info.  If stage is a specific stage of the graphics pipeline, then only
 // the portions of the pipeline build info that affect that stage will be included in the hash.  Otherwise, stage must
 // be ShaderStageInvalid, and all values in the build info will be included.
 //
 // @param pipeline : Info to build a graphics pipeline
 // @param isCacheHash : TRUE if the hash is used by shader cache
-// @param isRelocatableShader : TRUE if we are building relocatable shader
 // @param stage : The stage for which we are building the hash. ShaderStageInvalid if building for the entire pipeline.
 MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPipelineBuildInfo *pipeline,
                                                                 bool isCacheHash,
@@ -1434,9 +1472,12 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
   if (unlinkedShaderType != UnlinkedStageFragment) {
     if (!pipeline->enableUberFetchShader) {
       updateHashForVertexInputState(pipeline->pVertexInput, pipeline->dynamicVertexStride, &hasher);
-      hasher.Update(pipeline->vbAddressLowBits);
+      if (pipeline->getGlState().vbAddressLowBitsKnown) {
+        hasher.Update(pipeline->getGlState().vbAddressLowBitsKnown);
+        hasher.Update(pipeline->getGlState().vbAddressLowBits, pipeline->pVertexInput->vertexAttributeDescriptionCount);
+      }
     }
-    hasher.Update(pipeline->vbAddressLowBitsKnown);
+
     updateHashForNonFragmentState(pipeline, isCacheHash, &hasher);
   }
 
@@ -1444,9 +1485,14 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
     updateHashForFragmentState(pipeline, &hasher);
 
   updateHashForRtState(&pipeline->rtState, &hasher, isCacheHash);
-
-  if (pipeline->iaState.tessLevel)
-    hasher.Update(*pipeline->iaState.tessLevel);
+  if (pipeline->clientMetadataSize > 0) {
+    hasher.Update(reinterpret_cast<const uint8_t *>(pipeline->pClientMetadata), pipeline->clientMetadataSize);
+  }
+  for (unsigned i = 0; i < pipeline->getGlState().numUniformConstantMaps; i++) {
+    if (pipeline->getGlState().ppUniformMaps[i] != nullptr) {
+      updateHashForUniformConstantMap(pipeline->getGlState().ppUniformMaps[i], &hasher);
+    }
+  }
 
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
@@ -1459,7 +1505,6 @@ MetroHash::Hash PipelineDumper::generateHashForGraphicsPipeline(const GraphicsPi
 //
 // @param pipeline : Info to build a compute pipeline
 // @param isCacheHash : TRUE if the hash is used by shader cache
-// @param isRelocatableShader : TRUE if we are building relocatable shader
 MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipelineBuildInfo *pipeline,
                                                                bool isCacheHash) {
   MetroHash64 hasher;
@@ -1476,6 +1521,14 @@ MetroHash::Hash PipelineDumper::generateHashForComputePipeline(const ComputePipe
 
   // Relocatable shaders force an unlinked compilation.
   hasher.Update(pipeline->unlinked);
+
+  if (pipeline->clientMetadataSize > 0) {
+    hasher.Update(reinterpret_cast<const uint8_t *>(pipeline->pClientMetadata), pipeline->clientMetadataSize);
+  }
+
+  if (pipeline->pUniformMap != nullptr) {
+    updateHashForUniformConstantMap(pipeline->pUniformMap, &hasher);
+  }
 
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
@@ -1521,9 +1574,11 @@ MetroHash::Hash PipelineDumper::generateHashForRayTracingPipeline(const RayTraci
   hasher.Update(pipeline->libraryMode);
   hasher.Update(pipeline->libraryCount);
   for (unsigned i = 0; i < pipeline->libraryCount; ++i) {
-    hasher.Update(pipeline->pLibrarySummaries->codeSize);
-    hasher.Update(static_cast<const uint8_t *>(pipeline->pLibrarySummaries->pCode),
-                  pipeline->pLibrarySummaries->codeSize);
+    hasher.Update(pipeline->pLibrarySummaries[i].codeSize);
+    if (pipeline->pLibrarySummaries[i].codeSize > 0) {
+      hasher.Update(static_cast<const uint8_t *>(pipeline->pLibrarySummaries[i].pCode),
+                    pipeline->pLibrarySummaries[i].codeSize);
+    }
   }
 
   hasher.Update(pipeline->payloadSizeMaxInLib);
@@ -1537,7 +1592,9 @@ MetroHash::Hash PipelineDumper::generateHashForRayTracingPipeline(const RayTraci
     }
   }
 #endif
-
+  if (pipeline->clientMetadataSize > 0) {
+    hasher.Update(reinterpret_cast<const uint8_t *>(pipeline->pClientMetadata), pipeline->clientMetadataSize);
+  }
   MetroHash::Hash hash = {};
   hasher.Finalize(hash.bytes);
 
@@ -1548,13 +1605,13 @@ MetroHash::Hash PipelineDumper::generateHashForRayTracingPipeline(const RayTraci
 // Updates hash code context for vertex input state
 //
 // @param vertexInput : Vertex input state
-// @param [in/out] hasher : Haher to generate hash code
+// @param [in/out] hasher : Hasher to generate hash code
 void PipelineDumper::updateHashForVertexInputState(const VkPipelineVertexInputStateCreateInfo *vertexInput,
                                                    bool dynamicVertexStride, MetroHash64 *hasher) {
   if (vertexInput && vertexInput->vertexBindingDescriptionCount > 0) {
     hasher->Update(vertexInput->vertexBindingDescriptionCount);
     if (dynamicVertexStride) {
-      for (uint32_t i = 0; i < vertexInput->vertexBindingDescriptionCount; i++) {
+      for (unsigned i = 0; i < vertexInput->vertexBindingDescriptionCount; i++) {
         auto attribBinding = vertexInput->pVertexBindingDescriptions[i];
         attribBinding.stride = 0;
         hasher->Update(attribBinding);
@@ -1586,7 +1643,6 @@ void PipelineDumper::updateHashForVertexInputState(const VkPipelineVertexInputSt
 // @param pipeline : Info to build a graphics pipeline
 // @param isCacheHash : TRUE if the hash is used by shader cache
 // @param [in/out] hasher : Hasher to generate hash code
-// @param isRelocatableShader : TRUE if we are building relocatable shader
 void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildInfo *pipeline, bool isCacheHash,
                                                    MetroHash64 *hasher) {
   auto nggState = &pipeline->nggState;
@@ -1598,7 +1654,10 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
     hasher->Update(pipeline->rsState.provokingVertexMode);
   }
 
-  if (pipeline->gs.pModuleData || pipeline->tcs.pModuleData || pipeline->tes.pModuleData)
+  if (pipeline->gs.pModuleData || pipeline->tcs.pModuleData || pipeline->tes.pModuleData ||
+      pipeline->gs.options.clientHash.lower != 0 || pipeline->gs.options.clientHash.upper != 0 ||
+      pipeline->tcs.options.clientHash.lower != 0 || pipeline->tcs.options.clientHash.upper != 0 ||
+      pipeline->tes.options.clientHash.lower != 0 || pipeline->tes.options.clientHash.upper != 0)
     hasher->Update(iaState->patchControlPoints);
   hasher->Update(iaState->disableVertexReuse);
   hasher->Update(iaState->switchWinding);
@@ -1646,13 +1705,23 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
       hasher->Update(nggState->vertsPerSubgroup);
     }
   }
+  hasher->Update(pipeline->useSoftwareVertexBufferDescriptors);
+  if (pipeline->iaState.tessLevel)
+    hasher->Update(*pipeline->iaState.tessLevel);
 
-  hasher->Update(pipeline->apiXfbOutData.forceDisableStreamOut);
+  hasher->Update(pipeline->getGlState().apiXfbOutData.forceDisableStreamOut);
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 70
   hasher->Update(pipeline->apiXfbOutData.forceEnablePrimStats);
 #endif
-  hasher->Update(pipeline->useSoftwareVertexBufferDescriptors);
-  hasher->Update(pipeline->vbAddressLowBitsKnown);
+  for (unsigned i = 0; i < pipeline->getGlState().apiXfbOutData.numXfbOutInfo; i++) {
+    hasher->Update(pipeline->getGlState().apiXfbOutData.pXfbOutInfos[i].isBuiltIn);
+    hasher->Update(pipeline->getGlState().apiXfbOutData.pXfbOutInfos[i].location);
+    hasher->Update(pipeline->getGlState().apiXfbOutData.pXfbOutInfos[i].component);
+    hasher->Update(pipeline->getGlState().apiXfbOutData.pXfbOutInfos[i].xfbBuffer);
+    hasher->Update(pipeline->getGlState().apiXfbOutData.pXfbOutInfos[i].xfbOffset);
+    hasher->Update(pipeline->getGlState().apiXfbOutData.pXfbOutInfos[i].xfbStride);
+    hasher->Update(pipeline->getGlState().apiXfbOutData.pXfbOutInfos[i].streamId);
+  }
 }
 
 // =====================================================================================================================
@@ -1660,7 +1729,6 @@ void PipelineDumper::updateHashForNonFragmentState(const GraphicsPipelineBuildIn
 //
 // @param pipeline : Info to build a graphics pipeline
 // @param [in/out] hasher : Hasher to generate hash code
-// @param isRelocatableShader : TRUE if we are building relocatable shader
 void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo *pipeline, MetroHash64 *hasher) {
   auto rsState = &pipeline->rsState;
   hasher->Update(rsState->perSampleShading);
@@ -1688,6 +1756,8 @@ void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo 
     hasher->Update(cbState->target[i].blendSrcAlphaToColor);
     hasher->Update(cbState->target[i].format);
   }
+
+  hasher->Update(pipeline->getGlState().originUpperLeft);
 }
 
 // =====================================================================================================================
@@ -1696,42 +1766,39 @@ void PipelineDumper::updateHashForFragmentState(const GraphicsPipelineBuildInfo 
 // @param options: Pipeline options
 // @param [in/out] hasher : Hasher to generate hash code
 // @param isCacheHash : True if the hash will be used as a key for a cache lookup.
-// @param isRelocatableShader : TRUE if we are building a relocatable shader
 // @param stage : The unlinked shader stage that should be included in the hash.
 void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options, MetroHash64 *hasher, bool isCacheHash,
                                                   UnlinkedShaderStage stage) {
   hasher->Update(options->includeDisassembly);
   hasher->Update(options->scalarBlockLayout);
-  hasher->Update(options->includeIr);
-  hasher->Update(options->robustBufferAccess);
   hasher->Update(options->reconfigWorkgroupLayout);
   hasher->Update(options->forceCsThreadIdSwizzling);
-  hasher->Update(options->overrideThreadGroupSizeX);
-  hasher->Update(options->overrideThreadGroupSizeY);
-  hasher->Update(options->overrideThreadGroupSizeZ);
+  hasher->Update(options->includeIr);
+  hasher->Update(options->robustBufferAccess);
   hasher->Update(options->enableRelocatableShaderElf);
   hasher->Update(options->disableImageResourceCheck);
   hasher->Update(options->enableScratchAccessBoundsChecks);
   hasher->Update(options->enableImplicitInvariantExports);
-  hasher->Update(options->resourceLayoutScheme);
-
   hasher->Update(options->shadowDescriptorTableUsage);
   hasher->Update(options->shadowDescriptorTablePtrHigh);
-
   hasher->Update(options->extendedRobustness.robustBufferAccess);
   hasher->Update(options->extendedRobustness.robustImageAccess);
   hasher->Update(options->extendedRobustness.nullDescriptor);
+  hasher->Update(options->enableRayQuery);
   if (stage != UnlinkedStageCompute) {
     hasher->Update(options->optimizeTessFactor);
   }
-
   if (stage == UnlinkedStageFragment || stage == UnlinkedStageCount) {
     hasher->Update(options->enableInterpModePatch);
     hasher->Update(options->disableSampleMask);
   }
-
   hasher->Update(options->pageMigrationEnabled);
   hasher->Update(options->optimizationLevel);
+  hasher->Update(options->overrideThreadGroupSizeX);
+  hasher->Update(options->overrideThreadGroupSizeY);
+  hasher->Update(options->overrideThreadGroupSizeZ);
+  hasher->Update(options->resourceLayoutScheme);
+
   hasher->Update(options->threadGroupSwizzleMode);
   hasher->Update(options->reverseThreadGroup);
   hasher->Update(options->internalRtShaders);
@@ -1744,6 +1811,7 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
   hasher->Update(options->enableFragColor);
   hasher->Update(options->disableBaseVertex);
   hasher->Update(options->enablePrimGeneratedQuery);
+  // disablePerCompFetch has been handled in updateHashForNonFragmentState
 }
 
 // =====================================================================================================================
@@ -1753,17 +1821,22 @@ void PipelineDumper::updateHashForPipelineOptions(const PipelineOptions *options
 // @param shaderInfo : Shader info in specified shader stage
 // @param isCacheHash : TRUE if the hash is used by shader cache
 // @param [in/out] hasher : Hasher to generate hash code
-// @param isRelocatableShader : TRUE if we are building relocatable shader
 void PipelineDumper::updateHashForPipelineShaderInfo(ShaderStage stage, const PipelineShaderInfo *shaderInfo,
                                                      bool isCacheHash, MetroHash64 *hasher) {
-  if (shaderInfo->pModuleData) {
-    const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
+  if (shaderInfo->pModuleData || (shaderInfo->options.clientHash.lower != 0) ||
+      (shaderInfo->options.clientHash.upper != 0)) {
     hasher->Update(stage);
-    if (isCacheHash) {
-      hasher->Update(static_cast<const uint8_t *>(voidPtrInc(moduleData, ShaderModuleCacheHashOffset)),
-                     sizeof(moduleData->hash));
-    } else
-      hasher->Update(moduleData->hash);
+    if ((shaderInfo->options.clientHash.lower != 0) || (shaderInfo->options.clientHash.upper != 0)) {
+      hasher->Update(shaderInfo->options.clientHash);
+    } else {
+      const ShaderModuleData *moduleData = reinterpret_cast<const ShaderModuleData *>(shaderInfo->pModuleData);
+      hasher->Update(stage);
+      if (isCacheHash) {
+        hasher->Update(static_cast<const uint8_t *>(voidPtrInc(moduleData, ShaderModuleCacheHashOffset)),
+                       sizeof(moduleData->hash));
+      } else
+        hasher->Update(moduleData->hash);
+    }
 
     size_t entryNameLen = 0;
     if (shaderInfo->pEntryTarget) {

@@ -144,7 +144,12 @@ private:
 template <typename ModulePassT>
 std::unique_ptr<ModuleBunchToModulePassAdaptor::PassConceptT>
 createForModuleBunchToModulePassAdaptor(ModulePassT Pass) {
+#if LLVM_MAIN_REVISION && LLVM_MAIN_REVISION < 488550
   using PassModelT = detail::PassModel<Module, ModulePassT, PreservedAnalyses, ModuleAnalysisManager>;
+#else
+  // Analysis are always preserved.
+  using PassModelT = detail::PassModel<Module, ModulePassT, ModuleAnalysisManager>;
+#endif
   return std::unique_ptr<ModuleBunchToModulePassAdaptor::PassConceptT>(new PassModelT(std::forward<ModulePassT>(Pass)));
 }
 

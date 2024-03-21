@@ -1,0 +1,133 @@
+; RUN: amdllpc -v -gfxip 11.0 -o /dev/null %s | FileCheck -check-prefix=SHADERTEST %s
+; SHADERTEST: AMDLLPC SUCCESS
+
+; Test that we are able to build a pipeline in which task and mesh shaders have LDS variables of the same name
+
+[Version]
+version = 70
+
+[TaskGlsl]
+#version 460
+#extension GL_EXT_mesh_shader : require
+
+layout(local_size_x = 32) in;
+
+taskPayloadSharedEXT struct {
+    vec4 offset;
+} payload;
+
+shared vec4 lds[32];
+
+void main()
+{
+    const uint thread_id = gl_LocalInvocationID.x;
+
+    lds[thread_id] = vec4(thread_id, 0, 0, 0);
+
+    barrier();
+
+    payload.offset = vec4(4, 0, 0, 0);
+
+    EmitMeshTasksEXT(int(lds[15]), 1, 1);
+}
+
+[TaskInfo]
+entryPoint = main
+
+[MeshGlsl]
+#version 460
+#extension GL_EXT_mesh_shader : require
+
+layout(local_size_x = 32) in;
+layout(triangles, max_vertices = 32, max_primitives = 32) out;
+
+taskPayloadSharedEXT struct {
+    vec4 offset;
+} payload;
+
+shared vec4 lds[32];
+
+void main()
+{
+	const uint thread_id  = gl_LocalInvocationID.x;
+
+    lds[thread_id ^ 1] = vec4(thread_id, 0, 0, 0) + payload.offset;
+
+    barrier();
+
+    SetMeshOutputsEXT(32, 32);
+
+    gl_MeshVerticesEXT[thread_id].gl_Position = lds[thread_id];
+    gl_PrimitiveTriangleIndicesEXT[thread_id] = uvec3(thread_id % 32, (thread_id + 1) % 32, (thread_id + 2) % 32);
+}
+
+[MeshInfo]
+entryPoint = main
+
+[FsGlsl]
+#version 460
+
+layout(location = 0) out vec4 frag_color;
+
+void main() {
+   frag_color = vec4(0.0, 1.0, 0.0, 1.0);
+}
+
+[FsInfo]
+entryPoint = main
+
+[ResourceMapping]
+userDataNode[0].visibility = 2
+userDataNode[0].type = IndirectUserDataVaPtr
+userDataNode[0].offsetInDwords = 0
+userDataNode[0].sizeInDwords = 1
+userDataNode[0].indirectUserDataCount = 0
+userDataNode[1].visibility = 97
+userDataNode[1].type = PushConst
+userDataNode[1].offsetInDwords = 1
+userDataNode[1].sizeInDwords = 16
+userDataNode[1].set = 0xFFFFFFFF
+userDataNode[1].binding = 0
+userDataNode[1].strideInDwords = 0
+userDataNode[2].visibility = 32
+userDataNode[2].type = DescriptorTableVaPtr
+userDataNode[2].offsetInDwords = 17
+userDataNode[2].sizeInDwords = 1
+userDataNode[2].next[0].type = DescriptorBuffer
+userDataNode[2].next[0].offsetInDwords = 0
+userDataNode[2].next[0].sizeInDwords = 4
+userDataNode[2].next[0].set = 0x00000000
+userDataNode[2].next[0].binding = 1
+userDataNode[2].next[0].strideInDwords = 0
+userDataNode[2].next[1].type = DescriptorBuffer
+userDataNode[2].next[1].offsetInDwords = 4
+userDataNode[2].next[1].sizeInDwords = 4
+userDataNode[2].next[1].set = 0x00000000
+userDataNode[2].next[1].binding = 2
+userDataNode[2].next[1].strideInDwords = 0
+userDataNode[2].next[2].type = DescriptorBuffer
+userDataNode[2].next[2].offsetInDwords = 8
+userDataNode[2].next[2].sizeInDwords = 4
+userDataNode[2].next[2].set = 0x00000000
+userDataNode[2].next[2].binding = 3
+userDataNode[2].next[2].strideInDwords = 0
+userDataNode[2].next[3].type = DescriptorBuffer
+userDataNode[2].next[3].offsetInDwords = 12
+userDataNode[2].next[3].sizeInDwords = 4
+userDataNode[2].next[3].set = 0x00000000
+userDataNode[2].next[3].binding = 4
+userDataNode[2].next[3].strideInDwords = 0
+
+[GraphicsPipelineState]
+topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+provokingVertexMode = VK_PROVOKING_VERTEX_MODE_FIRST_VERTEX_EXT
+numSamples = 1
+colorBuffer[0].format = VK_FORMAT_B8G8R8A8_UNORM
+colorBuffer[0].channelWriteMask = 15
+colorBuffer[0].blendEnable = 0
+colorBuffer[0].blendSrcAlphaToColor = 1
+nggState.enableNgg = 1
+nggState.subgroupSizing = Auto
+nggState.primsPerSubgroup = 256
+nggState.vertsPerSubgroup = 256
+options.scalarBlockLayout = 1

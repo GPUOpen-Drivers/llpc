@@ -25,21 +25,10 @@
 
 set(LLPC_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/..")
 
-include("${LLPC_SOURCE_DIR}/cmake/llpc_version.cmake")
-include("${LLPC_SOURCE_DIR}/cmake/compilerutils.cmake")
+include("${LLPC_SOURCE_DIR}/cmake/llvmraytracing.cmake")
 
-# Macro to add continuations and its dependencies as LLVM external projects.
-# This appends the project names to LLVM_EXTERNAL_PROJECTS and sets each LLVM_EXTERNAL_*_SOURCE_DIR,
-# all in the caller's scope.
+# Deprecated transition macro for refactoring transition; use add_llvmraytracing_projects instead
 macro(add_continuations_projects)
-  add_llpc_version_projects()
-  add_compilerutils_projects()
-  if (NOT continuations IN_LIST LLVM_EXTERNAL_PROJECTS)
-    if (NOT llvm_dialects IN_LIST LLVM_EXTERNAL_PROJECTS)
-      list(APPEND LLVM_EXTERNAL_PROJECTS llvm_dialects)
-      set(LLVM_EXTERNAL_LLVM_DIALECTS_SOURCE_DIR "${LLPC_SOURCE_DIR}/imported/llvm-dialects")
-    endif()
-    list(APPEND LLVM_EXTERNAL_PROJECTS Continuations)
-    set(LLVM_EXTERNAL_CONTINUATIONS_SOURCE_DIR "${LLPC_SOURCE_DIR}/shared/continuations")
-  endif()
+  add_llvmraytracing_projects()
+  set(LLPC_RAYTRACING_ADD_TRANSITION_TARGETS ON)
 endmacro()

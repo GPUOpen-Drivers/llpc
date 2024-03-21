@@ -30,15 +30,19 @@
  */
 #include "llpcSpirvProcessGpuRtLibrary.h"
 #include "SPIRVInternal.h"
-#include "continuations/ContinuationsUtil.h"
+#include "compilerutils/CompilerUtils.h"
 #include "llpcContext.h"
+#include "llpcRayTracingContext.h"
 #include "llpcSpirvLowerInternalLibraryIntrinsicUtil.h"
 #include "llpcSpirvLowerUtil.h"
+#include "llvmraytracing/Continuations.h"
+#include "llvmraytracing/ContinuationsUtil.h"
 #include "lgc/Builder.h"
 #include "lgc/GpurtDialect.h"
 #include "lgc/LgcContext.h"
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcRtDialect.h"
+#include "llvm/ADT/SmallBitVector.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower-gpurt-library"
 using namespace lgc;
@@ -121,6 +125,8 @@ SpirvProcessGpuRtLibrary::LibraryFunctionTable::LibraryFunctionTable() {
   m_libFuncPtrs["_AmdContStackFree"] = &SpirvProcessGpuRtLibrary::createContStackFree;
   m_libFuncPtrs["_AmdContStackGetPtr"] = &SpirvProcessGpuRtLibrary::createContStackGetPtr;
   m_libFuncPtrs["_AmdContStackSetPtr"] = &SpirvProcessGpuRtLibrary::createContStackSetPtr;
+  m_libFuncPtrs["_AmdContinuationStackIsGlobal"] = &SpirvProcessGpuRtLibrary::createContinuationStackIsGlobal;
+  m_libFuncPtrs["_AmdGetRtip"] = &SpirvProcessGpuRtLibrary::createGetRtip;
 }
 
 // =====================================================================================================================
@@ -142,17 +148,72 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
   const StringRef fetchTrianglePositionFromRayQueryFuncName =
       m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_FETCH_HIT_TRIANGLE_FROM_RAY_QUERY);
 
+  const StringRef getInstanceIndex =
+      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_INSTANCE_INDEX);
+
+  const StringRef getInstanceId =
+      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_INSTANCE_ID);
+
+  const StringRef getInstanceNodeAddr =
+      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_GET_INSTANCE_NODE);
+
+  const StringRef getObjToWorldTrans =
+      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_OBJECT_TO_WORLD_TRANSFORM);
+
+  const StringRef getWorldToObjTrans =
+      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_WORLD_TO_OBJECT_TRANSFORM);
+
   assert(!traceRayFuncName.empty());
   assert(!rayQueryInitializeFuncName.empty());
   assert(!rayQueryProceedFuncName.empty());
   assert(!fetchTrianglePositionFromNodePointerFuncName.empty());
   assert(!fetchTrianglePositionFromRayQueryFuncName.empty());
+  assert(!getInstanceIndex.empty());
+  assert(!getInstanceId.empty());
+  assert(!getInstanceNodeAddr.empty());
+  assert(!getObjToWorldTrans.empty());
+  assert(!getWorldToObjTrans.empty());
+
+  bool isAmdAwaitLike = funcName.starts_with("_AmdAwait") || funcName.starts_with("_AmdWaitAwait");
+  if (funcName.starts_with("_cont_") || isAmdAwaitLike) {
+    func->setLinkage(GlobalValue::WeakAnyLinkage);
+    // Delete function body of _Amd*Await, it will be handled in LowerRaytracingPipeline.
+    if (isAmdAwaitLike)
+      func->deleteBody();
+
+    // The function might not have types metadata like _cont_SetupRayGen or _AmdAwait which is a declaration, nothing
+    // needs to be done.
+    if (!func->getMetadata(ContHelper::MDTypesName))
+      return;
+
+    SmallBitVector promotionMask(func->arg_size());
+    for (unsigned argNo = 0; argNo < func->arg_size(); argNo++) {
+      auto *arg = func->getArg(argNo);
+      ContArgTy argTy = ContArgTy::get(func, arg);
+      auto funcName = func->getName();
+
+      if (!argTy.isPointerTy())
+        continue;
+
+      // Change the pointer type to its value type for non-struct types.
+      // Amd*Await, use value types for all arguments.
+      // For _cont_SetTriangleHitAttributes, we always use its value type for hitAttributes argument.
+      if (!isa<StructType>(argTy.getPointerElementType()) || isAmdAwaitLike ||
+          (funcName == ContDriverFunc::SetTriangleHitAttributesName && argNo == 1))
+        promotionMask.set(argNo);
+    }
+
+    promotePointerArguments(func, promotionMask);
+    return;
+  }
 
   // Set external linkage for library entry functions
   if (funcName.starts_with(traceRayFuncName) || funcName.starts_with(rayQueryInitializeFuncName) ||
       funcName.starts_with(rayQueryProceedFuncName) ||
       funcName.starts_with(fetchTrianglePositionFromNodePointerFuncName) ||
-      funcName.starts_with(fetchTrianglePositionFromRayQueryFuncName) || funcName.starts_with("_cont_")) {
+      funcName.starts_with(fetchTrianglePositionFromRayQueryFuncName) || funcName.starts_with(getInstanceIndex) ||
+      funcName.starts_with(getInstanceId) || funcName.starts_with(getInstanceNodeAddr) ||
+      funcName.starts_with(getObjToWorldTrans) || funcName.starts_with(getWorldToObjTrans)) {
     func->setLinkage(GlobalValue::WeakAnyLinkage);
     return;
   }
@@ -178,6 +239,17 @@ void SpirvProcessGpuRtLibrary::processLibraryFunction(Function *&func) {
   } else if (funcName.starts_with("_AmdEnqueue") || funcName.starts_with("_AmdWaitEnqueue")) {
     m_builder->SetInsertPoint(clearBlock(func));
     createEnqueue(func);
+    return;
+  } else if (funcName.starts_with("_AmdGetUninitialized")) {
+    m_builder->SetInsertPoint(clearBlock(func));
+    m_builder->CreateRet(PoisonValue::get(func->getReturnType()));
+    return;
+  } else if (funcName.starts_with("_AmdGetShaderKind") || funcName.starts_with("_AmdGetCurrentFuncAddr") ||
+             funcName.starts_with("_AmdGetResumePointAddr")) {
+    // These _Amd* functions are handled in later continuation transformations, delete the function body to preserve the
+    // call.
+    func->deleteBody();
+    func->setLinkage(GlobalValue::WeakAnyLinkage);
     return;
   }
 
@@ -742,15 +814,8 @@ void SpirvProcessGpuRtLibrary::createDispatchThreadIdFlat(llvm::Function *func) 
 //
 // @param func : The function to create
 void SpirvProcessGpuRtLibrary::createContStackAlloc(llvm::Function *func) {
-  Value *byteSize = nullptr;
-  if (func->arg_size() == 2) {
-    // TODO: Remove this when refactoring is done.
-    // Ignore the first argument.
-    byteSize = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(1));
-  } else {
-    assert(func->arg_size() == 1);
-    byteSize = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(0));
-  }
+  assert(func->arg_size() == 1);
+  Value *byteSize = m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(0));
   auto stackPtr = m_builder->create<cps::AllocOp>(byteSize);
   m_builder->CreateRet(m_builder->CreatePtrToInt(stackPtr, m_builder->getInt32Ty()));
 }
@@ -824,14 +889,14 @@ void SpirvProcessGpuRtLibrary::createEnqueue(Function *func) {
   bool hasRetAddrArg = !funcName.contains("RayGen") && !funcName.contains("Traversal");
   bool hasWaitMaskArg = funcName.contains("Wait");
   if (hasRetAddrArg) {
-    // Skip csp and waitMask
-    unsigned retAddrArgIdx = hasWaitMaskArg ? 3 : 2;
+    // Skip waitMask
+    unsigned retAddrArgIdx = hasWaitMaskArg ? 2 : 1;
     tailArgs.push_back(m_builder->CreateLoad(m_builder->getInt32Ty(), func->getArg(retAddrArgIdx)));
   } else {
     tailArgs.push_back(PoisonValue::get(m_builder->getInt32Ty()));
   }
   // Get shader-index from system-data.
-  unsigned systemDataArgIdx = 2 + (hasRetAddrArg ? 1 : 0) + (hasWaitMaskArg ? 1 : 0);
+  unsigned systemDataArgIdx = 1 + (hasRetAddrArg ? 1 : 0) + (hasWaitMaskArg ? 1 : 0);
   tailArgs.push_back(m_builder->CreateNamedCall("_cont_GetLocalRootIndex", m_builder->getInt32Ty(),
                                                 {func->getArg(systemDataArgIdx)}, {}));
   // Process system-data and arguments after.
@@ -844,6 +909,23 @@ void SpirvProcessGpuRtLibrary::createEnqueue(Function *func) {
   // TODO: pass the levelMask correctly.
   m_builder->create<cps::JumpOp>(addr, -1, PoisonValue::get(StructType::get(*m_context, {})), tailArgs);
   m_builder->CreateUnreachable();
+}
+
+// Fill in function to check whether continuation stack is global
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createContinuationStackIsGlobal(llvm::Function *func) {
+  m_builder->CreateRet(m_builder->create<GpurtContinuationStackIsGlobalOp>());
+}
+
+// =====================================================================================================================
+// Fill in function to get RTIP
+//
+// @param func : The function to create
+void SpirvProcessGpuRtLibrary::createGetRtip(llvm::Function *func) {
+  auto rtip = m_context->getPipelineContext()->getRayTracingState()->rtIpVersion;
+  // The version is encoded as <major><minor> in decimal digits, so 11 is rtip 1.1, 20 is rtip 2.0
+  m_builder->CreateRet(m_builder->getInt32(rtip.major * 10 + rtip.minor));
 }
 
 } // namespace Llpc

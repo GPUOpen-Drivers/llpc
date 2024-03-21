@@ -30,28 +30,13 @@
  */
 
 #include "lgc/patch/LowerSubgroupOps.h"
-#include "ShaderMerger.h"
 #include "lgc/LgcContext.h"
 #include "lgc/LgcDialect.h"
-#include "lgc/builder/BuilderImpl.h"
-#include "lgc/patch/ShaderInputs.h"
-#include "lgc/state/AbiMetadata.h"
-#include "lgc/state/AbiUnlinked.h"
-#include "lgc/state/IntrinsDefs.h"
-#include "lgc/state/PalMetadata.h"
-#include "lgc/state/PipelineShaders.h"
+#include "lgc/builder/SubgroupBuilder.h"
 #include "lgc/state/PipelineState.h"
-#include "lgc/state/TargetInfo.h"
-#include "lgc/util/AddressExtender.h"
-#include "lgc/util/BuilderBase.h"
 #include "llvm-dialects/Dialect/Visitor.h"
-#include "llvm/Analysis/AliasAnalysis.h" // for MemoryEffects
-#include "llvm/IR/IntrinsicsAMDGPU.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Transforms/Utils/BasicBlockUtils.h"
-#include <optional>
 
 #define DEBUG_TYPE "lgc-lower-subgroup-ops"
 
@@ -59,50 +44,6 @@ using namespace llvm;
 using namespace lgc;
 
 namespace lgc {
-
-class SubgroupLoweringBuilder : public BuilderImpl {
-public:
-  SubgroupLoweringBuilder(Pipeline *pipeline) : BuilderImpl(pipeline) {}
-
-  // =====================================================================================================================
-  // Create a subgroup elect.
-  //
-  // @param instName : Name to give instruction(s)
-  llvm::Value *CreateSubgroupElect(const llvm::Twine &instName = "");
-
-  // Create a subgroup any
-  //
-  // @param value : The value to compare
-  // @param instName : Name to give instruction(s)
-  llvm::Value *CreateSubgroupAny(llvm::Value *const value, const llvm::Twine &instName = "");
-};
-
-// =====================================================================================================================
-// Create a subgroup elect call.
-//
-// @param instName : Name to give final instruction.
-Value *SubgroupLoweringBuilder::CreateSubgroupElect(const Twine &instName) {
-  return CreateICmpEQ(CreateSubgroupMbcnt(createGroupBallot(getTrue()), ""), getInt32(0));
-}
-
-// =====================================================================================================================
-// Create a subgroup any call.
-//
-// @param value : The value to compare across the subgroup. Must be an integer type.
-// @param instName : Name to give final instruction.
-Value *SubgroupLoweringBuilder::CreateSubgroupAny(Value *const value, const Twine &instName) {
-  Value *result = CreateICmpNE(createGroupBallot(value), getInt64(0));
-  result = CreateSelect(CreateUnaryIntrinsic(Intrinsic::is_constant, value), value, result);
-
-  // Helper invocations of whole quad mode should be included in the subgroup vote execution
-  const auto &fragmentMode = m_pipelineState->getShaderModes()->getFragmentShaderMode();
-  if (m_shaderStage == ShaderStage::Fragment && !fragmentMode.waveOpsExcludeHelperLanes) {
-    result = CreateZExt(result, getInt32Ty());
-    result = CreateIntrinsic(Intrinsic::amdgcn_softwqm, {getInt32Ty()}, {result});
-    result = CreateTrunc(result, getInt1Ty());
-  }
-  return result;
-}
 
 // =====================================================================================================================
 // Executes this LLVM patching pass on the specified LLVM module.
@@ -112,12 +53,11 @@ Value *SubgroupLoweringBuilder::CreateSubgroupAny(Value *const value, const Twin
 // @returns : The preserved analyses (The analyses that are still valid after this pass)
 PreservedAnalyses LowerSubgroupOps::run(Module &module, ModuleAnalysisManager &analysisManager) {
   PipelineState *pipelineState = analysisManager.getResult<PipelineStateWrapper>(module).getPipelineState();
-  // PipelineShadersResult &pipelineShaders = analysisManager.getResult<PipelineShaders>(module);
   LLVM_DEBUG(dbgs() << "Run the pass lower subgroup ops\n");
 
   m_pipelineState = pipelineState;
 
-  SubgroupLoweringBuilder builder(m_pipelineState);
+  SubgroupBuilder builder(m_pipelineState);
   m_builder = &builder;
   static const auto visitor = llvm_dialects::VisitorBuilder<LowerSubgroupOps>()
                                   .setStrategy(llvm_dialects::VisitorStrategy::ByFunctionDeclaration)

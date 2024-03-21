@@ -114,18 +114,16 @@ private:
   llvm::Value *patchTcsBuiltInOutputImport(llvm::Type *outputTy, unsigned builtInId, llvm::Value *elemIdx,
                                            llvm::Value *vertexIdx, BuilderBase &builder);
 
-  void patchVsBuiltInOutputExport(llvm::Value *output, unsigned builtInId, llvm::Instruction *insertPos);
+  void patchVsBuiltInOutputExport(llvm::Value *output, unsigned builtInId, BuilderBase &builder);
   void patchTcsBuiltInOutputExport(llvm::Value *output, unsigned builtInId, llvm::Value *elemIdx,
-                                   llvm::Value *vertexIdx, llvm::Instruction *insertPos);
-  void patchTesBuiltInOutputExport(llvm::Value *output, unsigned builtInId, llvm::Instruction *insertPos);
+                                   llvm::Value *vertexIdx, BuilderBase &builder);
+  void patchTesBuiltInOutputExport(llvm::Value *output, unsigned builtInId, BuilderBase &builder);
   void patchGsBuiltInOutputExport(llvm::Value *output, unsigned builtInId, unsigned streamId, BuilderBase &builder);
   void patchMeshBuiltInOutputExport(llvm::Value *output, unsigned builtInId, llvm::Value *elemIdx,
-                                    llvm::Value *vertexOrPrimitiveIdx, bool isPerPrimitive,
-                                    llvm::Instruction *insertPos);
-  void patchFsBuiltInOutputExport(llvm::Value *output, unsigned builtInId, llvm::Instruction *insertPos);
+                                    llvm::Value *vertexOrPrimitiveIdx, bool isPerPrimitive, BuilderBase &builder);
+  void patchFsBuiltInOutputExport(llvm::Value *output, unsigned builtInId, BuilderBase &insertPos);
 
-  void patchCopyShaderGenericOutputExport(llvm::Value *output, unsigned location, llvm::Instruction *insertPos);
-  void patchCopyShaderBuiltInOutputExport(llvm::Value *output, unsigned builtInId, llvm::Instruction *insertPos);
+  void patchCopyShaderBuiltInOutputExport(llvm::Value *output, unsigned builtInId, BuilderBase &insertPos);
 
   void patchXfbOutputExport(llvm::Value *output, unsigned xfbBuffer, unsigned xfbOffset, unsigned streamId,
                             BuilderBase &builder);
@@ -141,19 +139,19 @@ private:
                              llvm::Value *loadOffset, llvm::Value *bufBase, CoherentFlag coherent,
                              BuilderBase &builder);
 
-  void storeValueToEsGsRing(llvm::Value *storeValue, unsigned location, unsigned compIdx, llvm::Instruction *insertPos);
+  void storeValueToEsGsRing(llvm::Value *storeValue, unsigned location, unsigned compIdx, BuilderBase &builder);
 
   llvm::Value *loadValueFromEsGsRing(llvm::Type *loadType, unsigned location, unsigned compIdx, llvm::Value *vertexIdx,
-                                     llvm::Instruction *insertPos);
+                                     BuilderBase &builder);
 
   void storeValueToGsVsRing(llvm::Value *storeValue, unsigned location, unsigned compIdx, unsigned streamId,
                             BuilderBase &builder);
 
   llvm::Value *calcEsGsRingOffsetForOutput(unsigned location, unsigned compIdx, llvm::Value *esGsOffset,
-                                           llvm::Instruction *insertPos);
+                                           BuilderBase &builder);
 
   llvm::Value *calcEsGsRingOffsetForInput(unsigned location, unsigned compIdx, llvm::Value *vertexIdx,
-                                          llvm::Instruction *insertPos);
+                                          BuilderBase &builder);
 
   llvm::Value *calcGsVsRingOffsetForOutput(unsigned location, unsigned compIdx, unsigned streamId,
                                            llvm::Value *vertexIdx, llvm::Value *gsVsOffset, BuilderBase &builder);
@@ -177,9 +175,8 @@ private:
   llvm::Value *calcLdsOffsetForTesInput(llvm::Type *inputTy, unsigned location, llvm::Value *locOffset,
                                         llvm::Value *compIdx, llvm::Value *vertexIdx, BuilderBase &builder);
 
-  void addExportInstForGenericOutput(llvm::Value *output, unsigned location, unsigned compIdx,
-                                     llvm::Instruction *insertPos);
-  void addExportInstForBuiltInOutput(llvm::Value *output, unsigned builtInId, llvm::Instruction *insertPos);
+  void addExportInstForGenericOutput(llvm::Value *output, unsigned location, unsigned compIdx, BuilderBase &builder);
+  void addExportInstForBuiltInOutput(llvm::Value *output, unsigned builtInId, BuilderBase &builder);
 
   llvm::Value *adjustCentroidIj(llvm::Value *centroidIj, llvm::Value *centerIj, BuilderBase &builder);
 
@@ -189,16 +186,15 @@ private:
 
   llvm::Value *reconfigWorkgroupLayout(llvm::Value *localInvocationId, WorkgroupLayout macroLayout,
                                        WorkgroupLayout microLayout, unsigned workgroupSizeX, unsigned workgroupSizeY,
-                                       unsigned workgroupSizeZ, bool isHwLocalInvocationId,
-                                       llvm::Instruction *insertPos);
+                                       unsigned workgroupSizeZ, bool isHwLocalInvocationId, BuilderBase &builder);
 
   void createSwizzleThreadGroupFunction();
 
-  void exportShadingRate(llvm::Value *shadingRate, llvm::Instruction *insertPos);
-  llvm::Value *getShadingRate(llvm::Instruction *insertPos);
+  void exportShadingRate(llvm::Value *shadingRate, BuilderBase &builder);
+  llvm::Value *getShadingRate(BuilderBase &builderBase);
 
   void recordVertexAttribExport(unsigned location, llvm::ArrayRef<llvm::Value *> attribValues);
-  void exportVertexAttribs(llvm::Instruction *insertPos);
+  void exportVertexAttribs(BuilderBase &builder);
 
   GfxIpVersion m_gfxIp;                     // Graphics IP version info
   PipelineSystemValues m_pipelineSysValues; // Cache of ShaderSystemValues objects, one per shader stage

@@ -52,9 +52,6 @@ unsigned PipelineDocument::getMaxSectionCount(SectionType type) {
   case SectionTypeGraphicsState:
     maxSectionCount = 1;
     break;
-  case SectionTypeUniformConstant:
-    maxSectionCount = 1;
-    break;
   case SectionTypeComputeState:
     maxSectionCount = 1;
     break;
@@ -76,8 +73,6 @@ unsigned PipelineDocument::getMaxSectionCount(SectionType type) {
   case SectionTypeShaderInfo:
     maxSectionCount = UINT32_MAX;
     break;
-  case SectionTypeApiXfbOutput:
-    maxSectionCount = 1;
   default:
     break;
   }
@@ -107,130 +102,35 @@ VfxPipelineStatePtr PipelineDocument::getDocument() {
 
   // Section "GraphicsPipelineState"
   if (m_sections[SectionTypeGraphicsState].size() > 0) {
-    GraphicsPipelineState graphicState;
     m_pipelineState.pipelineType = VfxPipelineTypeGraphics;
     reinterpret_cast<SectionGraphicsState *>(m_sections[SectionTypeGraphicsState][0])
-        ->getSubState(m_fileName, graphicState, &m_errorMsg);
-    auto gfxPipelineInfo = &m_pipelineState.gfxPipelineInfo;
-    gfxPipelineInfo->iaState.topology = graphicState.topology;
-    gfxPipelineInfo->rsState.provokingVertexMode = graphicState.provokingVertexMode;
-    gfxPipelineInfo->iaState.patchControlPoints = graphicState.patchControlPoints;
-    gfxPipelineInfo->iaState.deviceIndex = graphicState.deviceIndex;
-    gfxPipelineInfo->iaState.disableVertexReuse = graphicState.disableVertexReuse != 0;
-    gfxPipelineInfo->iaState.switchWinding = graphicState.switchWinding != 0;
-    gfxPipelineInfo->iaState.enableMultiView = graphicState.enableMultiView != 0;
-    gfxPipelineInfo->vpState.depthClipEnable = graphicState.depthClipEnable != 0;
-    gfxPipelineInfo->rsState.rasterizerDiscardEnable = graphicState.rasterizerDiscardEnable != 0;
-    gfxPipelineInfo->rsState.perSampleShading = graphicState.perSampleShading != 0;
-    gfxPipelineInfo->rsState.numSamples = graphicState.numSamples;
-    gfxPipelineInfo->rsState.pixelShaderSamples = graphicState.pixelShaderSamples;
-    gfxPipelineInfo->rsState.samplePatternIdx = graphicState.samplePatternIdx;
-    gfxPipelineInfo->rsState.dynamicSampleInfo = graphicState.dynamicSampleInfo;
-    gfxPipelineInfo->rsState.rasterStream = graphicState.rasterStream;
-    gfxPipelineInfo->rsState.usrClipPlaneMask = static_cast<uint8_t>(graphicState.usrClipPlaneMask);
-    if (graphicState.tessLevelInner[0] < 0 || graphicState.tessLevelInner[1] < 0 ||
-        graphicState.tessLevelOuter[0] < 0 || graphicState.tessLevelOuter[1] < 0 || graphicState.tessLevelOuter[2] < 0)
-      gfxPipelineInfo->iaState.tessLevel = nullptr;
-    else {
-      m_tessellationLevel.inner[0] = graphicState.tessLevelInner[0];
-      m_tessellationLevel.inner[1] = graphicState.tessLevelInner[1];
-      m_tessellationLevel.outer[0] = graphicState.tessLevelOuter[0];
-      m_tessellationLevel.outer[1] = graphicState.tessLevelOuter[1];
-      m_tessellationLevel.outer[2] = graphicState.tessLevelOuter[2];
-      m_tessellationLevel.outer[3] = graphicState.tessLevelOuter[3];
-      gfxPipelineInfo->iaState.tessLevel = &m_tessellationLevel;
-    }
-
-    gfxPipelineInfo->cbState.alphaToCoverageEnable = graphicState.alphaToCoverageEnable != 0;
-    gfxPipelineInfo->cbState.dualSourceBlendEnable = graphicState.dualSourceBlendEnable != 0;
-    gfxPipelineInfo->cbState.dualSourceBlendDynamic = graphicState.dualSourceBlendDynamic != 0;
-    for (unsigned i = 0; i < MaxColorTargets; ++i) {
-      gfxPipelineInfo->cbState.target[i].format = graphicState.colorBuffer[i].format;
-      gfxPipelineInfo->cbState.target[i].channelWriteMask =
-          static_cast<uint8_t>(graphicState.colorBuffer[i].channelWriteMask);
-      gfxPipelineInfo->cbState.target[i].blendEnable = graphicState.colorBuffer[i].blendEnable != 0;
-      gfxPipelineInfo->cbState.target[i].blendSrcAlphaToColor = graphicState.colorBuffer[i].blendSrcAlphaToColor != 0;
-    }
-
-    gfxPipelineInfo->options = graphicState.options;
-    gfxPipelineInfo->nggState = graphicState.nggState;
-    gfxPipelineInfo->dynamicVertexStride = graphicState.dynamicVertexStride;
-    gfxPipelineInfo->enableUberFetchShader = graphicState.enableUberFetchShader;
-    gfxPipelineInfo->enableEarlyCompile = graphicState.enableEarlyCompile;
-    gfxPipelineInfo->enableColorExportShader = graphicState.enableColorExportShader;
-    gfxPipelineInfo->useSoftwareVertexBufferDescriptors = graphicState.useSoftwareVertexBufferDescriptors;
-    gfxPipelineInfo->vbAddressLowBitsKnown = graphicState.vbAddressLowBitsKnown;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
-    gfxPipelineInfo->shaderLibrary = graphicState.shaderLibrary;
-#endif
-    gfxPipelineInfo->rtState = graphicState.rtState;
-
-    if (m_sections[SectionTypeUniformConstant].size() > 0) {
-      UniformConstantState uniformState;
-      reinterpret_cast<SectionUniformConstant *>(m_sections[SectionTypeUniformConstant][0])->getSubState(uniformState);
-      gfxPipelineInfo->numUniformConstantMaps = uniformState.numUniformConstantMaps;
-      gfxPipelineInfo->ppUniformMaps = uniformState.uniformMaps;
-    }
-
-    if (m_sections[SectionTypeApiXfbOutput].size() > 0) {
-      ApiXfbOutData *apiXfbOutData = &m_pipelineState.gfxPipelineInfo.apiXfbOutData;
-      reinterpret_cast<SectionApiXfbOutput *>(m_sections[SectionTypeApiXfbOutput][0])->getSubState(*apiXfbOutData);
-    }
+        ->getSubState(m_fileName, m_pipelineState.gfxPipelineInfo, &m_errorMsg);
   }
-
   // Section "ComputePipelineState"
   if (m_sections[SectionTypeComputeState].size() > 0) {
-    ComputePipelineState computeState;
     m_pipelineState.pipelineType = VfxPipelineTypeCompute;
     reinterpret_cast<SectionComputeState *>(m_sections[SectionTypeComputeState][0])
-        ->getSubState(m_fileName, computeState, &m_errorMsg);
-    auto computePipelineInfo = &m_pipelineState.compPipelineInfo;
-    computePipelineInfo->deviceIndex = computeState.deviceIndex;
-    computePipelineInfo->options = computeState.options;
-    computePipelineInfo->cs.entryStage = Vkgc::ShaderStageCompute;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
-    computePipelineInfo->shaderLibrary = computeState.shaderLibrary;
-#endif
-    computePipelineInfo->rtState = computeState.rtState;
-
-    if (m_sections[SectionTypeUniformConstant].size() > 0) {
-      UniformConstantState uniformState;
-      reinterpret_cast<SectionUniformConstant *>(m_sections[SectionTypeUniformConstant][0])->getSubState(uniformState);
-      assert(uniformState.numUniformConstantMaps == 1);
-      computePipelineInfo->pUniformMap = *uniformState.uniformMaps;
-    }
+        ->getSubState(m_fileName, m_pipelineState.compPipelineInfo, &m_errorMsg);
   }
 
   // Section "RayTracingPipelineState"
   if (m_sections[SectionTypeRayTracingState].size() > 0) {
-    RayTracingPipelineState rayTracingState;
     m_pipelineState.pipelineType = VfxPipelineTypeRayTracing;
     reinterpret_cast<SectionRayTracingState *>(m_sections[SectionTypeRayTracingState][0])
-        ->getSubState(m_fileName, rayTracingState, &m_errorMsg);
-    auto rayTracingPipelineInfo = &m_pipelineState.rayPipelineInfo;
-    rayTracingPipelineInfo->deviceIndex = rayTracingState.deviceIndex;
-    rayTracingPipelineInfo->options = rayTracingState.options;
-    rayTracingPipelineInfo->shaderGroupCount = rayTracingState.shaderGroupCount;
-    rayTracingPipelineInfo->pShaderGroups = rayTracingState.pShaderGroups;
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
-    rayTracingPipelineInfo->shaderTraceRay = rayTracingState.shaderTraceRay;
-#endif
-    rayTracingPipelineInfo->maxRecursionDepth = rayTracingState.maxRecursionDepth;
-    rayTracingPipelineInfo->indirectStageMask = rayTracingState.indirectStageMask;
-    rayTracingPipelineInfo->mode = rayTracingState.mode;
-    rayTracingPipelineInfo->rtState = rayTracingState.rtState;
-    rayTracingPipelineInfo->payloadSizeMaxInLib = rayTracingState.payloadSizeMaxInLib;
-    rayTracingPipelineInfo->attributeSizeMaxInLib = rayTracingState.attributeSizeMaxInLib;
-    rayTracingPipelineInfo->hasPipelineLibrary = rayTracingState.hasPipelineLibrary;
-    rayTracingPipelineInfo->pipelineLibStageMask = rayTracingState.pipelineLibStageMask;
+        ->getSubState(m_fileName, m_pipelineState.rayPipelineInfo, &m_errorMsg);
   }
 
   // Section "VertexInputState"
   if (m_sections[SectionTypeVertexInputState].size() > 0) {
     reinterpret_cast<SectionVertexInput *>(m_sections[SectionTypeVertexInputState][0])->getSubState(m_vertexInputState);
     m_pipelineState.gfxPipelineInfo.pVertexInput = &m_vertexInputState;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 71
     reinterpret_cast<SectionVertexInput *>(m_sections[SectionTypeVertexInputState][0])
         ->getvbAddressLowBits(m_pipelineState.gfxPipelineInfo.vbAddressLowBits);
+#else
+    reinterpret_cast<SectionVertexInput *>(m_sections[SectionTypeVertexInputState][0])
+        ->getvbAddressLowBits(m_pipelineState.gfxPipelineInfo.glState.vbAddressLowBits);
+#endif
   }
 
   if (m_pipelineState.pipelineType == VfxPipelineTypeGraphics ||
@@ -453,12 +353,6 @@ Section *PipelineDocument::createSection(const char *sectionName) {
   case SectionTypeResourceMapping:
     section = new SectionResourceMapping();
     break;
-  case SectionTypeUniformConstant:
-    section = new SectionUniformConstant();
-    break;
-  case SectionTypeApiXfbOutput:
-    section = new SectionApiXfbOutput();
-    break;
   default:
     section = Document::createSection(sectionName);
     break;
@@ -490,7 +384,6 @@ bool PipelineDocument::getPtrOfSubSection(Section *section, unsigned lineNum, co
     CASE_SUBSECTION(MemberTypeNggState, SectionNggState)
     CASE_SUBSECTION(MemberTypeUniformConstantMap, SectionUniformConstantMap)
     CASE_SUBSECTION(MemberTypeUniformConstantMapEntry, SectionUniformConstantMapEntry)
-    CASE_SUBSECTION(MemberTypeUniformConstant, SectionUniformConstant)
     CASE_SUBSECTION(MemberTypeXfbOutInfo, SectionXfbOutInfo)
     CASE_SUBSECTION(MemberTypeShaderGroup, SectionShaderGroup)
     CASE_SUBSECTION(MemberTypeRtState, SectionRtState)

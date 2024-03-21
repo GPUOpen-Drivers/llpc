@@ -150,7 +150,7 @@ Function *lgc::addFunctionArgs(Function *oldFunc, Type *retTy, ArrayRef<Type *> 
   if (!retTy)
     retTy = oldFuncTy->getReturnType();
   auto newFuncTy = FunctionType::get(retTy, allArgTys, false);
-  Function *newFunc = Function::Create(newFuncTy, oldFunc->getLinkage());
+  Function *newFunc = createFunctionHelper(newFuncTy, oldFunc->getLinkage(), oldFunc->getParent());
   newFunc->setCallingConv(oldFunc->getCallingConv());
   newFunc->takeName(oldFunc);
   newFunc->setSubprogram(oldFunc->getSubprogram());

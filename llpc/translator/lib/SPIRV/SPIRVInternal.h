@@ -402,6 +402,8 @@ union ShaderInOutMetadata {
     uint64_t IsBlockArray : 1;       // Whether we are handling block array
     uint64_t PerVertexDimension : 1; // Whether this is the per-vertex dimension (outermost) for an array
     uint64_t PerPrimitive : 1;       // Whether this is a per-primitive output (mesh shader)
+    uint64_t NumComponents : 4;      // Number of components for input/output scalars/vectors (NOTE: for 64-bit data
+                                     //    types, each vector element or scalar is considered to occupy two components)
   };
   uint64_t U64All[2];
 };

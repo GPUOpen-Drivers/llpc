@@ -124,7 +124,7 @@ BUILTIN(InterpLinearCenter, BuiltInInternalBase + 5, N, P, v2f32)
 BUILTIN(InterpLinearCentroid, BuiltInInternalBase + 6, N, P, v2f32)
 
 // Internal built-ins for sample position emulation
-BUILTIN(SamplePosOffset, BuiltInInternalBase + 7, N, P, i32)
+BUILTIN(SamplePosOffset, BuiltInInternalBase + 7, N, P, v2f32)
 BUILTIN(NumSamples, BuiltInInternalBase + 8, N, P, i32)
 BUILTIN(SamplePatternIdx, BuiltInInternalBase + 9, N, P, i32)
 BUILTIN(GsWaveId, BuiltInInternalBase + 10, N, G, i32)

@@ -32,8 +32,6 @@
 
 #pragma once
 
-#define MAKE_GPURT_VERSION(MAJOR, MINOR) ((MAJOR << 16) | MINOR)
-
 namespace GpuRt {
 
 #pragma pack(push, 4)

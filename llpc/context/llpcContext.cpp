@@ -30,8 +30,6 @@
  */
 #include "llpcContext.h"
 #include "SPIRVInternal.h"
-#include "continuations/ContinuationsDialect.h"
-#include "continuations/GpurtContext.h"
 #include "llpcCompiler.h"
 #include "llpcDebug.h"
 #include "llpcPipelineContext.h"
@@ -43,6 +41,8 @@
 #include "llpcSpirvLowerTranslator.h"
 #include "llpcSpirvProcessGpuRtLibrary.h"
 #include "llpcTimerProfiler.h"
+#include "llvmraytracing/ContinuationsDialect.h"
+#include "llvmraytracing/GpurtContext.h"
 #include "vkgcMetroHash.h"
 #include "lgc/Builder.h"
 #include "lgc/GpurtDialect.h"
@@ -112,7 +112,8 @@ LgcContext *Context::getLgcContext() {
     if (!m_targetMachine)
       report_fatal_error(Twine("Unknown target '") + Twine(gpuName) + Twine("'"));
     m_builderContext.reset(LgcContext::create(&*m_targetMachine, *this, PAL_CLIENT_INTERFACE_MAJOR_VERSION));
-    lgc::GpurtContext::get(*this).theModule.reset();
+    lgc::GpurtContext::get(*this).theModule = nullptr;
+    lgc::GpurtContext::get(*this).ownedTheModule.reset();
 
     // Pass the state of LLPC_OUTS on to LGC.
     LgcContext::setLlpcOuts(EnableOuts() ? &outs() : nullptr);
@@ -219,8 +220,10 @@ void Context::ensureGpurtLibrary() {
   key.gpurtFeatureFlags = rtState->gpurtFeatureFlags; // gpurtFeatureFlags affect which GPURT library we're using
   key.hwIntersectRay = rtState->bvhResDesc.dataSizeInDwords > 0;
 
-  if (gpurtContext.theModule && key != m_currentGpurtKey)
-    gpurtContext.theModule.reset();
+  if (gpurtContext.ownedTheModule && key != m_currentGpurtKey) {
+    gpurtContext.theModule = nullptr;
+    gpurtContext.ownedTheModule.reset();
+  }
 
   if (gpurtContext.theModule)
     return;
@@ -270,7 +273,8 @@ void Context::ensureGpurtLibrary() {
 
   lowerPassMgr->run(*gpurt);
 
-  gpurtContext.theModule = std::move(gpurt);
+  gpurtContext.ownedTheModule = std::move(gpurt);
+  gpurtContext.theModule = gpurtContext.ownedTheModule.get();
 }
 
 } // namespace Llpc

@@ -30,6 +30,56 @@
  */
 #pragma once
 
+namespace lgc {
+
+enum class CooperativeMatrixMemoryAccess : unsigned {
+  MemoryAccessMaskNone = 0x00,     // No mask
+  MemoryAccessVolatileMask = 0x01, // Access memory in volatile
+  MemoryAccessCoherentMask = 0x02, // Access memory in coherent
+  MemoryAccessTemporalMask = 0x04, // Access memory in temporal
+};
+
+enum class CooperativeMatrixElementType : unsigned {
+  Unknown = 0,   // Unknown
+  Float16,       // 16-bit floating-point
+  Float32,       // 32-bit floating-point
+  Int8,          // 8-bit integer
+  Int16,         // 16-bit integer
+  Int32,         // 32 bit integer
+  Float16Packed, // packed 16-bit floating-point
+};
+
+// Layout is virtual concept, eg: 16bit and 32bit for matrixC will share the same layout initially.
+// It will be passed as the argument of getTypeProperties to calculate the more detailed layout information.
+enum class CooperativeMatrixLayout : unsigned {
+  FactorMatrixLayout = 0,            // A/B layout on gfx10/gfx11
+  AccumulatorMatrixLayout,           // C/D layout on gfx11
+  Gfx10AccumulatorMatrixLayout,      // 32bit@C/D layout on gfx10
+  Gfx10Accumulator16bitMatrixLayout, // 16bit@C/D layout on gfx10
+  InvalidLayout
+};
+
+// The cooperative matrix arithmetic operations the builder can consume.
+// NOTE: We rely on casting this implicitly to an integer, so we cannot use an enum class.
+enum class CooperativeMatrixArithOp : unsigned {
+  IAdd = 0,
+  FAdd,
+  ISub,
+  FSub,
+  IMul,
+  FMul,
+  UDiv,
+  SDiv,
+  FDiv,
+  UMod,
+  SRem,
+  SMod,
+  FRem,
+  FMod
+};
+
+} // namespace lgc
+
 #define GET_INCLUDES
 #define GET_DIALECT_DECLS
 #include "lgc/LgcDialect.h.inc"

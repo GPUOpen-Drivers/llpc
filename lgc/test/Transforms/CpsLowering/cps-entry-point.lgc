@@ -9,7 +9,7 @@ declare ptr addrspace(32) @lgc.cps.get.vsp() #2
 
 define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc.shaderstage !3 {
 .entry:
-  %desc = call <4 x i32> @lgc.load.user.data.v4i32(i32 0)
+  %desc = call <4 x i32> @lgc.load.user.data__v4i32(i32 0)
   %ptr = call ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32> %desc)
   %p0 = getelementptr i32, ptr addrspace(7) %ptr, i32 0
   %i_vsp = load i32, ptr addrspace(7) %p0, align 4
@@ -30,7 +30,7 @@ define dllexport spir_func void @lgc.shader.CS.main() local_unnamed_addr #0 !lgc
   unreachable
 }
 
-declare <4 x i32> @lgc.load.user.data.v4i32(i32) #4
+declare <4 x i32> @lgc.load.user.data__v4i32(i32) #4
 
 declare ptr addrspace(7) @lgc.buffer.desc.to.ptr(<4 x i32>) #5
 

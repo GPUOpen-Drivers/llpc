@@ -53,7 +53,7 @@ add_llvm_library(LLVMlgc LINK_COMPONENTS
     Vectorize
 )
 
-llvm_map_components_to_libnames(extra_llvm_libs CompilerUtils Continuations)
+llvm_map_components_to_libnames(extra_llvm_libs CompilerUtils Raytracing)
 target_link_libraries(LLVMlgc PUBLIC llvm_dialects ${extra_llvm_libs} llpc_version)
 
 ### Cached Project Options #############################################################################################
@@ -65,7 +65,11 @@ set_compiler_options(LLVMlgc ${LLPC_ENABLE_WERROR})
 
 ### TableGen for LGC dialect ###########################################################################################
 
-set(LGC_TABLEGEN_EXE $<TARGET_FILE:llvm-dialects-tblgen>)
+if (EXISTS ${LLVM_TOOLS_BINARY_PATH}/llvm-dialects-tblgen)
+  set(LGC_TABLEGEN_EXE ${LLVM_TOOLS_BINARY_PATH}/llvm-dialects-tblgen)
+else()
+  set(LGC_TABLEGEN_EXE $<TARGET_FILE:llvm-dialects-tblgen>)
+endif()
 set(LGC_TABLEGEN_TARGET llvm-dialects-tblgen)
 set(LLVM_TARGET_DEFINITIONS interface/lgc/LgcDialect.td)
 
@@ -204,6 +208,9 @@ target_sources(LLVMlgc PRIVATE
     util/StartStopTimer.cpp
 )
 
+# lgc/interface/lgc
+target_sources(LLVMlgc PRIVATE interface/lgc/LgcDialect.td)
+
 add_subdirectory(disassembler)
 add_subdirectory(tool/lgc)
 add_subdirectory(test)
@@ -212,4 +219,4 @@ if (LLPC_BUILD_TESTS)
   add_subdirectory(unittests)
 endif()
 
-target_link_libraries(LLVMlgc PRIVATE LLVMContinuations)
+target_link_libraries(LLVMlgc PRIVATE LLVMRaytracing)

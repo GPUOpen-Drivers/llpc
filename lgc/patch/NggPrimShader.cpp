@@ -550,7 +550,8 @@ Function *NggPrimShader::generate(Function *esMain, Function *gsMain, Function *
   uint64_t inRegMask = 0;
   auto primShaderTy = getPrimShaderType(inRegMask);
 
-  Function *primShader = Function::Create(primShaderTy, GlobalValue::ExternalLinkage, lgcName::NggPrimShaderEntryPoint);
+  Function *primShader =
+      createFunctionHelper(primShaderTy, GlobalValue::ExternalLinkage, module, lgcName::NggPrimShaderEntryPoint);
   primShader->setDLLStorageClass(GlobalValue::DLLExportStorageClass);
   const unsigned waveSize = m_pipelineState->getShaderWaveSize(ShaderStage::Geometry);
   primShader->addFnAttr("target-features", ",+wavefrontsize" + std::to_string(waveSize)); // Set wavefront size
@@ -6124,9 +6125,10 @@ void NggPrimShader::processVertexAttribExport(Function *&target) {
           coherent.bits.glc = true;
           coherent.bits.slc = true;
         }
-        m_builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_store, attribValue->getType(),
-                                  {attribValue, attribRingBufDesc, vertexIndex, locationOffset, ringOffset,
-                                   m_builder.getInt32(coherent.u32All)});
+        auto store = m_builder.CreateIntrinsic(Intrinsic::amdgcn_struct_buffer_store, attribValue->getType(),
+                                               {attribValue, attribRingBufDesc, vertexIndex, locationOffset, ringOffset,
+                                                m_builder.getInt32(coherent.u32All)});
+        (void)store;
 
         removedCalls.push_back(call);
       }

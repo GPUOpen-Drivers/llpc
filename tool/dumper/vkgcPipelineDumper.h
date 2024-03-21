@@ -123,6 +123,7 @@ private:
   static void dumpRayTracingStateInfo(const RayTracingPipelineBuildInfo *pipelineInfo, const char *dumpDir,
                                       std::ostream &dumpFile);
   static void updateHashForRtState(const RtState *rtState, MetroHash64 *hasher, bool isCacheHash);
+  static void updateHashForUniformConstantMap(const UniformConstantMap *pUniformConstantMap, MetroHash64 *hasher);
 
   static void dumpVersionInfo(std::ostream &dumpFile);
   static void dumpPipelineShaderInfo(const PipelineShaderInfo *shaderInfo, std::ostream &dumpFile);

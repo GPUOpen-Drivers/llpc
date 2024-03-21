@@ -31,12 +31,13 @@
 
 #include "llpcSpirvLowerRayTracing.h"
 #include "SPIRVInternal.h"
-#include "continuations/ContinuationsUtil.h"
-#include "continuations/GpurtContext.h"
+#include "compilerutils/CompilerUtils.h"
 #include "gpurt-compiler.h"
 #include "llpcContext.h"
 #include "llpcRayTracingContext.h"
 #include "llpcSpirvLowerUtil.h"
+#include "llvmraytracing/ContinuationsUtil.h"
+#include "llvmraytracing/GpurtContext.h"
 #include "lgc/Builder.h"
 #include "lgc/CommonDefs.h"
 #include "lgc/GpurtDialect.h"
@@ -66,6 +67,7 @@ extern opt<bool> TrimDebugInfo;
 using namespace llvm;
 using namespace Llpc;
 using namespace lgc::rt;
+using namespace CompilerUtils;
 
 namespace SPIRV {
 extern const char *MetaNameSpirvOp;
@@ -76,7 +78,6 @@ const char *TraceRayKHR = "_cs_";
 const char *TraceRaySetTraceParams = "TraceRaySetTraceParams";
 const char *ShaderTable = "ShaderTable";
 static const char *CallAnyHitShader = "AmdTraceRayCallAnyHitShader";
-static const char *FetchTrianglePositionFromNodePointer = "FetchTrianglePositionFromNodePointer";
 static const char *RemapCapturedVaToReplayVa = "AmdTraceRayRemapCapturedVaToReplayVa";
 static const char *ContinufyStageMeta = "continufy.stage";
 } // namespace RtName
@@ -418,6 +419,9 @@ PreservedAnalyses SpirvLowerRayTracing::run(Module &module, ModuleAnalysisManage
   mode.workgroupSizeY = rtState->threadGroupSizeY;
   mode.workgroupSizeZ = rtState->threadGroupSizeZ;
   lgc::Pipeline::setComputeShaderMode(module, mode);
+
+  CrossModuleInliner cmi;
+  m_crossModuleInliner = &cmi;
 
   // Create empty raygen main module
   if (module.empty()) {
@@ -1509,6 +1513,18 @@ void SpirvLowerRayTracing::inlineTraceRay(llvm::CallInst *callInst, ModuleAnalys
   auto &psi = analysisManager.getResult<ProfileSummaryAnalysis>(*m_module);
   auto calleeFunc = callInst->getCalledFunction();
   auto callingFunc = callInst->getCaller();
+#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 489715
+  // Check if conversion to NewDbgFormat is needed for calleeFunc.
+  // If we are inside PassManger then m_module and all its Functions and BB may be converted (depending if feature is
+  // turned on) to new Debug Info format. Since calleeFunc is a new function which will be added/inlined into m_module,
+  // we have to convert these function to new Debug Info format.
+  //
+  // Since calleeFunc will be removed after inline then there is no need to convert it back to old DbgInfoFormat after
+  // InlineFunction.
+  bool shouldConvert = m_module->IsNewDbgInfoFormat && !calleeFunc->IsNewDbgInfoFormat;
+  if (shouldConvert)
+    calleeFunc->convertToNewDbgValues();
+#endif
   InlineFunctionInfo IFI(getAssumptionCache, &psi, &getBFI(*callingFunc), &getBFI(*calleeFunc));
   InlineResult res = InlineFunction(*callInst, IFI, /*MergeAttributes=*/true, &getAAR(*calleeFunc), true);
   (void(res)); // unused
@@ -2092,26 +2108,10 @@ Value *SpirvLowerRayTracing::createLoadRayTracingMatrix(unsigned builtInId) {
 
   m_builder->SetInsertPoint(m_insertPosPastInit);
 
-  auto int32x2Ty = FixedVectorType::get(m_builder->getInt32Ty(), 2);
-  Value *zero = m_builder->getInt32(0);
-
   // Get matrix address from instance node address
   Value *instNodeAddr = createLoadInstNodeAddr();
 
-  Value *matrixAddr = instNodeAddr;
-
-  unsigned transformOffset = offsetof(RayTracingInstanceNode, desc.Transform);
-  if (builtInId == BuiltInObjectToWorldKHR) {
-    transformOffset = offsetof(RayTracingInstanceNode, extra.Transform);
-  }
-
-  Value *matrixOffset = PoisonValue::get(int32x2Ty);
-  matrixOffset = m_builder->CreateInsertElement(matrixOffset, m_builder->getInt32(transformOffset), uint64_t(0));
-  matrixOffset = m_builder->CreateInsertElement(matrixOffset, zero, 1);
-
-  matrixAddr = m_builder->CreateAdd(matrixAddr, matrixOffset);
-
-  return createLoadMatrixFromAddr(matrixAddr);
+  return createLoadMatrixFromFunc(instNodeAddr, builtInId);
 }
 
 // =====================================================================================================================
@@ -2122,6 +2122,9 @@ void SpirvLowerRayTracing::createSetHitTriangleNodePointer(Function *func) {
   eraseFunctionBlocks(func);
   BasicBlock *entryBlock = BasicBlock::Create(*m_context, "", func);
   m_builder->SetInsertPoint(entryBlock);
+  // Cross module inliner cannot be used to inline a function with multiple blocks into in a degenerate block, create
+  // the terminator first.
+  m_builder->SetInsertPoint(m_builder->CreateRetVoid());
   if (m_builtInParams.find(TraceParam::HitTriangleVertexPositions) != m_builtInParams.end()) {
     Value *bvh = func->arg_begin();
     Value *nodePtr = func->arg_begin() + 1;
@@ -2133,13 +2136,14 @@ void SpirvLowerRayTracing::createSetHitTriangleNodePointer(Function *func) {
     m_builder->CreateStore(bvh, bvhPtr);
     m_builder->CreateStore(nodePtr, nodePtrPtr);
 
-    auto triangleDataTy = m_traceParamsTys[TraceParam::HitTriangleVertexPositions];
-    auto triangleData =
-        m_builder->CreateNamedCall(RtName::FetchTrianglePositionFromNodePointer, triangleDataTy, {bvhPtr, nodePtrPtr},
-                                   {Attribute::NoUnwind, Attribute::AlwaysInline});
+    auto triangleData = m_crossModuleInliner
+                            ->inlineCall(*m_builder,
+                                         getGpurtFunction(m_context->getPipelineContext()->getRayTracingFunctionName(
+                                             Vkgc::RT_ENTRY_FETCH_HIT_TRIANGLE_FROM_NODE_POINTER)),
+                                         {bvhPtr, nodePtrPtr})
+                            .returnValue;
     m_builder->CreateStore(triangleData, vertexPos);
   }
-  m_builder->CreateRetVoid();
 }
 
 // =====================================================================================================================
@@ -2690,7 +2694,7 @@ void SpirvLowerRayTracing::visitInstanceIndexOp(lgc::rt::InstanceIndexOp &inst) 
   m_builder->SetInsertPoint(&inst);
 
   auto instNodeAddr = createLoadInstNodeAddr();
-  auto instanceIndex = createLoadInstanceId(instNodeAddr);
+  auto instanceIndex = createLoadInstanceIndexOrId(instNodeAddr, true);
   inst.replaceAllUsesWith(instanceIndex);
 
   m_callsToLower.push_back(&inst);
@@ -2798,7 +2802,7 @@ void SpirvLowerRayTracing::visitInstanceIdOp(lgc::rt::InstanceIdOp &inst) {
   m_builder->SetInsertPoint(&inst);
 
   auto instNodeAddr = createLoadInstNodeAddr();
-  auto instanceId = createLoadInstanceIndex(instNodeAddr);
+  auto instanceId = createLoadInstanceIndexOrId(instNodeAddr, false);
   inst.replaceAllUsesWith(instanceId);
 
   m_callsToLower.push_back(&inst);
@@ -2997,7 +3001,8 @@ void SpirvLowerRayTracing::createSqttCallCompactToken(ShaderStage stage) {
 // =====================================================================================================================
 // Creates instructions to emit SQTT shader data function return token
 void SpirvLowerRayTracing::createSqttFunctionReturnToken() {
-  m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_ttracedata, {}, m_builder->getInt32(SqttWellKnownTypeFunctionReturn));
+  m_builder->CreateIntrinsic(Intrinsic::amdgcn_s_ttracedata_imm, {},
+                             m_builder->getInt16(SqttWellKnownTypeFunctionReturn));
 }
 
 // =====================================================================================================================

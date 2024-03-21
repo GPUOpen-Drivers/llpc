@@ -39,7 +39,9 @@
 #include "llvm/Analysis/ConstantFolding.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Instructions.h"
+#include "llvm/IR/IntrinsicsAMDGPU.h"
 #include "llvm/IR/Operator.h"
+#include "llvm/IR/PatternMatch.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Transforms/Utils.h"
@@ -51,6 +53,7 @@
 
 using namespace lgc;
 using namespace llvm;
+using namespace PatternMatch;
 using namespace SPIRV;
 using namespace Llpc;
 
@@ -457,7 +460,6 @@ void SpirvLowerMathFloatOp::visitBinaryOperator(BinaryOperator &binaryOp) {
       isa<ConstantAggregateZero>(src1) || (isa<ConstantFP>(src1) && cast<ConstantFP>(src1)->isZero());
   bool src2IsConstZero =
       isa<ConstantAggregateZero>(src2) || (isa<ConstantFP>(src2) && cast<ConstantFP>(src2)->isZero());
-  Value *dest = nullptr;
 
   if (opCode == Instruction::FSub && src1IsConstZero) {
     // NOTE: Source1 is constant zero, we might be performing FNEG operation. This will be optimized
@@ -468,6 +470,7 @@ void SpirvLowerMathFloatOp::visitBinaryOperator(BinaryOperator &binaryOp) {
   // NOTE: We can't do constant folding for the following floating operations if we have floating-point controls that
   // will flush denormals or preserve NaN.
   if (!m_fp16DenormFlush && !m_fp32DenormFlush && !m_fp64DenormFlush) {
+    Value *dest = nullptr;
     switch (opCode) {
     case Instruction::FAdd:
       if (binaryOp.getFastMathFlags().noNaNs()) {
@@ -507,11 +510,12 @@ void SpirvLowerMathFloatOp::visitBinaryOperator(BinaryOperator &binaryOp) {
       binaryOp.eraseFromParent();
 
       m_changed = true;
+      return;
     }
   }
 
   // Replace FDIV x, y with FDIV 1.0, y; MUL x if it isn't optimized
-  if (opCode == Instruction::FDiv && !dest && src1 && src2) {
+  if (opCode == Instruction::FDiv) {
     Constant *one = ConstantFP::get(binaryOp.getType(), 1.0);
     if (src1 != one) {
       IRBuilder<> builder(*m_context);
@@ -525,6 +529,39 @@ void SpirvLowerMathFloatOp::visitBinaryOperator(BinaryOperator &binaryOp) {
       binaryOp.eraseFromParent();
 
       m_changed = true;
+      return;
+    }
+  }
+
+  // Replace mul with amdgcn_fmul_legacy intrinsic when detect patterns like:
+  // ((b==0.0 ? 0.0 : a) * (a==0.0 ? 0.0 : b))
+  if (opCode == Instruction::FMul) {
+    Value *src1CmpValue = nullptr;
+    Value *src1FalseValue = nullptr;
+    Value *src2CmpValue = nullptr;
+    Value *src2FalseValue = nullptr;
+    FCmpInst::Predicate pred = FCmpInst::FCMP_OEQ;
+    // Detect whether A = (b==0.0 ? 0.0 : a) and parse out b and a
+    bool src1Match =
+        match(src1, m_Select(m_FCmp(pred, m_Value(src1CmpValue), m_AnyZeroFP()), m_Zero(), m_Value(src1FalseValue)));
+    // Detect whether B = (a'==0.0 ? 0.0 : b') and output a' and b'
+    bool src2Match =
+        match(src2, m_Select(m_FCmp(pred, m_Value(src2CmpValue), m_AnyZeroFP()), m_Zero(), m_Value(src2FalseValue)));
+    // If b == b' && a == a' then use fmul_legacy(a,b) instead of fmul(A,B)
+    if (src1Match && src2Match) {
+      if ((src1CmpValue == src2FalseValue) && (src2CmpValue == src1FalseValue)) {
+        IRBuilder<> builder(*m_context);
+        builder.SetInsertPoint(&binaryOp);
+        builder.setFastMathFlags(binaryOp.getFastMathFlags());
+        Value *fmulzResult =
+            builder.CreateIntrinsic(Intrinsic::amdgcn_fmul_legacy, {}, {src1FalseValue, src2FalseValue});
+        binaryOp.replaceAllUsesWith(fmulzResult);
+        binaryOp.dropAllReferences();
+        binaryOp.eraseFromParent();
+
+        m_changed = true;
+        return;
+      }
     }
   }
 }

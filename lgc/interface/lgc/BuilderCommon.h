@@ -36,6 +36,10 @@
 namespace lgc {
 
 enum class ResourceNodeType : unsigned;
+enum class CooperativeMatrixMemoryAccess : unsigned;
+enum class CooperativeMatrixElementType : unsigned;
+enum class CooperativeMatrixLayout : unsigned;
+enum class CooperativeMatrixArithOp : unsigned;
 
 // =====================================================================================================================
 // BuilderCommon extends llvm_dialects::Builder, which extends llvm::IRBuilder<>, and provides a few utility methods
@@ -84,54 +88,14 @@ public:
   llvm::CallInst *CreateNamedCall(llvm::StringRef funcName, llvm::Type *retTy, llvm::ArrayRef<llvm::Value *> args,
                                   llvm::ArrayRef<llvm::Attribute::AttrKind> attribs, const llvm::Twine &instName = "");
 
+  // =====================================================================================================================
+  // Create alloca for given input type.
+  //
+  // @param ty : pointer type.
+  llvm::Value *CreateAllocaAtFuncEntry(llvm::Type *ty);
+
   // -----------------------------------------------------------------------------------------------------------------
   // Cooperative matrix operation.
-
-  enum CooperativeMatrixMemoryAccess {
-    MemoryAccessMaskNone = 0x00,     // No mask
-    MemoryAccessVolatileMask = 0x01, // Access memory in volatile
-    MemoryAccessCoherentMask = 0x02, // Access memory in coherent
-    MemoryAccessTemporalMask = 0x04, // Access memory in temporal
-  };
-
-  enum CooperativeMatrixElementType {
-    Unknown = 0,   // Unknown
-    Float16,       // 16-bit floating-point
-    Float32,       // 32-bit floating-point
-    Int8,          // 8-bit integer
-    Int16,         // 16-bit integer
-    Int32,         // 32 bit integer
-    Float16Packed, // packed 16-bit floating-point
-  };
-
-  // Layout is virtual concept, eg: 16bit and 32bit for matrixC will share the same layout initially.
-  // It will be passed as the argument of getTypeProperties to calculate the more detailed layout information.
-  enum CooperativeMatrixLayout {
-    FactorMatrixLayout = 0,            // A/B layout on gfx10/gfx11
-    AccumulatorMatrixLayout,           // C/D layout on gfx11
-    Gfx10AccumulatorMatrixLayout,      // 32bit@C/D layout on gfx10
-    Gfx10Accumulator16bitMatrixLayout, // 16bit@C/D layout on gfx10
-    InvalidLayout
-  };
-
-  // The cooperative matrix arithmetic operations the builder can consume.
-  // NOTE: We rely on casting this implicitly to an integer, so we cannot use an enum class.
-  enum class CooperativeMatrixArithOp {
-    IAdd = 0,
-    FAdd,
-    ISub,
-    FSub,
-    IMul,
-    FMul,
-    UDiv,
-    SDiv,
-    FDiv,
-    UMod,
-    SRem,
-    SMod,
-    FRem,
-    FMod
-  };
 
   // Convert the element type enum into the corresponding LLVM type.
   llvm::Type *transCooperativeMatrixElementType(CooperativeMatrixElementType elemType);
@@ -165,10 +129,12 @@ public:
   // @param colMaj : Whether the values loaded from memory are arrayed in column-major or row-major.
   // @param layout : Identify it's factor or accumulator
   // @param memoryAccess : Parsed from Memory operands in SPIRV-reader
+  // @param alignment : Alignment for memory operation.
   // @param instName : Name to give instruction(s)
   llvm::Value *CreateCooperativeMatrixLoad(llvm::Value *pointer, llvm::Value *stride, bool colMajor,
                                            CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout,
-                                           unsigned memoryAccess, const llvm::Twine &instName = "");
+                                           unsigned memoryAccess, llvm::Align alignment,
+                                           const llvm::Twine &instName = "");
 
   // Create cooperative matrix store.
   //
@@ -179,11 +145,12 @@ public:
   // @param colMaj : Whether the values loaded from memory are arrayed in column-major or row-major.
   // @param layout : Identify it's factor or accumulator
   // @param memoryAccess : Parsed from Memory operands in SPIRV-reader
+  // @param alignment : Alignment for memory operation.
   // @param instName : Name to give instruction(s).
   llvm::Value *CreateCooperativeMatrixStore(llvm::Value *pointer, llvm::Value *matrix, llvm::Value *stride,
                                             bool colMajor, CooperativeMatrixElementType elemType,
                                             CooperativeMatrixLayout layout, unsigned memoryAccess,
-                                            const llvm::Twine &instName = "");
+                                            llvm::Align alignment, const llvm::Twine &instName = "");
 
   // Create cooperative matrix conversion.
   // @param opCode : The convert opCode.

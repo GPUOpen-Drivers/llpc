@@ -305,10 +305,10 @@ Vkgc::UniformConstantMapEntry *getUniformConstantEntryByLocation(const Llpc::Con
   if (context->getPipelineType() == PipelineType::Graphics) {
     auto *buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(context->getPipelineBuildInfo());
     // Find the uniform constant map to use.
-    for (unsigned s = 0; s < buildInfo->numUniformConstantMaps; s++) {
-      if (buildInfo->ppUniformMaps[s] != nullptr &&
-          isShaderStageInMask(stage, buildInfo->ppUniformMaps[s]->visibility)) {
-        accessedUniformMap = buildInfo->ppUniformMaps[s];
+    for (unsigned s = 0; s < buildInfo->getGlState().numUniformConstantMaps; s++) {
+      if (buildInfo->getGlState().ppUniformMaps[s] != nullptr &&
+          isShaderStageInMask(stage, buildInfo->getGlState().ppUniformMaps[s]->visibility)) {
+        accessedUniformMap = buildInfo->getGlState().ppUniformMaps[s];
         break;
       }
     }
