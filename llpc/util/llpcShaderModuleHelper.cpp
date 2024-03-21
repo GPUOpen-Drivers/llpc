@@ -69,6 +69,7 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
   ShaderModuleUsage shaderModuleUsage = {};
   // Parse SPIR-V instructions
   std::unordered_set<unsigned> capabilities;
+  bool hasIndexDecoration = false;
 
   while (codePos < end) {
     unsigned opCode = (codePos[0] & OpCodeMask);
@@ -179,6 +180,8 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
           shaderModuleUsage.useBackSecondaryColor = true;
       } else if (decoration == DecorationPerVertexKHR) {
         shaderModuleUsage.useBarycentric = true;
+      } else if (decoration == DecorationIndex) {
+        hasIndexDecoration = true;
       }
       break;
     }
@@ -209,6 +212,10 @@ ShaderModuleUsage ShaderModuleHelper::getShaderModuleUsageInfo(const BinaryData 
     }
     codePos += wordCount;
   }
+
+  // Without any DecorationIndex, it needs to disableDualSource
+  if (hasIndexDecoration == false)
+    shaderModuleUsage.disableDualSource = true;
 
   if (capabilities.find(CapabilityVariablePointersStorageBuffer) != capabilities.end())
     shaderModuleUsage.enableVarPtrStorageBuf = true;

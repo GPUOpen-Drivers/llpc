@@ -417,23 +417,7 @@ unsigned PalMetadata::getUserDataReg0(ShaderStageEnum stage) {
   m_userDataRegMapping[ShaderStage::Task] = mmCOMPUTE_USER_DATA_0;
   m_userDataRegMapping[ShaderStage::Mesh] = mmSPI_SHADER_USER_DATA_GS_0;
 
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major == 9) {
-    // GFX9: Merged shaders, and merged ES-GS user data goes into ES registers.
-    m_userDataRegMapping[ShaderStage::CopyShader] = mmSPI_SHADER_USER_DATA_VS_0;
-    m_userDataRegMapping[ShaderStage::Geometry] = mmSPI_SHADER_USER_DATA_ES_0;
-    if (m_pipelineState->hasShaderStage(ShaderStage::Geometry))
-      m_userDataRegMapping[ShaderStage::TessEval] = m_userDataRegMapping[ShaderStage::Geometry];
-    else
-      m_userDataRegMapping[ShaderStage::TessEval] = mmSPI_SHADER_USER_DATA_VS_0;
-    m_userDataRegMapping[ShaderStage::TessControl] = mmSPI_SHADER_USER_DATA_HS_0;
-    if (m_pipelineState->hasShaderStage(ShaderStage::TessControl))
-      m_userDataRegMapping[ShaderStage::Vertex] = m_userDataRegMapping[ShaderStage::TessControl];
-    else if (m_pipelineState->hasShaderStage(ShaderStage::Geometry))
-      m_userDataRegMapping[ShaderStage::Vertex] = m_userDataRegMapping[ShaderStage::Geometry];
-    else
-      m_userDataRegMapping[ShaderStage::Vertex] = mmSPI_SHADER_USER_DATA_VS_0;
-
-  } else if (!m_pipelineState->getNggControl()->enableNgg) {
+  if (!m_pipelineState->getNggControl()->enableNgg) {
     // GFX10+ not NGG: Same as GFX9, except ES-GS user data goes into GS registers.
     m_userDataRegMapping[ShaderStage::CopyShader] = mmSPI_SHADER_USER_DATA_VS_0;
     m_userDataRegMapping[ShaderStage::Geometry] = mmSPI_SHADER_USER_DATA_GS_0;
@@ -480,8 +464,7 @@ void PalMetadata::setUserDataEntry(ShaderStageEnum stage, unsigned userDataIndex
 
   // Assert that the supplied user data index is not too big.
   bool inRange = userDataIndex + dwordCount <= 16;
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 && stage != ShaderStage::Compute &&
-      stage != ShaderStage::Task)
+  if (stage != ShaderStage::Compute && stage != ShaderStage::Task)
     inRange = userDataIndex + dwordCount <= 32;
   assert(inRange && "Out of range user data index");
   (void(inRange)); // Unused
@@ -620,8 +603,7 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
   if (m_pipelineState->useRegisterFieldFormat()) {
     auto graphicsRegNode = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters].getMap(true);
 
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 &&
-        m_pipelineState->getColorExportState().alphaToCoverageEnable) {
+    if (m_pipelineState->getColorExportState().alphaToCoverageEnable) {
       auto dbShaderControl = graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl].getMap(true);
       dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] = false;
     }
@@ -633,14 +615,12 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
           static_cast<unsigned>(waveBreakSize);
     }
 
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion{9, 0, 0}) {
-      if (m_pipelineState->getRasterizerState().innerCoverage)
-        graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::AaCoverageToShaderSelect] =
-            serializeEnum(Util::Abi::CoverageToShaderSel(INPUT_INNER_COVERAGE));
-      else
-        graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::AaCoverageToShaderSelect] =
-            serializeEnum(Util::Abi::CoverageToShaderSel(INPUT_COVERAGE));
-    }
+    if (m_pipelineState->getRasterizerState().innerCoverage)
+      graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::AaCoverageToShaderSelect] =
+          serializeEnum(Util::Abi::CoverageToShaderSel(INPUT_INNER_COVERAGE));
+    else
+      graphicsRegNode[Util::Abi::GraphicsRegisterMetadataKey::AaCoverageToShaderSelect] =
+          serializeEnum(Util::Abi::CoverageToShaderSel(INPUT_COVERAGE));
   } else {
     // Set PA_CL_CLIP_CNTL from pipeline state settings.
     // DX_CLIP_SPACE_DEF, ZCLIP_NEAR_DISABLE and ZCLIP_FAR_DISABLE are now set internally by PAL (as of
@@ -651,8 +631,7 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
     paClClipCntl.bits.DX_RASTERIZATION_KILL = rasterizerDiscardEnable;
     setRegister(mmPA_CL_CLIP_CNTL, paClClipCntl.u32All);
 
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9 &&
-        m_pipelineState->getColorExportState().alphaToCoverageEnable) {
+    if (m_pipelineState->getColorExportState().alphaToCoverageEnable) {
       DB_SHADER_CONTROL dbShaderControl = {};
       dbShaderControl.u32All = getRegister(mmDB_SHADER_CONTROL);
       dbShaderControl.bitfields.ALPHA_TO_MASK_DISABLE = 0;
@@ -666,15 +645,13 @@ void PalMetadata::finalizeRegisterSettings(bool isWholePipeline) {
       setRegister(mmPA_SC_SHADER_CONTROL, paScShaderControl.u32All);
     }
 
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion{9, 0, 0}) {
-      PA_SC_AA_CONFIG paScAaConfig = {};
-      if (m_pipelineState->getRasterizerState().innerCoverage) {
-        paScAaConfig.bitfields.COVERAGE_TO_SHADER_SELECT = INPUT_INNER_COVERAGE;
-      } else {
-        paScAaConfig.bitfields.COVERAGE_TO_SHADER_SELECT = INPUT_COVERAGE;
-      }
-      setRegister(mmPA_SC_AA_CONFIG, paScAaConfig.u32All);
+    PA_SC_AA_CONFIG paScAaConfig = {};
+    if (m_pipelineState->getRasterizerState().innerCoverage) {
+      paScAaConfig.bitfields.COVERAGE_TO_SHADER_SELECT = INPUT_INNER_COVERAGE;
+    } else {
+      paScAaConfig.bitfields.COVERAGE_TO_SHADER_SELECT = INPUT_COVERAGE;
     }
+    setRegister(mmPA_SC_AA_CONFIG, paScAaConfig.u32All);
   }
 }
 
@@ -1019,19 +996,17 @@ void PalMetadata::updateCbShaderMask(unsigned cbShaderMask) {
 //  Updates the DB shader control that depends on the CB state.
 //
 void PalMetadata::updateDbShaderControl() {
-  if (m_pipelineState->getTargetInfo().getGfxIpVersion().major >= 9) {
-    if (m_pipelineState->useRegisterFieldFormat()) {
-      auto dbShaderControl = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
-                                 .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl]
-                                 .getMap(true);
-      dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] =
-          !m_pipelineState->getColorExportState().alphaToCoverageEnable;
-    } else {
-      DB_SHADER_CONTROL dbShaderControl = {};
-      dbShaderControl.u32All = getRegister(mmDB_SHADER_CONTROL);
-      dbShaderControl.bitfields.ALPHA_TO_MASK_DISABLE = !m_pipelineState->getColorExportState().alphaToCoverageEnable;
-      setRegister(mmDB_SHADER_CONTROL, dbShaderControl.u32All);
-    }
+  if (m_pipelineState->useRegisterFieldFormat()) {
+    auto dbShaderControl = m_pipelineNode[Util::Abi::PipelineMetadataKey::GraphicsRegisters]
+                               .getMap(true)[Util::Abi::GraphicsRegisterMetadataKey::DbShaderControl]
+                               .getMap(true);
+    dbShaderControl[Util::Abi::DbShaderControlMetadataKey::AlphaToMaskDisable] =
+        !m_pipelineState->getColorExportState().alphaToCoverageEnable;
+  } else {
+    DB_SHADER_CONTROL dbShaderControl = {};
+    dbShaderControl.u32All = getRegister(mmDB_SHADER_CONTROL);
+    dbShaderControl.bitfields.ALPHA_TO_MASK_DISABLE = !m_pipelineState->getColorExportState().alphaToCoverageEnable;
+    setRegister(mmDB_SHADER_CONTROL, dbShaderControl.u32All);
   }
 }
 
@@ -1251,13 +1226,8 @@ unsigned PalMetadata::getFirstUserDataReg(unsigned callingConv) {
       {CallingConv::AMDGPU_LS, mmSPI_SHADER_USER_DATA_LS_0}, {CallingConv::AMDGPU_HS, mmSPI_SHADER_USER_DATA_HS_0},
       {CallingConv::AMDGPU_ES, mmSPI_SHADER_USER_DATA_ES_0}, {CallingConv::AMDGPU_GS, mmSPI_SHADER_USER_DATA_GS_0},
       {CallingConv::AMDGPU_VS, mmSPI_SHADER_USER_DATA_VS_0}, {CallingConv::AMDGPU_CS, mmCOMPUTE_PGM_RSRC1}};
-  static const ArrayMap shaderTableGfx9 = {
-      {CallingConv::AMDGPU_LS, mmSPI_SHADER_USER_DATA_LS_0}, {CallingConv::AMDGPU_HS, mmSPI_SHADER_USER_DATA_HS_0},
-      {CallingConv::AMDGPU_ES, mmSPI_SHADER_USER_DATA_ES_0}, {CallingConv::AMDGPU_GS, mmSPI_SHADER_USER_DATA_ES_0},
-      {CallingConv::AMDGPU_VS, mmSPI_SHADER_USER_DATA_VS_0}, {CallingConv::AMDGPU_CS, mmCOMPUTE_USER_DATA_0}};
 
-  bool isGfx9 = m_pipelineState->getTargetInfo().getGfxIpVersion().major == 9;
-  ArrayRef<KeyValuePair> currentShaderTable(isGfx9 ? shaderTableGfx9 : shaderTable);
+  ArrayRef<KeyValuePair> currentShaderTable(shaderTable);
   return findValueInArrayMap(currentShaderTable, callingConv);
 }
 
@@ -1272,10 +1242,8 @@ unsigned PalMetadata::getNumberOfSgprsBeforeUserData(unsigned callingConv) {
   case CallingConv::AMDGPU_PS:
     return 0;
   default:
-    // GFX9+ merged shader have an extra 8 SGPRs before user data.
-    if (m_pipelineState->getTargetInfo().getGfxIpVersion() >= GfxIpVersion{9, 0, 0})
-      return 8;
-    return 0;
+    // Merged shader have an extra 8 SGPRs before user data.
+    return 8;
   }
 }
 

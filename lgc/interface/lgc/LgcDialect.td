@@ -38,6 +38,11 @@ def TaskPayloadPointer : TgConstant<(PointerType 7)>, Type;
 
 def V4I32 : TgConstant<(FixedVectorType I32, 4)>, Type;
 
+defm CooperativeMatrixMemoryAccess : AttrEnum<"CooperativeMatrixMemoryAccess">;
+defm CooperativeMatrixElementType : AttrEnum<"CooperativeMatrixElementType">;
+defm CooperativeMatrixLayout : AttrEnum<"CooperativeMatrixLayout">;
+defm CooperativeMatrixArithOp : AttrEnum<"CooperativeMatrixArithOp">;
+
 class LgcOp<string mnemonic_, list<Trait> traits_ = []>
     : Op<LgcDialect, mnemonic_, traits_ # [NoUnwind]>;
 
@@ -415,8 +420,8 @@ def SubgroupAnyOp : LgcOp<"subgroup.any", [NoUnwind, Convergent]> {
   }];
 }
 
-def CooperativeRowAccLoadOp : LgcOp<"cooperative.rowacc.load", [Memory<[]>, WillReturn]> {
-  let arguments = (ins value:$pointer, I32:$stride, AttrI32:$elemType, AttrI32:$memoryAccess);
+def CooperativeRowAccLoadOp : LgcOp<"cooperative.rowacc.load", [Memory<[(read)]>, WillReturn]> {
+  let arguments = (ins value:$pointer, I32:$stride, CooperativeMatrixElementType:$elem_type, CooperativeMatrixMemoryAccess:$memory_access);
   let results = (outs value:$result);
 
   let defaultBuilderHasExplicitResultType = true;
@@ -427,34 +432,34 @@ def CooperativeRowAccLoadOp : LgcOp<"cooperative.rowacc.load", [Memory<[]>, Will
 
     Return acc row data in finalized mode.
 
+    'pointer' is the pointer address to the data.
     'stride' is the stride in bytes in memory between the first elements in the source data.
-    'elemType' is the element type for the row acc.
-    'memoryAccess' is the memory operands which provide:isVolatile/isTemporal/isCoherent additional operands,
+    'elem_type' is the element type for the row acc.
+    'memory_access' is the memory operands which provide:isVolatile/isTemporal/isCoherent additional operands,
     maybe volatile/Aligned/Nontemporal/MakePointerAvailable
   }];
 }
 
-def CooperativeRowAccStoreOp : LgcOp<"cooperative.rowacc.store", [Memory<[]>]> {
-  let arguments = (ins value:$pointer, I32:$stride, AttrI32:$elemType, value:$value, AttrI32:$memoryAccess);
+def CooperativeRowAccStoreOp : LgcOp<"cooperative.rowacc.store", [Memory<[(write)]>]> {
+  let arguments = (ins value:$pointer, I32:$stride, CooperativeMatrixElementType:$elem_type, value:$data, CooperativeMatrixMemoryAccess:$memory_access);
   let results = (outs);
 
   let summary = "store cooperative rowacc to memory";
   let description = [{
     Store a contiguous elements from the specified location of the memory.
 
+    'pointer' is the pointer address to the data.
     'stride' is the stride in bytes in memory between the first elements in the source data.
-    'elemType' is the element type for the row acc.
-    'value' is data of row acc, Must be in finalized mode.
-    'memoryAccess' is the memory operands which provide:isVolatile/isTemporal/isCoherent additional operands,
+    'elem_type' is the element type for the row acc.
+    'data' is data of row acc, Must be in finalized mode.
+    'memory_access' is the memory operands which provide:isVolatile/isTemporal/isCoherent additional operands,
     maybe volatile/Aligned/Nontemporal/MakePointerAvailable
   }];
 }
 
-def CooperativeRowAccAccumulateModeOp : LgcOp<"cooperative.rowacc.accumulatemode", [Memory<[]>, WillReturn]> {
-  let arguments = (ins value:$rowAccValue, AttrI32:$elemType);
-  let results = (outs value:$result);
-
-  let defaultBuilderHasExplicitResultType = true;
+def CooperativeRowAccAccumulateModeOp : LgcOp<"cooperative.rowacc.accumulate.mode", [Memory<[]>, WillReturn]> {
+  let arguments = (ins value:$row_acc, CooperativeMatrixElementType:$elem_type);
+  let results = (outs (eq $row_acc):$result);
 
   let summary = "change cooperative row acc date mode from finalize mode to accumulate mode";
   let description = [{
@@ -462,24 +467,90 @@ def CooperativeRowAccAccumulateModeOp : LgcOp<"cooperative.rowacc.accumulatemode
 
     Return acc row data in accumulate mode.
 
-    'rowAccValue' is the input row acc data, must be in finalize mode.
-    'elemType' is the element type for the row acc.
+    'row_acc' is the input row acc data, must be in finalize mode.
+    'elem_type' is the element type for the row acc.
   }];
 }
 
-def CooperativeRowAccFinalizeModeOp : LgcOp<"cooperative.rowacc.finalizemode", [Memory<[]>, WillReturn]> {
-  let arguments = (ins value:$rowAccValue, AttrI32:$elemType);
+def CooperativeRowAccFinalizeModeOp : LgcOp<"cooperative.rowacc.finalize.mode", [Memory<[]>, WillReturn]> {
+  let arguments = (ins value:$row_acc, CooperativeMatrixElementType:$elem_type);
+  let results = (outs (eq $row_acc):$result);
+
+  let summary = "change cooperative rowacc date mode from accumulate state to finalize state";
+  let description = [{
+    convert the row accumulator data from accumulate mode to finalize mode.
+
+    Return row accumulator data in finalized mode.
+
+    'row_acc' is the input row acc data, must be in accumulate mode.
+    'elem_type' is the element type for the row acc.
+  }];
+}
+
+def CooperativeRowAccSplatOp : LgcOp<"cooperative.rowacc.splat", [Memory<[]>, WillReturn]> {
+  let arguments = (ins value:$scalar, CooperativeMatrixElementType:$elem_type);
   let results = (outs value:$result);
 
   let defaultBuilderHasExplicitResultType = true;
 
-  let summary = "change cooperative rowacc date mode from accumulate state to finalize state";
+  let summary = "fill cooperative rowacc will a scalar value";
   let description = [{
-    convert the row acc data from accumulate mode to finalize mode.
+    Return filled cooperative acc row in finalize mode.
 
-    Return acc row data in finalized mode.
+    'scalar' is the scalar value for fill the cooperative row acc.
+    'elem_type' is the element type for the cooperative row acc.
+  }];
+}
 
-    'rowAccValue' is the input row acc data, must be in accumulate mode.
-    'elemType' is the element type for the row acc.
+def CooperativeRowAccSumAccumulateOp : LgcOp<"cooperative.rowacc.sum.accumulate", [Memory<[]>, WillReturn]> {
+  let arguments = (ins value:$matrix, CooperativeMatrixElementType:$matrix_elem_type, CooperativeMatrixLayout:$matrix_layout, value:$row_acc, CooperativeMatrixElementType:$row_acc_elem_type, AttrI1:$is_signed);
+  let results = (outs value:$result);
+
+  let defaultBuilderHasExplicitResultType = true;
+
+  let summary = "sum and accumuate columns of cooperative matrix value to cooperative row accumulator";
+  let description = [{
+    Return accumulated acc row data in accumulate mode.
+
+    'matrix' is the input cooperative matrix. Must be A/B matrix.
+    'matrix_elem_type' is the element type for the cooperative matrix.
+    'matrix_layout' is the layout for the cooperative matrix.
+    'row_acc' is the input cooperative row acc, must be in accumulate mode.
+    'row_acc_elem_type' is the element type for input cooperative row acc.
+    'is_signed' indicate if row accumulator elememnt type need to be consider as signed or not.
+  }];
+}
+
+def CooperativeRowAccScalarOp : LgcOp<"cooperative.rowacc.scalar", [Memory<[]>, WillReturn]> {
+  let arguments = (ins CooperativeMatrixArithOp:$binop, value:$row_acc, CooperativeMatrixElementType:$elem_type, value:$scalar, AttrI1:$accumulate_mode);
+  let results = (outs (eq $row_acc):$result);
+
+  let summary = "cooperative row accumulator scalar operation in accumulate or finalize mode";
+  let description = [{
+    Return the cooperative row accumulator data with same mode (accumulate or finalized) as input cooperative accumulator data.
+
+    'binop' is the cooperative matrix arithmetic operation.
+    'row_acc' is the input cooperative row accumulator.
+    'elem_type' is the element type for the cooperative row accumulator data.
+    'scalar' is the scalar value for operation.
+    'accumulate_mode' indicate if input and return accumulator data in accumulate or finalize mode.
+  }];
+}
+
+def CooperativeRowAccExpandOp : LgcOp<"cooperative.rowacc.expand", [Memory<[]>, WillReturn]> {
+  let arguments = (ins value:$row_acc, CooperativeMatrixElementType:$row_acc_elem_type, CooperativeMatrixElementType:$matrix_elem_type, CooperativeMatrixLayout:$matrix_layout, AttrI1:$col_major);
+  let results = (outs value:$result);
+
+  let defaultBuilderHasExplicitResultType = true;
+
+  let summary = "expand cooperative row accumulator data to cooperative matrix, the input row accumulator data must be in finalize mode.";
+  let description = [{
+    Return the cooperative matrix.
+
+    'row_acc' is the input cooperative row accumulator.
+    'row_acc_elem_type' is the element type for the input cooperative row accumulator data.
+    'matrix_elem_type' is the element type for the output cooperative matrix.
+    'matrix_layout' is the element type for the output cooperative matrix.
+    'col_major' indicate how to expand the cooperative row acculumlator data by row or col.
   }];
 }

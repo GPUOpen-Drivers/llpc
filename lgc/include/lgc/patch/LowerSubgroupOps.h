@@ -31,7 +31,7 @@
 #pragma once
 
 #include "compilerutils/TypeLowering.h"
-#include "continuations/CpsStackLowering.h"
+#include "llvmraytracing/CpsStackLowering.h"
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/patch/Patch.h"
@@ -44,7 +44,7 @@
 
 namespace lgc {
 
-class SubgroupLoweringBuilder;
+class SubgroupBuilder;
 
 // =====================================================================================================================
 // The lower subgroup ops pass
@@ -61,7 +61,7 @@ private:
   void visitAny(SubgroupAnyOp &op);
 
   PipelineState *m_pipelineState = nullptr;
-  SubgroupLoweringBuilder *m_builder = nullptr;
+  SubgroupBuilder *m_builder = nullptr;
 };
 
 } // namespace lgc

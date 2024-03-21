@@ -37,6 +37,8 @@
 //  %Version History
 //  | %Version | Change Description                                                                                    |
 //  | -------- | ----------------------------------------------------------------------------------------------------- |
+//  |     71.1 | Add GraphNodeName to the GraphicsPipelineBuildInfo                                                    |
+//  |     71.0 | Add glState to GraphicsPipelineBuildInfo. And move OGL status to glState.                             |
 //  |     70.5 | Add vbAddressLowBitsKnown to Options. Add vbAddrLowBits to VertexInputDescription.                    |
 //  |             Add vbAddressLowBitsKnown and vbAddressLowBits to GraphicsPipelineBuildInfo.                         |
 //  |            Add columnCount to ResourceNodeData.                                                                  |
@@ -173,7 +175,7 @@
 #define LLPC_INTERFACE_MAJOR_VERSION 70
 
 /// LLPC minor interface version.
-#define LLPC_INTERFACE_MINOR_VERSION 5
+#define LLPC_INTERFACE_MINOR_VERSION 1
 
 /// The client's LLPC major interface version
 #ifndef LLPC_CLIENT_INTERFACE_MAJOR_VERSION

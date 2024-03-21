@@ -31,7 +31,7 @@
 #pragma once
 
 #include "compilerutils/TypeLowering.h"
-#include "continuations/CpsStackLowering.h"
+#include "llvmraytracing/CpsStackLowering.h"
 #include "lgc/LgcCpsDialect.h"
 #include "lgc/LgcDialect.h"
 #include "lgc/patch/Patch.h"

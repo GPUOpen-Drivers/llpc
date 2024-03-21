@@ -140,9 +140,9 @@ attribute[1].offset = 16
 ; SHADERTEST-SAME: (i32 inreg noundef [[GLOBALTABLE:%.*]], i32 inreg noundef [[SAMPLEINFO:%.*]], i32 inreg noundef [[PRIMMASK:%.*]], <2 x float> noundef [[PERSPINTERPSAMPLE:%.*]], <2 x float> noundef [[PERSPINTERPCENTER:%.*]], <2 x float> noundef [[PERSPINTERPCENTROID:%.*]], <3 x float> noundef [[PERSPINTERPPULLMODE:%.*]], <2 x float> noundef [[LINEARINTERPSAMPLE:%.*]], <2 x float> noundef [[LINEARINTERPCENTER:%.*]], <2 x float> noundef [[LINEARINTERPCENTROID:%.*]], float noundef [[LINESTIPPLE:%.*]], float noundef [[FRAGCOORDX:%.*]], float noundef [[FRAGCOORDY:%.*]], float noundef [[FRAGCOORDZ:%.*]], float noundef [[FRAGCOORDW:%.*]], i32 noundef [[FRONTFACING:%.*]], i32 noundef [[ANCILLARY:%.*]], i32 noundef [[SAMPLECOVERAGE:%.*]], i32 noundef [[FIXEDXY:%.*]]) #[[ATTR1:[0-9]+]] !lgc.shaderstage !14 {
 ; SHADERTEST-NEXT:  .entry:
 ; SHADERTEST-NEXT:    [[INTERPPERSPSAMPLE:%.*]] = call <2 x float> @lgc.input.import.builtin.InterpPerspSample.v2f32.i32(i32 268435456) #[[ATTR3:[0-9]+]]
-; SHADERTEST-NEXT:    [[TMP0:%.*]] = call float (...) @lgc.input.import.interpolated.f32(i1 false, i32 1, i32 0, i32 0, i32 poison, i32 0, <2 x float> [[INTERPPERSPSAMPLE]])
+; SHADERTEST-NEXT:    [[TMP0:%.*]] = call float (...) @lgc.input.import.interpolated__f32(i1 false, i32 1, i32 0, i32 0, i32 poison, i32 0, <2 x float> [[INTERPPERSPSAMPLE]])
 ; SHADERTEST-NEXT:    [[TMP1:%.*]] = insertelement <2 x float> poison, float [[TMP0]], i64 0
-; SHADERTEST-NEXT:    [[TMP2:%.*]] = call float (...) @lgc.input.import.interpolated.f32(i1 false, i32 1, i32 0, i32 1, i32 poison, i32 0, <2 x float> [[INTERPPERSPSAMPLE]])
+; SHADERTEST-NEXT:    [[TMP2:%.*]] = call float (...) @lgc.input.import.interpolated__f32(i1 false, i32 1, i32 0, i32 1, i32 poison, i32 0, <2 x float> [[INTERPPERSPSAMPLE]])
 ; SHADERTEST-NEXT:    [[TMP3:%.*]] = insertelement <2 x float> [[TMP1]], float [[TMP2]], i64 1
 ; SHADERTEST-NEXT:    [[SAMPLEPOSITION:%.*]] = call <2 x float> @lgc.input.import.builtin.SamplePosition.v2f32.i32(i32 19) #[[ATTR3]]
 ; SHADERTEST-NEXT:    [[TMP4:%.*]] = fadd reassoc nnan nsz arcp contract afn <2 x float> [[SAMPLEPOSITION]], <float -5.000000e-01, float -5.000000e-01>
@@ -217,9 +217,9 @@ attribute[1].offset = 16
 ; SHADERTEST-NEXT:    [[DOTSPLATINSERT3:%.*]] = insertelement <2 x float> poison, float [[TMP67]], i64 0
 ; SHADERTEST-NEXT:    [[DOTSPLAT4:%.*]] = shufflevector <2 x float> [[DOTSPLATINSERT3]], <2 x float> poison, <2 x i32> zeroinitializer
 ; SHADERTEST-NEXT:    [[TMP68:%.*]] = fmul <2 x float> [[TMP65]], [[DOTSPLAT4]]
-; SHADERTEST-NEXT:    [[TMP69:%.*]] = call float (...) @lgc.input.import.interpolated.f32(i1 false, i32 0, i32 0, i32 0, i32 poison, i32 0, <2 x float> [[TMP68]])
+; SHADERTEST-NEXT:    [[TMP69:%.*]] = call float (...) @lgc.input.import.interpolated__f32(i1 false, i32 0, i32 0, i32 0, i32 poison, i32 0, <2 x float> [[TMP68]])
 ; SHADERTEST-NEXT:    [[TMP70:%.*]] = insertelement <2 x float> poison, float [[TMP69]], i64 0
-; SHADERTEST-NEXT:    [[TMP71:%.*]] = call float (...) @lgc.input.import.interpolated.f32(i1 false, i32 0, i32 0, i32 1, i32 poison, i32 0, <2 x float> [[TMP68]])
+; SHADERTEST-NEXT:    [[TMP71:%.*]] = call float (...) @lgc.input.import.interpolated__f32(i1 false, i32 0, i32 0, i32 1, i32 poison, i32 0, <2 x float> [[TMP68]])
 ; SHADERTEST-NEXT:    [[TMP72:%.*]] = insertelement <2 x float> [[TMP70]], float [[TMP71]], i64 1
 ; SHADERTEST-NEXT:    [[TMP73:%.*]] = fsub reassoc nnan nsz arcp contract afn <2 x float> [[TMP72]], [[TMP3]]
 ; SHADERTEST-NEXT:    [[TMP74:%.*]] = call reassoc nnan nsz arcp contract afn <2 x float> @llvm.fabs.v2f32(<2 x float> [[TMP73]])

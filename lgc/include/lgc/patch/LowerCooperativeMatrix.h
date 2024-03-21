@@ -43,6 +43,10 @@ class CooperativeRowAccLoadOp;
 class CooperativeRowAccStoreOp;
 class CooperativeRowAccFinalizeModeOp;
 class CooperativeRowAccAccumulateModeOp;
+class CooperativeRowAccSplatOp;
+class CooperativeRowAccExpandOp;
+class CooperativeRowAccSumAccumulateOp;
+class CooperativeRowAccScalarOp;
 
 // =====================================================================================================================
 // Pass to lower coopMatrix calls
@@ -87,115 +91,106 @@ private:
     unsigned microCount;
   };
 
-  unsigned getLength(Builder::CooperativeMatrixLayout layout) const;
+  unsigned getLength(CooperativeMatrixLayout layout) const;
 
-  TypeProperties getTypeProperties(Builder::CooperativeMatrixElementType elemType,
-                                   Builder::CooperativeMatrixLayout layout) const;
+  TypeProperties getTypeProperties(CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout) const;
 
-  ComputeAddressInfo computeAddressing(Builder::CooperativeMatrixLayout layout,
-                                       Builder::CooperativeMatrixElementType elemType, int waveSize,
-                                       llvm::Value *stride, bool isColMajor, llvm::Instruction *insertPos);
+  ComputeAddressInfo computeAddressing(CooperativeMatrixLayout layout, CooperativeMatrixElementType elemType,
+                                       int waveSize, llvm::Value *stride, bool isColMajor,
+                                       llvm::Instruction *insertPos);
 
   llvm::Value *cooperativeMatrixLoadInternal(llvm::Value *dataPtr, llvm::Value *stride, bool colMajor,
-                                             Builder::CooperativeMatrixElementType elemType,
-                                             Builder::CooperativeMatrixLayout layout, unsigned memoryAccess,
-                                             const llvm::Twine &instName, llvm::Instruction *insertPos);
+                                             CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout,
+                                             unsigned memoryAccess, unsigned alignment, const llvm::Twine &instName,
+                                             llvm::Instruction *insertPos);
   // Convert vector data to cooperativeMatrix vec data
   // eg. v16*data_In_Buffer-->v8*coopMatrix_data as two 16bits elements packed.
   llvm::Value *convFlatVecToCoopMatrixVec(BuilderCommon &builder, llvm::Value *vecValue,
-                                          Builder::CooperativeMatrixElementType elemType,
-                                          Builder::CooperativeMatrixLayout layout);
+                                          CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout);
 
   // Convert cooperativeMatrix vec data to vec data.
   llvm::Value *convCoopMatrixVecToFlatVec(BuilderCommon &builder, llvm::Value *matrixValue,
-                                          Builder::CooperativeMatrixElementType elemType,
-                                          Builder::CooperativeMatrixLayout layout);
+                                          CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout);
 
   // Create cooperative matrix store operation
   void cooperativeMatrixStoreInternal(llvm::Value *dataPtr, llvm::Value *stride, bool colMajor,
-                                      Builder::CooperativeMatrixElementType elemType,
-                                      Builder::CooperativeMatrixLayout layout, unsigned memoryAccess,
-                                      llvm::Value *&vecVal, const llvm::Twine &instName, llvm::Instruction *insertPos);
+                                      CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout,
+                                      unsigned memoryAccess, unsigned alignment, llvm::Value *&vecVal,
+                                      const llvm::Twine &instName, llvm::Instruction *insertPos);
 
   // Open-code cooperative matrix extract operation
   llvm::Value *cooperativeMatrixExtract(BuilderCommon &builder, llvm::Value *matrix, llvm::Value *index,
-                                        Builder::CooperativeMatrixElementType elemType,
-                                        Builder::CooperativeMatrixLayout layout);
+                                        CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout);
 
   // Open-code cooperative matrix insert operation
   llvm::Value *cooperativeMatrixInsert(BuilderCommon &builder, llvm::Value *matrix, llvm::Value *value,
-                                       llvm::Value *index, Builder::CooperativeMatrixElementType elemType,
-                                       Builder::CooperativeMatrixLayout layout);
+                                       llvm::Value *index, CooperativeMatrixElementType elemType,
+                                       CooperativeMatrixLayout layout);
 
   // Open-code cooperative matrix fill operation
-  llvm::Value *cooperativeMatrixFill(BuilderCommon &builder, llvm::Value *value,
-                                     Builder::CooperativeMatrixElementType elemType,
-                                     Builder::CooperativeMatrixLayout layout);
+  llvm::Value *cooperativeMatrixFill(BuilderCommon &builder, llvm::Value *value, CooperativeMatrixElementType elemType,
+                                     CooperativeMatrixLayout layout);
 
   // Create cooperative matrix convert operation
   llvm::Value *cooperativeMatrixConvert(llvm::CastInst::CastOps castOp, llvm::Value *source,
-                                        Builder::CooperativeMatrixElementType srcElemType,
-                                        Builder::CooperativeMatrixElementType dstElemType,
-                                        Builder::CooperativeMatrixLayout srclayout,
-                                        Builder::CooperativeMatrixLayout dstlayout, const llvm::Twine &instName,
+                                        CooperativeMatrixElementType srcElemType,
+                                        CooperativeMatrixElementType dstElemType, CooperativeMatrixLayout srclayout,
+                                        CooperativeMatrixLayout dstlayout, const llvm::Twine &instName,
                                         llvm::Instruction *insertPos);
 
   // Create cooperative matrix convert operation without reshape operation
   llvm::Value *cooperativeMatrixConvertInternal(llvm::CastInst::CastOps castOp, llvm::Value *source,
-                                                Builder::CooperativeMatrixElementType srcElemType,
-                                                Builder::CooperativeMatrixElementType dstElemType,
-                                                const llvm::Twine &instName, llvm::Instruction *insertPos);
+                                                CooperativeMatrixElementType srcElemType,
+                                                CooperativeMatrixElementType dstElemType, const llvm::Twine &instName,
+                                                llvm::Instruction *insertPos);
 
   // Create cooperative matrix binary operation
-  llvm::Value *cooperativeMatrixBinaryOp(Builder::CooperativeMatrixArithOp coopMatArithOp, llvm::Value *lhs,
-                                         llvm::Value *rhs, Builder::CooperativeMatrixElementType elemType,
-                                         Builder::CooperativeMatrixLayout layout, const llvm::Twine &instName,
-                                         llvm::Instruction *insertPos);
+  llvm::Value *cooperativeMatrixBinaryOp(CooperativeMatrixArithOp coopMatArithOp, llvm::Value *lhs, llvm::Value *rhs,
+                                         CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout,
+                                         const llvm::Twine &instName, llvm::Instruction *insertPos);
 
   // Create cooperative matrixTimeScalar operation
-  llvm::Value *coopMatrixTimesScalar(llvm::Value *matrix, llvm::Value *scalar,
-                                     Builder::CooperativeMatrixElementType elemType,
-                                     Builder::CooperativeMatrixLayout layout, const llvm::Twine &instName,
+  llvm::Value *coopMatrixTimesScalar(llvm::Value *matrix, llvm::Value *scalar, CooperativeMatrixElementType elemType,
+                                     CooperativeMatrixLayout layout, const llvm::Twine &instName,
                                      llvm::Instruction *insertPos);
 
   // Create cooperative matrix reshape operation for 16bit on gfx10 and gfx110
-  llvm::Value *cooperativeMatrixReshape16BitElementGfx1011(llvm::Value *matrix,
-                                                           Builder::CooperativeMatrixElementType elemType,
-                                                           Builder::CooperativeMatrixLayout srcLayout,
-                                                           Builder::CooperativeMatrixLayout dstLayout,
-                                                           llvm::Value *threadId, const llvm::Twine &instName,
-                                                           llvm::Instruction *insertPos);
+  llvm::Value *cooperativeMatrixReshape16BitElementGfx1011(llvm::Value *matrix, CooperativeMatrixElementType elemType,
+                                                           CooperativeMatrixLayout srcLayout,
+                                                           CooperativeMatrixLayout dstLayout, llvm::Value *threadId,
+                                                           const llvm::Twine &instName, llvm::Instruction *insertPos);
 
   // Create cooperative matrix reshape operation for 8bit on gfx10 and gfx11
-  llvm::Value *cooperativeMatrixReshapeBetween8bitAnd32bitElementGfx1011(
-      llvm::Value *matrix, Builder::CooperativeMatrixElementType srcElemType,
-      Builder::CooperativeMatrixLayout srcLayout, const llvm::Twine &instName, llvm::Instruction *insertPos);
+  llvm::Value *cooperativeMatrixReshapeBetween8bitAnd32bitElementGfx1011(llvm::Value *matrix,
+                                                                         CooperativeMatrixElementType srcElemType,
+                                                                         CooperativeMatrixLayout srcLayout,
+                                                                         const llvm::Twine &instName,
+                                                                         llvm::Instruction *insertPos);
 
   // Adjust the layout on accumulator for gfx10
-  llvm::Value *cooperativeMatrixReshapeBetween16bitAnd32bitOnAccGfx10(
-      llvm::Value *source, Builder::CooperativeMatrixElementType srcElemType,
-      Builder::CooperativeMatrixElementType dstElemType, Builder::CooperativeMatrixLayout layout,
-      llvm::Value *isEvenGroup, const llvm::Twine &instName, llvm::Instruction *insertPos);
+  llvm::Value *
+  cooperativeMatrixReshapeBetween16bitAnd32bitOnAccGfx10(llvm::Value *source, CooperativeMatrixElementType srcElemType,
+                                                         CooperativeMatrixElementType dstElemType,
+                                                         CooperativeMatrixLayout layout, llvm::Value *isEvenGroup,
+                                                         const llvm::Twine &instName, llvm::Instruction *insertPos);
 
   // Adjust the layout before reshape operation(eg:float16->float32)
-  llvm::Value *cooperativeMatrixReshapeBeforeConvert(llvm::Value *source,
-                                                     Builder::CooperativeMatrixElementType srcElemType,
-                                                     Builder::CooperativeMatrixElementType dstElemType,
-                                                     Builder::CooperativeMatrixLayout srcLayout,
-                                                     Builder::CooperativeMatrixLayout dstLayout,
-                                                     const llvm::Twine &instName, llvm::Instruction *insertPos);
+  llvm::Value *cooperativeMatrixReshapeBeforeConvert(llvm::Value *source, CooperativeMatrixElementType srcElemType,
+                                                     CooperativeMatrixElementType dstElemType,
+                                                     CooperativeMatrixLayout srcLayout,
+                                                     CooperativeMatrixLayout dstLayout, const llvm::Twine &instName,
+                                                     llvm::Instruction *insertPos);
 
   // Adjust the layout before reshape operation(eg:float32->float16)
-  llvm::Value *cooperativeMatrixReshapeAfterConvert(llvm::Value *source,
-                                                    Builder::CooperativeMatrixElementType srcElemType,
-                                                    Builder::CooperativeMatrixElementType dstElemType,
-                                                    Builder::CooperativeMatrixLayout srcLayout,
-                                                    Builder::CooperativeMatrixLayout dstLayout,
-                                                    const llvm::Twine &instName, llvm::Instruction *insertPos);
+  llvm::Value *cooperativeMatrixReshapeAfterConvert(llvm::Value *source, CooperativeMatrixElementType srcElemType,
+                                                    CooperativeMatrixElementType dstElemType,
+                                                    CooperativeMatrixLayout srcLayout,
+                                                    CooperativeMatrixLayout dstLayout, const llvm::Twine &instName,
+                                                    llvm::Instruction *insertPos);
 
   // Create cooperative matrix transpose operation
-  llvm::Value *cooperativeMatrixTranspose(llvm::Value *matrix, Builder::CooperativeMatrixElementType elemType,
-                                          Builder::CooperativeMatrixLayout srcLayout, const llvm::Twine &instName,
+  llvm::Value *cooperativeMatrixTranspose(llvm::Value *matrix, CooperativeMatrixElementType elemType,
+                                          CooperativeMatrixLayout srcLayout, const llvm::Twine &instName,
                                           llvm::Instruction *insertPos);
 
   llvm::Value *transposeCooperativeMatrixRecursively(llvm::Value *matrix, unsigned vecStride, unsigned laneStride,
@@ -204,9 +199,9 @@ private:
   // Create cooperative matrix muladd operation
   llvm::Value *cooperativeMatrixMulAdd(llvm::Value *copMatrixa, llvm::Value *copMatrixb, llvm::Value *copMatrixc,
                                        bool isSignedA, bool isSignedB, bool isSatOrOpsel, bool isTied,
-                                       Builder::CooperativeMatrixElementType accumElemType,
-                                       Builder::CooperativeMatrixElementType factorElemType,
-                                       const llvm::Twine &instName, llvm::Instruction *insertPos);
+                                       CooperativeMatrixElementType accumElemType,
+                                       CooperativeMatrixElementType factorElemType, const llvm::Twine &instName,
+                                       llvm::Instruction *insertPos);
 
   llvm::Value *cooperativeMatrixPack(llvm::Value *matrixCLo, llvm::Value *matrixCHi, const llvm::Twine &instName,
                                      llvm::Instruction *insertPos);
@@ -242,17 +237,26 @@ private:
   // store the row acc to memory. The input row acc data must be in finalize mode.
   void visitCooperativeRowAccStoreOp(CooperativeRowAccStoreOp &store);
 
-  // change row acc data from accumulate mode to finalize mode.
-  void visitCooperativeRowAccFinalizeModeOp(CooperativeRowAccFinalizeModeOp &finalizeMode);
   // change row acc data from finalize mode to accumulate mode.
   void visitCooperativeRowAccAccumulateModeOp(CooperativeRowAccAccumulateModeOp &accumulateMode);
+  // change row acc data from accumulate mode to finalize mode.
+  void visitCooperativeRowAccFinalizeModeOp(CooperativeRowAccFinalizeModeOp &finalizeMode);
+
+  // fill the row acc with a scalar value. The return row acc data is in finalize mode.
+  void visitCooperativeRowAccSplatOp(CooperativeRowAccSplatOp &splat);
+  // expand cooperative row accumulate data into cooperative matrix.
+  void visitCooperativeRowAccExpandOp(CooperativeRowAccExpandOp &expand);
+  // sum and accumulate a cooperative matrix to cooperative row acc.
+  // the input/output row acc data must be in accumulate mode.
+  void visitCooperativeRowAccSumAccumulateOp(CooperativeRowAccSumAccumulateOp &sumAccumulate);
+  // operate the row acc with a scalar value. The return row acc data is same mode as input.
+  void visitCooperativeRowAccScalarOp(CooperativeRowAccScalarOp &scalar);
 
   // Helper functions for row acc operstions.
   llvm::Value *cooperativeRowAccConvertToAccumulateMode(BuilderBase &builder, llvm::Value *rowAccVal,
-                                                        llvm::Value *threadId,
-                                                        Builder::CooperativeMatrixElementType elemType);
+                                                        llvm::Value *threadId, CooperativeMatrixElementType elemType);
   llvm::Value *cooperativeRowAccConvertToFinalizeMode(BuilderBase &builder, llvm::Value *rowAccVal,
-                                                      Builder::CooperativeMatrixElementType elemType);
+                                                      CooperativeMatrixElementType elemType);
 
   // process cooperative row acc operations.
   void processCoopRowAccFunction(llvm::Module &module);

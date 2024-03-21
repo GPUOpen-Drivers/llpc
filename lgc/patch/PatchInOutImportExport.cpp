@@ -111,8 +111,8 @@ PreservedAnalyses PatchInOutImportExport::run(Module &module, ModuleAnalysisMana
   }
 
   // Create the global variable that is to model LDS
-  // NOTE: ES -> GS ring is always on-chip on GFX9.
-  if (m_hasTs || (m_hasGs && (m_pipelineState->isGsOnChip() || m_gfxIp.major >= 9)))
+  // NOTE: ES -> GS ring is always on-chip on GFX10+.
+  if (m_hasTs || m_hasGs)
     m_lds = Patch::getLdsVariable(m_pipelineState, m_module);
 
   // Set buffer formats based on specific GFX
@@ -259,8 +259,8 @@ void PatchInOutImportExport::processShader() {
     }
   }
 
-  // Thread ID will be used in on-chip GS offset calculation (ES -> GS ring is always on-chip on GFX9)
-  bool useThreadId = (m_hasGs && (m_pipelineState->isGsOnChip() || m_gfxIp.major >= 9));
+  // Thread ID will be used in on-chip GS offset calculation (ES -> GS ring is always on-chip on GFX10+)
+  bool useThreadId = m_hasGs;
 
   // Thread ID will also be used for stream-out buffer export
   const bool enableXfb = m_pipelineState->enableXfb();
@@ -466,9 +466,10 @@ void PatchInOutImportExport::processShader() {
             bool isHwLocalInvocationId = cast<ConstantInt>(reconfigCall->getArgOperand(1))->getZExtValue();
             if ((layout.microLayout == WorkgroupLayout::Quads) ||
                 (layout.macroLayout == WorkgroupLayout::SexagintiQuads)) {
+              BuilderBase builder(reconfigCall);
               localInvocationId =
                   reconfigWorkgroupLayout(localInvocationId, layout.macroLayout, layout.microLayout, workgroupSizeX,
-                                          workgroupSizeY, workgroupSizeZ, isHwLocalInvocationId, reconfigCall);
+                                          workgroupSizeY, workgroupSizeZ, isHwLocalInvocationId, builder);
             }
           }
           reconfigCall->replaceAllUsesWith(localInvocationId);
@@ -791,7 +792,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
       Value *locOffset = outputImportGeneric.getLocOffset();
       if (isa<ConstantInt>(locOffset)) {
         origLoc += cast<ConstantInt>(locOffset)->getZExtValue();
-        locOffset = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
+        locOffset = builder.getInt32(0);
       }
 
       // NOTE: For generic outputs of tessellation control shader, they could be per-patch ones.
@@ -869,7 +870,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
 
       switch (m_shaderStage) {
       case ShaderStage::Vertex: {
-        patchVsBuiltInOutputExport(output, builtInId, &callInst);
+        patchVsBuiltInOutputExport(output, builtInId, builder);
         break;
       }
       case ShaderStage::TessControl: {
@@ -877,11 +878,11 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         Value *elemIdx = isDontCareValue(callInst.getOperand(1)) ? nullptr : callInst.getOperand(1);
         Value *vertexIdx = isDontCareValue(callInst.getOperand(2)) ? nullptr : callInst.getOperand(2);
 
-        patchTcsBuiltInOutputExport(output, builtInId, elemIdx, vertexIdx, &callInst);
+        patchTcsBuiltInOutputExport(output, builtInId, elemIdx, vertexIdx, builder);
         break;
       }
       case ShaderStage::TessEval: {
-        patchTesBuiltInOutputExport(output, builtInId, &callInst);
+        patchTesBuiltInOutputExport(output, builtInId, builder);
         break;
       }
       case ShaderStage::Geometry: {
@@ -894,15 +895,15 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
         Value *vertexOrPrimitiveIdx = callInst.getOperand(2);
         bool isPerPrimitive = cast<ConstantInt>(callInst.getOperand(3))->getZExtValue() != 0;
 
-        patchMeshBuiltInOutputExport(output, builtInId, elemIdx, vertexOrPrimitiveIdx, isPerPrimitive, &callInst);
+        patchMeshBuiltInOutputExport(output, builtInId, elemIdx, vertexOrPrimitiveIdx, isPerPrimitive, builder);
         break;
       }
       case ShaderStage::Fragment: {
-        patchFsBuiltInOutputExport(output, builtInId, &callInst);
+        patchFsBuiltInOutputExport(output, builtInId, builder);
         break;
       }
       case ShaderStage::CopyShader: {
-        patchCopyShaderBuiltInOutputExport(output, builtInId, &callInst);
+        patchCopyShaderBuiltInOutputExport(output, builtInId, builder);
         break;
       }
       default: {
@@ -1035,7 +1036,7 @@ void PatchInOutImportExport::visitCallInst(CallInst &callInst) {
           break;
         }
         case ShaderStage::CopyShader: {
-          patchCopyShaderGenericOutputExport(output, loc, &callInst);
+          addExportInstForGenericOutput(output, loc, 0, builder);
           break;
         }
         default: {
@@ -1105,11 +1106,11 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
                             m_shaderStage == ShaderStage::CopyShader) &&
                            (nextStage == ShaderStage::Invalid || nextStage == ShaderStage::Fragment));
 
-  auto zero = ConstantFP::get(Type::getFloatTy(*m_context), 0.0);
-  auto one = ConstantFP::get(Type::getFloatTy(*m_context), 1.0);
-  auto poison = PoisonValue::get(Type::getFloatTy(*m_context));
+  BuilderBase builder(&retInst);
 
-  Instruction *insertPos = &retInst;
+  auto zero = ConstantFP::get(builder.getFloatTy(), 0.0);
+  auto one = ConstantFP::get(builder.getFloatTy(), 1.0);
+  auto poison = PoisonValue::get(builder.getFloatTy());
 
   const bool enableXfb = m_pipelineState->enableXfb();
   if (m_shaderStage == ShaderStage::CopyShader && enableXfb) {
@@ -1159,7 +1160,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
           for (auto &caseBranch : switchInst->cases()) {
             if (caseBranch.getCaseValue()->getZExtValue() == m_pipelineState->getRasterizerState().rasterStream) {
               // The insert position is updated to this case branch, before the terminator
-              insertPos = caseBranch.getCaseSuccessor()->getTerminator();
+              builder.SetInsertPoint(caseBranch.getCaseSuccessor()->getTerminator());
               updated = true;
               // We must go to return block from this case branch
               assert(caseBranch.getCaseSuccessor()->getSingleSuccessor() == retInst.getParent());
@@ -1244,16 +1245,16 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
     // NOTE: If gl_Position is not present in this shader stage, we have to export a dummy one.
     if (!usePosition) {
       Value *args[] = {
-          ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_POS_0), // tgt
-          ConstantInt::get(Type::getInt32Ty(*m_context), 0xF),              // en
-          zero,                                                             // src0
-          zero,                                                             // src1
-          zero,                                                             // src2
-          one,                                                              // src3
-          ConstantInt::get(Type::getInt1Ty(*m_context), false),             // done
-          ConstantInt::get(Type::getInt1Ty(*m_context), false)              // vm
+          builder.getInt32(EXP_TARGET_POS_0), // tgt
+          builder.getInt32(0xF),              // en
+          zero,                               // src0
+          zero,                               // src1
+          zero,                               // src2
+          one,                                // src3
+          builder.getInt1(false),             // done
+          builder.getInt1(false)              // vm
       };
-      emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
+      builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_exp, args);
     }
 
     // Export gl_ClipDistance[] and gl_CullDistance[] before entry-point returns
@@ -1266,11 +1267,11 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       // Extract elements of gl_ClipDistance[] and gl_CullDistance[]
       std::vector<Value *> clipDistance;
       for (unsigned i = 0; i < clipDistanceCount; ++i)
-        clipDistance.push_back(ExtractValueInst::Create(m_clipDistance, {i}, "", insertPos));
+        clipDistance.push_back(builder.CreateExtractValue(m_clipDistance, i));
 
       std::vector<Value *> cullDistance;
       for (unsigned i = 0; i < cullDistanceCount; ++i)
-        cullDistance.push_back(ExtractValueInst::Create(m_cullDistance, {i}, "", insertPos));
+        cullDistance.push_back(builder.CreateExtractValue(m_cullDistance, i));
 
       // Merge gl_ClipDistance[] and gl_CullDistance[]
       std::vector<Value *> clipCullDistance;
@@ -1295,31 +1296,31 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
       // NOTE: When misc. export is present, gl_ClipDistance[] or gl_CullDistance[] should start from pos2.
       unsigned pos = miscExport ? EXP_TARGET_POS_2 : EXP_TARGET_POS_1;
       Value *args[] = {
-          ConstantInt::get(Type::getInt32Ty(*m_context), pos),  // tgt
-          ConstantInt::get(Type::getInt32Ty(*m_context), 0xF),  // en
-          clipCullDistance[0],                                  // src0
-          clipCullDistance[1],                                  // src1
-          clipCullDistance[2],                                  // src2
-          clipCullDistance[3],                                  // src3
-          ConstantInt::get(Type::getInt1Ty(*m_context), false), // done
-          ConstantInt::get(Type::getInt1Ty(*m_context), false)  // vm
+          builder.getInt32(pos),  // tgt
+          builder.getInt32(0xF),  // en
+          clipCullDistance[0],    // src0
+          clipCullDistance[1],    // src1
+          clipCullDistance[2],    // src2
+          clipCullDistance[3],    // src3
+          builder.getInt1(false), // done
+          builder.getInt1(false)  // vm
       };
 
-      emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
+      builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_exp, args);
 
       if (clipCullDistance.size() > 4) {
         // Do the second exporting
         Value *args[] = {
-            ConstantInt::get(Type::getInt32Ty(*m_context), pos + 1), // tgt
-            ConstantInt::get(Type::getInt32Ty(*m_context), 0xF),     // en
-            clipCullDistance[4],                                     // src0
-            clipCullDistance[5],                                     // src1
-            clipCullDistance[6],                                     // src2
-            clipCullDistance[7],                                     // src3
-            ConstantInt::get(Type::getInt1Ty(*m_context), false),    // done
-            ConstantInt::get(Type::getInt1Ty(*m_context), false)     // vm
+            builder.getInt32(pos + 1), // tgt
+            builder.getInt32(0xF),     // en
+            clipCullDistance[4],       // src0
+            clipCullDistance[5],       // src1
+            clipCullDistance[6],       // src2
+            clipCullDistance[7],       // src3
+            builder.getInt1(false),    // done
+            builder.getInt1(false)     // vm
         };
-        emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
+        builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_exp, args);
       }
 
       // NOTE: We have to export gl_ClipDistance[] or gl_CullDistancep[] via generic outputs as well.
@@ -1391,7 +1392,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
         const unsigned loc = builtInOutLocs.find(BuiltInPrimitiveId)->second;
 
         assert(m_primitiveId);
-        Value *primitiveId = new BitCastInst(m_primitiveId, Type::getFloatTy(*m_context), "", insertPos);
+        Value *primitiveId = builder.CreateBitCast(m_primitiveId, builder.getFloatTy());
 
         recordVertexAttribExport(loc, {primitiveId, poison, poison, poison});
       }
@@ -1399,17 +1400,14 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
 
     // Export EdgeFlag
     if (useEdgeFlag) {
-      addExportInstForBuiltInOutput(m_edgeFlag, BuiltInEdgeFlag, insertPos);
+      addExportInstForBuiltInOutput(m_edgeFlag, BuiltInEdgeFlag, builder);
     }
 
     // Export gl_Layer and gl_ViewportIndex before entry-point returns
-    if (m_gfxIp.major >= 9 && (useLayer || useViewportIndex || enableMultiView)) {
+    if (useLayer || useViewportIndex || enableMultiView) {
       Value *viewportIndex = nullptr;
       Value *layer = nullptr;
-      Value *viewportIndexAndLayer = ConstantInt::get(Type::getInt32Ty(*m_context), 0);
-
-      BuilderBase builder(*m_context);
-      builder.SetInsertPoint(insertPos);
+      Value *viewportIndexAndLayer = builder.getInt32(0);
 
       if (m_pipelineState->getInputAssemblyState().multiView == MultiViewMode::PerView) {
         assert(m_viewIndex);
@@ -1443,20 +1441,20 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
         viewportIndexAndLayer = builder.CreateOr(viewportIndexAndLayer, layer);
       }
 
-      viewportIndexAndLayer = builder.CreateBitCast(viewportIndexAndLayer, Type::getFloatTy(*m_context));
+      viewportIndexAndLayer = builder.CreateBitCast(viewportIndexAndLayer, builder.getFloatTy());
 
       Value *args[] = {
-          ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_POS_1), // tgt
-          ConstantInt::get(Type::getInt32Ty(*m_context), 0x4),              // en
-          poison,                                                           // src0
-          poison,                                                           // src1
-          viewportIndexAndLayer,                                            // src2
-          poison,                                                           // src3
-          ConstantInt::get(Type::getInt1Ty(*m_context), false),             // done
-          ConstantInt::get(Type::getInt1Ty(*m_context), false)              // vm
+          builder.getInt32(EXP_TARGET_POS_1), // tgt
+          builder.getInt32(0x4),              // en
+          poison,                             // src0
+          poison,                             // src1
+          viewportIndexAndLayer,              // src2
+          poison,                             // src3
+          builder.getInt1(false),             // done
+          builder.getInt1(false)              // vm
       };
 
-      builder.CreateIntrinsic(Intrinsic::amdgcn_exp, Type::getFloatTy(*m_context), args, {});
+      builder.CreateIntrinsic(Intrinsic::amdgcn_exp, builder.getFloatTy(), args, {});
 
       // NOTE: We have to export gl_ViewportIndex via generic outputs as well.
       if (useViewportIndex) {
@@ -1471,7 +1469,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
           assert(builtInOutLocs.find(BuiltInViewportIndex) != builtInOutLocs.end());
           const unsigned loc = builtInOutLocs.find(BuiltInViewportIndex)->second;
 
-          Value *viewportIndex = builder.CreateBitCast(m_viewportIndex, Type::getFloatTy(*m_context));
+          Value *viewportIndex = builder.CreateBitCast(m_viewportIndex, builder.getFloatTy());
 
           recordVertexAttribExport(loc, {viewportIndex, poison, poison, poison});
         }
@@ -1490,7 +1488,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
           assert(builtInOutLocs.find(BuiltInLayer) != builtInOutLocs.end());
           const unsigned loc = builtInOutLocs.find(BuiltInLayer)->second;
 
-          Value *layer = builder.CreateBitCast(m_layer, Type::getFloatTy(*m_context));
+          Value *layer = builder.CreateBitCast(m_layer, builder.getFloatTy());
 
           recordVertexAttribExport(loc, {layer, poison, poison, poison});
         }
@@ -1506,7 +1504,7 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
     }
 
     // Export vertex attributes that were recorded previously
-    exportVertexAttribs(insertPos);
+    exportVertexAttribs(builder);
 
     if (m_pipelineState->isUnlinked()) {
       // If we are building unlinked relocatable shaders, it is possible there are
@@ -1524,23 +1522,23 @@ void PatchInOutImportExport::visitReturnInst(ReturnInst &retInst) {
     // NOTE: We will read back tessellation factors from on-chip LDS in later phases and write them to TF buffer.
     // Add fence and barrier before the return instruction to make sure they have been stored already.
     SyncScope::ID syncScope = m_context->getOrInsertSyncScopeID("workgroup");
-    new FenceInst(*m_context, AtomicOrdering::Release, syncScope, insertPos);
-    emitCall("llvm.amdgcn.s.barrier", Type::getVoidTy(*m_context), {}, {}, insertPos);
-    new FenceInst(*m_context, AtomicOrdering::Acquire, syncScope, insertPos);
+    builder.CreateFence(AtomicOrdering::Release, syncScope);
+    builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_s_barrier, {});
+    builder.CreateFence(AtomicOrdering::Acquire, syncScope);
   } else if (m_shaderStage == ShaderStage::Geometry) {
     if (m_gfxIp.major >= 10) {
       // NOTE: Per programming guide, we should do a "s_waitcnt 0,0,0 + s_waitcnt_vscnt 0" before issuing a "done", so
       // we use fence release to generate s_waitcnt vmcnt lgkmcnt/s_waitcnt_vscnt before s_sendmsg(MSG_GS_DONE)
       SyncScope::ID scope =
           m_pipelineState->isGsOnChip() ? m_context->getOrInsertSyncScopeID("workgroup") : SyncScope::System;
-      new FenceInst(*m_context, AtomicOrdering::Release, scope, insertPos);
+      builder.CreateFence(AtomicOrdering::Release, scope);
     }
 
     auto &entryArgIdxs = m_pipelineState->getShaderInterfaceData(ShaderStage::Geometry)->entryArgIdxs.gs;
     auto gsWaveId = getFunctionArgument(m_entryPoint, entryArgIdxs.gsWaveId);
-    Value *args[] = {ConstantInt::get(Type::getInt32Ty(*m_context), GsDone), gsWaveId};
+    Value *args[] = {builder.getInt32(GsDone), gsWaveId};
 
-    emitCall("llvm.amdgcn.s.sendmsg", Type::getVoidTy(*m_context), args, {}, insertPos);
+    builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_s_sendmsg, args);
   } else if (m_shaderStage == ShaderStage::Fragment) {
     // Fragment shader export are handled in LowerFragColorExport.
     return;
@@ -1602,11 +1600,11 @@ Value *PatchInOutImportExport::patchGsGenericInputImport(Type *inputTy, unsigned
     compIdx *= 2; // For 64-bit data type, the component indexing must multiply by 2
 
     // Cast 64-bit data type to float vector
-    inputTy = FixedVectorType::get(Type::getFloatTy(*m_context), compCount * 2);
+    inputTy = FixedVectorType::get(builder.getFloatTy(), compCount * 2);
   } else
     assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32);
 
-  Value *input = loadValueFromEsGsRing(inputTy, location, compIdx, vertexIdx, &*builder.GetInsertPoint());
+  Value *input = loadValueFromEsGsRing(inputTy, location, compIdx, vertexIdx, builder);
 
   if (inputTy != origInputTy) {
     // Cast back to original input type
@@ -1838,11 +1836,11 @@ Value *PatchInOutImportExport::patchFsGenericInputImport(Type *inputTy, unsigned
   Type *interpTy = nullptr;
   if (bitWidth == 8) {
     assert(inputTy->isIntOrIntVectorTy());
-    interpTy = Type::getInt8Ty(*m_context);
+    interpTy = builder.getInt8Ty();
   } else if (bitWidth == 16)
-    interpTy = Type::getHalfTy(*m_context);
+    interpTy = builder.getHalfTy();
   else
-    interpTy = Type::getFloatTy(*m_context);
+    interpTy = builder.getFloatTy();
   if (numChannels > 1)
     interpTy = FixedVectorType::get(interpTy, numChannels);
   Value *interp = PoisonValue::get(interpTy);
@@ -1963,14 +1961,14 @@ void PatchInOutImportExport::patchVsGenericOutputExport(Value *output, unsigned 
 
         unsigned compCount = outputTy->isVectorTy() ? cast<FixedVectorType>(outputTy)->getNumElements() * 2 : 2;
 
-        outputTy = FixedVectorType::get(Type::getFloatTy(*m_context), compCount);
+        outputTy = FixedVectorType::get(builder.getFloatTy(), compCount);
         output = builder.CreateBitCast(output, outputTy);
       } else
         assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32);
 
-      storeValueToEsGsRing(output, location, compIdx, &*builder.GetInsertPoint());
+      storeValueToEsGsRing(output, location, compIdx, builder);
     } else
-      addExportInstForGenericOutput(output, location, compIdx, &*builder.GetInsertPoint());
+      addExportInstForGenericOutput(output, location, compIdx, builder);
   }
 }
 
@@ -2010,15 +2008,15 @@ void PatchInOutImportExport::patchTesGenericOutputExport(Value *output, unsigned
       compIdx *= 2;
 
       unsigned compCount = outputTy->isVectorTy() ? cast<FixedVectorType>(outputTy)->getNumElements() * 2 : 2;
-      outputTy = FixedVectorType::get(Type::getFloatTy(*m_context), compCount);
+      outputTy = FixedVectorType::get(builder.getFloatTy(), compCount);
 
       output = builder.CreateBitCast(output, outputTy);
     } else
       assert(bitWidth == 8 || bitWidth == 16 || bitWidth == 32);
 
-    storeValueToEsGsRing(output, location, compIdx, &*builder.GetInsertPoint());
+    storeValueToEsGsRing(output, location, compIdx, builder);
   } else
-    addExportInstForGenericOutput(output, location, compIdx, &*builder.GetInsertPoint());
+    addExportInstForGenericOutput(output, location, compIdx, builder);
 }
 
 // =====================================================================================================================
@@ -2040,10 +2038,9 @@ void PatchInOutImportExport::patchGsGenericOutputExport(Value *output, unsigned 
     compIdx *= 2;
 
     if (outputTy->isVectorTy())
-      outputTy =
-          FixedVectorType::get(Type::getFloatTy(*m_context), cast<FixedVectorType>(outputTy)->getNumElements() * 2);
+      outputTy = FixedVectorType::get(builder.getFloatTy(), cast<FixedVectorType>(outputTy)->getNumElements() * 2);
     else
-      outputTy = FixedVectorType::get(Type::getFloatTy(*m_context), 2);
+      outputTy = FixedVectorType::get(builder.getFloatTy(), 2);
 
     output = builder.CreateBitCast(output, outputTy);
   } else
@@ -2137,10 +2134,10 @@ Value *PatchInOutImportExport::patchTcsBuiltInInputImport(Type *inputTy, unsigne
 
       auto elemTy = inputTy->getArrayElementType();
       for (unsigned i = 0; i < inputTy->getArrayNumElements(); ++i) {
-        auto elemIdx = ConstantInt::get(Type::getInt32Ty(*m_context), i);
+        auto elemIdx = builder.getInt32(i);
         auto ldsOffset = calcLdsOffsetForTcsInput(elemTy, loc, nullptr, elemIdx, vertexIdx, builder);
         auto elem = readValueFromLds(false, elemTy, ldsOffset, builder);
-        builder.CreateInsertValue(input, elem, {i});
+        builder.CreateInsertValue(input, elem, i);
       }
     } else {
       auto ldsOffset = calcLdsOffsetForTcsInput(inputTy, loc, nullptr, elemIdx, vertexIdx, builder);
@@ -2150,7 +2147,7 @@ Value *PatchInOutImportExport::patchTcsBuiltInInputImport(Type *inputTy, unsigne
     break;
   }
   case BuiltInPatchVertices: {
-    input = ConstantInt::get(Type::getInt32Ty(*m_context), m_pipelineState->getNumPatchControlPoints());
+    input = builder.getInt32(m_pipelineState->getNumPatchControlPoints());
     break;
   }
   case BuiltInPrimitiveId: {
@@ -2329,7 +2326,7 @@ Value *PatchInOutImportExport::patchGsBuiltInInputImport(Type *inputTy, unsigned
     assert(inOutUsage.builtInInputLocMap.find(builtInId) != inOutUsage.builtInInputLocMap.end());
     const unsigned loc = inOutUsage.builtInInputLocMap.find(builtInId)->second;
     assert(loc != InvalidValue);
-    input = loadValueFromEsGsRing(inputTy, loc, 0, vertexIdx, &*builder.GetInsertPoint());
+    input = loadValueFromEsGsRing(inputTy, loc, 0, vertexIdx, builder);
     break;
   }
   case BuiltInPrimitiveId: {
@@ -2649,7 +2646,7 @@ Value *PatchInOutImportExport::patchFsBuiltInInputImport(Type *inputTy, unsigned
     // gl_ShadingRate is not supported on pre-GFX10.3
     assert(m_gfxIp >= GfxIpVersion({10, 3}));
 
-    input = getShadingRate(&*builder.GetInsertPoint());
+    input = getShadingRate(builder);
     break;
   }
   // Handle internal-use built-ins for sample position emulation
@@ -2856,7 +2853,7 @@ Value *PatchInOutImportExport::patchTcsBuiltInOutputImport(Type *outputTy, unsig
       // Import the whole tessLevel array
       for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
         Value *ldsOffset = builder.CreateAdd(baseOffset, builder.getInt32(tessFactorStart + i));
-        auto elem = readValueFromLds(false, Type::getFloatTy(*m_context), ldsOffset, builder);
+        auto elem = readValueFromLds(false, builder.getFloatTy(), ldsOffset, builder);
         output = builder.CreateInsertValue(output, elem, {i});
       }
     } else {
@@ -2882,10 +2879,8 @@ Value *PatchInOutImportExport::patchTcsBuiltInOutputImport(Type *outputTy, unsig
 //
 // @param output : Output value
 // @param builtInId : ID of the built-in variable
-// @param insertPos : Where to insert the patch instruction
-void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned builtInId, Instruction *insertPos) {
-  BuilderBase builder(insertPos);
-
+// @param builder : the builder to use
+void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned builtInId, BuilderBase &builder) {
   auto outputTy = output->getType();
 
   const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::Vertex);
@@ -2916,9 +2911,9 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
         assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
         unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
-        storeValueToEsGsRing(output, loc, 0, insertPos);
+        storeValueToEsGsRing(output, loc, 0, builder);
       } else
-        addExportInstForBuiltInOutput(output, builtInId, insertPos);
+        addExportInstForBuiltInOutput(output, builtInId, builder);
     }
 
     break;
@@ -2947,18 +2942,17 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
       auto ldsOffset = calcLdsOffsetForVsOutput(outputTy->getArrayElementType(), loc, 0, builder);
 
       for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
-        auto elem = ExtractValueInst::Create(output, {i}, "", insertPos);
+        auto elem = builder.CreateExtractValue(output, {i});
         writeValueToLds(false, elem, ldsOffset, builder);
 
-        ldsOffset =
-            BinaryOperator::CreateAdd(ldsOffset, ConstantInt::get(Type::getInt32Ty(*m_context), 1), "", insertPos);
+        ldsOffset = builder.CreateAdd(ldsOffset, builder.getInt32(1));
       }
     } else {
       if (m_hasGs) {
         assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
         unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
-        storeValueToEsGsRing(output, loc, 0, insertPos);
+        storeValueToEsGsRing(output, loc, 0, builder);
       } else {
         // NOTE: The export of gl_{Clip,Cull}Distance[] is delayed and is done before entry-point returns.
         if (builtInId == BuiltInClipDistance)
@@ -2987,7 +2981,7 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
       assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
       unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
-      storeValueToEsGsRing(output, loc, 0, insertPos);
+      storeValueToEsGsRing(output, loc, 0, builder);
     }
 
     break;
@@ -3009,7 +3003,7 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
       assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
       unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
-      storeValueToEsGsRing(output, loc, 0, insertPos);
+      storeValueToEsGsRing(output, loc, 0, builder);
     }
 
     break;
@@ -3022,7 +3016,7 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
     if (!m_hasTs && !m_hasGs) {
       // gl_PrimitiveShadingRate is not supported on pre-GFX10.3
       assert(m_gfxIp >= GfxIpVersion({10, 3}));
-      addExportInstForBuiltInOutput(output, builtInId, insertPos);
+      addExportInstForBuiltInOutput(output, builtInId, builder);
     }
 
     break;
@@ -3047,11 +3041,9 @@ void PatchInOutImportExport::patchVsBuiltInOutputExport(Value *output, unsigned 
 // @param builtInId : ID of the built-in variable
 // @param elemIdx : Index used for array/vector element indexing (could be null)
 // @param vertexIdx : Output array outermost index used for vertex indexing (could be null)
-// @param insertPos : Where to insert the patch instruction
+// @param builder : the builder to use
 void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned builtInId, Value *elemIdx,
-                                                         Value *vertexIdx, Instruction *insertPos) {
-  BuilderBase builder(insertPos);
-
+                                                         Value *vertexIdx, BuilderBase &builder) {
   auto outputTy = output->getType();
 
   const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessControl);
@@ -3094,8 +3086,8 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
       assert(outputTy->isArrayTy());
 
       for (unsigned i = 0; i < outputTy->getArrayNumElements(); ++i) {
-        auto elem = ExtractValueInst::Create(output, {i}, "", insertPos);
-        auto elemIdx = ConstantInt::get(Type::getInt32Ty(*m_context), i);
+        auto elem = builder.CreateExtractValue(output, i);
+        auto elemIdx = builder.getInt32(i);
         auto ldsOffset = calcLdsOffsetForTcsOutput(elem->getType(), loc, nullptr, elemIdx, vertexIdx, builder);
         writeValueToLds(true, elem, ldsOffset, builder);
       }
@@ -3129,7 +3121,7 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
     } else {
       // Handle a single element of tessLevelOuter array
       Value *ldsOffset = builder.CreateAdd(baseOffset, builder.getInt32(tessFactorStart));
-      ldsOffset = builder.CreateAdd(ldsOffset, elemIdx, "", insertPos);
+      ldsOffset = builder.CreateAdd(ldsOffset, elemIdx);
       writeValueToLds(false, output, ldsOffset, builder);
     }
 
@@ -3165,8 +3157,8 @@ void PatchInOutImportExport::patchTcsBuiltInOutputExport(Value *output, unsigned
 //
 // @param output : Output value
 // @param builtInId : ID of the built-in variable
-// @param insertPos : Where to insert the patch instruction
-void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned builtInId, Instruction *insertPos) {
+// @param builder : the builder to use
+void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned builtInId, BuilderBase &builder) {
   const auto resUsage = m_pipelineState->getShaderResourceUsage(ShaderStage::TessEval);
   auto &builtInUsage = resUsage->builtInUsage.tes;
   const auto &builtInOutLocMap = resUsage->inOutUsage.builtInOutputLocMap;
@@ -3207,12 +3199,12 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned
       assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
       unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
-      storeValueToEsGsRing(output, loc, 0, insertPos);
+      storeValueToEsGsRing(output, loc, 0, builder);
     } else {
       switch (builtInId) {
       case BuiltInPosition:
       case BuiltInPointSize:
-        addExportInstForBuiltInOutput(output, builtInId, insertPos);
+        addExportInstForBuiltInOutput(output, builtInId, builder);
         break;
       case BuiltInClipDistance:
         // NOTE: The export of gl_ClipDistance[] is delayed and is done before entry-point returns.
@@ -3241,7 +3233,7 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned
       assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
       unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
-      storeValueToEsGsRing(output, loc, 0, insertPos);
+      storeValueToEsGsRing(output, loc, 0, builder);
     }
 
     break;
@@ -3258,7 +3250,7 @@ void PatchInOutImportExport::patchTesBuiltInOutputExport(Value *output, unsigned
       assert(builtInOutLocMap.find(builtInId) != builtInOutLocMap.end());
       unsigned loc = builtInOutLocMap.find(builtInId)->second;
 
-      storeValueToEsGsRing(output, loc, 0, insertPos);
+      storeValueToEsGsRing(output, loc, 0, builder);
     }
 
     break;
@@ -3328,13 +3320,10 @@ void PatchInOutImportExport::patchGsBuiltInOutputExport(Value *output, unsigned 
 // @param elemIdx : Index used for array/vector element indexing (could be null)
 // @param vertexOrPrimitiveIdx : Output array outermost index used for vertex or primitive indexing
 // @param isPerPrimitive : Whether the output is per-primitive
-// @param insertPos : Where to insert the patch instruction
+// @param builder : the builder to use
 void PatchInOutImportExport::patchMeshBuiltInOutputExport(Value *output, unsigned builtInId, Value *elemIdx,
                                                           Value *vertexOrPrimitiveIdx, bool isPerPrimitive,
-                                                          Instruction *insertPos) {
-  BuilderBase builder(*m_context);
-  builder.SetInsertPoint(insertPos);
-
+                                                          BuilderBase &builder) {
   // Handle primitive indices built-ins
   if (builtInId == BuiltInPrimitivePointIndices || builtInId == BuiltInPrimitiveLineIndices ||
       builtInId == BuiltInPrimitiveTriangleIndices) {
@@ -3430,8 +3419,8 @@ void PatchInOutImportExport::patchMeshBuiltInOutputExport(Value *output, unsigne
 //
 // @param output : Output value
 // @param builtInId : ID of the built-in variable
-// @param insertPos : Where to insert the patch instruction
-void PatchInOutImportExport::patchFsBuiltInOutputExport(Value *output, unsigned builtInId, Instruction *insertPos) {
+// @param builder : the builder to use
+void PatchInOutImportExport::patchFsBuiltInOutputExport(Value *output, unsigned builtInId, BuilderBase &builder) {
   switch (builtInId) {
   case BuiltInFragDepth: {
     m_fragDepth = output;
@@ -3441,12 +3430,12 @@ void PatchInOutImportExport::patchFsBuiltInOutputExport(Value *output, unsigned 
     assert(output->getType()->isArrayTy());
 
     // NOTE: Only gl_SampleMask[0] is valid for us.
-    m_sampleMask = ExtractValueInst::Create(output, {0}, "", insertPos);
-    m_sampleMask = new BitCastInst(m_sampleMask, Type::getFloatTy(*m_context), "", insertPos);
+    m_sampleMask = builder.CreateExtractValue(output, 0);
+    m_sampleMask = builder.CreateBitCast(m_sampleMask, builder.getFloatTy());
     break;
   }
   case BuiltInFragStencilRef: {
-    m_fragStencilRef = new BitCastInst(output, Type::getFloatTy(*m_context), "", insertPos);
+    m_fragStencilRef = builder.CreateBitCast(output, builder.getFloatTy());
     break;
   }
   default: {
@@ -3457,28 +3446,17 @@ void PatchInOutImportExport::patchFsBuiltInOutputExport(Value *output, unsigned 
 }
 
 // =====================================================================================================================
-// Patches export calls for generic outputs of copy shader.
-//
-// @param output : Output value
-// @param location : Location of the output
-// @param insertPos : Where to insert the patch instruction
-void PatchInOutImportExport::patchCopyShaderGenericOutputExport(Value *output, unsigned location,
-                                                                Instruction *insertPos) {
-  addExportInstForGenericOutput(output, location, 0, insertPos);
-}
-
-// =====================================================================================================================
 // Patches export calls for built-in outputs of copy shader.
 //
 // @param output : Output value
 // @param builtInId : ID of the built-in variable
-// @param insertPos : Where to insert the patch instruction
+// @param builder : the builder to use
 void PatchInOutImportExport::patchCopyShaderBuiltInOutputExport(Value *output, unsigned builtInId,
-                                                                Instruction *insertPos) {
+                                                                BuilderBase &builder) {
   switch (builtInId) {
   case BuiltInPosition:
   case BuiltInPointSize: {
-    addExportInstForBuiltInOutput(output, builtInId, insertPos);
+    addExportInstForBuiltInOutput(output, builtInId, builder);
     break;
   }
   case BuiltInClipDistance: {
@@ -3514,7 +3492,7 @@ void PatchInOutImportExport::patchCopyShaderBuiltInOutputExport(Value *output, u
   case BuiltInPrimitiveShadingRate: {
     // gl_PrimitiveShadingRate is not supported on pre-GFX10.3
     assert(m_gfxIp >= GfxIpVersion({10, 3}));
-    addExportInstForBuiltInOutput(output, builtInId, insertPos);
+    addExportInstForBuiltInOutput(output, builtInId, builder);
 
     break;
   }
@@ -3602,10 +3580,10 @@ unsigned PatchInOutImportExport::combineBufferStore(const std::vector<Value *> &
                                                     unsigned valueOffset, Value *bufDesc, Value *storeOffset,
                                                     Value *bufBase, CoherentFlag coherent, BuilderBase &builder) {
   Type *storeTys[4] = {
-      Type::getInt32Ty(*m_context),
-      FixedVectorType::get(Type::getInt32Ty(*m_context), 2),
-      FixedVectorType::get(Type::getInt32Ty(*m_context), 3),
-      FixedVectorType::get(Type::getInt32Ty(*m_context), 4),
+      builder.getInt32Ty(),
+      FixedVectorType::get(builder.getInt32Ty(), 2),
+      FixedVectorType::get(builder.getInt32Ty(), 3),
+      FixedVectorType::get(builder.getInt32Ty(), 4),
   };
 
   std::string funcName = "llvm.amdgcn.raw.tbuffer.store.";
@@ -3617,7 +3595,7 @@ unsigned PatchInOutImportExport::combineBufferStore(const std::vector<Value *> &
       funcName += getTypeName(storeTys[compCount - 1]);
       Value *storeValue = nullptr;
       if (compCount > 1) {
-        auto storeTy = FixedVectorType::get(Type::getInt32Ty(*m_context), compCount);
+        auto storeTy = FixedVectorType::get(builder.getInt32Ty(), compCount);
         storeValue = PoisonValue::get(storeTy);
 
         for (unsigned i = 0; i < compCount; ++i) {
@@ -3658,10 +3636,10 @@ unsigned PatchInOutImportExport::combineBufferLoad(std::vector<Value *> &loadVal
                                                    Value *loadOffset, Value *bufBase, CoherentFlag coherent,
                                                    BuilderBase &builder) {
   Type *loadTyps[4] = {
-      Type::getInt32Ty(*m_context),
-      FixedVectorType::get(Type::getInt32Ty(*m_context), 2),
-      FixedVectorType::get(Type::getInt32Ty(*m_context), 3),
-      FixedVectorType::get(Type::getInt32Ty(*m_context), 4),
+      builder.getInt32Ty(),
+      FixedVectorType::get(builder.getInt32Ty(), 2),
+      FixedVectorType::get(builder.getInt32Ty(), 3),
+      FixedVectorType::get(builder.getInt32Ty(), 4),
   };
 
   std::string funcName = "llvm.amdgcn.raw.tbuffer.load.";
@@ -3826,9 +3804,9 @@ void PatchInOutImportExport::storeValueToStreamOutBuffer(Value *storeValue, unsi
 // @param storeValue : Value to store
 // @param location : Output location
 // @param compIdx : Output component index
-// @param insertPos : Where to insert the store instruction
+// @param builder : the builder to use
 void PatchInOutImportExport::storeValueToEsGsRing(Value *storeValue, unsigned location, unsigned compIdx,
-                                                  Instruction *insertPos) {
+                                                  BuilderBase &builder) {
   auto storeTy = storeValue->getType();
 
   Type *elemTy = storeTy;
@@ -3847,26 +3825,25 @@ void PatchInOutImportExport::storeValueToEsGsRing(Value *storeValue, unsigned lo
     for (unsigned i = 0; i < elemCount; ++i) {
       Value *storeElem = nullptr;
       if (storeTy->isArrayTy())
-        storeElem = ExtractValueInst::Create(storeValue, {i}, "", insertPos);
+        storeElem = builder.CreateExtractValue(storeValue, i);
       else {
-        storeElem =
-            ExtractElementInst::Create(storeValue, ConstantInt::get(Type::getInt32Ty(*m_context), i), "", insertPos);
+        storeElem = builder.CreateExtractElement(storeValue, builder.getInt32(i));
       }
 
-      storeValueToEsGsRing(storeElem, location + (compIdx + i) / 4, (compIdx + i) % 4, insertPos);
+      storeValueToEsGsRing(storeElem, location + (compIdx + i) / 4, (compIdx + i) % 4, builder);
     }
   } else {
     if (bitWidth == 8 || bitWidth == 16) {
       if (storeTy->isFloatingPointTy()) {
         assert(bitWidth == 16);
-        storeValue = new BitCastInst(storeValue, Type::getInt16Ty(*m_context), "", insertPos);
+        storeValue = builder.CreateBitCast(storeValue, builder.getInt16Ty());
       }
 
-      storeValue = new ZExtInst(storeValue, Type::getInt32Ty(*m_context), "", insertPos);
+      storeValue = builder.CreateZExt(storeValue, builder.getInt32Ty());
     } else {
       assert(bitWidth == 32);
       if (storeTy->isFloatingPointTy())
-        storeValue = new BitCastInst(storeValue, Type::getInt32Ty(*m_context), "", insertPos);
+        storeValue = builder.CreateBitCast(storeValue, builder.getInt32Ty());
     }
 
     // Call buffer store intrinsic or LDS store
@@ -3879,36 +3856,13 @@ void PatchInOutImportExport::storeValueToEsGsRing(Value *storeValue, unsigned lo
       esGsOffset = getFunctionArgument(m_entryPoint, entryArgIdxs.tes.esGsOffset);
     }
 
-    auto ringOffset = calcEsGsRingOffsetForOutput(location, compIdx, esGsOffset, insertPos);
+    auto ringOffset = calcEsGsRingOffsetForOutput(location, compIdx, esGsOffset, builder);
 
-    if (m_pipelineState->isGsOnChip() || m_gfxIp.major >= 9) // ES -> GS ring is always on-chip on GFX9+
-    {
-      Value *idxs[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0), ringOffset};
-      auto ldsType = m_lds->getValueType();
-      Value *storePtr = GetElementPtrInst::Create(ldsType, m_lds, idxs, "", insertPos);
-      new StoreInst(storeValue, storePtr, false, m_lds->getAlign().value(), insertPos);
-    } else {
-      Value *esGsRingBufDesc = m_pipelineSysValues.get(m_entryPoint)->getEsGsRingBufDesc();
-
-      // NOTE: Here we use tbuffer_store instruction instead of buffer_store because we have to do explicit control
-      // of soffset. This is required by swizzle enabled mode when address range checking should be complied with.
-      CombineFormat combineFormat = {};
-      combineFormat.bits.dfmt = BUF_DATA_FORMAT_32;
-      combineFormat.bits.nfmt = BUF_NUM_FORMAT_UINT;
-      CoherentFlag coherent = {};
-      coherent.bits.glc = true;
-      coherent.bits.slc = true;
-      coherent.bits.swz = true;
-      Value *args[] = {
-          storeValue,      // vdata
-          esGsRingBufDesc, // rsrc
-          ringOffset,      // voffset
-          esGsOffset,      // soffset
-          ConstantInt::get(Type::getInt32Ty(*m_context), combineFormat.u32All),
-          ConstantInt::get(Type::getInt32Ty(*m_context), coherent.u32All) // glc, slc, swz
-      };
-      emitCall("llvm.amdgcn.raw.tbuffer.store.i32", Type::getVoidTy(*m_context), args, {}, insertPos);
-    }
+    // ES -> GS ring is always on-chip on GFX10+
+    Value *idxs[] = {builder.getInt32(0), ringOffset};
+    auto ldsType = m_lds->getValueType();
+    Value *storePtr = builder.CreateGEP(ldsType, m_lds, idxs);
+    builder.CreateAlignedStore(storeValue, storePtr, m_lds->getAlign().value());
   }
 }
 
@@ -3919,9 +3873,9 @@ void PatchInOutImportExport::storeValueToEsGsRing(Value *storeValue, unsigned lo
 // @param location : Input location
 // @param compIdx : Input component index
 // @param vertexIdx : Vertex index
-// @param insertPos : Where to insert the load instruction
+// @param builder : the builder to use
 Value *PatchInOutImportExport::loadValueFromEsGsRing(Type *loadTy, unsigned location, unsigned compIdx,
-                                                     Value *vertexIdx, Instruction *insertPos) {
+                                                     Value *vertexIdx, BuilderBase &builder) {
   Type *elemTy = loadTy;
   if (loadTy->isArrayTy())
     elemTy = cast<ArrayType>(loadTy)->getElementType();
@@ -3929,6 +3883,7 @@ Value *PatchInOutImportExport::loadValueFromEsGsRing(Type *loadTy, unsigned loca
     elemTy = cast<VectorType>(loadTy)->getElementType();
 
   const uint64_t bitWidth = elemTy->getScalarSizeInBits();
+  (void)bitWidth; // unused in release builds
   assert((elemTy->isFloatingPointTy() || elemTy->isIntegerTy()) && (bitWidth == 8 || bitWidth == 16 || bitWidth == 32));
 
   Value *loadValue = PoisonValue::get(loadTy);
@@ -3939,63 +3894,21 @@ Value *PatchInOutImportExport::loadValueFromEsGsRing(Type *loadTy, unsigned loca
 
     for (unsigned i = 0; i < elemCount; ++i) {
       auto loadElem =
-          loadValueFromEsGsRing(elemTy, location + (compIdx + i) / 4, (compIdx + i) % 4, vertexIdx, insertPos);
+          loadValueFromEsGsRing(elemTy, location + (compIdx + i) / 4, (compIdx + i) % 4, vertexIdx, builder);
 
       if (loadTy->isArrayTy())
-        loadValue = InsertValueInst::Create(loadValue, loadElem, {i}, "", insertPos);
+        loadValue = builder.CreateInsertValue(loadValue, loadElem, i);
       else {
-        loadValue = InsertElementInst::Create(loadValue, loadElem, ConstantInt::get(Type::getInt32Ty(*m_context), i),
-                                              "", insertPos);
+        loadValue = builder.CreateInsertElement(loadValue, loadElem, i);
       }
     }
   } else {
-    Value *ringOffset = calcEsGsRingOffsetForInput(location, compIdx, vertexIdx, insertPos);
-    if (m_pipelineState->isGsOnChip() || m_gfxIp.major >= 9) // ES -> GS ring is always on-chip on GFX9
-    {
-      Value *idxs[] = {ConstantInt::get(Type::getInt32Ty(*m_context), 0), ringOffset};
-      auto ldsType = m_lds->getValueType();
-      auto *loadPtr = GetElementPtrInst::Create(ldsType, m_lds, idxs, "", insertPos);
-      auto loadInst =
-          new LoadInst(loadPtr->getResultElementType(), loadPtr, "", false, m_lds->getAlign().value(), insertPos);
-      loadValue = loadInst;
-
-      if (bitWidth == 8)
-        loadValue = new TruncInst(loadValue, Type::getInt8Ty(*m_context), "", insertPos);
-      else if (bitWidth == 16)
-        loadValue = new TruncInst(loadValue, Type::getInt16Ty(*m_context), "", insertPos);
-
-      if (loadTy->isFloatingPointTy())
-        loadValue = new BitCastInst(loadValue, loadTy, "", insertPos);
-    } else {
-      Value *esGsRingBufDesc = m_pipelineSysValues.get(m_entryPoint)->getEsGsRingBufDesc();
-      CoherentFlag coherent = {};
-      coherent.bits.glc = true;
-      coherent.bits.slc = true;
-      Value *args[] = {
-          esGsRingBufDesc,                                                // rsrc
-          ringOffset,                                                     // offset
-          ConstantInt::get(Type::getInt32Ty(*m_context), 0),              // soffset
-          ConstantInt::get(Type::getInt32Ty(*m_context), coherent.u32All) // glc slc
-      };
-      loadValue = emitCall("llvm.amdgcn.raw.buffer.load.f32", Type::getFloatTy(*m_context), args, {}, insertPos);
-
-      if (bitWidth == 8) {
-        assert(loadTy->isIntegerTy());
-
-        loadValue = new BitCastInst(loadValue, Type::getInt32Ty(*m_context), "", insertPos);
-        loadValue = new TruncInst(loadValue, Type::getInt8Ty(*m_context), "", insertPos);
-      } else if (bitWidth == 16) {
-        loadValue = new BitCastInst(loadValue, Type::getInt32Ty(*m_context), "", insertPos);
-        loadValue = new TruncInst(loadValue, Type::getInt16Ty(*m_context), "", insertPos);
-
-        if (loadTy->isFloatingPointTy())
-          loadValue = new BitCastInst(loadValue, loadTy, "", insertPos);
-      } else {
-        assert(bitWidth == 32);
-        if (loadTy->isIntegerTy())
-          loadValue = new BitCastInst(loadValue, loadTy, "", insertPos);
-      }
-    }
+    Value *ringOffset = calcEsGsRingOffsetForInput(location, compIdx, vertexIdx, builder);
+    // ES -> GS ring is always on-chip on GFX10+
+    Value *idxs[] = {builder.getInt32(0), ringOffset};
+    auto ldsType = m_lds->getValueType();
+    auto *loadPtr = builder.CreateGEP(ldsType, m_lds, idxs);
+    loadValue = builder.CreateAlignedLoad(loadTy, loadPtr, m_lds->getAlign().value());
   }
 
   return loadValue;
@@ -4025,9 +3938,7 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
   if (m_pipelineState->getNggControl()->enableNgg) {
     // NOTE: For NGG, writing GS output to GS-VS ring is represented by a call and the call is replaced with
     // real instructions when when NGG primitive shader is generated.
-    Value *args[] = {ConstantInt::get(Type::getInt32Ty(*m_context), location),
-                     ConstantInt::get(Type::getInt32Ty(*m_context), compIdx),
-                     ConstantInt::get(Type::getInt32Ty(*m_context), streamId), storeValue};
+    Value *args[] = {builder.getInt32(location), builder.getInt32(compIdx), builder.getInt32(streamId), storeValue};
     std::string callName = lgcName::NggWriteGsOutput + getTypeName(storeTy);
     builder.CreateNamedCall(callName, Type::getVoidTy(*m_context), args, {});
     return;
@@ -4120,31 +4031,22 @@ void PatchInOutImportExport::storeValueToGsVsRing(Value *storeValue, unsigned lo
 // @param location : Output location
 // @param compIdx : Output component index
 // @param esGsOffset : ES-GS ring offset in bytes
-// @param insertPos : Where to insert the instruction
+// @param builder : the builder to use
 Value *PatchInOutImportExport::calcEsGsRingOffsetForOutput(unsigned location, unsigned compIdx, Value *esGsOffset,
-                                                           Instruction *insertPos) {
-  Value *ringOffset = nullptr;
-  if (m_pipelineState->isGsOnChip() || m_gfxIp.major >= 9) // ES -> GS ring is always on-chip on GFX9
-  {
-    // ringOffset = esGsOffset + threadId * esGsRingItemSize + location * 4 + compIdx
+                                                           BuilderBase &builder) {
+  // ES -> GS ring is always on-chip on GFX10+
+  // ringOffset = esGsOffset + threadId * esGsRingItemSize + location * 4 + compIdx
 
-    assert(m_pipelineState->hasShaderStage(ShaderStage::Geometry));
-    const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor;
+  assert(m_pipelineState->hasShaderStage(ShaderStage::Geometry));
+  const auto &calcFactor = m_pipelineState->getShaderResourceUsage(ShaderStage::Geometry)->inOutUsage.gs.calcFactor;
 
-    esGsOffset =
-        BinaryOperator::CreateLShr(esGsOffset, ConstantInt::get(Type::getInt32Ty(*m_context), 2), "", insertPos);
+  esGsOffset = builder.CreateLShr(esGsOffset, builder.getInt32(2));
 
-    ringOffset = BinaryOperator::CreateMul(
-        m_threadId, ConstantInt::get(Type::getInt32Ty(*m_context), calcFactor.esGsRingItemSize), "", insertPos);
+  Value *ringOffset = builder.CreateMul(m_threadId, builder.getInt32(calcFactor.esGsRingItemSize));
 
-    ringOffset = BinaryOperator::CreateAdd(ringOffset, esGsOffset, "", insertPos);
+  ringOffset = builder.CreateAdd(ringOffset, esGsOffset);
 
-    ringOffset = BinaryOperator::CreateAdd(
-        ringOffset, ConstantInt::get(Type::getInt32Ty(*m_context), (location * 4 + compIdx)), "", insertPos);
-  } else {
-    // ringOffset = (location * 4 + compIdx) * 4
-    ringOffset = ConstantInt::get(Type::getInt32Ty(*m_context), (location * 4 + compIdx) * 4);
-  }
+  ringOffset = builder.CreateAdd(ringOffset, builder.getInt32(location * 4 + compIdx));
   return ringOffset;
 }
 
@@ -4154,30 +4056,16 @@ Value *PatchInOutImportExport::calcEsGsRingOffsetForOutput(unsigned location, un
 // @param location : Input location
 // @param compIdx : Input Component index
 // @param vertexIdx : Vertex index
-// @param insertPos : Where to insert the instruction
+// @param builder : the builder to use
 Value *PatchInOutImportExport::calcEsGsRingOffsetForInput(unsigned location, unsigned compIdx, Value *vertexIdx,
-                                                          Instruction *insertPos) {
-  Value *ringOffset = nullptr;
+                                                          BuilderBase &builder) {
   auto esGsOffsets = m_pipelineSysValues.get(m_entryPoint)->getEsGsOffsets();
 
-  if (m_pipelineState->isGsOnChip() || m_gfxIp.major >= 9) // ES -> GS ring is always on-chip on GFX9
-  {
-    Value *vertexOffset = ExtractElementInst::Create(esGsOffsets, vertexIdx, "", insertPos);
+  // ES -> GS ring is always on-chip on GFX10+
+  Value *vertexOffset = builder.CreateExtractElement(esGsOffsets, vertexIdx);
 
-    // ringOffset = vertexOffset[N] + (location * 4 + compIdx);
-    ringOffset = BinaryOperator::CreateAdd(
-        vertexOffset, ConstantInt::get(Type::getInt32Ty(*m_context), (location * 4 + compIdx)), "", insertPos);
-  } else {
-    Value *vertexOffset = ExtractElementInst::Create(esGsOffsets, vertexIdx, "", insertPos);
-
-    // ringOffset = vertexOffset[N] * 4 + (location * 4 + compIdx) * 64 * 4;
-    ringOffset =
-        BinaryOperator::CreateMul(vertexOffset, ConstantInt::get(Type::getInt32Ty(*m_context), 4), "", insertPos);
-
-    ringOffset = BinaryOperator::CreateAdd(
-        ringOffset, ConstantInt::get(Type::getInt32Ty(*m_context), (location * 4 + compIdx) * 64 * 4), "", insertPos);
-  }
-
+  // ringOffset = vertexOffset[N] + (location * 4 + compIdx);
+  Value *ringOffset = builder.CreateAdd(vertexOffset, builder.getInt32(location * 4 + compIdx));
   return ringOffset;
 }
 
@@ -4308,9 +4196,8 @@ Value *PatchInOutImportExport::readValueFromLds(bool offChip, Type *readTy, Valu
   // Construct <n x i8>, <n x i16>, or <n x i32> vector from load values (dwords)
   Value *castValue = nullptr;
   if (numChannels > 1) {
-    auto intTy = bitWidth == 32 || bitWidth == 64
-                     ? Type::getInt32Ty(*m_context)
-                     : (bitWidth == 16 ? Type::getInt16Ty(*m_context) : Type::getInt8Ty(*m_context));
+    auto intTy = bitWidth == 32 || bitWidth == 64 ? builder.getInt32Ty()
+                                                  : (bitWidth == 16 ? builder.getInt16Ty() : builder.getInt8Ty());
     auto castTy = FixedVectorType::get(intTy, numChannels);
     castValue = PoisonValue::get(castTy);
 
@@ -4343,9 +4230,8 @@ void PatchInOutImportExport::writeValueToLds(bool offChip, Value *writeValue, Va
   const unsigned numChannels = compCout * (bitWidth == 64 ? 2 : 1);
 
   // Cast write value to <n x i32> vector
-  Type *intTy = bitWidth == 32 || bitWidth == 64
-                    ? Type::getInt32Ty(*m_context)
-                    : (bitWidth == 16 ? Type::getInt16Ty(*m_context) : Type::getInt8Ty(*m_context));
+  Type *intTy = bitWidth == 32 || bitWidth == 64 ? builder.getInt32Ty()
+                                                 : (bitWidth == 16 ? builder.getInt16Ty() : builder.getInt8Ty());
   Type *castTy = numChannels > 1 ? cast<Type>(FixedVectorType::get(intTy, numChannels)) : intTy;
   Value *castValue = builder.CreateBitCast(writeValue, castTy);
 
@@ -4680,7 +4566,7 @@ unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(unsigned inVertexC
 
   // NOTE: Performance analysis shows that 16 patches per thread group is an optimal upper-bound. The value is only
   // an experimental number. For GFX9. 64 is an optimal number instead.
-  const unsigned optimalPatchCountPerThreadGroup = m_gfxIp.major >= 9 ? 64 : 16;
+  const unsigned optimalPatchCountPerThreadGroup = 64;
 
   patchCountPerThreadGroup = std::min(patchCountPerThreadGroup, optimalPatchCountPerThreadGroup);
 
@@ -4720,9 +4606,9 @@ unsigned PatchInOutImportExport::calcPatchCountPerThreadGroup(unsigned inVertexC
 // @param output : Output value
 // @param location : Location of the output
 // @param compIdx : Index used for vector element indexing
-// @param insertPos : Where to insert the "exp" instruction
+// @param builder : the builder to use
 void PatchInOutImportExport::addExportInstForGenericOutput(Value *output, unsigned location, unsigned compIdx,
-                                                           Instruction *insertPos) {
+                                                           BuilderBase &builder) {
   // Check if the shader stage is valid to use "exp" instruction to export output
   const auto nextStage = m_pipelineState->getNextShaderStage(m_shaderStage);
   const bool useExpInst = ((m_shaderStage == ShaderStage::Vertex || m_shaderStage == ShaderStage::TessEval ||
@@ -4741,35 +4627,34 @@ void PatchInOutImportExport::addExportInstForGenericOutput(Value *output, unsign
   Value *exportInst = nullptr;
   const unsigned numChannels = bitWidth == 64 ? compCount * 2 : compCount;
   unsigned startChannel = bitWidth == 64 ? compIdx * 2 : compIdx;
-  Type *exportTy =
-      numChannels > 1 ? FixedVectorType::get(Type::getFloatTy(*m_context), numChannels) : Type::getFloatTy(*m_context);
+  Type *exportTy = numChannels > 1 ? FixedVectorType::get(builder.getFloatTy(), numChannels) : builder.getFloatTy();
 
   if (outputTy != exportTy) {
     if (bitWidth == 8) {
       // NOTE: For 16-bit output export, we have to cast the 8-bit value to 32-bit floating-point value.
       assert(outputTy->isIntOrIntVectorTy());
-      Type *zExtTy = Type::getInt32Ty(*m_context);
+      Type *zExtTy = builder.getInt32Ty();
       zExtTy = outputTy->isVectorTy() ? cast<Type>(FixedVectorType::get(zExtTy, compCount)) : zExtTy;
-      exportInst = new ZExtInst(output, zExtTy, "", insertPos);
-      exportInst = new BitCastInst(exportInst, exportTy, "", insertPos);
+      exportInst = builder.CreateZExt(output, zExtTy);
+      exportInst = builder.CreateBitCast(exportInst, exportTy);
     } else if (bitWidth == 16) {
       // NOTE: For 16-bit output export, we have to cast the 16-bit value to 32-bit floating-point value.
       if (outputTy->isFPOrFPVectorTy()) {
-        Type *bitCastTy = Type::getInt16Ty(*m_context);
+        Type *bitCastTy = builder.getInt16Ty();
         bitCastTy = outputTy->isVectorTy() ? cast<Type>(FixedVectorType::get(bitCastTy, compCount)) : bitCastTy;
-        exportInst = new BitCastInst(output, bitCastTy, "", insertPos);
+        exportInst = builder.CreateBitCast(output, bitCastTy);
       } else {
         assert(outputTy->isIntOrIntVectorTy());
         exportInst = output;
       }
 
-      Type *zExtTy = Type::getInt32Ty(*m_context);
+      Type *zExtTy = builder.getInt32Ty();
       zExtTy = outputTy->isVectorTy() ? cast<Type>(FixedVectorType::get(zExtTy, compCount)) : zExtTy;
-      exportInst = new ZExtInst(exportInst, zExtTy, "", insertPos);
-      exportInst = new BitCastInst(exportInst, exportTy, "", insertPos);
+      exportInst = builder.CreateZExt(exportInst, zExtTy);
+      exportInst = builder.CreateBitCast(exportInst, exportTy);
     } else {
       assert(canBitCast(outputTy, exportTy));
-      exportInst = new BitCastInst(output, exportTy, "", insertPos);
+      exportInst = builder.CreateBitCast(output, exportTy);
     }
   } else
     exportInst = output;
@@ -4781,12 +4666,11 @@ void PatchInOutImportExport::addExportInstForGenericOutput(Value *output, unsign
     exportValues[0] = exportInst;
   else {
     for (unsigned i = 0; i < numChannels; ++i) {
-      exportValues[i] =
-          ExtractElementInst::Create(exportInst, ConstantInt::get(Type::getInt32Ty(*m_context), i), "", insertPos);
+      exportValues[i] = builder.CreateExtractElement(exportInst, i);
     }
   }
 
-  auto poison = PoisonValue::get(Type::getFloatTy(*m_context));
+  auto poison = PoisonValue::get(builder.getFloatTy());
   if (numChannels <= 4) {
     assert(startChannel + numChannels <= 4);
 
@@ -4818,68 +4702,67 @@ void PatchInOutImportExport::addExportInstForGenericOutput(Value *output, unsign
 //
 // @param output : Output value
 // @param builtInId : ID of the built-in variable
-// @param insertPos : Where to insert the "exp" instruction
-void PatchInOutImportExport::addExportInstForBuiltInOutput(Value *output, unsigned builtInId, Instruction *insertPos) {
-  const auto poison = PoisonValue::get(Type::getFloatTy(*m_context));
+// @param builder : the builder to use
+void PatchInOutImportExport::addExportInstForBuiltInOutput(Value *output, unsigned builtInId, BuilderBase &builder) {
+  const auto poison = PoisonValue::get(builder.getFloatTy());
 
   switch (builtInId) {
   case BuiltInPosition: {
     Value *args[] = {
-        ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_POS_0), // tgt
-        ConstantInt::get(Type::getInt32Ty(*m_context), 0xF),              // en
+        builder.getInt32(EXP_TARGET_POS_0), // tgt
+        builder.getInt32(0xF),              // en
         nullptr,
         nullptr,
         nullptr,
         nullptr,
-        ConstantInt::get(Type::getInt1Ty(*m_context), false), // done
-        ConstantInt::get(Type::getInt1Ty(*m_context), false)  // vm
+        builder.getInt1(false), // done
+        builder.getInt1(false)  // vm
     };
 
     // src0 ~ src3
     for (unsigned i = 0; i < 4; ++i) {
-      auto compValue =
-          ExtractElementInst::Create(output, ConstantInt::get(Type::getInt32Ty(*m_context), i), "", insertPos);
+      auto compValue = builder.CreateExtractElement(output, builder.getInt32(i));
       args[2 + i] = compValue;
     }
 
-    emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
+    builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_exp, args);
     break;
   }
   case BuiltInPointSize: {
     Value *args[] = {
-        ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_POS_1), // tgt
-        ConstantInt::get(Type::getInt32Ty(*m_context), 0x1),              // en
-        output,                                                           // src0
-        poison,                                                           // src1
-        poison,                                                           // src2
-        poison,                                                           // src3
-        ConstantInt::get(Type::getInt1Ty(*m_context), false),             // done
-        ConstantInt::get(Type::getInt1Ty(*m_context), false)              // vm
+        builder.getInt32(EXP_TARGET_POS_1), // tgt
+        builder.getInt32(0x1),              // en
+        output,                             // src0
+        poison,                             // src1
+        poison,                             // src2
+        poison,                             // src3
+        builder.getInt1(false),             // done
+        builder.getInt1(false)              // vm
     };
-    emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
+    builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_exp, args);
     break;
   }
   case BuiltInPrimitiveShadingRate: {
     // gl_PrimitiveShadingRate is not supported on pre-GFX10.3
     assert(m_gfxIp >= GfxIpVersion({10, 3}));
 
-    exportShadingRate(output, insertPos);
+    exportShadingRate(output, builder);
     break;
   }
   case BuiltInEdgeFlag: {
-    Value *edgeflag = new BitCastInst(output, Type::getFloatTy(*m_context), "", insertPos);
+    Value *edgeflag = builder.CreateBitCast(output, builder.getFloatTy());
 
     Value *args[] = {
-        ConstantInt::get(Type::getInt32Ty(*m_context), EXP_TARGET_POS_1), // tgt
-        ConstantInt::get(Type::getInt32Ty(*m_context), 0x2),              // en
-        PoisonValue::get(Type::getFloatTy(*m_context)),                   // src1
-        edgeflag,                                                         // src0
-        PoisonValue::get(Type::getFloatTy(*m_context)),                   // src2
-        PoisonValue::get(Type::getFloatTy(*m_context)),                   // src3
-        ConstantInt::get(Type::getInt1Ty(*m_context), false),             // done
-        ConstantInt::get(Type::getInt1Ty(*m_context), false)              // vm
+        builder.getInt32(EXP_TARGET_POS_1),     // tgt
+        builder.getInt32(0x2),                  // en
+        PoisonValue::get(builder.getFloatTy()), // src1
+        edgeflag,                               // src0
+        PoisonValue::get(builder.getFloatTy()), // src2
+        PoisonValue::get(builder.getFloatTy()), // src3
+        builder.getInt1(false),                 // done
+        builder.getInt1(false)                  // vm
     };
-    emitCall("llvm.amdgcn.exp.f32", Type::getVoidTy(*m_context), args, {}, insertPos);
+    builder.CreateIntrinsic(builder.getVoidTy(), Intrinsic::amdgcn_exp, args);
     break;
   }
   default: {
@@ -4986,13 +4869,11 @@ SwizzleWorkgroupLayout PatchInOutImportExport::calculateWorkgroupLayout() {
 // @param workgroupSizeZ : WorkgroupSize Z for thread Id numbers
 // @param isHwLocalInvocationId : identify whether the localInvocationId is builtInLocalInvcocationId or
 // BuiltInUnswizzledLocalInvocationId
-// @param insertPos : Where to insert instructions.
+// @param builder : the builder to use
 Value *PatchInOutImportExport::reconfigWorkgroupLayout(Value *localInvocationId, WorkgroupLayout macroLayout,
                                                        WorkgroupLayout microLayout, unsigned workgroupSizeX,
                                                        unsigned workgroupSizeY, unsigned workgroupSizeZ,
-                                                       bool isHwLocalInvocationId, llvm::Instruction *insertPos) {
-  BuilderBase builder(*m_context);
-  builder.SetInsertPoint(insertPos);
+                                                       bool isHwLocalInvocationId, BuilderBase &builder) {
   Value *apiX = builder.getInt32(0);
   Value *apiY = builder.getInt32(0);
   Value *newLocalInvocationId = PoisonValue::get(localInvocationId->getType());
@@ -5144,7 +5025,7 @@ void PatchInOutImportExport::createSwizzleThreadGroupFunction() {
 
   BuilderBase builder(*m_context);
 
-  Type *ivec3Ty = FixedVectorType::get(Type::getInt32Ty(*m_context), 3);
+  Type *ivec3Ty = FixedVectorType::get(builder.getInt32Ty(), 3);
 
   auto func = m_module->getFunction(lgcName::SwizzleWorkgroupId);
 
@@ -5304,14 +5185,14 @@ void PatchInOutImportExport::createSwizzleThreadGroupFunction() {
       // Helper to compact bits for Z-order curve
       auto createCompact1By1Bits = [&](unsigned bitsToExtract, Value *src) {
         auto createCompactShift = [&](unsigned shift, unsigned mask, Value *src) {
-          auto result = builder.CreateLShr(src, ConstantInt::get(Type::getInt32Ty(*m_context), shift));
+          auto result = builder.CreateLShr(src, builder.getInt32(shift));
           result = builder.CreateOr(result, src);
-          result = builder.CreateAnd(result, ConstantInt::get(Type::getInt32Ty(*m_context), mask));
+          result = builder.CreateAnd(result, builder.getInt32(mask));
           return result;
         };
 
         // x &= 0x55555555;                   // x = -f-e -d-c -b-a -9-8 -7-6 -5-4 -3-2 -1-0
-        auto result = builder.CreateAnd(src, ConstantInt::get(Type::getInt32Ty(*m_context), 0x55555555));
+        auto result = builder.CreateAnd(src, builder.getInt32(0x55555555));
 
         // x = (x | (x >> 1)) & 0x33333333;   // x = --fe --dc --ba --98 --76 --54 --32 --10 // NOLINT
         result = createCompactShift(1, 0x33333333, result);
@@ -5393,11 +5274,8 @@ void PatchInOutImportExport::createSwizzleThreadGroupFunction() {
 // Exports HW shading rate, extracting the values from LGC shading rate (a mask of ShadingRateFlags)
 //
 // @param shadingRate : LGC shading rate
-// @param insertPos : Where to insert instructions.
-void PatchInOutImportExport::exportShadingRate(Value *shadingRate, Instruction *insertPos) {
-  BuilderBase builder(*m_context);
-  builder.SetInsertPoint(insertPos);
-
+// @param builder : the builder to use
+void PatchInOutImportExport::exportShadingRate(Value *shadingRate, BuilderBase &builder) {
   assert(m_gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
 
   Value *hwShadingRate = nullptr;
@@ -5476,11 +5354,8 @@ void PatchInOutImportExport::exportShadingRate(Value *shadingRate, Instruction *
 // =====================================================================================================================
 // Gets HW shading rate and converts them to LGC definitions.
 //
-// @param insertPos : Where to insert instructions.
-Value *PatchInOutImportExport::getShadingRate(Instruction *insertPos) {
-  BuilderBase builder(*m_context);
-  builder.SetInsertPoint(insertPos);
-
+// @param builder : the builder to use
+Value *PatchInOutImportExport::getShadingRate(BuilderBase &builder) {
   assert(m_gfxIp >= GfxIpVersion({10, 3})); // Must be GFX10.3+
 
   assert(m_shaderStage == ShaderStage::Fragment);
@@ -5574,17 +5449,14 @@ void PatchInOutImportExport::recordVertexAttribExport(unsigned location, ArrayRe
 // =====================================================================================================================
 // Exports vertex attributes that were recorded previously
 //
-// @param insertPos : Where to insert instructions.
-void PatchInOutImportExport::exportVertexAttribs(Instruction *insertPos) {
+// @param builder : the builder to use
+void PatchInOutImportExport::exportVertexAttribs(BuilderBase &builder) {
   assert(m_shaderStage == ShaderStage::Vertex || m_shaderStage == ShaderStage::TessEval ||
          m_shaderStage == ShaderStage::CopyShader); // Valid shader stages
   if (m_attribExports.empty()) {
     assert(m_pipelineState->getShaderResourceUsage(m_shaderStage)->inOutUsage.expCount == 0);
     return;
   }
-
-  BuilderBase builder(*m_context);
-  builder.SetInsertPoint(insertPos);
 
   for (auto &attribExport : m_attribExports) {
     if (m_gfxIp.major <= 10) {
@@ -5611,10 +5483,10 @@ void PatchInOutImportExport::exportVertexAttribs(Instruction *insertPos) {
       // NOTE: For GFX11+, vertex attributes are exported through memory. This call will be expanded when NGG primitive
       // shader is generated. The arguments are: buffer descriptor of attribute ring, attribute location, and attribute
       // export value.
-      emitCall(lgcName::NggAttribExport, builder.getVoidTy(),
-               {m_pipelineSysValues.get(m_entryPoint)->getAttribRingBufDesc(), builder.getInt32(attribExport.first),
-                attribValue},
-               {}, insertPos);
+      builder.CreateNamedCall(lgcName::NggAttribExport, builder.getVoidTy(),
+                              {m_pipelineSysValues.get(m_entryPoint)->getAttribRingBufDesc(),
+                               builder.getInt32(attribExport.first), attribValue},
+                              {});
     }
   }
 }

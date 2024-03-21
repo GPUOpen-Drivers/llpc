@@ -1031,11 +1031,7 @@ void ConfigBuilder::buildLsHsRegConfig(ShaderStageEnum shaderStage1, ShaderStage
   ldsSizeInDwords = alignTo(ldsSizeInDwords, ldsSizeDwordGranularity);
 
   const unsigned ldsSize = ldsSizeInDwords >> ldsSizeDwordGranularityShift;
-  if (m_gfxIp.major == 9) {
-    SET_REG_GFX9_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, LDS_SIZE, ldsSize);
-  } else {
-    SET_REG_GFX10_PLUS_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, LDS_SIZE, ldsSize);
-  }
+  SET_REG_GFX10_PLUS_FIELD(&config->lsHsRegs, SPI_SHADER_PGM_RSRC2_HS, LDS_SIZE, ldsSize);
 
   if (m_gfxIp.major >= 11) {
     // Pixel wait sync+
@@ -1247,11 +1243,7 @@ void ConfigBuilder::buildEsGsRegConfig(ShaderStageEnum shaderStage1, ShaderStage
 
   const unsigned maxPrimsPerSubgroup = std::min(gsInstPrimsInSubgrp * maxVertOut, MaxGsThreadsPerSubgroup);
 
-  if (m_gfxIp.major == 9) {
-    SET_REG_FIELD(&config->esGsRegs, VGT_GS_MAX_PRIMS_PER_SUBGROUP, MAX_PRIMS_PER_SUBGROUP, maxPrimsPerSubgroup);
-  } else {
-    SET_REG_FIELD(&config->esGsRegs, GE_MAX_OUTPUT_PER_SUBGROUP, MAX_VERTS_PER_SUBGROUP, maxPrimsPerSubgroup);
-  }
+  SET_REG_FIELD(&config->esGsRegs, GE_MAX_OUTPUT_PER_SUBGROUP, MAX_VERTS_PER_SUBGROUP, maxPrimsPerSubgroup);
 
   setNumAvailSgprs(Util::Abi::HardwareStage::Gs, gsResUsage->numSgprsAvailable);
   setNumAvailVgprs(Util::Abi::HardwareStage::Gs, gsResUsage->numVgprsAvailable);

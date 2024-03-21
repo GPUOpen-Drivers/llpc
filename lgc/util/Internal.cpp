@@ -234,4 +234,18 @@ Type *getVgprTy(Type *ty) {
   return ty;
 }
 
+// =====================================================================================================================
+// Helper function to create LLVM Function and update NewDbgInfoFormat flag
+llvm::Function *createFunctionHelper(llvm::FunctionType *ty, llvm::GlobalValue::LinkageTypes linkage,
+                                     llvm::Module *module, const llvm::Twine &name) {
+
+  llvm::Function *func = Function::Create(ty, linkage, name);
+
+#if !defined(LLVM_MAIN_REVISION) || LLVM_MAIN_REVISION >= 489715
+  func->setIsNewDbgInfoFormat(module->IsNewDbgInfoFormat);
+#endif
+
+  return func;
+}
+
 } // namespace lgc

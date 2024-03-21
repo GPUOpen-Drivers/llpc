@@ -47,8 +47,13 @@ public:
 
     m_pipelineState.gfxPipelineInfo.options.optimizationLevel = 2;
     m_pipelineState.compPipelineInfo.options.optimizationLevel = 2;
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 71
     memset(&m_pipelineState.gfxPipelineInfo.vbAddressLowBits, 0,
            sizeof(m_pipelineState.gfxPipelineInfo.vbAddressLowBits));
+#else
+    memset(&m_pipelineState.gfxPipelineInfo.glState.vbAddressLowBits, 0,
+           sizeof(m_pipelineState.gfxPipelineInfo.glState.vbAddressLowBits));
+#endif
 
     memset(&m_vertexInputState, 0, sizeof(m_vertexInputState));
   };

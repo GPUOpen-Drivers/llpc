@@ -80,7 +80,7 @@
 // New version of the code (also handles unknown version, which we treat as latest)
 #include "llvm/IRPrinter/IRPrintingPasses.h"
 #endif
-#include "continuations/GpurtContext.h"
+#include "llvmraytracing/GpurtContext.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Format.h"
@@ -1153,6 +1153,8 @@ Result Compiler::buildGraphicsShaderStage(const GraphicsPipelineBuildInfo *pipel
       it = pipeNode.find(Vkgc::DiscardState);
       if (it != pipeNode.end())
         discardState = it->second.getBool();
+    } else {
+      report_fatal_error("Cannot emit llvm IR or bitcode with color export shader enabled");
     }
   }
 
@@ -1732,6 +1734,7 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
 
       if (moduleData->usage.enableRayQuery) {
         assert(!moduleData->usage.rayQueryLibrary);
+        context->ensureGpurtLibrary();
         lowerPassMgr->addPass(SpirvLowerRayQuery(false));
         ++numStagesWithRayQuery;
       }
@@ -1763,7 +1766,6 @@ Result Compiler::buildPipelineInternal(Context *context, ArrayRef<const Pipeline
       setUseGpurt(&*pipeline);
 
     if (numStagesWithRayQuery) {
-      context->ensureGpurtLibrary();
       setUseGpurt(&*pipeline);
       GpurtContext &gpurtContext = GpurtContext::get(*context);
 
@@ -3005,9 +3007,14 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
   // TODO: For continuations, we only need to compile the GpuRt module separately if there are TraceRay usages
   //       to compile the Traversal shader. For callable shaders, it is not required.
   if (needTraversal) {
-    StringRef traceRayFuncName = mainContext->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_TRACE_RAY);
-    StringRef fetchTrianglePosFunc = mainContext->getPipelineContext()->getRayTracingFunctionName(
-        Vkgc::RT_ENTRY_FETCH_HIT_TRIANGLE_FROM_NODE_POINTER);
+    auto fetchRayTracingFuncName = [&](Vkgc::RAYTRACING_ENTRY_FUNC attribute) -> StringRef {
+      return mainContext->getPipelineContext()->getRayTracingFunctionName(attribute);
+    };
+    StringRef traceRayFuncName = fetchRayTracingFuncName(Vkgc::RT_ENTRY_TRACE_RAY);
+    // For continuations, the entry is _cont_Traversal.
+    constexpr char ContTraceRayFuncName[] = "_cont_Traversal";
+    if (continuationsMode)
+      traceRayFuncName = ContTraceRayFuncName;
 
     std::unique_ptr<Module> traversal = CloneModule(*gpurtContext.theModule);
 
@@ -3020,16 +3027,9 @@ Result Compiler::buildRayTracingPipelineInternal(RayTracingContext &rtContext,
         func->setLinkage(GlobalValue::ExternalLinkage);
         lgc::rt::setLgcRtShaderStage(func, lgc::rt::RayTracingShaderStage::Traversal);
       } else if (func->getLinkage() == GlobalValue::WeakAnyLinkage && !func->empty()) {
-        // Preserve fetchTrianglePosFunc because we need to inline it into Traversal later on.
-        // Remove other function definitions both for compile speed, and to work around an
-        // issue with private globals used in multiple functions in GpuRt which confuses SpirvLowerGlobal.
-        bool isFetchTrianglePosFunc = func->getName().starts_with(fetchTrianglePosFunc);
-        bool isContinuationFunc = continuationsMode && func->getName().starts_with("_cont_");
-
-        if (!isFetchTrianglePosFunc && !isContinuationFunc) {
-          func->dropAllReferences();
-          func->eraseFromParent();
-        }
+        // Remove functions other than TraceRay entry, for traversal module we only need that.
+        func->dropAllReferences();
+        func->eraseFromParent();
       }
     }
 

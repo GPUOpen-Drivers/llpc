@@ -66,21 +66,22 @@ typedef Vkgc::ShaderStage ShaderStage;
 // =====================================================================================================================
 // Common definition of VfxParser
 
-static const unsigned NativeShaderStageCount = 8;        // Number of native shader stages in Vulkan
-static const unsigned MaxRenderSectionCount = 16;        // Max render document section count
-static const unsigned MaxBindingCount = 16;              // Max binding count
-static const unsigned MaxResultCount = 16;               // Max result count
-static const unsigned MaxPushConstRangCount = 16;        // Max push const range count
-static const unsigned MaxVertexBufferBindingCount = 16;  // Max vertex buffer binding count
-static const unsigned MaxVertexAttributeCount = 32;      // Max vertex attribute count
-static const unsigned MaxSpecConstantCount = 32;         // Max spec constant count
-static const unsigned VfxSizeOfVec4 = 16;                // Ehe size of vec4
-static const unsigned VfxInvalidValue = 0xFFFFFFFF;      // Invalid value
-static const unsigned VfxVertexBufferSetId = 0xFFFFFFFE; // Vertex buffer set id
-static const unsigned VfxIndexBufferSetId = 0xFFFFFFFD;  // Index buffer set id
-static const unsigned VfxDynamicArrayId = 0xFFFFFFFC;    // Dynamic array id
-static const size_t MaxKeyBufSize = 256;                 // Buffer size to parse a key-value pair key in VFX file.
-static const size_t MaxLineBufSize = 65536;              // Buffer size to parse a line in VFX file.
+static const unsigned NativeShaderStageCount = 8;               // Number of native shader stages in Vulkan
+static const unsigned MaxRenderSectionCount = 16;               // Max render document section count
+static const unsigned MaxBindingCount = 16;                     // Max binding count
+static const unsigned MaxResultCount = 16;                      // Max result count
+static const unsigned MaxPushConstRangCount = 16;               // Max push const range count
+static const unsigned MaxVertexBufferBindingCount = 16;         // Max vertex buffer binding count
+static const unsigned MaxInternalVertexBufferBindingCount = 65; // Max Internal vertex buffer binding count.
+static const unsigned MaxVertexAttributeCount = 32;             // Max vertex attribute count
+static const unsigned MaxSpecConstantCount = 32;                // Max spec constant count
+static const unsigned VfxSizeOfVec4 = 16;                       // Ehe size of vec4
+static const unsigned VfxInvalidValue = 0xFFFFFFFF;             // Invalid value
+static const unsigned VfxVertexBufferSetId = 0xFFFFFFFE;        // Vertex buffer set id
+static const unsigned VfxIndexBufferSetId = 0xFFFFFFFD;         // Index buffer set id
+static const unsigned VfxDynamicArrayId = 0xFFFFFFFC;           // Dynamic array id
+static const size_t MaxKeyBufSize = 256;    // Buffer size to parse a key-value pair key in VFX file.
+static const size_t MaxLineBufSize = 65536; // Buffer size to parse a line in VFX file.
 
 #define VFX_ASSERT(...) assert(__VA_ARGS__);
 #define VFX_NEW new
@@ -498,85 +499,6 @@ struct ColorBuffer {
   unsigned blendEnable;          // Whether the blend is enabled on this color buffer
   unsigned blendSrcAlphaToColor; // Whether source alpha is blended to color channels for this target at draw time
 };
-
-#if VFX_SUPPORT_VK_PIPELINE
-// =====================================================================================================================
-// Represents GraphicsPipelineState section.
-struct GraphicsPipelineState {
-  VkPrimitiveTopology topology;                 // Primitive type
-  VkProvokingVertexModeEXT provokingVertexMode; // Provoking vertex mode
-  unsigned patchControlPoints;                  // Patch control points
-  unsigned deviceIndex;                         // Device index for device group
-  unsigned disableVertexReuse;                  // Disable reusing vertex shader output for indexed draws
-  unsigned depthClipEnable;                     // Enable clipping based on Z coordinate
-  unsigned rasterizerDiscardEnable;             // Kill all rasterized pixels
-  unsigned perSampleShading;                    // Enable per sample shading
-  unsigned numSamples;                          // Number of coverage samples used when rendering with this pipeline
-  unsigned pixelShaderSamples;                  // Controls the pixel shader execution rate
-  unsigned samplePatternIdx;                    // Index into the currently bound MSAA sample pattern table
-  unsigned dynamicSampleInfo;                   // Whether to enable dynamic sample
-  unsigned rasterStream;                        // Which vertex stream to rasterize
-  unsigned usrClipPlaneMask;                    // Mask to indicate the enabled user defined clip planes
-  unsigned alphaToCoverageEnable;               // Enable alpha to coverage
-  unsigned dualSourceBlendEnable;               // Blend state bound at draw time will use a dual source blend mode
-  unsigned dualSourceBlendDynamic;              // Dual source blend mode is dynamically set
-  unsigned switchWinding;                       // reverse the TCS declared output primitive vertex order
-  unsigned enableMultiView;                     // Whether to enable multi-view support
-  Vkgc::PipelineOptions options;                // Pipeline options
-
-  Vkgc::NggState nggState; // NGG state
-
-  ColorBuffer colorBuffer[Vkgc::MaxColorTargets]; // Color target state.
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
-  Vkgc::BinaryData shaderLibrary; // Shader library SPIR-V binary
-#endif
-  Vkgc::RtState rtState;                   // Ray tracing state
-  bool dynamicVertexStride;                // Dynamic Vertex input Stride is enabled.
-  bool enableUberFetchShader;              // Use uber fetch shader
-  bool enableEarlyCompile;                 // Enable early compile
-  bool enableColorExportShader;            // Enable color export shader
-  bool useSoftwareVertexBufferDescriptors; // Use software vertex buffer descriptors
-  bool vbAddressLowBitsKnown;              // Vertex buffer address low bits is known
-
-  float tessLevelInner[2];
-  float tessLevelOuter[4];
-};
-
-// =====================================================================================================================
-// Represents ComputePipelineState section.
-struct ComputePipelineState {
-  unsigned deviceIndex;          // Device index for device group
-  Vkgc::PipelineOptions options; // Pipeline options
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
-  Vkgc::BinaryData shaderLibrary; // Shader library SPIR-V binary
-#endif
-  Vkgc::RtState rtState; // Ray tracing state
-};
-
-// =====================================================================================================================
-// Represents RayTracingPipelineState section.
-struct RayTracingPipelineState {
-  unsigned deviceIndex;                                // Device index for device group
-  Vkgc::PipelineOptions options;                       // Pipeline options
-  unsigned shaderGroupCount;                           // Count of shader groups
-  VkRayTracingShaderGroupCreateInfoKHR *pShaderGroups; // An array of shader groups
-#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
-  Vkgc::BinaryData shaderTraceRay; // Trace-ray SPIR-V binary
-#endif
-  unsigned maxRecursionDepth;     // Ray tracing max recursion depth
-  unsigned indirectStageMask;     // Trace-ray indirect stage mask
-  Vkgc::LlpcRaytracingMode mode;  // Raytracing Compiling mode
-  Vkgc::RtState rtState;          // Ray tracing state
-  unsigned payloadSizeMaxInLib;   // Pipeline library maxPayloadSize
-  unsigned attributeSizeMaxInLib; // Pipeline library maxAttributeSize
-  bool hasPipelineLibrary;        // Whether has pipeline library
-  unsigned pipelineLibStageMask;  // Pipeline library stage mask
-
-  /// Combination of GpuRt::ShaderLibraryFeatureFlag
-  unsigned gpurtFeatureFlags;
-};
-
-#endif
 
 }; // namespace Vfx
 

@@ -34,6 +34,7 @@
  */
 #include "lgc/patch/CombineCooperativeMatrix.h"
 #include "lgc/Builder.h"
+#include "lgc/LgcDialect.h"
 #include "lgc/state/Defs.h"
 #include "lgc/state/PipelineState.h"
 #include "lgc/state/TargetInfo.h"
@@ -48,10 +49,10 @@ using namespace lgc;
 namespace {
 
 struct Shape {
-  Builder::CooperativeMatrixElementType elementType;
-  Builder::CooperativeMatrixLayout layout;
+  CooperativeMatrixElementType elementType;
+  CooperativeMatrixLayout layout;
 
-  Shape(Builder::CooperativeMatrixElementType elementType_, Builder::CooperativeMatrixLayout layout_)
+  Shape(CooperativeMatrixElementType elementType_, CooperativeMatrixLayout layout_)
       : elementType(elementType_), layout(layout_) {}
 
   bool operator==(const Shape &rhs) const { return elementType == rhs.elementType && layout == rhs.layout; }
@@ -132,9 +133,9 @@ bool CooperativeMatrixCombiner::run() {
     } else if (m_gfxIpVersion.major == 11 && fn.getName().starts_with(lgcName::CooperativeMatrixMulAdd)) {
       for (User *user : fn.users()) {
         if (auto *call = dyn_cast<CallInst>(user)) {
-          Builder::CooperativeMatrixElementType accumElemType = static_cast<Builder::CooperativeMatrixElementType>(
-              cast<ConstantInt>(call->getOperand(7))->getZExtValue());
-          bool isPackable = accumElemType == Builder::CooperativeMatrixElementType::Float16;
+          auto accumElemType =
+              static_cast<CooperativeMatrixElementType>(cast<ConstantInt>(call->getOperand(7))->getZExtValue());
+          bool isPackable = accumElemType == CooperativeMatrixElementType::Float16;
           if (call->getFunction() == &m_function && isPackable) {
             muladds[call->getParent()].push_back(call);
           }
@@ -188,7 +189,7 @@ bool CooperativeMatrixCombiner::run() {
 Shape CooperativeMatrixCombiner::getShapeOfTranspose(CallInst *transpose) {
   unsigned elemType = cast<ConstantInt>(transpose->getArgOperand(1))->getZExtValue();
   unsigned layout = cast<ConstantInt>(transpose->getArgOperand(2))->getZExtValue();
-  return {(Builder::CooperativeMatrixElementType)elemType, (Builder::CooperativeMatrixLayout)layout};
+  return {(CooperativeMatrixElementType)elemType, (CooperativeMatrixLayout)layout};
 }
 
 // =====================================================================================================================
@@ -236,10 +237,8 @@ bool CooperativeMatrixCombiner::tryFold(CallInst *op) {
       // transpose/convert(undef) -> undef, if legal
       bool isFoldable = true;
       if (isConvert) {
-        auto srcElementType =
-            (Builder::CooperativeMatrixElementType)cast<ConstantInt>(op->getArgOperand(2))->getZExtValue();
-        auto dstElementType =
-            (Builder::CooperativeMatrixElementType)cast<ConstantInt>(op->getArgOperand(3))->getZExtValue();
+        auto srcElementType = (CooperativeMatrixElementType)cast<ConstantInt>(op->getArgOperand(2))->getZExtValue();
+        auto dstElementType = (CooperativeMatrixElementType)cast<ConstantInt>(op->getArgOperand(3))->getZExtValue();
         if (srcElementType != dstElementType) {
           // This is slightly conservative, but the point here is that e.g. `zext undef(i16) to i32` can't be folded
           // to undef because the result can't truly take all possible bit patterns.
@@ -350,7 +349,7 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
   } while (!worklistForward.empty());
 
   // Step 2: Analyze the inputs and outputs.
-  std::optional<Builder::CooperativeMatrixLayout> otherLayout;
+  std::optional<CooperativeMatrixLayout> otherLayout;
   Type *otherType = nullptr;
   unsigned numUnhandledInputs = 0;
   unsigned numTransposeInputs = 0;
@@ -366,7 +365,7 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
       assert(*component.shape == shape);
   };
 
-  auto foundOtherLayout = [&](Builder::CooperativeMatrixLayout layout, Type *type) {
+  auto foundOtherLayout = [&](CooperativeMatrixLayout layout, Type *type) {
     if (!otherLayout) {
       otherLayout = layout;
       otherType = type;
@@ -398,18 +397,16 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
           continue;
         }
         if (callee->getName().starts_with(lgcName::CooperativeMatrixConvert)) {
-          auto srcElemType =
-              (Builder::CooperativeMatrixElementType)cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
-          auto dstElemType =
-              (Builder::CooperativeMatrixElementType)cast<ConstantInt>(call->getArgOperand(3))->getZExtValue();
+          auto srcElemType = (CooperativeMatrixElementType)cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
+          auto dstElemType = (CooperativeMatrixElementType)cast<ConstantInt>(call->getArgOperand(3))->getZExtValue();
           if (srcElemType != dstElemType) {
             LLVM_DEBUG(dbgs() << "  unhandled element type input conversion: " << *call << '\n');
             ++numUnhandledInputs;
             continue;
           }
 
-          auto srcLayout = (Builder::CooperativeMatrixLayout)cast<ConstantInt>(call->getArgOperand(4))->getZExtValue();
-          auto dstLayout = (Builder::CooperativeMatrixLayout)cast<ConstantInt>(call->getArgOperand(5))->getZExtValue();
+          auto srcLayout = (CooperativeMatrixLayout)cast<ConstantInt>(call->getArgOperand(4))->getZExtValue();
+          auto dstLayout = (CooperativeMatrixLayout)cast<ConstantInt>(call->getArgOperand(5))->getZExtValue();
           foundComponentShape({dstElemType, dstLayout});
           foundOtherLayout(srcLayout, call->getArgOperand(1)->getType());
 
@@ -435,18 +432,16 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
           continue;
         }
         if (callee->getName().starts_with(lgcName::CooperativeMatrixConvert)) {
-          auto srcElemType =
-              (Builder::CooperativeMatrixElementType)cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
-          auto dstElemType =
-              (Builder::CooperativeMatrixElementType)cast<ConstantInt>(call->getArgOperand(3))->getZExtValue();
+          auto srcElemType = (CooperativeMatrixElementType)cast<ConstantInt>(call->getArgOperand(2))->getZExtValue();
+          auto dstElemType = (CooperativeMatrixElementType)cast<ConstantInt>(call->getArgOperand(3))->getZExtValue();
           if (srcElemType != dstElemType) {
             LLVM_DEBUG(dbgs() << "  unhandled element type output conversion: " << *call << '\n');
             ++numUnhandledInputs;
             continue;
           }
 
-          auto srcLayout = (Builder::CooperativeMatrixLayout)cast<ConstantInt>(call->getArgOperand(4))->getZExtValue();
-          auto dstLayout = (Builder::CooperativeMatrixLayout)cast<ConstantInt>(call->getArgOperand(5))->getZExtValue();
+          auto srcLayout = (CooperativeMatrixLayout)cast<ConstantInt>(call->getArgOperand(4))->getZExtValue();
+          auto dstLayout = (CooperativeMatrixLayout)cast<ConstantInt>(call->getArgOperand(5))->getZExtValue();
           foundComponentShape({srcElemType, srcLayout});
           foundOtherLayout(dstLayout, call->getType());
 
@@ -592,8 +587,7 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
             unsigned dstElemType = cast<ConstantInt>(call->getArgOperand(3))->getZExtValue();
 
             if (srcElemType == dstElemType) {
-              unsigned srcLayout =
-                  (Builder::CooperativeMatrixLayout)cast<ConstantInt>(call->getArgOperand(4))->getZExtValue();
+              auto srcLayout = (CooperativeMatrixLayout)cast<ConstantInt>(call->getArgOperand(4))->getZExtValue();
               assert(srcLayout == *otherLayout);
               (void(srcLayout)); // unused
 
@@ -640,8 +634,7 @@ bool CooperativeMatrixCombiner::tryFoldComponentContaining(Value *start) {
             unsigned dstElemType = cast<ConstantInt>(call->getArgOperand(3))->getZExtValue();
 
             if (srcElemType == dstElemType) {
-              unsigned dstLayout =
-                  (Builder::CooperativeMatrixLayout)cast<ConstantInt>(call->getArgOperand(5))->getZExtValue();
+              auto dstLayout = (CooperativeMatrixLayout)cast<ConstantInt>(call->getArgOperand(5))->getZExtValue();
               assert(dstLayout == *otherLayout);
               (void(dstLayout)); // unused
 
@@ -918,8 +911,8 @@ Value *CooperativeMatrixCombiner::tryFoldTimesScalar(CallInst *timesScalarLo, Ca
   scalarVec = b.CreateInsertElement(scalarVec, timesScalarLo->getArgOperand(1), b.getInt32(0));
   scalarVec = b.CreateInsertElement(scalarVec, timesScalarHi->getArgOperand(1), b.getInt32(1));
   auto *timesScalarPacked =
-      b.CreateCoopMatrixTimesScalar(packedMatrix, scalarVec, Builder::CooperativeMatrixElementType::Float16Packed,
-                                    Builder::CooperativeMatrixLayout::AccumulatorMatrixLayout);
+      b.CreateCoopMatrixTimesScalar(packedMatrix, scalarVec, CooperativeMatrixElementType::Float16Packed,
+                                    CooperativeMatrixLayout::AccumulatorMatrixLayout);
   m_eraseList.push_back(timesScalarLo);
   m_eraseList.push_back(timesScalarHi);
   return timesScalarPacked;

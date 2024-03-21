@@ -117,6 +117,7 @@ public:
   unsigned hasLibraryStage(unsigned stageMask) { return m_pipelineInfo->pipelineLibStageMask & stageMask; }
   bool isReplay() { return m_pipelineInfo->isReplay; }
   Vkgc::LlpcRaytracingMode getRaytracingMode() { return m_pipelineInfo->mode; }
+  unsigned getCpsFlag() { return m_pipelineInfo->cpsFlags; }
 
 protected:
   // Give the pipeline options to the middle-end, and/or hash them.

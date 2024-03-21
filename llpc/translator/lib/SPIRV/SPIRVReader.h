@@ -63,6 +63,11 @@ class Value;
 } // namespace llvm
 using namespace llvm;
 
+namespace Llpc {
+class PipelineContext;
+class RayTracingContext;
+} // namespace Llpc
+
 namespace SPIRV {
 class SPIRVLoopMerge;
 class SPIRVToLLVMDbgTran;
@@ -297,12 +302,12 @@ private:
     SmallVector<llvm::Instruction *, 1> llvmInstructions;
   };
 
-  lgc::Builder::CooperativeMatrixElementType mapToBasicType(Type *const ltType);
-  lgc::Builder::CooperativeMatrixElementType mapToBasicType(SPIRVType *const spvType);
-  lgc::Builder::CooperativeMatrixLayout getLayout(lgc::Builder::CooperativeMatrixElementType elemTy);
-  lgc::Builder::CooperativeMatrixLayout getCooperativeMatrixKHRLayout(CooperativeMatrixUse use,
-                                                                      lgc::Builder::CooperativeMatrixElementType elemTy,
-                                                                      unsigned rows, unsigned columns);
+  lgc::CooperativeMatrixElementType mapToBasicType(Type *const ltType);
+  lgc::CooperativeMatrixElementType mapToBasicType(SPIRVType *const spvType);
+  lgc::CooperativeMatrixLayout getLayout(lgc::CooperativeMatrixElementType elemTy);
+  lgc::CooperativeMatrixLayout getCooperativeMatrixKHRLayout(CooperativeMatrixUse use,
+                                                             lgc::CooperativeMatrixElementType elemTy, unsigned rows,
+                                                             unsigned columns);
 
   enum CooperativeMatrixMemoryAccess {
     CooperativeMatrixMemoryAccessNone = 0x00,
@@ -433,10 +438,22 @@ private:
   Value *createTraceRayDialectOp(SPIRVValue *const spvValue);
 
   // ========================================================================================================================
+  // Wrapper method for easier access to the pipeline context.
+  // @returns : Pointer to the pipeline context of the current LLPC context.
+  // ========================================================================================================================
+  Llpc::PipelineContext *getPipelineContext() const;
+
+  // ========================================================================================================================
   // Wrapper method for easier access to pipeline options.
   // @returns : Pointer to the pipeline options of the current LLPC context.
   // ========================================================================================================================
   const Vkgc::PipelineOptions *getPipelineOptions() const;
+
+  // ========================================================================================================================
+  // Wrapper method for easier access to the raytracing context.
+  // @returns : Pointer to the pipeline context of the current raytracing context.
+  // ========================================================================================================================
+  Llpc::RayTracingContext *getRaytracingContext() const;
 
   // ========================================================================================================================
   // Helper method for checking if the scratch out of bounds check was enabled.

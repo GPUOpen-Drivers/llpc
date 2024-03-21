@@ -203,8 +203,6 @@ std::string LgcContext::getGpuNameString(unsigned major, unsigned minor, unsigne
   gpuNameStream << "gfx" << major << minor;
   if (stepping >= 0xFFFA)
     gpuNameStream << char(stepping - 0xFFFA + 'A');
-  else if (major == 9 && stepping >= 10)
-    gpuNameStream << char(stepping - 10 + 'a');
   else
     gpuNameStream << stepping;
 

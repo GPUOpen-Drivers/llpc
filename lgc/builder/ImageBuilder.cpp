@@ -427,7 +427,6 @@ Value *BuilderImpl::CreateImageLoad(Type *resultTy, unsigned dim, unsigned flags
   getPipelineState()->getShaderResourceUsage(m_shaderStage.value())->useImages = true;
   getPipelineState()->getShaderResourceUsage(m_shaderStage.value())->resourceRead = true;
   assert(coord->getType()->getScalarType()->isIntegerTy(32));
-  imageDesc = patchCubeDescriptor(imageDesc, dim);
   coord = handleFragCoordViewIndex(coord, flags, dim);
 
   unsigned dmask = 1;
@@ -630,7 +629,6 @@ Value *BuilderImpl::CreateImageStore(Value *texel, unsigned dim, unsigned flags,
   // Mark usage of images, to allow the compute workgroup reconfiguration optimization.
   getPipelineState()->getShaderResourceUsage(m_shaderStage.value())->resourceWrite = true;
   assert(coord->getType()->getScalarType()->isIntegerTy(32));
-  imageDesc = patchCubeDescriptor(imageDesc, dim);
   coord = handleFragCoordViewIndex(coord, flags, dim);
 
   // For 64-bit texel, only the first component is stored
@@ -1142,7 +1140,6 @@ Value *BuilderImpl::CreateImageAtomicCommon(unsigned atomicOp, unsigned dim, uns
   unsigned imageDescArgIndex = 0;
   if (imageDesc->getType() == getDescTy(ResourceNodeType::DescriptorResource)) {
     // Resource descriptor. Use the image atomic instruction.
-    imageDesc = patchCubeDescriptor(imageDesc, dim);
     args.push_back(inputValue);
     if (atomicOp == AtomicOpCompareSwap)
       args.push_back(comparatorValue);
@@ -1730,53 +1727,6 @@ void BuilderImpl::combineCubeArrayFaceAndSlice(Value *coord, SmallVectorImpl<Val
   }
   coords[2] = combined;
   coords.pop_back();
-}
-
-// =====================================================================================================================
-// Patch descriptor with cube dimension for image load/store/atomic for GFX8 and earlier
-//
-// @param desc : Descriptor before patching
-// @param dim : Image dimensions
-Value *BuilderImpl::patchCubeDescriptor(Value *desc, unsigned dim) {
-  if ((dim != DimCube && dim != DimCubeArray) || getPipelineState()->getTargetInfo().getGfxIpVersion().major >= 9)
-    return desc;
-
-  // Extract the depth.
-  Value *elem4 = CreateExtractElement(desc, 4);
-  Value *depth = CreateAnd(elem4, getInt32(0x1FFF));
-
-  // Change to depth * 6 + 5
-  depth = CreateMul(depth, getInt32(6));
-  depth = CreateAdd(depth, getInt32(5));
-  elem4 = CreateAnd(elem4, getInt32(0xFFFFE000));
-  elem4 = CreateOr(elem4, depth);
-
-  // Change resource type to 2D array (0xD)
-  Value *originalElem3 = CreateExtractElement(desc, 3);
-  Value *elem3 = originalElem3;
-  elem3 = CreateAnd(elem3, getInt32(0x0FFFFFFF));
-  elem3 = CreateOr(elem3, getInt32(0xD0000000));
-
-  // If allowNullDescriptor is on and image descriptor is a null descriptor, keep elem3 and elem4 be zero
-  if (m_pipelineState->getOptions().allowNullDescriptor) {
-    if (m_pipelineState->getOptions().maskOffNullDescriptorTypeField) {
-      GfxIpVersion gfxIp = getPipelineState()->getTargetInfo().getGfxIpVersion();
-      SqImgRsrcRegHandler proxySqRsrcRegHelper(this, desc, &gfxIp);
-      unsigned typeMask = proxySqRsrcRegHelper.getRegMask(SqRsrcRegs::Type);
-      // Mask off the type bits for the null descriptor
-      originalElem3 = CreateAnd(originalElem3, getInt32(~typeMask));
-    }
-    // Check dword3 against 0 for a null descriptor
-    Value *zero = getInt32(0);
-    Value *isNullDesc = CreateICmpEQ(originalElem3, zero);
-    elem3 = CreateSelect(isNullDesc, zero, elem3);
-    elem4 = CreateSelect(isNullDesc, zero, elem4);
-  }
-
-  // Reassemble descriptor.
-  desc = CreateInsertElement(desc, elem4, 4);
-  desc = CreateInsertElement(desc, elem3, 3);
-  return desc;
 }
 
 // =====================================================================================================================

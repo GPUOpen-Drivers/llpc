@@ -35,6 +35,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/IR/Attributes.h"
+#include "llvm/IR/GlobalValue.h"
 
 namespace llvm {
 
@@ -95,5 +96,9 @@ bool isDontCareValue(llvm::Value *value);
 // Given a non-aggregate type, get a float type at least as big that can be used to pass a value of that
 // type in a return value struct, ensuring it gets into VGPRs.
 llvm::Type *getVgprTy(llvm::Type *ty);
+
+// Helper function to create LLVM Function and update NewDbgInfoFormat flag
+llvm::Function *createFunctionHelper(llvm::FunctionType *ty, llvm::GlobalValue::LinkageTypes linkage,
+                                     llvm::Module *module, const llvm::Twine &name = "");
 
 } // namespace lgc

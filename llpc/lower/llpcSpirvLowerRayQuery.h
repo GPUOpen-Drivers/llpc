@@ -31,6 +31,7 @@
 #pragma once
 
 #include "SPIRVInternal.h"
+#include "compilerutils/CompilerUtils.h"
 #include "llpcSpirvLower.h"
 #include "llvm/IR/PassManager.h"
 
@@ -95,6 +96,10 @@ struct RayTracingInstanceNode {
 };
 #pragma pack(pop)
 
+namespace CompilerUtils {
+class CrossModuleInliner;
+} // namespace CompilerUtils
+
 namespace Llpc {
 
 // Corresponds to gl_RayFlags* in GLSL_EXT_ray_tracing.txt
@@ -130,16 +135,17 @@ protected:
   void createGlobalRayQueryObj();
   void initGlobalVariable();
   unsigned generateTraceRayStaticId();
-  llvm::Value *createTransformMatrix(unsigned builtInId, llvm::Value *accelStruct, llvm::Value *instanceId,
-                                     llvm::Instruction *insertPos);
+  llvm::Value *createTransformMatrix(unsigned builtInId, llvm::Value *instanceNodeAddr, llvm::Instruction *insertPos);
   void eraseFunctionBlocks(llvm::Function *func);
   unsigned getFuncOpcode(llvm::Function *func);
-  llvm::Value *createLoadInstanceIndex(llvm::Value *instNodeAddr);
-  llvm::Value *createLoadInstanceId(llvm::Value *instNodeAddr);
-  llvm::Value *createLoadMatrixFromAddr(llvm::Value *matrixAddr);
+  llvm::Value *createLoadInstanceIndexOrId(Value *instNodeAddr, bool isIndex);
+  llvm::Value *createLoadMatrixFromFunc(llvm::Value *matrixAddr, unsigned builtInId);
+  llvm::Function *getGpurtFunction(llvm::StringRef name);
 
   bool m_rayQueryLibrary;       // Whether the module is ray query library
   unsigned m_spirvOpMetaKindId; // Metadata kind ID for "spirv.op"
+  std::optional<CompilerUtils::CrossModuleInliner> m_crossModuleInliner;
+
 private:
   template <spv::Op> void createRayQueryFunc(llvm::Function *func);
   void createRayQueryProceedFunc(llvm::Function *func);

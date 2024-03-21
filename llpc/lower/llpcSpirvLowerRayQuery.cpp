@@ -31,10 +31,13 @@
 
 #include "llpcSpirvLowerRayQuery.h"
 #include "SPIRVInternal.h"
+#include "compilerutils/CompilerUtils.h"
 #include "llpcContext.h"
 #include "llpcSpirvLowerUtil.h"
+#include "llvmraytracing/GpurtContext.h"
 #include "lgc/Builder.h"
 #include "lgc/GpurtDialect.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/IntrinsicsAMDGPU.h"
 
@@ -43,6 +46,7 @@
 using namespace spv;
 using namespace llvm;
 using namespace Llpc;
+using namespace CompilerUtils;
 
 namespace SPIRV {
 extern const char *MetaNameSpirvOp;
@@ -52,7 +56,6 @@ namespace RtName {
 const char *LdsUsage = "LdsUsage";
 const char *PrevRayQueryObj = "PrevRayQueryObj";
 const char *RayQueryObjGen = "RayQueryObjGen";
-static const char *FetchTrianglePositionFromRayQuery = "FetchTrianglePositionFromRayQuery";
 } // namespace RtName
 
 // Enum for the RayDesc
@@ -291,6 +294,8 @@ SpirvLowerRayQuery::SpirvLowerRayQuery(bool rayQueryLibrary)
 // @param [in/out] module : LLVM module to be run on
 // @param [in/out] analysisManager : Analysis manager to use for this transformation
 PreservedAnalyses SpirvLowerRayQuery::run(Module &module, ModuleAnalysisManager &analysisManager) {
+  m_crossModuleInliner = std::make_optional<CrossModuleInliner>();
+  auto onExit = make_scope_exit([&] { m_crossModuleInliner.reset(); });
   LLVM_DEBUG(dbgs() << "Run the pass Spirv-Lower-ray-query\n");
   SpirvLower::init(&module);
   createGlobalRayQueryObj();
@@ -688,7 +693,7 @@ void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetIntersectionInstanceCus
   auto instanceNodeAddr = createGetInstanceNodeAddr(instanceNodePtr, rayQuery);
 
   // Load instance index from instance node address
-  auto instanceIndex = createLoadInstanceId(instanceNodeAddr);
+  auto instanceIndex = createLoadInstanceIndexOrId(instanceNodeAddr, false);
 
   m_builder->CreateRet(instanceIndex);
 }
@@ -708,7 +713,7 @@ template <> void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetIntersectio
   auto instanceNodeAddr = createGetInstanceNodeAddr(instanceNodePtr, rayQuery);
 
   // Load instance index from instance node address
-  auto instanceId = createLoadInstanceIndex(instanceNodeAddr);
+  auto instanceId = createLoadInstanceIndexOrId(instanceNodeAddr, true);
 
   m_builder->CreateRet(instanceId);
 }
@@ -1019,10 +1024,9 @@ void SpirvLowerRayQuery::createIntersectMatrix(Function *func, unsigned builtInI
   auto committedInstanceNodePtr = m_builder->CreateExtractValue(committed, RaySystemParams::InstanceNodePtr);
   Value *instanceNodePtr = m_builder->CreateSelect(intersect, committedInstanceNodePtr, candidateInstanceNodePtr);
   Value *instanceNodeAddr = createGetInstanceNodeAddr(instanceNodePtr, rayQuery);
-  Value *instanceId = createLoadInstanceIndex(instanceNodeAddr);
 
   Instruction *brInst = m_builder->CreateBr(endBlock);
-  Value *matrix = createTransformMatrix(builtInId, accelStruct, instanceId, brInst);
+  Value *matrix = createTransformMatrix(builtInId, instanceNodeAddr, brInst);
   m_builder->SetInsertPoint(endBlock);
   m_builder->CreateRet(matrix);
 }
@@ -1052,6 +1056,12 @@ void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetIntersectionTriangleVer
   func->addFnAttr(Attribute::AlwaysInline);
   BasicBlock *entryBlock = BasicBlock::Create(*m_context, ".entry", func);
   m_builder->SetInsertPoint(entryBlock);
+
+  // Cross module inliner cannot be used to inline a function with multiple blocks into in a degenerate block, create
+  // a temporary terminator first.
+  auto tempTerminator = m_builder->CreateUnreachable();
+  m_builder->SetInsertPoint(tempTerminator);
+
   Value *rayQuery = func->arg_begin();
   Value *intersectVal = func->arg_begin() + 1;
   Value *intersectPtr = m_builder->CreateAlloca(m_builder->getInt32Ty());
@@ -1060,10 +1070,12 @@ void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetIntersectionTriangleVer
   // Call {vec3, vec3, vec3} FetchTrianglePositionFromRayQuery(rayquery* rayquery, int* intersect)
   // return 3 triangle vertices
   auto floatx3Ty = FixedVectorType::get(m_builder->getFloatTy(), 3);
-  auto triangleDataTy = StructType::get(*m_context, {floatx3Ty, floatx3Ty, floatx3Ty});
-  auto triangleData =
-      m_builder->CreateNamedCall(RtName::FetchTrianglePositionFromRayQuery, triangleDataTy, {rayQuery, intersectPtr},
-                                 {Attribute::NoUnwind, Attribute::AlwaysInline});
+  auto triangleData = m_crossModuleInliner.value()
+                          .inlineCall(*m_builder,
+                                      getGpurtFunction(m_context->getPipelineContext()->getRayTracingFunctionName(
+                                          Vkgc::RT_ENTRY_FETCH_HIT_TRIANGLE_FROM_RAY_QUERY)),
+                                      {rayQuery, intersectPtr})
+                          .returnValue;
 
   // Return type of OpRayQueryGetIntersectionTriangleVertexPositionsKHR is array of vec3 (vec3[3]).
   auto retType = ArrayType::get(floatx3Ty, 3);
@@ -1071,6 +1083,7 @@ void SpirvLowerRayQuery::createRayQueryFunc<OpRayQueryGetIntersectionTriangleVer
   for (unsigned i = 0; i < 3; i++)
     ret = m_builder->CreateInsertValue(ret, m_builder->CreateExtractValue(triangleData, {i}), {i});
   m_builder->CreateRet(ret);
+  tempTerminator->eraseFromParent();
 }
 
 // =====================================================================================================================
@@ -1183,61 +1196,15 @@ unsigned SpirvLowerRayQuery::getFuncOpcode(Function *func) {
 }
 
 // =====================================================================================================================
-// Create WorldToObject/ObjectToWorld Matrix by given instance ID
+// Create WorldToObject/ObjectToWorld Matrix by GpuRt Library Func.
 //
 // @param builtInId : ID of the built-in variable
-// @param accelStruct : Top accelerate structure
-// @param instanceId : Instance ID
+// @param instanceNodeAddr : instanceNode Address
 // @param insertPos : Where to insert instructions
-Value *SpirvLowerRayQuery::createTransformMatrix(unsigned builtInId, Value *accelStruct, Value *instanceId,
-                                                 Instruction *insertPos) {
+Value *SpirvLowerRayQuery::createTransformMatrix(unsigned builtInId, Value *instanceNodeAddr, Instruction *insertPos) {
   assert(builtInId == BuiltInWorldToObjectKHR || builtInId == BuiltInObjectToWorldKHR);
   m_builder->SetInsertPoint(insertPos);
-  Value *zero = m_builder->getInt32(0);
-
-  // offsetof(AccelStructHeader, dataOffsets) + offsetof(AccelStructOffsets, leafNodes)
-  unsigned instanceNodeOffset = offsetof(AccelStructHeader, dataOffsets) + offsetof(ResultDataOffsets, leafNodes);
-  Value *instanceNodeOffsetVal = m_builder->getInt32(instanceNodeOffset);
-
-  auto int32x2Ty = FixedVectorType::get(m_builder->getInt32Ty(), 2);
-
-  instanceNodeOffsetVal =
-      m_builder->CreateInsertElement(PoisonValue::get(int32x2Ty), instanceNodeOffsetVal, uint64_t(0));
-
-  instanceNodeOffsetVal = m_builder->CreateInsertElement(instanceNodeOffsetVal, zero, 1);
-  Value *instanceNodeOffsetAddr = m_builder->CreateAdd(accelStruct, instanceNodeOffsetVal);
-
-  // Bitcast instanceNodeOffsetAddr to i64 integer
-  instanceNodeOffsetAddr = m_builder->CreateBitCast(instanceNodeOffsetAddr, m_builder->getInt64Ty());
-  Type *gpuAddrAsPtrTy = PointerType::get(*m_context, SPIRAS_Global);
-  auto instNodeOffsetAddrAsPtr = m_builder->CreateIntToPtr(instanceNodeOffsetAddr, gpuAddrAsPtrTy);
-  Value *baseInstOffset = m_builder->CreateConstGEP1_32(m_builder->getInt8Ty(), instNodeOffsetAddrAsPtr, 0);
-  Type *baseInstOffsetTy = m_builder->getInt32Ty()->getPointerTo(SPIRAS_Global);
-
-  // Load base instance offset from InstanceNodeOffsetAddr
-  baseInstOffset = m_builder->CreateBitCast(baseInstOffset, baseInstOffsetTy);
-  baseInstOffset = m_builder->CreateLoad(m_builder->getInt32Ty(), baseInstOffset);
-
-  // Instance node includes the instance descriptor (64-bytes) followed by the extra instance node
-  // data (64-bytes).
-  Value *instanceNodeStrideShift = m_builder->getInt32(7);
-
-  // Offset into the instance node
-  instanceId = m_builder->CreateShl(instanceId, instanceNodeStrideShift);
-  Value *matrixOffset = m_builder->CreateAdd(baseInstOffset, instanceId);
-
-  if (builtInId == BuiltInObjectToWorldKHR) {
-    // The ObjectToWorld transform is at a 80 byte offset within the extra data structure
-    Value *transformOffset = m_builder->getInt32(80);
-    matrixOffset = m_builder->CreateAdd(matrixOffset, transformOffset);
-  }
-
-  Value *vecMatrixOffset = PoisonValue::get(int32x2Ty);
-  vecMatrixOffset = m_builder->CreateInsertElement(vecMatrixOffset, matrixOffset, uint64_t(0));
-  vecMatrixOffset = m_builder->CreateInsertElement(vecMatrixOffset, zero, 1);
-  Value *matrixAddr = m_builder->CreateAdd(accelStruct, vecMatrixOffset);
-
-  return createLoadMatrixFromAddr(matrixAddr);
+  return createLoadMatrixFromFunc(instanceNodeAddr, builtInId);
 }
 
 // =====================================================================================================================
@@ -1272,109 +1239,71 @@ bool SpirvLowerRayQuery::stageNotSupportLds(ShaderStage stage) {
 }
 
 // =====================================================================================================================
-// Create instructions to load instance index given the 64-bit instance node address at the current insert point
-//
+// Create instructions to load instance index/id given the 64-bit instance node address at the current insert point
+// Note: HLSL has just the opposite naming of index/ID compares to SPIR-V.
+// So "isIndex = true" means we use InstanceId(InstanceIndex for GPURT) for vulkan,
+// and "isIndex = false" means we use InstanceIndex(InstanceId for GPURT) for vulkan,
 // @param instNodeAddr : 64-bit instance node address, in <2 x i32>
-Value *SpirvLowerRayQuery::createLoadInstanceIndex(Value *instNodeAddr) {
-  Value *zero = m_builder->getInt32(0);
-  Type *gpuAddrAsPtrTy = PointerType::get(*m_context, SPIRAS_Global);
-  auto int32x2Ty = FixedVectorType::get(m_builder->getInt32Ty(), 2);
+Value *SpirvLowerRayQuery::createLoadInstanceIndexOrId(Value *instNodeAddr, bool isIndex) {
+  Value *instanceIdPtr = m_builder->CreateAllocaAtFuncEntry(m_builder->getInt64Ty());
+  m_builder->CreateStore(instNodeAddr, instanceIdPtr);
 
-  const unsigned instanceIndexOffset = offsetof(RayTracingInstanceNode, extra.instanceIndex);
+  StringRef getterName = isIndex
+                             ? m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_INSTANCE_INDEX)
+                             : m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_INSTANCE_ID);
 
-  Value *instanceIndexOffsetVar = PoisonValue::get(int32x2Ty);
-  instanceIndexOffsetVar =
-      m_builder->CreateInsertElement(instanceIndexOffsetVar, m_builder->getInt32(instanceIndexOffset), uint64_t(0));
-  instanceIndexOffsetVar = m_builder->CreateInsertElement(instanceIndexOffsetVar, zero, 1);
-  Value *instanceIndexAddr = m_builder->CreateAdd(instNodeAddr, instanceIndexOffsetVar);
+  auto cmiResult = m_crossModuleInliner.value().inlineCall(*m_builder, getGpurtFunction(getterName), {instanceIdPtr});
 
-  instanceIndexAddr = m_builder->CreateBitCast(instanceIndexAddr, m_builder->getInt64Ty());
-  auto instanceIndexAddrAsPtr = m_builder->CreateIntToPtr(instanceIndexAddr, gpuAddrAsPtrTy);
-  auto loadValue = m_builder->CreateConstGEP1_32(m_builder->getInt8Ty(), instanceIndexAddrAsPtr, 0);
-  loadValue = m_builder->CreateBitCast(loadValue, PointerType::get(*m_context, SPIRAS_Global));
-
-  return m_builder->CreateLoad(m_builder->getInt32Ty(), loadValue);
+  return cmiResult.returnValue;
 }
 
 // =====================================================================================================================
-// Create instructions to get instance node address given the instance node pointer at the current insert point
+// Call GpuRt Library to get instance node address given the instance node pointer at the current
+// insert point
 //
 // @param instNodePtr : Instance node pointer
-// @param rayQuery : Ray query structure
 Value *SpirvLowerRayQuery::createGetInstanceNodeAddr(Value *instNodePtr, Value *rayQuery) {
-  auto int32x2Ty = FixedVectorType::get(m_builder->getInt32Ty(), 2);
-  Value *zero = m_builder->getInt32(0);
-
   Value *BvhAddrLo = m_builder->CreateExtractValue(rayQuery, RayQueryParams::TopLevelBvhLo);
   Value *BvhAddrHi = m_builder->CreateExtractValue(rayQuery, RayQueryParams::TopLevelBvhHi);
 
   Value *BvhAddr = PoisonValue::get(FixedVectorType::get(Type::getInt32Ty(*m_context), 2));
   BvhAddr = m_builder->CreateInsertElement(BvhAddr, BvhAddrLo, uint64_t(0));
   BvhAddr = m_builder->CreateInsertElement(BvhAddr, BvhAddrHi, 1);
-  // Mask out the node offset
-  auto nodeOffsetMask = m_builder->getInt32(0xFFFFFFF8u);
-  // Shift left by 3 to make it 64B aligned address
-  auto nodeOffsetShift = m_builder->getInt32(3u);
 
-  auto nodeOffset = m_builder->CreateAnd(instNodePtr, nodeOffsetMask);
-  nodeOffset = m_builder->CreateShl(nodeOffset, nodeOffsetShift);
+  StringRef getInstanceNodeAddr =
+      m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_GET_INSTANCE_NODE);
 
-  Value *instNodeOffset = PoisonValue::get(int32x2Ty);
-  instNodeOffset = m_builder->CreateInsertElement(instNodeOffset, nodeOffset, uint64_t(0));
-  instNodeOffset = m_builder->CreateInsertElement(instNodeOffset, zero, 1);
+  auto bvhAddr = m_builder->CreateBitCast(BvhAddr, m_builder->getInt64Ty());
+  Value *bvhPtr = m_builder->CreateAllocaAtFuncEntry(m_builder->getInt64Ty());
+  Value *nodePtr = m_builder->CreateAllocaAtFuncEntry(m_builder->getInt32Ty());
+  m_builder->CreateStore(bvhAddr, bvhPtr);
+  m_builder->CreateStore(instNodePtr, nodePtr);
 
-  auto instNodeAddr = m_builder->CreateAdd(BvhAddr, instNodeOffset);
-  return instNodeAddr;
+  auto cmiResult =
+      m_crossModuleInliner.value().inlineCall(*m_builder, getGpurtFunction(getInstanceNodeAddr), {bvhPtr, nodePtr});
+  return cmiResult.returnValue;
 }
 
 // =====================================================================================================================
-// Create instructions to load instance ID given the 64-bit instance node address at the current insert point
+// Call GpuRt Library Func to load a 3x4 matrix from given address at the current insert point
 //
-// @param instNodeAddr : 64-bit instance node address, in <2 x i32>
-Value *SpirvLowerRayQuery::createLoadInstanceId(Value *instNodeAddr) {
-  Value *zero = m_builder->getInt32(0);
-  Type *gpuAddrAsPtrTy = PointerType::get(*m_context, SPIRAS_Global);
-  auto int32x2Ty = FixedVectorType::get(m_builder->getInt32Ty(), 2);
-
-  const unsigned instanceIdOffset = offsetof(RayTracingInstanceNode, desc.InstanceID_and_Mask);
-
-  Value *instanceIdOffsetVar = PoisonValue::get(int32x2Ty);
-  instanceIdOffsetVar =
-      m_builder->CreateInsertElement(instanceIdOffsetVar, m_builder->getInt32(instanceIdOffset), uint64_t(0));
-  instanceIdOffsetVar = m_builder->CreateInsertElement(instanceIdOffsetVar, zero, 1);
-  Value *instanceIdAddr = m_builder->CreateAdd(instNodeAddr, instanceIdOffsetVar);
-
-  instanceIdAddr = m_builder->CreateBitCast(instanceIdAddr, m_builder->getInt64Ty());
-  auto instanceIdAddrAsPtr = m_builder->CreateIntToPtr(instanceIdAddr, gpuAddrAsPtrTy);
-  auto loadValue = m_builder->CreateConstGEP1_32(m_builder->getInt8Ty(), instanceIdAddrAsPtr, 0);
-  loadValue = m_builder->CreateBitCast(loadValue, PointerType::get(*m_context, SPIRAS_Global));
-
-  loadValue = m_builder->CreateLoad(m_builder->getInt32Ty(), loadValue);
-  // Mask out the instance ID in lower 24 bits
-  loadValue = m_builder->CreateAnd(loadValue, 0x00FFFFFFu);
-
-  return loadValue;
-}
-
-// =====================================================================================================================
-// Create instructions to load a 3x4 matrix from given address at the current insert point
-//
-// @param matrixAddr : Matrix address, which type is <2 x i32>
-Value *SpirvLowerRayQuery::createLoadMatrixFromAddr(Value *matrixAddr) {
-  Value *zero = m_builder->getInt32(0);
-  Type *gpuAddrAsPtrTy = PointerType::get(*m_context, SPIRAS_Global);
-
-  // Bitcast matrixAddr to i64 integer
-  matrixAddr = m_builder->CreateBitCast(matrixAddr, m_builder->getInt64Ty());
-  auto matrixAddrAsPtr = m_builder->CreateIntToPtr(matrixAddr, gpuAddrAsPtrTy);
-
+// @param instanceNodeAddr : instanceNode address, which type is i64
+Value *SpirvLowerRayQuery::createLoadMatrixFromFunc(Value *instanceNodeAddr, unsigned builtInId) {
   auto floatx3Ty = FixedVectorType::get(m_builder->getFloatTy(), 3);
-  auto floatx4Ty = FixedVectorType::get(m_builder->getFloatTy(), 4);
   auto matrixTy = ArrayType::get(floatx3Ty, 4);
 
-  auto loadPtrTy = floatx4Ty->getPointerTo(SPIRAS_Global);
+  Value *instandeNodeAddrPtr = m_builder->CreateAllocaAtFuncEntry(m_builder->getInt64Ty());
+  m_builder->CreateStore(instanceNodeAddr, instandeNodeAddrPtr);
 
-  // Construct [4 x <3 x float>]
+  StringRef getMatrixFunc;
+  if (builtInId == BuiltInObjectToWorldKHR) {
+    getMatrixFunc =
+        m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_OBJECT_TO_WORLD_TRANSFORM);
+  } else {
+    getMatrixFunc =
+        m_context->getPipelineContext()->getRayTracingFunctionName(Vkgc::RT_ENTRY_WORLD_TO_OBJECT_TRANSFORM);
+  }
+
   Value *matrixRow[4] = {
       PoisonValue::get(floatx3Ty),
       PoisonValue::get(floatx3Ty),
@@ -1382,26 +1311,27 @@ Value *SpirvLowerRayQuery::createLoadMatrixFromAddr(Value *matrixAddr) {
       PoisonValue::get(floatx3Ty),
   };
 
-  // Matrix in the memory is [3 x <4 x float>], need to transform to [4 x <3 x float>]
-  Value *loadOffset = zero;
-  Value *stride = m_builder->getInt32(sizeof(float) * 4);
-  // For Three columns
   for (unsigned i = 0; i < 3; ++i) {
-    Value *loadValue = m_builder->CreateGEP(m_builder->getInt8Ty(), matrixAddrAsPtr, loadOffset);
-    loadValue = m_builder->CreateBitCast(loadValue, loadPtrTy);
-    auto rowValue = m_builder->CreateLoad(floatx4Ty, loadValue);
+    Value *row = m_builder->getInt32(i);
     for (unsigned j = 0; j < 4; ++j) {
-      auto element = m_builder->CreateExtractElement(rowValue, uint64_t(j));
-      matrixRow[j] = m_builder->CreateInsertElement(matrixRow[j], element, uint64_t(i));
+      Value *col = m_builder->getInt32(j);
+
+      Value *colPtr = m_builder->CreateAllocaAtFuncEntry(m_builder->getInt32Ty());
+      Value *rowPtr = m_builder->CreateAllocaAtFuncEntry(m_builder->getInt32Ty());
+      m_builder->CreateStore(col, colPtr);
+      m_builder->CreateStore(row, rowPtr);
+
+      auto cmiMatrixResult = m_crossModuleInliner.value().inlineCall(*m_builder, getGpurtFunction(getMatrixFunc),
+                                                                     {instandeNodeAddrPtr, rowPtr, colPtr});
+      matrixRow[j] = m_builder->CreateInsertElement(matrixRow[j], cmiMatrixResult.returnValue, uint64_t(i));
     }
-    loadOffset = m_builder->CreateAdd(loadOffset, stride);
   }
+
   Value *matrix = PoisonValue::get(matrixTy);
   matrix = m_builder->CreateInsertValue(matrix, matrixRow[0], 0);
   matrix = m_builder->CreateInsertValue(matrix, matrixRow[1], 1);
   matrix = m_builder->CreateInsertValue(matrix, matrixRow[2], 2);
   matrix = m_builder->CreateInsertValue(matrix, matrixRow[3], 3);
-
   return matrix;
 }
 
@@ -1412,6 +1342,15 @@ Value *SpirvLowerRayQuery::getThreadIdInGroup() const {
   unsigned builtIn = m_context->getPipelineType() == PipelineType::Graphics ? BuiltInSubgroupLocalInvocationId
                                                                             : BuiltInLocalInvocationIndex;
   return m_builder->CreateReadBuiltInInput(static_cast<lgc::BuiltInKind>(builtIn));
+}
+
+// =====================================================================================================================
+// Looks up an exported function in the GPURT module
+Function *SpirvLowerRayQuery::getGpurtFunction(StringRef name) {
+  auto &gpurtContext = lgc::GpurtContext::get(*m_context);
+  Function *fn = gpurtContext.theModule->getFunction(name);
+  assert(fn);
+  return fn;
 }
 
 } // namespace Llpc

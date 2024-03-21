@@ -209,33 +209,37 @@ PreservedAnalyses SpirvLowerGlobal::run(Module &module, ModuleAnalysisManager &a
 
   changeRtFunctionSignature();
 
-  // Map globals to proxy variables
-  for (auto global = m_module->global_begin(), end = m_module->global_end(); global != end; ++global) {
-    if (global->getType()->getAddressSpace() == SPIRAS_Private)
-      mapGlobalVariableToProxy(&*global);
-    else if (global->getType()->getAddressSpace() == SPIRAS_Input)
-      mapInputToProxy(&*global);
-    else if (global->getType()->getAddressSpace() == SPIRAS_Output)
-      mapOutputToProxy(&*global);
-  }
-
-  // NOTE: Global variable, include general global variable, input and output is a special constant variable, so if
-  // it is referenced by constant expression, we need translate constant expression to normal instruction first,
-  // Otherwise, we will hit assert in replaceAllUsesWith() when we replace global variable with proxy variable.
+  // First pass over globals
   for (GlobalVariable &global : m_module->globals()) {
     auto addrSpace = global.getType()->getAddressSpace();
 
-    // Remove constant expressions for global variables in these address spaces
-    bool isGlobalVar = addrSpace == SPIRAS_Private || addrSpace == SPIRAS_Input || addrSpace == SPIRAS_Output;
+    if (addrSpace == SPIRAS_Private || addrSpace == SPIRAS_Input || addrSpace == SPIRAS_Output) {
+      // Remove constant indexing expression and remove any proxy variables that are needed. (But the proxies aren't
+      // used yet for inputs/outputs.)
+      removeConstantExpr(m_context, &global);
 
-    if (!isGlobalVar)
-      continue;
-    removeConstantExpr(m_context, &global);
+      if (addrSpace == SPIRAS_Private)
+        mapGlobalVariableToProxy(&global);
+      else if (addrSpace == SPIRAS_Input)
+        mapInputToProxy(&global);
+      else if (addrSpace == SPIRAS_Output)
+        mapOutputToProxy(&global);
+    } else if (addrSpace == SPIRAS_Local) {
+      // Prefix all LDS variables to avoid downstream conflicts when linking shaders together
+      if (global.hasName()) {
+        global.setName(Twine("lds_") + getShaderStageName(m_shaderStage) + "_" + global.getName());
+      }
+    }
   }
 
-  // Do lowering operations
-  lowerGlobalVar();
+  // Remove global variables that were already fully replaced
+  for (auto globalVar : m_globalsToErase) {
+    globalVar->dropAllReferences();
+    globalVar->eraseFromParent();
+  }
+  m_globalsToErase.clear();
 
+  // Do lowering operations
   if (m_lowerInputInPlace && m_lowerOutputInPlace) {
     // Both input and output have to be lowered in-place (without proxy variables)
     lowerInOutInPlace(); // Just one lowering operation is sufficient
@@ -362,6 +366,12 @@ void SpirvLowerGlobal::handleCallInst(bool checkEmitCall, bool checkInterpCall) 
           } else if (mangledName.starts_with(gSPIRVName::InterpolateAtOffset)) {
             interpLoc = InterpLocCenter;
             auxInterpValue = callInst->getArgOperand(1); // Offset from pixel center
+            auto info = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
+            if (info->getGlState().originUpperLeft) {
+              auto yInvertOffset = m_builder->CreateExtractElement(auxInterpValue, 1);
+              yInvertOffset = m_builder->CreateFNeg(yInvertOffset);
+              auxInterpValue = m_builder->CreateInsertElement(auxInterpValue, yInvertOffset, 1);
+            }
           } else {
             assert(mangledName.starts_with(gSPIRVName::InterpolateAtVertexAMD));
             interpLoc = InterpLocCustom;
@@ -590,7 +600,6 @@ void SpirvLowerGlobal::mapGlobalVariableToProxy(GlobalVariable *globalVar) {
   Type *globalVarTy = globalVar->getValueType();
 
   Value *proxy = nullptr;
-  removeConstantExpr(m_context, globalVar);
   // Handle special globals, regular allocas will be removed by SROA pass.
   if (globalVar->getName().starts_with(RtName::HitAttribute)) {
     proxy = m_entryPoint->getArg(1);
@@ -625,7 +634,7 @@ void SpirvLowerGlobal::mapGlobalVariableToProxy(GlobalVariable *globalVar) {
     }
   }
 
-  m_globalVarProxy.insert(globalVar);
+  m_globalsToErase.push_back(globalVar);
 }
 
 // =====================================================================================================================
@@ -697,22 +706,6 @@ void SpirvLowerGlobal::mapOutputToProxy(GlobalVariable *output) {
   }
 
   m_outputProxyMap.emplace_back(output, proxy);
-}
-
-// =====================================================================================================================
-// Does lowering operations for SPIR-V global variables, replaces global variables with proxy variables.
-void SpirvLowerGlobal::lowerGlobalVar() {
-  if (m_globalVarProxy.empty()) {
-    // Skip lowering if there is no global variable
-    return;
-  }
-
-  // remove global variables
-  for (auto globalVar : m_globalVarProxy) {
-    globalVar->dropAllReferences();
-    globalVar->eraseFromParent();
-  }
-  m_globalVarProxy.clear();
 }
 
 // =====================================================================================================================
@@ -987,7 +980,9 @@ Value *SpirvLowerGlobal::createRaytracingBuiltIn(BuiltIn builtIn) {
   case BuiltInRayTmaxKHR:
     return m_builder->create<RayTcurrentOp>();
   case BuiltInInstanceCustomIndexKHR:
-    return m_builder->create<InstanceIndexOp>();
+    // Note: GPURT(HLSL) has just the opposite naming of index/ID compares to SPIR-V. For dialect calls, we use
+    // GPURT-style.
+    return m_builder->create<InstanceIdOp>();
   case BuiltInObjectToWorldKHR:
     return m_builder->create<ObjectToWorldOp>();
   case BuiltInWorldToObjectKHR:
@@ -1001,7 +996,9 @@ Value *SpirvLowerGlobal::createRaytracingBuiltIn(BuiltIn builtIn) {
   case BuiltInRayGeometryIndexKHR:
     return m_builder->create<GeometryIndexOp>();
   case BuiltInInstanceId:
-    return m_builder->create<InstanceIdOp>();
+    // Note: GPURT(HLSL) has just the opposite naming of index/ID compares to SPIR-V. For dialect calls, we use
+    // GPURT-style.
+    return m_builder->create<InstanceIndexOp>();
   case BuiltInPrimitiveId:
     return m_builder->create<PrimitiveIndexOp>();
   case BuiltInCullMaskKHR:
@@ -1213,7 +1210,7 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
           inOutValue = m_builder->CreateExtractElement(inOutValue, uint64_t(0));
         } else if (builtIn == lgc::BuiltInFragCoord) {
           auto buildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
-          if (buildInfo->originUpperLeft !=
+          if (buildInfo->getGlState().originUpperLeft !=
               static_cast<const ShaderModuleData *>(buildInfo->fs.pModuleData)->usage.originUpperLeft) {
             unsigned offset = 0;
             auto winSize = getUniformConstantEntryByLocation(m_context, m_shaderStage,
@@ -1245,6 +1242,12 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
         }
       }
     } else {
+      lgc::InOutInfo inOutInfo;
+      inOutInfo.setComponent(inOutMeta.Component);
+      // Specify NumComponents if components are dynamically indexed
+      if (elemIdx && !isa<ConstantInt>(elemIdx))
+        inOutInfo.setNumComponents(inOutMeta.NumComponents);
+
       unsigned idx = inOutMeta.Component;
       assert(inOutMeta.Component <= 3);
       if (inOutTy->getScalarSizeInBits() == 64) {
@@ -1252,9 +1255,6 @@ Value *SpirvLowerGlobal::addCallInstForInOutImport(Type *inOutTy, unsigned addrS
         idx = inOutMeta.Component / 2;
       }
       elemIdx = !elemIdx ? m_builder->getInt32(idx) : m_builder->CreateAdd(elemIdx, m_builder->getInt32(idx));
-
-      lgc::InOutInfo inOutInfo;
-      inOutInfo.setComponent(inOutMeta.Component);
 
       if (!locOffset)
         locOffset = m_builder->getInt32(0);
@@ -1430,6 +1430,10 @@ void SpirvLowerGlobal::addCallInstForOutputExport(Value *outputValue, Constant *
       }
       m_builder->CreateWriteBuiltInOutput(outputValue, builtInId, outputInfo, vertexOrPrimitiveIdx, elemIdx);
       return;
+    } else {
+      // Specify NumComponents if components are dynamically indexed
+      if (elemIdx && !isa<ConstantInt>(elemIdx))
+        outputInfo.setNumComponents(outputMeta.NumComponents);
     }
 
     unsigned location = outputMeta.Value + outputMeta.Index;
@@ -2362,8 +2366,8 @@ void SpirvLowerGlobal::interpolateInputElement(unsigned interpLoc, Value *auxInt
 // Fill the XFB info map from the Vkgc::ApiXfbOutData if XFB is specified by API interface
 void SpirvLowerGlobal::buildApiXfbMap() {
   auto pipelineBuildInfo = static_cast<const Vkgc::GraphicsPipelineBuildInfo *>(m_context->getPipelineBuildInfo());
-  for (unsigned idx = 0; idx < pipelineBuildInfo->apiXfbOutData.numXfbOutInfo; ++idx) {
-    const auto &xfbInfo = pipelineBuildInfo->apiXfbOutData.pXfbOutInfos[idx];
+  for (unsigned idx = 0; idx < pipelineBuildInfo->getGlState().apiXfbOutData.numXfbOutInfo; ++idx) {
+    const auto &xfbInfo = pipelineBuildInfo->getGlState().apiXfbOutData.pXfbOutInfos[idx];
     unsigned location = xfbInfo.location;
     if (xfbInfo.isBuiltIn) {
       if (m_builtInXfbMap.find(location) == m_builtInXfbMap.end()) {

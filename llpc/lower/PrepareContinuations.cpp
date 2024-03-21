@@ -30,8 +30,9 @@
  */
 #include "PrepareContinuations.h"
 #include "compilerutils/CompilerUtils.h"
-#include "continuations/GpurtContext.h"
 #include "llpcContext.h"
+#include "llvmraytracing/ContinuationsUtil.h"
+#include "llvmraytracing/GpurtContext.h"
 #include "lgc/Builder.h"
 
 #define DEBUG_TYPE "prepare-continuations"
@@ -57,7 +58,9 @@ PreservedAnalyses PrepareContinuations::run(Module &module, ModuleAnalysisManage
   mode.workgroupSizeX = rtState->threadGroupSizeX;
   mode.workgroupSizeY = rtState->threadGroupSizeY;
   mode.workgroupSizeZ = rtState->threadGroupSizeZ;
+  mode.noLocalInvocationIdInCalls = true;
   Pipeline::setComputeShaderMode(module, mode);
+  module.getOrInsertNamedMetadata(ContHelper::MDLgcCpsModuleName);
 
   if (module.getName().starts_with("main")) {
     m_shaderStage = ShaderStageRayTracingRayGen;

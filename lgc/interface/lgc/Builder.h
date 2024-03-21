@@ -113,23 +113,39 @@ public:
     m_data.bits.component = component;
   }
 
+  unsigned getNumComponents() const { return m_data.bits.numComponents; }
+  void setNumComponents(unsigned numComponents) {
+    assert(numComponents >= 1 && numComponents <= 8); // Valid range is 1~8
+    m_data.bits.numComponents = numComponents;
+  }
+
 private:
   union {
     struct {
-      unsigned interpMode : 4;   // FS input: interpolation mode
-      unsigned interpLoc : 3;    // FS input: interpolation location
-      unsigned hasInterpAux : 1; // FS input: there is an interpolation auxiliary value
-      unsigned streamId : 2;     // GS output: vertex stream ID (0 if none)
-      unsigned hasStreamId : 1;  // GS output: true if it has a stream ID
-      unsigned isSigned : 1;     // FS output: is signed integer. Determines whether i16-component output
-                                 //    is zero- or sign-extended
-      unsigned arraySize : 4;    // Built-in array input: shader-defined array size. Must be set for
-                                 //    a read or write of ClipDistance or CullDistance that is of the
-                                 //    whole array or of an element with a variable index.
-      unsigned perPrimitive : 1; // Mesh shader output: whether it is a per-primitive output
-      unsigned component : 2;    // Component offset, specifying which components within a location is consumed
+      unsigned interpMode : 4;    // FS input: interpolation mode
+      unsigned interpLoc : 3;     // FS input: interpolation location
+      unsigned hasInterpAux : 1;  // FS input: there is an interpolation auxiliary value
+      unsigned streamId : 2;      // GS output: vertex stream ID (0 if none)
+      unsigned hasStreamId : 1;   // GS output: true if it has a stream ID
+      unsigned isSigned : 1;      // FS output: is signed integer. Determines whether i16-component output
+                                  //    is zero- or sign-extended
+      unsigned arraySize : 4;     // Built-in array input: shader-defined array size. Must be set for
+                                  //    a read or write of ClipDistance or CullDistance that is of the
+                                  //    whole array or of an element with a variable index.
+      unsigned perPrimitive : 1;  // Mesh shader output: whether it is a per-primitive output
+      unsigned component : 2;     // Component offset, specifying which components within a location is consumed
+      unsigned numComponents : 4; // Number of components for vector/scalar inputs/outputs. For 64-bit data types, each
+                                  //    vector element or scalar is considered to occupy two components. The valid range
+                                  //    is therefore 1~8. This field is used to reserve enough [location, component] map
+                                  //    items for locations of an input/output when component indexing is performed
+                                  //    (currently allowed for TCS input/output, TES input, and mesh shader output). If
+                                  //    not specified (0 by default), LGC will try to determine its value from the
+                                  //    associated call that reads/writes an input/output. In dynamic component indexing
+                                  //    case, this field must be specified by frontend when invoking such input/output
+                                  //    reading/writing call.
       unsigned disableProvokingVertexMode : 1; // Disable the provoking vertex mode
     } bits;
+
     unsigned u32All;
   } m_data;
 };

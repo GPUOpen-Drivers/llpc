@@ -30,7 +30,7 @@
  */
 #include "lgc/patch/Patch.h"
 #include "PatchNullFragShader.h"
-#include "continuations/Continuations.h"
+#include "llvmraytracing/Continuations.h"
 #include "lgc/LgcContext.h"
 #include "lgc/PassManager.h"
 #include "lgc/Pipeline.h"
@@ -135,14 +135,33 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
   if (patchTimer)
     LgcContext::createAndAddStartStopTimer(passMgr, patchTimer, true);
 
+  const auto indirectMode = pipelineState->getOptions().rtIndirectMode;
+  if (indirectMode == RayTracingIndirectMode::ContinuationsContinufy ||
+      indirectMode == RayTracingIndirectMode::Continuations) {
+    if (indirectMode == RayTracingIndirectMode::ContinuationsContinufy) {
+      passMgr.addPass(Continufy());
+      // NOTE: LowerGpuRt needs to be run before continuation transform for continufy mode because some GPURT dialects
+      // that continuation transform does not support are used.
+      passMgr.addPass(LowerGpuRt());
+    } else {
+      passMgr.addPass(LowerRaytracingPipelinePass());
+    }
+
+    addLgcContinuationTransform(passMgr);
+  }
+
   if (pipelineState->getOptions().useGpurt) {
     // NOTE: Lower GPURT operations and run InstCombinePass before builder replayer, because some Op are going to be
     // turned into constant value, so that we can eliminate unused `@lgc.load.buffer.desc` before getting into
     // replayer. Otherwise, unnecessary `writes_uavs` and `uses_uav` may be set.
+    // NOTE: Lower GPURT operations after continuations transform, because we will inline some functions from GPURT
+    // library which may use gpurt dialect, and the library itself doesn't run any LGC passes.
     passMgr.addPass(LowerGpuRt());
     passMgr.addPass(createModuleToFunctionPassAdaptor(InstCombinePass()));
   }
 
+  // NOTE: Replay after continuations transform, because we will inline some functions from GPURT library which may use
+  // lgc record ops, and the library itself doesn't run any LGC passes.
   // We're using BuilderRecorder; replay the Builder calls now
   passMgr.addPass(BuilderReplayer());
   passMgr.addPass(LowerSubgroupOps());
@@ -151,17 +170,6 @@ void Patch::addPasses(PipelineState *pipelineState, lgc::PassManager &passMgr, T
     passMgr.addPass(PrintModulePass(*outs,
                                     "===============================================================================\n"
                                     "// LLPC pipeline before-patching results\n"));
-  }
-
-  const auto indirectMode = pipelineState->getOptions().rtIndirectMode;
-  if (indirectMode == RayTracingIndirectMode::ContinuationsContinufy ||
-      indirectMode == RayTracingIndirectMode::Continuations) {
-    if (indirectMode == RayTracingIndirectMode::ContinuationsContinufy)
-      passMgr.addPass(Continufy());
-    else
-      passMgr.addPass(LowerRaytracingPipelinePass());
-
-    addLgcContinuationTransform(passMgr);
   }
 
   passMgr.addPass(IPSCCPPass());

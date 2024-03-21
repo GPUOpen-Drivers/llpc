@@ -87,7 +87,8 @@ protected:
   virtual lgc::Options computePipelineOptions() const override;
 
   // Give the color export state to the middle-end, and/or hash it.
-  void setColorExportState(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher) const;
+  void setColorExportState(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher,
+                           bool disableDualSourceBlend = false) const;
 
   // Set vertex input descriptions in middle-end Pipeline, and/or hash them.
   void setVertexInputDescriptions(lgc::Pipeline *pipeline, Util::MetroHash64 *hasher) const;

@@ -98,6 +98,8 @@ private:
   void createContStackStore(llvm::Function *func);
   void createFloatOpWithRoundMode(llvm::Function *func);
   void createEnqueue(llvm::Function *func);
+  void createContinuationStackIsGlobal(llvm::Function *func);
+  void createGetRtip(llvm::Function *func);
   llvm::Value *createGetBvhSrd(llvm::Value *expansion, llvm::Value *boxSortMode);
 };
 } // namespace Llpc

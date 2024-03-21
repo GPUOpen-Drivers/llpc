@@ -391,10 +391,7 @@ void RegisterMetadataBuilder::buildEsGsRegisters() {
 
   // GE_MAX_OUTPUT_PER_SUBGROUP and VGT_GS_MAX_PRIMS_PER_SUBGROUP
   const unsigned maxPrimsPerSubgroup = std::min(gsInstPrimsInSubgrp * maxVertOut, MaxGsThreadsPerSubgroup);
-  if (m_gfxIp.major == 9)
-    getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::MaxPrimsPerSubgroup] = maxPrimsPerSubgroup;
-  else
-    getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::MaxVertsPerSubgroup] = maxPrimsPerSubgroup;
+  getGraphicsRegNode()[Util::Abi::GraphicsRegisterMetadataKey::MaxVertsPerSubgroup] = maxPrimsPerSubgroup;
 
   // Set LDS_SIZE of SPI_SHADER_PGM_RSRC2_GS
   unsigned ldsSizeInDwords = calcFactor.gsOnChipLdsSize;
@@ -544,6 +541,9 @@ void RegisterMetadataBuilder::buildPrimShaderRegisters() {
     case PrimitiveType::TriangleListAdjacency:
     case PrimitiveType::TriangleStripAdjacency:
       gsOutputPrimitiveType = TRISTRIP;
+      break;
+    case PrimitiveType::Patch:
+      gsOutputPrimitiveType = POINTLIST;
       break;
     default:
       llvm_unreachable("Should never be called!");

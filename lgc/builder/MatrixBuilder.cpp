@@ -28,6 +28,7 @@
  * @brief LLPC source file: implementation of matrix Builder methods
  ***********************************************************************************************************************
  */
+#include "lgc/LgcDialect.h"
 #include "lgc/builder/BuilderImpl.h"
 
 #define DEBUG_TYPE "lgc-builder-impl-matrix"
@@ -351,16 +352,16 @@ Value *BuilderImpl::CreateMatrixInverse(Value *const matrix, const Twine &instNa
 // @returns the corresponding LLVM type
 Type *BuilderCommon::transCooperativeMatrixElementType(CooperativeMatrixElementType elemType) {
   switch (elemType) {
-  case BuilderCommon::CooperativeMatrixElementType::Float16:
-  case BuilderCommon::CooperativeMatrixElementType::Float16Packed:
+  case CooperativeMatrixElementType::Float16:
+  case CooperativeMatrixElementType::Float16Packed:
     return getHalfTy();
-  case BuilderCommon::CooperativeMatrixElementType::Float32:
+  case CooperativeMatrixElementType::Float32:
     return getFloatTy();
-  case BuilderCommon::CooperativeMatrixElementType::Int16:
+  case CooperativeMatrixElementType::Int16:
     return getInt16Ty();
-  case BuilderCommon::CooperativeMatrixElementType::Int32:
+  case CooperativeMatrixElementType::Int32:
     return getInt32Ty();
-  case BuilderCommon::CooperativeMatrixElementType::Int8:
+  case CooperativeMatrixElementType::Int8:
     return getInt8Ty();
   default:
     llvm_unreachable("The element type is not supported.");
@@ -427,7 +428,8 @@ Value *BuilderCommon::CreateCooperativeMatrixExtract(Value *matrix, Value *index
   std::string callName(lgcName::CooperativeMatrixExtract);
   addTypeMangling(resultTy, args, callName);
   Value *result =
-      CreateNamedCall(callName, resultTy, args, {Attribute::ReadNone, Attribute::Speculatable, Attribute::WillReturn});
+      CreateNamedCall(callName, resultTy, args,
+                      {Attribute::ReadNone, Attribute::Convergent, Attribute::Speculatable, Attribute::WillReturn});
   result->setName(instName);
   return result;
 }
@@ -453,7 +455,8 @@ Value *BuilderCommon::CreateCooperativeMatrixInsert(Value *matrix, Value *value,
   std::string callName(lgcName::CooperativeMatrixInsert);
   addTypeMangling(resultTy, args, callName);
   Value *result =
-      CreateNamedCall(callName, resultTy, args, {Attribute::ReadNone, Attribute::Speculatable, Attribute::WillReturn});
+      CreateNamedCall(callName, resultTy, args,
+                      {Attribute::ReadNone, Attribute::Convergent, Attribute::Speculatable, Attribute::WillReturn});
   result->setName(instName);
   return result;
 }
@@ -472,7 +475,8 @@ Value *BuilderCommon::CreateCooperativeMatrixFill(Value *value, CooperativeMatri
   std::string callName(lgcName::CooperativeMatrixFill);
   addTypeMangling(resultTy, args, callName);
   Value *result =
-      CreateNamedCall(callName, resultTy, args, {Attribute::ReadNone, Attribute::Speculatable, Attribute::WillReturn});
+      CreateNamedCall(callName, resultTy, args,
+                      {Attribute::ReadNone, Attribute::Convergent, Attribute::Speculatable, Attribute::WillReturn});
   result->setName(instName);
   return result;
 }
@@ -492,10 +496,11 @@ Value *BuilderCommon::CreateCooperativeMatrixFill(Value *value, CooperativeMatri
 // @param elemType : Element type for the matrix.
 // @param layout : Identify whether it's A/B or C/D
 // @param memoryAccess : Parsed from memory operation.
+// @param alignment : Alignment for memory operation.
 // @param instName : Name to give instruction(s).
 Value *BuilderCommon::CreateCooperativeMatrixLoad(Value *pointer, Value *stride, bool colMajor,
                                                   CooperativeMatrixElementType elemType, CooperativeMatrixLayout layout,
-                                                  unsigned memoryAccess, const Twine &instName) {
+                                                  unsigned memoryAccess, Align alignment, const Twine &instName) {
   Type *resultTy = getCooperativeMatrixTy(elemType, layout);
   std::string callName(lgcName::CooperativeMatrixLoad);
   Value *args[] = {pointer,
@@ -503,9 +508,10 @@ Value *BuilderCommon::CreateCooperativeMatrixLoad(Value *pointer, Value *stride,
                    getInt1(colMajor),
                    getInt32(static_cast<unsigned>(elemType)),
                    getInt32(static_cast<unsigned>(layout)),
-                   getInt32(memoryAccess)};
+                   getInt32(memoryAccess),
+                   getInt32(alignment.value())};
   addTypeMangling(resultTy, args, callName);
-  Value *loadVal = CreateNamedCall(callName, resultTy, args, {Attribute::ReadOnly});
+  Value *loadVal = CreateNamedCall(callName, resultTy, args, {Attribute::ReadOnly, Attribute::Convergent});
   loadVal->setName(instName);
   return loadVal;
 }
@@ -526,11 +532,12 @@ Value *BuilderCommon::CreateCooperativeMatrixLoad(Value *pointer, Value *stride,
 // @param elemType : Element type for the matrix.
 // @param layout : Identify the matrix type(A/B or C).
 // @param memoryAccess : Memoray operands
+// @param alignment : Alignment for memory operation.
 // @param instName : Name to give instruction(s).
 Value *BuilderCommon::CreateCooperativeMatrixStore(Value *pointer, Value *matrix, Value *stride, bool colMajor,
                                                    CooperativeMatrixElementType elemType,
                                                    CooperativeMatrixLayout layout, unsigned memoryAccess,
-                                                   const Twine &instName) {
+                                                   Align alignment, const Twine &instName) {
   assert(matrix->getType() == getCooperativeMatrixTy(elemType, layout));
 
   std::string callName(lgcName::CooperativeMatrixStore);
@@ -540,11 +547,12 @@ Value *BuilderCommon::CreateCooperativeMatrixStore(Value *pointer, Value *matrix
                    getInt32(static_cast<unsigned>(elemType)),
                    getInt32(static_cast<unsigned>(layout)),
                    getInt32(memoryAccess),
+                   getInt32(alignment.value()),
                    matrix};
   addTypeMangling(Type::getVoidTy(getContext()), args, callName);
 
-  Value *storeVal =
-      CreateNamedCall(callName, Type::getVoidTy(getContext()), args, {Attribute::WriteOnly, Attribute::WillReturn});
+  Value *storeVal = CreateNamedCall(callName, Type::getVoidTy(getContext()), args,
+                                    {Attribute::WriteOnly, Attribute::Convergent, Attribute::WillReturn});
   storeVal->setName(instName);
   return nullptr;
 }
@@ -573,7 +581,8 @@ CallInst *BuilderCommon::CreateCooperativeMatrixConvert(CastInst::CastOps castOp
   std::string callName(lgcName::CooperativeMatrixConvert);
   addTypeMangling(resultTy, args, callName);
 
-  CallInst *dstElems = CreateNamedCall(callName, resultTy, args, {Attribute::ReadOnly, Attribute::WillReturn});
+  CallInst *dstElems =
+      CreateNamedCall(callName, resultTy, args, {Attribute::ReadNone, Attribute::Convergent, Attribute::WillReturn});
   dstElems->setName(instName);
   return dstElems;
 }
@@ -597,7 +606,8 @@ Value *BuilderCommon::CreateCooperativeMatrixBinaryOp(CooperativeMatrixArithOp c
                    getInt32(static_cast<unsigned>(layout))};
   addTypeMangling(rhs->getType(), args, callName);
 
-  Value *result = CreateNamedCall(callName, rhs->getType(), args, {Attribute::ReadOnly, Attribute::WillReturn});
+  Value *result = CreateNamedCall(callName, rhs->getType(), args,
+                                  {Attribute::ReadNone, Attribute::Convergent, Attribute::WillReturn});
   result->setName(instName);
   return result;
 }
@@ -622,7 +632,8 @@ Value *BuilderCommon::CreateCoopMatrixTimesScalar(Value *matrix, Value *scalar, 
   Value *args[] = {matrix, scalar, getInt32(static_cast<unsigned>(elemType)), getInt32(static_cast<unsigned>(layout))};
   addTypeMangling(matrix->getType(), args, callName);
 
-  Value *result = CreateNamedCall(callName, matrix->getType(), args, {Attribute::ReadOnly, Attribute::WillReturn});
+  Value *result = CreateNamedCall(callName, matrix->getType(), args,
+                                  {Attribute::ReadNone, Attribute::Convergent, Attribute::WillReturn});
   result->setName(instName);
   return result;
 }
@@ -642,7 +653,8 @@ CallInst *BuilderCommon::CreateCooperativeMatrixTranspose(llvm::Value *matrix, C
   Value *args[] = {matrix, getInt32(static_cast<unsigned>(elemType)), getInt32(static_cast<unsigned>(layout))};
   addTypeMangling(matrix->getType(), args, callName);
 
-  CallInst *result = CreateNamedCall(callName, matrix->getType(), args, {Attribute::ReadOnly, Attribute::WillReturn});
+  CallInst *result = CreateNamedCall(callName, matrix->getType(), args,
+                                     {Attribute::ReadNone, Attribute::Convergent, Attribute::WillReturn});
   result->setName(instName);
   return result;
 }
@@ -678,7 +690,8 @@ Value *BuilderCommon::CreateCooperativeMatrixMulAdd(llvm::Value *matrixA, llvm::
                    getInt32(static_cast<unsigned>(factorElemType))};
   addTypeMangling(matrixC->getType(), args, callName);
 
-  Value *result = CreateNamedCall(callName, matrixC->getType(), args, {Attribute::ReadOnly, Attribute::WillReturn});
+  Value *result = CreateNamedCall(callName, matrixC->getType(), args,
+                                  {Attribute::ReadNone, Attribute::Convergent, Attribute::WillReturn});
   result->setName(instName);
   return result;
 }

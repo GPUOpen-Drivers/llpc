@@ -91,8 +91,7 @@ PreservedAnalyses PatchPreparePipelineAbi::run(Module &module, ModuleAnalysisMan
   if (auto hsEntryPoint = m_pipelineShaders->getEntryPoint(ShaderStage::TessControl))
     storeTessFactors(hsEntryPoint);
 
-  if (m_gfxIp.major >= 9)
-    mergeShader(module);
+  mergeShader(module);
 
   setAbiEntryNames(module);
 
@@ -230,14 +229,14 @@ void PatchPreparePipelineAbi::writeTessFactors(PipelineState *pipelineState, Val
   if (primitiveMode == PrimitiveMode::Isolines) {
     assert(numOuterTfs == 2 && numInnerTfs == 0);
 
-    builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, outerTf->getType(),
-                            {outerTf,                             // vdata
-                             tfBufferDesc,                        // rsrc
-                             tfBufferOffset,                      // voffset
-                             tfBufferBase,                        // soffset
-                             builder.getInt32(bufferFormatX2),    // format
-                             builder.getInt32(coherent.u32All)}); // glc
-
+    auto callInst = builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, outerTf->getType(),
+                                            {outerTf,                             // vdata
+                                             tfBufferDesc,                        // rsrc
+                                             tfBufferOffset,                      // voffset
+                                             tfBufferBase,                        // soffset
+                                             builder.getInt32(bufferFormatX2),    // format
+                                             builder.getInt32(coherent.u32All)}); // glc
+    (void)callInst;
   } else if (primitiveMode == PrimitiveMode::Triangles) {
     assert(numOuterTfs == 3 && numInnerTfs == 1);
 
@@ -246,33 +245,35 @@ void PatchPreparePipelineAbi::writeTessFactors(PipelineState *pipelineState, Val
     tessFactor =
         builder.CreateInsertElement(tessFactor, builder.CreateExtractElement(innerTf, static_cast<uint64_t>(0)), 3);
 
-    builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, tessFactor->getType(),
-                            {tessFactor,                          // vdata
-                             tfBufferDesc,                        // rsrc
-                             tfBufferOffset,                      // voffset
-                             tfBufferBase,                        // soffset
-                             builder.getInt32(bufferFormatX4),    // format
-                             builder.getInt32(coherent.u32All)}); // glc
+    auto callInst = builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, tessFactor->getType(),
+                                            {tessFactor,                          // vdata
+                                             tfBufferDesc,                        // rsrc
+                                             tfBufferOffset,                      // voffset
+                                             tfBufferBase,                        // soffset
+                                             builder.getInt32(bufferFormatX4),    // format
+                                             builder.getInt32(coherent.u32All)}); // glc
+    (void)callInst;
   } else {
     assert(primitiveMode == PrimitiveMode::Quads);
     assert(numOuterTfs == 4 && numInnerTfs == 2);
 
-    builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, outerTf->getType(),
-                            {outerTf,                             // vdata
-                             tfBufferDesc,                        // rsrc
-                             tfBufferOffset,                      // voffset
-                             tfBufferBase,                        // soffset
-                             builder.getInt32(bufferFormatX4),    // format
-                             builder.getInt32(coherent.u32All)}); // glc
+    auto callInst = builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, outerTf->getType(),
+                                            {outerTf,                             // vdata
+                                             tfBufferDesc,                        // rsrc
+                                             tfBufferOffset,                      // voffset
+                                             tfBufferBase,                        // soffset
+                                             builder.getInt32(bufferFormatX4),    // format
+                                             builder.getInt32(coherent.u32All)}); // glc
 
     tfBufferOffset = builder.CreateAdd(tfBufferOffset, builder.getInt32(4 * sizeof(float)));
-    builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, innerTf->getType(),
-                            {innerTf,                             // vdata
-                             tfBufferDesc,                        // rsrc
-                             tfBufferOffset,                      // voffset
-                             tfBufferBase,                        // soffset
-                             builder.getInt32(bufferFormatX2),    // format
-                             builder.getInt32(coherent.u32All)}); // glc
+    callInst = builder.CreateIntrinsic(Intrinsic::amdgcn_raw_tbuffer_store, innerTf->getType(),
+                                       {innerTf,                             // vdata
+                                        tfBufferDesc,                        // rsrc
+                                        tfBufferOffset,                      // voffset
+                                        tfBufferBase,                        // soffset
+                                        builder.getInt32(bufferFormatX2),    // format
+                                        builder.getInt32(coherent.u32All)}); // glc
+    (void)callInst;
   }
 }
 
@@ -281,7 +282,7 @@ void PatchPreparePipelineAbi::writeTessFactors(PipelineState *pipelineState, Val
 //
 // @param module : LLVM module
 void PatchPreparePipelineAbi::mergeShader(Module &module) {
-  assert(m_gfxIp.major >= 9);
+  assert(m_gfxIp.major >= 10);
 
   const bool hasTs = (m_hasTcs || m_hasTes);
 

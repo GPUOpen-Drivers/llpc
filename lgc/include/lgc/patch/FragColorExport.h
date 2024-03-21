@@ -64,9 +64,8 @@ public:
     ColorExportState colorExportState;          // Color export state
     unsigned channelWriteMask[MaxColorTargets]; // Write mask to specify destination channels
     unsigned expFmt[MaxColorTargets];           // Export format used for "export" instruction.
-    unsigned dualExpFmt[2]; // Dual source blend export format. valid if dual source blend is enabled.
-    unsigned waveSize;      // The wave size for fragment.
-    bool enableFragColor;   // Whether to broadcast frag color. Only for OGLP
+    unsigned waveSize;                          // The wave size for fragment.
+    bool enableFragColor;                       // Whether to broadcast frag color. Only for OGLP
   };
 
   FragColorExport(LgcContext *context);
@@ -89,10 +88,10 @@ private:
   FragColorExport(const FragColorExport &) = delete;
   FragColorExport &operator=(const FragColorExport &) = delete;
   void updateColorExportInfoWithBroadCastInfo(const Key &key, llvm::ArrayRef<ColorExportInfo> originExpinfo,
-                                              llvm::SmallVector<ColorExportInfo> &outExpinfo, unsigned *pCbShaderMask);
+                                              bool needMrt0a, llvm::SmallVector<ColorExportInfo> &outExpinfo,
+                                              unsigned *pCbShaderMask);
   llvm::Value *handleColorExportInstructions(llvm::Value *output, unsigned int hwColorExport, BuilderBase &builder,
-                                             ExportFormat expFmt, const bool signedness, unsigned channelWriteMask,
-                                             const bool isDualSourceBlend);
+                                             ExportFormat expFmt, const bool signedness, const bool isDualSourceBlend);
   llvm::Value *convertToHalf(llvm::Value *value, bool signedness, BuilderBase &builder) const;
   llvm::Value *convertToFloat(llvm::Value *value, bool signedness, BuilderBase &builder) const;
   llvm::Value *convertToInt(llvm::Value *value, bool signedness, BuilderBase &builder) const;
@@ -102,7 +101,7 @@ private:
   // Colors to be exported for dual-source-blend
   llvm::SmallVector<llvm::Value *, 4> m_blendSources[2];
   // Number of color channels for dual-source-blend
-  unsigned m_blendSourceChannels;
+  unsigned m_blendSourceChannels = 0;
 
   LgcContext *m_lgcContext;
 };

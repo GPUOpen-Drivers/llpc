@@ -35,6 +35,7 @@
 #include "llpcSpirvLowerCooperativeMatrix.h"
 #include "llpcDialect.h"
 #include "lgc/BuilderCommon.h"
+#include "lgc/LgcDialect.h"
 #include "llvm/IR/Instructions.h"
 
 #define DEBUG_TYPE "llpc-spirv-lower-cooperative-matrix"
@@ -55,8 +56,8 @@ public:
 
 private:
   void visitProxy(CallInst &call);
-  void visitPointerUsers(Value *ptr, BuilderCommon::CooperativeMatrixElementType elemTypeEnum,
-                         BuilderCommon::CooperativeMatrixLayout layout, Type *elemType, Value *matrixPtr, Value *index);
+  void visitPointerUsers(Value *ptr, CooperativeMatrixElementType elemTypeEnum, CooperativeMatrixLayout layout,
+                         Type *elemType, Value *matrixPtr, Value *index);
 
   Module &m_module;
   BuilderCommon m_builder;
@@ -95,10 +96,9 @@ PreservedAnalyses LowerCooperativeMatrix::run() {
 // @returns true if a change was made
 void LowerCooperativeMatrix::visitProxy(CallInst &call) {
   Value *ptr = call.getArgOperand(0);
-  auto elemTypeEnum =
-      (BuilderCommon::CooperativeMatrixElementType)(cast<ConstantInt>(call.getArgOperand(1))->getZExtValue());
+  auto elemTypeEnum = (CooperativeMatrixElementType)(cast<ConstantInt>(call.getArgOperand(1))->getZExtValue());
   Type *elemType = m_builder.transCooperativeMatrixElementType(elemTypeEnum);
-  auto layout = (BuilderCommon::CooperativeMatrixLayout)(cast<ConstantInt>(call.getArgOperand(2))->getZExtValue());
+  auto layout = (CooperativeMatrixLayout)(cast<ConstantInt>(call.getArgOperand(2))->getZExtValue());
 
   m_toDelete.push_back(&call);
   visitPointerUsers(&call, elemTypeEnum, layout, elemType, ptr, m_builder.getInt32(0));
@@ -112,9 +112,9 @@ void LowerCooperativeMatrix::visitProxy(CallInst &call) {
 // @param layout : the matrix layout
 // @param matrixPtr : the pointer to the underlying proxied matrix
 // @param index : the 32-bit index of the matrix that @p ptr points to
-void LowerCooperativeMatrix::visitPointerUsers(Value *ptr, BuilderCommon::CooperativeMatrixElementType elemTypeEnum,
-                                               BuilderCommon::CooperativeMatrixLayout layout, Type *elemType,
-                                               Value *matrixPtr, Value *index) {
+void LowerCooperativeMatrix::visitPointerUsers(Value *ptr, CooperativeMatrixElementType elemTypeEnum,
+                                               CooperativeMatrixLayout layout, Type *elemType, Value *matrixPtr,
+                                               Value *index) {
   for (User *user : ptr->users()) {
     Instruction *inst = cast<Instruction>(user);
     m_builder.SetInsertPoint(inst);

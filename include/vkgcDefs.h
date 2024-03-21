@@ -451,7 +451,7 @@ struct PipelineOptions {
                               ///< depending the values of tessellation factors.
   bool enableInterpModePatch; ///< If set, per-sample interpolation for nonperspective and smooth input is enabled
   bool pageMigrationEnabled;  ///< If set, page migration is enabled
-  uint32_t optimizationLevel; ///< The higher the number the more optimizations will be performed.  Valid values are
+  unsigned optimizationLevel; ///< The higher the number the more optimizations will be performed.  Valid values are
                               ///< between 0 and 3.
   unsigned overrideThreadGroupSizeX;              ///< Override value for ThreadGroupSizeX
   unsigned overrideThreadGroupSizeY;              ///< Override value for ThreadGroupSizeY
@@ -517,21 +517,21 @@ struct ShaderModuleEntryData {
 /// Represents the shader resources
 struct ResourcesNodes {
   ResourceNodeData *pInputInfo;
-  uint32_t inputInfoCount;
+  unsigned inputInfoCount;
   ResourceNodeData *pOutputInfo;
-  uint32_t outputInfoCount;
+  unsigned outputInfoCount;
   ResourceNodeData *pUniformBufferInfo;
-  uint32_t uniformBufferInfoCount;
+  unsigned uniformBufferInfoCount;
   ResourceNodeData *pShaderStorageInfo;
-  uint32_t shaderStorageInfoCount;
+  unsigned shaderStorageInfoCount;
   ResourceNodeData *pTexturesInfo;
-  uint32_t textureInfoCount;
+  unsigned textureInfoCount;
   ResourceNodeData *pImagesInfo;
-  uint32_t imageInfoCount;
+  unsigned imageInfoCount;
   ResourceNodeData *pAtomicCounterInfo;
-  uint32_t atomicCounterInfoCount;
+  unsigned atomicCounterInfoCount;
   ResourceNodeData *pDefaultUniformInfo;
-  uint32_t defaultUniformInfoCount;
+  unsigned defaultUniformInfoCount;
 };
 
 /// Represents usage info of a shader module
@@ -567,6 +567,7 @@ struct ShaderModuleUsage {
   unsigned localSizeY;         ///< Compute shader work-group size in the Y dimension
   unsigned localSizeZ;         ///< Compute shader work-group size in the Z dimension
   bool useBarycentric;         ///< Whether to use gl_BarycentricXX or pervertexEXT decoration
+  bool disableDualSource;      ///< Whether disable dualSource blend
 };
 
 /// Represents common part of shader module data
@@ -889,33 +890,33 @@ struct SamplerYCbCrConversionMetaData {
 
 /// Represents assistant info for each vertex attribute in uber fetch shader
 struct UberFetchShaderAttribInfo {
-  uint32_t binding : 8;       ///< Attribute binding in vertex buffer table
-  uint32_t perInstance : 1;   ///< Whether vertex input rate is per-instance
-  uint32_t isCurrent : 1;     ///< Whether it is a current attribute
-  uint32_t isPacked : 1;      ///< Whether it is a packed format
-  uint32_t isFixed : 1;       ///< Whether it is a fixed format
-  uint32_t componentSize : 4; ///< Byte size per component
-  uint32_t componentMask : 4; ///< Component mask of this attribute.
-  uint32_t isBgra : 1;        ///< Whether is BGRA format
-  uint32_t reserved : 11;     ///< reserved bits in DWORD 0
-  uint32_t offset;            ///< Attribute offset
-  uint32_t instanceDivisor;   ///< Reciprocal of instance divisor
-  uint32_t bufferFormat;      ///< Buffer format info. it is a copy of buffer SRD DWORD3.
+  unsigned binding : 8;       ///< Attribute binding in vertex buffer table
+  unsigned perInstance : 1;   ///< Whether vertex input rate is per-instance
+  unsigned isCurrent : 1;     ///< Whether it is a current attribute
+  unsigned isPacked : 1;      ///< Whether it is a packed format
+  unsigned isFixed : 1;       ///< Whether it is a fixed format
+  unsigned componentSize : 4; ///< Byte size per component
+  unsigned componentMask : 4; ///< Component mask of this attribute.
+  unsigned isBgra : 1;        ///< Whether is BGRA format
+  unsigned reserved : 11;     ///< reserved bits in DWORD 0
+  unsigned offset;            ///< Attribute offset
+  unsigned instanceDivisor;   ///< Reciprocal of instance divisor
+  unsigned bufferFormat;      ///< Buffer format info. it is a copy of buffer SRD DWORD3.
 };
 
 /// Represents the bit field info of struct BilUberFetchShaderAttribInfo
-constexpr uint32_t UberFetchShaderAttribMaskBinding = 0x00000FFu;
-constexpr uint32_t UberFetchShaderAttribMaskPerInstance = 0x0000100u;
-constexpr uint32_t UberFetchShaderAttribMaskIsCurrent = 0x0000200u;
-constexpr uint32_t UberFetchShaderAttribMaskIsPacked = 0x0000400u;
-constexpr uint32_t UberFetchShaderAttribMaskIsFixed = 0x0000800u;
-constexpr uint32_t UberFetchShaderAttribMaskComponentSize = 0x000F000u;
-constexpr uint32_t UberFetchShaderAttribShiftComponentSize = 12u;
-constexpr uint32_t UberFetchShaderAttribMaskComponent0 = 0x0010000u;
-constexpr uint32_t UberFetchShaderAttribMaskComponent1 = 0x0020000u;
-constexpr uint32_t UberFetchShaderAttribMaskComponent2 = 0x0040000u;
-constexpr uint32_t UberFetchShaderAttribMaskComponent3 = 0x0080000u;
-constexpr uint32_t UberFetchShaderAttribMaskIsBgra = 0x0100000u;
+constexpr unsigned UberFetchShaderAttribMaskBinding = 0x00000FFu;
+constexpr unsigned UberFetchShaderAttribMaskPerInstance = 0x0000100u;
+constexpr unsigned UberFetchShaderAttribMaskIsCurrent = 0x0000200u;
+constexpr unsigned UberFetchShaderAttribMaskIsPacked = 0x0000400u;
+constexpr unsigned UberFetchShaderAttribMaskIsFixed = 0x0000800u;
+constexpr unsigned UberFetchShaderAttribMaskComponentSize = 0x000F000u;
+constexpr unsigned UberFetchShaderAttribShiftComponentSize = 12u;
+constexpr unsigned UberFetchShaderAttribMaskComponent0 = 0x0010000u;
+constexpr unsigned UberFetchShaderAttribMaskComponent1 = 0x0020000u;
+constexpr unsigned UberFetchShaderAttribMaskComponent2 = 0x0040000u;
+constexpr unsigned UberFetchShaderAttribMaskComponent3 = 0x0080000u;
+constexpr unsigned UberFetchShaderAttribMaskIsBgra = 0x0100000u;
 
 /// Represents the bit field info of struct BilUberFetchShaderAttribInfo
 
@@ -974,7 +975,7 @@ struct BvhShaderResourceDescriptor {
 };
 
 // Corresponds to gl_RayFlags* in GLSL_EXT_ray_tracing.txt
-enum RayTracingRayFlag : uint32_t {
+enum RayTracingRayFlag : unsigned {
   RayTracingRayFlagNone = 0x00,                       // gl_RayFlagsNoneEXT
   RayTracingRayFlagForceOpaque = 0x01,                // gl_RayFlagsOpaqueEXT
   RayTracingRayFlagForceNonOpaque = 0x02,             // gl_RayFlagsNoOpaqueEXT
@@ -1130,8 +1131,8 @@ struct RtState {
 };
 
 struct UniformConstantMapEntry {
-  uint32_t location; ///< Starting location of the uniform constant variable
-  uint32_t offset;   ///< Offset of the uniform constant variable in the final buffer
+  unsigned location; ///< Starting location of the uniform constant variable
+  unsigned offset;   ///< Offset of the uniform constant variable in the final buffer
 };
 
 struct UniformConstantMap {
@@ -1250,15 +1251,28 @@ struct GraphicsPipelineBuildInfo {
 #if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 62
   BinaryData shaderLibrary; ///< SPIR-V library binary data
 #endif
-  RtState rtState;                    ///< Ray tracing state
-  bool originUpperLeft;               ///< Whether origin coordinate of framebuffer is upper-left.
-  const void *pClientMetadata;        ///< Pointer to (optional) client-defined data to be stored inside the ELF
-  size_t clientMetadataSize;          ///< Size (in bytes) of the client-defined data
-  unsigned numUniformConstantMaps;    ///< Number of uniform constant maps
-  UniformConstantMap **ppUniformMaps; ///< Pointers to array of pointers for the uniform constant map.
-  ApiXfbOutData apiXfbOutData;        ///< Transform feedback data specified by API interface.
-  bool vbAddressLowBitsKnown;         ///< Whether vbAddressLowBits is valid
+  RtState rtState; ///< Ray tracing state
+#if LLPC_CLIENT_INTERFACE_MAJOR_VERSION < 71
+  bool originUpperLeft;                        ///< Whether origin coordinate of framebuffer is upper-left.
+  unsigned numUniformConstantMaps;             ///< Number of uniform constant maps
+  UniformConstantMap **ppUniformMaps;          ///< Pointers to array of pointers for the uniform constant map.
+  ApiXfbOutData apiXfbOutData;                 ///< Transform feedback data specified by API interface.
+  bool vbAddressLowBitsKnown;                  ///< Whether vbAddressLowBits is valid
   uint8_t vbAddressLowBits[MaxVertexBindings]; ///< Lowest two bits of vertex buffer addresses
+  const auto &getGlState() const { return *this; }
+#else
+  struct {
+    bool originUpperLeft;                        ///< Whether origin coordinate of framebuffer is upper-left.
+    unsigned numUniformConstantMaps;             ///< Number of uniform constant maps
+    UniformConstantMap **ppUniformMaps;          ///< Pointers to array of pointers for the uniform constant map.
+    ApiXfbOutData apiXfbOutData;                 ///< Transform feedback data specified by API interface.
+    bool vbAddressLowBitsKnown;                  ///< Whether vbAddressLowBits is valid
+    uint8_t vbAddressLowBits[MaxVertexBindings]; ///< Lowest two bits of vertex buffer addresses
+  } glState;
+  const auto &getGlState() const { return glState; }
+#endif
+  const void *pClientMetadata; ///< Pointer to (optional) client-defined data to be stored inside the ELF
+  size_t clientMetadataSize;   ///< Size (in bytes) of the client-defined data
 };
 
 /// Represents info to build a compute pipeline.

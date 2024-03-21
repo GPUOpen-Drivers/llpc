@@ -132,7 +132,7 @@ PrimShaderRegConfig::PrimShaderRegConfig(GfxIpVersion gfxIp) {
   INIT_REG(VGT_GS_ONCHIP_CNTL);
 
   // Special registers, having different register IDs
-  if (gfxIp.major == 9 || gfxIp.major == 10) {
+  if (gfxIp.major == 10) {
     INIT_REG_GFX9_10(gfxIp.major, VGT_GS_OUT_PRIM_TYPE);
   } else if (gfxIp.major == 11) {
     INIT_REG_GFX11(gfxIp.major, VGT_GS_OUT_PRIM_TYPE);
