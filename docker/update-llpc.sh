@@ -5,7 +5,7 @@ set -euxo pipefail
 
 # Sync the repos. Replace the base LLPC with a freshly checked-out one.
 cat /vulkandriver/build_info.txt
-(cd /vulkandriver/drivers/third_party/glslang && git checkout .)
+(rm /vulkandriver/drivers/third_party/glslang -rf)
 (cd /vulkandriver && repo sync -c --no-clone-bundle -j$(nproc))
 sed -i -e 's/enum MemoryAccessMask {/enum MemoryAccessMask : unsigned int {/g'   /vulkandriver/drivers/third_party/glslang/SPIRV/spirv.hpp
 sed -i -e 's/enum ImageOperandsMask {/enum ImageOperandsMask : unsigned int {/g' /vulkandriver/drivers/third_party/glslang/SPIRV/spirv.hpp
