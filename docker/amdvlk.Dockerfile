@@ -33,7 +33,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && export TZ=America/New_York \
        build-essential cmake pkg-config ninja-build \
        gcc g++ binutils-gold \
        llvm-14 clang-14 clang-tidy-14 libclang-common-14-dev lld-14 \
-       python3 python3-distutils python-is-python3 python3-jinja2 \
+       python3 python3-distutils python-is-python3 python3-jinja2 python3-ruamel.yaml \
        libssl-dev libx11-dev libxcb1-dev x11proto-dri2-dev libxcb-dri3-dev \
        libxcb-dri2-0-dev libxcb-present-dev libxshmfence-dev libxrandr-dev \
        libwayland-dev \
